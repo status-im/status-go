@@ -2,11 +2,8 @@ package pairing
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
-
-	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -38,10 +35,11 @@ func (s *SyncRawMessageHandler) CollectInstallationData(rawMessageCollector *Raw
 	return err
 }
 
-func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID, deviceType string) (rsm protobuf.SyncRawMessage, err error) {
+func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID, deviceType string) (rm []*protobuf.RawMessage, as []*accounts.Account, syncSettings *settings.Settings, err error) {
+	syncSettings = new(settings.Settings)
 	messenger := s.backend.Messenger()
 	if messenger == nil {
-		return rsm, fmt.Errorf("messenger is nil when PrepareRawMessage")
+		return nil, nil, nil, fmt.Errorf("messenger is nil when PrepareRawMessage")
 	}
 
 	currentAccount, err := s.backend.GetActiveAccount()
@@ -49,7 +47,7 @@ func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID, deviceType string) (rs
 		return
 	}
 	if keyUID != currentAccount.KeyUID {
-		return rsm, fmt.Errorf("keyUID not equal")
+		return nil, nil, nil, fmt.Errorf("keyUID not equal")
 	}
 
 	messenger.SetLocalPairing(true)
@@ -67,26 +65,16 @@ func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID, deviceType string) (rs
 		return
 	}
 
-	rsm = rawMessageCollector.convertToSyncRawMessage()
+	rsm := rawMessageCollector.convertToSyncRawMessage()
+	rm = rsm.RawMessages
 
 	accountService := s.backend.StatusNode().AccountService()
-	var (
-		subAccounts []*accounts.Account
-		setting     settings.Settings
-	)
-	subAccounts, err = accountService.GetAccountsByKeyUID(keyUID)
+
+	as, err = accountService.GetAccountsByKeyUID(keyUID)
 	if err != nil {
 		return
 	}
-	rsm.SubAccountsJsonBytes, err = json.Marshal(subAccounts)
-	if err != nil {
-		return
-	}
-	setting, err = accountService.GetSettings()
-	if err != nil {
-		return
-	}
-	rsm.SettingsJsonBytes, err = json.Marshal(setting)
+	*syncSettings, err = accountService.GetSettings()
 	if err != nil {
 		return
 	}
@@ -94,12 +82,8 @@ func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID, deviceType string) (rs
 	return
 }
 
-func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload, nodeConfig *params.NodeConfig, settingCurrentNetwork, deviceType string, rawMessagePayload []byte) error {
+func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload, nodeConfig *params.NodeConfig, settingCurrentNetwork, deviceType string, rmp *RawMessagesPayload) (err error) {
 	account := accountPayload.multiaccount
-	rawMessages, subAccounts, setting, err := s.unmarshalSyncRawMessage(rawMessagePayload)
-	if err != nil {
-		return err
-	}
 
 	activeAccount, _ := s.backend.GetActiveAccount()
 	if activeAccount == nil { // not login yet
@@ -115,10 +99,10 @@ func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload,
 			if err != nil {
 				return err
 			}
-			setting.InstallationID = nodeConfig.ShhextConfig.InstallationID
-			setting.CurrentNetwork = settingCurrentNetwork
+			rmp.setting.InstallationID = nodeConfig.ShhextConfig.InstallationID
+			rmp.setting.CurrentNetwork = settingCurrentNetwork
 
-			err = s.backend.StartNodeWithAccountAndInitialConfig(*account, accountPayload.password, *setting, nodeConfig, subAccounts)
+			err = s.backend.StartNodeWithAccountAndInitialConfig(*account, accountPayload.password, *rmp.setting, nodeConfig, rmp.subAccounts)
 		}
 		if err != nil {
 			return err
@@ -133,30 +117,5 @@ func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload,
 	if err != nil {
 		return err
 	}
-	return messenger.HandleSyncRawMessages(rawMessages)
-}
-
-func (s *SyncRawMessageHandler) unmarshalSyncRawMessage(payload []byte) ([]*protobuf.RawMessage, []*accounts.Account, *settings.Settings, error) {
-	var (
-		syncRawMessage protobuf.SyncRawMessage
-		subAccounts    []*accounts.Account
-		setting        *settings.Settings
-	)
-	err := proto.Unmarshal(payload, &syncRawMessage)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	if syncRawMessage.SubAccountsJsonBytes != nil {
-		err = json.Unmarshal(syncRawMessage.SubAccountsJsonBytes, &subAccounts)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-	}
-	if syncRawMessage.SettingsJsonBytes != nil {
-		err = json.Unmarshal(syncRawMessage.SettingsJsonBytes, &setting)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-	}
-	return syncRawMessage.RawMessages, subAccounts, setting, nil
+	return messenger.HandleSyncRawMessages(rmp.rawMessages)
 }

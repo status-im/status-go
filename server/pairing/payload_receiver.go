@@ -32,13 +32,42 @@ type PayloadStorer interface {
 type BasePayloadReceiver struct {
 	*PayloadLockPayload
 	*PayloadReceived
+
+	encryptor    *PayloadEncryptor
+	unmarshaller ProtobufUnmarshaller
+	storer       PayloadStorer
+
+	receiveCallback func()
 }
 
-func NewBaseBasePayloadReceiver(e *PayloadEncryptor) *BasePayloadReceiver {
+func NewBaseBasePayloadReceiver(e *PayloadEncryptor, um ProtobufUnmarshaller, s PayloadStorer, callback func()) *BasePayloadReceiver {
 	return &BasePayloadReceiver{
-		&PayloadLockPayload{e},
-		&PayloadReceived{e},
+		PayloadLockPayload: &PayloadLockPayload{e},
+		PayloadReceived:    &PayloadReceived{e},
+		encryptor:          e,
+		unmarshaller:       um,
+		storer:             s,
+		receiveCallback:    callback,
 	}
+}
+
+// Receive takes a []byte representing raw data, parses and stores the data
+func (bpr *BasePayloadReceiver) Receive(data []byte) error {
+	err := bpr.encryptor.decrypt(data)
+	if err != nil {
+		return err
+	}
+
+	err = bpr.unmarshaller.UnmarshalProtobuf(bpr.Received())
+	if err != nil {
+		return err
+	}
+
+	if bpr.receiveCallback != nil {
+		bpr.receiveCallback()
+	}
+
+	return bpr.storer.Store()
 }
 
 /*
@@ -50,56 +79,24 @@ func NewBaseBasePayloadReceiver(e *PayloadEncryptor) *BasePayloadReceiver {
 |
 */
 
-// AccountPayloadReceiver is responsible for the whole lifecycle of a AccountPayload
-type AccountPayloadReceiver struct {
-	*BasePayloadReceiver
-
-	logger                   *zap.Logger
-	accountPayload           *AccountPayload
-	encryptor                *PayloadEncryptor
-	accountPayloadMarshaller *AccountPayloadMarshaller
-	accountStorer            *AccountPayloadStorer
-}
-
-// NewAccountPayloadReceiver generates a new and initialised AccountPayloadManager
-func NewAccountPayloadReceiver(e *PayloadEncryptor, config *ReceiverConfig, logger *zap.Logger) (*AccountPayloadReceiver, error) {
+// NewAccountPayloadReceiver generates a new and initialised AccountPayload flavoured BasePayloadReceiver
+// AccountPayloadReceiver is responsible for the whole receive and store cycle of an AccountPayload
+func NewAccountPayloadReceiver(e *PayloadEncryptor, p *AccountPayload, config *ReceiverConfig, logger *zap.Logger) (*BasePayloadReceiver, error) {
 	l := logger.Named("AccountPayloadManager")
 	l.Debug("fired", zap.Any("config", config))
 
 	e = e.Renew()
 
-	// A new SHARED AccountPayload
-	p := new(AccountPayload)
-	accountPayloadRepository, err := NewAccountPayloadStorer(p, config)
+	aps, err := NewAccountPayloadStorer(p, config)
 	if err != nil {
 		return nil, err
 	}
 
-	return &AccountPayloadReceiver{
-		BasePayloadReceiver:      NewBaseBasePayloadReceiver(e),
-		logger:                   l,
-		accountPayload:           p,
-		encryptor:                e,
-		accountPayloadMarshaller: NewPairingPayloadMarshaller(p, l),
-		accountStorer:            accountPayloadRepository,
-	}, nil
-}
-
-// Receive takes a []byte representing raw data, parses and stores the data
-func (apr *AccountPayloadReceiver) Receive(data []byte) error {
-	err := apr.encryptor.decrypt(data)
-	if err != nil {
-		return err
-	}
-
-	err = apr.accountPayloadMarshaller.UnmarshalProtobuf(apr.Received())
-	if err != nil {
-		return err
-	}
-
-	signal.SendLocalPairingEvent(Event{Type: EventReceivedAccount, Action: ActionPairingAccount, Data: apr.accountPayload.multiaccount})
-
-	return apr.accountStorer.Store()
+	return NewBaseBasePayloadReceiver(e, NewPairingPayloadMarshaller(p, l), aps,
+		func() {
+			signal.SendLocalPairingEvent(Event{Type: EventReceivedAccount, Action: ActionPairingAccount, Data: p.multiaccount})
+		},
+	), nil
 }
 
 // AccountPayloadStorer is responsible for parsing, validating and storing AccountPayload data
@@ -217,38 +214,19 @@ func (aps *AccountPayloadStorer) storeMultiAccount() error {
 |
 */
 
-type RawMessagePayloadReceiver struct {
-	*BasePayloadReceiver
-
-	logger    *zap.Logger
-	encryptor *PayloadEncryptor
-	storer    *RawMessageStorer
-}
-
-func NewRawMessagePayloadReceiver(logger *zap.Logger, accountPayload *AccountPayload, e *PayloadEncryptor, backend *api.GethStatusBackend, config *ReceiverConfig) *RawMessagePayloadReceiver {
-	l := logger.Named("RawMessagePayloadManager")
-
+// NewRawMessagePayloadReceiver generates a new and initialised RawMessagesPayload flavoured BasePayloadReceiver
+// RawMessagePayloadReceiver is responsible for the whole receive and store cycle of a RawMessagesPayload
+func NewRawMessagePayloadReceiver(accountPayload *AccountPayload, e *PayloadEncryptor, backend *api.GethStatusBackend, config *ReceiverConfig) *BasePayloadReceiver {
 	e = e.Renew()
+	payload := NewRawMessagesPayload()
 
-	return &RawMessagePayloadReceiver{
-		BasePayloadReceiver: NewBaseBasePayloadReceiver(e),
-		logger:              l,
-		encryptor:           e,
-		storer:              NewRawMessageStorer(backend, accountPayload, config),
-	}
-}
-
-func (r *RawMessagePayloadReceiver) Receive(data []byte) error {
-	err := r.encryptor.decrypt(data)
-	if err != nil {
-		return err
-	}
-	r.storer.payload = r.Received()
-	return r.storer.Store()
+	return NewBaseBasePayloadReceiver(e,
+		NewRawMessagePayloadMarshaller(payload),
+		NewRawMessageStorer(backend, payload, accountPayload, config), nil)
 }
 
 type RawMessageStorer struct {
-	payload               []byte
+	payload               *RawMessagesPayload
 	syncRawMessageHandler *SyncRawMessageHandler
 	accountPayload        *AccountPayload
 	nodeConfig            *params.NodeConfig
@@ -256,10 +234,10 @@ type RawMessageStorer struct {
 	deviceType            string
 }
 
-func NewRawMessageStorer(backend *api.GethStatusBackend, accountPayload *AccountPayload, config *ReceiverConfig) *RawMessageStorer {
+func NewRawMessageStorer(backend *api.GethStatusBackend, payload *RawMessagesPayload, accountPayload *AccountPayload, config *ReceiverConfig) *RawMessageStorer {
 	return &RawMessageStorer{
 		syncRawMessageHandler: NewSyncRawMessageHandler(backend),
-		payload:               make([]byte, 0),
+		payload:               payload,
 		accountPayload:        accountPayload,
 		nodeConfig:            config.NodeConfig,
 		settingCurrentNetwork: config.SettingCurrentNetwork,
@@ -268,11 +246,10 @@ func NewRawMessageStorer(backend *api.GethStatusBackend, accountPayload *Account
 }
 
 func (r *RawMessageStorer) Store() error {
-	accountPayload := r.accountPayload
-	if accountPayload == nil || accountPayload.multiaccount == nil {
+	if r.accountPayload == nil || r.accountPayload.multiaccount == nil {
 		return fmt.Errorf("no known multiaccount when storing raw messages")
 	}
-	return r.syncRawMessageHandler.HandleRawMessage(accountPayload, r.nodeConfig, r.settingCurrentNetwork, r.deviceType, r.payload)
+	return r.syncRawMessageHandler.HandleRawMessage(r.accountPayload, r.nodeConfig, r.settingCurrentNetwork, r.deviceType, r.payload)
 }
 
 /*
@@ -284,45 +261,28 @@ func (r *RawMessageStorer) Store() error {
 |
 */
 
-type InstallationPayloadReceiver struct {
-	*BasePayloadReceiver
-
-	logger    *zap.Logger
-	encryptor *PayloadEncryptor
-	storer    *InstallationPayloadStorer
-}
-
-func NewInstallationPayloadReceiver(logger *zap.Logger, e *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *InstallationPayloadReceiver {
-	l := logger.Named("InstallationPayloadManager")
-
+// NewInstallationPayloadReceiver generates a new and initialised InstallationPayload flavoured BasePayloadReceiver
+// InstallationPayloadReceiver is responsible for the whole receive and store cycle of a RawMessagesPayload specifically
+// for sending / requesting installation data from the Receiver device.
+func NewInstallationPayloadReceiver(e *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *BasePayloadReceiver {
 	e = e.Renew()
+	payload := NewRawMessagesPayload()
 
-	return &InstallationPayloadReceiver{
-		BasePayloadReceiver: NewBaseBasePayloadReceiver(e),
-		logger:              l,
-		encryptor:           e,
-		storer:              NewInstallationPayloadStorer(backend, deviceType),
-	}
-}
-
-func (i *InstallationPayloadReceiver) Receive(data []byte) error {
-	err := i.encryptor.decrypt(data)
-	if err != nil {
-		return err
-	}
-	i.storer.payload = i.encryptor.getDecrypted()
-	return i.storer.Store()
+	return NewBaseBasePayloadReceiver(e,
+		NewRawMessagePayloadMarshaller(payload),
+		NewInstallationPayloadStorer(backend, payload, deviceType), nil)
 }
 
 type InstallationPayloadStorer struct {
-	payload               []byte
+	payload               *RawMessagesPayload
 	syncRawMessageHandler *SyncRawMessageHandler
 	deviceType            string
 	backend               *api.GethStatusBackend
 }
 
-func NewInstallationPayloadStorer(backend *api.GethStatusBackend, deviceType string) *InstallationPayloadStorer {
+func NewInstallationPayloadStorer(backend *api.GethStatusBackend, payload *RawMessagesPayload, deviceType string) *InstallationPayloadStorer {
 	return &InstallationPayloadStorer{
+		payload:               payload,
 		syncRawMessageHandler: NewSyncRawMessageHandler(backend),
 		deviceType:            deviceType,
 		backend:               backend,
@@ -334,15 +294,11 @@ func (r *InstallationPayloadStorer) Store() error {
 	if messenger == nil {
 		return fmt.Errorf("messenger is nil when invoke InstallationPayloadRepository#Store()")
 	}
-	rawMessages, _, _, err := r.syncRawMessageHandler.unmarshalSyncRawMessage(r.payload)
+	err := messenger.SetInstallationDeviceType(r.deviceType)
 	if err != nil {
 		return err
 	}
-	err = messenger.SetInstallationDeviceType(r.deviceType)
-	if err != nil {
-		return err
-	}
-	return messenger.HandleSyncRawMessages(rawMessages)
+	return messenger.HandleSyncRawMessages(r.payload.rawMessages)
 }
 
 /*
@@ -354,12 +310,15 @@ func (r *InstallationPayloadStorer) Store() error {
 |
 */
 
-func NewPayloadReceivers(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, config *ReceiverConfig) (*AccountPayloadReceiver, *RawMessagePayloadReceiver, *InstallationPayloadMounterReceiver, error) {
-	ar, err := NewAccountPayloadReceiver(pe, config, logger)
+func NewPayloadReceivers(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, config *ReceiverConfig) (PayloadReceiver, PayloadReceiver, PayloadMounterReceiver, error) {
+	// A new SHARED AccountPayload
+	p := new(AccountPayload)
+
+	ar, err := NewAccountPayloadReceiver(pe, p, config, logger)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	rmr := NewRawMessagePayloadReceiver(logger, ar.accountPayload, pe, backend, config)
-	imr := NewInstallationPayloadMounterReceiver(logger, pe, backend, config.DeviceType)
+	rmr := NewRawMessagePayloadReceiver(p, pe, backend, config)
+	imr := NewInstallationPayloadMounterReceiver(pe, backend, config.DeviceType)
 	return ar, rmr, imr, nil
 }

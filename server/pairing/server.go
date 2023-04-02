@@ -113,7 +113,7 @@ type SenderServer struct {
 	*BaseServer
 	accountMounter      PayloadMounter
 	rawMessageMounter   PayloadMounter
-	installationMounter *InstallationPayloadMounterReceiver
+	installationMounter PayloadMounterReceiver
 }
 
 // NewSenderServer returns a *SenderServer init from the given *SenderServerConfig

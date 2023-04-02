@@ -2,6 +2,7 @@ package settings
 
 import (
 	"encoding/json"
+	"reflect"
 
 	accountJson "github.com/status-im/status-go/account/json"
 	"github.com/status-im/status-go/eth-node/types"
@@ -199,4 +200,9 @@ func (s Settings) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return json.Marshal(ext)
+}
+
+func (s Settings) IsEmpty() bool {
+	empty := reflect.Zero(reflect.TypeOf(s)).Interface()
+	return reflect.DeepEqual(s, empty)
 }

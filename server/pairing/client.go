@@ -111,7 +111,7 @@ type SenderClient struct {
 	*BaseClient
 	accountMounter      PayloadMounter
 	rawMessageMounter   PayloadMounter
-	installationMounter *InstallationPayloadMounterReceiver
+	installationMounter PayloadMounterReceiver
 }
 
 // NewSenderClient returns a fully qualified SenderClient created with the incoming parameters
@@ -284,8 +284,8 @@ type ReceiverClient struct {
 	*BaseClient
 
 	accountReceiver      PayloadReceiver
-	rawMessageReceiver   *RawMessagePayloadReceiver
-	installationReceiver *InstallationPayloadMounterReceiver
+	rawMessageReceiver   PayloadReceiver
+	installationReceiver PayloadMounterReceiver
 }
 
 // NewReceiverClient returns a fully qualified ReceiverClient created with the incoming parameters

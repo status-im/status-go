@@ -21,7 +21,7 @@ func (r *RawMessageCollector) getRawMessages() []*common.RawMessage {
 	return r.rawMessages
 }
 
-func (r *RawMessageCollector) convertToSyncRawMessage() protobuf.SyncRawMessage {
+func (r *RawMessageCollector) convertToSyncRawMessage() *protobuf.SyncRawMessage {
 	syncRawMessage := new(protobuf.SyncRawMessage)
 	for _, m := range r.getRawMessages() {
 		rawMessage := new(protobuf.RawMessage)
@@ -29,5 +29,5 @@ func (r *RawMessageCollector) convertToSyncRawMessage() protobuf.SyncRawMessage 
 		rawMessage.MessageType = m.MessageType
 		syncRawMessage.RawMessages = append(syncRawMessage.RawMessages, rawMessage)
 	}
-	return *syncRawMessage
+	return syncRawMessage
 }

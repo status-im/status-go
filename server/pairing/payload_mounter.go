@@ -5,7 +5,6 @@ import (
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type PayloadMounter interface {
@@ -26,29 +25,29 @@ type BasePayloadMounter struct {
 	*PayloadLockPayload
 	*PayloadToSend
 
-	payloadLoader     PayloadLoader
-	payloadMarshaller ProtobufMarshaller
-	encryptor         *PayloadEncryptor
+	loader     PayloadLoader
+	marshaller ProtobufMarshaller
+	encryptor  *PayloadEncryptor
 }
 
 func NewBasePayloadMounter(loader PayloadLoader, marshaller ProtobufMarshaller, e *PayloadEncryptor) *BasePayloadMounter {
 	return &BasePayloadMounter{
 		PayloadLockPayload: &PayloadLockPayload{e},
 		PayloadToSend:      &PayloadToSend{e},
-		payloadLoader:      loader,
-		payloadMarshaller:  marshaller,
+		loader:             loader,
+		marshaller:         marshaller,
 		encryptor:          e,
 	}
 }
 
 // Mount loads and prepares the payload to be stored in the PayloadLoader's state ready for later access
 func (bpm *BasePayloadMounter) Mount() error {
-	err := bpm.payloadLoader.Load()
+	err := bpm.loader.Load()
 	if err != nil {
 		return err
 	}
 
-	p, err := bpm.payloadMarshaller.MarshalProtobuf()
+	p, err := bpm.marshaller.MarshalProtobuf()
 	if err != nil {
 		return err
 	}
@@ -65,7 +64,7 @@ func (bpm *BasePayloadMounter) Mount() error {
 |
 */
 
-// NewAccountPayloadMounter generates a new and initialised AccountPayloadMounter
+// NewAccountPayloadMounter generates a new and initialised AccountPayload flavoured BasePayloadMounter
 // responsible for the whole lifecycle of an AccountPayload
 func NewAccountPayloadMounter(pe *PayloadEncryptor, config *SenderConfig, logger *zap.Logger) (*BasePayloadMounter, error) {
 	l := logger.Named("AccountPayloadLoader")
@@ -141,11 +140,11 @@ func (apl *AccountPayloadLoader) Load() error {
 |
 */
 
-// NewRawMessagePayloadMounter generates a new and initialised RawMessagePayloadMounter
+// NewRawMessagePayloadMounter generates a new and initialised RawMessagePayload flavoured BasePayloadMounter
 // responsible for the whole lifecycle of an RawMessagePayload
 func NewRawMessagePayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) *BasePayloadMounter {
 	pe = pe.Renew()
-	payload := new(protobuf.SyncRawMessage)
+	payload := NewRawMessagesPayload()
 
 	return NewBasePayloadMounter(
 		NewRawMessageLoader(backend, payload, config),
@@ -155,13 +154,13 @@ func NewRawMessagePayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backe
 }
 
 type RawMessageLoader struct {
-	payload               *protobuf.SyncRawMessage
+	payload               *RawMessagesPayload
 	syncRawMessageHandler *SyncRawMessageHandler
 	keyUID                string
 	deviceType            string
 }
 
-func NewRawMessageLoader(backend *api.GethStatusBackend, payload *protobuf.SyncRawMessage, config *SenderConfig) *RawMessageLoader {
+func NewRawMessageLoader(backend *api.GethStatusBackend, payload *RawMessagesPayload, config *SenderConfig) *RawMessageLoader {
 	return &RawMessageLoader{
 		syncRawMessageHandler: NewSyncRawMessageHandler(backend),
 		payload:               payload,
@@ -171,7 +170,7 @@ func NewRawMessageLoader(backend *api.GethStatusBackend, payload *protobuf.SyncR
 }
 
 func (r *RawMessageLoader) Load() (err error) {
-	*r.payload, err = r.syncRawMessageHandler.PrepareRawMessage(r.keyUID, r.deviceType)
+	r.payload.rawMessages, r.payload.subAccounts, r.payload.setting, err = r.syncRawMessageHandler.PrepareRawMessage(r.keyUID, r.deviceType)
 	return err
 }
 
@@ -184,11 +183,11 @@ func (r *RawMessageLoader) Load() (err error) {
 |
 */
 
-// NewInstallationPayloadMounter generates a new and initialised InstallationPayloadMounter
+// NewInstallationPayloadMounter generates a new and initialised InstallationPayload flavoured BasePayloadMounter
 // responsible for the whole lifecycle of an InstallationPayload
-func NewInstallationPayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *BasePayloadMounter {
+func NewInstallationPayloadMounter(pe *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *BasePayloadMounter {
 	pe = pe.Renew()
-	payload := new(protobuf.SyncRawMessage)
+	payload := NewRawMessagesPayload()
 
 	return NewBasePayloadMounter(
 		NewInstallationPayloadLoader(backend, payload, deviceType),
@@ -198,12 +197,12 @@ func NewInstallationPayloadMounter(logger *zap.Logger, pe *PayloadEncryptor, bac
 }
 
 type InstallationPayloadLoader struct {
-	payload               *protobuf.SyncRawMessage
+	payload               *RawMessagesPayload
 	syncRawMessageHandler *SyncRawMessageHandler
 	deviceType            string
 }
 
-func NewInstallationPayloadLoader(backend *api.GethStatusBackend, payload *protobuf.SyncRawMessage, deviceType string) *InstallationPayloadLoader {
+func NewInstallationPayloadLoader(backend *api.GethStatusBackend, payload *RawMessagesPayload, deviceType string) *InstallationPayloadLoader {
 	return &InstallationPayloadLoader{
 		payload:               payload,
 		syncRawMessageHandler: NewSyncRawMessageHandler(backend),
@@ -217,7 +216,8 @@ func (r *InstallationPayloadLoader) Load() error {
 	if err != nil {
 		return err
 	}
-	*r.payload = rawMessageCollector.convertToSyncRawMessage()
+	rms := rawMessageCollector.convertToSyncRawMessage()
+	r.payload.rawMessages = rms.RawMessages
 	return nil
 }
 
@@ -232,12 +232,12 @@ func (r *InstallationPayloadLoader) Load() error {
 
 // NewPayloadMounters returns PayloadMounter s configured to handle local pairing transfers of:
 //   - AccountPayload, RawMessagePayload and InstallationPayload
-func NewPayloadMounters(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) (PayloadMounter, PayloadMounter, *InstallationPayloadMounterReceiver, error) {
+func NewPayloadMounters(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) (PayloadMounter, PayloadMounter, PayloadMounterReceiver, error) {
 	am, err := NewAccountPayloadMounter(pe, config, logger)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	rmm := NewRawMessagePayloadMounter(logger, pe, backend, config)
-	imr := NewInstallationPayloadMounterReceiver(logger, pe, backend, config.DeviceType)
+	imr := NewInstallationPayloadMounterReceiver(pe, backend, config.DeviceType)
 	return am, rmm, imr, nil
 }

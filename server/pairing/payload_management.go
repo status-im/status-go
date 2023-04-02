@@ -1,6 +1,7 @@
 package pairing
 
 import (
+	"encoding/json"
 	"errors"
 
 	"github.com/golang/protobuf/proto"
@@ -8,15 +9,14 @@ import (
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 const keystoreDir = "keystore"
 
 var (
-	// TODO add validation on config to ensure required fields have valid values
-	//  https://github.com/status-im/status-go/issues/3303
-
 	ErrKeyFileAlreadyExists    = errors.New("key file already exists")
 	ErrKeyUIDEmptyAsSender     = errors.New("keyUID must be provided as sender")
 	ErrNodeConfigNilAsReceiver = errors.New("node config must be provided as receiver")
@@ -103,36 +103,86 @@ func (ppm *AccountPayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *pr
 	ppm.multiaccount.FromProtobuf(pbMultiAccount)
 }
 
-// RawMessagePayloadMarshaller is responsible for marshalling and unmarshalling raw message data
-type RawMessagePayloadMarshaller struct {
-	payload *protobuf.SyncRawMessage
+type RawMessagesPayload struct {
+	rawMessages []*protobuf.RawMessage
+	subAccounts []*accounts.Account
+	setting     *settings.Settings
 }
 
-func NewRawMessagePayloadMarshaller(payload *protobuf.SyncRawMessage) *RawMessagePayloadMarshaller {
+func NewRawMessagesPayload() *RawMessagesPayload {
+	return &RawMessagesPayload{
+		setting: new(settings.Settings),
+	}
+}
+
+// RawMessagePayloadMarshaller is responsible for marshalling and unmarshalling raw message data
+type RawMessagePayloadMarshaller struct {
+	payload *RawMessagesPayload
+}
+
+func NewRawMessagePayloadMarshaller(payload *RawMessagesPayload) *RawMessagePayloadMarshaller {
 	return &RawMessagePayloadMarshaller{
 		payload: payload,
 	}
 }
 
-func (rmm *RawMessagePayloadMarshaller) MarshalProtobuf() ([]byte, error) {
-	return proto.Marshal(rmm.payload)
+func (rmm *RawMessagePayloadMarshaller) MarshalProtobuf() (data []byte, err error) {
+	syncRawMessage := new(protobuf.SyncRawMessage)
+
+	syncRawMessage.RawMessages = rmm.payload.rawMessages
+	if len(rmm.payload.subAccounts) > 0 {
+		syncRawMessage.SubAccountsJsonBytes, err = json.Marshal(rmm.payload.subAccounts)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if !rmm.payload.setting.IsEmpty() {
+		syncRawMessage.SettingsJsonBytes, err = json.Marshal(rmm.payload.setting)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return proto.Marshal(syncRawMessage)
+}
+
+func (rmm *RawMessagePayloadMarshaller) UnmarshalProtobuf(data []byte) error {
+	syncRawMessage := new(protobuf.SyncRawMessage)
+	err := proto.Unmarshal(data, syncRawMessage)
+	if err != nil {
+		return err
+	}
+	if syncRawMessage.SubAccountsJsonBytes != nil {
+		err = json.Unmarshal(syncRawMessage.SubAccountsJsonBytes, &rmm.payload.subAccounts)
+		if err != nil {
+			return err
+		}
+	}
+	if syncRawMessage.SettingsJsonBytes != nil {
+		err = json.Unmarshal(syncRawMessage.SettingsJsonBytes, rmm.payload.setting)
+		if err != nil {
+			return err
+		}
+	}
+
+	rmm.payload.rawMessages = syncRawMessage.RawMessages
+	return nil
 }
 
 // InstallationPayloadMounterReceiver represents an InstallationPayload Repository
 type InstallationPayloadMounterReceiver struct {
 	PayloadMounter
-	*InstallationPayloadReceiver
+	PayloadReceiver
 }
 
-func NewInstallationPayloadMounterReceiver(logger *zap.Logger, encryptor *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *InstallationPayloadMounterReceiver {
-	l := logger.Named("InstallationPayloadMounterReceiver")
+func NewInstallationPayloadMounterReceiver(encryptor *PayloadEncryptor, backend *api.GethStatusBackend, deviceType string) *InstallationPayloadMounterReceiver {
 	return &InstallationPayloadMounterReceiver{
-		NewInstallationPayloadMounter(l, encryptor, backend, deviceType),
-		NewInstallationPayloadReceiver(l, encryptor, backend, deviceType),
+		NewInstallationPayloadMounter(encryptor, backend, deviceType),
+		NewInstallationPayloadReceiver(encryptor, backend, deviceType),
 	}
 }
 
 func (i *InstallationPayloadMounterReceiver) LockPayload() {
 	i.PayloadMounter.LockPayload()
-	i.InstallationPayloadReceiver.LockPayload()
+	i.PayloadReceiver.LockPayload()
 }
