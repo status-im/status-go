@@ -307,11 +307,8 @@ func (ids *idService) sendPushes(ctx context.Context) {
 			if err != nil { // connection might have been closed recently
 				return
 			}
-			if ids.metricsTracer != nil {
-				ids.metricsTracer.IdentifyPush(network.DirOutbound)
-			}
 			// TODO: find out if the peer supports push if we didn't have any information about push support
-			if err := ids.sendIdentifyResp(str); err != nil {
+			if err := ids.sendIdentifyResp(str, true); err != nil {
 				log.Debugw("failed to send identify push", "peer", c.RemotePeer(), "error", err)
 				return
 			}
@@ -401,28 +398,19 @@ func (ids *idService) identifyConn(c network.Conn) error {
 		return err
 	}
 
-	if ids.metricsTracer != nil {
-		ids.metricsTracer.Identify(network.DirInbound)
-	}
 	return ids.handleIdentifyResponse(s, false)
 }
 
 // handlePush handles incoming identify push streams
 func (ids *idService) handlePush(s network.Stream) {
 	ids.handleIdentifyResponse(s, true)
-	if ids.metricsTracer != nil {
-		ids.metricsTracer.IdentifyPush(network.DirInbound)
-	}
 }
 
 func (ids *idService) handleIdentifyRequest(s network.Stream) {
-	if ids.metricsTracer != nil {
-		ids.metricsTracer.Identify(network.DirOutbound)
-	}
-	_ = ids.sendIdentifyResp(s)
+	_ = ids.sendIdentifyResp(s, false)
 }
 
-func (ids *idService) sendIdentifyResp(s network.Stream) error {
+func (ids *idService) sendIdentifyResp(s network.Stream, isPush bool) error {
 	if err := s.Scope().SetService(ServiceName); err != nil {
 		s.Reset()
 		return fmt.Errorf("failed to attaching stream to identify service: %w", err)
@@ -432,9 +420,19 @@ func (ids *idService) sendIdentifyResp(s network.Stream) error {
 	ids.currentSnapshot.Lock()
 	snapshot := ids.currentSnapshot.snapshot
 	ids.currentSnapshot.Unlock()
+
+	log.Debugw("sending snapshot", "seq", snapshot.seq, "protocols", snapshot.protocols, "addrs", snapshot.addrs)
+
+	mes := ids.createBaseIdentifyResponse(s.Conn(), &snapshot)
+	mes.SignedPeerRecord = ids.getSignedRecord(&snapshot)
+
 	log.Debugf("%s sending message to %s %s", ID, s.Conn().RemotePeer(), s.Conn().RemoteMultiaddr())
-	if err := ids.writeChunkedIdentifyMsg(s, &snapshot); err != nil {
+	if err := ids.writeChunkedIdentifyMsg(s, mes); err != nil {
 		return err
+	}
+
+	if ids.metricsTracer != nil {
+		ids.metricsTracer.IdentifySent(isPush, len(mes.Protocols), len(mes.ListenAddrs))
 	}
 
 	ids.connsMu.Lock()
@@ -485,6 +483,10 @@ func (ids *idService) handleIdentifyResponse(s network.Stream, isPush bool) erro
 
 	ids.consumeMessage(mes, c, isPush)
 
+	if ids.metricsTracer != nil {
+		ids.metricsTracer.IdentifyReceived(isPush, len(mes.Protocols), len(mes.ListenAddrs))
+	}
+
 	ids.connsMu.Lock()
 	defer ids.connsMu.Unlock()
 	e, ok := ids.conns[c]
@@ -497,6 +499,11 @@ func (ids *idService) handleIdentifyResponse(s network.Stream, isPush bool) erro
 	} else {
 		e.PushSupport = identifyPushUnsupported
 	}
+
+	if ids.metricsTracer != nil {
+		ids.metricsTracer.ConnPushSupport(e.PushSupport)
+	}
+
 	ids.conns[c] = e
 	return nil
 }
@@ -536,19 +543,14 @@ func (ids *idService) updateSnapshot() {
 	log.Debugw("updating snapshot", "seq", snapshot.seq, "addrs", snapshot.addrs)
 }
 
-func (ids *idService) writeChunkedIdentifyMsg(s network.Stream, snapshot *identifySnapshot) error {
-	c := s.Conn()
-	log.Debugw("sending snapshot", "seq", snapshot.seq, "protocols", snapshot.protocols, "addrs", snapshot.addrs)
-
-	mes := ids.createBaseIdentifyResponse(c, snapshot)
-	sr := ids.getSignedRecord(snapshot)
-	mes.SignedPeerRecord = sr
+func (ids *idService) writeChunkedIdentifyMsg(s network.Stream, mes *pb.Identify) error {
 	writer := pbio.NewDelimitedWriter(s)
 
-	if sr == nil || proto.Size(mes) <= legacyIDSize {
+	if mes.SignedPeerRecord == nil || proto.Size(mes) <= legacyIDSize {
 		return writer.WriteMsg(mes)
 	}
 
+	sr := mes.SignedPeerRecord
 	mes.SignedPeerRecord = nil
 	if err := writer.WriteMsg(mes); err != nil {
 		return err

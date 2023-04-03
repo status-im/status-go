@@ -27,13 +27,13 @@ type emitter struct {
 	n             *node
 	w             *wildcardNode
 	typ           reflect.Type
-	closed        int32
+	closed        atomic.Bool
 	dropper       func(reflect.Type)
 	metricsTracer MetricsTracer
 }
 
 func (e *emitter) Emit(evt interface{}) error {
-	if atomic.LoadInt32(&e.closed) != 0 {
+	if e.closed.Load() {
 		return fmt.Errorf("emitter is closed")
 	}
 
@@ -47,10 +47,10 @@ func (e *emitter) Emit(evt interface{}) error {
 }
 
 func (e *emitter) Close() error {
-	if !atomic.CompareAndSwapInt32(&e.closed, 0, 1) {
+	if !e.closed.CompareAndSwap(false, true) {
 		return fmt.Errorf("closed an emitter more than once")
 	}
-	if atomic.AddInt32(&e.n.nEmitters, -1) == 0 {
+	if e.n.nEmitters.Add(-1) == 0 {
 		e.dropper(e.typ)
 	}
 	return nil
@@ -100,7 +100,7 @@ func (b *basicBus) tryDropNode(typ reflect.Type) {
 	}
 
 	n.lk.Lock()
-	if atomic.LoadInt32(&n.nEmitters) > 0 || len(n.sinks) > 0 {
+	if n.nEmitters.Load() > 0 || len(n.sinks) > 0 {
 		n.lk.Unlock()
 		b.lk.Unlock()
 		return // still in use
@@ -178,7 +178,7 @@ func (s *sub) Close() error {
 			}
 		}
 
-		tryDrop := len(n.sinks) == 0 && atomic.LoadInt32(&n.nEmitters) == 0
+		tryDrop := len(n.sinks) == 0 && n.nEmitters.Load() == 0
 
 		n.lk.Unlock()
 
@@ -294,7 +294,7 @@ func (b *basicBus) Emitter(evtType interface{}, opts ...event.EmitterOpt) (e eve
 	typ = typ.Elem()
 
 	b.withNode(typ, func(n *node) {
-		atomic.AddInt32(&n.nEmitters, 1)
+		n.nEmitters.Add(1)
 		n.keepLast = n.keepLast || settings.makeStateful
 		e = &emitter{n: n, typ: typ, dropper: b.tryDropNode, w: b.wildcard, metricsTracer: b.metricsTracer}
 	}, nil)
@@ -319,13 +319,13 @@ func (b *basicBus) GetAllEventTypes() []reflect.Type {
 
 type wildcardNode struct {
 	sync.RWMutex
-	nSinks        int32
+	nSinks        atomic.Int32
 	sinks         []*namedSink
 	metricsTracer MetricsTracer
 }
 
 func (n *wildcardNode) addSink(sink *namedSink) {
-	atomic.AddInt32(&n.nSinks, 1) // ok to do outside the lock
+	n.nSinks.Add(1) // ok to do outside the lock
 	n.Lock()
 	n.sinks = append(n.sinks, sink)
 	n.Unlock()
@@ -336,7 +336,7 @@ func (n *wildcardNode) addSink(sink *namedSink) {
 }
 
 func (n *wildcardNode) removeSink(ch chan interface{}) {
-	atomic.AddInt32(&n.nSinks, -1) // ok to do outside the lock
+	n.nSinks.Add(-1) // ok to do outside the lock
 	n.Lock()
 	for i := 0; i < len(n.sinks); i++ {
 		if n.sinks[i].ch == ch {
@@ -349,7 +349,7 @@ func (n *wildcardNode) removeSink(ch chan interface{}) {
 }
 
 func (n *wildcardNode) emit(evt interface{}) {
-	if atomic.LoadInt32(&n.nSinks) == 0 {
+	if n.nSinks.Load() == 0 {
 		return
 	}
 
@@ -372,7 +372,7 @@ type node struct {
 	typ reflect.Type
 
 	// emitter ref count
-	nEmitters int32
+	nEmitters atomic.Int32
 
 	keepLast bool
 	last     interface{}

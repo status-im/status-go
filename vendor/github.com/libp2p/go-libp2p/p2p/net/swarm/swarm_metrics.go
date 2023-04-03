@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -26,7 +25,7 @@ var (
 			Name:      "connections_opened_total",
 			Help:      "Connections Opened",
 		},
-		[]string{"dir", "transport", "security", "muxer"},
+		[]string{"dir", "transport", "security", "muxer", "early_muxer", "ip_version"},
 	)
 	keyTypes = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -42,7 +41,7 @@ var (
 			Name:      "connections_closed_total",
 			Help:      "Connections Closed",
 		},
-		[]string{"dir", "transport", "security", "muxer"},
+		[]string{"dir", "transport", "security", "muxer", "early_muxer", "ip_version"},
 	)
 	dialError = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -50,7 +49,7 @@ var (
 			Name:      "dial_errors_total",
 			Help:      "Dial Error",
 		},
-		[]string{"transport", "error"},
+		[]string{"transport", "error", "ip_version"},
 	)
 	connDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -59,7 +58,7 @@ var (
 			Help:      "Duration of a Connection",
 			Buckets:   prometheus.ExponentialBuckets(1.0/16, 2, 25), // up to 24 days
 		},
-		[]string{"dir", "transport", "security", "muxer"},
+		[]string{"dir", "transport", "security", "muxer", "early_muxer", "ip_version"},
 	)
 	connHandshakeLatency = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -68,20 +67,22 @@ var (
 			Help:      "Duration of the libp2p Handshake",
 			Buckets:   prometheus.ExponentialBuckets(0.001, 1.3, 35),
 		},
-		[]string{"transport", "security", "muxer"},
+		[]string{"transport", "security", "muxer", "early_muxer", "ip_version"},
 	)
+	collectors = []prometheus.Collector{
+		connsOpened,
+		keyTypes,
+		connsClosed,
+		dialError,
+		connDuration,
+		connHandshakeLatency,
+	}
 )
 
-var initMetricsOnce sync.Once
-
-func initMetrics() {
-	prometheus.MustRegister(connsOpened, keyTypes, connsClosed, dialError, connDuration, connHandshakeLatency)
-}
-
 type MetricsTracer interface {
-	OpenedConnection(network.Direction, crypto.PubKey, network.ConnectionState)
-	ClosedConnection(network.Direction, time.Duration, network.ConnectionState)
-	CompletedHandshake(time.Duration, network.ConnectionState)
+	OpenedConnection(network.Direction, crypto.PubKey, network.ConnectionState, ma.Multiaddr)
+	ClosedConnection(network.Direction, time.Duration, network.ConnectionState, ma.Multiaddr)
+	CompletedHandshake(time.Duration, network.ConnectionState, ma.Multiaddr)
 	FailedDialing(ma.Multiaddr, error)
 }
 
@@ -89,8 +90,26 @@ type metricsTracer struct{}
 
 var _ MetricsTracer = &metricsTracer{}
 
-func NewMetricsTracer() *metricsTracer {
-	initMetricsOnce.Do(initMetrics)
+type metricsTracerSetting struct {
+	reg prometheus.Registerer
+}
+
+type MetricsTracerOption func(*metricsTracerSetting)
+
+func WithRegisterer(reg prometheus.Registerer) MetricsTracerOption {
+	return func(s *metricsTracerSetting) {
+		if reg != nil {
+			s.reg = reg
+		}
+	}
+}
+
+func NewMetricsTracer(opts ...MetricsTracerOption) MetricsTracer {
+	setting := &metricsTracerSetting{reg: prometheus.DefaultRegisterer}
+	for _, opt := range opts {
+		opt(setting)
+	}
+	metricshelper.RegisterCollectors(setting.reg, collectors...)
 	return &metricsTracer{}
 }
 
@@ -105,15 +124,37 @@ func appendConnectionState(tags []string, cs network.ConnectionState) []string {
 	// For example, QUIC doesn't set security nor muxer.
 	tags = append(tags, string(cs.Security))
 	tags = append(tags, string(cs.StreamMultiplexer))
+
+	earlyMuxer := "false"
+	if cs.UsedEarlyMuxerNegotiation {
+		earlyMuxer = "true"
+	}
+	tags = append(tags, earlyMuxer)
 	return tags
 }
 
-func (m *metricsTracer) OpenedConnection(dir network.Direction, p crypto.PubKey, cs network.ConnectionState) {
+func getIPVersion(addr ma.Multiaddr) string {
+	version := "unknown"
+	ma.ForEach(addr, func(c ma.Component) bool {
+		if c.Protocol().Code == ma.P_IP4 {
+			version = "ip4"
+			return false
+		} else if c.Protocol().Code == ma.P_IP6 {
+			version = "ip6"
+			return false
+		}
+		return true
+	})
+	return version
+}
+
+func (m *metricsTracer) OpenedConnection(dir network.Direction, p crypto.PubKey, cs network.ConnectionState, laddr ma.Multiaddr) {
 	tags := metricshelper.GetStringSlice()
 	defer metricshelper.PutStringSlice(tags)
 
 	*tags = append(*tags, metricshelper.GetDirection(dir))
 	*tags = appendConnectionState(*tags, cs)
+	*tags = append(*tags, getIPVersion(laddr))
 	connsOpened.WithLabelValues(*tags...).Inc()
 
 	*tags = (*tags)[:0]
@@ -122,25 +163,23 @@ func (m *metricsTracer) OpenedConnection(dir network.Direction, p crypto.PubKey,
 	keyTypes.WithLabelValues(*tags...).Inc()
 }
 
-func (m *metricsTracer) ClosedConnection(dir network.Direction, duration time.Duration, cs network.ConnectionState) {
+func (m *metricsTracer) ClosedConnection(dir network.Direction, duration time.Duration, cs network.ConnectionState, laddr ma.Multiaddr) {
 	tags := metricshelper.GetStringSlice()
 	defer metricshelper.PutStringSlice(tags)
 
 	*tags = append(*tags, metricshelper.GetDirection(dir))
 	*tags = appendConnectionState(*tags, cs)
+	*tags = append(*tags, getIPVersion(laddr))
 	connsClosed.WithLabelValues(*tags...).Inc()
-
-	*tags = (*tags)[:0]
-	*tags = append(*tags, metricshelper.GetDirection(dir))
-	*tags = appendConnectionState(*tags, cs)
 	connDuration.WithLabelValues(*tags...).Observe(duration.Seconds())
 }
 
-func (m *metricsTracer) CompletedHandshake(t time.Duration, cs network.ConnectionState) {
+func (m *metricsTracer) CompletedHandshake(t time.Duration, cs network.ConnectionState, laddr ma.Multiaddr) {
 	tags := metricshelper.GetStringSlice()
 	defer metricshelper.PutStringSlice(tags)
 
 	*tags = appendConnectionState(*tags, cs)
+	*tags = append(*tags, getIPVersion(laddr))
 	connHandshakeLatency.WithLabelValues(*tags...).Observe(t.Seconds())
 }
 
@@ -166,5 +205,11 @@ func (m *metricsTracer) FailedDialing(addr ma.Multiaddr, err error) {
 			e = "connection refused"
 		}
 	}
-	dialError.WithLabelValues(transport, e).Inc()
+
+	tags := metricshelper.GetStringSlice()
+	defer metricshelper.PutStringSlice(tags)
+
+	*tags = append(*tags, transport, e)
+	*tags = append(*tags, getIPVersion(addr))
+	dialError.WithLabelValues(*tags...).Inc()
 }

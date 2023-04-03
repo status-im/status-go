@@ -1,9 +1,14 @@
 package filterv2
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 const DefaultMaxSubscriptions = 1000
 const MaxCriteriaPerSubscription = 1000
+const MaxContentTopicsPerRequest = 30
+const MessagePushTimeout = 20 * time.Second
 
 type FilterError struct {
 	Code    int

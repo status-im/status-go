@@ -372,6 +372,9 @@ func (r *WakuRLNRelay) addValidator(
 				zap.Binary("payload", wakuMessage.Payload),
 				zap.Any("proof", wakuMessage.RateLimitProof),
 			)
+
+			relay.AddToCache(pubsubTopic, message.ID, wakuMessage)
+
 			return true
 		case MessageValidationResult_Invalid:
 			r.log.Debug("message could not be verified",
@@ -403,6 +406,9 @@ func (r *WakuRLNRelay) addValidator(
 			return false
 		}
 	}
+
+	// In case there's a topic validator registered
+	_ = relay.PubSub().UnregisterTopicValidator(pubsubTopic)
 
 	return relay.PubSub().RegisterTopicValidator(pubsubTopic, validator)
 }

@@ -45,6 +45,7 @@ type transport struct {
 
 	holePunchingMx sync.Mutex
 	holePunching   map[holePunchKey]*activeHolePunch
+	rnd            rand.Rand
 
 	connMx sync.Mutex
 	conns  map[quic.Connection]*conn
@@ -94,6 +95,7 @@ func NewTransport(key ic.PrivKey, connManager *quicreuse.ConnManager, psk pnet.P
 		rcmgr:        rcmgr,
 		conns:        make(map[quic.Connection]*conn),
 		holePunching: make(map[holePunchKey]*activeHolePunch),
+		rnd:          *rand.New(rand.NewSource(time.Now().UnixNano())),
 
 		listeners: make(map[string][]*virtualListener),
 	}, nil
@@ -217,7 +219,7 @@ func (t *transport) holePunch(ctx context.Context, raddr ma.Multiaddr, p peer.ID
 	var punchErr error
 loop:
 	for i := 0; ; i++ {
-		if _, err := rand.Read(payload); err != nil {
+		if _, err := t.rnd.Read(payload); err != nil {
 			punchErr = err
 			break
 		}

@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	ws "github.com/libp2p/go-libp2p/p2p/transport/websocket"
 	webtransport "github.com/libp2p/go-libp2p/p2p/transport/webtransport"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
@@ -129,6 +130,11 @@ var DefaultMultiaddrResolver = func(cfg *Config) error {
 	return cfg.Apply(MultiaddrResolver(madns.DefaultResolver))
 }
 
+// DefaultPrometheusRegisterer configures libp2p to use the default registerer
+var DefaultPrometheusRegisterer = func(cfg *Config) error {
+	return cfg.Apply(PrometheusRegisterer(prometheus.DefaultRegisterer))
+}
+
 // Complete list of default options and when to fallback on them.
 //
 // Please *DON'T* specify default options any other way. Putting this all here
@@ -180,6 +186,10 @@ var defaults = []struct {
 	{
 		fallback: func(cfg *Config) bool { return cfg.MultiaddrResolver == nil },
 		opt:      DefaultMultiaddrResolver,
+	},
+	{
+		fallback: func(cfg *Config) bool { return !cfg.DisableMetrics && cfg.PrometheusRegisterer == nil },
+		opt:      DefaultPrometheusRegisterer,
 	},
 }
 

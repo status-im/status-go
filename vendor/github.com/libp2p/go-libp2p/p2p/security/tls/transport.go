@@ -166,12 +166,15 @@ func (t *Transport) setupConn(tlsConn *tls.Conn, remotePubKey ci.PubKey) (sec.Se
 	}
 
 	return &conn{
-		Conn:            tlsConn,
-		localPeer:       t.localPeer,
-		privKey:         t.privKey,
-		remotePeer:      remotePeerID,
-		remotePubKey:    remotePubKey,
-		connectionState: network.ConnectionState{StreamMultiplexer: protocol.ID(nextProto)},
+		Conn:         tlsConn,
+		localPeer:    t.localPeer,
+		privKey:      t.privKey,
+		remotePeer:   remotePeerID,
+		remotePubKey: remotePubKey,
+		connectionState: network.ConnectionState{
+			StreamMultiplexer:         protocol.ID(nextProto),
+			UsedEarlyMuxerNegotiation: nextProto != "",
+		},
 	}, nil
 }
 

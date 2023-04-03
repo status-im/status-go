@@ -24,7 +24,7 @@ type Stream struct {
 
 	closeOnce sync.Once
 
-	protocol atomic.Value
+	protocol atomic.Pointer[protocol.ID]
 
 	stat network.Stats
 }
@@ -108,9 +108,11 @@ func (s *Stream) remove() {
 
 // Protocol returns the protocol negotiated on this stream (if set).
 func (s *Stream) Protocol() protocol.ID {
-	// Ignore type error. It means that the protocol is unset.
-	p, _ := s.protocol.Load().(protocol.ID)
-	return p
+	p := s.protocol.Load()
+	if p == nil {
+		return ""
+	}
+	return *p
 }
 
 // SetProtocol sets the protocol for this stream.
@@ -123,7 +125,7 @@ func (s *Stream) SetProtocol(p protocol.ID) error {
 		return err
 	}
 
-	s.protocol.Store(p)
+	s.protocol.Store(&p)
 	return nil
 }
 

@@ -146,7 +146,7 @@ type Swarm struct {
 	maResolver *madns.Resolver
 
 	// stream handlers
-	streamh atomic.Value
+	streamh atomic.Pointer[network.StreamHandler]
 
 	// dialing helpers
 	dsync   *dialSync
@@ -347,13 +347,16 @@ func (s *Swarm) Peerstore() peerstore.Peerstore {
 
 // SetStreamHandler assigns the handler for new streams.
 func (s *Swarm) SetStreamHandler(handler network.StreamHandler) {
-	s.streamh.Store(handler)
+	s.streamh.Store(&handler)
 }
 
 // StreamHandler gets the handler for new streams.
 func (s *Swarm) StreamHandler() network.StreamHandler {
-	handler, _ := s.streamh.Load().(network.StreamHandler)
-	return handler
+	handler := s.streamh.Load()
+	if handler == nil {
+		return nil
+	}
+	return *handler
 }
 
 // NewStream creates a new stream on any available connection to peer, dialing
@@ -638,3 +641,25 @@ func (s *Swarm) ResourceManager() network.ResourceManager {
 // Swarm is a Network.
 var _ network.Network = (*Swarm)(nil)
 var _ transport.TransportNetwork = (*Swarm)(nil)
+
+type connWithMetrics struct {
+	transport.CapableConn
+	opened        time.Time
+	dir           network.Direction
+	metricsTracer MetricsTracer
+}
+
+func wrapWithMetrics(capableConn transport.CapableConn, metricsTracer MetricsTracer, opened time.Time, dir network.Direction) connWithMetrics {
+	c := connWithMetrics{CapableConn: capableConn, opened: opened, dir: dir, metricsTracer: metricsTracer}
+	c.metricsTracer.OpenedConnection(c.dir, capableConn.RemotePublicKey(), capableConn.ConnState(), capableConn.LocalMultiaddr())
+	return c
+}
+
+func (c connWithMetrics) completedHandshake() {
+	c.metricsTracer.CompletedHandshake(time.Since(c.opened), c.ConnState(), c.LocalMultiaddr())
+}
+
+func (c connWithMetrics) Close() error {
+	c.metricsTracer.ClosedConnection(c.dir, time.Since(c.opened), c.ConnState(), c.LocalMultiaddr())
+	return c.CapableConn.Close()
+}

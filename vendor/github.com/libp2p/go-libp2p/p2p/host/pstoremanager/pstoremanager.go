@@ -109,7 +109,8 @@ func (m *PeerstoreManager) background(ctx context.Context, sub event.Subscriptio
 				// If we reconnect to the peer before we've cleared the information, keep it.
 				delete(disconnected, p)
 			}
-		case now := <-ticker.C:
+		case <-ticker.C:
+			now := time.Now()
 			for p, disconnectTime := range disconnected {
 				if disconnectTime.Add(m.gracePeriod).Before(now) {
 					m.pstore.RemovePeer(p)

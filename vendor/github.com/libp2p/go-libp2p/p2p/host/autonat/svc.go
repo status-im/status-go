@@ -100,6 +100,9 @@ func (as *autoNATService) handleStream(s network.Stream) {
 		s.Reset()
 		return
 	}
+	if as.config.metricsTracer != nil {
+		as.config.metricsTracer.OutgoingDialResponse(res.GetDialResponse().GetStatus())
+	}
 }
 
 func (as *autoNATService) handleDial(p peer.ID, obsaddr ma.Multiaddr, mpi *pb.Message_PeerInfo) *pb.Message_DialResponse {
@@ -126,6 +129,9 @@ func (as *autoNATService) handleDial(p peer.ID, obsaddr ma.Multiaddr, mpi *pb.Me
 	// need to know their public IP address, and it needs to be different from our public IP
 	// address.
 	if as.config.dialPolicy.skipDial(obsaddr) {
+		if as.config.metricsTracer != nil {
+			as.config.metricsTracer.OutgoingDialRefused(dial_blocked)
+		}
 		// Note: versions < v0.20.0 return Message_E_DIAL_ERROR here, thus we can not rely on this error code.
 		return newDialResponseError(pb.Message_E_DIAL_REFUSED, "refusing to dial peer with blocked observed address")
 	}
@@ -188,6 +194,9 @@ func (as *autoNATService) handleDial(p peer.ID, obsaddr ma.Multiaddr, mpi *pb.Me
 	}
 
 	if len(addrs) == 0 {
+		if as.config.metricsTracer != nil {
+			as.config.metricsTracer.OutgoingDialRefused(no_valid_address)
+		}
 		// Note: versions < v0.20.0 return Message_E_DIAL_ERROR here, thus we can not rely on this error code.
 		return newDialResponseError(pb.Message_E_DIAL_REFUSED, "no dialable addresses")
 	}
@@ -202,6 +211,9 @@ func (as *autoNATService) doDial(pi peer.AddrInfo) *pb.Message_DialResponse {
 	if count >= as.config.throttlePeerMax || (as.config.throttleGlobalMax > 0 &&
 		as.globalReqs >= as.config.throttleGlobalMax) {
 		as.mx.Unlock()
+		if as.config.metricsTracer != nil {
+			as.config.metricsTracer.OutgoingDialRefused(rate_limited)
+		}
 		return newDialResponseError(pb.Message_E_DIAL_REFUSED, "too many dials")
 	}
 	as.reqs[pi.ID] = count + 1

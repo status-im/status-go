@@ -499,9 +499,9 @@ func (s *Swarm) dialAddr(ctx context.Context, p peer.ID, addr ma.Multiaddr) (tra
 	}
 	canonicallog.LogPeerStatus(100, connC.RemotePeer(), connC.RemoteMultiaddr(), "connection_status", "established", "dir", "outbound")
 	if s.metricsTracer != nil {
-		connState := connC.ConnState()
-		s.metricsTracer.OpenedConnection(network.DirOutbound, connC.RemotePublicKey(), connState)
-		s.metricsTracer.CompletedHandshake(time.Since(start), connState)
+		connWithMetrics := wrapWithMetrics(connC, s.metricsTracer, start, network.DirOutbound)
+		connWithMetrics.completedHandshake()
+		connC = connWithMetrics
 	}
 
 	// Trust the transport? Yeah... right.

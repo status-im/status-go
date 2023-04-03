@@ -243,6 +243,8 @@ func (wakuPX *WakuPeerExchange) iterate(ctx context.Context) error {
 			continue
 		}
 
+		wakuPX.log.Debug("Discovered px peers via discv5")
+
 		wakuPX.enrCacheMutex.Lock()
 		wakuPX.enrCache[iterator.Node().ID()] = peerRecord{
 			idx:  len(wakuPX.enrCache),

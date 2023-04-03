@@ -16,8 +16,9 @@ type transportConn struct {
 	scope     network.ConnManagementScope
 	stat      network.ConnStats
 
-	muxer    protocol.ID
-	security protocol.ID
+	muxer                     protocol.ID
+	security                  protocol.ID
+	usedEarlyMuxerNegotiation bool
 }
 
 var _ transport.CapableConn = &transportConn{}
@@ -56,8 +57,9 @@ func (t *transportConn) Close() error {
 
 func (t *transportConn) ConnState() network.ConnectionState {
 	return network.ConnectionState{
-		StreamMultiplexer: t.muxer,
-		Security:          t.security,
-		Transport:         "tcp",
+		StreamMultiplexer:         t.muxer,
+		Security:                  t.security,
+		Transport:                 "tcp",
+		UsedEarlyMuxerNegotiation: t.usedEarlyMuxerNegotiation,
 	}
 }

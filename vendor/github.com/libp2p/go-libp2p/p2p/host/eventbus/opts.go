@@ -12,7 +12,7 @@ type subSettings struct {
 	name   string
 }
 
-var subCnt int64
+var subCnt atomic.Int64
 
 var subSettingsDefault = subSettings{
 	buffer: 16,
@@ -34,7 +34,7 @@ func newSubSettings() subSettings {
 		}
 		settings.name = fmt.Sprintf("%s-L%d", file, line)
 	} else {
-		settings.name = fmt.Sprintf("subscriber-%d", atomic.AddInt64(&subCnt, 1))
+		settings.name = fmt.Sprintf("subscriber-%d", subCnt.Add(1))
 	}
 	return settings
 }

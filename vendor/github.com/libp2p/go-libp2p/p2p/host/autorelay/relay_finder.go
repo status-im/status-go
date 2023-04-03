@@ -15,7 +15,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	basic "github.com/libp2p/go-libp2p/p2p/host/basic"
 	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
-	relayv1 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv1/relay"
 	circuitv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/client"
 	circuitv2_proto "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/proto"
 
@@ -23,13 +22,10 @@ import (
 	manet "github.com/multiformats/go-multiaddr/net"
 )
 
-const (
-	protoIDv1 = relayv1.ProtoID
-	protoIDv2 = circuitv2_proto.ProtoIDv2Hop
-)
+const protoIDv2 = circuitv2_proto.ProtoIDv2Hop
 
 // Terminology:
-// Candidate: Once we connect to a node and it supports (v1 / v2) relay protocol,
+// Candidate: Once we connect to a node and it supports relay protocol,
 // we call it a candidate, and consider using it as a relay.
 // Relay: Out of the list of candidates, we select a relay to connect to.
 // Currently, we just randomly select a candidate, but we can employ more sophisticated
@@ -77,10 +73,13 @@ type relayFinder struct {
 	relayUpdated chan struct{}
 
 	relayMx sync.Mutex
-	relays  map[peer.ID]*circuitv2.Reservation // rsvp will be nil if it is a v1 relay
+	relays  map[peer.ID]*circuitv2.Reservation
 
 	cachedAddrs       []ma.Multiaddr
 	cachedAddrsExpiry time.Time
+
+	// A channel that triggers a run of `runScheduledWork`.
+	triggerRunScheduledWork chan struct{}
 }
 
 func newRelayFinder(host *basic.BasicHost, peerSource PeerSource, conf *config) *relayFinder {
@@ -98,16 +97,26 @@ func newRelayFinder(host *basic.BasicHost, peerSource PeerSource, conf *config) 
 		candidateFound:             make(chan struct{}, 1),
 		maybeConnectToRelayTrigger: make(chan struct{}, 1),
 		maybeRequestNewCandidates:  make(chan struct{}, 1),
+		triggerRunScheduledWork:    make(chan struct{}, 1),
 		relays:                     make(map[peer.ID]*circuitv2.Reservation),
 		relayUpdated:               make(chan struct{}, 1),
 	}
 }
 
+type scheduledWorkTimes struct {
+	leastFrequentInterval       time.Duration
+	nextRefresh                 time.Time
+	nextBackoff                 time.Time
+	nextOldCandidateCheck       time.Time
+	nextAllowedCallToPeerSource time.Time
+}
+
 func (rf *relayFinder) background(ctx context.Context) {
+	peerSourceRateLimiter := make(chan struct{}, 1)
 	rf.refCount.Add(1)
 	go func() {
 		defer rf.refCount.Done()
-		rf.findNodes(ctx)
+		rf.findNodes(ctx, peerSourceRateLimiter)
 	}()
 
 	rf.refCount.Add(1)
@@ -123,19 +132,35 @@ func (rf *relayFinder) background(ctx context.Context) {
 	}
 	defer subConnectedness.Close()
 
-	bootDelayTimer := rf.conf.clock.Timer(rf.conf.bootDelay)
+	now := rf.conf.clock.Now()
+	bootDelayTimer := rf.conf.clock.InstantTimer(now.Add(rf.conf.bootDelay))
 	defer bootDelayTimer.Stop()
-	refreshTicker := rf.conf.clock.Ticker(rsvpRefreshInterval)
-	defer refreshTicker.Stop()
-	backoffTicker := rf.conf.clock.Ticker(rf.conf.backoff / 5)
-	defer backoffTicker.Stop()
-	oldCandidateTicker := rf.conf.clock.Ticker(rf.conf.maxCandidateAge / 5)
-	defer oldCandidateTicker.Stop()
+
+	// This is the least frequent event. It's our fallback timer if we don't have any other work to do.
+	leastFrequentInterval := rf.conf.minInterval
+	// Check if leastFrequentInterval is 0 to avoid busy looping
+	if rf.conf.backoff > leastFrequentInterval || leastFrequentInterval == 0 {
+		leastFrequentInterval = rf.conf.backoff
+	}
+	if rf.conf.maxCandidateAge > leastFrequentInterval || leastFrequentInterval == 0 {
+		leastFrequentInterval = rf.conf.maxCandidateAge
+	}
+	if rsvpRefreshInterval > leastFrequentInterval || leastFrequentInterval == 0 {
+		leastFrequentInterval = rsvpRefreshInterval
+	}
+
+	scheduledWork := &scheduledWorkTimes{
+		leastFrequentInterval:       leastFrequentInterval,
+		nextRefresh:                 now.Add(rsvpRefreshInterval),
+		nextBackoff:                 now.Add(rf.conf.backoff),
+		nextOldCandidateCheck:       now.Add(rf.conf.maxCandidateAge),
+		nextAllowedCallToPeerSource: now.Add(-time.Second), // allow immediately
+	}
+
+	workTimer := rf.conf.clock.InstantTimer(rf.runScheduledWork(ctx, now, scheduledWork, peerSourceRateLimiter))
+	defer workTimer.Stop()
 
 	for {
-		// when true, we need to identify push
-		var push bool
-
 		select {
 		case ev, ok := <-subConnectedness.Out():
 			if !ok {
@@ -145,6 +170,8 @@ func (rf *relayFinder) background(ctx context.Context) {
 			if evt.Connectedness != network.NotConnected {
 				continue
 			}
+			push := false
+
 			rf.relayMx.Lock()
 			if rf.usingRelay(evt.Peer) { // we were disconnected from a relay
 				log.Debugw("disconnected from relay", "id", evt.Peer)
@@ -154,85 +181,170 @@ func (rf *relayFinder) background(ctx context.Context) {
 				push = true
 			}
 			rf.relayMx.Unlock()
+
+			if push {
+				rf.clearCachedAddrsAndSignalAddressChange()
+			}
 		case <-rf.candidateFound:
 			rf.notifyMaybeConnectToRelay()
-		case <-bootDelayTimer.C:
+		case <-bootDelayTimer.Ch():
 			rf.notifyMaybeConnectToRelay()
 		case <-rf.relayUpdated:
-			push = true
-		case now := <-refreshTicker.C:
-			push = rf.refreshReservations(ctx, now)
-		case now := <-backoffTicker.C:
-			rf.candidateMx.Lock()
-			for id, t := range rf.backoff {
-				if !t.Add(rf.conf.backoff).After(now) {
-					log.Debugw("removing backoff for node", "id", id)
-					delete(rf.backoff, id)
-				}
-			}
-			rf.candidateMx.Unlock()
-		case now := <-oldCandidateTicker.C:
-			var deleted bool
-			rf.candidateMx.Lock()
-			for id, cand := range rf.candidates {
-				if !cand.added.Add(rf.conf.maxCandidateAge).After(now) {
-					deleted = true
-					log.Debugw("deleting candidate due to age", "id", id)
-					delete(rf.candidates, id)
-				}
-			}
-			rf.candidateMx.Unlock()
-			if deleted {
-				rf.notifyMaybeNeedNewCandidates()
-			}
+			rf.clearCachedAddrsAndSignalAddressChange()
+		case now := <-workTimer.Ch():
+			// Note: `now` is not guaranteed to be the current time. It's the time
+			// that the timer was fired. This is okay because we'll schedule
+			// future work at a specific time.
+			nextTime := rf.runScheduledWork(ctx, now, scheduledWork, peerSourceRateLimiter)
+			workTimer.Reset(nextTime)
+		case <-rf.triggerRunScheduledWork:
+			// Ignore the next time because we aren't scheduling any future work here
+			_ = rf.runScheduledWork(ctx, rf.conf.clock.Now(), scheduledWork, peerSourceRateLimiter)
 		case <-ctx.Done():
 			return
 		}
+	}
+}
 
-		if push {
-			rf.relayMx.Lock()
-			rf.cachedAddrs = nil
-			rf.relayMx.Unlock()
-			rf.host.SignalAddressChange()
+func (rf *relayFinder) clearCachedAddrsAndSignalAddressChange() {
+	rf.relayMx.Lock()
+	rf.cachedAddrs = nil
+	rf.relayMx.Unlock()
+	rf.host.SignalAddressChange()
+}
+
+func (rf *relayFinder) runScheduledWork(ctx context.Context, now time.Time, scheduledWork *scheduledWorkTimes, peerSourceRateLimiter chan<- struct{}) time.Time {
+	nextTime := now.Add(scheduledWork.leastFrequentInterval)
+
+	if now.After(scheduledWork.nextRefresh) {
+		scheduledWork.nextRefresh = now.Add(rsvpRefreshInterval)
+		if rf.refreshReservations(ctx, now) {
+			rf.clearCachedAddrsAndSignalAddressChange()
 		}
 	}
+
+	if now.After(scheduledWork.nextBackoff) {
+		scheduledWork.nextBackoff = rf.clearBackoff(now)
+	}
+
+	if now.After(scheduledWork.nextOldCandidateCheck) {
+		scheduledWork.nextOldCandidateCheck = rf.clearOldCandidates(now)
+	}
+
+	if now.After(scheduledWork.nextAllowedCallToPeerSource) {
+		select {
+		case peerSourceRateLimiter <- struct{}{}:
+			scheduledWork.nextAllowedCallToPeerSource = now.Add(rf.conf.minInterval)
+			if scheduledWork.nextAllowedCallToPeerSource.Before(nextTime) {
+				nextTime = scheduledWork.nextAllowedCallToPeerSource
+			}
+		default:
+		}
+	} else {
+		// We still need to schedule this work if it's sooner than nextTime
+		if scheduledWork.nextAllowedCallToPeerSource.Before(nextTime) {
+			nextTime = scheduledWork.nextAllowedCallToPeerSource
+		}
+	}
+
+	// Find the next time we need to run scheduled work.
+	if scheduledWork.nextRefresh.Before(nextTime) {
+		nextTime = scheduledWork.nextRefresh
+	}
+	if scheduledWork.nextBackoff.Before(nextTime) {
+		nextTime = scheduledWork.nextBackoff
+	}
+	if scheduledWork.nextOldCandidateCheck.Before(nextTime) {
+		nextTime = scheduledWork.nextOldCandidateCheck
+	}
+	if nextTime == now {
+		// Only happens in CI with a mock clock
+		nextTime = nextTime.Add(1) // avoids an infinite loop
+	}
+
+	return nextTime
+}
+
+// clearOldCandidates clears old candidates from the map. Returns the next time
+// to run this function.
+func (rf *relayFinder) clearOldCandidates(now time.Time) time.Time {
+	// If we don't have any candidates, we should run this again in rf.conf.maxCandidateAge.
+	nextTime := now.Add(rf.conf.maxCandidateAge)
+
+	var deleted bool
+	rf.candidateMx.Lock()
+	defer rf.candidateMx.Unlock()
+	for id, cand := range rf.candidates {
+		expiry := cand.added.Add(rf.conf.maxCandidateAge)
+		if expiry.After(now) {
+			if expiry.Before(nextTime) {
+				nextTime = expiry
+			}
+		} else {
+			deleted = true
+			log.Debugw("deleting candidate due to age", "id", id)
+			delete(rf.candidates, id)
+
+		}
+	}
+	if deleted {
+		rf.notifyMaybeNeedNewCandidates()
+	}
+
+	return nextTime
+}
+
+// clearBackoff clears old backoff entries from the map. Returns the next time
+// to run this function.
+func (rf *relayFinder) clearBackoff(now time.Time) time.Time {
+	nextTime := now.Add(rf.conf.backoff)
+
+	rf.candidateMx.Lock()
+	defer rf.candidateMx.Unlock()
+	for id, t := range rf.backoff {
+		expiry := t.Add(rf.conf.backoff)
+		if expiry.After(now) {
+			if expiry.Before(nextTime) {
+				nextTime = expiry
+			}
+		} else {
+			log.Debugw("removing backoff for node", "id", id)
+			delete(rf.backoff, id)
+		}
+	}
+
+	return nextTime
 }
 
 // findNodes accepts nodes from the channel and tests if they support relaying.
 // It is run on both public and private nodes.
 // It garbage collects old entries, so that nodes doesn't overflow.
 // This makes sure that as soon as we need to find relay candidates, we have them available.
-func (rf *relayFinder) findNodes(ctx context.Context) {
-	peerChan := rf.peerSource(ctx, rf.conf.maxCandidates)
+// peerSourceRateLimiter is used to limit how often we call the peer source.
+func (rf *relayFinder) findNodes(ctx context.Context, peerSourceRateLimiter <-chan struct{}) {
+	var peerChan <-chan peer.AddrInfo
 	var wg sync.WaitGroup
-	lastCallToPeerSource := rf.conf.clock.Now()
-
-	timer := newTimer(rf.conf.clock)
 	for {
 		rf.candidateMx.Lock()
 		numCandidates := len(rf.candidates)
 		rf.candidateMx.Unlock()
 
-		if peerChan == nil {
-			now := rf.conf.clock.Now()
-			nextAllowedCallToPeerSource := lastCallToPeerSource.Add(rf.conf.minInterval).Sub(now)
-			if numCandidates < rf.conf.minCandidates {
-				log.Debugw("not enough candidates. Resetting timer", "num", numCandidates, "desired", rf.conf.minCandidates)
-				timer.Reset(nextAllowedCallToPeerSource)
+		if peerChan == nil && numCandidates < rf.conf.minCandidates {
+			select {
+			case <-peerSourceRateLimiter:
+				peerChan = rf.peerSource(ctx, rf.conf.maxCandidates)
+				select {
+				case rf.triggerRunScheduledWork <- struct{}{}:
+				default:
+				}
+			case <-ctx.Done():
+				return
 			}
 		}
 
 		select {
 		case <-rf.maybeRequestNewCandidates:
 			continue
-		case now := <-timer.Chan():
-			timer.SetRead()
-			if peerChan != nil {
-				// We're still reading peers from the peerChan. No need to query for more peers now.
-				continue
-			}
-			lastCallToPeerSource = now
-			peerChan = rf.peerSource(ctx, rf.conf.maxCandidates)
 		case pi, ok := <-peerChan:
 			if !ok {
 				wg.Wait()
@@ -288,7 +400,7 @@ func (rf *relayFinder) notifyNewCandidate() {
 	}
 }
 
-// handleNewNode tests if a peer supports circuit v1 or v2.
+// handleNewNode tests if a peer supports circuit v2.
 // This method is only run on private nodes.
 // If a peer does, it is added to the candidates map.
 // Note that just supporting the protocol doesn't guarantee that we can also obtain a reservation.
@@ -322,7 +434,7 @@ func (rf *relayFinder) handleNewNode(ctx context.Context, pi peer.AddrInfo) (add
 	return true
 }
 
-// tryNode checks if a peer actually supports either circuit v1 or circuit v2.
+// tryNode checks if a peer actually supports either circuit v2.
 // It does not modify any internal state.
 func (rf *relayFinder) tryNode(ctx context.Context, pi peer.AddrInfo) (supportsRelayV2 bool, err error) {
 	if err := rf.host.Connect(ctx, pi); err != nil {
@@ -357,42 +469,14 @@ func (rf *relayFinder) tryNode(ctx context.Context, pi peer.AddrInfo) (supportsR
 		return false, ctx.Err()
 	}
 
-	protos, err := rf.host.Peerstore().SupportsProtocols(pi.ID, protoIDv1, protoIDv2)
+	protos, err := rf.host.Peerstore().SupportsProtocols(pi.ID, protoIDv2)
 	if err != nil {
 		return false, fmt.Errorf("error checking relay protocol support for peer %s: %w", pi.ID, err)
 	}
-
-	// If the node speaks both, prefer circuit v2
-	var maybeSupportsV1, supportsV2 bool
-	for _, proto := range protos {
-		switch proto {
-		case protoIDv1:
-			maybeSupportsV1 = true
-		case protoIDv2:
-			supportsV2 = true
-		}
-	}
-
-	if supportsV2 {
-		return true, nil
-	}
-
-	if !rf.conf.enableCircuitV1 && !supportsV2 {
+	if len(protos) == 0 {
 		return false, errors.New("doesn't speak circuit v2")
 	}
-	if !maybeSupportsV1 && !supportsV2 {
-		return false, errors.New("doesn't speak circuit v1 or v2")
-	}
-
-	// The node *may* support circuit v1.
-	supportsV1, err := relayv1.CanHop(ctx, rf.host, pi.ID)
-	if err != nil {
-		return false, fmt.Errorf("CanHop failed: %w", err)
-	}
-	if !supportsV1 {
-		return false, errors.New("doesn't speak circuit v1 or v2")
-	}
-	return false, nil
+	return true, nil
 }
 
 // When a new node that could be a relay is found, we receive a notification on the maybeConnectToRelayTrigger chan.
@@ -520,9 +604,6 @@ func (rf *relayFinder) refreshReservations(ctx context.Context, now time.Time) b
 	// find reservations about to expire and refresh them in parallel
 	g := new(errgroup.Group)
 	for p, rsvp := range rf.relays {
-		if rsvp == nil { // this is a circuit v1 relay, there is no reservation
-			continue
-		}
 		if now.Add(rsvpExpirationSlack).Before(rsvp.Expiration) {
 			continue
 		}
@@ -565,9 +646,12 @@ func (rf *relayFinder) usingRelay(p peer.ID) bool {
 // selectCandidates returns an ordered slice of relay candidates.
 // Callers should attempt to obtain reservations with the candidates in this order.
 func (rf *relayFinder) selectCandidates() []*candidate {
+	now := rf.conf.clock.Now()
 	candidates := make([]*candidate, 0, len(rf.candidates))
 	for _, cand := range rf.candidates {
-		candidates = append(candidates, cand)
+		if cand.added.Add(rf.conf.maxCandidateAge).After(now) {
+			candidates = append(candidates, cand)
+		}
 	}
 
 	// TODO: better relay selection strategy; this just selects random relays,

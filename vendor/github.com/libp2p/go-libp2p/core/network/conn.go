@@ -43,6 +43,8 @@ type ConnectionState struct {
 	Security protocol.ID
 	// the transport used on this connection. For example: tcp
 	Transport string
+	// indicates whether StreamMultiplexer was selected using inlined muxer negotiation
+	UsedEarlyMuxerNegotiation bool
 }
 
 // ConnSecurity is the interface that one can mix into a connection interface to
