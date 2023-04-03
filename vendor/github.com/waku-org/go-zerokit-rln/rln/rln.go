@@ -1,26 +1,23 @@
 package rln
 
-/*
-#include "./librln.h"
-*/
 import "C"
 import (
 	"encoding/binary"
 	"errors"
-	"unsafe"
+	"fmt"
 
+	"github.com/waku-org/go-zerokit-rln/rln/link"
 	"github.com/waku-org/go-zerokit-rln/rln/resources"
 )
 
 // RLN represents the context used for rln.
 type RLN struct {
-	ptr *C.RLN
+	w *link.RLNWrapper
 }
 
 // NewRLN generates an instance of RLN. An instance supports both zkSNARKs logics
 // and Merkle tree data structure and operations. It uses a depth of 20 by default
 func NewRLN() (*RLN, error) {
-
 	wasm, err := resources.Asset("tree_height_20/rln.wasm")
 	if err != nil {
 		return nil, err
@@ -40,12 +37,9 @@ func NewRLN() (*RLN, error) {
 
 	depth := 20
 
-	wasmBuffer := toCBufferPtr(wasm)
-	zkeyBuffer := toCBufferPtr(zkey)
-	verifKeyBuffer := toCBufferPtr(verifKey)
-
-	if !bool(C.new_with_params(C.uintptr_t(depth), wasmBuffer, zkeyBuffer, verifKeyBuffer, &r.ptr)) {
-		return nil, errors.New("failed to initialize")
+	r.w, err = link.NewWithParams(depth, wasm, zkey, verifKey)
+	if err != nil {
+		return nil, err
 	}
 
 	return r, nil
@@ -55,13 +49,11 @@ func NewRLN() (*RLN, error) {
 // and Merkle tree data structure and operations. The parameter `depth“ indicates the depth of Merkle tree
 func NewRLNWithParams(depth int, wasm []byte, zkey []byte, verifKey []byte) (*RLN, error) {
 	r := &RLN{}
+	var err error
 
-	wasmBuffer := toCBufferPtr(wasm)
-	zkeyBuffer := toCBufferPtr(zkey)
-	verifKeyBuffer := toCBufferPtr(verifKey)
-
-	if !bool(C.new_with_params(C.uintptr_t(depth), wasmBuffer, zkeyBuffer, verifKeyBuffer, &r.ptr)) {
-		return nil, errors.New("failed to initialize")
+	r.w, err = link.NewWithParams(depth, wasm, zkey, verifKey)
+	if err != nil {
+		return nil, err
 	}
 
 	return r, nil
@@ -73,91 +65,59 @@ func NewRLNWithParams(depth int, wasm []byte, zkey []byte, verifKey []byte) (*RL
 func NewRLNWithFolder(depth int, resourcesFolderPath string) (*RLN, error) {
 	r := &RLN{}
 
-	pathBuffer := toCBufferPtr([]byte(resourcesFolderPath))
+	var err error
 
-	if !bool(C.new(C.uintptr_t(depth), pathBuffer, &r.ptr)) {
-		return nil, errors.New("failed to initialize")
+	r.w, err = link.NewWithFolder(depth, resourcesFolderPath)
+	if err != nil {
+		return nil, err
 	}
 
 	return r, nil
 }
 
-func toCBufferPtr(input []byte) *C.Buffer {
-	buf := toBuffer(input)
-
-	size := int(unsafe.Sizeof(buf))
-	in := (*C.Buffer)(C.malloc(C.size_t(size)))
-	*in = buf
-
-	return in
-}
-
-// MembershipKeyGen generates a MembershipKeyPair that can be used for the registration into the rln membership contract
-func (r *RLN) MembershipKeyGen() (*MembershipKeyPair, error) {
-	buffer := toBuffer([]byte{})
-	if !bool(C.key_gen(r.ptr, &buffer)) {
+// MembershipKeyGen generates a IdentityCredential that can be used for the
+// registration into the rln membership contract. Returns an error if the key generation fails
+func (r *RLN) MembershipKeyGen() (*IdentityCredential, error) {
+	generatedKeys := r.w.ExtendedKeyGen()
+	if generatedKeys == nil {
 		return nil, errors.New("error in key generation")
 	}
 
-	key := &MembershipKeyPair{
-		IDKey:        [32]byte{},
+	key := &IdentityCredential{
+		IDTrapdoor:   [32]byte{},
+		IDNullifier:  [32]byte{},
+		IDSecretHash: [32]byte{},
 		IDCommitment: [32]byte{},
 	}
 
-	// the public and secret keys together are 64 bytes
-	generatedKeys := C.GoBytes(unsafe.Pointer(buffer.ptr), C.int(buffer.len))
-	if len(generatedKeys) != 64 {
-		return nil, errors.New("the generated keys are invalid")
+	if len(generatedKeys) != 32*4 {
+		return nil, errors.New("generated keys are of invalid length")
 	}
 
-	copy(key.IDKey[:], generatedKeys[:32])
-	copy(key.IDCommitment[:], generatedKeys[32:64])
+	copy(key.IDTrapdoor[:], generatedKeys[:32])
+	copy(key.IDNullifier[:], generatedKeys[32:64])
+	copy(key.IDSecretHash[:], generatedKeys[64:96])
+	copy(key.IDCommitment[:], generatedKeys[96:128])
 
 	return key, nil
 }
 
 // appendLength returns length prefixed version of the input with the following format
 // [len<8>|input<var>], the len is a 8 byte value serialized in little endian
+
 func appendLength(input []byte) []byte {
 	inputLen := make([]byte, 8)
 	binary.LittleEndian.PutUint64(inputLen, uint64(len(input)))
 	return append(inputLen, input...)
 }
 
-// toBuffer converts the input to a buffer object that is used to communicate data with the rln lib
-func toBuffer(data []byte) C.Buffer {
-	dataPtr, dataLen := sliceToPtr(data)
-	return C.Buffer{
-		ptr: dataPtr,
-		len: C.uintptr_t(dataLen),
-	}
-}
-
-func sliceToPtr(slice []byte) (*C.uchar, C.int) {
-	if len(slice) == 0 {
-		return nil, 0
-	} else {
-		return (*C.uchar)(unsafe.Pointer(&slice[0])), C.int(len(slice))
-	}
-}
-
-// Hash hashes the plain text supplied in inputs_buffer and then maps it to a field element
-// this proc is used to map arbitrary signals to field element for the sake of proof generation
-// inputs holds the hash input as a byte slice, the output slice will contain a 32 byte slice
-func (r *RLN) Hash(data []byte) (MerkleNode, error) {
-	//  a thin layer on top of the Nim wrapper of the Poseidon hasher
+func (r *RLN) Sha256(data []byte) (MerkleNode, error) {
 	lenPrefData := appendLength(data)
 
-	hashInputBuffer := toCBufferPtr(lenPrefData)
-
-	var output []byte
-	out := toBuffer(output)
-
-	if !bool(C.hash(r.ptr, hashInputBuffer, &out)) {
-		return MerkleNode{}, errors.New("failed to hash")
+	b, err := r.w.Hash(lenPrefData)
+	if err != nil {
+		return MerkleNode{}, err
 	}
-
-	b := C.GoBytes(unsafe.Pointer(out.ptr), C.int(out.len))
 
 	var result MerkleNode
 	copy(result[:], b)
@@ -165,21 +125,48 @@ func (r *RLN) Hash(data []byte) (MerkleNode, error) {
 	return result, nil
 }
 
+func (r *RLN) Poseidon(input ...[]byte) (MerkleNode, error) {
+	data := serializeSlice(input)
+
+	inputLen := make([]byte, 8)
+	binary.LittleEndian.PutUint64(inputLen, uint64(len(input)))
+
+	lenPrefData := append(inputLen, data...)
+
+	b, err := r.w.PoseidonHash(lenPrefData)
+	if err != nil {
+		return MerkleNode{}, err
+	}
+
+	var result MerkleNode
+	copy(result[:], b)
+
+	return result, nil
+}
+
+func (r *RLN) ExtractMetadata(proof RateLimitProof) (ProofMetadata, error) {
+	externalNullifierRes, err := r.Poseidon(proof.Epoch[:], proof.RLNIdentifier[:])
+	if err != nil {
+		return ProofMetadata{}, fmt.Errorf("could not construct the external nullifier: %w", err)
+	}
+
+	return ProofMetadata{
+		Nullifier:         proof.Nullifier,
+		ShareX:            proof.ShareX,
+		ShareY:            proof.ShareY,
+		ExternalNullifier: externalNullifierRes,
+	}, nil
+}
+
 // GenerateProof generates a proof for the RLN given a KeyPair and the index in a merkle tree.
 // The output will containt the proof data and should be parsed as |proof<128>|root<32>|epoch<32>|share_x<32>|share_y<32>|nullifier<32>|
 // integers wrapped in <> indicate value sizes in bytes
-func (r *RLN) GenerateProof(data []byte, key MembershipKeyPair, index MembershipIndex, epoch Epoch) (*RateLimitProof, error) {
-	input := serialize(key.IDKey, index, epoch, data)
-	inputBuffer := toCBufferPtr(input)
-
-	var output []byte
-	out := toBuffer(output)
-
-	if !bool(C.generate_rln_proof(r.ptr, inputBuffer, &out)) {
-		return nil, errors.New("could not generate the proof")
+func (r *RLN) GenerateProof(data []byte, key IdentityCredential, index MembershipIndex, epoch Epoch) (*RateLimitProof, error) {
+	input := serialize(key.IDSecretHash, index, epoch, data)
+	proofBytes, err := r.w.GenerateRLNProof(input)
+	if err != nil {
+		return nil, err
 	}
-
-	proofBytes := C.GoBytes(unsafe.Pointer(out.ptr), C.int(out.len))
 
 	if len(proofBytes) != 320 {
 		return nil, errors.New("invalid proof generated")
@@ -219,20 +206,15 @@ func (r *RLN) GenerateProof(data []byte, key MembershipKeyPair, index Membership
 	}, nil
 }
 
-// Verify verifies a proof generated for the RLN.
-// proof [ proof<128>| root<32>| epoch<32>| share_x<32>| share_y<32>| nullifier<32> | signal_len<8> | signal<var> ]
-func (r *RLN) Verify(data []byte, proof RateLimitProof) (bool, error) {
-	proofBytes := proof.serialize(data)
-	proofBuf := toCBufferPtr(proofBytes)
-	res := C.bool(false)
-	if !bool(C.verify_rln_proof(r.ptr, proofBuf, &res)) {
-		return false, errors.New("could not verify rln proof")
+func serialize32(roots [][32]byte) []byte {
+	var result []byte
+	for _, r := range roots {
+		result = append(result, r[:]...)
 	}
-
-	return bool(res), nil
+	return result
 }
 
-func serializeRoots(roots [][32]byte) []byte {
+func serializeSlice(roots [][]byte) []byte {
 	var result []byte
 	for _, r := range roots {
 		result = append(result, r[:]...)
@@ -257,16 +239,16 @@ func serializeCommitments(commitments []IDCommitment) []byte {
 	return result
 }
 
-func (r *RLN) VerifyWithRoots(data []byte, proof RateLimitProof, roots [][32]byte) (bool, error) {
+// proof [ proof<128>| root<32>| epoch<32>| share_x<32>| share_y<32>| nullifier<32> | signal_len<8> | signal<var> ]
+// validRoots should contain a sequence of roots in the acceptable windows.
+// As default, it is set to an empty sequence of roots. This implies that the validity check for the proof's root is skipped
+func (r *RLN) Verify(data []byte, proof RateLimitProof, roots ...[32]byte) (bool, error) {
 	proofBytes := proof.serialize(data)
-	proofBuf := toCBufferPtr(proofBytes)
+	rootBytes := serialize32(roots)
 
-	rootBytes := serializeRoots(roots)
-	rootBuf := toCBufferPtr(rootBytes)
-
-	res := C.bool(false)
-	if !bool(C.verify_with_roots(r.ptr, proofBuf, rootBuf, &res)) {
-		return false, errors.New("could not verify with roots")
+	res, err := r.w.VerifyWithRoots(proofBytes, rootBytes)
+	if err != nil {
+		return false, err
 	}
 
 	return bool(res), nil
@@ -274,8 +256,7 @@ func (r *RLN) VerifyWithRoots(data []byte, proof RateLimitProof, roots [][32]byt
 
 // InsertMember adds the member to the tree
 func (r *RLN) InsertMember(idComm IDCommitment) error {
-	idCommBuffer := toCBufferPtr(idComm[:])
-	insertionSuccess := bool(C.set_next_leaf(r.ptr, idCommBuffer))
+	insertionSuccess := r.w.SetNextLeaf(idComm[:])
 	if !insertionSuccess {
 		return errors.New("could not insert member")
 	}
@@ -286,8 +267,7 @@ func (r *RLN) InsertMember(idComm IDCommitment) error {
 // This proc is atomic, i.e., if any of the insertions fails, all the previous insertions are rolled back
 func (r *RLN) InsertMembers(index MembershipIndex, idComms []IDCommitment) error {
 	idCommBytes := serializeCommitments(idComms)
-	idCommBuffer := toCBufferPtr(idCommBytes)
-	insertionSuccess := bool(C.set_leaves_from(r.ptr, C.uintptr_t(index), idCommBuffer))
+	insertionSuccess := r.w.SetLeavesFrom(index, idCommBytes)
 	if !insertionSuccess {
 		return errors.New("could not insert members")
 	}
@@ -298,7 +278,7 @@ func (r *RLN) InsertMembers(index MembershipIndex, idComms []IDCommitment) error
 // parameter is the position of the id commitment key to be deleted from the tree.
 // The deleted id commitment key is replaced with a zero leaf
 func (r *RLN) DeleteMember(index MembershipIndex) error {
-	deletionSuccess := bool(C.delete_leaf(r.ptr, C.uintptr_t(index)))
+	deletionSuccess := r.w.DeleteLeaf(index)
 	if !deletionSuccess {
 		return errors.New("could not delete member")
 	}
@@ -307,14 +287,10 @@ func (r *RLN) DeleteMember(index MembershipIndex) error {
 
 // GetMerkleRoot reads the Merkle Tree root after insertion
 func (r *RLN) GetMerkleRoot() (MerkleNode, error) {
-	var output []byte
-	out := toBuffer(output)
-
-	if !bool(C.get_root(r.ptr, &out)) {
-		return MerkleNode{}, errors.New("could not get the root")
+	b, err := r.w.GetRoot()
+	if err != nil {
+		return MerkleNode{}, err
 	}
-
-	b := C.GoBytes(unsafe.Pointer(out.ptr), C.int(out.len))
 
 	if len(b) != 32 {
 		return MerkleNode{}, errors.New("wrong output size")
@@ -356,14 +332,14 @@ func CalcMerkleRoot(list []IDCommitment) (MerkleNode, error) {
 // CreateMembershipList produces a list of membership key pairs and also returns the root of a Merkle tree constructed
 // out of the identity commitment keys of the generated list. The output of this function is used to initialize a static
 // group keys (to test waku-rln-relay in the off-chain mode)
-func CreateMembershipList(n int) ([]MembershipKeyPair, MerkleNode, error) {
+func CreateMembershipList(n int) ([]IdentityCredential, MerkleNode, error) {
 	// initialize a Merkle tree
 	rln, err := NewRLN()
 	if err != nil {
 		return nil, MerkleNode{}, err
 	}
 
-	var output []MembershipKeyPair
+	var output []IdentityCredential
 	for i := 0; i < n; i++ {
 		// generate a keypair
 		keypair, err := rln.MembershipKeyGen()

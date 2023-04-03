@@ -225,7 +225,7 @@ setup: setup-check setup-build setup-dev tidy
 
 setup-check: ##@setup Check if Go compiler is installed.
 ifeq (, $(shell which go))
-	$(error "No Go compiler found! Make sure to install 1.18.0 or newer.")
+	$(error "No Go compiler found! Make sure to install 1.19.0 or newer.")
 endif
 
 setup-dev: ##@setup Install all necessary tools for development

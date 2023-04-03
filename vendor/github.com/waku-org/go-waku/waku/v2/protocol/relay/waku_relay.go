@@ -51,12 +51,6 @@ type WakuRelay struct {
 	subscriptions      map[string][]*Subscription
 	subscriptionsMutex sync.Mutex
 
-	// TODO: convert to concurrent map with gc
-	msgCacheMutex     sync.Mutex
-	msgCacheDeletions int
-	msgCache          map[string]*pb.WakuMessage
-	shrinkCacheReq    chan struct{}
-
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -108,12 +102,6 @@ func (w *WakuRelay) Start(ctx context.Context) error {
 	w.ctx = ctx // TODO: create worker for creating subscriptions instead of storing context
 	w.cancel = cancel
 
-	w.shrinkCacheReq = make(chan struct{})
-	w.msgCache = make(map[string]*pb.WakuMessage, 1000)
-
-	w.wg.Add(1)
-	go w.cacheWorker(ctx)
-
 	ps, err := pubsub.NewGossipSub(ctx, w.host, w.opts...)
 	if err != nil {
 		return err
@@ -122,51 +110,6 @@ func (w *WakuRelay) Start(ctx context.Context) error {
 
 	w.log.Info("Relay protocol started")
 	return nil
-}
-
-func (w *WakuRelay) getMessageFromCache(topic string, id string) *pb.WakuMessage {
-	w.msgCacheMutex.Lock()
-
-	key := topic + id
-	msg := w.msgCache[key]
-	delete(w.msgCache, key)
-	w.msgCacheDeletions++
-	deleteCnt := w.msgCacheDeletions
-	w.msgCacheMutex.Unlock()
-
-	if deleteCnt > 1000 {
-		w.shrinkCacheReq <- struct{}{}
-	}
-
-	return msg
-}
-
-func (w *WakuRelay) AddToCache(topic string, id string, msg *pb.WakuMessage) {
-	w.msgCacheMutex.Lock()
-	defer w.msgCacheMutex.Unlock()
-
-	key := topic + id
-	w.msgCache[key] = msg
-}
-
-func (w *WakuRelay) cacheWorker(ctx context.Context) {
-	defer w.wg.Done()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-w.shrinkCacheReq:
-			w.msgCacheMutex.Lock()
-			// Shrink msg cache to avoid oom
-			newMsgCache := make(map[string]*pb.WakuMessage, 1000)
-			for k, v := range w.msgCache {
-				newMsgCache[k] = v
-			}
-			w.msgCache = newMsgCache
-			w.msgCacheMutex.Unlock()
-		}
-	}
 }
 
 // PubSub returns the implementation of the pubsub system
@@ -214,8 +157,6 @@ func (w *WakuRelay) validatorFactory(pubsubTopic string) func(ctx context.Contex
 		if err != nil {
 			return false
 		}
-
-		w.AddToCache(pubsubTopic, message.ID, msg)
 
 		return true
 	}
@@ -299,10 +240,6 @@ func (w *WakuRelay) Stop() {
 
 	w.cancel()
 	w.wg.Wait()
-
-	close(w.shrinkCacheReq)
-
-	w.msgCache = nil
 
 	w.subscriptionsMutex.Lock()
 	defer w.subscriptionsMutex.Unlock()
@@ -448,10 +385,13 @@ func (w *WakuRelay) subscribeToTopic(userCtx context.Context, pubsubTopic string
 				return
 			}
 			stats.Record(ctx, metrics.Messages.M(1))
+			wakuMessage := &pb.WakuMessage{}
+			if err := proto.Unmarshal(msg.Data, wakuMessage); err != nil {
+				w.log.Error("decoding message", zap.Error(err))
+				return
+			}
 
-			wakuMessage := w.getMessageFromCache(pubsubTopic, msg.ID)
-			envelope := waku_proto.NewEnvelope(wakuMessage, w.timesource.Now().UnixNano(), string(pubsubTopic))
-
+			envelope := waku_proto.NewEnvelope(wakuMessage, w.timesource.Now().UnixNano(), pubsubTopic)
 			w.log.Debug("waku.relay received", logging.HexString("hash", envelope.Hash()))
 
 			if w.bcaster != nil {

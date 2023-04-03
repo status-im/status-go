@@ -1,6 +1,8 @@
 package pb
 
-import "github.com/waku-org/go-waku/waku/v2/hash"
+import (
+	"github.com/waku-org/go-waku/waku/v2/hash"
+)
 
 // Hash calculates the hash of a waku message
 func (msg *WakuMessage) Hash(pubsubTopic string) []byte {

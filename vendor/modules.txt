@@ -972,7 +972,7 @@ github.com/vacp2p/mvds/transport
 github.com/waku-org/go-discover/discover
 github.com/waku-org/go-discover/discover/v4wire
 github.com/waku-org/go-discover/discover/v5wire
-# github.com/waku-org/go-waku v0.5.3-0.20230403144301-3b3e3b6968b4
+# github.com/waku-org/go-waku v0.5.3-0.20230404182041-41691a44e579
 ## explicit; go 1.19
 github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/waku/persistence
@@ -997,15 +997,27 @@ github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange/pb
 github.com/waku-org/go-waku/waku/v2/protocol/relay
 github.com/waku-org/go-waku/waku/v2/protocol/rln
 github.com/waku-org/go-waku/waku/v2/protocol/rln/contracts
+github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager
+github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager/static
 github.com/waku-org/go-waku/waku/v2/protocol/store
 github.com/waku-org/go-waku/waku/v2/protocol/store/pb
 github.com/waku-org/go-waku/waku/v2/rendezvous
 github.com/waku-org/go-waku/waku/v2/timesource
 github.com/waku-org/go-waku/waku/v2/utils
-# github.com/waku-org/go-zerokit-rln v0.1.7-wakuorg
+# github.com/waku-org/go-zerokit-rln v0.1.11
 ## explicit; go 1.18
 github.com/waku-org/go-zerokit-rln/rln
+github.com/waku-org/go-zerokit-rln/rln/link
 github.com/waku-org/go-zerokit-rln/rln/resources
+# github.com/waku-org/go-zerokit-rln-apple v0.0.0-20230331231302-258cacb91327
+## explicit; go 1.19
+github.com/waku-org/go-zerokit-rln-apple/rln
+# github.com/waku-org/go-zerokit-rln-arm v0.0.0-20230331223149-f90e66aebb0d
+## explicit; go 1.19
+github.com/waku-org/go-zerokit-rln-arm/rln
+# github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230331181847-cba74520bae9
+## explicit; go 1.19
+github.com/waku-org/go-zerokit-rln-x86_64/rln
 # github.com/wealdtech/go-ens/v3 v3.5.0
 ## explicit; go 1.12
 github.com/wealdtech/go-ens/v3
