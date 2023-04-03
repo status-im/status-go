@@ -105,6 +105,11 @@ func (api *API) Deploy(ctx context.Context, chainID uint64, deploymentParameters
 	return DeploymentDetails{address.Hex(), tx.Hash().Hex()}, nil
 }
 
+// Returns gas units + 10%
+func (api *API) DeployCollectiblesEstimate(ctx context.Context) (uint64, error) {
+	return 3702411, nil
+}
+
 func (api *API) newCollectiblesInstance(chainID uint64, contractAddress string) (*collectibles.Collectibles, error) {
 	backend, err := api.RPCClient.EthClient(chainID)
 	if err != nil {
