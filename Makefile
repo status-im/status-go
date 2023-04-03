@@ -244,7 +244,7 @@ install-gomobile: ##@install Go Mobile Build Tools
 	GO111MODULE=off go get -d golang.org/x/mobile/cmd/gobind
 
 install-lint: ##@install Install Linting Tools
-	GO111MODULE=on go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
+	GO111MODULE=on go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
 
 install-mock: ##@install Install Module Mocking Tools
 	GO111MODULE=on go install github.com/golang/mock/mockgen@v1.4.4
