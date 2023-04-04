@@ -75,6 +75,7 @@ const (
 	BuyStickerPack        PendingTrxType = "BuyStickerPack"
 	WalletTransfer        PendingTrxType = "WalletTransfer"
 	CollectibleDeployment PendingTrxType = "CollectibleDeployment"
+	CollectibleAirdrop    PendingTrxType = "CollectibleAirdrop"
 )
 
 type PendingTransaction struct {
