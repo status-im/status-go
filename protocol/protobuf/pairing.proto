@@ -68,6 +68,11 @@ message LocalPairingPayload {
   }
 }
 
+message LocalPairingPeerHello {
+  string name = 1;
+  bytes signature = 2;
+}
+
 message PairInstallation {
   uint64 clock = 1;
   string installation_id = 2;
