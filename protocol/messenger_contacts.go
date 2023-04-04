@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -326,16 +327,13 @@ func (m *Messenger) addContact(pubKey, ensName, nickname, displayName, contactRe
 		return nil, err
 	}
 
-	// Fetch contact code
 	publicKey, err := contact.PublicKey()
 	if err != nil {
 		return nil, err
 	}
-	filter, err := m.transport.JoinPrivate(publicKey)
-	if err != nil {
-		return nil, err
-	}
-	_, err = m.scheduleSyncFilters([]*transport.Filter{filter})
+
+	// Fetch contact code
+	_, err = m.scheduleSyncFiltersForContact(publicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -989,18 +987,124 @@ func (m *Messenger) BuildContact(request *requests.BuildContact) (*Contact, erro
 	}
 
 	// Schedule sync filter to fetch information about the contact
+
 	publicKey, err := contact.PublicKey()
 	if err != nil {
 		return nil, err
 	}
+
+	_, err = m.scheduleSyncFiltersForContact(publicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return contact, nil
+}
+
+func (m *Messenger) scheduleSyncFiltersForContact(publicKey *ecdsa.PublicKey) (*transport.Filter, error) {
 	filter, err := m.transport.JoinPrivate(publicKey)
 	if err != nil {
 		return nil, err
 	}
 	_, err = m.scheduleSyncFilters([]*transport.Filter{filter})
 	if err != nil {
+		return filter, err
+	}
+	return filter, nil
+}
+
+func (m *Messenger) RequestContactInfoFromMailserver(pubkey string, waitForResponse bool) (*Contact, error) {
+
+	err := m.requestContactInfoFromMailserver(pubkey)
+
+	if err != nil {
 		return nil, err
 	}
 
+	if !waitForResponse {
+		return nil, nil
+	}
+
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	var contact *Contact
+	fetching := true
+
+	for fetching {
+		select {
+		case <-time.After(200 * time.Millisecond):
+			var ok bool
+			contact, ok = m.allContacts.Load(pubkey)
+
+			if ok && contact != nil && contact.DisplayName != "" {
+				fetching = false
+				m.logger.Info("contact info received", zap.String("pubkey", contact.ID))
+			}
+
+		case <-ctx.Done():
+			fetching = false
+		}
+	}
+
+	m.forgetContactInfoRequest(pubkey)
+
 	return contact, nil
+}
+
+func (m *Messenger) requestContactInfoFromMailserver(pubkey string) error {
+
+	m.requestedContactsLock.Lock()
+	defer m.requestedContactsLock.Unlock()
+
+	if _, ok := m.requestedContacts[pubkey]; ok {
+		return nil
+	}
+
+	m.logger.Debug("requesting contact info from mailserver", zap.String("publicKey", pubkey))
+
+	c, err := buildContactFromPkString(pubkey)
+
+	if err != nil {
+		return err
+	}
+
+	publicKey, err := c.PublicKey()
+
+	if err != nil {
+		return err
+	}
+
+	var filter *transport.Filter
+	filter, err = m.scheduleSyncFiltersForContact(publicKey)
+
+	if err != nil {
+		return err
+	}
+
+	m.requestedContacts[pubkey] = filter
+
+	return nil
+}
+
+func (m *Messenger) forgetContactInfoRequest(publicKey string) {
+
+	m.requestedContactsLock.Lock()
+	defer m.requestedContactsLock.Unlock()
+
+	filter, ok := m.requestedContacts[publicKey]
+	if !ok {
+		return
+	}
+
+	m.logger.Debug("forgetting contact info request", zap.String("publicKey", publicKey))
+
+	err := m.transport.RemoveFilters([]*transport.Filter{filter})
+
+	if err != nil {
+		m.logger.Warn("failed to remove filter", zap.Error(err))
+	}
+
+	delete(m.requestedContacts, publicKey)
 }

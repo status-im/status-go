@@ -334,6 +334,10 @@ func (api *PublicAPI) GetContactByID(parent context.Context, id string) *protoco
 	return api.service.messenger.GetContactByID(id)
 }
 
+func (api *PublicAPI) RequestContactInfoFromMailserver(pubkey string) (*protocol.Contact, error) {
+	return api.service.messenger.RequestContactInfoFromMailserver(pubkey, true)
+}
+
 func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*transport.Filter) error {
 	return api.service.messenger.RemoveFilters(chats)
 }
