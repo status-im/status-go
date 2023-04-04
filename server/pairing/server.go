@@ -142,13 +142,13 @@ func NewSenderServer(backend *api.GethStatusBackend, config *SenderServerConfig)
 func (s *SenderServer) startSendingData() error {
 	s.SetHandlers(server.HandlerPatternMap{
 		pairingChallenge:      handlePairingChallenge(s.challengeGiver),
-		pairingSendAccount:    middlewareChallenge(s.challengeGiver, handleSendAccount(s, s.accountMounter)),
-		pairingSendSyncDevice: middlewareChallenge(s.challengeGiver, handlePairingSyncDeviceSend(s, s.rawMessageMounter)),
+		pairingSendAccount:    middlewareChallenge(s.challengeGiver, handleSendAccount(s.GetLogger(), s.accountMounter)),
+		pairingSendSyncDevice: middlewareChallenge(s.challengeGiver, handlePairingSyncDeviceSend(s.GetLogger(), s.rawMessageMounter)),
 		// TODO implement refactor of installation data exchange to follow the send/receive pattern of
 		//  the other handlers.
 		//  https://github.com/status-im/status-go/issues/3304
 		// receive installation data from receiver
-		pairingReceiveInstallation: middlewareChallenge(s.challengeGiver, handleReceiveInstallation(s, s.installationMounter)),
+		pairingReceiveInstallation: middlewareChallenge(s.challengeGiver, handleReceiveInstallation(s.GetLogger(), s.installationMounter)),
 	})
 	return s.Start()
 }
@@ -237,13 +237,13 @@ func NewReceiverServer(backend *api.GethStatusBackend, config *ReceiverServerCon
 func (s *ReceiverServer) startReceivingData() error {
 	s.SetHandlers(server.HandlerPatternMap{
 		pairingChallenge:         handlePairingChallenge(s.challengeGiver),
-		pairingReceiveAccount:    handleReceiveAccount(s, s.accountReceiver),
-		pairingReceiveSyncDevice: handleParingSyncDeviceReceive(s, s.rawMessageReceiver),
+		pairingReceiveAccount:    handleReceiveAccount(s.GetLogger(), s.accountReceiver),
+		pairingReceiveSyncDevice: handleParingSyncDeviceReceive(s.GetLogger(), s.rawMessageReceiver),
 		// TODO implement refactor of installation data exchange to follow the send/receive pattern of
 		//  the other handlers.
 		//  https://github.com/status-im/status-go/issues/3304
 		// send installation data back to sender
-		pairingSendInstallation: middlewareChallenge(s.challengeGiver, handleSendInstallation(s, s.installationReceiver)),
+		pairingSendInstallation: middlewareChallenge(s.challengeGiver, handleSendInstallation(s.GetLogger(), s.installationReceiver)),
 	})
 	return s.Start()
 }

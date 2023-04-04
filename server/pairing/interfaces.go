@@ -1,9 +1,5 @@
 package pairing
 
-import (
-	"go.uber.org/zap"
-)
-
 // PayloadMounterReceiver represents a struct that can:
 //   - mount payload data from a PayloadRepository or a PayloadLoader into memory (PayloadMounter.Mount)
 //   - prepare data to be sent encrypted (PayloadMounter.ToSend) via some transport
@@ -23,14 +19,6 @@ type PayloadRepository interface {
 type PayloadLocker interface {
 	// LockPayload prevents future excess to outbound safe and received data
 	LockPayload()
-}
-
-// TODO if this interface only gets a logger, then maybe remove the interface and change consuming function params
-//  to accept a *zap.logger
-//  https://github.com/status-im/status-go/issues/3370
-
-type HandlerServer interface {
-	GetLogger() *zap.Logger
 }
 
 type ProtobufMarshaller interface {
