@@ -23,8 +23,7 @@ const (
 
 // Account handling
 
-func handleReceiveAccount(hs HandlerServer, pr PayloadReceiver) http.HandlerFunc {
-	logger := hs.GetLogger()
+func handleReceiveAccount(logger *zap.Logger, pr PayloadReceiver) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionPairingAccount})
 		payload, err := io.ReadAll(r.Body)
@@ -47,8 +46,7 @@ func handleReceiveAccount(hs HandlerServer, pr PayloadReceiver) http.HandlerFunc
 	}
 }
 
-func handleSendAccount(hs HandlerServer, pm PayloadMounter) http.HandlerFunc {
-	logger := hs.GetLogger()
+func handleSendAccount(logger *zap.Logger, pm PayloadMounter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionPairingAccount})
 		w.Header().Set("Content-Type", "application/octet-stream")
@@ -75,8 +73,7 @@ func handleSendAccount(hs HandlerServer, pm PayloadMounter) http.HandlerFunc {
 
 // Device sync handling
 
-func handleParingSyncDeviceReceive(hs HandlerServer, pr PayloadReceiver) http.HandlerFunc {
-	logger := hs.GetLogger()
+func handleParingSyncDeviceReceive(logger *zap.Logger, pr PayloadReceiver) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionSyncDevice})
 		payload, err := io.ReadAll(r.Body)
@@ -99,8 +96,7 @@ func handleParingSyncDeviceReceive(hs HandlerServer, pr PayloadReceiver) http.Ha
 	}
 }
 
-func handlePairingSyncDeviceSend(hs HandlerServer, pm PayloadMounter) http.HandlerFunc {
-	logger := hs.GetLogger()
+func handlePairingSyncDeviceSend(logger *zap.Logger, pm PayloadMounter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionSyncDevice})
 		w.Header().Set("Content-Type", "application/octet-stream")
@@ -129,8 +125,7 @@ func handlePairingSyncDeviceSend(hs HandlerServer, pm PayloadMounter) http.Handl
 
 // Installation data handling
 
-func handleReceiveInstallation(hs HandlerServer, pmr PayloadMounterReceiver) http.HandlerFunc {
-	logger := hs.GetLogger()
+func handleReceiveInstallation(logger *zap.Logger, pmr PayloadMounterReceiver) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionPairingInstallation})
 		payload, err := io.ReadAll(r.Body)
@@ -153,8 +148,7 @@ func handleReceiveInstallation(hs HandlerServer, pmr PayloadMounterReceiver) htt
 	}
 }
 
-func handleSendInstallation(hs HandlerServer, pmr PayloadMounterReceiver) http.HandlerFunc {
-	logger := hs.GetLogger()
+func handleSendInstallation(logger *zap.Logger, pmr PayloadMounterReceiver) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionPairingInstallation})
 		w.Header().Set("Content-Type", "application/octet-stream")
