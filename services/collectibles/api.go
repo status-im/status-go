@@ -118,6 +118,8 @@ func (api *API) newCollectiblesInstance(chainID uint64, contractAddress string) 
 	return collectibles.NewCollectibles(common.HexToAddress(contractAddress), backend)
 }
 
+// if we want to mint 2 tokens to addresses ["a", "b"] we need to mint
+// twice to every address - we need to send to smart contract table ["a", "a", "b", "b"]
 func (api *API) multiplyWalletAddresses(amount int, contractAddresses []string) []string {
 	var totalAddresses []string
 	for i := 1; i <= amount; i++ {
@@ -126,9 +128,10 @@ func (api *API) multiplyWalletAddresses(amount int, contractAddresses []string) 
 	return totalAddresses
 }
 
-func (api *API) MintTo(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, users []string, amount int) (string, error) {
-	if len(users) == 0 {
-		return "", errors.New("users list is empty")
+func (api *API) MintTo(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, walletAddresses []string, amount int) (string, error) {
+	err := api.validateWalletsAndAmounts(walletAddresses, amount)
+	if err != nil {
+		return "", err
 	}
 
 	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
@@ -136,9 +139,7 @@ func (api *API) MintTo(ctx context.Context, chainID uint64, contractAddress stri
 		return "", err
 	}
 
-	// if we want to mint 2 tokens to addresses ["a", "b"] we need to mint
-	// twice to every address - we need to send to smart contract table ["a", "a", "b", "b"]
-	totalAddresses := api.multiplyWalletAddresses(amount, users)
+	totalAddresses := api.multiplyWalletAddresses(amount, walletAddresses)
 
 	var usersAddresses = []common.Address{}
 	for _, k := range totalAddresses {
@@ -151,9 +152,6 @@ func (api *API) MintTo(ctx context.Context, chainID uint64, contractAddress stri
 	if err != nil {
 		return "", err
 	}
-
-	//save to db
-	_ = api.db.AddTokenOwners(chainID, contractAddress, totalAddresses)
 
 	return tx.Hash().Hex(), nil
 }
@@ -169,4 +167,24 @@ func (api *API) ContractOwner(ctx context.Context, chainID uint64, contractAddre
 		return "", err
 	}
 	return owner.String(), nil
+}
+
+func (api *API) AddTokenOwners(ctx context.Context, chainID uint64, contractAddress string, walletAddresses []string, amount int) error {
+	err := api.validateWalletsAndAmounts(walletAddresses, amount)
+	if err != nil {
+		return err
+	}
+
+	totalAddresses := api.multiplyWalletAddresses(amount, walletAddresses)
+	return api.db.AddTokenOwners(chainID, contractAddress, totalAddresses)
+}
+
+func (api *API) validateWalletsAndAmounts(walletAddresses []string, amount int) error {
+	if len(walletAddresses) == 0 {
+		return errors.New("wallet addresses list is empty")
+	}
+	if amount <= 0 {
+		return errors.New("amount is <= 0")
+	}
+	return nil
 }
