@@ -1583,21 +1583,44 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		}
 	}
 
-	// Update message and return it
-	originalMessage.Deleted = true
-	originalMessage.DeletedBy = deleteMessage.DeleteMessage.DeletedBy
-
-	err := m.persistence.SaveMessages([]*common.Message{originalMessage})
-	if err != nil {
-		return err
+	var messagesToDelete []*common.Message
+	// In case of Image messages, we need to delete all the images in the album
+	if originalMessage.ContentType == protobuf.ChatMessage_IMAGE {
+		image := originalMessage.GetImage()
+		messagesInTheAlbum, err := m.persistence.albumMessages(deleteMessage.ChatId, image.GetAlbumId())
+		if err != nil {
+			return err
+		}
+		for _, messageInAlbum := range messagesInTheAlbum {
+			messagesToDelete = append(messagesToDelete, messageInAlbum)
+		}
+	} else {
+		messagesToDelete = append(messagesToDelete, originalMessage)
 	}
 
-	m.logger.Debug("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", deleteMessage.MessageId))
-	err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, deleteMessage.MessageId)
+	// Update message and return it
+	for _, messageToDelete := range messagesToDelete {
+		messageToDelete.Deleted = true
+		messageToDelete.DeletedBy = deleteMessage.DeleteMessage.DeletedBy
+		err := m.persistence.SaveMessages([]*common.Message{messageToDelete})
+		if err != nil {
+			return err
+		}
 
-	if err != nil {
-		m.logger.Warn("failed to delete notifications for deleted message", zap.Error(err))
-		return err
+		m.logger.Debug("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", messageToDelete.ID))
+		err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, messageToDelete.ID)
+
+		if err != nil {
+			m.logger.Warn("failed to delete notifications for deleted message", zap.Error(err))
+			return err
+		}
+
+		state.Response.AddRemovedMessage(&RemovedMessage{MessageID: messageToDelete.ID, ChatID: chat.ID, DeletedBy: deleteMessage.DeleteMessage.DeletedBy})
+		state.Response.AddNotification(DeletedMessageNotification(messageToDelete.ID, chat))
+		state.Response.AddActivityCenterNotification(&ActivityCenterNotification{
+			ID:      types.FromHex(messageToDelete.ID),
+			Deleted: true,
+		})
 	}
 
 	if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
@@ -1610,13 +1633,7 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		}
 	}
 
-	state.Response.AddRemovedMessage(&RemovedMessage{MessageID: messageID, ChatID: chat.ID, DeletedBy: deleteMessage.DeleteMessage.DeletedBy})
 	state.Response.AddChat(chat)
-	state.Response.AddNotification(DeletedMessageNotification(messageID, chat))
-	state.Response.AddActivityCenterNotification(&ActivityCenterNotification{
-		ID:      types.FromHex(messageID),
-		Deleted: true,
-	})
 
 	return nil
 }
