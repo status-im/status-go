@@ -1979,7 +1979,7 @@ func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Mes
 		return nil, err
 	}
 
-	ImagesCount := 0
+	ImagesCount := int32(0)
 	for _, message := range messages {
 		if message.ContentType == protobuf.ChatMessage_IMAGE {
 			ImagesCount++

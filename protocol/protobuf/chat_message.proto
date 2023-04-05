@@ -17,6 +17,7 @@ message ImageMessage {
   string album_id = 3;
   uint32 width = 4;
   uint32 height = 5;
+  int32 album_images_count = 6;
 }
 
 message AudioMessage {
