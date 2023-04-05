@@ -125,7 +125,8 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 		}
 	}
 	for _, message := range response.Messages() {
-		s.Require().Equal(message.AlbumImagesCount, imagesCount)
+		s.Require().NotNil(message.GetImage())
+		s.Require().Equal(message.GetImage().AlbumImagesCount, imagesCount)
 	}
 
 	s.Require().Equal(messageCount, len(response.Messages()), "it returns the messages")
@@ -134,7 +135,7 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 
 	response, err = WaitOnMessengerResponse(
 		theirMessenger,
-		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.messages) == 3 },
 		"no messages",
 	)
 
@@ -143,8 +144,8 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 	s.Require().Len(response.Messages(), messageCount)
 	for _, message := range response.Messages() {
 		image := message.GetImage()
-		s.Require().Equal(message.AlbumImagesCount, imagesCount)
 		s.Require().NotNil(image, "Message.ID=%s", message.ID)
+		s.Require().Equal(image.AlbumImagesCount, imagesCount)
 		s.Require().NotEmpty(image.AlbumId, "Message.ID=%s", message.ID)
 	}
 }
