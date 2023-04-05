@@ -144,6 +144,9 @@ type Messenger struct {
 	requestedCommunitiesLock sync.RWMutex
 	requestedCommunities     map[string]*transport.Filter
 
+	requestedContactsLock sync.RWMutex
+	requestedContacts     map[string]*transport.Filter
+
 	connectionState                      connection.State
 	telemetryClient                      *telemetry.Client
 	contractMaker                        *contracts.ContractMaker
@@ -478,6 +481,8 @@ func NewMessenger(
 		cancel:                   cancel,
 		requestedCommunitiesLock: sync.RWMutex{},
 		requestedCommunities:     make(map[string]*transport.Filter),
+		requestedContactsLock:    sync.RWMutex{},
+		requestedContacts:        make(map[string]*transport.Filter),
 		importingCommunities:     make(map[string]bool),
 		browserDatabase:          c.browserDatabase,
 		httpServer:               c.httpServer,
@@ -3351,9 +3356,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 				senderID := contactIDFromPublicKey(publicKey)
 
-				// Check for messages from blocked users
-				if contact, ok := messageState.AllContacts.Load(senderID); ok && contact.Blocked {
-					continue
+				if _, ok := m.requestedContacts[senderID]; !ok {
+					// Check for messages from blocked users
+					if contact, ok := messageState.AllContacts.Load(senderID); ok && contact.Blocked {
+						continue
+					}
 				}
 
 				// Don't process duplicates
@@ -3379,6 +3386,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					}
 					contact = c
 					messageState.AllContacts.Store(senderID, contact)
+					m.forgetContactInfoRequest(senderID)
 				}
 				messageState.CurrentMessageState = &CurrentMessageState{
 					MessageID:        messageID,
@@ -3846,6 +3854,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.ContactUpdate:
+						logger.Info("<<< ContactUpdate", zap.String("publicKey", senderID))
+
 						if common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("coming from us, ignoring")
 							continue
@@ -3859,6 +3869,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							allMessagesProcessed = false
 							continue
 						}
+						m.forgetContactInfoRequest(senderID)
+
 					case protobuf.AcceptContactRequest:
 						logger.Debug("Handling AcceptContactRequest")
 						message := msg.ParsedMessage.Interface().(protobuf.AcceptContactRequest)
