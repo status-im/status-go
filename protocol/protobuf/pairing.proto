@@ -69,8 +69,10 @@ message LocalPairingPayload {
 }
 
 message LocalPairingPeerHello {
-  string name = 1;
-  bytes signature = 2;
+  bytes peer_id = 1;
+  string device_name = 2;
+  string device_type = 3;
+  bytes signature = 4;
 }
 
 message PairInstallation {
