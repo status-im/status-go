@@ -11,7 +11,7 @@ import (
 
 // SetupIterativeDownloader configures IterativeDownloader with last known synced block.
 func SetupIterativeDownloader(
-	db *Database, client HeaderReader, address common.Address,
+	client HeaderReader, address common.Address,
 	downloader BatchDownloader, size *big.Int, to *big.Int, from *big.Int) (*IterativeDownloader, error) {
 
 	if to == nil || from == nil {
