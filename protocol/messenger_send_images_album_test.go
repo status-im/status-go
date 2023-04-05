@@ -118,14 +118,15 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 	s.NoError(err)
 
 	// Check that album count was the number of the images sent
-	imagesCount := 0
+	imagesCount := uint32(0)
 	for _, message := range response.Messages() {
 		if message.ContentType == protobuf.ChatMessage_IMAGE {
 			imagesCount++
 		}
 	}
 	for _, message := range response.Messages() {
-		s.Require().Equal(message.AlbumImagesCount, imagesCount)
+		s.Require().NotNil(message.GetImage())
+		s.Require().Equal(message.GetImage().AlbumImagesCount, imagesCount)
 	}
 
 	s.Require().Equal(messageCount, len(response.Messages()), "it returns the messages")
@@ -134,17 +135,17 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 
 	response, err = WaitOnMessengerResponse(
 		theirMessenger,
-		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
+		func(r *MessengerResponse) bool { return len(r.messages) == 3 },
 		"no messages",
 	)
 
 	s.Require().NoError(err)
 	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages(), messageCount)
-
 	for _, message := range response.Messages() {
 		image := message.GetImage()
 		s.Require().NotNil(image, "Message.ID=%s", message.ID)
+		s.Require().Equal(image.AlbumImagesCount, imagesCount)
 		s.Require().NotEmpty(image.AlbumId, "Message.ID=%s", message.ID)
 	}
 }
