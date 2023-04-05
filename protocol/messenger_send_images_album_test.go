@@ -125,7 +125,7 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 		}
 	}
 	for _, message := range response.Messages() {
-		s.Require().Equal(int(message.AlbumImagesCount), int(imagesCount))
+		s.Require().Equal(message.AlbumImagesCount, imagesCount)
 	}
 
 	s.Require().Equal(messageCount, len(response.Messages()), "it returns the messages")
