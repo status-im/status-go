@@ -701,7 +701,7 @@ func (m *Message) LoadImage() error {
 	return nil
 }
 
-func (m *Message) SetAlbumIdAndImagesCount(albumID string, imagesCount uint32) error {
+func (m *Message) SetAlbumIDAndImagesCount(albumID string, imagesCount uint32) error {
 	imageMessage := m.GetImage()
 	if imageMessage == nil {
 		return errors.New("Image is empty")
