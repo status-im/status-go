@@ -24,9 +24,7 @@ func (m *Messenger) acceptContactRequest(ctx context.Context, requestID string, 
 	}
 
 	m.logger.Info("acceptContactRequest")
-	// We send a contact update for compatibility with 0.90 desktop, once that's
-	// not an issue anymore, we can set the last bool flag to `false`
-	return m.addContact(ctx, contactRequest.From, "", "", "", contactRequest.ID, "", syncing, true, false)
+	return m.addContact(ctx, contactRequest.From, "", "", "", contactRequest.ID, "", syncing, false, false)
 }
 
 func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.AcceptContactRequest) (*MessengerResponse, error) {
@@ -133,7 +131,7 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 		return nil, err
 	}
 
-	response, err := m.addContact(
+	return m.addContact(
 		ctx,
 		chatID,
 		"",
@@ -145,32 +143,6 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 		false,
 		true,
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	publicKey, err := common.HexToPubkey(chatID)
-	if err != nil {
-		return nil, err
-	}
-
-	// A valid added chat is required.
-	_, ok := m.allChats.Load(chatID)
-	if !ok {
-		// Create a one to one chat and set active to false
-		chat := CreateOneToOneChat(chatID, publicKey, m.getTimesource())
-		chat.Active = false
-		err = m.initChatSyncFields(chat)
-		if err != nil {
-			return nil, err
-		}
-		err = m.saveChat(chat)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return response, nil
 }
 
 func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, contactRequestID string) (*MessengerResponse, error) {
@@ -433,7 +405,6 @@ func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, conta
 	contactRequest.LocalChatID = contact.ID
 	contactRequest.ContentType = protobuf.ChatMessage_CONTACT_REQUEST
 	contactRequest.Clock = clock
-	contactRequest.ID = defaultContactRequestID(contact.ID)
 	if contact.mutual() {
 		contactRequest.ContactRequestState = common.ContactRequestStateAccepted
 	} else {
@@ -941,10 +912,6 @@ func (m *Messenger) AcceptLatestContactRequestForContact(ctx context.Context, re
 		return nil, err
 	}
 
-	if contactRequestID == "" {
-		contactRequestID = defaultContactRequestID(request.ID.String())
-	}
-
 	return m.AcceptContactRequest(ctx, &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequestID)})
 }
 
@@ -958,19 +925,11 @@ func (m *Messenger) DismissLatestContactRequestForContact(ctx context.Context, r
 		return nil, err
 	}
 
-	if contactRequestID == "" {
-		contactRequestID = defaultContactRequestID(request.ID.String())
-	}
-
 	return m.DeclineContactRequest(ctx, &requests.DeclineContactRequest{ID: types.Hex2Bytes(contactRequestID)})
 }
 
 func (m *Messenger) PendingContactRequests(cursor string, limit int) ([]*common.Message, string, error) {
 	return m.persistence.PendingContactRequests(cursor, limit)
-}
-
-func defaultContactRequestID(contactID string) string {
-	return "0x" + types.Bytes2Hex(append(types.Hex2Bytes(contactID), 0x20))
 }
 
 func (m *Messenger) BuildContact(request *requests.BuildContact) (*Contact, error) {
