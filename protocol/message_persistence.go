@@ -346,7 +346,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	}
 
 	if albumImagesCount.Valid {
-		message.AlbumImagesCount = int32(albumImagesCount.Int16)
+		message.AlbumImagesCount = uint32(albumImagesCount.Int16)
 	}
 
 	if quotedText.Valid {

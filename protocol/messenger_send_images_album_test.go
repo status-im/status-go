@@ -118,7 +118,7 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 	s.NoError(err)
 
 	// Check that album count was the number of the images sent
-	imagesCount := int32(0)
+	imagesCount := uint32(0)
 	for _, message := range response.Messages() {
 		if message.ContentType == protobuf.ChatMessage_IMAGE {
 			imagesCount++
@@ -142,7 +142,6 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages(), messageCount)
 	for _, message := range response.Messages() {
-		
 		image := message.GetImage()
 		s.Require().Equal(message.AlbumImagesCount, imagesCount)
 		s.Require().NotNil(image, "Message.ID=%s", message.ID)

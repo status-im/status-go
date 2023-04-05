@@ -171,7 +171,7 @@ type Message struct {
 	// ImageLocalURL is the local url of the image
 	ImageLocalURL string `json:"imageLocalUrl,omitempty"`
 	// AlbumImagesCount is the number of images in a collage
-	AlbumImagesCount int32 `json:"albumImagesCount,omitempty"`
+	AlbumImagesCount uint32 `json:"albumImagesCount,omitempty"`
 	// AudioLocalURL is the local url of the audio
 	AudioLocalURL string `json:"audioLocalUrl,omitempty"`
 	// StickerLocalURL is the local url of the sticker
@@ -250,7 +250,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		AlbumID                  string                           `json:"albumId,omitempty"`
 		ImageWidth               uint32                           `json:"imageWidth,omitempty"`
 		ImageHeight              uint32                           `json:"imageHeight,omitempty"`
-		AlbumImagesCount         int32                            `json:"albumImagesCount,omitempty"`
+		AlbumImagesCount         uint32                           `json:"albumImagesCount,omitempty"`
 		Audio                    string                           `json:"audio,omitempty"`
 		AudioDurationMs          uint64                           `json:"audioDurationMs,omitempty"`
 		CommunityID              string                           `json:"communityId,omitempty"`
@@ -703,12 +703,13 @@ func (m *Message) LoadImage() error {
 	return nil
 }
 
-func (m *Message) SetAlbumID(albumID string) error {
+func (m *Message) SetAlbumID(albumID string, ImagesCount uint32) error {
 	imageMessage := m.GetImage()
 	if imageMessage == nil {
 		return errors.New("Image is empty")
 	}
 	imageMessage.AlbumId = albumID
+	imageMessage.AlbumImagesCount = ImagesCount
 	m.Payload = &protobuf.ChatMessage_Image{Image: imageMessage}
 
 	return nil
