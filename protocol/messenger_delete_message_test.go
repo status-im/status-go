@@ -238,3 +238,76 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageFirstThenMessage() {
 	s.Require().Len(state.Response.RemovedMessages(), 0)
 	s.Require().Nil(state.Response.Chats()[0].LastMessage)
 }
+
+func (s *MessengerDeleteMessageSuite) TestDeleteImageMessage() {
+	theirMessenger := s.newMessenger()
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	err = theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	err = s.m.SaveChat(ourChat)
+	s.Require().NoError(err)
+
+	messageCount := 3
+	var album []*common.Message
+	for i := 0; i < messageCount; i++ {
+		image, err := buildImageWithoutAlbumIDMessage(*ourChat)
+		s.NoError(err)
+		album = append(album, image)
+	}
+
+	response, err := s.m.SendChatMessages(context.Background(), album)
+	s.NoError(err)
+
+	// Check that album count was the number of the images sent
+	imagesCount := uint32(0)
+	for _, message := range response.Messages() {
+		if message.ContentType == protobuf.ChatMessage_IMAGE {
+			imagesCount++
+		}
+	}
+	for _, message := range response.Messages() {
+		s.Require().NotNil(message.GetImage())
+		s.Require().Equal(message.GetImage().AlbumImagesCount, imagesCount)
+	}
+
+	s.Require().Equal(messageCount, len(response.Messages()), "it returns the messages")
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), messageCount)
+
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.messages) == messageCount },
+		"no messages",
+	)
+
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), messageCount)
+	for _, message := range response.Messages() {
+		image := message.GetImage()
+		s.Require().NotNil(image, "Message.ID=%s", message.ID)
+		s.Require().Equal(image.AlbumImagesCount, imagesCount)
+		s.Require().NotEmpty(image.AlbumId, "Message.ID=%s", message.ID)
+	}
+
+	firstMessageID := response.Messages()[0].ID
+	sendResponse, err := s.m.DeleteMessageAndSend(context.Background(), firstMessageID)
+
+	s.Require().NoError(err)
+	s.Require().Len(sendResponse.Messages(), 0)
+	s.Require().Len(sendResponse.RemovedMessages(), 3)
+	s.Require().Equal(sendResponse.RemovedMessages()[0].DeletedBy, "")
+	s.Require().Len(sendResponse.Chats(), 1)
+	// LastMessage is removed
+	s.Require().Nil(sendResponse.Chats()[0].LastMessage)
+
+	// Main instance user attempts to delete the message it received from theirMessenger
+	_, err = theirMessenger.DeleteMessageAndSend(context.Background(), firstMessageID)
+
+	s.Require().ErrorContains(err, "Chat not found")
+}

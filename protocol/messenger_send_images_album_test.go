@@ -3,8 +3,6 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -64,34 +62,6 @@ func (s *MessengerSendImagesAlbumSuite) newMessenger() *Messenger {
 	return messenger
 }
 
-func buildImageWithoutAlbumIDMessage(s *MessengerSendImagesAlbumSuite, chat Chat) *common.Message {
-	file, err := os.Open("../_assets/tests/test.jpg")
-	s.Require().NoError(err)
-	defer file.Close()
-
-	payload, err := ioutil.ReadAll(file)
-	s.Require().NoError(err)
-
-	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
-	message := &common.Message{}
-	message.ChatId = chat.ID
-	message.Clock = clock
-	message.Timestamp = timestamp
-	message.WhisperTimestamp = clock
-	message.LocalChatID = chat.ID
-	message.MessageType = protobuf.MessageType_ONE_TO_ONE
-	message.ContentType = protobuf.ChatMessage_IMAGE
-
-	image := protobuf.ImageMessage{
-		Payload: payload,
-		Type:    protobuf.ImageType_JPEG,
-		Width:   1200,
-		Height:  1000,
-	}
-	message.Payload = &protobuf.ChatMessage_Image{Image: &image}
-	return message
-}
-
 func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
@@ -109,7 +79,9 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 	var album []*common.Message
 
 	for i := 0; i < messageCount; i++ {
-		album = append(album, buildImageWithoutAlbumIDMessage(s, *ourChat))
+		image, err := buildImageWithoutAlbumIDMessage(*ourChat)
+		s.NoError(err)
+		album = append(album, image)
 	}
 
 	err = s.m.SaveChat(ourChat)
@@ -167,7 +139,8 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesWithMentionSend() 
 	var album []*common.Message
 
 	for i := 0; i < messageCount; i++ {
-		outgoingMessage := buildImageWithoutAlbumIDMessage(s, *ourChat)
+		outgoingMessage, err := buildImageWithoutAlbumIDMessage(*ourChat)
+		s.NoError(err)
 		outgoingMessage.Mentioned = true
 		outgoingMessage.Text = "hey @" + common.PubkeyToHex(&theirMessenger.identity.PublicKey)
 		album = append(album, outgoingMessage)

@@ -5,7 +5,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"math/big"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -2317,6 +2319,39 @@ func (s *MessengerSuite) TestResendExpiredEmojis() {
 	rawMessage, err = s.m.persistence.RawMessageByID(emojiID)
 	s.NoError(err)
 	s.True(rawMessage.SendCount >= 2)
+}
+
+func buildImageWithoutAlbumIDMessage(chat Chat) (*common.Message, error) {
+	file, err := os.Open("../_assets/tests/test.jpg")
+	if err != err {
+		return nil, err
+	}
+	defer file.Close()
+
+	payload, err := ioutil.ReadAll(file)
+	if err != err {
+		return nil, err
+	}
+
+	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
+	message := &common.Message{}
+	message.ChatId = chat.ID
+	message.Clock = clock
+	message.Timestamp = timestamp
+	message.WhisperTimestamp = clock
+	message.LocalChatID = chat.ID
+	message.MessageType = protobuf.MessageType_ONE_TO_ONE
+	message.ContentType = protobuf.ChatMessage_IMAGE
+
+	image := protobuf.ImageMessage{
+		Payload: payload,
+		Type:    protobuf.ImageType_JPEG,
+		Width:   1200,
+		Height:  1000,
+	}
+	message.Payload = &protobuf.ChatMessage_Image{Image: &image}
+
+	return message, nil
 }
 
 type testTimeSource struct{}
