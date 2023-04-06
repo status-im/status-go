@@ -6176,3 +6176,21 @@ func (m *Messenger) myHexIdentity() string {
 func (m *Messenger) GetMentionsManager() *MentionManager {
 	return m.mentionsManager
 }
+
+func (m *Messenger) getMessagesToDelete(message *common.Message, chatId string) ([]*common.Message, error) {
+	var messagesToDelete []*common.Message
+	// In case of Image messages, we need to delete all the images in the album
+	if message.ContentType == protobuf.ChatMessage_IMAGE {
+		image := message.GetImage()
+		messagesInTheAlbum, err := m.persistence.albumMessages(chatId, image.GetAlbumId())
+		if err != nil {
+			return nil, err
+		}
+		for _, messageInAlbum := range messagesInTheAlbum {
+			messagesToDelete = append(messagesToDelete, messageInAlbum)
+		}
+	} else {
+		messagesToDelete = append(messagesToDelete, message)
+	}
+	return messagesToDelete, nil
+}

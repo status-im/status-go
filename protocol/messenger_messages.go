@@ -157,19 +157,9 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 		return nil, ErrInvalidDeleteTypeAuthor
 	}
 
-	var messagesToDelete []*common.Message
-	// In case of Image messages, we need to delete all the images in the album
-	if message.ContentType == protobuf.ChatMessage_IMAGE {
-		image := message.GetImage()
-		messagesInTheAlbum, err := m.persistence.albumMessages(message.ChatId, image.GetAlbumId())
-		if err != nil {
-			return nil, err
-		}
-		for _, messageInAlbum := range messagesInTheAlbum {
-			messagesToDelete = append(messagesToDelete, messageInAlbum)
-		}
-	} else {
-		messagesToDelete = append(messagesToDelete, message)
+	messagesToDelete, err := m.getMessagesToDelete(message, message.ChatId)
+	if err != nil {
+		return nil, err
 	}
 
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
@@ -243,20 +233,27 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string
 		return nil, ErrInvalidDeleteTypeAuthor
 	}
 
-	message.DeletedForMe = true
-	err = m.persistence.SaveMessages([]*common.Message{message})
+	messagesToDelete, err := m.getMessagesToDelete(message, message.ChatId)
 	if err != nil {
 		return nil, err
 	}
 
-	if chat.LastMessage != nil && chat.LastMessage.ID == message.ID {
-		if err := m.updateLastMessage(chat); err != nil {
+	response := &MessengerResponse{}
+	for _, messageToDelete := range messagesToDelete {
+		messageToDelete.DeletedForMe = true
+		err = m.persistence.SaveMessages([]*common.Message{messageToDelete})
+		if err != nil {
 			return nil, err
 		}
-	}
 
-	response := &MessengerResponse{}
-	response.AddMessage(message)
+		if chat.LastMessage != nil && chat.LastMessage.ID == messageToDelete.ID {
+			if err := m.updateLastMessage(chat); err != nil {
+				return nil, err
+			}
+		}
+
+		response.AddMessage(messageToDelete)
+	}
 	response.AddChat(chat)
 
 	if m.hasPairedDevices() {
