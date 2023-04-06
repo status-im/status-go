@@ -35,15 +35,15 @@ const ChainIDRequiringAPIKey = 1
 
 func getbaseURL(chainID uint64) (string, error) {
 	switch chainID {
-	case 1:
+	case 1, 10, 42161:
 		return "https://api.opensea.io/api/v1", nil
 	case 4:
 		return "https://rinkeby-api.opensea.io/api/v1", nil
-	case 5:
+	case 5, 420, 421613:
 		return "https://testnets-api.opensea.io/api/v1", nil
 	}
 
-	return "", fmt.Errorf("chainID not supported")
+	return "", fmt.Errorf("chainID not supported: %d", chainID)
 }
 
 var OpenseaClientInstances = make(map[uint64]*Client)
