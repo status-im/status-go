@@ -1156,6 +1156,9 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 		if len(response.RequestsToJoinCommunity) == 0 {
 			return errors.New("request to join community not received")
 		}
+		if len(response.ActivityCenterNotifications()) == 0 {
+			return errors.New("request to join community notification not added in activity center")
+		}
 		return nil
 	})
 	s.Require().NoError(err)
@@ -1209,6 +1212,17 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 
 	s.Require().NoError(err)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	// Retrieve activity center notifications for admin to make sure the request notification is deleted
+	notifications, err := s.bob.ActivityCenterNotifications(ActivityCenterNotificationsRequest{
+		Cursor:        "",
+		Limit:         10,
+		ActivityTypes: []ActivityCenterType{},
+		ReadType:      ActivityCenterQueryParamsReadUnread,
+	})
+
+	s.Require().NoError(err)
+	s.Require().Len(notifications.Notifications, 0)
 
 	cancelRequestToJoin2 := response.RequestsToJoinCommunity[0]
 

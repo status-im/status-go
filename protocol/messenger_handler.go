@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/status-im/status-go/signal"
+
 	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -1229,6 +1231,28 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageSta
 	}
 
 	state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, requestToJoin)
+
+	// delete activity center notification
+	notification, err := m.persistence.GetActivityCenterNotificationByID(requestToJoin.ID)
+	if err != nil {
+		return err
+	}
+
+	if notification != nil {
+		err = m.persistence.DeleteActivityCenterNotification(types.FromHex(requestToJoin.ID.String()))
+		if err != nil {
+			m.logger.Error("failed to delete notification from Activity Center", zap.Error(err))
+			return err
+		}
+
+		// sending signal to client to remove the activity center notification from UI
+		response := &MessengerResponse{}
+		notification.Deleted = true
+		response.AddActivityCenterNotification(notification)
+
+		signal.SendNewMessages(response)
+	}
+
 	return nil
 }
 
