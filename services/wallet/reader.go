@@ -28,6 +28,16 @@ func getFixedCurrencies() []string {
 	return []string{"USD"}
 }
 
+func belongsToMandatoryTokens(symbol string) bool {
+	var mandatoryTokens = []string{"ETH", "DAI", "SNT", "STT"}
+	for _, t := range mandatoryTokens {
+		if t == symbol {
+			return true
+		}
+	}
+	return false
+}
+
 func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, marketManager *market.Manager, accountsDB *accounts.Database, walletFeed *event.Feed) *Reader {
 	return &Reader{rpcClient, tokenManager, marketManager, accountsDB, walletFeed, nil}
 }
@@ -224,6 +234,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 		for symbol, tokens := range getTokenBySymbols(allTokens) {
 			balancesPerChain := make(map[uint64]ChainBalance)
 			decimals := tokens[0].Decimals
+			anyPositiveBalance := false
 			for _, token := range tokens {
 				hexBalance := balances[token.ChainID][address][token.Address]
 				balance := big.NewFloat(0.0)
@@ -237,12 +248,19 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 				if client, ok := clients[token.ChainID]; ok {
 					hasError = err != nil || !client.IsConnected
 				}
+				if !anyPositiveBalance {
+					anyPositiveBalance = balance.Cmp(big.NewFloat(0.0)) > 0
+				}
 				balancesPerChain[token.ChainID] = ChainBalance{
 					Balance:  balance,
 					Address:  token.Address,
 					ChainID:  token.ChainID,
 					HasError: hasError,
 				}
+			}
+
+			if !anyPositiveBalance && !belongsToMandatoryTokens(symbol) {
+				continue
 			}
 
 			marketValuesPerCurrency := make(map[string]TokenMarketValues)
