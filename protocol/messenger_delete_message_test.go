@@ -311,3 +311,83 @@ func (s *MessengerDeleteMessageSuite) TestDeleteImageMessage() {
 
 	s.Require().ErrorContains(err, "Chat not found")
 }
+
+func (s *MessengerDeleteMessageSuite) TestDeleteImageMessageFirstThenMessage() {
+	theirMessenger := s.newMessenger()
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	err = theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	contact, err := BuildContactFromPublicKey(&theirMessenger.identity.PublicKey)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	err = s.m.SaveChat(ourChat)
+	s.Require().NoError(err)
+	messageID1 := "message-id1"
+	messageID2 := "message-id2"
+
+	messageCount := 2
+	var album []*common.Message
+	for i := 0; i < messageCount; i++ {
+		image, err := buildImageWithoutAlbumIDMessage(*ourChat)
+		image.Clock = 1
+		s.NoError(err)
+		album = append(album, image)
+	}
+
+	deleteMessage := DeleteMessage{
+		DeleteMessage: protobuf.DeleteMessage{
+			Clock:       2,
+			MessageType: protobuf.MessageType_ONE_TO_ONE,
+			MessageId:   messageID1,
+			ChatId:      theirChat.ID,
+		},
+		From: common.PubkeyToHex(&theirMessenger.identity.PublicKey),
+	}
+
+	state := &ReceivedMessageState{
+		Response: &MessengerResponse{},
+	}
+
+	// Handle Delete first
+	err = s.m.HandleDeleteMessage(state, deleteMessage)
+	s.Require().NoError(err)
+
+	// Handle first image message
+	state = &ReceivedMessageState{
+		Response: &MessengerResponse{},
+		CurrentMessageState: &CurrentMessageState{
+			Message:          album[0].ChatMessage,
+			MessageID:        messageID1,
+			WhisperTimestamp: s.m.getTimesource().GetCurrentTime(),
+			Contact:          contact,
+			PublicKey:        &theirMessenger.identity.PublicKey,
+		},
+	}
+	err = s.m.HandleChatMessage(state)
+	s.Require().NoError(err)
+	s.Require().Len(state.Response.Messages(), 0) // Message should not be added to response
+	s.Require().Len(state.Response.RemovedMessages(), 0)
+	s.Require().Nil(state.Response.Chats()[0].LastMessage)
+
+	// Handle second  image message
+	state = &ReceivedMessageState{
+		Response: &MessengerResponse{},
+		CurrentMessageState: &CurrentMessageState{
+			Message:          album[1].ChatMessage,
+			MessageID:        messageID2,
+			WhisperTimestamp: s.m.getTimesource().GetCurrentTime(),
+			Contact:          contact,
+			PublicKey:        &theirMessenger.identity.PublicKey,
+		},
+	}
+	err = s.m.HandleChatMessage(state)
+	s.Require().NoError(err)
+	s.Require().Len(state.Response.Messages(), 0) // Message should not be added to response even if we didn't delete that ID
+	s.Require().Len(state.Response.RemovedMessages(), 0)
+	s.Require().Nil(state.Response.Chats()[0].LastMessage)
+}

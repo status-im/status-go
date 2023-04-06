@@ -1532,6 +1532,24 @@ func (m *Messenger) HandleEditMessage(state *ReceivedMessageState, editMessage E
 	return nil
 }
 
+func (m *Messenger) getMessagesToDelete(message *common.Message, chatId string) ([]*common.Message, error) {
+	var messagesToDelete []*common.Message
+	// In case of Image messages, we need to delete all the images in the album
+	if message.ContentType == protobuf.ChatMessage_IMAGE {
+		image := message.GetImage()
+		messagesInTheAlbum, err := m.persistence.albumMessages(chatId, image.GetAlbumId())
+		if err != nil {
+			return nil, err
+		}
+		for _, messageInAlbum := range messagesInTheAlbum {
+			messagesToDelete = append(messagesToDelete, messageInAlbum)
+		}
+	} else {
+		messagesToDelete = append(messagesToDelete, message)
+	}
+	return messagesToDelete, nil
+}
+
 func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessage DeleteMessage) error {
 	if err := ValidateDeleteMessage(deleteMessage.DeleteMessage); err != nil {
 		return err
@@ -1583,22 +1601,11 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		}
 	}
 
-	var messagesToDelete []*common.Message
-	// In case of Image messages, we need to delete all the images in the album
-	if originalMessage.ContentType == protobuf.ChatMessage_IMAGE {
-		image := originalMessage.GetImage()
-		messagesInTheAlbum, err := m.persistence.albumMessages(deleteMessage.ChatId, image.GetAlbumId())
-		if err != nil {
-			return err
-		}
-		for _, messageInAlbum := range messagesInTheAlbum {
-			messagesToDelete = append(messagesToDelete, messageInAlbum)
-		}
-	} else {
-		messagesToDelete = append(messagesToDelete, originalMessage)
+	messagesToDelete, err := m.getMessagesToDelete(originalMessage, deleteMessage.ChatId)
+	if err != nil {
+		return err
 	}
 
-	// Update message and return it
 	for _, messageToDelete := range messagesToDelete {
 		messageToDelete.Deleted = true
 		messageToDelete.DeletedBy = deleteMessage.DeleteMessage.DeletedBy
@@ -1621,15 +1628,15 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 			ID:      types.FromHex(messageToDelete.ID),
 			Deleted: true,
 		})
-	}
 
-	if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
-		if err := m.updateLastMessage(chat); err != nil {
-			return err
-		}
+		if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
+			if err := m.updateLastMessage(chat); err != nil {
+				return err
+			}
 
-		if chat.LastMessage != nil && !chat.LastMessage.Seen && chat.OneToOne() && !chat.Active {
-			m.createMessageNotification(chat, state)
+			if chat.LastMessage != nil && !chat.LastMessage.Seen && chat.OneToOne() && !chat.Active {
+				m.createMessageNotification(chat, state)
+			}
 		}
 	}
 
@@ -1638,6 +1645,7 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 	return nil
 }
 
+// TODO do this delete too
 func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, deleteForMeMessage DeleteForMeMessage) error {
 	if err := ValidateDeleteForMeMessage(deleteForMeMessage.DeleteForMeMessage); err != nil {
 		return err
@@ -1665,29 +1673,35 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 		return errors.New("chat not found")
 	}
 
-	// Update message and return it
-	originalMessage.DeletedForMe = true
-
-	err := m.persistence.SaveMessages([]*common.Message{originalMessage})
+	messagesToDelete, err := m.getMessagesToDelete(originalMessage, deleteForMeMessage.LocalChatID)
 	if err != nil {
 		return err
 	}
 
-	m.logger.Debug("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", deleteForMeMessage.MessageId))
+	for _, messageToDelete := range messagesToDelete {
+		messageToDelete.DeletedForMe = true
 
-	err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, deleteForMeMessage.MessageId)
-	if err != nil {
-		m.logger.Warn("failed to delete notifications for deleted message", zap.Error(err))
-		return err
-	}
-
-	if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
-		if err := m.updateLastMessage(chat); err != nil {
+		err := m.persistence.SaveMessages([]*common.Message{messageToDelete})
+		if err != nil {
 			return err
 		}
-	}
 
-	state.Response.AddMessage(originalMessage)
+		m.logger.Debug("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", messageToDelete.ID))
+
+		err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, messageToDelete.ID)
+		if err != nil {
+			m.logger.Warn("failed to delete notifications for deleted message", zap.Error(err))
+			return err
+		}
+
+		if chat.LastMessage != nil && chat.LastMessage.ID == messageToDelete.ID {
+			if err := m.updateLastMessage(chat); err != nil {
+				return err
+			}
+		}
+
+		state.Response.AddMessage(messageToDelete)
+	}
 	state.Response.AddChat(chat)
 
 	return nil
@@ -2645,34 +2659,84 @@ func (m *Messenger) checkForEdits(message *common.Message) error {
 	return nil
 }
 
+func (m *Messenger) getMessagesToCheckForDelete(message *common.Message) ([]*common.Message, error) {
+	var messagesToCheck []*common.Message
+	if message.ContentType == protobuf.ChatMessage_IMAGE {
+		image := message.GetImage()
+		messagesInTheAlbum, err := m.persistence.albumMessages(message.ChatId, image.GetAlbumId())
+		if err != nil {
+			return nil, err
+		}
+		for _, messageInAlbum := range messagesInTheAlbum {
+			messagesToCheck = append(messagesToCheck, messageInAlbum)
+		}
+	}
+	messagesToCheck = append(messagesToCheck, message)
+	return messagesToCheck, nil
+}
+
 func (m *Messenger) checkForDeletes(message *common.Message) error {
-	// Check for any pending deletes
-	// If any pending deletes are available and valid, apply them
-	messageDeletes, err := m.persistence.GetDeletes(message.ID, message.From)
+	messagesToCheck, err := m.getMessagesToCheckForDelete(message)
 	if err != nil {
 		return err
 	}
 
-	if len(messageDeletes) == 0 {
-		return nil
-	}
+	var messageDeletes []*DeleteMessage
+	applyDelete := false
+	for _, messageToCheck := range messagesToCheck {
+		if !applyDelete {
+			// Check for any pending deletes
+			// If any pending deletes are available and valid, apply them
+			messageDeletes, err = m.persistence.GetDeletes(messageToCheck.ID, messageToCheck.From)
+			if err != nil {
+				return err
+			}
 
-	return m.applyDeleteMessage(messageDeletes, message)
+			if len(messageDeletes) == 0 {
+				continue
+			}
+		}
+		// Once one messageDelete has been found, we apply it to all the images in the album
+		applyDelete = true
+
+		err := m.applyDeleteMessage(messageDeletes, messageToCheck)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (m *Messenger) checkForDeleteForMes(message *common.Message) error {
-	// Check for any pending delete for mes
-	// If any pending deletes are available and valid, apply them
-	messageDeleteForMes, err := m.persistence.GetDeleteForMes(message.ID, message.From)
+	messagesToCheck, err := m.getMessagesToCheckForDelete(message)
 	if err != nil {
 		return err
 	}
 
-	if len(messageDeleteForMes) == 0 {
-		return nil
-	}
+	var messageDeleteForMes []*DeleteForMeMessage
+	applyDelete := false
+	for _, messageToCheck := range messagesToCheck {
+		if !applyDelete {
+			// Check for any pending delete for mes
+			// If any pending deletes are available and valid, apply them
+			messageDeleteForMes, err = m.persistence.GetDeleteForMes(messageToCheck.ID, messageToCheck.From)
+			if err != nil {
+				return err
+			}
 
-	return m.applyDeleteForMeMessage(messageDeleteForMes, message)
+			if len(messageDeleteForMes) == 0 {
+				continue
+			}
+		}
+		// Once one messageDeleteForMes has been found, we apply it to all the images in the album
+		applyDelete = true
+
+		err := m.applyDeleteForMeMessage(messageDeleteForMes, messageToCheck)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, error) {
