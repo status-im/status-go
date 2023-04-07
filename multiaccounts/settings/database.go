@@ -218,6 +218,16 @@ func (db *Database) parseSaveAndSyncSetting(sf SettingField, value interface{}) 
 		return err
 	}
 
+	if sf.GetDBName() == DBColumnMnemonic {
+		mnemonicRemoved := value == nil || value.(string) == ""
+		err = db.saveSetting(MnemonicRemoved, mnemonicRemoved)
+		if err != nil {
+			return err
+		}
+		sf = MnemonicRemoved
+		value = mnemonicRemoved
+	}
+
 	if sf.CanSync(FromInterface) {
 		db.SyncQueue <- SyncSettingField{sf, value}
 	}
@@ -240,6 +250,10 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 // This func is useful if you already know the SettingField to save
 func (db *Database) SaveSettingField(sf SettingField, value interface{}) error {
 	return db.parseSaveAndSyncSetting(sf, value)
+}
+
+func (db *Database) DeleteMnemonic() error {
+	return db.saveSetting(Mnemonic, nil)
 }
 
 // SaveSyncSetting stores setting data from a sync protobuf source, note it does not call SettingField.ValueHandler()
@@ -287,7 +301,7 @@ func (db *Database) SetSettingLastSynced(setting SettingField, clock uint64) err
 
 func (db *Database) GetSettings() (Settings, error) {
 	var s Settings
-	err := db.db.QueryRow("SELECT address, anon_metrics_should_send, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, display_name, bio, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, default_sync_period, use_mailservers, messages_from_contacts_only, usernames, appearance, profile_pictures_show_to, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests, current_user_status, send_status_updates, gif_recents, gif_favorites, opensea_enabled, last_backup, backup_enabled, telemetry_server_url, auto_message_enabled, gif_api_key, test_networks_enabled, mutual_contact_enabled FROM settings WHERE synthetic_id = 'id'").Scan(
+	err := db.db.QueryRow("SELECT address, anon_metrics_should_send, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, display_name, bio, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level, mnemonic, mnemonic_removed, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, default_sync_period, use_mailservers, messages_from_contacts_only, usernames, appearance, profile_pictures_show_to, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests, current_user_status, send_status_updates, gif_recents, gif_favorites, opensea_enabled, last_backup, backup_enabled, telemetry_server_url, auto_message_enabled, gif_api_key, test_networks_enabled, mutual_contact_enabled FROM settings WHERE synthetic_id = 'id'").Scan(
 		&s.Address,
 		&s.AnonMetricsShouldSend,
 		&s.ChaosMode,
@@ -312,6 +326,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.LinkPreviewsEnabledSites,
 		&s.LogLevel,
 		&s.Mnemonic,
+		&s.MnemonicRemoved,
 		&s.Name,
 		&s.Networks,
 		&s.NotificationsEnabled,
@@ -521,6 +536,18 @@ func (db *Database) DisplayName() (string, error) {
 
 func (db *Database) Bio() (string, error) {
 	return db.makeSelectString(Bio)
+}
+
+func (db *Database) Mnemonic() (string, error) {
+	return db.makeSelectString(Mnemonic)
+}
+
+func (db *Database) MnemonicRemoved() (result bool, err error) {
+	err = db.makeSelectRow(MnemonicRemoved).Scan(&result)
+	if err == sql.ErrNoRows {
+		return result, nil
+	}
+	return result, err
 }
 
 func (db *Database) GifAPIKey() (string, error) {

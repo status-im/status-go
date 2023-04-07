@@ -2044,18 +2044,29 @@ func (m *Messenger) handleSyncSetting(messageState *ReceivedMessageState, messag
 	if err != nil {
 		return err
 	}
-	if message.GetType() == protobuf.SyncSetting_DISPLAY_NAME && settingField != nil {
-		if message.GetValueString() != "" && m.account.Name != message.GetValueString() {
-			m.account.Name = message.GetValueString()
-			err = m.multiAccounts.SaveAccount(*m.account)
-			if err != nil {
+
+	if settingField == nil {
+		return nil
+	}
+
+	switch message.GetType() {
+	case protobuf.SyncSetting_DISPLAY_NAME:
+		if newName := message.GetValueString(); newName != "" && m.account.Name != newName {
+			m.account.Name = newName
+			if err := m.multiAccounts.SaveAccount(*m.account); err != nil {
 				return err
 			}
 		}
+	case protobuf.SyncSetting_MNEMONIC_REMOVED:
+		if message.GetValueBool() {
+			if err := m.settings.DeleteMnemonic(); err != nil {
+				return err
+			}
+			messageState.Response.AddSetting(&settings.SyncSettingField{SettingField: settings.Mnemonic})
+		}
+		return nil
 	}
-	if settingField != nil {
-		messageState.Response.AddSetting(settingField)
-	}
+	messageState.Response.AddSetting(settingField)
 	return nil
 }
 

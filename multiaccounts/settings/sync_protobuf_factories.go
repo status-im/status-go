@@ -464,3 +464,53 @@ func displayNameProtobufFactoryStruct(s Settings, clock uint64, chatID string) (
 
 	return buildRawDisplayNameSyncMessage(s.DisplayName, clock, chatID)
 }
+
+// Bio
+
+func buildRawBioSyncMessage(v string, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_BIO,
+		Value: &protobuf.SyncSetting_ValueString{ValueString: v},
+		Clock: clock,
+	}
+	rm, err := buildRawSyncSettingMessage(pb, chatID)
+	return rm, pb, err
+}
+
+func bioProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	v, err := assertString(value)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return buildRawBioSyncMessage(v, clock, chatID)
+}
+
+func bioProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	return buildRawBioSyncMessage(s.Bio, clock, chatID)
+}
+
+// MnemonicRemoved
+
+func buildRawMnemonicRemovedSyncMessage(v bool, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_MNEMONIC_REMOVED,
+		Value: &protobuf.SyncSetting_ValueBool{ValueBool: v},
+		Clock: clock,
+	}
+	rm, err := buildRawSyncSettingMessage(pb, chatID)
+	return rm, pb, err
+}
+
+func mnemonicRemovedProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	v, err := assertBool(value)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return buildRawMnemonicRemovedSyncMessage(v, clock, chatID)
+}
+
+func mnemonicRemovedProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	return buildRawMnemonicRemovedSyncMessage(s.MnemonicRemoved, clock, chatID)
+}

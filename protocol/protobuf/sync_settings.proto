@@ -29,6 +29,8 @@ message SyncSetting {
     STICKERS_PACKS_PENDING = 11;
     STICKERS_RECENT_STICKERS = 12;
     DISPLAY_NAME = 13;
+    BIO = 14;
+    MNEMONIC_REMOVED = 15;
   }
 }
 

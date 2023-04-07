@@ -217,6 +217,9 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 		bob1MessagesFromContactsOnly  = true
 		bob1ProfilePicturesShowTo     = settings.ProfilePicturesShowToEveryone
 		bob1ProfilePicturesVisibility = settings.ProfilePicturesVisibilityEveryone
+		bob1Bio                       = "bio"
+		bob1Mnemonic                  = ""
+		bob1MnemonicRemoved           = true
 	)
 
 	// Create bob1 and set fields which are supposed to be backed up to/fetched from waku
@@ -230,6 +233,10 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	err = bob1.settings.SaveSettingField(settings.ProfilePicturesShowTo, bob1ProfilePicturesShowTo)
 	s.Require().NoError(err)
 	err = bob1.settings.SaveSettingField(settings.ProfilePicturesVisibility, bob1ProfilePicturesVisibility)
+	s.Require().NoError(err)
+	err = bob1.settings.SaveSettingField(settings.Bio, bob1Bio)
+	s.Require().NoError(err)
+	err = bob1.settings.SaveSettingField(settings.Mnemonic, bob1Mnemonic)
 	s.Require().NoError(err)
 
 	// Create bob2
@@ -254,6 +261,15 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	storedBob1ProfilePicturesVisibility, err := bob1.settings.GetProfilePicturesVisibility()
 	s.Require().NoError(err)
 	s.Require().Equal(int(bob1ProfilePicturesVisibility), storedBob1ProfilePicturesVisibility)
+	storedBob1Bio, err := bob1.settings.Bio()
+	s.Require().NoError(err)
+	s.Require().Equal(bob1Bio, storedBob1Bio)
+	storedMnemonic, err := bob1.settings.Mnemonic()
+	s.Require().NoError(err)
+	s.Require().Equal(bob1Mnemonic, storedMnemonic)
+	storedMnemonicRemoved, err := bob1.settings.MnemonicRemoved()
+	s.Require().NoError(err)
+	s.Require().Equal(bob1MnemonicRemoved, storedMnemonicRemoved)
 
 	// Check bob2
 	storedBob2DisplayName, err := bob2.settings.DisplayName()
@@ -271,6 +287,12 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	storedBob2ProfilePicturesVisibility, err := bob2.settings.GetProfilePicturesVisibility()
 	s.Require().NoError(err)
 	s.Require().NotEqual(storedBob1ProfilePicturesVisibility, storedBob2ProfilePicturesVisibility)
+	storedBob2Bio, err := bob2.settings.Bio()
+	s.Require().NoError(err)
+	s.Require().NotEqual(storedBob1Bio, storedBob2Bio)
+	storedBob2MnemonicRemoved, err := bob2.settings.MnemonicRemoved()
+	s.Require().NoError(err)
+	s.Require().Equal(false, storedBob2MnemonicRemoved)
 
 	// Backup
 	clock, err := bob1.BackupData(context.Background())
@@ -302,6 +324,12 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	storedBob2ProfilePicturesVisibility, err = bob2.settings.GetProfilePicturesVisibility()
 	s.Require().NoError(err)
 	s.Require().Equal(storedBob1ProfilePicturesVisibility, storedBob2ProfilePicturesVisibility)
+	storedBob2Bio, err = bob2.settings.Bio()
+	s.Require().NoError(err)
+	s.Require().Equal(storedBob1Bio, storedBob2Bio)
+	storedBob2MnemonicRemoved, err = bob2.settings.MnemonicRemoved()
+	s.Require().NoError(err)
+	s.Require().Equal(bob1MnemonicRemoved, storedBob2MnemonicRemoved)
 
 	lastBackup, err := bob1.lastBackup()
 	s.Require().NoError(err)
