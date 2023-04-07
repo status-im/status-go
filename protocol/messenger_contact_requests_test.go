@@ -1418,3 +1418,286 @@ func (s *MessengerContactRequestSuite) TestBuildContact() {
 	s.Require().Equal(contact.EnsName, "foobar")
 	s.Require().True(contact.ENSVerified)
 }
+
+// The scenario tested is as follow:
+// 1) Alice sends a contact request to Bob
+// 2) Bob accepts the contact request
+// 3) Alice removes Bob from contacts
+// 4) Make sure Alice and Bob are not mutual contacts
+// 5) Alice sends new contact request
+// 6) Bob accepts new contact request
+func (s *MessengerContactRequestSuite) TestAliceResendsContactRequestAfterRemovingBobFromContacts() {
+
+	messageTextFirst := "hello 1!"
+
+	theirMessenger := s.newMessenger(s.shh)
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
+	s.Require().NoError(theirMessenger.settings.SaveSettingField(settings.MutualContactEnabled, true))
+
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	request := &requests.SendContactRequest{
+		ID:      contactID,
+		Message: messageTextFirst,
+	}
+
+	// Send contact request
+	resp, err := s.m.SendContactRequest(context.Background(), request)
+	s.Require().NoError(err)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().False(resp.Contacts[0].mutual())
+	s.Require().Equal(ContactRequestStateSent, resp.Contacts[0].ContactRequestLocalState)
+
+	s.Require().NotNil(resp)
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(common.ContactRequestStatePending, resp.Messages()[0].ContactRequestState)
+
+	// check outgoing pending notification
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
+	s.Require().Equal(common.ContactRequestStatePending, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, true)
+
+	// Make sure it's not returned as coming from us
+	contactRequests, _, err := s.m.PendingContactRequests("", 10)
+	s.Require().NoError(err)
+	s.Require().Len(contactRequests, 0)
+
+	// Make sure contact is added on the sender side
+	contacts := s.m.AddedContacts()
+	s.Require().Len(contacts, 1)
+
+	// Wait for the message to reach its destination
+	resp, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool {
+			return len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0
+		},
+		"no messages",
+	)
+
+	// Check contact request has been received
+	s.Require().NoError(err)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
+
+	// Check activity center notification is of the right type
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+	s.Require().Equal(common.ContactRequestStatePending, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+
+	// Make sure it's the pending contact requests
+	contactRequests, _, err = theirMessenger.PendingContactRequests("", 10)
+	s.Require().NoError(err)
+	s.Require().Len(contactRequests, 1)
+	s.Require().Equal(contactRequests[0].ContactRequestState, common.ContactRequestStatePending)
+
+	cid := resp.ActivityCenterNotifications()[0].Message.ID
+	// Accept contact request, receiver side
+	resp, err = theirMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(cid)})
+	s.Require().NoError(err)
+
+	// Make sure the message is updated
+	s.Require().NotNil(resp)
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(resp.Messages()[0].ID, contactRequests[0].ID)
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().True(resp.Contacts[0].mutual())
+
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), contactRequests[0].ID)
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+
+	// Make sure the sender is added to our contacts
+	contacts = theirMessenger.AddedContacts()
+	s.Require().Len(contacts, 1)
+
+	// Make sure we consider them a mutual contact, receiver side
+	mutualContacts := theirMessenger.MutualContacts()
+	s.Require().Len(mutualContacts, 1)
+
+	// Wait for the message to reach its destination
+	resp, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool {
+			return len(r.Messages()) == 1 && len(r.ActivityCenterNotifications()) == 1 && len(r.Contacts) == 1
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	// Check activity center notification is of the right type
+	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().True(resp.Contacts[0].mutual())
+
+	// Make sure the message is updated, sender side
+	s.Require().NotNil(resp)
+
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(resp.Messages()[0].ID, contactRequests[0].ID)
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
+
+	// Make sure we consider them a mutual contact, sender side
+	mutualContacts = s.m.MutualContacts()
+	s.Require().Len(mutualContacts, 1)
+
+	// Remove contact
+	resp, err = s.m.RetractContactRequest(&requests.RetractContactRequest{ID: types.Hex2Bytes(contactID)})
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().False(resp.Contacts[0].hasAddedUs())
+	s.Require().False(resp.Contacts[0].added())
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
+	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
+
+	// Wait for the message to reach its destination
+	resp, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) > 0
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+	s.Require().Len(resp.Contacts, 1)
+
+	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+	s.Require().Equal(myID, resp.Contacts[0].ID)
+
+	s.Require().False(resp.Contacts[0].added())
+	s.Require().False(resp.Contacts[0].hasAddedUs())
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
+	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
+
+	// Send new contact request
+	messageTextSecond := "hello 2!"
+
+	request = &requests.SendContactRequest{
+		ID:      contactID,
+		Message: messageTextSecond,
+	}
+
+	// Send contact request
+	resp, err = s.m.SendContactRequest(context.Background(), request)
+	s.Require().NoError(err)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().False(resp.Contacts[0].mutual())
+	s.Require().Equal(ContactRequestStateSent, resp.Contacts[0].ContactRequestLocalState)
+
+	s.Require().NotNil(resp)
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(common.ContactRequestStatePending, resp.Messages()[0].ContactRequestState)
+
+	// check outgoing pending notification
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
+	s.Require().Equal(common.ContactRequestStatePending, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, true)
+
+	// Make sure it's not returned as coming from us
+	contactRequests, _, err = s.m.PendingContactRequests("", 10)
+	s.Require().NoError(err)
+	s.Require().Len(contactRequests, 0)
+
+	// Wait for the message to reach its destination
+	resp, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool {
+			return len(r.Messages()) > 0 && len(r.ActivityCenterNotifications()) > 0
+		},
+		"no messages",
+	)
+
+	// Check contact request has been received
+	s.Require().NoError(err)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
+
+	// Check activity center notification is of the right type
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+	s.Require().Equal(common.ContactRequestStatePending, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+
+	cid = resp.ActivityCenterNotifications()[0].Message.ID
+	// Accept contact request, receiver side
+	resp, err = theirMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(cid)})
+	s.Require().NoError(err)
+
+	// Make sure the message is updated
+	s.Require().NotNil(resp)
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().True(resp.Contacts[0].mutual())
+
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+
+	// Make sure the sender is added to our contacts
+	contacts = theirMessenger.AddedContacts()
+	s.Require().Len(contacts, 1)
+
+	// Make sure we consider them a mutual contact, receiver side
+	mutualContacts = theirMessenger.MutualContacts()
+	s.Require().Len(mutualContacts, 1)
+
+	// Wait for the message to reach its destination
+	resp, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool {
+			return len(r.Messages()) == 1 && len(r.ActivityCenterNotifications()) == 1 && len(r.Contacts) == 1
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	// Check activity center notification is of the right type
+	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().True(resp.Contacts[0].mutual())
+
+	// Make sure the message is updated, sender side
+	s.Require().NotNil(resp)
+
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
+
+	// Make sure we consider them a mutual contact, sender side
+	mutualContacts = s.m.MutualContacts()
+	s.Require().Len(mutualContacts, 1)
+}
