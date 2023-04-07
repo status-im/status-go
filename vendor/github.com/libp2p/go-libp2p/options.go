@@ -27,6 +27,7 @@ import (
 	relayv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
 	"github.com/libp2p/go-libp2p/p2p/transport/quicreuse"
+	"github.com/prometheus/client_golang/prometheus"
 
 	ma "github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
@@ -545,6 +546,31 @@ func WithDialTimeout(t time.Duration) Option {
 			return errors.New("dial timeout needs to be non-negative")
 		}
 		cfg.DialTimeout = t
+		return nil
+	}
+}
+
+// DisableMetrics configures libp2p to disable prometheus metrics
+func DisableMetrics() Option {
+	return func(cfg *Config) error {
+		cfg.DisableMetrics = true
+		return nil
+	}
+}
+
+// PrometheusRegisterer configures libp2p to use reg as the Registerer for all metrics subsystems
+func PrometheusRegisterer(reg prometheus.Registerer) Option {
+	return func(cfg *Config) error {
+		if cfg.DisableMetrics {
+			return errors.New("cannot set registerer when metrics are disabled")
+		}
+		if cfg.PrometheusRegisterer != nil {
+			return errors.New("registerer already set")
+		}
+		if reg == nil {
+			return errors.New("registerer cannot be nil")
+		}
+		cfg.PrometheusRegisterer = reg
 		return nil
 	}
 }

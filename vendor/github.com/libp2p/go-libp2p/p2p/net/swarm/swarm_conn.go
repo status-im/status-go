@@ -60,10 +60,6 @@ func (c *Conn) Close() error {
 }
 
 func (c *Conn) doClose() {
-	if c.swarm.metricsTracer != nil {
-		c.swarm.metricsTracer.ClosedConnection(c.stat.Direction, time.Since(c.stat.Stats.Opened), c.ConnState())
-	}
-
 	c.swarm.removeConn(c)
 
 	// Prevent new streams from opening.

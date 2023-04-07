@@ -6,7 +6,7 @@ import "encoding/binary"
 // this conversion is used in the proofGen function
 // the serialization is done as instructed in  https://github.com/kilic/rln/blob/7ac74183f8b69b399e3bc96c1ae8ab61c026dc43/src/public.rs#L146
 // [ id_key<32> | id_index<8> | epoch<32> | signal_len<8> | signal<var> ]
-func serialize(idKey IDKey, memIndex MembershipIndex, epoch Epoch, msg []byte) []byte {
+func serialize(idKey IDSecretHash, memIndex MembershipIndex, epoch Epoch, msg []byte) []byte {
 
 	memIndexBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(memIndexBytes, uint64(memIndex))

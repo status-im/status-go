@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"sync"
@@ -188,6 +189,10 @@ func (wf *WakuFilterLightnode) Subscribe(ctx context.Context, contentFilter Cont
 		return nil, errors.New("at least one content topic is required")
 	}
 
+	if len(contentFilter.ContentTopics) > MaxContentTopicsPerRequest {
+		return nil, fmt.Errorf("exceeds maximum content topics: %d", MaxContentTopicsPerRequest)
+	}
+
 	params := new(FilterSubscribeParameters)
 	params.log = wf.log
 	params.host = wf.h
@@ -253,6 +258,10 @@ func (wf *WakuFilterLightnode) Unsubscribe(ctx context.Context, contentFilter Co
 
 	if len(contentFilter.ContentTopics) == 0 {
 		return nil, errors.New("at least one content topic is required")
+	}
+
+	if len(contentFilter.ContentTopics) > MaxContentTopicsPerRequest {
+		return nil, fmt.Errorf("exceeds maximum content topics: %d", MaxContentTopicsPerRequest)
 	}
 
 	params, err := wf.getUnsubscribeParameters(opts...)

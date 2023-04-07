@@ -14,6 +14,10 @@ func (h *AutoRelayHost) Close() error {
 	return h.Host.Close()
 }
 
+func (h *AutoRelayHost) Start() {
+	h.ar.Start()
+}
+
 func NewAutoRelayHost(h host.Host, ar *AutoRelay) *AutoRelayHost {
 	return &AutoRelayHost{Host: h, ar: ar}
 }

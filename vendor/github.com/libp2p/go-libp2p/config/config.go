@@ -31,6 +31,7 @@ import (
 	relayv2 "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
 	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
 	"github.com/libp2p/go-libp2p/p2p/transport/quicreuse"
+	"github.com/prometheus/client_golang/prometheus"
 
 	ma "github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
@@ -117,6 +118,9 @@ type Config struct {
 
 	EnableHolePunching  bool
 	HolePunchingOptions []holepunch.Option
+
+	DisableMetrics       bool
+	PrometheusRegisterer prometheus.Registerer
 }
 
 func (cfg *Config) makeSwarm(enableMetrics bool) (*swarm.Swarm, error) {
@@ -168,7 +172,8 @@ func (cfg *Config) makeSwarm(enableMetrics bool) (*swarm.Swarm, error) {
 		opts = append(opts, swarm.WithMultiaddrResolver(cfg.MultiaddrResolver))
 	}
 	if enableMetrics {
-		opts = append(opts, swarm.WithMetricsTracer(swarm.NewMetricsTracer()))
+		opts = append(opts,
+			swarm.WithMetricsTracer(swarm.NewMetricsTracer(swarm.WithRegisterer(cfg.PrometheusRegisterer))))
 	}
 	// TODO: Make the swarm implementation configurable.
 	return swarm.NewSwarm(pid, cfg.Peerstore, opts...)
@@ -279,22 +284,24 @@ func (cfg *Config) addTransports(h host.Host) error {
 //
 // This function consumes the config. Do not reuse it (really!).
 func (cfg *Config) NewNode() (host.Host, error) {
-	swrm, err := cfg.makeSwarm(true)
+	swrm, err := cfg.makeSwarm(!cfg.DisableMetrics)
 	if err != nil {
 		return nil, err
 	}
 
 	h, err := bhost.NewHost(swrm, &bhost.HostOpts{
-		ConnManager:         cfg.ConnManager,
-		AddrsFactory:        cfg.AddrsFactory,
-		NATManager:          cfg.NATManager,
-		EnablePing:          !cfg.DisablePing,
-		UserAgent:           cfg.UserAgent,
-		ProtocolVersion:     cfg.ProtocolVersion,
-		EnableHolePunching:  cfg.EnableHolePunching,
-		HolePunchingOptions: cfg.HolePunchingOptions,
-		EnableRelayService:  cfg.EnableRelayService,
-		RelayServiceOpts:    cfg.RelayServiceOpts,
+		ConnManager:          cfg.ConnManager,
+		AddrsFactory:         cfg.AddrsFactory,
+		NATManager:           cfg.NATManager,
+		EnablePing:           !cfg.DisablePing,
+		UserAgent:            cfg.UserAgent,
+		ProtocolVersion:      cfg.ProtocolVersion,
+		EnableHolePunching:   cfg.EnableHolePunching,
+		HolePunchingOptions:  cfg.HolePunchingOptions,
+		EnableRelayService:   cfg.EnableRelayService,
+		RelayServiceOpts:     cfg.RelayServiceOpts,
+		EnableMetrics:        !cfg.DisableMetrics,
+		PrometheusRegisterer: cfg.PrometheusRegisterer,
 	})
 	if err != nil {
 		swrm.Close()
@@ -354,6 +361,11 @@ func (cfg *Config) NewNode() (host.Host, error) {
 		autonat.UsingAddresses(func() []ma.Multiaddr {
 			return addrF(h.AllAddrs())
 		}),
+	}
+	if !cfg.DisableMetrics {
+		autonatOpts = append(autonatOpts,
+			autonat.WithMetricsTracer(
+				autonat.NewMetricsTracer(autonat.WithRegisterer(cfg.PrometheusRegisterer))))
 	}
 	if cfg.AutoNATConfig.ThrottleInterval != 0 {
 		autonatOpts = append(autonatOpts,
@@ -421,7 +433,9 @@ func (cfg *Config) NewNode() (host.Host, error) {
 		ho = routed.Wrap(h, router)
 	}
 	if ar != nil {
-		return autorelay.NewAutoRelayHost(ho, ar), nil
+		arh := autorelay.NewAutoRelayHost(ho, ar)
+		arh.Start()
+		ho = arh
 	}
 	return ho, nil
 }

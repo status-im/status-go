@@ -138,6 +138,7 @@ func (s *secureSession) Close() error {
 func SessionWithConnState(s *secureSession, muxer protocol.ID) *secureSession {
 	if s != nil {
 		s.connectionState.StreamMultiplexer = muxer
+		s.connectionState.UsedEarlyMuxerNegotiation = muxer != ""
 	}
 	return s
 }

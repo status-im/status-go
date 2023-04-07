@@ -38,7 +38,7 @@ type BasicConnMgr struct {
 
 	// channel-based semaphore that enforces only a single trim is in progress
 	trimMutex sync.Mutex
-	connCount int32
+	connCount atomic.Int32
 	// to be accessed atomically. This is mimicking the implementation of a sync.Once.
 	// Take care of correct alignment when modifying this struct.
 	trimCount uint64
@@ -158,7 +158,7 @@ func NewConnManager(low, hi int, opts ...Option) (*BasicConnMgr, error) {
 // We don't pay attention to the silence period or the grace period.
 // We try to not kill protected connections, but if that turns out to be necessary, not connection is safe!
 func (cm *BasicConnMgr) memoryEmergency() {
-	connCount := int(atomic.LoadInt32(&cm.connCount))
+	connCount := int(cm.connCount.Load())
 	target := connCount - cm.cfg.lowWater
 	if target < 0 {
 		log.Warnw("Low on memory, but we only have a few connections", "num", connCount, "low watermark", cm.cfg.lowWater)
@@ -173,7 +173,7 @@ func (cm *BasicConnMgr) memoryEmergency() {
 
 	// Trim connections without paying attention to the silence period.
 	for _, c := range cm.getConnsToCloseEmergency(target) {
-		log.Debugw("low on memory. closing conn", "peer", c.RemotePeer())
+		log.Infow("low on memory. closing conn", "peer", c.RemotePeer())
 		c.Close()
 	}
 
@@ -346,7 +346,7 @@ func (cm *BasicConnMgr) background() {
 	for {
 		select {
 		case <-ticker.C:
-			if atomic.LoadInt32(&cm.connCount) < int32(cm.cfg.highWater) {
+			if cm.connCount.Load() < int32(cm.cfg.highWater) {
 				// Below high water, skip.
 				continue
 			}
@@ -375,7 +375,7 @@ func (cm *BasicConnMgr) doTrim() {
 func (cm *BasicConnMgr) trim() {
 	// do the actual trim.
 	for _, c := range cm.getConnsToClose() {
-		log.Debugw("closing conn", "peer", c.RemotePeer())
+		log.Infow("closing conn", "peer", c.RemotePeer())
 		c.Close()
 	}
 }
@@ -456,7 +456,7 @@ func (cm *BasicConnMgr) getConnsToClose() []network.Conn {
 		return nil
 	}
 
-	if int(atomic.LoadInt32(&cm.connCount)) <= cm.cfg.lowWater {
+	if int(cm.connCount.Load()) <= cm.cfg.lowWater {
 		log.Info("open connection count below limit")
 		return nil
 	}
@@ -632,7 +632,7 @@ func (cm *BasicConnMgr) GetInfo() CMInfo {
 		LowWater:    cm.cfg.lowWater,
 		LastTrim:    lastTrim,
 		GracePeriod: cm.cfg.gracePeriod,
-		ConnCount:   int(atomic.LoadInt32(&cm.connCount)),
+		ConnCount:   int(cm.connCount.Load()),
 	}
 }
 
@@ -686,7 +686,7 @@ func (nn *cmNotifee) Connected(n network.Network, c network.Conn) {
 	}
 
 	pinfo.conns[c] = cm.clock.Now()
-	atomic.AddInt32(&cm.connCount, 1)
+	cm.connCount.Add(1)
 }
 
 // Disconnected is called by notifiers to inform that an existing connection has been closed or terminated.
@@ -715,7 +715,7 @@ func (nn *cmNotifee) Disconnected(n network.Network, c network.Conn) {
 	if len(cinf.conns) == 0 {
 		delete(s.peers, p)
 	}
-	atomic.AddInt32(&cm.connCount, -1)
+	cm.connCount.Add(-1)
 }
 
 // Listen is no-op in this implementation.

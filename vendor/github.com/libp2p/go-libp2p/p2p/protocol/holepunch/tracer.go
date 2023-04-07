@@ -227,7 +227,8 @@ func (t *tracer) gc() {
 
 	for {
 		select {
-		case now := <-timer.C:
+		case <-timer.C:
+			now := time.Now()
 			t.mutex.Lock()
 			for id, entry := range t.peers {
 				if entry.last.Before(now.Add(-tracerCacheDuration)) {

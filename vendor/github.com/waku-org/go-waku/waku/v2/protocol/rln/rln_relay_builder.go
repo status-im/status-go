@@ -16,7 +16,7 @@ func RlnRelayStatic(
 	ctx context.Context,
 	relay *relay.WakuRelay,
 	group []r.IDCommitment,
-	memKeyPair r.MembershipKeyPair,
+	memKeyPair r.IdentityCredential,
 	memIndex r.MembershipIndex,
 	pubsubTopic string,
 	contentTopic string,
@@ -48,7 +48,7 @@ func RlnRelayStatic(
 		contentTopic:      contentTopic,
 		log:               log,
 		timesource:        timesource,
-		nullifierLog:      make(map[r.Epoch][]r.ProofMetadata),
+		nullifierLog:      make(map[r.Nullifier][]r.ProofMetadata),
 	}
 
 	root, err := rlnPeer.RLN.GetMerkleRoot()
@@ -84,7 +84,7 @@ func RlnRelayDynamic(
 	ethClientAddr string,
 	ethAccountPrivateKey *ecdsa.PrivateKey,
 	memContractAddr common.Address,
-	memKeyPair *r.MembershipKeyPair,
+	memKeyPair *r.IdentityCredential,
 	memIndex r.MembershipIndex,
 	pubsubTopic string,
 	contentTopic string,
@@ -114,7 +114,7 @@ func RlnRelayDynamic(
 		contentTopic:              contentTopic,
 		log:                       log,
 		timesource:                timesource,
-		nullifierLog:              make(map[r.Epoch][]r.ProofMetadata),
+		nullifierLog:              make(map[r.Nullifier][]r.ProofMetadata),
 		registrationHandler:       registrationHandler,
 		lastIndexLoaded:           -1,
 	}

@@ -297,7 +297,7 @@ rand:
 	return id
 }
 
-func (s *Session) OpenStreamSync(ctx context.Context) (str Stream, err error) {
+func (s *Session) OpenStreamSync(ctx context.Context) (Stream, error) {
 	s.closeMx.Lock()
 	if s.closeErr != nil {
 		s.closeMx.Unlock()
@@ -307,19 +307,22 @@ func (s *Session) OpenStreamSync(ctx context.Context) (str Stream, err error) {
 	id := s.addStreamCtxCancel(cancel)
 	s.closeMx.Unlock()
 
-	defer func() {
-		s.closeMx.Lock()
-		defer s.closeMx.Unlock()
-		delete(s.streamCtxs, id)
-		if err != nil && s.closeErr != nil {
-			err = s.closeErr
-		}
-	}()
-
-	var qstr quic.Stream
-	qstr, err = s.qconn.OpenStreamSync(ctx)
+	qstr, err := s.qconn.OpenStreamSync(ctx)
 	if err != nil {
+		if s.closeErr != nil {
+			return nil, s.closeErr
+		}
 		return nil, err
+	}
+
+	s.closeMx.Lock()
+	defer s.closeMx.Unlock()
+	delete(s.streamCtxs, id)
+	// Some time might have passed. Check if the session is still alive
+	if s.closeErr != nil {
+		qstr.CancelWrite(sessionCloseErrorCode)
+		qstr.CancelRead(sessionCloseErrorCode)
+		return nil, s.closeErr
 	}
 	return s.addStream(qstr, true), nil
 }
@@ -348,19 +351,21 @@ func (s *Session) OpenUniStreamSync(ctx context.Context) (str SendStream, err er
 	id := s.addStreamCtxCancel(cancel)
 	s.closeMx.Unlock()
 
-	defer func() {
-		s.closeMx.Lock()
-		defer s.closeMx.Unlock()
-		delete(s.streamCtxs, id)
-		if err != nil && s.closeErr != nil {
-			err = s.closeErr
-		}
-	}()
-
-	var qstr quic.SendStream
-	qstr, err = s.qconn.OpenUniStreamSync(ctx)
+	qstr, err := s.qconn.OpenUniStreamSync(ctx)
 	if err != nil {
+		if s.closeErr != nil {
+			return nil, s.closeErr
+		}
 		return nil, err
+	}
+
+	s.closeMx.Lock()
+	defer s.closeMx.Unlock()
+	delete(s.streamCtxs, id)
+	// Some time might have passed. Check if the session is still alive
+	if s.closeErr != nil {
+		qstr.CancelWrite(sessionCloseErrorCode)
+		return nil, s.closeErr
 	}
 	return s.addSendStream(qstr), nil
 }

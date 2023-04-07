@@ -3,7 +3,6 @@ package eventbus
 import (
 	"reflect"
 	"strings"
-	"sync"
 
 	"github.com/libp2p/go-libp2p/p2p/metricshelper"
 
@@ -53,6 +52,13 @@ var (
 		},
 		[]string{"subscriber_name"},
 	)
+	collectors = []prometheus.Collector{
+		eventsEmitted,
+		totalSubscribers,
+		subscriberQueueLength,
+		subscriberQueueFull,
+		subscriberEventQueued,
+	}
 )
 
 // MetricsTracer tracks metrics for the eventbus subsystem
@@ -81,30 +87,26 @@ type metricsTracer struct{}
 
 var _ MetricsTracer = &metricsTracer{}
 
-type MetricsTracerOption = func(*metricsTracerSetting)
-
 type metricsTracerSetting struct {
 	reg prometheus.Registerer
 }
 
-var initMetricsOnce sync.Once
+type MetricsTracerOption func(*metricsTracerSetting)
 
-func initMetrics(reg prometheus.Registerer) {
-	reg.MustRegister(eventsEmitted, totalSubscribers, subscriberQueueLength, subscriberQueueFull, subscriberEventQueued)
-}
-
-func MustRegisterWith(reg prometheus.Registerer) MetricsTracerOption {
+func WithRegisterer(reg prometheus.Registerer) MetricsTracerOption {
 	return func(s *metricsTracerSetting) {
-		s.reg = reg
+		if reg != nil {
+			s.reg = reg
+		}
 	}
 }
 
 func NewMetricsTracer(opts ...MetricsTracerOption) MetricsTracer {
-	settings := &metricsTracerSetting{reg: prometheus.DefaultRegisterer}
+	setting := &metricsTracerSetting{reg: prometheus.DefaultRegisterer}
 	for _, opt := range opts {
-		opt(settings)
+		opt(setting)
 	}
-	initMetricsOnce.Do(func() { initMetrics(settings.reg) })
+	metricshelper.RegisterCollectors(setting.reg, collectors...)
 	return &metricsTracer{}
 }
 

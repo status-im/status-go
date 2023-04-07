@@ -31,7 +31,6 @@ func (c conn) Read(b []byte) (int, error) {
 	if err == nil && n == 0 && c.readAttempts < maxReadAttempts {
 		c.readAttempts++
 		// Nothing happened, let's read again. We reached the end of the frame
-		// we have
 		// (https://github.com/nhooyr/websocket/blob/master/netconn.go#L118).
 		// The next read will block until we get
 		// the next frame. We limit here to avoid looping in case of a bunch of

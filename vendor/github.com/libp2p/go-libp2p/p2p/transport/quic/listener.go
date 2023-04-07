@@ -96,7 +96,7 @@ func (l *listener) setupConn(qconn quic.Connection) (*conn, error) {
 	c, err := l.setupConnWithScope(qconn, connScope, remoteMultiaddr)
 	if err != nil {
 		connScope.Done()
-		qconn.CloseWithError(1, err.Error())
+		qconn.CloseWithError(1, "")
 		return nil, err
 	}
 

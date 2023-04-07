@@ -18,6 +18,14 @@ func WithLimit(limit *RelayLimit) Option {
 	}
 }
 
+// WithInfiniteLimits is a Relay option that disables limits.
+func WithInfiniteLimits() Option {
+	return func(r *Relay) error {
+		r.rc.Limit = nil
+		return nil
+	}
+}
+
 // WithACL is a Relay option that supplies an ACLFilter for access control.
 func WithACL(acl ACLFilter) Option {
 	return func(r *Relay) error {

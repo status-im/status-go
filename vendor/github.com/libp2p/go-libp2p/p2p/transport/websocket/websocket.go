@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -250,6 +251,8 @@ func (t *WebsocketTransport) maDial(ctx context.Context, raddr ma.Multiaddr) (ma
 		return nil, fmt.Errorf("failed to get local address")
 	}
 
+	// Set an arbitrarily large read limit since we don't actually want to limit the message size here.
+	wscon.SetReadLimit(math.MaxInt64 - 1) // -1 because the library adds a byte for the fin frame
 	mnc, err := manet.WrapNetConn(
 		conn{
 			Conn:       ws.NetConn(context.Background(), wscon, ws.MessageBinary),

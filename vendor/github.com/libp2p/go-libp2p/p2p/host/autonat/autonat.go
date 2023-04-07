@@ -33,7 +33,7 @@ type AmbientAutoNAT struct {
 	inboundConn  chan network.Conn
 	observations chan autoNATResult
 	// status is an autoNATResult reflecting current status.
-	status atomic.Value
+	status atomic.Pointer[autoNATResult]
 	// Reflects the confidence on of the NATStatus being private, as a single
 	// dialback may fail for reasons unrelated to NAT.
 	// If it is <3, then multiple autoNAT peers may be contacted for dialback
@@ -117,7 +117,7 @@ func New(h host.Host, options ...Option) (AutoNAT, error) {
 		service:                 service,
 		recentProbes:            make(map[peer.ID]time.Time),
 	}
-	as.status.Store(autoNATResult{network.ReachabilityUnknown, nil})
+	as.status.Store(&autoNATResult{network.ReachabilityUnknown, nil})
 
 	subscriber, err := as.host.EventBus().Subscribe(
 		[]any{new(event.EvtLocalAddressesUpdated), new(event.EvtPeerIdentificationCompleted)},
@@ -136,18 +136,21 @@ func New(h host.Host, options ...Option) (AutoNAT, error) {
 
 // Status returns the AutoNAT observed reachability status.
 func (as *AmbientAutoNAT) Status() network.Reachability {
-	s := as.status.Load().(autoNATResult)
+	s := as.status.Load()
 	return s.Reachability
 }
 
 func (as *AmbientAutoNAT) emitStatus() {
-	status := as.status.Load().(autoNATResult)
+	status := as.status.Load()
 	as.emitReachabilityChanged.Emit(event.EvtLocalReachabilityChanged{Reachability: status.Reachability})
+	if as.metricsTracer != nil {
+		as.metricsTracer.ReachabilityStatus(status.Reachability)
+	}
 }
 
 // PublicAddr returns the publicly connectable Multiaddr of this node if one is known.
 func (as *AmbientAutoNAT) PublicAddr() (ma.Multiaddr, error) {
-	s := as.status.Load().(autoNATResult)
+	s := as.status.Load()
 	if s.Reachability != network.ReachabilityPublic {
 		return nil, errors.New("NAT status is not public")
 	}
@@ -184,7 +187,7 @@ func (as *AmbientAutoNAT) background() {
 		// new inbound connection.
 		case conn := <-as.inboundConn:
 			localAddrs := as.host.Addrs()
-			ca := as.status.Load().(autoNATResult)
+			ca := as.status.Load()
 			if ca.address != nil {
 				localAddrs = append(localAddrs, ca.address)
 			}
@@ -204,7 +207,7 @@ func (as *AmbientAutoNAT) background() {
 				}
 			case event.EvtPeerIdentificationCompleted:
 				if s, err := as.host.Peerstore().SupportsProtocols(e.Peer, AutoNATProto); err == nil && len(s) > 0 {
-					currentStatus := as.status.Load().(autoNATResult)
+					currentStatus := as.status.Load()
 					if currentStatus.Reachability == network.ReachabilityUnknown {
 						as.tryProbe(e.Peer)
 					}
@@ -253,7 +256,7 @@ func (as *AmbientAutoNAT) scheduleProbe() time.Duration {
 	// * recent inbound connections (implying continued connectivity) should decrease the retry when public
 	// * recent inbound connections when not public mean we should try more actively to see if we're public.
 	fixedNow := time.Now()
-	currentStatus := as.status.Load().(autoNATResult)
+	currentStatus := as.status.Load()
 
 	nextProbe := fixedNow
 	// Don't look for peers in the peer store more than once per second.
@@ -279,17 +282,22 @@ func (as *AmbientAutoNAT) scheduleProbe() time.Duration {
 			nextProbe = as.lastProbe.Add(untilNext)
 		}
 	}
-
+	if as.metricsTracer != nil {
+		as.metricsTracer.NextProbeTime(nextProbe)
+	}
 	return nextProbe.Sub(fixedNow)
 }
 
 // Update the current status based on an observed result.
 func (as *AmbientAutoNAT) recordObservation(observation autoNATResult) {
-	currentStatus := as.status.Load().(autoNATResult)
+	currentStatus := as.status.Load()
+
 	if observation.Reachability == network.ReachabilityPublic {
 		log.Debugf("NAT status is public")
 		changed := false
 		if currentStatus.Reachability != network.ReachabilityPublic {
+			// Aggressively switch to public from other states ignoring confidence
+
 			// we are flipping our NATStatus, so confidence drops to 0
 			as.confidence = 0
 			if as.service != nil {
@@ -299,27 +307,19 @@ func (as *AmbientAutoNAT) recordObservation(observation autoNATResult) {
 		} else if as.confidence < 3 {
 			as.confidence++
 		}
-		if observation.address != nil {
-			if !changed && currentStatus.address != nil && !observation.address.Equal(currentStatus.address) {
-				as.confidence--
-			}
-			if currentStatus.address == nil || !observation.address.Equal(currentStatus.address) {
-				changed = true
-			}
-			as.status.Store(observation)
-		}
-		if observation.address != nil && changed {
+		as.status.Store(&observation)
+		if changed {
 			as.emitStatus()
 		}
 	} else if observation.Reachability == network.ReachabilityPrivate {
 		log.Debugf("NAT status is private")
-		if currentStatus.Reachability == network.ReachabilityPublic {
+		if currentStatus.Reachability != network.ReachabilityPrivate {
 			if as.confidence > 0 {
 				as.confidence--
 			} else {
 				// we are flipping our NATStatus, so confidence drops to 0
 				as.confidence = 0
-				as.status.Store(observation)
+				as.status.Store(&observation)
 				if as.service != nil {
 					as.service.Disable()
 				}
@@ -327,23 +327,23 @@ func (as *AmbientAutoNAT) recordObservation(observation autoNATResult) {
 			}
 		} else if as.confidence < 3 {
 			as.confidence++
-			as.status.Store(observation)
-			if currentStatus.Reachability != network.ReachabilityPrivate {
-				as.emitStatus()
-			}
+			as.status.Store(&observation)
 		}
 	} else if as.confidence > 0 {
 		// don't just flip to unknown, reduce confidence first
 		as.confidence--
 	} else {
 		log.Debugf("NAT status is unknown")
-		as.status.Store(autoNATResult{network.ReachabilityUnknown, nil})
+		as.status.Store(&autoNATResult{network.ReachabilityUnknown, nil})
 		if currentStatus.Reachability != network.ReachabilityUnknown {
 			if as.service != nil {
 				as.service.Enable()
 			}
 			as.emitStatus()
 		}
+	}
+	if as.metricsTracer != nil {
+		as.metricsTracer.ReachabilityStatusConfidence(as.confidence)
 	}
 }
 
@@ -372,7 +372,7 @@ func (as *AmbientAutoNAT) tryProbe(p peer.ID) bool {
 }
 
 func (as *AmbientAutoNAT) probe(pi *peer.AddrInfo) {
-	cli := NewAutoNATClient(as.host, as.config.addressFunc)
+	cli := NewAutoNATClient(as.host, as.config.addressFunc, as.metricsTracer)
 	ctx, cancel := context.WithTimeout(as.ctx, as.config.requestTimeout)
 	defer cancel()
 

@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-
-	"github.com/benbjohnson/clock"
 )
 
 // AutoRelay will call this function when it needs new candidates because it is
@@ -24,7 +22,7 @@ import (
 type PeerSource func(ctx context.Context, num int) <-chan peer.AddrInfo
 
 type config struct {
-	clock      clock.Clock
+	clock      ClockWithInstantTimer
 	peerSource PeerSource
 	// minimum interval used to call the peerSource callback
 	minInterval time.Duration
@@ -42,11 +40,10 @@ type config struct {
 	// see WithMaxCandidateAge
 	maxCandidateAge  time.Duration
 	setMinCandidates bool
-	enableCircuitV1  bool
 }
 
 var defaultConfig = config{
-	clock:           clock.New(),
+	clock:           RealClock{},
 	minCandidates:   4,
 	maxCandidates:   20,
 	bootDelay:       3 * time.Minute,
@@ -151,14 +148,6 @@ func WithBackoff(d time.Duration) Option {
 	}
 }
 
-// WithCircuitV1Support enables support for circuit v1 relays.
-func WithCircuitV1Support() Option {
-	return func(c *config) error {
-		c.enableCircuitV1 = true
-		return nil
-	}
-}
-
 // WithMaxCandidateAge sets the maximum age of a candidate.
 // When we are connected to the desired number of relays, we don't ask the peer source for new candidates.
 // This can lead to AutoRelay's candidate list becoming outdated, and means we won't be able
@@ -171,7 +160,53 @@ func WithMaxCandidateAge(d time.Duration) Option {
 	}
 }
 
-func WithClock(cl clock.Clock) Option {
+// InstantTimer is a timer that triggers at some instant rather than some duration
+type InstantTimer interface {
+	Reset(d time.Time) bool
+	Stop() bool
+	Ch() <-chan time.Time
+}
+
+// ClockWithInstantTimer is a clock that can create timers that trigger at some
+// instant rather than some duration
+type ClockWithInstantTimer interface {
+	Now() time.Time
+	Since(t time.Time) time.Duration
+	InstantTimer(when time.Time) InstantTimer
+}
+
+type RealTimer struct{ t *time.Timer }
+
+var _ InstantTimer = (*RealTimer)(nil)
+
+func (t RealTimer) Ch() <-chan time.Time {
+	return t.t.C
+}
+
+func (t RealTimer) Reset(d time.Time) bool {
+	return t.t.Reset(time.Until(d))
+}
+
+func (t RealTimer) Stop() bool {
+	return t.t.Stop()
+}
+
+type RealClock struct{}
+
+var _ ClockWithInstantTimer = RealClock{}
+
+func (RealClock) Now() time.Time {
+	return time.Now()
+}
+func (RealClock) Since(t time.Time) time.Duration {
+	return time.Since(t)
+}
+func (RealClock) InstantTimer(when time.Time) InstantTimer {
+	t := time.NewTimer(time.Until(when))
+	return &RealTimer{t}
+}
+
+func WithClock(cl ClockWithInstantTimer) Option {
 	return func(c *config) error {
 		c.clock = cl
 		return nil

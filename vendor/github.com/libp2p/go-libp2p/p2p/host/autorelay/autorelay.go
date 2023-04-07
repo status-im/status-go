@@ -49,12 +49,15 @@ func NewAutoRelay(bhost *basic.BasicHost, opts ...Option) (*AutoRelay, error) {
 	r.relayFinder = newRelayFinder(bhost, conf.peerSource, &conf)
 	bhost.AddrsFactory = r.hostAddrs
 
+	return r, nil
+}
+
+func (r *AutoRelay) Start() {
 	r.refCount.Add(1)
 	go func() {
 		defer r.refCount.Done()
 		r.background()
 	}()
-	return r, nil
 }
 
 func (r *AutoRelay) background() {

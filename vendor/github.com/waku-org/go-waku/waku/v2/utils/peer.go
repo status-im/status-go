@@ -11,12 +11,27 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
+	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/zap"
 )
 
 // ErrNoPeersAvailable is emitted when no suitable peers are found for
 // some protocol
 var ErrNoPeersAvailable = errors.New("no suitable peers found")
+
+func GetPeerID(m multiaddr.Multiaddr) (peer.ID, error) {
+	peerIDStr, err := m.ValueForProtocol(multiaddr.P_P2P)
+	if err != nil {
+		return "", err
+	}
+
+	peerID, err := peer.Decode(peerIDStr)
+	if err != nil {
+		return "", err
+	}
+
+	return peerID, nil
+}
 
 // SelectPeer is used to return a random peer that supports a given protocol.
 // If a list of specific peers is passed, the peer will be chosen from that list assuming

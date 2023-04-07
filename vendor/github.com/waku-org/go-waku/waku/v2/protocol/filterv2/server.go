@@ -3,6 +3,7 @@ package filterv2
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"sync"
@@ -157,6 +158,10 @@ func (wf *WakuFilterFull) subscribe(s network.Stream, logger *zap.Logger, reques
 		return
 	}
 
+	if len(request.ContentTopics) > MaxContentTopicsPerRequest {
+		reply(s, logger, request, http.StatusBadRequest, fmt.Sprintf("exceeds maximum content topics: %d", MaxContentTopicsPerRequest))
+	}
+
 	if wf.subscriptions.Count() >= wf.maxSubscriptions {
 		reply(s, logger, request, http.StatusServiceUnavailable, "node has reached maximum number of subscriptions")
 		return
@@ -190,6 +195,10 @@ func (wf *WakuFilterFull) unsubscribe(s network.Stream, logger *zap.Logger, requ
 	if len(request.ContentTopics) == 0 {
 		reply(s, logger, request, http.StatusBadRequest, "at least one contenttopic should be specified")
 		return
+	}
+
+	if len(request.ContentTopics) > MaxContentTopicsPerRequest {
+		reply(s, logger, request, http.StatusBadRequest, fmt.Sprintf("exceeds maximum content topics: %d", MaxContentTopicsPerRequest))
 	}
 
 	err := wf.subscriptions.Delete(s.Conn().RemotePeer(), request.PubsubTopic, request.ContentTopics)
@@ -253,6 +262,9 @@ func (wf *WakuFilterFull) pushMessage(ctx context.Context, peerID peer.ID, env *
 		PubsubTopic: env.PubsubTopic(),
 		WakuMessage: env.Message(),
 	}
+
+	ctx, cancel := context.WithTimeout(ctx, MessagePushTimeout)
+	defer cancel()
 
 	// We connect first so dns4 addresses are resolved (NewStream does not do it)
 	err := wf.h.Connect(ctx, wf.h.Peerstore().PeerInfo(peerID))

@@ -146,13 +146,23 @@ func (r *acceptLoopRunner) innerAccept(l *listener, expectedVersion quic.Version
 
 func (r *acceptLoopRunner) Accept(l *listener, expectedVersion quic.VersionNumber, bufferedConnChan chan acceptVal) (tpt.CapableConn, error) {
 	for {
-		r.acceptSem <- struct{}{}
-		conn, err := r.innerAccept(l, expectedVersion, bufferedConnChan)
-		<-r.acceptSem
+		var conn tpt.CapableConn
+		var err error
+		select {
+		case r.acceptSem <- struct{}{}:
+			conn, err = r.innerAccept(l, expectedVersion, bufferedConnChan)
+			<-r.acceptSem
 
-		if conn == nil && err == nil {
-			// Didn't find a conn for the expected version and there was no error, lets try again
-			continue
+			if conn == nil && err == nil {
+				// Didn't find a conn for the expected version and there was no error, lets try again
+				continue
+			}
+		case v, ok := <-bufferedConnChan:
+			if !ok {
+				return nil, errors.New("listener closed")
+			}
+			conn = v.conn
+			err = v.err
 		}
 		return conn, err
 	}

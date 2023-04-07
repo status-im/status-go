@@ -27,6 +27,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/libp2p/go-netroute"
 
@@ -151,19 +152,32 @@ type HostOpts struct {
 	EnableHolePunching bool
 	// HolePunchingOptions are options for the hole punching service
 	HolePunchingOptions []holepunch.Option
+
+	// EnableMetrics enables the metrics subsystems
+	EnableMetrics bool
+	// PrometheusRegisterer is the PrometheusRegisterer used for metrics
+	PrometheusRegisterer prometheus.Registerer
 }
 
 // NewHost constructs a new *BasicHost and activates it by attaching its stream and connection handlers to the given inet.Network.
 func NewHost(n network.Network, opts *HostOpts) (*BasicHost, error) {
-	eventBus := eventbus.NewBus(eventbus.WithMetricsTracer(eventbus.NewMetricsTracer()))
+	if opts == nil {
+		opts = &HostOpts{}
+	}
+
+	var eventBus event.Bus
+	if opts.EnableMetrics {
+		eventBus = eventbus.NewBus(
+			eventbus.WithMetricsTracer(eventbus.NewMetricsTracer(eventbus.WithRegisterer(opts.PrometheusRegisterer))))
+	} else {
+		eventBus = eventbus.NewBus()
+	}
+
 	psManager, err := pstoremanager.NewPeerstoreManager(n.Peerstore(), eventBus)
 	if err != nil {
 		return nil, err
 	}
 	hostCtx, cancel := context.WithCancel(context.Background())
-	if opts == nil {
-		opts = &HostOpts{}
-	}
 
 	h := &BasicHost{
 		network:                 n,
@@ -223,23 +237,22 @@ func NewHost(n network.Network, opts *HostOpts) (*BasicHost, error) {
 		h.mux = opts.MultistreamMuxer
 	}
 
+	idOpts := []identify.Option{
+		identify.UserAgent(opts.UserAgent),
+		identify.ProtocolVersion(opts.ProtocolVersion),
+	}
+
 	// we can't set this as a default above because it depends on the *BasicHost.
 	if h.disableSignedPeerRecord {
-		h.ids, err = identify.NewIDService(
-			h,
-			identify.UserAgent(opts.UserAgent),
-			identify.ProtocolVersion(opts.ProtocolVersion),
-			identify.DisableSignedPeerRecord(),
-			identify.WithMetricsTracer(identify.NewMetricsTracer()),
-		)
-	} else {
-		h.ids, err = identify.NewIDService(
-			h,
-			identify.UserAgent(opts.UserAgent),
-			identify.ProtocolVersion(opts.ProtocolVersion),
-			identify.WithMetricsTracer(identify.NewMetricsTracer()),
-		)
+		idOpts = append(idOpts, identify.DisableSignedPeerRecord())
 	}
+	if opts.EnableMetrics {
+		idOpts = append(idOpts,
+			identify.WithMetricsTracer(
+				identify.NewMetricsTracer(identify.WithRegisterer(opts.PrometheusRegisterer))))
+	}
+
+	h.ids, err = identify.NewIDService(h, idOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Identify service: %s", err)
 	}

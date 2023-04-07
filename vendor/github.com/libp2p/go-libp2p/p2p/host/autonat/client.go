@@ -17,16 +17,17 @@ import (
 
 // NewAutoNATClient creates a fresh instance of an AutoNATClient
 // If addrFunc is nil, h.Addrs will be used
-func NewAutoNATClient(h host.Host, addrFunc AddrFunc) Client {
+func NewAutoNATClient(h host.Host, addrFunc AddrFunc, mt MetricsTracer) Client {
 	if addrFunc == nil {
 		addrFunc = h.Addrs
 	}
-	return &client{h: h, addrFunc: addrFunc}
+	return &client{h: h, addrFunc: addrFunc, mt: mt}
 }
 
 type client struct {
 	h        host.Host
 	addrFunc AddrFunc
+	mt       MetricsTracer
 }
 
 // DialBack asks peer p to dial us back on all addresses returned by the addrFunc.
@@ -79,6 +80,9 @@ func (c *client) DialBack(ctx context.Context, p peer.ID) (ma.Multiaddr, error) 
 	}
 
 	status := res.GetDialResponse().GetStatus()
+	if c.mt != nil {
+		c.mt.ReceivedDialResponse(status)
+	}
 	switch status {
 	case pb.Message_OK:
 		addr := res.GetDialResponse().GetAddr()

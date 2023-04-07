@@ -225,7 +225,7 @@ setup: setup-check setup-build setup-dev tidy
 
 setup-check: ##@setup Check if Go compiler is installed.
 ifeq (, $(shell which go))
-	$(error "No Go compiler found! Make sure to install 1.18.0 or newer.")
+	$(error "No Go compiler found! Make sure to install 1.19.0 or newer.")
 endif
 
 setup-dev: ##@setup Install all necessary tools for development
@@ -244,7 +244,7 @@ install-gomobile: ##@install Go Mobile Build Tools
 	GO111MODULE=off go get -d golang.org/x/mobile/cmd/gobind
 
 install-lint: ##@install Install Linting Tools
-	GO111MODULE=on go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
+	GO111MODULE=on go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
 
 install-mock: ##@install Install Module Mocking Tools
 	GO111MODULE=on go install github.com/golang/mock/mockgen@v1.4.4

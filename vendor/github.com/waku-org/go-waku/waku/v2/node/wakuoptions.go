@@ -76,16 +76,14 @@ type WakuNodeParameters struct {
 	minRelayPeersToPublish int
 
 	enableStore     bool
-	enableSwap      bool
 	resumeNodes     []multiaddr.Multiaddr
 	messageProvider store.MessageProvider
 
 	enableRendezvous bool
-	rendezvousDB     *rendezvous.DB
+	rendezvousNodes  []multiaddr.Multiaddr
 
-	swapMode                int
-	swapDisconnectThreshold int
-	swapPaymentThreshold    int
+	enableRendezvousServer bool
+	rendezvousDB           *rendezvous.DB
 
 	discoveryMinPeers int
 
@@ -370,17 +368,6 @@ func WithWakuStoreFactory(factory storeFactory) WakuNodeOption {
 	}
 }
 
-// WithWakuSwap set the option of the Waku V2 Swap protocol
-func WithWakuSwap(mode int, disconnectThreshold, paymentThreshold int) WakuNodeOption {
-	return func(params *WakuNodeParameters) error {
-		params.enableSwap = true
-		params.swapMode = mode
-		params.swapDisconnectThreshold = disconnectThreshold
-		params.swapPaymentThreshold = paymentThreshold
-		return nil
-	}
-}
-
 // WithMessageProvider is a WakuNodeOption that sets the MessageProvider
 // used to store and retrieve persisted messages
 func WithMessageProvider(s store.MessageProvider) WakuNodeOption {
@@ -437,11 +424,20 @@ func WithWebsockets(address string, port int) WakuNodeOption {
 	}
 }
 
+// WithRendezvous is a WakuOption used to enable rendezvous as a discovery
+func WithRendezvous(rendezvousPoints []multiaddr.Multiaddr) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.enableRendezvous = true
+		params.rendezvousNodes = rendezvousPoints
+		return nil
+	}
+}
+
 // WithRendezvousServer is a WakuOption used to set the node as a rendezvous
 // point, using an specific storage for the peer information
 func WithRendezvousServer(db *rendezvous.DB) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
-		params.enableRendezvous = true
+		params.enableRendezvousServer = true
 		params.rendezvousDB = db
 		return nil
 	}
