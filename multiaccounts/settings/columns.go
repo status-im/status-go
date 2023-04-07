@@ -82,6 +82,12 @@ var (
 	Bio = SettingField{
 		reactFieldName: "bio",
 		dBColumnName:   "bio",
+		syncProtobufFactory: &SyncProtobufFactory{
+			fromInterface:     bioProtobufFactory,
+			fromStruct:        bioProtobufFactoryStruct,
+			valueFromProtobuf: StringFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_BIO,
+		},
 	}
 	EIP1581Address = SettingField{
 		reactFieldName: "eip1581-address",
@@ -422,6 +428,7 @@ var (
 		DappsAddress,
 		DefaultSyncPeriod,
 		DisplayName,
+		Bio,
 		EIP1581Address,
 		Fleet,
 		GifAPIKey,
