@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"encoding/asn1"
+	"github.com/status-im/status-go/logutils"
 	"math/big"
 	"testing"
 	"time"
@@ -12,8 +13,6 @@ import (
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-
-	"github.com/status-im/status-go/logutils"
 )
 
 const (
