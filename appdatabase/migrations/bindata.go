@@ -53,6 +53,7 @@
 // 1677681143_accounts_table_type_column_update.up.sql (135B)
 // 1678264207_accounts_table_new_columns_added.up.sql (130B)
 // 1680770368_add_bio_to_settings_sync_clock_table.up.sql (75B)
+// 1681110436_add_mnemonic_to_settings_sync_clock_table.up.sql (311B)
 // doc.go (74B)
 
 package migrations
@@ -1177,8 +1178,28 @@ func _1680770368_add_bio_to_settings_sync_clock_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1680770368_add_bio_to_settings_sync_clock_table.up.sql", size: 75, mode: os.FileMode(0644), modTime: time.Unix(1680862812, 0)}
+	info := bindataFileInfo{name: "1680770368_add_bio_to_settings_sync_clock_table.up.sql", size: 75, mode: os.FileMode(0644), modTime: time.Unix(1681291241, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x4a, 0x52, 0xf6, 0x3f, 0xaa, 0xd, 0xa0, 0xee, 0xe8, 0xe6, 0x16, 0x21, 0x80, 0x61, 0xe4, 0x7a, 0x4e, 0x37, 0x8d, 0x30, 0x51, 0x20, 0x4d, 0x15, 0x47, 0xfb, 0x6, 0xa1, 0xce, 0xc8, 0x27, 0x5a}}
+	return a, nil
+}
+
+var __1681110436_add_mnemonic_to_settings_sync_clock_tableUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x7c\xcd\xc1\x4a\x03\x31\x10\xc6\xf1\xfb\x3e\xc5\x77\xdb\xd6\x53\xef\x4b\x85\x74\x77\x56\x0b\xd3\x44\xb2\x13\x3c\xe6\x90\x06\x0d\xba\x59\x30\x41\xe8\xdb\x8b\x28\x56\x58\xf1\x3a\xcc\xf7\xfb\x2b\x16\xb2\x10\x75\x60\x42\x89\xb5\xa6\xfc\x54\x7c\xb9\xe4\xe0\xc3\xeb\x12\x5e\xa0\x86\x01\xbd\x61\x77\xd2\x98\x73\x9c\x97\x9c\x82\x7f\x8b\xf3\xf2\x1e\xcf\x38\x6a\xa1\x3b\xb2\xd0\x46\xa0\x1d\x33\x06\x1a\x95\x63\xc1\xae\x6b\xfe\x72\xff\xc5\x0e\xc6\x30\x29\xbd\xc6\x46\xc5\x13\x75\x8d\x7b\x18\x94\xfc\xb2\x26\x92\x35\xb2\xc7\x66\x22\xa6\x5e\xd0\x1b\xa7\x65\x73\xb3\xc5\x2d\x76\x18\xad\x39\x5d\x97\x8f\xf7\x64\xe9\x67\x8b\xe3\xf4\xd5\x33\xf6\x7a\xdb\xa3\x6d\xb7\xdf\x8f\xe5\x92\xeb\x73\xac\x29\xf8\xf4\x19\x68\xd3\xb9\xed\x9a\x8f\x00\x00\x00\xff\xff\x66\x07\x60\x7d\x37\x01\x00\x00")
+
+func _1681110436_add_mnemonic_to_settings_sync_clock_tableUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1681110436_add_mnemonic_to_settings_sync_clock_tableUpSql,
+		"1681110436_add_mnemonic_to_settings_sync_clock_table.up.sql",
+	)
+}
+
+func _1681110436_add_mnemonic_to_settings_sync_clock_tableUpSql() (*asset, error) {
+	bytes, err := _1681110436_add_mnemonic_to_settings_sync_clock_tableUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1681110436_add_mnemonic_to_settings_sync_clock_table.up.sql", size: 311, mode: os.FileMode(0644), modTime: time.Unix(1681291820, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3d, 0x74, 0x81, 0x7d, 0x9e, 0x77, 0xb6, 0xfe, 0xe3, 0xcb, 0x48, 0xe5, 0x5f, 0x39, 0x23, 0xa1, 0x7d, 0x53, 0x22, 0xe8, 0x96, 0x15, 0x8a, 0x1e, 0x8e, 0xbc, 0xe2, 0x1d, 0xc4, 0xc2, 0x56, 0x34}}
 	return a, nil
 }
 
@@ -1399,6 +1420,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1680770368_add_bio_to_settings_sync_clock_table.up.sql": _1680770368_add_bio_to_settings_sync_clock_tableUpSql,
 
+	"1681110436_add_mnemonic_to_settings_sync_clock_table.up.sql": _1681110436_add_mnemonic_to_settings_sync_clock_tableUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -1496,6 +1519,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1677681143_accounts_table_type_column_update.up.sql":              &bintree{_1677681143_accounts_table_type_column_updateUpSql, map[string]*bintree{}},
 	"1678264207_accounts_table_new_columns_added.up.sql":               &bintree{_1678264207_accounts_table_new_columns_addedUpSql, map[string]*bintree{}},
 	"1680770368_add_bio_to_settings_sync_clock_table.up.sql":           &bintree{_1680770368_add_bio_to_settings_sync_clock_tableUpSql, map[string]*bintree{}},
+	"1681110436_add_mnemonic_to_settings_sync_clock_table.up.sql":      &bintree{_1681110436_add_mnemonic_to_settings_sync_clock_tableUpSql, map[string]*bintree{}},
 	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 
