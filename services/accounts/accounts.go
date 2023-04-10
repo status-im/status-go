@@ -69,18 +69,28 @@ func (api *API) GetAccounts(ctx context.Context) ([]*accounts.Account, error) {
 }
 
 func (api *API) DeleteAccount(ctx context.Context, address types.Address, password string) error {
-	if len(password) > 0 {
-		acc, err := api.db.GetAccountByAddress(address)
-		if err != nil {
+	acc, err := api.db.GetAccountByAddress(address)
+	if err != nil {
+		return err
+	}
+
+	migratedKeyPairs, err := api.db.GetMigratedKeyPairByKeyUID(acc.KeyUID)
+	if err != nil {
+		return err
+	}
+
+	if acc.Type != accounts.AccountTypeWatch && len(migratedKeyPairs) == 0 {
+		if len(password) == 0 {
+			return errors.New("`password` must be provided for non keycard accounts")
+		}
+
+		err = api.manager.DeleteAccount(address, password)
+		var e *account.ErrCannotLocateKeyFile
+		if err != nil && !errors.As(err, &e) {
 			return err
 		}
-		if acc.Type != accounts.AccountTypeWatch {
-			err = api.manager.DeleteAccount(address, password)
-			var e *account.ErrCannotLocateKeyFile
-			if err != nil && !errors.As(err, &e) {
-				return err
-			}
 
+		if acc.Type != accounts.AccountTypeKey {
 			allAccountsOfKeypairWithKeyUID, err := api.db.GetAccountsByKeyUID(acc.KeyUID)
 			if err != nil {
 				return err
