@@ -778,7 +778,7 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 
 	// If the state has changed from non-mutual contact, to mutual contact
 	// we want to notify the user
-	if processingResponse.newContactRequestReceived && contact.mutual() {
+	if contact.mutual() {
 		// We set the chat as active, this is currently the expected behavior
 		// for mobile, it might change as we implement further the activity
 		// center

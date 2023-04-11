@@ -82,7 +82,8 @@ func (s *MessengerContactRequestSuite) sendContactRequest(request *requests.Send
 
 	// Check contacts
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().False(resp.Contacts[0].mutual())
+	contact := resp.Contacts[0]
+	s.Require().False(contact.mutual())
 
 	// Make sure it's not returned as coming from us
 	contactRequests, _, err := messenger.PendingContactRequests("", 10)
@@ -138,7 +139,8 @@ func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string,
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().Equal(ContactRequestStateReceived, resp.Contacts[0].ContactRequestRemoteState)
+	contact := resp.Contacts[0]
+	s.Require().Equal(ContactRequestStateReceived, contact.ContactRequestRemoteState)
 
 	// Make sure it's the latest pending contact requests
 	contactRequests, _, err := theirMessenger.PendingContactRequests("", 10)
@@ -209,7 +211,14 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
-	s.Require().True(resp.Contacts[0].mutual())
+	contact := resp.Contacts[0]
+	s.Require().True(contact.mutual())
+
+	// Chat should be active after receiving the CR
+	chat, _, err := s.m.getOneToOneAndNextClock(contact)
+	s.Require().NoError(err)
+	s.Require().NotNil(chat)
+	s.Require().True(chat.Active)
 }
 
 func (s *MessengerContactRequestSuite) declineContactRequest(contactRequest *common.Message, theirMessenger *Messenger) {
