@@ -3,6 +3,8 @@ package protocol
 import (
 	"encoding/json"
 
+	"github.com/status-im/status-go/protocol/identity"
+
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/wallet"
 
@@ -73,6 +75,7 @@ type MessengerResponse struct {
 	savedAddresses              map[string]*wallet.SavedAddress
 	keycards                    []*keypairs.KeyPair
 	keycardActions              []*keypairs.KeycardAction
+	socialLinkSettings          []*identity.SocialLink
 }
 
 func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
@@ -113,6 +116,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		SavedAddresses                []*wallet.SavedAddress               `json:"savedAddresses,omitempty"`
 		Keycards                      []*keypairs.KeyPair                  `json:"keycards,omitempty"`
 		KeycardActions                []*keypairs.KeycardAction            `json:"keycardActions,omitempty"`
+		SocialLinkSettings            []*identity.SocialLink               `json:"socialLinkSettings,omitempty"`
 	}{
 		Contacts:                r.Contacts,
 		Installations:           r.Installations,
@@ -146,6 +150,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DiscordOldestMessageTimestamp: r.DiscordOldestMessageTimestamp,
 		Keycards:                      r.AllKnownKeycards(),
 		KeycardActions:                r.KeycardActions(),
+		SocialLinkSettings:            r.SocialLinkSettings(),
 	}
 
 	responseItem.TrustStatus = r.TrustStatus()
@@ -272,6 +277,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.savedAddresses) == 0 &&
 		len(r.keycards) == 0 &&
 		len(r.keycardActions) == 0 &&
+		len(r.socialLinkSettings) == 0 &&
 		r.currentStatus == nil &&
 		r.activityCenterState == nil
 }
@@ -305,6 +311,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddSavedAddresses(response.SavedAddresses())
 	r.AddAllKnownKeycards(response.AllKnownKeycards())
 	r.AddKeycardActions(response.KeycardActions())
+	r.AddSocialLinkSettings(response.SocialLinkSettings())
 	r.CommunityChanges = append(r.CommunityChanges, response.CommunityChanges...)
 	r.BackupHandled = response.BackupHandled
 
@@ -455,6 +462,18 @@ func (r *MessengerResponse) AddKeycardActions(keycardActions []*keypairs.Keycard
 
 func (r *MessengerResponse) KeycardActions() []*keypairs.KeycardAction {
 	return r.keycardActions
+}
+
+func (r *MessengerResponse) AddSocialLinkSetting(socialLinkSettings *identity.SocialLink) {
+	r.socialLinkSettings = append(r.socialLinkSettings, socialLinkSettings)
+}
+
+func (r *MessengerResponse) AddSocialLinkSettings(socialLinkSettings []*identity.SocialLink) {
+	r.socialLinkSettings = append(r.socialLinkSettings, socialLinkSettings...)
+}
+
+func (r *MessengerResponse) SocialLinkSettings() []*identity.SocialLink {
+	return r.socialLinkSettings
 }
 
 func (r *MessengerResponse) AddNotification(n *localnotifications.Notification) {

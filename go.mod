@@ -78,8 +78,8 @@ require (
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/ladydascalie/currency v1.6.0
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
-	github.com/waku-org/go-waku v0.5.3-0.20230404182041-41691a44e579
 	github.com/schollz/peerdiscovery v1.7.0
+	github.com/waku-org/go-waku v0.5.3-0.20230404182041-41691a44e579
 	github.com/yeqown/go-qrcode/v2 v2.2.1
 	github.com/yeqown/go-qrcode/writer/standard v1.2.1
 	go.uber.org/multierr v1.8.0

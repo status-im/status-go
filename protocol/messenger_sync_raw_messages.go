@@ -225,6 +225,17 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				m.logger.Error("failed to handleSyncKeycards when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
+		case protobuf.ApplicationMetadataMessage_SYNC_SOCIAL_LINK_SETTING:
+			var message protobuf.SyncSocialLinkSetting
+			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			if err != nil {
+				return err
+			}
+			err = m.handleSyncSocialLinkSetting(state, message)
+			if err != nil {
+				m.logger.Error("failed to handleSyncSocialLinkSetting when HandleSyncRawMessages", zap.Error(err))
+				continue
+			}
 		case protobuf.ApplicationMetadataMessage_PAIR_INSTALLATION:
 			var message protobuf.PairInstallation
 			err := proto.Unmarshal(rawMessage.GetPayload(), &message)

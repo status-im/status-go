@@ -18,8 +18,9 @@ const (
 )
 
 type SocialLink struct {
-	Text string `json:"text"`
-	URL  string `json:"url"`
+	Text  string `json:"text"`
+	URL   string `json:"url"`
+	Clock uint64 `json:"clock"`
 }
 
 type SocialLinks []SocialLink

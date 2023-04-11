@@ -352,12 +352,26 @@ func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobu
 		pictures[i] = p
 	}
 
+	socialLinks, err := m.settings.GetSocialLinks()
+	if err != nil {
+		return nil, err
+	}
+	socialLinkSettings := make([]*protobuf.SyncSocialLinkSetting, len(socialLinks))
+	for i, socialLink := range socialLinks {
+		socialLinkSettings[i] = &protobuf.SyncSocialLinkSetting{
+			Text:  socialLink.Text,
+			Url:   socialLink.URL,
+			Clock: socialLink.Clock,
+		}
+	}
+
 	backupMessage := &protobuf.Backup{
 		Profile: &protobuf.BackedUpProfile{
-			KeyUid:           keyUID,
-			DisplayName:      displayName,
-			Pictures:         pictures,
-			DisplayNameClock: displayNameClock,
+			KeyUid:             keyUID,
+			DisplayName:        displayName,
+			Pictures:           pictures,
+			DisplayNameClock:   displayNameClock,
+			SocialLinkSettings: socialLinkSettings,
 		},
 	}
 

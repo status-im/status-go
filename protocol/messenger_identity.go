@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -127,9 +128,17 @@ func (m *Messenger) SetBio(bio string) error {
 
 func ValidateSocialLinks(socialLinks *identity.SocialLinks) error {
 	for _, link := range *socialLinks {
-		if len(link.Text) > maxSocialLinkTextLength {
-			return ErrInvalidSocialLinkTextLength
+		l := link
+		if err := ValidateSocialLink(&l); err != nil {
+			return err
 		}
+	}
+	return nil
+}
+
+func ValidateSocialLink(link *identity.SocialLink) error {
+	if len(link.Text) > maxSocialLinkTextLength {
+		return ErrInvalidSocialLinkTextLength
 	}
 	return nil
 }
@@ -148,6 +157,18 @@ func (m *Messenger) SetSocialLinks(socialLinks *identity.SocialLinks) error {
 		return err
 	}
 
+	err = m.withChatClock(func(chatID string, clock uint64) error {
+		for _, link := range *socialLinks {
+			if link.Clock == 0 {
+				link.Clock = clock
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
 	if err = m.settings.SetSocialLinks(socialLinks); err != nil {
 		return err
 	}
@@ -156,7 +177,12 @@ func (m *Messenger) SetSocialLinks(socialLinks *identity.SocialLinks) error {
 		return err
 	}
 
-	return m.publishContactCode()
+	err = m.publishContactCode()
+	if err != nil {
+		return err
+	}
+
+	return m.syncSocialSettings(context.Background(), m.dispatchMessage)
 }
 
 func (m *Messenger) setInstallationHostname() error {

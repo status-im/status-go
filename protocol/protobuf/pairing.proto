@@ -301,6 +301,7 @@ message BackedUpProfile {
   string display_name = 2;
   uint64 display_name_clock = 3;
   repeated SyncProfilePicture pictures = 4;
+  repeated SyncSocialLinkSetting social_link_settings = 5;
 }
 
 message RawMessage {
@@ -345,4 +346,10 @@ message SyncKeycardAction {
 message SyncAllKeycards {
   repeated SyncKeycard keycards = 1;
   uint64 clock = 2;
+}
+
+message SyncSocialLinkSetting {
+  string text = 1;
+  string url = 2;
+  uint64 clock = 3;
 }

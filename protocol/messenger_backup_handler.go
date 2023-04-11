@@ -21,7 +21,7 @@ const (
 func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.Backup) []error {
 	var errors []error
 
-	err := m.handleBackedUpProfile(message.Profile, message.Clock)
+	err := m.handleBackedUpProfile(state, message.Profile, message.Clock)
 	if err != nil {
 		errors = append(errors, err)
 	}
@@ -67,7 +67,7 @@ func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.B
 	return errors
 }
 
-func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, backupTime uint64) error {
+func (m *Messenger) handleBackedUpProfile(state *ReceivedMessageState, message *protobuf.BackedUpProfile, backupTime uint64) error {
 	if message == nil {
 		return nil
 	}
@@ -133,6 +133,13 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 			}
 			contentSet = true
 			response.AddImages(idImages)
+		}
+	}
+
+	for _, s := range message.SocialLinkSettings {
+		err = m.handleSyncSocialLinkSetting(state, *s)
+		if err != nil {
+			return err
 		}
 	}
 
