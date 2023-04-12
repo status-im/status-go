@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/json"
 
 	udpp2p "github.com/schollz/peerdiscovery"
 
@@ -28,6 +29,22 @@ func NewLocalPairingPeerHello(id []byte, name, deviceType string, k *ecdsa.Priva
 	}
 
 	return h, nil
+}
+
+func (h *LocalPairingPeerHello) MarshalJSON() ([]byte, error) {
+	alias := struct {
+		PeerID     []byte
+		DeviceName string
+		DeviceType string
+		Address    string
+	}{
+		PeerID:     h.PeerId,
+		DeviceName: h.DeviceName,
+		DeviceType: h.DeviceType,
+		Address:    h.Discovered.Address,
+	}
+
+	return json.Marshal(alias)
 }
 
 func (h *LocalPairingPeerHello) hash() []byte {
