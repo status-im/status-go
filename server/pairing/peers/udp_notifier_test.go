@@ -1,6 +1,7 @@
 package peers
 
 import (
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -8,7 +9,6 @@ import (
 	udpp2p "github.com/schollz/peerdiscovery"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/server/servertest"
 )
 
@@ -30,7 +30,7 @@ type testSignalLogger struct {
 	lock sync.Mutex
 }
 
-func NewTestSignalLogger() *testSignalLogger {
+func newTestSignalLogger() *testSignalLogger {
 	tsl := new(testSignalLogger)
 	tsl.log = make(map[string]map[string]bool)
 	return tsl
@@ -39,17 +39,15 @@ func NewTestSignalLogger() *testSignalLogger {
 func (t *testSignalLogger) testSignal(h *LocalPairingPeerHello) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
+
 	if _, ok := t.log[h.Discovered.Address]; !ok {
 		t.log[h.Discovered.Address] = make(map[string]bool)
 	}
 	t.log[h.Discovered.Address][h.DeviceName] = true
 }
 
-func (s *UDPPeerDiscoverySuite) Test() {
-	n, err := server.GetDeviceName()
-	s.Require().NoError(err)
-
-	tsl := NewTestSignalLogger()
+func (s *UDPPeerDiscoverySuite) TestUDPNotifier() {
+	tsl := newTestSignalLogger()
 
 	u1, err := NewUDPNotifier(s.Logger, tsl.testSignal)
 	s.Require().NoError(err)
@@ -57,13 +55,13 @@ func (s *UDPPeerDiscoverySuite) Test() {
 	u2, err := NewUDPNotifier(s.Logger, tsl.testSignal)
 	s.Require().NoError(err)
 
-	n1 := n + " - device 1"
-	n2 := n + " - device 2"
+	n1 := "device 1"
+	n2 := "device 2"
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		settings, err := u1.MakeUDPP2PSettings(n1)
+		settings, err := u1.MakeUDPP2PSettings(n1, runtime.GOOS)
 		s.Require().NoError(err)
 
 		settings.TimeLimit = 2 * time.Second
@@ -77,7 +75,7 @@ func (s *UDPPeerDiscoverySuite) Test() {
 
 	wg.Add(1)
 	go func() {
-		settings, err := u2.MakeUDPP2PSettings(n2)
+		settings, err := u2.MakeUDPP2PSettings(n2, runtime.GOOS)
 		s.Require().NoError(err)
 
 		settings.TimeLimit = 2 * time.Second

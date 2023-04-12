@@ -1023,6 +1023,21 @@ func GenerateImages(filepath string, aX, aY, bX, bY int) string {
 	return string(data)
 }
 
+// StartSearchForLocalPairingPeers starts a UDP multicast beacon that both listens for and broadcasts to LAN peers
+// on discovery the beacon will emit a signal with the details of the discovered peer.
+//
+// Currently, beacons are configured to search for 2 minutes pinging the network every 500 ms;
+//   - If no peer discovery is made before this time elapses the operation will terminate.
+//   - If a peer is discovered the pairing.PeerNotifier will terminate operation after 5 seconds, giving the peer
+//     reasonable time to discover this device.
+//
+// Peer details are represented by a json.Marshal peers.LocalPairingPeerHello
+func StartSearchForLocalPairingPeers() string {
+	pn := pairing.NewPeerNotifier()
+	err := pn.Search()
+	return makeJSONResponse(err)
+}
+
 // GetConnectionStringForBeingBootstrapped starts a pairing.ReceiverServer
 // then generates a pairing.ConnectionParams. Used when the device is Logged out or has no Account keys
 // and the device has no camera to read a QR code with

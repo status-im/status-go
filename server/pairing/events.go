@@ -6,6 +6,7 @@ type EventType string
 const (
 	// Both Sender and Receiver
 
+	EventPeerDiscovered    EventType = "peer-discovered"
 	EventConnectionError   EventType = "connection-error"
 	EventConnectionSuccess EventType = "connection-success"
 	EventTransferError     EventType = "transfer-error"
@@ -33,4 +34,5 @@ const (
 	ActionPairingAccount
 	ActionSyncDevice
 	ActionPairingInstallation
+	ActionPeerDiscovery
 )
