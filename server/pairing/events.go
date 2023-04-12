@@ -13,9 +13,10 @@ const (
 
 	// Only Receiver side
 
-	EventReceivedAccount EventType = "received-account"
-	EventProcessSuccess  EventType = "process-success"
-	EventProcessError    EventType = "process-error"
+	EventReceivedAccount      EventType = "received-account"
+	EventReceivedInstallation EventType = "received-installation"
+	EventProcessSuccess       EventType = "process-success"
+	EventProcessError         EventType = "process-error"
 )
 
 // Event is a type for transfer events.

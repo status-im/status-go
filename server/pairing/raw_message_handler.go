@@ -10,6 +10,8 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/protobuf"
+
+	"github.com/status-im/status-go/signal"
 )
 
 type SyncRawMessageHandler struct {
@@ -117,5 +119,36 @@ func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload,
 	if err != nil {
 		return err
 	}
-	return messenger.HandleSyncRawMessages(rmp.rawMessages)
+
+	prevInstallationIds := map[string]struct{}{}
+
+	for _, installation := range messenger.Installations() {
+		prevInstallationIds[installation.ID] = struct{}{}
+	}
+
+	fmt.Println("<<< about to handle raw messages")
+	fmt.Println("<<< previous installations: ", messenger.Installations())
+
+	err = messenger.HandleSyncRawMessages(rmp.rawMessages)
+
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("<<< new installations: ", messenger.Installations())
+
+	for _, installation := range messenger.Installations() {
+		_, ok := prevInstallationIds[installation.ID]
+		if ok {
+			continue
+		}
+		fmt.Println("<<< installation data received!")
+		signal.SendLocalPairingEvent(Event{
+			Type:   EventReceivedInstallation,
+			Action: ActionPairingAccount,
+			Data:   installation})
+		break
+	}
+
+	return nil
 }

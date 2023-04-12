@@ -3856,8 +3856,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.ContactUpdate:
-						logger.Info("<<< ContactUpdate", zap.String("publicKey", senderID))
-
 						if common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("coming from us, ignoring")
 							continue

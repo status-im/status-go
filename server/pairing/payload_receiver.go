@@ -270,7 +270,11 @@ func NewInstallationPayloadReceiver(e *PayloadEncryptor, backend *api.GethStatus
 
 	return NewBaseBasePayloadReceiver(e,
 		NewRawMessagePayloadMarshaller(payload),
-		NewInstallationPayloadStorer(backend, payload, deviceType), nil)
+		NewInstallationPayloadStorer(backend, payload, deviceType),
+		func() {
+			fmt.Println("<<< installation receive callback")
+		},
+	)
 }
 
 type InstallationPayloadStorer struct {
