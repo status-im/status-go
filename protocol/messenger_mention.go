@@ -10,6 +10,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/logutils"
+
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/protocol/common"
 )
@@ -160,7 +164,7 @@ func (ms *MentionState) String() string {
 		}
 		atIdxsStr += fmt.Sprintf("%+v", entry)
 	}
-	return fmt.Sprintf("MentionState{AtSignIdx: %d, AtIdxs: [%s], MentionEnd: %d, PreviousText: %q, NewText: %q, Start: %d, End: %d}",
+	return fmt.Sprintf("MentionState{AtSignIdx: %d, AtIdxs: [%s], MentionEnd: %d, PreviousText: %q, NewText: %s, Start: %d, End: %d}",
 		ms.AtSignIdx, atIdxsStr, ms.MentionEnd, ms.PreviousText, *ms.NewText, ms.Start, ms.End)
 }
 
@@ -169,6 +173,7 @@ type ChatMentionContext struct {
 	InputSegments      []InputSegment
 	MentionSuggestions map[string]*MentionableUser
 	MentionState       *MentionState
+	PreviousText       string // user input text before the last change
 	NewText            string
 }
 
@@ -189,12 +194,14 @@ type MentionManager struct {
 	mentionContexts map[string]*ChatMentionContext
 	*Messenger
 	mentionableUserGetter
+	logger *zap.Logger
 }
 
 func NewMentionManager(m *Messenger) *MentionManager {
 	mm := &MentionManager{
 		mentionContexts: make(map[string]*ChatMentionContext),
 		Messenger:       m,
+		logger:          logutils.ZapLogger().Named("MentionManager"),
 	}
 	mm.mentionableUserGetter = mm
 	return mm
@@ -296,25 +303,24 @@ func (m *MentionManager) CheckMentions(chatID, text string) (string, error) {
 	return newText, nil
 }
 
-func (m *MentionManager) OnTextInput(chatID string, state *MentionState) (*ChatMentionContext, error) {
-	if state == nil {
-		return nil, fmt.Errorf("mention[OnTextInput] state should not be nil")
-	}
+func (m *MentionManager) OnChangeText(chatID, text string) (*ChatMentionContext, error) {
 	ctx := m.getChatMentionContext(chatID)
-	previousState := ctx.MentionState
-	var newState *MentionState
-	if previousState == nil {
-		newState = state
-	} else {
-		previousState.PreviousText = state.PreviousText
-		previousState.NewText = state.NewText
-		previousState.Start = state.Start
-		previousState.End = state.End
-		newState = previousState
+	diff := diffText(ctx.PreviousText, text)
+	if diff == nil {
+		return ctx, nil
 	}
-	newState.AtIdxs = calcAtIdxs(newState)
-	ctx.MentionState = newState
-	return ctx, nil
+	ctx.PreviousText = text
+	if ctx.MentionState == nil {
+		ctx.MentionState = &MentionState{}
+	}
+	ctx.MentionState.PreviousText = diff.previousText
+	ctx.MentionState.NewText = &diff.newText
+	ctx.MentionState.Start = diff.start
+	ctx.MentionState.End = diff.end
+
+	ctx.MentionState.AtIdxs = calcAtIdxs(ctx.MentionState)
+	m.logger.Debug("OnChangeText", zap.String("chatID", chatID), zap.Any("state", ctx.MentionState))
+	return m.CalculateSuggestions(chatID, text)
 }
 
 func (m *MentionManager) RecheckAtIdxs(chatID string, text string, publicKey string) (*ChatMentionContext, error) {
@@ -338,6 +344,7 @@ func (m *MentionManager) CalculateSuggestions(chatID, text string) (*ChatMention
 	if err != nil {
 		return nil, err
 	}
+	m.logger.Debug("CalculateSuggestions", zap.String("chatID", chatID), zap.String("text", text), zap.Int("num of mentionable user", len(mentionableUsers)))
 
 	m.calculateSuggestions(chatID, text, mentionableUsers)
 
@@ -371,12 +378,12 @@ func (m *MentionManager) calculateSuggestions(chatID string, text string, mentio
 	} else {
 		end = state.Start
 	}
-	atSignIdx := LastIndexOf(text, charAtSign, state.Start)
-	tr := []rune(text)
-	searchedText := strings.ToLower(string(tr[atSignIdx+1 : end]))
+	atSignIdx := lastIndexOf(text, charAtSign, state.End)
+	searchedText := strings.ToLower(subs(text, atSignIdx+1, end))
+	m.logger.Debug("calculateSuggestions", zap.Int("atSignIdx", atSignIdx), zap.String("searchedText", searchedText), zap.String("text", text), zap.Any("state", state))
 
 	var suggestions map[string]*MentionableUser
-	if atSignIdx <= state.Start && end-atSignIdx <= 100 {
+	if (atSignIdx <= state.Start && end-atSignIdx <= 100) || text[len(text)-1] == charAtSign[0] {
 		suggestions = getUserSuggestions(mentionableUsers, searchedText, -1)
 	}
 
@@ -982,14 +989,13 @@ func calculateInput(text string, idxs []*AtIndexEntry) []InputSegment {
 	if len(idxs) == 0 {
 		return []InputSegment{{Type: Text, Value: text}}
 	}
-	tr := []rune(text)
 	idxCount := len(idxs)
 	lastFrom := idxs[idxCount-1].From
 
 	var result []InputSegment
 
 	if idxs[0].From != 0 {
-		result = append(result, InputSegment{Type: Text, Value: string(tr[:idxs[0].From])})
+		result = append(result, InputSegment{Type: Text, Value: subs(text, 0, idxs[0].From)})
 	}
 
 	for _, entry := range idxs {
@@ -999,17 +1005,47 @@ func calculateInput(text string, idxs []*AtIndexEntry) []InputSegment {
 		mentioned := entry.Mentioned
 
 		if mentioned && nextAtIdx != intUnknown {
-			result = append(result, InputSegment{Type: Mention, Value: string(tr[from : to+1])})
-			result = append(result, InputSegment{Type: Text, Value: string(tr[to+1 : nextAtIdx])})
+			result = append(result, InputSegment{Type: Mention, Value: subs(text, from, to+1)})
+			result = append(result, InputSegment{Type: Text, Value: subs(text, to+1, nextAtIdx)})
 		} else if mentioned && lastFrom == from {
-			result = append(result, InputSegment{Type: Mention, Value: string(tr[from : to+1])})
-			result = append(result, InputSegment{Type: Text, Value: string(tr[to+1:])})
+			result = append(result, InputSegment{Type: Mention, Value: subs(text, from, to+1)})
+			result = append(result, InputSegment{Type: Text, Value: subs(text, to+1)})
 		} else {
-			result = append(result, InputSegment{Type: Text, Value: string(tr[from : to+1])})
+			result = append(result, InputSegment{Type: Text, Value: subs(text, from, to+1)})
 		}
 	}
 
 	return result
+}
+
+func subs(s string, start int, end ...int) string {
+	tr := []rune(s)
+	e := len(tr)
+
+	if len(end) > 0 {
+		e = end[0]
+	}
+
+	if start < 0 {
+		start = 0
+	}
+
+	if e > len(tr) {
+		e = len(tr)
+	}
+
+	if e < 0 {
+		e = 0
+	}
+
+	if start > e {
+		start, e = e, start
+		if e > len(tr) {
+			e = len(tr)
+		}
+	}
+
+	return string(tr[start:e])
 }
 
 func isValidTerminatingCharacter(c rune) bool {
@@ -1152,9 +1188,9 @@ func toInfo(inputSegments []InputSegment) *MentionState {
 	return state
 }
 
-// LastIndexOf returns the index of the last occurrence of substr in s starting from index start.
+// lastIndexOf returns the index of the last occurrence of substr in s starting from index start.
 // If substr is not present in s, it returns -1.
-func LastIndexOf(s, substr string, start int) int {
+func lastIndexOf(s, substr string, start int) int {
 	if start < 0 {
 		return -1
 	}
@@ -1185,4 +1221,69 @@ func reverse(r []rune) string {
 		r[i], r[j] = r[j], r[i]
 	}
 	return string(r)
+}
+
+type TextDiff struct {
+	previousText string
+	newText      string // we always set it to empty if it's a delete operation
+	start        int
+	end          int
+}
+
+// hasCommonCharSequence checks if str1 has a common character sequence with str2.
+// It iterates through both strings and compares their characters one by one.
+// The function returns true if all characters in str1 can be found in str2 in the same order, but not necessarily consecutively.
+// This is helpful for determining if there is an insertion or deletion operation between two strings.
+func hasCommonCharSequence(str1, str2 []rune) bool {
+	i, j := 0, 0
+	for i < len(str1) && j < len(str2) {
+		if str1[i] == str2[j] {
+			i++
+		}
+		j++
+	}
+	return i == len(str1)
+}
+
+func diffText(oldText, newText string) *TextDiff {
+	if oldText == newText {
+		return nil
+	}
+	t1 := []rune(oldText)
+	t2 := []rune(newText)
+	oldLen := len(t1)
+	newLen := len(t2)
+	if oldLen == 0 {
+		return &TextDiff{previousText: oldText, newText: newText, start: 0, end: 0}
+	}
+	if newLen == 0 {
+		return &TextDiff{previousText: oldText, newText: "", start: 0, end: oldLen}
+	}
+
+	// if we reach here, t1 and t2 are not empty
+	start := 0
+	for start < oldLen && start < newLen && t1[start] == t2[start] {
+		start++
+	}
+
+	oldEnd, newEnd := oldLen, newLen
+	for oldEnd > start && newEnd > start && t1[oldEnd-1] == t2[newEnd-1] {
+		oldEnd--
+		newEnd--
+	}
+
+	diff := &TextDiff{previousText: oldText, start: start}
+	if hasCommonCharSequence(t1, t2) { // is just a insert operation
+		diff.end = start
+		diff.newText = string(t2[start:newEnd])
+	} else {
+		diff.end = newEnd
+		if oldLen > newLen {
+			diff.end = oldEnd
+		}
+		if !hasCommonCharSequence(t2, t1) { // is not a delete operation
+			diff.newText = string(t2[start:diff.end])
+		}
+	}
+	return diff
 }
