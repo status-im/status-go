@@ -146,10 +146,9 @@ func (api *API) GetChannelGroups(ctx context.Context) (map[string]ChannelGroup, 
 	totalUnviewedMentionsCount := 0
 
 	for _, chat := range channels {
-		if !chat.IsActivePersonalChat() {
+		if !chat.Active {
 			continue
 		}
-
 		totalUnviewedMessageCount += int(chat.UnviewedMessagesCount)
 		totalUnviewedMentionsCount += int(chat.UnviewedMentionsCount)
 	}
