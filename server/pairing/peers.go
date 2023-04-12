@@ -2,6 +2,8 @@ package pairing
 
 import (
 	"runtime"
+	"sync"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -12,8 +14,9 @@ import (
 )
 
 type PeerNotifier struct {
-	logger *zap.Logger
-	stop   chan struct{}
+	logger     *zap.Logger
+	stop       chan struct{}
+	terminator sync.Once
 }
 
 func NewPeerNotifier() *PeerNotifier {
@@ -26,11 +29,17 @@ func NewPeerNotifier() *PeerNotifier {
 	}
 }
 
+func (p *PeerNotifier) terminateIn(d time.Duration) {
+	p.terminator.Do(func() {
+		time.Sleep(d)
+		p.stop <- struct{}{}
+	})
+}
+
 func (p *PeerNotifier) handler(hello *peers.LocalPairingPeerHello) {
 	signal.SendLocalPairingEvent(Event{Type: EventPeerDiscovered, Action: ActionPeerDiscovery, Data: hello})
 	p.logger.Debug("received peers.LocalPairingPeerHello message", zap.Any("hello message", hello))
-	// TODO p.stop <- struct{}{} Don't do this immediately start a countdown to kill after 5 seconds to allow the
-	//  peer to discover us.
+	p.terminateIn(5 * time.Second)
 }
 
 func (p *PeerNotifier) Search() error {

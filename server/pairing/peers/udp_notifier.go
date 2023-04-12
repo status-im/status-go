@@ -19,15 +19,15 @@ type UDPNotifier struct {
 }
 
 func NewUDPNotifier(logger *zap.Logger, outputFunc NotifyHandler) (*UDPNotifier, error) {
-	randId := make([]byte, 32)
-	_, err := rand.Read(randId)
+	randID := make([]byte, 32)
+	_, err := rand.Read(randID)
 	if err != nil {
 		return nil, err
 	}
 
 	n := new(UDPNotifier)
 	n.logger = logger
-	n.id = randId
+	n.id = randID
 	n.notifyOutput = outputFunc
 	return n, nil
 }
