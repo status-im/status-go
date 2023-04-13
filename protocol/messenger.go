@@ -3884,7 +3884,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 					case protobuf.RetractContactRequest:
-
 						logger.Debug("Handling RetractContactRequest")
 						message := msg.ParsedMessage.Interface().(protobuf.RetractContactRequest)
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
@@ -4265,9 +4264,21 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					if err := messageState.Response.Merge(response); err != nil {
 						logger.Error("cannot merge join community response", zap.Error(err))
 						continue
-
 					}
 
+					// Activity Center notification
+					notification := &ActivityCenterNotification{
+						ID:          types.FromHex(uuid.New().String()),
+						Type:        ActivityCenterNotificationTypeCommunityKicked,
+						Timestamp:   m.getTimesource().GetCurrentTime(),
+						CommunityID: changes.Community.IDString(),
+					}
+
+					err = m.addActivityCenterNotification(response, notification)
+					if err != nil {
+						m.logger.Error("failed to save notification", zap.Error(err))
+						continue
+					}
 				}
 			}
 

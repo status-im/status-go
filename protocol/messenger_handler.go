@@ -11,7 +11,6 @@ import (
 
 	"github.com/status-im/status-go/signal"
 
-	"github.com/pborman/uuid"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -1447,20 +1446,6 @@ func (m *Messenger) HandleCommunityRequestToLeave(state *ReceivedMessageState, s
 
 	if len(response.Communities()) > 0 {
 		state.Response.AddCommunity(response.Communities()[0])
-	}
-
-	// Activity Center notification
-	notification := &ActivityCenterNotification{
-		ID:          types.FromHex(uuid.NewRandom().String()),
-		Type:        ActivityCenterNotificationTypeCommunityKicked,
-		Timestamp:   m.getTimesource().GetCurrentTime(),
-		CommunityID: string(requestToLeaveProto.CommunityId),
-	}
-
-	err = m.addActivityCenterNotification(state.Response, notification)
-	if err != nil {
-		m.logger.Error("failed to save notification", zap.Error(err))
-		return err
 	}
 
 	return nil
