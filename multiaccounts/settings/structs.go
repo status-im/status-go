@@ -137,6 +137,7 @@ type Settings struct {
 	LogLevel                  *string          `json:"log-level,omitempty"`
 	MessagesFromContactsOnly  bool             `json:"messages-from-contacts-only"`
 	Mnemonic                  *string          `json:"mnemonic,omitempty"`
+	MnemonicRemoved           bool             `json:"mnemonic-removed?,omitempty"`
 	MutualContactEnabled      bool             `json:"mutual-contact-enabled?"`
 	Name                      string           `json:"name,omitempty"`
 	Networks                  *json.RawMessage `json:"networks/networks"`

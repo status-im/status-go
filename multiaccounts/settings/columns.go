@@ -5,6 +5,10 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
+const (
+	DBColumnMnemonic = "mnemonic"
+)
+
 var (
 	AnonMetricsShouldSend = SettingField{
 		reactFieldName: "anon-metrics/should-send?",
@@ -82,6 +86,12 @@ var (
 	Bio = SettingField{
 		reactFieldName: "bio",
 		dBColumnName:   "bio",
+		syncProtobufFactory: &SyncProtobufFactory{
+			fromInterface:     bioProtobufFactory,
+			fromStruct:        bioProtobufFactoryStruct,
+			valueFromProtobuf: StringFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_BIO,
+		},
 	}
 	EIP1581Address = SettingField{
 		reactFieldName: "eip1581-address",
@@ -179,9 +189,22 @@ var (
 		},
 	}
 	Mnemonic = SettingField{
-		reactFieldName: "mnemonic",
-		dBColumnName:   "mnemonic",
+		reactFieldName: DBColumnMnemonic,
+		dBColumnName:   DBColumnMnemonic,
 	}
+
+	MnemonicRemoved = SettingField{
+		reactFieldName: "mnemonic-removed?",
+		dBColumnName:   "mnemonic_removed",
+		valueHandler:   BoolHandler,
+		syncProtobufFactory: &SyncProtobufFactory{
+			fromInterface:     mnemonicRemovedProtobufFactory,
+			fromStruct:        mnemonicRemovedProtobufFactoryStruct,
+			valueFromProtobuf: BoolFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_MNEMONIC_REMOVED,
+		},
+	}
+
 	MutualContactEnabled = SettingField{
 		reactFieldName: "mutual-contact-enabled?",
 		dBColumnName:   "mutual_contact_enabled",
@@ -422,6 +445,7 @@ var (
 		DappsAddress,
 		DefaultSyncPeriod,
 		DisplayName,
+		Bio,
 		EIP1581Address,
 		Fleet,
 		GifAPIKey,
@@ -439,6 +463,7 @@ var (
 		LogLevel,
 		MessagesFromContactsOnly,
 		Mnemonic,
+		MnemonicRemoved,
 		MutualContactEnabled,
 		Name,
 		NetworksCurrentNetwork,
