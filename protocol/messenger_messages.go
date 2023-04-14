@@ -33,7 +33,7 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 		return nil, ErrInvalidEditOrDeleteAuthor
 	}
 
-	if message.ContentType != protobuf.ChatMessage_TEXT_PLAIN && message.ContentType != protobuf.ChatMessage_EMOJI {
+	if message.ContentType != protobuf.ChatMessage_TEXT_PLAIN && message.ContentType != protobuf.ChatMessage_EMOJI && message.ContentType != protobuf.ChatMessage_IMAGE {
 		return nil, ErrInvalidEditContentType
 	}
 
@@ -92,10 +92,81 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 	}
 	response.AddMessages(updatedMessages)
 
+	if message.ContentType == protobuf.ChatMessage_IMAGE {
+		image := message.GetImage()
+		if image != nil && image.AlbumId != "" {
+			editedMessages, err := m.editMessagesFromAlbum(ctx, image.AlbumId, message.ChatId, request)
+			if err != nil {
+				return nil, err
+			}
+
+			response.AddMessages(editedMessages)
+		}
+	}
+
 	response.AddMessage(message)
 	response.AddChat(chat)
 
 	return response, nil
+}
+
+func (m *Messenger) editMessagesFromAlbum(ctx context.Context, albumID string, chatID string, request *requests.EditMessage) ([]*common.Message, error) {
+	messages, err := m.persistence.AlbumMessages(chatID, albumID)
+	if err != nil {
+		return nil, err
+	}
+	var result []*common.Message
+	for _, message := range messages {
+		// A valid added chat is required.
+		chat, ok := m.allChats.Load(message.ChatId)
+		if !ok {
+			return nil, errors.New("Chat not found")
+		}
+
+		clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+
+		editMessage := &EditMessage{}
+
+		editMessage.Text = request.Text
+		editMessage.ContentType = request.ContentType
+		editMessage.ChatId = message.ChatId
+		editMessage.MessageId = message.ID
+		editMessage.Clock = clock
+
+		err = m.applyEditMessage(&editMessage.EditMessage, message)
+		if err != nil {
+			return nil, err
+		}
+
+		encodedMessage, err := m.encodeChatEntity(chat, editMessage)
+		if err != nil {
+			return nil, err
+		}
+
+		rawMessage := common.RawMessage{
+			LocalChatID:          chat.ID,
+			Payload:              encodedMessage,
+			MessageType:          protobuf.ApplicationMetadataMessage_EDIT_MESSAGE,
+			SkipGroupMessageWrap: true,
+			ResendAutomatically:  true,
+		}
+		_, err = m.dispatchMessage(ctx, rawMessage)
+		if err != nil {
+			return nil, err
+		}
+
+		if chat.LastMessage != nil && chat.LastMessage.ID == message.ID {
+			chat.LastMessage = message
+			err := m.saveChat(chat)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		result = append(result, message)
+	}
+
+	return result, nil
 }
 
 func (m *Messenger) CanDeleteMessageForEveryoneInCommunity(communityID string, publicKey *ecdsa.PublicKey) bool {
