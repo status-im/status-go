@@ -2649,9 +2649,7 @@ func (m *Messenger) getMessagesToCheckForDelete(message *common.Message) ([]*com
 		if err != nil {
 			return nil, err
 		}
-		for _, messageInAlbum := range messagesInTheAlbum {
-			messagesToCheck = append(messagesToCheck, messageInAlbum)
-		}
+		messagesToCheck = append(messagesToCheck, messagesInTheAlbum...)
 	}
 	messagesToCheck = append(messagesToCheck, message)
 	return messagesToCheck, nil
