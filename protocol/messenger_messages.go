@@ -157,6 +157,11 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 		return nil, ErrInvalidDeleteTypeAuthor
 	}
 
+	messagesToDelete, err := m.getMessagesToDelete(message, message.ChatId)
+	if err != nil {
+		return nil, err
+	}
+
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	deleteMessage := &DeleteMessage{}
@@ -184,22 +189,24 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 		return nil, err
 	}
 
-	message.Deleted = true
-	message.DeletedBy = deletedBy
-	err = m.persistence.SaveMessages([]*common.Message{message})
-	if err != nil {
-		return nil, err
-	}
-
-	if chat.LastMessage != nil && chat.LastMessage.ID == message.ID {
-		if err := m.updateLastMessage(chat); err != nil {
+	response := &MessengerResponse{}
+	for _, messageToDelete := range messagesToDelete {
+		messageToDelete.Deleted = true
+		messageToDelete.DeletedBy = deletedBy
+		err = m.persistence.SaveMessages([]*common.Message{messageToDelete})
+		if err != nil {
 			return nil, err
+		}
+		response.AddMessage(messageToDelete)
+		response.AddRemovedMessage(&RemovedMessage{MessageID: messageToDelete.ID, ChatID: chat.ID, DeletedBy: deletedBy})
+
+		if chat.LastMessage != nil && chat.LastMessage.ID == messageToDelete.ID {
+			if err := m.updateLastMessage(chat); err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	response := &MessengerResponse{}
-	response.AddMessage(message)
-	response.AddRemovedMessage(&RemovedMessage{MessageID: messageID, ChatID: chat.ID, DeletedBy: deletedBy})
 	response.AddChat(chat)
 
 	return response, nil
@@ -226,20 +233,27 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string
 		return nil, ErrInvalidDeleteTypeAuthor
 	}
 
-	message.DeletedForMe = true
-	err = m.persistence.SaveMessages([]*common.Message{message})
+	messagesToDelete, err := m.getMessagesToDelete(message, message.ChatId)
 	if err != nil {
 		return nil, err
 	}
 
-	if chat.LastMessage != nil && chat.LastMessage.ID == message.ID {
-		if err := m.updateLastMessage(chat); err != nil {
+	response := &MessengerResponse{}
+	for _, messageToDelete := range messagesToDelete {
+		messageToDelete.DeletedForMe = true
+		err = m.persistence.SaveMessages([]*common.Message{messageToDelete})
+		if err != nil {
 			return nil, err
 		}
-	}
 
-	response := &MessengerResponse{}
-	response.AddMessage(message)
+		if chat.LastMessage != nil && chat.LastMessage.ID == messageToDelete.ID {
+			if err := m.updateLastMessage(chat); err != nil {
+				return nil, err
+			}
+		}
+
+		response.AddMessage(messageToDelete)
+	}
 	response.AddChat(chat)
 
 	if m.hasPairedDevices() {
