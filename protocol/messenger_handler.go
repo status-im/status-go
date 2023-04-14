@@ -1532,8 +1532,9 @@ func (m *Messenger) HandleEditMessage(state *ReceivedMessageState, editMessage E
 	return nil
 }
 
-func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessage DeleteMessage) error {
-	if err := ValidateDeleteMessage(deleteMessage.DeleteMessage); err != nil {
+func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessage DeleteMessage, forceDeletion bool) error {
+	// The forceDeletion arg is to enable deleting pinned messages .. Because their type is systemMessage .. So we need to force it
+	if err := ValidateDeleteMessage(deleteMessage.DeleteMessage, forceDeletion); err != nil {
 		return err
 	}
 
@@ -1619,6 +1620,16 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 	})
 
 	return nil
+}
+
+func (m *Messenger) HandleDeletePinnedMessage(state *ReceivedMessageState, deletePinnedMessage DeleteMessage) error {
+
+err := m.HandleDeleteMessage(state, deletePinnedMessage, true)
+    if err != nil {
+		return err
+	} else {
+		return nil
+	}
 }
 
 func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, deleteForMeMessage DeleteForMeMessage) error {

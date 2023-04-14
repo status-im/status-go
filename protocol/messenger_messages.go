@@ -153,7 +153,8 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 		message.ContentType != protobuf.ChatMessage_STICKER &&
 		message.ContentType != protobuf.ChatMessage_EMOJI &&
 		message.ContentType != protobuf.ChatMessage_IMAGE &&
-		message.ContentType != protobuf.ChatMessage_AUDIO {
+		message.ContentType != protobuf.ChatMessage_AUDIO &&
+		message.ContentType != protobuf.ChatMessage_SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP {
 		return nil, ErrInvalidDeleteTypeAuthor
 	}
 

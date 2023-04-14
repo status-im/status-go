@@ -218,7 +218,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageFirstThenMessage() {
 	}
 
 	// Handle Delete first
-	err = s.m.HandleDeleteMessage(state, deleteMessage)
+	err = s.m.HandleDeleteMessage(state, deleteMessage, false)
 	s.Require().NoError(err)
 
 	// // Handle chat message
