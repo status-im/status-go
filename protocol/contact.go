@@ -155,6 +155,7 @@ func (c Contact) PublicKey() (*ecdsa.PublicKey, error) {
 func (c *Contact) Block(clock uint64) {
 	c.Blocked = true
 	c.DismissContactRequest(clock)
+	c.Removed = true
 }
 
 func (c *Contact) BlockDesktop() {

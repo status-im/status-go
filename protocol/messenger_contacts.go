@@ -669,6 +669,11 @@ func (m *Messenger) blockContact(contactID string, isDesktopFunc bool) ([]*Chat,
 		return nil, err
 	}
 
+	err = m.sendRetractContactRequest(contact)
+	if err != nil {
+		return nil, err
+	}
+
 	m.allContacts.Store(contact.ID, contact)
 	for _, chat := range chats {
 		m.allChats.Store(chat.ID, chat)
