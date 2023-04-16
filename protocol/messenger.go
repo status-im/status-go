@@ -60,6 +60,7 @@ import (
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/telemetry"
 )
 
@@ -707,6 +708,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.handleConnectionChange(m.online())
 	m.handleENSVerificationSubscription(ensSubscription)
 	m.watchConnectionChange()
+	m.watchUnmutedChats()
 	m.watchExpiredMessages()
 	m.watchIdentityImageChanges()
 	m.broadcastLatestUserStatus()
@@ -1342,6 +1344,37 @@ func (m *Messenger) watchConnectionChange() {
 					m.logger.Debug("connection changed", zap.Bool("online", state))
 					m.handleConnectionChange(state)
 				}
+			case <-m.quit:
+				return
+			}
+		}
+	}()
+}
+
+// watchUnmutedChats regularly checks for chats that should be unmuted
+func (m *Messenger) watchUnmutedChats() {
+	m.logger.Debug("watching unmuted chats")
+	go func() {
+		for {
+			select {
+			case <-time.After(3 * time.Second): // Poll every 3 seconds
+				response := &MessengerResponse{}
+				m.allChats.Range(func(chatID string, c *Chat) bool {
+					chatMuteTill, _ := time.Parse(time.RFC3339, c.MuteTill.Format(time.RFC3339))
+					currTime, _ := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+					if currTime.After(chatMuteTill) && !chatMuteTill.Equal(time.Time{}) && c.Muted {
+						err := m.persistence.UnmuteChat(c.ID)
+						if err != nil {
+							m.logger.Info("err", zap.Any("Couldn't unmute chat", err))
+							return false
+						}
+						c.Muted = false
+						c.MuteTill = time.Time{}
+						response.AddChat(c)
+					}
+					return true
+				})
+				signal.SendNewMessages(response)
 			case <-m.quit:
 				return
 			}
@@ -4772,54 +4805,88 @@ func (m *Messenger) MarkAllReadInCommunity(communityID string) ([]string, error)
 
 // MuteChat signals to the messenger that we don't want to be notified
 // on new messages from this chat
-func (m *Messenger) MuteChat(chatID string) error {
-	chat, ok := m.allChats.Load(chatID)
+func (m *Messenger) MuteChat(request *requests.MuteChat) (time.Time, error) {
+	chat, ok := m.allChats.Load(request.ChatID)
 	if !ok {
 		// Only one to one chan be muted when it's not in the database
-		publicKey, err := common.HexToPubkey(chatID)
+		publicKey, err := common.HexToPubkey(request.ChatID)
 		if err != nil {
-			return err
+			return time.Time{}, err
 		}
 
 		// Create a one to one chat and set active to false
-		chat = CreateOneToOneChat(chatID, publicKey, m.getTimesource())
+		chat = CreateOneToOneChat(request.ChatID, publicKey, m.getTimesource())
 		chat.Active = false
 		err = m.initChatSyncFields(chat)
 		if err != nil {
-			return err
+			return time.Time{}, err
 		}
 		err = m.saveChat(chat)
 		if err != nil {
-			return err
+			return time.Time{}, err
 		}
 	}
 
 	var contact *Contact
 	if chat.OneToOne() {
-		contact, _ = m.allContacts.Load(chatID)
+		contact, _ = m.allContacts.Load(request.ChatID)
 	}
 
-	return m.muteChat(chat, contact)
+	var MuteTill time.Time
+
+	switch request.MutedType {
+	case MuteTill1Min:
+		MuteTill = time.Now().Add(MuteFor1MinDuration)
+	case MuteFor15Min:
+		MuteTill = time.Now().Add(MuteFor15MinsDuration)
+	case MuteFor1Hr:
+		MuteTill = time.Now().Add(MuteFor1HrsDuration)
+	case MuteFor8Hr:
+		MuteTill = time.Now().Add(MuteFor8HrsDuration)
+	case MuteFor1Week:
+		MuteTill = time.Now().Add(MuteFor1WeekDuration)
+	default:
+		MuteTill = time.Time{}
+	}
+	err := m.saveChat(chat)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return m.muteChat(chat, contact, MuteTill)
 }
 
-func (m *Messenger) muteChat(chat *Chat, contact *Contact) error {
-	err := m.persistence.MuteChat(chat.ID)
+func (m *Messenger) MuteChatV2(muteParams *requests.MuteChat) (time.Time, error) {
+	return m.MuteChat(muteParams)
+}
+
+func (m *Messenger) muteChat(chat *Chat, contact *Contact, mutedTill time.Time) (time.Time, error) {
+	err := m.persistence.MuteChat(chat.ID, mutedTill)
 	if err != nil {
-		return err
+		return time.Time{}, err
 	}
 
 	chat.Muted = true
+	chat.MuteTill = mutedTill
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	m.allChats.Store(chat.ID, chat)
 
 	if contact != nil {
 		err := m.syncContact(context.Background(), contact, m.dispatchMessage)
 		if err != nil {
-			return err
+			return time.Time{}, err
 		}
 	}
 
-	return m.reregisterForPushNotifications()
+	if !chat.MuteTill.IsZero() {
+		err := m.reregisterForPushNotifications()
+		if err != nil {
+			return time.Time{}, err
+		}
+		return mutedTill, nil
+	}
+
+	return time.Time{}, m.reregisterForPushNotifications()
 }
 
 // UnmuteChat signals to the messenger that we want to be notified
@@ -4845,6 +4912,7 @@ func (m *Messenger) unmuteChat(chat *Chat, contact *Contact) error {
 	}
 
 	chat.Muted = false
+	chat.MuteTill = time.Time{}
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	m.allChats.Store(chat.ID, chat)
 

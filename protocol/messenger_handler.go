@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/status-im/status-go/signal"
 
@@ -585,7 +586,7 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 		}
 		if chat != nil && message.Muted != chat.Muted {
 			if message.Muted {
-				err := m.muteChat(chat, contact)
+				_, err := m.muteChat(chat, contact, time.Time{})
 				if err != nil {
 					return err
 				}

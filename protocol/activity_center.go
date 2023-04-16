@@ -98,7 +98,7 @@ func (n *ActivityCenterNotification) Valid() error {
 }
 
 func showMentionOrReplyActivityCenterNotification(publicKey ecdsa.PublicKey, message *common.Message, chat *Chat, responseTo *common.Message) (bool, ActivityCenterType) {
-	if chat == nil || !chat.Active || (!chat.CommunityChat() && !chat.PrivateGroupChat()) {
+	if chat == nil || !chat.Active || (!chat.CommunityChat() && !chat.PrivateGroupChat()) || chat.Muted {
 		return false, ActivityCenterNotificationNoType
 	}
 
