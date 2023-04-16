@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math/rand"
+	"time"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -12,6 +13,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
@@ -38,6 +40,23 @@ const (
 const (
 	FirstMessageTimestampUndefined = 0
 	FirstMessageTimestampNoMessage = 1
+)
+
+const (
+	MuteFor1MinDuration   = time.Minute
+	MuteFor15MinsDuration = 15 * time.Minute
+	MuteFor1HrsDuration   = time.Hour
+	MuteFor8HrsDuration   = 8 * time.Hour
+	MuteFor1WeekDuration  = 7 * 24 * time.Hour
+)
+
+const (
+	MuteFor15Min requests.MutingVariation = iota + 1
+	MuteFor1Hr
+	MuteFor8Hr
+	MuteFor1Week
+	MuteTillUnmuted
+	MuteTill1Min
 )
 
 const pkStringLength = 68
@@ -88,6 +107,9 @@ type Chat struct {
 	// Muted is used to check whether we want to receive
 	// push notifications for this chat
 	Muted bool `json:"muted"`
+
+	// Time in which chat was muted
+	MuteTill time.Time `json:"muteTill,omitempty"`
 
 	// Public key of administrator who created invitation link
 	InvitationAdmin string `json:"invitationAdmin,omitempty"`
@@ -160,6 +182,9 @@ type ChatPreview struct {
 	// Muted is used to check whether we want to receive
 	// push notifications for this chat
 	Muted bool `json:"muted,omitempty"`
+
+	// Time in which chat will be  ummuted
+	MuteTill time.Time `json:"muteTill,omitempty"`
 
 	// Public key of user profile
 	Profile string `json:"profile,omitempty"`

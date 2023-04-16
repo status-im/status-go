@@ -138,8 +138,8 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, emoji, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile, community_id, joined, synced_from, synced_to, first_message_timestamp, description, highlight, read_messages_at_clock_value, received_invitation_admin, image_payload)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, emoji, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, members, membership_updates, muted, muted_till, invitation_admin, profile, community_id, joined, synced_from, synced_to, first_message_timestamp, description, highlight, read_messages_at_clock_value, received_invitation_admin, image_payload)
+	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
@@ -169,6 +169,7 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 		encodedMembers.Bytes(),
 		encodedMembershipUpdates.Bytes(),
 		chat.Muted,
+		chat.MuteTill,
 		chat.InvitationAdmin,
 		chat.Profile,
 		chat.CommunityID,
@@ -219,13 +220,14 @@ func (db sqlitePersistence) DeleteChat(chatID string) (err error) {
 	return
 }
 
-func (db sqlitePersistence) MuteChat(chatID string) error {
-	_, err := db.db.Exec("UPDATE chats SET muted = 1 WHERE id = ?", chatID)
+func (db sqlitePersistence) MuteChat(chatID string, mutedTill time.Time) error {
+	mutedTillFormatted := mutedTill.Format(time.RFC3339)
+	_, err := db.db.Exec("UPDATE chats SET muted = 1, muted_till = ? WHERE id = ?", mutedTillFormatted, chatID)
 	return err
 }
 
 func (db sqlitePersistence) UnmuteChat(chatID string) error {
-	_, err := db.db.Exec("UPDATE chats SET muted = 0 WHERE id = ?", chatID)
+	_, err := db.db.Exec("UPDATE chats SET muted = 0, muted_till = 0 WHERE id = ?", chatID)
 	return err
 }
 
@@ -267,6 +269,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chats.members,
 			chats.membership_updates,
 			chats.muted,
+			chats.muted_till,
 			chats.invitation_admin,
 			chats.profile,
 			chats.community_id,
@@ -295,6 +298,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			syncedFrom               sql.NullInt64
 			syncedTo                 sql.NullInt64
 			firstMessageTimestamp    sql.NullInt64
+			MuteTill                 sql.NullTime
 			chat                     Chat
 			encodedMembers           []byte
 			encodedMembershipUpdates []byte
@@ -318,6 +322,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&encodedMembers,
 			&encodedMembershipUpdates,
 			&chat.Muted,
+			&MuteTill,
 			&invitationAdmin,
 			&profile,
 			&chat.CommunityID,
@@ -385,6 +390,11 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			}
 			chat.LastMessage = message
 		}
+
+		if MuteTill.Valid {
+			chat.MuteTill = MuteTill.Time
+		}
+
 		chat.Alias = alias.String
 
 		chats = append(chats, &chat)
@@ -404,6 +414,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		syncedFrom               sql.NullInt64
 		syncedTo                 sql.NullInt64
 		firstMessageTimestamp    sql.NullInt64
+		MuteTill                 sql.NullTime
 		imagePayload             []byte
 	)
 
@@ -425,6 +436,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 			members,
 			membership_updates,
 			muted,
+			muted_till,
 			invitation_admin,
 			profile,
 			community_id,
@@ -454,6 +466,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		&encodedMembers,
 		&encodedMembershipUpdates,
 		&chat.Muted,
+		&MuteTill,
 		&invitationAdmin,
 		&profile,
 		&chat.CommunityID,
@@ -513,6 +526,10 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 			if err == nil {
 				chat.Base64Image = base64Image
 			}
+		}
+
+		if MuteTill.Valid {
+			chat.MuteTill = MuteTill.Time
 		}
 
 		return &chat, nil

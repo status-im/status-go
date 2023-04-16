@@ -530,7 +530,7 @@ func (m *Messenger) SetMutePropertyOnChatsByCategory(communityID string, categor
 
 	for _, chatID := range community.ChatsByCategoryID(categoryID) {
 		if muted {
-			err = m.MuteChat(communityID + chatID)
+			_, err = m.MuteChat(&requests.MuteChat{ChatID: communityID + chatID, MutedType: MuteTillUnmuted})
 		} else {
 			err = m.UnmuteChat(communityID + chatID)
 		}
