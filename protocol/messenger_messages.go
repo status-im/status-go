@@ -40,88 +40,17 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 	// A valid added chat is required.
 	chat, ok := m.allChats.Load(message.ChatId)
 	if !ok {
-		return nil, errors.New("Chat not found")
+		return nil, ErrChatNotFound
 	}
 
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
-
-	editMessage := &EditMessage{}
-
-	editMessage.Text = request.Text
-	editMessage.ContentType = request.ContentType
-	editMessage.ChatId = message.ChatId
-	editMessage.MessageId = request.ID.String()
-	editMessage.Clock = clock
-
-	err = m.applyEditMessage(&editMessage.EditMessage, message)
+	messages, err := m.getConnectedMessages(message, message.LocalChatID)
 	if err != nil {
 		return nil, err
-	}
-
-	encodedMessage, err := m.encodeChatEntity(chat, editMessage)
-	if err != nil {
-		return nil, err
-	}
-
-	rawMessage := common.RawMessage{
-		LocalChatID:          chat.ID,
-		Payload:              encodedMessage,
-		MessageType:          protobuf.ApplicationMetadataMessage_EDIT_MESSAGE,
-		SkipGroupMessageWrap: true,
-		ResendAutomatically:  true,
-	}
-	_, err = m.dispatchMessage(ctx, rawMessage)
-	if err != nil {
-		return nil, err
-	}
-
-	if chat.LastMessage != nil && chat.LastMessage.ID == message.ID {
-		chat.LastMessage = message
-		err := m.saveChat(chat)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	response := &MessengerResponse{}
 
-	// pull updated messages
-	updatedMessages, err := m.persistence.MessagesByResponseTo(request.ID.String())
-	if err != nil {
-		return nil, err
-	}
-	response.AddMessages(updatedMessages)
-
-	if message.ContentType == protobuf.ChatMessage_IMAGE {
-		image := message.GetImage()
-		if image != nil && image.AlbumId != "" {
-			editedMessages, err := m.editMessagesFromAlbum(ctx, image.AlbumId, message.ChatId, request)
-			if err != nil {
-				return nil, err
-			}
-
-			response.AddMessages(editedMessages)
-		}
-	}
-
-	response.AddMessage(message)
-	response.AddChat(chat)
-
-	return response, nil
-}
-
-func (m *Messenger) editMessagesFromAlbum(ctx context.Context, albumID string, chatID string, request *requests.EditMessage) ([]*common.Message, error) {
-	messages, err := m.persistence.AlbumMessages(chatID, albumID)
-	if err != nil {
-		return nil, err
-	}
-	var result []*common.Message
 	for _, message := range messages {
-		// A valid added chat is required.
-		chat, ok := m.allChats.Load(message.ChatId)
-		if !ok {
-			return nil, errors.New("Chat not found")
-		}
 
 		clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
@@ -163,10 +92,18 @@ func (m *Messenger) editMessagesFromAlbum(ctx context.Context, albumID string, c
 			}
 		}
 
-		result = append(result, message)
+		response.AddMessage(message)
 	}
 
-	return result, nil
+	// pull updated messages
+	updatedMessages, err := m.persistence.MessagesByResponseTo(request.ID.String())
+	if err != nil {
+		return nil, err
+	}
+	response.AddMessages(updatedMessages)
+	response.AddChat(chat)
+
+	return response, nil
 }
 
 func (m *Messenger) CanDeleteMessageForEveryoneInCommunity(communityID string, publicKey *ecdsa.PublicKey) bool {
@@ -200,7 +137,7 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 	// A valid added chat is required.
 	chat, ok := m.allChats.Load(message.ChatId)
 	if !ok {
-		return nil, errors.New("Chat not found")
+		return nil, ErrChatNotFound
 	}
 
 	var canDeleteMessageForEveryone = false
@@ -236,7 +173,7 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 		return nil, ErrInvalidDeleteTypeAuthor
 	}
 
-	messagesToDelete, err := m.getMessagesToDelete(message, message.ChatId)
+	messagesToDelete, err := m.getConnectedMessages(message, message.ChatId)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +243,7 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string
 	// A valid added chat is required.
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
-		return nil, errors.New("Chat not found")
+		return nil, ErrChatNotFound
 	}
 
 	// Only certain types of messages can be deleted
@@ -318,7 +255,7 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string
 		return nil, ErrInvalidDeleteTypeAuthor
 	}
 
-	messagesToDelete, err := m.getMessagesToDelete(message, message.ChatId)
+	messagesToDelete, err := m.getConnectedMessages(message, message.ChatId)
 	if err != nil {
 		return nil, err
 	}

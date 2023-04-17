@@ -104,7 +104,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessage() {
 	// Main instance user attempts to delete the message it received from theirMessenger
 	_, err = s.m.DeleteMessageAndSend(context.Background(), ogMessage.ID)
 
-	s.Require().ErrorContains(err, "Chat not found")
+	s.Require().ErrorContains(err, "can't find chat")
 }
 
 func (s *MessengerDeleteMessageSuite) TestDeleteMessagePreviousLastMessage() {
@@ -309,7 +309,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteImageMessage() {
 	// Main instance user attempts to delete the message it received from theirMessenger
 	_, err = theirMessenger.DeleteMessageAndSend(context.Background(), firstMessageID)
 
-	s.Require().ErrorContains(err, "Chat not found")
+	s.Require().ErrorContains(err, "can't find chat")
 }
 
 func (s *MessengerDeleteMessageSuite) TestDeleteImageMessageFirstThenMessage() {

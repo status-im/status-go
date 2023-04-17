@@ -6293,20 +6293,21 @@ func (m *Messenger) GetMentionsManager() *MentionManager {
 	return m.mentionsManager
 }
 
-func (m *Messenger) getMessagesToDelete(message *common.Message, chatID string) ([]*common.Message, error) {
-	var messagesToDelete []*common.Message
+func (m *Messenger) getConnectedMessages(message *common.Message, chatID string) ([]*common.Message, error) {
+	var connectedMessages []*common.Message
 	// In case of Image messages, we need to delete all the images in the album
 	if message.ContentType == protobuf.ChatMessage_IMAGE {
 		image := message.GetImage()
-		messagesInTheAlbum, err := m.persistence.albumMessages(chatID, image.GetAlbumId())
-		if err != nil {
-			return nil, err
+		if image != nil && image.AlbumId != "" {
+			messagesInTheAlbum, err := m.persistence.albumMessages(chatID, image.GetAlbumId())
+			if err != nil {
+				return nil, err
+			}
+			connectedMessages = append(connectedMessages, messagesInTheAlbum...)
+			return connectedMessages, nil
 		}
-		messagesToDelete = append(messagesToDelete, messagesInTheAlbum...)
-	} else {
-		messagesToDelete = append(messagesToDelete, message)
 	}
-	return messagesToDelete, nil
+	return append(connectedMessages, message), nil
 }
 
 func (m *Messenger) withChatClock(callback func(string, uint64) error) error {

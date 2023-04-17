@@ -1592,7 +1592,7 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		}
 	}
 
-	messagesToDelete, err := m.getMessagesToDelete(originalMessage, deleteMessage.ChatId)
+	messagesToDelete, err := m.getConnectedMessages(originalMessage, deleteMessage.ChatId)
 	if err != nil {
 		return err
 	}
@@ -1674,7 +1674,7 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 		return errors.New("chat not found")
 	}
 
-	messagesToDelete, err := m.getMessagesToDelete(originalMessage, deleteForMeMessage.LocalChatID)
+	messagesToDelete, err := m.getConnectedMessages(originalMessage, deleteForMeMessage.LocalChatID)
 	if err != nil {
 		return err
 	}

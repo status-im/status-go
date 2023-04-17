@@ -220,12 +220,12 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageEditText() {
 		s.Require().NotEmpty(image.AlbumId, "Message.ID=%s", message.ID)
 	}
 
-	firstMessageId, err := types.DecodeHex(album[0].ID)
+	firstMessageID, err := types.DecodeHex(album[0].ID)
 	s.Require().NoError(err)
 
 	editedText := "edited"
 	editedMessage := &requests.EditMessage{
-		ID:   firstMessageId,
+		ID:   firstMessageID,
 		Text: editedText,
 	}
 
