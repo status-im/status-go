@@ -163,5 +163,7 @@ message ChatMessage {
     CONTACT_REQUEST = 11;
     DISCORD_MESSAGE = 12;
     IDENTITY_VERIFICATION = 13;
+    // Only local
+    SYSTEM_MESSAGE_PINNED_MESSAGE = 14;
   }
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"fmt"
 
@@ -80,6 +81,41 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 		return nil, err
 	}
 
+	if message.Pinned {
+		id, err := generatePinMessageNotificationID(&m.identity.PublicKey, message, chat)
+		if err != nil {
+			return nil, err
+		}
+		chatMessage := &common.Message{
+			ChatMessage: protobuf.ChatMessage{
+				Clock:       message.Clock,
+				Timestamp:   m.getTimesource().GetCurrentTime(),
+				ChatId:      chat.ID,
+				MessageType: message.MessageType,
+				ResponseTo:  message.MessageId,
+				ContentType: protobuf.ChatMessage_SYSTEM_MESSAGE_PINNED_MESSAGE,
+			},
+			WhisperTimestamp: m.getTimesource().GetCurrentTime(),
+			ID:               id,
+			LocalChatID:      chat.ID,
+			From:             m.myHexIdentity(),
+		}
+
+		msg := []*common.Message{chatMessage}
+		err = m.persistence.SaveMessages(msg)
+		if err != nil {
+			return nil, err
+		}
+
+		msg, err = m.pullMessagesAndResponsesFromDB(msg)
+		if err != nil {
+			return nil, err
+		}
+
+		response.SetMessages(msg)
+		m.prepareMessages(response.messages)
+	}
+
 	response.AddPinMessage(message)
 	response.AddChat(chat)
 	return &response, m.saveChat(chat)
@@ -94,6 +130,18 @@ func (m *Messenger) SavePinMessages(messages []*common.PinMessage) error {
 }
 
 func generatePinMessageID(pubKey *ecdsa.PublicKey, pm *common.PinMessage, chat *Chat) (string, error) {
+	data, err := pinMessageBaseID(pubKey, pm, chat)
+	if err != nil {
+		return "", err
+	}
+
+	id := sha256.Sum256(data)
+	idString := fmt.Sprintf("%x", id)
+
+	return idString, nil
+}
+
+func pinMessageBaseID(pubKey *ecdsa.PublicKey, pm *common.PinMessage, chat *Chat) ([]byte, error) {
 	data := gethcommon.FromHex(pm.MessageId)
 
 	switch {
@@ -101,7 +149,7 @@ func generatePinMessageID(pubKey *ecdsa.PublicKey, pm *common.PinMessage, chat *
 		ourPubKey := crypto.FromECDSAPub(pubKey)
 		tmpPubKey, err := chat.PublicKey()
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		theirPubKey := crypto.FromECDSAPub(tmpPubKey)
 
@@ -115,6 +163,20 @@ func generatePinMessageID(pubKey *ecdsa.PublicKey, pm *common.PinMessage, chat *
 	default:
 		data = append(data, []byte(chat.ID)...)
 	}
+
+	return data, nil
+}
+
+func generatePinMessageNotificationID(pubKey *ecdsa.PublicKey, pm *common.PinMessage, chat *Chat) (string, error) {
+	data, err := pinMessageBaseID(pubKey, pm, chat)
+	if err != nil {
+		return "", err
+	}
+
+	clockBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(clockBytes, pm.Clock)
+	data = append(data, clockBytes...)
+
 	id := sha256.Sum256(data)
 	idString := fmt.Sprintf("%x", id)
 

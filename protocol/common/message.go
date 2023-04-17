@@ -44,6 +44,8 @@ type QuotedMessage struct {
 
 	Deleted bool `json:"deleted,omitempty"`
 
+	DeletedForMe bool `json:"deletedForMe,omitempty"`
+
 	DiscordMessage *protobuf.DiscordMessage `json:"discordMessage,omitempty"`
 }
 

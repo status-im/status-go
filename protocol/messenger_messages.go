@@ -84,6 +84,14 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 	}
 
 	response := &MessengerResponse{}
+
+	// pull updated messages
+	updatedMessages, err := m.persistence.MessagesByResponseTo(request.ID.String())
+	if err != nil {
+		return nil, err
+	}
+	response.AddMessages(updatedMessages)
+
 	response.AddMessage(message)
 	response.AddChat(chat)
 
@@ -205,6 +213,12 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 				return nil, err
 			}
 		}
+		// pull updated messages
+		updatedMessages, err := m.persistence.MessagesByResponseTo(messageToDelete.ID)
+		if err != nil {
+			return nil, err
+		}
+		response.AddMessages(updatedMessages)
 	}
 
 	response.AddChat(chat)
@@ -253,6 +267,14 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string
 		}
 
 		response.AddMessage(messageToDelete)
+
+		// pull updated messages
+		updatedMessages, err := m.persistence.MessagesByResponseTo(messageToDelete.ID)
+		if err != nil {
+			return nil, err
+		}
+		response.AddMessages(updatedMessages)
+
 	}
 	response.AddChat(chat)
 
