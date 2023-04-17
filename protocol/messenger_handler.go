@@ -282,7 +282,7 @@ func (m *Messenger) createContactRequestForContactUpdate(contact *Contact, messa
 		return nil, err
 	}
 
-	contactRequest.ID = "0x" + types.Bytes2Hex(append(types.Hex2Bytes(contact.ID), 0x20))
+	contactRequest.ID = defaultContactRequestID(contact.ID)
 
 	// save this message
 	messageState.Response.AddMessage(contactRequest)

@@ -932,6 +932,10 @@ func (m *Messenger) PendingContactRequests(cursor string, limit int) ([]*common.
 	return m.persistence.PendingContactRequests(cursor, limit)
 }
 
+func defaultContactRequestID(contactID string) string {
+	return "0x" + types.Bytes2Hex(append(types.Hex2Bytes(contactID), 0x20))
+}
+
 func (m *Messenger) BuildContact(request *requests.BuildContact) (*Contact, error) {
 	contact, ok := m.allContacts.Load(request.PublicKey)
 	if !ok {
