@@ -437,7 +437,7 @@ func (m *MentionManager) HandleSelectionChange(chatID, text string, start int, e
 func (m *MentionManager) handleSelectionChange(chatID, text string, start int, end int, mentionableUsers map[string]*MentionableUser) {
 	ctx := m.getChatMentionContext(chatID)
 	state := ctx.MentionState
-	if len(state.AtIdxs) > 0 {
+	if state != nil && len(state.AtIdxs) > 0 {
 		var atIdx *AtIndexEntry
 		for _, idx := range state.AtIdxs {
 			if start >= idx.From && end-1 <= idx.To {
