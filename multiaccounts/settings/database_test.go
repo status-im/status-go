@@ -39,7 +39,7 @@ var (
 		SendPushNotifications:     true,
 		ProfilePicturesShowTo:     ProfilePicturesShowToContactsOnly,
 		ProfilePicturesVisibility: ProfilePicturesVisibilityContactsOnly,
-		DefaultSyncPeriod:         86400,
+		DefaultSyncPeriod:         777600,
 		UseMailservers:            true,
 		LinkPreviewRequestEnabled: true,
 		SendStatusUpdates:         true,

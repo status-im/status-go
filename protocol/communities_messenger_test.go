@@ -116,7 +116,7 @@ func (s *MessengerCommunitiesSuite) newMessengerWithOptions(shh types.Waku, priv
 		SigningPhrase:             "yurt joey vibe",
 		SendPushNotifications:     true,
 		ProfilePicturesVisibility: 1,
-		DefaultSyncPeriod:         86400,
+		DefaultSyncPeriod:         777600,
 		UseMailservers:            true,
 		LinkPreviewRequestEnabled: true,
 		SendStatusUpdates:         true,
