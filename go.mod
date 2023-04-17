@@ -62,7 +62,7 @@ require (
 	github.com/zenthangplus/goccm v0.0.0-20211005163543-2f2e522aca15
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.4.0
-	golang.org/x/image v0.0.0-20210220032944-ac19c3e999fb
+	golang.org/x/image v0.5.0
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.31.0
