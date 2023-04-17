@@ -10,6 +10,11 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	pingInterval = 500 * time.Millisecond
+	searchLimit  = 2 * time.Minute
+)
+
 type NotifyHandler func(*LocalPairingPeerHello)
 
 type UDPNotifier struct {
@@ -86,8 +91,8 @@ func Search(deviceName, deviceType string, notify NotifyHandler, stop chan struc
 		return err
 	}
 
-	settings.Delay = 500 * time.Millisecond
-	settings.TimeLimit = 2 * time.Minute
+	settings.Delay = pingInterval
+	settings.TimeLimit = searchLimit
 	settings.StopChan = stop
 
 	go func() {
