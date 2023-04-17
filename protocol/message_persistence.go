@@ -179,6 +179,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m2.id,
         m2.content_type,
         m2.deleted,
+        m2.deleted_for_me,
 		c.alias,
 		c.identicon,
     COALESCE(m2.discord_message_id, ""),
@@ -204,6 +205,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var quotedAudioDuration sql.NullInt64
 	var quotedCommunityID sql.NullString
 	var quotedDeleted sql.NullBool
+	var quotedDeletedForMe sql.NullBool
 	var serializedMentions []byte
 	var serializedLinks []byte
 	var alias sql.NullString
@@ -308,6 +310,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&quotedID,
 		&ContentType,
 		&quotedDeleted,
+		&quotedDeletedForMe,
 		&alias,
 		&identicon,
 		&quotedDiscordMessage.Id,
@@ -345,10 +348,11 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	}
 
 	if quotedText.Valid {
-		if quotedDeleted.Bool {
+		if quotedDeleted.Bool || quotedDeletedForMe.Bool {
 			message.QuotedMessage = &common.QuotedMessage{
-				ID:      quotedID.String,
-				Deleted: quotedDeleted.Bool,
+				ID:           quotedID.String,
+				Deleted:      quotedDeleted.Bool,
+				DeletedForMe: quotedDeletedForMe.Bool,
 			}
 		} else {
 			message.QuotedMessage = &common.QuotedMessage{
@@ -638,6 +642,17 @@ func (db sqlitePersistence) MessagesByIDs(ids []string) ([]*common.Message, erro
 	where := fmt.Sprintf("WHERE NOT(m1.hide) AND m1.id IN (%s)", inVector)
 	query := db.buildMessagesQuery(where)
 	rows, err := db.db.Query(query, idsArgs...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return getMessagesFromScanRows(db, rows, false)
+}
+
+func (db sqlitePersistence) MessagesByResponseTo(responseTo string) ([]*common.Message, error) {
+	where := "WHERE m1.response_to = ?"
+	query := db.buildMessagesQuery(where)
+	rows, err := db.db.Query(query, responseTo)
 	if err != nil {
 		return nil, err
 	}
@@ -1067,19 +1082,19 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
        ON
        dm.author_id = dm_author.id
 
-       LEFT JOIN 
+       LEFT JOIN
               discord_message_attachments dm_attachment
-			 ON        
+			 ON
        dm.id = dm_attachment.discord_message_id
 
-			 LEFT JOIN 
+			 LEFT JOIN
 							discord_messages m2_dm
-			 ON        
+			 ON
 			 m2.discord_message_id = m2_dm.id
 
-				LEFT JOIN 
+				LEFT JOIN
 							discord_message_authors m2_dm_author
-			 ON        
+			 ON
 			 m2_dm.author_id = m2_dm_author.id
 
  			WHERE
@@ -1421,22 +1436,22 @@ func (db sqlitePersistence) SaveMessages(messages []*common.Message) (err error)
 	return
 }
 
-func (db sqlitePersistence) SavePinMessages(messages []*common.PinMessage) (err error) {
+type insertPinMessagesQueries struct {
+	selectStmt  string
+	insertStmt  *sql.Stmt
+	updateStmt  *sql.Stmt
+	transaction *sql.Tx
+}
+
+func (db sqlitePersistence) buildPinMessageQueries() (*insertPinMessagesQueries, error) {
 	tx, err := db.db.BeginTx(context.Background(), nil)
 	if err != nil {
-		return
+		return nil, err
 	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		// don't shadow original error
-		_ = tx.Rollback()
-	}()
 
+	queries := &insertPinMessagesQueries{}
 	// select
-	selectQuery := "SELECT clock_value FROM pin_messages WHERE id = ?"
+	queries.selectStmt = "SELECT clock_value FROM pin_messages WHERE id = ?"
 
 	// insert
 	allInsertFields := `id, message_id, whisper_timestamp, chat_id, local_chat_id, clock_value, pinned, pinned_by`
@@ -1444,52 +1459,102 @@ func (db sqlitePersistence) SavePinMessages(messages []*common.PinMessage) (err 
 	insertQuery := "INSERT INTO pin_messages(" + allInsertFields + ") VALUES (" + insertValues + ")" // nolint: gosec
 	insertStmt, err := tx.Prepare(insertQuery)
 	if err != nil {
-		return
+		return nil, err
 	}
+	queries.insertStmt = insertStmt
 
 	// update
 	updateQuery := "UPDATE pin_messages SET pinned = ?, clock_value = ?, pinned_by = ? WHERE id = ?"
 	updateStmt, err := tx.Prepare(updateQuery)
 	if err != nil {
+		return nil, err
+	}
+	queries.updateStmt = updateStmt
+	queries.transaction = tx
+	return queries, nil
+}
+
+func (db sqlitePersistence) SavePinMessages(messages []*common.PinMessage) (err error) {
+	queries, err := db.buildPinMessageQueries()
+	if err != nil {
 		return
 	}
-
+	defer func() {
+		if err == nil {
+			err = queries.transaction.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = queries.transaction.Rollback()
+	}()
 	for _, message := range messages {
-		row := tx.QueryRow(selectQuery, message.ID)
-		var existingClock uint64
-		switch err = row.Scan(&existingClock); err {
-		case sql.ErrNoRows:
-			// not found, insert new record
-			allValues := []interface{}{
-				message.ID,
-				message.MessageId,
-				message.WhisperTimestamp,
-				message.ChatId,
-				message.LocalChatID,
-				message.Clock,
-				message.Pinned,
-				message.From,
-			}
-			_, err = insertStmt.Exec(allValues...)
-			if err != nil {
-				return
-			}
-		case nil:
-			// found, update if current message is more recent, otherwise skip
-			if existingClock < message.Clock {
-				// update
-				_, err = updateStmt.Exec(message.Pinned, message.Clock, message.From, message.ID)
-				if err != nil {
-					return
-				}
-			}
-
-		default:
+		_, err = db.savePinMessage(message, queries)
+		if err != nil {
 			return
 		}
 	}
 
 	return
+}
+
+func (db sqlitePersistence) savePinMessage(message *common.PinMessage, queries *insertPinMessagesQueries) (inserted bool, err error) {
+	tx := queries.transaction
+	selectQuery := queries.selectStmt
+	updateStmt := queries.updateStmt
+	insertStmt := queries.insertStmt
+
+	row := tx.QueryRow(selectQuery, message.ID)
+	var existingClock uint64
+	switch err = row.Scan(&existingClock); err {
+	case sql.ErrNoRows:
+		// not found, insert new record
+		allValues := []interface{}{
+			message.ID,
+			message.MessageId,
+			message.WhisperTimestamp,
+			message.ChatId,
+			message.LocalChatID,
+			message.Clock,
+			message.Pinned,
+			message.From,
+		}
+		_, err = insertStmt.Exec(allValues...)
+		if err != nil {
+			return
+		}
+		inserted = true
+	case nil:
+		// found, update if current message is more recent, otherwise skip
+		if existingClock < message.Clock {
+			// update
+			_, err = updateStmt.Exec(message.Pinned, message.Clock, message.From, message.ID)
+			if err != nil {
+				return
+			}
+			inserted = true
+		}
+
+	default:
+		return
+	}
+
+	return
+}
+
+func (db sqlitePersistence) SavePinMessage(message *common.PinMessage) (inserted bool, err error) {
+	queries, err := db.buildPinMessageQueries()
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = queries.transaction.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = queries.transaction.Rollback()
+	}()
+	return db.savePinMessage(message, queries)
 }
 
 func (db sqlitePersistence) DeleteMessage(id string) error {

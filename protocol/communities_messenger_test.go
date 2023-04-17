@@ -2237,9 +2237,7 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 			communityMembersError = errors.New("alice not removed from community")
 		}
 
-		s.Require().NoError(communityMembersError)
-
-		return nil
+		return communityMembersError
 	}
 	err = tt.RetryWithBackOff(func() error {
 		return verifyCommunityMembers(s.admin)

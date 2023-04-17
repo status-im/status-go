@@ -675,19 +675,24 @@ func (m *Messenger) HandleSyncChatMessagesRead(state *ReceivedMessageState, mess
 	return nil
 }
 
-func (m *Messenger) HandlePinMessage(state *ReceivedMessageState, message protobuf.PinMessage) error {
+func (m *Messenger) handlePinMessage(pinner *Contact, whisperTimestamp uint64, response *MessengerResponse, message protobuf.PinMessage) error {
 	logger := m.logger.With(zap.String("site", "HandlePinMessage"))
 
 	logger.Info("Handling pin message")
 
+	publicKey, err := pinner.PublicKey()
+	if err != nil {
+		return err
+	}
+
 	pinMessage := &common.PinMessage{
 		PinMessage: message,
 		// MessageID:        message.MessageId,
-		WhisperTimestamp: state.CurrentMessageState.WhisperTimestamp,
-		From:             state.CurrentMessageState.Contact.ID,
-		SigPubKey:        state.CurrentMessageState.PublicKey,
-		Identicon:        state.CurrentMessageState.Contact.Identicon,
-		Alias:            state.CurrentMessageState.Contact.Alias,
+		WhisperTimestamp: whisperTimestamp,
+		From:             pinner.ID,
+		SigPubKey:        publicKey,
+		Identicon:        pinner.Identicon,
+		Alias:            pinner.Alias,
 	}
 
 	chat, err := m.matchChatEntity(pinMessage)
@@ -708,24 +713,60 @@ func (m *Messenger) HandlePinMessage(state *ReceivedMessageState, message protob
 	// Set the LocalChatID for the message
 	pinMessage.LocalChatID = chat.ID
 
-	if c, ok := state.AllChats.Load(chat.ID); ok {
+	if c, ok := m.allChats.Load(chat.ID); ok {
 		chat = c
 	}
 
 	// Set the LocalChatID for the message
 	pinMessage.LocalChatID = chat.ID
 
+	inserted, err := m.persistence.SavePinMessage(pinMessage)
+	if err != nil {
+		return err
+	}
+
+	// Nothing to do, returning
+	if !inserted {
+		m.logger.Info("pin message already processed")
+		return nil
+	}
+
+	if message.Pinned {
+		id, err := generatePinMessageNotificationID(&m.identity.PublicKey, pinMessage, chat)
+		if err != nil {
+			return err
+		}
+		message := &common.Message{
+			ChatMessage: protobuf.ChatMessage{
+				Clock:       message.Clock,
+				Timestamp:   whisperTimestamp,
+				ChatId:      chat.ID,
+				MessageType: message.MessageType,
+				ResponseTo:  message.MessageId,
+				ContentType: protobuf.ChatMessage_SYSTEM_MESSAGE_PINNED_MESSAGE,
+			},
+			WhisperTimestamp: whisperTimestamp,
+			ID:               id,
+			LocalChatID:      chat.ID,
+			From:             pinner.ID,
+		}
+		response.AddMessage(message)
+	}
+
 	if chat.LastClockValue < message.Clock {
 		chat.LastClockValue = message.Clock
 	}
 
-	state.Response.AddPinMessage(pinMessage)
+	response.AddPinMessage(pinMessage)
 
 	// Set in the modified maps chat
-	state.Response.AddChat(chat)
-	state.AllChats.Store(chat.ID, chat)
-
+	response.AddChat(chat)
+	m.allChats.Store(chat.ID, chat)
 	return nil
+}
+
+func (m *Messenger) HandlePinMessage(state *ReceivedMessageState, message protobuf.PinMessage) error {
+	return m.handlePinMessage(state.CurrentMessageState.Contact, state.CurrentMessageState.WhisperTimestamp, state.Response, message)
 }
 
 func (m *Messenger) handleAcceptContactRequest(
@@ -1429,21 +1470,13 @@ func (m *Messenger) HandleEditMessage(state *ReceivedMessageState, editMessage E
 		return err
 	}
 	messageID := editMessage.MessageId
-	// Check if it's already in the response
-	originalMessage := state.Response.GetMessage(messageID)
-	// otherwise pull from database
-	if originalMessage == nil {
-		var err error
-		originalMessage, err = m.persistence.MessageByID(messageID)
 
-		if err != nil && err != common.ErrRecordNotFound {
-			return err
-		}
-	}
+	originalMessage, err := m.getMessageFromResponseOrDatabase(state.Response, messageID)
 
-	// We don't have the original message, save the edited message
-	if originalMessage == nil {
+	if err == common.ErrRecordNotFound {
 		return m.persistence.SaveEdit(editMessage)
+	} else if err != nil {
+		return err
 	}
 
 	originalMessageMentioned := originalMessage.Mentioned
@@ -1464,7 +1497,7 @@ func (m *Messenger) HandleEditMessage(state *ReceivedMessageState, editMessage E
 	}
 
 	// Update message and return it
-	err := m.applyEditMessage(&editMessage.EditMessage, originalMessage)
+	err = m.applyEditMessage(&editMessage.EditMessage, originalMessage)
 	if err != nil {
 		return err
 	}
@@ -1495,6 +1528,14 @@ func (m *Messenger) HandleEditMessage(state *ReceivedMessageState, editMessage E
 	}
 
 	state.Response.AddMessage(originalMessage)
+
+	// pull updated messages
+	updatedMessages, err := m.persistence.MessagesByResponseTo(messageID)
+	if err != nil {
+		return err
+	}
+	state.Response.AddMessages(updatedMessages)
+
 	state.Response.AddChat(chat)
 
 	return nil
@@ -1588,11 +1629,28 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 				m.createMessageNotification(chat, state)
 			}
 		}
+
+		// pull updated messages
+		updatedMessages, err := m.persistence.MessagesByResponseTo(messageToDelete.ID)
+		if err != nil {
+			return err
+		}
+		state.Response.AddMessages(updatedMessages)
 	}
 
 	state.Response.AddChat(chat)
 
 	return nil
+}
+
+func (m *Messenger) getMessageFromResponseOrDatabase(response *MessengerResponse, messageID string) (*common.Message, error) {
+	originalMessage := response.GetMessage(messageID)
+	// otherwise pull from database
+	if originalMessage != nil {
+		return originalMessage, nil
+	}
+
+	return m.persistence.MessageByID(messageID)
 }
 
 // TODO do this delete too
@@ -1603,19 +1661,12 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 
 	messageID := deleteForMeMessage.MessageId
 	// Check if it's already in the response
-	originalMessage := state.Response.GetMessage(messageID)
-	// otherwise pull from database
-	if originalMessage == nil {
-		var err error
-		originalMessage, err = m.persistence.MessageByID(messageID)
+	originalMessage, err := m.getMessageFromResponseOrDatabase(state.Response, messageID)
 
-		if err == common.ErrRecordNotFound {
-			return m.persistence.SaveDeleteForMe(deleteForMeMessage)
-		}
-
-		if err != nil {
-			return err
-		}
+	if err == common.ErrRecordNotFound {
+		return m.persistence.SaveDeleteForMe(deleteForMeMessage)
+	} else if err != nil {
+		return err
 	}
 
 	chat, ok := m.allChats.Load(originalMessage.LocalChatID)

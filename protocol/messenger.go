@@ -4435,13 +4435,6 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 		}
 	}
 
-	if len(messageState.Response.pinMessages) > 0 {
-		err = m.SavePinMessages(messageState.Response.PinMessages())
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	messagesToSave := messageState.Response.Messages()
 	messagesCount := len(messagesToSave)
 	if messagesCount > 0 {
@@ -4549,6 +4542,17 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 
 	if len(messageState.AllTrustStatus) > 0 {
 		messageState.Response.AddTrustStatuses(messageState.AllTrustStatus)
+	}
+
+	// Hydrate pinned messages
+	for _, pinnedMessage := range messageState.Response.PinMessages() {
+		if pinnedMessage.Pinned {
+			pinnedMessage.Message = &common.PinnedMessage{
+				Message:  messageState.Response.GetMessage(pinnedMessage.MessageId),
+				PinnedBy: pinnedMessage.From,
+				PinnedAt: pinnedMessage.Clock,
+			}
+		}
 	}
 
 	return messageState.Response, nil

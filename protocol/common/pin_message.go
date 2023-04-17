@@ -31,6 +31,8 @@ type PinMessage struct {
 	Identicon string `json:"identicon"`
 	// Random 3 words name
 	Alias string `json:"alias"`
+
+	Message *PinnedMessage `json:"pinnedMessage"`
 }
 
 type PinnedMessage struct {

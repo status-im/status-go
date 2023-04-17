@@ -273,9 +273,9 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.activityCenterNotifications)+
 		len(r.trustStatus)+
 		len(r.verificationRequests)+
-		len(r.RequestsToJoinCommunity) == 0 &&
-		len(r.savedAddresses) == 0 &&
-		len(r.keycards) == 0 &&
+		len(r.RequestsToJoinCommunity)+
+		len(r.savedAddresses)+
+		len(r.keycards)+
 		len(r.keycardActions) == 0 &&
 		len(r.socialLinkSettings) == 0 &&
 		r.currentStatus == nil &&
