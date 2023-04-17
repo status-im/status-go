@@ -440,7 +440,6 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 		syncedTopics = append(syncedTopics, topicData)
 	}
 
-	m.logger.Debug("syncing topics", zap.Any("batches", batches))
 	if m.config.messengerSignalsHandler != nil {
 		m.config.messengerSignalsHandler.HistoryRequestStarted(len(batches))
 	}
@@ -451,9 +450,43 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 	}
 	sort.Ints(batchKeys)
 
+	var batches24h []MailserverBatch
+	keysToIterate := append([]int{}, batchKeys...)
+	for {
+		// For all batches
+		var tmpKeysToIterate []int
+		for _, k := range keysToIterate {
+			batch := batches[k]
+
+			dayBatch := MailserverBatch{
+				To:      batch.To,
+				Cursor:  batch.Cursor,
+				Topics:  batch.Topics,
+				ChatIDs: batch.ChatIDs,
+			}
+
+			from := batch.To - 86400
+			if from > batch.From {
+				dayBatch.From = from
+				batches24h = append(batches24h, dayBatch)
+
+				// Replace og batch with new dates
+				batch.To = from
+				batches[k] = batch
+				tmpKeysToIterate = append(tmpKeysToIterate, k)
+			} else {
+				batches24h = append(batches24h, batch)
+			}
+		}
+
+		if len(tmpKeysToIterate) == 0 {
+			break
+		}
+		keysToIterate = tmpKeysToIterate
+	}
+
 	i := 0
-	for _, k := range batchKeys {
-		batch := batches[k]
+	for _, batch := range batches24h {
 		i++
 		err := m.processMailserverBatch(batch)
 		if err != nil {
