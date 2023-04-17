@@ -9,6 +9,7 @@ import (
 	udpp2p "github.com/schollz/peerdiscovery"
 
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/server/pairing/versioning"
 )
 
 type LocalPairingPeerHello struct {
@@ -19,6 +20,7 @@ type LocalPairingPeerHello struct {
 func NewLocalPairingPeerHello(id []byte, name, deviceType string, k *ecdsa.PrivateKey) (*LocalPairingPeerHello, error) {
 	h := new(LocalPairingPeerHello)
 
+	h.PairingVersion = int32(versioning.LatestLocalPairingVer)
 	h.PeerId = id
 	h.DeviceName = name
 	h.DeviceType = deviceType
@@ -33,15 +35,17 @@ func NewLocalPairingPeerHello(id []byte, name, deviceType string, k *ecdsa.Priva
 
 func (h *LocalPairingPeerHello) MarshalJSON() ([]byte, error) {
 	alias := struct {
-		PeerID     []byte
-		DeviceName string
-		DeviceType string
-		Address    string
+		PairingVersion int32
+		PeerID         []byte
+		DeviceName     string
+		DeviceType     string
+		Address        string
 	}{
-		PeerID:     h.PeerId,
-		DeviceName: h.DeviceName,
-		DeviceType: h.DeviceType,
-		Address:    h.Discovered.Address,
+		PairingVersion: h.PairingVersion,
+		PeerID:         h.PeerId,
+		DeviceName:     h.DeviceName,
+		DeviceType:     h.DeviceType,
+		Address:        h.Discovered.Address,
 	}
 
 	return json.Marshal(alias)

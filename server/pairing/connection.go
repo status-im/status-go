@@ -10,12 +10,8 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcutil/base58"
-)
 
-type ConnectionParamVersion int
-
-const (
-	Version1 ConnectionParamVersion = iota + 1
+	"github.com/status-im/status-go/server/pairing/versioning"
 )
 
 const (
@@ -23,7 +19,7 @@ const (
 )
 
 type ConnectionParams struct {
-	version   ConnectionParamVersion
+	version   versioning.ConnectionParamVersion
 	netIP     net.IP
 	port      int
 	publicKey *ecdsa.PublicKey
@@ -32,7 +28,7 @@ type ConnectionParams struct {
 
 func NewConnectionParams(netIP net.IP, port int, publicKey *ecdsa.PublicKey, aesKey []byte) *ConnectionParams {
 	cp := new(ConnectionParams)
-	cp.version = Version1
+	cp.version = versioning.LatestConnectionParamVer
 	cp.netIP = netIP
 	cp.port = port
 	cp.publicKey = publicKey
@@ -81,7 +77,7 @@ func (cp *ConnectionParams) FromString(s string) error {
 		return fmt.Errorf("expected data '%s' to have length of '%d', received '%d'", s, requiredParams, len(sData))
 	}
 
-	cp.version = ConnectionParamVersion(new(big.Int).SetBytes(base58.Decode(sData[0])).Int64())
+	cp.version = versioning.ConnectionParamVersion(new(big.Int).SetBytes(base58.Decode(sData[0])).Int64())
 	cp.netIP = base58.Decode(sData[1])
 	cp.port = int(new(big.Int).SetBytes(base58.Decode(sData[2])).Int64())
 	cp.publicKey = new(ecdsa.PublicKey)
@@ -117,12 +113,10 @@ func (cp *ConnectionParams) validate() error {
 }
 
 func (cp *ConnectionParams) validateVersion() error {
-	switch cp.version {
-	case Version1:
+	if cp.version <= versioning.LatestConnectionParamVer {
 		return nil
-	default:
-		return fmt.Errorf("unsupported version '%d'", cp.version)
 	}
+	return fmt.Errorf("unsupported version '%d'", cp.version)
 }
 
 func (cp *ConnectionParams) validateNetIP() error {
