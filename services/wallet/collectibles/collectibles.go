@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/afex/hystrix-go/hystrix"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
@@ -17,22 +19,64 @@ import (
 
 const requestTimeout = 5 * time.Second
 
+const hystrixContractOwnershipClientName = "contractOwnershipClient"
+
 type Manager struct {
-	rpcClient        *rpc.Client
-	metadataProvider thirdparty.NFTMetadataProvider
-	openseaAPIKey    string
-	nftCache         map[uint64]map[string]opensea.Asset
-	nftCacheLock     sync.RWMutex
-	walletFeed       *event.Feed
+	rpcClient                         *rpc.Client
+	mainContractOwnershipProvider     thirdparty.NFTContractOwnershipProvider
+	fallbackContractOwnershipProvider thirdparty.NFTContractOwnershipProvider
+	metadataProvider                  thirdparty.NFTMetadataProvider
+	openseaAPIKey                     string
+	nftCache                          map[uint64]map[string]opensea.Asset
+	nftCacheLock                      sync.RWMutex
+	walletFeed                        *event.Feed
 }
 
-func NewManager(rpcClient *rpc.Client, metadataProvider thirdparty.NFTMetadataProvider, openseaAPIKey string, walletFeed *event.Feed) *Manager {
+func NewManager(rpcClient *rpc.Client, mainContractOwnershipProvider thirdparty.NFTContractOwnershipProvider, fallbackContractOwnershipProvider thirdparty.NFTContractOwnershipProvider, metadataProvider thirdparty.NFTMetadataProvider, openseaAPIKey string, walletFeed *event.Feed) *Manager {
+	hystrix.ConfigureCommand(hystrixContractOwnershipClientName, hystrix.CommandConfig{
+		Timeout:               10000,
+		MaxConcurrentRequests: 100,
+		SleepWindow:           300000,
+		ErrorPercentThreshold: 25,
+	})
+
 	return &Manager{
-		rpcClient:        rpcClient,
-		metadataProvider: metadataProvider,
-		openseaAPIKey:    openseaAPIKey,
-		nftCache:         make(map[uint64]map[string]opensea.Asset),
-		walletFeed:       walletFeed,
+		rpcClient:                         rpcClient,
+		mainContractOwnershipProvider:     mainContractOwnershipProvider,
+		fallbackContractOwnershipProvider: fallbackContractOwnershipProvider,
+		metadataProvider:                  metadataProvider,
+		openseaAPIKey:                     openseaAPIKey,
+		nftCache:                          make(map[uint64]map[string]opensea.Asset),
+		walletFeed:                        walletFeed,
+	}
+}
+
+func makeContractOwnershipCall(main func() (any, error), fallback func() (any, error)) (any, error) {
+	resultChan := make(chan any, 1)
+	errChan := hystrix.Go(hystrixContractOwnershipClientName, func() error {
+		res, err := main()
+		if err != nil {
+			return err
+		}
+		resultChan <- res
+		return nil
+	}, func(err error) error {
+		if fallback == nil {
+			return err
+		}
+
+		res, err := fallback()
+		if err != nil {
+			return err
+		}
+		resultChan <- res
+		return nil
+	})
+	select {
+	case result := <-resultChan:
+		return result, nil
+	case err := <-errChan:
+		return nil, err
 	}
 }
 
@@ -128,6 +172,24 @@ func (o *Manager) FetchAssetsByNFTUniqueID(chainID uint64, uniqueIDs []thirdpart
 	assetContainer.Assets = o.getCachedAssets(chainID, uniqueIDs)
 
 	return assetContainer, nil
+}
+
+func (o *Manager) FetchNFTOwnersByContractAddress(chainID uint64, contractAddress common.Address) (*thirdparty.NFTContractOwnership, error) {
+	mainFunc := func() (any, error) {
+		return o.mainContractOwnershipProvider.FetchNFTOwnersByContractAddress(chainID, contractAddress)
+	}
+	var fallbackFunc func() (any, error) = nil
+	if o.fallbackContractOwnershipProvider != nil && o.fallbackContractOwnershipProvider.IsChainSupported(chainID) {
+		fallbackFunc = func() (any, error) {
+			return o.fallbackContractOwnershipProvider.FetchNFTOwnersByContractAddress(chainID, contractAddress)
+		}
+	}
+	owners, err := makeContractOwnershipCall(mainFunc, fallbackFunc)
+	if err != nil {
+		return nil, err
+	}
+
+	return owners.(*thirdparty.NFTContractOwnership), nil
 }
 
 func isMetadataEmpty(asset opensea.Asset) bool {

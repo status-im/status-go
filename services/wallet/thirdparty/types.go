@@ -61,3 +61,23 @@ type NFTMetadataProvider interface {
 	CanProvideNFTMetadata(chainID uint64, id NFTUniqueID, tokenURI string) (bool, error)
 	FetchNFTMetadata(chainID uint64, id NFTUniqueID, tokenURI string) (*NFTMetadata, error)
 }
+
+type TokenBalance struct {
+	TokenID *bigint.BigInt `json:"tokenId"`
+	Balance *bigint.BigInt `json:"balance"`
+}
+
+type NFTOwner struct {
+	OwnerAddress  common.Address `json:"ownerAddress"`
+	TokenBalances []TokenBalance `json:"tokenBalances"`
+}
+
+type NFTContractOwnership struct {
+	ContractAddress common.Address `json:"contractAddress"`
+	Owners          []NFTOwner     `json:"owners"`
+}
+
+type NFTContractOwnershipProvider interface {
+	FetchNFTOwnersByContractAddress(chainID uint64, contractAddress common.Address) (*NFTContractOwnership, error)
+	IsChainSupported(chainID uint64) bool
+}

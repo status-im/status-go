@@ -320,6 +320,11 @@ func (api *API) GetOpenseaAssetsByNFTUniqueID(ctx context.Context, chainID uint6
 	return api.s.collectiblesManager.FetchAssetsByNFTUniqueID(chainID, uniqueIDs, limit)
 }
 
+func (api *API) GetCollectibleOwnersByContractAddress(chainID uint64, contractAddress common.Address) (*thirdparty.NFTContractOwnership, error) {
+	log.Debug("call to GetCollectibleOwnersByContractAddress")
+	return api.s.collectiblesManager.FetchNFTOwnersByContractAddress(chainID, contractAddress)
+}
+
 func (api *API) AddEthereumChain(ctx context.Context, network params.Network) error {
 	log.Debug("call to AddEthereumChain")
 	return api.s.rpcClient.NetworkManager.Upsert(&network)
