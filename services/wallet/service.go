@@ -22,8 +22,10 @@ import (
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/thirdparty/alchemy"
 	"github.com/status-im/status-go/services/wallet/thirdparty/coingecko"
 	"github.com/status-im/status-go/services/wallet/thirdparty/cryptocompare"
+	"github.com/status-im/status-go/services/wallet/thirdparty/infura"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -41,6 +43,9 @@ func NewService(
 	rpcClient *rpc.Client,
 	accountFeed *event.Feed,
 	openseaAPIKey string,
+	alchemyAPIKeys map[uint64]string,
+	infuraAPIKey string,
+	infuraAPIKeySecret string,
 	gethManager *account.GethManager,
 	transactor *transactions.Transactor,
 	config *params.NodeConfig,
@@ -92,7 +97,10 @@ func NewService(
 	reader := NewReader(rpcClient, tokenManager, marketManager, accountsDB, walletFeed)
 	history := history.NewService(db, walletFeed, rpcClient, tokenManager, marketManager)
 	currency := currency.NewService(db, walletFeed, tokenManager, marketManager)
-	collectiblesManager := collectibles.NewManager(rpcClient, nftMetadataProvider, openseaAPIKey, walletFeed)
+
+	alchemyClient := alchemy.NewClient(alchemyAPIKeys)
+	infuraClient := infura.NewClient(infuraAPIKey, infuraAPIKeySecret)
+	collectiblesManager := collectibles.NewManager(rpcClient, alchemyClient, infuraClient, nftMetadataProvider, openseaAPIKey, walletFeed)
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,

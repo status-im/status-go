@@ -515,8 +515,11 @@ type Network struct {
 
 // WalletConfig extra configuration for wallet.Service.
 type WalletConfig struct {
-	Enabled       bool
-	OpenseaAPIKey string `json:"OpenseaAPIKey"`
+	Enabled            bool
+	OpenseaAPIKey      string            `json:"OpenseaAPIKey"`
+	AlchemyAPIKeys     map[uint64]string `json:"AlchemyAPIKeys"`
+	InfuraAPIKey       string            `json:"InfuraAPIKey"`
+	InfuraAPIKeySecret string            `json:"InfuraAPIKeySecret"`
 }
 
 // LocalNotificationsConfig extra configuration for localnotifications.Service.
