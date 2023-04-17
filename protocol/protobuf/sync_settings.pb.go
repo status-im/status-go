@@ -91,6 +91,7 @@ type SyncSetting struct {
 	Type  SyncSetting_Type `protobuf:"varint,1,opt,name=type,proto3,enum=protobuf.SyncSetting_Type" json:"type,omitempty"`
 	Clock uint64           `protobuf:"varint,2,opt,name=clock,proto3" json:"clock,omitempty"`
 	// Types that are valid to be assigned to Value:
+	//
 	//	*SyncSetting_ValueString
 	//	*SyncSetting_ValueBytes
 	//	*SyncSetting_ValueBool
