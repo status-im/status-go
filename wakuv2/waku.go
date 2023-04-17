@@ -201,8 +201,6 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		sendQueue:               make(chan *protocol.Envelope, 1000),
 		connStatusChan:          make(chan node.ConnStatus, 100),
 		connStatusSubscriptions: make(map[string]*types.ConnStatusSubscription),
-		quit:                    make(chan struct{}),
-		connectionChanged:       make(chan struct{}),
 		wg:                      sync.WaitGroup{},
 		dnsAddressCache:         make(map[string][]dnsdisc.DiscoveredNode),
 		dnsAddressCacheLock:     &sync.RWMutex{},
@@ -230,7 +228,6 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 
 	waku.filters = common.NewFilters()
 	waku.bandwidthCounter = metrics.NewBandwidthCounter()
-	waku.filterMsgChannel = make(chan *protocol.Envelope, 1024)
 
 	var privateKey *ecdsa.PrivateKey
 	if nodeKey != "" {
@@ -646,11 +643,13 @@ func (w *Waku) runFilterMsgLoop() {
 		select {
 		case <-w.quit:
 			return
-		case env := <-w.filterMsgChannel:
-			envelopeErrors, err := w.OnNewEnvelopes(env, common.RelayedMessageType)
-			// TODO: should these be handled?
-			_ = envelopeErrors
-			_ = err
+		case env, ok := <-w.filterMsgChannel:
+			if ok {
+				envelopeErrors, err := w.OnNewEnvelopes(env, common.RelayedMessageType)
+				// TODO: should these be handled?
+				_ = envelopeErrors
+				_ = err
+			}
 		}
 	}
 }
@@ -1132,6 +1131,10 @@ func (w *Waku) Start() error {
 	}
 
 	w.identifyService = idService
+
+	w.quit = make(chan struct{})
+	w.filterMsgChannel = make(chan *protocol.Envelope, 1024)
+	w.connectionChanged = make(chan struct{})
 
 	ctx := context.Background()
 	if err = w.node.Start(ctx); err != nil {
