@@ -11,24 +11,25 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
 func getBaseURL(chainID uint64) (string, error) {
 	switch chainID {
-	case 1:
+	case walletCommon.EthereumMainnet:
 		return "https://eth-mainnet.g.alchemy.com", nil
-	case 5:
+	case walletCommon.EthereumGoerli:
 		return "https://eth-goerli.g.alchemy.com", nil
-	case 11155111:
+	case walletCommon.EthereumSepolia:
 		return "https://eth-sepolia.g.alchemy.com", nil
-	case 10:
+	case walletCommon.OptimismMainnet:
 		return "https://opt-mainnet.g.alchemy.com", nil
-	case 420:
+	case walletCommon.OptimismGoerli:
 		return "https://opt-goerli.g.alchemy.com", nil
-	case 42161:
+	case walletCommon.ArbitrumMainnet:
 		return "https://arb-mainnet.g.alchemy.com", nil
-	case 421613:
+	case walletCommon.ArbitrumGoerli:
 		return "https://arb-goerli.g.alchemy.com", nil
 	}
 

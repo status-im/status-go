@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/services/wallet/bigint"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -35,11 +36,9 @@ const ChainIDRequiringAPIKey = 1
 
 func getbaseURL(chainID uint64) (string, error) {
 	switch chainID {
-	case 1, 10, 42161:
+	case walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet:
 		return "https://api.opensea.io/api/v1", nil
-	case 4:
-		return "https://rinkeby-api.opensea.io/api/v1", nil
-	case 5, 420, 421613:
+	case walletCommon.EthereumGoerli, walletCommon.OptimismGoerli, walletCommon.ArbitrumGoerli:
 		return "https://testnets-api.opensea.io/api/v1", nil
 	}
 
