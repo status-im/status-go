@@ -25,7 +25,7 @@ func (s *SocialLinksSettings) GetSocialLink(text string) (*identity.SocialLink, 
 	}
 	defer rows.Close()
 
-	for rows.Next() {
+	if rows.Next() {
 		link := identity.SocialLink{}
 		var url sql.NullString
 
