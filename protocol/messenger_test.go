@@ -1378,6 +1378,9 @@ func (s *MessengerSuite) TestBlockContact() {
 	response, err := s.m.BlockContact(contact.ID)
 	s.Require().NoError(err)
 
+	blockedContacts := s.m.BlockedContacts()
+	s.Require().True(blockedContacts[0].Removed)
+
 	chats := response.Chats()
 
 	var actualChat2, actualChat3 *Chat
