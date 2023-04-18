@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
@@ -64,7 +65,7 @@ func (o *Client) doQuery(url string) (*http.Response, error) {
 
 func (o *Client) IsChainSupported(chainID uint64) bool {
 	switch chainID {
-	case 1, 5, 42161, 11155111:
+	case walletCommon.EthereumMainnet, walletCommon.EthereumGoerli, walletCommon.EthereumSepolia, walletCommon.ArbitrumMainnet:
 		return true
 	}
 	return false
