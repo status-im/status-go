@@ -42,10 +42,6 @@ func NewService(
 	accountsDB *accounts.Database,
 	rpcClient *rpc.Client,
 	accountFeed *event.Feed,
-	openseaAPIKey string,
-	alchemyAPIKeys map[uint64]string,
-	infuraAPIKey string,
-	infuraAPIKeySecret string,
 	gethManager *account.GethManager,
 	transactor *transactions.Transactor,
 	config *params.NodeConfig,
@@ -98,9 +94,9 @@ func NewService(
 	history := history.NewService(db, walletFeed, rpcClient, tokenManager, marketManager)
 	currency := currency.NewService(db, walletFeed, tokenManager, marketManager)
 
-	alchemyClient := alchemy.NewClient(alchemyAPIKeys)
-	infuraClient := infura.NewClient(infuraAPIKey, infuraAPIKeySecret)
-	collectiblesManager := collectibles.NewManager(rpcClient, alchemyClient, infuraClient, nftMetadataProvider, openseaAPIKey, walletFeed)
+	alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKeys)
+	infuraClient := infura.NewClient(config.WalletConfig.InfuraAPIKey, config.WalletConfig.InfuraAPIKeySecret)
+	collectiblesManager := collectibles.NewManager(rpcClient, alchemyClient, infuraClient, nftMetadataProvider, config.WalletConfig.OpenseaAPIKey, walletFeed)
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,

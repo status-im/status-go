@@ -56,8 +56,6 @@ var (
 	// ErrRPCClientUnavailable is returned if an RPC client can't be retrieved.
 	// This is a normal situation when a node is stopped.
 	ErrRPCClientUnavailable = errors.New("JSON-RPC client is unavailable")
-	// OpenseaKeyFromEnv passed from on env var during build time
-	OpenseaKeyFromEnv string
 )
 
 func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server.MediaServer) error {
@@ -132,11 +130,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	}
 
 	if config.WalletConfig.Enabled {
-		openseaKey := config.WalletConfig.OpenseaAPIKey
-		if len(openseaKey) == 0 {
-			openseaKey = OpenseaKeyFromEnv
-		}
-		walletService := b.walletService(accDB, accountsFeed, openseaKey, config.WalletConfig.AlchemyAPIKeys, config.WalletConfig.InfuraAPIKey, config.WalletConfig.InfuraAPIKeySecret)
+		walletService := b.walletService(accDB, accountsFeed)
 		services = append(services, walletService)
 	}
 
@@ -471,7 +465,7 @@ func (b *StatusNode) appmetricsService() common.StatusService {
 	return b.appMetricsSrvc
 }
 
-func (b *StatusNode) walletService(accountsDB *accounts.Database, accountsFeed *event.Feed, openseaAPIKey string, alchemyAPIKeys map[uint64]string, infuraAPIKey string, infuraAPIKeySecret string) common.StatusService {
+func (b *StatusNode) walletService(accountsDB *accounts.Database, accountsFeed *event.Feed) common.StatusService {
 	if b.walletSrvc == nil {
 		var extService *ext.Service
 		if b.WakuV2ExtService() != nil {
@@ -480,7 +474,7 @@ func (b *StatusNode) walletService(accountsDB *accounts.Database, accountsFeed *
 			extService = b.WakuExtService().Service
 		}
 		b.walletSrvc = wallet.NewService(
-			b.appDB, accountsDB, b.rpcClient, accountsFeed, openseaAPIKey, alchemyAPIKeys, infuraAPIKey, infuraAPIKeySecret, b.gethAccountManager, b.transactor, b.config,
+			b.appDB, accountsDB, b.rpcClient, accountsFeed, b.gethAccountManager, b.transactor, b.config,
 			b.ensService(),
 			b.stickersService(accountsDB),
 			extService,
