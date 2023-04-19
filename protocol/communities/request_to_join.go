@@ -1,6 +1,10 @@
 package communities
 
 import (
+	"fmt"
+	"strconv"
+	"time"
+
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -24,6 +28,7 @@ type RequestToJoin struct {
 	State             RequestToJoinState `json:"state"`
 	Our               bool               `json:"our"`
 	RevealedAddresses map[string][]byte  `json:"revealedAddresses,omitempty"`
+	Deleted           bool               `json:"deleted"`
 }
 
 func (r *RequestToJoin) CalculateID() {
@@ -56,4 +61,16 @@ func (r *RequestToJoin) InitFromSyncProtobuf(proto *protobuf.SyncCommunityReques
 
 func (r *RequestToJoin) Empty() bool {
 	return len(r.ID)+len(r.PublicKey)+int(r.Clock)+len(r.ENSName)+len(r.ChatID)+len(r.CommunityID)+int(r.State) == 0
+}
+
+func AddTimeoutToRequestToJoinClock(clock uint64) (uint64, error) {
+	requestToJoinClock, err := strconv.ParseInt(fmt.Sprint(clock), 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	// Adding 7 days to request
+	requestTimeOutClock := uint64(time.Unix(requestToJoinClock, 0).AddDate(0, 0, 7).Unix())
+
+	return requestTimeOutClock, nil
 }

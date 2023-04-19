@@ -645,7 +645,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		Timestamp:        m.getTimesource().GetCurrentTime(),
 		CommunityID:      community.IDString(),
 		MembershipStatus: ActivityCenterMembershipStatusPending,
-		Read:             true,
+		Deleted:          false,
 	}
 
 	err = m.addActivityCenterNotification(response, notification)
@@ -779,6 +779,24 @@ func (m *Messenger) CancelRequestToJoinCommunity(request *requests.CancelRequest
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
 	response.RequestsToJoinCommunity = append(response.RequestsToJoinCommunity, requestToJoin)
+
+	// delete activity center notification
+	notification, err := m.persistence.GetActivityCenterNotificationByID(requestToJoin.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if notification != nil {
+		err = m.persistence.DeleteActivityCenterNotification(types.FromHex(requestToJoin.ID.String()))
+		if err != nil {
+			m.logger.Error("failed to delete notification from Activity Center", zap.Error(err))
+			return nil, err
+		}
+
+		// set notification as deleted, so that the client will remove the activity center notification from UI
+		notification.Deleted = true
+		response.AddActivityCenterNotification(notification)
+	}
 
 	return response, nil
 }
@@ -990,6 +1008,82 @@ func (m *Messenger) leaveCommunity(communityID types.HexBytes) (*MessengerRespon
 
 	response.AddCommunity(community)
 	return response, nil
+}
+
+func (m *Messenger) CheckAndDeletePendingRequestToJoinCommunity(sendResponse bool) (*MessengerResponse, error) {
+	sendSignal := false
+
+	pendingRequestsToJoin, err := m.communitiesManager.PendingRequestsToJoin()
+	if err != nil {
+		m.logger.Error("failed to fetch pending request to join", zap.Error(err))
+		return nil, err
+	}
+
+	if len(pendingRequestsToJoin) == 0 {
+		return nil, nil
+	}
+
+	response := &MessengerResponse{}
+	timeNow := uint64(time.Now().Unix())
+
+	for _, requestToJoin := range pendingRequestsToJoin {
+		requestTimeOutClock, err := communities.AddTimeoutToRequestToJoinClock(requestToJoin.Clock)
+		if err != nil {
+			return nil, err
+		}
+
+		if timeNow >= requestTimeOutClock {
+			err := m.communitiesManager.DeletePendingRequestToJoin(requestToJoin)
+			if err != nil {
+				m.logger.Error("failed to delete pending request to join", zap.String("req-id", requestToJoin.ID.String()), zap.Error(err))
+				return nil, err
+			}
+
+			requestToJoin.Deleted = true
+			response.AddRequestToJoinCommunity(requestToJoin)
+
+			notification, err := m.persistence.GetActivityCenterNotificationByID(requestToJoin.ID)
+			if err != nil {
+				m.logger.Error("failed to fetch pending request to join", zap.Error(err))
+				return nil, err
+			}
+
+			if notification != nil {
+				// Delete activity centre notification for community admin
+				if notification.Type == ActivityCenterNotificationTypeCommunityMembershipRequest {
+					err = m.persistence.DeleteActivityCenterNotification(types.FromHex(requestToJoin.ID.String()))
+					if err != nil {
+						m.logger.Error("failed to delete notification from activity center", zap.Error(err))
+						return nil, err
+					}
+					notification.Deleted = true
+					response.AddActivityCenterNotification(notification)
+				}
+				// Update activity centre notification for requester
+				if notification.Type == ActivityCenterNotificationTypeCommunityRequest {
+					notification.MembershipStatus = ActivityCenterMembershipStatusIdle
+					notification.Read = false
+					err = m.addActivityCenterNotification(response, notification)
+					if err != nil {
+						m.logger.Error("failed to update notification in activity center", zap.Error(err))
+						return nil, err
+					}
+				}
+			}
+
+			sendSignal = true
+		}
+	}
+
+	if sendSignal && !sendResponse {
+		signal.SendNewMessages(response)
+	}
+
+	if sendResponse {
+		return response, nil
+	}
+
+	return nil, nil
 }
 
 func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.CommunityChat) (*MessengerResponse, error) {

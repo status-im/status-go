@@ -340,6 +340,10 @@ func (r *MessengerResponse) AddCommunitySettings(c *communities.CommunitySetting
 	r.communitiesSettings[c.CommunityID] = c
 }
 
+func (r *MessengerResponse) AddRequestToJoinCommunity(requestToJoin *communities.RequestToJoin) {
+	r.RequestsToJoinCommunity = append(r.RequestsToJoinCommunity, requestToJoin)
+}
+
 func (r *MessengerResponse) AddSetting(s *settings.SyncSettingField) {
 	r.Settings = append(r.Settings, s)
 }
