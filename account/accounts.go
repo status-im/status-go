@@ -579,6 +579,7 @@ func (m *Manager) ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) erro
 	}
 
 	keyDirPath = strings.TrimSuffix(keyDirPath, "/")
+	keyDirPath = strings.TrimSuffix(keyDirPath, "\\")
 	keyParent, keyDirName := filepath.Split(keyDirPath)
 
 	// backupKeyDirName used to store existing keys before final write
