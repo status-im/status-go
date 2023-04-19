@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/status-im/status-go/protocol/identity"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -29,6 +31,7 @@ const (
 	pathDefaultChat   = pathEIP1581 + "/0'/0"
 	pathDefaultWallet = pathWalletRoot + "/0"
 	currentNetwork    = "mainnet_rpc"
+	socialLinkURL     = "https://github.com/status-im"
 )
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
@@ -163,6 +166,8 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 		URL:  "https://status.im",
 	})
 	require.NoError(s.T(), err)
+	err = clientBackend.Messenger().SetSocialLinks(&identity.SocialLinks{{Text: identity.GithubID, URL: socialLinkURL, Clock: 1}})
+	require.NoError(s.T(), err)
 
 	clientActiveAccount, err := clientBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
@@ -181,11 +186,15 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	err = StartUpSendingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
 
+	// check that the server has the same data as the client
 	serverBrowserAPI := serverBackend.StatusNode().BrowserService().APIs()[0].Service.(*browsers.API)
 	bookmarks, err := serverBrowserAPI.GetBookmarks(context.TODO())
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), 1, len(bookmarks))
 	require.Equal(s.T(), "status.im", bookmarks[0].Name)
+	serverSocialLink, err := serverBackend.Messenger().GetSocialLink(identity.GithubID)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), socialLinkURL, serverSocialLink.URL)
 
 	serverActiveAccount, err := serverBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
@@ -257,6 +266,8 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 		URL:  "https://status.im",
 	})
 	require.NoError(s.T(), err)
+	err = serverBackend.Messenger().SetSocialLinks(&identity.SocialLinks{{Text: identity.GithubID, URL: socialLinkURL, Clock: 1}})
+	require.NoError(s.T(), err)
 
 	err = clientBackend.AccountManager().InitKeystore(filepath.Join(clientTmpDir, keystoreDir))
 	require.NoError(s.T(), err)
@@ -282,11 +293,15 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	err = StartUpReceivingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
 
+	// check that the client has the same data as the server
 	clientBrowserAPI := clientBackend.StatusNode().BrowserService().APIs()[0].Service.(*browsers.API)
 	bookmarks, err := clientBrowserAPI.GetBookmarks(context.TODO())
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), 1, len(bookmarks))
 	require.Equal(s.T(), "status.im", bookmarks[0].Name)
+	clientSocialLink, err := clientBackend.Messenger().GetSocialLink(identity.GithubID)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), socialLinkURL, clientSocialLink.URL)
 
 	clientActiveAccount, err := clientBackend.GetActiveAccount()
 	require.NoError(s.T(), err)

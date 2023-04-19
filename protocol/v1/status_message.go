@@ -322,6 +322,8 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.SyncAllKeycards))
 	case protobuf.ApplicationMetadataMessage_SYNC_KEYCARD_ACTION:
 		return m.unmarshalProtobufData(new(protobuf.SyncKeycardAction))
+	case protobuf.ApplicationMetadataMessage_SYNC_SOCIAL_LINK_SETTING:
+		return m.unmarshalProtobufData(new(protobuf.SyncSocialLinkSetting))
 	}
 	return nil
 }

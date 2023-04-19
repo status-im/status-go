@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/status-im/status-go/protocol/identity"
+
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
@@ -152,6 +154,15 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	iis := images.SampleIdentityImages()
 	s.Require().NoError(bob1.multiAccounts.StoreIdentityImages(bob1KeyUID, iis, false))
 
+	err = bob1.SetSocialLinks(&identity.SocialLinks{
+		{
+			Text:  identity.GithubID,
+			URL:   "https://github.com/status-im",
+			Clock: 1,
+		},
+	})
+	s.Require().NoError(err)
+
 	// Create bob2
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
 	s.Require().NoError(err)
@@ -169,6 +180,10 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	s.Require().NoError(err)
 	s.Require().Equal(imagesExpected, string(jBob1Images))
 
+	bob1SocialLink, err := bob1.settings.GetSocialLink(identity.GithubID)
+	s.Require().NoError(err)
+	s.Require().NotNil(bob1SocialLink)
+
 	// Check bob2
 	storedBob2DisplayName, err := bob2.settings.DisplayName()
 	s.Require().NoError(err)
@@ -178,6 +193,10 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	bob2Images, err := bob2.multiAccounts.GetIdentityImages(bob1KeyUID)
 	s.Require().NoError(err)
 	s.Require().Equal(expectedEmpty, bob2Images)
+
+	bob2SocialLink, err := bob2.settings.GetSocialLink(identity.GithubID)
+	s.Require().NoError(err)
+	s.Require().Equal("", bob2SocialLink.URL)
 
 	// Backup
 	clock, err := bob1.BackupData(context.Background())
@@ -203,6 +222,11 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	s.Require().Equal(2, len(bob2Images))
 	s.Require().Equal(bob2Images[0].Payload, bob1Images[0].Payload)
 	s.Require().Equal(bob2Images[1].Payload, bob1Images[1].Payload)
+
+	bob2SocialLink, err = bob2.settings.GetSocialLink(identity.GithubID)
+	s.Require().NoError(err)
+	s.Require().NotNil(bob2SocialLink)
+	s.Require().Equal(bob1SocialLink.URL, bob2SocialLink.URL)
 
 	lastBackup, err := bob1.lastBackup()
 	s.Require().NoError(err)

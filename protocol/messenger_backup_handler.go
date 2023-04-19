@@ -3,6 +3,8 @@ package protocol
 import (
 	"database/sql"
 
+	"github.com/status-im/status-go/protocol/identity"
+
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/images"
@@ -72,7 +74,6 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 		return nil
 	}
 
-	contentSet := false
 	response := wakusync.WakuBackedUpDataResponse{
 		Profile: &wakusync.BackedUpProfile{},
 	}
@@ -82,8 +83,7 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 		return err
 	}
 
-	contentSet = true
-	response.AddDisplayName(message.DisplayName)
+	response.SetDisplayName(message.DisplayName)
 
 	syncWithBackedUpImages := false
 	dbImages, err := m.multiAccounts.GetIdentityImages(message.KeyUid)
@@ -111,8 +111,7 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 			if err != nil {
 				return err
 			}
-			contentSet = true
-			response.AddImages(nil)
+			response.SetImages(nil)
 		} else {
 			idImages := make([]images.IdentityImage, len(message.Pictures))
 			for i, pic := range message.Pictures {
@@ -131,12 +130,22 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 			if err != nil {
 				return err
 			}
-			contentSet = true
-			response.AddImages(idImages)
+			response.SetImages(idImages)
 		}
 	}
 
-	if m.config.messengerSignalsHandler != nil && contentSet {
+	var links identity.SocialLinks
+	for _, s := range message.SocialLinkSettings {
+		err = m.handleSyncSocialLinkSetting(*s, func(link *identity.SocialLink) {
+			links = append(links, *link)
+		})
+		if err != nil {
+			return err
+		}
+	}
+	response.SetSocialLinks(links)
+
+	if m.config.messengerSignalsHandler != nil {
 		m.config.messengerSignalsHandler.SendWakuBackedUpProfile(&response)
 	}
 

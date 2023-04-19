@@ -2457,7 +2457,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		return err
 	}
 
-	return nil
+	return m.syncSocialSettings(ctx, rawMessageHandler)
 }
 
 func (m *Messenger) SaveAccounts(accs []*accounts.Account) error {
@@ -4246,6 +4246,20 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.handleSyncKeycardActivity(messageState, p)
 						if err != nil {
 							logger.Warn("failed to handle SyncKeycardAction", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+					case protobuf.SyncSocialLinkSetting:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						p := msg.ParsedMessage.Interface().(protobuf.SyncSocialLinkSetting)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
+						err = m.HandleSyncSocialLinkSetting(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle SyncSocialLinkSetting", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}
@@ -6259,4 +6273,73 @@ func (m *Messenger) getMessagesToDelete(message *common.Message, chatID string) 
 		messagesToDelete = append(messagesToDelete, message)
 	}
 	return messagesToDelete, nil
+}
+
+func (m *Messenger) withChatClock(callback func(string, uint64) error) error {
+	clock, chat := m.getLastClockWithRelatedChat()
+	err := callback(chat.ID, clock)
+	if err != nil {
+		return err
+	}
+	chat.LastClockValue = clock
+	return m.saveChat(chat)
+}
+
+func (m *Messenger) syncSocialSettings(ctx context.Context, rawMessageDispatcher RawMessageHandler) error {
+	if !m.hasPairedDevices() {
+		return nil
+	}
+
+	socialLinks, err := m.settings.GetSocialLinks()
+	if err != nil {
+		return err
+	}
+	for _, link := range socialLinks {
+		syncMessage := &protobuf.SyncSocialLinkSetting{
+			Text:  link.Text,
+			Url:   link.URL,
+			Clock: link.Clock,
+		}
+		encodedMessage, err2 := proto.Marshal(syncMessage)
+		if err2 != nil {
+			return err
+		}
+		err = m.withChatClock(func(chatID string, clock uint64) error {
+			rawMessage := common.RawMessage{
+				LocalChatID:         chatID,
+				Payload:             encodedMessage,
+				MessageType:         protobuf.ApplicationMetadataMessage_SYNC_SOCIAL_LINK_SETTING,
+				ResendAutomatically: true,
+			}
+			_, err = rawMessageDispatcher(ctx, rawMessage)
+			return err
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Messenger) HandleSyncSocialLinkSetting(state *ReceivedMessageState, message protobuf.SyncSocialLinkSetting) error {
+	return m.handleSyncSocialLinkSetting(message, func(link *identity.SocialLink) {
+		state.Response.AddSocialLinkSetting(link)
+	})
+}
+
+func (m *Messenger) handleSyncSocialLinkSetting(message protobuf.SyncSocialLinkSetting, callback func(*identity.SocialLink)) error {
+	link := &identity.SocialLink{
+		Text:  message.Text,
+		URL:   message.Url,
+		Clock: message.Clock,
+	}
+	if err := ValidateSocialLink(link); err != nil {
+		return err
+	}
+	err := m.settings.UpdateSocialLinkFromSync(link)
+	if err != nil {
+		return err
+	}
+	callback(link)
+	return nil
 }
