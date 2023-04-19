@@ -4257,7 +4257,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 						p := msg.ParsedMessage.Interface().(protobuf.SyncSocialLinkSetting)
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						err = m.handleSyncSocialLinkSetting(messageState, p)
+						err = m.HandleSyncSocialLinkSetting(messageState, p)
 						if err != nil {
 							logger.Warn("failed to handle SyncSocialLinkSetting", zap.Error(err))
 							allMessagesProcessed = false
@@ -6285,7 +6285,7 @@ func (m *Messenger) withChatClock(callback func(string, uint64) error) error {
 	return m.saveChat(chat)
 }
 
-func (m *Messenger) syncSocialSettings(ctx context.Context, rawMessageHandler RawMessageHandler) error {
+func (m *Messenger) syncSocialSettings(ctx context.Context, rawMessageDispatcher RawMessageHandler) error {
 	if !m.hasPairedDevices() {
 		return nil
 	}
@@ -6311,7 +6311,7 @@ func (m *Messenger) syncSocialSettings(ctx context.Context, rawMessageHandler Ra
 				MessageType:         protobuf.ApplicationMetadataMessage_SYNC_SOCIAL_LINK_SETTING,
 				ResendAutomatically: true,
 			}
-			_, err = rawMessageHandler(ctx, rawMessage)
+			_, err = rawMessageDispatcher(ctx, rawMessage)
 			return err
 		})
 		if err != nil {
@@ -6321,7 +6321,13 @@ func (m *Messenger) syncSocialSettings(ctx context.Context, rawMessageHandler Ra
 	return nil
 }
 
-func (m *Messenger) handleSyncSocialLinkSetting(state *ReceivedMessageState, message protobuf.SyncSocialLinkSetting) error {
+func (m *Messenger) HandleSyncSocialLinkSetting(state *ReceivedMessageState, message protobuf.SyncSocialLinkSetting) error {
+	return m.handleSyncSocialLinkSetting(message, func(link *identity.SocialLink) {
+		state.Response.AddSocialLinkSetting(link)
+	})
+}
+
+func (m *Messenger) handleSyncSocialLinkSetting(message protobuf.SyncSocialLinkSetting, callback func(*identity.SocialLink)) error {
 	link := &identity.SocialLink{
 		Text:  message.Text,
 		URL:   message.Url,
@@ -6334,6 +6340,22 @@ func (m *Messenger) handleSyncSocialLinkSetting(state *ReceivedMessageState, mes
 	if err != nil {
 		return err
 	}
-	state.Response.AddSocialLinkSetting(link)
+	callback(link)
 	return nil
+}
+
+func (m *Messenger) handleBackupSocialLinkSetting(message *protobuf.SyncSocialLinkSetting) (*identity.SocialLink, error) {
+	link := &identity.SocialLink{
+		Text:  message.Text,
+		URL:   message.Url,
+		Clock: message.Clock,
+	}
+	if err := ValidateSocialLink(link); err != nil {
+		return nil, err
+	}
+	err := m.settings.UpdateSocialLinkFromSync(link)
+	if err != nil {
+		return nil, err
+	}
+	return link, nil
 }

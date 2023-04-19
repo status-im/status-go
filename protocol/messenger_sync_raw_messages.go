@@ -231,9 +231,9 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.handleSyncSocialLinkSetting(state, message)
+			err = m.HandleSyncSocialLinkSetting(state, message)
 			if err != nil {
-				m.logger.Error("failed to handleSyncSocialLinkSetting when HandleSyncRawMessages", zap.Error(err))
+				m.logger.Error("failed to HandleSyncSocialLinkSetting when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_PAIR_INSTALLATION:
