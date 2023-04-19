@@ -46,6 +46,11 @@ func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.B
 		errors = append(errors, err)
 	}
 
+	err = m.handleBackedUpWalletAccount(message.WalletAccount)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
 	err = m.handleBackedUpKeycards(message.Keycards)
 	if err != nil {
 		errors = append(errors, err)
@@ -194,7 +199,28 @@ func (m *Messenger) handleBackedUpKeycards(message *protobuf.SyncAllKeycards) er
 			Keycards: allKeycards,
 		}
 
-		m.config.messengerSignalsHandler.SendWakuBackedUpSettings(&response)
+		m.config.messengerSignalsHandler.SendWakuBackedUpKeycards(&response)
+	}
+
+	return nil
+}
+
+func (m *Messenger) handleBackedUpWalletAccount(message *protobuf.SyncWalletAccount) error {
+	if message == nil {
+		return nil
+	}
+
+	acc, err := m.handleSyncWalletAccount(message)
+	if err != nil {
+		return err
+	}
+
+	if m.config.messengerSignalsHandler != nil {
+		response := wakusync.WakuBackedUpDataResponse{
+			WalletAccount: acc,
+		}
+
+		m.config.messengerSignalsHandler.SendWakuBackedUpWalletAccount(&response)
 	}
 
 	return nil

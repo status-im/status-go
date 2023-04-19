@@ -3,6 +3,7 @@ package wakusync
 import (
 	"encoding/json"
 
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/keypairs"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -13,6 +14,7 @@ type WakuBackedUpDataResponse struct {
 	Profile              *BackedUpProfile
 	Setting              *settings.SyncSettingField
 	Keycards             []*keypairs.KeyPair
+	WalletAccount        *accounts.Account
 }
 
 func (sfwr *WakuBackedUpDataResponse) MarshalJSON() ([]byte, error) {
@@ -21,10 +23,12 @@ func (sfwr *WakuBackedUpDataResponse) MarshalJSON() ([]byte, error) {
 		Profile              *BackedUpProfile                       `json:"backedUpProfile,omitempty"`
 		Setting              *settings.SyncSettingField             `json:"backedUpSettings,omitempty"`
 		Keycards             []*keypairs.KeyPair                    `json:"backedUpKeycards,omitempty"`
+		WalletAccount        *accounts.Account                      `json:"backedUpWalletAccount,omitempty"`
 	}{
-		Profile:  sfwr.Profile,
-		Setting:  sfwr.Setting,
-		Keycards: sfwr.Keycards,
+		Profile:       sfwr.Profile,
+		Setting:       sfwr.Setting,
+		Keycards:      sfwr.Keycards,
+		WalletAccount: sfwr.WalletAccount,
 	}
 
 	responseItem.FetchingDataProgress = sfwr.FetchingBackedUpDataDetails()
