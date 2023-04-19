@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	accountJson "github.com/status-im/status-go/account/json"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -73,8 +74,13 @@ func (e EmojiReaction) MarshalJSON() ([]byte, error) {
 		Retracted:   e.Retracted,
 		EmojiID:     e.Type,
 	}
+	
+	ext, err := accountJson.ExtendStructWithPubKeyData(item.From, item)
+	if err != nil {
+		return nil, err
+	}
 
-	return json.Marshal(item)
+	return json.Marshal(ext)
 }
 
 // WrapGroupMessage indicates whether we should wrap this in membership information
