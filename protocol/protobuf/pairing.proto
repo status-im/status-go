@@ -28,6 +28,8 @@ message Backup {
   FetchingBackedUpDataDetails settingsDetails = 10;
   SyncAllKeycards keycards = 11;
   FetchingBackedUpDataDetails keycardsDetails = 12;
+  SyncWalletAccount walletAccount = 13;
+  FetchingBackedUpDataDetails walletAccountsDetails = 14;
 }
 
 message MultiAccount {
@@ -228,6 +230,11 @@ message SyncWalletAccount {
 	string color = 10;
 	bool hidden = 11;
   bool removed = 12;
+  string emoji = 13;
+  string derived_from = 14;
+  string key_uid = 15;
+  string keypair_name = 16;
+  uint64 last_used_derivation_index = 17;
 }
 
 message SyncWalletAccounts {

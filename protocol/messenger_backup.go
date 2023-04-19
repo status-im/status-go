@@ -95,6 +95,11 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		return 0, errors[0]
 	}
 
+	syncWalletAccounts, err := m.backupWalletAccounts(clock)
+	if err != nil {
+		return 0, err
+	}
+
 	keycardsToBackup, err := m.prepareSyncAllKeycardsMessage(clock)
 	if err != nil {
 		return 0, err
@@ -118,6 +123,10 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 			SettingsDetails: &protobuf.FetchingBackedUpDataDetails{
 				DataNumber:  uint32(0),
 				TotalNumber: uint32(len(settings)),
+			},
+			WalletAccountsDetails: &protobuf.FetchingBackedUpDataDetails{
+				DataNumber:  uint32(0),
+				TotalNumber: uint32(len(syncWalletAccounts.Accounts)),
 			},
 			KeycardsDetails: &protobuf.FetchingBackedUpDataDetails{
 				DataNumber:  uint32(0),
@@ -164,6 +173,17 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		pb := backupDetailsOnly()
 		pb.SettingsDetails.DataNumber = uint32(i + 1)
 		pb.Setting = d
+		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	// Update wallet accounts messages encode and dispatch
+	for i, d := range syncWalletAccounts.Accounts {
+		pb := backupDetailsOnly()
+		pb.WalletAccountsDetails.DataNumber = uint32(i + 1)
+		pb.WalletAccount = d
 		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
 		if err != nil {
 			return 0, err
@@ -378,4 +398,13 @@ func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobu
 	backupMessages := []*protobuf.Backup{backupMessage}
 
 	return backupMessages, nil
+}
+
+func (m *Messenger) backupWalletAccounts(clock uint64) (*protobuf.SyncWalletAccounts, error) {
+	accounts, err := m.settings.GetAccounts()
+	if err != nil {
+		return nil, err
+	}
+
+	return m.prepareSyncWalletAccountsMessage(accounts, clock), nil
 }

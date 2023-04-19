@@ -12,6 +12,7 @@ import (
 	"math/rand"
 	"os"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -77,6 +78,8 @@ const (
 
 	publicChat  chatContext = "public-chat"
 	privateChat chatContext = "private-chat"
+
+	isMobileApp = runtime.GOOS == "android" || runtime.GOOS == "ios"
 )
 
 const messageResendMinDelay = 30
@@ -2504,6 +2507,54 @@ func (m *Messenger) DeleteAccount(address types.Address) error {
 	return m.syncWallets(accs, m.dispatchMessage)
 }
 
+func (m *Messenger) prepareSyncWalletAccountsMessage(accs []*accounts.Account, clock uint64) *protobuf.SyncWalletAccounts {
+	accountMessages := make([]*protobuf.SyncWalletAccount, 0)
+	for _, acc := range accs {
+		if acc.Chat {
+			continue
+		}
+
+		// Once mobile app supports seed phrase and private key imported accounts we should remove the following `if` block
+		if isMobileApp {
+			if acc.Type != accounts.AccountTypeWatch &&
+				acc.Type != accounts.AccountTypeGenerated {
+				continue
+			}
+		}
+		var accountClock uint64
+		if acc.Clock == 0 {
+			accountClock = clock
+		} else {
+			accountClock = acc.Clock
+		}
+		syncMessage := &protobuf.SyncWalletAccount{
+			Clock:                   accountClock,
+			Address:                 acc.Address.Bytes(),
+			Wallet:                  acc.Wallet,
+			Chat:                    acc.Chat,
+			Type:                    acc.Type.String(),
+			Storage:                 acc.Storage,
+			Path:                    acc.Path,
+			PublicKey:               acc.PublicKey,
+			Name:                    acc.Name,
+			Color:                   acc.Color,
+			Hidden:                  acc.Hidden,
+			Removed:                 acc.Removed,
+			Emoji:                   acc.Emoji,
+			DerivedFrom:             acc.DerivedFrom,
+			KeyUid:                  acc.KeyUID,
+			KeypairName:             acc.KeypairName,
+			LastUsedDerivationIndex: acc.LastUsedDerivationIndex,
+		}
+
+		accountMessages = append(accountMessages, syncMessage)
+	}
+
+	return &protobuf.SyncWalletAccounts{
+		Accounts: accountMessages,
+	}
+}
+
 // syncWallets syncs all wallets with paired devices
 func (m *Messenger) syncWallets(accs []*accounts.Account, rawMessageHandler RawMessageHandler) error {
 	if !m.hasPairedDevices() {
@@ -2515,38 +2566,7 @@ func (m *Messenger) syncWallets(accs []*accounts.Account, rawMessageHandler RawM
 
 	clock, chat := m.getLastClockWithRelatedChat()
 
-	accountMessages := make([]*protobuf.SyncWalletAccount, 0)
-	for _, acc := range accs {
-		if acc.Type != accounts.AccountTypeWatch &&
-			acc.Type != accounts.AccountTypeGenerated {
-			continue
-		}
-		var accountClock uint64
-		if acc.Clock == 0 {
-			accountClock = clock
-		} else {
-			accountClock = acc.Clock
-		}
-		syncMessage := &protobuf.SyncWalletAccount{
-			Clock:     accountClock,
-			Address:   acc.Address.Bytes(),
-			Wallet:    acc.Wallet,
-			Chat:      acc.Chat,
-			Type:      acc.Type.String(),
-			Storage:   acc.Storage,
-			Path:      acc.Path,
-			PublicKey: acc.PublicKey,
-			Name:      acc.Name,
-			Color:     acc.Color,
-			Hidden:    acc.Hidden,
-			Removed:   acc.Removed,
-		}
-		accountMessages = append(accountMessages, syncMessage)
-	}
-
-	message := &protobuf.SyncWalletAccounts{
-		Accounts: accountMessages,
-	}
+	message := m.prepareSyncWalletAccountsMessage(accs, clock)
 
 	encodedMessage, err := proto.Marshal(message)
 	if err != nil {

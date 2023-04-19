@@ -65,18 +65,114 @@ func (s *MessengerSyncWalletSuite) newMessenger(shh types.Waku) *Messenger {
 	return messenger
 }
 
-func (s *MessengerSyncWalletSuite) TestSyncWallets() {
+func getWalletAccountsForTest() []*accounts.Account {
+	defaultAccount := &accounts.Account{
+		Address:                 types.Address{0x11},
+		KeyUID:                  "0000000000000000000000000000000000000000000000000000000000000001",
+		Wallet:                  true,
+		Chat:                    false,
+		Path:                    "m/44'/60'/0'/0/0",
+		Name:                    "Default Account",
+		Color:                   "blue",
+		DerivedFrom:             "0x0001",
+		KeypairName:             "Profile Keypair",
+		LastUsedDerivationIndex: 0,
+	}
+	generatedFromDefaultAccount1 := &accounts.Account{
+		Address:                 types.Address{0x12},
+		Type:                    accounts.AccountTypeGenerated,
+		KeyUID:                  defaultAccount.KeyUID,
+		Path:                    "m/44'/60'/0'/0/1",
+		Name:                    "Generated Acc 1",
+		Color:                   "blue",
+		DerivedFrom:             defaultAccount.DerivedFrom,
+		KeypairName:             defaultAccount.KeypairName,
+		LastUsedDerivationIndex: 1,
+	}
+	generatedFromDefaultAccount2 := &accounts.Account{
+		Address:                 types.Address{0x13},
+		Type:                    accounts.AccountTypeGenerated,
+		KeyUID:                  defaultAccount.KeyUID,
+		Path:                    "m/44'/60'/0'/0/2",
+		Name:                    "Generated Acc 2",
+		Color:                   "blue",
+		DerivedFrom:             defaultAccount.DerivedFrom,
+		KeypairName:             defaultAccount.KeypairName,
+		LastUsedDerivationIndex: 2,
+	}
+	seedImportedAccount := &accounts.Account{
+		Address:                 types.Address{0x14},
+		Type:                    accounts.AccountTypeSeed,
+		KeyUID:                  "0000000000000000000000000000000000000000000000000000000000000002",
+		Path:                    "m/44'/60'/0'/0/0",
+		Name:                    "Seed Imported Account",
+		Color:                   "green",
+		DerivedFrom:             "0x0002",
+		KeypairName:             "Seed Keypair",
+		LastUsedDerivationIndex: 0,
+	}
+	generatedFromSeedImportedAccount1 := &accounts.Account{
+		Address:                 types.Address{0x15},
+		Type:                    accounts.AccountTypeSeed,
+		KeyUID:                  seedImportedAccount.KeyUID,
+		Path:                    "m/44'/60'/0'/0/1",
+		Name:                    "Generated Seed Account 1",
+		Color:                   "green",
+		DerivedFrom:             seedImportedAccount.DerivedFrom,
+		KeypairName:             seedImportedAccount.KeypairName,
+		LastUsedDerivationIndex: 1,
+	}
+	generatedFromSeedImportedAccount2 := &accounts.Account{
+		Address:                 types.Address{0x16},
+		Type:                    accounts.AccountTypeSeed,
+		KeyUID:                  seedImportedAccount.KeyUID,
+		Path:                    "m/44'/60'/0'/0/2",
+		Name:                    "Generated Seed Account 2",
+		Color:                   "green",
+		DerivedFrom:             seedImportedAccount.DerivedFrom,
+		KeypairName:             seedImportedAccount.KeypairName,
+		LastUsedDerivationIndex: 2,
+	}
+	keyImportedAccount := &accounts.Account{
+		Address:     types.Address{0x17},
+		Type:        accounts.AccountTypeKey,
+		KeyUID:      "0000000000000000000000000000000000000000000000000000000000000003",
+		Path:        "m",
+		Name:        "Key Imported Account",
+		Color:       "blue",
+		KeypairName: "Private Key Keypair",
+	}
+	watchOnlyAccount1 := &accounts.Account{
+		Address: types.Address{0x18},
+		Type:    accounts.AccountTypeWatch,
+		Name:    "Watch Only Account 1",
+		Color:   "green",
+	}
+	watchOnlyAccount2 := &accounts.Account{
+		Address: types.Address{0x19},
+		Type:    accounts.AccountTypeWatch,
+		Name:    "Watch Only Account 1",
+		Color:   "green",
+	}
 
+	return []*accounts.Account{
+		defaultAccount,
+		generatedFromDefaultAccount1,
+		generatedFromDefaultAccount2,
+		seedImportedAccount,
+		generatedFromSeedImportedAccount1,
+		generatedFromSeedImportedAccount2,
+		keyImportedAccount,
+		watchOnlyAccount1,
+		watchOnlyAccount2,
+	}
+}
+
+func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	mainAccount := &accounts.Account{
 		Address: types.Address{0x01},
-		Wallet:  true,
+		Wallet:  false,
 		Chat:    true,
-	}
-	watchOnly1 := &accounts.Account{
-		Address: types.Address{0x02},
-		Name:    "Alice watch only",
-		Color:   "green",
-		Type:    accounts.AccountTypeWatch,
 	}
 
 	// Create a main account on alice
@@ -139,28 +235,25 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	err = s.m.EnableInstallation(alicesOtherDevice.installationID)
 	s.Require().NoError(err)
 
-	// Create a watch-only acount on alice
-	s.NoError(s.m.settings.SaveAccounts([]*accounts.Account{watchOnly1}))
+	// Store wallet accounts on alice's device
+	walletAccounts := getWalletAccountsForTest()
+	expectedTotalNumOfAccounts := len(walletAccounts) + 1 // plus one for the Status profile account
+	s.NoError(s.m.settings.SaveAccounts(walletAccounts))
 	acc1, err = s.m.settings.GetAccounts()
 	s.Require().NoError(err, "alice.settings.GetAccounts")
-	s.Len(acc1, 2, "Must have 2 accounts")
+	s.Len(acc1, expectedTotalNumOfAccounts, "Must have all wallet accounts plus one for the Status profile account")
 
 	// Trigger's a sync between devices
 	err = s.m.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
 	s.Require().NoError(err)
 
 	err = tt.RetryWithBackOff(func() error {
-		_, err := alicesOtherDevice.RetrieveAll()
+		response, err := alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err
 		}
 
-		accs, err := alicesOtherDevice.settings.GetAccounts()
-		if err != nil {
-			return err
-		}
-
-		if len(accs) != 2 {
+		if len(response.Accounts) != len(walletAccounts) {
 			return errors.New("no sync wallet account received")
 		}
 		return nil
@@ -169,46 +262,47 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 
 	acc2, err = alicesOtherDevice.settings.GetAccounts()
 	s.Require().NoError(err, "alicesOtherDevice.settings.GetAccounts")
-	s.Len(acc2, 2, "Must have 2 accounts")
+	s.Len(acc2, expectedTotalNumOfAccounts, "Must have all wallet accounts plus one for the Status profile account")
 
-	found := false
-	for _, acc := range acc2 {
-		if acc.Address == watchOnly1.Address {
-			// Check account values match the expected values
-			s.Require().Equal(watchOnly1.Address, acc.Address)
-			s.Require().Equal(watchOnly1.Name, acc.Name)
-			s.Require().Equal(watchOnly1.Color, acc.Color)
-			s.Require().Equal(watchOnly1.Type, acc.Type)
-			found = true
+	for _, syncedAcc := range acc2 {
+		if syncedAcc.Chat {
+			continue
 		}
+		found := false
+		for _, sentAcc := range walletAccounts {
+			if syncedAcc.Address == sentAcc.Address {
+				// Check account values match the expected values
+				s.Require().Equal(sentAcc.Address, syncedAcc.Address)
+				s.Require().Equal(sentAcc.Path, syncedAcc.Path)
+				s.Require().Equal(sentAcc.KeyUID, syncedAcc.KeyUID)
+				s.Require().Equal(sentAcc.Name, syncedAcc.Name)
+				s.Require().Equal(sentAcc.Color, syncedAcc.Color)
+				s.Require().Equal(sentAcc.Type, syncedAcc.Type)
+				s.Require().Equal(sentAcc.KeypairName, syncedAcc.KeypairName)
+				s.Require().Equal(sentAcc.DerivedFrom, syncedAcc.DerivedFrom)
+				found = true
+			}
+		}
+		s.Require().True(found)
 	}
-	s.Require().True(found)
 
-	// Updates alice's watch only account attributes
-
-	watchOnly2 := &accounts.Account{
-		Address: types.Address{0x03},
-		Name:    "Alice watch only 2",
-		Color:   "blue",
-		Type:    accounts.AccountTypeWatch,
+	// Updates alice's accounts attributes
+	for _, acc := range walletAccounts {
+		acc.Name = acc.Name + "New"
+		acc.Color = "lightblue"
 	}
-	s.Require().NoError(s.m.SaveAccounts([]*accounts.Account{watchOnly2}))
+	s.Require().NoError(s.m.SaveAccounts(walletAccounts))
 
 	// Sync between devices is triggered automatically
 	// via watch account changes subscription
 	// Retrieve community link & community
 	err = tt.RetryWithBackOff(func() error {
-		_, err := alicesOtherDevice.RetrieveAll()
+		response, err := alicesOtherDevice.RetrieveAll()
 		if err != nil {
 			return err
 		}
 
-		accs, err := alicesOtherDevice.settings.GetAccounts()
-		if err != nil {
-			return err
-		}
-
-		if len(accs) != 3 {
+		if len(response.Accounts) != len(walletAccounts) {
 			return errors.New("no sync wallet account received")
 		}
 		return nil
@@ -217,18 +311,27 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 
 	acc2, err = alicesOtherDevice.settings.GetAccounts()
 	s.Require().NoError(err, "alicesOtherDevice.settings.GetAccounts")
-	s.Len(acc2, 3, "Must have 2 accounts")
+	s.Len(acc2, expectedTotalNumOfAccounts, "Must have all wallet accounts plus one for the Status profile account")
 
-	found = false
-	for _, acc := range acc2 {
-		if acc.Address == watchOnly2.Address {
-			// Check account values match the expected values
-			s.Require().Equal(watchOnly2.Address, acc.Address)
-			s.Require().Equal(watchOnly2.Name, acc.Name)
-			s.Require().Equal(watchOnly2.Color, acc.Color)
-			s.Require().Equal(watchOnly2.Type, acc.Type)
-			found = true
+	for _, syncedAcc := range acc2 {
+		if syncedAcc.Chat {
+			continue
 		}
+		found := false
+		for _, sentAcc := range walletAccounts {
+			if syncedAcc.Address == sentAcc.Address {
+				// Check account values match the expected values
+				s.Require().Equal(sentAcc.Address, syncedAcc.Address)
+				s.Require().Equal(sentAcc.Path, syncedAcc.Path)
+				s.Require().Equal(sentAcc.KeyUID, syncedAcc.KeyUID)
+				s.Require().Equal(sentAcc.Name, syncedAcc.Name)
+				s.Require().Equal(sentAcc.Color, syncedAcc.Color)
+				s.Require().Equal(sentAcc.Type, syncedAcc.Type)
+				s.Require().Equal(sentAcc.KeypairName, syncedAcc.KeypairName)
+				s.Require().Equal(sentAcc.DerivedFrom, syncedAcc.DerivedFrom)
+				found = true
+			}
+		}
+		s.Require().True(found)
 	}
-	s.Require().True(found)
 }

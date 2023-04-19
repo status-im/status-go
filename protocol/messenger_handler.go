@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
-	"runtime"
 	"sync"
 	"time"
 
@@ -37,8 +36,14 @@ const (
 	requestAddressForTransactionDeclinedMessage = "Request address for transaction declined"
 )
 
-var ErrMessageNotAllowed = errors.New("message from a non-contact")
-var ErrMessageForWrongChatType = errors.New("message for the wrong chat type")
+var (
+	ErrMessageNotAllowed                     = errors.New("message from a non-contact")
+	ErrMessageForWrongChatType               = errors.New("message for the wrong chat type")
+	ErrNotWalletAccount                      = errors.New("an account is not a wallet account")
+	ErrWalletAccountNotSupportedForMobileApp = errors.New("handling account is not supported for mobile app")
+	ErrTryingToStoreOldWalletAccount         = errors.New("trying to store an old wallet account")
+	ErrSomeFieldsMissingForWalletAccount     = errors.New("some fields are missing for wallet account")
+)
 
 // HandleMembershipUpdate updates a Chat instance according to the membership updates.
 // It retrieves chat, if exists, and merges membership updates from the message.
@@ -2776,54 +2781,89 @@ func (m *Messenger) updateUnviewedCounts(chat *Chat, mentionedOrReplied bool) {
 	}
 }
 
-func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message protobuf.SyncWalletAccounts) error {
-	dbAccounts, err := m.settings.GetAccounts()
-	if err != nil {
-		return err
+func (m *Messenger) handleSyncWalletAccount(message *protobuf.SyncWalletAccount) (*accounts.Account, error) {
+	if message.Chat {
+		return nil, ErrNotWalletAccount
+	}
+	accAddress := types.BytesToAddress(message.Address)
+	dbAccount, err := m.settings.GetAccountByAddress(accAddress)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
 	}
 
-	dbAccountMap := make(map[types.Address]*accounts.Account)
-	for _, acc := range dbAccounts {
-		dbAccountMap[acc.Address] = acc
+	// Once mobile app supports seed phrase and private key imported accounts we should remove the following `if` block
+	if isMobileApp {
+		accType := accounts.AccountType(message.Type)
+		if accType != accounts.AccountTypeWatch &&
+			accType != accounts.AccountTypeGenerated {
+			return nil, ErrWalletAccountNotSupportedForMobileApp
+		}
 	}
 
-	var accs []*accounts.Account
-	for _, message := range message.Accounts {
-		dbAcc := dbAccountMap[types.BytesToAddress(message.Address)]
-		if dbAcc != nil && message.Clock <= dbAcc.Clock {
-			continue
-		}
-		var acc *accounts.Account
-		if dbAcc != nil && message.Removed {
-			acc = &accounts.Account{
-				Address: types.BytesToAddress(message.Address),
-				Removed: true,
-			}
-		} else if !message.Removed {
-			acc = &accounts.Account{
-				Address:   types.BytesToAddress(message.Address),
-				Wallet:    message.Wallet,
-				Chat:      message.Chat,
-				Type:      accounts.AccountType(message.Type),
-				Storage:   message.Storage,
-				PublicKey: types.HexBytes(message.PublicKey),
-				Path:      message.Path,
-				Color:     message.Color,
-				Hidden:    message.Hidden,
-				Name:      message.Name,
-				Clock:     message.Clock,
-			}
+	if dbAccount != nil && message.Clock <= dbAccount.Clock {
+		return nil, ErrTryingToStoreOldWalletAccount
+	}
 
+	var acc *accounts.Account
+	if dbAccount != nil && message.Removed {
+		acc = &accounts.Account{
+			Address: types.BytesToAddress(message.Address),
+			Removed: true,
+		}
+	} else if !message.Removed {
+		acc = &accounts.Account{
+			Address:                 types.BytesToAddress(message.Address),
+			Wallet:                  message.Wallet,
+			Chat:                    message.Chat,
+			Type:                    accounts.AccountType(message.Type),
+			Storage:                 message.Storage,
+			PublicKey:               types.HexBytes(message.PublicKey),
+			Path:                    message.Path,
+			Color:                   message.Color,
+			Hidden:                  message.Hidden,
+			Name:                    message.Name,
+			Clock:                   message.Clock,
+			KeyUID:                  message.KeyUid,
+			Emoji:                   message.Emoji,
+			DerivedFrom:             message.DerivedFrom,
+			KeypairName:             message.KeypairName,
+			LastUsedDerivationIndex: message.LastUsedDerivationIndex,
 		}
 
-		if runtime.GOOS != "android" && runtime.GOOS != "ios" {
-			// For the desktop app we need to ignore accounts with empty `KeypairName` or empty `DerivedFrom` (except if an account
-			// is not private key imported account or watch only account). Otherwise keypair items will be broken.
+		// Once mobile app supports seed phrase and private key imported accounts we should remove the following line, not entire if block
+		if !isMobileApp {
+			// For the desktop app we need to ignore accounts:
+			// - with empty `KeypairName` (except if an account is WatchOnly account) or
+			// - with empty `DerivedFrom` (except if an account is not private key imported account or watch only account)
+			// Otherwise keypair items will be broken.
 			if acc.Type != accounts.AccountTypeWatch {
 				if len(acc.KeypairName) == 0 || acc.Type != accounts.AccountTypeKey && len(acc.DerivedFrom) == 0 {
-					continue
+					return nil, ErrSomeFieldsMissingForWalletAccount
 				}
 			}
+		}
+	}
+
+	err = m.settings.SaveAccounts([]*accounts.Account{acc})
+	if err != nil {
+		return nil, err
+	}
+
+	return acc, nil
+}
+
+func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message protobuf.SyncWalletAccounts) error {
+	var accs []*accounts.Account
+	for _, accMsg := range message.Accounts {
+		acc, err := m.handleSyncWalletAccount(accMsg)
+		if err != nil {
+			if err == ErrNotWalletAccount ||
+				err == ErrWalletAccountNotSupportedForMobileApp ||
+				err == ErrTryingToStoreOldWalletAccount ||
+				err == ErrSomeFieldsMissingForWalletAccount {
+				continue
+			}
+			return err
 		}
 
 		accs = append(accs, acc)
@@ -2833,24 +2873,20 @@ func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message
 		return nil
 	}
 
-	err = m.settings.SaveAccounts(accs)
-	if err != nil {
-		return err
-	}
+	state.Response.Accounts = accs
 
-	latestDerivedPath, err := m.settings.GetLatestDerivedPath()
-	if err != nil {
-		return err
-	}
+	if isMobileApp {
+		latestDerivedPath, err := m.settings.GetLatestDerivedPath()
+		if err != nil {
+			return err
+		}
 
-	newPath := latestDerivedPath + uint(len(accs))
-	err = m.settings.SaveSettingField(settings.LatestDerivedPath, newPath)
-	if err != nil {
-		return err
-	}
+		newPath := latestDerivedPath + uint(len(accs))
+		err = m.settings.SaveSettingField(settings.LatestDerivedPath, newPath)
+		if err != nil {
+			return err
+		}
 
-	if err == nil {
-		state.Response.Accounts = accs
 		if state.Response.Settings == nil {
 			state.Response.Settings = []*settings.SyncSettingField{}
 		}
@@ -2863,7 +2899,7 @@ func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message
 			})
 	}
 
-	return err
+	return nil
 }
 
 func (m *Messenger) HandleSyncContactRequestDecision(state *ReceivedMessageState, message protobuf.SyncContactRequestDecision) error {

@@ -636,6 +636,62 @@ func (s *MessengerBackupSuite) TestBackupCommunities() {
 	s.Require().Equal(clock, lastBackup)
 }
 
+func (s *MessengerBackupSuite) TestBackupWalletAccounts() {
+	// Create bob1
+	bob1 := s.m
+	walletAccounts := getWalletAccountsForTest()
+	s.NoError(bob1.settings.SaveAccounts(walletAccounts))
+	bob1Accs, err := bob1.settings.GetAccounts()
+	s.Require().NoError(err, "bob1.settings.GetAccounts")
+	s.Len(bob1Accs, len(walletAccounts), "must have all wallet accounts")
+
+	// Create bob2
+	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
+	s.Require().NoError(err)
+	_, err = bob2.Start()
+	s.Require().NoError(err)
+
+	// Backup
+	_, err = bob1.BackupData(context.Background())
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		bob2,
+		func(r *MessengerResponse) bool {
+			return r.BackupHandled
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	bob2Accs, err := bob2.settings.GetAccounts()
+	s.Require().NoError(err, "bob2.settings.GetAccounts")
+	s.Len(bob2Accs, len(walletAccounts), "must have all wallet accounts")
+
+	for _, syncedAcc := range bob2Accs {
+		if syncedAcc.Chat {
+			continue
+		}
+		found := false
+		for _, sentAcc := range walletAccounts {
+			if syncedAcc.Address == sentAcc.Address {
+				// Check account values match the expected values
+				s.Require().Equal(sentAcc.Address, syncedAcc.Address)
+				s.Require().Equal(sentAcc.Path, syncedAcc.Path)
+				s.Require().Equal(sentAcc.KeyUID, syncedAcc.KeyUID)
+				s.Require().Equal(sentAcc.Name, syncedAcc.Name)
+				s.Require().Equal(sentAcc.Color, syncedAcc.Color)
+				s.Require().Equal(sentAcc.Type, syncedAcc.Type)
+				s.Require().Equal(sentAcc.KeypairName, syncedAcc.KeypairName)
+				s.Require().Equal(sentAcc.DerivedFrom, syncedAcc.DerivedFrom)
+				found = true
+			}
+		}
+		s.Require().True(found)
+	}
+}
+
 func (s *MessengerBackupSuite) TestBackupKeycards() {
 	// Create bob1
 	bob1 := s.m

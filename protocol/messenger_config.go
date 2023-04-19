@@ -56,6 +56,7 @@ type MessengerSignalsHandler interface {
 	SendWakuFetchingBackupProgress(response *wakusync.WakuBackedUpDataResponse)
 	SendWakuBackedUpProfile(response *wakusync.WakuBackedUpDataResponse)
 	SendWakuBackedUpSettings(response *wakusync.WakuBackedUpDataResponse)
+	SendWakuBackedUpWalletAccount(response *wakusync.WakuBackedUpDataResponse)
 	SendWakuBackedUpKeycards(response *wakusync.WakuBackedUpDataResponse)
 }
 
