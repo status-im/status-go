@@ -6343,19 +6343,3 @@ func (m *Messenger) handleSyncSocialLinkSetting(message protobuf.SyncSocialLinkS
 	callback(link)
 	return nil
 }
-
-func (m *Messenger) handleBackupSocialLinkSetting(message *protobuf.SyncSocialLinkSetting) (*identity.SocialLink, error) {
-	link := &identity.SocialLink{
-		Text:  message.Text,
-		URL:   message.Url,
-		Clock: message.Clock,
-	}
-	if err := ValidateSocialLink(link); err != nil {
-		return nil, err
-	}
-	err := m.settings.UpdateSocialLinkFromSync(link)
-	if err != nil {
-		return nil, err
-	}
-	return link, nil
-}
