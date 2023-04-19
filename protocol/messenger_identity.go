@@ -185,6 +185,10 @@ func (m *Messenger) SetSocialLinks(socialLinks *identity.SocialLinks) error {
 	return m.syncSocialSettings(context.Background(), m.dispatchMessage)
 }
 
+func (m *Messenger) GetSocialLink(text string) (*identity.SocialLink, error) {
+	return m.settings.GetSocialLink(text)
+}
+
 func (m *Messenger) setInstallationHostname() error {
 	imd, err := m.getOurInstallationMetadata()
 	if err != nil {
