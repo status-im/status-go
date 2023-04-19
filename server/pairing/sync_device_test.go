@@ -31,7 +31,7 @@ const (
 	pathDefaultChat   = pathEIP1581 + "/0'/0"
 	pathDefaultWallet = pathWalletRoot + "/0"
 	currentNetwork    = "mainnet_rpc"
-	socialLinkUrl     = "https://github.com/status-im"
+	socialLinkURL     = "https://github.com/status-im"
 )
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
@@ -166,7 +166,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 		URL:  "https://status.im",
 	})
 	require.NoError(s.T(), err)
-	err = clientBackend.Messenger().SetSocialLinks(&identity.SocialLinks{{Text: identity.GithubID, URL: socialLinkUrl, Clock: 1}})
+	err = clientBackend.Messenger().SetSocialLinks(&identity.SocialLinks{{Text: identity.GithubID, URL: socialLinkURL, Clock: 1}})
 	require.NoError(s.T(), err)
 
 	clientActiveAccount, err := clientBackend.GetActiveAccount()
@@ -194,7 +194,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.Equal(s.T(), "status.im", bookmarks[0].Name)
 	serverSocialLink, err := serverBackend.Messenger().GetSocialLink(identity.GithubID)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), socialLinkUrl, serverSocialLink.URL)
+	require.Equal(s.T(), socialLinkURL, serverSocialLink.URL)
 
 	serverActiveAccount, err := serverBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
@@ -266,7 +266,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 		URL:  "https://status.im",
 	})
 	require.NoError(s.T(), err)
-	err = serverBackend.Messenger().SetSocialLinks(&identity.SocialLinks{{Text: identity.GithubID, URL: socialLinkUrl, Clock: 1}})
+	err = serverBackend.Messenger().SetSocialLinks(&identity.SocialLinks{{Text: identity.GithubID, URL: socialLinkURL, Clock: 1}})
 	require.NoError(s.T(), err)
 
 	err = clientBackend.AccountManager().InitKeystore(filepath.Join(clientTmpDir, keystoreDir))
@@ -301,7 +301,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.Equal(s.T(), "status.im", bookmarks[0].Name)
 	clientSocialLink, err := clientBackend.Messenger().GetSocialLink(identity.GithubID)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), socialLinkUrl, clientSocialLink.URL)
+	require.Equal(s.T(), socialLinkURL, clientSocialLink.URL)
 
 	clientActiveAccount, err := clientBackend.GetActiveAccount()
 	require.NoError(s.T(), err)

@@ -23,7 +23,7 @@ const (
 func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.Backup) []error {
 	var errors []error
 
-	err := m.handleBackedUpProfile(state, message.Profile, message.Clock)
+	err := m.handleBackedUpProfile(message.Profile, message.Clock)
 	if err != nil {
 		errors = append(errors, err)
 	}
@@ -69,12 +69,11 @@ func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.B
 	return errors
 }
 
-func (m *Messenger) handleBackedUpProfile(state *ReceivedMessageState, message *protobuf.BackedUpProfile, backupTime uint64) error {
+func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, backupTime uint64) error {
 	if message == nil {
 		return nil
 	}
 
-	contentSet := false
 	response := wakusync.WakuBackedUpDataResponse{
 		Profile: &wakusync.BackedUpProfile{},
 	}
@@ -84,7 +83,6 @@ func (m *Messenger) handleBackedUpProfile(state *ReceivedMessageState, message *
 		return err
 	}
 
-	contentSet = true
 	response.SetDisplayName(message.DisplayName)
 
 	syncWithBackedUpImages := false
@@ -113,7 +111,6 @@ func (m *Messenger) handleBackedUpProfile(state *ReceivedMessageState, message *
 			if err != nil {
 				return err
 			}
-			contentSet = true
 			response.SetImages(nil)
 		} else {
 			idImages := make([]images.IdentityImage, len(message.Pictures))
@@ -133,7 +130,6 @@ func (m *Messenger) handleBackedUpProfile(state *ReceivedMessageState, message *
 			if err != nil {
 				return err
 			}
-			contentSet = true
 			response.SetImages(idImages)
 		}
 	}
@@ -149,7 +145,7 @@ func (m *Messenger) handleBackedUpProfile(state *ReceivedMessageState, message *
 	}
 	response.SetSocialLinks(links)
 
-	if m.config.messengerSignalsHandler != nil && contentSet {
+	if m.config.messengerSignalsHandler != nil {
 		m.config.messengerSignalsHandler.SendWakuBackedUpProfile(&response)
 	}
 
