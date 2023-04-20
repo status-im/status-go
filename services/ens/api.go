@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multibase"
@@ -39,7 +40,7 @@ import (
 
 const StatusDomain = "stateofus.eth"
 
-func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig, appDb *sql.DB) *API {
+func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig, appDb *sql.DB, timeSource func() time.Time, syncUserDetailFunc *syncUsernameDetail) *API {
 	return &API{
 		contractMaker: &contracts.ContractMaker{
 			RPCClient: rpcClient,
@@ -50,7 +51,9 @@ func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFilt
 		addrPerChain:    make(map[uint64]common.Address),
 		db:              NewEnsDatabase(appDb),
 
-		quit: make(chan struct{}),
+		quit:               make(chan struct{}),
+		timeSource:         timeSource,
+		syncUserDetailFunc: syncUserDetailFunc,
 	}
 }
 
@@ -59,6 +62,9 @@ type URI struct {
 	Host   string
 	Path   string
 }
+
+// use this to avoid using messenger directly to avoid circular dependency (protocol->ens->protocol)
+type syncUsernameDetail func(context.Context, *UsernameDetail) error
 
 type API struct {
 	contractMaker   *contracts.ContractMaker
@@ -72,7 +78,10 @@ type API struct {
 	quitOnce sync.Once
 	quit     chan struct{}
 
-	db *Database
+	db                 *Database
+	syncUserDetailFunc *syncUsernameDetail
+
+	timeSource func() time.Time
 }
 
 func (api *API) Stop() {
@@ -81,16 +90,34 @@ func (api *API) Stop() {
 	})
 }
 
-func (api *API) GetEnsUsernames(ctx context.Context) ([]*UsernameDetails, error) {
-	return api.db.GetEnsUsernames()
+func (api *API) unixTime() uint64 {
+	return uint64(api.timeSource().Unix())
+}
+
+func (api *API) GetEnsUsernames(ctx context.Context) ([]*UsernameDetail, error) {
+	removed := false
+	return api.db.GetEnsUsernames(&removed)
 }
 
 func (api *API) Add(ctx context.Context, chainID uint64, username string) error {
-	return api.db.AddEnsUsername(UsernameDetails{username, chainID})
+	ud := &UsernameDetail{Username: username, ChainID: chainID, Clock: api.unixTime()}
+	err := api.db.AddEnsUsername(ud)
+	if err != nil {
+		return err
+	}
+	return (*api.syncUserDetailFunc)(ctx, ud)
 }
 
 func (api *API) Remove(ctx context.Context, chainID uint64, username string) error {
-	return api.db.RemoveEnsUsername(username, chainID)
+	ud := &UsernameDetail{Username: username, ChainID: chainID, Clock: api.unixTime()}
+	affected, err := api.db.RemoveEnsUsername(ud)
+	if err != nil {
+		return err
+	}
+	if affected {
+		return (*api.syncUserDetailFunc)(ctx, ud)
+	}
+	return nil
 }
 
 func (api *API) GetRegistrarAddress(ctx context.Context, chainID uint64) (common.Address, error) {

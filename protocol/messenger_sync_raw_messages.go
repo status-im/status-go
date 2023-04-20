@@ -236,6 +236,17 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				m.logger.Error("failed to HandleSyncSocialLinkSetting when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
+		case protobuf.ApplicationMetadataMessage_SYNC_ENS_USERNAME_DETAIL:
+			var message protobuf.SyncEnsUsernameDetail
+			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			if err != nil {
+				return err
+			}
+			err = m.handleSyncEnsUsernameDetail(state, message)
+			if err != nil {
+				m.logger.Error("failed to handleSyncEnsUsernameDetail when HandleSyncRawMessages", zap.Error(err))
+				continue
+			}
 		case protobuf.ApplicationMetadataMessage_PAIR_INSTALLATION:
 			var message protobuf.PairInstallation
 			err := proto.Unmarshal(rawMessage.GetPayload(), &message)

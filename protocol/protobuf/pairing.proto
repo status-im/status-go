@@ -197,6 +197,13 @@ message SyncBookmark {
   uint64 deleted_at = 6;
 }
 
+message SyncEnsUsernameDetail {
+  uint64 clock = 1;
+  string username = 2;
+  uint64 chain_id = 3;
+  bool  removed = 4;
+}
+
 message SyncClearHistory {
   string chat_id = 1;
   uint64 cleared_at = 2;
@@ -309,6 +316,7 @@ message BackedUpProfile {
   uint64 display_name_clock = 3;
   repeated SyncProfilePicture pictures = 4;
   repeated SyncSocialLinkSetting social_link_settings = 5;
+  repeated SyncEnsUsernameDetail ens_username_details = 6;
 }
 
 message RawMessage {

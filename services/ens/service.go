@@ -2,6 +2,7 @@ package ens
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/ethereum/go-ethereum/p2p"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
@@ -12,23 +13,31 @@ import (
 )
 
 // NewService initializes service instance.
-func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig, appDb *sql.DB) *Service {
-	return &Service{
+func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig, appDb *sql.DB, timeSource func() time.Time) *Service {
+	service := &Service{
 		rpcClient,
 		accountsManager,
 		rpcFiltersSrvc,
 		config,
-		NewAPI(rpcClient, accountsManager, rpcFiltersSrvc, config, appDb),
+		nil,
+		nil,
 	}
+	service.api = NewAPI(rpcClient, accountsManager, rpcFiltersSrvc, config, appDb, timeSource, &service.syncUserDetailFunc)
+	return service
 }
 
 // Service is a browsers service.
 type Service struct {
-	rpcClient       *rpc.Client
-	accountsManager *account.GethManager
-	rpcFiltersSrvc  *rpcfilters.Service
-	config          *params.NodeConfig
-	api             *API
+	rpcClient          *rpc.Client
+	accountsManager    *account.GethManager
+	rpcFiltersSrvc     *rpcfilters.Service
+	config             *params.NodeConfig
+	api                *API
+	syncUserDetailFunc syncUsernameDetail
+}
+
+func (s *Service) Init(syncUserDetailFunc syncUsernameDetail) {
+	s.syncUserDetailFunc = syncUserDetailFunc
 }
 
 // Start a service.

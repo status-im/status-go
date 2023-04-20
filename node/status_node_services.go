@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/status-im/status-go/server"
 
@@ -73,7 +74,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = append(services, b.peerService())
 	services = append(services, b.personalService())
 	services = append(services, b.statusPublicService())
-	services = append(services, b.ensService())
+	services = append(services, b.ensService(b.timeSourceNow()))
 	services = append(services, b.collectiblesService())
 	services = append(services, b.stickersService(accDB))
 	services = append(services, b.updatesService())
@@ -215,6 +216,10 @@ func (b *StatusNode) AccountService() *accountssvc.Service {
 
 func (b *StatusNode) BrowserService() *browsers.Service {
 	return b.browsersSrvc
+}
+
+func (b *StatusNode) EnsService() *ens.Service {
+	return b.ensSrvc
 }
 
 func (b *StatusNode) WakuService() *waku.Waku {
@@ -392,9 +397,9 @@ func (b *StatusNode) browsersService() *browsers.Service {
 	return b.browsersSrvc
 }
 
-func (b *StatusNode) ensService() *ens.Service {
+func (b *StatusNode) ensService(timesource func() time.Time) *ens.Service {
 	if b.ensSrvc == nil {
-		b.ensSrvc = ens.NewService(b.rpcClient, b.gethAccountManager, b.rpcFiltersSrvc, b.config, b.appDB)
+		b.ensSrvc = ens.NewService(b.rpcClient, b.gethAccountManager, b.rpcFiltersSrvc, b.config, b.appDB, timesource)
 	}
 	return b.ensSrvc
 }
@@ -415,7 +420,7 @@ func (b *StatusNode) stickersService(accountDB *accounts.Database) *stickers.Ser
 
 func (b *StatusNode) updatesService() *updates.Service {
 	if b.updatesSrvc == nil {
-		b.updatesSrvc = updates.NewService(b.ensService())
+		b.updatesSrvc = updates.NewService(b.ensService(b.timeSourceNow()))
 	}
 
 	return b.updatesSrvc
@@ -475,7 +480,7 @@ func (b *StatusNode) walletService(accountsDB *accounts.Database, accountsFeed *
 		}
 		b.walletSrvc = wallet.NewService(
 			b.appDB, accountsDB, b.rpcClient, accountsFeed, b.gethAccountManager, b.transactor, b.config,
-			b.ensService(),
+			b.ensService(b.timeSourceNow()),
 			b.stickersService(accountsDB),
 			extService,
 		)
@@ -582,6 +587,10 @@ func (b *StatusNode) timeSource() *timesource.NTPTimeSource {
 		b.timeSourceSrvc = timesource.Default()
 	}
 	return b.timeSourceSrvc
+}
+
+func (b *StatusNode) timeSourceNow() func() time.Time {
+	return b.timeSource().Now
 }
 
 func (b *StatusNode) Cleanup() error {

@@ -514,3 +514,29 @@ func mnemonicRemovedProtobufFactory(value interface{}, clock uint64, chatID stri
 func mnemonicRemovedProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
 	return buildRawMnemonicRemovedSyncMessage(s.MnemonicRemoved, clock, chatID)
 }
+
+// Usernames
+
+func buildRawUsernamesSyncMessage(v []byte, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_ENS_USERNAMES,
+		Value: &protobuf.SyncSetting_ValueBytes{ValueBytes: v},
+		Clock: clock,
+	}
+	rm, err := buildRawSyncSettingMessage(pb, chatID)
+	return rm, pb, err
+}
+
+func usernamesProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	v, err := assertBytes(value)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return buildRawUsernamesSyncMessage(v, clock, chatID)
+}
+
+func usernamesProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	us := extractJSONRawMessage(s.Usernames)
+	return buildRawUsernamesSyncMessage(us, clock, chatID)
+}

@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -56,7 +57,7 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 	utils.Init()
 	require.NoError(t, utils.ImportTestAccount(keyStoreDir, utils.GetAccount1PKFile()))
 
-	return NewAPI(rpcClient, nil, nil, nil, db), cancel
+	return NewAPI(rpcClient, nil, nil, nil, db, time.Now, nil), cancel
 }
 
 func TestResolver(t *testing.T) {

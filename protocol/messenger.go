@@ -56,6 +56,7 @@ import (
 	"github.com/status-im/status-go/protocol/verification"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
+	ensservice "github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/ext/mailservers"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
@@ -2476,6 +2477,10 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		return err
 	}
 
+	if err = m.syncEnsUsernameDetails(ctx, rawMessageHandler); err != nil {
+		return err
+	}
+
 	return m.syncSocialSettings(ctx, rawMessageHandler)
 }
 
@@ -2900,6 +2905,74 @@ func (m *Messenger) SyncBookmark(ctx context.Context, bookmark *browsers.Bookmar
 
 	chat.LastClockValue = clock
 	return m.saveChat(chat)
+}
+
+func (m *Messenger) SyncEnsNamesWithDispatchMessage(ctx context.Context, usernameDetail *ensservice.UsernameDetail) error {
+	return m.syncEnsUsernameDetail(ctx, usernameDetail, m.dispatchMessage)
+}
+
+func (m *Messenger) syncEnsUsernameDetails(ctx context.Context, rawMessageHandler RawMessageHandler) error {
+	if !m.hasPairedDevices() {
+		return nil
+	}
+
+	ensNameDetails, err := m.getEnsUsernameDetails()
+	if err != nil {
+		return err
+	}
+	for _, d := range ensNameDetails {
+		if err = m.syncEnsUsernameDetail(ctx, d, rawMessageHandler); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Messenger) saveEnsUsernameDetailProto(syncMessage protobuf.SyncEnsUsernameDetail) (*ensservice.UsernameDetail, error) {
+	ud := &ensservice.UsernameDetail{
+		Username: syncMessage.Username,
+		Clock:    syncMessage.Clock,
+		ChainID:  syncMessage.ChainId,
+		Removed:  syncMessage.Removed,
+	}
+	db := ensservice.NewEnsDatabase(m.database)
+	err := db.SaveOrUpdateEnsUsername(ud)
+	if err != nil {
+		return nil, err
+	}
+	return ud, nil
+}
+
+func (m *Messenger) handleSyncEnsUsernameDetail(state *ReceivedMessageState, syncMessage protobuf.SyncEnsUsernameDetail) error {
+	ud, err := m.saveEnsUsernameDetailProto(syncMessage)
+	if err != nil {
+		return err
+	}
+	state.Response.AddEnsUsernameDetail(ud)
+	return nil
+}
+
+func (m *Messenger) syncEnsUsernameDetail(ctx context.Context, usernameDetail *ensservice.UsernameDetail, rawMessageHandler RawMessageHandler) error {
+	syncMessage := &protobuf.SyncEnsUsernameDetail{
+		Clock:    usernameDetail.Clock,
+		Username: usernameDetail.Username,
+		ChainId:  usernameDetail.ChainID,
+		Removed:  usernameDetail.Removed,
+	}
+	encodedMessage, err := proto.Marshal(syncMessage)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := common.RawMessage{
+		LocalChatID:         contactIDFromPublicKey(&m.identity.PublicKey),
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ENS_USERNAME_DETAIL,
+		ResendAutomatically: true,
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
+	return err
 }
 
 func (m *Messenger) SyncTrustedUser(ctx context.Context, publicKey string, ts verification.TrustStatus, rawMessageHandler RawMessageHandler) error {
@@ -4288,6 +4361,19 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.HandleSyncSocialLinkSetting(messageState, p)
 						if err != nil {
 							logger.Warn("failed to handle SyncSocialLinkSetting", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+					case protobuf.SyncEnsUsernameDetail:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+						p := msg.ParsedMessage.Interface().(protobuf.SyncEnsUsernameDetail)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
+						err = m.handleSyncEnsUsernameDetail(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle SyncEnsName", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}
@@ -6128,6 +6214,11 @@ func (m *Messenger) getSettings() (settings.Settings, error) {
 		return settings.Settings{}, err
 	}
 	return sDB.GetSettings()
+}
+
+func (m *Messenger) getEnsUsernameDetails() (result []*ensservice.UsernameDetail, err error) {
+	db := ensservice.NewEnsDatabase(m.database)
+	return db.GetEnsUsernames(nil)
 }
 
 func (m *Messenger) handleSyncBookmark(state *ReceivedMessageState, message protobuf.SyncBookmark) error {
