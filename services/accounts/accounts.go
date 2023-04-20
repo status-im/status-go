@@ -229,13 +229,17 @@ func (api *API) GetRandomMnemonic(ctx context.Context) (string, error) {
 	return api.manager.GetRandomMnemonic()
 }
 
+func (api *API) VerifyKeystoreFileForAccount(address types.Address, password string) bool {
+	_, err := api.manager.VerifyAccountPassword(api.config.KeyStoreDir, address.Hex(), password)
+	return err == nil
+}
+
 func (api *API) VerifyPassword(password string) bool {
 	address, err := api.db.GetChatAddress()
 	if err != nil {
 		return false
 	}
-	_, err = api.manager.VerifyAccountPassword(api.config.KeyStoreDir, address.Hex(), password)
-	return err == nil
+	return api.VerifyKeystoreFileForAccount(address, password)
 }
 
 func (api *API) AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(ctx context.Context, kcUID string, kpName string, keyUID string, accountAddresses []string, password string) error {
