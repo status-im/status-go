@@ -1430,6 +1430,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		if requestToJoinResponseProto.Accepted {
 			notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
 			notification.Read = false
+			notification.Deleted = false
 		} else {
 			notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
 		}

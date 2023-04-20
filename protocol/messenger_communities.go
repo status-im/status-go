@@ -1064,6 +1064,7 @@ func (m *Messenger) CheckAndDeletePendingRequestToJoinCommunity(sendResponse boo
 				if notification.Type == ActivityCenterNotificationTypeCommunityRequest {
 					notification.MembershipStatus = ActivityCenterMembershipStatusIdle
 					notification.Read = false
+					notification.Deleted = false
 					err = m.addActivityCenterNotification(response, notification)
 					if err != nil {
 						m.logger.Error("failed to update notification in activity center", zap.Error(err))

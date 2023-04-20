@@ -1320,6 +1320,14 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
 
+	notification := response.ActivityCenterNotifications()[0]
+	s.Require().NotNil(notification)
+	s.Require().NotEmpty(notification.ID)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
+	s.Require().Equal(notification.Deleted, false)
+	s.Require().Equal(notification.Read, true)
+
 	requestToJoin := response.RequestsToJoinCommunity[0]
 	s.Require().NotNil(requestToJoin)
 	s.Require().Equal(community.ID(), requestToJoin.CommunityID)
@@ -1330,6 +1338,20 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Equal(response.Communities()[0].RequestedToJoinAt(), requestToJoin.Clock)
+
+	// Alice deletes activity center notification
+	err = s.alice.DeleteActivityCenterNotifications(ctx, []types.HexBytes{notification.ID}, false)
+	s.Require().NoError(err)
+
+	// Check activity center notification for Bob after deleting
+	notifications, err := s.alice.ActivityCenterNotifications(ActivityCenterNotificationsRequest{
+		Cursor:        "",
+		Limit:         10,
+		ActivityTypes: []ActivityCenterType{},
+		ReadType:      ActivityCenterQueryParamsReadUnread,
+	})
+	s.Require().NoError(err)
+	s.Require().Len(notifications.Notifications, 0)
 
 	// updating request clock by 8 days back
 	requestTime := uint64(time.Now().AddDate(0, 0, -8).Unix())
@@ -1389,11 +1411,11 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 		})
 	}
 
-	notifications, err := fetchActivityCenterNotificationsForAdmin()
+	notifications, err = fetchActivityCenterNotificationsForAdmin()
 	s.Require().NoError(err)
 	s.Require().Len(notifications.Notifications, 1)
 
-	notification := notifications.Notifications[0]
+	notification = notifications.Notifications[0]
 	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityMembershipRequest)
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
 
@@ -1446,6 +1468,16 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 
 	requestToJoin = response.RequestsToJoinCommunity[0]
 	s.Require().True(requestToJoin.Deleted)
+
+	notification = response.ActivityCenterNotifications()[0]
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusIdle)
+	s.Require().Equal(notification.Read, false)
+	s.Require().Equal(notification.Deleted, false)
+
+	notificationState := response.ActivityCenterState()
+	s.Require().False(notificationState.HasSeen)
 
 	// Alice request to join community
 	request = &requests.RequestToJoinCommunity{CommunityID: community.ID()}
