@@ -623,7 +623,7 @@ func (s *encryptor) getNextHashRatchetKeyID(groupID []byte) (uint32, error) {
 	return latestKeyID + 1, nil
 }
 
-// Generates and stores a hash ratchet key given a group ID
+// GenerateHashRatchetKey Generates and stores a hash ratchet key given a group ID
 func (s *encryptor) GenerateHashRatchetKey(groupID []byte) (uint32, error) {
 
 	// Randomly generate a hash ratchet key

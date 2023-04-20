@@ -969,8 +969,8 @@ func (o *Community) Encrypted() bool {
 	return o.config.CommunityDescription.Encrypted
 }
 
-func (o *Community) Encrypt() {
-	o.config.CommunityDescription.Encrypted = true
+func (o *Community) SetEncrypted(encrypted bool) {
+	o.config.CommunityDescription.Encrypted = encrypted
 }
 
 func (o *Community) Joined() bool {

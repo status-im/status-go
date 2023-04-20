@@ -3536,3 +3536,51 @@ func (m *Messenger) AddCommunityToken(token *communities.CommunityToken) (*commu
 func (m *Messenger) UpdateCommunityTokenState(contractAddress string, deployState communities.DeployState) error {
 	return m.communitiesManager.UpdateCommunityTokenState(contractAddress, deployState)
 }
+
+// SetCommunityEncryption takes a communityID string and an encryption state, then finds the community and
+// encrypts / decrypts the community
+//
+// Note: This function cannot decrypt previously encrypted messages, and it cannot encrypt previous unencrypted messages.
+// This functionality introduces some race conditions:
+//  - community description is processed by members before the receiving the key exchange messages
+//  - members maybe sending encrypted messages after the community description is updated and a new member joins
+func (m *Messenger) SetCommunityEncryption(communityID string, useEncryption bool) (*MessengerResponse, error) {
+	// Get Community
+	c, err := m.communitiesManager.GetByIDString(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check useEncryption is different to Community's value
+	// If not different return
+	if c.Encrypted() == useEncryption {
+		return nil, nil
+	}
+
+	if useEncryption {
+		// 🪄 The magic that encrypts a community
+		_, err = m.encryptor.GenerateHashRatchetKey(c.ID())
+		if err != nil {
+			return nil, err
+		}
+
+		err = m.SendKeyExchangeMessage(c.ID(), c.GetMemberPubkeys(), common.KeyExMsgReuse)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// 🧙 There is no magic that decrypts a community, we just need to tell everyone to not use encryption
+
+	// Republish the community.
+	c.SetEncrypted(useEncryption)
+	err = m.communitiesManager.UpdateCommunity(c)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(c)
+
+	return response, nil
+}

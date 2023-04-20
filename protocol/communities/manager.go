@@ -3329,3 +3329,13 @@ func (m *Manager) SetCommunityActiveMembersCount(communityID string, activeMembe
 
 	return nil
 }
+
+func (m *Manager) UpdateCommunity(c *Community) error {
+	err := m.persistence.SaveCommunity(c)
+	if err != nil {
+		return err
+	}
+
+	m.publish(&Subscription{Community: c})
+	return nil
+}
