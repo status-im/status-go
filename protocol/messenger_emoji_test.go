@@ -3,7 +3,6 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -208,27 +207,6 @@ func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 	s.Require().NoError(err)
 	s.Require().NoError(alice.Shutdown())
 
-}
-
-func ReadStruct(st interface{}) {
-	val := reflect.ValueOf(st)
-	if val.Kind() == reflect.Ptr {
-		val = val.Elem()
-	}
-	for i := 0; i < val.NumField(); i++ {
-		// fmt.Println(val.Type().Field(i).Type.Kind())
-		f := val.Field(i)
-		switch f.Kind() {
-		case reflect.Struct:
-			ReadStruct(f.Interface())
-		case reflect.Slice:
-			for j := 0; j < f.Len(); j++ {
-				ReadStruct(f.Index(i).Interface())
-			}
-		case reflect.String:
-			fmt.Printf("%v=%v\n", val.Type().Field(i).Name, val.Field(i).Interface())
-		}
-	}
 }
 
 func (s *MessengerEmojiSuite) TestCompressedKeyReturnedWithEmoji() {
