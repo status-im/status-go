@@ -3,11 +3,15 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/account/json"
+	accountJson "github.com/status-im/status-go/account/json"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -203,4 +207,119 @@ func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 	)
 	s.Require().NoError(err)
 	s.Require().NoError(alice.Shutdown())
+
+}
+
+func ReadStruct(st interface{}) {
+	val := reflect.ValueOf(st)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	for i := 0; i < val.NumField(); i++ {
+		// fmt.Println(val.Type().Field(i).Type.Kind())
+		f := val.Field(i)
+		switch f.Kind() {
+		case reflect.Struct:
+			ReadStruct(f.Interface())
+		case reflect.Slice:
+			for j := 0; j < f.Len(); j++ {
+				ReadStruct(f.Index(i).Interface())
+			}
+		case reflect.String:
+			fmt.Printf("%v=%v\n", val.Type().Field(i).Name, val.Field(i).Interface())
+		}
+	}
+}
+
+func (s *MessengerEmojiSuite) TestCompressedKeyReturnedWithEmoji() {
+	alice := s.m
+	alice.account = &multiaccounts.Account{KeyUID: "0xdeadbeef"}
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	bob, err := newMessengerWithKey(s.shh, key, s.logger, nil)
+	s.Require().NoError(err)
+
+	chatID := statusChatID
+
+	chat := CreatePublicChat(chatID, alice.transport)
+
+	err = alice.SaveChat(chat)
+	s.Require().NoError(err)
+
+	_, err = alice.Join(chat)
+	s.Require().NoError(err)
+
+	err = bob.SaveChat(chat)
+	s.Require().NoError(err)
+
+	_, err = bob.Join(chat)
+	s.Require().NoError(err)
+
+	// Send chat message from alice to bob
+
+	message := buildTestMessage(*chat)
+	_, err = alice.SendChatMessage(context.Background(), message)
+	s.NoError(err)
+
+	// Wait for message to arrive to bob
+	response, err := WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool { return len(r.Messages()) > 0 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Messages(), 1)
+
+	messageID := response.Messages()[0].ID
+
+	// Respond with an emoji, donald trump style
+
+	response, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_SAD)
+	s.Require().NoError(err)
+	s.Require().Len(response.EmojiReactions(), 1)
+
+	// Wait for the emoji to arrive to alice
+	response, err = WaitOnMessengerResponse(
+		alice,
+		func(r *MessengerResponse) bool { return len(r.EmojiReactions()) == 1 },
+		"no emoji",
+	)
+	s.Require().NoError(err)
+
+	item := struct {
+		ID          string                      `json:"id"`
+		Clock       uint64                      `json:"clock,omitempty"`
+		ChatID      string                      `json:"chatId,omitempty"`
+		LocalChatID string                      `json:"localChatId,omitempty"`
+		From        string                      `json:"from"`
+		MessageID   string                      `json:"messageId,omitempty"`
+		MessageType protobuf.MessageType        `json:"messageType,omitempty"`
+		Retracted   bool                        `json:"retracted,omitempty"`
+		EmojiID     protobuf.EmojiReaction_Type `json:"emojiId,omitempty"`
+	}{
+
+		ID:          response.EmojiReactions()[0].ID(),
+		Clock:       response.EmojiReactions()[0].Clock,
+		ChatID:      response.EmojiReactions()[0].ChatId,
+		LocalChatID: response.EmojiReactions()[0].LocalChatID,
+		From:        response.EmojiReactions()[0].From,
+		MessageID:   response.EmojiReactions()[0].MessageId,
+		MessageType: response.EmojiReactions()[0].MessageType,
+		Retracted:   response.EmojiReactions()[0].Retracted,
+		EmojiID:     response.EmojiReactions()[0].Type,
+	}
+
+	ext, err := accountJson.ExtendStructWithPubKeyData(item.From, item)
+
+	reflectionValue := reflect.ValueOf(ext).Elem()
+	for i := 0; i < reflectionValue.NumField(); i++ {
+		reflectionKeyToString := reflectionValue.Type().Field(i).Name
+		if reflectionKeyToString == "Pkd" {
+			reflectionValue := reflectionValue.Field(i).Interface().(*json.PublicKeyData)
+			s.Require().NotEmpty(reflectionValue.CompressedKey)
+			s.Require().NotEmpty(reflectionValue.EmojiHash)
+		}
+	}
 }
