@@ -74,7 +74,7 @@ func (e EmojiReaction) MarshalJSON() ([]byte, error) {
 		Retracted:   e.Retracted,
 		EmojiID:     e.Type,
 	}
-	
+
 	ext, err := accountJson.ExtendStructWithPubKeyData(item.From, item)
 	if err != nil {
 		return nil, err
