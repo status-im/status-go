@@ -159,10 +159,6 @@ var (
 		reactFieldName: "last-updated",
 		dBColumnName:   "last_updated",
 	}
-	LatestDerivedPath = SettingField{
-		reactFieldName: "latest-derived-path",
-		dBColumnName:   "latest_derived_path",
-	}
 	LinkPreviewRequestEnabled = SettingField{
 		reactFieldName: "link-preview-request-enabled",
 		dBColumnName:   "link_preview_request_enabled",
@@ -457,7 +453,6 @@ var (
 		KeycardPairing,
 		LastBackup,
 		LastUpdated,
-		LatestDerivedPath,
 		LinkPreviewRequestEnabled,
 		LinkPreviewsEnabledSites,
 		LogLevel,
