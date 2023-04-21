@@ -290,8 +290,8 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	for _, acc := range walletAccounts {
 		acc.Name = acc.Name + "New"
 		acc.Color = "lightblue"
+		s.Require().NoError(s.m.SaveAccount(acc))
 	}
-	s.Require().NoError(s.m.SaveAccounts(walletAccounts))
 
 	// Sync between devices is triggered automatically
 	// via watch account changes subscription
@@ -302,7 +302,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 			return err
 		}
 
-		if len(response.Accounts) != len(walletAccounts) {
+		if len(response.Accounts) != 1 {
 			return errors.New("no sync wallet account received")
 		}
 		return nil
