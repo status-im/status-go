@@ -2791,15 +2791,6 @@ func (m *Messenger) handleSyncWalletAccount(message *protobuf.SyncWalletAccount)
 		return nil, err
 	}
 
-	// Once mobile app supports seed phrase and private key imported accounts we should remove the following `if` block
-	if isMobileApp {
-		accType := accounts.AccountType(message.Type)
-		if accType != accounts.AccountTypeWatch &&
-			accType != accounts.AccountTypeGenerated {
-			return nil, ErrWalletAccountNotSupportedForMobileApp
-		}
-	}
-
 	if dbAccount != nil && message.Clock <= dbAccount.Clock {
 		return nil, ErrTryingToStoreOldWalletAccount
 	}
@@ -2829,19 +2820,6 @@ func (m *Messenger) handleSyncWalletAccount(message *protobuf.SyncWalletAccount)
 			KeypairName:             message.KeypairName,
 			LastUsedDerivationIndex: message.LastUsedDerivationIndex,
 		}
-
-		// Once mobile app supports seed phrase and private key imported accounts we should remove the following line, not entire if block
-		if !isMobileApp {
-			// For the desktop app we need to ignore accounts:
-			// - with empty `KeypairName` (except if an account is WatchOnly account) or
-			// - with empty `DerivedFrom` (except if an account is not private key imported account or watch only account)
-			// Otherwise keypair items will be broken.
-			if acc.Type != accounts.AccountTypeWatch {
-				if len(acc.KeypairName) == 0 || acc.Type != accounts.AccountTypeKey && len(acc.DerivedFrom) == 0 {
-					return nil, ErrSomeFieldsMissingForWalletAccount
-				}
-			}
-		}
 	}
 
 	err = m.settings.SaveAccounts([]*accounts.Account{acc})
@@ -2869,35 +2847,7 @@ func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message
 		accs = append(accs, acc)
 	}
 
-	if len(accs) == 0 {
-		return nil
-	}
-
 	state.Response.Accounts = accs
-
-	if isMobileApp {
-		latestDerivedPath, err := m.settings.GetLatestDerivedPath()
-		if err != nil {
-			return err
-		}
-
-		newPath := latestDerivedPath + uint(len(accs))
-		err = m.settings.SaveSettingField(settings.LatestDerivedPath, newPath)
-		if err != nil {
-			return err
-		}
-
-		if state.Response.Settings == nil {
-			state.Response.Settings = []*settings.SyncSettingField{}
-		}
-
-		state.Response.Settings = append(
-			state.Response.Settings,
-			&settings.SyncSettingField{
-				SettingField: settings.LatestDerivedPath,
-				Value:        newPath,
-			})
-	}
 
 	return nil
 }
