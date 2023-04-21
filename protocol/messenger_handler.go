@@ -1262,6 +1262,17 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 		return errors.New("invalid community id")
 	}
 
+	timeNow := uint64(time.Now().Unix())
+
+	requestTimeOutClock, err := communities.AddTimeoutToRequestToJoinClock(requestToJoinProto.Clock)
+	if err != nil {
+		return err
+	}
+
+	if timeNow >= requestTimeOutClock {
+		return errors.New("request is expired")
+	}
+
 	requestToJoin, err := m.communitiesManager.HandleCommunityRequestToJoin(signer, &requestToJoinProto)
 	if err != nil {
 		return err
@@ -1317,6 +1328,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 			Author:           contact.ID,
 			CommunityID:      community.IDString(),
 			MembershipStatus: ActivityCenterMembershipStatusPending,
+			Deleted:          false,
 		}
 
 		err = m.addActivityCenterNotification(state.Response, notification)
@@ -1417,6 +1429,8 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 	if notification != nil {
 		if requestToJoinResponseProto.Accepted {
 			notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
+			notification.Read = false
+			notification.Deleted = false
 		} else {
 			notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
 		}

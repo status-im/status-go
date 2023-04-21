@@ -711,6 +711,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchUnmutedChats()
 	m.watchExpiredMessages()
 	m.watchIdentityImageChanges()
+	m.watchPendingCommunityRequestToJoin()
 	m.broadcastLatestUserStatus()
 	m.timeoutAutomaticStatusUpdates()
 	m.startBackupLoop()
@@ -1422,6 +1423,24 @@ func (m *Messenger) watchIdentityImageChanges() {
 				err = m.PublishIdentityImage()
 				if err != nil {
 					m.logger.Error("failed to publish identity image", zap.Error(err))
+				}
+			case <-m.quit:
+				return
+			}
+		}
+	}()
+}
+
+func (m *Messenger) watchPendingCommunityRequestToJoin() {
+	m.logger.Debug("watching community request to join")
+
+	go func() {
+		for {
+			select {
+			case <-time.After(time.Minute * 10):
+				_, err := m.CheckAndDeletePendingRequestToJoinCommunity(false)
+				if err != nil {
+					m.logger.Error("failed to check and delete pending request to join community", zap.Error(err))
 				}
 			case <-m.quit:
 				return

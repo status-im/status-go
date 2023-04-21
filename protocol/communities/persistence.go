@@ -470,6 +470,25 @@ func (p *Persistence) RequestsToJoinForCommunityWithState(id []byte, state Reque
 	return requests, nil
 }
 
+func (p *Persistence) PendingRequestsToJoin() ([]*RequestToJoin, error) {
+	var requests []*RequestToJoin
+	rows, err := p.db.Query(`SELECT id,public_key,clock,ens_name,chat_id,community_id,state FROM communities_requests_to_join WHERE state = ?`, RequestToJoinStatePending)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		request := &RequestToJoin{}
+		err := rows.Scan(&request.ID, &request.PublicKey, &request.Clock, &request.ENSName, &request.ChatID, &request.CommunityID, &request.State)
+		if err != nil {
+			return nil, err
+		}
+		requests = append(requests, request)
+	}
+	return requests, nil
+}
+
 func (p *Persistence) PendingRequestsToJoinForCommunity(id []byte) ([]*RequestToJoin, error) {
 	return p.RequestsToJoinForCommunityWithState(id, RequestToJoinStatePending)
 }
@@ -484,6 +503,17 @@ func (p *Persistence) CanceledRequestsToJoinForCommunity(id []byte) ([]*RequestT
 
 func (p *Persistence) SetRequestToJoinState(pk string, communityID []byte, state RequestToJoinState) error {
 	_, err := p.db.Exec(`UPDATE communities_requests_to_join SET state = ? WHERE community_id = ? AND public_key = ?`, state, communityID, pk)
+	return err
+}
+
+func (p *Persistence) DeletePendingRequestToJoin(id []byte) error {
+	_, err := p.db.Exec(`DELETE FROM communities_requests_to_join WHERE id = ?`, id)
+	return err
+}
+
+// UpdateClockInRequestToJoin method is used for testing
+func (p *Persistence) UpdateClockInRequestToJoin(id []byte, clock uint64) error {
+	_, err := p.db.Exec(`UPDATE communities_requests_to_join SET clock = ? WHERE id = ?`, clock, id)
 	return err
 }
 

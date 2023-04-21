@@ -1184,6 +1184,30 @@ func (m *Manager) markRequestToJoinAsCanceled(pk *ecdsa.PublicKey, community *Co
 	return m.persistence.SetRequestToJoinState(common.PubkeyToHex(pk), community.ID(), RequestToJoinStateCanceled)
 }
 
+func (m *Manager) DeletePendingRequestToJoin(request *RequestToJoin) error {
+	community, err := m.GetByID(request.CommunityID)
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.DeletePendingRequestToJoin(request.ID)
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// UpdateClockInRequestToJoin method is used for testing
+func (m *Manager) UpdateClockInRequestToJoin(id types.HexBytes, clock uint64) error {
+	return m.persistence.UpdateClockInRequestToJoin(id, clock)
+}
+
 func (m *Manager) SetMuted(id types.HexBytes, muted bool) error {
 	return m.persistence.SetMuted(id, muted)
 }
@@ -1296,7 +1320,7 @@ func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCom
 	return m.persistence.SetRequestToJoinState(dbRequest.PublicKey, dbRequest.CommunityID, RequestToJoinStateDeclined)
 }
 
-func (m *Manager) isUserRejectedFromCommunity(signer *ecdsa.PublicKey, community *Community) (bool, error) {
+func (m *Manager) isUserRejectedFromCommunity(signer *ecdsa.PublicKey, community *Community, requestClock uint64) (bool, error) {
 	declinedRequestsToJoin, err := m.persistence.DeclinedRequestsToJoinForCommunity(community.ID())
 	if err != nil {
 		return false, err
@@ -1304,7 +1328,14 @@ func (m *Manager) isUserRejectedFromCommunity(signer *ecdsa.PublicKey, community
 
 	for _, req := range declinedRequestsToJoin {
 		if req.PublicKey == common.PubkeyToHex(signer) {
-			return true, nil
+			dbRequestTimeOutClock, err := AddTimeoutToRequestToJoinClock(req.Clock)
+			if err != nil {
+				return false, err
+			}
+
+			if requestClock < dbRequestTimeOutClock {
+				return true, nil
+			}
 		}
 	}
 	return false, nil
@@ -1319,7 +1350,7 @@ func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, re
 		return nil, ErrOrgNotFound
 	}
 
-	isUserRejected, err := m.isUserRejectedFromCommunity(signer, community)
+	isUserRejected, err := m.isUserRejectedFromCommunity(signer, community, request.Clock)
 	if err != nil {
 		return nil, err
 	}
@@ -1349,7 +1380,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		return nil, ErrOrgNotFound
 	}
 
-	isUserRejected, err := m.isUserRejectedFromCommunity(signer, community)
+	isUserRejected, err := m.isUserRejectedFromCommunity(signer, community, request.Clock)
 	if err != nil {
 		return nil, err
 	}
@@ -2119,6 +2150,10 @@ func (m *Manager) SaveRequestToJoin(request *RequestToJoin) error {
 
 func (m *Manager) CanceledRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
 	return m.persistence.CanceledRequestsToJoinForUser(common.PubkeyToHex(pk))
+}
+
+func (m *Manager) PendingRequestsToJoin() ([]*RequestToJoin, error) {
+	return m.persistence.PendingRequestsToJoin()
 }
 
 func (m *Manager) PendingRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
