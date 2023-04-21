@@ -131,7 +131,6 @@ type Settings struct {
 	KeycardPairedOn           int64            `json:"keycard-paired-on,omitempty"`
 	KeycardPairing            string           `json:"keycard-pairing,omitempty"`
 	LastUpdated               *int64           `json:"last-updated,omitempty"`
-	LatestDerivedPath         uint             `json:"latest-derived-path"`
 	LinkPreviewRequestEnabled bool             `json:"link-preview-request-enabled,omitempty"`
 	LinkPreviewsEnabledSites  *json.RawMessage `json:"link-previews-enabled-sites,omitempty"`
 	LogLevel                  *string          `json:"log-level,omitempty"`
