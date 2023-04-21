@@ -38,13 +38,13 @@ type DerivedAddress struct {
 	AlreadyCreated bool           `json:"alreadyCreated"`
 }
 
-func (api *API) SaveAccounts(ctx context.Context, accounts []*accounts.Account) error {
-	log.Info("[AccountsAPI::SaveAccounts]")
-	err := (*api.messenger).SaveAccounts(accounts)
+func (api *API) SaveAccount(ctx context.Context, account *accounts.Account) error {
+	log.Info("[AccountsAPI::SaveAccount]")
+	err := (*api.messenger).SaveAccount(account)
 	if err != nil {
 		return err
 	}
-	api.feed.Send(accounts)
+	api.feed.Send([]*accounts.Account{account})
 	return nil
 }
 
@@ -179,7 +179,7 @@ func (api *API) AddAccount(ctx context.Context, password string, account *accoun
 		}
 	}
 
-	return api.SaveAccounts(ctx, []*accounts.Account{account})
+	return api.SaveAccount(ctx, account)
 }
 
 // Imports a new private key and creates local keystore file.

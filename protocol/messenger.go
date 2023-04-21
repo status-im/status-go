@@ -2479,16 +2479,15 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 	return m.syncSocialSettings(ctx, rawMessageHandler)
 }
 
-func (m *Messenger) SaveAccounts(accs []*accounts.Account) error {
+func (m *Messenger) SaveAccount(acc *accounts.Account) error {
 	clock, _ := m.getLastClockWithRelatedChat()
-	for _, acc := range accs {
-		acc.Clock = clock
-	}
-	err := m.settings.SaveAccounts(accs)
+	acc.Clock = clock
+
+	err := m.settings.SaveAccounts([]*accounts.Account{acc})
 	if err != nil {
 		return err
 	}
-	return m.syncWallets(accs, m.dispatchMessage)
+	return m.syncWallets([]*accounts.Account{acc}, m.dispatchMessage)
 }
 
 func (m *Messenger) DeleteAccount(address types.Address) error {
