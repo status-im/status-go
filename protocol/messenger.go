@@ -12,7 +12,6 @@ import (
 	"math/rand"
 	"os"
 	"reflect"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -78,8 +77,6 @@ const (
 
 	publicChat  chatContext = "public-chat"
 	privateChat chatContext = "private-chat"
-
-	isMobileApp = runtime.GOOS == "android" || runtime.GOOS == "ios"
 )
 
 const messageResendMinDelay = 30
@@ -2514,13 +2511,6 @@ func (m *Messenger) prepareSyncWalletAccountsMessage(accs []*accounts.Account, c
 			continue
 		}
 
-		// Once mobile app supports seed phrase and private key imported accounts we should remove the following `if` block
-		if isMobileApp {
-			if acc.Type != accounts.AccountTypeWatch &&
-				acc.Type != accounts.AccountTypeGenerated {
-				continue
-			}
-		}
 		var accountClock uint64
 		if acc.Clock == 0 {
 			accountClock = clock
