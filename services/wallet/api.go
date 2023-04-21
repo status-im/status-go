@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/wallet/activity"
 	"github.com/status-im/status-go/services/wallet/bridge"
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
@@ -95,6 +96,12 @@ func (api *API) LoadTransferByHash(ctx context.Context, address common.Address, 
 func (api *API) GetTransfersByAddressAndChainID(ctx context.Context, chainID uint64, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]transfer.View, error) {
 	log.Debug("[WalletAPI:: GetTransfersByAddressAndChainIDs] get transfers for an address", "address", address)
 	return api.s.transferController.GetTransfersByAddress(ctx, chainID, address, hexBigToBN(toBlock), limit.ToInt().Int64(), fetchMore)
+}
+
+func (api *API) GetTransfersForIdentities(ctx context.Context, identities []transfer.TransactionIdentity) ([]transfer.View, error) {
+	log.Debug("[Wallet: GetTransfersForIdentities] count", len(identities))
+
+	return api.s.transferController.GetTransfersForIdentities(ctx, identities)
 }
 
 // Deprecated: GetCachedBalances is deprecated. Use GetTokensBalances instead
@@ -228,6 +235,20 @@ func (api *API) GetPendingTransactionsByChainIDs(ctx context.Context, chainIDs [
 	rst, err := api.s.transactionManager.GetAllPending(chainIDs)
 	log.Debug("result from database for pending transactions", "len", len(rst))
 	return rst, err
+}
+
+func (api *API) GetPendingTransactionsForIdentities(ctx context.Context, identities []transfer.TransactionIdentity) (result []*transfer.PendingTransaction, err error) {
+	log.Debug("call to GetPendingTransactionsForIdentities")
+
+	result = make([]*transfer.PendingTransaction, 0, len(identities))
+	var pt *transfer.PendingTransaction
+	for _, identity := range identities {
+		pt, err = api.s.transactionManager.GetPendingEntry(identity.ChainID, identity.Hash)
+		result = append(result, pt)
+	}
+
+	log.Debug("result from GetPendingTransactionsForIdentities", "len", len(result))
+	return
 }
 
 func (api *API) GetPendingOutboundTransactionsByAddress(ctx context.Context, address common.Address) ([]*transfer.PendingTransaction, error) {
@@ -494,4 +515,9 @@ func (api *API) GetCachedCurrencyFormats() (currency.FormatPerSymbol, error) {
 func (api *API) FetchAllCurrencyFormats() (currency.FormatPerSymbol, error) {
 	log.Debug("call to FetchAllCurrencyFormats")
 	return api.s.currency.FetchAllCurrencyFormats()
+}
+
+func (api *API) GetActivityEntries(addresses []common.Address, chainIDs []uint64, filter activity.Filter, offset int, limit int) ([]activity.Entry, error) {
+	log.Debug("call to GetActivityEntries")
+	return activity.GetActivityEntries(api.s.db, addresses, chainIDs, filter, offset, limit)
 }

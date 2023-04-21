@@ -12,30 +12,66 @@ import (
 
 const baseTransfersQuery = "SELECT hash, type, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, network_id, base_gas_fee, COALESCE(multi_transaction_id, 0) FROM transfers"
 
+type transfersQuery struct {
+	buf        *bytes.Buffer
+	args       []interface{}
+	whereAdded bool
+	subQuery   bool
+}
+
 func newTransfersQuery() *transfersQuery {
+	newQuery := newEmptyQuery()
+	newQuery.buf.WriteString(baseTransfersQuery)
+	return newQuery
+}
+
+func newSubQuery() *transfersQuery {
+	newQuery := newEmptyQuery()
+	newQuery.subQuery = true
+	return newQuery
+}
+
+func newEmptyQuery() *transfersQuery {
 	buf := bytes.NewBuffer(nil)
-	buf.WriteString(baseTransfersQuery)
 	return &transfersQuery{buf: buf}
 }
 
-type transfersQuery struct {
-	buf   *bytes.Buffer
-	args  []interface{}
-	added bool
+func (q *transfersQuery) addWhereSeparator(separator SeparatorType) {
+	if !q.whereAdded {
+		if !q.subQuery {
+			q.buf.WriteString(" WHERE")
+		}
+		q.whereAdded = true
+	} else if separator == OrSeparator {
+		q.buf.WriteString(" OR")
+	} else if separator == AndSeparator {
+		q.buf.WriteString(" AND")
+	} else if separator != NoSeparator {
+		panic("Unknown separator. Need to handle current SeparatorType value")
+	}
 }
 
-func (q *transfersQuery) andOrWhere() {
-	if q.added {
-		q.buf.WriteString(" AND")
-	} else {
-		q.buf.WriteString(" WHERE")
-	}
+type SeparatorType int
+
+const (
+	NoSeparator SeparatorType = iota + 1
+	OrSeparator
+	AndSeparator
+)
+
+// addSubQuery adds where clause formed as: WHERE/<separator> (<subQuery>)
+func (q *transfersQuery) addSubQuery(subQuery *transfersQuery, separator SeparatorType) *transfersQuery {
+	q.addWhereSeparator(separator)
+	q.buf.WriteString(" (")
+	q.buf.Write(subQuery.buf.Bytes())
+	q.buf.WriteString(")")
+	q.args = append(q.args, subQuery.args...)
+	return q
 }
 
 func (q *transfersQuery) FilterStart(start *big.Int) *transfersQuery {
 	if start != nil {
-		q.andOrWhere()
-		q.added = true
+		q.addWhereSeparator(AndSeparator)
 		q.buf.WriteString(" blk_number >= ?")
 		q.args = append(q.args, (*bigint.SQLBigInt)(start))
 	}
@@ -44,8 +80,7 @@ func (q *transfersQuery) FilterStart(start *big.Int) *transfersQuery {
 
 func (q *transfersQuery) FilterEnd(end *big.Int) *transfersQuery {
 	if end != nil {
-		q.andOrWhere()
-		q.added = true
+		q.addWhereSeparator(AndSeparator)
 		q.buf.WriteString(" blk_number <= ?")
 		q.args = append(q.args, (*bigint.SQLBigInt)(end))
 	}
@@ -53,8 +88,7 @@ func (q *transfersQuery) FilterEnd(end *big.Int) *transfersQuery {
 }
 
 func (q *transfersQuery) FilterLoaded(loaded int) *transfersQuery {
-	q.andOrWhere()
-	q.added = true
+	q.addWhereSeparator(AndSeparator)
 	q.buf.WriteString(" loaded = ? ")
 	q.args = append(q.args, loaded)
 
@@ -62,32 +96,35 @@ func (q *transfersQuery) FilterLoaded(loaded int) *transfersQuery {
 }
 
 func (q *transfersQuery) FilterNetwork(network uint64) *transfersQuery {
-	q.andOrWhere()
-	q.added = true
+	q.addWhereSeparator(AndSeparator)
 	q.buf.WriteString(" network_id = ?")
 	q.args = append(q.args, network)
 	return q
 }
 
 func (q *transfersQuery) FilterAddress(address common.Address) *transfersQuery {
-	q.andOrWhere()
-	q.added = true
+	q.addWhereSeparator(AndSeparator)
 	q.buf.WriteString(" address = ?")
 	q.args = append(q.args, address)
 	return q
 }
 
+func (q *transfersQuery) FilterTransactionHash(hash common.Hash) *transfersQuery {
+	q.addWhereSeparator(AndSeparator)
+	q.buf.WriteString(" hash = ?")
+	q.args = append(q.args, hash)
+	return q
+}
+
 func (q *transfersQuery) FilterBlockHash(blockHash common.Hash) *transfersQuery {
-	q.andOrWhere()
-	q.added = true
+	q.addWhereSeparator(AndSeparator)
 	q.buf.WriteString(" blk_hash = ?")
 	q.args = append(q.args, blockHash)
 	return q
 }
 
 func (q *transfersQuery) FilterBlockNumber(blockNumber *big.Int) *transfersQuery {
-	q.andOrWhere()
-	q.added = true
+	q.addWhereSeparator(AndSeparator)
 	q.buf.WriteString(" blk_number = ?")
 	q.args = append(q.args, (*bigint.SQLBigInt)(blockNumber))
 	return q
