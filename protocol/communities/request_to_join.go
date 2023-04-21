@@ -69,11 +69,8 @@ func AddTimeoutToRequestToJoinClock(clock uint64) (uint64, error) {
 		return 0, err
 	}
 
-	// Adding 7 days to request
-	// requestTimeOutClock := uint64(time.Unix(requestToJoinClock, 0).AddDate(0, 0, 7).Unix())
-
-	// For testing
-	requestTimeOutClock := uint64(time.Unix(requestToJoinClock, 0).Add(time.Minute * 5).Unix())
+	// Adding 7 days to the request clock
+	requestTimeOutClock := uint64(time.Unix(requestToJoinClock, 0).AddDate(0, 0, 7).Unix())
 
 	return requestTimeOutClock, nil
 }

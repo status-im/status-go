@@ -1437,8 +1437,7 @@ func (m *Messenger) watchPendingCommunityRequestToJoin() {
 	go func() {
 		for {
 			select {
-			// For testing, setting 1 minute
-			case <-time.After(time.Minute):
+			case <-time.After(time.Minute * 10):
 				_, err := m.CheckAndDeletePendingRequestToJoinCommunity(false)
 				if err != nil {
 					m.logger.Error("failed to check and delete pending request to join community", zap.Error(err))
