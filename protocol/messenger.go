@@ -2480,6 +2480,10 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 }
 
 func (m *Messenger) SaveAccounts(accs []*accounts.Account) error {
+	clock, _ := m.getLastClockWithRelatedChat()
+	for _, acc := range accs {
+		acc.Clock = clock
+	}
 	err := m.settings.SaveAccounts(accs)
 	if err != nil {
 		return err
@@ -2498,27 +2502,30 @@ func (m *Messenger) DeleteAccount(address types.Address) error {
 	if err != nil {
 		return err
 	}
+
+	clock, chat := m.getLastClockWithRelatedChat()
+	acc.Clock = clock
 	acc.Removed = true
 
 	accs := []*accounts.Account{acc}
-	return m.syncWallets(accs, m.dispatchMessage)
+	err = m.syncWallets(accs, m.dispatchMessage)
+	if err != nil {
+		return err
+	}
+
+	chat.LastClockValue = clock
+	return m.saveChat(chat)
 }
 
-func (m *Messenger) prepareSyncWalletAccountsMessage(accs []*accounts.Account, clock uint64) *protobuf.SyncWalletAccounts {
+func (m *Messenger) prepareSyncWalletAccountsMessage(accs []*accounts.Account) *protobuf.SyncWalletAccounts {
 	accountMessages := make([]*protobuf.SyncWalletAccount, 0)
 	for _, acc := range accs {
 		if acc.Chat {
 			continue
 		}
 
-		var accountClock uint64
-		if acc.Clock == 0 {
-			accountClock = clock
-		} else {
-			accountClock = acc.Clock
-		}
 		syncMessage := &protobuf.SyncWalletAccount{
-			Clock:                   accountClock,
+			Clock:                   acc.Clock,
 			Address:                 acc.Address.Bytes(),
 			Wallet:                  acc.Wallet,
 			Chat:                    acc.Chat,
@@ -2554,9 +2561,9 @@ func (m *Messenger) syncWallets(accs []*accounts.Account, rawMessageHandler RawM
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	clock, chat := m.getLastClockWithRelatedChat()
+	_, chat := m.getLastClockWithRelatedChat()
 
-	message := m.prepareSyncWalletAccountsMessage(accs, clock)
+	message := m.prepareSyncWalletAccountsMessage(accs)
 
 	encodedMessage, err := proto.Marshal(message)
 	if err != nil {
@@ -2571,12 +2578,7 @@ func (m *Messenger) syncWallets(accs []*accounts.Account, rawMessageHandler RawM
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
-	if err != nil {
-		return err
-	}
-
-	chat.LastClockValue = clock
-	return m.saveChat(chat)
+	return err
 }
 
 func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID string, accepted bool, rawMessageHandler RawMessageHandler) error {

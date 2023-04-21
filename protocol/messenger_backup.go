@@ -95,7 +95,7 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		return 0, errors[0]
 	}
 
-	syncWalletAccounts, err := m.backupWalletAccounts(clock)
+	syncWalletAccounts, err := m.backupWalletAccounts()
 	if err != nil {
 		return 0, err
 	}
@@ -400,11 +400,11 @@ func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobu
 	return backupMessages, nil
 }
 
-func (m *Messenger) backupWalletAccounts(clock uint64) (*protobuf.SyncWalletAccounts, error) {
+func (m *Messenger) backupWalletAccounts() (*protobuf.SyncWalletAccounts, error) {
 	accounts, err := m.settings.GetAccounts()
 	if err != nil {
 		return nil, err
 	}
 
-	return m.prepareSyncWalletAccountsMessage(accounts, clock), nil
+	return m.prepareSyncWalletAccountsMessage(accounts), nil
 }
