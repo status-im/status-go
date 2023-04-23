@@ -217,6 +217,7 @@ func (s *MessengerEmojiSuite) TestCompressedKeyReturnedWithEmoji() {
 	emojiReaction.From = common.PubkeyToHex(&id.PublicKey)
 	emojiReaction.LocalChatID = testPublicChatID
 	encodedReaction, err := json.Marshal(emojiReaction)
+	s.Require().NoError(err)
 
 	// Check that compressedKey and emojiHash exists
 	s.Require().True(strings.Contains(string(encodedReaction), "compressedKey\":\"zQ"))
