@@ -6,11 +6,12 @@ type EventType string
 const (
 	// Both Sender and Receiver
 
-	EventPeerDiscovered    EventType = "peer-discovered"
-	EventConnectionError   EventType = "connection-error"
-	EventConnectionSuccess EventType = "connection-success"
-	EventTransferError     EventType = "transfer-error"
-	EventTransferSuccess   EventType = "transfer-success"
+	EventPeerDiscovered       EventType = "peer-discovered"
+	EventConnectionError      EventType = "connection-error"
+	EventConnectionSuccess    EventType = "connection-success"
+	EventTransferError        EventType = "transfer-error"
+	EventTransferSuccess      EventType = "transfer-success"
+	EventReceivedInstallation EventType = "received-installation"
 
 	// Only Receiver side
 
