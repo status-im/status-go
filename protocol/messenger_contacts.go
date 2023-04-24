@@ -24,7 +24,30 @@ func (m *Messenger) acceptContactRequest(ctx context.Context, requestID string, 
 	}
 
 	m.logger.Info("acceptContactRequest")
-	return m.addContact(ctx, contactRequest.From, "", "", "", contactRequest.ID, "", syncing, false, false)
+
+	response, err := m.addContact(ctx, contactRequest.From, "", "", "", contactRequest.ID, "", syncing, false, false)
+	if err != nil {
+		return nil, err
+	}
+
+	// Force activate chat
+	chat, ok := m.allChats.Load(contactRequest.From)
+	if !ok {
+		publicKey, err := common.HexToPubkey(contactRequest.From)
+		if err != nil {
+			return nil, err
+		}
+
+		chat = OneToOneFromPublicKey(publicKey, m.getTimesource())
+	}
+
+	chat.Active = true
+	if err := m.saveChat(chat); err != nil {
+		return nil, err
+	}
+	response.AddChat(chat)
+
+	return response, nil
 }
 
 func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.AcceptContactRequest) (*MessengerResponse, error) {
@@ -280,6 +303,7 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 	if err != nil {
 		return nil, err
 	}
+
 	if err := m.saveChat(profileChat); err != nil {
 		return nil, err
 	}

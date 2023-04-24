@@ -94,6 +94,7 @@ func (s *MessengerContactRequestSuite) sendContactRequest(request *requests.Send
 	contacts := messenger.AddedContacts()
 	s.Require().Len(contacts, 1)
 	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestLocalState)
+	s.Require().NotNil(contacts[0].DisplayName)
 }
 
 func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string, theirMessenger *Messenger) *common.Message {
@@ -171,6 +172,11 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 	s.Require().Len(resp.Contacts, 1)
 	s.Require().True(resp.Contacts[0].mutual())
 
+	// Check we have active chat in the response
+	s.Require().Len(resp.Chats(), 2)
+	s.Require().True(resp.Chats()[0].Active) // This is unactive profile chat
+	s.Require().True(resp.Chats()[1].Active)
+
 	// Make sure the sender is added to our contacts
 	contacts := theirMessenger.AddedContacts()
 	s.Require().Len(contacts, 1)
@@ -214,9 +220,16 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 	contact := resp.Contacts[0]
 	s.Require().True(contact.mutual())
 
-	// Chat should be active after receiving the CR
-	chat, _, err := s.m.getOneToOneAndNextClock(contact)
-	s.Require().NoError(err)
+	// Sender's side chat should be active after the accepting the CR
+	chat, ok := s.m.allChats.Load(contact.ID)
+	s.Require().True(ok)
+	s.Require().NotNil(chat)
+	s.Require().True(chat.Active)
+
+	// Receiver's side chat should be also active after the accepting the CR
+	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+	chat, ok = theirMessenger.allChats.Load(myID)
+	s.Require().True(ok)
 	s.Require().NotNil(chat)
 	s.Require().True(chat.Active)
 }
