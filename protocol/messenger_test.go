@@ -279,6 +279,8 @@ func (s *MessengerSuite) TestMarkMessagesSeen() {
 		if c.ID == chat.ID {
 			s.Require().Equal(uint(1), c.UnviewedMessagesCount)
 			s.Require().Equal(uint(1), c.UnviewedMentionsCount)
+			s.Require().NotNil(c.FirstUnviewedMessage)
+			s.Require().Equal(inputMessage2.ID, c.FirstUnviewedMessage.ID)
 			s.Require().Equal(false, c.Highlight)
 		}
 	}
@@ -297,6 +299,10 @@ func (s *MessengerSuite) TestMarkAllRead() {
 	inputMessage2.ID = "2"
 	inputMessage2.Seen = false
 
+	chat.FirstUnviewedMessage = &common.Message{
+		ID: inputMessage1.ID,
+	}
+
 	err = s.m.SaveMessages([]*common.Message{inputMessage1, inputMessage2})
 	s.Require().NoError(err)
 
@@ -309,6 +315,7 @@ func (s *MessengerSuite) TestMarkAllRead() {
 		if chats[idx].ID == chat.ID {
 			s.Require().Equal(uint(0), chats[idx].UnviewedMessagesCount)
 			s.Require().Equal(false, chats[idx].Highlight)
+			s.Require().Nil(chats[idx].FirstUnviewedMessage)
 		}
 	}
 }
@@ -485,6 +492,8 @@ func (s *MessengerSuite) TestRetrieveOwnPublic() {
 	actualChat := response.Chats()[0]
 	// It does not set the unviewed messages count
 	s.Require().Equal(uint(0), actualChat.UnviewedMessagesCount)
+	// It does not set last unviewed message
+	s.Require().Nil(actualChat.FirstUnviewedMessage)
 	// It updates the last message clock value
 	s.Require().Equal(textMessage.Clock, actualChat.LastClockValue)
 	// It sets the last message
@@ -528,6 +537,8 @@ func (s *MessengerSuite) TestRetrieveTheirPublic() {
 	actualChat := response.Chats()[0]
 	// It sets the unviewed messages count
 	s.Require().Equal(uint(1), actualChat.UnviewedMessagesCount)
+	// It sets the first unviewed message
+	s.Require().NotNil(actualChat.FirstUnviewedMessage)
 	// It updates the last message clock value
 	s.Require().Equal(sentMessage.Clock, actualChat.LastClockValue)
 	// It sets the last message

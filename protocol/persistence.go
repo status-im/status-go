@@ -138,8 +138,8 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, emoji, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, members, membership_updates, muted, muted_till, invitation_admin, profile, community_id, joined, synced_from, synced_to, first_message_timestamp, description, highlight, read_messages_at_clock_value, received_invitation_admin, image_payload)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, emoji, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, unviewed_mentions_count, last_clock_value, last_message, first_unviewed_message_id, members, membership_updates, muted, muted_till, invitation_admin, profile, community_id, joined, synced_from, synced_to, first_message_timestamp, description, highlight, read_messages_at_clock_value, received_invitation_admin, image_payload)
+	    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
@@ -152,6 +152,13 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 			return err
 		}
 	}
+
+	firstUnviewedMessageID := func() string {
+		if chat.FirstUnviewedMessage != nil {
+			return chat.FirstUnviewedMessage.ID
+		}
+		return ""
+	}()
 
 	_, err = stmt.Exec(
 		chat.ID,
@@ -166,6 +173,7 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 		chat.UnviewedMentionsCount,
 		chat.LastClockValue,
 		encodedLastMessage,
+		firstUnviewedMessageID,
 		encodedMembers.Bytes(),
 		encodedMembershipUpdates.Bytes(),
 		chat.Muted,
@@ -266,6 +274,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chats.unviewed_mentions_count,
 			chats.last_clock_value,
 			chats.last_message,
+			chats.first_unviewed_message_id,
 			chats.members,
 			chats.membership_updates,
 			chats.muted,
@@ -295,6 +304,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			alias                    sql.NullString
 			invitationAdmin          sql.NullString
 			profile                  sql.NullString
+			firstUnviewedMessageID   sql.NullString
 			syncedFrom               sql.NullInt64
 			syncedTo                 sql.NullInt64
 			firstMessageTimestamp    sql.NullInt64
@@ -319,6 +329,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&chat.UnviewedMentionsCount,
 			&chat.LastClockValue,
 			&lastMessageBytes,
+			&firstUnviewedMessageID,
 			&encodedMembers,
 			&encodedMembershipUpdates,
 			&chat.Muted,
@@ -347,6 +358,13 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 
 		if profile.Valid {
 			chat.Profile = profile.String
+		}
+
+		if firstUnviewedMessageID.Valid && firstUnviewedMessageID.String != "" {
+			firstUnviewedMessage, err := db.messageByID(tx, firstUnviewedMessageID.String)
+			if err == nil {
+				chat.FirstUnviewedMessage = firstUnviewedMessage
+			}
 		}
 
 		// Restore members
@@ -411,6 +429,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		lastMessageBytes         []byte
 		invitationAdmin          sql.NullString
 		profile                  sql.NullString
+		firstUnviewedMessageID   sql.NullString
 		syncedFrom               sql.NullInt64
 		syncedTo                 sql.NullInt64
 		firstMessageTimestamp    sql.NullInt64
@@ -433,6 +452,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 			unviewed_mentions_count,
 			last_clock_value,
 			last_message,
+			chats.first_unviewed_message_id,
 			members,
 			membership_updates,
 			muted,
@@ -463,6 +483,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		&chat.UnviewedMentionsCount,
 		&chat.LastClockValue,
 		&lastMessageBytes,
+		&firstUnviewedMessageID,
 		&encodedMembers,
 		&encodedMembershipUpdates,
 		&chat.Muted,
@@ -491,6 +512,12 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		}
 		if firstMessageTimestamp.Valid {
 			chat.FirstMessageTimestamp = uint32(firstMessageTimestamp.Int64)
+		}
+		if firstUnviewedMessageID.Valid && firstUnviewedMessageID.String != "" {
+			firstUnviewedMessage, err := db.messageByID(nil, firstUnviewedMessageID.String)
+			if err == nil {
+				chat.FirstUnviewedMessage = firstUnviewedMessage
+			}
 		}
 		if invitationAdmin.Valid {
 			chat.InvitationAdmin = invitationAdmin.String

@@ -92,6 +92,7 @@ type Chat struct {
 	UnviewedMessagesCount uint            `json:"unviewedMessagesCount"`
 	UnviewedMentionsCount uint            `json:"unviewedMentionsCount"`
 	LastMessage           *common.Message `json:"lastMessage"`
+	FirstUnviewedMessage  *common.Message `json:"firstUnviewedMessage"`
 
 	// Group chat fields
 	// Members are the members who have been invited to the group chat
@@ -370,6 +371,17 @@ func (c *Chat) UpdateFromMessage(message *common.Message, timesource common.Time
 	if c.LastClockValue < message.Clock {
 		c.LastClockValue = message.Clock
 	}
+	// Update FirstUnviewedMessage
+	if !message.Seen && !message.Deleted && !message.DeletedForMe {
+		if c.FirstUnviewedMessage != nil {
+			if message.Clock < c.FirstUnviewedMessage.Clock {
+				c.FirstUnviewedMessage = message
+			}
+		} else {
+			c.FirstUnviewedMessage = message
+		}
+	}
+
 	return nil
 }
 

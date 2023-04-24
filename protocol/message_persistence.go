@@ -36,6 +36,8 @@ var basicInsertDiscordMessageAuthorQuery = `INSERT OR REPLACE INTO discord_messa
 var cursor = "substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id"
 var cursorField = cursor + " as cursor"
 
+const FirstUnviewedMessageNone = ""
+
 func (db sqlitePersistence) buildMessagesQueryWithAdditionalFields(additionalSelectFields, whereAndTheRest string) string {
 	allFields := db.tableUserMessagesAllFieldsJoin()
 	if additionalSelectFields != "" {
@@ -715,10 +717,10 @@ func (db sqlitePersistence) FirstUnseenMessageID(chatID string) (string, error) 
 			FROM
 				user_messages m1
 			WHERE
-				m1.local_chat_id = ? AND NOT(m1.seen) AND NOT(m1.hide) AND NOT(m1.deleted) AND NOT(m1.deleted_for_me)
+				m1.local_chat_id = ? AND NOT(m1.seen) AND %s
 			ORDER BY %s ASC
 			LIMIT 1
-		`, cursor),
+		`, msgNotHidden, cursor),
 		chatID).Scan(&id)
 
 	if err == sql.ErrNoRows {
@@ -728,6 +730,19 @@ func (db sqlitePersistence) FirstUnseenMessageID(chatID string) (string, error) 
 		return "", err
 	}
 	return id, nil
+}
+
+func (db sqlitePersistence) FirstUnviewedMessage(chatID string) (*common.Message, error) {
+	msgID, err := db.FirstUnseenMessageID(chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	if msgID == FirstUnviewedMessageNone {
+		return nil, nil
+	}
+
+	return db.MessageByID(msgID)
 }
 
 // Get last chat message that is not hide or deleted or deleted_for_me
@@ -1643,11 +1658,11 @@ func (db sqlitePersistence) deleteMessagesByChatID(id string, tx *sql.Tx) (err e
 	return
 }
 
-func (db sqlitePersistence) deleteMessagesByChatIDAndClockValueLessThanOrEqual(id string, clock uint64, tx *sql.Tx) (unViewedMessages, unViewedMentions uint, err error) {
+func (db sqlitePersistence) deleteMessagesByChatIDAndClockValueLessThanOrEqual(id string, clock uint64, tx *sql.Tx) (unviewedMessages, unviewedMentions uint, firstUnviewedMessageID string, err error) {
 	if tx == nil {
 		tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
 		if err != nil {
-			return 0, 0, err
+			return 0, 0, "", err
 		}
 		defer func() {
 			if err == nil {
@@ -1669,27 +1684,12 @@ func (db sqlitePersistence) deleteMessagesByChatIDAndClockValueLessThanOrEqual(i
 		return
 	}
 
-	_, err = tx.Exec(
-		`UPDATE chats
-		   SET unviewed_message_count =
-		   (SELECT COUNT(1)
-		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0),
-		   unviewed_mentions_count =
-		   (SELECT COUNT(1)
-		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0 AND (mentioned OR replied)),
-                   highlight = 0
-		WHERE id = ?`, id, id, id)
-
+	err = db.updateChatUnviewedCounts(id, tx)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, "", err
 	}
 
-	err = tx.QueryRow(`SELECT unviewed_message_count, unviewed_mentions_count FROM chats
-				WHERE id = ?`, id).Scan(&unViewedMessages, &unViewedMentions)
-
-	return
+	return db.getChatUnviewedCounts(id, tx)
 }
 
 func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int64, error) {
@@ -1726,19 +1726,7 @@ func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int
 		return 0, 0, err
 	}
 
-	_, err = tx.Exec(
-		`UPDATE chats
-		   SET unviewed_message_count =
-		   (SELECT COUNT(1)
-		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0),
-		   unviewed_mentions_count =
-		   (SELECT COUNT(1)
-		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0 AND (mentioned or replied)),
-                   highlight = 0
-		WHERE id = ?`, chatID, chatID, chatID)
-
+	err = db.clearChatsUnviewedCounts([]string{chatID}, tx)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -1774,10 +1762,7 @@ func (db sqlitePersistence) MarkAllReadMultiple(chatIDs []string) error {
 		return err
 	}
 
-	q = "UPDATE chats SET unviewed_mentions_count = 0, unviewed_message_count = 0, highlight = 0 WHERE id IN (%s)"
-	q = fmt.Sprintf(q, inVector)
-	_, err = tx.Exec(q, idsArgs...)
-	return err
+	return db.clearChatsUnviewedCounts(chatIDs, tx)
 }
 
 func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) (uint64, uint64, error) {
@@ -1824,19 +1809,8 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) (uint6
 		return 0, 0, err
 	}
 
-	// Update denormalized count
-	_, err = tx.Exec(
-		`UPDATE chats
-              	SET unviewed_message_count =
-		   (SELECT COUNT(1)
-		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0),
-		   unviewed_mentions_count =
-		   (SELECT COUNT(1)
-		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0 AND (mentioned OR replied)),
-                   highlight = 0
-		WHERE id = ?`, chatID, chatID, chatID)
+	err = db.updateChatUnviewedCounts(chatID, tx)
+
 	return countWithMentions + countNoMentions, countWithMentions, err
 }
 
@@ -1892,12 +1866,7 @@ func (db sqlitePersistence) BlockContact(contact *Contact, isDesktopFunc bool) (
 		}
 	}
 
-	// Recalculate denormalized fields
-	_, err = tx.Exec(`
-		UPDATE chats
-		SET
-			unviewed_message_count = (SELECT COUNT(1) FROM user_messages WHERE seen = 0 AND local_chat_id = chats.id),
-			unviewed_mentions_count = (SELECT COUNT(1) FROM user_messages WHERE seen = 0 AND local_chat_id = chats.id AND (mentioned OR replied))`)
+	err = db.updateAllChatsUnviewedCounts(tx)
 	if err != nil {
 		return nil, err
 	}
@@ -2464,6 +2433,7 @@ func (db sqlitePersistence) clearHistory(chat *Chat, currentClockValue uint64, t
 	chat.SyncedFrom = 0
 
 	chat.LastMessage = nil
+	chat.FirstUnviewedMessage = nil
 	chat.UnviewedMessagesCount = 0
 	chat.UnviewedMentionsCount = 0
 	chat.Highlight = true
@@ -2485,13 +2455,23 @@ func (db sqlitePersistence) clearHistoryFromSyncMessage(chat *Chat, clearedAt ui
 	chat.SyncedTo = syncedTo
 	chat.SyncedFrom = 0
 
-	unViewedMessagesCount, unViewedMentionsCount, err := db.deleteMessagesByChatIDAndClockValueLessThanOrEqual(chat.ID, clearedAt, tx)
+	unviewedMessagesCount, unviewedMentionsCount, firstUnviewedMessageID, err := db.deleteMessagesByChatIDAndClockValueLessThanOrEqual(chat.ID, clearedAt, tx)
 	if err != nil {
 		return err
 	}
 
-	chat.UnviewedMessagesCount = unViewedMessagesCount
-	chat.UnviewedMentionsCount = unViewedMentionsCount
+	chat.UnviewedMessagesCount = unviewedMessagesCount
+	chat.UnviewedMentionsCount = unviewedMentionsCount
+
+	if firstUnviewedMessageID != FirstUnviewedMessageNone {
+		firstUnviewedMessage, err := db.messageByID(tx, firstUnviewedMessageID)
+		if err != nil {
+			return err
+		}
+		chat.FirstUnviewedMessage = firstUnviewedMessage
+	} else {
+		chat.FirstUnviewedMessage = nil
+	}
 
 	if chat.LastMessage != nil && chat.LastMessage.Clock <= clearedAt {
 		chat.LastMessage = nil

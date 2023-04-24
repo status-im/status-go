@@ -193,6 +193,7 @@ func (s *MessengerSyncChatSuite) TestMarkChatMessagesRead() {
 
 	alice2chat := s.alice2.Chat(chatID)
 	s.Require().Equal(alice2chat.UnviewedMessagesCount, uint(1))
+	s.Require().NotNil(alice2chat.FirstUnviewedMessage)
 
 	err = s.alice1.MarkAllRead(chatID)
 	s.Require().NoError(err)
@@ -217,4 +218,5 @@ func (s *MessengerSyncChatSuite) TestMarkChatMessagesRead() {
 
 	s.Require().Equal(receivedChat.ID, chatID)
 	s.Require().Equal(receivedChat.UnviewedMessagesCount, uint(0))
+	s.Require().Nil(receivedChat.FirstUnviewedMessage)
 }

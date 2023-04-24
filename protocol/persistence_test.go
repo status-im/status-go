@@ -1224,6 +1224,9 @@ func TestDeactivatePublicChat(t *testing.T) {
 	publicChat := CreatePublicChat(publicChatID, timesource)
 	publicChat.LastMessage = &lastMessage
 	publicChat.UnviewedMessagesCount = 1
+	publicChat.FirstUnviewedMessage = &common.Message{
+		ID: "0x123",
+	}
 
 	err = p.DeactivateChat(publicChat, currentClockValue, true)
 
@@ -1236,6 +1239,9 @@ func TestDeactivatePublicChat(t *testing.T) {
 
 	// It sets unviewed messages count
 	require.Equal(t, uint(0), publicChat.UnviewedMessagesCount)
+
+	// It clears first unviewed message
+	require.Nil(t, publicChat.FirstUnviewedMessage)
 
 	// It sets active as false
 	require.False(t, publicChat.Active)
@@ -1261,6 +1267,9 @@ func TestDeactivatePublicChat(t *testing.T) {
 
 	// It sets unviewed messages count
 	require.Equal(t, uint(0), dbChat.UnviewedMessagesCount)
+
+	// It clears first unviewed message
+	require.Nil(t, dbChat.FirstUnviewedMessage)
 
 	// It sets active as false
 	require.False(t, dbChat.Active)
@@ -1293,6 +1302,9 @@ func TestDeactivateOneToOneChat(t *testing.T) {
 
 	chat.LastMessage = &lastMessage
 	chat.UnviewedMessagesCount = 1
+	chat.FirstUnviewedMessage = &common.Message{
+		ID: "0x123",
+	}
 
 	err = p.DeactivateChat(chat, currentClockValue, true)
 
@@ -1305,6 +1317,9 @@ func TestDeactivateOneToOneChat(t *testing.T) {
 
 	// It sets unviewed messages count
 	require.Equal(t, uint(0), chat.UnviewedMessagesCount)
+
+	// It clears first unviewed message
+	require.Nil(t, chat.FirstUnviewedMessage)
 
 	// It sets active as false
 	require.False(t, chat.Active)
@@ -1330,6 +1345,9 @@ func TestDeactivateOneToOneChat(t *testing.T) {
 
 	// It sets unviewed messages count
 	require.Equal(t, uint(0), dbChat.UnviewedMessagesCount)
+
+	// It clears first unviewed message
+	require.Nil(t, dbChat.FirstUnviewedMessage)
 
 	// It sets active as false
 	require.False(t, dbChat.Active)

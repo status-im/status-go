@@ -58,6 +58,7 @@ type Chat struct {
 	UnviewedMessagesCount    uint                               `json:"unviewedMessagesCount"`
 	UnviewedMentionsCount    uint                               `json:"unviewedMentionsCount"`
 	LastMessage              *common.Message                    `json:"lastMessage"`
+	FirstUnviewedMessage     *common.Message                    `json:"firstUnviewedMessage"`
 	Members                  map[string]Member                  `json:"members,omitempty"`
 	MembershipUpdates        []v1protocol.MembershipUpdateEvent `json:"membershipUpdateEvents"`
 	Alias                    string                             `json:"alias,omitempty"`
@@ -404,6 +405,7 @@ func (api *API) toAPIChat(protocolChat *protocol.Chat, community *communities.Co
 		UnviewedMessagesCount:    protocolChat.UnviewedMessagesCount,
 		UnviewedMentionsCount:    protocolChat.UnviewedMentionsCount,
 		LastMessage:              protocolChat.LastMessage,
+		FirstUnviewedMessage:     protocolChat.FirstUnviewedMessage,
 		MembershipUpdates:        protocolChat.MembershipUpdates,
 		Alias:                    protocolChat.Alias,
 		Identicon:                protocolChat.Identicon,
