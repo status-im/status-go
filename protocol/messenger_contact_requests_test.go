@@ -95,6 +95,9 @@ func (s *MessengerContactRequestSuite) sendContactRequest(request *requests.Send
 	s.Require().Len(contacts, 1)
 	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestLocalState)
 	s.Require().NotNil(contacts[0].DisplayName)
+
+	// Check contact's primary name matches notifiaction's name
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Name, contacts[0].PrimaryName())
 }
 
 func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string, theirMessenger *Messenger) *common.Message {
@@ -143,6 +146,9 @@ func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string,
 	contact := resp.Contacts[0]
 	s.Require().Equal(ContactRequestStateReceived, contact.ContactRequestRemoteState)
 
+	// Check contact's primary name matches notifiaction's name
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Name, contact.PrimaryName())
+
 	// Make sure it's the latest pending contact requests
 	contactRequests, _, err := theirMessenger.PendingContactRequests("", 10)
 	s.Require().NoError(err)
@@ -171,6 +177,9 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
 	s.Require().True(resp.Contacts[0].mutual())
+
+	// Check contact's primary name matches notifiaction's name
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Name, resp.Contacts[0].PrimaryName())
 
 	// Check we have active chat in the response
 	s.Require().Len(resp.Chats(), 2)
@@ -220,6 +229,9 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 	contact := resp.Contacts[0]
 	s.Require().True(contact.mutual())
 
+	// Check contact's primary name matches notifiaction's name
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Name, contact.PrimaryName())
+
 	// Sender's side chat should be active after the accepting the CR
 	chat, ok := s.m.allChats.Load(contact.ID)
 	s.Require().True(ok)
@@ -256,6 +268,9 @@ func (s *MessengerContactRequestSuite) declineContactRequest(contactRequest *com
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Accepted, false)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Dismissed, true)
 	s.Require().Equal(common.ContactRequestStateDismissed, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+
+	// Check contact's primary name matches notifiaction's name
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Name, resp.Contacts[0].PrimaryName())
 
 	// Make sure the sender is not added to our contacts
 	contacts := theirMessenger.AddedContacts()

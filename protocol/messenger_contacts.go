@@ -110,6 +110,7 @@ func (m *Messenger) declineContactRequest(requestID string, syncing bool) (*Mess
 		return nil, err
 	}
 	if notification != nil {
+		notification.Name = contact.PrimaryName()
 		notification.Message = contactRequest
 		notification.Read = true
 		notification.Dismissed = true
@@ -219,6 +220,7 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	}
 
 	if notification != nil {
+		notification.Name = contact.PrimaryName()
 		notification.Message = contactRequest
 		notification.Read = true
 		notification.Accepted = true

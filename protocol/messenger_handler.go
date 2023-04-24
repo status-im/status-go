@@ -304,6 +304,7 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 		}
 
 		if notification != nil {
+			notification.Name = contact.PrimaryName()
 			notification.Message = contactRequest
 			notification.Read = true
 			notification.Accepted = true
