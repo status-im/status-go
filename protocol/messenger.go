@@ -4347,11 +4347,17 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						Type:        ActivityCenterNotificationTypeCommunityKicked,
 						Timestamp:   m.getTimesource().GetCurrentTime(),
 						CommunityID: changes.Community.IDString(),
+						Read:        false,
 					}
 
 					err = m.addActivityCenterNotification(response, notification)
 					if err != nil {
-						m.logger.Error("failed to save notification", zap.Error(err))
+						logger.Error("failed to save notification", zap.Error(err))
+						continue
+					}
+
+					if err := messageState.Response.Merge(response); err != nil {
+						logger.Error("cannot merge notification response", zap.Error(err))
 						continue
 					}
 				}
