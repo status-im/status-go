@@ -1233,6 +1233,7 @@ func (m *Manager) CancelRequestToJoin(request *requests.CancelRequestToJoinCommu
 		return nil, nil, err
 	}
 
+	community.RemoveOurselvesFromOrg(pk)
 	err = m.persistence.SaveCommunity(community)
 	if err != nil {
 		return nil, nil, err
