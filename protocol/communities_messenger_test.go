@@ -1909,6 +1909,12 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 		if len(response.Communities()) == 0 {
 			return errors.New("community not received")
 		}
+		if len(response.ActivityCenterNotifications()) == 0 {
+			return errors.New("activity center notification not received")
+		}
+		if response.ActivityCenterState().HasSeen {
+			return errors.New("activity center seen state is incorrect")
+		}
 		return nil
 	})
 
