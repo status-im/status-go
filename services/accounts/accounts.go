@@ -243,6 +243,19 @@ func (api *API) VerifyPassword(password string) bool {
 }
 
 func (api *API) AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(ctx context.Context, kcUID string, kpName string, keyUID string, accountAddresses []string, password string) error {
+	if len(accountAddresses) == 0 {
+		return errors.New("cannot migrate a keypair without any address")
+	}
+
+	acc, err := api.db.GetAccountByAddress(types.Address(common.HexToAddress(accountAddresses[0])))
+	if err != nil {
+		return err
+	}
+
+	if len(acc.DerivedFrom) == 0 {
+		return errors.New("an account being migrated doesn't contain `derived_from` field set")
+	}
+
 	kp := keypairs.KeyPair{
 		KeycardUID:      kcUID,
 		KeycardName:     kpName,
@@ -267,7 +280,13 @@ func (api *API) AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(ctx context.Cont
 				return err
 			}
 		}
+
+		err = api.manager.DeleteAccount(types.Address(common.HexToAddress(acc.DerivedFrom)), password)
+		if err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 

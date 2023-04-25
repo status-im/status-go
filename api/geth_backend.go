@@ -647,11 +647,6 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 		return err
 	}
 
-	masterAddress, err := accountDB.GetMasterAddress()
-	if err != nil {
-		return err
-	}
-
 	dappsAddress, err := accountDB.GetDappsAddress()
 	if err != nil {
 		return err
@@ -678,8 +673,6 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 	}
 
 	// We need to delete all accounts for the keypair which is being migrated
-	// no need to check for the error below cause if this action fails from
-	// whichever reason the account is still successfully migrated
 	for _, acc := range knownAccounts {
 		if account.KeyUID == acc.KeyUID {
 			err = b.tryToDeleteAccount(acc.Address, password, newPassword)
@@ -687,11 +680,6 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 				return err
 			}
 		}
-	}
-
-	err = b.tryToDeleteAccount(masterAddress, password, newPassword)
-	if err != nil {
-		return err
 	}
 
 	err = b.tryToDeleteAccount(dappsAddress, password, newPassword)
