@@ -48,12 +48,7 @@ func (api *API) SaveAccount(ctx context.Context, account *accounts.Account) erro
 	return nil
 }
 
-func (api *API) GetAccounts(ctx context.Context) ([]*accounts.Account, error) {
-	accounts, err := api.db.GetAccounts()
-	if err != nil {
-		return nil, err
-	}
-
+func (api *API) checkDerivedFromField(accounts []*accounts.Account) ([]*accounts.Account, error) {
 	for i := range accounts {
 		account := accounts[i]
 		if account.Wallet && account.DerivedFrom == "" {
@@ -64,8 +59,25 @@ func (api *API) GetAccounts(ctx context.Context) ([]*accounts.Account, error) {
 			account.DerivedFrom = address.Hex()
 		}
 	}
-
 	return accounts, nil
+}
+
+func (api *API) GetAccounts(ctx context.Context) ([]*accounts.Account, error) {
+	accounts, err := api.db.GetAccounts()
+	if err != nil {
+		return nil, err
+	}
+
+	return api.checkDerivedFromField(accounts)
+}
+
+func (api *API) GetAccountsByKeyUID(ctx context.Context, keyUID string) ([]*accounts.Account, error) {
+	accounts, err := api.db.GetAccountsByKeyUID(keyUID)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.checkDerivedFromField(accounts)
 }
 
 func (api *API) DeleteAccount(ctx context.Context, address types.Address, password string) error {
