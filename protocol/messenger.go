@@ -157,6 +157,7 @@ type Messenger struct {
 	downloadHistoryArchiveTasksWaitGroup sync.WaitGroup
 	verificationDatabase                 *verification.Persistence
 	savedAddressesManager                *wallet.SavedAddressesManager
+	walletAPI                            *wallet.API
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
 	mutex                     sync.Mutex
@@ -421,7 +422,7 @@ func NewMessenger(
 	}
 	if c.rpcClient != nil {
 		tokenManager := token.NewTokenManager(database, c.rpcClient, c.rpcClient.NetworkManager)
-		managerOptions = append(managerOptions, communities.WithTokenManager(tokenManager))
+		managerOptions = append(managerOptions, communities.WithTokenManager(communities.NewDefaultTokenManager(tokenManager)))
 	}
 
 	if c.walletConfig != nil {
@@ -510,6 +511,10 @@ func NewMessenger(
 		savedAddressesManager: savedAddressesManager,
 	}
 	messenger.mentionsManager = NewMentionManager(messenger)
+
+	if c.walletService != nil {
+		messenger.walletAPI = wallet.NewAPI(c.walletService)
+	}
 
 	if c.outputMessagesCSV {
 		messenger.outputCSV = c.outputMessagesCSV
@@ -713,6 +718,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchUnmutedChats()
 	m.watchExpiredMessages()
 	m.watchIdentityImageChanges()
+	m.watchWalletBalances()
 	m.watchPendingCommunityRequestToJoin()
 	m.broadcastLatestUserStatus()
 	m.timeoutAutomaticStatusUpdates()
@@ -2496,107 +2502,6 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 	}
 
 	return m.syncSocialSettings(ctx, rawMessageHandler)
-}
-
-func (m *Messenger) SaveAccount(acc *accounts.Account) error {
-	clock, _ := m.getLastClockWithRelatedChat()
-	acc.Clock = clock
-
-	err := m.settings.SaveAccounts([]*accounts.Account{acc})
-	if err != nil {
-		return err
-	}
-	return m.syncWallets([]*accounts.Account{acc}, m.dispatchMessage)
-}
-
-func (m *Messenger) DeleteAccount(address types.Address) error {
-
-	acc, err := m.settings.GetAccountByAddress(address)
-	if err != nil {
-		return err
-	}
-
-	err = m.settings.DeleteAccount(address)
-	if err != nil {
-		return err
-	}
-
-	clock, chat := m.getLastClockWithRelatedChat()
-	acc.Clock = clock
-	acc.Removed = true
-
-	accs := []*accounts.Account{acc}
-	err = m.syncWallets(accs, m.dispatchMessage)
-	if err != nil {
-		return err
-	}
-
-	chat.LastClockValue = clock
-	return m.saveChat(chat)
-}
-
-func (m *Messenger) prepareSyncWalletAccountsMessage(accs []*accounts.Account) *protobuf.SyncWalletAccounts {
-	accountMessages := make([]*protobuf.SyncWalletAccount, 0)
-	for _, acc := range accs {
-		if acc.Chat {
-			continue
-		}
-
-		syncMessage := &protobuf.SyncWalletAccount{
-			Clock:                   acc.Clock,
-			Address:                 acc.Address.Bytes(),
-			Wallet:                  acc.Wallet,
-			Chat:                    acc.Chat,
-			Type:                    acc.Type.String(),
-			Storage:                 acc.Storage,
-			Path:                    acc.Path,
-			PublicKey:               acc.PublicKey,
-			Name:                    acc.Name,
-			Color:                   acc.Color,
-			Hidden:                  acc.Hidden,
-			Removed:                 acc.Removed,
-			Emoji:                   acc.Emoji,
-			DerivedFrom:             acc.DerivedFrom,
-			KeyUid:                  acc.KeyUID,
-			KeypairName:             acc.KeypairName,
-			LastUsedDerivationIndex: acc.LastUsedDerivationIndex,
-		}
-
-		accountMessages = append(accountMessages, syncMessage)
-	}
-
-	return &protobuf.SyncWalletAccounts{
-		Accounts: accountMessages,
-	}
-}
-
-// syncWallets syncs all wallets with paired devices
-func (m *Messenger) syncWallets(accs []*accounts.Account, rawMessageHandler RawMessageHandler) error {
-	if !m.hasPairedDevices() {
-		return nil
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, chat := m.getLastClockWithRelatedChat()
-
-	message := m.prepareSyncWalletAccountsMessage(accs)
-
-	encodedMessage, err := proto.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_WALLET_ACCOUNT,
-		ResendAutomatically: true,
-	}
-
-	_, err = rawMessageHandler(ctx, rawMessage)
-	return err
 }
 
 func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID string, accepted bool, rawMessageHandler RawMessageHandler) error {

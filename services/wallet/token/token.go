@@ -649,6 +649,7 @@ func (tm *Manager) GetBalancesByChain(parent context.Context, clients map[uint64
 		client := clients[clientIdx]
 		ethScanContract, err := contractMaker.NewEthScan(client.ChainID)
 		if err != nil {
+			log.Error("error scanning contract", "err", err)
 			return nil, err
 		}
 

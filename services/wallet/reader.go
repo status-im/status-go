@@ -38,8 +38,15 @@ func belongsToMandatoryTokens(symbol string) bool {
 	return false
 }
 
-func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, marketManager *market.Manager, accountsDB *accounts.Database, walletFeed *event.Feed) *Reader {
-	return &Reader{rpcClient, tokenManager, marketManager, accountsDB, walletFeed, nil}
+func NewReader(rpcClient *rpc.Client, tokenManager *token.Manager, marketManager *market.Manager, accountsDB *accounts.Database, persistence *Persistence, walletFeed *event.Feed) *Reader {
+	return &Reader{
+		rpcClient,
+		tokenManager,
+		marketManager,
+		accountsDB,
+		persistence,
+		walletFeed,
+		nil}
 }
 
 type Reader struct {
@@ -47,6 +54,7 @@ type Reader struct {
 	tokenManager  *token.Manager
 	marketManager *market.Manager
 	accountsDB    *accounts.Database
+	persistence   *Persistence
 	walletFeed    *event.Feed
 	cancel        context.CancelFunc
 }
@@ -217,7 +225,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 			for _, client := range clients {
 				client.SetIsConnected(false)
 			}
-			log.Info("tokenManager.GetBalancesByChain err", err)
+			log.Info("tokenManager.GetBalancesByChain error", "err", err)
 			return err
 		}
 		return nil
@@ -294,5 +302,12 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 			result[address] = append(result[address], walletToken)
 		}
 	}
-	return result, nil
+
+	return result, r.persistence.SaveTokens(result)
+}
+
+// GetCachedWalletTokensWithoutMarketData returns the latest fetched balances, minus
+// price information
+func (r *Reader) GetCachedWalletTokensWithoutMarketData() (map[common.Address][]Token, error) {
+	return r.persistence.GetTokens()
 }

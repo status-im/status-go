@@ -22,6 +22,7 @@ import (
 
 	"github.com/meirf/gopart"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -556,6 +557,20 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	if err := request.Validate(); err != nil {
 		logger.Debug("request failed to validate", zap.Error(err), zap.Any("request", request))
 		return nil, err
+	}
+
+	// verify wallet password if there
+	if request.Password != "" {
+		walletAccounts, err := m.settings.GetAccounts()
+		if err != nil {
+			return nil, err
+		}
+		if len(walletAccounts) > 0 {
+			_, err := m.accountsManager.GetVerifiedWalletAccount(m.settings, walletAccounts[0].Address.Hex(), request.Password)
+			if err != nil {
+				return nil, errors.New("wrong password")
+			}
+		}
 	}
 
 	displayName, err := m.settings.DisplayName()
@@ -3599,4 +3614,24 @@ func (m *Messenger) UpdateCommunityEncryption(community *communities.Community) 
 	response.AddCommunity(community)
 
 	return response, nil
+
+}
+
+func (m *Messenger) CheckPermissionsToJoinCommunity(request *requests.CheckPermissionToJoinCommunity) (*communities.CheckPermissionToJoinResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	accounts, err := m.settings.GetAccounts()
+	if err != nil {
+		return nil, err
+	}
+
+	var addresses []gethcommon.Address
+
+	for _, a := range accounts {
+		addresses = append(addresses, gethcommon.HexToAddress(a.Address.Hex()))
+	}
+
+	return m.communitiesManager.CheckPermissionToJoin(request.CommunityID, addresses)
 }
