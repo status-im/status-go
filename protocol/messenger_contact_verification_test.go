@@ -135,7 +135,7 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 	resp, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool {
-			return len(r.Contacts) == 1 && len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1
+			return len(r.Contacts) == 1 && len(r.Messages()) == 1 && len(r.ActivityCenterNotifications()) == 1
 		},
 		"no messages",
 	)
@@ -148,18 +148,9 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 
 	// Make sure the message is updated, sender s2de
 	s.Require().NotNil(resp)
-	s.Require().Len(resp.Messages(), 2)
-	var message *common.Message
-
-	for _, m := range resp.Messages() {
-		if m.ID == contactRequests[0].ID {
-			message = m
-		}
-	}
-	s.Require().NotNil(message)
-
-	s.Require().Equal(message.ID, contactRequests[0].ID)
-	s.Require().Equal(common.ContactRequestStateAccepted, message.ContactRequestState)
+	s.Require().Len(resp.Messages(), 1)
+	s.Require().Equal(resp.Messages()[0].ID, contactRequests[0].ID)
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
 
 	// Make sure we consider them a mutual contact, sender side
 	mutualContacts = s.m.MutualContacts()
@@ -168,7 +159,6 @@ func (s *MessengerVerificationRequests) mutualContact(theirMessenger *Messenger)
 	// Check the contact state is correctly set
 	s.Require().Len(resp.Contacts, 1)
 	s.Require().True(resp.Contacts[0].mutual())
-
 }
 
 func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {

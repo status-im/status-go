@@ -270,8 +270,33 @@ func (m *Messenger) PendingNotificationContactRequest(contactID string) (*Activi
 	return m.persistence.ActiveContactRequestNotification(contactID)
 }
 
+func (m *Messenger) createContactRequestForContactUpdate(contact *Contact, messageState *ReceivedMessageState) (*common.Message, error) {
+	contactRequest, err := m.generateContactRequest(
+		messageState.CurrentMessageState.Message.Clock,
+		messageState.CurrentMessageState.WhisperTimestamp,
+		contact,
+		"Please add me to your contacts",
+		false,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	contactRequest.ID = defaultContactRequestID(contact.ID)
+
+	// save this message
+	messageState.Response.AddMessage(contactRequest)
+	err = m.persistence.SaveMessages([]*common.Message{contactRequest})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return contactRequest, nil
+}
+
 func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, messageState *ReceivedMessageState, contactRequest *common.Message, createNewNotification bool) error {
-	if contactRequest != nil && contactRequest.ContactRequestState == common.ContactRequestStateAccepted {
+	if contactRequest.ContactRequestState == common.ContactRequestStateAccepted {
 		// Pull one from the db if there
 		notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(contactRequest.ID))
 		if err != nil {
@@ -279,6 +304,7 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 		}
 
 		if notification != nil {
+			notification.Name = contact.PrimaryName()
 			notification.Message = contactRequest
 			notification.Read = true
 			notification.Accepted = true
@@ -291,82 +317,6 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 			messageState.Response.AddActivityCenterNotification(notification)
 		}
 		return nil
-	}
-
-	if contactRequest == nil || contactRequest.ContactRequestState == common.ContactRequestStatePending {
-		notification, err := m.PendingNotificationContactRequest(contact.ID)
-		if err != nil {
-			return err
-		}
-
-		// If there's already a notification, we will check whether is a default notification
-		// that has not been dismissed (nor accepted???)
-		// If it is, we replace it with a non-default, since it contains a message
-		if notification != nil {
-			// Check if it's the default notification
-			if notification.Message.ID == defaultContactRequestID(contact.ID) {
-				// Nothing to do, we already have a default notification
-				if contactRequest == nil {
-					return nil
-				}
-				// We first dismiss it in the database
-				err := m.persistence.DismissActivityCenterNotifications([]types.HexBytes{types.Hex2Bytes(notification.Message.ID)})
-				if err != nil {
-					return err
-				}
-				//  we mark the notification as dismissed & read
-				notification.Dismissed = true
-				notification.Read = true
-				// We remove it from the response, since the client has never seen it, better to just remove it
-				found := messageState.Response.RemoveActivityCenterNotification(notification.Message.ID)
-				// Otherwise, it means we have already passed it to the client, so we add it with a `dismissed` flag
-				// so it can clean up
-				if !found {
-					messageState.Response.AddActivityCenterNotification(notification)
-				}
-			}
-		}
-	}
-
-	// Legacy//ContactUpdate contact request
-	if contactRequest == nil {
-		if messageState.CurrentMessageState == nil || messageState.CurrentMessageState.MessageID == "" {
-			return errors.New("no available id")
-		}
-		// We use a known id so that we can check if already in the database
-		defaultID := defaultContactRequestID(contact.ID)
-
-		// Pull one from the db if there
-		notification, err := m.persistence.GetActivityCenterNotificationByID(types.FromHex(defaultID))
-		if err != nil {
-			return err
-		}
-
-		// if the notification is accepted, we clear it, as this one will replace it
-		if notification != nil && notification.Accepted {
-			err = m.persistence.DeleteActivityCenterNotification(types.FromHex(defaultID))
-			if err != nil {
-				return err
-			}
-		}
-
-		// generate request message
-		contactRequest, err = m.generateContactRequest(
-			messageState.CurrentMessageState.Message.Clock,
-			messageState.CurrentMessageState.WhisperTimestamp,
-			contact,
-			"Please add me to your contacts",
-		)
-		if err != nil {
-			return err
-		}
-
-		// save this message
-		messageState.Response.AddMessage(contactRequest)
-		err = m.persistence.SaveMessages([]*common.Message{contactRequest})
-		if err != nil {
-			return err
-		}
 	}
 
 	if !createNewNotification {
@@ -829,7 +779,7 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 
 	// If the state has changed from non-mutual contact, to mutual contact
 	// we want to notify the user
-	if processingResponse.newContactRequestReceived && contact.mutual() {
+	if contact.mutual() {
 		// We set the chat as active, this is currently the expected behavior
 		// for mobile, it might change as we implement further the activity
 		// center
@@ -874,14 +824,7 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 }
 
 func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, message protobuf.AcceptContactRequest, senderID string) error {
-	// outgoing contact requests are created on the side of a sender
-	err := m.handleAcceptContactRequestMessage(state, message.Clock, defaultContactRequestID(senderID), true)
-	if err != nil {
-		m.logger.Warn("could not accept contact request", zap.Error(err))
-	}
-
-	// legacy contact requests: the ones that are send with SendContactRequest
-	err = m.handleAcceptContactRequestMessage(state, message.Clock, message.Id, false)
+	err := m.handleAcceptContactRequestMessage(state, message.Clock, message.Id, false)
 	if err != nil {
 		m.logger.Warn("could not accept contact request", zap.Error(err))
 	}
@@ -965,12 +908,17 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 
 		}
 		if result.newContactRequestReceived {
-			err = m.createIncomingContactRequestNotification(contact, state, nil, true)
+			contactRequest, err := m.createContactRequestForContactUpdate(contact, state)
 			if err != nil {
 				return err
 			}
 
+			err = m.createIncomingContactRequestNotification(contact, state, contactRequest, true)
+			if err != nil {
+				return err
+			}
 		}
+
 		logger.Debug("handled propagated state", zap.Any("state after update", contact.ContactRequestPropagatedState()))
 		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)
