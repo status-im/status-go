@@ -45,6 +45,10 @@ func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) 
 	return api.reader.GetWalletToken(ctx, addresses)
 }
 
+func (api *API) GetCachedWalletTokensWithoutMarketData(ctx context.Context) (map[common.Address][]Token, error) {
+	return api.reader.GetCachedWalletTokensWithoutMarketData()
+}
+
 type DerivedAddress struct {
 	Address        common.Address `json:"address"`
 	Path           string         `json:"path"`

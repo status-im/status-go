@@ -1311,6 +1311,10 @@ func (api *PublicAPI) CollapsedCommunityCategories() ([]protocol.CollapsedCommun
 	return api.service.messenger.CollapsedCommunityCategories()
 }
 
+func (api *PublicAPI) CheckPermissionsToJoinCommunity(request *requests.CheckPermissionToJoinCommunity) (*communities.CheckPermissionToJoinResponse, error) {
+	return api.service.messenger.CheckPermissionsToJoinCommunity(request)
+}
+
 func (api *PublicAPI) Messenger() *protocol.Messenger {
 	return api.service.messenger
 }

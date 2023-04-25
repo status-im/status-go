@@ -2,19 +2,26 @@ package communities
 
 import (
 	"bytes"
+	"context"
 	"image"
 	"image/png"
 	"io/ioutil"
+	"math"
+	"math/big"
 	"os"
 	"testing"
 	"time"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 	userimages "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 
 	"github.com/golang/protobuf/proto"
 	_ "github.com/mutecomm/go-sqlcipher" // require go-sqlcipher that overrides default implementation
@@ -52,7 +59,11 @@ func (s *ManagerSuite) SetupTest() {
 	s.manager = m
 }
 
-func (s *ManagerSuite) getHistoryTaksCount() int {
+func intToBig(n int64) *hexutil.Big {
+	return (*hexutil.Big)(big.NewInt(n))
+}
+
+func (s *ManagerSuite) getHistoryTasksCount() int {
 	// sync.Map doesn't have a Len function, so we need to count manually
 	count := 0
 	s.manager.historyArchiveTasks.Range(func(_, _ interface{}) bool {
@@ -60,6 +71,104 @@ func (s *ManagerSuite) getHistoryTaksCount() int {
 		return true
 	})
 	return count
+}
+
+type openseaClientTestBuilder struct {
+}
+
+func (b *openseaClientTestBuilder) NewOpenseaClient(chainID uint64, apiKey string, feed *event.Feed) (openseaClient, error) {
+	return opensea.NewOpenseaClient(chainID, apiKey, nil)
+}
+
+type testTokenManager struct {
+	response map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
+}
+
+func (m *testTokenManager) setResponse(chainID uint64, walletAddress, tokenAddress gethcommon.Address, balance int64) {
+
+	if m.response == nil {
+		m.response = make(map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	}
+
+	if m.response[chainID] == nil {
+		m.response[chainID] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	}
+
+	if m.response[chainID][walletAddress] == nil {
+		m.response[chainID][walletAddress] = make(map[gethcommon.Address]*hexutil.Big)
+	}
+
+	m.response[chainID][walletAddress][tokenAddress] = intToBig(balance)
+
+}
+
+func (m *testTokenManager) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
+	return m.response, nil
+}
+
+func (s *ManagerSuite) TestRetrieveTokens() {
+	db, err := appdatabase.InitializeDB(sqlite.InMemoryPath, "", sqlite.ReducedKDFIterationsNumber)
+	s.NoError(err, "creating sqlite db instance")
+	err = sqlite.Migrate(db)
+	s.NoError(err, "protocol migrate")
+
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	s.Require().NoError(err)
+
+	tm := &testTokenManager{}
+
+	options := []ManagerOption{
+		WithWalletConfig(&params.WalletConfig{
+			OpenseaAPIKey: "some-key",
+		}),
+		WithOpenseaClientBuilder(&openseaClientTestBuilder{}),
+		WithTokenManager(tm),
+	}
+
+	m, err := NewManager(key, db, nil, nil, nil, nil, nil, options...)
+	s.Require().NoError(err)
+	s.Require().NoError(m.Start())
+
+	var chainID uint64 = 5
+	contractAddresses := make(map[uint64]string)
+	contractAddresses[chainID] = "0x3d6afaa395c31fcd391fe3d562e75fe9e8ec7e6a"
+	var decimals uint64 = 18
+
+	var tokenCriteria = []*protobuf.TokenCriteria{
+		&protobuf.TokenCriteria{
+			ContractAddresses: contractAddresses,
+			Symbol:            "STT",
+			Type:              protobuf.CommunityTokenType_ERC20,
+			Name:              "Status Test Token",
+			Amount:            "1.000000000000000000",
+			Decimals:          decimals,
+		},
+	}
+
+	var permissions = []*protobuf.CommunityTokenPermission{
+		&protobuf.CommunityTokenPermission{
+			Id:            "some-id",
+			Type:          protobuf.CommunityTokenPermission_BECOME_MEMBER,
+			TokenCriteria: tokenCriteria,
+		},
+	}
+
+	wallets := []gethcommon.Address{gethcommon.HexToAddress("0xD6b912e09E797D291E8D0eA3D3D17F8000e01c32")}
+
+	// Set response to exactly the right one
+	tm.setResponse(chainID, wallets[0], gethcommon.HexToAddress(contractAddresses[chainID]), int64(1*math.Pow(10, float64(decimals))))
+	resp, err := m.checkPermissionToJoin(permissions, wallets, false)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+	s.Require().True(resp.Satisfied)
+
+	// Set response to 0
+	tm.setResponse(chainID, wallets[0], gethcommon.HexToAddress(contractAddresses[chainID]), 0)
+	resp, err = m.checkPermissionToJoin(permissions, wallets, false)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+	s.Require().False(resp.Satisfied)
 }
 
 func (s *ManagerSuite) TestCreateCommunity() {
@@ -212,7 +321,7 @@ func (s *ManagerSuite) TestStartHistoryArchiveTasksInterval() {
 	// the task count.
 	time.Sleep(5 * time.Second)
 
-	count := s.getHistoryTaksCount()
+	count := s.getHistoryTasksCount()
 	s.Require().Equal(count, 1)
 
 	// We wait another 5 seconds to ensure the first tick has kicked in
@@ -223,7 +332,7 @@ func (s *ManagerSuite) TestStartHistoryArchiveTasksInterval() {
 
 	s.manager.StopHistoryArchiveTasksInterval(community.ID())
 	s.manager.historyArchiveTasksWaitGroup.Wait()
-	count = s.getHistoryTaksCount()
+	count = s.getHistoryTasksCount()
 	s.Require().Equal(count, 0)
 }
 
@@ -244,12 +353,12 @@ func (s *ManagerSuite) TestStopHistoryArchiveTasksIntervals() {
 
 	time.Sleep(2 * time.Second)
 
-	count := s.getHistoryTaksCount()
+	count := s.getHistoryTasksCount()
 	s.Require().Equal(count, 1)
 
 	s.manager.StopHistoryArchiveTasksIntervals()
 
-	count = s.getHistoryTaksCount()
+	count = s.getHistoryTasksCount()
 	s.Require().Equal(count, 0)
 }
 
@@ -270,13 +379,13 @@ func (s *ManagerSuite) TestStopTorrentClient_ShouldStopHistoryArchiveTasks() {
 	// the task count.
 	time.Sleep(2 * time.Second)
 
-	count := s.getHistoryTaksCount()
+	count := s.getHistoryTasksCount()
 	s.Require().Equal(count, 1)
 
 	errs := s.manager.StopTorrentClient()
 	s.Require().Len(errs, 0)
 
-	count = s.getHistoryTaksCount()
+	count = s.getHistoryTasksCount()
 	s.Require().Equal(count, 0)
 }
 

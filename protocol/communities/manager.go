@@ -26,6 +26,8 @@ import (
 	"go.uber.org/zap"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -66,11 +68,12 @@ type Manager struct {
 	ensVerifier                    *ens.Verifier
 	identity                       *ecdsa.PrivateKey
 	accountsManager                *account.GethManager
-	tokenManager                   *token.Manager
+	tokenManager                   TokenManager
 	logger                         *zap.Logger
 	stdoutLogger                   *zap.Logger
 	transport                      *transport.Transport
 	quit                           chan struct{}
+	openseaClientBuilder           openseaClientBuilder
 	torrentConfig                  *params.TorrentConfig
 	torrentClient                  *torrent.Client
 	walletConfig                   *params.WalletConfig
@@ -79,6 +82,21 @@ type Manager struct {
 	periodicMemberPermissionsTasks sync.Map // stores `chan struct{}`
 	torrentTasks                   map[string]metainfo.Hash
 	historyArchiveDownloadTasks    map[string]*HistoryArchiveDownloadTask
+}
+
+type openseaClient interface {
+	FetchAllAssetsByOwnerAndContractAddress(owner gethcommon.Address, contractAddresses []gethcommon.Address, cursor string, limit int) (*opensea.AssetContainer, error)
+}
+
+type openseaClientBuilder interface {
+	NewOpenseaClient(uint64, string, *event.Feed) (openseaClient, error)
+}
+
+type defaultOpenseaBuilder struct {
+}
+
+func (b *defaultOpenseaBuilder) NewOpenseaClient(chainID uint64, apiKey string, feed *event.Feed) (openseaClient, error) {
+	return opensea.NewOpenseaClient(chainID, apiKey, nil)
 }
 
 type HistoryArchiveDownloadTask struct {
@@ -102,9 +120,42 @@ func (t *HistoryArchiveDownloadTask) Cancel() {
 }
 
 type managerOptions struct {
-	accountsManager *account.GethManager
-	tokenManager    *token.Manager
-	walletConfig    *params.WalletConfig
+	accountsManager      *account.GethManager
+	tokenManager         TokenManager
+	walletConfig         *params.WalletConfig
+	openseaClientBuilder openseaClientBuilder
+}
+
+type TokenManager interface {
+	GetBalancesByChain(ctx context.Context, accounts, tokens []gethcommon.Address) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error)
+}
+
+type DefaultTokenManager struct {
+	tokenManager *token.Manager
+}
+
+func NewDefaultTokenManager(tm *token.Manager) *DefaultTokenManager {
+	return &DefaultTokenManager{tokenManager: tm}
+}
+
+func (m *DefaultTokenManager) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
+	networks, err := m.tokenManager.RPCClient.NetworkManager.Get(false)
+	if err != nil {
+		return nil, err
+	}
+
+	chainIDs := make([]uint64, 0)
+	for _, network := range networks {
+		chainIDs = append(chainIDs, network.ChainID)
+	}
+
+	clients, err := m.tokenManager.RPCClient.EthClients(chainIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := m.tokenManager.GetBalancesByChain(context.Background(), clients, accounts, tokenAddresses)
+	return resp, err
 }
 
 type ManagerOption func(*managerOptions)
@@ -115,7 +166,13 @@ func WithAccountManager(accountsManager *account.GethManager) ManagerOption {
 	}
 }
 
-func WithTokenManager(tokenManager *token.Manager) ManagerOption {
+func WithOpenseaClientBuilder(builder openseaClientBuilder) ManagerOption {
+	return func(opts *managerOptions) {
+		opts.openseaClientBuilder = builder
+	}
+}
+
+func WithTokenManager(tokenManager TokenManager) ManagerOption {
 	return func(opts *managerOptions) {
 		opts.tokenManager = tokenManager
 	}
@@ -175,6 +232,12 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 
 	if managerConfig.walletConfig != nil {
 		manager.walletConfig = managerConfig.walletConfig
+	}
+
+	if managerConfig.openseaClientBuilder != nil {
+		manager.openseaClientBuilder = managerConfig.openseaClientBuilder
+	} else {
+		manager.openseaClientBuilder = &defaultOpenseaBuilder{}
 	}
 
 	if verifier != nil {
@@ -594,10 +657,12 @@ func (m *Manager) checkMemberPermissions(communityID types.HexBytes) error {
 				walletAddresses = append(walletAddresses, gethcommon.HexToAddress(walletAddress))
 			}
 
-			hasPermission, err := m.checkPermissionToJoin(becomeMemberPermissions, walletAddresses)
+			permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, walletAddresses, true)
 			if err != nil {
 				return err
 			}
+
+			hasPermission := permissionResponse.Satisfied
 
 			if !hasPermission {
 				pk, err := common.HexToPubkey(memberKey)
@@ -1240,6 +1305,22 @@ func (m *Manager) CancelRequestToJoin(request *requests.CancelRequestToJoinCommu
 	return dbRequest, community, nil
 }
 
+func (m *Manager) CheckPermissionToJoin(id []byte, addresses []gethcommon.Address) (*CheckPermissionToJoinResponse, error) {
+	community, err := m.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+
+	hasPermission, err := m.checkPermissionToJoin(becomeMemberPermissions, addresses, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return hasPermission, nil
+}
+
 func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommunity) (*Community, error) {
 	dbRequest, err := m.persistence.GetRequestToJoin(request.ID)
 	if err != nil {
@@ -1265,10 +1346,11 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 			walletAddresses = append(walletAddresses, gethcommon.HexToAddress(walletAddress))
 		}
 
-		hasPermission, err := m.checkPermissionToJoin(becomeMemberPermissions, walletAddresses)
+		permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, walletAddresses, true)
 		if err != nil {
 			return nil, err
 		}
+		hasPermission := permissionResponse.Satisfied
 
 		if !hasPermission {
 			return community, ErrNoPermissionToJoin
@@ -1468,10 +1550,11 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 			verifiedAddresses = append(verifiedAddresses, gethcommon.HexToAddress(walletAddress))
 		}
 
-		hasPermission, err := m.checkPermissionToJoin(becomeMemberPermissions, verifiedAddresses)
+		permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, verifiedAddresses, true)
 		if err != nil {
 			return nil, err
 		}
+		hasPermission := permissionResponse.Satisfied
 
 		if !hasPermission {
 			err = m.markRequestToJoinAsCanceled(signer, community)
@@ -1501,26 +1584,58 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 	return requestToJoin, nil
 }
 
-func (m *Manager) checkPermissionToJoin(permissions []*protobuf.CommunityTokenPermission, walletAddresses []gethcommon.Address) (bool, error) {
+type CheckPermissionToJoinResponse struct {
+	Satisfied   bool                                    `json:"satisfied"`
+	Permissions map[string]*CheckPermissionToJoinResult `json:"permissions"`
+}
+
+type CheckPermissionToJoinResult struct {
+	Criteria []bool `json:"criteria"`
+}
+
+func (c *CheckPermissionToJoinResponse) calculateSatisfied() {
+	if len(c.Permissions) == 0 {
+		c.Satisfied = true
+		return
+	}
+
+	for _, p := range c.Permissions {
+		c.Satisfied = true
+		for _, criteria := range p.Criteria {
+			if !criteria {
+				c.Satisfied = false
+				break
+			}
+		}
+	}
+}
+
+// checkPermissionToJoin will retrieve balances and check whether the user has
+// permission to join the community, if shortcircuit is true, it will stop as soon
+// as we know the answer
+func (m *Manager) checkPermissionToJoin(permissions []*protobuf.CommunityTokenPermission, walletAddresses []gethcommon.Address, shortcircuit bool) (*CheckPermissionToJoinResponse, error) {
+	response := &CheckPermissionToJoinResponse{
+		Permissions: make(map[string]*CheckPermissionToJoinResult),
+	}
 
 	erc20TokenRequirements, erc721TokenRequirements := extractTokenRequirements(permissions)
 
 	// find owned ERC721 tokens required by community's permissions
 	ownedERC721Tokens, err := m.getOwnedERC721Tokens(walletAddresses, erc721TokenRequirements)
 	if err != nil {
-		return false, err
+		return response, err
 	}
 
 	// find owned ERC20 token balances required by community's permissions
 	ownedERC20Tokens, err := m.getAccumulatedTokenBalances(walletAddresses, erc20TokenRequirements)
 	if err != nil {
-		return false, err
+		return response, err
 	}
 
-	hasPermission := false
-
 	for _, tokenPermission := range permissions {
+
 		permissionRequirementsMet := true
+		response.Permissions[tokenPermission.Id] = &CheckPermissionToJoinResult{}
 
 		// There can be multiple token requirements per permission.
 		// If only one is not met, the entire permission is marked
@@ -1532,6 +1647,7 @@ func (m *Manager) checkPermissionToJoin(permissions []*protobuf.CommunityTokenPe
 			// check NFTs
 			if tokenRequirement.Type == protobuf.CommunityTokenType_ERC721 {
 				if len(ownedERC721Tokens) == 0 {
+					response.Permissions[tokenPermission.Id].Criteria = append(response.Permissions[tokenPermission.Id].Criteria, false)
 					continue
 				}
 
@@ -1539,6 +1655,7 @@ func (m *Manager) checkPermissionToJoin(permissions []*protobuf.CommunityTokenPe
 				for chainID, address := range tokenRequirement.ContractAddresses {
 					addr := strings.ToLower(address)
 					if _, exists := ownedERC721Tokens[chainID][addr]; !exists {
+						response.Permissions[tokenPermission.Id].Criteria = append(response.Permissions[tokenPermission.Id].Criteria, false)
 						continue
 					}
 
@@ -1561,6 +1678,7 @@ func (m *Manager) checkPermissionToJoin(permissions []*protobuf.CommunityTokenPe
 				}
 			} else if tokenRequirement.Type == protobuf.CommunityTokenType_ERC20 {
 				if len(ownedERC20Tokens) == 0 {
+					response.Permissions[tokenPermission.Id].Criteria = append(response.Permissions[tokenPermission.Id].Criteria, false)
 					continue
 				}
 				amount, _ := strconv.ParseFloat(tokenRequirement.Amount, 32)
@@ -1571,17 +1689,19 @@ func (m *Manager) checkPermissionToJoin(permissions []*protobuf.CommunityTokenPe
 			if !tokenRequirementMet {
 				permissionRequirementsMet = false
 			}
+			response.Permissions[tokenPermission.Id].Criteria = append(response.Permissions[tokenPermission.Id].Criteria, tokenRequirementMet)
 		}
 		// multiple permissions are treated as logical OR, meaning
 		// if only one of them is fulfilled, the user gets permission
 		// to join and we can stop early
-		if permissionRequirementsMet {
-			hasPermission = true
+		if shortcircuit && permissionRequirementsMet {
 			break
 		}
 	}
 
-	return hasPermission, nil
+	response.calculateSatisfied()
+
+	return response, nil
 }
 
 func extractTokenRequirements(permissions []*protobuf.CommunityTokenPermission) (map[uint64]map[string]*protobuf.TokenCriteria, map[uint64]map[string]*protobuf.TokenCriteria) {
@@ -1621,14 +1741,14 @@ func extractTokenRequirements(permissions []*protobuf.CommunityTokenPermission) 
 
 func (m *Manager) getOwnedERC721Tokens(walletAddresses []gethcommon.Address, tokenRequirements map[uint64]map[string]*protobuf.TokenCriteria) (map[uint64]map[string][]opensea.Asset, error) {
 
-	if m.walletConfig == nil || len(m.walletConfig.OpenseaAPIKey) == 0 {
-		return nil, errors.New("no api key for opensea")
+	if m.walletConfig == nil || m.walletConfig.OpenseaAPIKey == "" {
+		return nil, errors.New("no opensea client")
 	}
 
 	ownedERC721Tokens := make(map[uint64]map[string][]opensea.Asset)
 
 	for chainID, erc721Tokens := range tokenRequirements {
-		client, err := opensea.NewOpenseaClient(chainID, m.walletConfig.OpenseaAPIKey, nil)
+		client, err := m.openseaClientBuilder.NewOpenseaClient(chainID, m.walletConfig.OpenseaAPIKey, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -1669,22 +1789,7 @@ func (m *Manager) getAccumulatedTokenBalances(accounts []gethcommon.Address, tok
 		}
 	}
 
-	networks, err := m.tokenManager.RPCClient.NetworkManager.Get(false)
-	if err != nil {
-		return nil, err
-	}
-
-	chainIDs := make([]uint64, 0)
-	for _, network := range networks {
-		chainIDs = append(chainIDs, network.ChainID)
-	}
-
-	clients, err := m.tokenManager.RPCClient.EthClients(chainIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	balancesByChain, err := m.tokenManager.GetBalancesByChain(context.Background(), clients, accounts, tokenAddresses)
+	balancesByChain, err := m.tokenManager.GetBalancesByChain(context.Background(), accounts, tokenAddresses)
 	if err != nil {
 		return nil, err
 	}
@@ -1693,7 +1798,7 @@ func (m *Manager) getAccumulatedTokenBalances(accounts []gethcommon.Address, tok
 	for chainID, accounts := range balancesByChain {
 		for _, contracts := range accounts {
 			for contract, value := range contracts {
-				if token, exists := tokenRequirements[chainID][contract.Hex()]; exists {
+				if token, exists := tokenRequirements[chainID][strings.ToLower(contract.Hex())]; exists {
 					if _, exists := accumulatedBalances[token.Symbol]; !exists {
 						accumulatedBalances[token.Symbol] = new(big.Float)
 					}

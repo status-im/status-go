@@ -47,6 +47,7 @@ import (
 	"github.com/status-im/status-go/services/ext/mailservers"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
+	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/transfer"
 )
@@ -114,7 +115,7 @@ func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
 	return enode.ParseV4(rawURL)
 }
 
-func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *sql.DB, httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, accountManager *account.GethManager, rpcClient *rpc.Client, logger *zap.Logger) error {
+func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *sql.DB, httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, accountManager *account.GethManager, rpcClient *rpc.Client, walletService *wallet.Service, logger *zap.Logger) error {
 	var err error
 	if !s.config.ShhextConfig.PFSEnabled {
 		return nil
@@ -153,7 +154,7 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *
 	s.multiAccountsDB = multiAccountDb
 	s.account = acc
 
-	options, err := buildMessengerOptions(s.config, identity, db, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, logger, &MessengerSignalsHandler{})
+	options, err := buildMessengerOptions(s.config, identity, db, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, walletService, logger, &MessengerSignalsHandler{})
 	if err != nil {
 		return err
 	}
@@ -406,6 +407,7 @@ func buildMessengerOptions(
 	account *multiaccounts.Account,
 	envelopesMonitorConfig *transport.EnvelopesMonitorConfig,
 	accountsDB *accounts.Database,
+	walletService *wallet.Service,
 	logger *zap.Logger,
 	messengerSignalsHandler protocol.MessengerSignalsHandler,
 ) ([]protocol.Option, error) {
@@ -426,6 +428,7 @@ func buildMessengerOptions(
 		protocol.WithRPCClient(rpcClient),
 		protocol.WithMessageCSV(config.OutputMessageCSVEnabled),
 		protocol.WithWalletConfig(&config.WalletConfig),
+		protocol.WithWalletService(walletService),
 	}
 
 	if config.ShhextConfig.DataSyncEnabled {

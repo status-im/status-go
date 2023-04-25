@@ -75,6 +75,35 @@ func EncryptDB(unencryptedPath string, encryptedPath string, key string, kdfIter
 	return err
 }
 
+func openCipher(db *sql.DB, key string, kdfIterationsNumber int, inMemory bool) error {
+	keyString := fmt.Sprintf("PRAGMA key = '%s'", key)
+	if _, err := db.Exec(keyString); err != nil {
+		return errors.New("failed to set key pragma")
+	}
+
+	if kdfIterationsNumber <= 0 {
+		kdfIterationsNumber = sqlite.ReducedKDFIterationsNumber
+	}
+
+	if _, err := db.Exec(fmt.Sprintf("PRAGMA kdf_iter = '%d'", kdfIterationsNumber)); err != nil {
+		return err
+	}
+
+	// readers do not block writers and faster i/o operations
+	// https://www.sqlite.org/draft/wal.html
+	// must be set after db is encrypted
+	var mode string
+	err := db.QueryRow("PRAGMA journal_mode=WAL").Scan(&mode)
+	if err != nil {
+		return err
+	}
+	if mode != WALMode && !inMemory {
+		return fmt.Errorf("unable to set journal_mode to WAL. actual mode %s", mode)
+	}
+
+	return nil
+}
+
 func openDB(path string, key string, kdfIterationsNumber int) (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
@@ -87,31 +116,11 @@ func openDB(path string, key string, kdfIterationsNumber int) (*sql.DB, error) {
 	if _, err = db.Exec("PRAGMA foreign_keys=ON"); err != nil {
 		return nil, err
 	}
-	keyString := fmt.Sprintf("PRAGMA key = '%s'", key)
-	if _, err = db.Exec(keyString); err != nil {
-		return nil, errors.New("failed to set key pragma")
-	}
 
-	if kdfIterationsNumber <= 0 {
-		kdfIterationsNumber = sqlite.ReducedKDFIterationsNumber
-	}
-
-	if _, err = db.Exec(fmt.Sprintf("PRAGMA kdf_iter = '%d'", kdfIterationsNumber)); err != nil {
-		return nil, err
-	}
-
-	// readers do not block writers and faster i/o operations
-	// https://www.sqlite.org/draft/wal.html
-	// must be set after db is encrypted
-	var mode string
-	err = db.QueryRow("PRAGMA journal_mode=WAL").Scan(&mode)
+	err = openCipher(db, key, kdfIterationsNumber, path == InMemoryPath)
 	if err != nil {
 		return nil, err
 	}
-	if mode != WALMode && path != InMemoryPath {
-		return nil, fmt.Errorf("unable to set journal_mode to WAL. actual mode %s", mode)
-	}
-
 	return db, nil
 }
 

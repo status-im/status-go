@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/services/mailservers"
+	"github.com/status-im/status-go/services/wallet"
 )
 
 type MessageDeliveredHandler func(string, string)
@@ -85,6 +86,7 @@ type config struct {
 	browserDatabase     *browsers.Database
 	torrentConfig       *params.TorrentConfig
 	walletConfig        *params.WalletConfig
+	walletService       *wallet.Service
 	httpServer          *server.MediaServer
 	rpcClient           *rpc.Client
 
@@ -321,6 +323,13 @@ func WithWalletConfig(wc *params.WalletConfig) Option {
 func WithMessageCSV(enabled bool) Option {
 	return func(c *config) error {
 		c.outputMessagesCSV = enabled
+		return nil
+	}
+}
+
+func WithWalletService(s *wallet.Service) Option {
+	return func(c *config) error {
+		c.walletService = s
 		return nil
 	}
 }
