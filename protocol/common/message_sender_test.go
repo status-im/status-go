@@ -1,7 +1,6 @@
 package common
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -53,8 +52,7 @@ func (s *MessageSenderSuite) SetupTest() {
 	s.logger, err = zap.NewDevelopment()
 	s.Require().NoError(err)
 
-	s.tmpDir, err = os.MkdirTemp("", "")
-	s.Require().NoError(err)
+	s.tmpDir = s.T().TempDir()
 
 	identity, err := crypto.GenerateKey()
 	s.Require().NoError(err)
@@ -96,7 +94,6 @@ func (s *MessageSenderSuite) SetupTest() {
 }
 
 func (s *MessageSenderSuite) TearDownTest() {
-	os.Remove(s.tmpDir)
 	_ = s.logger.Sync()
 }
 

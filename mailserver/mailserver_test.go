@@ -21,7 +21,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -69,18 +68,13 @@ func (s *MailserverSuite) SetupTest() {
 	s.shh = waku.New(&waku.DefaultConfig, nil)
 	s.shh.RegisterMailServer(s.server)
 
-	tmpDir, err := os.MkdirTemp("", "mailserver-test")
-	s.Require().NoError(err)
+	tmpDir := s.T().TempDir()
 	s.dataDir = tmpDir
 
 	s.config = &params.WakuConfig{
 		DataDir:            tmpDir,
 		MailServerPassword: "testpassword",
 	}
-}
-
-func (s *MailserverSuite) TearDownTest() {
-	s.Require().NoError(os.RemoveAll(s.config.DataDir))
 }
 
 func (s *MailserverSuite) TestInit() {

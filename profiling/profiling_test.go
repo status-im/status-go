@@ -10,10 +10,9 @@ import (
 )
 
 func TestProfilingCPU(t *testing.T) {
-	dir, err := os.MkdirTemp("", "profiling")
-	require.NoError(t, err)
+	dir := t.TempDir()
 
-	err = StartCPUProfile(dir)
+	err := StartCPUProfile(dir)
 	require.NoError(t, err)
 
 	// Block for a bit to collect some metrics.
@@ -38,10 +37,9 @@ func TestProfilingCPU(t *testing.T) {
 }
 
 func TestProfilingMem(t *testing.T) {
-	dir, err := os.MkdirTemp("", "profiling")
-	require.NoError(t, err)
+	dir := t.TempDir()
 
-	err = WriteHeapFile(dir)
+	err := WriteHeapFile(dir)
 	require.NoError(t, err)
 
 	// Verify that the file has some content.

@@ -1,7 +1,6 @@
 package sqlite
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -9,9 +8,7 @@ import (
 )
 
 func TestOpen(t *testing.T) {
-	dir, err := os.MkdirTemp("", "test-open")
-	require.NoError(t, err)
-	defer os.Remove(dir)
+	dir := t.TempDir()
 
 	dbPath := filepath.Join(dir, "db.sql")
 

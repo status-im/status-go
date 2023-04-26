@@ -102,13 +102,10 @@ func TestRequestMessagesErrors(t *testing.T) {
 }
 
 func TestInitProtocol(t *testing.T) {
-	directory, err := os.MkdirTemp("", "status-go-testing")
-	require.NoError(t, err)
-
 	config := params.NodeConfig{
 		ShhextConfig: params.ShhextConfig{
 			InstallationID:          "2",
-			BackupDisabledDataDir:   directory,
+			BackupDisabledDataDir:   t.TempDir(),
 			PFSEnabled:              true,
 			MailServerConfirmations: true,
 			ConnectionTarget:        10,
@@ -124,8 +121,7 @@ func TestInitProtocol(t *testing.T) {
 	nodeWrapper := ext.NewTestNodeWrapper(nil, waku)
 	service := New(config, nodeWrapper, nil, nil, db)
 
-	tmpdir, err := os.MkdirTemp("", "test-shhext-service-init-protocol")
-	require.NoError(t, err)
+	tmpdir := t.TempDir()
 
 	sqlDB, err := appdatabase.InitializeDB(fmt.Sprintf("%s/db.sql", tmpdir), "password", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
@@ -222,9 +218,7 @@ func (s *ShhExtSuite) createAndAddNode() {
 }
 
 func (s *ShhExtSuite) SetupTest() {
-	var err error
-	s.dir, err = os.MkdirTemp("", "status-go-testing")
-	s.Require().NoError(err)
+	s.dir = s.T().TempDir()
 }
 
 func (s *ShhExtSuite) TearDownTest() {

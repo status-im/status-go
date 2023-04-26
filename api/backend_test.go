@@ -625,9 +625,7 @@ func TestLoginWithKey(t *testing.T) {
 	main := multiaccounts.Account{
 		KeyUID: keyUID,
 	}
-	tmpdir, err := os.MkdirTemp("", "login-with-key-test-")
-	require.NoError(t, err)
-	defer os.Remove(tmpdir)
+	tmpdir := t.TempDir()
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
 	keyhex := hex.EncodeToString(gethcrypto.FromECDSA(chatKey))
@@ -668,9 +666,7 @@ func TestVerifyDatabasePassword(t *testing.T) {
 	main := multiaccounts.Account{
 		KeyUID: keyUID,
 	}
-	tmpdir, err := os.MkdirTemp("", "verify-database-password-")
-	require.NoError(t, err)
-	defer os.Remove(tmpdir)
+	tmpdir := t.TempDir()
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
 	keyhex := hex.EncodeToString(gethcrypto.FromECDSA(chatKey))
@@ -691,15 +687,13 @@ func TestVerifyDatabasePassword(t *testing.T) {
 func TestDeleteMultiaccount(t *testing.T) {
 	backend := NewGethStatusBackend()
 
-	rootDataDir, err := os.MkdirTemp("", "test-keystore-dir")
-	require.NoError(t, err)
-	defer os.Remove(rootDataDir)
+	rootDataDir := t.TempDir()
 
 	keyStoreDir := filepath.Join(rootDataDir, "keystore")
 
 	backend.rootDataDir = rootDataDir
 
-	err = backend.AccountManager().InitKeystore(keyStoreDir)
+	err := backend.AccountManager().InitKeystore(keyStoreDir)
 	require.NoError(t, err)
 
 	backend.AccountManager()
@@ -794,9 +788,7 @@ func TestConvertAccount(t *testing.T) {
 		return found
 	}
 
-	rootDataDir, err := os.MkdirTemp("", "test-keystore-dir")
-	require.NoError(t, err)
-	defer os.Remove(rootDataDir)
+	rootDataDir := t.TempDir()
 
 	keyStoreDir := filepath.Join(rootDataDir, "keystore")
 
@@ -1060,9 +1052,7 @@ func TestLoginAndMigrationsStillWorkWithExistingUsers(t *testing.T) {
 
 	srcFolder := "../static/test-0.97.3-account/"
 
-	tmpdir, err := os.MkdirTemp("", "login-and-migrations-with-existing-users")
-	require.NoError(t, err)
-	defer os.Remove(tmpdir)
+	tmpdir := t.TempDir()
 
 	copyDir(srcFolder, tmpdir, t)
 

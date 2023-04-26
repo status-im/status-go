@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -15,7 +14,7 @@ import (
 )
 
 func setupWalletTest(t *testing.T, password string) (backend *GethStatusBackend, defersFunc func(), err error) {
-	tmpdir, err := os.MkdirTemp("", "verified-account-test-")
+	tmpdir := t.TempDir()
 
 	defers := make([]func(), 0)
 	defersFunc = func() {
@@ -27,10 +26,6 @@ func setupWalletTest(t *testing.T, password string) (backend *GethStatusBackend,
 		return
 	}
 
-	defers = append(defers, func() {
-		os.Remove(tmpdir)
-	})
-	//defer os.Remove(tmpdir)
 	backend = NewGethStatusBackend()
 	backend.UpdateRootDataDir(tmpdir)
 

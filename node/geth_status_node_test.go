@@ -68,17 +68,11 @@ func TestStatusNodeStart(t *testing.T) {
 }
 
 func TestStatusNodeWithDataDir(t *testing.T) {
-	var err error
-
-	dir, err := os.MkdirTemp("", "status-node-test")
-	require.NoError(t, err)
-	defer func() {
-		require.NoError(t, os.RemoveAll(dir))
-	}()
+	dir := t.TempDir()
 
 	// keystore directory
 	keyStoreDir := path.Join(dir, "keystore")
-	err = os.MkdirAll(keyStoreDir, os.ModePerm)
+	err := os.MkdirAll(keyStoreDir, os.ModePerm)
 	require.NoError(t, err)
 
 	config := params.NodeConfig{

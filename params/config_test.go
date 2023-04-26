@@ -3,7 +3,6 @@ package params_test
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -55,11 +54,7 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 }
 
 func TestNewConfigFromJSON(t *testing.T) {
-	tmpDir, err := os.MkdirTemp(os.TempDir(), "geth-config-tests")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir) // nolint: errcheck
+	tmpDir := t.TempDir()
 	json := `{
 		"NetworkId": 3,
 		"DataDir": "` + tmpDir + `",
@@ -84,9 +79,7 @@ func TestNewConfigFromJSON(t *testing.T) {
 }
 
 func TestConfigWriteRead(t *testing.T) {
-	tmpDir, err := os.MkdirTemp(os.TempDir(), "geth-config-tests")
-	require.Nil(t, err)
-	defer os.RemoveAll(tmpDir) // nolint: errcheck
+	tmpDir := t.TempDir()
 
 	nodeConfig, err := utils.MakeTestNodeConfigWithDataDir("", tmpDir, params.GoerliNetworkID)
 	require.Nil(t, err, "cannot create new config object")
