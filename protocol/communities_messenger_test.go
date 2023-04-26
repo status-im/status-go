@@ -2237,8 +2237,6 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	community = response.Communities()[0]
 	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
 
-	s.logger.Info("->ALICE------")
-
 	// Alice should then be removed
 	err = tt.RetryWithBackOff(func() error {
 		response, err = s.alice.RetrieveAll()
@@ -2256,10 +2254,6 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 		}
 		return nil
 	})
-
-	aComm := response.Communities()[0]
-	s.logger.Info("->aComm", zap.Any("aComm", aComm))
-	s.Require().False(aComm.HasMember(&s.alice.identity.PublicKey))
 
 	// Check we got AC notification for Alice
 	aliceNotifications, err := s.alice.ActivityCenterNotifications(ActivityCenterNotificationsRequest{
