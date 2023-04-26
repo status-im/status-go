@@ -40,6 +40,7 @@ var (
 	logWithoutColors = flag.Bool("log-without-color", false, "Disables log colors")
 	seedPhrase       = flag.String("seed-phrase", "", "Seed phrase")
 	version          = flag.Bool("version", false, "Print version and dump configuration")
+	apiModules       = flag.String("api-modules", "wakuext,ext,waku,ens", "API modules to enable in the HTTP server")
 
 	dataDir   = flag.String("dir", getDefaultDataDir(), "Directory used by node to store data")
 	networkID = flag.Int(
@@ -264,7 +265,7 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig.HTTPHost = "0.0.0.0"
 	// FIXME: This should be taken from CLI flags.
 	nodeConfig.HTTPVirtualHosts = []string{"localhost", "wakunode"}
-	nodeConfig.APIModules = "wakuext,ext,waku"
+	nodeConfig.APIModules = *apiModules
 
 	nodeConfig.UpstreamConfig = params.UpstreamRPCConfig{
 		Enabled: true,
