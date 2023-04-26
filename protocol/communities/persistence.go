@@ -909,6 +909,18 @@ func (p *Persistence) GetCommunityChatIDs(communityID types.HexBytes) ([]string,
 	return ids, nil
 }
 
+func (p *Persistence) GetAllCommunityTokens() ([]*CommunityToken, error) {
+	rows, err := p.db.Query(`SELECT community_id, address, type, name, symbol, description, supply,
+	infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64
+	FROM community_tokens`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return p.getCommunityTokensInternal(rows)
+}
+
 func (p *Persistence) GetCommunityTokens(communityID string) ([]*CommunityToken, error) {
 	rows, err := p.db.Query(`SELECT community_id, address, type, name, symbol, description, supply,
 	infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64
@@ -918,6 +930,10 @@ func (p *Persistence) GetCommunityTokens(communityID string) ([]*CommunityToken,
 	}
 	defer rows.Close()
 
+	return p.getCommunityTokensInternal(rows)
+}
+
+func (p *Persistence) getCommunityTokensInternal(rows *sql.Rows) ([]*CommunityToken, error) {
 	tokens := []*CommunityToken{}
 
 	for rows.Next() {

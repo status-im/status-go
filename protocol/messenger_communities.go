@@ -3532,6 +3532,10 @@ func (m *Messenger) GetCommunityTokens(communityID string) ([]*communities.Commu
 	return m.communitiesManager.GetCommunityTokens(communityID)
 }
 
+func (m *Messenger) GetAllCommunityTokens() ([]*communities.CommunityToken, error) {
+	return m.communitiesManager.GetAllCommunityTokens()
+}
+
 func (m *Messenger) AddCommunityToken(token *communities.CommunityToken) (*communities.CommunityToken, error) {
 	return m.communitiesManager.AddCommunityToken(token)
 }
