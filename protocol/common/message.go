@@ -555,7 +555,7 @@ func (m *Message) PrepareContent(identity string) error {
 	m.Links = visitor.links
 	// Leave it set if already set, as sometimes we might run this without
 	// an identity
-	if !m.Mentioned {
+	if !m.Mentioned || identity != "" {
 		m.Mentioned = visitor.mentioned
 	}
 	jsonParsedText, err := json.Marshal(parsedText)
