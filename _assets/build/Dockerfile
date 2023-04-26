@@ -1,5 +1,5 @@
 # Build status-go in a Go builder container
-FROM golang:1.18-alpine as builder
+FROM golang:1.19-alpine as builder
 
 RUN apk add --no-cache make gcc g++ musl-dev linux-headers
 
