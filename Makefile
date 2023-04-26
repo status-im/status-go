@@ -30,7 +30,6 @@ help: ##@other Show this help
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
 CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
-GOBIN = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 GOPATH ?= $(HOME)/go
 GIT_COMMIT = $(shell git rev-parse --short HEAD)
 AUTHOR ?= $(shell git config user.email || echo $$USER)
@@ -81,17 +80,35 @@ HELP_FUN = \
 			   print "\n"; \
 		   }
 
-statusgo: ##@build Build status-go as statusd server
+GO_CMD_PATHS := $(filter-out library, $(wildcard cmd/*))
+GO_CMD_NAMES := $(notdir $(GO_CMD_PATHS))
+GO_CMD_BUILDS := $(addprefix build/bin/, $(GO_CMD_NAMES))
+
+all: $(GO_CMD_NAMES)
+
+.PHONY: $(GO_CMD_NAMES) $(GO_CMD_PATHS) $(GO_CMD_BUILDS)
+$(GO_CMD_BUILDS): ##@build Build any Go project from cmd folder
 	go build -mod=vendor -v \
 		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
-		-o $(GOBIN)/statusd ./cmd/statusd
+		-o ./$@ ./cmd/$(notdir $@)
 	@echo "Compilation done."
-	@echo "Run \"build/bin/statusd -h\" to view available commands."
+	@echo "Run \"build/bin/$(notdir $@) -h\" to view available commands."
+
+bootnode: ##@build Build discovery v5 bootnode using status-go deps
+bootnode: build/bin/bootnode
+
+node-canary: ##@build Build P2P node canary using status-go deps
+node-canary: build/bin/node-canary
+
+statusgo: ##@build Build status-go as statusd server
+statusgo: build/bin/statusd
+statusd: statusgo
 
 statusd-prune: ##@statusd-prune Build statusd-prune
-	go build -tags '$(BUILD_TAGS)' -o $(GOBIN)/statusd-prune -v ./cmd/statusd-prune
-	@echo "Compilation done."
-	@echo "Run \"build/bin/statusd-prune -h\" to view available commands."
+statusd-prune: build/bin/statusd-prune
+
+spiff-workflow: ##@build Build node for SpiffWorkflow BPMN software
+spiff-workflow: build/bin/spiff-workflow
 
 statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
 	@echo "Building docker image for ststusd-prune..."
@@ -101,21 +118,9 @@ statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
 		-t $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(STATUSD_PRUNE_IMAGE_NAME):latest
 
-bootnode: ##@build Build discovery v5 bootnode using status-go deps
-	go build -v \
-		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
-		-o $(GOBIN)/bootnode ./cmd/bootnode/
-	@echo "Compilation done."
-
-node-canary: ##@build Build P2P node canary using status-go deps
-	go build -v \
-		-tags '$(BUILD_TAGS)' $(BUILD_FLAGS) \
-		-o $(GOBIN)/node-canary ./cmd/node-canary/
-	@echo "Compilation done."
-
 statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
-	@ls -ld $(GOBIN)/statusgo-*
+	@ls -ld build/bin/statusgo-*
 
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
@@ -143,37 +148,37 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
-	mkdir -p $(GOBIN)/statusgo-lib
-	go run cmd/library/*.go > $(GOBIN)/statusgo-lib/main.go
+	mkdir -p build/bin/statusgo-lib
+	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
 	@echo "Building static library..."
 	go build \
 		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
 		-buildmode=c-archive \
-		-o $(GOBIN)/libstatus.a \
-		$(GOBIN)/statusgo-lib
+		-o build/bin/libstatus.a \
+		./build/bin/statusgo-lib
 	@echo "Static library built:"
-	@ls -la $(GOBIN)/libstatus.*
+	@ls -la build/bin/libstatus.*
 
 statusgo-shared-library: ##@cross-compile Build status-go as shared library for current platform
 	## cmd/library/README.md explains the magic incantation behind this
-	mkdir -p $(GOBIN)/statusgo-lib
-	go run cmd/library/*.go > $(GOBIN)/statusgo-lib/main.go
+	mkdir -p build/bin/statusgo-lib
+	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
 	@echo "Building shared library..."
 	$(GOBIN_SHARED_LIB_CFLAGS) $(GOBIN_SHARED_LIB_CGO_LDFLAGS) go build \
 		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
 		-buildmode=c-shared \
-		-o $(GOBIN)/libstatus.$(GOBIN_SHARED_LIB_EXT) \
-		$(GOBIN)/statusgo-lib
+		-o build/bin/libstatus.$(GOBIN_SHARED_LIB_EXT) \
+		./build/bin/statusgo-lib
 ifeq ($(detected_OS),Linux)
-	cd $(GOBIN) && \
+	cd build/bin && \
 	ls -lah . && \
 	mv ./libstatus.$(GOBIN_SHARED_LIB_EXT) ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 && \
 	ln -s ./libstatus.$(GOBIN_SHARED_LIB_EXT).0 ./libstatus.$(GOBIN_SHARED_LIB_EXT)
 endif
 	@echo "Shared library built:"
-	@ls -la $(GOBIN)/libstatus.*
+	@ls -la build/bin/libstatus.*
 
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
