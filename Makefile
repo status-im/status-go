@@ -180,11 +180,13 @@ endif
 	@echo "Shared library built:"
 	@ls -la build/bin/libstatus.*
 
+docker-image: BUILD_TARGET ?= statusd
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
 	docker build --file _assets/build/Dockerfile . \
 		--build-arg "build_tags=$(BUILD_TAGS)" \
 		--build-arg "build_flags=$(BUILD_FLAGS)" \
+		--build-arg "build_target=$(BUILD_TARGET)" \
 		--label "commit=$(GIT_COMMIT)" \
 		--label "author=$(AUTHOR)" \
 		-t $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
