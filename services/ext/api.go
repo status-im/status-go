@@ -409,6 +409,11 @@ func (api *PublicAPI) LeaveCommunity(parent context.Context, communityID types.H
 	return api.service.messenger.LeaveCommunity(communityID)
 }
 
+// RequestToLeaveCommunity requests admin to remove us from the community
+func (api *PublicAPI) RequestToLeaveCommunity(parent context.Context, communityID types.HexBytes) error {
+	return api.service.messenger.RequestToLeaveCommunity(communityID)
+}
+
 // CreateCommunity creates a new community with the provided description
 func (api *PublicAPI) CreateCommunity(request *requests.CreateCommunity) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateCommunity(request, true)

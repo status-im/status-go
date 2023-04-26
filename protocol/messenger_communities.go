@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethclient"
 
@@ -924,22 +926,10 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 }
 
 func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
-	err := m.persistence.DismissAllActivityCenterNotificationsFromCommunity(communityID.String())
-	if err != nil {
-		return nil, err
-	}
-
 	mr, err := m.leaveCommunity(communityID)
 	if err != nil {
 		return nil, err
 	}
-
-	err = m.communitiesManager.DeleteCommunitySettings(communityID)
-	if err != nil {
-		return nil, err
-	}
-
-	m.communitiesManager.StopHistoryArchiveTasksInterval(communityID)
 
 	if com, ok := mr.communities[communityID.String()]; ok {
 		err = m.syncCommunity(context.Background(), com, m.dispatchMessage)
@@ -979,6 +969,49 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 	return mr, nil
 }
 
+func (m *Messenger) RequestToLeaveCommunity(communityID types.HexBytes) error {
+	community, err := m.communitiesManager.GetByID(communityID)
+	if err != nil {
+		return err
+	}
+	if community == nil {
+		return errors.New("community not found for the given community ID")
+	}
+	if !community.Joined() {
+		return errors.New("can not leave an community which you have not joined")
+	}
+
+	isAdmin, err := m.communitiesManager.IsAdminCommunityByID(communityID)
+	if err != nil {
+		return err
+	}
+
+	if !isAdmin {
+		requestToLeaveProto := &protobuf.CommunityRequestToLeave{
+			Clock:       uint64(time.Now().Unix()),
+			CommunityId: communityID,
+		}
+
+		payload, err := proto.Marshal(requestToLeaveProto)
+		if err != nil {
+			return err
+		}
+
+		rawMessage := common.RawMessage{
+			Payload:        payload,
+			CommunityID:    communityID,
+			SkipEncryption: true,
+			MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE,
+		}
+		_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (m *Messenger) leaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
@@ -1001,6 +1034,18 @@ func (m *Messenger) leaveCommunity(communityID types.HexBytes) (*MessengerRespon
 			return nil, err
 		}
 	}
+
+	err = m.persistence.DismissAllActivityCenterNotificationsFromCommunity(communityID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.communitiesManager.DeleteCommunitySettings(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	m.communitiesManager.StopHistoryArchiveTasksInterval(communityID)
 
 	_, err = m.transport.RemoveFilterByChatID(communityID.String())
 	if err != nil {

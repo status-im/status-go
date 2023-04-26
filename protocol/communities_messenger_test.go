@@ -1695,6 +1695,343 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 
 }
 
+func (s *MessengerCommunitiesSuite) TestRequestToLeaveAndAccessAgain() {
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Name:        "Test Community",
+		Color:       "#ffffff",
+		Description: "Test - status community description",
+	}
+
+	// Bob create an community chat
+	response, err := s.bob.CreateCommunity(description, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	community := response.Communities()[0]
+
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+
+	s.Require().NoError(s.bob.SaveChat(chat))
+
+	message := buildTestMessage(*chat)
+	message.CommunityID = community.IDString()
+
+	// Send a community link to Alice
+	response, err = s.bob.SendChatMessage(context.Background(), message)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	// Alice Retrieve community link & community
+	err = tt.RetryWithBackOff(func() error {
+		response, err = s.alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("message not received")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+
+	// Alice try to join the org
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	response, err = s.alice.RequestToJoinCommunity(request)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+
+	notification := response.ActivityCenterNotifications()[0]
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
+	s.Require().Equal(notification.Read, true)
+	s.Require().Equal(notification.Accepted, false)
+	s.Require().Equal(notification.Dismissed, false)
+
+	requestToJoin1 := response.RequestsToJoinCommunity[0]
+	s.Require().NotNil(requestToJoin1)
+	s.Require().Equal(community.ID(), requestToJoin1.CommunityID)
+	s.Require().True(requestToJoin1.Our)
+	s.Require().NotEmpty(requestToJoin1.ID)
+	s.Require().NotEmpty(requestToJoin1.Clock)
+	s.Require().Equal(requestToJoin1.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
+	s.Require().NotEmpty(requestToJoin1.Clock)
+
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Equal(response.Communities()[0].RequestedToJoinAt(), requestToJoin1.Clock)
+
+	// Make sure Alice is NOT a member of the community
+	community = response.Communities()[0]
+	s.Require().False(community.Joined())
+	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
+
+	// pull all communities to make sure we set RequestedToJoinAt
+	allCommunities, err := s.alice.Communities()
+	s.Require().NoError(err)
+	s.Require().Len(allCommunities, 2)
+
+	if bytes.Equal(allCommunities[0].ID(), community.ID()) {
+		s.Require().Equal(allCommunities[0].RequestedToJoinAt(), requestToJoin1.Clock)
+	} else {
+		s.Require().Equal(allCommunities[1].RequestedToJoinAt(), requestToJoin1.Clock)
+	}
+
+	// pull to make sure it has been saved
+	requestsToJoin, err := s.alice.MyPendingRequestsToJoin()
+	s.Require().NoError(err)
+	s.Require().Len(requestsToJoin, 1)
+
+	// Make sure the requests are fetched also by community
+	requestsToJoin, err = s.alice.PendingRequestsToJoinForCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(requestsToJoin, 1)
+
+	// Bob retrieves request to join
+	err = tt.RetryWithBackOff(func() error {
+		response, err = s.bob.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.RequestsToJoinCommunity) == 0 {
+			return errors.New("request to join community not received")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	requestToJoin2 := response.RequestsToJoinCommunity[0]
+
+	s.Require().NotNil(requestToJoin2)
+	s.Require().Equal(community.ID(), requestToJoin2.CommunityID)
+	s.Require().False(requestToJoin2.Our)
+	s.Require().NotEmpty(requestToJoin2.ID)
+	s.Require().NotEmpty(requestToJoin2.Clock)
+	s.Require().Equal(requestToJoin2.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin2.State)
+
+	s.Require().Equal(requestToJoin1.ID, requestToJoin2.ID)
+
+	// Check that a notification is been added to messenger
+	notification = response.ActivityCenterNotifications()[0]
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityMembershipRequest)
+	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
+
+	s.Require().Len(response.Communities(), 1)
+
+	// Make sure Alice is NOT a member of the community
+	community = response.Communities()[0]
+	s.Require().NotNil(community)
+	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
+
+	// Bob accepts the request
+	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: requestToJoin1.ID}
+	response, err = s.bob.AcceptRequestToJoinCommunity(acceptRequestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+
+	notification = response.ActivityCenterNotifications()[0]
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityMembershipRequest)
+	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusAccepted)
+	s.Require().Equal(notification.Read, true)
+	s.Require().Equal(notification.Accepted, true)
+	s.Require().Equal(notification.Dismissed, false)
+
+	s.Require().Len(response.Communities(), 1)
+
+	// Make sure Alice is a member of the community
+	community = response.Communities()[0]
+	s.Require().True(community.HasMember(&s.alice.identity.PublicKey))
+
+	// Alice pulls message and make sure org is received
+	err = tt.RetryWithBackOff(func() error {
+		response, err = s.alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("community not received")
+		}
+		return nil
+	})
+
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	s.Require().Len(response.Communities(), 1)
+
+	// Community should be joined at this point
+	community = response.Communities()[0]
+	s.Require().Equal(community.ID(), community.ID())
+	s.Require().True(community.Joined())
+	s.Require().True(community.HasMember(&s.alice.identity.PublicKey))
+
+	// Make sure the requests are not pending on either sides
+	requestsToJoin, err = s.bob.PendingRequestsToJoinForCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(requestsToJoin, 0)
+
+	requestsToJoin, err = s.alice.MyPendingRequestsToJoin()
+	s.Require().NoError(err)
+	s.Require().Len(requestsToJoin, 0)
+
+	// Alice Request to Leave the community
+	err = s.alice.RequestToLeaveCommunity(community.ID())
+	s.Require().NoError(err)
+
+	// pull all communities to make sure Alice is still a member
+	allCommunities, err = s.alice.Communities()
+	s.Require().NoError(err)
+	s.Require().Len(allCommunities, 2)
+
+	if bytes.Equal(allCommunities[0].ID(), community.ID()) {
+		s.Require().True(allCommunities[0].HasMember(&s.alice.identity.PublicKey))
+	} else {
+		s.Require().True(allCommunities[1].HasMember(&s.alice.identity.PublicKey))
+	}
+
+	// Bob receives the request to leave
+	err = tt.RetryWithBackOff(func() error {
+		response, err = s.bob.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("community not received")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+
+	// Make sure Alice is NOT a member of the community
+	community = response.Communities()[0]
+	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
+
+	// Pull all communities for Bob to make sure Alice is removed
+	allCommunities, err = s.bob.Communities()
+	s.Require().NoError(err)
+	s.Require().Len(allCommunities, 2)
+
+	if bytes.Equal(allCommunities[0].ID(), community.ID()) {
+		s.Require().False(allCommunities[0].HasMember(&s.alice.identity.PublicKey))
+	} else {
+		s.Require().False(allCommunities[1].HasMember(&s.alice.identity.PublicKey))
+	}
+
+	// Alice pulls message and make sure org is received
+	err = tt.RetryWithBackOff(func() error {
+		response, err = s.alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("community not received")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	community = response.Communities()[0]
+	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
+
+	notification = response.ActivityCenterNotifications()[0]
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityKicked)
+	s.Require().Equal(notification.Read, false)
+
+	// Alice can request access again
+	request2 := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	response, err = s.alice.RequestToJoinCommunity(request2)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	requestToJoin3 := response.RequestsToJoinCommunity[0]
+	s.Require().NotNil(requestToJoin3)
+	s.Require().Equal(community.ID(), requestToJoin3.CommunityID)
+	s.Require().True(requestToJoin3.Our)
+	s.Require().NotEmpty(requestToJoin3.ID)
+	s.Require().NotEmpty(requestToJoin3.Clock)
+	s.Require().Equal(requestToJoin3.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin3.State)
+
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Equal(response.Communities()[0].RequestedToJoinAt(), requestToJoin3.Clock)
+
+	community = response.Communities()[0]
+	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
+
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+
+	notification = response.ActivityCenterNotifications()[0]
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
+
+	// Retrieve request to join
+	err = tt.RetryWithBackOff(func() error {
+		response, err = s.bob.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.RequestsToJoinCommunity) == 0 {
+			return errors.New("request to join community not received")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	// Alice cancels the request to join
+	requestToCancel := &requests.CancelRequestToJoinCommunity{ID: requestToJoin2.ID}
+	response, err = s.alice.CancelRequestToJoinCommunity(requestToCancel)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Equal(communities.RequestToJoinStateCanceled, response.RequestsToJoinCommunity[0].State)
+
+	// pull to make sure it has been saved
+	cancelRequestsToJoin, err := s.alice.MyCanceledRequestsToJoin()
+	s.Require().NoError(err)
+	s.Require().Len(cancelRequestsToJoin, 1)
+	s.Require().Equal(cancelRequestsToJoin[0].State, communities.RequestToJoinStateCanceled)
+
+	// Alice can request access again
+	request4 := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	response, err = s.alice.RequestToJoinCommunity(request4)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	requestToJoin4 := response.RequestsToJoinCommunity[0]
+	s.Require().NotNil(requestToJoin4)
+	s.Require().Equal(community.ID(), requestToJoin4.CommunityID)
+	s.Require().True(requestToJoin4.Our)
+	s.Require().NotEmpty(requestToJoin4.ID)
+	s.Require().NotEmpty(requestToJoin4.Clock)
+	s.Require().Equal(requestToJoin4.PublicKey, common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin4.State)
+	s.Require().NotEmpty(requestToJoin4.Clock)
+
+	s.Require().Len(response.Communities(), 1)
+
+	community = response.Communities()[0]
+	s.Require().False(community.Joined())
+	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
+	s.Require().Equal(community.RequestedToJoinAt(), requestToJoin4.Clock)
+}
+
 func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
@@ -1900,6 +2237,8 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	community = response.Communities()[0]
 	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
 
+	s.logger.Info("->ALICE------")
+
 	// Alice should then be removed
 	err = tt.RetryWithBackOff(func() error {
 		response, err = s.alice.RetrieveAll()
@@ -1917,6 +2256,10 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 		}
 		return nil
 	})
+
+	aComm := response.Communities()[0]
+	s.logger.Info("->aComm", zap.Any("aComm", aComm))
+	s.Require().False(aComm.HasMember(&s.alice.identity.PublicKey))
 
 	// Check we got AC notification for Alice
 	aliceNotifications, err := s.alice.ActivityCenterNotifications(ActivityCenterNotificationsRequest{
@@ -2284,6 +2627,8 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 		}
 	}
 	s.Require().Equal(1, numberInactiveChats)
+
+	//	J
 }
 
 func (s *MessengerCommunitiesSuite) TestShareCommunity() {
