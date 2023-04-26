@@ -31,6 +31,7 @@ message SyncSetting {
     DISPLAY_NAME = 13;
     BIO = 14;
     MNEMONIC_REMOVED = 15;
+    ENS_USERNAMES = 16;
   }
 }
 

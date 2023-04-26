@@ -355,7 +355,7 @@ func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobu
 		return nil, err
 	}
 
-	pictures := make([]*protobuf.SyncProfilePicture, len(images))
+	pictureProtos := make([]*protobuf.SyncProfilePicture, len(images))
 	for i, image := range images {
 		p := &protobuf.SyncProfilePicture{}
 		p.Name = image.Name
@@ -369,19 +369,33 @@ func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobu
 		} else {
 			p.Clock = image.Clock
 		}
-		pictures[i] = p
+		pictureProtos[i] = p
 	}
 
 	socialLinks, err := m.settings.GetSocialLinks()
 	if err != nil {
 		return nil, err
 	}
-	socialLinkSettings := make([]*protobuf.SyncSocialLinkSetting, len(socialLinks))
+	socialLinkSettingProtos := make([]*protobuf.SyncSocialLinkSetting, len(socialLinks))
 	for i, socialLink := range socialLinks {
-		socialLinkSettings[i] = &protobuf.SyncSocialLinkSetting{
+		socialLinkSettingProtos[i] = &protobuf.SyncSocialLinkSetting{
 			Text:  socialLink.Text,
 			Url:   socialLink.URL,
 			Clock: socialLink.Clock,
+		}
+	}
+
+	ensUsernameDetails, err := m.getEnsUsernameDetails()
+	if err != nil {
+		return nil, err
+	}
+	ensUsernameDetailProtos := make([]*protobuf.SyncEnsUsernameDetail, len(ensUsernameDetails))
+	for i, ensUsernameDetail := range ensUsernameDetails {
+		ensUsernameDetailProtos[i] = &protobuf.SyncEnsUsernameDetail{
+			Username: ensUsernameDetail.Username,
+			Clock:    ensUsernameDetail.Clock,
+			Removed:  ensUsernameDetail.Removed,
+			ChainId:  ensUsernameDetail.ChainID,
 		}
 	}
 
@@ -389,9 +403,10 @@ func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobu
 		Profile: &protobuf.BackedUpProfile{
 			KeyUid:             keyUID,
 			DisplayName:        displayName,
-			Pictures:           pictures,
+			Pictures:           pictureProtos,
 			DisplayNameClock:   displayNameClock,
-			SocialLinkSettings: socialLinkSettings,
+			SocialLinkSettings: socialLinkSettingProtos,
+			EnsUsernameDetails: ensUsernameDetailProtos,
 		},
 	}
 

@@ -395,6 +395,12 @@ var (
 		reactFieldName: "usernames",
 		dBColumnName:   "usernames",
 		valueHandler:   JSONBlobHandler,
+		syncProtobufFactory: &SyncProtobufFactory{
+			fromInterface:     usernamesProtobufFactory,
+			fromStruct:        usernamesProtobufFactoryStruct,
+			valueFromProtobuf: BytesFromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_ENS_USERNAMES,
+		},
 	}
 	WakuBloomFilterMode = SettingField{
 		reactFieldName: "waku-bloom-filter-mode",

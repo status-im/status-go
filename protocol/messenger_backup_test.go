@@ -163,6 +163,14 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	})
 	s.Require().NoError(err)
 
+	bob1EnsUsernameDetail, err := bob1.saveEnsUsernameDetailProto(protobuf.SyncEnsUsernameDetail{
+		Clock:    1,
+		Username: "bob1.eth",
+		ChainId:  1,
+		Removed:  false,
+	})
+	s.Require().NoError(err)
+
 	// Create bob2
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
 	s.Require().NoError(err)
@@ -184,6 +192,10 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	s.Require().NoError(err)
 	s.Require().NotNil(bob1SocialLink)
 
+	bob1EnsUsernameDetails, err := bob1.getEnsUsernameDetails()
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(bob1EnsUsernameDetails))
+
 	// Check bob2
 	storedBob2DisplayName, err := bob2.settings.DisplayName()
 	s.Require().NoError(err)
@@ -197,6 +209,10 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	bob2SocialLink, err := bob2.settings.GetSocialLink(identity.GithubID)
 	s.Require().NoError(err)
 	s.Require().Equal("", bob2SocialLink.URL)
+
+	bob2EnsUsernameDetails, err := bob2.getEnsUsernameDetails()
+	s.Require().NoError(err)
+	s.Require().Equal(0, len(bob2EnsUsernameDetails))
 
 	// Backup
 	clock, err := bob1.BackupData(context.Background())
@@ -228,6 +244,11 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	s.Require().NotNil(bob2SocialLink)
 	s.Require().Equal(bob1SocialLink.URL, bob2SocialLink.URL)
 
+	bob2EnsUsernameDetails, err = bob2.getEnsUsernameDetails()
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(bob2EnsUsernameDetails))
+	s.Require().Equal(bob1EnsUsernameDetail, bob2EnsUsernameDetails[0])
+
 	lastBackup, err := bob1.lastBackup()
 	s.Require().NoError(err)
 	s.Require().NotEmpty(lastBackup)
@@ -245,6 +266,9 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 		bob1Mnemonic                  = ""
 		bob1MnemonicRemoved           = true
 	)
+	var (
+		bob1Usernames = json.RawMessage(`["username1","username2"]`)
+	)
 
 	// Create bob1 and set fields which are supposed to be backed up to/fetched from waku
 	bob1 := s.m
@@ -261,6 +285,8 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	err = bob1.settings.SaveSettingField(settings.Bio, bob1Bio)
 	s.Require().NoError(err)
 	err = bob1.settings.SaveSettingField(settings.Mnemonic, bob1Mnemonic)
+	s.Require().NoError(err)
+	err = bob1.settings.SaveSettingField(settings.Usernames, bob1Usernames)
 	s.Require().NoError(err)
 
 	// Create bob2
@@ -294,6 +320,9 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	storedMnemonicRemoved, err := bob1.settings.MnemonicRemoved()
 	s.Require().NoError(err)
 	s.Require().Equal(bob1MnemonicRemoved, storedMnemonicRemoved)
+	storedBob1Usernames, err := bob1.settings.Usernames()
+	s.Require().NoError(err)
+	s.Require().Equal(bob1Usernames, *storedBob1Usernames)
 
 	// Check bob2
 	storedBob2DisplayName, err := bob2.settings.DisplayName()
@@ -317,6 +346,9 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	storedBob2MnemonicRemoved, err := bob2.settings.MnemonicRemoved()
 	s.Require().NoError(err)
 	s.Require().Equal(false, storedBob2MnemonicRemoved)
+	storedBob2Usernames, err := bob2.settings.Usernames()
+	s.Require().NoError(err)
+	s.Require().Nil(storedBob2Usernames)
 
 	// Backup
 	clock, err := bob1.BackupData(context.Background())
@@ -354,6 +386,9 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	storedBob2MnemonicRemoved, err = bob2.settings.MnemonicRemoved()
 	s.Require().NoError(err)
 	s.Require().Equal(bob1MnemonicRemoved, storedBob2MnemonicRemoved)
+	storedBob2Usernames, err = bob2.settings.Usernames()
+	s.Require().NoError(err)
+	s.Require().Equal(bob1Usernames, *storedBob2Usernames)
 
 	lastBackup, err := bob1.lastBackup()
 	s.Require().NoError(err)

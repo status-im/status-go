@@ -580,6 +580,11 @@ func (db *Database) GetInstalledStickerPacks() (rst *json.RawMessage, err error)
 	return
 }
 
+func (db *Database) Usernames() (rst *json.RawMessage, err error) {
+	err = db.makeSelectRow(Usernames).Scan(&rst)
+	return
+}
+
 func (db *Database) GetPendingStickerPacks() (rst *json.RawMessage, err error) {
 	err = db.makeSelectRow(StickersPacksPending).Scan(&rst)
 	return

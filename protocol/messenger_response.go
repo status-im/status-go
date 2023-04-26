@@ -3,6 +3,8 @@ package protocol
 import (
 	"encoding/json"
 
+	ensservice "github.com/status-im/status-go/services/ens"
+
 	"github.com/status-im/status-go/protocol/identity"
 
 	"github.com/status-im/status-go/services/browsers"
@@ -76,6 +78,7 @@ type MessengerResponse struct {
 	keycards                    []*keypairs.KeyPair
 	keycardActions              []*keypairs.KeycardAction
 	socialLinkSettings          []*identity.SocialLink
+	ensUsernameDetails          []*ensservice.UsernameDetail
 }
 
 func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
@@ -117,6 +120,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Keycards                      []*keypairs.KeyPair                  `json:"keycards,omitempty"`
 		KeycardActions                []*keypairs.KeycardAction            `json:"keycardActions,omitempty"`
 		SocialLinkSettings            []*identity.SocialLink               `json:"socialLinkSettings,omitempty"`
+		EnsUsernameDetails            []*ensservice.UsernameDetail         `json:"ensUsernameDetails,omitempty"`
 	}{
 		Contacts:                r.Contacts,
 		Installations:           r.Installations,
@@ -151,6 +155,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Keycards:                      r.AllKnownKeycards(),
 		KeycardActions:                r.KeycardActions(),
 		SocialLinkSettings:            r.SocialLinkSettings(),
+		EnsUsernameDetails:            r.EnsUsernameDetails(),
 	}
 
 	responseItem.TrustStatus = r.TrustStatus()
@@ -278,6 +283,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.keycards)+
 		len(r.keycardActions) == 0 &&
 		len(r.socialLinkSettings) == 0 &&
+		len(r.ensUsernameDetails) == 0 &&
 		r.currentStatus == nil &&
 		r.activityCenterState == nil
 }
@@ -288,7 +294,6 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	if len(response.Invitations)+
 		len(response.RequestsToJoinCommunity)+
 		len(response.Mailservers)+
-		len(response.Bookmarks)+
 		len(response.clearedHistories)+
 		len(response.DiscordChannels)+
 		len(response.DiscordCategories) != 0 {
@@ -313,6 +318,8 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddAllKnownKeycards(response.AllKnownKeycards())
 	r.AddKeycardActions(response.KeycardActions())
 	r.AddSocialLinkSettings(response.SocialLinkSettings())
+	r.AddEnsUsernameDetails(response.EnsUsernameDetails())
+	r.AddBookmarks(response.GetBookmarks())
 	r.CommunityChanges = append(r.CommunityChanges, response.CommunityChanges...)
 	r.BackupHandled = response.BackupHandled
 
@@ -357,6 +364,10 @@ func (r *MessengerResponse) AddBookmarks(bookmarks []*browsers.Bookmark) {
 	for _, b := range bookmarks {
 		r.AddBookmark(b)
 	}
+}
+
+func (r *MessengerResponse) GetBookmarks() []*browsers.Bookmark {
+	return r.Bookmarks
 }
 
 func (r *MessengerResponse) AddVerificationRequest(vr *verification.Request) {
@@ -479,6 +490,18 @@ func (r *MessengerResponse) AddSocialLinkSettings(socialLinkSettings []*identity
 
 func (r *MessengerResponse) SocialLinkSettings() []*identity.SocialLink {
 	return r.socialLinkSettings
+}
+
+func (r *MessengerResponse) AddEnsUsernameDetail(detail *ensservice.UsernameDetail) {
+	r.ensUsernameDetails = append(r.ensUsernameDetails, detail)
+}
+
+func (r *MessengerResponse) AddEnsUsernameDetails(details []*ensservice.UsernameDetail) {
+	r.ensUsernameDetails = append(r.ensUsernameDetails, details...)
+}
+
+func (r *MessengerResponse) EnsUsernameDetails() []*ensservice.UsernameDetail {
+	return r.ensUsernameDetails
 }
 
 func (r *MessengerResponse) AddNotification(n *localnotifications.Notification) {

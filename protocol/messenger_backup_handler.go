@@ -3,6 +3,8 @@ package protocol
 import (
 	"database/sql"
 
+	ensservice "github.com/status-im/status-go/services/ens"
+
 	"github.com/status-im/status-go/protocol/identity"
 
 	"go.uber.org/zap"
@@ -149,6 +151,16 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 		}
 	}
 	response.SetSocialLinks(links)
+
+	var ensUsernameDetails []*ensservice.UsernameDetail
+	for _, d := range message.EnsUsernameDetails {
+		dd, err := m.saveEnsUsernameDetailProto(*d)
+		if err != nil {
+			return err
+		}
+		ensUsernameDetails = append(ensUsernameDetails, dd)
+	}
+	response.SetEnsUsernameDetails(ensUsernameDetails)
 
 	if m.config.messengerSignalsHandler != nil {
 		m.config.messengerSignalsHandler.SendWakuBackedUpProfile(&response)
