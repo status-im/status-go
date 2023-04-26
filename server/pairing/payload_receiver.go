@@ -298,7 +298,23 @@ func (r *InstallationPayloadStorer) Store() error {
 	if err != nil {
 		return err
 	}
-	return messenger.HandleSyncRawMessages(r.payload.rawMessages)
+
+	installations := GetMessengerInstallationsMap(messenger)
+
+	err = messenger.HandleSyncRawMessages(r.payload.rawMessages)
+
+	if err != nil {
+		return err
+	}
+
+	if newInstallation := FindNewInstallations(messenger, installations); newInstallation != nil {
+		signal.SendLocalPairingEvent(Event{
+			Type:   EventReceivedInstallation,
+			Action: ActionPairingInstallation,
+			Data:   newInstallation})
+	}
+
+	return nil
 }
 
 /*
