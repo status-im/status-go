@@ -425,6 +425,7 @@ func (m *MentionManager) ClearMentions(chatID string) {
 	ctx.MentionState = nil
 	ctx.InputSegments = nil
 	ctx.NewText = ""
+	ctx.PreviousText = ""
 	m.clearSuggestions(chatID)
 }
 
