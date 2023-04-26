@@ -457,6 +457,7 @@ func (m *MentionManager) handleSelectionChange(chatID, text string, start int, e
 			m.clearSuggestions(chatID)
 		}
 	}
+	ctx.PreviousText = text
 }
 
 func (m *MentionManager) ToInputField(chatID, text string) (*ChatMentionContext, error) {
