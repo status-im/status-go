@@ -3251,6 +3251,10 @@ func (m *Manager) GetCommunityTokens(communityID string) ([]*CommunityToken, err
 	return m.persistence.GetCommunityTokens(communityID)
 }
 
+func (m *Manager) GetAllCommunityTokens() ([]*CommunityToken, error) {
+	return m.persistence.GetAllCommunityTokens()
+}
+
 func (m *Manager) ImageToBase64(uri string) string {
 	file, err := os.Open(uri)
 	if err != nil {

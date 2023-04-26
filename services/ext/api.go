@@ -1278,6 +1278,10 @@ func (api *PublicAPI) GetCommunityTokens(communityID string) ([]*communities.Com
 	return api.service.messenger.GetCommunityTokens(communityID)
 }
 
+func (api *PublicAPI) GetAllCommunityTokens() ([]*communities.CommunityToken, error) {
+	return api.service.messenger.GetAllCommunityTokens()
+}
+
 func (api *PublicAPI) AddCommunityToken(token *communities.CommunityToken) (*communities.CommunityToken, error) {
 	return api.service.messenger.AddCommunityToken(token)
 }
