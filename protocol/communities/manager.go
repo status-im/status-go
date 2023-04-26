@@ -3331,6 +3331,8 @@ func (m *Manager) SetCommunityActiveMembersCount(communityID string, activeMembe
 }
 
 func (m *Manager) UpdateCommunity(c *Community) error {
+	c.increaseClock()
+
 	err := m.persistence.SaveCommunity(c)
 	if err != nil {
 		return err

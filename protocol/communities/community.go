@@ -949,6 +949,7 @@ func (o *Community) Edit(description *protobuf.CommunityDescription) {
 	}
 	o.config.CommunityDescription.Permissions = description.Permissions
 	o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled = description.AdminSettings.PinMessageAllMembersEnabled
+	o.config.CommunityDescription.Encrypted = description.Encrypted
 	o.increaseClock()
 }
 
