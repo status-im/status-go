@@ -2621,8 +2621,6 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 		}
 	}
 	s.Require().Equal(1, numberInactiveChats)
-
-	//	J
 }
 
 func (s *MessengerCommunitiesSuite) TestShareCommunity() {
