@@ -306,6 +306,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddVerificationRequests(response.VerificationRequests())
 	r.AddTrustStatuses(response.trustStatus)
 	r.AddActivityCenterNotifications(response.ActivityCenterNotifications())
+	r.SetActivityCenterState(response.ActivityCenterState())
 	r.AddEmojiReactions(response.EmojiReactions())
 	r.AddInstallations(response.Installations)
 	r.AddSavedAddresses(response.SavedAddresses())
