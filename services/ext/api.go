@@ -1294,6 +1294,12 @@ func (api *PublicAPI) CollapsedCommunityCategories() ([]protocol.CollapsedCommun
 	return api.service.messenger.CollapsedCommunityCategories()
 }
 
+// SetCommunityEncryption takes a communityID string and an encryption state, then finds the community and
+// encrypts / decrypts the community. Community is republished along with any keys if needed.
+func (api *PublicAPI) SetCommunityEncryption(communityID string, useEncryption bool) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SetCommunityEncryption(communityID, useEncryption)
+}
+
 func (api *PublicAPI) Messenger() *protocol.Messenger {
 	return api.service.messenger
 }

@@ -3330,6 +3330,8 @@ func (m *Manager) SetCommunityActiveMembersCount(communityID string, activeMembe
 	return nil
 }
 
+// UpdateCommunity takes a Community persists it and republishes it.
+// The clock is incremented meaning even a no change update will be republished by the admin, and parsed by the member.
 func (m *Manager) UpdateCommunity(c *Community) error {
 	c.increaseClock()
 

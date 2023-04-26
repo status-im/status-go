@@ -3538,12 +3538,12 @@ func (m *Messenger) UpdateCommunityTokenState(contractAddress string, deployStat
 }
 
 // SetCommunityEncryption takes a communityID string and an encryption state, then finds the community and
-// encrypts / decrypts the community
+// encrypts / decrypts the community. Community is republished along with any keys if needed.
 //
 // Note: This function cannot decrypt previously encrypted messages, and it cannot encrypt previous unencrypted messages.
 // This functionality introduces some race conditions:
-//  - community description is processed by members before the receiving the key exchange messages
-//  - members maybe sending encrypted messages after the community description is updated and a new member joins
+//   - community description is processed by members before the receiving the key exchange messages
+//   - members maybe sending encrypted messages after the community description is updated and a new member joins
 func (m *Messenger) SetCommunityEncryption(communityID string, useEncryption bool) (*MessengerResponse, error) {
 	// Get Community
 	c, err := m.communitiesManager.GetByIDString(communityID)
