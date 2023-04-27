@@ -1302,16 +1302,12 @@ func (api *PublicAPI) ChatMentionCheckMentions(chatID, text string) (string, err
 	return api.service.messenger.GetMentionsManager().CheckMentions(chatID, text)
 }
 
-func (api *PublicAPI) ChatMentionOnTextInput(chatID string, state *protocol.MentionState) (*protocol.ChatMentionContext, error) {
-	return api.service.messenger.GetMentionsManager().OnTextInput(chatID, state)
+func (api *PublicAPI) ChatMentionOnChangeText(chatID, text string) (*protocol.ChatMentionContext, error) {
+	return api.service.messenger.GetMentionsManager().OnChangeText(chatID, text)
 }
 
 func (api *PublicAPI) ChatMentionRecheckAtIdxs(chatID string, text string, publicKey string) (*protocol.ChatMentionContext, error) {
 	return api.service.messenger.GetMentionsManager().RecheckAtIdxs(chatID, text, publicKey)
-}
-
-func (api *PublicAPI) ChatMentionCalculateSuggestions(chatID, text string) (*protocol.ChatMentionContext, error) {
-	return api.service.messenger.GetMentionsManager().CalculateSuggestions(chatID, text)
 }
 
 func (api *PublicAPI) ChatMentionNewInputTextWithMention(chatID, text, primaryName string) *protocol.ChatMentionContext {

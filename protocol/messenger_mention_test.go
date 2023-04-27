@@ -1,9 +1,12 @@
 package protocol
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/status-im/status-go/logutils"
 
 	"github.com/stretchr/testify/require"
 )
@@ -157,6 +160,8 @@ func TestReplaceMentions(t *testing.T) {
 		{"code case 2", "` @user2 `", "` @user2 `"},
 		{"code case 3", "``` @user2 ```", "``` @user2 ```"},
 		{"code case 4", "` ` @user2 ``", "` ` @0xpk2 ``"},
+
+		{"double @", "@ @user2", "@ @0xpk2"},
 	}
 
 	for _, tt := range tests {
@@ -338,16 +343,252 @@ func TestToInputField(t *testing.T) {
 	}
 }
 
+func TestSubs(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		start    int
+		end      int
+		expected string
+	}{
+		{
+			name:     "Normal case",
+			input:    "Hello, world!",
+			start:    0,
+			end:      5,
+			expected: "Hello",
+		},
+		{
+			name:     "Start index out of range (negative)",
+			input:    "Hello, world!",
+			start:    -5,
+			end:      5,
+			expected: "Hello",
+		},
+		{
+			name:     "End index out of range",
+			input:    "Hello, world!",
+			start:    7,
+			end:      50,
+			expected: "world!",
+		},
+		{
+			name:     "Start index greater than end index",
+			input:    "Hello, world!",
+			start:    10,
+			end:      5,
+			expected: ", wor",
+		},
+		{
+			name:     "Both indices out of range",
+			input:    "Hello, world!",
+			start:    -5,
+			end:      50,
+			expected: "Hello, world!",
+		},
+		{
+			name:     "Start index negative, end index out of range",
+			input:    "Hello, world!",
+			start:    -10,
+			end:      15,
+			expected: "Hello, world!",
+		},
+		{
+			name:     "Start index negative, end index within range",
+			input:    "Hello, world!",
+			start:    -10,
+			end:      5,
+			expected: "Hello",
+		},
+		{
+			name:     "Start index negative, end index negative",
+			input:    "Hello, world!",
+			start:    -10,
+			end:      -5,
+			expected: "",
+		},
+
+		{
+			name:     "Start index zero, end index zero",
+			input:    "Hello, world!",
+			start:    0,
+			end:      0,
+			expected: "",
+		},
+		{
+			name:     "Start index positive, end index zero",
+			input:    "Hello, world!",
+			start:    3,
+			end:      0,
+			expected: "Hel",
+		},
+		{
+			name:     "Start index equal to input length",
+			input:    "Hello, world!",
+			start:    13,
+			end:      15,
+			expected: "",
+		},
+		{
+			name:     "End index negative",
+			input:    "Hello, world!",
+			start:    5,
+			end:      -5,
+			expected: "Hello",
+		},
+		{
+			name:     "Start and end indices equal and negative",
+			input:    "Hello, world!",
+			start:    -3,
+			end:      -3,
+			expected: "",
+		},
+		{
+			name:     "Start index greater than input length",
+			input:    "Hello, world!",
+			start:    15,
+			end:      20,
+			expected: "",
+		},
+		{
+			name:     "End index equal to input length",
+			input:    "Hello, world!",
+			start:    0,
+			end:      13,
+			expected: "Hello, world!",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := subs(tc.input, tc.start, tc.end)
+			if actual != tc.expected {
+				t.Errorf("Test case '%s': expected '%s', got '%s'", tc.name, tc.expected, actual)
+			}
+		})
+	}
+}
+
 func TestLastIndexOf(t *testing.T) {
-	atSignIdx := LastIndexOf("@", charAtSign, 0)
+	atSignIdx := lastIndexOf("@", charAtSign, 0)
 	require.Equal(t, 0, atSignIdx)
 
-	atSignIdx = LastIndexOf("@@", charAtSign, 1)
+	atSignIdx = lastIndexOf("@@", charAtSign, 1)
 	require.Equal(t, 1, atSignIdx)
 
 	//at-sign-idx 0 text @t searched-text t start 2 end 2 new-text
-	atSignIdx = LastIndexOf("@t", charAtSign, 2)
+	atSignIdx = lastIndexOf("@t", charAtSign, 2)
 	require.Equal(t, 0, atSignIdx)
+}
+
+func TestDiffText(t *testing.T) {
+	testCases := []struct {
+		oldText  string
+		newText  string
+		expected *TextDiff
+	}{
+		{
+			oldText: "",
+			newText: "A",
+			expected: &TextDiff{
+				start:        0,
+				end:          0,
+				previousText: "",
+				newText:      "A",
+			},
+		},
+		{
+			oldText: "A",
+			newText: "Ab",
+			expected: &TextDiff{
+				start:        1,
+				end:          1,
+				previousText: "A",
+				newText:      "b",
+			},
+		},
+		{
+			oldText: "Ab",
+			newText: "Abc",
+			expected: &TextDiff{
+				start:        2,
+				end:          2,
+				previousText: "Ab",
+				newText:      "c",
+			},
+		},
+		{
+			oldText: "Abc",
+			newText: "Ac",
+			expected: &TextDiff{
+				start:        1,
+				end:          2,
+				previousText: "Abc",
+				newText:      "",
+			},
+		},
+		{
+			oldText: "Ac",
+			newText: "Adc",
+			expected: &TextDiff{
+				start:        1,
+				end:          1,
+				previousText: "Ac",
+				newText:      "d",
+			},
+		},
+		{
+			oldText: "Adc",
+			newText: "Ad ee c",
+			expected: &TextDiff{
+				start:        2,
+				end:          2,
+				previousText: "Adc",
+				newText:      " ee ",
+			},
+		},
+		{
+			oldText: "Ad ee c",
+			newText: "A fff d ee c",
+			expected: &TextDiff{
+				start:        1,
+				end:          1,
+				previousText: "Ad ee c",
+				newText:      " fff ",
+			},
+		},
+		{
+			oldText: "A fff d ee c",
+			newText: " fff d ee c",
+			expected: &TextDiff{
+				start:        0,
+				end:          1,
+				previousText: "A fff d ee c",
+				newText:      "",
+			},
+		},
+		{
+			oldText: " fff d ee c",
+			newText: " fffee c",
+			expected: &TextDiff{
+				start:        4,
+				end:          7,
+				previousText: " fff d ee c",
+				newText:      "",
+			},
+		},
+		{
+			oldText:  "abc",
+			newText:  "abc",
+			expected: nil,
+		},
+	}
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("%d", i+1), func(t *testing.T) {
+			diff := diffText(tc.oldText, tc.newText)
+			require.Equal(t, tc.expected, diff)
+		})
+	}
 }
 
 type MockMentionableUserGetter struct {
@@ -362,67 +603,127 @@ func (m *MockMentionableUserGetter) getMentionableUser(chatID string, pk string)
 	return m.mentionableUserMap[pk], nil
 }
 
-func TestMentionSuggestion(t *testing.T) {
-	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest()
+func TestMentionSuggestionCases(t *testing.T) {
+	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest(nil)
 
 	testCases := []struct {
-		newText      string
-		prevText     string
-		start        int
-		end          int
 		inputText    string
 		expectedSize int
 	}{
-		{"@", "", 0, 0, "@", len(mentionableUserMap)},
-		{"u", "", 1, 1, "@u", len(mentionableUserMap)},
-		{"2", "", 2, 2, "@u2", 1},
-		{"3", "", 3, 3, "@u23", 0},
-		{"", "3", 3, 4, "@u2", 1},
+		{"@", len(mentionableUserMap)},
+		{"@u", len(mentionableUserMap)},
+		{"@u2", 1},
+		{"@u23", 0},
+		{"@u2", 1},
 	}
 
-	for _, tc := range testCases {
-		input := MentionState{PreviousText: tc.prevText, NewText: &tc.newText, Start: tc.start, End: tc.end}
-		_, err := mentionManager.OnTextInput(chatID, &input)
-		require.NoError(t, err)
-		ctx, err := mentionManager.CalculateSuggestions(chatID, tc.inputText)
-		require.NoError(t, err)
-		require.Equal(t, tc.expectedSize, len(ctx.MentionSuggestions))
-		t.Logf("Input: %+v, MentionState:%+v, InputSegments:%+v\n", input, ctx.MentionState, ctx.InputSegments)
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("%d", i+1), func(t *testing.T) {
+			_, err := mentionManager.OnChangeText(chatID, tc.inputText)
+			require.NoError(t, err)
+			ctx, err := mentionManager.CalculateSuggestions(chatID, tc.inputText)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedSize, len(ctx.MentionSuggestions))
+			t.Logf("Input: %+v, MentionState:%+v, InputSegments:%+v\n", tc.inputText, ctx.MentionState, ctx.InputSegments)
+		})
 	}
 }
 
-func TestMentionSuggestionWithSpecialCharacters(t *testing.T) {
-	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest()
+func TestMentionSuggestionSpecialInputModeForAndroid(t *testing.T) {
+	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest(nil)
 
 	testCases := []struct {
-		newText             string
-		prevText            string
-		start               int
-		end                 int
+		inputText    string
+		expectedSize int
+	}{
+		{"A", 0},
+		{"As", 0},
+		{"Asd", 0},
+		{"Asd@", len(mentionableUserMap)},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("%d", i+1), func(t *testing.T) {
+			ctx, err := mentionManager.OnChangeText(chatID, tc.inputText)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedSize, len(ctx.MentionSuggestions))
+			t.Logf("Input: %+v, MentionState:%+v, InputSegments:%+v\n", tc.inputText, ctx.MentionState, ctx.InputSegments)
+		})
+	}
+}
+
+func TestMentionSuggestionSpecialChars(t *testing.T) {
+	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest(nil)
+
+	testCases := []struct {
 		inputText           string
 		expectedSize        int
 		calculateSuggestion bool
 	}{
-		{"'", "", 0, 0, "'", 0, false},
-		{"‘", "", 0, 1, "‘", 0, true},
-		{"@", "", 1, 1, "‘@", len(mentionableUserMap), true},
+		{"'", 0, false},
+		{"‘", 0, true},
+		{"‘@", len(mentionableUserMap), true},
 	}
 
 	for _, tc := range testCases {
-		input := MentionState{PreviousText: tc.prevText, NewText: &tc.newText, Start: tc.start, End: tc.end}
-		ctx, err := mentionManager.OnTextInput(chatID, &input)
+		ctx, err := mentionManager.OnChangeText(chatID, tc.inputText)
 		require.NoError(t, err)
 		if tc.calculateSuggestion {
 			ctx, err = mentionManager.CalculateSuggestions(chatID, tc.inputText)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectedSize, len(ctx.MentionSuggestions))
 		}
-		t.Logf("Input: %+v, MentionState:%+v, InputSegments:%+v\n", input, ctx.MentionState, ctx.InputSegments)
+		t.Logf("Input: %+v, MentionState:%+v, InputSegments:%+v\n", tc.inputText, ctx.MentionState, ctx.InputSegments)
 	}
 }
 
-func setupMentionSuggestionTest() (map[string]*MentionableUser, string, *MentionManager) {
-	mentionableUserMap := getMentionableUserMap()
+func TestMentionSuggestionAtSignSpaceCases(t *testing.T) {
+	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest(map[string]*MentionableUser{
+		"0xpk1": {
+			primaryName: "User Number One",
+			Contact: &Contact{
+				ID: "0xpk1",
+			},
+		},
+	})
+
+	testCases := []struct {
+		inputText           string
+		expectedSize        int
+		calculateSuggestion bool
+	}{
+		{"@", len(mentionableUserMap), true},
+		{"@ ", 0, true},
+		{"@ @", len(mentionableUserMap), true},
+	}
+
+	var ctx *ChatMentionContext
+	var err error
+	for _, tc := range testCases {
+		ctx, err = mentionManager.OnChangeText(chatID, tc.inputText)
+		require.NoError(t, err)
+		t.Logf("After OnChangeText, Input: %+v, MentionState:%+v, InputSegments:%+v\n", tc.inputText, ctx.MentionState, ctx.InputSegments)
+		if tc.calculateSuggestion {
+			ctx, err = mentionManager.CalculateSuggestions(chatID, tc.inputText)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedSize, len(ctx.MentionSuggestions))
+			t.Logf("After CalculateSuggestions, Input: %+v, MentionState:%+v, InputSegments:%+v\n", tc.inputText, ctx.MentionState, ctx.InputSegments)
+		}
+	}
+	require.Len(t, ctx.InputSegments, 3)
+	require.Equal(t, Mention, ctx.InputSegments[0].Type)
+	require.Equal(t, "@ @", ctx.InputSegments[0].Value)
+	require.Equal(t, Text, ctx.InputSegments[1].Type)
+	require.Equal(t, "@", ctx.InputSegments[1].Value)
+	require.Equal(t, Text, ctx.InputSegments[2].Type)
+	require.Equal(t, "@", ctx.InputSegments[2].Value)
+}
+
+func setupMentionSuggestionTest(mentionableUserMapInput map[string]*MentionableUser) (map[string]*MentionableUser, string, *MentionManager) {
+	mentionableUserMap := mentionableUserMapInput
+	if mentionableUserMap == nil {
+		mentionableUserMap = getDefaultMentionableUserMap()
+	}
 
 	for _, u := range mentionableUserMap {
 		addSearchablePhrases(u)
@@ -442,12 +743,13 @@ func setupMentionSuggestionTest() (map[string]*MentionableUser, string, *Mention
 		Messenger: &Messenger{
 			allChats: allChats,
 		},
+		logger: logutils.ZapLogger().Named("MentionManager"),
 	}
 
 	return mentionableUserMap, chatID, mentionManager
 }
 
-func getMentionableUserMap() map[string]*MentionableUser {
+func getDefaultMentionableUserMap() map[string]*MentionableUser {
 	return map[string]*MentionableUser{
 		"0xpk1": {
 			primaryName: "User Number One",
