@@ -145,12 +145,19 @@ func (api *API) GetChannelGroups(ctx context.Context) (map[string]ChannelGroup, 
 	totalUnviewedMessageCount := 0
 	totalUnviewedMentionsCount := 0
 
+	chats := make(map[string]*Chat)
 	for _, chat := range channels {
-		if !chat.Active {
+		if !chat.IsActivePersonalChat() {
 			continue
 		}
 		totalUnviewedMessageCount += int(chat.UnviewedMessagesCount)
 		totalUnviewedMentionsCount += int(chat.UnviewedMentionsCount)
+
+		c, err := api.toAPIChat(chat, nil, pubKey, true)
+		if err != nil {
+			return nil, err
+		}
+		chats[chat.ID] = c
 	}
 
 	result[pubKey] = ChannelGroup{
@@ -158,7 +165,7 @@ func (api *API) GetChannelGroups(ctx context.Context) (map[string]ChannelGroup, 
 		Name:                    "",
 		Images:                  make(map[string]images.IdentityImage),
 		Color:                   "",
-		Chats:                   make(map[string]*Chat),
+		Chats:                   chats,
 		Categories:              make(map[string]communities.CommunityCategory),
 		EnsName:                 "", // Not implemented yet in communities
 		Admin:                   true,
@@ -215,130 +222,26 @@ func (api *API) GetChannelGroups(ctx context.Context) (map[string]ChannelGroup, 
 			chGrp.Images[t] = images.IdentityImage{Name: t, Payload: i.Payload}
 		}
 
-		result[community.IDString()] = chGrp
-	}
-
-	return result, nil
-}
-
-func (api *API) GetChatsByChannelGroupID(ctx context.Context, channelGroupID string) (*ChannelGroup, error) {
-	pubKey := types.EncodeHex(crypto.FromECDSAPub(api.s.messenger.IdentityPublicKey()))
-
-	if pubKey == channelGroupID {
-		result := &ChannelGroup{
-			Type:                    Personal,
-			Name:                    "",
-			Images:                  make(map[string]images.IdentityImage),
-			Color:                   "",
-			Chats:                   make(map[string]*Chat),
-			Categories:              make(map[string]communities.CommunityCategory),
-			EnsName:                 "", // Not implemented yet in communities
-			Admin:                   true,
-			Verified:                true,
-			Description:             "",
-			IntroMessage:            "",
-			OutroMessage:            "",
-			Tags:                    []communities.CommunityTag{},
-			Permissions:             &protobuf.CommunityPermissions{},
-			Muted:                   false,
-			CommunityTokensMetadata: []*protobuf.CommunityTokenMetadata{},
+		for _, cat := range community.Categories() {
+			chGrp.Categories[cat.CategoryId] = communities.CommunityCategory{
+				ID:       cat.CategoryId,
+				Name:     cat.Name,
+				Position: int(cat.Position),
+			}
 		}
-
-		channels := api.s.messenger.Chats()
 
 		for _, chat := range channels {
-			if !chat.IsActivePersonalChat() {
-				continue
-			}
+			if chat.CommunityID == community.IDString() && chat.Active {
+				c, err := api.toAPIChat(chat, community, pubKey, true)
+				if err != nil {
+					return nil, err
+				}
 
-			c, err := api.toAPIChat(chat, nil, pubKey, true)
-			if err != nil {
-				return nil, err
-			}
-			result.Chats[chat.ID] = c
-		}
-
-		return result, nil
-	}
-
-	joinedCommunities, err := api.s.messenger.JoinedCommunities()
-	if err != nil {
-		return nil, err
-	}
-
-	found := false
-	var community *communities.Community
-	for _, comm := range joinedCommunities {
-		if comm.IDString() == channelGroupID {
-			community = comm
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		spectatedCommunities, err := api.s.messenger.SpectatedCommunities()
-		if err != nil {
-			return nil, err
-		}
-
-		for _, comm := range spectatedCommunities {
-			if comm.IDString() == channelGroupID {
-				community = comm
-				found = true
-				break
+				chGrp.Chats[c.ID] = c
 			}
 		}
-	}
 
-	if !found {
-		return nil, ErrCommunityNotFound
-	}
-
-	result := &ChannelGroup{
-		Type:                    Community,
-		Name:                    community.Name(),
-		Color:                   community.Color(),
-		Images:                  make(map[string]images.IdentityImage),
-		Chats:                   make(map[string]*Chat),
-		Categories:              make(map[string]communities.CommunityCategory),
-		Admin:                   community.IsAdmin(),
-		Verified:                community.Verified(),
-		Description:             community.DescriptionText(),
-		IntroMessage:            community.IntroMessage(),
-		OutroMessage:            community.OutroMessage(),
-		Tags:                    community.Tags(),
-		Permissions:             community.Description().Permissions,
-		Members:                 community.Description().Members,
-		CanManageUsers:          community.CanManageUsers(community.MemberIdentity()),
-		Muted:                   community.Muted(),
-		BanList:                 community.Description().BanList,
-		Encrypted:               community.Encrypted(),
-		CommunityTokensMetadata: community.Description().CommunityTokensMetadata,
-	}
-
-	for t, i := range community.Images() {
-		result.Images[t] = images.IdentityImage{Name: t, Payload: i.Payload}
-	}
-
-	for _, cat := range community.Categories() {
-		result.Categories[cat.CategoryId] = communities.CommunityCategory{
-			ID:       cat.CategoryId,
-			Name:     cat.Name,
-			Position: int(cat.Position),
-		}
-	}
-
-	channels := api.s.messenger.Chats()
-	for _, chat := range channels {
-		if chat.CommunityID == community.IDString() && chat.Active {
-			c, err := api.toAPIChat(chat, community, pubKey, true)
-			if err != nil {
-				return nil, err
-			}
-
-			result.Chats[c.ID] = c
-		}
+		result[community.IDString()] = chGrp
 	}
 
 	return result, nil
