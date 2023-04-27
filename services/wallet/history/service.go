@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -171,6 +172,7 @@ func (src *chainClientSource) TimeNow() int64 {
 	return time.Now().UTC().Unix()
 }
 
+// ERC20 token implementation of DataSource interface
 type tokenChainClientSource struct {
 	chainClientSource
 	TokenManager   *token.Manager
@@ -193,7 +195,7 @@ func (src *tokenChainClientSource) BalanceAt(ctx context.Context, account common
 	}
 	balance, err := src.TokenManager.GetTokenBalanceAt(ctx, src.chainClient, account, token.Address, blockNumber)
 	if err != nil {
-		if err.Error() == "no contract code at given address" {
+		if err == bind.ErrNoCode {
 			// Ignore requests before contract deployment and mark this state for future requests
 			src.firstUnavailableBlockNo = new(big.Int).Set(blockNumber)
 			return big.NewInt(0), nil

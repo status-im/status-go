@@ -172,7 +172,8 @@ func (b *Balance) fetchAndCache(ctx context.Context, source DataSource, address 
 	return &dataPoint, blockNo, nil
 }
 
-// update fetches the balance history for a given asset from DB first and missing information from the blockchain to minimize the RPC calls
+// update retrieves the balance history for a specified asset from the database initially
+// and supplements any missing information from the blockchain to minimize the number of RPC calls.
 // if context is cancelled it will return with error
 func (b *Balance) update(ctx context.Context, source DataSource, address common.Address, timeInterval TimeInterval) error {
 	startTimestamp := int64(0)

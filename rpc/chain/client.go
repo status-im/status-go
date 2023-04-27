@@ -11,6 +11,7 @@ import (
 	"github.com/afex/hystrix-go/hystrix"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -39,7 +40,8 @@ type ClientWithFallback struct {
 	LastCheckedAt   int64
 }
 
-var vmErrors = []error{
+// Don't mark connection as failed if we get one of these errors
+var propagateErrors = []error{
 	vm.ErrOutOfGas,
 	vm.ErrCodeStoreOutOfGas,
 	vm.ErrDepth,
@@ -53,6 +55,10 @@ var vmErrors = []error{
 	vm.ErrGasUintOverflow,
 	vm.ErrInvalidCode,
 	vm.ErrNonceUintOverflow,
+
+	// Used by balance history to check state
+	ethereum.NotFound,
+	bind.ErrNoCode,
 }
 
 type CommandResult struct {
@@ -114,7 +120,7 @@ func isVMError(err error) bool {
 	if strings.HasPrefix(err.Error(), "execution reverted") {
 		return true
 	}
-	for _, vmError := range vmErrors {
+	for _, vmError := range propagateErrors {
 		if err == vmError {
 			return true
 		}
