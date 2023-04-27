@@ -1388,6 +1388,11 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		return nil, ErrCommunityRequestAlreadyRejected
 	}
 
+	// Banned member can't request to join community
+	if community.isBanned(signer) {
+		return nil, ErrCantRequestAccess
+	}
+
 	if err := community.ValidateRequestToJoin(signer, request); err != nil {
 		return nil, err
 	}
