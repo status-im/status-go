@@ -557,38 +557,51 @@ type work struct {
 	storeCursor *types.StoreRequestCursor
 }
 
-func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
+type messageRequester interface {
+	SendMessagesRequestForTopics(
+		ctx context.Context,
+		peerID []byte,
+		from, to uint32,
+		previousCursor []byte,
+		previousStoreCursor *types.StoreRequestCursor,
+		topics []types.TopicType,
+		waitForResponse bool,
+	) (cursor []byte, storeCursor *types.StoreRequestCursor, err error)
+}
+
+func processMailserverBatch(ctx context.Context, messageRequester messageRequester, batch MailserverBatch, mailserverID []byte, logger *zap.Logger) error {
 	var topicStrings []string
 	for _, t := range batch.Topics {
 		topicStrings = append(topicStrings, t.String())
 	}
-	logger := m.logger.With(zap.Any("chatIDs", batch.ChatIDs), zap.String("fromString", time.Unix(int64(batch.From), 0).Format(time.RFC3339)), zap.String("toString", time.Unix(int64(batch.To), 0).Format(time.RFC3339)), zap.Any("topic", topicStrings), zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(batch.To)))
+	logger = logger.With(zap.Any("chatIDs", batch.ChatIDs), zap.String("fromString", time.Unix(int64(batch.From), 0).Format(time.RFC3339)), zap.String("toString", time.Unix(int64(batch.To), 0).Format(time.RFC3339)), zap.Any("topic", topicStrings), zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(batch.To)))
 	logger.Info("syncing topic")
-
-	mailserverID, err := m.activeMailserverID()
-	if err != nil {
-		return err
-	}
 
 	wg := sync.WaitGroup{}
 	workCh := make(chan work, 100)
+	errCh := make(chan error)
 
 	go func() {
+		defer func() {
+			close(errCh)
+		}()
+
 		for {
 			select {
-			case <-m.ctx.Done():
+			case <-ctx.Done():
 				return
 			case w, ok := <-workCh:
 				if !ok {
 					return
 				}
 
-				ctx, cancel := context.WithTimeout(m.ctx, mailserverRequestTimeout)
-				cursor, storeCursor, err := m.transport.SendMessagesRequestForTopics(ctx, mailserverID, batch.From, batch.To, w.cursor, w.storeCursor, w.topics, true)
+				ctx, cancel := context.WithTimeout(ctx, mailserverRequestTimeout)
+				cursor, storeCursor, err := messageRequester.SendMessagesRequestForTopics(ctx, mailserverID, batch.From, batch.To, w.cursor, w.storeCursor, w.topics, true)
 				if err != nil {
 					logger.Error("failed to send request", zap.Error(err))
 					wg.Done()
 					cancel()
+					errCh <- err
 					return
 				}
 
@@ -628,8 +641,20 @@ func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
 	// to test it
 	//logger.Info("waiting until message processed")
 	//m.waitUntilP2PMessagesProcessed()
-	logger.Info("synced topic")
-	return nil
+
+	result := <-errCh
+
+	logger.Info("synced topic", zap.NamedError("hasError", result))
+	return result
+}
+
+func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
+	mailserverID, err := m.activeMailserverID()
+	if err != nil {
+		return err
+	}
+
+	return processMailserverBatch(m.ctx, m.transport, batch, mailserverID, m.logger)
 }
 
 type MailserverBatch struct {
