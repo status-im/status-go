@@ -1,7 +1,7 @@
 library 'status-jenkins-lib@v1.7.0'
 
 pipeline {
-  agent { label 'macos && aarch64 && nix-2.11' }
+  agent { label 'macos && aarch64 && xcode-14.3 && nix-2.11' }
 
   parameters {
     string(
@@ -47,7 +47,7 @@ pipeline {
 
     stage('Compile') {
       steps { script {
-        nix.shell('make statusgo-ios', pure: false)
+        nix.shell('make statusgo-ios', pure: false, sandbox: false)
       } }
     }
 

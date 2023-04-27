@@ -35,7 +35,7 @@ let
   /* No Android SDK for Darwin aarch64. */
   isMacM1 = stdenv.isDarwin && stdenv.isAarch64;
   /* Lock requires Xcode verison. */
-  xcodeWrapper = pkgs.xcodeenv.composeXcodeWrapper { version = "14.2"; };
+  xcodeWrapper = pkgs.xcodeenv.composeXcodeWrapper { version = "14.3"; };
   /* Gomobile also needs the Xcode wrapper. */
   gomobileMod = pkgs.gomobile.override {
     inherit xcodeWrapper;
