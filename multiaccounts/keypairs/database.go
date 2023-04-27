@@ -175,6 +175,9 @@ func (kp *KeyPairs) GetMigratedKeyPairByKeyUID(keyUID string) ([]*KeyPair, error
 			k.keycard_uid
 	`, keyUID)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return []*KeyPair{}, nil
+		}
 		return nil, err
 	}
 

@@ -198,7 +198,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncWalletAccount(state, message)
+			err = m.HandleSyncWalletAccount(state, message, true)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncWalletAccount when HandleSyncRawMessages", zap.Error(err))
 				continue

@@ -24,26 +24,29 @@ const (
 )
 
 type Account struct {
-	Address                 types.Address  `json:"address"`
-	KeyUID                  string         `json:"key-uid"`
-	Wallet                  bool           `json:"wallet"`
-	Chat                    bool           `json:"chat"`
-	Type                    AccountType    `json:"type,omitempty"`
-	Storage                 string         `json:"storage,omitempty"`
-	Path                    string         `json:"path,omitempty"`
-	PublicKey               types.HexBytes `json:"public-key,omitempty"`
-	Name                    string         `json:"name"`
-	Emoji                   string         `json:"emoji"`
-	Color                   string         `json:"color"`
-	Hidden                  bool           `json:"hidden"`
-	DerivedFrom             string         `json:"derived-from,omitempty"`
-	Clock                   uint64         `json:"clock,omitempty"`
-	Removed                 bool           `json:"removed,omitempty"`
-	KeypairName             string         `json:"keypair-name"`
-	LastUsedDerivationIndex uint64         `json:"last-used-derivation-index"`
+	Address                 types.Address   `json:"address"`
+	KeyUID                  string          `json:"key-uid"`
+	Wallet                  bool            `json:"wallet"`
+	Chat                    bool            `json:"chat"`
+	Type                    AccountType     `json:"type,omitempty"`
+	Storage                 string          `json:"storage,omitempty"`
+	Path                    string          `json:"path,omitempty"`
+	PublicKey               types.HexBytes  `json:"public-key,omitempty"`
+	Name                    string          `json:"name"`
+	Emoji                   string          `json:"emoji"`
+	Color                   string          `json:"color"`
+	Hidden                  bool            `json:"hidden"`
+	DerivedFrom             string          `json:"derived-from,omitempty"`
+	Clock                   uint64          `json:"clock,omitempty"`
+	Removed                 bool            `json:"removed,omitempty"`
+	KeypairName             string          `json:"keypair-name"`
+	LastUsedDerivationIndex uint64          `json:"last-used-derivation-index"`
+	Operable                AccountOperable `json:"operable"`
+	ToRemove                bool            `json:"to-remove"`
 }
 
 type AccountType string
+type AccountOperable string
 
 func (a AccountType) String() string {
 	return string(a)
@@ -56,6 +59,12 @@ const (
 	AccountTypeWatch     AccountType = "watch"
 )
 
+const (
+	AccountNonOperable       AccountOperable = "no"        // an account is non operable it is not a keycard account and there is no keystore file for it and no keystore file for the address it is derived from
+	AccountPartiallyOperable AccountOperable = "partially" // an account is partially operable if it is not a keycard account and there is created keystore file for the address it is derived from
+	AccountFullyOperable     AccountOperable = "fully"     // an account is fully operable if it is not a keycard account and there is a keystore file for it
+)
+
 // IsOwnAccount returns true if this is an account we have the private key for
 // NOTE: Wallet flag can't be used as it actually indicates that it's the default
 // Wallet
@@ -65,24 +74,26 @@ func (a *Account) IsOwnAccount() bool {
 
 func (a *Account) MarshalJSON() ([]byte, error) {
 	item := struct {
-		Address                 types.Address  `json:"address"`
-		MixedcaseAddress        string         `json:"mixedcase-address"`
-		KeyUID                  string         `json:"key-uid"`
-		Wallet                  bool           `json:"wallet"`
-		Chat                    bool           `json:"chat"`
-		Type                    AccountType    `json:"type,omitempty"`
-		Storage                 string         `json:"storage,omitempty"`
-		Path                    string         `json:"path,omitempty"`
-		PublicKey               types.HexBytes `json:"public-key,omitempty"`
-		Name                    string         `json:"name"`
-		Emoji                   string         `json:"emoji"`
-		Color                   string         `json:"color"`
-		Hidden                  bool           `json:"hidden"`
-		DerivedFrom             string         `json:"derived-from,omitempty"`
-		Clock                   uint64         `json:"clock"`
-		Removed                 bool           `json:"removed"`
-		KeypairName             string         `json:"keypair-name"`
-		LastUsedDerivationIndex uint64         `json:"last-used-derivation-index"`
+		Address                 types.Address   `json:"address"`
+		MixedcaseAddress        string          `json:"mixedcase-address"`
+		KeyUID                  string          `json:"key-uid"`
+		Wallet                  bool            `json:"wallet"`
+		Chat                    bool            `json:"chat"`
+		Type                    AccountType     `json:"type,omitempty"`
+		Storage                 string          `json:"storage,omitempty"`
+		Path                    string          `json:"path,omitempty"`
+		PublicKey               types.HexBytes  `json:"public-key,omitempty"`
+		Name                    string          `json:"name"`
+		Emoji                   string          `json:"emoji"`
+		Color                   string          `json:"color"`
+		Hidden                  bool            `json:"hidden"`
+		DerivedFrom             string          `json:"derived-from,omitempty"`
+		Clock                   uint64          `json:"clock"`
+		Removed                 bool            `json:"removed"`
+		KeypairName             string          `json:"keypair-name"`
+		LastUsedDerivationIndex uint64          `json:"last-used-derivation-index"`
+		Operable                AccountOperable `json:"operable"`
+		ToRemove                bool            `json:"to-remove"`
 	}{
 		Address:                 a.Address,
 		MixedcaseAddress:        a.Address.Hex(),
@@ -102,6 +113,8 @@ func (a *Account) MarshalJSON() ([]byte, error) {
 		Removed:                 a.Removed,
 		KeypairName:             a.KeypairName,
 		LastUsedDerivationIndex: a.LastUsedDerivationIndex,
+		Operable:                a.Operable,
+		ToRemove:                a.ToRemove,
 	}
 
 	return json.Marshal(item)
@@ -268,6 +281,20 @@ func (db *Database) GetAccountsByKeyUID(keyUID string) ([]*Account, error) {
 	return filteredAccounts, nil
 }
 
+func (db *Database) GetAccountsByDerivedFromAddress(derivedFromAddress string) ([]*Account, error) {
+	accounts, err := db.GetAccounts()
+	if err != nil {
+		return nil, err
+	}
+	filteredAccounts := make([]*Account, 0)
+	for _, account := range accounts {
+		if account.KeyUID == derivedFromAddress {
+			filteredAccounts = append(filteredAccounts, account)
+		}
+	}
+	return filteredAccounts, nil
+}
+
 func (db *Database) GetAccounts() ([]*Account, error) {
 	rows, err := db.db.Query(`
 		SELECT 
@@ -286,7 +313,9 @@ func (db *Database) GetAccounts() ([]*Account, error) {
 			clock, 
 			key_uid,
 			keypair_name,
-			last_used_derivation_index
+			last_used_derivation_index,
+			operable,
+			to_remove
 		FROM 
 			accounts 
 		ORDER BY 
@@ -301,7 +330,8 @@ func (db *Database) GetAccounts() ([]*Account, error) {
 		acc := &Account{}
 		err := rows.Scan(
 			&acc.Address, &acc.Wallet, &acc.Chat, &acc.Type, &acc.Storage, &pubkey, &acc.Path, &acc.Name, &acc.Emoji,
-			&acc.Color, &acc.Hidden, &acc.DerivedFrom, &acc.Clock, &acc.KeyUID, &acc.KeypairName, &acc.LastUsedDerivationIndex)
+			&acc.Color, &acc.Hidden, &acc.DerivedFrom, &acc.Clock, &acc.KeyUID, &acc.KeypairName, &acc.LastUsedDerivationIndex,
+			&acc.Operable, &acc.ToRemove)
 		if err != nil {
 			return nil, err
 		}
@@ -332,7 +362,9 @@ func (db *Database) GetAccountByAddress(address types.Address) (rst *Account, er
 			clock, 
 			key_uid,
 			keypair_name,
-			last_used_derivation_index
+			last_used_derivation_index,
+			operable,
+			to_remove
 		FROM 
 			accounts 
 		WHERE 
@@ -343,7 +375,8 @@ func (db *Database) GetAccountByAddress(address types.Address) (rst *Account, er
 	pubkey := []byte{}
 	err = row.Scan(
 		&acc.Address, &acc.Wallet, &acc.Chat, &acc.Type, &acc.Storage, &pubkey, &acc.Path, &acc.Name, &acc.Emoji,
-		&acc.Color, &acc.Hidden, &acc.DerivedFrom, &acc.Clock, &acc.KeyUID, &acc.KeypairName, &acc.LastUsedDerivationIndex)
+		&acc.Color, &acc.Hidden, &acc.DerivedFrom, &acc.Clock, &acc.KeyUID, &acc.KeypairName, &acc.LastUsedDerivationIndex,
+		&acc.Operable, &acc.ToRemove)
 
 	if err != nil {
 		return nil, err
@@ -406,7 +439,9 @@ func (db *Database) SaveAccounts(accounts []*Account) (err error) {
 			updated_at = datetime('now'), 
 			clock = ?,
 			keypair_name = ?,
-			last_used_derivation_index = ?
+			last_used_derivation_index = ?,
+			operable = ?,
+			to_remove = ?
 		WHERE 
 			address = ?`)
 	if err != nil {
@@ -427,7 +462,8 @@ func (db *Database) SaveAccounts(accounts []*Account) (err error) {
 			return
 		}
 		_, err = update.Exec(acc.Wallet, acc.Chat, acc.Type, acc.Storage, acc.PublicKey, acc.Path, acc.Name, acc.Emoji, acc.Color,
-			acc.Hidden, acc.DerivedFrom, acc.KeyUID, acc.Clock, acc.KeypairName, acc.LastUsedDerivationIndex, acc.Address)
+			acc.Hidden, acc.DerivedFrom, acc.KeyUID, acc.Clock, acc.KeypairName, acc.LastUsedDerivationIndex, acc.Operable,
+			acc.ToRemove, acc.Address)
 		if err != nil {
 			switch err.Error() {
 			case uniqueChatConstraint:
@@ -449,6 +485,20 @@ func (db *Database) SaveAccounts(accounts []*Account) (err error) {
 
 func (db *Database) DeleteAccount(address types.Address) error {
 	_, err := db.db.Exec("DELETE FROM accounts WHERE address = ?", address)
+	return err
+}
+
+func (db *Database) MarkAccountAsFullyOperable(address types.Address) error {
+	update, err := db.db.Prepare(`UPDATE accounts 
+		SET 
+			operable = ?, 
+		WHERE 
+			address = ?`)
+	if err != nil {
+		return err
+	}
+
+	_, err = update.Exec(AccountFullyOperable, address)
 	return err
 }
 

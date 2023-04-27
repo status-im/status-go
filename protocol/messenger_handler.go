@@ -2794,7 +2794,7 @@ func (m *Messenger) updateUnviewedCounts(chat *Chat, mentionedOrReplied bool) {
 	}
 }
 
-func (m *Messenger) handleSyncWalletAccount(message *protobuf.SyncWalletAccount) (*accounts.Account, error) {
+func (m *Messenger) handleSyncWalletAccount(message *protobuf.SyncWalletAccount, fullySynced bool) (*accounts.Account, error) {
 	if message.Chat {
 		return nil, ErrNotWalletAccount
 	}
@@ -2808,30 +2808,65 @@ func (m *Messenger) handleSyncWalletAccount(message *protobuf.SyncWalletAccount)
 		return nil, ErrTryingToStoreOldWalletAccount
 	}
 
-	var acc *accounts.Account
-	if dbAccount != nil && message.Removed {
-		acc = &accounts.Account{
-			Address: types.BytesToAddress(message.Address),
-			Removed: true,
+	acc := &accounts.Account{
+		Address:                 types.BytesToAddress(message.Address),
+		Wallet:                  message.Wallet,
+		Chat:                    message.Chat,
+		Type:                    accounts.AccountType(message.Type),
+		Storage:                 message.Storage,
+		PublicKey:               types.HexBytes(message.PublicKey),
+		Path:                    message.Path,
+		Color:                   message.Color,
+		Hidden:                  message.Hidden,
+		Name:                    message.Name,
+		Clock:                   message.Clock,
+		KeyUID:                  message.KeyUid,
+		Emoji:                   message.Emoji,
+		DerivedFrom:             message.DerivedFrom,
+		KeypairName:             message.KeypairName,
+		LastUsedDerivationIndex: message.LastUsedDerivationIndex,
+		Operable:                accounts.AccountFullyOperable,
+		ToRemove:                false,
+		Removed:                 message.Removed,
+	}
+
+	if !fullySynced && acc.Type != accounts.AccountTypeWatch {
+		evaluateOperabilityForNewAccountByDerivedFromAddress := func(derivedFrom string) (accounts.AccountOperable, error) {
+			if len(derivedFrom) == 0 {
+				return accounts.AccountNonOperable, nil
+			}
+			dbKeyPairAccounts, err := m.settings.GetAccountsByDerivedFromAddress(derivedFrom)
+			if err != nil {
+				if err == sql.ErrNoRows {
+					return accounts.AccountNonOperable, nil
+				}
+				return accounts.AccountNonOperable, err
+			}
+			for _, acc := range dbKeyPairAccounts {
+				if acc.Operable == accounts.AccountPartiallyOperable ||
+					acc.Operable == accounts.AccountFullyOperable {
+					return accounts.AccountPartiallyOperable, nil
+				}
+			}
+			return accounts.AccountNonOperable, nil
 		}
-	} else if !message.Removed {
-		acc = &accounts.Account{
-			Address:                 types.BytesToAddress(message.Address),
-			Wallet:                  message.Wallet,
-			Chat:                    message.Chat,
-			Type:                    accounts.AccountType(message.Type),
-			Storage:                 message.Storage,
-			PublicKey:               types.HexBytes(message.PublicKey),
-			Path:                    message.Path,
-			Color:                   message.Color,
-			Hidden:                  message.Hidden,
-			Name:                    message.Name,
-			Clock:                   message.Clock,
-			KeyUID:                  message.KeyUid,
-			Emoji:                   message.Emoji,
-			DerivedFrom:             message.DerivedFrom,
-			KeypairName:             message.KeypairName,
-			LastUsedDerivationIndex: message.LastUsedDerivationIndex,
+
+		dbMigratedKeypairs, err := m.settings.GetMigratedKeyPairByKeyUID(acc.KeyUID)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(dbMigratedKeypairs) == 0 {
+			accOperable, err := evaluateOperabilityForNewAccountByDerivedFromAddress(acc.DerivedFrom)
+			if err != nil {
+				return nil, err
+			}
+			acc.Operable = accOperable
+		}
+
+		if acc.Operable != accounts.AccountFullyOperable && message.Removed {
+			acc.ToRemove = true
+			acc.Removed = false
 		}
 	}
 
@@ -2843,10 +2878,10 @@ func (m *Messenger) handleSyncWalletAccount(message *protobuf.SyncWalletAccount)
 	return acc, nil
 }
 
-func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message protobuf.SyncWalletAccounts) error {
+func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message protobuf.SyncWalletAccounts, fullySynced bool) error {
 	var accs []*accounts.Account
 	for _, accMsg := range message.Accounts {
-		acc, err := m.handleSyncWalletAccount(accMsg)
+		acc, err := m.handleSyncWalletAccount(accMsg, fullySynced)
 		if err != nil {
 			if err == ErrNotWalletAccount ||
 				err == ErrWalletAccountNotSupportedForMobileApp ||

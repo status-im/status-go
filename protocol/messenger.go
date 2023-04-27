@@ -4294,7 +4294,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						p := msg.ParsedMessage.Interface().(protobuf.SyncWalletAccounts)
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
 						logger.Debug("Handling SyncWalletAccount", zap.Any("message", p))
-						err = m.HandleSyncWalletAccount(messageState, p)
+						err = m.HandleSyncWalletAccount(messageState, p, false)
 						if err != nil {
 							logger.Warn("failed to handle SyncWalletAccount", zap.Error(err))
 							allMessagesProcessed = false

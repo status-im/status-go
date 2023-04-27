@@ -222,7 +222,7 @@ func (m *Messenger) handleBackedUpWalletAccount(message *protobuf.SyncWalletAcco
 		return nil
 	}
 
-	acc, err := m.handleSyncWalletAccount(message)
+	acc, err := m.handleSyncWalletAccount(message, false)
 	if err != nil {
 		return err
 	}
