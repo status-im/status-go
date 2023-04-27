@@ -1496,38 +1496,52 @@ func (m *Messenger) HandleEditMessage(state *ReceivedMessageState, editMessage E
 		return m.persistence.SaveEdit(editMessage)
 	}
 
+	// applyEditMessage modifies the message. Changing the variable name to make it clearer
+	editedMessage := originalMessage
 	// Update message and return it
-	err = m.applyEditMessage(&editMessage.EditMessage, originalMessage)
+	err = m.applyEditMessage(&editMessage.EditMessage, editedMessage)
 	if err != nil {
 		return err
 	}
 
-	if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
-		chat.LastMessage = originalMessage
+	if chat.LastMessage != nil && chat.LastMessage.ID == editedMessage.ID {
+		chat.LastMessage = editedMessage
 		err := m.saveChat(chat)
 		if err != nil {
 			return err
 		}
 	}
-	responseTo, err := m.persistence.MessageByID(originalMessage.ResponseTo)
+	responseTo, err := m.persistence.MessageByID(editedMessage.ResponseTo)
 
 	if err != nil && err != common.ErrRecordNotFound {
 		return err
 	}
 
-	err = state.updateExistingActivityCenterNotification(m.identity.PublicKey, m, originalMessage, responseTo)
+	err = state.updateExistingActivityCenterNotification(m.identity.PublicKey, m, editedMessage, responseTo)
 	if err != nil {
 		return err
 	}
 
-	editedMessageHasMentions := originalMessage.Mentioned
+	editedMessageHasMentions := editedMessage.Mentioned
 
-	if editedMessageHasMentions && !originalMessageMentioned && !originalMessage.Seen {
+	needToSaveChat := false
+	if editedMessageHasMentions && !originalMessageMentioned && !editedMessage.Seen {
 		// Increase unviewed count when the edited message has a mention and didn't have one before
-		m.updateUnviewedCounts(chat, originalMessage.Mentioned || originalMessage.Replied)
+		chat.UnviewedMentionsCount++
+		needToSaveChat = true
+	} else if !editedMessageHasMentions && originalMessageMentioned && !editedMessage.Seen {
+		// Opposite of above, the message had a mention, but no longer does, so we reduce the count
+		chat.UnviewedMentionsCount--
+		needToSaveChat = true
+	}
+	if needToSaveChat {
+		err := m.saveChat(chat)
+		if err != nil {
+			return err
+		}
 	}
 
-	state.Response.AddMessage(originalMessage)
+	state.Response.AddMessage(editedMessage)
 
 	// pull updated messages
 	updatedMessages, err := m.persistence.MessagesByResponseTo(messageID)
@@ -1597,6 +1611,7 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		return err
 	}
 
+	unreadCountDecreased := false
 	for _, messageToDelete := range messagesToDelete {
 		messageToDelete.Deleted = true
 		messageToDelete.DeletedBy = deleteMessage.DeleteMessage.DeletedBy
@@ -1611,6 +1626,19 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		if err != nil {
 			m.logger.Warn("failed to delete notifications for deleted message", zap.Error(err))
 			return err
+		}
+
+		// Reduce chat mention count and unread count if unread
+		if !messageToDelete.Seen && !unreadCountDecreased {
+			unreadCountDecreased = true
+			chat.UnviewedMessagesCount--
+			if messageToDelete.Mentioned || messageToDelete.Replied {
+				chat.UnviewedMentionsCount--
+			}
+			err := m.saveChat(chat)
+			if err != nil {
+				return err
+			}
 		}
 
 		state.Response.AddRemovedMessage(&RemovedMessage{MessageID: messageToDelete.ID, ChatID: chat.ID, DeletedBy: deleteMessage.DeleteMessage.DeletedBy})

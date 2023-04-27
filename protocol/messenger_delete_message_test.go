@@ -391,3 +391,62 @@ func (s *MessengerDeleteMessageSuite) TestDeleteImageMessageFirstThenMessage() {
 	s.Require().Len(state.Response.RemovedMessages(), 0)
 	s.Require().Nil(state.Response.Chats()[0].LastMessage)
 }
+
+func (s *MessengerDeleteMessageSuite) TestDeleteMessageWithAMention() {
+	theirMessenger := s.newMessenger()
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	err = theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	err = s.m.SaveChat(ourChat)
+	s.Require().NoError(err)
+
+	inputMessage := buildTestMessage(*theirChat)
+	inputMessage.Text = "text with a mention @" + common.PubkeyToHex(&s.privateKey.PublicKey)
+	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+
+	messageID := sendResponse.Messages()[0].ID
+
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.messages) == 1 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+	// Receiver (us) is mentioned
+	s.Require().Equal(int(response.Chats()[0].UnviewedMessagesCount), 1)
+	s.Require().Equal(int(response.Chats()[0].UnviewedMentionsCount), 1)
+	s.Require().True(response.Messages()[0].Mentioned)
+
+	deleteMessage := DeleteMessage{
+		DeleteMessage: protobuf.DeleteMessage{
+			Clock:       2,
+			MessageType: protobuf.MessageType_ONE_TO_ONE,
+			MessageId:   messageID,
+			ChatId:      theirChat.ID,
+		},
+		From: common.PubkeyToHex(&theirMessenger.identity.PublicKey),
+	}
+
+	state := &ReceivedMessageState{
+		Response: &MessengerResponse{},
+	}
+
+	// Handle Delete first
+	err = s.m.HandleDeleteMessage(state, deleteMessage)
+
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+	// Receiver (us) is  no longer mentioned
+	s.Require().Equal(int(response.Chats()[0].UnviewedMessagesCount), 0)
+	s.Require().Equal(int(response.Chats()[0].UnviewedMentionsCount), 0)
+}

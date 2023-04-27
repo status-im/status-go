@@ -374,3 +374,109 @@ func (s *MessengerEditMessageSuite) TestEditGroupChatMessage() {
 	s.Require().NotEmpty(response.Messages()[0].EditedAt)
 	s.Require().False(response.Messages()[0].New)
 }
+
+func (s *MessengerEditMessageSuite) TestEditMessageWithMention() {
+	theirMessenger := s.newMessenger()
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	err = theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	err = s.m.SaveChat(ourChat)
+	s.Require().NoError(err)
+
+	inputMessage := buildTestMessage(*theirChat)
+	// Send first message with no mention
+	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.messages) == 1 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+	// Make sure there is no mention at first
+	s.Require().Equal(int(response.Chats()[0].UnviewedMessagesCount), 1)
+	s.Require().Equal(int(response.Chats()[0].UnviewedMentionsCount), 0)
+	s.Require().False(response.Messages()[0].Mentioned)
+
+	ogMessage := sendResponse.Messages()[0]
+
+	messageID, err := types.DecodeHex(ogMessage.ID)
+	s.Require().NoError(err)
+
+	// Edit the message and add a mention
+	editedText := "edited text @" + common.PubkeyToHex(&s.privateKey.PublicKey)
+	editedMessage := &requests.EditMessage{
+		ID:   messageID,
+		Text: editedText,
+	}
+
+	sendResponse, err = theirMessenger.EditMessage(context.Background(), editedMessage)
+
+	s.Require().NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+	s.Require().NotEmpty(sendResponse.Messages()[0].EditedAt)
+	s.Require().Equal(sendResponse.Messages()[0].Text, editedText)
+	s.Require().Len(sendResponse.Chats(), 1)
+	s.Require().NotNil(sendResponse.Chats()[0].LastMessage)
+	s.Require().NotEmpty(sendResponse.Chats()[0].LastMessage.EditedAt)
+	s.Require().False(sendResponse.Messages()[0].Mentioned) // Sender is still not mentioned
+
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.messages) == 1 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().NotEmpty(response.Messages()[0].EditedAt)
+	s.Require().False(response.Messages()[0].New)
+	// Receiver (us) is now mentioned
+	s.Require().Equal(int(response.Chats()[0].UnviewedMessagesCount), 1)
+	s.Require().Equal(int(response.Chats()[0].UnviewedMentionsCount), 1)
+	s.Require().True(response.Messages()[0].Mentioned)
+
+	// Edit the message again but remove the mention
+	editedText = "edited text no mention"
+	editedMessage = &requests.EditMessage{
+		ID:   messageID,
+		Text: editedText,
+	}
+
+	sendResponse, err = theirMessenger.EditMessage(context.Background(), editedMessage)
+
+	s.Require().NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+	s.Require().NotEmpty(sendResponse.Messages()[0].EditedAt)
+	s.Require().Equal(sendResponse.Messages()[0].Text, editedText)
+	s.Require().Len(sendResponse.Chats(), 1)
+	s.Require().NotNil(sendResponse.Chats()[0].LastMessage)
+	s.Require().NotEmpty(sendResponse.Chats()[0].LastMessage.EditedAt)
+	s.Require().False(sendResponse.Messages()[0].Mentioned) // Sender is still not mentioned
+
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.messages) == 1 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().NotEmpty(response.Messages()[0].EditedAt)
+	s.Require().False(response.Messages()[0].New)
+	// Receiver (us) is no longer mentioned
+	s.Require().Equal(int(response.Chats()[0].UnviewedMessagesCount), 1) // We still have an unread message though
+	s.Require().Equal(int(response.Chats()[0].UnviewedMentionsCount), 0)
+	s.Require().False(response.Messages()[0].Mentioned)
+}
