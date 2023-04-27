@@ -134,17 +134,18 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
-	response, err = WaitOnMessengerResponse(
+	_, err = WaitOnMessengerResponse(
 		theirMessenger,
-		func(r *MessengerResponse) bool { return len(r.Contacts) == 1 && r.Contacts[0].ID == contact.ID },
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) == 1 &&
+				r.Contacts[0].ID == contact.ID &&
+				// Make sure lastupdated is **not** synced
+				actualContact.LastUpdated == 0 &&
+				r.Contacts[0].DisplayName == "display-name"
+		},
 		"contact not received",
 	)
 	s.Require().NoError(err)
-	actualContact = response.Contacts[0]
-	s.Require().Equal(contact.ID, actualContact.ID)
-	// Make sure lastupdated is **not** synced
-	s.Require().Equal(uint64(0), actualContact.LastUpdated)
-	s.Require().Equal("display-name", actualContact.DisplayName)
 
 	chat := CreatePublicChat(statusChatID, s.m.transport)
 	err = s.m.SaveChat(chat)
