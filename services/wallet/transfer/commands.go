@@ -2,7 +2,6 @@ package transfer
 
 import (
 	"context"
-	"database/sql"
 	"math/big"
 	"strings"
 	"time"
@@ -365,27 +364,16 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 		return err
 	}
 
-	// Update MultiTransactionID from pending entry
+	// Update MultiTransactionID from pending entry and mark for delete the finalized pending transactions
+	completedTransfers := []common.Hash{}
 	for index := range allTransfers {
 		transfer := &allTransfers[index]
-		if transfer.MultiTransactionID == NoMultiTransactionID {
-			entry, err := c.transactionManager.GetPendingEntry(c.chainClient.ChainID, transfer.ID)
-			if err != nil {
-				if err == sql.ErrNoRows {
-					log.Warn("Pending transaction not found for", c.chainClient.ChainID, transfer.ID)
-				} else {
-					return err
-				}
-			} else {
-				transfer.MultiTransactionID = entry.MultiTransactionID
-				if transfer.Receipt != nil && transfer.Receipt.Status == types.ReceiptStatusSuccessful {
-					// TODO: Nim logic was deleting pending previously, should we notify UI about it?
-					err := c.transactionManager.DeletePending(c.chainClient.ChainID, transfer.ID)
-					if err != nil {
-						return err
-					}
-				}
-			}
+
+		entry, err := c.transactionManager.GetPendingEntry(c.chainClient.ChainID, transfer.ID)
+		if err == nil {
+			// Propagate the MultiTransactionID, in case the pending entry was a multi-transaction
+			transfer.MultiTransactionID = entry.MultiTransactionID
+			completedTransfers = append(completedTransfers, transfer.ID)
 		}
 	}
 
@@ -394,6 +382,15 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 		if err != nil {
 			log.Error("SaveTransfers error", "error", err)
 			return err
+		}
+
+		// Delete the finalized pending transactions
+		for _, hash := range completedTransfers {
+			err := c.transactionManager.DeletePending(c.chainClient.ChainID, hash)
+			if err != nil {
+				return err
+			}
+			// TODO: Send wallet event so that the UI can update the activity view
 		}
 	}
 
