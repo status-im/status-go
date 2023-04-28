@@ -362,24 +362,13 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 	// Update MultiTransactionID from pending entry
 	for index := range allTransfers {
 		transfer := &allTransfers[index]
-		if transfer.MultiTransactionID == NoMultiTransactionID {
-			entry, err := c.transactionManager.GetPendingEntry(c.chainClient.ChainID, transfer.ID)
-			if err != nil {
-				if err == sql.ErrNoRows {
-					log.Info("Pending transaction not found for", "chainID", c.chainClient.ChainID, "transferID", transfer.ID)
-				} else {
-					return err
-				}
-			} else {
-				transfer.MultiTransactionID = entry.MultiTransactionID
-				if transfer.Receipt != nil && transfer.Receipt.Status == types.ReceiptStatusSuccessful {
-					// TODO: Nim logic was deleting pending previously, should we notify UI about it?
-					err := c.transactionManager.DeletePending(c.chainClient.ChainID, transfer.ID)
-					if err != nil {
-						return err
-					}
-				}
-			}
+		entry, err := c.transactionManager.GetPendingEntry(c.chainClient.ChainID, transfer.ID)
+		if err == nil {
+			// Propagate the MultiTransactionID, in case the pending entry was a multi-transaction
+			transfer.MultiTransactionID = entry.MultiTransactionID
+		} else if err != sql.ErrNoRows {
+			log.Error("GetPendingEntry error", "error", err)
+			return err
 		}
 	}
 
