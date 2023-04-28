@@ -126,7 +126,7 @@ func unique(communities []*communities.Community) (result []*communities.Communi
 	return result
 }
 
-func (api *API) GetChannelGroups(ctx context.Context) (map[string]ChannelGroup, error) {
+func (api *API) getChannelGroups(ctx context.Context, channelGroupID string) (map[string]ChannelGroup, error) {
 	joinedCommunities, err := api.s.messenger.JoinedCommunities()
 	if err != nil {
 		return nil, err
@@ -145,43 +145,53 @@ func (api *API) GetChannelGroups(ctx context.Context) (map[string]ChannelGroup, 
 	totalUnviewedMessageCount := 0
 	totalUnviewedMentionsCount := 0
 
-	chats := make(map[string]*Chat)
-	for _, chat := range channels {
-		if !chat.IsActivePersonalChat() {
-			continue
-		}
-		totalUnviewedMessageCount += int(chat.UnviewedMessagesCount)
-		totalUnviewedMentionsCount += int(chat.UnviewedMentionsCount)
+	if channelGroupID == "" || channelGroupID == pubKey {
+		chats := make(map[string]*Chat)
+		for _, chat := range channels {
+			if !chat.IsActivePersonalChat() {
+				continue
+			}
+			totalUnviewedMessageCount += int(chat.UnviewedMessagesCount)
+			totalUnviewedMentionsCount += int(chat.UnviewedMentionsCount)
 
-		c, err := api.toAPIChat(chat, nil, pubKey, true)
-		if err != nil {
-			return nil, err
+			c, err := api.toAPIChat(chat, nil, pubKey, true)
+			if err != nil {
+				return nil, err
+			}
+			chats[chat.ID] = c
 		}
-		chats[chat.ID] = c
+
+		result[pubKey] = ChannelGroup{
+			Type:                    Personal,
+			Name:                    "",
+			Images:                  make(map[string]images.IdentityImage),
+			Color:                   "",
+			Chats:                   chats,
+			Categories:              make(map[string]communities.CommunityCategory),
+			EnsName:                 "", // Not implemented yet in communities
+			Admin:                   true,
+			Verified:                true,
+			Description:             "",
+			IntroMessage:            "",
+			OutroMessage:            "",
+			Tags:                    []communities.CommunityTag{},
+			Permissions:             &protobuf.CommunityPermissions{},
+			Muted:                   false,
+			CommunityTokensMetadata: []*protobuf.CommunityTokenMetadata{},
+			UnviewedMessagesCount:   totalUnviewedMessageCount,
+			UnviewedMentionsCount:   totalUnviewedMentionsCount,
+		}
 	}
 
-	result[pubKey] = ChannelGroup{
-		Type:                    Personal,
-		Name:                    "",
-		Images:                  make(map[string]images.IdentityImage),
-		Color:                   "",
-		Chats:                   chats,
-		Categories:              make(map[string]communities.CommunityCategory),
-		EnsName:                 "", // Not implemented yet in communities
-		Admin:                   true,
-		Verified:                true,
-		Description:             "",
-		IntroMessage:            "",
-		OutroMessage:            "",
-		Tags:                    []communities.CommunityTag{},
-		Permissions:             &protobuf.CommunityPermissions{},
-		Muted:                   false,
-		CommunityTokensMetadata: []*protobuf.CommunityTokenMetadata{},
-		UnviewedMessagesCount:   totalUnviewedMessageCount,
-		UnviewedMentionsCount:   totalUnviewedMentionsCount,
+	if channelGroupID == pubKey {
+		// They asked for the personal channel group only, so we return now
+		return result, nil
 	}
 
 	for _, community := range unique(append(joinedCommunities, spectatedCommunities...)) {
+		if channelGroupID != "" && channelGroupID != community.IDString() {
+			continue
+		}
 		totalUnviewedMessageCount = 0
 		totalUnviewedMentionsCount = 0
 
@@ -242,9 +252,22 @@ func (api *API) GetChannelGroups(ctx context.Context) (map[string]ChannelGroup, 
 		}
 
 		result[community.IDString()] = chGrp
+
+		if channelGroupID == community.IDString() {
+			// We asked for this particular community, so we return now
+			return result, nil
+		}
 	}
 
 	return result, nil
+}
+
+func (api *API) GetChannelGroups(ctx context.Context) (map[string]ChannelGroup, error) {
+	return api.getChannelGroups(ctx, "")
+}
+
+func (api *API) GetChannelGroupByID(ctx context.Context, channelGroupID string) (map[string]ChannelGroup, error) {
+	return api.getChannelGroups(ctx, channelGroupID)
 }
 
 func (api *API) GetChat(ctx context.Context, communityID types.HexBytes, chatID string) (*Chat, error) {
