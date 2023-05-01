@@ -76,7 +76,7 @@ type Manager struct {
 	walletConfig                   *params.WalletConfig
 	historyArchiveTasksWaitGroup   sync.WaitGroup
 	historyArchiveTasks            sync.Map // stores `chan struct{}`
-	periodicMemberPermissionsTasks map[string]chan struct{}
+	periodicMemberPermissionsTasks sync.Map // stores `chan struct{}`
 	torrentTasks                   map[string]metainfo.Hash
 	historyArchiveDownloadTasks    map[string]*HistoryArchiveDownloadTask
 }
@@ -150,16 +150,15 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 	}
 
 	manager := &Manager{
-		logger:                         logger,
-		stdoutLogger:                   stdoutLogger,
-		encryptor:                      encryptor,
-		identity:                       identity,
-		quit:                           make(chan struct{}),
-		transport:                      transport,
-		torrentConfig:                  torrentConfig,
-		periodicMemberPermissionsTasks: make(map[string]chan struct{}),
-		torrentTasks:                   make(map[string]metainfo.Hash),
-		historyArchiveDownloadTasks:    make(map[string]*HistoryArchiveDownloadTask),
+		logger:                      logger,
+		stdoutLogger:                stdoutLogger,
+		encryptor:                   encryptor,
+		identity:                    identity,
+		quit:                        make(chan struct{}),
+		transport:                   transport,
+		torrentConfig:               torrentConfig,
+		torrentTasks:                make(map[string]metainfo.Hash),
+		historyArchiveDownloadTasks: make(map[string]*HistoryArchiveDownloadTask),
 		persistence: &Persistence{
 			logger: logger,
 			db:     db,
@@ -618,12 +617,12 @@ func (m *Manager) checkMemberPermissions(communityID types.HexBytes) error {
 
 func (m *Manager) CheckMemberPermissionsPeriodically(communityID types.HexBytes) {
 
-	if _, exists := m.periodicMemberPermissionsTasks[communityID.String()]; exists {
+	if _, exists := m.periodicMemberPermissionsTasks.Load(communityID.String()); exists {
 		return
 	}
 
 	cancel := make(chan struct{})
-	m.periodicMemberPermissionsTasks[communityID.String()] = cancel
+	m.periodicMemberPermissionsTasks.Store(communityID.String(), cancel)
 
 	ticker := time.NewTicker(memberPermissionsCheckInterval)
 	defer ticker.Stop()
@@ -636,7 +635,7 @@ func (m *Manager) CheckMemberPermissionsPeriodically(communityID types.HexBytes)
 				m.logger.Debug("failed to check member permissions", zap.Error(err))
 			}
 		case <-cancel:
-			delete(m.periodicMemberPermissionsTasks, communityID.String())
+			m.periodicMemberPermissionsTasks.Delete(communityID.String())
 			return
 		}
 	}
@@ -665,8 +664,8 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 	// if not we can stop checking token criteria on-chain
 	// for members
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
-	if cancel, exists := m.periodicMemberPermissionsTasks[community.IDString()]; exists && len(becomeMemberPermissions) == 0 {
-		close(cancel)
+	if cancel, exists := m.periodicMemberPermissionsTasks.Load(community.IDString()); exists && len(becomeMemberPermissions) == 0 {
+		close(cancel.(chan struct{})) // Need to cast to the chan
 	}
 
 	m.publish(&Subscription{Community: community})
