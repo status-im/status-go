@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -36,6 +35,8 @@ import (
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
+
+type createCommunityOption func(c *requests.CreateCommunity)
 
 func TestMessengerCommunitiesSuite(t *testing.T) {
 	suite.Run(t, new(MessengerCommunitiesSuite))
@@ -127,9 +128,9 @@ func (s *MessengerCommunitiesSuite) newMessengerWithOptions(shh types.Waku, priv
 }
 
 func (s *MessengerCommunitiesSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
-	tmpfile, err := ioutil.TempFile("", "accounts-tests-")
+	tmpFile, err := os.CreateTemp(s.T().TempDir(), "accounts-tests-")
 	s.Require().NoError(err)
-	madb, err := multiaccounts.InitializeDB(tmpfile.Name())
+	madb, err := multiaccounts.InitializeDB(tmpFile.Name())
 	s.Require().NoError(err)
 
 	acc := generator.NewAccount(privateKey, nil)
@@ -440,7 +441,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Len(response.RemovedChats(), 3)
 }
 
-func (s *MessengerCommunitiesSuite) createCommunity() *communities.Community {
+func (s *MessengerCommunitiesSuite) createCommunityWithChat(opts ...createCommunityOption) *communities.Community {
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
 		Name:        "status",
@@ -448,7 +449,11 @@ func (s *MessengerCommunitiesSuite) createCommunity() *communities.Community {
 		Description: "status community description",
 	}
 
-	// Create an community chat
+	for _, o := range opts {
+		o(description)
+	}
+
+	// Create a community chat
 	response, err := s.admin.CreateCommunity(description, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -547,8 +552,30 @@ func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Communi
 	s.Require().NoError(err)
 }
 
+// fetchCommunityUpdate receives a *Messenger representing a user device and a condition to meet
+// If the *communities.Community meets the criteria of the condition func tt.RetryWithBackOff is exited without error
+func (s *MessengerCommunitiesSuite) fetchCommunityUpdate(user *Messenger, condition func(*communities.Community) bool) {
+	err := tt.RetryWithBackOff(func() error {
+		response, err := user.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(response.Communities()) > 0 {
+			for _, c := range response.Communities() {
+				if condition(c) {
+					return nil
+				}
+			}
+		}
+
+		return fmt.Errorf("no encrypted community update found")
+	})
+	s.Require().NoError(err)
+}
+
 func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
-	community := s.createCommunity()
+	community := s.createCommunityWithChat()
 	s.advertiseCommunityTo(community, s.bob)
 	s.advertiseCommunityTo(community, s.alice)
 
@@ -2201,7 +2228,7 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 }
 
 func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
-	community := s.createCommunity()
+	community := s.createCommunityWithChat()
 	s.advertiseCommunityTo(community, s.alice)
 	s.advertiseCommunityTo(community, s.bob)
 
@@ -2396,6 +2423,101 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 
 	community = response.Communities()[0]
 	s.Require().False(community.IsBanned(&s.alice.identity.PublicKey))
+}
+
+// TestEncryptCommunityFromUnEncrypted Creates an unencrypted community and joins 2 new members
+// the admin sets the community to encrypted and the 2 members receive the keys and new community description
+func (s *MessengerCommunitiesSuite) TestEncryptCommunityFromUnEncrypted() {
+	c := s.createCommunityWithChat()
+	s.Require().False(c.Encrypted())
+
+	joinedCommunities, err := s.admin.communitiesManager.Joined()
+	s.Require().NoError(err)
+	s.Require().Equal(1, joinedCommunities[0].MembersCount())
+
+	s.advertiseCommunityTo(c, s.alice)
+	s.advertiseCommunityTo(c, s.bob)
+
+	s.joinCommunity(c, s.alice)
+	s.joinCommunity(c, s.bob)
+
+	joinedCommunities, err = s.admin.communitiesManager.Joined()
+	s.Require().NoError(err)
+	s.Require().Equal(3, joinedCommunities[0].MembersCount())
+
+	ac, err := s.alice.communitiesManager.GetByIDString(c.IDString())
+	s.Require().NoError(err)
+	s.Require().False(ac.Encrypted())
+
+	bc, err := s.bob.communitiesManager.GetByIDString(c.IDString())
+	s.Require().NoError(err)
+	s.Require().False(bc.Encrypted())
+
+	_, err = s.admin.SetCommunityEncryption(c.IDString(), true)
+	s.Require().NoError(err)
+
+	cond := func(c *communities.Community) bool {
+		return c.Encrypted()
+	}
+	s.fetchCommunityUpdate(s.alice, cond)
+	s.fetchCommunityUpdate(s.bob, cond)
+
+	ac, err = s.alice.communitiesManager.GetByIDString(c.IDString())
+	s.Require().NoError(err)
+	s.Require().True(ac.Encrypted())
+
+	bc, err = s.bob.communitiesManager.GetByIDString(c.IDString())
+	s.Require().NoError(err)
+	s.Require().True(bc.Encrypted())
+}
+
+// TestEncryptCommunityFromUnEncrypted Creates an encrypted community and joins 2 new members
+// the admin sets the community to unencrypted and the 2 members receive a new community description with flag to stop using keys
+func (s *MessengerCommunitiesSuite) TestDecryptCommunityFromEncrypted() {
+	opt := func(cc *requests.CreateCommunity) {
+		cc.Encrypted = true
+	}
+	c := s.createCommunityWithChat(opt)
+	s.Require().True(c.Encrypted())
+
+	joinedCommunities, err := s.admin.communitiesManager.Joined()
+	s.Require().NoError(err)
+	s.Require().Equal(1, joinedCommunities[0].MembersCount())
+
+	s.advertiseCommunityTo(c, s.alice)
+	s.advertiseCommunityTo(c, s.bob)
+
+	s.joinCommunity(c, s.alice)
+	s.joinCommunity(c, s.bob)
+
+	joinedCommunities, err = s.admin.communitiesManager.Joined()
+	s.Require().NoError(err)
+	s.Require().Equal(3, joinedCommunities[0].MembersCount())
+
+	ac, err := s.alice.communitiesManager.GetByIDString(c.IDString())
+	s.Require().NoError(err)
+	s.Require().True(ac.Encrypted())
+
+	bc, err := s.bob.communitiesManager.GetByIDString(c.IDString())
+	s.Require().NoError(err)
+	s.Require().True(bc.Encrypted())
+
+	_, err = s.admin.SetCommunityEncryption(c.IDString(), false)
+	s.Require().NoError(err)
+
+	cond := func(c *communities.Community) bool {
+		return !c.Encrypted()
+	}
+	s.fetchCommunityUpdate(s.alice, cond)
+	s.fetchCommunityUpdate(s.bob, cond)
+
+	ac, err = s.alice.communitiesManager.GetByIDString(c.IDString())
+	s.Require().NoError(err)
+	s.Require().False(ac.Encrypted())
+
+	bc, err = s.bob.communitiesManager.GetByIDString(c.IDString())
+	s.Require().NoError(err)
+	s.Require().False(bc.Encrypted())
 }
 
 func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
@@ -3120,9 +3242,8 @@ func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
 
 func (s *MessengerCommunitiesSuite) TestExtractDiscordChannelsAndCategories() {
 
-	tmpFile, err := ioutil.TempFile(os.TempDir(), "discord-channel-")
+	tmpFile, err := os.CreateTemp(s.T().TempDir(), "discord-channel-")
 	s.Require().NoError(err)
-	defer os.Remove(tmpFile.Name())
 
 	discordMessage := &protobuf.DiscordMessage{
 		Id:              "1234",
@@ -3167,14 +3288,13 @@ func (s *MessengerCommunitiesSuite) TestExtractDiscordChannelsAndCategories() {
 
 	s.Require().Len(mr.DiscordCategories, 1)
 	s.Require().Len(mr.DiscordChannels, 1)
-	s.Require().Equal(mr.DiscordOldestMessageTimestamp, int(1658845217))
+	s.Require().Equal(mr.DiscordOldestMessageTimestamp, 1658845217)
 }
 
 func (s *MessengerCommunitiesSuite) TestExtractDiscordChannelsAndCategories_WithErrors() {
 
-	tmpFile, err := ioutil.TempFile(os.TempDir(), "discord-channel-2")
+	tmpFile, err := os.CreateTemp(s.T().TempDir(), "discord-channel-2")
 	s.Require().NoError(err)
-	defer os.Remove(tmpFile.Name())
 
 	exportedDiscordData := &discord.ExportedData{
 		Channel: discord.Channel{
@@ -3197,7 +3317,7 @@ func (s *MessengerCommunitiesSuite) TestExtractDiscordChannelsAndCategories_With
 	files := make([]string, 0)
 	files = append(files, tmpFile.Name())
 	_, errs := s.bob.ExtractDiscordChannelsAndCategories(files)
-	// Expecting 1 errors since there are no messages to be extracted
+	// Expecting 1 error since there are no messages to be extracted
 	s.Require().Len(errs, 1)
 }
 

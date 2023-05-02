@@ -949,6 +949,7 @@ func (o *Community) Edit(description *protobuf.CommunityDescription) {
 	}
 	o.config.CommunityDescription.Permissions = description.Permissions
 	o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled = description.AdminSettings.PinMessageAllMembersEnabled
+	o.config.CommunityDescription.Encrypted = description.Encrypted
 	o.increaseClock()
 }
 
@@ -969,8 +970,8 @@ func (o *Community) Encrypted() bool {
 	return o.config.CommunityDescription.Encrypted
 }
 
-func (o *Community) Encrypt() {
-	o.config.CommunityDescription.Encrypted = true
+func (o *Community) SetEncrypted(encrypted bool) {
+	o.config.CommunityDescription.Encrypted = encrypted
 }
 
 func (o *Community) Joined() bool {
