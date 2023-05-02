@@ -705,7 +705,13 @@ func (tm *Manager) GetBalancesByChain(parent context.Context, clients map[uint64
 						return nil
 					}
 
+					if len(res) != len(chunk) {
+						log.Error("can't fetch erc20 token balance", "account", account, "error response not complete")
+						return nil
+					}
+
 					for idx, token := range chunk {
+
 						if !res[idx].Success {
 							continue
 						}
