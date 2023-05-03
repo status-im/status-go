@@ -114,6 +114,7 @@ func (s *MessengerPinMessageSuite) TestPinMessageOutOfOrder() {
 	)
 	s.Require().NoError(err)
 	s.Require().Len(response.Chats(), 1)
+	s.Require().Equal(response.Chats()[0].UnviewedMessagesCount, uint(1))
 
 	// Unpin with higher clock
 
@@ -136,6 +137,8 @@ func (s *MessengerPinMessageSuite) TestPinMessageOutOfOrder() {
 
 	s.Require().Len(handlePinMessageResponse.PinMessages(), 1)
 	s.Require().False(handlePinMessageResponse.PinMessages()[0].Pinned)
+	s.Require().Len(handlePinMessageResponse.Chats(), 1)
+	s.Require().Equal(handlePinMessageResponse.Chats()[0].UnviewedMessagesCount, uint(0))
 
 	// Pin with lower clock in response
 
@@ -157,6 +160,8 @@ func (s *MessengerPinMessageSuite) TestPinMessageOutOfOrder() {
 
 	s.Require().Len(handlePinMessageResponse.PinMessages(), 1)
 	s.Require().False(handlePinMessageResponse.PinMessages()[0].Pinned)
+	s.Require().Len(handlePinMessageResponse.Chats(), 1)
+	s.Require().Equal(handlePinMessageResponse.Chats()[0].UnviewedMessagesCount, uint(0))
 
 	// Pin with lower clock not in response
 

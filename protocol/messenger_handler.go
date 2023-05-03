@@ -751,6 +751,7 @@ func (m *Messenger) handlePinMessage(pinner *Contact, whisperTimestamp uint64, r
 			From:             pinner.ID,
 		}
 		response.AddMessage(message)
+		chat.UnviewedMessagesCount++
 	}
 
 	if chat.LastClockValue < message.Clock {
