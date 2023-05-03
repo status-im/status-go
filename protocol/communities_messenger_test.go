@@ -3242,3 +3242,81 @@ func (s *MessengerCommunitiesSuite) TestCommunityTokensMetadata() {
 	s.Require().Equal(tokensMetadata[0].Symbol, newToken.Symbol)
 	s.Require().Equal(tokensMetadata[0].Name, newToken.Name)
 }
+
+func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequesToJoin() {
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	// Create an community chat
+	response, err := s.bob.CreateCommunity(description, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	community := response.Communities()[0]
+
+	response, err = s.bob.InviteUsersToCommunity(
+		&requests.InviteUsersToCommunity{
+			CommunityID: community.ID(),
+			Users:       []types.HexBytes{common.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
+		},
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	community = response.Communities()[0]
+	s.Require().True(community.HasMember(&s.alice.identity.PublicKey))
+
+	response, err = s.bob.BanUserFromCommunity(
+		&requests.BanUserFromCommunity{
+			CommunityID: community.ID(),
+			User:        common.PubkeyToHexBytes(&s.alice.identity.PublicKey),
+		},
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	community = response.Communities()[0]
+	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
+	s.Require().True(community.IsBanned(&s.alice.identity.PublicKey))
+
+	response, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool { return len(r.communities) > 0 },
+		"no communities",
+	)
+
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	// We try to join the org
+	_, rtj, err := s.alice.communitiesManager.RequestToJoin(&s.alice.identity.PublicKey, request)
+
+	s.Require().NoError(err)
+
+	displayName, err := s.alice.settings.DisplayName()
+	s.Require().NoError(err)
+
+	requestToJoinProto := &protobuf.CommunityRequestToJoin{
+		Clock:             rtj.Clock,
+		EnsName:           rtj.ENSName,
+		DisplayName:       displayName,
+		CommunityId:       community.ID(),
+		RevealedAddresses: make(map[string][]byte),
+	}
+
+	s.Require().NoError(err)
+
+	messageState := s.bob.buildMessageState()
+
+	err = s.bob.HandleCommunityRequestToJoin(messageState, &s.alice.identity.PublicKey, *requestToJoinProto)
+
+	s.Require().ErrorContains(err, "can't request access")
+}
