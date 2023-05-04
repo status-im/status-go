@@ -1517,6 +1517,11 @@ func (m *Manager) checkPermissionToJoin(permissions []*protobuf.CommunityTokenPe
 		return false, err
 	}
 
+	ownedENSNames, err := m.getOwnedENS(walletAddresses)
+	if err != nil {
+		return false, err
+	}
+
 	hasPermission := false
 
 	for _, tokenPermission := range permissions {
@@ -1566,6 +1571,24 @@ func (m *Manager) checkPermissionToJoin(permissions []*protobuf.CommunityTokenPe
 				amount, _ := strconv.ParseFloat(tokenRequirement.Amount, 32)
 				if ownedERC20Tokens[tokenRequirement.Symbol].Cmp(big.NewFloat(amount)) != -1 {
 					tokenRequirementMet = true
+				}
+			} else if tokenRequirement.Type == protobuf.CommunityTokenType_ENS {
+				if len(ownedENSNames) == 0 {
+					continue
+				}
+				if !strings.HasPrefix(tokenRequirement.EnsPattern, "*.") {
+					for _, ownedENS := range ownedENSNames {
+						if ownedENS == tokenRequirement.EnsPattern {
+							tokenRequirementMet = true
+						}
+					}
+				} else {
+					parentName := tokenRequirement.EnsPattern[2:]
+					for _, ownedENS := range ownedENSNames {
+						if strings.HasSuffix(ownedENS, parentName) {
+							tokenRequirementMet = true
+						}
+					}
 				}
 			}
 			if !tokenRequirementMet {
@@ -1708,6 +1731,20 @@ func (m *Manager) getAccumulatedTokenBalances(accounts []gethcommon.Address, tok
 		}
 	}
 	return accumulatedBalances, nil
+}
+
+func (m *Manager) getOwnedENS(addresses []gethcommon.Address) ([]string, error) {
+	ownedENS := make([]string, 0)
+	for _, address := range addresses {
+		name, err := m.ensVerifier.ReverseResolve(address)
+		if err != nil && err.Error() != "not a resolver" {
+			return ownedENS, err
+		}
+		if name != "" {
+			ownedENS = append(ownedENS, name)
+		}
+	}
+	return ownedENS, nil
 }
 
 func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoinResponse) (*RequestToJoin, error) {

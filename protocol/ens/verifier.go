@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/protocol/common"
@@ -127,6 +128,11 @@ func (v *Verifier) publish(records []*VerificationRecord) {
 		}
 	}
 
+}
+
+func (v *Verifier) ReverseResolve(address gethcommon.Address) (string, error) {
+	verifier := v.node.NewENSVerifier(v.logger)
+	return verifier.ReverseResolve(address, v.rpcEndpoint)
 }
 
 // Verify verifies that a registered ENS name matches the expected public key

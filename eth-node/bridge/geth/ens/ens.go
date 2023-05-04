@@ -11,6 +11,7 @@ import (
 	ens "github.com/wealdtech/go-ens/v3"
 	"go.uber.org/zap"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -28,6 +29,17 @@ type Verifier struct {
 // NewVerifier returns a Verifier attached to the specified logger
 func NewVerifier(logger *zap.Logger) *Verifier {
 	return &Verifier{logger: logger}
+}
+
+func (m *Verifier) ReverseResolve(address common.Address, rpcEndpoint string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), contractQueryTimeout)
+	defer cancel()
+
+	ethClient, err := ethclient.DialContext(ctx, rpcEndpoint)
+	if err != nil {
+		return "", err
+	}
+	return ens.ReverseResolve(ethClient, address)
 }
 
 func (m *Verifier) verifyENSName(ensInfo enstypes.ENSDetails, ethclient *ethclient.Client) enstypes.ENSResponse {
