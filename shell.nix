@@ -1,8 +1,8 @@
 {
   /* This should match Nixpkgs commit in status-mobile. */
   source ? builtins.fetchTarball {
-    url = "https://github.com/NixOS/nixpkgs/archive/579238da5f431b7833a9f0681663900aaf0dd1e8.zip";
-    sha256 = "sha256:0a77c8fq4145k0zdmsda9cmhfw84ipf9nhvvn0givzhza1500g3h";
+    url = "https://github.com/NixOS/nixpkgs/archive/8fd4097529b4a71e0de000c90c8c4279f534eada.zip";
+    sha256 = "sha256:174p05mzfqk56l4lqvwkbqka4qi5imbd75xaaw4bzmr00bails9f";
   },
   pkgs ? import (source){
     config = {
@@ -13,7 +13,7 @@
       (self: super: {
         androidPkgs = pkgs.androidenv.composeAndroidPackages {
           toolsVersion = "26.1.1";
-          platformToolsVersion = "33.0.2";
+          platformToolsVersion = "33.0.3";
           buildToolsVersions = [ "31.0.0" ];
           platformVersions = [ "31" ];
           cmakeVersions = [ "3.18.1" ];
@@ -35,7 +35,10 @@ let
   /* No Android SDK for Darwin aarch64. */
   isMacM1 = stdenv.isDarwin && stdenv.isAarch64;
   /* Lock requires Xcode verison. */
-  xcodeWrapper = pkgs.xcodeenv.composeXcodeWrapper { version = "14.3"; };
+  xcodeWrapper = pkgs.xcodeenv.composeXcodeWrapper {
+    version = "14.3";
+    allowHigher = true;
+  };
   /* Gomobile also needs the Xcode wrapper. */
   gomobileMod = pkgs.gomobile.override {
     inherit xcodeWrapper;
