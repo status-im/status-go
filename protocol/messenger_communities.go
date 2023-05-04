@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
+	"errors"
 	_errors "errors"
 	"fmt"
 	"os"
@@ -1238,15 +1239,6 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 		response.AddChat(chatResponse.Chats()[0])
 	}
 
-	if request.Encrypted {
-		// Init hash ratchet for community
-		_, err = m.encryptor.GenerateHashRatchetKey(community.ID())
-
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	response.AddCommunity(community)
 	response.AddCommunitySettings(&communitySettings)
 	err = m.syncCommunity(context.Background(), community, m.dispatchMessage)
@@ -1271,8 +1263,16 @@ func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommu
 		return nil, err
 	}
 
-	response := &MessengerResponse{}
-	response.AddCommunity(community)
+	response, err := m.UpdateCommunityEncryption(community)
+	if err != nil {
+		return nil, err
+	}
+
+	if response == nil {
+		response = &MessengerResponse{}
+		response.AddCommunity(community)
+	}
+
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
 
 	return response, nil
@@ -1288,8 +1288,16 @@ func (m *Messenger) EditCommunityTokenPermission(request *requests.EditCommunity
 		return nil, err
 	}
 
-	response := &MessengerResponse{}
-	response.AddCommunity(community)
+	response, err := m.UpdateCommunityEncryption(community)
+	if err != nil {
+		return nil, err
+	}
+
+	if response == nil {
+		response = &MessengerResponse{}
+		response.AddCommunity(community)
+	}
+
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
 
 	return response, nil
@@ -1305,8 +1313,16 @@ func (m *Messenger) DeleteCommunityTokenPermission(request *requests.DeleteCommu
 		return nil, err
 	}
 
-	response := &MessengerResponse{}
-	response.AddCommunity(community)
+	response, err := m.UpdateCommunityEncryption(community)
+	if err != nil {
+		return nil, err
+	}
+
+	if response == nil {
+		response = &MessengerResponse{}
+		response.AddCommunity(community)
+	}
+
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
 	return response, nil
 }
@@ -2624,19 +2640,6 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			return
 		}
 
-		if createCommunityRequest.Encrypted {
-			// Init hash ratchet for community
-			_, err = m.encryptor.GenerateHashRatchetKey(discordCommunity.ID())
-
-			if err != nil {
-				m.cleanUpImport(discordCommunity.IDString())
-				importProgress.AddTaskError(discord.CommunityCreationTask, discord.Error(err.Error()))
-				importProgress.StopTask(discord.CommunityCreationTask)
-				progressUpdates <- importProgress
-				return
-			}
-		}
-
 		communityID := discordCommunity.IDString()
 
 		// marking import as not cancelled
@@ -3535,4 +3538,53 @@ func (m *Messenger) AddCommunityToken(token *communities.CommunityToken) (*commu
 
 func (m *Messenger) UpdateCommunityTokenState(contractAddress string, deployState communities.DeployState) error {
 	return m.communitiesManager.UpdateCommunityTokenState(contractAddress, deployState)
+}
+
+// UpdateCommunityEncryption takes a community and encrypts / decrypts the community
+// based on TokenPermission. Community is republished along with any keys if needed.
+//
+// Note: This function cannot decrypt previously encrypted messages, and it cannot encrypt previous unencrypted messages.
+// This functionality introduces some race conditions:
+//   - community description is processed by members before the receiving the key exchange messages
+//   - members maybe sending encrypted messages after the community description is updated and a new member joins
+func (m *Messenger) UpdateCommunityEncryption(community *communities.Community) (*MessengerResponse, error) {
+	if community == nil {
+		return nil, errors.New("community is nil")
+	}
+
+	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+	isEncrypted := len(becomeMemberPermissions) > 0
+
+	// Check isEncrypted is different to Community's value
+	// If not different return
+	if community.Encrypted() == isEncrypted {
+		return nil, nil
+	}
+
+	if isEncrypted {
+		// 🪄 The magic that encrypts a community
+		_, err := m.encryptor.GenerateHashRatchetKey(community.ID())
+		if err != nil {
+			return nil, err
+		}
+
+		err = m.SendKeyExchangeMessage(community.ID(), community.GetMemberPubkeys(), common.KeyExMsgReuse)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// 🧙 There is no magic that decrypts a community, we just need to tell everyone to not use encryption
+
+	// Republish the community.
+	community.SetEncrypted(isEncrypted)
+	err := m.communitiesManager.UpdateCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+
+	return response, nil
 }
