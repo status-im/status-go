@@ -265,7 +265,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 			return nil
 		}
 
-		return errors.New("Not received all chats & contacts")
+		return errors.New("not received all chats & contacts & bookmarks yet")
 
 	})
 
