@@ -2211,6 +2211,144 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 	s.Require().Len(requestsToJoin, 0)
 }
 
+func (s *MessengerCommunitiesSuite) TestCreateTokenPermission() {
+	community := s.createCommunity()
+
+	createTokenPermission := &requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{uint64(1): "0x123"},
+				Symbol:            "TEST",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+
+	response, err := s.admin.CreateCommunityTokenPermission(createTokenPermission)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	tokenPermissions := response.Communities()[0].TokenPermissions()
+	for _, tokenPermission := range tokenPermissions {
+		for _, tc := range tokenPermission.TokenCriteria {
+			s.Require().Equal(tc.Type, protobuf.CommunityTokenType_ERC20)
+			s.Require().Equal(tc.Symbol, "TEST")
+			s.Require().Equal(tc.Amount, "100")
+			s.Require().Equal(tc.Decimals, uint64(18))
+		}
+	}
+}
+
+func (s *MessengerCommunitiesSuite) TestEditTokenPermission() {
+	community := s.createCommunity()
+
+	tokenPermission := &requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{uint64(1): "0x123"},
+				Symbol:            "TEST",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+
+	response, err := s.admin.CreateCommunityTokenPermission(tokenPermission)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	tokenPermissions := response.Communities()[0].TokenPermissions()
+
+	var tokenPermissionID string
+	for id := range tokenPermissions {
+		tokenPermissionID = id
+	}
+
+	tokenPermission.TokenCriteria[0].Symbol = "TESTUpdated"
+	tokenPermission.TokenCriteria[0].Amount = "200"
+	tokenPermission.TokenCriteria[0].Decimals = uint64(20)
+
+	editTokenPermission := &requests.EditCommunityTokenPermission{
+		PermissionID:                   tokenPermissionID,
+		CreateCommunityTokenPermission: *tokenPermission,
+	}
+
+	response2, err := s.admin.EditCommunityTokenPermission(editTokenPermission)
+	s.Require().NoError(err)
+	// wait for `checkMemberPermissions` to finish
+	time.Sleep(1 * time.Second)
+	s.Require().NotNil(response2)
+	s.Require().Len(response2.Communities(), 1)
+
+	tokenPermissions = response2.Communities()[0].TokenPermissions()
+	for _, tokenPermission := range tokenPermissions {
+		for _, tc := range tokenPermission.TokenCriteria {
+			s.Require().Equal(tc.Type, protobuf.CommunityTokenType_ERC20)
+			s.Require().Equal(tc.Symbol, "TESTUpdated")
+			s.Require().Equal(tc.Amount, "200")
+			s.Require().Equal(tc.Decimals, uint64(20))
+		}
+	}
+}
+
+func (s *MessengerCommunitiesSuite) TestRequestAccessWithENSTokenPermission() {
+	community := s.createCommunity()
+
+	createTokenPermission := &requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:       protobuf.CommunityTokenType_ENS,
+				EnsPattern: "test.stateofus.eth",
+			},
+		},
+	}
+
+	response, err := s.admin.CreateCommunityTokenPermission(createTokenPermission)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	s.advertiseCommunityTo(community, s.alice)
+
+	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	// We try to join the org
+	response, err = s.alice.RequestToJoinCommunity(requestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	requestToJoin1 := response.RequestsToJoinCommunity[0]
+	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
+
+	// Retrieve request to join
+	err = tt.RetryWithBackOff(func() error {
+		response, err = s.admin.RetrieveAll()
+		return err
+	})
+	s.Require().NoError(err)
+	// We don't expect a requestToJoin in the response because due
+	// to missing revealed wallet addresses, the request should've
+	// been declined right away
+	s.Require().Len(response.RequestsToJoinCommunity, 0)
+
+	// Ensure alice is not a member of the community
+	allCommunities, err := s.admin.Communities()
+	if bytes.Equal(allCommunities[0].ID(), community.ID()) {
+		s.Require().False(allCommunities[0].HasMember(&s.alice.identity.PublicKey))
+	}
+}
+
 func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 	community := s.createCommunity()
 	s.advertiseCommunityTo(community, s.alice)
