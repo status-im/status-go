@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -28,7 +27,6 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
-	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -640,7 +638,6 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
-		Encrypted:   true,
 	}
 
 	// Create an community chat
@@ -2578,7 +2575,6 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	createCommunityReq := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
 		Name:        "new community",
-		Encrypted:   true,
 		Color:       "#000000",
 		Description: "new community description",
 	}
@@ -2592,15 +2588,6 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 		}
 	}
 	s.Require().NotNil(newCommunity)
-
-	// Check HR keys are created
-	encodedKeys, err := s.alice.encryptor.GetAllHREncodedKeys(newCommunity.ID())
-	s.Require().NoError(err)
-	s.Require().NotNil(encodedKeys)
-
-	keys := &encryption.HRKeys{}
-	s.Require().NoError(proto.Unmarshal(encodedKeys, keys))
-	s.Require().Len(keys.Keys, 1)
 
 	// Check that Alice has 2 communities
 	cs, err := s.alice.communitiesManager.All()
@@ -2628,15 +2615,6 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	tcs, err = alicesOtherDevice.communitiesManager.All()
 	s.Require().NoError(err)
 	s.Len(tcs, 2, "There must be 2 communities")
-
-	// Check HR keys are synced
-	encodedKeys, err = alicesOtherDevice.encryptor.GetAllHREncodedKeys(newCommunity.ID())
-	s.Require().NoError(err)
-	s.Require().NotNil(encodedKeys)
-
-	keys = &encryption.HRKeys{}
-	s.Require().NoError(proto.Unmarshal(encodedKeys, keys))
-	s.Require().Len(keys.Keys, 1)
 
 	s.logger.Debug("", zap.Any("tcs", tcs))
 

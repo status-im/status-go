@@ -790,7 +790,7 @@ func (s *sqlitePersistence) GetHashRatchetKeyByID(groupID []byte, keyID uint32, 
 	}
 }
 
-// GetCurrentKeyIDForGroup retrieves a key ID for given group ID
+// GetCurrentKeyForGroup retrieves a key ID for given group ID
 // (with an assumption that key ids are shared in the group, and
 // at any given time there is a single key used)
 func (s *sqlitePersistence) GetCurrentKeyForGroup(groupID []byte) (uint32, error) {
@@ -845,7 +845,7 @@ func (s *sqlitePersistence) GetKeyIDsForGroup(groupID []byte) ([]uint32, error) 
 	return keyIDs, nil
 }
 
-// SaveHashRachetKeyHash saves a hash ratchet key cache data
+// SaveHashRatchetKeyHash saves a hash ratchet key cache data
 func (s *sqlitePersistence) SaveHashRatchetKeyHash(
 	groupID []byte,
 	keyID uint32,

@@ -42,7 +42,6 @@ type CreateCommunity struct {
 	Banner                       images.CroppedImage                  `json:"banner"`
 	HistoryArchiveSupportEnabled bool                                 `json:"historyArchiveSupportEnabled,omitempty"`
 	PinMessageAllMembersEnabled  bool                                 `json:"pinMessageAllMembersEnabled,omitempty"`
-	Encrypted                    bool                                 `json:"encrypted,omitempty"`
 	Tags                         []string                             `json:"tags,omitempty"`
 }
 
@@ -129,7 +128,7 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 		},
 		IntroMessage: c.IntroMessage,
 		OutroMessage: c.OutroMessage,
-		Encrypted:    c.Encrypted,
+		Encrypted:    false,
 		Tags:         c.Tags,
 	}
 	return description, nil
