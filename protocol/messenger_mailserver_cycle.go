@@ -391,12 +391,7 @@ func (m *Messenger) isActiveMailserverAvailable() bool {
 	return mailserverStatus == connected
 }
 
-func (m *Messenger) mailserverAddressToID(uniqueID string) (string, error) {
-	allMailservers, err := m.allMailservers()
-	if err != nil {
-		return "", err
-	}
-
+func (m *Messenger) mailserverAddressToID(uniqueID string, allMailservers []mailservers.Mailserver) (string, error) {
 	for _, ms := range allMailservers {
 		if uniqueID == ms.UniqueID() {
 			return ms.ID, nil
@@ -451,6 +446,12 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 	m.logger.Debug("peers info", zap.Any("peer-info", m.mailserverCycle.peers))
 
 	m.mailPeersMutex.Lock()
+
+	allMailservers, err := m.allMailservers()
+	if err != nil {
+		return err
+	}
+
 	for pID, pInfo := range m.mailserverCycle.peers {
 		if pInfo.status == disconnected {
 			continue
@@ -460,7 +461,7 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 
 		found := false
 		for _, connectedPeer := range connectedPeers {
-			id, err := m.mailserverAddressToID(connectedPeer.UniqueID)
+			id, err := m.mailserverAddressToID(connectedPeer.UniqueID, allMailservers)
 			if err != nil {
 				m.logger.Error("failed to convert id to hex", zap.Error(err))
 				return err
@@ -486,7 +487,7 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 	// not available error
 	if m.mailserverCycle.activeMailserver != nil {
 		for _, connectedPeer := range connectedPeers {
-			id, err := m.mailserverAddressToID(connectedPeer.UniqueID)
+			id, err := m.mailserverAddressToID(connectedPeer.UniqueID, allMailservers)
 			if err != nil {
 				m.logger.Error("failed to convert id to hex", zap.Error(err))
 				return err
