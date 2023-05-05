@@ -24,6 +24,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	waku2extn "github.com/status-im/status-go/services/wakuv2ext"
@@ -41,6 +42,8 @@ var (
 	seedPhrase       = flag.String("seed-phrase", "", "Seed phrase")
 	version          = flag.Bool("version", false, "Print version and dump configuration")
 	apiModules       = flag.String("api-modules", "wakuext,ext,waku,ens", "API modules to enable in the HTTP server")
+	pprofEnabled     = flag.Bool("pprof", false, "Enable runtime profiling via pprof")
+	pprofPort        = flag.Int("pprof-port", 52525, "Port for runtime profiling via pprof")
 
 	dataDir   = flag.String("dir", getDefaultDataDir(), "Directory used by node to store data")
 	networkID = flag.Int(
@@ -109,6 +112,11 @@ func main() {
 	if *version {
 		printVersion(config)
 		return
+	}
+
+	// Check if profiling shall be enabled.
+	if *pprofEnabled {
+		profiling.NewProfiler(*pprofPort).Go()
 	}
 
 	backend := api.NewGethStatusBackend()
