@@ -74,12 +74,14 @@ contract CollectibleV1 is
 
     /**
      * @notice remoteBurn allows the owner to burn a token
-     * @param tokenId The token ID to be burned
+     * @param tokenIds The list of token IDs to be burned
      */
-    function remoteBurn(uint256 tokenId) public onlyOwner {
+    function remoteBurn(uint256[] memory tokenIds) public onlyOwner {
         require(remoteBurnable, "NOT_REMOTE_BURNABLE");
 
-        _burn(tokenId);
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            _burn(tokenIds[i]);
+        }
     }
 
     /**

@@ -6,7 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -15,6 +18,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/utils"
+	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -156,6 +160,31 @@ func (api *API) MintTo(ctx context.Context, chainID uint64, contractAddress stri
 	return tx.Hash().Hex(), nil
 }
 
+func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, tokenIds []*bigint.BigInt) (string, error) {
+	if len(tokenIds) == 0 {
+		return "", errors.New("tokenIds list is empty")
+	}
+
+	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
+	if err != nil {
+		return "", err
+	}
+
+	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
+
+	var tempTokenIds []*big.Int
+	for _, v := range tokenIds {
+		tempTokenIds = append(tempTokenIds, v.Int)
+	}
+
+	tx, err := contractInst.RemoteBurn(transactOpts, tempTokenIds)
+	if err != nil {
+		return "", err
+	}
+
+	return tx.Hash().Hex(), nil
+}
+
 func (api *API) ContractOwner(ctx context.Context, chainID uint64, contractAddress string) (string, error) {
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
 	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
@@ -187,4 +216,51 @@ func (api *API) validateWalletsAndAmounts(walletAddresses []string, amount int) 
 		return errors.New("amount is <= 0")
 	}
 	return nil
+}
+
+func (api *API) EstimateRemoteBurn(ctx context.Context, chainID uint64, contractAddress string, tokenIds []*bigint.BigInt) (uint64, error) {
+	if len(tokenIds) == 0 {
+		return 0, errors.New("token list is empty")
+	}
+
+	ethClient, err := api.RPCClient.EthClient(chainID)
+	if err != nil {
+		log.Error(err.Error())
+		return 0, err
+	}
+
+	collectiblesABI, err := abi.JSON(strings.NewReader(collectibles.CollectiblesABI))
+	if err != nil {
+		return 0, err
+	}
+
+	var tempTokenIds []*big.Int
+	for _, v := range tokenIds {
+		tempTokenIds = append(tempTokenIds, v.Int)
+	}
+
+	data, err := collectiblesABI.Pack("remoteBurn", tempTokenIds)
+	if err != nil {
+		return 0, err
+	}
+
+	ownerAddr, err := api.ContractOwner(ctx, chainID, contractAddress)
+	if err != nil {
+		return 0, err
+	}
+	toAddr := common.HexToAddress(contractAddress)
+	fromAddr := common.HexToAddress(ownerAddr)
+
+	callMsg := ethereum.CallMsg{
+		From:  fromAddr,
+		To:    &toAddr,
+		Value: big.NewInt(0),
+		Data:  data,
+	}
+
+	estimate, err := ethClient.EstimateGas(ctx, callMsg)
+	if err != nil {
+		return 0, err
+	}
+	return estimate + uint64(float32(estimate)*0.1), nil
 }
