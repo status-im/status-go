@@ -402,9 +402,10 @@ func (m *Manager) All() ([]*Community, error) {
 }
 
 type KnownCommunitiesResponse struct {
-	ContractCommunities []string              `json:"contractCommunities"`
-	Descriptions        map[string]*Community `json:"communities"`
-	UnknownCommunities  []string              `json:"unknownCommunities"`
+	ContractCommunities         []string              `json:"contractCommunities"`
+	ContractFeaturedCommunities []string              `json:"contractFeaturedCommunities"`
+	Descriptions                map[string]*Community `json:"communities"`
+	UnknownCommunities          []string              `json:"unknownCommunities"`
 }
 
 func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []types.HexBytes) (response *KnownCommunitiesResponse, err error) {
