@@ -640,8 +640,8 @@ func (m *Manager) ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) erro
 	return nil
 }
 
-func (m *Manager) DeleteAccount(address types.Address, password string) error {
-	return m.keystore.Delete(types.Account{Address: address}, password)
+func (m *Manager) DeleteAccount(address types.Address) error {
+	return m.keystore.Delete(types.Account{Address: address})
 }
 
 func (m *Manager) GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*SelectedExtKey, error) {
