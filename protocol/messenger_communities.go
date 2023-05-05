@@ -345,6 +345,14 @@ func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse,
 		return nil, err
 	}
 
+	featuredCommunities, err := directory.GetFeaturedCommunities(callOpts)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range featuredCommunities {
+		response.ContractFeaturedCommunities = append(response.ContractFeaturedCommunities, string(c))
+	}
+
 	go m.requestCommunitiesFromMailserver(response.UnknownCommunities)
 
 	return response, nil
