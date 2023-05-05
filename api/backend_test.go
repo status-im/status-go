@@ -761,15 +761,15 @@ func TestConvertAccount(t *testing.T) {
 	const mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
 	const password = "111111"        // represents password for a regular user
 	const keycardPassword = "222222" // represents password for a keycard user
-	const pathMaster = "m"
-	const pathWalletRoot = "m/44'/60'/0'/0"
+	const keycardUID = "1234"
 	const pathEIP1581Root = "m/43'/60'/1581'"
-	const pathEIP1581Chat = "m/43'/60'/1581'/0/0"
-	const pathDefaultWalletAccount = "m/44'/60'/0'/0/0"
-	const customWalletPath1 = "m/44'/60'/0'/0/1"
-	const customWalletPath2 = "m/44'/60'/0'/0/2"
+	const pathEIP1581Chat = pathEIP1581Root + "/0'/0"
+	const pathWalletRoot = "m/44'/60'/0'/0"
+	const pathDefaultWalletAccount = pathWalletRoot + "/0"
+	const customWalletPath1 = pathWalletRoot + "/1"
+	const customWalletPath2 = pathWalletRoot + "/2"
 	var allGeneratedPaths []string
-	allGeneratedPaths = append(allGeneratedPaths, customWalletPath1, customWalletPath2, pathWalletRoot, pathEIP1581Root, pathDefaultWalletAccount)
+	allGeneratedPaths = append(allGeneratedPaths, pathEIP1581Root, pathEIP1581Chat, pathWalletRoot, pathDefaultWalletAccount, customWalletPath1, customWalletPath2)
 
 	var err error
 
@@ -823,34 +823,32 @@ func TestConvertAccount(t *testing.T) {
 	genAccInfo, err := backend.AccountManager().AccountsGenerator().ImportMnemonic(mnemonic, "")
 	assert.NoError(t, err)
 
+	masterAddress := genAccInfo.Address
+
 	accountInfo, err := backend.AccountManager().AccountsGenerator().StoreAccount(genAccInfo.ID, password)
 	assert.NoError(t, err)
 
 	found := keystoreContainsFileForAccount(keyStoreDir, accountInfo.Address)
-	require.NoError(t, err)
 	require.True(t, found)
 
 	derivedAccounts, err := backend.AccountManager().AccountsGenerator().StoreDerivedAccounts(genAccInfo.ID, password, allGeneratedPaths)
 	assert.NoError(t, err)
 
-	accs, err := backend.AccountManager().AccountsGenerator().DeriveAddresses(genAccInfo.ID, []string{pathMaster})
-	require.NoError(t, err)
-	require.Equal(t, 1, len(accs))
-	masterAddress := accs[pathMaster].Address
-	found = keystoreContainsFileForAccount(keyStoreDir, masterAddress)
-	require.NoError(t, err)
+	chatAddress := derivedAccounts[pathEIP1581Chat].Address
+	found = keystoreContainsFileForAccount(keyStoreDir, chatAddress)
 	require.True(t, found)
 
 	var accountsToStore []*accounts.Account
 	accountsToStore = append(accountsToStore, &accounts.Account{
-		Address:   types.HexToAddress(masterAddress),
-		KeyUID:    genAccInfo.KeyUID,
-		Type:      accounts.AccountTypeGenerated,
-		PublicKey: types.Hex2Bytes(accountInfo.PublicKey),
-		Path:      pathEIP1581Chat,
-		Wallet:    false,
-		Chat:      true,
-		Name:      "GeneratedAccount",
+		Address:     types.HexToAddress(chatAddress),
+		DerivedFrom: masterAddress,
+		KeyUID:      genAccInfo.KeyUID,
+		Type:        accounts.AccountTypeGenerated,
+		PublicKey:   types.Hex2Bytes(accountInfo.PublicKey),
+		Path:        pathEIP1581Chat,
+		Wallet:      false,
+		Chat:        true,
+		Name:        "GeneratedAccount",
 	})
 
 	for p, dAccInfo := range derivedAccounts {
@@ -927,29 +925,45 @@ func TestConvertAccount(t *testing.T) {
 		KeycardPairing:     "pairing",
 	}
 
+	// Ensure we're able to open the DB
+	err = backend.ensureAppDBOpened(keycardAccount, keycardPassword)
+	require.NoError(t, err)
+
+	// db creation
+	db, err := accounts.NewDB(backend.appDB)
+	require.NoError(t, err)
+
+	// Check that there is no registered keycards
+	keycardKeyPairs, err := db.GetMigratedKeyPairByKeyUID(genAccInfo.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(keycardKeyPairs))
+
 	// Converting to a keycard account
-	err = backend.ConvertToKeycardAccount(keycardAccount, keycardSettings, password, keycardPassword)
+	err = backend.ConvertToKeycardAccount(keycardAccount, keycardSettings, keycardUID, password, keycardPassword)
 	require.NoError(t, err)
 
 	// Validating results of converting to a keycard account.
 	// All keystore files for the account which is migrated need to be removed.
-	found = keystoreContainsFileForAccount(keyStoreDir, accountInfo.Address)
-	require.NoError(t, err)
+	found = keystoreContainsFileForAccount(keyStoreDir, masterAddress)
 	require.False(t, found)
 
 	for _, dAccInfo := range derivedAccounts {
 		found = keystoreContainsFileForAccount(keyStoreDir, dAccInfo.Address)
-		require.NoError(t, err)
 		require.False(t, found)
 	}
-
-	found = keystoreContainsFileForAccount(keyStoreDir, masterAddress)
-	require.NoError(t, err)
-	require.False(t, found)
 
 	// Ensure we're able to open the DB
 	err = backend.ensureAppDBOpened(keycardAccount, keycardPassword)
 	require.NoError(t, err)
+
+	// db creation after re-encryption
+	db1, err := accounts.NewDB(backend.appDB)
+	require.NoError(t, err)
+
+	// Check that there is a registered keycard
+	keycardKeyPairs, err = db1.GetMigratedKeyPairByKeyUID(genAccInfo.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(keycardKeyPairs))
 
 	b1 := NewGethStatusBackend()
 	require.NoError(t, b1.OpenAccounts())
@@ -961,22 +975,28 @@ func TestConvertAccount(t *testing.T) {
 	// Validating results of converting to a regular account.
 	// All keystore files for need to be created.
 	found = keystoreContainsFileForAccount(keyStoreDir, accountInfo.Address)
-	require.NoError(t, err)
 	require.True(t, found)
 
 	for _, dAccInfo := range derivedAccounts {
 		found = keystoreContainsFileForAccount(keyStoreDir, dAccInfo.Address)
-		require.NoError(t, err)
 		require.True(t, found)
 	}
 
 	found = keystoreContainsFileForAccount(keyStoreDir, masterAddress)
-	require.NoError(t, err)
 	require.True(t, found)
 
 	// Ensure we're able to open the DB
 	err = backend.ensureAppDBOpened(keycardAccount, password)
 	require.NoError(t, err)
+
+	// db creation after re-encryption
+	db2, err := accounts.NewDB(backend.appDB)
+	require.NoError(t, err)
+
+	// Check that there is no registered keycards
+	keycardKeyPairs, err = db2.GetMigratedKeyPairByKeyUID(genAccInfo.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(keycardKeyPairs))
 
 	b2 := NewGethStatusBackend()
 	require.NoError(t, b2.OpenAccounts())

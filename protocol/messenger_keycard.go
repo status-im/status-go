@@ -188,11 +188,7 @@ func (m *Messenger) AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(ctx context.
 	return addedKc || addedAccs, m.dispatchKeycardActivity(ctx, activityMessage)
 }
 
-func (m *Messenger) RemoveMigratedAccountsForKeycard(ctx context.Context, kcUID string, accountAddresses []string, clock uint64) error {
-	var addresses []types.Address
-	for _, addr := range accountAddresses {
-		addresses = append(addresses, types.HexToAddress(addr))
-	}
+func (m *Messenger) RemoveMigratedAccountsForKeycard(ctx context.Context, kcUID string, addresses []types.Address, clock uint64) error {
 
 	err := m.settings.RemoveMigratedAccountsForKeycard(kcUID, addresses, clock)
 	if err != nil {

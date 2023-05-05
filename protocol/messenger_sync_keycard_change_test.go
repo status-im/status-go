@@ -178,17 +178,12 @@ func (s *MessengerSyncKeycardChangeSuite) TestRemovingAccountsFromKeycard() {
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
-	var accountAddressesToRemove []string
-	for _, acc := range keycardToSync.AccountsAddresses[:2] {
-		accountAddressesToRemove = append(accountAddressesToRemove, acc.String())
-	}
-
 	// Remove accounts from sender
 	updatedKeycard := getKeycardsForTest()[:1][0]
 	updatedKeycard.AccountsAddresses = updatedKeycard.AccountsAddresses[2:]
 
 	err = s.main.RemoveMigratedAccountsForKeycard(context.Background(), keycardToSync.KeycardUID,
-		accountAddressesToRemove, keycardToSync.LastUpdateClock)
+		keycardToSync.AccountsAddresses[:2], keycardToSync.LastUpdateClock)
 	s.Require().NoError(err)
 
 	// Wait for the response
@@ -224,14 +219,9 @@ func (s *MessengerSyncKeycardChangeSuite) TestRemovingAllAccountsFromKeycard() {
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
-	var accountAddressesToRemove []string
-	for _, acc := range keycardToSync.AccountsAddresses {
-		accountAddressesToRemove = append(accountAddressesToRemove, acc.String())
-	}
-
 	// Remove all accounts from sender
 	err = s.main.RemoveMigratedAccountsForKeycard(context.Background(), keycardToSync.KeycardUID,
-		accountAddressesToRemove, keycardToSync.LastUpdateClock)
+		keycardToSync.AccountsAddresses, keycardToSync.LastUpdateClock)
 	s.Require().NoError(err)
 
 	// Wait for the response
