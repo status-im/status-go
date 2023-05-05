@@ -98,8 +98,10 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessage() {
 	s.Require().Equal(messageID, sendResponse.RemovedMessages()[0].MessageID)
 	s.Require().Equal(sendResponse.RemovedMessages()[0].DeletedBy, "")
 	s.Require().Len(sendResponse.Chats(), 1)
-	// LastMessage is removed
-	s.Require().Nil(sendResponse.Chats()[0].LastMessage)
+	// LastMessage is marked as deleted
+	lastRemovedMessage := sendResponse.Chats()[0].LastMessage
+	s.Require().Equal(lastRemovedMessage.ID, messageID)
+	s.Require().Equal(lastRemovedMessage.Deleted, true)
 
 	// Main instance user attempts to delete the message it received from theirMessenger
 	_, err = s.m.DeleteMessageAndSend(context.Background(), ogMessage.ID)
@@ -150,9 +152,10 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessagePreviousLastMessage() {
 	s.Require().Len(sendResponse.RemovedMessages(), 1)
 	s.Require().Equal(messageID, sendResponse.RemovedMessages()[0].MessageID)
 	s.Require().Len(sendResponse.Chats(), 1)
-	// LastMessage is updated to previous message
+	// LastMessage is updated and marked as deleted
 	s.Require().NotNil(sendResponse.Chats()[0].LastMessage)
-	s.Require().Equal(inputMessage1.ID, sendResponse.Chats()[0].LastMessage.ID)
+	s.Require().Equal(inputMessage2.ID, sendResponse.Chats()[0].LastMessage.ID)
+	s.Require().Equal(sendResponse.Chats()[0].LastMessage.Deleted, true)
 
 }
 
@@ -303,8 +306,10 @@ func (s *MessengerDeleteMessageSuite) TestDeleteImageMessage() {
 	s.Require().Len(sendResponse.RemovedMessages(), 3)
 	s.Require().Equal(sendResponse.RemovedMessages()[0].DeletedBy, "")
 	s.Require().Len(sendResponse.Chats(), 1)
-	// LastMessage is removed
-	s.Require().Nil(sendResponse.Chats()[0].LastMessage)
+
+	// LastMessage marked as deleted
+	s.Require().Equal(sendResponse.Chats()[0].LastMessage.ID, album[2].ID)
+	s.Require().Equal(sendResponse.Chats()[0].LastMessage.Deleted, true)
 
 	// Main instance user attempts to delete the message it received from theirMessenger
 	_, err = theirMessenger.DeleteMessageAndSend(context.Background(), firstMessageID)
