@@ -75,7 +75,7 @@ type Manager struct {
 	torrentClient                  *torrent.Client
 	walletConfig                   *params.WalletConfig
 	historyArchiveTasksWaitGroup   sync.WaitGroup
-	historyArchiveTasks            map[string]chan struct{}
+	historyArchiveTasks            sync.Map // stores `chan struct{}`
 	periodicMemberPermissionsTasks map[string]chan struct{}
 	torrentTasks                   map[string]metainfo.Hash
 	historyArchiveDownloadTasks    map[string]*HistoryArchiveDownloadTask
@@ -157,7 +157,6 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 		quit:                           make(chan struct{}),
 		transport:                      transport,
 		torrentConfig:                  torrentConfig,
-		historyArchiveTasks:            make(map[string]chan struct{}),
 		periodicMemberPermissionsTasks: make(map[string]chan struct{}),
 		torrentTasks:                   make(map[string]metainfo.Hash),
 		historyArchiveDownloadTasks:    make(map[string]*HistoryArchiveDownloadTask),
@@ -2430,15 +2429,13 @@ func (m *Manager) CreateAndSeedHistoryArchive(communityID types.HexBytes, topics
 
 func (m *Manager) StartHistoryArchiveTasksInterval(community *Community, interval time.Duration) {
 	id := community.IDString()
-	_, exists := m.historyArchiveTasks[id]
-
-	if exists {
+	if _, exists := m.historyArchiveTasks.Load(id); exists {
 		m.LogStdout("history archive tasks interval already in progres", zap.String("id", id))
 		return
 	}
 
 	cancel := make(chan struct{})
-	m.historyArchiveTasks[id] = cancel
+	m.historyArchiveTasks.Store(id, cancel)
 	m.historyArchiveTasksWaitGroup.Add(1)
 
 	ticker := time.NewTicker(interval)
@@ -2479,7 +2476,7 @@ func (m *Manager) StartHistoryArchiveTasksInterval(community *Community, interva
 			}
 		case <-cancel:
 			m.UnseedHistoryArchiveTorrent(community.ID())
-			delete(m.historyArchiveTasks, id)
+			m.historyArchiveTasks.Delete(id)
 			m.historyArchiveTasksWaitGroup.Done()
 			return
 		}
@@ -2487,9 +2484,10 @@ func (m *Manager) StartHistoryArchiveTasksInterval(community *Community, interva
 }
 
 func (m *Manager) StopHistoryArchiveTasksIntervals() {
-	for _, t := range m.historyArchiveTasks {
-		close(t)
-	}
+	m.historyArchiveTasks.Range(func(_, task interface{}) bool {
+		close(task.(chan struct{})) // Need to cast to the chan
+		return true
+	})
 	// Stoping archive interval tasks is async, so we need
 	// to wait for all of them to be closed before we shutdown
 	// the torrent client
@@ -2497,10 +2495,10 @@ func (m *Manager) StopHistoryArchiveTasksIntervals() {
 }
 
 func (m *Manager) StopHistoryArchiveTasksInterval(communityID types.HexBytes) {
-	task, ok := m.historyArchiveTasks[communityID.String()]
-	if ok {
+	task, exists := m.historyArchiveTasks.Load(communityID.String())
+	if exists {
 		m.logger.Info("Stopping history archive tasks interval", zap.Any("id", communityID.String()))
-		close(task)
+		close(task.(chan struct{})) // Need to cast to the chan
 	}
 }
 

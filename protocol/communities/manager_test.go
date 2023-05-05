@@ -52,6 +52,16 @@ func (s *ManagerSuite) SetupTest() {
 	s.manager = m
 }
 
+func (s *ManagerSuite) getHistoryTaksCount() int {
+	// sync.Map doesn't have a Len function, so we need to count manually
+	count := 0
+	s.manager.historyArchiveTasks.Range(func(_, _ interface{}) bool {
+		count++
+		return true
+	})
+	return count
+}
+
 func (s *ManagerSuite) TestCreateCommunity() {
 
 	request := &requests.CreateCommunity{
@@ -201,7 +211,9 @@ func (s *ManagerSuite) TestStartHistoryArchiveTasksInterval() {
 	// Due to async exec we need to wait a bit until we check
 	// the task count.
 	time.Sleep(5 * time.Second)
-	s.Require().Len(s.manager.historyArchiveTasks, 1)
+
+	count := s.getHistoryTaksCount()
+	s.Require().Equal(count, 1)
 
 	// We wait another 5 seconds to ensure the first tick has kicked in
 	time.Sleep(5 * time.Second)
@@ -211,7 +223,8 @@ func (s *ManagerSuite) TestStartHistoryArchiveTasksInterval() {
 
 	s.manager.StopHistoryArchiveTasksInterval(community.ID())
 	s.manager.historyArchiveTasksWaitGroup.Wait()
-	s.Require().Len(s.manager.historyArchiveTasks, 0)
+	count = s.getHistoryTaksCount()
+	s.Require().Equal(count, 0)
 }
 
 func (s *ManagerSuite) TestStopHistoryArchiveTasksIntervals() {
@@ -230,9 +243,14 @@ func (s *ManagerSuite) TestStopHistoryArchiveTasksIntervals() {
 	go s.manager.StartHistoryArchiveTasksInterval(community, interval)
 
 	time.Sleep(2 * time.Second)
-	s.Require().Len(s.manager.historyArchiveTasks, 1)
+
+	count := s.getHistoryTaksCount()
+	s.Require().Equal(count, 1)
+
 	s.manager.StopHistoryArchiveTasksIntervals()
-	s.Require().Len(s.manager.historyArchiveTasks, 0)
+
+	count = s.getHistoryTaksCount()
+	s.Require().Equal(count, 0)
 }
 
 func (s *ManagerSuite) TestStopTorrentClient_ShouldStopHistoryArchiveTasks() {
@@ -251,11 +269,15 @@ func (s *ManagerSuite) TestStopTorrentClient_ShouldStopHistoryArchiveTasks() {
 	// Due to async exec we need to wait a bit until we check
 	// the task count.
 	time.Sleep(2 * time.Second)
-	s.Require().Len(s.manager.historyArchiveTasks, 1)
+
+	count := s.getHistoryTaksCount()
+	s.Require().Equal(count, 1)
 
 	errs := s.manager.StopTorrentClient()
 	s.Require().Len(errs, 0)
-	s.Require().Len(s.manager.historyArchiveTasks, 0)
+
+	count = s.getHistoryTaksCount()
+	s.Require().Equal(count, 0)
 }
 
 func (s *ManagerSuite) TestCreateHistoryArchiveTorrent_WithoutMessages() {
