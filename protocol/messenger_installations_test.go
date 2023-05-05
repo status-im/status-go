@@ -246,6 +246,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	var allChats []*Chat
 	var actualContact *Contact
+	var bookmarks []*browsers.Bookmark
 	// Wait for the message to reach its destination
 	err = tt.RetryWithBackOff(func() error {
 		var err error
@@ -258,12 +259,13 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 		if len(response.Contacts) == 1 {
 			actualContact = response.Contacts[0]
 		}
+		bookmarks = append(bookmarks, response.GetBookmarks()...)
 
-		if len(allChats) >= 2 && actualContact != nil {
+		if len(allChats) >= 2 && actualContact != nil && len(bookmarks) >= 1 {
 			return nil
 		}
 
-		return errors.New("Not received all chats & contacts")
+		return errors.New("not received all chats & contacts & bookmarks yet")
 
 	})
 
@@ -287,7 +289,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().True(actualContact.hasAddedUs())
 	s.Require().True(actualContact.mutual())
 
-	bookmarks, err := theirMessenger.browserDatabase.GetBookmarks()
+	bookmarks, err = theirMessenger.browserDatabase.GetBookmarks()
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(bookmarks))
 
