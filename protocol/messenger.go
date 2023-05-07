@@ -4991,7 +4991,13 @@ func (m *Messenger) MuteChat(request *requests.MuteChat) (time.Time, error) {
 		return time.Time{}, err
 	}
 
-	return m.muteChat(chat, contact, MuteTill)
+	muteTillTimeRemoveMS, err := time.Parse("2006-01-02T15:04:05Z", MuteTill.Format("2006-01-02T15:04:05Z"))
+
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return m.muteChat(chat, contact, muteTillTimeRemoveMS)
 }
 
 func (m *Messenger) MuteChatV2(muteParams *requests.MuteChat) (time.Time, error) {
