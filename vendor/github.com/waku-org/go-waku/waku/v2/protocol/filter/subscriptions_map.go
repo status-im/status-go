@@ -1,4 +1,4 @@
-package filterv2
+package filter
 
 import (
 	"sync"
@@ -6,19 +6,20 @@ import (
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
+	"go.uber.org/zap"
 )
 
 type SubscriptionDetails struct {
 	sync.RWMutex
 
-	id     string
+	ID     string
 	mapRef *SubscriptionsMap
-	closed bool
+	Closed bool
 	once   sync.Once
 
-	peerID        peer.ID
-	pubsubTopic   string
-	contentTopics map[string]struct{}
+	PeerID        peer.ID
+	PubsubTopic   string
+	ContentTopics map[string]struct{}
 	C             chan *protocol.Envelope
 }
 
@@ -31,12 +32,14 @@ type PeerSubscription struct {
 
 type SubscriptionsMap struct {
 	sync.RWMutex
-	items map[peer.ID]*PeerSubscription
+	logger *zap.Logger
+	items  map[peer.ID]*PeerSubscription
 }
 
-func NewSubscriptionMap() *SubscriptionsMap {
+func NewSubscriptionMap(logger *zap.Logger) *SubscriptionsMap {
 	return &SubscriptionsMap{
-		items: make(map[peer.ID]*PeerSubscription),
+		logger: logger.Named("subscription-map"),
+		items:  make(map[peer.ID]*PeerSubscription),
 	}
 }
 
@@ -59,24 +62,35 @@ func (sub *SubscriptionsMap) NewSubscription(peerID peer.ID, topic string, conte
 	}
 
 	details := &SubscriptionDetails{
-		id:            uuid.NewString(),
+		ID:            uuid.NewString(),
 		mapRef:        sub,
-		peerID:        peerID,
-		pubsubTopic:   topic,
-		C:             make(chan *protocol.Envelope),
-		contentTopics: make(map[string]struct{}),
+		PeerID:        peerID,
+		PubsubTopic:   topic,
+		C:             make(chan *protocol.Envelope, 1024),
+		ContentTopics: make(map[string]struct{}),
 	}
 
 	for _, ct := range contentTopics {
-		details.contentTopics[ct] = struct{}{}
+		details.ContentTopics[ct] = struct{}{}
 	}
 
-	sub.items[peerID].subscriptionsPerTopic[topic][details.id] = details
+	sub.items[peerID].subscriptionsPerTopic[topic][details.ID] = details
 
 	return details
 }
 
-func (sub *SubscriptionsMap) Has(peerID peer.ID, topic string, contentTopics []string) bool {
+func (sub *SubscriptionsMap) IsSubscribedTo(peerID peer.ID) bool {
+	sub.RLock()
+	defer sub.RUnlock()
+
+	_, ok := sub.items[peerID]
+	return ok
+}
+
+func (sub *SubscriptionsMap) Has(peerID peer.ID, topic string, contentTopics ...string) bool {
+	sub.RLock()
+	defer sub.RUnlock()
+
 	// Check if peer exits
 	peerSubscription, ok := sub.items[peerID]
 	if !ok {
@@ -93,7 +107,7 @@ func (sub *SubscriptionsMap) Has(peerID peer.ID, topic string, contentTopics []s
 	for _, ct := range contentTopics {
 		found := false
 		for _, subscription := range subscriptions {
-			_, exists := subscription.contentTopics[ct]
+			_, exists := subscription.ContentTopics[ct]
 			if exists {
 				found = true
 				break
@@ -111,12 +125,12 @@ func (sub *SubscriptionsMap) Delete(subscription *SubscriptionDetails) error {
 	sub.Lock()
 	defer sub.Unlock()
 
-	peerSubscription, ok := sub.items[subscription.peerID]
+	peerSubscription, ok := sub.items[subscription.PeerID]
 	if !ok {
 		return ErrNotFound
 	}
 
-	delete(peerSubscription.subscriptionsPerTopic[subscription.pubsubTopic], subscription.id)
+	delete(peerSubscription.subscriptionsPerTopic[subscription.PubsubTopic], subscription.ID)
 
 	return nil
 }
@@ -126,7 +140,7 @@ func (s *SubscriptionDetails) Add(contentTopics ...string) {
 	defer s.Unlock()
 
 	for _, ct := range contentTopics {
-		s.contentTopics[ct] = struct{}{}
+		s.ContentTopics[ct] = struct{}{}
 	}
 }
 
@@ -135,7 +149,7 @@ func (s *SubscriptionDetails) Remove(contentTopics ...string) {
 	defer s.Unlock()
 
 	for _, ct := range contentTopics {
-		delete(s.contentTopics, ct)
+		delete(s.ContentTopics, ct)
 	}
 }
 
@@ -144,7 +158,7 @@ func (s *SubscriptionDetails) closeC() {
 		s.Lock()
 		defer s.Unlock()
 
-		s.closed = true
+		s.Closed = true
 		close(s.C)
 	})
 }
@@ -159,17 +173,17 @@ func (s *SubscriptionDetails) Clone() *SubscriptionDetails {
 	defer s.RUnlock()
 
 	result := &SubscriptionDetails{
-		id:            uuid.NewString(),
+		ID:            uuid.NewString(),
 		mapRef:        s.mapRef,
-		closed:        false,
-		peerID:        s.peerID,
-		pubsubTopic:   s.pubsubTopic,
-		contentTopics: make(map[string]struct{}),
+		Closed:        false,
+		PeerID:        s.PeerID,
+		PubsubTopic:   s.PubsubTopic,
+		ContentTopics: make(map[string]struct{}),
 		C:             make(chan *protocol.Envelope),
 	}
 
-	for k := range s.contentTopics {
-		result.contentTopics[k] = struct{}{}
+	for k := range s.ContentTopics {
+		result.ContentTopics[k] = struct{}{}
 	}
 
 	return result
@@ -199,24 +213,27 @@ func (sub *SubscriptionsMap) Notify(peerID peer.ID, envelope *protocol.Envelope)
 
 	subscriptions, ok := sub.items[peerID].subscriptionsPerTopic[envelope.PubsubTopic()]
 	if ok {
-		iterateSubscriptionSet(subscriptions, envelope)
+		iterateSubscriptionSet(sub.logger, subscriptions, envelope)
 	}
 }
 
-func iterateSubscriptionSet(subscriptions SubscriptionSet, envelope *protocol.Envelope) {
+func iterateSubscriptionSet(logger *zap.Logger, subscriptions SubscriptionSet, envelope *protocol.Envelope) {
 	for _, subscription := range subscriptions {
 		func(subscription *SubscriptionDetails) {
 			subscription.RLock()
 			defer subscription.RUnlock()
 
-			_, ok := subscription.contentTopics[envelope.Message().ContentTopic]
-			if !ok && len(subscription.contentTopics) != 0 { // TODO: confirm if no content topics are allowed
+			_, ok := subscription.ContentTopics[envelope.Message().ContentTopic]
+			if !ok && len(subscription.ContentTopics) != 0 {
 				return
 			}
 
-			if !subscription.closed {
-				// TODO: consider pushing or dropping if subscription is not available
-				subscription.C <- envelope
+			if !subscription.Closed {
+				select {
+				case subscription.C <- envelope:
+				default:
+					logger.Warn("can't deliver message to subscription. subscriber too slow")
+				}
 			}
 		}(subscription)
 	}

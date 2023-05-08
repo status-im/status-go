@@ -14,7 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	ma "github.com/multiformats/go-multiaddr"
-	"github.com/waku-org/go-waku/waku/v2/utils"
+	wenr "github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"go.uber.org/zap"
 )
 
@@ -30,7 +30,7 @@ func writeMultiaddressField(localnode *enode.LocalNode, addrAggr []ma.Multiaddr)
 	defer func() {
 		if e := recover(); e != nil {
 			// Deleting the multiaddr entry, as we could not write it succesfully
-			localnode.Delete(enr.WithEntry(utils.MultiaddrENRField, struct{}{}))
+			localnode.Delete(enr.WithEntry(wenr.MultiaddrENRField, struct{}{}))
 			err = errors.New("could not write enr record")
 		}
 	}()
@@ -46,7 +46,7 @@ func writeMultiaddressField(localnode *enode.LocalNode, addrAggr []ma.Multiaddr)
 	}
 
 	if len(fieldRaw) != 0 && len(fieldRaw) <= 100 { // Max length for multiaddr field before triggering the 300 bytes limit
-		localnode.Set(enr.WithEntry(utils.MultiaddrENRField, fieldRaw))
+		localnode.Set(enr.WithEntry(wenr.MultiaddrENRField, fieldRaw))
 	}
 
 	// This is to trigger the signing record err due to exceeding 300bytes limit
@@ -55,9 +55,9 @@ func writeMultiaddressField(localnode *enode.LocalNode, addrAggr []ma.Multiaddr)
 	return nil
 }
 
-func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.Multiaddr, ipAddr *net.TCPAddr, udpPort uint, wakuFlags utils.WakuEnrBitfield, advertiseAddr []ma.Multiaddr, shouldAutoUpdate bool, log *zap.Logger) error {
+func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.Multiaddr, ipAddr *net.TCPAddr, udpPort uint, wakuFlags wenr.WakuEnrBitfield, advertiseAddr []ma.Multiaddr, shouldAutoUpdate bool, log *zap.Logger) error {
 	localnode.SetFallbackUDP(int(udpPort))
-	localnode.Set(enr.WithEntry(utils.WakuENRField, wakuFlags))
+	localnode.Set(enr.WithEntry(wenr.WakuENRField, wakuFlags))
 	localnode.SetFallbackIP(net.IP{127, 0, 0, 1})
 
 	if udpPort > math.MaxUint16 {

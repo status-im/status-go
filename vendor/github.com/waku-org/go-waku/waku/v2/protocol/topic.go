@@ -3,7 +3,6 @@ package protocol
 import (
 	"errors"
 	"fmt"
-	"runtime/debug"
 	"strconv"
 	"strings"
 )
@@ -72,19 +71,19 @@ const (
 	NamedSharding
 )
 
-type ShardedPubsubTopic interface {
+type NamespacedPubsubTopic interface {
 	String() string
 	Kind() NamespacedPubsubTopicKind
-	Equal(ShardedPubsubTopic) bool
+	Equal(NamespacedPubsubTopic) bool
 }
 
 type NamedShardingPubsubTopic struct {
-	ShardedPubsubTopic
+	NamespacedPubsubTopic
 	kind NamespacedPubsubTopicKind
 	name string
 }
 
-func NewNamedShardingPubsubTopic(name string) ShardedPubsubTopic {
+func NewNamedShardingPubsubTopic(name string) NamespacedPubsubTopic {
 	return NamedShardingPubsubTopic{
 		kind: NamedSharding,
 		name: name,
@@ -99,7 +98,7 @@ func (n NamedShardingPubsubTopic) Name() string {
 	return n.name
 }
 
-func (s NamedShardingPubsubTopic) Equal(t2 ShardedPubsubTopic) bool {
+func (s NamedShardingPubsubTopic) Equal(t2 NamespacedPubsubTopic) bool {
 	return s.String() == t2.String()
 }
 
@@ -124,13 +123,13 @@ func (s *NamedShardingPubsubTopic) Parse(topic string) error {
 }
 
 type StaticShardingPubsubTopic struct {
-	ShardedPubsubTopic
+	NamespacedPubsubTopic
 	kind    NamespacedPubsubTopicKind
 	cluster uint16
 	shard   uint16
 }
 
-func NewStaticShardingPubsubTopic(cluster uint16, shard uint16) ShardedPubsubTopic {
+func NewStaticShardingPubsubTopic(cluster uint16, shard uint16) NamespacedPubsubTopic {
 	return StaticShardingPubsubTopic{
 		kind:    StaticSharding,
 		cluster: cluster,
@@ -150,7 +149,7 @@ func (n StaticShardingPubsubTopic) Kind() NamespacedPubsubTopicKind {
 	return n.kind
 }
 
-func (s StaticShardingPubsubTopic) Equal(t2 ShardedPubsubTopic) bool {
+func (s StaticShardingPubsubTopic) Equal(t2 NamespacedPubsubTopic) bool {
 	return s.String() == t2.String()
 }
 
@@ -196,7 +195,7 @@ func (s *StaticShardingPubsubTopic) Parse(topic string) error {
 	return nil
 }
 
-func ToShardedPubsubTopic(topic string) (ShardedPubsubTopic, error) {
+func ToShardedPubsubTopic(topic string) (NamespacedPubsubTopic, error) {
 	if strings.HasPrefix(topic, StaticShardingPubsubTopicPrefix) {
 		s := StaticShardingPubsubTopic{}
 		err := s.Parse(topic)
@@ -205,7 +204,6 @@ func ToShardedPubsubTopic(topic string) (ShardedPubsubTopic, error) {
 		}
 		return s, nil
 	} else {
-		debug.PrintStack()
 		s := NamedShardingPubsubTopic{}
 		err := s.Parse(topic)
 		if err != nil {
@@ -215,6 +213,6 @@ func ToShardedPubsubTopic(topic string) (ShardedPubsubTopic, error) {
 	}
 }
 
-func DefaultPubsubTopic() ShardedPubsubTopic {
+func DefaultPubsubTopic() NamespacedPubsubTopic {
 	return NewNamedShardingPubsubTopic("default-waku/proto")
 }

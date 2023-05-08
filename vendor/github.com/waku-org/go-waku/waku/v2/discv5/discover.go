@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
@@ -14,6 +15,8 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/waku-org/go-discover/discover"
 	"github.com/waku-org/go-waku/logging"
+	"github.com/waku-org/go-waku/waku/v2/metrics"
+	"github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 
@@ -24,8 +27,6 @@ import (
 var ErrNoDiscV5Listener = errors.New("no discv5 listener")
 
 type DiscoveryV5 struct {
-	sync.RWMutex
-
 	params        *discV5Parameters
 	host          host.Host
 	config        discover.Config
@@ -37,7 +38,7 @@ type DiscoveryV5 struct {
 
 	log *zap.Logger
 
-	started bool
+	started atomic.Bool
 	cancel  context.CancelFunc
 	wg      *sync.WaitGroup
 }
@@ -87,7 +88,7 @@ type PeerConnector interface {
 	PeerChannel() chan<- peer.AddrInfo
 }
 
-func NewDiscoveryV5(host host.Host, priv *ecdsa.PrivateKey, localnode *enode.LocalNode, peerConnector PeerConnector, log *zap.Logger, opts ...DiscoveryV5Option) (*DiscoveryV5, error) {
+func NewDiscoveryV5(priv *ecdsa.PrivateKey, localnode *enode.LocalNode, peerConnector PeerConnector, log *zap.Logger, opts ...DiscoveryV5Option) (*DiscoveryV5, error) {
 	params := new(discV5Parameters)
 	optList := DefaultOptions()
 	optList = append(optList, opts...)
@@ -103,7 +104,6 @@ func NewDiscoveryV5(host host.Host, priv *ecdsa.PrivateKey, localnode *enode.Loc
 	}
 
 	return &DiscoveryV5{
-		host:          host,
 		peerConnector: peerConnector,
 		params:        params,
 		NAT:           NAT,
@@ -135,6 +135,7 @@ func (d *DiscoveryV5) listen(ctx context.Context) error {
 	}
 
 	d.udpAddr = conn.LocalAddr().(*net.UDPAddr)
+
 	if d.NAT != nil && !d.udpAddr.IP.IsLoopback() {
 		d.wg.Add(1)
 		go func() {
@@ -161,15 +162,21 @@ func (d *DiscoveryV5) listen(ctx context.Context) error {
 	return nil
 }
 
+// Sets the host to be able to mount or consume a protocol
+func (d *DiscoveryV5) SetHost(h host.Host) {
+	d.host = h
+}
+
+// only works if the discovery v5 hasn't been started yet.
 func (d *DiscoveryV5) Start(ctx context.Context) error {
-	d.Lock()
-	defer d.Unlock()
+	// compare and swap sets the discovery v5 to `started` state
+	// and prevents multiple calls to the start method by being atomic.
+	if !d.started.CompareAndSwap(false, true) {
+		return nil
+	}
 
-	d.wg.Wait() // Waiting for any go routines to stop
 	ctx, cancel := context.WithCancel(ctx)
-
 	d.cancel = cancel
-	d.started = true
 
 	err := d.listen(ctx)
 	if err != nil {
@@ -177,7 +184,10 @@ func (d *DiscoveryV5) Start(ctx context.Context) error {
 	}
 
 	d.wg.Add(1)
-	go d.runDiscoveryV5Loop(ctx)
+	go func() {
+		defer d.wg.Done()
+		d.runDiscoveryV5Loop(ctx)
+	}()
 
 	return nil
 }
@@ -190,16 +200,13 @@ func (d *DiscoveryV5) SetBootnodes(nodes []*enode.Node) error {
 	return d.listener.SetFallbackNodes(nodes)
 }
 
+// only works if the discovery v5 is in running state
+// so we can assume that cancel method is set
 func (d *DiscoveryV5) Stop() {
-	d.Lock()
-	defer d.Unlock()
-
-	if d.cancel == nil {
+	if !d.started.CompareAndSwap(true, false) { // if Discoveryv5 is running, set started to false
 		return
 	}
-
 	d.cancel()
-	d.started = false
 
 	if d.listener != nil {
 		d.listener.Close()
@@ -238,9 +245,10 @@ func evaluateNode(node *enode.Node) bool {
 		return false
 	}*/
 
-	_, err := utils.EnodeToPeerInfo(node)
+	_, err := enr.EnodeToPeerInfo(node)
 
 	if err != nil {
+		metrics.RecordDiscV5Error(context.Background(), "peer_info_failure")
 		utils.Logger().Named("discv5").Error("obtaining peer info from enode", logging.ENode("enr", node), zap.Error(err))
 		return false
 	}
@@ -248,6 +256,9 @@ func evaluateNode(node *enode.Node) bool {
 	return true
 }
 
+// get random nodes from DHT via discv5 listender
+// used for caching enr address in peerExchange
+// used for connecting to peers in discovery_connector
 func (d *DiscoveryV5) Iterator() (enode.Iterator, error) {
 	if d.listener == nil {
 		return nil, ErrNoDiscV5Listener
@@ -257,55 +268,38 @@ func (d *DiscoveryV5) Iterator() (enode.Iterator, error) {
 	return enode.Filter(iterator, evaluateNode), nil
 }
 
+// iterate over all fecthed peer addresses and send them to peerConnector
 func (d *DiscoveryV5) iterate(ctx context.Context) error {
 	iterator, err := d.Iterator()
 	if err != nil {
+		metrics.RecordDiscV5Error(context.Background(), "iterator_failure")
 		return fmt.Errorf("obtaining iterator: %w", err)
 	}
 
-	closeCh := make(chan struct{}, 1)
-	defer close(closeCh)
+	defer iterator.Close()
 
-	// Closing iterator when context is cancelled or function is returning
-	d.wg.Add(1)
-	go func() {
-		defer d.wg.Done()
-		select {
-		case <-ctx.Done():
-			iterator.Close()
-		case <-closeCh:
-			iterator.Close()
-		}
-	}()
-
-	for {
-		if ctx.Err() != nil {
-			break
-		}
-
-		exists := iterator.Next()
-		if !exists {
-			break
-		}
-
-		_, addresses, err := utils.Multiaddress(iterator.Node())
+	for iterator.Next() { // while next exists, run for loop
+		_, addresses, err := enr.Multiaddress(iterator.Node())
 		if err != nil {
+			metrics.RecordDiscV5Error(context.Background(), "peer_info_failure")
 			d.log.Error("extracting multiaddrs from enr", zap.Error(err))
 			continue
 		}
 
 		peerAddrs, err := peer.AddrInfosFromP2pAddrs(addresses...)
 		if err != nil {
+			metrics.RecordDiscV5Error(context.Background(), "peer_info_failure")
 			d.log.Error("converting multiaddrs to addrinfos", zap.Error(err))
 			continue
 		}
 
 		if len(peerAddrs) != 0 {
-			select {
-			case <-ctx.Done():
-				return nil
-			case d.peerConnector.PeerChannel() <- peerAddrs[0]:
-			}
+			d.peerConnector.PeerChannel() <- peerAddrs[0]
+		}
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
 		}
 	}
 
@@ -313,23 +307,20 @@ func (d *DiscoveryV5) iterate(ctx context.Context) error {
 }
 
 func (d *DiscoveryV5) runDiscoveryV5Loop(ctx context.Context) {
-	defer d.wg.Done()
-
-	ch := make(chan struct{}, 1)
-	ch <- struct{}{} // Initial execution
 
 restartLoop:
 	for {
+		err := d.iterate(ctx)
+		if err != nil {
+			d.log.Debug("iterating discv5", zap.Error(err))
+		}
+
+		t := time.NewTimer(5 * time.Second)
 		select {
-		case <-ch:
-			err := d.iterate(ctx)
-			if err != nil {
-				d.log.Debug("iterating discv5", zap.Error(err))
-				time.Sleep(2 * time.Second)
-			}
-			ch <- struct{}{}
+		case <-t.C:
+			t.Stop()
 		case <-ctx.Done():
-			close(ch)
+			t.Stop()
 			break restartLoop
 		}
 	}
@@ -337,8 +328,5 @@ restartLoop:
 }
 
 func (d *DiscoveryV5) IsStarted() bool {
-	d.RLock()
-	defer d.RUnlock()
-
-	return d.started
+	return d.started.Load()
 }

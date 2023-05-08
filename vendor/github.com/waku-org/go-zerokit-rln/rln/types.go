@@ -37,6 +37,10 @@ type IdentityCredential = struct {
 	IDCommitment IDCommitment `json:"idCommitment"`
 }
 
+func IdentityCredentialEquals(i IdentityCredential, i2 IdentityCredential) bool {
+	return bytes.Equal(i.IDTrapdoor[:], i2.IDTrapdoor[:]) && bytes.Equal(i.IDNullifier[:], i2.IDNullifier[:]) && bytes.Equal(i.IDSecretHash[:], i2.IDSecretHash[:]) && bytes.Equal(i.IDCommitment[:], i2.IDCommitment[:])
+}
+
 type RateLimitProof struct {
 	// RateLimitProof holds the public inputs to rln circuit as
 	// defined in https://hackmd.io/tMTLMYmTR5eynw2lwK9n1w?view#Public-Inputs

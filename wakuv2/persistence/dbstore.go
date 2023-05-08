@@ -21,6 +21,12 @@ import (
 
 var ErrInvalidCursor = errors.New("invalid cursor")
 
+var ErrFutureMessage = errors.New("message timestamp in the future")
+var ErrMessageTooOld = errors.New("message too old")
+
+// MaxTimeVariance is the maximum duration in the future allowed for a message timestamp
+const MaxTimeVariance = time.Duration(20) * time.Second
+
 // DBStore is a MessageProvider that has a *sql.DB connection
 type DBStore struct {
 	db  *sql.DB
@@ -83,6 +89,23 @@ func (d *DBStore) Start(ctx context.Context, timesource timesource.Timesource) e
 
 	d.wg.Add(1)
 	go d.checkForOlderRecords(ctx, 60*time.Second)
+
+	return nil
+}
+
+func (d *DBStore) Validate(env *protocol.Envelope) error {
+	n := time.Unix(0, env.Index().ReceiverTime)
+	upperBound := n.Add(MaxTimeVariance)
+	lowerBound := n.Add(-MaxTimeVariance)
+
+	// Ensure that messages don't "jump" to the front of the queue with future timestamps
+	if env.Message().Timestamp > upperBound.UnixNano() {
+		return ErrFutureMessage
+	}
+
+	if env.Message().Timestamp < lowerBound.UnixNano() {
+		return ErrMessageTooOld
+	}
 
 	return nil
 }
