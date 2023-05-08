@@ -9,11 +9,21 @@
  * Tom St Denis, tomstdenis@gmail.com, http://libtom.org
  */
 #include "tomcrypt.h"
+#include <string.h>
 
 /**
    @file zeromem.c
    Zero a block of memory, Tom St Denis
 */
+
+/*
+ * Pointer to memset is volatile so that compiler must de-reference
+ * the pointer and can't assume that it points to any function in
+ * particular (such as memset, which it then might further "optimize")
+ */
+typedef void *(*memset_t)(void *, int, size_t);
+
+static volatile memset_t memset_func = memset;
 
 /**
    Zero a block of memory
@@ -22,11 +32,8 @@
 */
 void zeromem(void *out, size_t outlen)
 {
-   unsigned char *mem = out;
    LTC_ARGCHKVD(out != NULL);
-   while (outlen-- > 0) {
-      *mem++ = 0;
-   }
+   memset_func((void *)out, 0, outlen);
 }
 
 /* $Source$ */
