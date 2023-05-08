@@ -180,12 +180,14 @@ func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selec
 	err := store.h.Connect(ctx, store.h.Peerstore().PeerInfo(selectedPeer))
 	if err != nil {
 		logger.Error("connecting to peer", zap.Error(err))
+		metrics.RecordStoreError(store.ctx, "dial_failure")
 		return nil, err
 	}
 
 	connOpt, err := store.h.NewStream(ctx, selectedPeer, StoreID_v20beta4)
 	if err != nil {
 		logger.Error("creating stream to peer", zap.Error(err))
+		metrics.RecordStoreError(store.ctx, "dial_failure")
 		return nil, err
 	}
 
@@ -202,6 +204,7 @@ func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selec
 	err = writer.WriteMsg(historyRequest)
 	if err != nil {
 		logger.Error("writing request", zap.Error(err))
+		metrics.RecordStoreError(store.ctx, "write_request_failure")
 		return nil, err
 	}
 
@@ -209,7 +212,7 @@ func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selec
 	err = reader.ReadMsg(historyResponseRPC)
 	if err != nil {
 		logger.Error("reading response", zap.Error(err))
-		metrics.RecordStoreError(store.ctx, "decodeRPCFailure")
+		metrics.RecordStoreError(store.ctx, "decode_rpc_failure")
 		return nil, err
 	}
 
@@ -219,8 +222,6 @@ func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selec
 			PagingInfo: &pb.PagingInfo{},
 		}, nil
 	}
-
-	metrics.RecordMessage(ctx, "retrieved", len(historyResponseRPC.Response.Messages))
 
 	return historyResponseRPC.Response, nil
 }
@@ -275,6 +276,7 @@ func (store *WakuStore) Query(ctx context.Context, query Query, opts ...HistoryR
 	}
 
 	if !params.localQuery && params.selectedPeer == "" {
+		metrics.RecordStoreError(ctx, "peer_not_found_failure")
 		return nil, ErrNoPeersAvailable
 	}
 

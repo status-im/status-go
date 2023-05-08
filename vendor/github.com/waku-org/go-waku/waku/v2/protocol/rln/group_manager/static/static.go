@@ -45,18 +45,9 @@ func (gm *StaticGroupManager) Start(ctx context.Context, rlnInstance *rln.RLN, r
 	gm.rln = rlnInstance
 	gm.rootTracker = rootTracker
 
-	err := rootTracker.Sync()
-	if err != nil {
-		return err
-	}
-
 	// add members to the Merkle tree
-	for _, member := range gm.group {
-		if err := rlnInstance.InsertMember(member); err != nil {
-			return err
-		}
-
-		err = rootTracker.Sync()
+	for i, member := range gm.group {
+		err := gm.insertMember(member, uint64(i+1))
 		if err != nil {
 			return err
 		}
@@ -67,8 +58,9 @@ func (gm *StaticGroupManager) Start(ctx context.Context, rlnInstance *rln.RLN, r
 	return nil
 }
 
-func (gm *StaticGroupManager) InsertMember(pubkey rln.IDCommitment) error {
-	gm.log.Debug("a new key is added", zap.Binary("pubkey", pubkey[:]))
+func (gm *StaticGroupManager) insertMember(pubkey rln.IDCommitment, index uint64) error {
+	gm.log.Debug("a new key is added", zap.Binary("pubkey", pubkey[:]), zap.Uint64("index", index))
+
 	// assuming all the members arrive in order
 	err := gm.rln.InsertMember(pubkey)
 	if err != nil {
@@ -76,7 +68,7 @@ func (gm *StaticGroupManager) InsertMember(pubkey rln.IDCommitment) error {
 		return err
 	}
 
-	err = gm.rootTracker.Sync()
+	_, err = gm.rootTracker.UpdateLatestRoot(index)
 	if err != nil {
 		return err
 	}

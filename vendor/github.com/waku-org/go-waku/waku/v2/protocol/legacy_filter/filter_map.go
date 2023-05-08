@@ -1,11 +1,11 @@
-package filter
+package legacy_filter
 
 import (
 	"sync"
 
-	v2 "github.com/waku-org/go-waku/waku/v2"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 )
 
@@ -13,7 +13,7 @@ type FilterMap struct {
 	sync.RWMutex
 	timesource  timesource.Timesource
 	items       map[string]Filter
-	broadcaster v2.Broadcaster
+	broadcaster relay.Broadcaster
 }
 
 type FilterMapItem struct {
@@ -21,7 +21,7 @@ type FilterMapItem struct {
 	Value Filter
 }
 
-func NewFilterMap(broadcaster v2.Broadcaster, timesource timesource.Timesource) *FilterMap {
+func NewFilterMap(broadcaster relay.Broadcaster, timesource timesource.Timesource) *FilterMap {
 	return &FilterMap{
 		timesource:  timesource,
 		items:       make(map[string]Filter),
@@ -48,6 +48,11 @@ func (fm *FilterMap) Get(key string) (Filter, bool) {
 func (fm *FilterMap) Delete(key string) {
 	fm.Lock()
 	defer fm.Unlock()
+
+	_, ok := fm.items[key]
+	if !ok {
+		return
+	}
 
 	close(fm.items[key].Chan)
 	delete(fm.items, key)

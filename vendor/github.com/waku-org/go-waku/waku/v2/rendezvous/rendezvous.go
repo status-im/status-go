@@ -43,7 +43,7 @@ type PeerConnector interface {
 	PeerChannel() chan<- peer.AddrInfo
 }
 
-func NewRendezvous(host host.Host, enableServer bool, db *DB, discoverPeers bool, rendezvousPoints []peer.ID, peerConnector PeerConnector, log *zap.Logger) *Rendezvous {
+func NewRendezvous(enableServer bool, db *DB, discoverPeers bool, rendezvousPoints []peer.ID, peerConnector PeerConnector, log *zap.Logger) *Rendezvous {
 	logger := log.Named("rendezvous")
 
 	var rendevousPoints []*rendezvousPoint
@@ -54,7 +54,6 @@ func NewRendezvous(host host.Host, enableServer bool, db *DB, discoverPeers bool
 	}
 
 	return &Rendezvous{
-		host:             host,
 		enableServer:     enableServer,
 		db:               db,
 		discoverPeers:    discoverPeers,
@@ -62,6 +61,11 @@ func NewRendezvous(host host.Host, enableServer bool, db *DB, discoverPeers bool
 		peerConnector:    peerConnector,
 		log:              logger,
 	}
+}
+
+// Sets the host to be able to mount or consume a protocol
+func (r *Rendezvous) SetHost(h host.Host) {
+	r.host = h
 }
 
 func (r *Rendezvous) Start(ctx context.Context) error {

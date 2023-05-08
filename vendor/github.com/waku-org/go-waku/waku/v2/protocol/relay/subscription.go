@@ -1,34 +1,29 @@
 package relay
 
-import (
-	"sync"
+import "github.com/waku-org/go-waku/waku/v2/protocol"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol"
-)
-
-// Subscription handles the subscrition to a particular pubsub topic
 type Subscription struct {
-	sync.RWMutex
-
-	// C is channel used for receiving envelopes
-	C chan *protocol.Envelope
-
-	closed bool
-	once   sync.Once
-	quit   chan struct{}
+	Unsubscribe func()
+	Ch          <-chan *protocol.Envelope
 }
 
-// Unsubscribe will close a subscription from a pubsub topic. Will close the message channel
-func (subs *Subscription) Unsubscribe() {
-	subs.once.Do(func() {
-		close(subs.quit)
-	})
-
+func NoopSubscription() Subscription {
+	ch := make(chan *protocol.Envelope)
+	close(ch)
+	return Subscription{
+		Unsubscribe: func() {},
+		Ch:          ch,
+	}
 }
 
-// IsClosed determine whether a Subscription is still open for receiving messages
-func (subs *Subscription) IsClosed() bool {
-	subs.RLock()
-	defer subs.RUnlock()
-	return subs.closed
+func ArraySubscription(msgs []*protocol.Envelope) Subscription {
+	ch := make(chan *protocol.Envelope, len(msgs))
+	for _, msg := range msgs {
+		ch <- msg
+	}
+	close(ch)
+	return Subscription{
+		Unsubscribe: func() {},
+		Ch:          ch,
+	}
 }

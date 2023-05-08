@@ -9,16 +9,19 @@ import (
 	"sync"
 	"time"
 
+	"github.com/waku-org/go-waku/waku/v2/metrics"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
+	"go.opencensus.io/stats"
 	"go.uber.org/zap"
 )
 
 type MessageProvider interface {
 	GetAll() ([]StoredMessage, error)
+	Validate(env *protocol.Envelope) error
 	Put(env *protocol.Envelope) error
 	Query(query *pb.HistoryQuery) ([]StoredMessage, error)
 	MostRecentTimestamp() (int64, error)
@@ -27,9 +30,14 @@ type MessageProvider interface {
 }
 
 var ErrInvalidCursor = errors.New("invalid cursor")
+var ErrFutureMessage = errors.New("message timestamp in the future")
+var ErrMessageTooOld = errors.New("message too old")
 
 // WALMode for sqlite.
 const WALMode = "wal"
+
+// MaxTimeVariance is the maximum duration in the future allowed for a message timestamp
+const MaxTimeVariance = time.Duration(20) * time.Second
 
 // DBStore is a MessageProvider that has a *sql.DB connection
 type DBStore struct {
@@ -152,18 +160,39 @@ func (d *DBStore) Start(ctx context.Context, timesource timesource.Timesource) e
 	d.cancel = cancel
 	d.timesource = timesource
 
-	err := d.cleanOlderRecords()
+	err := d.cleanOlderRecords(ctx)
 	if err != nil {
 		return err
 	}
 
-	d.wg.Add(1)
+	d.wg.Add(2)
 	go d.checkForOlderRecords(ctx, 60*time.Second)
+	go d.updateMetrics(ctx)
 
 	return nil
 }
 
-func (d *DBStore) cleanOlderRecords() error {
+func (store *DBStore) updateMetrics(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	defer store.wg.Done()
+
+	for {
+		select {
+		case <-ticker.C:
+			msgCount, err := store.Count()
+			if err != nil {
+				store.log.Error("updating store metrics", zap.Error(err))
+			} else {
+				metrics.RecordArchiveMessage(ctx, "stored", msgCount)
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (d *DBStore) cleanOlderRecords(ctx context.Context) error {
 	d.log.Info("Cleaning older records...")
 
 	// Delete older messages
@@ -172,6 +201,7 @@ func (d *DBStore) cleanOlderRecords() error {
 		sqlStmt := `DELETE FROM message WHERE receiverTimestamp < $1`
 		_, err := d.db.Exec(sqlStmt, utils.GetUnixEpochFrom(d.timesource.Now().Add(-d.maxDuration)))
 		if err != nil {
+			metrics.RecordArchiveError(ctx, "retpolicy_failure")
 			return err
 		}
 		elapsed := time.Since(start)
@@ -184,6 +214,7 @@ func (d *DBStore) cleanOlderRecords() error {
 		sqlStmt := `DELETE FROM message WHERE id IN (SELECT id FROM message ORDER BY receiverTimestamp DESC LIMIT -1 OFFSET $1)`
 		_, err := d.db.Exec(sqlStmt, d.maxMessages)
 		if err != nil {
+			metrics.RecordArchiveError(ctx, "retpolicy_failure")
 			return err
 		}
 		elapsed := time.Since(start)
@@ -206,7 +237,7 @@ func (d *DBStore) checkForOlderRecords(ctx context.Context, t time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			err := d.cleanOlderRecords()
+			err := d.cleanOlderRecords(ctx)
 			if err != nil {
 				d.log.Error("cleaning older records", zap.Error(err))
 			}
@@ -225,19 +256,41 @@ func (d *DBStore) Stop() {
 	d.db.Close()
 }
 
+func (d *DBStore) Validate(env *protocol.Envelope) error {
+	n := time.Unix(0, env.Index().ReceiverTime)
+	upperBound := n.Add(MaxTimeVariance)
+	lowerBound := n.Add(-MaxTimeVariance)
+
+	// Ensure that messages don't "jump" to the front of the queue with future timestamps
+	if env.Message().Timestamp > upperBound.UnixNano() {
+		return ErrFutureMessage
+	}
+
+	if env.Message().Timestamp < lowerBound.UnixNano() {
+		return ErrMessageTooOld
+	}
+
+	return nil
+}
+
 // Put inserts a WakuMessage into the DB
 func (d *DBStore) Put(env *protocol.Envelope) error {
 	stmt, err := d.db.Prepare("INSERT INTO message (id, receiverTimestamp, senderTimestamp, contentTopic, pubsubTopic, payload, version) VALUES ($1, $2, $3, $4, $5, $6, $7)")
 	if err != nil {
+		metrics.RecordArchiveError(context.TODO(), "insert_failure")
 		return err
 	}
 
 	cursor := env.Index()
 	dbKey := NewDBKey(uint64(cursor.SenderTime), uint64(cursor.ReceiverTime), env.PubsubTopic(), env.Index().Digest)
+
+	start := time.Now()
 	_, err = stmt.Exec(dbKey.Bytes(), cursor.ReceiverTime, env.Message().Timestamp, env.Message().ContentTopic, env.PubsubTopic(), env.Message().Payload, env.Message().Version)
 	if err != nil {
 		return err
 	}
+	ellapsed := time.Since(start)
+	stats.Record(context.Background(), metrics.ArchiveInsertDurationSeconds.M(int64(ellapsed.Seconds())))
 
 	err = stmt.Close()
 	if err != nil {
@@ -352,10 +405,13 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 	pageSize := query.PagingInfo.PageSize + 1
 
 	parameters = append(parameters, pageSize)
+	measurementStart := time.Now()
 	rows, err := stmt.Query(parameters...)
 	if err != nil {
 		return nil, nil, err
 	}
+	ellapsed := time.Since(measurementStart)
+	stats.Record(context.Background(), metrics.ArchiveQueryDurationSeconds.M(int64(ellapsed.Seconds())))
 
 	var result []StoredMessage
 	for rows.Next() {

@@ -1,4 +1,4 @@
-package filter
+package legacy_filter
 
 import (
 	"context"

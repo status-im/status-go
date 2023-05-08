@@ -25,29 +25,20 @@ func WithStaticRLNRelay(pubsubTopic string, contentTopic string, memberIndex r.M
 	}
 }
 
-type MembershipCredentials struct {
-	Contract common.Address       `json:"contract"`
-	Keypair  *r.MembershipKeyPair `json:"membershipKeyPair"`
-	Index    r.MembershipIndex    `json:"rlnIndex"`
-}
-
-// WithStaticRLNRelay enables the Waku V2 RLN protocol in onchain mode.
+// WithDynamicRLNRelay enables the Waku V2 RLN protocol in onchain mode.
 // Requires the `gowaku_rln` build constrain (or the env variable RLN=true if building go-waku)
-func WithDynamicRLNRelay(pubsubTopic string, contentTopic string, membershipCredentials MembershipCredentials, spamHandler rln.SpamHandler, ethClientAddress string, ethPrivateKey *ecdsa.PrivateKey, registrationHandler rln.RegistrationHandler) WakuNodeOption {
+func WithDynamicRLNRelay(pubsubTopic string, contentTopic string, keystorePath string, keystorePassword string, membershipContract common.Address, spamHandler rln.SpamHandler, ethClientAddress string, ethPrivateKey *ecdsa.PrivateKey, registrationHandler rln.RegistrationHandler) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableRLN = true
 		params.rlnRelayDynamic = true
-		params.rlnRelayMemIndex = membershipCredentials.Index
-		if membershipCredentials.Keypair != nil {
-			params.rlnRelayIDKey = &membershipCredentials.Keypair.IDKey
-			params.rlnRelayIDCommitment = &membershipCredentials.Keypair.IDCommitment
-		}
+		params.keystorePassword = keystorePassword
+		params.keystorePath = keystorePath
 		params.rlnRelayPubsubTopic = pubsubTopic
 		params.rlnRelayContentTopic = contentTopic
 		params.rlnSpamHandler = spamHandler
 		params.rlnETHClientAddress = ethClientAddress
 		params.rlnETHPrivateKey = ethPrivateKey
-		params.rlnMembershipContractAddress = membershipCredentials.Contract
+		params.rlnMembershipContractAddress = membershipContract
 		params.rlnRegistrationHandler = registrationHandler
 		return nil
 	}
