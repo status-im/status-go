@@ -179,7 +179,7 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 	// Only create a message notification when the user is added, not when removed
 	if !chat.Active && wasUserAdded {
 		chat.Highlight = true
-		m.createMessageNotification(chat, messageState)
+		m.createMessageNotification(chat, messageState, chat.LastMessage)
 	}
 
 	profilePicturesVisibility, err := m.settings.GetProfilePicturesVisibility()
@@ -241,7 +241,7 @@ func (m *Messenger) checkIfCreatorIsOurContact(group *v1protocol.Group) bool {
 	return false
 }
 
-func (m *Messenger) createMessageNotification(chat *Chat, messageState *ReceivedMessageState) {
+func (m *Messenger) createMessageNotification(chat *Chat, messageState *ReceivedMessageState, message *common.Message) {
 
 	var notificationType ActivityCenterType
 	if chat.OneToOne() {
@@ -252,7 +252,7 @@ func (m *Messenger) createMessageNotification(chat *Chat, messageState *Received
 	notification := &ActivityCenterNotification{
 		ID:          types.FromHex(chat.ID),
 		Name:        chat.Name,
-		LastMessage: chat.LastMessage,
+		LastMessage: message,
 		Type:        notificationType,
 		Author:      messageState.CurrentMessageState.Contact.ID,
 		Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
@@ -394,7 +394,7 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 	}
 
 	if !chat.Active {
-		m.createMessageNotification(chat, state)
+		m.createMessageNotification(chat, state, chat.LastMessage)
 	}
 
 	// Add to response
@@ -1607,7 +1607,7 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		}
 	}
 
-	messagesToDelete, err := m.getConnectedMessages(originalMessage, deleteMessage.ChatId)
+	messagesToDelete, err := m.getConnectedMessages(originalMessage, originalMessage.LocalChatID)
 	if err != nil {
 		return err
 	}
@@ -1649,13 +1649,22 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 			Deleted: true,
 		})
 
-		if chat.LastMessage != nil && chat.LastMessage.ID == originalMessage.ID {
-			if err := m.updateLastMessage(chat); err != nil {
-				return err
+		if chat.LastMessage != nil && chat.LastMessage.ID == messageToDelete.ID {
+			chat.LastMessage = messageToDelete
+			err = m.saveChat(chat)
+			if err != nil {
+				return nil
 			}
+		}
 
-			if chat.LastMessage != nil && !chat.LastMessage.Seen && chat.OneToOne() && !chat.Active {
-				m.createMessageNotification(chat, state)
+		messages, err := m.persistence.LatestMessageByChatID(chat.ID)
+		if err != nil {
+			return err
+		}
+		if len(messages) > 0 {
+			previousNotDeletedMessage := messages[0]
+			if previousNotDeletedMessage != nil && !previousNotDeletedMessage.Seen && chat.OneToOne() && !chat.Active {
+				m.createMessageNotification(chat, state, previousNotDeletedMessage)
 			}
 		}
 
@@ -1725,8 +1734,10 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 		}
 
 		if chat.LastMessage != nil && chat.LastMessage.ID == messageToDelete.ID {
-			if err := m.updateLastMessage(chat); err != nil {
-				return err
+			chat.LastMessage = messageToDelete
+			err = m.saveChat(chat)
+			if err != nil {
+				return nil
 			}
 		}
 
@@ -1735,21 +1746,6 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 	state.Response.AddChat(chat)
 
 	return nil
-}
-
-func (m *Messenger) updateLastMessage(chat *Chat) error {
-	// Get last message that is not hidden
-	messages, err := m.persistence.LatestMessageByChatID(chat.ID)
-	if err != nil {
-		return err
-	}
-	if len(messages) > 0 {
-		chat.LastMessage = messages[0]
-	} else {
-		chat.LastMessage = nil
-	}
-
-	return m.saveChat(chat)
 }
 
 func handleContactRequestChatMessage(receivedMessage *common.Message, contact *Contact, outgoing bool, logger *zap.Logger) (bool, error) {
@@ -1981,18 +1977,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 		return err
 	}
 
-	if (receivedMessage.Deleted || receivedMessage.DeletedForMe) && (chat.LastMessage == nil || chat.LastMessage.ID == receivedMessage.ID) {
-		// Get last message that is not hidden
-		messages, err := m.persistence.LatestMessageByChatID(receivedMessage.LocalChatID)
-		if err != nil {
-			return err
-		}
-		if len(messages) != 0 {
-			chat.LastMessage = messages[0]
-		} else {
-			chat.LastMessage = nil
-		}
-	} else {
+	if !receivedMessage.Deleted && !receivedMessage.DeletedForMe {
 		err = chat.UpdateFromMessage(receivedMessage, m.getTimesource())
 		if err != nil {
 			return err

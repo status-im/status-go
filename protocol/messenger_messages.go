@@ -217,7 +217,10 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 		response.AddRemovedMessage(&RemovedMessage{MessageID: messageToDelete.ID, ChatID: chat.ID, DeletedBy: deletedBy})
 
 		if chat.LastMessage != nil && chat.LastMessage.ID == messageToDelete.ID {
-			if err := m.updateLastMessage(chat); err != nil {
+			chat.LastMessage = messageToDelete
+
+			err = m.saveChat(chat)
+			if err != nil {
 				return nil, err
 			}
 		}
@@ -269,7 +272,9 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string
 		}
 
 		if chat.LastMessage != nil && chat.LastMessage.ID == messageToDelete.ID {
-			if err := m.updateLastMessage(chat); err != nil {
+			chat.LastMessage = messageToDelete
+			err = m.saveChat(chat)
+			if err != nil {
 				return nil, err
 			}
 		}

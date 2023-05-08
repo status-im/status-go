@@ -3,13 +3,12 @@ package protocol
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
-
-	"strings"
 )
 
 func (m *Messenger) getOneToOneAndNextClock(contact *Contact) (*Chat, uint64, error) {
@@ -76,8 +75,26 @@ func (m *Messenger) ChatsPreview() []*ChatPreview {
 				Highlight:             chat.Highlight,
 				Members:               chat.Members,
 			}
+
 			if chat.LastMessage != nil {
+
+				chatPreview.OutgoingStatus = chat.LastMessage.OutgoingStatus
+				chatPreview.ResponseTo = chat.LastMessage.ResponseTo
 				chatPreview.ContentType = chat.LastMessage.ContentType
+				chatPreview.From = chat.LastMessage.From
+				chatPreview.Deleted = chat.LastMessage.Deleted
+				chatPreview.DeletedForMe = chat.LastMessage.DeletedForMe
+
+				if chat.LastMessage.ContentType == protobuf.ChatMessage_IMAGE {
+					chatPreview.ParsedText = chat.LastMessage.ParsedText
+
+					image := chat.LastMessage.GetImage()
+					if image != nil {
+						chatPreview.AlbumImagesCount = image.AlbumImagesCount
+						chatPreview.ParsedText = chat.LastMessage.ParsedText
+					}
+				}
+
 				if chat.LastMessage.ContentType == protobuf.ChatMessage_TEXT_PLAIN {
 
 					simplifiedText, err := chat.LastMessage.GetSimplifiedText("", nil)

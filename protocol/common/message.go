@@ -351,17 +351,21 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	type Alias Message
 	aux := struct {
 		*Alias
-		ResponseTo      string                           `json:"responseTo"`
-		EnsName         string                           `json:"ensName"`
-		DisplayName     string                           `json:"displayName"`
-		ChatID          string                           `json:"chatId"`
-		Sticker         *protobuf.StickerMessage         `json:"sticker"`
-		AudioDurationMs uint64                           `json:"audioDurationMs"`
-		ParsedText      json.RawMessage                  `json:"parsedText"`
-		ContentType     protobuf.ChatMessage_ContentType `json:"contentType"`
-		AlbumID         string                           `json:"albumId"`
-		ImageWidth      uint32                           `json:"imageWidth"`
-		ImageHeight     uint32                           `json:"imageHeight"`
+		ResponseTo       string                           `json:"responseTo"`
+		EnsName          string                           `json:"ensName"`
+		DisplayName      string                           `json:"displayName"`
+		ChatID           string                           `json:"chatId"`
+		Sticker          *protobuf.StickerMessage         `json:"sticker"`
+		AudioDurationMs  uint64                           `json:"audioDurationMs"`
+		ParsedText       json.RawMessage                  `json:"parsedText"`
+		ContentType      protobuf.ChatMessage_ContentType `json:"contentType"`
+		AlbumID          string                           `json:"albumId"`
+		ImageWidth       uint32                           `json:"imageWidth"`
+		ImageHeight      uint32                           `json:"imageHeight"`
+		AlbumImagesCount uint32                           `json:"albumImagesCount"`
+		From             string                           `json:"from"`
+		Deleted          bool                             `json:"deleted,omitempty"`
+		DeletedForMe     bool                             `json:"deletedForMe,omitempty"`
 	}{
 		Alias: (*Alias)(m),
 	}
@@ -380,9 +384,10 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	if aux.ContentType == protobuf.ChatMessage_IMAGE {
 		m.Payload = &protobuf.ChatMessage_Image{
 			Image: &protobuf.ImageMessage{
-				AlbumId: aux.AlbumID,
-				Width:   aux.ImageWidth,
-				Height:  aux.ImageHeight},
+				AlbumId:          aux.AlbumID,
+				Width:            aux.ImageWidth,
+				Height:           aux.ImageHeight,
+				AlbumImagesCount: aux.AlbumImagesCount},
 		}
 	}
 
@@ -392,6 +397,9 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	m.ChatId = aux.ChatID
 	m.ContentType = aux.ContentType
 	m.ParsedText = aux.ParsedText
+	m.From = aux.From
+	m.Deleted = aux.Deleted
+	m.DeletedForMe = aux.DeletedForMe
 	return nil
 }
 
