@@ -351,7 +351,7 @@ func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse,
 		return nil, err
 	}
 	for _, c := range featuredCommunities {
-		response.ContractFeaturedCommunities = append(response.ContractFeaturedCommunities, string(c))
+		response.ContractFeaturedCommunities = append(response.ContractFeaturedCommunities, types.HexBytes(c).String())
 	}
 
 	go m.requestCommunitiesFromMailserver(response.UnknownCommunities)
