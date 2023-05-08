@@ -1691,7 +1691,6 @@ func (m *Messenger) getMessageFromResponseOrDatabase(response *MessengerResponse
 	return m.persistence.MessageByID(messageID)
 }
 
-// TODO do this delete too
 func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, deleteForMeMessage DeleteForMeMessage) error {
 	if err := ValidateDeleteForMeMessage(deleteForMeMessage.DeleteForMeMessage); err != nil {
 		return err

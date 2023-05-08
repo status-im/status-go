@@ -21,9 +21,6 @@ type DeleteMessage struct {
 
 	// SigPubKey is the ecdsa encoded public key of the edit author
 	SigPubKey *ecdsa.PublicKey `json:"-"`
-
-	// LocalChatID is the chatID of the local chat (one-to-one are not symmetric)
-	LocalChatID string `json:"localChatId"`
 }
 
 // GetSigPubKey returns an ecdsa encoded public key

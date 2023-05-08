@@ -296,7 +296,7 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string
 			deletedForMeMessage := &protobuf.DeleteForMeMessage{
 				MessageId: messageID,
 				Clock:     clock,
-				ChatId:    message.ChatId,
+				ChatId:    message.LocalChatID,
 			}
 
 			encodedMessage, err2 := proto.Marshal(deletedForMeMessage)

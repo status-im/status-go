@@ -130,6 +130,7 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 
 	var receivedPubChatMessage *common.Message
 	var alice1ReceivedMessage, alice2ReceivedMessage bool
+	var notReceivedMessageError = errors.New("not received all messages")
 	err = tt.RetryWithBackOff(func() error {
 		response, err = s.alice1.RetrieveAll()
 		if err != nil {
@@ -155,7 +156,7 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 			}
 		}
 
-		return errors.New("not received all messages")
+		return notReceivedMessageError
 	})
 	s.Require().NoError(err)
 	s.Require().Equal(receivedPubChatMessage.ChatId, chatID)
@@ -183,7 +184,7 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 			return nil
 		}
 
-		return errors.New("not received all messages")
+		return notReceivedMessageError
 	})
 	s.Require().NoError(err)
 
@@ -192,6 +193,19 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	s.Require().True(deletedForMeMessage.DeletedForMe)
 
 	// no DeletedForMe in others' message
+	err = tt.RetryWithBackOff(func() error {
+		response, err = otherMessenger.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(response.messages) > 0 {
+			return nil
+		}
+
+		return notReceivedMessageError
+	})
+	s.Require().ErrorIs(err, notReceivedMessageError)
 	otherMessage, err := otherMessenger.MessageByID(messageID)
 	s.Require().NoError(err)
 	s.Require().False(otherMessage.DeletedForMe)
