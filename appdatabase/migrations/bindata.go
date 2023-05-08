@@ -1324,7 +1324,7 @@ func _1682393575_sync_ens_nameUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1682393575_sync_ens_name.up.sql", size: 713, mode: os.FileMode(0644), modTime: time.Unix(1682512643, 0)}
+	info := bindataFileInfo{name: "1682393575_sync_ens_name.up.sql", size: 713, mode: os.FileMode(0644), modTime: time.Unix(1682560340, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xfb, 0xea, 0xcb, 0x4d, 0x71, 0x5a, 0x49, 0x19, 0x8b, 0xef, 0x66, 0x27, 0x33, 0x89, 0xb0, 0xe, 0x37, 0x1b, 0x41, 0x8, 0x12, 0xcc, 0x56, 0xd8, 0x1b, 0xf, 0xf8, 0x50, 0x4b, 0x93, 0xf1, 0x29}}
 	return a, nil
 }

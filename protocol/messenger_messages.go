@@ -292,27 +292,29 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string
 	response.AddChat(chat)
 
 	if m.hasPairedDevices() {
-		clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+		err = m.withChatClock(func(chatID string, clock uint64) error {
+			deletedForMeMessage := &protobuf.DeleteForMeMessage{
+				MessageId: messageID,
+				Clock:     clock,
+				ChatId:    message.ChatId,
+			}
 
-		deletedForMeMessage := &DeleteForMeMessage{}
+			encodedMessage, err2 := proto.Marshal(deletedForMeMessage)
 
-		deletedForMeMessage.MessageId = messageID
-		deletedForMeMessage.Clock = clock
+			if err2 != nil {
+				return err2
+			}
 
-		encodedMessage, err := proto.Marshal(deletedForMeMessage.GetProtobuf())
+			rawMessage := common.RawMessage{
+				LocalChatID:         chatID,
+				Payload:             encodedMessage,
+				MessageType:         protobuf.ApplicationMetadataMessage_SYNC_DELETE_FOR_ME_MESSAGE,
+				ResendAutomatically: true,
+			}
+			_, err2 = m.dispatchMessage(ctx, rawMessage)
+			return err2
+		})
 
-		if err != nil {
-			return response, err
-		}
-
-		rawMessage := common.RawMessage{
-			LocalChatID:          chat.ID,
-			Payload:              encodedMessage,
-			MessageType:          protobuf.ApplicationMetadataMessage_SYNC_DELETE_FOR_ME_MESSAGE,
-			SkipGroupMessageWrap: true,
-			ResendAutomatically:  true,
-		}
-		_, err = m.dispatchMessage(ctx, rawMessage)
 		if err != nil {
 			return response, err
 		}

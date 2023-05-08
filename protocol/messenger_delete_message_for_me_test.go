@@ -129,25 +129,33 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	s.Require().NoError(err)
 
 	var receivedPubChatMessage *common.Message
+	var alice1ReceivedMessage, alice2ReceivedMessage bool
 	err = tt.RetryWithBackOff(func() error {
-		var err error
-		_, err = s.alice1.RetrieveAll()
+		response, err = s.alice1.RetrieveAll()
 		if err != nil {
 			return err
 		}
+		if len(response.Messages()) > 0 {
+			alice1ReceivedMessage = true
+		}
 
-		response, err := s.alice2.RetrieveAll()
+		response, err = s.alice2.RetrieveAll()
 		if err != nil {
 			return err
+		}
+		if len(response.Messages()) > 0 {
+			alice2ReceivedMessage = true
 		}
 
 		messages := response.Messages()
 		if len(messages) > 0 {
 			receivedPubChatMessage = messages[0]
-			return nil
+			if alice1ReceivedMessage && alice2ReceivedMessage {
+				return nil
+			}
 		}
 
-		return errors.New("Not received all messages")
+		return errors.New("not received all messages")
 	})
 	s.Require().NoError(err)
 	s.Require().Equal(receivedPubChatMessage.ChatId, chatID)
@@ -166,23 +174,16 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	s.Require().Equal(response.Chats()[0].LastMessage.DeletedForMe, true)
 
 	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err := s.alice2.RetrieveAll()
-		if err != nil {
-			return err
-		}
-
-		_, err = otherMessenger.RetrieveAll()
+		response, err = s.alice2.RetrieveAll()
 		if err != nil {
 			return err
 		}
 
 		if len(response.messages) > 0 {
-			receivedPubChatMessage = response.Messages()[0]
 			return nil
 		}
 
-		return errors.New("Not received all messages")
+		return errors.New("not received all messages")
 	})
 	s.Require().NoError(err)
 

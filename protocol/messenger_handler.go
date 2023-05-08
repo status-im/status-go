@@ -1712,7 +1712,7 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 		return errors.New("chat not found")
 	}
 
-	messagesToDelete, err := m.getConnectedMessages(originalMessage, deleteForMeMessage.LocalChatID)
+	messagesToDelete, err := m.getConnectedMessages(originalMessage, deleteForMeMessage.ChatId)
 	if err != nil {
 		return err
 	}
