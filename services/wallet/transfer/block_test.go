@@ -1,9 +1,7 @@
 package transfer
 
 import (
-	"io/ioutil"
 	"math/big"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,14 +11,11 @@ import (
 	"github.com/status-im/status-go/sqlite"
 )
 
-func setupTestTransferDB(t *testing.T) (*Block, func()) {
-	tmpfile, err := ioutil.TempFile("", "wallet-transfer-tests-")
+func setupTestTransferDB(t *testing.T) (*BlockDAO, func()) {
+	db, err := appdatabase.InitializeDB(sqlite.InMemoryPath, "wallet-tests", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-tests", sqlite.ReducedKDFIterationsNumber)
-	require.NoError(t, err)
-	return &Block{db}, func() {
+	return &BlockDAO{db}, func() {
 		require.NoError(t, db.Close())
-		require.NoError(t, os.Remove(tmpfile.Name()))
 	}
 }
 

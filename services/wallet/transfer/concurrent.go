@@ -14,15 +14,19 @@ import (
 	"github.com/status-im/status-go/services/wallet/async"
 )
 
+const (
+	NoThreadLimit uint32 = 0
+)
+
 // NewConcurrentDownloader creates ConcurrentDownloader instance.
-func NewConcurrentDownloader(ctx context.Context) *ConcurrentDownloader {
-	runner := async.NewAtomicGroup(ctx)
+func NewConcurrentDownloader(ctx context.Context, limit uint32) *ConcurrentDownloader {
+	runner := async.NewQueuedAtomicGroup(ctx, limit)
 	result := &Result{}
 	return &ConcurrentDownloader{runner, result}
 }
 
 type ConcurrentDownloader struct {
-	*async.AtomicGroup
+	*async.QueuedAtomicGroup
 	*Result
 }
 
@@ -86,11 +90,14 @@ type Downloader interface {
 	GetTransfersByNumber(context.Context, *big.Int) ([]Transfer, error)
 }
 
-func checkRanges(parent context.Context, client BalanceReader, cache BalanceCache, downloader Downloader, account common.Address, ranges [][]*big.Int) ([][]*big.Int, []*DBHeader, error) {
+// Returns new block ranges that contain transfers and found block headers that contain transfers.
+func checkRanges(parent context.Context, client BalanceReader, cache BalanceCache, downloader Downloader,
+	account common.Address, ranges [][]*big.Int) ([][]*big.Int, []*DBHeader, error) {
+
 	ctx, cancel := context.WithTimeout(parent, 30*time.Second)
 	defer cancel()
 
-	c := NewConcurrentDownloader(ctx)
+	c := NewConcurrentDownloader(ctx, NoThreadLimit)
 
 	for _, blocksRange := range ranges {
 		from := blocksRange[0]
@@ -167,7 +174,10 @@ func checkRanges(parent context.Context, client BalanceReader, cache BalanceCach
 	return c.GetRanges(), c.GetHeaders(), nil
 }
 
-func findBlocksWithEthTransfers(parent context.Context, client BalanceReader, cache BalanceCache, downloader Downloader, account common.Address, low, high *big.Int, noLimit bool) (from *big.Int, headers []*DBHeader, err error) {
+func findBlocksWithEthTransfers(parent context.Context, client BalanceReader, cache BalanceCache, downloader Downloader,
+	account common.Address, low, high *big.Int, noLimit bool) (from *big.Int, headers []*DBHeader, err error) {
+	log.Debug("findBlocksWithEthTranfers start", "account", account, "low", low, "high", high, "noLimit", noLimit)
+
 	ranges := [][]*big.Int{{low, high}}
 	minBlock := big.NewInt(low.Int64())
 	headers = []*DBHeader{}
@@ -176,7 +186,9 @@ func findBlocksWithEthTransfers(parent context.Context, client BalanceReader, ca
 		log.Debug("check blocks ranges", "lvl", lvl, "ranges len", len(ranges))
 		lvl++
 		newRanges, newHeaders, err := checkRanges(parent, client, cache, downloader, account, ranges)
+
 		if err != nil {
+			log.Info("check ranges end", "err", err)
 			return nil, nil, err
 		}
 
@@ -197,5 +209,6 @@ func findBlocksWithEthTransfers(parent context.Context, client BalanceReader, ca
 		ranges = newRanges
 	}
 
+	log.Debug("findBlocksWithEthTranfers end", "account", account, "minBlock", minBlock, "headers len", len(headers))
 	return minBlock, headers, err
 }

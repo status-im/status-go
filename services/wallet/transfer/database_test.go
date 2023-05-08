@@ -1,9 +1,7 @@
 package transfer
 
 import (
-	"io/ioutil"
 	"math/big"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,14 +13,11 @@ import (
 	"github.com/status-im/status-go/sqlite"
 )
 
-func setupTestDB(t *testing.T) (*Database, *Block, func()) {
-	tmpfile, err := ioutil.TempFile("", "wallet-tests-")
+func setupTestDB(t *testing.T) (*Database, *BlockDAO, func()) {
+	db, err := appdatabase.InitializeDB(sqlite.InMemoryPath, "wallet-tests", sqlite.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-tests", sqlite.ReducedKDFIterationsNumber)
-	require.NoError(t, err)
-	return NewDB(db), &Block{db}, func() {
+	return NewDB(db), &BlockDAO{db}, func() {
 		require.NoError(t, db.Close())
-		require.NoError(t, os.Remove(tmpfile.Name()))
 	}
 }
 
@@ -34,8 +29,8 @@ func TestDBGetHeaderByNumber(t *testing.T) {
 		Difficulty: big.NewInt(1),
 		Time:       1,
 	}
-	require.NoError(t, db.SaveHeaders(777, []*types.Header{header}, common.Address{1}))
-	rst, err := db.GetHeaderByNumber(777, header.Number)
+	require.NoError(t, db.saveHeaders(777, []*types.Header{header}, common.Address{1}))
+	rst, err := db.getHeaderByNumber(777, header.Number)
 	require.NoError(t, err)
 	require.Equal(t, header.Hash(), rst.Hash)
 }
@@ -43,7 +38,7 @@ func TestDBGetHeaderByNumber(t *testing.T) {
 func TestDBGetHeaderByNumberNoRows(t *testing.T) {
 	db, _, stop := setupTestDB(t)
 	defer stop()
-	rst, err := db.GetHeaderByNumber(777, big.NewInt(1))
+	rst, err := db.getHeaderByNumber(777, big.NewInt(1))
 	require.NoError(t, err)
 	require.Nil(t, rst)
 }
@@ -65,7 +60,7 @@ func TestDBProcessBlocks(t *testing.T) {
 		}}
 	t.Log(blocks)
 	nonce := int64(0)
-	lastBlock := &LastKnownBlock{
+	lastBlock := &Block{
 		Number:  to,
 		Balance: big.NewInt(0),
 		Nonce:   &nonce,
@@ -83,7 +78,7 @@ func TestDBProcessBlocks(t *testing.T) {
 			From:        common.Address{1},
 		},
 	}
-	require.NoError(t, db.SaveTransfers(777, address, transfers, []*big.Int{big.NewInt(1), big.NewInt(2)}))
+	require.NoError(t, db.SaveTransfersMarkBlocksLoaded(777, address, transfers, []*big.Int{big.NewInt(1), big.NewInt(2)}))
 }
 
 func TestDBProcessTransfer(t *testing.T) {
@@ -108,7 +103,7 @@ func TestDBProcessTransfer(t *testing.T) {
 		},
 	}
 	nonce := int64(0)
-	lastBlock := &LastKnownBlock{
+	lastBlock := &Block{
 		Number:  big.NewInt(0),
 		Balance: big.NewInt(0),
 		Nonce:   &nonce,
@@ -135,7 +130,7 @@ func TestDBReorgTransfers(t *testing.T) {
 	originalTX := types.NewTransaction(1, common.Address{1}, nil, 10, big.NewInt(10), nil)
 	replacedTX := types.NewTransaction(2, common.Address{1}, nil, 10, big.NewInt(10), nil)
 	nonce := int64(0)
-	lastBlock := &LastKnownBlock{
+	lastBlock := &Block{
 		Number:  original.Number,
 		Balance: big.NewInt(0),
 		Nonce:   &nonce,
@@ -145,7 +140,7 @@ func TestDBReorgTransfers(t *testing.T) {
 		{ethTransfer, common.Hash{1}, *originalTX.To(), original.Number, original.Hash, 100, originalTX, true, 1777, common.Address{1}, rcpt, nil, "2100", NoMultiTransactionID},
 	}, []*DBHeader{}))
 	nonce = int64(0)
-	lastBlock = &LastKnownBlock{
+	lastBlock = &Block{
 		Number:  replaced.Number,
 		Balance: big.NewInt(0),
 		Nonce:   &nonce,
@@ -188,7 +183,7 @@ func TestDBGetTransfersFromBlock(t *testing.T) {
 		transfers = append(transfers, transfer)
 	}
 	nonce := int64(0)
-	lastBlock := &LastKnownBlock{
+	lastBlock := &Block{
 		Number:  headers[len(headers)-1].Number,
 		Balance: big.NewInt(0),
 		Nonce:   &nonce,
