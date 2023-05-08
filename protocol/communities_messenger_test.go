@@ -108,6 +108,7 @@ func (s *MessengerCommunitiesSuite) newMessengerWithOptions(shh types.Waku, priv
 		KeyUID:                    "0x1122334455667788990011223344556677889900",
 		Name:                      "Test",
 		Networks:                  &networks,
+		LatestDerivedPath:         0,
 		PhotoPath:                 "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
 		PreviewPrivacy:            false,
 		PublicKey:                 "0x04112233445566778899001122334455667788990011223344556677889900112233445566778899001122334455667788990011223344556677889900",

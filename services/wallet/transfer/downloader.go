@@ -150,7 +150,7 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 	startTs := time.Now()
 
 	for _, address := range accounts {
-		preloadedTransfers, err := d.db.GetPreloadedTransactions(d.chainClient.ChainID, address, blk.Hash())
+		preloadedTransfers, err := d.db.GetPreloadedTransactions(d.chainClient.ChainID, address, blk.Number())
 		if err != nil {
 			return nil, err
 		}

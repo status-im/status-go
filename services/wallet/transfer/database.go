@@ -290,11 +290,11 @@ func (db *Database) GetTransfersForIdentities(ctx context.Context, identities []
 	return query.Scan(rows)
 }
 
-func (db *Database) GetPreloadedTransactions(chainID uint64, address common.Address, blockHash common.Hash) (rst []Transfer, err error) {
+func (db *Database) GetPreloadedTransactions(chainID uint64, address common.Address, blockNumber *big.Int) (rst []Transfer, err error) {
 	query := newTransfersQuery().
 		FilterNetwork(chainID).
 		FilterAddress(address).
-		FilterBlockHash(blockHash).
+		FilterBlockNumber(blockNumber).
 		FilterLoaded(0)
 
 	rows, err := db.client.Query(query.String(), query.Args()...)

@@ -29,6 +29,7 @@ var (
 		InstallationID:            "d3efcff6-cffa-560e-a547-21d3858cbc51",
 		KeyUID:                    "0x4e8129f3edfc004875be17bf468a784098a9f69b53c095be1f52deff286935ab",
 		BackupEnabled:             true,
+		LatestDerivedPath:         0,
 		Name:                      "Jittery Cornflowerblue Kingbird",
 		Networks:                  &networks,
 		PhotoPath:                 "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
