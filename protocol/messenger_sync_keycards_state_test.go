@@ -11,7 +11,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/keypairs"
+	"github.com/status-im/status-go/multiaccounts/keycards"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
@@ -91,7 +91,7 @@ func (s *MessengerSyncKeycardsStateSuite) newMessenger(shh types.Waku) *Messenge
 	return messenger
 }
 
-func sameKeycards(a, b *keypairs.KeyPair) bool {
+func sameKeycards(a, b *keycards.Keycard) bool {
 	same := a.KeycardUID == b.KeycardUID &&
 		a.KeyUID == b.KeyUID &&
 		a.KeycardName == b.KeycardName &&
@@ -118,8 +118,8 @@ func sameKeycards(a, b *keypairs.KeyPair) bool {
 	return same
 }
 
-func getKeycardsForTest() []*keypairs.KeyPair {
-	keyPair1 := keypairs.KeyPair{
+func getKeycardsForTest() []*keycards.Keycard {
+	keycard1 := keycards.Keycard{
 		KeycardUID:        "00000000000000000000000000000001",
 		KeycardName:       "Card01",
 		KeycardLocked:     false,
@@ -127,7 +127,7 @@ func getKeycardsForTest() []*keypairs.KeyPair {
 		KeyUID:            "0000000000000000000000000000000000000000000000000000000000000001",
 		LastUpdateClock:   100,
 	}
-	keyPair2 := keypairs.KeyPair{
+	keycard2 := keycards.Keycard{
 		KeycardUID:        "00000000000000000000000000000002",
 		KeycardName:       "Card02",
 		KeycardLocked:     false,
@@ -135,7 +135,7 @@ func getKeycardsForTest() []*keypairs.KeyPair {
 		KeyUID:            "0000000000000000000000000000000000000000000000000000000000000002",
 		LastUpdateClock:   200,
 	}
-	keyPair3 := keypairs.KeyPair{
+	keycard3 := keycards.Keycard{
 		KeycardUID:        "00000000000000000000000000000003",
 		KeycardName:       "Card02 Copy",
 		KeycardLocked:     false,
@@ -143,7 +143,7 @@ func getKeycardsForTest() []*keypairs.KeyPair {
 		KeyUID:            "0000000000000000000000000000000000000000000000000000000000000002",
 		LastUpdateClock:   300,
 	}
-	keyPair4 := keypairs.KeyPair{
+	keycard4 := keycards.Keycard{
 		KeycardUID:        "00000000000000000000000000000004",
 		KeycardName:       "Card04",
 		KeycardLocked:     false,
@@ -152,7 +152,7 @@ func getKeycardsForTest() []*keypairs.KeyPair {
 		LastUpdateClock:   400,
 	}
 
-	return []*keypairs.KeyPair{&keyPair1, &keyPair2, &keyPair3, &keyPair4}
+	return []*keycards.Keycard{&keycard1, &keycard2, &keycard3, &keycard4}
 }
 
 func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverHasNoKeycards() {
@@ -162,7 +162,7 @@ func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverHasNoKeycard
 	// Add keycards on sender
 	allKeycardsToSync := getKeycardsForTest()
 	for _, kp := range allKeycardsToSync {
-		addedKc, addedAccs, err := senderDb.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(*kp)
+		addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*kp)
 		s.Require().NoError(err)
 		s.Require().Equal(true, addedKc)
 		s.Require().Equal(false, addedAccs)
@@ -195,7 +195,7 @@ func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverHasKeycardsO
 	// Add keycards on sender
 	allKeycardsToSync := getKeycardsForTest()
 	for _, kp := range allKeycardsToSync {
-		addedKc, addedAccs, err := senderDb.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(*kp)
+		addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*kp)
 		s.Require().NoError(err)
 		s.Require().Equal(true, addedKc)
 		s.Require().Equal(false, addedAccs)
@@ -210,7 +210,7 @@ func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverHasKeycardsO
 	keycardsOnReceiver[1].LastUpdateClock = keycardsOnReceiver[1].LastUpdateClock - 1
 
 	for _, kp := range keycardsOnReceiver {
-		addedKc, addedAccs, err := dbOnReceiver.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(*kp)
+		addedKc, addedAccs, err := dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*kp)
 		s.Require().NoError(err)
 		s.Require().Equal(true, addedKc)
 		s.Require().Equal(false, addedAccs)
@@ -243,7 +243,7 @@ func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfKeycardsWereDeletedO
 	// Add keycards on sender
 	allKeycardsToSync := getKeycardsForTest()[:2]
 	for _, kp := range allKeycardsToSync {
-		addedKc, addedAccs, err := senderDb.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(*kp)
+		addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*kp)
 		s.Require().NoError(err)
 		s.Require().Equal(true, addedKc)
 		s.Require().Equal(false, addedAccs)
@@ -252,7 +252,7 @@ func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfKeycardsWereDeletedO
 	// Add keycards on receiver
 	keycardsOnReceiver := getKeycardsForTest()
 	for _, kp := range keycardsOnReceiver {
-		addedKc, addedAccs, err := dbOnReceiver.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(*kp)
+		addedKc, addedAccs, err := dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*kp)
 		s.Require().NoError(err)
 		s.Require().Equal(true, addedKc)
 		s.Require().Equal(false, addedAccs)
@@ -285,7 +285,7 @@ func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverHasNewerKeyc
 	// Add keycards on sender
 	allKeycardsToSync := getKeycardsForTest()[:2]
 	for _, kp := range allKeycardsToSync {
-		addedKc, addedAccs, err := senderDb.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(*kp)
+		addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*kp)
 		s.Require().NoError(err)
 		s.Require().Equal(true, addedKc)
 		s.Require().Equal(false, addedAccs)
@@ -299,7 +299,7 @@ func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverHasNewerKeyc
 	keycardsOnReceiver[3].KeycardName = "NewerCardName-3"
 	keycardsOnReceiver[3].LastUpdateClock = clock + 1000
 	for _, kp := range keycardsOnReceiver {
-		addedKc, addedAccs, err := dbOnReceiver.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(*kp)
+		addedKc, addedAccs, err := dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*kp)
 		s.Require().NoError(err)
 		s.Require().Equal(true, addedKc)
 		s.Require().Equal(false, addedAccs)
@@ -337,7 +337,7 @@ func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverAndSenderHas
 	// Add keycards on sender
 	allKeycardsToSync := getKeycardsForTest()[:2]
 	for _, kp := range allKeycardsToSync {
-		addedKc, addedAccs, err := senderDb.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(*kp)
+		addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*kp)
 		s.Require().NoError(err)
 		s.Require().Equal(true, addedKc)
 		s.Require().Equal(false, addedAccs)
@@ -352,7 +352,7 @@ func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverAndSenderHas
 	keycardsOnReceiver[1].LastUpdateClock = clock + 1000
 
 	for _, kp := range keycardsOnReceiver {
-		addedKc, addedAccs, err := dbOnReceiver.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(*kp)
+		addedKc, addedAccs, err := dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*kp)
 		s.Require().NoError(err)
 		s.Require().Equal(true, addedKc)
 		s.Require().Equal(false, addedAccs)
@@ -390,7 +390,7 @@ func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverHasNewerKeyc
 	// Add keycards on sender
 	allKeycardsToSync := getKeycardsForTest()
 	for _, kp := range allKeycardsToSync {
-		addedKc, addedAccs, err := senderDb.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(*kp)
+		addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*kp)
 		s.Require().NoError(err)
 		s.Require().Equal(true, addedKc)
 		s.Require().Equal(false, addedAccs)
@@ -405,7 +405,7 @@ func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverHasNewerKeyc
 	keycardsOnReceiver[1].LastUpdateClock = clock + 1000
 
 	for _, kp := range keycardsOnReceiver {
-		addedKc, addedAccs, err := dbOnReceiver.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(*kp)
+		addedKc, addedAccs, err := dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*kp)
 		s.Require().NoError(err)
 		s.Require().Equal(true, addedKc)
 		s.Require().Equal(false, addedAccs)

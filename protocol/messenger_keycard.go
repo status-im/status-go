@@ -6,7 +6,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/keypairs"
+	"github.com/status-im/status-go/multiaccounts/keycards"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -69,15 +69,15 @@ func (m *Messenger) syncAllKeycards(ctx context.Context, rawMessageHandler RawMe
 	return m.saveChat(chat)
 }
 
-func (m *Messenger) syncReceivedKeycards(syncMessage protobuf.SyncAllKeycards) ([]*keypairs.KeyPair, error) {
-	var keypairsToSync []*keypairs.KeyPair
+func (m *Messenger) syncReceivedKeycards(syncMessage protobuf.SyncAllKeycards) ([]*keycards.Keycard, error) {
+	var keycardsToSync []*keycards.Keycard
 	for _, syncKc := range syncMessage.Keycards {
-		var kp = &keypairs.KeyPair{}
+		var kp = &keycards.Keycard{}
 		kp.FromSyncKeycard(syncKc)
-		keypairsToSync = append(keypairsToSync, kp)
+		keycardsToSync = append(keycardsToSync, kp)
 	}
 
-	err := m.settings.SyncKeycards(syncMessage.Clock, keypairsToSync)
+	err := m.settings.SyncKeycards(syncMessage.Clock, keycardsToSync)
 	if err != nil {
 		return nil, err
 	}
@@ -131,17 +131,17 @@ func (m *Messenger) dispatchKeycardActivity(ctx context.Context, syncMessage pro
 
 func (m *Messenger) handleSyncKeycardActivity(state *ReceivedMessageState, syncMessage protobuf.SyncKeycardAction) (err error) {
 
-	var kcAction = &keypairs.KeycardAction{
+	var kcAction = &keycards.KeycardAction{
 		Action:        protobuf.SyncKeycardAction_Action_name[int32(syncMessage.Action)],
 		OldKeycardUID: syncMessage.OldKeycardUid,
-		Keycard:       &keypairs.KeyPair{},
+		Keycard:       &keycards.Keycard{},
 	}
 	kcAction.Keycard.FromSyncKeycard(syncMessage.Keycard)
 
 	switch syncMessage.Action {
 	case protobuf.SyncKeycardAction_KEYCARD_ADDED,
 		protobuf.SyncKeycardAction_ACCOUNTS_ADDED:
-		_, _, err = m.settings.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(*kcAction.Keycard)
+		_, _, err = m.settings.AddKeycardOrAddAccountsIfKeycardIsAdded(*kcAction.Keycard)
 	case protobuf.SyncKeycardAction_KEYCARD_DELETED:
 		err = m.settings.DeleteKeycard(kcAction.Keycard.KeycardUID, kcAction.Keycard.LastUpdateClock)
 	case protobuf.SyncKeycardAction_ACCOUNTS_REMOVED:
@@ -170,8 +170,8 @@ func (m *Messenger) handleSyncKeycardActivity(state *ReceivedMessageState, syncM
 	return nil
 }
 
-func (m *Messenger) AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(ctx context.Context, kp *keypairs.KeyPair) (added bool, err error) {
-	addedKc, addedAccs, err := m.settings.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(*kp)
+func (m *Messenger) AddKeycardOrAddAccountsIfKeycardIsAdded(ctx context.Context, kp *keycards.Keycard) (added bool, err error) {
+	addedKc, addedAccs, err := m.settings.AddKeycardOrAddAccountsIfKeycardIsAdded(*kp)
 	if err != nil {
 		return addedKc || addedAccs, err
 	}

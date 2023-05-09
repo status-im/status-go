@@ -732,7 +732,7 @@ func (s *MessengerBackupSuite) TestBackupKeycards() {
 	bob1 := s.m
 	allKeycardsToSync := getKeycardsForTest()
 	for _, kp := range allKeycardsToSync {
-		addedKc, addedAccs, err := bob1.settings.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(*kp)
+		addedKc, addedAccs, err := bob1.settings.AddKeycardOrAddAccountsIfKeycardIsAdded(*kp)
 		s.Require().NoError(err)
 		s.Require().Equal(true, addedKc)
 		s.Require().Equal(false, addedAccs)
