@@ -66,6 +66,7 @@ message DeleteMessage {
 message DeleteForMeMessage {
   uint64 clock = 1;
   string message_id = 2;
+  string chat_id = 3;
 }
 
 message DiscordMessage {
