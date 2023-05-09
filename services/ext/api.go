@@ -1096,6 +1096,10 @@ func (api *PublicAPI) EnsVerified(pk, ensName string) error {
 	return api.service.messenger.ENSVerified(pk, ensName)
 }
 
+func (api *PublicAPI) ReverseResolveENS(walletAddresses []string) ([]string, error) {
+	return api.service.messenger.ReverseResolveENS(walletAddresses)
+}
+
 func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) (*communities.Community, error) {
 	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID, true)
 }

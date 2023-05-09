@@ -1517,7 +1517,7 @@ func (m *Manager) checkPermissionToJoin(permissions []*protobuf.CommunityTokenPe
 		return false, err
 	}
 
-	ownedENSNames, err := m.getOwnedENS(walletAddresses)
+	ownedENSNames, err := m.GetOwnedENS(walletAddresses)
 	if err != nil {
 		return false, err
 	}
@@ -1733,7 +1733,7 @@ func (m *Manager) getAccumulatedTokenBalances(accounts []gethcommon.Address, tok
 	return accumulatedBalances, nil
 }
 
-func (m *Manager) getOwnedENS(addresses []gethcommon.Address) ([]string, error) {
+func (m *Manager) GetOwnedENS(addresses []gethcommon.Address) ([]string, error) {
 	ownedENS := make([]string, 0)
 	for _, address := range addresses {
 		name, err := m.ensVerifier.ReverseResolve(address)

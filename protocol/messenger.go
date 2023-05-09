@@ -6225,6 +6225,14 @@ func (m *Messenger) getEnsUsernameDetails() (result []*ensservice.UsernameDetail
 	return db.GetEnsUsernames(nil)
 }
 
+func (m *Messenger) ReverseResolveENS(addresses []string) ([]string, error) {
+	walletAddresses := make([]gethcommon.Address, 0)
+	for _, address := range addresses {
+		walletAddresses = append(walletAddresses, gethcommon.HexToAddress(address))
+	}
+	return m.communitiesManager.GetOwnedENS(walletAddresses)
+}
+
 func (m *Messenger) handleSyncBookmark(state *ReceivedMessageState, message protobuf.SyncBookmark) error {
 	bookmark := &browsers.Bookmark{
 		URL:      message.Url,
