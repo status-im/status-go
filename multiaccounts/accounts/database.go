@@ -9,7 +9,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
-	"github.com/status-im/status-go/multiaccounts/keypairs"
+	"github.com/status-im/status-go/multiaccounts/keycards"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	notificationssettings "github.com/status-im/status-go/multiaccounts/settings_notifications"
 	sociallinkssettings "github.com/status-im/status-go/multiaccounts/settings_social_links"
@@ -112,7 +112,7 @@ type Database struct {
 	*settings.Database
 	*notificationssettings.NotificationsSettings
 	*sociallinkssettings.SocialLinksSettings
-	*keypairs.KeyPairs
+	*keycards.Keycards
 	db *sql.DB
 }
 
@@ -124,7 +124,7 @@ func NewDB(db *sql.DB) (*Database, error) {
 	}
 	sn := notificationssettings.NewNotificationsSettings(db)
 	ssl := sociallinkssettings.NewSocialLinksSettings(db)
-	kp := keypairs.NewKeyPairs(db)
+	kp := keycards.NewKeycards(db)
 
 	err = updateKeypairNameAndLastDerivationIndexIfNeeded(db)
 	if err != nil {

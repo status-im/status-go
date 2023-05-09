@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/keypairs"
+	"github.com/status-im/status-go/multiaccounts/keycards"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -75,8 +75,8 @@ type MessengerResponse struct {
 	trustStatus                 map[string]verification.TrustStatus
 	emojiReactions              map[string]*EmojiReaction
 	savedAddresses              map[string]*wallet.SavedAddress
-	keycards                    []*keypairs.KeyPair
-	keycardActions              []*keypairs.KeycardAction
+	keycards                    []*keycards.Keycard
+	keycardActions              []*keycards.KeycardAction
 	socialLinkSettings          []*identity.SocialLink
 	ensUsernameDetails          []*ensservice.UsernameDetail
 }
@@ -117,8 +117,8 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DiscordMessages               []*protobuf.DiscordMessage           `json:"discordMessages,omitempty"`
 		DiscordMessageAttachments     []*protobuf.DiscordMessageAttachment `json:"discordMessageAtachments,omitempty"`
 		SavedAddresses                []*wallet.SavedAddress               `json:"savedAddresses,omitempty"`
-		Keycards                      []*keypairs.KeyPair                  `json:"keycards,omitempty"`
-		KeycardActions                []*keypairs.KeycardAction            `json:"keycardActions,omitempty"`
+		Keycards                      []*keycards.Keycard                  `json:"keycards,omitempty"`
+		KeycardActions                []*keycards.KeycardAction            `json:"keycardActions,omitempty"`
 		SocialLinkSettings            []*identity.SocialLink               `json:"socialLinkSettings,omitempty"`
 		EnsUsernameDetails            []*ensservice.UsernameDetail         `json:"ensUsernameDetails,omitempty"`
 	}{
@@ -460,23 +460,23 @@ func (r *MessengerResponse) SavedAddresses() []*wallet.SavedAddress {
 	return ers
 }
 
-func (r *MessengerResponse) AddAllKnownKeycards(keycards []*keypairs.KeyPair) {
+func (r *MessengerResponse) AddAllKnownKeycards(keycards []*keycards.Keycard) {
 	r.keycards = append(r.keycards, keycards...)
 }
 
-func (r *MessengerResponse) AllKnownKeycards() []*keypairs.KeyPair {
+func (r *MessengerResponse) AllKnownKeycards() []*keycards.Keycard {
 	return r.keycards
 }
 
-func (r *MessengerResponse) AddKeycardAction(keycardAction *keypairs.KeycardAction) {
+func (r *MessengerResponse) AddKeycardAction(keycardAction *keycards.KeycardAction) {
 	r.keycardActions = append(r.keycardActions, keycardAction)
 }
 
-func (r *MessengerResponse) AddKeycardActions(keycardActions []*keypairs.KeycardAction) {
+func (r *MessengerResponse) AddKeycardActions(keycardActions []*keycards.KeycardAction) {
 	r.keycardActions = append(r.keycardActions, keycardActions...)
 }
 
-func (r *MessengerResponse) KeycardActions() []*keypairs.KeycardAction {
+func (r *MessengerResponse) KeycardActions() []*keycards.KeycardAction {
 	return r.keycardActions
 }
 

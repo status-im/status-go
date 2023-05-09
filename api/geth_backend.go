@@ -29,7 +29,7 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/keypairs"
+	"github.com/status-im/status-go/multiaccounts/keycards"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/nodecfg"
@@ -643,7 +643,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 			return err
 		}
 
-		kp := keypairs.KeyPair{
+		kc := keycards.Keycard{
 			KeycardUID:      keycardUID,
 			KeycardName:     displayName,
 			KeycardLocked:   false,
@@ -652,14 +652,14 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 		}
 
 		for _, acc := range relatedAccounts {
-			kp.AccountsAddresses = append(kp.AccountsAddresses, acc.Address)
+			kc.AccountsAddresses = append(kc.AccountsAddresses, acc.Address)
 		}
-		addedKc, _, err := accountDB.AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(kp)
+		addedKc, _, err := accountDB.AddKeycardOrAddAccountsIfKeycardIsAdded(kc)
 		if err != nil {
 			return err
 		}
 		if !addedKc {
-			return errors.New("couldn't register a keypair to keycards table")
+			return errors.New("couldn't register a keycard to keycards table")
 		}
 	}
 
@@ -688,7 +688,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 		return err
 	}
 
-	// We need to delete all accounts for the keypair which is being migrated
+	// We need to delete all accounts for the Keycard which is being added
 	for _, acc := range relatedAccounts {
 		err = b.accountManager.DeleteAccount(acc.Address)
 		if err != nil {
@@ -912,7 +912,7 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 		return err
 	}
 
-	err = db.DeleteKeypair(accountInfo.KeyUID)
+	err = db.DeleteAllKeycardsWithKeyUID(accountInfo.KeyUID)
 	if err != nil {
 		return err
 	}

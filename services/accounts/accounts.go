@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/keypairs"
+	"github.com/status-im/status-go/multiaccounts/keycards"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 )
@@ -93,12 +93,12 @@ func (api *API) DeleteAccount(ctx context.Context, address types.Address) error 
 	lastAcccountOfKeypairWithTheSameKey := len(allAccountsOfKeypairWithKeyUID) == 1
 
 	if acc.Type != accounts.AccountTypeWatch {
-		migratedKeyPairs, err := api.db.GetMigratedKeyPairByKeyUID(acc.KeyUID)
+		knownKeycardsForKeyUID, err := api.db.GetKeycardByKeyUID(acc.KeyUID)
 		if err != nil {
 			return err
 		}
 
-		if len(migratedKeyPairs) == 0 {
+		if len(knownKeycardsForKeyUID) == 0 {
 			err = api.manager.DeleteAccount(address)
 			var e *account.ErrCannotLocateKeyFile
 			if err != nil && !errors.As(err, &e) {
@@ -269,7 +269,7 @@ func (api *API) VerifyPassword(password string) bool {
 	return api.VerifyKeystoreFileForAccount(address, password)
 }
 
-func (api *API) AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(ctx context.Context, kcUID string, kpName string, keyUID string, accountAddresses []string) error {
+func (api *API) AddKeycardOrAddAccountsIfKeycardIsAdded(ctx context.Context, kcUID string, kpName string, keyUID string, accountAddresses []string) error {
 	if len(accountAddresses) == 0 {
 		return errors.New("cannot migrate a keypair without any address")
 	}
@@ -283,7 +283,7 @@ func (api *API) AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(ctx context.Cont
 		return errors.New("an account being migrated doesn't contain `derived_from` field set")
 	}
 
-	kp := keypairs.KeyPair{
+	kp := keycards.Keycard{
 		KeycardUID:      kcUID,
 		KeycardName:     kpName,
 		KeycardLocked:   false,
@@ -294,19 +294,19 @@ func (api *API) AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(ctx context.Cont
 		kp.AccountsAddresses = append(kp.AccountsAddresses, types.Address(common.HexToAddress(addr)))
 	}
 
-	migratedKeyPairs, err := api.db.GetMigratedKeyPairByKeyUID(keyUID)
+	knownKeycardsForKeyUID, err := api.db.GetKeycardByKeyUID(keyUID)
 	if err != nil {
 		return err
 	}
 
-	added, err := (*api.messenger).AddMigratedKeyPairOrAddAccountsIfKeyPairIsAdded(ctx, &kp)
+	added, err := (*api.messenger).AddKeycardOrAddAccountsIfKeycardIsAdded(ctx, &kp)
 	if err != nil {
 		return err
 	}
 
 	// Once we migrate a keypair, corresponding keystore files need to be deleted
 	// if the keypair being migrated is not already migrated (in case user is creating a copy of an existing Keycard)
-	if added && len(migratedKeyPairs) == 0 && acc.Type != accounts.AccountTypeWatch {
+	if added && len(knownKeycardsForKeyUID) == 0 && acc.Type != accounts.AccountTypeWatch {
 		for _, addr := range kp.AccountsAddresses {
 			err = api.manager.DeleteAccount(addr)
 			if err != nil {
@@ -332,16 +332,16 @@ func (api *API) RemoveMigratedAccountsForKeycard(ctx context.Context, kcUID stri
 	return (*api.messenger).RemoveMigratedAccountsForKeycard(ctx, kcUID, addresses, clock)
 }
 
-func (api *API) GetAllKnownKeycards(ctx context.Context) ([]*keypairs.KeyPair, error) {
+func (api *API) GetAllKnownKeycards(ctx context.Context) ([]*keycards.Keycard, error) {
 	return api.db.GetAllKnownKeycards()
 }
 
-func (api *API) GetAllMigratedKeyPairs(ctx context.Context) ([]*keypairs.KeyPair, error) {
-	return api.db.GetAllMigratedKeyPairs()
+func (api *API) GetAllKnownKeycardsGroupedByKeyUID(ctx context.Context) ([]*keycards.Keycard, error) {
+	return api.db.GetAllKnownKeycardsGroupedByKeyUID()
 }
 
-func (api *API) GetMigratedKeyPairByKeyUID(ctx context.Context, keyUID string) ([]*keypairs.KeyPair, error) {
-	return api.db.GetMigratedKeyPairByKeyUID(keyUID)
+func (api *API) GetKeycardByKeyUID(ctx context.Context, keyUID string) ([]*keycards.Keycard, error) {
+	return api.db.GetKeycardByKeyUID(keyUID)
 }
 
 func (api *API) SetKeycardName(ctx context.Context, kcUID string, kpName string) error {
@@ -364,8 +364,8 @@ func (api *API) DeleteKeycard(ctx context.Context, kcUID string) error {
 	return (*api.messenger).DeleteKeycard(ctx, kcUID, clock)
 }
 
-func (api *API) DeleteKeypair(ctx context.Context, keyUID string) error {
-	return api.db.DeleteKeypair(keyUID)
+func (api *API) DeleteAllKeycardsWithKeyUID(ctx context.Context, keyUID string) error {
+	return api.db.DeleteAllKeycardsWithKeyUID(keyUID)
 }
 
 func (api *API) UpdateKeycardUID(ctx context.Context, oldKcUID string, newKcUID string) error {

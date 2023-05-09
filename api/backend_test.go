@@ -934,9 +934,9 @@ func TestConvertAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check that there is no registered keycards
-	keycardKeyPairs, err := db.GetMigratedKeyPairByKeyUID(genAccInfo.KeyUID)
+	keycards, err := db.GetKeycardByKeyUID(genAccInfo.KeyUID)
 	require.NoError(t, err)
-	require.Equal(t, 0, len(keycardKeyPairs))
+	require.Equal(t, 0, len(keycards))
 
 	// Converting to a keycard account
 	err = backend.ConvertToKeycardAccount(keycardAccount, keycardSettings, keycardUID, password, keycardPassword)
@@ -961,9 +961,9 @@ func TestConvertAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check that there is a registered keycard
-	keycardKeyPairs, err = db1.GetMigratedKeyPairByKeyUID(genAccInfo.KeyUID)
+	keycards, err = db1.GetKeycardByKeyUID(genAccInfo.KeyUID)
 	require.NoError(t, err)
-	require.Equal(t, 1, len(keycardKeyPairs))
+	require.Equal(t, 1, len(keycards))
 
 	b1 := NewGethStatusBackend()
 	require.NoError(t, b1.OpenAccounts())
@@ -994,9 +994,9 @@ func TestConvertAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check that there is no registered keycards
-	keycardKeyPairs, err = db2.GetMigratedKeyPairByKeyUID(genAccInfo.KeyUID)
+	keycards, err = db2.GetKeycardByKeyUID(genAccInfo.KeyUID)
 	require.NoError(t, err)
-	require.Equal(t, 0, len(keycardKeyPairs))
+	require.Equal(t, 0, len(keycards))
 
 	b2 := NewGethStatusBackend()
 	require.NoError(t, b2.OpenAccounts())
