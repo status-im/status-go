@@ -1770,7 +1770,7 @@ func handleContactRequestChatMessage(receivedMessage *common.Message, contact *C
 	return response.newContactRequestReceived, nil
 }
 
-func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
+func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen bool) error {
 	logger := m.logger.With(zap.String("site", "handleChatMessage"))
 	if err := ValidateReceivedChatMessage(&state.CurrentMessageState.Message, state.CurrentMessageState.WhisperTimestamp); err != nil {
 		logger.Warn("failed to validate message", zap.Error(err))
@@ -1789,7 +1789,7 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	// is the message coming from us?
 	isSyncMessage := common.IsPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey)
 
-	if isSyncMessage {
+	if forceSeen || isSyncMessage {
 		receivedMessage.Seen = true
 	}
 
@@ -2024,6 +2024,14 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 	state.Response.AddMessage(receivedMessage)
 
 	return nil
+}
+
+func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
+	return m.handleChatMessage(state, false)
+}
+
+func (m *Messenger) HandleImportedChatMessage(state *ReceivedMessageState) error {
+	return m.handleChatMessage(state, true)
 }
 
 func (m *Messenger) addActivityCenterNotification(response *MessengerResponse, notification *ActivityCenterNotification) error {
