@@ -3325,7 +3325,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 						logger.Debug("Handling ChatMessage")
 						messageState.CurrentMessageState.Message = msg.ParsedMessage.Interface().(protobuf.ChatMessage)
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, messageState.CurrentMessageState.Message)
-						err = m.HandleChatMessage(messageState)
+						err = m.HandleImportedChatMessage(messageState)
 						if err != nil {
 							logger.Warn("failed to handle ChatMessage", zap.Error(err))
 							continue
