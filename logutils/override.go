@@ -52,6 +52,11 @@ func OverrideRootLog(enabled bool, levelStr string, fileOpts FileOptions, termin
 		handler log.Handler
 	)
 	if fileOpts.Filename != "" {
+		if fileOpts.MaxBackups == 0 {
+			// Setting MaxBackups to 0 causes all log files to be kept. Even setting MaxAge to > 0 doesn't fix it
+			// Docs: https://pkg.go.dev/gopkg.in/natefinch/lumberjack.v2@v2.0.0#readme-cleaning-up-old-log-files
+			fileOpts.MaxBackups = 1
+		}
 		handler = FileHandlerWithRotation(fileOpts, log.LogfmtFormat())
 	} else {
 		handler = log.StreamHandler(os.Stderr, log.TerminalFormat(terminal))
