@@ -1169,7 +1169,46 @@ func TestSaveLinks(t *testing.T) {
 	require.Len(t, retrievedMessages, 1)
 	require.Len(t, retrievedMessages[0].Links, 1)
 	require.Equal(t, retrievedMessages[0].Links, message.Links)
+}
 
+func TestSaveWithUnfurledLinks(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+	require.NoError(t, err)
+
+	chatID := testPublicChatID
+	message := common.Message{
+		ID:          "1",
+		LocalChatID: chatID,
+		From:        testPK,
+		ChatMessage: protobuf.ChatMessage{
+			Text: "some-text",
+			UnfurledLinks: []*protobuf.UnfurledLink{
+				{
+					Url:              "https://github.com",
+					Title:            "Build software better, together",
+					Description:      "GitHub is where people build software.",
+					ThumbnailPayload: []byte("abc"),
+				},
+				{
+					Url:              "https://www.youtube.com/watch?v=mzOyYtfXkb0",
+					Title:            "Status Town Hall #67 - 12 October 2020",
+					Description:      "",
+					ThumbnailPayload: []byte("def"),
+				},
+			},
+		},
+	}
+
+	err = p.SaveMessages([]*common.Message{&message})
+	require.NoError(t, err)
+
+	mgs, _, err := p.MessageByChatID(chatID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, mgs, 1)
+	require.Len(t, mgs[0].UnfurledLinks, 2)
+	require.Equal(t, mgs[0].UnfurledLinks, message.UnfurledLinks)
 }
 
 func TestHideMessage(t *testing.T) {

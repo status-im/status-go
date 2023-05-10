@@ -2106,6 +2106,15 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		}
 	}
 
+	unfurledLinks, err := message.ConvertLinkPreviewsToProto()
+	// We consider link previews non-critical data, so we do not want to block
+	// messages from being sent.
+	if err != nil {
+		m.logger.Error("failed to convert link previews", zap.Error(err))
+	} else {
+		message.UnfurledLinks = unfurledLinks
+	}
+
 	var response MessengerResponse
 
 	// A valid added chat is required.
@@ -4780,6 +4789,8 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 	if msg.ContentType == protobuf.ChatMessage_STICKER {
 		msg.StickerLocalURL = s.MakeStickerURL(msg.GetSticker().Hash)
 	}
+
+	msg.LinkPreviews = msg.ConvertFromProtoToLinkPreviews(s.MakeLinkPreviewThumbnailURL)
 }
 
 func (m *Messenger) AllMessageByChatIDWhichMatchTerm(chatID string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {

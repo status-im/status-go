@@ -115,6 +115,16 @@ func (s *ServerURLSuite) TestServer_MakeImageURL() {
 		s.serverNoPort.MakeImageURL("0x10aded70ffee"))
 }
 
+func (s *ServerURLSuite) TestServer_MakeLinkPreviewThumbnailURL() {
+	s.Require().Equal(
+		baseURLWithCustomPort+"/link-preview/thumbnail?message-id=99&url=https%3A%2F%2Fgithub.com",
+		s.server.MakeLinkPreviewThumbnailURL("99", "https://github.com"))
+
+	s.testNoPort(
+		baseURLWithDefaultPort+"/link-preview/thumbnail?message-id=99&url=https%3A%2F%2Fgithub.com",
+		s.serverNoPort.MakeLinkPreviewThumbnailURL("99", "https://github.com"))
+}
+
 func (s *ServerURLSuite) TestServer_MakeAudioURL() {
 	s.Require().Equal(
 		baseURLWithCustomPort+"/messages/audio?messageId=0xde1e7ebee71e",

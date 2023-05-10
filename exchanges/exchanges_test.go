@@ -3,8 +3,9 @@ package exchanges
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
 func TestNullAddress(t *testing.T) {
