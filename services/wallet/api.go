@@ -19,6 +19,8 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
+
+	wallet_common "github.com/status-im/status-go/services/wallet/common"
 )
 
 func NewAPI(s *Service) *API {
@@ -247,7 +249,7 @@ func (api *API) GetPendingTransactionsForIdentities(ctx context.Context, identit
 	result = make([]*transfer.PendingTransaction, 0, len(identities))
 	var pt *transfer.PendingTransaction
 	for _, identity := range identities {
-		pt, err = api.s.transactionManager.GetPendingEntry(identity.ChainID, identity.Hash)
+		pt, err = api.s.transactionManager.GetPendingEntry(uint64(identity.ChainID), identity.Hash)
 		result = append(result, pt)
 	}
 
@@ -525,7 +527,7 @@ func (api *API) FetchAllCurrencyFormats() (currency.FormatPerSymbol, error) {
 	return api.s.currency.FetchAllCurrencyFormats()
 }
 
-func (api *API) GetActivityEntries(addresses []common.Address, chainIDs []uint64, filter activity.Filter, offset int, limit int) ([]activity.Entry, error) {
+func (api *API) GetActivityEntries(addresses []common.Address, chainIDs []wallet_common.ChainID, filter activity.Filter, offset int, limit int) ([]activity.Entry, error) {
 	log.Debug("call to GetActivityEntries")
 	return activity.GetActivityEntries(api.s.db, addresses, chainIDs, filter, offset, limit)
 }
