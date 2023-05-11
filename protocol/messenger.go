@@ -2481,6 +2481,10 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		return err
 	}
 
+	if err = m.syncDeleteForMeMessage(ctx, rawMessageHandler); err != nil {
+		return err
+	}
+
 	return m.syncSocialSettings(ctx, rawMessageHandler)
 }
 
@@ -3606,14 +3610,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, deleteForMeProto)
-						deleteForMeMessage := DeleteForMeMessage{
-							DeleteForMeMessage: deleteForMeProto,
-							From:               contact.ID,
-							ID:                 messageID,
-							SigPubKey:          publicKey,
-						}
 
-						err = m.HandleDeleteForMeMessage(messageState, deleteForMeMessage)
+						err = m.HandleDeleteForMeMessage(messageState, deleteForMeProto)
 						if err != nil {
 							logger.Warn("failed to handle DeleteForMeMessage", zap.Error(err))
 							allMessagesProcessed = false
@@ -6413,6 +6411,32 @@ func (m *Messenger) withChatClock(callback func(string, uint64) error) error {
 	}
 	chat.LastClockValue = clock
 	return m.saveChat(chat)
+}
+
+func (m *Messenger) syncDeleteForMeMessage(ctx context.Context, rawMessageDispatcher RawMessageHandler) error {
+	deleteForMes, err := m.persistence.GetDeleteForMes()
+	if err != nil {
+		return err
+	}
+
+	err = m.withChatClock(func(chatID string, clock uint64) error {
+		for _, deleteForMe := range deleteForMes {
+			encodedMessage, err2 := proto.Marshal(deleteForMe)
+			if err2 != nil {
+				return err2
+			}
+			rawMessage := common.RawMessage{
+				LocalChatID:         chatID,
+				Payload:             encodedMessage,
+				MessageType:         protobuf.ApplicationMetadataMessage_SYNC_DELETE_FOR_ME_MESSAGE,
+				ResendAutomatically: true,
+			}
+			_, err2 = rawMessageDispatcher(ctx, rawMessage)
+			return err2
+		}
+		return nil
+	})
+	return err
 }
 
 func (m *Messenger) syncSocialSettings(ctx context.Context, rawMessageDispatcher RawMessageHandler) error {

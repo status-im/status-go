@@ -247,6 +247,17 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				m.logger.Error("failed to handleSyncEnsUsernameDetail when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
+		case protobuf.ApplicationMetadataMessage_SYNC_DELETE_FOR_ME_MESSAGE:
+			var message protobuf.DeleteForMeMessage
+			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			if err != nil {
+				return err
+			}
+			err = m.HandleDeleteForMeMessage(state, message)
+			if err != nil {
+				m.logger.Error("failed to HandleDeleteForMeMessage when HandleSyncRawMessages", zap.Error(err))
+				continue
+			}
 		case protobuf.ApplicationMetadataMessage_PAIR_INSTALLATION:
 			var message protobuf.PairInstallation
 			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
