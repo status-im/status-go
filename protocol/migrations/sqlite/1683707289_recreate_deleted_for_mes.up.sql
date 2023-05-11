@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS user_messages_deleted_for_mes_bk (
     PRIMARY KEY (message_id)
 );
 
-INSERT INTO user_messages_deleted_for_mes_bk SELECT clock, message_id FROM user_messages_deleted_for_mes;
+INSERT OR REPLACE INTO user_messages_deleted_for_mes_bk SELECT clock, message_id FROM user_messages_deleted_for_mes;
 
 DROP TABLE user_messages_deleted_for_mes;
 
