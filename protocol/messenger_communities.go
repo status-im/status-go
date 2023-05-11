@@ -4205,3 +4205,49 @@ func chunkAttachmentsByByteSize(slice []*protobuf.DiscordMessageAttachment, maxF
 	}
 	return chunks
 }
+
+// startCommunityRekeyLoop starts a loop function for each community the user is an admin of.
+func (m *Messenger) startCommunityRekeyLoop() error {
+	logger := m.logger.Named("CommunityRekeyLoop")
+
+	rekeyInterval := time.Hour
+
+	ticker := time.NewTicker(rekeyInterval)
+
+	cs, err := m.Communities()
+	if err != nil {
+		return err
+	}
+
+	for _, c := range cs {
+		if c.IsAdmin() && c.Encrypted() {
+			// get last rekey timestamp
+			c.config.RekeyedAt.Before(time.Now().Add(rekeyInterval))
+
+			// if rekey time period exceeded perform a rekey and set new last rekey timestamp to now
+
+			go func() {
+				logger.Debug("CommunityRekeyLoop started", zap.Binary("community ID", c.ID()))
+				for {
+					select {
+					case <-ticker.C:
+						// Rekey
+						err = m.SendKeyExchangeMessage(c.ID(), c.GetMemberPubkeys(), common.KeyExMsgRekey)
+						if err != nil {
+							logger.Error("error sending rekey message", zap.Error(err), zap.Binary("community ID", c.ID()))
+						}
+
+						// update rekey timestamp
+
+					case <-m.quit:
+						ticker.Stop()
+						logger.Debug("CommunityRekeyLoop stopped", zap.Binary("community ID", c.ID()))
+						return
+					}
+				}
+			}()
+		}
+	}
+
+	return nil
+}
