@@ -3551,6 +3551,8 @@ func (m *Messenger) SetCommunityEncryption(communityID string, useEncryption boo
 		return nil, err
 	}
 
+	m.communitiesManager.All()
+
 	// Check useEncryption is different to Community's value
 	// If not different return
 	if c.Encrypted() == useEncryption {
@@ -3559,6 +3561,8 @@ func (m *Messenger) SetCommunityEncryption(communityID string, useEncryption boo
 
 	if useEncryption {
 		// 🪄 The magic that encrypts a community
+		// TODO check if there are any existing keys. Don't just make some new keys
+		//  m.encryptor.GetKeyExMessageSpecs()
 		_, err = m.encryptor.GenerateHashRatchetKey(c.ID())
 		if err != nil {
 			return nil, err
