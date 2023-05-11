@@ -10,7 +10,10 @@ import (
 	"encoding/pem"
 	"math/big"
 	"net"
+	"net/http"
 	"time"
+
+	"github.com/status-im/status-go/images"
 )
 
 var globalCertificate *tls.Certificate = nil
@@ -83,6 +86,12 @@ func generateTLSCert() error {
 		return err
 	}
 
+	caCertPool, err := x509.SystemCertPool()
+	if err != nil {
+		return err
+	}
+	caCertPool.AppendCertsFromPEM(certPem)
+
 	finalCert, err := tls.X509KeyPair(certPem, keyPem)
 	if err != nil {
 		return err
@@ -90,6 +99,16 @@ func generateTLSCert() error {
 
 	globalCertificate = &finalCert
 	globalPem = string(certPem)
+
+	tlsConfig := &tls.Config{
+		RootCAs:    caCertPool,
+		MinVersion: tls.VersionTLS12,
+	}
+
+	images.DefaultClient.Transport = &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}
+
 	return nil
 }
 

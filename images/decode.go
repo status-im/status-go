@@ -18,6 +18,10 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+var DefaultClient = http.Client{
+	Timeout: 5 * time.Second,
+}
+
 func Decode(fileName string) (image.Image, error) {
 	file, err := os.Open(fileName)
 	if err != nil {
@@ -33,11 +37,12 @@ func Decode(fileName string) (image.Image, error) {
 	return decodeImageData(fb, file)
 }
 
+func ReplaceDefaultClient(client http.Client) {
+	DefaultClient = client
+}
+
 func DecodeFromURL(path string) (image.Image, error) {
-	client := http.Client{
-		Timeout: 5 * time.Second,
-	}
-	res, err := client.Get(path)
+	res, err := DefaultClient.Get(path)
 	if err != nil {
 		return nil, err
 	}
