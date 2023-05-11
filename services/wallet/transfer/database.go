@@ -279,7 +279,7 @@ func (db *Database) GetTransfersForIdentities(ctx context.Context, identities []
 	for _, identity := range identities {
 		subQuery := newSubQuery()
 		// TODO optimization: consider using tuples in sqlite and IN operator
-		subQuery = subQuery.FilterNetwork(identity.ChainID).FilterTransactionHash(identity.Hash).FilterAddress(identity.Address)
+		subQuery = subQuery.FilterNetwork(uint64(identity.ChainID)).FilterTransactionHash(identity.Hash).FilterAddress(identity.Address)
 		query.addSubQuery(subQuery, OrSeparator)
 	}
 	rows, err := db.client.QueryContext(ctx, query.String(), query.Args()...)

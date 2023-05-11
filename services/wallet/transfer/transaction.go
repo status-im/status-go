@@ -20,6 +20,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/bridge"
+	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -96,9 +97,9 @@ type PendingTransaction struct {
 }
 
 type TransactionIdentity struct {
-	ChainID uint64         `json:"chainId"`
-	Hash    common.Hash    `json:"hash"`
-	Address common.Address `json:"address"`
+	ChainID wallet_common.ChainID `json:"chainId"`
+	Hash    common.Hash           `json:"hash"`
+	Address common.Address        `json:"address"`
 }
 
 const selectFromPending = `SELECT hash, timestamp, value, from_address, to_address, data,
