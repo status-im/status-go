@@ -184,7 +184,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		w.timesource = timesource.NewDefaultClock()
 	}
 
-	w.localNode, err = w.newLocalnode(w.opts.privKey)
+	w.localNode, err = enr.NewLocalnode(w.opts.privKey)
 	if err != nil {
 		w.log.Error("creating localnode", zap.Error(err))
 	}

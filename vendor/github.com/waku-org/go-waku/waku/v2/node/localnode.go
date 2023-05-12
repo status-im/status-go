@@ -2,14 +2,9 @@ package node
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"encoding/binary"
 	"errors"
-	"math"
-	"math/rand"
 	"net"
 	"strconv"
-	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
@@ -18,71 +13,25 @@ import (
 	"go.uber.org/zap"
 )
 
-func (w *WakuNode) newLocalnode(priv *ecdsa.PrivateKey) (*enode.LocalNode, error) {
-	db, err := enode.OpenDB("")
-	if err != nil {
-		return nil, err
-	}
-	return enode.NewLocalNode(db, priv), nil
-}
-
-func writeMultiaddressField(localnode *enode.LocalNode, addrAggr []ma.Multiaddr) (err error) {
-	defer func() {
-		if e := recover(); e != nil {
-			// Deleting the multiaddr entry, as we could not write it succesfully
-			localnode.Delete(enr.WithEntry(wenr.MultiaddrENRField, struct{}{}))
-			err = errors.New("could not write enr record")
-		}
-	}()
-
-	var fieldRaw []byte
-	for _, addr := range addrAggr {
-		maRaw := addr.Bytes()
-		maSize := make([]byte, 2)
-		binary.BigEndian.PutUint16(maSize, uint16(len(maRaw)))
-
-		fieldRaw = append(fieldRaw, maSize...)
-		fieldRaw = append(fieldRaw, maRaw...)
-	}
-
-	if len(fieldRaw) != 0 && len(fieldRaw) <= 100 { // Max length for multiaddr field before triggering the 300 bytes limit
-		localnode.Set(enr.WithEntry(wenr.MultiaddrENRField, fieldRaw))
-	}
-
-	// This is to trigger the signing record err due to exceeding 300bytes limit
-	_ = localnode.Node()
-
-	return nil
-}
-
 func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.Multiaddr, ipAddr *net.TCPAddr, udpPort uint, wakuFlags wenr.WakuEnrBitfield, advertiseAddr []ma.Multiaddr, shouldAutoUpdate bool, log *zap.Logger) error {
-	localnode.SetFallbackUDP(int(udpPort))
-	localnode.Set(enr.WithEntry(wenr.WakuENRField, wakuFlags))
-	localnode.SetFallbackIP(net.IP{127, 0, 0, 1})
-
-	if udpPort > math.MaxUint16 {
-		return errors.New("invalid udp port number")
-	}
+	var options []wenr.ENROption
+	options = append(options, wenr.WithUDPPort(udpPort))
+	options = append(options, wenr.WithWakuBitfield(wakuFlags))
+	options = append(options, wenr.WithMultiaddress(multiaddrs...))
 
 	if advertiseAddr != nil {
 		// An advertised address disables libp2p address updates
 		// and discv5 predictions
-
 		ipAddr, err := selectMostExternalAddress(advertiseAddr)
 		if err != nil {
 			return err
 		}
 
-		localnode.SetStaticIP(ipAddr.IP)
-		localnode.Set(enr.TCP(uint16(ipAddr.Port))) // TODO: ipv6?
-
-		return writeMultiaddresses(localnode, multiaddrs)
+		options = append(options, wenr.WithIP(ipAddr))
 	} else if !shouldAutoUpdate {
 		// We received a libp2p address update. Autoupdate is disabled
 		// Using a static ip will disable endpoint prediction.
-		localnode.SetStaticIP(ipAddr.IP)
-		localnode.Set(enr.TCP(uint16(ipAddr.Port))) // TODO: ipv6?
-		return writeMultiaddresses(localnode, multiaddrs)
+		options = append(options, wenr.WithIP(ipAddr))
 	} else {
 		// We received a libp2p address update, but we should still
 		// allow discv5 to update the enr record. We set the localnode
@@ -105,42 +54,9 @@ func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.M
 			localnode.Delete(enr.IPv6{})
 			localnode.Delete(enr.TCP6(0))
 		}
-
-		return writeMultiaddresses(localnode, multiaddrs)
 	}
 
-}
-
-func writeMultiaddresses(localnode *enode.LocalNode, multiaddrs []ma.Multiaddr) error {
-	// Randomly shuffle multiaddresses
-	rand.Seed(time.Now().UnixNano())
-	rand.Shuffle(len(multiaddrs), func(i, j int) { multiaddrs[i], multiaddrs[j] = multiaddrs[j], multiaddrs[i] })
-
-	// Adding extra multiaddresses. Should probably not exceed the enr max size of 300bytes
-	var err error
-	failedOnceWritingENR := false
-	couldWriteENRatLeastOnce := false
-	successIdx := -1
-	for i := len(multiaddrs) - 1; i >= 0; i-- {
-		err = writeMultiaddressField(localnode, multiaddrs[0:i])
-		if err == nil {
-			couldWriteENRatLeastOnce = true
-			successIdx = i
-			break
-		} else {
-			failedOnceWritingENR = true
-		}
-	}
-
-	if failedOnceWritingENR && couldWriteENRatLeastOnce {
-		// Could write a subset of multiaddresses but not all
-		err = writeMultiaddressField(localnode, multiaddrs[0:successIdx])
-		if err != nil {
-			return errors.New("could not write new ENR")
-		}
-	}
-
-	return nil
+	return wenr.Update(localnode, options...)
 }
 
 func isPrivate(addr *net.TCPAddr) bool {
