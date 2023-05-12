@@ -36,6 +36,20 @@ const (
 
 type HandlerPatternMap map[string]http.HandlerFunc
 
+func handleRequestDBMissing(logger *zap.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger.Error("can't handle media request without appdb")
+		return
+	}
+}
+
+func handleRequestDownloaderMissing(logger *zap.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger.Error("can't handle media request without ipfs downloader")
+		return
+	}
+}
+
 func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
@@ -103,6 +117,10 @@ func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Lo
 }
 
 func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
 		pks, ok := params["publicKey"]
@@ -226,6 +244,10 @@ func handleIdenticon(logger *zap.Logger) http.HandlerFunc {
 }
 
 func handleDiscordAuthorAvatar(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		authorIDs, ok := r.URL.Query()["authorId"]
 		if !ok || len(authorIDs) == 0 {
@@ -260,6 +282,10 @@ func handleDiscordAuthorAvatar(db *sql.DB, logger *zap.Logger) http.HandlerFunc 
 }
 
 func handleDiscordAttachment(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		messageIDs, ok := r.URL.Query()["messageId"]
 		if !ok || len(messageIDs) == 0 {
@@ -299,6 +325,10 @@ func handleDiscordAttachment(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 }
 
 func handleImage(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		messageIDs, ok := r.URL.Query()["messageId"]
 		if !ok || len(messageIDs) == 0 {
@@ -332,6 +362,10 @@ func handleImage(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 }
 
 func handleAudio(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		messageIDs, ok := r.URL.Query()["messageId"]
 		if !ok || len(messageIDs) == 0 {
@@ -361,6 +395,10 @@ func handleAudio(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 }
 
 func handleIPFS(downloader *ipfs.Downloader, logger *zap.Logger) http.HandlerFunc {
+	if downloader == nil {
+		return handleRequestDownloaderMissing(logger)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		hashes, ok := r.URL.Query()["hash"]
 		if !ok || len(hashes) == 0 {

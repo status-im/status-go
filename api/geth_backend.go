@@ -180,6 +180,13 @@ func (b *GethStatusBackend) OpenAccounts() error {
 	b.multiaccountsDB = db
 	// Probably we should iron out a bit better how to create/dispose of the status-service
 	b.statusNode.SetMultiaccountsDB(db)
+
+	err = b.statusNode.StartMediaServerWithoutDB()
+	if err != nil {
+		b.log.Error("failed to start media server without app db", "err", err)
+		return err
+	}
+
 	return nil
 }
 

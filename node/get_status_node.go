@@ -188,6 +188,34 @@ type StartOptions struct {
 	AccountsManager *accounts.Manager
 }
 
+// StartMediaServerWithoutDB starts media server without starting the node
+// The server can only handle requests that don't require appdb or IPFS downloader
+func (n *StatusNode) StartMediaServerWithoutDB() error {
+	if n.isRunning() {
+		n.log.Debug("node is already running, no need to StartMediaServerWithoutDB")
+		return nil
+	}
+
+	if n.httpServer != nil {
+		if err := n.httpServer.Stop(); err != nil {
+			return err
+		}
+	}
+
+	httpServer, err := server.NewMediaServer(nil, nil, n.multiaccountsDB)
+	if err != nil {
+		return err
+	}
+
+	n.httpServer = httpServer
+
+	if err := n.httpServer.Start(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // StartWithOptions starts current StatusNode, failing if it's already started.
 // It takes some options that allows to further configure starting process.
 func (n *StatusNode) StartWithOptions(config *params.NodeConfig, options StartOptions) error {
@@ -238,20 +266,28 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manag
 		return err
 	}
 
-	n.downloader = ipfs.NewDownloader(config.RootDataDir)
+	if n.downloader == nil {
+		n.downloader = ipfs.NewDownloader(config.RootDataDir)
+	}
+
+	if n.httpServer != nil {
+		if err := n.httpServer.Stop(); err != nil {
+			return err
+		}
+	}
 
 	httpServer, err := server.NewMediaServer(n.appDB, n.downloader, n.multiaccountsDB)
 	if err != nil {
 		return err
 	}
 
-	if err := httpServer.Start(); err != nil {
+	n.httpServer = httpServer
+
+	if err := n.httpServer.Start(); err != nil {
 		return err
 	}
 
-	n.httpServer = httpServer
-
-	if err := n.initServices(config, httpServer); err != nil {
+	if err := n.initServices(config, n.httpServer); err != nil {
 		return err
 	}
 	return n.startGethNode()
