@@ -5,8 +5,7 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"testing"
-
-	"github.com/status-im/status-go/protocol/identity"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -19,7 +18,12 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
+	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/sqlite"
 )
@@ -33,6 +37,7 @@ const (
 	socialLinkURL     = "https://github.com/status-im"
 	ensUsername       = "bob.stateofus.eth"
 	ensChainID        = 1
+	publicChatID      = "localpairtest"
 )
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
@@ -124,6 +129,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 		require.NoError(s.T(), serverBackend.Logout())
 		require.NoError(s.T(), clientBackend.Logout())
 	}()
+	ctx := context.TODO()
 
 	err := serverBackend.AccountManager().InitKeystore(filepath.Join(serverTmpDir, keystoreDir))
 	require.NoError(s.T(), err)
@@ -150,15 +156,18 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.NoError(s.T(), err)
 
 	// generate some data for the client
+	// generate bookmark
 	clientBrowserAPI := clientBackend.StatusNode().BrowserService().APIs()[0].Service.(*browsers.API)
-	_, err = clientBrowserAPI.StoreBookmark(context.TODO(), browsers.Bookmark{
+	_, err = clientBrowserAPI.StoreBookmark(ctx, browsers.Bookmark{
 		Name: "status.im",
 		URL:  "https://status.im",
 	})
 	require.NoError(s.T(), err)
+	// generate social link
 	err = clientBackend.Messenger().SetSocialLinks(&identity.SocialLinks{{Text: identity.GithubID, URL: socialLinkURL, Clock: 1}})
 	require.NoError(s.T(), err)
-	err = clientBackend.StatusNode().EnsService().API().Add(context.Background(), ensChainID, ensUsername)
+	// generate ens username
+	err = clientBackend.StatusNode().EnsService().API().Add(ctx, ensChainID, ensUsername)
 	require.NoError(s.T(), err)
 
 	clientActiveAccount, err := clientBackend.GetActiveAccount()
@@ -180,14 +189,14 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 
 	// check that the server has the same data as the client
 	serverBrowserAPI := serverBackend.StatusNode().BrowserService().APIs()[0].Service.(*browsers.API)
-	bookmarks, err := serverBrowserAPI.GetBookmarks(context.TODO())
+	bookmarks, err := serverBrowserAPI.GetBookmarks(ctx)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), 1, len(bookmarks))
 	require.Equal(s.T(), "status.im", bookmarks[0].Name)
 	serverSocialLink, err := serverBackend.Messenger().GetSocialLink(identity.GithubID)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), socialLinkURL, serverSocialLink.URL)
-	uds, err := serverBackend.StatusNode().EnsService().API().GetEnsUsernames(context.Background())
+	uds, err := serverBackend.StatusNode().EnsService().API().GetEnsUsernames(ctx)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), 1, len(uds))
 	require.Equal(s.T(), ensUsername, uds[0].Username)
@@ -233,6 +242,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	clientTmpDir := filepath.Join(s.clientAsReceiverTmpdir, "client")
 	clientBackend := s.prepareBackendWithoutAccount(clientTmpDir)
+	ctx := context.TODO()
 
 	serverTmpDir := filepath.Join(s.clientAsReceiverTmpdir, "server")
 	serverBackend := s.prepareBackendWithAccount(serverTmpDir)
@@ -259,15 +269,33 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.NoError(s.T(), err)
 
 	// generate some data for the server
+	// generate bookmark
 	serverBrowserAPI := serverBackend.StatusNode().BrowserService().APIs()[0].Service.(*browsers.API)
-	_, err = serverBrowserAPI.StoreBookmark(context.TODO(), browsers.Bookmark{
+	_, err = serverBrowserAPI.StoreBookmark(ctx, browsers.Bookmark{
 		Name: "status.im",
 		URL:  "https://status.im",
 	})
 	require.NoError(s.T(), err)
-	err = serverBackend.Messenger().SetSocialLinks(&identity.SocialLinks{{Text: identity.GithubID, URL: socialLinkURL, Clock: 1}})
+
+	// generate social link
+	serverMessenger := serverBackend.Messenger()
+	err = serverMessenger.SetSocialLinks(&identity.SocialLinks{{Text: identity.GithubID, URL: socialLinkURL, Clock: 1}})
 	require.NoError(s.T(), err)
-	err = serverBackend.StatusNode().EnsService().API().Add(context.Background(), ensChainID, ensUsername)
+
+	// generate ens username
+	err = serverBackend.StatusNode().EnsService().API().Add(ctx, ensChainID, ensUsername)
+	require.NoError(s.T(), err)
+
+	// generate local deleted message
+	_, err = serverMessenger.CreatePublicChat(&requests.CreatePublicChat{ID: publicChatID})
+	require.NoError(s.T(), err)
+	serverChat := serverMessenger.Chat(publicChatID)
+	serverMessage := buildTestMessage(serverChat)
+	serverMessengerResponse, err := serverMessenger.SendChatMessage(ctx, serverMessage)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), 1, len(serverMessengerResponse.Messages()))
+	serverMessageID := serverMessengerResponse.Messages()[0].ID
+	_, err = serverMessenger.DeleteMessageForMeAndSync(ctx, publicChatID, serverMessageID)
 	require.NoError(s.T(), err)
 
 	err = clientBackend.AccountManager().InitKeystore(filepath.Join(clientTmpDir, keystoreDir))
@@ -295,27 +323,29 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.NoError(s.T(), err)
 
 	// check that the client has the same data as the server
+	clientMessenger := clientBackend.Messenger()
 	clientBrowserAPI := clientBackend.StatusNode().BrowserService().APIs()[0].Service.(*browsers.API)
-	bookmarks, err := clientBrowserAPI.GetBookmarks(context.TODO())
+	bookmarks, err := clientBrowserAPI.GetBookmarks(ctx)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), 1, len(bookmarks))
 	require.Equal(s.T(), "status.im", bookmarks[0].Name)
-	clientSocialLink, err := clientBackend.Messenger().GetSocialLink(identity.GithubID)
+	clientSocialLink, err := clientMessenger.GetSocialLink(identity.GithubID)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), socialLinkURL, clientSocialLink.URL)
-	uds, err := clientBackend.StatusNode().EnsService().API().GetEnsUsernames(context.Background())
+	uds, err := clientBackend.StatusNode().EnsService().API().GetEnsUsernames(ctx)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), 1, len(uds))
 	require.Equal(s.T(), ensUsername, uds[0].Username)
 	require.Equal(s.T(), uint64(ensChainID), uds[0].ChainID)
+	deleteForMeMessages, err := clientMessenger.GetDeleteForMeMessages()
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), 1, len(deleteForMeMessages))
 
 	clientActiveAccount, err := clientBackend.GetActiveAccount()
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), serverActiveAccount.Name, clientActiveAccount.Name)
 	require.Equal(s.T(), clientActiveAccount.KDFIterations, expectedKDFIterations)
 
-	serverMessenger := serverBackend.Messenger()
-	clientMessenger := clientBackend.Messenger()
 	require.True(s.T(), serverMessenger.HasPairedDevices())
 	require.True(s.T(), clientMessenger.HasPairedDevices())
 
@@ -437,4 +467,32 @@ func defaultNodeConfig(installationID, keyUID string) (*params.NodeConfig, error
 	}
 
 	return nodeConfig, nil
+}
+
+type testTimeSource struct{}
+
+func (t *testTimeSource) GetCurrentTime() uint64 {
+	return uint64(time.Now().Unix())
+}
+
+func buildTestMessage(chat *protocol.Chat) *common.Message {
+	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
+	message := &common.Message{}
+	message.Text = "text-input-message"
+	message.ChatId = chat.ID
+	message.Clock = clock
+	message.Timestamp = timestamp
+	message.WhisperTimestamp = clock
+	message.LocalChatID = chat.ID
+	message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	switch chat.ChatType {
+	case protocol.ChatTypePublic, protocol.ChatTypeProfile:
+		message.MessageType = protobuf.MessageType_PUBLIC_GROUP
+	case protocol.ChatTypeOneToOne:
+		message.MessageType = protobuf.MessageType_ONE_TO_ONE
+	case protocol.ChatTypePrivateGroupChat:
+		message.MessageType = protobuf.MessageType_PRIVATE_GROUP
+	}
+
+	return message
 }

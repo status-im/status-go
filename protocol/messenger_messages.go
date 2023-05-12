@@ -291,14 +291,13 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string
 	}
 	response.AddChat(chat)
 
-	if m.hasPairedDevices() {
-		err = m.withChatClock(func(chatID string, clock uint64) error {
-			deletedForMeMessage := &protobuf.DeleteForMeMessage{
-				MessageId: messageID,
-				Clock:     clock,
-				ChatId:    message.LocalChatID,
-			}
+	err = m.withChatClock(func(chatID string, clock uint64) error {
+		deletedForMeMessage := &protobuf.DeleteForMeMessage{
+			MessageId: messageID,
+			Clock:     clock,
+		}
 
+		if m.hasPairedDevices() {
 			encodedMessage, err2 := proto.Marshal(deletedForMeMessage)
 
 			if err2 != nil {
@@ -313,11 +312,13 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string
 			}
 			_, err2 = m.dispatchMessage(ctx, rawMessage)
 			return err2
-		})
-
-		if err != nil {
-			return response, err
 		}
+
+		return m.persistence.SaveOrUpdateDeleteForMeMessage(deletedForMeMessage)
+	})
+
+	if err != nil {
+		return response, err
 	}
 
 	return response, nil
@@ -377,10 +378,10 @@ func (m *Messenger) applyDeleteMessage(messageDeletes []*DeleteMessage, message 
 	return nil
 }
 
-func (m *Messenger) applyDeleteForMeMessage(messageDeletes []*DeleteForMeMessage, message *common.Message) error {
+func (m *Messenger) applyDeleteForMeMessage(message *common.Message) error {
 	message.DeletedForMe = true
 
-	err := message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+	err := message.PrepareContent(m.myHexIdentity())
 	if err != nil {
 		return err
 	}

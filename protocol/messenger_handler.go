@@ -1691,8 +1691,8 @@ func (m *Messenger) getMessageFromResponseOrDatabase(response *MessengerResponse
 	return m.persistence.MessageByID(messageID)
 }
 
-func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, deleteForMeMessage DeleteForMeMessage) error {
-	if err := ValidateDeleteForMeMessage(deleteForMeMessage.DeleteForMeMessage); err != nil {
+func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, deleteForMeMessage protobuf.DeleteForMeMessage) error {
+	if err := ValidateDeleteForMeMessage(deleteForMeMessage); err != nil {
 		return err
 	}
 
@@ -1701,7 +1701,7 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 	originalMessage, err := m.getMessageFromResponseOrDatabase(state.Response, messageID)
 
 	if err == common.ErrRecordNotFound {
-		return m.persistence.SaveDeleteForMe(deleteForMeMessage)
+		return m.persistence.SaveOrUpdateDeleteForMeMessage(&deleteForMeMessage)
 	} else if err != nil {
 		return err
 	}
@@ -1711,7 +1711,7 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 		return errors.New("chat not found")
 	}
 
-	messagesToDelete, err := m.getConnectedMessages(originalMessage, deleteForMeMessage.ChatId)
+	messagesToDelete, err := m.getConnectedMessages(originalMessage, originalMessage.LocalChatID)
 	if err != nil {
 		return err
 	}
@@ -2733,13 +2733,13 @@ func (m *Messenger) checkForDeleteForMes(message *common.Message) error {
 		return err
 	}
 
-	var messageDeleteForMes []*DeleteForMeMessage
+	var messageDeleteForMes []*protobuf.DeleteForMeMessage
 	applyDelete := false
 	for _, messageToCheck := range messagesToCheck {
 		if !applyDelete {
 			// Check for any pending delete for mes
 			// If any pending deletes are available and valid, apply them
-			messageDeleteForMes, err = m.persistence.GetDeleteForMes(messageToCheck.ID, messageToCheck.From)
+			messageDeleteForMes, err = m.persistence.GetDeleteForMeMessagesByMessageID(messageToCheck.ID)
 			if err != nil {
 				return err
 			}
@@ -2751,7 +2751,7 @@ func (m *Messenger) checkForDeleteForMes(message *common.Message) error {
 		// Once one messageDeleteForMes has been found, we apply it to all the images in the album
 		applyDelete = true
 
-		err := m.applyDeleteForMeMessage(messageDeleteForMes, messageToCheck)
+		err := m.applyDeleteForMeMessage(messageToCheck)
 		if err != nil {
 			return err
 		}
