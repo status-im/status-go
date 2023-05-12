@@ -2397,7 +2397,7 @@ func (db sqlitePersistence) GetDeletes(messageID string, from string) ([]*Delete
 
 func (db sqlitePersistence) SaveOrUpdateDeleteForMeMessage(deleteForMeMessage *protobuf.DeleteForMeMessage) error {
 	_, err := db.db.Exec(`INSERT OR REPLACE INTO user_messages_deleted_for_mes (clock, message_id) 
-    SELECT ?,? WHERE NOT EXISTS (SELECT 1 FROM user_messages_deleted_for_mes WHERE id = ? AND clock >= ?)`,
+    SELECT ?,? WHERE NOT EXISTS (SELECT 1 FROM user_messages_deleted_for_mes WHERE message_id = ? AND clock >= ?)`,
 		deleteForMeMessage.Clock, deleteForMeMessage.MessageId, deleteForMeMessage.MessageId, deleteForMeMessage.Clock)
 	return err
 }

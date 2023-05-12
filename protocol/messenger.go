@@ -6498,3 +6498,7 @@ func (m *Messenger) handleSyncSocialLinkSetting(message protobuf.SyncSocialLinkS
 	callback(link)
 	return nil
 }
+
+func (m *Messenger) GetDeleteForMeMessages() ([]*protobuf.DeleteForMeMessage, error) {
+	return m.persistence.GetDeleteForMeMessages()
+}
