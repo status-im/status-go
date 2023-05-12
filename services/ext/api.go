@@ -1302,30 +1302,37 @@ func (api *PublicAPI) Messenger() *protocol.Messenger {
 	return api.service.messenger
 }
 
-func (api *PublicAPI) ChatMentionCheckMentions(chatID, text string) (string, error) {
-	return api.service.messenger.GetMentionsManager().CheckMentions(chatID, text)
+// ChatMentionReplaceWithPublicKey checks if the text contains mentions and replace mention with user public key.
+// e.g. abc @alice -> abc 0x123
+func (api *PublicAPI) ChatMentionReplaceWithPublicKey(chatID, text string) (string, error) {
+	return api.service.messenger.GetMentionsManager().ReplaceWithPublicKey(chatID, text)
 }
 
+// ChatMentionOnChangeText
+// chatID: chat id
+// text: the full text user input in the chat input field
+// as performance consideration, we don't need to call this function each time after user input a character,
+// say user input "abc", we don't need to call this function 3 times, instead,
+// we can call this function 2 times as following:
+// 1. user input "a", call this function with text "a"
+// 2. user input "c", call this function with text "abc"
+// whatever, we should ensure ChatMentionOnChangeText know(invoked) the latest full text.
+// ChatMentionOnChangeText will maintain state of fulltext and diff between previous/latest full text internally.
 func (api *PublicAPI) ChatMentionOnChangeText(chatID, text string) (*protocol.ChatMentionContext, error) {
 	return api.service.messenger.GetMentionsManager().OnChangeText(chatID, text)
 }
 
-func (api *PublicAPI) ChatMentionRecheckAtIdxs(chatID string, text string, publicKey string) (*protocol.ChatMentionContext, error) {
-	return api.service.messenger.GetMentionsManager().RecheckAtIdxs(chatID, text, publicKey)
-}
-
-func (api *PublicAPI) ChatMentionNewInputTextWithMention(chatID, text, primaryName string) *protocol.ChatMentionContext {
-	return api.service.messenger.GetMentionsManager().NewInputTextWithMention(chatID, text, primaryName)
+// ChatMentionSelectMention select mention from mention suggestion list
+func (api *PublicAPI) ChatMentionSelectMention(chatID, text, primaryName, publicKey string) (*protocol.ChatMentionContext, error) {
+	return api.service.messenger.GetMentionsManager().SelectMention(chatID, text, primaryName, publicKey)
 }
 
 func (api *PublicAPI) ChatMentionClearMentions(chatID string) {
 	api.service.messenger.GetMentionsManager().ClearMentions(chatID)
 }
 
-func (api *PublicAPI) ChatMentionHandleSelectionChange(chatID, text string, start int, end int) *protocol.ChatMentionContext {
-	return api.service.messenger.GetMentionsManager().HandleSelectionChange(chatID, text, start, end)
-}
-
+// ChatMentionToInputField checks if the text contains mentions and replace mention with readable username.
+// generally, this function is invoked before user editing a sent message.
 func (api *PublicAPI) ChatMentionToInputField(chatID, text string) (*protocol.ChatMentionContext, error) {
 	return api.service.messenger.GetMentionsManager().ToInputField(chatID, text)
 }
