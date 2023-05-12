@@ -6419,7 +6419,7 @@ func (m *Messenger) syncDeleteForMeMessage(ctx context.Context, rawMessageDispat
 		return err
 	}
 
-	return m.withChatClock(func(chatID string, clock uint64) error {
+	return m.withChatClock(func(chatID string, _ uint64) error {
 		for _, deleteForMe := range deleteForMes {
 			encodedMessage, err2 := proto.Marshal(deleteForMe)
 			if err2 != nil {
