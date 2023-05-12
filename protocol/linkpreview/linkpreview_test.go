@@ -185,4 +185,9 @@ func TestUnfurlURLs(t *testing.T) {
 	previews, err = UnfurlURLs([]string{"https://github.com/status-im/i_do_not_exist"})
 	require.NoError(t, err)
 	require.Empty(t, previews)
+
+	// Test no response when trying to get OpenGraph metadata.
+	previews, err = UnfurlURLs([]string{"https://wikipedia.o"})
+	require.NoError(t, err)
+	require.Empty(t, previews)
 }

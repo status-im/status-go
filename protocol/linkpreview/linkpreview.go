@@ -155,8 +155,10 @@ func (u OpenGraphUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
 	res, cancel, err := httpGETForOpenGraph(url.String())
 	defer cancel()
 	defer func() {
-		if err = res.Body.Close(); err != nil {
-			u.logger.Error("failed to close response body", zap.Error(err))
+		if res != nil {
+			if err = res.Body.Close(); err != nil {
+				u.logger.Error("failed to close response body", zap.Error(err))
+			}
 		}
 	}()
 	if err != nil {
