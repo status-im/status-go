@@ -27,6 +27,8 @@ const (
 	CommunityMember_ROLE_ALL              CommunityMember_Roles = 1
 	CommunityMember_ROLE_MANAGE_USERS     CommunityMember_Roles = 2
 	CommunityMember_ROLE_MODERATE_CONTENT CommunityMember_Roles = 3
+	CommunityMember_ROLE_ADMIN            CommunityMember_Roles = 4
+	
 )
 
 var CommunityMember_Roles_name = map[int32]string{
@@ -34,6 +36,7 @@ var CommunityMember_Roles_name = map[int32]string{
 	1: "ROLE_ALL",
 	2: "ROLE_MANAGE_USERS",
 	3: "ROLE_MODERATE_CONTENT",
+	4: "ROLE_ADMIN",
 }
 
 var CommunityMember_Roles_value = map[string]int32{

@@ -660,11 +660,13 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 		return nil, nil, err
 	}
 
-	// Check if there's stil BECOME_MEMBER permissions,
+	// Check if there's stil BECOME_ADMIN and BECOME_MEMBER permissions,
 	// if not we can stop checking token criteria on-chain
 	// for members
+	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
-	if cancel, exists := m.periodicMemberPermissionsTasks.Load(community.IDString()); exists && len(becomeMemberPermissions) == 0 {
+	if cancel, exists := m.periodicMemberPermissionsTasks.Load(community.IDString()); exists &&
+		len(becomeMemberPermissions) == 0 && len(becomeAdminPermissions) == 0 {
 		close(cancel.(chan struct{})) // Need to cast to the chan
 	}
 
@@ -746,7 +748,7 @@ func (m *Manager) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error) 
 		return nil, err
 	}
 
-	if !community.IsAdmin() {
+	if community.PrivateKey() == nil {
 		return nil, errors.New("not an admin")
 	}
 
@@ -1251,10 +1253,13 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		return nil, err
 	}
 
+	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 	addressesToAdd := make([]string, 0)
 
-	if len(becomeMemberPermissions) > 0 {
+	memberRole := protobuf.CommunityMember_UNKNOWN_ROLE
+
+	if len(becomeMemberPermissions) > 0 || len(becomeAdminPermissions) > 0 {
 		revealedAddresses, err := m.persistence.GetRequestToJoinRevealedAddresses(dbRequest.ID)
 		if err != nil {
 			return nil, err
@@ -1265,9 +1270,18 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 			walletAddresses = append(walletAddresses, gethcommon.HexToAddress(walletAddress))
 		}
 
-		hasPermission, err := m.checkPermissionToJoin(becomeMemberPermissions, walletAddresses)
-		if err != nil {
-			return nil, err
+		hasPermission := false
+		if len(becomeAdminPermissions) > 0 {
+			hasPermission, err = m.checkPermissionToJoin(becomeAdminPermissions, walletAddresses)
+		}
+
+		if hasPermission {
+			memberRole = protobuf.CommunityMember_ROLE_ADMIN
+		} else if len(becomeMemberPermissions) > 0 {
+			hasPermission, err = m.checkPermissionToJoin(becomeMemberPermissions, walletAddresses)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		if !hasPermission {
@@ -1282,7 +1296,12 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		return nil, err
 	}
 
-	err = community.AddMember(pk, []protobuf.CommunityMember_Roles{})
+	role := []protobuf.CommunityMember_Roles{}
+	if memberRole != protobuf.CommunityMember_UNKNOWN_ROLE {
+		role = []protobuf.CommunityMember_Roles{memberRole}
+	}
+
+	err = community.AddMember(pk, role)
 	if err != nil {
 		return nil, err
 	}
@@ -1411,22 +1430,16 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		return nil, err
 	}
 
+	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 
 	// If user is already a member, then accept request automatically
 	// It may happen when member removes itself from community and then tries to rejoin
 	// More specifically, CommunityRequestToLeave may be delivered later than CommunityRequestToJoin, or not delivered at all
 	acceptAutomatically := community.AcceptRequestToJoinAutomatically() || community.HasMember(signer)
-	if len(becomeMemberPermissions) == 0 && acceptAutomatically {
-		err = m.markRequestToJoin(signer, community)
-		if err != nil {
-			return nil, err
-		}
-		requestToJoin.State = RequestToJoinStateAccepted
-		return requestToJoin, nil
-	}
+	hasPermission := false
 
-	if len(becomeMemberPermissions) > 0 {
+	if len(becomeMemberPermissions) > 0 || len(becomeAdminPermissions) > 0 {
 		// we have token permissions but requester hasn't revealed
 		// any addresses
 		if len(request.RevealedAddresses) == 0 {
@@ -1468,18 +1481,30 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 			verifiedAddresses = append(verifiedAddresses, gethcommon.HexToAddress(walletAddress))
 		}
 
-		hasPermission, err := m.checkPermissionToJoin(becomeMemberPermissions, verifiedAddresses)
-		if err != nil {
-			return nil, err
+		// admin token permissions requred to became an admin must not cancel request to join
+		// if requirements were not met
+		if len(becomeAdminPermissions) > 0 {
+			hasPermission, err = m.checkPermissionToJoin(becomeAdminPermissions, verifiedAddresses)
+			if err != nil {
+				m.logger.Info("Failed to check admin permmissions to join for the community as an admin", zap.Error(err))
+			}
 		}
 
-		if !hasPermission {
-			err = m.markRequestToJoinAsCanceled(signer, community)
+		// if user does not have admin permissions, check on member permissions
+		if !hasPermission && len(becomeMemberPermissions) > 0 {
+			hasPermission, err := m.checkPermissionToJoin(becomeMemberPermissions, verifiedAddresses)
 			if err != nil {
 				return nil, err
 			}
-			requestToJoin.State = RequestToJoinStateDeclined
-			return requestToJoin, nil
+
+			if !hasPermission {
+				err = m.markRequestToJoinAsCanceled(signer, community)
+				if err != nil {
+					return nil, err
+				}
+				requestToJoin.State = RequestToJoinStateDeclined
+				return requestToJoin, nil
+			}
 		}
 
 		// Save revealed addresses + signatures so they can later be added
@@ -1496,6 +1521,15 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 			}
 			requestToJoin.State = RequestToJoinStateAccepted
 		}
+	}
+
+	if (len(becomeMemberPermissions) == 0 || hasPermission) && acceptAutomatically {
+		err = m.markRequestToJoin(signer, community)
+		if err != nil {
+			return nil, err
+		}
+		requestToJoin.State = RequestToJoinStateAccepted
+		return requestToJoin, nil
 	}
 
 	return requestToJoin, nil

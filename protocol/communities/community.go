@@ -1219,7 +1219,10 @@ func (o *Community) ValidateRequestToJoin(signer *ecdsa.PublicKey, request *prot
 }
 
 func (o *Community) IsAdmin() bool {
-	return o.config.PrivateKey != nil
+	if o.config.PrivateKey != nil {
+		return true
+	}
+	return o.IsMemberAdmin(o.config.MemberIdentity)
 }
 
 func (o *Community) IsMemberAdmin(publicKey *ecdsa.PublicKey) bool {
@@ -1235,6 +1238,7 @@ func canManageUsersRolePermissions() map[protobuf.CommunityMember_Roles]bool {
 func adminRolePermissions() map[protobuf.CommunityMember_Roles]bool {
 	roles := make(map[protobuf.CommunityMember_Roles]bool)
 	roles[protobuf.CommunityMember_ROLE_ALL] = true
+	roles[protobuf.CommunityMember_ROLE_ADMIN] = true
 	return roles
 }
 
@@ -1451,12 +1455,16 @@ func (o *Community) TokenPermissionsByType(permissionType protobuf.CommunityToke
 	return permissions
 }
 
+func (o *Community) canManageTokenPermission(permission *protobuf.CommunityTokenPermission) bool {
+	return o.config.PrivateKey != nil || (o.IsAdmin() && permission.Type != protobuf.CommunityTokenPermission_BECOME_ADMIN)
+}
+
 func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermission) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
-		return nil, ErrNotAdmin
+	if !o.canManageTokenPermission(permission) {
+		return nil, ErrNotEnoughPermissions
 	}
 
 	if o.config.CommunityDescription.TokenPermissions == nil {
@@ -1484,8 +1492,8 @@ func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
-		return nil, ErrNotAdmin
+	if !o.canManageTokenPermission(tokenPermission) {
+		return nil, ErrNotEnoughPermissions
 	}
 
 	if o.config.CommunityDescription.TokenPermissions == nil {
@@ -1511,12 +1519,14 @@ func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChange
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
-		return nil, ErrNotAdmin
+	tokenPermission, exists := o.config.CommunityDescription.TokenPermissions[permissionID]
+
+	if !exists {
+		return nil, ErrTokenPermissionNotFound
 	}
 
-	if _, exists := o.config.CommunityDescription.TokenPermissions[permissionID]; !exists {
-		return nil, ErrTokenPermissionNotFound
+	if !o.canManageTokenPermission(tokenPermission) {
+		return nil, ErrNotEnoughPermissions
 	}
 
 	delete(o.config.CommunityDescription.TokenPermissions, permissionID)
