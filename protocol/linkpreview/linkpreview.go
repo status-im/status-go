@@ -44,7 +44,7 @@ type Unfurler interface {
 }
 
 const (
-	requestTimeout = 5 * time.Second
+	requestTimeout = 15000 * time.Millisecond
 
 	// Certain websites return an HTML error page if the user agent is unknown to
 	// them, e.g. IMDb.
@@ -56,7 +56,7 @@ const (
 )
 
 var (
-	httpClient = http.Client{Timeout: 15 * time.Second}
+	httpClient = http.Client{Timeout: requestTimeout}
 )
 
 func fetchResponseBody(logger *zap.Logger, url string) ([]byte, error) {
