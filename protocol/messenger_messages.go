@@ -314,7 +314,7 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string
 			return err2
 		}
 
-		return m.persistence.SaveOrUpdateDeleteForMe(deletedForMeMessage)
+		return m.persistence.SaveOrUpdateDeleteForMeMessage(deletedForMeMessage)
 	})
 
 	if err != nil {

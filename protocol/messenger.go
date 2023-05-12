@@ -6414,7 +6414,7 @@ func (m *Messenger) withChatClock(callback func(string, uint64) error) error {
 }
 
 func (m *Messenger) syncDeleteForMeMessage(ctx context.Context, rawMessageDispatcher RawMessageHandler) error {
-	deleteForMes, err := m.persistence.GetDeleteForMes()
+	deleteForMes, err := m.persistence.GetDeleteForMeMessages()
 	if err != nil {
 		return err
 	}

@@ -1701,7 +1701,7 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 	originalMessage, err := m.getMessageFromResponseOrDatabase(state.Response, messageID)
 
 	if err == common.ErrRecordNotFound {
-		return m.persistence.SaveOrUpdateDeleteForMe(&deleteForMeMessage)
+		return m.persistence.SaveOrUpdateDeleteForMeMessage(&deleteForMeMessage)
 	} else if err != nil {
 		return err
 	}
@@ -2739,7 +2739,7 @@ func (m *Messenger) checkForDeleteForMes(message *common.Message) error {
 		if !applyDelete {
 			// Check for any pending delete for mes
 			// If any pending deletes are available and valid, apply them
-			messageDeleteForMes, err = m.persistence.GetDeleteForMesByMessageID(messageToCheck.ID)
+			messageDeleteForMes, err = m.persistence.GetDeleteForMeMessagesByMessageID(messageToCheck.ID)
 			if err != nil {
 				return err
 			}

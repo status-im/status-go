@@ -2381,6 +2381,7 @@ func (db sqlitePersistence) GetDeletes(messageID string, from string) ([]*Delete
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	var messages []*DeleteMessage
 	for rows.Next() {
@@ -2394,21 +2395,21 @@ func (db sqlitePersistence) GetDeletes(messageID string, from string) ([]*Delete
 	return messages, nil
 }
 
-func (db sqlitePersistence) SaveOrUpdateDeleteForMe(deleteForMeMessage *protobuf.DeleteForMeMessage) error {
+func (db sqlitePersistence) SaveOrUpdateDeleteForMeMessage(deleteForMeMessage *protobuf.DeleteForMeMessage) error {
 	_, err := db.db.Exec(`INSERT OR REPLACE INTO user_messages_deleted_for_mes (clock, message_id) 
     SELECT ?,? WHERE NOT EXISTS (SELECT 1 FROM user_messages_deleted_for_mes WHERE id = ? AND clock >= ?)`,
 		deleteForMeMessage.Clock, deleteForMeMessage.MessageId, deleteForMeMessage.MessageId, deleteForMeMessage.Clock)
 	return err
 }
 
-func (db sqlitePersistence) GetDeleteForMesByMessageID(messageID string) ([]*protobuf.DeleteForMeMessage, error) {
+func (db sqlitePersistence) GetDeleteForMeMessagesByMessageID(messageID string) ([]*protobuf.DeleteForMeMessage, error) {
 	rows, err := db.db.Query(`SELECT clock, message_id FROM user_messages_deleted_for_mes WHERE message_id = ?`, messageID)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	var messages []*protobuf.DeleteForMeMessage
-
 	for rows.Next() {
 		d := &protobuf.DeleteForMeMessage{}
 		err := rows.Scan(&d.Clock, &d.MessageId)
@@ -2420,14 +2421,14 @@ func (db sqlitePersistence) GetDeleteForMesByMessageID(messageID string) ([]*pro
 	return messages, nil
 }
 
-func (db sqlitePersistence) GetDeleteForMes() ([]*protobuf.DeleteForMeMessage, error) {
+func (db sqlitePersistence) GetDeleteForMeMessages() ([]*protobuf.DeleteForMeMessage, error) {
 	rows, err := db.db.Query(`SELECT clock, message_id FROM user_messages_deleted_for_mes`)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	var messages []*protobuf.DeleteForMeMessage
-
 	for rows.Next() {
 		d := &protobuf.DeleteForMeMessage{}
 		err := rows.Scan(&d.Clock, &d.MessageId)
@@ -2449,9 +2450,9 @@ func (db sqlitePersistence) GetEdits(messageID string, from string) ([]*EditMess
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	var messages []*EditMessage
-
 	for rows.Next() {
 		e := &EditMessage{}
 		err := rows.Scan(&e.Clock, &e.ChatId, &e.MessageId, &e.From, &e.Text, &e.ID)
