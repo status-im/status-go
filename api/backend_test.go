@@ -1121,7 +1121,7 @@ func login(t *testing.T, conf *params.NodeConfig) {
 func TestLoginAndMigrationsStillWorkWithExistingUsers(t *testing.T) {
 	utils.Init()
 
-	srcFolder := "../static/test-0.97.3-account/"
+	srcFolder := "../static/test-0.132.0-account/"
 
 	tmpdir := t.TempDir()
 
