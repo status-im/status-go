@@ -334,11 +334,12 @@ func (s *MessengerDeleteMessageSuite) TestDeleteImageMessageFirstThenMessage() {
 	s.Require().NoError(err)
 	messageID1 := "message-id1"
 	messageID2 := "message-id2"
+	albumID := "album-id1"
 
 	messageCount := 2
 	var album []*common.Message
 	for i := 0; i < messageCount; i++ {
-		image, err := buildImageWithoutAlbumIDMessage(*ourChat)
+		image, err := buildImageWithAlbumIDMessage(*ourChat, albumID)
 		image.Clock = 1
 		s.NoError(err)
 		album = append(album, image)

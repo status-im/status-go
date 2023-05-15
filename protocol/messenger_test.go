@@ -2324,7 +2324,7 @@ func (s *MessengerSuite) TestResendExpiredEmojis() {
 	s.True(rawMessage.SendCount >= 2)
 }
 
-func buildImageWithoutAlbumIDMessage(chat Chat) (*common.Message, error) {
+func buildImageWithAlbumIDMessage(chat Chat, albumID string) (*common.Message, error) {
 	file, err := os.Open("../_assets/tests/test.jpg")
 	if err != err {
 		return nil, err
@@ -2351,10 +2351,15 @@ func buildImageWithoutAlbumIDMessage(chat Chat) (*common.Message, error) {
 		Type:    protobuf.ImageType_JPEG,
 		Width:   1200,
 		Height:  1000,
+		AlbumId: albumID,
 	}
 	message.Payload = &protobuf.ChatMessage_Image{Image: &image}
 
 	return message, nil
+}
+
+func buildImageWithoutAlbumIDMessage(chat Chat) (*common.Message, error) {
+	return buildImageWithAlbumIDMessage(chat, "")
 }
 
 type testTimeSource struct{}

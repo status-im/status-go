@@ -2685,17 +2685,20 @@ func (m *Messenger) getMessagesToCheckForDelete(message *common.Message) ([]*com
 	var messagesToCheck []*common.Message
 	if message.ContentType == protobuf.ChatMessage_IMAGE {
 		image := message.GetImage()
-		messagesInTheAlbum, err := m.persistence.albumMessages(message.ChatId, image.GetAlbumId())
-		if err != nil {
-			return nil, err
+		if image != nil && image.AlbumId != "" {
+			messagesInTheAlbum, err := m.persistence.albumMessages(message.ChatId, image.GetAlbumId())
+			if err != nil {
+				return nil, err
+			}
+			messagesToCheck = append(messagesToCheck, messagesInTheAlbum...)
 		}
-		messagesToCheck = append(messagesToCheck, messagesInTheAlbum...)
 	}
 	messagesToCheck = append(messagesToCheck, message)
 	return messagesToCheck, nil
 }
 
 func (m *Messenger) checkForDeletes(message *common.Message) error {
+	// Get all messages part of the album
 	messagesToCheck, err := m.getMessagesToCheckForDelete(message)
 	if err != nil {
 		return err
@@ -2703,25 +2706,28 @@ func (m *Messenger) checkForDeletes(message *common.Message) error {
 
 	var messageDeletes []*DeleteMessage
 	applyDelete := false
+	// Loop all messages part of the album, if one of them is marked as deleted, we delete them all
 	for _, messageToCheck := range messagesToCheck {
-		if !applyDelete {
-			// Check for any pending deletes
-			// If any pending deletes are available and valid, apply them
-			messageDeletes, err = m.persistence.GetDeletes(messageToCheck.ID, messageToCheck.From)
-			if err != nil {
-				return err
-			}
+		// Check for any pending deletes
+		// If any pending deletes are available and valid, apply them
+		messageDeletes, err = m.persistence.GetDeletes(messageToCheck.ID, messageToCheck.From)
+		if err != nil {
+			return err
+		}
 
-			if len(messageDeletes) == 0 {
-				continue
-			}
+		if len(messageDeletes) == 0 {
+			continue
 		}
 		// Once one messageDelete has been found, we apply it to all the images in the album
 		applyDelete = true
-
-		err := m.applyDeleteMessage(messageDeletes, messageToCheck)
-		if err != nil {
-			return err
+		break
+	}
+	if applyDelete {
+		for _, messageToCheck := range messagesToCheck {
+			err := m.applyDeleteMessage(messageDeletes, messageToCheck)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
