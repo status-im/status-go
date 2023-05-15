@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"context"
 	"math/big"
 	"testing"
 
@@ -10,11 +11,10 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/sqlite"
 )
 
 func setupTestDB(t *testing.T) (*Database, *BlockDAO, func()) {
-	db, err := appdatabase.InitializeDB(sqlite.InMemoryPath, "wallet-tests", sqlite.ReducedKDFIterationsNumber)
+	db, err := appdatabase.SetupTestMemorySQLDB("wallet-transfer-tests")
 	require.NoError(t, err)
 	return NewDB(db), &BlockDAO{db}, func() {
 		require.NoError(t, db.Close())
@@ -197,5 +197,34 @@ func TestDBGetTransfersFromBlock(t *testing.T) {
 	rst, err = db.GetTransfers(777, big.NewInt(2), big.NewInt(5))
 	require.NoError(t, err)
 	require.Len(t, rst, 4)
+}
 
+func TestGetTransfersForIdentities(t *testing.T) {
+	db, _, stop := setupTestDB(t)
+	defer stop()
+
+	trs := GenerateTestTransactions(t, db.client, 1, 4)
+	for i := range trs {
+		InsertTestTransfer(t, db.client, &trs[i])
+	}
+
+	entries, err := db.GetTransfersForIdentities(context.Background(), []TransactionIdentity{
+		TransactionIdentity{trs[1].ChainID, trs[1].Hash, trs[1].To},
+		TransactionIdentity{trs[3].ChainID, trs[3].Hash, trs[3].To}})
+	require.NoError(t, err)
+	require.Equal(t, 2, len(entries))
+	require.Equal(t, trs[1].Hash, entries[0].ID)
+	require.Equal(t, trs[3].Hash, entries[1].ID)
+	require.Equal(t, trs[1].From, entries[0].From)
+	require.Equal(t, trs[3].From, entries[1].From)
+	require.Equal(t, trs[1].To, entries[0].Address)
+	require.Equal(t, trs[3].To, entries[1].Address)
+	require.Equal(t, big.NewInt(trs[1].BlkNumber), entries[0].BlockNumber)
+	require.Equal(t, big.NewInt(trs[3].BlkNumber), entries[1].BlockNumber)
+	require.Equal(t, uint64(trs[1].Timestamp), entries[0].Timestamp)
+	require.Equal(t, uint64(trs[3].Timestamp), entries[1].Timestamp)
+	require.Equal(t, trs[1].ChainID, entries[0].NetworkID)
+	require.Equal(t, trs[3].ChainID, entries[1].NetworkID)
+	require.Equal(t, MultiTransactionIDType(0), entries[0].MultiTransactionID)
+	require.Equal(t, MultiTransactionIDType(0), entries[1].MultiTransactionID)
 }

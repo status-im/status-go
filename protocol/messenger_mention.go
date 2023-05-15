@@ -289,7 +289,7 @@ func (m *MentionManager) addMentionableUser(mentionableUsers map[string]*Mention
 	return nil
 }
 
-func (m *MentionManager) CheckMentions(chatID, text string) (string, error) {
+func (m *MentionManager) ReplaceWithPublicKey(chatID, text string) (string, error) {
 	chat, _ := m.allChats.Load(chatID)
 	if chat == nil {
 		return "", fmt.Errorf("chat not found when check mentions, chatID: %s", chatID)
@@ -323,7 +323,7 @@ func (m *MentionManager) OnChangeText(chatID, text string) (*ChatMentionContext,
 	return m.CalculateSuggestions(chatID, text)
 }
 
-func (m *MentionManager) RecheckAtIdxs(chatID string, text string, publicKey string) (*ChatMentionContext, error) {
+func (m *MentionManager) recheckAtIdxs(chatID string, text string, publicKey string) (*ChatMentionContext, error) {
 	user, err := m.getMentionableUser(chatID, publicKey)
 	if err != nil {
 		return nil, err
@@ -394,7 +394,7 @@ func (m *MentionManager) calculateSuggestions(chatID string, text string, mentio
 	ctx.MentionSuggestions = suggestions
 }
 
-func (m *MentionManager) NewInputTextWithMention(chatID, text, primaryName string) *ChatMentionContext {
+func (m *MentionManager) SelectMention(chatID, text, primaryName, publicKey string) (*ChatMentionContext, error) {
 	ctx := m.getChatMentionContext(chatID)
 	state := ctx.MentionState
 
@@ -413,7 +413,8 @@ func (m *MentionManager) NewInputTextWithMention(chatID, text, primaryName strin
 	}
 
 	ctx.NewText = string(tr[:atSignIdx+1]) + primaryName + space + string(tr[mentionEnd:])
-	return ctx
+
+	return m.recheckAtIdxs(chatID, ctx.NewText, publicKey)
 }
 
 func (m *MentionManager) clearSuggestions(chatID string) {
@@ -427,37 +428,6 @@ func (m *MentionManager) ClearMentions(chatID string) {
 	ctx.NewText = ""
 	ctx.PreviousText = ""
 	m.clearSuggestions(chatID)
-}
-
-func (m *MentionManager) HandleSelectionChange(chatID, text string, start int, end int) *ChatMentionContext {
-	ctx := m.getChatMentionContext(chatID)
-	m.handleSelectionChange(chatID, text, start, end, ctx.MentionSuggestions)
-	return ctx
-}
-
-func (m *MentionManager) handleSelectionChange(chatID, text string, start int, end int, mentionableUsers map[string]*MentionableUser) {
-	ctx := m.getChatMentionContext(chatID)
-	state := ctx.MentionState
-	if state != nil && len(state.AtIdxs) > 0 {
-		var atIdx *AtIndexEntry
-		for _, idx := range state.AtIdxs {
-			if start >= idx.From && end-1 <= idx.To {
-				atIdx = idx
-				break
-			}
-		}
-
-		if atIdx != nil {
-			newText := ""
-			state.Start = end
-			state.End = end
-			state.NewText = &newText
-			m.calculateSuggestions(chatID, text, mentionableUsers)
-		} else {
-			m.clearSuggestions(chatID)
-		}
-	}
-	ctx.PreviousText = text
 }
 
 func (m *MentionManager) ToInputField(chatID, text string) (*ChatMentionContext, error) {
@@ -482,6 +452,7 @@ func (m *MentionManager) ToInputField(chatID, text string) (*ChatMentionContext,
 	ctx.InputSegments = textWithMentions
 	ctx.MentionState = toInfo(textWithMentions)
 	ctx.NewText = newText
+	ctx.PreviousText = newText
 	return ctx, nil
 }
 

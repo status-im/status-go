@@ -219,6 +219,16 @@ func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, 
 	return castToTransferViews(rst), nil
 }
 
+func (c *Controller) GetTransfersForIdentities(ctx context.Context, identities []TransactionIdentity) ([]View, error) {
+	rst, err := c.db.GetTransfersForIdentities(ctx, identities)
+	if err != nil {
+		log.Error("[transfer.Controller.GetTransfersByAddress] DB err", err)
+		return nil, err
+	}
+
+	return castToTransferViews(rst), nil
+}
+
 func (c *Controller) GetCachedBalances(ctx context.Context, chainID uint64, addresses []common.Address) ([]BlockView, error) {
 	result, error := c.blockDAO.getLastKnownBlocks(chainID, addresses)
 	if error != nil {

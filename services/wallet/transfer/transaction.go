@@ -44,6 +44,7 @@ func NewTransactionManager(db *sql.DB, gethManager *account.GethManager, transac
 
 type MultiTransactionType uint8
 
+// TODO: extend with know types
 const (
 	MultiTransactionSend = iota
 	MultiTransactionSwap
@@ -92,6 +93,12 @@ type PendingTransaction struct {
 	AdditionalData     string                 `json:"additionalData"`
 	ChainID            uint64                 `json:"network_id"`
 	MultiTransactionID MultiTransactionIDType `json:"multi_transaction_id"`
+}
+
+type TransactionIdentity struct {
+	ChainID uint64         `json:"chainId"`
+	Hash    common.Hash    `json:"hash"`
+	Address common.Address `json:"address"`
 }
 
 const selectFromPending = `SELECT hash, timestamp, value, from_address, to_address, data,
@@ -173,6 +180,7 @@ func (tm *TransactionManager) GetPendingByAddress(chainIDs []uint64, address com
 }
 
 // GetPendingEntry returns sql.ErrNoRows if no pending transaction is found for the given identity
+// TODO: consider using address also in case we expect to have also for the receiver
 func (tm *TransactionManager) GetPendingEntry(chainID uint64, hash common.Hash) (*PendingTransaction, error) {
 	row := tm.db.QueryRow(`SELECT timestamp, value, from_address, to_address, data,
 								symbol, gas_price, gas_limit, type, additional_data,

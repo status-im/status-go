@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
@@ -262,10 +263,26 @@ func (db *Database) GetTransfersByAddressAndBlock(chainID uint64, address common
 	return query.Scan(rows)
 }
 
-// GetTransfers load transfers transfer betweeen two blocks.
+// GetTransfers load transfers transfer between two blocks.
 func (db *Database) GetTransfers(chainID uint64, start, end *big.Int) (rst []Transfer, err error) {
 	query := newTransfersQuery().FilterNetwork(chainID).FilterStart(start).FilterEnd(end).FilterLoaded(1)
 	rows, err := db.client.Query(query.String(), query.Args()...)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	return query.Scan(rows)
+}
+
+func (db *Database) GetTransfersForIdentities(ctx context.Context, identities []TransactionIdentity) (rst []Transfer, err error) {
+	query := newTransfersQuery()
+	for _, identity := range identities {
+		subQuery := newSubQuery()
+		// TODO optimization: consider using tuples in sqlite and IN operator
+		subQuery = subQuery.FilterNetwork(identity.ChainID).FilterTransactionHash(identity.Hash).FilterAddress(identity.Address)
+		query.addSubQuery(subQuery, OrSeparator)
+	}
+	rows, err := db.client.QueryContext(ctx, query.String(), query.Args()...)
 	if err != nil {
 		return
 	}
