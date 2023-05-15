@@ -29,6 +29,7 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/keycards"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/nodecfg"
@@ -594,20 +595,7 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 	return nil
 }
 
-func (b *GethStatusBackend) tryToDeleteAccount(address types.Address, password, newPassword string) error {
-	err := b.accountManager.DeleteAccount(address, newPassword)
-	if err != nil {
-		err = b.accountManager.DeleteAccount(address, password)
-		if err != nil && err.Error() != "no key for given address or file" {
-			b.log.Error("error on deleting account", "err", err)
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s settings.Settings, password string, newPassword string) error {
+func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s settings.Settings, keycardUID string, password string, newPassword string) error {
 	err := b.multiaccountsDB.UpdateAccountKeycardPairing(account.KeyUID, account.KeycardPairing)
 	if err != nil {
 		return err
@@ -642,12 +630,40 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 		return err
 	}
 
-	knownAccounts, err := accountDB.GetAccounts()
+	relatedAccounts, err := accountDB.GetAccountsByKeyUID(account.KeyUID)
 	if err != nil {
 		return err
 	}
 
-	dappsAddress, err := accountDB.GetDappsAddress()
+	// This check is added due to mobile app cause it doesn't support a Keycard features as desktop app.
+	// We should remove the following line once mobile and desktop app align.
+	if len(keycardUID) > 0 {
+		displayName, err := accountDB.DisplayName()
+		if err != nil {
+			return err
+		}
+
+		kc := keycards.Keycard{
+			KeycardUID:      keycardUID,
+			KeycardName:     displayName,
+			KeycardLocked:   false,
+			KeyUID:          account.KeyUID,
+			LastUpdateClock: uint64(time.Now().Unix()),
+		}
+
+		for _, acc := range relatedAccounts {
+			kc.AccountsAddresses = append(kc.AccountsAddresses, acc.Address)
+		}
+		addedKc, _, err := accountDB.AddKeycardOrAddAccountsIfKeycardIsAdded(kc)
+		if err != nil {
+			return err
+		}
+		if !addedKc {
+			return errors.New("couldn't register a keycard to keycards table")
+		}
+	}
+
+	masterAddress, err := accountDB.GetMasterAddress()
 	if err != nil {
 		return err
 	}
@@ -672,27 +688,25 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 		return err
 	}
 
-	// We need to delete all accounts for the keypair which is being migrated
-	for _, acc := range knownAccounts {
-		if account.KeyUID == acc.KeyUID {
-			err = b.tryToDeleteAccount(acc.Address, password, newPassword)
-			if err != nil {
-				return err
-			}
+	// We need to delete all accounts for the Keycard which is being added
+	for _, acc := range relatedAccounts {
+		err = b.accountManager.DeleteAccount(acc.Address)
+		if err != nil {
+			return err
 		}
 	}
 
-	err = b.tryToDeleteAccount(dappsAddress, password, newPassword)
+	err = b.accountManager.DeleteAccount(masterAddress)
 	if err != nil {
 		return err
 	}
 
-	err = b.tryToDeleteAccount(eip1581Address, password, newPassword)
+	err = b.accountManager.DeleteAccount(eip1581Address)
 	if err != nil {
 		return err
 	}
 
-	err = b.tryToDeleteAccount(walletRootAddress, password, newPassword)
+	err = b.accountManager.DeleteAccount(walletRootAddress)
 	if err != nil {
 		return err
 	}
@@ -898,7 +912,7 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 		return err
 	}
 
-	err = db.DeleteKeypair(accountInfo.KeyUID)
+	err = db.DeleteAllKeycardsWithKeyUID(accountInfo.KeyUID)
 	if err != nil {
 		return err
 	}

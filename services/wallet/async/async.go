@@ -8,6 +8,10 @@ import (
 
 type Command func(context.Context) error
 
+type Commander interface {
+	Command() Command
+}
+
 // FiniteCommand terminates when error is nil.
 type FiniteCommand struct {
 	Interval time.Duration
@@ -93,13 +97,16 @@ func (g *Group) WaitAsync() <-chan struct{} {
 
 func NewAtomicGroup(parent context.Context) *AtomicGroup {
 	ctx, cancel := context.WithCancel(parent)
-	return &AtomicGroup{ctx: ctx, cancel: cancel}
+	ag := &AtomicGroup{ctx: ctx, cancel: cancel}
+	ag.done = ag.onFinish
+	return ag
 }
 
 // AtomicGroup terminates as soon as first goroutine terminates..
 type AtomicGroup struct {
 	ctx    context.Context
 	cancel func()
+	done   func()
 	wg     sync.WaitGroup
 
 	mu    sync.Mutex
@@ -110,7 +117,7 @@ type AtomicGroup struct {
 func (d *AtomicGroup) Add(cmd Command) {
 	d.wg.Add(1)
 	go func() {
-		defer d.wg.Done()
+		defer d.done()
 		err := cmd(d.ctx)
 		d.mu.Lock()
 		defer d.mu.Unlock()
@@ -154,4 +161,61 @@ func (d *AtomicGroup) Error() error {
 
 func (d *AtomicGroup) Stop() {
 	d.cancel()
+}
+
+func (d *AtomicGroup) onFinish() {
+	d.wg.Done()
+}
+
+func NewQueuedAtomicGroup(parent context.Context, limit uint32) *QueuedAtomicGroup {
+	qag := &QueuedAtomicGroup{NewAtomicGroup(parent), limit, 0, []Command{}, sync.Mutex{}}
+	baseDoneFunc := qag.done // save original done function
+	qag.AtomicGroup.done = func() {
+		baseDoneFunc()
+		qag.onFinish()
+	}
+	return qag
+}
+
+type QueuedAtomicGroup struct {
+	*AtomicGroup
+	limit       uint32
+	count       uint32
+	pendingCmds []Command
+	mu          sync.Mutex
+}
+
+func (d *QueuedAtomicGroup) Add(cmd Command) {
+
+	d.mu.Lock()
+	if d.limit > 0 && d.count >= d.limit {
+		d.pendingCmds = append(d.pendingCmds, cmd)
+		d.mu.Unlock()
+		return
+	}
+
+	d.mu.Unlock()
+	d.run(cmd)
+}
+
+func (d *QueuedAtomicGroup) run(cmd Command) {
+	d.mu.Lock()
+	d.count++
+	d.mu.Unlock()
+	d.AtomicGroup.Add(cmd)
+}
+
+func (d *QueuedAtomicGroup) onFinish() {
+	d.mu.Lock()
+	d.count--
+
+	if d.count < d.limit && len(d.pendingCmds) > 0 {
+		cmd := d.pendingCmds[0]
+		d.pendingCmds = d.pendingCmds[1:]
+		d.mu.Unlock()
+		d.run(cmd)
+		return
+	}
+
+	d.mu.Unlock()
 }

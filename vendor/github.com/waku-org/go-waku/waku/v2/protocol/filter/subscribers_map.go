@@ -1,4 +1,4 @@
-package filterv2
+package filter
 
 import (
 	"encoding/hex"

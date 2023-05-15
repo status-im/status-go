@@ -1,4 +1,4 @@
-package utils
+package enr
 
 import (
 	"encoding/binary"
@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/waku-org/go-waku/waku/v2/utils"
 )
 
 // WakuENRField is the name of the ENR field that contains information about which protocols are supported by the node
@@ -17,6 +18,10 @@ const WakuENRField = "waku2"
 // MultiaddrENRField is the name of the ENR field that will contain multiaddresses that cannot be described using the
 // already available ENR fields (i.e. in the case of websocket connections)
 const MultiaddrENRField = "multiaddrs"
+
+const ShardingIndicesListEnrField = "rs"
+
+const ShardingBitVectorEnrField = "rsv"
 
 // WakuEnrBitfield is a8-bit flag field to indicate Waku capabilities. Only the 4 LSBs are currently defined according to RFC31 (https://rfc.vac.dev/spec/31/).
 type WakuEnrBitfield = uint8
@@ -46,7 +51,7 @@ func NewWakuEnrBitfield(lightpush, filter, store, relay bool) WakuEnrBitfield {
 
 // EnodeToMultiaddress converts an enode into a multiaddress
 func enodeToMultiAddr(node *enode.Node) (multiaddr.Multiaddr, error) {
-	pubKey := EcdsaPubKeyToSecp256k1PublicKey(node.Pubkey())
+	pubKey := utils.EcdsaPubKeyToSecp256k1PublicKey(node.Pubkey())
 	peerID, err := peer.IDFromPublicKey(pubKey)
 	if err != nil {
 		return nil, err
@@ -57,7 +62,7 @@ func enodeToMultiAddr(node *enode.Node) (multiaddr.Multiaddr, error) {
 
 // Multiaddress is used to extract all the multiaddresses that are part of a ENR record
 func Multiaddress(node *enode.Node) (peer.ID, []multiaddr.Multiaddr, error) {
-	pubKey := EcdsaPubKeyToSecp256k1PublicKey(node.Pubkey())
+	pubKey := utils.EcdsaPubKeyToSecp256k1PublicKey(node.Pubkey())
 	peerID, err := peer.IDFromPublicKey(pubKey)
 	if err != nil {
 		return "", nil, err

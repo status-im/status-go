@@ -197,7 +197,7 @@ github.com/edsrzf/mmap-go
 ## explicit; go 1.14
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
-# github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.4
+# github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.6
 ## explicit; go 1.17
 github.com/ethereum/go-ethereum
 github.com/ethereum/go-ethereum/accounts
@@ -652,7 +652,7 @@ github.com/multiformats/go-multistream
 # github.com/multiformats/go-varint v0.0.7
 ## explicit; go 1.18
 github.com/multiformats/go-varint
-# github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f
+# github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f => github.com/status-im/go-sqlcipher v0.1.0-status.1
 ## explicit; go 1.12
 github.com/mutecomm/go-sqlcipher
 # github.com/nfnt/resize v0.0.0-00010101000000-000000000000 => github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088
@@ -975,7 +975,7 @@ github.com/vacp2p/mvds/transport
 github.com/waku-org/go-discover/discover
 github.com/waku-org/go-discover/discover/v4wire
 github.com/waku-org/go-discover/discover/v5wire
-# github.com/waku-org/go-waku v0.5.3-0.20230404182041-41691a44e579
+# github.com/waku-org/go-waku v0.5.3-0.20230509204224-d9a12bf079a8
 ## explicit; go 1.19
 github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/waku/persistence
@@ -988,10 +988,11 @@ github.com/waku-org/go-waku/waku/v2/metrics
 github.com/waku-org/go-waku/waku/v2/node
 github.com/waku-org/go-waku/waku/v2/payload
 github.com/waku-org/go-waku/waku/v2/protocol
+github.com/waku-org/go-waku/waku/v2/protocol/enr
 github.com/waku-org/go-waku/waku/v2/protocol/filter
 github.com/waku-org/go-waku/waku/v2/protocol/filter/pb
-github.com/waku-org/go-waku/waku/v2/protocol/filterv2
-github.com/waku-org/go-waku/waku/v2/protocol/filterv2/pb
+github.com/waku-org/go-waku/waku/v2/protocol/legacy_filter
+github.com/waku-org/go-waku/waku/v2/protocol/legacy_filter/pb
 github.com/waku-org/go-waku/waku/v2/protocol/lightpush
 github.com/waku-org/go-waku/waku/v2/protocol/lightpush/pb
 github.com/waku-org/go-waku/waku/v2/protocol/pb
@@ -1001,13 +1002,15 @@ github.com/waku-org/go-waku/waku/v2/protocol/relay
 github.com/waku-org/go-waku/waku/v2/protocol/rln
 github.com/waku-org/go-waku/waku/v2/protocol/rln/contracts
 github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager
+github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager/dynamic
 github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager/static
+github.com/waku-org/go-waku/waku/v2/protocol/rln/keystore
 github.com/waku-org/go-waku/waku/v2/protocol/store
 github.com/waku-org/go-waku/waku/v2/protocol/store/pb
 github.com/waku-org/go-waku/waku/v2/rendezvous
 github.com/waku-org/go-waku/waku/v2/timesource
 github.com/waku-org/go-waku/waku/v2/utils
-# github.com/waku-org/go-zerokit-rln v0.1.11
+# github.com/waku-org/go-zerokit-rln v0.1.12
 ## explicit; go 1.18
 github.com/waku-org/go-zerokit-rln/rln
 github.com/waku-org/go-zerokit-rln/rln/link
@@ -1039,6 +1042,9 @@ github.com/wealdtech/go-ens/v3/util
 # github.com/wealdtech/go-multicodec v1.4.0
 ## explicit; go 1.12
 github.com/wealdtech/go-multicodec
+# github.com/wk8/go-ordered-map v1.0.0
+## explicit; go 1.14
+github.com/wk8/go-ordered-map
 # github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f
 ## explicit
 github.com/xeipuuv/gojsonpointer

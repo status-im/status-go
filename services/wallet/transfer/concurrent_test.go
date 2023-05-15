@@ -16,7 +16,7 @@ import (
 )
 
 func TestConcurrentErrorInterrupts(t *testing.T) {
-	concurrent := NewConcurrentDownloader(context.Background())
+	concurrent := NewConcurrentDownloader(context.Background(), NoThreadLimit)
 	var interrupted bool
 	concurrent.Add(func(ctx context.Context) error {
 		select {
@@ -36,7 +36,7 @@ func TestConcurrentErrorInterrupts(t *testing.T) {
 }
 
 func TestConcurrentCollectsTransfers(t *testing.T) {
-	concurrent := NewConcurrentDownloader(context.Background())
+	concurrent := NewConcurrentDownloader(context.Background(), NoThreadLimit)
 	concurrent.Add(func(context.Context) error {
 		concurrent.Push(Transfer{})
 		return nil
@@ -126,7 +126,7 @@ func TestConcurrentEthDownloader(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			concurrent := NewConcurrentDownloader(ctx)
+			concurrent := NewConcurrentDownloader(ctx, 0)
 			_, headers, _ := findBlocksWithEthTransfers(
 				ctx, tc.options.balances, newBalanceCache(), tc.options.batches,
 				common.Address{}, zero, tc.options.last, false)

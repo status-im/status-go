@@ -22,11 +22,12 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
+	libp2pwebtransport "github.com/libp2p/go-libp2p/p2p/transport/webtransport"
 	"github.com/multiformats/go-multiaddr"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
-	"github.com/waku-org/go-waku/waku/v2/protocol/filterv2"
+	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/rendezvous"
@@ -63,15 +64,15 @@ type WakuNodeParameters struct {
 	logger   *zap.Logger
 	logLevel logging.LogLevel
 
-	noDefaultWakuTopic      bool
-	enableRelay             bool
-	enableFilter            bool
-	isFilterFullNode        bool
-	enableFilterV2LightNode bool
-	enableFilterV2FullNode  bool
-	filterOpts              []filter.Option
-	filterV2Opts            []filterv2.Option
-	wOpts                   []pubsub.Option
+	noDefaultWakuTopic     bool
+	enableRelay            bool
+	enableLegacyFilter     bool
+	isLegacyFilterFullnode bool
+	enableFilterLightNode  bool
+	enableFilterFullNode   bool
+	legacyFilterOpts       []legacy_filter.Option
+	filterOpts             []filter.Option
+	wOpts                  []pubsub.Option
 
 	minRelayPeersToPublish int
 
@@ -100,10 +101,10 @@ type WakuNodeParameters struct {
 	rlnRelayContentTopic         string
 	rlnRelayDynamic              bool
 	rlnSpamHandler               func(message *pb.WakuMessage) error
-	rlnRelayIDKey                *[32]byte
-	rlnRelayIDCommitment         *[32]byte
 	rlnETHPrivateKey             *ecdsa.PrivateKey
 	rlnETHClientAddress          string
+	keystorePath                 string
+	keystorePassword             string
 	rlnMembershipContractAddress common.Address
 	rlnRegistrationHandler       func(tx *types.Transaction)
 
@@ -219,6 +220,31 @@ func WithAdvertiseAddresses(advertiseAddrs ...ma.Multiaddr) WakuNodeOption {
 	}
 }
 
+// WithExternalIP is a WakuNodeOption that allows overriding the advertised external IP used in the waku node with custom value
+func WithExternalIP(ip net.IP) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.addressFactory = func(inputAddr []multiaddr.Multiaddr) (addresses []multiaddr.Multiaddr) {
+			component := "/ip4/"
+			if ip.To4() == nil && ip.To16() != nil {
+				component = "/ip6/"
+			}
+
+			hostAddrMA, err := multiaddr.NewMultiaddr(component + ip.String())
+			if err != nil {
+				panic("Could not build external IP")
+			}
+
+			for _, addr := range inputAddr {
+				_, rest := multiaddr.SplitFirst(addr)
+				addresses = append(addresses, hostAddrMA.Encapsulate(rest))
+			}
+
+			return addresses
+		}
+		return nil
+	}
+}
+
 // WithMultiaddress is a WakuNodeOption that configures libp2p to listen on a list of multiaddresses
 func WithMultiaddress(addresses []multiaddr.Multiaddr) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
@@ -318,31 +344,31 @@ func WithPeerExchange() WakuNodeOption {
 	}
 }
 
-// WithWakuFilter enables the Waku Filter protocol. This WakuNodeOption
+// WithLegacyWakuFilter enables the legacy Waku Filter protocol. This WakuNodeOption
 // accepts a list of WakuFilter gossipsub options to setup the protocol
-func WithWakuFilter(fullNode bool, filterOpts ...filter.Option) WakuNodeOption {
+func WithLegacyWakuFilter(fullnode bool, filterOpts ...legacy_filter.Option) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
-		params.enableFilter = true
-		params.isFilterFullNode = fullNode
-		params.filterOpts = filterOpts
+		params.enableLegacyFilter = true
+		params.isLegacyFilterFullnode = fullnode
+		params.legacyFilterOpts = filterOpts
 		return nil
 	}
 }
 
-// WithWakuFilterV2 enables the Waku Filter V2 protocol for lightnode functionality
-func WithWakuFilterV2LightNode() WakuNodeOption {
+// WithWakuFilter enables the Waku Filter V2 protocol for lightnode functionality
+func WithWakuFilterLightNode() WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
-		params.enableFilterV2LightNode = true
+		params.enableFilterLightNode = true
 		return nil
 	}
 }
 
-// WithWakuFilterV2FullNode enables the Waku Filter V2 protocol full node functionality.
+// WithWakuFilterFullNode enables the Waku Filter V2 protocol full node functionality.
 // This WakuNodeOption accepts a list of WakuFilter options to setup the protocol
-func WithWakuFilterV2FullNode(filterOpts ...filterv2.Option) WakuNodeOption {
+func WithWakuFilterFullNode(filterOpts ...filter.Option) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
-		params.enableFilterV2FullNode = true
-		params.filterV2Opts = filterOpts
+		params.enableFilterFullNode = true
+		params.filterOpts = filterOpts
 		return nil
 	}
 }
@@ -473,6 +499,7 @@ var DefaultLibP2POptions = []libp2p.Option{
 	libp2p.ChainOptions(
 		libp2p.Transport(tcp.NewTCPTransport),
 		libp2p.Transport(quic.NewTransport),
+		libp2p.Transport(libp2pwebtransport.New),
 	),
 	libp2p.UserAgent(userAgent),
 	libp2p.ChainOptions(

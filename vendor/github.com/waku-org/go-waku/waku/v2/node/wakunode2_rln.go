@@ -6,9 +6,9 @@ package node
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"errors"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln"
+	"github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager/dynamic"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager/static"
 	r "github.com/waku-org/go-zerokit-rln/rln"
 	"go.uber.org/zap"
@@ -39,33 +39,53 @@ func (w *WakuNode) mountRlnRelay(ctx context.Context) error {
 		return errors.New("relay protocol does not support the configured pubsub topic")
 	}
 
+	var err error
+	var groupManager rln.GroupManager
+
 	if !w.opts.rlnRelayDynamic {
 		w.log.Info("setting up waku-rln-relay in off-chain mode")
+
 		// set up rln relay inputs
 		groupKeys, idCredential, err := static.Setup(w.opts.rlnRelayMemIndex)
 		if err != nil {
 			return err
 		}
 
-		// rlnrelay in off-chain mode with a static group of user
-
-		groupManager, err := static.NewStaticGroupManager(groupKeys, idCredential, w.opts.rlnRelayMemIndex, w.log)
+		groupManager, err = static.NewStaticGroupManager(groupKeys, idCredential, w.opts.rlnRelayMemIndex, w.log)
 		if err != nil {
 			return err
 		}
+	} else {
+		w.log.Info("setting up waku-rln-relay in on-chain mode")
 
-		rlnRelay, err := rln.New(w.Relay(), groupManager, w.opts.rlnRelayPubsubTopic, w.opts.rlnRelayContentTopic, w.opts.rlnSpamHandler, w.timesource, w.log)
+		groupManager, err = dynamic.NewDynamicGroupManager(
+			w.opts.rlnETHClientAddress,
+			w.opts.rlnETHPrivateKey,
+			w.opts.rlnMembershipContractAddress,
+			w.opts.keystorePath,
+			w.opts.keystorePassword,
+			true,
+			w.opts.rlnRegistrationHandler,
+			w.log,
+		)
 		if err != nil {
 			return err
 		}
+	}
 
-		err = rlnRelay.Start(ctx)
-		if err != nil {
-			return err
-		}
+	rlnRelay, err := rln.New(w.Relay(), groupManager, w.opts.rlnRelayPubsubTopic, w.opts.rlnRelayContentTopic, w.opts.rlnSpamHandler, w.timesource, w.log)
+	if err != nil {
+		return err
+	}
 
-		w.rlnRelay = rlnRelay
+	err = rlnRelay.Start(ctx)
+	if err != nil {
+		return err
+	}
 
+	w.rlnRelay = rlnRelay
+
+	if !w.opts.rlnRelayDynamic {
 		// check the correct construction of the tree by comparing the calculated root against the expected root
 		// no error should happen as it is already captured in the unit tests
 		root, err := rlnRelay.RLN.GetMerkleRoot()
@@ -81,26 +101,6 @@ func (w *WakuNode) mountRlnRelay(ctx context.Context) error {
 		if !bytes.Equal(expectedRoot[:], root[:]) {
 			return errors.New("root mismatch: something went wrong not in Merkle tree construction")
 		}
-
-		w.log.Debug("the calculated root", zap.String("root", hex.EncodeToString(root[:])))
-	} else {
-		w.log.Info("setting up waku-rln-relay in on-chain mode")
-
-		/*//  check if the peer has provided its rln credentials
-		var memKeyPair *r.IdentityCredential
-		if w.opts.rlnRelayIDCommitment != nil && w.opts.rlnRelayIDKey != nil {
-			memKeyPair = &r.IdentityCredential{
-				IDCommitment: *w.opts.rlnRelayIDCommitment,
-				IDSecretHash: *w.opts.rlnRelayIDKey,
-			}
-		}
-
-		// mount the rln relay protocol in the on-chain/dynamic mode
-		var err error
-		w.rlnRelay, err = rln.RlnRelayDynamic(ctx, w.Relay(), w.opts.rlnETHClientAddress, w.opts.rlnETHPrivateKey, w.opts.rlnMembershipContractAddress, memKeyPair, w.opts.rlnRelayMemIndex, w.opts.rlnRelayPubsubTopic, w.opts.rlnRelayContentTopic, w.opts.rlnSpamHandler, w.opts.rlnRegistrationHandler, w.timesource, w.log)
-		if err != nil {
-			return err
-		}*/
 	}
 
 	w.log.Info("mounted waku RLN relay", zap.String("pubsubTopic", w.opts.rlnRelayPubsubTopic), zap.String("contentTopic", w.opts.rlnRelayContentTopic))

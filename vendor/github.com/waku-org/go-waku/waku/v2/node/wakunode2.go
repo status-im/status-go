@@ -13,7 +13,6 @@ import (
 	"github.com/libp2p/go-libp2p"
 	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
@@ -33,8 +32,9 @@ import (
 	v2 "github.com/waku-org/go-waku/waku/v2"
 	"github.com/waku-org/go-waku/waku/v2/discv5"
 	"github.com/waku-org/go-waku/waku/v2/metrics"
+	"github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
-	"github.com/waku-org/go-waku/waku/v2/protocol/filterv2"
+	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
@@ -55,15 +55,18 @@ type Peer struct {
 
 type storeFactory func(w *WakuNode) store.Store
 
-type MembershipKeyPair = struct {
-	IDKey        [32]byte `json:"idKey"`
-	IDCommitment [32]byte `json:"idCommitment"`
+type byte32 = [32]byte
+
+type IdentityCredential = struct {
+	IDTrapdoor   byte32 `json:"idTrapdoor"`
+	IDNullifier  byte32 `json:"idNullifier"`
+	IDSecretHash byte32 `json:"idSecretHash"`
+	IDCommitment byte32 `json:"idCommitment"`
 }
 
 type RLNRelay interface {
-	MembershipKeyPair() *MembershipKeyPair
-	MembershipIndex() uint
-	MembershipContractAddress() common.Address
+	IdentityCredential() (IdentityCredential, error)
+	MembershipIndex() (uint, error)
 	AppendRLNProof(msg *pb.WakuMessage, senderEpochTime time.Time) error
 	Stop()
 }
@@ -74,23 +77,23 @@ type WakuNode struct {
 	log        *zap.Logger
 	timesource timesource.Timesource
 
-	relay         Service
-	lightPush     Service
-	peerConnector PeerConnectorService
-	discoveryV5   Service
-	peerExchange  Service
-	rendezvous    Service
-	filter        ReceptorService
-	filterV2Full  ReceptorService
-	filterV2Light Service
-	store         ReceptorService
-	rlnRelay      RLNRelay
+	relay           Service
+	lightPush       Service
+	peerConnector   PeerConnectorService
+	discoveryV5     Service
+	peerExchange    Service
+	rendezvous      Service
+	legacyFilter    ReceptorService
+	filterFullnode  ReceptorService
+	filterLightnode Service
+	store           ReceptorService
+	rlnRelay        RLNRelay
 
-	wakuFlag utils.WakuEnrBitfield
+	wakuFlag enr.WakuEnrBitfield
 
 	localNode *enode.LocalNode
 
-	bcaster v2.Broadcaster
+	bcaster relay.Broadcaster
 
 	connectionNotif        ConnectionNotifier
 	protocolEventSub       event.Subscription
@@ -112,7 +115,7 @@ type WakuNode struct {
 }
 
 func defaultStoreFactory(w *WakuNode) store.Store {
-	return store.NewWakuStore(w.host, w.opts.messageProvider, w.timesource, w.log)
+	return store.NewWakuStore(w.opts.messageProvider, w.timesource, w.log)
 }
 
 // New is used to instantiate a WakuNode using a set of WakuNodeOptions
@@ -165,19 +168,15 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		params.libP2POpts = append(params.libP2POpts, libp2p.AddrsFactory(params.addressFactory))
 	}
 
-	host, err := libp2p.New(params.libP2POpts...)
-	if err != nil {
-		return nil, err
-	}
+	var err error
 
 	w := new(WakuNode)
-	w.bcaster = v2.NewBroadcaster(1024)
-	w.host = host
+	w.bcaster = relay.NewBroadcaster(1024)
 	w.opts = params
 	w.log = params.logger.Named("node2")
 	w.wg = &sync.WaitGroup{}
 	w.keepAliveFails = make(map[peer.ID]int)
-	w.wakuFlag = utils.NewWakuEnrBitfield(w.opts.enableLightPush, w.opts.enableFilter, w.opts.enableStore, w.opts.enableRelay)
+	w.wakuFlag = enr.NewWakuEnrBitfield(w.opts.enableLightPush, w.opts.enableLegacyFilter, w.opts.enableStore, w.opts.enableRelay)
 
 	if params.enableNTP {
 		w.timesource = timesource.NewNTPTimesource(w.opts.ntpURLs, w.log)
@@ -195,7 +194,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	rngSrc := rand.NewSource(rand.Int63())
 	minBackoff, maxBackoff := time.Second*30, time.Hour
 	bkf := backoff.NewExponentialBackoff(minBackoff, maxBackoff, backoff.FullJitter, time.Second, 5.0, 0, rand.New(rngSrc))
-	w.peerConnector, err = v2.NewPeerConnectionStrategy(host, cacheSize, w.opts.discoveryMinPeers, network.DialPeerTimeout, bkf, w.log)
+	w.peerConnector, err = v2.NewPeerConnectionStrategy(cacheSize, w.opts.discoveryMinPeers, network.DialPeerTimeout, bkf, w.log)
 	if err != nil {
 		w.log.Error("creating peer connection strategy", zap.Error(err))
 	}
@@ -207,7 +206,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		}
 	}
 
-	w.peerExchange, err = peer_exchange.NewWakuPeerExchange(w.host, w.DiscV5(), w.peerConnector, w.log)
+	w.peerExchange, err = peer_exchange.NewWakuPeerExchange(w.DiscV5(), w.peerConnector, w.log)
 	if err != nil {
 		return nil, err
 	}
@@ -221,29 +220,17 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		rendezvousPoints = append(rendezvousPoints, peerID)
 	}
 
-	w.rendezvous = rendezvous.NewRendezvous(w.host, w.opts.enableRendezvousServer, w.opts.rendezvousDB, w.opts.enableRendezvous, rendezvousPoints, w.peerConnector, w.log)
-	w.relay = relay.NewWakuRelay(w.host, w.bcaster, w.opts.minRelayPeersToPublish, w.timesource, w.log, w.opts.wOpts...)
-	w.filter = filter.NewWakuFilter(w.host, w.bcaster, w.opts.isFilterFullNode, w.timesource, w.log, w.opts.filterOpts...)
-	w.filterV2Full = filterv2.NewWakuFilterFullnode(w.host, w.bcaster, w.timesource, w.log, w.opts.filterV2Opts...)
-	w.filterV2Light = filterv2.NewWakuFilterLightnode(w.host, w.bcaster, w.timesource, w.log)
-	w.lightPush = lightpush.NewWakuLightPush(w.host, w.Relay(), w.log)
+	w.rendezvous = rendezvous.NewRendezvous(w.opts.enableRendezvousServer, w.opts.rendezvousDB, w.opts.enableRendezvous, rendezvousPoints, w.peerConnector, w.log)
+	w.relay = relay.NewWakuRelay(w.bcaster, w.opts.minRelayPeersToPublish, w.timesource, w.log, w.opts.wOpts...)
+	w.legacyFilter = legacy_filter.NewWakuFilter(w.bcaster, w.opts.isLegacyFilterFullnode, w.timesource, w.log, w.opts.legacyFilterOpts...)
+	w.filterFullnode = filter.NewWakuFilterFullnode(w.timesource, w.log, w.opts.filterOpts...)
+	w.filterLightnode = filter.NewWakuFilterLightnode(w.bcaster, w.timesource, w.log)
+	w.lightPush = lightpush.NewWakuLightPush(w.Relay(), w.log)
 
 	if params.storeFactory != nil {
 		w.storeFactory = params.storeFactory
 	} else {
 		w.storeFactory = defaultStoreFactory
-	}
-
-	if w.protocolEventSub, err = host.EventBus().Subscribe(new(event.EvtPeerProtocolsUpdated)); err != nil {
-		return nil, err
-	}
-
-	if w.identificationEventSub, err = host.EventBus().Subscribe(new(event.EvtPeerIdentificationCompleted)); err != nil {
-		return nil, err
-	}
-
-	if w.addressChangesSub, err = host.EventBus().Subscribe(new(event.EvtLocalAddressesUpdated)); err != nil {
-		return nil, err
 	}
 
 	if params.connStatusC != nil {
@@ -294,6 +281,25 @@ func (w *WakuNode) Start(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	w.cancel = cancel
 
+	host, err := libp2p.New(w.opts.libP2POpts...)
+	if err != nil {
+		return err
+	}
+
+	w.host = host
+
+	if w.protocolEventSub, err = host.EventBus().Subscribe(new(event.EvtPeerProtocolsUpdated)); err != nil {
+		return err
+	}
+
+	if w.identificationEventSub, err = host.EventBus().Subscribe(new(event.EvtPeerIdentificationCompleted)); err != nil {
+		return err
+	}
+
+	if w.addressChangesSub, err = host.EventBus().Subscribe(new(event.EvtLocalAddressesUpdated)); err != nil {
+		return err
+	}
+
 	w.connectionNotif = NewConnectionNotifier(ctx, w.host, w.log)
 	w.host.Network().Notify(w.connectionNotif)
 
@@ -304,12 +310,18 @@ func (w *WakuNode) Start(ctx context.Context) error {
 	go w.watchMultiaddressChanges(ctx)
 	go w.watchENRChanges(ctx)
 
+	err = w.bcaster.Start(ctx)
+	if err != nil {
+		return err
+	}
+
 	if w.opts.keepAliveInterval > time.Duration(0) {
 		w.wg.Add(1)
 		go w.startKeepAlive(ctx, w.opts.keepAliveInterval)
 	}
 
-	err := w.peerConnector.Start(ctx)
+	w.peerConnector.SetHost(host)
+	err = w.peerConnector.Start(ctx)
 	if err != nil {
 		return err
 	}
@@ -321,6 +333,7 @@ func (w *WakuNode) Start(ctx context.Context) error {
 		}
 	}
 
+	w.relay.SetHost(host)
 	if w.opts.enableRelay {
 		err := w.relay.Start(ctx)
 		if err != nil {
@@ -332,50 +345,52 @@ func (w *WakuNode) Start(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-
-			w.Broadcaster().Unregister(&relay.DefaultWakuTopic, sub.C)
+			sub.Unsubscribe()
 		}
 	}
 
 	w.store = w.storeFactory(w)
+	w.store.SetHost(host)
 	if w.opts.enableStore {
-		err := w.startStore(ctx)
+		sub := w.bcaster.RegisterForAll()
+		err := w.startStore(ctx, sub)
 		if err != nil {
 			return err
 		}
-
 		w.log.Info("Subscribing store to broadcaster")
-		w.bcaster.Register(nil, w.store.MessageChannel())
 	}
 
+	w.lightPush.SetHost(host)
 	if w.opts.enableLightPush {
 		if err := w.lightPush.Start(ctx); err != nil {
 			return err
 		}
 	}
 
-	if w.opts.enableFilter {
-		err := w.filter.Start(ctx)
+	w.legacyFilter.SetHost(host)
+	if w.opts.enableLegacyFilter {
+		sub := w.bcaster.RegisterForAll()
+		err := w.legacyFilter.Start(ctx, sub)
 		if err != nil {
 			return err
 		}
-
 		w.log.Info("Subscribing filter to broadcaster")
-		w.bcaster.Register(nil, w.filter.MessageChannel())
 	}
 
-	if w.opts.enableFilterV2FullNode {
-		err := w.filterV2Full.Start(ctx)
+	w.filterFullnode.SetHost(host)
+	if w.opts.enableFilterFullNode {
+		sub := w.bcaster.RegisterForAll()
+		err := w.filterFullnode.Start(ctx, sub)
 		if err != nil {
 			return err
 		}
-
 		w.log.Info("Subscribing filterV2 to broadcaster")
-		w.bcaster.Register(nil, w.filterV2Full.MessageChannel())
+
 	}
 
-	if w.opts.enableFilterV2LightNode {
-		err := w.filterV2Light.Start(ctx)
+	w.filterLightnode.SetHost(host)
+	if w.opts.enableFilterLightNode {
+		err := w.filterLightnode.Start(ctx)
 		if err != nil {
 			return err
 		}
@@ -386,6 +401,7 @@ func (w *WakuNode) Start(ctx context.Context) error {
 		return err
 	}
 
+	w.peerExchange.SetHost(host)
 	if w.opts.enablePeerExchange {
 		err := w.peerExchange.Start(ctx)
 		if err != nil {
@@ -393,6 +409,7 @@ func (w *WakuNode) Start(ctx context.Context) error {
 		}
 	}
 
+	w.rendezvous.SetHost(host)
 	if w.opts.enableRendezvousServer || w.opts.enableRendezvous {
 		err := w.rendezvous.Start(ctx)
 		if err != nil {
@@ -416,9 +433,7 @@ func (w *WakuNode) Stop() {
 		return
 	}
 
-	w.cancel()
-
-	w.bcaster.Close()
+	w.bcaster.Stop()
 
 	defer w.connectionNotif.Close()
 	defer w.protocolEventSub.Close()
@@ -432,8 +447,8 @@ func (w *WakuNode) Stop() {
 	w.relay.Stop()
 	w.lightPush.Stop()
 	w.store.Stop()
-	w.filter.Stop()
-	w.filterV2Full.Stop()
+	w.legacyFilter.Stop()
+	w.filterFullnode.Stop()
 	w.peerExchange.Stop()
 
 	if w.opts.enableDiscV5 {
@@ -448,9 +463,13 @@ func (w *WakuNode) Stop() {
 
 	w.host.Close()
 
+	w.cancel()
+
 	w.wg.Wait()
 
 	close(w.enrChangeCh)
+
+	w.cancel = nil
 }
 
 // Host returns the libp2p Host used by the WakuNode
@@ -521,17 +540,25 @@ func (w *WakuNode) Store() store.Store {
 	return w.store.(store.Store)
 }
 
-// Filter is used to access any operation related to Waku Filter protocol
-func (w *WakuNode) Filter() *filter.WakuFilter {
-	if result, ok := w.filter.(*filter.WakuFilter); ok {
+// LegacyFilter is used to access any operation related to Waku LegacyFilter protocol
+func (w *WakuNode) LegacyFilter() *legacy_filter.WakuFilter {
+	if result, ok := w.legacyFilter.(*legacy_filter.WakuFilter); ok {
 		return result
 	}
 	return nil
 }
 
-// FilterV2 is used to access any operation related to Waku Filter protocol
-func (w *WakuNode) FilterV2() *filterv2.WakuFilterLightnode {
-	if result, ok := w.filterV2Light.(*filterv2.WakuFilterLightnode); ok {
+// FilterLightnode is used to access any operation related to Waku Filter protocol Full node feature
+func (w *WakuNode) FilterFullnode() *filter.WakuFilterFullNode {
+	if result, ok := w.filterFullnode.(*filter.WakuFilterFullNode); ok {
+		return result
+	}
+	return nil
+}
+
+// FilterFullnode is used to access any operation related to Waku Filter protocol Light node feature
+func (w *WakuNode) FilterLightnode() *filter.WakuFilterLightnode {
+	if result, ok := w.filterLightnode.(*filter.WakuFilterLightnode); ok {
 		return result
 	}
 	return nil
@@ -563,7 +590,7 @@ func (w *WakuNode) PeerExchange() *peer_exchange.WakuPeerExchange {
 
 // Broadcaster is used to access the message broadcaster that is used to push
 // messages to different protocols
-func (w *WakuNode) Broadcaster() v2.Broadcaster {
+func (w *WakuNode) Broadcaster() relay.Broadcaster {
 	return w.bcaster
 }
 
@@ -607,13 +634,13 @@ func (w *WakuNode) mountDiscV5() error {
 	}
 
 	var err error
-	w.discoveryV5, err = discv5.NewDiscoveryV5(w.Host(), w.opts.privKey, w.localNode, w.peerConnector, w.log, discV5Options...)
+	w.discoveryV5, err = discv5.NewDiscoveryV5(w.opts.privKey, w.localNode, w.peerConnector, w.log, discV5Options...)
 
 	return err
 }
 
-func (w *WakuNode) startStore(ctx context.Context) error {
-	err := w.store.Start(ctx)
+func (w *WakuNode) startStore(ctx context.Context, sub relay.Subscription) error {
+	err := w.store.Start(ctx, sub)
 	if err != nil {
 		w.log.Error("starting store", zap.Error(err))
 		return err

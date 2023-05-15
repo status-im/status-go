@@ -219,6 +219,13 @@ type ChatPreview struct {
 
 	// Members array to represent how many there are for chats preview of group chats
 	Members []ChatMember `json:"members"`
+
+	OutgoingStatus   string `json:"outgoingStatus,omitempty"`
+	ResponseTo       string `json:"responseTo"`
+	AlbumImagesCount uint32 `json:"albumImagesCount,omitempty"`
+	From             string `json:"from"`
+	Deleted          bool   `json:"deleted"`
+	DeletedForMe     bool   `json:"deletedForMe"`
 }
 
 func (c *Chat) PublicKey() (*ecdsa.PublicKey, error) {

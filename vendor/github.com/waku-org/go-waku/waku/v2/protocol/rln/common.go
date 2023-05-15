@@ -24,12 +24,6 @@ const MAX_EPOCH_GAP = int64(MAX_CLOCK_GAP_SECONDS / rln.EPOCH_UNIT_SECONDS)
 // Acceptable roots for merkle root validation of incoming messages
 const AcceptableRootWindowSize = 5
 
-type AppInfo struct {
-	Application   string
-	AppIdentifier string
-	Version       string
-}
-
 type RegistrationHandler = func(tx *types.Transaction)
 
 type SpamHandler = func(message *pb.WakuMessage) error

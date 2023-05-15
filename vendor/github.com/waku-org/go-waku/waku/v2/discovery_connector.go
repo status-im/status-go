@@ -46,7 +46,7 @@ type PeerConnectionStrategy struct {
 // dialTimeout is how long we attempt to connect to a peer before giving up
 // minPeers is the minimum number of peers that the node should have
 // backoff describes the strategy used to decide how long to backoff after previously attempting to connect to a peer
-func NewPeerConnectionStrategy(h host.Host, cacheSize int, minPeers int, dialTimeout time.Duration, backoff backoff.BackoffFactory, logger *zap.Logger) (*PeerConnectionStrategy, error) {
+func NewPeerConnectionStrategy(cacheSize int, minPeers int, dialTimeout time.Duration, backoff backoff.BackoffFactory, logger *zap.Logger) (*PeerConnectionStrategy, error) {
 	cache, err := lru.New2Q(cacheSize)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,6 @@ func NewPeerConnectionStrategy(h host.Host, cacheSize int, minPeers int, dialTim
 
 	return &PeerConnectionStrategy{
 		cache:       cache,
-		host:        h,
 		wg:          sync.WaitGroup{},
 		minPeers:    minPeers,
 		dialTimeout: dialTimeout,
@@ -71,6 +70,11 @@ type connCacheData struct {
 // PeerChannel exposes the channel on which discovered peers should be pushed
 func (c *PeerConnectionStrategy) PeerChannel() chan<- peer.AddrInfo {
 	return c.peerCh
+}
+
+// Sets the host to be able to mount or consume a protocol
+func (c *PeerConnectionStrategy) SetHost(h host.Host) {
+	c.host = h
 }
 
 // Start attempts to connect to the peers passed in by peerCh. Will not connect to peers if they are within the backoff period.

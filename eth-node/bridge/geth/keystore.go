@@ -48,13 +48,13 @@ func (k *gethKeyStoreAdapter) AccountDecryptedKey(a types.Account, auth string) 
 	return accountFrom(gethAccount), keyFrom(gethKey), err
 }
 
-func (k *gethKeyStoreAdapter) Delete(a types.Account, auth string) error {
+func (k *gethKeyStoreAdapter) Delete(a types.Account) error {
 	gethAccount, err := gethAccountFrom(a)
 	if err != nil {
 		return err
 	}
 
-	return k.keystore.Delete(gethAccount, auth)
+	return k.keystore.Delete(gethAccount)
 }
 
 // parseGethURL converts a user supplied URL into the accounts specific structure.

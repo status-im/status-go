@@ -58,7 +58,7 @@ import (
 
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
+	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
@@ -286,7 +286,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 	}
 
 	if cfg.LightClient {
-		opts = append(opts, node.WithWakuFilter(false))
+		opts = append(opts, node.WithLegacyWakuFilter(false))
 	} else {
 		relayOpts := []pubsub.Option{
 			pubsub.WithMaxMessageSize(int(waku.settings.MaxMsgSize)),
@@ -525,8 +525,7 @@ func (w *Waku) GetStats() types.StatsSummary {
 
 func (w *Waku) runPeerExchangeLoop() {
 	defer w.wg.Done()
-
-	if w.settings.PeerExchange && !w.settings.LightClient {
+	if !w.settings.PeerExchange || !w.settings.LightClient {
 		// Currently peer exchange is only used for full nodes
 		// TODO: should it be used for lightpush? or lightpush nodes
 		// are only going to be selected from a specific set of peers?
@@ -620,7 +619,7 @@ func (w *Waku) runRelayMsgLoop() {
 		case <-w.quit:
 			sub.Unsubscribe()
 			return
-		case env := <-sub.C:
+		case env := <-sub.Ch:
 			envelopeErrors, err := w.OnNewEnvelopes(env, common.RelayedMessageType)
 			if err != nil {
 				w.logger.Error("onNewEnvelope error", zap.Error(err))
@@ -661,13 +660,13 @@ func (w *Waku) subscribeWakuFilterTopic(topics [][]byte) {
 	}
 
 	var err error
-	contentFilter := filter.ContentFilter{
+	contentFilter := legacy_filter.ContentFilter{
 		Topic:         relay.DefaultWakuTopic,
 		ContentTopics: contentTopics,
 	}
 
-	var wakuFilter filter.Filter
-	_, wakuFilter, err = w.node.Filter().Subscribe(context.Background(), contentFilter)
+	var wakuFilter legacy_filter.Filter
+	_, wakuFilter, err = w.node.LegacyFilter().Subscribe(context.Background(), contentFilter)
 	if err != nil {
 		w.logger.Warn("could not add wakuv2 filter for topics", zap.Any("topics", topics))
 		return
@@ -982,14 +981,14 @@ func (w *Waku) GetFilter(id string) *common.Filter {
 func (w *Waku) Unsubscribe(id string) error {
 	f := w.filters.Get(id)
 	if f != nil && w.settings.LightClient {
-		contentFilter := filter.ContentFilter{
+		contentFilter := legacy_filter.ContentFilter{
 			Topic: relay.DefaultWakuTopic,
 		}
 		for _, topic := range f.Topics {
 			contentFilter.ContentTopics = append(contentFilter.ContentTopics, common.BytesToTopic(topic).ContentTopic())
 		}
 
-		if err := w.node.Filter().UnsubscribeFilter(context.Background(), contentFilter); err != nil {
+		if err := w.node.LegacyFilter().UnsubscribeFilter(context.Background(), contentFilter); err != nil {
 			return fmt.Errorf("failed to unsubscribe: %w", err)
 		}
 	}
@@ -1125,13 +1124,6 @@ func (w *Waku) Start() error {
 		return fmt.Errorf("failed to create a go-waku node: %v", err)
 	}
 
-	idService, err := identify.NewIDService(w.node.Host())
-	if err != nil {
-		return err
-	}
-
-	w.identifyService = idService
-
 	w.quit = make(chan struct{})
 	w.filterMsgChannel = make(chan *protocol.Envelope, 1024)
 	w.connectionChanged = make(chan struct{})
@@ -1140,6 +1132,13 @@ func (w *Waku) Start() error {
 	if err = w.node.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start go-waku node: %v", err)
 	}
+
+	idService, err := identify.NewIDService(w.node.Host())
+	if err != nil {
+		return err
+	}
+
+	w.identifyService = idService
 
 	if err = w.addWakuV2Peers(ctx, w.cfg); err != nil {
 		return fmt.Errorf("failed to add wakuv2 peers: %v", err)
@@ -1215,9 +1214,9 @@ func (w *Waku) Start() error {
 // Stop implements node.Service, stopping the background data propagation thread
 // of the Waku protocol.
 func (w *Waku) Stop() error {
+	close(w.quit)
 	w.identifyService.Close()
 	w.node.Stop()
-	close(w.quit)
 	close(w.filterMsgChannel)
 	close(w.connectionChanged)
 	w.wg.Wait()
@@ -1226,7 +1225,7 @@ func (w *Waku) Stop() error {
 
 func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.MessageType) ([]common.EnvelopeError, error) {
 	if envelope == nil {
-		return nil, errors.New("nil envelope error")
+		return nil, nil
 	}
 
 	recvMessage := common.NewReceivedMessage(envelope, msgType)

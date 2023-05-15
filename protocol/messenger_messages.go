@@ -217,7 +217,10 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 		response.AddRemovedMessage(&RemovedMessage{MessageID: messageToDelete.ID, ChatID: chat.ID, DeletedBy: deletedBy})
 
 		if chat.LastMessage != nil && chat.LastMessage.ID == messageToDelete.ID {
-			if err := m.updateLastMessage(chat); err != nil {
+			chat.LastMessage = messageToDelete
+
+			err = m.saveChat(chat)
+			if err != nil {
 				return nil, err
 			}
 		}
@@ -269,7 +272,9 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string
 		}
 
 		if chat.LastMessage != nil && chat.LastMessage.ID == messageToDelete.ID {
-			if err := m.updateLastMessage(chat); err != nil {
+			chat.LastMessage = messageToDelete
+			err = m.saveChat(chat)
+			if err != nil {
 				return nil, err
 			}
 		}
@@ -286,31 +291,34 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string
 	}
 	response.AddChat(chat)
 
-	if m.hasPairedDevices() {
-		clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
-
-		deletedForMeMessage := &DeleteForMeMessage{}
-
-		deletedForMeMessage.MessageId = messageID
-		deletedForMeMessage.Clock = clock
-
-		encodedMessage, err := proto.Marshal(deletedForMeMessage.GetProtobuf())
-
-		if err != nil {
-			return response, err
+	err = m.withChatClock(func(chatID string, clock uint64) error {
+		deletedForMeMessage := &protobuf.DeleteForMeMessage{
+			MessageId: messageID,
+			Clock:     clock,
 		}
 
-		rawMessage := common.RawMessage{
-			LocalChatID:          chat.ID,
-			Payload:              encodedMessage,
-			MessageType:          protobuf.ApplicationMetadataMessage_SYNC_DELETE_FOR_ME_MESSAGE,
-			SkipGroupMessageWrap: true,
-			ResendAutomatically:  true,
+		if m.hasPairedDevices() {
+			encodedMessage, err2 := proto.Marshal(deletedForMeMessage)
+
+			if err2 != nil {
+				return err2
+			}
+
+			rawMessage := common.RawMessage{
+				LocalChatID:         chatID,
+				Payload:             encodedMessage,
+				MessageType:         protobuf.ApplicationMetadataMessage_SYNC_DELETE_FOR_ME_MESSAGE,
+				ResendAutomatically: true,
+			}
+			_, err2 = m.dispatchMessage(ctx, rawMessage)
+			return err2
 		}
-		_, err = m.dispatchMessage(ctx, rawMessage)
-		if err != nil {
-			return response, err
-		}
+
+		return m.persistence.SaveOrUpdateDeleteForMeMessage(deletedForMeMessage)
+	})
+
+	if err != nil {
+		return response, err
 	}
 
 	return response, nil
@@ -370,10 +378,10 @@ func (m *Messenger) applyDeleteMessage(messageDeletes []*DeleteMessage, message 
 	return nil
 }
 
-func (m *Messenger) applyDeleteForMeMessage(messageDeletes []*DeleteForMeMessage, message *common.Message) error {
+func (m *Messenger) applyDeleteForMeMessage(message *common.Message) error {
 	message.DeletedForMe = true
 
-	err := message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+	err := message.PrepareContent(m.myHexIdentity())
 	if err != nil {
 		return err
 	}

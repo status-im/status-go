@@ -241,22 +241,17 @@ func (ks *KeyStore) AccountDecryptedKey(a accounts.Account, auth string) (accoun
 	return ks.getDecryptedKey(a, auth)
 }
 
-// Delete deletes the key matched by account if the passphrase is correct.
+// Delete deletes the key matched by account.
 // If the account contains no filename, the address must match a unique key.
-func (ks *KeyStore) Delete(a accounts.Account, passphrase string) error {
-	// Decrypting the key isn't really necessary, but we do
-	// it anyway to check the password and zero out the key
-	// immediately afterwards.
-	a, key, err := ks.getDecryptedKey(a, passphrase)
-	if key != nil {
-		zeroKey(key.PrivateKey)
-	}
-	if err != nil {
-		return err
-	}
+func (ks *KeyStore) Delete(a accounts.Account) error {
 	// The order is crucial here. The key is dropped from the
 	// cache after the file is gone so that a reload happening in
 	// between won't insert it into the cache again.
+	a, err := ks.Find(a)
+	if err != nil {
+		return err
+	}
+
 	err = os.Remove(a.URL.Path)
 	if err == nil {
 		ks.cache.delete(a)

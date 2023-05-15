@@ -10,7 +10,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/waku-org/go-waku/logging"
 	"github.com/waku-org/go-waku/waku/v2/metrics"
-	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
+	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
@@ -131,7 +131,7 @@ func (w *WakuNode) Status() (isOnline bool, hasHistory bool) {
 			if !hasStore && protocol == store.StoreID_v20beta4 {
 				hasStore = true
 			}
-			if !hasFilter && protocol == filter.FilterID_v20beta1 {
+			if !hasFilter && protocol == legacy_filter.FilterID_v20beta1 {
 				hasFilter = true
 			}
 		}

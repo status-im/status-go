@@ -2481,6 +2481,10 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		return err
 	}
 
+	if err = m.syncDeleteForMeMessage(ctx, rawMessageHandler); err != nil {
+		return err
+	}
+
 	return m.syncSocialSettings(ctx, rawMessageHandler)
 }
 
@@ -3325,7 +3329,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 						logger.Debug("Handling ChatMessage")
 						messageState.CurrentMessageState.Message = msg.ParsedMessage.Interface().(protobuf.ChatMessage)
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, messageState.CurrentMessageState.Message)
-						err = m.HandleChatMessage(messageState)
+						err = m.HandleImportedChatMessage(messageState)
 						if err != nil {
 							logger.Warn("failed to handle ChatMessage", zap.Error(err))
 							continue
@@ -3606,14 +3610,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, deleteForMeProto)
-						deleteForMeMessage := DeleteForMeMessage{
-							DeleteForMeMessage: deleteForMeProto,
-							From:               contact.ID,
-							ID:                 messageID,
-							SigPubKey:          publicKey,
-						}
 
-						err = m.HandleDeleteForMeMessage(messageState, deleteForMeMessage)
+						err = m.HandleDeleteForMeMessage(messageState, deleteForMeProto)
 						if err != nil {
 							logger.Warn("failed to handle DeleteForMeMessage", zap.Error(err))
 							allMessagesProcessed = false
@@ -6421,6 +6419,33 @@ func (m *Messenger) withChatClock(callback func(string, uint64) error) error {
 	return m.saveChat(chat)
 }
 
+func (m *Messenger) syncDeleteForMeMessage(ctx context.Context, rawMessageDispatcher RawMessageHandler) error {
+	deleteForMes, err := m.persistence.GetDeleteForMeMessages()
+	if err != nil {
+		return err
+	}
+
+	return m.withChatClock(func(chatID string, _ uint64) error {
+		for _, deleteForMe := range deleteForMes {
+			encodedMessage, err2 := proto.Marshal(deleteForMe)
+			if err2 != nil {
+				return err2
+			}
+			rawMessage := common.RawMessage{
+				LocalChatID:         chatID,
+				Payload:             encodedMessage,
+				MessageType:         protobuf.ApplicationMetadataMessage_SYNC_DELETE_FOR_ME_MESSAGE,
+				ResendAutomatically: true,
+			}
+			_, err2 = rawMessageDispatcher(ctx, rawMessage)
+			if err2 != nil {
+				return err2
+			}
+		}
+		return nil
+	})
+}
+
 func (m *Messenger) syncSocialSettings(ctx context.Context, rawMessageDispatcher RawMessageHandler) error {
 	if !m.hasPairedDevices() {
 		return nil
@@ -6478,4 +6503,8 @@ func (m *Messenger) handleSyncSocialLinkSetting(message protobuf.SyncSocialLinkS
 	}
 	callback(link)
 	return nil
+}
+
+func (m *Messenger) GetDeleteForMeMessages() ([]*protobuf.DeleteForMeMessage, error) {
+	return m.persistence.GetDeleteForMeMessages()
 }

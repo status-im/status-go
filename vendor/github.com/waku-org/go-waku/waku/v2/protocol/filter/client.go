@@ -1,4 +1,4 @@
-package filterv2
+package filter
 
 import (
 	"context"
@@ -15,11 +15,11 @@ import (
 	libp2pProtocol "github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-msgio/pbio"
 	"github.com/waku-org/go-waku/logging"
-	v2 "github.com/waku-org/go-waku/waku/v2"
 	"github.com/waku-org/go-waku/waku/v2/metrics"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/protocol/filterv2/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/filter/pb"
 	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"go.opencensus.io/tag"
 	"go.uber.org/zap"
@@ -37,7 +37,7 @@ type WakuFilterLightnode struct {
 	cancel        context.CancelFunc
 	ctx           context.Context
 	h             host.Host
-	broadcaster   v2.Broadcaster
+	broadcaster   relay.Broadcaster
 	timesource    timesource.Timesource
 	wg            *sync.WaitGroup
 	log           *zap.Logger
@@ -55,15 +55,19 @@ type WakuFilterPushResult struct {
 }
 
 // NewWakuRelay returns a new instance of Waku Filter struct setup according to the chosen parameter and options
-func NewWakuFilterLightnode(host host.Host, broadcaster v2.Broadcaster, timesource timesource.Timesource, log *zap.Logger) *WakuFilterLightnode {
+func NewWakuFilterLightnode(broadcaster relay.Broadcaster, timesource timesource.Timesource, log *zap.Logger) *WakuFilterLightnode {
 	wf := new(WakuFilterLightnode)
 	wf.log = log.Named("filterv2-lightnode")
 	wf.broadcaster = broadcaster
 	wf.timesource = timesource
 	wf.wg = &sync.WaitGroup{}
-	wf.h = host
 
 	return wf
+}
+
+// Sets the host to be able to mount or consume a protocol
+func (wf *WakuFilterLightnode) SetHost(h host.Host) {
+	wf.h = h
 }
 
 func (wf *WakuFilterLightnode) Start(ctx context.Context) error {
@@ -78,11 +82,11 @@ func (wf *WakuFilterLightnode) Start(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	wf.cancel = cancel
 	wf.ctx = ctx
-	wf.subscriptions = NewSubscriptionMap()
+	wf.subscriptions = NewSubscriptionMap(wf.log)
 
 	wf.h.SetStreamHandlerMatch(FilterPushID_v20beta1, protocol.PrefixTextMatch(string(FilterPushID_v20beta1)), wf.onRequest(ctx))
 
-	wf.log.Info("filter protocol (light) started")
+	wf.log.Info("filter-push protocol started")
 
 	return nil
 }
@@ -109,14 +113,29 @@ func (wf *WakuFilterLightnode) onRequest(ctx context.Context) func(s network.Str
 		defer s.Close()
 		logger := wf.log.With(logging.HostID("peer", s.Conn().RemotePeer()))
 
+		if !wf.subscriptions.IsSubscribedTo(s.Conn().RemotePeer()) {
+			logger.Warn("received message push from unknown peer", logging.HostID("peerID", s.Conn().RemotePeer()))
+			metrics.RecordFilterError(ctx, "unknown_peer_messagepush")
+			return
+		}
+
 		reader := pbio.NewDelimitedReader(s, math.MaxInt32)
 
 		messagePush := &pb.MessagePushV2{}
 		err := reader.ReadMsg(messagePush)
 		if err != nil {
 			logger.Error("reading message push", zap.Error(err))
+			metrics.RecordFilterError(ctx, "decode_rpc_failure")
 			return
 		}
+
+		if !wf.subscriptions.Has(s.Conn().RemotePeer(), messagePush.PubsubTopic, messagePush.WakuMessage.ContentTopic) {
+			logger.Warn("received messagepush with invalid subscription parameters", logging.HostID("peerID", s.Conn().RemotePeer()), zap.String("topic", messagePush.PubsubTopic), zap.String("contentTopic", messagePush.WakuMessage.ContentTopic))
+			metrics.RecordFilterError(ctx, "invalid_subscription_message")
+			return
+		}
+
+		metrics.RecordFilterMessage(ctx, "PushMessage", 1)
 
 		wf.notify(s.Conn().RemotePeer(), messagePush.PubsubTopic, messagePush.WakuMessage)
 
@@ -137,12 +156,14 @@ func (wf *WakuFilterLightnode) notify(remotePeerID peer.ID, pubsubTopic string, 
 func (wf *WakuFilterLightnode) request(ctx context.Context, params *FilterSubscribeParameters, reqType pb.FilterSubscribeRequest_FilterSubscribeType, contentFilter ContentFilter) error {
 	err := wf.h.Connect(ctx, wf.h.Peerstore().PeerInfo(params.selectedPeer))
 	if err != nil {
+		metrics.RecordFilterError(ctx, "dial_failure")
 		return err
 	}
 
 	var conn network.Stream
 	conn, err = wf.h.NewStream(ctx, params.selectedPeer, FilterSubscribeID_v20beta1)
 	if err != nil {
+		metrics.RecordFilterError(ctx, "dial_failure")
 		return err
 	}
 	defer conn.Close()
@@ -160,6 +181,7 @@ func (wf *WakuFilterLightnode) request(ctx context.Context, params *FilterSubscr
 	wf.log.Debug("sending FilterSubscribeRequest", zap.Stringer("request", request))
 	err = writer.WriteMsg(request)
 	if err != nil {
+		metrics.RecordFilterError(ctx, "write_request_failure")
 		wf.log.Error("sending FilterSubscribeRequest", zap.Error(err))
 		return err
 	}
@@ -168,10 +190,19 @@ func (wf *WakuFilterLightnode) request(ctx context.Context, params *FilterSubscr
 	err = reader.ReadMsg(filterSubscribeResponse)
 	if err != nil {
 		wf.log.Error("receiving FilterSubscribeResponse", zap.Error(err))
+		metrics.RecordFilterError(ctx, "decode_rpc_failure")
 		return err
 	}
 
+	if filterSubscribeResponse.RequestId != request.RequestId {
+		wf.log.Error("requestId mismatch", zap.String("expected", request.RequestId), zap.String("received", filterSubscribeResponse.RequestId))
+		metrics.RecordFilterError(ctx, "request_id_mismatch")
+		err := NewFilterError(300, "request_id_mismatch")
+		return &err
+	}
+
 	if filterSubscribeResponse.StatusCode != http.StatusOK {
+		metrics.RecordFilterError(ctx, "error_response")
 		err := NewFilterError(int(filterSubscribeResponse.StatusCode), filterSubscribeResponse.StatusDesc)
 		return &err
 	}
@@ -204,6 +235,7 @@ func (wf *WakuFilterLightnode) Subscribe(ctx context.Context, contentFilter Cont
 	}
 
 	if params.selectedPeer == "" {
+		metrics.RecordFilterError(ctx, "peer_not_found_failure")
 		return nil, ErrNoPeersAvailable
 	}
 
@@ -217,7 +249,7 @@ func (wf *WakuFilterLightnode) Subscribe(ctx context.Context, contentFilter Cont
 
 // FilterSubscription is used to obtain an object from which you could receive messages received via filter protocol
 func (wf *WakuFilterLightnode) FilterSubscription(peerID peer.ID, contentFilter ContentFilter) (*SubscriptionDetails, error) {
-	if !wf.subscriptions.Has(peerID, contentFilter.Topic, contentFilter.ContentTopics) {
+	if !wf.subscriptions.Has(peerID, contentFilter.Topic, contentFilter.ContentTopics...) {
 		return nil, errors.New("subscription does not exist")
 	}
 
@@ -247,7 +279,24 @@ func (wf *WakuFilterLightnode) Ping(ctx context.Context, peerID peer.ID) error {
 }
 
 func (wf *WakuFilterLightnode) IsSubscriptionAlive(ctx context.Context, subscription *SubscriptionDetails) error {
-	return wf.Ping(ctx, subscription.peerID)
+	return wf.Ping(ctx, subscription.PeerID)
+}
+
+func (wf *WakuFilterLightnode) Subscriptions() []*SubscriptionDetails {
+	wf.subscriptions.RLock()
+	defer wf.subscriptions.RUnlock()
+
+	var output []*SubscriptionDetails
+
+	for _, peerSubscription := range wf.subscriptions.items {
+		for _, subscriptionPerTopic := range peerSubscription.subscriptionsPerTopic {
+			for _, subscriptionDetail := range subscriptionPerTopic {
+				output = append(output, subscriptionDetail)
+			}
+		}
+	}
+
+	return output
 }
 
 // Unsubscribe is used to stop receiving messages from a peer that match a content filter
@@ -305,13 +354,13 @@ func (wf *WakuFilterLightnode) Unsubscribe(ctx context.Context, contentFilter Co
 // Unsubscribe is used to stop receiving messages from a peer that match a content filter
 func (wf *WakuFilterLightnode) UnsubscribeWithSubscription(ctx context.Context, sub *SubscriptionDetails, opts ...FilterUnsubscribeOption) (<-chan WakuFilterPushResult, error) {
 	var contentTopics []string
-	for k := range sub.contentTopics {
+	for k := range sub.ContentTopics {
 		contentTopics = append(contentTopics, k)
 	}
 
-	opts = append(opts, Peer(sub.peerID))
+	opts = append(opts, Peer(sub.PeerID))
 
-	return wf.Unsubscribe(ctx, ContentFilter{Topic: sub.pubsubTopic, ContentTopics: contentTopics}, opts...)
+	return wf.Unsubscribe(ctx, ContentFilter{Topic: sub.PubsubTopic, ContentTopics: contentTopics}, opts...)
 }
 
 // UnsubscribeAll is used to stop receiving messages from peer(s). It does not close subscriptions

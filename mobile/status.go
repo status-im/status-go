@@ -904,7 +904,7 @@ func ChangeDatabasePassword(KeyUID, password, newPassword string) string {
 	return makeJSONResponse(nil)
 }
 
-func ConvertToKeycardAccount(accountData, settingsJSON, password, newPassword string) string {
+func ConvertToKeycardAccount(accountData, settingsJSON, keycardUID, password, newPassword string) string {
 	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(accountData), &account)
 	if err != nil {
@@ -916,7 +916,7 @@ func ConvertToKeycardAccount(accountData, settingsJSON, password, newPassword st
 		return makeJSONResponse(err)
 	}
 
-	err = statusBackend.ConvertToKeycardAccount(account, settings, password, newPassword)
+	err = statusBackend.ConvertToKeycardAccount(account, settings, keycardUID, password, newPassword)
 	if err != nil {
 		return makeJSONResponse(err)
 	}

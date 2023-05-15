@@ -1,15 +1,12 @@
 package transfer
 
 import (
-	"context"
 	"database/sql"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
@@ -18,23 +15,23 @@ type BlocksRange struct {
 	to   *big.Int
 }
 
-type LastKnownBlock struct {
+type Block struct {
 	Number  *big.Int
 	Balance *big.Int
 	Nonce   *int64
 }
 
-type LastKnownBlockView struct {
+type BlockView struct {
 	Address common.Address `json:"address"`
 	Number  *big.Int       `json:"blockNumber"`
 	Balance bigint.BigInt  `json:"balance"`
 	Nonce   *int64         `json:"nonce"`
 }
 
-func blocksToViews(blocks map[common.Address]*LastKnownBlock) []LastKnownBlockView {
-	blocksViews := []LastKnownBlockView{}
+func blocksToViews(blocks map[common.Address]*Block) []BlockView {
+	blocksViews := []BlockView{}
 	for address, block := range blocks {
-		view := LastKnownBlockView{
+		view := BlockView{
 			Address: address,
 			Number:  block.Number,
 			Balance: bigint.BigInt{Int: block.Balance},
@@ -46,12 +43,12 @@ func blocksToViews(blocks map[common.Address]*LastKnownBlock) []LastKnownBlockVi
 	return blocksViews
 }
 
-type Block struct {
+type BlockDAO struct {
 	db *sql.DB
 }
 
 // MergeBlocksRanges merge old blocks ranges if possible
-func (b *Block) mergeBlocksRanges(chainIDs []uint64, accounts []common.Address) error {
+func (b *BlockDAO) mergeBlocksRanges(chainIDs []uint64, accounts []common.Address) error {
 	for _, chainID := range chainIDs {
 		for _, account := range accounts {
 			err := b.mergeRanges(chainID, account)
@@ -63,7 +60,7 @@ func (b *Block) mergeBlocksRanges(chainIDs []uint64, accounts []common.Address) 
 	return nil
 }
 
-func (b *Block) setInitialBlocksRange(chainClient *chain.ClientWithFallback) error {
+func (b *BlockDAO) setInitialBlocksRange(chainID uint64, from *big.Int, to *big.Int) error {
 	accountsDB, err := accounts.NewDB(b.db)
 	if err != nil {
 		return err
@@ -73,23 +70,14 @@ func (b *Block) setInitialBlocksRange(chainClient *chain.ClientWithFallback) err
 		return err
 	}
 
-	from := big.NewInt(0)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	header, err := chainClient.HeaderByNumber(ctx, nil)
-	if err != nil {
-		return err
-	}
-
-	err = b.insertRange(chainClient.ChainID, common.Address(watchAddress), from, header.Number, big.NewInt(0), 0)
+	err = b.insertRange(chainID, common.Address(watchAddress), from, to, big.NewInt(0), 0)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (b *Block) mergeRanges(chainID uint64, account common.Address) (err error) {
+func (b *BlockDAO) mergeRanges(chainID uint64, account common.Address) (err error) {
 	var (
 		tx *sql.Tx
 	)
@@ -137,7 +125,7 @@ func (b *Block) mergeRanges(chainID uint64, account common.Address) (err error) 
 	return nil
 }
 
-func (b *Block) insertRange(chainID uint64, account common.Address, from, to, balance *big.Int, nonce uint64) error {
+func (b *BlockDAO) insertRange(chainID uint64, account common.Address, from, to, balance *big.Int, nonce uint64) error {
 	log.Debug("insert blocks range", "account", account, "network id", chainID, "from", from, "to", to, "balance", balance, "nonce", nonce)
 	insert, err := b.db.Prepare("INSERT INTO blocks_ranges (network_id, address, blk_from, blk_to, balance, nonce) VALUES (?, ?, ?, ?, ?, ?)")
 	if err != nil {
@@ -147,7 +135,7 @@ func (b *Block) insertRange(chainID uint64, account common.Address, from, to, ba
 	return err
 }
 
-func (b *Block) getOldRanges(chainID uint64, account common.Address) ([]*BlocksRange, error) {
+func (b *BlockDAO) getOldRanges(chainID uint64, account common.Address) ([]*BlocksRange, error) {
 	query := `select blk_from, blk_to from blocks_ranges
 	          where address = ?
 	          and network_id = ?
@@ -177,10 +165,10 @@ func (b *Block) getOldRanges(chainID uint64, account common.Address) ([]*BlocksR
 }
 
 // GetBlocksByAddress loads blocks for a given address.
-func (b *Block) GetBlocksByAddress(chainID uint64, address common.Address, limit int) (rst []*big.Int, err error) {
+func (b *BlockDAO) GetBlocksByAddress(chainID uint64, address common.Address, limit int) (rst []*big.Int, err error) {
 	query := `SELECT blk_number FROM blocks
 	WHERE address = ? AND network_id = ? AND loaded = 0
-	ORDER BY blk_number DESC 
+	ORDER BY blk_number DESC
 	LIMIT ?`
 	rows, err := b.db.Query(query, address, chainID, limit)
 	if err != nil {
@@ -198,10 +186,10 @@ func (b *Block) GetBlocksByAddress(chainID uint64, address common.Address, limit
 	return rst, nil
 }
 
-func (b *Block) RemoveBlockWithTransfer(chainID uint64, address common.Address, block *big.Int) error {
+func (b *BlockDAO) RemoveBlockWithTransfer(chainID uint64, address common.Address, block *big.Int) error {
 	query := `DELETE FROM blocks
-	WHERE address = ? 
-	AND blk_number = ? 
+	WHERE address = ?
+	AND blk_number = ?
 	AND network_id = ?`
 
 	_, err := b.db.Exec(query, address, (*bigint.SQLBigInt)(block), chainID)
@@ -213,8 +201,8 @@ func (b *Block) RemoveBlockWithTransfer(chainID uint64, address common.Address, 
 	return nil
 }
 
-func (b *Block) GetLastBlockByAddress(chainID uint64, address common.Address, limit int) (rst *big.Int, err error) {
-	query := `SELECT * FROM 
+func (b *BlockDAO) GetLastBlockByAddress(chainID uint64, address common.Address, limit int) (rst *big.Int, err error) {
+	query := `SELECT * FROM
 	(SELECT blk_number FROM blocks WHERE address = ? AND network_id = ? ORDER BY blk_number DESC LIMIT ?)
 	ORDER BY blk_number LIMIT 1`
 	rows, err := b.db.Query(query, address, chainID, limit)
@@ -236,10 +224,11 @@ func (b *Block) GetLastBlockByAddress(chainID uint64, address common.Address, li
 	return nil, nil
 }
 
-func (b *Block) GetLastSavedBlock(chainID uint64) (rst *DBHeader, err error) {
-	query := `SELECT blk_number, blk_hash 
-	FROM blocks 
-	WHERE network_id = ? 
+// TODO remove as not used
+func (b *BlockDAO) GetLastSavedBlock(chainID uint64) (rst *DBHeader, err error) {
+	query := `SELECT blk_number, blk_hash
+	FROM blocks
+	WHERE network_id = ?
 	ORDER BY blk_number DESC LIMIT 1`
 	rows, err := b.db.Query(query, chainID)
 	if err != nil {
@@ -260,7 +249,8 @@ func (b *Block) GetLastSavedBlock(chainID uint64) (rst *DBHeader, err error) {
 	return nil, nil
 }
 
-func (b *Block) GetBlocks(chainID uint64) (rst []*DBHeader, err error) {
+// TODO remove as not used
+func (b *BlockDAO) GetBlocks(chainID uint64) (rst []*DBHeader, err error) {
 	query := `SELECT blk_number, blk_hash, address FROM blocks`
 	rows, err := b.db.Query(query, chainID)
 	if err != nil {
@@ -282,9 +272,10 @@ func (b *Block) GetBlocks(chainID uint64) (rst []*DBHeader, err error) {
 	return rst, nil
 }
 
-func (b *Block) GetLastSavedBlockBefore(chainID uint64, block *big.Int) (rst *DBHeader, err error) {
-	query := `SELECT blk_number, blk_hash 
-	FROM blocks 
+// TODO remove as not used
+func (b *BlockDAO) GetLastSavedBlockBefore(chainID uint64, block *big.Int) (rst *DBHeader, err error) {
+	query := `SELECT blk_number, blk_hash
+	FROM blocks
 	WHERE network_id = ? AND blk_number < ?
 	ORDER BY blk_number DESC LIMIT 1`
 	rows, err := b.db.Query(query, chainID, (*bigint.SQLBigInt)(block))
@@ -306,7 +297,7 @@ func (b *Block) GetLastSavedBlockBefore(chainID uint64, block *big.Int) (rst *DB
 	return nil, nil
 }
 
-func (b *Block) GetFirstKnownBlock(chainID uint64, address common.Address) (rst *big.Int, err error) {
+func (b *BlockDAO) GetFirstKnownBlock(chainID uint64, address common.Address) (rst *big.Int, err error) {
 	query := `SELECT blk_from FROM blocks_ranges
 	WHERE address = ?
 	AND network_id = ?
@@ -332,7 +323,7 @@ func (b *Block) GetFirstKnownBlock(chainID uint64, address common.Address) (rst 
 	return nil, nil
 }
 
-func (b *Block) GetLastKnownBlockByAddress(chainID uint64, address common.Address) (block *LastKnownBlock, err error) {
+func (b *BlockDAO) GetLastKnownBlockByAddress(chainID uint64, address common.Address) (block *Block, err error) {
 	query := `SELECT blk_to, balance, nonce FROM blocks_ranges
 	WHERE address = ?
 	AND network_id = ?
@@ -347,7 +338,7 @@ func (b *Block) GetLastKnownBlockByAddress(chainID uint64, address common.Addres
 
 	if rows.Next() {
 		var nonce sql.NullInt64
-		block = &LastKnownBlock{Number: &big.Int{}, Balance: &big.Int{}}
+		block = &Block{Number: &big.Int{}, Balance: &big.Int{}}
 		err = rows.Scan((*bigint.SQLBigInt)(block.Number), (*bigint.SQLBigIntBytes)(block.Balance), &nonce)
 		if err != nil {
 			return nil, err
@@ -362,8 +353,8 @@ func (b *Block) GetLastKnownBlockByAddress(chainID uint64, address common.Addres
 	return nil, nil
 }
 
-func (b *Block) getLastKnownBalances(chainID uint64, addresses []common.Address) (map[common.Address]*LastKnownBlock, error) {
-	result := map[common.Address]*LastKnownBlock{}
+func (b *BlockDAO) getLastKnownBlocks(chainID uint64, addresses []common.Address) (map[common.Address]*Block, error) {
+	result := map[common.Address]*Block{}
 	for _, address := range addresses {
 		block, error := b.GetLastKnownBlockByAddress(chainID, address)
 		if error != nil {
@@ -378,8 +369,9 @@ func (b *Block) getLastKnownBalances(chainID uint64, addresses []common.Address)
 	return result, nil
 }
 
-func (b *Block) GetLastKnownBlockByAddresses(chainID uint64, addresses []common.Address) (map[common.Address]*LastKnownBlock, []common.Address, error) {
-	res := map[common.Address]*LastKnownBlock{}
+// TODO Remove the method below, it is used in one place and duplicates getLastKnownBlocks method with slight unneeded change
+func (b *BlockDAO) GetLastKnownBlockByAddresses(chainID uint64, addresses []common.Address) (map[common.Address]*Block, []common.Address, error) {
+	res := map[common.Address]*Block{}
 	accountsWithoutHistory := []common.Address{}
 	for _, address := range addresses {
 		block, err := b.GetLastKnownBlockByAddress(chainID, address)
@@ -469,7 +461,7 @@ func insertRange(chainID uint64, creator statementCreator, account common.Addres
 	return err
 }
 
-func upsertRange(chainID uint64, creator statementCreator, account common.Address, from *big.Int, to *LastKnownBlock) (err error) {
+func upsertRange(chainID uint64, creator statementCreator, account common.Address, from *big.Int, to *Block) (err error) {
 	log.Debug("upsert blocks range", "account", account, "network id", chainID, "from", from, "to", to.Number, "balance", to.Balance)
 	update, err := creator.Prepare(`UPDATE blocks_ranges
                 SET blk_to = ?, balance = ?, nonce = ?

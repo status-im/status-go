@@ -3,6 +3,8 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -12,6 +14,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
@@ -203,4 +206,20 @@ func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 	)
 	s.Require().NoError(err)
 	s.Require().NoError(alice.Shutdown())
+
+}
+
+func (s *MessengerEmojiSuite) TestCompressedKeyReturnedWithEmoji() {
+	emojiReaction := &EmojiReaction{}
+	id, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	emojiReaction.From = common.PubkeyToHex(&id.PublicKey)
+	emojiReaction.LocalChatID = testPublicChatID
+	encodedReaction, err := json.Marshal(emojiReaction)
+	s.Require().NoError(err)
+
+	// Check that compressedKey and emojiHash exists
+	s.Require().True(strings.Contains(string(encodedReaction), "compressedKey\":\"zQ"))
+	s.Require().True(strings.Contains(string(encodedReaction), "emojiHash"))
 }

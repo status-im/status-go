@@ -108,7 +108,7 @@ func TestTransactionNotification(t *testing.T) {
 		},
 	}
 	nonce := int64(0)
-	lastBlock := &transfer.LastKnownBlock{
+	lastBlock := &transfer.Block{
 		Number:  big.NewInt(1),
 		Balance: big.NewInt(0),
 		Nonce:   &nonce,

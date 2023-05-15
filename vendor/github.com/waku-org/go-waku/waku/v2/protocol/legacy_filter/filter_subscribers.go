@@ -1,11 +1,11 @@
-package filter
+package legacy_filter
 
 import (
 	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/waku-org/go-waku/waku/v2/protocol/filter/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_filter/pb"
 )
 
 type Subscriber struct {

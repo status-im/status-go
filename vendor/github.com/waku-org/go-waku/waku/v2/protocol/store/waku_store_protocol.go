@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-msgio/pbio"
@@ -17,12 +18,10 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/metrics"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 )
-
-// MaxTimeVariance is the maximum duration in the future allowed for a message timestamp
-const MaxTimeVariance = time.Duration(20) * time.Second
 
 func findMessages(query *pb.HistoryQuery, msgProvider MessageProvider) ([]*wpb.WakuMessage, *pb.PagingInfo, error) {
 	if query.PagingInfo == nil {
@@ -77,6 +76,7 @@ func (store *WakuStore) FindMessages(query *pb.HistoryQuery) *pb.HistoryResponse
 type MessageProvider interface {
 	GetAll() ([]persistence.StoredMessage, error)
 	Query(query *pb.HistoryQuery) (*pb.Index, []persistence.StoredMessage, error)
+	Validate(env *protocol.Envelope) error
 	Put(env *protocol.Envelope) error
 	MostRecentTimestamp() (int64, error)
 	Start(ctx context.Context, timesource timesource.Timesource) error
@@ -85,12 +85,12 @@ type MessageProvider interface {
 }
 
 type Store interface {
-	Start(ctx context.Context) error
+	SetHost(h host.Host)
+	Start(context.Context, relay.Subscription) error
 	Query(ctx context.Context, query Query, opts ...HistoryRequestOption) (*Result, error)
 	Find(ctx context.Context, query Query, cb criteriaFN, opts ...HistoryRequestOption) (*wpb.WakuMessage, error)
 	Next(ctx context.Context, r *Result) (*Result, error)
 	Resume(ctx context.Context, pubsubTopic string, peerList []peer.ID) (int, error)
-	MessageChannel() chan *protocol.Envelope
 	Stop()
 }
 
@@ -99,8 +99,13 @@ func (store *WakuStore) SetMessageProvider(p MessageProvider) {
 	store.msgProvider = p
 }
 
+// Sets the host to be able to mount or consume a protocol
+func (store *WakuStore) SetHost(h host.Host) {
+	store.h = h
+}
+
 // Start initializes the WakuStore by enabling the protocol and fetching records from a message provider
-func (store *WakuStore) Start(ctx context.Context) error {
+func (store *WakuStore) Start(ctx context.Context, sub relay.Subscription) error {
 	if store.started {
 		return nil
 	}
@@ -113,18 +118,17 @@ func (store *WakuStore) Start(ctx context.Context) error {
 	err := store.msgProvider.Start(ctx, store.timesource) // TODO: store protocol should not start a message provider
 	if err != nil {
 		store.log.Error("Error starting message provider", zap.Error(err))
-		return nil
+		return err
 	}
 
 	store.started = true
 	store.ctx, store.cancel = context.WithCancel(ctx)
-	store.MsgC = make(chan *protocol.Envelope, 1024)
+	store.MsgC = sub
 
 	store.h.SetStreamHandlerMatch(StoreID_v20beta4, protocol.PrefixTextMatch(string(StoreID_v20beta4)), store.onRequest)
 
-	store.wg.Add(2)
+	store.wg.Add(1)
 	go store.storeIncomingMessages(store.ctx)
-	go store.updateMetrics(store.ctx)
 
 	store.log.Info("Store protocol started")
 
@@ -132,16 +136,17 @@ func (store *WakuStore) Start(ctx context.Context) error {
 }
 
 func (store *WakuStore) storeMessage(env *protocol.Envelope) error {
-	// Ensure that messages don't "jump" to the front of the queue with future timestamps
-	if env.Index().SenderTime-env.Index().ReceiverTime > int64(MaxTimeVariance) {
-		return ErrFutureMessage
-	}
 
 	if env.Message().Ephemeral {
 		return nil
 	}
 
-	err := store.msgProvider.Put(env)
+	err := store.msgProvider.Validate(env)
+	if err != nil {
+		return err
+	}
+
+	err = store.msgProvider.Put(env)
 	if err != nil {
 		store.log.Error("storing message", zap.Error(err))
 		metrics.RecordStoreError(store.ctx, "store_failure")
@@ -153,30 +158,10 @@ func (store *WakuStore) storeMessage(env *protocol.Envelope) error {
 
 func (store *WakuStore) storeIncomingMessages(ctx context.Context) {
 	defer store.wg.Done()
-	for envelope := range store.MsgC {
+	for envelope := range store.MsgC.Ch {
 		go func(env *protocol.Envelope) {
 			_ = store.storeMessage(env)
 		}(envelope)
-	}
-}
-
-func (store *WakuStore) updateMetrics(ctx context.Context) {
-	ticker := time.NewTicker(3 * time.Second)
-	defer ticker.Stop()
-	defer store.wg.Done()
-
-	for {
-		select {
-		case <-ticker.C:
-			msgCount, err := store.msgProvider.Count()
-			if err != nil {
-				store.log.Error("updating store metrics", zap.Error(err))
-			} else {
-				metrics.RecordMessage(store.ctx, "stored", msgCount)
-			}
-		case <-ctx.Done():
-			return
-		}
 	}
 }
 
@@ -191,7 +176,7 @@ func (store *WakuStore) onRequest(s network.Stream) {
 	err := reader.ReadMsg(historyRPCRequest)
 	if err != nil {
 		logger.Error("reading request", zap.Error(err))
-		metrics.RecordStoreError(store.ctx, "decodeRPCFailure")
+		metrics.RecordStoreError(store.ctx, "decode_rpc_failure")
 		return
 	}
 
@@ -200,7 +185,7 @@ func (store *WakuStore) onRequest(s network.Stream) {
 		logger = logger.With(logging.Filters(query.GetContentFilters()))
 	} else {
 		logger.Error("reading request", zap.Error(err))
-		metrics.RecordStoreError(store.ctx, "emptyRpcQueryFailure")
+		metrics.RecordStoreError(store.ctx, "empty_rpc_query_failure")
 		return
 	}
 
@@ -215,14 +200,11 @@ func (store *WakuStore) onRequest(s network.Stream) {
 	err = writer.WriteMsg(historyResponseRPC)
 	if err != nil {
 		logger.Error("writing response", zap.Error(err), logging.PagingInfo(historyResponseRPC.Response.PagingInfo))
+		metrics.RecordStoreError(store.ctx, "response_write_failure")
 		_ = s.Reset()
 	} else {
 		logger.Info("response sent")
 	}
-}
-
-func (store *WakuStore) MessageChannel() chan *protocol.Envelope {
-	return store.MsgC
 }
 
 // TODO: queryWithAccounting
@@ -237,9 +219,7 @@ func (store *WakuStore) Stop() {
 
 	store.started = false
 
-	if store.MsgC != nil {
-		close(store.MsgC)
-	}
+	store.MsgC.Unsubscribe()
 
 	if store.msgProvider != nil {
 		store.msgProvider.Stop() // TODO: StoreProtocol should not stop a message provider

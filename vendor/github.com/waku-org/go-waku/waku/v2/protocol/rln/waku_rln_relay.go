@@ -21,12 +21,6 @@ import (
 	proto "google.golang.org/protobuf/proto"
 )
 
-var RLNAppInfo = AppInfo{
-	Application:   "go-waku-rln-relay",
-	AppIdentifier: "01234567890abcdef",
-	Version:       "0.1",
-}
-
 type GroupManager interface {
 	Start(ctx context.Context, rln *rln.RLN, rootTracker *group_manager.MerkleRootTracker) error
 	IdentityCredentials() (rln.IdentityCredential, error)
@@ -68,11 +62,16 @@ func New(
 		return nil, err
 	}
 
+	rootTracker, err := group_manager.NewMerkleRootTracker(AcceptableRootWindowSize, rlnInstance)
+	if err != nil {
+		return nil, err
+	}
+
 	// create the WakuRLNRelay
 	rlnPeer := &WakuRLNRelay{
 		RLN:          rlnInstance,
 		groupManager: groupManager,
-		rootTracker:  group_manager.NewMerkleRootTracker(AcceptableRootWindowSize, rlnInstance),
+		rootTracker:  rootTracker,
 		pubsubTopic:  pubsubTopic,
 		contentTopic: contentTopic,
 		relay:        relay,
@@ -366,4 +365,12 @@ func (rlnRelay *WakuRLNRelay) generateProof(input []byte, epoch rln.Epoch) (*pb.
 		Nullifier:     proof.Nullifier[:],
 		RlnIdentifier: proof.RLNIdentifier[:],
 	}, nil
+}
+
+func (rlnRelay *WakuRLNRelay) IdentityCredential() (rln.IdentityCredential, error) {
+	return rlnRelay.groupManager.IdentityCredentials()
+}
+
+func (rlnRelay *WakuRLNRelay) MembershipIndex() (uint, error) {
+	return rlnRelay.groupManager.MembershipIndex()
 }

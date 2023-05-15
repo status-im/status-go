@@ -97,11 +97,13 @@ func (api *API) GetTransfersByAddressAndChainID(ctx context.Context, chainID uin
 	return api.s.transferController.GetTransfersByAddress(ctx, chainID, address, hexBigToBN(toBlock), limit.ToInt().Int64(), fetchMore)
 }
 
-func (api *API) GetCachedBalances(ctx context.Context, addresses []common.Address) ([]transfer.LastKnownBlockView, error) {
+// Deprecated: GetCachedBalances is deprecated. Use GetTokensBalances instead
+func (api *API) GetCachedBalances(ctx context.Context, addresses []common.Address) ([]transfer.BlockView, error) {
 	return api.s.transferController.GetCachedBalances(ctx, api.s.rpcClient.UpstreamChainID, addresses)
 }
 
-func (api *API) GetCachedBalancesbyChainID(ctx context.Context, chainID uint64, addresses []common.Address) ([]transfer.LastKnownBlockView, error) {
+// Deprecated: GetCachedBalances is deprecated. Use GetTokensBalancesForChainIDs instead
+func (api *API) GetCachedBalancesbyChainID(ctx context.Context, chainID uint64, addresses []common.Address) ([]transfer.BlockView, error) {
 	return api.s.transferController.GetCachedBalances(ctx, chainID, addresses)
 }
 

@@ -11,8 +11,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-msgio/pbio"
 	"github.com/waku-org/go-waku/waku/v2/metrics"
+	wenr "github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange/pb"
-	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
 
@@ -85,7 +85,7 @@ func (wakuPX *WakuPeerExchange) handleResponse(ctx context.Context, response *pb
 			return err
 		}
 
-		peerInfo, err := utils.EnodeToPeerInfo(enodeRecord)
+		peerInfo, err := wenr.EnodeToPeerInfo(enodeRecord)
 		if err != nil {
 			return err
 		}
