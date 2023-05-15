@@ -2268,7 +2268,8 @@ func (s *MessengerSuite) TestShouldResendEmoji() {
 func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	httpServer, err := server.NewMediaServer(s.m.database, nil, nil)
 	s.Require().NoError(err)
-	httpServer.SetPort(9876)
+	err = httpServer.SetPort(9876)
+	s.NoError(err)
 	s.m.httpServer = httpServer
 
 	chat := CreatePublicChat("test-chat", s.m.transport)
