@@ -168,19 +168,25 @@ func ResetChainData() string {
 
 // CallRPC calls public APIs via RPC.
 func CallRPC(inputJSON string) string {
+	fmt.Println("@dd IN  CallRPC", inputJSON)
 	resp, err := statusBackend.CallRPC(inputJSON)
 	if err != nil {
+		fmt.Println("@dd ERR CallRPC", err)
 		return makeJSONResponse(err)
 	}
+	fmt.Println("@dd OUT CallRPC", inputJSON)
 	return resp
 }
 
 // CallPrivateRPC calls both public and private APIs via RPC.
 func CallPrivateRPC(inputJSON string) string {
+	fmt.Println("@dd IN  CallPrivateRPC", inputJSON)
 	resp, err := statusBackend.CallPrivateRPC(inputJSON)
 	if err != nil {
+		fmt.Println("@dd ERR CallPrivateRPC", err)
 		return makeJSONResponse(err)
 	}
+	fmt.Println("@dd OUT CallPrivateRPC", inputJSON)
 	return resp
 }
 
