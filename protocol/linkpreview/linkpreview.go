@@ -15,6 +15,7 @@ import (
 	"golang.org/x/net/publicsuffix"
 
 	"github.com/status-im/markdown"
+
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 )
