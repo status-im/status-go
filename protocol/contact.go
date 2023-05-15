@@ -426,6 +426,8 @@ func (c *Contact) MarshalJSON() ([]byte, error) {
 
 	if c.mutual() {
 		item.ContactRequestState = ContactRequestStateMutual
+	} else if c.dismissed() {
+		item.ContactRequestState = ContactRequestStateDismissed
 	} else if c.added() {
 		item.ContactRequestState = ContactRequestStateSent
 	} else if c.hasAddedUs() {
