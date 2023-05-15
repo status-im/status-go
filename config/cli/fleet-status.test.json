@@ -6,18 +6,23 @@
     "Fleet": "status.test",
     "BootNodes": [],
     "TrustedMailServers": [],
-    "PushNotificationsServers": [],
+    "PushNotificationsServers": [
+      "401ba5eda402678dc78a0a40fd0795f4ea8b1e34972c4d15cf33ac01292341c89f0cbc637fa9f7a3ffe0b9dfe90e9cdae7a14925500ab01b6a91c67bae42a97a",
+      "181141b1d111908aaf05f4788e6778ec07073a1d4e1ce43c73815c40ee4e7345a1cbf5a90a45f601bf3763f12be63b01624ba1f36eeb9572455e7034b8f9f2c4",
+      "5ffc34d5ffda180d94cd3974d9ed2bb082ede68f342babdbe801ceffb7da902087d43f9aa961c7b85029358874c08ef04ecad9f1d95a1f0e448cbdd5d04350c7"
+    ],
     "StaticNodes": [],
     "RendezvousNodes": [],
     "WakuNodes": [
-      "/ip4/47.242.233.36/tcp/30303/p2p/16Uiu2HAm2BjXxCp1sYFJQKpLLbPbwd5juxbsYofu3TsS3auvT9Yi",
-      "/ip4/64.225.81.237/tcp/30303/p2p/16Uiu2HAkukebeXjTQ9QDBeNDWuGfbaSg79wkkhK4vPocLgR6QFDf",
-      "/ip4/34.122.252.118/tcp/30303/p2p/16Uiu2HAmGDX3iAFox93PupVYaHa88kULGqMpJ7AEHGwj3jbMtt76"
+      "/dns4/node-01.do-ams3.status.test.statusim.net/tcp/30303/p2p/16Uiu2HAkukebeXjTQ9QDBeNDWuGfbaSg79wkkhK4vPocLgR6QFDf",
+      "/dns4/node-01.gc-us-central1-a.status.test.statusim.net/tcp/30303/p2p/16Uiu2HAmGDX3iAFox93PupVYaHa88kULGqMpJ7AEHGwj3jbMtt76",
+      "/dns4/node-01.ac-cn-hongkong-c.status.test.statusim.net/tcp/30303/p2p/16Uiu2HAm2BjXxCp1sYFJQKpLLbPbwd5juxbsYofu3TsS3auvT9Yi"
     ],
     "WakuStoreNodes": [
       "/ip4/47.242.233.36/tcp/30303/p2p/16Uiu2HAm2BjXxCp1sYFJQKpLLbPbwd5juxbsYofu3TsS3auvT9Yi",
       "/ip4/64.225.81.237/tcp/30303/p2p/16Uiu2HAkukebeXjTQ9QDBeNDWuGfbaSg79wkkhK4vPocLgR6QFDf",
-      "/ip4/34.122.252.118/tcp/30303/p2p/16Uiu2HAmGDX3iAFox93PupVYaHa88kULGqMpJ7AEHGwj3jbMtt76"    ]
+      "/ip4/34.122.252.118/tcp/30303/p2p/16Uiu2HAmGDX3iAFox93PupVYaHa88kULGqMpJ7AEHGwj3jbMtt76"
+    ]
   },
   "WakuV2Config": {
     "Enabled": true

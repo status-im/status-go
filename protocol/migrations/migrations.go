@@ -1935,7 +1935,7 @@ func _1684174617_add_url_previews_to_user_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1684174617_add_url_previews_to_user_messages.up.sql", size: 58, mode: os.FileMode(0644), modTime: time.Unix(1684497970, 0)}
+	info := bindataFileInfo{name: "1684174617_add_url_previews_to_user_messages.up.sql", size: 58, mode: os.FileMode(0644), modTime: time.Unix(1684503588, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xdc, 0xb0, 0x72, 0xe3, 0xe4, 0xa9, 0x63, 0x82, 0xea, 0x52, 0x70, 0xb6, 0xa0, 0x73, 0x55, 0x7a, 0x78, 0xa8, 0xd2, 0xb0, 0xf4, 0x78, 0x8a, 0xd, 0x5a, 0xa2, 0x9d, 0x92, 0xdc, 0xce, 0x1c, 0x71}}
 	return a, nil
 }
@@ -1955,7 +1955,7 @@ func _1684175608_add_token_balancesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1684175608_add_token_balances.up.sql", size: 467, mode: os.FileMode(0644), modTime: time.Unix(1684497971, 0)}
+	info := bindataFileInfo{name: "1684175608_add_token_balances.up.sql", size: 467, mode: os.FileMode(0644), modTime: time.Unix(1684503588, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1b, 0x4e, 0xe0, 0x48, 0x34, 0x1, 0x4d, 0x88, 0x11, 0x54, 0x20, 0x52, 0x5c, 0x57, 0x14, 0xa9, 0xa9, 0x36, 0xa4, 0x28, 0x59, 0x48, 0xa8, 0xa, 0x76, 0xec, 0x37, 0xee, 0x9e, 0xd2, 0x20, 0xaa}}
 	return a, nil
 }

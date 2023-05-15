@@ -749,7 +749,7 @@ func (c *NodeConfig) setDefaultPushNotificationsServers() error {
 	if len(c.ShhextConfig.DefaultPushNotificationsServers) == 0 {
 		log.Debug("setting default push notification servers", "cluster servers", c.ClusterConfig.PushNotificationsServers)
 		for _, pk := range c.ClusterConfig.PushNotificationsServers {
-			keyBytes, err := hex.DecodeString(pk)
+			keyBytes, err := hex.DecodeString("04" + pk)
 			if err != nil {
 				return err
 			}

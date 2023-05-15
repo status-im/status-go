@@ -1345,7 +1345,7 @@ func _1683457503_add_blocks_ranges_sequential_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1683457503_add_blocks_ranges_sequential_table.up.sql", size: 263, mode: os.FileMode(0644), modTime: time.Unix(1684497970, 0)}
+	info := bindataFileInfo{name: "1683457503_add_blocks_ranges_sequential_table.up.sql", size: 263, mode: os.FileMode(0644), modTime: time.Unix(1684503588, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xfe, 0x57, 0x2e, 0x0, 0x6a, 0x6e, 0xd7, 0xeb, 0xe6, 0x66, 0x79, 0x32, 0x22, 0x82, 0x92, 0xf4, 0xc9, 0xf1, 0x58, 0x1a, 0x45, 0x60, 0x77, 0x50, 0xe7, 0x54, 0x4a, 0xc0, 0x42, 0x3a, 0x4f, 0x35}}
 	return a, nil
 }
