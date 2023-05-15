@@ -7,15 +7,26 @@ json=$(curl --silent https://fleets.status.im/)
 fleets=(
     'eth.prod'
     'eth.staging'
-    'eth.test'
 )
 
 wakufleets=(
-    'wakuv2.test'
+    'status.prod'
+    'status.test'
     'wakuv2.prod'
+    'wakuv2.test'
 )
 
-for fleet in ${fleets[@]}; do 
+# Notify fleet is configured for all fleets.
+push=$(echo $json | jq '
+    .fleets."notify.prod"."tcp/p2p/waku"
+        | to_entries
+        | map(.value
+              | match("enode://([a-z0-9]+)@.*$")
+              | .captures[0].string
+    )'
+)
+
+for fleet in "${fleets[@]}"; do
     echo "Processing $fleet fleet..."
     fleetJSON=$(echo $json | jq ".fleets.\"$fleet\"")
     boot=$(echo $fleetJSON | jq ".boot | map(.)" -r)
@@ -32,20 +43,22 @@ for fleet in ${fleets[@]}; do
         && jq \
               ".ClusterConfig.BootNodes = $boot \
              | .ClusterConfig.TrustedMailServers = $mail \
+             | .ClusterConfig.PushNotificationsServers = $push \
              | .ClusterConfig.StaticNodes = $whisper" \
              $DIR/fleet-$fleet.json \
         | tee "$DIR/tmp.json" >/dev/null \
         && mv $DIR/tmp.json $DIR/fleet-$fleet.json
 done
 
-for fleet in ${wakufleets[@]}; do 
+for fleet in "${wakufleets[@]}"; do
     echo "Processing $fleet fleet..."
     fleetJSON=$(echo $json | jq ".fleets.\"$fleet\"")
-    waku=$(echo $fleetJSON | jq ".waku | map(.)" -r)
+    waku=$(echo $fleetJSON | jq '."tcp/p2p/waku" | map(.)' -r)
 
     git checkout $DIR/fleet-$fleet.json \
         && jq \
-              ".ClusterConfig.WakuNodes = $waku" \
+              ".ClusterConfig.WakuNodes = $waku \
+             | .ClusterConfig.PushNotificationsServers = $push" \
              $DIR/fleet-$fleet.json \
         | tee "$DIR/tmp.json" >/dev/null \
         && mv $DIR/tmp.json $DIR/fleet-$fleet.json
