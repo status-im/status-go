@@ -6,9 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/status-im/status-go/logutils"
-
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/logutils"
 )
 
 func TestRePosRegex(t *testing.T) {
@@ -292,45 +293,48 @@ func TestToInfo(t *testing.T) {
 }
 
 func TestToInputField(t *testing.T) {
-	mentionText1 := "parse-text"
-	mentionTextResult1 := []InputSegment{
-		{Type: Text, Value: "parse-text"},
-	}
-
-	mentionText2 := "hey @0x04fbce10971e1cd7253b98c7b7e54de3729ca57ce41a2bfb0d1c4e0a26f72c4b6913c3487fa1b4bb86125770f1743fb4459da05c1cbe31d938814cfaf36e252073 he"
-	mentionTextResult2 := []InputSegment{
-		{Type: Text, Value: "hey "},
-		{Type: Mention, Value: "0x04fbce10971e1cd7253b98c7b7e54de3729ca57ce41a2bfb0d1c4e0a26f72c4b6913c3487fa1b4bb86125770f1743fb4459da05c1cbe31d938814cfaf36e252073"},
-		{Type: Text, Value: " he"},
-	}
-
-	mentionText3 := "@0x04fbce10971e1cd7253b98c7b7e54de3729ca57ce41a2bfb0d1c4e0a26f72c4b6913c3487fa1b4bb86125770f1743fb4459da05c1cbe31d938814cfaf36e252073 he"
-	mentionTextResult3 := []InputSegment{
-		{Type: Mention, Value: "0x04fbce10971e1cd7253b98c7b7e54de3729ca57ce41a2bfb0d1c4e0a26f72c4b6913c3487fa1b4bb86125770f1743fb4459da05c1cbe31d938814cfaf36e252073"},
-		{Type: Text, Value: " he"},
-	}
-
-	mentionText4 := "hey @0x04fbce10971e1cd7253b98c7b7e54de3729ca57ce41a2bfb0d1c4e0a26f72c4b6913c3487fa1b4bb86125770f1743fb4459da05c1cbe31d938814cfaf36e252073"
-	mentionTextResult4 := []InputSegment{
-		{Type: Text, Value: "hey "},
-		{Type: Mention, Value: "0x04fbce10971e1cd7253b98c7b7e54de3729ca57ce41a2bfb0d1c4e0a26f72c4b6913c3487fa1b4bb86125770f1743fb4459da05c1cbe31d938814cfaf36e252073"},
-	}
-
-	mentionText5 := "invalid @0x04fBce10971e1cd7253b98c7b7e54de3729ca57ce41a2bfb0d1c4e0a26f72c4b6913c3487fa1b4bb86125770f1743fb4459da05c1cbe31d938814cfaf36e252073"
-	mentionTextResult5 := []InputSegment{
-		{Type: Text, Value: "invalid @0x04fBce10971e1cd7253b98c7b7e54de3729ca57ce41a2bfb0d1c4e0a26f72c4b6913c3487fa1b4bb86125770f1743fb4459da05c1cbe31d938814cfaf36e252073"},
-	}
-
 	testCases := []struct {
 		name     string
 		input    string
 		expected []InputSegment
 	}{
-		{"only text", mentionText1, mentionTextResult1},
-		{"in the middle", mentionText2, mentionTextResult2},
-		{"at the beginning", mentionText3, mentionTextResult3},
-		{"at the end", mentionText4, mentionTextResult4},
-		{"invalid", mentionText5, mentionTextResult5},
+		{
+			"only text",
+			"parse-text",
+			[]InputSegment{{Type: Text, Value: "parse-text"}},
+		},
+		{
+			"in the middle",
+			"hey @0x04fbce10971e1cd7253b98c7b7e54de3729ca57ce41a2bfb0d1c4e0a26f72c4b6913c3487fa1b4bb86125770f1743fb4459da05c1cbe31d938814cfaf36e252073 he",
+			[]InputSegment{
+				{Type: Text, Value: "hey "},
+				{Type: Mention, Value: "0x04fbce10971e1cd7253b98c7b7e54de3729ca57ce41a2bfb0d1c4e0a26f72c4b6913c3487fa1b4bb86125770f1743fb4459da05c1cbe31d938814cfaf36e252073"},
+				{Type: Text, Value: " he"},
+			},
+		},
+		{
+			"at the beginning",
+			"@0x04fbce10971e1cd7253b98c7b7e54de3729ca57ce41a2bfb0d1c4e0a26f72c4b6913c3487fa1b4bb86125770f1743fb4459da05c1cbe31d938814cfaf36e252073 he",
+			[]InputSegment{
+				{Type: Mention, Value: "0x04fbce10971e1cd7253b98c7b7e54de3729ca57ce41a2bfb0d1c4e0a26f72c4b6913c3487fa1b4bb86125770f1743fb4459da05c1cbe31d938814cfaf36e252073"},
+				{Type: Text, Value: " he"},
+			},
+		},
+		{
+			"at the end",
+			"hey @0x04fbce10971e1cd7253b98c7b7e54de3729ca57ce41a2bfb0d1c4e0a26f72c4b6913c3487fa1b4bb86125770f1743fb4459da05c1cbe31d938814cfaf36e252073",
+			[]InputSegment{
+				{Type: Text, Value: "hey "},
+				{Type: Mention, Value: "0x04fbce10971e1cd7253b98c7b7e54de3729ca57ce41a2bfb0d1c4e0a26f72c4b6913c3487fa1b4bb86125770f1743fb4459da05c1cbe31d938814cfaf36e252073"},
+			},
+		},
+		{
+			"invalid",
+			"invalid @0x04fBce10971e1cd7253b98c7b7e54de3729ca57ce41a2bfb0d1c4e0a26f72c4b6913c3487fa1b4bb86125770f1743fb4459da05c1cbe31d938814cfaf36e252073",
+			[]InputSegment{
+				{Type: Text, Value: "invalid @0x04fBce10971e1cd7253b98c7b7e54de3729ca57ce41a2bfb0d1c4e0a26f72c4b6913c3487fa1b4bb86125770f1743fb4459da05c1cbe31d938814cfaf36e252073"},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -604,7 +608,7 @@ func (m *MockMentionableUserGetter) getMentionableUser(chatID string, pk string)
 }
 
 func TestMentionSuggestionCases(t *testing.T) {
-	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest(nil)
+	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest(t, nil)
 
 	testCases := []struct {
 		inputText    string
@@ -629,8 +633,17 @@ func TestMentionSuggestionCases(t *testing.T) {
 	}
 }
 
+func TestMentionSuggestionAfterToInputField(t *testing.T) {
+	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest(t, nil)
+	_, err := mentionManager.ToInputField(chatID, "abc")
+	require.NoError(t, err)
+	ctx, err := mentionManager.OnChangeText(chatID, "@")
+	require.NoError(t, err)
+	require.Equal(t, len(mentionableUserMap), len(ctx.MentionSuggestions))
+}
+
 func TestMentionSuggestionSpecialInputModeForAndroid(t *testing.T) {
-	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest(nil)
+	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest(t, nil)
 
 	testCases := []struct {
 		inputText    string
@@ -653,7 +666,7 @@ func TestMentionSuggestionSpecialInputModeForAndroid(t *testing.T) {
 }
 
 func TestMentionSuggestionSpecialChars(t *testing.T) {
-	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest(nil)
+	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest(t, nil)
 
 	testCases := []struct {
 		inputText           string
@@ -678,7 +691,7 @@ func TestMentionSuggestionSpecialChars(t *testing.T) {
 }
 
 func TestMentionSuggestionAtSignSpaceCases(t *testing.T) {
-	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest(map[string]*MentionableUser{
+	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest(t, map[string]*MentionableUser{
 		"0xpk1": {
 			primaryName: "User Number One",
 			Contact: &Contact{
@@ -719,7 +732,7 @@ func TestMentionSuggestionAtSignSpaceCases(t *testing.T) {
 	require.Equal(t, "@", ctx.InputSegments[2].Value)
 }
 
-func setupMentionSuggestionTest(mentionableUserMapInput map[string]*MentionableUser) (map[string]*MentionableUser, string, *MentionManager) {
+func setupMentionSuggestionTest(t *testing.T, mentionableUserMapInput map[string]*MentionableUser) (map[string]*MentionableUser, string, *MentionManager) {
 	mentionableUserMap := mentionableUserMapInput
 	if mentionableUserMap == nil {
 		mentionableUserMap = getDefaultMentionableUserMap()
@@ -737,11 +750,14 @@ func setupMentionSuggestionTest(mentionableUserMapInput map[string]*MentionableU
 	allChats := new(chatMap)
 	allChats.Store(chatID, &Chat{})
 
+	key, err := crypto.GenerateKey()
+	require.NoError(t, err)
 	mentionManager := &MentionManager{
 		mentionableUserGetter: mockMentionableUserGetter,
 		mentionContexts:       make(map[string]*ChatMentionContext),
 		Messenger: &Messenger{
 			allChats: allChats,
+			identity: key,
 		},
 		logger: logutils.ZapLogger().Named("MentionManager"),
 	}

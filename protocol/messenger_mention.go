@@ -452,6 +452,7 @@ func (m *MentionManager) ToInputField(chatID, text string) (*ChatMentionContext,
 	ctx.InputSegments = textWithMentions
 	ctx.MentionState = toInfo(textWithMentions)
 	ctx.NewText = newText
+	ctx.PreviousText = newText
 	return ctx, nil
 }
 
