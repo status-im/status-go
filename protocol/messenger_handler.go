@@ -1632,8 +1632,10 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		// Reduce chat mention count and unread count if unread
 		if !messageToDelete.Seen && !unreadCountDecreased {
 			unreadCountDecreased = true
-			chat.UnviewedMessagesCount--
-			if messageToDelete.Mentioned || messageToDelete.Replied {
+			if chat.UnviewedMessagesCount > 0 {
+				chat.UnviewedMessagesCount--
+			}
+			if chat.UnviewedMentionsCount > 0 && (messageToDelete.Mentioned || messageToDelete.Replied) {
 				chat.UnviewedMentionsCount--
 			}
 			err := m.saveChat(chat)
