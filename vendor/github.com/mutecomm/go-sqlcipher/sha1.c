@@ -21,7 +21,7 @@
 #ifdef LTC_SHA1
 
 // -> BEGIN arm intrinsics block
-#if defined(__arm__) || defined(__aarch32__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM)
+#if defined(__APPLE__) && (defined(__arm__) || defined(__aarch32__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM))
 # if defined(__GNUC__)
 #  include <stdint.h>
 # endif
