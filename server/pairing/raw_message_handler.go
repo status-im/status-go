@@ -37,7 +37,7 @@ func (s *SyncRawMessageHandler) CollectInstallationData(rawMessageCollector *Raw
 	return err
 }
 
-func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID, deviceType string) (rm []*protobuf.RawMessage, as []*accounts.Account, syncSettings *settings.Settings, err error) {
+func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID, deviceType string) (rm []*protobuf.RawMessage, kp *accounts.Keypair, syncSettings *settings.Settings, err error) {
 	syncSettings = new(settings.Settings)
 	messenger := s.backend.Messenger()
 	if messenger == nil {
@@ -72,7 +72,7 @@ func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID, deviceType string) (rm
 
 	accountService := s.backend.StatusNode().AccountService()
 
-	as, err = accountService.GetAccountsByKeyUID(keyUID)
+	kp, err = accountService.GetKeypairByKeyUID(keyUID)
 	if err != nil {
 		return
 	}
@@ -104,7 +104,7 @@ func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload,
 			rmp.setting.InstallationID = nodeConfig.ShhextConfig.InstallationID
 			rmp.setting.CurrentNetwork = settingCurrentNetwork
 
-			err = s.backend.StartNodeWithAccountAndInitialConfig(*account, accountPayload.password, *rmp.setting, nodeConfig, rmp.subAccounts)
+			err = s.backend.StartNodeWithAccountAndInitialConfig(*account, accountPayload.password, *rmp.setting, nodeConfig, rmp.profileKeypair.Accounts)
 		}
 		if err != nil {
 			return err

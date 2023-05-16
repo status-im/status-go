@@ -3,6 +3,7 @@ package protocol
 import (
 	"database/sql"
 
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	ensservice "github.com/status-im/status-go/services/ens"
 
 	"github.com/status-im/status-go/protocol/identity"
@@ -15,11 +16,12 @@ import (
 )
 
 const (
-	SyncWakuSectionKeyProfile     = "profile"
-	SyncWakuSectionKeyContacts    = "contacts"
-	SyncWakuSectionKeyCommunities = "communities"
-	SyncWakuSectionKeySettings    = "settings"
-	SyncWakuSectionKeyKeycards    = "keycards"
+	SyncWakuSectionKeyProfile           = "profile"
+	SyncWakuSectionKeyContacts          = "contacts"
+	SyncWakuSectionKeyCommunities       = "communities"
+	SyncWakuSectionKeySettings          = "settings"
+	SyncWakuSectionKeyKeypairs          = "keypairs"
+	SyncWakuSectionKeyWatchOnlyAccounts = "watchOnlyAccounts"
 )
 
 func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.Backup) []error {
@@ -48,25 +50,28 @@ func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.B
 		errors = append(errors, err)
 	}
 
-	err = m.handleBackedUpWalletAccount(message.WalletAccount)
+	err = m.handleFullKeypair(message.FullKeypair)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
-	err = m.handleBackedUpKeycards(message.Keycards)
+	err = m.handleWatchOnlyAccount(message.WatchOnlyAccount)
 	if err != nil {
 		errors = append(errors, err)
 	}
 
 	// Send signal about applied backup progress
 	if m.config.messengerSignalsHandler != nil {
-		response := wakusync.WakuBackedUpDataResponse{}
+		response := wakusync.WakuBackedUpDataResponse{
+			Clock: message.Clock,
+		}
 
 		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeyProfile, message.ProfileDetails)
 		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeyContacts, message.ContactsDetails)
 		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeyCommunities, message.CommunitiesDetails)
 		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeySettings, message.SettingsDetails)
-		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeyKeycards, message.KeycardsDetails)
+		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeyKeypairs, message.FullKeypairDetails)
+		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeyWatchOnlyAccounts, message.WatchOnlyAccountDetails)
 
 		m.config.messengerSignalsHandler.SendWakuFetchingBackupProgress(&response)
 	}
@@ -196,43 +201,49 @@ func (m *Messenger) handleBackedUpSettings(message *protobuf.SyncSetting) error 
 	return nil
 }
 
-func (m *Messenger) handleBackedUpKeycards(message *protobuf.SyncAllKeycards) error {
+func (m *Messenger) handleFullKeypair(message *protobuf.SyncKeypairFull) error {
 	if message == nil {
 		return nil
 	}
 
-	allKeycards, err := m.syncReceivedKeycards(*message)
+	keypair, keycards, err := m.handleSyncKeypairFull(message)
 	if err != nil {
 		return err
 	}
 
 	if m.config.messengerSignalsHandler != nil {
-		response := wakusync.WakuBackedUpDataResponse{
-			Keycards: allKeycards,
+		kpResponse := wakusync.WakuBackedUpDataResponse{
+			Keypair: keypair.CopyKeypair(),
 		}
 
-		m.config.messengerSignalsHandler.SendWakuBackedUpKeycards(&response)
+		m.config.messengerSignalsHandler.SendWakuBackedUpKeypair(&kpResponse)
+
+		kcResponse := wakusync.WakuBackedUpDataResponse{
+			Keycards: keycards,
+		}
+
+		m.config.messengerSignalsHandler.SendWakuBackedUpKeycards(&kcResponse)
 	}
 
 	return nil
 }
 
-func (m *Messenger) handleBackedUpWalletAccount(message *protobuf.SyncWalletAccount) error {
+func (m *Messenger) handleWatchOnlyAccount(message *protobuf.SyncAccount) error {
 	if message == nil {
 		return nil
 	}
 
-	acc, err := m.handleSyncWalletAccount(message)
+	acc, err := m.handleSyncWalletAccount(message, accounts.SyncedFromBackup)
 	if err != nil {
 		return err
 	}
 
 	if m.config.messengerSignalsHandler != nil {
 		response := wakusync.WakuBackedUpDataResponse{
-			WalletAccount: acc,
+			WatchOnlyAccount: acc,
 		}
 
-		m.config.messengerSignalsHandler.SendWakuBackedUpWalletAccount(&response)
+		m.config.messengerSignalsHandler.SendWakuBackedUpWatchOnlyAccount(&response)
 	}
 
 	return nil

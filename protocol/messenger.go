@@ -2330,6 +2330,7 @@ func (m *Messenger) syncProfilePictures(rawMessageHandler RawMessageHandler) err
 // SyncDevices sends all public chats and contacts to paired devices
 // TODO remove use of photoPath in contacts
 func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, rawMessageHandler RawMessageHandler) (err error) {
+	syncedFromLocalPairing := rawMessageHandler != nil
 	if rawMessageHandler == nil {
 		rawMessageHandler = m.dispatchMessage
 	}
@@ -2448,11 +2449,6 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		return err
 	}
 
-	accounts, err := m.settings.GetAccounts()
-	if err != nil {
-		return err
-	}
-
 	ids, err := m.persistence.LatestContactRequestIDs()
 
 	if err != nil {
@@ -2469,9 +2465,31 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		}
 	}
 
-	err = m.syncWallets(accounts, rawMessageHandler)
+	keypairs, err := m.settings.GetKeypairs()
 	if err != nil {
 		return err
+	}
+
+	for _, kp := range keypairs {
+		if syncedFromLocalPairing {
+			kp.SyncedFrom = accounts.SyncedFromLocalPairing
+		}
+		err = m.syncKeypair(kp, true, rawMessageHandler)
+		if err != nil {
+			return err
+		}
+	}
+
+	woAccounts, err := m.settings.GetWatchOnlyAccounts()
+	if err != nil {
+		return err
+	}
+
+	for _, woAcc := range woAccounts {
+		err = m.syncWalletAccount(woAcc, rawMessageHandler)
+		if err != nil {
+			return err
+		}
 	}
 
 	savedAddresses, err := m.savedAddressesManager.GetRawSavedAddresses()
@@ -2486,11 +2504,6 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		if err != nil {
 			return err
 		}
-	}
-
-	err = m.syncAllKeycards(ctx, rawMessageHandler)
-	if err != nil {
-		return err
 	}
 
 	if err = m.syncEnsUsernameDetails(ctx, rawMessageHandler); err != nil {
@@ -4198,18 +4211,48 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 						messageState.Response.AnonymousMetrics = append(messageState.Response.AnonymousMetrics, ams...)
 
-					case protobuf.SyncWalletAccounts:
+					case protobuf.SyncKeypair:
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
 							continue
 						}
 
-						p := msg.ParsedMessage.Interface().(protobuf.SyncWalletAccounts)
+						p := msg.ParsedMessage.Interface().(protobuf.SyncKeypair)
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						logger.Debug("Handling SyncWalletAccount", zap.Any("message", p))
-						err = m.HandleSyncWalletAccount(messageState, p)
+						logger.Debug("Handling SyncKeypair", zap.Any("message", p))
+						err = m.HandleSyncKeypair(messageState, p)
 						if err != nil {
-							logger.Warn("failed to handle SyncWalletAccount", zap.Error(err))
+							logger.Warn("failed to handle SyncKeypair", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+					case protobuf.SyncKeypairFull:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						p := msg.ParsedMessage.Interface().(protobuf.SyncKeypairFull)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
+						logger.Debug("Handling SyncKeypairFull", zap.Any("message", p))
+						err = m.HandleSyncKeypairFull(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle SyncKeypairFull", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+					case protobuf.SyncAccount:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						p := msg.ParsedMessage.Interface().(protobuf.SyncAccount)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
+						logger.Debug("Handling SyncAccount", zap.Any("message", p))
+						err = m.HandleSyncWalletAccount(messageState, p, "")
+						if err != nil {
+							logger.Warn("failed to handle SyncAccount", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}
@@ -4232,20 +4275,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.handleSyncSavedAddress(messageState, p)
 						if err != nil {
 							logger.Warn("failed to handle SyncSavedAddress", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-					case protobuf.SyncAllKeycards:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						p := msg.ParsedMessage.Interface().(protobuf.SyncAllKeycards)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						err = m.handleSyncKeycards(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle SyncAllKeycards", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}

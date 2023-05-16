@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -11,6 +12,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -71,15 +73,30 @@ func (m *Messenger) watchWalletBalances() {
 	}()
 }
 
-func (m *Messenger) SaveAccount(acc *accounts.Account) error {
+func (m *Messenger) SaveOrUpdateKeypair(keypair *accounts.Keypair) error {
 	clock, _ := m.getLastClockWithRelatedChat()
-	acc.Clock = clock
+	keypair.Clock = clock
 
-	err := m.settings.SaveAccounts([]*accounts.Account{acc})
+	for _, acc := range keypair.Accounts {
+		acc.Clock = clock
+	}
+
+	err := m.settings.SaveOrUpdateKeypair(keypair)
 	if err != nil {
 		return err
 	}
-	return m.syncWallets([]*accounts.Account{acc}, m.dispatchMessage)
+	return m.syncKeypair(keypair, false, m.dispatchMessage)
+}
+
+func (m *Messenger) SaveOrUpdateAccount(acc *accounts.Account) error {
+	clock, _ := m.getLastClockWithRelatedChat()
+	acc.Clock = clock
+
+	err := m.settings.SaveOrUpdateAccounts([]*accounts.Account{acc})
+	if err != nil {
+		return err
+	}
+	return m.syncWalletAccount(acc, m.dispatchMessage)
 }
 
 func (m *Messenger) DeleteAccount(address types.Address) error {
@@ -98,8 +115,7 @@ func (m *Messenger) DeleteAccount(address types.Address) error {
 	acc.Clock = clock
 	acc.Removed = true
 
-	accs := []*accounts.Account{acc}
-	err = m.syncWallets(accs, m.dispatchMessage)
+	err = m.syncWalletAccount(acc, m.dispatchMessage)
 	if err != nil {
 		return err
 	}
@@ -108,43 +124,89 @@ func (m *Messenger) DeleteAccount(address types.Address) error {
 	return m.saveChat(chat)
 }
 
-func (m *Messenger) prepareSyncWalletAccountsMessage(accs []*accounts.Account) *protobuf.SyncWalletAccounts {
-	accountMessages := make([]*protobuf.SyncWalletAccount, 0)
-	for _, acc := range accs {
-		if acc.Chat {
-			continue
-		}
-
-		syncMessage := &protobuf.SyncWalletAccount{
-			Clock:                   acc.Clock,
-			Address:                 acc.Address.Bytes(),
-			Wallet:                  acc.Wallet,
-			Chat:                    acc.Chat,
-			Type:                    acc.Type.String(),
-			Storage:                 acc.Storage,
-			Path:                    acc.Path,
-			PublicKey:               acc.PublicKey,
-			Name:                    acc.Name,
-			Color:                   acc.Color,
-			Hidden:                  acc.Hidden,
-			Removed:                 acc.Removed,
-			Emoji:                   acc.Emoji,
-			DerivedFrom:             acc.DerivedFrom,
-			KeyUid:                  acc.KeyUID,
-			KeypairName:             acc.KeypairName,
-			LastUsedDerivationIndex: acc.LastUsedDerivationIndex,
-		}
-
-		accountMessages = append(accountMessages, syncMessage)
+func (m *Messenger) prepareSyncAccountMessage(acc *accounts.Account) *protobuf.SyncAccount {
+	if acc.Chat {
+		return nil
 	}
 
-	return &protobuf.SyncWalletAccounts{
-		Accounts: accountMessages,
+	return &protobuf.SyncAccount{
+		Clock:     acc.Clock,
+		Address:   acc.Address.Bytes(),
+		KeyUid:    acc.KeyUID,
+		PublicKey: acc.PublicKey,
+		Path:      acc.Path,
+		Name:      acc.Name,
+		Color:     acc.Color,
+		Emoji:     acc.Emoji,
+		Wallet:    acc.Wallet,
+		Chat:      acc.Chat,
+		Hidden:    acc.Hidden,
+		Removed:   acc.Removed,
 	}
 }
 
-// syncWallets syncs all wallets with paired devices
-func (m *Messenger) syncWallets(accs []*accounts.Account, rawMessageHandler RawMessageHandler) error {
+func (m *Messenger) getMyInstallationMetadata() (*multidevice.InstallationMetadata, error) {
+	installation, ok := m.allInstallations.Load(m.installationID)
+	if !ok {
+		return nil, errors.New("no installation found")
+	}
+
+	if installation.InstallationMetadata == nil {
+		return nil, errors.New("no installation metadata")
+	}
+
+	return installation.InstallationMetadata, nil
+}
+
+func (m *Messenger) prepareSyncKeypairMessage(kp *accounts.Keypair) (*protobuf.SyncKeypair, error) {
+	message := &protobuf.SyncKeypair{
+		Clock:                   kp.Clock,
+		KeyUid:                  kp.KeyUID,
+		Name:                    kp.Name,
+		Type:                    kp.Type.String(),
+		DerivedFrom:             kp.DerivedFrom,
+		LastUsedDerivationIndex: kp.LastUsedDerivationIndex,
+		SyncedFrom:              kp.SyncedFrom,
+	}
+
+	if kp.SyncedFrom == "" {
+		installationMetadata, err := m.getMyInstallationMetadata()
+		if err != nil {
+			return nil, err
+		}
+		message.SyncedFrom = installationMetadata.Name
+	}
+
+	for _, acc := range kp.Accounts {
+		sAcc := m.prepareSyncAccountMessage(acc)
+		if sAcc == nil {
+			continue
+		}
+
+		message.Accounts = append(message.Accounts, sAcc)
+	}
+
+	return message, nil
+}
+
+func (m *Messenger) prepareSyncKeypairFullMessage(kp *accounts.Keypair) (*protobuf.SyncKeypairFull, error) {
+	syncKpMsg, err := m.prepareSyncKeypairMessage(kp)
+	if err != nil {
+		return nil, err
+	}
+
+	syncKcMsgs, err := m.prepareSyncKeycardsMessage(kp.KeyUID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &protobuf.SyncKeypairFull{
+		Keypair:  syncKpMsg,
+		Keycards: syncKcMsgs,
+	}, nil
+}
+
+func (m *Messenger) syncWalletAccount(acc *accounts.Account, rawMessageHandler RawMessageHandler) error {
 	if !m.hasPairedDevices() {
 		return nil
 	}
@@ -154,7 +216,7 @@ func (m *Messenger) syncWallets(accs []*accounts.Account, rawMessageHandler RawM
 
 	_, chat := m.getLastClockWithRelatedChat()
 
-	message := m.prepareSyncWalletAccountsMessage(accs)
+	message := m.prepareSyncAccountMessage(acc)
 
 	encodedMessage, err := proto.Marshal(message)
 	if err != nil {
@@ -164,8 +226,50 @@ func (m *Messenger) syncWallets(accs []*accounts.Account, rawMessageHandler RawM
 	rawMessage := common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_WALLET_ACCOUNT,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACCOUNT,
 		ResendAutomatically: true,
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
+	return err
+}
+
+func (m *Messenger) syncKeypair(keypair *accounts.Keypair, fullKeypairSync bool, rawMessageHandler RawMessageHandler) (err error) {
+	if !m.hasPairedDevices() {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, chat := m.getLastClockWithRelatedChat()
+	rawMessage := common.RawMessage{
+		LocalChatID:         chat.ID,
+		ResendAutomatically: true,
+	}
+
+	if fullKeypairSync {
+		message, err := m.prepareSyncKeypairFullMessage(keypair)
+		if err != nil {
+			return err
+		}
+
+		rawMessage.MessageType = protobuf.ApplicationMetadataMessage_SYNC_FULL_KEYPAIR
+		rawMessage.Payload, err = proto.Marshal(message)
+		if err != nil {
+			return err
+		}
+	} else {
+		message, err := m.prepareSyncKeypairMessage(keypair)
+		if err != nil {
+			return err
+		}
+
+		rawMessage.MessageType = protobuf.ApplicationMetadataMessage_SYNC_KEYPAIR
+		rawMessage.Payload, err = proto.Marshal(message)
+		if err != nil {
+			return err
+		}
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)

@@ -29,7 +29,6 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/keycards"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/nodecfg"
@@ -619,6 +618,15 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 	if err != nil {
 		return err
 	}
+
+	keypair, err := accountDB.GetKeypairByKeyUID(account.KeyUID)
+	if err != nil {
+		if err == accounts.ErrDbKeypairNotFound {
+			return errors.New("cannot convert an unknown keypair")
+		}
+		return err
+	}
+
 	err = accountDB.SaveSettingField(settings.KeycardInstanceUID, s.KeycardInstanceUID)
 	if err != nil {
 		return err
@@ -639,11 +647,6 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 		return err
 	}
 
-	relatedAccounts, err := accountDB.GetAccountsByKeyUID(account.KeyUID)
-	if err != nil {
-		return err
-	}
-
 	// This check is added due to mobile app cause it doesn't support a Keycard features as desktop app.
 	// We should remove the following line once mobile and desktop app align.
 	if len(keycardUID) > 0 {
@@ -652,7 +655,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 			return err
 		}
 
-		kc := keycards.Keycard{
+		kc := accounts.Keycard{
 			KeycardUID:      keycardUID,
 			KeycardName:     displayName,
 			KeycardLocked:   false,
@@ -660,7 +663,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 			LastUpdateClock: uint64(time.Now().Unix()),
 		}
 
-		for _, acc := range relatedAccounts {
+		for _, acc := range keypair.Accounts {
 			kc.AccountsAddresses = append(kc.AccountsAddresses, acc.Address)
 		}
 		addedKc, _, err := accountDB.AddKeycardOrAddAccountsIfKeycardIsAdded(kc)
@@ -698,7 +701,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 	}
 
 	// We need to delete all accounts for the Keycard which is being added
-	for _, acc := range relatedAccounts {
+	for _, acc := range keypair.Accounts {
 		err = b.accountManager.DeleteAccount(acc.Address)
 		if err != nil {
 			return err
@@ -1058,6 +1061,7 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	return b.StartNodeWithAccount(account, password, nodecfg)
 }
 
+// TODO: change in `saveAccountsAndSettings` function param `subaccs []*accounts.Account` parameter to `profileKeypair *accounts.Keypair` parameter
 func (b *GethStatusBackend) saveAccountsAndSettings(settings settings.Settings, nodecfg *params.NodeConfig, subaccs []*accounts.Account) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -1079,7 +1083,20 @@ func (b *GethStatusBackend) saveAccountsAndSettings(settings settings.Settings, 
 		return err
 	}
 
-	return accdb.SaveAccounts(subaccs)
+	keypair := &accounts.Keypair{
+		KeyUID:                  settings.KeyUID,
+		Name:                    settings.DisplayName,
+		Type:                    accounts.KeypairTypeProfile,
+		DerivedFrom:             settings.Address.String(),
+		LastUsedDerivationIndex: 0,
+	}
+
+	for _, acc := range subaccs {
+		acc.Operable = accounts.AccountFullyOperable
+		keypair.Accounts = append(keypair.Accounts, acc)
+	}
+
+	return accdb.SaveOrUpdateKeypair(keypair)
 }
 
 func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) error {

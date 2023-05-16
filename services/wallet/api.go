@@ -53,6 +53,7 @@ func (api *API) GetCachedWalletTokensWithoutMarketData(ctx context.Context) (map
 
 type DerivedAddress struct {
 	Address        common.Address `json:"address"`
+	PublicKey      types.HexBytes `json:"public-key,omitempty"`
 	Path           string         `json:"path"`
 	HasActivity    bool           `json:"hasActivity"`
 	AlreadyCreated bool           `json:"alreadyCreated"`
@@ -458,8 +459,9 @@ func (api *API) getDerivedAddresses(id string, paths []string) ([]*DerivedAddres
 	for accPath, acc := range info {
 
 		derivedAddress := &DerivedAddress{
-			Address: common.HexToAddress(acc.Address),
-			Path:    accPath,
+			Address:   common.HexToAddress(acc.Address),
+			PublicKey: types.Hex2Bytes(acc.PublicKey),
+			Path:      accPath,
 		}
 
 		for _, account := range addedAccounts {

@@ -294,8 +294,8 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.SyncSetting))
 	case protobuf.ApplicationMetadataMessage_COMMUNITY_ARCHIVE_MAGNETLINK:
 		return m.unmarshalProtobufData(new(protobuf.CommunityMessageArchiveMagnetlink))
-	case protobuf.ApplicationMetadataMessage_SYNC_WALLET_ACCOUNT:
-		return m.unmarshalProtobufData(new(protobuf.SyncWalletAccounts))
+	case protobuf.ApplicationMetadataMessage_SYNC_ACCOUNT:
+		return m.unmarshalProtobufData(new(protobuf.SyncAccount))
 	case protobuf.ApplicationMetadataMessage_ACCEPT_CONTACT_REQUEST:
 		return m.unmarshalProtobufData(new(protobuf.AcceptContactRequest))
 	case protobuf.ApplicationMetadataMessage_RETRACT_CONTACT_REQUEST:
@@ -318,14 +318,16 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData((new(protobuf.SyncContactRequestDecision)))
 	case protobuf.ApplicationMetadataMessage_SYNC_SAVED_ADDRESS:
 		return m.unmarshalProtobufData(new(protobuf.SyncSavedAddress))
-	case protobuf.ApplicationMetadataMessage_SYNC_ALL_KEYCARDS:
-		return m.unmarshalProtobufData(new(protobuf.SyncAllKeycards))
 	case protobuf.ApplicationMetadataMessage_SYNC_KEYCARD_ACTION:
 		return m.unmarshalProtobufData(new(protobuf.SyncKeycardAction))
 	case protobuf.ApplicationMetadataMessage_SYNC_SOCIAL_LINK_SETTING:
 		return m.unmarshalProtobufData(new(protobuf.SyncSocialLinkSetting))
 	case protobuf.ApplicationMetadataMessage_SYNC_ENS_USERNAME_DETAIL:
 		return m.unmarshalProtobufData(new(protobuf.SyncEnsUsernameDetail))
+	case protobuf.ApplicationMetadataMessage_SYNC_KEYPAIR:
+		return m.unmarshalProtobufData(new(protobuf.SyncKeypair))
+	case protobuf.ApplicationMetadataMessage_SYNC_FULL_KEYPAIR:
+		return m.unmarshalProtobufData(new(protobuf.SyncKeypairFull))
 	}
 	return nil
 }

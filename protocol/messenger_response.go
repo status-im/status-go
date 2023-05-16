@@ -13,7 +13,6 @@ import (
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/keycards"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -48,6 +47,7 @@ type MessengerResponse struct {
 	Settings                      []*settings.SyncSettingField
 	IdentityImages                []images.IdentityImage
 	Accounts                      []*accounts.Account
+	Keypairs                      []*accounts.Keypair
 	DiscordCategories             []*discord.Category
 	DiscordChannels               []*discord.Channel
 	DiscordOldestMessageTimestamp int
@@ -75,8 +75,8 @@ type MessengerResponse struct {
 	trustStatus                 map[string]verification.TrustStatus
 	emojiReactions              map[string]*EmojiReaction
 	savedAddresses              map[string]*wallet.SavedAddress
-	keycards                    []*keycards.Keycard
-	keycardActions              []*keycards.KeycardAction
+	Keycards                    []*accounts.Keycard
+	keycardActions              []*accounts.KeycardAction
 	socialLinkSettings          []*identity.SocialLink
 	ensUsernameDetails          []*ensservice.UsernameDetail
 }
@@ -111,14 +111,15 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Settings                      []*settings.SyncSettingField         `json:"settings,omitempty"`
 		IdentityImages                []images.IdentityImage               `json:"identityImages,omitempty"`
 		Accounts                      []*accounts.Account                  `json:"accounts,omitempty"`
+		Keypairs                      []*accounts.Keypair                  `json:"keypairs,omitempty"`
 		DiscordCategories             []*discord.Category                  `json:"discordCategories,omitempty"`
 		DiscordChannels               []*discord.Channel                   `json:"discordChannels,omitempty"`
 		DiscordOldestMessageTimestamp int                                  `json:"discordOldestMessageTimestamp"`
 		DiscordMessages               []*protobuf.DiscordMessage           `json:"discordMessages,omitempty"`
 		DiscordMessageAttachments     []*protobuf.DiscordMessageAttachment `json:"discordMessageAtachments,omitempty"`
 		SavedAddresses                []*wallet.SavedAddress               `json:"savedAddresses,omitempty"`
-		Keycards                      []*keycards.Keycard                  `json:"keycards,omitempty"`
-		KeycardActions                []*keycards.KeycardAction            `json:"keycardActions,omitempty"`
+		Keycards                      []*accounts.Keycard                  `json:"keycards,omitempty"`
+		KeycardActions                []*accounts.KeycardAction            `json:"keycardActions,omitempty"`
 		SocialLinkSettings            []*identity.SocialLink               `json:"socialLinkSettings,omitempty"`
 		EnsUsernameDetails            []*ensservice.UsernameDetail         `json:"ensUsernameDetails,omitempty"`
 	}{
@@ -133,6 +134,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Settings:                r.Settings,
 		IdentityImages:          r.IdentityImages,
 		Accounts:                r.Accounts,
+		Keypairs:                r.Keypairs,
 
 		Messages:                      r.Messages(),
 		VerificationRequests:          r.VerificationRequests(),
@@ -152,7 +154,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DiscordCategories:             r.DiscordCategories,
 		DiscordChannels:               r.DiscordChannels,
 		DiscordOldestMessageTimestamp: r.DiscordOldestMessageTimestamp,
-		Keycards:                      r.AllKnownKeycards(),
+		Keycards:                      r.Keycards,
 		KeycardActions:                r.KeycardActions(),
 		SocialLinkSettings:            r.SocialLinkSettings(),
 		EnsUsernameDetails:            r.EnsUsernameDetails(),
@@ -273,6 +275,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.Mailservers)+
 		len(r.IdentityImages)+
 		len(r.Accounts)+
+		len(r.Keypairs)+
 		len(r.notifications)+
 		len(r.statusUpdates)+
 		len(r.activityCenterNotifications)+
@@ -280,7 +283,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.verificationRequests)+
 		len(r.RequestsToJoinCommunity)+
 		len(r.savedAddresses)+
-		len(r.keycards)+
+		len(r.Keycards)+
 		len(r.keycardActions) == 0 &&
 		len(r.socialLinkSettings) == 0 &&
 		len(r.ensUsernameDetails) == 0 &&
@@ -315,13 +318,15 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddEmojiReactions(response.EmojiReactions())
 	r.AddInstallations(response.Installations)
 	r.AddSavedAddresses(response.SavedAddresses())
-	r.AddAllKnownKeycards(response.AllKnownKeycards())
 	r.AddKeycardActions(response.KeycardActions())
 	r.AddSocialLinkSettings(response.SocialLinkSettings())
 	r.AddEnsUsernameDetails(response.EnsUsernameDetails())
 	r.AddBookmarks(response.GetBookmarks())
 	r.CommunityChanges = append(r.CommunityChanges, response.CommunityChanges...)
 	r.BackupHandled = response.BackupHandled
+	r.Accounts = append(r.Accounts, response.Accounts...)
+	r.Keypairs = append(r.Keypairs, response.Keypairs...)
+	r.Keycards = append(r.Keycards, response.Keycards...)
 
 	return nil
 }
@@ -460,23 +465,15 @@ func (r *MessengerResponse) SavedAddresses() []*wallet.SavedAddress {
 	return ers
 }
 
-func (r *MessengerResponse) AddAllKnownKeycards(keycards []*keycards.Keycard) {
-	r.keycards = append(r.keycards, keycards...)
-}
-
-func (r *MessengerResponse) AllKnownKeycards() []*keycards.Keycard {
-	return r.keycards
-}
-
-func (r *MessengerResponse) AddKeycardAction(keycardAction *keycards.KeycardAction) {
+func (r *MessengerResponse) AddKeycardAction(keycardAction *accounts.KeycardAction) {
 	r.keycardActions = append(r.keycardActions, keycardAction)
 }
 
-func (r *MessengerResponse) AddKeycardActions(keycardActions []*keycards.KeycardAction) {
+func (r *MessengerResponse) AddKeycardActions(keycardActions []*accounts.KeycardAction) {
 	r.keycardActions = append(r.keycardActions, keycardActions...)
 }
 
-func (r *MessengerResponse) KeycardActions() []*keycards.KeycardAction {
+func (r *MessengerResponse) KeycardActions() []*accounts.KeycardAction {
 	return r.keycardActions
 }
 

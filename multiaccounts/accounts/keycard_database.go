@@ -1,4 +1,4 @@
-package keycards
+package accounts
 
 import (
 	"database/sql"
@@ -10,7 +10,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-var errDbTransactionIsNil = errors.New("keycard: database transaction is nil")
+var errKeycardDbTransactionIsNil = errors.New("keycard: database transaction is nil")
 
 type Keycard struct {
 	KeycardUID        string          `json:"keycard-uid"`
@@ -175,6 +175,9 @@ func (kp *Keycards) GetKeycardByKeyUID(keyUID string) ([]*Keycard, error) {
 			k.keycard_uid
 	`, keyUID)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return []*Keycard{}, nil
+		}
 		return nil, err
 	}
 
@@ -198,7 +201,7 @@ func (kp *Keycards) startTransactionAndCheckIfNeedToProceed(kcUID string, clock 
 
 func (kp *Keycards) setLastUpdateClock(tx *sql.Tx, kcUID string, clock uint64) (err error) {
 	if tx == nil {
-		return errDbTransactionIsNil
+		return errKeycardDbTransactionIsNil
 	}
 
 	_, err = tx.Exec(`
@@ -216,7 +219,7 @@ func (kp *Keycards) setLastUpdateClock(tx *sql.Tx, kcUID string, clock uint64) (
 func (kp *Keycards) getAccountsForKeycard(tx *sql.Tx, kcUID string) ([]types.Address, error) {
 	var accountAddresses []types.Address
 	if tx == nil {
-		return accountAddresses, errDbTransactionIsNil
+		return accountAddresses, errKeycardDbTransactionIsNil
 	}
 
 	rows, err := tx.Query(`SELECT account_address FROM keycards_accounts WHERE keycard_uid = ?`, kcUID)
@@ -239,7 +242,7 @@ func (kp *Keycards) getAccountsForKeycard(tx *sql.Tx, kcUID string) ([]types.Add
 
 func (kp *Keycards) addAccounts(tx *sql.Tx, kcUID string, accountsAddresses []types.Address) (err error) {
 	if tx == nil {
-		return errDbTransactionIsNil
+		return errKeycardDbTransactionIsNil
 	}
 
 	insertKcAcc, err := tx.Prepare(`
@@ -272,7 +275,7 @@ func (kp *Keycards) addAccounts(tx *sql.Tx, kcUID string, accountsAddresses []ty
 
 func (kp *Keycards) deleteKeycard(tx *sql.Tx, kcUID string) (err error) {
 	if tx == nil {
-		return errDbTransactionIsNil
+		return errKeycardDbTransactionIsNil
 	}
 
 	delete, err := tx.Prepare(`
@@ -339,7 +342,7 @@ func (kp *Keycards) AddKeycardOrAddAccountsIfKeycardIsAdded(keycard Keycard) (ad
 	return false, false, err
 }
 
-func (kp *Keycards) SyncKeycards(syncingClock uint64, keycardsToSync []*Keycard) (err error) {
+func (kp *Keycards) ApplyKeycardsForKeypairWithKeyUID(keyUID string, keycardsToSync []*Keycard) (err error) {
 	tx, err := kp.db.Begin()
 	if err != nil {
 		return
@@ -352,7 +355,7 @@ func (kp *Keycards) SyncKeycards(syncingClock uint64, keycardsToSync []*Keycard)
 		_ = tx.Rollback()
 	}()
 
-	rows, err := tx.Query(`SELECT * FROM keycards`)
+	rows, err := tx.Query(`SELECT * FROM keycards WHERE key_uid = ?`, keyUID)
 	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
@@ -371,55 +374,54 @@ func (kp *Keycards) SyncKeycards(syncingClock uint64, keycardsToSync []*Keycard)
 	}
 
 	// apply those from `keycardsToSync` which are newer
-	for _, syncKp := range keycardsToSync {
+	for _, syncKc := range keycardsToSync {
 		foundAtIndex := -1
 		for i := range dbKeycards {
-			if dbKeycards[i].KeycardUID == syncKp.KeycardUID {
+			if dbKeycards[i].KeycardUID == syncKc.KeycardUID {
 				foundAtIndex = i
 				break
 			}
 		}
 
-		doInsertOrReplace := true
 		if foundAtIndex > -1 {
-			if dbKeycards[foundAtIndex].LastUpdateClock > syncKp.LastUpdateClock {
-				doInsertOrReplace = false
-			}
+			dbClock := dbKeycards[foundAtIndex].LastUpdateClock
 			dbKeycards = removeElementAtIndex(dbKeycards, foundAtIndex)
+
+			if dbClock > syncKc.LastUpdateClock {
+				continue
+			}
+			err = kp.deleteKeycard(tx, syncKc.KeycardUID)
+			if err != nil {
+				return err
+			}
 		}
 
-		if doInsertOrReplace {
-			_, err = tx.Exec(`
-				INSERT OR REPLACE INTO
-					keycards
-					(
-						keycard_uid,
-						keycard_name,
-						keycard_locked,
-						key_uid,
-						last_update_clock
-					)
-				VALUES
-					(?, ?, ?, ?, ?);`,
-				syncKp.KeycardUID, syncKp.KeycardName, syncKp.KeycardLocked, syncKp.KeyUID, syncKp.LastUpdateClock)
+		_, err = tx.Exec(`
+			INSERT OR REPLACE INTO
+				keycards
+				(
+					keycard_uid,
+					keycard_name,
+					keycard_locked,
+					key_uid,
+					last_update_clock
+				)
+			VALUES
+				(?, ?, ?, ?, ?);`,
+			syncKc.KeycardUID, syncKc.KeycardName, syncKc.KeycardLocked, syncKc.KeyUID, syncKc.LastUpdateClock)
 
-			if err != nil {
-				return err
-			}
+		if err != nil {
+			return err
+		}
 
-			err = kp.addAccounts(tx, syncKp.KeycardUID, syncKp.AccountsAddresses)
-			if err != nil {
-				return err
-			}
+		err = kp.addAccounts(tx, syncKc.KeycardUID, syncKc.AccountsAddresses)
+		if err != nil {
+			return err
 		}
 	}
 
-	// remove those from the db if they are not in `keycardsToSync` and if they are older than the moment `keycardsToSync` was created at
+	// remove those from the db if they are not in `keycardsToSync`
 	for _, dbKp := range dbKeycards {
-		if dbKp.LastUpdateClock > syncingClock {
-			continue
-		}
-
 		err = kp.deleteKeycard(tx, dbKp.KeycardUID)
 		if err != nil {
 			return err

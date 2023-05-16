@@ -170,7 +170,7 @@ func NewRawMessageLoader(backend *api.GethStatusBackend, payload *RawMessagesPay
 }
 
 func (r *RawMessageLoader) Load() (err error) {
-	r.payload.rawMessages, r.payload.subAccounts, r.payload.setting, err = r.syncRawMessageHandler.PrepareRawMessage(r.keyUID, r.deviceType)
+	r.payload.rawMessages, r.payload.profileKeypair, r.payload.setting, err = r.syncRawMessageHandler.PrepareRawMessage(r.keyUID, r.deviceType)
 	return err
 }
 
