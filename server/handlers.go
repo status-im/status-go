@@ -30,6 +30,7 @@ const (
 
 	// Handler routes for pairing
 	accountImagesPath = "/accountImages"
+	accountRingPath   = "/accountRing"
 	contactImagesPath = "/contactImages"
 	generateQRCode    = "/GenerateQRCode"
 )
@@ -74,25 +75,130 @@ func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Lo
 		var payload = identityImage.Payload
 
 		if ringEnabled(params) {
-			pks, ok := params["publicKey"]
-			if !ok || len(pks) == 0 {
-				logger.Error("no publicKey")
+			accColorHash, err := multiaccountsDB.GetColorHash(keyUids[0])
+
+			if err != nil {
+				logger.Error("handleAccountImages: failed to GetColorHash .", zap.String("keyUid", keyUids[0]), zap.Error(err))
 				return
 			}
-			colorHash, err := colorhash.GenerateFor(pks[0])
-			if err != nil {
-				logger.Error("could not generate color hash")
-				return
+
+			if accColorHash == nil {
+				pks, ok := params["publicKey"]
+				if !ok || len(pks) == 0 {
+					logger.Error("no publicKey")
+					return
+				}
+
+				accColorHash, err = colorhash.GenerateFor(pks[0])
+				if err != nil {
+					logger.Error("could not generate color hash")
+					return
+				}
 			}
 
 			var theme = getTheme(params, logger)
 
 			payload, err = ring.DrawRing(&ring.DrawRingParam{
-				Theme: theme, ColorHash: colorHash, ImageBytes: identityImage.Payload, Height: identityImage.Height, Width: identityImage.Width,
+				Theme: theme, ColorHash: accColorHash, ImageBytes: identityImage.Payload, Height: identityImage.Height, Width: identityImage.Width,
 			})
 
 			if err != nil {
 				logger.Error("failed to draw ring for account identity", zap.Error(err))
+				return
+			}
+		}
+
+		if len(payload) == 0 {
+			logger.Error("empty image")
+			return
+		}
+		mime, err := images.GetProtobufImageMime(payload)
+		if err != nil {
+			logger.Error("failed to get mime", zap.Error(err))
+		}
+
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Cache-Control", "no-store")
+
+		_, err = w.Write(payload)
+		if err != nil {
+			logger.Error("failed to write image", zap.Error(err))
+		}
+	}
+}
+
+func handleAccountRing(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		params := r.URL.Query()
+
+		keyUids, ok := params["keyUid"]
+		if !ok || len(keyUids) == 0 {
+			logger.Error("no keyUid")
+			return
+		}
+
+		widths, ok := params["width"]
+		if !ok || len(widths) == 0 {
+			logger.Error("no width")
+			return
+		}
+
+		width, err := strconv.Atoi(widths[0])
+
+		if err != nil {
+			logger.Error("failed to parse width as int")
+			return
+		}
+
+		heights, ok := params["height"]
+		if !ok || len(heights) == 0 {
+			logger.Error("no height")
+			return
+		}
+
+		height, err := strconv.Atoi(widths[0])
+
+		if err != nil {
+			logger.Error("failed to parse height as int")
+			return
+		}
+
+		payload, err := images.GenerateTransparentImage(0, 0, width, height)
+		if err != nil {
+			logger.Error("failed to generate transparent image")
+			return
+		}
+
+		if ringEnabled(params) {
+			accColorHash, err := multiaccountsDB.GetColorHash(keyUids[0])
+
+			if err != nil {
+				logger.Error("handleAccountRing: failed to GetColorHash .", zap.String("keyUid", keyUids[0]), zap.Error(err))
+				return
+			}
+
+			if accColorHash == nil {
+				pks, ok := params["publicKey"]
+				if !ok || len(pks) == 0 {
+					logger.Error("no publicKey")
+					return
+				}
+
+				accColorHash, err = colorhash.GenerateFor(pks[0])
+				if err != nil {
+					logger.Error("could not generate color hash")
+					return
+				}
+			}
+
+			var theme = getTheme(params, logger)
+
+			payload, err = ring.DrawRing(&ring.DrawRingParam{
+				Theme: theme, ColorHash: accColorHash, ImageBytes: payload, Height: height, Width: width,
+			})
+
+			if err != nil {
+				logger.Error("failed to draw ring for transparent image", zap.Error(err))
 				return
 			}
 		}

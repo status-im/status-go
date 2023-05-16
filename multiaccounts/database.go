@@ -362,6 +362,16 @@ func (db *Database) DeleteAccount(keyUID string) error {
 }
 
 // Account images
+func (db *Database) GetColorHash(keyUID string) (ColorHash, error) {
+	acc := Account{}
+	err := db.db.QueryRow("SELECT colorHash FROM accounts WHERE key_uid = ?", keyUID).Scan(&acc.ColorHash)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return acc.ColorHash, nil
+}
 
 func (db *Database) GetIdentityImages(keyUID string) (iis []*images.IdentityImage, err error) {
 	rows, err := db.db.Query(`SELECT key_uid, name, image_payload, width, height, file_size, resize_target, clock FROM identity_images WHERE key_uid = ?`, keyUID)

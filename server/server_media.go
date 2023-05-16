@@ -42,6 +42,7 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 		identiconsPath:         handleIdenticon(s.logger),
 		ipfsPath:               handleIPFS(s.downloader, s.logger),
 		accountImagesPath:      handleAccountImages(s.multiaccountsDB, s.logger),
+		accountRingPath:        handleAccountRing(s.multiaccountsDB, s.logger),
 		contactImagesPath:      handleContactImages(s.db, s.logger),
 		discordAuthorsPath:     handleDiscordAuthorAvatar(s.db, s.logger),
 		discordAttachmentsPath: handleDiscordAttachment(s.db, s.logger),
