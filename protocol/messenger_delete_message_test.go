@@ -452,6 +452,68 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageWithAMention() {
 	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages(), 1)
 	// Receiver (us) is  no longer mentioned
-	s.Require().Equal(int(response.Chats()[0].UnviewedMessagesCount), 0)
-	s.Require().Equal(int(response.Chats()[0].UnviewedMentionsCount), 0)
+	s.Require().Equal(int(state.Response.Chats()[0].UnviewedMessagesCount), 0)
+	s.Require().Equal(int(state.Response.Chats()[0].UnviewedMentionsCount), 0)
+}
+
+// This test makes sure the UnviewMessageCount doesn't go below 0 in a very rare case where the Chat could be marked
+// as read but the message still unseen (Seen == false)
+func (s *MessengerDeleteMessageSuite) TestDeleteMessageAndChatIsAlreadyRead() {
+	theirMessenger := s.newMessenger()
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	err = theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	err = s.m.SaveChat(ourChat)
+	s.Require().NoError(err)
+
+	inputMessage := buildTestMessage(*theirChat)
+	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.messages) == 1 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Equal(response.Chats()[0].UnviewedMessagesCount, uint(1))
+	s.Require().Len(response.Messages(), 1)
+
+	// Force UnviewedMessagesCount to 0 to test if the uint validation is done correctly
+	ourChat.UnviewedMessagesCount = 0
+	err = s.m.saveChat(ourChat)
+
+	s.Require().NoError(err)
+
+	ogMessage := sendResponse.Messages()[0]
+
+	deleteMessage := DeleteMessage{
+		DeleteMessage: protobuf.DeleteMessage{
+			Clock:       2,
+			MessageType: protobuf.MessageType_ONE_TO_ONE,
+			MessageId:   ogMessage.ID,
+			ChatId:      theirChat.ID,
+		},
+		From: common.PubkeyToHex(&theirMessenger.identity.PublicKey),
+	}
+
+	state := &ReceivedMessageState{
+		Response: &MessengerResponse{},
+	}
+
+	// Handle Delete first
+	err = s.m.HandleDeleteMessage(state, deleteMessage)
+
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+	// Receiver (us) no longer has unread messages and it's not negative
+	s.Require().Equal(0, int(state.Response.Chats()[0].UnviewedMessagesCount))
 }

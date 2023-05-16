@@ -418,6 +418,9 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		imagePayload             []byte
 	)
 
+	var unviewedMessagesCount int
+	var unviewedMentionsCount int
+
 	err := db.db.QueryRow(`
 		SELECT
 			id,
@@ -459,8 +462,8 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		&chat.Timestamp,
 		&chat.ReadMessagesAtClockValue,
 		&chat.DeletedAtClockValue,
-		&chat.UnviewedMessagesCount,
-		&chat.UnviewedMentionsCount,
+		&unviewedMessagesCount,
+		&unviewedMentionsCount,
 		&chat.LastClockValue,
 		&lastMessageBytes,
 		&encodedMembers,
@@ -498,6 +501,18 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		if profile.Valid {
 			chat.Profile = profile.String
 		}
+
+		// Set UnviewedCounts and make sure they are above 0
+		// Since Chat's UnviewedMessagesCount is uint and the SQL column is INT, it can create a discrepancy
+		if unviewedMessagesCount < 0 {
+			unviewedMessagesCount = 0
+		}
+		if unviewedMentionsCount < 0 {
+			unviewedMentionsCount = 0
+		}
+		chat.UnviewedMessagesCount = uint(unviewedMessagesCount)
+		chat.UnviewedMentionsCount = uint(unviewedMentionsCount)
+
 		// Restore members
 		membersDecoder := gob.NewDecoder(bytes.NewBuffer(encodedMembers))
 		err = membersDecoder.Decode(&chat.Members)
