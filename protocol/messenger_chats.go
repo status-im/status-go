@@ -460,6 +460,7 @@ func (m *Messenger) saveChat(chat *Chat) error {
 		chat.Alias = name
 		chat.Identicon = identicon
 	}
+
 	// Sync chat if it's a new active public chat, but not a timeline chat
 	if !ok && chat.Active && chat.Public() && !chat.ProfileUpdates() && !chat.Timeline() {
 
