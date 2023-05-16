@@ -1726,14 +1726,8 @@ func (db sqlitePersistence) MarkAllRead(chatID string, clock uint64) (int64, int
 
 	_, err = tx.Exec(
 		`UPDATE chats
-		   SET unviewed_message_count =
-		   (SELECT COUNT(1)
-		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0),
-		   unviewed_mentions_count =
-		   (SELECT COUNT(1)
-		   FROM user_messages
-		   WHERE local_chat_id = ? AND seen = 0 AND (mentioned or replied)),
+		   SET unviewed_message_count = 0,
+		   unviewed_mentions_count = 0,
                    highlight = 0
 		WHERE id = ?`, chatID, chatID, chatID)
 
