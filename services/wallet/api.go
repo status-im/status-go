@@ -474,7 +474,7 @@ func (api *API) getDerivedAddresses(id string, paths []string) ([]*DerivedAddres
 }
 
 // Returns details for the passed address (response doesn't include derivation path)
-func (api *API) GetAddressDetails(ctx context.Context, address string) (*DerivedAddress, error) {
+func (api *API) GetAddressDetails(ctx context.Context, chainID uint64, address string) (*DerivedAddress, error) {
 	var derivedAddress *DerivedAddress
 
 	commonAddr := common.HexToAddress(address)
@@ -483,13 +483,17 @@ func (api *API) GetAddressDetails(ctx context.Context, address string) (*Derived
 		return derivedAddress, err
 	}
 
-	transactions, err := api.s.transferController.GetTransfersByAddress(ctx, api.s.rpcClient.UpstreamChainID, commonAddr, nil, 1, false)
-
+	chainClient, err := api.s.rpcClient.EthClient(chainID)
 	if err != nil {
 		return derivedAddress, err
 	}
 
-	hasActivity := int64(len(transactions)) > 0
+	balance, err := api.s.tokenManager.GetChainBalance(ctx, chainClient, commonAddr)
+	if err != nil {
+		return derivedAddress, err
+	}
+
+	hasActivity := balance.Cmp(big.NewInt(0)) != 0
 
 	derivedAddress = &DerivedAddress{
 		Address:        commonAddr,
