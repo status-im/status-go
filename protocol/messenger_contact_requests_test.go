@@ -314,6 +314,28 @@ func (s *MessengerContactRequestSuite) retractContactRequest(contactID string, t
 	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
 }
 
+func (s *MessengerContactRequestSuite) syncInstallationContactV2FromContact(contact *Contact) protobuf.SyncInstallationContactV2 {
+	return protobuf.SyncInstallationContactV2{
+		LastUpdatedLocally:        contact.LastUpdatedLocally,
+		LastUpdated:               contact.LastUpdated,
+		Id:                        contact.ID,
+		DisplayName:               contact.DisplayName,
+		EnsName:                   contact.EnsName,
+		LocalNickname:             contact.LocalNickname,
+		Added:                     contact.added(),
+		Blocked:                   contact.Blocked,
+		Muted:                     false,
+		HasAddedUs:                contact.hasAddedUs(),
+		Removed:                   contact.Removed,
+		ContactRequestLocalState:  int64(contact.ContactRequestLocalState),
+		ContactRequestRemoteState: int64(contact.ContactRequestRemoteState),
+		ContactRequestRemoteClock: int64(contact.ContactRequestRemoteClock),
+		ContactRequestLocalClock:  int64(contact.ContactRequestLocalClock),
+		VerificationStatus:        int64(contact.VerificationStatus),
+		TrustStatus:               int64(contact.TrustStatus),
+	}
+}
+
 func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() { //nolint: unused
 	messageText := "hello!"
 
@@ -1051,4 +1073,78 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	contacts = s.m.Contacts()
 	s.Require().Len(contacts, 1)
 	s.Require().Equal(ContactRequestStateReceived, contacts[0].ContactRequestRemoteState)
+}
+
+// The scenario tested is as follow:
+// 1) AliceBob sends a contact request to Bob
+// 2) Bob receives CR from Alice
+// 3) Bob resets his device
+// 4) Bob restores alice's contact from backup, CR is created
+// 5) Bob succesefully accepts restored contact request
+// 6) Alice get notified properly
+func (s *MessengerContactRequestSuite) TestBobRestoresContactRequestFromSyncInstallationContactV2() {
+	messageText := "hello, Bobby!"
+
+	alice := s.m
+
+	bob1 := s.newMessenger(s.shh)
+	_, err := bob1.Start()
+	s.Require().NoError(err)
+
+	aliceID := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
+	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob1.identity.PublicKey))
+
+	// Alice sends a contact request to bob
+	requestFromAlice := &requests.SendContactRequest{
+		ID:      bobID,
+		Message: messageText,
+	}
+	s.sendContactRequest(requestFromAlice, alice)
+
+	// Bob receives CR from Alice
+	contactRequest := s.receiveContactRequest(messageText, bob1)
+	s.Require().NotNil(contactRequest)
+
+	// Bob resets his device
+	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
+	s.Require().NoError(err)
+
+	_, err = bob2.Start()
+	s.Require().NoError(err)
+
+	// Get bob perspective of alice for backup
+	aliceFromBob := bob1.Contacts()[0]
+	state := bob2.buildMessageState()
+
+	// Restore alice's contact from backup
+	sync := s.syncInstallationContactV2FromContact(aliceFromBob)
+	err = bob2.HandleSyncInstallationContact(state, sync)
+	s.Require().NoError(err)
+
+	// Accept latest CR for a contact
+	resp, err := bob2.AcceptLatestContactRequestForContact(context.Background(), &requests.AcceptLatestContactRequestForContact{ID: types.Hex2Bytes(aliceID)})
+	s.Require().NoError(err)
+
+	// Make sure the message is updated
+	s.Require().NotNil(resp)
+	s.Require().Len(resp.Messages(), 1)
+	// NOTE: We don't restore CR message
+	// s.Require().Equal(resp.Messages()[0].ID, contactRequest.ID)
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
+
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().True(resp.Contacts[0].mutual())
+
+	// Make sure the sender is added to our contacts
+	contacts := bob2.AddedContacts()
+	s.Require().Len(contacts, 1)
+
+	// Make sure we consider them a mutual contact, receiver side
+	mutualContacts := bob2.MutualContacts()
+	s.Require().Len(mutualContacts, 1)
 }
