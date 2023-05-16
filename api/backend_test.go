@@ -555,12 +555,25 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		pkey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		address := crypto.PubkeyToAddress(pkey.PublicKey)
+		keyUIDHex := sha256.Sum256(gethcrypto.FromECDSAPub(&pkey.PublicKey))
+		keyUID := types.EncodeHex(keyUIDHex[:])
+
 		db, err := accounts.NewDB(backend.appDB)
 
 		require.NoError(t, err)
 		_, err = backend.AccountManager().ImportAccount(pkey, password)
 		require.NoError(t, err)
-		require.NoError(t, db.SaveAccounts([]*accounts.Account{{Address: address}}))
+		require.NoError(t, db.SaveOrUpdateKeypair(&accounts.Keypair{
+			KeyUID: keyUID,
+			Name:   "private key keypair",
+			Type:   accounts.KeypairTypeKey,
+			Accounts: []*accounts.Account{
+				&accounts.Account{
+					Address: address,
+					KeyUID:  keyUID,
+				},
+			},
+		}))
 		key, err := backend.getVerifiedWalletAccount(address.String(), "wrong-password")
 		require.EqualError(t, err, "could not decrypt key with given password")
 		require.Nil(t, key)
@@ -580,32 +593,53 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		require.NoError(t, err)
 		derivedInfo := derivedInfos[newPath]
 
-		partialAcc := &accounts.Account{
-			Address:   types.HexToAddress(derivedInfo.Address),
-			Type:      accounts.AccountTypeGenerated,
-			PublicKey: types.Hex2Bytes(derivedInfo.PublicKey),
-			Path:      newPath,
-			Wallet:    false,
-			Name:      "PartialAccount",
+		keypair := &accounts.Keypair{
+			KeyUID: walletInfo.KeyUID,
+			Name:   "profile keypair",
+			Type:   accounts.KeypairTypeProfile,
+			Accounts: []*accounts.Account{
+				&accounts.Account{
+					Address:   types.HexToAddress(derivedInfo.Address),
+					KeyUID:    walletInfo.KeyUID,
+					Type:      accounts.AccountTypeGenerated,
+					PublicKey: types.Hex2Bytes(derivedInfo.PublicKey),
+					Path:      newPath,
+					Wallet:    false,
+					Name:      "PartialAccount",
+				},
+			},
 		}
-		require.NoError(t, db.SaveAccounts([]*accounts.Account{partialAcc}))
+		require.NoError(t, db.SaveOrUpdateKeypair(keypair))
 
 		// With partial account we need to dynamically generate private key
-		key, err := backend.getVerifiedWalletAccount(partialAcc.Address.Hex(), password)
+		key, err := backend.getVerifiedWalletAccount(keypair.Accounts[0].Address.Hex(), password)
 		require.NoError(t, err)
-		require.Equal(t, partialAcc.Address, key.Address)
+		require.Equal(t, keypair.Accounts[0].Address, key.Address)
 	})
 
 	t.Run("Success", func(t *testing.T) {
 		pkey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		address := crypto.PubkeyToAddress(pkey.PublicKey)
+		keyUIDHex := sha256.Sum256(gethcrypto.FromECDSAPub(&pkey.PublicKey))
+		keyUID := types.EncodeHex(keyUIDHex[:])
+
 		db, err := accounts.NewDB(backend.appDB)
 		require.NoError(t, err)
 		defer db.Close()
 		_, err = backend.AccountManager().ImportAccount(pkey, password)
 		require.NoError(t, err)
-		require.NoError(t, db.SaveAccounts([]*accounts.Account{{Address: address}}))
+		require.NoError(t, db.SaveOrUpdateKeypair(&accounts.Keypair{
+			KeyUID: keyUID,
+			Name:   "private key keypair",
+			Type:   accounts.KeypairTypeKey,
+			Accounts: []*accounts.Account{
+				&accounts.Account{
+					Address: address,
+					KeyUID:  keyUID,
+				},
+			},
+		}))
 		key, err := backend.getVerifiedWalletAccount(address.String(), password)
 		require.NoError(t, err)
 		require.Equal(t, address, key.Address)
@@ -636,7 +670,12 @@ func TestLoginWithKey(t *testing.T) {
 	require.NotNil(t, b.statusNode.HTTPServer())
 
 	address := crypto.PubkeyToAddress(walletKey.PublicKey)
-	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", testSettings, conf, []*accounts.Account{{Address: address, Wallet: true}}, keyhex))
+
+	settings := testSettings
+	settings.KeyUID = keyUID
+	settings.Address = crypto.PubkeyToAddress(walletKey.PublicKey)
+
+	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", settings, conf, []*accounts.Account{{Address: address, KeyUID: keyUID, Wallet: true}}, keyhex))
 	require.NoError(t, b.Logout())
 	require.NoError(t, b.StopNode())
 
@@ -677,7 +716,12 @@ func TestVerifyDatabasePassword(t *testing.T) {
 	require.NoError(t, b.OpenAccounts())
 
 	address := crypto.PubkeyToAddress(walletKey.PublicKey)
-	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", testSettings, conf, []*accounts.Account{{Address: address, Wallet: true}}, keyhex))
+
+	settings := testSettings
+	settings.KeyUID = keyUID
+	settings.Address = crypto.PubkeyToAddress(walletKey.PublicKey)
+
+	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", settings, conf, []*accounts.Account{{Address: address, KeyUID: keyUID, Wallet: true}}, keyhex))
 	require.NoError(t, b.Logout())
 	require.NoError(t, b.StopNode())
 
@@ -738,7 +782,8 @@ func TestDeleteMultiaccount(t *testing.T) {
 		s,
 		&params.NodeConfig{},
 		nil)
-	require.NoError(t, err)
+	require.Error(t, err)
+	require.True(t, err == accounts.ErrKeypairWithoutAccounts)
 
 	err = backend.OpenAccounts()
 	require.NoError(t, err)
@@ -839,17 +884,22 @@ func TestConvertAccount(t *testing.T) {
 	found = keystoreContainsFileForAccount(keyStoreDir, chatAddress)
 	require.True(t, found)
 
-	var accountsToStore []*accounts.Account
-	accountsToStore = append(accountsToStore, &accounts.Account{
-		Address:     types.HexToAddress(chatAddress),
-		DerivedFrom: masterAddress,
+	profileKeypair := &accounts.Keypair{
 		KeyUID:      genAccInfo.KeyUID,
-		Type:        accounts.AccountTypeGenerated,
-		PublicKey:   types.Hex2Bytes(accountInfo.PublicKey),
-		Path:        pathEIP1581Chat,
-		Wallet:      false,
-		Chat:        true,
-		Name:        "GeneratedAccount",
+		Name:        "Profile Name",
+		Type:        accounts.KeypairTypeProfile,
+		DerivedFrom: masterAddress,
+	}
+
+	profileKeypair.Accounts = append(profileKeypair.Accounts, &accounts.Account{
+		Address:   types.HexToAddress(chatAddress),
+		KeyUID:    profileKeypair.KeyUID,
+		Type:      accounts.AccountTypeGenerated,
+		PublicKey: types.Hex2Bytes(accountInfo.PublicKey),
+		Path:      pathEIP1581Chat,
+		Wallet:    false,
+		Chat:      true,
+		Name:      "GeneratedAccount",
 	})
 
 	for p, dAccInfo := range derivedAccounts {
@@ -860,25 +910,24 @@ func TestConvertAccount(t *testing.T) {
 		if p == pathDefaultWalletAccount ||
 			p == customWalletPath1 ||
 			p == customWalletPath2 {
-			accountsToStore = append(accountsToStore, &accounts.Account{
-				Address:     types.HexToAddress(dAccInfo.Address),
-				KeyUID:      genAccInfo.KeyUID,
-				Wallet:      false,
-				Chat:        false,
-				Type:        accounts.AccountTypeGenerated,
-				Path:        p,
-				Name:        "derivacc" + p,
-				Hidden:      false,
-				DerivedFrom: masterAddress,
-				Removed:     false,
+			profileKeypair.Accounts = append(profileKeypair.Accounts, &accounts.Account{
+				Address: types.HexToAddress(dAccInfo.Address),
+				KeyUID:  genAccInfo.KeyUID,
+				Wallet:  false,
+				Chat:    false,
+				Type:    accounts.AccountTypeGenerated,
+				Path:    p,
+				Name:    "derivacc" + p,
+				Hidden:  false,
+				Removed: false,
 			})
 		}
 	}
 
 	account := multiaccounts.Account{
-		Name:      "foo",
+		Name:      profileKeypair.Name,
 		Timestamp: 1,
-		KeyUID:    genAccInfo.KeyUID,
+		KeyUID:    profileKeypair.KeyUID,
 	}
 
 	err = backend.ensureAppDBOpened(account, password)
@@ -904,7 +953,7 @@ func TestConvertAccount(t *testing.T) {
 	err = backend.saveAccountsAndSettings(
 		s,
 		&params.NodeConfig{},
-		accountsToStore)
+		profileKeypair.Accounts)
 	require.NoError(t, err)
 
 	err = backend.OpenAccounts()
