@@ -72,21 +72,33 @@ func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Lo
 		var payload = identityImage.Payload
 
 		if ringEnabled(params) {
-			pks, ok := params["publicKey"]
-			if !ok || len(pks) == 0 {
-				logger.Error("no publicKey")
+			account, err := multiaccountsDB.GetAccount(keyUids[0])
+
+			if err != nil {
+				logger.Error("handleAccountImages: failed to GetAccount .", zap.String("keyUid", keyUids[0]), zap.Error(err))
 				return
 			}
-			colorHash, err := colorhash.GenerateFor(pks[0])
-			if err != nil {
-				logger.Error("could not generate color hash")
-				return
+
+			accColorHash := account.ColorHash
+
+			if accColorHash == nil {
+				pks, ok := params["publicKey"]
+				if !ok || len(pks) == 0 {
+					logger.Error("no publicKey")
+					return
+				}
+
+				accColorHash, err = colorhash.GenerateFor(pks[0])
+				if err != nil {
+					logger.Error("could not generate color hash")
+					return
+				}
 			}
 
 			var theme = getTheme(params, logger)
 
 			payload, err = ring.DrawRing(&ring.DrawRingParam{
-				Theme: theme, ColorHash: colorHash, ImageBytes: identityImage.Payload, Height: identityImage.Height, Width: identityImage.Width,
+				Theme: theme, ColorHash: accColorHash, ImageBytes: identityImage.Payload, Height: identityImage.Height, Width: identityImage.Width,
 			})
 
 			if err != nil {
