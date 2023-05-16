@@ -26,10 +26,10 @@ message Backup {
   FetchingBackedUpDataDetails profileDetails = 8;
   SyncSetting setting = 9;
   FetchingBackedUpDataDetails settingsDetails = 10;
-  SyncAllKeycards keycards = 11;
-  FetchingBackedUpDataDetails keycardsDetails = 12;
-  SyncWalletAccount walletAccount = 13;
-  FetchingBackedUpDataDetails walletAccountsDetails = 14;
+  SyncKeypairFull fullKeypair = 11;
+  FetchingBackedUpDataDetails fullKeypairDetails = 12;
+  SyncAccount watchOnlyAccount = 13;
+  FetchingBackedUpDataDetails watchOnlyAccountDetails = 14;
 }
 
 message MultiAccount {
@@ -224,28 +224,35 @@ message SyncProfilePictures {
   repeated SyncProfilePicture pictures = 2;
 }
 
-message SyncWalletAccount {
+message SyncAccount {
   uint64 clock = 1;
-	bytes address = 2;
-	bool wallet = 3;
-	bool chat = 4;
-	string type = 5;
-	string storage = 6;
-	string path = 7;
-	bytes publicKey = 8;
-	string name = 9;
-	string color = 10;
-	bool hidden = 11;
+  bytes address = 2;
+  string key_uid = 3;
+  bytes public_key = 4;
+  string path = 5;
+  string name = 6;
+  string color = 7;
+  string emoji = 8;
+  bool wallet = 9;
+  bool chat = 10;
+  bool hidden = 11;
   bool removed = 12;
-  string emoji = 13;
-  string derived_from = 14;
-  string key_uid = 15;
-  string keypair_name = 16;
-  uint64 last_used_derivation_index = 17;
 }
 
-message SyncWalletAccounts {
-  repeated SyncWalletAccount accounts = 1;
+message SyncKeypair {
+  uint64 clock = 1;
+  string key_uid = 2;
+  string name = 3;
+  string type = 4;
+  string derived_from = 5;
+  uint64 last_used_derivation_index = 6;
+  string synced_from = 7;
+  repeated SyncAccount accounts = 8;
+}
+
+message SyncKeypairFull {
+  SyncKeypair keypair = 1;
+  repeated SyncKeycard keycards = 2;
 }
 
 message SyncSavedAddress {
@@ -356,11 +363,6 @@ message SyncKeycardAction {
     UID_UPDATED = 6;
     NAME_CHANGED = 7;
   }
-}
-
-message SyncAllKeycards {
-  repeated SyncKeycard keycards = 1;
-  uint64 clock = 2;
 }
 
 message SyncSocialLinkSetting {

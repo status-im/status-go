@@ -43,6 +43,8 @@ var (
 	ErrWalletAccountNotSupportedForMobileApp = errors.New("handling account is not supported for mobile app")
 	ErrTryingToStoreOldWalletAccount         = errors.New("trying to store an old wallet account")
 	ErrSomeFieldsMissingForWalletAccount     = errors.New("some fields are missing for wallet account")
+	ErrTryingToRemoveUnexistingWalletAccount = errors.New("trying to remove an unexisting wallet account")
+	ErrUnknownKeypairForWalletAccount        = errors.New("keypair is not known for the wallet account")
 )
 
 // HandleMembershipUpdate updates a Chat instance according to the membership updates.
@@ -2871,49 +2873,101 @@ func (m *Messenger) updateUnviewedCounts(chat *Chat, mentionedOrReplied bool) {
 		chat.UnviewedMentionsCount++
 	}
 }
+func mapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability accounts.AccountOperable) *accounts.Account {
+	return &accounts.Account{
+		Address:   types.BytesToAddress(message.Address),
+		KeyUID:    message.KeyUid,
+		PublicKey: types.HexBytes(message.PublicKey),
+		Path:      message.Path,
+		Name:      message.Name,
+		Color:     message.Color,
+		Emoji:     message.Emoji,
+		Wallet:    message.Wallet,
+		Chat:      message.Chat,
+		Hidden:    message.Hidden,
+		Clock:     message.Clock,
+		Operable:  accountOperability,
+	}
+}
 
-func (m *Messenger) handleSyncWalletAccount(message *protobuf.SyncWalletAccount) (*accounts.Account, error) {
+func (m *Messenger) resolveAccountOperability(keyUID string, defaultWalletAccount bool, accountReceivedFromRecovering bool) (accounts.AccountOperable, error) {
+	knownKeycardsForKeyUID, err := m.settings.GetKeycardByKeyUID(keyUID)
+	if err != nil {
+		if err == accounts.ErrDbKeypairNotFound {
+			return accounts.AccountNonOperable, nil
+		}
+		return accounts.AccountNonOperable, err
+	}
+
+	keypairMigratedToKeycard := len(knownKeycardsForKeyUID) > 0
+	accountsOperability := accounts.AccountNonOperable
+	if keypairMigratedToKeycard || accountReceivedFromRecovering || defaultWalletAccount {
+		accountsOperability = accounts.AccountFullyOperable
+	} else {
+		partiallyOrFullyOperable, err := m.settings.IsAnyAccountPartalyOrFullyOperableForKeyUID(keyUID)
+		if err != nil {
+			if err == accounts.ErrDbKeypairNotFound {
+				return accounts.AccountNonOperable, nil
+			}
+			return accounts.AccountNonOperable, err
+		}
+		if partiallyOrFullyOperable {
+			accountsOperability = accounts.AccountPartiallyOperable
+		}
+	}
+
+	return accountsOperability, nil
+}
+
+func (m *Messenger) handleSyncWalletAccount(message *protobuf.SyncAccount, syncedFrom string) (*accounts.Account, error) {
 	if message.Chat {
 		return nil, ErrNotWalletAccount
 	}
+
+	accountOperability := accounts.AccountFullyOperable
+
+	// The only account without `KeyUid` is watch only account and it doesn't belong to any keypair.
+	if message.KeyUid != "" {
+		_, err := m.settings.GetKeypairByKeyUID(message.KeyUid)
+		if err != nil {
+			if err == accounts.ErrDbKeypairNotFound {
+				return nil, ErrUnknownKeypairForWalletAccount
+			}
+			return nil, err
+		}
+
+		accountReceivedFromRecovering := syncedFrom == accounts.SyncedFromLocalPairing
+		accountOperability, err = m.resolveAccountOperability(message.KeyUid, message.Wallet, accountReceivedFromRecovering)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	accAddress := types.BytesToAddress(message.Address)
 	dbAccount, err := m.settings.GetAccountByAddress(accAddress)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && err != accounts.ErrDbAccountNotFound {
 		return nil, err
 	}
 
-	if dbAccount != nil && message.Clock <= dbAccount.Clock {
-		return nil, ErrTryingToStoreOldWalletAccount
-	}
-
-	var acc *accounts.Account
-	if dbAccount != nil && message.Removed {
-		acc = &accounts.Account{
-			Address: types.BytesToAddress(message.Address),
-			Removed: true,
+	if dbAccount != nil {
+		if message.Clock <= dbAccount.Clock {
+			return nil, ErrTryingToStoreOldWalletAccount
 		}
-	} else if !message.Removed {
-		acc = &accounts.Account{
-			Address:                 types.BytesToAddress(message.Address),
-			Wallet:                  message.Wallet,
-			Chat:                    message.Chat,
-			Type:                    accounts.AccountType(message.Type),
-			Storage:                 message.Storage,
-			PublicKey:               types.HexBytes(message.PublicKey),
-			Path:                    message.Path,
-			Color:                   message.Color,
-			Hidden:                  message.Hidden,
-			Name:                    message.Name,
-			Clock:                   message.Clock,
-			KeyUID:                  message.KeyUid,
-			Emoji:                   message.Emoji,
-			DerivedFrom:             message.DerivedFrom,
-			KeypairName:             message.KeypairName,
-			LastUsedDerivationIndex: message.LastUsedDerivationIndex,
+
+		if message.Removed {
+			err = m.settings.DeleteAccount(accAddress)
+			dbAccount.Removed = true
+			return dbAccount, err
+		}
+	} else {
+		if message.Removed {
+			return nil, ErrTryingToRemoveUnexistingWalletAccount
 		}
 	}
 
-	err = m.settings.SaveAccounts([]*accounts.Account{acc})
+	acc := mapSyncAccountToAccount(message, accountOperability)
+
+	err = m.settings.SaveOrUpdateAccounts([]*accounts.Account{acc})
 	if err != nil {
 		return nil, err
 	}
@@ -2921,24 +2975,132 @@ func (m *Messenger) handleSyncWalletAccount(message *protobuf.SyncWalletAccount)
 	return acc, nil
 }
 
-func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message protobuf.SyncWalletAccounts) error {
-	var accs []*accounts.Account
-	for _, accMsg := range message.Accounts {
-		acc, err := m.handleSyncWalletAccount(accMsg)
-		if err != nil {
-			if err == ErrNotWalletAccount ||
-				err == ErrWalletAccountNotSupportedForMobileApp ||
-				err == ErrTryingToStoreOldWalletAccount ||
-				err == ErrSomeFieldsMissingForWalletAccount {
-				continue
-			}
-			return err
-		}
-
-		accs = append(accs, acc)
+func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.Keypair, error) {
+	dbKeypair, err := m.settings.GetKeypairByKeyUID(message.KeyUid)
+	if err != nil && err != accounts.ErrDbKeypairNotFound {
+		return nil, err
 	}
 
-	state.Response.Accounts = accs
+	kp := &accounts.Keypair{
+		KeyUID:                  message.KeyUid,
+		Name:                    message.Name,
+		Type:                    accounts.KeypairType(message.Type),
+		DerivedFrom:             message.DerivedFrom,
+		LastUsedDerivationIndex: message.LastUsedDerivationIndex,
+		SyncedFrom:              message.SyncedFrom,
+		Clock:                   message.Clock,
+	}
+
+	saveOrUpdate := dbKeypair == nil
+	if dbKeypair != nil {
+		saveOrUpdate = dbKeypair.Clock < kp.Clock
+		// in case of keypair update, we need to keep `synced_from` field as it was when keypair was introduced to this device for the first time
+		kp.SyncedFrom = dbKeypair.SyncedFrom
+	}
+
+	if saveOrUpdate {
+		accountReceivedFromRecovering := message.SyncedFrom == accounts.SyncedFromLocalPairing
+		if dbKeypair != nil && message.SyncedFrom == accounts.SyncedFromBackup {
+			// in case of recovering from backed up messages we need to delete messages which are already in db (eg. stored py previously received backed up message)
+			for _, dbAcc := range dbKeypair.Accounts {
+				found := false
+				for _, sAcc := range message.Accounts {
+					sAccAddress := types.BytesToAddress(sAcc.Address)
+					if dbAcc.Address == sAccAddress {
+						found = true
+						break
+					}
+				}
+				if found {
+					err = m.settings.DeleteAccount(dbAcc.Address)
+					if err != nil {
+						return nil, err
+					}
+				}
+			}
+		}
+
+		for _, sAcc := range message.Accounts {
+			accountOperability, err := m.resolveAccountOperability(sAcc.KeyUid, sAcc.Wallet, accountReceivedFromRecovering)
+			if err != nil {
+				return nil, err
+			}
+			acc := mapSyncAccountToAccount(sAcc, accountOperability)
+			kp.Accounts = append(kp.Accounts, acc)
+		}
+		err = m.settings.SaveOrUpdateKeypair(kp)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	for _, sAcc := range message.Accounts {
+		acc, err := m.handleSyncWalletAccount(sAcc, message.SyncedFrom)
+		if err != nil {
+			if err == ErrNotWalletAccount ||
+				err == ErrTryingToStoreOldWalletAccount ||
+				err == ErrTryingToRemoveUnexistingWalletAccount {
+				continue
+			}
+			return nil, err
+		}
+
+		kp.Accounts = append(kp.Accounts, acc)
+	}
+
+	return kp, nil
+}
+
+func (m *Messenger) handleSyncKeypairFull(message *protobuf.SyncKeypairFull) (kp *accounts.Keypair, keycards []*accounts.Keycard, err error) {
+	kp, err = m.handleSyncKeypair(message.Keypair)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, sKc := range message.Keycards {
+		kc := accounts.Keycard{}
+		kc.FromSyncKeycard(sKc)
+		keycards = append(keycards, &kc)
+	}
+
+	err = m.settings.ApplyKeycardsForKeypairWithKeyUID(kp.KeyUID, keycards)
+	if err != nil {
+		return kp, keycards, err
+	}
+
+	return
+}
+
+func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message protobuf.SyncAccount, syncedFrom string) error {
+	acc, err := m.handleSyncWalletAccount(&message, syncedFrom)
+	if err != nil {
+		return err
+	}
+
+	state.Response.Accounts = append(state.Response.Accounts, acc)
+
+	return nil
+}
+
+func (m *Messenger) HandleSyncKeypair(state *ReceivedMessageState, message protobuf.SyncKeypair) error {
+	kp, err := m.handleSyncKeypair(&message)
+	if err != nil {
+		return err
+	}
+
+	state.Response.Keypairs = append(state.Response.Keypairs, kp)
+
+	return nil
+}
+
+func (m *Messenger) HandleSyncKeypairFull(state *ReceivedMessageState, message protobuf.SyncKeypairFull) error {
+	keypair, keycards, err := m.handleSyncKeypairFull(&message)
+	if err != nil {
+		return err
+	}
+
+	state.Response.Keypairs = append(state.Response.Keypairs, keypair)
+	state.Response.Keycards = append(state.Response.Keycards, keycards...)
 
 	return nil
 }

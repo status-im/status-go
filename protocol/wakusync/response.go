@@ -4,31 +4,36 @@ import (
 	"encoding/json"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/keycards"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type WakuBackedUpDataResponse struct {
+	Clock                uint64
 	FetchingDataProgress map[string]protobuf.FetchingBackedUpDataDetails // key represents the data/section backup details refer to
 	Profile              *BackedUpProfile
 	Setting              *settings.SyncSettingField
-	Keycards             []*keycards.Keycard
-	WalletAccount        *accounts.Account
+	Keycards             []*accounts.Keycard
+	Keypair              *accounts.Keypair
+	WatchOnlyAccount     *accounts.Account
 }
 
 func (sfwr *WakuBackedUpDataResponse) MarshalJSON() ([]byte, error) {
 	responseItem := struct {
+		Clock                uint64                                 `json:"clock,omitempty"`
 		FetchingDataProgress map[string]FetchingBackupedDataDetails `json:"fetchingBackedUpDataProgress,omitempty"`
 		Profile              *BackedUpProfile                       `json:"backedUpProfile,omitempty"`
 		Setting              *settings.SyncSettingField             `json:"backedUpSettings,omitempty"`
-		Keycards             []*keycards.Keycard                    `json:"backedUpKeycards,omitempty"`
-		WalletAccount        *accounts.Account                      `json:"backedUpWalletAccount,omitempty"`
+		Keycards             []*accounts.Keycard                    `json:"backedUpKeycards,omitempty"`
+		Keypair              *accounts.Keypair                      `json:"backedUpKeypair,omitempty"`
+		WatchOnlyAccount     *accounts.Account                      `json:"backedUpWatchOnlyAccount,omitempty"`
 	}{
-		Profile:       sfwr.Profile,
-		Setting:       sfwr.Setting,
-		Keycards:      sfwr.Keycards,
-		WalletAccount: sfwr.WalletAccount,
+		Clock:            sfwr.Clock,
+		Profile:          sfwr.Profile,
+		Setting:          sfwr.Setting,
+		Keycards:         sfwr.Keycards,
+		Keypair:          sfwr.Keypair,
+		WatchOnlyAccount: sfwr.WatchOnlyAccount,
 	}
 
 	responseItem.FetchingDataProgress = sfwr.FetchingBackedUpDataDetails()
