@@ -580,7 +580,7 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 	} else {
 		keyDir = config.KeyStoreDir
 	}
-
+	b.log.Info("Changing database password", "keyUID", keyUID, "b.accountManager.Keydir", b.accountManager.Keydir, "config.KeyStoreDir", config.KeyStoreDir)
 	if keyDir != "" {
 		err := b.accountManager.ReEncryptKeyStoreDir(keyDir, password, newPassword)
 		if err != nil {
@@ -744,7 +744,7 @@ func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error)
 }
 
 func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *requests.CreateAccount) error {
-	keystoreDir := filepath.Join(request.BackupDisabledDataDir, keystoreRelativePath)
+	keystoreDir := keystoreRelativePath
 
 	b.UpdateRootDataDir(request.BackupDisabledDataDir)
 	err := b.OpenAccounts()
@@ -779,7 +779,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 
 	userKeyStoreDir := filepath.Join(keystoreDir, info.KeyUID)
 	// Initialize keystore dir with account
-	if err := b.accountManager.InitKeystore(userKeyStoreDir); err != nil {
+	if err := b.accountManager.InitKeystore(filepath.Join(b.rootDataDir, userKeyStoreDir)); err != nil {
 		return err
 	}
 
@@ -813,6 +813,8 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 		return err
 	}
 
+	// when we set nodeConfig.KeyStoreDir, value of nodeConfig.KeyStoreDir should not contain the rootDataDir
+	// loadNodeConfig will add rootDataDir to nodeConfig.KeyStoreDir
 	nodeConfig.KeyStoreDir = userKeyStoreDir
 
 	walletDerivedAccount := derivedAddresses[pathDefaultWallet]
