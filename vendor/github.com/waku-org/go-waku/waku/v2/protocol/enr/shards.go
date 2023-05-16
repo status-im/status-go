@@ -6,25 +6,31 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 )
 
-func SetWakuRelayShardingIndicesList(localnode *enode.LocalNode, rs protocol.RelayShards) error {
-	value, err := rs.IndicesList()
-	if err != nil {
-		return err
+func WithWakuRelayShardingIndicesList(rs protocol.RelayShards) ENROption {
+	return func(localnode *enode.LocalNode) error {
+		value, err := rs.IndicesList()
+		if err != nil {
+			return err
+		}
+		localnode.Set(enr.WithEntry(ShardingIndicesListEnrField, value))
+		return nil
 	}
-	localnode.Set(enr.WithEntry(ShardingIndicesListEnrField, value))
-	return nil
 }
 
-func SetWakuRelayShardingBitVector(localnode *enode.LocalNode, rs protocol.RelayShards) error {
-	localnode.Set(enr.WithEntry(ShardingBitVectorEnrField, rs.BitVector()))
-	return nil
+func WithWakuRelayShardingBitVector(rs protocol.RelayShards) ENROption {
+	return func(localnode *enode.LocalNode) error {
+		localnode.Set(enr.WithEntry(ShardingBitVectorEnrField, rs.BitVector()))
+		return nil
+	}
 }
 
-func SetWakuRelaySharding(localnode *enode.LocalNode, rs protocol.RelayShards) error {
-	if len(rs.Indices) >= 64 {
-		return SetWakuRelayShardingBitVector(localnode, rs)
-	} else {
-		return SetWakuRelayShardingIndicesList(localnode, rs)
+func WithtWakuRelaySharding(rs protocol.RelayShards) ENROption {
+	return func(localnode *enode.LocalNode) error {
+		if len(rs.Indices) >= 64 {
+			return WithWakuRelayShardingBitVector(rs)(localnode)
+		} else {
+			return WithWakuRelayShardingIndicesList(rs)(localnode)
+		}
 	}
 }
 

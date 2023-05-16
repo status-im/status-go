@@ -294,8 +294,13 @@ func (d *DiscoveryV5) iterate(ctx context.Context) error {
 		}
 
 		if len(peerAddrs) != 0 {
-			d.peerConnector.PeerChannel() <- peerAddrs[0]
+			select {
+			case d.peerConnector.PeerChannel() <- peerAddrs[0]:
+			case <-ctx.Done():
+				return nil
+			}
 		}
+
 		select {
 		case <-ctx.Done():
 			return nil
