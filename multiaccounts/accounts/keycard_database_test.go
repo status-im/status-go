@@ -1,98 +1,76 @@
-package keycards
+package accounts
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 )
-
-func setupTestDB(t *testing.T) (*Keycards, func()) {
-	db, stop, err := appdatabase.SetupTestSQLDB("settings-tests-")
-	if err != nil {
-		require.NoError(t, stop())
-	}
-	require.NoError(t, err)
-
-	d := NewKeycards(db)
-
-	return d, func() {
-		require.NoError(t, stop())
-	}
-}
 
 func TestKeycards(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
 	keycardUID := "00000000000000000000000000000000"
-	keycard1 := Keycard{
-		KeycardUID:        "00000000000000000000000000000001",
-		KeycardName:       "Card01",
-		KeycardLocked:     false,
-		AccountsAddresses: []types.Address{{0x01}, {0x02}, {0x03}, {0x04}},
-		KeyUID:            "0000000000000000000000000000000000000000000000000000000000000001",
-		LastUpdateClock:   100,
-	}
-	keycard2 := Keycard{
-		KeycardUID:        "00000000000000000000000000000002",
-		KeycardName:       "Card02",
-		KeycardLocked:     false,
-		AccountsAddresses: []types.Address{{0x01}, {0x02}},
-		KeyUID:            "0000000000000000000000000000000000000000000000000000000000000002",
-		LastUpdateClock:   200,
-	}
-	keycard3 := Keycard{
-		KeycardUID:        "00000000000000000000000000000003",
-		KeycardName:       "Card02 Copy",
-		KeycardLocked:     false,
-		AccountsAddresses: []types.Address{{0x01}, {0x02}},
-		KeyUID:            "0000000000000000000000000000000000000000000000000000000000000002",
-		LastUpdateClock:   300,
-	}
-	keycard4 := Keycard{
-		KeycardUID:        "00000000000000000000000000000004",
-		KeycardName:       "Card04",
-		KeycardLocked:     false,
-		AccountsAddresses: []types.Address{{0x01}, {0x02}, {0x03}},
-		KeyUID:            "0000000000000000000000000000000000000000000000000000000000000004",
-		LastUpdateClock:   400,
-	}
+
+	kp1 := GetProfileKeypairForTest(false)
+	keycard1 := GetProfileKeycardForTest()
+
+	kp2 := GetSeedImportedKeypair1ForTest()
+	keycard2 := GetKeycardForSeedImportedKeypair1ForTest()
+
+	keycard2Copy := GetKeycardForSeedImportedKeypair1ForTest()
+	keycard2Copy.KeycardUID = keycard2Copy.KeycardUID + "C"
+	keycard2Copy.KeycardName = keycard2Copy.KeycardName + "Copy"
+	keycard2Copy.LastUpdateClock = keycard2Copy.LastUpdateClock + 1
+
+	kp3 := GetSeedImportedKeypair2ForTest()
+	keycard3 := GetKeycardForSeedImportedKeypair2ForTest()
+
+	// Pre-condition
+	err := db.SaveOrUpdateKeypair(kp1)
+	require.NoError(t, err)
+	err = db.SaveOrUpdateKeypair(kp2)
+	require.NoError(t, err)
+	err = db.SaveOrUpdateKeypair(kp3)
+	require.NoError(t, err)
+	dbKeypairs, err := db.GetKeypairs()
+	require.NoError(t, err)
+	require.Equal(t, 3, len(dbKeypairs))
 
 	// Test adding key pairs
-	addedKc, addedAccs, err := db.AddKeycardOrAddAccountsIfKeycardIsAdded(keycard1)
+	addedKc, addedAccs, err := db.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	require.NoError(t, err)
 	require.Equal(t, true, addedKc)
 	require.Equal(t, false, addedAccs)
-	addedKc, addedAccs, err = db.AddKeycardOrAddAccountsIfKeycardIsAdded(keycard2)
+	addedKc, addedAccs, err = db.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard2)
 	require.NoError(t, err)
 	require.Equal(t, true, addedKc)
 	require.Equal(t, false, addedAccs)
-	addedKc, addedAccs, err = db.AddKeycardOrAddAccountsIfKeycardIsAdded(keycard3)
+	addedKc, addedAccs, err = db.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard2Copy)
 	require.NoError(t, err)
 	require.Equal(t, true, addedKc)
 	require.Equal(t, false, addedAccs)
 	// this should be added
 	addedKc, addedAccs, err = db.AddKeycardOrAddAccountsIfKeycardIsAdded(Keycard{
-		KeycardUID:        keycard3.KeycardUID,
+		KeycardUID:        keycard2Copy.KeycardUID,
 		AccountsAddresses: []types.Address{{0x03}},
-		LastUpdateClock:   keycard3.LastUpdateClock + 1,
+		LastUpdateClock:   keycard2Copy.LastUpdateClock + 1,
 	})
 	require.NoError(t, err)
 	require.Equal(t, false, addedKc)
 	require.Equal(t, true, addedAccs)
 	// this should not be added as it has clock value less than last updated clock value
 	addedKc, addedAccs, err = db.AddKeycardOrAddAccountsIfKeycardIsAdded(Keycard{
-		KeycardUID:        keycard3.KeycardUID,
+		KeycardUID:        keycard2Copy.KeycardUID,
 		AccountsAddresses: []types.Address{{0x04}},
-		LastUpdateClock:   keycard3.LastUpdateClock,
+		LastUpdateClock:   keycard2Copy.LastUpdateClock,
 	})
 	require.NoError(t, err)
 	require.Equal(t, false, addedKc)
 	require.Equal(t, false, addedAccs)
-	addedKc, addedAccs, err = db.AddKeycardOrAddAccountsIfKeycardIsAdded(keycard4)
+	addedKc, addedAccs, err = db.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard3)
 	require.NoError(t, err)
 	require.Equal(t, true, addedKc)
 	require.Equal(t, false, addedAccs)
@@ -113,10 +91,10 @@ func TestKeycards(t *testing.T) {
 			require.Equal(t, keycard2.KeycardLocked, kp.KeycardLocked)
 			require.Equal(t, len(keycard2.AccountsAddresses)+1, len(kp.AccountsAddresses)) // Add 1, cause one account is additionally added for the same keycard.
 		} else {
-			require.Equal(t, keycard4.KeycardUID, kp.KeycardUID)
-			require.Equal(t, keycard4.KeycardName, kp.KeycardName)
-			require.Equal(t, keycard4.KeycardLocked, kp.KeycardLocked)
-			require.Equal(t, len(keycard4.AccountsAddresses), len(kp.AccountsAddresses))
+			require.Equal(t, keycard3.KeycardUID, kp.KeycardUID)
+			require.Equal(t, keycard3.KeycardName, kp.KeycardName)
+			require.Equal(t, keycard3.KeycardLocked, kp.KeycardLocked)
+			require.Equal(t, len(keycard3.AccountsAddresses), len(kp.AccountsAddresses))
 		}
 	}
 
@@ -146,18 +124,18 @@ func TestKeycards(t *testing.T) {
 			require.Equal(t, keycard2.KeycardLocked, kp.KeycardLocked)
 			require.Equal(t, len(keycard2.AccountsAddresses), len(kp.AccountsAddresses))
 			require.Equal(t, keycard2.LastUpdateClock, kp.LastUpdateClock)
-		} else if kp.KeycardUID == keycard3.KeycardUID {
+		} else if kp.KeycardUID == keycard2Copy.KeycardUID {
+			require.Equal(t, keycard2Copy.KeycardUID, kp.KeycardUID)
+			require.Equal(t, keycard2Copy.KeycardName, kp.KeycardName)
+			require.Equal(t, keycard2Copy.KeycardLocked, kp.KeycardLocked)
+			require.Equal(t, len(keycard2Copy.AccountsAddresses)+1, len(kp.AccountsAddresses)) // Add 1, cause one account is additionally added.
+			require.Equal(t, keycard2Copy.LastUpdateClock+1, kp.LastUpdateClock)
+		} else {
 			require.Equal(t, keycard3.KeycardUID, kp.KeycardUID)
 			require.Equal(t, keycard3.KeycardName, kp.KeycardName)
 			require.Equal(t, keycard3.KeycardLocked, kp.KeycardLocked)
-			require.Equal(t, len(keycard3.AccountsAddresses)+1, len(kp.AccountsAddresses)) // Add 1, cause one account is additionally added.
-			require.Equal(t, keycard3.LastUpdateClock+1, kp.LastUpdateClock)
-		} else {
-			require.Equal(t, keycard4.KeycardUID, kp.KeycardUID)
-			require.Equal(t, keycard4.KeycardName, kp.KeycardName)
-			require.Equal(t, keycard4.KeycardLocked, kp.KeycardLocked)
-			require.Equal(t, len(keycard4.AccountsAddresses), len(kp.AccountsAddresses))
-			require.Equal(t, keycard4.LastUpdateClock, kp.LastUpdateClock)
+			require.Equal(t, len(keycard3.AccountsAddresses), len(kp.AccountsAddresses))
+			require.Equal(t, keycard3.LastUpdateClock, kp.LastUpdateClock)
 		}
 	}
 
@@ -212,20 +190,20 @@ func TestKeycards(t *testing.T) {
 	require.Equal(t, len(keycard1.AccountsAddresses)-numOfAccountsToRemove, len(rows[0].AccountsAddresses))
 
 	// Test deleting accounts one by one, with the last deleted account keycard should be delete as well
-	for i, addr := range keycard4.AccountsAddresses {
-		err = db.RemoveMigratedAccountsForKeycard(keycard4.KeycardUID, []types.Address{addr}, 1003+uint64(i))
+	for i, addr := range keycard3.AccountsAddresses {
+		err = db.RemoveMigratedAccountsForKeycard(keycard3.KeycardUID, []types.Address{addr}, 1003+uint64(i))
 		require.NoError(t, err)
 	}
 	rows, err = db.GetAllKnownKeycardsGroupedByKeyUID()
 	require.NoError(t, err)
 	// Test if correct keycard is deleted
-	deletedKeycard4 := true
+	deletedKeycard3 := true
 	for _, kp := range rows {
-		if kp.KeycardUID == keycard4.KeycardUID {
-			deletedKeycard4 = false
+		if kp.KeycardUID == keycard3.KeycardUID {
+			deletedKeycard3 = false
 		}
 	}
-	require.Equal(t, true, deletedKeycard4)
+	require.Equal(t, true, deletedKeycard3)
 
 	// Test update keycard uid
 	err = db.UpdateKeycardUID(keycard1.KeycardUID, keycardUID, 1100)
@@ -272,4 +250,78 @@ func TestKeycards(t *testing.T) {
 		}
 	}
 	require.Equal(t, true, deletedKeycard2And3)
+}
+
+func TestKeycardsRemovalWhenDeletingKeypair(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	kp2 := &Keypair{
+		KeyUID:      "0000000000000000000000000000000000000000000000000000000000000002",
+		Name:        "Keypair Name 2",
+		Type:        KeypairTypeSeed,
+		DerivedFrom: "0x0001",
+	}
+	kp2.Accounts = append(kp2.Accounts, &Account{Address: types.Address{0x11}, KeyUID: kp2.KeyUID})
+	kp2.Accounts = append(kp2.Accounts, &Account{Address: types.Address{0x12}, KeyUID: kp2.KeyUID})
+
+	keycard2 := Keycard{
+		KeycardUID:        "00000000000000000000000000000002",
+		KeycardName:       "Card02",
+		KeycardLocked:     false,
+		AccountsAddresses: []types.Address{{0x11}, {0x12}},
+		KeyUID:            kp2.KeyUID,
+		LastUpdateClock:   200,
+	}
+	keycard3 := Keycard{
+		KeycardUID:        "00000000000000000000000000000003",
+		KeycardName:       "Card02 Copy",
+		KeycardLocked:     false,
+		AccountsAddresses: []types.Address{{0x11}, {0x12}},
+		KeyUID:            kp2.KeyUID,
+		LastUpdateClock:   300,
+	}
+
+	// Pre-condition - save keypair
+	err := db.SaveOrUpdateKeypair(kp2)
+	require.NoError(t, err)
+	dbKeypairs, err := db.GetKeypairs()
+	require.NoError(t, err)
+	require.Equal(t, 1, len(dbKeypairs))
+
+	// Pre-condition - save keycards referring to previously added keypair
+	addedKc, addedAccs, err := db.AddKeycardOrAddAccountsIfKeycardIsAdded(keycard2)
+	require.NoError(t, err)
+	require.Equal(t, true, addedKc)
+	require.Equal(t, false, addedAccs)
+	addedKc, addedAccs, err = db.AddKeycardOrAddAccountsIfKeycardIsAdded(keycard3)
+	require.NoError(t, err)
+	require.Equal(t, true, addedKc)
+	require.Equal(t, false, addedAccs)
+
+	// Check db state
+	keycardsWithSameKeyUID, err := db.GetAllKnownKeycards()
+	require.NoError(t, err)
+	require.Equal(t, 2, len(keycardsWithSameKeyUID))
+
+	require.Equal(t, len(kp2.KeyUID), len(dbKeypairs[0].KeyUID))
+	require.Equal(t, len(kp2.KeyUID), len(keycardsWithSameKeyUID[0].KeyUID))
+	require.Equal(t, len(kp2.KeyUID), len(keycardsWithSameKeyUID[1].KeyUID))
+
+	require.Equal(t, len(kp2.Accounts), len(dbKeypairs[0].Accounts))
+	require.Equal(t, len(kp2.Accounts), len(keycardsWithSameKeyUID[0].AccountsAddresses))
+	require.Equal(t, len(kp2.Accounts), len(keycardsWithSameKeyUID[1].AccountsAddresses))
+
+	// Remove keypair
+	err = db.DeleteKeypair(kp2.KeyUID)
+	require.NoError(t, err)
+
+	// Check db state after deletion
+	dbKeypairs, err = db.GetKeypairs()
+	require.NoError(t, err)
+	require.Equal(t, 0, len(dbKeypairs))
+
+	keycardsWithSameKeyUID, err = db.GetAllKnownKeycards()
+	require.NoError(t, err)
+	require.Equal(t, 0, len(keycardsWithSameKeyUID))
 }

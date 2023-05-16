@@ -7,6 +7,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 
@@ -84,7 +85,8 @@ func setupWalletTest(t *testing.T, password string) (backend *GethStatusBackend,
 		WalletRootAddress: types.HexToAddress(walletRootAddress)}
 
 	err = backend.saveAccountsAndSettings(s, config, nil)
-	require.NoError(t, err)
+	require.Error(t, err)
+	require.True(t, err == accounts.ErrKeypairWithoutAccounts)
 
 	// this is for StatusNode().Config() call inside of the getVerifiedWalletAccount
 	err = backend.StartNode(config)
