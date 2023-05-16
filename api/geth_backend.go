@@ -580,7 +580,7 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 	} else {
 		keyDir = config.KeyStoreDir
 	}
-	b.log.Info("Changing database password", "keyUID", keyUID, "b.accountManager.Keydir", b.accountManager.Keydir, "config.KeyStoreDir", config.KeyStoreDir)
+
 	if keyDir != "" {
 		err := b.accountManager.ReEncryptKeyStoreDir(keyDir, password, newPassword)
 		if err != nil {
