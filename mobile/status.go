@@ -335,26 +335,6 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 		return makeJSONResponse(err)
 	}
 
-	for i, acc := range subaccs {
-		subaccs[i].KeyUID = account.KeyUID
-
-		if acc.Chat {
-			colorHash, err := colorhash.GenerateFor(string(acc.PublicKey.Bytes()))
-			if err != nil {
-				return makeJSONResponse(err)
-			}
-			account.ColorHash = colorHash
-
-			colorID, err := identityUtils.ToColorID(string(acc.PublicKey.Bytes()))
-			if err != nil {
-				return makeJSONResponse(err)
-			}
-			account.ColorID = colorID
-
-			break
-		}
-	}
-
 	api.RunAsync(func() error {
 		log.Debug("starting a node, and saving account with configuration", "key-uid", account.KeyUID)
 		err := statusBackend.StartNodeWithAccountAndInitialConfig(account, password, settings, &conf, subaccs)
@@ -415,26 +395,6 @@ func SaveAccountAndLoginWithKeycard(accountData, password, settingsJSON, configJ
 	err = json.Unmarshal([]byte(subaccountData), &subaccs)
 	if err != nil {
 		return makeJSONResponse(err)
-	}
-
-	for i, acc := range subaccs {
-		subaccs[i].KeyUID = account.KeyUID
-
-		if acc.Chat {
-			colorHash, err := colorhash.GenerateFor(string(acc.PublicKey.Bytes()))
-			if err != nil {
-				return makeJSONResponse(err)
-			}
-			account.ColorHash = colorHash
-
-			colorID, err := identityUtils.ToColorID(string(acc.PublicKey.Bytes()))
-			if err != nil {
-				return makeJSONResponse(err)
-			}
-			account.ColorID = colorID
-
-			break
-		}
 	}
 
 	api.RunAsync(func() error {
