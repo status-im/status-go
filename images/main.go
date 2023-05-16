@@ -3,6 +3,7 @@ package images
 import (
 	"bytes"
 	"image"
+	"image/png"
 )
 
 func GenerateImageVariants(cImg image.Image) ([]IdentityImage, error) {
@@ -100,4 +101,23 @@ func GenerateBannerImage(filepath string, aX, aY, bX, bY int) (*IdentityImage, e
 	}
 
 	return ii, nil
+}
+
+func GenerateTransparentImage(aX, aY, bX, bY int) ([]byte, error) {
+	img := image.NewRGBA(image.Rect(aX, aY, bX, bY))
+	for i := range img.Pix {
+		img.Pix[i] = 0 // Set the alpha channel to 0 for each pixel
+	}
+
+	// Encode the image to bytes
+	buf := new(bytes.Buffer)
+	err := png.Encode(buf, img)
+	if err != nil {
+		return nil, err
+	}
+
+	// Use the bytes however you need
+	payload := buf.Bytes()
+
+	return payload, nil
 }
