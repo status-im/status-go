@@ -29,23 +29,30 @@ type ConnStatus struct {
 	Peers      PeerStats
 }
 
+type PeerConnection struct {
+	PeerID    peer.ID
+	Connected bool
+}
+
 // ConnectionNotifier is a custom Notifier to be used to display when a peer
 // connects or disconnects to the node
 type ConnectionNotifier struct {
 	h              host.Host
 	ctx            context.Context
 	log            *zap.Logger
+	connNotifCh    chan<- PeerConnection
 	DisconnectChan chan peer.ID
 	quit           chan struct{}
 }
 
-func NewConnectionNotifier(ctx context.Context, h host.Host, log *zap.Logger) ConnectionNotifier {
+func NewConnectionNotifier(ctx context.Context, h host.Host, connNotifCh chan<- PeerConnection, log *zap.Logger) ConnectionNotifier {
 	return ConnectionNotifier{
 		h:              h,
 		ctx:            ctx,
 		DisconnectChan: make(chan peer.ID, 100),
+		connNotifCh:    connNotifCh,
 		quit:           make(chan struct{}),
-		log:            log,
+		log:            log.Named("connection-notifier"),
 	}
 }
 
@@ -60,6 +67,13 @@ func (c ConnectionNotifier) ListenClose(n network.Network, m multiaddr.Multiaddr
 // Connected is called when a connection is opened
 func (c ConnectionNotifier) Connected(n network.Network, cc network.Conn) {
 	c.log.Info("peer connected", logging.HostID("peer", cc.RemotePeer()))
+	if c.connNotifCh != nil {
+		select {
+		case c.connNotifCh <- PeerConnection{cc.RemotePeer(), true}:
+		default:
+			c.log.Warn("subscriber is too slow")
+		}
+	}
 	stats.Record(c.ctx, metrics.Peers.M(1))
 }
 
@@ -68,6 +82,13 @@ func (c ConnectionNotifier) Disconnected(n network.Network, cc network.Conn) {
 	c.log.Info("peer disconnected", logging.HostID("peer", cc.RemotePeer()))
 	stats.Record(c.ctx, metrics.Peers.M(-1))
 	c.DisconnectChan <- cc.RemotePeer()
+	if c.connNotifCh != nil {
+		select {
+		case c.connNotifCh <- PeerConnection{cc.RemotePeer(), false}:
+		default:
+			c.log.Warn("subscriber is too slow")
+		}
+	}
 }
 
 // OpenedStream is called when a stream opened

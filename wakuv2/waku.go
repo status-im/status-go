@@ -403,11 +403,11 @@ func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnA
 
 func (w *Waku) addWakuV2Peers(ctx context.Context, cfg *Config) error {
 	fnApply := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
-		if len(d.Addresses) != 0 {
+		if len(d.PeerInfo.Addrs) != 0 {
 			go func(ma multiaddr.Multiaddr) {
 				w.identifyAndConnect(ctx, w.settings.LightClient, ma)
 				wg.Done()
-			}(d.Addresses[0])
+			}(d.PeerInfo.Addrs[0])
 		}
 	}
 
@@ -564,14 +564,14 @@ func (w *Waku) runPeerExchangeLoop() {
 			var withThesePeers []peer.ID
 			for _, record := range w.dnsAddressCache {
 				for _, discoveredNode := range record {
-					if len(discoveredNode.Addresses) == 0 {
+					if len(discoveredNode.PeerInfo.Addrs) == 0 {
 						continue
 					}
 
 					// Obtaining peer ID
-					peerIDString, err := discoveredNode.Addresses[0].ValueForProtocol(multiaddr.P_P2P)
+					peerIDString, err := discoveredNode.PeerInfo.Addrs[0].ValueForProtocol(multiaddr.P_P2P)
 					if err != nil {
-						w.logger.Warn("multiaddress does not contain peerID", zap.String("multiaddr", discoveredNode.Addresses[0].String()))
+						w.logger.Warn("multiaddress does not contain peerID", zap.String("multiaddr", discoveredNode.PeerInfo.Addrs[0].String()))
 						continue // No peer ID available somehow
 					}
 

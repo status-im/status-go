@@ -112,7 +112,8 @@ type WakuNodeParameters struct {
 
 	enableLightPush bool
 
-	connStatusC chan ConnStatus
+	connStatusC chan<- ConnStatus
+	connNotifCh chan<- PeerConnection
 
 	storeFactory storeFactory
 }
@@ -429,6 +430,13 @@ func WithKeepAlive(t time.Duration) WakuNodeOption {
 func WithConnectionStatusChannel(connStatus chan ConnStatus) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.connStatusC = connStatus
+		return nil
+	}
+}
+
+func WithConnectionNotification(ch chan<- PeerConnection) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.connNotifCh = ch
 		return nil
 	}
 }

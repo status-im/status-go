@@ -9,8 +9,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/waku-org/go-waku/waku/v2/metrics"
 	wenr "github.com/waku-org/go-waku/waku/v2/protocol/enr"
-
-	ma "github.com/multiformats/go-multiaddr"
 )
 
 type dnsDiscoveryParameters struct {
@@ -27,9 +25,9 @@ func WithNameserver(nameserver string) DnsDiscoveryOption {
 }
 
 type DiscoveredNode struct {
-	PeerID    peer.ID
-	Addresses []ma.Multiaddr
-	ENR       *enode.Node
+	PeerID   peer.ID
+	PeerInfo peer.AddrInfo
+	ENR      *enode.Node
 }
 
 // RetrieveNodes returns a list of multiaddress given a url to a DNS discoverable ENR tree
@@ -58,9 +56,22 @@ func RetrieveNodes(ctx context.Context, url string, opts ...DnsDiscoveryOption) 
 			return nil, err
 		}
 
+		infoAddr, err := peer.AddrInfosFromP2pAddrs(m...)
+		if err != nil {
+			return nil, err
+		}
+
+		var info peer.AddrInfo
+		for _, i := range infoAddr {
+			if i.ID == peerID {
+				info = i
+				break
+			}
+		}
+
 		d := DiscoveredNode{
-			PeerID:    peerID,
-			Addresses: m,
+			PeerID:   peerID,
+			PeerInfo: info,
 		}
 
 		if hasUDP(node) {

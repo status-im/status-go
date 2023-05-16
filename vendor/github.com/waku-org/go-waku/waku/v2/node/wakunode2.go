@@ -109,7 +109,7 @@ type WakuNode struct {
 
 	// Channel passed to WakuNode constructor
 	// receiving connection status notifications
-	connStatusChan chan ConnStatus
+	connStatusChan chan<- ConnStatus
 
 	storeFactory storeFactory
 }
@@ -184,7 +184,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		w.timesource = timesource.NewDefaultClock()
 	}
 
-	w.localNode, err = w.newLocalnode(w.opts.privKey)
+	w.localNode, err = enr.NewLocalnode(w.opts.privKey)
 	if err != nil {
 		w.log.Error("creating localnode", zap.Error(err))
 	}
@@ -300,7 +300,7 @@ func (w *WakuNode) Start(ctx context.Context) error {
 		return err
 	}
 
-	w.connectionNotif = NewConnectionNotifier(ctx, w.host, w.log)
+	w.connectionNotif = NewConnectionNotifier(ctx, w.host, w.opts.connNotifCh, w.log)
 	w.host.Network().Notify(w.connectionNotif)
 
 	w.enrChangeCh = make(chan struct{}, 10)
@@ -720,6 +720,11 @@ func (w *WakuNode) DialPeer(ctx context.Context, address string) error {
 	}
 
 	return w.connect(ctx, *info)
+}
+
+// DialPeerWithInfo is used to connect to a peer using its address information
+func (w *WakuNode) DialPeerWithInfo(ctx context.Context, peerInfo peer.AddrInfo) error {
+	return w.connect(ctx, peerInfo)
 }
 
 func (w *WakuNode) connect(ctx context.Context, info peer.AddrInfo) error {

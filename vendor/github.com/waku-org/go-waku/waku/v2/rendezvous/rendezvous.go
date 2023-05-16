@@ -124,7 +124,11 @@ func (r *Rendezvous) discover(ctx context.Context) {
 				server.Unlock()
 
 				for _, addr := range addrInfo {
-					r.peerConnector.PeerChannel() <- addr
+					select {
+					case r.peerConnector.PeerChannel() <- addr:
+					case <-ctx.Done():
+						return
+					}
 				}
 			} else {
 				// TODO: change log level to DEBUG in go-libp2p-rendezvous@v0.4.1/svc.go:234  discover query
