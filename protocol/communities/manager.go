@@ -223,6 +223,7 @@ type Subscription struct {
 	DownloadingHistoryArchivesStartedSignal  *signal.DownloadingHistoryArchivesStartedSignal
 	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
 	ImportingHistoryArchiveMessagesSignal    *signal.ImportingHistoryArchiveMessagesSignal
+	CommunityAdminEvent                      *protobuf.CommunityAdminEvent
 }
 
 type CommunityResponse struct {
@@ -693,6 +694,7 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 	if community == nil {
 		return nil, ErrOrgNotFound
 	}
+
 	if !community.IsAdmin() {
 		return nil, errors.New("not an admin")
 	}
@@ -737,7 +739,11 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 		return nil, err
 	}
 
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityAdminEvent(protobuf.CommunityAdminEvent_COMMUNITY_DESCRIPTION_CHANGED)})
+	}
 
 	return community, nil
 }
@@ -1155,6 +1161,34 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		Community: community,
 		Changes:   changes,
 	}, nil
+}
+
+func (m *Manager) HandleCommunityAdminEvent(signer *ecdsa.PublicKey, adminEvent *protobuf.CommunityAdminEvent, payload []byte) (*CommunityResponse, error) {
+	if signer == nil {
+		return nil, errors.New("signer can't be nil")
+	}
+
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, adminEvent.CommunityId)
+	if err != nil {
+		return nil, err
+	}
+
+	if !community.IsMemberAdmin(signer) {
+		return nil, errors.New("user is not an admin")
+	}
+
+	community.UpdateCommunityByAdmin(adminEvent)
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CommunityResponse{
+		Community: community,
+		Changes:   community.emptyCommunityChanges(),
+	}, nil
+
 }
 
 // TODO: This is not fully implemented, we want to save the grant passed at

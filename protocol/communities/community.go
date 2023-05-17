@@ -300,6 +300,10 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 	return json.Marshal(communityItem)
 }
 
+func (o *Community) Identity() *protobuf.ChatIdentity {
+	return o.config.CommunityDescription.Identity
+}
+
 func (o *Community) Name() string {
 	if o != nil &&
 		o.config != nil &&
@@ -1216,6 +1220,10 @@ func (o *Community) ValidateRequestToJoin(signer *ecdsa.PublicKey, request *prot
 	}
 
 	return nil
+}
+
+func (o *Community) IsOwner() bool {
+	return o.config.PrivateKey != nil
 }
 
 func (o *Community) IsAdmin() bool {

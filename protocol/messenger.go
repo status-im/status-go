@@ -4268,6 +4268,17 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
+					case protobuf.CommunityAdminEvent:
+						logger.Debug("Handling CommunityAdminEvent")
+						message := msg.ParsedMessage.Interface().(protobuf.CommunityAdminEvent)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
+						err = m.handleCommunityAdminEvent(messageState, publicKey, message, msg.DecryptedPayload)
+						if err != nil {
+							logger.Warn("failed to handle CommunityAdminEvent", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
 					case protobuf.AnonymousMetricBatch:
 						logger.Debug("Handling AnonymousMetricBatch")
 						if m.anonMetricsServer == nil {
