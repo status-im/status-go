@@ -143,12 +143,11 @@ func (s *AdminMessengerCommunitiesSuite) newMessenger() *Messenger {
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminEditCommunityDescription() {
-	community := s.SetUpCommunityAndRoles()
-
+	community := s.setUpCommunityAndRoles()
 	s.adminEditsCommunityDescription(community)
 }
 
-func (s *AdminMessengerCommunitiesSuite) SetUpCommunityAndRoles() *communities.Community {
+func (s *AdminMessengerCommunitiesSuite) setUpCommunityAndRoles() *communities.Community {
 	tcs2, err := s.owner.communitiesManager.All()
 	s.Require().NoError(err, "admin.communitiesManager.All")
 	s.Len(tcs2, 1, "Must have 1 community")
@@ -271,28 +270,46 @@ func (s *AdminMessengerCommunitiesSuite) grantAdminPermissions(community *commun
 }
 
 func (s *AdminMessengerCommunitiesSuite) adminEditsCommunityDescription(community *communities.Community) {
+	expected_name := "edited community name"
+	expected_color := "#000000"
+	expected_descr := "edited community description"
+
 	response, err := s.admin.EditCommunity(&requests.EditCommunity{
 		CommunityID: community.ID(),
 		CreateCommunity: requests.CreateCommunity{
 			Membership:  protobuf.CommunityPermissions_ON_REQUEST,
-			Name:        "new community name",
-			Color:       "#000000",
-			Description: "new community description",
+			Name:        expected_name,
+			Color:       expected_color,
+			Description: expected_descr,
 		},
 	})
+
+	checkCommunityEdit := func(response *MessengerResponse) bool {
+		if len(response.Communities()) == 0 {
+			return false
+		}
+
+		r_communities := response.Communities()
+		s.Require().Len(r_communities, 1)
+		s.Equal(expected_name, r_communities[0].Name())
+		s.Equal(expected_color, r_communities[0].Color())
+		s.Equal(expected_descr, r_communities[0].DescriptionText())
+
+		return true
+	}
+
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
-
-	s.refreshMessengerResponses()
+	checkCommunityEdit(response)
 
 	_, err = WaitOnMessengerResponse(s.owner, func(response *MessengerResponse) bool {
-		return len(response.Communities()) > 0
-	}, "admin community description changed message not received")
+		return checkCommunityEdit(response)
+	}, "admin edit community message not received by owner")
 	s.Require().NoError(err)
 
 	_, err = WaitOnMessengerResponse(s.alice, func(response *MessengerResponse) bool {
-		return len(response.Communities()) > 0
-	}, "admin community description changed message not received")
+		return checkCommunityEdit(response)
+	}, "admin edit community message not received by alice")
 	s.Require().NoError(err)
 }
 
@@ -311,5 +328,4 @@ func (s *AdminMessengerCommunitiesSuite) refreshMessengerResponses() {
 		return true
 	}, "community description changed message not received")
 	s.Require().NoError(err)
-
 }

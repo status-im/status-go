@@ -326,7 +326,10 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.SyncSocialLinkSetting))
 	case protobuf.ApplicationMetadataMessage_SYNC_ENS_USERNAME_DETAIL:
 		return m.unmarshalProtobufData(new(protobuf.SyncEnsUsernameDetail))
+	case protobuf.ApplicationMetadataMessage_COMMUNITY_ADMIN_MESSAGE:
+		return m.unmarshalProtobufData(new(protobuf.CommunityAdminEvent))
 	}
+
 	return nil
 }
 

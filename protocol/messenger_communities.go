@@ -107,7 +107,8 @@ func (m *Messenger) publishCommunityAdminEvent(adminEvent *protobuf.CommunityAdm
 		SkipEncryption: true,
 		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_ADMIN_MESSAGE,
 	}
-	_, err = m.sender.SendPublic(context.Background(), admin_pubkey, rawMessage)
+
+	_, err = m.sender.SendPublic(context.Background(), types.EncodeHex(adminEvent.CommunityId), rawMessage)
 	return err
 }
 
