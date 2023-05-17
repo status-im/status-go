@@ -277,12 +277,6 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		}
 
 		opts = append(opts, node.WithDiscoveryV5(uint(cfg.UDPPort), bootnodes, cfg.AutoUpdate))
-
-		// Peer exchange requires DiscV5 to run (might change in future versions of the protocol)
-		if cfg.PeerExchange {
-			opts = append(opts, node.WithPeerExchange())
-		}
-
 	}
 
 	if cfg.LightClient {
