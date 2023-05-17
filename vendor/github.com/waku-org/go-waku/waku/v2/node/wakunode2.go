@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	backoffv4 "github.com/cenkalti/backoff/v4"
 	golog "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p"
 	"go.uber.org/zap"
@@ -23,6 +24,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/discovery/backoff"
+	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
+	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/proto"
 	ws "github.com/libp2p/go-libp2p/p2p/transport/websocket"
 	ma "github.com/multiformats/go-multiaddr"
 	"go.opencensus.io/stats"
@@ -89,7 +92,8 @@ type WakuNode struct {
 	store           ReceptorService
 	rlnRelay        RLNRelay
 
-	wakuFlag enr.WakuEnrBitfield
+	wakuFlag          enr.WakuEnrBitfield
+	circuitRelayNodes chan peer.AddrInfo
 
 	localNode *enode.LocalNode
 
@@ -120,6 +124,7 @@ func defaultStoreFactory(w *WakuNode) store.Store {
 
 // New is used to instantiate a WakuNode using a set of WakuNodeOptions
 func New(opts ...WakuNodeOption) (*WakuNode, error) {
+	var err error
 	params := new(WakuNodeParameters)
 	params.libP2POpts = DefaultLibP2POptions
 
@@ -153,11 +158,16 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 
 	// Setting default host address if none was provided
 	if params.hostAddr == nil {
-		err := WithHostAddress(&net.TCPAddr{IP: net.ParseIP("0.0.0.0"), Port: 0})(params)
+		params.hostAddr, err = net.ResolveTCPAddr("tcp", "0.0.0.0:0")
+		if err != nil {
+			return nil, err
+		}
+		err = WithHostAddress(params.hostAddr)(params)
 		if err != nil {
 			return nil, err
 		}
 	}
+
 	if len(params.multiAddr) > 0 {
 		params.libP2POpts = append(params.libP2POpts, libp2p.ListenAddrs(params.multiAddr...))
 	}
@@ -168,8 +178,6 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		params.libP2POpts = append(params.libP2POpts, libp2p.AddrsFactory(params.addressFactory))
 	}
 
-	var err error
-
 	w := new(WakuNode)
 	w.bcaster = relay.NewBroadcaster(1024)
 	w.opts = params
@@ -177,6 +185,34 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	w.wg = &sync.WaitGroup{}
 	w.keepAliveFails = make(map[peer.ID]int)
 	w.wakuFlag = enr.NewWakuEnrBitfield(w.opts.enableLightPush, w.opts.enableLegacyFilter, w.opts.enableStore, w.opts.enableRelay)
+	w.circuitRelayNodes = make(chan peer.AddrInfo)
+
+	// Use circuit relay with nodes received on circuitRelayNodes channel
+	params.libP2POpts = append(params.libP2POpts, libp2p.EnableAutoRelayWithPeerSource(
+		func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
+			r := make(chan peer.AddrInfo)
+			go func() {
+				defer close(r)
+				for ; numPeers != 0; numPeers-- {
+					select {
+					case v, ok := <-w.circuitRelayNodes:
+						if !ok {
+							return
+						}
+						select {
+						case r <- v:
+						case <-ctx.Done():
+							return
+						}
+					case <-ctx.Done():
+						return
+					}
+				}
+			}()
+			return r
+		},
+		autorelay.WithMinInterval(2*time.Second),
+	))
 
 	if params.enableNTP {
 		w.timesource = timesource.NewNTPTimesource(w.opts.ntpURLs, w.log)
@@ -305,10 +341,11 @@ func (w *WakuNode) Start(ctx context.Context) error {
 
 	w.enrChangeCh = make(chan struct{}, 10)
 
-	w.wg.Add(3)
+	w.wg.Add(4)
 	go w.connectednessListener(ctx)
 	go w.watchMultiaddressChanges(ctx)
 	go w.watchENRChanges(ctx)
+	go w.findRelayNodes(ctx)
 
 	err = w.bcaster.Start(ctx)
 	if err != nil {
@@ -449,11 +486,11 @@ func (w *WakuNode) Stop() {
 	w.store.Stop()
 	w.legacyFilter.Stop()
 	w.filterFullnode.Stop()
-	w.peerExchange.Stop()
 
 	if w.opts.enableDiscV5 {
 		w.discoveryV5.Stop()
 	}
+	w.peerExchange.Stop()
 
 	w.peerConnector.Stop()
 
@@ -811,4 +848,57 @@ func (w *WakuNode) Peers() ([]*Peer, error) {
 		})
 	}
 	return peers, nil
+}
+
+func (w *WakuNode) findRelayNodes(ctx context.Context) {
+	defer w.wg.Done()
+
+	// Feed peers more often right after the bootstrap, then backoff
+	bo := backoffv4.NewExponentialBackOff()
+	bo.InitialInterval = 15 * time.Second
+	bo.Multiplier = 3
+	bo.MaxInterval = 1 * time.Hour
+	bo.MaxElapsedTime = 0 // never stop
+	t := backoffv4.NewTicker(bo)
+	defer t.Stop()
+	for {
+		select {
+		case <-t.C:
+		case <-ctx.Done():
+			return
+		}
+
+		peers, err := w.Peers()
+		if err != nil {
+			w.log.Error("failed to fetch peers", zap.Error(err))
+			continue
+		}
+
+		// Shuffle peers
+		rand.Seed(time.Now().UnixNano())
+		rand.Shuffle(len(peers), func(i, j int) { peers[i], peers[j] = peers[j], peers[i] })
+
+		for _, p := range peers {
+			info := w.Host().Peerstore().PeerInfo(p.ID)
+
+			supportedProtocols, err := w.Host().Peerstore().SupportsProtocols(p.ID, proto.ProtoIDv2Hop)
+			if err != nil {
+				w.log.Error("could not check supported protocols", zap.Error(err))
+				continue
+			}
+
+			if len(supportedProtocols) == 0 {
+				continue
+			}
+
+			select {
+			case <-ctx.Done():
+				w.log.Debug("context done, auto-relay has enough peers")
+				return
+
+			case w.circuitRelayNodes <- info:
+				w.log.Debug("published auto-relay peer info", zap.Any("peer-id", p.ID))
+			}
+		}
+	}
 }
