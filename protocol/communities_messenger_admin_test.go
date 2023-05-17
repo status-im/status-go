@@ -143,9 +143,75 @@ func (s *AdminMessengerCommunitiesSuite) newMessenger() *Messenger {
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminEditCommunityDescription() {
+	// TODO admin test: update to include edit tags, logo, banner, request to join required setting, pin setting, etc...
 	community := s.setUpCommunityAndRoles()
 	s.adminEditsCommunityDescription(community)
 }
+
+func (s *AdminMessengerCommunitiesSuite) TestAdminCreateEditDeleteChannels() {
+	community := s.setUpCommunityAndRoles()
+	// TODO admin test: Create, edit and delete channels (allowed)
+}
+
+func (s *AdminMessengerCommunitiesSuite) TestAdminCreateEditDeleteCategories() {
+	community := s.setUpCommunityAndRoles()
+	// TODO admin test: Create, edit and delete categories (allowed)
+}
+
+func (s *AdminMessengerCommunitiesSuite) TestAdminReorderChannelsAndCategories() {
+	community := s.setUpCommunityAndRoles()
+	// TODO admin test: Reorder channels and categories (allowed)
+}
+
+func (s *AdminMessengerCommunitiesSuite) TestAdminCreateEditDeleteBecomeMemberPermission() {
+	community := s.setUpCommunityAndRoles()
+	// TODO admin test: Create, edit and delete 'become member' permissions
+}
+
+func (s *AdminMessengerCommunitiesSuite) TestAdminCreateEditDeleteBecomeAdminPermission() {
+	community := s.setUpCommunityAndRoles()
+	// TODO admin test: Create, edit and delete 'become admin' permissions (restricted)
+}
+
+func (s *AdminMessengerCommunitiesSuite) TestAdminAcceptMemberRequestToJoin() {
+	community := s.setUpCommunityAndRoles()
+	// TODO admin test: Receive 'request to join' notifications, and ability to Accept or Reject (accept must be approved by owner node)
+}
+
+func (s *AdminMessengerCommunitiesSuite) TestAdminKickMember() {
+	community := s.setUpCommunityAndRoles()
+	// TODO admin test: Kick member (kick must be approved by owner node)
+}
+
+func (s *AdminMessengerCommunitiesSuite) TestAdminBanMember() {
+	community := s.setUpCommunityAndRoles()
+	// TODO admin test: Ban members (ban must be approved by owner node)
+}
+
+func (s *AdminMessengerCommunitiesSuite) TestAdminDeleteAnyMessageInTheCommunity() {
+	community := s.setUpCommunityAndRoles()
+	// TODO admin test: Delete any message in the Community
+}
+
+func (s *AdminMessengerCommunitiesSuite) TestAdminPinMessage() {
+	community := s.setUpCommunityAndRoles()
+	// TODO admin test: Pin messages, if 'Any member can pin a message' is switched off in community settings
+}
+
+func (s *AdminMessengerCommunitiesSuite) TestAdminMintToken() {
+	community := s.setUpCommunityAndRoles()
+	// TODO admin test: Mint Tokens (rescticted)
+}
+
+func (s *AdminMessengerCommunitiesSuite) TestAdminAirdropTokens() {
+	community := s.setUpCommunityAndRoles()
+	// TODO admin test: Airdrop Tokens (restricted)
+}
+
+// TODO admin test:
+//	- would be nice to test on a regression and check that simple user can't do this actions
+//  - test when user loses his admin permissions
+//  - some other tests scenarious (review)
 
 func (s *AdminMessengerCommunitiesSuite) setUpCommunityAndRoles() *communities.Community {
 	tcs2, err := s.owner.communitiesManager.All()

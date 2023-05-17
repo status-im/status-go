@@ -222,7 +222,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		ActiveMembersCount          uint64                                        `json:"activeMembersCount"`
 	}{
 		ID:                          o.ID(),
-		Admin:                       o.IsAdmin(),
+		Admin:                       o.IsOwner(),
 		Verified:                    o.config.Verified,
 		Chats:                       make(map[string]CommunityChat),
 		Categories:                  make(map[string]CommunityCategory),
