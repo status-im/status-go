@@ -78,5 +78,6 @@ message ApplicationMetadataMessage {
     SYNC_KEYCARD_ACTION = 63;
     SYNC_SOCIAL_LINK_SETTING = 64;
     SYNC_ENS_USERNAME_DETAIL = 65;
+    COMMUNITY_ADMIN_MESSAGE = 66;
   }
 }

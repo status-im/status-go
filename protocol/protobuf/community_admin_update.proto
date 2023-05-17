@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+option go_package = "./;protobuf";
+package protobuf;
+
+import "chat_identity.proto";
+import "communities.proto";
+
+message CommunityAdminEvent {
+  uint64 clock = 1;
+  bytes community_id = 2;
+  EventType type = 3;
+  ChatIdentity description = 4;
+  map<string, CommunityTokenPermission> token_permissions = 5;
+  map<string,CommunityCategory> categories = 6;
+  map<string,CommunityChat> chats = 7;
+  
+  enum EventType {
+    UNKNOWN = 0;
+    COMMUNITY_DESCRIPTION_CHANGED = 1; // TODO update to content all updates in one struct (i.e. tags, intro/outro msgs, etc)
+    COMMUNITY_TOKEN_PERMISSION_CHANGED = 2;
+    COMMUNITY_CATEGORY_CREATED = 3;
+    COMMUNITY_CATEGORY_REORDERED = 4;
+    COMMUNITY_CATEGORY_DELETED = 5;
+    COMMUNITY_CATEGORY_CHANGED = 6;
+    COMMUNITY_CHANNEL_CREATED = 7;
+    COMMUNITY_CHANNEL_DELETED = 8;
+    COMMUNITY_CHANNEL_CHANGED = 9;
+  }
+}
