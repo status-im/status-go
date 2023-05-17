@@ -3231,6 +3231,39 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 	return nil
 }
 
+func (r *ReceivedMessageState) addNewActivityCenterNotificationV2(publicKey ecdsa.PublicKey, m *Messenger, message *common.Message, responseTo *common.Message, albumId string) error {
+	if !message.New {
+		return nil
+	}
+
+	chat, ok := r.AllChats.Load(message.LocalChatID)
+	if !ok {
+		return fmt.Errorf("chat ID '%s' not present", message.LocalChatID)
+	}
+
+	isNotification, notificationType := showMentionOrReplyActivityCenterNotification(publicKey, message, chat, responseTo)
+	if isNotification {
+		notification := &ActivityCenterNotification{
+			ID:           types.FromHex(albumId),
+			Name:         chat.Name,
+			Message:      message,
+			ReplyMessage: responseTo,
+			Type:         notificationType,
+			Timestamp:    message.WhisperTimestamp,
+			ChatID:       chat.ID,
+			CommunityID:  chat.CommunityID,
+			Author:       message.From,
+		}
+
+		err := m.addActivityCenterNotification(r.Response, notification)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (m *Messenger) buildMessageState() *ReceivedMessageState {
 	return &ReceivedMessageState{
 		AllChats:              m.allChats,
@@ -4595,18 +4628,25 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 
 	for _, message := range messageState.Response.messages {
 		if _, ok := newMessagesIds[message.ID]; ok {
+
 			message.New = true
 
+			if message.ContentType == protobuf.ChatMessage_IMAGE {
+				albumIdForImage := message.GetImage().GetAlbumId()
+				if err = messageState.addNewActivityCenterNotificationV2(m.identity.PublicKey, m, message, messagesByID[message.ResponseTo], albumIdForImage); err != nil {
+					return nil, err
+				}
+
+			} else {
+				if err = messageState.addNewActivityCenterNotification(m.identity.PublicKey, m, message, messagesByID[message.ResponseTo]); err != nil {
+					return nil, err
+				}
+			}
 			if notificationsEnabled {
 				// Create notification body to be eventually passed to `localnotifications.SendMessageNotifications()`
 				if err = messageState.addNewMessageNotification(m.identity.PublicKey, message, messagesByID[message.ResponseTo], profilePicturesVisibility); err != nil {
 					return nil, err
 				}
-			}
-
-			// Create activity center notification body to be eventually passed to `activitycenter.SendActivityCenterNotifications()`
-			if err = messageState.addNewActivityCenterNotification(m.identity.PublicKey, m, message, messagesByID[message.ResponseTo]); err != nil {
-				return nil, err
 			}
 		}
 	}
