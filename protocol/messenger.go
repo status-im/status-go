@@ -4613,7 +4613,8 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 					return nil, err
 				}
 			}
-				// Create activity center notification body to be eventually passed to `activitycenter.SendActivityCenterNotifications()`
+
+			// Create activity center notification body to be eventually passed to `activitycenter.SendActivityCenterNotifications()`
 			if err = messageState.addNewActivityCenterNotification(m.identity.PublicKey, m, message, messagesByID[message.ResponseTo]); err != nil {
 				return nil, err
 			}
