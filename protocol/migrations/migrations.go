@@ -1872,7 +1872,7 @@ func _1682528339_add_index_user_messages_unseenUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1682528339_add_index_user_messages_unseen.up.sql", size: 104, mode: os.FileMode(0644), modTime: time.Unix(1684180118, 0)}
+	info := bindataFileInfo{name: "1682528339_add_index_user_messages_unseen.up.sql", size: 104, mode: os.FileMode(0644), modTime: time.Unix(1684360395, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x35, 0xfa, 0x98, 0xdd, 0x74, 0x5e, 0x21, 0x1f, 0xf2, 0x56, 0x17, 0x96, 0xfe, 0xbb, 0x44, 0x4c, 0xa1, 0xd8, 0x9f, 0x2e, 0x6, 0x2f, 0xd8, 0x23, 0xec, 0x94, 0x8c, 0x53, 0xf3, 0xf0, 0x40, 0xe7}}
 	return a, nil
 }
@@ -1892,7 +1892,7 @@ func _1683707289_recreate_deleted_for_mesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1683707289_recreate_deleted_for_mes.up.sql", size: 408, mode: os.FileMode(0644), modTime: time.Unix(1684180118, 0)}
+	info := bindataFileInfo{name: "1683707289_recreate_deleted_for_mes.up.sql", size: 408, mode: os.FileMode(0644), modTime: time.Unix(1684360395, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x5b, 0x9d, 0xd6, 0x45, 0x41, 0x29, 0x44, 0xf6, 0x14, 0x38, 0xeb, 0xdf, 0x6b, 0x5d, 0x9c, 0x45, 0x4b, 0xc3, 0xa8, 0xbd, 0x38, 0x14, 0xd9, 0x73, 0xf1, 0x51, 0xbb, 0x9f, 0x14, 0x36, 0xf2, 0x11}}
 	return a, nil
 }
@@ -1912,7 +1912,7 @@ func _1683725607_mark_discord_messages_as_seenUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1683725607_mark_discord_messages_as_seen.up.sql", size: 108, mode: os.FileMode(0644), modTime: time.Unix(1684180118, 0)}
+	info := bindataFileInfo{name: "1683725607_mark_discord_messages_as_seen.up.sql", size: 108, mode: os.FileMode(0644), modTime: time.Unix(1684360395, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd7, 0x2a, 0xc3, 0x43, 0xea, 0x5e, 0x3, 0x2e, 0xce, 0x79, 0xea, 0xa5, 0x67, 0x61, 0x8c, 0xe4, 0xb9, 0xb7, 0x4d, 0xd5, 0xd5, 0xb0, 0x35, 0xc8, 0x2b, 0xa0, 0x3f, 0xd8, 0xde, 0xea, 0x4e, 0x16}}
 	return a, nil
 }

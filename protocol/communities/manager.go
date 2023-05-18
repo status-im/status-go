@@ -742,7 +742,7 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 	if community.IsOwner() {
 		m.publish(&Subscription{Community: community})
 	} else {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityAdminEvent(protobuf.CommunityAdminEvent_COMMUNITY_DESCRIPTION_CHANGED)})
+		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityAdminEvent(protobuf.CommunityAdminEvent_COMMUNITY_CONFIG_CHANGED)})
 	}
 
 	return community, nil
@@ -824,6 +824,11 @@ func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.Communit
 
 	// Advertise changes
 	if publish {
+		if community.IsOwner() {
+			m.publish(&Subscription{Community: community})
+		} else {
+			m.publish(&Subscription{CommunityAdminEvent: community.ChangesToCommunityAdminEvent(protobuf.CommunityAdminEvent_COMMUNITY_CHANNEL_CREATED, changes)})
+		}
 		m.publish(&Subscription{Community: community})
 	}
 
@@ -1076,6 +1081,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	}
 
 	id := crypto.CompressPubkey(signer)
+
 	community, err := m.persistence.GetByID(&m.identity.PublicKey, id)
 	if err != nil {
 		return nil, err

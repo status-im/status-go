@@ -6,19 +6,27 @@ package protobuf;
 import "chat_identity.proto";
 import "communities.proto";
 
+message CommunityConfig {
+  ChatIdentity identity = 1;
+  CommunityPermissions permissions = 2;
+  CommunityAdminSettings admin_settings = 3;
+  string intro_message = 4;
+  string outro_message = 5;
+  repeated string tags = 6;
+}
+
 message CommunityAdminEvent {
   uint64 clock = 1;
   bytes community_id = 2;
   EventType type = 3;
-  ChatIdentity description = 4;
+  CommunityConfig community_config = 4;
   map<string, CommunityTokenPermission> token_permissions = 5;
   map<string,CommunityCategory> categories = 6;
   map<string,CommunityChat> chats = 7;
   
-  
   enum EventType {
     UNKNOWN = 0;
-    COMMUNITY_DESCRIPTION_CHANGED = 1; // TODO update to content all updates in one struct (i.e. tags, intro/outro msgs, etc)
+    COMMUNITY_CONFIG_CHANGED = 1; // TODO update to content all updates in one struct (i.e. tags, intro/outro msgs, etc)
     COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGED = 2;
     COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETED = 3;
     COMMUNITY_CATEGORY_CREATED = 4;

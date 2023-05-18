@@ -1946,6 +1946,10 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 		return err
 	}
 
+	return m.handleCommunityResponse(state, communityResponse)
+}
+
+func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communityResponse *communities.CommunityResponse) error {
 	community := communityResponse.Community
 
 	state.Response.AddCommunity(community)
@@ -2026,12 +2030,7 @@ func (m *Messenger) handleCommunityAdminEvent(state *ReceivedMessageState, signe
 		return err
 	}
 
-	community := communityResponse.Community
-
-	state.Response.AddCommunity(community)
-	state.Response.CommunityChanges = append(state.Response.CommunityChanges, communityResponse.Changes)
-
-	return nil
+	return m.handleCommunityResponse(state, communityResponse)
 }
 
 func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, syncCommunity protobuf.SyncCommunity) error {

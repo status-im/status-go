@@ -304,6 +304,14 @@ func (o *Community) Identity() *protobuf.ChatIdentity {
 	return o.config.CommunityDescription.Identity
 }
 
+func (o *Community) Permissions() *protobuf.CommunityPermissions {
+	return o.config.CommunityDescription.Permissions
+}
+
+func (o *Community) AdminSettings() *protobuf.CommunityAdminSettings {
+	return o.config.CommunityDescription.AdminSettings
+}
+
 func (o *Community) Name() string {
 	if o != nil &&
 		o.config != nil &&
@@ -356,6 +364,10 @@ func (o *Community) Tags() []CommunityTag {
 		return result
 	}
 	return nil
+}
+
+func (o *Community) TagsRaw() []string {
+	return o.config.CommunityDescription.Tags
 }
 
 func (o *Community) OutroMessage() string {

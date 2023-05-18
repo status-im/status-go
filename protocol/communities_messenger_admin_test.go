@@ -150,61 +150,63 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminEditCommunityDescription() {
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminCreateEditDeleteChannels() {
 	community := s.setUpCommunityAndRoles()
+	s.adminCreateCommunityChannel(community)
+
 	// TODO admin test: Create, edit and delete channels (allowed)
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminCreateEditDeleteCategories() {
-	community := s.setUpCommunityAndRoles()
+	s.setUpCommunityAndRoles()
 	// TODO admin test: Create, edit and delete categories (allowed)
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminReorderChannelsAndCategories() {
-	community := s.setUpCommunityAndRoles()
+	s.setUpCommunityAndRoles()
 	// TODO admin test: Reorder channels and categories (allowed)
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminCreateEditDeleteBecomeMemberPermission() {
-	community := s.setUpCommunityAndRoles()
+	s.setUpCommunityAndRoles()
 	// TODO admin test: Create, edit and delete 'become member' permissions
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminCreateEditDeleteBecomeAdminPermission() {
-	community := s.setUpCommunityAndRoles()
+	s.setUpCommunityAndRoles()
 	// TODO admin test: Create, edit and delete 'become admin' permissions (restricted)
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminAcceptMemberRequestToJoin() {
-	community := s.setUpCommunityAndRoles()
+	s.setUpCommunityAndRoles()
 	// TODO admin test: Receive 'request to join' notifications, and ability to Accept or Reject (accept must be approved by owner node)
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminKickMember() {
-	community := s.setUpCommunityAndRoles()
+	s.setUpCommunityAndRoles()
 	// TODO admin test: Kick member (kick must be approved by owner node)
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminBanMember() {
-	community := s.setUpCommunityAndRoles()
+	s.setUpCommunityAndRoles()
 	// TODO admin test: Ban members (ban must be approved by owner node)
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminDeleteAnyMessageInTheCommunity() {
-	community := s.setUpCommunityAndRoles()
+	s.setUpCommunityAndRoles()
 	// TODO admin test: Delete any message in the Community
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminPinMessage() {
-	community := s.setUpCommunityAndRoles()
+	s.setUpCommunityAndRoles()
 	// TODO admin test: Pin messages, if 'Any member can pin a message' is switched off in community settings
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminMintToken() {
-	community := s.setUpCommunityAndRoles()
+	s.setUpCommunityAndRoles()
 	// TODO admin test: Mint Tokens (rescticted)
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminAirdropTokens() {
-	community := s.setUpCommunityAndRoles()
+	s.setUpCommunityAndRoles()
 	// TODO admin test: Airdrop Tokens (restricted)
 }
 
@@ -393,5 +395,45 @@ func (s *AdminMessengerCommunitiesSuite) refreshMessengerResponses() {
 	_, err = WaitOnMessengerResponse(s.alice, func(response *MessengerResponse) bool {
 		return true
 	}, "community description changed message not received")
+	s.Require().NoError(err)
+}
+
+func (s *AdminMessengerCommunitiesSuite) adminCreateCommunityChannel(community *communities.Community) {
+	orgChat := &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "chat from admin",
+			Emoji:       "",
+			Description: "chat created by an admin",
+		},
+	}
+
+	s.refreshMessengerResponses()
+
+	checkChannelCreated := func(response *MessengerResponse) bool {
+		s.Require().NotNil(response)
+		if len(response.Communities()) == 0 {
+			return false
+		}
+		s.Require().Len(response.Communities(), 1)
+		s.Require().Len(response.Communities()[0].Chats(), 2)
+
+		return true
+	}
+
+	response, err := s.admin.CreateCommunityChat(community.ID(), orgChat)
+	s.Require().NoError(err)
+	s.Require().True(checkChannelCreated(response))
+
+	// _, err = WaitOnMessengerResponse(s.owner, func(response *MessengerResponse) bool {
+	// 	return checkChannelCreated(response)
+	// }, "owner did not receive new channel from admin")
+	// s.Require().NoError(err)
+
+	_, err = WaitOnMessengerResponse(s.alice, func(response *MessengerResponse) bool {
+		return checkChannelCreated(response)
+	}, "alice did not receive new channel from admin")
 	s.Require().NoError(err)
 }
