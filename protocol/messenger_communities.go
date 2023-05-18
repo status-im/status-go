@@ -2032,6 +2032,25 @@ func (m *Messenger) SendKeyExchangeMessage(communityID []byte, pubkeys []*ecdsa.
 	return nil
 }
 
+// RekeyCommunity takes a communities.Community and triggers a force rekey event,
+// after rekeying has be triggered updates the communities.Community rekeyed_at value to now
+func (m *Messenger) RekeyCommunity(cID types.HexBytes) error {
+	// Get the community as the member list could have changed
+	c, err := m.GetCommunityByID(cID)
+	if err != nil {
+		return err
+	}
+
+	// RekeyCommunity
+	err = m.SendKeyExchangeMessage(c.ID(), c.GetMemberPubkeys(), common.KeyExMsgRekey)
+	if err != nil {
+		return err
+	}
+
+	// update rekey timestamp
+	return m.communitiesManager.SetRekeyedAtClock(c.ID(), time.Now())
+}
+
 func (m *Messenger) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunity) (*MessengerResponse, error) {
 	community, err := m.communitiesManager.UnbanUserFromCommunity(request)
 	if err != nil {
@@ -4210,9 +4229,13 @@ func chunkAttachmentsByByteSize(slice []*protobuf.DiscordMessageAttachment, maxF
 func (m *Messenger) startCommunityRekeyLoop() error {
 	logger := m.logger.Named("CommunityRekeyLoop")
 
-	rekeyInterval := time.Hour
-
-	ticker := time.NewTicker(rekeyInterval)
+	var rki time.Duration
+	if m.communitiesManager.RekeyInterval == nil {
+		rki = time.Hour
+	} else {
+		rki = *m.communitiesManager.RekeyInterval
+	}
+	ticker := time.NewTicker(rki)
 
 	cs, err := m.Communities()
 	if err != nil {
@@ -4221,23 +4244,23 @@ func (m *Messenger) startCommunityRekeyLoop() error {
 
 	for _, c := range cs {
 		if c.IsAdmin() && c.Encrypted() {
-			// get last rekey timestamp
-			c.config.RekeyedAt.Before(time.Now().Add(rekeyInterval))
-
-			// if rekey time period exceeded perform a rekey and set new last rekey timestamp to now
+			// if rekey time period exceeded, perform a rekey
+			if c.RekeyedAt().Add(rki).Before(time.Now()) {
+				err = m.RekeyCommunity(c.ID())
+				if err != nil {
+					return err
+				}
+			}
 
 			go func() {
 				logger.Debug("CommunityRekeyLoop started", zap.Binary("community ID", c.ID()))
 				for {
 					select {
 					case <-ticker.C:
-						// Rekey
-						err = m.SendKeyExchangeMessage(c.ID(), c.GetMemberPubkeys(), common.KeyExMsgRekey)
+						err = m.RekeyCommunity(c.ID())
 						if err != nil {
 							logger.Error("error sending rekey message", zap.Error(err), zap.Binary("community ID", c.ID()))
 						}
-
-						// update rekey timestamp
 
 					case <-m.quit:
 						ticker.Stop()
