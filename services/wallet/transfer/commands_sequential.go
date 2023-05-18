@@ -3,7 +3,6 @@ package transfer
 import (
 	"context"
 	"math/big"
-	"sort"
 	"time"
 
 	"github.com/pkg/errors"
@@ -56,7 +55,7 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 			c.error = err
 		}
 
-		return
+		return nil // We break the loop if we fetched all the blocks
 	}
 
 	var head *types.Header = nil
@@ -93,7 +92,7 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 
 		// 'to' is set to 'head' if 'last' block not found in DB
 		if head != nil && to.Cmp(head.Number) == 0 {
-			log.Info("update blockrange", "head", head.Number, "to", to, "chain", c.chainClient.ChainID, "account", c.account)
+			log.Info("upsert blockrange", "head", head.Number, "to", to, "chain", c.chainClient.ChainID, "account", c.account)
 
 			err = c.blockDAO.upsertRange(c.chainClient.ChainID, c.account, c.startBlockNumber,
 				c.resFromBlock.Number, to)
@@ -147,13 +146,13 @@ func (c *findBlocksCommand) checkRange(parent context.Context, from *big.Int, to
 	fromBlock := &Block{Number: from}
 
 	newFromBlock, ethHeaders, startBlock, err := c.fastIndex(parent, c.balanceCache, fromBlock, to)
-	log.Info("findBlocksCommand checkRange", "startBlock", startBlock, "newFromBlock", newFromBlock.Number, "toBlockNumber", to, "noLimit", c.noLimit)
 	if err != nil {
 		log.Info("findBlocksCommand checkRange fastIndex", "err", err)
 		c.error = err
 		// return err // In case c.noLimit is true, hystrix "max concurrency" may be reached and we will not be able to index ETH transfers
 		return nil, nil
 	}
+	log.Info("findBlocksCommand checkRange", "startBlock", startBlock, "newFromBlock", newFromBlock.Number, "toBlockNumber", to, "noLimit", c.noLimit)
 
 	// TODO There should be transfers when either when we have found headers
 	// or when newFromBlock is different from fromBlock, but if I check for
@@ -202,10 +201,6 @@ func (c *findBlocksCommand) checkRange(parent context.Context, from *big.Int, to
 			// return err
 			return nil, nil
 		}
-
-		sort.SliceStable(foundHeaders, func(i, j int) bool {
-			return foundHeaders[i].Number.Cmp(foundHeaders[j].Number) == 1
-		})
 	}
 	// }
 
@@ -348,7 +343,6 @@ type loadBlocksAndTransfersCommand struct {
 	db            *Database
 	blockRangeDAO *BlockRangeSequentialDAO
 	blockDAO      *BlockDAO
-	erc20         *ERC20TransfersDownloader
 	chainClient   *chain.ClientWithFallback
 	feed          *event.Feed
 	balanceCache  *balanceCache

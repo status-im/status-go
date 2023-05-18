@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/rpc/chain"
@@ -42,14 +41,12 @@ type SequentialFetchStrategy struct {
 func (s *SequentialFetchStrategy) newCommand(chainClient *chain.ClientWithFallback,
 	accounts []common.Address) async.Commander {
 
-	signer := types.NewLondonSigner(chainClient.ToBigInt())
 	ctl := &loadBlocksAndTransfersCommand{
 		db:                 s.db,
 		chainClient:        chainClient,
 		accounts:           accounts,
 		blockRangeDAO:      &BlockRangeSequentialDAO{s.db.client},
 		blockDAO:           s.blockDAO,
-		erc20:              NewERC20TransfersDownloader(chainClient, accounts, signer),
 		feed:               s.feed,
 		errorsCount:        0,
 		transactionManager: s.transactionManager,

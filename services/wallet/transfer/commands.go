@@ -78,7 +78,8 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 	if c.from.Number != nil && c.from.Nonce != nil {
 		c.balanceCache.addNonceToCache(c.address, c.from.Number, c.from.Nonce)
 	}
-	from, headers, startBlock, err := findBlocksWithEthTransfers(ctx, c.chainClient, c.balanceCache, c.eth, c.address, c.from.Number, c.to, c.noLimit, c.threadLimit)
+	from, headers, startBlock, err := findBlocksWithEthTransfers(ctx, c.chainClient,
+		c.balanceCache, c.eth, c.address, c.from.Number, c.to, c.noLimit, c.threadLimit)
 
 	if err != nil {
 		c.error = err
@@ -387,6 +388,15 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 			log.Error("SaveTransfers error", "error", err)
 			return err
 		}
+	} else {
+		// If no transfers found, that is suspecting, because downloader returned this block as containing transfers
+		log.Error("no transfers found in block", "chain", c.chainClient.ChainID, "address", c.address, "block", c.blockNum)
+
+		err = markBlocksAsLoaded(c.chainClient.ChainID, c.db.client, c.address, []*big.Int{c.blockNum})
+		if err != nil {
+			log.Error("Mark blocks loaded error", "error", err)
+			return err
+		}
 	}
 
 	c.fetchedTransfers = allTransfers
@@ -496,7 +506,8 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) 
 		foundHeaders[address] = uniqHeaders
 
 		lastBlockNumber := c.toByAddress[address]
-		log.Debug("saving headers", "len", len(uniqHeaders), "lastBlockNumber", lastBlockNumber, "balance", c.balanceCache.ReadCachedBalance(address, lastBlockNumber), "nonce", c.balanceCache.ReadCachedNonce(address, lastBlockNumber))
+		log.Debug("saving headers", "len", len(uniqHeaders), "lastBlockNumber", lastBlockNumber,
+			"balance", c.balanceCache.ReadCachedBalance(address, lastBlockNumber), "nonce", c.balanceCache.ReadCachedNonce(address, lastBlockNumber))
 		to := &Block{
 			Number:  lastBlockNumber,
 			Balance: c.balanceCache.ReadCachedBalance(address, lastBlockNumber),
