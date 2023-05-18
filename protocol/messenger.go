@@ -3211,12 +3211,12 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 	// Use albumId as notificationId to prevent multiple notifications
 	// for same message with multiple images
 	var idToUse string
+	
 	if message.GetImage() != nil {
 		idToUse = message.GetImage().GetAlbumId()
 	} else {
 		idToUse = message.ID
 	}
-	print(message.GetImage().GetAlbumId(), "AIOWDJAOWIDJA")
 
 	isNotification, notificationType := showMentionOrReplyActivityCenterNotification(publicKey, message, chat, responseTo)
 	if isNotification {
@@ -4613,11 +4613,10 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 					return nil, err
 				}
 			}
-
+				// Create activity center notification body to be eventually passed to `activitycenter.SendActivityCenterNotifications()`
 			if err = messageState.addNewActivityCenterNotification(m.identity.PublicKey, m, message, messagesByID[message.ResponseTo]); err != nil {
 				return nil, err
 			}
-
 		}
 	}
 
