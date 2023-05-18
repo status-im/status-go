@@ -1967,6 +1967,11 @@ func (o *Community) SetActiveMembersCount(activeMembersCount uint64) (updated bo
 	return true, nil
 }
 
+// RekeyedAt returns the RekeyedAt value from the underlying Community.config
+func (o *Community) RekeyedAt() time.Time {
+	return o.config.RekeyedAt
+}
+
 type sortSlice []sorterHelperIdx
 type sorterHelperIdx struct {
 	pos    int32

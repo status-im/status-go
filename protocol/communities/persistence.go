@@ -1273,17 +1273,16 @@ func decodeEventsData(eventsBytes []byte, eventsDescriptionBytes []byte) (*Event
 }
 
 // GetRekeyedAtClock returns the rekeyed_at time of a given community
-func (p *Persistence) GetRekeyedAtClock(id []byte) (*time.Time, error) {
-	rekeyedAt := time.Time{}
-	err := p.db.QueryRow(`SELECT rekeyed_at FROM communities_communities WHERE id = ?`, id).Scan(&rekeyedAt)
+func (p *Persistence) GetRekeyedAtClock(id []byte) (rekeyedAt time.Time, err error) {
+	err = p.db.QueryRow(`SELECT rekeyed_at FROM communities_communities WHERE id = ?`, id).Scan(&rekeyedAt)
 	if err != nil {
-		return nil, err
+		return rekeyedAt, err
 	}
-	return &rekeyedAt, nil
+	return rekeyedAt, nil
 }
 
 // SetRekeyedAtClock sets the rekeyed_at time value of a given community
-func (p *Persistence) SetRekeyedAtClock(id []byte, time *time.Time) error {
+func (p *Persistence) SetRekeyedAtClock(id []byte, time time.Time) error {
 	_, err := p.db.Exec(`UPDATE communities_communities SET rekeyed_at = ? WHERE id = ? AND rekeyed_at < ?`, time, id, time)
 	return err
 }
