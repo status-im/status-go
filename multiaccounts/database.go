@@ -362,7 +362,6 @@ func (db *Database) DeleteAccount(keyUID string) error {
 }
 
 // Account images
-
 func (db *Database) GetIdentityImages(keyUID string) (iis []*images.IdentityImage, err error) {
 	rows, err := db.db.Query(`SELECT key_uid, name, image_payload, width, height, file_size, resize_target, clock FROM identity_images WHERE key_uid = ?`, keyUID)
 	if err != nil {

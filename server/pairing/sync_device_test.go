@@ -110,6 +110,9 @@ func (s *SyncDeviceSuite) prepareBackendWithAccount(tmpdir string) *api.GethStat
 	accounts := []*accounts.Account{walletAccount, chatAccount}
 	err = backend.StartNodeWithAccountAndInitialConfig(account, s.password, *settings, nodeConfig, accounts)
 	require.NoError(s.T(), err)
+	multiaccounts, err := backend.GetAccounts()
+	require.NoError(s.T(), err)
+	require.NotEmpty(s.T(), multiaccounts[0].ColorHash)
 
 	return backend
 }

@@ -35,6 +35,8 @@ import (
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
+	identityUtils "github.com/status-im/status-go/protocol/identity"
+	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ext"
@@ -180,6 +182,13 @@ func (b *GethStatusBackend) OpenAccounts() error {
 	b.multiaccountsDB = db
 	// Probably we should iron out a bit better how to create/dispose of the status-service
 	b.statusNode.SetMultiaccountsDB(db)
+
+	err = b.statusNode.StartMediaServerWithoutDB()
+	if err != nil {
+		b.log.Error("failed to start media server without app db", "err", err)
+		return err
+	}
+
 	return nil
 }
 
@@ -968,12 +977,44 @@ func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password strin
 	return nil
 }
 
-func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, settings settings.Settings, nodecfg *params.NodeConfig, subaccs []*accounts.Account, keyHex string) error {
-	err := b.SaveAccount(acc)
+func enrichMultiaccountInfo(account *multiaccounts.Account, subaccs []*accounts.Account) error {
+	if account.ColorHash != nil && account.ColorID != 0 {
+		return nil
+	}
+
+	for i, acc := range subaccs {
+		subaccs[i].KeyUID = account.KeyUID
+
+		if acc.Chat {
+			colorHash, err := colorhash.GenerateFor(string(acc.PublicKey.Bytes()))
+			if err != nil {
+				return err
+			}
+			account.ColorHash = colorHash
+
+			colorID, err := identityUtils.ToColorID(string(acc.PublicKey.Bytes()))
+			if err != nil {
+				return err
+			}
+			account.ColorID = colorID
+
+			break
+		}
+	}
+
+	return nil
+}
+
+func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(account multiaccounts.Account, password string, settings settings.Settings, nodecfg *params.NodeConfig, subaccs []*accounts.Account, keyHex string) error {
+	err := enrichMultiaccountInfo(&account, subaccs)
 	if err != nil {
 		return err
 	}
-	err = b.ensureAppDBOpened(acc, password)
+	err = b.SaveAccount(account)
+	if err != nil {
+		return err
+	}
+	err = b.ensureAppDBOpened(account, password)
 	if err != nil {
 		return err
 	}
@@ -981,7 +1022,7 @@ func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Acc
 	if err != nil {
 		return err
 	}
-	return b.StartNodeWithKey(acc, password, keyHex)
+	return b.StartNodeWithKey(account, password, keyHex)
 }
 
 // StartNodeWithAccountAndInitialConfig is used after account and config was generated.
@@ -995,7 +1036,12 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	subaccs []*accounts.Account,
 ) error {
 	b.log.Info("node config", "config", nodecfg)
-	err := b.SaveAccount(account)
+
+	err := enrichMultiaccountInfo(&account, subaccs)
+	if err != nil {
+		return err
+	}
+	err = b.SaveAccount(account)
 	if err != nil {
 		return err
 	}

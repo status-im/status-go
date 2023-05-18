@@ -36,6 +36,18 @@ const (
 
 type HandlerPatternMap map[string]http.HandlerFunc
 
+func handleRequestDBMissing(logger *zap.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger.Error("can't handle media request without appdb")
+	}
+}
+
+func handleRequestDownloaderMissing(logger *zap.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger.Error("can't handle media request without ipfs downloader")
+	}
+}
+
 func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
@@ -60,21 +72,33 @@ func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Lo
 		var payload = identityImage.Payload
 
 		if ringEnabled(params) {
-			pks, ok := params["publicKey"]
-			if !ok || len(pks) == 0 {
-				logger.Error("no publicKey")
+			account, err := multiaccountsDB.GetAccount(keyUids[0])
+
+			if err != nil {
+				logger.Error("handleAccountImages: failed to GetAccount .", zap.String("keyUid", keyUids[0]), zap.Error(err))
 				return
 			}
-			colorHash, err := colorhash.GenerateFor(pks[0])
-			if err != nil {
-				logger.Error("could not generate color hash")
-				return
+
+			accColorHash := account.ColorHash
+
+			if accColorHash == nil {
+				pks, ok := params["publicKey"]
+				if !ok || len(pks) == 0 {
+					logger.Error("no publicKey")
+					return
+				}
+
+				accColorHash, err = colorhash.GenerateFor(pks[0])
+				if err != nil {
+					logger.Error("could not generate color hash")
+					return
+				}
 			}
 
 			var theme = getTheme(params, logger)
 
 			payload, err = ring.DrawRing(&ring.DrawRingParam{
-				Theme: theme, ColorHash: colorHash, ImageBytes: identityImage.Payload, Height: identityImage.Height, Width: identityImage.Width,
+				Theme: theme, ColorHash: accColorHash, ImageBytes: identityImage.Payload, Height: identityImage.Height, Width: identityImage.Width,
 			})
 
 			if err != nil {
@@ -103,6 +127,10 @@ func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Lo
 }
 
 func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
 		pks, ok := params["publicKey"]
@@ -226,6 +254,10 @@ func handleIdenticon(logger *zap.Logger) http.HandlerFunc {
 }
 
 func handleDiscordAuthorAvatar(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		authorIDs, ok := r.URL.Query()["authorId"]
 		if !ok || len(authorIDs) == 0 {
@@ -260,6 +292,10 @@ func handleDiscordAuthorAvatar(db *sql.DB, logger *zap.Logger) http.HandlerFunc 
 }
 
 func handleDiscordAttachment(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		messageIDs, ok := r.URL.Query()["messageId"]
 		if !ok || len(messageIDs) == 0 {
@@ -299,6 +335,10 @@ func handleDiscordAttachment(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 }
 
 func handleImage(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		messageIDs, ok := r.URL.Query()["messageId"]
 		if !ok || len(messageIDs) == 0 {
@@ -332,6 +372,10 @@ func handleImage(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 }
 
 func handleAudio(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		messageIDs, ok := r.URL.Query()["messageId"]
 		if !ok || len(messageIDs) == 0 {
@@ -361,6 +405,10 @@ func handleAudio(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 }
 
 func handleIPFS(downloader *ipfs.Downloader, logger *zap.Logger) http.HandlerFunc {
+	if downloader == nil {
+		return handleRequestDownloaderMissing(logger)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		hashes, ok := r.URL.Query()["hash"]
 		if !ok || len(hashes) == 0 {
