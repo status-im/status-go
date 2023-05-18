@@ -191,6 +191,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 	}
 	communityItem := struct {
 		ID                          types.HexBytes                                `json:"id"`
+		Owner                       bool                                          `json:"owner"`
 		Admin                       bool                                          `json:"admin"`
 		Verified                    bool                                          `json:"verified"`
 		Joined                      bool                                          `json:"joined"`
@@ -222,7 +223,8 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		ActiveMembersCount          uint64                                        `json:"activeMembersCount"`
 	}{
 		ID:                          o.ID(),
-		Admin:                       o.IsOwner(),
+		Owner:                       o.IsOwner(),
+		Admin:                       o.IsAdmin(),
 		Verified:                    o.config.Verified,
 		Chats:                       make(map[string]CommunityChat),
 		Categories:                  make(map[string]CommunityCategory),
