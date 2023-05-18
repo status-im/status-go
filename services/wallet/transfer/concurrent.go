@@ -139,7 +139,7 @@ func checkRangesWithStartBlock(parent context.Context, client BalanceReader, cac
 				return err
 			}
 			if lb.Cmp(hb) == 0 {
-				log.Debug("balances are equal", "from", from, "to", to)
+				log.Debug("balances are equal", "from", from, "to", to, "lb", lb, "hb", hb)
 
 				hn, err := cache.NonceAt(ctx, client, account, to)
 				if err != nil {
@@ -166,7 +166,7 @@ func checkRangesWithStartBlock(parent context.Context, client BalanceReader, cac
 					return err
 				}
 				if *ln == *hn {
-					log.Debug("transaction count is also equal", "from", from, "to", to)
+					log.Debug("transaction count is also equal", "from", from, "to", to, "ln", *ln, "hn", *hn)
 					return nil
 				}
 			}

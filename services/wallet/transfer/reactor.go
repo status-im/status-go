@@ -20,7 +20,7 @@ const (
 	ReactorNotStarted string = "reactor not started"
 
 	NonArchivalNodeBlockChunkSize = 100
-	DefaultNodeBlockChunkSize     = 10000
+	DefaultNodeBlockChunkSize     = 100000
 )
 
 var errAlreadyRunning = errors.New("already running")
