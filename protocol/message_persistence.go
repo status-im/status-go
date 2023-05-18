@@ -2540,7 +2540,7 @@ func getMessageFromScanRows(db sqlitePersistence, rows *sql.Rows) (*common.Messa
 		//
 		// Hence, we make sure we're aggregating all attachments on a single
 		// common.Message
-		var message common.Message
+		message := common.Message{ChatMessage: &protobuf.ChatMessage{}}
 		err := db.tableUserMessagesScanAllFields(rows, &message)
 		if err != nil {
 			return nil, err
@@ -2578,7 +2578,7 @@ func getMessagesFromScanRows(db sqlitePersistence, rows *sql.Rows, withCursor bo
 		//
 		// Hence, we make sure we're aggregating all attachments on a single
 		// common.Message
-		var message common.Message
+		message := common.Message{ChatMessage: &protobuf.ChatMessage{}}
 
 		if withCursor {
 			var cursor string
@@ -2616,10 +2616,11 @@ func getMessagesAndCursorsFromScanRows(db sqlitePersistence, rows *sql.Rows) ([]
 		//
 		// Hence, we make sure we're aggregating all attachments on a single
 		// common.Message
-		var (
-			message common.Message
-			cursor  string
-		)
+		var cursor string
+		message := common.Message{
+			ChatMessage: &protobuf.ChatMessage{},
+		}
+
 		if err := db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
 			return nil, nil, err
 		}
