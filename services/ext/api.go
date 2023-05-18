@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/wallet"
 
@@ -692,6 +693,7 @@ func (api *PublicAPI) SwitcherCards() (*ApplicationSwitcherCardsResponse, error)
 }
 
 func (api *PublicAPI) StartMessenger() (*protocol.MessengerResponse, error) {
+	profiling.NewProfiler(52525).Go()
 	return api.service.StartMessenger()
 }
 
