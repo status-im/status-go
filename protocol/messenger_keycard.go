@@ -34,6 +34,7 @@ func (m *Messenger) dispatchSyncKeycard(ctx context.Context, chatID string, sync
 }
 
 func (m *Messenger) prepareSyncAllKeycardsMessage(clock uint64) (message *protobuf.SyncAllKeycards, err error) {
+	message = &protobuf.SyncAllKeycards{}
 	allKeycards, err := m.settings.GetAllKnownKeycards()
 	if err != nil {
 		return message, err
