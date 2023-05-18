@@ -477,7 +477,7 @@ func (t *testTimeSource) GetCurrentTime() uint64 {
 
 func buildTestMessage(chat *protocol.Chat) *common.Message {
 	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
-	message := &common.Message{}
+	message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	message.Text = "text-input-message"
 	message.ChatId = chat.ID
 	message.Clock = clock

@@ -74,7 +74,7 @@ func buildImageMessage(s *MessengerShareMessageSuite, chat Chat) *common.Message
 	s.Require().NoError(err)
 
 	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
-	message := &common.Message{}
+	message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	message.ChatId = chat.ID
 	message.Clock = clock
 	message.Timestamp = timestamp

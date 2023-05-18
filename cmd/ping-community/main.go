@@ -188,7 +188,7 @@ func main() {
 			count++
 			timestamp := time.Now().Format(time.RFC3339)
 			logger.Info("Publishing", "id", id, "count", count, "time", timestamp)
-			inputMessage := &common.Message{}
+			inputMessage := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 
 			inputMessage.Text = fmt.Sprintf("%d\n%s\n%s", count, timestamp, id)
 			inputMessage.LocalChatID = targetChat.ID

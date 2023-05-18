@@ -180,7 +180,7 @@ func (s *MessengerSuite) TestInit() {
 
 func buildAudioMessage(s *MessengerSuite, chat Chat) *common.Message {
 	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
-	message := &common.Message{}
+	message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	message.Text = "text-input-message"
 	message.ChatId = chat.ID
 	message.Clock = clock
@@ -201,7 +201,7 @@ func buildAudioMessage(s *MessengerSuite, chat Chat) *common.Message {
 
 func buildTestMessage(chat Chat) *common.Message {
 	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
-	message := &common.Message{}
+	message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	message.Text = "text-input-message"
 	message.ChatId = chat.ID
 	message.Clock = clock
@@ -223,7 +223,7 @@ func buildTestMessage(chat Chat) *common.Message {
 
 func buildTestGapMessage(chat Chat) *common.Message {
 	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
-	message := &common.Message{}
+	message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	message.ChatId = chat.ID
 	message.Clock = clock
 	message.Timestamp = timestamp
@@ -372,7 +372,7 @@ func (s *MessengerSuite) TestSendPrivateOneToOne() {
 	pkString := hex.EncodeToString(crypto.FromECDSAPub(&recipientKey.PublicKey))
 	chat := CreateOneToOneChat(pkString, &recipientKey.PublicKey, s.m.transport)
 
-	inputMessage := &common.Message{}
+	inputMessage := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	inputMessage.ChatId = chat.ID
 	chat.LastClockValue = uint64(100000000000000)
 	err = s.m.SaveChat(chat)
@@ -408,7 +408,7 @@ func (s *MessengerSuite) TestSendPrivateGroup() {
 	_, err = s.m.AddMembersToGroupChat(context.Background(), chat.ID, members)
 	s.NoError(err)
 
-	inputMessage := &common.Message{}
+	inputMessage := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	inputMessage.ChatId = chat.ID
 	chat.LastClockValue = uint64(100000000000000)
 	err = s.m.SaveChat(chat)
@@ -436,7 +436,7 @@ func (s *MessengerSuite) TestSendPrivateEmptyGroup() {
 
 	chat := response.Chats()[0]
 
-	inputMessage := &common.Message{}
+	inputMessage := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	inputMessage.ChatId = chat.ID
 	chat.LastClockValue = uint64(100000000000000)
 	err = s.m.SaveChat(chat)
@@ -1035,7 +1035,7 @@ func (s *MessengerSuite) TestChatPersistencePublic() {
 		LastClockValue:        20,
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
-		LastMessage:           &common.Message{},
+		LastMessage:           &common.Message{ChatMessage: &protobuf.ChatMessage{}},
 		Highlight:             false,
 	}
 
@@ -1056,7 +1056,7 @@ func (s *MessengerSuite) TestDeleteChat() {
 		LastClockValue:        20,
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
-		LastMessage:           &common.Message{},
+		LastMessage:           &common.Message{ChatMessage: &protobuf.ChatMessage{}},
 		Highlight:             false,
 	}
 
@@ -1080,7 +1080,7 @@ func (s *MessengerSuite) TestChatPersistenceUpdate() {
 		LastClockValue:        20,
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
-		LastMessage:           &common.Message{},
+		LastMessage:           &common.Message{ChatMessage: &protobuf.ChatMessage{}},
 		Highlight:             false,
 	}
 
@@ -1124,7 +1124,7 @@ func (s *MessengerSuite) TestChatPersistenceOneToOne() {
 		LastClockValue:        20,
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
-		LastMessage:           &common.Message{},
+		LastMessage:           &common.Message{ChatMessage: &protobuf.ChatMessage{}},
 		Highlight:             false,
 	}
 
@@ -1212,7 +1212,7 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 		LastClockValue:        20,
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
-		LastMessage:           &common.Message{},
+		LastMessage:           &common.Message{ChatMessage: &protobuf.ChatMessage{}},
 		Highlight:             false,
 	}
 	s.Require().NoError(s.m.SaveChat(chat))
@@ -2337,7 +2337,7 @@ func buildImageWithAlbumIDMessage(chat Chat, albumID string) (*common.Message, e
 	}
 
 	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
-	message := &common.Message{}
+	message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	message.ChatId = chat.ID
 	message.Clock = clock
 	message.Timestamp = timestamp

@@ -26,7 +26,7 @@ func TestPrepareContentImage(t *testing.T) {
 	payload, err := ioutil.ReadAll(file)
 	require.NoError(t, err)
 
-	message := &Message{}
+	message := &Message{ChatMessage: &protobuf.ChatMessage{}}
 	message.ContentType = protobuf.ChatMessage_IMAGE
 	image := protobuf.ImageMessage{
 		Payload: payload,
@@ -46,7 +46,7 @@ func TestPrepareContentAudio(t *testing.T) {
 	payload, err := ioutil.ReadAll(file)
 	require.NoError(t, err)
 
-	message := &Message{}
+	message := &Message{ChatMessage: &protobuf.ChatMessage{}}
 	message.ContentType = protobuf.ChatMessage_AUDIO
 	audio := protobuf.AudioMessage{
 		Payload: payload,
@@ -71,7 +71,7 @@ func TestGetAudioMessageMIME(t *testing.T) {
 }
 
 func TestPrepareContentMentions(t *testing.T) {
-	message := &Message{}
+	message := &Message{ChatMessage: &protobuf.ChatMessage{}}
 	pk1, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	pk1String := types.EncodeHex(crypto.FromECDSAPub(&pk1.PublicKey))
@@ -90,7 +90,7 @@ func TestPrepareContentMentions(t *testing.T) {
 }
 
 func TestPrepareContentLinks(t *testing.T) {
-	message := &Message{}
+	message := &Message{ChatMessage: &protobuf.ChatMessage{}}
 
 	link1 := "https://github.com/status-im/status-mobile"
 	link2 := "https://www.youtube.com/watch?v=6RYO8KCY6YE"
@@ -107,7 +107,7 @@ func TestPrepareSimplifiedText(t *testing.T) {
 	canonicalName1 := "canonical-name-1"
 	canonicalName2 := "canonical-name-2"
 
-	message := &Message{}
+	message := &Message{ChatMessage: &protobuf.ChatMessage{}}
 	pk1, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	pk1String := types.EncodeHex(crypto.FromECDSAPub(&pk1.PublicKey))
@@ -133,7 +133,7 @@ func TestPrepareSimplifiedText(t *testing.T) {
 }
 
 func TestMarshalMessageJSON(t *testing.T) {
-	message := &Message{}
+	message := &Message{ChatMessage: &protobuf.ChatMessage{}}
 	from, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	message.From = PubkeyToHex(&from.PublicKey)

@@ -54,7 +54,9 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 
 		clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
-		editMessage := &EditMessage{}
+		editMessage := &EditMessage{
+			EditMessage: &protobuf.EditMessage{},
+		}
 
 		editMessage.Text = request.Text
 		editMessage.ContentType = request.ContentType
@@ -180,7 +182,9 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
-	deleteMessage := &DeleteMessage{}
+	deleteMessage := &DeleteMessage{
+		DeleteMessage: &protobuf.DeleteMessage{},
+	}
 	deleteMessage.ChatId = message.ChatId
 	deleteMessage.MessageId = messageID
 	deleteMessage.Clock = clock
@@ -336,7 +340,9 @@ func (m *Messenger) applyEditMessage(editMessage *protobuf.EditMessage, message 
 
 	// Save original message as edit so we can retrieve history
 	if message.EditedAt == 0 {
-		originalEdit := EditMessage{}
+		originalEdit := EditMessage{
+			EditMessage: &protobuf.EditMessage{},
+		}
 		originalEdit.Clock = message.Clock
 		originalEdit.LocalChatID = message.LocalChatID
 		originalEdit.MessageId = message.ID
@@ -442,7 +448,7 @@ func (m *Messenger) SendOneToOneMessage(request *requests.SendOneToOneMessage) (
 		}
 	}
 
-	message := &common.Message{}
+	message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	message.Text = request.Message
 	message.ChatId = chatID
 	message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
@@ -462,7 +468,7 @@ func (m *Messenger) SendGroupChatMessage(request *requests.SendGroupChatMessage)
 		return nil, ErrChatNotFound
 	}
 
-	message := &common.Message{}
+	message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	message.Text = request.Message
 	message.ChatId = chatID
 	message.ContentType = protobuf.ChatMessage_TEXT_PLAIN

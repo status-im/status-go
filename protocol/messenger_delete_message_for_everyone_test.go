@@ -90,7 +90,7 @@ func (s *MessengerDeleteMessageForEveryoneSuite) TestDeleteMessageForEveryone() 
 	s.Require().NoError(err)
 
 	ctx := context.Background()
-	inputMessage := &common.Message{}
+	inputMessage := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	inputMessage.ChatId = communityChat.ID
 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = "some text"

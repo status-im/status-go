@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 func (db sqlitePersistence) DeleteActivityCenterNotification(id []byte) error {
@@ -212,7 +213,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 
 	// Restore last message
 	if lastMessageBytes != nil {
-		lastMessage := &common.Message{}
+		lastMessage := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 		if err = json.Unmarshal(lastMessageBytes, lastMessage); err != nil {
 			return nil, err
 		}
@@ -221,7 +222,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 
 	// Restore message
 	if messageBytes != nil {
-		message := &common.Message{}
+		message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 		if err = json.Unmarshal(messageBytes, message); err != nil {
 			return nil, err
 		}
@@ -230,7 +231,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 
 	// Restore reply message
 	if replyMessageBytes != nil {
-		replyMessage := &common.Message{}
+		replyMessage := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 		if err = json.Unmarshal(replyMessageBytes, replyMessage); err != nil {
 			return nil, err
 		}
@@ -291,7 +292,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 
 		// Restore last message
 		if lastMessageBytes != nil {
-			lastMessage := &common.Message{}
+			lastMessage := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 			if err = json.Unmarshal(lastMessageBytes, lastMessage); err != nil {
 				return "", nil, err
 			}
@@ -300,7 +301,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 
 		// Restore message
 		if messageBytes != nil {
-			message := &common.Message{}
+			message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 			if err = json.Unmarshal(messageBytes, message); err != nil {
 				return "", nil, err
 			}
@@ -309,7 +310,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 
 		// Restore reply message
 		if replyMessageBytes != nil {
-			replyMessage := &common.Message{}
+			replyMessage := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 			if err = json.Unmarshal(replyMessageBytes, replyMessage); err != nil {
 				return "", nil, err
 			}

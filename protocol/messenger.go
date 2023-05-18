@@ -2225,7 +2225,7 @@ func (m *Messenger) ShareImageMessage(request *requests.ShareImageMessage) (*Mes
 
 	var messages []*common.Message
 	for _, pk := range request.Users {
-		message := &common.Message{}
+		message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 		message.ChatId = pk.String()
 		message.Payload = msg.Payload
 		message.Text = "This message has been shared with you"
@@ -5084,7 +5084,7 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 		return nil, errors.New("Need to be a one-to-one chat")
 	}
 
-	message := &common.Message{}
+	message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	err := extendMessageFromChat(message, chat, &m.identity.PublicKey, m.transport)
 	if err != nil {
 		return nil, err
@@ -5158,7 +5158,7 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 		return nil, errors.New("Need to be a one-to-one chat")
 	}
 
-	message := &common.Message{}
+	message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	err := extendMessageFromChat(message, chat, &m.identity.PublicKey, m.transport)
 	if err != nil {
 		return nil, err
@@ -5577,7 +5577,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 		return nil, errors.New("Need to be a one-to-one chat")
 	}
 
-	message := &common.Message{}
+	message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	err := extendMessageFromChat(message, chat, &m.identity.PublicKey, m.transport)
 	if err != nil {
 		return nil, err
@@ -5673,7 +5673,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		if validationResult.Message != nil {
 			message = validationResult.Message
 		} else {
-			message = &common.Message{}
+			message = &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 			err := extendMessageFromChat(message, chat, &m.identity.PublicKey, m.transport)
 			if err != nil {
 				return nil, err

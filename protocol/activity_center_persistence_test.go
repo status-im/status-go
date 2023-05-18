@@ -8,6 +8,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 func createNotifications(t *testing.T, p *sqlitePersistence, notifications []*ActivityCenterNotification) []*ActivityCenterNotification {
@@ -39,7 +40,7 @@ func TestDeleteActivityCenterNotificationsWhenEmpty(t *testing.T) {
 	p := newSQLitePersistence(db)
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
-	message := &common.Message{}
+	message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	message.Text = "sample text"
 	chat.LastMessage = message
 	err = p.SaveChat(*chat)
@@ -68,7 +69,7 @@ func TestDeleteActivityCenterNotificationsWithMultipleIds(t *testing.T) {
 	p := newSQLitePersistence(db)
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
-	message := &common.Message{}
+	message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	message.Text = "sample text"
 	chat.LastMessage = message
 	err = p.SaveChat(*chat)
@@ -693,7 +694,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 	p := newSQLitePersistence(db)
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
-	message := &common.Message{}
+	message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	message.Text = "sample text"
 	chat.LastMessage = message
 	err = p.SaveChat(*chat)
@@ -835,7 +836,7 @@ func TestActivityCenterReadUnreadPagination(t *testing.T) {
 	initialOrFinalCursor := ""
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
-	message := &common.Message{}
+	message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	message.Text = "sample text"
 	chat.LastMessage = message
 	err = p.SaveChat(*chat)
@@ -962,7 +963,7 @@ func TestActivityCenterReadUnreadFilterByTypes(t *testing.T) {
 	p := newSQLitePersistence(db)
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
-	message := &common.Message{}
+	message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	message.Text = "sample text"
 	chat.LastMessage = message
 	err = p.SaveChat(*chat)
@@ -1090,7 +1091,7 @@ func TestActivityCenterReadUnread(t *testing.T) {
 	p := newSQLitePersistence(db)
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
-	message := &common.Message{}
+	message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	message.Text = "sample text"
 	chat.LastMessage = message
 	err = p.SaveChat(*chat)

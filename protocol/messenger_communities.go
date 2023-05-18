@@ -1449,7 +1449,7 @@ func (m *Messenger) InviteUsersToCommunity(request *requests.InviteUsersToCommun
 		}
 		publicKeys = append(publicKeys, publicKey)
 
-		message := &common.Message{}
+		message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 		message.ChatId = pkBytes.String()
 		message.CommunityID = request.CommunityID.String()
 		message.Text = fmt.Sprintf("You have been invited to community %s", community.Name())
@@ -1503,7 +1503,7 @@ func (m *Messenger) ShareCommunity(request *requests.ShareCommunity) (*Messenger
 
 	var messages []*common.Message
 	for _, pk := range request.Users {
-		message := &common.Message{}
+		message := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 		message.ChatId = pk.String()
 		message.CommunityID = request.CommunityID.String()
 		message.Text = fmt.Sprintf("Community %s has been shared with you", community.Name())

@@ -1068,7 +1068,7 @@ func (m *Messenger) createOrUpdateIncomingContactVerificationNotification(contac
 }
 
 func (m *Messenger) createContactVerificationMessage(challenge string, chat *Chat, state *ReceivedMessageState, verificationStatus common.ContactVerificationState) (*common.Message, error) {
-	chatMessage := &common.Message{}
+	chatMessage := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	chatMessage.ID = state.CurrentMessageState.MessageID
 	chatMessage.From = state.CurrentMessageState.Contact.ID
 	chatMessage.Alias = state.CurrentMessageState.Contact.Alias
@@ -1090,7 +1090,7 @@ func (m *Messenger) createContactVerificationMessage(challenge string, chat *Cha
 
 func (m *Messenger) createLocalContactVerificationMessage(challenge string, chat *Chat, id string, status common.ContactVerificationState) (*common.Message, error) {
 
-	chatMessage := &common.Message{}
+	chatMessage := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	chatMessage.ID = id
 	err := extendMessageFromChat(chatMessage, chat, &m.identity.PublicKey, m.getTimesource())
 	if err != nil {

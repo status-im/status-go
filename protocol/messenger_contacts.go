@@ -418,7 +418,7 @@ func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, conta
 		return nil, errors.New("contact cannot be nil")
 	}
 
-	contactRequest := &common.Message{}
+	contactRequest := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	contactRequest.ChatId = contact.ID
 	contactRequest.WhisperTimestamp = timestamp
 	contactRequest.Seen = true

@@ -998,7 +998,7 @@ func TestSaveChat(t *testing.T) {
 	p := newSQLitePersistence(db)
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
-	chat.LastMessage = &common.Message{}
+	chat.LastMessage = &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	err = p.SaveChat(*chat)
 	require.NoError(t, err)
 
@@ -1466,7 +1466,7 @@ func TestSaveCommunityChat(t *testing.T) {
 	}
 
 	chat := CreateCommunityChat("test-or-gid", "test-chat-id", communityChat, &testTimeSource{})
-	chat.LastMessage = &common.Message{}
+	chat.LastMessage = &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	err = p.SaveChat(*chat)
 	require.NoError(t, err)
 

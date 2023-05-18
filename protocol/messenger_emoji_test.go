@@ -210,7 +210,9 @@ func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 }
 
 func (s *MessengerEmojiSuite) TestCompressedKeyReturnedWithEmoji() {
-	emojiReaction := &EmojiReaction{}
+	emojiReaction := &EmojiReaction{
+		EmojiReaction: &protobuf.EmojiReaction{},
+	}
 	id, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 

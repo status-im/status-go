@@ -2239,7 +2239,9 @@ func (db sqlitePersistence) GetGroupChatInvitations() (rst []*GroupChatInvitatio
 	}
 	defer bRows.Close()
 	for bRows.Next() {
-		invitation := GroupChatInvitation{}
+		invitation := GroupChatInvitation{
+			GroupChatInvitation: &protobuf.GroupChatInvitation{},
+		}
 		err = bRows.Scan(
 			&invitation.From,
 			&invitation.ChatId,
@@ -2379,7 +2381,9 @@ func (db sqlitePersistence) GetDeletes(messageID string, from string) ([]*Delete
 
 	var messages []*DeleteMessage
 	for rows.Next() {
-		d := &DeleteMessage{}
+		d := &DeleteMessage{
+			DeleteMessage: &protobuf.DeleteMessage{},
+		}
 		err := rows.Scan(&d.Clock, &d.ChatId, &d.MessageId, &d.From, &d.ID)
 		if err != nil {
 			return nil, err
@@ -2448,7 +2452,9 @@ func (db sqlitePersistence) GetEdits(messageID string, from string) ([]*EditMess
 
 	var messages []*EditMessage
 	for rows.Next() {
-		e := &EditMessage{}
+		e := &EditMessage{
+			EditMessage: &protobuf.EditMessage{},
+		}
 		err := rows.Scan(&e.Clock, &e.ChatId, &e.MessageId, &e.From, &e.Text, &e.ID)
 		if err != nil {
 			return nil, err

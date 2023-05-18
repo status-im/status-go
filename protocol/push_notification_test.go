@@ -915,7 +915,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 	// Send an community message
 	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, alice.transport)
 
-	inputMessage := &common.Message{}
+	inputMessage := &common.Message{ChatMessage: &protobuf.ChatMessage{}}
 	inputMessage.ChatId = chat.ID
 	inputMessage.Text = "some text"
 	inputMessage.CommunityID = community.IDString()
