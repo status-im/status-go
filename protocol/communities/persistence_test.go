@@ -471,3 +471,42 @@ func (s *PersistenceSuite) TestSaveCheckChannelPermissionResponse() {
 	s.Require().Equal(responses[chatID].ViewAndPostPermissions.Permissions["one"].Criteria, []bool{true, true, true, true})
 	s.Require().Equal(responses[chatID].ViewAndPostPermissions.Permissions["two"].Criteria, []bool{false})
 }
+
+func (s *PersistenceSuite) TestGetRekeyedAtClock() {
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	// there is one community inserted by default
+	communities, err := s.db.AllCommunities(&key.PublicKey)
+	s.Require().NoError(err)
+	s.Require().Len(communities, 1)
+
+	community := Community{
+		config: &Config{
+			PrivateKey:           key,
+			ID:                   &key.PublicKey,
+			Joined:               true,
+			Spectated:            true,
+			Verified:             true,
+			CommunityDescription: &protobuf.CommunityDescription{},
+		},
+	}
+	s.Require().NoError(s.db.SaveCommunity(&community))
+
+	communities, err = s.db.AllCommunities(&key.PublicKey)
+	s.Require().NoError(err)
+	s.Require().Len(communities, 2)
+	s.Equal(types.HexBytes(crypto.CompressPubkey(&key.PublicKey)), communities[1].ID())
+	s.True(communities[1].Joined())
+	s.True(communities[1].Spectated())
+	s.True(communities[1].Verified())
+	s.Zero(communities[1].config.RekeyedAt.Unix())
+
+	now := time.Now()
+	err = s.db.SetRekeyedAtClock(communities[1].ID(), &now)
+	s.NoError(err)
+
+	then, err := s.db.GetRekeyedAtClock(communities[0].ID())
+	s.NoError(err)
+	now.Equal(*then)
+}

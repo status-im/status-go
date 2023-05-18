@@ -40,7 +40,7 @@ type Config struct {
 	RequestsToJoin                []*RequestToJoin
 	MemberIdentity                *ecdsa.PublicKey
 	SyncedAt                      uint64
-	RekeyedAt                     *time.Time
+	RekeyedAt                     time.Time
 	EventsData                    *EventsData
 }
 
