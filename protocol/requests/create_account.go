@@ -16,8 +16,6 @@ type CreateAccount struct {
 	Password           string `json:"password"`
 	ImagePath          string `json:"imagePath"`
 	CustomizationColor string `json:"customizationColor"`
-	// RootKeystoreDir is the directory where keys are stored
-	RootKeystoreDir string `json:"rootKeystoreDir"`
 	// BackupDisabledDataDir is the directory where backup is disabled
 	BackupDisabledDataDir string `json:"backupDisabledDataDir"`
 
@@ -51,10 +49,6 @@ func ValidateAccountCreationRequest(c CreateAccount) error {
 
 	if len(c.CustomizationColor) == 0 {
 		return ErrCreateAccountInvalidCustomizationColor
-	}
-
-	if len(c.RootKeystoreDir) == 0 {
-		return ErrCreateAccountInvalidRootKeystoreDir
 	}
 
 	if len(c.BackupDisabledDataDir) == 0 {
