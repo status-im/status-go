@@ -2,6 +2,7 @@ package communities
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -15,9 +16,11 @@ type RawCommunityRow struct {
 	Verified    bool
 	SyncedAt    uint64
 	Muted       bool
+	RekeyedAt   time.Time
 }
 
 func fromSyncCommunityProtobuf(syncCommProto *protobuf.SyncCommunity) RawCommunityRow {
+	// TODO handle rekeyedAt value
 	return RawCommunityRow{
 		ID:          syncCommProto.Id,
 		Description: syncCommProto.Description,
@@ -31,9 +34,7 @@ func fromSyncCommunityProtobuf(syncCommProto *protobuf.SyncCommunity) RawCommuni
 
 func (p *Persistence) scanRowToStruct(rowScan func(dest ...interface{}) error) (*RawCommunityRow, error) {
 	rcr := new(RawCommunityRow)
-
-	syncedAt := sql.NullTime{}
-	muteTill := sql.NullTime{}
+	var syncedAt, muteTill, rekeyedAt sql.NullTime
 
 	err := rowScan(
 		&rcr.ID,
@@ -44,10 +45,14 @@ func (p *Persistence) scanRowToStruct(rowScan func(dest ...interface{}) error) (
 		&rcr.Spectated,
 		&rcr.Muted,
 		&muteTill,
+		&rekeyedAt,
 		&syncedAt,
 	)
 	if syncedAt.Valid {
 		rcr.SyncedAt = uint64(syncedAt.Time.Unix())
+	}
+	if rekeyedAt.Valid {
+		rcr.RekeyedAt = rekeyedAt.Time
 	}
 
 	if err != nil {
