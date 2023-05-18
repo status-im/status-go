@@ -4243,33 +4243,42 @@ func (m *Messenger) startCommunityRekeyLoop() error {
 	}
 
 	for _, c := range cs {
-		if c.IsAdmin() && c.Encrypted() {
-			// if rekey time period exceeded, perform a rekey
-			if c.RekeyedAt().Add(rki).Before(time.Now()) {
-				err = m.RekeyCommunity(c.ID())
-				if err != nil {
-					return err
+		err = m.rekeyCommunity(c, rki, ticker, logger)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *Messenger) rekeyCommunity(c *communities.Community, rki time.Duration, ticker *time.Ticker, logger *zap.Logger) error {
+	if c.IsAdmin() && c.Encrypted() {
+		// if rekey time period exceeded, perform a rekey
+		if c.RekeyedAt().Add(rki).Before(time.Now()) {
+			err := m.RekeyCommunity(c.ID())
+			if err != nil {
+				return err
+			}
+		}
+
+		go func() {
+			logger.Debug("CommunityRekeyLoop started", zap.Binary("community ID", c.ID()))
+			for {
+				select {
+				case <-ticker.C:
+					err := m.RekeyCommunity(c.ID())
+					if err != nil {
+						logger.Error("error sending rekey message", zap.Error(err), zap.Binary("community ID", c.ID()))
+					}
+
+				case <-m.quit:
+					ticker.Stop()
+					logger.Debug("CommunityRekeyLoop stopped", zap.Binary("community ID", c.ID()))
+					return
 				}
 			}
-
-			go func() {
-				logger.Debug("CommunityRekeyLoop started", zap.Binary("community ID", c.ID()))
-				for {
-					select {
-					case <-ticker.C:
-						err = m.RekeyCommunity(c.ID())
-						if err != nil {
-							logger.Error("error sending rekey message", zap.Error(err), zap.Binary("community ID", c.ID()))
-						}
-
-					case <-m.quit:
-						ticker.Stop()
-						logger.Debug("CommunityRekeyLoop stopped", zap.Binary("community ID", c.ID()))
-						return
-					}
-				}
-			}()
-		}
+		}()
 	}
 
 	return nil
