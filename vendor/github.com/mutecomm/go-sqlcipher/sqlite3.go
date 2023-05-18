@@ -82,6 +82,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -107,6 +108,30 @@ var SQLiteTimestampFormats = []string{
 	"2006-01-02 15:04",
 	"2006-01-02T15:04",
 	"2006-01-02",
+}
+
+var csvFile *os.File
+var err error
+
+type PerfLogger struct {
+	query string
+	args  []namedValue
+	start time.Time
+}
+
+func (pf *PerfLogger) Complete() {
+	duration := time.Since(pf.start)
+	fmt.Println("--- PerfLogger ---", pf.query, pf.args, duration.Nanoseconds())
+
+	query := strings.ReplaceAll(pf.query, "\n", " ")
+	args := strings.ReplaceAll(fmt.Sprint(pf.args), "\n", " ")
+
+	line := fmt.Sprintf("%sµ%sµ%d\n", query, args, duration.Nanoseconds())
+	_, err = csvFile.Write([]byte(line))
+	if err != nil {
+		fmt.Println("--- PerfLogger ---", "could not write to csv", err)
+		return
+	}
 }
 
 func init() {
@@ -143,6 +168,7 @@ type SQLiteStmt struct {
 	c      *SQLiteConn
 	s      *C.sqlite3_stmt
 	t      string
+	_query string
 	closed bool
 	cls    bool
 }
@@ -336,6 +362,11 @@ func errorString(err Error) string {
 //   _pragma_cipher_page_size=XXX
 //     Set the PRAGMA cipher_page_size to adjust the page size.
 func (d *SQLiteDriver) Open(dsn string) (driver.Conn, error) {
+	csvFile, err = os.Create("database-perf-" + fmt.Sprint(time.Now().Unix()) + ".csv")
+	if err != nil {
+		fmt.Println("Can't create database perf csv:", err)
+	}
+
 	if C.sqlite3_threadsafe() == 0 {
 		return nil, errors.New("sqlite library was not compiled for thread-safe operation")
 	}
@@ -489,6 +520,7 @@ func (c *SQLiteConn) Close() error {
 	}
 	c.db = nil
 	runtime.SetFinalizer(c, nil)
+	csvFile.Close()
 	return nil
 }
 
@@ -510,7 +542,7 @@ func (c *SQLiteConn) prepare(ctx context.Context, query string) (driver.Stmt, er
 	if tail != nil && *tail != '\000' {
 		t = strings.TrimSpace(C.GoString(tail))
 	}
-	ss := &SQLiteStmt{c: c, s: s, t: t}
+	ss := &SQLiteStmt{c: c, s: s, t: t, _query: query}
 	runtime.SetFinalizer(ss, (*SQLiteStmt).Close)
 	return ss, nil
 }
@@ -609,6 +641,12 @@ func (s *SQLiteStmt) Query(args []driver.Value) (driver.Rows, error) {
 }
 
 func (s *SQLiteStmt) query(ctx context.Context, args []namedValue) (driver.Rows, error) {
+	logger := PerfLogger{
+		query: s._query,
+		args:  args,
+		start: time.Now(),
+	}
+
 	if err := s.bind(args); err != nil {
 		return nil, err
 	}
@@ -630,6 +668,7 @@ func (s *SQLiteStmt) query(ctx context.Context, args []namedValue) (driver.Rows,
 			default:
 				C.sqlite3_interrupt(db)
 				rows.Close()
+				logger.Complete()
 			}
 		case <-rows.done:
 		}
@@ -661,6 +700,13 @@ func (s *SQLiteStmt) Exec(args []driver.Value) (driver.Result, error) {
 }
 
 func (s *SQLiteStmt) exec(ctx context.Context, args []namedValue) (driver.Result, error) {
+	logger := PerfLogger{
+		query: s._query,
+		args:  args,
+		start: time.Now(),
+	}
+	defer logger.Complete()
+
 	if err := s.bind(args); err != nil {
 		C.sqlite3_reset(s.s)
 		C.sqlite3_clear_bindings(s.s)
