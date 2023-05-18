@@ -2,11 +2,13 @@ package sqlite
 
 import (
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"os"
+	"runtime"
 
-	_ "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
+	sqlcipher "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
 
 	"github.com/status-im/status-go/protocol/sqlite"
 )
@@ -75,52 +77,60 @@ func EncryptDB(unencryptedPath string, encryptedPath string, key string, kdfIter
 	return err
 }
 
-func openCipher(db *sql.DB, key string, kdfIterationsNumber int, inMemory bool) error {
-	keyString := fmt.Sprintf("PRAGMA key = '%s'", key)
-	if _, err := db.Exec(keyString); err != nil {
-		return errors.New("failed to set key pragma")
-	}
-
-	if kdfIterationsNumber <= 0 {
-		kdfIterationsNumber = sqlite.ReducedKDFIterationsNumber
-	}
-
-	if _, err := db.Exec(fmt.Sprintf("PRAGMA kdf_iter = '%d'", kdfIterationsNumber)); err != nil {
-		return err
-	}
-
-	// readers do not block writers and faster i/o operations
-	// https://www.sqlite.org/draft/wal.html
-	// must be set after db is encrypted
-	var mode string
-	err := db.QueryRow("PRAGMA journal_mode=WAL").Scan(&mode)
-	if err != nil {
-		return err
-	}
-	if mode != WALMode && !inMemory {
-		return fmt.Errorf("unable to set journal_mode to WAL. actual mode %s", mode)
-	}
-
-	return nil
-}
-
 func openDB(path string, key string, kdfIterationsNumber int) (*sql.DB, error) {
-	db, err := sql.Open("sqlite3", path)
+	driverName := fmt.Sprintf("sqlcipher_with_extensions-%d", len(sql.Drivers()))
+	sql.Register(driverName, &sqlcipher.SQLiteDriver{
+		ConnectHook: func(conn *sqlcipher.SQLiteConn) error {
+			if _, err := conn.Exec("PRAGMA foreign_keys=ON", []driver.Value{}); err != nil {
+				return errors.New("failed to set `foreign_keys` pragma")
+			}
+
+			if _, err := conn.Exec(fmt.Sprintf("PRAGMA key = '%s'", key), []driver.Value{}); err != nil {
+				return errors.New("failed to set `key` pragma")
+			}
+
+			if kdfIterationsNumber <= 0 {
+				kdfIterationsNumber = sqlite.ReducedKDFIterationsNumber
+			}
+
+			if _, err := conn.Exec(fmt.Sprintf("PRAGMA kdf_iter = '%d'", kdfIterationsNumber), []driver.Value{}); err != nil {
+				return errors.New("failed to set `kdf_iter` pragma")
+			}
+
+			// readers do not block writers and faster i/o operations
+			if _, err := conn.Exec("PRAGMA journal_mode=WAL", []driver.Value{}); err != nil && path != InMemoryPath {
+				return errors.New("failed to set `journal_mode` pragma")
+			}
+
+			// workaround to mitigate the issue of "database is locked" errors during concurrent write operations
+			if _, err := conn.Exec("PRAGMA busy_timeout=60000", []driver.Value{}); err != nil {
+				return errors.New("failed to set `busy_timeout` pragma")
+			}
+
+			return nil
+		},
+	})
+
+	db, err := sql.Open(driverName, path)
 	if err != nil {
 		return nil, err
 	}
 
-	// Disable concurrent access as not supported by the driver
-	db.SetMaxOpenConns(1)
-
-	if _, err = db.Exec("PRAGMA foreign_keys=ON"); err != nil {
-		return nil, err
+	if path == InMemoryPath {
+		db.SetMaxOpenConns(1)
+	} else {
+		nproc := func() int {
+			maxProcs := runtime.GOMAXPROCS(0)
+			numCPU := runtime.NumCPU()
+			if maxProcs < numCPU {
+				return maxProcs
+			}
+			return numCPU
+		}()
+		db.SetMaxOpenConns(nproc)
+		db.SetMaxIdleConns(nproc)
 	}
 
-	err = openCipher(db, key, kdfIterationsNumber, path == InMemoryPath)
-	if err != nil {
-		return nil, err
-	}
 	return db, nil
 }
 
