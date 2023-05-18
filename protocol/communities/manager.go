@@ -1316,7 +1316,7 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		}
 
 		if hasPermission {
-			memberRole = protobuf.CommunityMember_ROLE_ADMIN
+			memberRole = protobuf.CommunityMember_ROLE_ALL
 		} else if len(becomeMemberPermissions) > 0 {
 			hasPermission, err = m.checkPermissionToJoin(becomeMemberPermissions, walletAddresses)
 			if err != nil {

@@ -309,7 +309,7 @@ func (s *AdminMessengerCommunitiesSuite) grantAdminPermissions(community *commun
 	response_add_role, err := s.owner.AddRoleToMember(&requests.AddRoleToMember{
 		CommunityID: community.ID(),
 		User:        common.PubkeyToHexBytes(target.IdentityPublicKey()),
-		Role:        protobuf.CommunityMember_ROLE_ADMIN,
+		Role:        protobuf.CommunityMember_ROLE_ALL,
 	})
 	s.Require().NoError(err)
 

@@ -1260,7 +1260,6 @@ func canManageUsersRolePermissions() map[protobuf.CommunityMember_Roles]bool {
 func adminRolePermissions() map[protobuf.CommunityMember_Roles]bool {
 	roles := make(map[protobuf.CommunityMember_Roles]bool)
 	roles[protobuf.CommunityMember_ROLE_ALL] = true
-	roles[protobuf.CommunityMember_ROLE_ADMIN] = true
 	return roles
 }
 
