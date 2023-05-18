@@ -633,6 +633,7 @@ func TestLoginWithKey(t *testing.T) {
 	require.NoError(t, b.AccountManager().InitKeystore(conf.KeyStoreDir))
 	b.UpdateRootDataDir(conf.DataDir)
 	require.NoError(t, b.OpenAccounts())
+	require.NotNil(t, b.statusNode.HTTPServer())
 
 	address := crypto.PubkeyToAddress(walletKey.PublicKey)
 	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", testSettings, conf, []*accounts.Account{{Address: address, Wallet: true}}, keyhex))
@@ -1063,6 +1064,7 @@ func login(t *testing.T, conf *params.NodeConfig) {
 
 	wg.Wait()
 	require.NoError(t, b.Logout())
+	require.NotNil(t, b.statusNode.HTTPServer())
 	require.NoError(t, b.StopNode())
 
 }
