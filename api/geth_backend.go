@@ -1596,6 +1596,12 @@ func (b *GethStatusBackend) Logout() error {
 	}
 	// re-initialize the node, at some point we should better manage the lifecycle
 	b.initialize()
+
+	err = b.statusNode.StartMediaServerWithoutDB()
+	if err != nil {
+		b.log.Error("failed to start media server without app db", "err", err)
+		return err
+	}
 	return nil
 }
 
