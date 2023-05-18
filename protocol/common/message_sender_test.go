@@ -33,12 +33,12 @@ type MessageSenderSuite struct {
 
 	sender      *MessageSender
 	tmpDir      string
-	testMessage protobuf.ChatMessage
+	testMessage *protobuf.ChatMessage
 	logger      *zap.Logger
 }
 
 func (s *MessageSenderSuite) SetupTest() {
-	s.testMessage = protobuf.ChatMessage{
+	s.testMessage = &protobuf.ChatMessage{
 		Text:        "abc123",
 		ChatId:      "testing-adamb",
 		ContentType: protobuf.ChatMessage_TEXT_PLAIN,
@@ -104,7 +104,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesWrapped() {
 	authorKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	encodedPayload, err := proto.Marshal(&s.testMessage)
+	encodedPayload, err := proto.Marshal(s.testMessage)
 	s.Require().NoError(err)
 
 	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
@@ -122,7 +122,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesWrapped() {
 	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ID)
 	parsedMessage := decodedMessages[0].ParsedMessage.Interface().(*protobuf.ChatMessage)
 	s.Require().Equal(encodedPayload, decodedMessages[0].UnwrappedPayload)
-	s.Require().True(proto.Equal(&s.testMessage, parsedMessage))
+	s.Require().True(proto.Equal(s.testMessage, parsedMessage))
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }
 
@@ -133,7 +133,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasync() {
 	authorKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	encodedPayload, err := proto.Marshal(&s.testMessage)
+	encodedPayload, err := proto.Marshal(s.testMessage)
 	s.Require().NoError(err)
 
 	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
@@ -159,7 +159,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasync() {
 	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ID)
 	s.Require().Equal(encodedPayload, decodedMessages[0].UnwrappedPayload)
 	parsedMessage := decodedMessages[0].ParsedMessage.Interface().(*protobuf.ChatMessage)
-	s.Require().True(proto.Equal(&s.testMessage, parsedMessage))
+	s.Require().True(proto.Equal(s.testMessage, parsedMessage))
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }
 
@@ -177,7 +177,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	authorKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	encodedPayload, err := proto.Marshal(&s.testMessage)
+	encodedPayload, err := proto.Marshal(s.testMessage)
 	s.Require().NoError(err)
 
 	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
@@ -224,6 +224,6 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ID)
 	s.Require().Equal(encodedPayload, decodedMessages[0].UnwrappedPayload)
 	parsedMessage := decodedMessages[0].ParsedMessage.Interface().(*protobuf.ChatMessage)
-	s.Require().True(proto.Equal(&s.testMessage, parsedMessage))
+	s.Require().True(proto.Equal(s.testMessage, parsedMessage))
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }

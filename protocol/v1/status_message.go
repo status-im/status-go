@@ -345,8 +345,7 @@ func (m *StatusMessage) unmarshalProtobufData(pb proto.Message) error {
 		log.Error("[message::DecodeMessage] could not decode %T: %#x, err: %v", pb, m.Hash, err.Error())
 	} else {
 		rv = reflect.ValueOf(ptr)
-		elem := rv.Elem()
-		m.ParsedMessage = &elem
+		m.ParsedMessage = &rv
 		return nil
 	}
 
