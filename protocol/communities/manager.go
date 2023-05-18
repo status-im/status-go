@@ -1313,6 +1313,9 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		hasPermission := false
 		if len(becomeAdminPermissions) > 0 {
 			hasPermission, err = m.checkPermissionToJoin(becomeAdminPermissions, walletAddresses)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		if hasPermission {
@@ -1526,7 +1529,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		if len(becomeAdminPermissions) > 0 {
 			hasPermission, err = m.checkPermissionToJoin(becomeAdminPermissions, verifiedAddresses)
 			if err != nil {
-				m.logger.Info("Failed to check admin permmissions to join for the community as an admin", zap.Error(err))
+				return nil, err
 			}
 		}
 
@@ -1694,12 +1697,15 @@ func extractTokenRequirements(permissions []*protobuf.CommunityTokenPermission) 
 }
 
 func (m *Manager) getOwnedERC721Tokens(walletAddresses []gethcommon.Address, tokenRequirements map[uint64]map[string]*protobuf.TokenCriteria) (map[uint64]map[string][]opensea.Asset, error) {
+	// TODO: revert
+	ownedERC721Tokens := make(map[uint64]map[string][]opensea.Asset)
+	return ownedERC721Tokens, nil
 
 	if m.walletConfig == nil || len(m.walletConfig.OpenseaAPIKey) == 0 {
 		return nil, errors.New("no api key for opensea")
 	}
 
-	ownedERC721Tokens := make(map[uint64]map[string][]opensea.Asset)
+	//ownedERC721Tokens := make(map[uint64]map[string][]opensea.Asset)
 
 	for chainID, erc721Tokens := range tokenRequirements {
 		client, err := opensea.NewOpenseaClient(chainID, m.walletConfig.OpenseaAPIKey, nil)
