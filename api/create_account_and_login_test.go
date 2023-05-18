@@ -45,18 +45,18 @@ func TestCreateAccountAndLogin(t *testing.T) {
 	statusBackend := NewGethStatusBackend()
 	err = statusBackend.CreateAccountAndLogin(&request)
 	require.NoError(t, err)
-	t.Logf("create account user1 and login successfully, wait 3 seconds")
-	time.Sleep(3 * time.Second)
+	t.Logf("TestCreateAccountAndLogin: create account user1 and login successfully")
+	// wait waku node start working
+	time.Sleep(2 * time.Second)
 
-	t.Logf("logouting")
+	t.Logf("TestCreateAccountAndLogin: logouting")
 	err = statusBackend.Logout()
 	require.NoError(t, err)
-	t.Logf("logout done")
+	t.Logf("TestCreateAccountAndLogin: logout done")
 
 	requestJSON = fmt.Sprintf(requestJSONTemplateString, rootDir, "user2", rootDir)
 	err = json.Unmarshal([]byte(requestJSON), &request)
 	require.NoError(t, err)
 	err = statusBackend.CreateAccountAndLogin(&request)
 	require.NoError(t, err)
-	t.Logf("create account user2 and login successfully, wait 3 seconds")
 }
