@@ -47,6 +47,7 @@ import (
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
+	"github.com/status-im/status-go/protocol/linkpreview"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
@@ -2104,6 +2105,15 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	unfurledLinks, err := message.ConvertLinkPreviewsToProto()
+	// We consider link previews non-critical data, so we do not want to block
+	// messages from being sent.
+	if err != nil {
+		m.logger.Error("failed to convert link previews", zap.Error(err))
+	} else {
+		message.UnfurledLinks = unfurledLinks
 	}
 
 	var response MessengerResponse
@@ -4780,6 +4790,8 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 	if msg.ContentType == protobuf.ChatMessage_STICKER {
 		msg.StickerLocalURL = s.MakeStickerURL(msg.GetSticker().Hash)
 	}
+
+	msg.LinkPreviews = msg.ConvertFromProtoToLinkPreviews(s.MakeLinkPreviewThumbnailURL)
 }
 
 func (m *Messenger) AllMessageByChatIDWhichMatchTerm(chatID string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
@@ -5978,6 +5990,10 @@ func generateAliasAndIdenticon(pk string) (string, string, error) {
 	}
 	return name, identicon, nil
 
+}
+
+func (m *Messenger) UnfurlURLs(urls []string) ([]common.LinkPreview, error) {
+	return linkpreview.UnfurlURLs(m.logger, urls)
 }
 
 func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID protobuf.EmojiReaction_Type) (*MessengerResponse, error) {

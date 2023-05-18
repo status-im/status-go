@@ -1,11 +1,10 @@
 package common
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -132,17 +131,150 @@ func TestPrepareSimplifiedText(t *testing.T) {
 	require.Equal(t, "hey "+canonicalName1+" "+canonicalName2, simplifiedText)
 }
 
+func TestConvertLinkPreviewsToProto(t *testing.T) {
+	msg := Message{
+		LinkPreviews: []LinkPreview{
+			{
+				Description: "GitHub is where people build software.",
+				Hostname:    "github.com",
+				Title:       "Build software better, together",
+				URL:         "https://github.com",
+				Thumbnail: LinkPreviewThumbnail{
+					Width:   100,
+					Height:  200,
+					URL:     "http://localhost:9999",
+					DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+				},
+			},
+		},
+	}
+
+	unfurledLinks, err := msg.ConvertLinkPreviewsToProto()
+	require.NoError(t, err)
+	require.Len(t, unfurledLinks, 1)
+
+	l := unfurledLinks[0]
+	validPreview := msg.LinkPreviews[0]
+	require.Equal(t, validPreview.Description, l.Description)
+	require.Equal(t, validPreview.Title, l.Title)
+	require.Equal(t, uint32(validPreview.Thumbnail.Width), l.ThumbnailWidth)
+	require.Equal(t, uint32(validPreview.Thumbnail.Height), l.ThumbnailHeight)
+
+	expectedPayload, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUg=")
+	require.NoError(t, err)
+	require.Equal(t, expectedPayload, l.ThumbnailPayload)
+
+	// Test any invalid link preview causes an early return.
+	invalidPreview := validPreview
+	invalidPreview.Title = ""
+	msg.LinkPreviews = []LinkPreview{invalidPreview}
+	_, err = msg.ConvertLinkPreviewsToProto()
+	require.ErrorContains(t, err, "invalid link preview, url='https://github.com'")
+
+	// Test invalid data URI invalidates a preview.
+	invalidPreview = validPreview
+	invalidPreview.Thumbnail.DataURI = "data:hello/png,iVBOR"
+	msg.LinkPreviews = []LinkPreview{invalidPreview}
+	_, err = msg.ConvertLinkPreviewsToProto()
+	require.ErrorContains(t, err, "could not get data URI payload, url='https://github.com': wrong uri format")
+
+	// Test thumbnail is optional.
+	somePreview := validPreview
+	somePreview.Thumbnail.DataURI = ""
+	somePreview.Thumbnail.Width = 0
+	somePreview.Thumbnail.Height = 0
+	msg.LinkPreviews = []LinkPreview{somePreview}
+	unfurledLinks, err = msg.ConvertLinkPreviewsToProto()
+	require.NoError(t, err)
+	require.Len(t, unfurledLinks, 1)
+	require.Nil(t, unfurledLinks[0].ThumbnailPayload)
+}
+
+func TestConvertFromProtoToLinkPreviews(t *testing.T) {
+	l := &protobuf.UnfurledLink{
+		Description:      "GitHub is where people build software.",
+		Title:            "Build software better, together",
+		Url:              "https://github.com",
+		ThumbnailPayload: []byte(""),
+		ThumbnailWidth:   100,
+		ThumbnailHeight:  200,
+	}
+	msg := Message{
+		ID: "42",
+		ChatMessage: protobuf.ChatMessage{
+			UnfurledLinks: []*protobuf.UnfurledLink{l},
+		},
+	}
+
+	urlMaker := func(msgID string, linkURL string) string {
+		return "https://localhost:6666/" + msgID + "-" + linkURL
+	}
+
+	previews := msg.ConvertFromProtoToLinkPreviews(urlMaker)
+	require.Len(t, previews, 1)
+	p := previews[0]
+	require.Equal(t, "github.com", p.Hostname)
+	require.Equal(t, l.Description, p.Description)
+	require.Equal(t, l.Url, p.URL)
+	require.Equal(t, int(l.ThumbnailHeight), p.Thumbnail.Height)
+	require.Equal(t, int(l.ThumbnailWidth), p.Thumbnail.Width)
+	// Important, don't build up a data URI because the thumbnail should be
+	// fetched from the media server.
+	require.Equal(t, "", p.Thumbnail.DataURI)
+	require.Equal(t, "https://localhost:6666/42-https://github.com", p.Thumbnail.URL)
+
+	// Test when the URL is not parseable by url.Parse.
+	l.Url = "postgres://user:abc{DEf1=ghi@example.com:5432/db?sslmode=require"
+	msg.ChatMessage.UnfurledLinks = []*protobuf.UnfurledLink{l}
+	previews = msg.ConvertFromProtoToLinkPreviews(urlMaker)
+	require.Len(t, previews, 1)
+	p = previews[0]
+	require.Equal(t, l.Url, p.Hostname)
+
+	// Test when there's no thumbnail payload.
+	l = &protobuf.UnfurledLink{
+		Description: "GitHub is where people build software.",
+		Title:       "Build software better, together",
+		Url:         "https://github.com",
+	}
+	msg.ChatMessage.UnfurledLinks = []*protobuf.UnfurledLink{l}
+	previews = msg.ConvertFromProtoToLinkPreviews(urlMaker)
+	require.Len(t, previews, 1)
+	p = previews[0]
+	require.Equal(t, 0, p.Thumbnail.Height)
+	require.Equal(t, 0, p.Thumbnail.Width)
+	require.Equal(t, "", p.Thumbnail.URL)
+}
+
+func assertMarshalAndUnmarshalJSON[T any](t *testing.T, obj *T, msgAndArgs ...any) {
+	rawJSON, err := json.Marshal(obj)
+	require.NoError(t, err, msgAndArgs...)
+
+	var unmarshalled T
+	err = json.Unmarshal(rawJSON, &unmarshalled)
+	require.NoError(t, err, msgAndArgs...)
+	require.Equal(t, obj, &unmarshalled, msgAndArgs...)
+}
+
 func TestMarshalMessageJSON(t *testing.T) {
-	message := &Message{}
-	from, err := crypto.GenerateKey()
-	require.NoError(t, err)
-	message.From = PubkeyToHex(&from.PublicKey)
+	msg := &Message{
+		ID:   "1",
+		From: "0x04c51631b3354242d5a56f044c3b7703bcc001e8c725c4706928b3fac3c2a12ec9019e1e224d487f5c893389405bcec998bc687307f290a569d6a97d24b711bca8",
+		LinkPreviews: []LinkPreview{
+			{
+				Description: "GitHub is where people build software.",
+				Hostname:    "github.com",
+				Title:       "Build software better, together",
+				URL:         "https://github.com",
+				Thumbnail: LinkPreviewThumbnail{
+					Width:   100,
+					Height:  200,
+					URL:     "http://localhost:9999",
+					DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+				},
+			},
+		},
+	}
 
-	encodedMessage, err := json.Marshal(message)
-
-	require.NoError(t, err)
-
-	log.Println("### encodedMessage", string(encodedMessage))
-	require.True(t, strings.Contains(string(encodedMessage), "compressedKey\":\"zQ"))
-	require.True(t, strings.Contains(string(encodedMessage), "emojiHash"))
+	assertMarshalAndUnmarshalJSON(t, msg, "message ID='%s'", msg.ID)
 }

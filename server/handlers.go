@@ -3,6 +3,8 @@ package server
 import (
 	"bytes"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"image"
 	"net/http"
 	"net/url"
@@ -17,16 +19,18 @@ import (
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/identity/ring"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 const (
-	basePath               = "/messages"
-	identiconsPath         = basePath + "/identicons"
-	imagesPath             = basePath + "/images"
-	audioPath              = basePath + "/audio"
-	ipfsPath               = "/ipfs"
-	discordAuthorsPath     = "/discord/authors"
-	discordAttachmentsPath = basePath + "/discord/attachments"
+	basePath                 = "/messages"
+	identiconsPath           = basePath + "/identicons"
+	imagesPath               = basePath + "/images"
+	audioPath                = basePath + "/audio"
+	ipfsPath                 = "/ipfs"
+	discordAuthorsPath       = "/discord/authors"
+	discordAttachmentsPath   = basePath + "/discord/attachments"
+	LinkPreviewThumbnailPath = "/link-preview/thumbnail"
 
 	// Handler routes for pairing
 	accountImagesPath = "/accountImages"
@@ -452,6 +456,73 @@ func handleQRCodeGeneration(multiaccountsDB *multiaccounts.Database, logger *zap
 
 		if err != nil {
 			logger.Error("failed to write image", zap.Error(err))
+		}
+	}
+}
+
+func getThumbnailPayload(db *sql.DB, logger *zap.Logger, msgID string, thumbnailURL string) ([]byte, error) {
+	var payload []byte
+
+	var result []byte
+	err := db.QueryRow(`SELECT unfurled_links FROM user_messages WHERE id = ?`, msgID).Scan(&result)
+	if err != nil {
+		return payload, fmt.Errorf("could not find message with message-id '%s': %w", msgID, err)
+	}
+
+	var links []*protobuf.UnfurledLink
+	err = json.Unmarshal(result, &links)
+	if err != nil {
+		return payload, fmt.Errorf("failed to unmarshal protobuf.UrlPreview: %w", err)
+	}
+
+	for _, p := range links {
+		if p.Url == thumbnailURL {
+			payload = p.ThumbnailPayload
+			break
+		}
+	}
+
+	return payload, nil
+}
+
+func handleLinkPreviewThumbnail(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		queryParams := r.URL.Query()
+
+		paramID, ok := queryParams["message-id"]
+		if !ok || len(paramID) == 0 {
+			http.Error(w, "missing query parameter 'message-id'", http.StatusBadRequest)
+			return
+		}
+
+		paramURL, ok := queryParams["url"]
+		if !ok || len(paramURL) == 0 {
+			http.Error(w, "missing query parameter 'url'", http.StatusBadRequest)
+			return
+		}
+
+		msgID := paramID[0]
+		thumbnailURL := paramURL[0]
+
+		thumbnail, err := getThumbnailPayload(db, logger, msgID, thumbnailURL)
+		if err != nil {
+			logger.Error("failed to get thumbnail", zap.String("msgID", msgID))
+			http.Error(w, "failed to get thumbnail", http.StatusInternalServerError)
+			return
+		}
+
+		mimeType, err := images.GetMimeType(thumbnail)
+		if err != nil {
+			http.Error(w, "mime type not supported", http.StatusNotImplemented)
+			return
+		}
+
+		w.Header().Set("Content-Type", "image/"+mimeType)
+		w.Header().Set("Cache-Control", "no-store")
+
+		_, err = w.Write(thumbnail)
+		if err != nil {
+			logger.Error("failed to write response", zap.Error(err))
 		}
 	}
 }

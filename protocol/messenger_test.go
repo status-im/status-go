@@ -20,11 +20,13 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/server"
 )
 
 const (
@@ -2261,6 +2263,56 @@ func (s *MessengerSuite) TestShouldResendEmoji() {
 	}, s.m.getTimesource())
 	s.NoError(err)
 	s.True(ok)
+}
+
+func (s *MessengerSuite) TestSendMessageWithPreviews() {
+	httpServer, err := server.NewMediaServer(s.m.database, nil, nil)
+	s.Require().NoError(err)
+	err = httpServer.SetPort(9876)
+	s.NoError(err)
+	s.m.httpServer = httpServer
+
+	chat := CreatePublicChat("test-chat", s.m.transport)
+	err = s.m.SaveChat(chat)
+	s.NoError(err)
+	inputMsg := buildTestMessage(*chat)
+
+	preview := common.LinkPreview{
+		URL:         "https://github.com",
+		Title:       "Build software better, together",
+		Description: "GitHub is where people build software.",
+		Thumbnail: common.LinkPreviewThumbnail{
+			DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+			Width:   100,
+			Height:  200,
+		},
+	}
+	inputMsg.LinkPreviews = []common.LinkPreview{preview}
+
+	_, err = s.m.SendChatMessage(context.Background(), inputMsg)
+	s.NoError(err)
+
+	savedMsgs, _, err := s.m.MessageByChatID(chat.ID, "", 10)
+	s.Require().NoError(err)
+	s.Require().Len(savedMsgs, 1)
+	savedMsg := savedMsgs[0]
+
+	// Test unfurled links have been saved.
+	s.Require().Len(savedMsg.UnfurledLinks, 1)
+	unfurledLink := savedMsg.UnfurledLinks[0]
+	s.Require().Equal(preview.URL, unfurledLink.Url)
+	s.Require().Equal(preview.Title, unfurledLink.Title)
+	s.Require().Equal(preview.Description, unfurledLink.Description)
+
+	// Test the saved link thumbnail can be encoded as a data URI.
+	expectedDataURI, err := images.GetPayloadDataURI(unfurledLink.ThumbnailPayload)
+	s.Require().NoError(err)
+	s.Require().Equal(preview.Thumbnail.DataURI, expectedDataURI)
+
+	s.Require().Equal(
+		httpServer.MakeLinkPreviewThumbnailURL(inputMsg.ID, preview.URL),
+		savedMsg.LinkPreviews[0].Thumbnail.URL,
+	)
 }
 
 func (s *MessengerSuite) TestMessageSent() {

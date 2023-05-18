@@ -80,6 +80,7 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		community_id,
 		mentions,
 		links,
+		unfurled_links,
 		command_id,
 		command_value,
 		command_from,
@@ -132,6 +133,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.community_id,
 		m1.mentions,
 		m1.links,
+		m1.unfurled_links,
 		m1.command_id,
 		m1.command_value,
 		m1.command_from,
@@ -208,6 +210,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var quotedDeletedForMe sql.NullBool
 	var serializedMentions []byte
 	var serializedLinks []byte
+	var serializedUnfurledLinks []byte
 	var alias sql.NullString
 	var identicon sql.NullString
 	var communityID sql.NullString
@@ -263,6 +266,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&communityID,
 		&serializedMentions,
 		&serializedLinks,
+		&serializedUnfurledLinks,
 		&command.ID,
 		&command.Value,
 		&command.From,
@@ -397,6 +401,13 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		}
 	}
 
+	if serializedUnfurledLinks != nil {
+		err = json.Unmarshal(serializedUnfurledLinks, &message.UnfurledLinks)
+		if err != nil {
+			return err
+		}
+	}
+
 	if attachment.Id != "" {
 		discordMessage.Attachments = append(discordMessage.Attachments, attachment)
 	}
@@ -477,6 +488,14 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		}
 	}
 
+	var serializedUnfurledLinks []byte
+	if links := message.GetUnfurledLinks(); links != nil {
+		serializedUnfurledLinks, err = json.Marshal(links)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return []interface{}{
 		message.ID,
 		message.WhisperTimestamp,
@@ -508,6 +527,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		message.CommunityID,
 		serializedMentions,
 		serializedLinks,
+		serializedUnfurledLinks,
 		command.ID,
 		command.Value,
 		command.From,
