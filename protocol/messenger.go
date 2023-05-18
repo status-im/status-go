@@ -3208,19 +3208,15 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 		return fmt.Errorf("chat ID '%s' not present", message.LocalChatID)
 	}
 
-
-	var albumIdForImage string
+	// Use albumId as notificationId to prevent multiple notifications
+	// for same message with multiple images
 	var idToUse string
-	if message.ContentType == protobuf.ChatMessage_IMAGE {
-		albumIdForImage = message.GetImage().GetAlbumId()
-		
-	}
-
-	if albumIdForImage == "" {
-		idToUse = message.ID
+	if message.GetImage() != nil {
+		idToUse = message.GetImage().GetAlbumId()
 	} else {
-		idToUse = albumIdForImage
+		idToUse = message.ID
 	}
+	print(message.GetImage().GetAlbumId(), "AIOWDJAOWIDJA")
 
 	isNotification, notificationType := showMentionOrReplyActivityCenterNotification(publicKey, message, chat, responseTo)
 	if isNotification {
@@ -4610,7 +4606,7 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 	for _, message := range messageState.Response.messages {
 		if _, ok := newMessagesIds[message.ID]; ok {
 			message.New = true
-			
+
 			if notificationsEnabled {
 				// Create notification body to be eventually passed to `localnotifications.SendMessageNotifications()`
 				if err = messageState.addNewMessageNotification(m.identity.PublicKey, message, messagesByID[message.ResponseTo], profilePicturesVisibility); err != nil {
