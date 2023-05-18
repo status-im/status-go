@@ -109,13 +109,16 @@ func TestDeleteActivityCenterNotificationsForMessage(t *testing.T) {
 		{
 			ID:          "0x1",
 			LocalChatID: chat.ID,
+			ChatMessage: &protobuf.ChatMessage{},
 		},
 		{
 			ID:          "0x2",
 			LocalChatID: chat.ID,
+			ChatMessage: &protobuf.ChatMessage{},
 		},
 		{
-			ID: "0x3",
+			ID:          "0x3",
+			ChatMessage: &protobuf.ChatMessage{},
 		},
 	}
 	err = p.SaveMessages(messages)
