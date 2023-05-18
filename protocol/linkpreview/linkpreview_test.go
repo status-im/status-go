@@ -159,7 +159,7 @@ func TestUnfurlURLs(t *testing.T) {
 		urls = append(urls, e.url)
 	}
 
-	links, err := UnfurlURLs(urls)
+	links, err := UnfurlURLs(nil, urls)
 	require.NoError(t, err)
 	require.Len(t, links, len(examples), "all URLs should have been unfurled successfully")
 
@@ -177,17 +177,17 @@ func TestUnfurlURLs(t *testing.T) {
 	}
 
 	// Test URL that doesn't return any OpenGraph title.
-	previews, err := UnfurlURLs([]string{"https://wikipedia.org"})
+	previews, err := UnfurlURLs(nil, []string{"https://wikipedia.org"})
 	require.NoError(t, err)
 	require.Empty(t, previews)
 
 	// Test 404.
-	previews, err = UnfurlURLs([]string{"https://github.com/status-im/i_do_not_exist"})
+	previews, err = UnfurlURLs(nil, []string{"https://github.com/status-im/i_do_not_exist"})
 	require.NoError(t, err)
 	require.Empty(t, previews)
 
 	// Test no response when trying to get OpenGraph metadata.
-	previews, err = UnfurlURLs([]string{"https://wikipedia.o"})
+	previews, err = UnfurlURLs(nil, []string{"https://wikipedia.o"})
 	require.NoError(t, err)
 	require.Empty(t, previews)
 }

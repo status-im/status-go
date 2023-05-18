@@ -1102,7 +1102,7 @@ func (api *PublicAPI) GetTextURLs(text string) []string {
 //
 // This endpoint expects the client to send URLs normalized by GetTextURLs.
 func (api *PublicAPI) UnfurlURLs(urls []string) ([]common.LinkPreview, error) {
-	return linkpreview.UnfurlURLs(urls)
+	return api.service.messenger.UnfurlURLs(urls)
 }
 
 func (api *PublicAPI) EnsVerified(pk, ensName string) error {

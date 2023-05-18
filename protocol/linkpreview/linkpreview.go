@@ -299,10 +299,13 @@ func GetURLs(text string) []string {
 
 // UnfurlURLs assumes clients pass URLs verbatim that were validated and
 // processed by GetURLs.
-func UnfurlURLs(urls []string) ([]common.LinkPreview, error) {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create logger: %w", err)
+func UnfurlURLs(logger *zap.Logger, urls []string) ([]common.LinkPreview, error) {
+	var err error
+	if logger == nil {
+		logger, err = zap.NewDevelopment()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create logger: %w", err)
+		}
 	}
 
 	previews := make([]common.LinkPreview, 0, len(urls))
