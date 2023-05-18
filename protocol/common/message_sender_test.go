@@ -120,9 +120,9 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesWrapped() {
 	s.Require().Equal(1, len(decodedMessages))
 	s.Require().Equal(&authorKey.PublicKey, decodedMessages[0].SigPubKey())
 	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ID)
-	parsedMessage := decodedMessages[0].ParsedMessage.Interface().(protobuf.ChatMessage)
+	parsedMessage := decodedMessages[0].ParsedMessage.Interface().(*protobuf.ChatMessage)
 	s.Require().Equal(encodedPayload, decodedMessages[0].UnwrappedPayload)
-	s.Require().True(proto.Equal(&s.testMessage, &parsedMessage))
+	s.Require().True(proto.Equal(&s.testMessage, parsedMessage))
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }
 
@@ -158,8 +158,8 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasync() {
 	s.Require().Equal(&authorKey.PublicKey, decodedMessages[0].SigPubKey())
 	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ID)
 	s.Require().Equal(encodedPayload, decodedMessages[0].UnwrappedPayload)
-	parsedMessage := decodedMessages[0].ParsedMessage.Interface().(protobuf.ChatMessage)
-	s.Require().True(proto.Equal(&s.testMessage, &parsedMessage))
+	parsedMessage := decodedMessages[0].ParsedMessage.Interface().(*protobuf.ChatMessage)
+	s.Require().True(proto.Equal(&s.testMessage, parsedMessage))
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }
 
@@ -223,7 +223,7 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	s.Require().Equal(&authorKey.PublicKey, decodedMessages[0].SigPubKey())
 	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ID)
 	s.Require().Equal(encodedPayload, decodedMessages[0].UnwrappedPayload)
-	parsedMessage := decodedMessages[0].ParsedMessage.Interface().(protobuf.ChatMessage)
-	s.Require().True(proto.Equal(&s.testMessage, &parsedMessage))
+	parsedMessage := decodedMessages[0].ParsedMessage.Interface().(*protobuf.ChatMessage)
+	s.Require().True(proto.Equal(&s.testMessage, parsedMessage))
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }

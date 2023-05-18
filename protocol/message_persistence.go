@@ -2365,7 +2365,7 @@ func (db sqlitePersistence) deactivateChat(chat *Chat, currentClockValue uint64,
 	return db.clearHistory(chat, currentClockValue, tx, true)
 }
 
-func (db sqlitePersistence) SaveDelete(deleteMessage DeleteMessage) error {
+func (db sqlitePersistence) SaveDelete(deleteMessage *DeleteMessage) error {
 	_, err := db.db.Exec(`INSERT INTO user_messages_deletes (clock, chat_id, message_id, source, id) VALUES(?,?,?,?,?)`, deleteMessage.Clock, deleteMessage.ChatId, deleteMessage.MessageId, deleteMessage.From, deleteMessage.ID)
 	return err
 }

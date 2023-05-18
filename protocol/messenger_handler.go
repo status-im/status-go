@@ -48,13 +48,13 @@ var (
 // HandleMembershipUpdate updates a Chat instance according to the membership updates.
 // It retrieves chat, if exists, and merges membership updates from the message.
 // Finally, the Chat is updated with the new group events.
-func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, chat *Chat, rawMembershipUpdate protobuf.MembershipUpdateMessage, translations *systemMessageTranslationsMap) error {
+func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, chat *Chat, rawMembershipUpdate *protobuf.MembershipUpdateMessage, translations *systemMessageTranslationsMap) error {
 	var group *v1protocol.Group
 	var err error
 
 	logger := m.logger.With(zap.String("site", "HandleMembershipUpdate"))
 
-	message, err := v1protocol.MembershipUpdateMessageFromProtobuf(&rawMembershipUpdate)
+	message, err := v1protocol.MembershipUpdateMessageFromProtobuf(rawMembershipUpdate)
 	if err != nil {
 		return err
 
@@ -93,7 +93,7 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		if waitingForApproval {
 
 			groupChatInvitation := &GroupChatInvitation{
-				GroupChatInvitation: protobuf.GroupChatInvitation{
+				GroupChatInvitation: &protobuf.GroupChatInvitation{
 					ChatId: message.ChatID,
 				},
 				From: types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
@@ -222,10 +222,10 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 	}
 
 	if message.Message != nil {
-		messageState.CurrentMessageState.Message = *message.Message
+		messageState.CurrentMessageState.Message = message.Message
 		return m.HandleChatMessage(messageState)
 	} else if message.EmojiReaction != nil {
-		return m.HandleEmojiReaction(messageState, *message.EmojiReaction)
+		return m.HandleEmojiReaction(messageState, message.EmojiReaction)
 	}
 
 	return nil
@@ -410,7 +410,7 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 	return nil
 }
 
-func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, message protobuf.SyncInstallationContactV2) error {
+func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, message *protobuf.SyncInstallationContactV2) error {
 	removedOrBlocked := message.Removed || message.Blocked
 	chat, ok := state.AllChats.Load(message.Id)
 	if !ok && (message.Added || message.Muted) && !removedOrBlocked {
@@ -566,7 +566,7 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 	return nil
 }
 
-func (m *Messenger) HandleSyncProfilePictures(state *ReceivedMessageState, message protobuf.SyncProfilePictures) error {
+func (m *Messenger) HandleSyncProfilePictures(state *ReceivedMessageState, message *protobuf.SyncProfilePictures) error {
 	dbImages, err := m.multiAccounts.GetIdentityImages(message.KeyUid)
 	if err != nil {
 		return err
@@ -606,7 +606,7 @@ func (m *Messenger) HandleSyncProfilePictures(state *ReceivedMessageState, messa
 	return err
 }
 
-func (m *Messenger) HandleSyncInstallationPublicChat(state *ReceivedMessageState, message protobuf.SyncInstallationPublicChat) *Chat {
+func (m *Messenger) HandleSyncInstallationPublicChat(state *ReceivedMessageState, message *protobuf.SyncInstallationPublicChat) *Chat {
 	chatID := message.Id
 	existingChat, ok := state.AllChats.Load(chatID)
 	if ok && (existingChat.Active || uint32(message.GetClock()/1000) < existingChat.SyncedTo) {
@@ -627,7 +627,7 @@ func (m *Messenger) HandleSyncInstallationPublicChat(state *ReceivedMessageState
 	return chat
 }
 
-func (m *Messenger) HandleSyncChatRemoved(state *ReceivedMessageState, message protobuf.SyncChatRemoved) error {
+func (m *Messenger) HandleSyncChatRemoved(state *ReceivedMessageState, message *protobuf.SyncChatRemoved) error {
 	chat, ok := m.allChats.Load(message.Id)
 	if !ok {
 		return ErrChatNotFound
@@ -656,7 +656,7 @@ func (m *Messenger) HandleSyncChatRemoved(state *ReceivedMessageState, message p
 	return state.Response.Merge(response)
 }
 
-func (m *Messenger) HandleSyncChatMessagesRead(state *ReceivedMessageState, message protobuf.SyncChatMessagesRead) error {
+func (m *Messenger) HandleSyncChatMessagesRead(state *ReceivedMessageState, message *protobuf.SyncChatMessagesRead) error {
 	chat, ok := m.allChats.Load(message.Id)
 	if !ok {
 		return ErrChatNotFound
@@ -675,7 +675,7 @@ func (m *Messenger) HandleSyncChatMessagesRead(state *ReceivedMessageState, mess
 	return nil
 }
 
-func (m *Messenger) handlePinMessage(pinner *Contact, whisperTimestamp uint64, response *MessengerResponse, message protobuf.PinMessage) error {
+func (m *Messenger) handlePinMessage(pinner *Contact, whisperTimestamp uint64, response *MessengerResponse, message *protobuf.PinMessage) error {
 	logger := m.logger.With(zap.String("site", "HandlePinMessage"))
 
 	logger.Info("Handling pin message")
@@ -737,7 +737,7 @@ func (m *Messenger) handlePinMessage(pinner *Contact, whisperTimestamp uint64, r
 			return err
 		}
 		message := &common.Message{
-			ChatMessage: protobuf.ChatMessage{
+			ChatMessage: &protobuf.ChatMessage{
 				Clock:       message.Clock,
 				Timestamp:   whisperTimestamp,
 				ChatId:      chat.ID,
@@ -766,7 +766,7 @@ func (m *Messenger) handlePinMessage(pinner *Contact, whisperTimestamp uint64, r
 	return nil
 }
 
-func (m *Messenger) HandlePinMessage(state *ReceivedMessageState, message protobuf.PinMessage) error {
+func (m *Messenger) HandlePinMessage(state *ReceivedMessageState, message *protobuf.PinMessage) error {
 	return m.handlePinMessage(state.CurrentMessageState.Contact, state.CurrentMessageState.WhisperTimestamp, state.Response, message)
 }
 
@@ -865,7 +865,7 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 	return nil
 }
 
-func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, message protobuf.AcceptContactRequest, senderID string) error {
+func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, message *protobuf.AcceptContactRequest, senderID string) error {
 	err := m.handleAcceptContactRequestMessage(state, message.Clock, message.Id, false)
 	if err != nil {
 		m.logger.Warn("could not accept contact request", zap.Error(err))
@@ -874,7 +874,7 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
 	return nil
 }
 
-func (m *Messenger) handleRetractContactRequest(contact *Contact, message protobuf.RetractContactRequest) error {
+func (m *Messenger) handleRetractContactRequest(contact *Contact, message *protobuf.RetractContactRequest) error {
 	if contact.ID == m.myHexIdentity() {
 		m.logger.Debug("retraction coming from us, ignoring")
 		return nil
@@ -898,7 +898,7 @@ func (m *Messenger) handleRetractContactRequest(contact *Contact, message protob
 	return nil
 }
 
-func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, message protobuf.RetractContactRequest) error {
+func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, message *protobuf.RetractContactRequest) error {
 	contact := state.CurrentMessageState.Contact
 	err := m.handleRetractContactRequest(contact, message)
 	if err != nil {
@@ -911,7 +911,7 @@ func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, mes
 	return nil
 }
 
-func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message protobuf.ContactUpdate) error {
+func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message *protobuf.ContactUpdate) error {
 	logger := m.logger.With(zap.String("site", "HandleContactUpdate"))
 	contact := state.CurrentMessageState.Contact
 	chat, ok := state.AllChats.Load(contact.ID)
@@ -1005,9 +1005,9 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 	return nil
 }
 
-func (m *Messenger) HandlePairInstallation(state *ReceivedMessageState, message protobuf.PairInstallation) error {
+func (m *Messenger) HandlePairInstallation(state *ReceivedMessageState, message *protobuf.PairInstallation) error {
 	logger := m.logger.With(zap.String("site", "HandlePairInstallation"))
-	if err := ValidateReceivedPairInstallation(&message, state.CurrentMessageState.WhisperTimestamp); err != nil {
+	if err := ValidateReceivedPairInstallation(message, state.CurrentMessageState.WhisperTimestamp); err != nil {
 		logger.Warn("failed to validate message", zap.Error(err))
 		return err
 	}
@@ -1031,7 +1031,7 @@ func (m *Messenger) HandlePairInstallation(state *ReceivedMessageState, message 
 }
 
 // HandleCommunityInvitation handles an community invitation
-func (m *Messenger) HandleCommunityInvitation(state *ReceivedMessageState, signer *ecdsa.PublicKey, invitation protobuf.CommunityInvitation, rawPayload []byte) error {
+func (m *Messenger) HandleCommunityInvitation(state *ReceivedMessageState, signer *ecdsa.PublicKey, invitation *protobuf.CommunityInvitation, rawPayload []byte) error {
 	if invitation.PublicKey == nil {
 		return errors.New("invalid pubkey")
 	}
@@ -1044,7 +1044,7 @@ func (m *Messenger) HandleCommunityInvitation(state *ReceivedMessageState, signe
 		return errors.New("invitation not for us")
 	}
 
-	communityResponse, err := m.communitiesManager.HandleCommunityInvitation(signer, &invitation, rawPayload)
+	communityResponse, err := m.communitiesManager.HandleCommunityInvitation(signer, invitation, rawPayload)
 	if err != nil {
 		return err
 	}
@@ -1215,12 +1215,12 @@ func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessag
 	return response, nil
 }
 
-func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageState, signer *ecdsa.PublicKey, cancelRequestToJoinProto protobuf.CommunityCancelRequestToJoin) error {
+func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageState, signer *ecdsa.PublicKey, cancelRequestToJoinProto *protobuf.CommunityCancelRequestToJoin) error {
 	if cancelRequestToJoinProto.CommunityId == nil {
 		return errors.New("invalid community id")
 	}
 
-	requestToJoin, err := m.communitiesManager.HandleCommunityCancelRequestToJoin(signer, &cancelRequestToJoinProto)
+	requestToJoin, err := m.communitiesManager.HandleCommunityCancelRequestToJoin(signer, cancelRequestToJoinProto)
 	if err != nil {
 		return err
 	}
@@ -1252,7 +1252,7 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageSta
 }
 
 // HandleCommunityRequestToJoin handles an community request to join
-func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, signer *ecdsa.PublicKey, requestToJoinProto protobuf.CommunityRequestToJoin) error {
+func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, signer *ecdsa.PublicKey, requestToJoinProto *protobuf.CommunityRequestToJoin) error {
 	if requestToJoinProto.CommunityId == nil {
 		return errors.New("invalid community id")
 	}
@@ -1268,7 +1268,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 		return errors.New("request is expired")
 	}
 
-	requestToJoin, err := m.communitiesManager.HandleCommunityRequestToJoin(signer, &requestToJoinProto)
+	requestToJoin, err := m.communitiesManager.HandleCommunityRequestToJoin(signer, requestToJoinProto)
 	if err != nil {
 		return err
 	}
@@ -1355,12 +1355,12 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 	return nil
 }
 
-func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageState, signer *ecdsa.PublicKey, requestToJoinResponseProto protobuf.CommunityRequestToJoinResponse) error {
+func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageState, signer *ecdsa.PublicKey, requestToJoinResponseProto *protobuf.CommunityRequestToJoinResponse) error {
 	if requestToJoinResponseProto.CommunityId == nil {
 		return errors.New("invalid community id")
 	}
 
-	updatedRequest, err := m.communitiesManager.HandleCommunityRequestToJoinResponse(signer, &requestToJoinResponseProto)
+	updatedRequest, err := m.communitiesManager.HandleCommunityRequestToJoinResponse(signer, requestToJoinResponseProto)
 	if err != nil {
 		return err
 	}
@@ -1439,12 +1439,12 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 	return nil
 }
 
-func (m *Messenger) HandleCommunityRequestToLeave(state *ReceivedMessageState, signer *ecdsa.PublicKey, requestToLeaveProto protobuf.CommunityRequestToLeave) error {
+func (m *Messenger) HandleCommunityRequestToLeave(state *ReceivedMessageState, signer *ecdsa.PublicKey, requestToLeaveProto *protobuf.CommunityRequestToLeave) error {
 	if requestToLeaveProto.CommunityId == nil {
 		return errors.New("invalid community id")
 	}
 
-	err := m.communitiesManager.HandleCommunityRequestToLeave(signer, &requestToLeaveProto)
+	err := m.communitiesManager.HandleCommunityRequestToLeave(signer, requestToLeaveProto)
 	if err != nil {
 		return err
 	}
@@ -1500,7 +1500,7 @@ func (m *Messenger) HandleEditMessage(state *ReceivedMessageState, editMessage E
 	// applyEditMessage modifies the message. Changing the variable name to make it clearer
 	editedMessage := originalMessage
 	// Update message and return it
-	err = m.applyEditMessage(&editMessage.EditMessage, editedMessage)
+	err = m.applyEditMessage(editMessage.EditMessage, editedMessage)
 	if err != nil {
 		return err
 	}
@@ -1556,7 +1556,7 @@ func (m *Messenger) HandleEditMessage(state *ReceivedMessageState, editMessage E
 	return nil
 }
 
-func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessage DeleteMessage) error {
+func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessage *DeleteMessage) error {
 	if err := ValidateDeleteMessage(deleteMessage.DeleteMessage); err != nil {
 		return err
 	}
@@ -1693,7 +1693,7 @@ func (m *Messenger) getMessageFromResponseOrDatabase(response *MessengerResponse
 	return m.persistence.MessageByID(messageID)
 }
 
-func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, deleteForMeMessage protobuf.DeleteForMeMessage) error {
+func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, deleteForMeMessage *protobuf.DeleteForMeMessage) error {
 	if err := ValidateDeleteForMeMessage(deleteForMeMessage); err != nil {
 		return err
 	}
@@ -1703,7 +1703,7 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 	originalMessage, err := m.getMessageFromResponseOrDatabase(state.Response, messageID)
 
 	if err == common.ErrRecordNotFound {
-		return m.persistence.SaveOrUpdateDeleteForMeMessage(&deleteForMeMessage)
+		return m.persistence.SaveOrUpdateDeleteForMeMessage(deleteForMeMessage)
 	} else if err != nil {
 		return err
 	}
@@ -1774,7 +1774,7 @@ func handleContactRequestChatMessage(receivedMessage *common.Message, contact *C
 
 func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen bool) error {
 	logger := m.logger.With(zap.String("site", "handleChatMessage"))
-	if err := ValidateReceivedChatMessage(&state.CurrentMessageState.Message, state.CurrentMessageState.WhisperTimestamp); err != nil {
+	if err := ValidateReceivedChatMessage(state.CurrentMessageState.Message, state.CurrentMessageState.WhisperTimestamp); err != nil {
 		logger.Warn("failed to validate message", zap.Error(err))
 		return err
 	}
@@ -2054,13 +2054,13 @@ func (m *Messenger) addActivityCenterNotification(response *MessengerResponse, n
 	return nil
 }
 
-func (m *Messenger) HandleRequestAddressForTransaction(messageState *ReceivedMessageState, command protobuf.RequestAddressForTransaction) error {
-	err := ValidateReceivedRequestAddressForTransaction(&command, messageState.CurrentMessageState.WhisperTimestamp)
+func (m *Messenger) HandleRequestAddressForTransaction(messageState *ReceivedMessageState, command *protobuf.RequestAddressForTransaction) error {
+	err := ValidateReceivedRequestAddressForTransaction(command, messageState.CurrentMessageState.WhisperTimestamp)
 	if err != nil {
 		return err
 	}
 	message := &common.Message{
-		ChatMessage: protobuf.ChatMessage{
+		ChatMessage: &protobuf.ChatMessage{
 			Clock:     command.Clock,
 			Timestamp: messageState.CurrentMessageState.WhisperTimestamp,
 			Text:      "Request address for transaction",
@@ -2110,13 +2110,13 @@ func (m *Messenger) handleSyncSetting(messageState *ReceivedMessageState, messag
 	return nil
 }
 
-func (m *Messenger) HandleRequestTransaction(messageState *ReceivedMessageState, command protobuf.RequestTransaction) error {
-	err := ValidateReceivedRequestTransaction(&command, messageState.CurrentMessageState.WhisperTimestamp)
+func (m *Messenger) HandleRequestTransaction(messageState *ReceivedMessageState, command *protobuf.RequestTransaction) error {
+	err := ValidateReceivedRequestTransaction(command, messageState.CurrentMessageState.WhisperTimestamp)
 	if err != nil {
 		return err
 	}
 	message := &common.Message{
-		ChatMessage: protobuf.ChatMessage{
+		ChatMessage: &protobuf.ChatMessage{
 			Clock:     command.Clock,
 			Timestamp: messageState.CurrentMessageState.WhisperTimestamp,
 			Text:      "Request transaction",
@@ -2136,8 +2136,8 @@ func (m *Messenger) HandleRequestTransaction(messageState *ReceivedMessageState,
 	return m.handleCommandMessage(messageState, message)
 }
 
-func (m *Messenger) HandleAcceptRequestAddressForTransaction(messageState *ReceivedMessageState, command protobuf.AcceptRequestAddressForTransaction) error {
-	err := ValidateReceivedAcceptRequestAddressForTransaction(&command, messageState.CurrentMessageState.WhisperTimestamp)
+func (m *Messenger) HandleAcceptRequestAddressForTransaction(messageState *ReceivedMessageState, command *protobuf.AcceptRequestAddressForTransaction) error {
+	err := ValidateReceivedAcceptRequestAddressForTransaction(command, messageState.CurrentMessageState.WhisperTimestamp)
 	if err != nil {
 		return err
 	}
@@ -2187,8 +2187,8 @@ func (m *Messenger) HandleAcceptRequestAddressForTransaction(messageState *Recei
 	return m.handleCommandMessage(messageState, initialMessage)
 }
 
-func (m *Messenger) HandleSendTransaction(messageState *ReceivedMessageState, command protobuf.SendTransaction) error {
-	err := ValidateReceivedSendTransaction(&command, messageState.CurrentMessageState.WhisperTimestamp)
+func (m *Messenger) HandleSendTransaction(messageState *ReceivedMessageState, command *protobuf.SendTransaction) error {
+	err := ValidateReceivedSendTransaction(command, messageState.CurrentMessageState.WhisperTimestamp)
 	if err != nil {
 		return err
 	}
@@ -2207,8 +2207,8 @@ func (m *Messenger) HandleSendTransaction(messageState *ReceivedMessageState, co
 	return m.persistence.SaveTransactionToValidate(transactionToValidate)
 }
 
-func (m *Messenger) HandleDeclineRequestAddressForTransaction(messageState *ReceivedMessageState, command protobuf.DeclineRequestAddressForTransaction) error {
-	err := ValidateReceivedDeclineRequestAddressForTransaction(&command, messageState.CurrentMessageState.WhisperTimestamp)
+func (m *Messenger) HandleDeclineRequestAddressForTransaction(messageState *ReceivedMessageState, command *protobuf.DeclineRequestAddressForTransaction) error {
+	err := ValidateReceivedDeclineRequestAddressForTransaction(command, messageState.CurrentMessageState.WhisperTimestamp)
 	if err != nil {
 		return err
 	}
@@ -2249,8 +2249,8 @@ func (m *Messenger) HandleDeclineRequestAddressForTransaction(messageState *Rece
 	return m.handleCommandMessage(messageState, oldMessage)
 }
 
-func (m *Messenger) HandleDeclineRequestTransaction(messageState *ReceivedMessageState, command protobuf.DeclineRequestTransaction) error {
-	err := ValidateReceivedDeclineRequestTransaction(&command, messageState.CurrentMessageState.WhisperTimestamp)
+func (m *Messenger) HandleDeclineRequestTransaction(messageState *ReceivedMessageState, command *protobuf.DeclineRequestTransaction) error {
+	err := ValidateReceivedDeclineRequestTransaction(command, messageState.CurrentMessageState.WhisperTimestamp)
 	if err != nil {
 		return err
 	}
@@ -2439,9 +2439,9 @@ func (m *Messenger) messageExists(messageID string, existingMessagesMap map[stri
 	return false, nil
 }
 
-func (m *Messenger) HandleEmojiReaction(state *ReceivedMessageState, pbEmojiR protobuf.EmojiReaction) error {
+func (m *Messenger) HandleEmojiReaction(state *ReceivedMessageState, pbEmojiR *protobuf.EmojiReaction) error {
 	logger := m.logger.With(zap.String("site", "HandleEmojiReaction"))
-	if err := ValidateReceivedEmojiReaction(&pbEmojiR, state.Timesource.GetCurrentTime()); err != nil {
+	if err := ValidateReceivedEmojiReaction(pbEmojiR, state.Timesource.GetCurrentTime()); err != nil {
 		logger.Error("invalid emoji reaction", zap.Error(err))
 		return err
 	}
@@ -2493,7 +2493,7 @@ func (m *Messenger) HandleEmojiReaction(state *ReceivedMessageState, pbEmojiR pr
 	return nil
 }
 
-func (m *Messenger) HandleGroupChatInvitation(state *ReceivedMessageState, pbGHInvitations protobuf.GroupChatInvitation) error {
+func (m *Messenger) HandleGroupChatInvitation(state *ReceivedMessageState, pbGHInvitations *protobuf.GroupChatInvitation) error {
 	allowed, err := m.isMessageAllowedFrom(state.CurrentMessageState.Contact.ID, nil)
 	if err != nil {
 		return err
@@ -2503,7 +2503,7 @@ func (m *Messenger) HandleGroupChatInvitation(state *ReceivedMessageState, pbGHI
 		return ErrMessageNotAllowed
 	}
 	logger := m.logger.With(zap.String("site", "HandleGroupChatInvitation"))
-	if err := ValidateReceivedGroupChatInvitation(&pbGHInvitations); err != nil {
+	if err := ValidateReceivedGroupChatInvitation(pbGHInvitations); err != nil {
 		logger.Error("invalid group chat invitation", zap.Error(err))
 		return err
 	}
@@ -2545,7 +2545,7 @@ func (m *Messenger) HandleGroupChatInvitation(state *ReceivedMessageState, pbGHI
 
 // HandleChatIdentity handles an incoming protobuf.ChatIdentity
 // extracts contact information stored in the protobuf and adds it to the user's contact for update.
-func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.ChatIdentity) error {
+func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci *protobuf.ChatIdentity) error {
 	s, err := m.settings.GetSettings()
 	if err != nil {
 		return err
@@ -2595,7 +2595,7 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 		}
 	}
 
-	clockChanged, imagesChanged, err := m.persistence.SaveContactChatIdentity(contact.ID, &ci)
+	clockChanged, imagesChanged, err := m.persistence.SaveContactChatIdentity(contact.ID, ci)
 	if err != nil {
 		return err
 	}
@@ -2650,7 +2650,7 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 	return nil
 }
 
-func (m *Messenger) HandleAnonymousMetricBatch(amb protobuf.AnonymousMetricBatch) error {
+func (m *Messenger) HandleAnonymousMetricBatch(amb *protobuf.AnonymousMetricBatch) error {
 
 	// TODO
 	return nil
@@ -2672,7 +2672,7 @@ func (m *Messenger) checkForEdits(message *common.Message) error {
 	for _, e := range edits {
 		if e.Clock >= message.Clock {
 			// Update message and return it
-			err := m.applyEditMessage(&e.EditMessage, message)
+			err := m.applyEditMessage(e.EditMessage, message)
 			if err != nil {
 				return err
 			}
@@ -2858,7 +2858,7 @@ func (m *Messenger) handleSyncWalletAccount(message *protobuf.SyncWalletAccount)
 	return acc, nil
 }
 
-func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message protobuf.SyncWalletAccounts) error {
+func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message *protobuf.SyncWalletAccounts) error {
 	var accs []*accounts.Account
 	for _, accMsg := range message.Accounts {
 		acc, err := m.handleSyncWalletAccount(accMsg)
@@ -2880,7 +2880,7 @@ func (m *Messenger) HandleSyncWalletAccount(state *ReceivedMessageState, message
 	return nil
 }
 
-func (m *Messenger) HandleSyncContactRequestDecision(state *ReceivedMessageState, message protobuf.SyncContactRequestDecision) error {
+func (m *Messenger) HandleSyncContactRequestDecision(state *ReceivedMessageState, message *protobuf.SyncContactRequestDecision) error {
 	var err error
 	var response *MessengerResponse
 

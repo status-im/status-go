@@ -10,7 +10,7 @@ import (
 )
 
 type WakuBackedUpDataResponse struct {
-	FetchingDataProgress map[string]protobuf.FetchingBackedUpDataDetails // key represents the data/section backup details refer to
+	FetchingDataProgress map[string]*protobuf.FetchingBackedUpDataDetails // key represents the data/section backup details refer to
 	Profile              *BackedUpProfile
 	Setting              *settings.SyncSettingField
 	Keycards             []*keycards.Keycard

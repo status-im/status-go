@@ -62,7 +62,7 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 		editMessage.MessageId = message.ID
 		editMessage.Clock = clock
 
-		err = m.applyEditMessage(&editMessage.EditMessage, message)
+		err = m.applyEditMessage(editMessage.EditMessage, message)
 		if err != nil {
 			return nil, err
 		}

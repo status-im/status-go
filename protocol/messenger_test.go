@@ -1298,7 +1298,7 @@ func (s *MessengerSuite) TestBlockContact() {
 		{
 			ID:          "test-1",
 			LocalChatID: chat2.ID,
-			ChatMessage: protobuf.ChatMessage{
+			ChatMessage: &protobuf.ChatMessage{
 				ContentType: 1,
 				Text:        "test-1",
 				Clock:       1,
@@ -1308,7 +1308,7 @@ func (s *MessengerSuite) TestBlockContact() {
 		{
 			ID:          "test-2",
 			LocalChatID: chat2.ID,
-			ChatMessage: protobuf.ChatMessage{
+			ChatMessage: &protobuf.ChatMessage{
 				ContentType: 2,
 				Text:        "test-2",
 				Clock:       2,
@@ -1318,7 +1318,7 @@ func (s *MessengerSuite) TestBlockContact() {
 		{
 			ID:          "test-3",
 			LocalChatID: chat2.ID,
-			ChatMessage: protobuf.ChatMessage{
+			ChatMessage: &protobuf.ChatMessage{
 				ContentType: 3,
 				Text:        "test-3",
 				Clock:       3,
@@ -1329,7 +1329,7 @@ func (s *MessengerSuite) TestBlockContact() {
 		{
 			ID:          "test-4",
 			LocalChatID: chat2.ID,
-			ChatMessage: protobuf.ChatMessage{
+			ChatMessage: &protobuf.ChatMessage{
 				ContentType: 4,
 				Text:        "test-4",
 				Clock:       4,
@@ -1340,7 +1340,7 @@ func (s *MessengerSuite) TestBlockContact() {
 		{
 			ID:          "test-5",
 			LocalChatID: chat2.ID,
-			ChatMessage: protobuf.ChatMessage{
+			ChatMessage: &protobuf.ChatMessage{
 				ContentType: 5,
 				Text:        "test-5",
 				Clock:       5,
@@ -1351,7 +1351,7 @@ func (s *MessengerSuite) TestBlockContact() {
 		{
 			ID:          "test-6",
 			LocalChatID: chat3.ID,
-			ChatMessage: protobuf.ChatMessage{
+			ChatMessage: &protobuf.ChatMessage{
 				ContentType: 6,
 				Text:        "test-6",
 				Clock:       6,
@@ -1362,7 +1362,7 @@ func (s *MessengerSuite) TestBlockContact() {
 		{
 			ID:          "test-7",
 			LocalChatID: chat3.ID,
-			ChatMessage: protobuf.ChatMessage{
+			ChatMessage: &protobuf.ChatMessage{
 				ContentType: 7,
 				Text:        "test-7",
 				Clock:       7,
@@ -2139,7 +2139,7 @@ func (s *MessengerSuite) TestMessageJSON() {
 		ID:          "test-1",
 		LocalChatID: "local-chat-id",
 		Alias:       "alias",
-		ChatMessage: protobuf.ChatMessage{
+		ChatMessage: &protobuf.ChatMessage{
 			ChatId:      "remote-chat-id",
 			ContentType: 0,
 			Text:        "test-1",

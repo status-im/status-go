@@ -231,7 +231,7 @@ func (m *Messenger) SetUserStatus(ctx context.Context, newStatus int, newCustomT
 	return m.sendUserStatus(ctx, *currStatus)
 }
 
-func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, statusMessage protobuf.StatusUpdate) error {
+func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, statusMessage *protobuf.StatusUpdate) error {
 	if err := ValidateStatusUpdate(statusMessage); err != nil {
 		return err
 	}

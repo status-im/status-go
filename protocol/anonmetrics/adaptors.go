@@ -65,7 +65,7 @@ func adaptModelsToProtoBatch(modelAnonMetrics []appmetrics.AppMetric, sendID *ec
 	return amb, nil
 }
 
-func adaptProtoBatchToModels(protoBatch protobuf.AnonymousMetricBatch) ([]*appmetrics.AppMetric, error) {
+func adaptProtoBatchToModels(protoBatch *protobuf.AnonymousMetricBatch) ([]*appmetrics.AppMetric, error) {
 	var ams []*appmetrics.AppMetric
 
 	for _, pm := range protoBatch.Metrics {

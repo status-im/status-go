@@ -22,13 +22,13 @@ func (s *MessageValidatorSuite) TestValidateRequestAddressForTransaction() {
 		Name             string
 		WhisperTimestamp uint64
 		Valid            bool
-		Message          protobuf.RequestAddressForTransaction
+		Message          *protobuf.RequestAddressForTransaction
 	}{
 		{
 			Name:             "valid message",
 			WhisperTimestamp: 30,
 			Valid:            true,
-			Message: protobuf.RequestAddressForTransaction{
+			Message: &protobuf.RequestAddressForTransaction{
 				Clock:    30,
 				Value:    "0.34",
 				Contract: "some contract",
@@ -38,7 +38,7 @@ func (s *MessageValidatorSuite) TestValidateRequestAddressForTransaction() {
 			Name:             "missing clock value",
 			WhisperTimestamp: 30,
 			Valid:            false,
-			Message: protobuf.RequestAddressForTransaction{
+			Message: &protobuf.RequestAddressForTransaction{
 				Value:    "0.34",
 				Contract: "some contract",
 			},
@@ -47,7 +47,7 @@ func (s *MessageValidatorSuite) TestValidateRequestAddressForTransaction() {
 			Name:             "missing value",
 			WhisperTimestamp: 30,
 			Valid:            false,
-			Message: protobuf.RequestAddressForTransaction{
+			Message: &protobuf.RequestAddressForTransaction{
 				Clock:    30,
 				Contract: "some contract",
 			},
@@ -56,7 +56,7 @@ func (s *MessageValidatorSuite) TestValidateRequestAddressForTransaction() {
 			Name:             "non number value",
 			WhisperTimestamp: 30,
 			Valid:            false,
-			Message: protobuf.RequestAddressForTransaction{
+			Message: &protobuf.RequestAddressForTransaction{
 				Clock:    30,
 				Value:    "most definitely not a number",
 				Contract: "some contract",
@@ -66,7 +66,7 @@ func (s *MessageValidatorSuite) TestValidateRequestAddressForTransaction() {
 			Name:             "Clock value too high",
 			WhisperTimestamp: 30,
 			Valid:            false,
-			Message: protobuf.RequestAddressForTransaction{
+			Message: &protobuf.RequestAddressForTransaction{
 				Clock:    151000,
 				Value:    "0.34",
 				Contract: "some contract",
@@ -75,7 +75,7 @@ func (s *MessageValidatorSuite) TestValidateRequestAddressForTransaction() {
 	}
 	for _, tc := range testCases {
 		s.Run(tc.Name, func() {
-			err := ValidateReceivedRequestAddressForTransaction(&tc.Message, tc.WhisperTimestamp)
+			err := ValidateReceivedRequestAddressForTransaction(tc.Message, tc.WhisperTimestamp)
 			if tc.Valid {
 				s.Nil(err)
 			} else {
@@ -91,13 +91,13 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 		Name             string
 		WhisperTimestamp uint64
 		Valid            bool
-		Message          protobuf.ChatMessage
+		Message          *protobuf.ChatMessage
 	}{
 		{
 			Name:             "A valid message",
 			WhisperTimestamp: 2,
 			Valid:            true,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:      "a",
 				Clock:       1,
 				Timestamp:   2,
@@ -112,7 +112,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Missing chatId",
 			WhisperTimestamp: 2,
 			Valid:            false,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				Clock:       1,
 				Timestamp:   2,
 				Text:        "some-text",
@@ -126,7 +126,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Missing clock",
 			WhisperTimestamp: 2,
 			Valid:            false,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:      "a",
 				Timestamp:   2,
 				Text:        "some-text",
@@ -140,7 +140,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Clock value too high",
 			WhisperTimestamp: 2,
 			Valid:            false,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:      "a",
 				Clock:       133000,
 				Timestamp:   1,
@@ -155,7 +155,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Missing timestamp",
 			WhisperTimestamp: 2,
 			Valid:            false,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:      "a",
 				Clock:       2,
 				Text:        "some-text",
@@ -169,7 +169,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Missing text",
 			WhisperTimestamp: 2,
 			Valid:            false,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:      "a",
 				Clock:       2,
 				Timestamp:   3,
@@ -183,7 +183,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Blank text",
 			WhisperTimestamp: 2,
 			Valid:            false,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:      "a",
 				Text:        "  \n \t \n  ",
 				Clock:       2,
@@ -198,7 +198,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Too long text",
 			WhisperTimestamp: 2,
 			Valid:            false,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:      "a",
 				Clock:       1,
 				Timestamp:   2,
@@ -213,7 +213,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Unknown MessageType",
 			WhisperTimestamp: 2,
 			Valid:            false,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:      "a",
 				Text:        "valid",
 				Clock:       2,
@@ -228,7 +228,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Unknown ContentType",
 			WhisperTimestamp: 2,
 			Valid:            false,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:      "a",
 				Text:        "valid",
 				Clock:       2,
@@ -243,7 +243,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "System message MessageType",
 			WhisperTimestamp: 2,
 			Valid:            false,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:      "a",
 				Text:        "valid",
 				Clock:       2,
@@ -258,7 +258,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Request address for transaction message type",
 			WhisperTimestamp: 2,
 			Valid:            false,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:      "a",
 				Text:        "valid",
 				Clock:       2,
@@ -273,7 +273,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Valid  emoji only emssage",
 			WhisperTimestamp: 2,
 			Valid:            true,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:      "a",
 				Text:        ":+1:",
 				Clock:       2,
@@ -304,7 +304,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Valid sticker message",
 			WhisperTimestamp: 2,
 			Valid:            true,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:     "a",
 				Text:       "valid",
 				Clock:      2,
@@ -325,7 +325,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Invalid sticker message without Hash",
 			WhisperTimestamp: 2,
 			Valid:            false,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:     "a",
 				Text:       "valid",
 				Clock:      2,
@@ -345,7 +345,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Invalid sticker message without any content",
 			WhisperTimestamp: 2,
 			Valid:            false,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:      "a",
 				Text:        "valid",
 				Clock:       2,
@@ -360,7 +360,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Valid image message",
 			WhisperTimestamp: 2,
 			Valid:            true,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:     "a",
 				Text:       "valid",
 				Clock:      2,
@@ -381,7 +381,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Invalid image message, type unknown",
 			WhisperTimestamp: 2,
 			Valid:            false,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:     "a",
 				Text:       "valid",
 				Clock:      2,
@@ -402,7 +402,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Invalid image message, missing payload",
 			WhisperTimestamp: 2,
 			Valid:            false,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:     "a",
 				Text:       "valid",
 				Clock:      2,
@@ -422,7 +422,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Valid audio message",
 			WhisperTimestamp: 2,
 			Valid:            true,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:     "a",
 				Text:       "valid",
 				Clock:      2,
@@ -443,7 +443,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Invalid audio message, type unknown",
 			WhisperTimestamp: 2,
 			Valid:            false,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:     "a",
 				Text:       "valid",
 				Clock:      2,
@@ -464,7 +464,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			Name:             "Invalid audio message, missing payload",
 			WhisperTimestamp: 2,
 			Valid:            false,
-			Message: protobuf.ChatMessage{
+			Message: &protobuf.ChatMessage{
 				ChatId:     "a",
 				Text:       "valid",
 				Clock:      2,
@@ -484,7 +484,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 
 	for _, tc := range testCases {
 		s.Run(tc.Name, func() {
-			err := ValidateReceivedChatMessage(&tc.Message, tc.WhisperTimestamp)
+			err := ValidateReceivedChatMessage(tc.Message, tc.WhisperTimestamp)
 			if tc.Valid {
 				s.Nil(err)
 			} else {
@@ -499,13 +499,13 @@ func (s *MessageValidatorSuite) TestValidateEmojiReaction() {
 		Name             string
 		Valid            bool
 		WhisperTimestamp uint64
-		Message          protobuf.EmojiReaction
+		Message          *protobuf.EmojiReaction
 	}{
 		{
 			Name:             "valid emoji reaction",
 			Valid:            true,
 			WhisperTimestamp: 30,
-			Message: protobuf.EmojiReaction{
+			Message: &protobuf.EmojiReaction{
 				Clock:       30,
 				ChatId:      "chat-id",
 				MessageId:   "message-id",
@@ -517,7 +517,7 @@ func (s *MessageValidatorSuite) TestValidateEmojiReaction() {
 			Name:             "valid emoji retraction",
 			Valid:            true,
 			WhisperTimestamp: 30,
-			Message: protobuf.EmojiReaction{
+			Message: &protobuf.EmojiReaction{
 				Clock:       30,
 				ChatId:      "0.34",
 				MessageId:   "message-id",
@@ -530,7 +530,7 @@ func (s *MessageValidatorSuite) TestValidateEmojiReaction() {
 			Name:             "missing chatID",
 			Valid:            false,
 			WhisperTimestamp: 30,
-			Message: protobuf.EmojiReaction{
+			Message: &protobuf.EmojiReaction{
 				Clock:       30,
 				MessageId:   "message-id",
 				MessageType: protobuf.MessageType_ONE_TO_ONE,
@@ -541,7 +541,7 @@ func (s *MessageValidatorSuite) TestValidateEmojiReaction() {
 			Name:             "missing messageID",
 			Valid:            false,
 			WhisperTimestamp: 30,
-			Message: protobuf.EmojiReaction{
+			Message: &protobuf.EmojiReaction{
 				Clock:       30,
 				ChatId:      "chat-id",
 				MessageType: protobuf.MessageType_ONE_TO_ONE,
@@ -552,7 +552,7 @@ func (s *MessageValidatorSuite) TestValidateEmojiReaction() {
 			Name:             "missing type",
 			Valid:            false,
 			WhisperTimestamp: 30,
-			Message: protobuf.EmojiReaction{
+			Message: &protobuf.EmojiReaction{
 				Clock:       30,
 				ChatId:      "chat-id",
 				MessageId:   "message-id",
@@ -563,7 +563,7 @@ func (s *MessageValidatorSuite) TestValidateEmojiReaction() {
 			Name:             "missing message type",
 			Valid:            false,
 			WhisperTimestamp: 30,
-			Message: protobuf.EmojiReaction{
+			Message: &protobuf.EmojiReaction{
 				Clock:     30,
 				ChatId:    "chat-id",
 				MessageId: "message-id",
@@ -574,7 +574,7 @@ func (s *MessageValidatorSuite) TestValidateEmojiReaction() {
 			Name:             "clock value too high",
 			Valid:            false,
 			WhisperTimestamp: 30,
-			Message: protobuf.EmojiReaction{
+			Message: &protobuf.EmojiReaction{
 				Clock:       900000,
 				ChatId:      "chat-id",
 				MessageId:   "message-id",
@@ -585,7 +585,7 @@ func (s *MessageValidatorSuite) TestValidateEmojiReaction() {
 	}
 	for _, tc := range testCases {
 		s.Run(tc.Name, func() {
-			err := ValidateReceivedEmojiReaction(&tc.Message, tc.WhisperTimestamp)
+			err := ValidateReceivedEmojiReaction(tc.Message, tc.WhisperTimestamp)
 			if tc.Valid {
 				s.Nil(err)
 			} else {

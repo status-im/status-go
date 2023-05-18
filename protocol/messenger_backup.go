@@ -193,7 +193,7 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 	// Update keycards message encode and dispatch
 	pb := backupDetailsOnly()
 	pb.KeycardsDetails.DataNumber = 1
-	pb.Keycards = &keycardsToBackup
+	pb.Keycards = keycardsToBackup
 	err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
 	if err != nil {
 		return 0, err

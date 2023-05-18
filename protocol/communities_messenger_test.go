@@ -3294,7 +3294,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequesToJoin() {
 
 	messageState := s.bob.buildMessageState()
 
-	err = s.bob.HandleCommunityRequestToJoin(messageState, &s.alice.identity.PublicKey, *requestToJoinProto)
+	err = s.bob.HandleCommunityRequestToJoin(messageState, &s.alice.identity.PublicKey, requestToJoinProto)
 
 	s.Require().ErrorContains(err, "can't request access")
 }

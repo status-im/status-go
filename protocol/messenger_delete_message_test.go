@@ -206,8 +206,8 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageFirstThenMessage() {
 
 	inputMessage := buildTestMessage(*theirChat)
 	inputMessage.Clock = 1
-	deleteMessage := DeleteMessage{
-		DeleteMessage: protobuf.DeleteMessage{
+	deleteMessage := &DeleteMessage{
+		DeleteMessage: &protobuf.DeleteMessage{
 			Clock:       2,
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			MessageId:   messageID,
@@ -345,8 +345,8 @@ func (s *MessengerDeleteMessageSuite) TestDeleteImageMessageFirstThenMessage() {
 		album = append(album, image)
 	}
 
-	deleteMessage := DeleteMessage{
-		DeleteMessage: protobuf.DeleteMessage{
+	deleteMessage := &DeleteMessage{
+		DeleteMessage: &protobuf.DeleteMessage{
 			Clock:       2,
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			MessageId:   messageID1,
@@ -432,8 +432,8 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageWithAMention() {
 	s.Require().Equal(int(response.Chats()[0].UnviewedMentionsCount), 1)
 	s.Require().True(response.Messages()[0].Mentioned)
 
-	deleteMessage := DeleteMessage{
-		DeleteMessage: protobuf.DeleteMessage{
+	deleteMessage := &DeleteMessage{
+		DeleteMessage: &protobuf.DeleteMessage{
 			Clock:       2,
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			MessageId:   messageID,
@@ -495,8 +495,8 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageAndChatIsAlreadyRead() {
 
 	ogMessage := sendResponse.Messages()[0]
 
-	deleteMessage := DeleteMessage{
-		DeleteMessage: protobuf.DeleteMessage{
+	deleteMessage := &DeleteMessage{
+		DeleteMessage: &protobuf.DeleteMessage{
 			Clock:       2,
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			MessageId:   ogMessage.ID,

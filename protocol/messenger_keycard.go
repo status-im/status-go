@@ -11,13 +11,13 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-func (m *Messenger) dispatchSyncKeycard(ctx context.Context, chatID string, syncKeycard protobuf.SyncAllKeycards,
+func (m *Messenger) dispatchSyncKeycard(ctx context.Context, chatID string, syncKeycard *protobuf.SyncAllKeycards,
 	rawMessageHandler RawMessageHandler) error {
 	if !m.hasPairedDevices() {
 		return nil
 	}
 
-	encodedMessage, err := proto.Marshal(&syncKeycard)
+	encodedMessage, err := proto.Marshal(syncKeycard)
 	if err != nil {
 		return err
 	}
@@ -33,7 +33,7 @@ func (m *Messenger) dispatchSyncKeycard(ctx context.Context, chatID string, sync
 	return err
 }
 
-func (m *Messenger) prepareSyncAllKeycardsMessage(clock uint64) (message protobuf.SyncAllKeycards, err error) {
+func (m *Messenger) prepareSyncAllKeycardsMessage(clock uint64) (message *protobuf.SyncAllKeycards, err error) {
 	allKeycards, err := m.settings.GetAllKnownKeycards()
 	if err != nil {
 		return message, err
@@ -69,7 +69,7 @@ func (m *Messenger) syncAllKeycards(ctx context.Context, rawMessageHandler RawMe
 	return m.saveChat(chat)
 }
 
-func (m *Messenger) syncReceivedKeycards(syncMessage protobuf.SyncAllKeycards) ([]*keycards.Keycard, error) {
+func (m *Messenger) syncReceivedKeycards(syncMessage *protobuf.SyncAllKeycards) ([]*keycards.Keycard, error) {
 	var keycardsToSync []*keycards.Keycard
 	for _, syncKc := range syncMessage.Keycards {
 		var kp = &keycards.Keycard{}
@@ -90,7 +90,7 @@ func (m *Messenger) syncReceivedKeycards(syncMessage protobuf.SyncAllKeycards) (
 	return allKeycards, nil
 }
 
-func (m *Messenger) handleSyncKeycards(state *ReceivedMessageState, syncMessage protobuf.SyncAllKeycards) (err error) {
+func (m *Messenger) handleSyncKeycards(state *ReceivedMessageState, syncMessage *protobuf.SyncAllKeycards) (err error) {
 	allKeycards, err := m.syncReceivedKeycards(syncMessage)
 	if err != nil {
 		return err
@@ -101,14 +101,14 @@ func (m *Messenger) handleSyncKeycards(state *ReceivedMessageState, syncMessage 
 	return nil
 }
 
-func (m *Messenger) dispatchKeycardActivity(ctx context.Context, syncMessage protobuf.SyncKeycardAction) error {
+func (m *Messenger) dispatchKeycardActivity(ctx context.Context, syncMessage *protobuf.SyncKeycardAction) error {
 	if !m.hasPairedDevices() {
 		return nil
 	}
 
 	clock, chat := m.getLastClockWithRelatedChat()
 
-	encodedMessage, err := proto.Marshal(&syncMessage)
+	encodedMessage, err := proto.Marshal(syncMessage)
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func (m *Messenger) dispatchKeycardActivity(ctx context.Context, syncMessage pro
 	return m.saveChat(chat)
 }
 
-func (m *Messenger) handleSyncKeycardActivity(state *ReceivedMessageState, syncMessage protobuf.SyncKeycardAction) (err error) {
+func (m *Messenger) handleSyncKeycardActivity(state *ReceivedMessageState, syncMessage *protobuf.SyncKeycardAction) (err error) {
 
 	var kcAction = &keycards.KeycardAction{
 		Action:        protobuf.SyncKeycardAction_Action_name[int32(syncMessage.Action)],
@@ -176,7 +176,7 @@ func (m *Messenger) AddKeycardOrAddAccountsIfKeycardIsAdded(ctx context.Context,
 		return addedKc || addedAccs, err
 	}
 
-	activityMessage := protobuf.SyncKeycardAction{
+	activityMessage := &protobuf.SyncKeycardAction{
 		Keycard: kp.ToSyncKeycard(),
 	}
 	if addedKc {
@@ -195,7 +195,7 @@ func (m *Messenger) RemoveMigratedAccountsForKeycard(ctx context.Context, kcUID 
 		return err
 	}
 
-	activityMessage := protobuf.SyncKeycardAction{
+	activityMessage := &protobuf.SyncKeycardAction{
 		Action: protobuf.SyncKeycardAction_ACCOUNTS_REMOVED,
 		Keycard: &protobuf.SyncKeycard{
 			Uid:   kcUID,
@@ -216,7 +216,7 @@ func (m *Messenger) SetKeycardName(ctx context.Context, kcUID string, kpName str
 		return err
 	}
 
-	activityMessage := protobuf.SyncKeycardAction{
+	activityMessage := &protobuf.SyncKeycardAction{
 		Action: protobuf.SyncKeycardAction_NAME_CHANGED,
 		Keycard: &protobuf.SyncKeycard{
 			Uid:   kcUID,
@@ -234,7 +234,7 @@ func (m *Messenger) KeycardLocked(ctx context.Context, kcUID string, clock uint6
 		return err
 	}
 
-	activityMessage := protobuf.SyncKeycardAction{
+	activityMessage := &protobuf.SyncKeycardAction{
 		Action: protobuf.SyncKeycardAction_LOCKED,
 		Keycard: &protobuf.SyncKeycard{
 			Uid:   kcUID,
@@ -251,7 +251,7 @@ func (m *Messenger) KeycardUnlocked(ctx context.Context, kcUID string, clock uin
 		return err
 	}
 
-	activityMessage := protobuf.SyncKeycardAction{
+	activityMessage := &protobuf.SyncKeycardAction{
 		Action: protobuf.SyncKeycardAction_UNLOCKED,
 		Keycard: &protobuf.SyncKeycard{
 			Uid:   kcUID,
@@ -268,7 +268,7 @@ func (m *Messenger) DeleteKeycard(ctx context.Context, kcUID string, clock uint6
 		return err
 	}
 
-	activityMessage := protobuf.SyncKeycardAction{
+	activityMessage := &protobuf.SyncKeycardAction{
 		Action: protobuf.SyncKeycardAction_KEYCARD_DELETED,
 		Keycard: &protobuf.SyncKeycard{
 			Uid:   kcUID,
@@ -285,7 +285,7 @@ func (m *Messenger) UpdateKeycardUID(ctx context.Context, oldKcUID string, newKc
 		return err
 	}
 
-	activityMessage := protobuf.SyncKeycardAction{
+	activityMessage := &protobuf.SyncKeycardAction{
 		Action:        protobuf.SyncKeycardAction_UID_UPDATED,
 		OldKeycardUid: oldKcUID,
 		Keycard: &protobuf.SyncKeycard{

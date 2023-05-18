@@ -1908,8 +1908,8 @@ func (m *Messenger) passStoredCommunityInfoToSignalHandler(communityID string) {
 }
 
 // handleCommunityDescription handles an community description
-func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description protobuf.CommunityDescription, rawPayload []byte) error {
-	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, &description, rawPayload)
+func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawPayload []byte) error {
+	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload)
 	if err != nil {
 		return err
 	}
@@ -1987,11 +1987,11 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 	return nil
 }
 
-func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, syncCommunity protobuf.SyncCommunity) error {
+func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, syncCommunity *protobuf.SyncCommunity) error {
 	logger := m.logger.Named("handleSyncCommunity")
 
 	// Should handle community
-	shouldHandle, err := m.communitiesManager.ShouldHandleSyncCommunity(&syncCommunity)
+	shouldHandle, err := m.communitiesManager.ShouldHandleSyncCommunity(syncCommunity)
 	if err != nil {
 		logger.Debug("m.communitiesManager.ShouldHandleSyncCommunity error", zap.Error(err))
 		return err
@@ -2043,8 +2043,8 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		return err
 	}
 
-	var cd protobuf.CommunityDescription
-	err = proto.Unmarshal(amm.Payload, &cd)
+	cd := &protobuf.CommunityDescription{}
+	err = proto.Unmarshal(amm.Payload, cd)
 	if err != nil {
 		logger.Debug("proto.Unmarshal protobuf.CommunityDescription error", zap.Error(err))
 		return err
@@ -2057,7 +2057,7 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 	}
 
 	if syncCommunity.Settings != nil {
-		err = m.handleSyncCommunitySettings(messageState, *syncCommunity.Settings)
+		err = m.handleSyncCommunitySettings(messageState, syncCommunity.Settings)
 		if err != nil {
 			logger.Debug("m.handleSyncCommunitySettings error", zap.Error(err))
 			return err
@@ -2111,8 +2111,8 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 	return nil
 }
 
-func (m *Messenger) handleSyncCommunitySettings(messageState *ReceivedMessageState, syncCommunitySettings protobuf.SyncCommunitySettings) error {
-	shouldHandle, err := m.communitiesManager.ShouldHandleSyncCommunitySettings(&syncCommunitySettings)
+func (m *Messenger) handleSyncCommunitySettings(messageState *ReceivedMessageState, syncCommunitySettings *protobuf.SyncCommunitySettings) error {
+	shouldHandle, err := m.communitiesManager.ShouldHandleSyncCommunitySettings(syncCommunitySettings)
 	if err != nil {
 		m.logger.Debug("m.communitiesManager.ShouldHandleSyncCommunitySettings error", zap.Error(err))
 		return err
@@ -2122,7 +2122,7 @@ func (m *Messenger) handleSyncCommunitySettings(messageState *ReceivedMessageSta
 		return nil
 	}
 
-	communitySettings, err := m.communitiesManager.HandleSyncCommunitySettings(&syncCommunitySettings)
+	communitySettings, err := m.communitiesManager.HandleSyncCommunitySettings(syncCommunitySettings)
 	if err != nil {
 		return err
 	}
@@ -2881,7 +2881,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				clockAndTimestamp := uint64(timestamp.Unix()) * 1000
 				communityPubKey := discordCommunity.PrivateKey().PublicKey
 
-				chatMessage := protobuf.ChatMessage{
+				chatMessage := &protobuf.ChatMessage{
 					Timestamp:   clockAndTimestamp,
 					MessageType: protobuf.MessageType_COMMUNITY_CHAT,
 					ContentType: protobuf.ChatMessage_DISCORD_MESSAGE,
@@ -2924,7 +2924,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 
 					_, exists := messagesToSave[communityID+discordMessage.Reference.MessageId]
 					if exists {
-						pinMessage := protobuf.PinMessage{
+						pinMessage := &protobuf.PinMessage{
 							Clock:       messageToSave.WhisperTimestamp,
 							MessageId:   communityID + discordMessage.Reference.MessageId,
 							ChatId:      messageToSave.LocalChatID,
@@ -2932,7 +2932,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 							Pinned:      true,
 						}
 
-						encodedPayload, err := proto.Marshal(&pinMessage)
+						encodedPayload, err := proto.Marshal(pinMessage)
 						if err != nil {
 							m.logger.Error("failed to parse marshal pin message", zap.Error(err))
 							importProgress.AddTaskError(discord.ImportMessagesTask, discord.Warning(err.Error()))

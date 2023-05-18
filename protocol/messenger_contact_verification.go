@@ -712,7 +712,7 @@ func (m *Messenger) GetTrustStatus(contactID string) (verification.TrustStatus, 
 	return m.verificationDatabase.GetTrustStatus(contactID)
 }
 
-func ValidateContactVerificationRequest(request protobuf.RequestContactVerification) error {
+func ValidateContactVerificationRequest(request *protobuf.RequestContactVerification) error {
 	challengeLen := len(strings.TrimSpace(request.Challenge))
 	if challengeLen < minContactVerificationMessageLen || challengeLen > maxContactVerificationMessageLen {
 		return errors.New("invalid verification request challenge length")
@@ -721,7 +721,7 @@ func ValidateContactVerificationRequest(request protobuf.RequestContactVerificat
 	return nil
 }
 
-func (m *Messenger) HandleRequestContactVerification(state *ReceivedMessageState, request protobuf.RequestContactVerification) error {
+func (m *Messenger) HandleRequestContactVerification(state *ReceivedMessageState, request *protobuf.RequestContactVerification) error {
 	if err := ValidateContactVerificationRequest(request); err != nil {
 		m.logger.Debug("Invalid verification request", zap.Error(err))
 		return err
@@ -805,7 +805,7 @@ func (m *Messenger) HandleRequestContactVerification(state *ReceivedMessageState
 	return m.createOrUpdateIncomingContactVerificationNotification(contact, state, persistedVR, chatMessage, nil)
 }
 
-func ValidateAcceptContactVerification(request protobuf.AcceptContactVerification) error {
+func ValidateAcceptContactVerification(request *protobuf.AcceptContactVerification) error {
 	responseLen := len(strings.TrimSpace(request.Response))
 	if responseLen < minContactVerificationMessageLen || responseLen > maxContactVerificationMessageLen {
 		return errors.New("invalid verification request response length")
@@ -814,7 +814,7 @@ func ValidateAcceptContactVerification(request protobuf.AcceptContactVerificatio
 	return nil
 }
 
-func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState, request protobuf.AcceptContactVerification) error {
+func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState, request *protobuf.AcceptContactVerification) error {
 	if err := ValidateAcceptContactVerification(request); err != nil {
 		m.logger.Debug("Invalid AcceptContactVerification", zap.Error(err))
 		return err
@@ -908,7 +908,7 @@ func (m *Messenger) HandleAcceptContactVerification(state *ReceivedMessageState,
 	return nil
 }
 
-func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState, request protobuf.DeclineContactVerification) error {
+func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState, request *protobuf.DeclineContactVerification) error {
 	if common.IsPubKeyEqual(state.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 		return nil // Is ours, do nothing
 	}
@@ -972,7 +972,7 @@ func (m *Messenger) HandleDeclineContactVerification(state *ReceivedMessageState
 	return m.createOrUpdateOutgoingContactVerificationNotification(contact, state.Response, persistedVR, msg, nil)
 }
 
-func (m *Messenger) HandleCancelContactVerification(state *ReceivedMessageState, request protobuf.CancelContactVerification) error {
+func (m *Messenger) HandleCancelContactVerification(state *ReceivedMessageState, request *protobuf.CancelContactVerification) error {
 	myPubKey := hexutil.Encode(crypto.FromECDSAPub(&m.identity.PublicKey))
 	contactID := hexutil.Encode(crypto.FromECDSAPub(state.CurrentMessageState.PublicKey))
 

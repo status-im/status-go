@@ -1008,7 +1008,7 @@ func (s *MessengerContactRequestSuite) TestBuildContact() {
 }
 
 func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequestOutOfOrder() {
-	message := protobuf.ChatMessage{
+	message := &protobuf.ChatMessage{
 		Clock:       4,
 		Timestamp:   1,
 		Text:        "some text",
@@ -1041,7 +1041,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	s.Require().Len(contacts, 1)
 	s.Require().Equal(ContactRequestStateReceived, contacts[0].ContactRequestRemoteState)
 
-	retract := protobuf.RetractContactRequest{
+	retract := &protobuf.RetractContactRequest{
 		Clock: 2,
 	}
 	err = s.m.HandleRetractContactRequest(state, retract)

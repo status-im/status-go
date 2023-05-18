@@ -163,7 +163,7 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	})
 	s.Require().NoError(err)
 
-	bob1EnsUsernameDetail, err := bob1.saveEnsUsernameDetailProto(protobuf.SyncEnsUsernameDetail{
+	bob1EnsUsernameDetail, err := bob1.saveEnsUsernameDetailProto(&protobuf.SyncEnsUsernameDetail{
 		Clock:    1,
 		Username: "bob1.eth",
 		ChainId:  1,

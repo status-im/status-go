@@ -118,7 +118,7 @@ func (s *MessengerPinMessageSuite) TestPinMessageOutOfOrder() {
 
 	// Unpin with higher clock
 
-	unpinMessage := protobuf.PinMessage{
+	unpinMessage := &protobuf.PinMessage{
 		ChatId:      theirChat.ID,
 		MessageId:   inputMessage.ID,
 		Pinned:      false,
@@ -142,7 +142,7 @@ func (s *MessengerPinMessageSuite) TestPinMessageOutOfOrder() {
 
 	// Pin with lower clock in response
 
-	pinMessage := protobuf.PinMessage{
+	pinMessage := &protobuf.PinMessage{
 		ChatId:      theirChat.ID,
 		MessageId:   inputMessage.ID,
 		Pinned:      true,
@@ -166,7 +166,7 @@ func (s *MessengerPinMessageSuite) TestPinMessageOutOfOrder() {
 	// Pin with lower clock not in response
 
 	handlePinMessageResponse = &MessengerResponse{}
-	pinMessage = protobuf.PinMessage{
+	pinMessage = &protobuf.PinMessage{
 		ChatId:      theirChat.ID,
 		MessageId:   inputMessage.ID,
 		Pinned:      true,

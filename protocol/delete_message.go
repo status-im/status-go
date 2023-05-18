@@ -11,7 +11,7 @@ import (
 // DeleteMessage represents a delete of a message from a user in the application layer, used for persistence, querying and
 // signaling
 type DeleteMessage struct {
-	protobuf.DeleteMessage
+	*protobuf.DeleteMessage
 
 	// ID is the ID of the message that has been edited
 	ID string `json:"id,omitempty"`
@@ -25,14 +25,14 @@ type DeleteMessage struct {
 
 // GetSigPubKey returns an ecdsa encoded public key
 // this function is required to implement the ChatEntity interface
-func (e DeleteMessage) GetSigPubKey() *ecdsa.PublicKey {
+func (e *DeleteMessage) GetSigPubKey() *ecdsa.PublicKey {
 	return e.SigPubKey
 }
 
 // GetProtoBuf returns the struct's embedded protobuf struct
 // this function is required to implement the ChatEntity interface
-func (e DeleteMessage) GetProtobuf() proto.Message {
-	return &e.DeleteMessage
+func (e *DeleteMessage) GetProtobuf() proto.Message {
+	return e.DeleteMessage
 }
 
 // SetMessageType a setter for the MessageType field

@@ -21,8 +21,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 	for _, rawMessage := range rawMessages {
 		switch rawMessage.GetMessageType() {
 		case protobuf.ApplicationMetadataMessage_CONTACT_UPDATE:
-			var message protobuf.ContactUpdate
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.ContactUpdate{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}
@@ -43,7 +43,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				state.AllContacts.Store(message.PublicKey, contact)
 			}
 			currentMessageState := &CurrentMessageState{
-				Message: protobuf.ChatMessage{
+				Message: &protobuf.ChatMessage{
 					Clock: message.Clock,
 				},
 				MessageID:        " ", // make it not empty to bypass this validation: https://github.com/status-im/status-go/blob/7cd7430d3141b08f7c455d7918f4160ea8fd0559/protocol/messenger_handler.go#L325
@@ -58,8 +58,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_PUBLIC_CHAT:
-			var message protobuf.SyncInstallationPublicChat
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.SyncInstallationPublicChat{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}
@@ -72,8 +72,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				}
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_CHAT_REMOVED:
-			var message protobuf.SyncChatRemoved
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.SyncChatRemoved{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}
@@ -83,8 +83,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_CHAT_MESSAGES_READ:
-			var message protobuf.SyncChatMessagesRead
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.SyncChatMessagesRead{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}
@@ -94,8 +94,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_CLEAR_HISTORY:
-			var message protobuf.SyncClearHistory
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.SyncClearHistory{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}
@@ -105,8 +105,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_CONTACT:
-			var message protobuf.SyncInstallationContactV2
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.SyncInstallationContactV2{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}
@@ -116,8 +116,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_COMMUNITY:
-			var message protobuf.SyncCommunity
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.SyncCommunity{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}
@@ -127,8 +127,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_BOOKMARK:
-			var message protobuf.SyncBookmark
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.SyncBookmark{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}
@@ -138,8 +138,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_TRUSTED_USER:
-			var message protobuf.SyncTrustedUser
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.SyncTrustedUser{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}
@@ -149,8 +149,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_VERIFICATION_REQUEST:
-			var message protobuf.SyncVerificationRequest
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.SyncVerificationRequest{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}
@@ -171,8 +171,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_PROFILE_PICTURE:
-			var message protobuf.SyncProfilePictures
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.SyncProfilePictures{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}
@@ -182,8 +182,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_CONTACT_REQUEST_DECISION:
-			var message protobuf.SyncContactRequestDecision
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.SyncContactRequestDecision{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}
@@ -193,8 +193,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_WALLET_ACCOUNT:
-			var message protobuf.SyncWalletAccounts
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.SyncWalletAccounts{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}
@@ -204,8 +204,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_SAVED_ADDRESS:
-			var message protobuf.SyncSavedAddress
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.SyncSavedAddress{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}
@@ -215,8 +215,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_ALL_KEYCARDS:
-			var message protobuf.SyncAllKeycards
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.SyncAllKeycards{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}
@@ -226,8 +226,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_SOCIAL_LINK_SETTING:
-			var message protobuf.SyncSocialLinkSetting
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.SyncSocialLinkSetting{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}
@@ -237,8 +237,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_ENS_USERNAME_DETAIL:
-			var message protobuf.SyncEnsUsernameDetail
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.SyncEnsUsernameDetail{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}
@@ -248,8 +248,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_DELETE_FOR_ME_MESSAGE:
-			var message protobuf.DeleteForMeMessage
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.DeleteForMeMessage{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}
@@ -259,8 +259,8 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_PAIR_INSTALLATION:
-			var message protobuf.PairInstallation
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			message := &protobuf.PairInstallation{}
+			err := proto.Unmarshal(rawMessage.GetPayload(), message)
 			if err != nil {
 				return err
 			}

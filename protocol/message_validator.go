@@ -40,7 +40,7 @@ func ValidateMembershipUpdateMessage(message *protocol.MembershipUpdateMessage, 
 	return nil
 }
 
-func ValidateStatusUpdate(message protobuf.StatusUpdate) error {
+func ValidateStatusUpdate(message *protobuf.StatusUpdate) error {
 	if message.Clock == 0 {
 		return errors.New("clock can't be 0")
 	}
@@ -57,7 +57,7 @@ func ValidateStatusUpdate(message protobuf.StatusUpdate) error {
 
 }
 
-func ValidateEditMessage(message protobuf.EditMessage) error {
+func ValidateEditMessage(message *protobuf.EditMessage) error {
 	if message.Clock == 0 {
 		return errors.New("clock can't be 0")
 	}
@@ -75,7 +75,7 @@ func ValidateEditMessage(message protobuf.EditMessage) error {
 	return ValidateText(message.Text)
 }
 
-func ValidateDeleteMessage(message protobuf.DeleteMessage) error {
+func ValidateDeleteMessage(message *protobuf.DeleteMessage) error {
 	if len(message.ChatId) == 0 {
 		return errors.New("chat-id can't be empty")
 	}
@@ -90,7 +90,7 @@ func ValidateDeleteMessage(message protobuf.DeleteMessage) error {
 	return nil
 }
 
-func ValidateDeleteForMeMessage(message protobuf.DeleteForMeMessage) error {
+func ValidateDeleteForMeMessage(message *protobuf.DeleteForMeMessage) error {
 	if len(message.MessageId) == 0 {
 		return errors.New("message-id can't be empty")
 	}

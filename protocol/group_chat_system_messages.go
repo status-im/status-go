@@ -74,7 +74,7 @@ func eventToSystemMessage(e v1protocol.MembershipUpdateEvent, translations *syst
 	}
 	timestamp := v1protocol.TimestampInMsFromTime(time.Now())
 	message := &common.Message{
-		ChatMessage: protobuf.ChatMessage{
+		ChatMessage: &protobuf.ChatMessage{
 			ChatId:      e.ChatID,
 			Text:        text,
 			MessageType: protobuf.MessageType_SYSTEM_MESSAGE_PRIVATE_GROUP,

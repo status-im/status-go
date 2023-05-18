@@ -166,7 +166,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 	s.Require().NoError(err)
 
 	editMessage := EditMessage{
-		EditMessage: protobuf.EditMessage{
+		EditMessage: &protobuf.EditMessage{
 			Clock:     editedMessage.Clock + 1,
 			Text:      "some text",
 			MessageId: editedMessage.ID,
@@ -191,7 +191,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 	s.Require().NoError(err)
 
 	editMessage = EditMessage{
-		EditMessage: protobuf.EditMessage{
+		EditMessage: &protobuf.EditMessage{
 			Clock:       editedMessage.Clock + 2,
 			Text:        "some text",
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
@@ -213,7 +213,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 
 	// In-between edit
 	editMessage = EditMessage{
-		EditMessage: protobuf.EditMessage{
+		EditMessage: &protobuf.EditMessage{
 			Clock:       editedMessage.Clock + 1,
 			Text:        "some other text",
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
@@ -252,7 +252,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageFirstEditsThenMessage() {
 	inputMessage := buildTestMessage(*theirChat)
 	inputMessage.Clock = 1
 	editMessage := EditMessage{
-		EditMessage: protobuf.EditMessage{
+		EditMessage: &protobuf.EditMessage{
 			Clock:       2,
 			Text:        "some text",
 			MessageType: protobuf.MessageType_ONE_TO_ONE,

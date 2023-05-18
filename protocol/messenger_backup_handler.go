@@ -22,7 +22,7 @@ const (
 	SyncWakuSectionKeyKeycards    = "keycards"
 )
 
-func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.Backup) []error {
+func (m *Messenger) HandleBackup(state *ReceivedMessageState, message *protobuf.Backup) []error {
 	var errors []error
 
 	err := m.handleBackedUpProfile(message.Profile, message.Clock)
@@ -31,14 +31,14 @@ func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.B
 	}
 
 	for _, contact := range message.Contacts {
-		err = m.HandleSyncInstallationContact(state, *contact)
+		err = m.HandleSyncInstallationContact(state, contact)
 		if err != nil {
 			errors = append(errors, err)
 		}
 	}
 
 	for _, community := range message.Communities {
-		err = m.handleSyncCommunity(state, *community)
+		err = m.handleSyncCommunity(state, community)
 		if err != nil {
 			errors = append(errors, err)
 		}
@@ -143,7 +143,7 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 
 	var links identity.SocialLinks
 	for _, s := range message.SocialLinkSettings {
-		err = m.handleSyncSocialLinkSetting(*s, func(link *identity.SocialLink) {
+		err = m.handleSyncSocialLinkSetting(s, func(link *identity.SocialLink) {
 			links = append(links, *link)
 		})
 		if err != nil {
@@ -154,7 +154,7 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 
 	var ensUsernameDetails []*ensservice.UsernameDetail
 	for _, d := range message.EnsUsernameDetails {
-		dd, err := m.saveEnsUsernameDetailProto(*d)
+		dd, err := m.saveEnsUsernameDetailProto(d)
 		if err != nil {
 			return err
 		}
@@ -201,7 +201,7 @@ func (m *Messenger) handleBackedUpKeycards(message *protobuf.SyncAllKeycards) er
 		return nil
 	}
 
-	allKeycards, err := m.syncReceivedKeycards(*message)
+	allKeycards, err := m.syncReceivedKeycards(message)
 	if err != nil {
 		return err
 	}

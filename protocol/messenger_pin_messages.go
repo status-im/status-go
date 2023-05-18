@@ -87,7 +87,7 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 			return nil, err
 		}
 		chatMessage := &common.Message{
-			ChatMessage: protobuf.ChatMessage{
+			ChatMessage: &protobuf.ChatMessage{
 				Clock:       message.Clock,
 				Timestamp:   m.getTimesource().GetCurrentTime(),
 				ChatId:      chat.ID,

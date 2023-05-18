@@ -297,7 +297,7 @@ func (m *Messenger) ActivityCenterNotification(id types.HexBytes) (*ActivityCent
 	return m.persistence.GetActivityCenterNotificationByID(id)
 }
 
-func (m *Messenger) handleActivityCenterRead(state *ReceivedMessageState, message protobuf.SyncActivityCenterRead) error {
+func (m *Messenger) handleActivityCenterRead(state *ReceivedMessageState, message *protobuf.SyncActivityCenterRead) error {
 	resp, err := m.MarkActivityCenterNotificationsRead(context.TODO(), toHexBytes(message.Ids), false)
 
 	if err != nil {
@@ -307,7 +307,7 @@ func (m *Messenger) handleActivityCenterRead(state *ReceivedMessageState, messag
 	return state.Response.Merge(resp)
 }
 
-func (m *Messenger) handleActivityCenterAccepted(state *ReceivedMessageState, message protobuf.SyncActivityCenterAccepted) error {
+func (m *Messenger) handleActivityCenterAccepted(state *ReceivedMessageState, message *protobuf.SyncActivityCenterAccepted) error {
 	resp, err := m.AcceptActivityCenterNotifications(context.TODO(), toHexBytes(message.Ids), false)
 
 	if err != nil {
@@ -317,7 +317,7 @@ func (m *Messenger) handleActivityCenterAccepted(state *ReceivedMessageState, me
 	return state.Response.Merge(resp)
 }
 
-func (m *Messenger) handleActivityCenterDismissed(state *ReceivedMessageState, message protobuf.SyncActivityCenterDismissed) error {
+func (m *Messenger) handleActivityCenterDismissed(state *ReceivedMessageState, message *protobuf.SyncActivityCenterDismissed) error {
 	resp, err := m.DismissActivityCenterNotifications(context.TODO(), toHexBytes(message.Ids), false)
 
 	if err != nil {

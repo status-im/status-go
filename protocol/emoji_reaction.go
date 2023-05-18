@@ -16,7 +16,7 @@ import (
 // EmojiReaction represents an emoji reaction from a user in the application layer, used for persistence, querying and
 // signaling
 type EmojiReaction struct {
-	protobuf.EmojiReaction
+	*protobuf.EmojiReaction
 
 	// From is a public key of the author of the emoji reaction.
 	From string `json:"from,omitempty"`
@@ -29,20 +29,20 @@ type EmojiReaction struct {
 }
 
 // ID is the Keccak256() contatenation of From-MessageID-EmojiType
-func (e EmojiReaction) ID() string {
+func (e *EmojiReaction) ID() string {
 	return types.EncodeHex(crypto.Keccak256([]byte(fmt.Sprintf("%s%s%d", e.From, e.MessageId, e.Type))))
 }
 
 // GetSigPubKey returns an ecdsa encoded public key
 // this function is required to implement the ChatEntity interface
-func (e EmojiReaction) GetSigPubKey() *ecdsa.PublicKey {
+func (e *EmojiReaction) GetSigPubKey() *ecdsa.PublicKey {
 	return e.SigPubKey
 }
 
 // GetProtoBuf returns the struct's embedded protobuf struct
 // this function is required to implement the ChatEntity interface
-func (e EmojiReaction) GetProtobuf() proto.Message {
-	return &e.EmojiReaction
+func (e *EmojiReaction) GetProtobuf() proto.Message {
+	return e.EmojiReaction
 }
 
 // SetMessageType a setter for the MessageType field
@@ -51,7 +51,7 @@ func (e *EmojiReaction) SetMessageType(messageType protobuf.MessageType) {
 	e.MessageType = messageType
 }
 
-func (e EmojiReaction) MarshalJSON() ([]byte, error) {
+func (e *EmojiReaction) MarshalJSON() ([]byte, error) {
 	item := struct {
 		ID          string                      `json:"id"`
 		Clock       uint64                      `json:"clock,omitempty"`
@@ -84,6 +84,6 @@ func (e EmojiReaction) MarshalJSON() ([]byte, error) {
 }
 
 // WrapGroupMessage indicates whether we should wrap this in membership information
-func (e EmojiReaction) WrapGroupMessage() bool {
+func (e *EmojiReaction) WrapGroupMessage() bool {
 	return false
 }
