@@ -158,9 +158,9 @@ func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string,
 	return contactRequest
 }
 
-func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *common.Message, theirMessenger *Messenger) {
+func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *common.Message, sender *Messenger, receiver *Messenger) {
 	// Accept contact request, receiver side
-	resp, err := theirMessenger.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequest.ID)})
+	resp, err := receiver.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequest.ID)})
 	s.Require().NoError(err)
 
 	// Make sure the message is updated
@@ -187,16 +187,16 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 	s.Require().True(resp.Chats()[1].Active)
 
 	// Make sure the sender is added to our contacts
-	contacts := theirMessenger.AddedContacts()
+	contacts := receiver.AddedContacts()
 	s.Require().Len(contacts, 1)
 
 	// Make sure we consider them a mutual contact, receiver side
-	mutualContacts := theirMessenger.MutualContacts()
+	mutualContacts := receiver.MutualContacts()
 	s.Require().Len(mutualContacts, 1)
 
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
-		s.m,
+		sender,
 		func(r *MessengerResponse) bool {
 			return len(r.Contacts) == 1 && len(r.Messages()) == 1 && len(r.ActivityCenterNotifications()) == 1
 		},
@@ -240,7 +240,7 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 
 	// Receiver's side chat should be also active after the accepting the CR
 	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
-	chat, ok = theirMessenger.allChats.Load(myID)
+	chat, ok = receiver.allChats.Load(myID)
 	s.Require().True(ok)
 	s.Require().NotNil(chat)
 	s.Require().True(chat.Active)
@@ -350,7 +350,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() { //
 	}
 	s.sendContactRequest(request, s.m)
 	contactRequest := s.receiveContactRequest(messageText, theirMessenger)
-	s.acceptContactRequest(contactRequest, theirMessenger)
+	s.acceptContactRequest(contactRequest, s.m, theirMessenger)
 }
 
 func (s *MessengerContactRequestSuite) TestReceiveAndDismissContactRequest() {
@@ -386,7 +386,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	}
 	s.sendContactRequest(request, s.m)
 	contactRequest := s.receiveContactRequest(messageText, theirMessenger)
-	s.acceptContactRequest(contactRequest, theirMessenger)
+	s.acceptContactRequest(contactRequest, s.m, theirMessenger)
 	s.retractContactRequest(contactID, theirMessenger)
 }
 
@@ -404,7 +404,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequestTwice()
 	}
 	s.sendContactRequest(request, s.m)
 	contactRequest := s.receiveContactRequest(messageText, theirMessenger)
-	s.acceptContactRequest(contactRequest, theirMessenger)
+	s.acceptContactRequest(contactRequest, s.m, theirMessenger)
 
 	// Resend contact request with higher clock value
 	resp, err := s.m.SendContactRequest(context.Background(), request)
@@ -562,7 +562,7 @@ func (s *MessengerContactRequestSuite) TestPairedDevicesRemoveContact() {
 	}
 	s.sendContactRequest(request, alice1)
 	contactRequest := s.receiveContactRequest(messageText, bob)
-	s.acceptContactRequest(contactRequest, bob)
+	s.acceptContactRequest(contactRequest, alice1, bob)
 
 	// Wait for the message to reach its destination
 	resp, err := WaitOnMessengerResponse(
@@ -630,7 +630,7 @@ func (s *MessengerContactRequestSuite) TestAliceRecoverStateSendContactRequest()
 	s.Require().NotNil(contactRequest)
 
 	// Bob accepts the contact request
-	s.acceptContactRequest(contactRequest, bob)
+	s.acceptContactRequest(contactRequest, alice1, bob)
 
 	// Alice resets her device
 	alice2, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
@@ -700,7 +700,7 @@ func (s *MessengerContactRequestSuite) TestAliceRecoverStateReceiveContactReques
 	s.Require().NotNil(contactRequest)
 
 	// Bob accepts the contact request
-	s.acceptContactRequest(contactRequest, bob)
+	s.acceptContactRequest(contactRequest, alice1, bob)
 
 	// Alice resets her device
 	alice2, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
@@ -779,7 +779,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsCorrectOrd
 	s.Require().NotNil(contactRequest)
 
 	// Bob accepts the contact request
-	s.acceptContactRequest(contactRequest, bob)
+	s.acceptContactRequest(contactRequest, alice1, bob)
 
 	// Alice removes Bob from contacts
 	_, err = alice1.RetractContactRequest(&requests.RetractContactRequest{ID: types.Hex2Bytes(bob.myHexIdentity())})
@@ -828,7 +828,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsWrongOrder
 	s.Require().NotNil(contactRequest)
 
 	// Bob accepts the contact request
-	s.acceptContactRequest(contactRequest, bob)
+	s.acceptContactRequest(contactRequest, alice1, bob)
 
 	// Alice removes Bob from contacts
 	_, err = alice1.RetractContactRequest(&requests.RetractContactRequest{ID: types.Hex2Bytes(bob.myHexIdentity())})
@@ -878,7 +878,7 @@ func (s *MessengerContactRequestSuite) TestAliceResendsContactRequestAfterRemovi
 	// Bob accepts the contact request
 	contactRequest := s.receiveContactRequest(messageTextFirst, theirMessenger)
 	s.Require().NotNil(contactRequest)
-	s.acceptContactRequest(contactRequest, theirMessenger)
+	s.acceptContactRequest(contactRequest, s.m, theirMessenger)
 
 	// Alice removes Bob from contacts
 	s.retractContactRequest(contactID, theirMessenger)
@@ -900,7 +900,7 @@ func (s *MessengerContactRequestSuite) TestAliceResendsContactRequestAfterRemovi
 	// Bob accepts new contact request
 	contactRequest = s.receiveContactRequest(messageTextSecond, theirMessenger)
 	s.Require().NotNil(contactRequest)
-	s.acceptContactRequest(contactRequest, theirMessenger)
+	s.acceptContactRequest(contactRequest, s.m, theirMessenger)
 
 	// Make sure bob and alice are not mutual after sending CR
 	s.Require().Len(s.m.MutualContacts(), 1)
@@ -1076,13 +1076,13 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 }
 
 // The scenario tested is as follow:
-// 1) AliceBob sends a contact request to Bob
+// 1) Alice sends a contact request to Bob
 // 2) Bob receives CR from Alice
 // 3) Bob resets his device
-// 4) Bob restores alice's contact from backup, CR is created
+// 4) Bob restores Alice's contact from backup, CR is created
 // 5) Bob succesefully accepts restored contact request
 // 6) Alice get notified properly
-func (s *MessengerContactRequestSuite) TestBobRestoresContactRequestFromSyncInstallationContactV2() {
+func (s *MessengerContactRequestSuite) TestBobRestoresIncomingContactRequestFromSyncInstallationContactV2() {
 	messageText := "hello, Bobby!"
 
 	alice := s.m
@@ -1146,5 +1146,79 @@ func (s *MessengerContactRequestSuite) TestBobRestoresContactRequestFromSyncInst
 
 	// Make sure we consider them a mutual contact, receiver side
 	mutualContacts := bob2.MutualContacts()
+	s.Require().Len(mutualContacts, 1)
+}
+
+// The scenario tested is as follow:
+// 1) Alice sends a contact request to Alice
+// 2) Bob receives CR from Alice
+// 3) Alice resets his device
+// 4) Alice restores Bob's contact from backup, CR is created
+// 5) Bob accepts contact request
+// 6) Alice get notified properly
+func (s *MessengerContactRequestSuite) TestAliceRestoresOutgoingContactRequestFromSyncInstallationContactV2() {
+	messageText := "hello, Bobby!"
+
+	alice1 := s.m
+
+	bob := s.newMessenger(s.shh)
+	_, err := bob.Start()
+	s.Require().NoError(err)
+
+	aliceID := types.EncodeHex(crypto.FromECDSAPub(&alice1.identity.PublicKey))
+	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
+
+	// Alice sends a contact request to bob
+	requestFromAlice := &requests.SendContactRequest{
+		ID:      bobID,
+		Message: messageText,
+	}
+	s.sendContactRequest(requestFromAlice, alice1)
+
+	// Bob receives CR from Alice
+	contactRequest := s.receiveContactRequest(messageText, bob)
+	s.Require().NotNil(contactRequest)
+
+	// Bob resets his device
+	alice2, err := newMessengerWithKey(s.shh, alice1.identity, s.logger, nil)
+	s.Require().NoError(err)
+
+	_, err = alice2.Start()
+	s.Require().NoError(err)
+
+	// Get bob perspective of alice for backup
+	bobFromAlice := alice1.Contacts()[0]
+	state := alice2.buildMessageState()
+
+	// Restore alice's contact from backup
+	sync := s.syncInstallationContactV2FromContact(bobFromAlice)
+	err = alice2.HandleSyncInstallationContact(state, sync)
+	s.Require().NoError(err)
+
+	// Accept latest CR for a contact
+	resp, err := bob.AcceptLatestContactRequestForContact(context.Background(), &requests.AcceptLatestContactRequestForContact{ID: types.Hex2Bytes(aliceID)})
+	s.Require().NoError(err)
+
+	// Make sure the message is updated
+	s.Require().NotNil(resp)
+	s.Require().Len(resp.Messages(), 1)
+	// NOTE: We don't restore CR message
+	// s.Require().Equal(resp.Messages()[0].ID, contactRequest.ID)
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
+
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+
+	// Check the contact state is correctly set
+	s.Require().Len(resp.Contacts, 1)
+	s.Require().True(resp.Contacts[0].mutual())
+
+	// Make sure the sender is added to our contacts
+	contacts := bob.AddedContacts()
+	s.Require().Len(contacts, 1)
+
+	// Make sure we consider them a mutual contact, receiver side
+	mutualContacts := bob.MutualContacts()
 	s.Require().Len(mutualContacts, 1)
 }
