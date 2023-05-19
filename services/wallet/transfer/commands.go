@@ -27,21 +27,23 @@ const (
 	EventFetchingHistoryError walletevent.EventType = "fetching-history-error"
 	// EventNonArchivalNodeDetected emitted when a connection to a non archival node is detected
 	EventNonArchivalNodeDetected walletevent.EventType = "non-archival-node-detected"
+
+	numberOfBlocksCheckedPerIteration = 40
+	noBlockLimit                      = 0
 )
 
 var (
 	// This will work only for binance testnet as mainnet doesn't support
 	// archival request.
-	binanceChainMaxInitialRange       = big.NewInt(500000)
-	binanceChainErc20BatchSize        = big.NewInt(5000)
-	goerliErc20BatchSize              = big.NewInt(100000)
-	goerliErc20ArbitrumBatchSize      = big.NewInt(100000)
-	erc20BatchSize                    = big.NewInt(500000)
-	binancChainID                     = uint64(56)
-	goerliChainID                     = uint64(5)
-	goerliArbitrumChainID             = uint64(421613)
-	binanceTestChainID                = uint64(97)
-	numberOfBlocksCheckedPerIteration = 40
+	binanceChainMaxInitialRange  = big.NewInt(500000)
+	binanceChainErc20BatchSize   = big.NewInt(5000)
+	goerliErc20BatchSize         = big.NewInt(100000)
+	goerliErc20ArbitrumBatchSize = big.NewInt(100000)
+	erc20BatchSize               = big.NewInt(500000)
+	binancChainID                = uint64(56)
+	goerliChainID                = uint64(5)
+	goerliArbitrumChainID        = uint64(421613)
+	binanceTestChainID           = uint64(97)
 )
 
 type ethHistoricalCommand struct {
@@ -54,8 +56,9 @@ type ethHistoricalCommand struct {
 	error        error
 	noLimit      bool
 
-	from              *Block
-	to, resultingFrom *big.Int
+	from                          *Block
+	to, resultingFrom, startBlock *big.Int
+	threadLimit                   uint32
 }
 
 func (c *ethHistoricalCommand) Command() async.Command {
@@ -75,17 +78,20 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 	if c.from.Number != nil && c.from.Nonce != nil {
 		c.balanceCache.addNonceToCache(c.address, c.from.Number, c.from.Nonce)
 	}
-	from, headers, err := findBlocksWithEthTransfers(ctx, c.chainClient, c.balanceCache, c.eth, c.address, c.from.Number, c.to, c.noLimit)
+	from, headers, startBlock, err := findBlocksWithEthTransfers(ctx, c.chainClient, c.balanceCache, c.eth, c.address, c.from.Number, c.to, c.noLimit, c.threadLimit)
 
 	if err != nil {
 		c.error = err
+		log.Error("failed to find blocks with transfers", "error", err)
 		return nil
 	}
 
 	c.foundHeaders = headers
 	c.resultingFrom = from
+	c.startBlock = startBlock
 
-	log.Info("eth historical downloader finished successfully", "address", c.address, "from", from, "to", c.to, "total blocks", len(headers), "time", time.Since(start))
+	log.Info("eth historical downloader finished successfully", "chain", c.chainClient.ChainID,
+		"address", c.address, "from", from, "to", c.to, "total blocks", len(headers), "time", time.Since(start))
 
 	return nil
 }
@@ -239,6 +245,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 	cmnd := &findAndCheckBlockRangeCommand{
 		accounts:      c.accounts,
 		db:            c.db,
+		blockDAO:      c.blockDAO,
 		chainClient:   c.chainClient,
 		balanceCache:  bCache,
 		feed:          c.feed,
@@ -261,7 +268,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 		return cmnd.error
 	}
 
-	_, err = c.LoadTransfers(parent, 40)
+	_, err = c.LoadTransfers(parent, numberOfBlocksCheckedPerIteration)
 	if err != nil {
 		if c.NewError(err) {
 			return nil
@@ -336,7 +343,7 @@ func (c *controlCommand) Command() async.Command {
 type transfersCommand struct {
 	db                 *Database
 	eth                *ETHDownloader
-	block              *big.Int
+	blockNum           *big.Int
 	address            common.Address
 	chainClient        *chain.ClientWithFallback
 	fetchedTransfers   []Transfer
@@ -351,11 +358,13 @@ func (c *transfersCommand) Command() async.Command {
 }
 
 func (c *transfersCommand) Run(ctx context.Context) (err error) {
+	log.Debug("start transfersCommand", "chain", c.chainClient.ChainID, "address", c.address, "block", c.blockNum)
+
 	startTs := time.Now()
 
-	allTransfers, err := getTransfersByBlocks(ctx, c.db, c.eth, []*big.Int{c.block})
+	allTransfers, err := c.eth.GetTransfersByNumber(ctx, c.blockNum)
 	if err != nil {
-		log.Info("getTransfersByBlocks error", "error", err)
+		log.Error("getTransfersByBlocks error", "error", err)
 		return err
 	}
 
@@ -373,7 +382,7 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 	}
 
 	if len(allTransfers) > 0 {
-		err = c.db.SaveTransfersMarkBlocksLoaded(c.chainClient.ChainID, c.address, allTransfers, []*big.Int{c.block})
+		err = c.db.SaveTransfersMarkBlocksLoaded(c.chainClient.ChainID, c.address, allTransfers, []*big.Int{c.blockNum})
 		if err != nil {
 			log.Error("SaveTransfers error", "error", err)
 			return err
@@ -381,7 +390,9 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 	}
 
 	c.fetchedTransfers = allTransfers
-	log.Debug("transfers loaded", "address", c.address, "len", len(allTransfers), "in", time.Since(startTs))
+	log.Debug("end transfersCommand", "chain", c.chainClient.ChainID, "address", c.address,
+		"block", c.blockNum, "len", len(allTransfers), "in", time.Since(startTs))
+
 	return nil
 }
 
@@ -393,6 +404,7 @@ type loadTransfersCommand struct {
 	blocksByAddress         map[common.Address][]*big.Int
 	foundTransfersByAddress map[common.Address][]Transfer
 	transactionManager      *TransactionManager
+	blocksLimit             int
 }
 
 func (c *loadTransfersCommand) Command() async.Command {
@@ -407,7 +419,7 @@ func (c *loadTransfersCommand) LoadTransfers(ctx context.Context, limit int, blo
 }
 
 func (c *loadTransfersCommand) Run(parent context.Context) (err error) {
-	transfersByAddress, err := c.LoadTransfers(parent, 40, c.blocksByAddress, c.transactionManager)
+	transfersByAddress, err := c.LoadTransfers(parent, c.blocksLimit, c.blocksByAddress, c.transactionManager)
 	if err != nil {
 		return err
 	}
@@ -419,6 +431,7 @@ func (c *loadTransfersCommand) Run(parent context.Context) (err error) {
 type findAndCheckBlockRangeCommand struct {
 	accounts      []common.Address
 	db            *Database
+	blockDAO      *BlockDAO
 	chainClient   *chain.ClientWithFallback
 	balanceCache  *balanceCache
 	feed          *event.Feed
@@ -524,10 +537,11 @@ func (c *findAndCheckBlockRangeCommand) fastIndex(ctx context.Context, bCache *b
 				signer:      types.NewLondonSigner(c.chainClient.ToBigInt()),
 				db:          c.db,
 			},
-			feed:    c.feed,
-			from:    fromByAddress[address],
-			to:      toByAddress[address],
-			noLimit: c.noLimit,
+			feed:        c.feed,
+			from:        fromByAddress[address],
+			to:          toByAddress[address],
+			noLimit:     c.noLimit,
+			threadLimit: NoThreadLimit,
 		}
 		commands[i] = eth
 		group.Add(eth.Command())
@@ -586,10 +600,10 @@ func (c *findAndCheckBlockRangeCommand) fastIndexErc20(ctx context.Context, from
 }
 
 func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *BlockDAO, db *Database,
-	chainClient *chain.ClientWithFallback, limit int, blocksByAddress map[common.Address][]*big.Int,
+	chainClient *chain.ClientWithFallback, blocksLimitPerAccount int, blocksByAddress map[common.Address][]*big.Int,
 	transactionManager *TransactionManager) (map[common.Address][]Transfer, error) {
 
-	log.Info("loadTransfers start", "accounts", accounts, "limit", limit)
+	log.Info("loadTransfers start", "accounts", accounts, "chain", chainClient.ChainID, "limit", blocksLimitPerAccount)
 
 	start := time.Now()
 	group := async.NewGroup(ctx)
@@ -601,6 +615,7 @@ func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *Blo
 		if !ok {
 			blocks, _ = blockDAO.GetBlocksByAddress(chainClient.ChainID, address, numberOfBlocksCheckedPerIteration)
 		}
+
 		for _, block := range blocks {
 			transfers := &transfersCommand{
 				db:          db,
@@ -612,14 +627,13 @@ func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *Blo
 					signer:      types.NewLondonSigner(chainClient.ToBigInt()),
 					db:          db,
 				},
-				block:              block,
+				blockNum:           block,
 				transactionManager: transactionManager,
 			}
 			commands = append(commands, transfers)
 			group.Add(transfers.Command())
 		}
 	}
-
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -639,7 +653,7 @@ func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *Blo
 				transfersByAddress[command.address] = append(transfers, transfer)
 			}
 		}
-		log.Info("loadTransfers finished", "in", time.Since(start))
+		log.Info("loadTransfers finished for account", "in", time.Since(start), "chain", chainClient.ChainID)
 		return transfersByAddress, nil
 	}
 }
@@ -730,21 +744,4 @@ func findFirstRanges(c context.Context, accounts []common.Address, initialTo *bi
 	}
 
 	return res, nil
-}
-
-func getTransfersByBlocks(ctx context.Context, db *Database, downloader *ETHDownloader, blocks []*big.Int) ([]Transfer, error) {
-	allTransfers := []Transfer{}
-
-	for _, block := range blocks {
-		transfers, err := downloader.GetTransfersByNumber(ctx, block)
-		if err != nil {
-			return nil, err
-		}
-		log.Debug("loadTransfers", "block", block, "new transfers", len(transfers))
-		if len(transfers) > 0 {
-			allTransfers = append(allTransfers, transfers...)
-		}
-	}
-
-	return allTransfers, nil
 }

@@ -20,6 +20,7 @@ const (
 	ReactorNotStarted string = "reactor not started"
 
 	NonArchivalNodeBlockChunkSize = 100
+	DefaultNodeBlockChunkSize     = 10000
 )
 
 var errAlreadyRunning = errors.New("already running")
@@ -133,10 +134,6 @@ func (s *OnDemandFetchStrategy) getTransfersByAddress(ctx context.Context, chain
 	}
 
 	transfersCount := int64(len(rst))
-	chainClient, err := getChainClientByID(s.chainClients, chainID)
-	if err != nil {
-		return nil, err
-	}
 
 	if fetchMore && limit > transfersCount {
 
@@ -149,6 +146,11 @@ func (s *OnDemandFetchStrategy) getTransfersByAddress(ctx context.Context, chain
 		if block == nil || big.NewInt(0).Cmp(block) == 0 {
 			log.Info("[WalletAPI:: GetTransfersByAddress] ZERO block is found for", "address", address, "chaindID", chainID)
 			return rst, nil
+		}
+
+		chainClient, err := getChainClientByID(s.chainClients, chainID)
+		if err != nil {
+			return nil, err
 		}
 
 		from, err := findFirstRange(ctx, address, block, chainClient)
@@ -204,6 +206,7 @@ func (s *OnDemandFetchStrategy) getTransfersByAddress(ctx context.Context, chain
 				blockDAO:           s.blockDAO,
 				chainClient:        chainClient,
 				transactionManager: s.transactionManager,
+				blocksLimit:        numberOfBlocksCheckedPerIteration,
 			}
 
 			err = txCommand.Command()(ctx)
@@ -265,14 +268,14 @@ func (r *Reactor) createFetchStrategy(chainClients map[uint64]*chain.ClientWithF
 	accounts []common.Address, fetchType FetchStrategyType) HistoryFetcher {
 
 	if fetchType == SequentialFetchStrategyType {
-		return &SequentialFetchStrategy{
-			db:                 r.db,
-			feed:               r.feed,
-			blockDAO:           r.blockDAO,
-			transactionManager: r.transactionManager,
-			chainClients:       chainClients,
-			accounts:           accounts,
-		}
+		return NewSequentialFetchStrategy(
+			r.db,
+			r.blockDAO,
+			r.feed,
+			r.transactionManager,
+			chainClients,
+			accounts,
+		)
 	}
 
 	return &OnDemandFetchStrategy{
