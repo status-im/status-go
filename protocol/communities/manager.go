@@ -1102,12 +1102,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		}
 	}
 
-	community_pubkey, err := common.HexToPubkey(community.IDString())
-	if err != nil {
-		return nil, err
-	}
-
-	if !common.IsPubKeyEqual(community_pubkey, signer) {
+	if !common.IsPubKeyEqual(community.PublicKey(), signer) {
 		return nil, ErrNotAuthorized
 	}
 
@@ -1831,12 +1826,7 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, err
 	}
 
-	community_pubkey, err := common.HexToPubkey(community.IDString())
-	if err != nil {
-		return nil, err
-	}
-
-	if !common.IsPubKeyEqual(community_pubkey, signer) {
+	if !common.IsPubKeyEqual(community.PublicKey(), signer) {
 		return nil, ErrNotAuthorized
 	}
 
