@@ -155,14 +155,40 @@ func EncodePNG(img *image.RGBA) ([]byte, error) {
 	return resultImg.Bytes(), nil
 }
 
-func CreateCircle(img image.Image) *image.RGBA {
+func CreateCircleWithPadding(img image.Image, padding int) *image.RGBA {
 	bounds := img.Bounds()
-	circle := image.NewRGBA(bounds)
-	draw.DrawMask(circle, bounds, img, image.ZP, &Circle{
-		X: bounds.Dx() / 2,
-		Y: bounds.Dy() / 2,
-		R: bounds.Dx() / 2,
-	}, image.ZP, draw.Over)
+	width := bounds.Dx()
+	// only relying on width as a metric here because we know that we
+	// store profile images in a perfect circle
+	radius := width / 2
+
+	paddedWidth := width + 2*padding
+	paddedRadius := paddedWidth / 2
+
+	// Create a new circular image with padding
+	newBounds := image.Rect(0, 0, paddedWidth, paddedWidth)
+	circle := image.NewRGBA(newBounds)
+
+	// Create a larger circular mask for the padding
+	paddingMask := &Circle{
+		X: paddedRadius,
+		Y: paddedRadius,
+		R: paddedRadius,
+	}
+
+	// Draw the white color onto the circle with padding mask
+	draw.DrawMask(circle, circle.Bounds(), image.NewUniform(color.White), image.ZP, paddingMask, image.ZP, draw.Src)
+
+	// Create a new circle mask with the original size
+	circleMask := &Circle{
+		X: radius,
+		Y: radius,
+		R: radius,
+	}
+
+	// Draw the original image onto the white circular image at the center (with padding offset)
+	draw.DrawMask(circle, bounds.Add(image.Pt(padding, padding)), img, image.ZP, circleMask, image.ZP, draw.Over)
+
 	return circle
 }
 

@@ -107,6 +107,7 @@ func (s *QROpsTestSuite) TestQROpsCodeWithSuperImposingLogo() {
 
 	payload := generateQRBytes(params, s.Logger, db)
 	s.Require().NotEmpty(payload)
+
 	expectedPayload, err := images.Asset("_assets/tests/qr/QRWithLogo.png")
 	require.Equal(s.T(), payload, expectedPayload)
 	s.Require().NoError(err)
