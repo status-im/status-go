@@ -3435,6 +3435,13 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 			}
 		}
 	}
+	// Save chats if they were modified
+	if len(messageState.Response.chats) > 0 {
+		err := m.saveChats(messageState.Response.Chats())
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
