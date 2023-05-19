@@ -33,3 +33,11 @@ func WithACL(acl ACLFilter) Option {
 		return nil
 	}
 }
+
+// WithMetricsTracer is a Relay option that supplies a MetricsTracer for metrics
+func WithMetricsTracer(mt MetricsTracer) Option {
+	return func(r *Relay) error {
+		r.metricsTracer = mt
+		return nil
+	}
+}

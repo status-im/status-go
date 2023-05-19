@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/connmgr"
+	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/metrics"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -111,6 +112,8 @@ type Swarm struct {
 	// down before continuing.
 	refs sync.WaitGroup
 
+	emitter event.Emitter
+
 	rcmgr network.ResourceManager
 
 	local peer.ID
@@ -163,11 +166,16 @@ type Swarm struct {
 }
 
 // NewSwarm constructs a Swarm.
-func NewSwarm(local peer.ID, peers peerstore.Peerstore, opts ...Option) (*Swarm, error) {
+func NewSwarm(local peer.ID, peers peerstore.Peerstore, eventBus event.Bus, opts ...Option) (*Swarm, error) {
+	emitter, err := eventBus.Emitter(new(event.EvtPeerConnectednessChanged))
+	if err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Swarm{
 		local:            local,
 		peers:            peers,
+		emitter:          emitter,
 		ctx:              ctx,
 		ctxCancel:        cancel,
 		dialTimeout:      defaultDialTimeout,
@@ -202,6 +210,8 @@ func (s *Swarm) Close() error {
 
 func (s *Swarm) close() {
 	s.ctxCancel()
+
+	s.emitter.Close()
 
 	// Prevents new connections and/or listeners from being added to the swarm.
 	s.listeners.Lock()
@@ -319,6 +329,12 @@ func (s *Swarm) addConn(tc transport.CapableConn, dir network.Direction) (*Conn,
 	}
 
 	c.streams.m = make(map[*Stream]struct{})
+	if len(s.conns.m[p]) == 0 { // first connection
+		s.emitter.Emit(event.EvtPeerConnectednessChanged{
+			Peer:          p,
+			Connectedness: network.Connected,
+		})
+	}
 	s.conns.m[p] = append(s.conns.m[p], c)
 
 	// Add two swarm refs:
@@ -611,11 +627,16 @@ func (s *Swarm) removeConn(c *Conn) {
 
 	s.conns.Lock()
 	defer s.conns.Unlock()
+
 	cs := s.conns.m[p]
 	for i, ci := range cs {
 		if ci == c {
 			if len(cs) == 1 {
 				delete(s.conns.m, p)
+				s.emitter.Emit(event.EvtPeerConnectednessChanged{
+					Peer:          p,
+					Connectedness: network.NotConnected,
+				})
 			} else {
 				// NOTE: We're intentionally preserving order.
 				// This way, connections to a peer are always
@@ -624,7 +645,7 @@ func (s *Swarm) removeConn(c *Conn) {
 				cs[len(cs)-1] = nil
 				s.conns.m[p] = cs[:len(cs)-1]
 			}
-			return
+			break
 		}
 	}
 }

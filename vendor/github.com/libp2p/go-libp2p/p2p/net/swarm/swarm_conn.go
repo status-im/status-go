@@ -43,6 +43,10 @@ type Conn struct {
 
 var _ network.Conn = &Conn{}
 
+func (c *Conn) IsClosed() bool {
+	return c.conn.IsClosed()
+}
+
 func (c *Conn) ID() string {
 	// format: <first 10 chars of peer id>-<global conn ordinal>
 	return fmt.Sprintf("%s-%d", c.RemotePeer().Pretty()[0:10], c.id)
@@ -166,11 +170,6 @@ func (c *Conn) RemoteMultiaddr() ma.Multiaddr {
 // RemotePeer is the Peer on the remote side
 func (c *Conn) RemotePeer() peer.ID {
 	return c.conn.RemotePeer()
-}
-
-// LocalPrivateKey is the public key of the peer on this side
-func (c *Conn) LocalPrivateKey() ic.PrivKey {
-	return c.conn.LocalPrivateKey()
 }
 
 // RemotePublicKey is the public key of the peer on the remote side

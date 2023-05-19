@@ -11,8 +11,6 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/host/autonat/pb"
 
 	"github.com/libp2p/go-msgio/pbio"
-
-	ma "github.com/multiformats/go-multiaddr"
 )
 
 // NewAutoNATClient creates a fresh instance of an AutoNATClient
@@ -36,22 +34,22 @@ type client struct {
 // Note: A returned error Message_E_DIAL_ERROR does not imply that the server
 // actually performed a dial attempt. Servers that run a version < v0.20.0 also
 // return Message_E_DIAL_ERROR if the dial was skipped due to the dialPolicy.
-func (c *client) DialBack(ctx context.Context, p peer.ID) (ma.Multiaddr, error) {
+func (c *client) DialBack(ctx context.Context, p peer.ID) error {
 	s, err := c.h.NewStream(ctx, p, AutoNATProto)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := s.Scope().SetService(ServiceName); err != nil {
 		log.Debugf("error attaching stream to autonat service: %s", err)
 		s.Reset()
-		return nil, err
+		return err
 	}
 
 	if err := s.Scope().ReserveMemory(maxMsgSize, network.ReservationPriorityAlways); err != nil {
 		log.Debugf("error reserving memory for autonat stream: %s", err)
 		s.Reset()
-		return nil, err
+		return err
 	}
 	defer s.Scope().ReleaseMemory(maxMsgSize)
 
@@ -66,17 +64,17 @@ func (c *client) DialBack(ctx context.Context, p peer.ID) (ma.Multiaddr, error) 
 	req := newDialMessage(peer.AddrInfo{ID: c.h.ID(), Addrs: c.addrFunc()})
 	if err := w.WriteMsg(req); err != nil {
 		s.Reset()
-		return nil, err
+		return err
 	}
 
 	var res pb.Message
 	if err := r.ReadMsg(&res); err != nil {
 		s.Reset()
-		return nil, err
+		return err
 	}
 	if res.GetType() != pb.Message_DIAL_RESPONSE {
 		s.Reset()
-		return nil, fmt.Errorf("unexpected response: %s", res.GetType().String())
+		return fmt.Errorf("unexpected response: %s", res.GetType().String())
 	}
 
 	status := res.GetDialResponse().GetStatus()
@@ -85,10 +83,9 @@ func (c *client) DialBack(ctx context.Context, p peer.ID) (ma.Multiaddr, error) 
 	}
 	switch status {
 	case pb.Message_OK:
-		addr := res.GetDialResponse().GetAddr()
-		return ma.NewMultiaddrBytes(addr)
+		return nil
 	default:
-		return nil, Error{Status: status, Text: res.GetDialResponse().GetStatusText()}
+		return Error{Status: status, Text: res.GetDialResponse().GetStatusText()}
 	}
 }
 
