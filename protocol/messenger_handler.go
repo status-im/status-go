@@ -1570,12 +1570,10 @@ func (m *Messenger) HandleEditMessage(state *ReceivedMessageState, editMessage E
 		return err
 	}
 
+	needToSaveChat := false
 	if chat.LastMessage != nil && chat.LastMessage.ID == editedMessage.ID {
 		chat.LastMessage = editedMessage
-		err := m.saveChat(chat)
-		if err != nil {
-			return err
-		}
+		needToSaveChat = true
 	}
 	responseTo, err := m.persistence.MessageByID(editedMessage.ResponseTo)
 
@@ -1590,7 +1588,6 @@ func (m *Messenger) HandleEditMessage(state *ReceivedMessageState, editMessage E
 
 	editedMessageHasMentions := editedMessage.Mentioned
 
-	needToSaveChat := false
 	if editedMessageHasMentions && !originalMessageMentioned && !editedMessage.Seen {
 		// Increase unviewed count when the edited message has a mention and didn't have one before
 		chat.UnviewedMentionsCount++
