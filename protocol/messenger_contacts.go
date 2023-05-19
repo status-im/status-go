@@ -475,7 +475,7 @@ func (m *Messenger) AddContact(ctx context.Context, request *requests.AddContact
 		request.Nickname,
 		request.DisplayName,
 		"",
-		"Please add me to your contacts",
+		defaultContactRequestText(),
 		false,
 		true,
 		true,
@@ -960,6 +960,10 @@ func (m *Messenger) PendingContactRequests(cursor string, limit int) ([]*common.
 
 func defaultContactRequestID(contactID string) string {
 	return "0x" + types.Bytes2Hex(append(types.Hex2Bytes(contactID), 0x20))
+}
+
+func defaultContactRequestText() string {
+	return "Please add me to your contacts"
 }
 
 func (m *Messenger) BuildContact(request *requests.BuildContact) (*Contact, error) {

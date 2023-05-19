@@ -275,7 +275,7 @@ func (m *Messenger) createContactRequestForContactUpdate(contact *Contact, messa
 		messageState.CurrentMessageState.Message.Clock,
 		messageState.CurrentMessageState.WhisperTimestamp,
 		contact,
-		"Please add me to your contacts",
+		defaultContactRequestText(),
 		false,
 	)
 	if err != nil {
@@ -410,7 +410,11 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 	return nil
 }
 
-func (m *Messenger) syncReceivedContactRequest(contact *Contact, state *ReceivedMessageState, chat *Chat) error {
+func (m *Messenger) syncContactRequestForInstallationContact(contact *Contact, state *ReceivedMessageState, chat *Chat, outgoing bool) error {
+	if chat == nil {
+		return fmt.Errorf("no chat restored during the contact synchronisation, contact.ID = %s", contact.ID)
+	}
+
 	contactRequestID, err := m.persistence.LatestPendingContactRequestIDForContact(contact.ID)
 	if err != nil {
 		return err
@@ -420,70 +424,31 @@ func (m *Messenger) syncReceivedContactRequest(contact *Contact, state *Received
 		return nil
 	}
 
-	if chat == nil {
-		return fmt.Errorf("no chat restored during the contact synchronisation, contact.ID = %s", contact.ID)
-	}
-
 	clock, timestamp := chat.NextClockAndTimestamp(m.transport)
-	contactRequest, err := m.generateContactRequest(clock, timestamp, contact, "Please add me to your contacts", false)
+	contactRequest, err := m.generateContactRequest(clock, timestamp, contact, defaultContactRequestText(), outgoing)
 	if err != nil {
 		return err
 	}
 
 	contactRequest.ID = defaultContactRequestID(contact.ID)
 
-	// save this message
 	state.Response.AddMessage(contactRequest)
 	err = m.persistence.SaveMessages([]*common.Message{contactRequest})
 	if err != nil {
 		return err
 	}
 
-	// create AC notification
-	err = m.createIncomingContactRequestNotification(contact, state, contactRequest, true)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (m *Messenger) syncSentContactRequest(contact *Contact, state *ReceivedMessageState, chat *Chat) error {
-	contactRequestID, err := m.persistence.LatestPendingContactRequestIDForContact(contact.ID)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("------------> syncSentContactRequest", contactRequestID)
-
-	if contactRequestID != "" {
-		return nil
-	}
-
-	if chat == nil {
-		return fmt.Errorf("no chat restored during the contact synchronisation, contact.ID = %s", contact.ID)
-	}
-
-	clock, timestamp := chat.NextClockAndTimestamp(m.transport)
-	contactRequest, err := m.generateContactRequest(clock, timestamp, contact, "Please add me to your contacts", true)
-	if err != nil {
-		return err
-	}
-
-	contactRequest.ID = defaultContactRequestID(contact.ID)
-
-	// save this message
-	state.Response.AddMessage(contactRequest)
-	err = m.persistence.SaveMessages([]*common.Message{contactRequest})
-	if err != nil {
-		return err
-	}
-
-	// create AC notification
-	notification := m.generateOutgoingContactRequestNotification(contact, contactRequest)
-	err = m.addActivityCenterNotification(state.Response, notification)
-	if err != nil {
-		return err
+	if outgoing {
+		notification := m.generateOutgoingContactRequestNotification(contact, contactRequest)
+		err = m.addActivityCenterNotification(state.Response, notification)
+		if err != nil {
+			return err
+		}
+	} else {
+		err = m.createIncomingContactRequestNotification(contact, state, contactRequest, true)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -528,16 +493,9 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)
 
-		if contact.ContactRequestRemoteState == ContactRequestStateReceived {
-			err := m.syncReceivedContactRequest(contact, state, chat)
-			if err != nil {
-				return err
-			}
-		} else if contact.ContactRequestLocalState == ContactRequestStateSent {
-			err := m.syncSentContactRequest(contact, state, chat)
-			if err != nil {
-				return err
-			}
+		err := m.syncContactRequestForInstallationContact(contact, state, chat, contact.ContactRequestLocalState == ContactRequestStateSent)
+		if err != nil {
+			return err
 		}
 	} else if message.Added || message.HasAddedUs {
 		// NOTE(cammellos): this is for handling backward compatibility, old clients
@@ -546,7 +504,7 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 		if message.Added && contact.LastUpdatedLocally < message.LastUpdatedLocally {
 			contact.ContactRequestSent(message.LastUpdatedLocally)
 
-			err := m.syncSentContactRequest(contact, state, chat)
+			err := m.syncContactRequestForInstallationContact(contact, state, chat, true)
 			if err != nil {
 				return err
 			}
@@ -555,7 +513,7 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 		if message.HasAddedUs && contact.LastUpdated < message.LastUpdated {
 			contact.ContactRequestReceived(message.LastUpdated)
 
-			err := m.syncReceivedContactRequest(contact, state, chat)
+			err := m.syncContactRequestForInstallationContact(contact, state, chat, false)
 			if err != nil {
 				return err
 			}

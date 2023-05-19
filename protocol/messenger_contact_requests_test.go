@@ -1150,9 +1150,9 @@ func (s *MessengerContactRequestSuite) TestBobRestoresIncomingContactRequestFrom
 }
 
 // The scenario tested is as follow:
-// 1) Alice sends a contact request to Alice
+// 1) Alice sends a contact request to Bob
 // 2) Bob receives CR from Alice
-// 3) Alice resets his device
+// 3) Alice resets her device
 // 4) Alice restores Bob's contact from backup, CR is created
 // 5) Bob accepts contact request
 // 6) Alice get notified properly
