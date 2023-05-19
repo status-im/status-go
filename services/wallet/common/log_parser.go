@@ -1,4 +1,6 @@
-package transfer
+// Moved here because transactions package depends on accounts package which
+// depends on appdatabase where this functionality is needed
+package common
 
 import (
 	"fmt"
@@ -6,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -17,21 +20,21 @@ type EventType string
 
 const (
 	// Transaction types
-	ethTransfer        Type = "eth"
-	erc20Transfer      Type = "erc20"
-	erc721Transfer     Type = "erc721"
-	uniswapV2Swap      Type = "uniswapV2Swap"
-	uniswapV3Swap      Type = "uniswapV3Swap"
+	EthTransfer        Type = "eth"
+	Erc20Transfer      Type = "erc20"
+	Erc721Transfer     Type = "erc721"
+	UniswapV2Swap      Type = "uniswapV2Swap"
+	UniswapV3Swap      Type = "uniswapV3Swap"
 	unknownTransaction Type = "unknown"
 
 	// Event types
-	erc20TransferEventType  EventType = "erc20Event"
-	erc721TransferEventType EventType = "erc721Event"
-	uniswapV2SwapEventType  EventType = "uniswapV2SwapEvent"
-	uniswapV3SwapEventType  EventType = "uniswapV3SwapEvent"
-	unknownEventType        EventType = "unknownEvent"
+	Erc20TransferEventType  EventType = "erc20Event"
+	Erc721TransferEventType EventType = "erc721Event"
+	UniswapV2SwapEventType  EventType = "uniswapV2SwapEvent"
+	UniswapV3SwapEventType  EventType = "uniswapV3SwapEvent"
+	UnknownEventType        EventType = "unknownEvent"
 
-	erc20_721TransferEventSignature = "Transfer(address,address,uint256)"
+	Erc20_721TransferEventSignature = "Transfer(address,address,uint256)"
 
 	erc20TransferEventIndexedParameters  = 3 // signature, from, to
 	erc721TransferEventIndexedParameters = 4 // signature, from, to, tokenId
@@ -47,39 +50,39 @@ var (
 
 // Detect event type for a cetain item from the Events Log
 func GetEventType(log *types.Log) EventType {
-	erc20_721TransferEventSignatureHash := getEventSignatureHash(erc20_721TransferEventSignature)
-	uniswapV2SwapEventSignatureHash := getEventSignatureHash(uniswapV2SwapEventSignature)
-	uniswapV3SwapEventSignatureHash := getEventSignatureHash(uniswapV3SwapEventSignature)
+	erc20_721TransferEventSignatureHash := GetEventSignatureHash(Erc20_721TransferEventSignature)
+	uniswapV2SwapEventSignatureHash := GetEventSignatureHash(uniswapV2SwapEventSignature)
+	uniswapV3SwapEventSignatureHash := GetEventSignatureHash(uniswapV3SwapEventSignature)
 
 	if len(log.Topics) > 0 {
 		switch log.Topics[0] {
 		case erc20_721TransferEventSignatureHash:
 			switch len(log.Topics) {
 			case erc20TransferEventIndexedParameters:
-				return erc20TransferEventType
+				return Erc20TransferEventType
 			case erc721TransferEventIndexedParameters:
-				return erc721TransferEventType
+				return Erc721TransferEventType
 			}
 		case uniswapV2SwapEventSignatureHash:
-			return uniswapV2SwapEventType
+			return UniswapV2SwapEventType
 		case uniswapV3SwapEventSignatureHash:
-			return uniswapV3SwapEventType
+			return UniswapV3SwapEventType
 		}
 	}
 
-	return unknownEventType
+	return UnknownEventType
 }
 
 func EventTypeToSubtransactionType(eventType EventType) Type {
 	switch eventType {
-	case erc20TransferEventType:
-		return erc20Transfer
-	case erc721TransferEventType:
-		return erc721Transfer
-	case uniswapV2SwapEventType:
-		return uniswapV2Swap
-	case uniswapV3SwapEventType:
-		return uniswapV3Swap
+	case Erc20TransferEventType:
+		return Erc20Transfer
+	case Erc721TransferEventType:
+		return Erc721Transfer
+	case UniswapV2SwapEventType:
+		return UniswapV2Swap
+	case UniswapV3SwapEventType:
+		return UniswapV3Swap
 	}
 
 	return unknownTransaction
@@ -88,20 +91,20 @@ func EventTypeToSubtransactionType(eventType EventType) Type {
 func GetFirstEvent(logs []*types.Log) (EventType, *types.Log) {
 	for _, log := range logs {
 		eventType := GetEventType(log)
-		if eventType != unknownEventType {
+		if eventType != UnknownEventType {
 			return eventType, log
 		}
 	}
 
-	return unknownEventType, nil
+	return UnknownEventType, nil
 }
 
 func IsTokenTransfer(logs []*types.Log) bool {
 	eventType, _ := GetFirstEvent(logs)
-	return eventType == erc20TransferEventType
+	return eventType == Erc20TransferEventType
 }
 
-func parseErc20TransferLog(ethlog *types.Log) (from, to common.Address, amount *big.Int) {
+func ParseErc20TransferLog(ethlog *types.Log) (from, to common.Address, amount *big.Int) {
 	amount = new(big.Int)
 	if len(ethlog.Topics) < 3 {
 		log.Warn("not enough topics for erc20 transfer", "topics", ethlog.Topics)
@@ -126,7 +129,7 @@ func parseErc20TransferLog(ethlog *types.Log) (from, to common.Address, amount *
 	return
 }
 
-func parseErc721TransferLog(ethlog *types.Log) (from, to common.Address, tokenID *big.Int) {
+func ParseErc721TransferLog(ethlog *types.Log) (from, to common.Address, tokenID *big.Int) {
 	tokenID = new(big.Int)
 	if len(ethlog.Topics) < 4 {
 		log.Warn("not enough topics for erc721 transfer", "topics", ethlog.Topics)
@@ -151,7 +154,7 @@ func parseErc721TransferLog(ethlog *types.Log) (from, to common.Address, tokenID
 	return
 }
 
-func parseUniswapV2Log(ethlog *types.Log) (pairAddress common.Address, from common.Address, to common.Address, amount0In *big.Int, amount1In *big.Int, amount0Out *big.Int, amount1Out *big.Int, err error) {
+func ParseUniswapV2Log(ethlog *types.Log) (pairAddress common.Address, from common.Address, to common.Address, amount0In *big.Int, amount1In *big.Int, amount0Out *big.Int, amount1Out *big.Int, err error) {
 	amount0In = new(big.Int)
 	amount1In = new(big.Int)
 	amount0Out = new(big.Int)
@@ -199,7 +202,7 @@ func readInt256(b []byte) *big.Int {
 	return ret
 }
 
-func parseUniswapV3Log(ethlog *types.Log) (poolAddress common.Address, sender common.Address, recipient common.Address, amount0 *big.Int, amount1 *big.Int, err error) {
+func ParseUniswapV3Log(ethlog *types.Log) (poolAddress common.Address, sender common.Address, recipient common.Address, amount0 *big.Int, amount1 *big.Int, err error) {
 	amount0 = new(big.Int)
 	amount1 = new(big.Int)
 
@@ -226,6 +229,38 @@ func parseUniswapV3Log(ethlog *types.Log) (poolAddress common.Address, sender co
 	}
 	amount0 = readInt256(ethlog.Data[0:32])
 	amount1 = readInt256(ethlog.Data[32:64])
+
+	return
+}
+
+func GetEventSignatureHash(signature string) common.Hash {
+	return crypto.Keccak256Hash([]byte(signature))
+}
+
+func ExtractTokenIdentity(dbEntryType Type, log *types.Log, tx *types.Transaction) (correctType Type, tokenAddress *common.Address, tokenID *big.Int, value *big.Int) {
+	// erc721 transfers share signature with erc20 ones, so they both used to be categorized as erc20
+	// by the Downloader. We fix this here since they might be mis-categorized in the db.
+	if dbEntryType == Erc20Transfer {
+		eventType := GetEventType(log)
+		correctType = EventTypeToSubtransactionType(eventType)
+	} else {
+		correctType = dbEntryType
+	}
+
+	switch correctType {
+	case EthTransfer:
+		if tx != nil {
+			value = new(big.Int).Set(tx.Value())
+		}
+	case Erc20Transfer:
+		tokenAddress = new(common.Address)
+		*tokenAddress = log.Address
+		_, _, value = ParseErc20TransferLog(log)
+	case Erc721Transfer:
+		tokenAddress = new(common.Address)
+		*tokenAddress = log.Address
+		_, _, tokenID = ParseErc721TransferLog(log)
+	}
 
 	return
 }

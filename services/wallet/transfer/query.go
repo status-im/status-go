@@ -53,7 +53,7 @@ func (q *transfersQuery) addWhereSeparator(separator SeparatorType) {
 
 type SeparatorType int
 
-// Beware if changing this enum please update addWhereSeparator as well
+// Beware: please update addWhereSeparator if changing this enum
 const (
 	NoSeparator SeparatorType = iota + 1
 	OrSeparator

@@ -13,7 +13,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/status-im/status-go/rpc/chain"
+	w_common "github.com/status-im/status-go/services/wallet/common"
 )
 
 type MultiTransactionIDType int64
@@ -21,10 +23,6 @@ type MultiTransactionIDType int64
 const (
 	NoMultiTransactionID = MultiTransactionIDType(0)
 )
-
-func getEventSignatureHash(signature string) common.Hash {
-	return crypto.Keccak256Hash([]byte(signature))
-}
 
 func getLogSubTxID(log types.Log) common.Hash {
 	// Get unique ID by using TxHash and log index
@@ -45,7 +43,7 @@ var (
 // To be converted into one or many Transfer objects post-indexing.
 type PreloadedTransaction struct {
 	NetworkID   uint64
-	Type        Type           `json:"type"`
+	Type        w_common.Type  `json:"type"`
 	ID          common.Hash    `json:"-"`
 	Address     common.Address `json:"address"`
 	BlockNumber *big.Int       `json:"blockNumber"`
@@ -61,7 +59,7 @@ type PreloadedTransaction struct {
 // Transfer stores information about transfer.
 // A Transfer represents a plain ETH transfer or some token activity inside a Transaction
 type Transfer struct {
-	Type        Type               `json:"type"`
+	Type        w_common.Type      `json:"type"`
 	ID          common.Hash        `json:"-"`
 	Address     common.Address     `json:"address"`
 	BlockNumber *big.Int           `json:"blockNumber"`
@@ -114,8 +112,8 @@ func getTransferByHash(ctx context.Context, client *chain.ClientWithFallback, si
 		return nil, err
 	}
 
-	eventType, transactionLog := GetFirstEvent(receipt.Logs)
-	transactionType := EventTypeToSubtransactionType(eventType)
+	eventType, transactionLog := w_common.GetFirstEvent(receipt.Logs)
+	transactionType := w_common.EventTypeToSubtransactionType(eventType)
 
 	from, err := types.Sender(signer, transaction)
 
@@ -184,7 +182,7 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 					return nil, err
 				}
 
-				eventType, _ := GetFirstEvent(receipt.Logs)
+				eventType, _ := w_common.GetFirstEvent(receipt.Logs)
 
 				baseGasFee, err := d.chainClient.GetBaseFeeFromBlock(blk.Number())
 				if err != nil {
@@ -193,9 +191,9 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 
 				// If the transaction is not already some known transfer type, add it
 				// to the list as a plain eth transfer
-				if eventType == unknownEventType {
+				if eventType == w_common.UnknownEventType {
 					rst = append(rst, Transfer{
-						Type:               ethTransfer,
+						Type:               w_common.EthTransfer,
 						ID:                 tx.Hash(),
 						Address:            address,
 						BlockNumber:        blk.Number(),
@@ -218,7 +216,7 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 
 // NewERC20TransfersDownloader returns new instance.
 func NewERC20TransfersDownloader(client *chain.ClientWithFallback, accounts []common.Address, signer types.Signer) *ERC20TransfersDownloader {
-	signature := getEventSignatureHash(erc20_721TransferEventSignature)
+	signature := w_common.GetEventSignatureHash(w_common.Erc20_721TransferEventSignature)
 
 	return &ERC20TransfersDownloader{
 		client:    client,
@@ -230,7 +228,7 @@ func NewERC20TransfersDownloader(client *chain.ClientWithFallback, accounts []co
 
 // ERC20TransfersDownloader is a downloader for erc20 and erc721 tokens transfers.
 // Since both transaction types share the same signature, both will be assigned
-// type erc20Transfer. Until the downloader gets refactored and a migration of the
+// type Erc20Transfer. Until the downloader gets refactored and a migration of the
 // database gets implemented, differentiation between erc20 and erc721 will handled
 // in the controller.
 type ERC20TransfersDownloader struct {
@@ -291,28 +289,28 @@ func (d *ETHDownloader) subTransactionsFromTransactionHash(parent context.Contex
 	rst := make([]Transfer, 0, len(receipt.Logs))
 
 	for _, log := range receipt.Logs {
-		eventType := GetEventType(log)
+		eventType := w_common.GetEventType(log)
 		// Only add ERC20/ERC721 transfers from/to the given account
 		// Other types of events get always added
 		mustAppend := false
 		switch eventType {
-		case erc20TransferEventType:
-			from, to, _ := parseErc20TransferLog(log)
+		case w_common.Erc20TransferEventType:
+			from, to, _ := w_common.ParseErc20TransferLog(log)
 			if from == address || to == address {
 				mustAppend = true
 			}
-		case erc721TransferEventType:
-			from, to, _ := parseErc721TransferLog(log)
+		case w_common.Erc721TransferEventType:
+			from, to, _ := w_common.ParseErc721TransferLog(log)
 			if from == address || to == address {
 				mustAppend = true
 			}
-		case uniswapV2SwapEventType, uniswapV3SwapEventType:
+		case w_common.UniswapV2SwapEventType, w_common.UniswapV3SwapEventType:
 			mustAppend = true
 		}
 
 		if mustAppend {
 			transfer := Transfer{
-				Type:               EventTypeToSubtransactionType(eventType),
+				Type:               w_common.EventTypeToSubtransactionType(eventType),
 				ID:                 getLogSubTxID(*log),
 				Address:            address,
 				BlockNumber:        new(big.Int).SetUint64(log.BlockNumber),
@@ -359,7 +357,7 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 				ID:          id,
 				From:        address,
 				Loaded:      false,
-				Type:        erc20Transfer,
+				Type:        w_common.Erc20Transfer,
 				Log:         &l,
 				BaseGasFees: baseGasFee,
 			}},

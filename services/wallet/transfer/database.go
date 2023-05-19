@@ -12,7 +12,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/status-im/status-go/services/wallet/bigint"
+	w_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/sqlite"
 )
 
 // DBHeader fields from header that are stored in database.
@@ -25,7 +28,7 @@ type DBHeader struct {
 	Address               common.Address
 	// Head is true if the block was a head at the time it was pulled from chain.
 	Head bool
-	// Loaded is true if trasfers from this block has been already fetched
+	// Loaded is true if transfers from this block have been already fetched
 	Loaded bool
 }
 
@@ -364,15 +367,15 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, acco
 		return err
 	}
 	updateTx, err := creator.Prepare(`UPDATE transfers
-	SET log = ?
+	SET log = ?, log_index = ?
 	WHERE network_id = ? AND address = ? AND hash = ?`)
 	if err != nil {
 		return err
 	}
 
 	insertTx, err := creator.Prepare(`INSERT OR IGNORE
-	INTO transfers (network_id, address, sender, hash, blk_number, blk_hash, type, timestamp, log, loaded)
-	VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 0)`)
+	INTO transfers (network_id, address, sender, hash, blk_number, blk_hash, type, timestamp, log, loaded, log_index)
+	VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 0, ?)`)
 	if err != nil {
 		return err
 	}
@@ -383,7 +386,12 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, acco
 			return err
 		}
 		for _, transaction := range header.PreloadedTransactions {
-			res, err := updateTx.Exec(&JSONBlob{transaction.Log}, chainID, account, transaction.ID)
+			var logIndex *uint
+			if transaction.Log != nil {
+				logIndex = new(uint)
+				*logIndex = transaction.Log.Index
+			}
+			res, err := updateTx.Exec(&JSONBlob{transaction.Log}, logIndex, chainID, account, transaction.ID)
 			if err != nil {
 				return err
 			}
@@ -395,9 +403,9 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, acco
 				continue
 			}
 
-			_, err = insertTx.Exec(chainID, account, account, transaction.ID, (*bigint.SQLBigInt)(header.Number), header.Hash, erc20Transfer, &JSONBlob{transaction.Log})
+			_, err = insertTx.Exec(chainID, account, account, transaction.ID, (*bigint.SQLBigInt)(header.Number), header.Hash, w_common.Erc20Transfer, &JSONBlob{transaction.Log}, logIndex)
 			if err != nil {
-				log.Error("error saving erc20transfer", "err", err)
+				log.Error("error saving Erc20transfer", "err", err)
 				return err
 			}
 		}
@@ -407,14 +415,70 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, acco
 
 func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers []Transfer) error {
 	insert, err := creator.Prepare(`INSERT OR REPLACE INTO transfers
-        (network_id, hash, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, type, loaded, base_gas_fee, multi_transaction_id)
+        (network_id, hash, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, type, loaded, base_gas_fee, multi_transaction_id,
+		status, receipt_type, tx_hash, log_index, block_hash, cumulative_gas_used, contract_address, gas_used, tx_index,
+		tx_type, protected, gas_limit, gas_price_clamped64, gas_tip_cap_clamped64, gas_fee_cap_clamped64, amount_padded128hex, account_nonce, size, token_address, token_id)
 	VALUES
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`)
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
 	for _, t := range transfers {
-		_, err = insert.Exec(chainID, t.ID, t.BlockHash, (*bigint.SQLBigInt)(t.BlockNumber), t.Timestamp, t.Address, &JSONBlob{t.Transaction}, t.From, &JSONBlob{t.Receipt}, &JSONBlob{t.Log}, t.Type, t.BaseGasFees, t.MultiTransactionID)
+		var receiptType *uint8
+		var txHash, blockHash *common.Hash
+		var receiptStatus, cumulativeGasUsed, gasUsed *uint64
+		var contractAddress *common.Address
+		var transactionIndex, logIndex *uint
+
+		if t.Receipt != nil {
+			receiptType = &t.Receipt.Type
+			receiptStatus = &t.Receipt.Status
+			txHash = &t.Receipt.TxHash
+			if t.Log != nil {
+				logIndex = new(uint)
+				*logIndex = t.Log.Index
+			}
+			blockHash = &t.Receipt.BlockHash
+			cumulativeGasUsed = &t.Receipt.CumulativeGasUsed
+			contractAddress = &t.Receipt.ContractAddress
+			gasUsed = &t.Receipt.GasUsed
+			transactionIndex = &t.Receipt.TransactionIndex
+		}
+
+		var txProtected *bool
+		var txGas, txNonce, txSize *uint64
+		var txGasPrice, txGasTipCap, txGasFeeCap *int64
+		var txType *uint8
+		var txValue *string
+		var tokenAddress *common.Address
+		var tokenID *big.Int
+		if t.Transaction != nil {
+			var value *big.Int
+			if t.Log != nil {
+				_, tokenAddress, tokenID, value = w_common.ExtractTokenIdentity(t.Type, t.Log, t.Transaction)
+			} else {
+				value = new(big.Int).Set(t.Transaction.Value())
+			}
+
+			txType = new(uint8)
+			*txType = t.Transaction.Type()
+			txProtected = new(bool)
+			*txProtected = t.Transaction.Protected()
+			txGas = new(uint64)
+			*txGas = t.Transaction.Gas()
+			txGasPrice = sqlite.BigIntToClampedInt64(t.Transaction.GasPrice())
+			txGasTipCap = sqlite.BigIntToClampedInt64(t.Transaction.GasTipCap())
+			txGasFeeCap = sqlite.BigIntToClampedInt64(t.Transaction.GasFeeCap())
+			txValue = sqlite.BigIntToPadded128BitsStr(value)
+			txNonce = new(uint64)
+			*txNonce = t.Transaction.Nonce()
+			txSize = new(uint64)
+			*txSize = uint64(t.Transaction.Size())
+		}
+
+		_, err = insert.Exec(chainID, t.ID, t.BlockHash, (*bigint.SQLBigInt)(t.BlockNumber), t.Timestamp, t.Address, &JSONBlob{t.Transaction}, t.From, &JSONBlob{t.Receipt}, &JSONBlob{t.Log}, t.Type, t.BaseGasFees, t.MultiTransactionID,
+			receiptStatus, receiptType, txHash, logIndex, blockHash, cumulativeGasUsed, contractAddress, gasUsed, transactionIndex,
+			txType, txProtected, txGas, txGasPrice, txGasTipCap, txGasFeeCap, txValue, txNonce, txSize, &sqlite.JSONBlob{Data: tokenAddress}, (*bigint.SQLBigIntBytes)(tokenID))
 		if err != nil {
 			log.Error("can't save transfer", "b-hash", t.BlockHash, "b-n", t.BlockNumber, "a", t.Address, "h", t.ID)
 			return err

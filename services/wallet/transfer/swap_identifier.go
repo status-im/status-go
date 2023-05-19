@@ -9,9 +9,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+
 	uniswapv2 "github.com/status-im/status-go/contracts/uniswapV2"
 	uniswapv3 "github.com/status-im/status-go/contracts/uniswapV3"
 	"github.com/status-im/status-go/rpc/chain"
+	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/token"
 )
 
@@ -86,7 +88,7 @@ func identifyUniswapV2Asset(tokenManager *token.Manager, chainID uint64, amount0
 }
 
 func fetchUniswapV2Info(ctx context.Context, client *chain.ClientWithFallback, tokenManager *token.Manager, log *types.Log) (fromAsset string, fromAmount *hexutil.Big, toAsset string, toAmount *hexutil.Big, err error) {
-	pairAddress, _, _, amount0In, amount1In, amount0Out, amount1Out, err := parseUniswapV2Log(log)
+	pairAddress, _, _, amount0In, amount1In, amount0Out, amount1Out, err := w_common.ParseUniswapV2Log(log)
 	if err != nil {
 		return
 	}
@@ -155,7 +157,7 @@ func identifyUniswapV3Assets(tokenManager *token.Manager, chainID uint64, amount
 }
 
 func fetchUniswapV3Info(ctx context.Context, client *chain.ClientWithFallback, tokenManager *token.Manager, log *types.Log) (fromAsset string, fromAmount *hexutil.Big, toAsset string, toAmount *hexutil.Big, err error) {
-	poolAddress, _, _, amount0, amount1, err := parseUniswapV3Log(log)
+	poolAddress, _, _, amount0, amount1, err := w_common.ParseUniswapV3Log(log)
 	if err != nil {
 		return
 	}
@@ -183,11 +185,11 @@ func fetchUniswapV3Info(ctx context.Context, client *chain.ClientWithFallback, t
 	return
 }
 
-func fetchUniswapInfo(ctx context.Context, client *chain.ClientWithFallback, tokenManager *token.Manager, log *types.Log, logType EventType) (fromAsset string, fromAmount *hexutil.Big, toAsset string, toAmount *hexutil.Big, err error) {
+func fetchUniswapInfo(ctx context.Context, client *chain.ClientWithFallback, tokenManager *token.Manager, log *types.Log, logType w_common.EventType) (fromAsset string, fromAmount *hexutil.Big, toAsset string, toAmount *hexutil.Big, err error) {
 	switch logType {
-	case uniswapV2SwapEventType:
+	case w_common.UniswapV2SwapEventType:
 		return fetchUniswapV2Info(ctx, client, tokenManager, log)
-	case uniswapV3SwapEventType:
+	case w_common.UniswapV3SwapEventType:
 		return fetchUniswapV3Info(ctx, client, tokenManager, log)
 	}
 	err = fmt.Errorf("wrong log type %s", logType)
@@ -204,12 +206,12 @@ func buildUniswapSwapMultitransaction(ctx context.Context, client *chain.ClientW
 	}
 
 	var firstSwapLog, lastSwapLog *types.Log
-	var firstSwapLogType, lastSwapLogType EventType
+	var firstSwapLogType, lastSwapLogType w_common.EventType
 
 	for _, ethlog := range transfer.Receipt.Logs {
-		logType := GetEventType(ethlog)
+		logType := w_common.GetEventType(ethlog)
 		switch logType {
-		case uniswapV2SwapEventType, uniswapV3SwapEventType:
+		case w_common.UniswapV2SwapEventType, w_common.UniswapV3SwapEventType:
 			if firstSwapLog == nil {
 				firstSwapLog = ethlog
 				firstSwapLogType = logType
