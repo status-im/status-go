@@ -18,7 +18,6 @@ type conn struct {
 	scope     network.ConnManagementScope
 
 	localPeer      peer.ID
-	privKey        ic.PrivKey
 	localMultiaddr ma.Multiaddr
 
 	remotePeerID    peer.ID
@@ -65,9 +64,6 @@ func (c *conn) AcceptStream() (network.MuxedStream, error) {
 
 // LocalPeer returns our peer ID
 func (c *conn) LocalPeer() peer.ID { return c.localPeer }
-
-// LocalPrivateKey returns our private key
-func (c *conn) LocalPrivateKey() ic.PrivKey { return c.privKey }
 
 // RemotePeer returns the peer ID of the remote peer.
 func (c *conn) RemotePeer() peer.ID { return c.remotePeerID }

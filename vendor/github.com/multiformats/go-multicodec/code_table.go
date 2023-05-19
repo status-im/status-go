@@ -69,10 +69,10 @@ const (
 	// Dccp is a draft code tagged "multiaddr".
 	Dccp Code = 0x21 // dccp
 
-	// Murmur3X64_64 is a permanent code tagged "multihash" and described by: The first 64-bits of a murmur3-x64-128 - used for UnixFS directory sharding..
+	// Murmur3X64_64 is a permanent code tagged "hash" and described by: The first 64-bits of a murmur3-x64-128 - used for UnixFS directory sharding..
 	Murmur3X64_64 Code = 0x22 // murmur3-x64-64
 
-	// Murmur3_32 is a draft code tagged "multihash".
+	// Murmur3_32 is a draft code tagged "hash".
 	Murmur3_32 Code = 0x23 // murmur3-32
 
 	// Ip6 is a permanent code tagged "multiaddr".
@@ -330,6 +330,12 @@ const (
 	// Utp is a draft code tagged "multiaddr".
 	Utp Code = 0x012e // utp
 
+	// Crc32 is a draft code tagged "hash" and described by: CRC-32 non-cryptographic hash algorithm (IEEE 802.3).
+	Crc32 Code = 0x0132 // crc32
+
+	// Crc64Ecma is a draft code tagged "hash" and described by: CRC-64 non-cryptographic hash algorithm (ECMA-182 - Annex B).
+	Crc64Ecma Code = 0x0164 // crc64-ecma
+
 	// Unix is a permanent code tagged "multiaddr".
 	Unix Code = 0x0190 // unix
 
@@ -366,6 +372,9 @@ const (
 	// Quic is a permanent code tagged "multiaddr".
 	Quic Code = 0x01cc // quic
 
+	// QuicV1 is a permanent code tagged "multiaddr".
+	QuicV1 Code = 0x01cd // quic-v1
+
 	// Webtransport is a draft code tagged "multiaddr".
 	Webtransport Code = 0x01d1 // webtransport
 
@@ -396,6 +405,9 @@ const (
 	// Car is a draft code tagged "serialization" and described by: Content Addressable aRchive (CAR).
 	Car Code = 0x0202 // car
 
+	// IpnsRecord is a permanent code tagged "serialization" and described by: Signed IPNS Record.
+	IpnsRecord Code = 0x0300 // ipns-record
+
 	// Libp2pPeerRecord is a permanent code tagged "libp2p" and described by: libp2p peer record type.
 	Libp2pPeerRecord Code = 0x0301 // libp2p-peer-record
 
@@ -417,6 +429,9 @@ const (
 	// TransportGraphsyncFilecoinv1 is a draft code tagged "transport" and described by: Filecoin graphsync datatransfer.
 	TransportGraphsyncFilecoinv1 Code = 0x0910 // transport-graphsync-filecoinv1
 
+	// Multidid is a draft code tagged "multiformat" and described by: Compact encoding for Decentralized Identifers.
+	Multidid Code = 0x0d1d // multidid
+
 	// Sha2_256Trunc254Padded is a permanent code tagged "multihash" and described by: SHA2-256 with the two most significant bits from the last byte zeroed (as via a mask with 0b00111111) - used for proving trees as in Filecoin.
 	Sha2_256Trunc254Padded Code = 0x1012 // sha2-256-trunc254-padded
 
@@ -429,7 +444,7 @@ const (
 	// Sha2_512_256 is a permanent code tagged "multihash" and described by: aka SHA-512/256; as specified by FIPS 180-4..
 	Sha2_512_256 Code = 0x1015 // sha2-512-256
 
-	// Murmur3X64_128 is a draft code tagged "multihash".
+	// Murmur3X64_128 is a draft code tagged "hash".
 	Murmur3X64_128 Code = 0x1022 // murmur3-x64-128
 
 	// Ripemd128 is a draft code tagged "multihash".
@@ -1449,6 +1464,18 @@ const (
 	// Skein1024_1024 is a draft code tagged "multihash".
 	Skein1024_1024 Code = 0xb3e0 // skein1024-1024
 
+	// Xxh32 is a draft code tagged "hash" and described by: Extremely fast non-cryptographic hash algorithm.
+	Xxh32 Code = 0xb3e1 // xxh-32
+
+	// Xxh64 is a draft code tagged "hash" and described by: Extremely fast non-cryptographic hash algorithm.
+	Xxh64 Code = 0xb3e2 // xxh-64
+
+	// Xxh3_64 is a draft code tagged "hash" and described by: Extremely fast non-cryptographic hash algorithm.
+	Xxh3_64 Code = 0xb3e3 // xxh3-64
+
+	// Xxh3_128 is a draft code tagged "hash" and described by: Extremely fast non-cryptographic hash algorithm.
+	Xxh3_128 Code = 0xb3e4 // xxh3-128
+
 	// PoseidonBls12_381A2Fc1 is a permanent code tagged "multihash" and described by: Poseidon using BLS12-381 and arity of 2 with Filecoin parameters.
 	PoseidonBls12_381A2Fc1 Code = 0xb401 // poseidon-bls12_381-a2-fc1
 
@@ -1490,6 +1517,9 @@ const (
 
 	// Eip191 is a draft code tagged "varsig" and described by: EIP-191 Ethereum Signed Data Standard.
 	Eip191 Code = 0xd191 // eip-191
+
+	// Jwk_jcsPub is a draft code tagged "key" and described by: JSON object containing only the required members of a JWK (RFC 7518 and RFC 7517) representing the public key. Serialisation based on JCS (RFC 8785).
+	Jwk_jcsPub Code = 0xeb51 // jwk_jcs-pub
 
 	// FilCommitmentUnsealed is a permanent code tagged "filecoin" and described by: Filecoin piece or sector data commitment merkle node/root (CommP & CommD).
 	FilCommitmentUnsealed Code = 0xf101 // fil-commitment-unsealed
@@ -1653,6 +1683,8 @@ var knownCodes = []Code{
 	DagJson,
 	Udt,
 	Utp,
+	Crc32,
+	Crc64Ecma,
 	Unix,
 	Thread,
 	P2p,
@@ -1665,6 +1697,7 @@ var knownCodes = []Code{
 	Sni,
 	Noise,
 	Quic,
+	QuicV1,
 	Webtransport,
 	Certhash,
 	Ws,
@@ -1675,6 +1708,7 @@ var knownCodes = []Code{
 	Json,
 	Messagepack,
 	Car,
+	IpnsRecord,
 	Libp2pPeerRecord,
 	Libp2pRelayRsvp,
 	Memorytransport,
@@ -1682,6 +1716,7 @@ var knownCodes = []Code{
 	CarMultihashIndexSorted,
 	TransportBitswap,
 	TransportGraphsyncFilecoinv1,
+	Multidid,
 	Sha2_256Trunc254Padded,
 	Sha2_224,
 	Sha2_512_224,
@@ -2026,6 +2061,10 @@ var knownCodes = []Code{
 	Skein1024_1008,
 	Skein1024_1016,
 	Skein1024_1024,
+	Xxh32,
+	Xxh64,
+	Xxh3_64,
+	Xxh3_128,
 	PoseidonBls12_381A2Fc1,
 	PoseidonBls12_381A2Fc1Sc,
 	Urdca2015Canon,
@@ -2040,6 +2079,7 @@ var knownCodes = []Code{
 	Bls12381G2Sig,
 	Eddsa,
 	Eip191,
+	Jwk_jcsPub,
 	FilCommitmentUnsealed,
 	FilCommitmentSealed,
 	Plaintextv2,
@@ -2069,6 +2109,17 @@ func (c Code) Tag() string {
 	case FilCommitmentUnsealed,
 		FilCommitmentSealed:
 		return "filecoin"
+
+	case Murmur3X64_64,
+		Murmur3_32,
+		Crc32,
+		Crc64Ecma,
+		Murmur3X64_128,
+		Xxh32,
+		Xxh64,
+		Xxh3_64,
+		Xxh3_128:
+		return "hash"
 
 	case HolochainAdrV0,
 		HolochainAdrV1,
@@ -2144,7 +2195,8 @@ func (c Code) Tag() string {
 		Ed25519Priv,
 		Secp256k1Priv,
 		X25519Priv,
-		RsaPriv:
+		RsaPriv,
+		Jwk_jcsPub:
 		return "key"
 
 	case Libp2pPeerRecord,
@@ -2183,6 +2235,7 @@ func (c Code) Tag() string {
 		Sni,
 		Noise,
 		Quic,
+		QuicV1,
 		Webtransport,
 		Certhash,
 		Ws,
@@ -2197,7 +2250,8 @@ func (c Code) Tag() string {
 		Multihash,
 		Multiaddr,
 		Multibase,
-		Caip50:
+		Caip50,
+		Multidid:
 		return "multiformat"
 
 	case Identity,
@@ -2216,8 +2270,6 @@ func (c Code) Tag() string {
 		Keccak512,
 		Blake3,
 		Sha2_384,
-		Murmur3X64_64,
-		Murmur3_32,
 		DblSha2_256,
 		Md4,
 		Md5,
@@ -2225,7 +2277,6 @@ func (c Code) Tag() string {
 		Sha2_224,
 		Sha2_512_224,
 		Sha2_512_256,
-		Murmur3X64_128,
 		Ripemd128,
 		Ripemd160,
 		Ripemd256,
@@ -2577,6 +2628,7 @@ func (c Code) Tag() string {
 		Bencode,
 		Messagepack,
 		Car,
+		IpnsRecord,
 		CarIndexSorted,
 		CarMultihashIndexSorted,
 		Ssz:

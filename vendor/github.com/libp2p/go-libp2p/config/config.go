@@ -8,6 +8,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/metrics"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -23,6 +24,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	blankhost "github.com/libp2p/go-libp2p/p2p/host/blank"
+	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
 	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoremem"
 	routed "github.com/libp2p/go-libp2p/p2p/host/routed"
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
@@ -123,7 +125,7 @@ type Config struct {
 	PrometheusRegisterer prometheus.Registerer
 }
 
-func (cfg *Config) makeSwarm(enableMetrics bool) (*swarm.Swarm, error) {
+func (cfg *Config) makeSwarm(eventBus event.Bus, enableMetrics bool) (*swarm.Swarm, error) {
 	if cfg.Peerstore == nil {
 		return nil, fmt.Errorf("no peerstore specified")
 	}
@@ -176,7 +178,7 @@ func (cfg *Config) makeSwarm(enableMetrics bool) (*swarm.Swarm, error) {
 			swarm.WithMetricsTracer(swarm.NewMetricsTracer(swarm.WithRegisterer(cfg.PrometheusRegisterer))))
 	}
 	// TODO: Make the swarm implementation configurable.
-	return swarm.NewSwarm(pid, cfg.Peerstore, opts...)
+	return swarm.NewSwarm(pid, cfg.Peerstore, eventBus, opts...)
 }
 
 func (cfg *Config) addTransports(h host.Host) error {
@@ -284,12 +286,14 @@ func (cfg *Config) addTransports(h host.Host) error {
 //
 // This function consumes the config. Do not reuse it (really!).
 func (cfg *Config) NewNode() (host.Host, error) {
-	swrm, err := cfg.makeSwarm(!cfg.DisableMetrics)
+	eventBus := eventbus.NewBus(eventbus.WithMetricsTracer(eventbus.NewMetricsTracer(eventbus.WithRegisterer(cfg.PrometheusRegisterer))))
+	swrm, err := cfg.makeSwarm(eventBus, !cfg.DisableMetrics)
 	if err != nil {
 		return nil, err
 	}
 
 	h, err := bhost.NewHost(swrm, &bhost.HostOpts{
+		EventBus:             eventBus,
 		ConnManager:          cfg.ConnManager,
 		AddrsFactory:         cfg.AddrsFactory,
 		NATManager:           cfg.NATManager,
@@ -350,6 +354,12 @@ func (cfg *Config) NewNode() (host.Host, error) {
 			h.Close()
 			return nil, fmt.Errorf("cannot enable autorelay; relay is not enabled")
 		}
+		if !cfg.DisableMetrics {
+			mt := autorelay.WithMetricsTracer(
+				autorelay.NewMetricsTracer(autorelay.WithRegisterer(cfg.PrometheusRegisterer)))
+			mtOpts := []autorelay.Option{mt}
+			cfg.AutoRelayOpts = append(mtOpts, cfg.AutoRelayOpts...)
+		}
 
 		ar, err = autorelay.NewAutoRelay(h, cfg.AutoRelayOpts...)
 		if err != nil {
@@ -397,7 +407,7 @@ func (cfg *Config) NewNode() (host.Host, error) {
 			Peerstore:          ps,
 		}
 
-		dialer, err := autoNatCfg.makeSwarm(false)
+		dialer, err := autoNatCfg.makeSwarm(eventbus.NewBus(), false)
 		if err != nil {
 			h.Close()
 			return nil, err

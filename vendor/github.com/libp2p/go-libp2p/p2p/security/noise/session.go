@@ -95,10 +95,6 @@ func (s *secureSession) LocalPeer() peer.ID {
 	return s.localID
 }
 
-func (s *secureSession) LocalPrivateKey() crypto.PrivKey {
-	return s.localKey
-}
-
 func (s *secureSession) LocalPublicKey() crypto.PubKey {
 	return s.localKey.GetPublic()
 }

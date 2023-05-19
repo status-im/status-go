@@ -56,11 +56,6 @@ import "github.com/libp2p/go-libp2p"
 
 Examples can be found in the [examples folder](examples).
 
-## Development
-
-### Tests
-
-`go test ./...` will run all tests in the repo.
 
 # Contribute
 

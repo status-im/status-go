@@ -78,11 +78,6 @@ func NewBlankHost(n network.Network, options ...Option) *BlankHost {
 	if bh.emitters.evtLocalProtocolsUpdated, err = bh.eventbus.Emitter(&event.EvtLocalProtocolsUpdated{}); err != nil {
 		return nil
 	}
-	evtPeerConnectednessChanged, err := bh.eventbus.Emitter(&event.EvtPeerConnectednessChanged{})
-	if err != nil {
-		return nil
-	}
-	n.Notify(newPeerConnectWatcher(evtPeerConnectednessChanged))
 
 	n.SetStreamHandler(bh.newStreamHandler)
 
