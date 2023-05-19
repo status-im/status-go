@@ -78,13 +78,31 @@ func (o *Community) ChangesToCommunityAdminEvent(eventType protobuf.CommunityAdm
 			Type:        eventType,
 			Chats:       changes.ChatsAdded,
 		}
+	case protobuf.CommunityAdminEvent_COMMUNITY_CHANNEL_CHANGED:
+		chatsModified := map[string]*protobuf.CommunityChat{}
+		for key, value := range changes.ChatsModified {
+			chatsModified[key] = value.ChatModified
+		}
+		return &protobuf.CommunityAdminEvent{
+			Clock:       o.Clock(),
+			CommunityId: o.ID(),
+			Type:        eventType,
+			Chats:       chatsModified,
+		}
+	case protobuf.CommunityAdminEvent_COMMUNITY_CHANNEL_DELETED:
+		return &protobuf.CommunityAdminEvent{
+			Clock:       o.Clock(),
+			CommunityId: o.ID(),
+			Type:        eventType,
+			Chats:       changes.ChatsRemoved,
+		}
 	default:
 		// TODO: log error
 	}
 	return &protobuf.CommunityAdminEvent{Type: protobuf.CommunityAdminEvent_UNKNOWN}
 }
 
-func (o *Community) UpdateCommunityByAdmin(adminEvent *protobuf.CommunityAdminEvent) {
+func (o *Community) PatchCommunityDescriptionByAdminEvent(adminEvent *protobuf.CommunityAdminEvent) *protobuf.CommunityDescription {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -92,14 +110,16 @@ func (o *Community) UpdateCommunityByAdmin(adminEvent *protobuf.CommunityAdminEv
 		o.config.Logger.Warn("Clock is outdated")
 	}
 
+	communityDescription := o.config.CommunityDescription
+
 	switch adminEvent.Type {
 	case protobuf.CommunityAdminEvent_COMMUNITY_CONFIG_CHANGED:
-		o.config.CommunityDescription.Identity = adminEvent.CommunityConfig.Identity
-		o.config.CommunityDescription.Permissions = adminEvent.CommunityConfig.Permissions
-		o.config.CommunityDescription.AdminSettings = adminEvent.CommunityConfig.AdminSettings
-		o.config.CommunityDescription.IntroMessage = adminEvent.CommunityConfig.IntroMessage
-		o.config.CommunityDescription.OutroMessage = adminEvent.CommunityConfig.OutroMessage
-		o.config.CommunityDescription.Tags = adminEvent.CommunityConfig.Tags
+		communityDescription.Identity = adminEvent.CommunityConfig.Identity
+		communityDescription.Permissions = adminEvent.CommunityConfig.Permissions
+		communityDescription.AdminSettings = adminEvent.CommunityConfig.AdminSettings
+		communityDescription.IntroMessage = adminEvent.CommunityConfig.IntroMessage
+		communityDescription.OutroMessage = adminEvent.CommunityConfig.OutroMessage
+		communityDescription.Tags = adminEvent.CommunityConfig.Tags
 		break
 	case protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGED:
 		// TODO admin permission
@@ -118,17 +138,19 @@ func (o *Community) UpdateCommunityByAdmin(adminEvent *protobuf.CommunityAdminEv
 		break
 	case protobuf.CommunityAdminEvent_COMMUNITY_CHANNEL_CREATED:
 		for key, value := range adminEvent.Chats {
-			if _, ok := o.config.CommunityDescription.Chats[key]; !ok {
-				if o.config.CommunityDescription.Chats == nil {
-					o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
+			if _, ok := communityDescription.Chats[key]; !ok {
+				if communityDescription.Chats == nil {
+					communityDescription.Chats = make(map[string]*protobuf.CommunityChat)
 				}
-				o.config.CommunityDescription.Chats[key] = value
+				communityDescription.Chats[key] = value
 			}
 		}
 		break
 	case protobuf.CommunityAdminEvent_COMMUNITY_CHANNEL_DELETED:
-		// TODO admin permission
-		break
+		for key := range adminEvent.Chats {
+			delete(communityDescription.Chats, key)
+		}
+
 	case protobuf.CommunityAdminEvent_COMMUNITY_CHANNEL_CHANGED:
 		// TODO admin permission
 		break
@@ -156,4 +178,6 @@ func (o *Community) UpdateCommunityByAdmin(adminEvent *protobuf.CommunityAdminEv
 	default:
 		// TODO return error
 	}
+
+	return communityDescription
 }

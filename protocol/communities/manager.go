@@ -1102,7 +1102,20 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		}
 	}
 
-	changes, err := community.UpdateCommunityDescription(signer, description, payload)
+	community_pubkey, err := common.HexToPubkey(community.IDString())
+	if err != nil {
+		return nil, err
+	}
+
+	if !common.IsPubKeyEqual(community_pubkey, signer) {
+		return nil, ErrNotAuthorized
+	}
+
+	return m.handleCommunityDescriptionMessageCommon(community, description, payload)
+}
+
+func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, description *protobuf.CommunityDescription, payload []byte) (*CommunityResponse, error) {
+	changes, err := community.UpdateCommunityDescription(description, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -1183,17 +1196,14 @@ func (m *Manager) HandleCommunityAdminEvent(signer *ecdsa.PublicKey, adminEvent 
 		return nil, errors.New("user is not an admin")
 	}
 
-	community.UpdateCommunityByAdmin(adminEvent)
+	patchedCommDescr := community.PatchCommunityDescriptionByAdminEvent(adminEvent)
+	marshaledCommDescr, err := proto.Marshal(patchedCommDescr)
 
-	err = m.persistence.SaveCommunity(community)
 	if err != nil {
 		return nil, err
 	}
 
-	return &CommunityResponse{
-		Community: community,
-		Changes:   community.emptyCommunityChanges(),
-	}, nil
+	return m.handleCommunityDescriptionMessageCommon(community, patchedCommDescr, marshaledCommDescr)
 
 }
 
@@ -1821,7 +1831,16 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, err
 	}
 
-	_, err = community.UpdateCommunityDescription(signer, request.Community, appMetadataMsg)
+	community_pubkey, err := common.HexToPubkey(community.IDString())
+	if err != nil {
+		return nil, err
+	}
+
+	if !common.IsPubKeyEqual(community_pubkey, signer) {
+		return nil, ErrNotAuthorized
+	}
+
+	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg)
 	if err != nil {
 		return nil, err
 	}

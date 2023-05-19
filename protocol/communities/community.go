@@ -599,7 +599,7 @@ func (o *Community) DeleteChat(chatID string) (*protobuf.CommunityDescription, e
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
+	if !o.IsAdmin() {
 		return nil, ErrNotAdmin
 	}
 
@@ -1012,13 +1012,9 @@ func (o *Community) MemberIdentity() *ecdsa.PublicKey {
 }
 
 // UpdateCommunityDescription will update the community to the new community description and return a list of changes
-func (o *Community) UpdateCommunityDescription(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawMessage []byte) (*CommunityChanges, error) {
+func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDescription, rawMessage []byte) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
-
-	if !common.IsPubKeyEqual(o.config.ID, signer) {
-		return nil, ErrNotAuthorized
-	}
 
 	// This is done in case tags are updated and a client sends unknown tags
 	description.Tags = requests.RemoveUnknownAndDeduplicateTags(description.Tags)
