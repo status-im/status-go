@@ -11,8 +11,10 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
+	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -450,7 +452,7 @@ func (c *transfersCommand) checkAndProcessPendingMultiTx(subTx *Transfer) (Multi
 func (c *transfersCommand) checkAndProcessSwapMultiTx(ctx context.Context, subTx *Transfer) (MultiTransactionIDType, error) {
 	switch subTx.Type {
 	// If the Tx contains any uniswapV2Swap/uniswapV3Swap subTx, generate a Swap multiTx
-	case uniswapV2Swap, uniswapV3Swap:
+	case w_common.UniswapV2Swap, w_common.UniswapV3Swap:
 		multiTransaction, err := buildUniswapSwapMultitransaction(ctx, c.chainClient, c.tokenManager, subTx)
 		if err != nil {
 			return NoMultiTransactionID, err

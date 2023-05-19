@@ -102,7 +102,7 @@ func InitializeDB(path string) (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = migrations.Migrate(db)
+	err = migrations.Migrate(db, nil)
 	if err != nil {
 		return nil, err
 	}

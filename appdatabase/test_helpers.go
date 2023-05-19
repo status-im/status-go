@@ -38,3 +38,34 @@ func SetupTestMemorySQLDB(prefix string) (*sql.DB, error) {
 
 	return db, nil
 }
+
+func ColumnExists(db *sql.DB, tableName string, columnName string) (bool, error) {
+	rows, err := db.Query("PRAGMA table_info(" + tableName + ")")
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	var cid int
+	var name string
+	var dataType string
+	var notNull bool
+	var dFLTValue sql.NullString
+	var pk int
+
+	for rows.Next() {
+		err := rows.Scan(&cid, &name, &dataType, &notNull, &dFLTValue, &pk)
+		if err != nil {
+			return false, err
+		}
+		if name == columnName {
+			return true, nil
+		}
+	}
+
+	if rows.Err() != nil {
+		return false, rows.Err()
+	}
+
+	return false, nil
+}

@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/status-go/appdatabase"
+	w_common "github.com/status-im/status-go/services/wallet/common"
 )
 
 func setupTestDB(t *testing.T) (*Database, *BlockDAO, func()) {
@@ -28,11 +29,11 @@ func TestDBProcessBlocks(t *testing.T) {
 	from := big.NewInt(0)
 	to := big.NewInt(10)
 	blocks := []*DBHeader{
-		&DBHeader{
+		{
 			Number: big.NewInt(1),
 			Hash:   common.Hash{1},
 		},
-		&DBHeader{
+		{
 			Number: big.NewInt(2),
 			Hash:   common.Hash{2},
 		}}
@@ -48,7 +49,7 @@ func TestDBProcessBlocks(t *testing.T) {
 	transfers := []Transfer{
 		{
 			ID:          common.Hash{1},
-			Type:        ethTransfer,
+			Type:        w_common.EthTransfer,
 			BlockHash:   common.Hash{2},
 			BlockNumber: big.NewInt(1),
 			Address:     common.Address{1},
@@ -71,7 +72,7 @@ func TestDBProcessTransfer(t *testing.T) {
 	transfers := []Transfer{
 		{
 			ID:                 common.Hash{1},
-			Type:               ethTransfer,
+			Type:               w_common.EthTransfer,
 			BlockHash:          header.Hash,
 			BlockNumber:        header.Number,
 			Transaction:        tx,
@@ -115,7 +116,7 @@ func TestDBReorgTransfers(t *testing.T) {
 	}
 	require.NoError(t, db.ProcessBlocks(777, original.Address, original.Number, lastBlock, []*DBHeader{original}))
 	require.NoError(t, db.ProcessTransfers(777, []Transfer{
-		{ethTransfer, common.Hash{1}, *originalTX.To(), original.Number, original.Hash, 100, originalTX, true, 1777, common.Address{1}, rcpt, nil, "2100", NoMultiTransactionID},
+		{w_common.EthTransfer, common.Hash{1}, *originalTX.To(), original.Number, original.Hash, 100, originalTX, true, 1777, common.Address{1}, rcpt, nil, "2100", NoMultiTransactionID},
 	}, []*DBHeader{}))
 	nonce = int64(0)
 	lastBlock = &Block{
@@ -125,7 +126,7 @@ func TestDBReorgTransfers(t *testing.T) {
 	}
 	require.NoError(t, db.ProcessBlocks(777, replaced.Address, replaced.Number, lastBlock, []*DBHeader{replaced}))
 	require.NoError(t, db.ProcessTransfers(777, []Transfer{
-		{ethTransfer, common.Hash{2}, *replacedTX.To(), replaced.Number, replaced.Hash, 100, replacedTX, true, 1777, common.Address{1}, rcpt, nil, "2100", NoMultiTransactionID},
+		{w_common.EthTransfer, common.Hash{2}, *replacedTX.To(), replaced.Number, replaced.Hash, 100, replacedTX, true, 1777, common.Address{1}, rcpt, nil, "2100", NoMultiTransactionID},
 	}, []*DBHeader{original}))
 
 	all, err := db.GetTransfers(777, big.NewInt(0), nil)
@@ -151,7 +152,7 @@ func TestDBGetTransfersFromBlock(t *testing.T) {
 		receipt.Logs = []*types.Log{}
 		transfer := Transfer{
 			ID:          tx.Hash(),
-			Type:        ethTransfer,
+			Type:        w_common.EthTransfer,
 			BlockNumber: header.Number,
 			BlockHash:   header.Hash,
 			Transaction: tx,

@@ -48,8 +48,8 @@ import (
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
+	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/transfer"
 )
 
 // EnvelopeEventsHandler used for two different event types.
@@ -296,7 +296,7 @@ func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash ty
 
 	// Token transfer, check the logs
 	if len(coremessage.Data()) != 0 {
-		if transfer.IsTokenTransfer(receipt.Logs) {
+		if w_common.IsTokenTransfer(receipt.Logs) {
 			return coremessage, coretypes.TransactionStatus(receipt.Status), nil
 		}
 		return coremessage, coretypes.TransactionStatusFailed, nil

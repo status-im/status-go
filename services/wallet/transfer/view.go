@@ -5,13 +5,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	w_common "github.com/status-im/status-go/services/wallet/common"
 )
 
 // View stores only fields used by a client and ensures that all relevant fields are
 // encoded in hex.
 type View struct {
 	ID                   common.Hash    `json:"id"`
-	Type                 Type           `json:"type"`
+	Type                 w_common.Type  `json:"type"`
 	Address              common.Address `json:"address"`
 	BlockNumber          *hexutil.Big   `json:"blockNumber"`
 	BlockHash            common.Hash    `json:"blockhash"`
@@ -27,8 +28,8 @@ type View struct {
 	TxStatus             hexutil.Uint64 `json:"txStatus"`
 	Input                hexutil.Bytes  `json:"input"`
 	TxHash               common.Hash    `json:"txHash"`
-	Value                *hexutil.Big   `json:"value"`   // Only used for Type ethTransfer and erc20Transfer
-	TokenID              *hexutil.Big   `json:"tokenId"` // Only used for Type erc721Transfer
+	Value                *hexutil.Big   `json:"value"`   // Only used for Type EthTransfer and Erc20Transfer
+	TokenID              *hexutil.Big   `json:"tokenId"` // Only used for Type Erc721Transfer
 	From                 common.Address `json:"from"`
 	To                   common.Address `json:"to"`
 	Contract             common.Address `json:"contract"`
@@ -41,7 +42,7 @@ func castToTransferViews(transfers []Transfer) []View {
 	views := make([]View, 0, len(transfers))
 	for _, tx := range transfers {
 		switch tx.Type {
-		case ethTransfer, erc20Transfer, erc721Transfer:
+		case w_common.EthTransfer, w_common.Erc20Transfer, w_common.Erc721Transfer:
 			view := CastToTransferView(tx)
 			views = append(views, view)
 		}
@@ -82,20 +83,20 @@ func CastToTransferView(t Transfer) View {
 	tokenID := new(hexutil.Big)
 
 	switch view.Type {
-	case ethTransfer:
+	case w_common.EthTransfer:
 		view.From = t.From
 		if t.Transaction.To() != nil {
 			view.To = *t.Transaction.To()
 		}
 		value = (*hexutil.Big)(t.Transaction.Value())
 		view.Contract = t.Receipt.ContractAddress
-	case erc20Transfer:
+	case w_common.Erc20Transfer:
 		view.Contract = t.Log.Address
-		from, to, valueInt := parseErc20TransferLog(t.Log)
+		from, to, valueInt := w_common.ParseErc20TransferLog(t.Log)
 		view.From, view.To, value = from, to, (*hexutil.Big)(valueInt)
-	case erc721Transfer:
+	case w_common.Erc721Transfer:
 		view.Contract = t.Log.Address
-		from, to, tokenIDInt := parseErc721TransferLog(t.Log)
+		from, to, tokenIDInt := w_common.ParseErc721TransferLog(t.Log)
 		view.From, view.To, tokenID = from, to, (*hexutil.Big)(tokenIDInt)
 	}
 
@@ -106,12 +107,12 @@ func CastToTransferView(t Transfer) View {
 	return view
 }
 
-func getFixedTransferType(tx Transfer) Type {
+func getFixedTransferType(tx Transfer) w_common.Type {
 	// erc721 transfers share signature with erc20 ones, so they both used to be categorized as erc20
 	// by the Downloader. We fix this here since they might be mis-categorized in the db.
-	if tx.Type == erc20Transfer {
-		eventType := GetEventType(tx.Log)
-		return EventTypeToSubtransactionType(eventType)
+	if tx.Type == w_common.Erc20Transfer {
+		eventType := w_common.GetEventType(tx.Log)
+		return w_common.EventTypeToSubtransactionType(eventType)
 	}
 	return tx.Type
 }

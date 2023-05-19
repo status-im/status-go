@@ -19,9 +19,7 @@ import (
 
 type PayloadType = int
 
-// Beware if adding/removing please check if affected and update the functions below
-// - NewActivityEntryWithTransaction
-// - multiTransactionTypeToActivityType
+// Beware: pleas update multiTransactionTypeToActivityType if changing this enum
 const (
 	MultiTransactionPT PayloadType = iota + 1
 	SimpleTransactionPT
@@ -75,9 +73,18 @@ func (e *Entry) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func NewActivityEntryWithTransaction(payloadType PayloadType, transaction *transfer.TransactionIdentity, timestamp int64, activityType Type, activityStatus Status) Entry {
-	if payloadType != SimpleTransactionPT && payloadType != PendingTransactionPT {
-		panic("invalid transaction type")
+func newActivityEntryWithPendingTransaction(transaction *transfer.TransactionIdentity, timestamp int64, activityType Type, activityStatus Status) Entry {
+	return newActivityEntryWithTransaction(true, transaction, timestamp, activityType, activityStatus)
+}
+
+func newActivityEntryWithSimpleTransaction(transaction *transfer.TransactionIdentity, timestamp int64, activityType Type, activityStatus Status) Entry {
+	return newActivityEntryWithTransaction(false, transaction, timestamp, activityType, activityStatus)
+}
+
+func newActivityEntryWithTransaction(pending bool, transaction *transfer.TransactionIdentity, timestamp int64, activityType Type, activityStatus Status) Entry {
+	payloadType := SimpleTransactionPT
+	if pending {
+		payloadType = PendingTransactionPT
 	}
 
 	return Entry{
@@ -442,14 +449,13 @@ func GetActivityEntries(db *sql.DB, addresses []eth.Address, chainIDs []common.C
 			// TODO: extend DB with status in order to filter by status. The status has to be extracted from the receipt upon downloading
 			activityStatus := FinalizedAS
 			activityType, filteredAddress := getActivityType(dbTrType)
-			entry = NewActivityEntryWithTransaction(SimpleTransactionPT,
+			entry = newActivityEntryWithSimpleTransaction(
 				&transfer.TransactionIdentity{ChainID: common.ChainID(chainID.Int64), Hash: eth.BytesToHash(transferHash), Address: filteredAddress},
 				timestamp, activityType, activityStatus)
 		} else if pendingHash != nil && chainID.Valid {
 			activityStatus := PendingAS
 			activityType, _ := getActivityType(dbTrType)
-			entry = NewActivityEntryWithTransaction(PendingTransactionPT,
-				&transfer.TransactionIdentity{ChainID: common.ChainID(chainID.Int64), Hash: eth.BytesToHash(pendingHash)},
+			entry = newActivityEntryWithPendingTransaction(&transfer.TransactionIdentity{ChainID: common.ChainID(chainID.Int64), Hash: eth.BytesToHash(pendingHash)},
 				timestamp, activityType, activityStatus)
 		} else if multiTxID.Valid {
 			activityType := multiTransactionTypeToActivityType(transfer.MultiTransactionType(dbMtType.Byte))

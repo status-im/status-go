@@ -15,5 +15,5 @@ func Migrate(db *sql.DB) error {
 		func(name string) ([]byte, error) {
 			return Asset(name)
 		},
-	))
+	), nil, nil)
 }

@@ -152,7 +152,7 @@ func WithDatabase(db *sql.DB) Option {
 func WithToplevelDatabaseMigrations() Option {
 	return func(c *config) error {
 		c.afterDbCreatedHooks = append(c.afterDbCreatedHooks, func(c *config) error {
-			return migrations.Migrate(c.db)
+			return migrations.Migrate(c.db, nil)
 		})
 		return nil
 	}

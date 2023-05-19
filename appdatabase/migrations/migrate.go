@@ -9,11 +9,22 @@ import (
 )
 
 // Migrate applies migrations.
-func Migrate(db *sql.DB) error {
+// see Migrate in vendor/status-go/sqlite/migrate.go
+func Migrate(db *sql.DB, customSteps []sqlite.PostStep) error {
 	return sqlite.Migrate(db, bindata.Resource(
 		AssetNames(),
 		func(name string) ([]byte, error) {
 			return Asset(name)
 		},
-	))
+	), customSteps, nil)
+}
+
+// MigrateTo is used for testing purposes
+func MigrateTo(db *sql.DB, customSteps []sqlite.PostStep, untilVersion uint) error {
+	return sqlite.Migrate(db, bindata.Resource(
+		AssetNames(),
+		func(name string) ([]byte, error) {
+			return Asset(name)
+		},
+	), customSteps, &untilVersion)
 }

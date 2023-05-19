@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/signal"
@@ -99,7 +100,7 @@ func TestTransactionNotification(t *testing.T) {
 	transfers := []transfer.Transfer{
 		{
 			ID:          common.Hash{1},
-			Type:        transfer.Type("eth"),
+			Type:        w_common.Type("eth"),
 			BlockHash:   header.Hash,
 			BlockNumber: header.Number,
 			Transaction: tx,
