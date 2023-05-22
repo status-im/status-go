@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"fmt"
 	"sync"
 	"time"
 
@@ -322,7 +323,7 @@ func (s *MessageSender) sendCommunity(
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to decompress pubkey")
 		}
-		hash, newMessage, err = s.dispatchCommunityMessage(ctx, pubkey, payload, messageIDs)
+		hash, newMessage, err = s.dispatchCommunityMessage(ctx, pubkey, payload, messageIDs, rawMessage.PubsubTopic)
 		if err != nil {
 			s.logger.Error("failed to send a community message", zap.Error(err))
 			return nil, errors.Wrap(err, "failed to send a message spec")
@@ -504,10 +505,11 @@ func (s *MessageSender) EncodeAbridgedMembershipUpdate(
 func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMessage *RawMessage, wrappedMessage []byte) ([]byte, *types.NewMessage, error) {
 
 	newMessage := &types.NewMessage{
-		TTL:       whisperTTL,
-		Payload:   wrappedMessage,
-		PowTarget: calculatePoW(wrappedMessage),
-		PowTime:   whisperPoWTime,
+		TTL:         whisperTTL,
+		Payload:     wrappedMessage,
+		PowTarget:   calculatePoW(wrappedMessage),
+		PowTime:     whisperPoWTime,
+		PubsubTopic: rawMessage.PubsubTopic,
 	}
 
 	// notify before dispatching
@@ -560,6 +562,7 @@ func (s *MessageSender) SendPublic(
 	}
 
 	newMessage.Ephemeral = rawMessage.Ephemeral
+	newMessage.PubsubTopic = rawMessage.PubsubTopic
 
 	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
 	rawMessage.ID = types.EncodeHex(messageID)
@@ -761,6 +764,7 @@ func (s *MessageSender) handleErrDeviceNotFound(ctx context.Context, publicKey *
 }
 
 func (s *MessageSender) wrapMessageV1(rawMessage *RawMessage) ([]byte, error) {
+	fmt.Println("wrapMessageV1: pubsubTopic: ", rawMessage.PubsubTopic, " message type", rawMessage.MessageType.String())
 	wrappedMessage, err := v1protocol.WrapMessageV1(rawMessage.Payload, rawMessage.MessageType, rawMessage.Sender)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
@@ -831,10 +835,11 @@ func (s *MessageSender) sendDataSync(ctx context.Context, publicKey *ecdsa.Publi
 // sendPrivateRawMessage sends a message not wrapped in an encryption layer
 func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *RawMessage, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
 	newMessage := &types.NewMessage{
-		TTL:       whisperTTL,
-		Payload:   payload,
-		PowTarget: calculatePoW(payload),
-		PowTime:   whisperPoWTime,
+		TTL:         whisperTTL,
+		Payload:     payload,
+		PowTarget:   calculatePoW(payload),
+		PowTime:     whisperPoWTime,
+		PubsubTopic: rawMessage.PubsubTopic,
 	}
 	var hash []byte
 	var err error
@@ -853,12 +858,13 @@ func (s *MessageSender) sendPrivateRawMessage(ctx context.Context, rawMessage *R
 
 // sendCommunityMessage sends a message not wrapped in an encryption layer
 // to a community
-func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
+func (s *MessageSender) dispatchCommunityMessage(ctx context.Context, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte, pubsubTopic string) ([]byte, *types.NewMessage, error) {
 	newMessage := &types.NewMessage{
-		TTL:       whisperTTL,
-		Payload:   payload,
-		PowTarget: calculatePoW(payload),
-		PowTime:   whisperPoWTime,
+		TTL:         whisperTTL,
+		Payload:     payload,
+		PowTarget:   calculatePoW(payload),
+		PowTime:     whisperPoWTime,
+		PubsubTopic: pubsubTopic,
 	}
 
 	hash, err := s.transport.SendCommunityMessage(ctx, newMessage, publicKey)

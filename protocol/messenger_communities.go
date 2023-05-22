@@ -409,16 +409,17 @@ func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse,
 func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Chat, error) {
 	logger := m.logger.Named("initCommunityChats")
 
-	chatIDs := community.DefaultFilters()
+	publicFiltersToInit := community.DefaultFilters()
 
 	chats := CreateCommunityChats(community, m.getTimesource())
 
 	for _, chat := range chats {
-		chatIDs = append(chatIDs, chat.ID)
+		publicFiltersToInit = append(publicFiltersToInit, transport.FiltersToInitialize{ChatID: chat.ID, PubsubTopic: community.PubsubTopic()})
+
 	}
 
 	// Load transport filters
-	filters, err := m.transport.InitPublicFilters(chatIDs)
+	filters, err := m.transport.InitPublicFilters(publicFiltersToInit)
 	if err != nil {
 		logger.Debug("m.transport.InitPublicFilters error", zap.Error(err))
 		return nil, err
@@ -426,7 +427,11 @@ func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Cha
 
 	if community.IsOwner() {
 		// Init the community filter so we can receive messages on the community
-		communityFilters, err := m.transport.InitCommunityFilters([]*ecdsa.PrivateKey{community.PrivateKey()})
+		communityFilters, err := m.transport.InitCommunityFilters([]transport.CommunityFilterToInitialize{{
+			CommunityID: community.ID(),
+			PrivKey:     community.PrivateKey(),
+		}})
+
 		if err != nil {
 			return nil, err
 		}
@@ -498,6 +503,16 @@ func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexByte
 	return mr, nil
 }
 
+func (m *Messenger) subscribeToCommunityShard(communityID []byte) error {
+	// TODO: store private key and topic
+	// TODO: determine pubsub topic and public key for community
+	// TODO: this should probably be moved completely to transport once pubsub topic logic is implemented
+
+	pubsubTopic := transport.GetPubsubTopic(communityID)
+	var communityPubKey *ecdsa.PublicKey
+	return m.transport.SubscribeToPubsubTopic(pubsubTopic, communityPubKey)
+}
+
 func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexBytes, forceJoin bool) (*MessengerResponse, error) {
 	logger := m.logger.Named("joinCommunity")
 
@@ -518,6 +533,10 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 		response.AddChats(chats)
 
 		if _, err = m.initCommunitySettings(communityID); err != nil {
+			return nil, err
+		}
+
+		if err = m.subscribeToCommunityShard(communityID); err != nil {
 			return nil, err
 		}
 	}
@@ -570,6 +589,10 @@ func (m *Messenger) SpectateCommunity(communityID types.HexBytes) (*MessengerRes
 	response.AddCommunitySettings(settings)
 
 	response.AddCommunity(community)
+
+	if err = m.subscribeToCommunityShard(community.ID()); err != nil {
+		return nil, err
+	}
 
 	return response, nil
 }
@@ -708,6 +731,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		CommunityID:    community.ID(),
 		SkipEncryption: true,
 		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
+		PubsubTopic:    community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
 	}
 
 	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
@@ -879,6 +903,7 @@ func (m *Messenger) CancelRequestToJoinCommunity(request *requests.CancelRequest
 		CommunityID:    community.ID(),
 		SkipEncryption: true,
 		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN,
+		PubsubTopic:    community.PubsubTopic(), // TODO: confirm if it should be send in community pubsub topic
 	}
 	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
 
@@ -974,6 +999,7 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 		Sender:         community.PrivateKey(),
 		SkipEncryption: true,
 		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
+		PubsubTopic:    community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
 	}
 
 	_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
@@ -1086,6 +1112,7 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 			CommunityID:    communityID,
 			SkipEncryption: true,
 			MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE,
+			PubsubTopic:    transport.GetPubsubTopic(communityID), // TODO: confirm if it should be sent in the community pubsub topic
 		}
 		_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
 		if err != nil {
@@ -1232,16 +1259,17 @@ func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
 
 	var chats []*Chat
-	var chatIDs []string
+	var publicFiltersToInit []transport.FiltersToInitialize
 	for chatID, chat := range changes.ChatsAdded {
 		c := CreateCommunityChat(community.IDString(), chatID, chat, m.getTimesource())
 		chats = append(chats, c)
-		chatIDs = append(chatIDs, c.ID)
+		publicFiltersToInit = append(publicFiltersToInit, transport.FiltersToInitialize{ChatID: c.ID, PubsubTopic: community.PubsubTopic()})
+
 		response.AddChat(c)
 	}
 
 	// Load filters
-	filters, err := m.transport.InitPublicFilters(chatIDs)
+	filters, err := m.transport.InitPublicFilters(publicFiltersToInit)
 	if err != nil {
 		return nil, err
 	}
@@ -1273,16 +1301,16 @@ func (m *Messenger) EditCommunityChat(communityID types.HexBytes, chatID string,
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
 
 	var chats []*Chat
-	var chatIDs []string
+	var publicFiltersToInit []transport.FiltersToInitialize
 	for chatID, change := range changes.ChatsModified {
 		c := CreateCommunityChat(community.IDString(), chatID, change.ChatModified, m.getTimesource())
 		chats = append(chats, c)
-		chatIDs = append(chatIDs, c.ID)
+		publicFiltersToInit = append(publicFiltersToInit, transport.FiltersToInitialize{ChatID: c.ID, PubsubTopic: community.PubsubTopic()})
 		response.AddChat(c)
 	}
 
 	// Load filters
-	filters, err := m.transport.InitPublicFilters(chatIDs)
+	filters, err := m.transport.InitPublicFilters(publicFiltersToInit)
 	if err != nil {
 		return nil, err
 	}
@@ -1337,8 +1365,15 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 		return nil, err
 	}
 
+	if err = m.subscribeToCommunityShard(community.ID()); err != nil {
+		return nil, err
+	}
+
 	// Init the community filter so we can receive messages on the community
-	_, err = m.transport.InitCommunityFilters([]*ecdsa.PrivateKey{community.PrivateKey()})
+	_, err = m.transport.InitCommunityFilters([]transport.CommunityFilterToInitialize{{
+		CommunityID: community.ID(),
+		PrivKey:     community.PrivateKey(),
+	}})
 	if err != nil {
 		return nil, err
 	}
@@ -1704,6 +1739,7 @@ func (m *Messenger) SendKeyExchangeMessage(communityID []byte, pubkeys []*ecdsa.
 		CommunityKeyExMsgType: msgType,
 		Recipients:            pubkeys,
 		MessageType:           protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
+		PubsubTopic:           transport.GetPubsubTopic(communityID),
 	}
 	_, err := m.sender.SendCommunityMessage(context.Background(), rawMessage)
 
@@ -1830,11 +1866,19 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, waitF
 		return nil, nil
 	}
 
+	id, err := hexutil.Decode(communityID)
+	if err != nil {
+		return nil, err
+	}
+
 	//If filter wasn't installed we create it and remember for deinstalling after
 	//response received
 	filter := m.transport.FilterByChatID(communityID)
 	if filter == nil {
-		filters, err := m.transport.InitPublicFilters([]string{communityID})
+		filters, err := m.transport.InitPublicFilters([]transport.FiltersToInitialize{{
+			ChatID:      communityID,
+			PubsubTopic: transport.GetPubsubTopic(id),
+		}})
 		if err != nil {
 			return nil, fmt.Errorf("Can't install filter for community: %v", err)
 		}
@@ -1851,9 +1895,9 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, waitF
 	to := uint32(m.transport.GetCurrentTime() / 1000)
 	from := to - oneMonthInSeconds
 
-	_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
+	_, err = m.performMailserverRequest(func() (*MessengerResponse, error) {
 
-		batch := MailserverBatch{From: from, To: to, Topics: []types.TopicType{filter.Topic}}
+		batch := MailserverBatch{From: from, To: to, Topics: []types.TopicType{filter.ContentTopic}}
 		m.logger.Info("Requesting historic")
 		err := m.processMailserverBatch(batch)
 		return nil, err
@@ -1917,11 +1961,19 @@ func (m *Messenger) requestCommunitiesFromMailserver(communityIDs []string) {
 			continue
 		}
 
+		id, err := hexutil.Decode(communityID)
+		if err != nil {
+			continue
+		}
+
 		//If filter wasn't installed we create it and remember for deinstalling after
 		//response received
 		filter := m.transport.FilterByChatID(communityID)
 		if filter == nil {
-			filters, err := m.transport.InitPublicFilters([]string{communityID})
+			filters, err := m.transport.InitPublicFilters([]transport.FiltersToInitialize{{
+				ChatID:      communityID,
+				PubsubTopic: transport.GetPubsubTopic(id),
+			}})
 			if err != nil {
 				m.logger.Error("Can't install filter for community", zap.Error(err))
 				continue
@@ -1936,7 +1988,7 @@ func (m *Messenger) requestCommunitiesFromMailserver(communityIDs []string) {
 			//we don't remember filter id associated with community because it was already installed
 			m.requestedCommunities[communityID] = nil
 		}
-		topics = append(topics, filter.Topic)
+		topics = append(topics, filter.ContentTopic)
 	}
 
 	to := uint32(m.transport.GetCurrentTime() / 1000)
@@ -2072,7 +2124,7 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 	// Update relevant chats names and add new ones
 	// Currently removal is not supported
 	chats := CreateCommunityChats(community, state.Timesource)
-	var chatIDs []string
+	var publicFiltersToInit []transport.FiltersToInitialize
 	for i, chat := range chats {
 
 		oldChat, ok := state.AllChats.Load(chat.ID)
@@ -2081,7 +2133,10 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 			state.AllChats.Store(chat.ID, chats[i])
 
 			state.Response.AddChat(chat)
-			chatIDs = append(chatIDs, chat.ID)
+			publicFiltersToInit = append(publicFiltersToInit, transport.FiltersToInitialize{
+				ChatID:      chat.ID,
+				PubsubTopic: community.PubsubTopic(),
+			})
 			// Update name, currently is the only field is mutable
 		} else if oldChat.Name != chat.Name ||
 			oldChat.Description != chat.Description ||
@@ -2106,7 +2161,7 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 	}
 
 	// Load transport filters
-	filters, err := m.transport.InitPublicFilters(chatIDs)
+	filters, err := m.transport.InitPublicFilters(publicFiltersToInit)
 	if err != nil {
 		return err
 	}
@@ -2314,7 +2369,7 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 			topics := []types.TopicType{}
 
 			for _, filter := range filters {
-				topics = append(topics, filter.Topic)
+				topics = append(topics, filter.ContentTopic)
 			}
 
 			// First we need to know the timestamp of the latest waku message
@@ -2560,6 +2615,7 @@ func (m *Messenger) dispatchMagnetlinkMessage(communityID string) error {
 		Payload:              encodedMessage,
 		MessageType:          protobuf.ApplicationMetadataMessage_COMMUNITY_ARCHIVE_MAGNETLINK,
 		SkipGroupMessageWrap: true,
+		PubsubTopic:          community.PubsubTopic(),
 	}
 
 	_, err = m.sender.SendPublic(context.Background(), chatID, rawMessage)
@@ -3489,7 +3545,10 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 		}
 
 		// Init the community filter so we can receive messages on the community
-		_, err = m.transport.InitCommunityFilters([]*ecdsa.PrivateKey{discordCommunity.PrivateKey()})
+		_, err = m.transport.InitCommunityFilters([]transport.CommunityFilterToInitialize{{
+			CommunityID: discordCommunity.ID(),
+			PrivKey:     discordCommunity.PrivateKey(),
+		}})
 		if err != nil {
 			m.cleanUpImport(communityID)
 			importProgress.AddTaskError(discord.InitCommunityTask, discord.Error(err.Error()))
@@ -3668,7 +3727,7 @@ func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, 
 		wakuMessage := &types.Message{
 			Sig:       crypto.FromECDSAPub(&c.PrivateKey().PublicKey),
 			Timestamp: uint32(msg.WhisperTimestamp / 1000),
-			Topic:     filter.Topic,
+			Topic:     filter.ContentTopic,
 			Payload:   wrappedPayload,
 			Padding:   []byte{1},
 			Hash:      hash[:],
@@ -3707,7 +3766,7 @@ func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c
 		wakuMessage := &types.Message{
 			Sig:          crypto.FromECDSAPub(&c.PrivateKey().PublicKey),
 			Timestamp:    uint32(msg.WhisperTimestamp / 1000),
-			Topic:        filter.Topic,
+			Topic:        filter.ContentTopic,
 			Payload:      wrappedPayload,
 			Padding:      []byte{1},
 			Hash:         hash[:],

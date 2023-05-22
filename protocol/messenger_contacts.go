@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -495,7 +496,7 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 	// Add chat
 	response.AddChat(profileChat)
 
-	_, err = m.transport.InitFilters([]string{profileChat.ID}, []*ecdsa.PublicKey{publicKey})
+	_, err = m.transport.InitFilters([]transport.FiltersToInitialize{{ChatID: profileChat.ID, PubsubTopic: relay.DefaultWakuTopic}}, []*ecdsa.PublicKey{publicKey})
 	if err != nil {
 		return nil, err
 	}

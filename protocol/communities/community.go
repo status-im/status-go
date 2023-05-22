@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -17,6 +18,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/v1"
 )
 
@@ -1352,13 +1354,26 @@ func (o *Community) MemberUpdateChannelID() string {
 	return o.IDString() + "-memberUpdate"
 }
 
-func (o *Community) DefaultFilters() []string {
+func (o *Community) PubsubTopic() string {
+	return transport.GetPubsubTopic(o.ID())
+}
+
+func (o *Community) DefaultFilters() []transport.FiltersToInitialize {
 	cID := o.IDString()
 	uncompressedPubKey := common.PubkeyToHex(o.config.ID)[2:]
 	updatesChannelID := o.StatusUpdatesChannelID()
 	mlChannelID := o.MagnetlinkMessageChannelID()
 	memberUpdateChannelID := o.MemberUpdateChannelID()
-	return []string{cID, uncompressedPubKey, updatesChannelID, mlChannelID, memberUpdateChannelID}
+
+	communityPubsubTopic := o.PubsubTopic()
+
+	return []transport.FiltersToInitialize{
+		{ChatID: cID, PubsubTopic: relay.DefaultWakuTopic}, // TODO: verify if this goes into default topic
+		{ChatID: uncompressedPubKey, PubsubTopic: communityPubsubTopic},
+		{ChatID: updatesChannelID, PubsubTopic: communityPubsubTopic},
+		{ChatID: mlChannelID, PubsubTopic: communityPubsubTopic},
+		{ChatID: memberUpdateChannelID, PubsubTopic: communityPubsubTopic},
+	}
 }
 
 func (o *Community) PrivateKey() *ecdsa.PrivateKey {

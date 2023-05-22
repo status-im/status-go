@@ -34,4 +34,5 @@ type RawMessage struct {
 	CommunityID           []byte
 	CommunityKeyExMsgType CommKeyExMsgType
 	Ephemeral             bool
+	PubsubTopic           string
 }

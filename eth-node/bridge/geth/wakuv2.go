@@ -130,7 +130,7 @@ func (w *gethWakuV2Wrapper) Subscribe(opts *types.SubscriptionOptions) (string, 
 		}
 	}
 
-	f, err := w.createFilterWrapper("", keyAsym, keySym, opts.PoW, opts.Topics)
+	f, err := w.createFilterWrapper("", keyAsym, keySym, opts.PoW, opts.PubsubTopic, opts.Topics)
 	if err != nil {
 		return "", err
 	}
@@ -160,12 +160,13 @@ func (w *gethWakuV2Wrapper) UnsubscribeMany(ids []string) error {
 	return w.waku.UnsubscribeMany(ids)
 }
 
-func (w *gethWakuV2Wrapper) createFilterWrapper(id string, keyAsym *ecdsa.PrivateKey, keySym []byte, pow float64, topics [][]byte) (types.Filter, error) {
+func (w *gethWakuV2Wrapper) createFilterWrapper(id string, keyAsym *ecdsa.PrivateKey, keySym []byte, pow float64, pubsubTopic string, topics [][]byte) (types.Filter, error) {
 	return NewWakuV2FilterWrapper(&wakucommon.Filter{
-		KeyAsym:  keyAsym,
-		KeySym:   keySym,
-		Topics:   topics,
-		Messages: wakucommon.NewMemoryMessageStore(),
+		KeyAsym:     keyAsym,
+		KeySym:      keySym,
+		Topics:      topics,
+		PubsubTopic: pubsubTopic,
+		Messages:    wakucommon.NewMemoryMessageStore(),
 	}, id), nil
 }
 
@@ -194,12 +195,12 @@ func (w *gethWakuV2Wrapper) RequestStoreMessages(ctx context.Context, peerID []b
 		}))
 	}
 
-	var topics []wakucommon.TopicType
-	for _, topic := range r.Topics {
-		topics = append(topics, wakucommon.BytesToTopic(topic))
+	var contentTopics []wakucommon.TopicType
+	for _, topic := range r.ContentTopics {
+		contentTopics = append(contentTopics, wakucommon.BytesToTopic(topic))
 	}
 
-	pbCursor, err := w.waku.Query(ctx, peer, topics, uint64(r.From), uint64(r.To), options)
+	pbCursor, err := w.waku.Query(ctx, peer, r.PubsubTopic, contentTopics, uint64(r.From), uint64(r.To), options)
 	if err != nil {
 		return nil, err
 	}
@@ -227,6 +228,15 @@ func (w *gethWakuV2Wrapper) StartDiscV5() error {
 
 func (w *gethWakuV2Wrapper) StopDiscV5() error {
 	return w.waku.StopDiscV5()
+}
+
+// Subscribe to a pubsub topic, passing an optional public key if the pubsub topic is protected
+func (w *gethWakuV2Wrapper) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error {
+	return w.waku.SubscribeToPubsubTopic(topic, optPublicKey)
+}
+
+func (w *gethWakuV2Wrapper) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
+	return w.waku.StorePubsubTopicKey(topic, privKey)
 }
 
 func (w *gethWakuV2Wrapper) AddStorePeer(address string) (peer.ID, error) {

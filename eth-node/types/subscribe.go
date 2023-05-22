@@ -6,5 +6,6 @@ type SubscriptionOptions struct {
 	PrivateKeyID string
 	SymKeyID     string
 	PoW          float64
+	PubsubTopic  string
 	Topics       [][]byte
 }

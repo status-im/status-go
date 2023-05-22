@@ -15,8 +15,10 @@ type Filter struct {
 	// Identity is the public key of the other recipient for non-public filters.
 	// It's encoded using encoding/hex.
 	Identity string `json:"identity"`
-	// Topic is the whisper topic
-	Topic types.TopicType `json:"topic"`
+	// PubsubTopic is the waku2 pubsub topic
+	PubsubTopic string `json:"pubsubTopic"`
+	// ContentTopic is the waku topic
+	ContentTopic types.TopicType `json:"topic"`
 	// Discovery is whether this is a discovery topic
 	Discovery bool `json:"discovery"`
 	// Negotiated tells us whether is a negotiated topic

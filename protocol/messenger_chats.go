@@ -406,7 +406,7 @@ func (m *Messenger) deactivateChat(chatID string, deactivationClock uint64, shou
 				continue
 			}
 
-			err := m.mailserversDatabase.ResetLastRequest(filter.Topic.String())
+			err := m.mailserversDatabase.ResetLastRequest(filter.PubsubTopic, filter.ContentTopic.String())
 			if err != nil {
 				return nil, err
 			}

@@ -88,6 +88,10 @@ type Waku interface {
 
 	StopDiscV5() error
 
+	SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error
+
+	StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error
+
 	AddStorePeer(address string) (peer.ID, error)
 
 	AddRelayPeer(address string) (peer.ID, error)
