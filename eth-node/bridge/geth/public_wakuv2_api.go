@@ -53,10 +53,11 @@ func (w *gethPublicWakuV2APIWrapper) NewMessageFilter(req types.Criteria) (strin
 	}
 
 	criteria := wakuv2.Criteria{
-		SymKeyID:     req.SymKeyID,
-		PrivateKeyID: req.PrivateKeyID,
-		Sig:          req.Sig,
-		Topics:       topics,
+		SymKeyID:      req.SymKeyID,
+		PrivateKeyID:  req.PrivateKeyID,
+		Sig:           req.Sig,
+		PubsubTopic:   req.PubsubTopic,
+		ContentTopics: topics,
 	}
 	return w.api.NewMessageFilter(criteria)
 }
@@ -72,13 +73,14 @@ func (w *gethPublicWakuV2APIWrapper) GetFilterMessages(id string) ([]*types.Mess
 	wrappedMsgs := make([]*types.Message, len(msgs))
 	for index, msg := range msgs {
 		wrappedMsgs[index] = &types.Message{
-			Sig:       msg.Sig,
-			Timestamp: msg.Timestamp,
-			Topic:     types.TopicType(msg.Topic),
-			Payload:   msg.Payload,
-			Padding:   msg.Padding,
-			Hash:      msg.Hash,
-			Dst:       msg.Dst,
+			Sig:         msg.Sig,
+			Timestamp:   msg.Timestamp,
+			PubsubTopic: msg.PubsubTopic,
+			Topic:       types.TopicType(msg.ContentTopic),
+			Payload:     msg.Payload,
+			Padding:     msg.Padding,
+			Hash:        msg.Hash,
+			Dst:         msg.Dst,
 		}
 	}
 	return wrappedMsgs, nil
@@ -88,14 +90,15 @@ func (w *gethPublicWakuV2APIWrapper) GetFilterMessages(id string) ([]*types.Mess
 // returns the hash of the message in case of success.
 func (w *gethPublicWakuV2APIWrapper) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
 	msg := wakuv2.NewMessage{
-		SymKeyID:   req.SymKeyID,
-		PublicKey:  req.PublicKey,
-		Sig:        req.SigID, // Sig is really a SigID
-		Topic:      wakucommon.TopicType(req.Topic),
-		Payload:    req.Payload,
-		Padding:    req.Padding,
-		TargetPeer: req.TargetPeer,
-		Ephemeral:  req.Ephemeral,
+		SymKeyID:     req.SymKeyID,
+		PublicKey:    req.PublicKey,
+		Sig:          req.SigID, // Sig is really a SigID
+		PubsubTopic:  req.PubsubTopic,
+		ContentTopic: wakucommon.TopicType(req.Topic),
+		Payload:      req.Payload,
+		Padding:      req.Padding,
+		TargetPeer:   req.TargetPeer,
+		Ephemeral:    req.Ephemeral,
 	}
 	return w.api.Post(ctx, msg)
 }

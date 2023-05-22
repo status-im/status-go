@@ -45,10 +45,12 @@ type ReceivedMessage struct {
 	Padding   []byte
 	Signature []byte
 
-	Sent  uint32           // Time when the message was posted into the network
-	Src   *ecdsa.PublicKey // Message recipient (identity used to decode the message)
-	Dst   *ecdsa.PublicKey // Message recipient (identity used to decode the message)
-	Topic TopicType
+	Sent uint32           // Time when the message was posted into the network
+	Src  *ecdsa.PublicKey // Message recipient (identity used to decode the message)
+	Dst  *ecdsa.PublicKey // Message recipient (identity used to decode the message)
+
+	PubsubTopic  string
+	ContentTopic TopicType
 
 	SymKeyHash common.Hash // The Keccak256Hash of the key
 
@@ -159,10 +161,11 @@ func NewReceivedMessage(env *protocol.Envelope, msgType MessageType) *ReceivedMe
 	}
 
 	return &ReceivedMessage{
-		Envelope: env,
-		MsgType:  msgType,
-		Sent:     uint32(env.Message().Timestamp / int64(time.Second)),
-		Topic:    ct,
+		Envelope:     env,
+		MsgType:      msgType,
+		Sent:         uint32(env.Message().Timestamp / int64(time.Second)),
+		ContentTopic: ct,
+		PubsubTopic:  env.PubsubTopic(),
 	}
 }
 
@@ -242,7 +245,8 @@ func (msg *ReceivedMessage) Open(watcher *Filter) (result *ReceivedMessage) {
 		return nil
 	}
 
-	result.Topic = ct
+	result.PubsubTopic = watcher.PubsubTopic
+	result.ContentTopic = ct
 
 	return result
 }

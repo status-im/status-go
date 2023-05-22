@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+
 	"github.com/status-im/status-go/wakuv2/common"
 )
 
@@ -45,8 +47,8 @@ func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
 	t2 := [4]byte{0xca, 0xfe, 0xde, 0xca}
 
 	crit := Criteria{
-		SymKeyID: keyID,
-		Topics:   []common.TopicType{common.TopicType(t1), common.TopicType(t2)},
+		SymKeyID:      keyID,
+		ContentTopics: []common.TopicType{common.TopicType(t1), common.TopicType(t2)},
 	}
 
 	_, err = api.NewMessageFilter(crit)
@@ -55,7 +57,7 @@ func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
 	}
 
 	found := false
-	candidates := w.filters.GetWatchersByTopic(t1)
+	candidates := w.filters.GetWatchersByTopic(relay.DefaultWakuTopic, t1)
 	for _, f := range candidates {
 		if len(f.Topics) == 2 {
 			if bytes.Equal(f.Topics[0], t1[:]) && bytes.Equal(f.Topics[1], t2[:]) {

@@ -25,14 +25,14 @@ func (ckd *CommunitiesKeyDistributorImpl) Distribute(community *communities.Comm
 		return communities.ErrNotControlNode
 	}
 
-	err := ckd.distributeKey(community.ID(), community.ID(), &keyActions.CommunityKeyAction)
+	err := ckd.distributeKey(community, community.ID(), &keyActions.CommunityKeyAction)
 	if err != nil {
 		return err
 	}
 
 	for channelID := range keyActions.ChannelKeysActions {
 		keyAction := keyActions.ChannelKeysActions[channelID]
-		err := ckd.distributeKey(community.ID(), []byte(community.IDString()+channelID), &keyAction)
+		err := ckd.distributeKey(community, []byte(community.IDString()+channelID), &keyAction)
 		if err != nil {
 			return err
 		}
@@ -46,7 +46,7 @@ func (ckd *CommunitiesKeyDistributorImpl) Rekey(community *communities.Community
 		return communities.ErrNotControlNode
 	}
 
-	err := ckd.distributeKey(community.ID(), community.ID(), &communities.EncryptionKeyAction{
+	err := ckd.distributeKey(community, community.ID(), &communities.EncryptionKeyAction{
 		ActionType: communities.EncryptionKeyRekey,
 		Members:    community.Members(),
 	})
@@ -55,7 +55,7 @@ func (ckd *CommunitiesKeyDistributorImpl) Rekey(community *communities.Community
 	}
 
 	for channelID, channel := range community.Chats() {
-		err := ckd.distributeKey(community.ID(), []byte(community.IDString()+channelID), &communities.EncryptionKeyAction{
+		err := ckd.distributeKey(community, []byte(community.IDString()+channelID), &communities.EncryptionKeyAction{
 			ActionType: communities.EncryptionKeyRekey,
 			Members:    channel.Members,
 		})
@@ -67,7 +67,7 @@ func (ckd *CommunitiesKeyDistributorImpl) Rekey(community *communities.Community
 	return nil
 }
 
-func (ckd *CommunitiesKeyDistributorImpl) distributeKey(communityID, hashRatchetGroupID []byte, keyAction *communities.EncryptionKeyAction) error {
+func (ckd *CommunitiesKeyDistributorImpl) distributeKey(community *communities.Community, hashRatchetGroupID []byte, keyAction *communities.EncryptionKeyAction) error {
 	pubkeys := make([]*ecdsa.PublicKey, len(keyAction.Members))
 	i := 0
 	for hex := range keyAction.Members {
@@ -82,19 +82,19 @@ func (ckd *CommunitiesKeyDistributorImpl) distributeKey(communityID, hashRatchet
 			return err
 		}
 
-		err = ckd.sendKeyExchangeMessage(communityID, hashRatchetGroupID, pubkeys, common.KeyExMsgReuse)
+		err = ckd.sendKeyExchangeMessage(community, hashRatchetGroupID, pubkeys, common.KeyExMsgReuse)
 		if err != nil {
 			return err
 		}
 
 	case communities.EncryptionKeyRekey:
-		err := ckd.sendKeyExchangeMessage(communityID, hashRatchetGroupID, pubkeys, common.KeyExMsgRekey)
+		err := ckd.sendKeyExchangeMessage(community, hashRatchetGroupID, pubkeys, common.KeyExMsgRekey)
 		if err != nil {
 			return err
 		}
 
 	case communities.EncryptionKeySendToMembers:
-		err := ckd.sendKeyExchangeMessage(communityID, hashRatchetGroupID, pubkeys, common.KeyExMsgReuse)
+		err := ckd.sendKeyExchangeMessage(community, hashRatchetGroupID, pubkeys, common.KeyExMsgReuse)
 		if err != nil {
 			return err
 		}
@@ -103,14 +103,15 @@ func (ckd *CommunitiesKeyDistributorImpl) distributeKey(communityID, hashRatchet
 	return nil
 }
 
-func (ckd *CommunitiesKeyDistributorImpl) sendKeyExchangeMessage(communityID, hashRatchetGroupID []byte, pubkeys []*ecdsa.PublicKey, msgType common.CommKeyExMsgType) error {
+func (ckd *CommunitiesKeyDistributorImpl) sendKeyExchangeMessage(community *communities.Community, hashRatchetGroupID []byte, pubkeys []*ecdsa.PublicKey, msgType common.CommKeyExMsgType) error {
 	rawMessage := common.RawMessage{
 		SkipProtocolLayer:     false,
-		CommunityID:           communityID,
+		CommunityID:           community.ID(),
 		CommunityKeyExMsgType: msgType,
 		Recipients:            pubkeys,
 		MessageType:           protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
 		HashRatchetGroupID:    hashRatchetGroupID,
+		PubsubTopic:           community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
 	}
 	_, err := ckd.sender.SendCommunityMessage(context.Background(), rawMessage)
 

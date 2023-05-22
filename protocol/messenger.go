@@ -19,6 +19,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
@@ -988,6 +989,7 @@ func (m *Messenger) publishContactCode() error {
 	}
 	for _, community := range joinedCommunities {
 		rawMessage.LocalChatID = community.MemberUpdateChannelID()
+		rawMessage.PubsubTopic = community.PubsubTopic()
 		_, err = m.sender.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
 		if err != nil {
 			return err
@@ -1586,7 +1588,7 @@ func (m *Messenger) Init() error {
 	logger := m.logger.With(zap.String("site", "Init"))
 
 	var (
-		publicChatIDs []string
+		filtersToInit []transport.FiltersToInitialize
 		publicKeys    []*ecdsa.PublicKey
 	)
 
@@ -1596,7 +1598,7 @@ func (m *Messenger) Init() error {
 	}
 	for _, org := range joinedCommunities {
 		// the org advertise on the public topic derived by the pk
-		publicChatIDs = append(publicChatIDs, org.DefaultFilters()...)
+		filtersToInit = append(filtersToInit, org.DefaultFilters()...)
 
 		// This is for status-go versions that didn't have `CommunitySettings`
 		// We need to ensure communities that existed before community settings
@@ -1644,21 +1646,24 @@ func (m *Messenger) Init() error {
 	}
 
 	for _, org := range spectatedCommunities {
-		publicChatIDs = append(publicChatIDs, org.DefaultFilters()...)
+		filtersToInit = append(filtersToInit, org.DefaultFilters()...)
 	}
 
 	// Init filters for the communities we control
-	var controlledCommunitiesPks []*ecdsa.PrivateKey
+	var communityFiltersToInitialize []transport.CommunityFilterToInitialize
 	controlledCommunities, err := m.communitiesManager.ControlledCommunities()
 	if err != nil {
 		return err
 	}
 
 	for _, c := range controlledCommunities {
-		controlledCommunitiesPks = append(controlledCommunitiesPks, c.PrivateKey())
+		communityFiltersToInitialize = append(communityFiltersToInitialize, transport.CommunityFilterToInitialize{
+			CommunityID: c.ID(),
+			PrivKey:     c.PrivateKey(),
+		})
 	}
 
-	_, err = m.transport.InitCommunityFilters(controlledCommunitiesPks)
+	_, err = m.transport.InitCommunityFilters(communityFiltersToInitialize)
 	if err != nil {
 		return err
 	}
@@ -1688,10 +1693,13 @@ func (m *Messenger) Init() error {
 
 		switch chat.ChatType {
 		case ChatTypePublic, ChatTypeProfile:
-			publicChatIDs = append(publicChatIDs, chat.ID)
+			filtersToInit = append(filtersToInit, transport.FiltersToInitialize{ChatID: chat.ID, PubsubTopic: relay.DefaultWakuTopic})
 		case ChatTypeCommunityChat:
-			// TODO not public chat now
-			publicChatIDs = append(publicChatIDs, chat.ID)
+			communityID, err := hexutil.Decode(chat.CommunityID)
+			if err != nil {
+				return err
+			}
+			filtersToInit = append(filtersToInit, transport.FiltersToInitialize{ChatID: chat.ID, PubsubTopic: transport.GetPubsubTopic(communityID)})
 		case ChatTypeOneToOne:
 			pk, err := chat.PublicKey()
 			if err != nil {
@@ -1766,7 +1774,7 @@ func (m *Messenger) Init() error {
 		return err
 	}
 
-	_, err = m.transport.InitFilters(publicChatIDs, publicKeys)
+	_, err = m.transport.InitFilters(filtersToInit, publicKeys)
 	return err
 }
 
@@ -1935,6 +1943,7 @@ func (m *Messenger) reSendRawMessage(ctx context.Context, messageID string) erro
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             message.Payload,
+		PubsubTopic:         message.PubsubTopic,
 		MessageType:         message.MessageType,
 		Recipients:          message.Recipients,
 		ResendAutomatically: message.ResendAutomatically,
@@ -2047,6 +2056,13 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 			return rawMessage, err
 		}
 	case ChatTypeCommunityChat:
+		communityID, err := hexutil.Decode(chat.CommunityID)
+		if err != nil {
+			return rawMessage, err
+		}
+
+		rawMessage.PubsubTopic = transport.GetPubsubTopic(communityID)
+
 		// TODO: add grant
 		canPost, err := m.communitiesManager.CanPost(&m.identity.PublicKey, chat.CommunityID, chat.CommunityChatID(), nil)
 		if err != nil {
@@ -3423,7 +3439,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 						}
 
 						messageState.CurrentMessageState.Message = protoMessage
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, messageState.CurrentMessageState.Message)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.ContentTopic, filter.ChatID, msg.Type, messageState.CurrentMessageState.Message)
 						err = m.HandleImportedChatMessage(messageState)
 						if err != nil {
 							logger.Warn("failed to handle ChatMessage", zap.Error(err))

@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -136,12 +137,12 @@ func NewTransport(
 	return t, nil
 }
 
-func (t *Transport) InitFilters(chatIDs []string, publicKeys []*ecdsa.PublicKey) ([]*Filter, error) {
+func (t *Transport) InitFilters(chatIDs []FiltersToInitialize, publicKeys []*ecdsa.PublicKey) ([]*Filter, error) {
 	return t.filters.Init(chatIDs, publicKeys)
 }
 
-func (t *Transport) InitPublicFilters(chatIDs []string) ([]*Filter, error) {
-	return t.filters.InitPublicFilters(chatIDs)
+func (t *Transport) InitPublicFilters(filtersToInit []FiltersToInitialize) ([]*Filter, error) {
+	return t.filters.InitPublicFilters(filtersToInit)
 }
 
 func (t *Transport) Filters() []*Filter {
@@ -164,8 +165,8 @@ func (t *Transport) LoadFilters(filters []*Filter) ([]*Filter, error) {
 	return t.filters.InitWithFilters(filters)
 }
 
-func (t *Transport) InitCommunityFilters(pks []*ecdsa.PrivateKey) ([]*Filter, error) {
-	return t.filters.InitCommunityFilters(pks)
+func (t *Transport) InitCommunityFilters(communityFiltersToInitialize []CommunityFilterToInitialize) ([]*Filter, error) {
+	return t.filters.InitCommunityFilters(communityFiltersToInitialize)
 }
 
 func (t *Transport) RemoveFilters(filters []*Filter) error {
@@ -189,7 +190,7 @@ func (t *Transport) ProcessNegotiatedSecret(secret types.NegotiatedSecret) (*Fil
 }
 
 func (t *Transport) JoinPublic(chatID string) (*Filter, error) {
-	return t.filters.LoadPublic(chatID)
+	return t.filters.LoadPublic(chatID, relay.DefaultWakuTopic)
 }
 
 func (t *Transport) LeavePublic(chatID string) error {
@@ -279,13 +280,13 @@ func (t *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage
 		return nil, err
 	}
 
-	filter, err := t.filters.LoadPublic(chatName)
+	filter, err := t.filters.LoadPublic(chatName, newMessage.PubsubTopic)
 	if err != nil {
 		return nil, err
 	}
 
 	newMessage.SymKeyID = filter.SymKeyID
-	newMessage.Topic = filter.Topic
+	newMessage.Topic = filter.ContentTopic
 
 	return t.api.Post(ctx, *newMessage)
 }
@@ -304,7 +305,7 @@ func (t *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage 
 	}
 
 	newMessage.SymKeyID = filter.SymKeyID
-	newMessage.Topic = filter.Topic
+	newMessage.Topic = filter.ContentTopic
 	newMessage.PublicKey = nil
 
 	return t.api.Post(ctx, *newMessage)
@@ -320,7 +321,7 @@ func (t *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *
 		return nil, err
 	}
 
-	newMessage.Topic = filter.Topic
+	newMessage.Topic = filter.ContentTopic
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
 	return t.api.Post(ctx, *newMessage)
@@ -336,7 +337,7 @@ func (t *Transport) SendPrivateOnPersonalTopic(ctx context.Context, newMessage *
 		return nil, err
 	}
 
-	newMessage.Topic = filter.Topic
+	newMessage.Topic = filter.ContentTopic
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
 	return t.api.Post(ctx, *newMessage)
@@ -356,15 +357,15 @@ func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.
 	}
 
 	// We load the filter to make sure we can post on it
-	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:])
+	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:], newMessage.PubsubTopic)
 	if err != nil {
 		return nil, err
 	}
 
-	newMessage.Topic = filter.Topic
+	newMessage.Topic = filter.ContentTopic
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
-	t.logger.Debug("SENDING message", zap.Binary("topic", filter.Topic[:]))
+	t.logger.Debug("SENDING message", zap.Binary("topic", filter.ContentTopic[:]))
 
 	return t.api.Post(ctx, *newMessage)
 }
@@ -450,7 +451,7 @@ func (t *Transport) createMessagesRequestV1(
 	topics []types.TopicType,
 	waitForResponse bool,
 ) (cursor []byte, err error) {
-	r := createMessagesRequest(from, to, previousCursor, nil, topics)
+	r := createMessagesRequest(from, to, previousCursor, nil, "", topics)
 
 	events := make(chan types.EnvelopeEvent, 10)
 	sub := t.waku.SubscribeEnvelopeEvents(events)
@@ -481,10 +482,11 @@ func (t *Transport) createMessagesRequestV2(
 	peerID []byte,
 	from, to uint32,
 	previousStoreCursor *types.StoreRequestCursor,
-	topics []types.TopicType,
+	pubsubTopic string,
+	contentTopics []types.TopicType,
 	waitForResponse bool,
 ) (storeCursor *types.StoreRequestCursor, err error) {
-	r := createMessagesRequest(from, to, nil, previousStoreCursor, topics)
+	r := createMessagesRequest(from, to, nil, previousStoreCursor, pubsubTopic, contentTopics)
 
 	if waitForResponse {
 		resultCh := make(chan struct {
@@ -524,55 +526,22 @@ func (t *Transport) SendMessagesRequestForTopics(
 	from, to uint32,
 	previousCursor []byte,
 	previousStoreCursor *types.StoreRequestCursor,
-	topics []types.TopicType,
+	pubsubTopic string,
+	contentTopics []types.TopicType,
 	waitForResponse bool,
 ) (cursor []byte, storeCursor *types.StoreRequestCursor, err error) {
 	switch t.waku.Version() {
 	case 2:
-		storeCursor, err = t.createMessagesRequestV2(ctx, peerID, from, to, previousStoreCursor, topics, waitForResponse)
+		storeCursor, err = t.createMessagesRequestV2(ctx, peerID, from, to, previousStoreCursor, pubsubTopic, contentTopics, waitForResponse)
 	case 1:
-		cursor, err = t.createMessagesRequestV1(ctx, peerID, from, to, previousCursor, topics, waitForResponse)
+		cursor, err = t.createMessagesRequestV1(ctx, peerID, from, to, previousCursor, contentTopics, waitForResponse)
 	default:
 		err = fmt.Errorf("unsupported version %d", t.waku.Version())
 	}
 	return
 }
 
-// RequestHistoricMessages requests historic messages for all registered filters.
-func (t *Transport) SendMessagesRequest(
-	ctx context.Context,
-	peerID []byte,
-	from, to uint32,
-	previousCursor []byte,
-	previousStoreCursor *types.StoreRequestCursor,
-	waitForResponse bool,
-) (cursor []byte, storeCursor *types.StoreRequestCursor, err error) {
-
-	topics := make([]types.TopicType, len(t.Filters()))
-	for _, f := range t.Filters() {
-		topics = append(topics, f.Topic)
-	}
-
-	return t.SendMessagesRequestForTopics(ctx, peerID, from, to, previousCursor, previousStoreCursor, topics, waitForResponse)
-}
-
-func (t *Transport) SendMessagesRequestForFilter(
-	ctx context.Context,
-	peerID []byte,
-	from, to uint32,
-	previousCursor []byte,
-	previousStoreCursor *types.StoreRequestCursor,
-	filter *Filter,
-	waitForResponse bool,
-) (cursor []byte, storeCursor *types.StoreRequestCursor, err error) {
-
-	topics := make([]types.TopicType, len(t.Filters()))
-	topics = append(topics, filter.Topic)
-
-	return t.SendMessagesRequestForTopics(ctx, peerID, from, to, previousCursor, previousStoreCursor, topics, waitForResponse)
-}
-
-func createMessagesRequest(from, to uint32, cursor []byte, storeCursor *types.StoreRequestCursor, topics []types.TopicType) types.MessagesRequest {
+func createMessagesRequest(from, to uint32, cursor []byte, storeCursor *types.StoreRequestCursor, pubsubTopic string, topics []types.TopicType) types.MessagesRequest {
 	aUUID := uuid.New()
 	// uuid is 16 bytes, converted to hex it's 32 bytes as expected by types.MessagesRequest
 	id := []byte(hex.EncodeToString(aUUID[:]))
@@ -581,13 +550,14 @@ func createMessagesRequest(from, to uint32, cursor []byte, storeCursor *types.St
 		topicBytes = append(topicBytes, topics[idx][:])
 	}
 	return types.MessagesRequest{
-		ID:          id,
-		From:        from,
-		To:          to,
-		Limit:       1000,
-		Cursor:      cursor,
-		Topics:      topicBytes,
-		StoreCursor: storeCursor,
+		ID:            id,
+		From:          from,
+		To:            to,
+		Limit:         1000,
+		Cursor:        cursor,
+		PubsubTopic:   pubsubTopic,
+		ContentTopics: topicBytes,
+		StoreCursor:   storeCursor,
 	}
 }
 
@@ -688,4 +658,26 @@ func (t *Transport) SubscribeToConnStatusChanges() (*types.ConnStatusSubscriptio
 
 func (t *Transport) ConnectionChanged(state connection.State) {
 	t.waku.ConnectionChanged(state)
+}
+
+// Subscribe to a pubsub topic, passing an optional public key if the pubsub topic is protected
+func (t *Transport) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error {
+	if t.waku.Version() == 2 {
+		return t.waku.SubscribeToPubsubTopic(topic, optPublicKey)
+	}
+	return nil
+}
+
+func (t *Transport) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
+	return t.waku.StorePubsubTopicKey(topic, privKey)
+}
+
+func GetPubsubTopic(communityID []byte) string {
+	// TODO: remove hardcoded pubsub topic and use shard
+	result := "/waku/2/status-signed-test-1"
+	if communityID == nil {
+		result = relay.DefaultWakuTopic
+	}
+
+	return result
 }

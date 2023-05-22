@@ -6,17 +6,18 @@ import (
 
 // NewMessage represents a new whisper message that is posted through the RPC.
 type NewMessage struct {
-	SymKeyID   string    `json:"symKeyID"`
-	PublicKey  []byte    `json:"pubKey"`
-	SigID      string    `json:"sig"`
-	TTL        uint32    `json:"ttl"`
-	Topic      TopicType `json:"topic"`
-	Payload    []byte    `json:"payload"`
-	Padding    []byte    `json:"padding"`
-	PowTime    uint32    `json:"powTime"`
-	PowTarget  float64   `json:"powTarget"`
-	TargetPeer string    `json:"targetPeer"`
-	Ephemeral  bool      `json:"ephemeral"`
+	SymKeyID    string    `json:"symKeyID"`
+	PublicKey   []byte    `json:"pubKey"`
+	SigID       string    `json:"sig"`
+	TTL         uint32    `json:"ttl"`
+	PubsubTopic string    `json:"pubsubTopic"`
+	Topic       TopicType `json:"topic"`
+	Payload     []byte    `json:"payload"`
+	Padding     []byte    `json:"padding"`
+	PowTime     uint32    `json:"powTime"`
+	PowTarget   float64   `json:"powTarget"`
+	TargetPeer  string    `json:"targetPeer"`
+	Ephemeral   bool      `json:"ephemeral"`
 }
 
 // Message is the RPC representation of a whisper message.
@@ -24,6 +25,7 @@ type Message struct {
 	Sig          []byte    `json:"sig,omitempty"`
 	TTL          uint32    `json:"ttl"`
 	Timestamp    uint32    `json:"timestamp"`
+	PubsubTopic  string    `json:"pubsubTopic"`
 	Topic        TopicType `json:"topic"`
 	Payload      []byte    `json:"payload"`
 	Padding      []byte    `json:"padding"`
@@ -40,6 +42,7 @@ type Criteria struct {
 	PrivateKeyID string      `json:"privateKeyID"`
 	Sig          []byte      `json:"sig"`
 	MinPow       float64     `json:"minPow"`
+	PubsubTopic  string      `json:"pubsubTopic"`
 	Topics       []TopicType `json:"topics"`
 	AllowP2P     bool        `json:"allowP2P"`
 }
