@@ -30,7 +30,7 @@ linters-settings:
   gofmt:
     simplify: true
   goimports:
-    local-prefixes: github.com/ethereum/go-ethereum,github.com/status-im/status-go
+    local-prefixes: github.com/ethereum/go-ethereum,github.com/status-im/status-go,github.com/waku-org/go-waku
   maligned:
     suggest-new: true
   dupl:
