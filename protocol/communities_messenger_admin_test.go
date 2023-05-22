@@ -417,23 +417,34 @@ func (s *AdminMessengerCommunitiesSuite) adminCreateCommunityChannel(community *
 		if len(response.Communities()) == 0 {
 			return false
 		}
-		s.Require().Len(response.Communities(), 1)
-		s.Require().Len(response.Communities()[0].Chats(), 2)
+
+		madeAssertions := false
+		for _, c := range response.Communities() {
+			if c.IDString() == community.IDString() {
+				madeAssertions = true
+				s.Require().Len(c.Chats(), 2)
+			}
+		}
+
+		if !madeAssertions {
+			s.Require().Equal(true, false)
+		}
 
 		return true
 	}
 
 	response, err := s.admin.CreateCommunityChat(community.ID(), orgChat)
+
 	s.Require().NoError(err)
 	s.Require().True(checkChannelCreated(response))
 
-	// _, err = WaitOnMessengerResponse(s.owner, func(response *MessengerResponse) bool {
-	// 	return checkChannelCreated(response)
-	// }, "owner did not receive new channel from admin")
-	// s.Require().NoError(err)
-
 	_, err = WaitOnMessengerResponse(s.alice, func(response *MessengerResponse) bool {
 		return checkChannelCreated(response)
+	}, "owner did not receive new channel from admin")
+	s.Require().NoError(err)
+
+	_, err = WaitOnMessengerResponse(s.owner, func(r *MessengerResponse) bool {
+		return checkChannelCreated(r)
 	}, "alice did not receive new channel from admin")
 	s.Require().NoError(err)
 }
