@@ -47,6 +47,8 @@ var (
 	seedPhrase       = flag.String("seed-phrase", "", "Seed phrase")
 	version          = flag.Bool("version", false, "Print version and dump configuration")
 	communityID      = flag.String("community-id", "", "The id of the community")
+	shardCluster     = flag.Int("shard-cluster", common.UndefinedShardValue, "The shard cluster in which the of the community is published")
+	shardIndex       = flag.Int("shard-index", common.UndefinedShardValue, "The shard index in which the community is published")
 	chatID           = flag.String("chat-id", "", "The id of the chat")
 
 	dataDir   = flag.String("dir", getDefaultDataDir(), "Directory used by node to store data")
@@ -145,7 +147,15 @@ func main() {
 
 	messenger := wakuextservice.Messenger()
 
-	community, err := messenger.RequestCommunityInfoFromMailserver(*communityID, true)
+	var shard *common.Shard = nil
+	if shardCluster != nil && shardIndex != nil && *shardCluster != common.UndefinedShardValue && *shardIndex != common.UndefinedShardValue {
+		shard = &common.Shard{
+			Cluster: uint16(*shardCluster),
+			Index:   uint16(*shardIndex),
+		}
+	}
+
+	community, err := messenger.RequestCommunityInfoFromMailserver(*communityID, shard, true)
 	if err != nil {
 
 		logger.Error("community error", "error", err)

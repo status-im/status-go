@@ -19,9 +19,10 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
+
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -1687,8 +1688,8 @@ func (m *Messenger) Init() error {
 
 	for _, c := range controlledCommunities {
 		communityFiltersToInitialize = append(communityFiltersToInitialize, transport.CommunityFilterToInitialize{
-			CommunityID: c.ID(),
-			PrivKey:     c.PrivateKey(),
+			Shard:   c.Shard().TransportShard(),
+			PrivKey: c.PrivateKey(),
 		})
 	}
 
@@ -1720,6 +1721,8 @@ func (m *Messenger) Init() error {
 			continue
 		}
 
+		communityInfo := make(map[string]*communities.Community)
+
 		switch chat.ChatType {
 		case ChatTypePublic, ChatTypeProfile:
 			filtersToInit = append(filtersToInit, transport.FiltersToInitialize{ChatID: chat.ID, PubsubTopic: relay.DefaultWakuTopic})
@@ -1728,7 +1731,17 @@ func (m *Messenger) Init() error {
 			if err != nil {
 				return err
 			}
-			filtersToInit = append(filtersToInit, transport.FiltersToInitialize{ChatID: chat.ID, PubsubTopic: transport.GetPubsubTopic(communityID)})
+
+			community, ok := communityInfo[chat.CommunityID]
+			if !ok {
+				community, err = m.communitiesManager.GetByID(communityID)
+				if err != nil {
+					return err
+				}
+				communityInfo[chat.CommunityID] = community
+			}
+
+			filtersToInit = append(filtersToInit, transport.FiltersToInitialize{ChatID: chat.ID, PubsubTopic: transport.GetPubsubTopic(community.Shard().TransportShard())})
 		case ChatTypeOneToOne:
 			pk, err := chat.PublicKey()
 			if err != nil {
@@ -2085,12 +2098,10 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 			return rawMessage, err
 		}
 	case ChatTypeCommunityChat:
-		communityID, err := hexutil.Decode(chat.CommunityID)
+		rawMessage.PubsubTopic, err = m.communitiesManager.GetPubsubTopic(chat.CommunityID)
 		if err != nil {
 			return rawMessage, err
 		}
-
-		rawMessage.PubsubTopic = transport.GetPubsubTopic(communityID)
 
 		// TODO: add grant
 		canPost, err := m.communitiesManager.CanPost(&m.identity.PublicKey, chat.CommunityID, chat.CommunityChatID(), nil)

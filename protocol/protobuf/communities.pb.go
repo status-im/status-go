@@ -1144,15 +1144,18 @@ func (m *CommunityCancelRequestToJoin) GetDisplayName() string {
 }
 
 type CommunityRequestToJoinResponse struct {
-	Clock                uint64                `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
-	Community            *CommunityDescription `protobuf:"bytes,2,opt,name=community,proto3" json:"community,omitempty"`
-	Accepted             bool                  `protobuf:"varint,3,opt,name=accepted,proto3" json:"accepted,omitempty"`
-	Grant                []byte                `protobuf:"bytes,4,opt,name=grant,proto3" json:"grant,omitempty"`
-	CommunityId          []byte                `protobuf:"bytes,5,opt,name=community_id,json=communityId,proto3" json:"community_id,omitempty"`
-	MagnetUri            string                `protobuf:"bytes,6,opt,name=magnet_uri,json=magnetUri,proto3" json:"magnet_uri,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}              `json:"-"`
-	XXX_unrecognized     []byte                `json:"-"`
-	XXX_sizecache        int32                 `json:"-"`
+	Clock                    uint64                `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
+	Community                *CommunityDescription `protobuf:"bytes,2,opt,name=community,proto3" json:"community,omitempty"`
+	Accepted                 bool                  `protobuf:"varint,3,opt,name=accepted,proto3" json:"accepted,omitempty"`
+	Grant                    []byte                `protobuf:"bytes,4,opt,name=grant,proto3" json:"grant,omitempty"`
+	CommunityId              []byte                `protobuf:"bytes,5,opt,name=community_id,json=communityId,proto3" json:"community_id,omitempty"`
+	MagnetUri                string                `protobuf:"bytes,6,opt,name=magnet_uri,json=magnetUri,proto3" json:"magnet_uri,omitempty"`
+	ProtectedTopicPrivateKey []byte                `protobuf:"bytes,7,opt,name=protected_topic_private_key,json=protectedTopicPrivateKey,proto3" json:"protected_topic_private_key,omitempty"`
+	ShardCluster             int32                 `protobuf:"varint,8,opt,name=shard_cluster,json=shardCluster,proto3" json:"shard_cluster,omitempty"`
+	ShardIndex               int32                 `protobuf:"varint,9,opt,name=shard_index,json=shardIndex,proto3" json:"shard_index,omitempty"`
+	XXX_NoUnkeyedLiteral     struct{}              `json:"-"`
+	XXX_unrecognized         []byte                `json:"-"`
+	XXX_sizecache            int32                 `json:"-"`
 }
 
 func (m *CommunityRequestToJoinResponse) Reset()         { *m = CommunityRequestToJoinResponse{} }
@@ -1220,6 +1223,27 @@ func (m *CommunityRequestToJoinResponse) GetMagnetUri() string {
 		return m.MagnetUri
 	}
 	return ""
+}
+
+func (m *CommunityRequestToJoinResponse) GetProtectedTopicPrivateKey() []byte {
+	if m != nil {
+		return m.ProtectedTopicPrivateKey
+	}
+	return nil
+}
+
+func (m *CommunityRequestToJoinResponse) GetShardCluster() int32 {
+	if m != nil {
+		return m.ShardCluster
+	}
+	return 0
+}
+
+func (m *CommunityRequestToJoinResponse) GetShardIndex() int32 {
+	if m != nil {
+		return m.ShardIndex
+	}
+	return 0
 }
 
 type CommunityRequestToLeave struct {

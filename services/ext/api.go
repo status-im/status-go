@@ -436,6 +436,11 @@ func (api *PublicAPI) RemovePrivateKey(id types.HexBytes) (*protocol.MessengerRe
 	return api.service.messenger.RemovePrivateKey(id)
 }
 
+// Sets the community shard for a community and updates all active filters for the community
+func (api *PublicAPI) SetCommunityShard(request *requests.SetCommunityShard) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SetCommunityShard(request)
+}
+
 // ExportCommunity exports the private key of the community with given ID
 func (api *PublicAPI) ExportCommunity(id types.HexBytes) (types.HexBytes, error) {
 	key, err := api.service.messenger.ExportCommunity(id)
@@ -1169,12 +1174,22 @@ func (api *PublicAPI) EnsVerified(pk, ensName string) error {
 	return api.service.messenger.ENSVerified(pk, ensName)
 }
 
+// DEPRECATED
 func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) (*communities.Community, error) {
-	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID, true)
+	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID, nil, true)
 }
 
+func (api *PublicAPI) RequestCommunityInfoFromMailserverWithShard(communityID string, shard *common.Shard) (*communities.Community, error) {
+	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID, shard, true)
+}
+
+// DEPRECATED
 func (api *PublicAPI) RequestCommunityInfoFromMailserverAsync(communityID string) error {
-	return api.service.messenger.RequestCommunityInfoFromMailserverAsync(communityID)
+	return api.service.messenger.RequestCommunityInfoFromMailserverAsync(communityID, nil)
+}
+
+func (api *PublicAPI) RequestCommunityInfoFromMailserverAsyncWithShard(communityID string, shard *common.Shard) error {
+	return api.service.messenger.RequestCommunityInfoFromMailserverAsync(communityID, shard)
 }
 
 func (api *PublicAPI) ActivityCenterNotifications(request protocol.ActivityCenterNotificationsRequest) (*protocol.ActivityCenterPaginationResponse, error) {

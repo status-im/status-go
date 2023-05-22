@@ -1570,6 +1570,16 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 	}
 
 	if requestToJoinResponseProto.Accepted {
+		community, err := m.communitiesManager.GetByID(requestToJoinResponseProto.CommunityId)
+		if err != nil {
+			return err
+		}
+
+		err = m.handleCommunityShardAndFiltersFromProto(community, requestToJoinResponseProto.ShardCluster, requestToJoinResponseProto.ShardIndex, requestToJoinResponseProto.ProtectedTopicPrivateKey)
+		if err != nil {
+			return err
+		}
+
 		response, err := m.JoinCommunity(context.Background(), requestToJoinResponseProto.CommunityId, false)
 		if err != nil {
 			return err
