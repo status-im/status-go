@@ -58,12 +58,12 @@ func (b *BlockRangeSequentialDAO) getBlockRange(chainID uint64, address common.A
 //
 //lint:ignore U1000 Ignore unused function temporarily
 func (b *BlockRangeSequentialDAO) deleteRange(chainID uint64, account common.Address) error {
-	log.Info("delete blocks range", "account", account, "network", chainID)
+	log.Debug("delete blocks range", "account", account, "network", chainID)
 	delete, err := b.db.Prepare(`DELETE FROM blocks_ranges_sequential
                                         WHERE address = ?
                                         AND network_id = ?`)
 	if err != nil {
-		log.Info("some error", "error", err)
+		log.Error("Failed to prepare deletion of sequential block range", "error", err)
 		return err
 	}
 
@@ -106,9 +106,10 @@ func updateBlock(creator statementCreator, chainID uint64, account common.Addres
 }
 
 func (b *BlockRangeSequentialDAO) upsertRange(chainID uint64, account common.Address,
-	start *big.Int, first *big.Int, last *big.Int) (err error) {
+	blockRange *BlockRange) (err error) {
 
-	log.Info("upsert blocks range", "account", account, "network id", chainID, "start", start, "first", first, "last", last)
+	log.Debug("upsert blocks range", "account", account, "network id", chainID,
+		"start", blockRange.Start, "first", blockRange.FirstKnown, "last", blockRange.LastKnown)
 
 	update, err := b.db.Prepare(`UPDATE blocks_ranges_sequential
                 SET blk_start = ?,
@@ -121,7 +122,8 @@ func (b *BlockRangeSequentialDAO) upsertRange(chainID uint64, account common.Add
 		return err
 	}
 
-	res, err := update.Exec((*bigint.SQLBigInt)(start), (*bigint.SQLBigInt)(first), (*bigint.SQLBigInt)(last), account, chainID)
+	res, err := update.Exec((*bigint.SQLBigInt)(blockRange.Start), (*bigint.SQLBigInt)(blockRange.FirstKnown),
+		(*bigint.SQLBigInt)(blockRange.LastKnown), account, chainID)
 
 	if err != nil {
 		return err
@@ -136,7 +138,8 @@ func (b *BlockRangeSequentialDAO) upsertRange(chainID uint64, account common.Add
 			return err
 		}
 
-		_, err = insert.Exec(chainID, account, (*bigint.SQLBigInt)(first), (*bigint.SQLBigInt)(last), (*bigint.SQLBigInt)(start))
+		_, err = insert.Exec(chainID, account, (*bigint.SQLBigInt)(blockRange.Start), (*bigint.SQLBigInt)(blockRange.FirstKnown),
+			(*bigint.SQLBigInt)(blockRange.LastKnown))
 		if err != nil {
 			return err
 		}

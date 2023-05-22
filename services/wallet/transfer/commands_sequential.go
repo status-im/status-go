@@ -45,42 +45,24 @@ func (c *findBlocksCommand) Command() async.Command {
 func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 	log.Info("start findBlocksCommand", "account", c.account, "chain", c.chainClient.ChainID, "noLimit", c.noLimit)
 
-	rangeSize := big.NewInt(DefaultNodeBlockChunkSize)
-
-	to, err := c.loadFirstKnownBlockNumber()
-	log.Info("findBlocksCommand", "firstKnownBlockNumber", to, "error", err)
-
+	blockRange, err := c.loadBlockRangeInfo()
 	if err != nil {
-		if err.Error() != allBlocksLoaded {
-			c.error = err
-		}
-
-		return nil // We break the loop if we fetched all the blocks
+		log.Error("findBlocksCommand loadBlockRangeInfo", "error", err)
+		c.error = err
+		return nil // break immediately as there is no sense to retry
 	}
 
-	var head *types.Header = nil
+	var needToInsertBlockRange bool
 
-	if to == nil {
-		ctx, cancel := context.WithTimeout(parent, 3*time.Second)
-		head, err = c.chainClient.HeaderByNumber(ctx, nil)
-		cancel()
-
-		if err != nil {
-			c.error = err
-			log.Error("findBlocksCommand failed to get head block", "error", err)
-			return nil
-		}
-
-		log.Info("current head is", "chain", c.chainClient.ChainID, "block number", head.Number)
-
-		to = new(big.Int).Set(head.Number) // deep copy
-	} else {
-		to.Sub(to, big.NewInt(1))
+	if blockRange == nil {
+		// Insert block range into DB for the first time
+		needToInsertBlockRange = true
 	}
 
-	var from = big.NewInt(0)
-	if to.Cmp(rangeSize) > 0 {
-		from.Sub(to, rangeSize)
+	from, to, err := c.findInitialRange(parent, blockRange)
+	if err != nil {
+		c.error = err
+		return nil // Might need to retry a couple of times
 	}
 
 	for {
@@ -90,43 +72,31 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 			break
 		}
 
-		// 'to' is set to 'head' if 'last' block not found in DB
-		if head != nil && to.Cmp(head.Number) == 0 {
-			log.Info("upsert blockrange", "head", head.Number, "to", to, "chain", c.chainClient.ChainID, "account", c.account)
-
-			err = c.blockDAO.upsertRange(c.chainClient.ChainID, c.account, c.startBlockNumber,
-				c.resFromBlock.Number, to)
+		if needToInsertBlockRange {
+			err = c.insertBlockRange(&BlockRange{c.startBlockNumber, c.resFromBlock.Number, to})
 			if err != nil {
-				c.error = err
-				log.Error("findBlocksCommand upsertRange", "error", err)
-				break
+				return err
 			}
-		}
-
-		log.Info("findBlocksCommand.Run()", "headers len", len(headers), "resFromBlock", c.resFromBlock.Number)
-		err = c.blockDAO.updateFirstBlock(c.chainClient.ChainID, c.account, c.resFromBlock.Number)
-		if err != nil {
-			c.error = err
-			log.Error("findBlocksCommand failed to update first block", "error", err)
-			break
-		}
-
-		if c.startBlockNumber.Cmp(big.NewInt(0)) > 0 {
-			err = c.blockDAO.updateStartBlock(c.chainClient.ChainID, c.account, c.startBlockNumber)
-			if err != nil {
-				c.error = err
-				log.Error("findBlocksCommand failed to update start block", "error", err)
-				break
-			}
-		}
-
-		// Assign new range
-		to.Sub(from, big.NewInt(1)) // it won't hit the cache, but we wont load the transfers twice
-		if to.Cmp(rangeSize) > 0 {
-			from.Sub(to, rangeSize)
 		} else {
-			from = big.NewInt(0)
+			log.Info("findBlocksCommand.Run()", "headers len", len(headers), "resFromBlock", c.resFromBlock.Number)
+			err = c.blockDAO.updateFirstBlock(c.chainClient.ChainID, c.account, c.resFromBlock.Number)
+			if err != nil {
+				c.error = err
+				log.Error("findBlocksCommand failed to update first block", "error", err)
+				break
+			}
+
+			if c.startBlockNumber.Cmp(big.NewInt(0)) > 0 {
+				err = c.blockDAO.updateStartBlock(c.chainClient.ChainID, c.account, c.startBlockNumber)
+				if err != nil {
+					c.error = err
+					log.Error("findBlocksCommand failed to update start block", "error", err)
+					break
+				}
+			}
 		}
+
+		from, to = nextRange(from, to)
 
 		if to.Cmp(big.NewInt(0)) <= 0 || (c.startBlockNumber != nil &&
 			c.startBlockNumber.Cmp(big.NewInt(0)) > 0 && to.Cmp(c.startBlockNumber) <= 0) {
@@ -136,6 +106,74 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 	}
 
 	log.Info("end findBlocksCommand", "account", c.account, "chain", c.chainClient.ChainID, "noLimit", c.noLimit)
+
+	return nil
+}
+
+func (c *findBlocksCommand) findInitialRange(parent context.Context, blockRange *BlockRange) (from *big.Int,
+	to *big.Int, err error) {
+	rangeSize := big.NewInt(DefaultNodeBlockChunkSize)
+
+	if blockRange == nil {
+		ctx, cancel := context.WithTimeout(parent, 3*time.Second)
+		var head *types.Header = nil
+		head, err = c.chainClient.HeaderByNumber(ctx, nil)
+		cancel()
+
+		if err != nil {
+			log.Error("findBlocksCommand failed to get head block", "error", err)
+			return // TODO Might need to retry a couple of times
+		}
+
+		log.Debug("current head is", "chain", c.chainClient.ChainID, "block number", head.Number)
+
+		// If no blocks were fetched, start from head backwards
+		to = new(big.Int).Set(head.Number) // deep copy
+	} else {
+		allLoaded, _ := areAllHistoryBlocksLoaded(blockRange)
+
+		if allLoaded {
+			log.Info("all blocks fetched", "chain", c.chainClient.ChainID, "account", c.account)
+			return // We break the loop if we fetched all the blocks
+		}
+
+		to = new(big.Int).Sub(blockRange.FirstKnown, big.NewInt(1))
+	}
+
+	log.Debug("findBlocksCommand", "to", to)
+
+	from = big.NewInt(0)
+	if to.Cmp(rangeSize) > 0 {
+		from.Sub(to, rangeSize)
+	}
+
+	return
+}
+
+func nextRange(from *big.Int, to *big.Int) (*big.Int, *big.Int) {
+	rangeSize := big.NewInt(DefaultNodeBlockChunkSize)
+
+	// Assign new range
+	to.Sub(from, big.NewInt(1)) // it won't hit the cache, but we wont load the transfers twice
+	if to.Cmp(rangeSize) > 0 {
+		from.Sub(to, rangeSize)
+	} else {
+		from = big.NewInt(0)
+	}
+
+	return from, to
+}
+
+func (c *findBlocksCommand) insertBlockRange(blockRange *BlockRange) error {
+	log.Info("insert blockrange", "head", blockRange.FirstKnown, "to", blockRange.LastKnown,
+		"chain", c.chainClient.ChainID, "account", c.account)
+
+	err := c.blockDAO.upsertRange(c.chainClient.ChainID, c.account, blockRange)
+	if err != nil {
+		c.error = err
+		log.Error("findBlocksCommand upsertRange", "error", err)
+		return err
+	}
 
 	return nil
 }
@@ -236,6 +274,31 @@ func (c *findBlocksCommand) loadFirstKnownBlockNumber() (*big.Int, error) {
 	log.Info("no blockInfo for", "address", c.account, "chain", c.chainClient.ChainID)
 
 	return nil, nil
+}
+
+func (c *findBlocksCommand) loadBlockRangeInfo() (*BlockRange, error) {
+	blockRange, err := c.blockDAO.getBlockRange(c.chainClient.ChainID, c.account)
+	if err != nil {
+		log.Error("failed to load block ranges from database", "chain", c.chainClient.ChainID, "account", c.account, "error", err)
+		return nil, err
+	}
+
+	return blockRange, nil
+}
+
+// Returns if all the blocks prior to first known block are loaded, not considering
+func areAllHistoryBlocksLoaded(blockInfo *BlockRange) (bool, error) {
+	if blockInfo == nil {
+		return false, errors.New("blockInfo is nil")
+	}
+
+	if blockInfo.FirstKnown != nil && blockInfo.Start != nil &&
+		blockInfo.Start.Cmp(blockInfo.FirstKnown) >= 0 {
+
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // run fast indexing for every accont up to canonical chain head minus safety depth.
@@ -370,8 +433,6 @@ func (c *loadBlocksAndTransfersCommand) Run(parent context.Context) error {
 	group := async.NewGroup(ctx)
 
 	for _, address := range c.accounts {
-		log.Info("start findBlocks command", "chain", c.chainClient.ChainID)
-
 		fbc := &findBlocksCommand{
 			account:            address,
 			db:                 c.db,
