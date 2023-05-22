@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/market"
@@ -154,13 +155,25 @@ func (r *Reader) Stop() {
 }
 
 func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
-	networks, err := r.rpcClient.NetworkManager.Get(false)
+	areTestNetworksEnabled, err := r.accountsDB.GetTestNetworksEnabled()
 	if err != nil {
 		return nil, err
 	}
 
-	chainIDs := make([]uint64, 0)
+	networks, err := r.rpcClient.NetworkManager.Get(false)
+	if err != nil {
+		return nil, err
+	}
+	availableNetworks := make([]*params.Network, 0)
 	for _, network := range networks {
+		if network.IsTest != areTestNetworksEnabled {
+			continue
+		}
+		availableNetworks = append(availableNetworks, network)
+	}
+
+	chainIDs := make([]uint64, 0)
+	for _, network := range availableNetworks {
 		chainIDs = append(chainIDs, network.ChainID)
 	}
 
@@ -172,11 +185,11 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	currencies = append(currencies, currency)
 	currencies = append(currencies, getFixedCurrencies()...)
 
-	allTokens, err := r.tokenManager.GetAllTokens()
+	allTokens, err := r.tokenManager.GetTokensByChainIDs(chainIDs)
 	if err != nil {
 		return nil, err
 	}
-	for _, network := range networks {
+	for _, network := range availableNetworks {
 		allTokens = append(allTokens, r.tokenManager.ToToken(network))
 	}
 

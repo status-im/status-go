@@ -230,6 +230,18 @@ func (tm *Manager) GetAllTokens() ([]*Token, error) {
 	return tokens, nil
 }
 
+func (tm *Manager) GetTokensByChainIDs(chainIDs []uint64) ([]*Token, error) {
+	tokens := make([]*Token, 0)
+	for _, chainID := range chainIDs {
+		t, err := tm.GetTokens(chainID)
+		if err != nil {
+			return nil, err
+		}
+		tokens = append(tokens, t...)
+	}
+	return tokens, nil
+}
+
 func (tm *Manager) GetTokens(chainID uint64) ([]*Token, error) {
 	if !tm.areTokensFetched() {
 		tm.fetchTokens()
