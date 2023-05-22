@@ -518,6 +518,11 @@ type CommunityShard struct {
 	Shard       *common.Shard `json:"shard"`
 }
 
+type CommunityShard struct {
+	CommunityID string        `json:"communityID"`
+	Shard       *common.Shard `json:"shard"`
+}
+
 type KnownCommunitiesResponse struct {
 	ContractCommunities         []string              `json:"contractCommunities"`         // TODO: use CommunityShard
 	ContractFeaturedCommunities []string              `json:"contractFeaturedCommunities"` // TODO: use CommunityShard
