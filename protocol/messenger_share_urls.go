@@ -44,6 +44,7 @@ type URLDataResponse struct {
 	Community CommunityURLData        `json:"community"`
 	Channel   CommunityChannelURLData `json:"channel"`
 	Contact   ContactURLData          `json:"contact"`
+	Shard     *common.Shard           `json:"shard,omitempty"`
 }
 
 const baseShareURL = "https://status.app"
@@ -119,6 +120,7 @@ func (m *Messenger) parseCommunityURLWithChatKey(urlData string) (*URLDataRespon
 
 	return &URLDataResponse{
 		Community: m.prepareCommunityData(community),
+		Shard:     community.Shard(),
 	}, nil
 }
 
@@ -136,8 +138,17 @@ func (m *Messenger) prepareEncodedCommunityData(community *communities.Community
 		return "", "", err
 	}
 
+	shardCluster := int32(common.UndefinedShardValue)
+	shardIndex := int32(common.UndefinedShardValue)
+	if community.Shard() != nil {
+		shardCluster = int32(community.Shard().Cluster)
+		shardIndex = int32(community.Shard().Index)
+	}
+
 	urlDataProto := &protobuf.URLData{
-		Content: communityData,
+		Content:      communityData,
+		ShardCluster: shardCluster,
+		ShardIndex:   shardIndex,
 	}
 
 	urlData, err := proto.Marshal(urlDataProto)
@@ -199,6 +210,14 @@ func (m *Messenger) parseCommunityURLWithData(data string, chatKey string) (*URL
 		return nil, err
 	}
 
+	var shard *common.Shard
+	if urlDataProto.ShardCluster != common.UndefinedShardValue && urlDataProto.ShardIndex != common.UndefinedShardValue {
+		shard = &common.Shard{
+			Cluster: uint16(urlDataProto.ShardCluster),
+			Index:   uint16(urlDataProto.ShardIndex),
+		}
+	}
+
 	return &URLDataResponse{
 		Community: CommunityURLData{
 			DisplayName:  communityProto.DisplayName,
@@ -208,6 +227,7 @@ func (m *Messenger) parseCommunityURLWithData(data string, chatKey string) (*URL
 			TagIndices:   communityProto.TagIndices,
 			CommunityID:  types.EncodeHex(communityID),
 		},
+		Shard: shard,
 	}, nil
 }
 
@@ -274,6 +294,7 @@ func (m *Messenger) parseCommunityChannelURLWithChatKey(channelID string, public
 	return &URLDataResponse{
 		Community: m.prepareCommunityData(community),
 		Channel:   m.prepareCommunityChannelData(channel),
+		Shard:     community.Shard(),
 	}, nil
 }
 
@@ -300,8 +321,18 @@ func (m *Messenger) prepareEncodedCommunityChannelData(community *communities.Co
 		return "", "", err
 	}
 
+	shardCluster := int32(common.UndefinedShardValue)
+	shardIndex := int32(common.UndefinedShardValue)
+	if community.Shard() != nil {
+		shardCluster = int32(community.Shard().Cluster)
+		shardIndex = int32(community.Shard().Index)
+
+	}
+
 	urlDataProto := &protobuf.URLData{
-		Content: channelData,
+		Content:      channelData,
+		ShardCluster: shardCluster,
+		ShardIndex:   shardIndex,
 	}
 
 	urlData, err := proto.Marshal(urlDataProto)
@@ -376,6 +407,14 @@ func (m *Messenger) parseCommunityChannelURLWithData(data string, chatKey string
 		return nil, err
 	}
 
+	var shard *common.Shard
+	if urlDataProto.ShardCluster != common.UndefinedShardValue-1 && urlDataProto.ShardIndex != common.UndefinedShardValue {
+		shard = &common.Shard{
+			Cluster: uint16(urlDataProto.ShardCluster),
+			Index:   uint16(urlDataProto.ShardIndex),
+		}
+	}
+
 	return &URLDataResponse{
 		Community: CommunityURLData{
 			DisplayName:  channelProto.Community.DisplayName,
@@ -392,6 +431,7 @@ func (m *Messenger) parseCommunityChannelURLWithData(data string, chatKey string
 			Color:       channelProto.Color,
 			ChannelUUID: channelProto.Uuid,
 		},
+		Shard: shard,
 	}, nil
 }
 

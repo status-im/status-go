@@ -21,6 +21,8 @@ import (
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/golang/protobuf/proto"
 
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -491,11 +493,16 @@ func (m *Manager) All() ([]*Community, error) {
 	return m.persistence.AllCommunities(&m.identity.PublicKey)
 }
 
+type CommunityShard struct {
+	CommunityID string        `json:"communityID"`
+	Shard       *common.Shard `json:"shard"`
+}
+
 type KnownCommunitiesResponse struct {
-	ContractCommunities         []string              `json:"contractCommunities"`
-	ContractFeaturedCommunities []string              `json:"contractFeaturedCommunities"`
+	ContractCommunities         []CommunityShard      `json:"contractCommunities"`
+	ContractFeaturedCommunities []CommunityShard      `json:"contractFeaturedCommunities"`
 	Descriptions                map[string]*Community `json:"communities"`
-	UnknownCommunities          []string              `json:"unknownCommunities"`
+	UnknownCommunities          []CommunityShard      `json:"unknownCommunities"`
 }
 
 func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []types.HexBytes) (response *KnownCommunitiesResponse, err error) {
@@ -511,12 +518,18 @@ func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []types.HexByt
 			return
 		}
 
-		response.ContractCommunities = append(response.ContractCommunities, communityID)
+		response.ContractCommunities = append(response.ContractCommunities, CommunityShard{
+			CommunityID: communityID,
+			Shard:       community.Shard(),
+		})
 
 		if community != nil {
 			response.Descriptions[community.IDString()] = community
 		} else {
-			response.UnknownCommunities = append(response.UnknownCommunities, communityID)
+			response.UnknownCommunities = append(response.UnknownCommunities, CommunityShard{
+				CommunityID: communityID,
+				Shard:       community.Shard(),
+			})
 		}
 	}
 
@@ -573,6 +586,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 		Joined:               true,
 		MemberIdentity:       &m.identity.PublicKey,
 		CommunityDescription: description,
+		Shard:                nil,
 	}
 	community, err := New(config)
 	if err != nil {
@@ -851,6 +865,34 @@ func (m *Manager) DeleteCommunity(id types.HexBytes) error {
 		return err
 	}
 	return m.persistence.DeleteCommunitySettings(id)
+}
+
+func (m *Manager) UpdateShard(community *Community, shard *common.Shard) error {
+	community.config.Shard = shard
+	return m.persistence.SaveCommunity(community)
+}
+
+// SetShard assigns a shard to a community
+func (m *Manager) SetShard(communityID types.HexBytes, shard *common.Shard) (*Community, error) {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+	if !community.IsControlNode() {
+		return nil, errors.New("not admin or owner")
+	}
+
+	err = m.UpdateShard(community, shard)
+	if err != nil {
+		return nil, err
+	}
+
+	m.publish(&Subscription{Community: community})
+
+	return community, nil
 }
 
 // EditCommunity takes a description, updates the community with the description,
@@ -3227,6 +3269,20 @@ func (m *Manager) AcceptedPendingRequestsToJoinForCommunity(id types.HexBytes) (
 
 func (m *Manager) DeclinedPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
 	return m.persistence.DeclinedPendingRequestsToJoinForCommunity(id)
+
+}
+
+func (m *Manager) GetPubsubTopic(communityID string) (string, error) {
+	community, err := m.GetByIDString(communityID)
+	if err != nil {
+		return "", err
+	}
+
+	if community == nil {
+		return relay.DefaultWakuTopic, nil
+	}
+
+	return transport.GetPubsubTopic(community.Shard().TransportShard()), nil
 }
 
 func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string, grant []byte) (bool, error) {
