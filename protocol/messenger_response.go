@@ -1,8 +1,11 @@
 package protocol
 
 import (
+	"crypto/ecdsa"
 	"encoding/json"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/status-im/status-go/eth-node/crypto"
 	ensservice "github.com/status-im/status-go/services/ens"
 
 	"github.com/status-im/status-go/services/browsers"
@@ -34,6 +37,11 @@ type ClearedHistory struct {
 	ClearedAt uint64 `json:"clearedAt"`
 }
 
+type ProtectedTopic struct {
+	PubsubTopic string `json:"pubsubTopic"`
+	PublicKey   string `json:"publicKey"`
+}
+
 type MessengerResponse struct {
 	Contacts                      []*Contact
 	Installations                 []*multidevice.Installation
@@ -62,6 +70,7 @@ type MessengerResponse struct {
 	removedMessages             map[string]*RemovedMessage
 	communities                 map[string]*communities.Community
 	communitiesSettings         map[string]*communities.CommunitySettings
+	protectedTopics             map[string]*ecdsa.PrivateKey
 	activityCenterNotifications map[string]*ActivityCenterNotification
 	activityCenterState         *ActivityCenterState
 	messages                    map[string]*common.Message
@@ -103,6 +112,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Notifications                 []*localnotifications.Notification   `json:"notifications"`
 		Communities                   []*communities.Community             `json:"communities,omitempty"`
 		CommunitiesSettings           []*communities.CommunitySettings     `json:"communitiesSettings,omitempty"`
+		ProtectedTopics               []ProtectedTopic                     `json:"protectedTopic,omitempty"`
 		ActivityCenterNotifications   []*ActivityCenterNotification        `json:"activityCenterNotifications,omitempty"`
 		ActivityCenterState           *ActivityCenterState                 `json:"activityCenterState,omitempty"`
 		CurrentStatus                 *UserStatus                          `json:"currentStatus,omitempty"`
@@ -144,6 +154,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Chats:                         r.Chats(),
 		Communities:                   r.Communities(),
 		CommunitiesSettings:           r.CommunitiesSettings(),
+		ProtectedTopics:               r.ProtectedTopics(),
 		RemovedChats:                  r.RemovedChats(),
 		RemovedMessages:               r.RemovedMessages(),
 		ClearedHistories:              r.ClearedHistories(),
@@ -209,6 +220,17 @@ func (r *MessengerResponse) CommunitiesSettings() []*communities.CommunitySettin
 		settings = append(settings, s)
 	}
 	return settings
+}
+
+func (r *MessengerResponse) ProtectedTopics() []ProtectedTopic {
+	var protectedTopics []ProtectedTopic
+	for pubsubTopic, privKey := range r.protectedTopics {
+		protectedTopics = append(protectedTopics, ProtectedTopic{
+			PubsubTopic: pubsubTopic,
+			PublicKey:   hexutil.Encode(crypto.FromECDSAPub(&privKey.PublicKey)),
+		})
+	}
+	return protectedTopics
 }
 
 func (r *MessengerResponse) Notifications() []*localnotifications.Notification {
@@ -353,6 +375,14 @@ func (r *MessengerResponse) AddCommunitySettings(c *communities.CommunitySetting
 
 func (r *MessengerResponse) AddRequestsToJoinCommunity(requestsToJoin []*communities.RequestToJoin) {
 	r.RequestsToJoinCommunity = append(r.RequestsToJoinCommunity, requestsToJoin...)
+}
+
+func (r *MessengerResponse) AddProtectedTopic(pubsubTopic string, privKey *ecdsa.PrivateKey) {
+	if r.protectedTopics == nil {
+		r.protectedTopics = make(map[string]*ecdsa.PrivateKey)
+	}
+
+	r.protectedTopics[pubsubTopic] = privKey
 }
 
 func (r *MessengerResponse) AddRequestToJoinCommunity(requestToJoin *communities.RequestToJoin) {

@@ -69,12 +69,12 @@ type PublicAPI struct {
 	service *Service
 }
 
-func (p *PublicAPI) CommunityInfo(communityID types.HexBytes) (json.RawMessage, error) {
+func (p *PublicAPI) CommunityInfo(communityID types.HexBytes, shardCluster *uint, shardIndex *uint) (json.RawMessage, error) {
 	if p.service.messenger == nil {
 		return nil, ErrNotInitialized
 	}
 
-	community, err := p.service.messenger.RequestCommunityInfoFromMailserver(communityID.String(), true)
+	community, err := p.service.messenger.RequestCommunityInfoFromMailserver(communityID.String(), shardCluster, shardIndex, true)
 	if err != nil {
 		return nil, err
 	}

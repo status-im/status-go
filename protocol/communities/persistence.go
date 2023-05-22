@@ -32,7 +32,7 @@ var ErrOldRequestToLeave = errors.New("old request to leave")
 
 const OR = " OR "
 const communitiesBaseQuery = `
-	SELECT c.id, c.private_key, c.description, c.joined, c.spectated, c.verified, c.muted, c.muted_till, r.clock, ae.raw_events, ae.raw_description
+	SELECT c.id, c.private_key, c.description, c.joined, c.spectated, c.verified, c.muted, c.muted_till, r.clock, ae.raw_events, ae.raw_description, c.shard_cluster, c.shard_index
 	FROM communities_communities c
 	LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?
 	LEFT JOIN communities_events ae ON c.id = ae.id`
@@ -46,8 +46,8 @@ func (p *Persistence) SaveCommunity(community *Community) error {
 	}
 
 	_, err = p.db.Exec(`
-		INSERT INTO communities_communities (id, private_key, description, joined, spectated, verified, muted, muted_till) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, crypto.FromECDSA(privateKey), wrappedCommunity, community.config.Joined, community.config.Spectated, community.config.Verified, community.config.Muted, community.config.MuteTill)
+		INSERT INTO communities_communities (id, private_key, description, joined, spectated, verified, muted, muted_till, shard_cluster, shard_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, crypto.FromECDSA(privateKey), wrappedCommunity, community.config.Joined, community.config.Spectated, community.config.Verified, community.config.Muted, community.config.MuteTill, community.config.ShardCluster, community.config.ShardIndex)
 	return err
 }
 
@@ -100,9 +100,8 @@ func (p *Persistence) ShouldHandleSyncCommunitySettings(settings *protobuf.SyncC
 
 func (p *Persistence) ShouldHandleSyncCommunity(community *protobuf.SyncCommunity) (bool, error) {
 	// TODO see if there is a way to make this more elegant
-	// Keep the "*".
 	// When the test for this function fails because the table has changed we should update sync functionality
-	qr := p.db.QueryRow(`SELECT * FROM communities_communities WHERE id = ? AND synced_at > ?`, community.Id, community.Clock)
+	qr := p.db.QueryRow(`SELECT id, private_key, description, joined, verified, spectated, muted, muted_till, synced_at FROM communities_communities WHERE id = ? AND synced_at > ?`, community.Id, community.Clock)
 	_, err := p.scanRowToStruct(qr.Scan)
 
 	switch err {
@@ -139,16 +138,28 @@ func (p *Persistence) queryCommunities(memberIdentity *ecdsa.PublicKey, query st
 		var publicKeyBytes, privateKeyBytes, descriptionBytes []byte
 		var joined, spectated, verified, muted bool
 		var muteTill sql.NullTime
-		var requestedToJoinAt sql.NullInt64
+		var cluster, index, requestedToJoinAt sql.NullInt64
 
 		// Community events specific fields
 		var eventsBytes, eventsDescriptionBytes []byte
-		err := rows.Scan(&publicKeyBytes, &privateKeyBytes, &descriptionBytes, &joined, &spectated, &verified, &muted, &muteTill, &requestedToJoinAt, &eventsBytes, &eventsDescriptionBytes)
+		err := rows.Scan(&publicKeyBytes, &privateKeyBytes, &descriptionBytes, &joined, &spectated, &verified, &muted, &muteTill, &requestedToJoinAt, &eventsBytes, &eventsDescriptionBytes, &cluster, &index)
 		if err != nil {
 			return nil, err
 		}
 
-		org, err := unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(requestedToJoinAt.Int64), eventsBytes, eventsDescriptionBytes, p.logger)
+		var clusterValue *uint
+		if cluster.Valid {
+			v := uint(cluster.Int64)
+			clusterValue = &v
+		}
+
+		var indexValue *uint
+		if index.Valid {
+			v := uint(index.Int64)
+			indexValue = &v
+		}
+
+		org, err := unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(requestedToJoinAt.Int64), eventsBytes, eventsDescriptionBytes, clusterValue, indexValue, p.logger)
 		if err != nil {
 			return nil, err
 		}
@@ -191,6 +202,7 @@ func (p *Persistence) rowsToCommunities(memberIdentity *ecdsa.PublicKey, rows *s
 		var publicKeyBytes, privateKeyBytes, descriptionBytes []byte
 		var joined, spectated, verified, muted bool
 		var muteTill sql.NullTime
+		var cluster, index sql.NullInt64
 
 		// Request to join specific fields
 		var rtjID, rtjCommunityID []byte
@@ -202,12 +214,25 @@ func (p *Persistence) rowsToCommunities(memberIdentity *ecdsa.PublicKey, rows *s
 
 		err = rows.Scan(
 			&publicKeyBytes, &privateKeyBytes, &descriptionBytes, &joined, &spectated, &verified, &muted, &muteTill,
-			&rtjID, &rtjPublicKey, &rtjClock, &rtjENSName, &rtjChatID, &rtjCommunityID, &rtjState, &eventsBytes, &eventsDescriptionBytes)
+			&rtjID, &rtjPublicKey, &rtjClock, &rtjENSName, &rtjChatID, &rtjCommunityID, &rtjState, &eventsBytes,
+			&eventsDescriptionBytes, &cluster, &index)
 		if err != nil {
 			return nil, err
 		}
 
-		comm, err = unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(rtjClock.Int64), eventsBytes, eventsDescriptionBytes, p.logger)
+		var clusterValue *uint
+		if cluster.Valid {
+			v := uint(cluster.Int64)
+			clusterValue = &v
+		}
+
+		var indexValue *uint
+		if index.Valid {
+			v := uint(index.Int64)
+			indexValue = &v
+		}
+
+		comm, err = unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(rtjClock.Int64), eventsBytes, eventsDescriptionBytes, clusterValue, indexValue, p.logger)
 		if err != nil {
 			return nil, err
 		}
@@ -225,7 +250,8 @@ func (p *Persistence) rowsToCommunities(memberIdentity *ecdsa.PublicKey, rows *s
 func (p *Persistence) JoinedAndPendingCommunitiesWithRequests(memberIdentity *ecdsa.PublicKey) (comms []*Community, err error) {
 	query := `SELECT
 c.id, c.private_key, c.description, c.joined, c.spectated, c.verified, c.muted, c.muted_till,
-r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.community_id, r.state, ae.raw_events, ae.raw_description
+r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.community_id, r.state, ae.raw_events, ae.raw_description,
+c.shard_cluster, c.shard_index
 FROM communities_communities c
 LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?
 LEFT JOIN communities_events ae ON c.id = ae.id
@@ -242,7 +268,8 @@ WHERE c.Joined OR r.state = ?`
 func (p *Persistence) DeletedCommunities(memberIdentity *ecdsa.PublicKey) (comms []*Community, err error) {
 	query := `SELECT
 c.id, c.private_key, c.description, c.joined, c.spectated, c.verified, c.muted, c.muted_till,
-r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.community_id, r.state, ae.raw_events, ae.raw_description
+r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.community_id, r.state, ae.raw_events, ae.raw_description,
+c.shard_cluster, c.shard_index
 FROM communities_communities c
 LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?
 LEFT JOIN communities_events ae ON c.id = ae.id
@@ -268,24 +295,36 @@ func (p *Persistence) GetByID(memberIdentity *ecdsa.PublicKey, id []byte) (*Comm
 	var verified bool
 	var muted bool
 	var muteTill sql.NullTime
-	var requestedToJoinAt sql.NullInt64
+	var requestedToJoinAt, cluster, index sql.NullInt64
 
 	// Community events specific fields
 	var eventsBytes, eventsDescriptionBytes []byte
 
-	err := p.db.QueryRow(communitiesBaseQuery+` WHERE c.id = ?`, common.PubkeyToHex(memberIdentity), id).Scan(&publicKeyBytes, &privateKeyBytes, &descriptionBytes, &joined, &spectated, &verified, &muted, &muteTill, &requestedToJoinAt, &eventsBytes, &eventsDescriptionBytes)
+	err := p.db.QueryRow(communitiesBaseQuery+` WHERE c.id = ?`, common.PubkeyToHex(memberIdentity), id).Scan(&publicKeyBytes, &privateKeyBytes, &descriptionBytes, &joined, &spectated, &verified, &muted, &muteTill, &requestedToJoinAt, &eventsBytes, &eventsDescriptionBytes, &cluster, &index)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
 	}
 
-	return unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(requestedToJoinAt.Int64), eventsBytes, eventsDescriptionBytes, p.logger)
+	var clusterValue *uint
+	if cluster.Valid {
+		v := uint(cluster.Int64)
+		clusterValue = &v
+	}
+
+	var indexValue *uint
+	if index.Valid {
+		v := uint(index.Int64)
+		indexValue = &v
+	}
+
+	return unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(requestedToJoinAt.Int64), eventsBytes, eventsDescriptionBytes, clusterValue, indexValue, p.logger)
 }
 
 func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, privateKeyBytes, wrappedCommunity []byte, joined,
 	spectated, verified, muted bool, muteTill time.Time, requestedToJoinAt uint64, eventsBytes []byte,
-	eventsDescriptionBytes []byte, logger *zap.Logger) (*Community, error) {
+	eventsDescriptionBytes []byte, cluster *uint, index *uint, logger *zap.Logger) (*Community, error) {
 
 	var privateKey *ecdsa.PrivateKey
 	var err error
@@ -326,6 +365,8 @@ func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, p
 		Joined:                              joined,
 		Spectated:                           spectated,
 		EventsData:                          eventsData,
+		ShardCluster:                        cluster,
+		ShardIndex:                          index,
 	}
 	community, err := New(config)
 	if err != nil {

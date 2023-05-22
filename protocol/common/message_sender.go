@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"fmt"
 	"sync"
 	"time"
 
@@ -13,6 +12,8 @@ import (
 	datasyncnode "github.com/vacp2p/mvds/node"
 	datasyncproto "github.com/vacp2p/mvds/protobuf"
 	"go.uber.org/zap"
+
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -186,6 +187,40 @@ func (s *MessageSender) SendCommunityMessage(
 	rawMessage.Sender = s.identity
 
 	return s.sendCommunity(ctx, &rawMessage)
+}
+
+// SendCommunityMessage takes encoded data, encrypts it and sends through the wire
+// using the community topic and their key
+func (s *MessageSender) SendPubsubTopicKey(
+	ctx context.Context,
+	rawMessage *RawMessage,
+) ([]byte, error) {
+	s.logger.Debug(
+		"sending the protected topic key for a community",
+		zap.String("communityId", types.EncodeHex(rawMessage.CommunityID)),
+		zap.String("site", "SendPubsubTopicKey"),
+	)
+	rawMessage.Sender = s.identity
+	messageID, err := s.getMessageID(rawMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	rawMessage.ID = types.EncodeHex(messageID)
+
+	// Notify before dispatching, otherwise the dispatch subscription might happen
+	// earlier than the scheduled
+	s.notifyOnScheduledMessage(nil, rawMessage)
+
+	// Send to each recipients
+	for _, recipient := range rawMessage.Recipients {
+		_, err = s.sendPrivate(ctx, recipient, rawMessage)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to send message")
+		}
+	}
+	return messageID, nil
+
 }
 
 // SendGroup takes encoded data, encrypts it and sends through the wire,
@@ -365,6 +400,7 @@ func (s *MessageSender) sendPrivate(
 
 	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
 	rawMessage.ID = types.EncodeHex(messageID)
+	rawMessage.PubsubTopic = relay.DefaultWakuTopic // TODO: determine which pubsub topic should be used for 1:1 messages
 
 	if rawMessage.BeforeDispatch != nil {
 		if err := rawMessage.BeforeDispatch(rawMessage); err != nil {
@@ -794,7 +830,6 @@ func (s *MessageSender) handleErrDeviceNotFound(ctx context.Context, publicKey *
 }
 
 func (s *MessageSender) wrapMessageV1(rawMessage *RawMessage) ([]byte, error) {
-	fmt.Println("wrapMessageV1: pubsubTopic: ", rawMessage.PubsubTopic, " message type", rawMessage.MessageType.String())
 	wrappedMessage, err := v1protocol.WrapMessageV1(rawMessage.Payload, rawMessage.MessageType, rawMessage.Sender)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")

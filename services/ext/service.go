@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -554,46 +553,49 @@ func (s *Service) CanProvideCollectibleMetadata(id thirdparty.CollectibleUniqueI
 }
 
 func (s *Service) FetchCollectibleMetadata(id thirdparty.CollectibleUniqueID, tokenURI string) (*thirdparty.FullCollectibleData, error) {
-	if s.messenger == nil {
-		return nil, fmt.Errorf("messenger not ready")
-	}
+	// TODO: fix this
+	return nil, nil
+	/*
+		if s.messenger == nil {
+			return nil, fmt.Errorf("messenger not ready")
+		}
 
-	communityID := tokenURIToCommunityID(tokenURI)
+		communityID := tokenURIToCommunityID(tokenURI)
 
-	if communityID == "" {
-		return nil, fmt.Errorf("invalid tokenURI")
-	}
+		if communityID == "" {
+			return nil, fmt.Errorf("invalid tokenURI")
+		}
 
-	// Try to fetch metadata from Messenger communities
-	community, err := s.messenger.RequestCommunityInfoFromMailserver(communityID, true)
+		// Try to fetch metadata from Messenger communities
+		community, err := s.messenger.RequestCommunityInfoFromMailserver(communityID, true)
 
-	if err != nil {
-		return nil, err
-	}
+		if err != nil {
+			return nil, err
+		}
 
-	if community != nil {
-		tokensMetadata := community.CommunityTokensMetadata()
+		if community != nil {
+			tokensMetadata := community.CommunityTokensMetadata()
 
-		for _, tokenMetadata := range tokensMetadata {
-			contractAddresses := tokenMetadata.GetContractAddresses()
-			if contractAddresses[uint64(id.ContractID.ChainID)] == id.ContractID.Address.Hex() {
-				return &thirdparty.FullCollectibleData{
-					CollectibleData: thirdparty.CollectibleData{
-						ID:          id,
-						Name:        tokenMetadata.GetName(),
-						Description: tokenMetadata.GetDescription(),
-						ImageURL:    tokenMetadata.GetImage(),
-						TokenURI:    tokenURI,
-					},
-					CollectionData: &thirdparty.CollectionData{
-						ID:       id.ContractID,
-						Name:     tokenMetadata.GetName(),
-						ImageURL: tokenMetadata.GetImage(),
-					},
-				}, nil
+			for _, tokenMetadata := range tokensMetadata {
+				contractAddresses := tokenMetadata.GetContractAddresses()
+				if contractAddresses[uint64(id.ContractID.ChainID)] == id.ContractID.Address.Hex() {
+					return &thirdparty.FullCollectibleData{
+						CollectibleData: thirdparty.CollectibleData{
+							ID:          id,
+							Name:        tokenMetadata.GetName(),
+							Description: tokenMetadata.GetDescription(),
+							ImageURL:    tokenMetadata.GetImage(),
+							TokenURI:    tokenURI,
+						},
+						CollectionData: &thirdparty.CollectionData{
+							ID:       id.ContractID,
+							Name:     tokenMetadata.GetName(),
+							ImageURL: tokenMetadata.GetImage(),
+						},
+					}, nil
+				}
 			}
 		}
-	}
 
-	return nil, nil
+		return nil, nil*/
 }
