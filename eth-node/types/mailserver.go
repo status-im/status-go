@@ -28,10 +28,11 @@ type MessagesRequest struct {
 	StoreCursor *StoreRequestCursor `json:"storeCursor"`
 	// Bloom is a filter to match requested messages.
 	Bloom []byte `json:"bloom"`
-
-	// Topics is a list of topics. A returned message should
+	// PubsubTopic is the gossipsub topic on which the message was broadcasted
+	PubsubTopic string
+	// ContentTopics is a list of topics. A returned message should
 	// belong to one of the topics from the list.
-	Topics [][]byte `json:"topics"`
+	ContentTopics [][]byte `json:"topics"`
 }
 
 type StoreRequestCursor struct {

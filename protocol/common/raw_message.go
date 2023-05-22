@@ -36,4 +36,5 @@ type RawMessage struct {
 	Ephemeral             bool
 	BeforeDispatch        func(*RawMessage) error
 	HashRatchetGroupID    []byte
+	PubsubTopic           string
 }

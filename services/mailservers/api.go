@@ -51,8 +51,8 @@ func (a *API) GetMailserverTopics(ctx context.Context) ([]MailserverTopic, error
 	return a.db.Topics()
 }
 
-func (a *API) DeleteMailserverTopic(ctx context.Context, topic string) error {
-	return a.db.DeleteTopic(topic)
+func (a *API) DeleteMailserverTopic(ctx context.Context, pubsubTopic string, topic string) error {
+	return a.db.DeleteTopic(pubsubTopic, topic)
 }
 
 func (a *API) AddChatRequestRange(ctx context.Context, req ChatRequestRange) error {
