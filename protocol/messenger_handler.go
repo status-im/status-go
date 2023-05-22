@@ -455,6 +455,11 @@ func (m *Messenger) syncContactRequestForInstallationContact(contact *Contact, s
 }
 
 func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, message protobuf.SyncInstallationContactV2) error {
+	// Ignore own contact installation
+	if message.Id == m.myHexIdentity() {
+		return nil
+	}
+
 	removedOrBlocked := message.Removed || message.Blocked
 	chat, ok := state.AllChats.Load(message.Id)
 	if !ok && (message.Added || message.HasAddedUs || message.Muted) && !removedOrBlocked {
