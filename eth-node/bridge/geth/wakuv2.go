@@ -235,6 +235,10 @@ func (w *gethWakuV2Wrapper) SubscribeToPubsubTopic(topic string, optPublicKey *e
 	return w.waku.SubscribeToPubsubTopic(topic, optPublicKey)
 }
 
+func (w *gethWakuV2Wrapper) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
+	return w.waku.RetrievePubsubTopicKey(topic)
+}
+
 func (w *gethWakuV2Wrapper) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
 	return w.waku.StorePubsubTopicKey(topic, privKey)
 }

@@ -39,6 +39,8 @@ type Config struct {
 	RequestsToJoin                []*RequestToJoin
 	MemberIdentity                *ecdsa.PublicKey
 	SyncedAt                      uint64
+	ShardCluster                  *uint
+	ShardIndex                    *uint
 }
 
 type Community struct {
@@ -117,13 +119,20 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		TokenPermissions        map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissions"`
 		CommunityTokensMetadata []*protobuf.CommunityTokenMetadata            `json:"communityTokensMetadata"`
 		ActiveMembersCount      uint64                                        `json:"activeMembersCount"`
+		PubsubTopic             string                                        `json:"pubsubTopic"`
+		ShardCluster            *uint                                         `json:"shardCluster"`
+		ShardIndex              *uint                                         `json:"shardIndex"`
 	}{
-		ID:         o.ID(),
-		Verified:   o.config.Verified,
-		Chats:      make(map[string]CommunityChat),
-		Categories: make(map[string]CommunityCategory),
-		Tags:       o.Tags(),
+		ID:           o.ID(),
+		Verified:     o.config.Verified,
+		Chats:        make(map[string]CommunityChat),
+		Categories:   make(map[string]CommunityCategory),
+		Tags:         o.Tags(),
+		PubsubTopic:  o.PubsubTopic(),
+		ShardCluster: o.ShardCluster(),
+		ShardIndex:   o.ShardIndex(),
 	}
+
 	if o.config.CommunityDescription != nil {
 		for id, c := range o.config.CommunityDescription.Categories {
 			category := CommunityCategory{
@@ -156,7 +165,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 
 		communityItem.TokenPermissions = o.config.CommunityDescription.TokenPermissions
 		communityItem.MembersCount = len(o.config.CommunityDescription.Members)
-		communityItem.Link = fmt.Sprintf("https://join.status.im/c/0x%x", o.ID())
+		communityItem.Link = fmt.Sprintf("https://join.status.im/c/0x%x/%d/%d", o.ID(), o.ShardCluster(), o.ShardIndex())
 		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
 		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
 		communityItem.BanList = o.config.CommunityDescription.BanList
@@ -332,6 +341,22 @@ func (o *Community) DescriptionText() string {
 		return o.config.CommunityDescription.Identity.Description
 	}
 	return ""
+}
+
+func (o *Community) ShardCluster() *uint {
+	if o != nil && o.config != nil {
+		return o.config.ShardCluster
+	}
+
+	return nil
+}
+
+func (o *Community) ShardIndex() *uint {
+	if o != nil && o.config != nil {
+		return o.config.ShardIndex
+	}
+
+	return nil
 }
 
 func (o *Community) IntroMessage() string {
@@ -608,6 +633,18 @@ func (o *Community) InviteUserToOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityInv
 	}
 	response.CommunityDescription = marshaledCommunity
 
+	if o.ShardIndex() != nil {
+		response.ShardIndex = int32(*o.ShardIndex())
+	} else {
+		response.ShardIndex = -1
+	}
+
+	if o.ShardCluster() != nil {
+		response.ShardIndex = int32(*o.ShardCluster())
+	} else {
+		response.ShardIndex = -1
+	}
+
 	grant, err := o.buildGrant(pk, "")
 	if err != nil {
 		return nil, err
@@ -649,6 +686,18 @@ func (o *Community) InviteUserToChat(pk *ecdsa.PublicKey, chatID string) (*proto
 		return nil, err
 	}
 	response.CommunityDescription = marshaledCommunity
+
+	if o.ShardIndex() != nil {
+		response.ShardIndex = int32(*o.ShardIndex())
+	} else {
+		response.ShardIndex = -1
+	}
+
+	if o.ShardCluster() != nil {
+		response.ShardIndex = int32(*o.ShardCluster())
+	} else {
+		response.ShardIndex = -1
+	}
 
 	grant, err := o.buildGrant(pk, chatID)
 	if err != nil {
@@ -1355,7 +1404,7 @@ func (o *Community) MemberUpdateChannelID() string {
 }
 
 func (o *Community) PubsubTopic() string {
-	return transport.GetPubsubTopic(o.ID())
+	return transport.GetPubsubTopic(o.ShardCluster(), o.ShardIndex())
 }
 
 func (o *Community) DefaultFilters() []transport.FiltersToInitialize {

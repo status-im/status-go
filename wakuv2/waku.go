@@ -1237,7 +1237,7 @@ func (w *Waku) Start() error {
 		}
 	}
 
-	w.wg.Add(3)
+	w.wg.Add(4)
 
 	go func() {
 		defer w.wg.Done()
@@ -1289,6 +1289,8 @@ func (w *Waku) Start() error {
 	if err != nil {
 		return err
 	}
+
+	go w.runFilterMsgLoop()
 
 	numCPU := runtime.NumCPU()
 	for i := 0; i < numCPU; i++ {
@@ -1512,6 +1514,10 @@ func (w *Waku) SubscribeToPubsubTopic(topic string, pubkey *ecdsa.PublicKey) err
 		}
 	}
 	return nil
+}
+
+func (w *Waku) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
+	return w.protectedTopicStore.FetchPrivateKey(topic)
 }
 
 func (w *Waku) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {

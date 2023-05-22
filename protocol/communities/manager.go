@@ -20,6 +20,7 @@ import (
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/golang/protobuf/proto"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -471,11 +472,17 @@ func (m *Manager) All() ([]*Community, error) {
 	return m.persistence.AllCommunities(&m.identity.PublicKey)
 }
 
+type CommunityShard struct {
+	CommunityID string `json:"communityID"`
+	Cluster     *uint  `json:"cluster"`
+	Index       *uint  `json:"index"`
+}
+
 type KnownCommunitiesResponse struct {
-	ContractCommunities         []string              `json:"contractCommunities"`
-	ContractFeaturedCommunities []string              `json:"contractFeaturedCommunities"`
+	ContractCommunities         []CommunityShard      `json:"contractCommunities"`
+	ContractFeaturedCommunities []CommunityShard      `json:"contractFeaturedCommunities"`
 	Descriptions                map[string]*Community `json:"communities"`
-	UnknownCommunities          []string              `json:"unknownCommunities"`
+	UnknownCommunities          []CommunityShard      `json:"unknownCommunities"`
 }
 
 func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []types.HexBytes) (response *KnownCommunitiesResponse, err error) {
@@ -491,12 +498,20 @@ func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []types.HexByt
 			return
 		}
 
-		response.ContractCommunities = append(response.ContractCommunities, communityID)
+		response.ContractCommunities = append(response.ContractCommunities, CommunityShard{
+			CommunityID: communityID,
+			Cluster:     community.ShardCluster(),
+			Index:       community.ShardIndex(),
+		})
 
 		if community != nil {
 			response.Descriptions[community.IDString()] = community
 		} else {
-			response.UnknownCommunities = append(response.UnknownCommunities, communityID)
+			response.UnknownCommunities = append(response.UnknownCommunities, CommunityShard{
+				CommunityID: communityID,
+				Cluster:     community.ShardCluster(),
+				Index:       community.ShardIndex(),
+			})
 		}
 	}
 
@@ -553,6 +568,8 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 		Joined:               true,
 		MemberIdentity:       &m.identity.PublicKey,
 		CommunityDescription: description,
+		ShardCluster:         nil,
+		ShardIndex:           nil,
 	}
 	community, err := New(config)
 	if err != nil {
@@ -826,6 +843,33 @@ func (m *Manager) DeleteCommunity(id types.HexBytes) error {
 		return err
 	}
 	return m.persistence.DeleteCommunitySettings(id)
+}
+
+// EditCommunity takes a description, updates the community with the description,
+// saves it and returns it
+func (m *Manager) SetShard(communityID types.HexBytes, shardCluster, shardIndex *uint) (*Community, error) {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+	if !community.IsAdmin() {
+		return nil, errors.New("not an admin")
+	}
+
+	community.config.ShardCluster = shardCluster
+	community.config.ShardIndex = shardIndex
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	m.publish(&Subscription{Community: community})
+
+	return community, nil
 }
 
 // EditCommunity takes a description, updates the community with the description,
@@ -2744,6 +2788,19 @@ func (m *Manager) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*Requ
 func (m *Manager) AcceptedRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
 	m.logger.Info("fetching canceled invitations", zap.String("community-id", id.String()))
 	return m.persistence.AcceptedRequestsToJoinForCommunity(id)
+}
+
+func (m *Manager) GetPubsubTopic(communityID string) (string, error) {
+	community, err := m.GetByIDString(communityID)
+	if err != nil {
+		return "", err
+	}
+
+	if community == nil {
+		return relay.DefaultWakuTopic, nil
+	}
+
+	return transport.GetPubsubTopic(community.ShardCluster(), community.ShardIndex()), nil
 }
 
 func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string, grant []byte) (bool, error) {

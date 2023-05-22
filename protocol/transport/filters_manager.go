@@ -140,8 +140,9 @@ func (f *FiltersManager) InitPublicFilters(publicFiltersToInit []FiltersToInitia
 }
 
 type CommunityFilterToInitialize struct {
-	CommunityID []byte
-	PrivKey     *ecdsa.PrivateKey
+	ShardCluster *uint
+	ShardIndex   *uint
+	PrivKey      *ecdsa.PrivateKey
 }
 
 func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []CommunityFilterToInitialize) ([]*Filter, error) {
@@ -150,7 +151,7 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 	defer f.mutex.Unlock()
 
 	for _, cf := range communityFiltersToInitialize {
-		pubsubTopic := GetPubsubTopic(cf.CommunityID)
+		pubsubTopic := GetPubsubTopic(cf.ShardCluster, cf.ShardIndex)
 		identityStr := PublicKeyToStr(&cf.PrivKey.PublicKey)
 		rawFilter, err := f.addAsymmetric(identityStr, pubsubTopic, cf.PrivKey, true)
 		if err != nil {

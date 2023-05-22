@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -548,7 +547,9 @@ func (s *Service) CanProvideNFTMetadata(chainID uint64, id thirdparty.NFTUniqueI
 }
 
 func (s *Service) FetchNFTMetadata(chainID uint64, id thirdparty.NFTUniqueID, tokenURI string) (*thirdparty.NFTMetadata, error) {
-	if s.messenger == nil {
+	// TODO: fix this
+	return nil, nil
+	/*if s.messenger == nil {
 		return nil, fmt.Errorf("messenger not ready")
 	}
 
@@ -581,5 +582,5 @@ func (s *Service) FetchNFTMetadata(chainID uint64, id thirdparty.NFTUniqueID, to
 		}
 	}
 
-	return nil, nil
+	return nil, nil*/
 }

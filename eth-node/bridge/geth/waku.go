@@ -69,8 +69,14 @@ func (w *gethWakuWrapper) SubscribeToPubsubTopic(topic string, optPublicKey *ecd
 	return nil
 }
 
+func (w *gethWakuWrapper) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
+	// not available in WakuV1
+	return nil, nil
+}
+
 func (w *gethWakuWrapper) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
-	return errors.New("not available in WakuV1")
+	// not available in WakuV1
+	return nil
 }
 
 // AddRelayPeer function only added for compatibility with waku V2

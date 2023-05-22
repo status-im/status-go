@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
+	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
 
@@ -669,12 +670,15 @@ func (t *Transport) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey)
 	return t.waku.StorePubsubTopicKey(topic, privKey)
 }
 
-func GetPubsubTopic(communityID []byte) string {
-	// TODO: remove hardcoded pubsub topic and use shard
-	result := "/waku/2/status-signed-test-1"
-	if communityID == nil {
-		result = relay.DefaultWakuTopic
+func (t *Transport) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
+	return t.waku.RetrievePubsubTopicKey(topic)
+}
+
+func GetPubsubTopic(shardCluster *uint, shardIndex *uint) string {
+	if shardCluster != nil && shardIndex != nil {
+		return protocol.NewStaticShardingPubsubTopic(uint16(*shardCluster), uint16(*shardIndex)).String()
+		// return "/waku/2/status-signed-test-1"
 	}
 
-	return result
+	return relay.DefaultWakuTopic
 }

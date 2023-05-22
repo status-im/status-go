@@ -118,6 +118,8 @@ message CommunityInvitation {
   bytes grant = 2;
   string chat_id = 3;
   bytes public_key = 4;
+  int32 shard_cluster = 5;
+  int32 shard_index = 6;
 }
 
 message RevealedAccount {

@@ -1589,8 +1589,9 @@ func (m *Messenger) Init() error {
 
 	for _, c := range adminCommunities {
 		communityFiltersToInitialize = append(communityFiltersToInitialize, transport.CommunityFilterToInitialize{
-			CommunityID: c.ID(),
-			PrivKey:     c.PrivateKey(),
+			ShardCluster: c.ShardCluster(),
+			ShardIndex:   c.ShardIndex(),
+			PrivKey:      c.PrivateKey(),
 		})
 	}
 
@@ -1622,6 +1623,8 @@ func (m *Messenger) Init() error {
 			continue
 		}
 
+		communityInfo := make(map[string]*communities.Community)
+
 		switch chat.ChatType {
 		case ChatTypePublic, ChatTypeProfile:
 			filtersToInit = append(filtersToInit, transport.FiltersToInitialize{ChatID: chat.ID, PubsubTopic: relay.DefaultWakuTopic})
@@ -1630,7 +1633,17 @@ func (m *Messenger) Init() error {
 			if err != nil {
 				return err
 			}
-			filtersToInit = append(filtersToInit, transport.FiltersToInitialize{ChatID: chat.ID, PubsubTopic: transport.GetPubsubTopic(communityID)})
+
+			community, ok := communityInfo[chat.CommunityID]
+			if !ok {
+				community, err = m.communitiesManager.GetByID(communityID)
+				if err != nil {
+					return err
+				}
+				communityInfo[chat.CommunityID] = community
+			}
+
+			filtersToInit = append(filtersToInit, transport.FiltersToInitialize{ChatID: chat.ID, PubsubTopic: transport.GetPubsubTopic(community.ShardCluster(), community.ShardIndex())})
 		case ChatTypeOneToOne:
 			pk, err := chat.PublicKey()
 			if err != nil {
@@ -1978,12 +1991,10 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 			return rawMessage, err
 		}
 	case ChatTypeCommunityChat:
-		communityID, err := hexutil.Decode(chat.CommunityID)
+		rawMessage.PubsubTopic, err = m.communitiesManager.GetPubsubTopic(chat.CommunityID)
 		if err != nil {
 			return rawMessage, err
 		}
-
-		rawMessage.PubsubTopic = transport.GetPubsubTopic(communityID)
 
 		// TODO: add grant
 		canPost, err := m.communitiesManager.CanPost(&m.identity.PublicKey, chat.CommunityID, chat.CommunityChatID(), nil)
