@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	storepb "github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 
@@ -233,6 +234,10 @@ func (w *gethWakuV2Wrapper) StopDiscV5() error {
 // Subscribe to a pubsub topic, passing an optional public key if the pubsub topic is protected
 func (w *gethWakuV2Wrapper) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error {
 	return w.waku.SubscribeToPubsubTopic(topic, optPublicKey)
+}
+
+func (w *gethWakuV2Wrapper) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
+	return w.waku.RetrievePubsubTopicKey(topic)
 }
 
 func (w *gethWakuV2Wrapper) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {

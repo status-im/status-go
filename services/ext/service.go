@@ -556,6 +556,7 @@ func (s *Service) CanProvideCollectibleMetadata(id thirdparty.CollectibleUniqueI
 }
 
 func (s *Service) FetchCollectibleMetadata(id thirdparty.CollectibleUniqueID, tokenURI string) (*thirdparty.FullCollectibleData, error) {
+
 	if s.messenger == nil {
 		return nil, fmt.Errorf("messenger not ready")
 	}
@@ -567,7 +568,12 @@ func (s *Service) FetchCollectibleMetadata(id thirdparty.CollectibleUniqueID, to
 	}
 
 	// Try to fetch metadata from Messenger communities
-	community, err := s.messenger.RequestCommunityInfoFromMailserver(communityID, true)
+
+	// TODO: we need the shard information in the collectible to be able to retrieve info for
+	// communities that have specific shards
+
+	var shard *common.Shard = nil // TODO: build this with info from token
+	community, err := s.messenger.RequestCommunityInfoFromMailserver(communityID, shard, true)
 
 	if err != nil {
 		return nil, err

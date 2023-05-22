@@ -92,6 +92,8 @@ type Waku interface {
 
 	StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error
 
+	RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error)
+
 	AddStorePeer(address string) (peer.ID, error)
 
 	AddRelayPeer(address string) (peer.ID, error)

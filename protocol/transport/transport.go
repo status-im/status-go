@@ -13,8 +13,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
+
+	"github.com/waku-org/go-waku/waku/v2/protocol"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/connection"
@@ -672,6 +674,14 @@ func (t *Transport) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey)
 	return t.waku.StorePubsubTopicKey(topic, privKey)
 }
 
-func GetPubsubTopic(communityID []byte) string {
+func (t *Transport) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
+	return t.waku.RetrievePubsubTopicKey(topic)
+}
+
+func GetPubsubTopic(shard *Shard) string {
+	if shard != nil {
+		return protocol.NewStaticShardingPubsubTopic(shard.Cluster, shard.Index).String()
+	}
+
 	return relay.DefaultWakuTopic
 }

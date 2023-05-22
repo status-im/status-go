@@ -10,8 +10,9 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
+
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -43,6 +44,7 @@ type Config struct {
 	MemberIdentity                      *ecdsa.PublicKey
 	SyncedAt                            uint64
 	EventsData                          *EventsData
+	Shard                               *common.Shard
 }
 
 type EventsData struct {
@@ -126,13 +128,18 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		TokenPermissions        map[string]*CommunityTokenPermission `json:"tokenPermissions"`
 		CommunityTokensMetadata []*protobuf.CommunityTokenMetadata   `json:"communityTokensMetadata"`
 		ActiveMembersCount      uint64                               `json:"activeMembersCount"`
+		PubsubTopic             string                               `json:"pubsubTopic"`
+		Shard                   *common.Shard                        `json:"shard"`
 	}{
-		ID:         o.ID(),
-		Verified:   o.config.Verified,
-		Chats:      make(map[string]CommunityChat),
-		Categories: make(map[string]CommunityCategory),
-		Tags:       o.Tags(),
+		ID:          o.ID(),
+		Verified:    o.config.Verified,
+		Chats:       make(map[string]CommunityChat),
+		Categories:  make(map[string]CommunityCategory),
+		Tags:        o.Tags(),
+		PubsubTopic: o.PubsubTopic(),
+		Shard:       o.Shard(),
 	}
+
 	if o.config.CommunityDescription != nil {
 		for id, c := range o.config.CommunityDescription.Categories {
 			category := CommunityCategory{
@@ -165,7 +172,12 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 
 		communityItem.TokenPermissions = o.tokenPermissions()
 		communityItem.MembersCount = len(o.config.CommunityDescription.Members)
+
 		communityItem.Link = fmt.Sprintf("https://join.status.im/c/0x%x", o.ID())
+		if o.Shard() != nil {
+			communityItem.Link = fmt.Sprintf("%s/%d/%d", communityItem.Link, o.Shard().Cluster, o.Shard().Index)
+		}
+
 		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
 		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
 		communityItem.BanList = o.config.CommunityDescription.BanList
@@ -233,6 +245,8 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		TokenPermissions            map[string]*CommunityTokenPermission `json:"tokenPermissions"`
 		CommunityTokensMetadata     []*protobuf.CommunityTokenMetadata   `json:"communityTokensMetadata"`
 		ActiveMembersCount          uint64                               `json:"activeMembersCount"`
+		PubsubTopic                 string                               `json:"pubsubTopic"`
+		Shard                       *common.Shard                        `json:"shard"`
 	}{
 		ID:                          o.ID(),
 		MemberRole:                  o.MemberRole(o.MemberIdentity()),
@@ -252,6 +266,8 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		MuteTill:                    o.config.MuteTill,
 		Tags:                        o.Tags(),
 		Encrypted:                   o.Encrypted(),
+		PubsubTopic:                 o.PubsubTopic(),
+		Shard:                       o.Shard(),
 	}
 	if o.config.CommunityDescription != nil {
 		for id, c := range o.config.CommunityDescription.Categories {
@@ -345,6 +361,14 @@ func (o *Community) DescriptionText() string {
 		return o.config.CommunityDescription.Identity.Description
 	}
 	return ""
+}
+
+func (o *Community) Shard() *common.Shard {
+	if o != nil && o.config != nil {
+		return o.config.Shard
+	}
+
+	return nil
 }
 
 func (o *Community) IntroMessage() string {
@@ -1222,7 +1246,7 @@ func (o *Community) MemberUpdateChannelID() string {
 }
 
 func (o *Community) PubsubTopic() string {
-	return transport.GetPubsubTopic(o.ID())
+	return transport.GetPubsubTopic(o.Shard().TransportShard())
 }
 
 func (o *Community) DefaultFilters() []transport.FiltersToInitialize {

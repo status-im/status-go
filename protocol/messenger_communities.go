@@ -80,12 +80,13 @@ func (m *Messenger) publishOrg(org *communities.Community) error {
 		// we don't want to wrap in an encryption layer message
 		SkipProtocolLayer: true,
 		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION,
+		PubsubTopic:       org.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
 	}
 	_, err = m.sender.SendPublic(context.Background(), org.IDString(), rawMessage)
 	return err
 }
 
-func (m *Messenger) publishCommunityEvents(msg *communities.CommunityEventsMessage) error {
+func (m *Messenger) publishCommunityEvents(community *communities.Community, msg *communities.CommunityEventsMessage) error {
 	m.logger.Debug("publishing community events", zap.String("admin-id", common.PubkeyToHex(&m.identity.PublicKey)), zap.Any("event", msg))
 
 	payload, err := msg.Marshal()
@@ -99,7 +100,7 @@ func (m *Messenger) publishCommunityEvents(msg *communities.CommunityEventsMessa
 		// we don't want to wrap in an encryption layer message
 		SkipProtocolLayer: true,
 		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_EVENTS_MESSAGE,
-		PubsubTopic:       transport.GetPubsubTopic(msg.CommunityID), // TODO: confirm if it should be sent in community pubsub topic
+		PubsubTopic:       community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
 	}
 
 	// TODO: resend in case of failure?
@@ -300,7 +301,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 				}
 
 				if sub.CommunityEventsMessage != nil {
-					err := m.publishCommunityEvents(sub.CommunityEventsMessage)
+					err := m.publishCommunityEvents(sub.Community, sub.CommunityEventsMessage)
 					if err != nil {
 						m.logger.Warn("failed to publish community events", zap.Error(err))
 					}
@@ -551,12 +552,12 @@ func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse,
 
 	callOpts := &bind.CallOpts{Context: context.Background(), Pending: false}
 
-	communities, err := directory.GetCommunities(callOpts)
+	curatedCommunities, err := directory.GetCommunities(callOpts)
 	if err != nil {
 		return nil, err
 	}
 	var communityIDs []types.HexBytes
-	for _, c := range communities {
+	for _, c := range curatedCommunities {
 		communityIDs = append(communityIDs, c)
 	}
 
@@ -569,8 +570,14 @@ func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse,
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO: The curated communities smart contract should also store the community shard cluster and index
+
 	for _, c := range featuredCommunities {
-		response.ContractFeaturedCommunities = append(response.ContractFeaturedCommunities, types.HexBytes(c).String())
+		response.ContractFeaturedCommunities = append(response.ContractFeaturedCommunities, communities.CommunityShard{
+			CommunityID: types.HexBytes(c).String(),
+			// Shard:     c.Shard, // TODO: obtain this value
+		})
 	}
 
 	go m.requestCommunitiesFromMailserver(response.UnknownCommunities)
@@ -600,8 +607,8 @@ func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Cha
 	if community.IsControlNode() {
 		// Init the community filter so we can receive messages on the community
 		communityFilters, err := m.transport.InitCommunityFilters([]transport.CommunityFilterToInitialize{{
-			CommunityID: community.ID(),
-			PrivKey:     community.PrivateKey(),
+			Shard:   community.Shard().TransportShard(),
+			PrivKey: community.PrivateKey(),
 		}})
 
 		if err != nil {
@@ -675,14 +682,25 @@ func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexByte
 	return mr, nil
 }
 
-func (m *Messenger) subscribeToCommunityShard(communityID []byte) error {
-	// TODO: store private key and topic
-	// TODO: determine pubsub topic and public key for community
-	// TODO: this should probably be moved completely to transport once pubsub topic logic is implemented
+func (m *Messenger) subscribeToCommunityShard(communityID []byte, shard *common.Shard) error {
+	if m.transport.WakuVersion() != 2 {
+		return nil
+	}
 
-	pubsubTopic := transport.GetPubsubTopic(communityID)
-	// var communityPubKey *ecdsa.PublicKey
-	return m.transport.SubscribeToPubsubTopic(pubsubTopic, nil)
+	// TODO: this should probably be moved completely to transport once pubsub topic logic is implemented
+	pubsubTopic := transport.GetPubsubTopic(shard.TransportShard())
+
+	privK, err := m.transport.RetrievePubsubTopicKey(pubsubTopic)
+	if err != nil {
+		return err
+	}
+
+	var pubK *ecdsa.PublicKey
+	if privK != nil {
+		pubK = &privK.PublicKey
+	}
+
+	return m.transport.SubscribeToPubsubTopic(pubsubTopic, pubK)
 }
 
 func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexBytes, forceJoin bool) (*MessengerResponse, error) {
@@ -708,7 +726,7 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 			return nil, err
 		}
 
-		if err = m.subscribeToCommunityShard(communityID); err != nil {
+		if err = m.subscribeToCommunityShard(community.ID(), community.Shard()); err != nil {
 			return nil, err
 		}
 	}
@@ -762,7 +780,7 @@ func (m *Messenger) SpectateCommunity(communityID types.HexBytes) (*MessengerRes
 
 	response.AddCommunity(community)
 
-	if err = m.subscribeToCommunityShard(community.ID()); err != nil {
+	if err = m.subscribeToCommunityShard(community.ID(), community.Shard()); err != nil {
 		return nil, err
 	}
 
@@ -1193,7 +1211,7 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 		CommunityID:       community.ID(),
 		SkipProtocolLayer: true,
 		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_EDIT_SHARED_ADDRESSES,
-		PubsubTopic:       community.PubsubTopic(),
+		PubsubTopic:       community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
 	}
 
 	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
@@ -1436,12 +1454,29 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 			return nil, err
 		}
 
+		var key *ecdsa.PrivateKey
+		if m.transport.WakuVersion() == 2 {
+			key, err = m.transport.RetrievePubsubTopicKey(community.PubsubTopic())
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		requestToJoinResponseProto := &protobuf.CommunityRequestToJoinResponse{
-			Clock:       community.Clock(),
-			Accepted:    true,
-			CommunityId: community.ID(),
-			Community:   community.Description(),
-			Grant:       grant,
+			Clock:                    community.Clock(),
+			Accepted:                 true,
+			CommunityId:              community.ID(),
+			Community:                community.Description(),
+			Grant:                    grant,
+			ProtectedTopicPrivateKey: crypto.FromECDSA(key),
+		}
+
+		if community.Shard() != nil {
+			requestToJoinResponseProto.ShardIndex = int32(community.Shard().Index)
+			requestToJoinResponseProto.ShardCluster = int32(community.Shard().Cluster)
+		} else {
+			requestToJoinResponseProto.ShardIndex = common.UndefinedShardValue
+			requestToJoinResponseProto.ShardCluster = common.UndefinedShardValue
 		}
 
 		if m.torrentClientReady() && m.communitiesManager.TorrentFileExists(community.IDString()) {
@@ -1629,12 +1664,17 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 			return nil, err
 		}
 
+		community, err := m.communitiesManager.GetByID(communityID)
+		if err != nil {
+			return nil, err
+		}
+
 		rawMessage := common.RawMessage{
 			Payload:           payload,
 			CommunityID:       communityID,
 			SkipProtocolLayer: true,
 			MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE,
-			PubsubTopic:       transport.GetPubsubTopic(communityID), // TODO: confirm if it should be sent in the community pubsub topic
+			PubsubTopic:       community.PubsubTopic(), // TODO: confirm if it should be sent in the community pubsub topic
 		}
 		_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
 		if err != nil {
@@ -1887,14 +1927,14 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 		return nil, err
 	}
 
-	if err = m.subscribeToCommunityShard(community.ID()); err != nil {
+	if err = m.subscribeToCommunityShard(community.ID(), community.Shard()); err != nil {
 		return nil, err
 	}
 
 	// Init the community filter so we can receive messages on the community
 	_, err = m.transport.InitCommunityFilters([]transport.CommunityFilterToInitialize{{
-		CommunityID: community.ID(),
-		PrivKey:     community.PrivateKey(),
+		Shard:   community.Shard().TransportShard(),
+		PrivKey: community.PrivateKey(),
 	}})
 	if err != nil {
 		return nil, err
@@ -1939,6 +1979,95 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 	}
 
 	return response, nil
+}
+
+func (m *Messenger) SetCommunityShard(request *requests.SetCommunityShard) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	community, err := m.communitiesManager.SetShard(request.CommunityID, request.Shard)
+	if err != nil {
+		return nil, err
+	}
+
+	var topicPrivKey *ecdsa.PrivateKey
+	if request.PrivateKey != nil {
+		topicPrivKey, err = crypto.ToECDSA(*request.PrivateKey)
+	} else {
+		topicPrivKey, err = crypto.GenerateKey()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.UpdateCommunityFilters(community, topicPrivKey)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.SendCommunityShardKey(community, community.GetMemberPubkeys())
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddProtectedTopic(community.PubsubTopic(), topicPrivKey)
+
+	return response, nil
+}
+
+func (m *Messenger) UpdateCommunityFilters(community *communities.Community, privKey *ecdsa.PrivateKey) error {
+	if m.transport.WakuVersion() == 2 && privKey != nil {
+		if err := m.transport.StorePubsubTopicKey(community.PubsubTopic(), privKey); err != nil {
+			return err
+		}
+	}
+
+	publicFiltersToInit := make([]transport.FiltersToInitialize, 0, len(community.DefaultFilters())+len(community.Chats()))
+
+	for _, df := range community.DefaultFilters() {
+		_, err := m.transport.RemoveFilterByChatID(df.ChatID)
+		if err != nil {
+			return err
+		}
+		publicFiltersToInit = append(publicFiltersToInit, df)
+	}
+
+	for chatID := range community.Chats() {
+		communityChatID := community.IDString() + chatID
+		_, err := m.transport.RemoveFilterByChatID(communityChatID)
+		if err != nil {
+			return err
+		}
+		publicFiltersToInit = append(publicFiltersToInit, transport.FiltersToInitialize{ChatID: communityChatID, PubsubTopic: community.PubsubTopic()})
+	}
+
+	_, err := m.transport.InitPublicFilters(publicFiltersToInit)
+	if err != nil {
+		return err
+	}
+
+	// Init the community filter so we can receive messages on the community
+	_, err = m.transport.InitCommunityFilters([]transport.CommunityFilterToInitialize{{
+		Shard:   community.Shard().TransportShard(),
+		PrivKey: community.PrivateKey(),
+	}})
+	if err != nil {
+		return err
+	}
+
+	// Init the default community filters
+	_, err = m.transport.InitPublicFilters(publicFiltersToInit)
+	if err != nil {
+		return err
+	}
+
+	if err = m.subscribeToCommunityShard(community.ID(), community.Shard()); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommunityTokenPermission) (*MessengerResponse, error) {
@@ -2122,7 +2251,7 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 		return nil, err
 	}
 
-	_, err = m.RequestCommunityInfoFromMailserver(community.IDString(), false)
+	_, err = m.RequestCommunityInfoFromMailserver(community.IDString(), community.Shard(), false)
 	if err != nil {
 		// TODO In the future we should add a mechanism to re-apply next steps (adding owner, joining)
 		// if there is no connection with mailserver. Otherwise changes will be overwritten.
@@ -2264,6 +2393,55 @@ func (m *Messenger) RemoveUserFromCommunity(id types.HexBytes, pkString string) 
 	return response, nil
 }
 
+func (m *Messenger) SendCommunityShardKey(community *communities.Community, pubkeys []*ecdsa.PublicKey) error {
+	if m.transport.WakuVersion() != 2 {
+		return nil
+	}
+
+	if !community.IsControlNode() {
+		return nil
+	}
+
+	key, err := m.transport.RetrievePubsubTopicKey(community.PubsubTopic())
+	if err != nil {
+		return err
+	}
+
+	if key == nil {
+		return nil // No community shard key available
+	}
+
+	communityShardKey := &protobuf.CommunityShardKey{
+		Clock:       m.getTimesource().GetCurrentTime(),
+		CommunityId: community.ID(),
+		PrivateKey:  crypto.FromECDSA(key),
+	}
+
+	if community.Shard() != nil {
+		communityShardKey.ShardIndex = int32(community.Shard().Index)
+		communityShardKey.ShardCluster = int32(community.Shard().Cluster)
+	} else {
+		communityShardKey.ShardIndex = common.UndefinedShardValue
+		communityShardKey.ShardCluster = common.UndefinedShardValue
+	}
+
+	encodedMessage, err := proto.Marshal(communityShardKey)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := common.RawMessage{
+		Recipients:          pubkeys,
+		ResendAutomatically: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_SHARD_KEY,
+		Payload:             encodedMessage,
+	}
+
+	_, err = m.sender.SendPubsubTopicKey(context.Background(), &rawMessage)
+
+	return err
+}
+
 func (m *Messenger) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunity) (*MessengerResponse, error) {
 	community, err := m.communitiesManager.UnbanUserFromCommunity(request)
 	if err != nil {
@@ -2350,7 +2528,7 @@ func (m *Messenger) GetCommunityIDFromKey(communityKey string) string {
 // RequestCommunityInfoFromMailserver installs filter for community and requests its details
 // from mailserver. It waits until it has the community before returning it.
 // If useDatabase is true, it searches for community in database and does not request mailserver.
-func (m *Messenger) RequestCommunityInfoFromMailserver(privateOrPublicKey string, useDatabase bool) (*communities.Community, error) {
+func (m *Messenger) RequestCommunityInfoFromMailserver(privateOrPublicKey string, shard *common.Shard, useDatabase bool) (*communities.Community, error) {
 	communityID := m.GetCommunityIDFromKey(privateOrPublicKey)
 	if useDatabase {
 		community, err := m.findCommunityInfoFromDB(communityID)
@@ -2362,12 +2540,12 @@ func (m *Messenger) RequestCommunityInfoFromMailserver(privateOrPublicKey string
 		}
 	}
 
-	return m.requestCommunityInfoFromMailserver(communityID, true)
+	return m.requestCommunityInfoFromMailserver(communityID, shard, true)
 }
 
 // RequestCommunityInfoFromMailserverAsync installs filter for community and requests its details
 // from mailserver. When response received it will be passed through signals handler
-func (m *Messenger) RequestCommunityInfoFromMailserverAsync(privateOrPublicKey string) error {
+func (m *Messenger) RequestCommunityInfoFromMailserverAsync(privateOrPublicKey string, shard *common.Shard) error {
 	communityID := m.GetCommunityIDFromKey(privateOrPublicKey)
 
 	community, err := m.findCommunityInfoFromDB(communityID)
@@ -2378,23 +2556,18 @@ func (m *Messenger) RequestCommunityInfoFromMailserverAsync(privateOrPublicKey s
 		m.config.messengerSignalsHandler.CommunityInfoFound(community)
 		return nil
 	}
-	_, err = m.requestCommunityInfoFromMailserver(communityID, false)
+	_, err = m.requestCommunityInfoFromMailserver(communityID, shard, false)
 	return err
 }
 
 // RequestCommunityInfoFromMailserver installs filter for community and requests its details
 // from mailserver. When response received it will be passed through signals handler
-func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, waitForResponse bool) (*communities.Community, error) {
+func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, shard *common.Shard, waitForResponse bool) (*communities.Community, error) {
 	m.requestedCommunitiesLock.Lock()
 	defer m.requestedCommunitiesLock.Unlock()
 
 	if _, ok := m.requestedCommunities[communityID]; ok {
 		return nil, nil
-	}
-
-	id, err := hexutil.Decode(communityID)
-	if err != nil {
-		return nil, err
 	}
 
 	//If filter wasn't installed we create it and remember for deinstalling after
@@ -2403,7 +2576,7 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, waitF
 	if filter == nil {
 		filters, err := m.transport.InitPublicFilters([]transport.FiltersToInitialize{{
 			ChatID:      communityID,
-			PubsubTopic: transport.GetPubsubTopic(id),
+			PubsubTopic: transport.GetPubsubTopic(shard.TransportShard()),
 		}})
 		if err != nil {
 			return nil, fmt.Errorf("Can't install filter for community: %v", err)
@@ -2421,7 +2594,7 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, waitF
 	to := uint32(m.transport.GetCurrentTime() / 1000)
 	from := to - oneMonthInSeconds
 
-	_, err = m.performMailserverRequest(func() (*MessengerResponse, error) {
+	_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
 
 		batch := MailserverBatch{From: from, To: to, Topics: []types.TopicType{filter.ContentTopic}}
 		m.logger.Info("Requesting historic")
@@ -2447,7 +2620,7 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, waitF
 		select {
 		case <-time.After(200 * time.Millisecond):
 			//send signal to client that message status updated
-			community, err = m.communitiesManager.GetByIDString(communityID)
+			community, err := m.communitiesManager.GetByIDString(communityID)
 			if err != nil {
 				return nil, err
 			}
@@ -2477,28 +2650,23 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, waitF
 
 // RequestCommunityInfoFromMailserver installs filter for community and requests its details
 // from mailserver. When response received it will be passed through signals handler
-func (m *Messenger) requestCommunitiesFromMailserver(communityIDs []string) {
+func (m *Messenger) requestCommunitiesFromMailserver(communities []communities.CommunityShard) {
 	m.requestedCommunitiesLock.Lock()
 	defer m.requestedCommunitiesLock.Unlock()
 
 	var topics []types.TopicType
-	for _, communityID := range communityIDs {
-		if _, ok := m.requestedCommunities[communityID]; ok {
-			continue
-		}
-
-		id, err := hexutil.Decode(communityID)
-		if err != nil {
+	for _, c := range communities {
+		if _, ok := m.requestedCommunities[c.CommunityID]; ok {
 			continue
 		}
 
 		//If filter wasn't installed we create it and remember for deinstalling after
 		//response received
-		filter := m.transport.FilterByChatID(communityID)
+		filter := m.transport.FilterByChatID(c.CommunityID)
 		if filter == nil {
 			filters, err := m.transport.InitPublicFilters([]transport.FiltersToInitialize{{
-				ChatID:      communityID,
-				PubsubTopic: transport.GetPubsubTopic(id),
+				ChatID:      c.CommunityID,
+				PubsubTopic: transport.GetPubsubTopic(c.Shard.TransportShard()),
 			}})
 			if err != nil {
 				m.logger.Error("Can't install filter for community", zap.Error(err))
@@ -2509,10 +2677,10 @@ func (m *Messenger) requestCommunitiesFromMailserver(communityIDs []string) {
 				continue
 			}
 			filter = filters[0]
-			m.requestedCommunities[communityID] = filter
+			m.requestedCommunities[c.CommunityID] = filter
 		} else {
 			//we don't remember filter id associated with community because it was already installed
-			m.requestedCommunities[communityID] = nil
+			m.requestedCommunities[c.CommunityID] = nil
 		}
 		topics = append(topics, filter.ContentTopic)
 	}
@@ -2541,8 +2709,8 @@ func (m *Messenger) requestCommunitiesFromMailserver(communityIDs []string) {
 		select {
 		case <-time.After(200 * time.Millisecond):
 			allLoaded := true
-			for _, c := range communityIDs {
-				community, err := m.communitiesManager.GetByIDString(c)
+			for _, c := range communities {
+				community, err := m.communitiesManager.GetByIDString(c.CommunityID)
 				if err != nil {
 					m.logger.Error("Error loading community", zap.Error(err))
 					break
@@ -2563,8 +2731,8 @@ func (m *Messenger) requestCommunitiesFromMailserver(communityIDs []string) {
 		}
 	}
 
-	for _, c := range communityIDs {
-		m.forgetCommunityRequest(c)
+	for _, c := range communities {
+		m.forgetCommunityRequest(c.CommunityID)
 	}
 
 }
@@ -2756,7 +2924,71 @@ func (m *Messenger) HandleCommunityEventsMessageRejected(state *ReceivedMessageS
 		return nil
 	}
 
-	err = m.publishCommunityEvents(reapplyEventsMessage)
+	community, err := m.communitiesManager.GetByID(reapplyEventsMessage.CommunityID)
+	if err != nil {
+		return err
+	}
+
+	err = m.publishCommunityEvents(community, reapplyEventsMessage)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// HandleCommunityShardKey handles the private keys for the community shards
+func (m *Messenger) HandleCommunityShardKey(state *ReceivedMessageState, message *protobuf.CommunityShardKey, statusMessage *v1protocol.StatusMessage) error {
+	// TODO: @cammellos: This is risky, it does not seem to support out of order messages
+	// (say that the community changes shards twice, last one wins, but we don't check clock
+	// etc)
+
+	// TODO: @cammellos: getbyid returns nil if the community is not in the db, so we need to handle it
+	community, err := m.communitiesManager.GetByID(message.CommunityId)
+	if err != nil {
+		return err
+	}
+
+	// If we haven't joined the community, nothing to do
+	if !community.Joined() {
+		return nil
+	}
+
+	signer := state.CurrentMessageState.PublicKey
+	if signer == nil {
+		return errors.New("signer can't be nil")
+	}
+
+	if !community.IsMemberOwner(signer) {
+		return communities.ErrNotAuthorized
+	}
+
+	return m.handleCommunityShardAndFiltersFromProto(community, message.ShardCluster, message.ShardIndex, message.PrivateKey)
+}
+
+func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communities.Community, shardCluster int32, shardIndex int32, privateKeyBytes []byte) error {
+	var shard *common.Shard
+	if shardCluster != common.UndefinedShardValue && shardIndex != common.UndefinedShardValue {
+		shard = &common.Shard{
+			Cluster: uint16(shardCluster),
+			Index:   uint16(shardIndex),
+		}
+	}
+
+	err := m.communitiesManager.UpdateShard(community, shard)
+	if err != nil {
+		return err
+	}
+
+	var privKey *ecdsa.PrivateKey = nil
+	if privateKeyBytes != nil {
+		privKey, err = crypto.ToECDSA(privateKeyBytes)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = m.UpdateCommunityFilters(community, privKey)
 	if err != nil {
 		return err
 	}
@@ -4257,8 +4489,8 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 
 		// Init the community filter so we can receive messages on the community
 		_, err = m.transport.InitCommunityFilters([]transport.CommunityFilterToInitialize{{
-			CommunityID: discordCommunity.ID(),
-			PrivKey:     discordCommunity.PrivateKey(),
+			Shard:   discordCommunity.Shard().TransportShard(),
+			PrivKey: discordCommunity.PrivateKey(),
 		}})
 		if err != nil {
 			m.cleanUpImport(communityID)
