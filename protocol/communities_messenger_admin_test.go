@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"testing"
 
@@ -412,39 +413,44 @@ func (s *AdminMessengerCommunitiesSuite) adminCreateCommunityChannel(community *
 
 	s.refreshMessengerResponses()
 
-	checkChannelCreated := func(response *MessengerResponse) bool {
-		s.Require().NotNil(response)
+	checkChannelCreated := func(response *MessengerResponse) error {
 		if len(response.Communities()) == 0 {
-			return false
+			return errors.New("community not received")
 		}
 
 		madeAssertions := false
 		for _, c := range response.Communities() {
 			if c.IDString() == community.IDString() {
 				madeAssertions = true
-				s.Require().Len(c.Chats(), 2)
+				if len(c.Chats()) < 2 {
+					return errors.New("created chat does not exist on community")
+				}
 			}
 		}
 
 		if !madeAssertions {
-			s.Require().Equal(true, false)
+			return errors.New("couldn't find community in response")
 		}
-
-		return true
+		return nil
 	}
 
 	response, err := s.admin.CreateCommunityChat(community.ID(), orgChat)
-
 	s.Require().NoError(err)
-	s.Require().True(checkChannelCreated(response))
+	s.Require().NoError(checkChannelCreated(response))
 
-	_, err = WaitOnMessengerResponse(s.alice, func(response *MessengerResponse) bool {
-		return checkChannelCreated(response)
-	}, "owner did not receive new channel from admin")
+	response, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		"community not received",
+	)
 	s.Require().NoError(err)
+	s.Require().NoError(checkChannelCreated(response))
 
-	_, err = WaitOnMessengerResponse(s.owner, func(r *MessengerResponse) bool {
-		return checkChannelCreated(r)
-	}, "alice did not receive new channel from admin")
+	response, err = WaitOnMessengerResponse(
+		s.owner,
+		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		"community not received",
+	)
 	s.Require().NoError(err)
+	s.Require().NoError(checkChannelCreated(response))
 }
