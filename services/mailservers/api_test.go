@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
@@ -65,9 +66,9 @@ func TestTopic(t *testing.T) {
 	defer close()
 	topicA := "0x61000000"
 	topicD := "0x64000000"
-	topic1 := MailserverTopic{Topic: topicA, LastRequest: 1}
-	topic2 := MailserverTopic{Topic: "0x6200000", LastRequest: 2}
-	topic3 := MailserverTopic{Topic: "0x6300000", LastRequest: 3}
+	topic1 := MailserverTopic{PubsubTopic: relay.DefaultWakuTopic, ContentTopic: topicA, LastRequest: 1}
+	topic2 := MailserverTopic{PubsubTopic: relay.DefaultWakuTopic, ContentTopic: "0x6200000", LastRequest: 2}
+	topic3 := MailserverTopic{PubsubTopic: relay.DefaultWakuTopic, ContentTopic: "0x6300000", LastRequest: 3}
 
 	require.NoError(t, db.AddTopic(topic1))
 	require.NoError(t, db.AddTopic(topic2))
@@ -79,12 +80,16 @@ func TestTopic(t *testing.T) {
 
 	filters := []*transport.Filter{
 		// Existing topic, is not updated
-		{Topic: types.BytesToTopic([]byte{0x61})},
+		{
+			PubsubTopic:  relay.DefaultWakuTopic,
+			ContentTopic: types.BytesToTopic([]byte{0x61}),
+		},
 		// Non existing topic is not inserted
 		{
-			Discovery:  true,
-			Negotiated: true,
-			Topic:      types.BytesToTopic([]byte{0x64}),
+			Discovery:    true,
+			Negotiated:   true,
+			PubsubTopic:  relay.DefaultWakuTopic,
+			ContentTopic: types.BytesToTopic([]byte{0x64}),
 		},
 	}
 
@@ -93,13 +98,13 @@ func TestTopic(t *testing.T) {
 	topics, err = db.Topics()
 	require.NoError(t, err)
 	require.Len(t, topics, 2)
-	require.Equal(t, topics[0].Topic, topicA)
+	require.Equal(t, topics[0].ContentTopic, topicA)
 	require.Equal(t, topics[0].LastRequest, 1)
 
-	require.Equal(t, topics[0].Topic, topicA)
+	require.Equal(t, topics[0].ContentTopic, topicA)
 	require.Equal(t, topics[0].LastRequest, 1)
 
-	require.Equal(t, topics[1].Topic, topicD)
+	require.Equal(t, topics[1].ContentTopic, topicD)
 	require.NotEmpty(t, topics[1].LastRequest)
 	require.True(t, topics[1].Negotiated)
 	require.True(t, topics[1].Discovery)
@@ -159,9 +164,10 @@ func TestAddGetDeleteMailserverTopics(t *testing.T) {
 	defer close()
 	api := &API{db: db}
 	testTopic := MailserverTopic{
-		Topic:       "topic-001",
-		ChatIDs:     []string{"chatID01", "chatID02"},
-		LastRequest: 10,
+		PubsubTopic:  relay.DefaultWakuTopic,
+		ContentTopic: "topic-001",
+		ChatIDs:      []string{"chatID01", "chatID02"},
+		LastRequest:  10,
 	}
 	err := api.AddMailserverTopic(context.Background(), testTopic)
 	require.NoError(t, err)
@@ -171,14 +177,14 @@ func TestAddGetDeleteMailserverTopics(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, []MailserverTopic{testTopic}, topics)
 
-	err = api.DeleteMailserverTopic(context.Background(), testTopic.Topic)
+	err = api.DeleteMailserverTopic(context.Background(), relay.DefaultWakuTopic, testTopic.ContentTopic)
 	require.NoError(t, err)
 	topics, err = api.GetMailserverTopics(context.Background())
 	require.NoError(t, err)
 	require.EqualValues(t, ([]MailserverTopic)(nil), topics)
 
 	// Delete non-existing topic.
-	err = api.DeleteMailserverTopic(context.Background(), "non-existing-topic")
+	err = api.DeleteMailserverTopic(context.Background(), relay.DefaultWakuTopic, "non-existing-topic")
 	require.NoError(t, err)
 }
 

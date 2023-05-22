@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/connection"
@@ -217,19 +218,19 @@ func (m *Messenger) filtersForChat(chatID string) ([]*transport.Filter, error) {
 	return filters, nil
 }
 
-func (m *Messenger) topicsForChat(chatID string) ([]types.TopicType, error) {
+func (m *Messenger) topicsForChat(chatID string) (string, []types.TopicType, error) {
 	filters, err := m.filtersForChat(chatID)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 
-	var topics []types.TopicType
+	var contentTopics []types.TopicType
 
 	for _, filter := range filters {
-		topics = append(topics, filter.Topic)
+		contentTopics = append(contentTopics, filter.ContentTopic)
 	}
 
-	return topics, nil
+	return filters[0].PubsubTopic, contentTopics, nil
 }
 
 // Assume is a public chat for now
@@ -250,7 +251,7 @@ func (m *Messenger) syncBackup() error {
 
 	to := m.calculateMailserverTo()
 	from := uint32(m.getTimesource().GetCurrentTime()/1000) - oneMonthInSeconds
-	batch := MailserverBatch{From: from, To: to, Topics: []types.TopicType{filter.Topic}}
+	batch := MailserverBatch{From: from, To: to, PubsubTopic: relay.DefaultWakuTopic, Topics: []types.TopicType{filter.ContentTopic}}
 	err := m.processMailserverBatch(batch)
 	if err != nil {
 		return err
@@ -346,7 +347,7 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 
 	topicsData := make(map[string]mailservers.MailserverTopic)
 	for _, topic := range topicInfo {
-		topicsData[topic.Topic] = topic
+		topicsData[fmt.Sprintf("%s-%s", topic.PubsubTopic, topic.ContentTopic)] = topic
 	}
 
 	batches := make(map[int]MailserverBatch)
@@ -371,74 +372,88 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 		return nil, err
 	}
 
+	contentTopicsPerPubsubTopic := make(map[string]map[string]*transport.Filter)
 	for _, filter := range filters {
 		if !filter.Listen || filter.Ephemeral {
 			continue
 		}
 
-		var chatID string
-		// If the filter has an identity, we use it as a chatID, otherwise is a public chat/community chat filter
-		if len(filter.Identity) != 0 {
-			chatID = filter.Identity
-		} else {
-			chatID = filter.ChatID
-		}
-
-		topicData, ok := topicsData[filter.Topic.String()]
-		var capToDefaultSyncPeriod = true
+		contentTopics, ok := contentTopicsPerPubsubTopic[filter.PubsubTopic]
 		if !ok {
-			if lastRequest == 0 {
-				lastRequest = defaultPeriodFromNow
-			}
-			topicData = mailservers.MailserverTopic{
-				Topic:       filter.Topic.String(),
-				LastRequest: int(defaultPeriodFromNow),
-			}
-		} else if lastRequest != 0 {
-			topicData.LastRequest = int(lastRequest)
-			capToDefaultSyncPeriod = false
+			contentTopics = make(map[string]*transport.Filter)
 		}
+		contentTopics[filter.ContentTopic.String()] = filter
+		contentTopicsPerPubsubTopic[filter.PubsubTopic] = contentTopics
+	}
 
-		batchID := topicData.LastRequest
-
-		if currentBatch < len(prioritizedBatches) {
-			batch, ok := batches[currentBatch]
-			if ok {
-				prevTopicData, ok := topicsData[batch.Topics[0].String()]
-				if (!ok && topicData.LastRequest != int(defaultPeriodFromNow)) ||
-					(ok && prevTopicData.LastRequest != topicData.LastRequest) {
-					currentBatch++
-				}
+	for pubsubTopic, contentTopics := range contentTopicsPerPubsubTopic {
+		for _, filter := range contentTopics {
+			var chatID string
+			// If the filter has an identity, we use it as a chatID, otherwise is a public chat/community chat filter
+			if len(filter.Identity) != 0 {
+				chatID = filter.Identity
+			} else {
+				chatID = filter.ChatID
 			}
+
+			topicData, ok := topicsData[filter.PubsubTopic+filter.ContentTopic.String()]
+			var capToDefaultSyncPeriod = true
+			if !ok {
+				if lastRequest == 0 {
+					lastRequest = defaultPeriodFromNow
+				}
+				topicData = mailservers.MailserverTopic{
+					PubsubTopic:  filter.PubsubTopic,
+					ContentTopic: filter.ContentTopic.String(),
+					LastRequest:  int(defaultPeriodFromNow),
+				}
+			} else if lastRequest != 0 {
+				topicData.LastRequest = int(lastRequest)
+				capToDefaultSyncPeriod = false
+			}
+
+			batchID := topicData.LastRequest
+
 			if currentBatch < len(prioritizedBatches) {
-				batchID = currentBatch
-				currentBatchCap := prioritizedBatches[currentBatch] - 1
-				if currentBatchCap == 0 {
-					currentBatch++
-				} else {
-					prioritizedBatches[currentBatch] = currentBatchCap
+				batch, ok := batches[currentBatch]
+				if ok {
+					prevTopicData, ok := topicsData[batch.PubsubTopic+batch.Topics[0].String()]
+					if (!ok && topicData.LastRequest != int(defaultPeriodFromNow)) ||
+						(ok && prevTopicData.LastRequest != topicData.LastRequest) {
+						currentBatch++
+					}
+				}
+				if currentBatch < len(prioritizedBatches) {
+					batchID = currentBatch
+					currentBatchCap := prioritizedBatches[currentBatch] - 1
+					if currentBatchCap == 0 {
+						currentBatch++
+					} else {
+						prioritizedBatches[currentBatch] = currentBatchCap
+					}
 				}
 			}
-		}
 
-		batch, ok := batches[batchID]
-		if !ok {
-			from := uint32(topicData.LastRequest)
-			if capToDefaultSyncPeriod {
-				from, err = m.capToDefaultSyncPeriod(uint32(topicData.LastRequest))
-				if err != nil {
-					return nil, err
+			batch, ok := batches[batchID]
+			if !ok {
+				from := uint32(topicData.LastRequest)
+				if capToDefaultSyncPeriod {
+					from, err = m.capToDefaultSyncPeriod(uint32(topicData.LastRequest))
+					if err != nil {
+						return nil, err
+					}
 				}
+				batch = MailserverBatch{From: from, To: to}
 			}
-			batch = MailserverBatch{From: from, To: to}
-		}
 
-		batch.ChatIDs = append(batch.ChatIDs, chatID)
-		batch.Topics = append(batch.Topics, filter.Topic)
-		batches[batchID] = batch
-		// Set last request to the new `to`
-		topicData.LastRequest = int(to)
-		syncedTopics = append(syncedTopics, topicData)
+			batch.ChatIDs = append(batch.ChatIDs, chatID)
+			batch.PubsubTopic = pubsubTopic
+			batch.Topics = append(batch.Topics, filter.ContentTopic)
+			batches[batchID] = batch
+			// Set last request to the new `to`
+			topicData.LastRequest = int(to)
+			syncedTopics = append(syncedTopics, topicData)
+		}
 	}
 
 	if m.config.messengerSignalsHandler != nil {
@@ -460,10 +475,11 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 			batch := batches[k]
 
 			dayBatch := MailserverBatch{
-				To:      batch.To,
-				Cursor:  batch.Cursor,
-				Topics:  batch.Topics,
-				ChatIDs: batch.ChatIDs,
+				To:          batch.To,
+				Cursor:      batch.Cursor,
+				PubsubTopic: batch.PubsubTopic,
+				Topics:      batch.Topics,
+				ChatIDs:     batch.ChatIDs,
 			}
 
 			from := batch.To - 86400
@@ -586,9 +602,10 @@ func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Messag
 }
 
 type work struct {
-	topics      []types.TopicType
-	cursor      []byte
-	storeCursor *types.StoreRequestCursor
+	pubsubTopic   string
+	contentTopics []types.TopicType
+	cursor        []byte
+	storeCursor   *types.StoreRequestCursor
 }
 
 type messageRequester interface {
@@ -598,7 +615,8 @@ type messageRequester interface {
 		from, to uint32,
 		previousCursor []byte,
 		previousStoreCursor *types.StoreRequestCursor,
-		topics []types.TopicType,
+		pubsubTopic string,
+		contentTopics []types.TopicType,
 		waitForResponse bool,
 	) (cursor []byte, storeCursor *types.StoreRequestCursor, err error)
 }
@@ -645,7 +663,8 @@ func processMailserverBatch(ctx context.Context, messageRequester messageRequest
 			default:
 				logger.Debug("processBatch producer - creating work")
 				workCh <- work{
-					topics: batch.Topics[i:j],
+					pubsubTopic:   batch.PubsubTopic,
+					contentTopics: batch.Topics[i:j],
 				}
 				time.Sleep(50 * time.Millisecond)
 			}
@@ -685,7 +704,7 @@ loop:
 				}()
 
 				queryCtx, queryCancel := context.WithTimeout(ctx, mailserverRequestTimeout)
-				cursor, storeCursor, err := messageRequester.SendMessagesRequestForTopics(queryCtx, mailserverID, batch.From, batch.To, w.cursor, w.storeCursor, w.topics, true)
+				cursor, storeCursor, err := messageRequester.SendMessagesRequestForTopics(queryCtx, mailserverID, batch.From, batch.To, w.cursor, w.storeCursor, w.pubsubTopic, w.contentTopics, true)
 
 				queryCancel()
 
@@ -700,9 +719,10 @@ loop:
 
 					workWg.Add(1)
 					workCh <- work{
-						topics:      w.topics,
-						cursor:      cursor,
-						storeCursor: storeCursor,
+						pubsubTopic:   w.pubsubTopic,
+						contentTopics: w.contentTopics,
+						cursor:        cursor,
+						storeCursor:   storeCursor,
 					}
 				}
 			}(w)
@@ -737,45 +757,18 @@ func (m *Messenger) processMailserverBatch(batch MailserverBatch) error {
 }
 
 type MailserverBatch struct {
-	From    uint32
-	To      uint32
-	Cursor  string
-	Topics  []types.TopicType
-	ChatIDs []string
-}
-
-func (m *Messenger) RequestHistoricMessagesForFilter(
-	ctx context.Context,
-	from, to uint32,
-	cursor []byte,
-	previousStoreCursor *types.StoreRequestCursor,
-	filter *transport.Filter,
-	waitForResponse bool,
-) ([]byte, *types.StoreRequestCursor, error) {
-
-	activeMailserverID, err := m.activeMailserverID()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if activeMailserverID == nil {
-		m.cycleMailservers()
-		activeMailserverID, err = m.activeMailserverID()
-		if err != nil {
-			return nil, nil, err
-		}
-		if activeMailserverID == nil {
-			return nil, nil, errors.New("no mailserver selected")
-		}
-	}
-
-	return m.transport.SendMessagesRequestForFilter(ctx, activeMailserverID, from, to, cursor, previousStoreCursor, filter, waitForResponse)
+	From        uint32
+	To          uint32
+	Cursor      string
+	PubsubTopic string
+	Topics      []types.TopicType
+	ChatIDs     []string
 }
 
 func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 	var from uint32
 	_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
-		topics, err := m.topicsForChat(chatID)
+		pubsubTopic, topics, err := m.topicsForChat(chatID)
 		if err != nil {
 			return nil, nil
 		}
@@ -789,11 +782,13 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		batch := MailserverBatch{
-			ChatIDs: []string{chatID},
-			To:      chat.SyncedFrom,
-			From:    chat.SyncedFrom - defaultSyncPeriod,
-			Topics:  topics,
+			ChatIDs:     []string{chatID},
+			To:          chat.SyncedFrom,
+			From:        chat.SyncedFrom - defaultSyncPeriod,
+			PubsubTopic: pubsubTopic,
+			Topics:      topics,
 		}
 		if m.config.messengerSignalsHandler != nil {
 			m.config.messengerSignalsHandler.HistoryRequestStarted(1)
@@ -835,7 +830,7 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 		return errors.New("chat not existing")
 	}
 
-	topics, err := m.topicsForChat(chatID)
+	pubsubTopic, topics, err := m.topicsForChat(chatID)
 	if err != nil {
 		return err
 	}
@@ -857,10 +852,11 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 	}
 
 	batch := MailserverBatch{
-		ChatIDs: []string{chatID},
-		To:      highestTo,
-		From:    lowestFrom,
-		Topics:  topics,
+		ChatIDs:     []string{chatID},
+		To:          highestTo,
+		From:        lowestFrom,
+		PubsubTopic: pubsubTopic,
+		Topics:      topics,
 	}
 
 	if m.config.messengerSignalsHandler != nil {

@@ -82,6 +82,7 @@ func (m *Messenger) sendUserStatus(ctx context.Context, status UserStatus) error
 	}
 	for _, community := range joinedCommunities {
 		rawMessage.LocalChatID = community.StatusUpdatesChannelID()
+		rawMessage.PubsubTopic = community.PubsubTopic()
 		_, err = m.sender.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)
 		if err != nil {
 			return err
@@ -170,6 +171,7 @@ func (m *Messenger) sendCurrentUserStatusToCommunity(ctx context.Context, commun
 		MessageType:         protobuf.ApplicationMetadataMessage_STATUS_UPDATE,
 		ResendAutomatically: true,
 		Ephemeral:           statusUpdate.StatusType == protobuf.StatusUpdate_AUTOMATIC,
+		PubsubTopic:         community.PubsubTopic(),
 	}
 
 	_, err = m.sender.SendPublic(ctx, rawMessage.LocalChatID, rawMessage)

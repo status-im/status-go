@@ -3273,7 +3273,7 @@ func (m *Manager) GetCommunityChatsTopics(communityID types.HexBytes) ([]types.T
 
 	topics := []types.TopicType{}
 	for _, filter := range filters {
-		topics = append(topics, filter.Topic)
+		topics = append(topics, filter.ContentTopic)
 	}
 
 	return topics, nil
@@ -3316,7 +3316,7 @@ func (m *Manager) GetHistoryArchivePartitionStartTimestamp(communityID types.Hex
 	topics := []types.TopicType{}
 
 	for _, filter := range filters {
-		topics = append(topics, filter.Topic)
+		topics = append(topics, filter.ContentTopic)
 	}
 
 	lastArchiveEndDateTimestamp, err := m.GetLastMessageArchiveEndDate(communityID)
