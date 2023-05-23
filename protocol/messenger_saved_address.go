@@ -7,6 +7,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet"
@@ -58,6 +59,7 @@ func (m *Messenger) dispatchSyncSavedAddress(ctx context.Context, syncMessage pr
 	}
 
 	chat.LastClockValue = clock
+	log.Info("dispatchSyncSavedAddress")
 	return m.saveChat(chat)
 }
 

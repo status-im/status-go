@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -2354,6 +2355,8 @@ func (db sqlitePersistence) DeactivateChat(chat *Chat, currentClockValue uint64,
 
 func (db sqlitePersistence) deactivateChat(chat *Chat, currentClockValue uint64, tx *sql.Tx, doClearHistory bool) error {
 	chat.Active = false
+	log.Info("deactivateChat")
+
 	err := db.saveChat(tx, *chat)
 	if err != nil {
 		return err
@@ -2464,6 +2467,7 @@ func (db sqlitePersistence) clearHistory(chat *Chat, currentClockValue uint64, t
 	if err != nil {
 		return err
 	}
+	log.Info("clearHistory")
 
 	err = db.saveChat(tx, *chat)
 	return err
@@ -2489,6 +2493,7 @@ func (db sqlitePersistence) clearHistoryFromSyncMessage(chat *Chat, clearedAt ui
 		chat.LastMessage = nil
 	}
 
+	log.Info("clearHistoryFromSyncMessage")
 	err = db.saveChat(tx, *chat)
 	return err
 }

@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -118,6 +119,7 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 
 	response.AddPinMessage(message)
 	response.AddChat(chat)
+	log.Info("sendPinMessage")
 	return &response, m.saveChat(chat)
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -25,6 +26,7 @@ func (m *Messenger) getOneToOneAndNextClock(contact *Contact) (*Chat, uint64, er
 		// We don't want to show the chat to the user by default
 		chat.Active = false
 
+		log.Info("getOneToOneAndNextClock")
 		if err := m.saveChat(chat); err != nil {
 			return nil, 0, err
 		}
@@ -469,6 +471,7 @@ func (m *Messenger) saveChat(chat *Chat) error {
 		}
 	}
 
+	log.Info("Messenger saveChat")
 	err := m.persistence.SaveChat(*chat)
 	if err != nil {
 		return err

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
@@ -42,6 +43,7 @@ func (m *Messenger) acceptContactRequest(ctx context.Context, requestID string, 
 	}
 
 	chat.Active = true
+	log.Info("acceptContactRequest")
 	if err := m.saveChat(chat); err != nil {
 		return nil, err
 	}
@@ -306,6 +308,7 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 		return nil, err
 	}
 
+	log.Info("addContact")
 	if err := m.saveChat(profileChat); err != nil {
 		return nil, err
 	}
@@ -358,6 +361,7 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 	if !ok {
 		chat = OneToOneFromPublicKey(publicKey, m.getTimesource())
 		chat.Active = false
+		log.Info("addContact loop")
 		if err := m.saveChat(chat); err != nil {
 			return nil, err
 		}
@@ -856,6 +860,7 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, displayName, 
 	response.AddChat(chat)
 
 	chat.LastClockValue = clock
+	log.Info("sendContactUpdate")
 	err = m.saveChat(chat)
 	if err != nil {
 		return nil, err

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/signal"
 
 	"github.com/pkg/errors"
@@ -1533,6 +1534,7 @@ func (m *Messenger) HandleEditMessage(state *ReceivedMessageState, editMessage E
 		needToSaveChat = true
 	}
 	if needToSaveChat {
+		log.Info("HandleEditMessage")
 		err := m.saveChat(chat)
 		if err != nil {
 			return err
@@ -1635,6 +1637,7 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 			if chat.UnviewedMentionsCount > 0 && (messageToDelete.Mentioned || messageToDelete.Replied) {
 				chat.UnviewedMentionsCount--
 			}
+			log.Info("HandleDeleteMessage")
 			err := m.saveChat(chat)
 			if err != nil {
 				return err
@@ -1748,6 +1751,7 @@ func (m *Messenger) updateLastMessage(chat *Chat) error {
 		chat.LastMessage = nil
 	}
 
+	log.Info("updateLastMessage")
 	return m.saveChat(chat)
 }
 

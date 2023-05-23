@@ -14,6 +14,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -2486,6 +2487,8 @@ func (m *Messenger) SyncCommunitySettings(ctx context.Context, settings *communi
 	}
 
 	chat.LastClockValue = clock
+
+	log.Info("GetCommunitiesSettings")
 	return m.saveChat(chat)
 }
 

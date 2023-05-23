@@ -25,6 +25,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appdatabase"
@@ -1803,6 +1804,7 @@ func (m *Messenger) addMessagesAndChat(chat *Chat, messages []*common.Message, r
 		return nil, err
 	}
 
+	log.Info("addMessagesAndChat")
 	return response, m.saveChat(chat)
 }
 
@@ -2181,6 +2183,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	m.logger.Debug("sent message", zap.String("id", message.ID))
 	m.prepareMessages(response.messages)
 
+	log.Info("sendChatMessage")
 	return &response, m.saveChat(chat)
 }
 
@@ -2308,6 +2311,7 @@ func (m *Messenger) syncProfilePictures(rawMessageHandler RawMessageHandler) err
 	}
 
 	chat.LastClockValue = clock
+	log.Info("syncProfilePictures")
 	return m.saveChat(chat)
 }
 
@@ -2518,6 +2522,7 @@ func (m *Messenger) DeleteAccount(address types.Address) error {
 	}
 
 	chat.LastClockValue = clock
+	log.Info("DeleteAccount")
 	return m.saveChat(chat)
 }
 
@@ -2685,6 +2690,7 @@ func (m *Messenger) SendPairInstallation(ctx context.Context, rawMessageHandler 
 	response.AddChat(chat)
 
 	chat.LastClockValue = clock
+	log.Info("SendPairInstallation")
 	err = m.saveChat(chat)
 	if err != nil {
 		return nil, err
@@ -2722,6 +2728,7 @@ func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat, rawMes
 	}
 
 	chat.LastClockValue = clock
+	log.Info("syncPublicChat")
 	return m.saveChat(chat)
 }
 
@@ -2755,6 +2762,7 @@ func (m *Messenger) syncClearHistory(ctx context.Context, publicChat *Chat, rawM
 	}
 
 	chat.LastClockValue = clock
+	log.Info("syncClearHistory")
 	return m.saveChat(chat)
 }
 
@@ -2787,6 +2795,7 @@ func (m *Messenger) syncChatRemoving(ctx context.Context, id string, rawMessageH
 	}
 
 	chat.LastClockValue = clock
+	log.Info("syncChatRemoving")
 	return m.saveChat(chat)
 }
 
@@ -2821,6 +2830,7 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact, rawMessag
 	}
 
 	chat.LastClockValue = clock
+	log.Info("syncContact")
 	return m.saveChat(chat)
 }
 
@@ -2869,6 +2879,7 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 	logger.Debug("message dispatched")
 
 	chat.LastClockValue = clock
+	log.Info("syncCommunity")
 	return m.saveChat(chat)
 }
 
@@ -2904,6 +2915,7 @@ func (m *Messenger) SyncBookmark(ctx context.Context, bookmark *browsers.Bookmar
 	}
 
 	chat.LastClockValue = clock
+	log.Info("SyncBookmark")
 	return m.saveChat(chat)
 }
 
@@ -3005,6 +3017,7 @@ func (m *Messenger) SyncTrustedUser(ctx context.Context, publicKey string, ts ve
 	}
 
 	chat.LastClockValue = clock
+	log.Info("SyncTrustedUser")
 	return m.saveChat(chat)
 }
 
@@ -3044,6 +3057,7 @@ func (m *Messenger) SyncVerificationRequest(ctx context.Context, vr *verificatio
 	}
 
 	chat.LastClockValue = clock
+	log.Info("SyncVerificationRequest")
 	return m.saveChat(chat)
 }
 
@@ -4957,6 +4971,7 @@ func (m *Messenger) MuteChat(request *requests.MuteChat) (time.Time, error) {
 		if err != nil {
 			return time.Time{}, err
 		}
+		log.Info("allChats")
 		err = m.saveChat(chat)
 		if err != nil {
 			return time.Time{}, err
@@ -4984,6 +4999,7 @@ func (m *Messenger) MuteChat(request *requests.MuteChat) (time.Time, error) {
 	default:
 		MuteTill = time.Time{}
 	}
+	log.Info("MuteChat 2")
 	err := m.saveChat(chat)
 	if err != nil {
 		return time.Time{}, err
@@ -6410,6 +6426,7 @@ func (m *Messenger) withChatClock(callback func(string, uint64) error) error {
 		return err
 	}
 	chat.LastClockValue = clock
+	log.Info("withChatClock")
 	return m.saveChat(chat)
 }
 

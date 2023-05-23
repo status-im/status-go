@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -66,6 +67,7 @@ func (m *Messenger) syncAllKeycards(ctx context.Context, rawMessageHandler RawMe
 	}
 
 	chat.LastClockValue = clock
+	log.Info("syncAllKeycards")
 	return m.saveChat(chat)
 }
 
@@ -126,6 +128,7 @@ func (m *Messenger) dispatchKeycardActivity(ctx context.Context, syncMessage pro
 	}
 
 	chat.LastClockValue = clock
+	log.Info("dispatchKeycardActivity")
 	return m.saveChat(chat)
 }
 

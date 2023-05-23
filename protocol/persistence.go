@@ -153,6 +153,8 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 		}
 	}
 
+	log.Info("Save this chat", "chat name", chat.Name, "unreadCount", chat.UnviewedMessagesCount, "unreadMentiosn", chat.UnviewedMentionsCount)
+
 	_, err = stmt.Exec(
 		chat.ID,
 		chat.Name,

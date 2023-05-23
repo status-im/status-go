@@ -7,6 +7,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/protocol/common"
@@ -86,6 +87,7 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 
 		if chat.LastMessage != nil && chat.LastMessage.ID == message.ID {
 			chat.LastMessage = message
+			log.Info("EditMessage")
 			err := m.saveChat(chat)
 			if err != nil {
 				return nil, err
@@ -428,6 +430,7 @@ func (m *Messenger) SendOneToOneMessage(request *requests.SendOneToOneMessage) (
 		if err != nil {
 			return nil, err
 		}
+		log.Info("SendOneToOneMessage")
 		err = m.saveChat(chat)
 		if err != nil {
 			return nil, err

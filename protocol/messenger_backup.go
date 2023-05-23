@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
@@ -200,6 +201,7 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 	}
 
 	chat.LastClockValue = clock
+	log.Info("BackupData")
 	err = m.saveChat(chat)
 	if err != nil {
 		return 0, err
