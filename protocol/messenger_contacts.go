@@ -16,6 +16,44 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 )
 
+type MutualStateUpdateType int
+
+const (
+	MutualStateUpdateTypeSent MutualStateUpdateType = iota + 1
+	MutualStateUpdateTypeAdded
+	MutualStateUpdateTypeRemoved
+)
+
+func (m *Messenger) prepareMutualStateUpdateMessage(chatID string, updateType MutualStateUpdateType, clock uint64, timestamp uint64) *common.Message {
+	var text string
+	// TODO: provide translations & solve naming
+	switch updateType {
+	case MutualStateUpdateTypeSent:
+		text = "%1 sent %2 a Contact Request"
+	case MutualStateUpdateTypeAdded:
+		text = "%1 added %2 as a contact"
+	case MutualStateUpdateTypeRemoved:
+		text = "%1 removed %2 as a contact"
+	}
+
+	message := &common.Message{
+		ChatMessage: protobuf.ChatMessage{
+			ChatId:      chatID,
+			Text:        text,
+			MessageType: protobuf.MessageType_ONE_TO_ONE,
+			ContentType: protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_STATE_UPDATE,
+			Clock:       clock,
+			Timestamp:   timestamp,
+		},
+		From:             m.myHexIdentity(),
+		WhisperTimestamp: timestamp,
+		LocalChatID:      chatID,
+		Seen:             true,
+	}
+
+	return message
+}
+
 func (m *Messenger) acceptContactRequest(ctx context.Context, requestID string, syncing bool) (*MessengerResponse, error) {
 	contactRequest, err := m.persistence.MessageByID(requestID)
 	if err != nil {
@@ -391,7 +429,21 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 			return nil, err
 		}
 
+		// Send contact request as a plain chat message
 		messageResponse, err := m.sendChatMessage(ctx, contactRequest)
+		if err != nil {
+			return nil, err
+		}
+
+		err = response.Merge(messageResponse)
+		if err != nil {
+			return nil, err
+		}
+
+		// Send mutual state update message
+		updateMessage := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, timestamp)
+
+		messageResponse, err = m.sendChatMessage(ctx, updateMessage)
 		if err != nil {
 			return nil, err
 		}

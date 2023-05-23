@@ -180,5 +180,6 @@ message ChatMessage {
     IDENTITY_VERIFICATION = 13;
     // Only local
     SYSTEM_MESSAGE_PINNED_MESSAGE = 14;
+    SYSTEM_MESSAGE_MUTUAL_STATE_UPDATE = 15;
   }
 }

@@ -67,11 +67,16 @@ func (s *MessengerContactRequestSuite) sendContactRequest(request *requests.Send
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
-	// Check CR message
-	s.Require().Len(resp.Messages(), 1)
+	// Check CR and mutual state update messages
+	s.Require().Len(resp.Messages(), 2)
+
 	contactRequest := resp.Messages()[0]
 	s.Require().Equal(common.ContactRequestStatePending, contactRequest.ContactRequestState)
 	s.Require().Equal(request.Message, contactRequest.Text)
+
+	mutualStateUpdate := resp.Messages()[1]
+	s.Require().Equal(mutualStateUpdate.From, messenger.myHexIdentity())
+	s.Require().Equal(mutualStateUpdate.ChatId, request.ID)
 
 	// Check pending notification
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
@@ -105,7 +110,7 @@ func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string,
 	resp, err := WaitOnMessengerResponse(
 		theirMessenger,
 		func(r *MessengerResponse) bool {
-			return len(r.Contacts) == 1 && len(r.Messages()) == 1 && len(r.ActivityCenterNotifications()) == 1
+			return len(r.Contacts) == 1 && len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1
 		},
 		"no messages",
 	)
@@ -114,9 +119,14 @@ func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string,
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
-	// Check CR message
-	s.Require().Len(resp.Messages(), 1)
-	contactRequest := resp.Messages()[0]
+	// Check CR and mutual state update messages
+	s.Require().Len(resp.Messages(), 2)
+
+	mutualStateUpdate := resp.Messages()[0]
+	contactRequest := resp.Messages()[1]
+
+	s.Require().Equal(mutualStateUpdate.From, contactRequest.From)
+	s.Require().Equal(mutualStateUpdate.ChatId, contactRequest.ChatId)
 	s.Require().Equal(common.ContactRequestStatePending, contactRequest.ContactRequestState)
 	s.Require().Equal(messageText, contactRequest.Text)
 
@@ -414,7 +424,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequestTwice()
 	resp, err = WaitOnMessengerResponse(
 		theirMessenger,
 		func(r *MessengerResponse) bool {
-			return len(r.Messages()) == 1 && r.Messages()[0].ID == resp.Messages()[0].ID
+			return len(r.Messages()) == 2 && r.Messages()[0].ID == resp.Messages()[0].ID
 		},
 		"no messages",
 	)
