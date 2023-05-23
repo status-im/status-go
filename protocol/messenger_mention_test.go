@@ -84,23 +84,34 @@ func TestRePos(t *testing.T) {
 func TestReplaceMentions(t *testing.T) {
 	users := map[string]*MentionableUser{
 		"0xpk1": {
-			primaryName: "User Number One",
 			Contact: &Contact{
-				ID: "0xpk1",
+				ID:            "0xpk1",
+				LocalNickname: "User Number One",
 			},
 		},
 		"0xpk2": {
-			primaryName:   "user2",
-			secondaryName: "User Number Two",
 			Contact: &Contact{
-				ID: "0xpk2",
+				ID:            "0xpk2",
+				LocalNickname: "user2",
+				ENSVerified:   true,
+				EnsName:       "User Number Two",
 			},
 		},
 		"0xpk3": {
-			primaryName:   "user3",
-			secondaryName: "User Number Three",
 			Contact: &Contact{
-				ID: "0xpk3",
+				ID:            "0xpk3",
+				LocalNickname: "user3",
+				ENSVerified:   true,
+				EnsName:       "User Number Three",
+			},
+		},
+		"0xpk4": {
+			Contact: &Contact{
+				ID:            "0xpk4",
+				EnsName:       "ens-user-4.eth",
+				ENSVerified:   true,
+				DisplayName:   "display-name-user-4",
+				LocalNickname: "primary-name-user-4",
 			},
 		},
 	}
@@ -163,6 +174,8 @@ func TestReplaceMentions(t *testing.T) {
 		{"code case 4", "` ` @user2 ``", "` ` @0xpk2 ``"},
 
 		{"double @", "@ @user2", "@ @0xpk2"},
+
+		{"user name contains dash", "@display-name-user-4 ", "@0xpk4 "},
 	}
 
 	for _, tt := range tests {
@@ -693,9 +706,9 @@ func TestMentionSuggestionSpecialChars(t *testing.T) {
 func TestMentionSuggestionAtSignSpaceCases(t *testing.T) {
 	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest(t, map[string]*MentionableUser{
 		"0xpk1": {
-			primaryName: "User Number One",
 			Contact: &Contact{
-				ID: "0xpk1",
+				ID:            "0xpk1",
+				LocalNickname: "User Number One",
 			},
 		},
 	})
@@ -768,23 +781,25 @@ func setupMentionSuggestionTest(t *testing.T, mentionableUserMapInput map[string
 func getDefaultMentionableUserMap() map[string]*MentionableUser {
 	return map[string]*MentionableUser{
 		"0xpk1": {
-			primaryName: "User Number One",
 			Contact: &Contact{
-				ID: "0xpk1",
+				ID:            "0xpk1",
+				LocalNickname: "User Number One",
 			},
 		},
 		"0xpk2": {
-			primaryName:   "u2",
-			secondaryName: "User Number Two",
 			Contact: &Contact{
-				ID: "0xpk2",
+				ID:            "0xpk2",
+				LocalNickname: "u2",
+				ENSVerified:   true,
+				EnsName:       "User Number Two",
 			},
 		},
 		"0xpk3": {
-			primaryName:   "u3",
-			secondaryName: "User Number Three",
 			Contact: &Contact{
-				ID: "0xpk3",
+				ID:            "0xpk3",
+				LocalNickname: "u3",
+				ENSVerified:   true,
+				EnsName:       "User Number Three",
 			},
 		},
 	}
