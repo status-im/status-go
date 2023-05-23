@@ -26,7 +26,7 @@ func (o *Community) CreateCategory(categoryID string, categoryName string, chatI
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
+	if !o.IsAdmin() {
 		return nil, ErrNotAdmin
 	}
 
@@ -82,7 +82,7 @@ func (o *Community) EditCategory(categoryID string, categoryName string, chatIDs
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
+	if !o.IsAdmin() {
 		return nil, ErrNotAdmin
 	}
 
@@ -163,7 +163,7 @@ func (o *Community) ReorderCategories(categoryID string, newPosition int) (*Comm
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
+	if !o.IsAdmin() {
 		return nil, ErrNotAdmin
 	}
 
@@ -248,7 +248,7 @@ func (o *Community) ReorderChat(categoryID string, chatID string, newPosition in
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
+	if !o.IsAdmin() {
 		return nil, ErrNotAdmin
 	}
 
@@ -406,7 +406,7 @@ func (o *Community) DeleteCategory(categoryID string) (*CommunityChanges, error)
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
+	if !o.IsAdmin() {
 		return nil, ErrNotAdmin
 	}
 

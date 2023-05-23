@@ -860,12 +860,16 @@ func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *prot
 	}
 
 	// Advertise changes
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else {
+		m.publish(&Subscription{CommunityAdminEvent: community.ChangesToCommunityAdminEvent(protobuf.CommunityAdminEvent_COMMUNITY_CHANNEL_CHANGED, changes)})
+	}
 
 	return community, changes, nil
 }
 
-func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Community, *protobuf.CommunityDescription, error) {
+func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Community, *CommunityChanges, error) {
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, nil, err
@@ -878,7 +882,7 @@ func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Commun
 	if strings.HasPrefix(chatID, communityID.String()) {
 		chatID = strings.TrimPrefix(chatID, communityID.String())
 	}
-	description, err := community.DeleteChat(chatID)
+	changes, err := community.DeleteChat(chatID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -889,9 +893,13 @@ func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Commun
 	}
 
 	// Advertise changes
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else {
+		m.publish(&Subscription{CommunityAdminEvent: community.ChangesToCommunityAdminEvent(protobuf.CommunityAdminEvent_COMMUNITY_CHANNEL_DELETED, changes)})
+	}
 
-	return community, description, nil
+	return community, changes, nil
 }
 
 func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory, publish bool) (*Community, *CommunityChanges, error) {
@@ -926,8 +934,10 @@ func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory, publ
 	}
 
 	// Advertise changes
-	if publish {
+	if community.IsOwner() {
 		m.publish(&Subscription{Community: community})
+	} else {
+		m.publish(&Subscription{CommunityAdminEvent: community.ChangesToCommunityAdminEvent(protobuf.CommunityAdminEvent_COMMUNITY_CATEGORY_CREATED, changes)})
 	}
 
 	return community, changes, nil
@@ -960,7 +970,11 @@ func (m *Manager) EditCategory(request *requests.EditCommunityCategory) (*Commun
 	}
 
 	// Advertise changes
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else {
+		m.publish(&Subscription{CommunityAdminEvent: community.ChangesToCommunityAdminEvent(protobuf.CommunityAdminEvent_COMMUNITY_CATEGORY_CHANGED, changes)})
+	}
 
 	return community, changes, nil
 }
@@ -1015,7 +1029,11 @@ func (m *Manager) ReorderCategories(request *requests.ReorderCommunityCategories
 	}
 
 	// Advertise changes
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else {
+		m.publish(&Subscription{CommunityAdminEvent: community.ChangesToCommunityAdminEvent(protobuf.CommunityAdminEvent_COMMUNITY_CHANNEL_CATEGORY_REORDERED, changes)})
+	}
 
 	return community, changes, nil
 }
@@ -1045,7 +1063,11 @@ func (m *Manager) ReorderChat(request *requests.ReorderCommunityChat) (*Communit
 	}
 
 	// Advertise changes
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else {
+		m.publish(&Subscription{CommunityAdminEvent: community.ChangesToCommunityAdminEvent(protobuf.CommunityAdminEvent_COMMUNITY_CHANNEL_CATEGORY_REORDERED, changes)})
+	}
 
 	return community, changes, nil
 }
@@ -1070,7 +1092,11 @@ func (m *Manager) DeleteCategory(request *requests.DeleteCommunityCategory) (*Co
 	}
 
 	// Advertise changes
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else {
+		m.publish(&Subscription{CommunityAdminEvent: community.ChangesToCommunityAdminEvent(protobuf.CommunityAdminEvent_COMMUNITY_CATEGORY_DELETED, changes)})
+	}
 
 	return community, changes, nil
 }

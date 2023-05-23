@@ -595,7 +595,7 @@ func (o *Community) EditChat(chatID string, chat *protobuf.CommunityChat) (*Comm
 	return changes, nil
 }
 
-func (o *Community) DeleteChat(chatID string) (*protobuf.CommunityDescription, error) {
+func (o *Community) DeleteChat(chatID string) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -613,13 +613,14 @@ func (o *Community) DeleteChat(chatID string) (*protobuf.CommunityDescription, e
 		tmpCatID := chat.CategoryId
 		chat.CategoryId = ""
 		o.SortCategoryChats(changes, tmpCatID)
+		changes.ChatsRemoved[chatID] = chat
 	}
 
 	delete(o.config.CommunityDescription.Chats, chatID)
 
 	o.increaseClock()
 
-	return o.config.CommunityDescription, nil
+	return changes, nil
 }
 
 func (o *Community) InviteUserToOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityInvitation, error) {

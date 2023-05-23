@@ -411,8 +411,6 @@ func (s *AdminMessengerCommunitiesSuite) adminCreateCommunityChannel(community *
 		},
 	}
 
-	s.refreshMessengerResponses()
-
 	checkChannelCreated := func(response *MessengerResponse) error {
 		if len(response.Communities()) == 0 {
 			return errors.New("community not received")
@@ -453,4 +451,6 @@ func (s *AdminMessengerCommunitiesSuite) adminCreateCommunityChannel(community *
 	)
 	s.Require().NoError(err)
 	s.Require().NoError(checkChannelCreated(response))
+
+	s.refreshMessengerResponses()
 }

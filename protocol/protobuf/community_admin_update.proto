@@ -21,8 +21,12 @@ message CommunityAdminEvent {
   EventType type = 3;
   CommunityConfig community_config = 4;
   map<string, CommunityTokenPermission> token_permissions = 5;
-  map<string,CommunityCategory> categories = 6;
-  map<string,CommunityChat> chats = 7;
+  map<string,CommunityCategory> categoriesAdded = 6;
+  map<string,CommunityCategory> categoriesModified = 7;
+  repeated string categoriesRemoved = 8;
+  map<string,CommunityChat> chatsAdded = 9;
+  map<string,CommunityChat> chatsRemoved = 10;
+  map<string,CommunityChat> chatsModified = 11;
   
   enum EventType {
     UNKNOWN = 0;
