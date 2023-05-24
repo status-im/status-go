@@ -413,6 +413,97 @@ func (b *GethStatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n
 	return conf, nil
 }
 
+func (b *GethStatusBackend) overrideNetworks(conf *params.NodeConfig, request *requests.Login) {
+	conf.Networks = setRPCs(defaultNetworks, &request.WalletSecretsConfig)
+}
+
+func (b *GethStatusBackend) LoginAccount(request *requests.Login) error {
+	err := b.loginAccount(request)
+	if err != nil {
+		// Stop node for clean up
+		_ = b.StopNode()
+	}
+	signal.SendLoggedIn(err)
+	return err
+}
+
+func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
+	if err := request.Validate(); err != nil {
+		return err
+	}
+
+	password := request.Password
+
+	acc := multiaccounts.Account{
+		KeyUID:        request.KeyUID,
+		KDFIterations: request.KdfIterations,
+	}
+
+	if acc.KDFIterations == 0 {
+		acc.KDFIterations = sqlite.ReducedKDFIterationsNumber
+	}
+
+	err := b.ensureAppDBOpened(acc, password)
+	if err != nil {
+		return err
+	}
+
+	err = b.loadNodeConfig(nil)
+	if err != nil {
+		return err
+	}
+
+	b.overrideNetworks(b.config, request)
+
+	err = b.setupLogSettings()
+	if err != nil {
+		return err
+	}
+
+	b.account = &acc
+	accountsDB, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		return err
+	}
+	chatAddr, err := accountsDB.GetChatAddress()
+	if err != nil {
+		return err
+	}
+	walletAddr, err := accountsDB.GetWalletAddress()
+	if err != nil {
+		return err
+	}
+	watchAddrs, err := accountsDB.GetWalletAddresses()
+	if err != nil {
+		return err
+	}
+	login := account.LoginParams{
+		Password:       password,
+		ChatAddress:    chatAddr,
+		WatchAddresses: watchAddrs,
+		MainAccount:    walletAddr,
+	}
+
+	err = b.StartNode(b.config)
+	if err != nil {
+		b.log.Info("failed to start node")
+		return err
+	}
+
+	err = b.SelectAccount(login)
+	if err != nil {
+		return err
+	}
+	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
+	if err != nil {
+		b.log.Info("failed to update account")
+		return err
+	}
+
+	return nil
+
+}
+
 func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string, inputNodeCfg *params.NodeConfig) error {
 	err := b.ensureAppDBOpened(acc, password)
 	if err != nil {

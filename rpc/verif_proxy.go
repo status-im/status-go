@@ -6,14 +6,15 @@ package rpc
 import (
 	"context"
 	"fmt"
-)
 
-import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
+
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
+
 	proxy "github.com/siphiuel/lc-proxy-wrapper"
+
 	"github.com/status-im/status-go/params"
 )
 

@@ -13,8 +13,10 @@ func TestBuildDefaultNetworks(t *testing.T) {
 	poktToken := "poket-token"
 	infuraToken := "infura-token"
 	request := &requests.CreateAccount{
-		PoktToken:   poktToken,
-		InfuraToken: infuraToken,
+		WalletSecretsConfig: requests.WalletSecretsConfig{
+			PoktToken:   poktToken,
+			InfuraToken: infuraToken,
+		},
 	}
 
 	actualNetworks := buildDefaultNetworks(request)
@@ -55,7 +57,9 @@ func TestBuildDefaultNetworks(t *testing.T) {
 func TestBuildDefaultNetworksGanache(t *testing.T) {
 	ganacheURL := "ganacheurl"
 	request := &requests.CreateAccount{
-		GanacheURL: ganacheURL,
+		WalletSecretsConfig: requests.WalletSecretsConfig{
+			GanacheURL: ganacheURL,
+		},
 	}
 
 	actualNetworks := buildDefaultNetworks(request)

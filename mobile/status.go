@@ -287,6 +287,30 @@ func CreateAccountAndLogin(requestJSON string) string {
 	return makeJSONResponse(nil)
 }
 
+func LoginAccount(requestJSON string) string {
+	var request requests.Login
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	api.RunAsync(func() error {
+		err := statusBackend.LoginAccount(&request)
+		if err != nil {
+			log.Error("loginAccount error", err)
+			return err
+		}
+		log.Debug("loginAccount started node")
+		return nil
+	})
+	return makeJSONResponse(nil)
+}
+
 func RestoreAccountAndLogin(requestJSON string) string {
 	var request requests.RestoreAccount
 	err := json.Unmarshal([]byte(requestJSON), &request)
