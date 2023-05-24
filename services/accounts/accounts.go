@@ -60,6 +60,11 @@ func (api *API) SaveKeypair(ctx context.Context, keypair *accounts.Keypair) erro
 	return nil
 }
 
+// Setting `Keypair` without `Accounts` will update keypair only.
+func (api *API) UpdateKeypairName(ctx context.Context, keyUID string, name string) error {
+	return (*api.messenger).UpdateKeypairName(keyUID, name)
+}
+
 func (api *API) GetAccounts(ctx context.Context) ([]*accounts.Account, error) {
 	return api.db.GetAccounts()
 }

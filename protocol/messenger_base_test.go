@@ -22,6 +22,8 @@ import (
 	"github.com/status-im/status-go/waku"
 )
 
+const DefaultProfileDisplayName = ""
+
 func TestMessengerCollapsedComunityCategoriesSuite(t *testing.T) {
 	suite.Run(t, new(MessengerCollapsedCommunityCategoriesSuite))
 }
@@ -86,6 +88,7 @@ func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *z
 		WithDatasync(),
 		WithToplevelDatabaseMigrations(),
 		WithAppSettings(settings.Settings{
+			DisplayName:               DefaultProfileDisplayName,
 			ProfilePicturesShowTo:     1,
 			ProfilePicturesVisibility: 1,
 		}, params.NodeConfig{}),
