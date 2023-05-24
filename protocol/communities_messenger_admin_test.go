@@ -151,14 +151,48 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminEditCommunityDescription() {
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminCreateEditDeleteChannels() {
 	community := s.setUpCommunityAndRoles()
-	s.adminCreateCommunityChannel(community)
 
-	// TODO admin test: Create, edit and delete channels (allowed)
+	newAdminChat := &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "chat from admin",
+			Emoji:       "",
+			Description: "chat created by an admin",
+		},
+	}
+
+	newChatID := s.adminCreateCommunityChannel(community, newAdminChat)
+
+	newAdminChat.Identity.DisplayName = "modified chat from admin"
+	s.adminEditCommunityChannel(community, newAdminChat, newChatID)
+
+	s.adminDeleteCommunityChannel(community, newChatID)
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminCreateEditDeleteCategories() {
-	s.setUpCommunityAndRoles()
-	// TODO admin test: Create, edit and delete categories (allowed)
+	community := s.setUpCommunityAndRoles()
+	newCategory := &requests.CreateCommunityCategory{
+		CommunityID:  community.ID(),
+		CategoryName: "admin-category-name",
+	}
+	categoryID := s.adminCreateCommunityCategory(community, newCategory)
+
+	editCategory := &requests.EditCommunityCategory{
+		CommunityID:  community.ID(),
+		CategoryID:   categoryID,
+		CategoryName: "edited-admin-category-name",
+	}
+
+	s.adminEditCommunityCategory(community.IDString(), editCategory)
+
+	deleteCategory := &requests.DeleteCommunityCategory{
+		CommunityID: community.ID(),
+		CategoryID:  categoryID,
+	}
+
+	s.adminDeleteCommunityCategory(community.IDString(), deleteCategory)
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminReorderChannelsAndCategories() {
@@ -223,7 +257,8 @@ func (s *AdminMessengerCommunitiesSuite) setUpCommunityAndRoles() *communities.C
 
 	// owner creates a community and chat
 	community := s.createCommunity()
-	_ = s.createCommunityChat(community)
+	//_ = s.createCommunityChat(community)
+	s.refreshMessengerResponses()
 
 	// add admin and alice to the community
 	s.advertiseCommunityTo(community, s.admin)
@@ -321,34 +356,14 @@ func (s *AdminMessengerCommunitiesSuite) createCommunity() *communities.Communit
 		Color:       "#ffffff",
 		Description: "status community description",
 	}
-	response, err := s.owner.CreateCommunity(description, false)
+	response, err := s.owner.CreateCommunity(description, true)
 
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Chats(), 0)
-
-	return response.Communities()[0]
-}
-
-func (s *AdminMessengerCommunitiesSuite) createCommunityChat(community *communities.Community) *Chat {
-	orgChat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		},
-		Identity: &protobuf.ChatIdentity{
-			DisplayName: "status-core",
-			Emoji:       "",
-			Description: "status-core community chatToModerator",
-		},
-	}
-
-	response, err := s.owner.CreateCommunityChat(community.ID(), orgChat)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.Chats(), 1)
-	return response.Chats()[0]
+
+	return response.Communities()[0]
 }
 
 func (s *AdminMessengerCommunitiesSuite) grantAdminPermissions(community *communities.Community, target *Messenger) {
@@ -444,50 +459,16 @@ func (s *AdminMessengerCommunitiesSuite) refreshMessengerResponses() {
 	s.Require().NoError(err)
 }
 
-func (s *AdminMessengerCommunitiesSuite) adminCreateCommunityChannel(community *communities.Community) {
-	orgChat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		},
-		Identity: &protobuf.ChatIdentity{
-			DisplayName: "chat from admin",
-			Emoji:       "",
-			Description: "chat created by an admin",
-		},
-	}
+type MessageResponseValidator func(*MessengerResponse) error
 
-	checkChannelCreated := func(response *MessengerResponse) error {
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-
-		madeAssertions := false
-		for _, c := range response.Communities() {
-			if c.IDString() == community.IDString() {
-				madeAssertions = true
-				if len(c.Chats()) < 2 {
-					return errors.New("created chat does not exist on community")
-				}
-			}
-		}
-
-		if !madeAssertions {
-			return errors.New("couldn't find community in response")
-		}
-		return nil
-	}
-
-	response, err := s.admin.CreateCommunityChat(community.ID(), orgChat)
-	s.Require().NoError(err)
-	s.Require().NoError(checkChannelCreated(response))
-
-	response, err = WaitOnMessengerResponse(
+func (s *AdminMessengerCommunitiesSuite) checkClientsReceivedAdminEvent(fn MessageResponseValidator) {
+	response, err := WaitOnMessengerResponse(
 		s.alice,
 		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
 		"community not received",
 	)
 	s.Require().NoError(err)
-	s.Require().NoError(checkChannelCreated(response))
+	s.Require().NoError(fn(response))
 
 	response, err = WaitOnMessengerResponse(
 		s.owner,
@@ -495,7 +476,223 @@ func (s *AdminMessengerCommunitiesSuite) adminCreateCommunityChannel(community *
 		"community not received",
 	)
 	s.Require().NoError(err)
-	s.Require().NoError(checkChannelCreated(response))
+	s.Require().NoError(fn(response))
 
 	s.refreshMessengerResponses()
+}
+
+func (s *AdminMessengerCommunitiesSuite) adminCreateCommunityChannel(community *communities.Community, newChannel *protobuf.CommunityChat) string {
+	checkChannelCreated := func(response *MessengerResponse) error {
+		if len(response.Communities()) == 0 {
+			return errors.New("community not received")
+		}
+
+		var modifiedCommmunity *communities.Community = nil
+		for _, c := range response.Communities() {
+			if c.IDString() == community.IDString() {
+				modifiedCommmunity = c
+			}
+		}
+
+		if modifiedCommmunity == nil {
+			return errors.New("couldn't find community in response")
+		}
+
+		for _, chat := range modifiedCommmunity.Chats() {
+			if chat.GetIdentity().GetDisplayName() == newChannel.GetIdentity().GetDisplayName() {
+				return nil
+			}
+		}
+
+		return errors.New("couldn't find created chat in response")
+	}
+
+	response, err := s.admin.CreateCommunityChat(community.ID(), newChannel)
+	s.Require().NoError(err)
+	s.Require().NoError(checkChannelCreated(response))
+	s.Require().Len(response.CommunityChanges, 1)
+	s.Require().Len(response.CommunityChanges[0].ChatsAdded, 1)
+	var addedChatID string
+	for addedChatID = range response.CommunityChanges[0].ChatsAdded {
+		break
+	}
+
+	s.checkClientsReceivedAdminEvent(checkChannelCreated)
+
+	return addedChatID
+}
+
+func (s *AdminMessengerCommunitiesSuite) adminEditCommunityChannel(community *communities.Community, editChannel *protobuf.CommunityChat, channelID string) {
+	checkChannelEdited := func(response *MessengerResponse) error {
+		if len(response.Communities()) == 0 {
+			return errors.New("community not received")
+		}
+
+		var modifiedCommmunity *communities.Community = nil
+		for _, c := range response.Communities() {
+			if c.IDString() == community.IDString() {
+				modifiedCommmunity = c
+			}
+		}
+
+		if modifiedCommmunity == nil {
+			return errors.New("couldn't find community in response")
+		}
+
+		for _, chat := range modifiedCommmunity.Chats() {
+			if chat.GetIdentity().GetDisplayName() == editChannel.GetIdentity().GetDisplayName() {
+				return nil
+			}
+		}
+
+		return errors.New("couldn't find modified chat in response")
+	}
+
+	_, err := WaitOnMessengerResponse(s.admin, func(response *MessengerResponse) bool {
+		return true
+	}, "community description changed message not received")
+	s.Require().NoError(err)
+
+	response, err := s.admin.EditCommunityChat(community.ID(), channelID, editChannel)
+	s.Require().NoError(err)
+	s.Require().NoError(checkChannelEdited(response))
+
+	s.checkClientsReceivedAdminEvent(checkChannelEdited)
+}
+
+func (s *AdminMessengerCommunitiesSuite) adminDeleteCommunityChannel(community *communities.Community, channelID string) {
+	checkChannelDeleted := func(response *MessengerResponse) error {
+		if len(response.Communities()) == 0 {
+			return errors.New("community not received")
+		}
+
+		var modifiedCommmunity *communities.Community = nil
+		for _, c := range response.Communities() {
+			if c.IDString() == community.IDString() {
+				modifiedCommmunity = c
+			}
+		}
+
+		if modifiedCommmunity == nil {
+			return errors.New("couldn't find community in response")
+		}
+
+		if _, exists := modifiedCommmunity.Chats()[channelID]; exists {
+			return errors.New("channel was not deleted")
+		}
+
+		return nil
+	}
+
+	response, err := s.admin.DeleteCommunityChat(community.ID(), channelID)
+	s.Require().NoError(err)
+	s.Require().NoError(checkChannelDeleted(response))
+
+	s.checkClientsReceivedAdminEvent(checkChannelDeleted)
+}
+
+func (s *AdminMessengerCommunitiesSuite) adminCreateCommunityCategory(community *communities.Community, newCategory *requests.CreateCommunityCategory) string {
+	checkCategoryCreated := func(response *MessengerResponse) error {
+		if len(response.Communities()) == 0 {
+			return errors.New("community not received")
+		}
+
+		var modifiedCommmunity *communities.Community = nil
+		for _, c := range response.Communities() {
+			if c.IDString() == community.IDString() {
+				modifiedCommmunity = c
+			}
+		}
+
+		if modifiedCommmunity == nil {
+			return errors.New("couldn't find community in response")
+		}
+
+		for _, category := range modifiedCommmunity.Categories() {
+			if category.GetName() == newCategory.CategoryName {
+				return nil
+			}
+		}
+
+		return errors.New("couldn't find created Category in the response")
+	}
+
+	response, err := s.admin.CreateCommunityCategory(newCategory)
+	s.Require().NoError(err)
+	s.Require().NoError(checkCategoryCreated(response))
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.CommunityChanges[0].CategoriesAdded, 1)
+
+	var categoryId string
+	for categoryId = range response.CommunityChanges[0].CategoriesAdded {
+		break
+	}
+
+	s.checkClientsReceivedAdminEvent(checkCategoryCreated)
+
+	return categoryId
+}
+
+func (s *AdminMessengerCommunitiesSuite) adminEditCommunityCategory(communityID string, editCategory *requests.EditCommunityCategory) {
+	checkCategoryEdited := func(response *MessengerResponse) error {
+		if len(response.Communities()) == 0 {
+			return errors.New("community not received")
+		}
+
+		var modifiedCommmunity *communities.Community = nil
+		for _, c := range response.Communities() {
+			if c.IDString() == communityID {
+				modifiedCommmunity = c
+			}
+		}
+
+		if modifiedCommmunity == nil {
+			return errors.New("couldn't find community in response")
+		}
+
+		for _, category := range modifiedCommmunity.Categories() {
+			if category.GetName() == editCategory.CategoryName {
+				return nil
+			}
+		}
+
+		return errors.New("couldn't find created Category in the response")
+	}
+
+	response, err := s.admin.EditCommunityCategory(editCategory)
+	s.Require().NoError(err)
+	s.Require().NoError(checkCategoryEdited(response))
+
+	s.checkClientsReceivedAdminEvent(checkCategoryEdited)
+}
+
+func (s *AdminMessengerCommunitiesSuite) adminDeleteCommunityCategory(communityID string, deleteCategory *requests.DeleteCommunityCategory) {
+	checkCategoryDeleted := func(response *MessengerResponse) error {
+		if len(response.Communities()) == 0 {
+			return errors.New("community not received")
+		}
+
+		var modifiedCommmunity *communities.Community = nil
+		for _, c := range response.Communities() {
+			if c.IDString() == communityID {
+				modifiedCommmunity = c
+			}
+		}
+
+		if modifiedCommmunity == nil {
+			return errors.New("couldn't find community in response")
+		}
+
+		if _, exists := modifiedCommmunity.Chats()[deleteCategory.CategoryID]; exists {
+			return errors.New("community was not deleted")
+		}
+
+		return nil
+	}
+
+	response, err := s.admin.DeleteCommunityCategory(deleteCategory)
+	s.Require().NoError(err)
+	s.Require().NoError(checkCategoryDeleted(response))
+
+	s.checkClientsReceivedAdminEvent(checkCategoryDeleted)
 }
