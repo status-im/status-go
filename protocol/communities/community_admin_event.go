@@ -148,8 +148,25 @@ func (o *Community) PatchCommunityDescriptionByAdminEvent(adminEvent *protobuf.C
 		o.config.Logger.Warn("Clock is outdated")
 	}
 
-	communityDescription := o.config.CommunityDescription
-	communityDescription.Clock = adminEvent.Clock
+	// create copy of current description so it can be patched
+	communityDescription := &protobuf.CommunityDescription{
+		Clock:                   adminEvent.Clock,
+		Members:                 o.config.CommunityDescription.Members,
+		Permissions:             o.config.CommunityDescription.Permissions,
+		Identity:                o.config.CommunityDescription.Identity,
+		Chats:                   o.config.CommunityDescription.Chats,
+		BanList:                 o.config.CommunityDescription.BanList,
+		Categories:              o.config.CommunityDescription.Categories,
+		ArchiveMagnetlinkClock:  o.config.CommunityDescription.ArchiveMagnetlinkClock,
+		AdminSettings:           o.config.CommunityDescription.AdminSettings,
+		IntroMessage:            o.config.CommunityDescription.IntroMessage,
+		OutroMessage:            o.config.CommunityDescription.OutroMessage,
+		Encrypted:               o.config.CommunityDescription.Encrypted,
+		Tags:                    o.config.CommunityDescription.Tags,
+		TokenPermissions:        o.config.CommunityDescription.TokenPermissions,
+		CommunityTokensMetadata: o.config.CommunityDescription.CommunityTokensMetadata,
+		ActiveMembersCount:      o.config.CommunityDescription.ActiveMembersCount,
+	}
 
 	switch adminEvent.Type {
 	case protobuf.CommunityAdminEvent_COMMUNITY_CONFIG_CHANGED:

@@ -37,6 +37,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/signal"
@@ -1219,13 +1220,15 @@ func (m *Manager) HandleCommunityAdminEvent(signer *ecdsa.PublicKey, adminEvent 
 
 	patchedCommDescr := community.PatchCommunityDescriptionByAdminEvent(adminEvent)
 	marshaledCommDescr, err := proto.Marshal(patchedCommDescr)
-
+	if err != nil {
+		return nil, err
+	}
+	rawMessage, err := protocol.WrapMessageV1(marshaledCommDescr, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, community.PrivateKey())
 	if err != nil {
 		return nil, err
 	}
 
-	return m.handleCommunityDescriptionMessageCommon(community, patchedCommDescr, marshaledCommDescr)
-
+	return m.handleCommunityDescriptionMessageCommon(community, patchedCommDescr, rawMessage)
 }
 
 // TODO: This is not fully implemented, we want to save the grant passed at

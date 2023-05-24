@@ -226,8 +226,10 @@ func (s *AdminMessengerCommunitiesSuite) setUpCommunityAndRoles() *communities.C
 	_ = s.createCommunityChat(community)
 
 	// add admin and alice to the community
-	s.inviteAndJoin(community, s.admin)
-	s.inviteAndJoin(community, s.alice)
+	s.advertiseCommunityTo(community, s.admin)
+	s.advertiseCommunityTo(community, s.alice)
+	s.joinCommunity(community, s.admin)
+	s.joinCommunity(community, s.alice)
 
 	s.refreshMessengerResponses()
 
@@ -237,35 +239,78 @@ func (s *AdminMessengerCommunitiesSuite) setUpCommunityAndRoles() *communities.C
 	return community
 }
 
-func (s *AdminMessengerCommunitiesSuite) inviteAndJoin(community *communities.Community, target *Messenger) {
-	response, err := s.owner.InviteUsersToCommunity(&requests.InviteUsersToCommunity{
-		CommunityID: community.ID(),
-		Users:       []types.HexBytes{common.PubkeyToHexBytes(&target.identity.PublicKey)},
+func (s *AdminMessengerCommunitiesSuite) advertiseCommunityTo(community *communities.Community, user *Messenger) {
+	chat := CreateOneToOneChat(common.PubkeyToHex(&user.identity.PublicKey), &user.identity.PublicKey, user.transport)
+
+	inputMessage := &common.Message{}
+	inputMessage.ChatId = chat.ID
+	inputMessage.Text = "some text"
+	inputMessage.CommunityID = community.IDString()
+
+	err := s.owner.SaveChat(chat)
+	s.Require().NoError(err)
+	_, err = s.owner.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
+
+	// Ensure community is received
+	err = tt.RetryWithBackOff(func() error {
+		response, err := user.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("community not received")
+		}
+		return nil
 	})
 	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
+}
 
-	community = response.Communities()[0]
-	s.Require().True(community.HasMember(&target.identity.PublicKey))
-
-	_, err = WaitOnMessengerResponse(target, func(response *MessengerResponse) bool {
-		return len(response.Communities()) > 0
-	}, "community not received")
-	s.Require().NoError(err)
-
-	response, err = target.JoinCommunity(context.Background(), community.ID())
+func (s *AdminMessengerCommunitiesSuite) joinCommunity(community *communities.Community, user *Messenger) {
+	// Request to join the community
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	response, err := user.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().True(response.Communities()[0].Joined())
-	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
 
-	s.Require().NoError(target.SaveChat(response.Chats()[0]))
+	notification := response.ActivityCenterNotifications()[0]
+	s.Require().NotNil(notification)
+	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
+	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
 
-	_, err = WaitOnMessengerResponse(target, func(response *MessengerResponse) bool {
-		return len(response.Messages()) > 0
-	}, "message 'You have been invited to community' not received")
+	// Retrieve and accept join request
+	err = tt.RetryWithBackOff(func() error {
+		response, err := s.owner.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("no communities in response (accept join request)")
+		}
+		if !response.Communities()[0].HasMember(&user.identity.PublicKey) {
+			return errors.New("user not accepted")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+
+	// Retrieve join request response
+	err = tt.RetryWithBackOff(func() error {
+		response, err := user.RetrieveAll()
+
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("no communities in response (join request response)")
+		}
+		if !response.Communities()[0].HasMember(&user.identity.PublicKey) {
+			return errors.New("user not a member")
+		}
+		return nil
+	})
 	s.Require().NoError(err)
 }
 

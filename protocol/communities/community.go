@@ -1179,6 +1179,25 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 				response.ChatsModified[chatID].CategoryModified = chat.CategoryId
 			}
 		}
+
+		// Check for removed token permissions
+		for id, _ := range o.config.CommunityDescription.TokenPermissions {
+			if _, ok := description.TokenPermissions[id]; !ok {
+				if response.TokenPermissionsRemoved == nil {
+					response.TokenPermissionsRemoved = make([]string, 0)
+				}
+				response.TokenPermissionsRemoved = append(response.TokenPermissionsRemoved, id)
+			}
+		}
+
+		for id, permission := range description.TokenPermissions {
+			if _, ok := o.config.CommunityDescription.TokenPermissions[id]; !ok {
+				if response.TokenPermissionsAdded == nil {
+					response.TokenPermissionsAdded = make(map[string]*protobuf.CommunityTokenPermission)
+				}
+				response.TokenPermissionsAdded[id] = permission
+			}
+		}
 	}
 
 	o.config.CommunityDescription = description
@@ -1375,8 +1394,8 @@ func (o *Community) toBytes() ([]byte, error) {
 		return nil, ErrNotAdmin
 	}
 
-	// We are not admin, use the received serialized version
-	if o.config.PrivateKey == nil {
+	//We are not admin, use the received serialized version
+	if !o.IsAdmin() {
 		return o.config.MarshaledCommunityDescription, nil
 	}
 
@@ -1474,14 +1493,14 @@ func (o *Community) TokenPermissionsByType(permissionType protobuf.CommunityToke
 }
 
 func (o *Community) canManageTokenPermission(permission *protobuf.CommunityTokenPermission) bool {
-	return o.config.PrivateKey != nil || (o.IsAdmin() && permission.Type != protobuf.CommunityTokenPermission_BECOME_ADMIN)
+	return o.config.PrivateKey != nil || (o.IsAdmin())
 }
 
 func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermission) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.canManageTokenPermission(permission) {
+	if !o.IsAdmin() {
 		return nil, ErrNotEnoughPermissions
 	}
 
@@ -1510,7 +1529,7 @@ func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.canManageTokenPermission(tokenPermission) {
+	if !o.IsAdmin() {
 		return nil, ErrNotEnoughPermissions
 	}
 
