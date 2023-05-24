@@ -3537,7 +3537,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					PublicKey:        publicKey,
 				}
 
+				fmt.Println("\n\n>>> MAKING IT HERE: ", msg.ID.String())
 				if msg.ParsedMessage != nil {
+					fmt.Println(">>> HANLDING MESSAGE", msg.ParsedMessage.Interface())
 
 					logger.Debug("Handling parsed message")
 
@@ -4225,6 +4227,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						logger.Debug("Handling CommunityRequestToJoin")
 						request := msg.ParsedMessage.Interface().(protobuf.CommunityRequestToJoin)
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, request)
+						fmt.Println("\n>>>>> MESSENGER")
 						err = m.HandleCommunityRequestToJoin(messageState, publicKey, request)
 						if err != nil {
 							logger.Warn("failed to handle CommunityRequestToJoin", zap.Error(err))

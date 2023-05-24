@@ -526,7 +526,12 @@ func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommuni
 		return nil, nil, err
 	}
 
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else {
+		fmt.Println("\n>>>>>>>> EMITTING ADMIN CREATE EVENT\n")
+		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityAdminEvent(protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGED)})
+	}
 
 	// check existing member permission once, then check periodically
 	err = m.checkMemberPermissions(community.ID())
@@ -559,7 +564,12 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 		return nil, nil, err
 	}
 
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER {
+		fmt.Println("\n>>>>>>>> EMITTING ADMIN EDIT EVENT\n")
+		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityAdminEvent(protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGED)})
+	}
 
 	// check if members still fulfill the token criteria of all
 	// BECOME_MEMBER permissions and kick them if necessary
@@ -672,7 +682,12 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 		close(cancel.(chan struct{})) // Need to cast to the chan
 	}
 
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else {
+		fmt.Println("\n>>>>>>>> EMITTING ADMIN DELETE EVENT\n")
+		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityAdminEvent(protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETED)})
+	}
 
 	return community, changes, nil
 }
@@ -1317,6 +1332,7 @@ func (m *Manager) CancelRequestToJoin(request *requests.CancelRequestToJoinCommu
 }
 
 func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommunity) (*Community, error) {
+	fmt.Println("\n>>>> ACCEPTING REQUEST TO JOIN")
 	dbRequest, err := m.persistence.GetRequestToJoin(request.ID)
 	if err != nil {
 		return nil, err
@@ -1368,35 +1384,42 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		addressesToAdd = append(addressesToAdd, revealedAddresses...)
 	}
 
+	fmt.Println(">>>> ACCEPTING REQUEST TO JOIN 2")
 	pk, err := common.HexToPubkey(dbRequest.PublicKey)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println(">>>> ACCEPTING REQUEST TO JOIN 3")
 	role := []protobuf.CommunityMember_Roles{}
 	if memberRole != protobuf.CommunityMember_UNKNOWN_ROLE {
 		role = []protobuf.CommunityMember_Roles{memberRole}
 	}
 
+	fmt.Println(">>>> ACCEPTING REQUEST TO JOIN 4")
 	err = community.AddMember(pk, role)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println(">>>> ACCEPTING REQUEST TO JOIN 5")
 	_, err = community.AddMemberWallet(dbRequest.PublicKey, addressesToAdd)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println(">>>> ACCEPTING REQUEST TO JOIN 6")
 	if err := m.markRequestToJoin(pk, community); err != nil {
 		return nil, err
 	}
 
+	fmt.Println(">>>> ACCEPTING REQUEST TO JOIN 7")
 	err = m.persistence.SaveCommunity(community)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println(">>>> ACCEPTING REQUEST TO JOIN 8")
 	m.publish(&Subscription{Community: community})
 
 	return community, nil
@@ -1475,6 +1498,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		return nil, ErrOrgNotFound
 	}
 
+	fmt.Println("\n >>>>> HANDLING REQUEST TO JION")
 	isUserRejected, err := m.isUserRejectedFromCommunity(signer, community, request.Clock)
 	if err != nil {
 		return nil, err
@@ -1614,6 +1638,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 
 func (m *Manager) checkPermissionToJoin(permissions []*protobuf.CommunityTokenPermission, walletAddresses []gethcommon.Address) (bool, error) {
 
+	return true, nil
 	erc20TokenRequirements, erc721TokenRequirements := extractTokenRequirements(permissions)
 
 	// find owned ERC721 tokens required by community's permissions
@@ -2222,7 +2247,12 @@ func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (
 }
 
 func (m *Manager) GetByID(id []byte) (*Community, error) {
-	return m.persistence.GetByID(&m.identity.PublicKey, id)
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, id)
+	if err != nil {
+		return nil, err
+	}
+	m.logger.Debug("\n>>>>>>>>> GET BY ID", zap.Any("LEN", len(community.TokenPermissions())))
+	return community, nil
 }
 
 func (m *Manager) GetByIDString(idString string) (*Community, error) {

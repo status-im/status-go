@@ -292,7 +292,6 @@ func (r *MessengerResponse) IsEmpty() bool {
 // the existing Messages & Chats if they have the same ID
 func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	if len(response.Invitations)+
-		len(response.RequestsToJoinCommunity)+
 		len(response.Mailservers)+
 		len(response.clearedHistories)+
 		len(response.DiscordChannels)+
@@ -319,6 +318,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddKeycardActions(response.KeycardActions())
 	r.AddSocialLinkSettings(response.SocialLinkSettings())
 	r.AddEnsUsernameDetails(response.EnsUsernameDetails())
+	r.AddRequestsToJoinCommunity(response.RequestsToJoinCommunity)
 	r.AddBookmarks(response.GetBookmarks())
 	r.CommunityChanges = append(r.CommunityChanges, response.CommunityChanges...)
 	r.BackupHandled = response.BackupHandled
@@ -346,6 +346,10 @@ func (r *MessengerResponse) AddCommunitySettings(c *communities.CommunitySetting
 	}
 
 	r.communitiesSettings[c.CommunityID] = c
+}
+
+func (r *MessengerResponse) AddRequestsToJoinCommunity(requestsToJoin []*communities.RequestToJoin) {
+	r.RequestsToJoinCommunity = append(r.RequestsToJoinCommunity, requestsToJoin...)
 }
 
 func (r *MessengerResponse) AddRequestToJoinCommunity(requestToJoin *communities.RequestToJoin) {

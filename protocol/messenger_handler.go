@@ -1253,10 +1253,12 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageSta
 
 // HandleCommunityRequestToJoin handles an community request to join
 func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, signer *ecdsa.PublicKey, requestToJoinProto protobuf.CommunityRequestToJoin) error {
+	fmt.Println(">>> HERE 0")
 	if requestToJoinProto.CommunityId == nil {
 		return errors.New("invalid community id")
 	}
 
+	fmt.Println(">>> HERE 1")
 	timeNow := uint64(time.Now().Unix())
 
 	requestTimeOutClock, err := communities.AddTimeoutToRequestToJoinClock(requestToJoinProto.Clock)
@@ -1268,11 +1270,13 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 		return errors.New("request is expired")
 	}
 
+	fmt.Println(">>> HERE 2")
 	requestToJoin, err := m.communitiesManager.HandleCommunityRequestToJoin(signer, &requestToJoinProto)
 	if err != nil {
 		return err
 	}
 
+	fmt.Println(">>> HERE 3")
 	if requestToJoin.State == communities.RequestToJoinStateAccepted {
 		accept := &requests.AcceptRequestToJoinCommunity{
 			ID: requestToJoin.ID,
@@ -1283,7 +1287,9 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 		}
 	}
 
+	fmt.Println(">>> HERE 4")
 	if requestToJoin.State == communities.RequestToJoinStateDeclined {
+		fmt.Println(">>> DECLINED!")
 		cancel := &requests.DeclineRequestToJoinCommunity{
 			ID: requestToJoin.ID,
 		}
@@ -1294,6 +1300,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 		return nil
 	}
 
+	fmt.Println(">>> HERE 5")
 	community, err := m.communitiesManager.GetByID(requestToJoinProto.CommunityId)
 	if err != nil {
 		return err
@@ -1303,6 +1310,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 
 	contact, _ := state.AllContacts.Load(contactID)
 
+	fmt.Println(">>> HERE 6")
 	if len(requestToJoinProto.DisplayName) != 0 {
 		contact.DisplayName = requestToJoinProto.DisplayName
 		state.ModifiedContacts.Store(contact.ID, true)
@@ -1310,7 +1318,12 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 		state.ModifiedContacts.Store(contact.ID, true)
 	}
 
+	fmt.Println(">>> HERE 7")
 	if requestToJoin.State == communities.RequestToJoinStatePending {
+		fmt.Println(">>> PENDING")
+		if state.Response.RequestsToJoinCommunity == nil {
+			state.Response.RequestsToJoinCommunity = make([]*communities.RequestToJoin, 0)
+		}
 		state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, requestToJoin)
 
 		state.Response.AddNotification(NewCommunityRequestToJoinNotification(requestToJoin.ID.String(), community, contact))
@@ -1352,6 +1365,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 		}
 	}
 
+	fmt.Println(">>> HERE 8")
 	return nil
 }
 

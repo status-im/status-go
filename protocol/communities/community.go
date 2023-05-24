@@ -1028,6 +1028,7 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 	response := o.emptyCommunityChanges()
 
 	if description.Clock <= o.config.CommunityDescription.Clock {
+		// o.config.MarshaledCommunityDescription = rawMessage
 		return response, nil
 	}
 
@@ -1200,8 +1201,8 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 		}
 	}
 
-	o.config.CommunityDescription = description
-	o.config.MarshaledCommunityDescription = rawMessage
+	o.config.CommunityDescription = description         // patched communition description
+	o.config.MarshaledCommunityDescription = rawMessage // marshaled patched
 
 	return response, nil
 }
@@ -1500,7 +1501,7 @@ func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermis
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsAdmin() {
+	if !o.IsAdmin() || (!o.IsOwner() && o.IsMemberAdmin(o.config.MemberIdentity) && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
 		return nil, ErrNotEnoughPermissions
 	}
 
@@ -1529,7 +1530,7 @@ func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsAdmin() {
+	if !o.IsAdmin() || (!o.IsOwner() && o.IsMemberAdmin(o.config.MemberIdentity) && tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
 		return nil, ErrNotEnoughPermissions
 	}
 
@@ -1537,7 +1538,7 @@ func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *
 		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
 	}
 	if _, ok := o.config.CommunityDescription.TokenPermissions[permissionID]; !ok {
-		return nil, ErrTokenPermissionNotFound
+		return nil, errors.New("NO PERMISSION FOUND WITH ID: " + permissionID)
 	}
 
 	changes := o.emptyCommunityChanges()
@@ -1556,13 +1557,13 @@ func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChange
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	tokenPermission, exists := o.config.CommunityDescription.TokenPermissions[permissionID]
+	permission, exists := o.config.CommunityDescription.TokenPermissions[permissionID]
 
 	if !exists {
 		return nil, ErrTokenPermissionNotFound
 	}
 
-	if !o.canManageTokenPermission(tokenPermission) {
+	if !o.IsAdmin() || (!o.IsOwner() && o.IsMemberAdmin(o.config.MemberIdentity) && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
 		return nil, ErrNotEnoughPermissions
 	}
 

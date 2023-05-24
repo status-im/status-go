@@ -844,25 +844,31 @@ func (m *Messenger) CancelRequestToJoinCommunity(request *requests.CancelRequest
 }
 
 func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequestToJoinCommunity) (*MessengerResponse, error) {
+
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
 
+	fmt.Println("\n >> MESSENGER COMMUNITIES")
 	requestToJoin, err := m.communitiesManager.GetRequestToJoin(request.ID)
 	if err != nil {
+		fmt.Println("\nERROR: ", err)
 		return nil, err
 	}
 
+	fmt.Println("\n >> MESSENGER COMMUNITIES 2")
 	community, err := m.communitiesManager.AcceptRequestToJoin(request)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println("\n >> MESSENGER COMMUNITIES 3")
 	pk, err := common.HexToPubkey(requestToJoin.PublicKey)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println("\n >> MESSENGER COMMUNITIES 4")
 	grant, err := community.BuildGrant(pk, "")
 	if err != nil {
 		return nil, err
@@ -902,6 +908,7 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
 	}
 
+	fmt.Println("\n >> MESSENGER COMMUNITIES 5")
 	_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
 	if err != nil {
 		return nil, err
@@ -928,6 +935,7 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 		}
 	}
 
+	fmt.Println("\n >> MESSENGER COMMUNITIES 6")
 	return response, nil
 }
 

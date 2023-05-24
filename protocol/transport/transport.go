@@ -279,6 +279,7 @@ func (t *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage
 		return nil, err
 	}
 
+	fmt.Println("\n\n >>>>> LOAD FILTER FROM: ", chatName)
 	filter, err := t.filters.LoadPublic(chatName)
 	if err != nil {
 		return nil, err
@@ -360,6 +361,13 @@ func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("\n\n >>>>> LOADED FILTER: ", filter)
+	fmt.Println("\n\n >>>>> LOADED FILTER (CHATID): ", filter.ChatID)
+	fmt.Println("\n\n >>>>> LOADED FILTER (FilterID): ", filter.FilterID)
+	fmt.Println("\n\n >>>>> LOADED FILTER (TOPIC): ", filter.Topic)
+	fmt.Println("\n\n >>>>> LOADED FILTER (IdentityStr): ", filter.Identity)
+	fmt.Println("\n\n >>>>> LOADED FILTER (OneToOne): ", filter.OneToOne)
 
 	newMessage.Topic = filter.Topic
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)

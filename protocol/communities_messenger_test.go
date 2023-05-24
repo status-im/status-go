@@ -3298,3 +3298,41 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequesToJoin() {
 
 	s.Require().ErrorContains(err, "can't request access")
 }
+
+func (s *MessengerCommunitiesSuite) TestSanity() {
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	// Create an community chat
+	response, err := s.bob.CreateCommunity(description, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	community := response.Communities()[0]
+
+	orgChat := &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "status-core2",
+			Emoji:       "😎",
+			Description: "status-core community chat2",
+		},
+	}
+
+	mr, err := s.bob.CreateCommunityChat(community.ID(), orgChat)
+	s.Require().NoError(err)
+	s.Require().NotNil(mr)
+	s.Require().Len(mr.Communities(), 1)
+	s.Require().Len(mr.Chats(), 1)
+	adminCommunity, err := s.bob.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	// assertions done here fail, even though it should be the same
+	s.Require().Len(adminCommunity.Chats(), 2)
+}

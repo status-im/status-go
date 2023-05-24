@@ -1,6 +1,7 @@
 package communities
 
 import (
+	"fmt"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -21,9 +22,29 @@ func (o *Community) ToCommunityAdminEvent(eventType protobuf.CommunityAdminEvent
 			},
 		}
 	case protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGED:
-		// TODO admin permission
+		tokenPermissions := make(map[string]*protobuf.CommunityTokenPermission)
+		for _, tp := range o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER) {
+			tokenPermissions[tp.Id] = tp
+		}
+
+		return &protobuf.CommunityAdminEvent{
+			Clock:            o.Clock(),
+			CommunityId:      o.ID(),
+			Type:             eventType,
+			TokenPermissions: tokenPermissions,
+		}
+		break
 	case protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETED:
-		// TODO admin permission
+		tokenPermissions := make(map[string]*protobuf.CommunityTokenPermission)
+		for _, tp := range o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER) {
+			tokenPermissions[tp.Id] = tp
+		}
+		return &protobuf.CommunityAdminEvent{
+			Clock:            o.Clock(),
+			CommunityId:      o.ID(),
+			Type:             eventType,
+			TokenPermissions: make(map[string]*protobuf.CommunityTokenPermission, 0),
+		}
 		break
 	case protobuf.CommunityAdminEvent_COMMUNITY_CATEGORY_CREATED:
 		// TODO admin permission
@@ -178,10 +199,71 @@ func (o *Community) PatchCommunityDescriptionByAdminEvent(adminEvent *protobuf.C
 		communityDescription.Tags = adminEvent.CommunityConfig.Tags
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGED:
-		// TODO admin permission
+		prevPermissions := o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+		newPermissions := adminEvent.TokenPermissions
+		fmt.Println("\n >>>>>>>> HANDLING PERMISSIONS CHANGED")
+
+		if len(newPermissions) < len(prevPermissions) {
+			// we only handle additions and update in this event type
+			fmt.Println(">>>>>>>> BREAKING HERE")
+			break
+		}
+
+		if communityDescription.TokenPermissions == nil {
+			communityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
+		}
+
+		if len(newPermissions) > len(prevPermissions) {
+			fmt.Println(">>>>>>>> PREV PERMISSIONS", len(prevPermissions))
+			fmt.Println(">>>>>>>> NEW PERMISSIONS", len(newPermissions))
+			// new permission has been added
+			for id, newPermission := range newPermissions {
+				exists := false
+				for _, prevPermission := range prevPermissions {
+					if prevPermission.Id == id {
+						exists = true
+						fmt.Println(">>>>>>>> BREAKING HERE 2")
+						break
+					}
+				}
+				if !exists {
+					communityDescription.TokenPermissions[id] = newPermission
+				}
+			}
+			fmt.Println(">>>>>>>> BREAKING HERE 3")
+			break
+		}
+
+		fmt.Println("\n >>>>>>>> UPDATING EXISTING PERMISSIONS")
+		// update existing permissions
+		for id, newPermission := range newPermissions {
+			communityDescription.TokenPermissions[id] = newPermission
+		}
 		break
 	case protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETED:
-		// TODO admin permission
+		fmt.Println("\n >>>>>>>> HANDLING PERMISSIONS DELETED")
+		prevPermissions := o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+		newPermissions := adminEvent.TokenPermissions
+
+		if len(newPermissions) == 0 {
+			communityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
+			break
+		}
+
+		if len(newPermissions) < len(prevPermissions) {
+			for _, permission := range newPermissions {
+				exists := false
+				for _, prevPermission := range prevPermissions {
+					if prevPermission.Id == permission.Id {
+						exists = true
+					}
+				}
+				if !exists {
+					delete(communityDescription.TokenPermissions, permission.Id)
+				}
+			}
+		}
+		fmt.Println("\n >>>>>>>> ENDING HERE")
 		break
 	case protobuf.CommunityAdminEvent_COMMUNITY_CATEGORY_CREATED:
 		for categoryID, category := range adminEvent.CategoriesAdded {

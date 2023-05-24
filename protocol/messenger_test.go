@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"fmt"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -2375,6 +2376,7 @@ func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bo
 		var err error
 		r, err := m.RetrieveAll()
 		if err := response.Merge(r); err != nil {
+			fmt.Println("PANICKING HERE: ", err)
 			panic(err)
 		}
 
