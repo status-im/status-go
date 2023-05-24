@@ -84,7 +84,7 @@ type Manager struct {
 	torrentTasks                   map[string]metainfo.Hash
 	historyArchiveDownloadTasks    map[string]*HistoryArchiveDownloadTask
 	stopped                        bool
-	RekeyInterval                  *time.Duration
+	RekeyInterval                  time.Duration
 }
 
 type HistoryArchiveDownloadTask struct {

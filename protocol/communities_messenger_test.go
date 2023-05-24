@@ -60,6 +60,9 @@ func (s *MessengerCommunitiesSuite) SetupTest() {
 	s.admin = s.newMessenger()
 	s.bob = s.newMessenger()
 	s.alice = s.newMessenger()
+
+	s.admin.communitiesManager.RekeyInterval = 50 * time.Millisecond
+
 	_, err := s.admin.Start()
 	s.Require().NoError(err)
 	_, err = s.bob.Start()
@@ -3421,4 +3424,69 @@ func (s *MessengerCommunitiesSuite) TestGetCommunityIdFromKey() {
 	// Private key returns the public key
 	communityID = s.bob.GetCommunityIDFromKey(privateKey)
 	s.Require().Equal(communityID, publicKey)
+}
+
+func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
+	// Create a new community
+	response, err := s.admin.CreateCommunity(
+		&requests.CreateCommunity{
+			Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Name:        "status",
+			Color:       "#57a7e5",
+			Description: "status community description",
+		},
+		true,
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	// Check community is present in the DB and has default values we care about
+	c, err := s.admin.GetCommunityByID(response.Communities()[0].ID())
+	s.Require().NoError(err)
+	s.Require().False(c.Encrypted())
+	s.Require().Zero(c.RekeyedAt().Unix())
+
+	// Update the community to use encryption and check the values
+	err = s.admin.UpdateCommunityEncryption(c, true)
+	s.Require().NoError(err)
+
+	c, err = s.admin.GetCommunityByID(c.ID())
+	s.Require().NoError(err)
+	s.Require().True(c.Encrypted())
+
+	// Add Alice and Bob to the community
+	response, err = s.admin.InviteUsersToCommunity(
+		&requests.InviteUsersToCommunity{
+			CommunityID: c.ID(),
+			Users: []types.HexBytes{
+				common.PubkeyToHexBytes(&s.alice.identity.PublicKey),
+				common.PubkeyToHexBytes(&s.bob.identity.PublicKey),
+			},
+		},
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	// Check the Alice and Bob are members of the community
+	c, err = s.admin.GetCommunityByID(c.ID())
+	s.Require().NoError(err)
+	s.Require().True(c.HasMember(&s.alice.identity.PublicKey))
+	s.Require().True(c.HasMember(&s.bob.identity.PublicKey))
+
+	// Check the keys in the database
+	keys, err := s.admin.sender.GetKeyIDsForGroup(c.ID())
+	s.Require().NoError(err)
+	keyCount := len(keys)
+
+	// Check that rekeying is occurring by counting the number of keyIDs in the encryptor's DB
+	// This test could be flaky, as the rekey function may not be finished before RekeyInterval * 2 has passed
+	for i := 0; i < 5; i++ {
+		time.Sleep(s.admin.communitiesManager.RekeyInterval * 2)
+		keys, err = s.admin.sender.GetKeyIDsForGroup(c.ID())
+		s.Require().NoError(err)
+		s.Require().Greater(len(keys), keyCount)
+		keyCount = len(keys)
+	}
 }

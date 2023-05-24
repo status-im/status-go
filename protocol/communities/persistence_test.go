@@ -481,7 +481,7 @@ func (s *PersistenceSuite) TestGetRekeyedAtClock() {
 	s.Require().NoError(err)
 	s.Require().Len(communities, 1)
 
-	community := Community{
+	community := &Community{
 		config: &Config{
 			PrivateKey:           key,
 			ID:                   &key.PublicKey,
@@ -491,22 +491,23 @@ func (s *PersistenceSuite) TestGetRekeyedAtClock() {
 			CommunityDescription: &protobuf.CommunityDescription{},
 		},
 	}
-	s.Require().NoError(s.db.SaveCommunity(&community))
+	s.Require().NoError(s.db.SaveCommunity(community))
 
 	communities, err = s.db.AllCommunities(&key.PublicKey)
+	c := communities[1]
 	s.Require().NoError(err)
 	s.Require().Len(communities, 2)
-	s.Equal(types.HexBytes(crypto.CompressPubkey(&key.PublicKey)), communities[1].ID())
-	s.True(communities[1].Joined())
-	s.True(communities[1].Spectated())
-	s.True(communities[1].Verified())
-	s.Zero(communities[1].config.RekeyedAt.Unix())
+	s.Equal(types.HexBytes(crypto.CompressPubkey(&key.PublicKey)), c.ID())
+	s.True(c.Joined())
+	s.True(c.Spectated())
+	s.True(c.Verified())
+	s.Zero(c.config.RekeyedAt.Unix())
 
 	now := time.Now()
-	err = s.db.SetRekeyedAtClock(communities[1].ID(), now)
-	s.NoError(err)
+	err = s.db.SetRekeyedAtClock(c.ID(), now)
+	s.Require().NoError(err)
 
-	then, err := s.db.GetRekeyedAtClock(communities[0].ID())
-	s.NoError(err)
-	now.Equal(then)
+	then, err := s.db.GetRekeyedAtClock(c.ID())
+	s.Require().NoError(err)
+	s.Require().True(now.Equal(then))
 }
