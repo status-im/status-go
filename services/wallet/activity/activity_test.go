@@ -179,8 +179,8 @@ func TestGetActivityEntriesWithSameTransactionForSenderAndReceiverInDB(t *testin
 
 	// add accounts to DB for proper detection of sender/receiver in all cases
 	accounts.AddTestAccounts(t, db, []*accounts.Account{
-		{Address: types.Address(td.tr1.From), Chat: false, Wallet: true},
-		{Address: types.Address(receiverTr.From)},
+		{Address: types.Address(td.tr1.From), Type: accounts.AccountTypeWatch},
+		{Address: types.Address(receiverTr.From), Type: accounts.AccountTypeWatch},
 	})
 
 	entries, err = GetActivityEntries(db, []eth.Address{}, []common.ChainID{}, filter, 0, 10)

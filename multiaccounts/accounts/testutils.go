@@ -11,7 +11,7 @@ func AddTestAccounts(t *testing.T, db *sql.DB, accounts []*Account) {
 	d, err := NewDB(db)
 	require.NoError(t, err)
 
-	err = d.SaveAccounts(accounts)
+	err = d.SaveOrUpdateAccounts(accounts)
 	require.NoError(t, err)
 	res, err := d.GetAccounts()
 	require.NoError(t, err)

@@ -212,7 +212,7 @@ const (
 			? AS includeAllNetworks
 		),
 		filter_addresses(address) AS (
-			SELECT HEX(address) FROM accounts WHERE (SELECT filterAllAddresses FROM filter_conditions) != 0
+			SELECT HEX(address) FROM keypairs_accounts WHERE (SELECT filterAllAddresses FROM filter_conditions) != 0
 			UNION ALL
 			SELECT * FROM (VALUES %s) WHERE (SELECT filterAllAddresses FROM filter_conditions) = 0
 		),
