@@ -675,7 +675,7 @@ func (s *MessengerBackupSuite) TestBackupCommunities() {
 func (s *MessengerBackupSuite) TestBackupKeypairs() {
 	// Create bob1
 	bob1 := s.m
-	profileKp := accounts.GetProfileKeypairForTest(false)
+	profileKp := accounts.GetProfileKeypairForTest(true, true, true)
 	seedKp := accounts.GetSeedImportedKeypair1ForTest()
 
 	// Create a main account on bob1
@@ -734,7 +734,7 @@ func (s *MessengerBackupSuite) TestBackupKeycards() {
 	// Create bob1
 	bob1 := s.m
 
-	kp1 := accounts.GetProfileKeypairForTest(false)
+	kp1 := accounts.GetProfileKeypairForTest(true, true, true)
 	keycard1 := accounts.GetProfileKeycardForTest()
 
 	kp2 := accounts.GetSeedImportedKeypair1ForTest()

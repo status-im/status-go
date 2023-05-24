@@ -30,7 +30,7 @@ func GetWatchOnlyAccountsForTest() []*Account {
 	return []*Account{wo1, wo2, wo3}
 }
 
-func GetProfileKeypairForTest(onlyChatAndDefaultWalletAccount bool) *Keypair {
+func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccount bool, includeAdditionalAccounts bool) *Keypair {
 	kp := &Keypair{
 		KeyUID:      "0000000000000000000000000000000000000000000000000000000000000001",
 		Name:        "Profile Name",
@@ -38,39 +38,43 @@ func GetProfileKeypairForTest(onlyChatAndDefaultWalletAccount bool) *Keypair {
 		DerivedFrom: "0x0001",
 	}
 
-	profileAccount := &Account{
-		Address:   types.Address{0x01},
-		KeyUID:    kp.KeyUID,
-		Wallet:    false,
-		Chat:      true,
-		Type:      AccountTypeGenerated,
-		Path:      "m/43'/60'/1581'/0'/0",
-		PublicKey: types.Hex2Bytes("0x000000001"),
-		Name:      "Profile Name",
-		Operable:  AccountFullyOperable,
+	if includeChatAccount {
+		profileAccount := &Account{
+			Address:   types.Address{0x01},
+			KeyUID:    kp.KeyUID,
+			Wallet:    false,
+			Chat:      true,
+			Type:      AccountTypeGenerated,
+			Path:      "m/43'/60'/1581'/0'/0",
+			PublicKey: types.Hex2Bytes("0x000000001"),
+			Name:      "Profile Name",
+			Operable:  AccountFullyOperable,
+		}
+		kp.Accounts = append(kp.Accounts, profileAccount)
 	}
-	kp.Accounts = append(kp.Accounts, profileAccount)
 
-	defaultWalletAccount := &Account{
-		Address:   types.Address{0x02},
-		KeyUID:    kp.KeyUID,
-		Wallet:    true,
-		Chat:      false,
-		Type:      AccountTypeGenerated,
-		Path:      "m/44'/60'/0'/0/0",
-		PublicKey: types.Hex2Bytes("0x000000002"),
-		Name:      "Generated Acc 1",
-		Emoji:     "emoji-1",
-		Color:     "blue",
-		Hidden:    false,
-		Clock:     0,
-		Removed:   false,
-		Operable:  AccountFullyOperable,
+	if includeDefaultWalletAccount {
+		defaultWalletAccount := &Account{
+			Address:   types.Address{0x02},
+			KeyUID:    kp.KeyUID,
+			Wallet:    true,
+			Chat:      false,
+			Type:      AccountTypeGenerated,
+			Path:      "m/44'/60'/0'/0/0",
+			PublicKey: types.Hex2Bytes("0x000000002"),
+			Name:      "Generated Acc 1",
+			Emoji:     "emoji-1",
+			Color:     "blue",
+			Hidden:    false,
+			Clock:     0,
+			Removed:   false,
+			Operable:  AccountFullyOperable,
+		}
+		kp.Accounts = append(kp.Accounts, defaultWalletAccount)
+		kp.LastUsedDerivationIndex = 0
 	}
-	kp.Accounts = append(kp.Accounts, defaultWalletAccount)
-	kp.LastUsedDerivationIndex = 0
 
-	if !onlyChatAndDefaultWalletAccount {
+	if includeAdditionalAccounts {
 		generatedWalletAccount1 := &Account{
 			Address:   types.Address{0x03},
 			KeyUID:    kp.KeyUID,
@@ -241,7 +245,7 @@ func GetPrivKeyImportedKeypairForTest() *Keypair {
 }
 
 func GetProfileKeycardForTest() *Keycard {
-	profileKp := GetProfileKeypairForTest(false)
+	profileKp := GetProfileKeypairForTest(true, true, true)
 	keycard1Addresses := []types.Address{}
 	for _, acc := range profileKp.Accounts {
 		keycard1Addresses = append(keycard1Addresses, acc.Address)

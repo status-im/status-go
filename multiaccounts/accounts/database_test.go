@@ -178,7 +178,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 
 func TestKeypairs(t *testing.T) {
 	keypairs := []*Keypair{
-		GetProfileKeypairForTest(false),
+		GetProfileKeypairForTest(true, true, true),
 		GetSeedImportedKeypair1ForTest(),
 		GetPrivKeyImportedKeypairForTest(), // in this context (when testing db functions) there is not limitations for private key imported keypair
 	}

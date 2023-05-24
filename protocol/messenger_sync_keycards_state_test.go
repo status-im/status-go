@@ -76,7 +76,7 @@ func (s *MessengerSyncKeycardsStateSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	// Pre-condition - both sides have to know about keypairs migrated to a keycards
-	kp1 := accounts.GetProfileKeypairForTest(false)
+	kp1 := accounts.GetProfileKeypairForTest(true, true, true)
 	kp2 := accounts.GetSeedImportedKeypair1ForTest()
 	kp3 := accounts.GetSeedImportedKeypair2ForTest()
 
