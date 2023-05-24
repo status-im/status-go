@@ -36,10 +36,15 @@ type CreateAccount struct {
 
 	CurrentNetwork string `json:"currentNetwork"`
 	NetworkID      uint64 `json:"networkId"`
-	PoktToken      string `json:"poktToken"`
-	InfuraToken    string `json:"infuraToken"`
-	InfuraSecret   string `json:"infuraSecret"`
-	OpenseaAPIKey  string `json:"openseaApiKey"`
+
+	WalletSecretsConfig
+}
+
+type WalletSecretsConfig struct {
+	PoktToken     string `json:"poktToken"`
+	InfuraToken   string `json:"infuraToken"`
+	InfuraSecret  string `json:"infuraSecret"`
+	OpenseaAPIKey string `json:"openseaApiKey"`
 
 	// Testing
 	GanacheURL                  string `json:"ganacheURL"`

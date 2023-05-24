@@ -14,16 +14,15 @@ import (
 
 	"net/http"
 	"net/http/httptest"
-)
 
-import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	gethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/params"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/params"
 )
 
 type ProxySuite struct {

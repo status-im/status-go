@@ -141,7 +141,7 @@ var goerliGanacheTokenOverrides = params.TokenOverride{
 	Address: ganacheTokenAddress,
 }
 
-func setRPCs(networks []params.Network, request *requests.CreateAccount) []params.Network {
+func setRPCs(networks []params.Network, request *requests.WalletSecretsConfig) []params.Network {
 
 	var networksWithRPC []params.Network
 
@@ -187,5 +187,5 @@ func setRPCs(networks []params.Network, request *requests.CreateAccount) []param
 }
 
 func buildDefaultNetworks(request *requests.CreateAccount) []params.Network {
-	return setRPCs(defaultNetworks, request)
+	return setRPCs(defaultNetworks, &request.WalletSecretsConfig)
 }
