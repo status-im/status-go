@@ -89,25 +89,12 @@ func TestGetLinks(t *testing.T) {
 }
 
 func TestUnfurlURLs(t *testing.T) {
-	examples := []struct {
+	type Example struct {
 		url      string
 		expected common.LinkPreview
-	}{
-		{
-			url: "https://github.com/",
-			expected: common.LinkPreview{
-				Description: "GitHub is where over 100 million developers shape the future of software, together. Contribute to the open source community, manage your Git repositories, review code like a pro, track bugs and fea...",
-				Hostname:    "github.com",
-				Title:       "GitHub: Let’s build from here",
-				URL:         "https://github.com/",
-				Thumbnail: common.LinkPreviewThumbnail{
-					Width:   1200,
-					Height:  630,
-					URL:     "",
-					DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABLAAAAJ2CAMAAAB4",
-				},
-			},
-		},
+	}
+
+	examples := []Example{
 		{
 			url: "https://github.com/status-im/status-mobile/issues/15469",
 			expected: common.LinkPreview{
@@ -139,6 +126,31 @@ func TestUnfurlURLs(t *testing.T) {
 			},
 		},
 		{
+			url: "https://www.reddit.com/r/Bitcoin/comments/13j0tzr/the_best_bitcoin_explanation_of_all_times/?utm_source=share",
+			expected: common.LinkPreview{
+				Description: "",
+				Hostname:    "www.reddit.com",
+				Title:       "The best bitcoin explanation of all times.",
+				URL:         "https://www.reddit.com/r/Bitcoin/comments/13j0tzr/the_best_bitcoin_explanation_of_all_times/?utm_source=share",
+				Thumbnail:   common.LinkPreviewThumbnail{},
+			},
+		},
+		{
+			url: "https://open.spotify.com/album/0Wn5sHYtC7vPPX0n2AVJmF?si=iXmxsFJyQ62F2yMElt086A",
+			expected: common.LinkPreview{
+				Description: "SadSvit · Album · 2021 · 8 songs.",
+				Hostname:    "open.spotify.com",
+				Title:       "Cassette",
+				URL:         "https://open.spotify.com/album/0Wn5sHYtC7vPPX0n2AVJmF?si=iXmxsFJyQ62F2yMElt086A",
+				Thumbnail: common.LinkPreviewThumbnail{
+					Width:   640,
+					Height:  640,
+					URL:     "",
+					DataURI: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEBLAEsAAD//gA8Q1JFQVRPUjogZ2QtanBlZyB2MS4wICh1c2luZyBJSkcgS",
+				},
+			},
+		},
+		{
 			url: "https://www.youtube.com/watch?v=lE4UXdJSJM4",
 			expected: common.LinkPreview{
 				URL:         "https://www.youtube.com/watch?v=lE4UXdJSJM4",
@@ -149,6 +161,48 @@ func TestUnfurlURLs(t *testing.T) {
 					Width:   1280,
 					Height:  720,
 					DataURI: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAUDBA8",
+				},
+			},
+		},
+		{
+			url: "https://music.youtube.com/watch?v=1TTAXENxbM0",
+			expected: common.LinkPreview{
+				URL:         "https://music.youtube.com/watch?v=1TTAXENxbM0",
+				Hostname:    "music.youtube.com",
+				Title:       "Telegraph Road - YouTube Music",
+				Description: "Provided to YouTube by Universal Music Group Telegraph Road · Dire Straits Love Over Gold ℗ 1982 Mercury Records Limited Released on: 1982-01-01 Produce...",
+				Thumbnail: common.LinkPreviewThumbnail{
+					Width:   1280,
+					Height:  720,
+					DataURI: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAUDBAg",
+				},
+			},
+		},
+		{
+			url: "https://media.giphy.com/media/dTlyIvBdEzIQM/giphy.gif",
+			expected: common.LinkPreview{
+				URL:         "https://media.giphy.com/media/dTlyIvBdEzIQM/giphy.gif",
+				Hostname:    "media.giphy.com",
+				Title:       "Cat GIF - Find & Share on GIPHY",
+				Description: "Discover & share this Cat GIF with everyone you know. GIPHY is how you search, share, discover, and create GIFs.",
+				Thumbnail: common.LinkPreviewThumbnail{
+					Width:   339,
+					Height:  200,
+					DataURI: "data:image/gif;base64,R0lGODlhUwHIAPf/ACslIC4oIzEqIjIqJTMsKDQw",
+				},
+			},
+		},
+		{
+			url: "https://t.co/TLEVzWCTkV",
+			expected: common.LinkPreview{
+				URL:         "https://t.co/TLEVzWCTkV",
+				Hostname:    "t.co",
+				Title:       "Casting announced for The Way, the bold new BBC drama from Michael Sheen, James Graham and Adam Curtis",
+				Description: "Steffan Rhodri, Mali Harries, Sophie Melville and Callum Scott Howells lead the cast, Luke Evans also stars",
+				Thumbnail: common.LinkPreviewThumbnail{
+					Width:   1920,
+					Height:  1080,
+					DataURI: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAUEBAU",
 				},
 			},
 		},

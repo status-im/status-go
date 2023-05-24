@@ -2,11 +2,13 @@ package linkpreview
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	neturl "net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -47,9 +49,10 @@ type Unfurler interface {
 const (
 	requestTimeout = 15000 * time.Millisecond
 
-	// Certain websites return an HTML error page if the user agent is unknown to
-	// them, e.g. IMDb.
-	defaultUserAgent = "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/109.0"
+	// Without an user agent, many providers treat status-go as a gluttony bot,
+	// and either respond more frequently with a 429 (Too Many Requests), or
+	// simply refuse to return valid data.
+	defaultUserAgent = "status-go/v0.151.15"
 
 	// Currently set to English, but we could make this setting dynamic according
 	// to the user's language of choice.
@@ -98,20 +101,6 @@ func newDefaultLinkPreview(url *neturl.URL) common.LinkPreview {
 	}
 }
 
-func httpGETForOpenGraph(url string) (*http.Response, context.CancelFunc, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, cancel, err
-	}
-	req.Header.Set("User-Agent", defaultUserAgent)
-	req.Header.Set("Accept-Language", defaultAcceptLanguage)
-
-	res, err := httpClient.Do(req)
-	return res, cancel, err
-}
-
 func fetchThumbnail(logger *zap.Logger, url string) (common.LinkPreviewThumbnail, error) {
 	var thumbnail common.LinkPreviewThumbnail
 
@@ -136,16 +125,101 @@ func fetchThumbnail(logger *zap.Logger, url string) (common.LinkPreviewThumbnail
 	return thumbnail, nil
 }
 
+type OEmbedUnfurler struct {
+	logger *zap.Logger
+	// oembedEndpoint describes where the consumer may request representations for
+	// the supported URL scheme. For example, for YouTube, it is
+	// https://www.youtube.com/oembed.
+	oembedEndpoint string
+	// url is the actual URL to be unfurled.
+	url neturl.URL
+}
+
+type OEmbedResponse struct {
+	Title        string `json:"title"`
+	ThumbnailURL string `json:"thumbnail_url"`
+}
+
+func (u OEmbedUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
+	preview := newDefaultLinkPreview(url)
+
+	requestURL, err := neturl.Parse(u.oembedEndpoint)
+	if err != nil {
+		return preview, err
+	}
+
+	// When format is specified, the provider MUST return data in the request
+	// format, else return an error.
+	requestURL.RawQuery = neturl.Values{
+		"url":    {u.url.String()},
+		"format": {"json"},
+	}.Encode()
+
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", requestURL.String(), nil)
+	if err != nil {
+		return preview, err
+	}
+	req.Header.Set("accept", "application/json; charset=utf-8")
+	req.Header.Set("accept-language", defaultAcceptLanguage)
+	req.Header.Set("user-agent", defaultUserAgent)
+
+	res, err := httpClient.Do(req)
+	defer func() {
+		if res != nil {
+			if err = res.Body.Close(); err != nil {
+				u.logger.Error("failed to close response body", zap.Error(err))
+			}
+		}
+	}()
+	if err != nil {
+		return preview, UnfurlError{
+			msg: "failed to get oEmbed",
+			url: u.url.String(),
+			err: err,
+		}
+	}
+
+	if res.StatusCode >= http.StatusBadRequest {
+		return preview, UnfurlError{
+			msg: fmt.Sprintf("failed to fetch oEmbed metadata, statusCode='%d'", res.StatusCode),
+			url: u.url.String(),
+			err: nil,
+		}
+	}
+
+	var oembedResponse OEmbedResponse
+	oembedBytes, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return preview, err
+	}
+	err = json.Unmarshal(oembedBytes, &oembedResponse)
+	if err != nil {
+		return preview, err
+	}
+
+	if oembedResponse.Title == "" {
+		return preview, UnfurlError{
+			msg: "missing title",
+			url: url.String(),
+			err: errors.New(""),
+		}
+	}
+
+	preview.Title = oembedResponse.Title
+	return preview, nil
+}
+
 type OpenGraphMetadata struct {
 	Title        string `json:"title" meta:"og:title"`
 	Description  string `json:"description" meta:"og:description"`
 	ThumbnailURL string `json:"thumbnailUrl" meta:"og:image"`
 }
 
-// OpenGraphUnfurler can be used either as the default unfurler for some websites
-// (e.g. GitHub), or as a fallback strategy. It parses HTML and extract
-// OpenGraph meta tags. If an oEmbed endpoint is available, it should be
-// preferred.
+// OpenGraphUnfurler should be preferred over OEmbedUnfurler because oEmbed
+// gives back a JSON response with a "html" field that's supposed to be embedded
+// in an iframe (hardly useful for existing Status' clients).
 type OpenGraphUnfurler struct {
 	logger *zap.Logger
 }
@@ -153,8 +227,17 @@ type OpenGraphUnfurler struct {
 func (u OpenGraphUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
 	preview := newDefaultLinkPreview(url)
 
-	res, cancel, err := httpGETForOpenGraph(url.String())
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
+	if err != nil {
+		return preview, err
+	}
+	req.Header.Set("accept", "text/html; charset=utf-8")
+	req.Header.Set("accept-language", defaultAcceptLanguage)
+	req.Header.Set("user-agent", defaultUserAgent)
+
+	res, err := httpClient.Do(req)
 	defer func() {
 		if res != nil {
 			if err = res.Body.Close(); err != nil {
@@ -170,15 +253,11 @@ func (u OpenGraphUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
 		}
 	}
 
-	// Behave like WhatsApp, i.e. if the response is a 404, consider the URL
-	// unfurleable. We can try to unfurl from the 404 HTML, which works well for
-	// certain websites, like GitHub, but it also potentially confuses users
-	// because they'll be sharing previews that don't match the actual URLs.
-	if res.StatusCode == http.StatusNotFound {
+	if res.StatusCode >= http.StatusBadRequest {
 		return preview, UnfurlError{
-			msg: "could not find page",
+			msg: fmt.Sprintf("failed to fetch OpenGraph metadata, statusCode='%d'", res.StatusCode),
 			url: url.String(),
-			err: errors.New(""),
+			err: nil,
 		}
 	}
 
@@ -219,10 +298,23 @@ func (u OpenGraphUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
 	return preview, nil
 }
 
+func normalizeHostname(hostname string) string {
+	hostname = strings.ToLower(hostname)
+	re := regexp.MustCompile(`^www\.(.*)$`)
+	return re.ReplaceAllString(hostname, "$1")
+}
+
 func newUnfurler(logger *zap.Logger, url *neturl.URL) Unfurler {
-	u := new(OpenGraphUnfurler)
-	u.logger = logger
-	return u
+	switch normalizeHostname(url.Hostname()) {
+	case "reddit.com":
+		return OEmbedUnfurler{
+			oembedEndpoint: "https://www.reddit.com/oembed",
+			url:            *url,
+			logger:         logger,
+		}
+	default:
+		return OpenGraphUnfurler{logger: logger}
+	}
 }
 
 func unfurl(logger *zap.Logger, url string) (common.LinkPreview, error) {
@@ -264,6 +356,10 @@ func parseValidURL(rawURL string) (*neturl.URL, error) {
 }
 
 // GetURLs returns only what we consider unfurleable URLs.
+//
+// If we wanted to be extra precise and help improve UX, we could ignore URLs
+// that we know can't be unfurled. This is at least possible with the oEmbed
+// protocol because providers must specify an endpoint scheme.
 func GetURLs(text string) []string {
 	parsedText := markdown.Parse([]byte(text), nil)
 	visitor := common.RunLinksVisitor(parsedText)
