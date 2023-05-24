@@ -176,6 +176,37 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	require.True(t, err == ErrDbAccountNotFound)
 }
 
+func TestUpdateKeypairName(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	kp := GetProfileKeypairForTest(true, false, false)
+
+	// check the db
+	dbAccounts, err := db.GetAccounts()
+	require.NoError(t, err)
+	require.Equal(t, 0, len(dbAccounts))
+
+	// save keypair
+	err = db.SaveOrUpdateKeypair(kp)
+	require.NoError(t, err)
+	dbKeypairs, err := db.GetKeypairs()
+	require.NoError(t, err)
+	require.Equal(t, 1, len(dbKeypairs))
+	require.True(t, SameKeypairs(kp, dbKeypairs[0]))
+
+	// update keypair name
+	kp.Name = kp.Name + "updated"
+	err = db.UpdateKeypairName(kp.KeyUID, kp.Name, kp.Clock)
+	require.NoError(t, err)
+
+	// check keypair
+	dbKp, err := db.GetKeypairByKeyUID(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, len(kp.Accounts), len(dbKp.Accounts))
+	require.True(t, SameKeypairs(kp, dbKp))
+}
+
 func TestKeypairs(t *testing.T) {
 	keypairs := []*Keypair{
 		GetProfileKeypairForTest(true, true, true),

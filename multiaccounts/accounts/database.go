@@ -376,28 +376,28 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string) ([]*Keypair, error) {
 	}
 	query := fmt.Sprintf( // nolint: gosec
 		`
-		SELECT 
-			k.*, 
-			ka.address, 
+		SELECT
+			k.*,
+			ka.address,
 			ka.key_uid,
-			ka.pubkey, 
-			ka.path, 
-			ka.name, 
+			ka.pubkey,
+			ka.path,
+			ka.name,
 			ka.color,
 			ka.emoji,
-			ka.wallet, 
-			ka.chat, 
+			ka.wallet,
+			ka.chat,
 			ka.hidden,
 			ka.operable,
 			ka.clock
-		FROM 
+		FROM
 			keypairs k
-		LEFT JOIN 
+		LEFT JOIN
 			keypairs_accounts ka
 		ON
 			k.key_uid = ka.key_uid
 		%s
-		ORDER BY 
+		ORDER BY
 			ka.created_at`, where)
 
 	if tx == nil {
@@ -457,28 +457,28 @@ func (db *Database) getAccounts(tx *sql.Tx, address types.Address) ([]*Account, 
 
 	query := fmt.Sprintf( // nolint: gosec
 		`
-		SELECT 
-			k.*, 
-			ka.address, 
+		SELECT
+			k.*,
+			ka.address,
 			ka.key_uid,
-			ka.pubkey, 
-			ka.path, 
-			ka.name, 
+			ka.pubkey,
+			ka.path,
+			ka.name,
 			ka.color,
 			ka.emoji,
-			ka.wallet, 
-			ka.chat, 
+			ka.wallet,
+			ka.chat,
 			ka.hidden,
 			ka.operable,
 			ka.clock
-		FROM 
+		FROM
 			keypairs_accounts ka
-		LEFT JOIN 
+		LEFT JOIN
 			keypairs k
 		ON
 			ka.key_uid = k.key_uid
 		%s
-		ORDER BY 
+		ORDER BY
 			ka.created_at`, where)
 
 	if tx == nil {
@@ -665,12 +665,12 @@ func updateKeypairLastUsedIndex(tx *sql.Tx, keyUID string, index uint64, clock u
 		return errDbTransactionIsNil
 	}
 	_, err := tx.Exec(`
-			UPDATE 
-				keypairs 
-			SET 
+			UPDATE
+				keypairs
+			SET
 				last_used_derivation_index = ?,
 				clock = ?
-			WHERE 
+			WHERE
 				key_uid = ?`,
 		index, clock, keyUID)
 
@@ -699,20 +699,20 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account) (err e
 		}
 
 		_, err = tx.Exec(`
-			INSERT OR IGNORE INTO 
-				keypairs_accounts (address, key_uid, pubkey, path, wallet, chat, created_at, updated_at) 
-			VALUES 
+			INSERT OR IGNORE INTO
+				keypairs_accounts (address, key_uid, pubkey, path, wallet, chat, created_at, updated_at)
+			VALUES
 				(?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'));
-			
+
 			UPDATE
 				keypairs_accounts
 			SET
-				name = ?, 
-				color = ?, 
-				emoji = ?, 
+				name = ?,
+				color = ?,
+				emoji = ?,
 				hidden = ?,
 				operable = ?,
-				clock = ? 
+				clock = ?
 			WHERE
 				address = ?;
 		`,
@@ -807,15 +807,15 @@ func (db *Database) SaveOrUpdateKeypair(keypair *Keypair) error {
 	}
 
 	_, err = tx.Exec(`
-		INSERT OR IGNORE INTO 
-			keypairs (key_uid, type, derived_from) 
-		VALUES 
+		INSERT OR IGNORE INTO
+			keypairs (key_uid, type, derived_from)
+		VALUES
 			(?, ?, ?);
 
 		UPDATE
 			keypairs
 		SET
-			name = ?, 
+			name = ?,
 			last_used_derivation_index = ?,
 			synced_from = ?,
 			clock = ?
@@ -828,6 +828,37 @@ func (db *Database) SaveOrUpdateKeypair(keypair *Keypair) error {
 	}
 
 	return db.saveOrUpdateAccounts(tx, keypair.Accounts)
+}
+
+func (db *Database) UpdateKeypairName(keyUID string, name string, clock uint64) error {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	_, err = db.getKeypairByKeyUID(tx, keyUID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`
+		UPDATE
+			keypairs
+		SET
+			name = ?,
+			clock = ?
+		WHERE
+			key_uid = ?;
+	`, name, clock, keyUID)
+
+	return err
 }
 
 func (db *Database) GetWalletAddress() (rst types.Address, err error) {

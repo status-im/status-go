@@ -22,6 +22,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
@@ -546,6 +547,15 @@ func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Communi
 }
 
 func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
+	// add bob's profile keypair
+	bobProfileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	bobProfileKp.KeyUID = s.bob.account.KeyUID
+	bobProfileKp.Accounts[0].KeyUID = s.bob.account.KeyUID
+
+	err := s.bob.settings.SaveOrUpdateKeypair(bobProfileKp)
+	s.Require().NoError(err)
+
+	// create community and make bob and alice join to it
 	community := s.createCommunity()
 	s.advertiseCommunityTo(community, s.bob)
 	s.advertiseCommunityTo(community, s.alice)
@@ -554,7 +564,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
 	s.joinCommunity(community, s.alice)
 
 	// Trigger ContactCodeAdvertisement
-	err := s.bob.SetDisplayName("bobby")
+	err = s.bob.SetDisplayName("bobby")
 	s.Require().NoError(err)
 	err = s.bob.SetBio("I like P2P chats")
 	s.Require().NoError(err)

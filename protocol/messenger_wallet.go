@@ -16,7 +16,11 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-var checkBalancesInterval = time.Minute * 10
+var (
+	checkBalancesInterval = time.Minute * 10
+
+	ErrCannotChangeKeypairName = errors.New("cannot change profile keypair name")
+)
 
 func (m *Messenger) retrieveWalletBalances() error {
 	if m.walletAPI == nil {
@@ -73,7 +77,30 @@ func (m *Messenger) watchWalletBalances() {
 	}()
 }
 
+func (m *Messenger) UpdateKeypairName(keyUID string, name string) error {
+	if keyUID == m.account.KeyUID && name != m.account.Name {
+		// profile keypair name must always follow profile display name
+		return ErrCannotChangeKeypairName
+	}
+	clock, _ := m.getLastClockWithRelatedChat()
+	err := m.settings.UpdateKeypairName(keyUID, name, clock)
+	if err != nil {
+		return err
+	}
+
+	dbKeypair, err := m.settings.GetKeypairByKeyUID(m.account.KeyUID)
+	if err != nil {
+		return err
+	}
+
+	return m.syncKeypair(dbKeypair, false, m.dispatchMessage)
+}
+
 func (m *Messenger) SaveOrUpdateKeypair(keypair *accounts.Keypair) error {
+	if keypair.KeyUID == m.account.KeyUID && keypair.Name != m.account.Name {
+		// profile keypair name must always follow profile display name
+		return ErrCannotChangeKeypairName
+	}
 	clock, _ := m.getLastClockWithRelatedChat()
 	keypair.Clock = clock
 
