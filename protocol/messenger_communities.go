@@ -4225,61 +4225,56 @@ func chunkAttachmentsByByteSize(slice []*protobuf.DiscordMessageAttachment, maxF
 	return chunks
 }
 
-// startCommunityRekeyLoop starts a loop function for each community the user is an admin of.
-func (m *Messenger) startCommunityRekeyLoop() error {
+// startCommunityRekeyLoop creates a 5-minute ticker and starts a routine that attempts to rekey every community every tick
+func (m *Messenger) startCommunityRekeyLoop() {
 	logger := m.logger.Named("CommunityRekeyLoop")
 
+	ticker := time.NewTicker(5 * time.Minute)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				logger.Debug("rekeyAllCommunities ticker fired")
+				m.rekeyAllCommunities(logger)
+				logger.Debug("rekeyAllCommunities ticker loop ended")
+			case <-m.quit:
+				ticker.Stop()
+				logger.Debug("CommunityRekeyLoop stopped")
+				return
+			}
+		}
+	}()
+}
+
+// rekeyAllCommunities attempts to rekey every community in persistence.
+// A community will be rekeyed if it meets all the following criteria:
+//   - Community.IsAdmin()
+//   - Community.Encrypted()
+//   - Community.RekeyedAt().Add(rki).Before(time.Now()) where rki is a defined rekey interval
+func (m *Messenger) rekeyAllCommunities(logger *zap.Logger) {
+	// Determine the rekey interval, if the value is not set as a property of m.communitiesManager
+	// default to one hour
+	// TODO in future perhaps have a community level rki rather than a global rki
 	var rki time.Duration
 	if m.communitiesManager.RekeyInterval == nil {
 		rki = time.Hour
 	} else {
 		rki = *m.communitiesManager.RekeyInterval
 	}
-	ticker := time.NewTicker(rki)
 
+	// Get and loop over all communities in persistence
 	cs, err := m.Communities()
 	if err != nil {
-		return err
+		logger.Error("error getting communities", zap.Error(err))
+		return
 	}
-
 	for _, c := range cs {
-		err = m.rekeyCommunity(c, rki, ticker, logger)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (m *Messenger) rekeyCommunity(c *communities.Community, rki time.Duration, ticker *time.Ticker, logger *zap.Logger) error {
-	if c.IsAdmin() && c.Encrypted() {
-		// if rekey time period exceeded, perform a rekey
-		if c.RekeyedAt().Add(rki).Before(time.Now()) {
+		if c.IsAdmin() && c.Encrypted() && c.RekeyedAt().Add(rki).Before(time.Now()) {
 			err := m.RekeyCommunity(c.ID())
 			if err != nil {
-				return err
+				logger.Error("error sending rekey message", zap.Error(err), zap.Binary("community ID", c.ID()))
+				continue
 			}
 		}
-
-		go func() {
-			logger.Debug("CommunityRekeyLoop started", zap.Binary("community ID", c.ID()))
-			for {
-				select {
-				case <-ticker.C:
-					err := m.RekeyCommunity(c.ID())
-					if err != nil {
-						logger.Error("error sending rekey message", zap.Error(err), zap.Binary("community ID", c.ID()))
-					}
-
-				case <-m.quit:
-					ticker.Stop()
-					logger.Debug("CommunityRekeyLoop stopped", zap.Binary("community ID", c.ID()))
-					return
-				}
-			}
-		}()
 	}
-
-	return nil
 }

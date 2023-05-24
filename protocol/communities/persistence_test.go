@@ -503,10 +503,10 @@ func (s *PersistenceSuite) TestGetRekeyedAtClock() {
 	s.Zero(communities[1].config.RekeyedAt.Unix())
 
 	now := time.Now()
-	err = s.db.SetRekeyedAtClock(communities[1].ID(), &now)
+	err = s.db.SetRekeyedAtClock(communities[1].ID(), now)
 	s.NoError(err)
 
 	then, err := s.db.GetRekeyedAtClock(communities[0].ID())
 	s.NoError(err)
-	now.Equal(*then)
+	now.Equal(then)
 }

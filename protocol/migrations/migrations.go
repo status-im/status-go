@@ -90,6 +90,7 @@
 // 1683725607_mark_discord_messages_as_seen.up.sql (108B)
 // 1684174617_add_url_previews_to_user_messages.up.sql (58B)
 // 1684175608_add_token_balances.up.sql (467B)
+// 1684926535_add_rekeyed_at_column_to_communities.up.sql (88B)
 // 1684979808_sync_activity_center_notifications.up.sql (169B)
 // 1685383829_add_communities_mute_till.up.sql (69B)
 // 1685964183_add_chainids_to_revealed_addresses.up.sql (88B)
@@ -2329,6 +2330,26 @@ func _1684175608_add_token_balancesUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1684926535_add_rekeyed_at_column_to_communitiesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\xce\xcf\xcd\x2d\xcd\xcb\x2c\xc9\x4c\x2d\x8e\x47\x62\x2b\x38\xba\xb8\x28\x38\xfb\xfb\x84\xfa\xfa\x29\x14\xa5\x66\xa7\x56\xa6\xa6\xc4\x27\x96\x28\x84\x78\xfa\xba\x06\x87\x38\xfa\x06\x28\xb8\xb8\xba\x39\x86\xfa\x84\x28\x18\x28\xf8\xf9\x87\x28\xf8\x85\xfa\xf8\x58\x73\x01\x02\x00\x00\xff\xff\xe5\x49\x11\x67\x58\x00\x00\x00")
+
+func _1684926535_add_rekeyed_at_column_to_communitiesUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1684926535_add_rekeyed_at_column_to_communitiesUpSql,
+		"1684926535_add_rekeyed_at_column_to_communities.up.sql",
+	)
+}
+
+func _1684926535_add_rekeyed_at_column_to_communitiesUpSql() (*asset, error) {
+	bytes, err := _1684926535_add_rekeyed_at_column_to_communitiesUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1684926535_add_rekeyed_at_column_to_communities.up.sql", size: 88, mode: os.FileMode(0644), modTime: time.Unix(1687994097, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x32, 0x2e, 0x1e, 0x79, 0xed, 0xf0, 0x90, 0xc1, 0x26, 0x72, 0x46, 0xcc, 0x54, 0x8a, 0x9, 0xb3, 0xe1, 0x70, 0x46, 0x13, 0x26, 0x89, 0xb5, 0xde, 0xc5, 0x74, 0xe, 0x26, 0xc2, 0x37, 0x56, 0xe8}}
+	return a, nil
+}
+
 var __1684979808_sync_activity_center_notificationsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x94\xcc\xc1\x09\x02\x31\x10\x05\xd0\xbb\x55\xfc\x12\xbc\x7b\x8a\x26\x82\x30\x66\x41\x26\xe7\x30\x64\x23\xcc\x25\x2b\xe6\x2b\xd8\xbd\x1d\x08\x36\xf0\x82\x68\xba\x41\xc3\x51\x12\xac\xd1\xdf\xce\x4f\x6d\x7d\xb0\x3f\xeb\xa4\xb1\x4f\x84\x18\x71\x5a\xa4\x5c\x33\x5e\x8f\xd5\xd8\xd7\x6a\xc4\x25\x2b\xf2\xa2\xc8\x45\x04\x31\x9d\x43\x11\xc5\xfe\xb0\xfb\x05\x8e\x8d\x7e\xf7\x66\xf4\x6d\xfc\xeb\x7e\x03\x00\x00\xff\xff\x09\xb8\x1a\x7c\xa9\x00\x00\x00")
 
 func _1684979808_sync_activity_center_notificationsUpSqlBytes() ([]byte, error) {
@@ -2852,6 +2873,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1684175608_add_token_balances.up.sql": _1684175608_add_token_balancesUpSql,
 
+	"1684926535_add_rekeyed_at_column_to_communities.up.sql": _1684926535_add_rekeyed_at_column_to_communitiesUpSql,
+
 	"1684979808_sync_activity_center_notifications.up.sql": _1684979808_sync_activity_center_notificationsUpSql,
 
 	"1685383829_add_communities_mute_till.up.sql": _1685383829_add_communities_mute_tillUpSql,
@@ -3009,6 +3032,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1683725607_mark_discord_messages_as_seen.up.sql":                             &bintree{_1683725607_mark_discord_messages_as_seenUpSql, map[string]*bintree{}},
 	"1684174617_add_url_previews_to_user_messages.up.sql":                         &bintree{_1684174617_add_url_previews_to_user_messagesUpSql, map[string]*bintree{}},
 	"1684175608_add_token_balances.up.sql":                                        &bintree{_1684175608_add_token_balancesUpSql, map[string]*bintree{}},
+	"1684926535_add_rekeyed_at_column_to_communities.up.sql":                      &bintree{_1684926535_add_rekeyed_at_column_to_communitiesUpSql, map[string]*bintree{}},
 	"1684979808_sync_activity_center_notifications.up.sql":                        &bintree{_1684979808_sync_activity_center_notificationsUpSql, map[string]*bintree{}},
 	"1685383829_add_communities_mute_till.up.sql":                                 &bintree{_1685383829_add_communities_mute_tillUpSql, map[string]*bintree{}},
 	"1685964183_add_chainids_to_revealed_addresses.up.sql":                        &bintree{_1685964183_add_chainids_to_revealed_addressesUpSql, map[string]*bintree{}},
