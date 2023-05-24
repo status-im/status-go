@@ -14,7 +14,7 @@ func TestKeycards(t *testing.T) {
 
 	keycardUID := "00000000000000000000000000000000"
 
-	kp1 := GetProfileKeypairForTest(false)
+	kp1 := GetProfileKeypairForTest(true, true, true)
 	keycard1 := GetProfileKeycardForTest()
 
 	kp2 := GetSeedImportedKeypair1ForTest()

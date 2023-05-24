@@ -66,7 +66,7 @@ func (s *MessengerSyncWalletSuite) newMessenger(shh types.Waku) *Messenger {
 }
 
 func (s *MessengerSyncWalletSuite) TestSyncWallets() {
-	profileKp := accounts.GetProfileKeypairForTest(false)
+	profileKp := accounts.GetProfileKeypairForTest(true, true, true)
 
 	// Create a main account on alice
 	err := s.m.settings.SaveOrUpdateKeypair(profileKp)
@@ -82,7 +82,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	s.Require().NoError(err)
 
 	// Store only chat and default wallet account on other device
-	profileKpOtherDevice := accounts.GetProfileKeypairForTest(true)
+	profileKpOtherDevice := accounts.GetProfileKeypairForTest(true, true, false)
 	err = alicesOtherDevice.settings.SaveOrUpdateKeypair(profileKpOtherDevice)
 	s.Require().NoError(err, "profile keypair alicesOtherDevice.settings.SaveOrUpdateKeypair")
 
@@ -194,7 +194,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	s.Require().True(haveSameElements(dbAccounts1, dbAccounts2, accounts.SameAccounts))
 
 	// Update keypair name on alice's primary device
-	profileKpUpdated := accounts.GetProfileKeypairForTest(true)
+	profileKpUpdated := accounts.GetProfileKeypairForTest(true, true, false)
 	profileKpUpdated.Name = profileKp.Name + "Updated"
 	profileKpUpdated.Accounts = profileKp.Accounts[:0]
 	err = s.m.SaveOrUpdateKeypair(profileKpUpdated)
@@ -222,7 +222,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	s.Require().Equal(profileKpUpdated.Name, dbProfileKp2.Name)
 
 	// Update accounts on alice's primary device
-	profileKpUpdated = accounts.GetProfileKeypairForTest(false)
+	profileKpUpdated = accounts.GetProfileKeypairForTest(true, true, true)
 	accountsToUpdate := profileKpUpdated.Accounts[2:]
 	for _, acc := range accountsToUpdate {
 		acc.Name = acc.Name + "Updated"
