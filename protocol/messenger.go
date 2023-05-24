@@ -3558,6 +3558,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				if msg.ParsedMessage != nil {
 
 					logger.Debug("Handling parsed message")
+					log.Info("HANDLE RETRIED MESSAGE", msg.Type)
 
 					switch msg.ParsedMessage.Interface().(type) {
 					case protobuf.MembershipUpdateMessage:
@@ -3997,7 +3998,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						logger.Debug("Handling DeclineRequestTransaction")
 						err = m.HandleDeclineRequestTransaction(messageState, command)
 						if err != nil {
-							logger.Warn("failed to handle DeclineRequestTransaction", zap.Error(err))
+							logger.Warn("failed to hasaveDataAndPrepareResponsendle DeclineRequestTransaction", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}

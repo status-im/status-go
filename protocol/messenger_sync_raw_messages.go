@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
@@ -19,6 +20,7 @@ type RawMessageHandler func(ctx context.Context, rawMessage common.RawMessage) (
 func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) error {
 	state := m.buildMessageState()
 	for _, rawMessage := range rawMessages {
+		log.Info("RawMessageHandler", rawMessage.GetMessageType())
 		switch rawMessage.GetMessageType() {
 		case protobuf.ApplicationMetadataMessage_CONTACT_UPDATE:
 			var message protobuf.ContactUpdate
@@ -290,6 +292,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			}
 		}
 	}
+	log.Info(" saveDataAndPrepareResponse from HandleRaw")
 	response, err := m.saveDataAndPrepareResponse(state)
 	if err != nil {
 		return err
