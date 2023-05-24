@@ -76,6 +76,11 @@ func (m *Messenger) SetDisplayName(displayName string) error {
 		return err
 	}
 
+	err = m.UpdateKeypairName(m.account.KeyUID, displayName)
+	if err != nil {
+		return err
+	}
+
 	err = m.resetLastPublishedTimeForChatIdentity()
 	if err != nil {
 		return err

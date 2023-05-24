@@ -65,6 +65,48 @@ func (s *MessengerSyncWalletSuite) newMessenger(shh types.Waku) *Messenger {
 	return messenger
 }
 
+// user should not be able to change a keypair name directly, it follows display name
+func (s *MessengerSyncWalletSuite) TestProfileKeypairNameChange() {
+	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp.KeyUID = s.m.account.KeyUID
+	profileKp.Name = s.m.account.Name
+	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
+
+	// Create a main account on alice
+	err := s.m.settings.SaveOrUpdateKeypair(profileKp)
+	s.Require().NoError(err, "profile keypair alice.settings.SaveOrUpdateKeypair")
+
+	// Check account is present in the db
+	dbProfileKp, err := s.m.settings.GetKeypairByKeyUID(profileKp.KeyUID)
+	s.Require().NoError(err)
+	s.Require().True(accounts.SameKeypairs(profileKp, dbProfileKp))
+
+	// Try to change profile keypair name using `SaveOrUpdateKeypair` function
+	profileKp1 := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp1.Name = profileKp1.Name + "updated"
+	profileKp1.KeyUID = s.m.account.KeyUID
+	profileKp1.Accounts[0].KeyUID = s.m.account.KeyUID
+
+	err = s.m.SaveOrUpdateKeypair(profileKp1)
+	s.Require().Error(err)
+	s.Require().True(err == ErrCannotChangeKeypairName)
+
+	// Check the db
+	dbProfileKp, err = s.m.settings.GetKeypairByKeyUID(profileKp.KeyUID)
+	s.Require().NoError(err)
+	s.Require().True(accounts.SameKeypairs(profileKp, dbProfileKp))
+
+	// Try to change profile keypair name using `UpdateKeypairName` function
+	err = s.m.UpdateKeypairName(profileKp1.KeyUID, profileKp1.Name)
+	s.Require().Error(err)
+	s.Require().True(err == ErrCannotChangeKeypairName)
+
+	// Check the db
+	dbProfileKp, err = s.m.settings.GetKeypairByKeyUID(profileKp.KeyUID)
+	s.Require().NoError(err)
+	s.Require().True(accounts.SameKeypairs(profileKp, dbProfileKp))
+}
+
 func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	profileKp := accounts.GetProfileKeypairForTest(true, true, true)
 
