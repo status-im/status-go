@@ -3451,6 +3451,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 	}
 	// Save chats if they were modified
 	if len(messageState.Response.chats) > 0 {
+		log.Info("My own code lol")
 		err := m.saveChats(messageState.Response.Chats())
 		if err != nil {
 			return err
@@ -4540,6 +4541,7 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 	}
 
 	if len(messageState.Response.chats) > 0 {
+		log.Info("saveDataAndPrepareResponse")
 		err = m.saveChats(messageState.Response.Chats())
 		if err != nil {
 			return nil, err
@@ -4900,7 +4902,7 @@ func (m *Messenger) markAllRead(chatID string, clock uint64, shouldBeSynced bool
 
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	m.allChats.Store(chat.ID, chat)
-	return m.persistence.SaveChats([]*Chat{chat})
+	return m.persistence.SaveChat(*chat)
 }
 
 func (m *Messenger) MarkAllRead(chatID string) error {

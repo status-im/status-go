@@ -407,6 +407,7 @@ func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Cha
 		}
 	}
 
+	log.Info("initCommunityChats")
 	if err = m.saveChats(chats); err != nil {
 		logger.Debug("m.saveChats error", zap.Error(err))
 		return nil, err
@@ -465,6 +466,7 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 
 	// chats and settings are already initialized for spectated communities
 	if !community.Spectated() {
+		log.Info("joinCommunity")
 		chats, err := m.initCommunityChats(community)
 		if err != nil {
 			return nil, err
@@ -511,6 +513,7 @@ func (m *Messenger) SpectateCommunity(communityID types.HexBytes) (*MessengerRes
 		return nil, err
 	}
 
+	log.Info("SpectateCommunity")
 	chats, err := m.initCommunityChats(community)
 	if err != nil {
 		return nil, err
@@ -1128,6 +1131,7 @@ func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.
 		return nil, err
 	}
 
+	log.Info("CreateCommunityChat")
 	err = m.saveChats(chats)
 	if err != nil {
 		return nil, err
@@ -1169,6 +1173,7 @@ func (m *Messenger) EditCommunityChat(communityID types.HexBytes, chatID string,
 		return nil, err
 	}
 
+	log.Info("EditCommunityChat")
 	return &response, m.saveChats(chats)
 }
 
@@ -3289,6 +3294,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 
 		// Chats need to be saved after the community has been published,
 		// hence we make this part of the `InitCommunityTask`
+		log.Info("RequestDiscordCommunity")
 		err = m.saveChats(chatsToSave)
 		if err != nil {
 			m.cleanUpImport(communityID)

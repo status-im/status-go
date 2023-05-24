@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -199,6 +200,7 @@ func (m *Messenger) processActivityCenterNotifications(notifications []*Activity
 		}
 	}
 	if len(chats) != 0 {
+		log.Info("processActivityCenterNotifications")
 		err := m.saveChats(chats)
 		if err != nil {
 			return nil, err
