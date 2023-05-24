@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
-	_errors "errors"
 	"fmt"
 	"os"
 	"strings"
@@ -237,7 +236,8 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					}
 
 					if sub.MemberPermissionsCheckedSignal != nil {
-						err := m.UpdateCommunityEncryption(sub.Community)
+						becomeMemberPermissions := sub.Community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+						err := m.UpdateCommunityEncryption(sub.Community, len(becomeMemberPermissions) > 0)
 						if err != nil {
 							m.logger.Warn("failed to update community encryption", zap.Error(err))
 						}
@@ -3315,7 +3315,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				if err != nil {
 					m.cleanUpImport(communityID)
 					errmsg := err.Error()
-					if _errors.Is(err, communities.ErrInvalidCommunityDescriptionDuplicatedName) {
+					if errors.Is(err, communities.ErrInvalidCommunityDescriptionDuplicatedName) {
 						errmsg = fmt.Sprintf("Couldn't create channel '%s': %s", communityChat.Identity.DisplayName, err.Error())
 					}
 					importProgress.AddTaskError(discord.ChannelsCreationTask, discord.Error(errmsg))
@@ -4081,26 +4081,25 @@ func (m *Messenger) UpdateCommunityTokenSupply(chainID int, contractAddress stri
 	return m.communitiesManager.UpdateCommunityTokenSupply(chainID, contractAddress, supply)
 }
 
-// UpdateCommunityEncryption takes a community and encrypts / decrypts the community
-// based on TokenPermission. Community is republished along with any keys if needed.
+// UpdateCommunityEncryption takes a communityID string and an encryption state, then finds the community and
+// encrypts / decrypts the community. Community is republished along with any keys if needed.
 //
 // Note: This function cannot decrypt previously encrypted messages, and it cannot encrypt previous unencrypted messages.
 // This functionality introduces some race conditions:
 //   - community description is processed by members before the receiving the key exchange messages
 //   - members maybe sending encrypted messages after the community description is updated and a new member joins
-func (m *Messenger) UpdateCommunityEncryption(community *communities.Community) error {
+func (m *Messenger) UpdateCommunityEncryption(community *communities.Community, useEncryption bool) error {
 	if community == nil {
 		return errors.New("community is nil")
 	}
 
-	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
-	isEncrypted := len(becomeMemberPermissions) > 0
-
-	if community.Encrypted() == isEncrypted {
+	// Check isEncrypted is different to Community's value
+	// If not different return
+	if community.Encrypted() == useEncryption {
 		return nil
 	}
 
-	if isEncrypted {
+	if useEncryption {
 		// 🪄 The magic that encrypts a community
 		_, err := m.encryptor.GenerateHashRatchetKey(community.ID())
 		if err != nil {
@@ -4116,7 +4115,7 @@ func (m *Messenger) UpdateCommunityEncryption(community *communities.Community) 
 	// 🧙 There is no magic that decrypts a community, we just need to tell everyone to not use encryption
 
 	// Republish the community.
-	community.SetEncrypted(isEncrypted)
+	community.SetEncrypted(useEncryption)
 	err := m.communitiesManager.UpdateCommunity(community)
 	if err != nil {
 		return err
@@ -4229,7 +4228,14 @@ func chunkAttachmentsByByteSize(slice []*protobuf.DiscordMessageAttachment, maxF
 func (m *Messenger) startCommunityRekeyLoop() {
 	logger := m.logger.Named("CommunityRekeyLoop")
 
-	ticker := time.NewTicker(5 * time.Minute)
+	var d time.Duration
+	if m.communitiesManager.RekeyInterval != 0 {
+		d = m.communitiesManager.RekeyInterval / 10
+	} else {
+		d = 5 * time.Minute
+	}
+
+	ticker := time.NewTicker(d)
 	go func() {
 		for {
 			select {
@@ -4256,10 +4262,10 @@ func (m *Messenger) rekeyAllCommunities(logger *zap.Logger) {
 	// default to one hour
 	// TODO in future perhaps have a community level rki rather than a global rki
 	var rki time.Duration
-	if m.communitiesManager.RekeyInterval == nil {
+	if m.communitiesManager.RekeyInterval == 0 {
 		rki = time.Hour
 	} else {
-		rki = *m.communitiesManager.RekeyInterval
+		rki = m.communitiesManager.RekeyInterval
 	}
 
 	// Get and loop over all communities in persistence

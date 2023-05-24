@@ -245,6 +245,11 @@ func (p *Protocol) GetAllHREncodedKeys(groupID []byte) ([]byte, error) {
 	return p.GetHREncodedKeys(groupID, keyIDs)
 }
 
+// GetKeyIDsForGroup returns a slice of key IDs belonging to a given group ID
+func (p *Protocol) GetKeyIDsForGroup(groupID []byte) ([]uint32, error) {
+	return p.encryptor.persistence.GetKeyIDsForGroup(groupID)
+}
+
 func (p *Protocol) GetHREncodedKeys(groupID []byte, keyIDs []uint32) ([]byte, error) {
 	keys := &HRKeys{}
 	for _, keyID := range keyIDs {

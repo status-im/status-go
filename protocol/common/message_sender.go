@@ -1041,3 +1041,8 @@ func (s *MessageSender) StartDatasync() {
 
 	s.datasync = ds
 }
+
+// GetKeyIDsForGroup returns a slice of key IDs belonging to a given group ID
+func (s *MessageSender) GetKeyIDsForGroup(groupID []byte) ([]uint32, error) {
+	return s.protocol.GetKeyIDsForGroup(groupID)
+}
