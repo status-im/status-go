@@ -160,6 +160,56 @@ func (api *API) MintTo(ctx context.Context, chainID uint64, contractAddress stri
 	return tx.Hash().Hex(), nil
 }
 
+func (api *API) EstimateMintTo(ctx context.Context, chainID uint64, contractAddress string, walletAddresses []string, amount int) (uint64, error) {
+	err := api.validateWalletsAndAmounts(walletAddresses, amount)
+	if err != nil {
+		return 0, err
+	}
+
+	ethClient, err := api.RPCClient.EthClient(chainID)
+	if err != nil {
+		log.Error(err.Error())
+		return 0, err
+	}
+
+	collectiblesABI, err := abi.JSON(strings.NewReader(collectibles.CollectiblesABI))
+	if err != nil {
+		return 0, err
+	}
+
+	totalAddresses := api.multiplyWalletAddresses(amount, walletAddresses)
+
+	var usersAddresses = []common.Address{}
+	for _, k := range totalAddresses {
+		usersAddresses = append(usersAddresses, common.HexToAddress(k))
+	}
+
+	data, err := collectiblesABI.Pack("mintTo", usersAddresses)
+	if err != nil {
+		return 0, err
+	}
+
+	ownerAddr, err := api.ContractOwner(ctx, chainID, contractAddress)
+	if err != nil {
+		return 0, err
+	}
+	toAddr := common.HexToAddress(contractAddress)
+	fromAddr := common.HexToAddress(ownerAddr)
+
+	callMsg := ethereum.CallMsg{
+		From:  fromAddr,
+		To:    &toAddr,
+		Value: big.NewInt(0),
+		Data:  data,
+	}
+
+	estimate, err := ethClient.EstimateGas(ctx, callMsg)
+	if err != nil {
+		return 0, err
+	}
+	return estimate + uint64(float32(estimate)*0.1), nil
+}
+
 func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, tokenIds []*bigint.BigInt) (string, error) {
 	if len(tokenIds) == 0 {
 		return "", errors.New("tokenIds list is empty")
