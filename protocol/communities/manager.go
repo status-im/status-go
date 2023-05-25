@@ -3160,6 +3160,31 @@ func (m *Manager) DownloadHistoryArchivesByMagnetlink(communityID types.HexBytes
 	}
 }
 
+func (m *Manager) MarkAllDownloadedArchivesAsNotImported(community *Community) error {
+	index, err := m.LoadHistoryArchiveIndexFromFile(m.identity, community.ID())
+	if err != nil {
+		return err
+	}
+	for hash, _ := range index.Archives {
+		exists, err := m.persistence.HasMessageArchiveID(community.ID(), hash)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			err := m.persistence.SaveMessageArchiveID(community.ID(), hash)
+			if err != nil {
+				return err
+			}
+		} else {
+			err := m.persistence.SetMessageArchiveIDImported(community.ID(), hash, false)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (m *Manager) GetMessageArchiveIDsToImport(communityID types.HexBytes) ([]string, error) {
 	return m.persistence.GetMessageArchiveIDsToImport(communityID)
 }

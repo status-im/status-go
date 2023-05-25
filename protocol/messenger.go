@@ -768,9 +768,14 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	for _, joinedCommunity := range joinedCommunities {
+		// TESTING: mark all downloaded archives as not yet imported
+		err := m.communitiesManager.MarkAllDownloadedArchivesAsNotImported(joinedCommunity)
+		if err != nil {
+			m.logger.Warn("failed to mark all downloaded archives as not imported", zap.Error(err))
+		}
 		// resume importing message history archives in case
 		// imports have been interrupted previously
-		err := m.resumeHistoryArchivesImport(joinedCommunity.ID())
+		err = m.resumeHistoryArchivesImport(joinedCommunity.ID())
 		if err != nil {
 			return nil, err
 		}
