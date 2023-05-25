@@ -112,6 +112,12 @@ func (api *API) GetTransfersForIdentities(ctx context.Context, identities []tran
 	return api.s.transferController.GetTransfersForIdentities(ctx, identities)
 }
 
+func (api *API) FetchDecodedTxData(ctx context.Context, data string) (*thirdparty.DataParsed, error) {
+	log.Debug("[Wallet: FetchDecodedTxData]")
+
+	return api.s.decoder.Run(data)
+}
+
 // Deprecated: GetCachedBalances is deprecated. Use GetTokensBalances instead
 func (api *API) GetCachedBalances(ctx context.Context, addresses []common.Address) ([]transfer.BlockView, error) {
 	return api.s.transferController.GetCachedBalances(ctx, api.s.rpcClient.UpstreamChainID, addresses)
