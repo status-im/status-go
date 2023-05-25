@@ -273,6 +273,20 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	response.AddMessage(contactRequest)
 	response.AddContact(contact)
 
+	// Send mutual state update message
+	timestamp := m.getTimesource().GetCurrentTime()
+	updateMessage := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeAdded, clock, timestamp)
+	ctx := context.Background()
+	updateResponse, err := m.sendChatMessage(ctx, updateMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	err = response.Merge(updateResponse)
+	if err != nil {
+		return nil, err
+	}
+
 	return response, nil
 }
 
@@ -442,7 +456,6 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 
 		// Send mutual state update message
 		updateMessage := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, timestamp)
-
 		messageResponse, err = m.sendChatMessage(ctx, updateMessage)
 		if err != nil {
 			return nil, err
