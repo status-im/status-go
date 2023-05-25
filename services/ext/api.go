@@ -480,6 +480,11 @@ func (api *PublicAPI) SetCommunityMuted(communityID types.HexBytes, muted bool) 
 	return api.service.messenger.SetMuted(communityID, muted)
 }
 
+// SetMutedPropertyOnAllChats sets the  muted value of the community and all chats in the community
+func (api *PublicAPI) MuteCommunityChats(communityID types.HexBytes, muted bool) error {
+	return api.service.messenger.MuteAllCommunityChats(communityID, muted)
+}
+
 // BanUserFromCommunity removes the user with pk from the community with ID
 func (api *PublicAPI) BanUserFromCommunity(request *requests.BanUserFromCommunity) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.BanUserFromCommunity(request)

@@ -532,6 +532,43 @@ func (m *Messenger) SetMuted(communityID types.HexBytes, muted bool) error {
 	return m.communitiesManager.SetMuted(communityID, muted)
 }
 
+func (m *Messenger) MuteAllCommunityChats(communityID types.HexBytes, muted bool) error {
+	community, err := m.communitiesManager.GetByID(communityID)
+	if err != nil {
+		return err
+	}
+
+	for _, chatID := range community.CommunityChats() {
+		if muted {
+			_, err = m.MuteChat(&requests.MuteChat{ChatID: community.IDString() + chatID, MutedType: MuteTillUnmuted})
+			if err != nil {
+				return err
+			}
+
+			err = m.SetMuted(communityID, muted)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = m.UnmuteChat(community.IDString() + chatID)
+			if err != nil {
+				return err
+			}
+
+			err = m.SetMuted(communityID, muted)
+			if err != nil {
+				return err
+			}
+		}
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (m *Messenger) SetMutePropertyOnChatsByCategory(communityID string, categoryID string, muted bool) error {
 	community, err := m.communitiesManager.GetByIDString(communityID)
 	if err != nil {

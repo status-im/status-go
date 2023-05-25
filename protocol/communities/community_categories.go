@@ -22,6 +22,20 @@ func (o *Community) ChatsByCategoryID(categoryID string) []string {
 	return chatIDs
 }
 
+func (o *Community) CommunityChats() []string {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+	var chatIDs []string
+	if o.config == nil || o.config.CommunityDescription == nil {
+		return chatIDs
+	}
+
+	for chatID := range o.config.CommunityDescription.Chats {
+		chatIDs = append(chatIDs, chatID)
+	}
+	return chatIDs
+}
+
 func (o *Community) CreateCategory(categoryID string, categoryName string, chatIDs []string) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
