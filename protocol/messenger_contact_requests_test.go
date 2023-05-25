@@ -494,9 +494,19 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 
 	// Make sure the message is updated
 	s.Require().NotNil(resp)
-	s.Require().Len(resp.Messages(), 1)
-	s.Require().Equal(resp.Messages()[0].ID, contactRequest.ID)
-	s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
+	s.Require().Len(resp.Messages(), 2)
+
+	contactRequestMsg := s.takeOutMessageByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
+	s.Require().NotNil(contactRequestMsg)
+
+	mutualStateUpdate := s.takeOutMessageByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_STATE_UPDATE)
+	s.Require().NotNil(mutualStateUpdate)
+
+	s.Require().Equal(contactRequestMsg.ID, contactRequest.ID)
+	s.Require().Equal(common.ContactRequestStateAccepted, contactRequestMsg.ContactRequestState)
+
+	s.Require().Equal(mutualStateUpdate.From, contactRequest.ChatId)
+	s.Require().Equal(mutualStateUpdate.ChatId, contactRequest.From)
 
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), contactRequest.ID)
@@ -519,7 +529,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	resp, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool {
-			return len(r.Contacts) == 1 && len(r.Messages()) == 1 && len(r.ActivityCenterNotifications()) == 1
+			return len(r.Contacts) == 1 && len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1
 		},
 		"no messages",
 	)
@@ -528,9 +538,18 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	// Make sure the message is updated, sender side
 	s.Require().NotNil(resp)
 
-	s.Require().Len(resp.Messages(), 1)
-	s.Require().Equal(messageText, resp.Messages()[0].Text)
-	s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
+	s.Require().Len(resp.Messages(), 2)
+
+	contactRequestMsg = s.takeOutMessageByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
+	s.Require().NotNil(contactRequestMsg)
+
+	mutualStateUpdate = s.takeOutMessageByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_STATE_UPDATE)
+	s.Require().NotNil(mutualStateUpdate)
+
+	s.Require().Equal(common.ContactRequestStateAccepted, contactRequestMsg.ContactRequestState)
+
+	s.Require().Equal(mutualStateUpdate.From, contactRequest.ChatId)
+	s.Require().Equal(mutualStateUpdate.ChatId, contactRequest.From)
 
 	// Check activity center notification is of the right type
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
@@ -996,10 +1015,19 @@ func (s *MessengerContactRequestSuite) TestBobSendsContactRequestAfterDecliningO
 	s.Require().NotNil(resp)
 
 	// Check CR message, it should be accepted
-	s.Require().Len(resp.Messages(), 1)
-	contactRequest = resp.Messages()[0]
+	s.Require().Len(resp.Messages(), 2)
+
+	contactRequest = s.takeOutMessageByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
+	s.Require().NotNil(contactRequest)
+
+	mutualStateUpdate := s.takeOutMessageByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_STATE_UPDATE)
+	s.Require().NotNil(mutualStateUpdate)
+
 	s.Require().Equal(common.ContactRequestStateAccepted, contactRequest.ContactRequestState)
 	s.Require().Equal(requestFromBob.Message, contactRequest.Text)
+
+	s.Require().Equal(mutualStateUpdate.From, contactRequest.From)
+	s.Require().Equal(mutualStateUpdate.ChatId, contactRequest.ChatId)
 
 	// Check pending notification
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
@@ -1023,7 +1051,7 @@ func (s *MessengerContactRequestSuite) TestBobSendsContactRequestAfterDecliningO
 	resp, err = WaitOnMessengerResponse(
 		alice,
 		func(r *MessengerResponse) bool {
-			return len(r.Contacts) == 1 && len(r.Messages()) == 1 && len(r.ActivityCenterNotifications()) == 1
+			return len(r.Contacts) == 1 && len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1
 		},
 		"no messages",
 	)
@@ -1032,9 +1060,15 @@ func (s *MessengerContactRequestSuite) TestBobSendsContactRequestAfterDecliningO
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
+	contactRequestMsg := s.takeOutMessageByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
+	s.Require().NotNil(contactRequestMsg)
+
 	// Check CR message, it should be accepted
-	s.Require().Len(resp.Messages(), 1)
-	contactRequest = resp.Messages()[0]
+	s.Require().Len(resp.Messages(), 2)
+
+	contactRequest = s.takeOutMessageByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
+	s.Require().NotNil(contactRequest)
+
 	s.Require().Equal(common.ContactRequestStateAccepted, contactRequest.ContactRequestState)
 	s.Require().Equal(requestFromBob.Message, contactRequest.Text)
 
@@ -1171,10 +1205,14 @@ func (s *MessengerContactRequestSuite) TestBobRestoresIncomingContactRequestFrom
 
 	// Make sure the message is updated
 	s.Require().NotNil(resp)
-	s.Require().Len(resp.Messages(), 1)
+	s.Require().Len(resp.Messages(), 2)
+
+	contactRequestMsg := s.takeOutMessageByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
+	s.Require().NotNil(contactRequestMsg)
+
 	// NOTE: We don't restore CR message
 	// s.Require().Equal(resp.Messages()[0].ID, contactRequest.ID)
-	s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
+	s.Require().Equal(common.ContactRequestStateAccepted, contactRequestMsg.ContactRequestState)
 
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
 	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
@@ -1245,10 +1283,14 @@ func (s *MessengerContactRequestSuite) TestAliceRestoresOutgoingContactRequestFr
 
 	// Make sure the message is updated
 	s.Require().NotNil(resp)
-	s.Require().Len(resp.Messages(), 1)
+	s.Require().Len(resp.Messages(), 2)
+
+	contactRequestMsg := s.takeOutMessageByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
+	s.Require().NotNil(contactRequestMsg)
+
 	// NOTE: We don't restore CR message
 	// s.Require().Equal(resp.Messages()[0].ID, contactRequest.ID)
-	s.Require().Equal(common.ContactRequestStateAccepted, resp.Messages()[0].ContactRequestState)
+	s.Require().Equal(common.ContactRequestStateAccepted, contactRequestMsg.ContactRequestState)
 
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
 	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)

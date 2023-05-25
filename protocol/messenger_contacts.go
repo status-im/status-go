@@ -721,7 +721,7 @@ func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNic
 	return response, nil
 }
 
-func (m *Messenger) blockContact(contactID string, isDesktopFunc bool) (*Contact, []*Chat, error) {
+func (m *Messenger) blockContact(response *MessengerResponse, contactID string, isDesktopFunc bool) (*Contact, []*Chat, error) {
 	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: contactID})
 	if err != nil {
 		return nil, nil, err
@@ -741,7 +741,7 @@ func (m *Messenger) blockContact(contactID string, isDesktopFunc bool) (*Contact
 		return nil, nil, err
 	}
 
-	err = m.sendRetractContactRequest(contact)
+	err = m.sendRetractContactRequest(contact, response)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -773,7 +773,7 @@ func (m *Messenger) blockContact(contactID string, isDesktopFunc bool) (*Contact
 func (m *Messenger) BlockContact(contactID string) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
-	contact, chats, err := m.blockContact(contactID, false)
+	contact, chats, err := m.blockContact(response, contactID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -797,7 +797,7 @@ func (m *Messenger) BlockContact(contactID string) (*MessengerResponse, error) {
 func (m *Messenger) BlockContactDesktop(contactID string) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
-	contact, chats, err := m.blockContact(contactID, true)
+	contact, chats, err := m.blockContact(response, contactID, true)
 	if err != nil {
 		return nil, err
 	}
@@ -979,7 +979,7 @@ func (m *Messenger) RetractContactRequest(request *requests.RetractContactReques
 		return nil, err
 	}
 
-	err = m.sendRetractContactRequest(contact)
+	err = m.sendRetractContactRequest(contact, response)
 	if err != nil {
 		return nil, err
 	}
@@ -988,7 +988,7 @@ func (m *Messenger) RetractContactRequest(request *requests.RetractContactReques
 }
 
 // Send message to remote account to remove our contact from their end.
-func (m *Messenger) sendRetractContactRequest(contact *Contact) error {
+func (m *Messenger) sendRetractContactRequest(contact *Contact, response *MessengerResponse) error {
 	_, clock, err := m.getOneToOneAndNextClock(contact)
 	if err != nil {
 		return err
@@ -1008,6 +1008,20 @@ func (m *Messenger) sendRetractContactRequest(contact *Contact) error {
 		MessageType:         protobuf.ApplicationMetadataMessage_RETRACT_CONTACT_REQUEST,
 		ResendAutomatically: true,
 	})
+
+	// Send mutual state update message
+	timestamp := m.getTimesource().GetCurrentTime()
+	ctx := context.Background()
+	updateMessage := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeRemoved, clock, timestamp)
+	messageResponse, err := m.sendChatMessage(ctx, updateMessage)
+	if err != nil {
+		return err
+	}
+
+	err = response.Merge(messageResponse)
+	if err != nil {
+		return err
+	}
 
 	return err
 }
