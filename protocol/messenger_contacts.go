@@ -16,15 +16,7 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 )
 
-type MutualStateUpdateType int
-
-const (
-	MutualStateUpdateTypeSent MutualStateUpdateType = iota + 1
-	MutualStateUpdateTypeAdded
-	MutualStateUpdateTypeRemoved
-)
-
-func (m *Messenger) prepareMutualStateUpdateMessage(chatID string, updateType MutualStateUpdateType, clock uint64, timestamp uint64) *common.Message {
+func (m *Messenger) prepareMutualStateUpdateMessage(contactId string, updateType MutualStateUpdateType, clock uint64, timestamp uint64, outgoing bool) (*common.Message, error) {
 	var text string
 	// TODO: provide translations & solve naming
 	switch updateType {
@@ -36,22 +28,32 @@ func (m *Messenger) prepareMutualStateUpdateMessage(chatID string, updateType Mu
 		text = "%1 removed %2 as a contact"
 	}
 
+	var to string
+	var from string
+	if outgoing {
+		to = contactId
+		from = m.myHexIdentity()
+	} else {
+		to = m.myHexIdentity()
+		from = contactId
+	}
+
 	message := &common.Message{
 		ChatMessage: protobuf.ChatMessage{
-			ChatId:      chatID,
+			ChatId:      to,
 			Text:        text,
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			ContentType: protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_STATE_UPDATE,
 			Clock:       clock,
 			Timestamp:   timestamp,
 		},
-		From:             m.myHexIdentity(),
+		From:             from,
 		WhisperTimestamp: timestamp,
-		LocalChatID:      chatID,
+		LocalChatID:      to,
 		Seen:             true,
 	}
 
-	return message
+	return message, nil
 }
 
 func (m *Messenger) acceptContactRequest(ctx context.Context, requestID string, syncing bool) (*MessengerResponse, error) {
@@ -273,19 +275,17 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	response.AddMessage(contactRequest)
 	response.AddContact(contact)
 
-	// Send mutual state update message
+	// System message for mutual state update
 	timestamp := m.getTimesource().GetCurrentTime()
-	updateMessage := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeAdded, clock, timestamp)
-	ctx := context.Background()
-	updateResponse, err := m.sendChatMessage(ctx, updateMessage)
+	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeAdded, clock, timestamp, true)
 	if err != nil {
 		return nil, err
 	}
-
-	err = response.Merge(updateResponse)
+	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
 	if err != nil {
 		return nil, err
 	}
+	response.AddMessage(updateMessage)
 
 	return response, nil
 }
@@ -454,17 +454,16 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 			return nil, err
 		}
 
-		// Send mutual state update message
-		updateMessage := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, timestamp)
-		messageResponse, err = m.sendChatMessage(ctx, updateMessage)
+		// System message for mutual state update
+		updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, timestamp, true)
 		if err != nil {
 			return nil, err
 		}
-
-		err = response.Merge(messageResponse)
+		err = m.persistence.SaveMessages([]*common.Message{updateMessage})
 		if err != nil {
 			return nil, err
 		}
+		response.AddMessage(updateMessage)
 
 		notification := m.generateOutgoingContactRequestNotification(contact, contactRequest)
 		err = m.addActivityCenterNotification(response, notification)
@@ -1008,20 +1007,21 @@ func (m *Messenger) sendRetractContactRequest(contact *Contact, response *Messen
 		MessageType:         protobuf.ApplicationMetadataMessage_RETRACT_CONTACT_REQUEST,
 		ResendAutomatically: true,
 	})
+	if err != nil {
+		return err
+	}
 
-	// Send mutual state update message
+	// System message for mutual state update
 	timestamp := m.getTimesource().GetCurrentTime()
-	ctx := context.Background()
-	updateMessage := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeRemoved, clock, timestamp)
-	messageResponse, err := m.sendChatMessage(ctx, updateMessage)
+	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeRemoved, clock, timestamp, true)
 	if err != nil {
 		return err
 	}
-
-	err = response.Merge(messageResponse)
+	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
 	if err != nil {
 		return err
 	}
+	response.AddMessage(updateMessage)
 
 	return err
 }
