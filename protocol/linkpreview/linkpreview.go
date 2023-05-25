@@ -43,7 +43,7 @@ type LinkPreview struct {
 }
 
 type Unfurler interface {
-	unfurl(*neturl.URL) (common.LinkPreview, error)
+	unfurl() (common.LinkPreview, error)
 }
 
 const (
@@ -129,7 +129,7 @@ type OEmbedUnfurler struct {
 	// https://www.youtube.com/oembed.
 	oembedEndpoint string
 	// url is the actual URL to be unfurled.
-	url neturl.URL
+	url *neturl.URL
 }
 
 type OEmbedResponse struct {
@@ -137,8 +137,8 @@ type OEmbedResponse struct {
 	ThumbnailURL string `json:"thumbnail_url"`
 }
 
-func (u OEmbedUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
-	preview := newDefaultLinkPreview(url)
+func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
+	preview := newDefaultLinkPreview(u.url)
 
 	requestURL, err := neturl.Parse(u.oembedEndpoint)
 	if err != nil {
@@ -199,7 +199,7 @@ func (u OEmbedUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
 	if oembedResponse.Title == "" {
 		return preview, UnfurlError{
 			msg: "missing title",
-			url: url.String(),
+			url: u.url.String(),
 			err: errors.New(""),
 		}
 	}
@@ -218,16 +218,17 @@ type OpenGraphMetadata struct {
 // gives back a JSON response with a "html" field that's supposed to be embedded
 // in an iframe (hardly useful for existing Status' clients).
 type OpenGraphUnfurler struct {
+	url        *neturl.URL
 	logger     *zap.Logger
 	httpClient http.Client
 }
 
-func (u OpenGraphUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
-	preview := newDefaultLinkPreview(url)
+func (u OpenGraphUnfurler) unfurl() (common.LinkPreview, error) {
+	preview := newDefaultLinkPreview(u.url)
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", u.url.String(), nil)
 	if err != nil {
 		return preview, err
 	}
@@ -246,7 +247,7 @@ func (u OpenGraphUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
 	if err != nil {
 		return preview, UnfurlError{
 			msg: "failed to get HTML page",
-			url: url.String(),
+			url: u.url.String(),
 			err: err,
 		}
 	}
@@ -254,7 +255,7 @@ func (u OpenGraphUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
 	if res.StatusCode >= http.StatusBadRequest {
 		return preview, UnfurlError{
 			msg: fmt.Sprintf("failed to fetch OpenGraph metadata, statusCode='%d'", res.StatusCode),
-			url: url.String(),
+			url: u.url.String(),
 			err: nil,
 		}
 	}
@@ -264,7 +265,7 @@ func (u OpenGraphUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
 	if err != nil {
 		return preview, UnfurlError{
 			msg: "failed to parse OpenGraph data",
-			url: url.String(),
+			url: u.url.String(),
 			err: err,
 		}
 	}
@@ -275,7 +276,7 @@ func (u OpenGraphUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
 	if ogMetadata.Title == "" {
 		return preview, UnfurlError{
 			msg: "missing title",
-			url: url.String(),
+			url: u.url.String(),
 			err: errors.New(""),
 		}
 	}
@@ -285,7 +286,7 @@ func (u OpenGraphUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
 		if err != nil {
 			// Given we want to fetch thumbnails on a best-effort basis, if an error
 			// happens we simply log it.
-			u.logger.Info("failed to fetch thumbnail", zap.String("url", url.String()), zap.Error(err))
+			u.logger.Info("failed to fetch thumbnail", zap.String("url", u.url.String()), zap.Error(err))
 		} else {
 			preview.Thumbnail = t
 		}
@@ -307,12 +308,13 @@ func newUnfurler(logger *zap.Logger, httpClient http.Client, url *neturl.URL) Un
 	case "reddit.com":
 		return OEmbedUnfurler{
 			oembedEndpoint: "https://www.reddit.com/oembed",
-			url:            *url,
+			url:            url,
 			logger:         logger,
 			httpClient:     httpClient,
 		}
 	default:
 		return OpenGraphUnfurler{
+			url:        url,
 			logger:     logger,
 			httpClient: httpClient,
 		}
@@ -328,7 +330,7 @@ func unfurl(logger *zap.Logger, httpClient http.Client, url string) (common.Link
 	}
 
 	unfurler := newUnfurler(logger, httpClient, parsedURL)
-	preview, err = unfurler.unfurl(parsedURL)
+	preview, err = unfurler.unfurl()
 	if err != nil {
 		return preview, err
 	}
