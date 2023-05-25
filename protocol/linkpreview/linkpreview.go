@@ -22,22 +22,6 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 )
 
-// UnfurlError means a non-critical error, and that processing of the preview
-// should be interrupted and the preview probably ignored.
-type UnfurlError struct {
-	msg string
-	url string
-	err error
-}
-
-func (ue UnfurlError) Error() string {
-	return fmt.Sprintf("%s, url='%s'", ue.msg, ue.url)
-}
-
-func (ue UnfurlError) Unwrap() error {
-	return ue.err
-}
-
 type LinkPreview struct {
 	common.LinkPreview
 }
@@ -171,19 +155,11 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 		}
 	}()
 	if err != nil {
-		return preview, UnfurlError{
-			msg: "failed to get oEmbed",
-			url: u.url.String(),
-			err: err,
-		}
+		return preview, fmt.Errorf("failed to fetch oEmbed metadata: %w", err)
 	}
 
 	if res.StatusCode >= http.StatusBadRequest {
-		return preview, UnfurlError{
-			msg: fmt.Sprintf("failed to fetch oEmbed metadata, statusCode='%d'", res.StatusCode),
-			url: u.url.String(),
-			err: nil,
-		}
+		return preview, fmt.Errorf("failed to fetch oEmbed metadata, statusCode='%d'", res.StatusCode)
 	}
 
 	var oembedResponse OEmbedResponse
@@ -197,11 +173,7 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 	}
 
 	if oembedResponse.Title == "" {
-		return preview, UnfurlError{
-			msg: "missing title",
-			url: u.url.String(),
-			err: errors.New(""),
-		}
+		return preview, fmt.Errorf("missing required title in oEmbed response")
 	}
 
 	preview.Title = oembedResponse.Title
@@ -245,40 +217,24 @@ func (u OpenGraphUnfurler) unfurl() (common.LinkPreview, error) {
 		}
 	}()
 	if err != nil {
-		return preview, UnfurlError{
-			msg: "failed to get HTML page",
-			url: u.url.String(),
-			err: err,
-		}
+		return preview, fmt.Errorf("failed to get HTML page: %w", err)
 	}
 
 	if res.StatusCode >= http.StatusBadRequest {
-		return preview, UnfurlError{
-			msg: fmt.Sprintf("failed to fetch OpenGraph metadata, statusCode='%d'", res.StatusCode),
-			url: u.url.String(),
-			err: nil,
-		}
+		return preview, fmt.Errorf("failed to fetch OpenGraph metadata, statusCode='%d'", res.StatusCode)
 	}
 
 	var ogMetadata OpenGraphMetadata
 	err = metabolize.Metabolize(res.Body, &ogMetadata)
 	if err != nil {
-		return preview, UnfurlError{
-			msg: "failed to parse OpenGraph data",
-			url: u.url.String(),
-			err: err,
-		}
+		return preview, fmt.Errorf("failed to parse OpenGraph data")
 	}
 
 	// There are URLs like https://wikipedia.org/ that don't have an OpenGraph
 	// title tag, but article pages do. In the future, we can fallback to the
 	// website's title by using the <title> tag.
 	if ogMetadata.Title == "" {
-		return preview, UnfurlError{
-			msg: "missing title",
-			url: u.url.String(),
-			err: errors.New(""),
-		}
+		return preview, fmt.Errorf("missing required title in OpenGraph response")
 	}
 
 	if ogMetadata.ThumbnailURL != "" {
@@ -417,12 +373,8 @@ func UnfurlURLs(logger *zap.Logger, httpClient http.Client, urls []string) ([]co
 	for _, url := range urls {
 		p, err := unfurl(logger, httpClient, url)
 		if err != nil {
-			if unfurlErr, ok := err.(UnfurlError); ok {
-				logger.Info("failed to unfurl", zap.Error(unfurlErr))
-				continue
-			}
-
-			return nil, err
+			logger.Info("failed to unfurl", zap.String("url", url), zap.Error(err))
+			continue
 		}
 		previews = append(previews, p)
 	}
