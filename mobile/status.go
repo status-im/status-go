@@ -1011,6 +1011,12 @@ func GetConnectionStringForBeingBootstrapped(configJSON string) string {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+
+	err = statusBackend.StopNode()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
 	return cs
 }
 
@@ -1045,6 +1051,11 @@ func InputConnectionStringForBootstrapping(cs, configJSON string) string {
 	}
 
 	err := pairing.StartUpReceivingClient(statusBackend, cs, configJSON)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = statusBackend.StopNode()
 	return makeJSONResponse(err)
 }
 
