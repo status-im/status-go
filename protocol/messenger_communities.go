@@ -671,6 +671,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		MembershipStatus: ActivityCenterMembershipStatusPending,
 		Read:             true,
 		Deleted:          false,
+		UpdatedAt:        m.getCurrentTimeInMillis(),
 	}
 
 	err = m.addActivityCenterNotification(response, notification)
@@ -812,7 +813,8 @@ func (m *Messenger) CancelRequestToJoinCommunity(request *requests.CancelRequest
 	}
 
 	if notification != nil {
-		err = m.persistence.DeleteActivityCenterNotification(types.FromHex(requestToJoin.ID.String()))
+		notification.UpdatedAt = m.getCurrentTimeInMillis()
+		err = m.persistence.DeleteActivityCenterNotificationByID(types.FromHex(requestToJoin.ID.String()), notification.UpdatedAt)
 		if err != nil {
 			m.logger.Error("failed to delete notification from Activity Center", zap.Error(err))
 			return nil, err
@@ -903,6 +905,7 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 		notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
 		notification.Read = true
 		notification.Accepted = true
+		notification.UpdatedAt = m.getCurrentTimeInMillis()
 
 		err = m.addActivityCenterNotification(response, notification)
 		if err != nil {
@@ -936,6 +939,7 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 		notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
 		notification.Read = true
 		notification.Dismissed = true
+		notification.UpdatedAt = m.getCurrentTimeInMillis()
 
 		err = m.addActivityCenterNotification(response, notification)
 		if err != nil {
@@ -948,7 +952,7 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 }
 
 func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
-	err := m.persistence.DismissAllActivityCenterNotificationsFromCommunity(communityID.String())
+	err := m.persistence.DismissAllActivityCenterNotificationsFromCommunity(communityID.String(), m.getCurrentTimeInMillis())
 	if err != nil {
 		return nil, err
 	}
@@ -1076,7 +1080,8 @@ func (m *Messenger) CheckAndDeletePendingRequestToJoinCommunity(sendResponse boo
 			if notification != nil {
 				// Delete activity centre notification for community admin
 				if notification.Type == ActivityCenterNotificationTypeCommunityMembershipRequest {
-					err = m.persistence.DeleteActivityCenterNotification(types.FromHex(requestToJoin.ID.String()))
+					notification.UpdatedAt = m.getCurrentTimeInMillis()
+					err = m.persistence.DeleteActivityCenterNotificationByID(types.FromHex(requestToJoin.ID.String()), notification.UpdatedAt)
 					if err != nil {
 						m.logger.Error("failed to delete notification from activity center", zap.Error(err))
 						return nil, err
@@ -1089,6 +1094,7 @@ func (m *Messenger) CheckAndDeletePendingRequestToJoinCommunity(sendResponse boo
 					notification.MembershipStatus = ActivityCenterMembershipStatusIdle
 					notification.Read = false
 					notification.Deleted = false
+					notification.UpdatedAt = m.getCurrentTimeInMillis()
 					err = m.addActivityCenterNotification(response, notification)
 					if err != nil {
 						m.logger.Error("failed to update notification in activity center", zap.Error(err))

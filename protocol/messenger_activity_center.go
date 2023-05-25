@@ -69,7 +69,7 @@ func (m *Messenger) GetActivityCenterState() (*ActivityCenterState, error) {
 
 func (m *Messenger) MarkAsSeenActivityCenterNotifications() (*MessengerResponse, error) {
 	response := &MessengerResponse{}
-	err := m.persistence.MarkAsSeenActivityCenterNotifications()
+	err := m.persistence.MarkAsSeenActivityCenterNotifications(m.getCurrentTimeInMillis())
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (m *Messenger) MarkAllActivityCenterNotificationsRead(ctx context.Context) 
 		return nil, err
 	}
 
-	err := m.persistence.MarkAllActivityCenterNotificationsRead()
+	err := m.persistence.MarkAllActivityCenterNotificationsRead(m.getCurrentTimeInMillis())
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (m *Messenger) MarkAllActivityCenterNotificationsRead(ctx context.Context) 
 
 func (m *Messenger) MarkActivityCenterNotificationsRead(ctx context.Context, ids []types.HexBytes, sync bool) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
-	err := m.persistence.MarkActivityCenterNotificationsRead(ids)
+	err := m.persistence.MarkActivityCenterNotificationsRead(ids, m.getCurrentTimeInMillis())
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,7 @@ func (m *Messenger) MarkActivityCenterNotificationsRead(ctx context.Context, ids
 
 func (m *Messenger) MarkActivityCenterNotificationsUnread(ids []types.HexBytes) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
-	err := m.persistence.MarkActivityCenterNotificationsUnread(ids)
+	err := m.persistence.MarkActivityCenterNotificationsUnread(ids, m.getCurrentTimeInMillis())
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +247,7 @@ func (m *Messenger) AcceptActivityCenterNotifications(ctx context.Context, ids [
 		return nil, errors.New("notifications ids are not provided")
 	}
 
-	notifications, err := m.persistence.AcceptActivityCenterNotifications(ids)
+	notifications, err := m.persistence.AcceptActivityCenterNotifications(ids, m.getCurrentTimeInMillis())
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +256,7 @@ func (m *Messenger) AcceptActivityCenterNotifications(ctx context.Context, ids [
 }
 
 func (m *Messenger) DismissActivityCenterNotifications(ctx context.Context, ids []types.HexBytes, sync bool) (*MessengerResponse, error) {
-	err := m.persistence.DismissActivityCenterNotifications(ids)
+	err := m.persistence.DismissActivityCenterNotifications(ids, m.getCurrentTimeInMillis())
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +290,7 @@ func (m *Messenger) DismissActivityCenterNotifications(ctx context.Context, ids 
 }
 
 func (m *Messenger) DeleteActivityCenterNotifications(ctx context.Context, ids []types.HexBytes, sync bool) error {
-	return m.persistence.DeleteActivityCenterNotifications(ids)
+	return m.persistence.DeleteActivityCenterNotifications(ids, m.getCurrentTimeInMillis())
 }
 
 func (m *Messenger) ActivityCenterNotification(id types.HexBytes) (*ActivityCenterNotification, error) {

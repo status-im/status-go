@@ -11,12 +11,12 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 )
 
-func (db sqlitePersistence) DeleteActivityCenterNotification(id []byte) error {
-	_, err := db.db.Exec(`DELETE FROM activity_center_notifications WHERE id = ?`, id)
+func (db sqlitePersistence) DeleteActivityCenterNotificationByID(id []byte, updatedAt uint64) error {
+	_, err := db.db.Exec(`UPDATE activity_center_notifications SET deleted = 1, updated_at = ? WHERE id = ? AND NOT deleted`, updatedAt, id)
 	return err
 }
 
-func (db sqlitePersistence) DeleteActivityCenterNotificationForMessage(chatID string, messageID string) error {
+func (db sqlitePersistence) DeleteActivityCenterNotificationForMessage(chatID string, messageID string, updatedAt uint64) error {
 	var tx *sql.Tx
 	var err error
 
@@ -56,14 +56,15 @@ func (db sqlitePersistence) DeleteActivityCenterNotificationForMessage(chatID st
 	}
 
 	if len(ids) > 0 {
-		idsArgs := make([]interface{}, 0, len(ids))
+		args := make([]interface{}, 0, len(ids)+1)
+		args = append(args, updatedAt)
 		for _, id := range ids {
-			idsArgs = append(idsArgs, id)
+			args = append(args, id)
 		}
 
 		inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-		query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1, deleted = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
-		_, err = tx.Exec(query, idsArgs...)
+		query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1, deleted = 1, updated_at = ? WHERE id IN (" + inVector + ")" // nolint: gosec
+		_, err = tx.Exec(query, args...)
 		return err
 	}
 
@@ -91,15 +92,6 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		// don't shadow original error
 		_ = tx.Rollback()
 	}()
-
-	if notification.Type == ActivityCenterNotificationTypeNewOneToOne ||
-		notification.Type == ActivityCenterNotificationTypeNewPrivateGroupChat {
-		// Delete other notifications, so it pops us again if it was not dismissed
-		_, err = tx.Exec(`DELETE FROM activity_center_notifications WHERE id = ? AND (dismissed OR accepted)`, notification.ID)
-		if err != nil {
-			return err
-		}
-	}
 
 	// encode message
 	var encodedMessage []byte
@@ -135,9 +127,10 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 			read,
 			accepted,
 			dismissed,
-			deleted
+			deleted,
+		    updated_at
 		)
-		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 		`,
 		notification.ID,
 		notification.Timestamp,
@@ -153,11 +146,12 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		notification.Accepted,
 		notification.Dismissed,
 		notification.Deleted,
+		notification.UpdatedAt,
 	)
 
 	// When we have inserted or updated unread notification - mark whole activity_center_settings as unseen
 	if err == nil && !notification.Read {
-		_, err = tx.Exec(`UPDATE activity_center_states SET has_seen = 0`)
+		_, err = tx.Exec(`UPDATE activity_center_states SET has_seen = 0, updated_at = ?`, notification.UpdatedAt)
 	}
 
 	return err
@@ -188,7 +182,8 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRow(row *sql.Row)
 		&replyMessageBytes,
 		&notification.ContactVerificationStatus,
 		&name,
-		&author)
+		&author,
+		&notification.UpdatedAt)
 
 	if err != nil {
 		return nil, err
@@ -268,7 +263,8 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 			&notification.ContactVerificationStatus,
 			&name,
 			&author,
-			&latestCursor)
+			&latestCursor,
+			&notification.UpdatedAt)
 		if err != nil {
 			return "", nil, err
 		}
@@ -419,7 +415,8 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	a.contact_verification_status,
 	c.name,
 	a.author,
-	substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || hex(a.id) as cursor
+	substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || hex(a.id) as cursor,
+	a.updated_at
 	FROM activity_center_notifications a
 	LEFT JOIN chats c
 	ON
@@ -436,6 +433,7 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, params activity
 	if err != nil {
 		return "", nil, err
 	}
+	defer rows.Close()
 
 	return db.unmarshalActivityCenterNotificationRows(rows)
 }
@@ -474,14 +472,14 @@ func (db sqlitePersistence) runActivityCenterIDQuery(query string) ([][]byte, er
 }
 
 func (db sqlitePersistence) GetNotReadActivityCenterNotificationIds() ([][]byte, error) {
-	return db.runActivityCenterIDQuery("SELECT a.id FROM activity_center_notifications a WHERE NOT a.read")
+	return db.runActivityCenterIDQuery("SELECT a.id FROM activity_center_notifications a WHERE NOT a.read AND NOT a.deleted")
 }
 
 func (db sqlitePersistence) GetToProcessActivityCenterNotificationIds() ([][]byte, error) {
 	return db.runActivityCenterIDQuery(`
 		SELECT a.id
 		FROM activity_center_notifications a
-		WHERE NOT a.deleted AND NOT a.dismissed AND NOT a.accepted
+		WHERE NOT a.dismissed AND NOT a.accepted AND NOT a.deleted  
 		`)
 }
 
@@ -515,7 +513,7 @@ func (db sqlitePersistence) GetActivityCenterNotificationsByID(ids []types.HexBy
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	rows, err := db.db.Query("SELECT a.id, a.read, a.accepted, a.dismissed FROM activity_center_notifications a WHERE a.id IN ("+inVector+")", idsArgs...) // nolint: gosec
+	rows, err := db.db.Query("SELECT a.id, a.read, a.accepted, a.dismissed FROM activity_center_notifications a WHERE a.id IN ("+inVector+") AND NOT a.deleted", idsArgs...) // nolint: gosec
 
 	if err != nil {
 		return nil, err
@@ -558,12 +556,13 @@ func (db sqlitePersistence) GetActivityCenterNotificationByID(id types.HexBytes)
 		a.reply_message,
 		a.contact_verification_status,
 		c.name,
-		a.author
+		a.author,
+		a.updated_at
 		FROM activity_center_notifications a
 		LEFT JOIN chats c
 		ON
 		c.id = a.chat_id
-		WHERE a.id = ?`, id)
+		WHERE a.id = ? AND NOT deleted`, id)
 
 	notification, err := db.unmarshalActivityCenterNotificationRow(row)
 	if err == sql.ErrNoRows {
@@ -606,58 +605,60 @@ func (db sqlitePersistence) activityCenterNotifications(params activityCenterQue
 	return latestCursor, notifications, nil
 }
 
-func (db sqlitePersistence) DismissAllActivityCenterNotifications() error {
-	_, err := db.db.Exec(`UPDATE activity_center_notifications SET read = 1, dismissed = 1 WHERE NOT dismissed AND NOT accepted`)
+func (db sqlitePersistence) DismissAllActivityCenterNotifications(updatedAt uint64) error {
+	_, err := db.db.Exec(`UPDATE activity_center_notifications SET read = 1, dismissed = 1, updated_at = ? WHERE NOT dismissed AND NOT accepted AND NOT deleted`, updatedAt)
 	return err
 }
 
-func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromUser(userPublicKey string) error {
+func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromUser(userPublicKey string, updatedAt uint64) error {
 	_, err := db.db.Exec(`
 		UPDATE activity_center_notifications
-		SET read = 1, dismissed = 1
+		SET read = 1, dismissed = 1, updated_at = ?
 		WHERE author = ?
 			AND NOT deleted
 			AND NOT dismissed
 			AND NOT accepted
 		`,
-		userPublicKey)
+		updatedAt, userPublicKey)
 	return err
 }
 
-func (db sqlitePersistence) DeleteActivityCenterNotifications(ids []types.HexBytes) error {
+func (db sqlitePersistence) DeleteActivityCenterNotifications(ids []types.HexBytes, updatedAt uint64) error {
 	if len(ids) == 0 {
 		return nil
 	}
 
-	idsArgs := make([]interface{}, 0, len(ids))
+	args := make([]interface{}, 0, len(ids)+1)
+	args = append(args, updatedAt)
 	for _, id := range ids {
-		idsArgs = append(idsArgs, id)
+		args = append(args, id)
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "UPDATE activity_center_notifications SET deleted = 1 WHERE id IN (" + inVector + ")"
-	_, err := db.db.Exec(query, idsArgs...)
+	query := "UPDATE activity_center_notifications SET deleted = 1, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted"
+	_, err := db.db.Exec(query, args...)
 
 	return err
 }
 
-func (db sqlitePersistence) DismissActivityCenterNotifications(ids []types.HexBytes) error {
+func (db sqlitePersistence) DismissActivityCenterNotifications(ids []types.HexBytes, updatedAt uint64) error {
 	if len(ids) == 0 {
 		return nil
 	}
 
-	idsArgs := make([]interface{}, 0, len(ids))
+	args := make([]interface{}, 0, len(ids)+1)
+	args = append(args, updatedAt)
 	for _, id := range ids {
-		idsArgs = append(idsArgs, id)
+		args = append(args, id)
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
-	_, err := db.db.Exec(query, idsArgs...)
+	query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1, updated_at = ? WHERE id IN (" + inVector + ") AND not deleted" // nolint: gosec
+	_, err := db.db.Exec(query, args...)
 	return err
 }
 
-func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromCommunity(communityID string) error {
+func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromCommunity(communityID string, updatedAt uint64) error {
 
 	chatIDs, err := db.AllChatIDsByCommunity(communityID)
 	if err != nil {
@@ -669,34 +670,35 @@ func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromCommunity(c
 		return nil
 	}
 
-	chatIDsArgs := make([]interface{}, 0, chatIDsCount)
+	args := make([]interface{}, 0, chatIDsCount+1)
+	args = append(args, updatedAt)
 	for _, chatID := range chatIDs {
-		chatIDsArgs = append(chatIDsArgs, chatID)
+		args = append(args, chatID)
 	}
 
 	inVector := strings.Repeat("?, ", chatIDsCount-1) + "?"
-	query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1 WHERE chat_id IN (" + inVector + ")" // nolint: gosec
-	_, err = db.db.Exec(query, chatIDsArgs...)
+	query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1, updated_at = ? WHERE chat_id IN (" + inVector + ") AND NOT deleted" // nolint: gosec
+	_, err = db.db.Exec(query, args...)
 	return err
 
 }
 
-func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromChatID(chatID string) error {
+func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromChatID(chatID string, updatedAt uint64) error {
 	// We exclude notifications related to contacts, since those we don't want to
 	// be cleared.
 	query := `
 		UPDATE activity_center_notifications
-		SET read = 1, dismissed = 1
-		WHERE NOT deleted
+		SET read = 1, dismissed = 1, updated_at = ?
+		WHERE chat_id = ? 
+		    AND NOT deleted
 			AND NOT accepted
-			AND chat_id = ?
 			AND notification_type != ?
 	`
-	_, err := db.db.Exec(query, chatID, ActivityCenterNotificationTypeContactRequest)
+	_, err := db.db.Exec(query, updatedAt, chatID, ActivityCenterNotificationTypeContactRequest)
 	return err
 }
 
-func (db sqlitePersistence) AcceptAllActivityCenterNotifications() ([]*ActivityCenterNotification, error) {
+func (db sqlitePersistence) AcceptAllActivityCenterNotifications(updatedAt uint64) ([]*ActivityCenterNotification, error) {
 	var tx *sql.Tx
 	var err error
 
@@ -713,16 +715,15 @@ func (db sqlitePersistence) AcceptAllActivityCenterNotifications() ([]*ActivityC
 		_ = tx.Rollback()
 	}()
 
-	_, notifications, err := db.buildActivityCenterQuery(tx, activityCenterQueryParams{})
-
-	_, err = tx.Exec(`UPDATE activity_center_notifications SET read = 1, accepted = 1 WHERE NOT accepted AND NOT dismissed`)
+	_, err = tx.Exec(`UPDATE activity_center_notifications SET read = 1, accepted = 1, updated_at = ? WHERE NOT dismissed AND NOT accepted AND NOT deleted`, updatedAt)
 	if err != nil {
 		return nil, err
 	}
+	_, notifications, err := db.buildActivityCenterQuery(tx, activityCenterQueryParams{})
 	return notifications, nil
 }
 
-func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexBytes) ([]*ActivityCenterNotification, error) {
+func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexBytes, updatedAt uint64) ([]*ActivityCenterNotification, error) {
 
 	var tx *sql.Tx
 	var err error
@@ -739,29 +740,28 @@ func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexByt
 		// don't shadow original error
 		_ = tx.Rollback()
 	}()
+
+	args := make([]interface{}, 0, len(ids)+1)
+	args = append(args, updatedAt)
+	for _, id := range ids {
+		args = append(args, id)
+	}
+
+	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
+	query := "UPDATE activity_center_notifications SET read = 1, accepted = 1, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted" // nolint: gosec
+	_, err = tx.Exec(query, args...)
+	if err != nil {
+		return nil, err
+	}
 
 	params := activityCenterQueryParams{
 		ids: ids,
 	}
-
 	_, notifications, err := db.buildActivityCenterQuery(tx, params)
-
-	if err != nil {
-		return nil, err
-	}
-
-	idsArgs := make([]interface{}, 0, len(ids))
-	for _, id := range ids {
-		idsArgs = append(idsArgs, id)
-	}
-
-	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "UPDATE activity_center_notifications SET read = 1, accepted = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
-	_, err = tx.Exec(query, idsArgs...)
 	return notifications, err
 }
 
-func (db sqlitePersistence) AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey string) ([]*ActivityCenterNotification, error) {
+func (db sqlitePersistence) AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey string, updatedAt uint64) ([]*ActivityCenterNotification, error) {
 	var tx *sql.Tx
 	var err error
 
@@ -791,14 +791,14 @@ func (db sqlitePersistence) AcceptActivityCenterNotificationsForInvitesFromUser(
 
 	_, err = tx.Exec(`
 		UPDATE activity_center_notifications
-		SET read = 1, accepted = 1
-		WHERE NOT accepted
-			AND NOT dismissed
+		SET read = 1, accepted = 1, updated_at = ? 
+		WHERE author = ? 
 			AND NOT deleted
-			AND author = ?
+			AND NOT dismissed
+		    AND NOT accepted
 			AND notification_type = ?
 		`,
-		userPublicKey, ActivityCenterNotificationTypeNewPrivateGroupChat)
+		updatedAt, userPublicKey, ActivityCenterNotificationTypeNewPrivateGroupChat)
 
 	if err != nil {
 		return nil, err
@@ -807,35 +807,37 @@ func (db sqlitePersistence) AcceptActivityCenterNotificationsForInvitesFromUser(
 	return notifications, nil
 }
 
-func (db sqlitePersistence) MarkAllActivityCenterNotificationsRead() error {
-	_, err := db.db.Exec(`UPDATE activity_center_notifications SET read = 1 WHERE NOT read`)
+func (db sqlitePersistence) MarkAllActivityCenterNotificationsRead(updatedAt uint64) error {
+	_, err := db.db.Exec(`UPDATE activity_center_notifications SET read = 1, updated_at = ? WHERE NOT read AND NOT deleted`, updatedAt)
 	return err
 }
 
-func (db sqlitePersistence) MarkActivityCenterNotificationsRead(ids []types.HexBytes) error {
+func (db sqlitePersistence) MarkActivityCenterNotificationsRead(ids []types.HexBytes, updatedAt uint64) error {
 
-	idsArgs := make([]interface{}, 0, len(ids))
+	args := make([]interface{}, 0, len(ids)+1)
+	args = append(args, updatedAt)
 	for _, id := range ids {
-		idsArgs = append(idsArgs, id)
+		args = append(args, id)
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "UPDATE activity_center_notifications SET read = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
-	_, err := db.db.Exec(query, idsArgs...)
+	query := "UPDATE activity_center_notifications SET read = 1, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted" // nolint: gosec
+	_, err := db.db.Exec(query, args...)
 	return err
 
 }
 
-func (db sqlitePersistence) MarkActivityCenterNotificationsUnread(ids []types.HexBytes) error {
+func (db sqlitePersistence) MarkActivityCenterNotificationsUnread(ids []types.HexBytes, updatedAt uint64) error {
 
-	idsArgs := make([]interface{}, 0, len(ids))
+	args := make([]interface{}, 0, len(ids)+1)
+	args = append(args, updatedAt)
 	for _, id := range ids {
-		idsArgs = append(idsArgs, id)
+		args = append(args, id)
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := "UPDATE activity_center_notifications SET read = 0 WHERE id IN (" + inVector + ")" // nolint: gosec
-	_, err := db.db.Exec(query, idsArgs...)
+	query := "UPDATE activity_center_notifications SET read = 0, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted" // nolint: gosec
+	_, err := db.db.Exec(query, args...)
 	return err
 }
 
@@ -880,18 +882,19 @@ func (db sqlitePersistence) ActiveContactRequestNotification(contactID string) (
 			a.reply_message,
 			a.contact_verification_status,
 			c.name,
-			a.author
+			a.author,
+			a.updated_at
 		FROM activity_center_notifications a
 		LEFT JOIN chats c ON c.id = a.chat_id
-		WHERE NOT a.deleted
+		WHERE a.author = ? 
+		    AND NOT a.deleted
 			AND NOT a.dismissed
 			AND NOT a.accepted
 			AND a.notification_type = ?
-			AND a.author = ?
 		ORDER BY a.timestamp DESC
 		LIMIT 1
 		`
-	row := db.db.QueryRow(query, ActivityCenterNotificationTypeContactRequest, contactID)
+	row := db.db.QueryRow(query, contactID, ActivityCenterNotificationTypeContactRequest)
 	notification, err := db.unmarshalActivityCenterNotificationRow(row)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -899,13 +902,14 @@ func (db sqlitePersistence) ActiveContactRequestNotification(contactID string) (
 	return notification, err
 }
 
-func (db sqlitePersistence) HardDeleteChatContactRequestActivityCenterNotifications(chatID string) error {
+func (db sqlitePersistence) DeleteChatContactRequestActivityCenterNotifications(chatID string, updatedAt uint64) error {
 	_, err := db.db.Exec(`
-				DELETE FROM activity_center_notifications
+				UPDATE activity_center_notifications SET deleted = 1, updated_at = ? 
 	WHERE
 	chat_id = ?
+	AND NOT deleted
 	AND notification_type = ?
-	`, chatID, ActivityCenterNotificationTypeContactRequest)
+	`, updatedAt, chatID, ActivityCenterNotificationTypeContactRequest)
 	return err
 }
 
@@ -916,8 +920,8 @@ func (db sqlitePersistence) HasUnseenActivityCenterNotifications() (bool, error)
 	return !hasSeen, err
 }
 
-func (db sqlitePersistence) MarkAsSeenActivityCenterNotifications() error {
-	_, err := db.db.Exec(`UPDATE activity_center_states SET has_seen = 1`)
+func (db sqlitePersistence) MarkAsSeenActivityCenterNotifications(updatedAt uint64) error {
+	_, err := db.db.Exec(`UPDATE activity_center_states SET has_seen = 1, updated_at = ?`, updatedAt)
 	return err
 }
 

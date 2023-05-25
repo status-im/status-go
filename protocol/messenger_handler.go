@@ -260,6 +260,7 @@ func (m *Messenger) createMessageNotification(chat *Chat, messageState *Received
 		Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
 		ChatID:      chat.ID,
 		CommunityID: chat.CommunityID,
+		UpdatedAt:   m.getCurrentTimeInMillis(),
 	}
 
 	err := m.addActivityCenterNotification(messageState.Response, notification)
@@ -311,6 +312,7 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 			notification.Read = true
 			notification.Accepted = true
 			notification.Dismissed = false
+			notification.UpdatedAt = m.getCurrentTimeInMillis()
 			err = m.persistence.SaveActivityCenterNotification(notification)
 			if err != nil {
 				return err
@@ -336,6 +338,7 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 		Read:      contactRequest.ContactRequestState == common.ContactRequestStateAccepted || contactRequest.ContactRequestState == common.ContactRequestStateDismissed,
 		Accepted:  contactRequest.ContactRequestState == common.ContactRequestStateAccepted,
 		Dismissed: contactRequest.ContactRequestState == common.ContactRequestStateDismissed,
+		UpdatedAt: m.getCurrentTimeInMillis(),
 	}
 
 	return m.addActivityCenterNotification(messageState.Response, notification)
@@ -953,7 +956,7 @@ func (m *Messenger) handleRetractContactRequest(contact *Contact, message protob
 	}
 
 	// We remove anything that's related to this contact request
-	err := m.persistence.HardDeleteChatContactRequestActivityCenterNotifications(contact.ID)
+	err := m.persistence.DeleteChatContactRequestActivityCenterNotifications(contact.ID, m.getCurrentTimeInMillis())
 	if err != nil {
 		return err
 	}
@@ -1299,7 +1302,8 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageSta
 	}
 
 	if notification != nil {
-		err = m.persistence.DeleteActivityCenterNotification(types.FromHex(requestToJoin.ID.String()))
+		notification.UpdatedAt = m.getCurrentTimeInMillis()
+		err = m.persistence.DeleteActivityCenterNotificationByID(types.FromHex(requestToJoin.ID.String()), notification.UpdatedAt)
 		if err != nil {
 			m.logger.Error("failed to delete notification from Activity Center", zap.Error(err))
 			return err
@@ -1389,6 +1393,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 			CommunityID:      community.IDString(),
 			MembershipStatus: ActivityCenterMembershipStatusPending,
 			Deleted:          false,
+			UpdatedAt:        m.getCurrentTimeInMillis(),
 		}
 
 		err = m.addActivityCenterNotification(state.Response, notification)
@@ -1409,6 +1414,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 			} else {
 				notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
 			}
+			notification.UpdatedAt = m.getCurrentTimeInMillis()
 			err = m.addActivityCenterNotification(state.Response, notification)
 			if err != nil {
 				m.logger.Error("failed to save notification", zap.Error(err))
@@ -1494,6 +1500,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		} else {
 			notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
 		}
+		notification.UpdatedAt = m.getCurrentTimeInMillis()
 		err = m.addActivityCenterNotification(state.Response, notification)
 		if err != nil {
 			m.logger.Warn("failed to update notification", zap.Error(err))
@@ -1687,7 +1694,7 @@ func (m *Messenger) HandleDeleteMessage(state *ReceivedMessageState, deleteMessa
 		}
 
 		m.logger.Debug("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", messageToDelete.ID))
-		err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, messageToDelete.ID)
+		err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, messageToDelete.ID, m.getCurrentTimeInMillis())
 
 		if err != nil {
 			m.logger.Warn("failed to delete notifications for deleted message", zap.Error(err))
@@ -1793,7 +1800,7 @@ func (m *Messenger) HandleDeleteForMeMessage(state *ReceivedMessageState, delete
 
 		m.logger.Debug("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", messageToDelete.ID))
 
-		err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, messageToDelete.ID)
+		err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, messageToDelete.ID, m.getCurrentTimeInMillis())
 		if err != nil {
 			m.logger.Warn("failed to delete notifications for deleted message", zap.Error(err))
 			return err

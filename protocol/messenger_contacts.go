@@ -114,6 +114,7 @@ func (m *Messenger) declineContactRequest(requestID string, syncing bool) (*Mess
 		notification.Message = contactRequest
 		notification.Read = true
 		notification.Dismissed = true
+		notification.UpdatedAt = m.getCurrentTimeInMillis()
 
 		err = m.addActivityCenterNotification(response, notification)
 		if err != nil {
@@ -224,6 +225,7 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 		notification.Message = contactRequest
 		notification.Read = true
 		notification.Accepted = true
+		notification.UpdatedAt = m.getCurrentTimeInMillis()
 
 		err = m.addActivityCenterNotification(response, notification)
 		if err != nil {
@@ -454,6 +456,7 @@ func (m *Messenger) generateOutgoingContactRequestNotification(contact *Contact,
 			contactRequest.ContactRequestState == common.ContactRequestStatePending,
 		Accepted:  contactRequest.ContactRequestState == common.ContactRequestStateAccepted,
 		Dismissed: contactRequest.ContactRequestState == common.ContactRequestStateDismissed,
+		UpdatedAt: m.getCurrentTimeInMillis(),
 	}
 }
 
@@ -705,7 +708,7 @@ func (m *Messenger) BlockContact(contactID string) (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	err = m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID)
+	err = m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID, m.getCurrentTimeInMillis())
 	if err != nil {
 		return nil, err
 	}
@@ -728,7 +731,7 @@ func (m *Messenger) BlockContactDesktop(contactID string) (*MessengerResponse, e
 		return nil, err
 	}
 
-	err = m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID)
+	err = m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID, m.getCurrentTimeInMillis())
 	if err != nil {
 		return nil, err
 	}

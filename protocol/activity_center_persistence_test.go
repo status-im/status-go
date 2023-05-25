@@ -26,7 +26,7 @@ func createNotifications(t *testing.T, p *sqlitePersistence, notifications []*Ac
 	var createdNotifications []*ActivityCenterNotification
 	for _, notif := range notifications {
 		n, err := p.GetActivityCenterNotificationByID(notif.ID)
-		require.NoError(t, err, n.ID)
+		require.NoError(t, err, notif.ID)
 		createdNotifications = append(createdNotifications, n)
 	}
 
@@ -55,7 +55,7 @@ func TestDeleteActivityCenterNotificationsWhenEmpty(t *testing.T) {
 	count, _ = p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)
 	require.Equal(t, uint64(1), count)
 
-	err = p.DeleteActivityCenterNotifications([]types.HexBytes{})
+	err = p.DeleteActivityCenterNotifications([]types.HexBytes{}, 0)
 	require.NoError(t, err)
 
 	count, _ = p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)
@@ -84,7 +84,7 @@ func TestDeleteActivityCenterNotificationsWithMultipleIds(t *testing.T) {
 	count, _ = p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)
 	require.Equal(t, uint64(3), count)
 
-	err = p.DeleteActivityCenterNotifications([]types.HexBytes{notifications[1].ID, notifications[2].ID})
+	err = p.DeleteActivityCenterNotifications([]types.HexBytes{notifications[1].ID, notifications[2].ID}, 0)
 	require.NoError(t, err)
 
 	count, _ = p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)
@@ -158,14 +158,12 @@ func TestDeleteActivityCenterNotificationsForMessage(t *testing.T) {
 	})
 
 	// Test: soft delete only the notifications that have Message.ID == messages[0].ID.
-	err = p.DeleteActivityCenterNotificationForMessage(chat.ID, messages[0].ID)
+	err = p.DeleteActivityCenterNotificationForMessage(chat.ID, messages[0].ID, 1)
 	require.NoError(t, err)
 
 	notif, err := p.GetActivityCenterNotificationByID(nID1)
 	require.NoError(t, err)
-	require.True(t, notif.Deleted)
-	require.True(t, notif.Dismissed)
-	require.True(t, notif.Read)
+	require.Nil(t, notif)
 
 	// Other notifications are not affected.
 	for _, id := range []types.HexBytes{nID2, nID3, nID4} {
@@ -178,15 +176,13 @@ func TestDeleteActivityCenterNotificationsForMessage(t *testing.T) {
 
 	// Test: soft delete the notifications that have Message.ID == messages[1].ID
 	// or LastMessage.ID == chat.LastMessage.
-	err = p.DeleteActivityCenterNotificationForMessage(chat.ID, messages[1].ID)
+	err = p.DeleteActivityCenterNotificationForMessage(chat.ID, messages[1].ID, 2)
 	require.NoError(t, err)
 
 	for _, id := range []types.HexBytes{nID2, nID3} {
 		notif, err = p.GetActivityCenterNotificationByID(id)
-		require.NoError(t, err, notif.ID)
-		require.True(t, notif.Deleted, notif.ID)
-		require.True(t, notif.Dismissed, notif.ID)
-		require.True(t, notif.Read, notif.ID)
+		require.NoError(t, err)
+		require.Nil(t, notif)
 	}
 
 	notif, err = p.GetActivityCenterNotificationByID(nID4)
@@ -196,7 +192,7 @@ func TestDeleteActivityCenterNotificationsForMessage(t *testing.T) {
 	require.False(t, notif.Read)
 
 	// Test: don't do anything if passed a chat and message without notifications.
-	err = p.DeleteActivityCenterNotificationForMessage(chat2.ID, messages[2].ID)
+	err = p.DeleteActivityCenterNotificationForMessage(chat2.ID, messages[2].ID, 3)
 	require.NoError(t, err)
 }
 
@@ -250,7 +246,7 @@ func TestAcceptActivityCenterNotificationsForInvitesFromUser(t *testing.T) {
 	require.False(t, notifications[0].Accepted)
 	require.False(t, notifications[0].Read)
 
-	notifications, err = p.AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey)
+	notifications, err = p.AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey, 1)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	require.Equal(t, nID2, notifications[0].ID)
@@ -270,13 +266,11 @@ func TestAcceptActivityCenterNotificationsForInvitesFromUser(t *testing.T) {
 	}
 	err = p.SaveActivityCenterNotification(notif)
 	require.NoError(t, err)
-	_, err = p.AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey)
+	_, err = p.AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey, 0)
 	require.NoError(t, err)
 	notif, err = p.GetActivityCenterNotificationByID(notif.ID)
 	require.NoError(t, err)
-	require.False(t, notif.Accepted)
-	require.False(t, notif.Read)
-	require.True(t, notif.Deleted)
+	require.Nil(t, notif)
 
 	// Dismissed notifications are ignored.
 	notif = &ActivityCenterNotification{
@@ -288,7 +282,7 @@ func TestAcceptActivityCenterNotificationsForInvitesFromUser(t *testing.T) {
 	}
 	err = p.SaveActivityCenterNotification(notif)
 	require.NoError(t, err)
-	_, err = p.AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey)
+	_, err = p.AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey, 0)
 	require.NoError(t, err)
 	notif, err = p.GetActivityCenterNotificationByID(notif.ID)
 	require.NoError(t, err)
@@ -412,19 +406,14 @@ func TestDismissAllActivityCenterNotificationsFromUser(t *testing.T) {
 		},
 	})
 
-	err = p.DismissAllActivityCenterNotificationsFromUser(publicKey)
+	err = p.DismissAllActivityCenterNotificationsFromUser(publicKey, 0)
 	require.NoError(t, err)
 
 	// Ignores already soft deleted.
-	notif, err := p.GetActivityCenterNotificationByID(notifications[0].ID)
-	require.NoError(t, err)
-	require.False(t, notif.Accepted)
-	require.False(t, notif.Read)
-	require.False(t, notif.Dismissed)
-	require.True(t, notif.Deleted)
+	require.Nil(t, notifications[0])
 
 	// Ignores already dismissed.
-	notif, err = p.GetActivityCenterNotificationByID(notifications[1].ID)
+	notif, err := p.GetActivityCenterNotificationByID(notifications[1].ID)
 	require.NoError(t, err)
 	require.False(t, notif.Accepted)
 	require.False(t, notif.Read)
@@ -492,21 +481,16 @@ func TestDismissAllActivityCenterNotificationsFromChatID(t *testing.T) {
 		},
 	})
 
-	err = p.DismissAllActivityCenterNotificationsFromChatID(chatID)
+	err = p.DismissAllActivityCenterNotificationsFromChatID(chatID, 0)
 	require.NoError(t, err)
 
 	// Ignores already soft deleted.
-	notif, err := p.GetActivityCenterNotificationByID(notifications[0].ID)
-	require.NoError(t, err)
-	require.False(t, notif.Accepted)
-	require.False(t, notif.Read)
-	require.False(t, notif.Dismissed)
-	require.True(t, notif.Deleted)
+	require.Nil(t, notifications[0])
 
 	// Do not ignore already dismissed, because notifications can become
 	// read/unread AND dismissed, and the method should still update the Read
 	// column.
-	notif, err = p.GetActivityCenterNotificationByID(notifications[1].ID)
+	notif, err := p.GetActivityCenterNotificationByID(notifications[1].ID)
 	require.NoError(t, err)
 	require.False(t, notif.Accepted)
 	require.True(t, notif.Read)
@@ -746,19 +730,19 @@ func TestActivityCenterPersistence(t *testing.T) {
 	require.Equal(t, uint64(2), count)
 
 	// Mark first one as read
-	require.NoError(t, p.MarkActivityCenterNotificationsRead([]types.HexBytes{nID1}))
+	require.NoError(t, p.MarkActivityCenterNotificationsRead([]types.HexBytes{nID1}, 0))
 	count, err = p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), count)
 
 	// Mark first one as unread
-	require.NoError(t, p.MarkActivityCenterNotificationsUnread([]types.HexBytes{nID1}))
+	require.NoError(t, p.MarkActivityCenterNotificationsUnread([]types.HexBytes{nID1}, 0))
 	count, err = p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)
 	require.NoError(t, err)
 	require.Equal(t, uint64(2), count)
 
 	// Mark all read
-	require.NoError(t, p.MarkAllActivityCenterNotificationsRead())
+	require.NoError(t, p.MarkAllActivityCenterNotificationsRead(0))
 	_, notifications, err = p.ActivityCenterNotifications(cursor, 2, []ActivityCenterType{}, ActivityCenterQueryParamsReadAll, false)
 	require.NoError(t, err)
 	require.Len(t, notifications, 2)
@@ -773,7 +757,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 
 	// Mark first one as accepted
 
-	notifications, err = p.AcceptActivityCenterNotifications([]types.HexBytes{nID1})
+	notifications, err = p.AcceptActivityCenterNotifications([]types.HexBytes{nID1}, 0)
 	require.NoError(t, err)
 	require.Len(t, notifications, 1)
 	_, notifications, err = p.ActivityCenterNotifications("", 2, []ActivityCenterType{}, ActivityCenterQueryParamsReadAll, false)
@@ -782,7 +766,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 	require.Len(t, notifications, 1)
 
 	// Mark last one as dismissed
-	require.NoError(t, p.DismissActivityCenterNotifications([]types.HexBytes{nID2}))
+	require.NoError(t, p.DismissActivityCenterNotifications([]types.HexBytes{nID2}, 0))
 	_, notifications, err = p.ActivityCenterNotifications("", 2, []ActivityCenterType{}, ActivityCenterQueryParamsReadAll, false)
 	require.NoError(t, err)
 
@@ -799,7 +783,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 	require.NoError(t, err)
 
 	// Mark all as accepted
-	notifications, err = p.AcceptAllActivityCenterNotifications()
+	notifications, err = p.AcceptAllActivityCenterNotifications(0)
 	require.NoError(t, err)
 	require.Len(t, notifications, 2)
 
@@ -818,7 +802,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 	require.NoError(t, err)
 
 	// Mark all as dismissed
-	require.NoError(t, p.DismissAllActivityCenterNotifications())
+	require.NoError(t, p.DismissAllActivityCenterNotifications(0))
 	_, notifications, err = p.ActivityCenterNotifications("", 2, []ActivityCenterType{}, ActivityCenterQueryParamsReadAll, false)
 	require.NoError(t, err)
 
@@ -886,9 +870,9 @@ func TestActivityCenterReadUnreadPagination(t *testing.T) {
 	}
 
 	// Mark the notification as read
-	err = p.MarkActivityCenterNotificationsRead([]types.HexBytes{nID2})
+	err = p.MarkActivityCenterNotificationsRead([]types.HexBytes{nID2}, 0)
 	require.NoError(t, err)
-	err = p.MarkActivityCenterNotificationsRead([]types.HexBytes{nID4})
+	err = p.MarkActivityCenterNotificationsRead([]types.HexBytes{nID4}, 0)
 	require.NoError(t, err)
 
 	// Fetch UNREAD notifications, first page.
@@ -1053,7 +1037,7 @@ func TestActivityCenterReadUnreadFilterByTypes(t *testing.T) {
 
 	// Mark all notifications as read.
 	for _, notification := range allNotifications {
-		err = p.MarkActivityCenterNotificationsRead([]types.HexBytes{notification.ID})
+		err = p.MarkActivityCenterNotificationsRead([]types.HexBytes{notification.ID}, 0)
 		require.NoError(t, err)
 	}
 
@@ -1117,7 +1101,7 @@ func TestActivityCenterReadUnread(t *testing.T) {
 	require.NoError(t, err)
 
 	// Mark the notification as read
-	err = p.MarkActivityCenterNotificationsRead([]types.HexBytes{nID2})
+	err = p.MarkActivityCenterNotificationsRead([]types.HexBytes{nID2}, 0)
 	require.NoError(t, err)
 
 	cursor, notifications, err := p.ActivityCenterNotifications(

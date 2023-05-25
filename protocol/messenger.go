@@ -3115,6 +3115,7 @@ func (r *ReceivedMessageState) updateExistingActivityCenterNotification(publicKe
 
 	notification.Message = message
 	notification.ReplyMessage = responseTo
+	notification.UpdatedAt = m.getCurrentTimeInMillis()
 
 	err = m.addActivityCenterNotification(r.Response, notification)
 	if err != nil {
@@ -3148,12 +3149,10 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 			ChatID:       chat.ID,
 			CommunityID:  chat.CommunityID,
 			Author:       message.From,
+			UpdatedAt:    m.getCurrentTimeInMillis(),
 		}
 
-		err := m.addActivityCenterNotification(r.Response, notification)
-		if err != nil {
-			return err
-		}
+		return m.addActivityCenterNotification(r.Response, notification)
 	}
 
 	return nil
@@ -4373,9 +4372,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					notification := &ActivityCenterNotification{
 						ID:          types.FromHex(uuid.New().String()),
 						Type:        ActivityCenterNotificationTypeCommunityKicked,
-						Timestamp:   m.getTimesource().GetCurrentTime(),
+						Timestamp:   m.getCurrentTimeInMillis(),
 						CommunityID: changes.Community.IDString(),
 						Read:        false,
+						UpdatedAt:   m.getCurrentTimeInMillis(),
 					}
 
 					err = m.addActivityCenterNotification(response, notification)
@@ -4827,7 +4827,7 @@ func (m *Messenger) markAllRead(chatID string, clock uint64, shouldBeSynced bool
 }
 
 func (m *Messenger) MarkAllRead(chatID string) error {
-	err := m.persistence.DismissAllActivityCenterNotificationsFromChatID(chatID)
+	err := m.persistence.DismissAllActivityCenterNotificationsFromChatID(chatID, m.getCurrentTimeInMillis())
 	if err != nil {
 		return err
 	}
@@ -4846,7 +4846,7 @@ func (m *Messenger) MarkAllRead(chatID string) error {
 }
 
 func (m *Messenger) MarkAllReadInCommunity(communityID string) ([]string, error) {
-	err := m.persistence.DismissAllActivityCenterNotificationsFromCommunity(communityID)
+	err := m.persistence.DismissAllActivityCenterNotificationsFromCommunity(communityID, m.getCurrentTimeInMillis())
 	if err != nil {
 		return nil, err
 	}
@@ -5738,6 +5738,10 @@ func (m *Messenger) SignMessage(message string) ([]byte, error) {
 
 func (m *Messenger) getTimesource() common.TimeSource {
 	return m.transport
+}
+
+func (m *Messenger) getCurrentTimeInMillis() uint64 {
+	return m.getTimesource().GetCurrentTime()
 }
 
 // AddPushNotificationsServer adds a push notification server

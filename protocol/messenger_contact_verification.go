@@ -246,6 +246,7 @@ func (m *Messenger) CancelVerificationRequest(ctx context.Context, id string) (*
 		message := notification.Message
 		message.ContactVerificationState = common.ContactVerificationStateCanceled
 		notification.Read = true
+		notification.UpdatedAt = m.getCurrentTimeInMillis()
 
 		err = m.addActivityCenterNotification(response, notification)
 		if err != nil {
@@ -356,6 +357,7 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 		notification.ReplyMessage = replyMessage
 		notification.Read = true
 		notification.Accepted = true
+		notification.UpdatedAt = m.getCurrentTimeInMillis()
 
 		err = m.addActivityCenterNotification(resp, notification)
 		if err != nil {
@@ -452,6 +454,7 @@ func (m *Messenger) VerifiedTrusted(ctx context.Context, request *requests.Verif
 	notification.Message.ContactVerificationState = common.ContactVerificationStateTrusted
 	notification.Read = true
 	notification.Accepted = true
+	notification.UpdatedAt = m.getCurrentTimeInMillis()
 
 	err = m.addActivityCenterNotification(response, notification)
 	if err != nil {
@@ -558,6 +561,7 @@ func (m *Messenger) VerifiedUntrustworthy(ctx context.Context, request *requests
 	notification.Message.ContactVerificationState = common.ContactVerificationStateUntrustworthy
 	notification.Read = true
 	notification.Accepted = true
+	notification.UpdatedAt = m.getCurrentTimeInMillis()
 
 	err = m.addActivityCenterNotification(response, notification)
 	if err != nil {
@@ -666,6 +670,7 @@ func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id st
 		notification.ContactVerificationStatus = verification.RequestStatusDECLINED
 		notification.Read = true
 		notification.Dismissed = true
+		notification.UpdatedAt = m.getCurrentTimeInMillis()
 
 		message := notification.Message
 		message.ContactVerificationState = common.ContactVerificationStateDeclined
@@ -1043,6 +1048,7 @@ func (m *Messenger) createOrUpdateOutgoingContactVerificationNotification(contac
 		Read:                      vr.RequestStatus != verification.RequestStatusACCEPTED, // Mark as Unread Accepted notification because we are waiting for the asnwer
 		Accepted:                  vr.RequestStatus == verification.RequestStatusTRUSTED || vr.RequestStatus == verification.RequestStatusUNTRUSTWORTHY,
 		Dismissed:                 vr.RequestStatus == verification.RequestStatusDECLINED,
+		UpdatedAt:                 m.getCurrentTimeInMillis(),
 	}
 
 	return m.addActivityCenterNotification(response, notification)
@@ -1062,6 +1068,7 @@ func (m *Messenger) createOrUpdateIncomingContactVerificationNotification(contac
 		Read:                      vr.RequestStatus != verification.RequestStatusPENDING, // Unread only for pending incomming
 		Accepted:                  vr.RequestStatus == verification.RequestStatusACCEPTED || vr.RequestStatus == verification.RequestStatusTRUSTED || vr.RequestStatus == verification.RequestStatusUNTRUSTWORTHY,
 		Dismissed:                 vr.RequestStatus == verification.RequestStatusDECLINED,
+		UpdatedAt:                 m.getCurrentTimeInMillis(),
 	}
 
 	return m.addActivityCenterNotification(messageState.Response, notification)
