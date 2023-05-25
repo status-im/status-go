@@ -188,12 +188,12 @@ func Test_UnfurlURLs_YouTube(t *testing.T) {
 		[]byte(fmt.Sprintf(`
 			<html>
 				<head>
-					<meta property="og:title" content="Interview with a GNU/Linux user - Partition 1">
-					<meta property="og:description" content="GNU/Linux Operating SystemInterview with a GNU/Linux user with Richie Guix - aired on © The GNU Linux.Programmer humorLinux humorProgramming jokesProgramming...">
+					<meta property="og:title" content="%s">
+					<meta property="og:description" content="%s">
 					<meta property="og:image" content="%s">
 				</head>
 			</html>
-		`, thumbnailURL)),
+		`, expected.Title, expected.Description, thumbnailURL)),
 	)
 	transport.AddURLMatcher(thumbnailURL, readAsset(t, "1.jpg"))
 	stubbedClient := http.Client{Transport: &transport}
