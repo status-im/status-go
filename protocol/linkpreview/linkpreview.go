@@ -55,10 +55,8 @@ func fetchBody(logger *zap.Logger, httpClient http.Client, url string, headers H
 		return nil, fmt.Errorf("failed to perform HTTP request: %w", err)
 	}
 
-	if headers != nil {
-		for k, v := range headers {
-			req.Header.Set(k, v)
-		}
+	for k, v := range headers {
+		req.Header.Set(k, v)
 	}
 
 	res, err := httpClient.Do(req)

@@ -58,7 +58,7 @@ func (t *StubTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // Add a matcher based on a URL regexp. If a given request URL matches the
 // regexp, then responseBody will be returned with a hardcoded 200 status code.
-func (st *StubTransport) AddURLMatcher(urlRegexp string, responseBody []byte) {
+func (t *StubTransport) AddURLMatcher(urlRegexp string, responseBody []byte) {
 	matcher := func(req *http.Request) *http.Response {
 		rx, err := regexp.Compile(regexp.QuoteMeta(urlRegexp))
 		if err != nil {
@@ -73,7 +73,7 @@ func (st *StubTransport) AddURLMatcher(urlRegexp string, responseBody []byte) {
 		return nil
 	}
 
-	st.matchers = append(st.matchers, matcher)
+	t.matchers = append(t.matchers, matcher)
 }
 
 // assertContainsLongString verifies if actual contains a slice of expected and
