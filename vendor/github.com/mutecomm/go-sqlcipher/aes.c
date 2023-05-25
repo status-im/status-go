@@ -20,10 +20,10 @@
 
 #include "mbtls_aes.h"
 
-static mbedtls_aes_context ctx_encrypt;
+static __thread mbedtls_aes_context ctx_encrypt;
 
 #ifndef ENCRYPT_ONLY
-static mbedtls_aes_context ctx_decrypt;
+static __thread mbedtls_aes_context ctx_decrypt;
 
 #define SETUP    rijndael_setup
 #define ECB_ENC  rijndael_ecb_encrypt
