@@ -1,13 +1,80 @@
 package linkpreview
 
 import (
+	"bytes"
+	"fmt"
+	"io/ioutil"
 	"math"
+	"net/http"
+	"regexp"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/protocol/common"
 )
+
+// StubMatcher should either return an http.Response or nil in case the request
+// doesn't match.
+type StubMatcher func(req *http.Request) *http.Response
+
+type StubTransport struct {
+	// fallbackToDefaultTransport when true will make the transport use
+	// http.DefaultTransport in case no matcher is found.
+	fallbackToDefaultTransport bool
+	// disabledStubs when true, will skip all matchers and use
+	// http.DefaultTransport.
+	//
+	// Useful while testing to toggle between the original and stubbed responses.
+	disabledStubs bool
+	// matchers are http.RoundTripper functions.
+	matchers []StubMatcher
+}
+
+// RoundTrip returns a stubbed response if any matcher returns a non-nil
+// http.Response. If no matcher is found and fallbackToDefaultTransport is true,
+// then it executes the HTTP request using the default http transport.
+//
+// If StubTransport#disabledStubs is true, the default http transport is used.
+func (t *StubTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if t.disabledStubs {
+		return http.DefaultTransport.RoundTrip(req)
+	}
+
+	for _, matcher := range t.matchers {
+		res := matcher(req)
+		if res != nil {
+			return res, nil
+		}
+	}
+
+	if t.fallbackToDefaultTransport {
+		return http.DefaultTransport.RoundTrip(req)
+	}
+
+	return nil, fmt.Errorf("no HTTP matcher found")
+}
+
+// Add a matcher based on a URL regexp. If a given request URL matches the
+// regexp, then responseBody will be returned with a hardcoded 200 status code.
+func (st *StubTransport) AddURLMatcher(urlRegexp string, responseBody []byte) {
+	matcher := func(req *http.Request) *http.Response {
+		rx, err := regexp.Compile(regexp.QuoteMeta(urlRegexp))
+		if err != nil {
+			return nil
+		}
+		if rx.MatchString(req.URL.String()) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       ioutil.NopCloser(bytes.NewBuffer(responseBody)),
+			}
+		}
+		return nil
+	}
+
+	st.matchers = append(st.matchers, matcher)
+}
 
 // assertContainsLongString verifies if actual contains a slice of expected and
 // correctly prints the cause of the failure. The default behavior of
@@ -37,7 +104,7 @@ func assertContainsLongString(t *testing.T, expected string, actual string, maxL
 	)
 }
 
-func TestGetLinks(t *testing.T) {
+func Test_GetLinks(t *testing.T) {
 	examples := []struct {
 		args     string
 		expected []string
@@ -88,160 +155,130 @@ func TestGetLinks(t *testing.T) {
 	}
 }
 
-func TestUnfurlURLs(t *testing.T) {
-	type Example struct {
-		url      string
-		expected common.LinkPreview
-	}
-
-	examples := []Example{
-		{
-			url: "https://github.com/status-im/status-mobile/issues/15469",
-			expected: common.LinkPreview{
-				Description: "Designs https://www.figma.com/file/wA8Epdki2OWa8Vr067PCNQ/Composer-for-Mobile?node-id=2102-232933&t=tTYKjMpICnzwF5Zv-0 Out of scope Enable link previews (we can assume for now that is always on) Mu...",
-				Hostname:    "github.com",
-				Title:       "Allow users to customize links · Issue #15469 · status-im/status-mobile",
-				URL:         "https://github.com/status-im/status-mobile/issues/15469",
-				Thumbnail: common.LinkPreviewThumbnail{
-					Width:   1200,
-					Height:  600,
-					URL:     "",
-					DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABLAAAAJYCAYAAABy",
-				},
-			},
-		},
-		{
-			url: "https://www.imdb.com/title/tt0117500/",
-			expected: common.LinkPreview{
-				Description: "The Rock: Directed by Michael Bay. With Sean Connery, Nicolas Cage, Ed Harris, John Spencer. A mild-mannered chemist and an ex-con must lead the counterstrike when a rogue group of military men, led by a renegade general, threaten a nerve gas attack from Alcatraz against San Francisco.",
-				Hostname:    "www.imdb.com",
-				Title:       "The Rock (1996) - IMDb",
-				URL:         "https://www.imdb.com/title/tt0117500/",
-				Thumbnail: common.LinkPreviewThumbnail{
-					Width:   1000,
-					Height:  1481,
-					URL:     "",
-					DataURI: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkJCgg",
-				},
-			},
-		},
-		{
-			url: "https://www.reddit.com/r/Bitcoin/comments/13j0tzr/the_best_bitcoin_explanation_of_all_times/?utm_source=share",
-			expected: common.LinkPreview{
-				Description: "",
-				Hostname:    "www.reddit.com",
-				Title:       "The best bitcoin explanation of all times.",
-				URL:         "https://www.reddit.com/r/Bitcoin/comments/13j0tzr/the_best_bitcoin_explanation_of_all_times/?utm_source=share",
-				Thumbnail:   common.LinkPreviewThumbnail{},
-			},
-		},
-		{
-			url: "https://open.spotify.com/album/0Wn5sHYtC7vPPX0n2AVJmF?si=iXmxsFJyQ62F2yMElt086A",
-			expected: common.LinkPreview{
-				Description: "SadSvit · Album · 2021 · 8 songs.",
-				Hostname:    "open.spotify.com",
-				Title:       "Cassette",
-				URL:         "https://open.spotify.com/album/0Wn5sHYtC7vPPX0n2AVJmF?si=iXmxsFJyQ62F2yMElt086A",
-				Thumbnail: common.LinkPreviewThumbnail{
-					Width:   640,
-					Height:  640,
-					URL:     "",
-					DataURI: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEBLAEsAAD//gA8Q1JFQVRPUjogZ2QtanBlZyB2MS4wICh1c2luZyBJSkcgS",
-				},
-			},
-		},
-		{
-			url: "https://www.youtube.com/watch?v=lE4UXdJSJM4",
-			expected: common.LinkPreview{
-				URL:         "https://www.youtube.com/watch?v=lE4UXdJSJM4",
-				Hostname:    "www.youtube.com",
-				Title:       "Interview with a GNU/Linux user - Partition 1",
-				Description: "GNU/Linux Operating SystemInterview with a GNU/Linux user with Richie Guix - aired on © The GNU Linux.Programmer humorLinux humorProgramming jokesProgramming...",
-				Thumbnail: common.LinkPreviewThumbnail{
-					Width:   1280,
-					Height:  720,
-					DataURI: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAUDBA8",
-				},
-			},
-		},
-		{
-			url: "https://music.youtube.com/watch?v=1TTAXENxbM0",
-			expected: common.LinkPreview{
-				URL:         "https://music.youtube.com/watch?v=1TTAXENxbM0",
-				Hostname:    "music.youtube.com",
-				Title:       "Telegraph Road - YouTube Music",
-				Description: "Provided to YouTube by Universal Music Group Telegraph Road · Dire Straits Love Over Gold ℗ 1982 Mercury Records Limited Released on: 1982-01-01 Produce...",
-				Thumbnail: common.LinkPreviewThumbnail{
-					Width:   1280,
-					Height:  720,
-					DataURI: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAUDBAg",
-				},
-			},
-		},
-		{
-			url: "https://media.giphy.com/media/dTlyIvBdEzIQM/giphy.gif",
-			expected: common.LinkPreview{
-				URL:         "https://media.giphy.com/media/dTlyIvBdEzIQM/giphy.gif",
-				Hostname:    "media.giphy.com",
-				Title:       "Cat GIF - Find & Share on GIPHY",
-				Description: "Discover & share this Cat GIF with everyone you know. GIPHY is how you search, share, discover, and create GIFs.",
-				Thumbnail: common.LinkPreviewThumbnail{
-					Width:   339,
-					Height:  200,
-					DataURI: "data:image/gif;base64,R0lGODlhUwHIAPf/ACslIC4oIzEqIjIqJTMsKDQw",
-				},
-			},
-		},
-		{
-			url: "https://t.co/TLEVzWCTkV",
-			expected: common.LinkPreview{
-				URL:         "https://t.co/TLEVzWCTkV",
-				Hostname:    "t.co",
-				Title:       "Casting announced for The Way, the bold new BBC drama from Michael Sheen, James Graham and Adam Curtis",
-				Description: "Steffan Rhodri, Mali Harries, Sophie Melville and Callum Scott Howells lead the cast, Luke Evans also stars",
-				Thumbnail: common.LinkPreviewThumbnail{
-					Width:   1920,
-					Height:  1080,
-					DataURI: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAUEBAU",
-				},
-			},
-		},
-	}
-
-	var urls []string
-	for _, e := range examples {
-		urls = append(urls, e.url)
-	}
-
-	links, err := UnfurlURLs(nil, urls)
+func readAsset(t *testing.T, filename string) []byte {
+	b, err := ioutil.ReadFile("../../_assets/tests/" + filename)
 	require.NoError(t, err)
-	require.Len(t, links, len(examples), "all URLs should have been unfurled successfully")
+	return b
+}
 
-	for i, link := range links {
-		e := examples[i]
-		require.Equal(t, e.expected.URL, link.URL, e.url)
-		require.Equal(t, e.expected.Hostname, link.Hostname, e.url)
-		require.Equal(t, e.expected.Title, link.Title, e.url)
-		require.Equal(t, e.expected.Description, link.Description, e.url)
-
-		require.Equal(t, e.expected.Thumbnail.Width, link.Thumbnail.Width, e.url)
-		require.Equal(t, e.expected.Thumbnail.Height, link.Thumbnail.Height, e.url)
-		require.Equal(t, e.expected.Thumbnail.URL, link.Thumbnail.URL, e.url)
-		assertContainsLongString(t, e.expected.Thumbnail.DataURI, link.Thumbnail.DataURI, 100)
+func Test_UnfurlURLs_YouTube(t *testing.T) {
+	url := "https://www.youtube.com/watch?v=lE4UXdJSJM4"
+	thumbnailURL := "https://i.ytimg.com/vi/lE4UXdJSJM4/maxresdefault.jpg"
+	expected := common.LinkPreview{
+		URL:         url,
+		Hostname:    "www.youtube.com",
+		Title:       "Interview with a GNU/Linux user - Partition 1",
+		Description: "GNU/Linux Operating SystemInterview with a GNU/Linux user with Richie Guix - aired on © The GNU Linux.Programmer humorLinux humorProgramming jokesProgramming...",
+		Thumbnail: common.LinkPreviewThumbnail{
+			Width:   1,
+			Height:  1,
+			DataURI: "data:image/webp;base64,UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAQAaJaQAA3AA/vpMgAA",
+		},
 	}
+
+	disabledStubs := false
+	if disabledStubs {
+		expected.Thumbnail.Width = 1280
+		expected.Thumbnail.Height = 720
+		expected.Thumbnail.DataURI = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAUDBA8"
+	}
+	transport := StubTransport{disabledStubs: disabledStubs}
+	transport.AddURLMatcher(
+		url,
+		[]byte(fmt.Sprintf(`
+			<html>
+				<head>
+					<meta property="og:title" content="Interview with a GNU/Linux user - Partition 1">
+					<meta property="og:description" content="GNU/Linux Operating SystemInterview with a GNU/Linux user with Richie Guix - aired on © The GNU Linux.Programmer humorLinux humorProgramming jokesProgramming...">
+					<meta property="og:image" content="%s">
+				</head>
+			</html>
+		`, thumbnailURL)),
+	)
+	transport.AddURLMatcher(thumbnailURL, readAsset(t, "1.jpg"))
+	stubbedClient := http.Client{Transport: &transport}
+
+	previews, err := UnfurlURLs(nil, stubbedClient, []string{url})
+	require.NoError(t, err)
+	require.Len(t, previews, 1)
+	preview := previews[0]
+
+	require.Equal(t, expected.URL, preview.URL)
+	require.Equal(t, expected.Hostname, preview.Hostname)
+	require.Equal(t, expected.Title, preview.Title)
+	require.Equal(t, expected.Description, preview.Description)
+	require.Equal(t, expected.Thumbnail.Width, preview.Thumbnail.Width)
+	require.Equal(t, expected.Thumbnail.Height, preview.Thumbnail.Height)
+	require.Equal(t, expected.Thumbnail.URL, preview.Thumbnail.URL)
+	assertContainsLongString(t, expected.Thumbnail.DataURI, preview.Thumbnail.DataURI, 100)
+}
+
+func Test_UnfurlURLs_Reddit(t *testing.T) {
+	url := "https://www.reddit.com/r/Bitcoin/comments/13j0tzr/the_best_bitcoin_explanation_of_all_times/?utm_source=share"
+	expected := common.LinkPreview{
+		URL:         url,
+		Hostname:    "www.reddit.com",
+		Title:       "The best bitcoin explanation of all times.",
+		Description: "",
+		Thumbnail:   common.LinkPreviewThumbnail{},
+	}
+
+	transport := StubTransport{}
+	transport.AddURLMatcher(
+		"https://www.reddit.com/oembed",
+		[]byte(`
+			{
+				"provider_url": "https://www.reddit.com/",
+				"version": "1.0",
+				"title": "The best bitcoin explanation of all times.",
+				"provider_name": "reddit",
+				"type": "rich",
+				"author_name": "DTheDev"
+			}
+		`),
+	)
+	stubbedClient := http.Client{Transport: &transport}
+
+	previews, err := UnfurlURLs(nil, stubbedClient, []string{url})
+	require.NoError(t, err)
+	require.Len(t, previews, 1)
+	preview := previews[0]
+
+	require.Equal(t, expected.URL, preview.URL)
+	require.Equal(t, expected.Hostname, preview.Hostname)
+	require.Equal(t, expected.Title, preview.Title)
+	require.Equal(t, expected.Description, preview.Description)
+	require.Equal(t, expected.Thumbnail, preview.Thumbnail)
+}
+
+func Test_UnfurlURLs_Timeout(t *testing.T) {
+	httpClient := http.Client{Timeout: time.Nanosecond}
+	previews, err := UnfurlURLs(nil, httpClient, []string{"https://status.im"})
+	require.NoError(t, err)
+	require.Empty(t, previews)
+}
+
+func Test_UnfurlURLs_CommonFailures(t *testing.T) {
+	httpClient := http.Client{}
 
 	// Test URL that doesn't return any OpenGraph title.
-	previews, err := UnfurlURLs(nil, []string{"https://wikipedia.org"})
+	transport := StubTransport{}
+	transport.AddURLMatcher(
+		"https://wikipedia.org",
+		[]byte("<html><head></head></html>"),
+	)
+	stubbedClient := http.Client{Transport: &transport}
+	previews, err := UnfurlURLs(nil, stubbedClient, []string{"https://wikipedia.org"})
 	require.NoError(t, err)
 	require.Empty(t, previews)
 
 	// Test 404.
-	previews, err = UnfurlURLs(nil, []string{"https://github.com/status-im/i_do_not_exist"})
+	previews, err = UnfurlURLs(nil, httpClient, []string{"https://github.com/status-im/i_do_not_exist"})
 	require.NoError(t, err)
 	require.Empty(t, previews)
 
 	// Test no response when trying to get OpenGraph metadata.
-	previews, err = UnfurlURLs(nil, []string{"https://wikipedia.o"})
+	previews, err = UnfurlURLs(nil, httpClient, []string{"https://wikipedia.o"})
 	require.NoError(t, err)
 	require.Empty(t, previews)
 }

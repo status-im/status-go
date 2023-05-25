@@ -47,7 +47,7 @@ type Unfurler interface {
 }
 
 const (
-	requestTimeout = 15000 * time.Millisecond
+	defaultRequestTimeout = 15000 * time.Millisecond
 
 	// Without an user agent, many providers treat status-go as a gluttony bot,
 	// and either respond more frequently with a 429 (Too Many Requests), or
@@ -59,12 +59,8 @@ const (
 	defaultAcceptLanguage = "en-US,en;q=0.5"
 )
 
-var (
-	httpClient = http.Client{Timeout: requestTimeout}
-)
-
-func fetchResponseBody(logger *zap.Logger, url string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+func fetchResponseBody(logger *zap.Logger, httpClient http.Client, url string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -101,10 +97,10 @@ func newDefaultLinkPreview(url *neturl.URL) common.LinkPreview {
 	}
 }
 
-func fetchThumbnail(logger *zap.Logger, url string) (common.LinkPreviewThumbnail, error) {
+func fetchThumbnail(logger *zap.Logger, httpClient http.Client, url string) (common.LinkPreviewThumbnail, error) {
 	var thumbnail common.LinkPreviewThumbnail
 
-	imgBytes, err := fetchResponseBody(logger, url)
+	imgBytes, err := fetchResponseBody(logger, httpClient, url)
 	if err != nil {
 		return thumbnail, fmt.Errorf("could not fetch thumbnail: %w", err)
 	}
@@ -126,7 +122,8 @@ func fetchThumbnail(logger *zap.Logger, url string) (common.LinkPreviewThumbnail
 }
 
 type OEmbedUnfurler struct {
-	logger *zap.Logger
+	logger     *zap.Logger
+	httpClient http.Client
 	// oembedEndpoint describes where the consumer may request representations for
 	// the supported URL scheme. For example, for YouTube, it is
 	// https://www.youtube.com/oembed.
@@ -148,14 +145,14 @@ func (u OEmbedUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
 		return preview, err
 	}
 
-	// When format is specified, the provider MUST return data in the request
+	// When format is specified, the provider MUST return data in the requested
 	// format, else return an error.
 	requestURL.RawQuery = neturl.Values{
 		"url":    {u.url.String()},
 		"format": {"json"},
 	}.Encode()
 
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", requestURL.String(), nil)
 	if err != nil {
@@ -165,7 +162,7 @@ func (u OEmbedUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
 	req.Header.Set("accept-language", defaultAcceptLanguage)
 	req.Header.Set("user-agent", defaultUserAgent)
 
-	res, err := httpClient.Do(req)
+	res, err := u.httpClient.Do(req)
 	defer func() {
 		if res != nil {
 			if err = res.Body.Close(); err != nil {
@@ -221,13 +218,14 @@ type OpenGraphMetadata struct {
 // gives back a JSON response with a "html" field that's supposed to be embedded
 // in an iframe (hardly useful for existing Status' clients).
 type OpenGraphUnfurler struct {
-	logger *zap.Logger
+	logger     *zap.Logger
+	httpClient http.Client
 }
 
 func (u OpenGraphUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
 	preview := newDefaultLinkPreview(url)
 
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
 	if err != nil {
@@ -237,7 +235,7 @@ func (u OpenGraphUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
 	req.Header.Set("accept-language", defaultAcceptLanguage)
 	req.Header.Set("user-agent", defaultUserAgent)
 
-	res, err := httpClient.Do(req)
+	res, err := u.httpClient.Do(req)
 	defer func() {
 		if res != nil {
 			if err = res.Body.Close(); err != nil {
@@ -283,7 +281,7 @@ func (u OpenGraphUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
 	}
 
 	if ogMetadata.ThumbnailURL != "" {
-		t, err := fetchThumbnail(u.logger, ogMetadata.ThumbnailURL)
+		t, err := fetchThumbnail(u.logger, u.httpClient, ogMetadata.ThumbnailURL)
 		if err != nil {
 			// Given we want to fetch thumbnails on a best-effort basis, if an error
 			// happens we simply log it.
@@ -304,20 +302,24 @@ func normalizeHostname(hostname string) string {
 	return re.ReplaceAllString(hostname, "$1")
 }
 
-func newUnfurler(logger *zap.Logger, url *neturl.URL) Unfurler {
+func newUnfurler(logger *zap.Logger, httpClient http.Client, url *neturl.URL) Unfurler {
 	switch normalizeHostname(url.Hostname()) {
 	case "reddit.com":
 		return OEmbedUnfurler{
 			oembedEndpoint: "https://www.reddit.com/oembed",
 			url:            *url,
 			logger:         logger,
+			httpClient:     httpClient,
 		}
 	default:
-		return OpenGraphUnfurler{logger: logger}
+		return OpenGraphUnfurler{
+			logger:     logger,
+			httpClient: httpClient,
+		}
 	}
 }
 
-func unfurl(logger *zap.Logger, url string) (common.LinkPreview, error) {
+func unfurl(logger *zap.Logger, httpClient http.Client, url string) (common.LinkPreview, error) {
 	var preview common.LinkPreview
 
 	parsedURL, err := neturl.Parse(url)
@@ -325,7 +327,7 @@ func unfurl(logger *zap.Logger, url string) (common.LinkPreview, error) {
 		return preview, err
 	}
 
-	unfurler := newUnfurler(logger, parsedURL)
+	unfurler := newUnfurler(logger, httpClient, parsedURL)
 	preview, err = unfurler.unfurl(parsedURL)
 	if err != nil {
 		return preview, err
@@ -393,9 +395,13 @@ func GetURLs(text string) []string {
 	return urls
 }
 
+func NewDefaultHTTPClient() http.Client {
+	return http.Client{Timeout: defaultRequestTimeout}
+}
+
 // UnfurlURLs assumes clients pass URLs verbatim that were validated and
 // processed by GetURLs.
-func UnfurlURLs(logger *zap.Logger, urls []string) ([]common.LinkPreview, error) {
+func UnfurlURLs(logger *zap.Logger, httpClient http.Client, urls []string) ([]common.LinkPreview, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -407,7 +413,7 @@ func UnfurlURLs(logger *zap.Logger, urls []string) ([]common.LinkPreview, error)
 	previews := make([]common.LinkPreview, 0, len(urls))
 
 	for _, url := range urls {
-		p, err := unfurl(logger, url)
+		p, err := unfurl(logger, httpClient, url)
 		if err != nil {
 			if unfurlErr, ok := err.(UnfurlError); ok {
 				logger.Info("failed to unfurl", zap.Error(unfurlErr))
