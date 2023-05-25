@@ -33,9 +33,10 @@ const (
 	LinkPreviewThumbnailPath = "/link-preview/thumbnail"
 
 	// Handler routes for pairing
-	accountImagesPath = "/accountImages"
-	contactImagesPath = "/contactImages"
-	generateQRCode    = "/GenerateQRCode"
+	accountImagesPath   = "/accountImages"
+	accountInitialsPath = "/accountInitials"
+	contactImagesPath   = "/contactImages"
+	generateQRCode      = "/GenerateQRCode"
 )
 
 type HandlerPatternMap map[string]http.HandlerFunc
@@ -103,6 +104,150 @@ func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Lo
 
 			payload, err = ring.DrawRing(&ring.DrawRingParam{
 				Theme: theme, ColorHash: accColorHash, ImageBytes: identityImage.Payload, Height: identityImage.Height, Width: identityImage.Width,
+			})
+
+			if err != nil {
+				logger.Error("failed to draw ring for account identity", zap.Error(err))
+				return
+			}
+		}
+
+		if len(payload) == 0 {
+			logger.Error("empty image")
+			return
+		}
+		mime, err := images.GetProtobufImageMime(payload)
+		if err != nil {
+			logger.Error("failed to get mime", zap.Error(err))
+		}
+
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Cache-Control", "no-store")
+
+		_, err = w.Write(payload)
+		if err != nil {
+			logger.Error("failed to write image", zap.Error(err))
+		}
+	}
+}
+
+func handleAccountInitials(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		params := r.URL.Query()
+
+		keyUids, ok := params["keyUid"]
+		if !ok || len(keyUids) == 0 {
+			logger.Error("no keyUid")
+			return
+		}
+
+		amountInitialsStr, ok := params["length"]
+		if !ok || len(amountInitialsStr) == 0 {
+			logger.Error("no length")
+			return
+		}
+		amountInitials, err := strconv.Atoi(amountInitialsStr[0])
+		if err != nil {
+			logger.Error("invalid length")
+			return
+		}
+
+		fontFile, ok := params["fontFile"]
+		if !ok || len(fontFile) == 0 {
+			logger.Error("no fontFile")
+			return
+		}
+
+		fontSizeStr, ok := params["fontSize"]
+		if !ok || len(fontSizeStr) == 0 {
+			logger.Error("no fontSize")
+			return
+		}
+		fontSize, err := strconv.ParseFloat(fontSizeStr[0], 64)
+		if err != nil {
+			logger.Error("invalid fontSize")
+			return
+		}
+
+		colors, ok := params["color"]
+		if !ok {
+			logger.Error("invalid color")
+			return
+		}
+		color := "#000000"
+		if len(colors) != 0 {
+			color = colors[0]
+		}
+
+		sizeStr, ok := params["size"]
+		if !ok || len(sizeStr) == 0 {
+			logger.Error("no size")
+			return
+		}
+		size, err := strconv.Atoi(sizeStr[0])
+		if err != nil {
+			logger.Error("invalid size")
+			return
+		}
+
+		bgColors, ok := params["bgColor"]
+		if !ok {
+			logger.Error("invalid bgColor")
+			return
+		}
+		bgColor := "#ffffff"
+		if len(bgColors) != 0 {
+			bgColor = bgColors[0]
+		}
+
+		uppercasePercentStr, ok := params["uppercasePercent"]
+		if !ok {
+			logger.Error("invalid fontSize")
+			return
+		}
+		uppercasePercent := 1.0
+		if len(uppercasePercentStr) != 0 {
+			uppercasePercent, err = strconv.ParseFloat(uppercasePercentStr[0], 64)
+			if err != nil {
+				logger.Error("invalid uppercasePercent")
+				return
+			}
+		}
+
+		account, err := multiaccountsDB.GetAccount(keyUids[0])
+
+		initials := images.ExtractInitials(account.Name, amountInitials)
+
+		initialsImagePayload, err := images.GenerateInitialsImage(initials, bgColor, color, fontFile[0], size, fontSize, uppercasePercent)
+
+		if err != nil {
+			logger.Error("handleAccountInitials: failed to load image.", zap.String("keyUid", keyUids[0]), zap.Error(err))
+			return
+		}
+
+		var payload = initialsImagePayload
+
+		if ringEnabled(params) {
+			accColorHash := account.ColorHash
+
+			if accColorHash == nil {
+				pks, ok := params["publicKey"]
+				if !ok || len(pks) == 0 {
+					logger.Error("no publicKey")
+					return
+				}
+
+				accColorHash, err = colorhash.GenerateFor(pks[0])
+				if err != nil {
+					logger.Error("could not generate color hash")
+					return
+				}
+			}
+
+			var theme = getTheme(params, logger)
+
+			payload, err = ring.DrawRing(&ring.DrawRingParam{
+				Theme: theme, ColorHash: accColorHash, ImageBytes: initialsImagePayload, Height: size, Width: size,
 			})
 
 			if err != nil {
