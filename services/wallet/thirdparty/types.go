@@ -81,3 +81,13 @@ type NFTContractOwnershipProvider interface {
 	FetchNFTOwnersByContractAddress(chainID uint64, contractAddress common.Address) (*NFTContractOwnership, error)
 	IsChainSupported(chainID uint64) bool
 }
+
+type DataParsed struct {
+	Name      string            `json:"name"`
+	Inputs    map[string]string `json:"inputs"`
+	Signature string            `json:"signature"`
+}
+
+type DecoderProvider interface {
+	Run(data string) (*DataParsed, error)
+}
