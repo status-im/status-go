@@ -210,6 +210,7 @@ func (m *Messenger) declineContactRequest(requestID string, syncing bool) (*Mess
 		notification.Message = contactRequest
 		notification.Read = true
 		notification.Dismissed = true
+		notification.UpdatedAt = m.getCurrentTimeInMillis()
 
 		err = m.addActivityCenterNotification(response, notification)
 		if err != nil {
@@ -320,6 +321,7 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 		notification.Message = contactRequest
 		notification.Read = true
 		notification.Accepted = true
+		notification.UpdatedAt = m.getCurrentTimeInMillis()
 
 		err = m.addActivityCenterNotification(response, notification)
 		if err != nil {
@@ -591,6 +593,7 @@ func (m *Messenger) generateOutgoingContactRequestNotification(contact *Contact,
 			contactRequest.ContactRequestState == common.ContactRequestStatePending,
 		Accepted:  contactRequest.ContactRequestState == common.ContactRequestStateAccepted,
 		Dismissed: contactRequest.ContactRequestState == common.ContactRequestStateDismissed,
+		UpdatedAt: m.getCurrentTimeInMillis(),
 	}
 }
 
@@ -860,8 +863,14 @@ func (m *Messenger) blockContact(response *MessengerResponse, contactID string, 
 	}
 
 	// We remove anything that's related to this contact request
-	err = m.persistence.HardDeleteChatContactRequestActivityCenterNotifications(contact.ID)
+	notifications, err := m.persistence.DeleteChatContactRequestActivityCenterNotifications(contact.ID, m.getCurrentTimeInMillis())
 	if err != nil {
+		return nil, nil, err
+	}
+
+	err = m.syncActivityCenterNotifications(notifications)
+	if err != nil {
+		m.logger.Error("BlockContact, error syncing activity center notifications", zap.Error(err))
 		return nil, nil, err
 	}
 
@@ -883,8 +892,14 @@ func (m *Messenger) BlockContact(contactID string) (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	err = m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID)
+	notifications, err := m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID, m.getCurrentTimeInMillis())
 	if err != nil {
+		return nil, err
+	}
+
+	err = m.syncActivityCenterNotifications(notifications)
+	if err != nil {
+		m.logger.Error("BlockContact, error syncing activity center notifications", zap.Error(err))
 		return nil, err
 	}
 
@@ -907,8 +922,14 @@ func (m *Messenger) BlockContactDesktop(contactID string) (*MessengerResponse, e
 		return nil, err
 	}
 
-	err = m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID)
+	notifications, err := m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID, m.getCurrentTimeInMillis())
 	if err != nil {
+		return nil, err
+	}
+
+	err = m.syncActivityCenterNotifications(notifications)
+	if err != nil {
+		m.logger.Error("BlockContactDesktop, error syncing activity center notifications", zap.Error(err))
 		return nil, err
 	}
 

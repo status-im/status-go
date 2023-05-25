@@ -628,7 +628,14 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 		response, err := receiver.RetrieveAll()
 		s.Require().NoError(err)
 		if require {
-			s.Require().Len(response.Messages(), 1)
+			containTextMsg := false
+			for _, msg := range response.Messages() {
+				if msg.ContentType == protobuf.ChatMessage_TEXT_PLAIN && msg.Text == "text-input-message" {
+					containTextMsg = true
+					break
+				}
+			}
+			s.Require().True(containTextMsg)
 		} else {
 			s.Require().Len(response.Messages(), 0)
 		}

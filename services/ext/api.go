@@ -1152,7 +1152,7 @@ func (api *PublicAPI) MarkAllActivityCenterNotificationsRead(ctx context.Context
 }
 
 func (api *PublicAPI) MarkActivityCenterNotificationsRead(ctx context.Context, ids []types.HexBytes) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.MarkActivityCenterNotificationsRead(ctx, ids, true)
+	return api.service.messenger.MarkActivityCenterNotificationsRead(ctx, ids, 0, true)
 }
 
 func (api *PublicAPI) MarkActivityCenterNotificationsUnread(ids []types.HexBytes) (*protocol.MessengerResponse, error) {
@@ -1160,11 +1160,11 @@ func (api *PublicAPI) MarkActivityCenterNotificationsUnread(ids []types.HexBytes
 }
 
 func (api *PublicAPI) AcceptActivityCenterNotifications(ctx context.Context, ids []types.HexBytes) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.AcceptActivityCenterNotifications(ctx, ids, true)
+	return api.service.messenger.AcceptActivityCenterNotifications(ctx, ids, 0, true)
 }
 
 func (api *PublicAPI) DismissActivityCenterNotifications(ctx context.Context, ids []types.HexBytes) error {
-	_, err := api.service.messenger.DismissActivityCenterNotifications(ctx, ids, true)
+	_, err := api.service.messenger.DismissActivityCenterNotifications(ctx, ids, 0, true)
 	return err
 }
 
