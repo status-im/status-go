@@ -1819,6 +1819,10 @@ func (m *Manager) JoinCommunity(id types.HexBytes) (*Community, error) {
 	if community == nil {
 		return nil, ErrOrgNotFound
 	}
+	if community.Joined() {
+		// Nothing to do, we are already joined
+		return community, ErrOrgAlreadyJoined
+	}
 	community.Join()
 	err = m.persistence.SaveCommunity(community)
 	if err != nil {

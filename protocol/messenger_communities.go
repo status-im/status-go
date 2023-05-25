@@ -2091,6 +2091,9 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 			mr, err = m.joinCommunity(context.Background(), syncCommunity.Id)
 			if err != nil {
 				logger.Debug("m.joinCommunity error", zap.Error(err))
+				if err == communities.ErrOrgAlreadyJoined {
+					return nil
+				}
 				return err
 			}
 		} else {
