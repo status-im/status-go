@@ -1,6 +1,7 @@
 package linkpreview
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -30,6 +31,8 @@ type Unfurler interface {
 	unfurl() (common.LinkPreview, error)
 }
 
+type Headers map[string]string
+
 const (
 	defaultRequestTimeout = 15000 * time.Millisecond
 
@@ -43,32 +46,40 @@ const (
 	defaultAcceptLanguage = "en-US,en;q=0.5"
 )
 
-func fetchResponseBody(logger *zap.Logger, httpClient http.Client, url string) ([]byte, error) {
+func fetchBody(logger *zap.Logger, httpClient http.Client, url string, headers Headers) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to perform HTTP request: %w", err)
+	}
+
+	if headers != nil {
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
 	}
 
 	res, err := httpClient.Do(req)
+	defer func() {
+		if res != nil {
+			if err = res.Body.Close(); err != nil {
+				logger.Error("failed to close response body", zap.Error(err))
+			}
+		}
+	}()
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if err = res.Body.Close(); err != nil {
-			logger.Error("Failed to close response body", zap.Error(err))
-		}
-	}()
 
 	if res.StatusCode >= http.StatusBadRequest {
-		return nil, errors.New(http.StatusText(res.StatusCode))
+		return nil, fmt.Errorf("http request failed, statusCode='%d'", res.StatusCode)
 	}
 
 	bodyBytes, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read body bytes: %w", err)
 	}
 
 	return bodyBytes, nil
@@ -84,7 +95,7 @@ func newDefaultLinkPreview(url *neturl.URL) common.LinkPreview {
 func fetchThumbnail(logger *zap.Logger, httpClient http.Client, url string) (common.LinkPreviewThumbnail, error) {
 	var thumbnail common.LinkPreviewThumbnail
 
-	imgBytes, err := fetchResponseBody(logger, httpClient, url)
+	imgBytes, err := fetchBody(logger, httpClient, url, nil)
 	if err != nil {
 		return thumbnail, fmt.Errorf("could not fetch thumbnail: %w", err)
 	}
@@ -121,49 +132,41 @@ type OEmbedResponse struct {
 	ThumbnailURL string `json:"thumbnail_url"`
 }
 
-func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
-	preview := newDefaultLinkPreview(u.url)
-
-	requestURL, err := neturl.Parse(u.oembedEndpoint)
+func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
+	oembedURL, err := neturl.Parse(u.oembedEndpoint)
 	if err != nil {
-		return preview, err
+		return nil, err
 	}
 
 	// When format is specified, the provider MUST return data in the requested
 	// format, else return an error.
-	requestURL.RawQuery = neturl.Values{
+	oembedURL.RawQuery = neturl.Values{
 		"url":    {u.url.String()},
 		"format": {"json"},
 	}.Encode()
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", requestURL.String(), nil)
+	return oembedURL, nil
+}
+
+func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
+	preview := newDefaultLinkPreview(u.url)
+
+	oembedURL, err := u.newOEmbedURL()
 	if err != nil {
 		return preview, err
 	}
-	req.Header.Set("accept", "application/json; charset=utf-8")
-	req.Header.Set("accept-language", defaultAcceptLanguage)
-	req.Header.Set("user-agent", defaultUserAgent)
 
-	res, err := u.httpClient.Do(req)
-	defer func() {
-		if res != nil {
-			if err = res.Body.Close(); err != nil {
-				u.logger.Error("failed to close response body", zap.Error(err))
-			}
-		}
-	}()
-	if err != nil {
-		return preview, fmt.Errorf("failed to fetch oEmbed metadata: %w", err)
+	headers := map[string]string{
+		"accept":          "application/json; charset=utf-8",
+		"accept-language": defaultAcceptLanguage,
+		"user-agent":      defaultUserAgent,
 	}
-
-	if res.StatusCode >= http.StatusBadRequest {
-		return preview, fmt.Errorf("failed to fetch oEmbed metadata, statusCode='%d'", res.StatusCode)
+	oembedBytes, err := fetchBody(u.logger, u.httpClient, oembedURL.String(), headers)
+	if err != nil {
+		return preview, err
 	}
 
 	var oembedResponse OEmbedResponse
-	oembedBytes, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return preview, err
 	}
@@ -198,34 +201,18 @@ type OpenGraphUnfurler struct {
 func (u OpenGraphUnfurler) unfurl() (common.LinkPreview, error) {
 	preview := newDefaultLinkPreview(u.url)
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", u.url.String(), nil)
+	headers := map[string]string{
+		"accept":          "text/html; charset=utf-8",
+		"accept-language": defaultAcceptLanguage,
+		"user-agent":      defaultUserAgent,
+	}
+	bodyBytes, err := fetchBody(u.logger, u.httpClient, u.url.String(), headers)
 	if err != nil {
 		return preview, err
 	}
-	req.Header.Set("accept", "text/html; charset=utf-8")
-	req.Header.Set("accept-language", defaultAcceptLanguage)
-	req.Header.Set("user-agent", defaultUserAgent)
-
-	res, err := u.httpClient.Do(req)
-	defer func() {
-		if res != nil {
-			if err = res.Body.Close(); err != nil {
-				u.logger.Error("failed to close response body", zap.Error(err))
-			}
-		}
-	}()
-	if err != nil {
-		return preview, fmt.Errorf("failed to get HTML page: %w", err)
-	}
-
-	if res.StatusCode >= http.StatusBadRequest {
-		return preview, fmt.Errorf("failed to fetch OpenGraph metadata, statusCode='%d'", res.StatusCode)
-	}
 
 	var ogMetadata OpenGraphMetadata
-	err = metabolize.Metabolize(res.Body, &ogMetadata)
+	err = metabolize.Metabolize(ioutil.NopCloser(bytes.NewBuffer(bodyBytes)), &ogMetadata)
 	if err != nil {
 		return preview, fmt.Errorf("failed to parse OpenGraph data")
 	}
@@ -371,6 +358,7 @@ func UnfurlURLs(logger *zap.Logger, httpClient http.Client, urls []string) ([]co
 	previews := make([]common.LinkPreview, 0, len(urls))
 
 	for _, url := range urls {
+		logger.Debug("unfurling", zap.String("url", url))
 		p, err := unfurl(logger, httpClient, url)
 		if err != nil {
 			logger.Info("failed to unfurl", zap.String("url", url), zap.Error(err))
