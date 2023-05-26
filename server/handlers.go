@@ -168,15 +168,17 @@ func handleAccountInitials(multiaccountsDB *multiaccounts.Database, logger *zap.
 			logger.Error("invalid fontSize")
 			return
 		}
+		logger.Info("handleAccountInitials", zap.Float64("fontSize", fontSize))
 
 		colors, ok := params["color"]
-		if !ok {
-			logger.Error("invalid color")
+		if !ok || len(colors) == 0 {
+			logger.Error("no color")
 			return
 		}
-		color := "#000000"
-		if len(colors) != 0 {
-			color = colors[0]
+		color, err := images.ParseColor(colors[0])
+		if err != nil {
+			logger.Error("failed to parse color")
+			return
 		}
 
 		sizeStr, ok := params["size"]
@@ -191,25 +193,26 @@ func handleAccountInitials(multiaccountsDB *multiaccounts.Database, logger *zap.
 		}
 
 		bgColors, ok := params["bgColor"]
-		if !ok {
-			logger.Error("invalid bgColor")
+		if !ok || len(bgColors) == 0 {
+			logger.Error("no bgColor")
 			return
 		}
-		bgColor := "#ffffff"
-		if len(bgColors) != 0 {
-			bgColor = bgColors[0]
+		bgColor, err := images.ParseColor(bgColors[0])
+		if err != nil {
+			logger.Error("failed to parse bgColor")
+			return
 		}
 
-		uppercasePercentStr, ok := params["uppercasePercent"]
+		uppercaseRatioStr, ok := params["uppercaseRatio"]
 		if !ok {
 			logger.Error("invalid fontSize")
 			return
 		}
-		uppercasePercent := 1.0
-		if len(uppercasePercentStr) != 0 {
-			uppercasePercent, err = strconv.ParseFloat(uppercasePercentStr[0], 64)
+		uppercaseRatio := 1.0
+		if len(uppercaseRatioStr) != 0 {
+			uppercaseRatio, err = strconv.ParseFloat(uppercaseRatioStr[0], 64)
 			if err != nil {
-				logger.Error("invalid uppercasePercent")
+				logger.Error("invalid uppercaseRatio")
 				return
 			}
 		}
@@ -218,7 +221,7 @@ func handleAccountInitials(multiaccountsDB *multiaccounts.Database, logger *zap.
 
 		initials := images.ExtractInitials(account.Name, amountInitials)
 
-		initialsImagePayload, err := images.GenerateInitialsImage(initials, bgColor, color, fontFile[0], size, fontSize, uppercasePercent)
+		initialsImagePayload, err := images.GenerateInitialsImage(initials, bgColor, color, fontFile[0], size, fontSize, uppercaseRatio)
 
 		if err != nil {
 			logger.Error("handleAccountInitials: failed to load image.", zap.String("keyUid", keyUids[0]), zap.Error(err))

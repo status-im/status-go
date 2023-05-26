@@ -5,6 +5,7 @@ import (
 	"github.com/fogleman/gg"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
+	"image/color"
 	"image/png"
 	"io/ioutil"
 	"strings"
@@ -33,9 +34,9 @@ func ExtractInitials(fullName string, amountInitials int) string {
 	return initials.String()
 }
 
-// uppercasePercent is <height of any upper case> / dc.FontHeight() (line height)
+// uppercaseRatio is <height of any upper case> / dc.FontHeight() (line height)
 // 0.60386123 for Inter-UI-Medium.otf
-func GenerateInitialsImage(initials string, bgColor, fontColor string, fontFile string, size int, fontSize float64, uppercasePercent float64) ([]byte, error) {
+func GenerateInitialsImage(initials string, bgColor, fontColor color.Color, fontFile string, size int, fontSize float64, uppercaseRatio float64) ([]byte, error) {
 	// Load otf file
 	fontBytes, err := ioutil.ReadFile(fontFile)
 	if err != nil {
@@ -53,7 +54,7 @@ func GenerateInitialsImage(initials string, bgColor, fontColor string, fontFile 
 
 	dc := gg.NewContext(size, size)
 	dc.DrawCircle(halfSize, halfSize, halfSize)
-	dc.SetHexColor(bgColor)
+	dc.SetColor(bgColor)
 	dc.Fill()
 
 	// Load font
@@ -68,9 +69,9 @@ func GenerateInitialsImage(initials string, bgColor, fontColor string, fontFile 
 	dc.SetFontFace(face)
 
 	// Draw initials
-	dc.SetHexColor(fontColor)
+	dc.SetColor(fontColor)
 
-	dc.DrawStringAnchored(initials, halfSize, halfSize, 0.5, uppercasePercent/2)
+	dc.DrawStringAnchored(initials, halfSize, halfSize, 0.5, uppercaseRatio/2)
 
 	img := dc.Image()
 	buffer := new(bytes.Buffer)
@@ -80,27 +81,3 @@ func GenerateInitialsImage(initials string, bgColor, fontColor string, fontFile 
 	}
 	return buffer.Bytes(), nil
 }
-
-// func main() {
-//  FontHeight is line height, not the height of uppercase initials
-//  0.60386123 is [height of any upper case] / dc.FontHeight() (line height)
-//  this value is specific to font Inter-UI-Medium.otf
-// 	imgData, err := GenerateInitialsImage("AX", "#757575ff", "#ffffffff", "Inter-UI-Medium.otf", 800, 270, 0.60386123)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	resultImage, _, err := image.Decode(bytes.NewReader(imgData))
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	f, err := os.Create("result.png")
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	defer f.Close()
-
-// 	err = png.Encode(f, resultImage)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// }
