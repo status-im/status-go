@@ -36,14 +36,17 @@ type Headers map[string]string
 const (
 	defaultRequestTimeout = 15000 * time.Millisecond
 
+	headerAcceptJSON = "application/json; charset=utf-8"
+	headerAcceptText = "text/html; charset=utf-8"
+
 	// Without an user agent, many providers treat status-go as a gluttony bot,
 	// and either respond more frequently with a 429 (Too Many Requests), or
 	// simply refuse to return valid data.
-	defaultUserAgent = "status-go/v0.151.15"
+	headerUserAgent = "status-go/v0.151.15"
 
 	// Currently set to English, but we could make this setting dynamic according
 	// to the user's language of choice.
-	defaultAcceptLanguage = "en-US,en;q=0.5"
+	headerAcceptLanguage = "en-US,en;q=0.5"
 )
 
 func fetchBody(logger *zap.Logger, httpClient http.Client, url string, headers Headers) ([]byte, error) {
@@ -153,9 +156,9 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 	}
 
 	headers := map[string]string{
-		"accept":          "application/json; charset=utf-8",
-		"accept-language": defaultAcceptLanguage,
-		"user-agent":      defaultUserAgent,
+		"accept":          headerAcceptJSON,
+		"accept-language": headerAcceptLanguage,
+		"user-agent":      headerUserAgent,
 	}
 	oembedBytes, err := fetchBody(u.logger, u.httpClient, oembedURL.String(), headers)
 	if err != nil {
@@ -198,9 +201,9 @@ func (u OpenGraphUnfurler) unfurl() (common.LinkPreview, error) {
 	preview := newDefaultLinkPreview(u.url)
 
 	headers := map[string]string{
-		"accept":          "text/html; charset=utf-8",
-		"accept-language": defaultAcceptLanguage,
-		"user-agent":      defaultUserAgent,
+		"accept":          headerAcceptText,
+		"accept-language": headerAcceptLanguage,
+		"user-agent":      headerUserAgent,
 	}
 	bodyBytes, err := fetchBody(u.logger, u.httpClient, u.url.String(), headers)
 	if err != nil {
