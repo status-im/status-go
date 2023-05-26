@@ -57,6 +57,7 @@ const (
 	MuteFor1Week
 	MuteTillUnmuted
 	MuteTill1Min
+	Unmuted
 )
 
 const pkStringLength = 68

@@ -3093,7 +3093,11 @@ func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
 		categoryID = k
 	}
 
-	err = s.alice.SetMutePropertyOnChatsByCategory(newCommunity.IDString(), categoryID, true)
+	err = s.alice.SetMutePropertyOnChatsByCategory(&requests.MuteCategory{
+		CommunityID: newCommunity.IDString(),
+		CategoryID:  categoryID,
+		MutedType:   MuteTillUnmuted,
+	}, true)
 	s.Require().NoError(err)
 
 	for _, chat := range s.alice.Chats() {
@@ -3102,7 +3106,11 @@ func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
 		}
 	}
 
-	err = s.alice.SetMutePropertyOnChatsByCategory(newCommunity.IDString(), categoryID, false)
+	err = s.alice.SetMutePropertyOnChatsByCategory(&requests.MuteCategory{
+		CommunityID: newCommunity.IDString(),
+		CategoryID:  categoryID,
+		MutedType:   Unmuted,
+	}, false)
 	s.Require().NoError(err)
 
 	for _, chat := range s.alice.Chats() {

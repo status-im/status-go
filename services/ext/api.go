@@ -295,12 +295,12 @@ func (api *PublicAPI) DeleteChat(parent context.Context, chatID string) error {
 	return api.service.messenger.DeleteChat(chatID)
 }
 
-func (api *PublicAPI) MuteCommunityCategory(communityID string, categoryID string) error {
-	return api.service.messenger.SetMutePropertyOnChatsByCategory(communityID, categoryID, true)
+func (api *PublicAPI) MuteCommunityCategory(request *requests.MuteCategory) error {
+	return api.service.messenger.SetMutePropertyOnChatsByCategory(request, true)
 }
 
 func (api *PublicAPI) UnmuteCommunityCategory(communityID string, categoryID string) error {
-	return api.service.messenger.SetMutePropertyOnChatsByCategory(communityID, categoryID, false)
+	return api.service.messenger.SetMutePropertyOnChatsByCategory(&requests.MuteCategory{CommunityID: communityID, CategoryID: categoryID, MutedType: protocol.Unmuted}, false)
 }
 
 func (api *PublicAPI) MuteChatV2(parent context.Context, request *requests.MuteChat) (time.Time, error) {
