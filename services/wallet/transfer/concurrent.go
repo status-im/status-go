@@ -149,12 +149,14 @@ func checkRangesWithStartBlock(parent context.Context, client BalanceReader, cac
 				if *hn == 0 {
 					log.Debug("zero nonce", "to", to)
 
-					if startBlock != nil {
-						if hb.Cmp(big.NewInt(0)) == 0 { // balance is 0, nonce is 0, we stop checking further, that will be the start block (even though the real one can be a later one)
+					if hb.Cmp(big.NewInt(0)) == 0 { // balance is 0, nonce is 0, we stop checking further, that will be the start block (even though the real one can be a later one)
+						if startBlock != nil {
 							if to.Cmp(newStartBlock) > 0 {
 								log.Debug("found possible start block, we should not search back", "block", to)
 								newStartBlock = to // increase newStartBlock if we found a new higher block
 							}
+						} else {
+							newStartBlock = to
 						}
 					}
 
@@ -210,13 +212,12 @@ func findBlocksWithEthTransfers(parent context.Context, client BalanceReader, ca
 	account common.Address, low, high *big.Int, noLimit bool, threadLimit uint32) (from *big.Int, headers []*DBHeader, resStartBlock *big.Int, err error) {
 
 	ranges := [][]*big.Int{{low, high}}
-	minBlock := big.NewInt(low.Int64())
+	from = big.NewInt(low.Int64())
 	headers = []*DBHeader{}
 	var lvl = 1
-	resStartBlock = big.NewInt(0)
 
 	for len(ranges) > 0 && lvl <= 30 {
-		log.Info("check blocks ranges", "lvl", lvl, "ranges len", len(ranges))
+		log.Debug("check blocks ranges", "lvl", lvl, "ranges len", len(ranges))
 		lvl++
 		// Check if there are transfers in blocks in ranges. To do that, nonce and balance is checked
 		// the block ranges that have transfers are returned
@@ -230,7 +231,7 @@ func findBlocksWithEthTransfers(parent context.Context, client BalanceReader, ca
 		headers = append(headers, newHeaders...)
 
 		if len(newRanges) > 0 {
-			log.Info("found new ranges", "account", account, "lvl", lvl, "new ranges len", len(newRanges))
+			log.Debug("found new ranges", "account", account, "lvl", lvl, "new ranges len", len(newRanges))
 		}
 		if len(newRanges) > 60 && !noLimit {
 			sort.SliceStable(newRanges, func(i, j int) bool {
@@ -238,11 +239,11 @@ func findBlocksWithEthTransfers(parent context.Context, client BalanceReader, ca
 			})
 
 			newRanges = newRanges[:60]
-			minBlock = newRanges[len(newRanges)-1][0]
+			from = newRanges[len(newRanges)-1][0]
 		}
 
 		ranges = newRanges
 	}
 
-	return minBlock, headers, resStartBlock, err
+	return
 }

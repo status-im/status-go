@@ -2,18 +2,11 @@ package transfer
 
 import (
 	"database/sql"
-	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/services/wallet/bigint"
-)
-
-const (
-	firstBlockColumn = "blk_first"
-	lastBlockColumn  = "blk_last"
-	startBlockColumn = "blk_start"
 )
 
 type BlockRangeSequentialDAO struct {
@@ -58,12 +51,12 @@ func (b *BlockRangeSequentialDAO) getBlockRange(chainID uint64, address common.A
 //
 //lint:ignore U1000 Ignore unused function temporarily
 func (b *BlockRangeSequentialDAO) deleteRange(chainID uint64, account common.Address) error {
-	log.Info("delete blocks range", "account", account, "network", chainID)
+	log.Debug("delete blocks range", "account", account, "network", chainID)
 	delete, err := b.db.Prepare(`DELETE FROM blocks_ranges_sequential
                                         WHERE address = ?
                                         AND network_id = ?`)
 	if err != nil {
-		log.Info("some error", "error", err)
+		log.Error("Failed to prepare deletion of sequential block range", "error", err)
 		return err
 	}
 
@@ -71,76 +64,54 @@ func (b *BlockRangeSequentialDAO) deleteRange(chainID uint64, account common.Add
 	return err
 }
 
-func (b *BlockRangeSequentialDAO) updateStartBlock(chainID uint64, account common.Address, block *big.Int) (err error) {
-	return updateBlock(b.db, chainID, account, startBlockColumn, block)
-}
-
-//lint:ignore U1000 Ignore unused function temporarily, TODO use it when new transfers are fetched
-func (b *BlockRangeSequentialDAO) updateLastBlock(chainID uint64, account common.Address, block *big.Int) (err error) {
-	return updateBlock(b.db, chainID, account, lastBlockColumn, block)
-}
-
-func (b *BlockRangeSequentialDAO) updateFirstBlock(chainID uint64, account common.Address, block *big.Int) (err error) {
-	return updateBlock(b.db, chainID, account, firstBlockColumn, block)
-}
-
-func updateBlock(creator statementCreator, chainID uint64, account common.Address,
-	blockColumn string, block *big.Int) (err error) {
-
-	update, err := creator.Prepare(fmt.Sprintf(`UPDATE blocks_ranges_sequential
-                SET %s = ?
-                WHERE address = ?
-                AND network_id = ?`, blockColumn))
-
-	if err != nil {
-		return err
-	}
-
-	_, err = update.Exec((*bigint.SQLBigInt)(block), account, chainID)
-
-	if err != nil {
-		return err
-	}
-
-	return
-}
-
 func (b *BlockRangeSequentialDAO) upsertRange(chainID uint64, account common.Address,
-	start *big.Int, first *big.Int, last *big.Int) (err error) {
+	newBlockRange *BlockRange) (err error) {
 
-	log.Info("upsert blocks range", "account", account, "network id", chainID, "start", start, "first", first, "last", last)
+	log.Debug("upsert blocks range", "account", account, "chainID", chainID,
+		"start", newBlockRange.Start, "first", newBlockRange.FirstKnown, "last", newBlockRange.LastKnown)
 
-	update, err := b.db.Prepare(`UPDATE blocks_ranges_sequential
-                SET blk_start = ?,
-                blk_first = ?,
-                blk_last = ?
-                WHERE address = ?
-                AND network_id = ?`)
-
+	blockRange, err := b.getBlockRange(chainID, account)
 	if err != nil {
 		return err
 	}
 
-	res, err := update.Exec((*bigint.SQLBigInt)(start), (*bigint.SQLBigInt)(first), (*bigint.SQLBigInt)(last), account, chainID)
-
-	if err != nil {
-		return err
-	}
-	affected, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if affected == 0 {
-		insert, err := b.db.Prepare("INSERT INTO blocks_ranges_sequential (network_id, address, blk_first, blk_last, blk_start) VALUES (?, ?, ?, ?, ?)")
-		if err != nil {
-			return err
+	// Update existing range
+	if blockRange != nil {
+		// Ovewrite start block if there was not any or if new one is older, because it can be precised only
+		// to a greater value, because no history can be before some block that is considered
+		// as a start of history, but due to concurrent block range checks, a newer greater block
+		// can be found that matches criteria of a start block (nonce is zero, balances are equal)
+		if newBlockRange.Start != nil || (blockRange.Start != nil && newBlockRange.Start != nil &&
+			blockRange.Start.Cmp(newBlockRange.Start) < 0) {
+			blockRange.Start = newBlockRange.Start
 		}
 
-		_, err = insert.Exec(chainID, account, (*bigint.SQLBigInt)(first), (*bigint.SQLBigInt)(last), (*bigint.SQLBigInt)(start))
-		if err != nil {
-			return err
+		// Overwrite first known block if there was not any or if new one is older
+		if (blockRange.FirstKnown == nil && newBlockRange.FirstKnown != nil) ||
+			(blockRange.FirstKnown != nil && newBlockRange.FirstKnown != nil && blockRange.FirstKnown.Cmp(newBlockRange.FirstKnown) > 0) {
+			blockRange.FirstKnown = newBlockRange.FirstKnown
 		}
+
+		// Overwrite last known block if there was not any or if new one is newer
+		if (blockRange.LastKnown == nil && newBlockRange.LastKnown != nil) ||
+			(blockRange.LastKnown != nil && newBlockRange.LastKnown != nil && blockRange.LastKnown.Cmp(newBlockRange.LastKnown) < 0) {
+			blockRange.LastKnown = newBlockRange.LastKnown
+		}
+
+		log.Debug("update blocks range", "account", account, "chainID", chainID,
+			"start", blockRange.Start, "first", blockRange.FirstKnown, "last", blockRange.LastKnown)
+	} else {
+		blockRange = newBlockRange
 	}
+
+	upsert, err := b.db.Prepare(`REPLACE INTO blocks_ranges_sequential
+					(network_id, address, blk_start, blk_first, blk_last) VALUES (?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+
+	_, err = upsert.Exec(chainID, account, (*bigint.SQLBigInt)(blockRange.Start), (*bigint.SQLBigInt)(blockRange.FirstKnown),
+		(*bigint.SQLBigInt)(blockRange.LastKnown))
 
 	return
 }
