@@ -60,16 +60,14 @@ func fetchBody(logger *zap.Logger, httpClient http.Client, url string, headers H
 	}
 
 	res, err := httpClient.Do(req)
-	defer func() {
-		if res != nil {
-			if err = res.Body.Close(); err != nil {
-				logger.Error("failed to close response body", zap.Error(err))
-			}
-		}
-	}()
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			logger.Error("failed to close response body", zap.Error(err))
+		}
+	}()
 
 	if res.StatusCode >= http.StatusBadRequest {
 		return nil, fmt.Errorf("http request failed, statusCode='%d'", res.StatusCode)
