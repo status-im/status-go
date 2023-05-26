@@ -139,7 +139,7 @@ func (tm *Manager) fetchTokens() {
 	for _, store := range tm.stores {
 		tokens, err := store.GetTokens()
 		if err != nil {
-			log.Error("can't fetch tokens from store: %s", err)
+			log.Error("can't fetch tokens from store", "error", err)
 			continue
 		}
 		validTokens := make([]*Token, 0)
@@ -220,7 +220,7 @@ func (tm *Manager) GetAllTokens() ([]*Token, error) {
 
 	tokens, err := tm.GetCustoms()
 	if err != nil {
-		log.Error("can't fetch custom tokens: %s", err)
+		log.Error("can't fetch custom tokens", "error", err)
 	}
 
 	tokens = append(tm.tokenList, tokens...)
