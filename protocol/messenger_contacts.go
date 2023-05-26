@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -16,26 +18,39 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 )
 
-func (m *Messenger) prepareMutualStateUpdateMessage(contactId string, updateType MutualStateUpdateType, clock uint64, timestamp uint64, outgoing bool) (*common.Message, error) {
+func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType MutualStateUpdateType, clock uint64, timestamp uint64, outgoing bool) (*common.Message, error) {
 	var text string
-	// TODO: provide translations & solve naming
-	switch updateType {
-	case MutualStateUpdateTypeSent:
-		text = "%1 sent %2 a Contact Request"
-	case MutualStateUpdateTypeAdded:
-		text = "%1 added %2 as a contact"
-	case MutualStateUpdateTypeRemoved:
-		text = "%1 removed %2 as a contact"
-	}
 
 	var to string
 	var from string
 	if outgoing {
-		to = contactId
+		to = contactID
 		from = m.myHexIdentity()
+
+		switch updateType {
+		case MutualStateUpdateTypeSent:
+			text = "You sent a contact request to @" + to
+		case MutualStateUpdateTypeAdded:
+			text = "You added  @" + to + " as a contact"
+		case MutualStateUpdateTypeRemoved:
+			text = "You removed @" + to + " as a contact"
+		default:
+			return nil, fmt.Errorf("unhandled outgoing MutualStateUpdateType = %d", updateType)
+		}
 	} else {
 		to = m.myHexIdentity()
-		from = contactId
+		from = contactID
+
+		switch updateType {
+		case MutualStateUpdateTypeSent:
+			text = "@" + from + " sent you a contact request"
+		case MutualStateUpdateTypeAdded:
+			text = "@" + from + " added you as a contact"
+		case MutualStateUpdateTypeRemoved:
+			text = "@" + from + " removed you as a contact"
+		default:
+			return nil, fmt.Errorf("unhandled incoming MutualStateUpdateType = %d", updateType)
+		}
 	}
 
 	message := &common.Message{
@@ -50,7 +65,8 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactId string, updateType
 		From:             from,
 		WhisperTimestamp: timestamp,
 		LocalChatID:      to,
-		Seen:             true,
+		Seen:             outgoing,
+		ID:               types.EncodeHex(crypto.Keccak256([]byte(fmt.Sprintf("%s%s%d", from, to, clock)))),
 	}
 
 	return message, nil
@@ -281,11 +297,14 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	if err != nil {
 		return nil, err
 	}
+
+	response.AddMessage(updateMessage)
+	m.prepareMessages(response.messages)
+
 	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
 	if err != nil {
 		return nil, err
 	}
-	response.AddMessage(updateMessage)
 
 	return response, nil
 }
@@ -459,11 +478,14 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 		if err != nil {
 			return nil, err
 		}
+
+		response.AddMessage(updateMessage)
+		m.prepareMessages(response.messages)
+
 		err = m.persistence.SaveMessages([]*common.Message{updateMessage})
 		if err != nil {
 			return nil, err
 		}
-		response.AddMessage(updateMessage)
 
 		notification := m.generateOutgoingContactRequestNotification(contact, contactRequest)
 		err = m.addActivityCenterNotification(response, notification)
@@ -1017,11 +1039,14 @@ func (m *Messenger) sendRetractContactRequest(contact *Contact, response *Messen
 	if err != nil {
 		return err
 	}
+
+	response.AddMessage(updateMessage)
+	m.prepareMessages(response.messages)
+
 	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
 	if err != nil {
 		return err
 	}
-	response.AddMessage(updateMessage)
 
 	return err
 }

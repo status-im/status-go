@@ -300,7 +300,11 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 	}
 
 	if message.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP {
-		return errors.New("system message content type not allowed")
+		return errors.New("private group system message content type not allowed")
+	}
+
+	if message.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_STATE_UPDATE {
+		return errors.New("mutual state update system message content type not allowed")
 	}
 
 	if err := ValidateDisplayName(&message.DisplayName); err != nil {

@@ -353,11 +353,14 @@ func (m *Messenger) createIncomingContactRequestEventAndNotification(contact *Co
 	if err != nil {
 		return err
 	}
+
+	messageState.Response.AddMessage(updateMessage)
+	m.prepareMessages(messageState.Response.messages)
+
 	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
 	if err != nil {
 		return err
 	}
-	messageState.Response.AddMessage(updateMessage)
 
 	return m.createIncomingContactRequestNotification(contact, messageState, contactRequest, createNewNotification)
 }

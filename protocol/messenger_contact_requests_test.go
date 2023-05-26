@@ -87,8 +87,10 @@ func (s *MessengerContactRequestSuite) sendContactRequest(request *requests.Send
 
 	s.Require().Equal(common.ContactRequestStatePending, contactRequest.ContactRequestState)
 	s.Require().Equal(request.Message, contactRequest.Text)
+	s.Require().NotNil(mutualStateUpdate.ID)
 	s.Require().Equal(mutualStateUpdate.From, messenger.myHexIdentity())
 	s.Require().Equal(mutualStateUpdate.ChatId, request.ID)
+	s.Require().Equal(mutualStateUpdate.Text, "You sent a contact request to @"+request.ID)
 
 	// Check pending notification
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
@@ -115,6 +117,13 @@ func (s *MessengerContactRequestSuite) sendContactRequest(request *requests.Send
 
 	// Check contact's primary name matches notifiaction's name
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Name, contacts[0].PrimaryName())
+
+	// Make sure update message was saved properly
+	mutualStateUpdateFromDb, err := messenger.persistence.MessageByID(mutualStateUpdate.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(mutualStateUpdateFromDb.From, messenger.myHexIdentity())
+	s.Require().Equal(mutualStateUpdateFromDb.ChatId, request.ID)
+	s.Require().Equal(mutualStateUpdateFromDb.Text, "You sent a contact request to @"+request.ID)
 }
 
 func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string, theirMessenger *Messenger) *common.Message {
@@ -144,6 +153,7 @@ func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string,
 	s.Require().Equal(messageText, contactRequest.Text)
 	s.Require().Equal(mutualStateUpdate.From, contactRequest.From)
 	s.Require().Equal(mutualStateUpdate.ChatId, contactRequest.ChatId)
+	s.Require().Equal(mutualStateUpdate.Text, "@"+contactRequest.From+" sent you a contact request")
 
 	// Check activity center notification is of the right type
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
@@ -203,6 +213,7 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 	// Reversed for add contact update
 	s.Require().Equal(mutualStateUpdate.From, contactRequestMsg.ChatId)
 	s.Require().Equal(mutualStateUpdate.ChatId, contactRequestMsg.From)
+	s.Require().Equal(mutualStateUpdate.Text, "You added  @"+contactRequestMsg.From+" as a contact")
 
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), contactRequest.ID)
@@ -263,6 +274,7 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 
 	s.Require().Equal(mutualStateUpdate.From, contactRequestMsg.ChatId)
 	s.Require().Equal(mutualStateUpdate.ChatId, contactRequestMsg.From)
+	s.Require().Equal(mutualStateUpdate.Text, "@"+mutualStateUpdate.From+" added you as a contact")
 
 	// Make sure we consider them a mutual contact, sender side
 	mutualContacts = s.m.MutualContacts()
@@ -351,9 +363,6 @@ func (s *MessengerContactRequestSuite) retractContactRequest(contactID string, t
 
 	s.Require().False(resp.Contacts[0].added())
 	s.Require().False(resp.Contacts[0].hasAddedUs())
-
-	// Check the contact state is correctly set
-	s.Require().Len(resp.Contacts, 1)
 	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
 	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
 }
