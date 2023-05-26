@@ -2976,6 +2976,9 @@ func (m *Messenger) handleSyncWalletAccount(message *protobuf.SyncAccount, synce
 }
 
 func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.Keypair, error) {
+	if message == nil {
+		return nil, errors.New("handleSyncKeypair receive a nil message")
+	}
 	dbKeypair, err := m.settings.GetKeypairByKeyUID(message.KeyUid)
 	if err != nil && err != accounts.ErrDbKeypairNotFound {
 		return nil, err
