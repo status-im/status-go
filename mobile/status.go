@@ -1007,6 +1007,10 @@ func GetConnectionStringForBeingBootstrapped(configJSON string) string {
 	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
 	}
+	statusBackend.SetLocalPairing(true)
+	defer func() {
+		statusBackend.SetLocalPairing(false)
+	}()
 	cs, err := pairing.StartUpReceiverServer(statusBackend, configJSON)
 	if err != nil {
 		return makeJSONResponse(err)
@@ -1049,7 +1053,10 @@ func InputConnectionStringForBootstrapping(cs, configJSON string) string {
 	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, ReceiverClientConfig is expected"))
 	}
-
+	statusBackend.SetLocalPairing(true)
+	defer func() {
+		statusBackend.SetLocalPairing(false)
+	}()
 	err := pairing.StartUpReceivingClient(statusBackend, cs, configJSON)
 	if err != nil {
 		return makeJSONResponse(err)

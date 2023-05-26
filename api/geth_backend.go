@@ -85,7 +85,7 @@ type GethStatusBackend struct {
 	selectedAccountKeyID string
 	log                  log.Logger
 	allowAllRPC          bool // used only for tests, disables api method restrictions
-
+	localPairing         bool // used to disable login/logout signalling
 }
 
 // NewGethStatusBackend create a new GethStatusBackend instance
@@ -109,6 +109,7 @@ func (b *GethStatusBackend) initialize() {
 	b.personalAPI = personalAPI
 	b.statusNode.SetMultiaccountsDB(b.multiaccountsDB)
 	b.log = log.New("package", "status-go/api.GethStatusBackend")
+	b.localPairing = false
 }
 
 // StatusNode returns reference to node manager
@@ -395,7 +396,9 @@ func (b *GethStatusBackend) StartNodeWithKey(acc multiaccounts.Account, password
 		// Stop node for clean up
 		_ = b.StopNode()
 	}
-	signal.SendLoggedIn(err)
+	if !b.localPairing {
+		signal.SendLoggedIn(err)
+	}
 	return err
 }
 
@@ -512,7 +515,9 @@ func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, pass
 		// Stop node for clean up
 		_ = b.StopNode()
 	}
-	signal.SendLoggedIn(err)
+	if !b.localPairing {
+		signal.SendLoggedIn(err)
+	}
 	return err
 }
 
@@ -1241,7 +1246,9 @@ func (b *GethStatusBackend) stopNode() error {
 	if b.statusNode == nil || !b.IsNodeRunning() {
 		return nil
 	}
-	defer signal.SendNodeStopped()
+	if !b.localPairing {
+		defer signal.SendNodeStopped()
+	}
 
 	return b.statusNode.Stop()
 }
@@ -1812,4 +1819,8 @@ func (b *GethStatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) e
 	}
 
 	return nil
+}
+
+func (b *GethStatusBackend) SetLocalPairing(value bool) {
+	b.localPairing = value
 }
