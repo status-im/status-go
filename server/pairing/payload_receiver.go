@@ -94,7 +94,8 @@ func NewAccountPayloadReceiver(e *PayloadEncryptor, p *AccountPayload, config *R
 
 	return NewBaseBasePayloadReceiver(e, NewPairingPayloadMarshaller(p, l), aps,
 		func() {
-			signal.SendLocalPairingEvent(Event{Type: EventReceivedAccount, Action: ActionPairingAccount, Data: p.multiaccount})
+			data := AccountData{Account: p.multiaccount, Password: p.password}
+			signal.SendLocalPairingEvent(Event{Type: EventReceivedAccount, Action: ActionPairingAccount, Data: data})
 		},
 	), nil
 }
