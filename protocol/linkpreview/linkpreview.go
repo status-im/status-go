@@ -39,9 +39,11 @@ const (
 	headerAcceptJSON = "application/json; charset=utf-8"
 	headerAcceptText = "text/html; charset=utf-8"
 
-	// Without an user agent, many providers treat status-go as a gluttony bot,
-	// and either respond more frequently with a 429 (Too Many Requests), or
-	// simply refuse to return valid data.
+	// Without a particular user agent, many providers treat status-go as a
+	// gluttony bot, and either respond more frequently with a 429 (Too Many
+	// Requests), or simply refuse to return valid data. Note that using a known
+	// browser UA doesn't work well with some providers, such as Spotify,
+	// apparently they still flag status-go as a bad actor.
 	headerUserAgent = "status-go/v0.151.15"
 
 	// Currently set to English, but we could make this setting dynamic according
