@@ -24,7 +24,7 @@ var ganacheTokenAddress = common.HexToAddress("0x8571Ddc46b10d31EF963aF49b6C7799
 var mainnet = params.Network{
 	ChainID:                mainnetChainID,
 	ChainName:              "Ethereum Mainnet",
-	RPCURL:                 "https://eth-mainnet.gateway.pokt.network/v1/lb/",
+	RPCURL:                 "https://eth-archival.gateway.pokt.network/v1/lb/",
 	FallbackURL:            "https://mainnet.infura.io/v3/",
 	BlockExplorerURL:       "https://etherscan.io/",
 	IconURL:                "network/Network=Ethereum",
@@ -41,7 +41,7 @@ var mainnet = params.Network{
 var goerli = params.Network{
 	ChainID:                goerliChainID,
 	ChainName:              "Ethereum Mainnet",
-	RPCURL:                 "https://eth-goerli.gateway.pokt.network/v1/lb/",
+	RPCURL:                 "https://goerli-archival.gateway.pokt.network/v1/lb/",
 	FallbackURL:            "https://goerli.infura.io/v3/",
 	BlockExplorerURL:       "https://goerli.etherscan.io/",
 	IconURL:                "network/Network=Testnet",
