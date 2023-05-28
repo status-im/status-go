@@ -29,14 +29,14 @@ Improve on the identified limitations
 
 Filter requirements
 
-- [ ] Activity operation status
-  - [ ] `pending`: have to aggregate for `Buy`, `Swap`, `Bridge`
+- [x] Activity operation status
+  - [x] `pending`: have to aggregate for `Buy`, `Swap`, `Bridge`
     - already there for `Send`, `Receive`
-  - [ ] `complete`: only extract and check for `status` in the `receipt` for `Send`, `Receive`
+  - [x] `complete`: only extract and check for `status` in the `receipt` for `Send`, `Receive`
     - For complex operations aggregate the `complete` status `Buy`, `Swap`, `Bridge`
-  - [ ] `finalized`: similar to `complete`  for `Send`, `Receive`
+  - [x] `finalized`: similar to `complete`  for `Send`, `Receive`
     - all sub-transactions are `complete` for `Buy`, `Swap`, `Bridge`
-  - [ ] `failed`: extract from `status` for all sub-transactions
+  - [x] `failed`: extract from `status` for all sub-transactions
 - [ ] `chainID`: aggregate data for activity entries `Bridge`, `Buy`, `Swap`
 - [ ] `tokenCode` for activity entries `Send`, `Receive`
   - For `Bridge` its already there and `Buy`, `Swap` is coming soon
@@ -44,7 +44,7 @@ Filter requirements
 
 UX requirements
 
-- [ ] `status`: for status icon and label
+- [x] `status`: for status icon and label
 - [ ] `chainIDs`: for chain icons
   - Missing for `Bridge`, `Buy`, `Swap`
 - [ ] `amount`s: add to the activity.Entry
@@ -60,6 +60,11 @@ UX requirements
 - [x] `time`: timestamp
 
 ### Refactoring
+
+Extend `entry.nim:ActivityEntry` and `activity.go:Entry` with presentation layer data
+
+- [ ] `activityType`: instead of the current `MultiTransactionType`
+- [x] `status`: for status icon and label
 
 ## Current state
 

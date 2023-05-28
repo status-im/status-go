@@ -29,10 +29,10 @@ func allActivityTypesFilter() []Type {
 type Status int
 
 const (
-	FailedAS Status = iota
-	PendingAS
-	CompleteAS
-	FinalizedAS
+	FailedAS    Status = iota // failed status or at least one failed transaction for multi-transactions
+	PendingAS                 // in pending DB or at least one transaction in pending for multi-transactions
+	CompleteAS                // success status
+	FinalizedAS               // all multi-transactions have success status
 )
 
 func allActivityStatusesFilter() []Status {

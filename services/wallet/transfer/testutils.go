@@ -23,11 +23,12 @@ type TestTransaction struct {
 	Timestamp            int64
 	Value                int64
 	BlkNumber            int64
+	Success              bool
 	MultiTransactionID   MultiTransactionIDType
 	MultiTransactionType MultiTransactionType
 }
 
-func GenerateTestTransactions(t *testing.T, db *sql.DB, firstStartIndex int, count int) (result []TestTransaction) {
+func GenerateTestTransactions(t *testing.T, db *sql.DB, firstStartIndex int, count int) (result []TestTransaction, fromAddresses, toAddresses []eth_common.Address) {
 	for i := firstStartIndex; i < (firstStartIndex + count); i++ {
 		tr := TestTransaction{
 			Hash:                 eth_common.HexToHash(fmt.Sprintf("0x1%d", i)),
@@ -37,9 +38,12 @@ func GenerateTestTransactions(t *testing.T, db *sql.DB, firstStartIndex int, cou
 			Timestamp:            int64(i),
 			Value:                int64(i),
 			BlkNumber:            int64(i),
+			Success:              true,
 			MultiTransactionID:   NoMultiTransactionID,
 			MultiTransactionType: MultiTransactionSend,
 		}
+		fromAddresses = append(fromAddresses, tr.From)
+		toAddresses = append(toAddresses, tr.To)
 		result = append(result, tr)
 	}
 	return
@@ -58,10 +62,10 @@ func InsertTestTransfer(t *testing.T, db *sql.DB, tr *TestTransaction) {
 		) VALUES (?, ?, ?, ?);
 		INSERT INTO transfers (network_id, hash, address, blk_hash, tx,
 			sender, receipt, log, type, blk_number, timestamp, loaded,
-			multi_transaction_id, base_gas_fee
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 0)`,
+			multi_transaction_id, base_gas_fee, status
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 0, ?)`,
 		tr.ChainID, tr.To, tr.BlkNumber, blkHash,
-		tr.ChainID, tr.Hash, tr.To, blkHash, &JSONBlob{}, tr.From, &JSONBlob{}, &JSONBlob{}, tokenType, tr.BlkNumber, tr.Timestamp, tr.MultiTransactionID)
+		tr.ChainID, tr.Hash, tr.To, blkHash, &JSONBlob{}, tr.From, &JSONBlob{}, &JSONBlob{}, tokenType, tr.BlkNumber, tr.Timestamp, tr.MultiTransactionID, tr.Success)
 	require.NoError(t, err)
 }
 
