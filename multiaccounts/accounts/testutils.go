@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func AddTestAccounts(t *testing.T, db *sql.DB, accounts []*Account) {
+func MockTestAccounts(t *testing.T, db *sql.DB, accounts []*Account) {
 	d, err := NewDB(db)
 	require.NoError(t, err)
 

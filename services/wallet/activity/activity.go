@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	eth "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/transfer"
@@ -182,7 +183,7 @@ func activityTypesToMultiTransactionTypes(trTypes []Type) []transfer.MultiTransa
 
 const (
 	fromTrType = byte(1)
-	//toTrType   = byte(2)
+	toTrType   = byte(2)
 
 	// TODO: Multi-transaction network information is missing in filtering
 	// TODO: extract token code for non transfer type eth
@@ -198,6 +199,9 @@ const (
 	//
 	// UNION ALL is used to avoid the overhead of DISTINCT given that we don't expect to have duplicate entries outside
 	// the sender and receiver addresses being in the list which is handled separately
+	//
+	// Only status FailedAS, PendingAS and CompleteAS are returned. FinalizedAS requires correlation with blockchain
+	// current state. As an optimization we can approximate it by using timestamp information or last known block number
 	queryFormatString = `
 	WITH filter_conditions AS (
 		SELECT
@@ -210,11 +214,23 @@ const (
 			? AS filterActivityTypeSend,
 			? AS filterActivityTypeReceive,
 
+			? AS fromTrType,
+			? AS toTrType,
+
 			? AS filterAllAddresses,
 			? AS filterAllToAddresses,
+
 			? AS filterAllActivityStatus,
+			? AS filterStatusCompleted,
+			? AS filterStatusFailed,
+			? AS filterStatusFinalized,
+			? AS filterStatusPending,
+
+			? AS statusFailed,
+			? AS statusSuccess,
+			? AS statusPending,
+
 			? AS includeAllTokenTypeAssets,
-			? AS statusIsPending,
 
 			? AS includeAllNetworks
 		),
@@ -231,6 +247,26 @@ const (
 		),
 		filter_networks(network_id) AS (
 			VALUES %s
+		),
+		tr_status AS (
+			SELECT
+			  multi_transaction_id,
+			  MIN(status) AS min_status,
+			  COUNT(*) AS count
+			FROM
+			  transfers
+			WHERE transfers.multi_transaction_id != 0
+			GROUP BY
+				transfers.multi_transaction_id
+		),
+		pending_status AS (
+			SELECT
+			  multi_transaction_id,
+			  COUNT(*) AS count
+			FROM
+			  pending_transactions
+			WHERE pending_transactions.multi_transaction_id != 0
+			GROUP BY pending_transactions.multi_transaction_id
 		)
 	SELECT
 		transfers.hash AS transfer_hash,
@@ -241,8 +277,8 @@ const (
 		NULL AS mt_type,
 
 		CASE
-	        WHEN from_join.address IS NOT NULL AND to_join.address IS NULL THEN 1
-			WHEN to_join.address IS NOT NULL AND from_join.address IS NULL THEN 2
+	        WHEN from_join.address IS NOT NULL AND to_join.address IS NULL THEN fromTrType
+			WHEN to_join.address IS NOT NULL AND from_join.address IS NULL THEN toTrType
 	        WHEN from_join.address IS NOT NULL AND to_join.address IS NOT NULL THEN
 				CASE
 					WHEN from_join.address < to_join.address THEN 1
@@ -252,7 +288,14 @@ const (
 	    END as tr_type,
 
 		transfers.sender AS from_address,
-		transfers.address AS to_address
+		transfers.address AS to_address,
+
+		CASE
+			WHEN transfers.status IS 1 THEN statusSuccess
+			ELSE statusFailed
+		END AS agg_status,
+
+		1 AS agg_count
 	FROM transfers, filter_conditions
 	LEFT JOIN
 		filter_addresses from_join ON HEX(transfers.sender) = from_join.address
@@ -281,6 +324,9 @@ const (
 		)
 		AND (includeAllTokenTypeAssets OR (transfers.type = "eth" AND ("ETH" IN filter_assets)))
 		AND (includeAllNetworks OR (transfers.network_id IN filter_networks))
+		AND (filterAllActivityStatus OR ((filterStatusCompleted OR filterStatusFinalized) AND transfers.status = 1)
+			OR (filterStatusFailed AND transfers.status = 0)
+		)
 
 	UNION ALL
 
@@ -304,14 +350,16 @@ const (
 	    END as tr_type,
 
 		pending_transactions.from_address AS from_address,
-		pending_transactions.to_address AS to_address
+		pending_transactions.to_address AS to_address,
+		statusPending AS agg_status,
+		1 AS agg_count
 	FROM pending_transactions, filter_conditions
 	LEFT JOIN
 		filter_addresses from_join ON HEX(pending_transactions.from_address) = from_join.address
 	LEFT JOIN
 		filter_addresses to_join ON HEX(pending_transactions.to_address) = to_join.address
 	WHERE pending_transactions.multi_transaction_id = 0
-		AND (filterAllActivityStatus OR statusIsPending)
+		AND (filterAllActivityStatus OR filterStatusPending)
 		AND ((startFilterDisabled OR timestamp >= startTimestamp)
 			AND (endFilterDisabled OR timestamp <= endTimestamp)
 		)
@@ -337,10 +385,22 @@ const (
 		multi_transactions.type AS mt_type,
 		NULL as tr_type,
 		multi_transactions.from_address AS from_address,
-		multi_transactions.to_address AS to_address
+		multi_transactions.to_address AS to_address,
+
+		CASE
+			WHEN tr_status.min_status = 1 AND pending_status.count IS NULL THEN statusSuccess
+			WHEN tr_status.min_status = 0 THEN statusFailed
+			ELSE statusPending
+	    END AS agg_status,
+
+		COALESCE(tr_status.count, 0) + COALESCE(pending_status.count, 0) AS agg_count
+
 	FROM multi_transactions, filter_conditions
-	WHERE ((startFilterDisabled OR timestamp >= startTimestamp)
-			AND (endFilterDisabled OR timestamp <= endTimestamp)
+	JOIN tr_status ON multi_transactions.ROWID = tr_status.multi_transaction_id
+	LEFT JOIN pending_status ON multi_transactions.ROWID = pending_status.multi_transaction_id
+	WHERE
+		((startFilterDisabled OR multi_transactions.timestamp >= startTimestamp)
+		AND (endFilterDisabled OR multi_transactions.timestamp <= endTimestamp)
 		)
 		AND (filterActivityTypeAll OR (multi_transactions.type IN (%s)))
 		AND (filterAllAddresses
@@ -350,7 +410,11 @@ const (
 		AND (filterAllToAddresses
 			OR (HEX(multi_transactions.to_address) IN filter_to_addresses)
 		)
-		AND (includeAllTokenTypeAssets OR (UPPER(multi_transactions.from_asset) IN filter_assets) OR (UPPER(multi_transactions.to_asset) IN filter_assets))
+		AND (includeAllTokenTypeAssets OR (UPPER(multi_transactions.from_asset) IN filter_assets)
+			OR (UPPER(multi_transactions.to_asset) IN filter_assets)
+		)
+		AND (filterAllActivityStatus OR ((filterStatusCompleted OR filterStatusFinalized) AND agg_status = statusSuccess)
+		OR (filterStatusFailed AND agg_status = statusFailed) OR (filterStatusPending AND agg_status = statusPending))
 
 	ORDER BY timestamp DESC
 	LIMIT ? OFFSET ?`
@@ -391,9 +455,15 @@ func GetActivityEntries(db *sql.DB, addresses []eth.Address, chainIDs []common.C
 	filterAllToAddresses := len(filter.CounterpartyAddresses) == 0
 	includeAllStatuses := len(filter.Statuses) == 0
 
-	statusIsPending := false
+	filterStatusPending := false
+	filterStatusCompleted := false
+	filterStatusFailed := false
+	filterStatusFinalized := false
 	if !includeAllStatuses {
-		statusIsPending = sliceContains(filter.Statuses, PendingAS)
+		filterStatusPending = sliceContains(filter.Statuses, PendingAS)
+		filterStatusCompleted = sliceContains(filter.Statuses, CompleteAS)
+		filterStatusFailed = sliceContains(filter.Statuses, FailedAS)
+		filterStatusFinalized = sliceContains(filter.Statuses, FinalizedAS)
 	}
 
 	involvedAddresses := noEntriesInTmpTableSQLValues
@@ -416,7 +486,11 @@ func GetActivityEntries(db *sql.DB, addresses []eth.Address, chainIDs []common.C
 	rows, err := db.Query(queryString,
 		startFilterDisabled, filter.Period.StartTimestamp, endFilterDisabled, filter.Period.EndTimestamp,
 		filterActivityTypeAll, sliceContains(filter.Types, SendAT), sliceContains(filter.Types, ReceiveAT),
-		filterAllAddresses, filterAllToAddresses, includeAllStatuses, includeAllTokenTypeAssets, statusIsPending,
+		fromTrType, toTrType,
+		filterAllAddresses, filterAllToAddresses,
+		includeAllStatuses, filterStatusCompleted, filterStatusFailed, filterStatusFinalized, filterStatusPending,
+		FailedAS, CompleteAS, PendingAS,
+		includeAllTokenTypeAssets,
 		includeAllNetworks,
 		limit, offset)
 	if err != nil {
@@ -427,40 +501,43 @@ func GetActivityEntries(db *sql.DB, addresses []eth.Address, chainIDs []common.C
 	var entries []Entry
 	for rows.Next() {
 		var transferHash, pendingHash []byte
-		var chainID, multiTxID sql.NullInt64
+		var chainID, multiTxID, aggregatedCount sql.NullInt64
 		var timestamp int64
 		var dbMtType, dbTrType sql.NullByte
 		var toAddress, fromAddress eth.Address
-		err := rows.Scan(&transferHash, &pendingHash, &chainID, &multiTxID, &timestamp, &dbMtType, &dbTrType, &fromAddress, &toAddress)
+		var aggregatedStatus int
+		err := rows.Scan(&transferHash, &pendingHash, &chainID, &multiTxID, &timestamp, &dbMtType, &dbTrType, &fromAddress, &toAddress, &aggregatedStatus, &aggregatedCount)
 		if err != nil {
 			return nil, err
 		}
 
 		getActivityType := func(trType sql.NullByte) (activityType Type, filteredAddress eth.Address) {
-			if trType.Valid && trType.Byte == fromTrType {
-				return SendAT, fromAddress
+			if trType.Valid {
+				if trType.Byte == fromTrType {
+					return SendAT, fromAddress
+				} else if trType.Byte == toTrType {
+					return ReceiveAT, toAddress
+				}
 			}
-			// Don't expect this to happen due to trType = NULL outside of tests
+			log.Warn(fmt.Sprintf("unexpected activity type. Missing [%s, %s] in the addresses table?", fromAddress, toAddress))
 			return ReceiveAT, toAddress
 		}
 
+		// Can be mapped directly because the values are injected into the query
+		activityStatus := Status(aggregatedStatus)
+
 		var entry Entry
 		if transferHash != nil && chainID.Valid {
-			// TODO: extend DB with status in order to filter by status. The status has to be extracted from the receipt upon downloading
-			activityStatus := FinalizedAS
 			activityType, filteredAddress := getActivityType(dbTrType)
 			entry = newActivityEntryWithSimpleTransaction(
 				&transfer.TransactionIdentity{ChainID: common.ChainID(chainID.Int64), Hash: eth.BytesToHash(transferHash), Address: filteredAddress},
 				timestamp, activityType, activityStatus)
 		} else if pendingHash != nil && chainID.Valid {
-			activityStatus := PendingAS
 			activityType, _ := getActivityType(dbTrType)
 			entry = newActivityEntryWithPendingTransaction(&transfer.TransactionIdentity{ChainID: common.ChainID(chainID.Int64), Hash: eth.BytesToHash(pendingHash)},
 				timestamp, activityType, activityStatus)
 		} else if multiTxID.Valid {
 			activityType := multiTransactionTypeToActivityType(transfer.MultiTransactionType(dbMtType.Byte))
-			// TODO: aggregate status from all sub-transactions
-			activityStatus := FinalizedAS
 			entry = NewActivityEntryWithMultiTransaction(transfer.MultiTransactionIDType(multiTxID.Int64),
 				timestamp, activityType, activityStatus)
 		} else {
