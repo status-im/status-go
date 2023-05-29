@@ -1916,7 +1916,7 @@ func (m *Manager) HandleWrappedCommunityDescriptionMessage(payload []byte) (*Com
 	return m.HandleCommunityDescriptionMessage(signer, description, payload)
 }
 
-func (m *Manager) JoinCommunity(id types.HexBytes) (*Community, error) {
+func (m *Manager) JoinCommunity(id types.HexBytes, forceJoin bool) (*Community, error) {
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
@@ -1924,7 +1924,7 @@ func (m *Manager) JoinCommunity(id types.HexBytes) (*Community, error) {
 	if community == nil {
 		return nil, ErrOrgNotFound
 	}
-	if community.Joined() {
+	if !forceJoin && community.Joined() {
 		// Nothing to do, we are already joined
 		return community, ErrOrgAlreadyJoined
 	}

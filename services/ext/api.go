@@ -402,7 +402,7 @@ func (api *PublicAPI) SpectateCommunity(parent context.Context, communityID type
 
 // JoinCommunity joins a community with the given ID
 func (api *PublicAPI) JoinCommunity(parent context.Context, communityID types.HexBytes) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.JoinCommunity(parent, communityID)
+	return api.service.messenger.JoinCommunity(parent, communityID, false)
 }
 
 // LeaveCommunity leaves a commuity with the given ID

@@ -350,7 +350,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Equal(community.IDString(), response.Messages()[0].CommunityID)
 
 	// We join the org
-	response, err = s.alice.JoinCommunity(ctx, community.ID())
+	response, err = s.alice.JoinCommunity(ctx, community.ID(), false)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -719,7 +719,7 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	ctx := context.Background()
 
 	// We join the org
-	response, err = s.alice.JoinCommunity(ctx, community.ID())
+	response, err = s.alice.JoinCommunity(ctx, community.ID(), false)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -2986,7 +2986,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	}
 
 	// alice joins the community
-	mr, err = s.alice.JoinCommunity(context.Background(), community.ID())
+	mr, err = s.alice.JoinCommunity(context.Background(), community.ID(), false)
 	s.Require().NoError(err, "s.alice.JoinCommunity")
 	s.Require().NotNil(mr)
 	s.Len(mr.Communities(), 1)
@@ -3386,7 +3386,7 @@ func (s *MessengerCommunitiesSuite) TestHandleImport() {
 	ctx := context.Background()
 
 	// We join the org
-	response, err = s.alice.JoinCommunity(ctx, community.ID())
+	response, err = s.alice.JoinCommunity(ctx, community.ID(), false)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)

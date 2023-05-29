@@ -1435,7 +1435,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 	}
 
 	if requestToJoinResponseProto.Accepted {
-		response, err := m.JoinCommunity(context.Background(), requestToJoinResponseProto.CommunityId)
+		response, err := m.JoinCommunity(context.Background(), requestToJoinResponseProto.CommunityId, false)
 		if err != nil {
 			return err
 		}
