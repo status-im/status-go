@@ -2098,7 +2098,7 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		var mr *MessengerResponse
 		if syncCommunity.Joined {
 			mr, err = m.joinCommunity(context.Background(), syncCommunity.Id)
-			if err != nil {
+			if err != nil && err != communities.ErrOrgAlreadyJoined {
 				logger.Debug("m.joinCommunity error", zap.Error(err))
 				return err
 			}
@@ -2109,10 +2109,12 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 				return err
 			}
 		}
-		err = messageState.Response.Merge(mr)
-		if err != nil {
-			logger.Debug("messageState.Response.Merge error", zap.Error(err))
-			return err
+		if mr != nil {
+			err = messageState.Response.Merge(mr)
+			if err != nil {
+				logger.Debug("messageState.Response.Merge error", zap.Error(err))
+				return err
+			}
 		}
 	}
 
