@@ -3367,6 +3367,13 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 			}
 		}
 	}
+	// Save chats if they were modified
+	if len(messageState.Response.chats) > 0 {
+		err := m.saveChats(messageState.Response.Chats())
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -4346,7 +4353,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			// Process any community changes
 			for _, changes := range messageState.Response.CommunityChanges {
 				if changes.ShouldMemberJoin {
-					response, err := m.joinCommunity(context.TODO(), changes.Community.ID())
+					response, err := m.joinCommunity(context.TODO(), changes.Community.ID(), false)
 					if err != nil {
 						logger.Error("cannot join community", zap.Error(err))
 						continue

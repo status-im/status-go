@@ -436,8 +436,8 @@ func (m *Messenger) initCommunitySettings(communityID types.HexBytes) (*communit
 	return communitySettings, nil
 }
 
-func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexBytes) (*MessengerResponse, error) {
-	mr, err := m.joinCommunity(ctx, communityID)
+func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexBytes, forceJoin bool) (*MessengerResponse, error) {
+	mr, err := m.joinCommunity(ctx, communityID, forceJoin)
 	if err != nil {
 		return nil, err
 	}
@@ -452,12 +452,12 @@ func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexByte
 	return mr, nil
 }
 
-func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexBytes) (*MessengerResponse, error) {
+func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexBytes, forceJoin bool) (*MessengerResponse, error) {
 	logger := m.logger.Named("joinCommunity")
 
 	response := &MessengerResponse{}
 
-	community, err := m.communitiesManager.JoinCommunity(communityID)
+	community, err := m.communitiesManager.JoinCommunity(communityID, forceJoin)
 	if err != nil {
 		logger.Debug("m.communitiesManager.JoinCommunity error", zap.Error(err))
 		return nil, err
@@ -1429,7 +1429,7 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 		return nil, err
 	}
 
-	response, err := m.JoinCommunity(ctx, community.ID())
+	response, err := m.JoinCommunity(ctx, community.ID(), true)
 	if err != nil {
 		return nil, err
 	}
@@ -2097,8 +2097,8 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 	if !pending {
 		var mr *MessengerResponse
 		if syncCommunity.Joined {
-			mr, err = m.joinCommunity(context.Background(), syncCommunity.Id)
-			if err != nil {
+			mr, err = m.joinCommunity(context.Background(), syncCommunity.Id, false)
+			if err != nil && err != communities.ErrOrgAlreadyJoined {
 				logger.Debug("m.joinCommunity error", zap.Error(err))
 				return err
 			}
@@ -2109,10 +2109,12 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 				return err
 			}
 		}
-		err = messageState.Response.Merge(mr)
-		if err != nil {
-			logger.Debug("messageState.Response.Merge error", zap.Error(err))
-			return err
+		if mr != nil {
+			err = messageState.Response.Merge(mr)
+			if err != nil {
+				logger.Debug("messageState.Response.Merge error", zap.Error(err))
+				return err
+			}
 		}
 	}
 

@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -32,7 +33,9 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/tt"
+	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/waku"
 )
 
@@ -347,7 +350,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Equal(community.IDString(), response.Messages()[0].CommunityID)
 
 	// We join the org
-	response, err = s.alice.JoinCommunity(ctx, community.ID())
+	response, err = s.alice.JoinCommunity(ctx, community.ID(), false)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -716,7 +719,7 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	ctx := context.Background()
 
 	// We join the org
-	response, err = s.alice.JoinCommunity(ctx, community.ID())
+	response, err = s.alice.JoinCommunity(ctx, community.ID(), false)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
@@ -2983,7 +2986,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	}
 
 	// alice joins the community
-	mr, err = s.alice.JoinCommunity(context.Background(), community.ID())
+	mr, err = s.alice.JoinCommunity(context.Background(), community.ID(), false)
 	s.Require().NoError(err, "s.alice.JoinCommunity")
 	s.Require().NotNil(mr)
 	s.Len(mr.Communities(), 1)
@@ -3308,4 +3311,131 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequesToJoin() {
 	err = s.bob.HandleCommunityRequestToJoin(messageState, &s.alice.identity.PublicKey, *requestToJoinProto)
 
 	s.Require().ErrorContains(err, "can't request access")
+}
+
+func (s *MessengerCommunitiesSuite) TestHandleImport() {
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_INVITATION_ONLY,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	// Create a community
+	response, err := s.bob.CreateCommunity(description, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Communities()[0].Chats(), 1)
+	s.Require().Len(response.Chats(), 1)
+
+	community := response.Communities()[0]
+
+	// Create chat
+	orgChat := &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "status-core",
+			Description: "status-core community chat",
+		},
+	}
+	response, err = s.bob.CreateCommunityChat(community.ID(), orgChat)
+
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Communities()[0].Chats(), 2)
+	s.Require().Len(response.Chats(), 1)
+
+	response, err = s.bob.InviteUsersToCommunity(
+		&requests.InviteUsersToCommunity{
+			CommunityID: community.ID(),
+			Users:       []types.HexBytes{common.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
+		},
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	community = response.Communities()[0]
+	s.Require().True(community.HasMember(&s.alice.identity.PublicKey))
+
+	// Pull message and make sure org is received
+	err = tt.RetryWithBackOff(func() error {
+		response, err = s.alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("community not received")
+		}
+		return nil
+	})
+
+	s.Require().NoError(err)
+	communities, err := s.alice.Communities()
+	s.Require().NoError(err)
+	s.Require().Len(communities, 2)
+	s.Require().Len(response.Communities(), 1)
+
+	communityID := response.Communities()[0].ID()
+	s.Require().Equal(communityID, community.ID())
+
+	ctx := context.Background()
+
+	// We join the org
+	response, err = s.alice.JoinCommunity(ctx, community.ID(), false)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Communities()[0].Chats(), 2)
+	s.Require().True(response.Communities()[0].Joined())
+	s.Require().Len(response.Chats(), 2)
+
+	chatID := response.Chats()[1].ID
+
+	// Check that there are no messages in the chat at first
+	chat, err := s.alice.persistence.Chat(chatID)
+	s.Require().NoError(err)
+	s.Require().NotNil(chat)
+	s.Require().Equal(0, int(chat.UnviewedMessagesCount))
+
+	// Create an message that will be imported
+	testMessage := protobuf.ChatMessage{
+		Text:        "abc123",
+		ChatId:      chatID,
+		ContentType: protobuf.ChatMessage_TEXT_PLAIN,
+		MessageType: protobuf.MessageType_COMMUNITY_CHAT,
+		Clock:       1,
+		Timestamp:   1,
+	}
+	encodedPayload, err := proto.Marshal(&testMessage)
+	s.Require().NoError(err)
+	wrappedPayload, err := v1protocol.WrapMessageV1(
+		encodedPayload,
+		protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
+		s.bob.identity,
+	)
+	s.Require().NoError(err)
+
+	message := &types.Message{}
+	message.Sig = crypto.FromECDSAPub(&s.bob.identity.PublicKey)
+	message.Payload = wrappedPayload
+
+	filter := s.alice.transport.FilterByChatID(chatID)
+	importedMessages := make(map[transport.Filter][]*types.Message, 0)
+
+	importedMessages[*filter] = append(importedMessages[*filter], message)
+
+	// Import that message
+	err = s.alice.handleImportedMessages(importedMessages)
+	s.Require().NoError(err)
+
+	// Get the chat again and see that there is still no unread message because we don't count import messages
+	chat, err = s.alice.persistence.Chat(chatID)
+	s.Require().NoError(err)
+	s.Require().NotNil(chat)
+	s.Require().Equal(0, int(chat.UnviewedMessagesCount))
 }

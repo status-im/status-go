@@ -159,7 +159,7 @@ func main() {
 	}
 	logger.Info("GOT community", "comm", chat)
 
-	response, err := messenger.JoinCommunity(context.Background(), community.ID())
+	response, err := messenger.JoinCommunity(context.Background(), community.ID(), false)
 	if err != nil {
 		logger.Error("failed to join community", "err", err)
 	}

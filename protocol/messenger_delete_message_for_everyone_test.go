@@ -175,7 +175,7 @@ func (s *MessengerDeleteMessageForEveryoneSuite) inviteAndJoin(community *commun
 	}, "community not received")
 	s.Require().NoError(err)
 
-	response, err = target.JoinCommunity(context.Background(), community.ID())
+	response, err = target.JoinCommunity(context.Background(), community.ID(), false)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
