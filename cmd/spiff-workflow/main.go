@@ -324,9 +324,9 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 }
 
 func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
-	backend.UpdateRootDataDir("./tmp")
+	backend.UpdateRootDataDir(*dataDir)
 	manager := backend.AccountManager()
-	if err := manager.InitKeystore("./tmp"); err != nil {
+	if err := manager.InitKeystore(*dataDir); err != nil {
 		return err
 	}
 	err := backend.OpenAccounts()
