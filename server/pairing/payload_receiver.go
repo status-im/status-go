@@ -63,11 +63,16 @@ func (bpr *BasePayloadReceiver) Receive(data []byte) error {
 		return err
 	}
 
+	err = bpr.storer.Store()
+	if err != nil {
+		return err
+	}
+
 	if bpr.receiveCallback != nil {
 		bpr.receiveCallback()
 	}
 
-	return bpr.storer.Store()
+	return nil
 }
 
 /*
