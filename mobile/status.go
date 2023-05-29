@@ -1007,16 +1007,18 @@ func GetConnectionStringForBeingBootstrapped(configJSON string) string {
 	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
 	}
+
 	statusBackend.SetLocalPairing(true)
 	defer func() {
 		statusBackend.SetLocalPairing(false)
 	}()
+
 	cs, err := pairing.StartUpReceiverServer(statusBackend, configJSON)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
-	err = statusBackend.StopNode()
+	err = statusBackend.Logout()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -1034,6 +1036,12 @@ func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string 
 	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, SendingServerConfig is expected"))
 	}
+
+	statusBackend.SetLocalPairing(true)
+	defer func() {
+		statusBackend.SetLocalPairing(false)
+	}()
+
 	cs, err := pairing.StartUpSenderServer(statusBackend, configJSON)
 	if err != nil {
 		return makeJSONResponse(err)
@@ -1053,16 +1061,18 @@ func InputConnectionStringForBootstrapping(cs, configJSON string) string {
 	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, ReceiverClientConfig is expected"))
 	}
+
 	statusBackend.SetLocalPairing(true)
 	defer func() {
 		statusBackend.SetLocalPairing(false)
 	}()
+
 	err := pairing.StartUpReceivingClient(statusBackend, cs, configJSON)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
-	err = statusBackend.StopNode()
+	err = statusBackend.Logout()
 	return makeJSONResponse(err)
 }
 
@@ -1077,6 +1087,11 @@ func InputConnectionStringForBootstrappingAnotherDevice(cs, configJSON string) s
 	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, SenderClientConfig is expected"))
 	}
+
+	statusBackend.SetLocalPairing(true)
+	defer func() {
+		statusBackend.SetLocalPairing(false)
+	}()
 
 	err := pairing.StartUpSendingClient(statusBackend, cs, configJSON)
 	return makeJSONResponse(err)
