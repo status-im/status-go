@@ -5,8 +5,10 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"runtime"
+	"strings"
 
 	sqlcipher "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
 
@@ -77,6 +79,31 @@ func EncryptDB(unencryptedPath string, encryptedPath string, key string, kdfIter
 	return err
 }
 
+func buildSqlcipherDSN(path string) (string, error) {
+	if path == InMemoryPath {
+		return InMemoryPath, nil
+	}
+
+	// Adding sqlcipher query parameter to the DSN
+	queryOperator := "?"
+
+	if queryStart := strings.IndexRune(path, '?'); queryStart != -1 {
+		params, err := url.ParseQuery(path[queryStart+1:])
+		if err != nil {
+			return "", err
+		}
+
+		if len(params) > 0 {
+			queryOperator = "&"
+		}
+	}
+
+	// We need to set txlock=immediate to avoid "database is locked" errors during concurrent write operations
+	// This could happen when a read transaction is promoted to write transaction
+	// https://www.sqlite.org/lang_transaction.html
+	return path + queryOperator + "_txlock=immediate", nil
+}
+
 func openDB(path string, key string, kdfIterationsNumber int) (*sql.DB, error) {
 	driverName := fmt.Sprintf("sqlcipher_with_extensions-%d", len(sql.Drivers()))
 	sql.Register(driverName, &sqlcipher.SQLiteDriver{
@@ -111,7 +138,13 @@ func openDB(path string, key string, kdfIterationsNumber int) (*sql.DB, error) {
 		},
 	})
 
-	db, err := sql.Open(driverName, path)
+	dsn, err := buildSqlcipherDSN(path)
+
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := sql.Open(driverName, dsn)
 	if err != nil {
 		return nil, err
 	}
