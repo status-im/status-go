@@ -485,20 +485,29 @@ func (s *AdminMessengerCommunitiesSuite) refreshMessengerResponses() {
 }
 
 type MessageResponseValidator func(*MessengerResponse) error
+type WaitResponseValidator func(*MessengerResponse) bool
 
-func (s *AdminMessengerCommunitiesSuite) checkClientsReceivedAdminEvent(fn MessageResponseValidator) {
+func WaitCommunityCondition(r *MessengerResponse) bool {
+	return len(r.Communities()) > 0
+}
+
+func WaitMessageCondition(response *MessengerResponse) bool {
+	return len(response.Messages()) > 0
+}
+
+func (s *AdminMessengerCommunitiesSuite) checkClientsReceivedAdminEvent(fnWait WaitResponseValidator, fn MessageResponseValidator) {
 	response, err := WaitOnMessengerResponse(
 		s.alice,
-		func(r *MessengerResponse) bool { return true },
-		"community not received",
+		fnWait,
+		"MessengerResponse data not received",
 	)
 	s.Require().NoError(err)
 	s.Require().NoError(fn(response))
 
 	response, err = WaitOnMessengerResponse(
 		s.owner,
-		func(r *MessengerResponse) bool { return true },
-		"community not received",
+		fnWait,
+		"MessengerResponse data not received",
 	)
 	s.Require().NoError(err)
 	s.Require().NoError(fn(response))
@@ -542,7 +551,8 @@ func (s *AdminMessengerCommunitiesSuite) adminCreateCommunityChannel(community *
 		break
 	}
 
-	s.checkClientsReceivedAdminEvent(checkChannelCreated)
+	waitForResponse := func(r *MessengerResponse) bool { return len(r.Communities()) > 0 }
+	s.checkClientsReceivedAdminEvent(waitForResponse, checkChannelCreated)
 
 	return addedChatID
 }
@@ -582,7 +592,7 @@ func (s *AdminMessengerCommunitiesSuite) adminEditCommunityChannel(community *co
 	s.Require().NoError(err)
 	s.Require().NoError(checkChannelEdited(response))
 
-	s.checkClientsReceivedAdminEvent(checkChannelEdited)
+	s.checkClientsReceivedAdminEvent(WaitCommunityCondition, checkChannelEdited)
 }
 
 func (s *AdminMessengerCommunitiesSuite) adminDeleteCommunityChannel(community *communities.Community, channelID string) {
@@ -613,7 +623,7 @@ func (s *AdminMessengerCommunitiesSuite) adminDeleteCommunityChannel(community *
 	s.Require().NoError(err)
 	s.Require().NoError(checkChannelDeleted(response))
 
-	s.checkClientsReceivedAdminEvent(checkChannelDeleted)
+	s.checkClientsReceivedAdminEvent(WaitCommunityCondition, checkChannelDeleted)
 }
 
 func (s *AdminMessengerCommunitiesSuite) adminCreateCommunityCategory(community *communities.Community, newCategory *requests.CreateCommunityCategory) string {
@@ -653,7 +663,7 @@ func (s *AdminMessengerCommunitiesSuite) adminCreateCommunityCategory(community 
 		break
 	}
 
-	s.checkClientsReceivedAdminEvent(checkCategoryCreated)
+	s.checkClientsReceivedAdminEvent(WaitCommunityCondition, checkCategoryCreated)
 
 	return categoryId
 }
@@ -688,7 +698,7 @@ func (s *AdminMessengerCommunitiesSuite) adminEditCommunityCategory(communityID 
 	s.Require().NoError(err)
 	s.Require().NoError(checkCategoryEdited(response))
 
-	s.checkClientsReceivedAdminEvent(checkCategoryEdited)
+	s.checkClientsReceivedAdminEvent(WaitCommunityCondition, checkCategoryEdited)
 }
 
 func (s *AdminMessengerCommunitiesSuite) adminDeleteCommunityCategory(communityID string, deleteCategory *requests.DeleteCommunityCategory) {
@@ -719,7 +729,7 @@ func (s *AdminMessengerCommunitiesSuite) adminDeleteCommunityCategory(communityI
 	s.Require().NoError(err)
 	s.Require().NoError(checkCategoryDeleted(response))
 
-	s.checkClientsReceivedAdminEvent(checkCategoryDeleted)
+	s.checkClientsReceivedAdminEvent(WaitCommunityCondition, checkCategoryDeleted)
 }
 
 func (s *AdminMessengerCommunitiesSuite) ownerSendMessage(chatId string, inputMessage *common.Message) string {
@@ -729,16 +739,12 @@ func (s *AdminMessengerCommunitiesSuite) ownerSendMessage(chatId string, inputMe
 	s.Require().Equal(inputMessage.Text, message.Text)
 	messageID := message.ID
 
-	response, err = WaitOnMessengerResponse(s.admin, func(response *MessengerResponse) bool {
-		return len(response.Messages()) > 0
-	}, "messages not received")
+	response, err = WaitOnMessengerResponse(s.admin, WaitMessageCondition, "messages not received")
 	s.Require().NoError(err)
 	message = response.Messages()[0]
 	s.Require().Equal(inputMessage.Text, message.Text)
 
-	response, err = WaitOnMessengerResponse(s.alice, func(response *MessengerResponse) bool {
-		return len(response.Messages()) > 0
-	}, "messages not received")
+	response, err = WaitOnMessengerResponse(s.alice, WaitMessageCondition, "messages not received")
 	s.Require().NoError(err)
 	message = response.Messages()[0]
 	s.Require().Equal(inputMessage.Text, message.Text)
@@ -750,7 +756,7 @@ func (s *AdminMessengerCommunitiesSuite) ownerSendMessage(chatId string, inputMe
 
 func (s *AdminMessengerCommunitiesSuite) adminDeleteMessage(messageID string) {
 	checkMessageDeleted := func(response *MessengerResponse) error {
-		if len(response.Messages()) == 0 {
+		if len(response.RemovedMessages()) > 0 {
 			return nil
 		}
 		return errors.New("message was not deleted")
@@ -760,7 +766,10 @@ func (s *AdminMessengerCommunitiesSuite) adminDeleteMessage(messageID string) {
 	s.Require().NoError(err)
 	s.Require().NoError(checkMessageDeleted(response))
 
-	s.checkClientsReceivedAdminEvent(checkMessageDeleted)
+	waitMessageCondition := func(response *MessengerResponse) bool {
+		return len(response.RemovedMessages()) > 0
+	}
+	s.checkClientsReceivedAdminEvent(waitMessageCondition, checkMessageDeleted)
 }
 
 func (s *AdminMessengerCommunitiesSuite) adminPinMessage(pinnedMessage *common.PinMessage) {
@@ -775,5 +784,5 @@ func (s *AdminMessengerCommunitiesSuite) adminPinMessage(pinnedMessage *common.P
 	s.Require().NoError(err)
 	s.Require().NoError(checkPinned(response))
 
-	s.checkClientsReceivedAdminEvent(checkPinned)
+	s.checkClientsReceivedAdminEvent(WaitMessageCondition, checkPinned)
 }
