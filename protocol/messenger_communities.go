@@ -322,6 +322,27 @@ func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
 	}()
 }
 
+func (m *Messenger) CheckCommunitiesToUnmute(response *MessengerResponse) error {
+	m.logger.Debug("watching communities to unmute")
+	communities, err := m.communitiesManager.All()
+	if err != nil {
+		return fmt.Errorf("couldn't get all communities: %v", err)
+	}
+	for _, community := range communities {
+		communityMuteTill, _ := time.Parse(time.RFC3339, community.MuteTill().Format(time.RFC3339))
+		currTime, _ := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+		if currTime.After(communityMuteTill) && !communityMuteTill.Equal(time.Time{}) && community.Muted() {
+			err := m.communitiesManager.SetMuted(community.ID(), false, time.Time{})
+			if err != nil {
+				m.logger.Info("CheckCommunitiesToUnmute err", zap.Any("Couldn't unmute community", err))
+				break
+			}
+			response.AddCommunity(community)
+		}
+	}
+	return nil
+}
+
 func (m *Messenger) updateCommunityActiveMembers(communityID string) error {
 	lastWeek := time.Now().AddDate(0, 0, -7).Unix()
 	count, err := m.persistence.CountActiveChattersInCommunity(communityID, lastWeek)
@@ -574,8 +595,35 @@ func (m *Messenger) SpectateCommunity(communityID types.HexBytes) (*MessengerRes
 	return response, nil
 }
 
-func (m *Messenger) SetMuted(communityID types.HexBytes, muted bool) error {
-	return m.communitiesManager.SetMuted(communityID, muted)
+func (m *Messenger) SetMuted(request *requests.MuteCommunity) error {
+	if err := request.Validate(); err != nil {
+		return err
+	}
+	if request.MutedType == Unmuted {
+		return m.communitiesManager.SetMuted(request.CommunityID, false, time.Time{})
+	}
+	var MuteTill time.Time
+
+	switch request.MutedType {
+	case MuteTill1Min:
+		MuteTill = time.Now().Add(MuteFor1MinDuration)
+	case MuteFor15Min:
+		MuteTill = time.Now().Add(MuteFor15MinsDuration)
+	case MuteFor1Hr:
+		MuteTill = time.Now().Add(MuteFor1HrsDuration)
+	case MuteFor8Hr:
+		MuteTill = time.Now().Add(MuteFor8HrsDuration)
+	case MuteFor1Week:
+		MuteTill = time.Now().Add(MuteFor1WeekDuration)
+	default:
+		MuteTill = time.Time{}
+	}
+	muteTillTimeRemoveMs, err := time.Parse(time.RFC3339, MuteTill.Format(time.RFC3339))
+
+	if err != nil {
+		return err
+	}
+	return m.communitiesManager.SetMuted(request.CommunityID, true, muteTillTimeRemoveMs)
 }
 
 func (m *Messenger) SetMutePropertyOnChatsByCategory(request *requests.MuteCategory, muted bool) error {

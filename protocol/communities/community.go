@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -32,6 +33,7 @@ type Config struct {
 	Verified                      bool
 	Spectated                     bool
 	Muted                         bool
+	MuteTill                      time.Time
 	Logger                        *zap.Logger
 	RequestedToJoinAt             uint64
 	RequestsToJoin                []*RequestToJoin
@@ -214,6 +216,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		RequestedToJoinAt           uint64                                        `json:"requestedToJoinAt,omitempty"`
 		IsMember                    bool                                          `json:"isMember"`
 		Muted                       bool                                          `json:"muted"`
+		MuteTill                    time.Time                                     `json:"muteTill,omitempty"`
 		CommunityAdminSettings      CommunityAdminSettings                        `json:"adminSettings"`
 		Encrypted                   bool                                          `json:"encrypted"`
 		BanList                     []string                                      `json:"banList"`
@@ -235,6 +238,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		RequestedToJoinAt:           o.RequestedToJoinAt(),
 		IsMember:                    o.isMember(),
 		Muted:                       o.config.Muted,
+		MuteTill:                    o.config.MuteTill,
 		Tags:                        o.Tags(),
 		Encrypted:                   o.Encrypted(),
 	}
@@ -956,6 +960,10 @@ func (o *Community) Verified() bool {
 
 func (o *Community) Muted() bool {
 	return o.config.Muted
+}
+
+func (o *Community) MuteTill() time.Time {
+	return o.config.MuteTill
 }
 
 func (o *Community) MemberIdentity() *ecdsa.PublicKey {

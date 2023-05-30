@@ -3324,6 +3324,38 @@ func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
 	}
 }
 
+func (s *MessengerCommunitiesSuite) TestCheckCommunitiesToUnmute() {
+	// Create a community
+	createCommunityReq := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Name:        "new community",
+		Color:       "#000000",
+		Description: "new community description",
+	}
+
+	mr, err := s.alice.CreateCommunity(createCommunityReq, true)
+	s.Require().NoError(err, "s.alice.CreateCommunity")
+	var newCommunity *communities.Community
+	for _, com := range mr.Communities() {
+		if com.Name() == createCommunityReq.Name {
+			newCommunity = com
+		}
+	}
+	s.Require().NotNil(newCommunity)
+
+	currTime, _ := time.Parse(time.RFC3339, time.Now().Add(-time.Hour).Format(time.RFC3339))
+
+	err = s.alice.communitiesManager.SetMuted(newCommunity.ID(), true, currTime)
+	s.Require().NoError(err, "SetMuted to community")
+
+	response := &MessengerResponse{}
+
+	err = s.alice.CheckCommunitiesToUnmute(response)
+
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1, "CheckCommunitiesToUnmute should unmute the community")
+}
+
 func (s *MessengerCommunitiesSuite) TestExtractDiscordChannelsAndCategories() {
 
 	tmpFile, err := ioutil.TempFile(os.TempDir(), "discord-channel-")

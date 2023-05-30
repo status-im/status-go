@@ -486,8 +486,8 @@ func (api *PublicAPI) RemoveUserFromCommunity(communityID types.HexBytes, userPu
 }
 
 // SetCommunityMuted sets the community's muted value
-func (api *PublicAPI) SetCommunityMuted(communityID types.HexBytes, muted bool) error {
-	return api.service.messenger.SetMuted(communityID, muted)
+func (api *PublicAPI) SetCommunityMuted(request *requests.MuteCommunity) error {
+	return api.service.messenger.SetMuted(request)
 }
 
 // BanUserFromCommunity removes the user with pk from the community with ID
