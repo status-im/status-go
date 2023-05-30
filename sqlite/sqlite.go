@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"runtime"
 
 	sqlcipher "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
 
@@ -116,20 +115,7 @@ func openDB(path string, key string, kdfIterationsNumber int) (*sql.DB, error) {
 		return nil, err
 	}
 
-	if path == InMemoryPath {
-		db.SetMaxOpenConns(1)
-	} else {
-		nproc := func() int {
-			maxProcs := runtime.GOMAXPROCS(0)
-			numCPU := runtime.NumCPU()
-			if maxProcs < numCPU {
-				return maxProcs
-			}
-			return numCPU
-		}()
-		db.SetMaxOpenConns(nproc)
-		db.SetMaxIdleConns(nproc)
-	}
+	db.SetMaxOpenConns(1)
 
 	return db, nil
 }
