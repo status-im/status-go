@@ -158,11 +158,10 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 		}
 		chat.updateChatFromGroupMembershipChanges(group)
 
-		wasUserAdded = !existingGroup.IsMember(ourKey) &&
-			group.IsMember(ourKey)
-
 		// Reactivate deleted group chat on re-invite from contact
-		chat.Active = chat.Active || (isActive && wasUserAdded)
+		chat.Active = chat.Active || (isActive && group.IsMember(ourKey))
+
+		wasUserAdded = !existingGroup.IsMember(ourKey) && group.IsMember(ourKey)
 
 		// Show push notifications when our key is added to members list and chat is Active
 		showPushNotification = showPushNotification && wasUserAdded
