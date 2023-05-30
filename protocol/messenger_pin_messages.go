@@ -122,7 +122,20 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 }
 
 func (m *Messenger) PinnedMessageByChatID(chatID, cursor string, limit int) ([]*common.PinnedMessage, string, error) {
-	return m.persistence.PinnedMessageByChatID(chatID, cursor, limit)
+	pinnedMsgs, cursor, err := m.persistence.PinnedMessageByChatID(chatID, cursor, limit)
+
+	if err != nil {
+		return nil, "", err
+	}
+
+	if m.httpServer != nil {
+		for idx := range pinnedMsgs {
+			msg := pinnedMsgs[idx].Message
+			m.prepareMessage(msg, m.httpServer)
+			pinnedMsgs[idx].Message = msg
+		}
+	}
+	return pinnedMsgs, cursor, nil
 }
 
 func (m *Messenger) SavePinMessages(messages []*common.PinMessage) error {
