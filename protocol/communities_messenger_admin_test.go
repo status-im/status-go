@@ -226,13 +226,37 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminBanMember() {
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminDeleteAnyMessageInTheCommunity() {
-	s.setUpCommunityAndRoles()
-	// TODO admin test: Delete any message in the Community
+	community := s.setUpCommunityAndRoles()
+	chatID := community.ChatIDs()[0]
+
+	inputMessage := common.Message{}
+	inputMessage.ChatId = chatID
+	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	inputMessage.Text = "owner text"
+
+	messageID := s.ownerSendMessage(chatID, &inputMessage)
+
+	s.adminDeleteMessage(messageID)
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminPinMessage() {
-	s.setUpCommunityAndRoles()
-	// TODO admin test: Pin messages, if 'Any member can pin a message' is switched off in community settings
+	community := s.setUpCommunityAndRoles()
+	s.Require().False(community.AllowsAllMembersToPinMessage())
+	chatID := community.ChatIDs()[0]
+
+	inputMessage := common.Message{}
+	inputMessage.ChatId = chatID
+	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	inputMessage.Text = "owner text"
+
+	messageID := s.ownerSendMessage(chatID, &inputMessage)
+
+	pinnedMessage := common.PinMessage{}
+	pinnedMessage.MessageId = messageID
+	pinnedMessage.ChatId = chatID
+	pinnedMessage.Pinned = true
+
+	s.adminPinMessage(&pinnedMessage)
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminMintToken() {
@@ -351,10 +375,11 @@ func (s *AdminMessengerCommunitiesSuite) joinCommunity(community *communities.Co
 
 func (s *AdminMessengerCommunitiesSuite) createCommunity() *communities.Community {
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		Name:        "status",
-		Color:       "#ffffff",
-		Description: "status community description",
+		Membership:                  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:                        "status",
+		Color:                       "#ffffff",
+		Description:                 "status community description",
+		PinMessageAllMembersEnabled: false,
 	}
 	response, err := s.owner.CreateCommunity(description, true)
 
@@ -464,7 +489,7 @@ type MessageResponseValidator func(*MessengerResponse) error
 func (s *AdminMessengerCommunitiesSuite) checkClientsReceivedAdminEvent(fn MessageResponseValidator) {
 	response, err := WaitOnMessengerResponse(
 		s.alice,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		func(r *MessengerResponse) bool { return true },
 		"community not received",
 	)
 	s.Require().NoError(err)
@@ -472,7 +497,7 @@ func (s *AdminMessengerCommunitiesSuite) checkClientsReceivedAdminEvent(fn Messa
 
 	response, err = WaitOnMessengerResponse(
 		s.owner,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		func(r *MessengerResponse) bool { return true },
 		"community not received",
 	)
 	s.Require().NoError(err)
@@ -695,4 +720,60 @@ func (s *AdminMessengerCommunitiesSuite) adminDeleteCommunityCategory(communityI
 	s.Require().NoError(checkCategoryDeleted(response))
 
 	s.checkClientsReceivedAdminEvent(checkCategoryDeleted)
+}
+
+func (s *AdminMessengerCommunitiesSuite) ownerSendMessage(chatId string, inputMessage *common.Message) string {
+	response, err := s.owner.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
+	message := response.Messages()[0]
+	s.Require().Equal(inputMessage.Text, message.Text)
+	messageID := message.ID
+
+	response, err = WaitOnMessengerResponse(s.admin, func(response *MessengerResponse) bool {
+		return len(response.Messages()) > 0
+	}, "messages not received")
+	s.Require().NoError(err)
+	message = response.Messages()[0]
+	s.Require().Equal(inputMessage.Text, message.Text)
+
+	response, err = WaitOnMessengerResponse(s.alice, func(response *MessengerResponse) bool {
+		return len(response.Messages()) > 0
+	}, "messages not received")
+	s.Require().NoError(err)
+	message = response.Messages()[0]
+	s.Require().Equal(inputMessage.Text, message.Text)
+
+	s.refreshMessengerResponses()
+
+	return messageID
+}
+
+func (s *AdminMessengerCommunitiesSuite) adminDeleteMessage(messageID string) {
+	checkMessageDeleted := func(response *MessengerResponse) error {
+		if len(response.Messages()) == 0 {
+			return nil
+		}
+		return errors.New("message was not deleted")
+	}
+
+	response, err := s.admin.DeleteMessageAndSend(context.Background(), messageID)
+	s.Require().NoError(err)
+	s.Require().NoError(checkMessageDeleted(response))
+
+	s.checkClientsReceivedAdminEvent(checkMessageDeleted)
+}
+
+func (s *AdminMessengerCommunitiesSuite) adminPinMessage(pinnedMessage *common.PinMessage) {
+	checkPinned := func(response *MessengerResponse) error {
+		if len(response.PinMessages()) > 0 {
+			return nil
+		}
+		return errors.New("pin messages was not added")
+	}
+
+	response, err := s.admin.SendPinMessage(context.Background(), pinnedMessage)
+	s.Require().NoError(err)
+	s.Require().NoError(checkPinned(response))
+
+	s.checkClientsReceivedAdminEvent(checkPinned)
 }

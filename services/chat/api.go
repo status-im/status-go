@@ -89,6 +89,7 @@ type ChannelGroup struct {
 	Categories              map[string]communities.CommunityCategory `json:"categories"`
 	EnsName                 string                                   `json:"ensName"`
 	Admin                   bool                                     `json:"admin"`
+	Owner                   bool                                     `json:"owner"`
 	Verified                bool                                     `json:"verified"`
 	Description             string                                   `json:"description"`
 	IntroMessage            string                                   `json:"introMessage"`
@@ -170,6 +171,7 @@ func (api *API) getChannelGroups(ctx context.Context, channelGroupID string) (ma
 			Categories:              make(map[string]communities.CommunityCategory),
 			EnsName:                 "", // Not implemented yet in communities
 			Admin:                   true,
+			Owner:                   true,
 			Verified:                true,
 			Description:             "",
 			IntroMessage:            "",
