@@ -112,6 +112,14 @@ func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Lo
 			}
 		}
 
+		if statusIndicatorEnabled(params) {
+			payload, err = images.AddStatusIndicatorToImage(payload, isOnline(params))
+			if err != nil {
+				logger.Error("failed to draw status-indicator for initials", zap.Error(err))
+				return
+			}
+		}
+
 		if len(payload) == 0 {
 			logger.Error("empty image")
 			return
@@ -168,7 +176,6 @@ func handleAccountInitials(multiaccountsDB *multiaccounts.Database, logger *zap.
 			logger.Error("invalid fontSize")
 			return
 		}
-		logger.Info("handleAccountInitials", zap.Float64("fontSize", fontSize))
 
 		colors, ok := params["color"]
 		if !ok || len(colors) == 0 {
@@ -255,6 +262,14 @@ func handleAccountInitials(multiaccountsDB *multiaccounts.Database, logger *zap.
 
 			if err != nil {
 				logger.Error("failed to draw ring for account identity", zap.Error(err))
+				return
+			}
+		}
+
+		if statusIndicatorEnabled(params) {
+			payload, err = images.AddStatusIndicatorToImage(payload, isOnline(params))
+			if err != nil {
+				logger.Error("failed to draw status-indicator for initials", zap.Error(err))
 				return
 			}
 		}
@@ -349,6 +364,16 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 func ringEnabled(params url.Values) bool {
 	addRings, ok := params["addRing"]
 	return ok && len(addRings) == 1 && addRings[0] == "1"
+}
+
+func isOnline(params url.Values) bool {
+	onlines, ok := params["online"]
+	return ok && len(onlines) == 1 && onlines[0] == "1"
+}
+
+func statusIndicatorEnabled(params url.Values) bool {
+	statusIndicators, ok := params["status"]
+	return ok && len(statusIndicators) == 1 && statusIndicators[0] == "1"
 }
 
 func getTheme(params url.Values, logger *zap.Logger) ring.Theme {
