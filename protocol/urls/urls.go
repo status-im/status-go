@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -52,10 +52,6 @@ const (
 	YoutubeOembedLink = "https://www.youtube.com/oembed?format=json&url=%s"
 	TwitterOembedLink = "https://publish.twitter.com/oembed?url=%s"
 	GiphyOembedLink   = "https://giphy.com/services/oembed?url=%s"
-)
-
-var (
-	httpClient = http.Client{Timeout: 30 * time.Second}
 )
 
 func LinkPreviewWhitelist() []Site {
@@ -130,19 +126,36 @@ func LinkPreviewWhitelist() []Site {
 	}
 }
 
-func getURLContent(url string) (data []byte, err error) {
-	response, err := httpClient.Get(url)
+type oembedGetter interface {
+	GetOembed(name, endpoint, url string, data interface{}) error
+	GetResponse(url string) (resp *http.Response, err error)
+}
+
+// baseOembedGetter is the production oembedGetter
+type baseOembedGetter struct {
+	client http.Client
+}
+
+func newOembedGetter() *baseOembedGetter {
+	og := new(baseOembedGetter)
+	og.client = http.Client{Timeout: 30 * time.Second}
+	return og
+}
+
+func (o *baseOembedGetter) getURLContent(url string) (data []byte, err error) {
+	response, err := o.client.Get(url)
+	o.client.Head()
 	if err != nil {
 		return data, fmt.Errorf("can't get content from link %s", url)
 	}
 	defer response.Body.Close()
-	return ioutil.ReadAll(response.Body)
+	return io.ReadAll(response.Body)
 }
 
-func GetOembed(name, endpoint, url string, data interface{}) error {
+func (o *baseOembedGetter) GetOembed(name, endpoint, url string, data interface{}) error {
 	oembedLink := fmt.Sprintf(endpoint, url)
 
-	jsonBytes, err := getURLContent(oembedLink)
+	jsonBytes, err := o.getURLContent(oembedLink)
 	if err != nil {
 		return fmt.Errorf("can't get bytes from %s oembed response on %s link", name, oembedLink)
 	}
@@ -150,9 +163,24 @@ func GetOembed(name, endpoint, url string, data interface{}) error {
 	return json.Unmarshal(jsonBytes, &data)
 }
 
-func GetYoutubePreviewData(link string) (previewData LinkPreviewData, err error) {
+func (o *baseOembedGetter) GetResponse(url string) (resp *http.Response, err error) {
+	return o.client.Get(url)
+}
+
+// oembedParser
+type oembedParser struct {
+	getter oembedGetter
+}
+
+func newOembedParser(getter oembedGetter) *oembedParser {
+	return &oembedParser{
+		getter: getter,
+	}
+}
+
+func (o *oembedParser) getYoutubePreviewData(link string) (previewData LinkPreviewData, err error) {
 	oembedData := new(YoutubeOembedData)
-	err = GetOembed("Youtube", YoutubeOembedLink, link, &oembedData)
+	err = o.getter.GetOembed("Youtube", YoutubeOembedLink, link, &oembedData)
 	if err != nil {
 		return
 	}
@@ -163,20 +191,20 @@ func GetYoutubePreviewData(link string) (previewData LinkPreviewData, err error)
 	return
 }
 
-func GetTwitterPreviewData(link string) (previewData LinkPreviewData, err error) {
+func (o *oembedParser) getTwitterPreviewData(link string) (previewData LinkPreviewData, err error) {
 	oembedData := new(TwitterOembedData)
-	err = GetOembed("Twitter", TwitterOembedLink, link, oembedData)
+	err = o.getter.GetOembed("Twitter", TwitterOembedLink, link, oembedData)
 	if err != nil {
 		return previewData, err
 	}
 
-	previewData.Title = getReadableTextFromTweetHTML(oembedData.HTML)
+	previewData.Title = o.getReadableTextFromTweetHTML(oembedData.HTML)
 	previewData.Site = oembedData.ProviderName
 
 	return previewData, nil
 }
 
-func getReadableTextFromTweetHTML(s string) string {
+func (o *oembedParser) getReadableTextFromTweetHTML(s string) string {
 	s = strings.ReplaceAll(s, "\u003Cbr\u003E", "\n")   // Adds line break for all <br>
 	s = strings.ReplaceAll(s, "https://", "\nhttps://") // Displays links in next line
 	s = html.UnescapeString(s)                          // Parses html special characters like &#225;
@@ -188,8 +216,8 @@ func getReadableTextFromTweetHTML(s string) string {
 	return s
 }
 
-func GetGenericLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
-	res, err := httpClient.Get(link)
+func (o *oembedParser) getGenericLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
+	res, err := o.getter.GetResponse(link)
 	if err != nil {
 		return previewData, fmt.Errorf("can't get content from link %s", link)
 	}
@@ -202,8 +230,8 @@ func GetGenericLinkPreviewData(link string) (previewData LinkPreviewData, err er
 	return previewData, nil
 }
 
-func FakeGenericImageLinkPreviewData(title string, link string) (previewData LinkPreviewData, err error) {
-	url, err := url.Parse(link)
+func (o *oembedParser) FakeGenericImageLinkPreviewData(title string, link string) (previewData LinkPreviewData, err error) {
+	u, err := url.Parse(link)
 	if err != nil {
 		return previewData, fmt.Errorf("Failed to parse link %s", link)
 	}
@@ -218,7 +246,7 @@ func FakeGenericImageLinkPreviewData(title string, link string) (previewData Lin
 	}
 
 	previewData.Title = title
-	previewData.Site = strings.ToLower(url.Hostname())
+	previewData.Site = strings.ToLower(u.Hostname())
 	previewData.ContentType = res.Header.Get("Content-type")
 	previewData.ThumbnailURL = link
 	previewData.Height = 0
@@ -226,9 +254,9 @@ func FakeGenericImageLinkPreviewData(title string, link string) (previewData Lin
 	return previewData, nil
 }
 
-func GetGiphyPreviewData(link string) (previewData LinkPreviewData, err error) {
+func (o *oembedParser) getGiphyPreviewData(link string) (previewData LinkPreviewData, err error) {
 	oembedData := new(GiphyOembedData)
-	err = GetOembed("Giphy", GiphyOembedLink, link, oembedData)
+	err = o.getter.GetOembed("Giphy", GiphyOembedLink, link, oembedData)
 	if err != nil {
 		return previewData, err
 	}
@@ -242,10 +270,10 @@ func GetGiphyPreviewData(link string) (previewData LinkPreviewData, err error) {
 	return previewData, nil
 }
 
-// GetGiphyLongURL Giphy has a shortener service called gph.is, the oembed service doesn't work with shortened urls,
+// getGiphyLongURL Giphy has a shortener service called gph.is, the oembed service doesn't work with shortened urls,
 // so we need to fetch the long url first
-func GetGiphyLongURL(shortURL string) (longURL string, err error) {
-	res, err := httpClient.Get(shortURL)
+func (o *oembedParser) getGiphyLongURL(shortURL string) (longURL string, err error) {
+	res, err := o.getter.GetResponse(shortURL)
 	if err != nil {
 		return longURL, fmt.Errorf("can't get bytes from Giphy's short url at %s", shortURL)
 	}
@@ -259,16 +287,16 @@ func GetGiphyLongURL(shortURL string) (longURL string, err error) {
 	return canonicalURL, err
 }
 
-func GetGiphyShortURLPreviewData(shortURL string) (data LinkPreviewData, err error) {
-	longURL, err := GetGiphyLongURL(shortURL)
+func (o *oembedParser) getGiphyShortURLPreviewData(shortURL string) (data LinkPreviewData, err error) {
+	longURL, err := o.getGiphyLongURL(shortURL)
 	if err != nil {
 		return data, err
 	}
 
-	return GetGiphyPreviewData(longURL)
+	return o.getGiphyPreviewData(longURL)
 }
 
-func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
+func (o *oembedParser) GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 	u, err := url.Parse(link)
 	if err != nil {
 		return previewData, fmt.Errorf("cant't parse link %s", link)
@@ -278,17 +306,18 @@ func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 
 	switch hostname {
 	case "youtube.com", "youtu.be", "www.youtube.com", "m.youtube.com":
-		return GetYoutubePreviewData(link)
+		return o.getYoutubePreviewData(link)
 	case "github.com", "our.status.im":
-		return GetGenericLinkPreviewData(link)
+		return o.getGenericLinkPreviewData(link)
 	case "giphy.com", "media.giphy.com":
-		return GetGiphyPreviewData(link)
+		return o.getGiphyPreviewData(link)
 	case "gph.is":
-		return GetGiphyShortURLPreviewData(link)
+		return o.getGiphyShortURLPreviewData(link)
 	case "twitter.com", "mobile.twitter.com":
-		return GetTwitterPreviewData(link)
+		return o.getTwitterPreviewData(link)
 	case "media.tenor.com":
-		return FakeGenericImageLinkPreviewData("Tenor", link)
+		//TODO rename to getTenor...?
+		return o.FakeGenericImageLinkPreviewData("Tenor", link)
 	default:
 		return previewData, fmt.Errorf("link %s isn't whitelisted. Hostname - %s", link, u.Hostname())
 	}
