@@ -47,7 +47,6 @@ var (
 )
 
 type ethHistoricalCommand struct {
-	eth          Downloader
 	address      common.Address
 	chainClient  *chain.ClientWithFallback
 	balanceCache *balanceCache
@@ -69,7 +68,8 @@ func (c *ethHistoricalCommand) Command() async.Command {
 }
 
 func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
-	log.Info("eth historical downloader start", "address", c.address, "from", c.from.Number, "to", c.to, "noLimit", c.noLimit)
+	log.Info("eth historical downloader start", "chainID", c.chainClient.ChainID, "address", c.address,
+		"from", c.from.Number, "to", c.to, "noLimit", c.noLimit)
 
 	start := time.Now()
 	if c.from.Number != nil && c.from.Balance != nil {
@@ -79,11 +79,12 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 		c.balanceCache.addNonceToCache(c.address, c.from.Number, c.from.Nonce)
 	}
 	from, headers, startBlock, err := findBlocksWithEthTransfers(ctx, c.chainClient,
-		c.balanceCache, c.eth, c.address, c.from.Number, c.to, c.noLimit, c.threadLimit)
+		c.balanceCache, c.address, c.from.Number, c.to, c.noLimit, c.threadLimit)
 
 	if err != nil {
 		c.error = err
-		log.Error("failed to find blocks with transfers", "error", err)
+		log.Error("failed to find blocks with transfers", "error", err, "chainID", c.chainClient.ChainID,
+			"address", c.address, "from", c.from.Number, "to", c.to)
 		return nil
 	}
 
@@ -343,12 +344,16 @@ func (c *controlCommand) Command() async.Command {
 
 type transfersCommand struct {
 	db                 *Database
+	blockDAO           *BlockDAO
 	eth                *ETHDownloader
-	blockNum           *big.Int
+	blockNums          []*big.Int
 	address            common.Address
 	chainClient        *chain.ClientWithFallback
-	fetchedTransfers   []Transfer
+	blocksLimit        int
 	transactionManager *TransactionManager
+
+	// result
+	fetchedTransfers []Transfer
 }
 
 func (c *transfersCommand) Command() async.Command {
@@ -359,16 +364,66 @@ func (c *transfersCommand) Command() async.Command {
 }
 
 func (c *transfersCommand) Run(ctx context.Context) (err error) {
-	log.Debug("start transfersCommand", "chain", c.chainClient.ChainID, "address", c.address, "block", c.blockNum)
+	// Take blocks from cache if available and disrespect the limit
+	// If no blocks are available in cache, take blocks from DB respecting the limit
+	// If no limit is set, take all blocks from DB
+	for {
+		blocks := c.blockNums
+		if blocks == nil {
+			blocks, _ = c.blockDAO.GetBlocksByAddress(c.chainClient.ChainID, c.address, numberOfBlocksCheckedPerIteration)
+		}
 
-	startTs := time.Now()
+		for _, blockNum := range blocks {
+			log.Info("start transfersCommand", "chain", c.chainClient.ChainID, "address", c.address, "block", blockNum)
 
-	allTransfers, err := c.eth.GetTransfersByNumber(ctx, c.blockNum)
-	if err != nil {
-		log.Error("getTransfersByBlocks error", "error", err)
-		return err
+			startTs := time.Now()
+
+			allTransfers, err := c.eth.GetTransfersByNumber(ctx, blockNum)
+			if err != nil {
+				log.Error("getTransfersByBlocks error", "error", err)
+				return err
+			}
+
+			err = c.updateMultiTxFromPendingEntry(allTransfers)
+			if err != nil {
+				return err
+			}
+
+			if len(allTransfers) > 0 {
+				err = c.db.SaveTransfersMarkBlocksLoaded(c.chainClient.ChainID, c.address, allTransfers, []*big.Int{blockNum})
+				if err != nil {
+					log.Error("SaveTransfers error", "error", err)
+					return err
+				}
+			} else {
+				// If no transfers found, that is suspecting, because downloader returned this block as containing transfers
+				log.Error("no transfers found in block", "chain", c.chainClient.ChainID, "address", c.address, "block", blockNum)
+
+				err = markBlocksAsLoaded(c.chainClient.ChainID, c.db.client, c.address, []*big.Int{blockNum})
+				if err != nil {
+					log.Error("Mark blocks loaded error", "error", err)
+					return err
+				}
+			}
+
+			c.fetchedTransfers = append(c.fetchedTransfers, allTransfers...)
+
+			log.Debug("end transfersCommand", "chain", c.chainClient.ChainID, "address", c.address,
+				"block", blockNum, "len", len(allTransfers), "in", time.Since(startTs))
+		}
+
+		if c.blockNums != nil || len(blocks) == 0 ||
+			(c.blocksLimit > noBlockLimit && len(blocks) >= c.blocksLimit) {
+			log.Debug("loadTransfers breaking loop on block limits reached or 0 blocks", "chain", c.chainClient.ChainID,
+				"address", c.address, "limit", c.blocksLimit, "blocks", len(blocks))
+			break
+		}
 	}
 
+	return nil
+}
+
+func (c *transfersCommand) updateMultiTxFromPendingEntry(allTransfers []Transfer) error {
 	// Update MultiTransactionID from pending entry
 	for index := range allTransfers {
 		transfer := &allTransfers[index]
@@ -381,27 +436,6 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 			return err
 		}
 	}
-
-	if len(allTransfers) > 0 {
-		err = c.db.SaveTransfersMarkBlocksLoaded(c.chainClient.ChainID, c.address, allTransfers, []*big.Int{c.blockNum})
-		if err != nil {
-			log.Error("SaveTransfers error", "error", err)
-			return err
-		}
-	} else {
-		// If no transfers found, that is suspecting, because downloader returned this block as containing transfers
-		log.Error("no transfers found in block", "chain", c.chainClient.ChainID, "address", c.address, "block", c.blockNum)
-
-		err = markBlocksAsLoaded(c.chainClient.ChainID, c.db.client, c.address, []*big.Int{c.blockNum})
-		if err != nil {
-			log.Error("Mark blocks loaded error", "error", err)
-			return err
-		}
-	}
-
-	c.fetchedTransfers = allTransfers
-	log.Debug("end transfersCommand", "chain", c.chainClient.ChainID, "address", c.address,
-		"block", c.blockNum, "len", len(allTransfers), "in", time.Since(startTs))
 
 	return nil
 }
@@ -485,22 +519,9 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) 
 		erc20Headers := erc20HeadersByAddress[address]
 		allHeaders := append(ethHeaders, erc20Headers...)
 
-		uniqHeadersByHash := map[common.Hash]*DBHeader{}
-		for _, header := range allHeaders {
-			uniqHeader, ok := uniqHeadersByHash[header.Hash]
-			if ok {
-				if len(header.Erc20Transfers) > 0 {
-					uniqHeader.Erc20Transfers = append(uniqHeader.Erc20Transfers, header.Erc20Transfers...)
-				}
-				uniqHeadersByHash[header.Hash] = uniqHeader
-			} else {
-				uniqHeadersByHash[header.Hash] = header
-			}
-		}
-
 		uniqHeaders := []*DBHeader{}
-		for _, header := range uniqHeadersByHash {
-			uniqHeaders = append(uniqHeaders, header)
+		if len(allHeaders) > 0 {
+			uniqHeaders = uniqueHeaders(allHeaders)
 		}
 
 		foundHeaders[address] = uniqHeaders
@@ -542,17 +563,11 @@ func (c *findAndCheckBlockRangeCommand) fastIndex(ctx context.Context, bCache *b
 			chainClient:  c.chainClient,
 			balanceCache: bCache,
 			address:      address,
-			eth: &ETHDownloader{
-				chainClient: c.chainClient,
-				accounts:    []common.Address{address},
-				signer:      types.NewLondonSigner(c.chainClient.ToBigInt()),
-				db:          c.db,
-			},
-			feed:        c.feed,
-			from:        fromByAddress[address],
-			to:          toByAddress[address],
-			noLimit:     c.noLimit,
-			threadLimit: NoThreadLimit,
+			feed:         c.feed,
+			from:         fromByAddress[address],
+			to:           toByAddress[address],
+			noLimit:      c.noLimit,
+			threadLimit:  NoThreadLimit,
 		}
 		commands[i] = eth
 		group.Add(eth.Command())
@@ -621,30 +636,24 @@ func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *Blo
 
 	commands := []*transfersCommand{}
 	for _, address := range accounts {
-		blocks, ok := blocksByAddress[address]
-
-		if !ok {
-			blocks, _ = blockDAO.GetBlocksByAddress(chainClient.ChainID, address, numberOfBlocksCheckedPerIteration)
-		}
-
-		for _, block := range blocks {
-			transfers := &transfersCommand{
-				db:          db,
+		transfers := &transfersCommand{
+			db:          db,
+			blockDAO:    blockDAO,
+			chainClient: chainClient,
+			address:     address,
+			eth: &ETHDownloader{
 				chainClient: chainClient,
-				address:     address,
-				eth: &ETHDownloader{
-					chainClient: chainClient,
-					accounts:    []common.Address{address},
-					signer:      types.NewLondonSigner(chainClient.ToBigInt()),
-					db:          db,
-				},
-				blockNum:           block,
-				transactionManager: transactionManager,
-			}
-			commands = append(commands, transfers)
-			group.Add(transfers.Command())
+				accounts:    []common.Address{address},
+				signer:      types.NewLondonSigner(chainClient.ToBigInt()),
+				db:          db,
+			},
+			blockNums:          blocksByAddress[address],
+			transactionManager: transactionManager,
 		}
+		commands = append(commands, transfers)
+		group.Add(transfers.Command())
 	}
+
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
@@ -755,4 +764,26 @@ func findFirstRanges(c context.Context, accounts []common.Address, initialTo *bi
 	}
 
 	return res, nil
+}
+
+func uniqueHeaders(allHeaders []*DBHeader) []*DBHeader {
+	uniqHeadersByHash := map[common.Hash]*DBHeader{}
+	for _, header := range allHeaders {
+		uniqHeader, ok := uniqHeadersByHash[header.Hash]
+		if ok {
+			if len(header.Erc20Transfers) > 0 {
+				uniqHeader.Erc20Transfers = append(uniqHeader.Erc20Transfers, header.Erc20Transfers...)
+			}
+			uniqHeadersByHash[header.Hash] = uniqHeader
+		} else {
+			uniqHeadersByHash[header.Hash] = header
+		}
+	}
+
+	uniqHeaders := []*DBHeader{}
+	for _, header := range uniqHeadersByHash {
+		uniqHeaders = append(uniqHeaders, header)
+	}
+
+	return uniqHeaders
 }

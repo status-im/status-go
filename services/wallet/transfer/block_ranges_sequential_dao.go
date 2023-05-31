@@ -81,8 +81,7 @@ func (b *BlockRangeSequentialDAO) upsertRange(chainID uint64, account common.Add
 		// to a greater value, because no history can be before some block that is considered
 		// as a start of history, but due to concurrent block range checks, a newer greater block
 		// can be found that matches criteria of a start block (nonce is zero, balances are equal)
-		if newBlockRange.Start != nil || (blockRange.Start != nil && newBlockRange.Start != nil &&
-			blockRange.Start.Cmp(newBlockRange.Start) < 0) {
+		if newBlockRange.Start != nil && (blockRange.Start == nil || blockRange.Start.Cmp(newBlockRange.Start) < 0) {
 			blockRange.Start = newBlockRange.Start
 		}
 

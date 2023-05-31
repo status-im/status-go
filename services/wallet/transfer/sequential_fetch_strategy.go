@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
 func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, feed *event.Feed,
@@ -41,17 +42,8 @@ type SequentialFetchStrategy struct {
 func (s *SequentialFetchStrategy) newCommand(chainClient *chain.ClientWithFallback,
 	accounts []common.Address) async.Commander {
 
-	ctl := &loadBlocksAndTransfersCommand{
-		db:                 s.db,
-		chainClient:        chainClient,
-		accounts:           accounts,
-		blockRangeDAO:      &BlockRangeSequentialDAO{s.db.client},
-		blockDAO:           s.blockDAO,
-		feed:               s.feed,
-		errorsCount:        0,
-		transactionManager: s.transactionManager,
-	}
-	return ctl
+	return newLoadBlocksAndTransfersCommand(accounts, s.db, s.blockDAO, chainClient, s.feed,
+		s.transactionManager)
 }
 
 func (s *SequentialFetchStrategy) start() error {
@@ -62,6 +54,13 @@ func (s *SequentialFetchStrategy) start() error {
 		return errAlreadyRunning
 	}
 	s.group = async.NewGroup(context.Background())
+
+	if s.feed != nil {
+		s.feed.Send(walletevent.Event{
+			Type:     EventFetchingRecentHistory,
+			Accounts: s.accounts,
+		})
+	}
 
 	for _, chainClient := range s.chainClients {
 		ctl := s.newCommand(chainClient, s.accounts)
