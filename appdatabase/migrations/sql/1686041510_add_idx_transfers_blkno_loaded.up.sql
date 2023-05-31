@@ -1,0 +1,1 @@
+CREATE INDEX idx_transfers_blk_loaded ON transfers(blk_number, loaded);
