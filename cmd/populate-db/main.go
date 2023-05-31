@@ -359,7 +359,7 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 
 	settings.PreviewPrivacy = true
 	settings.Currency = "usd"
-	settings.ProfilePicturesVisibility = 1
+	settings.ProfilePicturesVisibility = 2
 	settings.LinkPreviewRequestEnabled = true
 
 	visibleTokens := make(map[string][]string)
