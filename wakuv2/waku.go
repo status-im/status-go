@@ -623,6 +623,24 @@ func (w *Waku) runRelayMsgLoop() {
 	}
 }
 
+func (w *Waku) runFilterSubscriptionLoop(sub *filter.SubscriptionDetails) {
+	for {
+		select {
+		case <-w.quit:
+			return
+		case env, ok := <-sub.C:
+			if ok {
+				envelopeErrors, err := w.OnNewEnvelopes(env, common.RelayedMessageType)
+				// TODO: should these be handled?
+				_ = envelopeErrors
+				_ = err
+			} else {
+				return
+			}
+		}
+	}
+}
+
 func (w *Waku) runFilterMsgLoop() {
 	defer w.wg.Done()
 
@@ -656,25 +674,9 @@ func (w *Waku) runFilterMsgLoop() {
 								w.logger.Warn("could not add wakuv2 filter for peer", zap.Any("peer", peers[0]))
 							}
 
-							w.filterSubscriptions[f][subDetails.ID] = subDetails
-
+							subMap[subDetails.ID] = subDetails
+							go w.runFilterSubscriptionLoop(subDetails)
 						}
-					}
-				}
-			}
-		default:
-			for _, subMap := range w.filterSubscriptions {
-				for _, sub := range subMap {
-					select {
-					case env, ok := <-sub.C:
-						if ok {
-							envelopeErrors, err := w.OnNewEnvelopes(env, common.RelayedMessageType)
-							// TODO: should these be handled?
-							_ = envelopeErrors
-							_ = err
-						}
-					default:
-						// Use an empty default so that reading from each sub.C is non-blocking
 					}
 				}
 			}
@@ -1654,7 +1656,7 @@ func (w *Waku) subscribeToFilter(f *common.Filter) error {
 			}
 
 			w.filterSubscriptions[f][subDetails.ID] = subDetails
-
+			go w.runFilterSubscriptionLoop(subDetails)
 		}
 
 	} else {
