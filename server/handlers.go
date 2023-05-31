@@ -76,6 +76,12 @@ func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Lo
 
 		var payload = identityImage.Payload
 
+		payload, err = images.CropAvatar(payload)
+		if err != nil {
+			logger.Error("handleAccountImages: failed to crop image.", zap.String("keyUid", keyUids[0]), zap.String("imageName", imageNames[0]), zap.Error(err))
+			return
+		}
+
 		if ringEnabled(params) {
 			account, err := multiaccountsDB.GetAccount(keyUids[0])
 
@@ -103,7 +109,7 @@ func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Lo
 			var theme = getTheme(params, logger)
 
 			payload, err = ring.DrawRing(&ring.DrawRingParam{
-				Theme: theme, ColorHash: accColorHash, ImageBytes: identityImage.Payload, Height: identityImage.Height, Width: identityImage.Width,
+				Theme: theme, ColorHash: accColorHash, ImageBytes: payload, Height: identityImage.Height, Width: identityImage.Width,
 			})
 
 			if err != nil {
