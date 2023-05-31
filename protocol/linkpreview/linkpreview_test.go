@@ -176,13 +176,7 @@ func Test_UnfurlURLs_YouTube(t *testing.T) {
 		},
 	}
 
-	disabledStubs := false
-	if disabledStubs {
-		expected.Thumbnail.Width = 1280
-		expected.Thumbnail.Height = 720
-		expected.Thumbnail.DataURI = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAUDBA8"
-	}
-	transport := StubTransport{disabledStubs: disabledStubs}
+	transport := StubTransport{}
 	transport.AddURLMatcher(
 		url,
 		[]byte(fmt.Sprintf(`
