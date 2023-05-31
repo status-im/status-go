@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/services/accounts/accountsevent"
 )
 
 func NewAccountsAPI(manager *account.GethManager, config *params.NodeConfig, db *accounts.Database, feed *event.Feed, messenger **protocol.Messenger) *API {
@@ -43,7 +44,11 @@ func (api *API) SaveAccount(ctx context.Context, account *accounts.Account) erro
 	if err != nil {
 		return err
 	}
-	api.feed.Send([]*accounts.Account{account})
+
+	api.feed.Send(accountsevent.Event{
+		Type:     accountsevent.EventTypeAdded,
+		Accounts: []common.Address{common.Address(account.Address)},
+	})
 	return nil
 }
 
@@ -54,9 +59,16 @@ func (api *API) SaveKeypair(ctx context.Context, keypair *accounts.Keypair) erro
 	if err != nil {
 		return err
 	}
+
+	commonAddresses := []common.Address{}
 	for _, acc := range keypair.Accounts {
-		api.feed.Send([]*accounts.Account{acc})
+		commonAddresses = append(commonAddresses, common.Address(acc.Address))
 	}
+
+	api.feed.Send(accountsevent.Event{
+		Type:     accountsevent.EventTypeAdded,
+		Accounts: commonAddresses,
+	})
 	return nil
 }
 
@@ -139,6 +151,11 @@ func (api *API) DeleteAccount(ctx context.Context, address types.Address) error 
 			}
 		}
 	}
+
+	api.feed.Send(accountsevent.Event{
+		Type:     accountsevent.EventTypeRemoved,
+		Accounts: []common.Address{common.Address(address)},
+	})
 
 	return (*api.messenger).DeleteAccount(address)
 }
