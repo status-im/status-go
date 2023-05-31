@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"strings"
 
-	sqlcipher "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
+	sqlcipher "github.com/mutecomm/go-sqlcipher/v4" // We require go sqlcipher that overrides default implementation
 
 	"github.com/status-im/status-go/protocol/sqlite"
 )
@@ -118,6 +118,20 @@ func openDB(path string, key string, kdfIterationsNumber int) (*sql.DB, error) {
 
 			if kdfIterationsNumber <= 0 {
 				kdfIterationsNumber = sqlite.ReducedKDFIterationsNumber
+			}
+
+			if _, err := conn.Exec("PRAGMA cipher_page_size = 1024", nil); err != nil {
+				fmt.Println("failed to set cipher_page_size pragma")
+				return err
+			}
+			if _, err := conn.Exec("PRAGMA cipher_hmac_algorithm = HMAC_SHA1", nil); err != nil {
+				fmt.Println("failed to set cipher_hmac_algorithm pragma")
+				return err
+			}
+
+			if _, err := conn.Exec("PRAGMA cipher_kdf_algorithm = PBKDF2_HMAC_SHA1", nil); err != nil {
+				fmt.Println("failed to set cipher_kdf_algorithm pragma")
+				return err
 			}
 
 			if _, err := conn.Exec(fmt.Sprintf("PRAGMA kdf_iter = '%d'", kdfIterationsNumber), []driver.Value{}); err != nil {

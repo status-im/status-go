@@ -11,7 +11,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/protocol/tt"
 
-	_ "github.com/mutecomm/go-sqlcipher"
+	_ "github.com/mutecomm/go-sqlcipher/v4"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
