@@ -330,37 +330,37 @@ var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWa
 func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {
 	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
 
-	settings := &settings.Settings{}
-	settings.KeyUID = generatedAccountInfo.KeyUID
-	settings.Address = types.HexToAddress(generatedAccountInfo.Address)
-	settings.WalletRootAddress = types.HexToAddress(derivedAddresses[pathWalletRoot].Address)
+	defaultSettings := &settings.Settings{}
+	defaultSettings.KeyUID = generatedAccountInfo.KeyUID
+	defaultSettings.Address = types.HexToAddress(generatedAccountInfo.Address)
+	defaultSettings.WalletRootAddress = types.HexToAddress(derivedAddresses[pathWalletRoot].Address)
 
 	// Set chat key & name
 	name, err := alias.GenerateFromPublicKeyString(chatKeyString)
 	if err != nil {
 		return nil, err
 	}
-	settings.Name = name
-	settings.PublicKey = chatKeyString
+	defaultSettings.Name = name
+	defaultSettings.PublicKey = chatKeyString
 
-	settings.DappsAddress = types.HexToAddress(derivedAddresses[pathDefaultWallet].Address)
-	settings.EIP1581Address = types.HexToAddress(derivedAddresses[pathEIP1581].Address)
-	settings.Mnemonic = mnemonic
+	defaultSettings.DappsAddress = types.HexToAddress(derivedAddresses[pathDefaultWallet].Address)
+	defaultSettings.EIP1581Address = types.HexToAddress(derivedAddresses[pathEIP1581].Address)
+	defaultSettings.Mnemonic = mnemonic
 
 	signingPhrase, err := buildSigningPhrase()
 	if err != nil {
 		return nil, err
 	}
-	settings.SigningPhrase = signingPhrase
+	defaultSettings.SigningPhrase = signingPhrase
 
-	settings.SendPushNotifications = true
-	settings.InstallationID = uuid.New().String()
-	settings.UseMailservers = true
+	defaultSettings.SendPushNotifications = true
+	defaultSettings.InstallationID = uuid.New().String()
+	defaultSettings.UseMailservers = true
 
-	settings.PreviewPrivacy = true
-	settings.Currency = "usd"
-	settings.ProfilePicturesVisibility = 2
-	settings.LinkPreviewRequestEnabled = true
+	defaultSettings.PreviewPrivacy = true
+	defaultSettings.Currency = "usd"
+	defaultSettings.ProfilePicturesVisibility = settings.ProfilePicturesVisibilityEveryone
+	defaultSettings.LinkPreviewRequestEnabled = true
 
 	visibleTokens := make(map[string][]string)
 	visibleTokens["mainnet"] = []string{"SNT"}
@@ -369,7 +369,7 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 		return nil, err
 	}
 	visibleTokenJSONRaw := json.RawMessage(visibleTokensJSON)
-	settings.WalletVisibleTokens = &visibleTokenJSONRaw
+	defaultSettings.WalletVisibleTokens = &visibleTokenJSONRaw
 
 	// TODO: fix this
 	networks := make([]map[string]string, 0)
@@ -378,10 +378,10 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 		return nil, err
 	}
 	networkRawMessage := json.RawMessage(networksJSON)
-	settings.Networks = &networkRawMessage
-	settings.CurrentNetwork = "mainnet_rpc"
+	defaultSettings.Networks = &networkRawMessage
+	defaultSettings.CurrentNetwork = "mainnet_rpc"
 
-	return settings, nil
+	return defaultSettings, nil
 }
 
 func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
