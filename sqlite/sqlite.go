@@ -71,6 +71,20 @@ func EncryptDB(unencryptedPath string, encryptedPath string, key string, kdfIter
 		return err
 	}
 
+	if _, err := db.Exec("PRAGMA encrypted.cipher_page_size = 1024"); err != nil {
+		fmt.Println("failed to set cipher_page_size pragma")
+		return err
+	}
+	if _, err := db.Exec("PRAGMA encrypted.cipher_hmac_algorithm = HMAC_SHA1"); err != nil {
+		fmt.Println("failed to set cipher_hmac_algorithm pragma")
+		return err
+	}
+
+	if _, err := db.Exec("PRAGMA encrypted.cipher_kdf_algorithm = PBKDF2_HMAC_SHA1"); err != nil {
+		fmt.Println("failed to set cipher_kdf_algorithm pragma")
+		return err
+	}
+
 	_, err = db.Exec(`SELECT sqlcipher_export('encrypted')`)
 	if err != nil {
 		return err
