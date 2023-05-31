@@ -10,9 +10,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/wallet/async"
 )
 
@@ -131,8 +131,8 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 func watchAccountsChanges(ctx context.Context, accountFeed *event.Feed, reactor *Reactor,
 	chainClients map[uint64]*chain.ClientWithFallback, initial []common.Address, fetchStrategyType FetchStrategyType) error {
 
-	accounts := make(chan []*accounts.Account, 1) // it may block if the rate of updates will be significantly higher
-	sub := accountFeed.Subscribe(accounts)
+	ch := make(chan accountsevent.Event, 1) // it may block if the rate of updates will be significantly higher
+	sub := accountFeed.Subscribe(ch)
 	defer sub.Unsubscribe()
 	listen := make(map[common.Address]struct{}, len(initial))
 	for _, address := range initial {
@@ -146,19 +146,24 @@ func watchAccountsChanges(ctx context.Context, accountFeed *event.Feed, reactor 
 			if err != nil {
 				log.Error("accounts watcher subscription failed", "error", err)
 			}
-		case n := <-accounts:
-			log.Debug("wallet received updated list of accounts", "accounts", n)
+		case ev := <-ch:
 			restart := false
-			for _, acc := range n {
-				_, exist := listen[common.Address(acc.Address)]
-				if !exist {
-					listen[common.Address(acc.Address)] = struct{}{}
+
+			for _, address := range ev.Accounts {
+				_, exist := listen[address]
+				if ev.Type == accountsevent.EventTypeAdded && !exist {
+					listen[address] = struct{}{}
+					restart = true
+				} else if ev.Type == accountsevent.EventTypeRemoved && exist {
+					delete(listen, address)
 					restart = true
 				}
 			}
+
 			if !restart {
 				continue
 			}
+
 			listenList := mapToList(listen)
 			log.Debug("list of accounts was changed from a previous version. reactor will be restarted", "new", listenList)
 
