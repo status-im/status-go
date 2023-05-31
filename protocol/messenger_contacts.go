@@ -642,15 +642,15 @@ func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNic
 	return response, nil
 }
 
-func (m *Messenger) blockContact(contactID string, isDesktopFunc bool) ([]*Chat, error) {
+func (m *Messenger) blockContact(contactID string, isDesktopFunc bool) (*Contact, []*Chat, error) {
 	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: contactID})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	_, clock, err := m.getOneToOneAndNextClock(contact)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	contact.Block(clock)
@@ -659,12 +659,12 @@ func (m *Messenger) blockContact(contactID string, isDesktopFunc bool) ([]*Chat,
 
 	chats, err := m.persistence.BlockContact(contact, isDesktopFunc)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = m.sendRetractContactRequest(contact)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	m.allContacts.Store(contact.ID, contact)
@@ -679,26 +679,27 @@ func (m *Messenger) blockContact(contactID string, isDesktopFunc bool) ([]*Chat,
 
 	err = m.syncContact(context.Background(), contact, m.dispatchMessage)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// re-register for push notifications
 	err = m.reregisterForPushNotifications()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return chats, nil
+	return contact, chats, nil
 }
 
 func (m *Messenger) BlockContact(contactID string) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
-	chats, err := m.blockContact(contactID, false)
+	contact, chats, err := m.blockContact(contactID, false)
 	if err != nil {
 		return nil, err
 	}
 	response.AddChats(chats)
+	response.AddContact(contact)
 
 	response, err = m.DeclineAllPendingGroupInvitesFromUser(response, contactID)
 	if err != nil {
@@ -717,11 +718,12 @@ func (m *Messenger) BlockContact(contactID string) (*MessengerResponse, error) {
 func (m *Messenger) BlockContactDesktop(contactID string) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
-	chats, err := m.blockContact(contactID, true)
+	contact, chats, err := m.blockContact(contactID, true)
 	if err != nil {
 		return nil, err
 	}
 	response.AddChats(chats)
+	response.AddContact(contact)
 
 	response, err = m.DeclineAllPendingGroupInvitesFromUser(response, contactID)
 	if err != nil {
@@ -736,15 +738,16 @@ func (m *Messenger) BlockContactDesktop(contactID string) (*MessengerResponse, e
 	return response, nil
 }
 
-func (m *Messenger) UnblockContact(contactID string) error {
+func (m *Messenger) UnblockContact(contactID string) (*MessengerResponse, error) {
+	response := &MessengerResponse{}
 	contact, ok := m.allContacts.Load(contactID)
 	if !ok || !contact.Blocked {
-		return nil
+		return response, nil
 	}
 
 	_, clock, err := m.getOneToOneAndNextClock(contact)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	contact.Unblock(clock)
@@ -753,23 +756,25 @@ func (m *Messenger) UnblockContact(contactID string) error {
 
 	err = m.persistence.SaveContact(contact, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	m.allContacts.Store(contact.ID, contact)
 
+	response.AddContact(contact)
+
 	err = m.syncContact(context.Background(), contact, m.dispatchMessage)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// re-register for push notifications
 	err = m.reregisterForPushNotifications()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return response, nil
 }
 
 // Send contact updates to all contacts added by us

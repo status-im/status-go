@@ -651,8 +651,11 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 	requireMessageArrival(theirMessenger, true)
 
 	// Unblock contact
-	err = s.m.UnblockContact(blockedContact.ID)
+	response, err := s.m.UnblockContact(blockedContact.ID)
 	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Equal(false, response.Contacts[0].Blocked)
+	s.Require().Equal(true, response.Contacts[0].Removed)
 
 	// Unblocked contact sends message, we should receive it
 	_, err = theirMessenger.SendChatMessage(context.Background(), theirMessage)

@@ -327,7 +327,7 @@ func (api *PublicAPI) BlockContactDesktop(parent context.Context, contactID stri
 	return api.service.messenger.BlockContactDesktop(contactID)
 }
 
-func (api *PublicAPI) UnblockContact(parent context.Context, contactID string) error {
+func (api *PublicAPI) UnblockContact(parent context.Context, contactID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.UnblockContact(contactID)
 }
 
