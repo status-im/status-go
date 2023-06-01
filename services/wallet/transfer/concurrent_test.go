@@ -8,8 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/rpc/chain"
+
 	"github.com/stretchr/testify/require"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -72,6 +75,17 @@ func (f balancesFixture) HeaderByNumber(ctx context.Context, number *big.Int) (*
 func (f balancesFixture) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
 	return &types.Header{
 		Number: big.NewInt(0),
+	}, nil
+}
+
+func (f balancesFixture) FullTransactionByBlockNumberAndIndex(ctx context.Context, blockNumber *big.Int, index uint) (*chain.FullTransaction, error) {
+	blockHash := common.HexToHash("0x0")
+	return &chain.FullTransaction{
+		Tx: &types.Transaction{},
+		TxExtraInfo: chain.TxExtraInfo{
+			BlockNumber: (*hexutil.Big)(big.NewInt(0)),
+			BlockHash:   &blockHash,
+		},
 	}, nil
 }
 

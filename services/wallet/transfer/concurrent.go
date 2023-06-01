@@ -173,11 +173,17 @@ func checkRangesWithStartBlock(parent context.Context, client BalanceReader, cac
 				}
 			}
 			if new(big.Int).Sub(to, from).Cmp(one) == 0 {
+				// WARNING: Block hash calculation from plain header returns a wrong value.
 				header, err := client.HeaderByNumber(ctx, to)
 				if err != nil {
 					return err
 				}
-				c.PushHeader(toDBHeader(header))
+				// Obtain block hash from first transaction
+				firstTransaction, err := client.FullTransactionByBlockNumberAndIndex(ctx, to, 0)
+				if err != nil {
+					return err
+				}
+				c.PushHeader(toDBHeader(header, *firstTransaction.BlockHash))
 				return nil
 			}
 			mid := new(big.Int).Add(from, to)

@@ -29,9 +29,9 @@ type DBHeader struct {
 	Loaded bool
 }
 
-func toDBHeader(header *types.Header) *DBHeader {
+func toDBHeader(header *types.Header, blockHash common.Hash) *DBHeader {
 	return &DBHeader{
-		Hash:      header.Hash(),
+		Hash:      blockHash,
 		Number:    header.Number,
 		Timestamp: header.Time,
 		Loaded:    false,
