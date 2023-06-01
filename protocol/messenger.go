@@ -1371,6 +1371,7 @@ func (m *Messenger) watchUnmutedChats() {
 				m.allChats.Range(func(chatID string, c *Chat) bool {
 					chatMuteTill, _ := time.Parse(time.RFC3339, c.MuteTill.Format(time.RFC3339))
 					currTime, _ := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+
 					if currTime.After(chatMuteTill) && !chatMuteTill.Equal(time.Time{}) && c.Muted {
 						err := m.persistence.UnmuteChat(c.ID)
 						if err != nil {
@@ -1383,7 +1384,9 @@ func (m *Messenger) watchUnmutedChats() {
 					}
 					return true
 				})
-				signal.SendNewMessages(response)
+				if !response.IsEmpty() {
+					signal.SendNewMessages(response)
+				}
 			case <-m.quit:
 				return
 			}
@@ -4933,7 +4936,7 @@ func (m *Messenger) MuteChat(request *requests.MuteChat) (time.Time, error) {
 		return time.Time{}, err
 	}
 
-	muteTillTimeRemoveMs, err := time.Parse("2006-01-02T15:04:05Z", MuteTill.Format("2006-01-02T15:04:05Z"))
+	muteTillTimeRemoveMs, err := time.Parse(time.RFC3339, MuteTill.Format(time.RFC3339))
 
 	if err != nil {
 		return time.Time{}, err
