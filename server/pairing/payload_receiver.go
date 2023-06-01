@@ -40,7 +40,7 @@ type BasePayloadReceiver struct {
 	receiveCallback func()
 }
 
-func NewBaseBasePayloadReceiver(e *PayloadEncryptor, um ProtobufUnmarshaller, s PayloadStorer, callback func()) *BasePayloadReceiver {
+func NewBasePayloadReceiver(e *PayloadEncryptor, um ProtobufUnmarshaller, s PayloadStorer, callback func()) *BasePayloadReceiver {
 	return &BasePayloadReceiver{
 		PayloadLockPayload: &PayloadLockPayload{e},
 		PayloadReceived:    &PayloadReceived{e},
@@ -63,11 +63,16 @@ func (bpr *BasePayloadReceiver) Receive(data []byte) error {
 		return err
 	}
 
+	err = bpr.storer.Store()
+	if err != nil {
+		return err
+	}
+
 	if bpr.receiveCallback != nil {
 		bpr.receiveCallback()
 	}
 
-	return bpr.storer.Store()
+	return nil
 }
 
 /*
@@ -92,9 +97,10 @@ func NewAccountPayloadReceiver(e *PayloadEncryptor, p *AccountPayload, config *R
 		return nil, err
 	}
 
-	return NewBaseBasePayloadReceiver(e, NewPairingPayloadMarshaller(p, l), aps,
+	return NewBasePayloadReceiver(e, NewPairingPayloadMarshaller(p, l), aps,
 		func() {
-			signal.SendLocalPairingEvent(Event{Type: EventReceivedAccount, Action: ActionPairingAccount, Data: p.multiaccount})
+			data := AccountData{Account: p.multiaccount, Password: p.password}
+			signal.SendLocalPairingEvent(Event{Type: EventReceivedAccount, Action: ActionPairingAccount, Data: data})
 		},
 	), nil
 }
@@ -220,7 +226,7 @@ func NewRawMessagePayloadReceiver(accountPayload *AccountPayload, e *PayloadEncr
 	e = e.Renew()
 	payload := NewRawMessagesPayload()
 
-	return NewBaseBasePayloadReceiver(e,
+	return NewBasePayloadReceiver(e,
 		NewRawMessagePayloadMarshaller(payload),
 		NewRawMessageStorer(backend, payload, accountPayload, config), nil)
 }
@@ -268,7 +274,7 @@ func NewInstallationPayloadReceiver(e *PayloadEncryptor, backend *api.GethStatus
 	e = e.Renew()
 	payload := NewRawMessagesPayload()
 
-	return NewBaseBasePayloadReceiver(e,
+	return NewBasePayloadReceiver(e,
 		NewRawMessagePayloadMarshaller(payload),
 		NewInstallationPayloadStorer(backend, payload, deviceType), nil)
 }
