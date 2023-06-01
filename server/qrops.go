@@ -188,10 +188,8 @@ func ToLogoImageFromBytes(imageBytes []byte, padding int) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("decoding image failed: %v", err)
 	}
-	paddedImg := images.AddPadding(img, padding)
-	circle := images.CreateCircle(img)
-	centeredImg := images.PlaceCircleInCenter(paddedImg, circle)
-	resultBytes, err := images.EncodePNG(centeredImg)
+	circle := images.CreateCircleWithPadding(img, padding)
+	resultBytes, err := images.EncodePNG(circle)
 	if err != nil {
 		return nil, fmt.Errorf("encoding PNG failed: %v", err)
 	}
@@ -214,11 +212,13 @@ func GetLogoImage(multiaccountsDB *multiaccounts.Database, keyUID string, imageN
 		return nil, err
 	}
 
+	// default padding to 10 to make the QR with profile image look as per
+	// the designs
+	padding = 10
+
 	if identityImageObjectFromDB == nil {
-		padding = GetPadding(staticImageData)
 		LogoBytes, err = ToLogoImageFromBytes(staticImageData, padding)
 	} else {
-		padding = GetPadding(identityImageObjectFromDB.Payload)
 		LogoBytes, err = ToLogoImageFromBytes(identityImageObjectFromDB.Payload, padding)
 	}
 
