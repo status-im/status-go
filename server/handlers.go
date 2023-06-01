@@ -149,9 +149,20 @@ func handleAccountInitials(multiaccountsDB *multiaccounts.Database, logger *zap.
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
 
+		names, ok := params["name"]
+		if !ok {
+			logger.Error("no name")
+			return
+		}
+
 		keyUids, ok := params["keyUid"]
-		if !ok || len(keyUids) == 0 {
+		if !ok {
 			logger.Error("no keyUid")
+			return
+		}
+
+		if len(names) == 0 && len(keyUids) == 0 {
+			logger.Error("no keyUid or name")
 			return
 		}
 
@@ -230,9 +241,26 @@ func handleAccountInitials(multiaccountsDB *multiaccounts.Database, logger *zap.
 			}
 		}
 
-		account, err := multiaccountsDB.GetAccount(keyUids[0])
+		var name = "Your Name"
+		var account *multiaccounts.Account
 
-		initials := images.ExtractInitials(account.Name, amountInitials)
+		if len(names) != 0 {
+			name = names[0]
+		} else {
+			account, err := multiaccountsDB.GetAccount(keyUids[0])
+			if err != nil {
+				logger.Error("handleAccountInitials: failed to get account", zap.String("keyUid", keyUids[0]), zap.Error(err))
+				return
+			}
+			name = account.Name
+		}
+
+		if ringEnabled(params) && account == nil {
+			logger.Error("handleAccountInitials: failed to get account, can't render ring", zap.String("keyUid", keyUids[0]), zap.Error(err))
+			return
+		}
+
+		initials := images.ExtractInitials(name, amountInitials)
 
 		initialsImagePayload, err := images.GenerateInitialsImage(initials, bgColor, color, fontFile[0], size, fontSize, uppercaseRatio)
 
