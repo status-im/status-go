@@ -106,6 +106,7 @@ type Waku struct {
 	filterSubscriptions map[*common.Filter]map[string]*filter.SubscriptionDetails // wakuv2 filter subscription details
 
 	filterPeerDisconnectMap map[peer.ID]int64
+	isFilterSubAlive        func(sub *filter.SubscriptionDetails) error
 
 	privateKeys map[string]*ecdsa.PrivateKey // Private key storage
 	symKeys     map[string][]byte            // Symmetric key storage
@@ -207,10 +208,15 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		dnsAddressCacheLock:     &sync.RWMutex{},
 		storeMsgIDs:             make(map[gethcommon.Hash]bool),
 		filterPeerDisconnectMap: make(map[peer.ID]int64),
+		filterSubscriptions:     make(map[*common.Filter]map[string]*filter.SubscriptionDetails),
 		timesource:              ts,
 		storeMsgIDsMu:           sync.RWMutex{},
 		logger:                  logger,
 		discV5BootstrapNodes:    cfg.DiscV5BootstrapNodes,
+	}
+	// This fn is being mocked in test
+	waku.isFilterSubAlive = func(sub *filter.SubscriptionDetails) error {
+		return waku.node.FilterLightnode().IsSubscriptionAlive(context.Background(), sub)
 	}
 
 	// Disabling light client mode if using status.prod or undefined
@@ -658,8 +664,17 @@ func (w *Waku) runFilterMsgLoop() {
 			return
 		case <-ticker.C:
 			for f, subMap := range w.filterSubscriptions {
+				if len(subMap) == 0 {
+					// All peers have disconnected on previous iteration,
+					// attempt full reconnect
+					err := w.subscribeToFilter(f)
+					if err != nil {
+						w.logger.Error("Failed to subscribe to filter")
+					}
+					continue
+				}
 				for id, sub := range subMap {
-					err := w.node.FilterLightnode().IsSubscriptionAlive(context.Background(), sub)
+					err := w.isFilterSubAlive(sub)
 					if err != nil {
 						w.filterPeerDisconnectMap[sub.PeerID] = time.Now().Unix()
 						delete(subMap, id)
@@ -667,7 +682,7 @@ func (w *Waku) runFilterMsgLoop() {
 
 						// Re-subscribe
 						peers := w.findFilterPeers()
-						if len(peers) > 0 {
+						if len(peers) > 0 && len(subMap) < w.settings.MinPeersForFilter {
 							contentFilter := w.buildContentFilter(f.Topics)
 							subDetails, err := w.node.FilterLightnode().Subscribe(context.Background(), contentFilter, filter.WithPeer(peers[0]))
 							if err != nil {
@@ -676,6 +691,8 @@ func (w *Waku) runFilterMsgLoop() {
 
 							subMap[subDetails.ID] = subDetails
 							go w.runFilterSubscriptionLoop(subDetails)
+
+							break
 						}
 					}
 				}
@@ -979,6 +996,7 @@ func (w *Waku) GetSymKey(id string) ([]byte, error) {
 // Subscribe installs a new message handler used for filtering, decrypting
 // and subsequent storing of incoming messages.
 func (w *Waku) Subscribe(f *common.Filter) (string, error) {
+
 	s, err := w.filters.Install(f)
 	if err != nil {
 		return s, err
@@ -1620,6 +1638,7 @@ func formatConnStatus(wakuNode *node.WakuNode, c node.ConnStatus) types.ConnStat
 // Find suitable peer(s). For this we use a peerDisconnectMap, it works so that
 // peers that have been recently disconnected from have lower priority
 func (w *Waku) findFilterPeers() []peer.ID {
+
 	allPeers := w.node.Host().Peerstore().Peers()
 	var peers peer.IDSlice
 	for _, peer := range allPeers {
@@ -1640,6 +1659,11 @@ func (w *Waku) findFilterPeers() []peer.ID {
 		})
 	}
 
+	var peerLen = len(peers)
+	if w.settings.MinPeersForFilter < peerLen {
+		peerLen = w.settings.MinPeersForFilter
+	}
+	peers = peers[0:peerLen]
 	return peers
 }
 
@@ -1655,7 +1679,12 @@ func (w *Waku) subscribeToFilter(f *common.Filter) error {
 				continue
 			}
 
-			w.filterSubscriptions[f][subDetails.ID] = subDetails
+			subMap := w.filterSubscriptions[f]
+			if subMap == nil {
+				subMap = make(map[string]*filter.SubscriptionDetails)
+				w.filterSubscriptions[f] = subMap
+			}
+			subMap[subDetails.ID] = subDetails
 			go w.runFilterSubscriptionLoop(subDetails)
 		}
 
