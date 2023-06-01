@@ -731,7 +731,11 @@ func TestVerifyDatabasePassword(t *testing.T) {
 	settings.KeyUID = keyUID
 	settings.Address = crypto.PubkeyToAddress(walletKey.PublicKey)
 
-	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", settings, conf, []*accounts.Account{{Address: address, KeyUID: keyUID, Wallet: true}}, keyhex))
+	chatPubKey := crypto.FromECDSAPub(&chatKey.PublicKey)
+
+	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", settings, conf, []*accounts.Account{
+		{Address: address, KeyUID: keyUID, Wallet: true},
+		{Address: crypto.PubkeyToAddress(chatKey.PublicKey), KeyUID: keyUID, Chat: true, PublicKey: chatPubKey}}, keyhex))
 	require.NoError(t, b.Logout())
 	require.NoError(t, b.StopNode())
 
