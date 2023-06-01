@@ -838,3 +838,26 @@ func (c *ClientWithFallback) GetBaseFeeFromBlock(blockNumber *big.Int) (string, 
 
 	return baseGasFee, err
 }
+
+// go-ethereum's `Transaction` items drop the blkHash obtained during the RPC call.
+// This function preserves the additional data. This is the cheapest way to obtain
+// the block hash for a given block number.
+func (c *ClientWithFallback) FullTransactionByBlockNumberAndIndex(ctx context.Context, blockNumber *big.Int, index uint) (*FullTransaction, error) {
+	rpcstats.CountCall("eth_FullTransactionByBlockNumberAndIndex")
+
+	tx, err := c.makeCallSingleReturn(
+		func() (any, error) {
+			return callFullTransactionByBlockNumberAndIndex(ctx, c.mainRPC, blockNumber, index)
+		},
+		func() (any, error) {
+			return callFullTransactionByBlockNumberAndIndex(ctx, c.fallbackRPC, blockNumber, index)
+		},
+		true,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return tx.(*FullTransaction), nil
+}
