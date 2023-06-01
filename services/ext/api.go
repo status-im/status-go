@@ -440,6 +440,16 @@ func (api *PublicAPI) ImportCommunity(ctx context.Context, hexPrivateKey string)
 
 }
 
+// Speeds up importing messages from archives
+func (api *PublicAPI) SpeedupArchivesImport(ctx context.Context) {
+	api.service.messenger.SpeedupArchivesImport()
+}
+
+// Slows down importing messages from archives
+func (api *PublicAPI) SlowdownArchivesImport(ctx context.Context) {
+	api.service.messenger.SlowdownArchivesImport()
+}
+
 // CreateCommunityChat creates a community chat in the given community
 func (api *PublicAPI) CreateCommunityChat(communityID types.HexBytes, c *protobuf.CommunityChat) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateCommunityChat(communityID, c)
