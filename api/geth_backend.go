@@ -201,6 +201,24 @@ func (b *GethStatusBackend) GetAccounts() ([]multiaccounts.Account, error) {
 	return b.multiaccountsDB.GetAccounts()
 }
 
+func (b *GethStatusBackend) getAccountByKeyUID(keyUID string) (*multiaccounts.Account, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.multiaccountsDB == nil {
+		return nil, errors.New("accounts db wasn't initialized")
+	}
+	as, err := b.multiaccountsDB.GetAccounts()
+	if err != nil {
+		return nil, err
+	}
+	for _, acc := range as {
+		if acc.KeyUID == keyUID {
+			return &acc, nil
+		}
+	}
+	return nil, fmt.Errorf("account with keyUID %s not found", keyUID)
+}
+
 func (b *GethStatusBackend) SaveAccount(account multiaccounts.Account) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -350,11 +368,21 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 		return err
 	}
 
-	b.account = &acc
 	accountsDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
 		return err
 	}
+
+	if acc.ColorHash == nil || acc.ColorID == 0 {
+		multiAccount, err := b.updateAccountColorHashAndColorID(acc.KeyUID, accountsDB)
+		if err != nil {
+			return err
+		}
+		acc = *multiAccount
+	}
+
+	b.account = &acc
+
 	walletAddr, err := accountsDB.GetWalletAddress()
 	if err != nil {
 		return err
@@ -414,6 +442,30 @@ func (b *GethStatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n
 	}
 
 	return conf, nil
+}
+
+func (b *GethStatusBackend) updateAccountColorHashAndColorID(keyUID string, accountsDB *accounts.Database) (*multiaccounts.Account, error) {
+	multiAccount, err := b.getAccountByKeyUID(keyUID)
+	if err != nil {
+		return nil, err
+	}
+	if multiAccount.ColorHash == nil || multiAccount.ColorID == 0 {
+		keypair, err := accountsDB.GetKeypairByKeyUID(keyUID)
+		if err != nil {
+			return nil, err
+		}
+		publicKey := keypair.GetChatPublicKey()
+		if publicKey == nil {
+			return nil, errors.New("chat public key not found")
+		}
+		if err = enrichMultiAccountByPublicKey(multiAccount, publicKey); err != nil {
+			return nil, err
+		}
+		if err = b.multiaccountsDB.UpdateAccount(*multiAccount); err != nil {
+			return nil, err
+		}
+	}
+	return multiAccount, nil
 }
 
 func (b *GethStatusBackend) overrideNetworks(conf *params.NodeConfig, request *requests.Login) {
@@ -523,11 +575,21 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		return err
 	}
 
-	b.account = &acc
 	accountsDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
 		return err
 	}
+
+	if acc.ColorHash == nil || acc.ColorID == 0 {
+		multiAccount, err := b.updateAccountColorHashAndColorID(acc.KeyUID, accountsDB)
+		if err != nil {
+			return err
+		}
+		acc = *multiAccount
+	}
+
+	b.account = &acc
+
 	chatAddr, err := accountsDB.GetChatAddress()
 	if err != nil {
 		return err
@@ -1078,22 +1140,22 @@ func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password strin
 	return nil
 }
 
-func enrichMultiaccountInfo(account *multiaccounts.Account, subaccs []*accounts.Account) error {
+func enrichMultiAccountBySubAccounts(account *multiaccounts.Account, subaccs []*accounts.Account) error {
 	if account.ColorHash != nil && account.ColorID != 0 {
 		return nil
 	}
 
 	for i, acc := range subaccs {
 		subaccs[i].KeyUID = account.KeyUID
-
 		if acc.Chat {
-			colorHash, err := colorhash.GenerateFor(string(acc.PublicKey.Bytes()))
+			pk := string(acc.PublicKey.Bytes())
+			colorHash, err := colorhash.GenerateFor(pk)
 			if err != nil {
 				return err
 			}
 			account.ColorHash = colorHash
 
-			colorID, err := identityUtils.ToColorID(string(acc.PublicKey.Bytes()))
+			colorID, err := identityUtils.ToColorID(pk)
 			if err != nil {
 				return err
 			}
@@ -1106,8 +1168,25 @@ func enrichMultiaccountInfo(account *multiaccounts.Account, subaccs []*accounts.
 	return nil
 }
 
+func enrichMultiAccountByPublicKey(account *multiaccounts.Account, publicKey types.HexBytes) error {
+	pk := string(publicKey.Bytes())
+	colorHash, err := colorhash.GenerateFor(pk)
+	if err != nil {
+		return err
+	}
+	account.ColorHash = colorHash
+
+	colorID, err := identityUtils.ToColorID(pk)
+	if err != nil {
+		return err
+	}
+	account.ColorID = colorID
+
+	return nil
+}
+
 func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(account multiaccounts.Account, password string, settings settings.Settings, nodecfg *params.NodeConfig, subaccs []*accounts.Account, keyHex string) error {
-	err := enrichMultiaccountInfo(&account, subaccs)
+	err := enrichMultiAccountBySubAccounts(&account, subaccs)
 	if err != nil {
 		return err
 	}
@@ -1138,7 +1217,7 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 ) error {
 	b.log.Info("node config", "config", nodecfg)
 
-	err := enrichMultiaccountInfo(&account, subaccs)
+	err := enrichMultiAccountBySubAccounts(&account, subaccs)
 	if err != nil {
 		return err
 	}
