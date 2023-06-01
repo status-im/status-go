@@ -515,11 +515,17 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		return err
 	}
 
-	b.account = &acc
 	accountsDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
 		return err
 	}
+
+	multiAccount, err := b.updateAccountColorHashAndColorID(acc.KeyUID, accountsDB)
+	if err != nil {
+		return err
+	}
+	b.account = multiAccount
+
 	chatAddr, err := accountsDB.GetChatAddress()
 	if err != nil {
 		return err
