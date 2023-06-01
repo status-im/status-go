@@ -348,19 +348,25 @@ func (m *Messenger) createIncomingContactRequestEventAndNotification(contact *Co
 	} else {
 		updateType = MutualStateUpdateTypeSent
 	}
+
 	// System message for mutual state update
-	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, updateType, contactRequest.Clock, contactRequest.Timestamp, false)
+	chat, clock, err := m.getOneToOneAndNextClock(contact)
+	if err != nil {
+		return err
+	}
+	timestamp := m.getTimesource().GetCurrentTime()
+	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, updateType, clock, timestamp, false)
 	if err != nil {
 		return err
 	}
 
-	messageState.Response.AddMessage(updateMessage)
-	m.prepareMessages(messageState.Response.messages)
-
+	m.prepareMessage(updateMessage, m.httpServer)
 	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
 	if err != nil {
 		return err
 	}
+	messageState.Response.AddMessage(updateMessage)
+	messageState.Response.AddChat(chat)
 
 	return m.createIncomingContactRequestNotification(contact, messageState, contactRequest, createNewNotification)
 }
