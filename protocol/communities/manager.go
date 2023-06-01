@@ -3234,6 +3234,7 @@ func (m *Manager) ExtractMessagesFromHistoryArchive(communityID types.HexBytes, 
 	}
 
 	data := make([]byte, metadata.Size-metadata.Padding)
+	m.LogStdout("loading history archive data into memory", zap.Float64("data_size_MB", float64(metadata.Size-metadata.Padding)/1024.0/1024.0))
 	_, err = dataFile.Read(data)
 	if err != nil {
 		m.LogStdout("failed failed to read archive data", zap.Error(err))

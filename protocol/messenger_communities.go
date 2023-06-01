@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethclient"
 
@@ -46,6 +48,19 @@ var messageArchiveInterval = 7 * 24 * time.Hour
 var updateActiveMembersInterval = 24 * time.Hour
 
 const discordTimestampLayout = "2006-01-02T15:04:05+00:00"
+
+var importRateLimiter = rate.NewLimiter(rate.Every(importSlowRate), 1)
+
+const (
+	importSlowRate          = time.Second / 1
+	importFastRate          = time.Second / 100
+	importMessagesChunkSize = 10
+)
+
+const (
+	maxChunkSizeMessages = 1000
+	maxChunkSizeBytes    = 1500000
+)
 
 func (m *Messenger) publishOrg(org *communities.Community) error {
 	m.logger.Debug("publishing org", zap.String("org-id", org.IDString()), zap.Any("org", org))
@@ -2309,14 +2324,28 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) erro
 	return nil
 }
 
+func (m *Messenger) SpeedupArchivesImport() {
+	importRateLimiter.SetLimit(rate.Every(importFastRate))
+}
+
+func (m *Messenger) SlowdownArchivesImport() {
+	importRateLimiter.SetLimit(rate.Every(importSlowRate))
+}
+
 func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel chan struct{}) error {
 	importTicker := time.NewTicker(100 * time.Millisecond)
 	defer importTicker.Stop()
 
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	go func() {
+		<-cancel
+		cancelFunc()
+	}()
+
 importMessageArchivesLoop:
 	for {
 		select {
-		case <-cancel:
+		case <-ctx.Done():
 			m.communitiesManager.LogStdout("interrupted importing history archive messages")
 			return nil
 		case <-importTicker.C:
@@ -2345,23 +2374,33 @@ importMessageArchivesLoop:
 			}
 
 			m.config.messengerSignalsHandler.ImportingHistoryArchiveMessages(types.EncodeHex(communityID))
-			response, err := m.handleArchiveMessages(archiveMessages, communityID)
-			if err != nil {
-				m.communitiesManager.LogStdout("failed to handle archive messages", zap.Error(err))
-				continue
+
+			for _, messagesChunk := range chunkSlice(archiveMessages, importMessagesChunkSize) {
+				if err := importRateLimiter.Wait(ctx); err != nil {
+					if !errors.Is(err, context.Canceled) {
+						m.communitiesManager.LogStdout("rate limiter error when handling archive messages", zap.Error(err))
+					}
+					continue importMessageArchivesLoop
+				}
+
+				response, err := m.handleArchiveMessages(messagesChunk, communityID)
+				if err != nil {
+					m.communitiesManager.LogStdout("failed to handle archive messages", zap.Error(err))
+					continue importMessageArchivesLoop
+				}
+
+				if !response.IsEmpty() {
+					notifications := response.Notifications()
+					response.ClearNotifications()
+					signal.SendNewMessages(response)
+					localnotifications.PushMessages(notifications)
+				}
 			}
 
 			err = m.communitiesManager.SetMessageArchiveIDImported(communityID, downloadedArchiveID, true)
 			if err != nil {
 				m.communitiesManager.LogStdout("failed to mark history message archive as imported", zap.Error(err))
 				continue
-			}
-
-			if !response.IsEmpty() {
-				notifications := response.Notifications()
-				response.ClearNotifications()
-				signal.SendNewMessages(response)
-				localnotifications.PushMessages(notifications)
 			}
 		}
 	}
@@ -3639,4 +3678,43 @@ func (m *Messenger) CheckPermissionsToJoinCommunity(request *requests.CheckPermi
 	}
 
 	return m.communitiesManager.CheckPermissionToJoin(request.CommunityID, addresses)
+}
+
+func chunkSlice[T comparable](slice []T, chunkSize int) [][]T {
+	var chunks [][]T
+	for i := 0; i < len(slice); i += chunkSize {
+		end := i + chunkSize
+
+		// necessary check to avoid slicing beyond
+		// slice capacity
+		if end > len(slice) {
+			end = len(slice)
+		}
+
+		chunks = append(chunks, slice[i:end])
+	}
+
+	return chunks
+}
+
+func chunkAttachmentsByByteSize(slice []*protobuf.DiscordMessageAttachment, maxFileSizeBytes uint64) [][]*protobuf.DiscordMessageAttachment {
+	var chunks [][]*protobuf.DiscordMessageAttachment
+
+	currentChunkSize := uint64(0)
+	currentChunk := make([]*protobuf.DiscordMessageAttachment, 0)
+
+	for i, attachment := range slice {
+		payloadBytes := attachment.GetFileSizeBytes()
+		if currentChunkSize+payloadBytes > maxFileSizeBytes && len(currentChunk) > 0 {
+			chunks = append(chunks, currentChunk)
+			currentChunk = make([]*protobuf.DiscordMessageAttachment, 0)
+			currentChunkSize = uint64(0)
+		}
+		currentChunk = append(currentChunk, attachment)
+		currentChunkSize = currentChunkSize + payloadBytes
+		if i == len(slice)-1 {
+			chunks = append(chunks, currentChunk)
+		}
+	}
+	return chunks
 }
