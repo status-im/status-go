@@ -197,6 +197,16 @@ func (a *Keypair) CopyKeypair() *Keypair {
 	return kp
 }
 
+func (a *Keypair) GetChatPublicKey() types.HexBytes {
+	for _, acc := range a.Accounts {
+		if acc.Chat {
+			return acc.PublicKey
+		}
+	}
+
+	return nil
+}
+
 // Database sql wrapper for operations with browser objects.
 type Database struct {
 	*settings.Database

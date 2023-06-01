@@ -676,7 +676,11 @@ func TestLoginWithKey(t *testing.T) {
 	settings.KeyUID = keyUID
 	settings.Address = crypto.PubkeyToAddress(walletKey.PublicKey)
 
-	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", settings, conf, []*accounts.Account{{Address: address, KeyUID: keyUID, Wallet: true}}, keyhex))
+	chatPubKey := crypto.FromECDSAPub(&chatKey.PublicKey)
+	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", settings, conf,
+		[]*accounts.Account{
+			{Address: address, KeyUID: keyUID, Wallet: true},
+			{Address: crypto.PubkeyToAddress(chatKey.PublicKey), KeyUID: keyUID, Chat: true, PublicKey: chatPubKey}}, keyhex))
 	require.NoError(t, b.Logout())
 	require.NoError(t, b.StopNode())
 
@@ -692,6 +696,11 @@ func TestLoginWithKey(t *testing.T) {
 	extkey, err := b.accountManager.SelectedChatAccount()
 	require.NoError(t, err)
 	require.Equal(t, crypto.PubkeyToAddress(chatKey.PublicKey), extkey.Address)
+
+	activeAccount, err := b.GetActiveAccount()
+	require.NoError(t, err)
+	require.NotNil(t, activeAccount.ColorHash)
+	require.NotZero(t, activeAccount.ColorID)
 }
 
 func TestVerifyDatabasePassword(t *testing.T) {
@@ -722,7 +731,11 @@ func TestVerifyDatabasePassword(t *testing.T) {
 	settings.KeyUID = keyUID
 	settings.Address = crypto.PubkeyToAddress(walletKey.PublicKey)
 
-	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", settings, conf, []*accounts.Account{{Address: address, KeyUID: keyUID, Wallet: true}}, keyhex))
+	chatPubKey := crypto.FromECDSAPub(&chatKey.PublicKey)
+
+	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", settings, conf, []*accounts.Account{
+		{Address: address, KeyUID: keyUID, Wallet: true},
+		{Address: crypto.PubkeyToAddress(chatKey.PublicKey), KeyUID: keyUID, Chat: true, PublicKey: chatPubKey}}, keyhex))
 	require.NoError(t, b.Logout())
 	require.NoError(t, b.StopNode())
 
