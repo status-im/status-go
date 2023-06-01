@@ -93,9 +93,9 @@ type Downloader interface {
 
 // Returns new block ranges that contain transfers and found block headers that contain transfers, and a block where
 // beginning of trasfers history detected
-func checkRangesWithStartBlock(parent context.Context, client BalanceReader, cache BalanceCache, downloader Downloader,
-	account common.Address, ranges [][]*big.Int, threadLimit uint32, startBlock *big.Int) (resRanges [][]*big.Int,
-	headers []*DBHeader, newStartBlock *big.Int, err error) {
+func checkRangesWithStartBlock(parent context.Context, client BalanceReader, cache BalanceCache,
+	account common.Address, ranges [][]*big.Int, threadLimit uint32, startBlock *big.Int) (
+	resRanges [][]*big.Int, headers []*DBHeader, newStartBlock *big.Int, err error) {
 
 	log.Debug("start checkRanges", "account", account.Hex(), "ranges len", len(ranges))
 
@@ -208,8 +208,9 @@ func checkRangesWithStartBlock(parent context.Context, client BalanceReader, cac
 	return c.GetRanges(), c.GetHeaders(), newStartBlock, nil
 }
 
-func findBlocksWithEthTransfers(parent context.Context, client BalanceReader, cache BalanceCache, downloader Downloader,
-	account common.Address, low, high *big.Int, noLimit bool, threadLimit uint32) (from *big.Int, headers []*DBHeader, resStartBlock *big.Int, err error) {
+func findBlocksWithEthTransfers(parent context.Context, client BalanceReader, cache BalanceCache,
+	account common.Address, low, high *big.Int, noLimit bool, threadLimit uint32) (
+	from *big.Int, headers []*DBHeader, resStartBlock *big.Int, err error) {
 
 	ranges := [][]*big.Int{{low, high}}
 	from = big.NewInt(low.Int64())
@@ -222,7 +223,7 @@ func findBlocksWithEthTransfers(parent context.Context, client BalanceReader, ca
 		// Check if there are transfers in blocks in ranges. To do that, nonce and balance is checked
 		// the block ranges that have transfers are returned
 		newRanges, newHeaders, strtBlock, err := checkRangesWithStartBlock(parent, client, cache,
-			downloader, account, ranges, threadLimit, resStartBlock)
+			account, ranges, threadLimit, resStartBlock)
 		resStartBlock = strtBlock
 		if err != nil {
 			return nil, nil, nil, err

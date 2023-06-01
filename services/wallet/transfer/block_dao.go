@@ -249,6 +249,30 @@ func (b *BlockDAO) GetLastSavedBlock(chainID uint64) (rst *DBHeader, err error) 
 	return nil, nil
 }
 
+func (b *BlockDAO) GetFirstSavedBlock(chainID uint64, address common.Address) (rst *DBHeader, err error) {
+	query := `SELECT blk_number, blk_hash, loaded
+	FROM blocks
+	WHERE network_id = ? AND address = ?
+	ORDER BY blk_number LIMIT 1`
+	rows, err := b.db.Query(query, chainID, address)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		header := &DBHeader{Hash: common.Hash{}, Number: new(big.Int)}
+		err = rows.Scan((*bigint.SQLBigInt)(header.Number), &header.Hash, &header.Loaded)
+		if err != nil {
+			return nil, err
+		}
+
+		return header, nil
+	}
+
+	return nil, nil
+}
+
 // TODO remove as not used
 func (b *BlockDAO) GetBlocks(chainID uint64) (rst []*DBHeader, err error) {
 	query := `SELECT blk_number, blk_hash, address FROM blocks`

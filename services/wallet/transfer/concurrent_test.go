@@ -128,7 +128,7 @@ func TestConcurrentEthDownloader(t *testing.T) {
 			defer cancel()
 			concurrent := NewConcurrentDownloader(ctx, 0)
 			_, headers, _, _ := findBlocksWithEthTransfers(
-				ctx, tc.options.balances, newBalanceCache(), tc.options.batches,
+				ctx, tc.options.balances, newBalanceCache(),
 				common.Address{}, zero, tc.options.last, false, NoThreadLimit)
 			concurrent.Wait()
 			require.NoError(t, concurrent.Error())
