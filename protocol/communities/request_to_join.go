@@ -35,6 +35,15 @@ func (r *RequestToJoin) CalculateID() {
 	r.ID = CalculateRequestID(r.PublicKey, r.CommunityID)
 }
 
+func (r *RequestToJoin) ToCommunityRequestToJoinProtobuf() *protobuf.CommunityRequestToJoin {
+	return &protobuf.CommunityRequestToJoin{
+		Clock:             r.Clock,
+		EnsName:           r.ENSName,
+		CommunityId:       r.CommunityID,
+		RevealedAddresses: r.RevealedAddresses,
+	}
+}
+
 func (r *RequestToJoin) ToSyncProtobuf() *protobuf.SyncCommunityRequestsToJoin {
 	return &protobuf.SyncCommunityRequestsToJoin{
 		Id:               r.ID,
