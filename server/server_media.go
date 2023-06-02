@@ -20,14 +20,14 @@ type MediaServer struct {
 
 // NewMediaServer returns a *MediaServer
 func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *multiaccounts.Database) (*MediaServer, error) {
-	err := generateTLSCert()
+	err := generateMediaTLSCert()
 	if err != nil {
 		return nil, err
 	}
 
 	s := &MediaServer{
 		Server: NewServer(
-			globalCertificate,
+			globalMediaCertificate,
 			Localhost,
 			signal.SendMediaServerStarted,
 			logutils.ZapLogger().Named("MediaServer"),
