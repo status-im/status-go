@@ -657,7 +657,12 @@ func (m *Manager) checkMemberPermissions(communityID types.HexBytes) error {
 
 	if len(becomeMemberPermissions) > 0 {
 		for memberKey, member := range community.Members() {
-			if memberKey == common.PubkeyToHex(&m.identity.PublicKey) {
+			memberPubKey, err := common.HexToPubkey(memberKey)
+			if err != nil {
+				return err
+			}
+
+			if memberKey == common.PubkeyToHex(&m.identity.PublicKey) || community.IsMemberOwner(memberPubKey) {
 				continue
 			}
 
