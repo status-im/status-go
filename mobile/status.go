@@ -38,6 +38,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/server/pairing"
+	"github.com/status-im/status-go/server/pairing/preflight"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
@@ -1005,6 +1006,16 @@ func GenerateImages(filepath string, aX, aY, bX, bY int) string {
 		return makeJSONResponse(fmt.Errorf("Error marshalling to json: %v", err))
 	}
 	return string(data)
+}
+
+// LocalPairingPreflightOutboundCheck creates a local tls server accessible via an outbound network address.
+// The function creates a client and makes an outbound network call to the local server. This function should be
+// triggered to ensure that the device has permissions to access its LAN or to make outbound network calls.
+//
+// In addition, the functionality attempts to address an issue with iOS devices https://stackoverflow.com/a/64242745
+func LocalPairingPreflightOutboundCheck() string {
+	err := preflight.CheckOutbound()
+	return makeJSONResponse(err)
 }
 
 // StartSearchForLocalPairingPeers starts a UDP multicast beacon that both listens for and broadcasts to LAN peers
