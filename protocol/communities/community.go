@@ -1559,7 +1559,7 @@ func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChange
 		return nil, ErrTokenPermissionNotFound
 	}
 
-	if !o.IsAdmin() || (!o.IsOwner() && o.IsAdmin() && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
+	if !o.IsOwner() || (o.IsAdmin() && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
 		return nil, ErrNotEnoughPermissions
 	}
 
