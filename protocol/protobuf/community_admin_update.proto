@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+option go_package = "./;protobuf";
+package protobuf;
+
+import "chat_identity.proto";
+import "communities.proto";
+
+message CommunityAdminEvent {
+  uint64 clock = 1;
+  bytes community_id = 2;
+  EventType type = 3;
+  CommunityConfig community_config = 4;
+  map<string, CommunityTokenPermission> token_permissions = 5;
+  CategoryData category_data = 6;
+  ChannelData channel_data = 7;
+  string member_to_action = 8;
+  
+  enum EventType {
+    UNKNOWN = 0;
+    COMMUNITY_EDIT = 1;
+    COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGE = 2;
+    COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETE = 3;
+    COMMUNITY_CATEGORY_CREATE = 4;
+    COMMUNITY_CATEGORY_DELETE = 5;
+    COMMUNITY_CATEGORY_EDIT = 6;
+    COMMUNITY_CHANNEL_CREATE = 7;
+    COMMUNITY_CHANNEL_DELETE = 8;
+    COMMUNITY_CHANNEL_EDIT = 9;
+    COMMUNITY_CATEGORY_REORDER = 10;
+    COMMUNITY_CHANNEL_REORDER = 11;
+    COMMUNITY_REQUEST_TO_JOIN_ACCEPT = 12;
+    COMMUNITY_REQUEST_TO_JOIN_REJECT = 13;
+    COMMUNITY_MEMBER_KICK = 14;
+    COMMUNITY_MEMBER_BAN = 15;
+    COMMUNITY_MEMBER_UNBAN = 16;
+  }
+}
+
+message CommunityConfig {
+  ChatIdentity identity = 1;
+  CommunityPermissions permissions = 2;
+  CommunityAdminSettings admin_settings = 3;
+  string intro_message = 4;
+  string outro_message = 5;
+  repeated string tags = 6;
+}
+
+message CategoryData {
+  string category_id = 1;
+  string name = 2;
+  repeated string channels_ids = 3;
+  int32 position = 4;
+}
+
+message ChannelData {
+  string category_id = 1;
+  string channel_id = 2;
+  int32 position = 3;
+  CommunityChat channel = 4;
+}
