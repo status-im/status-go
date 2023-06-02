@@ -67,12 +67,14 @@ func (s *CommunitySuite) TestInviteUserToOrg() {
 
 	org := s.buildCommunity(&s.identity.PublicKey)
 	org.config.PrivateKey = nil
+	org.config.ID = nil
 	// Not an admin
 	_, err = org.InviteUserToOrg(&s.member2.PublicKey)
 	s.Require().Equal(ErrNotAdmin, err)
 
 	// Add admin to community
 	org.config.PrivateKey = s.identity
+	org.config.ID = &s.identity.PublicKey
 
 	response, err := org.InviteUserToOrg(&newMember.PublicKey)
 	s.Require().Nil(err)
@@ -106,6 +108,7 @@ func (s *CommunitySuite) TestCreateChat() {
 	newChatID := "new-chat-id"
 	org := s.buildCommunity(&s.identity.PublicKey)
 	org.config.PrivateKey = nil
+	org.config.ID = nil
 
 	identity := &protobuf.ChatIdentity{
 		DisplayName: "new-chat-display-name",
@@ -123,6 +126,7 @@ func (s *CommunitySuite) TestCreateChat() {
 	s.Require().Equal(ErrNotAdmin, err)
 
 	org.config.PrivateKey = s.identity
+	org.config.ID = &s.identity.PublicKey
 
 	changes, err := org.CreateChat(newChatID, &protobuf.CommunityChat{
 		Identity:    identity,
@@ -174,6 +178,7 @@ func (s *CommunitySuite) TestEditChat() {
 	s.Require().NoError(err)
 
 	org.config.PrivateKey = nil
+	org.config.ID = nil
 	editedIdentity := &protobuf.ChatIdentity{
 		DisplayName: "edited-new-chat-display-name",
 		Description: "edited-new-chat-description",
@@ -192,6 +197,7 @@ func (s *CommunitySuite) TestEditChat() {
 
 	description := org.config.CommunityDescription
 	org.config.PrivateKey = s.identity
+	org.config.ID = &s.identity.PublicKey
 	editChanges, err := org.EditChat(newChatID, &protobuf.CommunityChat{
 		Identity:    editedIdentity,
 		Permissions: editedPermissions,
@@ -213,18 +219,21 @@ func (s *CommunitySuite) TestEditChat() {
 func (s *CommunitySuite) TestDeleteChat() {
 	org := s.buildCommunity(&s.identity.PublicKey)
 	org.config.PrivateKey = nil
+	org.config.ID = nil
 
 	_, err := org.DeleteChat(testChatID1)
 	s.Require().Equal(ErrNotAdmin, err)
 
 	org.config.PrivateKey = s.identity
+	org.config.ID = &s.identity.PublicKey
 
-	description, err := org.DeleteChat(testChatID1)
+	changes, err := org.DeleteChat(testChatID1)
 	s.Require().NoError(err)
-	s.Require().NotNil(description)
+	s.Require().NotNil(changes)
 
-	s.Require().Nil(description.Chats[testChatID1])
-	s.Require().Equal(uint64(2), description.Clock)
+	s.Require().Nil(org.Chats()[testChatID1])
+	s.Require().Len(changes.ChatsRemoved, 1)
+	s.Require().Equal(uint64(2), org.Clock())
 }
 
 func (s *CommunitySuite) TestInviteUserToChat() {
@@ -233,12 +242,14 @@ func (s *CommunitySuite) TestInviteUserToChat() {
 
 	org := s.buildCommunity(&s.identity.PublicKey)
 	org.config.PrivateKey = nil
+	org.config.ID = nil
 	// Not an admin
 	_, err = org.InviteUserToChat(&s.member2.PublicKey, testChatID1)
 	s.Require().Equal(ErrNotAdmin, err)
 
 	// Add admin to community
 	org.config.PrivateKey = s.identity
+	org.config.ID = &s.identity.PublicKey
 
 	response, err := org.InviteUserToChat(&newMember.PublicKey, testChatID1)
 	s.Require().Nil(err)
@@ -278,12 +289,14 @@ func (s *CommunitySuite) TestInviteUserToChat() {
 func (s *CommunitySuite) TestRemoveUserFromChat() {
 	org := s.buildCommunity(&s.identity.PublicKey)
 	org.config.PrivateKey = nil
+	org.config.ID = nil
 	// Not an admin
 	_, err := org.RemoveUserFromOrg(&s.member1.PublicKey)
 	s.Require().Equal(ErrNotAdmin, err)
 
 	// Add admin to community
 	org.config.PrivateKey = s.identity
+	org.config.ID = &s.identity.PublicKey
 
 	actualCommunity, err := org.RemoveUserFromChat(&s.member1.PublicKey, testChatID1)
 	s.Require().Nil(err)
@@ -304,12 +317,14 @@ func (s *CommunitySuite) TestRemoveUserFromChat() {
 func (s *CommunitySuite) TestRemoveUserFormOrg() {
 	org := s.buildCommunity(&s.identity.PublicKey)
 	org.config.PrivateKey = nil
+	org.config.ID = nil
 	// Not an admin
 	_, err := org.RemoveUserFromOrg(&s.member1.PublicKey)
 	s.Require().Equal(ErrNotAdmin, err)
 
 	// Add admin to community
 	org.config.PrivateKey = s.identity
+	org.config.ID = &s.identity.PublicKey
 
 	actualCommunity, err := org.RemoveUserFromOrg(&s.member1.PublicKey)
 	s.Require().Nil(err)
@@ -723,7 +738,7 @@ func (s *CommunitySuite) TestHandleCommunityDescription() {
 			org := s.buildCommunity(signer)
 			org.Join()
 			expectedChanges := tc.changes(org)
-			actualChanges, err := org.UpdateCommunityDescription(tc.signer, tc.description(org), []byte{0x01})
+			actualChanges, err := org.UpdateCommunityDescription(tc.description(org), []byte{0x01})
 			s.Require().Equal(tc.err, err)
 			s.Require().Equal(expectedChanges, actualChanges)
 		})
@@ -950,7 +965,6 @@ func (s *CommunitySuite) memberInChatNotInOrgCommunityDescription() *protobuf.Co
 }
 
 func (s *CommunitySuite) buildCommunity(owner *ecdsa.PublicKey) *Community {
-
 	config := s.config()
 	config.ID = owner
 	config.CommunityDescription = s.buildCommunityDescription()

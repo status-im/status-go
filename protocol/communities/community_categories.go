@@ -26,42 +26,14 @@ func (o *Community) CreateCategory(categoryID string, categoryName string, chatI
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
+	if !o.IsOwnerOrAdmin() {
 		return nil, ErrNotAdmin
 	}
 
-	if o.config.CommunityDescription.Categories == nil {
-		o.config.CommunityDescription.Categories = make(map[string]*protobuf.CommunityCategory)
+	changes, err := o.createCategory(categoryID, categoryName, chatIDs)
+	if err != nil {
+		return nil, err
 	}
-	if _, ok := o.config.CommunityDescription.Categories[categoryID]; ok {
-		return nil, ErrCategoryAlreadyExists
-	}
-
-	for _, cid := range chatIDs {
-		c, exists := o.config.CommunityDescription.Chats[cid]
-		if !exists {
-			return nil, ErrChatNotFound
-		}
-
-		if exists && c.CategoryId != categoryID && c.CategoryId != "" {
-			return nil, ErrChatAlreadyAssigned
-		}
-	}
-
-	changes := o.emptyCommunityChanges()
-
-	o.config.CommunityDescription.Categories[categoryID] = &protobuf.CommunityCategory{
-		CategoryId: categoryID,
-		Name:       categoryName,
-		Position:   int32(len(o.config.CommunityDescription.Categories)),
-	}
-
-	for i, cid := range chatIDs {
-		o.config.CommunityDescription.Chats[cid].CategoryId = categoryID
-		o.config.CommunityDescription.Chats[cid].Position = int32(i)
-	}
-
-	o.SortCategoryChats(changes, "")
 
 	o.increaseClock()
 
@@ -82,67 +54,14 @@ func (o *Community) EditCategory(categoryID string, categoryName string, chatIDs
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
+	if !o.IsOwnerOrAdmin() {
 		return nil, ErrNotAdmin
 	}
 
-	if o.config.CommunityDescription.Categories == nil {
-		o.config.CommunityDescription.Categories = make(map[string]*protobuf.CommunityCategory)
+	changes, err := o.editCategory(categoryID, categoryName, chatIDs)
+	if err != nil {
+		return nil, err
 	}
-	if _, ok := o.config.CommunityDescription.Categories[categoryID]; !ok {
-		return nil, ErrCategoryNotFound
-	}
-
-	for _, cid := range chatIDs {
-		c, exists := o.config.CommunityDescription.Chats[cid]
-		if !exists {
-			return nil, ErrChatNotFound
-		}
-
-		if exists && c.CategoryId != categoryID && c.CategoryId != "" {
-			return nil, ErrChatAlreadyAssigned
-		}
-	}
-
-	changes := o.emptyCommunityChanges()
-
-	emptyCatLen := o.getCategoryChatCount("")
-
-	// remove any chat that might have been assigned before and now it's not part of the category
-	var chatsToRemove []string
-	for k, chat := range o.config.CommunityDescription.Chats {
-		if chat.CategoryId == categoryID {
-			found := false
-			for _, c := range chatIDs {
-				if k == c {
-					found = true
-				}
-			}
-			if !found {
-				chat.CategoryId = ""
-				chatsToRemove = append(chatsToRemove, k)
-			}
-		}
-	}
-
-	o.config.CommunityDescription.Categories[categoryID].Name = categoryName
-
-	for i, cid := range chatIDs {
-		o.config.CommunityDescription.Chats[cid].CategoryId = categoryID
-		o.config.CommunityDescription.Chats[cid].Position = int32(i)
-	}
-
-	for i, cid := range chatsToRemove {
-		o.config.CommunityDescription.Chats[cid].Position = int32(emptyCatLen + i)
-		changes.ChatsModified[cid] = &CommunityChatChanges{
-			MembersAdded:     make(map[string]*protobuf.CommunityMember),
-			MembersRemoved:   make(map[string]*protobuf.CommunityMember),
-			CategoryModified: "",
-			PositionModified: int(o.config.CommunityDescription.Chats[cid].Position),
-		}
-	}
-
-	o.SortCategoryChats(changes, "")
 
 	o.increaseClock()
 
@@ -163,71 +82,14 @@ func (o *Community) ReorderCategories(categoryID string, newPosition int) (*Comm
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
+	if !o.IsOwnerOrAdmin() {
 		return nil, ErrNotAdmin
 	}
 
-	if _, exists := o.config.CommunityDescription.Categories[categoryID]; !exists {
-		return nil, ErrCategoryNotFound
+	changes, err := o.reorderCategories(categoryID, newPosition)
+	if err != nil {
+		return nil, err
 	}
-
-	if newPosition > 0 && newPosition >= len(o.config.CommunityDescription.Categories) {
-		newPosition = len(o.config.CommunityDescription.Categories) - 1
-	} else if newPosition < 0 {
-		newPosition = 0
-	}
-
-	category := o.config.CommunityDescription.Categories[categoryID]
-	if category.Position == int32(newPosition) {
-		return nil, ErrNoChangeInPosition
-	}
-
-	decrease := false
-	if category.Position > int32(newPosition) {
-		decrease = true
-	}
-
-	// Sorting the categories because maps are not guaranteed to keep order
-	s := make(sortSlice, 0, len(o.config.CommunityDescription.Categories))
-	for k, v := range o.config.CommunityDescription.Categories {
-		s = append(s, sorterHelperIdx{
-			pos:   v.Position,
-			catID: k,
-		})
-	}
-	sort.Sort(s)
-	var communityCategories []*protobuf.CommunityCategory
-	for _, currCat := range s {
-		communityCategories = append(communityCategories, o.config.CommunityDescription.Categories[currCat.catID])
-	}
-
-	var sortedCategoryIDs []string
-	for _, v := range communityCategories {
-		if v != category && ((decrease && v.Position < int32(newPosition)) || (!decrease && v.Position <= int32(newPosition))) {
-			sortedCategoryIDs = append(sortedCategoryIDs, v.CategoryId)
-		}
-	}
-
-	sortedCategoryIDs = append(sortedCategoryIDs, categoryID)
-
-	for _, v := range communityCategories {
-		if v.CategoryId == categoryID || (decrease && v.Position < int32(newPosition)) || (!decrease && v.Position <= int32(newPosition)) {
-			continue
-		}
-		sortedCategoryIDs = append(sortedCategoryIDs, v.CategoryId)
-	}
-
-	s = make(sortSlice, 0, len(o.config.CommunityDescription.Categories))
-	for i, k := range sortedCategoryIDs {
-		s = append(s, sorterHelperIdx{
-			pos:   int32(i),
-			catID: k,
-		})
-	}
-
-	changes := o.emptyCommunityChanges()
-
-	o.setModifiedCategories(changes, s)
 
 	o.increaseClock()
 
@@ -248,29 +110,14 @@ func (o *Community) ReorderChat(categoryID string, chatID string, newPosition in
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
+	if !o.IsOwnerOrAdmin() {
 		return nil, ErrNotAdmin
 	}
 
-	if categoryID != "" {
-		if _, exists := o.config.CommunityDescription.Categories[categoryID]; !exists {
-			return nil, ErrCategoryNotFound
-		}
+	changes, err := o.reorderChat(categoryID, chatID, newPosition)
+	if err != nil {
+		return nil, err
 	}
-
-	var chat *protobuf.CommunityChat
-	var exists bool
-	if chat, exists = o.config.CommunityDescription.Chats[chatID]; !exists {
-		return nil, ErrChatNotFound
-	}
-
-	oldCategoryID := chat.CategoryId
-	chat.CategoryId = categoryID
-
-	changes := o.emptyCommunityChanges()
-
-	o.SortCategoryChats(changes, oldCategoryID)
-	o.insertAndSort(changes, oldCategoryID, categoryID, chatID, chat, newPosition)
 
 	o.increaseClock()
 
@@ -406,10 +253,120 @@ func (o *Community) DeleteCategory(categoryID string) (*CommunityChanges, error)
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
+	if !o.IsOwnerOrAdmin() {
 		return nil, ErrNotAdmin
 	}
 
+	changes, err := o.deleteCategory(categoryID)
+	if err != nil {
+		return nil, err
+	}
+
+	o.increaseClock()
+
+	return changes, nil
+}
+
+func (o *Community) createCategory(categoryID string, categoryName string, chatIDs []string) (*CommunityChanges, error) {
+	if o.config.CommunityDescription.Categories == nil {
+		o.config.CommunityDescription.Categories = make(map[string]*protobuf.CommunityCategory)
+	}
+	if _, ok := o.config.CommunityDescription.Categories[categoryID]; ok {
+		return nil, ErrCategoryAlreadyExists
+	}
+
+	for _, cid := range chatIDs {
+		c, exists := o.config.CommunityDescription.Chats[cid]
+		if !exists {
+			return nil, ErrChatNotFound
+		}
+
+		if exists && c.CategoryId != categoryID && c.CategoryId != "" {
+			return nil, ErrChatAlreadyAssigned
+		}
+	}
+
+	changes := o.emptyCommunityChanges()
+
+	o.config.CommunityDescription.Categories[categoryID] = &protobuf.CommunityCategory{
+		CategoryId: categoryID,
+		Name:       categoryName,
+		Position:   int32(len(o.config.CommunityDescription.Categories)),
+	}
+
+	for i, cid := range chatIDs {
+		o.config.CommunityDescription.Chats[cid].CategoryId = categoryID
+		o.config.CommunityDescription.Chats[cid].Position = int32(i)
+	}
+
+	o.SortCategoryChats(changes, "")
+
+	return changes, nil
+}
+
+func (o *Community) editCategory(categoryID string, categoryName string, chatIDs []string) (*CommunityChanges, error) {
+	if o.config.CommunityDescription.Categories == nil {
+		o.config.CommunityDescription.Categories = make(map[string]*protobuf.CommunityCategory)
+	}
+	if _, ok := o.config.CommunityDescription.Categories[categoryID]; !ok {
+		return nil, ErrCategoryNotFound
+	}
+
+	for _, cid := range chatIDs {
+		c, exists := o.config.CommunityDescription.Chats[cid]
+		if !exists {
+			return nil, ErrChatNotFound
+		}
+
+		if exists && c.CategoryId != categoryID && c.CategoryId != "" {
+			return nil, ErrChatAlreadyAssigned
+		}
+	}
+
+	changes := o.emptyCommunityChanges()
+
+	emptyCatLen := o.getCategoryChatCount("")
+
+	// remove any chat that might have been assigned before and now it's not part of the category
+	var chatsToRemove []string
+	for k, chat := range o.config.CommunityDescription.Chats {
+		if chat.CategoryId == categoryID {
+			found := false
+			for _, c := range chatIDs {
+				if k == c {
+					found = true
+				}
+			}
+			if !found {
+				chat.CategoryId = ""
+				chatsToRemove = append(chatsToRemove, k)
+			}
+		}
+	}
+
+	o.config.CommunityDescription.Categories[categoryID].Name = categoryName
+
+	for i, cid := range chatIDs {
+		o.config.CommunityDescription.Chats[cid].CategoryId = categoryID
+		o.config.CommunityDescription.Chats[cid].Position = int32(i)
+	}
+
+	for i, cid := range chatsToRemove {
+		o.config.CommunityDescription.Chats[cid].Position = int32(emptyCatLen + i)
+		changes.ChatsModified[cid] = &CommunityChatChanges{
+			MembersAdded:     make(map[string]*protobuf.CommunityMember),
+			MembersRemoved:   make(map[string]*protobuf.CommunityMember),
+			CategoryModified: "",
+			PositionModified: int(o.config.CommunityDescription.Chats[cid].Position),
+		}
+	}
+
+	o.SortCategoryChats(changes, "")
+
+	return changes, nil
+}
+
+func (o *Community) deleteCategory(categoryID string) (*CommunityChanges, error) {
 	if _, exists := o.config.CommunityDescription.Categories[categoryID]; !exists {
 		return nil, ErrCategoryNotFound
 	}
@@ -443,7 +400,95 @@ func (o *Community) DeleteCategory(categoryID string) (*CommunityChanges, error)
 
 	o.setModifiedCategories(changes, s)
 
-	o.increaseClock()
+	return changes, nil
+}
+
+func (o *Community) reorderCategories(categoryID string, newPosition int) (*CommunityChanges, error) {
+	if _, exists := o.config.CommunityDescription.Categories[categoryID]; !exists {
+		return nil, ErrCategoryNotFound
+	}
+
+	if newPosition > 0 && newPosition >= len(o.config.CommunityDescription.Categories) {
+		newPosition = len(o.config.CommunityDescription.Categories) - 1
+	} else if newPosition < 0 {
+		newPosition = 0
+	}
+
+	category := o.config.CommunityDescription.Categories[categoryID]
+	if category.Position == int32(newPosition) {
+		return nil, ErrNoChangeInPosition
+	}
+
+	decrease := false
+	if category.Position > int32(newPosition) {
+		decrease = true
+	}
+
+	// Sorting the categories because maps are not guaranteed to keep order
+	s := make(sortSlice, 0, len(o.config.CommunityDescription.Categories))
+	for k, v := range o.config.CommunityDescription.Categories {
+		s = append(s, sorterHelperIdx{
+			pos:   v.Position,
+			catID: k,
+		})
+	}
+	sort.Sort(s)
+	var communityCategories []*protobuf.CommunityCategory
+	for _, currCat := range s {
+		communityCategories = append(communityCategories, o.config.CommunityDescription.Categories[currCat.catID])
+	}
+
+	var sortedCategoryIDs []string
+	for _, v := range communityCategories {
+		if v != category && ((decrease && v.Position < int32(newPosition)) || (!decrease && v.Position <= int32(newPosition))) {
+			sortedCategoryIDs = append(sortedCategoryIDs, v.CategoryId)
+		}
+	}
+
+	sortedCategoryIDs = append(sortedCategoryIDs, categoryID)
+
+	for _, v := range communityCategories {
+		if v.CategoryId == categoryID || (decrease && v.Position < int32(newPosition)) || (!decrease && v.Position <= int32(newPosition)) {
+			continue
+		}
+		sortedCategoryIDs = append(sortedCategoryIDs, v.CategoryId)
+	}
+
+	s = make(sortSlice, 0, len(o.config.CommunityDescription.Categories))
+	for i, k := range sortedCategoryIDs {
+		s = append(s, sorterHelperIdx{
+			pos:   int32(i),
+			catID: k,
+		})
+	}
+
+	changes := o.emptyCommunityChanges()
+
+	o.setModifiedCategories(changes, s)
+
+	return changes, nil
+}
+
+func (o *Community) reorderChat(categoryID string, chatID string, newPosition int) (*CommunityChanges, error) {
+	if categoryID != "" {
+		if _, exists := o.config.CommunityDescription.Categories[categoryID]; !exists {
+			return nil, ErrCategoryNotFound
+		}
+	}
+
+	var chat *protobuf.CommunityChat
+	var exists bool
+	if chat, exists = o.config.CommunityDescription.Chats[chatID]; !exists {
+		return nil, ErrChatNotFound
+	}
+
+	oldCategoryID := chat.CategoryId
+	chat.CategoryId = categoryID
+
+	changes := o.emptyCommunityChanges()
+
+	o.SortCategoryChats(changes, oldCategoryID)
+	o.insertAndSort(changes, oldCategoryID, categoryID, chatID, chat, newPosition)
 
 	return changes, nil
 }
