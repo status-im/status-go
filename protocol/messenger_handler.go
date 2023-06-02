@@ -2876,7 +2876,7 @@ func mapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability a
 		PublicKey: types.HexBytes(message.PublicKey),
 		Path:      message.Path,
 		Name:      message.Name,
-		Color:     message.Color,
+		ColorID:   message.ColorID,
 		Emoji:     message.Emoji,
 		Wallet:    message.Wallet,
 		Chat:      message.Chat,

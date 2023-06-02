@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts/common"
 )
 
 func GetWatchOnlyAccountsForTest() []*Account {
@@ -9,21 +10,21 @@ func GetWatchOnlyAccountsForTest() []*Account {
 		Address: types.Address{0x11},
 		Type:    AccountTypeWatch,
 		Name:    "WatchOnlyAcc1",
-		Color:   "blue",
+		ColorID: common.CustomizationColorPrimary,
 		Emoji:   "emoji-1",
 	}
 	wo2 := &Account{
 		Address: types.Address{0x12},
 		Type:    AccountTypeWatch,
 		Name:    "WatchOnlyAcc2",
-		Color:   "blue",
+		ColorID: common.CustomizationColorPrimary,
 		Emoji:   "emoji-1",
 	}
 	wo3 := &Account{
 		Address: types.Address{0x13},
 		Type:    AccountTypeWatch,
 		Name:    "WatchOnlyAcc3",
-		Color:   "blue",
+		ColorID: common.CustomizationColorPrimary,
 		Emoji:   "emoji-1",
 	}
 
@@ -64,7 +65,7 @@ func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccou
 			PublicKey: types.Hex2Bytes("0x000000002"),
 			Name:      "Generated Acc 1",
 			Emoji:     "emoji-1",
-			Color:     "blue",
+			ColorID:   common.CustomizationColorPrimary,
 			Hidden:    false,
 			Clock:     0,
 			Removed:   false,
@@ -85,7 +86,7 @@ func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccou
 			PublicKey: types.Hex2Bytes("0x000000003"),
 			Name:      "Generated Acc 2",
 			Emoji:     "emoji-2",
-			Color:     "blue",
+			ColorID:   common.CustomizationColorPrimary,
 			Hidden:    false,
 			Clock:     0,
 			Removed:   false,
@@ -104,7 +105,7 @@ func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccou
 			PublicKey: types.Hex2Bytes("0x000000004"),
 			Name:      "Generated Acc 3",
 			Emoji:     "emoji-3",
-			Color:     "blue",
+			ColorID:   common.CustomizationColorPrimary,
 			Hidden:    false,
 			Clock:     0,
 			Removed:   false,
@@ -135,7 +136,7 @@ func GetSeedImportedKeypair1ForTest() *Keypair {
 		PublicKey: types.Hex2Bytes("0x000000021"),
 		Name:      "Seed Impo 1 Acc 1",
 		Emoji:     "emoji-1",
-		Color:     "blue",
+		ColorID:   common.CustomizationColorPrimary,
 		Hidden:    false,
 		Clock:     0,
 		Removed:   false,
@@ -154,7 +155,7 @@ func GetSeedImportedKeypair1ForTest() *Keypair {
 		PublicKey: types.Hex2Bytes("0x000000022"),
 		Name:      "Seed Impo 1 Acc 2",
 		Emoji:     "emoji-2",
-		Color:     "blue",
+		ColorID:   common.CustomizationColorPrimary,
 		Hidden:    false,
 		Clock:     0,
 		Removed:   false,
@@ -184,7 +185,7 @@ func GetSeedImportedKeypair2ForTest() *Keypair {
 		PublicKey: types.Hex2Bytes("0x000000031"),
 		Name:      "Seed Impo 2 Acc 1",
 		Emoji:     "emoji-1",
-		Color:     "blue",
+		ColorID:   common.CustomizationColorPrimary,
 		Hidden:    false,
 		Clock:     0,
 		Removed:   false,
@@ -203,7 +204,7 @@ func GetSeedImportedKeypair2ForTest() *Keypair {
 		PublicKey: types.Hex2Bytes("0x000000032"),
 		Name:      "Seed Impo 2 Acc 2",
 		Emoji:     "emoji-2",
-		Color:     "blue",
+		ColorID:   common.CustomizationColorPrimary,
 		Hidden:    false,
 		Clock:     0,
 		Removed:   false,
@@ -233,7 +234,7 @@ func GetPrivKeyImportedKeypairForTest() *Keypair {
 		PublicKey: types.Hex2Bytes("0x000000041"),
 		Name:      "Priv Key Impo Acc",
 		Emoji:     "emoji-1",
-		Color:     "blue",
+		ColorID:   common.CustomizationColorPrimary,
 		Hidden:    false,
 		Clock:     0,
 		Removed:   false,
@@ -302,7 +303,7 @@ func SameAccounts(expected, real *Account) bool {
 		string(expected.PublicKey) == string(real.PublicKey) &&
 		expected.Name == real.Name &&
 		expected.Emoji == real.Emoji &&
-		expected.Color == real.Color &&
+		expected.ColorID == real.ColorID &&
 		expected.Hidden == real.Hidden &&
 		expected.Clock == real.Clock &&
 		expected.Removed == real.Removed

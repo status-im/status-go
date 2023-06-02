@@ -91,7 +91,7 @@ func (s *SyncDeviceSuite) prepareBackendWithAccount(tmpdir string) *api.GethStat
 		PublicKey: types.Hex2Bytes(walletDerivedAccount.PublicKey),
 		KeyUID:    generatedAccountInfo.KeyUID,
 		Address:   types.HexToAddress(walletDerivedAccount.Address),
-		Color:     "",
+		ColorID:   "",
 		Wallet:    true,
 		Path:      pathDefaultWallet,
 		Name:      "Ethereum account",
