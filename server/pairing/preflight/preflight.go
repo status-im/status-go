@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/server"
@@ -134,7 +136,10 @@ func CheckOutbound() error {
 		return err
 	}
 	defer func() {
-		stop()
+		err := stop()
+		if err != nil {
+			logutils.ZapLogger().Error("error while stopping preflight serve", zap.Error(err))
+		}
 	}()
 
 	// Client stuff
