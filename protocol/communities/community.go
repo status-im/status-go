@@ -1489,10 +1489,6 @@ func (o *Community) TokenPermissionsByType(permissionType protobuf.CommunityToke
 	return permissions
 }
 
-func (o *Community) canManageTokenPermission(permission *protobuf.CommunityTokenPermission) bool {
-	return o.config.PrivateKey != nil || (o.IsOwnerOrAdmin())
-}
-
 func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermission) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
@@ -1559,7 +1555,7 @@ func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChange
 		return nil, ErrTokenPermissionNotFound
 	}
 
-	if !o.IsOwner() || (o.IsAdmin() && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
+	if !o.IsOwnerOrAdmin() || (o.IsAdmin() && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
 		return nil, ErrNotEnoughPermissions
 	}
 
