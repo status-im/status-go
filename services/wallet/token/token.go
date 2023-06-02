@@ -158,22 +158,38 @@ func (tm *Manager) fetchTokens() {
 	tm.tokenMap = toTokenMap(tm.tokenList)
 }
 
+func (tm *Manager) getFullTokenList(chainID uint64) []*Token {
+	tokens, err := tm.GetTokens(chainID)
+	if err != nil {
+		return nil
+	}
+
+	customTokens, err := tm.GetCustomsByChainID(chainID)
+	if err != nil {
+		return nil
+	}
+
+	return append(tokens, customTokens...)
+}
+
 func (tm *Manager) FindToken(network *params.Network, tokenSymbol string) *Token {
 	if tokenSymbol == network.NativeCurrencySymbol {
 		return tm.ToToken(network)
 	}
 
-	tokens, err := tm.GetTokens(network.ChainID)
-	if err != nil {
-		return nil
-	}
-	customTokens, err := tm.GetCustomsByChainID(network.ChainID)
-	if err != nil {
-		return nil
-	}
-	allTokens := append(tokens, customTokens...)
+	allTokens := tm.getFullTokenList(network.ChainID)
 	for _, token := range allTokens {
 		if token.Symbol == tokenSymbol {
+			return token
+		}
+	}
+	return nil
+}
+
+func (tm *Manager) FindTokenByAddress(chainID uint64, address common.Address) *Token {
+	allTokens := tm.getFullTokenList(chainID)
+	for _, token := range allTokens {
+		if token.Address == address {
 			return token
 		}
 	}
