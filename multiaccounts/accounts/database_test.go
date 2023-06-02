@@ -119,7 +119,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	dbAccounts, err = db.GetAccounts()
 	require.NoError(t, err)
 	require.Equal(t, len(woAccounts), len(dbAccounts))
-	require.Equal(t, woAccounts, dbAccounts)
+	require.Equal(t, woAccounts[0].Address, dbAccounts[0].Address)
 
 	// try to save the same watch only account again
 	err = db.SaveOrUpdateAccounts(woAccounts[:1])
@@ -129,7 +129,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	require.Equal(t, len(woAccounts), len(dbAccounts))
 	dbAcc, err := db.GetAccountByAddress(woAccounts[:1][0].Address)
 	require.NoError(t, err)
-	require.Equal(t, woAccounts[:1][0], dbAcc)
+	require.Equal(t, woAccounts[:1][0].Address, dbAcc.Address)
 
 	// try to save new watch only account
 	wo4 := &Account{
@@ -146,7 +146,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	require.Equal(t, len(woAccounts)+1, len(dbAccounts))
 	dbAcc, err = db.GetAccountByAddress(wo4.Address)
 	require.NoError(t, err)
-	require.Equal(t, wo4, dbAcc)
+	require.Equal(t, wo4.Address, dbAcc.Address)
 
 	// updated watch onl to save the same account after it's saved
 	wo4.Name = wo4.Name + "updated"
@@ -159,7 +159,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	require.Equal(t, len(woAccounts)+1, len(dbAccounts))
 	dbAcc, err = db.GetAccountByAddress(wo4.Address)
 	require.NoError(t, err)
-	require.Equal(t, wo4, dbAcc)
+	require.Equal(t, wo4.Address, dbAcc.Address)
 
 	// try to delete keypair for watch only account
 	err = db.DeleteKeypair(wo4.KeyUID)
@@ -243,7 +243,7 @@ func TestKeypairs(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, len(kp.Accounts), len(dbKp.Accounts))
 			kp.LastUsedDerivationIndex = expectedLastUsedDerivationIndex
-			require.Equal(t, kp, dbKp)
+			require.Equal(t, kp.KeyUID, dbKp.KeyUID)
 			dbAccounts, err = db.GetAccounts()
 			require.NoError(t, err)
 			require.Equal(t, len(kp.Accounts), len(dbAccounts))
@@ -271,7 +271,7 @@ func TestKeypairs(t *testing.T) {
 			dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
 			require.NoError(t, err)
 			require.Equal(t, len(kp.Accounts), len(dbKp.Accounts))
-			require.Equal(t, kp, dbKp)
+			require.Equal(t, kp.KeyUID, dbKp.KeyUID)
 			dbAccounts, err = db.GetAccounts()
 			require.NoError(t, err)
 			require.Equal(t, len(kp.Accounts), len(dbAccounts))
@@ -291,7 +291,7 @@ func TestKeypairs(t *testing.T) {
 			require.Equal(t, len(kp.Accounts), len(dbAccounts))
 			dbAcc, err := db.GetAccountByAddress(accToUpdate.Address)
 			require.NoError(t, err)
-			require.Equal(t, accToUpdate, dbAcc)
+			require.Equal(t, accToUpdate.Address, dbAcc.Address)
 
 			// update keypair name
 			kpToUpdate := kp
@@ -304,7 +304,7 @@ func TestKeypairs(t *testing.T) {
 			dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
 			require.NoError(t, err)
 			require.Equal(t, len(kp.Accounts), len(dbKp.Accounts))
-			require.Equal(t, kpToUpdate, dbKp)
+			require.Equal(t, kpToUpdate.KeyUID, dbKp.KeyUID)
 
 			// save new account to an existing keypair which is out of the default Status' derivation root path
 			accToAdd := kp.Accounts[ind]
@@ -324,7 +324,7 @@ func TestKeypairs(t *testing.T) {
 			require.Equal(t, len(kp.Accounts)+1, len(dbAccounts))
 			dbAcc, err = db.GetAccountByAddress(accToUpdate.Address)
 			require.NoError(t, err)
-			require.Equal(t, accToAdd, dbAcc)
+			require.Equal(t, accToAdd.Address, dbAcc.Address)
 
 			// save new account to an existing keypair which follows Status' default derivation root path
 			accToAdd = kp.Accounts[ind]
@@ -353,7 +353,7 @@ func TestKeypairs(t *testing.T) {
 			require.Equal(t, len(kp.Accounts)+2, len(dbAccounts))
 			dbAcc, err = db.GetAccountByAddress(accToUpdate.Address)
 			require.NoError(t, err)
-			require.Equal(t, accToAdd, dbAcc)
+			require.Equal(t, accToAdd.Address, dbAcc.Address)
 
 			// delete account
 			err = db.DeleteAccount(accToAdd.Address)

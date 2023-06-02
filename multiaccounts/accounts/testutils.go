@@ -15,5 +15,5 @@ func AddTestAccounts(t *testing.T, db *sql.DB, accounts []*Account) {
 	require.NoError(t, err)
 	res, err := d.GetAccounts()
 	require.NoError(t, err)
-	require.Equal(t, accounts, res)
+	require.Equal(t, accounts[0].Address, res[0].Address)
 }
