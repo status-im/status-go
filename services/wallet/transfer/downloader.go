@@ -306,7 +306,7 @@ func (d *ETHDownloader) subTransactionsFromTransactionHash(parent context.Contex
 			if from == address || to == address {
 				mustAppend = true
 			}
-		case uniswapV2SwapEventType:
+		case uniswapV2SwapEventType, uniswapV3SwapEventType:
 			mustAppend = true
 		}
 

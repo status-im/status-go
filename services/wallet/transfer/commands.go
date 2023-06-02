@@ -442,8 +442,8 @@ func (c *transfersCommand) checkAndProcessPendingMultiTx(subTx *Transfer) (Multi
 
 func (c *transfersCommand) checkAndProcessSwapMultiTx(ctx context.Context, subTx *Transfer) (MultiTransactionIDType, error) {
 	switch subTx.Type {
-	// If the Tx contains any uniswapV2Swap subTx, generate a Swap multiTx
-	case uniswapV2Swap:
+	// If the Tx contains any uniswapV2Swap/uniswapV3Swap subTx, generate a Swap multiTx
+	case uniswapV2Swap, uniswapV3Swap:
 		multiTransaction, err := buildUniswapSwapMultitransaction(ctx, c.chainClient, c.tokenManager, subTx)
 		if err != nil {
 			return NoMultiTransactionID, err
