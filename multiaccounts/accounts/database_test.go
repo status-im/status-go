@@ -8,7 +8,6 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/common"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
@@ -136,7 +135,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 		Address: types.Address{0x14},
 		Type:    AccountTypeWatch,
 		Name:    "WatchOnlyAcc4",
-		ColorID: common.CustomizationColorPrimary,
+		Color:   "blue",
 		Emoji:   "emoji-1",
 	}
 	err = db.SaveOrUpdateAccounts([]*Account{wo4})
@@ -150,7 +149,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 
 	// updated watch onl to save the same account after it's saved
 	wo4.Name = wo4.Name + "updated"
-	wo4.ColorID = common.CustomizationColorCamel
+	wo4.Color = "lightgreen"
 	wo4.Emoji = wo4.Emoji + "updated"
 	err = db.SaveOrUpdateAccounts([]*Account{wo4})
 	require.NoError(t, err)
@@ -278,7 +277,7 @@ func TestKeypairs(t *testing.T) {
 
 			// update an existing account
 			accToUpdate.Name = accToUpdate.Name + "updated"
-			accToUpdate.ColorID = common.CustomizationColorBrown
+			accToUpdate.Color = "green"
 			accToUpdate.Emoji = accToUpdate.Emoji + "updated"
 
 			err = db.SaveOrUpdateAccounts([]*Account{accToUpdate})

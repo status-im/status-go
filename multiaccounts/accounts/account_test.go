@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/status-im/status-go/multiaccounts/common"
 )
 
 func TestIsOwnAccount(t *testing.T) {
@@ -43,7 +41,7 @@ func TestUnmarshal(t *testing.T) {
 		"key-uid": "0xbc14c321b74652e57c7f26eb30d597ea27cbdf36cba5c85d24f12748153a035e",
     "public-key": "0x0465f6d4f1172524fc057954c8a3f8e34f991558b3d1097189975062f67adda7835da61acb5cda3348b41d211ed0cb07aba668eb12e19e29d98745bebf68d93b61",
     "address": "0xf09c9f5Fb9faa22d0C6C593e7157Ceac8B2b0fe4",
-    "colorId": "primary",
+    "color": "#4360df",
     "wallet": true,
 		"chat": true,
     "path": "m/44'/60'/0'/0/0",
@@ -63,7 +61,7 @@ func TestUnmarshal(t *testing.T) {
 	require.Equal(t, "0xbc14c321b74652e57c7f26eb30d597ea27cbdf36cba5c85d24f12748153a035e", account.KeyUID)
 	require.Equal(t, []byte("0x0465f6d4f1172524fc057954c8a3f8e34f991558b3d1097189975062f67adda7835da61acb5cda3348b41d211ed0cb07aba668eb12e19e29d98745bebf68d93b61"), account.PublicKey.Bytes())
 	require.Equal(t, "0xf09c9f5Fb9faa22d0C6C593e7157Ceac8B2b0fe4", account.Address.String())
-	require.Equal(t, common.CustomizationColorPrimary, account.ColorID)
+	require.Equal(t, "#4360df", account.Color)
 	require.Equal(t, true, account.Wallet)
 	require.Equal(t, true, account.Chat)
 	require.Equal(t, "m/44'/60'/0'/0/0", account.Path)

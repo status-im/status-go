@@ -231,7 +231,7 @@ message SyncAccount {
   bytes public_key = 4;
   string path = 5;
   string name = 6;
-  string colorId = 7;
+  string color = 7;
   string emoji = 8;
   bool wallet = 9;
   bool chat = 10;

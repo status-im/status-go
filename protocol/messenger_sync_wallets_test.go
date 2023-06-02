@@ -268,7 +268,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	accountsToUpdate := profileKpUpdated.Accounts[2:]
 	for _, acc := range accountsToUpdate {
 		acc.Name = acc.Name + "Updated"
-		acc.ColorID = acc.ColorID + "Updated"
+		acc.Color = acc.Color + "Updated"
 		acc.Emoji = acc.Emoji + "Updated"
 		err = s.m.SaveOrUpdateAccount(acc)
 		s.Require().NoError(err, "updated account on alice primary device")

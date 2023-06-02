@@ -213,8 +213,8 @@ func (api *API) checkAccountValidity(account *accounts.Account) error {
 		return errors.New("`Emoji` field of an account must be set")
 	}
 
-	if len(account.ColorID) == 0 {
-		return errors.New("`ColorID` field of an account must be set")
+	if len(account.Color) == 0 {
+		return errors.New("`Color` field of an account must be set")
 	}
 
 	if account.Type != accounts.AccountTypeWatch {

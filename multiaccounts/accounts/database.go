@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	notificationssettings "github.com/status-im/status-go/multiaccounts/settings_notifications"
 	sociallinkssettings "github.com/status-im/status-go/multiaccounts/settings_social_links"
@@ -44,20 +43,20 @@ type Keypair struct {
 }
 
 type Account struct {
-	Address   types.Address             `json:"address"`
-	KeyUID    string                    `json:"key-uid"`
-	Wallet    bool                      `json:"wallet"`
-	Chat      bool                      `json:"chat"`
-	Type      AccountType               `json:"type,omitempty"`
-	Path      string                    `json:"path,omitempty"`
-	PublicKey types.HexBytes            `json:"public-key,omitempty"`
-	Name      string                    `json:"name"`
-	Emoji     string                    `json:"emoji"`
-	ColorID   common.CustomizationColor `json:"colorId,omitempty"`
-	Hidden    bool                      `json:"hidden"`
-	Clock     uint64                    `json:"clock,omitempty"`
-	Removed   bool                      `json:"removed,omitempty"`
-	Operable  AccountOperable           `json:"operable"` // describes an account's operability (read an explanation at the top of this file)
+	Address   types.Address   `json:"address"`
+	KeyUID    string          `json:"key-uid"`
+	Wallet    bool            `json:"wallet"`
+	Chat      bool            `json:"chat"`
+	Type      AccountType     `json:"type,omitempty"`
+	Path      string          `json:"path,omitempty"`
+	PublicKey types.HexBytes  `json:"public-key,omitempty"`
+	Name      string          `json:"name"`
+	Emoji     string          `json:"emoji"`
+	Color     string          `json:"color"`
+	Hidden    bool            `json:"hidden"`
+	Clock     uint64          `json:"clock,omitempty"`
+	Removed   bool            `json:"removed,omitempty"`
+	Operable  AccountOperable `json:"operable"` // describes an account's operability (read an explanation at the top of this file)
 }
 
 type KeypairType string
@@ -104,21 +103,21 @@ func (a *Account) IsOwnAccount() bool {
 
 func (a *Account) MarshalJSON() ([]byte, error) {
 	item := struct {
-		Address          types.Address             `json:"address"`
-		MixedcaseAddress string                    `json:"mixedcase-address"`
-		KeyUID           string                    `json:"key-uid"`
-		Wallet           bool                      `json:"wallet"`
-		Chat             bool                      `json:"chat"`
-		Type             AccountType               `json:"type"`
-		Path             string                    `json:"path"`
-		PublicKey        types.HexBytes            `json:"public-key"`
-		Name             string                    `json:"name"`
-		Emoji            string                    `json:"emoji"`
-		ColorID          common.CustomizationColor `json:"colorId"`
-		Hidden           bool                      `json:"hidden"`
-		Clock            uint64                    `json:"clock"`
-		Removed          bool                      `json:"removed"`
-		Operable         AccountOperable           `json:"operable"`
+		Address          types.Address   `json:"address"`
+		MixedcaseAddress string          `json:"mixedcase-address"`
+		KeyUID           string          `json:"key-uid"`
+		Wallet           bool            `json:"wallet"`
+		Chat             bool            `json:"chat"`
+		Type             AccountType     `json:"type"`
+		Path             string          `json:"path"`
+		PublicKey        types.HexBytes  `json:"public-key"`
+		Name             string          `json:"name"`
+		Emoji            string          `json:"emoji"`
+		Color            string          `json:"color"`
+		Hidden           bool            `json:"hidden"`
+		Clock            uint64          `json:"clock"`
+		Removed          bool            `json:"removed"`
+		Operable         AccountOperable `json:"operable"`
 	}{
 		Address:          a.Address,
 		MixedcaseAddress: a.Address.Hex(),
@@ -130,7 +129,7 @@ func (a *Account) MarshalJSON() ([]byte, error) {
 		PublicKey:        a.PublicKey,
 		Name:             a.Name,
 		Emoji:            a.Emoji,
-		ColorID:          a.ColorID,
+		Color:            a.Color,
 		Hidden:           a.Hidden,
 		Clock:            a.Clock,
 		Removed:          a.Removed,
@@ -187,7 +186,7 @@ func (a *Keypair) CopyKeypair() *Keypair {
 			PublicKey: acc.PublicKey,
 			Name:      acc.Name,
 			Emoji:     acc.Emoji,
-			ColorID:   acc.ColorID,
+			Color:     acc.Color,
 			Hidden:    acc.Hidden,
 			Clock:     acc.Clock,
 			Removed:   acc.Removed,
@@ -271,7 +270,7 @@ func (db *Database) processKeypairs(rows *sql.Rows) ([]*Keypair, error) {
 		accKeyUID   sql.NullString
 		accPath     sql.NullString
 		accName     sql.NullString
-		accColorID  sql.NullString
+		accColor    sql.NullString
 		accEmoji    sql.NullString
 		accWallet   sql.NullBool
 		accChat     sql.NullBool
@@ -286,7 +285,7 @@ func (db *Database) processKeypairs(rows *sql.Rows) ([]*Keypair, error) {
 		pubkey := []byte{}
 		err := rows.Scan(
 			&kpKeyUID, &kpName, &kpType, &kpDerivedFrom, &kpLastUsedDerivationIndex, &kpSyncedFrom, &kpClock,
-			&accAddress, &accKeyUID, &pubkey, &accPath, &accName, &accColorID, &accEmoji,
+			&accAddress, &accKeyUID, &pubkey, &accPath, &accName, &accColor, &accEmoji,
 			&accWallet, &accChat, &accHidden, &accOperable, &accClock)
 		if err != nil {
 			return nil, err
@@ -328,8 +327,8 @@ func (db *Database) processKeypairs(rows *sql.Rows) ([]*Keypair, error) {
 		if accName.Valid {
 			acc.Name = accName.String
 		}
-		if accColorID.Valid {
-			acc.ColorID = common.CustomizationColor(accColorID.String)
+		if accColor.Valid {
+			acc.Color = accColor.String
 		}
 		if accEmoji.Valid {
 			acc.Emoji = accEmoji.String
@@ -394,7 +393,7 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string) ([]*Keypair, error) {
 			ka.pubkey,
 			ka.path,
 			ka.name,
-                        ka.color,
+			ka.color,
 			ka.emoji,
 			ka.wallet,
 			ka.chat,
@@ -475,7 +474,7 @@ func (db *Database) getAccounts(tx *sql.Tx, address types.Address) ([]*Account, 
 			ka.pubkey,
 			ka.path,
 			ka.name,
-                        ka.color,
+			ka.color,
 			ka.emoji,
 			ka.wallet,
 			ka.chat,
@@ -719,7 +718,7 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account) (err e
 				keypairs_accounts
 			SET
 				name = ?,
-                                color = ?,
+				color = ?,
 				emoji = ?,
 				hidden = ?,
 				operable = ?,
@@ -728,7 +727,7 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account) (err e
 				address = ?;
 		`,
 			acc.Address, keyUID, acc.PublicKey, acc.Path, acc.Wallet, acc.Chat,
-			acc.Name, acc.ColorID, acc.Emoji, acc.Hidden, acc.Operable, acc.Clock, acc.Address)
+			acc.Name, acc.Color, acc.Emoji, acc.Hidden, acc.Operable, acc.Clock, acc.Address)
 		if err != nil {
 			return err
 		}

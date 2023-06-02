@@ -375,7 +375,7 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 		PublicKey: types.Hex2Bytes(walletDerivedAccount.PublicKey),
 		KeyUID:    generatedAccountInfo.KeyUID,
 		Address:   types.HexToAddress(walletDerivedAccount.Address),
-		ColorID:   "",
+		Color:     "",
 		Wallet:    true,
 		Path:      pathDefaultWallet,
 		Name:      "Ethereum account",

@@ -29,7 +29,6 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/nodecfg"
@@ -959,7 +958,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 	account := multiaccounts.Account{
 		KeyUID:             info.KeyUID,
 		Name:               request.DisplayName,
-		CustomizationColor: common.CustomizationColor(request.CustomizationColor),
+		CustomizationColor: multiaccounts.CustomizationColor(request.CustomizationColor),
 		KDFIterations:      sqlite.ReducedKDFIterationsNumber,
 	}
 
@@ -990,7 +989,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 		PublicKey: types.Hex2Bytes(walletDerivedAccount.PublicKey),
 		KeyUID:    info.KeyUID,
 		Address:   types.HexToAddress(walletDerivedAccount.Address),
-		ColorID:   "",
+		Color:     "",
 		Wallet:    true,
 		Path:      pathDefaultWallet,
 		Name:      walletAccountDefaultName,

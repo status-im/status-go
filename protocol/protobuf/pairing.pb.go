@@ -5,11 +5,8 @@ package protobuf
 
 import (
 	fmt "fmt"
-	math "math"
-
 	proto "github.com/golang/protobuf/proto"
-
-	"github.com/status-im/status-go/multiaccounts/common"
+	math "math"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -351,7 +348,7 @@ type MultiAccount struct {
 	Timestamp            int64                         `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	Identicon            string                        `protobuf:"bytes,3,opt,name=identicon,proto3" json:"identicon,omitempty"`
 	ColorHash            []*MultiAccount_ColorHash     `protobuf:"bytes,4,rep,name=color_hash,json=colorHash,proto3" json:"color_hash,omitempty"`
-	ColorID              int64                         `protobuf:"varint,5,opt,name=color_id,json=colorId,proto3" json:"color_id,omitempty"`
+	ColorId              int64                         `protobuf:"varint,5,opt,name=color_id,json=colorId,proto3" json:"color_id,omitempty"`
 	KeycardPairing       string                        `protobuf:"bytes,6,opt,name=keycard_pairing,json=keycardPairing,proto3" json:"keycard_pairing,omitempty"`
 	KeyUid               string                        `protobuf:"bytes,7,opt,name=key_uid,json=keyUid,proto3" json:"key_uid,omitempty"`
 	Images               []*MultiAccount_IdentityImage `protobuf:"bytes,8,rep,name=images,proto3" json:"images,omitempty"`
@@ -414,9 +411,9 @@ func (m *MultiAccount) GetColorHash() []*MultiAccount_ColorHash {
 	return nil
 }
 
-func (m *MultiAccount) GetColorID() int64 {
+func (m *MultiAccount) GetColorId() int64 {
 	if m != nil {
-		return m.ColorID
+		return m.ColorId
 	}
 	return 0
 }
@@ -2044,21 +2041,21 @@ func (m *SyncProfilePictures) GetPictures() []*SyncProfilePicture {
 }
 
 type SyncAccount struct {
-	Clock                uint64                    `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
-	Address              []byte                    `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
-	KeyUid               string                    `protobuf:"bytes,3,opt,name=key_uid,json=keyUid,proto3" json:"key_uid,omitempty"`
-	PublicKey            []byte                    `protobuf:"bytes,4,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
-	Path                 string                    `protobuf:"bytes,5,opt,name=path,proto3" json:"path,omitempty"`
-	Name                 string                    `protobuf:"bytes,6,opt,name=name,proto3" json:"name,omitempty"`
-	ColorID              common.CustomizationColor `protobuf:"bytes,7,opt,name=colorId,proto3" json:"colorId,omitempty"`
-	Emoji                string                    `protobuf:"bytes,8,opt,name=emoji,proto3" json:"emoji,omitempty"`
-	Wallet               bool                      `protobuf:"varint,9,opt,name=wallet,proto3" json:"wallet,omitempty"`
-	Chat                 bool                      `protobuf:"varint,10,opt,name=chat,proto3" json:"chat,omitempty"`
-	Hidden               bool                      `protobuf:"varint,11,opt,name=hidden,proto3" json:"hidden,omitempty"`
-	Removed              bool                      `protobuf:"varint,12,opt,name=removed,proto3" json:"removed,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                  `json:"-"`
-	XXX_unrecognized     []byte                    `json:"-"`
-	XXX_sizecache        int32                     `json:"-"`
+	Clock                uint64   `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
+	Address              []byte   `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
+	KeyUid               string   `protobuf:"bytes,3,opt,name=key_uid,json=keyUid,proto3" json:"key_uid,omitempty"`
+	PublicKey            []byte   `protobuf:"bytes,4,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
+	Path                 string   `protobuf:"bytes,5,opt,name=path,proto3" json:"path,omitempty"`
+	Name                 string   `protobuf:"bytes,6,opt,name=name,proto3" json:"name,omitempty"`
+	Color                string   `protobuf:"bytes,7,opt,name=color,proto3" json:"color,omitempty"`
+	Emoji                string   `protobuf:"bytes,8,opt,name=emoji,proto3" json:"emoji,omitempty"`
+	Wallet               bool     `protobuf:"varint,9,opt,name=wallet,proto3" json:"wallet,omitempty"`
+	Chat                 bool     `protobuf:"varint,10,opt,name=chat,proto3" json:"chat,omitempty"`
+	Hidden               bool     `protobuf:"varint,11,opt,name=hidden,proto3" json:"hidden,omitempty"`
+	Removed              bool     `protobuf:"varint,12,opt,name=removed,proto3" json:"removed,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
 func (m *SyncAccount) Reset()         { *m = SyncAccount{} }
@@ -2128,9 +2125,9 @@ func (m *SyncAccount) GetName() string {
 	return ""
 }
 
-func (m *SyncAccount) GetColorID() common.CustomizationColor {
+func (m *SyncAccount) GetColor() string {
 	if m != nil {
-		return m.ColorID
+		return m.Color
 	}
 	return ""
 }
