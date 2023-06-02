@@ -2066,7 +2066,7 @@ func (m *Manager) getOwnedERC721Tokens(walletAddresses []gethcommon.Address, tok
 		return nil, errors.New("no opensea client")
 	}
 
-	//ownedERC721Tokens := make(map[uint64]map[string][]opensea.Asset)
+	ownedERC721Tokens := make(map[uint64]map[string][]opensea.Asset)
 
 	for chainID, erc721Tokens := range tokenRequirements {
 		client, err := m.openseaClientBuilder.NewOpenseaClient(chainID, m.walletConfig.OpenseaAPIKey, nil)
