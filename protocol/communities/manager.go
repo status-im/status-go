@@ -39,8 +39,8 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
-	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/protocol/v1"
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/signal"
@@ -1425,43 +1425,32 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 	revealedAccounts := make([]*protobuf.RevealedAccount, 0)
 
-<<<<<<< HEAD
-	if len(becomeMemberPermissions) > 0 {
-		revealedAccounts, err = m.persistence.GetRequestToJoinRevealedAddresses(dbRequest.ID)
-=======
 	memberRole := protobuf.CommunityMember_ROLE_NONE
 
 	if len(becomeMemberPermissions) > 0 || len(becomeAdminPermissions) > 0 {
-		revealedAddresses, err := m.persistence.GetRequestToJoinRevealedAddresses(dbRequest.ID)
->>>>>>> b132dc4f1 (chore: sending admin events)
+		revealedAccounts, err := m.persistence.GetRequestToJoinRevealedAddresses(dbRequest.ID)
 		if err != nil {
 			return nil, err
 		}
 
 		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(revealedAccounts)
 
-<<<<<<< HEAD
-		permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, accountsAndChainIDs, true)
-		if err != nil {
-			return nil, err
-=======
 		// admin token permissions requred to became an admin must not cancel request to join
 		// if requirements were not met
 		hasPermission := false
 		if len(becomeAdminPermissions) > 0 {
-			permissionResponse, err := m.checkPermissionToJoin(becomeAdminPermissions, walletAddresses, true)
+			permissionResponse, err := m.checkPermissionToJoin(becomeAdminPermissions, accountsAndChainIDs, true)
 			if err != nil {
 				m.logger.Warn("Failed to check admin permmissions to join for the community as an admin", zap.Error(err))
 			} else {
 				hasPermission = permissionResponse.Satisfied
 			}
->>>>>>> b132dc4f1 (chore: sending admin events)
 		}
 
 		if hasPermission {
 			memberRole = protobuf.CommunityMember_ROLE_ADMIN
 		} else if len(becomeMemberPermissions) > 0 {
-			permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, walletAddresses, true)
+			permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, accountsAndChainIDs, true)
 			if err != nil {
 				return nil, err
 			}
@@ -1620,88 +1609,29 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 	// It may happen when member removes itself from community and then tries to rejoin
 	// More specifically, CommunityRequestToLeave may be delivered later than CommunityRequestToJoin, or not delivered at all
 	acceptAutomatically := community.AcceptRequestToJoinAutomatically() || community.HasMember(signer)
-<<<<<<< HEAD
-	if len(becomeMemberPermissions) == 0 && acceptAutomatically {
-		err = m.markRequestToJoin(signer, community)
-		if err != nil {
-			return nil, err
-		}
-		requestToJoin.State = RequestToJoinStateAccepted
-		return requestToJoin, nil
-	}
-
-	if len(becomeMemberPermissions) > 0 {
-		// we have token permissions but requester hasn't revealed
-		// any addresses
-		if len(request.RevealedAccounts) == 0 {
-			err = m.markRequestToJoinAsCanceled(signer, community)
-			if err != nil {
-				return nil, err
-			}
-			requestToJoin.State = RequestToJoinStateDeclined
-			return requestToJoin, nil
-		}
-=======
 	hasPermission := false
->>>>>>> b132dc4f1 (chore: sending admin events)
 
 	// if we have admin or member permission and user revealed the address - process verification
 	// if user does not reveal the address and we have member permission only - we decline this request
 	// if user does not reveal the address and we have admin permission only - user allowed to join as a member
 	// in non private community
-	if (len(becomeMemberPermissions) > 0 || len(becomeAdminPermissions) > 0) && len(request.RevealedAddresses) > 0 {
-		// verify if revealed addresses indeed belong to requester
-		for _, revealedAccount := range request.RevealedAccounts {
-			recoverParams := account.RecoverParams{
-				Message:   types.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID(), requestToJoin.ID)),
-				Signature: types.EncodeHex(revealedAccount.Signature),
-			}
-
-			recovered, err := m.accountsManager.Recover(recoverParams)
-			if err != nil {
-				return nil, err
-			}
-			if recovered.Hex() != revealedAccount.Address {
-				// if ownership of only one wallet address cannot be verified,
-				// we mark the request as cancelled and stop
-				err = m.markRequestToJoinAsCanceled(signer, community)
-				if err != nil {
-					return nil, err
-				}
-				requestToJoin.State = RequestToJoinStateDeclined
-				return requestToJoin, nil
-			}
-		}
-
+	if (len(becomeMemberPermissions) > 0 || len(becomeAdminPermissions) > 0) && len(request.RevealedAccounts) > 0 {
 		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(request.RevealedAccounts)
-
-		// provided wallet addresses seem to be legit, so let's check
-		// if the necessary token permission funds exist
-<<<<<<< HEAD
-		permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, accountsAndChainIDs, true)
-		if err != nil {
-			return nil, err
-=======
-		verifiedAddresses := make([]gethcommon.Address, 0)
-		for walletAddress := range request.RevealedAddresses {
-			verifiedAddresses = append(verifiedAddresses, gethcommon.HexToAddress(walletAddress))
-		}
 
 		// admin token permissions requred to became an admin must not cancel request to join
 		// if requirements were not met
 		if len(becomeAdminPermissions) > 0 {
-			permissionResponse, err := m.checkPermissionToJoin(becomeAdminPermissions, verifiedAddresses, true)
+			permissionResponse, err := m.checkPermissionToJoin(becomeAdminPermissions, accountsAndChainIDs, true)
 			if err != nil {
 				m.logger.Info("Failed to check admin permmissions to join for the community as an admin", zap.Error(err))
 			} else {
 				hasPermission = permissionResponse.Satisfied
 			}
->>>>>>> b132dc4f1 (chore: sending admin events)
 		}
 
 		// if user does not have admin permissions, check on member permissions
 		if !hasPermission && len(becomeMemberPermissions) > 0 {
-			permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, verifiedAddresses, true)
+			permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, accountsAndChainIDs, true)
 			if err != nil {
 				return nil, err
 			}
@@ -1724,7 +1654,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		if err != nil {
 			return nil, err
 		}
-	} else if len(becomeMemberPermissions) > 0 && len(request.RevealedAddresses) == 0 {
+	} else if len(becomeMemberPermissions) > 0 && len(request.RevealedAccounts) == 0 {
 		// we have member token permissions but requester hasn't revealed
 		// any addresses
 		err = m.markRequestToJoinAsCanceled(signer, community)
@@ -1770,22 +1700,11 @@ func (c *CheckPermissionToJoinResponse) calculateSatisfied() {
 
 	c.Satisfied = false
 	for _, p := range c.Permissions {
-<<<<<<< HEAD
-		satisfied := true
-		for _, criteria := range p.Criteria {
-			if !criteria {
-				satisfied = false
-=======
-		c.Satisfied = false
 		for _, criteria := range p.Criteria {
 			if criteria {
 				c.Satisfied = true
->>>>>>> b132dc4f1 (chore: sending admin events)
-				break
+				return
 			}
-		}
-		if satisfied {
-			c.Satisfied = true
 		}
 	}
 }
@@ -2045,50 +1964,13 @@ func (m *Manager) checkPermissionToJoin(permissions []*protobuf.CommunityTokenPe
 
 type CollectiblesByChain = map[uint64]map[gethcommon.Address]map[string][]opensea.Asset
 
-<<<<<<< HEAD
 func (m *Manager) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tokenRequirements map[uint64]map[string]*protobuf.TokenCriteria, chainIDs []uint64) (CollectiblesByChain, error) {
-=======
-				_, existsERC721 := erc721TokenRequirementsByChain[chainID]
-
-				if isERC721 && !existsERC721 {
-					erc721TokenRequirementsByChain[chainID] = make(map[string]*protobuf.TokenCriteria)
-				}
-				_, existsERC20 := erc20TokenRequirementsByChain[chainID]
-
-				if isERC20 && !existsERC20 {
-					erc20TokenRequirementsByChain[chainID] = make(map[string]*protobuf.TokenCriteria)
-				}
-
-				_, existsERC721 = erc721TokenRequirementsByChain[chainID][contractAddress]
-				if isERC721 && !existsERC721 {
-					erc721TokenRequirementsByChain[chainID][strings.ToLower(contractAddress)] = tokenRequirement
-				}
-
-				_, existsERC20 = erc20TokenRequirementsByChain[chainID][contractAddress]
-				if isERC20 && !existsERC20 {
-					erc20TokenRequirementsByChain[chainID][strings.ToLower(contractAddress)] = tokenRequirement
-				}
-			}
-		}
-	}
-	return erc20TokenRequirementsByChain, erc721TokenRequirementsByChain
-}
-
-func (m *Manager) getOwnedERC721Tokens(walletAddresses []gethcommon.Address, tokenRequirements map[uint64]map[string]*protobuf.TokenCriteria) (map[uint64]map[string][]opensea.Asset, error) {
-	// TODO: revert
-	ownedERC721Tokens := make(map[uint64]map[string][]opensea.Asset)
-	return ownedERC721Tokens, nil
->>>>>>> b132dc4f1 (chore: sending admin events)
 
 	if m.walletConfig == nil || m.walletConfig.OpenseaAPIKey == "" {
 		return nil, errors.New("no opensea client")
 	}
 
-<<<<<<< HEAD
 	ownedERC721Tokens := make(map[uint64]map[gethcommon.Address]map[string][]opensea.Asset)
-=======
-	//ownedERC721Tokens := make(map[uint64]map[string][]opensea.Asset)
->>>>>>> b132dc4f1 (chore: sending admin events)
 
 	for chainID, erc721Tokens := range tokenRequirements {
 
