@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/status-im/status-go/logutils"
@@ -37,10 +38,16 @@ func makeCert(address net.IP) (*tls.Certificate, []byte, error) {
 }
 
 func makeAndStartServer(cert *tls.Certificate, address net.IP) (string, func() error, error) {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	waitForPortSet := func(int) {
+		wg.Done()
+	}
+
 	s := server.NewServer(
 		cert,
 		address.String(),
-		nil,
+		waitForPortSet,
 		logutils.ZapLogger().Named("Preflight Server"),
 	)
 
@@ -50,9 +57,7 @@ func makeAndStartServer(cert *tls.Certificate, address net.IP) (string, func() e
 		return "", nil, err
 	}
 
-	// hack : sleep to give server time
-	// TODO something funky with the afterPortChanged func. Maybe waitgroup magic
-	time.Sleep(500 * time.Millisecond)
+	wg.Wait()
 	return s.GetHostname() + ":" + strconv.Itoa(s.GetPort()), s.Stop, nil
 }
 
