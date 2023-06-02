@@ -2650,6 +2650,11 @@ func (m *Manager) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*Requ
 	return m.persistence.CanceledRequestsToJoinForCommunity(id)
 }
 
+func (m *Manager) AcceptedRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
+	m.logger.Info("fetching canceled invitations", zap.String("community-id", id.String()))
+	return m.persistence.AcceptedRequestsToJoinForCommunity(id)
+}
+
 func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string, grant []byte) (bool, error) {
 	community, err := m.GetByIDString(communityID)
 	if err != nil {
