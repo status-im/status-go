@@ -58,6 +58,7 @@ type Account struct {
 	Clock     uint64                    `json:"clock,omitempty"`
 	Removed   bool                      `json:"removed,omitempty"`
 	Operable  AccountOperable           `json:"operable"` // describes an account's operability (read an explanation at the top of this file)
+	CreatedAt int64                     `json:"createdAt"`
 }
 
 type KeypairType string
@@ -119,6 +120,7 @@ func (a *Account) MarshalJSON() ([]byte, error) {
 		Clock            uint64                    `json:"clock"`
 		Removed          bool                      `json:"removed"`
 		Operable         AccountOperable           `json:"operable"`
+		CreatedAt        int64                     `json:"createdAt"`
 	}{
 		Address:          a.Address,
 		MixedcaseAddress: a.Address.Hex(),
@@ -135,6 +137,7 @@ func (a *Account) MarshalJSON() ([]byte, error) {
 		Clock:            a.Clock,
 		Removed:          a.Removed,
 		Operable:         a.Operable,
+		CreatedAt:        a.CreatedAt,
 	}
 
 	return json.Marshal(item)
@@ -267,17 +270,18 @@ func (db *Database) processKeypairs(rows *sql.Rows) ([]*Keypair, error) {
 	)
 
 	var (
-		accAddress  sql.NullString
-		accKeyUID   sql.NullString
-		accPath     sql.NullString
-		accName     sql.NullString
-		accColorID  sql.NullString
-		accEmoji    sql.NullString
-		accWallet   sql.NullBool
-		accChat     sql.NullBool
-		accHidden   sql.NullBool
-		accOperable sql.NullString
-		accClock    sql.NullInt64
+		accAddress   sql.NullString
+		accKeyUID    sql.NullString
+		accPath      sql.NullString
+		accName      sql.NullString
+		accColorID   sql.NullString
+		accEmoji     sql.NullString
+		accWallet    sql.NullBool
+		accChat      sql.NullBool
+		accHidden    sql.NullBool
+		accOperable  sql.NullString
+		accClock     sql.NullInt64
+		accCreatedAt sql.NullTime
 	)
 
 	for rows.Next() {
@@ -287,7 +291,7 @@ func (db *Database) processKeypairs(rows *sql.Rows) ([]*Keypair, error) {
 		err := rows.Scan(
 			&kpKeyUID, &kpName, &kpType, &kpDerivedFrom, &kpLastUsedDerivationIndex, &kpSyncedFrom, &kpClock,
 			&accAddress, &accKeyUID, &pubkey, &accPath, &accName, &accColorID, &accEmoji,
-			&accWallet, &accChat, &accHidden, &accOperable, &accClock)
+			&accWallet, &accChat, &accHidden, &accOperable, &accClock, &accCreatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -314,7 +318,6 @@ func (db *Database) processKeypairs(rows *sql.Rows) ([]*Keypair, error) {
 		if kpClock.Valid {
 			kp.Clock = uint64(kpClock.Int64)
 		}
-
 		// check keypair accounts fields
 		if accAddress.Valid {
 			acc.Address = types.BytesToAddress([]byte(accAddress.String))
@@ -349,7 +352,9 @@ func (db *Database) processKeypairs(rows *sql.Rows) ([]*Keypair, error) {
 		if accClock.Valid {
 			acc.Clock = uint64(accClock.Int64)
 		}
-
+		if accCreatedAt.Valid {
+			acc.CreatedAt = accCreatedAt.Time.UnixMilli()
+		}
 		if lth := len(pubkey); lth > 0 {
 			acc.PublicKey = make(types.HexBytes, lth)
 			copy(acc.PublicKey, pubkey)
@@ -394,13 +399,14 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string) ([]*Keypair, error) {
 			ka.pubkey,
 			ka.path,
 			ka.name,
-                        ka.color,
+			ka.color,
 			ka.emoji,
 			ka.wallet,
 			ka.chat,
 			ka.hidden,
 			ka.operable,
-			ka.clock
+			ka.clock,
+			ka.created_at
 		FROM
 			keypairs k
 		LEFT JOIN
@@ -481,7 +487,8 @@ func (db *Database) getAccounts(tx *sql.Tx, address types.Address) ([]*Account, 
 			ka.chat,
 			ka.hidden,
 			ka.operable,
-			ka.clock
+			ka.clock,
+			ka.created_at
 		FROM
 			keypairs_accounts ka
 		LEFT JOIN
