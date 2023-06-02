@@ -417,7 +417,7 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 	s.Require().Len(tokens, 1)
 	s.Require().Equal(token, *tokens[0])
 
-	err = s.db.UpdateCommunityTokenState("0x123", Deployed)
+	err = s.db.UpdateCommunityTokenState(1, "0x123", Deployed)
 	s.Require().NoError(err)
 	tokens, err = s.db.GetCommunityTokens("123")
 	s.Require().NoError(err)

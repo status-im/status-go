@@ -1309,8 +1309,12 @@ func (api *PublicAPI) AddCommunityToken(token *communities.CommunityToken) (*com
 	return api.service.messenger.AddCommunityToken(token)
 }
 
-func (api *PublicAPI) UpdateCommunityTokenState(contractAddress string, deployState communities.DeployState) error {
-	return api.service.messenger.UpdateCommunityTokenState(contractAddress, deployState)
+func (api *PublicAPI) UpdateCommunityTokenState(chainID int, contractAddress string, deployState communities.DeployState) error {
+	return api.service.messenger.UpdateCommunityTokenState(chainID, contractAddress, deployState)
+}
+
+func (api *PublicAPI) UpdateCommunityTokenSupply(chainID int, contractAddress string, supply int) error {
+	return api.service.messenger.UpdateCommunityTokenSupply(chainID, contractAddress, supply)
 }
 
 func (api *PublicAPI) ToggleCollapsedCommunityCategory(request *requests.ToggleCollapsedCommunityCategory) error {

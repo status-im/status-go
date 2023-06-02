@@ -3845,8 +3845,12 @@ func (m *Manager) AddCommunityToken(token *CommunityToken) (*CommunityToken, err
 	return token, m.persistence.AddCommunityToken(token)
 }
 
-func (m *Manager) UpdateCommunityTokenState(contractAddress string, deployState DeployState) error {
-	return m.persistence.UpdateCommunityTokenState(contractAddress, deployState)
+func (m *Manager) UpdateCommunityTokenState(chainID int, contractAddress string, deployState DeployState) error {
+	return m.persistence.UpdateCommunityTokenState(chainID, contractAddress, deployState)
+}
+
+func (m *Manager) UpdateCommunityTokenSupply(chainID int, contractAddress string, supply int) error {
+	return m.persistence.UpdateCommunityTokenSupply(chainID, contractAddress, supply)
 }
 
 func (m *Manager) SetCommunityActiveMembersCount(communityID string, activeMembersCount uint64) error {

@@ -89,6 +89,7 @@ const (
 	CollectibleDeployment         PendingTrxType = "CollectibleDeployment"
 	CollectibleAirdrop            PendingTrxType = "CollectibleAirdrop"
 	CollectibleRemoteSelfDestruct PendingTrxType = "CollectibleRemoteSelfDestruct"
+	CollectibleBurn               PendingTrxType = "CollectibleBurn"
 )
 
 type PendingTransaction struct {

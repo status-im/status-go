@@ -111,7 +111,8 @@ func (api *API) Deploy(ctx context.Context, chainID uint64, deploymentParameters
 
 // Returns gas units + 10%
 func (api *API) DeployCollectiblesEstimate(ctx context.Context) (uint64, error) {
-	return 3702411, nil
+	gasAmount := uint64(1960645)
+	return gasAmount + uint64(float32(gasAmount)*0.1), nil
 }
 
 func (api *API) newCollectiblesInstance(chainID uint64, contractAddress string) (*collectibles.Collectibles, error) {
@@ -166,17 +167,6 @@ func (api *API) EstimateMintTo(ctx context.Context, chainID uint64, contractAddr
 		return 0, err
 	}
 
-	ethClient, err := api.RPCClient.EthClient(chainID)
-	if err != nil {
-		log.Error(err.Error())
-		return 0, err
-	}
-
-	collectiblesABI, err := abi.JSON(strings.NewReader(collectibles.CollectiblesABI))
-	if err != nil {
-		return 0, err
-	}
-
 	totalAddresses := api.multiplyWalletAddresses(amount, walletAddresses)
 
 	var usersAddresses = []common.Address{}
@@ -184,35 +174,13 @@ func (api *API) EstimateMintTo(ctx context.Context, chainID uint64, contractAddr
 		usersAddresses = append(usersAddresses, common.HexToAddress(k))
 	}
 
-	data, err := collectiblesABI.Pack("mintTo", usersAddresses)
-	if err != nil {
-		return 0, err
-	}
-
-	ownerAddr, err := api.ContractOwner(ctx, chainID, contractAddress)
-	if err != nil {
-		return 0, err
-	}
-	toAddr := common.HexToAddress(contractAddress)
-	fromAddr := common.HexToAddress(ownerAddr)
-
-	callMsg := ethereum.CallMsg{
-		From:  fromAddr,
-		To:    &toAddr,
-		Value: big.NewInt(0),
-		Data:  data,
-	}
-
-	estimate, err := ethClient.EstimateGas(ctx, callMsg)
-	if err != nil {
-		return 0, err
-	}
-	return estimate + uint64(float32(estimate)*0.1), nil
+	return api.estimateMethod(ctx, chainID, contractAddress, "mintTo", usersAddresses)
 }
 
 func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, tokenIds []*bigint.BigInt) (string, error) {
-	if len(tokenIds) == 0 {
-		return "", errors.New("tokenIds list is empty")
+	err := api.validateTokens(tokenIds)
+	if err != nil {
+		return "", err
 	}
 
 	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
@@ -235,6 +203,20 @@ func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress 
 	return tx.Hash().Hex(), nil
 }
 
+func (api *API) EstimateRemoteBurn(ctx context.Context, chainID uint64, contractAddress string, tokenIds []*bigint.BigInt) (uint64, error) {
+	err := api.validateTokens(tokenIds)
+	if err != nil {
+		return 0, err
+	}
+
+	var tempTokenIds []*big.Int
+	for _, v := range tokenIds {
+		tempTokenIds = append(tempTokenIds, v.Int)
+	}
+
+	return api.estimateMethod(ctx, chainID, contractAddress, "remoteBurn", tempTokenIds)
+}
+
 func (api *API) ContractOwner(ctx context.Context, chainID uint64, contractAddress string) (string, error) {
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
 	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
@@ -248,14 +230,90 @@ func (api *API) ContractOwner(ctx context.Context, chainID uint64, contractAddre
 	return owner.String(), nil
 }
 
-func (api *API) AddTokenOwners(ctx context.Context, chainID uint64, contractAddress string, walletAddresses []string, amount int) error {
-	err := api.validateWalletsAndAmounts(walletAddresses, amount)
+func (api *API) MintedCount(ctx context.Context, chainID uint64, contractAddress string) (*big.Int, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	mintedCount, err := contractInst.MintedCount(callOpts)
+	if err != nil {
+		return nil, err
+	}
+	return mintedCount, nil
+}
+
+// RemainingSupply = MaxSupply - MintedCount
+func (api *API) RemainingSupply(ctx context.Context, chainID uint64, contractAddress string) (*big.Int, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+	maxSupply, err := contractInst.MaxSupply(callOpts)
+	if err != nil {
+		return nil, err
+	}
+	mintedCount, err := contractInst.MintedCount(callOpts)
+	if err != nil {
+		return nil, err
+	}
+	var res = new(big.Int)
+	res.Sub(maxSupply, mintedCount)
+	return res, nil
+}
+
+func (api *API) maxSupply(ctx context.Context, chainID uint64, contractAddress string) (*big.Int, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+	return contractInst.MaxSupply(callOpts)
+}
+
+func (api *API) Burn(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, burnAmount *bigint.BigInt) (string, error) {
+	err := api.validateBurnAmount(ctx, burnAmount, chainID, contractAddress)
+	if err != nil {
+		return "", err
 	}
 
-	totalAddresses := api.multiplyWalletAddresses(amount, walletAddresses)
-	return api.db.AddTokenOwners(chainID, contractAddress, totalAddresses)
+	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
+	if err != nil {
+		return "", err
+	}
+
+	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
+
+	maxSupply, err := api.maxSupply(ctx, chainID, contractAddress)
+	if err != nil {
+		return "", err
+	}
+	var newMaxSupply = new(big.Int)
+	newMaxSupply.Sub(maxSupply, burnAmount.Int)
+
+	tx, err := contractInst.SetMaxSupply(transactOpts, newMaxSupply)
+	if err != nil {
+		return "", err
+	}
+
+	return tx.Hash().Hex(), nil
+}
+
+func (api *API) EstimateBurn(ctx context.Context, chainID uint64, contractAddress string, burnAmount *bigint.BigInt) (uint64, error) {
+	err := api.validateBurnAmount(ctx, burnAmount, chainID, contractAddress)
+	if err != nil {
+		return 0, err
+	}
+
+	maxSupply, err := api.maxSupply(ctx, chainID, contractAddress)
+	if err != nil {
+		return 0, err
+	}
+	var newMaxSupply = new(big.Int)
+	newMaxSupply.Sub(maxSupply, burnAmount.Int)
+
+	return api.estimateMethod(ctx, chainID, contractAddress, "setMaxSupply", newMaxSupply)
 }
 
 func (api *API) validateWalletsAndAmounts(walletAddresses []string, amount int) error {
@@ -268,11 +326,28 @@ func (api *API) validateWalletsAndAmounts(walletAddresses []string, amount int) 
 	return nil
 }
 
-func (api *API) EstimateRemoteBurn(ctx context.Context, chainID uint64, contractAddress string, tokenIds []*bigint.BigInt) (uint64, error) {
+func (api *API) validateTokens(tokenIds []*bigint.BigInt) error {
 	if len(tokenIds) == 0 {
-		return 0, errors.New("token list is empty")
+		return errors.New("token list is empty")
 	}
+	return nil
+}
 
+func (api *API) validateBurnAmount(ctx context.Context, burnAmount *bigint.BigInt, chainID uint64, contractAddress string) error {
+	if burnAmount.Cmp(big.NewInt(0)) <= 0 {
+		return errors.New("burnAmount is less than 0")
+	}
+	remainingSupply, err := api.RemainingSupply(ctx, chainID, contractAddress)
+	if err != nil {
+		return err
+	}
+	if burnAmount.Cmp(remainingSupply) > 1 {
+		return errors.New("burnAmount is bigger than remaining amount")
+	}
+	return nil
+}
+
+func (api *API) estimateMethod(ctx context.Context, chainID uint64, contractAddress string, methodName string, args ...interface{}) (uint64, error) {
 	ethClient, err := api.RPCClient.EthClient(chainID)
 	if err != nil {
 		log.Error(err.Error())
@@ -284,12 +359,7 @@ func (api *API) EstimateRemoteBurn(ctx context.Context, chainID uint64, contract
 		return 0, err
 	}
 
-	var tempTokenIds []*big.Int
-	for _, v := range tokenIds {
-		tempTokenIds = append(tempTokenIds, v.Int)
-	}
-
-	data, err := collectiblesABI.Pack("remoteBurn", tempTokenIds)
+	data, err := collectiblesABI.Pack(methodName, args...)
 	if err != nil {
 		return 0, err
 	}
@@ -298,6 +368,7 @@ func (api *API) EstimateRemoteBurn(ctx context.Context, chainID uint64, contract
 	if err != nil {
 		return 0, err
 	}
+
 	toAddr := common.HexToAddress(contractAddress)
 	fromAddr := common.HexToAddress(ownerAddr)
 
@@ -307,7 +378,6 @@ func (api *API) EstimateRemoteBurn(ctx context.Context, chainID uint64, contract
 		Value: big.NewInt(0),
 		Data:  data,
 	}
-
 	estimate, err := ethClient.EstimateGas(ctx, callMsg)
 	if err != nil {
 		return 0, err
