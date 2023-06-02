@@ -916,7 +916,7 @@ func ConvertToRegularAccount(mnemonic, currPassword, newPassword string) string 
 }
 
 func ImageServerTLSCert() string {
-	cert, err := server.PublicTLSCert()
+	cert, err := server.PublicMediaTLSCert()
 
 	if err != nil {
 		return makeJSONResponse(err)
