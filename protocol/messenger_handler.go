@@ -1455,6 +1455,9 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 	}
 
 	if requestToJoin.State == communities.RequestToJoinStatePending {
+		if state.Response.RequestsToJoinCommunity == nil {
+			state.Response.RequestsToJoinCommunity = make([]*communities.RequestToJoin, 0)
+		}
 		state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, requestToJoin)
 
 		state.Response.AddNotification(NewCommunityRequestToJoinNotification(requestToJoin.ID.String(), community, contact))
