@@ -328,7 +328,10 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.SyncKeypair))
 	case protobuf.ApplicationMetadataMessage_SYNC_FULL_KEYPAIR:
 		return m.unmarshalProtobufData(new(protobuf.SyncKeypairFull))
+	case protobuf.ApplicationMetadataMessage_COMMUNITY_ADMIN_MESSAGE:
+		return m.unmarshalProtobufData(new(protobuf.CommunityAdminEvent))
 	}
+
 	return nil
 }
 
