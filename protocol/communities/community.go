@@ -584,7 +584,7 @@ func (o *Community) InviteUserToOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityInv
 		return nil, ErrNotAdmin
 	}
 
-	err := o.AddMember(pk, []protobuf.CommunityMember_Roles{})
+	_, err := o.AddMember(pk, []protobuf.CommunityMember_Roles{})
 	if err != nil {
 		return nil, err
 	}
@@ -1824,12 +1824,13 @@ func (o *Community) RequestsToJoin() []*RequestToJoin {
 	return o.config.RequestsToJoin
 }
 
-func (o *Community) AddMember(publicKey *ecdsa.PublicKey, roles []protobuf.CommunityMember_Roles) error {
-	if o.config.PrivateKey == nil {
-		return ErrNotAdmin
+func (o *Community) AddMember(publicKey *ecdsa.PublicKey, roles []protobuf.CommunityMember_Roles) (*CommunityChanges, error) {
+	if !o.IsOwnerOrAdmin() {
+		return nil, ErrNotAdmin
 	}
 
 	memberKey := common.PubkeyToHex(publicKey)
+	changes := o.emptyCommunityChanges()
 
 	if o.config.CommunityDescription.Members == nil {
 		o.config.CommunityDescription.Members = make(map[string]*protobuf.CommunityMember)
@@ -1837,9 +1838,11 @@ func (o *Community) AddMember(publicKey *ecdsa.PublicKey, roles []protobuf.Commu
 
 	if _, ok := o.config.CommunityDescription.Members[memberKey]; !ok {
 		o.config.CommunityDescription.Members[memberKey] = &protobuf.CommunityMember{Roles: roles}
+		changes.MembersAdded[memberKey] = o.config.CommunityDescription.Members[memberKey]
 	}
+
 	o.increaseClock()
-	return nil
+	return changes, nil
 }
 
 func (o *Community) ChatIDs() (chatIDs []string) {
