@@ -147,6 +147,32 @@ func (o *Community) ToCommunityEditAdminEvent() *protobuf.CommunityAdminEvent {
 	}
 }
 
+func (o *Community) ToCommunityBecomeMemberTokenPermissionChangeAdminEvent() *protobuf.CommunityAdminEvent {
+	tokenPermissions := make(map[string]*protobuf.CommunityTokenPermission)
+	for _, tp := range o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER) {
+		tokenPermissions[tp.Id] = tp
+	}
+	return &protobuf.CommunityAdminEvent{
+		Clock:            o.Clock(),
+		CommunityId:      o.ID(),
+		Type:             protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGE,
+		TokenPermissions: tokenPermissions,
+	}
+}
+
+func (o *Community) ToCommunityBecomeMemberTokenPermissionDeleteAdminEvent() *protobuf.CommunityAdminEvent {
+	tokenPermissions := make(map[string]*protobuf.CommunityTokenPermission)
+	for _, tp := range o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER) {
+		tokenPermissions[tp.Id] = tp
+	}
+	return &protobuf.CommunityAdminEvent{
+		Clock:            o.Clock(),
+		CommunityId:      o.ID(),
+		Type:             protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETE,
+		TokenPermissions: tokenPermissions,
+	}
+}
+
 func (o *Community) PatchCommunityDescriptionByAdminEvent(adminEvent *protobuf.CommunityAdminEvent) (*protobuf.CommunityDescription, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
@@ -178,10 +204,24 @@ func (o *Community) PatchCommunityDescriptionByAdminEvent(adminEvent *protobuf.C
 		copy.config.CommunityDescription.Tags = adminEvent.CommunityConfig.Tags
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGE:
-		// TODO admin permission
+		prevPermissions := copy.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+		newPermissions := adminEvent.TokenPermissions
+
+		if len(newPermissions) < len(prevPermissions) {
+			// we only handle additions and update in this event type
+			break
+		}
+
+		if len(newPermissions) > len(prevPermissions) {
+			copy.addBecomeMemberTokenPermissions(newPermissions)
+			break
+		}
+
+		// update existing permissions
+		copy.updateTokenPermissions(newPermissions)
 		break
 	case protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETE:
-		// TODO admin permission
+		copy.replaceBecomeMemberTokenPermissions(adminEvent.TokenPermissions)
 		break
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_CATEGORY_CREATE:
