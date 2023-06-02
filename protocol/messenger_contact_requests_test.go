@@ -152,7 +152,7 @@ func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string,
 	s.Require().Equal(common.ContactRequestStatePending, contactRequest.ContactRequestState)
 	s.Require().Equal(messageText, contactRequest.Text)
 	s.Require().Equal(mutualStateUpdate.From, contactRequest.From)
-	s.Require().Equal(mutualStateUpdate.ChatId, contactRequest.ChatId)
+	s.Require().Equal(mutualStateUpdate.ChatId, contactRequest.From)
 	s.Require().Equal(mutualStateUpdate.Text, "@"+contactRequest.From+" sent you a contact request")
 
 	// Check activity center notification is of the right type
@@ -167,7 +167,7 @@ func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string,
 	notifications, err := theirMessenger.ActivityCenterNotifications(ActivityCenterNotificationsRequest{
 		Cursor:        "",
 		Limit:         10,
-		ActivityTypes: []ActivityCenterType{},
+		ActivityTypes: []ActivityCenterType{ActivityCenterNotificationTypeContactRequest},
 		ReadType:      ActivityCenterQueryParamsReadUnread,
 	},
 	)
@@ -273,7 +273,7 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 	s.Require().Equal(common.ContactRequestStateAccepted, contactRequestMsg.ContactRequestState)
 
 	s.Require().Equal(mutualStateUpdate.From, contactRequestMsg.ChatId)
-	s.Require().Equal(mutualStateUpdate.ChatId, contactRequestMsg.From)
+	s.Require().Equal(mutualStateUpdate.ChatId, contactRequestMsg.ChatId)
 	s.Require().Equal(mutualStateUpdate.Text, "@"+mutualStateUpdate.From+" added you as a contact")
 
 	// Make sure we consider them a mutual contact, sender side
@@ -350,7 +350,7 @@ func (s *MessengerContactRequestSuite) retractContactRequest(contactID string, t
 	resp, err = WaitOnMessengerResponse(
 		theirMessenger,
 		func(r *MessengerResponse) bool {
-			return len(r.Contacts) > 0
+			return len(r.Contacts) > 0 && len(r.ActivityCenterNotifications()) == 1
 		},
 		"no messages",
 	)
@@ -365,6 +365,11 @@ func (s *MessengerContactRequestSuite) retractContactRequest(contactID string, t
 	s.Require().False(resp.Contacts[0].hasAddedUs())
 	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
 	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
+
+	// Check pending notification
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(ActivityCenterNotificationTypeContactRemoved, resp.ActivityCenterNotifications()[0].Type)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, false)
 }
 
 func (s *MessengerContactRequestSuite) syncInstallationContactV2FromContact(contact *Contact) protobuf.SyncInstallationContactV2 {
@@ -581,7 +586,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	s.Require().Equal(common.ContactRequestStateAccepted, contactRequestMsg.ContactRequestState)
 
 	s.Require().Equal(mutualStateUpdate.From, contactRequest.ChatId)
-	s.Require().Equal(mutualStateUpdate.ChatId, contactRequest.From)
+	s.Require().Equal(mutualStateUpdate.ChatId, contactRequest.ChatId)
 
 	// Check activity center notification is of the right type
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)

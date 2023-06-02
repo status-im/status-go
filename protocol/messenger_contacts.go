@@ -54,7 +54,7 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 
 	message := &common.Message{
 		ChatMessage: protobuf.ChatMessage{
-			ChatId:      to,
+			ChatId:      contactID,
 			Text:        text,
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			ContentType: protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_STATE_UPDATE,
@@ -63,7 +63,7 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 		},
 		From:             from,
 		WhisperTimestamp: timestamp,
-		LocalChatID:      to,
+		LocalChatID:      contactID,
 		Seen:             outgoing,
 		ID:               types.EncodeHex(crypto.Keccak256([]byte(fmt.Sprintf("%s%s%d%d", from, to, updateType, clock)))),
 	}
@@ -585,7 +585,27 @@ func (m *Messenger) removeContact(ctx context.Context, response *MessengerRespon
 		return ErrContactNotFound
 	}
 
-	_, clock, err := m.getOneToOneAndNextClock(contact)
+	// System message for mutual state update
+	chat, clock, err := m.getOneToOneAndNextClock(contact)
+	if err != nil {
+		return err
+	}
+	timestamp := m.getTimesource().GetCurrentTime()
+	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeRemoved, clock, timestamp, true)
+	if err != nil {
+		return err
+	}
+
+	m.prepareMessage(updateMessage, m.httpServer)
+	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
+	if err != nil {
+		return err
+	}
+	response.AddMessage(updateMessage)
+	response.AddChat(chat)
+
+	// Next we retract a contact request
+	_, clock, err = m.getOneToOneAndNextClock(contact)
 	if err != nil {
 		return err
 	}
@@ -766,7 +786,7 @@ func (m *Messenger) blockContact(response *MessengerResponse, contactID string, 
 		return nil, nil, err
 	}
 
-	err = m.sendRetractContactRequest(contact, response)
+	err = m.sendRetractContactRequest(contact)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -788,6 +808,12 @@ func (m *Messenger) blockContact(response *MessengerResponse, contactID string, 
 
 	// re-register for push notifications
 	err = m.reregisterForPushNotifications()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// We remove anything that's related to this contact request
+	err = m.persistence.HardDeleteChatContactRequestActivityCenterNotifications(contact.ID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1004,7 +1030,7 @@ func (m *Messenger) RetractContactRequest(request *requests.RetractContactReques
 		return nil, err
 	}
 
-	err = m.sendRetractContactRequest(contact, response)
+	err = m.sendRetractContactRequest(contact)
 	if err != nil {
 		return nil, err
 	}
@@ -1013,7 +1039,7 @@ func (m *Messenger) RetractContactRequest(request *requests.RetractContactReques
 }
 
 // Send message to remote account to remove our contact from their end.
-func (m *Messenger) sendRetractContactRequest(contact *Contact, response *MessengerResponse) error {
+func (m *Messenger) sendRetractContactRequest(contact *Contact) error {
 	_, clock, err := m.getOneToOneAndNextClock(contact)
 	if err != nil {
 		return err
@@ -1036,25 +1062,6 @@ func (m *Messenger) sendRetractContactRequest(contact *Contact, response *Messen
 	if err != nil {
 		return err
 	}
-
-	// System message for mutual state update
-	chat, clock, err := m.getOneToOneAndNextClock(contact)
-	if err != nil {
-		return err
-	}
-	timestamp := m.getTimesource().GetCurrentTime()
-	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeRemoved, clock, timestamp, true)
-	if err != nil {
-		return err
-	}
-
-	m.prepareMessage(updateMessage, m.httpServer)
-	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
-	if err != nil {
-		return err
-	}
-	response.AddMessage(updateMessage)
-	response.AddChat(chat)
 
 	return err
 }

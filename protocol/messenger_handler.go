@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/status-im/status-go/signal"
 
 	"github.com/pkg/errors"
@@ -972,7 +973,7 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
 	return nil
 }
 
-func (m *Messenger) handleRetractContactRequest(contact *Contact, message protobuf.RetractContactRequest) error {
+func (m *Messenger) handleRetractContactRequest(response *MessengerResponse, contact *Contact, message protobuf.RetractContactRequest) error {
 	if contact.ID == m.myHexIdentity() {
 		m.logger.Debug("retraction coming from us, ignoring")
 		return nil
@@ -985,9 +986,38 @@ func (m *Messenger) handleRetractContactRequest(contact *Contact, message protob
 		return nil
 	}
 
-	// We remove anything that's related to this contact request
-	err := m.persistence.HardDeleteChatContactRequestActivityCenterNotifications(contact.ID)
+	// System message for mutual state update
+	chat, clock, err := m.getOneToOneAndNextClock(contact)
 	if err != nil {
+		return err
+	}
+	timestamp := m.getTimesource().GetCurrentTime()
+	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeRemoved, clock, timestamp, false)
+	if err != nil {
+		return err
+	}
+
+	m.prepareMessage(updateMessage, m.httpServer)
+	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
+	if err != nil {
+		return err
+	}
+	response.AddMessage(updateMessage)
+	response.AddChat(chat)
+
+	notification := &ActivityCenterNotification{
+		ID:        types.FromHex(uuid.New().String()),
+		Type:      ActivityCenterNotificationTypeContactRemoved,
+		Name:      contact.PrimaryName(),
+		Author:    contact.ID,
+		Timestamp: m.getTimesource().GetCurrentTime(),
+		ChatID:    contact.ID,
+		Read:      false,
+	}
+
+	err = m.addActivityCenterNotification(response, notification)
+	if err != nil {
+		m.logger.Warn("failed to create activity center notification", zap.Error(err))
 		return err
 	}
 
@@ -998,7 +1028,7 @@ func (m *Messenger) handleRetractContactRequest(contact *Contact, message protob
 
 func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, message protobuf.RetractContactRequest) error {
 	contact := state.CurrentMessageState.Contact
-	err := m.handleRetractContactRequest(contact, message)
+	err := m.handleRetractContactRequest(state.Response, contact, message)
 	if err != nil {
 		return err
 	}
