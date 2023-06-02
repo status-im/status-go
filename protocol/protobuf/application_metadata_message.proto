@@ -79,5 +79,6 @@ message ApplicationMetadataMessage {
     SYNC_SOCIAL_LINKS = 64;
     SYNC_ENS_USERNAME_DETAIL = 65;
     SYNC_FULL_KEYPAIR = 66;
+    COMMUNITY_ADMIN_MESSAGE = 67;
   }
 }

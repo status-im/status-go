@@ -15,10 +15,11 @@ message Grant {
 
 message CommunityMember {
   enum Roles {
-    UNKNOWN_ROLE = 0;
-    ROLE_ALL = 1;
+    ROLE_NONE = 0;
+    ROLE_OWNER = 1;
     ROLE_MANAGE_USERS = 2;
     ROLE_MODERATE_CONTENT = 3;
+    ROLE_ADMIN = 4;
   }
   repeated Roles roles = 1;
   repeated string wallet_accounts = 2;
