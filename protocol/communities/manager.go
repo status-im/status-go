@@ -661,40 +661,81 @@ func (m *Manager) checkMemberPermissions(communityID types.HexBytes) error {
 	if err != nil {
 		return err
 	}
+
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 
-	if len(becomeMemberPermissions) > 0 {
-		for memberKey, member := range community.Members() {
-			memberPubKey, err := common.HexToPubkey(memberKey)
+	adminPermissions := len(becomeAdminPermissions) > 0
+	memberPermissions := len(becomeMemberPermissions) > 0
+
+	if !adminPermissions && !memberPermissions {
+		m.publish(&Subscription{Community: community})
+		return nil
+	}
+
+	for memberKey, member := range community.Members() {
+		memberPubKey, err := common.HexToPubkey(memberKey)
+		if err != nil {
+			return err
+		}
+
+		if memberKey == common.PubkeyToHex(&m.identity.PublicKey) || community.IsMemberOwner(memberPubKey) {
+			continue
+		}
+
+		isAdmin := community.IsMemberAdmin(memberPubKey)
+		memberHasWallet := len(member.RevealedAccounts) > 0
+
+		// check if user was not treated as an admin without wallet in open community
+		// or user threated as a member without wallet in closed community
+		if (!memberHasWallet && isAdmin) || (memberPermissions && !memberHasWallet) {
+			_, err = community.RemoveUserFromOrg(memberPubKey)
 			if err != nil {
 				return err
 			}
+			continue
+		}
 
-			if memberKey == common.PubkeyToHex(&m.identity.PublicKey) || community.IsMemberOwner(memberPubKey) {
-				continue
-			}
+		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(member.RevealedAccounts)
 
-			accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(member.RevealedAccounts)
-
-			permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, accountsAndChainIDs, true)
+		// check if user is still an admin or can became an admin and do update of member role
+		if adminPermissions {
+			permissionResponse, err := m.checkPermissionToJoin(becomeAdminPermissions, accountsAndChainIDs, true)
 			if err != nil {
 				return err
+			} else if permissionResponse.Satisfied && !isAdmin {
+				_, err = community.AddRoleToMember(memberPubKey, protobuf.CommunityMember_ROLE_ADMIN)
+				if err != nil {
+					return err
+				}
+				isAdmin = true
+			} else if !permissionResponse.Satisfied && isAdmin {
+				_, err = community.RemoveRoleFromMember(memberPubKey, protobuf.CommunityMember_ROLE_ADMIN)
+				if err != nil {
+					return err
+				}
+				isAdmin = false
 			}
+		}
 
-			hasPermission := permissionResponse.Satisfied
+		// skip further validation if user has admin permissions or we do not have member permissions
+		if isAdmin || !memberPermissions {
+			continue
+		}
 
-			if !hasPermission {
-				pk, err := common.HexToPubkey(memberKey)
-				if err != nil {
-					return err
-				}
-				_, err = community.RemoveUserFromOrg(pk)
-				if err != nil {
-					return err
-				}
+		permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, accountsAndChainIDs, true)
+		if err != nil {
+			return err
+		}
+
+		if !permissionResponse.Satisfied {
+			_, err = community.RemoveUserFromOrg(memberPubKey)
+			if err != nil {
+				return err
 			}
 		}
 	}
+
 	m.publish(&Subscription{Community: community})
 	return nil
 }
