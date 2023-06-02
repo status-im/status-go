@@ -6,8 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"image"
+	"image/color"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -53,276 +56,437 @@ func handleRequestDownloaderMissing(logger *zap.Logger) http.HandlerFunc {
 	}
 }
 
+type PreparedImage struct {
+	Payload []byte
+	Width   int
+	Height  int
+}
+
+type ParsedParams struct {
+	KeyUID          string
+	PublicKey       string
+	ImageName       string
+	ImagePath       string
+	FullName        string
+	InitialsLength  int
+	FontFile        string
+	FontSize        float64
+	Color           color.Color
+	BgSize          int
+	BgColor         color.Color
+	UppercaseRatio  float64
+	Theme           ring.Theme
+	Ring            bool
+	StatusIndicator bool
+	Online          bool
+}
+
+func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
+	parsed := ParsedParams{}
+	parsed.Color = color.Transparent
+	parsed.BgColor = color.Transparent
+	parsed.UppercaseRatio = 1.0
+
+	keyUids, _ := params["keyUid"]
+	if len(keyUids) != 0 {
+		parsed.KeyUID = keyUids[0]
+	}
+
+	pks, _ := params["publicKey"]
+	if len(pks) != 0 {
+		parsed.PublicKey = pks[0]
+	}
+
+	imageNames, _ := params["imageName"]
+	if len(imageNames) != 0 {
+		if filepath.IsAbs(imageNames[0]) {
+			if _, err := os.Stat(imageNames[0]); err == nil {
+				parsed.ImagePath = imageNames[0]
+			} else {
+				logger.Error("ParseParams: image not exit", zap.String("imageName", imageNames[0]))
+				return parsed
+			}
+		} else {
+			parsed.ImageName = imageNames[0]
+		}
+	}
+
+	names, _ := params["name"]
+	if len(names) != 0 {
+		parsed.FullName = names[0]
+	}
+
+	parsed.InitialsLength = 2
+	amountInitialsStr, _ := params["length"]
+	if len(amountInitialsStr) != 0 {
+		amountInitials, err := strconv.Atoi(amountInitialsStr[0])
+		if err != nil {
+			logger.Error("ParseParams: invalid initials length")
+			return parsed
+		}
+		parsed.InitialsLength = amountInitials
+	}
+
+	fontFiles, _ := params["fontFile"]
+	if len(fontFiles) != 0 {
+		if _, err := os.Stat(fontFiles[0]); err == nil {
+			parsed.FontFile = fontFiles[0]
+		} else {
+			logger.Error("ParseParams: font file not exit", zap.String("FontFile", fontFiles[0]))
+			return parsed
+		}
+	}
+
+	fontSizeStr, _ := params["fontSize"]
+	if len(fontSizeStr) != 0 {
+		fontSize, err := strconv.ParseFloat(fontSizeStr[0], 64)
+		if err != nil {
+			logger.Error("ParseParams: invalid fontSize", zap.String("FontSize", fontSizeStr[0]))
+			return parsed
+		}
+		parsed.FontSize = fontSize
+	}
+
+	colors, _ := params["color"]
+	if len(colors) != 0 {
+		color, err := images.ParseColor(colors[0])
+		if err != nil {
+			logger.Error("ParseParams: invalid color", zap.String("Color", colors[0]))
+			return parsed
+		}
+		parsed.Color = color
+	}
+
+	sizeStrs, _ := params["size"]
+	if len(sizeStrs) != 0 {
+		size, err := strconv.Atoi(sizeStrs[0])
+		if err != nil {
+			logger.Error("ParseParams: invalid size", zap.String("size", sizeStrs[0]))
+			return parsed
+		}
+		parsed.BgSize = size
+	}
+
+	bgColors, _ := params["bgColor"]
+	if len(bgColors) != 0 {
+		bgColor, err := images.ParseColor(bgColors[0])
+		if err != nil {
+			logger.Error("ParseParams: invalid bgColor", zap.String("BgColor", bgColors[0]))
+			return parsed
+		}
+		parsed.BgColor = bgColor
+	}
+
+	uppercaseRatioStr, _ := params["uppercaseRatio"]
+	if len(uppercaseRatioStr) != 0 {
+		uppercaseRatio, err := strconv.ParseFloat(uppercaseRatioStr[0], 64)
+		if err != nil {
+			logger.Error("ParseParams: invalid uppercaseRatio", zap.String("uppercaseRatio", uppercaseRatioStr[0]))
+			return parsed
+		}
+		parsed.UppercaseRatio = uppercaseRatio
+	}
+
+	parsed.Theme = getTheme(params, logger)
+	parsed.Ring = ringEnabled(params)
+	parsed.StatusIndicator = statusIndicatorEnabled(params)
+	parsed.Online = isOnline(params)
+
+	return parsed
+}
+
+func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *zap.Logger, w http.ResponseWriter, r *http.Request, parsed ParsedParams) {
+	if parsed.KeyUID == "" {
+		logger.Error("handleAccountImagesImpl: no keyUid")
+		return
+	}
+
+	if parsed.ImageName == "" {
+		logger.Error("handleAccountImagesImpl: no imageName")
+		return
+	}
+
+	identityImage, err := multiaccountsDB.GetIdentityImage(parsed.KeyUID, parsed.ImageName)
+	if err != nil {
+		logger.Error("handleAccountImagesImpl: failed to load image.", zap.String("keyUid", parsed.KeyUID), zap.String("imageName", parsed.ImageName), zap.Error(err))
+		return
+	}
+	img := PreparedImage{identityImage.Payload, identityImage.Width, identityImage.Height}
+
+	payload, err := images.CropAvatar(img.Payload)
+	if err != nil {
+		logger.Error("handleAccountImagesImpl: failed to crop image.", zap.String("keyUid", parsed.KeyUID), zap.String("imageName", parsed.ImageName), zap.Error(err))
+		return
+	}
+	img.Payload = payload
+
+	if parsed.Ring {
+		account, err := multiaccountsDB.GetAccount(parsed.KeyUID)
+		if err != nil {
+			logger.Error("handleAccountImagesImpl: failed to GetAccount .", zap.String("keyUid", parsed.KeyUID), zap.Error(err))
+			return
+		}
+
+		accColorHash := account.ColorHash
+
+		if accColorHash == nil {
+			if parsed.PublicKey == "" {
+				logger.Error("handleAccountImagesImpl: no public key for color hash", zap.String("keyUid", parsed.KeyUID))
+				return
+			}
+
+			accColorHash, err = colorhash.GenerateFor(parsed.PublicKey)
+			if err != nil {
+				logger.Error("handleAccountImagesImpl: could not generate color hash", zap.String("keyUid", parsed.KeyUID))
+				return
+			}
+		}
+
+		payload, err = ring.DrawRing(&ring.DrawRingParam{
+			Theme: parsed.Theme, ColorHash: accColorHash, ImageBytes: img.Payload, Height: img.Height, Width: img.Width,
+		})
+		if err != nil {
+			logger.Error("handleAccountImagesImpl: failed to draw ring for account identity", zap.Error(err))
+			return
+		}
+		img.Payload = payload
+	}
+
+	if parsed.StatusIndicator {
+		payload, err = images.AddStatusIndicatorToImage(img.Payload, parsed.Online)
+		if err != nil {
+			logger.Error("handleAccountImagesImpl: failed to draw status-indicator for initials", zap.Error(err))
+			return
+		}
+		img.Payload = payload
+	}
+
+	if len(img.Payload) == 0 {
+		logger.Error("handleAccountImagesImpl: empty image")
+		return
+	}
+
+	mime, err := images.GetProtobufImageMime(img.Payload)
+	if err != nil {
+		logger.Error("failed to get mime", zap.Error(err))
+	}
+
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Cache-Control", "no-store")
+
+	_, err = w.Write(img.Payload)
+	if err != nil {
+		logger.Error("handleAccountImagesImpl: failed to write image", zap.Error(err))
+	}
+}
+
+func handleAccountImagesPlaceholder(logger *zap.Logger, w http.ResponseWriter, r *http.Request, parsed ParsedParams) {
+	if parsed.ImagePath == "" {
+		logger.Error("handleAccountImagesPlaceholder: no imagePath")
+		return
+	}
+
+	payload, im, err := images.ImageToBytesAndImage(parsed.ImagePath)
+	if err != nil {
+		logger.Error("handleAccountImagesPlaceholder: failed to load image from disk", zap.String("imageName", parsed.ImagePath))
+		return
+	}
+	img := PreparedImage{payload, im.Bounds().Dx(), im.Bounds().Dy()}
+
+	payload, err = images.CropAvatar(img.Payload)
+	if err != nil {
+		logger.Error("handleAccountImagesPlaceholder: failed to crop image.", zap.String("imageName", parsed.ImagePath), zap.Error(err))
+		return
+	}
+	img.Payload = payload
+
+	if parsed.StatusIndicator {
+		payload, err = images.AddStatusIndicatorToImage(img.Payload, parsed.Online)
+		if err != nil {
+			logger.Error("handleAccountImagesPlaceholder: failed to draw status-indicator for initials", zap.Error(err))
+			return
+		}
+		img.Payload = payload
+	}
+
+	if len(img.Payload) == 0 {
+		logger.Error("handleAccountImagesPlaceholder: empty image")
+		return
+	}
+
+	mime, err := images.GetProtobufImageMime(img.Payload)
+	if err != nil {
+		logger.Error("failed to get mime", zap.Error(err))
+	}
+
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Cache-Control", "no-store")
+
+	_, err = w.Write(img.Payload)
+	if err != nil {
+		logger.Error("handleAccountImagesPlaceholder: failed to write image", zap.Error(err))
+	}
+}
+
 func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
+		parsed := ParseParams(logger, params)
 
-		keyUids, ok := params["keyUid"]
-		if !ok || len(keyUids) == 0 {
-			logger.Error("no keyUid")
+		if parsed.KeyUID == "" {
+			handleAccountImagesPlaceholder(logger, w, r, parsed)
+			return
+		} else {
+			handleAccountImagesImpl(multiaccountsDB, logger, w, r, parsed)
 			return
 		}
-		imageNames, ok := params["imageName"]
-		if !ok || len(imageNames) == 0 {
-			logger.Error("no imageName")
-			return
-		}
+	}
+}
 
-		identityImage, err := multiaccountsDB.GetIdentityImage(keyUids[0], imageNames[0])
-		if err != nil {
-			logger.Error("handleAccountImages: failed to load image.", zap.String("keyUid", keyUids[0]), zap.String("imageName", imageNames[0]), zap.Error(err))
-			return
-		}
+func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *zap.Logger, w http.ResponseWriter, r *http.Request, parsed ParsedParams) {
+	account, err := multiaccountsDB.GetAccount(parsed.KeyUID)
 
-		var payload = identityImage.Payload
+	initials := images.ExtractInitials(account.Name, parsed.InitialsLength)
 
-		payload, err = images.CropAvatar(payload)
-		if err != nil {
-			logger.Error("handleAccountImages: failed to crop image.", zap.String("keyUid", keyUids[0]), zap.String("imageName", imageNames[0]), zap.Error(err))
-			return
-		}
+	initialsImagePayload, err := images.GenerateInitialsImage(initials, parsed.BgColor, parsed.Color, parsed.FontFile, parsed.BgSize, parsed.FontSize, parsed.UppercaseRatio)
 
-		if ringEnabled(params) {
-			account, err := multiaccountsDB.GetAccount(keyUids[0])
+	if err != nil {
+		logger.Error("handleAccountInitialsImpl: failed to generate initials image.", zap.String("keyUid", parsed.KeyUID), zap.String("name", account.Name), zap.Error(err))
+		return
+	}
 
-			if err != nil {
-				logger.Error("handleAccountImages: failed to GetAccount .", zap.String("keyUid", keyUids[0]), zap.Error(err))
+	img := PreparedImage{initialsImagePayload, parsed.BgSize, parsed.BgSize}
+
+	if parsed.Ring {
+		accColorHash := account.ColorHash
+
+		if accColorHash == nil {
+			if parsed.PublicKey == "" {
+				logger.Error("handleAccountInitialsImpl: no public key or color hash, can't draw ring", zap.String("keyUid", parsed.KeyUID), zap.Error(err))
 				return
 			}
 
-			accColorHash := account.ColorHash
-
-			if accColorHash == nil {
-				pks, ok := params["publicKey"]
-				if !ok || len(pks) == 0 {
-					logger.Error("no publicKey")
-					return
-				}
-
-				accColorHash, err = colorhash.GenerateFor(pks[0])
-				if err != nil {
-					logger.Error("could not generate color hash")
-					return
-				}
-			}
-
-			var theme = getTheme(params, logger)
-
-			payload, err = ring.DrawRing(&ring.DrawRingParam{
-				Theme: theme, ColorHash: accColorHash, ImageBytes: payload, Height: identityImage.Height, Width: identityImage.Width,
-			})
-
+			accColorHash, err = colorhash.GenerateFor(parsed.PublicKey)
 			if err != nil {
-				logger.Error("failed to draw ring for account identity", zap.Error(err))
+				logger.Error("handleAccountInitialsImpl: failed to generate color hash from pubkey", zap.String("keyUid", parsed.KeyUID), zap.Error(err))
 				return
 			}
 		}
 
-		if statusIndicatorEnabled(params) {
-			payload, err = images.AddStatusIndicatorToImage(payload, isOnline(params))
-			if err != nil {
-				logger.Error("failed to draw status-indicator for initials", zap.Error(err))
-				return
-			}
-		}
+		payload, err := ring.DrawRing(&ring.DrawRingParam{
+			Theme: parsed.Theme, ColorHash: accColorHash, ImageBytes: img.Payload, Height: parsed.BgSize, Width: parsed.BgSize,
+		})
 
-		if len(payload) == 0 {
-			logger.Error("empty image")
+		if err != nil {
+			logger.Error("failed to draw ring for account identity", zap.Error(err))
 			return
 		}
-		mime, err := images.GetProtobufImageMime(payload)
-		if err != nil {
-			logger.Error("failed to get mime", zap.Error(err))
-		}
+		img.Payload = payload
+	}
 
-		w.Header().Set("Content-Type", mime)
-		w.Header().Set("Cache-Control", "no-store")
-
-		_, err = w.Write(payload)
+	if parsed.StatusIndicator {
+		payload, err := images.AddStatusIndicatorToImage(img.Payload, parsed.Online)
 		if err != nil {
-			logger.Error("failed to write image", zap.Error(err))
+			logger.Error("failed to draw status-indicator for initials", zap.Error(err))
+			return
 		}
+		img.Payload = payload
+	}
+
+	if len(img.Payload) == 0 {
+		logger.Error("handleAccountInitialsImpl: empty image", zap.String("keyUid", parsed.KeyUID), zap.Error(err))
+		return
+	}
+	mime, err := images.GetProtobufImageMime(img.Payload)
+	if err != nil {
+		logger.Error("failed to get mime", zap.Error(err))
+	}
+
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Cache-Control", "no-store")
+
+	_, err = w.Write(img.Payload)
+	if err != nil {
+		logger.Error("failed to write image", zap.Error(err))
+	}
+}
+
+func handleAccountInitialsPlaceholder(logger *zap.Logger, w http.ResponseWriter, r *http.Request, parsed ParsedParams) {
+	if parsed.FullName == "" {
+		logger.Error("handleAccountInitialsPlaceholder: no full name")
+		return
+	}
+
+	initials := images.ExtractInitials(parsed.FullName, parsed.InitialsLength)
+
+	initialsImagePayload, err := images.GenerateInitialsImage(initials, parsed.BgColor, parsed.Color, parsed.FontFile, parsed.BgSize, parsed.FontSize, parsed.UppercaseRatio)
+
+	if err != nil {
+		logger.Error("handleAccountInitialsPlaceholder: failed to generate initials image.", zap.String("keyUid", parsed.KeyUID), zap.String("name", parsed.FullName), zap.Error(err))
+		return
+	}
+
+	img := PreparedImage{initialsImagePayload, parsed.BgSize, parsed.BgSize}
+
+	if parsed.StatusIndicator {
+		payload, err := images.AddStatusIndicatorToImage(img.Payload, parsed.Online)
+		if err != nil {
+			logger.Error("failed to draw status-indicator for initials", zap.Error(err))
+			return
+		}
+		img.Payload = payload
+	}
+
+	if len(img.Payload) == 0 {
+		logger.Error("handleAccountInitialsPlaceholder: empty image", zap.String("keyUid", parsed.KeyUID), zap.Error(err))
+		return
+	}
+	mime, err := images.GetProtobufImageMime(img.Payload)
+	if err != nil {
+		logger.Error("failed to get mime", zap.Error(err))
+	}
+
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Cache-Control", "no-store")
+
+	_, err = w.Write(img.Payload)
+	if err != nil {
+		logger.Error("failed to write image", zap.Error(err))
 	}
 }
 
 func handleAccountInitials(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
+		parsed := ParseParams(logger, params)
 
-		names, ok := params["name"]
-		if !ok {
-			logger.Error("no name")
+		if parsed.FontFile == "" {
+			logger.Error("handleAccountInitials: no fontFile")
 			return
 		}
-
-		keyUids, ok := params["keyUid"]
-		if !ok {
-			logger.Error("no keyUid")
+		if parsed.FontSize == 0 {
+			logger.Error("handleAccountInitials: no fontSize")
 			return
 		}
-
-		if len(names) == 0 && len(keyUids) == 0 {
-			logger.Error("no keyUid or name")
+		if parsed.Color == color.Transparent {
+			logger.Error("handleAccountInitials: no color")
 			return
 		}
-
-		amountInitialsStr, ok := params["length"]
-		if !ok || len(amountInitialsStr) == 0 {
-			logger.Error("no length")
+		if parsed.BgSize == 0 {
+			logger.Error("handleAccountInitials: no size")
 			return
 		}
-		amountInitials, err := strconv.Atoi(amountInitialsStr[0])
-		if err != nil {
-			logger.Error("invalid length")
+		if parsed.BgColor == color.Transparent {
+			logger.Error("handleAccountInitials: no bgColor")
 			return
 		}
 
-		fontFile, ok := params["fontFile"]
-		if !ok || len(fontFile) == 0 {
-			logger.Error("no fontFile")
+		if parsed.KeyUID == "" {
+			handleAccountInitialsPlaceholder(logger, w, r, parsed)
 			return
-		}
-
-		fontSizeStr, ok := params["fontSize"]
-		if !ok || len(fontSizeStr) == 0 {
-			logger.Error("no fontSize")
-			return
-		}
-		fontSize, err := strconv.ParseFloat(fontSizeStr[0], 64)
-		if err != nil {
-			logger.Error("invalid fontSize")
-			return
-		}
-
-		colors, ok := params["color"]
-		if !ok || len(colors) == 0 {
-			logger.Error("no color")
-			return
-		}
-		color, err := images.ParseColor(colors[0])
-		if err != nil {
-			logger.Error("failed to parse color")
-			return
-		}
-
-		sizeStr, ok := params["size"]
-		if !ok || len(sizeStr) == 0 {
-			logger.Error("no size")
-			return
-		}
-		size, err := strconv.Atoi(sizeStr[0])
-		if err != nil {
-			logger.Error("invalid size")
-			return
-		}
-
-		bgColors, ok := params["bgColor"]
-		if !ok || len(bgColors) == 0 {
-			logger.Error("no bgColor")
-			return
-		}
-		bgColor, err := images.ParseColor(bgColors[0])
-		if err != nil {
-			logger.Error("failed to parse bgColor")
-			return
-		}
-
-		uppercaseRatioStr, ok := params["uppercaseRatio"]
-		if !ok {
-			logger.Error("invalid fontSize")
-			return
-		}
-		uppercaseRatio := 1.0
-		if len(uppercaseRatioStr) != 0 {
-			uppercaseRatio, err = strconv.ParseFloat(uppercaseRatioStr[0], 64)
-			if err != nil {
-				logger.Error("invalid uppercaseRatio")
-				return
-			}
-		}
-
-		var name = "Your Name"
-		var account *multiaccounts.Account
-
-		if len(names) != 0 {
-			name = names[0]
 		} else {
-			account, err := multiaccountsDB.GetAccount(keyUids[0])
-			if err != nil {
-				logger.Error("handleAccountInitials: failed to get account", zap.String("keyUid", keyUids[0]), zap.Error(err))
-				return
-			}
-			name = account.Name
-		}
-
-		if ringEnabled(params) && account == nil {
-			logger.Error("handleAccountInitials: failed to get account, can't render ring", zap.String("keyUid", keyUids[0]), zap.Error(err))
+			handleAccountInitialsImpl(multiaccountsDB, logger, w, r, parsed)
 			return
-		}
-
-		initials := images.ExtractInitials(name, amountInitials)
-
-		initialsImagePayload, err := images.GenerateInitialsImage(initials, bgColor, color, fontFile[0], size, fontSize, uppercaseRatio)
-
-		if err != nil {
-			logger.Error("handleAccountInitials: failed to load image.", zap.String("keyUid", keyUids[0]), zap.Error(err))
-			return
-		}
-
-		var payload = initialsImagePayload
-
-		if ringEnabled(params) {
-			accColorHash := account.ColorHash
-
-			if accColorHash == nil {
-				pks, ok := params["publicKey"]
-				if !ok || len(pks) == 0 {
-					logger.Error("no publicKey")
-					return
-				}
-
-				accColorHash, err = colorhash.GenerateFor(pks[0])
-				if err != nil {
-					logger.Error("could not generate color hash")
-					return
-				}
-			}
-
-			var theme = getTheme(params, logger)
-
-			payload, err = ring.DrawRing(&ring.DrawRingParam{
-				Theme: theme, ColorHash: accColorHash, ImageBytes: initialsImagePayload, Height: size, Width: size,
-			})
-
-			if err != nil {
-				logger.Error("failed to draw ring for account identity", zap.Error(err))
-				return
-			}
-		}
-
-		if statusIndicatorEnabled(params) {
-			payload, err = images.AddStatusIndicatorToImage(payload, isOnline(params))
-			if err != nil {
-				logger.Error("failed to draw status-indicator for initials", zap.Error(err))
-				return
-			}
-		}
-
-		if len(payload) == 0 {
-			logger.Error("empty image")
-			return
-		}
-		mime, err := images.GetProtobufImageMime(payload)
-		if err != nil {
-			logger.Error("failed to get mime", zap.Error(err))
-		}
-
-		w.Header().Set("Content-Type", mime)
-		w.Header().Set("Cache-Control", "no-store")
-
-		_, err = w.Write(payload)
-		if err != nil {
-			logger.Error("failed to write image", zap.Error(err))
 		}
 	}
 }

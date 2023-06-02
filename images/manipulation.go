@@ -137,6 +137,33 @@ func ImageToBytes(imagePath string) ([]byte, error) {
 	return imgBuffer.Bytes(), nil
 }
 
+func ImageToBytesAndImage(imagePath string) ([]byte, image.Image, error) {
+	// Open the image file
+	file, err := os.Open(imagePath)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer file.Close()
+
+	// Decode the image
+	img, _, err := image.Decode(file)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Create a new buffer to hold the image data
+	var imgBuffer bytes.Buffer
+
+	// Encode the image to the desired format and save it in the buffer
+	err = png.Encode(&imgBuffer, img)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Return the image data as a byte slice
+	return imgBuffer.Bytes(), img, nil
+}
+
 func AddPadding(img image.Image, padding int) *image.RGBA {
 	bounds := img.Bounds()
 	newBounds := image.Rect(bounds.Min.X-padding, bounds.Min.Y-padding, bounds.Max.X+padding, bounds.Max.Y+padding)
