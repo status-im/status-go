@@ -1487,7 +1487,7 @@ func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermis
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsOwnerOrAdmin() {
+	if !o.IsOwnerOrAdmin() || (o.IsAdmin() && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
 		return nil, ErrNotEnoughPermissions
 	}
 
@@ -1516,7 +1516,7 @@ func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsOwnerOrAdmin() {
+	if !o.IsOwnerOrAdmin() || (o.IsAdmin() && tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
 		return nil, ErrNotEnoughPermissions
 	}
 
@@ -1543,13 +1543,13 @@ func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChange
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	tokenPermission, exists := o.config.CommunityDescription.TokenPermissions[permissionID]
+	permission, exists := o.config.CommunityDescription.TokenPermissions[permissionID]
 
 	if !exists {
 		return nil, ErrTokenPermissionNotFound
 	}
 
-	if !o.canManageTokenPermission(tokenPermission) {
+	if !o.IsAdmin() || (!o.IsOwner() && o.IsAdmin() && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
 		return nil, ErrNotEnoughPermissions
 	}
 
@@ -2078,4 +2078,51 @@ func (o *Community) deleteChat(chatID string) *CommunityChanges {
 
 	delete(o.config.CommunityDescription.Chats, chatID)
 	return changes
+}
+
+func (o *Community) replaceBecomeMemberTokenPermissions(newPermissions map[string]*protobuf.CommunityTokenPermission) {
+	if len(newPermissions) == 0 {
+		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
+		return
+	}
+
+	prevPermissions := o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+
+	if len(newPermissions) < len(prevPermissions) {
+		for _, permission := range newPermissions {
+			if permissionExists(permission.Id, prevPermissions) {
+				delete(o.config.CommunityDescription.TokenPermissions, permission.Id)
+			}
+		}
+	}
+}
+
+func (o *Community) addBecomeMemberTokenPermissions(newPermissions map[string]*protobuf.CommunityTokenPermission) {
+	if o.config.CommunityDescription.TokenPermissions == nil {
+		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
+	}
+	prevPermissions := o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+	for _, permission := range newPermissions {
+		if !permissionExists(permission.Id, prevPermissions) {
+			o.config.CommunityDescription.TokenPermissions[permission.Id] = permission
+		}
+	}
+}
+
+func (o *Community) updateTokenPermissions(newPermissions map[string]*protobuf.CommunityTokenPermission) {
+	if o.config.CommunityDescription.TokenPermissions == nil {
+		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
+	}
+	for _, newPermission := range newPermissions {
+		o.config.CommunityDescription.TokenPermissions[newPermission.Id] = newPermission
+	}
+}
+
+func permissionExists(id string, prevPermissions []*protobuf.CommunityTokenPermission) bool {
+	for _, prevPermission := range prevPermissions {
+		if prevPermission.Id == id {
+			return true
+		}
+	}
+	return false
 }

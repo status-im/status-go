@@ -589,7 +589,11 @@ func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommuni
 		return nil, nil, err
 	}
 
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityBecomeMemberTokenPermissionChangeAdminEvent()})
+	}
 
 	// check existing member permission once, then check periodically
 	err = m.checkMemberPermissions(community.ID())
@@ -622,7 +626,11 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 		return nil, nil, err
 	}
 
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityBecomeMemberTokenPermissionChangeAdminEvent()})
+	}
 
 	// check if members still fulfill the token criteria of all
 	// BECOME_MEMBER permissions and kick them if necessary
@@ -742,7 +750,11 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 		close(cancel.(chan struct{})) // Need to cast to the chan
 	}
 
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if community.IsAdmin() {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityBecomeMemberTokenPermissionDeleteAdminEvent()})
+	}
 
 	return community, changes, nil
 }
@@ -1473,7 +1485,7 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		role = []protobuf.CommunityMember_Roles{memberRole}
 	}
 
-	_, err := community.AddMember(pk, role)
+	_, err = community.AddMember(pk, role)
 	if err != nil {
 		return nil, err
 	}
