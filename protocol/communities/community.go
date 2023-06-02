@@ -1261,6 +1261,17 @@ func canDeleteMessageForEveryonePermissions() map[protobuf.CommunityMember_Roles
 	return roles
 }
 
+func (o *Community) GetMemberAdmins() []*ecdsa.PublicKey {
+	admins := make([]*ecdsa.PublicKey, 0)
+	members := o.GetMemberPubkeys()
+	for _, member := range members {
+		if o.IsMemberAdmin(member) {
+			admins = append(admins, member)
+		}
+	}
+	return admins
+}
+
 func (o *Community) validateRequestToJoinWithChatID(request *protobuf.CommunityRequestToJoin) error {
 
 	chat, ok := o.config.CommunityDescription.Chats[request.ChatId]
