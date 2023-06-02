@@ -501,6 +501,10 @@ func (p *Persistence) CanceledRequestsToJoinForCommunity(id []byte) ([]*RequestT
 	return p.RequestsToJoinForCommunityWithState(id, RequestToJoinStateCanceled)
 }
 
+func (p *Persistence) AcceptedRequestsToJoinForCommunity(id []byte) ([]*RequestToJoin, error) {
+	return p.RequestsToJoinForCommunityWithState(id, RequestToJoinStateAccepted)
+}
+
 func (p *Persistence) SetRequestToJoinState(pk string, communityID []byte, state RequestToJoinState) error {
 	_, err := p.db.Exec(`UPDATE communities_requests_to_join SET state = ? WHERE community_id = ? AND public_key = ?`, state, communityID, pk)
 	return err
