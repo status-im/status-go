@@ -685,9 +685,19 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		SkipEncryption: true,
 		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
 	}
+
 	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
 	if err != nil {
 		return nil, err
+	}
+
+	// send request to join also to community admins
+	communityAdmins := community.GetMemberAdmins()
+	for _, communityAdmin := range communityAdmins {
+		_, err := m.sender.SendPrivate(context.Background(), communityAdmin, &rawMessage)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	response := &MessengerResponse{RequestsToJoinCommunity: []*communities.RequestToJoin{requestToJoin}}
