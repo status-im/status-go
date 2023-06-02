@@ -1734,6 +1734,10 @@ func (m *Manager) checkPermissionToJoin(permissions []*protobuf.CommunityTokenPe
 		Permissions: make(map[string]*CheckPermissionToJoinResult),
 	}
 
+	if len(walletAddresses) == 0 {
+		return response, nil
+	}
+
 	erc20TokenRequirements, erc721TokenRequirements := extractTokenRequirements(permissions)
 
 	// find owned ERC721 tokens required by community's permissions
