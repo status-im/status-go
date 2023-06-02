@@ -160,6 +160,8 @@ func TestBasicWakuV2(t *testing.T) {
 	storeResult, err := w.query(context.Background(), storeNode.PeerID, []common.TopicType{contentTopic}, uint64(timestampInSeconds-20), uint64(timestampInSeconds+20), []store.HistoryRequestOption{})
 	require.NoError(t, err)
 	require.NotZero(t, len(storeResult.Messages))
+
+	require.NoError(t, w.Stop())
 }
 
 func TestWakuV2Filter(t *testing.T) {
@@ -243,4 +245,6 @@ func TestWakuV2Filter(t *testing.T) {
 
 	// Ensure there are some active peers now
 	require.Greater(t, len(subMap), 0)
+
+	require.NoError(t, w.Stop())
 }
