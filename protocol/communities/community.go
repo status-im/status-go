@@ -496,6 +496,16 @@ type CommunityChanges struct {
 	ShouldMemberLeave bool `json:"memberRemoved"`
 }
 
+// `CommunityAdminEventChanges contain additional changes that don't live on
+// a `Community` but still have to be propagated to other admin and control nodes
+type CommunityAdminEventChanges struct {
+	*CommunityChanges
+	// `RejectedRequestsToJoin` is a map of signer keys to requests to join
+	RejectedRequestsToJoin map[string]*protobuf.CommunityRequestToJoin `json:"rejectedRequestsToJoin"`
+	// `AcceptedRequestsToJoin` is a map of signer keys to requests to join
+	AcceptedRequestsToJoin map[string]*protobuf.CommunityRequestToJoin `json:"acceptedRequestsToJoin"`
+}
+
 func (c *CommunityChanges) HasNewMember(identity string) bool {
 	if len(c.MembersAdded) == 0 {
 		return false
@@ -1699,25 +1709,29 @@ func (o *Community) BuildGrant(key *ecdsa.PublicKey, chatID string) ([]byte, err
 }
 
 func (o *Community) buildGrant(key *ecdsa.PublicKey, chatID string) ([]byte, error) {
-	grant := &protobuf.Grant{
-		CommunityId: o.ID(),
-		MemberId:    crypto.CompressPubkey(key),
-		ChatId:      chatID,
-		Clock:       o.config.CommunityDescription.Clock,
-	}
-	marshaledGrant, err := proto.Marshal(grant)
-	if err != nil {
-		return nil, err
-	}
+	bytes := make([]byte, 0)
+	if o.config.PrivateKey != nil {
+		grant := &protobuf.Grant{
+			CommunityId: o.ID(),
+			MemberId:    crypto.CompressPubkey(key),
+			ChatId:      chatID,
+			Clock:       o.config.CommunityDescription.Clock,
+		}
+		marshaledGrant, err := proto.Marshal(grant)
+		if err != nil {
+			return nil, err
+		}
 
-	signatureMaterial := crypto.Keccak256(marshaledGrant)
+		signatureMaterial := crypto.Keccak256(marshaledGrant)
 
-	signature, err := crypto.Sign(signatureMaterial, o.config.PrivateKey)
-	if err != nil {
-		return nil, err
+		signature, err := crypto.Sign(signatureMaterial, o.config.PrivateKey)
+		if err != nil {
+			return nil, err
+		}
+
+		bytes = append(signature, marshaledGrant...)
 	}
-
-	return append(signature, marshaledGrant...), nil
+	return bytes, nil
 }
 
 func (o *Community) increaseClock() {
@@ -1871,7 +1885,7 @@ func (o *Community) AddMemberWallet(memberID string, addresses []string) (*Commu
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
+	if !o.IsOwnerOrAdmin() {
 		return nil, ErrNotAdmin
 	}
 
@@ -2116,6 +2130,16 @@ func (o *Community) updateTokenPermissions(newPermissions map[string]*protobuf.C
 	for _, newPermission := range newPermissions {
 		o.config.CommunityDescription.TokenPermissions[newPermission.Id] = newPermission
 	}
+}
+
+func (o *Community) addCommunityMember(pk *ecdsa.PublicKey, member *protobuf.CommunityMember) {
+
+	if o.config.CommunityDescription.Members == nil {
+		o.config.CommunityDescription.Members = make(map[string]*protobuf.CommunityMember)
+	}
+
+	memberKey := common.PubkeyToHex(pk)
+	o.config.CommunityDescription.Members[memberKey] = member
 }
 
 func permissionExists(id string, prevPermissions []*protobuf.CommunityTokenPermission) bool {

@@ -1308,12 +1308,83 @@ func (m *Manager) HandleCommunityAdminEvent(signer *ecdsa.PublicKey, adminEvent 
 	if err != nil {
 		return nil, err
 	}
+
+	// Some admin changes do not live on a `Community` and need to be handled by
+	// `Manager` here
+	err = m.handleAdditionalAdminChanges(community, adminEvent)
+	if err != nil {
+		return nil, err
+	}
+
 	rawMessage, err := protocol.WrapMessageV1(marshaledCommDescr, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, community.PrivateKey())
 	if err != nil {
 		return nil, err
 	}
 
 	return m.handleCommunityDescriptionMessageCommon(community, patchedCommDescr, rawMessage)
+}
+
+func (m *Manager) handleAdditionalAdminChanges(community *Community, adminEvent *protobuf.CommunityAdminEvent) error {
+
+	saveOrUpdateRequestToJoin := func(signer string, request *protobuf.CommunityRequestToJoin, state RequestToJoinState) error {
+		requestToJoin := &RequestToJoin{
+			PublicKey:         signer,
+			Clock:             request.Clock,
+			ENSName:           request.EnsName,
+			CommunityID:       request.CommunityId,
+			State:             state,
+			RevealedAddresses: request.RevealedAddresses,
+		}
+
+		requestToJoin.CalculateID()
+
+		existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+
+		if existingRequestToJoin != nil {
+			// node already knows about this request to join, so let's compare clocks
+			// and update it if necessary
+			if existingRequestToJoin.Clock <= requestToJoin.Clock {
+				pk, err := common.HexToPubkey(existingRequestToJoin.PublicKey)
+				if err != nil {
+					return err
+				}
+				err = m.persistence.SetRequestToJoinState(common.PubkeyToHex(pk), community.ID(), state)
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			err := m.persistence.SaveRequestToJoin(requestToJoin)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	switch adminEvent.Type {
+	case protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT:
+		for signer, request := range adminEvent.AcceptedRequestsToJoin {
+			err := saveOrUpdateRequestToJoin(signer, request, RequestToJoinStateAccepted)
+			if err != nil {
+				return err
+			}
+		}
+		break
+	case protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT:
+		for signer, request := range adminEvent.RejectedRequestsToJoin {
+			err := saveOrUpdateRequestToJoin(signer, request, RequestToJoinStateDeclined)
+			if err != nil {
+				return err
+			}
+		}
+		break
+	default:
+	}
+	return nil
 }
 
 // TODO: This is not fully implemented, we want to save the grant passed at
@@ -1485,7 +1556,7 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		role = []protobuf.CommunityMember_Roles{memberRole}
 	}
 
-	_, err = community.AddMember(pk, role)
+	changes, err := community.AddMember(pk, role)
 	if err != nil {
 		return nil, err
 	}
@@ -1504,7 +1575,19 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		return nil, err
 	}
 
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if community.IsAdmin() {
+		acceptedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
+		acceptedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
+
+		adminChanges := &CommunityAdminEventChanges{
+			CommunityChanges:       changes,
+			AcceptedRequestsToJoin: acceptedRequestsToJoin,
+		}
+
+		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityRequestToJoinAcceptAdminEvent(adminChanges)})
+	}
 
 	return community, nil
 }
@@ -1519,7 +1602,36 @@ func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCom
 		return err
 	}
 
-	return m.persistence.SetRequestToJoinState(dbRequest.PublicKey, dbRequest.CommunityID, RequestToJoinStateDeclined)
+	community, err := m.GetByID(dbRequest.CommunityID)
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.SetRequestToJoinState(dbRequest.PublicKey, dbRequest.CommunityID, RequestToJoinStateDeclined)
+	if err != nil {
+		return err
+	}
+
+	// typically, community's clock is increased implicitly when making changes
+	// to it, however in this scenario there are no changes in the community, yet
+	// we need to increase the clock to ensure the admin event is processed by other
+	// nodes.
+	community.increaseClock()
+
+	rejectedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
+	rejectedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
+
+	adminChanges := &CommunityAdminEventChanges{
+		CommunityChanges:       community.emptyCommunityChanges(),
+		RejectedRequestsToJoin: rejectedRequestsToJoin,
+	}
+
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if community.IsAdmin() {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityRequestToJoinRejectAdminEvent(adminChanges)})
+	}
+	return nil
 }
 
 func (m *Manager) isUserRejectedFromCommunity(signer *ecdsa.PublicKey, community *Community, requestClock uint64) (bool, error) {
@@ -2028,7 +2140,7 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, err
 	}
 
-	if !common.IsPubKeyEqual(community.PublicKey(), signer) {
+	if !common.IsPubKeyEqual(community.PublicKey(), signer) && !community.IsMemberAdmin(signer) {
 		return nil, ErrNotAuthorized
 	}
 

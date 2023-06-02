@@ -425,6 +425,138 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminCannotDeleteBecomeAdminPermiss
 	s.Require().Nil(response)
 }
 
+func (s *AdminMessengerCommunitiesSuite) TestAdminAcceptMemberRequestToJoin() {
+	community := s.setUpOnRequestCommunityAndRoles()
+
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	_, err := user.Start()
+	s.Require().NoError(err)
+
+	s.advertiseCommunityTo(community, user)
+
+	// user sends request to join
+	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	response, err := user.RequestToJoinCommunity(requestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+	_ = response.RequestsToJoinCommunity[0]
+
+	// admin receives request to join
+	response, err = WaitOnMessengerResponse(
+		s.admin,
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		"admin did not receive community request to join",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	receivedRequest := response.RequestsToJoinCommunity[0]
+
+	// admin has not accepted request yet
+	adminCommunity, err := s.admin.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().False(adminCommunity.HasMember(&user.identity.PublicKey))
+
+	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: receivedRequest.ID}
+	response, err = s.admin.AcceptRequestToJoinCommunity(acceptRequestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().True(response.Communities()[0].HasMember(&user.identity.PublicKey))
+
+	// user receives request to join response
+	response, err = WaitOnMessengerResponse(
+		user,
+		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		"user did not receive community request to join response",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().True(response.Communities()[0].HasMember(&user.identity.PublicKey))
+
+	// owner receives updated community
+	response, err = WaitOnMessengerResponse(
+		s.owner,
+		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		"owner did not receive community request to join response",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+
+	requests, err := s.owner.AcceptedRequestsToJoinForCommunity(community.ID())
+	// there's now two requests to join (admin and alice) + 1 from user
+	s.Require().Len(requests, 3)
+	s.Require().True(response.Communities()[0].HasMember(&user.identity.PublicKey))
+
+	// alice receives updated community
+	response, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		"alice did not receive community request to join response",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().True(response.Communities()[0].HasMember(&user.identity.PublicKey))
+}
+
+func (s *AdminMessengerCommunitiesSuite) TestAdminRejectMemberRequestToJoin() {
+	community := s.setUpOnRequestCommunityAndRoles()
+
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	_, err := user.Start()
+	s.Require().NoError(err)
+
+	s.advertiseCommunityTo(community, user)
+
+	// user sends request to join
+	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	response, err := user.RequestToJoinCommunity(requestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	// admin receives request to join
+	response, err = WaitOnMessengerResponse(
+		s.admin,
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		"admin did not receive community request to join",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	receivedRequest := response.RequestsToJoinCommunity[0]
+
+	// admin has not accepted request yet
+	adminCommunity, err := s.admin.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().False(adminCommunity.HasMember(&user.identity.PublicKey))
+
+	// admin rejects request to join
+	rejectRequestToJoin := &requests.DeclineRequestToJoinCommunity{ID: receivedRequest.ID}
+	_, err = s.admin.DeclineRequestToJoinCommunity(rejectRequestToJoin)
+	s.Require().NoError(err)
+
+	adminCommunity, err = s.admin.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().False(adminCommunity.HasMember(&user.identity.PublicKey))
+
+	// owner receives admin event and stores rejected request to join
+	response, err = WaitOnMessengerResponse(
+		s.owner,
+		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		// func(r *MessengerResponse) bool { return true },
+		"owner did not receive community request to join update from admin",
+	)
+	s.Require().NoError(err)
+	s.Require().False(response.Communities()[0].HasMember(&user.identity.PublicKey))
+
+	requests, err := s.owner.DeclinedRequestsToJoinForCommunity(community.ID())
+	s.Require().Len(requests, 1)
+}
+
 func (s *AdminMessengerCommunitiesSuite) TestAdminCreateEditDeleteCategories() {
 	community := s.setUpCommunityAndRoles()
 	newCategory := &requests.CreateCommunityCategory{
@@ -575,13 +707,35 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminAirdropTokens() {
 	// TODO admin test: Airdrop Tokens (restricted)
 }
 
+func (s *AdminMessengerCommunitiesSuite) setUpOnRequestCommunityAndRoles() *communities.Community {
+	tcs2, err := s.owner.communitiesManager.All()
+	s.Require().NoError(err, "admin.communitiesManager.All")
+	s.Len(tcs2, 1, "Must have 1 community")
+
+	// owner creates a community and chat
+	community := s.createCommunity(protobuf.CommunityPermissions_ON_REQUEST)
+	s.advertiseCommunityTo(community, s.admin)
+	s.advertiseCommunityTo(community, s.alice)
+
+	s.refreshMessengerResponses()
+
+	s.joinOnRequestCommunity(community, s.admin)
+	s.joinOnRequestCommunity(community, s.alice)
+
+	s.refreshMessengerResponses()
+
+	// grant admin permissions to the admin
+	s.grantAdminPermissions(community, s.admin)
+	return community
+}
+
 func (s *AdminMessengerCommunitiesSuite) setUpCommunityAndRoles() *communities.Community {
 	tcs2, err := s.owner.communitiesManager.All()
 	s.Require().NoError(err, "admin.communitiesManager.All")
 	s.Len(tcs2, 1, "Must have 1 community")
 
 	// owner creates a community and chat
-	community := s.createCommunity()
+	community := s.createCommunity(protobuf.CommunityPermissions_NO_MEMBERSHIP)
 	//_ = s.createCommunityChat(community)
 	s.refreshMessengerResponses()
 
@@ -624,6 +778,53 @@ func (s *AdminMessengerCommunitiesSuite) advertiseCommunityTo(community *communi
 		return nil
 	})
 	s.Require().NoError(err)
+}
+
+func (s *AdminMessengerCommunitiesSuite) joinOnRequestCommunity(community *communities.Community, user *Messenger) {
+	// Request to join the community
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	response, err := user.RequestToJoinCommunity(request)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	requestToJoin := response.RequestsToJoinCommunity[0]
+	s.Require().Equal(requestToJoin.PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+
+	response, err = WaitOnMessengerResponse(
+		s.owner,
+		func(r *MessengerResponse) bool {
+			return len(r.RequestsToJoinCommunity) > 0
+		},
+		"owner did not receive community request to join",
+	)
+	s.Require().NoError(err)
+
+	userRequestToJoin := response.RequestsToJoinCommunity[0]
+	s.Require().Equal(userRequestToJoin.PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+
+	// accept join request
+	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: requestToJoin.ID}
+	response, err = s.owner.AcceptRequestToJoinCommunity(acceptRequestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	updatedCommunity := response.Communities()[0]
+	s.Require().NotNil(updatedCommunity)
+	s.Require().True(updatedCommunity.HasMember(&user.identity.PublicKey))
+
+	// receive request to join response
+	response, err = WaitOnMessengerResponse(
+		user,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0
+		},
+		"user did not receive request to join response",
+	)
+	s.Require().NoError(err)
+	userCommunity, err := user.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(userCommunity.HasMember(&user.identity.PublicKey))
 }
 
 func (s *AdminMessengerCommunitiesSuite) joinCommunity(community *communities.Community, user *Messenger) {
@@ -674,9 +875,9 @@ func (s *AdminMessengerCommunitiesSuite) joinCommunity(community *communities.Co
 	s.Require().NoError(err)
 }
 
-func (s *AdminMessengerCommunitiesSuite) createCommunity() *communities.Community {
+func (s *AdminMessengerCommunitiesSuite) createCommunity(membershipType protobuf.CommunityPermissions_Access) *communities.Community {
 	description := &requests.CreateCommunity{
-		Membership:                  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:                  membershipType,
 		Name:                        "status",
 		Color:                       "#ffffff",
 		Description:                 "status community description",

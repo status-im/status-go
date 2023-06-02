@@ -173,6 +173,25 @@ func (o *Community) ToCommunityBecomeMemberTokenPermissionDeleteAdminEvent() *pr
 	}
 }
 
+func (o *Community) ToCommunityRequestToJoinAcceptAdminEvent(changes *CommunityAdminEventChanges) *protobuf.CommunityAdminEvent {
+	return &protobuf.CommunityAdminEvent{
+		Clock:                  o.Clock(),
+		CommunityId:            o.ID(),
+		Type:                   protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT,
+		MembersAdded:           changes.MembersAdded,
+		AcceptedRequestsToJoin: changes.AcceptedRequestsToJoin,
+	}
+}
+
+func (o *Community) ToCommunityRequestToJoinRejectAdminEvent(changes *CommunityAdminEventChanges) *protobuf.CommunityAdminEvent {
+	return &protobuf.CommunityAdminEvent{
+		Clock:                  o.Clock(),
+		CommunityId:            o.ID(),
+		Type:                   protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT,
+		RejectedRequestsToJoin: changes.RejectedRequestsToJoin,
+	}
+}
+
 func (o *Community) PatchCommunityDescriptionByAdminEvent(adminEvent *protobuf.CommunityAdminEvent) (*protobuf.CommunityDescription, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
@@ -270,10 +289,24 @@ func (o *Community) PatchCommunityDescriptionByAdminEvent(adminEvent *protobuf.C
 		}
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT:
-		// TODO admin permission: must be accepted by owner only and owner update others
+		for pkString, addedMember := range adminEvent.MembersAdded {
+			pk, err := common.HexToPubkey(pkString)
+			if err != nil {
+				return nil, err
+			}
+			if !copy.HasMember(pk) {
+				copy.addCommunityMember(pk, addedMember)
+			}
+		}
 		break
 	case protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT:
-		// TODO admin permission: must be accepted by owner only and owner update others
+		// Do not remove this case!
+		//
+		// if we've received a rejected request to join, there's nothing that needs
+		// to be done on the `Community`.
+		//
+		// However, we need to leave this case here, otherwise it'll end up in
+		// the default case, which will error out
 		break
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_KICK:

@@ -15,6 +15,9 @@ message CommunityAdminEvent {
   CategoryData category_data = 6;
   ChannelData channel_data = 7;
   string member_to_action = 8;
+  map<string,CommunityMember> membersAdded = 9;
+  map<string,CommunityRequestToJoin> rejectedRequestsToJoin = 10;
+  map<string,CommunityRequestToJoin> acceptedRequestsToJoin = 11;
   
   enum EventType {
     UNKNOWN = 0;
