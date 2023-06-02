@@ -164,8 +164,8 @@ func (b *BlockDAO) getOldRanges(chainID uint64, account common.Address) ([]*Bloc
 	return ranges, nil
 }
 
-// GetBlocksByAddress loads blocks for a given address.
-func (b *BlockDAO) GetBlocksByAddress(chainID uint64, address common.Address, limit int) (rst []*big.Int, err error) {
+// GetBlocksToLoadByAddress gets unloaded blocks for a given address.
+func (b *BlockDAO) GetBlocksToLoadByAddress(chainID uint64, address common.Address, limit int) (rst []*big.Int, err error) {
 	query := `SELECT blk_number FROM blocks
 	WHERE address = ? AND network_id = ? AND loaded = 0
 	ORDER BY blk_number DESC
@@ -184,21 +184,6 @@ func (b *BlockDAO) GetBlocksByAddress(chainID uint64, address common.Address, li
 		rst = append(rst, block)
 	}
 	return rst, nil
-}
-
-func (b *BlockDAO) RemoveBlockWithTransfer(chainID uint64, address common.Address, block *big.Int) error {
-	query := `DELETE FROM blocks
-	WHERE address = ?
-	AND blk_number = ?
-	AND network_id = ?`
-
-	_, err := b.db.Exec(query, address, (*bigint.SQLBigInt)(block), chainID)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (b *BlockDAO) GetLastBlockByAddress(chainID uint64, address common.Address, limit int) (rst *big.Int, err error) {
@@ -224,31 +209,6 @@ func (b *BlockDAO) GetLastBlockByAddress(chainID uint64, address common.Address,
 	return nil, nil
 }
 
-// TODO remove as not used
-func (b *BlockDAO) GetLastSavedBlock(chainID uint64) (rst *DBHeader, err error) {
-	query := `SELECT blk_number, blk_hash
-	FROM blocks
-	WHERE network_id = ?
-	ORDER BY blk_number DESC LIMIT 1`
-	rows, err := b.db.Query(query, chainID)
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-
-	if rows.Next() {
-		header := &DBHeader{Hash: common.Hash{}, Number: new(big.Int)}
-		err = rows.Scan((*bigint.SQLBigInt)(header.Number), &header.Hash)
-		if err != nil {
-			return nil, err
-		}
-
-		return header, nil
-	}
-
-	return nil, nil
-}
-
 func (b *BlockDAO) GetFirstSavedBlock(chainID uint64, address common.Address) (rst *DBHeader, err error) {
 	query := `SELECT blk_number, blk_hash, loaded
 	FROM blocks
@@ -263,54 +223,6 @@ func (b *BlockDAO) GetFirstSavedBlock(chainID uint64, address common.Address) (r
 	if rows.Next() {
 		header := &DBHeader{Hash: common.Hash{}, Number: new(big.Int)}
 		err = rows.Scan((*bigint.SQLBigInt)(header.Number), &header.Hash, &header.Loaded)
-		if err != nil {
-			return nil, err
-		}
-
-		return header, nil
-	}
-
-	return nil, nil
-}
-
-// TODO remove as not used
-func (b *BlockDAO) GetBlocks(chainID uint64) (rst []*DBHeader, err error) {
-	query := `SELECT blk_number, blk_hash, address FROM blocks`
-	rows, err := b.db.Query(query, chainID)
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-
-	rst = []*DBHeader{}
-	for rows.Next() {
-		header := &DBHeader{Hash: common.Hash{}, Number: new(big.Int)}
-		err = rows.Scan((*bigint.SQLBigInt)(header.Number), &header.Hash, &header.Address)
-		if err != nil {
-			return nil, err
-		}
-
-		rst = append(rst, header)
-	}
-
-	return rst, nil
-}
-
-// TODO remove as not used
-func (b *BlockDAO) GetLastSavedBlockBefore(chainID uint64, block *big.Int) (rst *DBHeader, err error) {
-	query := `SELECT blk_number, blk_hash
-	FROM blocks
-	WHERE network_id = ? AND blk_number < ?
-	ORDER BY blk_number DESC LIMIT 1`
-	rows, err := b.db.Query(query, chainID, (*bigint.SQLBigInt)(block))
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-
-	if rows.Next() {
-		header := &DBHeader{Hash: common.Hash{}, Number: new(big.Int)}
-		err = rows.Scan((*bigint.SQLBigInt)(header.Number), &header.Hash)
 		if err != nil {
 			return nil, err
 		}

@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/token"
 )
 
 type Controller struct {
@@ -25,11 +26,12 @@ type Controller struct {
 	TransferFeed       *event.Feed
 	group              *async.Group
 	transactionManager *TransactionManager
+	tokenManager       *token.Manager
 	fetchStrategyType  FetchStrategyType
 }
 
 func NewTransferController(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed, transferFeed *event.Feed,
-	transactionManager *TransactionManager, fetchStrategyType FetchStrategyType) *Controller {
+	transactionManager *TransactionManager, tokenManager *token.Manager, fetchStrategyType FetchStrategyType) *Controller {
 
 	blockDAO := &BlockDAO{db}
 	return &Controller{
@@ -39,6 +41,7 @@ func NewTransferController(db *sql.DB, rpcClient *rpc.Client, accountFeed *event
 		accountFeed:        accountFeed,
 		TransferFeed:       transferFeed,
 		transactionManager: transactionManager,
+		tokenManager:       tokenManager,
 		fetchStrategyType:  fetchStrategyType,
 	}
 }
@@ -112,7 +115,7 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 			return err
 		}
 	} else {
-		c.reactor = NewReactor(c.db, c.blockDAO, c.TransferFeed, c.transactionManager)
+		c.reactor = NewReactor(c.db, c.blockDAO, c.TransferFeed, c.transactionManager, c.tokenManager)
 
 		err = c.reactor.start(chainClients, accounts, c.fetchStrategyType)
 		if err != nil {
@@ -183,6 +186,7 @@ func mapToList(m map[common.Address]struct{}) []common.Address {
 	return rst
 }
 
+// Only used by status-mobile
 func (c *Controller) LoadTransferByHash(ctx context.Context, rpcClient *rpc.Client, address common.Address, hash common.Hash) error {
 	chainClient, err := rpcClient.EthClient(rpcClient.UpstreamChainID)
 	if err != nil {

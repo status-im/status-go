@@ -86,7 +86,7 @@ func NewService(
 	tokenManager := token.NewTokenManager(db, rpcClient, rpcClient.NetworkManager)
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := transfer.NewTransactionManager(db, gethManager, transactor, config, accountsDB)
-	transferController := transfer.NewTransferController(db, rpcClient, accountFeed, walletFeed, transactionManager, transfer.OnDemandFetchStrategyType)
+	transferController := transfer.NewTransferController(db, rpcClient, accountFeed, walletFeed, transactionManager, tokenManager, transfer.OnDemandFetchStrategyType)
 	cryptoCompare := cryptocompare.NewClient()
 	coingecko := coingecko.NewClient()
 	marketManager := market.NewManager(cryptoCompare, coingecko, walletFeed)

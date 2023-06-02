@@ -10,11 +10,13 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
 func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, feed *event.Feed,
 	transactionManager *TransactionManager,
+	tokenManager *token.Manager,
 	chainClients map[uint64]*chain.ClientWithFallback,
 	accounts []common.Address) *SequentialFetchStrategy {
 
@@ -23,6 +25,7 @@ func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, feed *event.Fe
 		blockDAO:           blockDAO,
 		feed:               feed,
 		transactionManager: transactionManager,
+		tokenManager:       tokenManager,
 		chainClients:       chainClients,
 		accounts:           accounts,
 	}
@@ -35,6 +38,7 @@ type SequentialFetchStrategy struct {
 	mu                 sync.Mutex
 	group              *async.Group
 	transactionManager *TransactionManager
+	tokenManager       *token.Manager
 	chainClients       map[uint64]*chain.ClientWithFallback
 	accounts           []common.Address
 }
@@ -43,7 +47,7 @@ func (s *SequentialFetchStrategy) newCommand(chainClient *chain.ClientWithFallba
 	accounts []common.Address) async.Commander {
 
 	return newLoadBlocksAndTransfersCommand(accounts, s.db, s.blockDAO, chainClient, s.feed,
-		s.transactionManager)
+		s.transactionManager, s.tokenManager)
 }
 
 func (s *SequentialFetchStrategy) start() error {
