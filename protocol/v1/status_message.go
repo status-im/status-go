@@ -332,7 +332,10 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.SyncActivityCenterNotifications))
 	case protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_NOTIFICATION_STATE:
 		return m.unmarshalProtobufData(new(protobuf.SyncActivityCenterNotificationState))
+	case protobuf.ApplicationMetadataMessage_COMMUNITY_ADMIN_MESSAGE:
+		return m.unmarshalProtobufData(new(protobuf.CommunityAdminEvent))
 	}
+
 	return nil
 }
 
