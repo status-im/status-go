@@ -3731,8 +3731,12 @@ func (m *Messenger) AddCommunityToken(token *communities.CommunityToken) (*commu
 	return m.communitiesManager.AddCommunityToken(token)
 }
 
-func (m *Messenger) UpdateCommunityTokenState(contractAddress string, deployState communities.DeployState) error {
-	return m.communitiesManager.UpdateCommunityTokenState(contractAddress, deployState)
+func (m *Messenger) UpdateCommunityTokenState(chainID int, contractAddress string, deployState communities.DeployState) error {
+	return m.communitiesManager.UpdateCommunityTokenState(chainID, contractAddress, deployState)
+}
+
+func (m *Messenger) UpdateCommunityTokenSupply(chainID int, contractAddress string, supply int) error {
+	return m.communitiesManager.UpdateCommunityTokenSupply(chainID, contractAddress, supply)
 }
 
 // UpdateCommunityEncryption takes a community and encrypts / decrypts the community

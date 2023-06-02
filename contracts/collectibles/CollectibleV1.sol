@@ -53,6 +53,11 @@ contract CollectibleV1 is
 
     // External functions
 
+    function setMaxSupply(uint256 newMaxSupply) external onlyOwner {
+        require(newMaxSupply >= totalSupply(), "MAX_SUPPLY_LOWER_THAN_TOTAL_SUPPLY");
+        maxSupply = newMaxSupply;
+    }
+
     /**
      * @dev Creates a new token for each address in `addresses`. Its token ID will be automatically
      * assigned (and available on the emitted {IERC721-Transfer} event), and the token
@@ -62,7 +67,7 @@ contract CollectibleV1 is
     function mintTo(address[] memory addresses) external onlyOwner {
         // We cannot just use totalSupply() to create the new tokenId because tokens
         // can be burned so we use a separate counter.
-        require(_tokenIdTracker.current() + addresses.length < maxSupply, "MAX_SUPPLY_REACHED");
+        require(_tokenIdTracker.current() + addresses.length <= maxSupply, "MAX_SUPPLY_REACHED");
 
         for (uint256 i = 0; i < addresses.length; i++) {
             _safeMint(addresses[i], _tokenIdTracker.current(), "");
@@ -71,6 +76,10 @@ contract CollectibleV1 is
     }
 
     // Public functions
+
+    function mintedCount() public view returns (uint256) {
+        return _tokenIdTracker.current();
+    }
 
     /**
      * @notice remoteBurn allows the owner to burn a token
@@ -117,6 +126,9 @@ contract CollectibleV1 is
         uint256 firstTokenId,
         uint256 batchSize
     ) internal virtual override(ERC721Enumerable) {
+        if (from != address(0) && to != address(0) && !transferable) {
+            revert("not transferable");
+        }
         super._beforeTokenTransfer(from, to, firstTokenId, batchSize);
     }
 

@@ -988,7 +988,12 @@ func (p *Persistence) AddCommunityToken(token *CommunityToken) error {
 	return err
 }
 
-func (p *Persistence) UpdateCommunityTokenState(contractAddress string, deployState DeployState) error {
-	_, err := p.db.Exec(`UPDATE community_tokens SET deploy_state = ? WHERE address = ?`, deployState, contractAddress)
+func (p *Persistence) UpdateCommunityTokenState(chainID int, contractAddress string, deployState DeployState) error {
+	_, err := p.db.Exec(`UPDATE community_tokens SET deploy_state = ? WHERE address = ? AND chain_id = ?`, deployState, contractAddress, chainID)
+	return err
+}
+
+func (p *Persistence) UpdateCommunityTokenSupply(chainID int, contractAddress string, supply int) error {
+	_, err := p.db.Exec(`UPDATE community_tokens SET supply = ? WHERE address = ? AND chain_id = ?`, supply, contractAddress, chainID)
 	return err
 }
