@@ -21,12 +21,14 @@ const (
 	erc20Transfer      Type = "erc20"
 	erc721Transfer     Type = "erc721"
 	uniswapV2Swap      Type = "uniswapV2Swap"
+	uniswapV3Swap      Type = "uniswapV3Swap"
 	unknownTransaction Type = "unknown"
 
 	// Event types
 	erc20TransferEventType  EventType = "erc20Event"
 	erc721TransferEventType EventType = "erc721Event"
 	uniswapV2SwapEventType  EventType = "uniswapV2SwapEvent"
+	uniswapV3SwapEventType  EventType = "uniswapV3SwapEvent"
 	unknownEventType        EventType = "unknownEvent"
 
 	erc20_721TransferEventSignature = "Transfer(address,address,uint256)"
@@ -35,6 +37,7 @@ const (
 	erc721TransferEventIndexedParameters = 4 // signature, from, to, tokenId
 
 	uniswapV2SwapEventSignature = "Swap(address,uint256,uint256,uint256,uint256,address)" // also used by SushiSwap
+	uniswapV3SwapEventSignature = "Swap(address,address,int256,int256,uint160,uint128,int24)"
 )
 
 var (
@@ -46,6 +49,7 @@ var (
 func GetEventType(log *types.Log) EventType {
 	erc20_721TransferEventSignatureHash := getEventSignatureHash(erc20_721TransferEventSignature)
 	uniswapV2SwapEventSignatureHash := getEventSignatureHash(uniswapV2SwapEventSignature)
+	uniswapV3SwapEventSignatureHash := getEventSignatureHash(uniswapV3SwapEventSignature)
 
 	if len(log.Topics) > 0 {
 		switch log.Topics[0] {
@@ -58,6 +62,8 @@ func GetEventType(log *types.Log) EventType {
 			}
 		case uniswapV2SwapEventSignatureHash:
 			return uniswapV2SwapEventType
+		case uniswapV3SwapEventSignatureHash:
+			return uniswapV3SwapEventType
 		}
 	}
 
@@ -72,6 +78,8 @@ func EventTypeToSubtransactionType(eventType EventType) Type {
 		return erc721Transfer
 	case uniswapV2SwapEventType:
 		return uniswapV2Swap
+	case uniswapV3SwapEventType:
+		return uniswapV3Swap
 	}
 
 	return unknownTransaction
@@ -174,6 +182,50 @@ func parseUniswapV2Log(ethlog *types.Log) (pairAddress common.Address, from comm
 	amount1In.SetBytes(ethlog.Data[32:64])
 	amount0Out.SetBytes(ethlog.Data[64:96])
 	amount1Out.SetBytes(ethlog.Data[96:128])
+
+	return
+}
+
+func readInt256(b []byte) *big.Int {
+	// big.SetBytes can't tell if a number is negative or positive in itself.
+	// On EVM, if the returned number > max int256, it is negative.
+	// A number is > max int256 if the bit at position 255 is set.
+	ret := new(big.Int).SetBytes(b)
+	if ret.Bit(255) == 1 {
+		ret.Add(MaxUint256, new(big.Int).Neg(ret))
+		ret.Add(ret, common.Big1)
+		ret.Neg(ret)
+	}
+	return ret
+}
+
+func parseUniswapV3Log(ethlog *types.Log) (poolAddress common.Address, sender common.Address, recipient common.Address, amount0 *big.Int, amount1 *big.Int, err error) {
+	amount0 = new(big.Int)
+	amount1 = new(big.Int)
+
+	if len(ethlog.Topics) < 3 {
+		err = fmt.Errorf("not enough topics for uniswapV3 swap %s, %v", "topics", ethlog.Topics)
+		return
+	}
+
+	poolAddress = ethlog.Address
+
+	if len(ethlog.Topics[1]) != 32 {
+		err = fmt.Errorf("second topic is not padded to 32 byte address %s, %v", "topic", ethlog.Topics[1])
+		return
+	}
+	if len(ethlog.Topics[2]) != 32 {
+		err = fmt.Errorf("third topic is not padded to 32 byte address %s, %v", "topic", ethlog.Topics[2])
+		return
+	}
+	copy(sender[:], ethlog.Topics[1][12:])
+	copy(recipient[:], ethlog.Topics[2][12:])
+	if len(ethlog.Data) != 32*5 {
+		err = fmt.Errorf("data is not padded to 5 * 32 bytes big int %s, %v", "data", ethlog.Data)
+		return
+	}
+	amount0 = readInt256(ethlog.Data[0:32])
+	amount1 = readInt256(ethlog.Data[32:64])
 
 	return
 }
