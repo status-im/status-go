@@ -2062,10 +2062,6 @@ func extractTokenRequirements(permissions []*protobuf.CommunityTokenPermission) 
 }
 
 func (m *Manager) getOwnedERC721Tokens(walletAddresses []gethcommon.Address, tokenRequirements map[uint64]map[string]*protobuf.TokenCriteria) (map[uint64]map[string][]opensea.Asset, error) {
-	// TODO: revert
-	ownedERC721Tokens := make(map[uint64]map[string][]opensea.Asset)
-	return ownedERC721Tokens, nil
-
 	if m.walletConfig == nil || m.walletConfig.OpenseaAPIKey == "" {
 		return nil, errors.New("no opensea client")
 	}
