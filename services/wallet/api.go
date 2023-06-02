@@ -95,6 +95,7 @@ func (api *API) GetTransfersByAddress(ctx context.Context, address common.Addres
 }
 
 // LoadTransferByHash loads transfer to the database
+// Only used by status-mobile
 func (api *API) LoadTransferByHash(ctx context.Context, address common.Address, hash common.Hash) error {
 	log.Debug("[WalletAPI:: LoadTransferByHash] get transfer by hash", "address", address, "hash", hash)
 	return api.s.transferController.LoadTransferByHash(ctx, api.s.rpcClient, address, hash)
@@ -509,7 +510,7 @@ func (api *API) GetAddressDetails(ctx context.Context, chainID uint64, address s
 
 func (api *API) CreateMultiTransaction(ctx context.Context, multiTransaction *transfer.MultiTransaction, data []*bridge.TransactionBridge, password string) (*transfer.MultiTransactionResult, error) {
 	log.Debug("[WalletAPI:: CreateMultiTransaction] create multi transaction")
-	return api.s.transactionManager.CreateMultiTransaction(ctx, multiTransaction, data, api.router.bridges, password)
+	return api.s.transactionManager.CreateBridgeMultiTransaction(ctx, multiTransaction, data, api.router.bridges, password)
 }
 
 func (api *API) GetMultiTransactions(ctx context.Context, transactionIDs []transfer.MultiTransactionIDType) ([]*transfer.MultiTransaction, error) {

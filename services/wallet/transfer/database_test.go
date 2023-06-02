@@ -21,28 +21,6 @@ func setupTestDB(t *testing.T) (*Database, *BlockDAO, func()) {
 	}
 }
 
-func TestDBGetHeaderByNumber(t *testing.T) {
-	db, _, stop := setupTestDB(t)
-	defer stop()
-	header := &types.Header{
-		Number:     big.NewInt(10),
-		Difficulty: big.NewInt(1),
-		Time:       1,
-	}
-	require.NoError(t, db.saveHeaders(777, []*types.Header{header}, common.Address{1}))
-	rst, err := db.getHeaderByNumber(777, header.Number)
-	require.NoError(t, err)
-	require.Equal(t, header.Hash(), rst.Hash)
-}
-
-func TestDBGetHeaderByNumberNoRows(t *testing.T) {
-	db, _, stop := setupTestDB(t)
-	defer stop()
-	rst, err := db.getHeaderByNumber(777, big.NewInt(1))
-	require.NoError(t, err)
-	require.Nil(t, rst)
-}
-
 func TestDBProcessBlocks(t *testing.T) {
 	db, block, stop := setupTestDB(t)
 	defer stop()

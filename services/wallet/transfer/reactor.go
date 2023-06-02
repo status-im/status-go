@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
@@ -63,6 +64,7 @@ type OnDemandFetchStrategy struct {
 	group              *async.Group
 	balanceCache       *balanceCache
 	transactionManager *TransactionManager
+	tokenManager       *token.Manager
 	chainClients       map[uint64]*chain.ClientWithFallback
 	accounts           []common.Address
 }
@@ -84,6 +86,7 @@ func (s *OnDemandFetchStrategy) newControlCommand(chainClient *chain.ClientWithF
 		feed:               s.feed,
 		errorsCount:        0,
 		transactionManager: s.transactionManager,
+		tokenManager:       s.tokenManager,
 	}
 
 	return ctl
@@ -194,7 +197,7 @@ func (s *OnDemandFetchStrategy) getTransfersByAddress(ctx context.Context, chain
 			return nil, err
 		}
 
-		blocks, err := s.blockDAO.GetBlocksByAddress(chainID, address, numberOfBlocksCheckedPerIteration)
+		blocks, err := s.blockDAO.GetBlocksToLoadByAddress(chainID, address, numberOfBlocksCheckedPerIteration)
 		if err != nil {
 			return nil, err
 		}
@@ -208,6 +211,7 @@ func (s *OnDemandFetchStrategy) getTransfersByAddress(ctx context.Context, chain
 				chainClient:        chainClient,
 				transactionManager: s.transactionManager,
 				blocksLimit:        numberOfBlocksCheckedPerIteration,
+				tokenManager:       s.tokenManager,
 			}
 
 			err = txCommand.Command()(ctx)
@@ -231,15 +235,17 @@ type Reactor struct {
 	blockDAO           *BlockDAO
 	feed               *event.Feed
 	transactionManager *TransactionManager
+	tokenManager       *token.Manager
 	strategy           HistoryFetcher
 }
 
-func NewReactor(db *Database, blockDAO *BlockDAO, feed *event.Feed, tm *TransactionManager) *Reactor {
+func NewReactor(db *Database, blockDAO *BlockDAO, feed *event.Feed, tm *TransactionManager, tokenManager *token.Manager) *Reactor {
 	return &Reactor{
 		db:                 db,
 		blockDAO:           blockDAO,
 		feed:               feed,
 		transactionManager: tm,
+		tokenManager:       tokenManager,
 	}
 }
 
@@ -274,6 +280,7 @@ func (r *Reactor) createFetchStrategy(chainClients map[uint64]*chain.ClientWithF
 			r.blockDAO,
 			r.feed,
 			r.transactionManager,
+			r.tokenManager,
 			chainClients,
 			accounts,
 		)
@@ -284,6 +291,7 @@ func (r *Reactor) createFetchStrategy(chainClients map[uint64]*chain.ClientWithF
 		feed:               r.feed,
 		blockDAO:           r.blockDAO,
 		transactionManager: r.transactionManager,
+		tokenManager:       r.tokenManager,
 		chainClients:       chainClients,
 		accounts:           accounts,
 	}

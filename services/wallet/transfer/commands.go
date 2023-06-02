@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
@@ -175,10 +176,11 @@ type controlCommand struct {
 	errorsCount        int
 	nonArchivalRPCNode bool
 	transactionManager *TransactionManager
+	tokenManager       *token.Manager
 }
 
 func (c *controlCommand) LoadTransfers(ctx context.Context, limit int) (map[common.Address][]Transfer, error) {
-	return loadTransfers(ctx, c.accounts, c.blockDAO, c.db, c.chainClient, limit, make(map[common.Address][]*big.Int), c.transactionManager)
+	return loadTransfers(ctx, c.accounts, c.blockDAO, c.db, c.chainClient, limit, make(map[common.Address][]*big.Int), c.transactionManager, c.tokenManager)
 }
 
 func (c *controlCommand) Run(parent context.Context) error {
@@ -351,6 +353,7 @@ type transfersCommand struct {
 	chainClient        *chain.ClientWithFallback
 	blocksLimit        int
 	transactionManager *TransactionManager
+	tokenManager       *token.Manager
 
 	// result
 	fetchedTransfers []Transfer
@@ -370,7 +373,7 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 	for {
 		blocks := c.blockNums
 		if blocks == nil {
-			blocks, _ = c.blockDAO.GetBlocksByAddress(c.chainClient.ChainID, c.address, numberOfBlocksCheckedPerIteration)
+			blocks, _ = c.blockDAO.GetBlocksToLoadByAddress(c.chainClient.ChainID, c.address, numberOfBlocksCheckedPerIteration)
 		}
 
 		for _, blockNum := range blocks {
@@ -384,7 +387,7 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 				return err
 			}
 
-			err = c.updateMultiTxFromPendingEntry(allTransfers)
+			err = c.processMultiTransactions(ctx, allTransfers)
 			if err != nil {
 				return err
 			}
@@ -423,17 +426,77 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 	return nil
 }
 
-func (c *transfersCommand) updateMultiTxFromPendingEntry(allTransfers []Transfer) error {
+func (c *transfersCommand) checkAndProcessPendingMultiTx(subTx *Transfer) (MultiTransactionIDType, error) {
 	// Update MultiTransactionID from pending entry
-	for index := range allTransfers {
-		transfer := &allTransfers[index]
-		entry, err := c.transactionManager.GetPendingEntry(c.chainClient.ChainID, transfer.ID)
-		if err == nil {
-			// Propagate the MultiTransactionID, in case the pending entry was a multi-transaction
-			transfer.MultiTransactionID = entry.MultiTransactionID
-		} else if err != sql.ErrNoRows {
-			log.Error("GetPendingEntry error", "error", err)
-			return err
+	entry, err := c.transactionManager.GetPendingEntry(c.chainClient.ChainID, subTx.ID)
+	if err == nil {
+		// Propagate the MultiTransactionID, in case the pending entry was a multi-transaction
+		return entry.MultiTransactionID, nil
+	} else if err != sql.ErrNoRows {
+		log.Error("GetPendingEntry error", "error", err)
+		return NoMultiTransactionID, err
+	}
+
+	return NoMultiTransactionID, nil
+}
+
+func (c *transfersCommand) checkAndProcessSwapMultiTx(ctx context.Context, subTx *Transfer) (MultiTransactionIDType, error) {
+	switch subTx.Type {
+	// If the Tx contains any uniswapV2Swap subTx, generate a Swap multiTx
+	case uniswapV2Swap:
+		multiTransaction, err := buildUniswapSwapMultitransaction(ctx, c.chainClient, c.tokenManager, subTx)
+		if err != nil {
+			return NoMultiTransactionID, err
+		}
+
+		if multiTransaction != nil {
+			id, err := c.transactionManager.InsertMultiTransaction(multiTransaction)
+			if err != nil {
+				return NoMultiTransactionID, err
+			}
+			return id, nil
+		}
+	}
+
+	return NoMultiTransactionID, nil
+}
+
+func (c *transfersCommand) processMultiTransactions(ctx context.Context, allTransfers []Transfer) error {
+	subTxsByTxHash := subTransactionsByTxHash(allTransfers)
+
+	// Detect / Generate multitransactions
+	// Iterate over all detected transactions
+	for _, subTxs := range subTxsByTxHash {
+		multiTxID := NoMultiTransactionID
+		var err error
+		// Iterate over transaction's subtransactions
+		for _, subTx := range subTxs {
+			if subTx.MultiTransactionID == NoMultiTransactionID {
+				// First check every subTX for pending transaction
+				multiTxID, err = c.checkAndProcessPendingMultiTx(subTx)
+				if err != nil {
+					return err
+				}
+				if multiTxID != NoMultiTransactionID {
+					break
+				}
+
+				// Then check for a Swap transaction
+				multiTxID, err = c.checkAndProcessSwapMultiTx(ctx, subTx)
+				if err != nil {
+					return err
+				}
+				if multiTxID != NoMultiTransactionID {
+					break
+				}
+			}
+		}
+
+		// Mark all subTxs of a given Tx with the same multiTxID
+		if multiTxID != NoMultiTransactionID {
+			for _, subTx := range subTxs {
+				subTx.MultiTransactionID = multiTxID
+			}
 		}
 	}
 
@@ -449,6 +512,7 @@ type loadTransfersCommand struct {
 	foundTransfersByAddress map[common.Address][]Transfer
 	transactionManager      *TransactionManager
 	blocksLimit             int
+	tokenManager            *token.Manager
 }
 
 func (c *loadTransfersCommand) Command() async.Command {
@@ -458,12 +522,12 @@ func (c *loadTransfersCommand) Command() async.Command {
 	}.Run
 }
 
-func (c *loadTransfersCommand) LoadTransfers(ctx context.Context, limit int, blocksByAddress map[common.Address][]*big.Int, transactionManager *TransactionManager) (map[common.Address][]Transfer, error) {
-	return loadTransfers(ctx, c.accounts, c.blockDAO, c.db, c.chainClient, limit, blocksByAddress, c.transactionManager)
+func (c *loadTransfersCommand) LoadTransfers(ctx context.Context, limit int, blocksByAddress map[common.Address][]*big.Int) (map[common.Address][]Transfer, error) {
+	return loadTransfers(ctx, c.accounts, c.blockDAO, c.db, c.chainClient, limit, blocksByAddress, c.transactionManager, c.tokenManager)
 }
 
 func (c *loadTransfersCommand) Run(parent context.Context) (err error) {
-	transfersByAddress, err := c.LoadTransfers(parent, c.blocksLimit, c.blocksByAddress, c.transactionManager)
+	transfersByAddress, err := c.LoadTransfers(parent, c.blocksLimit, c.blocksByAddress)
 	if err != nil {
 		return err
 	}
@@ -493,7 +557,7 @@ func (c *findAndCheckBlockRangeCommand) Command() async.Command {
 	}.Run
 }
 
-func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) {
+func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) error {
 	log.Debug("start findAndCHeckBlockRangeCommand")
 
 	newFromByAddress, ethHeadersByAddress, err := c.fastIndex(parent, c.balanceCache, c.fromByAddress, c.toByAddress)
@@ -519,9 +583,17 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) 
 		erc20Headers := erc20HeadersByAddress[address]
 		allHeaders := append(ethHeaders, erc20Headers...)
 
+		// Ensure only 1 DBHeader per block hash.
 		uniqHeaders := []*DBHeader{}
 		if len(allHeaders) > 0 {
-			uniqHeaders = uniqueHeaders(allHeaders)
+			uniqHeaders = uniqueHeaderPerBlockHash(allHeaders)
+		}
+
+		// Ensure only 1 PreloadedTransaction per transaction hash during block discovery.
+		// Full list of SubTransactions will be obtained from the receipt logs
+		// at a later stage.
+		for _, header := range uniqHeaders {
+			header.PreloadedTransactions = uniquePreloadedTransactionPerTxHash(header.PreloadedTransactions)
 		}
 
 		foundHeaders[address] = uniqHeaders
@@ -529,6 +601,7 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) 
 		lastBlockNumber := c.toByAddress[address]
 		log.Debug("saving headers", "len", len(uniqHeaders), "lastBlockNumber", lastBlockNumber,
 			"balance", c.balanceCache.ReadCachedBalance(address, lastBlockNumber), "nonce", c.balanceCache.ReadCachedNonce(address, lastBlockNumber))
+
 		to := &Block{
 			Number:  lastBlockNumber,
 			Balance: c.balanceCache.ReadCachedBalance(address, lastBlockNumber),
@@ -543,7 +616,7 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) 
 	c.foundHeaders = foundHeaders
 
 	log.Debug("end findAndCheckBlockRangeCommand")
-	return
+	return nil
 }
 
 // run fast indexing for every accont up to canonical chain head minus safety depth.
@@ -616,19 +689,18 @@ func (c *findAndCheckBlockRangeCommand) fastIndexErc20(ctx context.Context, from
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-group.WaitAsync():
-		headres := map[common.Address][]*DBHeader{}
+		headers := map[common.Address][]*DBHeader{}
 		for _, command := range commands {
-			headres[command.address] = command.foundHeaders
+			headers[command.address] = command.foundHeaders
 		}
 		log.Info("fast indexer Erc20 finished", "in", time.Since(start))
-		return headres, nil
+		return headers, nil
 	}
 }
 
 func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *BlockDAO, db *Database,
 	chainClient *chain.ClientWithFallback, blocksLimitPerAccount int, blocksByAddress map[common.Address][]*big.Int,
-	transactionManager *TransactionManager) (map[common.Address][]Transfer, error) {
-
+	transactionManager *TransactionManager, tokenManager *token.Manager) (map[common.Address][]Transfer, error) {
 	log.Info("loadTransfers start", "accounts", accounts, "chain", chainClient.ChainID, "limit", blocksLimitPerAccount)
 
 	start := time.Now()
@@ -649,6 +721,7 @@ func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *Blo
 			},
 			blockNums:          blocksByAddress[address],
 			transactionManager: transactionManager,
+			tokenManager:       tokenManager,
 		}
 		commands = append(commands, transfers)
 		group.Add(transfers.Command())
@@ -664,14 +737,7 @@ func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *Blo
 				continue
 			}
 
-			transfers, ok := transfersByAddress[command.address]
-			if !ok {
-				transfers = []Transfer{}
-			}
-
-			for _, transfer := range command.fetchedTransfers {
-				transfersByAddress[command.address] = append(transfers, transfer)
-			}
+			transfersByAddress[command.address] = append(transfersByAddress[command.address], command.fetchedTransfers...)
 		}
 		log.Info("loadTransfers finished for account", "in", time.Since(start), "chain", chainClient.ChainID)
 		return transfersByAddress, nil
@@ -766,13 +832,14 @@ func findFirstRanges(c context.Context, accounts []common.Address, initialTo *bi
 	return res, nil
 }
 
-func uniqueHeaders(allHeaders []*DBHeader) []*DBHeader {
+// Ensure 1 DBHeader per Block Hash
+func uniqueHeaderPerBlockHash(allHeaders []*DBHeader) []*DBHeader {
 	uniqHeadersByHash := map[common.Hash]*DBHeader{}
 	for _, header := range allHeaders {
 		uniqHeader, ok := uniqHeadersByHash[header.Hash]
 		if ok {
-			if len(header.Erc20Transfers) > 0 {
-				uniqHeader.Erc20Transfers = append(uniqHeader.Erc20Transfers, header.Erc20Transfers...)
+			if len(header.PreloadedTransactions) > 0 {
+				uniqHeader.PreloadedTransactions = append(uniqHeader.PreloadedTransactions, header.PreloadedTransactions...)
 			}
 			uniqHeadersByHash[header.Hash] = uniqHeader
 		} else {
@@ -786,4 +853,35 @@ func uniqueHeaders(allHeaders []*DBHeader) []*DBHeader {
 	}
 
 	return uniqHeaders
+}
+
+// Ensure 1 PreloadedTransaction per Transaction Hash
+func uniquePreloadedTransactionPerTxHash(allTransactions []*PreloadedTransaction) []*PreloadedTransaction {
+	uniqTransactionsByTransactionHash := map[common.Hash]*PreloadedTransaction{}
+	for _, transaction := range allTransactions {
+		uniqTransactionsByTransactionHash[transaction.Log.TxHash] = transaction
+	}
+	uniqTransactions := []*PreloadedTransaction{}
+	for _, transaction := range uniqTransactionsByTransactionHash {
+		uniqTransactions = append(uniqTransactions, transaction)
+	}
+
+	return uniqTransactions
+}
+
+// Organize subTransactions by Transaction Hash
+func subTransactionsByTxHash(subTransactions []Transfer) map[common.Hash][]*Transfer {
+	rst := map[common.Hash][]*Transfer{}
+
+	for index := range subTransactions {
+		subTx := &subTransactions[index]
+		txHash := subTx.Transaction.Hash()
+
+		if _, ok := rst[txHash]; !ok {
+			rst[txHash] = make([]*Transfer, 0)
+		}
+		rst[txHash] = append(rst[txHash], subTx)
+	}
+
+	return rst
 }

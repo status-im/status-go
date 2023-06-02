@@ -86,10 +86,12 @@ func TestMultiTransactions(t *testing.T) {
 		FromAsset:   "fromAsset",
 		ToAsset:     "toAsset",
 		FromAmount:  (*hexutil.Big)(big.NewInt(123)),
+		ToAmount:    (*hexutil.Big)(big.NewInt(234)),
 		Type:        MultiTransactionBridge,
 	}
 	trx2 := trx1
 	trx2.FromAmount = (*hexutil.Big)(big.NewInt(456))
+	trx2.ToAmount = (*hexutil.Big)(big.NewInt(567))
 
 	var err error
 	ids := make([]MultiTransactionIDType, 2)

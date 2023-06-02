@@ -17,12 +17,12 @@ import (
 
 // DBHeader fields from header that are stored in database.
 type DBHeader struct {
-	Number         *big.Int
-	Hash           common.Hash
-	Timestamp      uint64
-	Erc20Transfers []*Transfer
-	Network        uint64
-	Address        common.Address
+	Number                *big.Int
+	Hash                  common.Hash
+	Timestamp             uint64
+	PreloadedTransactions []*PreloadedTransaction
+	Network               uint64
+	Address               common.Address
 	// Head is true if the block was a head at the time it was pulled from chain.
 	Head bool
 	// Loaded is true if trasfers from this block has been already fetched
@@ -114,7 +114,6 @@ func (db *Database) ProcessBlocks(chainID uint64, account common.Address, from *
 	return
 }
 
-// TODO remove as not used
 func (db *Database) SaveBlocks(chainID uint64, account common.Address, headers []*DBHeader) (err error) {
 	var (
 		tx *sql.Tx
@@ -226,7 +225,7 @@ func (db *Database) GetTransfersInRange(chainID uint64, address common.Address, 
 		return
 	}
 	defer rows.Close()
-	return query.Scan(rows)
+	return query.TransferScan(rows)
 }
 
 // GetTransfersByAddress loads transfers for a given address between two blocks.
@@ -243,7 +242,7 @@ func (db *Database) GetTransfersByAddress(chainID uint64, address common.Address
 		return
 	}
 	defer rows.Close()
-	return query.Scan(rows)
+	return query.TransferScan(rows)
 }
 
 // GetTransfersByAddressAndBlock loads transfers for a given address and block.
@@ -260,7 +259,7 @@ func (db *Database) GetTransfersByAddressAndBlock(chainID uint64, address common
 		return
 	}
 	defer rows.Close()
-	return query.Scan(rows)
+	return query.TransferScan(rows)
 }
 
 // GetTransfers load transfers transfer between two blocks.
@@ -271,7 +270,7 @@ func (db *Database) GetTransfers(chainID uint64, start, end *big.Int) (rst []Tra
 		return
 	}
 	defer rows.Close()
-	return query.Scan(rows)
+	return query.TransferScan(rows)
 }
 
 func (db *Database) GetTransfersForIdentities(ctx context.Context, identities []TransactionIdentity) (rst []Transfer, err error) {
@@ -287,10 +286,10 @@ func (db *Database) GetTransfersForIdentities(ctx context.Context, identities []
 		return
 	}
 	defer rows.Close()
-	return query.Scan(rows)
+	return query.TransferScan(rows)
 }
 
-func (db *Database) GetPreloadedTransactions(chainID uint64, address common.Address, blockNumber *big.Int) (rst []Transfer, err error) {
+func (db *Database) GetTransactionsToLoad(chainID uint64, address common.Address, blockNumber *big.Int) (rst []PreloadedTransaction, err error) {
 	query := newTransfersQuery().
 		FilterNetwork(chainID).
 		FilterAddress(address).
@@ -302,65 +301,7 @@ func (db *Database) GetPreloadedTransactions(chainID uint64, address common.Addr
 		return
 	}
 	defer rows.Close()
-	return query.Scan(rows)
-}
-
-func (db *Database) GetTransactionsLog(chainID uint64, address common.Address, transactionHash common.Hash) (*types.Log, error) {
-	l := &types.Log{}
-	err := db.client.QueryRow("SELECT log FROM transfers WHERE network_id = ? AND address = ? AND hash = ?",
-		chainID, address, transactionHash).
-		Scan(&JSONBlob{l})
-	if err == nil {
-		return l, nil
-	}
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	return nil, err
-}
-
-// saveHeaders stores a list of headers atomically.
-func (db *Database) saveHeaders(chainID uint64, headers []*types.Header, address common.Address) (err error) {
-	var (
-		tx     *sql.Tx
-		insert *sql.Stmt
-	)
-	tx, err = db.client.Begin()
-	if err != nil {
-		return
-	}
-	insert, err = tx.Prepare("INSERT INTO blocks(network_id, blk_number, blk_hash, address) VALUES (?, ?, ?, ?)")
-	if err != nil {
-		return
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-		} else {
-			_ = tx.Rollback()
-		}
-	}()
-
-	for _, h := range headers {
-		_, err = insert.Exec(chainID, (*bigint.SQLBigInt)(h.Number), h.Hash(), address)
-		if err != nil {
-			return
-		}
-	}
-	return
-}
-
-// getHeaderByNumber selects header using block number.
-func (db *Database) getHeaderByNumber(chainID uint64, number *big.Int) (header *DBHeader, err error) {
-	header = &DBHeader{Hash: common.Hash{}, Number: new(big.Int)}
-	err = db.client.QueryRow("SELECT blk_hash, blk_number FROM blocks WHERE blk_number = ? AND network_id = ?", (*bigint.SQLBigInt)(number), chainID).Scan(&header.Hash, (*bigint.SQLBigInt)(header.Number))
-	if err == nil {
-		return header, nil
-	}
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	return nil, err
+	return query.PreloadedTransactionScan(rows)
 }
 
 // statementCreator allows to pass transaction or database to use in consumer.
@@ -391,6 +332,7 @@ func deleteHeaders(creator statementCreator, headers []*DBHeader) error {
 	return nil
 }
 
+// Only used by status-mobile
 func (db *Database) InsertBlock(chainID uint64, account common.Address, blockNumber *big.Int, blockHash common.Hash) error {
 	var (
 		tx *sql.Tx
@@ -429,8 +371,8 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, acco
 	}
 
 	insertTx, err := creator.Prepare(`INSERT OR IGNORE
-	INTO transfers (network_id, address, sender, hash, blk_number, blk_hash, type, timestamp, log, loaded, multi_transaction_id)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`)
+	INTO transfers (network_id, address, sender, hash, blk_number, blk_hash, type, timestamp, log, loaded)
+	VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 0)`)
 	if err != nil {
 		return err
 	}
@@ -440,25 +382,23 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, acco
 		if err != nil {
 			return err
 		}
-		if len(header.Erc20Transfers) > 0 {
-			for _, transfer := range header.Erc20Transfers {
-				res, err := updateTx.Exec(&JSONBlob{transfer.Log}, chainID, account, transfer.ID)
-				if err != nil {
-					return err
-				}
-				affected, err := res.RowsAffected()
-				if err != nil {
-					return err
-				}
-				if affected > 0 {
-					continue
-				}
+		for _, transaction := range header.PreloadedTransactions {
+			res, err := updateTx.Exec(&JSONBlob{transaction.Log}, chainID, account, transaction.ID)
+			if err != nil {
+				return err
+			}
+			affected, err := res.RowsAffected()
+			if err != nil {
+				return err
+			}
+			if affected > 0 {
+				continue
+			}
 
-				_, err = insertTx.Exec(chainID, account, account, transfer.ID, (*bigint.SQLBigInt)(header.Number), header.Hash, erc20Transfer, transfer.Timestamp, &JSONBlob{transfer.Log}, transfer.MultiTransactionID)
-				if err != nil {
-					log.Error("error saving erc20transfer", "err", err)
-					return err
-				}
+			_, err = insertTx.Exec(chainID, account, account, transaction.ID, (*bigint.SQLBigInt)(header.Number), header.Hash, erc20Transfer, &JSONBlob{transaction.Log})
+			if err != nil {
+				log.Error("error saving erc20transfer", "err", err)
+				return err
 			}
 		}
 	}
@@ -466,14 +406,7 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, acco
 }
 
 func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers []Transfer) error {
-	update, err := creator.Prepare(`UPDATE transfers
-        SET tx = ?, sender = ?, receipt = ?, timestamp = ?, loaded = 1, base_gas_fee = ?
-	WHERE address =?  AND hash = ?`)
-	if err != nil {
-		return err
-	}
-
-	insert, err := creator.Prepare(`INSERT OR IGNORE INTO transfers
+	insert, err := creator.Prepare(`INSERT OR REPLACE INTO transfers
         (network_id, hash, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, type, loaded, base_gas_fee, multi_transaction_id)
 	VALUES
         (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`)
@@ -481,19 +414,6 @@ func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers
 		return err
 	}
 	for _, t := range transfers {
-		res, err := update.Exec(&JSONBlob{t.Transaction}, t.From, &JSONBlob{t.Receipt}, t.Timestamp, t.BaseGasFees, t.Address, t.ID)
-
-		if err != nil {
-			return err
-		}
-		affected, err := res.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if affected > 0 {
-			continue
-		}
-
 		_, err = insert.Exec(chainID, t.ID, t.BlockHash, (*bigint.SQLBigInt)(t.BlockNumber), t.Timestamp, t.Address, &JSONBlob{t.Transaction}, t.From, &JSONBlob{t.Receipt}, &JSONBlob{t.Log}, t.Type, t.BaseGasFees, t.MultiTransactionID)
 		if err != nil {
 			log.Error("can't save transfer", "b-hash", t.BlockHash, "b-n", t.BlockNumber, "a", t.Address, "h", t.ID)

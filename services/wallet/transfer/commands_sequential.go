@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
@@ -134,7 +135,7 @@ func (c *findBlocksCommand) checkRange(parent context.Context, from *big.Int, to
 	allHeaders := append(ethHeaders, erc20Headers...)
 
 	if len(allHeaders) > 0 {
-		foundHeaders = uniqueHeaders(allHeaders)
+		foundHeaders = uniqueHeaderPerBlockHash(allHeaders)
 	}
 
 	c.resFromBlock = newFromBlock
@@ -267,6 +268,7 @@ type loadAllTransfersCommand struct {
 	chainClient        *chain.ClientWithFallback
 	blocksByAddress    map[common.Address][]*big.Int
 	transactionManager *TransactionManager
+	tokenManager       *token.Manager
 	blocksLimit        int
 	feed               *event.Feed
 }
@@ -298,6 +300,7 @@ func (c *loadAllTransfersCommand) Run(parent context.Context) error {
 			blockNums:          c.blocksByAddress[address],
 			blocksLimit:        c.blocksLimit,
 			transactionManager: c.transactionManager,
+			tokenManager:       c.tokenManager,
 		}
 		commands = append(commands, transfers)
 		group.Add(transfers.Command())
@@ -331,7 +334,7 @@ func (c *loadAllTransfersCommand) notifyOfNewTransfers(commands []*transfersComm
 
 func newLoadBlocksAndTransfersCommand(accounts []common.Address, db *Database,
 	blockDAO *BlockDAO, chainClient *chain.ClientWithFallback, feed *event.Feed,
-	transactionManager *TransactionManager) *loadBlocksAndTransfersCommand {
+	transactionManager *TransactionManager, tokenManager *token.Manager) *loadBlocksAndTransfersCommand {
 
 	return &loadBlocksAndTransfersCommand{
 		accounts:           accounts,
@@ -342,6 +345,7 @@ func newLoadBlocksAndTransfersCommand(accounts []common.Address, db *Database,
 		feed:               feed,
 		errorsCount:        0,
 		transactionManager: transactionManager,
+		tokenManager:       tokenManager,
 		transfersLoaded:    make(map[common.Address]bool),
 	}
 }
@@ -357,6 +361,7 @@ type loadBlocksAndTransfersCommand struct {
 	errorsCount   int
 	// nonArchivalRPCNode bool // TODO Make use of it
 	transactionManager *TransactionManager
+	tokenManager       *token.Manager
 
 	// Not to be set by the caller
 	transfersLoaded map[common.Address]bool // For event RecentHistoryReady to be sent only once per account during app lifetime
