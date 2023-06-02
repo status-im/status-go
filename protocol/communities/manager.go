@@ -596,7 +596,7 @@ func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommuni
 	}
 
 	// check existing member permission once, then check periodically
-	err = m.checkMemberPermissions(community.ID())
+	err = m.checkMemberPermissions(community, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -628,7 +628,7 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 
 	if community.IsOwner() {
 		m.publish(&Subscription{Community: community})
-	} else if tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER {
+	} else if community.IsAdmin() && tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER {
 		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityBecomeMemberTokenPermissionChangeAdminEvent()})
 	}
 
@@ -637,31 +637,24 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 	//
 	// We do this in a separate routine to not block
 	// this function
-	if tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER {
-		go func() {
-			err := m.checkMemberPermissions(community.ID())
-			if err != nil {
-				m.logger.Debug("failed to check member permissions", zap.Error(err))
-			}
-		}()
-	}
+	go func() {
+		err := m.checkMemberPermissions(community, false)
+		if err != nil {
+			m.logger.Debug("failed to check member permissions", zap.Error(err))
+		}
+	}()
 
 	return community, changes, nil
 }
 
-func (m *Manager) checkMemberPermissions(communityID types.HexBytes) error {
-	community, err := m.GetByID(communityID)
-	if err != nil {
-		return err
-	}
-
+func (m *Manager) checkMemberPermissions(community *Community, removeAdmins bool) error {
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 
 	adminPermissions := len(becomeAdminPermissions) > 0
 	memberPermissions := len(becomeMemberPermissions) > 0
 
-	if !adminPermissions && !memberPermissions {
+	if !adminPermissions && !memberPermissions && !removeAdmins {
 		m.publish(&Subscription{Community: community})
 		return nil
 	}
@@ -684,7 +677,7 @@ func (m *Manager) checkMemberPermissions(communityID types.HexBytes) error {
 		isAdmin := community.IsMemberAdmin(memberPubKey)
 		memberHasWallet := len(walletAddresses) > 0
 
-		// check if user was not treated as an admin without wallet in open community
+		// Check if user was not treated as an admin without wallet in open community
 		// or user threated as a member without wallet in closed community
 		if (!memberHasWallet && isAdmin) || (memberPermissions && !memberHasWallet) {
 			_, err = community.RemoveUserFromOrg(memberPubKey)
@@ -694,7 +687,8 @@ func (m *Manager) checkMemberPermissions(communityID types.HexBytes) error {
 			continue
 		}
 
-		// check if user is still an admin or can became an admin and do update of member role
+		// Check if user is still an admin or can became an admin and do update of member role
+		removeAdminRole := false
 		if adminPermissions {
 			permissionResponse, err := m.checkPermissionToJoin(becomeAdminPermissions, walletAddresses, true)
 			if err != nil {
@@ -706,15 +700,21 @@ func (m *Manager) checkMemberPermissions(communityID types.HexBytes) error {
 				}
 				isAdmin = true
 			} else if !permissionResponse.Satisfied && isAdmin {
-				_, err = community.RemoveRoleFromMember(memberPubKey, protobuf.CommunityMember_ROLE_ADMIN)
-				if err != nil {
-					return err
-				}
+				removeAdminRole = true
 				isAdmin = false
 			}
 		}
 
-		// skip further validation if user has admin permissions or we do not have member permissions
+		// Remove admin role if user do not pass admin perrmissions or we do not have admin permissions but have an admin role
+		if removeAdminRole || isAdmin && removeAdmins {
+			_, err = community.RemoveRoleFromMember(memberPubKey, protobuf.CommunityMember_ROLE_ADMIN)
+			if err != nil {
+				return err
+			}
+			isAdmin = false
+		}
+
+		// Skip further validation if user has admin permissions or we do not have member permissions
 		if isAdmin || !memberPermissions {
 			continue
 		}
@@ -751,7 +751,13 @@ func (m *Manager) CheckMemberPermissionsPeriodically(communityID types.HexBytes)
 	for {
 		select {
 		case <-ticker.C:
-			err := m.checkMemberPermissions(communityID)
+			community, err := m.GetByID(communityID)
+			if err != nil {
+				m.logger.Debug("can't validate member permissions, community was not found", zap.Error(err))
+				m.periodicMemberPermissionsTasks.Delete(communityID.String())
+			}
+
+			err = m.checkMemberPermissions(community, true)
 			if err != nil {
 				m.logger.Debug("failed to check member permissions", zap.Error(err))
 			}
@@ -781,20 +787,22 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 		return nil, nil, err
 	}
 
-	// Check if there's stil BECOME_ADMIN and BECOME_MEMBER permissions,
-	// if not we can stop checking token criteria on-chain
-	// for members
-	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
-	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
-	if cancel, exists := m.periodicMemberPermissionsTasks.Load(community.IDString()); exists &&
-		len(becomeMemberPermissions) == 0 && len(becomeAdminPermissions) == 0 {
-		close(cancel.(chan struct{})) // Need to cast to the chan
-	}
-
 	if community.IsOwner() {
 		m.publish(&Subscription{Community: community})
 	} else if community.IsAdmin() {
 		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityBecomeMemberTokenPermissionDeleteAdminEvent()})
+	}
+
+	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
+
+	// Make sure that we remove admins roles if we remove admin permissions
+	m.checkMemberPermissions(community, len(becomeAdminPermissions) == 0)
+
+	// Check if there's stil BECOME_ADMIN and BECOME_MEMBER permissions,
+	// if not we can stop checking token criteria on-chain
+	if cancel, exists := m.periodicMemberPermissionsTasks.Load(community.IDString()); exists &&
+		len(community.TokenPermissions()) == 0 {
+		close(cancel.(chan struct{})) // Need to cast to the chan
 	}
 
 	return community, changes, nil
