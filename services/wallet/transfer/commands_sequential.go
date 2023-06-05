@@ -410,6 +410,7 @@ func (c *loadBlocksAndTransfersCommand) Run(parent context.Context) error {
 
 	select {
 	case <-ctx.Done():
+		c.balanceCache.Clear()
 		return ctx.Err()
 	case <-group.WaitAsync():
 		log.Debug("end loadBlocksAndTransfers command", "chain", c.chainClient.ChainID, "account", c.account)

@@ -118,16 +118,6 @@ func (api *API) FetchDecodedTxData(ctx context.Context, data string) (*thirdpart
 	return api.s.decoder.Decode(data)
 }
 
-// Deprecated: GetCachedBalances is deprecated. Use GetTokensBalances instead
-func (api *API) GetCachedBalances(ctx context.Context, addresses []common.Address) ([]transfer.BlockView, error) {
-	return api.s.transferController.GetCachedBalances(ctx, api.s.rpcClient.UpstreamChainID, addresses)
-}
-
-// Deprecated: GetCachedBalances is deprecated. Use GetTokensBalancesForChainIDs instead
-func (api *API) GetCachedBalancesbyChainID(ctx context.Context, chainID uint64, addresses []common.Address) ([]transfer.BlockView, error) {
-	return api.s.transferController.GetCachedBalances(ctx, chainID, addresses)
-}
-
 // GetTokensBalances return mapping of token balances for every account.
 func (api *API) GetTokensBalances(ctx context.Context, accounts, addresses []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	chainClients, err := api.s.rpcClient.EthClients([]uint64{api.s.rpcClient.UpstreamChainID})
