@@ -718,7 +718,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 				return nil, err
 			}
 
-			link := identity.SocialLink{}
+			link := &identity.SocialLink{}
 			if text.Valid {
 				link.Text = text.String
 			}

@@ -5,8 +5,6 @@ import (
 
 	ensservice "github.com/status-im/status-go/services/ens"
 
-	"github.com/status-im/status-go/protocol/identity"
-
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/wallet"
 
@@ -18,6 +16,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/verification"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
@@ -77,7 +76,7 @@ type MessengerResponse struct {
 	savedAddresses              map[string]*wallet.SavedAddress
 	Keycards                    []*accounts.Keycard
 	keycardActions              []*accounts.KeycardAction
-	socialLinkSettings          []*identity.SocialLink
+	SocialLinksInfo             *identity.SocialLinksInfo
 	ensUsernameDetails          []*ensservice.UsernameDetail
 }
 
@@ -120,7 +119,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		SavedAddresses                []*wallet.SavedAddress               `json:"savedAddresses,omitempty"`
 		Keycards                      []*accounts.Keycard                  `json:"keycards,omitempty"`
 		KeycardActions                []*accounts.KeycardAction            `json:"keycardActions,omitempty"`
-		SocialLinkSettings            []*identity.SocialLink               `json:"socialLinkSettings,omitempty"`
+		SocialLinksInfo               *identity.SocialLinksInfo            `json:"socialLinksInfo,omitempty"`
 		EnsUsernameDetails            []*ensservice.UsernameDetail         `json:"ensUsernameDetails,omitempty"`
 	}{
 		Contacts:                r.Contacts,
@@ -156,7 +155,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DiscordOldestMessageTimestamp: r.DiscordOldestMessageTimestamp,
 		Keycards:                      r.Keycards,
 		KeycardActions:                r.KeycardActions(),
-		SocialLinkSettings:            r.SocialLinkSettings(),
+		SocialLinksInfo:               r.SocialLinksInfo,
 		EnsUsernameDetails:            r.EnsUsernameDetails(),
 	}
 
@@ -285,10 +284,10 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.savedAddresses)+
 		len(r.Keycards)+
 		len(r.keycardActions) == 0 &&
-		len(r.socialLinkSettings) == 0 &&
 		len(r.ensUsernameDetails) == 0 &&
 		r.currentStatus == nil &&
-		r.activityCenterState == nil
+		r.activityCenterState == nil &&
+		r.SocialLinksInfo == nil
 }
 
 // Merge takes another response and appends the new Chats & new Messages and replaces
@@ -319,7 +318,6 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddInstallations(response.Installations)
 	r.AddSavedAddresses(response.SavedAddresses())
 	r.AddKeycardActions(response.KeycardActions())
-	r.AddSocialLinkSettings(response.SocialLinkSettings())
 	r.AddEnsUsernameDetails(response.EnsUsernameDetails())
 	r.AddBookmarks(response.GetBookmarks())
 	r.CommunityChanges = append(r.CommunityChanges, response.CommunityChanges...)
@@ -327,6 +325,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.Accounts = append(r.Accounts, response.Accounts...)
 	r.Keypairs = append(r.Keypairs, response.Keypairs...)
 	r.Keycards = append(r.Keycards, response.Keycards...)
+	r.SocialLinksInfo = response.SocialLinksInfo
 
 	return nil
 }
@@ -475,18 +474,6 @@ func (r *MessengerResponse) AddKeycardActions(keycardActions []*accounts.Keycard
 
 func (r *MessengerResponse) KeycardActions() []*accounts.KeycardAction {
 	return r.keycardActions
-}
-
-func (r *MessengerResponse) AddSocialLinkSetting(socialLinkSettings *identity.SocialLink) {
-	r.socialLinkSettings = append(r.socialLinkSettings, socialLinkSettings)
-}
-
-func (r *MessengerResponse) AddSocialLinkSettings(socialLinkSettings []*identity.SocialLink) {
-	r.socialLinkSettings = append(r.socialLinkSettings, socialLinkSettings...)
-}
-
-func (r *MessengerResponse) SocialLinkSettings() []*identity.SocialLink {
-	return r.socialLinkSettings
 }
 
 func (r *MessengerResponse) AddEnsUsernameDetail(detail *ensservice.UsernameDetail) {

@@ -976,7 +976,7 @@ func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) e
 		return err
 	}
 
-	identityHash, err := m.getIdentityHash(displayName, bio, img, &socialLinks)
+	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks)
 	if err != nil {
 		return err
 	}
@@ -1056,7 +1056,7 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 		return err
 	}
 
-	identityHash, err := m.getIdentityHash(displayName, bio, img, &socialLinks)
+	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks)
 	if err != nil {
 		return err
 	}
@@ -1069,7 +1069,7 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 	return nil
 }
 
-func (m *Messenger) getIdentityHash(displayName, bio string, img *images.IdentityImage, socialLinks *identity.SocialLinks) ([]byte, error) {
+func (m *Messenger) getIdentityHash(displayName, bio string, img *images.IdentityImage, socialLinks identity.SocialLinks) ([]byte, error) {
 	socialLinksData, err := socialLinks.Serialize()
 	if err != nil {
 		return []byte{}, err
@@ -1116,7 +1116,7 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 		return false, err
 	}
 
-	identityHash, err := m.getIdentityHash(displayName, bio, img, &socialLinks)
+	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks)
 	if err != nil {
 		return false, err
 	}
@@ -2517,7 +2517,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		return err
 	}
 
-	return m.syncSocialSettings(ctx, rawMessageHandler)
+	return m.syncSocialLinks(context.Background(), rawMessageHandler)
 }
 
 func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID string, accepted bool, rawMessageHandler RawMessageHandler) error {
@@ -4302,17 +4302,17 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							allMessagesProcessed = false
 							continue
 						}
-					case protobuf.SyncSocialLinkSetting:
+					case protobuf.SyncSocialLinks:
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
 							continue
 						}
 
-						p := msg.ParsedMessage.Interface().(protobuf.SyncSocialLinkSetting)
+						p := msg.ParsedMessage.Interface().(protobuf.SyncSocialLinks)
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						err = m.HandleSyncSocialLinkSetting(messageState, p)
+						err = m.HandleSyncSocialLinks(messageState, p)
 						if err != nil {
-							logger.Warn("failed to handle SyncSocialLinkSetting", zap.Error(err))
+							logger.Warn("failed to handle HandleSyncSocialLinks", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}
@@ -6397,62 +6397,74 @@ func (m *Messenger) syncDeleteForMeMessage(ctx context.Context, rawMessageDispat
 	})
 }
 
-func (m *Messenger) syncSocialSettings(ctx context.Context, rawMessageDispatcher RawMessageHandler) error {
+func (m *Messenger) syncSocialLinks(ctx context.Context, rawMessageDispatcher RawMessageHandler) error {
 	if !m.hasPairedDevices() {
 		return nil
 	}
 
-	socialLinks, err := m.settings.GetSocialLinks()
+	dbSocialLinks, err := m.settings.GetSocialLinks()
 	if err != nil {
 		return err
 	}
-	for _, link := range socialLinks {
-		syncMessage := &protobuf.SyncSocialLinkSetting{
-			Text:  link.Text,
-			Url:   link.URL,
-			Clock: link.Clock,
-		}
-		encodedMessage, err2 := proto.Marshal(syncMessage)
-		if err2 != nil {
-			return err
-		}
-		err = m.withChatClock(func(chatID string, clock uint64) error {
-			rawMessage := common.RawMessage{
-				LocalChatID:         chatID,
-				Payload:             encodedMessage,
-				MessageType:         protobuf.ApplicationMetadataMessage_SYNC_SOCIAL_LINK_SETTING,
-				ResendAutomatically: true,
-			}
-			_, err = rawMessageDispatcher(ctx, rawMessage)
-			return err
-		})
-		if err != nil {
-			return err
-		}
+
+	dbClock, err := m.settings.GetSocialLinksClock()
+	if err != nil {
+		return err
 	}
-	return nil
+
+	_, chat := m.getLastClockWithRelatedChat()
+	encodedMessage, err := proto.Marshal(dbSocialLinks.ToSyncProtobuf(dbClock))
+	if err != nil {
+		return err
+	}
+
+	rawMessage := common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_SOCIAL_LINKS,
+		ResendAutomatically: true,
+	}
+
+	_, err = rawMessageDispatcher(ctx, rawMessage)
+	return err
 }
 
-func (m *Messenger) HandleSyncSocialLinkSetting(state *ReceivedMessageState, message protobuf.SyncSocialLinkSetting) error {
-	return m.handleSyncSocialLinkSetting(message, func(link *identity.SocialLink) {
-		state.Response.AddSocialLinkSetting(link)
+func (m *Messenger) HandleSyncSocialLinks(state *ReceivedMessageState, message protobuf.SyncSocialLinks) error {
+	return m.handleSyncSocialLinks(&message, func(links identity.SocialLinks) {
+		state.Response.SocialLinksInfo = &identity.SocialLinksInfo{
+			Links:   links,
+			Removed: len(links) == 0,
+		}
 	})
 }
 
-func (m *Messenger) handleSyncSocialLinkSetting(message protobuf.SyncSocialLinkSetting, callback func(*identity.SocialLink)) error {
-	link := &identity.SocialLink{
-		Text:  message.Text,
-		URL:   message.Url,
-		Clock: message.Clock,
+func (m *Messenger) handleSyncSocialLinks(message *protobuf.SyncSocialLinks, callback func(identity.SocialLinks)) error {
+	if message == nil {
+		return nil
 	}
-	if err := ValidateSocialLink(link); err != nil {
-		return err
+	var (
+		links identity.SocialLinks
+		err   error
+	)
+	for _, sl := range message.SocialLinks {
+		link := &identity.SocialLink{
+			Text: sl.Text,
+			URL:  sl.Url,
+		}
+		err = ValidateSocialLink(link)
+		if err != nil {
+			return err
+		}
+
+		links = append(links, link)
 	}
-	err := m.settings.UpdateSocialLinkFromSync(link)
+
+	err = m.settings.AddOrReplaceSocialLinksIfNewer(links, message.Clock)
 	if err != nil {
 		return err
 	}
-	callback(link)
+
+	callback(links)
 	return nil
 }
 

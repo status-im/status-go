@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"context"
+	"errors"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -168,6 +169,15 @@ func (api *SettingsAPI) GetSocialLinks() (identity.SocialLinks, error) {
 	return api.db.GetSocialLinks()
 }
 
-func (api *SettingsAPI) SetSocialLinks(socialLinks identity.SocialLinks) error {
-	return (*api.messenger).SetSocialLinks(&socialLinks)
+func (api *SettingsAPI) AddOrReplaceSocialLinks(links identity.SocialLinks) error {
+	for _, link := range links {
+		if len(link.Text) == 0 {
+			return errors.New("`Text` field of a social link must be set")
+		}
+		if len(link.URL) == 0 {
+			return errors.New("`URL` field of a social link must be set")
+		}
+	}
+
+	return (*api.messenger).AddOrReplaceSocialLinks(links)
 }
