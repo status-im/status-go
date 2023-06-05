@@ -705,7 +705,7 @@ func (m *Manager) checkMemberPermissions(community *Community, removeAdmins bool
 			}
 		}
 
-		// Remove admin role if user do not pass admin perrmissions or we do not have admin permissions but have an admin role
+		// Remove admin role if user does not pass admin permissions or we do not have admin permissions but have an admin role
 		if removeAdminRole || isAdmin && removeAdmins {
 			_, err = community.RemoveRoleFromMember(memberPubKey, protobuf.CommunityMember_ROLE_ADMIN)
 			if err != nil {

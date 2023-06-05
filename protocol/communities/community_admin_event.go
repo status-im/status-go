@@ -240,7 +240,7 @@ func (o *Community) PatchCommunityDescriptionByAdminEvent(adminEvent *protobuf.C
 		copy.updateTokenPermissions(newPermissions)
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETE:
-		copy.replaceBecomeMemberTokenPermissions(adminEvent.TokenPermissions)
+		copy.deleteBecomeMemberTokenPermissions(adminEvent.TokenPermissions)
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_CATEGORY_CREATE:
 		_, err := copy.createCategory(adminEvent.CategoryData.CategoryId, adminEvent.CategoryData.Name, adminEvent.CategoryData.ChannelsIds)
