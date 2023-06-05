@@ -163,7 +163,7 @@ func (m *Messenger) prepareSyncAccountMessage(acc *accounts.Account) *protobuf.S
 		PublicKey: acc.PublicKey,
 		Path:      acc.Path,
 		Name:      acc.Name,
-		ColorID:   acc.ColorID,
+		ColorId:   string(acc.ColorID),
 		Emoji:     acc.Emoji,
 		Wallet:    acc.Wallet,
 		Chat:      acc.Chat,

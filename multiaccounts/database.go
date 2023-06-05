@@ -50,7 +50,7 @@ func (a *Account) ToProtobuf() *protobuf.MultiAccount {
 		Timestamp:          a.Timestamp,
 		Identicon:          a.Identicon,
 		ColorHash:          colorHashes,
-		ColorID:            a.ColorID,
+		ColorId:            a.ColorID,
 		CustomizationColor: string(a.CustomizationColor),
 		KeycardPairing:     a.KeycardPairing,
 		KeyUid:             a.KeyUID,
@@ -80,7 +80,7 @@ func (a *Account) FromProtobuf(ma *protobuf.MultiAccount) {
 	a.Timestamp = ma.Timestamp
 	a.Identicon = ma.Identicon
 	a.ColorHash = colorHash
-	a.ColorID = ma.ColorID
+	a.ColorID = ma.ColorId
 	a.KeycardPairing = ma.KeycardPairing
 	a.CustomizationColor = common.CustomizationColor(ma.CustomizationColor)
 	a.KeyUID = ma.KeyUid
