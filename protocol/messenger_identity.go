@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/multiaccounts/settings"
+	sociallinkssettings "github.com/status-im/status-go/multiaccounts/settings_social_links"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
@@ -131,10 +132,10 @@ func (m *Messenger) SetBio(bio string) error {
 	return m.publishContactCode()
 }
 
-func ValidateSocialLinks(socialLinks *identity.SocialLinks) error {
-	for _, link := range *socialLinks {
+func ValidateSocialLinks(socialLinks identity.SocialLinks) error {
+	for _, link := range socialLinks {
 		l := link
-		if err := ValidateSocialLink(&l); err != nil {
+		if err := ValidateSocialLink(l); err != nil {
 			return err
 		}
 	}
@@ -148,33 +149,35 @@ func ValidateSocialLink(link *identity.SocialLink) error {
 	return nil
 }
 
-func (m *Messenger) SetSocialLinks(socialLinks *identity.SocialLinks) error {
+func (m *Messenger) AddOrReplaceSocialLinks(socialLinks identity.SocialLinks) error {
+	if len(socialLinks) > sociallinkssettings.MaxNumOfSocialLinks {
+		return errors.New("exceeded maximum number of social links")
+	}
+
 	currentSocialLinks, err := m.settings.GetSocialLinks()
 	if err != nil {
 		return err
 	}
 
-	if currentSocialLinks.Equals(*socialLinks) {
+	if currentSocialLinks.Equal(socialLinks) {
 		return nil // Do nothing
 	}
 
-	if err = ValidateSocialLinks(socialLinks); err != nil {
-		return err
-	}
-
-	err = m.withChatClock(func(chatID string, clock uint64) error {
-		for _, link := range *socialLinks {
-			if link.Clock == 0 {
-				link.Clock = clock
-			}
-		}
-		return nil
-	})
+	err = ValidateSocialLinks(socialLinks)
 	if err != nil {
 		return err
 	}
 
-	if err = m.settings.SetSocialLinks(socialLinks); err != nil {
+	err = m.withChatClock(func(chatID string, clock uint64) error {
+		err = m.settings.AddOrReplaceSocialLinksIfNewer(socialLinks, clock)
+		if err != nil {
+			return err
+		}
+
+		err = m.syncSocialLinks(context.Background(), m.dispatchMessage)
+		return err
+	})
+	if err != nil {
 		return err
 	}
 
@@ -182,16 +185,11 @@ func (m *Messenger) SetSocialLinks(socialLinks *identity.SocialLinks) error {
 		return err
 	}
 
-	err = m.publishContactCode()
-	if err != nil {
-		return err
-	}
-
-	return m.syncSocialSettings(context.Background(), m.dispatchMessage)
+	return m.publishContactCode()
 }
 
-func (m *Messenger) GetSocialLink(text string) (*identity.SocialLink, error) {
-	return m.settings.GetSocialLink(text)
+func (m *Messenger) GetSocialLinks() (identity.SocialLinks, error) {
+	return m.settings.GetSocialLinks()
 }
 
 func (m *Messenger) setInstallationHostname() error {

@@ -2698,8 +2698,8 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 			return err
 		}
 
-		if !contact.SocialLinks.Equals(*socialLinks) {
-			contact.SocialLinks = *socialLinks
+		if !contact.SocialLinks.Equal(socialLinks) {
+			contact.SocialLinks = socialLinks
 			contactModified = true
 		}
 	}

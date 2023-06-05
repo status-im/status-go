@@ -1,5 +1,6 @@
 syntax = "proto3";
 
+import "chat_identity.proto";
 import "sync_settings.proto";
 import 'application_metadata_message.proto';
 
@@ -322,7 +323,7 @@ message BackedUpProfile {
   string display_name = 2;
   uint64 display_name_clock = 3;
   repeated SyncProfilePicture pictures = 4;
-  repeated SyncSocialLinkSetting social_link_settings = 5;
+  SyncSocialLinks social_links = 5;
   repeated SyncEnsUsernameDetail ens_username_details = 6;
 }
 
@@ -365,8 +366,7 @@ message SyncKeycardAction {
   }
 }
 
-message SyncSocialLinkSetting {
-  string text = 1;
-  string url = 2;
-  uint64 clock = 3;
+message SyncSocialLinks {
+  repeated SocialLink social_links = 1;
+  uint64 clock = 2;
 }

@@ -163,13 +163,22 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	iis := images.SampleIdentityImages()
 	s.Require().NoError(bob1.multiAccounts.StoreIdentityImages(bob1KeyUID, iis, false))
 
-	err = bob1.SetSocialLinks(&identity.SocialLinks{
+	profileSocialLinks := identity.SocialLinks{
 		{
-			Text:  identity.GithubID,
-			URL:   "https://github.com/status-im",
-			Clock: 1,
+			Text: identity.TwitterID,
+			URL:  "https://twitter.com/ethstatus",
 		},
-	})
+		{
+			Text: identity.TwitterID,
+			URL:  "https://twitter.com/StatusIMBlog",
+		},
+		{
+			Text: identity.GithubID,
+			URL:  "https://github.com/status-im",
+		},
+	}
+	profileSocialLinksClock := uint64(1)
+	err = bob1.settings.AddOrReplaceSocialLinksIfNewer(profileSocialLinks, profileSocialLinksClock)
 	s.Require().NoError(err)
 
 	bob1EnsUsernameDetail, err := bob1.saveEnsUsernameDetailProto(protobuf.SyncEnsUsernameDetail{
@@ -197,9 +206,13 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	s.Require().NoError(err)
 	s.Require().Equal(imagesExpected, string(jBob1Images))
 
-	bob1SocialLink, err := bob1.settings.GetSocialLink(identity.GithubID)
+	bob1SocialLinks, err := bob1.settings.GetSocialLinks()
 	s.Require().NoError(err)
-	s.Require().NotNil(bob1SocialLink)
+	s.Require().Len(bob1SocialLinks, len(profileSocialLinks))
+
+	bob1SocialLinksClock, err := bob1.settings.GetSocialLinksClock()
+	s.Require().NoError(err)
+	s.Require().Equal(profileSocialLinksClock, bob1SocialLinksClock)
 
 	bob1EnsUsernameDetails, err := bob1.getEnsUsernameDetails()
 	s.Require().NoError(err)
@@ -215,9 +228,13 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	s.Require().NoError(err)
 	s.Require().Equal(expectedEmpty, bob2Images)
 
-	bob2SocialLink, err := bob2.settings.GetSocialLink(identity.GithubID)
+	bob2SocialLinks, err := bob2.settings.GetSocialLinks()
 	s.Require().NoError(err)
-	s.Require().Equal("", bob2SocialLink.URL)
+	s.Require().Len(bob2SocialLinks, 0)
+
+	bob2SocialLinksClock, err := bob2.settings.GetSocialLinksClock()
+	s.Require().NoError(err)
+	s.Require().Equal(uint64(0), bob2SocialLinksClock)
 
 	bob2EnsUsernameDetails, err := bob2.getEnsUsernameDetails()
 	s.Require().NoError(err)
@@ -248,10 +265,14 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	s.Require().Equal(bob2Images[0].Payload, bob1Images[0].Payload)
 	s.Require().Equal(bob2Images[1].Payload, bob1Images[1].Payload)
 
-	bob2SocialLink, err = bob2.settings.GetSocialLink(identity.GithubID)
+	bob2SocialLinks, err = bob2.settings.GetSocialLinks()
 	s.Require().NoError(err)
-	s.Require().NotNil(bob2SocialLink)
-	s.Require().Equal(bob1SocialLink.URL, bob2SocialLink.URL)
+	s.Require().Len(bob2SocialLinks, len(profileSocialLinks))
+	s.Require().True(profileSocialLinks.Equal(bob2SocialLinks))
+
+	bob2SocialLinksClock, err = bob2.settings.GetSocialLinksClock()
+	s.Require().NoError(err)
+	s.Require().Equal(profileSocialLinksClock, bob2SocialLinksClock)
 
 	bob2EnsUsernameDetails, err = bob2.getEnsUsernameDetails()
 	s.Require().NoError(err)

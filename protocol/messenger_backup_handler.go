@@ -146,16 +146,12 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 		}
 	}
 
-	var links identity.SocialLinks
-	for _, s := range message.SocialLinkSettings {
-		err = m.handleSyncSocialLinkSetting(*s, func(link *identity.SocialLink) {
-			links = append(links, *link)
-		})
-		if err != nil {
-			return err
-		}
+	err = m.handleSyncSocialLinks(message.SocialLinks, func(links identity.SocialLinks) {
+		response.SetSocialLinks(links)
+	})
+	if err != nil {
+		return err
 	}
-	response.SetSocialLinks(links)
 
 	var ensUsernameDetails []*ensservice.UsernameDetail
 	for _, d := range message.EnsUsernameDetails {

@@ -9,7 +9,7 @@ import (
 type BackedUpProfile struct {
 	DisplayName        string                 `json:"displayName,omitempty"`
 	Images             []images.IdentityImage `json:"images,omitempty"`
-	SocialLinks        identity.SocialLinks   `json:"socialLinks,omitempty"`
+	SocialLinks        []*identity.SocialLink `json:"socialLinks,omitempty"`
 	EnsUsernameDetails []*ens.UsernameDetail  `json:"ensUsernameDetails,omitempty"`
 }
 
@@ -21,7 +21,7 @@ func (sfwr *WakuBackedUpDataResponse) SetImages(images []images.IdentityImage) {
 	sfwr.Profile.Images = images
 }
 
-func (sfwr *WakuBackedUpDataResponse) SetSocialLinks(socialLinks identity.SocialLinks) {
+func (sfwr *WakuBackedUpDataResponse) SetSocialLinks(socialLinks []*identity.SocialLink) {
 	sfwr.Profile.SocialLinks = socialLinks
 }
 
