@@ -111,7 +111,7 @@ func TestProfileSocialLinksUpdate(t *testing.T) {
 	require.NoError(t, err)
 
 	clock = 2
-	// test sociial link update
+	// test social link update
 	updateLinkAtIndex := 2
 	profileSocialLinks[updateLinkAtIndex].Text = identity.GithubID
 	profileSocialLinks[updateLinkAtIndex].URL = "https://github.com/status-im"
