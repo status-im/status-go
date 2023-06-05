@@ -41,7 +41,7 @@ func (s *SocialLinksSettings) getSocialLinks(tx *sql.Tx) (identity.SocialLinks, 
 		rows *sql.Rows
 		err  error
 	)
-	query := "SELECT * FROM profile_social_links"
+	query := "SELECT text, url FROM profile_social_links ORDER BY position ASC"
 
 	if tx == nil {
 		rows, err = s.db.Query(query)
@@ -112,19 +112,20 @@ func (s *SocialLinksSettings) AddOrReplaceSocialLinksIfNewer(links identity.Soci
 		}
 	}
 
-	stmt, err := tx.Prepare("INSERT INTO profile_social_links (text, url) VALUES (?, ?)")
+	stmt, err := tx.Prepare("INSERT INTO profile_social_links (text, url, position) VALUES (?, ?, ?)")
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
-	for _, link := range links {
+	for position, link := range links {
 		if link == nil {
 			return ErrNilSocialLinkProvided
 		}
 		_, err = stmt.Exec(
 			link.Text,
 			link.URL,
+			position,
 		)
 		if err != nil {
 			return err
