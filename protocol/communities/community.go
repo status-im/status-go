@@ -2090,7 +2090,7 @@ func (o *Community) deleteChat(chatID string) *CommunityChanges {
 	return changes
 }
 
-func (o *Community) replaceBecomeMemberTokenPermissions(newPermissions map[string]*protobuf.CommunityTokenPermission) {
+func (o *Community) deleteBecomeMemberTokenPermissions(newPermissions map[string]*protobuf.CommunityTokenPermission) {
 	if len(newPermissions) == 0 {
 		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
 		return
