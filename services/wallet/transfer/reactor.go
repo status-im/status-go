@@ -199,6 +199,7 @@ func (s *OnDemandFetchStrategy) getTransfersByAddress(ctx context.Context, chain
 		if err = blocksCommand.Command()(ctx); err != nil {
 			return nil, err
 		}
+		s.balanceCache.Clear()
 
 		blocks, err := s.blockDAO.GetBlocksToLoadByAddress(chainID, address, numberOfBlocksCheckedPerIteration)
 		if err != nil {
