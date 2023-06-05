@@ -354,6 +354,7 @@ type transfersCommand struct {
 	blocksLimit        int
 	transactionManager *TransactionManager
 	tokenManager       *token.Manager
+	feed               *event.Feed
 
 	// result
 	fetchedTransfers []Transfer
@@ -370,6 +371,9 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 	// Take blocks from cache if available and disrespect the limit
 	// If no blocks are available in cache, take blocks from DB respecting the limit
 	// If no limit is set, take all blocks from DB
+	log.Info("start transfersCommand", "chain", c.chainClient.ChainID, "address", c.address, "blockNums", c.blockNums)
+	startTs := time.Now()
+
 	for {
 		blocks := c.blockNums
 		if blocks == nil {
@@ -377,9 +381,7 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 		}
 
 		for _, blockNum := range blocks {
-			log.Info("start transfersCommand", "chain", c.chainClient.ChainID, "address", c.address, "block", blockNum)
-
-			startTs := time.Now()
+			log.Debug("transfersCommand block start", "chain", c.chainClient.ChainID, "address", c.address, "block", blockNum)
 
 			allTransfers, err := c.eth.GetTransfersByNumber(ctx, blockNum)
 			if err != nil {
@@ -411,8 +413,10 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 
 			c.fetchedTransfers = append(c.fetchedTransfers, allTransfers...)
 
-			log.Debug("end transfersCommand", "chain", c.chainClient.ChainID, "address", c.address,
-				"block", blockNum, "len", len(allTransfers), "in", time.Since(startTs))
+			c.notifyOfNewTransfers(allTransfers)
+
+			log.Debug("transfersCommand block end", "chain", c.chainClient.ChainID, "address", c.address,
+				"block", blockNum, "tranfers.len", len(allTransfers), "fetchedTransfers.len", len(c.fetchedTransfers))
 		}
 
 		if c.blockNums != nil || len(blocks) == 0 ||
@@ -422,6 +426,9 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 			break
 		}
 	}
+
+	log.Info("end transfersCommand", "chain", c.chainClient.ChainID, "address", c.address,
+		"blocks.len", len(c.blockNums), "transfers.len", len(c.fetchedTransfers), "in", time.Since(startTs))
 
 	return nil
 }
@@ -501,6 +508,17 @@ func (c *transfersCommand) processMultiTransactions(ctx context.Context, allTran
 	}
 
 	return nil
+}
+
+func (c *transfersCommand) notifyOfNewTransfers(transfers []Transfer) {
+	if c.feed != nil {
+		if len(transfers) > 0 {
+			c.feed.Send(walletevent.Event{
+				Type:     EventNewTransfers,
+				Accounts: []common.Address{c.address},
+			})
+		}
+	}
 }
 
 type loadTransfersCommand struct {

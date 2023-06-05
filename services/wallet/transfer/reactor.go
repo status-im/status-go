@@ -251,9 +251,9 @@ func NewReactor(db *Database, blockDAO *BlockDAO, feed *event.Feed, tm *Transact
 
 // Start runs reactor loop in background.
 func (r *Reactor) start(chainClients map[uint64]*chain.ClientWithFallback, accounts []common.Address,
-	fetchStrategyType FetchStrategyType) error {
+	loadAllTransfers bool) error {
 
-	r.strategy = r.createFetchStrategy(chainClients, accounts, fetchStrategyType)
+	r.strategy = r.createFetchStrategy(chainClients, accounts, loadAllTransfers)
 	return r.strategy.start()
 }
 
@@ -265,16 +265,16 @@ func (r *Reactor) stop() {
 }
 
 func (r *Reactor) restart(chainClients map[uint64]*chain.ClientWithFallback, accounts []common.Address,
-	fetchStrategyType FetchStrategyType) error {
+	loadAllTransfers bool) error {
 
 	r.stop()
-	return r.start(chainClients, accounts, fetchStrategyType)
+	return r.start(chainClients, accounts, loadAllTransfers)
 }
 
 func (r *Reactor) createFetchStrategy(chainClients map[uint64]*chain.ClientWithFallback,
-	accounts []common.Address, fetchType FetchStrategyType) HistoryFetcher {
+	accounts []common.Address, loadAllTransfers bool) HistoryFetcher {
 
-	if fetchType == SequentialFetchStrategyType {
+	if loadAllTransfers {
 		return NewSequentialFetchStrategy(
 			r.db,
 			r.blockDAO,
