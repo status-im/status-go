@@ -1131,7 +1131,7 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 		}
 
 		// Check for removed token permissions
-		for id, _ := range o.config.CommunityDescription.TokenPermissions {
+		for id := range o.config.CommunityDescription.TokenPermissions {
 			if _, ok := description.TokenPermissions[id]; !ok {
 				if response.TokenPermissionsRemoved == nil {
 					response.TokenPermissionsRemoved = make([]string, 0)

@@ -407,7 +407,7 @@ func getChatMembers(sourceChat *protocol.Chat, community *communities.Community,
 	}
 
 	if community != nil {
-		for member, _ := range community.Description().Members {
+		for member := range community.Description().Members {
 			pubKey, err := common.HexToPubkey(member)
 			if err != nil {
 				return nil, err
