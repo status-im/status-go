@@ -284,7 +284,6 @@ func (c *loadAllTransfersCommand) Run(parent context.Context) error {
 	start := time.Now()
 	group := async.NewGroup(parent)
 
-	commands := []*transfersCommand{}
 	for _, address := range c.accounts {
 		transfers := &transfersCommand{
 			db:          c.db,
@@ -301,8 +300,8 @@ func (c *loadAllTransfersCommand) Run(parent context.Context) error {
 			blocksLimit:        c.blocksLimit,
 			transactionManager: c.transactionManager,
 			tokenManager:       c.tokenManager,
+			feed:               c.feed,
 		}
-		commands = append(commands, transfers)
 		group.Add(transfers.Command())
 	}
 
@@ -312,24 +311,9 @@ func (c *loadAllTransfersCommand) Run(parent context.Context) error {
 		return parent.Err()
 	case <-group.WaitAsync():
 		log.Debug("loadTransfers finished for account", "in", time.Since(start), "chain", c.chainClient.ChainID, "limit", c.blocksLimit)
-
-		c.notifyOfNewTransfers(commands)
 	}
 
 	return nil
-}
-
-func (c *loadAllTransfersCommand) notifyOfNewTransfers(commands []*transfersCommand) {
-	if c.feed != nil {
-		for _, command := range commands {
-			if len(command.fetchedTransfers) > 0 {
-				c.feed.Send(walletevent.Event{
-					Type:     EventNewTransfers,
-					Accounts: []common.Address{command.address},
-				})
-			}
-		}
-	}
 }
 
 func newLoadBlocksAndTransfersCommand(accounts []common.Address, db *Database,

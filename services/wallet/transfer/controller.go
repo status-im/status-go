@@ -27,11 +27,11 @@ type Controller struct {
 	group              *async.Group
 	transactionManager *TransactionManager
 	tokenManager       *token.Manager
-	fetchStrategyType  FetchStrategyType
+	loadAllTransfers   bool
 }
 
 func NewTransferController(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed, transferFeed *event.Feed,
-	transactionManager *TransactionManager, tokenManager *token.Manager, fetchStrategyType FetchStrategyType) *Controller {
+	transactionManager *TransactionManager, tokenManager *token.Manager, loadAllTransfers bool) *Controller {
 
 	blockDAO := &BlockDAO{db}
 	return &Controller{
@@ -42,7 +42,7 @@ func NewTransferController(db *sql.DB, rpcClient *rpc.Client, accountFeed *event
 		TransferFeed:       transferFeed,
 		transactionManager: transactionManager,
 		tokenManager:       tokenManager,
-		fetchStrategyType:  fetchStrategyType,
+		loadAllTransfers:   loadAllTransfers,
 	}
 }
 
@@ -110,20 +110,20 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 	}
 
 	if c.reactor != nil {
-		err := c.reactor.restart(chainClients, accounts, c.fetchStrategyType)
+		err := c.reactor.restart(chainClients, accounts, c.loadAllTransfers)
 		if err != nil {
 			return err
 		}
 	} else {
 		c.reactor = NewReactor(c.db, c.blockDAO, c.TransferFeed, c.transactionManager, c.tokenManager)
 
-		err = c.reactor.start(chainClients, accounts, c.fetchStrategyType)
+		err = c.reactor.start(chainClients, accounts, c.loadAllTransfers)
 		if err != nil {
 			return err
 		}
 
 		c.group.Add(func(ctx context.Context) error {
-			return watchAccountsChanges(ctx, c.accountFeed, c.reactor, chainClients, accounts, c.fetchStrategyType)
+			return watchAccountsChanges(ctx, c.accountFeed, c.reactor, chainClients, accounts, c.loadAllTransfers)
 		})
 	}
 	return nil
@@ -132,7 +132,7 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 // watchAccountsChanges subscribes to a feed and watches for changes in accounts list. If there are new or removed accounts
 // reactor will be restarted.
 func watchAccountsChanges(ctx context.Context, accountFeed *event.Feed, reactor *Reactor,
-	chainClients map[uint64]*chain.ClientWithFallback, initial []common.Address, fetchStrategyType FetchStrategyType) error {
+	chainClients map[uint64]*chain.ClientWithFallback, initial []common.Address, loadAllTransfers bool) error {
 
 	ch := make(chan accountsevent.Event, 1) // it may block if the rate of updates will be significantly higher
 	sub := accountFeed.Subscribe(ch)
@@ -170,7 +170,7 @@ func watchAccountsChanges(ctx context.Context, accountFeed *event.Feed, reactor 
 			listenList := mapToList(listen)
 			log.Debug("list of accounts was changed from a previous version. reactor will be restarted", "new", listenList)
 
-			err := reactor.restart(chainClients, listenList, fetchStrategyType)
+			err := reactor.restart(chainClients, listenList, loadAllTransfers)
 			if err != nil {
 				log.Error("failed to restart reactor with new accounts", "error", err)
 			}
