@@ -12,6 +12,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,7 +22,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -29,7 +30,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -222,24 +223,21 @@ func AssetNames() []string {
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
 	"config/public-chain-accounts.json": configPublicChainAccountsJson,
-	"config/status-chain-accounts.json": configStatusChainAccountsJson,
-	"config/test-data.json":             configTestDataJson,
-}
 
-// AssetDebug is true if the assets were built with the debug flag enabled.
-const AssetDebug = false
+	"config/status-chain-accounts.json": configStatusChainAccountsJson,
+
+	"config/test-data.json": configTestDataJson,
+}
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//
-//	data/
-//	  foo.txt
-//	  img/
-//	    a.png
-//	    b.png
-//
+//     data/
+//       foo.txt
+//       img/
+//         a.png
+//         b.png
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -272,10 +270,10 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"config": {nil, map[string]*bintree{
-		"public-chain-accounts.json": {configPublicChainAccountsJson, map[string]*bintree{}},
-		"status-chain-accounts.json": {configStatusChainAccountsJson, map[string]*bintree{}},
-		"test-data.json":             {configTestDataJson, map[string]*bintree{}},
+	"config": &bintree{nil, map[string]*bintree{
+		"public-chain-accounts.json": &bintree{configPublicChainAccountsJson, map[string]*bintree{}},
+		"status-chain-accounts.json": &bintree{configStatusChainAccountsJson, map[string]*bintree{}},
+		"test-data.json":             &bintree{configTestDataJson, map[string]*bintree{}},
 	}},
 }}
 
@@ -293,7 +291,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}

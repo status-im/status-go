@@ -101,6 +101,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -110,7 +111,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -118,7 +119,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -2090,114 +2091,200 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"000001_init.down.db.sql":                                                     _000001_initDownDbSql,
-	"000001_init.up.db.sql":                                                       _000001_initUpDbSql,
-	"000002_add_last_ens_clock_value.up.sql":                                      _000002_add_last_ens_clock_valueUpSql,
-	"1586358095_add_replace.up.sql":                                               _1586358095_add_replaceUpSql,
-	"1588665364_add_image_data.up.sql":                                            _1588665364_add_image_dataUpSql,
-	"1589365189_add_pow_target.up.sql":                                            _1589365189_add_pow_targetUpSql,
-	"1591277220_add_index_messages.up.sql":                                        _1591277220_add_index_messagesUpSql,
-	"1593087212_add_mute_chat_and_raw_message_fields.up.sql":                      _1593087212_add_mute_chat_and_raw_message_fieldsUpSql,
-	"1595862781_add_audio_data.up.sql":                                            _1595862781_add_audio_dataUpSql,
-	"1595865249_create_emoji_reactions_table.up.sql":                              _1595865249_create_emoji_reactions_tableUpSql,
-	"1596805115_create_group_chat_invitations_table.up.sql":                       _1596805115_create_group_chat_invitations_tableUpSql,
-	"1597322655_add_invitation_admin_chat_field.up.sql":                           _1597322655_add_invitation_admin_chat_fieldUpSql,
-	"1597757544_add_nickname.up.sql":                                              _1597757544_add_nicknameUpSql,
-	"1598955122_add_mentions.up.sql":                                              _1598955122_add_mentionsUpSql,
-	"1599641390_add_emoji_reactions_index.up.sql":                                 _1599641390_add_emoji_reactions_indexUpSql,
-	"1599720851_add_seen_index_remove_long_messages.up.sql":                       _1599720851_add_seen_index_remove_long_messagesUpSql,
-	"1603198582_add_profile_chat_field.up.sql":                                    _1603198582_add_profile_chat_fieldUpSql,
-	"1603816533_add_links.up.sql":                                                 _1603816533_add_linksUpSql,
-	"1603888149_create_chat_identity_last_published_table.up.sql":                 _1603888149_create_chat_identity_last_published_tableUpSql,
-	"1605075346_add_communities.up.sql":                                           _1605075346_add_communitiesUpSql,
-	"1610117927_add_message_cache.up.sql":                                         _1610117927_add_message_cacheUpSql,
-	"1610959908_add_dont_wrap_to_raw_messages.up.sql":                             _1610959908_add_dont_wrap_to_raw_messagesUpSql,
-	"1610960912_add_send_on_personal_topic.up.sql":                                _1610960912_add_send_on_personal_topicUpSql,
-	"1612870480_add_datasync_id.up.sql":                                           _1612870480_add_datasync_idUpSql,
-	"1614152139_add_communities_request_to_join.up.sql":                           _1614152139_add_communities_request_to_joinUpSql,
-	"1615374373_add_confirmations.up.sql":                                         _1615374373_add_confirmationsUpSql,
-	"1617694931_add_notification_center.up.sql":                                   _1617694931_add_notification_centerUpSql,
-	"1618923660_create_pin_messages.up.sql":                                       _1618923660_create_pin_messagesUpSql,
-	"1619094007_add_joined_chat_field.up.sql":                                     _1619094007_add_joined_chat_fieldUpSql,
-	"1619099821_add_last_synced_field.up.sql":                                     _1619099821_add_last_synced_fieldUpSql,
-	"1621933219_add_mentioned.up.sql":                                             _1621933219_add_mentionedUpSql,
-	"1622010048_add_unviewed_mentions_count.up.sql":                               _1622010048_add_unviewed_mentions_countUpSql,
-	"1622061278_add_message_activity_center_notification_field.up.sql":            _1622061278_add_message_activity_center_notification_fieldUpSql,
-	"1622464518_set_synced_to_from.up.sql":                                        _1622464518_set_synced_to_fromUpSql,
-	"1622464519_add_chat_description.up.sql":                                      _1622464519_add_chat_descriptionUpSql,
-	"1622622253_add_pinned_by_to_pin_messages.up.sql":                             _1622622253_add_pinned_by_to_pin_messagesUpSql,
-	"1623938329_add_author_activity_center_notification_field.up.sql":             _1623938329_add_author_activity_center_notification_fieldUpSql,
-	"1623938330_add_edit_messages.up.sql":                                         _1623938330_add_edit_messagesUpSql,
-	"1624978434_add_muted_community.up.sql":                                       _1624978434_add_muted_communityUpSql,
-	"1625018910_add_repply_message_activity_center_notification_field.up.sql":     _1625018910_add_repply_message_activity_center_notification_fieldUpSql,
-	"1625762506_add_deleted_messages.up.sql":                                      _1625762506_add_deleted_messagesUpSql,
-	"1627388946_add_communities_synced_at.up.sql":                                 _1627388946_add_communities_synced_atUpSql,
-	"1628280060_create-usermessages-index.sql":                                    _1628280060_createUsermessagesIndexSql,
-	"1632303896_modify_contacts_table.up.sql":                                     _1632303896_modify_contacts_tableUpSql,
-	"1633349838_add_emoji_column_in_chats.up.sql":                                 _1633349838_add_emoji_column_in_chatsUpSql,
-	"1634831235_add_highlight_column_in_chats.up.sql":                             _1634831235_add_highlight_column_in_chatsUpSql,
-	"1634896007_add_last_updated_locally_and_removed.up.sql":                      _1634896007_add_last_updated_locally_and_removedUpSql,
-	"1635840039_add_clock_read_at_column_in_chats.up.sql":                         _1635840039_add_clock_read_at_column_in_chatsUpSql,
-	"1637852321_add_received_invitation_admin_column_in_chats.up.sql":             _1637852321_add_received_invitation_admin_column_in_chatsUpSql,
-	"1645034601_display_name.up.sql":                                              _1645034601_display_nameUpSql,
-	"1645034602_add_mutual_contact_request.up.sql":                                _1645034602_add_mutual_contact_requestUpSql,
-	"1650373957_add_contact_request_state.up.sql":                                 _1650373957_add_contact_request_stateUpSql,
-	"1656958989_contact_verification.up.sql":                                      _1656958989_contact_verificationUpSql,
-	"1658236268_add_discord_message_authors_table.up.sql":                         _1658236268_add_discord_message_authors_tableUpSql,
-	"1659619997_add_discord_messages_table.up.sql":                                _1659619997_add_discord_messages_tableUpSql,
-	"1660226788_create_chat_identity_social_links.up.sql":                         _1660226788_create_chat_identity_social_linksUpSql,
-	"1660226789_add_walletconnectsessions_table.up.sql":                           _1660226789_add_walletconnectsessions_tableUpSql,
-	"1661242854_add_communities_requests_to_leave.up.sql":                         _1661242854_add_communities_requests_to_leaveUpSql,
-	"1662044232_add_chat_image.up.sql":                                            _1662044232_add_chat_imageUpSql,
-	"1662106895_add_chat_first_message_timestamp.up.sql":                          _1662106895_add_chat_first_message_timestampUpSql,
-	"1662723928_add_discord_author_image_fields.up.sql":                           _1662723928_add_discord_author_image_fieldsUpSql,
-	"1664195977_add_deleted_for_mes.up.sql":                                       _1664195977_add_deleted_for_mesUpSql,
-	"1664367420_add_discord_attachments_table.up.sql":                             _1664367420_add_discord_attachments_tableUpSql,
-	"1665079662_add_spectated_column_in_communities.up.sql":                       _1665079662_add_spectated_column_in_communitiesUpSql,
-	"1665479047_add_community_id_in_notifications.up.sql":                         _1665479047_add_community_id_in_notificationsUpSql,
-	"1665484435_add_encrypted_messages.up.sql":                                    _1665484435_add_encrypted_messagesUpSql,
-	"1665560200_add_contact_verification_individual.up.sql":                       _1665560200_add_contact_verification_individualUpSql,
-	"1670921937_add_album_id.up.sql":                                              _1670921937_add_album_idUpSql,
-	"1673373000_add_replied.up.sql":                                               _1673373000_add_repliedUpSql,
-	"1673428910_add_image_width_height.up.sql":                                    _1673428910_add_image_width_heightUpSql,
-	"1674210659_add_contact_request_local_clock.up.sql":                           _1674210659_add_contact_request_local_clockUpSql,
-	"1675212323_add_deleted_by.up.sql":                                            _1675212323_add_deleted_byUpSql,
-	"1675247084_add_activity_center_states.up.sql":                                _1675247084_add_activity_center_statesUpSql,
-	"1675272329_fix_protocol_migration.up.sql":                                    _1675272329_fix_protocol_migrationUpSql,
-	"1676998418_fix_activity_center_migration.up.sql":                             _1676998418_fix_activity_center_migrationUpSql,
-	"1677278861_add_deleted_column_to_activity_center_notifications_table.up.sql": _1677278861_add_deleted_column_to_activity_center_notifications_tableUpSql,
-	"1677486338_add_community_tokens_table.up.sql":                                _1677486338_add_community_tokens_tableUpSql,
-	"1678292329_add_collapsed_categories.up.sql":                                  _1678292329_add_collapsed_categoriesUpSql,
-	"1678800760_add_index_to_raw_messages.up.sql":                                 _1678800760_add_index_to_raw_messagesUpSql,
-	"1678877478_add_communities_requests_to_join_revealed_addresses_table.up.sql": _1678877478_add_communities_requests_to_join_revealed_addresses_tableUpSql,
-	"1679326850_add_community_token_owners.up.sql":                                _1679326850_add_community_token_ownersUpSql,
-	"1680011500_add_album_images_count.up.sql":                                    _1680011500_add_album_images_countUpSql,
-	"1680114896_add_index_on_album_id.up.sql":                                     _1680114896_add_index_on_album_idUpSql,
-	"1681655289_add_mute_till.up.sql":                                             _1681655289_add_mute_tillUpSql,
-	"1681934966_add_index_response_to.up.sql":                                     _1681934966_add_index_response_toUpSql,
-	"1682528339_add_index_user_messages_unseen.up.sql":                            _1682528339_add_index_user_messages_unseenUpSql,
-	"1683707289_recreate_deleted_for_mes.up.sql":                                  _1683707289_recreate_deleted_for_mesUpSql,
-	"1683725607_mark_discord_messages_as_seen.up.sql":                             _1683725607_mark_discord_messages_as_seenUpSql,
-	"1684174617_add_url_previews_to_user_messages.up.sql":                         _1684174617_add_url_previews_to_user_messagesUpSql,
-	"1684175608_add_token_balances.up.sql":                                        _1684175608_add_token_balancesUpSql,
-	"README.md":                                                                   readmeMd,
-	"doc.go":                                                                      docGo,
-}
+	"000001_init.down.db.sql": _000001_initDownDbSql,
 
-// AssetDebug is true if the assets were built with the debug flag enabled.
-const AssetDebug = false
+	"000001_init.up.db.sql": _000001_initUpDbSql,
+
+	"000002_add_last_ens_clock_value.up.sql": _000002_add_last_ens_clock_valueUpSql,
+
+	"1586358095_add_replace.up.sql": _1586358095_add_replaceUpSql,
+
+	"1588665364_add_image_data.up.sql": _1588665364_add_image_dataUpSql,
+
+	"1589365189_add_pow_target.up.sql": _1589365189_add_pow_targetUpSql,
+
+	"1591277220_add_index_messages.up.sql": _1591277220_add_index_messagesUpSql,
+
+	"1593087212_add_mute_chat_and_raw_message_fields.up.sql": _1593087212_add_mute_chat_and_raw_message_fieldsUpSql,
+
+	"1595862781_add_audio_data.up.sql": _1595862781_add_audio_dataUpSql,
+
+	"1595865249_create_emoji_reactions_table.up.sql": _1595865249_create_emoji_reactions_tableUpSql,
+
+	"1596805115_create_group_chat_invitations_table.up.sql": _1596805115_create_group_chat_invitations_tableUpSql,
+
+	"1597322655_add_invitation_admin_chat_field.up.sql": _1597322655_add_invitation_admin_chat_fieldUpSql,
+
+	"1597757544_add_nickname.up.sql": _1597757544_add_nicknameUpSql,
+
+	"1598955122_add_mentions.up.sql": _1598955122_add_mentionsUpSql,
+
+	"1599641390_add_emoji_reactions_index.up.sql": _1599641390_add_emoji_reactions_indexUpSql,
+
+	"1599720851_add_seen_index_remove_long_messages.up.sql": _1599720851_add_seen_index_remove_long_messagesUpSql,
+
+	"1603198582_add_profile_chat_field.up.sql": _1603198582_add_profile_chat_fieldUpSql,
+
+	"1603816533_add_links.up.sql": _1603816533_add_linksUpSql,
+
+	"1603888149_create_chat_identity_last_published_table.up.sql": _1603888149_create_chat_identity_last_published_tableUpSql,
+
+	"1605075346_add_communities.up.sql": _1605075346_add_communitiesUpSql,
+
+	"1610117927_add_message_cache.up.sql": _1610117927_add_message_cacheUpSql,
+
+	"1610959908_add_dont_wrap_to_raw_messages.up.sql": _1610959908_add_dont_wrap_to_raw_messagesUpSql,
+
+	"1610960912_add_send_on_personal_topic.up.sql": _1610960912_add_send_on_personal_topicUpSql,
+
+	"1612870480_add_datasync_id.up.sql": _1612870480_add_datasync_idUpSql,
+
+	"1614152139_add_communities_request_to_join.up.sql": _1614152139_add_communities_request_to_joinUpSql,
+
+	"1615374373_add_confirmations.up.sql": _1615374373_add_confirmationsUpSql,
+
+	"1617694931_add_notification_center.up.sql": _1617694931_add_notification_centerUpSql,
+
+	"1618923660_create_pin_messages.up.sql": _1618923660_create_pin_messagesUpSql,
+
+	"1619094007_add_joined_chat_field.up.sql": _1619094007_add_joined_chat_fieldUpSql,
+
+	"1619099821_add_last_synced_field.up.sql": _1619099821_add_last_synced_fieldUpSql,
+
+	"1621933219_add_mentioned.up.sql": _1621933219_add_mentionedUpSql,
+
+	"1622010048_add_unviewed_mentions_count.up.sql": _1622010048_add_unviewed_mentions_countUpSql,
+
+	"1622061278_add_message_activity_center_notification_field.up.sql": _1622061278_add_message_activity_center_notification_fieldUpSql,
+
+	"1622464518_set_synced_to_from.up.sql": _1622464518_set_synced_to_fromUpSql,
+
+	"1622464519_add_chat_description.up.sql": _1622464519_add_chat_descriptionUpSql,
+
+	"1622622253_add_pinned_by_to_pin_messages.up.sql": _1622622253_add_pinned_by_to_pin_messagesUpSql,
+
+	"1623938329_add_author_activity_center_notification_field.up.sql": _1623938329_add_author_activity_center_notification_fieldUpSql,
+
+	"1623938330_add_edit_messages.up.sql": _1623938330_add_edit_messagesUpSql,
+
+	"1624978434_add_muted_community.up.sql": _1624978434_add_muted_communityUpSql,
+
+	"1625018910_add_repply_message_activity_center_notification_field.up.sql": _1625018910_add_repply_message_activity_center_notification_fieldUpSql,
+
+	"1625762506_add_deleted_messages.up.sql": _1625762506_add_deleted_messagesUpSql,
+
+	"1627388946_add_communities_synced_at.up.sql": _1627388946_add_communities_synced_atUpSql,
+
+	"1628280060_create-usermessages-index.sql": _1628280060_createUsermessagesIndexSql,
+
+	"1632303896_modify_contacts_table.up.sql": _1632303896_modify_contacts_tableUpSql,
+
+	"1633349838_add_emoji_column_in_chats.up.sql": _1633349838_add_emoji_column_in_chatsUpSql,
+
+	"1634831235_add_highlight_column_in_chats.up.sql": _1634831235_add_highlight_column_in_chatsUpSql,
+
+	"1634896007_add_last_updated_locally_and_removed.up.sql": _1634896007_add_last_updated_locally_and_removedUpSql,
+
+	"1635840039_add_clock_read_at_column_in_chats.up.sql": _1635840039_add_clock_read_at_column_in_chatsUpSql,
+
+	"1637852321_add_received_invitation_admin_column_in_chats.up.sql": _1637852321_add_received_invitation_admin_column_in_chatsUpSql,
+
+	"1645034601_display_name.up.sql": _1645034601_display_nameUpSql,
+
+	"1645034602_add_mutual_contact_request.up.sql": _1645034602_add_mutual_contact_requestUpSql,
+
+	"1650373957_add_contact_request_state.up.sql": _1650373957_add_contact_request_stateUpSql,
+
+	"1656958989_contact_verification.up.sql": _1656958989_contact_verificationUpSql,
+
+	"1658236268_add_discord_message_authors_table.up.sql": _1658236268_add_discord_message_authors_tableUpSql,
+
+	"1659619997_add_discord_messages_table.up.sql": _1659619997_add_discord_messages_tableUpSql,
+
+	"1660226788_create_chat_identity_social_links.up.sql": _1660226788_create_chat_identity_social_linksUpSql,
+
+	"1660226789_add_walletconnectsessions_table.up.sql": _1660226789_add_walletconnectsessions_tableUpSql,
+
+	"1661242854_add_communities_requests_to_leave.up.sql": _1661242854_add_communities_requests_to_leaveUpSql,
+
+	"1662044232_add_chat_image.up.sql": _1662044232_add_chat_imageUpSql,
+
+	"1662106895_add_chat_first_message_timestamp.up.sql": _1662106895_add_chat_first_message_timestampUpSql,
+
+	"1662723928_add_discord_author_image_fields.up.sql": _1662723928_add_discord_author_image_fieldsUpSql,
+
+	"1664195977_add_deleted_for_mes.up.sql": _1664195977_add_deleted_for_mesUpSql,
+
+	"1664367420_add_discord_attachments_table.up.sql": _1664367420_add_discord_attachments_tableUpSql,
+
+	"1665079662_add_spectated_column_in_communities.up.sql": _1665079662_add_spectated_column_in_communitiesUpSql,
+
+	"1665479047_add_community_id_in_notifications.up.sql": _1665479047_add_community_id_in_notificationsUpSql,
+
+	"1665484435_add_encrypted_messages.up.sql": _1665484435_add_encrypted_messagesUpSql,
+
+	"1665560200_add_contact_verification_individual.up.sql": _1665560200_add_contact_verification_individualUpSql,
+
+	"1670921937_add_album_id.up.sql": _1670921937_add_album_idUpSql,
+
+	"1673373000_add_replied.up.sql": _1673373000_add_repliedUpSql,
+
+	"1673428910_add_image_width_height.up.sql": _1673428910_add_image_width_heightUpSql,
+
+	"1674210659_add_contact_request_local_clock.up.sql": _1674210659_add_contact_request_local_clockUpSql,
+
+	"1675212323_add_deleted_by.up.sql": _1675212323_add_deleted_byUpSql,
+
+	"1675247084_add_activity_center_states.up.sql": _1675247084_add_activity_center_statesUpSql,
+
+	"1675272329_fix_protocol_migration.up.sql": _1675272329_fix_protocol_migrationUpSql,
+
+	"1676998418_fix_activity_center_migration.up.sql": _1676998418_fix_activity_center_migrationUpSql,
+
+	"1677278861_add_deleted_column_to_activity_center_notifications_table.up.sql": _1677278861_add_deleted_column_to_activity_center_notifications_tableUpSql,
+
+	"1677486338_add_community_tokens_table.up.sql": _1677486338_add_community_tokens_tableUpSql,
+
+	"1678292329_add_collapsed_categories.up.sql": _1678292329_add_collapsed_categoriesUpSql,
+
+	"1678800760_add_index_to_raw_messages.up.sql": _1678800760_add_index_to_raw_messagesUpSql,
+
+	"1678877478_add_communities_requests_to_join_revealed_addresses_table.up.sql": _1678877478_add_communities_requests_to_join_revealed_addresses_tableUpSql,
+
+	"1679326850_add_community_token_owners.up.sql": _1679326850_add_community_token_ownersUpSql,
+
+	"1680011500_add_album_images_count.up.sql": _1680011500_add_album_images_countUpSql,
+
+	"1680114896_add_index_on_album_id.up.sql": _1680114896_add_index_on_album_idUpSql,
+
+	"1681655289_add_mute_till.up.sql": _1681655289_add_mute_tillUpSql,
+
+	"1681934966_add_index_response_to.up.sql": _1681934966_add_index_response_toUpSql,
+
+	"1682528339_add_index_user_messages_unseen.up.sql": _1682528339_add_index_user_messages_unseenUpSql,
+
+	"1683707289_recreate_deleted_for_mes.up.sql": _1683707289_recreate_deleted_for_mesUpSql,
+
+	"1683725607_mark_discord_messages_as_seen.up.sql": _1683725607_mark_discord_messages_as_seenUpSql,
+
+	"1684174617_add_url_previews_to_user_messages.up.sql": _1684174617_add_url_previews_to_user_messagesUpSql,
+
+	"1684175608_add_token_balances.up.sql": _1684175608_add_token_balancesUpSql,
+
+	"README.md": readmeMd,
+
+	"doc.go": docGo,
+}
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//
-//	data/
-//	  foo.txt
-//	  img/
-//	    a.png
-//	    b.png
-//
+//     data/
+//       foo.txt
+//       img/
+//         a.png
+//         b.png
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -2230,98 +2317,98 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"000001_init.down.db.sql":                                                     {_000001_initDownDbSql, map[string]*bintree{}},
-	"000001_init.up.db.sql":                                                       {_000001_initUpDbSql, map[string]*bintree{}},
-	"000002_add_last_ens_clock_value.up.sql":                                      {_000002_add_last_ens_clock_valueUpSql, map[string]*bintree{}},
-	"1586358095_add_replace.up.sql":                                               {_1586358095_add_replaceUpSql, map[string]*bintree{}},
-	"1588665364_add_image_data.up.sql":                                            {_1588665364_add_image_dataUpSql, map[string]*bintree{}},
-	"1589365189_add_pow_target.up.sql":                                            {_1589365189_add_pow_targetUpSql, map[string]*bintree{}},
-	"1591277220_add_index_messages.up.sql":                                        {_1591277220_add_index_messagesUpSql, map[string]*bintree{}},
-	"1593087212_add_mute_chat_and_raw_message_fields.up.sql":                      {_1593087212_add_mute_chat_and_raw_message_fieldsUpSql, map[string]*bintree{}},
-	"1595862781_add_audio_data.up.sql":                                            {_1595862781_add_audio_dataUpSql, map[string]*bintree{}},
-	"1595865249_create_emoji_reactions_table.up.sql":                              {_1595865249_create_emoji_reactions_tableUpSql, map[string]*bintree{}},
-	"1596805115_create_group_chat_invitations_table.up.sql":                       {_1596805115_create_group_chat_invitations_tableUpSql, map[string]*bintree{}},
-	"1597322655_add_invitation_admin_chat_field.up.sql":                           {_1597322655_add_invitation_admin_chat_fieldUpSql, map[string]*bintree{}},
-	"1597757544_add_nickname.up.sql":                                              {_1597757544_add_nicknameUpSql, map[string]*bintree{}},
-	"1598955122_add_mentions.up.sql":                                              {_1598955122_add_mentionsUpSql, map[string]*bintree{}},
-	"1599641390_add_emoji_reactions_index.up.sql":                                 {_1599641390_add_emoji_reactions_indexUpSql, map[string]*bintree{}},
-	"1599720851_add_seen_index_remove_long_messages.up.sql":                       {_1599720851_add_seen_index_remove_long_messagesUpSql, map[string]*bintree{}},
-	"1603198582_add_profile_chat_field.up.sql":                                    {_1603198582_add_profile_chat_fieldUpSql, map[string]*bintree{}},
-	"1603816533_add_links.up.sql":                                                 {_1603816533_add_linksUpSql, map[string]*bintree{}},
-	"1603888149_create_chat_identity_last_published_table.up.sql":                 {_1603888149_create_chat_identity_last_published_tableUpSql, map[string]*bintree{}},
-	"1605075346_add_communities.up.sql":                                           {_1605075346_add_communitiesUpSql, map[string]*bintree{}},
-	"1610117927_add_message_cache.up.sql":                                         {_1610117927_add_message_cacheUpSql, map[string]*bintree{}},
-	"1610959908_add_dont_wrap_to_raw_messages.up.sql":                             {_1610959908_add_dont_wrap_to_raw_messagesUpSql, map[string]*bintree{}},
-	"1610960912_add_send_on_personal_topic.up.sql":                                {_1610960912_add_send_on_personal_topicUpSql, map[string]*bintree{}},
-	"1612870480_add_datasync_id.up.sql":                                           {_1612870480_add_datasync_idUpSql, map[string]*bintree{}},
-	"1614152139_add_communities_request_to_join.up.sql":                           {_1614152139_add_communities_request_to_joinUpSql, map[string]*bintree{}},
-	"1615374373_add_confirmations.up.sql":                                         {_1615374373_add_confirmationsUpSql, map[string]*bintree{}},
-	"1617694931_add_notification_center.up.sql":                                   {_1617694931_add_notification_centerUpSql, map[string]*bintree{}},
-	"1618923660_create_pin_messages.up.sql":                                       {_1618923660_create_pin_messagesUpSql, map[string]*bintree{}},
-	"1619094007_add_joined_chat_field.up.sql":                                     {_1619094007_add_joined_chat_fieldUpSql, map[string]*bintree{}},
-	"1619099821_add_last_synced_field.up.sql":                                     {_1619099821_add_last_synced_fieldUpSql, map[string]*bintree{}},
-	"1621933219_add_mentioned.up.sql":                                             {_1621933219_add_mentionedUpSql, map[string]*bintree{}},
-	"1622010048_add_unviewed_mentions_count.up.sql":                               {_1622010048_add_unviewed_mentions_countUpSql, map[string]*bintree{}},
-	"1622061278_add_message_activity_center_notification_field.up.sql":            {_1622061278_add_message_activity_center_notification_fieldUpSql, map[string]*bintree{}},
-	"1622464518_set_synced_to_from.up.sql":                                        {_1622464518_set_synced_to_fromUpSql, map[string]*bintree{}},
-	"1622464519_add_chat_description.up.sql":                                      {_1622464519_add_chat_descriptionUpSql, map[string]*bintree{}},
-	"1622622253_add_pinned_by_to_pin_messages.up.sql":                             {_1622622253_add_pinned_by_to_pin_messagesUpSql, map[string]*bintree{}},
-	"1623938329_add_author_activity_center_notification_field.up.sql":             {_1623938329_add_author_activity_center_notification_fieldUpSql, map[string]*bintree{}},
-	"1623938330_add_edit_messages.up.sql":                                         {_1623938330_add_edit_messagesUpSql, map[string]*bintree{}},
-	"1624978434_add_muted_community.up.sql":                                       {_1624978434_add_muted_communityUpSql, map[string]*bintree{}},
-	"1625018910_add_repply_message_activity_center_notification_field.up.sql":     {_1625018910_add_repply_message_activity_center_notification_fieldUpSql, map[string]*bintree{}},
-	"1625762506_add_deleted_messages.up.sql":                                      {_1625762506_add_deleted_messagesUpSql, map[string]*bintree{}},
-	"1627388946_add_communities_synced_at.up.sql":                                 {_1627388946_add_communities_synced_atUpSql, map[string]*bintree{}},
-	"1628280060_create-usermessages-index.sql":                                    {_1628280060_createUsermessagesIndexSql, map[string]*bintree{}},
-	"1632303896_modify_contacts_table.up.sql":                                     {_1632303896_modify_contacts_tableUpSql, map[string]*bintree{}},
-	"1633349838_add_emoji_column_in_chats.up.sql":                                 {_1633349838_add_emoji_column_in_chatsUpSql, map[string]*bintree{}},
-	"1634831235_add_highlight_column_in_chats.up.sql":                             {_1634831235_add_highlight_column_in_chatsUpSql, map[string]*bintree{}},
-	"1634896007_add_last_updated_locally_and_removed.up.sql":                      {_1634896007_add_last_updated_locally_and_removedUpSql, map[string]*bintree{}},
-	"1635840039_add_clock_read_at_column_in_chats.up.sql":                         {_1635840039_add_clock_read_at_column_in_chatsUpSql, map[string]*bintree{}},
-	"1637852321_add_received_invitation_admin_column_in_chats.up.sql":             {_1637852321_add_received_invitation_admin_column_in_chatsUpSql, map[string]*bintree{}},
-	"1645034601_display_name.up.sql":                                              {_1645034601_display_nameUpSql, map[string]*bintree{}},
-	"1645034602_add_mutual_contact_request.up.sql":                                {_1645034602_add_mutual_contact_requestUpSql, map[string]*bintree{}},
-	"1650373957_add_contact_request_state.up.sql":                                 {_1650373957_add_contact_request_stateUpSql, map[string]*bintree{}},
-	"1656958989_contact_verification.up.sql":                                      {_1656958989_contact_verificationUpSql, map[string]*bintree{}},
-	"1658236268_add_discord_message_authors_table.up.sql":                         {_1658236268_add_discord_message_authors_tableUpSql, map[string]*bintree{}},
-	"1659619997_add_discord_messages_table.up.sql":                                {_1659619997_add_discord_messages_tableUpSql, map[string]*bintree{}},
-	"1660226788_create_chat_identity_social_links.up.sql":                         {_1660226788_create_chat_identity_social_linksUpSql, map[string]*bintree{}},
-	"1660226789_add_walletconnectsessions_table.up.sql":                           {_1660226789_add_walletconnectsessions_tableUpSql, map[string]*bintree{}},
-	"1661242854_add_communities_requests_to_leave.up.sql":                         {_1661242854_add_communities_requests_to_leaveUpSql, map[string]*bintree{}},
-	"1662044232_add_chat_image.up.sql":                                            {_1662044232_add_chat_imageUpSql, map[string]*bintree{}},
-	"1662106895_add_chat_first_message_timestamp.up.sql":                          {_1662106895_add_chat_first_message_timestampUpSql, map[string]*bintree{}},
-	"1662723928_add_discord_author_image_fields.up.sql":                           {_1662723928_add_discord_author_image_fieldsUpSql, map[string]*bintree{}},
-	"1664195977_add_deleted_for_mes.up.sql":                                       {_1664195977_add_deleted_for_mesUpSql, map[string]*bintree{}},
-	"1664367420_add_discord_attachments_table.up.sql":                             {_1664367420_add_discord_attachments_tableUpSql, map[string]*bintree{}},
-	"1665079662_add_spectated_column_in_communities.up.sql":                       {_1665079662_add_spectated_column_in_communitiesUpSql, map[string]*bintree{}},
-	"1665479047_add_community_id_in_notifications.up.sql":                         {_1665479047_add_community_id_in_notificationsUpSql, map[string]*bintree{}},
-	"1665484435_add_encrypted_messages.up.sql":                                    {_1665484435_add_encrypted_messagesUpSql, map[string]*bintree{}},
-	"1665560200_add_contact_verification_individual.up.sql":                       {_1665560200_add_contact_verification_individualUpSql, map[string]*bintree{}},
-	"1670921937_add_album_id.up.sql":                                              {_1670921937_add_album_idUpSql, map[string]*bintree{}},
-	"1673373000_add_replied.up.sql":                                               {_1673373000_add_repliedUpSql, map[string]*bintree{}},
-	"1673428910_add_image_width_height.up.sql":                                    {_1673428910_add_image_width_heightUpSql, map[string]*bintree{}},
-	"1674210659_add_contact_request_local_clock.up.sql":                           {_1674210659_add_contact_request_local_clockUpSql, map[string]*bintree{}},
-	"1675212323_add_deleted_by.up.sql":                                            {_1675212323_add_deleted_byUpSql, map[string]*bintree{}},
-	"1675247084_add_activity_center_states.up.sql":                                {_1675247084_add_activity_center_statesUpSql, map[string]*bintree{}},
-	"1675272329_fix_protocol_migration.up.sql":                                    {_1675272329_fix_protocol_migrationUpSql, map[string]*bintree{}},
-	"1676998418_fix_activity_center_migration.up.sql":                             {_1676998418_fix_activity_center_migrationUpSql, map[string]*bintree{}},
-	"1677278861_add_deleted_column_to_activity_center_notifications_table.up.sql": {_1677278861_add_deleted_column_to_activity_center_notifications_tableUpSql, map[string]*bintree{}},
-	"1677486338_add_community_tokens_table.up.sql":                                {_1677486338_add_community_tokens_tableUpSql, map[string]*bintree{}},
-	"1678292329_add_collapsed_categories.up.sql":                                  {_1678292329_add_collapsed_categoriesUpSql, map[string]*bintree{}},
-	"1678800760_add_index_to_raw_messages.up.sql":                                 {_1678800760_add_index_to_raw_messagesUpSql, map[string]*bintree{}},
-	"1678877478_add_communities_requests_to_join_revealed_addresses_table.up.sql": {_1678877478_add_communities_requests_to_join_revealed_addresses_tableUpSql, map[string]*bintree{}},
-	"1679326850_add_community_token_owners.up.sql":                                {_1679326850_add_community_token_ownersUpSql, map[string]*bintree{}},
-	"1680011500_add_album_images_count.up.sql":                                    {_1680011500_add_album_images_countUpSql, map[string]*bintree{}},
-	"1680114896_add_index_on_album_id.up.sql":                                     {_1680114896_add_index_on_album_idUpSql, map[string]*bintree{}},
-	"1681655289_add_mute_till.up.sql":                                             {_1681655289_add_mute_tillUpSql, map[string]*bintree{}},
-	"1681934966_add_index_response_to.up.sql":                                     {_1681934966_add_index_response_toUpSql, map[string]*bintree{}},
-	"1682528339_add_index_user_messages_unseen.up.sql":                            {_1682528339_add_index_user_messages_unseenUpSql, map[string]*bintree{}},
-	"1683707289_recreate_deleted_for_mes.up.sql":                                  {_1683707289_recreate_deleted_for_mesUpSql, map[string]*bintree{}},
-	"1683725607_mark_discord_messages_as_seen.up.sql":                             {_1683725607_mark_discord_messages_as_seenUpSql, map[string]*bintree{}},
-	"1684174617_add_url_previews_to_user_messages.up.sql":                         {_1684174617_add_url_previews_to_user_messagesUpSql, map[string]*bintree{}},
-	"1684175608_add_token_balances.up.sql":                                        {_1684175608_add_token_balancesUpSql, map[string]*bintree{}},
-	"README.md":                                                                   {readmeMd, map[string]*bintree{}},
-	"doc.go":                                                                      {docGo, map[string]*bintree{}},
+	"000001_init.down.db.sql":                                                     &bintree{_000001_initDownDbSql, map[string]*bintree{}},
+	"000001_init.up.db.sql":                                                       &bintree{_000001_initUpDbSql, map[string]*bintree{}},
+	"000002_add_last_ens_clock_value.up.sql":                                      &bintree{_000002_add_last_ens_clock_valueUpSql, map[string]*bintree{}},
+	"1586358095_add_replace.up.sql":                                               &bintree{_1586358095_add_replaceUpSql, map[string]*bintree{}},
+	"1588665364_add_image_data.up.sql":                                            &bintree{_1588665364_add_image_dataUpSql, map[string]*bintree{}},
+	"1589365189_add_pow_target.up.sql":                                            &bintree{_1589365189_add_pow_targetUpSql, map[string]*bintree{}},
+	"1591277220_add_index_messages.up.sql":                                        &bintree{_1591277220_add_index_messagesUpSql, map[string]*bintree{}},
+	"1593087212_add_mute_chat_and_raw_message_fields.up.sql":                      &bintree{_1593087212_add_mute_chat_and_raw_message_fieldsUpSql, map[string]*bintree{}},
+	"1595862781_add_audio_data.up.sql":                                            &bintree{_1595862781_add_audio_dataUpSql, map[string]*bintree{}},
+	"1595865249_create_emoji_reactions_table.up.sql":                              &bintree{_1595865249_create_emoji_reactions_tableUpSql, map[string]*bintree{}},
+	"1596805115_create_group_chat_invitations_table.up.sql":                       &bintree{_1596805115_create_group_chat_invitations_tableUpSql, map[string]*bintree{}},
+	"1597322655_add_invitation_admin_chat_field.up.sql":                           &bintree{_1597322655_add_invitation_admin_chat_fieldUpSql, map[string]*bintree{}},
+	"1597757544_add_nickname.up.sql":                                              &bintree{_1597757544_add_nicknameUpSql, map[string]*bintree{}},
+	"1598955122_add_mentions.up.sql":                                              &bintree{_1598955122_add_mentionsUpSql, map[string]*bintree{}},
+	"1599641390_add_emoji_reactions_index.up.sql":                                 &bintree{_1599641390_add_emoji_reactions_indexUpSql, map[string]*bintree{}},
+	"1599720851_add_seen_index_remove_long_messages.up.sql":                       &bintree{_1599720851_add_seen_index_remove_long_messagesUpSql, map[string]*bintree{}},
+	"1603198582_add_profile_chat_field.up.sql":                                    &bintree{_1603198582_add_profile_chat_fieldUpSql, map[string]*bintree{}},
+	"1603816533_add_links.up.sql":                                                 &bintree{_1603816533_add_linksUpSql, map[string]*bintree{}},
+	"1603888149_create_chat_identity_last_published_table.up.sql":                 &bintree{_1603888149_create_chat_identity_last_published_tableUpSql, map[string]*bintree{}},
+	"1605075346_add_communities.up.sql":                                           &bintree{_1605075346_add_communitiesUpSql, map[string]*bintree{}},
+	"1610117927_add_message_cache.up.sql":                                         &bintree{_1610117927_add_message_cacheUpSql, map[string]*bintree{}},
+	"1610959908_add_dont_wrap_to_raw_messages.up.sql":                             &bintree{_1610959908_add_dont_wrap_to_raw_messagesUpSql, map[string]*bintree{}},
+	"1610960912_add_send_on_personal_topic.up.sql":                                &bintree{_1610960912_add_send_on_personal_topicUpSql, map[string]*bintree{}},
+	"1612870480_add_datasync_id.up.sql":                                           &bintree{_1612870480_add_datasync_idUpSql, map[string]*bintree{}},
+	"1614152139_add_communities_request_to_join.up.sql":                           &bintree{_1614152139_add_communities_request_to_joinUpSql, map[string]*bintree{}},
+	"1615374373_add_confirmations.up.sql":                                         &bintree{_1615374373_add_confirmationsUpSql, map[string]*bintree{}},
+	"1617694931_add_notification_center.up.sql":                                   &bintree{_1617694931_add_notification_centerUpSql, map[string]*bintree{}},
+	"1618923660_create_pin_messages.up.sql":                                       &bintree{_1618923660_create_pin_messagesUpSql, map[string]*bintree{}},
+	"1619094007_add_joined_chat_field.up.sql":                                     &bintree{_1619094007_add_joined_chat_fieldUpSql, map[string]*bintree{}},
+	"1619099821_add_last_synced_field.up.sql":                                     &bintree{_1619099821_add_last_synced_fieldUpSql, map[string]*bintree{}},
+	"1621933219_add_mentioned.up.sql":                                             &bintree{_1621933219_add_mentionedUpSql, map[string]*bintree{}},
+	"1622010048_add_unviewed_mentions_count.up.sql":                               &bintree{_1622010048_add_unviewed_mentions_countUpSql, map[string]*bintree{}},
+	"1622061278_add_message_activity_center_notification_field.up.sql":            &bintree{_1622061278_add_message_activity_center_notification_fieldUpSql, map[string]*bintree{}},
+	"1622464518_set_synced_to_from.up.sql":                                        &bintree{_1622464518_set_synced_to_fromUpSql, map[string]*bintree{}},
+	"1622464519_add_chat_description.up.sql":                                      &bintree{_1622464519_add_chat_descriptionUpSql, map[string]*bintree{}},
+	"1622622253_add_pinned_by_to_pin_messages.up.sql":                             &bintree{_1622622253_add_pinned_by_to_pin_messagesUpSql, map[string]*bintree{}},
+	"1623938329_add_author_activity_center_notification_field.up.sql":             &bintree{_1623938329_add_author_activity_center_notification_fieldUpSql, map[string]*bintree{}},
+	"1623938330_add_edit_messages.up.sql":                                         &bintree{_1623938330_add_edit_messagesUpSql, map[string]*bintree{}},
+	"1624978434_add_muted_community.up.sql":                                       &bintree{_1624978434_add_muted_communityUpSql, map[string]*bintree{}},
+	"1625018910_add_repply_message_activity_center_notification_field.up.sql":     &bintree{_1625018910_add_repply_message_activity_center_notification_fieldUpSql, map[string]*bintree{}},
+	"1625762506_add_deleted_messages.up.sql":                                      &bintree{_1625762506_add_deleted_messagesUpSql, map[string]*bintree{}},
+	"1627388946_add_communities_synced_at.up.sql":                                 &bintree{_1627388946_add_communities_synced_atUpSql, map[string]*bintree{}},
+	"1628280060_create-usermessages-index.sql":                                    &bintree{_1628280060_createUsermessagesIndexSql, map[string]*bintree{}},
+	"1632303896_modify_contacts_table.up.sql":                                     &bintree{_1632303896_modify_contacts_tableUpSql, map[string]*bintree{}},
+	"1633349838_add_emoji_column_in_chats.up.sql":                                 &bintree{_1633349838_add_emoji_column_in_chatsUpSql, map[string]*bintree{}},
+	"1634831235_add_highlight_column_in_chats.up.sql":                             &bintree{_1634831235_add_highlight_column_in_chatsUpSql, map[string]*bintree{}},
+	"1634896007_add_last_updated_locally_and_removed.up.sql":                      &bintree{_1634896007_add_last_updated_locally_and_removedUpSql, map[string]*bintree{}},
+	"1635840039_add_clock_read_at_column_in_chats.up.sql":                         &bintree{_1635840039_add_clock_read_at_column_in_chatsUpSql, map[string]*bintree{}},
+	"1637852321_add_received_invitation_admin_column_in_chats.up.sql":             &bintree{_1637852321_add_received_invitation_admin_column_in_chatsUpSql, map[string]*bintree{}},
+	"1645034601_display_name.up.sql":                                              &bintree{_1645034601_display_nameUpSql, map[string]*bintree{}},
+	"1645034602_add_mutual_contact_request.up.sql":                                &bintree{_1645034602_add_mutual_contact_requestUpSql, map[string]*bintree{}},
+	"1650373957_add_contact_request_state.up.sql":                                 &bintree{_1650373957_add_contact_request_stateUpSql, map[string]*bintree{}},
+	"1656958989_contact_verification.up.sql":                                      &bintree{_1656958989_contact_verificationUpSql, map[string]*bintree{}},
+	"1658236268_add_discord_message_authors_table.up.sql":                         &bintree{_1658236268_add_discord_message_authors_tableUpSql, map[string]*bintree{}},
+	"1659619997_add_discord_messages_table.up.sql":                                &bintree{_1659619997_add_discord_messages_tableUpSql, map[string]*bintree{}},
+	"1660226788_create_chat_identity_social_links.up.sql":                         &bintree{_1660226788_create_chat_identity_social_linksUpSql, map[string]*bintree{}},
+	"1660226789_add_walletconnectsessions_table.up.sql":                           &bintree{_1660226789_add_walletconnectsessions_tableUpSql, map[string]*bintree{}},
+	"1661242854_add_communities_requests_to_leave.up.sql":                         &bintree{_1661242854_add_communities_requests_to_leaveUpSql, map[string]*bintree{}},
+	"1662044232_add_chat_image.up.sql":                                            &bintree{_1662044232_add_chat_imageUpSql, map[string]*bintree{}},
+	"1662106895_add_chat_first_message_timestamp.up.sql":                          &bintree{_1662106895_add_chat_first_message_timestampUpSql, map[string]*bintree{}},
+	"1662723928_add_discord_author_image_fields.up.sql":                           &bintree{_1662723928_add_discord_author_image_fieldsUpSql, map[string]*bintree{}},
+	"1664195977_add_deleted_for_mes.up.sql":                                       &bintree{_1664195977_add_deleted_for_mesUpSql, map[string]*bintree{}},
+	"1664367420_add_discord_attachments_table.up.sql":                             &bintree{_1664367420_add_discord_attachments_tableUpSql, map[string]*bintree{}},
+	"1665079662_add_spectated_column_in_communities.up.sql":                       &bintree{_1665079662_add_spectated_column_in_communitiesUpSql, map[string]*bintree{}},
+	"1665479047_add_community_id_in_notifications.up.sql":                         &bintree{_1665479047_add_community_id_in_notificationsUpSql, map[string]*bintree{}},
+	"1665484435_add_encrypted_messages.up.sql":                                    &bintree{_1665484435_add_encrypted_messagesUpSql, map[string]*bintree{}},
+	"1665560200_add_contact_verification_individual.up.sql":                       &bintree{_1665560200_add_contact_verification_individualUpSql, map[string]*bintree{}},
+	"1670921937_add_album_id.up.sql":                                              &bintree{_1670921937_add_album_idUpSql, map[string]*bintree{}},
+	"1673373000_add_replied.up.sql":                                               &bintree{_1673373000_add_repliedUpSql, map[string]*bintree{}},
+	"1673428910_add_image_width_height.up.sql":                                    &bintree{_1673428910_add_image_width_heightUpSql, map[string]*bintree{}},
+	"1674210659_add_contact_request_local_clock.up.sql":                           &bintree{_1674210659_add_contact_request_local_clockUpSql, map[string]*bintree{}},
+	"1675212323_add_deleted_by.up.sql":                                            &bintree{_1675212323_add_deleted_byUpSql, map[string]*bintree{}},
+	"1675247084_add_activity_center_states.up.sql":                                &bintree{_1675247084_add_activity_center_statesUpSql, map[string]*bintree{}},
+	"1675272329_fix_protocol_migration.up.sql":                                    &bintree{_1675272329_fix_protocol_migrationUpSql, map[string]*bintree{}},
+	"1676998418_fix_activity_center_migration.up.sql":                             &bintree{_1676998418_fix_activity_center_migrationUpSql, map[string]*bintree{}},
+	"1677278861_add_deleted_column_to_activity_center_notifications_table.up.sql": &bintree{_1677278861_add_deleted_column_to_activity_center_notifications_tableUpSql, map[string]*bintree{}},
+	"1677486338_add_community_tokens_table.up.sql":                                &bintree{_1677486338_add_community_tokens_tableUpSql, map[string]*bintree{}},
+	"1678292329_add_collapsed_categories.up.sql":                                  &bintree{_1678292329_add_collapsed_categoriesUpSql, map[string]*bintree{}},
+	"1678800760_add_index_to_raw_messages.up.sql":                                 &bintree{_1678800760_add_index_to_raw_messagesUpSql, map[string]*bintree{}},
+	"1678877478_add_communities_requests_to_join_revealed_addresses_table.up.sql": &bintree{_1678877478_add_communities_requests_to_join_revealed_addresses_tableUpSql, map[string]*bintree{}},
+	"1679326850_add_community_token_owners.up.sql":                                &bintree{_1679326850_add_community_token_ownersUpSql, map[string]*bintree{}},
+	"1680011500_add_album_images_count.up.sql":                                    &bintree{_1680011500_add_album_images_countUpSql, map[string]*bintree{}},
+	"1680114896_add_index_on_album_id.up.sql":                                     &bintree{_1680114896_add_index_on_album_idUpSql, map[string]*bintree{}},
+	"1681655289_add_mute_till.up.sql":                                             &bintree{_1681655289_add_mute_tillUpSql, map[string]*bintree{}},
+	"1681934966_add_index_response_to.up.sql":                                     &bintree{_1681934966_add_index_response_toUpSql, map[string]*bintree{}},
+	"1682528339_add_index_user_messages_unseen.up.sql":                            &bintree{_1682528339_add_index_user_messages_unseenUpSql, map[string]*bintree{}},
+	"1683707289_recreate_deleted_for_mes.up.sql":                                  &bintree{_1683707289_recreate_deleted_for_mesUpSql, map[string]*bintree{}},
+	"1683725607_mark_discord_messages_as_seen.up.sql":                             &bintree{_1683725607_mark_discord_messages_as_seenUpSql, map[string]*bintree{}},
+	"1684174617_add_url_previews_to_user_messages.up.sql":                         &bintree{_1684174617_add_url_previews_to_user_messagesUpSql, map[string]*bintree{}},
+	"1684175608_add_token_balances.up.sql":                                        &bintree{_1684175608_add_token_balancesUpSql, map[string]*bintree{}},
+	"README.md":                                                                   &bintree{readmeMd, map[string]*bintree{}},
+	"doc.go":                                                                      &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
@@ -2338,7 +2425,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}
