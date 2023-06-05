@@ -114,6 +114,12 @@ func TestReplaceMentions(t *testing.T) {
 				LocalNickname: "primary-name-user-4",
 			},
 		},
+		"0xpk5": {
+			Contact: &Contact{
+				ID:            "0xpk5",
+				LocalNickname: "User Number",
+			},
+		},
 	}
 
 	tests := []struct {
@@ -128,7 +134,7 @@ func TestReplaceMentions(t *testing.T) {
 		{"no mentions", "foo bar @buzz kek @foo", "foo bar @buzz kek @foo"},
 		{"starts with mention", "@User Number One", "@0xpk1"},
 		{"starts with mention, comma after mention", "@User Number One,", "@0xpk1,"},
-		{"starts with mention but no space after", "@User Number Onefoo", "@User Number Onefoo"},
+		{"starts with mention but no space after", "@User NumberOnefoo", "@User NumberOnefoo"},
 		{"starts with mention, some text after mention", "@User Number One foo", "@0xpk1 foo"},
 		{"starts with some text, then mention", "text @User Number One", "text @0xpk1"},
 		{"starts with some text, then mention, then more text", "text @User Number One foo", "text @0xpk1 foo"},
@@ -176,6 +182,9 @@ func TestReplaceMentions(t *testing.T) {
 		{"double @", "@ @user2", "@ @0xpk2"},
 
 		{"user name contains dash", "@display-name-user-4 ", "@0xpk4 "},
+
+		{"username or nickname of one is a substring of another case 1", "@User Number One @User Number", "@0xpk1 @0xpk5"},
+		{"username or nickname of one is a substring of another case 2", "@User Number @User Number One ", "@0xpk5 @0xpk1 "},
 	}
 
 	for _, tt := range tests {
