@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	multiaccountscommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -2876,7 +2877,7 @@ func mapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability a
 		PublicKey: types.HexBytes(message.PublicKey),
 		Path:      message.Path,
 		Name:      message.Name,
-		ColorID:   message.ColorID,
+		ColorID:   multiaccountscommon.CustomizationColor(message.ColorId),
 		Emoji:     message.Emoji,
 		Wallet:    message.Wallet,
 		Chat:      message.Chat,
