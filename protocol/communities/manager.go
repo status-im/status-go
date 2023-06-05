@@ -800,7 +800,10 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 
 	// Make sure that we remove admins roles if we remove admin permissions
-	m.checkMemberPermissions(community, len(becomeAdminPermissions) == 0)
+	err = m.checkMemberPermissions(community, len(becomeAdminPermissions) == 0)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// Check if there's stil BECOME_ADMIN and BECOME_MEMBER permissions,
 	// if not we can stop checking token criteria on-chain
@@ -1426,7 +1429,7 @@ func (m *Manager) handleAdditionalAdminChanges(community *Community, adminEvent 
 				return err
 			}
 		}
-		break
+
 	case protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT:
 		for signer, request := range adminEvent.RejectedRequestsToJoin {
 			err := saveOrUpdateRequestToJoin(signer, request, RequestToJoinStateDeclined)
@@ -1434,7 +1437,7 @@ func (m *Manager) handleAdditionalAdminChanges(community *Community, adminEvent 
 				return err
 			}
 		}
-		break
+
 	default:
 	}
 	return nil
@@ -1572,7 +1575,7 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 
 		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(revealedAccounts)
 
-		// admin token permissions requred to became an admin must not cancel request to join
+		// admin token permissions required to became an admin must not cancel request to join
 		// if requirements were not met
 		hasPermission := false
 		if len(becomeAdminPermissions) > 0 {
@@ -1796,7 +1799,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 	if (len(becomeMemberPermissions) > 0 || len(becomeAdminPermissions) > 0) && len(request.RevealedAccounts) > 0 {
 		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(request.RevealedAccounts)
 
-		// admin token permissions requred to became an admin must not cancel request to join
+		// admin token permissions required to became an admin must not cancel request to join
 		// if requirements were not met
 		if len(becomeAdminPermissions) > 0 {
 			permissionResponse, err := m.checkPermissionToJoin(becomeAdminPermissions, accountsAndChainIDs, true)

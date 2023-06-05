@@ -104,8 +104,8 @@ func (m *Messenger) publishOrgInvitation(org *communities.Community, invitation 
 }
 
 func (m *Messenger) publishCommunityAdminEvent(adminEvent *protobuf.CommunityAdminEvent) error {
-	admin_pubkey := common.PubkeyToHex(&m.identity.PublicKey)
-	m.logger.Debug("publishing community admin event", zap.String("admin-id", admin_pubkey), zap.Any("event", adminEvent))
+	adminPubkey := common.PubkeyToHex(&m.identity.PublicKey)
+	m.logger.Debug("publishing community admin event", zap.String("admin-id", adminPubkey), zap.Any("event", adminEvent))
 	_, err := crypto.DecompressPubkey(adminEvent.CommunityId)
 	if err != nil {
 		return err

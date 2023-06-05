@@ -208,7 +208,7 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminEditBecomeMemberPermission() {
 	tokenPermissionID, createTokenPermission := s.adminCreateTestTokenPermission(community)
 
 	// then, ensure owner receives it
-	response, err := WaitOnMessengerResponse(
+	_, err := WaitOnMessengerResponse(
 		s.owner,
 		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
 		"owner did not receive community",
@@ -219,7 +219,7 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminEditBecomeMemberPermission() {
 	s.assertAdminTokenPermissionCreated(ownerCommunity)
 
 	// then, ensure alice receives it
-	response, err = WaitOnMessengerResponse(
+	_, err = WaitOnMessengerResponse(
 		s.alice,
 		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
 		"alice did not receive community",
@@ -239,7 +239,7 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminEditBecomeMemberPermission() {
 
 	s.refreshMessengerResponses()
 	// then, admin edits the permission
-	response, err = s.admin.EditCommunityTokenPermission(editTokenPermission)
+	response, err := s.admin.EditCommunityTokenPermission(editTokenPermission)
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
 	s.assertAdminTokenPermissionEdited(response.Communities()[0])
@@ -360,6 +360,7 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminCannotEditBecomeAdminPermissio
 	s.Require().NotEqual(tokenPermissionID, "")
 
 	ownerCommunity, err := s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
 	s.assertAdminTokenPermissionCreated(ownerCommunity)
 
 	// then, ensure admin receives updated community
@@ -487,6 +488,7 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminAcceptMemberRequestToJoin() {
 
 	requests, err := s.owner.AcceptedRequestsToJoinForCommunity(community.ID())
 	// there's now two requests to join (admin and alice) + 1 from user
+	s.Require().NoError(err)
 	s.Require().Len(requests, 3)
 	s.Require().True(response.Communities()[0].HasMember(&user.identity.PublicKey))
 
@@ -547,7 +549,6 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminRejectMemberRequestToJoin() {
 	response, err = WaitOnMessengerResponse(
 		s.owner,
 		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		// func(r *MessengerResponse) bool { return true },
 		"owner did not receive community request to join update from admin",
 	)
 	s.Require().NoError(err)
@@ -555,6 +556,7 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminRejectMemberRequestToJoin() {
 
 	requests, err := s.owner.DeclinedRequestsToJoinForCommunity(community.ID())
 	s.Require().Len(requests, 1)
+	s.Require().NoError(err)
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminCreateEditDeleteCategories() {
@@ -672,7 +674,7 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminDeleteAnyMessageInTheCommunity
 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = "owner text"
 
-	messageID := s.ownerSendMessage(chatID, &inputMessage)
+	messageID := s.ownerSendMessage(&inputMessage)
 
 	s.adminDeleteMessage(messageID)
 }
@@ -687,7 +689,7 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminPinMessage() {
 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = "owner text"
 
-	messageID := s.ownerSendMessage(chatID, &inputMessage)
+	messageID := s.ownerSendMessage(&inputMessage)
 
 	pinnedMessage := common.PinMessage{}
 	pinnedMessage.MessageId = messageID
@@ -814,7 +816,7 @@ func (s *AdminMessengerCommunitiesSuite) joinOnRequestCommunity(community *commu
 	s.Require().True(updatedCommunity.HasMember(&user.identity.PublicKey))
 
 	// receive request to join response
-	response, err = WaitOnMessengerResponse(
+	_, err = WaitOnMessengerResponse(
 		user,
 		func(r *MessengerResponse) bool {
 			return len(r.Communities()) > 0
@@ -894,7 +896,7 @@ func (s *AdminMessengerCommunitiesSuite) createCommunity(membershipType protobuf
 }
 
 func (s *AdminMessengerCommunitiesSuite) grantAdminPermissions(community *communities.Community, target *Messenger) {
-	response_add_role, err := s.owner.AddRoleToMember(&requests.AddRoleToMember{
+	responseAddRole, err := s.owner.AddRoleToMember(&requests.AddRoleToMember{
 		CommunityID: community.ID(),
 		User:        common.PubkeyToHexBytes(target.IdentityPublicKey()),
 		Role:        protobuf.CommunityMember_ROLE_ADMIN,
@@ -905,13 +907,13 @@ func (s *AdminMessengerCommunitiesSuite) grantAdminPermissions(community *commun
 		if len(response.Communities()) == 0 {
 			return false
 		}
-		r_communities := response.Communities()
-		s.Require().Len(r_communities, 1)
-		s.Require().True(r_communities[0].IsMemberAdmin(target.IdentityPublicKey()))
+		rCommunities := response.Communities()
+		s.Require().Len(rCommunities, 1)
+		s.Require().True(rCommunities[0].IsMemberAdmin(target.IdentityPublicKey()))
 		return true
 	}
 
-	checkAdminRole(response_add_role)
+	checkAdminRole(responseAddRole)
 
 	_, err = WaitOnMessengerResponse(s.admin, func(response *MessengerResponse) bool {
 		return checkAdminRole(response)
@@ -926,17 +928,17 @@ func (s *AdminMessengerCommunitiesSuite) grantAdminPermissions(community *commun
 }
 
 func (s *AdminMessengerCommunitiesSuite) adminEditsCommunityDescription(community *communities.Community) {
-	expected_name := "edited community name"
-	expected_color := "#000000"
-	expected_descr := "edited community description"
+	expectedName := "edited community name"
+	expectedColor := "#000000"
+	expectedDescr := "edited community description"
 
 	response, err := s.admin.EditCommunity(&requests.EditCommunity{
 		CommunityID: community.ID(),
 		CreateCommunity: requests.CreateCommunity{
 			Membership:  protobuf.CommunityPermissions_ON_REQUEST,
-			Name:        expected_name,
-			Color:       expected_color,
-			Description: expected_descr,
+			Name:        expectedName,
+			Color:       expectedColor,
+			Description: expectedDescr,
 		},
 	})
 
@@ -945,16 +947,16 @@ func (s *AdminMessengerCommunitiesSuite) adminEditsCommunityDescription(communit
 			return errors.New("community not received")
 		}
 
-		r_communities := response.Communities()
-		if expected_name != r_communities[0].Name() {
+		rCommunities := response.Communities()
+		if expectedName != rCommunities[0].Name() {
 			return errors.New("incorrect community name")
 		}
 
-		if expected_color != r_communities[0].Color() {
+		if expectedColor != rCommunities[0].Color() {
 			return errors.New("incorrect community color")
 		}
 
-		if expected_descr != r_communities[0].DescriptionText() {
+		if expectedDescr != rCommunities[0].DescriptionText() {
 			return errors.New("incorrect community description")
 		}
 
@@ -1220,14 +1222,14 @@ func (s *AdminMessengerCommunitiesSuite) adminCreateCommunityCategory(community 
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.CommunityChanges[0].CategoriesAdded, 1)
 
-	var categoryId string
-	for categoryId = range response.CommunityChanges[0].CategoriesAdded {
+	var categoryID string
+	for categoryID = range response.CommunityChanges[0].CategoriesAdded {
 		break
 	}
 
 	s.checkClientsReceivedAdminEvent(WaitCommunityCondition, checkCategoryCreated)
 
-	return categoryId
+	return categoryID
 }
 
 func (s *AdminMessengerCommunitiesSuite) adminEditCommunityCategory(communityID string, editCategory *requests.EditCommunityCategory) {
@@ -1294,7 +1296,7 @@ func (s *AdminMessengerCommunitiesSuite) adminDeleteCommunityCategory(communityI
 	s.checkClientsReceivedAdminEvent(WaitCommunityCondition, checkCategoryDeleted)
 }
 
-func (s *AdminMessengerCommunitiesSuite) ownerSendMessage(chatId string, inputMessage *common.Message) string {
+func (s *AdminMessengerCommunitiesSuite) ownerSendMessage(inputMessage *common.Message) string {
 	response, err := s.owner.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
 	message := response.Messages()[0]

@@ -55,50 +55,50 @@ func (o *Community) ToReorderChannelAdminEvent(categoryID string, channelID stri
 	}
 }
 
-func (o *Community) ToCreateCategoryAdminEvent(categoryId string, categoryName string, channelsIds []string) *protobuf.CommunityAdminEvent {
+func (o *Community) ToCreateCategoryAdminEvent(categoryID string, categoryName string, channelsIds []string) *protobuf.CommunityAdminEvent {
 	return &protobuf.CommunityAdminEvent{
 		Clock:       o.Clock(),
 		CommunityId: o.ID(),
 		Type:        protobuf.CommunityAdminEvent_COMMUNITY_CATEGORY_CREATE,
 		CategoryData: &protobuf.CategoryData{
 			Name:        categoryName,
-			CategoryId:  categoryId,
+			CategoryId:  categoryID,
 			ChannelsIds: channelsIds,
 		},
 	}
 }
 
-func (o *Community) ToEditCategoryAdminEvent(categoryId string, categoryName string, channelsIds []string) *protobuf.CommunityAdminEvent {
+func (o *Community) ToEditCategoryAdminEvent(categoryID string, categoryName string, channelsIds []string) *protobuf.CommunityAdminEvent {
 	return &protobuf.CommunityAdminEvent{
 		Clock:       o.Clock(),
 		CommunityId: o.ID(),
 		Type:        protobuf.CommunityAdminEvent_COMMUNITY_CATEGORY_EDIT,
 		CategoryData: &protobuf.CategoryData{
 			Name:        categoryName,
-			CategoryId:  categoryId,
+			CategoryId:  categoryID,
 			ChannelsIds: channelsIds,
 		},
 	}
 }
 
-func (o *Community) ToDeleteCategoryAdminEvent(categoryId string) *protobuf.CommunityAdminEvent {
+func (o *Community) ToDeleteCategoryAdminEvent(categoryID string) *protobuf.CommunityAdminEvent {
 	return &protobuf.CommunityAdminEvent{
 		Clock:       o.Clock(),
 		CommunityId: o.ID(),
 		Type:        protobuf.CommunityAdminEvent_COMMUNITY_CATEGORY_DELETE,
 		CategoryData: &protobuf.CategoryData{
-			CategoryId: categoryId,
+			CategoryId: categoryID,
 		},
 	}
 }
 
-func (o *Community) ToReorderCategoryAdminEvent(categoryId string, position int) *protobuf.CommunityAdminEvent {
+func (o *Community) ToReorderCategoryAdminEvent(categoryID string, position int) *protobuf.CommunityAdminEvent {
 	return &protobuf.CommunityAdminEvent{
 		Clock:       o.Clock(),
 		CommunityId: o.ID(),
 		Type:        protobuf.CommunityAdminEvent_COMMUNITY_CATEGORY_REORDER,
 		CategoryData: &protobuf.CategoryData{
-			CategoryId: categoryId,
+			CategoryId: categoryID,
 			Position:   int32(position),
 		},
 	}
@@ -238,10 +238,9 @@ func (o *Community) PatchCommunityDescriptionByAdminEvent(adminEvent *protobuf.C
 
 		// update existing permissions
 		copy.updateTokenPermissions(newPermissions)
-		break
+
 	case protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETE:
 		copy.replaceBecomeMemberTokenPermissions(adminEvent.TokenPermissions)
-		break
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_CATEGORY_CREATE:
 		_, err := copy.createCategory(adminEvent.CategoryData.CategoryId, adminEvent.CategoryData.Name, adminEvent.CategoryData.ChannelsIds)
@@ -298,7 +297,7 @@ func (o *Community) PatchCommunityDescriptionByAdminEvent(adminEvent *protobuf.C
 				copy.addCommunityMember(pk, addedMember)
 			}
 		}
-		break
+
 	case protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT:
 		// Do not remove this case!
 		//
