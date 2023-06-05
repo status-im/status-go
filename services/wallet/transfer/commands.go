@@ -274,6 +274,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 		return cmnd.error
 	}
 
+	bCache.Clear()
 	err = c.LoadTransfers(parent, numberOfBlocksCheckedPerIteration)
 	if err != nil {
 		if c.NewError(err) {
@@ -309,7 +310,6 @@ func (c *controlCommand) Run(parent context.Context) error {
 			BlockNumber: target,
 		})
 	}
-
 	log.Info("end control command")
 	return err
 }
