@@ -1,12 +1,15 @@
 package linkpreview
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	neturl "net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -20,53 +23,45 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 )
 
-// UnfurlError means a non-critical error, and that processing of the preview
-// should be interrupted and the preview probably ignored.
-type UnfurlError struct {
-	msg string
-	url string
-	err error
-}
-
-func (ue UnfurlError) Error() string {
-	return fmt.Sprintf("%s, url='%s'", ue.msg, ue.url)
-}
-
-func (ue UnfurlError) Unwrap() error {
-	return ue.err
-}
-
 type LinkPreview struct {
 	common.LinkPreview
 }
 
 type Unfurler interface {
-	unfurl(*neturl.URL) (common.LinkPreview, error)
+	unfurl() (common.LinkPreview, error)
 }
 
-const (
-	requestTimeout = 15000 * time.Millisecond
+type Headers map[string]string
 
-	// Certain websites return an HTML error page if the user agent is unknown to
-	// them, e.g. IMDb.
-	defaultUserAgent = "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/109.0"
+const (
+	defaultRequestTimeout = 15000 * time.Millisecond
+
+	headerAcceptJSON = "application/json; charset=utf-8"
+	headerAcceptText = "text/html; charset=utf-8"
+
+	// Without a particular user agent, many providers treat status-go as a
+	// gluttony bot, and either respond more frequently with a 429 (Too Many
+	// Requests), or simply refuse to return valid data. Note that using a known
+	// browser UA doesn't work well with some providers, such as Spotify,
+	// apparently they still flag status-go as a bad actor.
+	headerUserAgent = "status-go/v0.151.15"
 
 	// Currently set to English, but we could make this setting dynamic according
 	// to the user's language of choice.
-	defaultAcceptLanguage = "en-US,en;q=0.5"
+	headerAcceptLanguage = "en-US,en;q=0.5"
 )
 
-var (
-	httpClient = http.Client{Timeout: requestTimeout}
-)
-
-func fetchResponseBody(logger *zap.Logger, url string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+func fetchBody(logger *zap.Logger, httpClient http.Client, url string, headers Headers) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to perform HTTP request: %w", err)
+	}
+
+	for k, v := range headers {
+		req.Header.Set(k, v)
 	}
 
 	res, err := httpClient.Do(req)
@@ -74,18 +69,18 @@ func fetchResponseBody(logger *zap.Logger, url string) ([]byte, error) {
 		return nil, err
 	}
 	defer func() {
-		if err = res.Body.Close(); err != nil {
-			logger.Error("Failed to close response body", zap.Error(err))
+		if err := res.Body.Close(); err != nil {
+			logger.Error("failed to close response body", zap.Error(err))
 		}
 	}()
 
 	if res.StatusCode >= http.StatusBadRequest {
-		return nil, errors.New(http.StatusText(res.StatusCode))
+		return nil, fmt.Errorf("http request failed, statusCode='%d'", res.StatusCode)
 	}
 
 	bodyBytes, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read body bytes: %w", err)
 	}
 
 	return bodyBytes, nil
@@ -98,24 +93,10 @@ func newDefaultLinkPreview(url *neturl.URL) common.LinkPreview {
 	}
 }
 
-func httpGETForOpenGraph(url string) (*http.Response, context.CancelFunc, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, cancel, err
-	}
-	req.Header.Set("User-Agent", defaultUserAgent)
-	req.Header.Set("Accept-Language", defaultAcceptLanguage)
-
-	res, err := httpClient.Do(req)
-	return res, cancel, err
-}
-
-func fetchThumbnail(logger *zap.Logger, url string) (common.LinkPreviewThumbnail, error) {
+func fetchThumbnail(logger *zap.Logger, httpClient http.Client, url string) (common.LinkPreviewThumbnail, error) {
 	var thumbnail common.LinkPreviewThumbnail
 
-	imgBytes, err := fetchResponseBody(logger, url)
+	imgBytes, err := fetchBody(logger, httpClient, url, nil)
 	if err != nil {
 		return thumbnail, fmt.Errorf("could not fetch thumbnail: %w", err)
 	}
@@ -136,79 +117,120 @@ func fetchThumbnail(logger *zap.Logger, url string) (common.LinkPreviewThumbnail
 	return thumbnail, nil
 }
 
+type OEmbedUnfurler struct {
+	logger     *zap.Logger
+	httpClient http.Client
+	// oembedEndpoint describes where the consumer may request representations for
+	// the supported URL scheme. For example, for YouTube, it is
+	// https://www.youtube.com/oembed.
+	oembedEndpoint string
+	// url is the actual URL to be unfurled.
+	url *neturl.URL
+}
+
+type OEmbedResponse struct {
+	Title        string `json:"title"`
+	ThumbnailURL string `json:"thumbnail_url"`
+}
+
+func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
+	oembedURL, err := neturl.Parse(u.oembedEndpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	// When format is specified, the provider MUST return data in the requested
+	// format, else return an error.
+	oembedURL.RawQuery = neturl.Values{
+		"url":    {u.url.String()},
+		"format": {"json"},
+	}.Encode()
+
+	return oembedURL, nil
+}
+
+func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
+	preview := newDefaultLinkPreview(u.url)
+
+	oembedURL, err := u.newOEmbedURL()
+	if err != nil {
+		return preview, err
+	}
+
+	headers := map[string]string{
+		"accept":          headerAcceptJSON,
+		"accept-language": headerAcceptLanguage,
+		"user-agent":      headerUserAgent,
+	}
+	oembedBytes, err := fetchBody(u.logger, u.httpClient, oembedURL.String(), headers)
+	if err != nil {
+		return preview, err
+	}
+
+	var oembedResponse OEmbedResponse
+	if err != nil {
+		return preview, err
+	}
+	err = json.Unmarshal(oembedBytes, &oembedResponse)
+	if err != nil {
+		return preview, err
+	}
+
+	if oembedResponse.Title == "" {
+		return preview, fmt.Errorf("missing required title in oEmbed response")
+	}
+
+	preview.Title = oembedResponse.Title
+	return preview, nil
+}
+
 type OpenGraphMetadata struct {
 	Title        string `json:"title" meta:"og:title"`
 	Description  string `json:"description" meta:"og:description"`
 	ThumbnailURL string `json:"thumbnailUrl" meta:"og:image"`
 }
 
-// OpenGraphUnfurler can be used either as the default unfurler for some websites
-// (e.g. GitHub), or as a fallback strategy. It parses HTML and extract
-// OpenGraph meta tags. If an oEmbed endpoint is available, it should be
-// preferred.
+// OpenGraphUnfurler should be preferred over OEmbedUnfurler because oEmbed
+// gives back a JSON response with a "html" field that's supposed to be embedded
+// in an iframe (hardly useful for existing Status' clients).
 type OpenGraphUnfurler struct {
-	logger *zap.Logger
+	url        *neturl.URL
+	logger     *zap.Logger
+	httpClient http.Client
 }
 
-func (u OpenGraphUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
-	preview := newDefaultLinkPreview(url)
+func (u OpenGraphUnfurler) unfurl() (common.LinkPreview, error) {
+	preview := newDefaultLinkPreview(u.url)
 
-	res, cancel, err := httpGETForOpenGraph(url.String())
-	defer cancel()
-	defer func() {
-		if res != nil {
-			if err = res.Body.Close(); err != nil {
-				u.logger.Error("failed to close response body", zap.Error(err))
-			}
-		}
-	}()
-	if err != nil {
-		return preview, UnfurlError{
-			msg: "failed to get HTML page",
-			url: url.String(),
-			err: err,
-		}
+	headers := map[string]string{
+		"accept":          headerAcceptText,
+		"accept-language": headerAcceptLanguage,
+		"user-agent":      headerUserAgent,
 	}
-
-	// Behave like WhatsApp, i.e. if the response is a 404, consider the URL
-	// unfurleable. We can try to unfurl from the 404 HTML, which works well for
-	// certain websites, like GitHub, but it also potentially confuses users
-	// because they'll be sharing previews that don't match the actual URLs.
-	if res.StatusCode == http.StatusNotFound {
-		return preview, UnfurlError{
-			msg: "could not find page",
-			url: url.String(),
-			err: errors.New(""),
-		}
+	bodyBytes, err := fetchBody(u.logger, u.httpClient, u.url.String(), headers)
+	if err != nil {
+		return preview, err
 	}
 
 	var ogMetadata OpenGraphMetadata
-	err = metabolize.Metabolize(res.Body, &ogMetadata)
+	err = metabolize.Metabolize(ioutil.NopCloser(bytes.NewBuffer(bodyBytes)), &ogMetadata)
 	if err != nil {
-		return preview, UnfurlError{
-			msg: "failed to parse OpenGraph data",
-			url: url.String(),
-			err: err,
-		}
+		return preview, fmt.Errorf("failed to parse OpenGraph data")
 	}
 
 	// There are URLs like https://wikipedia.org/ that don't have an OpenGraph
 	// title tag, but article pages do. In the future, we can fallback to the
 	// website's title by using the <title> tag.
 	if ogMetadata.Title == "" {
-		return preview, UnfurlError{
-			msg: "missing title",
-			url: url.String(),
-			err: errors.New(""),
-		}
+		return preview, fmt.Errorf("missing required title in OpenGraph response")
 	}
 
 	if ogMetadata.ThumbnailURL != "" {
-		t, err := fetchThumbnail(u.logger, ogMetadata.ThumbnailURL)
+		t, err := fetchThumbnail(u.logger, u.httpClient, ogMetadata.ThumbnailURL)
 		if err != nil {
 			// Given we want to fetch thumbnails on a best-effort basis, if an error
 			// happens we simply log it.
-			u.logger.Info("failed to fetch thumbnail", zap.String("url", url.String()), zap.Error(err))
+			u.logger.Info("failed to fetch thumbnail", zap.String("url", u.url.String()), zap.Error(err))
 		} else {
 			preview.Thumbnail = t
 		}
@@ -219,13 +241,31 @@ func (u OpenGraphUnfurler) unfurl(url *neturl.URL) (common.LinkPreview, error) {
 	return preview, nil
 }
 
-func newUnfurler(logger *zap.Logger, url *neturl.URL) Unfurler {
-	u := new(OpenGraphUnfurler)
-	u.logger = logger
-	return u
+func normalizeHostname(hostname string) string {
+	hostname = strings.ToLower(hostname)
+	re := regexp.MustCompile(`^www\.(.*)$`)
+	return re.ReplaceAllString(hostname, "$1")
 }
 
-func unfurl(logger *zap.Logger, url string) (common.LinkPreview, error) {
+func newUnfurler(logger *zap.Logger, httpClient http.Client, url *neturl.URL) Unfurler {
+	switch normalizeHostname(url.Hostname()) {
+	case "reddit.com":
+		return OEmbedUnfurler{
+			oembedEndpoint: "https://www.reddit.com/oembed",
+			url:            url,
+			logger:         logger,
+			httpClient:     httpClient,
+		}
+	default:
+		return OpenGraphUnfurler{
+			url:        url,
+			logger:     logger,
+			httpClient: httpClient,
+		}
+	}
+}
+
+func unfurl(logger *zap.Logger, httpClient http.Client, url string) (common.LinkPreview, error) {
 	var preview common.LinkPreview
 
 	parsedURL, err := neturl.Parse(url)
@@ -233,8 +273,8 @@ func unfurl(logger *zap.Logger, url string) (common.LinkPreview, error) {
 		return preview, err
 	}
 
-	unfurler := newUnfurler(logger, parsedURL)
-	preview, err = unfurler.unfurl(parsedURL)
+	unfurler := newUnfurler(logger, httpClient, parsedURL)
+	preview, err = unfurler.unfurl()
 	if err != nil {
 		return preview, err
 	}
@@ -264,6 +304,10 @@ func parseValidURL(rawURL string) (*neturl.URL, error) {
 }
 
 // GetURLs returns only what we consider unfurleable URLs.
+//
+// If we wanted to be extra precise and help improve UX, we could ignore URLs
+// that we know can't be unfurled. This is at least possible with the oEmbed
+// protocol because providers must specify an endpoint scheme.
 func GetURLs(text string) []string {
 	parsedText := markdown.Parse([]byte(text), nil)
 	visitor := common.RunLinksVisitor(parsedText)
@@ -297,9 +341,13 @@ func GetURLs(text string) []string {
 	return urls
 }
 
+func NewDefaultHTTPClient() http.Client {
+	return http.Client{Timeout: defaultRequestTimeout}
+}
+
 // UnfurlURLs assumes clients pass URLs verbatim that were validated and
 // processed by GetURLs.
-func UnfurlURLs(logger *zap.Logger, urls []string) ([]common.LinkPreview, error) {
+func UnfurlURLs(logger *zap.Logger, httpClient http.Client, urls []string) ([]common.LinkPreview, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -311,14 +359,11 @@ func UnfurlURLs(logger *zap.Logger, urls []string) ([]common.LinkPreview, error)
 	previews := make([]common.LinkPreview, 0, len(urls))
 
 	for _, url := range urls {
-		p, err := unfurl(logger, url)
+		logger.Debug("unfurling", zap.String("url", url))
+		p, err := unfurl(logger, httpClient, url)
 		if err != nil {
-			if unfurlErr, ok := err.(UnfurlError); ok {
-				logger.Info("failed to unfurl", zap.Error(unfurlErr))
-				continue
-			}
-
-			return nil, err
+			logger.Info("failed to unfurl", zap.String("url", url), zap.Error(err))
+			continue
 		}
 		previews = append(previews, p)
 	}

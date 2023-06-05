@@ -5937,7 +5937,7 @@ func generateAliasAndIdenticon(pk string) (string, string, error) {
 }
 
 func (m *Messenger) UnfurlURLs(urls []string) ([]common.LinkPreview, error) {
-	return linkpreview.UnfurlURLs(m.logger, urls)
+	return linkpreview.UnfurlURLs(m.logger, linkpreview.NewDefaultHTTPClient(), urls)
 }
 
 func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID protobuf.EmojiReaction_Type) (*MessengerResponse, error) {
