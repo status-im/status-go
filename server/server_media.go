@@ -130,3 +130,11 @@ func (s *MediaServer) MakeQRURL(qurul string,
 
 	return u.String()
 }
+
+func (s *MediaServer) MakeContactImageURL(publicKey string, imageType string) string {
+	u := s.MakeBaseURL()
+	u.Path = contactImagesPath
+	u.RawQuery = url.Values{"publicKey": {publicKey}, "imageName": {imageType}}.Encode()
+
+	return u.String()
+}

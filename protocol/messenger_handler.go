@@ -2671,6 +2671,10 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 			contact.Images[imageType] = images.IdentityImage{Name: imageType, Payload: image.Payload, Clock: ci.Clock}
 
 		}
+		if err = m.updateContactImagesURL(contact); err != nil {
+			return err
+		}
+
 		contactModified = true
 	}
 

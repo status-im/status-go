@@ -1642,6 +1642,9 @@ func (m *Messenger) Init() error {
 		return err
 	}
 	for idx, contact := range contacts {
+		if err = m.updateContactImagesURL(contact); err != nil {
+			return err
+		}
 		m.allContacts.Store(contact.ID, contacts[idx])
 		// We only need filters for contacts added by us and not blocked.
 		if !contact.added() || contact.Blocked {

@@ -17,6 +17,7 @@ type IdentityImage struct {
 	FileSize     int    `json:"fileSize"`
 	ResizeTarget int    `json:"resizeTarget"`
 	Clock        uint64 `json:"clock"`
+	LocalURL     string `json:"localUrl,omitempty"`
 }
 
 func (i IdentityImage) GetType() (ImageType, error) {
@@ -51,6 +52,7 @@ func (i IdentityImage) MarshalJSON() ([]byte, error) {
 		FileSize     int    `json:"fileSize"`
 		ResizeTarget int    `json:"resizeTarget"`
 		Clock        uint64 `json:"clock"`
+		LocalURL     string `json:"localUrl,omitempty"`
 	}{
 		KeyUID:       i.KeyUID,
 		Name:         i.Name,
@@ -60,6 +62,7 @@ func (i IdentityImage) MarshalJSON() ([]byte, error) {
 		FileSize:     i.FileSize,
 		ResizeTarget: i.ResizeTarget,
 		Clock:        i.Clock,
+		LocalURL:     i.LocalURL,
 	}
 
 	return json.Marshal(temp)

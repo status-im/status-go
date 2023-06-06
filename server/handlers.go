@@ -147,20 +147,21 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 			logger.Error("no imageName")
 			return
 		}
-		colorHash, err := colorhash.GenerateFor(pks[0])
-		if err != nil {
-			logger.Error("could not generate color hash")
-			return
-		}
 
 		var payload []byte
-		err = db.QueryRow(`SELECT payload FROM chat_identity_contacts WHERE contact_id = ? and image_type = ?`, pks[0], imageNames[0]).Scan(&payload)
+		err := db.QueryRow(`SELECT payload FROM chat_identity_contacts WHERE contact_id = ? and image_type = ?`, pks[0], imageNames[0]).Scan(&payload)
 		if err != nil {
 			logger.Error("failed to load image.", zap.String("contact id", pks[0]), zap.String("image type", imageNames[0]), zap.Error(err))
 			return
 		}
 
 		if ringEnabled(params) {
+			colorHash, err := colorhash.GenerateFor(pks[0])
+			if err != nil {
+				logger.Error("could not generate color hash")
+				return
+			}
+
 			var theme = getTheme(params, logger)
 			config, _, err := image.DecodeConfig(bytes.NewReader(payload))
 			if err != nil {
