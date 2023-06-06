@@ -12,6 +12,7 @@ func TestRun(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, res.Signature, "processDepositQueue(address,uint256)")
 	require.Equal(t, res.Name, "processDepositQueue")
+	require.Equal(t, res.ID, "0xf94d2")
 	require.Equal(t, res.Inputs, map[string]string{
 		"0": "0x3030303030303030303030303637306463613632",
 		"1": "44417128579249187980157595307322491418158007948522794164811090501355597543782",
