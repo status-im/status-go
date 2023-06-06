@@ -18,6 +18,8 @@ pipeline {
 
   options {
     timestamps()
+    /* Prevent Jenkins jobs from running forever */
+    timeout(time: 10, unit: 'MINUTES')
     disableConcurrentBuilds()
     /* Go requires a certain directory structure */
     checkoutToSubdirectory('src/github.com/status-im/status-go')

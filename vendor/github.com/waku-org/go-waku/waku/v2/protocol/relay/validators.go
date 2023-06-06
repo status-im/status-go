@@ -54,8 +54,8 @@ func withinTimeWindow(t timesource.Timesource, msg *pb.WakuMessage) bool {
 
 type validatorFn = func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool
 
-func validatorFnBuilder(t timesource.Timesource, topic string, publicKey *ecdsa.PublicKey) validatorFn {
-	pubkBytes := crypto.FromECDSAPub(publicKey)
+func validatorFnBuilder(t timesource.Timesource, topic string, publicKey *ecdsa.PublicKey) (validatorFn, error) {
+	publicKeyBytes := crypto.FromECDSAPub(publicKey)
 	return func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool {
 		msg := new(pb.WakuMessage)
 		err := proto.Unmarshal(message.Data, msg)
@@ -70,13 +70,19 @@ func validatorFnBuilder(t timesource.Timesource, topic string, publicKey *ecdsa.
 		msgHash := MsgHash(topic, msg)
 		signature := msg.Meta
 
-		return secp256k1.VerifySignature(pubkBytes, msgHash, signature)
-	}
+		return secp256k1.VerifySignature(publicKeyBytes, msgHash, signature)
+	}, nil
 }
 
 func (w *WakuRelay) AddSignedTopicValidator(topic string, publicKey *ecdsa.PublicKey) error {
 	w.log.Info("adding validator to signed topic", zap.String("topic", topic), zap.String("publicKey", hex.EncodeToString(elliptic.Marshal(publicKey.Curve, publicKey.X, publicKey.Y))))
-	err := w.pubsub.RegisterTopicValidator(topic, validatorFnBuilder(w.timesource, topic, publicKey))
+
+	fn, err := validatorFnBuilder(w.timesource, topic, publicKey)
+	if err != nil {
+		return err
+	}
+
+	err = w.pubsub.RegisterTopicValidator(topic, fn)
 	if err != nil {
 		return err
 	}
@@ -88,13 +94,13 @@ func (w *WakuRelay) AddSignedTopicValidator(topic string, publicKey *ecdsa.Publi
 	return nil
 }
 
-func SignMessage(privKey *ecdsa.PrivateKey, topic string, msg *pb.WakuMessage) error {
-	msgHash := MsgHash(topic, msg)
+func SignMessage(privKey *ecdsa.PrivateKey, msg *pb.WakuMessage, pubsubTopic string) error {
+	msgHash := MsgHash(pubsubTopic, msg)
 	sign, err := secp256k1.Sign(msgHash, crypto.FromECDSA(privKey))
 	if err != nil {
 		return err
 	}
 
-	msg.Meta = sign[0:64] // Drop the V in R||S||V
+	msg.Meta = sign[0:64] // Remove V
 	return nil
 }

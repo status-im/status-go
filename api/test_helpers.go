@@ -7,6 +7,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 
@@ -75,6 +76,7 @@ func setupWalletTest(t *testing.T, password string) (backend *GethStatusBackend,
 		EIP1581Address:    types.HexToAddress(walletRootAddress),
 		InstallationID:    "d3efcff6-cffa-560e-a547-21d3858cbc51",
 		KeyUID:            account.KeyUID,
+		LatestDerivedPath: 0,
 		Name:              "Jittery Cornflowerblue Kingbird",
 		Networks:          &networks,
 		PhotoPath:         "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
@@ -84,7 +86,8 @@ func setupWalletTest(t *testing.T, password string) (backend *GethStatusBackend,
 		WalletRootAddress: types.HexToAddress(walletRootAddress)}
 
 	err = backend.saveAccountsAndSettings(s, config, nil)
-	require.NoError(t, err)
+	require.Error(t, err)
+	require.True(t, err == accounts.ErrKeypairWithoutAccounts)
 
 	// this is for StatusNode().Config() call inside of the getVerifiedWalletAccount
 	err = backend.StartNode(config)

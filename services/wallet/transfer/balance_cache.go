@@ -17,8 +17,8 @@ type nonceRange struct {
 
 type balanceCache struct {
 	// balances maps an address to a map of a block number and the balance of this particular address
-	balances     map[common.Address]map[*big.Int]*big.Int
-	nonces       map[common.Address]map[*big.Int]*int64
+	balances     map[common.Address]map[uint64]*big.Int // we don't care about block number overflow as we use cache only for comparing balances when fetching, not for UI
+	nonces       map[common.Address]map[uint64]*int64   // we don't care about block number overflow as we use cache only for comparing balances when fetching, not for UI
 	nonceRanges  map[common.Address]map[int64]nonceRange
 	sortedRanges map[common.Address][]nonceRange
 	rw           sync.RWMutex
@@ -33,7 +33,7 @@ func (b *balanceCache) ReadCachedBalance(account common.Address, blockNumber *bi
 	b.rw.RLock()
 	defer b.rw.RUnlock()
 
-	return b.balances[account][blockNumber]
+	return b.balances[account][blockNumber.Uint64()]
 }
 
 func (b *balanceCache) addBalanceToCache(account common.Address, blockNumber *big.Int, balance *big.Int) {
@@ -42,9 +42,9 @@ func (b *balanceCache) addBalanceToCache(account common.Address, blockNumber *bi
 
 	_, exists := b.balances[account]
 	if !exists {
-		b.balances[account] = make(map[*big.Int]*big.Int)
+		b.balances[account] = make(map[uint64]*big.Int)
 	}
-	b.balances[account][blockNumber] = balance
+	b.balances[account][blockNumber.Uint64()] = balance
 }
 
 func (b *balanceCache) BalanceAt(ctx context.Context, client BalanceReader, account common.Address, blockNumber *big.Int) (*big.Int, error) {
@@ -65,7 +65,7 @@ func (b *balanceCache) ReadCachedNonce(account common.Address, blockNumber *big.
 	b.rw.RLock()
 	defer b.rw.RUnlock()
 
-	return b.nonces[account][blockNumber]
+	return b.nonces[account][blockNumber.Uint64()]
 }
 
 func (b *balanceCache) sortRanges(account common.Address) {
@@ -74,7 +74,7 @@ func (b *balanceCache) sortRanges(account common.Address) {
 		keys = append(keys, int(k))
 	}
 
-	sort.Ints(keys)
+	sort.Ints(keys) // This will not work for keys > 2^31
 
 	ranges := []nonceRange{}
 	for _, k := range keys {
@@ -86,6 +86,9 @@ func (b *balanceCache) sortRanges(account common.Address) {
 }
 
 func (b *balanceCache) findNonceInRange(account common.Address, block *big.Int) *int64 {
+	b.rw.RLock()
+	defer b.rw.RUnlock()
+
 	for k := range b.sortedRanges[account] {
 		nr := b.sortedRanges[account][k]
 		cmpMin := nr.min.Cmp(block)
@@ -137,9 +140,9 @@ func (b *balanceCache) addNonceToCache(account common.Address, blockNumber *big.
 
 	_, exists := b.nonces[account]
 	if !exists {
-		b.nonces[account] = make(map[*big.Int]*int64)
+		b.nonces[account] = make(map[uint64]*int64)
 	}
-	b.nonces[account][blockNumber] = nonce
+	b.nonces[account][blockNumber.Uint64()] = nonce
 	b.updateNonceRange(account, blockNumber, nonce)
 }
 
@@ -166,8 +169,8 @@ func (b *balanceCache) NonceAt(ctx context.Context, client BalanceReader, accoun
 
 func newBalanceCache() *balanceCache {
 	return &balanceCache{
-		balances:     make(map[common.Address]map[*big.Int]*big.Int),
-		nonces:       make(map[common.Address]map[*big.Int]*int64),
+		balances:     make(map[common.Address]map[uint64]*big.Int),
+		nonces:       make(map[common.Address]map[uint64]*int64),
 		nonceRanges:  make(map[common.Address]map[int64]nonceRange),
 		sortedRanges: make(map[common.Address][]nonceRange),
 	}

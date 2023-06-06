@@ -7,6 +7,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -95,12 +96,12 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		return 0, errors[0]
 	}
 
-	syncWalletAccounts, err := m.backupWalletAccounts()
+	fullKeypairsToBackup, err := m.backupKeypairs()
 	if err != nil {
 		return 0, err
 	}
 
-	keycardsToBackup, err := m.prepareSyncAllKeycardsMessage(clock)
+	woAccountsToBackup, err := m.backupWatchOnlyAccounts()
 	if err != nil {
 		return 0, err
 	}
@@ -124,13 +125,13 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 				DataNumber:  uint32(0),
 				TotalNumber: uint32(len(settings)),
 			},
-			WalletAccountsDetails: &protobuf.FetchingBackedUpDataDetails{
+			FullKeypairDetails: &protobuf.FetchingBackedUpDataDetails{
 				DataNumber:  uint32(0),
-				TotalNumber: uint32(len(syncWalletAccounts.Accounts)),
+				TotalNumber: uint32(len(fullKeypairsToBackup)),
 			},
-			KeycardsDetails: &protobuf.FetchingBackedUpDataDetails{
+			WatchOnlyAccountDetails: &protobuf.FetchingBackedUpDataDetails{
 				DataNumber:  uint32(0),
-				TotalNumber: uint32(1),
+				TotalNumber: uint32(len(woAccountsToBackup)),
 			},
 		}
 	}
@@ -179,24 +180,26 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		}
 	}
 
-	// Update wallet accounts messages encode and dispatch
-	for i, d := range syncWalletAccounts.Accounts {
+	// Update keypairs messages encode and dispatch
+	for i, d := range fullKeypairsToBackup {
 		pb := backupDetailsOnly()
-		pb.WalletAccountsDetails.DataNumber = uint32(i + 1)
-		pb.WalletAccount = d
+		pb.FullKeypairDetails.DataNumber = uint32(i + 1)
+		pb.FullKeypair = d.FullKeypair
 		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
 		if err != nil {
 			return 0, err
 		}
 	}
 
-	// Update keycards message encode and dispatch
-	pb := backupDetailsOnly()
-	pb.KeycardsDetails.DataNumber = 1
-	pb.Keycards = &keycardsToBackup
-	err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
-	if err != nil {
-		return 0, err
+	// Update watch only messages encode and dispatch
+	for i, d := range woAccountsToBackup {
+		pb := backupDetailsOnly()
+		pb.WatchOnlyAccountDetails.DataNumber = uint32(i + 1)
+		pb.WatchOnlyAccount = d.WatchOnlyAccount
+		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	chat.LastClockValue = clock
@@ -376,13 +379,15 @@ func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobu
 	if err != nil {
 		return nil, err
 	}
-	socialLinkSettingProtos := make([]*protobuf.SyncSocialLinkSetting, len(socialLinks))
-	for i, socialLink := range socialLinks {
-		socialLinkSettingProtos[i] = &protobuf.SyncSocialLinkSetting{
-			Text:  socialLink.Text,
-			Url:   socialLink.URL,
-			Clock: socialLink.Clock,
-		}
+
+	socialLinksClock, err := m.settings.GetSocialLinksClock()
+	if err != nil {
+		return nil, err
+	}
+
+	syncSocialLinks := &protobuf.SyncSocialLinks{
+		SocialLinks: socialLinks.ToProtobuf(),
+		Clock:       socialLinksClock,
 	}
 
 	ensUsernameDetails, err := m.getEnsUsernameDetails()
@@ -405,7 +410,7 @@ func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobu
 			DisplayName:        displayName,
 			Pictures:           pictureProtos,
 			DisplayNameClock:   displayNameClock,
-			SocialLinkSettings: socialLinkSettingProtos,
+			SocialLinks:        syncSocialLinks,
 			EnsUsernameDetails: ensUsernameDetailProtos,
 		},
 	}
@@ -415,11 +420,45 @@ func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobu
 	return backupMessages, nil
 }
 
-func (m *Messenger) backupWalletAccounts() (*protobuf.SyncWalletAccounts, error) {
-	accounts, err := m.settings.GetAccounts()
+func (m *Messenger) backupKeypairs() ([]*protobuf.Backup, error) {
+	keypairs, err := m.settings.GetKeypairs()
 	if err != nil {
 		return nil, err
 	}
 
-	return m.prepareSyncWalletAccountsMessage(accounts), nil
+	var backupMessages []*protobuf.Backup
+	for _, kp := range keypairs {
+
+		kp.SyncedFrom = accounts.SyncedFromBackup
+		fullKeypair, err := m.prepareSyncKeypairFullMessage(kp)
+		if err != nil {
+			return nil, err
+		}
+
+		backupMessage := &protobuf.Backup{
+			FullKeypair: fullKeypair,
+		}
+
+		backupMessages = append(backupMessages, backupMessage)
+	}
+
+	return backupMessages, nil
+}
+
+func (m *Messenger) backupWatchOnlyAccounts() ([]*protobuf.Backup, error) {
+	accounts, err := m.settings.GetWatchOnlyAccounts()
+	if err != nil {
+		return nil, err
+	}
+
+	var backupMessages []*protobuf.Backup
+	for _, acc := range accounts {
+
+		backupMessage := &protobuf.Backup{}
+		backupMessage.WatchOnlyAccount = m.prepareSyncAccountMessage(acc)
+
+		backupMessages = append(backupMessages, backupMessage)
+	}
+
+	return backupMessages, nil
 }

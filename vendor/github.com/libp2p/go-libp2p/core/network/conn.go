@@ -33,6 +33,10 @@ type Conn interface {
 
 	// GetStreams returns all open streams over this conn.
 	GetStreams() []Stream
+
+	// IsClosed returns whether a connection is fully closed, so it can
+	// be garbage collected.
+	IsClosed() bool
 }
 
 // ConnectionState holds information about the connection.
@@ -52,9 +56,6 @@ type ConnectionState struct {
 type ConnSecurity interface {
 	// LocalPeer returns our peer ID
 	LocalPeer() peer.ID
-
-	// LocalPrivateKey returns our private key
-	LocalPrivateKey() ic.PrivKey
 
 	// RemotePeer returns the peer ID of the remote peer.
 	RemotePeer() peer.ID

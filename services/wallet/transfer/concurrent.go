@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	NoThreadLimit uint32 = 0
+	NoThreadLimit         uint32 = 0
+	SequentialThreadLimit uint32 = 10
 )
 
 // NewConcurrentDownloader creates ConcurrentDownloader instance.
@@ -90,24 +91,45 @@ type Downloader interface {
 	GetTransfersByNumber(context.Context, *big.Int) ([]Transfer, error)
 }
 
-// Returns new block ranges that contain transfers and found block headers that contain transfers.
-func checkRanges(parent context.Context, client BalanceReader, cache BalanceCache, downloader Downloader,
-	account common.Address, ranges [][]*big.Int) ([][]*big.Int, []*DBHeader, error) {
+// Returns new block ranges that contain transfers and found block headers that contain transfers, and a block where
+// beginning of trasfers history detected
+func checkRangesWithStartBlock(parent context.Context, client BalanceReader, cache BalanceCache,
+	account common.Address, ranges [][]*big.Int, threadLimit uint32, startBlock *big.Int) (
+	resRanges [][]*big.Int, headers []*DBHeader, newStartBlock *big.Int, err error) {
+
+	log.Debug("start checkRanges", "account", account.Hex(), "ranges len", len(ranges))
 
 	ctx, cancel := context.WithTimeout(parent, 30*time.Second)
 	defer cancel()
 
-	c := NewConcurrentDownloader(ctx, NoThreadLimit)
+	c := NewConcurrentDownloader(ctx, threadLimit)
+
+	newStartBlock = startBlock
 
 	for _, blocksRange := range ranges {
 		from := blocksRange[0]
 		to := blocksRange[1]
+
+		if startBlock != nil {
+			if to.Cmp(newStartBlock) <= 0 {
+				log.Debug("'to' block is less than 'start' block", "to", to, "startBlock", startBlock)
+				continue
+			}
+		}
 
 		c.Add(func(ctx context.Context) error {
 			if from.Cmp(to) >= 0 {
 				return nil
 			}
 			log.Debug("eth transfers comparing blocks", "from", from, "to", to)
+
+			if startBlock != nil {
+				if to.Cmp(startBlock) <= 0 {
+					log.Debug("'to' block is less than 'start' block", "to", to, "startBlock", startBlock)
+					return nil
+				}
+			}
+
 			lb, err := cache.BalanceAt(ctx, client, account, from)
 			if err != nil {
 				return err
@@ -117,7 +139,7 @@ func checkRanges(parent context.Context, client BalanceReader, cache BalanceCach
 				return err
 			}
 			if lb.Cmp(hb) == 0 {
-				log.Debug("balances are equal", "from", from, "to", to)
+				log.Debug("balances are equal", "from", from, "to", to, "lb", lb, "hb", hb)
 
 				hn, err := cache.NonceAt(ctx, client, account, to)
 				if err != nil {
@@ -126,6 +148,18 @@ func checkRanges(parent context.Context, client BalanceReader, cache BalanceCach
 				// if nonce is zero in a newer block then there is no need to check an older one
 				if *hn == 0 {
 					log.Debug("zero nonce", "to", to)
+
+					if hb.Cmp(big.NewInt(0)) == 0 { // balance is 0, nonce is 0, we stop checking further, that will be the start block (even though the real one can be a later one)
+						if startBlock != nil {
+							if to.Cmp(newStartBlock) > 0 {
+								log.Debug("found possible start block, we should not search back", "block", to)
+								newStartBlock = to // increase newStartBlock if we found a new higher block
+							}
+						} else {
+							newStartBlock = to
+						}
+					}
+
 					return nil
 				}
 
@@ -134,16 +168,22 @@ func checkRanges(parent context.Context, client BalanceReader, cache BalanceCach
 					return err
 				}
 				if *ln == *hn {
-					log.Debug("transaction count is also equal", "from", from, "to", to)
+					log.Debug("transaction count is also equal", "from", from, "to", to, "ln", *ln, "hn", *hn)
 					return nil
 				}
 			}
 			if new(big.Int).Sub(to, from).Cmp(one) == 0 {
+				// WARNING: Block hash calculation from plain header returns a wrong value.
 				header, err := client.HeaderByNumber(ctx, to)
 				if err != nil {
 					return err
 				}
-				c.PushHeader(toDBHeader(header))
+				// Obtain block hash from first transaction
+				firstTransaction, err := client.FullTransactionByBlockNumberAndIndex(ctx, to, 0)
+				if err != nil {
+					return err
+				}
+				c.PushHeader(toDBHeader(header, *firstTransaction.BlockHash))
 				return nil
 			}
 			mid := new(big.Int).Add(from, to)
@@ -154,42 +194,45 @@ func checkRanges(parent context.Context, client BalanceReader, cache BalanceCach
 			}
 			log.Debug("balances are not equal", "from", from, "mid", mid, "to", to)
 
-			c.PushRange([]*big.Int{from, mid})
 			c.PushRange([]*big.Int{mid, to})
+			c.PushRange([]*big.Int{from, mid})
 			return nil
 		})
-
 	}
 
 	select {
 	case <-c.WaitAsync():
 	case <-ctx.Done():
-		return nil, nil, errDownloaderStuck
+		return nil, nil, nil, errDownloaderStuck
 	}
 
 	if c.Error() != nil {
-		return nil, nil, errors.Wrap(c.Error(), "failed to dowload transfers using concurrent downloader")
+		return nil, nil, nil, errors.Wrap(c.Error(), "failed to dowload transfers using concurrent downloader")
 	}
 
-	return c.GetRanges(), c.GetHeaders(), nil
+	log.Debug("end checkRanges", "account", account.Hex(), "newStartBlock", newStartBlock)
+	return c.GetRanges(), c.GetHeaders(), newStartBlock, nil
 }
 
-func findBlocksWithEthTransfers(parent context.Context, client BalanceReader, cache BalanceCache, downloader Downloader,
-	account common.Address, low, high *big.Int, noLimit bool) (from *big.Int, headers []*DBHeader, err error) {
-	log.Debug("findBlocksWithEthTranfers start", "account", account, "low", low, "high", high, "noLimit", noLimit)
+func findBlocksWithEthTransfers(parent context.Context, client BalanceReader, cache BalanceCache,
+	account common.Address, low, high *big.Int, noLimit bool, threadLimit uint32) (
+	from *big.Int, headers []*DBHeader, resStartBlock *big.Int, err error) {
 
 	ranges := [][]*big.Int{{low, high}}
-	minBlock := big.NewInt(low.Int64())
+	from = big.NewInt(low.Int64())
 	headers = []*DBHeader{}
 	var lvl = 1
+
 	for len(ranges) > 0 && lvl <= 30 {
 		log.Debug("check blocks ranges", "lvl", lvl, "ranges len", len(ranges))
 		lvl++
-		newRanges, newHeaders, err := checkRanges(parent, client, cache, downloader, account, ranges)
-
+		// Check if there are transfers in blocks in ranges. To do that, nonce and balance is checked
+		// the block ranges that have transfers are returned
+		newRanges, newHeaders, strtBlock, err := checkRangesWithStartBlock(parent, client, cache,
+			account, ranges, threadLimit, resStartBlock)
+		resStartBlock = strtBlock
 		if err != nil {
-			log.Info("check ranges end", "err", err)
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		headers = append(headers, newHeaders...)
@@ -203,12 +246,11 @@ func findBlocksWithEthTransfers(parent context.Context, client BalanceReader, ca
 			})
 
 			newRanges = newRanges[:60]
-			minBlock = newRanges[len(newRanges)-1][0]
+			from = newRanges[len(newRanges)-1][0]
 		}
 
 		ranges = newRanges
 	}
 
-	log.Debug("findBlocksWithEthTranfers end", "account", account, "minBlock", minBlock, "headers len", len(headers))
-	return minBlock, headers, err
+	return
 }

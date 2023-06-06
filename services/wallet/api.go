@@ -19,6 +19,8 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
+
+	wallet_common "github.com/status-im/status-go/services/wallet/common"
 )
 
 func NewAPI(s *Service) *API {
@@ -45,8 +47,13 @@ func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) 
 	return api.reader.GetWalletToken(ctx, addresses)
 }
 
+func (api *API) GetCachedWalletTokensWithoutMarketData(ctx context.Context) (map[common.Address][]Token, error) {
+	return api.reader.GetCachedWalletTokensWithoutMarketData()
+}
+
 type DerivedAddress struct {
 	Address        common.Address `json:"address"`
+	PublicKey      types.HexBytes `json:"public-key,omitempty"`
 	Path           string         `json:"path"`
 	HasActivity    bool           `json:"hasActivity"`
 	AlreadyCreated bool           `json:"alreadyCreated"`
@@ -88,6 +95,7 @@ func (api *API) GetTransfersByAddress(ctx context.Context, address common.Addres
 }
 
 // LoadTransferByHash loads transfer to the database
+// Only used by status-mobile
 func (api *API) LoadTransferByHash(ctx context.Context, address common.Address, hash common.Hash) error {
 	log.Debug("[WalletAPI:: LoadTransferByHash] get transfer by hash", "address", address, "hash", hash)
 	return api.s.transferController.LoadTransferByHash(ctx, api.s.rpcClient, address, hash)
@@ -243,7 +251,7 @@ func (api *API) GetPendingTransactionsForIdentities(ctx context.Context, identit
 	result = make([]*transfer.PendingTransaction, 0, len(identities))
 	var pt *transfer.PendingTransaction
 	for _, identity := range identities {
-		pt, err = api.s.transactionManager.GetPendingEntry(identity.ChainID, identity.Hash)
+		pt, err = api.s.transactionManager.GetPendingEntry(uint64(identity.ChainID), identity.Hash)
 		result = append(result, pt)
 	}
 
@@ -452,8 +460,9 @@ func (api *API) getDerivedAddresses(id string, paths []string) ([]*DerivedAddres
 	for accPath, acc := range info {
 
 		derivedAddress := &DerivedAddress{
-			Address: common.HexToAddress(acc.Address),
-			Path:    accPath,
+			Address:   common.HexToAddress(acc.Address),
+			PublicKey: types.Hex2Bytes(acc.PublicKey),
+			Path:      accPath,
 		}
 
 		for _, account := range addedAccounts {
@@ -469,37 +478,39 @@ func (api *API) getDerivedAddresses(id string, paths []string) ([]*DerivedAddres
 	return derivedAddresses, nil
 }
 
-// Returns details for the passed address (response doesn't include derivation path)
-func (api *API) GetAddressDetails(ctx context.Context, address string) (*DerivedAddress, error) {
-	var derivedAddress *DerivedAddress
+func (api *API) AddressExists(ctx context.Context, address types.Address) (bool, error) {
+	return api.s.accountsDB.AddressExists(address)
+}
 
+// Returns details for the passed address (response doesn't include derivation path)
+func (api *API) GetAddressDetails(ctx context.Context, chainID uint64, address string) (*DerivedAddress, error) {
 	commonAddr := common.HexToAddress(address)
 	addressExists, err := api.s.accountsDB.AddressExists(types.Address(commonAddr))
 	if err != nil {
-		return derivedAddress, err
+		return nil, err
 	}
 
-	transactions, err := api.s.transferController.GetTransfersByAddress(ctx, api.s.rpcClient.UpstreamChainID, commonAddr, nil, 1, false)
-
+	chainClient, err := api.s.rpcClient.EthClient(chainID)
 	if err != nil {
-		return derivedAddress, err
+		return nil, err
 	}
 
-	hasActivity := int64(len(transactions)) > 0
+	balance, err := api.s.tokenManager.GetChainBalance(ctx, chainClient, commonAddr)
+	if err != nil {
+		return nil, err
+	}
 
-	derivedAddress = &DerivedAddress{
+	return &DerivedAddress{
 		Address:        commonAddr,
 		Path:           "",
-		HasActivity:    hasActivity,
 		AlreadyCreated: addressExists,
-	}
-
-	return derivedAddress, nil
+		HasActivity:    balance.Cmp(big.NewInt(0)) != 0,
+	}, nil
 }
 
 func (api *API) CreateMultiTransaction(ctx context.Context, multiTransaction *transfer.MultiTransaction, data []*bridge.TransactionBridge, password string) (*transfer.MultiTransactionResult, error) {
 	log.Debug("[WalletAPI:: CreateMultiTransaction] create multi transaction")
-	return api.s.transactionManager.CreateMultiTransaction(ctx, multiTransaction, data, api.router.bridges, password)
+	return api.s.transactionManager.CreateBridgeMultiTransaction(ctx, multiTransaction, data, api.router.bridges, password)
 }
 
 func (api *API) GetMultiTransactions(ctx context.Context, transactionIDs []transfer.MultiTransactionIDType) ([]*transfer.MultiTransaction, error) {
@@ -517,7 +528,7 @@ func (api *API) FetchAllCurrencyFormats() (currency.FormatPerSymbol, error) {
 	return api.s.currency.FetchAllCurrencyFormats()
 }
 
-func (api *API) GetActivityEntries(addresses []common.Address, chainIDs []uint64, filter activity.Filter, offset int, limit int) ([]activity.Entry, error) {
+func (api *API) GetActivityEntries(addresses []common.Address, chainIDs []wallet_common.ChainID, filter activity.Filter, offset int, limit int) ([]activity.Entry, error) {
 	log.Debug("call to GetActivityEntries")
 	return activity.GetActivityEntries(api.s.db, addresses, chainIDs, filter, offset, limit)
 }

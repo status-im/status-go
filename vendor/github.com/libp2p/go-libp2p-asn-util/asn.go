@@ -4,14 +4,15 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 
 	"github.com/libp2p/go-cidranger"
 )
 
-var Store *indirectAsnStore
+var Store *lazyAsnStore
 
 func init() {
-	Store = newIndirectAsnStore()
+	Store = &lazyAsnStore{}
 }
 
 type networkWithAsn struct {
@@ -66,32 +67,29 @@ func newAsnStore() (*asnStore, error) {
 	return &asnStore{cr}, nil
 }
 
-type indirectAsnStore struct {
-	store       *asnStore
-	doneLoading chan struct{}
+// lazyAsnStore builds the underlying trie on first call to AsnForIPv6.
+// Alternatively, Init can be called to manually trigger initialization.
+type lazyAsnStore struct {
+	store *asnStore
+	once  sync.Once
 }
 
 // AsnForIPv6 returns the AS number for the given IPv6 address.
 // If no mapping exists for the given IP, this function will
 // return an empty ASN and a nil error.
-func (a *indirectAsnStore) AsnForIPv6(ip net.IP) (string, error) {
-	<-a.doneLoading
+func (a *lazyAsnStore) AsnForIPv6(ip net.IP) (string, error) {
+	a.once.Do(a.init)
 	return a.store.AsnForIPv6(ip)
 }
 
-func newIndirectAsnStore() *indirectAsnStore {
-	a := &indirectAsnStore{
-		doneLoading: make(chan struct{}),
+func (a *lazyAsnStore) Init() {
+	a.once.Do(a.init)
+}
+
+func (a *lazyAsnStore) init() {
+	store, err := newAsnStore()
+	if err != nil {
+		panic(err)
 	}
-
-	go func() {
-		defer close(a.doneLoading)
-		store, err := newAsnStore()
-		if err != nil {
-			panic(err)
-		}
-		a.store = store
-	}()
-
-	return a
+	a.store = store
 }

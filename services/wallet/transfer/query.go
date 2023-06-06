@@ -53,6 +53,7 @@ func (q *transfersQuery) addWhereSeparator(separator SeparatorType) {
 
 type SeparatorType int
 
+// Beware if changing this enum please update addWhereSeparator as well
 const (
 	NoSeparator SeparatorType = iota + 1
 	OrSeparator
@@ -145,7 +146,7 @@ func (q *transfersQuery) Args() []interface{} {
 	return q.args
 }
 
-func (q *transfersQuery) Scan(rows *sql.Rows) (rst []Transfer, err error) {
+func (q *transfersQuery) TransferScan(rows *sql.Rows) (rst []Transfer, err error) {
 	for rows.Next() {
 		transfer := Transfer{
 			BlockNumber: &big.Int{},
@@ -162,5 +163,33 @@ func (q *transfersQuery) Scan(rows *sql.Rows) (rst []Transfer, err error) {
 		}
 		rst = append(rst, transfer)
 	}
+
+	return rst, nil
+}
+
+func (q *transfersQuery) PreloadedTransactionScan(rows *sql.Rows) (rst []PreloadedTransaction, err error) {
+	transfers, err := q.TransferScan(rows)
+	if err != nil {
+		return
+	}
+
+	rst = make([]PreloadedTransaction, 0, len(transfers))
+
+	for _, transfer := range transfers {
+		preloadedTransaction := PreloadedTransaction{
+			ID:          transfer.ID,
+			Type:        transfer.Type,
+			BlockHash:   transfer.BlockHash,
+			BlockNumber: transfer.BlockNumber,
+			Address:     transfer.Address,
+			From:        transfer.From,
+			Log:         transfer.Log,
+			NetworkID:   transfer.NetworkID,
+			BaseGasFees: transfer.BaseGasFees,
+		}
+
+		rst = append(rst, preloadedTransaction)
+	}
+
 	return rst, nil
 }

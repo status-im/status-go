@@ -3,6 +3,8 @@ package server
 import (
 	"bytes"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"image"
 	"net/http"
 	"net/url"
@@ -17,16 +19,18 @@ import (
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/identity/ring"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 const (
-	basePath               = "/messages"
-	identiconsPath         = basePath + "/identicons"
-	imagesPath             = basePath + "/images"
-	audioPath              = basePath + "/audio"
-	ipfsPath               = "/ipfs"
-	discordAuthorsPath     = "/discord/authors"
-	discordAttachmentsPath = basePath + "/discord/attachments"
+	basePath                 = "/messages"
+	identiconsPath           = basePath + "/identicons"
+	imagesPath               = basePath + "/images"
+	audioPath                = basePath + "/audio"
+	ipfsPath                 = "/ipfs"
+	discordAuthorsPath       = "/discord/authors"
+	discordAttachmentsPath   = basePath + "/discord/attachments"
+	LinkPreviewThumbnailPath = "/link-preview/thumbnail"
 
 	// Handler routes for pairing
 	accountImagesPath = "/accountImages"
@@ -35,6 +39,18 @@ const (
 )
 
 type HandlerPatternMap map[string]http.HandlerFunc
+
+func handleRequestDBMissing(logger *zap.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger.Error("can't handle media request without appdb")
+	}
+}
+
+func handleRequestDownloaderMissing(logger *zap.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		logger.Error("can't handle media request without ipfs downloader")
+	}
+}
 
 func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -60,21 +76,33 @@ func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Lo
 		var payload = identityImage.Payload
 
 		if ringEnabled(params) {
-			pks, ok := params["publicKey"]
-			if !ok || len(pks) == 0 {
-				logger.Error("no publicKey")
+			account, err := multiaccountsDB.GetAccount(keyUids[0])
+
+			if err != nil {
+				logger.Error("handleAccountImages: failed to GetAccount .", zap.String("keyUid", keyUids[0]), zap.Error(err))
 				return
 			}
-			colorHash, err := colorhash.GenerateFor(pks[0])
-			if err != nil {
-				logger.Error("could not generate color hash")
-				return
+
+			accColorHash := account.ColorHash
+
+			if accColorHash == nil {
+				pks, ok := params["publicKey"]
+				if !ok || len(pks) == 0 {
+					logger.Error("no publicKey")
+					return
+				}
+
+				accColorHash, err = colorhash.GenerateFor(pks[0])
+				if err != nil {
+					logger.Error("could not generate color hash")
+					return
+				}
 			}
 
 			var theme = getTheme(params, logger)
 
 			payload, err = ring.DrawRing(&ring.DrawRingParam{
-				Theme: theme, ColorHash: colorHash, ImageBytes: identityImage.Payload, Height: identityImage.Height, Width: identityImage.Width,
+				Theme: theme, ColorHash: accColorHash, ImageBytes: identityImage.Payload, Height: identityImage.Height, Width: identityImage.Width,
 			})
 
 			if err != nil {
@@ -103,6 +131,10 @@ func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Lo
 }
 
 func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
 		pks, ok := params["publicKey"]
@@ -226,6 +258,10 @@ func handleIdenticon(logger *zap.Logger) http.HandlerFunc {
 }
 
 func handleDiscordAuthorAvatar(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		authorIDs, ok := r.URL.Query()["authorId"]
 		if !ok || len(authorIDs) == 0 {
@@ -260,6 +296,10 @@ func handleDiscordAuthorAvatar(db *sql.DB, logger *zap.Logger) http.HandlerFunc 
 }
 
 func handleDiscordAttachment(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		messageIDs, ok := r.URL.Query()["messageId"]
 		if !ok || len(messageIDs) == 0 {
@@ -299,6 +339,10 @@ func handleDiscordAttachment(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 }
 
 func handleImage(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		messageIDs, ok := r.URL.Query()["messageId"]
 		if !ok || len(messageIDs) == 0 {
@@ -332,6 +376,10 @@ func handleImage(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 }
 
 func handleAudio(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	if db == nil {
+		return handleRequestDBMissing(logger)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		messageIDs, ok := r.URL.Query()["messageId"]
 		if !ok || len(messageIDs) == 0 {
@@ -361,6 +409,10 @@ func handleAudio(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 }
 
 func handleIPFS(downloader *ipfs.Downloader, logger *zap.Logger) http.HandlerFunc {
+	if downloader == nil {
+		return handleRequestDownloaderMissing(logger)
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		hashes, ok := r.URL.Query()["hash"]
 		if !ok || len(hashes) == 0 {
@@ -404,6 +456,73 @@ func handleQRCodeGeneration(multiaccountsDB *multiaccounts.Database, logger *zap
 
 		if err != nil {
 			logger.Error("failed to write image", zap.Error(err))
+		}
+	}
+}
+
+func getThumbnailPayload(db *sql.DB, logger *zap.Logger, msgID string, thumbnailURL string) ([]byte, error) {
+	var payload []byte
+
+	var result []byte
+	err := db.QueryRow(`SELECT unfurled_links FROM user_messages WHERE id = ?`, msgID).Scan(&result)
+	if err != nil {
+		return payload, fmt.Errorf("could not find message with message-id '%s': %w", msgID, err)
+	}
+
+	var links []*protobuf.UnfurledLink
+	err = json.Unmarshal(result, &links)
+	if err != nil {
+		return payload, fmt.Errorf("failed to unmarshal protobuf.UrlPreview: %w", err)
+	}
+
+	for _, p := range links {
+		if p.Url == thumbnailURL {
+			payload = p.ThumbnailPayload
+			break
+		}
+	}
+
+	return payload, nil
+}
+
+func handleLinkPreviewThumbnail(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		queryParams := r.URL.Query()
+
+		paramID, ok := queryParams["message-id"]
+		if !ok || len(paramID) == 0 {
+			http.Error(w, "missing query parameter 'message-id'", http.StatusBadRequest)
+			return
+		}
+
+		paramURL, ok := queryParams["url"]
+		if !ok || len(paramURL) == 0 {
+			http.Error(w, "missing query parameter 'url'", http.StatusBadRequest)
+			return
+		}
+
+		msgID := paramID[0]
+		thumbnailURL := paramURL[0]
+
+		thumbnail, err := getThumbnailPayload(db, logger, msgID, thumbnailURL)
+		if err != nil {
+			logger.Error("failed to get thumbnail", zap.String("msgID", msgID))
+			http.Error(w, "failed to get thumbnail", http.StatusInternalServerError)
+			return
+		}
+
+		mimeType, err := images.GetMimeType(thumbnail)
+		if err != nil {
+			http.Error(w, "mime type not supported", http.StatusNotImplemented)
+			return
+		}
+
+		w.Header().Set("Content-Type", "image/"+mimeType)
+		w.Header().Set("Cache-Control", "no-store")
+
+		_, err = w.Write(thumbnail)
+		if err != nil {
+			logger.Error("failed to write response", zap.Error(err))
 		}
 	}
 }

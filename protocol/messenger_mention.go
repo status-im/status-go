@@ -35,7 +35,7 @@ const (
 var (
 	specialCharsRegex = regexp.MustCompile("[@~\\\\*_\n>`]{1}")
 	endingCharsRegex  = regexp.MustCompile(endingChars)
-	wordRegex         = regexp.MustCompile("^[\\w\\d]*" + endingChars + "|^[\\S]*$")
+	wordRegex         = regexp.MustCompile("^[\\w\\d\\-]*" + endingChars + "|^[\\S]*$")
 )
 
 type specialCharLocation struct {
@@ -60,12 +60,15 @@ type textMeta struct {
 	newlineIndexes []int
 }
 
+type searchablePhrase struct {
+	originalName string
+	phrase       string
+}
+
 type MentionableUser struct {
 	*Contact
 
-	primaryName       string
-	secondaryName     string
-	searchablePhrases []string
+	searchablePhrases []searchablePhrase
 
 	Key          string // a unique identifier of a mentionable user
 	Match        string
@@ -105,20 +108,6 @@ func (c *MentionableUser) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(contactJSON)
-}
-
-func (c *MentionableUser) PrimaryName() string {
-	if c.primaryName != "" {
-		return c.primaryName
-	}
-	return c.Contact.PrimaryName()
-}
-
-func (c *MentionableUser) SecondaryName() string {
-	if c.secondaryName != "" {
-		return c.secondaryName
-	}
-	return c.Contact.SecondaryName()
 }
 
 func (c *MentionableUser) GetDisplayName() string {
@@ -649,8 +638,6 @@ func getUserSuggestions(users map[string]*MentionableUser, searchedText string, 
 		match := findMatch(user, searchedText)
 		if match != "" {
 			result[pk] = &MentionableUser{
-				primaryName:       user.PrimaryName(),
-				secondaryName:     user.SecondaryName(),
 				searchablePhrases: user.searchablePhrases,
 				Contact:           user.Contact,
 				Key:               pk,
@@ -677,9 +664,9 @@ func findMatch(user *MentionableUser, searchedText string) string {
 func findMatchInPhrases(user *MentionableUser, searchedText string) string {
 	var match string
 
-	for _, phrase := range user.searchablePhrases {
-		if searchedText == "" || strings.HasPrefix(strings.ToLower(phrase), searchedText) {
-			match = primaryOrSecondaryName(user)
+	for _, p := range user.searchablePhrases {
+		if searchedText == "" || strings.HasPrefix(strings.ToLower(p.phrase), searchedText) {
+			match = p.originalName
 			break
 		}
 	}
@@ -690,13 +677,11 @@ func findMatchInPhrases(user *MentionableUser, searchedText string) string {
 // findMatchInNames searches for a matching phrase in MentionableUser's primary and secondary names.
 func findMatchInNames(user *MentionableUser, searchedText string) string {
 	var match string
-
-	if hasMatchingPrefix(user.PrimaryName(), searchedText) {
-		match = primaryOrSecondaryName(user)
-	} else if hasMatchingPrefix(user.SecondaryName(), searchedText) {
-		match = user.SecondaryName()
+	for _, name := range user.names() {
+		if hasMatchingPrefix(name, searchedText) {
+			match = name
+		}
 	}
-
 	return match
 }
 
@@ -705,18 +690,15 @@ func hasMatchingPrefix(text, searchedText string) bool {
 	return text != "" && (searchedText == "" || strings.HasPrefix(strings.ToLower(text), searchedText))
 }
 
-// primaryOrSecondaryName returns the primary name if it is not empty, otherwise returns the secondary name.
-func primaryOrSecondaryName(user *MentionableUser) string {
-	if primaryName := user.PrimaryName(); primaryName != "" {
-		return primaryName
-	}
-	return user.SecondaryName()
-}
-
 func isMentioned(user *MentionableUser, text string) bool {
-	lCasePName := strings.ToLower(user.PrimaryName())
-	lCaseSName := strings.ToLower(user.SecondaryName())
-	regexStr := "^" + lCasePName + endingChars + "|" + "^" + lCasePName + "$" + "|" + "^" + lCaseSName + endingChars + "|" + "^" + lCaseSName + "$"
+	regexStr := ""
+	for i, name := range user.names() {
+		name = strings.ToLower(name)
+		if i != 0 {
+			regexStr += "|"
+		}
+		regexStr += "^" + name + endingChars + "|" + "^" + name + "$"
+	}
 	regex := regexp.MustCompile(regexStr)
 	lCaseText := strings.ToLower(text)
 	return regex.MatchString(lCaseText)
@@ -797,12 +779,16 @@ func replaceMentions(text string, users map[string]*MentionableUser, idxs []int,
 
 func addSearchablePhrases(user *MentionableUser) *MentionableUser {
 	if !user.Blocked {
-		searchablePhrases := []string{user.PrimaryName(), user.SecondaryName()}
+		searchablePhrases := user.names()
 		for _, s := range searchablePhrases {
 			if s != "" {
 				newWords := []string{s}
 				newWords = append(newWords, strings.Split(s, " ")[1:]...)
-				user.searchablePhrases = append(user.searchablePhrases, newWords...)
+				var phrases []searchablePhrase
+				for _, w := range newWords {
+					phrases = append(phrases, searchablePhrase{s, w})
+				}
+				user.searchablePhrases = append(user.searchablePhrases, phrases...)
 			}
 		}
 		return user

@@ -126,10 +126,8 @@ type idService struct {
 
 	connsMu sync.RWMutex
 	// The conns map contains all connections we're currently handling.
-	// Connections are inserted as soon as they're available in the swarm, and - crucially -
-	// before any stream can be opened or accepted on that connection.
+	// Connections are inserted as soon as they're available in the swarm
 	// Connections are removed from the map when the connection disconnects.
-	// It is therefore safe to assume that a connection was (recently) closed if there's no entry in this map.
 	conns map[network.Conn]entry
 
 	addrMu sync.Mutex
@@ -349,10 +347,17 @@ func (ids *idService) IdentifyWait(c network.Conn) <-chan struct{} {
 	defer ids.connsMu.Unlock()
 
 	e, found := ids.conns[c]
-	if !found { // No entry found. Connection was most likely closed (and removed from this map) recently.
-		ch := make(chan struct{})
-		close(ch)
-		return ch
+	if !found {
+		// No entry found. We may have gotten an out of order notification. Check it we should have this conn (because we're still connected)
+		// We hold the ids.connsMu lock so this is safe since a disconnect event will be processed later if we are connected.
+		if c.IsClosed() {
+			log.Debugw("connection not found in identify service", "peer", c.RemotePeer())
+			ch := make(chan struct{})
+			close(ch)
+			return ch
+		} else {
+			ids.addConnWithLock(c)
+		}
 	}
 
 	if e.IdentifyWaitChan != nil {
@@ -862,6 +867,15 @@ func (ids *idService) consumeObservedAddress(observed []byte, c network.Conn) {
 	ids.observedAddrs.Record(c, maddr)
 }
 
+// addConnWithLock assuems caller holds the connsMu lock
+func (ids *idService) addConnWithLock(c network.Conn) {
+	_, found := ids.conns[c]
+	if !found {
+		<-ids.setupCompleted
+		ids.conns[c] = entry{}
+	}
+}
+
 func signedPeerRecordFromMessage(msg *pb.Identify) (*record.Envelope, error) {
 	if msg.SignedPeerRecord == nil || len(msg.SignedPeerRecord) == 0 {
 		return nil, nil
@@ -878,14 +892,10 @@ func (nn *netNotifiee) IDService() *idService {
 }
 
 func (nn *netNotifiee) Connected(_ network.Network, c network.Conn) {
-	// We rely on this notification being received before we receive any incoming streams on the connection.
-	// The swarm implementation guarantees this.
 	ids := nn.IDService()
 
-	<-ids.setupCompleted
-
 	ids.connsMu.Lock()
-	ids.conns[c] = entry{}
+	ids.addConnWithLock(c)
 	ids.connsMu.Unlock()
 
 	nn.IDService().IdentifyWait(c)

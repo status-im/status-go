@@ -165,6 +165,7 @@ statusgo-shared-library: ##@cross-compile Build status-go as shared library for 
 	mkdir -p build/bin/statusgo-lib
 	go run cmd/library/*.go > build/bin/statusgo-lib/main.go
 	@echo "Building shared library..."
+	@echo "Tags: $(BUILD_TAGS)"
 	$(GOBIN_SHARED_LIB_CFLAGS) $(GOBIN_SHARED_LIB_CGO_LDFLAGS) go build \
 		-tags '$(BUILD_TAGS)' \
 		$(BUILD_FLAGS) \
@@ -389,3 +390,16 @@ migration:
 migration-protocol: DEFAULT_PROTOCOL_PATH := protocol/migrations/sqlite
 migration-protocol:
 	touch $(DEFAULT_PROTOCOL_PATH)/$(shell date +%s)_$(D).up.sql
+
+PROXY_WRAPPER_PATH = $(CURDIR)/vendor/github.com/siphiuel/lc-proxy-wrapper
+-include $(PROXY_WRAPPER_PATH)/Makefile.vars
+
+#export VERIF_PROXY_OUT_PATH = $(CURDIR)/vendor/github.com/siphiuel/lc-proxy-wrapper
+build-verif-proxy:
+	$(MAKE) -C $(NIMBUS_ETH1_PATH) libverifproxy
+
+build-verif-proxy-wrapper:
+	$(MAKE) -C $(VERIF_PROXY_OUT_PATH) build-verif-proxy-wrapper
+
+test-verif-proxy-wrapper:
+	CGO_CFLAGS="$(CGO_CFLAGS)" go test -v github.com/status-im/status-go/rpc -tags gowaku_skip_migrations,nimbus_light_client -run ^TestProxySuite$$ -testify.m TestRun -ldflags $(LDFLAGS)

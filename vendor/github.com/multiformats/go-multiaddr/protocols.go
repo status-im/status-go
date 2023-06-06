@@ -31,14 +31,15 @@ const (
 	P_ONION3            = 445
 	P_GARLIC64          = 446
 	P_GARLIC32          = 447
-	P_P2P_WEBRTC_DIRECT = 276
+	P_P2P_WEBRTC_DIRECT = 276 // Deprecated. use webrtc-direct instead
 	P_TLS               = 448
 	P_SNI               = 449
 	P_NOISE             = 454
 	P_WS                = 477
 	P_WSS               = 478 // deprecated alias for /tls/ws
 	P_PLAINTEXTV2       = 7367777
-	P_WEBRTC            = 280
+	P_WEBRTC_DIRECT     = 280
+	P_WEBRTC            = 281
 )
 
 var (
@@ -262,6 +263,11 @@ var (
 		Code:  P_WSS,
 		VCode: CodeToVarint(P_WSS),
 	}
+	protoWebRTCDirect = Protocol{
+		Name:  "webrtc-direct",
+		Code:  P_WEBRTC_DIRECT,
+		VCode: CodeToVarint(P_WEBRTC_DIRECT),
+	}
 	protoWebRTC = Protocol{
 		Name:  "webrtc",
 		Code:  P_WEBRTC,
@@ -305,6 +311,7 @@ func init() {
 		protoWS,
 		protoWSS,
 		protoPlaintextV2,
+		protoWebRTCDirect,
 		protoWebRTC,
 	} {
 		if err := AddProtocol(p); err != nil {

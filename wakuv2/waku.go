@@ -26,7 +26,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/rand"
 	"net"
 	"runtime"
 	"strings"
@@ -34,8 +33,6 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
-	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/proto"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	"github.com/multiformats/go-multiaddr"
 
@@ -77,7 +74,6 @@ import (
 
 const messageQueueLimit = 1024
 const requestTimeout = 30 * time.Second
-const autoRelayMinInterval = 2 * time.Second
 const bootnodesQueryBackoffMs = 200
 const bootnodesMaxRetries = 7
 
@@ -253,11 +249,6 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 	libp2pOpts := node.DefaultLibP2POptions
 	libp2pOpts = append(libp2pOpts, libp2p.BandwidthReporter(waku.bandwidthCounter))
 	libp2pOpts = append(libp2pOpts, libp2p.NATPortMap())
-	libp2pOpts = append(libp2pOpts, libp2p.EnableHolePunching())
-	libp2pOpts = append(libp2pOpts, libp2p.EnableAutoRelayWithPeerSource(
-		waku.autoRelayPeerSource,
-		autorelay.WithMinInterval(autoRelayMinInterval),
-	))
 
 	opts := []node.WakuNodeOption{
 		node.WithLibP2POptions(libp2pOpts...),
@@ -277,12 +268,6 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		}
 
 		opts = append(opts, node.WithDiscoveryV5(uint(cfg.UDPPort), bootnodes, cfg.AutoUpdate))
-
-		// Peer exchange requires DiscV5 to run (might change in future versions of the protocol)
-		if cfg.PeerExchange {
-			opts = append(opts, node.WithPeerExchange())
-		}
-
 	}
 
 	if cfg.LightClient {
@@ -403,11 +388,11 @@ func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnA
 
 func (w *Waku) addWakuV2Peers(ctx context.Context, cfg *Config) error {
 	fnApply := func(d dnsdisc.DiscoveredNode, wg *sync.WaitGroup) {
-		if len(d.Addresses) != 0 {
+		if len(d.PeerInfo.Addrs) != 0 {
 			go func(ma multiaddr.Multiaddr) {
 				w.identifyAndConnect(ctx, w.settings.LightClient, ma)
 				wg.Done()
-			}(d.Addresses[0])
+			}(d.PeerInfo.Addrs[0])
 		}
 	}
 
@@ -564,14 +549,14 @@ func (w *Waku) runPeerExchangeLoop() {
 			var withThesePeers []peer.ID
 			for _, record := range w.dnsAddressCache {
 				for _, discoveredNode := range record {
-					if len(discoveredNode.Addresses) == 0 {
+					if len(discoveredNode.PeerInfo.Addrs) == 0 {
 						continue
 					}
 
 					// Obtaining peer ID
-					peerIDString, err := discoveredNode.Addresses[0].ValueForProtocol(multiaddr.P_P2P)
+					peerIDString, err := discoveredNode.PeerInfo.Addrs[0].ValueForProtocol(multiaddr.P_P2P)
 					if err != nil {
-						w.logger.Warn("multiaddress does not contain peerID", zap.String("multiaddr", discoveredNode.Addresses[0].String()))
+						w.logger.Warn("multiaddress does not contain peerID", zap.String("multiaddr", discoveredNode.PeerInfo.Addrs[0].String()))
 						continue // No peer ID available somehow
 					}
 
@@ -1494,49 +1479,6 @@ func (w *Waku) AddStorePeer(address string) (peer.ID, error) {
 
 func (w *Waku) timestamp() int64 {
 	return w.timesource.Now().UnixNano()
-}
-
-func (w *Waku) autoRelayPeerSource(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
-
-	w.logger.Debug("auto-relay asking for peers", zap.Int("num-peers", numPeers))
-
-	output := make(chan peer.AddrInfo, numPeers)
-	go func() {
-		peers, err := w.node.Peers()
-		if err != nil {
-			w.logger.Error("failed to fetch peers", zap.Error(err))
-			close(output)
-		}
-
-		// Shuffle peers
-		rand.Seed(time.Now().UnixNano())
-		rand.Shuffle(len(peers), func(i, j int) { peers[i], peers[j] = peers[j], peers[i] })
-
-		for _, p := range peers {
-			info := w.node.Host().Peerstore().PeerInfo(p.ID)
-
-			supportedProtocols, err := w.node.Host().Peerstore().SupportsProtocols(p.ID, proto.ProtoIDv2Hop)
-			if err != nil {
-				w.logger.Error("could not check supported protocols", zap.Error(err))
-			}
-
-			if len(supportedProtocols) == 0 {
-				continue
-			}
-
-			select {
-			case <-ctx.Done():
-				w.logger.Debug("context done, auto-relay has enough peers")
-				close(output)
-
-			case output <- info:
-				w.logger.Debug("published auto-relay peer info", zap.Any("peer-id", p.ID))
-
-			}
-		}
-		close(output)
-	}()
-	return output
 }
 
 func (w *Waku) AddRelayPeer(address string) (peer.ID, error) {

@@ -8,8 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/rpc/chain"
+
 	"github.com/stretchr/testify/require"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -75,6 +78,17 @@ func (f balancesFixture) HeaderByHash(ctx context.Context, hash common.Hash) (*t
 	}, nil
 }
 
+func (f balancesFixture) FullTransactionByBlockNumberAndIndex(ctx context.Context, blockNumber *big.Int, index uint) (*chain.FullTransaction, error) {
+	blockHash := common.HexToHash("0x0")
+	return &chain.FullTransaction{
+		Tx: &types.Transaction{},
+		TxExtraInfo: chain.TxExtraInfo{
+			BlockNumber: (*hexutil.Big)(big.NewInt(0)),
+			BlockHash:   &blockHash,
+		},
+	}, nil
+}
+
 type batchesFixture [][]Transfer
 
 func (f batchesFixture) GetTransfersByNumber(ctx context.Context, number *big.Int) (rst []Transfer, err error) {
@@ -127,9 +141,9 @@ func TestConcurrentEthDownloader(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			concurrent := NewConcurrentDownloader(ctx, 0)
-			_, headers, _ := findBlocksWithEthTransfers(
-				ctx, tc.options.balances, newBalanceCache(), tc.options.batches,
-				common.Address{}, zero, tc.options.last, false)
+			_, headers, _, _ := findBlocksWithEthTransfers(
+				ctx, tc.options.balances, newBalanceCache(),
+				common.Address{}, zero, tc.options.last, false, NoThreadLimit)
 			concurrent.Wait()
 			require.NoError(t, concurrent.Error())
 			rst := concurrent.Get()

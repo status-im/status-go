@@ -6,99 +6,26 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/keycards"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-func (m *Messenger) dispatchSyncKeycard(ctx context.Context, chatID string, syncKeycard protobuf.SyncAllKeycards,
-	rawMessageHandler RawMessageHandler) error {
-	if !m.hasPairedDevices() {
-		return nil
-	}
-
-	encodedMessage, err := proto.Marshal(&syncKeycard)
-	if err != nil {
-		return err
-	}
-
-	rawMessage := common.RawMessage{
-		LocalChatID:         chatID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ALL_KEYCARDS,
-		ResendAutomatically: true,
-	}
-
-	_, err = rawMessageHandler(ctx, rawMessage)
-	return err
-}
-
-func (m *Messenger) prepareSyncAllKeycardsMessage(clock uint64) (message protobuf.SyncAllKeycards, err error) {
+func (m *Messenger) prepareSyncKeycardsMessage(keyUID string) (message []*protobuf.SyncKeycard, err error) {
 	allKeycards, err := m.settings.GetAllKnownKeycards()
 	if err != nil {
 		return message, err
 	}
 
-	message.Clock = clock
-
 	for _, kc := range allKeycards {
-		syncKeycard := kc.ToSyncKeycard()
-		if syncKeycard.Clock == 0 {
-			syncKeycard.Clock = clock
+		if kc.KeyUID != keyUID {
+			continue
 		}
-		message.Keycards = append(message.Keycards, syncKeycard)
+		syncKeycard := kc.ToSyncKeycard()
+		message = append(message, syncKeycard)
 	}
 
 	return
-}
-
-func (m *Messenger) syncAllKeycards(ctx context.Context, rawMessageHandler RawMessageHandler) (err error) {
-	clock, chat := m.getLastClockWithRelatedChat()
-
-	message, err := m.prepareSyncAllKeycardsMessage(clock)
-	if err != nil {
-		return err
-	}
-
-	err = m.dispatchSyncKeycard(ctx, chat.ID, message, rawMessageHandler)
-	if err != nil {
-		return err
-	}
-
-	chat.LastClockValue = clock
-	return m.saveChat(chat)
-}
-
-func (m *Messenger) syncReceivedKeycards(syncMessage protobuf.SyncAllKeycards) ([]*keycards.Keycard, error) {
-	var keycardsToSync []*keycards.Keycard
-	for _, syncKc := range syncMessage.Keycards {
-		var kp = &keycards.Keycard{}
-		kp.FromSyncKeycard(syncKc)
-		keycardsToSync = append(keycardsToSync, kp)
-	}
-
-	err := m.settings.SyncKeycards(syncMessage.Clock, keycardsToSync)
-	if err != nil {
-		return nil, err
-	}
-
-	allKeycards, err := m.settings.GetAllKnownKeycards()
-	if err != nil {
-		return nil, err
-	}
-
-	return allKeycards, nil
-}
-
-func (m *Messenger) handleSyncKeycards(state *ReceivedMessageState, syncMessage protobuf.SyncAllKeycards) (err error) {
-	allKeycards, err := m.syncReceivedKeycards(syncMessage)
-	if err != nil {
-		return err
-	}
-
-	state.Response.AddAllKnownKeycards(allKeycards)
-
-	return nil
 }
 
 func (m *Messenger) dispatchKeycardActivity(ctx context.Context, syncMessage protobuf.SyncKeycardAction) error {
@@ -131,10 +58,10 @@ func (m *Messenger) dispatchKeycardActivity(ctx context.Context, syncMessage pro
 
 func (m *Messenger) handleSyncKeycardActivity(state *ReceivedMessageState, syncMessage protobuf.SyncKeycardAction) (err error) {
 
-	var kcAction = &keycards.KeycardAction{
+	var kcAction = &accounts.KeycardAction{
 		Action:        protobuf.SyncKeycardAction_Action_name[int32(syncMessage.Action)],
 		OldKeycardUID: syncMessage.OldKeycardUid,
-		Keycard:       &keycards.Keycard{},
+		Keycard:       &accounts.Keycard{},
 	}
 	kcAction.Keycard.FromSyncKeycard(syncMessage.Keycard)
 
@@ -170,7 +97,7 @@ func (m *Messenger) handleSyncKeycardActivity(state *ReceivedMessageState, syncM
 	return nil
 }
 
-func (m *Messenger) AddKeycardOrAddAccountsIfKeycardIsAdded(ctx context.Context, kp *keycards.Keycard) (added bool, err error) {
+func (m *Messenger) AddKeycardOrAddAccountsIfKeycardIsAdded(ctx context.Context, kp *accounts.Keycard) (added bool, err error) {
 	addedKc, addedAccs, err := m.settings.AddKeycardOrAddAccountsIfKeycardIsAdded(*kp)
 	if err != nil {
 		return addedKc || addedAccs, err

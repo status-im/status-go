@@ -29,12 +29,14 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/keycards"
+	"github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
+	identityUtils "github.com/status-im/status-go/protocol/identity"
+	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ext"
@@ -84,7 +86,7 @@ type GethStatusBackend struct {
 	selectedAccountKeyID string
 	log                  log.Logger
 	allowAllRPC          bool // used only for tests, disables api method restrictions
-
+	localPairing         bool // used to disable login/logout signalling
 }
 
 // NewGethStatusBackend create a new GethStatusBackend instance
@@ -108,6 +110,7 @@ func (b *GethStatusBackend) initialize() {
 	b.personalAPI = personalAPI
 	b.statusNode.SetMultiaccountsDB(b.multiaccountsDB)
 	b.log = log.New("package", "status-go/api.GethStatusBackend")
+	b.localPairing = false
 }
 
 // StatusNode returns reference to node manager
@@ -180,6 +183,13 @@ func (b *GethStatusBackend) OpenAccounts() error {
 	b.multiaccountsDB = db
 	// Probably we should iron out a bit better how to create/dispose of the status-service
 	b.statusNode.SetMultiaccountsDB(db)
+
+	err = b.statusNode.StartMediaServerWithoutDB()
+	if err != nil {
+		b.log.Error("failed to start media server without app db", "err", err)
+		return err
+	}
+
 	return nil
 }
 
@@ -190,6 +200,24 @@ func (b *GethStatusBackend) GetAccounts() ([]multiaccounts.Account, error) {
 		return nil, errors.New("accounts db wasn't initialized")
 	}
 	return b.multiaccountsDB.GetAccounts()
+}
+
+func (b *GethStatusBackend) getAccountByKeyUID(keyUID string) (*multiaccounts.Account, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.multiaccountsDB == nil {
+		return nil, errors.New("accounts db wasn't initialized")
+	}
+	as, err := b.multiaccountsDB.GetAccounts()
+	if err != nil {
+		return nil, err
+	}
+	for _, acc := range as {
+		if acc.KeyUID == keyUID {
+			return &acc, nil
+		}
+	}
+	return nil, fmt.Errorf("account with keyUID %s not found", keyUID)
 }
 
 func (b *GethStatusBackend) SaveAccount(account multiaccounts.Account) error {
@@ -341,11 +369,21 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 		return err
 	}
 
-	b.account = &acc
 	accountsDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
 		return err
 	}
+
+	if acc.ColorHash == nil || acc.ColorID == 0 {
+		multiAccount, err := b.updateAccountColorHashAndColorID(acc.KeyUID, accountsDB)
+		if err != nil {
+			return err
+		}
+		acc = *multiAccount
+	}
+
+	b.account = &acc
+
 	walletAddr, err := accountsDB.GetWalletAddress()
 	if err != nil {
 		return err
@@ -387,7 +425,9 @@ func (b *GethStatusBackend) StartNodeWithKey(acc multiaccounts.Account, password
 		// Stop node for clean up
 		_ = b.StopNode()
 	}
-	signal.SendLoggedIn(err)
+	if !b.localPairing {
+		signal.SendLoggedIn(err)
+	}
 	return err
 }
 
@@ -403,6 +443,127 @@ func (b *GethStatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n
 	}
 
 	return conf, nil
+}
+
+func (b *GethStatusBackend) updateAccountColorHashAndColorID(keyUID string, accountsDB *accounts.Database) (*multiaccounts.Account, error) {
+	multiAccount, err := b.getAccountByKeyUID(keyUID)
+	if err != nil {
+		return nil, err
+	}
+	if multiAccount.ColorHash == nil || multiAccount.ColorID == 0 {
+		keypair, err := accountsDB.GetKeypairByKeyUID(keyUID)
+		if err != nil {
+			return nil, err
+		}
+		publicKey := keypair.GetChatPublicKey()
+		if publicKey == nil {
+			return nil, errors.New("chat public key not found")
+		}
+		if err = enrichMultiAccountByPublicKey(multiAccount, publicKey); err != nil {
+			return nil, err
+		}
+		if err = b.multiaccountsDB.UpdateAccount(*multiAccount); err != nil {
+			return nil, err
+		}
+	}
+	return multiAccount, nil
+}
+
+func (b *GethStatusBackend) overrideNetworks(conf *params.NodeConfig, request *requests.Login) {
+	conf.Networks = setRPCs(defaultNetworks, &request.WalletSecretsConfig)
+}
+
+func (b *GethStatusBackend) LoginAccount(request *requests.Login) error {
+	err := b.loginAccount(request)
+	if err != nil {
+		// Stop node for clean up
+		_ = b.StopNode()
+	}
+	signal.SendLoggedIn(err)
+	return err
+}
+
+func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
+	if err := request.Validate(); err != nil {
+		return err
+	}
+
+	password := request.Password
+
+	acc := multiaccounts.Account{
+		KeyUID:        request.KeyUID,
+		KDFIterations: request.KdfIterations,
+	}
+
+	if acc.KDFIterations == 0 {
+		acc.KDFIterations = sqlite.ReducedKDFIterationsNumber
+	}
+
+	err := b.ensureAppDBOpened(acc, password)
+	if err != nil {
+		return err
+	}
+
+	err = b.loadNodeConfig(nil)
+	if err != nil {
+		return err
+	}
+
+	b.overrideNetworks(b.config, request)
+
+	err = b.setupLogSettings()
+	if err != nil {
+		return err
+	}
+
+	accountsDB, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		return err
+	}
+
+	multiAccount, err := b.updateAccountColorHashAndColorID(acc.KeyUID, accountsDB)
+	if err != nil {
+		return err
+	}
+	b.account = multiAccount
+
+	chatAddr, err := accountsDB.GetChatAddress()
+	if err != nil {
+		return err
+	}
+	walletAddr, err := accountsDB.GetWalletAddress()
+	if err != nil {
+		return err
+	}
+	watchAddrs, err := accountsDB.GetWalletAddresses()
+	if err != nil {
+		return err
+	}
+	login := account.LoginParams{
+		Password:       password,
+		ChatAddress:    chatAddr,
+		WatchAddresses: watchAddrs,
+		MainAccount:    walletAddr,
+	}
+
+	err = b.StartNode(b.config)
+	if err != nil {
+		b.log.Info("failed to start node")
+		return err
+	}
+
+	err = b.SelectAccount(login)
+	if err != nil {
+		return err
+	}
+	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
+	if err != nil {
+		b.log.Info("failed to update account")
+		return err
+	}
+
+	return nil
+
 }
 
 func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string, inputNodeCfg *params.NodeConfig) error {
@@ -421,11 +582,21 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		return err
 	}
 
-	b.account = &acc
 	accountsDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
 		return err
 	}
+
+	if acc.ColorHash == nil || acc.ColorID == 0 {
+		multiAccount, err := b.updateAccountColorHashAndColorID(acc.KeyUID, accountsDB)
+		if err != nil {
+			return err
+		}
+		acc = *multiAccount
+	}
+
+	b.account = &acc
+
 	chatAddr, err := accountsDB.GetChatAddress()
 	if err != nil {
 		return err
@@ -504,7 +675,9 @@ func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, pass
 		// Stop node for clean up
 		_ = b.StopNode()
 	}
-	signal.SendLoggedIn(err)
+	if !b.localPairing {
+		signal.SendLoggedIn(err)
+	}
 	return err
 }
 
@@ -610,6 +783,15 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 	if err != nil {
 		return err
 	}
+
+	keypair, err := accountDB.GetKeypairByKeyUID(account.KeyUID)
+	if err != nil {
+		if err == accounts.ErrDbKeypairNotFound {
+			return errors.New("cannot convert an unknown keypair")
+		}
+		return err
+	}
+
 	err = accountDB.SaveSettingField(settings.KeycardInstanceUID, s.KeycardInstanceUID)
 	if err != nil {
 		return err
@@ -630,11 +812,6 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 		return err
 	}
 
-	relatedAccounts, err := accountDB.GetAccountsByKeyUID(account.KeyUID)
-	if err != nil {
-		return err
-	}
-
 	// This check is added due to mobile app cause it doesn't support a Keycard features as desktop app.
 	// We should remove the following line once mobile and desktop app align.
 	if len(keycardUID) > 0 {
@@ -643,7 +820,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 			return err
 		}
 
-		kc := keycards.Keycard{
+		kc := accounts.Keycard{
 			KeycardUID:      keycardUID,
 			KeycardName:     displayName,
 			KeycardLocked:   false,
@@ -651,7 +828,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 			LastUpdateClock: uint64(time.Now().Unix()),
 		}
 
-		for _, acc := range relatedAccounts {
+		for _, acc := range keypair.Accounts {
 			kc.AccountsAddresses = append(kc.AccountsAddresses, acc.Address)
 		}
 		addedKc, _, err := accountDB.AddKeycardOrAddAccountsIfKeycardIsAdded(kc)
@@ -689,7 +866,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 	}
 
 	// We need to delete all accounts for the Keycard which is being added
-	for _, acc := range relatedAccounts {
+	for _, acc := range keypair.Accounts {
 		err = b.accountManager.DeleteAccount(acc.Address)
 		if err != nil {
 			return err
@@ -735,7 +912,7 @@ func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error)
 }
 
 func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *requests.CreateAccount) error {
-	keystoreDir := filepath.Join(request.BackupDisabledDataDir, keystoreRelativePath)
+	keystoreDir := keystoreRelativePath
 
 	b.UpdateRootDataDir(request.BackupDisabledDataDir)
 	err := b.OpenAccounts()
@@ -770,7 +947,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 
 	userKeyStoreDir := filepath.Join(keystoreDir, info.KeyUID)
 	// Initialize keystore dir with account
-	if err := b.accountManager.InitKeystore(userKeyStoreDir); err != nil {
+	if err := b.accountManager.InitKeystore(filepath.Join(b.rootDataDir, userKeyStoreDir)); err != nil {
 		return err
 	}
 
@@ -782,7 +959,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 	account := multiaccounts.Account{
 		KeyUID:             info.KeyUID,
 		Name:               request.DisplayName,
-		CustomizationColor: multiaccounts.CustomizationColor(request.CustomizationColor),
+		CustomizationColor: common.CustomizationColor(request.CustomizationColor),
 		KDFIterations:      sqlite.ReducedKDFIterationsNumber,
 	}
 
@@ -804,6 +981,8 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 		return err
 	}
 
+	// when we set nodeConfig.KeyStoreDir, value of nodeConfig.KeyStoreDir should not contain the rootDataDir
+	// loadNodeConfig will add rootDataDir to nodeConfig.KeyStoreDir
 	nodeConfig.KeyStoreDir = userKeyStoreDir
 
 	walletDerivedAccount := derivedAddresses[pathDefaultWallet]
@@ -811,7 +990,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 		PublicKey: types.Hex2Bytes(walletDerivedAccount.PublicKey),
 		KeyUID:    info.KeyUID,
 		Address:   types.HexToAddress(walletDerivedAccount.Address),
-		Color:     "",
+		ColorID:   "",
 		Wallet:    true,
 		Path:      pathDefaultWallet,
 		Name:      walletAccountDefaultName,
@@ -968,12 +1147,61 @@ func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password strin
 	return nil
 }
 
-func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, settings settings.Settings, nodecfg *params.NodeConfig, subaccs []*accounts.Account, keyHex string) error {
-	err := b.SaveAccount(acc)
+func enrichMultiAccountBySubAccounts(account *multiaccounts.Account, subaccs []*accounts.Account) error {
+	if account.ColorHash != nil && account.ColorID != 0 {
+		return nil
+	}
+
+	for i, acc := range subaccs {
+		subaccs[i].KeyUID = account.KeyUID
+		if acc.Chat {
+			pk := string(acc.PublicKey.Bytes())
+			colorHash, err := colorhash.GenerateFor(pk)
+			if err != nil {
+				return err
+			}
+			account.ColorHash = colorHash
+
+			colorID, err := identityUtils.ToColorID(pk)
+			if err != nil {
+				return err
+			}
+			account.ColorID = colorID
+
+			break
+		}
+	}
+
+	return nil
+}
+
+func enrichMultiAccountByPublicKey(account *multiaccounts.Account, publicKey types.HexBytes) error {
+	pk := string(publicKey.Bytes())
+	colorHash, err := colorhash.GenerateFor(pk)
 	if err != nil {
 		return err
 	}
-	err = b.ensureAppDBOpened(acc, password)
+	account.ColorHash = colorHash
+
+	colorID, err := identityUtils.ToColorID(pk)
+	if err != nil {
+		return err
+	}
+	account.ColorID = colorID
+
+	return nil
+}
+
+func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(account multiaccounts.Account, password string, settings settings.Settings, nodecfg *params.NodeConfig, subaccs []*accounts.Account, keyHex string) error {
+	err := enrichMultiAccountBySubAccounts(&account, subaccs)
+	if err != nil {
+		return err
+	}
+	err = b.SaveAccount(account)
+	if err != nil {
+		return err
+	}
+	err = b.ensureAppDBOpened(account, password)
 	if err != nil {
 		return err
 	}
@@ -981,7 +1209,7 @@ func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Acc
 	if err != nil {
 		return err
 	}
-	return b.StartNodeWithKey(acc, password, keyHex)
+	return b.StartNodeWithKey(account, password, keyHex)
 }
 
 // StartNodeWithAccountAndInitialConfig is used after account and config was generated.
@@ -995,7 +1223,12 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	subaccs []*accounts.Account,
 ) error {
 	b.log.Info("node config", "config", nodecfg)
-	err := b.SaveAccount(account)
+
+	err := enrichMultiAccountBySubAccounts(&account, subaccs)
+	if err != nil {
+		return err
+	}
+	err = b.SaveAccount(account)
 	if err != nil {
 		return err
 	}
@@ -1010,6 +1243,7 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	return b.StartNodeWithAccount(account, password, nodecfg)
 }
 
+// TODO: change in `saveAccountsAndSettings` function param `subaccs []*accounts.Account` parameter to `profileKeypair *accounts.Keypair` parameter
 func (b *GethStatusBackend) saveAccountsAndSettings(settings settings.Settings, nodecfg *params.NodeConfig, subaccs []*accounts.Account) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -1031,7 +1265,20 @@ func (b *GethStatusBackend) saveAccountsAndSettings(settings settings.Settings, 
 		return err
 	}
 
-	return accdb.SaveAccounts(subaccs)
+	keypair := &accounts.Keypair{
+		KeyUID:                  settings.KeyUID,
+		Name:                    settings.DisplayName,
+		Type:                    accounts.KeypairTypeProfile,
+		DerivedFrom:             settings.Address.String(),
+		LastUsedDerivationIndex: 0,
+	}
+
+	for _, acc := range subaccs {
+		acc.Operable = accounts.AccountFullyOperable
+		keypair.Accounts = append(keypair.Accounts, acc)
+	}
+
+	return accdb.SaveOrUpdateKeypair(keypair)
 }
 
 func (b *GethStatusBackend) loadNodeConfig(inputNodeCfg *params.NodeConfig) error {
@@ -1176,7 +1423,9 @@ func (b *GethStatusBackend) stopNode() error {
 	if b.statusNode == nil || !b.IsNodeRunning() {
 		return nil
 	}
-	defer signal.SendNodeStopped()
+	if !b.localPairing {
+		defer signal.SendNodeStopped()
+	}
 
 	return b.statusNode.Stop()
 }
@@ -1550,6 +1799,12 @@ func (b *GethStatusBackend) Logout() error {
 	}
 	// re-initialize the node, at some point we should better manage the lifecycle
 	b.initialize()
+
+	err = b.statusNode.StartMediaServerWithoutDB()
+	if err != nil {
+		b.log.Error("failed to start media server without app db", "err", err)
+		return err
+	}
 	return nil
 }
 
@@ -1629,7 +1884,7 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w types.WakuKeyManager
 	}
 
 	if st != nil {
-		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.statusNode.HTTPServer(), b.multiaccountsDB, acc, b.accountManager, b.statusNode.RPCClient(), logutils.ZapLogger()); err != nil {
+		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.statusNode.HTTPServer(), b.multiaccountsDB, acc, b.accountManager, b.statusNode.RPCClient(), b.statusNode.WalletService(), logutils.ZapLogger()); err != nil {
 			return err
 		}
 		// Set initial connection state
@@ -1741,4 +1996,8 @@ func (b *GethStatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) e
 	}
 
 	return nil
+}
+
+func (b *GethStatusBackend) SetLocalPairing(value bool) {
+	b.localPairing = value
 }

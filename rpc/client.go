@@ -56,6 +56,9 @@ type Client struct {
 	walletNotifier func(chainID uint64, message string)
 }
 
+// Is initialized in a build-tag-dependent module
+var verifProxyInitFn func(c *Client)
+
 // NewClient initializes Client and tries to connect to both,
 // upstream and local node.
 //
@@ -91,6 +94,10 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 	}
 
 	c.router = newRouter(c.upstreamEnabled)
+
+	if verifProxyInitFn != nil {
+		verifProxyInitFn(&c)
+	}
 
 	return &c, nil
 }
@@ -245,6 +252,14 @@ func (c *Client) RegisterHandler(method string, handler Handler) {
 	defer c.handlersMx.Unlock()
 
 	c.handlers[method] = handler
+}
+
+// UnregisterHandler removes a previously registered handler.
+func (c *Client) UnregisterHandler(method string) {
+	c.handlersMx.Lock()
+	defer c.handlersMx.Unlock()
+
+	delete(c.handlers, method)
 }
 
 // callMethod calls registered RPC handler with given args and pointer to result.

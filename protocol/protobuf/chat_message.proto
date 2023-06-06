@@ -106,6 +106,19 @@ message DiscordMessageAttachment {
   string localUrl = 8;
 }
 
+message UnfurledLink {
+  // A valid URL which uniquely identifies this link.
+  string url = 1;
+  // Website's title.
+  string title = 2;
+  // Description is sometimes available, but can be empty. Most mainstream
+  // websites provide this information.
+  string description = 3;
+  bytes thumbnail_payload = 4;
+  uint32 thumbnail_width = 5;
+  uint32 thumbnail_height = 6;
+}
+
 message ChatMessage {
   // Lamport timestamp of the chat message
   uint64 clock = 1;
@@ -145,6 +158,8 @@ message ChatMessage {
   string display_name = 14;
 
   ContactRequestPropagatedState contact_request_propagated_state = 15;
+
+  repeated UnfurledLink unfurled_links = 16;
 
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;

@@ -158,7 +158,7 @@ func (s *MessengerActivityCenterMessageSuite) TestEveryoneMentionTag() {
 	s.Require().NoError(err)
 
 	// Alice joins the community
-	response, err = alice.JoinCommunity(context.Background(), community.ID())
+	response, err = alice.JoinCommunity(context.Background(), community.ID(), false)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)

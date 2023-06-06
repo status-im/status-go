@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/connmgr"
@@ -68,11 +69,12 @@ type transport struct {
 	rcmgr       network.ResourceManager
 	gater       connmgr.ConnectionGater
 
-	listenOnce    sync.Once
-	listenOnceErr error
-	certManager   *certManager
-	staticTLSConf *tls.Config
-	tlsClientConf *tls.Config
+	listenOnce     sync.Once
+	listenOnceErr  error
+	certManager    *certManager
+	hasCertManager atomic.Bool // set to true once the certManager is initialized
+	staticTLSConf  *tls.Config
+	tlsClientConf  *tls.Config
 
 	noise *noise.Transport
 
@@ -286,28 +288,19 @@ func decodeCertHashesFromProtobuf(b [][]byte) ([]multihash.DecodedMultihash, err
 }
 
 func (t *transport) CanDial(addr ma.Multiaddr) bool {
-	var numHashes int
-	ma.ForEach(addr, func(c ma.Component) bool {
-		if c.Protocol().Code == ma.P_CERTHASH {
-			numHashes++
-		}
-		return true
-	})
-	// Remove the /certhash components from the multiaddr.
-	// If the multiaddr doesn't contain any certhashes, the node might have a CA-signed certificate.
-	for i := 0; i < numHashes; i++ {
-		addr, _ = ma.SplitLast(addr)
-	}
-	return webtransportMatcher.Matches(addr)
+	ok, _ := IsWebtransportMultiaddr(addr)
+	return ok
 }
 
 func (t *transport) Listen(laddr ma.Multiaddr) (tpt.Listener, error) {
-	if !webtransportMatcher.Matches(laddr) {
+	isWebTransport, _ := IsWebtransportMultiaddr(laddr)
+	if !isWebTransport {
 		return nil, fmt.Errorf("cannot listen on non-WebTransport addr: %s", laddr)
 	}
 	if t.staticTLSConf == nil {
 		t.listenOnce.Do(func() {
 			t.certManager, t.listenOnceErr = newCertManager(t.privKey, t.clock)
+			t.hasCertManager.Store(true)
 		})
 		if t.listenOnceErr != nil {
 			return nil, t.listenOnceErr
@@ -409,4 +402,13 @@ func (t *transport) Resolve(_ context.Context, maddr ma.Multiaddr) ([]ma.Multiad
 		return nil, err
 	}
 	return []ma.Multiaddr{beforeQuicMA.Encapsulate(quicComponent).Encapsulate(sniComponent).Encapsulate(afterQuicMA)}, nil
+}
+
+// AddCertHashes adds the current certificate hashes to a multiaddress.
+// If called before Listen, it's a no-op.
+func (t *transport) AddCertHashes(m ma.Multiaddr) (ma.Multiaddr, bool) {
+	if !t.hasCertManager.Load() {
+		return m, false
+	}
+	return m.Encapsulate(t.certManager.AddrComponent()), true
 }

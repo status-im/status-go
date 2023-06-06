@@ -46,8 +46,9 @@ type acceptVal struct {
 type acceptLoopRunner struct {
 	acceptSem chan struct{}
 
-	muxerMu sync.Mutex
-	muxer   map[quic.VersionNumber]chan acceptVal
+	muxerMu     sync.Mutex
+	muxer       map[quic.VersionNumber]chan acceptVal
+	muxerClosed bool
 }
 
 func (r *acceptLoopRunner) AcceptForVersion(v quic.VersionNumber) chan acceptVal {
@@ -68,6 +69,11 @@ func (r *acceptLoopRunner) RmAcceptForVersion(v quic.VersionNumber) {
 	r.muxerMu.Lock()
 	defer r.muxerMu.Unlock()
 
+	if r.muxerClosed {
+		// Already closed, all versions are removed
+		return
+	}
+
 	ch, ok := r.muxer[v]
 	if !ok {
 		panic("expected chan in accept muxer")
@@ -79,6 +85,7 @@ func (r *acceptLoopRunner) RmAcceptForVersion(v quic.VersionNumber) {
 func (r *acceptLoopRunner) sendErrAndClose(err error) {
 	r.muxerMu.Lock()
 	defer r.muxerMu.Unlock()
+	r.muxerClosed = true
 	for k, ch := range r.muxer {
 		select {
 		case ch <- acceptVal{err: err}:

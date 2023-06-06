@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/linkpreview"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/requests"
@@ -294,12 +295,12 @@ func (api *PublicAPI) DeleteChat(parent context.Context, chatID string) error {
 	return api.service.messenger.DeleteChat(chatID)
 }
 
-func (api *PublicAPI) MuteCommunityCategory(communityID string, categoryID string) error {
-	return api.service.messenger.SetMutePropertyOnChatsByCategory(communityID, categoryID, true)
+func (api *PublicAPI) MuteCommunityCategory(request *requests.MuteCategory) error {
+	return api.service.messenger.SetMutePropertyOnChatsByCategory(request, true)
 }
 
 func (api *PublicAPI) UnmuteCommunityCategory(communityID string, categoryID string) error {
-	return api.service.messenger.SetMutePropertyOnChatsByCategory(communityID, categoryID, false)
+	return api.service.messenger.SetMutePropertyOnChatsByCategory(&requests.MuteCategory{CommunityID: communityID, CategoryID: categoryID, MutedType: protocol.Unmuted}, false)
 }
 
 func (api *PublicAPI) MuteChatV2(parent context.Context, request *requests.MuteChat) (time.Time, error) {
@@ -326,7 +327,7 @@ func (api *PublicAPI) BlockContactDesktop(parent context.Context, contactID stri
 	return api.service.messenger.BlockContactDesktop(contactID)
 }
 
-func (api *PublicAPI) UnblockContact(parent context.Context, contactID string) error {
+func (api *PublicAPI) UnblockContact(parent context.Context, contactID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.UnblockContact(contactID)
 }
 
@@ -401,7 +402,7 @@ func (api *PublicAPI) SpectateCommunity(parent context.Context, communityID type
 
 // JoinCommunity joins a community with the given ID
 func (api *PublicAPI) JoinCommunity(parent context.Context, communityID types.HexBytes) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.JoinCommunity(parent, communityID)
+	return api.service.messenger.JoinCommunity(parent, communityID, false)
 }
 
 // LeaveCommunity leaves a commuity with the given ID
@@ -437,6 +438,16 @@ func (api *PublicAPI) ImportCommunity(ctx context.Context, hexPrivateKey string)
 	}
 	return api.service.messenger.ImportCommunity(ctx, privateKey)
 
+}
+
+// Speeds up importing messages from archives
+func (api *PublicAPI) SpeedupArchivesImport(ctx context.Context) {
+	api.service.messenger.SpeedupArchivesImport()
+}
+
+// Slows down importing messages from archives
+func (api *PublicAPI) SlowdownArchivesImport(ctx context.Context) {
+	api.service.messenger.SlowdownArchivesImport()
 }
 
 // CreateCommunityChat creates a community chat in the given community
@@ -1082,14 +1093,26 @@ func (api *PublicAPI) EmojiReactionsByChatIDMessageID(chatID string, messageID s
 	return api.service.messenger.EmojiReactionsByChatIDMessageID(chatID, messageID)
 }
 
-// Urls
-
 func (api *PublicAPI) GetLinkPreviewWhitelist() []urls.Site {
 	return urls.LinkPreviewWhitelist()
 }
 
 func (api *PublicAPI) GetLinkPreviewData(link string) (previewData urls.LinkPreviewData, err error) {
 	return urls.GetLinkPreviewData(link)
+}
+
+// GetTextURLs parses text and returns a deduplicated and (somewhat) normalized
+// slice of URLs. The returned URLs can be used as cache keys by clients.
+func (api *PublicAPI) GetTextURLs(text string) []string {
+	return linkpreview.GetURLs(text)
+}
+
+// UnfurlURLs uses a best-effort approach to unfurl each URL. Failed URLs will
+// be removed from the response.
+//
+// This endpoint expects the client to send URLs normalized by GetTextURLs.
+func (api *PublicAPI) UnfurlURLs(urls []string) ([]common.LinkPreview, error) {
+	return api.service.messenger.UnfurlURLs(urls)
 }
 
 func (api *PublicAPI) EnsVerified(pk, ensName string) error {
@@ -1296,6 +1319,10 @@ func (api *PublicAPI) ToggleCollapsedCommunityCategory(request *requests.ToggleC
 
 func (api *PublicAPI) CollapsedCommunityCategories() ([]protocol.CollapsedCommunityCategory, error) {
 	return api.service.messenger.CollapsedCommunityCategories()
+}
+
+func (api *PublicAPI) CheckPermissionsToJoinCommunity(request *requests.CheckPermissionToJoinCommunity) (*communities.CheckPermissionToJoinResponse, error) {
+	return api.service.messenger.CheckPermissionsToJoinCommunity(request)
 }
 
 func (api *PublicAPI) Messenger() *protocol.Messenger {

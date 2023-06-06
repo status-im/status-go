@@ -139,7 +139,7 @@ func (tm *Manager) fetchTokens() {
 	for _, store := range tm.stores {
 		tokens, err := store.GetTokens()
 		if err != nil {
-			log.Error("can't fetch tokens from store: %s", err)
+			log.Error("can't fetch tokens from store", "error", err)
 			continue
 		}
 		validTokens := make([]*Token, 0)
@@ -158,22 +158,38 @@ func (tm *Manager) fetchTokens() {
 	tm.tokenMap = toTokenMap(tm.tokenList)
 }
 
+func (tm *Manager) getFullTokenList(chainID uint64) []*Token {
+	tokens, err := tm.GetTokens(chainID)
+	if err != nil {
+		return nil
+	}
+
+	customTokens, err := tm.GetCustomsByChainID(chainID)
+	if err != nil {
+		return nil
+	}
+
+	return append(tokens, customTokens...)
+}
+
 func (tm *Manager) FindToken(network *params.Network, tokenSymbol string) *Token {
 	if tokenSymbol == network.NativeCurrencySymbol {
 		return tm.ToToken(network)
 	}
 
-	tokens, err := tm.GetTokens(network.ChainID)
-	if err != nil {
-		return nil
-	}
-	customTokens, err := tm.GetCustomsByChainID(network.ChainID)
-	if err != nil {
-		return nil
-	}
-	allTokens := append(tokens, customTokens...)
+	allTokens := tm.getFullTokenList(network.ChainID)
 	for _, token := range allTokens {
 		if token.Symbol == tokenSymbol {
+			return token
+		}
+	}
+	return nil
+}
+
+func (tm *Manager) FindTokenByAddress(chainID uint64, address common.Address) *Token {
+	allTokens := tm.getFullTokenList(chainID)
+	for _, token := range allTokens {
+		if token.Address == address {
 			return token
 		}
 	}
@@ -220,13 +236,25 @@ func (tm *Manager) GetAllTokens() ([]*Token, error) {
 
 	tokens, err := tm.GetCustoms()
 	if err != nil {
-		log.Error("can't fetch custom tokens: %s", err)
+		log.Error("can't fetch custom tokens", "error", err)
 	}
 
 	tokens = append(tm.tokenList, tokens...)
 
 	overrideTokensInPlace(tm.networkManager.GetConfiguredNetworks(), tokens)
 
+	return tokens, nil
+}
+
+func (tm *Manager) GetTokensByChainIDs(chainIDs []uint64) ([]*Token, error) {
+	tokens := make([]*Token, 0)
+	for _, chainID := range chainIDs {
+		t, err := tm.GetTokens(chainID)
+		if err != nil {
+			return nil, err
+		}
+		tokens = append(tokens, t...)
+	}
 	return tokens, nil
 }
 
@@ -649,6 +677,7 @@ func (tm *Manager) GetBalancesByChain(parent context.Context, clients map[uint64
 		client := clients[clientIdx]
 		ethScanContract, err := contractMaker.NewEthScan(client.ChainID)
 		if err != nil {
+			log.Error("error scanning contract", "err", err)
 			return nil, err
 		}
 

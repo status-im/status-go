@@ -37,6 +37,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	sociallinkssettings "github.com/status-im/status-go/multiaccounts/settings_social_links"
 	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -47,6 +48,7 @@ import (
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
+	"github.com/status-im/status-go/protocol/linkpreview"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
@@ -64,9 +66,6 @@ import (
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/telemetry"
 )
-
-const maxChunkSizeMessages = 1000
-const maxChunkSizeBytes = 1500000
 
 // todo: kozieiev: get rid of wakutransp word
 type chatContext string
@@ -156,6 +155,7 @@ type Messenger struct {
 	downloadHistoryArchiveTasksWaitGroup sync.WaitGroup
 	verificationDatabase                 *verification.Persistence
 	savedAddressesManager                *wallet.SavedAddressesManager
+	walletAPI                            *wallet.API
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
 	mutex                     sync.Mutex
@@ -420,7 +420,7 @@ func NewMessenger(
 	}
 	if c.rpcClient != nil {
 		tokenManager := token.NewTokenManager(database, c.rpcClient, c.rpcClient.NetworkManager)
-		managerOptions = append(managerOptions, communities.WithTokenManager(tokenManager))
+		managerOptions = append(managerOptions, communities.WithTokenManager(communities.NewDefaultTokenManager(tokenManager)))
 	}
 
 	if c.walletConfig != nil {
@@ -509,6 +509,10 @@ func NewMessenger(
 		savedAddressesManager: savedAddressesManager,
 	}
 	messenger.mentionsManager = NewMentionManager(messenger)
+
+	if c.walletService != nil {
+		messenger.walletAPI = wallet.NewAPI(c.walletService)
+	}
 
 	if c.outputMessagesCSV {
 		messenger.outputCSV = c.outputMessagesCSV
@@ -712,6 +716,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.watchUnmutedChats()
 	m.watchExpiredMessages()
 	m.watchIdentityImageChanges()
+	m.watchWalletBalances()
 	m.watchPendingCommunityRequestToJoin()
 	m.broadcastLatestUserStatus()
 	m.timeoutAutomaticStatusUpdates()
@@ -969,7 +974,7 @@ func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) e
 		return err
 	}
 
-	identityHash, err := m.getIdentityHash(displayName, bio, img, &socialLinks)
+	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks)
 	if err != nil {
 		return err
 	}
@@ -1049,7 +1054,7 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 		return err
 	}
 
-	identityHash, err := m.getIdentityHash(displayName, bio, img, &socialLinks)
+	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks)
 	if err != nil {
 		return err
 	}
@@ -1062,7 +1067,7 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 	return nil
 }
 
-func (m *Messenger) getIdentityHash(displayName, bio string, img *images.IdentityImage, socialLinks *identity.SocialLinks) ([]byte, error) {
+func (m *Messenger) getIdentityHash(displayName, bio string, img *images.IdentityImage, socialLinks identity.SocialLinks) ([]byte, error) {
 	socialLinksData, err := socialLinks.Serialize()
 	if err != nil {
 		return []byte{}, err
@@ -1109,7 +1114,7 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 		return false, err
 	}
 
-	identityHash, err := m.getIdentityHash(displayName, bio, img, &socialLinks)
+	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks)
 	if err != nil {
 		return false, err
 	}
@@ -1364,6 +1369,7 @@ func (m *Messenger) watchUnmutedChats() {
 				m.allChats.Range(func(chatID string, c *Chat) bool {
 					chatMuteTill, _ := time.Parse(time.RFC3339, c.MuteTill.Format(time.RFC3339))
 					currTime, _ := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+
 					if currTime.After(chatMuteTill) && !chatMuteTill.Equal(time.Time{}) && c.Muted {
 						err := m.persistence.UnmuteChat(c.ID)
 						if err != nil {
@@ -1376,7 +1382,9 @@ func (m *Messenger) watchUnmutedChats() {
 					}
 					return true
 				})
-				signal.SendNewMessages(response)
+				if !response.IsEmpty() {
+					signal.SendNewMessages(response)
+				}
 			case <-m.quit:
 				return
 			}
@@ -2106,6 +2114,15 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		}
 	}
 
+	unfurledLinks, err := message.ConvertLinkPreviewsToProto()
+	// We consider link previews non-critical data, so we do not want to block
+	// messages from being sent.
+	if err != nil {
+		m.logger.Error("failed to convert link previews", zap.Error(err))
+	} else {
+		message.UnfurledLinks = unfurledLinks
+	}
+
 	var response MessengerResponse
 
 	// A valid added chat is required.
@@ -2314,6 +2331,7 @@ func (m *Messenger) syncProfilePictures(rawMessageHandler RawMessageHandler) err
 // SyncDevices sends all public chats and contacts to paired devices
 // TODO remove use of photoPath in contacts
 func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, rawMessageHandler RawMessageHandler) (err error) {
+	syncedFromLocalPairing := rawMessageHandler != nil
 	if rawMessageHandler == nil {
 		rawMessageHandler = m.dispatchMessage
 	}
@@ -2432,11 +2450,6 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		return err
 	}
 
-	accounts, err := m.settings.GetAccounts()
-	if err != nil {
-		return err
-	}
-
 	ids, err := m.persistence.LatestContactRequestIDs()
 
 	if err != nil {
@@ -2453,9 +2466,31 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		}
 	}
 
-	err = m.syncWallets(accounts, rawMessageHandler)
+	keypairs, err := m.settings.GetKeypairs()
 	if err != nil {
 		return err
+	}
+
+	for _, kp := range keypairs {
+		if syncedFromLocalPairing {
+			kp.SyncedFrom = accounts.SyncedFromLocalPairing
+		}
+		err = m.syncKeypair(kp, true, rawMessageHandler)
+		if err != nil {
+			return err
+		}
+	}
+
+	woAccounts, err := m.settings.GetWatchOnlyAccounts()
+	if err != nil {
+		return err
+	}
+
+	for _, woAcc := range woAccounts {
+		err = m.syncWalletAccount(woAcc, rawMessageHandler)
+		if err != nil {
+			return err
+		}
 	}
 
 	savedAddresses, err := m.savedAddressesManager.GetRawSavedAddresses()
@@ -2472,11 +2507,6 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		}
 	}
 
-	err = m.syncAllKeycards(ctx, rawMessageHandler)
-	if err != nil {
-		return err
-	}
-
 	if err = m.syncEnsUsernameDetails(ctx, rawMessageHandler); err != nil {
 		return err
 	}
@@ -2485,108 +2515,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		return err
 	}
 
-	return m.syncSocialSettings(ctx, rawMessageHandler)
-}
-
-func (m *Messenger) SaveAccount(acc *accounts.Account) error {
-	clock, _ := m.getLastClockWithRelatedChat()
-	acc.Clock = clock
-
-	err := m.settings.SaveAccounts([]*accounts.Account{acc})
-	if err != nil {
-		return err
-	}
-	return m.syncWallets([]*accounts.Account{acc}, m.dispatchMessage)
-}
-
-func (m *Messenger) DeleteAccount(address types.Address) error {
-
-	acc, err := m.settings.GetAccountByAddress(address)
-	if err != nil {
-		return err
-	}
-
-	err = m.settings.DeleteAccount(address)
-	if err != nil {
-		return err
-	}
-
-	clock, chat := m.getLastClockWithRelatedChat()
-	acc.Clock = clock
-	acc.Removed = true
-
-	accs := []*accounts.Account{acc}
-	err = m.syncWallets(accs, m.dispatchMessage)
-	if err != nil {
-		return err
-	}
-
-	chat.LastClockValue = clock
-	return m.saveChat(chat)
-}
-
-func (m *Messenger) prepareSyncWalletAccountsMessage(accs []*accounts.Account) *protobuf.SyncWalletAccounts {
-	accountMessages := make([]*protobuf.SyncWalletAccount, 0)
-	for _, acc := range accs {
-		if acc.Chat {
-			continue
-		}
-
-		syncMessage := &protobuf.SyncWalletAccount{
-			Clock:                   acc.Clock,
-			Address:                 acc.Address.Bytes(),
-			Wallet:                  acc.Wallet,
-			Chat:                    acc.Chat,
-			Type:                    acc.Type.String(),
-			Storage:                 acc.Storage,
-			Path:                    acc.Path,
-			PublicKey:               acc.PublicKey,
-			Name:                    acc.Name,
-			Color:                   acc.Color,
-			Hidden:                  acc.Hidden,
-			Removed:                 acc.Removed,
-			Emoji:                   acc.Emoji,
-			DerivedFrom:             acc.DerivedFrom,
-			KeyUid:                  acc.KeyUID,
-			KeypairName:             acc.KeypairName,
-			LastUsedDerivationIndex: acc.LastUsedDerivationIndex,
-		}
-
-		accountMessages = append(accountMessages, syncMessage)
-	}
-
-	return &protobuf.SyncWalletAccounts{
-		Accounts: accountMessages,
-	}
-}
-
-// syncWallets syncs all wallets with paired devices
-func (m *Messenger) syncWallets(accs []*accounts.Account, rawMessageHandler RawMessageHandler) error {
-	if !m.hasPairedDevices() {
-		return nil
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, chat := m.getLastClockWithRelatedChat()
-
-	message := m.prepareSyncWalletAccountsMessage(accs)
-
-	encodedMessage, err := proto.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_WALLET_ACCOUNT,
-		ResendAutomatically: true,
-	}
-
-	_, err = rawMessageHandler(ctx, rawMessage)
-	return err
+	return m.syncSocialLinks(context.Background(), rawMessageHandler)
 }
 
 func (m *Messenger) syncContactRequestDecision(ctx context.Context, requestID string, accepted bool, rawMessageHandler RawMessageHandler) error {
@@ -3359,94 +3288,48 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 	}
 
 	importMessagesToSave := messageState.Response.DiscordMessages()
-	importMessagesCount := len(importMessagesToSave)
-	if importMessagesCount > 0 {
-		if importMessagesCount <= maxChunkSizeMessages {
-			m.communitiesManager.LogStdout(fmt.Sprintf("saving %d discord messages", importMessagesCount))
-			m.handleImportMessagesMutex.Lock()
-			err := m.persistence.SaveDiscordMessages(importMessagesToSave)
-			if err != nil {
-				m.communitiesManager.LogStdout("failed to save discord messages", zap.Error(err))
-				m.handleImportMessagesMutex.Unlock()
-				return err
-			}
+	if len(importMessagesToSave) > 0 {
+		m.communitiesManager.LogStdout(fmt.Sprintf("saving %d discord messages", len(importMessagesToSave)))
+		m.handleImportMessagesMutex.Lock()
+		err := m.persistence.SaveDiscordMessages(importMessagesToSave)
+		if err != nil {
+			m.communitiesManager.LogStdout("failed to save discord messages", zap.Error(err))
 			m.handleImportMessagesMutex.Unlock()
-		} else {
-			// We need to process the messages in chunks otherwise we'll
-			// block the database for too long
-			chunks := chunkSlice(importMessagesToSave, maxChunkSizeMessages)
-			chunksCount := len(chunks)
-			for i, msgs := range chunks {
-				m.communitiesManager.LogStdout(fmt.Sprintf("saving %d/%d chunk with %d discord messages", i+1, chunksCount, len(msgs)))
-				// We can't defer Unlock here because we want to
-				// unlock after every iteration to leave room for
-				// other processes to access the database
-				m.handleImportMessagesMutex.Lock()
-				err := m.persistence.SaveDiscordMessages(msgs)
-				if err != nil {
-					m.communitiesManager.LogStdout(fmt.Sprintf("failed to save discord message chunk %d of %d", i+1, chunksCount), zap.Error(err))
-					m.handleImportMessagesMutex.Unlock()
-					return err
-				}
-				m.handleImportMessagesMutex.Unlock()
-				// We slow down the saving of message chunks to keep the database responsive
-				if i < chunksCount-1 {
-					time.Sleep(2 * time.Second)
-				}
-			}
+			return err
 		}
+		m.handleImportMessagesMutex.Unlock()
 	}
 
 	messageAttachmentsToSave := messageState.Response.DiscordMessageAttachments()
 	if len(messageAttachmentsToSave) > 0 {
-		chunks := chunkAttachmentsByByteSize(messageAttachmentsToSave, maxChunkSizeBytes)
-		chunksCount := len(chunks)
-		for i, attachments := range chunks {
-			m.communitiesManager.LogStdout(fmt.Sprintf("saving %d/%d chunk with %d discord message attachments", i+1, chunksCount, len(attachments)))
-			m.handleImportMessagesMutex.Lock()
-			err := m.persistence.SaveDiscordMessageAttachments(attachments)
-			if err != nil {
-				m.communitiesManager.LogStdout(fmt.Sprintf("failed to save discord message attachments chunk %d of %d", i+1, chunksCount), zap.Error(err))
-				m.handleImportMessagesMutex.Unlock()
-				return err
-			}
-			// We slow down the saving of message chunks to keep the database responsive
+		m.communitiesManager.LogStdout(fmt.Sprintf("saving %d discord message attachments", len(messageAttachmentsToSave)))
+		m.handleImportMessagesMutex.Lock()
+		err := m.persistence.SaveDiscordMessageAttachments(messageAttachmentsToSave)
+		if err != nil {
+			m.communitiesManager.LogStdout("failed to save discord message attachments", zap.Error(err))
 			m.handleImportMessagesMutex.Unlock()
-			if i < chunksCount-1 {
-				time.Sleep(2 * time.Second)
-			}
+			return err
 		}
+		m.handleImportMessagesMutex.Unlock()
 	}
 
 	messagesToSave := messageState.Response.Messages()
-	messagesCount := len(messagesToSave)
-	if messagesCount > 0 {
-		if messagesCount <= maxChunkSizeMessages {
-			m.communitiesManager.LogStdout(fmt.Sprintf("saving %d app messages", messagesCount))
-			m.handleMessagesMutex.Lock()
-			err := m.SaveMessages(messagesToSave)
-			if err != nil {
-				m.handleMessagesMutex.Unlock()
-				return err
-			}
+	if len(messagesToSave) > 0 {
+		m.communitiesManager.LogStdout(fmt.Sprintf("saving %d app messages", len(messagesToSave)))
+		m.handleMessagesMutex.Lock()
+		err := m.SaveMessages(messagesToSave)
+		if err != nil {
 			m.handleMessagesMutex.Unlock()
-		} else {
-			chunks := chunkSlice(messagesToSave, maxChunkSizeMessages)
-			chunksCount := len(chunks)
-			for i, msgs := range chunks {
-				m.communitiesManager.LogStdout(fmt.Sprintf("saving %d/%d chunk with %d app messages", i+1, chunksCount, len(msgs)))
-				m.handleMessagesMutex.Lock()
-				err := m.SaveMessages(msgs)
-				if err != nil {
-					m.handleMessagesMutex.Unlock()
-					return err
-				}
-				m.handleMessagesMutex.Unlock()
-				// We slow down the saving of message chunks to keep the database responsive
-				if i < chunksCount-1 {
-					time.Sleep(2 * time.Second)
-				}
-			}
+			return err
+		}
+		m.handleMessagesMutex.Unlock()
+	}
+
+	// Save chats if they were modified
+	if len(messageState.Response.chats) > 0 {
+		err := m.saveChats(messageState.Response.Chats())
+		if err != nil {
+			return err
 		}
 	}
 	return nil
@@ -4293,18 +4176,48 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 						messageState.Response.AnonymousMetrics = append(messageState.Response.AnonymousMetrics, ams...)
 
-					case protobuf.SyncWalletAccounts:
+					case protobuf.SyncKeypair:
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
 							continue
 						}
 
-						p := msg.ParsedMessage.Interface().(protobuf.SyncWalletAccounts)
+						p := msg.ParsedMessage.Interface().(protobuf.SyncKeypair)
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						logger.Debug("Handling SyncWalletAccount", zap.Any("message", p))
-						err = m.HandleSyncWalletAccount(messageState, p)
+						logger.Debug("Handling SyncKeypair", zap.Any("message", p))
+						err = m.HandleSyncKeypair(messageState, p)
 						if err != nil {
-							logger.Warn("failed to handle SyncWalletAccount", zap.Error(err))
+							logger.Warn("failed to handle SyncKeypair", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+					case protobuf.SyncKeypairFull:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						p := msg.ParsedMessage.Interface().(protobuf.SyncKeypairFull)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
+						logger.Debug("Handling SyncKeypairFull", zap.Any("message", p))
+						err = m.HandleSyncKeypairFull(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle SyncKeypairFull", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+					case protobuf.SyncAccount:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						p := msg.ParsedMessage.Interface().(protobuf.SyncAccount)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
+						logger.Debug("Handling SyncAccount", zap.Any("message", p))
+						err = m.HandleSyncWalletAccount(messageState, p, "")
+						if err != nil {
+							logger.Warn("failed to handle SyncAccount", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}
@@ -4330,20 +4243,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							allMessagesProcessed = false
 							continue
 						}
-					case protobuf.SyncAllKeycards:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						p := msg.ParsedMessage.Interface().(protobuf.SyncAllKeycards)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						err = m.handleSyncKeycards(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle SyncAllKeycards", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
 					case protobuf.SyncKeycardAction:
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
@@ -4358,17 +4257,17 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							allMessagesProcessed = false
 							continue
 						}
-					case protobuf.SyncSocialLinkSetting:
+					case protobuf.SyncSocialLinks:
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
 							continue
 						}
 
-						p := msg.ParsedMessage.Interface().(protobuf.SyncSocialLinkSetting)
+						p := msg.ParsedMessage.Interface().(protobuf.SyncSocialLinks)
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						err = m.HandleSyncSocialLinkSetting(messageState, p)
+						err = m.HandleSyncSocialLinks(messageState, p)
 						if err != nil {
-							logger.Warn("failed to handle SyncSocialLinkSetting", zap.Error(err))
+							logger.Warn("failed to handle HandleSyncSocialLinks", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}
@@ -4412,7 +4311,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			// Process any community changes
 			for _, changes := range messageState.Response.CommunityChanges {
 				if changes.ShouldMemberJoin {
-					response, err := m.joinCommunity(context.TODO(), changes.Community.ID())
+					response, err := m.joinCommunity(context.TODO(), changes.Community.ID(), false)
 					if err != nil {
 						logger.Error("cannot join community", zap.Error(err))
 						continue
@@ -4534,28 +4433,10 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 	}
 
 	messagesToSave := messageState.Response.Messages()
-	messagesCount := len(messagesToSave)
-	if messagesCount > 0 {
-		if messagesCount <= maxChunkSizeMessages {
-			err = m.SaveMessages(messagesToSave)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			messageChunks := chunkSlice(messagesToSave, maxChunkSizeMessages)
-			chunksCount := len(messageChunks)
-			for i, msgs := range messageChunks {
-				err := m.SaveMessages(msgs)
-				if err != nil {
-					return nil, err
-				}
-				// We slow down the saving of message chunks to keep the database responsive
-				// this is important when messages from history archives are handled,
-				// which could result in handling several thousand messages per archive
-				if i < chunksCount-1 {
-					time.Sleep(2 * time.Second)
-				}
-			}
+	if len(messagesToSave) > 0 {
+		err = m.SaveMessages(messagesToSave)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -4790,6 +4671,8 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 	if msg.ContentType == protobuf.ChatMessage_STICKER {
 		msg.StickerLocalURL = s.MakeStickerURL(msg.GetSticker().Hash)
 	}
+
+	msg.LinkPreviews = msg.ConvertFromProtoToLinkPreviews(s.MakeLinkPreviewThumbnailURL)
 }
 
 func (m *Messenger) AllMessageByChatIDWhichMatchTerm(chatID string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
@@ -4990,7 +4873,7 @@ func (m *Messenger) MuteChat(request *requests.MuteChat) (time.Time, error) {
 		return time.Time{}, err
 	}
 
-	muteTillTimeRemoveMs, err := time.Parse("2006-01-02T15:04:05Z", MuteTill.Format("2006-01-02T15:04:05Z"))
+	muteTillTimeRemoveMs, err := time.Parse(time.RFC3339, MuteTill.Format(time.RFC3339))
 
 	if err != nil {
 		return time.Time{}, err
@@ -5990,6 +5873,10 @@ func generateAliasAndIdenticon(pk string) (string, string, error) {
 
 }
 
+func (m *Messenger) UnfurlURLs(urls []string) ([]common.LinkPreview, error) {
+	return linkpreview.UnfurlURLs(m.logger, linkpreview.NewDefaultHTTPClient(), urls)
+}
+
 func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID protobuf.EmojiReaction_Type) (*MessengerResponse, error) {
 	var response MessengerResponse
 
@@ -6342,45 +6229,6 @@ func (m *Messenger) handleSyncVerificationRequest(state *ReceivedMessageState, m
 	return nil
 }
 
-func chunkSlice[T comparable](slice []T, chunkSize int) [][]T {
-	var chunks [][]T
-	for i := 0; i < len(slice); i += chunkSize {
-		end := i + chunkSize
-
-		// necessary check to avoid slicing beyond
-		// slice capacity
-		if end > len(slice) {
-			end = len(slice)
-		}
-
-		chunks = append(chunks, slice[i:end])
-	}
-
-	return chunks
-}
-
-func chunkAttachmentsByByteSize(slice []*protobuf.DiscordMessageAttachment, maxFileSizeBytes uint64) [][]*protobuf.DiscordMessageAttachment {
-	var chunks [][]*protobuf.DiscordMessageAttachment
-
-	currentChunkSize := uint64(0)
-	currentChunk := make([]*protobuf.DiscordMessageAttachment, 0)
-
-	for i, attachment := range slice {
-		payloadBytes := attachment.GetFileSizeBytes()
-		if currentChunkSize+payloadBytes > maxFileSizeBytes && len(currentChunk) > 0 {
-			chunks = append(chunks, currentChunk)
-			currentChunk = make([]*protobuf.DiscordMessageAttachment, 0)
-			currentChunkSize = uint64(0)
-		}
-		currentChunk = append(currentChunk, attachment)
-		currentChunkSize = currentChunkSize + payloadBytes
-		if i == len(slice)-1 {
-			chunks = append(chunks, currentChunk)
-		}
-	}
-	return chunks
-}
-
 func (m *Messenger) ImageServerURL() string {
 	return m.httpServer.MakeImageServerURL()
 }
@@ -6447,62 +6295,78 @@ func (m *Messenger) syncDeleteForMeMessage(ctx context.Context, rawMessageDispat
 	})
 }
 
-func (m *Messenger) syncSocialSettings(ctx context.Context, rawMessageDispatcher RawMessageHandler) error {
+func (m *Messenger) syncSocialLinks(ctx context.Context, rawMessageDispatcher RawMessageHandler) error {
 	if !m.hasPairedDevices() {
 		return nil
 	}
 
-	socialLinks, err := m.settings.GetSocialLinks()
+	dbSocialLinks, err := m.settings.GetSocialLinks()
 	if err != nil {
 		return err
 	}
-	for _, link := range socialLinks {
-		syncMessage := &protobuf.SyncSocialLinkSetting{
-			Text:  link.Text,
-			Url:   link.URL,
-			Clock: link.Clock,
-		}
-		encodedMessage, err2 := proto.Marshal(syncMessage)
-		if err2 != nil {
-			return err
-		}
-		err = m.withChatClock(func(chatID string, clock uint64) error {
-			rawMessage := common.RawMessage{
-				LocalChatID:         chatID,
-				Payload:             encodedMessage,
-				MessageType:         protobuf.ApplicationMetadataMessage_SYNC_SOCIAL_LINK_SETTING,
-				ResendAutomatically: true,
-			}
-			_, err = rawMessageDispatcher(ctx, rawMessage)
-			return err
-		})
-		if err != nil {
-			return err
-		}
+
+	dbClock, err := m.settings.GetSocialLinksClock()
+	if err != nil {
+		return err
 	}
-	return nil
+
+	_, chat := m.getLastClockWithRelatedChat()
+	encodedMessage, err := proto.Marshal(dbSocialLinks.ToSyncProtobuf(dbClock))
+	if err != nil {
+		return err
+	}
+
+	rawMessage := common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_SOCIAL_LINKS,
+		ResendAutomatically: true,
+	}
+
+	_, err = rawMessageDispatcher(ctx, rawMessage)
+	return err
 }
 
-func (m *Messenger) HandleSyncSocialLinkSetting(state *ReceivedMessageState, message protobuf.SyncSocialLinkSetting) error {
-	return m.handleSyncSocialLinkSetting(message, func(link *identity.SocialLink) {
-		state.Response.AddSocialLinkSetting(link)
+func (m *Messenger) HandleSyncSocialLinks(state *ReceivedMessageState, message protobuf.SyncSocialLinks) error {
+	return m.handleSyncSocialLinks(&message, func(links identity.SocialLinks) {
+		state.Response.SocialLinksInfo = &identity.SocialLinksInfo{
+			Links:   links,
+			Removed: len(links) == 0,
+		}
 	})
 }
 
-func (m *Messenger) handleSyncSocialLinkSetting(message protobuf.SyncSocialLinkSetting, callback func(*identity.SocialLink)) error {
-	link := &identity.SocialLink{
-		Text:  message.Text,
-		URL:   message.Url,
-		Clock: message.Clock,
+func (m *Messenger) handleSyncSocialLinks(message *protobuf.SyncSocialLinks, callback func(identity.SocialLinks)) error {
+	if message == nil {
+		return nil
 	}
-	if err := ValidateSocialLink(link); err != nil {
-		return err
+	var (
+		links identity.SocialLinks
+		err   error
+	)
+	for _, sl := range message.SocialLinks {
+		link := &identity.SocialLink{
+			Text: sl.Text,
+			URL:  sl.Url,
+		}
+		err = ValidateSocialLink(link)
+		if err != nil {
+			return err
+		}
+
+		links = append(links, link)
 	}
-	err := m.settings.UpdateSocialLinkFromSync(link)
+
+	err = m.settings.AddOrReplaceSocialLinksIfNewer(links, message.Clock)
 	if err != nil {
+		if err == sociallinkssettings.ErrOlderSocialLinksProvided {
+			return nil
+		}
 		return err
 	}
-	callback(link)
+
+	callback(links)
+
 	return nil
 }
 

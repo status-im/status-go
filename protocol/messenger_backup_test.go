@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -145,7 +146,15 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 
 	// Create bob1
 	bob1 := s.m
-	err := bob1.SetDisplayName(bob1DisplayName)
+
+	bobProfileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	bobProfileKp.KeyUID = bob1.account.KeyUID
+	bobProfileKp.Accounts[0].KeyUID = bob1.account.KeyUID
+
+	err := bob1.settings.SaveOrUpdateKeypair(bobProfileKp)
+	s.Require().NoError(err)
+
+	err = bob1.SetDisplayName(bob1DisplayName)
 	s.Require().NoError(err)
 	bob1KeyUID := bob1.account.KeyUID
 	imagesExpected := fmt.Sprintf(`[{"keyUid":"%s","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240,"clock":0},{"keyUid":"%s","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80,"clock":0}]`,
@@ -154,13 +163,22 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	iis := images.SampleIdentityImages()
 	s.Require().NoError(bob1.multiAccounts.StoreIdentityImages(bob1KeyUID, iis, false))
 
-	err = bob1.SetSocialLinks(&identity.SocialLinks{
+	profileSocialLinks := identity.SocialLinks{
 		{
-			Text:  identity.GithubID,
-			URL:   "https://github.com/status-im",
-			Clock: 1,
+			Text: identity.TwitterID,
+			URL:  "https://twitter.com/ethstatus",
 		},
-	})
+		{
+			Text: identity.TwitterID,
+			URL:  "https://twitter.com/StatusIMBlog",
+		},
+		{
+			Text: identity.GithubID,
+			URL:  "https://github.com/status-im",
+		},
+	}
+	profileSocialLinksClock := uint64(1)
+	err = bob1.settings.AddOrReplaceSocialLinksIfNewer(profileSocialLinks, profileSocialLinksClock)
 	s.Require().NoError(err)
 
 	bob1EnsUsernameDetail, err := bob1.saveEnsUsernameDetailProto(protobuf.SyncEnsUsernameDetail{
@@ -188,9 +206,13 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	s.Require().NoError(err)
 	s.Require().Equal(imagesExpected, string(jBob1Images))
 
-	bob1SocialLink, err := bob1.settings.GetSocialLink(identity.GithubID)
+	bob1SocialLinks, err := bob1.settings.GetSocialLinks()
 	s.Require().NoError(err)
-	s.Require().NotNil(bob1SocialLink)
+	s.Require().Len(bob1SocialLinks, len(profileSocialLinks))
+
+	bob1SocialLinksClock, err := bob1.settings.GetSocialLinksClock()
+	s.Require().NoError(err)
+	s.Require().Equal(profileSocialLinksClock, bob1SocialLinksClock)
 
 	bob1EnsUsernameDetails, err := bob1.getEnsUsernameDetails()
 	s.Require().NoError(err)
@@ -199,16 +221,20 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	// Check bob2
 	storedBob2DisplayName, err := bob2.settings.DisplayName()
 	s.Require().NoError(err)
-	s.Require().Equal("", storedBob2DisplayName)
+	s.Require().Equal(DefaultProfileDisplayName, storedBob2DisplayName)
 
 	var expectedEmpty []*images.IdentityImage
 	bob2Images, err := bob2.multiAccounts.GetIdentityImages(bob1KeyUID)
 	s.Require().NoError(err)
 	s.Require().Equal(expectedEmpty, bob2Images)
 
-	bob2SocialLink, err := bob2.settings.GetSocialLink(identity.GithubID)
+	bob2SocialLinks, err := bob2.settings.GetSocialLinks()
 	s.Require().NoError(err)
-	s.Require().Equal("", bob2SocialLink.URL)
+	s.Require().Len(bob2SocialLinks, 0)
+
+	bob2SocialLinksClock, err := bob2.settings.GetSocialLinksClock()
+	s.Require().NoError(err)
+	s.Require().Equal(uint64(0), bob2SocialLinksClock)
 
 	bob2EnsUsernameDetails, err := bob2.getEnsUsernameDetails()
 	s.Require().NoError(err)
@@ -239,10 +265,14 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	s.Require().Equal(bob2Images[0].Payload, bob1Images[0].Payload)
 	s.Require().Equal(bob2Images[1].Payload, bob1Images[1].Payload)
 
-	bob2SocialLink, err = bob2.settings.GetSocialLink(identity.GithubID)
+	bob2SocialLinks, err = bob2.settings.GetSocialLinks()
 	s.Require().NoError(err)
-	s.Require().NotNil(bob2SocialLink)
-	s.Require().Equal(bob1SocialLink.URL, bob2SocialLink.URL)
+	s.Require().Len(bob2SocialLinks, len(profileSocialLinks))
+	s.Require().True(profileSocialLinks.Equal(bob2SocialLinks))
+
+	bob2SocialLinksClock, err = bob2.settings.GetSocialLinksClock()
+	s.Require().NoError(err)
+	s.Require().Equal(profileSocialLinksClock, bob2SocialLinksClock)
 
 	bob2EnsUsernameDetails, err = bob2.getEnsUsernameDetails()
 	s.Require().NoError(err)
@@ -671,14 +701,25 @@ func (s *MessengerBackupSuite) TestBackupCommunities() {
 	s.Require().Equal(clock, lastBackup)
 }
 
-func (s *MessengerBackupSuite) TestBackupWalletAccounts() {
+func (s *MessengerBackupSuite) TestBackupKeypairs() {
 	// Create bob1
 	bob1 := s.m
-	walletAccounts := getWalletAccountsForTest()
-	s.NoError(bob1.settings.SaveAccounts(walletAccounts))
-	bob1Accs, err := bob1.settings.GetAccounts()
-	s.Require().NoError(err, "bob1.settings.GetAccounts")
-	s.Len(bob1Accs, len(walletAccounts), "must have all wallet accounts")
+	profileKp := accounts.GetProfileKeypairForTest(true, true, true)
+	seedKp := accounts.GetSeedImportedKeypair1ForTest()
+
+	// Create a main account on bob1
+	err := bob1.settings.SaveOrUpdateKeypair(profileKp)
+	s.Require().NoError(err, "profile keypair bob1")
+	err = bob1.settings.SaveOrUpdateKeypair(seedKp)
+	s.Require().NoError(err, "seed keypair bob1")
+
+	// Check account is present in the db for bob1
+	dbProfileKp1, err := bob1.settings.GetKeypairByKeyUID(profileKp.KeyUID)
+	s.Require().NoError(err)
+	s.Require().True(accounts.SameKeypairs(profileKp, dbProfileKp1))
+	dbSeedKp1, err := bob1.settings.GetKeypairByKeyUID(seedKp.KeyUID)
+	s.Require().NoError(err)
+	s.Require().True(accounts.SameKeypairs(seedKp, dbSeedKp1))
 
 	// Create bob2
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
@@ -700,43 +741,69 @@ func (s *MessengerBackupSuite) TestBackupWalletAccounts() {
 	)
 	s.Require().NoError(err)
 
-	bob2Accs, err := bob2.settings.GetAccounts()
-	s.Require().NoError(err, "bob2.settings.GetAccounts")
-	s.Len(bob2Accs, len(walletAccounts), "must have all wallet accounts")
+	// Check account is present in the db for bob2
+	dbProfileKp2, err := bob2.settings.GetKeypairByKeyUID(profileKp.KeyUID)
+	s.Require().NoError(err)
+	s.Require().Equal(profileKp.Name, dbProfileKp2.Name)
+	s.Require().Equal(accounts.SyncedFromBackup, dbProfileKp2.SyncedFrom)
 
-	for _, syncedAcc := range bob2Accs {
-		if syncedAcc.Chat {
+	for _, acc := range profileKp.Accounts {
+		if acc.Chat {
 			continue
 		}
-		found := false
-		for _, sentAcc := range walletAccounts {
-			if syncedAcc.Address == sentAcc.Address {
-				// Check account values match the expected values
-				s.Require().Equal(sentAcc.Address, syncedAcc.Address)
-				s.Require().Equal(sentAcc.Path, syncedAcc.Path)
-				s.Require().Equal(sentAcc.KeyUID, syncedAcc.KeyUID)
-				s.Require().Equal(sentAcc.Name, syncedAcc.Name)
-				s.Require().Equal(sentAcc.Color, syncedAcc.Color)
-				s.Require().Equal(sentAcc.Type, syncedAcc.Type)
-				s.Require().Equal(sentAcc.KeypairName, syncedAcc.KeypairName)
-				s.Require().Equal(sentAcc.DerivedFrom, syncedAcc.DerivedFrom)
-				found = true
-			}
-		}
-		s.Require().True(found)
+		s.Require().True(contains(dbProfileKp2.Accounts, acc, accounts.SameAccounts))
 	}
+
+	dbSeedKp2, err := bob2.settings.GetKeypairByKeyUID(seedKp.KeyUID)
+	s.Require().NoError(err)
+	s.Require().True(accounts.SameKeypairsWithDifferentSyncedFrom(seedKp, dbSeedKp2, false, accounts.SyncedFromBackup, accounts.AccountNonOperable))
 }
 
 func (s *MessengerBackupSuite) TestBackupKeycards() {
 	// Create bob1
 	bob1 := s.m
-	allKeycardsToSync := getKeycardsForTest()
-	for _, kp := range allKeycardsToSync {
-		addedKc, addedAccs, err := bob1.settings.AddKeycardOrAddAccountsIfKeycardIsAdded(*kp)
-		s.Require().NoError(err)
-		s.Require().Equal(true, addedKc)
-		s.Require().Equal(false, addedAccs)
-	}
+
+	kp1 := accounts.GetProfileKeypairForTest(true, true, true)
+	keycard1 := accounts.GetProfileKeycardForTest()
+
+	kp2 := accounts.GetSeedImportedKeypair1ForTest()
+	keycard2 := accounts.GetKeycardForSeedImportedKeypair1ForTest()
+
+	keycard2Copy := accounts.GetKeycardForSeedImportedKeypair1ForTest()
+	keycard2Copy.KeycardUID = keycard2Copy.KeycardUID + "C"
+	keycard2Copy.KeycardName = keycard2Copy.KeycardName + "Copy"
+	keycard2Copy.LastUpdateClock = keycard2Copy.LastUpdateClock + 1
+
+	kp3 := accounts.GetSeedImportedKeypair2ForTest()
+	keycard3 := accounts.GetKeycardForSeedImportedKeypair2ForTest()
+
+	// Pre-condition
+	err := bob1.settings.SaveOrUpdateKeypair(kp1)
+	s.Require().NoError(err)
+	err = bob1.settings.SaveOrUpdateKeypair(kp2)
+	s.Require().NoError(err)
+	err = bob1.settings.SaveOrUpdateKeypair(kp3)
+	s.Require().NoError(err)
+	dbKeypairs, err := bob1.settings.GetKeypairs()
+	s.Require().NoError(err)
+	s.Require().Equal(3, len(dbKeypairs))
+
+	addedKc, addedAccs, err := bob1.settings.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
+	s.Require().NoError(err)
+	s.Require().Equal(true, addedKc)
+	s.Require().Equal(false, addedAccs)
+	addedKc, addedAccs, err = bob1.settings.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard2)
+	s.Require().NoError(err)
+	s.Require().Equal(true, addedKc)
+	s.Require().Equal(false, addedAccs)
+	addedKc, addedAccs, err = bob1.settings.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard2Copy)
+	s.Require().NoError(err)
+	s.Require().Equal(true, addedKc)
+	s.Require().Equal(false, addedAccs)
+	addedKc, addedAccs, err = bob1.settings.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard3)
+	s.Require().NoError(err)
+	s.Require().Equal(true, addedKc)
+	s.Require().Equal(false, addedAccs)
 
 	// Create bob2
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
@@ -760,6 +827,47 @@ func (s *MessengerBackupSuite) TestBackupKeycards() {
 
 	syncedKeycards, err := bob2.settings.GetAllKnownKeycards()
 	s.Require().NoError(err)
-	s.Require().Equal(len(allKeycardsToSync), len(syncedKeycards))
-	s.Require().True(haveSameElements(syncedKeycards, allKeycardsToSync, sameKeycards))
+	s.Require().Equal(4, len(syncedKeycards))
+	s.Require().True(contains(syncedKeycards, keycard1, accounts.SameKeycards))
+	s.Require().True(contains(syncedKeycards, keycard2, accounts.SameKeycards))
+	s.Require().True(contains(syncedKeycards, keycard2Copy, accounts.SameKeycards))
+	s.Require().True(contains(syncedKeycards, keycard3, accounts.SameKeycards))
+}
+
+func (s *MessengerBackupSuite) TestBackupWatchOnlyAccounts() {
+	// Create bob1
+	bob1 := s.m
+
+	woAccounts := accounts.GetWatchOnlyAccountsForTest()
+	err := bob1.settings.SaveOrUpdateAccounts(woAccounts)
+	s.Require().NoError(err)
+	dbWoAccounts1, err := bob1.settings.GetWatchOnlyAccounts()
+	s.Require().NoError(err)
+	s.Require().Equal(len(woAccounts), len(dbWoAccounts1))
+	s.Require().True(haveSameElements(woAccounts, dbWoAccounts1, accounts.SameAccounts))
+
+	// Create bob2
+	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
+	s.Require().NoError(err)
+	_, err = bob2.Start()
+	s.Require().NoError(err)
+
+	// Backup
+	_, err = bob1.BackupData(context.Background())
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		bob2,
+		func(r *MessengerResponse) bool {
+			return r.BackupHandled
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	dbWoAccounts2, err := bob2.settings.GetWatchOnlyAccounts()
+	s.Require().NoError(err)
+	s.Require().Equal(len(woAccounts), len(dbWoAccounts2))
+	s.Require().True(haveSameElements(woAccounts, dbWoAccounts2, accounts.SameAccounts))
 }

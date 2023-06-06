@@ -20,14 +20,14 @@ type MediaServer struct {
 
 // NewMediaServer returns a *MediaServer
 func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *multiaccounts.Database) (*MediaServer, error) {
-	err := generateTLSCert()
+	err := generateMediaTLSCert()
 	if err != nil {
 		return nil, err
 	}
 
 	s := &MediaServer{
 		Server: NewServer(
-			globalCertificate,
+			globalMediaCertificate,
 			Localhost,
 			signal.SendMediaServerStarted,
 			logutils.ZapLogger().Named("MediaServer"),
@@ -37,15 +37,16 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 		multiaccountsDB: multiaccountsDB,
 	}
 	s.SetHandlers(HandlerPatternMap{
-		imagesPath:             handleImage(s.db, s.logger),
-		audioPath:              handleAudio(s.db, s.logger),
-		identiconsPath:         handleIdenticon(s.logger),
-		ipfsPath:               handleIPFS(s.downloader, s.logger),
-		accountImagesPath:      handleAccountImages(s.multiaccountsDB, s.logger),
-		contactImagesPath:      handleContactImages(s.db, s.logger),
-		discordAuthorsPath:     handleDiscordAuthorAvatar(s.db, s.logger),
-		discordAttachmentsPath: handleDiscordAttachment(s.db, s.logger),
-		generateQRCode:         handleQRCodeGeneration(s.multiaccountsDB, s.logger),
+		accountImagesPath:        handleAccountImages(s.multiaccountsDB, s.logger),
+		audioPath:                handleAudio(s.db, s.logger),
+		contactImagesPath:        handleContactImages(s.db, s.logger),
+		discordAttachmentsPath:   handleDiscordAttachment(s.db, s.logger),
+		discordAuthorsPath:       handleDiscordAuthorAvatar(s.db, s.logger),
+		generateQRCode:           handleQRCodeGeneration(s.multiaccountsDB, s.logger),
+		identiconsPath:           handleIdenticon(s.logger),
+		imagesPath:               handleImage(s.db, s.logger),
+		ipfsPath:                 handleIPFS(s.downloader, s.logger),
+		LinkPreviewThumbnailPath: handleLinkPreviewThumbnail(s.db, s.logger),
 	})
 
 	return s, nil
@@ -70,6 +71,13 @@ func (s *MediaServer) MakeImageURL(id string) string {
 	u.Path = imagesPath
 	u.RawQuery = url.Values{"messageId": {id}}.Encode()
 
+	return u.String()
+}
+
+func (s *MediaServer) MakeLinkPreviewThumbnailURL(msgID string, previewURL string) string {
+	u := s.MakeBaseURL()
+	u.Path = LinkPreviewThumbnailPath
+	u.RawQuery = url.Values{"message-id": {msgID}, "url": {previewURL}}.Encode()
 	return u.String()
 }
 

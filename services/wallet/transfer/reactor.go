@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
@@ -20,6 +21,7 @@ const (
 	ReactorNotStarted string = "reactor not started"
 
 	NonArchivalNodeBlockChunkSize = 100
+	DefaultNodeBlockChunkSize     = 100000
 )
 
 var errAlreadyRunning = errors.New("already running")
@@ -42,6 +44,7 @@ type BalanceReader interface {
 	BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error)
 	NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error)
 	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
+	FullTransactionByBlockNumberAndIndex(ctx context.Context, blockNumber *big.Int, index uint) (*chain.FullTransaction, error)
 }
 
 type HistoryFetcher interface {
@@ -61,6 +64,7 @@ type OnDemandFetchStrategy struct {
 	group              *async.Group
 	balanceCache       *balanceCache
 	transactionManager *TransactionManager
+	tokenManager       *token.Manager
 	chainClients       map[uint64]*chain.ClientWithFallback
 	accounts           []common.Address
 }
@@ -82,6 +86,7 @@ func (s *OnDemandFetchStrategy) newControlCommand(chainClient *chain.ClientWithF
 		feed:               s.feed,
 		errorsCount:        0,
 		transactionManager: s.transactionManager,
+		tokenManager:       s.tokenManager,
 	}
 
 	return ctl
@@ -133,10 +138,6 @@ func (s *OnDemandFetchStrategy) getTransfersByAddress(ctx context.Context, chain
 	}
 
 	transfersCount := int64(len(rst))
-	chainClient, err := getChainClientByID(s.chainClients, chainID)
-	if err != nil {
-		return nil, err
-	}
 
 	if fetchMore && limit > transfersCount {
 
@@ -149,6 +150,11 @@ func (s *OnDemandFetchStrategy) getTransfersByAddress(ctx context.Context, chain
 		if block == nil || big.NewInt(0).Cmp(block) == 0 {
 			log.Info("[WalletAPI:: GetTransfersByAddress] ZERO block is found for", "address", address, "chaindID", chainID)
 			return rst, nil
+		}
+
+		chainClient, err := getChainClientByID(s.chainClients, chainID)
+		if err != nil {
+			return nil, err
 		}
 
 		from, err := findFirstRange(ctx, address, block, chainClient)
@@ -191,7 +197,7 @@ func (s *OnDemandFetchStrategy) getTransfersByAddress(ctx context.Context, chain
 			return nil, err
 		}
 
-		blocks, err := s.blockDAO.GetBlocksByAddress(chainID, address, numberOfBlocksCheckedPerIteration)
+		blocks, err := s.blockDAO.GetBlocksToLoadByAddress(chainID, address, numberOfBlocksCheckedPerIteration)
 		if err != nil {
 			return nil, err
 		}
@@ -204,6 +210,8 @@ func (s *OnDemandFetchStrategy) getTransfersByAddress(ctx context.Context, chain
 				blockDAO:           s.blockDAO,
 				chainClient:        chainClient,
 				transactionManager: s.transactionManager,
+				blocksLimit:        numberOfBlocksCheckedPerIteration,
+				tokenManager:       s.tokenManager,
 			}
 
 			err = txCommand.Command()(ctx)
@@ -227,15 +235,17 @@ type Reactor struct {
 	blockDAO           *BlockDAO
 	feed               *event.Feed
 	transactionManager *TransactionManager
+	tokenManager       *token.Manager
 	strategy           HistoryFetcher
 }
 
-func NewReactor(db *Database, blockDAO *BlockDAO, feed *event.Feed, tm *TransactionManager) *Reactor {
+func NewReactor(db *Database, blockDAO *BlockDAO, feed *event.Feed, tm *TransactionManager, tokenManager *token.Manager) *Reactor {
 	return &Reactor{
 		db:                 db,
 		blockDAO:           blockDAO,
 		feed:               feed,
 		transactionManager: tm,
+		tokenManager:       tokenManager,
 	}
 }
 
@@ -265,14 +275,15 @@ func (r *Reactor) createFetchStrategy(chainClients map[uint64]*chain.ClientWithF
 	accounts []common.Address, fetchType FetchStrategyType) HistoryFetcher {
 
 	if fetchType == SequentialFetchStrategyType {
-		return &SequentialFetchStrategy{
-			db:                 r.db,
-			feed:               r.feed,
-			blockDAO:           r.blockDAO,
-			transactionManager: r.transactionManager,
-			chainClients:       chainClients,
-			accounts:           accounts,
-		}
+		return NewSequentialFetchStrategy(
+			r.db,
+			r.blockDAO,
+			r.feed,
+			r.transactionManager,
+			r.tokenManager,
+			chainClients,
+			accounts,
+		)
 	}
 
 	return &OnDemandFetchStrategy{
@@ -280,6 +291,7 @@ func (r *Reactor) createFetchStrategy(chainClients map[uint64]*chain.ClientWithF
 		feed:               r.feed,
 		blockDAO:           r.blockDAO,
 		transactionManager: r.transactionManager,
+		tokenManager:       r.tokenManager,
 		chainClients:       chainClients,
 		accounts:           accounts,
 	}

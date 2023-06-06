@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/migrations"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/sqlite"
@@ -14,41 +15,18 @@ import (
 
 type ColorHash [][2]int
 
-type CustomizationColor string
-
-const (
-	CustomizationColorPrimary   CustomizationColor = "primary"
-	CustomizationColorPurple    CustomizationColor = "purple"
-	CustomizationColorIndigo    CustomizationColor = "indigo"
-	CustomizationColorTurquoise CustomizationColor = "turquoise"
-	CustomizationColorBlue      CustomizationColor = "blue"
-	CustomizationColorGreen     CustomizationColor = "green"
-	CustomizationColorYellow    CustomizationColor = "yellow"
-	CustomizationColorOrange    CustomizationColor = "orange"
-	CustomizationColorRed       CustomizationColor = "red"
-	CustomizationColorPink      CustomizationColor = "pink"
-	CustomizationColorBrown     CustomizationColor = "brown"
-	CustomizationColorSky       CustomizationColor = "sky"
-	CustomizationColorArmy      CustomizationColor = "army"
-	CustomizationColorMagenta   CustomizationColor = "magenta"
-	CustomizationColorCopper    CustomizationColor = "copper"
-	CustomizationColorCamel     CustomizationColor = "camel"
-	CustomizationColorYinYang   CustomizationColor = "yinyang"
-	CustomizationColorBeige     CustomizationColor = "beige"
-)
-
 // Account stores public information about account.
 type Account struct {
-	Name               string                 `json:"name"`
-	Timestamp          int64                  `json:"timestamp"`
-	Identicon          string                 `json:"identicon"`
-	ColorHash          ColorHash              `json:"colorHash"`
-	ColorID            int64                  `json:"colorId"`
-	CustomizationColor CustomizationColor     `json:"customizationColor,omitempty"`
-	KeycardPairing     string                 `json:"keycard-pairing"`
-	KeyUID             string                 `json:"key-uid"`
-	Images             []images.IdentityImage `json:"images"`
-	KDFIterations      int                    `json:"kdfIterations,omitempty"`
+	Name               string                    `json:"name"`
+	Timestamp          int64                     `json:"timestamp"`
+	Identicon          string                    `json:"identicon"`
+	ColorHash          ColorHash                 `json:"colorHash"`
+	ColorID            int64                     `json:"colorId"`
+	CustomizationColor common.CustomizationColor `json:"customizationColor,omitempty"`
+	KeycardPairing     string                    `json:"keycard-pairing"`
+	KeyUID             string                    `json:"key-uid"`
+	Images             []images.IdentityImage    `json:"images"`
+	KDFIterations      int                       `json:"kdfIterations,omitempty"`
 }
 
 func (a *Account) ToProtobuf() *protobuf.MultiAccount {
@@ -104,7 +82,7 @@ func (a *Account) FromProtobuf(ma *protobuf.MultiAccount) {
 	a.ColorHash = colorHash
 	a.ColorID = ma.ColorId
 	a.KeycardPairing = ma.KeycardPairing
-	a.CustomizationColor = CustomizationColor(ma.CustomizationColor)
+	a.CustomizationColor = common.CustomizationColor(ma.CustomizationColor)
 	a.KeyUID = ma.KeyUid
 	a.Images = identityImages
 }
@@ -362,7 +340,6 @@ func (db *Database) DeleteAccount(keyUID string) error {
 }
 
 // Account images
-
 func (db *Database) GetIdentityImages(keyUID string) (iis []*images.IdentityImage, err error) {
 	rows, err := db.db.Query(`SELECT key_uid, name, image_payload, width, height, file_size, resize_target, clock FROM identity_images WHERE key_uid = ?`, keyUID)
 	if err != nil {

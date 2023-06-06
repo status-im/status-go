@@ -2,7 +2,6 @@ package rcmgr
 
 import (
 	"bytes"
-	"encoding/json"
 	"sort"
 	"strings"
 
@@ -34,23 +33,6 @@ type ResourceManagerStat struct {
 	Services  map[string]network.ScopeStat
 	Protocols map[protocol.ID]network.ScopeStat
 	Peers     map[peer.ID]network.ScopeStat
-}
-
-func (s ResourceManagerStat) MarshalJSON() ([]byte, error) {
-	// we want to marshal the encoded peer id
-	encodedPeerMap := make(map[string]network.ScopeStat, len(s.Peers))
-	for p, v := range s.Peers {
-		encodedPeerMap[p.String()] = v
-	}
-
-	type Alias ResourceManagerStat
-	return json.Marshal(&struct {
-		*Alias
-		Peers map[string]network.ScopeStat `json:",omitempty"`
-	}{
-		Alias: (*Alias)(&s),
-		Peers: encodedPeerMap,
-	})
 }
 
 var _ ResourceManagerState = (*resourceManager)(nil)

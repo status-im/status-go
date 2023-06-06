@@ -5,8 +5,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 // View stores only fields used by a client and ensures that all relevant fields are
@@ -40,9 +38,13 @@ type View struct {
 }
 
 func castToTransferViews(transfers []Transfer) []View {
-	views := make([]View, len(transfers))
-	for i := range transfers {
-		views[i] = CastToTransferView(transfers[i])
+	views := make([]View, 0, len(transfers))
+	for _, tx := range transfers {
+		switch tx.Type {
+		case ethTransfer, erc20Transfer, erc721Transfer:
+			view := CastToTransferView(tx)
+			views = append(views, view)
+		}
 	}
 	return views
 }
@@ -89,11 +91,11 @@ func CastToTransferView(t Transfer) View {
 		view.Contract = t.Receipt.ContractAddress
 	case erc20Transfer:
 		view.Contract = t.Log.Address
-		from, to, valueInt := parseErc20Log(t.Log)
+		from, to, valueInt := parseErc20TransferLog(t.Log)
 		view.From, view.To, value = from, to, (*hexutil.Big)(valueInt)
 	case erc721Transfer:
 		view.Contract = t.Log.Address
-		from, to, tokenIDInt := parseErc721Log(t.Log)
+		from, to, tokenIDInt := parseErc721TransferLog(t.Log)
 		view.From, view.To, tokenID = from, to, (*hexutil.Big)(tokenIDInt)
 	}
 
@@ -105,68 +107,11 @@ func CastToTransferView(t Transfer) View {
 }
 
 func getFixedTransferType(tx Transfer) Type {
-	// erc721 transfers share signature with erc20 ones, so they are both (cached and new)
-	// categorized as erc20 by the Downloader. We fix this on the fly for the moment, until
-	// the Downloader gets refactored.
+	// erc721 transfers share signature with erc20 ones, so they both used to be categorized as erc20
+	// by the Downloader. We fix this here since they might be mis-categorized in the db.
 	if tx.Type == erc20Transfer {
-		switch len(tx.Log.Topics) {
-		case erc20TransferEventIndexedParameters:
-			// do nothing
-		case erc721TransferEventIndexedParameters:
-			return erc721Transfer
-		default:
-			return unknownTokenTransfer
-		}
+		eventType := GetEventType(tx.Log)
+		return EventTypeToSubtransactionType(eventType)
 	}
 	return tx.Type
-}
-
-func parseErc20Log(ethlog *types.Log) (from, to common.Address, amount *big.Int) {
-	amount = new(big.Int)
-	if len(ethlog.Topics) < 3 {
-		log.Warn("not enough topics for erc20 transfer", "topics", ethlog.Topics)
-		return
-	}
-	if len(ethlog.Topics[1]) != 32 {
-		log.Warn("second topic is not padded to 32 byte address", "topic", ethlog.Topics[1])
-		return
-	}
-	if len(ethlog.Topics[2]) != 32 {
-		log.Warn("third topic is not padded to 32 byte address", "topic", ethlog.Topics[2])
-		return
-	}
-	copy(from[:], ethlog.Topics[1][12:])
-	copy(to[:], ethlog.Topics[2][12:])
-	if len(ethlog.Data) != 32 {
-		log.Warn("data is not padded to 32 byts big int", "data", ethlog.Data)
-		return
-	}
-	amount.SetBytes(ethlog.Data)
-
-	return
-}
-
-func parseErc721Log(ethlog *types.Log) (from, to common.Address, tokenID *big.Int) {
-	tokenID = new(big.Int)
-	if len(ethlog.Topics) < 4 {
-		log.Warn("not enough topics for erc721 transfer", "topics", ethlog.Topics)
-		return
-	}
-	if len(ethlog.Topics[1]) != 32 {
-		log.Warn("second topic is not padded to 32 byte address", "topic", ethlog.Topics[1])
-		return
-	}
-	if len(ethlog.Topics[2]) != 32 {
-		log.Warn("third topic is not padded to 32 byte address", "topic", ethlog.Topics[2])
-		return
-	}
-	if len(ethlog.Topics[3]) != 32 {
-		log.Warn("fourth topic is not 32 byte tokenId", "topic", ethlog.Topics[3])
-		return
-	}
-	copy(from[:], ethlog.Topics[1][12:])
-	copy(to[:], ethlog.Topics[2][12:])
-	tokenID.SetBytes(ethlog.Topics[3][:])
-
-	return
 }

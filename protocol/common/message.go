@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"strings"
 	"unicode"
@@ -30,9 +31,10 @@ type QuotedMessage struct {
 	ID          string `json:"id"`
 	ContentType int64  `json:"contentType"`
 	// From is a public key of the author of the message.
-	From       string          `json:"from"`
-	Text       string          `json:"text"`
-	ParsedText json.RawMessage `json:"parsedText,omitempty"`
+	From             string          `json:"from"`
+	Text             string          `json:"text"`
+	ParsedText       json.RawMessage `json:"parsedText,omitempty"`
+	AlbumImagesCount int64           `json:"albumImagesCount"`
 	// ImageLocalURL is the local url of the image
 	ImageLocalURL string `json:"image,omitempty"`
 	// AudioLocalURL is the local url of the audio
@@ -79,6 +81,25 @@ const (
 	ContactVerificationStateUntrustworthy
 	ContactVerificationStateCanceled
 )
+
+type LinkPreviewThumbnail struct {
+	Width  int `json:"width"`
+	Height int `json:"height"`
+	// Non-empty when the thumbnail is available via the media server, i.e. after
+	// the chat message is sent.
+	URL string `json:"url,omitempty"`
+	// Non-empty when the thumbnail payload needs to be shared with the client,
+	// but before it has been persisted.
+	DataURI string `json:"dataUri,omitempty"`
+}
+
+type LinkPreview struct {
+	URL         string               `json:"url"`
+	Hostname    string               `json:"hostname"`
+	Title       string               `json:"title,omitempty"`
+	Description string               `json:"description,omitempty"`
+	Thumbnail   LinkPreviewThumbnail `json:"thumbnail,omitempty"`
+}
 
 const EveryoneMentionTag = "0x00001"
 
@@ -197,7 +218,8 @@ type Message struct {
 	Replied bool `json:"replied"`
 
 	// Links is an array of links within given message
-	Links []string
+	Links        []string
+	LinkPreviews []LinkPreview `json:"linkPreviews"`
 
 	// EditedAt indicates the clock value it was edited
 	EditedAt uint64 `json:"editedAt"`
@@ -264,6 +286,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Mentioned                bool                             `json:"mentioned,omitempty"`
 		Replied                  bool                             `json:"replied,omitempty"`
 		Links                    []string                         `json:"links,omitempty"`
+		LinkPreviews             []LinkPreview                    `json:"linkPreviews,omitempty"`
 		EditedAt                 uint64                           `json:"editedAt,omitempty"`
 		Deleted                  bool                             `json:"deleted,omitempty"`
 		DeletedBy                string                           `json:"deletedBy,omitempty"`
@@ -302,6 +325,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Mentioned:                m.Mentioned,
 		Replied:                  m.Replied,
 		Links:                    m.Links,
+		LinkPreviews:             m.LinkPreviews,
 		MessageType:              m.MessageType,
 		CommandParameters:        m.CommandParameters,
 		GapParameters:            m.GapParameters,
@@ -522,6 +546,10 @@ type MentionsAndLinksVisitor struct {
 	links     []string
 }
 
+type LinksVisitor struct {
+	Links []string
+}
+
 func (v *MentionsAndLinksVisitor) Visit(node ast.Node, entering bool) ast.WalkStatus {
 	// only on entering we fetch, otherwise we go on
 	if !entering {
@@ -541,8 +569,27 @@ func (v *MentionsAndLinksVisitor) Visit(node ast.Node, entering bool) ast.WalkSt
 	return ast.GoToNext
 }
 
+func (v *LinksVisitor) Visit(node ast.Node, entering bool) ast.WalkStatus {
+	if !entering {
+		return ast.GoToNext
+	}
+
+	switch n := node.(type) {
+	case *ast.Link:
+		v.Links = append(v.Links, string(n.Destination))
+	}
+
+	return ast.GoToNext
+}
+
 func runMentionsAndLinksVisitor(parsedText ast.Node, identity string) *MentionsAndLinksVisitor {
 	visitor := &MentionsAndLinksVisitor{identity: identity}
+	ast.Walk(parsedText, visitor)
+	return visitor
+}
+
+func RunLinksVisitor(parsedText ast.Node) *LinksVisitor {
+	visitor := &LinksVisitor{}
 	ast.Walk(parsedText, visitor)
 	return visitor
 }
@@ -709,6 +756,88 @@ func (m *Message) LoadImage() error {
 	m.Payload = &protobuf.ChatMessage_Image{Image: imageMessage}
 
 	return nil
+}
+
+func isValidLinkPreviewForProto(preview LinkPreview) bool {
+	return preview.Title != "" && preview.URL != "" &&
+		((preview.Thumbnail.DataURI == "" && preview.Thumbnail.Width == 0 && preview.Thumbnail.Height == 0) ||
+			(preview.Thumbnail.DataURI != "" && preview.Thumbnail.Width > 0 && preview.Thumbnail.Height > 0))
+}
+
+// ConvertLinkPreviewsToProto expects previews to be correctly sent by the
+// client because we can't attempt to re-unfurl URLs at this point (it's
+// actually undesirable). We run a basic validation as an additional safety net.
+func (m *Message) ConvertLinkPreviewsToProto() ([]*protobuf.UnfurledLink, error) {
+	if len(m.LinkPreviews) == 0 {
+		return nil, nil
+	}
+
+	unfurledLinks := make([]*protobuf.UnfurledLink, 0, len(m.LinkPreviews))
+
+	for _, preview := range m.LinkPreviews {
+		// Do not process subsequent previews because we do expect all previews to
+		// be valid at this stage.
+		if !isValidLinkPreviewForProto(preview) {
+			return nil, fmt.Errorf("invalid link preview, url='%s'", preview.URL)
+		}
+
+		var payload []byte
+		var err error
+		if preview.Thumbnail.DataURI != "" {
+			payload, err = images.GetPayloadFromURI(preview.Thumbnail.DataURI)
+			if err != nil {
+				return nil, fmt.Errorf("could not get data URI payload, url='%s': %w", preview.URL, err)
+			}
+		}
+
+		ul := &protobuf.UnfurledLink{
+			Url:              preview.URL,
+			Title:            preview.Title,
+			Description:      preview.Description,
+			ThumbnailWidth:   uint32(preview.Thumbnail.Width),
+			ThumbnailHeight:  uint32(preview.Thumbnail.Height),
+			ThumbnailPayload: payload,
+		}
+		unfurledLinks = append(unfurledLinks, ul)
+	}
+
+	return unfurledLinks, nil
+}
+
+func (m *Message) ConvertFromProtoToLinkPreviews(makeMediaServerURL func(msgID string, previewURL string) string) []LinkPreview {
+	var links []*protobuf.UnfurledLink
+
+	if links = m.GetUnfurledLinks(); links == nil {
+		return nil
+	}
+
+	previews := make([]LinkPreview, 0, len(links))
+	for _, link := range links {
+		parsedURL, err := url.Parse(link.Url)
+		var hostname string
+		// URL parsing in Go can fail with URLs that weren't correctly URL encoded.
+		// This shouldn't happen in general, but if an error happens we just reuse
+		// the full URL.
+		if err != nil {
+			hostname = link.Url
+		} else {
+			hostname = parsedURL.Hostname()
+		}
+		lp := LinkPreview{
+			Description: link.Description,
+			Hostname:    hostname,
+			Title:       link.Title,
+			URL:         link.Url,
+		}
+		if payload := link.GetThumbnailPayload(); payload != nil {
+			lp.Thumbnail.Width = int(link.ThumbnailWidth)
+			lp.Thumbnail.Height = int(link.ThumbnailHeight)
+			lp.Thumbnail.URL = makeMediaServerURL(m.ID, link.Url)
+		}
+		previews = append(previews, lp)
+	}
+
+	return previews
 }
 
 func (m *Message) SetAlbumIDAndImagesCount(albumID string, imagesCount uint32) error {

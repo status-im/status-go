@@ -133,7 +133,6 @@ func (l *listener) setupConnWithScope(qconn quic.Connection, connScope network.C
 		scope:           connScope,
 		localPeer:       l.localPeer,
 		localMultiaddr:  localMultiaddr,
-		privKey:         l.privKey,
 		remoteMultiaddr: remoteMultiaddr,
 		remotePeerID:    remotePeerID,
 		remotePubKey:    remotePubKey,

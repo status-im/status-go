@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethclient"
 
@@ -22,6 +24,7 @@ import (
 
 	"github.com/meirf/gopart"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -45,6 +48,19 @@ var messageArchiveInterval = 7 * 24 * time.Hour
 var updateActiveMembersInterval = 24 * time.Hour
 
 const discordTimestampLayout = "2006-01-02T15:04:05+00:00"
+
+var importRateLimiter = rate.NewLimiter(rate.Every(importSlowRate), 1)
+
+const (
+	importSlowRate          = time.Second / 1
+	importFastRate          = time.Second / 100
+	importMessagesChunkSize = 10
+)
+
+const (
+	maxChunkSizeMessages = 1000
+	maxChunkSizeBytes    = 1500000
+)
 
 func (m *Messenger) publishOrg(org *communities.Community) error {
 	m.logger.Debug("publishing org", zap.String("org-id", org.IDString()), zap.Any("org", org))
@@ -435,8 +451,8 @@ func (m *Messenger) initCommunitySettings(communityID types.HexBytes) (*communit
 	return communitySettings, nil
 }
 
-func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexBytes) (*MessengerResponse, error) {
-	mr, err := m.joinCommunity(ctx, communityID)
+func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexBytes, forceJoin bool) (*MessengerResponse, error) {
+	mr, err := m.joinCommunity(ctx, communityID, forceJoin)
 	if err != nil {
 		return nil, err
 	}
@@ -451,12 +467,12 @@ func (m *Messenger) JoinCommunity(ctx context.Context, communityID types.HexByte
 	return mr, nil
 }
 
-func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexBytes) (*MessengerResponse, error) {
+func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexBytes, forceJoin bool) (*MessengerResponse, error) {
 	logger := m.logger.Named("joinCommunity")
 
 	response := &MessengerResponse{}
 
-	community, err := m.communitiesManager.JoinCommunity(communityID)
+	community, err := m.communitiesManager.JoinCommunity(communityID, forceJoin)
 	if err != nil {
 		logger.Debug("m.communitiesManager.JoinCommunity error", zap.Error(err))
 		return nil, err
@@ -531,17 +547,20 @@ func (m *Messenger) SetMuted(communityID types.HexBytes, muted bool) error {
 	return m.communitiesManager.SetMuted(communityID, muted)
 }
 
-func (m *Messenger) SetMutePropertyOnChatsByCategory(communityID string, categoryID string, muted bool) error {
-	community, err := m.communitiesManager.GetByIDString(communityID)
+func (m *Messenger) SetMutePropertyOnChatsByCategory(request *requests.MuteCategory, muted bool) error {
+	if err := request.Validate(); err != nil {
+		return err
+	}
+	community, err := m.communitiesManager.GetByIDString(request.CommunityID)
 	if err != nil {
 		return err
 	}
 
-	for _, chatID := range community.ChatsByCategoryID(categoryID) {
+	for _, chatID := range community.ChatsByCategoryID(request.CategoryID) {
 		if muted {
-			_, err = m.MuteChat(&requests.MuteChat{ChatID: communityID + chatID, MutedType: MuteTillUnmuted})
+			_, err = m.MuteChat(&requests.MuteChat{ChatID: request.CommunityID + chatID, MutedType: request.MutedType})
 		} else {
-			err = m.UnmuteChat(communityID + chatID)
+			err = m.UnmuteChat(request.CommunityID + chatID)
 		}
 		if err != nil {
 			return err
@@ -556,6 +575,20 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	if err := request.Validate(); err != nil {
 		logger.Debug("request failed to validate", zap.Error(err), zap.Any("request", request))
 		return nil, err
+	}
+
+	// verify wallet password if there
+	if request.Password != "" {
+		walletAccounts, err := m.settings.GetAccounts()
+		if err != nil {
+			return nil, err
+		}
+		if len(walletAccounts) > 0 {
+			_, err := m.accountsManager.GetVerifiedWalletAccount(m.settings, walletAccounts[0].Address.Hex(), request.Password)
+			if err != nil {
+				return nil, errors.New("wrong password")
+			}
+		}
 	}
 
 	displayName, err := m.settings.DisplayName()
@@ -1414,7 +1447,7 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 		return nil, err
 	}
 
-	response, err := m.JoinCommunity(ctx, community.ID())
+	response, err := m.JoinCommunity(ctx, community.ID(), true)
 	if err != nil {
 		return nil, err
 	}
@@ -2082,8 +2115,8 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 	if !pending {
 		var mr *MessengerResponse
 		if syncCommunity.Joined {
-			mr, err = m.joinCommunity(context.Background(), syncCommunity.Id)
-			if err != nil {
+			mr, err = m.joinCommunity(context.Background(), syncCommunity.Id, false)
+			if err != nil && err != communities.ErrOrgAlreadyJoined {
 				logger.Debug("m.joinCommunity error", zap.Error(err))
 				return err
 			}
@@ -2094,10 +2127,12 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 				return err
 			}
 		}
-		err = messageState.Response.Merge(mr)
-		if err != nil {
-			logger.Debug("messageState.Response.Merge error", zap.Error(err))
-			return err
+		if mr != nil {
+			err = messageState.Response.Merge(mr)
+			if err != nil {
+				logger.Debug("messageState.Response.Merge error", zap.Error(err))
+				return err
+			}
 		}
 	}
 
@@ -2289,14 +2324,28 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) erro
 	return nil
 }
 
+func (m *Messenger) SpeedupArchivesImport() {
+	importRateLimiter.SetLimit(rate.Every(importFastRate))
+}
+
+func (m *Messenger) SlowdownArchivesImport() {
+	importRateLimiter.SetLimit(rate.Every(importSlowRate))
+}
+
 func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel chan struct{}) error {
 	importTicker := time.NewTicker(100 * time.Millisecond)
 	defer importTicker.Stop()
 
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	go func() {
+		<-cancel
+		cancelFunc()
+	}()
+
 importMessageArchivesLoop:
 	for {
 		select {
-		case <-cancel:
+		case <-ctx.Done():
 			m.communitiesManager.LogStdout("interrupted importing history archive messages")
 			return nil
 		case <-importTicker.C:
@@ -2325,23 +2374,33 @@ importMessageArchivesLoop:
 			}
 
 			m.config.messengerSignalsHandler.ImportingHistoryArchiveMessages(types.EncodeHex(communityID))
-			response, err := m.handleArchiveMessages(archiveMessages, communityID)
-			if err != nil {
-				m.communitiesManager.LogStdout("failed to handle archive messages", zap.Error(err))
-				continue
+
+			for _, messagesChunk := range chunkSlice(archiveMessages, importMessagesChunkSize) {
+				if err := importRateLimiter.Wait(ctx); err != nil {
+					if !errors.Is(err, context.Canceled) {
+						m.communitiesManager.LogStdout("rate limiter error when handling archive messages", zap.Error(err))
+					}
+					continue importMessageArchivesLoop
+				}
+
+				response, err := m.handleArchiveMessages(messagesChunk, communityID)
+				if err != nil {
+					m.communitiesManager.LogStdout("failed to handle archive messages", zap.Error(err))
+					continue importMessageArchivesLoop
+				}
+
+				if !response.IsEmpty() {
+					notifications := response.Notifications()
+					response.ClearNotifications()
+					signal.SendNewMessages(response)
+					localnotifications.PushMessages(notifications)
+				}
 			}
 
 			err = m.communitiesManager.SetMessageArchiveIDImported(communityID, downloadedArchiveID, true)
 			if err != nil {
 				m.communitiesManager.LogStdout("failed to mark history message archive as imported", zap.Error(err))
 				continue
-			}
-
-			if !response.IsEmpty() {
-				notifications := response.Notifications()
-				response.ClearNotifications()
-				signal.SendNewMessages(response)
-				localnotifications.PushMessages(notifications)
 			}
 		}
 	}
@@ -3599,4 +3658,63 @@ func (m *Messenger) UpdateCommunityEncryption(community *communities.Community) 
 	response.AddCommunity(community)
 
 	return response, nil
+
+}
+
+func (m *Messenger) CheckPermissionsToJoinCommunity(request *requests.CheckPermissionToJoinCommunity) (*communities.CheckPermissionToJoinResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	accounts, err := m.settings.GetAccounts()
+	if err != nil {
+		return nil, err
+	}
+
+	var addresses []gethcommon.Address
+
+	for _, a := range accounts {
+		addresses = append(addresses, gethcommon.HexToAddress(a.Address.Hex()))
+	}
+
+	return m.communitiesManager.CheckPermissionToJoin(request.CommunityID, addresses)
+}
+
+func chunkSlice[T comparable](slice []T, chunkSize int) [][]T {
+	var chunks [][]T
+	for i := 0; i < len(slice); i += chunkSize {
+		end := i + chunkSize
+
+		// necessary check to avoid slicing beyond
+		// slice capacity
+		if end > len(slice) {
+			end = len(slice)
+		}
+
+		chunks = append(chunks, slice[i:end])
+	}
+
+	return chunks
+}
+
+func chunkAttachmentsByByteSize(slice []*protobuf.DiscordMessageAttachment, maxFileSizeBytes uint64) [][]*protobuf.DiscordMessageAttachment {
+	var chunks [][]*protobuf.DiscordMessageAttachment
+
+	currentChunkSize := uint64(0)
+	currentChunk := make([]*protobuf.DiscordMessageAttachment, 0)
+
+	for i, attachment := range slice {
+		payloadBytes := attachment.GetFileSizeBytes()
+		if currentChunkSize+payloadBytes > maxFileSizeBytes && len(currentChunk) > 0 {
+			chunks = append(chunks, currentChunk)
+			currentChunk = make([]*protobuf.DiscordMessageAttachment, 0)
+			currentChunkSize = uint64(0)
+		}
+		currentChunk = append(currentChunk, attachment)
+		currentChunkSize = currentChunkSize + payloadBytes
+		if i == len(slice)-1 {
+			chunks = append(chunks, currentChunk)
+		}
+	}
+	return chunks
 }

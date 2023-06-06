@@ -12,9 +12,7 @@ import (
 type conn struct {
 	*tls.Conn
 
-	localPeer peer.ID
-	privKey   ci.PrivKey
-
+	localPeer       peer.ID
 	remotePeer      peer.ID
 	remotePubKey    ci.PubKey
 	connectionState network.ConnectionState
@@ -24,10 +22,6 @@ var _ sec.SecureConn = &conn{}
 
 func (c *conn) LocalPeer() peer.ID {
 	return c.localPeer
-}
-
-func (c *conn) LocalPrivateKey() ci.PrivKey {
-	return c.privKey
 }
 
 func (c *conn) RemotePeer() peer.ID {

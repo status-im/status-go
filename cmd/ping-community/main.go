@@ -159,7 +159,7 @@ func main() {
 	}
 	logger.Info("GOT community", "comm", chat)
 
-	response, err := messenger.JoinCommunity(context.Background(), community.ID())
+	response, err := messenger.JoinCommunity(context.Background(), community.ID(), false)
 	if err != nil {
 		logger.Error("failed to join community", "err", err)
 	}
@@ -414,7 +414,7 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 		PublicKey: types.Hex2Bytes(walletDerivedAccount.PublicKey),
 		KeyUID:    generatedAccountInfo.KeyUID,
 		Address:   types.HexToAddress(walletDerivedAccount.Address),
-		Color:     "",
+		ColorID:   "",
 		Wallet:    true,
 		Path:      pathDefaultWallet,
 		Name:      "Ethereum account",

@@ -105,6 +105,11 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 		services = append(services, wakuext)
 	}
 
+	if config.WalletConfig.Enabled {
+		walletService := b.walletService(accDB, accountsFeed)
+		services = append(services, walletService)
+	}
+
 	if config.WakuV2Config.Enabled {
 		telemetryServerURL := ""
 		if accDB.DB() != nil {
@@ -128,11 +133,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 		b.wakuV2ExtSrvc = wakuext
 
 		services = append(services, wakuext)
-	}
-
-	if config.WalletConfig.Enabled {
-		walletService := b.walletService(accDB, accountsFeed)
-		services = append(services, walletService)
 	}
 
 	// We ignore for now local notifications flag as users who are upgrading have no mean to enable it
@@ -470,7 +470,11 @@ func (b *StatusNode) appmetricsService() common.StatusService {
 	return b.appMetricsSrvc
 }
 
-func (b *StatusNode) walletService(accountsDB *accounts.Database, accountsFeed *event.Feed) common.StatusService {
+func (b *StatusNode) WalletService() *wallet.Service {
+	return b.walletSrvc
+}
+
+func (b *StatusNode) walletService(accountsDB *accounts.Database, accountsFeed *event.Feed) *wallet.Service {
 	if b.walletSrvc == nil {
 		var extService *ext.Service
 		if b.WakuV2ExtService() != nil {

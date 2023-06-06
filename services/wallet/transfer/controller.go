@@ -10,10 +10,11 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/token"
 )
 
 type Controller struct {
@@ -25,11 +26,12 @@ type Controller struct {
 	TransferFeed       *event.Feed
 	group              *async.Group
 	transactionManager *TransactionManager
+	tokenManager       *token.Manager
 	fetchStrategyType  FetchStrategyType
 }
 
 func NewTransferController(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed, transferFeed *event.Feed,
-	transactionManager *TransactionManager, fetchStrategyType FetchStrategyType) *Controller {
+	transactionManager *TransactionManager, tokenManager *token.Manager, fetchStrategyType FetchStrategyType) *Controller {
 
 	blockDAO := &BlockDAO{db}
 	return &Controller{
@@ -39,6 +41,7 @@ func NewTransferController(db *sql.DB, rpcClient *rpc.Client, accountFeed *event
 		accountFeed:        accountFeed,
 		TransferFeed:       transferFeed,
 		transactionManager: transactionManager,
+		tokenManager:       tokenManager,
 		fetchStrategyType:  fetchStrategyType,
 	}
 }
@@ -112,7 +115,7 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 			return err
 		}
 	} else {
-		c.reactor = NewReactor(c.db, c.blockDAO, c.TransferFeed, c.transactionManager)
+		c.reactor = NewReactor(c.db, c.blockDAO, c.TransferFeed, c.transactionManager, c.tokenManager)
 
 		err = c.reactor.start(chainClients, accounts, c.fetchStrategyType)
 		if err != nil {
@@ -131,8 +134,8 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 func watchAccountsChanges(ctx context.Context, accountFeed *event.Feed, reactor *Reactor,
 	chainClients map[uint64]*chain.ClientWithFallback, initial []common.Address, fetchStrategyType FetchStrategyType) error {
 
-	accounts := make(chan []*accounts.Account, 1) // it may block if the rate of updates will be significantly higher
-	sub := accountFeed.Subscribe(accounts)
+	ch := make(chan accountsevent.Event, 1) // it may block if the rate of updates will be significantly higher
+	sub := accountFeed.Subscribe(ch)
 	defer sub.Unsubscribe()
 	listen := make(map[common.Address]struct{}, len(initial))
 	for _, address := range initial {
@@ -146,19 +149,24 @@ func watchAccountsChanges(ctx context.Context, accountFeed *event.Feed, reactor 
 			if err != nil {
 				log.Error("accounts watcher subscription failed", "error", err)
 			}
-		case n := <-accounts:
-			log.Debug("wallet received updated list of accounts", "accounts", n)
+		case ev := <-ch:
 			restart := false
-			for _, acc := range n {
-				_, exist := listen[common.Address(acc.Address)]
-				if !exist {
-					listen[common.Address(acc.Address)] = struct{}{}
+
+			for _, address := range ev.Accounts {
+				_, exist := listen[address]
+				if ev.Type == accountsevent.EventTypeAdded && !exist {
+					listen[address] = struct{}{}
+					restart = true
+				} else if ev.Type == accountsevent.EventTypeRemoved && exist {
+					delete(listen, address)
 					restart = true
 				}
 			}
+
 			if !restart {
 				continue
 			}
+
 			listenList := mapToList(listen)
 			log.Debug("list of accounts was changed from a previous version. reactor will be restarted", "new", listenList)
 
@@ -178,6 +186,7 @@ func mapToList(m map[common.Address]struct{}) []common.Address {
 	return rst
 }
 
+// Only used by status-mobile
 func (c *Controller) LoadTransferByHash(ctx context.Context, rpcClient *rpc.Client, address common.Address, hash common.Hash) error {
 	chainClient, err := rpcClient.EthClient(rpcClient.UpstreamChainID)
 	if err != nil {

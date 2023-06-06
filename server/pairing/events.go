@@ -1,5 +1,7 @@
 package pairing
 
+import "github.com/status-im/status-go/multiaccounts"
+
 // EventType type for event types.
 type EventType string
 
@@ -37,3 +39,8 @@ const (
 	ActionPairingInstallation
 	ActionPeerDiscovery
 )
+
+type AccountData struct {
+	Account  *multiaccounts.Account `json:"account,omitempty"`
+	Password string                 `json:"password,omitempty"`
+}

@@ -80,6 +80,7 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		community_id,
 		mentions,
 		links,
+		unfurled_links,
 		command_id,
 		command_value,
 		command_from,
@@ -132,6 +133,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.community_id,
 		m1.mentions,
 		m1.links,
+		m1.unfurled_links,
 		m1.command_id,
 		m1.command_value,
 		m1.command_from,
@@ -174,6 +176,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m2.source,
 		m2.text,
 		m2.parsed_text,
+		m2.album_images_count,
 		m2.audio_duration_ms,
 		m2.community_id,
 		m2.id,
@@ -201,6 +204,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var ContentType sql.NullInt64
 	var quotedText sql.NullString
 	var quotedParsedText []byte
+	var quotedAlbumImagesCount sql.NullInt64
 	var quotedFrom sql.NullString
 	var quotedAudioDuration sql.NullInt64
 	var quotedCommunityID sql.NullString
@@ -208,6 +212,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var quotedDeletedForMe sql.NullBool
 	var serializedMentions []byte
 	var serializedLinks []byte
+	var serializedUnfurledLinks []byte
 	var alias sql.NullString
 	var identicon sql.NullString
 	var communityID sql.NullString
@@ -263,6 +268,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&communityID,
 		&serializedMentions,
 		&serializedLinks,
+		&serializedUnfurledLinks,
 		&command.ID,
 		&command.Value,
 		&command.From,
@@ -305,6 +311,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&quotedFrom,
 		&quotedText,
 		&quotedParsedText,
+		&quotedAlbumImagesCount,
 		&quotedAudioDuration,
 		&quotedCommunityID,
 		&quotedID,
@@ -356,13 +363,14 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 			}
 		} else {
 			message.QuotedMessage = &common.QuotedMessage{
-				ID:          quotedID.String,
-				ContentType: ContentType.Int64,
-				From:        quotedFrom.String,
-				Text:        quotedText.String,
-				ParsedText:  quotedParsedText,
-				CommunityID: quotedCommunityID.String,
-				Deleted:     quotedDeleted.Bool,
+				ID:               quotedID.String,
+				ContentType:      ContentType.Int64,
+				From:             quotedFrom.String,
+				Text:             quotedText.String,
+				ParsedText:       quotedParsedText,
+				AlbumImagesCount: quotedAlbumImagesCount.Int64,
+				CommunityID:      quotedCommunityID.String,
+				Deleted:          quotedDeleted.Bool,
 			}
 			if message.QuotedMessage.ContentType == int64(protobuf.ChatMessage_DISCORD_MESSAGE) {
 				message.QuotedMessage.DiscordMessage = quotedDiscordMessage
@@ -392,6 +400,13 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 
 	if serializedLinks != nil {
 		err := json.Unmarshal(serializedLinks, &message.Links)
+		if err != nil {
+			return err
+		}
+	}
+
+	if serializedUnfurledLinks != nil {
+		err = json.Unmarshal(serializedUnfurledLinks, &message.UnfurledLinks)
 		if err != nil {
 			return err
 		}
@@ -477,6 +492,14 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		}
 	}
 
+	var serializedUnfurledLinks []byte
+	if links := message.GetUnfurledLinks(); links != nil {
+		serializedUnfurledLinks, err = json.Marshal(links)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return []interface{}{
 		message.ID,
 		message.WhisperTimestamp,
@@ -508,6 +531,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		message.CommunityID,
 		serializedMentions,
 		serializedLinks,
+		serializedUnfurledLinks,
 		command.ID,
 		command.Value,
 		command.From,

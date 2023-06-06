@@ -21,28 +21,6 @@ func setupTestDB(t *testing.T) (*Database, *BlockDAO, func()) {
 	}
 }
 
-func TestDBGetHeaderByNumber(t *testing.T) {
-	db, _, stop := setupTestDB(t)
-	defer stop()
-	header := &types.Header{
-		Number:     big.NewInt(10),
-		Difficulty: big.NewInt(1),
-		Time:       1,
-	}
-	require.NoError(t, db.saveHeaders(777, []*types.Header{header}, common.Address{1}))
-	rst, err := db.getHeaderByNumber(777, header.Number)
-	require.NoError(t, err)
-	require.Equal(t, header.Hash(), rst.Hash)
-}
-
-func TestDBGetHeaderByNumberNoRows(t *testing.T) {
-	db, _, stop := setupTestDB(t)
-	defer stop()
-	rst, err := db.getHeaderByNumber(777, big.NewInt(1))
-	require.NoError(t, err)
-	require.Nil(t, rst)
-}
-
 func TestDBProcessBlocks(t *testing.T) {
 	db, block, stop := setupTestDB(t)
 	defer stop()
@@ -223,8 +201,8 @@ func TestGetTransfersForIdentities(t *testing.T) {
 	require.Equal(t, big.NewInt(trs[3].BlkNumber), entries[1].BlockNumber)
 	require.Equal(t, uint64(trs[1].Timestamp), entries[0].Timestamp)
 	require.Equal(t, uint64(trs[3].Timestamp), entries[1].Timestamp)
-	require.Equal(t, trs[1].ChainID, entries[0].NetworkID)
-	require.Equal(t, trs[3].ChainID, entries[1].NetworkID)
+	require.Equal(t, uint64(trs[1].ChainID), entries[0].NetworkID)
+	require.Equal(t, uint64(trs[3].ChainID), entries[1].NetworkID)
 	require.Equal(t, MultiTransactionIDType(0), entries[0].MultiTransactionID)
 	require.Equal(t, MultiTransactionIDType(0), entries[1].MultiTransactionID)
 }

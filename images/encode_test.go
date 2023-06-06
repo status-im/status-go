@@ -100,3 +100,13 @@ func TestCompressToFileLimits(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 291645, bb.Len())
 }
+
+func TestGetPayloadFromURI(t *testing.T) {
+	payload, err := GetPayloadFromURI("data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=")
+	require.NoError(t, err)
+	require.Equal(
+		t,
+		[]byte{0xff, 0xd8, 0xff, 0xdb, 0x0, 0x84, 0x0, 0x50, 0x37, 0x3c, 0x46, 0x3c, 0x32, 0x50},
+		payload,
+	)
+}

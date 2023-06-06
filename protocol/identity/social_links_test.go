@@ -22,10 +22,10 @@ func TestEquals(t *testing.T) {
 
 	protobufLinks := []*protobuf.SocialLink{}
 	transformedLinks := NewSocialLinks(protobufLinks)
-	require.False(t, socialLinks.Equals(*transformedLinks))
+	require.False(t, socialLinks.Equal(transformedLinks))
 
 	protobufLinks = append(protobufLinks, &protobuf.SocialLink{Text: "A", Url: "B"})
 	protobufLinks = append(protobufLinks, &protobuf.SocialLink{Text: "X", Url: "Y"})
 	transformedLinks = NewSocialLinks(protobufLinks)
-	require.True(t, socialLinks.Equals(*transformedLinks))
+	require.True(t, socialLinks.Equal(transformedLinks))
 }

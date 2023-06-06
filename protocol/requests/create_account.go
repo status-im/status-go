@@ -12,27 +12,46 @@ var ErrCreateAccountInvalidBackupDisabledDataDir = errors.New("create-account: i
 var ErrCreateAccountInvalidLogFilePath = errors.New("create-account: invalid log file path")
 
 type CreateAccount struct {
+	// BackupDisabledDataDir is the directory where backup is disabled
+	BackupDisabledDataDir string `json:"backupDisabledDataDir"`
+
 	DisplayName        string `json:"displayName"`
 	Password           string `json:"password"`
 	ImagePath          string `json:"imagePath"`
 	CustomizationColor string `json:"customizationColor"`
-	// RootKeystoreDir is the directory where keys are stored
-	RootKeystoreDir string `json:"rootKeystoreDir"`
-	// BackupDisabledDataDir is the directory where backup is disabled
-	BackupDisabledDataDir string `json:"backupDisabledDataDir"`
+
+	WakuV2Nameserver *string `json:"wakuV2Nameserver"`
+
+	LogLevel    *string `json:"logLevel"`
+	LogFilePath string  `json:"logFilePath"`
+	LogEnabled  bool    `json:"logEnabled"`
+
+	PreviewPrivacy bool `json:"previewPrivacy"`
 
 	VerifyTransactionURL     *string `json:"verifyTransactionURL"`
 	VerifyENSURL             *string `json:"verifyENSURL"`
 	VerifyENSContractAddress *string `json:"verifyENSContractAddress"`
 	VerifyTransactionChainID *int64  `json:"verifyTransactionChainID"`
 	UpstreamConfig           string  `json:"upstreamConfig"`
-	WakuV2Nameserver         *string `json:"wakuV2Nameserver"`
-	LogLevel                 *string `json:"logLevel"`
-	LogFilePath              string  `json:"logFilePath"`
-	LogEnabled               bool    `json:"logEnabled"`
-	PreviewPrivacy           bool    `json:"previewPrivacy"`
-	CurrentNetwork           string  `json:"currentNetwork"`
-	NetworkID                uint64  `json:"networkId"`
+
+	CurrentNetwork string `json:"currentNetwork"`
+	NetworkID      uint64 `json:"networkId"`
+
+	WalletSecretsConfig
+}
+
+type WalletSecretsConfig struct {
+	PoktToken     string `json:"poktToken"`
+	InfuraToken   string `json:"infuraToken"`
+	InfuraSecret  string `json:"infuraSecret"`
+	OpenseaAPIKey string `json:"openseaApiKey"`
+
+	// Testing
+	GanacheURL                  string `json:"ganacheURL"`
+	AlchemyArbitrumMainnetToken string `json:"alchemyArbitrumMainnetToken"`
+	AlchemyArbitrumGoerliToken  string `json:"alchemyArbitrumGoerliToken"`
+	AlchemyOptimismMainnetToken string `json:"alchemyOptimismMainnetToken"`
+	AlchemyOptimismGoerliToken  string `json:"alchemyOptimismGoerliToken"`
 }
 
 func (c *CreateAccount) Validate() error {
@@ -51,10 +70,6 @@ func ValidateAccountCreationRequest(c CreateAccount) error {
 
 	if len(c.CustomizationColor) == 0 {
 		return ErrCreateAccountInvalidCustomizationColor
-	}
-
-	if len(c.RootKeystoreDir) == 0 {
-		return ErrCreateAccountInvalidRootKeystoreDir
 	}
 
 	if len(c.BackupDisabledDataDir) == 0 {

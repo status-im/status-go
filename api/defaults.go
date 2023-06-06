@@ -119,7 +119,36 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 	nodeConfig.MaxPeers = 20
 	nodeConfig.MaxPendingPeers = 20
 
-	nodeConfig.WalletConfig = params.WalletConfig{Enabled: true}
+	nodeConfig.WalletConfig = params.WalletConfig{
+		Enabled:        true,
+		AlchemyAPIKeys: make(map[uint64]string),
+	}
+
+	if request.OpenseaAPIKey != "" {
+		nodeConfig.WalletConfig.OpenseaAPIKey = request.OpenseaAPIKey
+	}
+
+	if request.InfuraToken != "" {
+		nodeConfig.WalletConfig.InfuraAPIKey = request.InfuraToken
+	}
+
+	if request.InfuraSecret != "" {
+		nodeConfig.WalletConfig.InfuraAPIKeySecret = request.InfuraSecret
+	}
+
+	if request.AlchemyArbitrumMainnetToken != "" {
+		nodeConfig.WalletConfig.AlchemyAPIKeys[arbitrumChainID] = request.AlchemyArbitrumMainnetToken
+	}
+	if request.AlchemyArbitrumGoerliToken != "" {
+		nodeConfig.WalletConfig.AlchemyAPIKeys[arbitrumGoerliChainID] = request.AlchemyArbitrumGoerliToken
+	}
+	if request.AlchemyOptimismMainnetToken != "" {
+		nodeConfig.WalletConfig.AlchemyAPIKeys[optimismChainID] = request.AlchemyOptimismMainnetToken
+	}
+	if request.AlchemyOptimismGoerliToken != "" {
+		nodeConfig.WalletConfig.AlchemyAPIKeys[optimismGoerliChainID] = request.AlchemyOptimismGoerliToken
+	}
+
 	nodeConfig.LocalNotificationsConfig = params.LocalNotificationsConfig{Enabled: true}
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
@@ -177,6 +206,8 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 	} else {
 		nodeConfig.LogEnabled = false
 	}
+
+	nodeConfig.Networks = buildDefaultNetworks(request)
 
 	return nodeConfig, nil
 }

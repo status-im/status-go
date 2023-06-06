@@ -60,6 +60,13 @@
 // 1682073779_settings_table_remove_latest_derived_path_column.up.sql (4.47kB)
 // 1682146075_add_created_at_to_saved_addresses.up.sql (107B)
 // 1682393575_sync_ens_name.up.sql (713B)
+// 1683457503_add_blocks_ranges_sequential_table.up.sql (263B)
+// 1683627613_accounts_and_keycards_improvements.up.sql (3.64kB)
+// 1685041348_settings_table_add_latest_derived_path_column.up.sql (115B)
+// 1685440989_update_color_id_accounts.up.sql (918B)
+// 1685463947_add_to_asset_to_multitransaction.up.sql (61B)
+// 1685880973_add_profile_links_settings_table.up.sql (1.656kB)
+// 1686041510_add_idx_transfers_blkno_loaded.up.sql (71B)
 // doc.go (74B)
 
 package migrations
@@ -144,7 +151,7 @@ func _1640111208_dummyUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1640111208_dummy.up.sql", size: 258, mode: os.FileMode(0644), modTime: time.Unix(1645666387, 0)}
+	info := bindataFileInfo{name: "1640111208_dummy.up.sql", size: 258, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3e, 0xf0, 0xae, 0x20, 0x6e, 0x75, 0xd1, 0x36, 0x14, 0xf2, 0x40, 0xe5, 0xd6, 0x7a, 0xc4, 0xa5, 0x72, 0xaa, 0xb5, 0x4d, 0x71, 0x97, 0xb8, 0xe8, 0x95, 0x22, 0x95, 0xa2, 0xac, 0xaf, 0x48, 0x58}}
 	return a, nil
 }
@@ -164,7 +171,7 @@ func _1642666031_add_removed_clock_to_bookmarksUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1642666031_add_removed_clock_to_bookmarks.up.sql", size: 117, mode: os.FileMode(0644), modTime: time.Unix(1645666387, 0)}
+	info := bindataFileInfo{name: "1642666031_add_removed_clock_to_bookmarks.up.sql", size: 117, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x84, 0x4e, 0x38, 0x99, 0x7a, 0xc, 0x90, 0x13, 0xec, 0xfe, 0x2f, 0x55, 0xff, 0xb7, 0xb6, 0xaa, 0x96, 0xc6, 0x92, 0x79, 0xcc, 0xee, 0x4e, 0x99, 0x53, 0xfe, 0x1c, 0xbb, 0x32, 0x2, 0xa4, 0x27}}
 	return a, nil
 }
@@ -184,7 +191,7 @@ func _1643644541_gif_api_key_settingUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1643644541_gif_api_key_setting.up.sql", size: 108, mode: os.FileMode(0644), modTime: time.Unix(1645666387, 0)}
+	info := bindataFileInfo{name: "1643644541_gif_api_key_setting.up.sql", size: 108, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1b, 0x94, 0x28, 0xfb, 0x66, 0xd1, 0x7c, 0xb8, 0x89, 0xe2, 0xb4, 0x71, 0x65, 0x24, 0x57, 0x22, 0x95, 0x38, 0x97, 0x3, 0x9b, 0xc6, 0xa4, 0x41, 0x7b, 0xba, 0xf7, 0xdb, 0x70, 0xf7, 0x20, 0x3a}}
 	return a, nil
 }
@@ -204,7 +211,7 @@ func _1644188994_recent_stickersUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1644188994_recent_stickers.up.sql", size: 79, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1644188994_recent_stickers.up.sql", size: 79, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1e, 0xad, 0xaa, 0x30, 0xbf, 0x4, 0x7, 0xf8, 0xc3, 0x3, 0xb8, 0x97, 0x23, 0x2b, 0xbd, 0x1c, 0x60, 0x69, 0xb0, 0x42, 0x5e, 0x6b, 0xd, 0xa7, 0xa3, 0x6b, 0x2e, 0xdc, 0x70, 0x13, 0x72, 0x7}}
 	return a, nil
 }
@@ -224,7 +231,7 @@ func _1646659233_add_address_to_dapp_permisssionUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1646659233_add_address_to_dapp_permisssion.up.sql", size: 700, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1646659233_add_address_to_dapp_permisssion.up.sql", size: 700, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xed, 0xb0, 0x35, 0xcc, 0x2e, 0x16, 0xe6, 0x15, 0x86, 0x2c, 0x37, 0x80, 0xae, 0xa3, 0xc5, 0x31, 0x78, 0x5, 0x9d, 0xcd, 0x7b, 0xeb, 0x5f, 0xf2, 0xb3, 0x74, 0x72, 0xdf, 0xcf, 0x88, 0xb, 0x40}}
 	return a, nil
 }
@@ -244,7 +251,7 @@ func _1646841105_add_emoji_accountUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1646841105_add_emoji_account.up.sql", size: 96, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1646841105_add_emoji_account.up.sql", size: 96, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe6, 0x77, 0x29, 0x95, 0x18, 0x64, 0x82, 0x63, 0xe7, 0xaf, 0x6c, 0xa9, 0x15, 0x7d, 0x46, 0xa6, 0xbc, 0xdf, 0xa7, 0xd, 0x2b, 0xd2, 0x2d, 0x97, 0x4d, 0xa, 0x6b, 0xd, 0x6e, 0x90, 0x42, 0x5c}}
 	return a, nil
 }
@@ -264,7 +271,7 @@ func _1647278782_display_nameUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1647278782_display_name.up.sql", size: 110, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1647278782_display_name.up.sql", size: 110, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf4, 0xa1, 0x1f, 0x3e, 0x61, 0x65, 0x8d, 0xff, 0xee, 0xde, 0xc5, 0x91, 0xd9, 0x5c, 0xb5, 0xe2, 0xf0, 0xb7, 0xe7, 0x5c, 0x5c, 0x16, 0x25, 0x89, 0xee, 0x78, 0x12, 0xea, 0x3e, 0x48, 0x41, 0xa6}}
 	return a, nil
 }
@@ -284,7 +291,7 @@ func _1647862838_reset_last_backupUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1647862838_reset_last_backup.up.sql", size: 37, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1647862838_reset_last_backup.up.sql", size: 37, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x21, 0xe3, 0xd5, 0xf6, 0x5f, 0xfe, 0x65, 0xfa, 0x1d, 0x88, 0xf8, 0x5f, 0x24, 0x71, 0x34, 0x68, 0x96, 0x2a, 0x60, 0x87, 0x15, 0x82, 0x4d, 0x8a, 0x59, 0x3d, 0x1f, 0xd8, 0x56, 0xd4, 0xfb, 0xda}}
 	return a, nil
 }
@@ -304,7 +311,7 @@ func _1647871652_add_settings_sync_clock_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1647871652_add_settings_sync_clock_table.up.sql", size: 1044, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1647871652_add_settings_sync_clock_table.up.sql", size: 1044, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd8, 0x58, 0xec, 0x85, 0x90, 0xfa, 0x30, 0x98, 0x98, 0x9a, 0xa6, 0xa8, 0x96, 0x2b, 0x38, 0x93, 0xf3, 0xae, 0x46, 0x74, 0xa4, 0x41, 0x62, 0x9b, 0x2, 0x86, 0xbf, 0xe5, 0x2a, 0xce, 0xe2, 0xc0}}
 	return a, nil
 }
@@ -324,7 +331,7 @@ func _1647880168_add_torrent_configUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1647880168_add_torrent_config.up.sql", size: 211, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1647880168_add_torrent_config.up.sql", size: 211, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1, 0x92, 0x22, 0x37, 0x96, 0xf3, 0xb5, 0x5b, 0x27, 0xd0, 0x7d, 0x43, 0x5, 0x4e, 0x9d, 0xe2, 0x49, 0xbe, 0x86, 0x31, 0xa1, 0x89, 0xff, 0xd6, 0x51, 0xe0, 0x9c, 0xb, 0xda, 0xfc, 0xf2, 0x93}}
 	return a, nil
 }
@@ -344,7 +351,7 @@ func _1647882837_add_communities_settings_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1647882837_add_communities_settings_table.up.sql", size: 206, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1647882837_add_communities_settings_table.up.sql", size: 206, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xbd, 0x87, 0x78, 0x99, 0xd9, 0x5d, 0xbd, 0xf7, 0x57, 0x9c, 0xca, 0x97, 0xbd, 0xb3, 0xe9, 0xb5, 0x89, 0x31, 0x3f, 0xf6, 0x5c, 0x13, 0xb, 0xc3, 0x54, 0x93, 0x18, 0x40, 0x7, 0x82, 0xfe, 0x7e}}
 	return a, nil
 }
@@ -364,7 +371,7 @@ func _1647956635_add_waku_messages_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1647956635_add_waku_messages_table.up.sql", size: 266, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1647956635_add_waku_messages_table.up.sql", size: 266, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd1, 0xe, 0xe1, 0xdc, 0xda, 0x2e, 0x89, 0x8d, 0xdc, 0x2a, 0x1c, 0x13, 0xa1, 0xfc, 0xfe, 0xf, 0xb2, 0xb9, 0x85, 0xc8, 0x45, 0xd6, 0xd1, 0x7, 0x5c, 0xa3, 0x8, 0x47, 0x44, 0x6d, 0x96, 0xe0}}
 	return a, nil
 }
@@ -384,7 +391,7 @@ func _1648554928_network_testUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1648554928_network_test.up.sql", size: 132, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1648554928_network_test.up.sql", size: 132, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9a, 0xc5, 0x7f, 0x87, 0xf3, 0x2c, 0xf7, 0xbb, 0xd3, 0x3a, 0x4e, 0x76, 0x88, 0xca, 0xaf, 0x73, 0xce, 0x8f, 0xa1, 0xf6, 0x3d, 0x4d, 0xed, 0x6f, 0x49, 0xf2, 0xfe, 0x56, 0x2a, 0x60, 0x68, 0xca}}
 	return a, nil
 }
@@ -404,7 +411,7 @@ func _1649174829_add_visitble_tokenUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1649174829_add_visitble_token.up.sql", size: 84, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1649174829_add_visitble_token.up.sql", size: 84, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa3, 0x22, 0xc0, 0x2b, 0x3f, 0x4f, 0x3d, 0x5e, 0x4c, 0x68, 0x7c, 0xd0, 0x15, 0x36, 0x9f, 0xec, 0xa1, 0x2a, 0x7b, 0xb4, 0xe3, 0xc6, 0xc9, 0xb4, 0x81, 0x50, 0x4a, 0x11, 0x3b, 0x35, 0x7, 0xcf}}
 	return a, nil
 }
@@ -424,7 +431,7 @@ func _1649882262_add_derived_from_accountsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1649882262_add_derived_from_accounts.up.sql", size: 110, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1649882262_add_derived_from_accounts.up.sql", size: 110, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x11, 0xb9, 0x44, 0x4d, 0x85, 0x8d, 0x7f, 0xb4, 0xae, 0x4f, 0x5c, 0x66, 0x64, 0xb6, 0xe2, 0xe, 0x3d, 0xad, 0x9d, 0x8, 0x4f, 0xab, 0x6e, 0xa8, 0x7d, 0x76, 0x3, 0xad, 0x96, 0x1, 0xee, 0x5c}}
 	return a, nil
 }
@@ -444,7 +451,7 @@ func _1650612625_add_community_message_archive_hashes_tableUpSql() (*asset, erro
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1650612625_add_community_message_archive_hashes_table.up.sql", size: 130, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1650612625_add_community_message_archive_hashes_table.up.sql", size: 130, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x48, 0x31, 0xb3, 0x75, 0x23, 0xe2, 0x45, 0xe, 0x47, 0x1b, 0x35, 0xa5, 0x6e, 0x83, 0x4e, 0x64, 0x7d, 0xd7, 0xa2, 0xda, 0xe9, 0x53, 0xf1, 0x16, 0x86, 0x2c, 0x57, 0xad, 0xfa, 0xca, 0x39, 0xde}}
 	return a, nil
 }
@@ -464,7 +471,7 @@ func _1650616788_add_communities_archives_info_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1650616788_add_communities_archives_info_table.up.sql", size: 208, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1650616788_add_communities_archives_info_table.up.sql", size: 208, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd1, 0x4f, 0x80, 0x45, 0xb9, 0xd9, 0x15, 0xe2, 0x78, 0xd0, 0xcb, 0x71, 0xc1, 0x1b, 0xb7, 0x1b, 0x1b, 0x97, 0xfe, 0x47, 0x53, 0x3c, 0x62, 0xbc, 0xdd, 0x3a, 0x94, 0x1a, 0xc, 0x48, 0x76, 0xe}}
 	return a, nil
 }
@@ -484,7 +491,7 @@ func _1652715604_add_clock_accountsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1652715604_add_clock_accounts.up.sql", size: 62, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1652715604_add_clock_accounts.up.sql", size: 62, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb6, 0xd9, 0x8d, 0x73, 0xc9, 0xef, 0xfa, 0xb1, 0x4b, 0xa5, 0xf3, 0x5, 0x19, 0x26, 0x46, 0xf8, 0x47, 0x93, 0xdb, 0xac, 0x2, 0xef, 0xf9, 0x71, 0x56, 0x83, 0xe6, 0x2d, 0xb0, 0xd7, 0x83, 0x5c}}
 	return a, nil
 }
@@ -504,7 +511,7 @@ func _1653037334_add_notifications_settings_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1653037334_add_notifications_settings_table.up.sql", size: 1276, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1653037334_add_notifications_settings_table.up.sql", size: 1276, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x4b, 0xc4, 0x65, 0xac, 0xa, 0xf2, 0xef, 0xb6, 0x39, 0x3c, 0xc5, 0xb1, 0xb2, 0x9c, 0x86, 0x58, 0xe0, 0x38, 0xcb, 0x57, 0x3c, 0x76, 0x73, 0x87, 0x79, 0x4e, 0xf6, 0xed, 0xb0, 0x8e, 0x9e, 0xa}}
 	return a, nil
 }
@@ -524,7 +531,7 @@ func _1654702119_add_mutual_contact_settingsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1654702119_add_mutual_contact_settings.up.sql", size: 78, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1654702119_add_mutual_contact_settings.up.sql", size: 78, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x26, 0x66, 0x67, 0x50, 0xfe, 0xd7, 0xe3, 0x29, 0x8b, 0xff, 0x9d, 0x5a, 0x87, 0xa7, 0x99, 0x6e, 0xd6, 0xcd, 0x2e, 0xbb, 0x17, 0xdf, 0x7f, 0xf7, 0xa3, 0xfa, 0x32, 0x7c, 0x2d, 0x92, 0xc8, 0x74}}
 	return a, nil
 }
@@ -544,7 +551,7 @@ func _1655375270_add_clock_field_to_communities_settings_tableUpSql() (*asset, e
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1655375270_add_clock_field_to_communities_settings_table.up.sql", size: 74, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1655375270_add_clock_field_to_communities_settings_table.up.sql", size: 74, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x19, 0xc5, 0xc0, 0xf9, 0x84, 0x53, 0xdf, 0x83, 0xcf, 0xb6, 0x40, 0x6d, 0xf5, 0xdc, 0x77, 0x37, 0xb7, 0xe3, 0xa, 0x75, 0xe7, 0x6, 0x11, 0xca, 0x2b, 0x51, 0x92, 0xdd, 0x7d, 0xdb, 0xc3, 0xf5}}
 	return a, nil
 }
@@ -564,7 +571,7 @@ func _1655385721_drop_networks_configUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1655385721_drop_networks_config.up.sql", size: 27, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1655385721_drop_networks_config.up.sql", size: 27, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xfc, 0xa7, 0x20, 0xbb, 0x67, 0x21, 0xe, 0xc6, 0xc8, 0x21, 0x74, 0xe0, 0xce, 0xc8, 0xe2, 0x2, 0xb4, 0xea, 0xf0, 0xe5, 0xc4, 0x4d, 0xdd, 0xd4, 0x52, 0x31, 0xa9, 0x3d, 0xcd, 0xd8, 0x9b, 0xab}}
 	return a, nil
 }
@@ -584,7 +591,7 @@ func _1655385724_networks_chaincolor_shortnameUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1655385724_networks_chainColor_shortName.up.sql", size: 220, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1655385724_networks_chainColor_shortName.up.sql", size: 220, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd9, 0xe7, 0x84, 0xbb, 0x5f, 0xd2, 0x2c, 0x42, 0x88, 0x62, 0x52, 0xb6, 0x58, 0x31, 0xac, 0xc, 0x96, 0x2b, 0x1b, 0xe5, 0x4e, 0x9a, 0x3a, 0xf6, 0xf6, 0xfc, 0xa9, 0x1a, 0x35, 0x62, 0x28, 0x88}}
 	return a, nil
 }
@@ -604,7 +611,7 @@ func _1655456688_add_deleted_at_field_to_bookmarks_tableUpSql() (*asset, error) 
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1655456688_add_deleted_at_field_to_bookmarks_table.up.sql", size: 69, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1655456688_add_deleted_at_field_to_bookmarks_table.up.sql", size: 69, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe7, 0x9a, 0xbd, 0x9a, 0xc9, 0xf, 0xdf, 0x90, 0x0, 0x5d, 0xea, 0x6e, 0x7d, 0x51, 0x95, 0xcd, 0x90, 0xd3, 0x1a, 0x36, 0x6c, 0xf4, 0xbd, 0xa7, 0x6b, 0xbf, 0xe5, 0xdb, 0xa3, 0x88, 0xe3, 0x50}}
 	return a, nil
 }
@@ -624,7 +631,7 @@ func _1655462032_create_bookmarks_deleted_at_indexUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1655462032_create_bookmarks_deleted_at_index.up.sql", size: 81, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1655462032_create_bookmarks_deleted_at_index.up.sql", size: 81, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf, 0x8e, 0x20, 0x6b, 0x14, 0x9e, 0xcd, 0x97, 0xd3, 0xfe, 0x62, 0x3, 0x26, 0x59, 0x1, 0x6c, 0x99, 0xef, 0x6d, 0x21, 0xd4, 0xb5, 0xa3, 0xf4, 0x39, 0x40, 0x54, 0x6, 0xd, 0x60, 0x13, 0x38}}
 	return a, nil
 }
@@ -644,7 +651,7 @@ func _1657617291_add_multi_transactions_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1657617291_add_multi_transactions_table.up.sql", size: 412, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1657617291_add_multi_transactions_table.up.sql", size: 412, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x86, 0xb0, 0x4e, 0x8c, 0x4, 0x82, 0xb4, 0x43, 0xaa, 0xd0, 0x16, 0xdd, 0xcb, 0x88, 0x81, 0xac, 0x4, 0x34, 0x1a, 0x8f, 0x2e, 0xc5, 0x69, 0xb, 0xf0, 0x17, 0xf7, 0xe3, 0x9, 0xe, 0x54, 0xe0}}
 	return a, nil
 }
@@ -664,7 +671,7 @@ func _1660134042_add_social_links_settings_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1660134042_add_social_links_settings_table.up.sql", size: 334, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1660134042_add_social_links_settings_table.up.sql", size: 334, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x84, 0x73, 0xb6, 0xe7, 0x3f, 0xaa, 0x39, 0x9a, 0x56, 0x56, 0x31, 0xf1, 0x8e, 0x26, 0x23, 0x1, 0xe4, 0xfa, 0x98, 0xfe, 0x78, 0x87, 0x20, 0xcb, 0x52, 0xf4, 0x38, 0x7f, 0xc4, 0x1c, 0x4, 0x22}}
 	return a, nil
 }
@@ -684,7 +691,7 @@ func _1660134060_settings_bioUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1660134060_settings_bio.up.sql", size: 91, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1660134060_settings_bio.up.sql", size: 91, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x46, 0x25, 0xa0, 0xa6, 0x47, 0xff, 0xbc, 0x2a, 0x0, 0xff, 0x59, 0x4b, 0xb0, 0xc9, 0x4e, 0x15, 0xe4, 0xd9, 0xda, 0xeb, 0xfe, 0x55, 0x98, 0xc3, 0x9d, 0x96, 0xe7, 0xf, 0xd1, 0x5c, 0x93, 0x73}}
 	return a, nil
 }
@@ -704,7 +711,7 @@ func _1660134070_add_wakuv2_storeUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1660134070_add_wakuv2_store.up.sql", size: 269, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1660134070_add_wakuv2_store.up.sql", size: 269, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1d, 0xe6, 0xc3, 0x9, 0xef, 0xdc, 0xae, 0x49, 0x30, 0x78, 0x54, 0xd6, 0xdb, 0xbf, 0xc0, 0x8e, 0x25, 0x8f, 0xfc, 0x67, 0x80, 0x39, 0x37, 0xd4, 0x86, 0xc1, 0x85, 0xc8, 0x99, 0xc4, 0x59, 0xd4}}
 	return a, nil
 }
@@ -724,7 +731,7 @@ func _1660134072_waku2_store_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1660134072_waku2_store_messages.up.sql", size: 497, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1660134072_waku2_store_messages.up.sql", size: 497, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3e, 0xeb, 0xb4, 0xa0, 0xa1, 0x2b, 0xcb, 0x4c, 0x3c, 0xc6, 0xd0, 0xe8, 0x96, 0xe3, 0x96, 0xf1, 0x4f, 0x1f, 0xe0, 0xe7, 0x1f, 0x85, 0xa3, 0xe, 0xf7, 0x52, 0x56, 0x63, 0x2b, 0xb0, 0x87, 0x7b}}
 	return a, nil
 }
@@ -744,7 +751,7 @@ func _1662365868_add_key_uid_accountsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1662365868_add_key_uid_accounts.up.sql", size: 68, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1662365868_add_key_uid_accounts.up.sql", size: 68, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc6, 0xd8, 0x2f, 0x2f, 0x3b, 0xa8, 0xbd, 0x6d, 0xf6, 0x87, 0x7e, 0xd2, 0xf1, 0xa2, 0xf7, 0x81, 0x6a, 0x23, 0x10, 0xbc, 0xbf, 0x5b, 0xe7, 0x2b, 0x9c, 0xa9, 0x8a, 0x18, 0xbb, 0xd0, 0x86, 0x91}}
 	return a, nil
 }
@@ -764,7 +771,7 @@ func _1662447680_add_keypairs_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1662447680_add_keypairs_table.up.sql", size: 218, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1662447680_add_keypairs_table.up.sql", size: 218, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xdc, 0x25, 0xa9, 0xc7, 0x63, 0x27, 0x97, 0x35, 0x5f, 0x6b, 0xab, 0x26, 0xcb, 0xf9, 0xbd, 0x5e, 0xac, 0x3, 0xa0, 0x5e, 0xb9, 0x71, 0xa3, 0x1f, 0xb3, 0x4f, 0x7f, 0x79, 0x28, 0x48, 0xbe, 0xc}}
 	return a, nil
 }
@@ -784,7 +791,7 @@ func _1662460056_move_favourites_to_saved_addressesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1662460056_move_favourites_to_saved_addresses.up.sql", size: 233, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1662460056_move_favourites_to_saved_addresses.up.sql", size: 233, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x10, 0xa2, 0x8c, 0xa3, 0xec, 0xad, 0xdf, 0xc3, 0x48, 0x5, 0x9b, 0x50, 0x25, 0x59, 0xae, 0x7d, 0xee, 0x58, 0xd2, 0x41, 0x27, 0xf2, 0x22, 0x2e, 0x9a, 0xb9, 0x4a, 0xcc, 0x38, 0x6e, 0x3a, 0xb2}}
 	return a, nil
 }
@@ -804,7 +811,7 @@ func _1662738097_add_base_fee_transactionUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1662738097_add_base_fee_transaction.up.sql", size: 112, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1662738097_add_base_fee_transaction.up.sql", size: 112, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6b, 0xfb, 0x10, 0xae, 0xfc, 0x77, 0x70, 0x98, 0x6f, 0xec, 0xaa, 0xcd, 0x7, 0xc7, 0x74, 0x23, 0xc, 0xd5, 0x1e, 0x82, 0xdd, 0xfe, 0xff, 0x3b, 0xd2, 0x49, 0x10, 0x5b, 0x30, 0xc, 0x2d, 0xb0}}
 	return a, nil
 }
@@ -824,7 +831,7 @@ func _1662972194_add_keypairs_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1662972194_add_keypairs_table.up.sql", size: 345, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1662972194_add_keypairs_table.up.sql", size: 345, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xab, 0x76, 0xf2, 0x86, 0xe1, 0x7e, 0xe9, 0x47, 0x32, 0x48, 0xd5, 0x6b, 0xe5, 0xd, 0xab, 0xb7, 0xf1, 0xd4, 0xf1, 0xad, 0x38, 0xa6, 0x11, 0xe7, 0xce, 0x5c, 0x11, 0x11, 0xf, 0x47, 0xb2, 0x4}}
 	return a, nil
 }
@@ -844,7 +851,7 @@ func _1664392661_add_third_party_id_to_waku_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1664392661_add_third_party_id_to_waku_messages.up.sql", size: 70, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1664392661_add_third_party_id_to_waku_messages.up.sql", size: 70, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xfd, 0x67, 0x66, 0x9e, 0x66, 0x74, 0xce, 0x1c, 0xb, 0x1b, 0x9d, 0xd5, 0xfc, 0x65, 0xe, 0x83, 0x90, 0x4c, 0x61, 0x4e, 0x6b, 0xe7, 0x86, 0xbe, 0x36, 0x4f, 0x91, 0x36, 0x4, 0x47, 0x7b, 0x82}}
 	return a, nil
 }
@@ -864,7 +871,7 @@ func _1664783660_add_sync_info_to_saved_addressesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1664783660_add_sync_info_to_saved_addresses.up.sql", size: 388, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1664783660_add_sync_info_to_saved_addresses.up.sql", size: 388, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x67, 0x7c, 0x3a, 0x95, 0x4e, 0x55, 0xb2, 0xbd, 0xb4, 0x18, 0x93, 0xc1, 0xcf, 0x9f, 0x12, 0xbb, 0x49, 0x8a, 0x2a, 0x6a, 0x2a, 0x7f, 0xad, 0x44, 0xc3, 0xf, 0x3a, 0x79, 0x18, 0xb9, 0x4c, 0x64}}
 	return a, nil
 }
@@ -884,7 +891,7 @@ func _1668109917_wakunodesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1668109917_wakunodes.up.sql", size: 99, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1668109917_wakunodes.up.sql", size: 99, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x29, 0xaa, 0x9e, 0x2, 0x66, 0x85, 0x69, 0xa8, 0xd9, 0xe2, 0x4b, 0x8d, 0x2a, 0x9c, 0xdf, 0xd2, 0xef, 0x64, 0x58, 0xe3, 0xa6, 0xe7, 0xc1, 0xd1, 0xc8, 0x9c, 0xc0, 0x2c, 0x1, 0xa8, 0x7b, 0x81}}
 	return a, nil
 }
@@ -904,7 +911,7 @@ func _1670249678_display_name_to_settings_sync_clock_tableUpSql() (*asset, error
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1670249678_display_name_to_settings_sync_clock_table.up.sql", size: 83, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1670249678_display_name_to_settings_sync_clock_table.up.sql", size: 83, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x39, 0x18, 0xdc, 0xc4, 0x1f, 0x79, 0x22, 0x16, 0x4d, 0xdf, 0x6c, 0x66, 0xd5, 0xa4, 0x88, 0x5d, 0x5, 0x37, 0xa7, 0x41, 0x5, 0x50, 0xae, 0x12, 0xfa, 0x7e, 0x89, 0x24, 0x5c, 0xae, 0x30, 0xfc}}
 	return a, nil
 }
@@ -924,7 +931,7 @@ func _1670836810_add_imported_flag_to_community_archive_hashesUpSql() (*asset, e
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1670836810_add_imported_flag_to_community_archive_hashes.up.sql", size: 144, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1670836810_add_imported_flag_to_community_archive_hashes.up.sql", size: 144, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6f, 0xf, 0xf0, 0xbd, 0xfe, 0x63, 0x25, 0x8f, 0x5e, 0x46, 0x4b, 0x45, 0x31, 0x8b, 0x3e, 0xd8, 0x6b, 0x5d, 0x9d, 0x6d, 0x10, 0x9a, 0x87, 0x4b, 0x18, 0xc6, 0x39, 0x81, 0x6e, 0xe4, 0x75, 0xfb}}
 	return a, nil
 }
@@ -944,7 +951,7 @@ func _1671438731_add_magnetlink_uri_to_communities_archive_infoUpSql() (*asset, 
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1671438731_add_magnetlink_uri_to_communities_archive_info.up.sql", size: 86, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1671438731_add_magnetlink_uri_to_communities_archive_info.up.sql", size: 86, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xda, 0x8b, 0x4b, 0xd6, 0xd8, 0xe2, 0x3d, 0xf7, 0x6b, 0xcd, 0x1e, 0x70, 0x9, 0x2e, 0x35, 0x4, 0x61, 0xc3, 0xb5, 0x9d, 0xc5, 0x27, 0x21, 0xa, 0x5a, 0xd6, 0x3e, 0xa6, 0x24, 0xa2, 0x12, 0xdf}}
 	return a, nil
 }
@@ -964,7 +971,7 @@ func _1672933930_switcher_cardUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1672933930_switcher_card.up.sql", size: 162, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1672933930_switcher_card.up.sql", size: 162, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x39, 0xba, 0xdc, 0xbb, 0x40, 0x4, 0xf2, 0x10, 0xdf, 0xb4, 0xd2, 0x80, 0x8a, 0x74, 0x4d, 0xf6, 0xbc, 0x50, 0x7, 0xd, 0x22, 0x7f, 0xc4, 0xaf, 0xaa, 0xde, 0xdc, 0x71, 0xe9, 0x42, 0x98, 0x36}}
 	return a, nil
 }
@@ -984,7 +991,7 @@ func _1674056187_add_price_cacheUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1674056187_add_price_cache.up.sql", size: 255, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1674056187_add_price_cache.up.sql", size: 255, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb7, 0x79, 0x6a, 0x9b, 0x28, 0xd1, 0x22, 0xf0, 0x84, 0x76, 0x40, 0x39, 0x49, 0x15, 0x5d, 0xaa, 0xfd, 0x11, 0xff, 0x13, 0x27, 0x42, 0x12, 0xfa, 0x82, 0xe6, 0x7a, 0xf0, 0x5e, 0x1f, 0xe3, 0xba}}
 	return a, nil
 }
@@ -1004,7 +1011,7 @@ func _1674136690_ens_usernamesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1674136690_ens_usernames.up.sql", size: 98, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1674136690_ens_usernames.up.sql", size: 98, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x81, 0x7a, 0xf3, 0xa8, 0x88, 0x99, 0xd6, 0x9c, 0x69, 0x48, 0x3c, 0x10, 0xda, 0x72, 0xdc, 0x14, 0xd, 0x6e, 0x8c, 0x82, 0x92, 0x2d, 0x2c, 0xee, 0x4c, 0x70, 0xa4, 0xdc, 0x5c, 0x5, 0x2, 0xc3}}
 	return a, nil
 }
@@ -1024,7 +1031,7 @@ func _1674232431_add_balance_historyUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1674232431_add_balance_history.up.sql", size: 698, mode: os.FileMode(0644), modTime: time.Unix(1675323803, 0)}
+	info := bindataFileInfo{name: "1674232431_add_balance_history.up.sql", size: 698, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf7, 0xb5, 0x18, 0xca, 0x4a, 0x93, 0xbb, 0x6f, 0xa4, 0xee, 0xe4, 0x3e, 0xff, 0x6a, 0x4b, 0xe2, 0xe1, 0x61, 0x28, 0xee, 0xc5, 0x26, 0x57, 0x61, 0x5e, 0x6d, 0x44, 0x1e, 0x85, 0x43, 0x70, 0xa2}}
 	return a, nil
 }
@@ -1044,7 +1051,7 @@ func _1676368933_keypairs_to_keycardsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1676368933_keypairs_to_keycards.up.sql", size: 639, mode: os.FileMode(0644), modTime: time.Unix(1677122376, 0)}
+	info := bindataFileInfo{name: "1676368933_keypairs_to_keycards.up.sql", size: 639, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x81, 0x93, 0x27, 0x2, 0xf0, 0x37, 0x81, 0x65, 0xa4, 0xb3, 0x5b, 0x60, 0x36, 0x95, 0xfc, 0x81, 0xf0, 0x3b, 0x7c, 0xc3, 0x2c, 0x85, 0xbd, 0x38, 0x46, 0xa4, 0x95, 0x4a, 0x6, 0x3e, 0x74, 0xd5}}
 	return a, nil
 }
@@ -1064,7 +1071,7 @@ func _1676951398_add_currency_format_cacheUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1676951398_add_currency_format_cache.up.sql", size: 291, mode: os.FileMode(0644), modTime: time.Unix(1677122376, 0)}
+	info := bindataFileInfo{name: "1676951398_add_currency_format_cache.up.sql", size: 291, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf9, 0xa3, 0x76, 0x35, 0xca, 0xf, 0xe8, 0xdf, 0xd9, 0x61, 0xf9, 0xed, 0xfc, 0x6d, 0xf5, 0xe, 0x11, 0x88, 0xbd, 0x14, 0x92, 0xc6, 0x57, 0x53, 0xe, 0xcd, 0x52, 0xf4, 0xa9, 0xb1, 0xdd, 0xfd}}
 	return a, nil
 }
@@ -1084,7 +1091,7 @@ func _1676968196_keycards_add_clock_columnUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1676968196_keycards_add_clock_column.up.sql", size: 73, mode: os.FileMode(0644), modTime: time.Unix(1677564198, 0)}
+	info := bindataFileInfo{name: "1676968196_keycards_add_clock_column.up.sql", size: 73, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x4c, 0xf, 0x1c, 0x28, 0x41, 0x57, 0x57, 0x6c, 0xe, 0x75, 0x6b, 0x75, 0x12, 0x0, 0x18, 0x1e, 0x88, 0x1e, 0x45, 0xe0, 0x32, 0xb9, 0xd4, 0xd9, 0x2e, 0xc8, 0xb, 0x80, 0x6, 0x51, 0x3d, 0x28}}
 	return a, nil
 }
@@ -1104,7 +1111,7 @@ func _1676968197_add_fallback_rpc_to_networksUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1676968197_add_fallback_rpc_to_networks.up.sql", size: 112, mode: os.FileMode(0644), modTime: time.Unix(1677576114, 0)}
+	info := bindataFileInfo{name: "1676968197_add_fallback_rpc_to_networks.up.sql", size: 112, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x77, 0x6a, 0xc6, 0x45, 0xfa, 0x62, 0x84, 0x74, 0x6d, 0x7c, 0xd7, 0x1d, 0x79, 0xb6, 0x38, 0x43, 0xa8, 0x8, 0x6b, 0x75, 0x3d, 0x9, 0x2, 0xc5, 0x9f, 0xbb, 0x45, 0x56, 0x4c, 0x4e, 0x17, 0x89}}
 	return a, nil
 }
@@ -1124,7 +1131,7 @@ func _1677674090_add_chains_ens_istest_to_saved_addressesUpSql() (*asset, error)
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1677674090_add_chains_ens_istest_to_saved_addresses.up.sql", size: 638, mode: os.FileMode(0644), modTime: time.Unix(1678240714, 0)}
+	info := bindataFileInfo{name: "1677674090_add_chains_ens_istest_to_saved_addresses.up.sql", size: 638, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa8, 0x2d, 0xa4, 0x1b, 0xf6, 0x6a, 0x13, 0x7b, 0xe, 0x59, 0xcd, 0xe2, 0x4e, 0x81, 0x99, 0xc4, 0x33, 0x84, 0xde, 0x66, 0xca, 0xac, 0x2f, 0x5, 0x90, 0xac, 0xfd, 0x4e, 0xfc, 0x55, 0x44, 0xe5}}
 	return a, nil
 }
@@ -1144,7 +1151,7 @@ func _1677681143_accounts_table_type_column_updateUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1677681143_accounts_table_type_column_update.up.sql", size: 135, mode: os.FileMode(0644), modTime: time.Unix(1678240714, 0)}
+	info := bindataFileInfo{name: "1677681143_accounts_table_type_column_update.up.sql", size: 135, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd2, 0xc4, 0x6, 0x42, 0x50, 0x1d, 0xf4, 0x48, 0x55, 0xbc, 0xa2, 0x19, 0xdd, 0xad, 0xc8, 0xc, 0xa7, 0x30, 0xb6, 0xaf, 0xe, 0x2b, 0xaa, 0x2a, 0xa4, 0xe1, 0xb9, 0x41, 0x23, 0x66, 0xd3, 0x3}}
 	return a, nil
 }
@@ -1164,7 +1171,7 @@ func _1678264207_accounts_table_new_columns_addedUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1678264207_accounts_table_new_columns_added.up.sql", size: 130, mode: os.FileMode(0644), modTime: time.Unix(1680083223, 0)}
+	info := bindataFileInfo{name: "1678264207_accounts_table_new_columns_added.up.sql", size: 130, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf4, 0xd4, 0xf3, 0x35, 0xef, 0x5c, 0x19, 0x3c, 0x15, 0x90, 0x60, 0xbd, 0x1f, 0x81, 0xf0, 0x86, 0x73, 0x89, 0xa0, 0x70, 0xf2, 0x46, 0xae, 0xea, 0xd0, 0xc6, 0x9e, 0x55, 0x4a, 0x54, 0x62, 0xbb}}
 	return a, nil
 }
@@ -1184,7 +1191,7 @@ func _1680770368_add_bio_to_settings_sync_clock_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1680770368_add_bio_to_settings_sync_clock_table.up.sql", size: 75, mode: os.FileMode(0644), modTime: time.Unix(1681777994, 0)}
+	info := bindataFileInfo{name: "1680770368_add_bio_to_settings_sync_clock_table.up.sql", size: 75, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x4a, 0x52, 0xf6, 0x3f, 0xaa, 0xd, 0xa0, 0xee, 0xe8, 0xe6, 0x16, 0x21, 0x80, 0x61, 0xe4, 0x7a, 0x4e, 0x37, 0x8d, 0x30, 0x51, 0x20, 0x4d, 0x15, 0x47, 0xfb, 0x6, 0xa1, 0xce, 0xc8, 0x27, 0x5a}}
 	return a, nil
 }
@@ -1204,7 +1211,7 @@ func _1681110436_add_mnemonic_to_settings_sync_clock_tableUpSql() (*asset, error
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1681110436_add_mnemonic_to_settings_sync_clock_table.up.sql", size: 311, mode: os.FileMode(0644), modTime: time.Unix(1681777994, 0)}
+	info := bindataFileInfo{name: "1681110436_add_mnemonic_to_settings_sync_clock_table.up.sql", size: 311, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3d, 0x74, 0x81, 0x7d, 0x9e, 0x77, 0xb6, 0xfe, 0xe3, 0xcb, 0x48, 0xe5, 0x5f, 0x39, 0x23, 0xa1, 0x7d, 0x53, 0x22, 0xe8, 0x96, 0x15, 0x8a, 0x1e, 0x8e, 0xbc, 0xe2, 0x1d, 0xc4, 0xc2, 0x56, 0x34}}
 	return a, nil
 }
@@ -1224,7 +1231,7 @@ func _1681392602_9d_sync_periodUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1681392602_9d_sync_period.up.sql", size: 60, mode: os.FileMode(0644), modTime: time.Unix(1681777994, 0)}
+	info := bindataFileInfo{name: "1681392602_9d_sync_period.up.sql", size: 60, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc9, 0xa, 0x90, 0x29, 0x7f, 0x76, 0x98, 0xa7, 0x71, 0x80, 0x5a, 0x2f, 0xbe, 0x23, 0x9a, 0xd4, 0xf4, 0x39, 0x19, 0xd3, 0xa5, 0x34, 0x6e, 0x67, 0x6a, 0xbe, 0x8a, 0xad, 0x21, 0xc7, 0xba, 0x88}}
 	return a, nil
 }
@@ -1244,7 +1251,7 @@ func _1681762078_default_sync_period_9dUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1681762078_default_sync_period_9d.up.sql", size: 3002, mode: os.FileMode(0644), modTime: time.Unix(1682429358, 0)}
+	info := bindataFileInfo{name: "1681762078_default_sync_period_9d.up.sql", size: 3002, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3e, 0xd9, 0x26, 0xfc, 0xa9, 0x45, 0xc1, 0x81, 0xa8, 0xe2, 0x2c, 0xe9, 0x3c, 0xea, 0x1d, 0x37, 0x11, 0x45, 0x8c, 0x6c, 0xbc, 0xc2, 0x6, 0x69, 0x2, 0x75, 0x29, 0x40, 0x9f, 0xc5, 0xbb, 0x36}}
 	return a, nil
 }
@@ -1264,7 +1271,7 @@ func _1681780680_add_clock_to_social_links_settingsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1681780680_add_clock_to_social_links_settings.up.sql", size: 137, mode: os.FileMode(0644), modTime: time.Unix(1682429358, 0)}
+	info := bindataFileInfo{name: "1681780680_add_clock_to_social_links_settings.up.sql", size: 137, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x63, 0x11, 0xf5, 0x41, 0xe5, 0x5a, 0xf4, 0xe3, 0xf3, 0x14, 0x87, 0x28, 0xd8, 0xf0, 0x52, 0x31, 0x8, 0xd5, 0xbb, 0xf4, 0xff, 0x55, 0x5f, 0x42, 0x90, 0xcb, 0xf7, 0x46, 0x2, 0x6, 0xbe, 0x42}}
 	return a, nil
 }
@@ -1284,7 +1291,7 @@ func _1682073779_settings_table_remove_latest_derived_path_columnUpSql() (*asset
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1682073779_settings_table_remove_latest_derived_path_column.up.sql", size: 4470, mode: os.FileMode(0644), modTime: time.Unix(1682429358, 0)}
+	info := bindataFileInfo{name: "1682073779_settings_table_remove_latest_derived_path_column.up.sql", size: 4470, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7a, 0x36, 0x2, 0x41, 0xd, 0x5c, 0xd1, 0x92, 0x85, 0x6d, 0x84, 0xff, 0x67, 0xa7, 0x4c, 0x67, 0xa4, 0xef, 0x52, 0x69, 0x1f, 0x22, 0x25, 0x92, 0xc, 0xb3, 0x89, 0x50, 0x91, 0xc, 0x49, 0xf9}}
 	return a, nil
 }
@@ -1304,7 +1311,7 @@ func _1682146075_add_created_at_to_saved_addressesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1682146075_add_created_at_to_saved_addresses.up.sql", size: 107, mode: os.FileMode(0644), modTime: time.Unix(1682429358, 0)}
+	info := bindataFileInfo{name: "1682146075_add_created_at_to_saved_addresses.up.sql", size: 107, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x88, 0xfe, 0x35, 0x9c, 0x6b, 0xdf, 0x67, 0x18, 0x16, 0xe4, 0xc9, 0xd4, 0x77, 0x7c, 0x4, 0xe2, 0x6c, 0x41, 0xd9, 0x53, 0x97, 0xfe, 0x5, 0xa3, 0x23, 0xce, 0x82, 0xad, 0x92, 0x5e, 0xd7, 0x7d}}
 	return a, nil
 }
@@ -1324,8 +1331,148 @@ func _1682393575_sync_ens_nameUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1682393575_sync_ens_name.up.sql", size: 713, mode: os.FileMode(0644), modTime: time.Unix(1682560340, 0)}
+	info := bindataFileInfo{name: "1682393575_sync_ens_name.up.sql", size: 713, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xfb, 0xea, 0xcb, 0x4d, 0x71, 0x5a, 0x49, 0x19, 0x8b, 0xef, 0x66, 0x27, 0x33, 0x89, 0xb0, 0xe, 0x37, 0x1b, 0x41, 0x8, 0x12, 0xcc, 0x56, 0xd8, 0x1b, 0xf, 0xf8, 0x50, 0x4b, 0x93, 0xf1, 0x29}}
+	return a, nil
+}
+
+var __1683457503_add_blocks_ranges_sequential_tableUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x74\x8e\xd1\x4a\x80\x30\x14\x86\xef\x7d\x8a\xff\x52\xc1\x37\xe8\x6a\xea\xd2\x43\x36\x63\xce\xcc\xab\x31\x73\x85\x38\x94\xb6\x45\xaf\x1f\x49\x21\x44\xdd\x9e\xef\xfc\x1f\x5f\x29\x39\x53\x1c\x8a\x15\x2d\x07\xdd\x42\x74\x0a\xfc\x89\x7a\xd5\x63\x76\xc7\xf3\x16\xb4\x37\xfb\xab\x0d\x3a\xd8\xb7\x77\xbb\xc7\xd5\x38\xa4\x09\x00\xec\x36\x7e\x1c\x7e\xd3\xeb\x82\x41\xf4\x54\x0b\x5e\xa1\xa0\x9a\x84\x3a\x25\x62\x68\xdb\xfc\x7c\x34\xcb\xe2\x6d\x08\x78\x64\xb2\x6c\x98\xfc\x45\x67\xb7\xe9\x10\x8d\x8f\xdf\xe3\xeb\xfa\xb2\xfa\x10\xff\x56\x7e\x61\x67\xfe\xa3\x0f\x92\xee\x99\x9c\x70\xc7\x27\xa4\x57\x66\xfe\x53\x92\x25\x19\x46\x52\x4d\x37\x28\xc8\x6e\xa4\xea\x26\xf9\x0c\x00\x00\xff\xff\x16\x63\xd9\xa7\x07\x01\x00\x00")
+
+func _1683457503_add_blocks_ranges_sequential_tableUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1683457503_add_blocks_ranges_sequential_tableUpSql,
+		"1683457503_add_blocks_ranges_sequential_table.up.sql",
+	)
+}
+
+func _1683457503_add_blocks_ranges_sequential_tableUpSql() (*asset, error) {
+	bytes, err := _1683457503_add_blocks_ranges_sequential_tableUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1683457503_add_blocks_ranges_sequential_table.up.sql", size: 263, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xfe, 0x57, 0x2e, 0x0, 0x6a, 0x6e, 0xd7, 0xeb, 0xe6, 0x66, 0x79, 0x32, 0x22, 0x82, 0x92, 0xf4, 0xc9, 0xf1, 0x58, 0x1a, 0x45, 0x60, 0x77, 0x50, 0xe7, 0x54, 0x4a, 0xc0, 0x42, 0x3a, 0x4f, 0x35}}
+	return a, nil
+}
+
+var __1683627613_accounts_and_keycards_improvementsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xbc\x56\xcd\x72\xea\x36\x14\xde\xfb\x29\x4e\xd9\x94\xcc\x60\xee\x5d\x37\x93\xce\x38\x20\x6e\xe8\x25\x76\xc6\x38\x6d\xb3\x32\x8a\x75\x88\x55\x8c\xe4\xb1\x45\x12\xde\xbe\x23\xc9\x36\xc6\x38\x81\x66\x51\x36\xd8\x3a\x3f\xfa\xce\xdf\x77\xec\xba\xf0\x20\xcb\x92\x3f\x67\x08\x2b\x99\x63\x41\x9f\x33\x5c\x41\x22\xb3\xdd\x56\xc0\x2b\xcd\x76\x58\xfe\xe6\xb8\x2e\x0c\x84\x1c\x40\xf5\xfb\xf6\x0d\xa8\x00\x9a\x24\x72\x27\x14\xf0\x12\x84\x14\x50\x1b\x03\xaf\x8e\x14\x50\xd8\xe0\x3e\xa1\x05\x6b\x74\xa9\x60\xa0\x52\x2c\xd0\xaa\x68\x79\xa9\x64\x81\xb0\xe6\x19\xc2\x5a\x16\xda\x5a\x2b\xf5\xca\x54\x8a\x40\x19\x2b\xb0\x2c\xab\x5b\x18\x16\xfc\x15\x19\xac\x0b\xb9\x35\x28\x73\x5a\x28\x4e\xb3\x6c\x3f\x38\x45\xd9\xc8\x5a\x58\xd7\x97\xc3\x4d\x0a\xa4\x0a\xd9\xd7\x70\xad\x77\x06\x53\x6f\xf6\x8c\xec\x6b\x98\x68\x6f\x06\x1d\x7d\xa5\xc7\x18\x17\x2f\x20\xf0\x0d\x94\xf6\x5b\xc2\x6a\x83\xfb\x9c\xf2\xa2\x5c\x19\x27\xcd\x6b\x5c\xb9\x2e\x57\xce\x24\x24\x5e\x44\x20\xf2\x6e\x17\x04\xe6\x33\xf0\x83\x08\xc8\xdf\xf3\x65\xb4\x84\x5a\x1b\x86\x0e\xe8\x97\x78\xc7\x19\xfc\xe9\x85\x93\x3b\x2f\x84\x87\x70\x7e\xef\x85\x4f\xf0\x93\x3c\x19\x1b\xff\x71\xb1\x80\xc9\x1d\x99\xfc\x84\x61\x86\xe2\x45\xa5\x43\x55\xf0\xed\xb0\xb2\xbb\xba\x82\xdf\xe1\xfb\xd5\xc8\x01\x10\x74\x8b\x8d\x9b\xc6\x74\x4a\x66\xde\xe3\x22\x82\xc1\x40\xeb\xa8\x7d\x7e\x56\xa7\xca\x78\xac\x33\x7e\x4e\x37\xa3\xa5\x8a\x77\x25\xb2\xd8\x58\x51\xc5\xa5\x88\xb9\x60\xf8\x0e\x73\x3f\x3a\xb5\xfa\xae\x8d\xca\xbd\x48\x2e\xf1\x0f\xae\x0b\x1b\xc4\xbc\xd4\x55\xe6\x62\x2d\xe1\x2d\xe5\x49\x0a\x0c\x5f\x79\x82\xa0\x52\x5e\xd6\xb9\x34\x15\x64\xac\xee\x13\x80\x24\x93\xc9\xe6\x03\x0c\xce\xd5\xb5\x73\x49\x7d\x9a\x6a\x9a\x42\xd5\x6d\xd9\x53\xa8\xd1\x69\x1d\xf5\x51\xbe\x7b\xde\xe0\xfe\xe8\x84\xaa\xf4\x5c\x4a\x2f\x29\x63\x22\x33\x59\x9c\x53\xc2\xad\xfc\x87\x9f\x53\x7a\xa3\x59\x86\x0a\x6e\x83\x60\x71\xaa\x32\xf3\x16\x4b\x62\xee\x4b\xe9\x59\x9d\x94\x33\x86\xe2\x9c\x56\x33\x9b\x1f\xe3\x12\xd2\x96\x9e\x61\x99\x14\xfc\x19\xcb\xd6\x90\xff\x5a\x56\x1e\x78\xc6\xd5\x1e\x86\x05\x52\xa6\xc5\xf8\x9e\x67\x54\x98\xf6\x03\xaa\x0c\x8d\x28\x99\x83\x5c\xdb\x2e\xd1\x13\x7d\xa5\xe3\xb0\xc4\x13\x53\x05\x53\x2f\x22\xd1\xfc\x9e\x34\x00\x34\xba\x5d\xce\x3e\x95\x7f\xd6\x55\x5a\x3e\x0b\x42\x32\xff\xe1\xeb\x9e\x68\x06\x14\x42\x32\x23\x21\xf1\x27\xe4\xd0\x59\x07\xa1\xa3\x79\x2c\xf0\x61\x4a\x16\x24\x22\x30\xf1\x96\x13\x6f\x4a\x4c\x87\xba\x2e\xcc\x76\xd9\x9a\x67\x99\x66\x1f\x13\x92\x61\x1f\x67\xee\x2f\x49\x18\x69\x18\xc1\x81\x4b\x1c\x80\x25\x59\x90\x49\x54\x77\xe2\xa8\x96\xc5\xba\xa3\x46\x30\xc8\x0b\xa9\xf3\x30\x18\x1d\x4d\xf8\xe8\x93\x19\x1e\x99\x29\xb4\x41\xeb\xe8\xc2\xe0\x1e\x9a\x99\x70\x00\xfe\xba\x23\x21\xb1\x9c\xf2\xcb\x0d\x0c\xde\xa8\x4a\xd2\x01\x78\xfe\xf4\x70\x56\x22\xb2\xce\xd1\x06\xf7\x03\x07\xe0\x47\x18\x3c\x3e\xc0\xed\x53\x8d\xf7\xda\xf9\x62\x60\xda\xf1\xff\x1a\x53\xe7\xf5\x05\x05\x16\xba\x6d\xfe\x43\x54\x71\xfb\xca\x2a\x3c\x3a\xae\x28\x66\x04\x9b\x7c\xdc\x04\x4b\xc7\x96\x47\xcc\x13\x55\xa9\xfe\xb7\x81\xd3\xb1\xe1\x01\xfd\x60\x66\x5d\x3f\xd8\x79\x36\xb2\x94\x9a\x7f\x3b\x97\xa3\x7a\x71\x1a\x51\x33\x06\xfa\xed\xd0\xf4\x46\xd6\x9f\x19\xaa\x8f\x16\x64\x16\xc1\x1f\xc1\xdc\x3f\x54\x67\x93\x6b\x41\xe0\x03\xad\x11\xc3\x4d\x0b\xbe\x6d\xe3\x10\xb7\xf2\x55\x37\xb1\xcc\x18\xac\x9a\x1d\x69\xfb\xd9\x99\x86\xc1\x43\xc5\xc3\xb5\xe8\xba\xde\xbb\x7a\x0d\x23\x7f\x11\xfa\x42\x50\xd2\x6c\x5a\xbd\xc3\x1b\x63\xd7\x85\xa8\xf5\x15\x24\xf5\x3e\x87\x37\x6a\x94\xe9\x79\x7b\xc0\xf7\x04\x73\xa5\x45\x05\xba\x36\x2f\xd5\x98\x8d\x1d\x6f\x11\x91\xb0\x42\x56\xdb\x41\x48\x7c\xef\x9e\x80\xad\xa5\x39\x8a\x65\xc6\xae\x7b\x95\x0f\x55\xee\xb1\xaa\x65\xd6\xfc\xcc\x3e\xb2\x77\x0f\x0d\x5b\x54\xaf\x47\x5f\x0d\x0d\x1d\x75\xb6\xd2\x41\xbb\x77\xad\x1c\xab\xe8\xca\x23\x33\x0c\x4e\x3c\xff\x94\xbb\x4f\x3f\x56\x8e\xfd\xd8\xa1\x33\xdd\x14\x9f\x63\xca\x2f\x73\xe5\x47\x6c\x79\x41\xfe\x8e\xf7\xf9\xe7\x89\xb4\x18\x2b\x83\xb8\xbb\xfb\x8f\xb5\x3a\x91\xd4\x3e\xbb\xd1\x18\x0c\xc7\x0a\x87\x88\x1e\x1f\xf4\xc2\x69\x22\xfa\x2c\xd2\x0e\x9f\xd8\xd6\x68\xb1\x64\xa2\x3b\x6a\xdc\xba\x67\xd4\x3d\xb3\xf4\xd1\x39\xb4\xd5\x3f\xe6\x9e\x4a\xe5\xb4\xb0\x35\x3f\xb4\x67\xa0\xd2\x76\xe0\x23\x8a\x38\x5c\xd8\xc7\x13\x7d\x61\xf5\xd1\xe4\x26\x39\x89\x8d\x26\xd6\x73\xb7\x5c\x27\x28\xdb\x33\xd7\x32\x6c\x41\xb6\xd9\xdc\x24\x0d\xe2\xda\x77\xbb\x59\x6e\x3a\x20\xae\x9d\x36\x89\x7d\x30\xe1\x7d\x1a\x5a\xf0\x6f\x00\x00\x00\xff\xff\x42\x84\x7a\x0a\x38\x0e\x00\x00")
+
+func _1683627613_accounts_and_keycards_improvementsUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1683627613_accounts_and_keycards_improvementsUpSql,
+		"1683627613_accounts_and_keycards_improvements.up.sql",
+	)
+}
+
+func _1683627613_accounts_and_keycards_improvementsUpSql() (*asset, error) {
+	bytes, err := _1683627613_accounts_and_keycards_improvementsUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1683627613_accounts_and_keycards_improvements.up.sql", size: 3640, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x8e, 0xbe, 0x62, 0xf5, 0x9, 0x42, 0x8c, 0x8f, 0xa8, 0x45, 0xe7, 0x36, 0xc9, 0xde, 0xf4, 0xe2, 0xfd, 0xc4, 0x8, 0xd0, 0xa3, 0x8, 0x64, 0xe2, 0x56, 0xcc, 0xa7, 0x6d, 0xc5, 0xcc, 0x82, 0x2c}}
+	return a, nil
+}
+
+var __1685041348_settings_table_add_latest_derived_path_columnUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x4c\xcc\xc1\x0a\xc2\x30\x0c\x06\xe0\xfb\x9e\xe2\x67\x4f\xb0\xfb\xf0\x10\x6d\x05\x21\x76\xa2\xe9\xb9\x14\x16\x67\x50\x64\xd8\x20\xf8\xf6\x5e\xf7\x02\x1f\xb1\xc4\x2b\x84\xf6\x1c\xd1\xd4\xdd\xde\x4b\x03\x85\x80\xc3\xc4\xf9\x9c\xf0\xaa\xae\xcd\xcb\xac\x1f\xfb\xea\x5c\xd6\xea\x0f\x9c\x92\x20\x4d\x82\x94\x99\x11\xe2\x91\x32\x0b\xfa\xa1\x1f\xbb\x7c\x09\x24\x1b\xe8\x16\x05\x8b\xdd\x4b\x5d\xad\x3c\xf5\x87\x1d\x86\xb1\xfb\x07\x00\x00\xff\xff\x6b\x36\xb8\x34\x73\x00\x00\x00")
+
+func _1685041348_settings_table_add_latest_derived_path_columnUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1685041348_settings_table_add_latest_derived_path_columnUpSql,
+		"1685041348_settings_table_add_latest_derived_path_column.up.sql",
+	)
+}
+
+func _1685041348_settings_table_add_latest_derived_path_columnUpSql() (*asset, error) {
+	bytes, err := _1685041348_settings_table_add_latest_derived_path_columnUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1685041348_settings_table_add_latest_derived_path_column.up.sql", size: 115, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x21, 0xd4, 0x1b, 0xbf, 0x8, 0xf9, 0xd4, 0xb0, 0xa0, 0x6, 0x5b, 0xfb, 0x7e, 0xff, 0xfa, 0xbf, 0xcc, 0x64, 0x47, 0x81, 0x8b, 0x5e, 0x17, 0x6a, 0xa7, 0xa4, 0x35, 0x8f, 0x30, 0x4f, 0xd9, 0xd}}
+	return a, nil
+}
+
+var __1685440989_update_color_id_accountsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xa4\xd2\xbf\x6a\xc3\x30\x10\x06\xf0\x3d\x4f\x21\xe8\xe0\xd5\x7f\x62\xd9\x26\x74\x50\x6c\x99\x8e\xa5\x4d\xe9\x58\x0e\x23\x8c\x89\x2c\xa9\x27\x8b\xa2\xb7\x2f\x64\xe9\x60\x0d\x57\x7c\xa3\x86\x1f\xa7\xef\xbb\x8f\xd7\x41\xdc\x24\xbb\xab\xe8\x60\x41\xff\x05\xd3\x64\x83\xd9\x3c\x7b\x97\x37\x36\x59\x6d\x91\x3d\xb3\x2c\x2e\x26\x82\x99\x33\xf6\xf9\x22\xdf\xe4\xdf\xfb\x53\xfe\x98\xec\x72\x3a\xe8\x8c\x8f\x21\x3b\x0e\x97\x15\x30\xee\x9d\xb2\x3b\xf3\xfe\x4c\x77\x02\x3a\xad\xf6\x4c\xdb\x36\x62\xec\xc8\x8c\xbf\x27\x56\xa9\x8b\x21\x1f\xe9\xd1\x58\x04\x33\x27\x56\x19\xaa\x46\x8e\xf4\x1f\xad\x30\x2b\xb3\x41\x22\x61\xc1\x6b\x5e\xd3\x9b\x52\x5a\xdb\x9f\x54\x51\xbd\xc8\xe9\x45\x01\xae\x89\x68\x9a\x7e\x10\xff\xb8\x9a\x2d\xe0\x77\xb0\x8b\x4f\xa4\x53\x72\xc1\x3b\x41\x96\x26\xeb\x9c\xc2\x44\xdf\xd7\xaa\xa8\x0a\x3a\x03\xab\xd2\x7b\xa5\xbb\xb6\x55\x79\xfc\x88\xb3\xcb\xe9\x37\x00\x00\xff\xff\xfb\x65\x25\xb7\x96\x03\x00\x00")
+
+func _1685440989_update_color_id_accountsUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1685440989_update_color_id_accountsUpSql,
+		"1685440989_update_color_id_accounts.up.sql",
+	)
+}
+
+func _1685440989_update_color_id_accountsUpSql() (*asset, error) {
+	bytes, err := _1685440989_update_color_id_accountsUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1685440989_update_color_id_accounts.up.sql", size: 918, mode: os.FileMode(0644), modTime: time.Unix(1686041617, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x10, 0x2e, 0x51, 0x1d, 0x2d, 0x16, 0x84, 0xd6, 0xe8, 0xbc, 0x20, 0x53, 0x47, 0xb8, 0x40, 0x21, 0x52, 0x5c, 0xd9, 0xbb, 0xea, 0xe2, 0xa5, 0x77, 0xc8, 0x35, 0x4c, 0xe0, 0x9d, 0x42, 0x44, 0x50}}
+	return a, nil
+}
+
+var __1685463947_add_to_asset_to_multitransactionUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\xc8\x2d\xcd\x29\xc9\x8c\x2f\x29\x4a\xcc\x2b\x4e\x4c\x2e\xc9\xcc\xcf\x2b\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x28\xc9\x8f\x4f\xcc\xcd\x2f\xcd\x2b\x51\x08\x73\x0c\x72\xf6\x70\x0c\xb2\xe6\x02\x04\x00\x00\xff\xff\x40\x38\x81\x4e\x3d\x00\x00\x00")
+
+func _1685463947_add_to_asset_to_multitransactionUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1685463947_add_to_asset_to_multitransactionUpSql,
+		"1685463947_add_to_asset_to_multitransaction.up.sql",
+	)
+}
+
+func _1685463947_add_to_asset_to_multitransactionUpSql() (*asset, error) {
+	bytes, err := _1685463947_add_to_asset_to_multitransactionUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1685463947_add_to_asset_to_multitransaction.up.sql", size: 61, mode: os.FileMode(0644), modTime: time.Unix(1686041617, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd3, 0x66, 0x15, 0x10, 0xfa, 0x66, 0x81, 0x68, 0xd9, 0xb4, 0x93, 0x9e, 0x11, 0xed, 0x1d, 0x16, 0x9d, 0x5a, 0xf8, 0xd7, 0x8, 0xea, 0x7a, 0xaf, 0xe4, 0xb3, 0x22, 0x19, 0xca, 0xff, 0x75, 0x7c}}
+	return a, nil
+}
+
+var __1685880973_add_profile_links_settings_tableUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x8c\x54\x5d\x6f\xe3\x36\x10\x7c\xd7\xaf\x98\x5e\x1f\x6a\x03\xf6\x39\xe9\x5d\x70\x45\x8b\x14\x70\x6d\xa6\x11\xce\x1f\x81\x2c\xb7\xbd\x27\x1f\x23\xad\x2d\x22\x14\xe9\x23\x57\xe7\xe6\xdf\x17\x94\x6c\xc5\x46\x95\x6b\xdf\x68\xef\x2c\x77\x76\x66\xa8\xe1\x10\x13\x47\x92\x09\x86\x0e\x60\xf9\xa8\x09\x87\x82\x1c\xe1\x40\x38\x28\xad\xe1\xd9\x3a\xc2\xde\xd9\xad\xd2\x04\x6f\x33\x25\x35\xb4\x32\x4f\x7e\x10\x0d\x87\x90\x5b\x26\x87\x5c\xf9\xac\xf2\x5e\x59\x83\x82\x79\xef\x7f\x1e\x8d\x76\x8a\x8b\xea\xf1\x6d\x66\xcb\x91\x67\xc9\x95\x1f\xaa\xf6\xb4\xb3\xa3\x7d\xa5\xf5\xe8\xdd\xcd\xcd\x8f\xdf\x2b\xef\x2b\xca\x6c\x59\x92\xe1\xe1\xf5\xcd\x87\x77\x3f\x5d\x7f\xb8\x7a\xff\x3e\x5c\x7e\x20\xe4\x94\xa9\x9c\x72\xb0\x85\xa3\xbd\x96\x19\x81\x0b\x02\x19\x56\x8e\x90\x3f\x1e\x39\x67\xd6\x30\x19\x86\x35\xa0\xaf\xe4\x9e\x91\x15\xd2\xec\x08\xbd\x47\xca\x64\xe5\x09\x76\x0b\x2e\x24\x63\x6f\xbd\xe2\xc0\x33\xb3\xba\x2a\x0d\x94\x87\xb1\x0c\x43\x94\x53\xde\x8f\x26\x89\x18\xa7\x02\xe9\xf8\xb7\x99\x40\x7c\x87\xc5\x32\x85\xf8\x2b\x5e\xa5\xab\x93\x04\x9b\x46\x82\x4d\x2d\x01\x7a\x11\xc0\xf4\x37\xe3\x8f\x71\x32\xb9\x1f\x27\x75\xc3\x62\x3d\x9b\x61\x72\x2f\x26\x1f\xd1\xd3\x64\x76\x5c\xf4\xd8\xa9\xb2\x17\x80\xfd\x3e\x7e\xc5\x55\x7f\x10\x01\x95\xd3\xff\xab\xad\x72\xfa\xac\xab\x5d\x20\x5e\xa4\x98\x8a\xbb\xf1\x7a\x96\xe2\x2a\x54\x1e\x92\x78\x3e\x4e\x3e\xe1\xa3\xf8\x84\x7a\xd6\x20\x8c\xe8\x47\xfd\x5f\xa2\xe8\xd2\xe7\xe3\xee\x6c\xf1\x44\xb4\x47\xa6\x6d\xf6\xd4\x28\x44\xd0\xd2\xf3\x49\x3d\xbb\xed\x34\x1e\x3d\xaf\x4c\xf6\x22\xba\xf2\x27\x6f\x72\x48\xad\xe1\xec\x01\xbe\x90\xae\xb1\xca\xcb\x92\x8e\x23\xbe\x4a\x5d\x51\x3f\x1a\xcf\x52\x91\x1c\x35\xf6\xc4\xac\xcc\xce\x6f\xfc\xb3\xc9\x36\x0d\x6c\x3c\x9d\x62\xb2\x9c\xad\xe7\x0b\x5c\x88\x1d\x2f\x52\xf1\xbb\x38\x13\xab\x5d\xff\x62\x43\xa6\x72\x7f\x8c\x05\x5b\xec\xc8\x90\x0b\x7f\xcb\x17\xe9\xb6\xd6\x05\x92\xbe\xb5\x5b\xcc\x1f\x96\x49\xd0\xae\x21\x15\x6e\xb8\xf0\x79\x73\xa2\x59\x1b\xae\xf2\x96\xca\xb9\xe6\xe3\x75\xba\x8c\x17\x93\x44\xcc\xc5\x22\x1d\xbc\x16\x8c\xd7\x9c\x6f\x6d\xb2\xfb\xe7\xc0\xfb\x65\x8b\x28\x5e\xac\x44\x92\x86\x99\xcb\x6f\x52\x3b\xf3\x1c\x58\x89\x99\x98\xa4\xb5\x61\x9b\xa6\x50\x1f\x2b\xa7\x23\xe0\x2e\x59\xce\xd1\x79\x4b\x04\xfc\x79\x2f\x12\xd1\xa2\xf1\xdd\x2d\xde\xbc\x69\xb8\xc5\xc6\x93\x63\x28\xc3\x16\x9f\xbb\xde\xc3\xe7\x0e\xc6\x5d\xb8\x17\x7e\x2d\xe7\x01\x54\x7e\x62\xf6\xfa\x92\x0d\x8f\x3b\x67\x4b\x78\x5b\x12\x1c\x49\x6f\x4d\x9d\xb3\xad\xd5\xda\x1e\x94\xd9\xc1\x7f\xd1\xc8\x2d\x79\xf3\x03\xe3\x60\xdd\x13\xb8\x70\xb6\xda\x15\x68\x3f\x3f\x28\xd5\xce\xc9\x90\x05\x3f\x80\xd4\x5c\xd4\xe5\x70\xcb\x97\x2a\x7c\x3d\x94\x47\x66\x9d\xa3\x8c\xdf\x86\x79\xc3\x21\x56\xc4\x75\xbd\x49\x68\x08\x50\xd7\xcb\x08\xe0\xf5\xc3\x34\x64\xaa\x23\xd8\xa1\x1a\x16\x4f\x9b\x03\x2e\xd3\x7d\x8b\xde\x51\x93\x33\xf0\x37\xad\x3a\x22\xba\xfc\x3a\xd5\x66\xf1\x3c\x4e\x71\xdd\x6f\x7e\x37\x48\xff\x6c\xb8\x20\x56\xd9\x46\xe5\xb8\xc5\x1b\x95\x1f\xed\x9d\x3a\xbb\x3f\xcf\xdd\x34\x59\x3e\xfc\xe7\x8b\x38\x6b\xb5\x3a\xff\x77\x67\x77\xd3\x3f\x01\x00\x00\xff\xff\x31\x2f\xbb\x07\x78\x06\x00\x00")
+
+func _1685880973_add_profile_links_settings_tableUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1685880973_add_profile_links_settings_tableUpSql,
+		"1685880973_add_profile_links_settings_table.up.sql",
+	)
+}
+
+func _1685880973_add_profile_links_settings_tableUpSql() (*asset, error) {
+	bytes, err := _1685880973_add_profile_links_settings_tableUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1685880973_add_profile_links_settings_table.up.sql", size: 1656, mode: os.FileMode(0644), modTime: time.Unix(1686041617, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x13, 0x23, 0x7b, 0x1e, 0x82, 0x61, 0xcc, 0x76, 0xd6, 0xc7, 0x42, 0x6e, 0x69, 0x21, 0x1b, 0xfd, 0x7d, 0xda, 0xd7, 0xb7, 0xc7, 0xd3, 0x22, 0x63, 0xfe, 0xc6, 0xd3, 0xdf, 0xc8, 0x5f, 0x50, 0xcc}}
+	return a, nil
+}
+
+var __1686041510_add_idx_transfers_blkno_loadedUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x0e\x72\x75\x0c\x71\x55\xf0\xf4\x73\x71\x8d\x50\xc8\x4c\xa9\x88\x2f\x29\x4a\xcc\x2b\x4e\x4b\x2d\x2a\x8e\x4f\xca\xc9\x8e\xcf\xc9\x4f\x4c\x49\x4d\x51\xf0\xf7\x53\x80\x8b\x6b\x80\xc4\xf3\x4a\x73\x93\x52\x8b\x74\x14\x20\xf2\x9a\xd6\x80\x00\x00\x00\xff\xff\x39\xde\x34\xdd\x47\x00\x00\x00")
+
+func _1686041510_add_idx_transfers_blkno_loadedUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1686041510_add_idx_transfers_blkno_loadedUpSql,
+		"1686041510_add_idx_transfers_blkno_loaded.up.sql",
+	)
+}
+
+func _1686041510_add_idx_transfers_blkno_loadedUpSql() (*asset, error) {
+	bytes, err := _1686041510_add_idx_transfers_blkno_loadedUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1686041510_add_idx_transfers_blkno_loaded.up.sql", size: 71, mode: os.FileMode(0644), modTime: time.Unix(1686041617, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe2, 0x5d, 0x7e, 0x43, 0x14, 0x3c, 0x50, 0x44, 0x25, 0xd0, 0xe1, 0x75, 0xba, 0x61, 0x7b, 0x68, 0x2e, 0x43, 0x74, 0x1d, 0x10, 0x61, 0x8e, 0x45, 0xe6, 0x25, 0x78, 0x81, 0x68, 0x6, 0x24, 0x5b}}
 	return a, nil
 }
 
@@ -1344,7 +1491,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 74, mode: os.FileMode(0644), modTime: time.Unix(1645429416, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 74, mode: os.FileMode(0644), modTime: time.Unix(1685543739, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xde, 0x7c, 0x28, 0xcd, 0x47, 0xf2, 0xfa, 0x7c, 0x51, 0x2d, 0xd8, 0x38, 0xb, 0xb0, 0x34, 0x9d, 0x4c, 0x62, 0xa, 0x9e, 0x28, 0xc3, 0x31, 0x23, 0xd9, 0xbb, 0x89, 0x9f, 0xa0, 0x89, 0x1f, 0xe8}}
 	return a, nil
 }
@@ -1560,6 +1707,20 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1682393575_sync_ens_name.up.sql": _1682393575_sync_ens_nameUpSql,
 
+	"1683457503_add_blocks_ranges_sequential_table.up.sql": _1683457503_add_blocks_ranges_sequential_tableUpSql,
+
+	"1683627613_accounts_and_keycards_improvements.up.sql": _1683627613_accounts_and_keycards_improvementsUpSql,
+
+	"1685041348_settings_table_add_latest_derived_path_column.up.sql": _1685041348_settings_table_add_latest_derived_path_columnUpSql,
+
+	"1685440989_update_color_id_accounts.up.sql": _1685440989_update_color_id_accountsUpSql,
+
+	"1685463947_add_to_asset_to_multitransaction.up.sql": _1685463947_add_to_asset_to_multitransactionUpSql,
+
+	"1685880973_add_profile_links_settings_table.up.sql": _1685880973_add_profile_links_settings_tableUpSql,
+
+	"1686041510_add_idx_transfers_blkno_loaded.up.sql": _1686041510_add_idx_transfers_blkno_loadedUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -1664,7 +1825,14 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1682073779_settings_table_remove_latest_derived_path_column.up.sql": &bintree{_1682073779_settings_table_remove_latest_derived_path_columnUpSql, map[string]*bintree{}},
 	"1682146075_add_created_at_to_saved_addresses.up.sql":                &bintree{_1682146075_add_created_at_to_saved_addressesUpSql, map[string]*bintree{}},
 	"1682393575_sync_ens_name.up.sql":                                    &bintree{_1682393575_sync_ens_nameUpSql, map[string]*bintree{}},
-	"doc.go":                                                             &bintree{docGo, map[string]*bintree{}},
+	"1683457503_add_blocks_ranges_sequential_table.up.sql":               &bintree{_1683457503_add_blocks_ranges_sequential_tableUpSql, map[string]*bintree{}},
+	"1683627613_accounts_and_keycards_improvements.up.sql":               &bintree{_1683627613_accounts_and_keycards_improvementsUpSql, map[string]*bintree{}},
+	"1685041348_settings_table_add_latest_derived_path_column.up.sql":    &bintree{_1685041348_settings_table_add_latest_derived_path_columnUpSql, map[string]*bintree{}},
+	"1685440989_update_color_id_accounts.up.sql":                         &bintree{_1685440989_update_color_id_accountsUpSql, map[string]*bintree{}},
+	"1685463947_add_to_asset_to_multitransaction.up.sql":                 &bintree{_1685463947_add_to_asset_to_multitransactionUpSql, map[string]*bintree{}},
+	"1685880973_add_profile_links_settings_table.up.sql":                 &bintree{_1685880973_add_profile_links_settings_tableUpSql, map[string]*bintree{}},
+	"1686041510_add_idx_transfers_blkno_loaded.up.sql":                   &bintree{_1686041510_add_idx_transfers_blkno_loadedUpSql, map[string]*bintree{}},
+	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

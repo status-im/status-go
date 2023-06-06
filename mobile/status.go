@@ -38,6 +38,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/server/pairing"
+	"github.com/status-im/status-go/server/pairing/preflight"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
@@ -287,6 +288,30 @@ func CreateAccountAndLogin(requestJSON string) string {
 	return makeJSONResponse(nil)
 }
 
+func LoginAccount(requestJSON string) string {
+	var request requests.Login
+	err := json.Unmarshal([]byte(requestJSON), &request)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = request.Validate()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	api.RunAsync(func() error {
+		err := statusBackend.LoginAccount(&request)
+		if err != nil {
+			log.Error("loginAccount error", err)
+			return err
+		}
+		log.Debug("loginAccount started node")
+		return nil
+	})
+	return makeJSONResponse(nil)
+}
+
 func RestoreAccountAndLogin(requestJSON string) string {
 	var request requests.RestoreAccount
 	err := json.Unmarshal([]byte(requestJSON), &request)
@@ -333,26 +358,6 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 	err = json.Unmarshal([]byte(subaccountData), &subaccs)
 	if err != nil {
 		return makeJSONResponse(err)
-	}
-
-	for i, acc := range subaccs {
-		subaccs[i].KeyUID = account.KeyUID
-
-		if acc.Chat {
-			colorHash, err := colorhash.GenerateFor(string(acc.PublicKey.Bytes()))
-			if err != nil {
-				return makeJSONResponse(err)
-			}
-			account.ColorHash = colorHash
-
-			colorID, err := identityUtils.ToColorID(string(acc.PublicKey.Bytes()))
-			if err != nil {
-				return makeJSONResponse(err)
-			}
-			account.ColorID = colorID
-
-			break
-		}
 	}
 
 	api.RunAsync(func() error {
@@ -415,26 +420,6 @@ func SaveAccountAndLoginWithKeycard(accountData, password, settingsJSON, configJ
 	err = json.Unmarshal([]byte(subaccountData), &subaccs)
 	if err != nil {
 		return makeJSONResponse(err)
-	}
-
-	for i, acc := range subaccs {
-		subaccs[i].KeyUID = account.KeyUID
-
-		if acc.Chat {
-			colorHash, err := colorhash.GenerateFor(string(acc.PublicKey.Bytes()))
-			if err != nil {
-				return makeJSONResponse(err)
-			}
-			account.ColorHash = colorHash
-
-			colorID, err := identityUtils.ToColorID(string(acc.PublicKey.Bytes()))
-			if err != nil {
-				return makeJSONResponse(err)
-			}
-			account.ColorID = colorID
-
-			break
-		}
 	}
 
 	api.RunAsync(func() error {
@@ -932,7 +917,7 @@ func ConvertToRegularAccount(mnemonic, currPassword, newPassword string) string 
 }
 
 func ImageServerTLSCert() string {
-	cert, err := server.PublicTLSCert()
+	cert, err := server.PublicMediaTLSCert()
 
 	if err != nil {
 		return makeJSONResponse(err)
@@ -1023,6 +1008,16 @@ func GenerateImages(filepath string, aX, aY, bX, bY int) string {
 	return string(data)
 }
 
+// LocalPairingPreflightOutboundCheck creates a local tls server accessible via an outbound network address.
+// The function creates a client and makes an outbound network call to the local server. This function should be
+// triggered to ensure that the device has permissions to access its LAN or to make outbound network calls.
+//
+// In addition, the functionality attempts to address an issue with iOS devices https://stackoverflow.com/a/64242745
+func LocalPairingPreflightOutboundCheck() string {
+	err := preflight.CheckOutbound()
+	return makeJSONResponse(err)
+}
+
 // StartSearchForLocalPairingPeers starts a UDP multicast beacon that both listens for and broadcasts to LAN peers
 // on discovery the beacon will emit a signal with the details of the discovered peer.
 //
@@ -1047,10 +1042,22 @@ func GetConnectionStringForBeingBootstrapped(configJSON string) string {
 	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
 	}
+
+	statusBackend.SetLocalPairing(true)
+	defer func() {
+		statusBackend.SetLocalPairing(false)
+	}()
+
 	cs, err := pairing.StartUpReceiverServer(statusBackend, configJSON)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+
+	err = statusBackend.Logout()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
 	return cs
 }
 
@@ -1064,6 +1071,12 @@ func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string 
 	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, SendingServerConfig is expected"))
 	}
+
+	statusBackend.SetLocalPairing(true)
+	defer func() {
+		statusBackend.SetLocalPairing(false)
+	}()
+
 	cs, err := pairing.StartUpSenderServer(statusBackend, configJSON)
 	if err != nil {
 		return makeJSONResponse(err)
@@ -1084,7 +1097,17 @@ func InputConnectionStringForBootstrapping(cs, configJSON string) string {
 		return makeJSONResponse(fmt.Errorf("no config given, ReceiverClientConfig is expected"))
 	}
 
+	statusBackend.SetLocalPairing(true)
+	defer func() {
+		statusBackend.SetLocalPairing(false)
+	}()
+
 	err := pairing.StartUpReceivingClient(statusBackend, cs, configJSON)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = statusBackend.Logout()
 	return makeJSONResponse(err)
 }
 
@@ -1099,6 +1122,11 @@ func InputConnectionStringForBootstrappingAnotherDevice(cs, configJSON string) s
 	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, SenderClientConfig is expected"))
 	}
+
+	statusBackend.SetLocalPairing(true)
+	defer func() {
+		statusBackend.SetLocalPairing(false)
+	}()
 
 	err := pairing.StartUpSendingClient(statusBackend, cs, configJSON)
 	return makeJSONResponse(err)

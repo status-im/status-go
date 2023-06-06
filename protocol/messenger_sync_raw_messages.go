@@ -7,6 +7,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -192,15 +193,26 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				m.logger.Error("failed to HandleSyncContactRequestDecision when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
-		case protobuf.ApplicationMetadataMessage_SYNC_WALLET_ACCOUNT:
-			var message protobuf.SyncWalletAccounts
+		case protobuf.ApplicationMetadataMessage_SYNC_ACCOUNT:
+			var message protobuf.SyncAccount
 			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncWalletAccount(state, message)
+			err = m.HandleSyncWalletAccount(state, message, accounts.SyncedFromLocalPairing)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncWalletAccount when HandleSyncRawMessages", zap.Error(err))
+				continue
+			}
+		case protobuf.ApplicationMetadataMessage_SYNC_FULL_KEYPAIR:
+			var message protobuf.SyncKeypairFull
+			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			if err != nil {
+				return err
+			}
+			err = m.HandleSyncKeypairFull(state, message)
+			if err != nil {
+				m.logger.Error("failed to HandleSyncKeypairFull when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_SAVED_ADDRESS:
@@ -214,26 +226,15 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				m.logger.Error("failed to handleSyncSavedAddress when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
-		case protobuf.ApplicationMetadataMessage_SYNC_ALL_KEYCARDS:
-			var message protobuf.SyncAllKeycards
+		case protobuf.ApplicationMetadataMessage_SYNC_SOCIAL_LINKS:
+			var message protobuf.SyncSocialLinks
 			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
 			if err != nil {
 				return err
 			}
-			err = m.handleSyncKeycards(state, message)
+			err = m.HandleSyncSocialLinks(state, message)
 			if err != nil {
-				m.logger.Error("failed to handleSyncKeycards when HandleSyncRawMessages", zap.Error(err))
-				continue
-			}
-		case protobuf.ApplicationMetadataMessage_SYNC_SOCIAL_LINK_SETTING:
-			var message protobuf.SyncSocialLinkSetting
-			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
-			if err != nil {
-				return err
-			}
-			err = m.HandleSyncSocialLinkSetting(state, message)
-			if err != nil {
-				m.logger.Error("failed to HandleSyncSocialLinkSetting when HandleSyncRawMessages", zap.Error(err))
+				m.logger.Error("failed to HandleSyncSocialLinks when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_ENS_USERNAME_DETAIL:

@@ -8,7 +8,7 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/errors"
+	"github.com/status-im/status-go/multiaccounts/common"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
@@ -29,77 +29,6 @@ func setupTestDB(t *testing.T) (*Database, func()) {
 	}
 }
 
-func TestSaveAccounts(t *testing.T) {
-	type testCase struct {
-		description string
-		accounts    []*Account
-		err         error
-	}
-	for _, tc := range []testCase{
-		{
-			description: "NoError",
-			accounts: []*Account{
-				{Address: types.Address{0x01}, Chat: true, Wallet: true},
-				{Address: types.Address{0x02}},
-			},
-		},
-		{
-			description: "UniqueChat",
-			accounts: []*Account{
-				{Address: types.Address{0x01}, Chat: true},
-				{Address: types.Address{0x02}, Chat: true},
-			},
-			err: errors.ErrChatNotUnique,
-		},
-		{
-			description: "UniqueWallet",
-			accounts: []*Account{
-				{Address: types.Address{0x01}, Wallet: true},
-				{Address: types.Address{0x02}, Wallet: true},
-			},
-			err: errors.ErrWalletNotUnique,
-		},
-	} {
-		t.Run(tc.description, func(t *testing.T) {
-			db, stop := setupTestDB(t)
-			defer stop()
-			require.Equal(t, tc.err, db.SaveAccounts(tc.accounts))
-		})
-	}
-}
-
-func TestUpdateAccounts(t *testing.T) {
-	db, stop := setupTestDB(t)
-	defer stop()
-	accounts := []*Account{
-		{Address: types.Address{0x01}, Chat: true, Wallet: true},
-		{Address: types.Address{0x02}},
-	}
-	require.NoError(t, db.SaveAccounts(accounts))
-	accounts[0].Chat = false
-	accounts[1].Chat = true
-	require.NoError(t, db.SaveAccounts(accounts))
-	rst, err := db.GetAccounts()
-	require.NoError(t, err)
-	require.Equal(t, accounts, rst)
-}
-
-func TestDeleteAccount(t *testing.T) {
-	db, stop := setupTestDB(t)
-	defer stop()
-	accounts := []*Account{
-		{Address: types.Address{0x01}, Chat: true, Wallet: true},
-	}
-	require.NoError(t, db.SaveAccounts(accounts))
-	rst, err := db.GetAccounts()
-	require.NoError(t, err)
-	require.Equal(t, 1, len(rst))
-	require.NoError(t, db.DeleteAccount(types.Address{0x01}))
-	rst2, err := db.GetAccounts()
-	require.NoError(t, err)
-	require.Equal(t, 0, len(rst2))
-}
-
 func TestGetAddresses(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
@@ -107,7 +36,7 @@ func TestGetAddresses(t *testing.T) {
 		{Address: types.Address{0x01}, Chat: true, Wallet: true},
 		{Address: types.Address{0x02}},
 	}
-	require.NoError(t, db.SaveAccounts(accounts))
+	require.NoError(t, db.SaveOrUpdateAccounts(accounts))
 	addresses, err := db.GetAddresses()
 	require.NoError(t, err)
 	require.Equal(t, []types.Address{{0x01}, {0x02}}, addresses)
@@ -119,7 +48,7 @@ func TestGetWalletAddress(t *testing.T) {
 	address := types.Address{0x01}
 	_, err := db.GetWalletAddress()
 	require.Equal(t, err, sql.ErrNoRows)
-	require.NoError(t, db.SaveAccounts([]*Account{{Address: address, Wallet: true}}))
+	require.NoError(t, db.SaveOrUpdateAccounts([]*Account{{Address: address, Wallet: true}}))
 	wallet, err := db.GetWalletAddress()
 	require.NoError(t, err)
 	require.Equal(t, address, wallet)
@@ -131,42 +60,10 @@ func TestGetChatAddress(t *testing.T) {
 	address := types.Address{0x01}
 	_, err := db.GetChatAddress()
 	require.Equal(t, err, sql.ErrNoRows)
-	require.NoError(t, db.SaveAccounts([]*Account{{Address: address, Chat: true}}))
+	require.NoError(t, db.SaveOrUpdateAccounts([]*Account{{Address: address, Chat: true}}))
 	chat, err := db.GetChatAddress()
 	require.NoError(t, err)
 	require.Equal(t, address, chat)
-}
-
-func TestGetAccounts(t *testing.T) {
-	db, stop := setupTestDB(t)
-	defer stop()
-	accounts := []*Account{
-		{Address: types.Address{0x01}, Chat: true, Wallet: true},
-		{Address: types.Address{0x02}, PublicKey: types.HexBytes{0x01, 0x02}},
-		{Address: types.Address{0x03}, PublicKey: types.HexBytes{0x02, 0x03}},
-	}
-	require.NoError(t, db.SaveAccounts(accounts))
-	rst, err := db.GetAccounts()
-	require.NoError(t, err)
-	require.Equal(t, accounts, rst)
-}
-
-func TestGetAccountByAddress(t *testing.T) {
-	db, stop := setupTestDB(t)
-	defer stop()
-	address := types.Address{0x01}
-	account := &Account{Address: address, Chat: true, Wallet: true}
-	dilute := []*Account{
-		{Address: types.Address{0x02}, PublicKey: types.HexBytes{0x01, 0x02}},
-		{Address: types.Address{0x03}, PublicKey: types.HexBytes{0x02, 0x03}},
-	}
-
-	accounts := append(dilute, account)
-
-	require.NoError(t, db.SaveAccounts(accounts))
-	rst, err := db.GetAccountByAddress(address)
-	require.NoError(t, err)
-	require.Equal(t, account, rst)
 }
 
 func TestAddressExists(t *testing.T) {
@@ -176,7 +73,7 @@ func TestAddressExists(t *testing.T) {
 	accounts := []*Account{
 		{Address: types.Address{0x01}, Chat: true, Wallet: true},
 	}
-	require.NoError(t, db.SaveAccounts(accounts))
+	require.NoError(t, db.SaveOrUpdateAccounts(accounts))
 
 	exists, err := db.AddressExists(accounts[0].Address)
 	require.NoError(t, err)
@@ -191,74 +88,291 @@ func TestAddressDoesntExist(t *testing.T) {
 	require.False(t, exists)
 }
 
-func TestKeypairNameAndIndexWhenAddingNewAccount(t *testing.T) {
+func TestWatchOnlyAccounts(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	accountsRegular := []*Account{
-		// chat account
-		{Address: types.Address{0x01}, Chat: true, Wallet: false, KeyUID: "0x0001"},
-		// Status Profile keypair
-		{Address: types.Address{0x02}, Chat: false, Wallet: true, KeyUID: "0x0001", Path: "m/44'/60'/0'/0/0", LastUsedDerivationIndex: 0, DerivedFrom: "0x1111", KeypairName: "Status Profile"},
-		{Address: types.Address{0x03}, Chat: false, Wallet: false, KeyUID: "0x0001", Path: "m/44'/60'/0'/0/1", LastUsedDerivationIndex: 1, DerivedFrom: "0x1111", KeypairName: "Status Profile"},
-		{Address: types.Address{0x04}, Chat: false, Wallet: false, KeyUID: "0x0001", Path: "m/44'/60'/0'/0/2", LastUsedDerivationIndex: 2, DerivedFrom: "0x1111", KeypairName: "Status Profile"},
+
+	// check the db
+	dbAccounts, err := db.GetAccounts()
+	require.NoError(t, err)
+	require.Equal(t, 0, len(dbAccounts))
+
+	woAccounts := GetWatchOnlyAccountsForTest()
+
+	// try to save keypair with watch only accounts
+	kp := &Keypair{}
+	kp.Accounts = append(kp.Accounts, woAccounts...)
+	err = db.SaveOrUpdateKeypair(kp)
+	require.Error(t, err)
+
+	// check the db after that trying to save keypair with watch only accounts
+	dbAccounts, err = db.GetAccounts()
+	require.NoError(t, err)
+	require.Equal(t, 0, len(dbAccounts))
+
+	// save watch only accounts
+	err = db.SaveOrUpdateAccounts(woAccounts)
+	require.NoError(t, err)
+	_, err = db.GetKeypairByKeyUID(woAccounts[0].KeyUID)
+	require.Error(t, err)
+	require.True(t, err == ErrDbKeypairNotFound)
+	dbAccounts, err = db.GetAccounts()
+	require.NoError(t, err)
+	require.Equal(t, len(woAccounts), len(dbAccounts))
+	require.Equal(t, woAccounts[0].Address, dbAccounts[0].Address)
+
+	// try to save the same watch only account again
+	err = db.SaveOrUpdateAccounts(woAccounts[:1])
+	require.NoError(t, err)
+	dbAccounts, err = db.GetAccounts()
+	require.NoError(t, err)
+	require.Equal(t, len(woAccounts), len(dbAccounts))
+	dbAcc, err := db.GetAccountByAddress(woAccounts[:1][0].Address)
+	require.NoError(t, err)
+	require.Equal(t, woAccounts[:1][0].Address, dbAcc.Address)
+
+	// try to save new watch only account
+	wo4 := &Account{
+		Address: types.Address{0x14},
+		Type:    AccountTypeWatch,
+		Name:    "WatchOnlyAcc4",
+		ColorID: common.CustomizationColorPrimary,
+		Emoji:   "emoji-1",
 	}
-	accountsCustom := []*Account{
-		// Keypair1
-		{Address: types.Address{0x11}, Chat: false, Wallet: false, KeyUID: "0x0002", Path: "m/44'/60'/0'/0/10", LastUsedDerivationIndex: 0, DerivedFrom: "0x2222", KeypairName: "Keypair11"},
-		{Address: types.Address{0x12}, Chat: false, Wallet: false, KeyUID: "0x0002", Path: "m/44'/60'/0'/0/11", LastUsedDerivationIndex: 0, DerivedFrom: "0x2222", KeypairName: "Keypair12"},
-		// Keypair2 out of the default Status' derivation tree
-		{Address: types.Address{0x22}, Chat: false, Wallet: false, KeyUID: "0x0003", Path: "m/44'/60'/0'/0/0/100", LastUsedDerivationIndex: 0, DerivedFrom: "0x3333", KeypairName: "Keypair21"},
-		{Address: types.Address{0x23}, Chat: false, Wallet: false, KeyUID: "0x0003", Path: "m/44'/60'/0'/0/1/100", LastUsedDerivationIndex: 0, DerivedFrom: "0x3333", KeypairName: "Keypair22"},
+	err = db.SaveOrUpdateAccounts([]*Account{wo4})
+	require.NoError(t, err)
+	dbAccounts, err = db.GetAccounts()
+	require.NoError(t, err)
+	require.Equal(t, len(woAccounts)+1, len(dbAccounts))
+	dbAcc, err = db.GetAccountByAddress(wo4.Address)
+	require.NoError(t, err)
+	require.Equal(t, wo4.Address, dbAcc.Address)
+
+	// updated watch onl to save the same account after it's saved
+	wo4.Name = wo4.Name + "updated"
+	wo4.ColorID = common.CustomizationColorCamel
+	wo4.Emoji = wo4.Emoji + "updated"
+	err = db.SaveOrUpdateAccounts([]*Account{wo4})
+	require.NoError(t, err)
+	dbAccounts, err = db.GetAccounts()
+	require.NoError(t, err)
+	require.Equal(t, len(woAccounts)+1, len(dbAccounts))
+	dbAcc, err = db.GetAccountByAddress(wo4.Address)
+	require.NoError(t, err)
+	require.Equal(t, wo4.Address, dbAcc.Address)
+
+	// try to delete keypair for watch only account
+	err = db.DeleteKeypair(wo4.KeyUID)
+	require.Error(t, err)
+	require.True(t, err == ErrDbKeypairNotFound)
+
+	// try to delete watch only account
+	err = db.DeleteAccount(wo4.Address)
+	require.NoError(t, err)
+	dbAccounts, err = db.GetAccounts()
+	require.NoError(t, err)
+	require.Equal(t, len(woAccounts), len(dbAccounts))
+	_, err = db.GetAccountByAddress(wo4.Address)
+	require.Error(t, err)
+	require.True(t, err == ErrDbAccountNotFound)
+}
+
+func TestUpdateKeypairName(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	kp := GetProfileKeypairForTest(true, false, false)
+
+	// check the db
+	dbAccounts, err := db.GetAccounts()
+	require.NoError(t, err)
+	require.Equal(t, 0, len(dbAccounts))
+
+	// save keypair
+	err = db.SaveOrUpdateKeypair(kp)
+	require.NoError(t, err)
+	dbKeypairs, err := db.GetKeypairs()
+	require.NoError(t, err)
+	require.Equal(t, 1, len(dbKeypairs))
+	require.True(t, SameKeypairs(kp, dbKeypairs[0]))
+
+	// update keypair name
+	kp.Name = kp.Name + "updated"
+	err = db.UpdateKeypairName(kp.KeyUID, kp.Name, kp.Clock)
+	require.NoError(t, err)
+
+	// check keypair
+	dbKp, err := db.GetKeypairByKeyUID(kp.KeyUID)
+	require.NoError(t, err)
+	require.Equal(t, len(kp.Accounts), len(dbKp.Accounts))
+	require.True(t, SameKeypairs(kp, dbKp))
+}
+
+func TestKeypairs(t *testing.T) {
+	keypairs := []*Keypair{
+		GetProfileKeypairForTest(true, true, true),
+		GetSeedImportedKeypair1ForTest(),
+		GetPrivKeyImportedKeypairForTest(), // in this context (when testing db functions) there is not limitations for private key imported keypair
 	}
 
-	err := db.SaveAccounts(accountsRegular)
-	require.NoError(t, err)
-	err = db.SaveAccounts(accountsCustom)
-	require.NoError(t, err)
-	accs, err := db.GetAccounts()
-	require.NoError(t, err)
+	for _, kp := range keypairs {
+		t.Run("test keypair "+kp.Name, func(t *testing.T) {
+			db, stop := setupTestDB(t)
+			defer stop()
 
-	for _, acc := range accs {
-		if acc.Chat {
-			continue
-		}
-		if acc.KeyUID == accountsRegular[0].KeyUID {
-			require.Equal(t, uint64(2), acc.LastUsedDerivationIndex)
-			require.Equal(t, "Status Profile", acc.KeypairName)
-		} else if acc.KeyUID == accountsCustom[1].KeyUID {
-			require.Equal(t, uint64(0), acc.LastUsedDerivationIndex)
-			require.Equal(t, "Keypair12", acc.KeypairName)
-		} else if acc.KeyUID == accountsCustom[3].KeyUID {
-			require.Equal(t, uint64(0), acc.LastUsedDerivationIndex)
-			require.Equal(t, "Keypair22", acc.KeypairName)
-		}
+			// check the db
+			dbKeypairs, err := db.GetKeypairs()
+			require.NoError(t, err)
+			require.Equal(t, 0, len(dbKeypairs))
+			dbAccounts, err := db.GetAccounts()
+			require.NoError(t, err)
+			require.Equal(t, 0, len(dbAccounts))
+
+			expectedLastUsedDerivationIndex := uint64(len(kp.Accounts) - 1)
+			if kp.Type == KeypairTypeProfile {
+				expectedLastUsedDerivationIndex-- // subtract one more in case of profile keypair because of chat account
+			}
+
+			// save keypair
+			err = db.SaveOrUpdateKeypair(kp)
+			require.NoError(t, err)
+			dbKeypairs, err = db.GetKeypairs()
+			require.NoError(t, err)
+			require.Equal(t, 1, len(dbKeypairs))
+			dbKp, err := db.GetKeypairByKeyUID(kp.KeyUID)
+			require.NoError(t, err)
+			require.Equal(t, len(kp.Accounts), len(dbKp.Accounts))
+			kp.LastUsedDerivationIndex = expectedLastUsedDerivationIndex
+			require.Equal(t, kp.KeyUID, dbKp.KeyUID)
+			dbAccounts, err = db.GetAccounts()
+			require.NoError(t, err)
+			require.Equal(t, len(kp.Accounts), len(dbAccounts))
+
+			// delete keypair
+			err = db.DeleteKeypair(kp.KeyUID)
+			require.NoError(t, err)
+			_, err = db.GetKeypairByKeyUID(kp.KeyUID)
+			require.Error(t, err)
+			require.True(t, err == ErrDbKeypairNotFound)
+
+			// save keypair again to test the flow below
+			err = db.SaveOrUpdateKeypair(kp)
+			require.NoError(t, err)
+			dbKeypairs, err = db.GetKeypairs()
+			require.NoError(t, err)
+			require.Equal(t, 1, len(dbKeypairs))
+
+			ind := len(kp.Accounts) - 1
+			accToUpdate := kp.Accounts[ind]
+
+			// try to save the same account again
+			err = db.SaveOrUpdateAccounts([]*Account{accToUpdate})
+			require.NoError(t, err)
+			dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
+			require.NoError(t, err)
+			require.Equal(t, len(kp.Accounts), len(dbKp.Accounts))
+			require.Equal(t, kp.KeyUID, dbKp.KeyUID)
+			dbAccounts, err = db.GetAccounts()
+			require.NoError(t, err)
+			require.Equal(t, len(kp.Accounts), len(dbAccounts))
+
+			// update an existing account
+			accToUpdate.Name = accToUpdate.Name + "updated"
+			accToUpdate.ColorID = common.CustomizationColorBrown
+			accToUpdate.Emoji = accToUpdate.Emoji + "updated"
+
+			err = db.SaveOrUpdateAccounts([]*Account{accToUpdate})
+			require.NoError(t, err)
+			dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
+			require.NoError(t, err)
+			require.Equal(t, len(kp.Accounts), len(dbKp.Accounts))
+			dbAccounts, err = db.GetAccounts()
+			require.NoError(t, err)
+			require.Equal(t, len(kp.Accounts), len(dbAccounts))
+			dbAcc, err := db.GetAccountByAddress(accToUpdate.Address)
+			require.NoError(t, err)
+			require.Equal(t, accToUpdate.Address, dbAcc.Address)
+
+			// update keypair name
+			kpToUpdate := kp
+			kpToUpdate.Name = kpToUpdate.Name + "updated"
+			err = db.SaveOrUpdateKeypair(kp)
+			require.NoError(t, err)
+			dbKeypairs, err = db.GetKeypairs()
+			require.NoError(t, err)
+			require.Equal(t, 1, len(dbKeypairs))
+			dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
+			require.NoError(t, err)
+			require.Equal(t, len(kp.Accounts), len(dbKp.Accounts))
+			require.Equal(t, kpToUpdate.KeyUID, dbKp.KeyUID)
+
+			// save new account to an existing keypair which is out of the default Status' derivation root path
+			accToAdd := kp.Accounts[ind]
+			accToAdd.Address = types.Address{0x08}
+			accToAdd.Path = "m/44'/60'/0'/0/10"
+			accToAdd.PublicKey = types.Hex2Bytes("0x000000008")
+			accToAdd.Name = "Generated Acc 8"
+
+			err = db.SaveOrUpdateAccounts([]*Account{accToAdd})
+			require.NoError(t, err)
+			dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
+			require.NoError(t, err)
+			require.Equal(t, len(kp.Accounts)+1, len(dbKp.Accounts))
+			require.Equal(t, kp.LastUsedDerivationIndex, dbKp.LastUsedDerivationIndex)
+			dbAccounts, err = db.GetAccounts()
+			require.NoError(t, err)
+			require.Equal(t, len(kp.Accounts)+1, len(dbAccounts))
+			dbAcc, err = db.GetAccountByAddress(accToUpdate.Address)
+			require.NoError(t, err)
+			require.Equal(t, accToAdd.Address, dbAcc.Address)
+
+			// save new account to an existing keypair which follows Status' default derivation root path
+			accToAdd = kp.Accounts[ind]
+			accToAdd.Address = types.Address{0x09}
+			accToAdd.Path = "m/44'/60'/0'/0/3"
+			accToAdd.PublicKey = types.Hex2Bytes("0x000000009")
+			accToAdd.Name = "Generated Acc 9"
+
+			expectedLastUsedDerivationIndex = 3
+			if kp.Type == KeypairTypeSeed {
+				accToAdd.Path = "m/44'/60'/0'/0/2"
+				expectedLastUsedDerivationIndex = 2
+			} else if kp.Type == KeypairTypeKey {
+				accToAdd.Path = "m/44'/60'/0'/0/1"
+				expectedLastUsedDerivationIndex = 1
+			}
+
+			err = db.SaveOrUpdateAccounts([]*Account{accToAdd})
+			require.NoError(t, err)
+			dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
+			require.NoError(t, err)
+			require.Equal(t, len(kp.Accounts)+2, len(dbKp.Accounts))
+			require.Equal(t, expectedLastUsedDerivationIndex, dbKp.LastUsedDerivationIndex)
+			dbAccounts, err = db.GetAccounts()
+			require.NoError(t, err)
+			require.Equal(t, len(kp.Accounts)+2, len(dbAccounts))
+			dbAcc, err = db.GetAccountByAddress(accToUpdate.Address)
+			require.NoError(t, err)
+			require.Equal(t, accToAdd.Address, dbAcc.Address)
+
+			// delete account
+			err = db.DeleteAccount(accToAdd.Address)
+			require.NoError(t, err)
+			dbAccounts, err = db.GetAccounts()
+			require.NoError(t, err)
+			require.Equal(t, len(kp.Accounts)+1, len(dbAccounts))
+			_, err = db.GetAccountByAddress(accToAdd.Address)
+			require.Error(t, err)
+			require.True(t, err == ErrDbAccountNotFound)
+
+			for _, acc := range dbAccounts {
+				err = db.DeleteAccount(acc.Address)
+				require.NoError(t, err)
+			}
+
+			_, err = db.GetKeypairByKeyUID(kp.KeyUID)
+			require.Error(t, err)
+			require.True(t, err == ErrDbKeypairNotFound)
+		})
 	}
-
-	accountsCustom = []*Account{
-		// Status Profile keypair
-		{Address: types.Address{0x05}, Chat: false, Wallet: false, KeyUID: "0x0001", Path: "m/44'/60'/0'/0/100/1", LastUsedDerivationIndex: 2, DerivedFrom: "0x1111", KeypairName: "Status Profile"},
-	}
-
-	err = db.SaveAccounts(accountsCustom)
-	require.NoError(t, err)
-
-	result, err := db.GetAccountsByKeyUID(accountsCustom[0].KeyUID)
-	require.NoError(t, err)
-	require.Equal(t, 5, len(result))
-	require.Equal(t, uint64(2), accountsCustom[0].LastUsedDerivationIndex)
-	require.Equal(t, "Status Profile", accountsCustom[0].KeypairName)
-
-	accountsRegular = []*Account{
-		// Status Profile keypair
-		{Address: types.Address{0x06}, Chat: false, Wallet: false, KeyUID: "0x0001", Path: "m/44'/60'/0'/0/3", LastUsedDerivationIndex: 3, DerivedFrom: "0x1111", KeypairName: "Status Profile"},
-	}
-
-	err = db.SaveAccounts(accountsRegular)
-	require.NoError(t, err)
-
-	result, err = db.GetAccountsByKeyUID(accountsCustom[0].KeyUID)
-	require.NoError(t, err)
-	require.Equal(t, 6, len(result))
-	require.Equal(t, uint64(3), accountsRegular[0].LastUsedDerivationIndex)
-	require.Equal(t, "Status Profile", accountsRegular[0].KeypairName)
 }

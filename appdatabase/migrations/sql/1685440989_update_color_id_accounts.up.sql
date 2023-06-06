@@ -1,0 +1,13 @@
+UPDATE keypairs_accounts SET color = 'yinyang' WHERE color = '#000000';
+UPDATE keypairs_accounts SET color = 'yinyang' WHERE color = '#FFFFFF';
+UPDATE keypairs_accounts SET color = 'primary' WHERE color = '#2946C4';
+UPDATE keypairs_accounts SET color = 'purple' WHERE color = '#887AF9';
+UPDATE keypairs_accounts SET color = 'sky' WHERE color = '#51D0F0';
+UPDATE keypairs_accounts SET color = 'orange' WHERE color = '#D37EF4';
+UPDATE keypairs_accounts SET color = 'magenta' WHERE color = '#FA6565';
+UPDATE keypairs_accounts SET color = 'yellow' WHERE color = '#FFCA0F';
+UPDATE keypairs_accounts SET color = 'army' WHERE color = '#7CDA00';
+UPDATE keypairs_accounts SET color = 'turquoise' WHERE color = '#26A69A';
+UPDATE keypairs_accounts SET color = 'copper' WHERE color = '#8B3131';
+UPDATE keypairs_accounts SET color = 'camel' WHERE color = '#9B832F';
+UPDATE keypairs_accounts SET color = 'primary' WHERE color = '';

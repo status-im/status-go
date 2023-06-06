@@ -104,9 +104,9 @@ func (ppm *AccountPayloadMarshaller) multiaccountFromProtobuf(pbMultiAccount *pr
 }
 
 type RawMessagesPayload struct {
-	rawMessages []*protobuf.RawMessage
-	subAccounts []*accounts.Account
-	setting     *settings.Settings
+	rawMessages    []*protobuf.RawMessage
+	profileKeypair *accounts.Keypair
+	setting        *settings.Settings
 }
 
 func NewRawMessagesPayload() *RawMessagesPayload {
@@ -130,8 +130,8 @@ func (rmm *RawMessagePayloadMarshaller) MarshalProtobuf() (data []byte, err erro
 	syncRawMessage := new(protobuf.SyncRawMessage)
 
 	syncRawMessage.RawMessages = rmm.payload.rawMessages
-	if len(rmm.payload.subAccounts) > 0 {
-		syncRawMessage.SubAccountsJsonBytes, err = json.Marshal(rmm.payload.subAccounts)
+	if rmm.payload.profileKeypair != nil && len(rmm.payload.profileKeypair.KeyUID) > 0 {
+		syncRawMessage.SubAccountsJsonBytes, err = json.Marshal(rmm.payload.profileKeypair)
 		if err != nil {
 			return nil, err
 		}
@@ -153,7 +153,7 @@ func (rmm *RawMessagePayloadMarshaller) UnmarshalProtobuf(data []byte) error {
 		return err
 	}
 	if syncRawMessage.SubAccountsJsonBytes != nil {
-		err = json.Unmarshal(syncRawMessage.SubAccountsJsonBytes, &rmm.payload.subAccounts)
+		err = json.Unmarshal(syncRawMessage.SubAccountsJsonBytes, &rmm.payload.profileKeypair)
 		if err != nil {
 			return err
 		}

@@ -11,6 +11,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
@@ -73,6 +74,31 @@ func (s *MessengerSyncKeycardChangeSuite) SetupTest() {
 
 	err = s.main.EnableInstallation(s.other.installationID)
 	s.Require().NoError(err)
+
+	// Pre-condition - both sides have to know about keypairs migrated to a keycards
+	kp1 := accounts.GetProfileKeypairForTest(true, true, true)
+	kp2 := accounts.GetSeedImportedKeypair1ForTest()
+	// kp3 := accounts.GetSeedImportedKeypair2ForTest()
+
+	err = s.main.settings.SaveOrUpdateKeypair(kp1)
+	s.Require().NoError(err)
+	err = s.main.settings.SaveOrUpdateKeypair(kp2)
+	s.Require().NoError(err)
+	// err = s.main.settings.SaveOrUpdateKeypair(kp3)
+	// s.Require().NoError(err)
+	dbKeypairs, err := s.main.settings.GetKeypairs()
+	s.Require().NoError(err)
+	s.Require().Equal(2, len(dbKeypairs))
+
+	err = s.other.SaveOrUpdateKeypair(kp1)
+	s.Require().NoError(err)
+	err = s.other.SaveOrUpdateKeypair(kp2)
+	s.Require().NoError(err)
+	// err = s.other.SaveOrUpdateKeypair(kp3)
+	// s.Require().NoError(err)
+	dbKeypairs, err = s.other.settings.GetKeypairs()
+	s.Require().NoError(err)
+	s.Require().Equal(2, len(dbKeypairs))
 }
 
 func (s *MessengerSyncKeycardChangeSuite) TearDownTest() {
@@ -94,56 +120,65 @@ func (s *MessengerSyncKeycardChangeSuite) TestAddingNewKeycards() {
 	dbOnReceiver := s.other.settings
 
 	// Add key cards on sender
-	allKeycardsToSync := getKeycardsForTest()[:2]
-	for _, kp := range allKeycardsToSync {
-		added, err := s.main.AddKeycardOrAddAccountsIfKeycardIsAdded(context.Background(), kp)
-		s.Require().NoError(err)
-		s.Require().Equal(true, added)
-	}
+	keycard1 := accounts.GetProfileKeycardForTest()
+
+	keycard2 := accounts.GetKeycardForSeedImportedKeypair1ForTest()
+
+	added, err := s.main.AddKeycardOrAddAccountsIfKeycardIsAdded(context.Background(), keycard1)
+	s.Require().NoError(err)
+	s.Require().Equal(true, added)
+
+	added, err = s.main.AddKeycardOrAddAccountsIfKeycardIsAdded(context.Background(), keycard2)
+	s.Require().NoError(err)
+	s.Require().Equal(true, added)
 
 	// Wait for the response
-	_, err := WaitOnMessengerResponse(
+	_, err = WaitOnMessengerResponse(
 		s.other,
 		func(r *MessengerResponse) bool {
-			return len(r.KeycardActions()) == len(allKeycardsToSync)
+			return len(r.KeycardActions()) == 2
 		},
 		"expected to receive keycard activities",
 	)
 	s.Require().NoError(err)
 
+	senderKeycards, err := s.main.settings.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(2, len(senderKeycards))
+	s.Require().True(contains(senderKeycards, keycard1, accounts.SameKeycards))
+	s.Require().True(contains(senderKeycards, keycard2, accounts.SameKeycards))
+
 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
 	s.Require().NoError(err)
-	s.Require().Equal(len(allKeycardsToSync), len(syncedKeycards))
-	s.Require().True(haveSameElements(syncedKeycards, allKeycardsToSync, sameKeycards))
+	s.Require().Equal(2, len(syncedKeycards))
+	s.Require().True(contains(syncedKeycards, keycard1, accounts.SameKeycards))
+	s.Require().True(contains(syncedKeycards, keycard2, accounts.SameKeycards))
 }
 
 func (s *MessengerSyncKeycardChangeSuite) TestAddingAccountsToKeycard() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
+	keycard1 := accounts.GetProfileKeycardForTest()
+
+	keycard2 := accounts.GetKeycardForSeedImportedKeypair1ForTest()
+
 	// Add keycard on sender
-	keycardToSync := getKeycardsForTest()[:1][0]
-	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
 	// Add the same keycard on receiver
-	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
 	// Add additional accounts to sender
-	updatedKeycard := getKeycardsForTest()[:1][0]
-	updatedKeycard.AccountsAddresses = []types.Address{{0x011}, {0x022}, {0x033}, {0x044}}
-
-	added, err := s.main.AddKeycardOrAddAccountsIfKeycardIsAdded(context.Background(), updatedKeycard)
+	added, err := s.main.AddKeycardOrAddAccountsIfKeycardIsAdded(context.Background(), keycard2)
 	s.Require().NoError(err)
 	s.Require().Equal(true, added)
-
-	// Add accounts that we can check for results later
-	updatedKeycard.AccountsAddresses = append(updatedKeycard.AccountsAddresses, keycardToSync.AccountsAddresses...)
 
 	// Wait for the response
 	_, err = WaitOnMessengerResponse(
@@ -155,35 +190,44 @@ func (s *MessengerSyncKeycardChangeSuite) TestAddingAccountsToKeycard() {
 	)
 	s.Require().NoError(err)
 
+	senderKeycards, err := senderDb.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(2, len(senderKeycards))
+	s.Require().True(contains(senderKeycards, keycard1, accounts.SameKeycards))
+	s.Require().True(contains(senderKeycards, keycard2, accounts.SameKeycards))
+
 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
 	s.Require().NoError(err)
-	s.Require().Equal(1, len(syncedKeycards))
-	s.Require().True(sameKeycards(syncedKeycards[0], updatedKeycard))
+	s.Require().Equal(2, len(syncedKeycards))
+	s.Require().True(contains(syncedKeycards, keycard1, accounts.SameKeycards))
+	s.Require().True(contains(syncedKeycards, keycard2, accounts.SameKeycards))
 }
 
 func (s *MessengerSyncKeycardChangeSuite) TestRemovingAccountsFromKeycard() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
+	keycard1 := accounts.GetProfileKeycardForTest()
+
 	// Add keycard on sender
-	keycardToSync := getKeycardsForTest()[:1][0]
-	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
 	// Add the same keycard on receiver
-	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
-	// Remove accounts from sender
-	updatedKeycard := getKeycardsForTest()[:1][0]
-	updatedKeycard.AccountsAddresses = updatedKeycard.AccountsAddresses[2:]
+	// Prepare expected keycard for comparison
+	updatedKeycard1 := accounts.GetProfileKeycardForTest()
+	updatedKeycard1.AccountsAddresses = updatedKeycard1.AccountsAddresses[2:]
 
-	err = s.main.RemoveMigratedAccountsForKeycard(context.Background(), keycardToSync.KeycardUID,
-		keycardToSync.AccountsAddresses[:2], keycardToSync.LastUpdateClock)
+	// Remove accounts from sender
+	err = s.main.RemoveMigratedAccountsForKeycard(context.Background(), keycard1.KeycardUID,
+		keycard1.AccountsAddresses[:2], updatedKeycard1.LastUpdateClock)
 	s.Require().NoError(err)
 
 	// Wait for the response
@@ -196,32 +240,38 @@ func (s *MessengerSyncKeycardChangeSuite) TestRemovingAccountsFromKeycard() {
 	)
 	s.Require().NoError(err)
 
+	senderKeycards, err := senderDb.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(senderKeycards))
+	s.Require().True(contains(senderKeycards, updatedKeycard1, accounts.SameKeycards))
+
 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(syncedKeycards))
-	s.Require().True(sameKeycards(updatedKeycard, syncedKeycards[0]))
+	s.Require().True(contains(syncedKeycards, updatedKeycard1, accounts.SameKeycards))
 }
 
 func (s *MessengerSyncKeycardChangeSuite) TestRemovingAllAccountsFromKeycard() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
+	keycard1 := accounts.GetProfileKeycardForTest()
+
 	// Add keycard on sender
-	keycardToSync := getKeycardsForTest()[:1][0]
-	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
 	// Add the same keycard on receiver
-	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
 	// Remove all accounts from sender
-	err = s.main.RemoveMigratedAccountsForKeycard(context.Background(), keycardToSync.KeycardUID,
-		keycardToSync.AccountsAddresses, keycardToSync.LastUpdateClock)
+	err = s.main.RemoveMigratedAccountsForKeycard(context.Background(), keycard1.KeycardUID,
+		keycard1.AccountsAddresses, keycard1.LastUpdateClock)
 	s.Require().NoError(err)
 
 	// Wait for the response
@@ -233,6 +283,10 @@ func (s *MessengerSyncKeycardChangeSuite) TestRemovingAllAccountsFromKeycard() {
 		"expected to receive keycard activities",
 	)
 	s.Require().NoError(err)
+
+	senderKeycards, err := senderDb.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(0, len(senderKeycards))
 
 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
 	s.Require().NoError(err)
@@ -243,21 +297,22 @@ func (s *MessengerSyncKeycardChangeSuite) TestDeleteKeycard() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
+	keycard1 := accounts.GetProfileKeycardForTest()
+
 	// Add keycard on sender
-	keycardToSync := getKeycardsForTest()[:1][0]
-	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
 	// Add the same keycard on receiver
-	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
 	// Remove keycard from sender
-	err = s.main.DeleteKeycard(context.Background(), keycardToSync.KeycardUID, keycardToSync.LastUpdateClock)
+	err = s.main.DeleteKeycard(context.Background(), keycard1.KeycardUID, keycard1.LastUpdateClock)
 	s.Require().NoError(err)
 
 	// Wait for the response
@@ -269,6 +324,10 @@ func (s *MessengerSyncKeycardChangeSuite) TestDeleteKeycard() {
 		"expected to receive keycard activities",
 	)
 	s.Require().NoError(err)
+
+	senderKeycards, err := senderDb.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(0, len(senderKeycards))
 
 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
 	s.Require().NoError(err)
@@ -279,26 +338,27 @@ func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardName() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
+	keycard1 := accounts.GetProfileKeycardForTest()
+
 	// Add keycard on sender
-	keycardToSync := getKeycardsForTest()[:1][0]
-	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
 	// Add the same keycard on receiver
-	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
-	// Set new keycard name to sender
-	updatedKeycard := getKeycardsForTest()[:1][0]
-	updatedKeycard.KeycardName = "New Keycard Name"
-	updatedKeycard.LastUpdateClock = updatedKeycard.LastUpdateClock + 1
+	// Prepare expected keycard for comparison
+	updatedKeycard1 := accounts.GetProfileKeycardForTest()
+	updatedKeycard1.KeycardName = "New Keycard Name"
 
-	err = s.main.SetKeycardName(context.Background(), updatedKeycard.KeycardUID, updatedKeycard.KeycardName,
-		updatedKeycard.LastUpdateClock)
+	// Set new keycard name to sender
+	err = s.main.SetKeycardName(context.Background(), updatedKeycard1.KeycardUID, updatedKeycard1.KeycardName,
+		updatedKeycard1.LastUpdateClock)
 	s.Require().NoError(err)
 
 	// Wait for the response
@@ -311,36 +371,43 @@ func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardName() {
 	)
 	s.Require().NoError(err)
 
+	senderKeycards, err := senderDb.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(senderKeycards))
+	s.Require().True(accounts.SameKeycards(updatedKeycard1, senderKeycards[0]))
+
 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(syncedKeycards))
-	s.Require().True(sameKeycards(updatedKeycard, syncedKeycards[0]))
+	s.Require().True(accounts.SameKeycards(updatedKeycard1, syncedKeycards[0]))
 }
 
 func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardNameWithOlderClock() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
+	keycard1 := accounts.GetProfileKeycardForTest()
+
 	// Add keycard on sender
-	keycardToSync := getKeycardsForTest()[:1][0]
-	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
 	// Add the same keycard on receiver
-	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
-	// Set new keycard name to sender
-	updatedKeycard := getKeycardsForTest()[:1][0]
-	updatedKeycard.KeycardName = "New Keycard Name"
-	updatedKeycard.LastUpdateClock = updatedKeycard.LastUpdateClock - 1
+	// Prepare expected keycard for comparison
+	updatedKeycard1 := accounts.GetProfileKeycardForTest()
+	updatedKeycard1.KeycardName = "New Keycard Name"
+	updatedKeycard1.LastUpdateClock = updatedKeycard1.LastUpdateClock - 1
 
-	err = s.main.SetKeycardName(context.Background(), updatedKeycard.KeycardUID, updatedKeycard.KeycardName,
-		updatedKeycard.LastUpdateClock)
+	// Set new keycard name to sender
+	err = s.main.SetKeycardName(context.Background(), updatedKeycard1.KeycardUID, updatedKeycard1.KeycardName,
+		updatedKeycard1.LastUpdateClock)
 	s.Require().NoError(err)
 
 	// Wait for the response
@@ -353,35 +420,40 @@ func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardNameWithOlderClock()
 	)
 	s.Require().NoError(err)
 
+	senderKeycards, err := senderDb.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(senderKeycards))
+	s.Require().True(accounts.SameKeycards(keycard1, senderKeycards[0]))
+
 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(syncedKeycards))
-	s.Require().True(sameKeycards(keycardToSync, syncedKeycards[0]))
+	s.Require().True(accounts.SameKeycards(keycard1, syncedKeycards[0]))
 }
 
 func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardLocked() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
+	keycard1 := accounts.GetProfileKeycardForTest()
+
 	// Add keycard on sender
-	keycardToSync := getKeycardsForTest()[:1][0]
-	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
 	// Add the same keycard on receiver
-	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
-	// Set keycard locked on sender
-	updatedKeycard := getKeycardsForTest()[:1][0]
-	updatedKeycard.KeycardLocked = true
-	updatedKeycard.LastUpdateClock = updatedKeycard.LastUpdateClock + 1
+	// Prepare expected keycard for comparison
+	updatedKeycard1 := accounts.GetProfileKeycardForTest()
+	updatedKeycard1.KeycardLocked = true
 
-	err = s.main.KeycardLocked(context.Background(), updatedKeycard.KeycardUID, updatedKeycard.LastUpdateClock)
+	err = s.main.KeycardLocked(context.Background(), updatedKeycard1.KeycardUID, updatedKeycard1.LastUpdateClock)
 	s.Require().NoError(err)
 
 	// Wait for the response
@@ -394,35 +466,41 @@ func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardLocked() {
 	)
 	s.Require().NoError(err)
 
+	senderKeycards, err := senderDb.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(senderKeycards))
+	s.Require().True(accounts.SameKeycards(updatedKeycard1, senderKeycards[0]))
+
 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(syncedKeycards))
-	s.Require().True(sameKeycards(updatedKeycard, syncedKeycards[0]))
+	s.Require().True(accounts.SameKeycards(updatedKeycard1, syncedKeycards[0]))
 }
 
 func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardLockedOlderClock() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
+	keycard1 := accounts.GetProfileKeycardForTest()
+
 	// Add keycard on sender
-	keycardToSync := getKeycardsForTest()[:1][0]
-	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
 	// Add the same keycard on receiver
-	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
-	// Set keycard locked on sender
-	updatedKeycard := getKeycardsForTest()[:1][0]
-	updatedKeycard.KeycardLocked = true
-	updatedKeycard.LastUpdateClock = updatedKeycard.LastUpdateClock - 1
+	// Prepare expected keycard for comparison
+	updatedKeycard1 := accounts.GetProfileKeycardForTest()
+	updatedKeycard1.KeycardLocked = true
+	updatedKeycard1.LastUpdateClock = updatedKeycard1.LastUpdateClock - 1
 
-	err = s.main.KeycardLocked(context.Background(), updatedKeycard.KeycardUID, updatedKeycard.LastUpdateClock)
+	err = s.main.KeycardLocked(context.Background(), updatedKeycard1.KeycardUID, updatedKeycard1.LastUpdateClock)
 	s.Require().NoError(err)
 
 	// Wait for the response
@@ -435,36 +513,41 @@ func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardLockedOlderClock() {
 	)
 	s.Require().NoError(err)
 
+	senderKeycards, err := senderDb.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(senderKeycards))
+	s.Require().True(accounts.SameKeycards(keycard1, senderKeycards[0]))
+
 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(syncedKeycards))
-	s.Require().True(sameKeycards(keycardToSync, syncedKeycards[0]))
+	s.Require().True(accounts.SameKeycards(keycard1, syncedKeycards[0]))
 }
 
 func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardUnlocked() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
+	keycard1 := accounts.GetProfileKeycardForTest()
+	keycard1.KeycardLocked = true
+
 	// Add keycard on sender
-	keycardToSync := getKeycardsForTest()[:1][0]
-	keycardToSync.KeycardLocked = true
-	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
 	// Add the same keycard on receiver
-	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
-	// Set keycard unlocked on sender
-	updatedKeycard := getKeycardsForTest()[:1][0]
-	updatedKeycard.KeycardLocked = false
-	updatedKeycard.LastUpdateClock = updatedKeycard.LastUpdateClock + 1
+	// Prepare expected keycard for comparison
+	updatedKeycard1 := accounts.GetProfileKeycardForTest()
+	updatedKeycard1.KeycardLocked = false
 
-	err = s.main.KeycardUnlocked(context.Background(), updatedKeycard.KeycardUID, updatedKeycard.LastUpdateClock)
+	err = s.main.KeycardUnlocked(context.Background(), updatedKeycard1.KeycardUID, updatedKeycard1.LastUpdateClock)
 	s.Require().NoError(err)
 
 	// Wait for the response
@@ -477,36 +560,42 @@ func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardUnlocked() {
 	)
 	s.Require().NoError(err)
 
+	senderKeycards, err := senderDb.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(senderKeycards))
+	s.Require().True(accounts.SameKeycards(updatedKeycard1, senderKeycards[0]))
+
 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(syncedKeycards))
-	s.Require().True(sameKeycards(updatedKeycard, syncedKeycards[0]))
+	s.Require().True(accounts.SameKeycards(updatedKeycard1, syncedKeycards[0]))
 }
 
 func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardUnlockedOlderClock() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
+	keycard1 := accounts.GetProfileKeycardForTest()
+	keycard1.KeycardLocked = true
+
 	// Add keycard on sender
-	keycardToSync := getKeycardsForTest()[:1][0]
-	keycardToSync.KeycardLocked = true
-	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
 	// Add the same keycard on receiver
-	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
-	// Set keycard unlocked on sender
-	updatedKeycard := getKeycardsForTest()[:1][0]
-	updatedKeycard.KeycardLocked = false
-	updatedKeycard.LastUpdateClock = updatedKeycard.LastUpdateClock - 1
+	// Prepare expected keycard for comparison
+	updatedKeycard1 := accounts.GetProfileKeycardForTest()
+	updatedKeycard1.KeycardLocked = false
+	updatedKeycard1.LastUpdateClock = updatedKeycard1.LastUpdateClock - 1
 
-	err = s.main.KeycardLocked(context.Background(), updatedKeycard.KeycardUID, updatedKeycard.LastUpdateClock)
+	err = s.main.KeycardUnlocked(context.Background(), updatedKeycard1.KeycardUID, updatedKeycard1.LastUpdateClock)
 	s.Require().NoError(err)
 
 	// Wait for the response
@@ -519,36 +608,42 @@ func (s *MessengerSyncKeycardChangeSuite) TestSettingKeycardUnlockedOlderClock()
 	)
 	s.Require().NoError(err)
 
+	senderKeycards, err := senderDb.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(senderKeycards))
+	s.Require().True(accounts.SameKeycards(keycard1, senderKeycards[0]))
+
 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(syncedKeycards))
-	s.Require().True(sameKeycards(keycardToSync, syncedKeycards[0]))
+	s.Require().True(accounts.SameKeycards(keycard1, syncedKeycards[0]))
 }
 
 func (s *MessengerSyncKeycardChangeSuite) TestUpdatingKeycardUid() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
+	keycard1 := accounts.GetProfileKeycardForTest()
+
 	// Add keycard on sender
-	keycardToSync := getKeycardsForTest()[:1][0]
-	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
 	// Add the same keycard on receiver
-	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
-	// Set keycard unlocked on sender
-	updatedKeycard := getKeycardsForTest()[:1][0]
-	updatedKeycard.KeycardUID = "00000000000000000000000000000000"
-	updatedKeycard.LastUpdateClock = updatedKeycard.LastUpdateClock + 1
+	// Prepare expected keycard for comparison
+	updatedKeycard1 := accounts.GetProfileKeycardForTest()
+	updatedKeycard1.KeycardUID = "00000000000000000000000000000000"
 
-	err = s.main.UpdateKeycardUID(context.Background(), keycardToSync.KeycardUID, updatedKeycard.KeycardUID,
-		updatedKeycard.LastUpdateClock)
+	// Update keycard uid on sender
+	err = s.main.UpdateKeycardUID(context.Background(), keycard1.KeycardUID, updatedKeycard1.KeycardUID,
+		updatedKeycard1.LastUpdateClock)
 	s.Require().NoError(err)
 
 	// Wait for the response
@@ -561,36 +656,43 @@ func (s *MessengerSyncKeycardChangeSuite) TestUpdatingKeycardUid() {
 	)
 	s.Require().NoError(err)
 
+	senderKeycards, err := senderDb.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(senderKeycards))
+	s.Require().True(accounts.SameKeycards(updatedKeycard1, senderKeycards[0]))
+
 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(syncedKeycards))
-	s.Require().True(sameKeycards(updatedKeycard, syncedKeycards[0]))
+	s.Require().True(accounts.SameKeycards(updatedKeycard1, syncedKeycards[0]))
 }
 
 func (s *MessengerSyncKeycardChangeSuite) TestUpdatingKeycardUidOldClock() {
 	senderDb := s.main.settings
 	dbOnReceiver := s.other.settings
 
+	keycard1 := accounts.GetProfileKeycardForTest()
+
 	// Add keycard on sender
-	keycardToSync := getKeycardsForTest()[:1][0]
-	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
 	// Add the same keycard on receiver
-	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardToSync)
+	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
 	s.Require().NoError(err)
 	s.Require().Equal(true, addedKc)
 	s.Require().Equal(false, addedAccs)
 
-	// Set keycard unlocked on sender
-	updatedKeycard := getKeycardsForTest()[:1][0]
-	updatedKeycard.KeycardUID = "00000000000000000000000000000000"
-	updatedKeycard.LastUpdateClock = updatedKeycard.LastUpdateClock - 1
+	// Prepare expected keycard for comparison
+	updatedKeycard1 := accounts.GetProfileKeycardForTest()
+	updatedKeycard1.KeycardUID = "00000000000000000000000000000000"
+	updatedKeycard1.LastUpdateClock = updatedKeycard1.LastUpdateClock - 1
 
-	err = s.main.UpdateKeycardUID(context.Background(), keycardToSync.KeycardUID, updatedKeycard.KeycardUID,
-		updatedKeycard.LastUpdateClock)
+	// Update keycard uid on sender
+	err = s.main.UpdateKeycardUID(context.Background(), keycard1.KeycardUID, updatedKeycard1.KeycardUID,
+		updatedKeycard1.LastUpdateClock)
 	s.Require().NoError(err)
 
 	// Wait for the response
@@ -603,8 +705,13 @@ func (s *MessengerSyncKeycardChangeSuite) TestUpdatingKeycardUidOldClock() {
 	)
 	s.Require().NoError(err)
 
+	senderKeycards, err := senderDb.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(senderKeycards))
+	s.Require().True(accounts.SameKeycards(keycard1, senderKeycards[0]))
+
 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(syncedKeycards))
-	s.Require().True(sameKeycards(keycardToSync, syncedKeycards[0]))
+	s.Require().True(accounts.SameKeycards(keycard1, syncedKeycards[0]))
 }

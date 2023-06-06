@@ -6,11 +6,30 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 )
+
+func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, feed *event.Feed,
+	transactionManager *TransactionManager,
+	tokenManager *token.Manager,
+	chainClients map[uint64]*chain.ClientWithFallback,
+	accounts []common.Address) *SequentialFetchStrategy {
+
+	return &SequentialFetchStrategy{
+		db:                 db,
+		blockDAO:           blockDAO,
+		feed:               feed,
+		transactionManager: transactionManager,
+		tokenManager:       tokenManager,
+		chainClients:       chainClients,
+		accounts:           accounts,
+	}
+}
 
 type SequentialFetchStrategy struct {
 	db                 *Database
@@ -19,33 +38,16 @@ type SequentialFetchStrategy struct {
 	mu                 sync.Mutex
 	group              *async.Group
 	transactionManager *TransactionManager
+	tokenManager       *token.Manager
 	chainClients       map[uint64]*chain.ClientWithFallback
 	accounts           []common.Address
 }
 
 func (s *SequentialFetchStrategy) newCommand(chainClient *chain.ClientWithFallback,
-	// accounts []common.Address) *loadAllTransfersCommand {
 	accounts []common.Address) async.Commander {
 
-	signer := types.NewLondonSigner(chainClient.ToBigInt())
-	// ctl := &loadAllTransfersCommand{
-	ctl := &controlCommand{ // TODO Will be replaced by loadAllTranfersCommand in upcoming commit
-		db:          s.db,
-		chainClient: chainClient,
-		accounts:    accounts,
-		blockDAO:    s.blockDAO,
-		eth: &ETHDownloader{
-			chainClient: chainClient,
-			accounts:    accounts,
-			signer:      signer,
-			db:          s.db,
-		},
-		erc20:              NewERC20TransfersDownloader(chainClient, accounts, signer),
-		feed:               s.feed,
-		errorsCount:        0,
-		transactionManager: s.transactionManager,
-	}
-	return ctl
+	return newLoadBlocksAndTransfersCommand(accounts, s.db, s.blockDAO, chainClient, s.feed,
+		s.transactionManager, s.tokenManager)
 }
 
 func (s *SequentialFetchStrategy) start() error {
@@ -56,6 +58,13 @@ func (s *SequentialFetchStrategy) start() error {
 		return errAlreadyRunning
 	}
 	s.group = async.NewGroup(context.Background())
+
+	if s.feed != nil {
+		s.feed.Send(walletevent.Event{
+			Type:     EventFetchingRecentHistory,
+			Accounts: s.accounts,
+		})
+	}
 
 	for _, chainClient := range s.chainClients {
 		ctl := s.newCommand(chainClient, s.accounts)
@@ -81,9 +90,18 @@ func (s *SequentialFetchStrategy) kind() FetchStrategyType {
 	return SequentialFetchStrategyType
 }
 
+// TODO: remove fetchMore parameter from here and interface, it is used by OnDemandFetchStrategy only
 func (s *SequentialFetchStrategy) getTransfersByAddress(ctx context.Context, chainID uint64, address common.Address, toBlock *big.Int,
 	limit int64, fetchMore bool) ([]Transfer, error) {
 
-	// TODO: implement - load from database
-	return []Transfer{}, nil
+	log.Info("[WalletAPI:: GetTransfersByAddress] get transfers for an address", "address", address, "fetchMore", fetchMore,
+		"chainID", chainID, "toBlock", toBlock, "limit", limit)
+
+	rst, err := s.db.GetTransfersByAddress(chainID, address, toBlock, limit)
+	if err != nil {
+		log.Error("[WalletAPI:: GetTransfersByAddress] can't fetch transfers", "err", err)
+		return nil, err
+	}
+
+	return rst, nil
 }

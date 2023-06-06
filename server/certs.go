@@ -13,8 +13,8 @@ import (
 	"time"
 )
 
-var globalCertificate *tls.Certificate = nil
-var globalPem string
+var globalMediaCertificate *tls.Certificate = nil
+var globalMediaPem string
 
 func makeRandomSerialNumber() (*big.Int, error) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
@@ -59,47 +59,52 @@ func GenerateX509PEMs(cert *x509.Certificate, key *ecdsa.PrivateKey) (certPem, k
 	return
 }
 
-func generateTLSCert() error {
-	if globalCertificate != nil {
-		return nil
-	}
-
+func GenerateTLSCert(notBefore, notAfter time.Time, hostname string) (*tls.Certificate, []byte, error) {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		return err
+		return nil, nil, err
+	}
+
+	sn, err := makeRandomSerialNumber()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	cert := GenerateX509Cert(sn, notBefore, notAfter, hostname)
+	certPem, keyPem, err := GenerateX509PEMs(cert, priv)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	finalCert, err := tls.X509KeyPair(certPem, keyPem)
+	return &finalCert, certPem, err
+}
+
+func generateMediaTLSCert() error {
+	if globalMediaCertificate != nil {
+		return nil
 	}
 
 	notBefore := time.Now()
 	notAfter := notBefore.Add(365 * 24 * time.Hour)
 
-	sn, err := makeRandomSerialNumber()
+	finalCert, certPem, err := GenerateTLSCert(notBefore, notAfter, Localhost)
 	if err != nil {
 		return err
 	}
 
-	cert := GenerateX509Cert(sn, notBefore, notAfter, Localhost)
-	certPem, keyPem, err := GenerateX509PEMs(cert, priv)
-	if err != nil {
-		return err
-	}
-
-	finalCert, err := tls.X509KeyPair(certPem, keyPem)
-	if err != nil {
-		return err
-	}
-
-	globalCertificate = &finalCert
-	globalPem = string(certPem)
+	globalMediaCertificate = finalCert
+	globalMediaPem = string(certPem)
 	return nil
 }
 
-func PublicTLSCert() (string, error) {
-	err := generateTLSCert()
+func PublicMediaTLSCert() (string, error) {
+	err := generateMediaTLSCert()
 	if err != nil {
 		return "", err
 	}
 
-	return globalPem, nil
+	return globalMediaPem, nil
 }
 
 // ToECDSA takes a []byte of D and uses it to create an ecdsa.PublicKey on the elliptic.P256 curve

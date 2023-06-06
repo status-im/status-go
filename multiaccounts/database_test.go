@@ -10,6 +10,8 @@ import (
 	"github.com/status-im/status-go/protocol/sqlite"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/multiaccounts/common"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
@@ -26,7 +28,7 @@ func setupTestDB(t *testing.T) (*Database, func()) {
 func TestAccounts(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	expected := Account{Name: "string", KeyUID: "string", CustomizationColor: CustomizationColorBlue, ColorHash: ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: sqlite.ReducedKDFIterationsNumber}
+	expected := Account{Name: "string", KeyUID: "string", CustomizationColor: common.CustomizationColorBlue, ColorHash: ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: sqlite.ReducedKDFIterationsNumber}
 	require.NoError(t, db.SaveAccount(expected))
 	accounts, err := db.GetAccounts()
 	require.NoError(t, err)
@@ -37,10 +39,10 @@ func TestAccounts(t *testing.T) {
 func TestAccountsUpdate(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	expected := Account{KeyUID: "string", CustomizationColor: CustomizationColorBlue, ColorHash: ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: sqlite.ReducedKDFIterationsNumber}
+	expected := Account{KeyUID: "string", CustomizationColor: common.CustomizationColorBlue, ColorHash: ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: sqlite.ReducedKDFIterationsNumber}
 	require.NoError(t, db.SaveAccount(expected))
 	expected.Name = "chars"
-	expected.CustomizationColor = CustomizationColorMagenta
+	expected.CustomizationColor = common.CustomizationColorMagenta
 	require.NoError(t, db.UpdateAccount(expected))
 	rst, err := db.GetAccounts()
 	require.NoError(t, err)

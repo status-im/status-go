@@ -112,7 +112,8 @@ type WakuNodeParameters struct {
 
 	enableLightPush bool
 
-	connStatusC chan ConnStatus
+	connStatusC chan<- ConnStatus
+	connNotifCh chan<- PeerConnection
 
 	storeFactory storeFactory
 }
@@ -166,9 +167,9 @@ func WithLogLevel(lvl zapcore.Level) WakuNodeOption {
 func WithDns4Domain(dns4Domain string) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.dns4Domain = dns4Domain
-
-		params.addressFactory = func([]multiaddr.Multiaddr) []multiaddr.Multiaddr {
-			var result []multiaddr.Multiaddr
+		previousAddrFactory := params.addressFactory
+		params.addressFactory = func(inputAddr []multiaddr.Multiaddr) (addresses []multiaddr.Multiaddr) {
+			addresses = append(addresses, inputAddr...)
 
 			hostAddrMA, err := multiaddr.NewMultiaddr("/dns4/" + params.dns4Domain)
 			if err != nil {
@@ -177,18 +178,23 @@ func WithDns4Domain(dns4Domain string) WakuNodeOption {
 
 			tcp, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/tcp/%d", params.hostAddr.Port))
 
-			result = append(result, hostAddrMA.Encapsulate(tcp))
+			addresses = append(addresses, hostAddrMA.Encapsulate(tcp))
 
 			if params.enableWS || params.enableWSS {
 				if params.enableWSS {
 					wss, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/tcp/%d/wss", params.wssPort))
-					result = append(result, hostAddrMA.Encapsulate(wss))
+					addresses = append(addresses, hostAddrMA.Encapsulate(wss))
 				} else {
 					ws, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/tcp/%d/ws", params.wsPort))
-					result = append(result, hostAddrMA.Encapsulate(ws))
+					addresses = append(addresses, hostAddrMA.Encapsulate(ws))
 				}
 			}
-			return result
+
+			if previousAddrFactory != nil {
+				return previousAddrFactory(addresses)
+			} else {
+				return addresses
+			}
 		}
 
 		return nil
@@ -213,17 +219,17 @@ func WithHostAddress(hostAddr *net.TCPAddr) WakuNodeOption {
 func WithAdvertiseAddresses(advertiseAddrs ...ma.Multiaddr) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.advertiseAddrs = advertiseAddrs
-		params.addressFactory = func([]multiaddr.Multiaddr) (addresses []multiaddr.Multiaddr) {
-			return advertiseAddrs
-		}
-		return nil
+		return WithMultiaddress(advertiseAddrs...)(params)
 	}
 }
 
 // WithExternalIP is a WakuNodeOption that allows overriding the advertised external IP used in the waku node with custom value
 func WithExternalIP(ip net.IP) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
+		oldAddrFactory := params.addressFactory
 		params.addressFactory = func(inputAddr []multiaddr.Multiaddr) (addresses []multiaddr.Multiaddr) {
+			addresses = append(addresses, inputAddr...)
+
 			component := "/ip4/"
 			if ip.To4() == nil && ip.To16() != nil {
 				component = "/ip6/"
@@ -234,19 +240,31 @@ func WithExternalIP(ip net.IP) WakuNodeOption {
 				panic("Could not build external IP")
 			}
 
+			addrSet := make(map[string]multiaddr.Multiaddr)
 			for _, addr := range inputAddr {
 				_, rest := multiaddr.SplitFirst(addr)
-				addresses = append(addresses, hostAddrMA.Encapsulate(rest))
+
+				addr := hostAddrMA.Encapsulate(rest)
+
+				addrSet[addr.String()] = addr
 			}
 
-			return addresses
+			for _, addr := range addrSet {
+				addresses = append(addresses, addr)
+			}
+
+			if oldAddrFactory != nil {
+				return oldAddrFactory(addresses)
+			} else {
+				return addresses
+			}
 		}
 		return nil
 	}
 }
 
 // WithMultiaddress is a WakuNodeOption that configures libp2p to listen on a list of multiaddresses
-func WithMultiaddress(addresses []multiaddr.Multiaddr) WakuNodeOption {
+func WithMultiaddress(addresses ...multiaddr.Multiaddr) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.multiAddr = append(params.multiAddr, addresses...)
 		return nil
@@ -433,6 +451,13 @@ func WithConnectionStatusChannel(connStatus chan ConnStatus) WakuNodeOption {
 	}
 }
 
+func WithConnectionNotification(ch chan<- PeerConnection) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.connNotifCh = ch
+		return nil
+	}
+}
+
 // WithWebsockets is a WakuNodeOption used to enable websockets support
 func WithWebsockets(address string, port int) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
@@ -508,6 +533,7 @@ var DefaultLibP2POptions = []libp2p.Option{
 	),
 	libp2p.EnableNATService(),
 	libp2p.ConnectionManager(newConnManager(200, 300, connmgr.WithGracePeriod(0))),
+	libp2p.EnableHolePunching(),
 }
 
 func newConnManager(lo int, hi int, opts ...connmgr.Option) *connmgr.BasicConnMgr {

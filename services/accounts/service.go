@@ -70,9 +70,9 @@ func (s *Service) Protocols() []p2p.Protocol {
 	return nil
 }
 
-func (s *Service) GetAccountsByKeyUID(keyUID string) ([]*accounts.Account, error) {
+func (s *Service) GetKeypairByKeyUID(keyUID string) (*accounts.Keypair, error) {
 
-	return s.db.GetAccountsByKeyUID(keyUID)
+	return s.db.GetKeypairByKeyUID(keyUID)
 }
 
 func (s *Service) GetSettings() (settings.Settings, error) {

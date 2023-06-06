@@ -20,6 +20,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/bridge"
+	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -59,6 +60,7 @@ type MultiTransaction struct {
 	FromAsset   string               `json:"fromAsset"`
 	ToAsset     string               `json:"toAsset"`
 	FromAmount  *hexutil.Big         `json:"fromAmount"`
+	ToAmount    *hexutil.Big         `json:"toAmount"`
 	Type        MultiTransactionType `json:"type"`
 }
 
@@ -70,13 +72,14 @@ type MultiTransactionResult struct {
 type PendingTrxType string
 
 const (
-	RegisterENS           PendingTrxType = "RegisterENS"
-	ReleaseENS            PendingTrxType = "ReleaseENS"
-	SetPubKey             PendingTrxType = "SetPubKey"
-	BuyStickerPack        PendingTrxType = "BuyStickerPack"
-	WalletTransfer        PendingTrxType = "WalletTransfer"
-	CollectibleDeployment PendingTrxType = "CollectibleDeployment"
-	CollectibleAirdrop    PendingTrxType = "CollectibleAirdrop"
+	RegisterENS                   PendingTrxType = "RegisterENS"
+	ReleaseENS                    PendingTrxType = "ReleaseENS"
+	SetPubKey                     PendingTrxType = "SetPubKey"
+	BuyStickerPack                PendingTrxType = "BuyStickerPack"
+	WalletTransfer                PendingTrxType = "WalletTransfer"
+	CollectibleDeployment         PendingTrxType = "CollectibleDeployment"
+	CollectibleAirdrop            PendingTrxType = "CollectibleAirdrop"
+	CollectibleRemoteSelfDestruct PendingTrxType = "CollectibleRemoteSelfDestruct"
 )
 
 type PendingTransaction struct {
@@ -96,9 +99,9 @@ type PendingTransaction struct {
 }
 
 type TransactionIdentity struct {
-	ChainID uint64         `json:"chainId"`
-	Hash    common.Hash    `json:"hash"`
-	Address common.Address `json:"address"`
+	ChainID wallet_common.ChainID `json:"chainId"`
+	Hash    common.Hash           `json:"hash"`
+	Address common.Address        `json:"address"`
 }
 
 const selectFromPending = `SELECT hash, timestamp, value, from_address, to_address, data,
@@ -259,11 +262,11 @@ func (tm *TransactionManager) Watch(ctx context.Context, transactionHash common.
 	return watchTxCommand.Command()(commandContext)
 }
 
-const multiTransactionColumns = "from_address, from_asset, from_amount, to_address, to_asset, type, timestamp"
+const multiTransactionColumns = "from_address, from_asset, from_amount, to_address, to_asset, to_amount, type, timestamp"
 
 func insertMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) (MultiTransactionIDType, error) {
 	insert, err := db.Prepare(fmt.Sprintf(`INSERT OR REPLACE INTO multi_transactions (%s)
-											VALUES(?, ?, ?, ?, ?, ?, ?)`, multiTransactionColumns))
+											VALUES(?, ?, ?, ?, ?, ?, ?, ?)`, multiTransactionColumns))
 	if err != nil {
 		return 0, err
 	}
@@ -273,6 +276,7 @@ func insertMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) (Mul
 		multiTransaction.FromAmount.String(),
 		multiTransaction.ToAddress,
 		multiTransaction.ToAsset,
+		multiTransaction.ToAmount.String(),
 		multiTransaction.Type,
 		time.Now().Unix(),
 	)
@@ -284,7 +288,11 @@ func insertMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) (Mul
 	return MultiTransactionIDType(multiTransactionID), err
 }
 
-func (tm *TransactionManager) CreateMultiTransaction(ctx context.Context, multiTransaction *MultiTransaction, data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge, password string) (*MultiTransactionResult, error) {
+func (tm *TransactionManager) InsertMultiTransaction(multiTransaction *MultiTransaction) (MultiTransactionIDType, error) {
+	return insertMultiTransaction(tm.db, multiTransaction)
+}
+
+func (tm *TransactionManager) CreateBridgeMultiTransaction(ctx context.Context, multiTransaction *MultiTransaction, data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge, password string) (*MultiTransactionResult, error) {
 	selectedAccount, err := tm.getVerifiedWalletAccount(multiTransaction.FromAddress.Hex(), password)
 	if err != nil {
 		return nil, err
@@ -354,6 +362,7 @@ func (tm *TransactionManager) GetMultiTransactions(ctx context.Context, ids []Mu
 	for rows.Next() {
 		multiTransaction := &MultiTransaction{}
 		var fromAmount string
+		var toAmount string
 		err := rows.Scan(
 			&multiTransaction.ID,
 			&multiTransaction.FromAddress,
@@ -361,6 +370,7 @@ func (tm *TransactionManager) GetMultiTransactions(ctx context.Context, ids []Mu
 			&fromAmount,
 			&multiTransaction.ToAddress,
 			&multiTransaction.ToAsset,
+			&toAmount,
 			&multiTransaction.Type,
 			&multiTransaction.Timestamp,
 		)
@@ -372,6 +382,12 @@ func (tm *TransactionManager) GetMultiTransactions(ctx context.Context, ids []Mu
 		_, ok := (*big.Int)(multiTransaction.FromAmount).SetString(fromAmount, 0)
 		if !ok {
 			return nil, errors.New("failed to convert fromAmount to big.Int: " + fromAmount)
+		}
+
+		multiTransaction.ToAmount = new(hexutil.Big)
+		_, ok = (*big.Int)(multiTransaction.ToAmount).SetString(toAmount, 0)
+		if !ok {
+			return nil, errors.New("failed to convert toAmount to big.Int: " + toAmount)
 		}
 
 		multiTransactions = append(multiTransactions, multiTransaction)
