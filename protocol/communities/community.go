@@ -1900,25 +1900,8 @@ func (o *Community) AddMemberWallet(memberID string, addresses []string) (*Commu
 func (o *Community) createDeepCopy() Community {
 	return Community{
 		config: &Config{
-			PrivateKey: o.config.PrivateKey,
-			CommunityDescription: &protobuf.CommunityDescription{
-				Clock:                   o.config.CommunityDescription.Clock,
-				Members:                 o.config.CommunityDescription.Members,
-				Permissions:             o.config.CommunityDescription.Permissions,
-				Identity:                o.config.CommunityDescription.Identity,
-				Chats:                   o.config.CommunityDescription.Chats,
-				BanList:                 o.config.CommunityDescription.BanList,
-				Categories:              o.config.CommunityDescription.Categories,
-				ArchiveMagnetlinkClock:  o.config.CommunityDescription.ArchiveMagnetlinkClock,
-				AdminSettings:           o.config.CommunityDescription.AdminSettings,
-				IntroMessage:            o.config.CommunityDescription.IntroMessage,
-				OutroMessage:            o.config.CommunityDescription.OutroMessage,
-				Encrypted:               o.config.CommunityDescription.Encrypted,
-				Tags:                    o.config.CommunityDescription.Tags,
-				TokenPermissions:        o.config.CommunityDescription.TokenPermissions,
-				CommunityTokensMetadata: o.config.CommunityDescription.CommunityTokensMetadata,
-				ActiveMembersCount:      o.config.CommunityDescription.ActiveMembersCount,
-			},
+			PrivateKey:                    o.config.PrivateKey,
+			CommunityDescription:          proto.Clone(o.config.CommunityDescription).(*protobuf.CommunityDescription),
 			MarshaledCommunityDescription: o.config.MarshaledCommunityDescription,
 			ID:                            o.config.ID,
 			Joined:                        o.config.Joined,
