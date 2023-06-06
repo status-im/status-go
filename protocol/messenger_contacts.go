@@ -554,6 +554,20 @@ func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*Messenge
 	return response, nil
 }
 
+func (m *Messenger) updateContactImagesURL(contact *Contact) error {
+	if m.httpServer != nil {
+		for k, v := range contact.Images {
+			publicKey, err := contact.PublicKey()
+			if err != nil {
+				return err
+			}
+			v.LocalURL = m.httpServer.MakeContactImageURL(common.PubkeyToHex(publicKey), k)
+			contact.Images[k] = v
+		}
+	}
+	return nil
+}
+
 func (m *Messenger) Contacts() []*Contact {
 	var contacts []*Contact
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
