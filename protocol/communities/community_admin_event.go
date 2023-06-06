@@ -204,7 +204,7 @@ func (o *Community) PatchCommunityDescriptionByAdminEvent(adminEvent *protobuf.C
 		return nil, errors.New("unknown admin event")
 	}
 
-	// create a deep copy of current community so we can patch CoommunityDescription
+	// create a deep copy of current community so we can patch CommunityDescription
 	copy := o.createDeepCopy()
 
 	copy.config.CommunityDescription.Clock = adminEvent.Clock
