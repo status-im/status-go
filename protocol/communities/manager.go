@@ -1570,15 +1570,7 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 
 		// admin token permissions required to became an admin must not cancel request to join
 		// if requirements were not met
-		hasPermission := false
-		if len(becomeAdminPermissions) > 0 {
-			permissionResponse, err := m.checkPermissionToJoin(becomeAdminPermissions, walletAddresses, true)
-			if err != nil {
-				m.logger.Warn("Failed to check admin permmissions to join for the community as an admin", zap.Error(err))
-			} else {
-				hasPermission = permissionResponse.Satisfied
-			}
-		}
+		hasPermission := m.isWaleltsHasAdminPermission(becomeAdminPermissions, walletAddresses)
 
 		if hasPermission {
 			memberRole = protobuf.CommunityMember_ROLE_ADMIN
@@ -1824,14 +1816,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 
 		// admin token permissions required to became an admin must not cancel request to join
 		// if requirements were not met
-		if len(becomeAdminPermissions) > 0 {
-			permissionResponse, err := m.checkPermissionToJoin(becomeAdminPermissions, verifiedAddresses, true)
-			if err != nil {
-				m.logger.Info("Failed to check admin permmissions to join for the community as an admin", zap.Error(err))
-			} else {
-				hasPermission = permissionResponse.Satisfied
-			}
-		}
+		hasPermission = m.isWaleltsHasAdminPermission(becomeAdminPermissions, verifiedAddresses)
 
 		// if user does not have admin permissions, check on member permissions
 		if !hasPermission && len(becomeMemberPermissions) > 0 {
@@ -3822,4 +3807,14 @@ func (m *Manager) UpdateCommunity(c *Community) error {
 
 	m.publish(&Subscription{Community: c})
 	return nil
+}
+
+func (m *Manager) isWaleltsHasAdminPermission(becomeAdminPermissions []*protobuf.CommunityTokenPermission, walletAddresses []gethcommon.Address) bool {
+	if len(becomeAdminPermissions) > 0 {
+		permissionResponse, err := m.checkPermissionToJoin(becomeAdminPermissions, walletAddresses, true)
+		if err == nil {
+			return permissionResponse.Satisfied
+		}
+	}
+	return false
 }
