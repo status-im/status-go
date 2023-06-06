@@ -176,6 +176,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m2.source,
 		m2.text,
 		m2.parsed_text,
+		m2.album_images_count,
 		m2.audio_duration_ms,
 		m2.community_id,
 		m2.id,
@@ -203,6 +204,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var ContentType sql.NullInt64
 	var quotedText sql.NullString
 	var quotedParsedText []byte
+	var quotedAlbumImagesCount sql.NullInt64
 	var quotedFrom sql.NullString
 	var quotedAudioDuration sql.NullInt64
 	var quotedCommunityID sql.NullString
@@ -309,6 +311,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&quotedFrom,
 		&quotedText,
 		&quotedParsedText,
+		&quotedAlbumImagesCount,
 		&quotedAudioDuration,
 		&quotedCommunityID,
 		&quotedID,
@@ -360,13 +363,14 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 			}
 		} else {
 			message.QuotedMessage = &common.QuotedMessage{
-				ID:          quotedID.String,
-				ContentType: ContentType.Int64,
-				From:        quotedFrom.String,
-				Text:        quotedText.String,
-				ParsedText:  quotedParsedText,
-				CommunityID: quotedCommunityID.String,
-				Deleted:     quotedDeleted.Bool,
+				ID:               quotedID.String,
+				ContentType:      ContentType.Int64,
+				From:             quotedFrom.String,
+				Text:             quotedText.String,
+				ParsedText:       quotedParsedText,
+				AlbumImagesCount: quotedAlbumImagesCount.Int64,
+				CommunityID:      quotedCommunityID.String,
+				Deleted:          quotedDeleted.Bool,
 			}
 			if message.QuotedMessage.ContentType == int64(protobuf.ChatMessage_DISCORD_MESSAGE) {
 				message.QuotedMessage.DiscordMessage = quotedDiscordMessage
