@@ -3,6 +3,7 @@ syntax = "proto3";
 import "chat_identity.proto";
 import "sync_settings.proto";
 import 'application_metadata_message.proto';
+import 'communities.proto';
 
 option go_package = "./;protobuf";
 package protobuf;
@@ -154,7 +155,7 @@ message SyncCommunityRequestsToJoin {
   string chat_id = 5;
   bytes community_id = 6;
   uint64 state = 7;
-  map<string, bytes> revealed_addresses = 8;
+  repeated RevealedAccount revealed_accounts = 8;
 }
 
 message SyncInstallation {

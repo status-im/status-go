@@ -6,6 +6,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -336,16 +338,23 @@ func (p *Persistence) SaveRequestToJoinRevealedAddresses(request *RequestToJoin)
 		_ = tx.Rollback()
 	}()
 
-	query := `INSERT OR REPLACE INTO communities_requests_to_join_revealed_addresses (request_id, address) VALUES (?, ?)`
+	query := `INSERT OR REPLACE INTO communities_requests_to_join_revealed_addresses (request_id, address, chain_ids) VALUES (?, ?, ?)`
 	stmt, err := tx.Prepare(query)
 	if err != nil {
 		return
 	}
 	defer stmt.Close()
-	for address := range request.RevealedAddresses {
+	for _, account := range request.RevealedAccounts {
+
+		var chainIDs []string
+		for _, ID := range account.ChainIds {
+			chainIDs = append(chainIDs, strconv.Itoa(int(ID)))
+		}
+
 		_, err = stmt.Exec(
 			request.ID,
-			address,
+			account.Address,
+			strings.Join(chainIDs, ","),
 		)
 		if err != nil {
 			return
@@ -354,9 +363,9 @@ func (p *Persistence) SaveRequestToJoinRevealedAddresses(request *RequestToJoin)
 	return
 }
 
-func (p *Persistence) GetRequestToJoinRevealedAddresses(requestID []byte) ([]string, error) {
-	revealedAddresses := make([]string, 0)
-	rows, err := p.db.Query(`SELECT address FROM communities_requests_to_join_revealed_addresses WHERE request_id = ?`, requestID)
+func (p *Persistence) GetRequestToJoinRevealedAddresses(requestID []byte) ([]*protobuf.RevealedAccount, error) {
+	revealedAccounts := make([]*protobuf.RevealedAccount, 0)
+	rows, err := p.db.Query(`SELECT address, chain_ids FROM communities_requests_to_join_revealed_addresses WHERE request_id = ?`, requestID)
 	if err != nil {
 		return nil, err
 	}
@@ -364,13 +373,30 @@ func (p *Persistence) GetRequestToJoinRevealedAddresses(requestID []byte) ([]str
 
 	for rows.Next() {
 		address := ""
-		err := rows.Scan(&address)
+		chainIDsStr := ""
+		err := rows.Scan(&address, &chainIDsStr)
 		if err != nil {
 			return nil, err
 		}
-		revealedAddresses = append(revealedAddresses, address)
+
+		chainIDs := make([]uint64, 0)
+		for _, chainIDstr := range strings.Split(chainIDsStr, ",") {
+			if chainIDstr != "" {
+				chainID, err := strconv.Atoi(chainIDstr)
+				if err != nil {
+					return nil, err
+				}
+				chainIDs = append(chainIDs, uint64(chainID))
+			}
+		}
+
+		revealedAccount := &protobuf.RevealedAccount{
+			Address:  address,
+			ChainIds: chainIDs,
+		}
+		revealedAccounts = append(revealedAccounts, revealedAccount)
 	}
-	return revealedAddresses, nil
+	return revealedAccounts, nil
 }
 
 func (p *Persistence) SaveRequestToLeave(request *RequestToLeave) error {

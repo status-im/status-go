@@ -21,7 +21,7 @@ message CommunityMember {
     ROLE_MODERATE_CONTENT = 3;
   }
   repeated Roles roles = 1;
-  repeated string wallet_accounts = 2;
+  repeated RevealedAccount revealed_accounts = 2;
 }
 
 message CommunityTokenMetadata {
@@ -117,13 +117,19 @@ message CommunityInvitation {
   bytes public_key = 4;
 }
 
+message RevealedAccount {
+  string address = 1;
+  bytes signature = 2;
+  repeated uint64 chain_ids = 3;
+}
+
 message CommunityRequestToJoin {
   uint64 clock = 1;
   string ens_name = 2;
   string chat_id = 3;
   bytes community_id = 4;
   string display_name = 5;
-  map<string, bytes> revealed_addresses = 6;
+  repeated RevealedAccount revealed_accounts = 6;
 }
 
 message CommunityCancelRequestToJoin {

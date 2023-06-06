@@ -14,6 +14,7 @@ import (
 
 	"golang.org/x/time/rate"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethclient"
 
@@ -24,7 +25,6 @@ import (
 
 	"github.com/meirf/gopart"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -606,20 +606,25 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	}
 
 	requestToJoinProto := &protobuf.CommunityRequestToJoin{
-		Clock:             requestToJoin.Clock,
-		EnsName:           requestToJoin.ENSName,
-		DisplayName:       displayName,
-		CommunityId:       community.ID(),
-		RevealedAddresses: make(map[string][]byte),
+		Clock:            requestToJoin.Clock,
+		EnsName:          requestToJoin.ENSName,
+		DisplayName:      displayName,
+		CommunityId:      community.ID(),
+		RevealedAccounts: make([]*protobuf.RevealedAccount, 0),
 	}
 
 	// find wallet accounts and attach wallet addresses and
 	// signatures to request
 	if request.Password != "" {
+
 		walletAccounts, err := m.settings.GetAccounts()
 		if err != nil {
 			return nil, err
 		}
+
+		revealedAccounts := make(map[gethcommon.Address]*protobuf.RevealedAccount)
+		revealedAddresses := make([]gethcommon.Address, 0)
+
 		for _, walletAccount := range walletAccounts {
 			if !walletAccount.Chat && walletAccount.Type != accounts.AccountTypeWatch {
 				verifiedAccount, err := m.accountsManager.GetVerifiedWalletAccount(m.settings, walletAccount.Address.Hex(), request.Password)
@@ -637,8 +642,28 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 				if err != nil {
 					return nil, err
 				}
-				requestToJoinProto.RevealedAddresses[verifiedAccount.Address.Hex()] = signatureBytes
+
+				revealedAddress := gethcommon.HexToAddress(verifiedAccount.Address.Hex())
+				revealedAddresses = append(revealedAddresses, revealedAddress)
+				revealedAccounts[revealedAddress] = &protobuf.RevealedAccount{
+					Address:   verifiedAccount.Address.Hex(),
+					Signature: signatureBytes,
+					ChainIds:  make([]uint64, 0),
+				}
 			}
+		}
+
+		response, err := m.communitiesManager.CheckPermissionToJoin(community.ID(), revealedAddresses)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, accountAndChainIDs := range response.ValidCombinations {
+			revealedAccounts[accountAndChainIDs.Address].ChainIds = accountAndChainIDs.ChainIDs
+		}
+
+		for _, revealedAccount := range revealedAccounts {
+			requestToJoinProto.RevealedAccounts = append(requestToJoinProto.RevealedAccounts, revealedAccount)
 		}
 	}
 

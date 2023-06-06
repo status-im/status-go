@@ -468,8 +468,8 @@ type CommunityChanges struct {
 	CategoriesAdded    map[string]*protobuf.CommunityCategory `json:"categoriesAdded"`
 	CategoriesModified map[string]*protobuf.CommunityCategory `json:"categoriesModified"`
 
-	MemberWalletsRemoved []string            `json:"memberWalletsRemoved"`
-	MemberWalletsAdded   map[string][]string `json:"memberWalletsAdded"`
+	MemberWalletsRemoved []string                               `json:"memberWalletsRemoved"`
+	MemberWalletsAdded   map[string][]*protobuf.RevealedAccount `json:"memberWalletsAdded"`
 
 	// ShouldMemberJoin indicates whether the user should join this community
 	// automatically
@@ -1829,7 +1829,7 @@ func (o *Community) AllowsAllMembersToPinMessage() bool {
 	return o.config.CommunityDescription.AdminSettings != nil && o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled
 }
 
-func (o *Community) AddMemberWallet(memberID string, addresses []string) (*CommunityChanges, error) {
+func (o *Community) AddMemberRevealedAccounts(memberID string, accounts []*protobuf.RevealedAccount) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -1841,11 +1841,11 @@ func (o *Community) AddMemberWallet(memberID string, addresses []string) (*Commu
 		return nil, ErrMemberNotFound
 	}
 
-	o.config.CommunityDescription.Members[memberID].WalletAccounts = addresses
+	o.config.CommunityDescription.Members[memberID].RevealedAccounts = accounts
 	o.increaseClock()
 
 	changes := o.emptyCommunityChanges()
-	changes.MemberWalletsAdded[memberID] = o.config.CommunityDescription.Members[memberID].WalletAccounts
+	changes.MemberWalletsAdded[memberID] = o.config.CommunityDescription.Members[memberID].RevealedAccounts
 	return changes, nil
 }
 
@@ -1881,7 +1881,7 @@ func emptyCommunityChanges() *CommunityChanges {
 		CategoriesModified: make(map[string]*protobuf.CommunityCategory),
 
 		MemberWalletsRemoved: []string{},
-		MemberWalletsAdded:   make(map[string][]string),
+		MemberWalletsAdded:   make(map[string][]*protobuf.RevealedAccount),
 	}
 }
 
