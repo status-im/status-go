@@ -4,6 +4,7 @@
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 
+//go:build cgo
 // +build cgo
 
 package sqlite3
@@ -2092,7 +2093,7 @@ func (rc *SQLiteRows) nextSyncLocked(dest []driver.Value) error {
 		case C.SQLITE_BLOB:
 			p := C.sqlite3_column_blob(rc.s.s, C.int(i))
 			if p == nil {
-				dest[i] = []byte{}
+				dest[i] = nil
 				continue
 			}
 			n := C.sqlite3_column_bytes(rc.s.s, C.int(i))
