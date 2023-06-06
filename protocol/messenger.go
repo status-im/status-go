@@ -37,6 +37,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
+	sociallinkssettings "github.com/status-im/status-go/multiaccounts/settings_social_links"
 	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -6348,10 +6349,14 @@ func (m *Messenger) handleSyncSocialLinks(message *protobuf.SyncSocialLinks, cal
 
 	err = m.settings.AddOrReplaceSocialLinksIfNewer(links, message.Clock)
 	if err != nil {
+		if err == sociallinkssettings.ErrOlderSocialLinksProvided {
+			return nil
+		}
 		return err
 	}
 
 	callback(links)
+
 	return nil
 }
 

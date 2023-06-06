@@ -13,7 +13,8 @@ const (
 )
 
 var (
-	ErrNilSocialLinkProvided = errors.New("social links, nil object provided")
+	ErrNilSocialLinkProvided    = errors.New("social links, nil object provided")
+	ErrOlderSocialLinksProvided = errors.New("older social links provided")
 )
 
 type SocialLinksSettings struct {
@@ -98,7 +99,7 @@ func (s *SocialLinksSettings) AddOrReplaceSocialLinksIfNewer(links identity.Soci
 	}
 
 	if dbClock > clock {
-		return nil
+		return ErrOlderSocialLinksProvided
 	}
 
 	dbLinks, err := s.getSocialLinks(tx)
