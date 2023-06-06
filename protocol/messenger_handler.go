@@ -9,11 +9,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/status-im/status-go/signal"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+
+	"github.com/google/uuid"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
