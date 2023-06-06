@@ -21,6 +21,8 @@ const requestTimeout = 5 * time.Second
 
 const hystrixContractOwnershipClientName = "contractOwnershipClient"
 
+const maxNFTDescriptionLength = 1024
+
 type Manager struct {
 	rpcClient                         *rpc.Client
 	mainContractOwnershipProvider     thirdparty.NFTContractOwnershipProvider
@@ -270,6 +272,12 @@ func (o *Manager) processAssets(chainID uint64, assets []opensea.Asset) error {
 					assets[idx].ImageURL = metadata.ImageURL
 				}
 			}
+		}
+
+		// The NFT description field could be arbitrarily large, causing memory management issues upstream.
+		// Trim it to a reasonable length here.
+		if len(assets[idx].Description) > maxNFTDescriptionLength {
+			assets[idx].Description = assets[idx].Description[:maxNFTDescriptionLength]
 		}
 
 		o.nftCache[chainID][id.HashKey()] = assets[idx]
