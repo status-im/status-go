@@ -81,7 +81,8 @@ func TestProfileSocialLinksSaveAndGet(t *testing.T) {
 	// delete add profile social links with old clock
 	profileSocialLinks2 := profileSocialLinks()
 	err = socialLinkSettings.AddOrReplaceSocialLinksIfNewer(profileSocialLinks2, oldClock)
-	require.NoError(t, err)
+	require.Error(t, err)
+	require.Equal(t, err, ErrOlderSocialLinksProvided)
 
 	// check social links
 	links, err = socialLinkSettings.GetSocialLinks()
@@ -161,7 +162,8 @@ func TestProfileSocialLinksDelete(t *testing.T) {
 	oldClock := uint64(0)
 	// test delete with old clock
 	err = socialLinkSettings.AddOrReplaceSocialLinksIfNewer(profileSocialLinks, oldClock)
-	require.NoError(t, err)
+	require.Error(t, err)
+	require.Equal(t, err, ErrOlderSocialLinksProvided)
 
 	// check
 	links, err = socialLinkSettings.GetSocialLinks()
