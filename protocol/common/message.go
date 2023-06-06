@@ -31,9 +31,10 @@ type QuotedMessage struct {
 	ID          string `json:"id"`
 	ContentType int64  `json:"contentType"`
 	// From is a public key of the author of the message.
-	From       string          `json:"from"`
-	Text       string          `json:"text"`
-	ParsedText json.RawMessage `json:"parsedText,omitempty"`
+	From             string          `json:"from"`
+	Text             string          `json:"text"`
+	ParsedText       json.RawMessage `json:"parsedText,omitempty"`
+	AlbumImagesCount int64           `json:"albumImagesCount"`
 	// ImageLocalURL is the local url of the image
 	ImageLocalURL string `json:"image,omitempty"`
 	// AudioLocalURL is the local url of the audio
