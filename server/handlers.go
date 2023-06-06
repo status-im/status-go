@@ -498,26 +498,27 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
-		pks, ok := params["publicKey"]
-		if !ok || len(pks) == 0 {
+		parsed := ParseParams(logger, params)
+
+		if parsed.PublicKey == "" {
 			logger.Error("no publicKey")
 			return
 		}
-		imageNames, ok := params["imageName"]
-		if !ok || len(imageNames) == 0 {
+
+		if parsed.ImageName == "" {
 			logger.Error("no imageName")
 			return
 		}
 
 		var payload []byte
-		err := db.QueryRow(`SELECT payload FROM chat_identity_contacts WHERE contact_id = ? and image_type = ?`, pks[0], imageNames[0]).Scan(&payload)
+		err := db.QueryRow(`SELECT payload FROM chat_identity_contacts WHERE contact_id = ? and image_type = ?`, parsed.PublicKey, parsed.ImageName).Scan(&payload)
 		if err != nil {
-			logger.Error("failed to load image.", zap.String("contact id", pks[0]), zap.String("image type", imageNames[0]), zap.Error(err))
+			logger.Error("failed to load image.", zap.String("contact id", parsed.PublicKey), zap.String("image type", parsed.ImageName), zap.Error(err))
 			return
 		}
 
-		if ringEnabled(params) {
-			colorHash, err := colorhash.GenerateFor(pks[0])
+		if parsed.Ring {
+			colorHash, err := colorhash.GenerateFor(parsed.PublicKey)
 			if err != nil {
 				logger.Error("could not generate color hash")
 				return
@@ -526,18 +527,23 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 			var theme = getTheme(params, logger)
 			config, _, err := image.DecodeConfig(bytes.NewReader(payload))
 			if err != nil {
-				logger.Error("failed to decode config.", zap.String("contact id", pks[0]), zap.String("image type", imageNames[0]), zap.Error(err))
+				logger.Error("failed to decode config.", zap.String("contact id", parsed.PublicKey), zap.String("image type", parsed.ImageName), zap.Error(err))
 				return
 			}
 
 			payload, err = ring.DrawRing(&ring.DrawRingParam{
-				Theme: theme, ColorHash: colorHash, ImageBytes: payload, Height: config.Height, Width: config.Width,
+				Theme: parsed.Theme, ColorHash: colorHash, ImageBytes: payload, Height: config.Height, Width: config.Width,
 			})
 
 			if err != nil {
 				logger.Error("failed to draw ring for contact image.", zap.Error(err))
 				return
 			}
+		}
+		payload, err = images.CropAvatar(payload)
+		if err != nil {
+			logger.Error("handleContactImages: failed to crop image.", zap.Error(err))
+			return
 		}
 
 		if len(payload) == 0 {
