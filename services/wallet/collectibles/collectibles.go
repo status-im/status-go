@@ -23,6 +23,13 @@ const hystrixContractOwnershipClientName = "contractOwnershipClient"
 
 const maxNFTDescriptionLength = 1024
 
+// ERC721 does not support function "TokenURI" if call
+// returns error starting with one of these strings
+var noTokenURIErrorPrefixes = []string{
+	"execution reverted",
+	"abi: attempting to unmarshall",
+}
+
 type Manager struct {
 	rpcClient                         *rpc.Client
 	mainContractOwnershipProvider     thirdparty.NFTContractOwnershipProvider
@@ -220,9 +227,11 @@ func (o *Manager) fetchTokenURI(chainID uint64, id thirdparty.NFTUniqueID) (stri
 	}, id.TokenID.Int)
 
 	if err != nil {
-		if strings.HasPrefix(err.Error(), "execution reverted") {
-			// Contract doesn't support "TokenURI" method
-			return "", nil
+		for _, errorPrefix := range noTokenURIErrorPrefixes {
+			if strings.HasPrefix(err.Error(), errorPrefix) {
+				// Contract doesn't support "TokenURI" method
+				return "", nil
+			}
 		}
 		return "", err
 	}
