@@ -84,6 +84,7 @@ type NFTContractOwnershipProvider interface {
 
 type DataParsed struct {
 	Name      string            `json:"name"`
+	ID        string            `json:"id"`
 	Inputs    map[string]string `json:"inputs"`
 	Signature string            `json:"signature"`
 }

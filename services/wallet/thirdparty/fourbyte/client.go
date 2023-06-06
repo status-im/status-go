@@ -23,7 +23,7 @@ type Signature struct {
 type ByID []Signature
 
 func (s ByID) Len() int           { return len(s) }
-func (s ByID) Less(i, j int) bool { return s[i].ID < s[j].ID }
+func (s ByID) Less(i, j int) bool { return s[i].ID > s[j].ID }
 func (s ByID) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 type SignatureList struct {
@@ -53,6 +53,7 @@ func (c *Client) Run(data string) (*thirdparty.DataParsed, error) {
 		return nil, errors.New("input is badly formatted")
 	}
 	methodSigData := data[2:10]
+	fmt.Println(methodSigData)
 	url := fmt.Sprintf("https://www.4byte.directory/api/v1/signatures/?hex_signature=%s", methodSigData)
 	resp, err := c.DoQuery(url)
 	if err != nil {
@@ -77,6 +78,7 @@ func (c *Client) Run(data string) (*thirdparty.DataParsed, error) {
 	results := signatures.Results
 	sort.Sort(ByID(results))
 	for _, signature := range results {
+		id := fmt.Sprintf("0x%x", signature.ID)
 		name := strings.Split(signature.Text, "(")[0]
 		rs := rgx.FindStringSubmatch(signature.Text)
 
@@ -102,6 +104,7 @@ func (c *Client) Run(data string) (*thirdparty.DataParsed, error) {
 
 		return &thirdparty.DataParsed{
 			Name:      name,
+			ID:        id,
 			Signature: signature.Text,
 			Inputs:    inputsMapString,
 		}, nil
