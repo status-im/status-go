@@ -79,6 +79,14 @@ type ParsedParams struct {
 	Ring            bool
 	StatusIndicator bool
 	Online          bool
+
+	AuthorID     string
+	URL          string
+	MessageID    string
+	AttachmentID string
+
+	Hash     string
+	Download bool
 }
 
 func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
@@ -87,17 +95,17 @@ func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
 	parsed.BgColor = color.Transparent
 	parsed.UppercaseRatio = 1.0
 
-	keyUids, _ := params["keyUid"]
+	keyUids := params["keyUid"]
 	if len(keyUids) != 0 {
 		parsed.KeyUID = keyUids[0]
 	}
 
-	pks, _ := params["publicKey"]
+	pks := params["publicKey"]
 	if len(pks) != 0 {
 		parsed.PublicKey = pks[0]
 	}
 
-	imageNames, _ := params["imageName"]
+	imageNames := params["imageName"]
 	if len(imageNames) != 0 {
 		if filepath.IsAbs(imageNames[0]) {
 			if _, err := os.Stat(imageNames[0]); err == nil {
@@ -111,13 +119,13 @@ func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
 		}
 	}
 
-	names, _ := params["name"]
+	names := params["name"]
 	if len(names) != 0 {
 		parsed.FullName = names[0]
 	}
 
 	parsed.InitialsLength = 2
-	amountInitialsStr, _ := params["length"]
+	amountInitialsStr := params["length"]
 	if len(amountInitialsStr) != 0 {
 		amountInitials, err := strconv.Atoi(amountInitialsStr[0])
 		if err != nil {
@@ -127,7 +135,7 @@ func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
 		parsed.InitialsLength = amountInitials
 	}
 
-	fontFiles, _ := params["fontFile"]
+	fontFiles := params["fontFile"]
 	if len(fontFiles) != 0 {
 		if _, err := os.Stat(fontFiles[0]); err == nil {
 			parsed.FontFile = fontFiles[0]
@@ -137,7 +145,7 @@ func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
 		}
 	}
 
-	fontSizeStr, _ := params["fontSize"]
+	fontSizeStr := params["fontSize"]
 	if len(fontSizeStr) != 0 {
 		fontSize, err := strconv.ParseFloat(fontSizeStr[0], 64)
 		if err != nil {
@@ -147,7 +155,7 @@ func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
 		parsed.FontSize = fontSize
 	}
 
-	colors, _ := params["color"]
+	colors := params["color"]
 	if len(colors) != 0 {
 		color, err := images.ParseColor(colors[0])
 		if err != nil {
@@ -157,7 +165,7 @@ func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
 		parsed.Color = color
 	}
 
-	sizeStrs, _ := params["size"]
+	sizeStrs := params["size"]
 	if len(sizeStrs) != 0 {
 		size, err := strconv.Atoi(sizeStrs[0])
 		if err != nil {
@@ -167,7 +175,7 @@ func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
 		parsed.BgSize = size
 	}
 
-	bgColors, _ := params["bgColor"]
+	bgColors := params["bgColor"]
 	if len(bgColors) != 0 {
 		bgColor, err := images.ParseColor(bgColors[0])
 		if err != nil {
@@ -177,7 +185,7 @@ func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
 		parsed.BgColor = bgColor
 	}
 
-	uppercaseRatioStr, _ := params["uppercaseRatio"]
+	uppercaseRatioStr := params["uppercaseRatio"]
 	if len(uppercaseRatioStr) != 0 {
 		uppercaseRatio, err := strconv.ParseFloat(uppercaseRatioStr[0], 64)
 		if err != nil {
@@ -191,6 +199,34 @@ func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
 	parsed.Ring = ringEnabled(params)
 	parsed.StatusIndicator = statusIndicatorEnabled(params)
 	parsed.Online = isOnline(params)
+
+	messageIDs := params["message-id"]
+	if len(messageIDs) != 0 {
+		parsed.MessageID = messageIDs[0]
+	}
+
+	messageIDs = params["messageId"]
+	if len(messageIDs) != 0 {
+		parsed.MessageID = messageIDs[0]
+	}
+
+	authorIds := params["authorId"]
+	if len(authorIds) != 0 {
+		parsed.AuthorID = authorIds[0]
+	}
+
+	urls := params["url"]
+	if len(urls) != 0 {
+		parsed.URL = urls[0]
+	}
+
+	hash := params["hash"]
+	if len(urls) != 0 {
+		parsed.Hash = hash[0]
+	}
+
+	_, download := params["download"]
+	parsed.Download = download
 
 	return parsed
 }
@@ -524,7 +560,6 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 				return
 			}
 
-			var theme = getTheme(params, logger)
 			config, _, err := image.DecodeConfig(bytes.NewReader(payload))
 			if err != nil {
 				logger.Error("failed to decode config.", zap.String("contact id", parsed.PublicKey), zap.String("image type", parsed.ImageName), zap.Error(err))
@@ -597,27 +632,27 @@ func getTheme(params url.Values, logger *zap.Logger) ring.Theme {
 func handleIdenticon(logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
-		pks, ok := params["publicKey"]
-		if !ok || len(pks) == 0 {
+		parsed := ParseParams(logger, params)
+
+		if parsed.PublicKey == "" {
 			logger.Error("no publicKey")
 			return
 		}
-		pk := pks[0]
-		image, err := identicon.Generate(pk)
+
+		image, err := identicon.Generate(parsed.PublicKey)
 		if err != nil {
 			logger.Error("could not generate identicon")
 		}
 
-		if image != nil && ringEnabled(params) {
-			colorHash, err := colorhash.GenerateFor(pk)
+		if image != nil && parsed.Ring {
+			colorHash, err := colorhash.GenerateFor(parsed.PublicKey)
 			if err != nil {
 				logger.Error("could not generate color hash")
 				return
 			}
 
-			theme := getTheme(params, logger)
 			image, err = ring.DrawRing(&ring.DrawRingParam{
-				Theme: theme, ColorHash: colorHash, ImageBytes: image, Height: identicon.Height, Width: identicon.Width,
+				Theme: parsed.Theme, ColorHash: colorHash, ImageBytes: image, Height: identicon.Height, Width: identicon.Width,
 			})
 			if err != nil {
 				logger.Error("failed to draw ring", zap.Error(err))
@@ -641,15 +676,16 @@ func handleDiscordAuthorAvatar(db *sql.DB, logger *zap.Logger) http.HandlerFunc 
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		authorIDs, ok := r.URL.Query()["authorId"]
-		if !ok || len(authorIDs) == 0 {
+		params := r.URL.Query()
+		parsed := ParseParams(logger, params)
+
+		if parsed.AuthorID == "" {
 			logger.Error("no authorIDs")
 			return
 		}
-		authorID := authorIDs[0]
 
 		var image []byte
-		err := db.QueryRow(`SELECT avatar_image_payload FROM discord_message_authors WHERE id = ?`, authorID).Scan(&image)
+		err := db.QueryRow(`SELECT avatar_image_payload FROM discord_message_authors WHERE id = ?`, parsed.AuthorID).Scan(&image)
 		if err != nil {
 			logger.Error("failed to find image", zap.Error(err))
 			return
@@ -679,20 +715,20 @@ func handleDiscordAttachment(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		messageIDs, ok := r.URL.Query()["messageId"]
-		if !ok || len(messageIDs) == 0 {
+		params := r.URL.Query()
+		parsed := ParseParams(logger, params)
+
+		if parsed.MessageID == "" {
 			logger.Error("no messageID")
 			return
 		}
-		attachmentIDs, ok := r.URL.Query()["attachmentId"]
-		if !ok || len(attachmentIDs) == 0 {
+		if parsed.AttachmentID == "" {
 			logger.Error("no attachmentID")
 			return
 		}
-		messageID := messageIDs[0]
-		attachmentID := attachmentIDs[0]
+
 		var image []byte
-		err := db.QueryRow(`SELECT payload FROM discord_message_attachments WHERE discord_message_id = ? AND id = ?`, messageID, attachmentID).Scan(&image)
+		err := db.QueryRow(`SELECT payload FROM discord_message_attachments WHERE discord_message_id = ? AND id = ?`, parsed.MessageID, parsed.AttachmentID).Scan(&image)
 		if err != nil {
 			logger.Error("failed to find image", zap.Error(err))
 			return
@@ -722,14 +758,16 @@ func handleImage(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		messageIDs, ok := r.URL.Query()["messageId"]
-		if !ok || len(messageIDs) == 0 {
+		params := r.URL.Query()
+		parsed := ParseParams(logger, params)
+
+		if parsed.MessageID == "" {
 			logger.Error("no messageID")
 			return
 		}
-		messageID := messageIDs[0]
+
 		var image []byte
-		err := db.QueryRow(`SELECT image_payload FROM user_messages WHERE id = ?`, messageID).Scan(&image)
+		err := db.QueryRow(`SELECT image_payload FROM user_messages WHERE id = ?`, parsed.MessageID).Scan(&image)
 		if err != nil {
 			logger.Error("failed to find image", zap.Error(err))
 			return
@@ -759,14 +797,16 @@ func handleAudio(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		messageIDs, ok := r.URL.Query()["messageId"]
-		if !ok || len(messageIDs) == 0 {
+		params := r.URL.Query()
+		parsed := ParseParams(logger, params)
+
+		if parsed.MessageID == "" {
 			logger.Error("no messageID")
 			return
 		}
-		messageID := messageIDs[0]
+
 		var audio []byte
-		err := db.QueryRow(`SELECT audio_payload FROM user_messages WHERE id = ?`, messageID).Scan(&audio)
+		err := db.QueryRow(`SELECT audio_payload FROM user_messages WHERE id = ?`, parsed.MessageID).Scan(&audio)
 		if err != nil {
 			logger.Error("failed to find image", zap.Error(err))
 			return
@@ -792,15 +832,15 @@ func handleIPFS(downloader *ipfs.Downloader, logger *zap.Logger) http.HandlerFun
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		hashes, ok := r.URL.Query()["hash"]
-		if !ok || len(hashes) == 0 {
+		params := r.URL.Query()
+		parsed := ParseParams(logger, params)
+
+		if parsed.Hash == "" {
 			logger.Error("no hash")
 			return
 		}
 
-		_, download := r.URL.Query()["download"]
-
-		content, err := downloader.Get(hashes[0], download)
+		content, err := downloader.Get(parsed.Hash, parsed.Download)
 		if err != nil {
 			logger.Error("could not download hash", zap.Error(err))
 			return
@@ -865,26 +905,22 @@ func getThumbnailPayload(db *sql.DB, logger *zap.Logger, msgID string, thumbnail
 
 func handleLinkPreviewThumbnail(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		queryParams := r.URL.Query()
+		params := r.URL.Query()
+		parsed := ParseParams(logger, params)
 
-		paramID, ok := queryParams["message-id"]
-		if !ok || len(paramID) == 0 {
+		if parsed.MessageID == "" {
 			http.Error(w, "missing query parameter 'message-id'", http.StatusBadRequest)
 			return
 		}
 
-		paramURL, ok := queryParams["url"]
-		if !ok || len(paramURL) == 0 {
+		if parsed.URL == "" {
 			http.Error(w, "missing query parameter 'url'", http.StatusBadRequest)
 			return
 		}
 
-		msgID := paramID[0]
-		thumbnailURL := paramURL[0]
-
-		thumbnail, err := getThumbnailPayload(db, logger, msgID, thumbnailURL)
+		thumbnail, err := getThumbnailPayload(db, logger, parsed.MessageID, parsed.URL)
 		if err != nil {
-			logger.Error("failed to get thumbnail", zap.String("msgID", msgID))
+			logger.Error("failed to get thumbnail", zap.String("msgID", parsed.MessageID))
 			http.Error(w, "failed to get thumbnail", http.StatusInternalServerError)
 			return
 		}
