@@ -3443,11 +3443,11 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequesToJoin() {
 	s.Require().NoError(err)
 
 	requestToJoinProto := &protobuf.CommunityRequestToJoin{
-		Clock:             rtj.Clock,
-		EnsName:           rtj.ENSName,
-		DisplayName:       displayName,
-		CommunityId:       community.ID(),
-		RevealedAddresses: make(map[string][]byte),
+		Clock:            rtj.Clock,
+		EnsName:          rtj.ENSName,
+		DisplayName:      displayName,
+		CommunityId:      community.ID(),
+		RevealedAccounts: make([]*protobuf.RevealedAccount, 0),
 	}
 
 	s.Require().NoError(err)

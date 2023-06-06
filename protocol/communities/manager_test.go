@@ -102,7 +102,11 @@ func (m *testTokenManager) setResponse(chainID uint64, walletAddress, tokenAddre
 
 }
 
-func (m *testTokenManager) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
+func (m *testTokenManager) GetAllChainIDs() ([]uint64, error) {
+	return []uint64{5}, nil
+}
+
+func (m *testTokenManager) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
 	return m.response, nil
 }
 
@@ -154,18 +158,22 @@ func (s *ManagerSuite) TestRetrieveTokens() {
 		},
 	}
 
-	wallets := []gethcommon.Address{gethcommon.HexToAddress("0xD6b912e09E797D291E8D0eA3D3D17F8000e01c32")}
-
+	accountChainIDsCombination := []*AccountChainIDsCombination{
+		&AccountChainIDsCombination{
+			Address:  gethcommon.HexToAddress("0xD6b912e09E797D291E8D0eA3D3D17F8000e01c32"),
+			ChainIDs: []uint64{chainID},
+		},
+	}
 	// Set response to exactly the right one
-	tm.setResponse(chainID, wallets[0], gethcommon.HexToAddress(contractAddresses[chainID]), int64(1*math.Pow(10, float64(decimals))))
-	resp, err := m.checkPermissionToJoin(permissions, wallets, false)
+	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), int64(1*math.Pow(10, float64(decimals))))
+	resp, err := m.checkPermissionToJoin(permissions, accountChainIDsCombination, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 	s.Require().True(resp.Satisfied)
 
 	// Set response to 0
-	tm.setResponse(chainID, wallets[0], gethcommon.HexToAddress(contractAddresses[chainID]), 0)
-	resp, err = m.checkPermissionToJoin(permissions, wallets, false)
+	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), 0)
+	resp, err = m.checkPermissionToJoin(permissions, accountChainIDsCombination, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 	s.Require().False(resp.Satisfied)
