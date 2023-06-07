@@ -72,6 +72,42 @@ func (rs RelayShards) ContainsNamespacedTopic(topic NamespacedPubsubTopic) bool 
 	return rs.Contains(shardedTopic.Cluster(), shardedTopic.Shard())
 }
 
+func TopicsToRelayShards(topic ...string) ([]RelayShards, error) {
+	result := make([]RelayShards, 0)
+	dict := make(map[uint16]map[uint16]struct{})
+	for _, t := range topic {
+		var ps StaticShardingPubsubTopic
+		err := ps.Parse(t)
+		if err != nil {
+			return nil, err
+		}
+
+		indices, ok := dict[ps.cluster]
+		if !ok {
+			indices = make(map[uint16]struct{})
+		}
+
+		indices[ps.shard] = struct{}{}
+		dict[ps.cluster] = indices
+	}
+
+	for cluster, indices := range dict {
+		idx := make([]uint16, 0, len(indices))
+		for index := range indices {
+			idx = append(idx, index)
+		}
+
+		rs, err := NewRelayShards(cluster, idx...)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, rs)
+	}
+
+	return result, nil
+}
+
 func (rs RelayShards) ContainsTopic(topic string) bool {
 	nsTopic, err := ToShardedPubsubTopic(topic)
 	if err != nil {

@@ -57,7 +57,18 @@ func enodeToMultiAddr(node *enode.Node) (multiaddr.Multiaddr, error) {
 		return nil, err
 	}
 
-	return multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", node.IP(), node.TCP(), peerID))
+	ipType := "ip4"
+	portNumber := node.TCP()
+	if utils.IsIPv6(node.IP().String()) {
+		ipType = "ip6"
+		var port enr.TCP6
+		if err := node.Record().Load(&port); err != nil {
+			return nil, err
+		}
+		portNumber = int(port)
+	}
+
+	return multiaddr.NewMultiaddr(fmt.Sprintf("/%s/%s/tcp/%d/p2p/%s", ipType, node.IP(), portNumber, peerID))
 }
 
 // Multiaddress is used to extract all the multiaddresses that are part of a ENR record

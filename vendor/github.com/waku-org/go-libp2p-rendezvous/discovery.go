@@ -21,12 +21,12 @@ type rendezvousDiscovery struct {
 }
 
 type discoveryCache struct {
-	recs   map[peer.ID]*record
+	recs   map[peer.ID]*peerRecord
 	cookie []byte
 	mux    sync.Mutex
 }
 
-type record struct {
+type peerRecord struct {
 	peer   peer.AddrInfo
 	expire int64
 }
@@ -84,7 +84,7 @@ func (c *rendezvousDiscovery) FindPeers(ctx context.Context, ns string, opts ...
 		c.peerCacheMux.Lock()
 		cache, ok = c.peerCache[ns]
 		if !ok {
-			cache = &discoveryCache{recs: make(map[peer.ID]*record)}
+			cache = &discoveryCache{recs: make(map[peer.ID]*peerRecord)}
 			c.peerCache[ns] = cache
 		}
 		c.peerCacheMux.Unlock()
@@ -114,7 +114,7 @@ func (c *rendezvousDiscovery) FindPeers(ctx context.Context, ns string, opts ...
 		var newCookie []byte
 		if regs, newCookie, err = c.rp.Discover(ctx, ns, limit, cookie); err == nil {
 			for _, reg := range regs {
-				rec := &record{peer: reg.Peer, expire: int64(reg.Ttl) + currentTime}
+				rec := &peerRecord{peer: reg.Peer, expire: int64(reg.Ttl) + currentTime}
 				cache.recs[rec.peer.ID] = rec
 			}
 			cache.cookie = newCookie

@@ -176,14 +176,6 @@ func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selec
 	logger := store.log.With(logging.HostID("peer", selectedPeer))
 	logger.Info("querying message history")
 
-	// We connect first so dns4 addresses are resolved (NewStream does not do it)
-	err := store.h.Connect(ctx, store.h.Peerstore().PeerInfo(selectedPeer))
-	if err != nil {
-		logger.Error("connecting to peer", zap.Error(err))
-		metrics.RecordStoreError(store.ctx, "dial_failure")
-		return nil, err
-	}
-
 	connOpt, err := store.h.NewStream(ctx, selectedPeer, StoreID_v20beta4)
 	if err != nil {
 		logger.Error("creating stream to peer", zap.Error(err))

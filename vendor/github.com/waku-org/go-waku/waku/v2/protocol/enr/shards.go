@@ -1,6 +1,8 @@
 package enr
 
 import (
+	"errors"
+
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
@@ -24,13 +26,28 @@ func WithWakuRelayShardingBitVector(rs protocol.RelayShards) ENROption {
 	}
 }
 
-func WithtWakuRelaySharding(rs protocol.RelayShards) ENROption {
+func WithWakuRelaySharding(rs protocol.RelayShards) ENROption {
 	return func(localnode *enode.LocalNode) error {
 		if len(rs.Indices) >= 64 {
 			return WithWakuRelayShardingBitVector(rs)(localnode)
 		} else {
 			return WithWakuRelayShardingIndicesList(rs)(localnode)
 		}
+	}
+}
+
+func WithWakuRelayShardingTopics(topics ...string) ENROption {
+	return func(localnode *enode.LocalNode) error {
+		rs, err := protocol.TopicsToRelayShards(topics...)
+		if err != nil {
+			return err
+		}
+
+		if len(rs) != 1 {
+			return errors.New("expected a single RelayShards")
+		}
+
+		return WithWakuRelaySharding(rs[0])(localnode)
 	}
 }
 
