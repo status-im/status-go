@@ -10,7 +10,7 @@ replace github.com/nfnt/resize => github.com/status-im/resize v0.0.0-20201215164
 
 replace github.com/forPelevin/gomoji => github.com/status-im/gomoji v1.1.3-0.20220213022530-e5ac4a8732d4
 
-replace github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f => github.com/status-im/go-sqlcipher v0.1.0-status.6
+replace github.com/mutecomm/go-sqlcipher/v4 v4.4.2 => github.com/status-im/go-sqlcipher/v4 v4.5.4-status.2
 
 require (
 	github.com/anacrolix/torrent v1.41.0
@@ -39,7 +39,6 @@ require (
 	github.com/multiformats/go-multibase v0.2.0
 	github.com/multiformats/go-multihash v0.2.1
 	github.com/multiformats/go-varint v0.0.7
-	github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f
 	github.com/nfnt/resize v0.0.0-00010101000000-000000000000
 	github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 	github.com/oliamb/cutter v0.2.2
@@ -49,7 +48,7 @@ require (
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
 	github.com/status-im/markdown v0.0.0-20230314100416-26c6f74522d5
-	github.com/status-im/migrate/v4 v4.6.2-status.2
+	github.com/status-im/migrate/v4 v4.6.2-status.3
 	github.com/status-im/rendezvous v1.3.6
 	github.com/status-im/status-go/extkeys v1.1.2
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
@@ -80,6 +79,7 @@ require (
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/ladydascalie/currency v1.6.0
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
+	github.com/mutecomm/go-sqlcipher/v4 v4.4.2
 	github.com/schollz/peerdiscovery v1.7.0
 	github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
 	github.com/waku-org/go-waku v0.6.1-0.20230526151800-10c2e20910bf

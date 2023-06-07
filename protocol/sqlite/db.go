@@ -7,7 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	_ "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
+	_ "github.com/mutecomm/go-sqlcipher/v4" // We require go sqlcipher that overrides default implementation
 	"github.com/status-im/migrate/v4"
 	"github.com/status-im/migrate/v4/database/sqlcipher"
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"

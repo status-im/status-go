@@ -3,7 +3,7 @@ package sqlite
 import (
 	"database/sql"
 
-	_ "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
+	_ "github.com/mutecomm/go-sqlcipher/v4" // We require go sqlcipher that overrides default implementation
 	"github.com/pkg/errors"
 	"github.com/status-im/migrate/v4"
 )

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mutecomm/go-sqlcipher" // require go-sqlcipher that overrides default implementation
+	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
