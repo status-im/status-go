@@ -4359,9 +4359,13 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					}
 
 				} else if changes.ShouldMemberLeave {
-					response, err := m.leaveCommunity(changes.Community.ID())
+					// this means we've been kicked by the community owner/admin,
+					// in this case we don't want to unsubscribe from community updates
+					// so we still get notified accordingly when something changes,
+					// hence, we're setting `unsubscribeFromCommunity` to `false` here
+					response, err := m.leaveCommunity(changes.Community.ID(), false)
 					if err != nil {
-						logger.Error("cannot join community", zap.Error(err))
+						logger.Error("cannot leave community", zap.Error(err))
 						continue
 					}
 

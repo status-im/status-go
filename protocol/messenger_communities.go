@@ -980,7 +980,7 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 		return nil, err
 	}
 
-	mr, err := m.leaveCommunity(communityID)
+	mr, err := m.leaveCommunity(communityID, true)
 	if err != nil {
 		return nil, err
 	}
@@ -1036,7 +1036,7 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 	return mr, nil
 }
 
-func (m *Messenger) leaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
+func (m *Messenger) leaveCommunity(communityID types.HexBytes, unsubsribeFromCommunity bool) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
 	community, err := m.communitiesManager.LeaveCommunity(communityID)
@@ -1059,9 +1059,11 @@ func (m *Messenger) leaveCommunity(communityID types.HexBytes) (*MessengerRespon
 		}
 	}
 
-	_, err = m.transport.RemoveFilterByChatID(communityID.String())
-	if err != nil {
-		return nil, err
+	if unsubsribeFromCommunity {
+		_, err = m.transport.RemoveFilterByChatID(communityID.String())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	response.AddCommunity(community)
@@ -2143,7 +2145,7 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 				return err
 			}
 		} else {
-			mr, err = m.leaveCommunity(syncCommunity.Id)
+			mr, err = m.leaveCommunity(syncCommunity.Id, true)
 			if err != nil {
 				logger.Debug("m.leaveCommunity error", zap.Error(err))
 				return err
