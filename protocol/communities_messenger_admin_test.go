@@ -1415,7 +1415,13 @@ func (s *AdminMessengerCommunitiesSuite) adminUnbanAlice(unbanRequest *requests.
 	s.Require().NoError(err)
 	s.Require().Nil(checkUnbanned(response))
 
-	s.checkClientsReceivedAdminEvent(WaitCommunityCondition, checkUnbanned)
+	response, err = WaitOnMessengerResponse(
+		s.owner,
+		WaitCommunityCondition,
+		"MessengerResponse data not received",
+	)
+	s.Require().NoError(err)
+	s.Require().NoError(checkUnbanned(response))
 }
 
 func (s *AdminMessengerCommunitiesSuite) adminKickAlice(communityID types.HexBytes, pubkey string) {
