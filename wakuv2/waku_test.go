@@ -12,6 +12,7 @@ import (
 	"github.com/cenkalti/backoff/v3"
 	"github.com/stretchr/testify/require"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
+	waku_filter "github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
@@ -159,4 +160,91 @@ func TestBasicWakuV2(t *testing.T) {
 	storeResult, err := w.query(context.Background(), storeNode.PeerID, []common.TopicType{contentTopic}, uint64(timestampInSeconds-20), uint64(timestampInSeconds+20), []store.HistoryRequestOption{})
 	require.NoError(t, err)
 	require.NotZero(t, len(storeResult.Messages))
+
+	require.NoError(t, w.Stop())
+}
+
+func TestWakuV2Filter(t *testing.T) {
+	enrTreeAddress := testENRBootstrap
+	envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
+	if envEnrTreeAddress != "" {
+		enrTreeAddress = envEnrTreeAddress
+	}
+
+	config := &Config{}
+	config.Port = 0
+	config.LightClient = true
+	config.KeepAliveInterval = 1
+	config.MinPeersForFilter = 2
+	config.EnableDiscV5 = true
+	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
+	config.DiscoveryLimit = 20
+	config.UDPPort = 9001
+	config.WakuNodes = []string{enrTreeAddress}
+	fleet := "status.test" // Need a name fleet so that LightClient is not set to false
+	w, err := New("", fleet, config, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, w.Start())
+
+	// DNSDiscovery
+	// Wait for some peers to be discovered
+	time.Sleep(10 * time.Second)
+
+	// At least 3 peers should have been discovered
+	require.Greater(t, w.PeerCount(), 3)
+
+	filter := &common.Filter{
+		Messages: common.NewMemoryMessageStore(),
+		Topics: [][]byte{
+			{1, 2, 3, 4},
+		},
+	}
+
+	_, err = w.Subscribe(filter)
+	require.NoError(t, err)
+
+	msgTimestamp := w.timestamp()
+	contentTopic := common.BytesToTopic(filter.Topics[0])
+
+	_, err = w.Send(&pb.WakuMessage{
+		Payload:      []byte{1, 2, 3, 4, 5},
+		ContentTopic: contentTopic.ContentTopic(),
+		Version:      0,
+		Timestamp:    msgTimestamp,
+	})
+	require.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+
+	// Ensure there is 1 active filter subscription
+	require.Len(t, w.filterSubscriptions, 1)
+	subMap := w.filterSubscriptions[filter]
+	// Ensure there are some active peers for this filter subscription
+	require.Greater(t, len(subMap), 0)
+
+	messages := filter.Retrieve()
+	//require.Len(t, messages, 1)
+	require.Len(t, messages, 1)
+
+	// Mock peers going down
+	isFilterSubAliveBak := w.isFilterSubAlive
+	w.settings.MinPeersForFilter = 0
+	w.isFilterSubAlive = func(sub *waku_filter.SubscriptionDetails) error {
+		return errors.New("peer down")
+	}
+
+	time.Sleep(10 * time.Second)
+
+	// Ensure there are 0 active peers now
+	require.Len(t, subMap, 0)
+
+	// Reconnect
+	w.settings.MinPeersForFilter = 2
+	w.isFilterSubAlive = isFilterSubAliveBak
+	time.Sleep(10 * time.Second)
+
+	// Ensure there are some active peers now
+	require.Greater(t, len(subMap), 0)
+
+	require.NoError(t, w.Stop())
 }

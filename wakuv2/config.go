@@ -30,6 +30,7 @@ type Config struct {
 	PeerExchange         bool     `toml:",omitempty"`
 	KeepAliveInterval    int      `toml:",omitempty"`
 	MinPeersForRelay     int      `toml:",omitempty"`
+	MinPeersForFilter    int      `toml:",omitempty"`
 	LightClient          bool     `toml:",omitempty"`
 	WakuNodes            []string `toml:",omitempty"`
 	Rendezvous           bool     `toml:",omitempty"`
@@ -52,6 +53,7 @@ var DefaultConfig = Config{
 	KeepAliveInterval: 10, // second
 	DiscoveryLimit:    40,
 	MinPeersForRelay:  1, // TODO: determine correct value with Vac team
+	MinPeersForFilter: 1, // TODO: determine correct value with Vac team and via testing
 	AutoUpdate:        false,
 }
 
@@ -78,6 +80,10 @@ func setDefaults(cfg *Config) *Config {
 
 	if cfg.MinPeersForRelay == 0 {
 		cfg.MinPeersForRelay = DefaultConfig.MinPeersForRelay
+	}
+
+	if cfg.MinPeersForFilter == 0 {
+		cfg.MinPeersForFilter = DefaultConfig.MinPeersForFilter
 	}
 
 	return cfg
