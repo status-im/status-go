@@ -188,6 +188,61 @@ message SyncActivityCenterDismissed {
   repeated bytes ids = 2;
 }
 
+message SyncActivityCenterNotificationState {
+  uint64 updated_at = 1;
+  bool has_seen = 2;
+}
+
+message SyncActivityCenterNotifications {
+   repeated SyncActivityCenterNotification activity_center_notifications = 1;
+}
+
+message SyncActivityCenterNotification {
+  bytes id = 1;
+  uint64 timestamp = 2;
+  NotificationType notification_type = 3;
+  enum NotificationType {
+      NoType = 0;
+      NewOneToOne = 1;
+      NewPrivateGroupChat = 2;
+      Mention = 3;
+      Reply = 4;
+      ContactRequest = 5;
+      CommunityInvitation = 6;
+      CommunityRequest = 7;
+      CommunityMembershipRequest = 8;
+      CommunityKicked = 9;
+      ContactVerification = 10;
+  }
+  string chat_id = 4;
+  bool read = 5;
+  bool dismissed = 6;
+  bool accepted = 7;
+  bytes message = 8;
+  string author = 9;
+  bytes reply_message = 10;
+  string community_id = 11;
+  MembershipStatus membership_status = 12;
+  enum MembershipStatus {
+    MembershipStatusIdle = 0;
+    MembershipStatusPending = 1;
+    MembershipStatusAccepted = 2;
+    MembershipStatusDeclined = 3;
+  }
+  ContactVerificationStatus contact_verification_status = 13;
+  enum ContactVerificationStatus {
+      Unknown = 0;
+      Pending = 1;
+      Accepted = 2;
+      Declined = 3;
+      Cancelled = 4;
+      Trusted = 5;
+      UnTrustWorthy = 6;
+  }
+  bool deleted = 14;
+  uint64 updated_at = 15;
+}
+
 message SyncBookmark {
   uint64 clock = 1;
   string url = 2;

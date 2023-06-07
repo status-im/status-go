@@ -708,8 +708,14 @@ func (m *Messenger) BlockContact(contactID string) (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	err = m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID, m.getCurrentTimeInMillis())
+	notifications, err := m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID, m.getCurrentTimeInMillis())
 	if err != nil {
+		return nil, err
+	}
+
+	err = m.syncActivityCenterNotifications(notifications)
+	if err != nil {
+		m.logger.Error("BlockContact, error syncing activity center notifications", zap.Error(err))
 		return nil, err
 	}
 
@@ -731,11 +737,17 @@ func (m *Messenger) BlockContactDesktop(contactID string) (*MessengerResponse, e
 		return nil, err
 	}
 
-	err = m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID, m.getCurrentTimeInMillis())
+	notifications, err := m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID, m.getCurrentTimeInMillis())
 	if err != nil {
 		return nil, err
 	}
 
+	err = m.syncActivityCenterNotifications(notifications)
+	if err != nil {
+		m.logger.Error("BlockContactDesktop, error syncing activity center notifications", zap.Error(err))
+		return nil, err
+	}
+	
 	return response, nil
 }
 

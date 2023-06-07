@@ -91,6 +91,7 @@ type ActivityCenterCountResponse = map[ActivityCenterType]uint64
 
 type ActivityCenterState struct {
 	HasSeen bool `json:"hasSeen"`
+	UpdatedAt uint64 `json:"updatedAt"`
 }
 
 func (n *ActivityCenterNotification) Valid() error {

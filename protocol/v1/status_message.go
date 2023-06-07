@@ -328,6 +328,10 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.SyncKeypair))
 	case protobuf.ApplicationMetadataMessage_SYNC_FULL_KEYPAIR:
 		return m.unmarshalProtobufData(new(protobuf.SyncKeypairFull))
+	case protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_NOTIFICATION:
+		return m.unmarshalProtobufData(new(protobuf.SyncActivityCenterNotifications))
+	case protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_NOTIFICATION_STATE:
+		return m.unmarshalProtobufData(new(protobuf.SyncActivityCenterNotificationState))
 	}
 	return nil
 }

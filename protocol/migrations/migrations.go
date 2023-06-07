@@ -90,7 +90,7 @@
 // 1683725607_mark_discord_messages_as_seen.up.sql (108B)
 // 1684174617_add_url_previews_to_user_messages.up.sql (58B)
 // 1684175608_add_token_balances.up.sql (467B)
-// 1684979808_sync_activity_center_notifications.up.sql (151B)
+// 1684979808_sync_activity_center_notifications.up.sql (169B)
 // README.md (554B)
 // doc.go (850B)
 
@@ -1961,7 +1961,7 @@ func _1684175608_add_token_balancesUpSql() (*asset, error) {
 	return a, nil
 }
 
-var __1684979808_sync_activity_center_notificationsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\x4c\x2e\xc9\x2c\xcb\x2c\xa9\x8c\x4f\x4e\xcd\x2b\x49\x2d\x8a\x2f\x2e\x49\x2c\x49\x2d\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x28\x2d\x48\x49\x2c\x49\x4d\x89\x4f\x2c\x51\xf0\xf4\x0b\x51\x70\x71\x75\x73\x0c\xf5\x09\x51\x30\xb0\xe6\xc2\x67\x4e\x5e\x7e\x49\x66\x5a\x66\x72\x62\x49\x66\x7e\x1e\x91\xc6\x01\x02\x00\x00\xff\xff\xcc\xf1\x1c\xb3\x97\x00\x00\x00")
+var __1684979808_sync_activity_center_notificationsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x94\xcc\xc1\x09\x02\x31\x10\x05\xd0\xbb\x55\xfc\x12\xbc\x7b\x8a\x26\x82\x30\x66\x41\x26\xe7\x30\x64\x23\xcc\x25\x2b\xe6\x2b\xd8\xbd\x1d\x08\x36\xf0\x82\x68\xba\x41\xc3\x51\x12\xac\xd1\xdf\xce\x4f\x6d\x7d\xb0\x3f\xeb\xa4\xb1\x4f\x84\x18\x71\x5a\xa4\x5c\x33\x5e\x8f\xd5\xd8\xd7\x6a\xc4\x25\x2b\xf2\xa2\xc8\x45\x04\x31\x9d\x43\x11\xc5\xfe\xb0\xfb\x05\x8e\x8d\x7e\xf7\x66\xf4\x6d\xfc\xeb\x7e\x03\x00\x00\xff\xff\x09\xb8\x1a\x7c\xa9\x00\x00\x00")
 
 func _1684979808_sync_activity_center_notificationsUpSqlBytes() ([]byte, error) {
 	return bindataRead(
@@ -1976,8 +1976,8 @@ func _1684979808_sync_activity_center_notificationsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1684979808_sync_activity_center_notifications.up.sql", size: 151, mode: os.FileMode(0644), modTime: time.Unix(1685365885, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xac, 0xda, 0xc3, 0x8e, 0xb3, 0x4, 0x44, 0xc1, 0x8d, 0xa5, 0x85, 0x7e, 0xc8, 0x39, 0xd8, 0xb8, 0x30, 0x38, 0x26, 0x93, 0x92, 0x36, 0x7f, 0x7c, 0xed, 0xf6, 0x7e, 0x2e, 0xf, 0x3e, 0xf, 0x16}}
+	info := bindataFileInfo{name: "1684979808_sync_activity_center_notifications.up.sql", size: 169, mode: os.FileMode(0644), modTime: time.Unix(1686047555, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd8, 0xf5, 0xf7, 0x94, 0xa9, 0xa1, 0x60, 0x26, 0x9d, 0xca, 0x31, 0xf, 0x14, 0xd, 0x70, 0xf8, 0xab, 0x40, 0x29, 0x73, 0x61, 0xbd, 0x1b, 0xb6, 0xc4, 0x31, 0x77, 0x9e, 0x32, 0xa8, 0xce, 0x6d}}
 	return a, nil
 }
 

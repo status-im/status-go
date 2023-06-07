@@ -822,6 +822,11 @@ func (m *Messenger) CancelRequestToJoinCommunity(request *requests.CancelRequest
 
 		// set notification as deleted, so that the client will remove the activity center notification from UI
 		notification.Deleted = true
+		err = m.syncActivityCenterNotifications([]*ActivityCenterNotification{notification})
+		if err != nil {
+			m.logger.Error("CancelRequestToJoinCommunity, failed to sync activity center notifications", zap.Error(err))
+			return nil, err
+		}
 		response.AddActivityCenterNotification(notification)
 	}
 
@@ -952,7 +957,7 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 }
 
 func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
-	err := m.persistence.DismissAllActivityCenterNotificationsFromCommunity(communityID.String(), m.getCurrentTimeInMillis())
+	notifications, err := m.persistence.DismissAllActivityCenterNotificationsFromCommunity(communityID.String(), m.getCurrentTimeInMillis())
 	if err != nil {
 		return nil, err
 	}
@@ -1002,6 +1007,12 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	err = m.syncActivityCenterNotifications(notifications)
+	if err != nil {
+		m.logger.Error("LeaveCommunity, failed to sync activity center notifications", zap.Error(err))
+		return nil, err
 	}
 
 	return mr, nil
@@ -1087,6 +1098,11 @@ func (m *Messenger) CheckAndDeletePendingRequestToJoinCommunity(sendResponse boo
 						return nil, err
 					}
 					notification.Deleted = true
+					err = m.syncActivityCenterNotifications([]*ActivityCenterNotification{notification})
+					if err != nil {
+						m.logger.Error("CheckAndDeletePendingRequestToJoinCommunity, failed to sync activity center notifications", zap.Error(err))
+						return nil, err
+					}
 					response.AddActivityCenterNotification(notification)
 				}
 				// Update activity centre notification for requester

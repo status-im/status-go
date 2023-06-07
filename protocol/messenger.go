@@ -3833,6 +3833,40 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
+					case protobuf.SyncActivityCenterNotifications:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterNotifications)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, a)
+						logger.Debug("Handling SyncActivityCenterNotification", zap.Any("message", a))
+
+						err = m.handleSyncActivityCenterNotifications(messageState, &a)
+						if err != nil {
+							logger.Warn("failed to handle SyncActivityCenterNotification", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncActivityCenterNotificationState:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterNotificationState)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, a)
+						logger.Debug("Handling SyncActivityCenterNotificationState", zap.Any("message", a))
+
+						err = m.handleSyncActivityCenterNotificationState(messageState, &a)
+						if err != nil {
+							logger.Warn("failed to handle SyncActivityCenterNotificationState", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
 					case protobuf.SyncSetting:
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
@@ -4369,13 +4403,14 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					}
 
 					// Activity Center notification
+					now := m.getCurrentTimeInMillis()
 					notification := &ActivityCenterNotification{
 						ID:          types.FromHex(uuid.New().String()),
 						Type:        ActivityCenterNotificationTypeCommunityKicked,
-						Timestamp:   m.getCurrentTimeInMillis(),
+						Timestamp:   now,
 						CommunityID: changes.Community.IDString(),
 						Read:        false,
-						UpdatedAt:   m.getCurrentTimeInMillis(),
+						UpdatedAt:   now,
 					}
 
 					err = m.addActivityCenterNotification(response, notification)
@@ -4827,8 +4862,13 @@ func (m *Messenger) markAllRead(chatID string, clock uint64, shouldBeSynced bool
 }
 
 func (m *Messenger) MarkAllRead(chatID string) error {
-	err := m.persistence.DismissAllActivityCenterNotificationsFromChatID(chatID, m.getCurrentTimeInMillis())
+	notifications, err := m.persistence.DismissAllActivityCenterNotificationsFromChatID(chatID, m.getCurrentTimeInMillis())
 	if err != nil {
+		return err
+	}
+	err = m.syncActivityCenterNotifications(notifications)
+	if err != nil {
+		m.logger.Error("MarkAllRead, failed to sync activity center notifications", zap.Error(err))
 		return err
 	}
 
@@ -4846,7 +4886,7 @@ func (m *Messenger) MarkAllRead(chatID string) error {
 }
 
 func (m *Messenger) MarkAllReadInCommunity(communityID string) ([]string, error) {
-	err := m.persistence.DismissAllActivityCenterNotificationsFromCommunity(communityID, m.getCurrentTimeInMillis())
+	notifications, err := m.persistence.DismissAllActivityCenterNotificationsFromCommunity(communityID, m.getCurrentTimeInMillis())
 	if err != nil {
 		return nil, err
 	}
@@ -4871,6 +4911,14 @@ func (m *Messenger) MarkAllReadInCommunity(communityID string) ([]string, error)
 		} else {
 			err = errors.New(fmt.Sprintf("chat with chatID %s not found", chatID))
 		}
+	}
+	if err != nil {
+		return chatIDs, err
+	}
+
+	err = m.syncActivityCenterNotifications(notifications)
+	if err != nil {
+		m.logger.Error("MarkAllReadInCommunity, error syncing activity center notifications", zap.Error(err))
 	}
 
 	return chatIDs, err
