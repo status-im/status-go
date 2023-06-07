@@ -77,7 +77,7 @@ func (m *Messenger) syncActivityCenterNotificationState(state *ActivityCenterSta
 	}
 	syncStateMessage := &protobuf.SyncActivityCenterNotificationState{
 		UpdatedAt: state.UpdatedAt,
-		HasSeen:  state.HasSeen,
+		HasSeen:   state.HasSeen,
 	}
 	encodedMessage, err := proto.Marshal(syncStateMessage)
 	if err != nil {
@@ -124,7 +124,7 @@ func (m *Messenger) MarkAsSeenActivityCenterNotifications() (*MessengerResponse,
 	response := &MessengerResponse{}
 	s := &ActivityCenterState{
 		UpdatedAt: m.getCurrentTimeInMillis(),
-		HasSeen:  true,
+		HasSeen:   true,
 	}
 	n, err := m.persistence.UpdateActivityCenterNotificationState(s)
 	if err != nil {
@@ -410,7 +410,7 @@ func (m *Messenger) handleActivityCenterDismissed(state *ReceivedMessageState, m
 
 func (m *Messenger) handleSyncActivityCenterNotificationState(state *ReceivedMessageState, a *protobuf.SyncActivityCenterNotificationState) error {
 	s := &ActivityCenterState{
-		HasSeen: a.HasSeen,
+		HasSeen:   a.HasSeen,
 		UpdatedAt: a.UpdatedAt,
 	}
 	_, err := m.persistence.UpdateActivityCenterNotificationState(s)
@@ -446,8 +446,8 @@ func convertActivityCenterNotificationToProtobuf(n *ActivityCenterNotification) 
 		return nil, errors.New("convertActivityCenterNotificationToProtobuf, n is nil")
 	}
 
-	var(
-		message []byte
+	var (
+		message      []byte
 		replyMessage []byte
 	)
 	if n.Message != nil {
@@ -463,21 +463,21 @@ func convertActivityCenterNotificationToProtobuf(n *ActivityCenterNotification) 
 		}
 	}
 	p = &protobuf.SyncActivityCenterNotification{
-		Id: n.ID,
-		Timestamp: n.Timestamp,
-		NotificationType: protobuf.SyncActivityCenterNotification_NotificationType(n.Type),
-		ChatId: n.ChatID,
-		Read: n.Read,
-		Dismissed: n.Dismissed,
-		Accepted: n.Accepted,
-		Message: message,
-		Author: n.Author,
-		ReplyMessage: replyMessage,
-		CommunityId: n.CommunityID,
-		MembershipStatus: protobuf.SyncActivityCenterNotification_MembershipStatus(n.MembershipStatus),
+		Id:                        n.ID,
+		Timestamp:                 n.Timestamp,
+		NotificationType:          protobuf.SyncActivityCenterNotification_NotificationType(n.Type),
+		ChatId:                    n.ChatID,
+		Read:                      n.Read,
+		Dismissed:                 n.Dismissed,
+		Accepted:                  n.Accepted,
+		Message:                   message,
+		Author:                    n.Author,
+		ReplyMessage:              replyMessage,
+		CommunityId:               n.CommunityID,
+		MembershipStatus:          protobuf.SyncActivityCenterNotification_MembershipStatus(n.MembershipStatus),
 		ContactVerificationStatus: protobuf.SyncActivityCenterNotification_ContactVerificationStatus(n.ContactVerificationStatus),
-		Deleted: n.Deleted,
-		UpdatedAt: n.UpdatedAt,
+		Deleted:                   n.Deleted,
+		UpdatedAt:                 n.UpdatedAt,
 	}
 	return
 }

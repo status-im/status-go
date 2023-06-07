@@ -747,7 +747,7 @@ func (m *Messenger) BlockContactDesktop(contactID string) (*MessengerResponse, e
 		m.logger.Error("BlockContactDesktop, error syncing activity center notifications", zap.Error(err))
 		return nil, err
 	}
-	
+
 	return response, nil
 }
 

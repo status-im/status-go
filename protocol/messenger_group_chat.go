@@ -800,6 +800,6 @@ func (m *Messenger) DeclineAllPendingGroupInvitesFromUser(response *MessengerRes
 		m.logger.Error("DeclineAllPendingGroupInvitesFromUser, Failed to sync activity center notifications", zap.Error(err))
 		return nil, err
 	}
-	
+
 	return response, nil
 }

@@ -2163,8 +2163,6 @@ func (m *Messenger) addActivityCenterNotification(response *MessengerResponse, n
 	return nil
 }
 
-
-
 func (m *Messenger) HandleRequestAddressForTransaction(messageState *ReceivedMessageState, command protobuf.RequestAddressForTransaction) error {
 	err := ValidateReceivedRequestAddressForTransaction(&command, messageState.CurrentMessageState.WhisperTimestamp)
 	if err != nil {

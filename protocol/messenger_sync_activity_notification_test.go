@@ -4,13 +4,15 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
-	"github.com/stretchr/testify/require"
-	"testing"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -24,9 +26,9 @@ func TestMessengerSyncActivityCenterNotificationSuite(t *testing.T) {
 
 type MessengerSyncActivityCenterNotificationSuite struct {
 	suite.Suite
-	m          *Messenger        // main instance of Messenger
+	m              *Messenger // main instance of Messenger
 	theirMessenger *Messenger
-	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
+	privateKey     *ecdsa.PrivateKey // private key for the main instance of Messenger
 
 	// If one wants to send messages between different instances of Messenger,
 	// a single Waku service should be shared.
@@ -91,9 +93,9 @@ func (s *MessengerSyncActivityCenterNotificationSuite) TestSyncActivityCenterNot
 	now := currentMilliseconds()
 	notificationID := types.HexBytes("123")
 	expectedNotification := &ActivityCenterNotification{
-		ID:	  notificationID,
-		Author: "author",
-		Type: ActivityCenterNotificationTypeContactRequest,
+		ID:        notificationID,
+		Author:    "author",
+		Type:      ActivityCenterNotificationTypeContactRequest,
 		Timestamp: now,
 		UpdatedAt: now,
 	}

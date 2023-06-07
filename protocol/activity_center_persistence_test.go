@@ -614,7 +614,7 @@ func TestActiveContactRequestNotification(t *testing.T) {
 	createNotifications(t, p, []*ActivityCenterNotification{
 		{
 			ID:        expectedID,
-			Timestamp: t2+1,
+			Timestamp: t2 + 1,
 			ChatID:    chat.ID,
 			Author:    contactID,
 			Type:      ActivityCenterNotificationTypeContactRequest,
