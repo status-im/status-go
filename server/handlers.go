@@ -380,9 +380,22 @@ func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Lo
 }
 
 func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *zap.Logger, w http.ResponseWriter, r *http.Request, parsed ParsedParams) {
-	account, err := multiaccountsDB.GetAccount(parsed.KeyUID)
+	var name = parsed.FullName
+	var accColorHash multiaccounts.ColorHash
+	var account *multiaccounts.Account
 
-	initials := images.ExtractInitials(account.Name, parsed.InitialsLength)
+	if parsed.KeyUID != "" {
+		account, err := multiaccountsDB.GetAccount(parsed.KeyUID)
+
+		if err != nil {
+			logger.Error("handleAccountInitialsImpl: failed to get account.", zap.String("keyUid", parsed.KeyUID), zap.Error(err))
+			return
+		}
+		name = account.Name
+		accColorHash = account.ColorHash
+	}
+
+	initials := images.ExtractInitials(name, parsed.InitialsLength)
 
 	initialsImagePayload, err := images.GenerateInitialsImage(initials, parsed.BgColor, parsed.Color, parsed.FontFile, parsed.BgSize, parsed.FontSize, parsed.UppercaseRatio)
 
@@ -394,8 +407,6 @@ func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *
 	img := PreparedImage{initialsImagePayload, parsed.BgSize, parsed.BgSize}
 
 	if parsed.Ring {
-		accColorHash := account.ColorHash
-
 		if accColorHash == nil {
 			if parsed.PublicKey == "" {
 				logger.Error("handleAccountInitialsImpl: no public key or color hash, can't draw ring", zap.String("keyUid", parsed.KeyUID), zap.Error(err))
@@ -517,7 +528,7 @@ func handleAccountInitials(multiaccountsDB *multiaccounts.Database, logger *zap.
 			return
 		}
 
-		if parsed.KeyUID == "" {
+		if parsed.KeyUID == "" && parsed.PublicKey == "" {
 			handleAccountInitialsPlaceholder(logger, w, r, parsed)
 			return
 		} else {
