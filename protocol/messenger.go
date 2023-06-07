@@ -834,7 +834,7 @@ func (m *Messenger) handleConnectionChange(online bool) {
 			m.shouldPublishContactCode = false
 		}
 		go func() {
-			_, err := m.RequestAllHistoricMessagesWithRetries()
+			_, err := m.RequestAllHistoricMessagesWithRetries(false)
 			if err != nil {
 				m.logger.Warn("failed to fetch historic messages", zap.Error(err))
 			}

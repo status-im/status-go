@@ -515,7 +515,7 @@ func (m *Messenger) handleMailserverCycleEvent(connectedPeers []ConnectedPeer) e
 				}
 				// Query mailserver
 				go func() {
-					_, err := m.performMailserverRequest(m.RequestAllHistoricMessages)
+					_, err := m.performMailserverRequest(func() (*MessengerResponse, error) { return m.RequestAllHistoricMessages(false) })
 					if err != nil {
 						m.logger.Error("could not perform mailserver request", zap.Error(err))
 					}

@@ -1172,12 +1172,12 @@ func (api *PublicAPI) DeleteActivityCenterNotifications(ctx context.Context, ids
 	return api.service.messenger.DeleteActivityCenterNotifications(ctx, ids, false)
 }
 
-func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {
-	return api.service.messenger.RequestAllHistoricMessages()
+func (api *PublicAPI) RequestAllHistoricMessages(forceFetchingBackup bool) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RequestAllHistoricMessages(forceFetchingBackup)
 }
 
-func (api *PublicAPI) RequestAllHistoricMessagesWithRetries() (*protocol.MessengerResponse, error) {
-	return api.service.messenger.RequestAllHistoricMessagesWithRetries()
+func (api *PublicAPI) RequestAllHistoricMessagesWithRetries(forceFetchingBackup bool) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RequestAllHistoricMessagesWithRetries(forceFetchingBackup)
 }
 
 func (api *PublicAPI) DisconnectActiveMailserver() {

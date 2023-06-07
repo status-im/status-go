@@ -294,12 +294,12 @@ func (m *Messenger) resetFiltersPriority(filters []*transport.Filter) {
 	}
 }
 
-func (m *Messenger) RequestAllHistoricMessagesWithRetries() (*MessengerResponse, error) {
-	return m.performMailserverRequest(m.RequestAllHistoricMessages)
+func (m *Messenger) RequestAllHistoricMessagesWithRetries(forceFetchingBackup bool) (*MessengerResponse, error) {
+	return m.performMailserverRequest(func() (*MessengerResponse, error) { return m.RequestAllHistoricMessages(forceFetchingBackup) })
 }
 
 // RequestAllHistoricMessages requests all the historic messages for any topic
-func (m *Messenger) RequestAllHistoricMessages() (*MessengerResponse, error) {
+func (m *Messenger) RequestAllHistoricMessages(forceFetchingBackup bool) (*MessengerResponse, error) {
 	shouldSync, err := m.shouldSync()
 	if err != nil {
 		return nil, err
@@ -314,7 +314,7 @@ func (m *Messenger) RequestAllHistoricMessages() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	if !backupFetched {
+	if forceFetchingBackup || !backupFetched {
 		m.logger.Info("fetching backup")
 		err := m.syncBackup()
 		if err != nil {
