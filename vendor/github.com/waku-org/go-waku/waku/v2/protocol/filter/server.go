@@ -285,19 +285,6 @@ func (wf *WakuFilterFullNode) pushMessage(ctx context.Context, peerID peer.ID, e
 	ctx, cancel := context.WithTimeout(ctx, MessagePushTimeout)
 	defer cancel()
 
-	// We connect first so dns4 addresses are resolved (NewStream does not do it)
-	err := wf.h.Connect(ctx, wf.h.Peerstore().PeerInfo(peerID))
-	if err != nil {
-		wf.subscriptions.FlagAsFailure(peerID)
-		if errors.Is(context.DeadlineExceeded, err) {
-			metrics.RecordFilterError(ctx, "push_timeout_failure")
-		} else {
-			metrics.RecordFilterError(ctx, "dial_failure")
-		}
-		logger.Error("connecting to peer", zap.Error(err))
-		return err
-	}
-
 	conn, err := wf.h.NewStream(ctx, peerID, FilterPushID_v20beta1)
 	if err != nil {
 		wf.subscriptions.FlagAsFailure(peerID)

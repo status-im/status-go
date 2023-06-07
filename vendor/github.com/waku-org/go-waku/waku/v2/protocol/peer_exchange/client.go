@@ -38,12 +38,6 @@ func (wakuPX *WakuPeerExchange) Request(ctx context.Context, numPeers int, opts 
 		},
 	}
 
-	// We connect first so dns4 addresses are resolved (NewStream does not do it)
-	err := wakuPX.h.Connect(ctx, wakuPX.h.Peerstore().PeerInfo(params.selectedPeer))
-	if err != nil {
-		return err
-	}
-
 	connOpt, err := wakuPX.h.NewStream(ctx, params.selectedPeer, PeerExchangeID_v20alpha1)
 	if err != nil {
 		return err

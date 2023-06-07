@@ -6,12 +6,12 @@ import (
 	"math/rand"
 	"time"
 
-	ggio "github.com/gogo/protobuf/io"
 	"github.com/libp2p/go-libp2p/core/host"
 	inet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-msgio/pbio"
 
-	pb "github.com/berty/go-libp2p-rendezvous/pb"
+	pb "github.com/waku-org/go-libp2p-rendezvous/pb"
 )
 
 var (
@@ -23,7 +23,6 @@ type RendezvousPoint interface {
 	Unregister(ctx context.Context, ns string) error
 	Discover(ctx context.Context, ns string, limit int, cookie []byte) ([]Registration, []byte, error)
 	DiscoverAsync(ctx context.Context, ns string) (<-chan Registration, error)
-	DiscoverSubscribe(ctx context.Context, ns string, serviceTypes []RendezvousSyncClient) (<-chan peer.AddrInfo, error)
 }
 
 type Registration struct {
@@ -37,7 +36,6 @@ type RendezvousClient interface {
 	Unregister(ctx context.Context, ns string) error
 	Discover(ctx context.Context, ns string, limit int, cookie []byte) ([]peer.AddrInfo, []byte, error)
 	DiscoverAsync(ctx context.Context, ns string) (<-chan peer.AddrInfo, error)
-	DiscoverSubscribe(ctx context.Context, ns string) (<-chan peer.AddrInfo, error)
 }
 
 func NewRendezvousPoint(host host.Host, p peer.ID, opts ...RendezvousPointOption) RendezvousPoint {
@@ -56,17 +54,16 @@ type rendezvousPoint struct {
 	p           peer.ID
 }
 
-func NewRendezvousClient(host host.Host, rp peer.ID, sync ...RendezvousSyncClient) RendezvousClient {
-	return NewRendezvousClientWithPoint(NewRendezvousPoint(host, rp), sync...)
+func NewRendezvousClient(host host.Host, rp peer.ID) RendezvousClient {
+	return NewRendezvousClientWithPoint(NewRendezvousPoint(host, rp))
 }
 
-func NewRendezvousClientWithPoint(rp RendezvousPoint, syncClientList ...RendezvousSyncClient) RendezvousClient {
-	return &rendezvousClient{rp: rp, syncClients: syncClientList}
+func NewRendezvousClientWithPoint(rp RendezvousPoint) RendezvousClient {
+	return &rendezvousClient{rp: rp}
 }
 
 type rendezvousClient struct {
-	rp          RendezvousPoint
-	syncClients []RendezvousSyncClient
+	rp RendezvousPoint
 }
 
 func (rp *rendezvousPoint) Register(ctx context.Context, ns string, ttl int) (time.Duration, error) {
@@ -76,8 +73,8 @@ func (rp *rendezvousPoint) Register(ctx context.Context, ns string, ttl int) (ti
 	}
 	defer s.Reset()
 
-	r := ggio.NewDelimitedReader(s, inet.MessageSizeMax)
-	w := ggio.NewDelimitedWriter(s)
+	r := pbio.NewDelimitedReader(s, inet.MessageSizeMax)
+	w := pbio.NewDelimitedWriter(s)
 
 	addrs := rp.addrFactory(rp.host.Addrs())
 	if len(addrs) == 0 {
@@ -85,7 +82,13 @@ func (rp *rendezvousPoint) Register(ctx context.Context, ns string, ttl int) (ti
 	}
 
 	log.Debugf("advertising on `%s` with: %v", ns, addrs)
-	req := newRegisterMessage(ns, peer.AddrInfo{ID: rp.host.ID(), Addrs: addrs}, ttl)
+
+	privKey := rp.host.Peerstore().PrivKey(rp.host.ID())
+	req, err := newRegisterMessage(privKey, ns, peer.AddrInfo{ID: rp.host.ID(), Addrs: addrs}, ttl)
+	if err != nil {
+		return 0, err
+	}
+
 	err = w.WriteMsg(req)
 	if err != nil {
 		return 0, err
@@ -107,7 +110,12 @@ func (rp *rendezvousPoint) Register(ctx context.Context, ns string, ttl int) (ti
 		return 0, RendezvousError{Status: status, Text: res.GetRegisterResponse().GetStatusText()}
 	}
 
-	return time.Duration(response.Ttl) * time.Second, nil
+	responseTTL := int64(0)
+	if response.Ttl != nil {
+		responseTTL = int64(*response.Ttl)
+	}
+
+	return time.Duration(responseTTL) * time.Second, nil
 }
 
 func (rc *rendezvousClient) Register(ctx context.Context, ns string, ttl int) (time.Duration, error) {
@@ -163,7 +171,7 @@ func (rp *rendezvousPoint) Unregister(ctx context.Context, ns string) error {
 	}
 	defer s.Close()
 
-	w := ggio.NewDelimitedWriter(s)
+	w := pbio.NewDelimitedWriter(s)
 	req := newUnregisterMessage(ns, rp.host.ID())
 	return w.WriteMsg(req)
 }
@@ -179,13 +187,13 @@ func (rp *rendezvousPoint) Discover(ctx context.Context, ns string, limit int, c
 	}
 	defer s.Reset()
 
-	r := ggio.NewDelimitedReader(s, inet.MessageSizeMax)
-	w := ggio.NewDelimitedWriter(s)
+	r := pbio.NewDelimitedReader(s, inet.MessageSizeMax)
+	w := pbio.NewDelimitedWriter(s)
 
 	return discoverQuery(ns, limit, cookie, r, w)
 }
 
-func discoverQuery(ns string, limit int, cookie []byte, r ggio.Reader, w ggio.Writer) ([]Registration, []byte, error) {
+func discoverQuery(ns string, limit int, cookie []byte, r pbio.Reader, w pbio.Writer) ([]Registration, []byte, error) {
 	req := newDiscoverMessage(ns, limit, cookie)
 	err := w.WriteMsg(req)
 	if err != nil {
@@ -199,7 +207,7 @@ func discoverQuery(ns string, limit int, cookie []byte, r ggio.Reader, w ggio.Wr
 	}
 
 	if res.GetType() != pb.Message_DISCOVER_RESPONSE {
-		return nil, nil, fmt.Errorf("Unexpected response: %s", res.GetType().String())
+		return nil, nil, fmt.Errorf("unexpected response: %s", res.GetType().String())
 	}
 
 	status := res.GetDiscoverResponse().GetStatus()
@@ -210,7 +218,7 @@ func discoverQuery(ns string, limit int, cookie []byte, r ggio.Reader, w ggio.Wr
 	regs := res.GetDiscoverResponse().GetRegistrations()
 	result := make([]Registration, 0, len(regs))
 	for _, reg := range regs {
-		pi, err := pbToPeerInfo(reg.GetPeer())
+		pi, err := pbToPeerRecord(reg.SignedPeerRecord)
 		if err != nil {
 			log.Errorf("Invalid peer info: %s", err.Error())
 			continue
@@ -236,8 +244,8 @@ func discoverAsync(ctx context.Context, ns string, s inet.Stream, ch chan Regist
 	defer s.Reset()
 	defer close(ch)
 
-	r := ggio.NewDelimitedReader(s, inet.MessageSizeMax)
-	w := ggio.NewDelimitedWriter(s)
+	r := pbio.NewDelimitedReader(s, inet.MessageSizeMax)
+	w := pbio.NewDelimitedWriter(s)
 
 	const batch = 200
 
@@ -319,100 +327,4 @@ func discoverPeersAsync(ctx context.Context, rch <-chan Registration, ch chan pe
 			return
 		}
 	}
-}
-
-func (rc *rendezvousClient) DiscoverSubscribe(ctx context.Context, ns string) (<-chan peer.AddrInfo, error) {
-	return rc.rp.DiscoverSubscribe(ctx, ns, rc.syncClients)
-}
-
-func subscribeServiceTypes(serviceTypeClients []RendezvousSyncClient) []string {
-	serviceTypes := []string(nil)
-	for _, serviceType := range serviceTypeClients {
-		serviceTypes = append(serviceTypes, serviceType.GetServiceType())
-	}
-
-	return serviceTypes
-}
-
-func (rp *rendezvousPoint) DiscoverSubscribe(ctx context.Context, ns string, serviceTypeClients []RendezvousSyncClient) (<-chan peer.AddrInfo, error) {
-	serviceTypes := subscribeServiceTypes(serviceTypeClients)
-
-	s, err := rp.host.NewStream(ctx, rp.p, RendezvousProto)
-	if err != nil {
-		return nil, err
-	}
-	defer s.Close()
-
-	r := ggio.NewDelimitedReader(s, inet.MessageSizeMax)
-	w := ggio.NewDelimitedWriter(s)
-
-	subType, subDetails, err := discoverSubscribeQuery(ns, serviceTypes, r, w)
-	if err != nil {
-		return nil, fmt.Errorf("discover subscribe error: %w", err)
-	}
-
-	subClient := RendezvousSyncClient(nil)
-	for _, subClient = range serviceTypeClients {
-		if subClient.GetServiceType() == subType {
-			break
-		}
-	}
-	if subClient == nil {
-		return nil, fmt.Errorf("unrecognized client type")
-	}
-
-	regCh, err := subClient.Subscribe(ctx, subDetails)
-	if err != nil {
-		return nil, fmt.Errorf("unable to subscribe to updates: %w", err)
-	}
-
-	ch := make(chan peer.AddrInfo)
-	go func() {
-		defer close(ch)
-
-		for {
-			select {
-			case result, ok := <-regCh:
-				if !ok {
-					return
-				}
-				ch <- result.Peer
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	return ch, nil
-}
-
-func discoverSubscribeQuery(ns string, serviceTypes []string, r ggio.Reader, w ggio.Writer) (subType string, subDetails string, err error) {
-	req := &pb.Message{
-		Type:              pb.Message_DISCOVER_SUBSCRIBE,
-		DiscoverSubscribe: newDiscoverSubscribeMessage(ns, serviceTypes),
-	}
-	err = w.WriteMsg(req)
-	if err != nil {
-		return "", "", fmt.Errorf("write err: %w", err)
-	}
-
-	var res pb.Message
-	err = r.ReadMsg(&res)
-	if err != nil {
-		return "", "", fmt.Errorf("read err: %w", err)
-	}
-
-	if res.GetType() != pb.Message_DISCOVER_SUBSCRIBE_RESPONSE {
-		return "", "", fmt.Errorf("unexpected response: %s", res.GetType().String())
-	}
-
-	status := res.GetDiscoverSubscribeResponse().GetStatus()
-	if status != pb.Message_OK {
-		return "", "", RendezvousError{Status: status, Text: res.GetDiscoverSubscribeResponse().GetStatusText()}
-	}
-
-	subType = res.GetDiscoverSubscribeResponse().GetSubscriptionType()
-	subDetails = res.GetDiscoverSubscribeResponse().GetSubscriptionDetails()
-
-	return subType, subDetails, nil
 }

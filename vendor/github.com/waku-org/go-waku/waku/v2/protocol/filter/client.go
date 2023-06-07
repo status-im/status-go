@@ -154,14 +154,7 @@ func (wf *WakuFilterLightnode) notify(remotePeerID peer.ID, pubsubTopic string, 
 }
 
 func (wf *WakuFilterLightnode) request(ctx context.Context, params *FilterSubscribeParameters, reqType pb.FilterSubscribeRequest_FilterSubscribeType, contentFilter ContentFilter) error {
-	err := wf.h.Connect(ctx, wf.h.Peerstore().PeerInfo(params.selectedPeer))
-	if err != nil {
-		metrics.RecordFilterError(ctx, "dial_failure")
-		return err
-	}
-
-	var conn network.Stream
-	conn, err = wf.h.NewStream(ctx, params.selectedPeer, FilterSubscribeID_v20beta1)
+	conn, err := wf.h.NewStream(ctx, params.selectedPeer, FilterSubscribeID_v20beta1)
 	if err != nil {
 		metrics.RecordFilterError(ctx, "dial_failure")
 		return err

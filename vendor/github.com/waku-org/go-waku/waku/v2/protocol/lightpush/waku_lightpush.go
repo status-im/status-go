@@ -157,13 +157,6 @@ func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, o
 	}
 
 	logger := wakuLP.log.With(logging.HostID("peer", params.selectedPeer))
-	// We connect first so dns4 addresses are resolved (NewStream does not do it)
-	err := wakuLP.h.Connect(ctx, wakuLP.h.Peerstore().PeerInfo(params.selectedPeer))
-	if err != nil {
-		metrics.RecordLightpushError(ctx, "dial_failure")
-		logger.Error("connecting peer", zap.Error(err))
-		return nil, err
-	}
 
 	connOpt, err := wakuLP.h.NewStream(ctx, params.selectedPeer, LightPushID_v20beta1)
 	if err != nil {

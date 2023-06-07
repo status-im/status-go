@@ -171,15 +171,6 @@ func (wf *WakuFilter) pushMessage(ctx context.Context, subscriber Subscriber, ms
 	pushRPC := &pb.FilterRPC{RequestId: subscriber.requestId, Push: &pb.MessagePush{Messages: []*wpb.WakuMessage{msg}}}
 	logger := wf.log.With(logging.HostID("peer", subscriber.peer))
 
-	// We connect first so dns4 addresses are resolved (NewStream does not do it)
-	err := wf.h.Connect(ctx, wf.h.Peerstore().PeerInfo(subscriber.peer))
-	if err != nil {
-		wf.subscribers.FlagAsFailure(subscriber.peer)
-		logger.Error("connecting to peer", zap.Error(err))
-		metrics.RecordLegacyFilterError(ctx, "dial_failure")
-		return err
-	}
-
 	conn, err := wf.h.NewStream(ctx, subscriber.peer, FilterID_v20beta1)
 	if err != nil {
 		wf.subscribers.FlagAsFailure(subscriber.peer)
@@ -269,13 +260,6 @@ func (wf *WakuFilter) requestSubscription(ctx context.Context, filter ContentFil
 		contentFilters = append(contentFilters, &pb.FilterRequest_ContentFilter{ContentTopic: ct})
 	}
 
-	// We connect first so dns4 addresses are resolved (NewStream does not do it)
-	err = wf.h.Connect(ctx, wf.h.Peerstore().PeerInfo(params.selectedPeer))
-	if err != nil {
-		metrics.RecordLegacyFilterError(ctx, "dial_failure")
-		return
-	}
-
 	request := &pb.FilterRequest{
 		Subscribe:      true,
 		Topic:          filter.Topic,
@@ -313,12 +297,6 @@ func (wf *WakuFilter) requestSubscription(ctx context.Context, filter ContentFil
 
 // Unsubscribe is used to stop receiving messages from a peer that match a content filter
 func (wf *WakuFilter) Unsubscribe(ctx context.Context, contentFilter ContentFilter, peer peer.ID) error {
-	// We connect first so dns4 addresses are resolved (NewStream does not do it)
-	err := wf.h.Connect(ctx, wf.h.Peerstore().PeerInfo(peer))
-	if err != nil {
-		metrics.RecordLegacyFilterError(ctx, "dial_failure")
-		return err
-	}
 
 	conn, err := wf.h.NewStream(ctx, peer, FilterID_v20beta1)
 	if err != nil {

@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	rvs "github.com/berty/go-libp2p-rendezvous"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	rvs "github.com/waku-org/go-libp2p-rendezvous"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
 )
@@ -116,6 +116,8 @@ func (r *Rendezvous) discover(ctx context.Context) {
 			if err != nil {
 				r.log.Error("could not discover new peers", zap.Error(err))
 				cookie = nil
+				// TODO: add backoff strategy
+				// continue
 			}
 
 			if len(addrInfo) != 0 {
@@ -133,7 +135,7 @@ func (r *Rendezvous) discover(ctx context.Context) {
 			} else {
 				// TODO: change log level to DEBUG in go-libp2p-rendezvous@v0.4.1/svc.go:234  discover query
 				// TODO: improve this by adding an exponential backoff?
-				time.Sleep(2 * time.Second)
+				time.Sleep(5 * time.Second)
 			}
 		}
 	}

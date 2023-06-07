@@ -11,8 +11,8 @@ import (
 	"fmt"
 	"time"
 
-	dbi "github.com/berty/go-libp2p-rendezvous/db"
 	"github.com/libp2p/go-libp2p/core/peer"
+	dbi "github.com/waku-org/go-libp2p-rendezvous/db"
 	"go.uber.org/zap"
 )
 
@@ -164,9 +164,8 @@ func (db *DB) prepareStmts() error {
 	return nil
 }
 
-func (db *DB) Register(p peer.ID, ns string, addrs [][]byte, ttl int) (uint64, error) {
+func (db *DB) Register(p peer.ID, ns string, signedPeerRecord []byte, ttl int) (uint64, error) {
 	pid := p.Pretty()
-	maddrs := packAddrs(addrs)
 	expire := time.Now().Unix() + int64(ttl)
 
 	tx, err := db.db.Begin()
@@ -184,7 +183,7 @@ func (db *DB) Register(p peer.ID, ns string, addrs [][]byte, ttl int) (uint64, e
 		return 0, err
 	}
 
-	_, err = insertNew.Exec(pid, ns, expire, maddrs)
+	_, err = insertNew.Exec(pid, ns, expire, signedPeerRecord)
 	if err != nil {
 		_ = tx.Rollback()
 		return 0, err
@@ -268,16 +267,15 @@ func (db *DB) Discover(ns string, cookie []byte, limit int) ([]dbi.RegistrationR
 	regs := make([]dbi.RegistrationRecord, 0, limit)
 	for rows.Next() {
 		var (
-			reg    dbi.RegistrationRecord
-			rid    string
-			rns    string
-			expire int64
-			raddrs []byte
-			addrs  [][]byte
-			p      peer.ID
+			reg              dbi.RegistrationRecord
+			rid              string
+			rns              string
+			expire           int64
+			signedPeerRecord []byte
+			p                peer.ID
 		)
 
-		err = rows.Scan(&counter, &rid, &rns, &expire, &raddrs)
+		err = rows.Scan(&counter, &rid, &rns, &expire, &signedPeerRecord)
 		if err != nil {
 			db.logger.Error("row scan error", zap.Error(err))
 			return nil, nil, err
@@ -289,14 +287,8 @@ func (db *DB) Discover(ns string, cookie []byte, limit int) ([]dbi.RegistrationR
 			continue
 		}
 
-		addrs, err := unpackAddrs(raddrs)
-		if err != nil {
-			db.logger.Error("error unpacking address", zap.Error(err))
-			continue
-		}
-
 		reg.Id = p
-		reg.Addrs = addrs
+		reg.SignedPeerRecord = signedPeerRecord
 		reg.Ttl = int(expire - now)
 
 		if ns == "" {
@@ -340,47 +332,6 @@ func (db *DB) cleanupExpired() {
 	if err != nil {
 		db.logger.Error("deleting expired registrations", zap.Error(err))
 	}
-}
-
-func packAddrs(addrs [][]byte) []byte {
-	packlen := 0
-	for _, addr := range addrs {
-		packlen = packlen + 2 + len(addr)
-	}
-
-	packed := make([]byte, packlen)
-	buf := packed
-	for _, addr := range addrs {
-		binary.BigEndian.PutUint16(buf, uint16(len(addr)))
-		buf = buf[2:]
-		copy(buf, addr)
-		buf = buf[len(addr):]
-	}
-
-	return packed
-}
-
-func unpackAddrs(packed []byte) ([][]byte, error) {
-	var addrs [][]byte
-
-	buf := packed
-	for len(buf) > 1 {
-		l := binary.BigEndian.Uint16(buf)
-		buf = buf[2:]
-		if len(buf) < int(l) {
-			return nil, fmt.Errorf("bad packed address: not enough bytes %v %v", packed, buf)
-		}
-		addr := make([]byte, l)
-		copy(addr, buf[:l])
-		buf = buf[l:]
-		addrs = append(addrs, addr)
-	}
-
-	if len(buf) > 0 {
-		return nil, fmt.Errorf("bad packed address: unprocessed bytes: %v %v", packed, buf)
-	}
-
-	return addrs, nil
 }
 
 // cookie: counter:SHA256(nonce + ns + counter)

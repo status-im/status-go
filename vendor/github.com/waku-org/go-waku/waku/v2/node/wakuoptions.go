@@ -230,12 +230,12 @@ func WithExternalIP(ip net.IP) WakuNodeOption {
 		params.addressFactory = func(inputAddr []multiaddr.Multiaddr) (addresses []multiaddr.Multiaddr) {
 			addresses = append(addresses, inputAddr...)
 
-			component := "/ip4/"
-			if ip.To4() == nil && ip.To16() != nil {
-				component = "/ip6/"
+			ipType := "/ip4/"
+			if utils.IsIPv6(ip.String()) {
+				ipType = "/ip6/"
 			}
 
-			hostAddrMA, err := multiaddr.NewMultiaddr(component + ip.String())
+			hostAddrMA, err := multiaddr.NewMultiaddr(ipType + ip.String())
 			if err != nil {
 				panic("Could not build external IP")
 			}
