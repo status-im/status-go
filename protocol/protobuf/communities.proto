@@ -65,6 +65,8 @@ message CommunityTokenPermission {
     UNKNOWN_TOKEN_PERMISSION = 0;
     BECOME_ADMIN = 1;
     BECOME_MEMBER = 2;
+    CAN_VIEW_CHANNEL = 3;
+    CAN_VIEW_AND_POST_CHANNEL = 4;
   }
 
   string id = 1;
