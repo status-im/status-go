@@ -229,7 +229,9 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 		if err != nil {
 			return nil, err
 		}
+
 		response.AddMessages(updatedMessages)
+		m.prepareMessages(response.messages)
 	}
 
 	response.AddChat(chat)
