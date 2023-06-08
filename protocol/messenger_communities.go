@@ -49,12 +49,11 @@ var updateActiveMembersInterval = 24 * time.Hour
 
 const discordTimestampLayout = "2006-01-02T15:04:05+00:00"
 
-var importRateLimiter = rate.NewLimiter(rate.Every(importSlowRate), 1)
-
 const (
 	importSlowRate          = time.Second / 1
 	importFastRate          = time.Second / 100
 	importMessagesChunkSize = 10
+	importInitialDelay      = time.Minute * 5
 )
 
 const (
@@ -2334,6 +2333,15 @@ func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community
 	}
 }
 
+func (m *Messenger) enableHistoryArchivesImportAfterDelay() {
+	go func() {
+		time.Sleep(importInitialDelay)
+		m.importDelayer.once.Do(func() {
+			close(m.importDelayer.wait)
+		})
+	}()
+}
+
 func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) error {
 	archiveIDsToImport, err := m.communitiesManager.GetMessageArchiveIDsToImport(communityID)
 	if err != nil {
@@ -2374,11 +2382,11 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) erro
 }
 
 func (m *Messenger) SpeedupArchivesImport() {
-	importRateLimiter.SetLimit(rate.Every(importFastRate))
+	m.importRateLimiter.SetLimit(rate.Every(importFastRate))
 }
 
 func (m *Messenger) SlowdownArchivesImport() {
-	importRateLimiter.SetLimit(rate.Every(importSlowRate))
+	m.importRateLimiter.SetLimit(rate.Every(importSlowRate))
 }
 
 func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel chan struct{}) error {
@@ -2390,6 +2398,13 @@ func (m *Messenger) importHistoryArchives(communityID types.HexBytes, cancel cha
 		<-cancel
 		cancelFunc()
 	}()
+
+	// don't proceed until initial import delay has passed
+	select {
+	case <-m.importDelayer.wait:
+	case <-ctx.Done():
+		return nil
+	}
 
 importMessageArchivesLoop:
 	for {
@@ -2425,7 +2440,7 @@ importMessageArchivesLoop:
 			m.config.messengerSignalsHandler.ImportingHistoryArchiveMessages(types.EncodeHex(communityID))
 
 			for _, messagesChunk := range chunkSlice(archiveMessages, importMessagesChunkSize) {
-				if err := importRateLimiter.Wait(ctx); err != nil {
+				if err := m.importRateLimiter.Wait(ctx); err != nil {
 					if !errors.Is(err, context.Canceled) {
 						m.communitiesManager.LogStdout("rate limiter error when handling archive messages", zap.Error(err))
 					}

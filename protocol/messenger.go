@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -142,6 +143,11 @@ type Messenger struct {
 	cancel context.CancelFunc
 
 	importingCommunities map[string]bool
+	importRateLimiter    *rate.Limiter
+	importDelayer        struct {
+		wait chan struct{}
+		once sync.Once
+	}
 
 	requestedCommunitiesLock sync.RWMutex
 	requestedCommunities     map[string]*transport.Filter
@@ -487,8 +493,13 @@ func NewMessenger(
 		requestedContactsLock:    sync.RWMutex{},
 		requestedContacts:        make(map[string]*transport.Filter),
 		importingCommunities:     make(map[string]bool),
-		browserDatabase:          c.browserDatabase,
-		httpServer:               c.httpServer,
+		importRateLimiter:        rate.NewLimiter(rate.Every(importSlowRate), 1),
+		importDelayer: struct {
+			wait chan struct{}
+			once sync.Once
+		}{wait: make(chan struct{})},
+		browserDatabase: c.browserDatabase,
+		httpServer:      c.httpServer,
 		contractMaker: &contracts.ContractMaker{
 			RPCClient: c.rpcClient,
 		},
@@ -773,6 +784,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 			return nil, err
 		}
 	}
+	m.enableHistoryArchivesImportAfterDelay()
 
 	if m.httpServer != nil {
 		err = m.httpServer.Start()
