@@ -173,7 +173,9 @@ func TestDeleteActivityCenterNotificationsForMessage(t *testing.T) {
 
 	notif, err := p.GetActivityCenterNotificationByID(nID1)
 	require.NoError(t, err)
-	require.Nil(t, notif)
+	require.True(t, notif.Deleted)
+	require.True(t, notif.Dismissed)
+	require.True(t, notif.Read)
 
 	// Other notifications are not affected.
 	for _, id := range []types.HexBytes{nID2, nID3, nID4} {
@@ -191,8 +193,10 @@ func TestDeleteActivityCenterNotificationsForMessage(t *testing.T) {
 
 	for _, id := range []types.HexBytes{nID2, nID3} {
 		notif, err = p.GetActivityCenterNotificationByID(id)
-		require.NoError(t, err)
-		require.Nil(t, notif)
+		require.NoError(t, err, notif.ID)
+		require.True(t, notif.Deleted, notif.ID)
+		require.True(t, notif.Dismissed, notif.ID)
+		require.True(t, notif.Read, notif.ID)
 	}
 
 	notif, err = p.GetActivityCenterNotificationByID(nID4)
@@ -280,7 +284,9 @@ func TestAcceptActivityCenterNotificationsForInvitesFromUser(t *testing.T) {
 	require.NoError(t, err)
 	notif, err = p.GetActivityCenterNotificationByID(notif.ID)
 	require.NoError(t, err)
-	require.Nil(t, notif)
+	require.False(t, notif.Accepted)
+	require.False(t, notif.Read)
+	require.True(t, notif.Deleted)
 
 	// Dismissed notifications are ignored.
 	notif = &ActivityCenterNotification{
@@ -420,10 +426,15 @@ func TestDismissAllActivityCenterNotificationsFromUser(t *testing.T) {
 	require.NoError(t, err)
 
 	// Ignores already soft deleted.
-	require.Nil(t, notifications[0])
+	notif, err := p.GetActivityCenterNotificationByID(notifications[0].ID)
+	require.NoError(t, err)
+	require.False(t, notif.Accepted)
+	require.False(t, notif.Read)
+	require.False(t, notif.Dismissed)
+	require.True(t, notif.Deleted)
 
 	// Ignores already dismissed.
-	notif, err := p.GetActivityCenterNotificationByID(notifications[1].ID)
+	notif, err = p.GetActivityCenterNotificationByID(notifications[1].ID)
 	require.NoError(t, err)
 	require.False(t, notif.Accepted)
 	require.False(t, notif.Read)
@@ -495,12 +506,17 @@ func TestDismissAllActivityCenterNotificationsFromChatID(t *testing.T) {
 	require.NoError(t, err)
 
 	// Ignores already soft deleted.
-	require.Nil(t, notifications[0])
+	notif, err := p.GetActivityCenterNotificationByID(notifications[0].ID)
+	require.NoError(t, err)
+	require.False(t, notif.Accepted)
+	require.False(t, notif.Read)
+	require.False(t, notif.Dismissed)
+	require.True(t, notif.Deleted)
 
 	// Do not ignore already dismissed, because notifications can become
 	// read/unread AND dismissed, and the method should still update the Read
 	// column.
-	notif, err := p.GetActivityCenterNotificationByID(notifications[1].ID)
+	notif, err = p.GetActivityCenterNotificationByID(notifications[1].ID)
 	require.NoError(t, err)
 	require.False(t, notif.Accepted)
 	require.True(t, notif.Read)
