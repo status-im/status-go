@@ -20,7 +20,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 
-	wallet_common "github.com/status-im/status-go/services/wallet/common"
+	wcommon "github.com/status-im/status-go/services/wallet/common"
 )
 
 func NewAPI(s *Service) *API {
@@ -528,7 +528,7 @@ func (api *API) FetchAllCurrencyFormats() (currency.FormatPerSymbol, error) {
 	return api.s.currency.FetchAllCurrencyFormats()
 }
 
-func (api *API) GetActivityEntries(addresses []common.Address, chainIDs []wallet_common.ChainID, filter activity.Filter, offset int, limit int) ([]activity.Entry, error) {
-	log.Debug("call to GetActivityEntries")
-	return activity.GetActivityEntries(api.s.db, addresses, chainIDs, filter, offset, limit)
+func (api *API) FilterActivityAsync(ctx context.Context, addresses []common.Address, chainIDs []wcommon.ChainID, filter activity.Filter, offset int, limit int) error {
+	log.Debug("[WalletAPI:: FilterActivityAsync] addr.count", len(addresses), "chainIDs.count", len(chainIDs), "filter", filter, "offset", offset, "limit", limit)
+	return api.s.activity.FilterActivityAsync(ctx, addresses, chainIDs, filter, offset, limit)
 }

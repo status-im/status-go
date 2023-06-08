@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/stickers"
+	"github.com/status-im/status-go/services/wallet/activity"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
@@ -93,6 +94,7 @@ func NewService(
 	reader := NewReader(rpcClient, tokenManager, marketManager, accountsDB, NewPersistence(db), walletFeed)
 	history := history.NewService(db, walletFeed, rpcClient, tokenManager, marketManager)
 	currency := currency.NewService(db, walletFeed, tokenManager, marketManager)
+	activity := activity.NewService(db, walletFeed)
 
 	alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKeys)
 	infuraClient := infura.NewClient(config.WalletConfig.InfuraAPIKey, config.WalletConfig.InfuraAPIKeySecret)
@@ -118,6 +120,7 @@ func NewService(
 		reader:                reader,
 		history:               history,
 		currency:              currency,
+		activity:              activity,
 	}
 }
 
@@ -144,6 +147,7 @@ type Service struct {
 	reader                *Reader
 	history               *history.Service
 	currency              *currency.Service
+	activity              *activity.Service
 }
 
 // Start signals transmitter.
@@ -169,6 +173,7 @@ func (s *Service) Stop() error {
 	s.currency.Stop()
 	s.reader.Stop()
 	s.history.Stop()
+	s.activity.Stop()
 	s.started = false
 	log.Info("wallet stopped")
 	return nil

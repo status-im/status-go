@@ -1,6 +1,7 @@
 package activity
 
 import (
+	"context"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
@@ -422,12 +423,12 @@ const (
 	noEntriesInTmpTableSQLValues = "(NULL)"
 )
 
-// GetActivityEntries returns query the transfers, pending_transactions, and multi_transactions tables
+// getActivityEntries queries the transfers, pending_transactions, and multi_transactions tables
 // based on filter parameters and arguments
 // it returns metadata for all entries ordered by timestamp column
 //
 // Adding a no-limit option was never considered or required.
-func GetActivityEntries(db *sql.DB, addresses []eth.Address, chainIDs []common.ChainID, filter Filter, offset int, limit int) ([]Entry, error) {
+func getActivityEntries(ctx context.Context, db *sql.DB, addresses []eth.Address, chainIDs []common.ChainID, filter Filter, offset int, limit int) ([]Entry, error) {
 	// TODO: filter collectibles after  they are added to multi_transactions table
 	if len(filter.Tokens.EnabledTypes) > 0 && !sliceContains(filter.Tokens.EnabledTypes, AssetTT) {
 		// For now we deal only with assets so return empty result
@@ -483,7 +484,7 @@ func GetActivityEntries(db *sql.DB, addresses []eth.Address, chainIDs []common.C
 	queryString := fmt.Sprintf(queryFormatString, involvedAddresses, toAddresses, assets, networks,
 		joinedMTTypes)
 
-	rows, err := db.Query(queryString,
+	rows, err := db.QueryContext(ctx, queryString,
 		startFilterDisabled, filter.Period.StartTimestamp, endFilterDisabled, filter.Period.EndTimestamp,
 		filterActivityTypeAll, sliceContains(filter.Types, SendAT), sliceContains(filter.Types, ReceiveAT),
 		fromTrType, toTrType,
