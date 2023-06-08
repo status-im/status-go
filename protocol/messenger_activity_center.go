@@ -96,11 +96,8 @@ func (m *Messenger) syncActivityCenterNotifications(notifications []*ActivityCen
 	}
 	var s []*protobuf.SyncActivityCenterNotification
 	for _, n := range notifications {
-		if n == nil {
-			return errors.New("SyncActivityCenterNotifications with nil notification")
-		}
 		var p *protobuf.SyncActivityCenterNotification
-		p, err = convertActivityCenterNotificationToProtobuf(n)
+		p, err = convertActivityCenterNotificationToProtobuf(*n)
 		if err != nil {
 			return
 		}
@@ -445,11 +442,7 @@ func (m *Messenger) handleSyncActivityCenterNotifications(state *ReceivedMessage
 	return state.Response.Merge(response)
 }
 
-func convertActivityCenterNotificationToProtobuf(n *ActivityCenterNotification) (p *protobuf.SyncActivityCenterNotification, err error) {
-	if n == nil {
-		return nil, errors.New("convertActivityCenterNotificationToProtobuf, n is nil")
-	}
-
+func convertActivityCenterNotificationToProtobuf(n ActivityCenterNotification) (syncActivityCenterNotification *protobuf.SyncActivityCenterNotification, err error) {
 	var (
 		message      []byte
 		replyMessage []byte
@@ -466,7 +459,7 @@ func convertActivityCenterNotificationToProtobuf(n *ActivityCenterNotification) 
 			return
 		}
 	}
-	p = &protobuf.SyncActivityCenterNotification{
+	syncActivityCenterNotification = &protobuf.SyncActivityCenterNotification{
 		Id:                        n.ID,
 		Timestamp:                 n.Timestamp,
 		NotificationType:          protobuf.SyncActivityCenterNotification_NotificationType(n.Type),
