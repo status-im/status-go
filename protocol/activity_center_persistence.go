@@ -649,7 +649,7 @@ func (db sqlitePersistence) GetActivityCenterNotificationByID(id types.HexBytes)
 		LEFT JOIN chats c
 		ON
 		c.id = a.chat_id
-		WHERE a.id = ? AND NOT deleted`, id)
+		WHERE a.id = ?`, id)
 
 	notification, err := db.unmarshalActivityCenterNotificationRow(row)
 	if err == sql.ErrNoRows {
