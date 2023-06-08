@@ -735,11 +735,30 @@ func matchMention(text string, users map[string]*MentionableUser, mentionKeyIdx 
 			textLen := len(tr)
 			nextWordStart := nextWordIdx + wordLen
 			if textLen > nextWordStart {
-				return matchMention(text, users, mentionKeyIdx, nextWordStart, newWords)
+				user := matchMention(text, users, mentionKeyIdx, nextWordStart, newWords)
+				if user != nil {
+					return user
+				}
 			}
+			return filterWithFullMatch(userSuggestions, searchedText)
 		}
 	}
 	return nil
+}
+
+func filterWithFullMatch(userSuggestions map[string]*MentionableUser, text string) *MentionableUser {
+	if text == "" {
+		return nil
+	}
+	result := make(map[string]*MentionableUser)
+	for pk, user := range userSuggestions {
+		for _, name := range user.names() {
+			if strings.ToLower(name) == text {
+				result[pk] = user
+			}
+		}
+	}
+	return getFirstUser(result)
 }
 
 func getFirstUser(userSuggestions map[string]*MentionableUser) *MentionableUser {
