@@ -289,6 +289,39 @@ func (b *GethStatusBackend) DeleteImportedKey(address, password, keyStoreDir str
 	return err
 }
 
+func (b *GethStatusBackend) runDBFileMigrations(account multiaccounts.Account, password string) (string, error) {
+	// Migrate file path to fix issue https://github.com/status-im/status-go/issues/2027
+	unsupportedPath := filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", account.KeyUID))
+	v3Path := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", account.KeyUID))
+	v4Path := filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db", account.KeyUID))
+
+	_, err := os.Stat(unsupportedPath)
+	if err == nil {
+		err := os.Rename(unsupportedPath, v3Path)
+		if err != nil {
+			return "", err
+		}
+
+		// rename journals as well, but ignore errors
+		_ = os.Rename(unsupportedPath+"-shm", v3Path+"-shm")
+		_ = os.Rename(unsupportedPath+"-wal", v3Path+"-wal")
+	}
+
+	if _, err = os.Stat(v3Path); err == nil {
+		if err := appdatabase.MigrateV3ToV4(v3Path, v4Path, password, account.KDFIterations); err != nil {
+			_ = os.Remove(v4Path)
+			_ = os.Remove(v4Path + "-shm")
+			_ = os.Remove(v4Path + "-wal")
+			return "", errors.New("Failed to migrate v3 db to v4: " + err.Error())
+		}
+		_ = os.Remove(v3Path)
+		_ = os.Remove(v3Path + "-shm")
+		_ = os.Remove(v3Path + "-wal")
+	}
+
+	return v4Path, nil
+}
+
 func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, password string) (err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -299,23 +332,12 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 		return errors.New("root datadir wasn't provided")
 	}
 
-	// Migrate file path to fix issue https://github.com/status-im/status-go/issues/2027
-	oldPath := filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", account.KeyUID))
-	newPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", account.KeyUID))
-
-	_, err = os.Stat(oldPath)
-	if err == nil {
-		err := os.Rename(oldPath, newPath)
-		if err != nil {
-			return err
-		}
-
-		// rename journals as well, but ignore errors
-		_ = os.Rename(oldPath+"-shm", newPath+"-shm")
-		_ = os.Rename(oldPath+"-wal", newPath+"-wal")
+	dbFilePath, err := b.runDBFileMigrations(account, password)
+	if err != nil {
+		return errors.New("Failed to migrate db file: " + err.Error())
 	}
 
-	b.appDB, err = appdatabase.InitializeDB(newPath, password, account.KDFIterations)
+	b.appDB, err = appdatabase.InitializeDB(dbFilePath, password, account.KDFIterations)
 	if err != nil {
 		b.log.Error("failed to initialize db", "err", err)
 		return err
@@ -1126,15 +1148,6 @@ func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password strin
 	}
 
 	err = b.ensureAppDBOpened(multiaccounts.Account{KeyUID: keyUID, KDFIterations: kdfIterations}, password)
-	if err != nil {
-		return err
-	}
-
-	accountsDB, err := accounts.NewDB(b.appDB)
-	if err != nil {
-		return err
-	}
-	_, err = accountsDB.GetWalletAddress()
 	if err != nil {
 		return err
 	}
