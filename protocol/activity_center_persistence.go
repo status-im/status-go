@@ -83,18 +83,18 @@ func (db sqlitePersistence) DeleteActivityCenterNotificationForMessage(chatID st
 	return matchNotifications, nil
 }
 
-func (db sqlitePersistence) SaveActivityCenterNotification(notification *ActivityCenterNotification, updateState bool) error {
+func (db sqlitePersistence) SaveActivityCenterNotification(notification *ActivityCenterNotification, updateState bool) (int64, error) {
 	var tx *sql.Tx
 	var err error
 
 	err = notification.Valid()
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer func() {
 		if err == nil {
@@ -110,7 +110,7 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 	if notification.Message != nil {
 		encodedMessage, err = json.Marshal(notification.Message)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
 
@@ -119,7 +119,7 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 	if notification.ReplyMessage != nil {
 		encodedReplyMessage, err = json.Marshal(notification.ReplyMessage)
 		if err != nil {
-			return err
+			return 0, err
 		}
 	}
 
@@ -163,11 +163,11 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		notification.UpdatedAt,
 	)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	n, err := result.RowsAffected()
 	if err != nil {
-		return err
+		return n, err
 	}
 
 	// When we have inserted or updated unread notification - mark whole activity_center_settings as unseen
@@ -175,7 +175,7 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 		_, err = tx.Exec(`UPDATE activity_center_states SET has_seen = 0, updated_at = ?`, notification.UpdatedAt)
 	}
 
-	return nil
+	return n, nil
 }
 
 func (db sqlitePersistence) parseRowFromTableActivityCenterNotification(rows *sql.Rows, withNotification func(notification *ActivityCenterNotification)) ([]*ActivityCenterNotification, error) {
@@ -625,6 +625,7 @@ func (db sqlitePersistence) GetActivityCenterNotificationsByID(ids []types.HexBy
 	return notifications, nil
 }
 
+// GetActivityCenterNotificationByID returns a notification by its ID even it's deleted logically
 func (db sqlitePersistence) GetActivityCenterNotificationByID(id types.HexBytes) (*ActivityCenterNotification, error) {
 	row := db.db.QueryRow(`
 		SELECT

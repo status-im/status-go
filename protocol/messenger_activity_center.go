@@ -413,11 +413,13 @@ func (m *Messenger) handleSyncActivityCenterNotificationState(state *ReceivedMes
 		HasSeen:   a.HasSeen,
 		UpdatedAt: a.UpdatedAt,
 	}
-	_, err := m.persistence.UpdateActivityCenterNotificationState(s)
+	n, err := m.persistence.UpdateActivityCenterNotificationState(s)
 	if err != nil {
 		return err
 	}
-	state.Response.SetActivityCenterState(s)
+	if n > 0 {
+		state.Response.SetActivityCenterState(s)
+	}
 	return nil
 }
 
@@ -428,11 +430,13 @@ func (m *Messenger) handleSyncActivityCenterNotifications(state *ReceivedMessage
 		if err != nil {
 			return err
 		}
-		err = m.persistence.SaveActivityCenterNotification(notification, false)
+		affectedNum, err := m.persistence.SaveActivityCenterNotification(notification, false)
 		if err != nil {
 			return err
 		}
-		notifications = append(notifications, notification)
+		if affectedNum > 0 {
+			notifications = append(notifications, notification)
+		}
 	}
 	response, err := m.processActivityCenterNotifications(notifications, true)
 	if err != nil {

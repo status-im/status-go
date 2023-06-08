@@ -313,7 +313,7 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 			notification.Accepted = true
 			notification.Dismissed = false
 			notification.UpdatedAt = m.getCurrentTimeInMillis()
-			err = m.persistence.SaveActivityCenterNotification(notification, true)
+			_, err = m.persistence.SaveActivityCenterNotification(notification, true)
 			if err != nil {
 				return err
 			}
@@ -2137,7 +2137,7 @@ func (m *Messenger) HandleImportedChatMessage(state *ReceivedMessageState) error
 }
 
 func (m *Messenger) addActivityCenterNotification(response *MessengerResponse, notification *ActivityCenterNotification) error {
-	err := m.persistence.SaveActivityCenterNotification(notification, true)
+	_, err := m.persistence.SaveActivityCenterNotification(notification, true)
 	if err != nil {
 		m.logger.Error("failed to save notification", zap.Error(err))
 		return err

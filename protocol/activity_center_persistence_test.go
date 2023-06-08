@@ -28,7 +28,7 @@ func createNotifications(t *testing.T, p *sqlitePersistence, notifications []*Ac
 		if notif.UpdatedAt == 0 {
 			notif.UpdatedAt = now
 		}
-		err := p.SaveActivityCenterNotification(notif, true)
+		_, err := p.SaveActivityCenterNotification(notif, true)
 		require.NoError(t, err, notif.ID)
 	}
 
@@ -245,7 +245,7 @@ func TestAcceptActivityCenterNotificationsForInvitesFromUser(t *testing.T) {
 
 	var notif *ActivityCenterNotification
 	for _, notif = range notifications {
-		err = p.SaveActivityCenterNotification(notif, true)
+		_, err = p.SaveActivityCenterNotification(notif, true)
 		require.NoError(t, err, notif.ID)
 	}
 
@@ -274,7 +274,7 @@ func TestAcceptActivityCenterNotificationsForInvitesFromUser(t *testing.T) {
 		Author:    userPublicKey,
 		Deleted:   true,
 	}
-	err = p.SaveActivityCenterNotification(notif, true)
+	_, err = p.SaveActivityCenterNotification(notif, true)
 	require.NoError(t, err)
 	_, err = p.AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey, currentMilliseconds())
 	require.NoError(t, err)
@@ -290,7 +290,7 @@ func TestAcceptActivityCenterNotificationsForInvitesFromUser(t *testing.T) {
 		Author:    userPublicKey,
 		Dismissed: true,
 	}
-	err = p.SaveActivityCenterNotification(notif, true)
+	_, err = p.SaveActivityCenterNotification(notif, true)
 	require.NoError(t, err)
 	_, err = p.AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey, currentMilliseconds())
 	require.NoError(t, err)
@@ -375,7 +375,7 @@ func TestHasPendingNotificationsForChat(t *testing.T) {
 		Type:      ActivityCenterNotificationTypeCommunityRequest,
 		Timestamp: 1,
 	}
-	err = p.SaveActivityCenterNotification(notif, true)
+	_, err = p.SaveActivityCenterNotification(notif, true)
 	require.NoError(t, err)
 
 	result, err = p.HasPendingNotificationsForChat(chat.ID)
@@ -701,7 +701,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 		ChatID:    chat.ID,
 		Timestamp: 1,
 	}
-	err = p.SaveActivityCenterNotification(notification, true)
+	_, err = p.SaveActivityCenterNotification(notification, true)
 	require.NoError(t, err)
 
 	cursor, notifications, err := p.ActivityCenterNotifications("", 2, []ActivityCenterType{}, ActivityCenterQueryParamsReadAll, false)
@@ -718,7 +718,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 		Type:      ActivityCenterNotificationTypeNewOneToOne,
 		Timestamp: 2,
 	}
-	err = p.SaveActivityCenterNotification(notification, true)
+	_, err = p.SaveActivityCenterNotification(notification, true)
 	require.NoError(t, err)
 
 	cursor, notifications, err = p.ActivityCenterNotifications("", 1, []ActivityCenterType{}, ActivityCenterQueryParamsReadAll, false)
@@ -796,7 +796,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 		Type:      ActivityCenterNotificationTypeNewOneToOne,
 		Timestamp: 3,
 	}
-	err = p.SaveActivityCenterNotification(notification, true)
+	_, err = p.SaveActivityCenterNotification(notification, true)
 	require.NoError(t, err)
 
 	// Mark all as accepted
@@ -816,7 +816,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 		Type:      ActivityCenterNotificationTypeNewOneToOne,
 		Timestamp: 4,
 	}
-	err = p.SaveActivityCenterNotification(notification, true)
+	_, err = p.SaveActivityCenterNotification(notification, true)
 	require.NoError(t, err)
 
 	// Mark all as dismissed
@@ -884,7 +884,7 @@ func TestActivityCenterReadUnreadPagination(t *testing.T) {
 	}
 
 	for _, notification := range allNotifications {
-		err = p.SaveActivityCenterNotification(notification, true)
+		_, err = p.SaveActivityCenterNotification(notification, true)
 		require.NoError(t, err)
 	}
 
@@ -1000,7 +1000,7 @@ func TestActivityCenterReadUnreadFilterByTypes(t *testing.T) {
 	}
 
 	for _, notification := range allNotifications {
-		err = p.SaveActivityCenterNotification(notification, true)
+		_, err = p.SaveActivityCenterNotification(notification, true)
 		require.NoError(t, err)
 	}
 
@@ -1106,7 +1106,7 @@ func TestActivityCenterReadUnread(t *testing.T) {
 		Timestamp: 1,
 	}
 
-	err = p.SaveActivityCenterNotification(notification, true)
+	_, err = p.SaveActivityCenterNotification(notification, true)
 	require.NoError(t, err)
 
 	notification = &ActivityCenterNotification{
@@ -1116,7 +1116,7 @@ func TestActivityCenterReadUnread(t *testing.T) {
 		Timestamp: 1,
 	}
 
-	err = p.SaveActivityCenterNotification(notification, true)
+	_, err = p.SaveActivityCenterNotification(notification, true)
 	require.NoError(t, err)
 
 	// Mark the notification as read
