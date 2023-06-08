@@ -14,6 +14,8 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	"github.com/google/uuid"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
@@ -341,6 +343,36 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 	return m.addActivityCenterNotification(messageState.Response, notification)
 }
 
+func (m *Messenger) createIncomingContactRequestEventAndNotification(contact *Contact, messageState *ReceivedMessageState, contactRequest *common.Message, createNewNotification bool) error {
+	var updateType MutualStateUpdateType
+	if contactRequest.ContactRequestState == common.ContactRequestStateAccepted {
+		updateType = MutualStateUpdateTypeAdded
+	} else {
+		updateType = MutualStateUpdateTypeSent
+	}
+
+	// System message for mutual state update
+	chat, clock, err := m.getOneToOneAndNextClock(contact)
+	if err != nil {
+		return err
+	}
+	timestamp := m.getTimesource().GetCurrentTime()
+	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, updateType, clock, timestamp, false)
+	if err != nil {
+		return err
+	}
+
+	m.prepareMessage(updateMessage, m.httpServer)
+	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
+	if err != nil {
+		return err
+	}
+	messageState.Response.AddMessage(updateMessage)
+	messageState.Response.AddChat(chat)
+
+	return m.createIncomingContactRequestNotification(contact, messageState, contactRequest, createNewNotification)
+}
+
 func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *common.Message) error {
 	message.ID = state.CurrentMessageState.MessageID
 	message.From = state.CurrentMessageState.Contact.ID
@@ -447,7 +479,7 @@ func (m *Messenger) syncContactRequestForInstallationContact(contact *Contact, s
 			return err
 		}
 	} else {
-		err = m.createIncomingContactRequestNotification(contact, state, contactRequest, true)
+		err = m.createIncomingContactRequestEventAndNotification(contact, state, contactRequest, true)
 		if err != nil {
 			return err
 		}
@@ -918,7 +950,10 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 				return err
 			}
 		} else {
-			err = m.createIncomingContactRequestNotification(contact, state, request, processingResponse.newContactRequestReceived)
+			err = m.createIncomingContactRequestEventAndNotification(contact, state, request, processingResponse.newContactRequestReceived)
+			if err != nil {
+				return err
+			}
 		}
 		if err != nil {
 			m.logger.Warn("could not create contact request notification", zap.Error(err))
@@ -939,7 +974,7 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
 	return nil
 }
 
-func (m *Messenger) handleRetractContactRequest(contact *Contact, message protobuf.RetractContactRequest) error {
+func (m *Messenger) handleRetractContactRequest(response *MessengerResponse, contact *Contact, message protobuf.RetractContactRequest) error {
 	if contact.ID == m.myHexIdentity() {
 		m.logger.Debug("retraction coming from us, ignoring")
 		return nil
@@ -952,9 +987,38 @@ func (m *Messenger) handleRetractContactRequest(contact *Contact, message protob
 		return nil
 	}
 
-	// We remove anything that's related to this contact request
-	err := m.persistence.HardDeleteChatContactRequestActivityCenterNotifications(contact.ID)
+	// System message for mutual state update
+	chat, clock, err := m.getOneToOneAndNextClock(contact)
 	if err != nil {
+		return err
+	}
+	timestamp := m.getTimesource().GetCurrentTime()
+	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeRemoved, clock, timestamp, false)
+	if err != nil {
+		return err
+	}
+
+	m.prepareMessage(updateMessage, m.httpServer)
+	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
+	if err != nil {
+		return err
+	}
+	response.AddMessage(updateMessage)
+	response.AddChat(chat)
+
+	notification := &ActivityCenterNotification{
+		ID:        types.FromHex(uuid.New().String()),
+		Type:      ActivityCenterNotificationTypeContactRemoved,
+		Name:      contact.PrimaryName(),
+		Author:    contact.ID,
+		Timestamp: m.getTimesource().GetCurrentTime(),
+		ChatID:    contact.ID,
+		Read:      false,
+	}
+
+	err = m.addActivityCenterNotification(response, notification)
+	if err != nil {
+		m.logger.Warn("failed to create activity center notification", zap.Error(err))
 		return err
 	}
 
@@ -965,7 +1029,7 @@ func (m *Messenger) handleRetractContactRequest(contact *Contact, message protob
 
 func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, message protobuf.RetractContactRequest) error {
 	contact := state.CurrentMessageState.Contact
-	err := m.handleRetractContactRequest(contact, message)
+	err := m.handleRetractContactRequest(state.Response, contact, message)
 	if err != nil {
 		return err
 	}
@@ -1020,7 +1084,7 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 				return err
 			}
 
-			err = m.createIncomingContactRequestNotification(contact, state, contactRequest, true)
+			err = m.createIncomingContactRequestEventAndNotification(contact, state, contactRequest, true)
 			if err != nil {
 				return err
 			}
@@ -1044,11 +1108,10 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 
 		r := contact.ContactRequestReceived(message.ContactRequestClock)
 		if r.newContactRequestReceived {
-			err = m.createIncomingContactRequestNotification(contact, state, nil, true)
+			err = m.createIncomingContactRequestEventAndNotification(contact, state, nil, true)
 			if err != nil {
-				m.logger.Warn("could not create contact request notification", zap.Error(err))
+				return err
 			}
-
 		}
 		contact.LastUpdated = message.Clock
 		state.ModifiedContacts.Store(contact.ID, true)
@@ -1975,11 +2038,10 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 				receivedMessage.ContactRequestState = common.ContactRequestStatePending
 			}
 
-			err = m.createIncomingContactRequestNotification(contact, state, receivedMessage, true)
+			err = m.createIncomingContactRequestEventAndNotification(contact, state, receivedMessage, true)
 			if err != nil {
 				return err
 			}
-
 		}
 		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)
@@ -2003,7 +2065,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 		state.AllContacts.Store(chatContact.ID, chatContact)
 
 		if sendNotification {
-			err = m.createIncomingContactRequestNotification(chatContact, state, receivedMessage, true)
+			err = m.createIncomingContactRequestEventAndNotification(chatContact, state, receivedMessage, true)
 			if err != nil {
 				return err
 			}

@@ -30,6 +30,14 @@ const (
 	ContactRequestStateDismissed
 )
 
+type MutualStateUpdateType int
+
+const (
+	MutualStateUpdateTypeSent MutualStateUpdateType = iota + 1
+	MutualStateUpdateTypeAdded
+	MutualStateUpdateTypeRemoved
+)
+
 // ContactDeviceInfo is a struct containing information about a particular device owned by a contact
 type ContactDeviceInfo struct {
 	// The installation id of the device

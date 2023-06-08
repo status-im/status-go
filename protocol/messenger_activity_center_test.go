@@ -75,7 +75,7 @@ func (s *MessengerActivityCenterMessageSuite) TestDeleteOneToOneChat() {
 	}
 	sendResponse, err := theirMessenger.SendContactRequest(context.Background(), r)
 	s.NoError(err)
-	s.Require().Len(sendResponse.Messages(), 1)
+	s.Require().Len(sendResponse.Messages(), 2)
 
 	response, err := WaitOnMessengerResponse(
 		s.m,
@@ -84,7 +84,7 @@ func (s *MessengerActivityCenterMessageSuite) TestDeleteOneToOneChat() {
 	)
 	s.Require().NoError(err)
 	s.Require().Len(response.Chats(), 1)
-	s.Require().Len(response.Messages(), 1)
+	s.Require().Len(response.Messages(), 2)
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
 
 	request := &requests.DeactivateChat{ID: response.Chats()[0].ID}
