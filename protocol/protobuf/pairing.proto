@@ -66,6 +66,7 @@ message LocalPairingPayload {
   MultiAccount multiaccount = 2;
   string password = 3;
   string chatKey = 4;
+  string keycardPairings = 5;
 
   message Key {
     string name = 1;
