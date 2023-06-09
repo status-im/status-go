@@ -248,6 +248,9 @@ func (b *GethStatusBackend) DeleteMultiaccount(keyUID string, keyStoreDir string
 		filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", keyUID)),
 		filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db-shm", keyUID)),
 		filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db-wal", keyUID)),
+		filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db", keyUID)),
+		filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db-shm", keyUID)),
+		filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db-wal", keyUID)),
 	}
 	for _, path := range dbFiles {
 		if _, err := os.Stat(path); err == nil {
@@ -713,23 +716,12 @@ func (b *GethStatusBackend) ExportUnencryptedDatabase(acc multiaccounts.Account,
 		return errors.New("root datadir wasn't provided")
 	}
 
-	// Migrate file path to fix issue https://github.com/status-im/status-go/issues/2027
-	oldPath := filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", acc.KeyUID))
-	newPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", acc.KeyUID))
-
-	_, err := os.Stat(oldPath)
-	if err == nil {
-		err := os.Rename(oldPath, newPath)
-		if err != nil {
-			return err
-		}
-
-		// rename journals as well, but ignore errors
-		_ = os.Rename(oldPath+"-shm", newPath+"-shm")
-		_ = os.Rename(oldPath+"-wal", newPath+"-wal")
+	dbPath, err := b.runDBFileMigrations(acc, password)
+	if err != nil {
+		return err
 	}
 
-	err = appdatabase.DecryptDatabase(newPath, directory, password, acc.KDFIterations)
+	err = appdatabase.DecryptDatabase(dbPath, directory, password, acc.KDFIterations)
 	if err != nil {
 		b.log.Error("failed to initialize db", "err", err)
 		return err
@@ -747,7 +739,7 @@ func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account,
 		return errors.New("root datadir wasn't provided")
 	}
 
-	path := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", acc.KeyUID))
+	path := filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db", acc.KeyUID))
 
 	err := appdatabase.EncryptDatabase(databasePath, path, password, acc.KDFIterations)
 	if err != nil {
@@ -758,7 +750,7 @@ func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account,
 }
 
 func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password string, newPassword string) error {
-	dbPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", keyUID))
+	dbPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db", keyUID))
 	config := b.StatusNode().Config()
 	keyDir := ""
 	if config == nil {
