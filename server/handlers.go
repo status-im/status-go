@@ -77,8 +77,9 @@ type ParsedParams struct {
 	UppercaseRatio  float64
 	Theme           ring.Theme
 	Ring            bool
-	StatusIndicator bool
-	Online          bool
+	IndicatorSize   int
+	IndicatorBorder int
+	IndicatorColor  color.Color
 
 	AuthorID     string
 	URL          string
@@ -93,6 +94,7 @@ func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
 	parsed := ParsedParams{}
 	parsed.Color = color.Transparent
 	parsed.BgColor = color.Transparent
+	parsed.IndicatorColor = color.Transparent
 	parsed.UppercaseRatio = 1.0
 
 	keyUids := params["keyUid"]
@@ -195,10 +197,38 @@ func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
 		parsed.UppercaseRatio = uppercaseRatio
 	}
 
+	indicatorColors := params["indicatorColor"]
+	if len(indicatorColors) != 0 {
+		indicatorColor, err := images.ParseColor(indicatorColors[0])
+		if err != nil {
+			logger.Error("ParseParams: invalid indicatorColor", zap.String("IndicatorColor", indicatorColors[0]))
+			return parsed
+		}
+		parsed.IndicatorColor = indicatorColor
+	}
+
+	indicatorSizeStrs := params["indicatorSize"]
+	if len(indicatorSizeStrs) != 0 {
+		indicatorSize, err := strconv.Atoi(indicatorSizeStrs[0])
+		if err != nil {
+			logger.Error("ParseParams: invalid indicatorSize", zap.String("indicatorSize", indicatorSizeStrs[0]))
+			indicatorSize = 0
+		}
+		parsed.IndicatorSize = indicatorSize
+	}
+
+	indicatorBorderStrs := params["indicatorBorder"]
+	if len(indicatorBorderStrs) != 0 {
+		indicatorBorder, err := strconv.Atoi(indicatorBorderStrs[0])
+		if err != nil {
+			logger.Error("ParseParams: invalid indicatorBorder", zap.String("indicatorBorder", indicatorBorderStrs[0]))
+			indicatorBorder = 0
+		}
+		parsed.IndicatorBorder = indicatorBorder
+	}
+
 	parsed.Theme = getTheme(params, logger)
 	parsed.Ring = ringEnabled(params)
-	parsed.StatusIndicator = statusIndicatorEnabled(params)
-	parsed.Online = isOnline(params)
 
 	messageIDs := params["message-id"]
 	if len(messageIDs) != 0 {
@@ -232,6 +262,7 @@ func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
 }
 
 func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *zap.Logger, w http.ResponseWriter, r *http.Request, parsed ParsedParams) {
+	logger.Info("handleAccountImagesImpl: parsed", zap.Any("parsed", parsed))
 	if parsed.KeyUID == "" {
 		logger.Error("handleAccountImagesImpl: no keyUid")
 		return
@@ -288,8 +319,8 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 		img.Payload = payload
 	}
 
-	if parsed.StatusIndicator {
-		payload, err = images.AddStatusIndicatorToImage(img.Payload, parsed.Online)
+	if parsed.IndicatorSize != 0 {
+		payload, err = images.AddStatusIndicatorToImage(img.Payload, parsed.IndicatorColor, parsed.IndicatorSize, parsed.IndicatorBorder)
 		if err != nil {
 			logger.Error("handleAccountImagesImpl: failed to draw status-indicator for initials", zap.Error(err))
 			return
@@ -336,8 +367,8 @@ func handleAccountImagesPlaceholder(logger *zap.Logger, w http.ResponseWriter, r
 	}
 	img.Payload = payload
 
-	if parsed.StatusIndicator {
-		payload, err = images.AddStatusIndicatorToImage(img.Payload, parsed.Online)
+	if parsed.IndicatorSize != 0 {
+		payload, err = images.AddStatusIndicatorToImage(img.Payload, parsed.IndicatorColor, parsed.IndicatorSize, parsed.IndicatorBorder)
 		if err != nil {
 			logger.Error("handleAccountImagesPlaceholder: failed to draw status-indicator for initials", zap.Error(err))
 			return
@@ -431,8 +462,8 @@ func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *
 		img.Payload = payload
 	}
 
-	if parsed.StatusIndicator {
-		payload, err := images.AddStatusIndicatorToImage(img.Payload, parsed.Online)
+	if parsed.IndicatorSize != 0 {
+		payload, err := images.AddStatusIndicatorToImage(img.Payload, parsed.IndicatorColor, parsed.IndicatorSize, parsed.IndicatorBorder)
 		if err != nil {
 			logger.Error("failed to draw status-indicator for initials", zap.Error(err))
 			return
@@ -475,8 +506,8 @@ func handleAccountInitialsPlaceholder(logger *zap.Logger, w http.ResponseWriter,
 
 	img := PreparedImage{initialsImagePayload, parsed.BgSize, parsed.BgSize}
 
-	if parsed.StatusIndicator {
-		payload, err := images.AddStatusIndicatorToImage(img.Payload, parsed.Online)
+	if parsed.IndicatorSize != 0 {
+		payload, err := images.AddStatusIndicatorToImage(img.Payload, parsed.IndicatorColor, parsed.IndicatorSize, parsed.IndicatorBorder)
 		if err != nil {
 			logger.Error("failed to draw status-indicator for initials", zap.Error(err))
 			return
@@ -614,16 +645,6 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 func ringEnabled(params url.Values) bool {
 	addRings, ok := params["addRing"]
 	return ok && len(addRings) == 1 && addRings[0] == "1"
-}
-
-func isOnline(params url.Values) bool {
-	onlines, ok := params["online"]
-	return ok && len(onlines) == 1 && onlines[0] == "1"
-}
-
-func statusIndicatorEnabled(params url.Values) bool {
-	statusIndicators, ok := params["status"]
-	return ok && len(statusIndicators) == 1 && statusIndicators[0] == "1"
 }
 
 func getTheme(params url.Values, logger *zap.Logger) ring.Theme {

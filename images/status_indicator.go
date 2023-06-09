@@ -10,10 +10,7 @@ import (
 	"github.com/fogleman/gg"
 )
 
-var OnlineGreen = "#23ADA0"
-var OfflineGray = "#A1ABBD"
-
-func addStatusIndicatorToImage(inputImage []byte, innerColor color.Color) ([]byte, error) {
+func AddStatusIndicatorToImage(inputImage []byte, innerColor color.Color, indicatorSize, indicatorBorder int) ([]byte, error) {
 	// decode the input image
 	img, _, err := image.Decode(bytes.NewReader(inputImage))
 	if err != nil {
@@ -24,7 +21,7 @@ func addStatusIndicatorToImage(inputImage []byte, innerColor color.Color) ([]byt
 	width := img.Bounds().Max.X
 	height := img.Bounds().Max.Y
 
-	indicatorRadius := float64(width / 8)
+	indicatorRadius := float64(indicatorSize/2) + float64(indicatorBorder)
 
 	// calculate the center point
 	x := float64(width) - indicatorRadius
@@ -45,7 +42,7 @@ func addStatusIndicatorToImage(inputImage []byte, innerColor color.Color) ([]byt
 	}
 
 	// draw inner circle
-	dc.DrawCircle(x, y, indicatorRadius*0.6)
+	dc.DrawCircle(x, y, indicatorRadius)
 	dc.SetColor(innerColor)
 	dc.Fill()
 
@@ -56,19 +53,4 @@ func addStatusIndicatorToImage(inputImage []byte, innerColor color.Color) ([]byt
 		return nil, err
 	}
 	return outputImage.Bytes(), nil
-}
-
-func AddStatusIndicatorToImage(inputImage []byte, isOnline bool) ([]byte, error) {
-	innerColorStr := OfflineGray
-	if isOnline {
-		innerColorStr = OnlineGreen
-	}
-
-	innerColor, err := ParseColor(innerColorStr)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return addStatusIndicatorToImage(inputImage, innerColor)
 }
