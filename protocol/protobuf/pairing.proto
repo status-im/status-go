@@ -65,6 +65,7 @@ message LocalPairingPayload {
   repeated Key keys = 1;
   MultiAccount multiaccount = 2;
   string password = 3;
+  string chatKey = 4;
 
   message Key {
     string name = 1;

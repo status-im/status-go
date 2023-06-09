@@ -94,7 +94,11 @@ func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload,
 		keystoreDir := filepath.Join(nodeConfig.KeyStoreDir, account.KeyUID)
 		nodeConfig.KeyStoreDir = keystoreDir
 		if accountPayload.exist {
-			err = s.backend.StartNodeWithAccount(*account, accountPayload.password, nodeConfig)
+			if len(accountPayload.chatKey) == 0 {
+				err = s.backend.StartNodeWithAccount(*account, accountPayload.password, nodeConfig)
+			} else {
+				err = s.backend.StartNodeWithKey(*account, accountPayload.password, accountPayload.chatKey)
+			}
 		} else {
 			accountManager := s.backend.AccountManager()
 			err = accountManager.InitKeystore(filepath.Join(nodeConfig.RootDataDir, keystoreDir))
@@ -104,7 +108,11 @@ func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload,
 			rmp.setting.InstallationID = nodeConfig.ShhextConfig.InstallationID
 			rmp.setting.CurrentNetwork = settingCurrentNetwork
 
-			err = s.backend.StartNodeWithAccountAndInitialConfig(*account, accountPayload.password, *rmp.setting, nodeConfig, rmp.profileKeypair.Accounts)
+			if len(accountPayload.chatKey) == 0 {
+				err = s.backend.StartNodeWithAccountAndInitialConfig(*account, accountPayload.password, *rmp.setting, nodeConfig, rmp.profileKeypair.Accounts)
+			} else {
+				err = s.backend.SaveAccountAndStartNodeWithKey(*account, accountPayload.password, *rmp.setting, nodeConfig, rmp.profileKeypair.Accounts, accountPayload.chatKey)
+			}
 		}
 		if err != nil {
 			return err
