@@ -21,7 +21,7 @@ func AddStatusIndicatorToImage(inputImage []byte, innerColor color.Color, indica
 	width := img.Bounds().Max.X
 	height := img.Bounds().Max.Y
 
-	indicatorRadius := float64(indicatorSize/2) + float64(indicatorBorder)
+	indicatorRadius := float64(indicatorSize / 2)
 
 	// calculate the center point
 	x := float64(width) - indicatorRadius
@@ -42,7 +42,7 @@ func AddStatusIndicatorToImage(inputImage []byte, innerColor color.Color, indica
 	}
 
 	// draw inner circle
-	dc.DrawCircle(x, y, indicatorRadius)
+	dc.DrawCircle(x, y, indicatorRadius-float64(indicatorBorder))
 	dc.SetColor(innerColor)
 	dc.Fill()
 

@@ -56,12 +56,6 @@ func handleRequestDownloaderMissing(logger *zap.Logger) http.HandlerFunc {
 	}
 }
 
-type PreparedImage struct {
-	Payload []byte
-	Width   int
-	Height  int
-}
-
 type ParsedParams struct {
 	KeyUID          string
 	PublicKey       string
@@ -262,7 +256,6 @@ func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
 }
 
 func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *zap.Logger, w http.ResponseWriter, r *http.Request, parsed ParsedParams) {
-	logger.Info("handleAccountImagesImpl: parsed", zap.Any("parsed", parsed))
 	if parsed.KeyUID == "" {
 		logger.Error("handleAccountImagesImpl: no keyUid")
 		return
@@ -278,14 +271,21 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 		logger.Error("handleAccountImagesImpl: failed to load image.", zap.String("keyUid", parsed.KeyUID), zap.String("imageName", parsed.ImageName), zap.Error(err))
 		return
 	}
-	img := PreparedImage{identityImage.Payload, identityImage.Width, identityImage.Height}
+	if parsed.BgSize == 0 {
+		parsed.BgSize = identityImage.Width
+	}
 
-	payload, err := images.CropAvatar(img.Payload)
+	payload, err := images.ResizeImage(identityImage.Payload, parsed.BgSize, parsed.BgSize)
+	if err != nil {
+		logger.Error("handleAccountImagesImpl: failed to resize image.", zap.String("keyUid", parsed.KeyUID), zap.String("imageName", parsed.ImageName), zap.Error(err))
+		return
+	}
+
+	payload, err = images.CropAvatar(payload)
 	if err != nil {
 		logger.Error("handleAccountImagesImpl: failed to crop image.", zap.String("keyUid", parsed.KeyUID), zap.String("imageName", parsed.ImageName), zap.Error(err))
 		return
 	}
-	img.Payload = payload
 
 	if parsed.Ring {
 		account, err := multiaccountsDB.GetAccount(parsed.KeyUID)
@@ -310,30 +310,28 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 		}
 
 		payload, err = ring.DrawRing(&ring.DrawRingParam{
-			Theme: parsed.Theme, ColorHash: accColorHash, ImageBytes: img.Payload, Height: img.Height, Width: img.Width,
+			Theme: parsed.Theme, ColorHash: accColorHash, ImageBytes: payload, Height: parsed.BgSize, Width: parsed.BgSize,
 		})
 		if err != nil {
 			logger.Error("handleAccountImagesImpl: failed to draw ring for account identity", zap.Error(err))
 			return
 		}
-		img.Payload = payload
 	}
 
 	if parsed.IndicatorSize != 0 {
-		payload, err = images.AddStatusIndicatorToImage(img.Payload, parsed.IndicatorColor, parsed.IndicatorSize, parsed.IndicatorBorder)
+		payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize, parsed.IndicatorBorder)
 		if err != nil {
 			logger.Error("handleAccountImagesImpl: failed to draw status-indicator for initials", zap.Error(err))
 			return
 		}
-		img.Payload = payload
 	}
 
-	if len(img.Payload) == 0 {
+	if len(payload) == 0 {
 		logger.Error("handleAccountImagesImpl: empty image")
 		return
 	}
 
-	mime, err := images.GetProtobufImageMime(img.Payload)
+	mime, err := images.GetProtobufImageMime(payload)
 	if err != nil {
 		logger.Error("failed to get mime", zap.Error(err))
 	}
@@ -341,7 +339,7 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 	w.Header().Set("Content-Type", mime)
 	w.Header().Set("Cache-Control", "no-store")
 
-	_, err = w.Write(img.Payload)
+	_, err = w.Write(payload)
 	if err != nil {
 		logger.Error("handleAccountImagesImpl: failed to write image", zap.Error(err))
 	}
@@ -358,30 +356,30 @@ func handleAccountImagesPlaceholder(logger *zap.Logger, w http.ResponseWriter, r
 		logger.Error("handleAccountImagesPlaceholder: failed to load image from disk", zap.String("imageName", parsed.ImagePath))
 		return
 	}
-	img := PreparedImage{payload, im.Bounds().Dx(), im.Bounds().Dy()}
+	if parsed.BgSize == 0 {
+		parsed.BgSize = im.Bounds().Dx()
+	}
 
-	payload, err = images.CropAvatar(img.Payload)
+	payload, err = images.CropAvatar(payload)
 	if err != nil {
 		logger.Error("handleAccountImagesPlaceholder: failed to crop image.", zap.String("imageName", parsed.ImagePath), zap.Error(err))
 		return
 	}
-	img.Payload = payload
 
 	if parsed.IndicatorSize != 0 {
-		payload, err = images.AddStatusIndicatorToImage(img.Payload, parsed.IndicatorColor, parsed.IndicatorSize, parsed.IndicatorBorder)
+		payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize, parsed.IndicatorBorder)
 		if err != nil {
 			logger.Error("handleAccountImagesPlaceholder: failed to draw status-indicator for initials", zap.Error(err))
 			return
 		}
-		img.Payload = payload
 	}
 
-	if len(img.Payload) == 0 {
+	if len(payload) == 0 {
 		logger.Error("handleAccountImagesPlaceholder: empty image")
 		return
 	}
 
-	mime, err := images.GetProtobufImageMime(img.Payload)
+	mime, err := images.GetProtobufImageMime(payload)
 	if err != nil {
 		logger.Error("failed to get mime", zap.Error(err))
 	}
@@ -389,7 +387,7 @@ func handleAccountImagesPlaceholder(logger *zap.Logger, w http.ResponseWriter, r
 	w.Header().Set("Content-Type", mime)
 	w.Header().Set("Cache-Control", "no-store")
 
-	_, err = w.Write(img.Payload)
+	_, err = w.Write(payload)
 	if err != nil {
 		logger.Error("handleAccountImagesPlaceholder: failed to write image", zap.Error(err))
 	}
@@ -428,14 +426,12 @@ func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *
 
 	initials := images.ExtractInitials(name, parsed.InitialsLength)
 
-	initialsImagePayload, err := images.GenerateInitialsImage(initials, parsed.BgColor, parsed.Color, parsed.FontFile, parsed.BgSize, parsed.FontSize, parsed.UppercaseRatio)
+	payload, err := images.GenerateInitialsImage(initials, parsed.BgColor, parsed.Color, parsed.FontFile, parsed.BgSize, parsed.FontSize, parsed.UppercaseRatio)
 
 	if err != nil {
 		logger.Error("handleAccountInitialsImpl: failed to generate initials image.", zap.String("keyUid", parsed.KeyUID), zap.String("name", account.Name), zap.Error(err))
 		return
 	}
-
-	img := PreparedImage{initialsImagePayload, parsed.BgSize, parsed.BgSize}
 
 	if parsed.Ring {
 		if accColorHash == nil {
@@ -451,31 +447,29 @@ func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *
 			}
 		}
 
-		payload, err := ring.DrawRing(&ring.DrawRingParam{
-			Theme: parsed.Theme, ColorHash: accColorHash, ImageBytes: img.Payload, Height: parsed.BgSize, Width: parsed.BgSize,
+		payload, err = ring.DrawRing(&ring.DrawRingParam{
+			Theme: parsed.Theme, ColorHash: accColorHash, ImageBytes: payload, Height: parsed.BgSize, Width: parsed.BgSize,
 		})
 
 		if err != nil {
 			logger.Error("failed to draw ring for account identity", zap.Error(err))
 			return
 		}
-		img.Payload = payload
 	}
 
 	if parsed.IndicatorSize != 0 {
-		payload, err := images.AddStatusIndicatorToImage(img.Payload, parsed.IndicatorColor, parsed.IndicatorSize, parsed.IndicatorBorder)
+		payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize, parsed.IndicatorBorder)
 		if err != nil {
 			logger.Error("failed to draw status-indicator for initials", zap.Error(err))
 			return
 		}
-		img.Payload = payload
 	}
 
-	if len(img.Payload) == 0 {
+	if len(payload) == 0 {
 		logger.Error("handleAccountInitialsImpl: empty image", zap.String("keyUid", parsed.KeyUID), zap.Error(err))
 		return
 	}
-	mime, err := images.GetProtobufImageMime(img.Payload)
+	mime, err := images.GetProtobufImageMime(payload)
 	if err != nil {
 		logger.Error("failed to get mime", zap.Error(err))
 	}
@@ -483,7 +477,7 @@ func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *
 	w.Header().Set("Content-Type", mime)
 	w.Header().Set("Cache-Control", "no-store")
 
-	_, err = w.Write(img.Payload)
+	_, err = w.Write(payload)
 	if err != nil {
 		logger.Error("failed to write image", zap.Error(err))
 	}
@@ -497,29 +491,27 @@ func handleAccountInitialsPlaceholder(logger *zap.Logger, w http.ResponseWriter,
 
 	initials := images.ExtractInitials(parsed.FullName, parsed.InitialsLength)
 
-	initialsImagePayload, err := images.GenerateInitialsImage(initials, parsed.BgColor, parsed.Color, parsed.FontFile, parsed.BgSize, parsed.FontSize, parsed.UppercaseRatio)
+	payload, err := images.GenerateInitialsImage(initials, parsed.BgColor, parsed.Color, parsed.FontFile, parsed.BgSize, parsed.FontSize, parsed.UppercaseRatio)
 
 	if err != nil {
 		logger.Error("handleAccountInitialsPlaceholder: failed to generate initials image.", zap.String("keyUid", parsed.KeyUID), zap.String("name", parsed.FullName), zap.Error(err))
 		return
 	}
 
-	img := PreparedImage{initialsImagePayload, parsed.BgSize, parsed.BgSize}
-
 	if parsed.IndicatorSize != 0 {
-		payload, err := images.AddStatusIndicatorToImage(img.Payload, parsed.IndicatorColor, parsed.IndicatorSize, parsed.IndicatorBorder)
+		payload, err := images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize, parsed.IndicatorBorder)
 		if err != nil {
 			logger.Error("failed to draw status-indicator for initials", zap.Error(err))
 			return
 		}
-		img.Payload = payload
+		payload = payload
 	}
 
-	if len(img.Payload) == 0 {
+	if len(payload) == 0 {
 		logger.Error("handleAccountInitialsPlaceholder: empty image", zap.String("keyUid", parsed.KeyUID), zap.Error(err))
 		return
 	}
-	mime, err := images.GetProtobufImageMime(img.Payload)
+	mime, err := images.GetProtobufImageMime(payload)
 	if err != nil {
 		logger.Error("failed to get mime", zap.Error(err))
 	}
@@ -527,7 +519,7 @@ func handleAccountInitialsPlaceholder(logger *zap.Logger, w http.ResponseWriter,
 	w.Header().Set("Content-Type", mime)
 	w.Header().Set("Cache-Control", "no-store")
 
-	_, err = w.Write(img.Payload)
+	_, err = w.Write(payload)
 	if err != nil {
 		logger.Error("failed to write image", zap.Error(err))
 	}
@@ -595,6 +587,28 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 			return
 		}
 
+		config, _, err := image.DecodeConfig(bytes.NewReader(payload))
+		if err != nil {
+			logger.Error("failed to decode config.", zap.String("contact id", parsed.PublicKey), zap.String("image type", parsed.ImageName), zap.Error(err))
+			return
+		}
+
+		if parsed.BgSize == 0 {
+			parsed.BgSize = config.Width
+		}
+
+		payload, err = images.ResizeImage(payload, parsed.BgSize, parsed.BgSize)
+		if err != nil {
+			logger.Error("handleContactImages: failed to crop image.", zap.Error(err))
+			return
+		}
+
+		payload, err = images.CropAvatar(payload)
+		if err != nil {
+			logger.Error("handleContactImages: failed to crop image.", zap.Error(err))
+			return
+		}
+
 		if parsed.Ring {
 			colorHash, err := colorhash.GenerateFor(parsed.PublicKey)
 			if err != nil {
@@ -602,14 +616,8 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 				return
 			}
 
-			config, _, err := image.DecodeConfig(bytes.NewReader(payload))
-			if err != nil {
-				logger.Error("failed to decode config.", zap.String("contact id", parsed.PublicKey), zap.String("image type", parsed.ImageName), zap.Error(err))
-				return
-			}
-
 			payload, err = ring.DrawRing(&ring.DrawRingParam{
-				Theme: parsed.Theme, ColorHash: colorHash, ImageBytes: payload, Height: config.Height, Width: config.Width,
+				Theme: parsed.Theme, ColorHash: colorHash, ImageBytes: payload, Height: parsed.BgSize, Width: parsed.BgSize,
 			})
 
 			if err != nil {
@@ -617,10 +625,13 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 				return
 			}
 		}
-		payload, err = images.CropAvatar(payload)
-		if err != nil {
-			logger.Error("handleContactImages: failed to crop image.", zap.Error(err))
-			return
+
+		if parsed.IndicatorSize != 0 {
+			payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize, parsed.IndicatorBorder)
+			if err != nil {
+				logger.Error("handleAccountImagesImpl: failed to draw status-indicator for initials", zap.Error(err))
+				return
+			}
 		}
 
 		if len(payload) == 0 {
