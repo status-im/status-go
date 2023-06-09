@@ -21,6 +21,7 @@ type CreateCommunityTokenPermission struct {
 	CommunityID   types.HexBytes                         `json:"communityId"`
 	Type          protobuf.CommunityTokenPermission_Type `json:"type"`
 	TokenCriteria []*protobuf.TokenCriteria              `json:"tokenCriteria"`
+	IsPrivate     bool                                   `json:"isPrivate"`
 }
 
 func (p *CreateCommunityTokenPermission) Validate() error {
@@ -54,5 +55,6 @@ func (p *CreateCommunityTokenPermission) ToCommunityTokenPermission() protobuf.C
 	return protobuf.CommunityTokenPermission{
 		Type:          p.Type,
 		TokenCriteria: p.TokenCriteria,
+		IsPrivate:     p.IsPrivate,
 	}
 }
