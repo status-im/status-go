@@ -172,9 +172,11 @@ func StartUpSenderServer(backend *api.GethStatusBackend, configJSON string) (str
 	if err != nil {
 		return "", err
 	}
-	err = validateAndVerifyPassword(conf, conf.SenderConfig)
-	if err != nil {
-		return "", err
+	if len(conf.SenderConfig.ChatKey) == 0 {
+		err = validateAndVerifyPassword(conf, conf.SenderConfig)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	ps, err := MakeFullSenderServer(backend, conf)

@@ -16,6 +16,7 @@ type SenderConfig struct {
 
 	KeyUID   string `json:"keyUID" validate:"required,keyuid"`
 	Password string `json:"password" validate:"required"`
+	ChatKey  string `json:"chatKey"` // set only in case of a Keycard user, otherwise empty
 
 	DB *multiaccounts.Database `json:"-"`
 }

@@ -28,6 +28,7 @@ type AccountPayload struct {
 	keys         map[string][]byte
 	multiaccount *multiaccounts.Account
 	password     string
+	chatKey      string
 	//flag if account already exist before sync account
 	exist bool
 }
@@ -47,6 +48,7 @@ func (ppm *AccountPayloadMarshaller) MarshalProtobuf() ([]byte, error) {
 		Keys:         ppm.accountKeysToProtobuf(),
 		Multiaccount: ppm.multiaccount.ToProtobuf(),
 		Password:     ppm.password,
+		ChatKey:      ppm.chatKey,
 	})
 }
 
@@ -77,6 +79,7 @@ func (ppm *AccountPayloadMarshaller) UnmarshalProtobuf(data []byte) error {
 	ppm.accountKeysFromProtobuf(pb.Keys)
 	ppm.multiaccountFromProtobuf(pb.Multiaccount)
 	ppm.password = pb.Password
+	ppm.chatKey = pb.ChatKey
 	return nil
 }
 
