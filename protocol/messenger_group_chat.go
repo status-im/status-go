@@ -747,8 +747,13 @@ func (m *Messenger) leaveGroupChat(ctx context.Context, response *MessengerRespo
 }
 
 func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bool) (*MessengerResponse, error) {
-	err := m.persistence.DismissAllActivityCenterNotificationsFromChatID(chatID)
+	notifications, err := m.persistence.DismissAllActivityCenterNotificationsFromChatID(chatID, m.getCurrentTimeInMillis())
 	if err != nil {
+		return nil, err
+	}
+	err = m.syncActivityCenterNotifications(notifications)
+	if err != nil {
+		m.logger.Error("LeaveGroupChat, Failed to sync activity center notifications", zap.Error(err))
 		return nil, err
 	}
 
@@ -778,7 +783,7 @@ func (m *Messenger) DeclineAllPendingGroupInvitesFromUser(response *MessengerRes
 	}
 
 	// Decline group invites from activity center notifications
-	notifications, err := m.persistence.AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey)
+	notifications, err := m.persistence.AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey, m.getCurrentTimeInMillis())
 	if err != nil {
 		return nil, err
 	}
@@ -789,5 +794,12 @@ func (m *Messenger) DeclineAllPendingGroupInvitesFromUser(response *MessengerRes
 			return nil, err
 		}
 	}
+
+	err = m.syncActivityCenterNotifications(notifications)
+	if err != nil {
+		m.logger.Error("DeclineAllPendingGroupInvitesFromUser, Failed to sync activity center notifications", zap.Error(err))
+		return nil, err
+	}
+
 	return response, nil
 }

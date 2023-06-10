@@ -1,19 +1,19 @@
 package protocol
 
-func (p *sqlitePersistence) UpsertCollapsedCommunityCategory(category CollapsedCommunityCategory) error {
+func (db *sqlitePersistence) UpsertCollapsedCommunityCategory(category CollapsedCommunityCategory) error {
 	var err error
 	if category.Collapsed {
-		_, err = p.db.Exec("INSERT INTO collapsed_community_categories(community_id, category_id) VALUES(?,?)", category.CommunityID, category.CategoryID)
+		_, err = db.db.Exec("INSERT INTO collapsed_community_categories(community_id, category_id) VALUES(?,?)", category.CommunityID, category.CategoryID)
 	} else {
-		_, err = p.db.Exec("DELETE FROM collapsed_community_categories WHERE community_id = ? AND category_id = ?", category.CommunityID, category.CategoryID)
+		_, err = db.db.Exec("DELETE FROM collapsed_community_categories WHERE community_id = ? AND category_id = ?", category.CommunityID, category.CategoryID)
 	}
 	return err
 }
 
-func (p *sqlitePersistence) CollapsedCommunityCategories() ([]CollapsedCommunityCategory, error) {
+func (db *sqlitePersistence) CollapsedCommunityCategories() ([]CollapsedCommunityCategory, error) {
 	var categories []CollapsedCommunityCategory
 
-	rows, err := p.db.Query(`
+	rows, err := db.db.Query(`
   SELECT
     community_id,
     category_id
