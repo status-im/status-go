@@ -66,6 +66,7 @@ func (m *Messenger) ChatsPreview() []*ChatPreview {
 				Alias:                 chat.Alias,
 				Identicon:             chat.Identicon,
 				Muted:                 chat.Muted,
+				MuteTill:              chat.MuteTill,
 				Profile:               chat.Profile,
 				CommunityID:           chat.CommunityID,
 				CategoryID:            chat.CategoryID,
