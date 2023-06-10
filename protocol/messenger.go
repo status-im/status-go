@@ -3141,10 +3141,20 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 		return fmt.Errorf("chat ID '%s' not present", message.LocalChatID)
 	}
 
+	// Use albumId as notificationId to prevent multiple notifications
+	// for same message with multiple images
+	var idToUse string
+
+	if message.GetImage() != nil {
+		idToUse = message.GetImage().GetAlbumId()
+	} else {
+		idToUse = message.ID
+	}
+
 	isNotification, notificationType := showMentionOrReplyActivityCenterNotification(publicKey, message, chat, responseTo)
 	if isNotification {
 		notification := &ActivityCenterNotification{
-			ID:           types.FromHex(message.ID),
+			ID:           types.FromHex(idToUse),
 			Name:         chat.Name,
 			Message:      message,
 			ReplyMessage: responseTo,
