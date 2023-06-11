@@ -47,9 +47,12 @@ const (
 )
 
 type FilterResponse struct {
-	Activities       []Entry   `json:"activities"`
-	ThereMightBeMore bool      `json:"thereMightBeMore"`
-	ErrorCode        ErrorCode `json:"errorCode"`
+	Activities []Entry `json:"activities"`
+	Offset     int     `json:"offset"`
+	// Used to indicate that there might be more entries that were not returned
+	// based on a simple heuristic
+	HasMore   bool      `json:"hasMore"`
+	ErrorCode ErrorCode `json:"errorCode"`
 }
 
 // FilterActivityAsync allows only one filter task to run at a time
@@ -72,6 +75,7 @@ func (s *Service) FilterActivityAsync(ctx context.Context, addresses []common.Ad
 	s.context, s.cancelFn = context.WithCancel(context.Background())
 
 	s.wg.Add(1)
+
 	go func() {
 		defer s.wg.Done()
 		defer func() {
@@ -88,7 +92,8 @@ func (s *Service) FilterActivityAsync(ctx context.Context, addresses []common.Ad
 			res.ErrorCode = ErrorCodeFilterCanceled
 		} else if err == nil {
 			res.Activities = activities
-			res.ThereMightBeMore = len(activities) == limit
+			res.Offset = offset
+			res.HasMore = len(activities) == limit
 			res.ErrorCode = ErrorCodeSuccess
 		}
 
