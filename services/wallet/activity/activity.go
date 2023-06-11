@@ -429,7 +429,7 @@ const (
 //
 // Adding a no-limit option was never considered or required.
 func getActivityEntries(ctx context.Context, db *sql.DB, addresses []eth.Address, chainIDs []common.ChainID, filter Filter, offset int, limit int) ([]Entry, error) {
-	// TODO: filter collectibles after  they are added to multi_transactions table
+	// TODO: filter collectibles after they are added to multi_transactions table
 	if len(filter.Tokens.EnabledTypes) > 0 && !sliceContains(filter.Tokens.EnabledTypes, AssetTT) {
 		// For now we deal only with assets so return empty result
 		return []Entry{}, nil

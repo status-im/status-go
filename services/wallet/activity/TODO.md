@@ -4,9 +4,9 @@
 
 |               | Buy            | Swap           | Bridge        | Send/Receive  |
 | ------------- | -------------- | -------------- | ------------- | ------------- |
-| Activity data | ~~API~~ ~~DB~~ | ~~API~~ ~~DB~~ |  _API_  _DB_  |  _API_  _DB_  |
-| Raw data      | ~~API~~ ~~DB~~ | ~~API~~ ~~DB~~ |  _API_  _DB_  |  _API_  _DB_  |
-| Pending data  | ~~API~~ ~~DB~~ | ~~API~~ ~~DB~~ |  _API_  _DB_  |  _API_  _DB_  |
+| Activity data | ~~API~~ ~~DB~~ | ~~API~~   DB   |  _API_   DB   |  _API_   DB   |
+| Raw data      | ~~API~~ ~~DB~~ | ~~API~~   DB   |  _API_   DB   |  _API_   DB   |
+| Pending data  | ~~API~~ ~~DB~~ | ~~API~~   DB   |  _API_   DB   |  _API_   DB   |
 
 Legend:
 
@@ -37,8 +37,8 @@ Filter requirements
   - [x] `finalized`: similar to `complete`  for `Send`, `Receive`
     - all sub-transactions are `complete` for `Buy`, `Swap`, `Bridge`
   - [x] `failed`: extract from `status` for all sub-transactions
-- [ ] `chainID`: aggregate data for activity entries `Bridge`, `Buy`, `Swap`
-- [ ] `tokenCode` for activity entries `Send`, `Receive`
+- [x] `chainID`: aggregate data for activity entries `Bridge`, `Buy`, `Swap`
+- [x] `tokenCode` for activity entries `Send`, `Receive`
   - For `Bridge` its already there and `Buy`, `Swap` is coming soon
 - [ ] `collectibles`: require adding collectible attributes to activity data (probably `token_address` and `tokenId`)
 
