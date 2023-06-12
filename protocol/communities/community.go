@@ -1497,6 +1497,25 @@ func (o *Community) TokenPermissionsByType(permissionType protobuf.CommunityToke
 	return permissions
 }
 
+func (o *Community) ChannelTokenPermissionsByType(channelID string, permissionType protobuf.CommunityTokenPermission_Type) []*protobuf.CommunityTokenPermission {
+	permissions := make([]*protobuf.CommunityTokenPermission, 0)
+	for _, tokenPermission := range o.TokenPermissions() {
+		if tokenPermission.Type == permissionType && includes(tokenPermission.ChatIds, channelID) {
+			permissions = append(permissions, tokenPermission)
+		}
+	}
+	return permissions
+}
+
+func includes(channelIDs []string, channelID string) bool {
+	for _, id := range channelIDs {
+		if id == channelID {
+			return true
+		}
+	}
+	return false
+}
+
 func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermission) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
