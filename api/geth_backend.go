@@ -749,8 +749,7 @@ func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account,
 	return nil
 }
 
-func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password string, newPassword string) error {
-	dbPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db", keyUID))
+func (b *GethStatusBackend) reEncryptKeyStoreDir(currentPassword string, newPassword string) error {
 	config := b.StatusNode().Config()
 	keyDir := ""
 	if config == nil {
@@ -760,24 +759,73 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 	}
 
 	if keyDir != "" {
-		err := b.accountManager.ReEncryptKeyStoreDir(keyDir, password, newPassword)
+		err := b.accountManager.ReEncryptKeyStoreDir(keyDir, currentPassword, newPassword)
 		if err != nil {
 			return fmt.Errorf("ReEncryptKeyStoreDir error: %v", err)
 		}
 	}
+	return nil
+}
 
-	kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(keyUID)
+func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password string, newPassword string) error {
+	dbPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db", keyUID))
+
+	account, err := b.multiaccountsDB.GetAccount(keyUID)
 	if err != nil {
 		return err
 	}
-	err = appdatabase.ChangeDatabasePassword(dbPath, password, kdfIterations, newPassword)
+
+	file, err := os.CreateTemp("", "*-v4.db")
 	if err != nil {
-		if config != nil {
-			keyDir := config.KeyStoreDir
-			// couldn't change db password so undo keystore changes to mainitain consistency
-			_ = b.accountManager.ReEncryptKeyStoreDir(keyDir, newPassword, password)
+		return err
+	}
+
+	newDBPath := file.Name()
+	defer func() {
+		_ = file.Close()
+		_ = os.Remove(newDBPath)
+		_ = os.Remove(newDBPath + "-wal")
+		_ = os.Remove(newDBPath + "-shm")
+		_ = os.Remove(newDBPath + "-journal")
+	}()
+
+	// Exporting database to a temporary file with a new password
+	err = appdatabase.ExportDB(dbPath, password, account.KDFIterations, newDBPath, newPassword)
+	if err != nil {
+		return err
+	}
+
+	err = b.reEncryptKeyStoreDir(password, newPassword)
+	if err != nil {
+		return err
+	}
+
+	// Replacing the old database with the new one requires closing all connections to the database
+	// This is done by stopping the node and restarting it with the new DB
+	appDBPath, _ := appdatabase.GetDBFilename(b.appDB)
+	changeCurrentAccountPassword := appDBPath == dbPath
+	if changeCurrentAccountPassword {
+		_ = b.Logout()
+	}
+
+	// Replacing the old database files with the new ones, ignoring the wal and shm errors
+	err = os.Rename(newDBPath, dbPath)
+	if err != nil {
+		// Restore the old account
+		_ = b.reEncryptKeyStoreDir(newPassword, password)
+		if changeCurrentAccountPassword {
+			_ = b.startNodeWithAccount(*account, password, nil)
 		}
 		return err
+	}
+
+	_ = os.Remove(dbPath + "-wal")
+	_ = os.Remove(dbPath + "-shm")
+	_ = os.Rename(newDBPath+"-wal", dbPath+"-wal")
+	_ = os.Rename(newDBPath+"-shm", dbPath+"-shm")
+
+	if changeCurrentAccountPassword {
+		return b.startNodeWithAccount(*account, newPassword, nil)
 	}
 	return nil
 }
