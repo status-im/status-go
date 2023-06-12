@@ -110,7 +110,7 @@ type Messenger struct {
 	pushNotificationClient *pushnotificationclient.Client
 	pushNotificationServer *pushnotificationserver.Server
 	communitiesManager     *communities.Manager
-	accountsManager        *account.GethManager
+	accountsManager        account.AccountInterface
 	mentionsManager        *MentionManager
 	logger                 *zap.Logger
 
@@ -248,7 +248,7 @@ func NewMessenger(
 	node types.Node,
 	installationID string,
 	peerStore *mailservers.PeerStore,
-	accountsManager *account.GethManager,
+	accountsManager account.AccountInterface,
 	opts ...Option,
 ) (*Messenger, error) {
 	var messenger *Messenger

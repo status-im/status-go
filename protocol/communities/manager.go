@@ -69,7 +69,7 @@ type Manager struct {
 	subscriptions                  []chan *Subscription
 	ensVerifier                    *ens.Verifier
 	identity                       *ecdsa.PrivateKey
-	accountsManager                *account.GethManager
+	accountsManager                account.AccountInterface
 	tokenManager                   TokenManager
 	logger                         *zap.Logger
 	stdoutLogger                   *zap.Logger
@@ -122,7 +122,7 @@ func (t *HistoryArchiveDownloadTask) Cancel() {
 }
 
 type managerOptions struct {
-	accountsManager      *account.GethManager
+	accountsManager      account.AccountInterface
 	tokenManager         TokenManager
 	walletConfig         *params.WalletConfig
 	openseaClientBuilder openseaClientBuilder
@@ -168,7 +168,7 @@ func (m *DefaultTokenManager) GetBalancesByChain(ctx context.Context, accounts, 
 
 type ManagerOption func(*managerOptions)
 
-func WithAccountManager(accountsManager *account.GethManager) ManagerOption {
+func WithAccountManager(accountsManager account.AccountInterface) ManagerOption {
 	return func(opts *managerOptions) {
 		opts.accountsManager = accountsManager
 	}
@@ -1775,6 +1775,23 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		return nil, err
 	}
 
+	if len(request.RevealedAccounts) < 1 {
+		// we decline request without revealed accounts
+		err = m.markRequestToJoinAsCanceled(signer, community)
+		if err != nil {
+			return nil, err
+		}
+		requestToJoin.State = RequestToJoinStateDeclined
+		return requestToJoin, nil
+	}
+
+	// Save revealed addresses so they can later be added
+	// to the community member list when the request is accepted
+	err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin)
+	if err != nil {
+		return nil, err
+	}
+
 	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 
@@ -1788,7 +1805,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 	// if user does not reveal the address and we have member permission only - we decline this request
 	// if user does not reveal the address and we have admin permission only - user allowed to join as a member
 	// in non private community
-	if (len(becomeMemberPermissions) > 0 || len(becomeAdminPermissions) > 0) && len(request.RevealedAccounts) > 0 {
+	if len(becomeMemberPermissions) > 0 || len(becomeAdminPermissions) > 0 {
 		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(request.RevealedAccounts)
 
 		// admin token permissions required to became an admin must not cancel request to join
@@ -1813,22 +1830,6 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 				return requestToJoin, nil
 			}
 		}
-
-		// Save revealed addresses + signatures so they can later be added
-		// to the community member list when the request is accepted
-		err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin)
-		if err != nil {
-			return nil, err
-		}
-	} else if len(becomeMemberPermissions) > 0 && len(request.RevealedAccounts) == 0 {
-		// we have member token permissions but requester hasn't revealed
-		// any addresses
-		err = m.markRequestToJoinAsCanceled(signer, community)
-		if err != nil {
-			return nil, err
-		}
-		requestToJoin.State = RequestToJoinStateDeclined
-		return requestToJoin, nil
 	}
 
 	if (len(becomeMemberPermissions) == 0 || hasPermission) && acceptAutomatically {
