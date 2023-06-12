@@ -64,7 +64,16 @@ type MultiTransaction struct {
 	Type        MultiTransactionType `json:"type"`
 }
 
-type MultiTransactionResult struct {
+type MultiTransactionCommand struct {
+	FromAddress common.Address       `json:"fromAddress"`
+	ToAddress   common.Address       `json:"toAddress"`
+	FromAsset   string               `json:"fromAsset"`
+	ToAsset     string               `json:"toAsset"`
+	FromAmount  *hexutil.Big         `json:"fromAmount"`
+	Type        MultiTransactionType `json:"type"`
+}
+
+type MultiTransactionCommandResult struct {
 	ID     int64                   `json:"id"`
 	Hashes map[uint64][]types.Hash `json:"hashes"`
 }
@@ -292,7 +301,16 @@ func (tm *TransactionManager) InsertMultiTransaction(multiTransaction *MultiTran
 	return insertMultiTransaction(tm.db, multiTransaction)
 }
 
-func (tm *TransactionManager) CreateBridgeMultiTransaction(ctx context.Context, multiTransaction *MultiTransaction, data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge, password string) (*MultiTransactionResult, error) {
+func (tm *TransactionManager) CreateMultiTransactionFromCommand(ctx context.Context, command *MultiTransactionCommand, data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge, password string) (*MultiTransactionCommandResult, error) {
+	multiTransaction := &MultiTransaction{
+		FromAddress: command.FromAddress,
+		ToAddress:   command.ToAddress,
+		FromAsset:   command.FromAsset,
+		ToAsset:     command.ToAsset,
+		FromAmount:  command.FromAmount,
+		Type:        command.Type,
+	}
+
 	selectedAccount, err := tm.getVerifiedWalletAccount(multiTransaction.FromAddress.Hex(), password)
 	if err != nil {
 		return nil, err
@@ -328,7 +346,7 @@ func (tm *TransactionManager) CreateBridgeMultiTransaction(ctx context.Context, 
 		hashes[tx.ChainID] = append(hashes[tx.ChainID], hash)
 	}
 
-	return &MultiTransactionResult{
+	return &MultiTransactionCommandResult{
 		ID:     int64(multiTransactionID),
 		Hashes: hashes,
 	}, nil
