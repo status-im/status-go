@@ -219,11 +219,6 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		return waku.node.FilterLightnode().IsSubscriptionAlive(context.Background(), sub)
 	}
 
-	// Disabling light client mode if using status.prod or undefined
-	if fleet == "status.prod" || fleet == "" {
-		cfg.LightClient = false
-	}
-
 	waku.settings = settings{
 		MaxMsgSize:        cfg.MaxMessageSize,
 		LightClient:       cfg.LightClient,
