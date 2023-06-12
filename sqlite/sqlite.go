@@ -13,6 +13,7 @@ import (
 	sqlcipher "github.com/mutecomm/go-sqlcipher/v4" // We require go sqlcipher that overrides default implementation
 
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/signal"
 )
 
 const (
@@ -51,6 +52,9 @@ func DecryptDB(oldPath string, newPath string, key string, kdfIterationsNumber i
 }
 
 func encryptDB(db *sql.DB, encryptedPath string, key string, kdfIterationsNumber int) error {
+	signal.SendReEncryptionStarted()
+	defer signal.SendReEncryptionFinished()
+
 	_, err := db.Exec(`ATTACH DATABASE '` + encryptedPath + `' AS encrypted KEY '` + key + `'`)
 	if err != nil {
 		return err
@@ -240,6 +244,9 @@ func OpenUnecryptedDB(path string) (*sql.DB, error) {
 }
 
 func ChangeEncryptionKey(path string, key string, kdfIterationsNumber int, newKey string) error {
+	signal.SendReEncryptionStarted()
+	defer signal.SendReEncryptionFinished()
+
 	if kdfIterationsNumber <= 0 {
 		kdfIterationsNumber = sqlite.ReducedKDFIterationsNumber
 	}
