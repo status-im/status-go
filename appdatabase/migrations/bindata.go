@@ -1493,7 +1493,7 @@ func _1686048341_transfers_receipt_json_blob_outUpSqlDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1686048341_transfers_receipt_json_blob_out.up.sql.down.sql", size: 104, mode: os.FileMode(0644), modTime: time.Unix(1686309958, 0)}
+	info := bindataFileInfo{name: "1686048341_transfers_receipt_json_blob_out.up.sql.down.sql", size: 104, mode: os.FileMode(0644), modTime: time.Unix(1686577600, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9f, 0x6c, 0xd9, 0x76, 0x83, 0x64, 0xf0, 0xf2, 0x74, 0x97, 0xca, 0xd7, 0xaa, 0x4, 0x74, 0x7c, 0x34, 0x56, 0x88, 0x10, 0xa9, 0x4d, 0x1d, 0x8e, 0x85, 0xc3, 0x66, 0x1, 0x2b, 0x30, 0x90, 0xf4}}
 	return a, nil
 }
@@ -1513,7 +1513,7 @@ func _1686048341_transfers_receipt_json_blob_outUpSqlUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1686048341_transfers_receipt_json_blob_out.up.sql.up.sql", size: 1500, mode: os.FileMode(0644), modTime: time.Unix(1686309958, 0)}
+	info := bindataFileInfo{name: "1686048341_transfers_receipt_json_blob_out.up.sql.up.sql", size: 1500, mode: os.FileMode(0644), modTime: time.Unix(1686577600, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x49, 0xcd, 0xe3, 0xa6, 0x8c, 0x53, 0x51, 0xe6, 0x3c, 0x64, 0xcb, 0x3, 0x3, 0xb, 0x4d, 0x52, 0xa5, 0x1c, 0xcc, 0xe1, 0x23, 0x94, 0x14, 0x79, 0xd7, 0x56, 0x58, 0xef, 0xcc, 0x1a, 0x6, 0xa4}}
 	return a, nil
 }
