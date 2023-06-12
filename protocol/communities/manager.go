@@ -1550,12 +1550,7 @@ func (m *Manager) CheckPermissionToJoin(id []byte, addresses []gethcommon.Addres
 	}
 
 	accountsAndChainIDs := combineAddressesAndChainIDs(addresses, allChainIDs)
-	hasPermission, err := m.checkPermissionToJoin(permissionsToJoin, accountsAndChainIDs, false)
-	if err != nil {
-		return nil, err
-	}
-
-	return hasPermission, nil
+	return m.checkPermissionToJoin(permissionsToJoin, accountsAndChainIDs, false)
 }
 
 func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommunity) (*Community, error) {
@@ -1882,13 +1877,15 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 	return requestToJoin, nil
 }
 
-type CheckPermissionToJoinResponse struct {
-	Satisfied         bool                                    `json:"satisfied"`
-	Permissions       map[string]*CheckPermissionToJoinResult `json:"permissions"`
-	ValidCombinations []*AccountChainIDsCombination           `json:"validCombinations"`
+type CheckPermissionsResponse struct {
+	Satisfied         bool                                      `json:"satisfied"`
+	Permissions       map[string]*PermissionTokenCriteriaResult `json:"permissions"`
+	ValidCombinations []*AccountChainIDsCombination             `json:"validCombinations"`
 }
 
-type CheckPermissionToJoinResult struct {
+type CheckPermissionToJoinResponse = CheckPermissionsResponse
+
+type PermissionTokenCriteriaResult struct {
 	Criteria []bool `json:"criteria"`
 }
 
@@ -1936,14 +1933,18 @@ func calculateChainIDsSet(accountsAndChainIDs []*AccountChainIDsCombination, req
 	return revealedAccountsChainIDs
 }
 
-// checkPermissionToJoin will retrieve balances and check whether the user has
+func (m *Manager) checkPermissionToJoin(permissions []*protobuf.CommunityTokenPermission, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckPermissionToJoinResponse, error) {
+	return m.checkPermissions(permissions, accountsAndChainIDs, shortcircuit)
+}
+
+// checkPermissions will retrieve balances and check whether the user has
 // permission to join the community, if shortcircuit is true, it will stop as soon
 // as we know the answer
-func (m *Manager) checkPermissionToJoin(permissions []*protobuf.CommunityTokenPermission, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckPermissionToJoinResponse, error) {
+func (m *Manager) checkPermissions(permissions []*protobuf.CommunityTokenPermission, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckPermissionsResponse, error) {
 
-	response := &CheckPermissionToJoinResponse{
+	response := &CheckPermissionsResponse{
 		Satisfied:         false,
-		Permissions:       make(map[string]*CheckPermissionToJoinResult),
+		Permissions:       make(map[string]*PermissionTokenCriteriaResult),
 		ValidCombinations: make([]*AccountChainIDsCombination, 0),
 	}
 
@@ -2004,7 +2005,7 @@ func (m *Manager) checkPermissionToJoin(permissions []*protobuf.CommunityTokenPe
 	for _, tokenPermission := range permissions {
 
 		permissionRequirementsMet := true
-		response.Permissions[tokenPermission.Id] = &CheckPermissionToJoinResult{}
+		response.Permissions[tokenPermission.Id] = &PermissionTokenCriteriaResult{}
 
 		// There can be multiple token requirements per permission.
 		// If only one is not met, the entire permission is marked
@@ -2250,6 +2251,87 @@ func (m *Manager) getOwnedENS(addresses []gethcommon.Address) ([]string, error) 
 		}
 	}
 	return ownedENS, nil
+}
+
+func (m *Manager) CheckChannelPermissions(communityID types.HexBytes, chatID string, addresses []gethcommon.Address) (*CheckChannelPermissionsResponse, error) {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	if chatID == "" {
+		return nil, errors.New(fmt.Sprintf("couldn't check channel permissions, invalid chat id: %s", chatID))
+	}
+
+	viewOnlyPermissions := community.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
+	viewAndPostPermissions := community.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
+
+	allChainIDs, err := m.tokenManager.GetAllChainIDs()
+	if err != nil {
+		return nil, err
+	}
+	accountsAndChainIDs := combineAddressesAndChainIDs(addresses, allChainIDs)
+
+	return m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountsAndChainIDs, false)
+}
+
+type CheckChannelPermissionsResponse struct {
+	ViewOnlyPermissions    *CheckChannelViewOnlyPermissionsResult    `json:"viewOnlyPermissions"`
+	ViewAndPostPermissions *CheckChannelViewAndPostPermissionsResult `json:"viewAndPostPermissions"`
+}
+
+type CheckChannelViewOnlyPermissionsResult struct {
+	Satisfied   bool                                      `json:"satisfied"`
+	Permissions map[string]*PermissionTokenCriteriaResult `json:"permissions"`
+}
+
+type CheckChannelViewAndPostPermissionsResult struct {
+	Satisfied   bool                                      `json:"satisfied"`
+	Permissions map[string]*PermissionTokenCriteriaResult `json:"permissions"`
+}
+
+func (m *Manager) checkChannelPermissions(viewOnlyPermissions []*protobuf.CommunityTokenPermission, viewAndPostPermissions []*protobuf.CommunityTokenPermission, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckChannelPermissionsResponse, error) {
+
+	response := &CheckChannelPermissionsResponse{
+		ViewOnlyPermissions: &CheckChannelViewOnlyPermissionsResult{
+			Satisfied:   false,
+			Permissions: make(map[string]*PermissionTokenCriteriaResult),
+		},
+		ViewAndPostPermissions: &CheckChannelViewAndPostPermissionsResult{
+			Satisfied:   false,
+			Permissions: make(map[string]*PermissionTokenCriteriaResult),
+		},
+	}
+
+	viewOnlyPermissionsResponse, err := m.checkPermissions(viewOnlyPermissions, accountsAndChainIDs, shortcircuit)
+	if err != nil {
+		return nil, err
+	}
+
+	viewAndPostPermissionsResponse, err := m.checkPermissions(viewAndPostPermissions, accountsAndChainIDs, shortcircuit)
+	if err != nil {
+		return nil, err
+	}
+
+	hasViewOnlyPermissions := len(viewOnlyPermissions) > 0
+	hasViewAndPostPermissions := len(viewAndPostPermissions) > 0
+
+	if (hasViewAndPostPermissions && !hasViewOnlyPermissions) || (hasViewOnlyPermissions && hasViewAndPostPermissions && viewAndPostPermissionsResponse.Satisfied) {
+		response.ViewOnlyPermissions.Satisfied = viewAndPostPermissionsResponse.Satisfied
+	} else {
+		response.ViewOnlyPermissions.Satisfied = viewOnlyPermissionsResponse.Satisfied
+	}
+	response.ViewOnlyPermissions.Permissions = viewOnlyPermissionsResponse.Permissions
+
+	if (hasViewOnlyPermissions && !viewOnlyPermissionsResponse.Satisfied) ||
+		(hasViewOnlyPermissions && !hasViewAndPostPermissions) {
+		response.ViewAndPostPermissions.Satisfied = false
+	} else {
+		response.ViewAndPostPermissions.Satisfied = viewAndPostPermissionsResponse.Satisfied
+	}
+	response.ViewAndPostPermissions.Permissions = viewAndPostPermissionsResponse.Permissions
+
+	return response, nil
 }
 
 func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoinResponse) (*RequestToJoin, error) {

@@ -3856,6 +3856,25 @@ func (m *Messenger) CheckPermissionsToJoinCommunity(request *requests.CheckPermi
 	return m.communitiesManager.CheckPermissionToJoin(request.CommunityID, addresses)
 }
 
+func (m *Messenger) CheckCommunityChannelPermissions(request *requests.CheckCommunityChannelPermissions) (*communities.CheckChannelPermissionsResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	accounts, err := m.settings.GetAccounts()
+	if err != nil {
+		return nil, err
+	}
+
+	var addresses []gethcommon.Address
+
+	for _, a := range accounts {
+		addresses = append(addresses, gethcommon.HexToAddress(a.Address.Hex()))
+	}
+
+	return m.communitiesManager.CheckChannelPermissions(request.CommunityID, request.ChatID, addresses)
+}
+
 func chunkSlice[T comparable](slice []T, chunkSize int) [][]T {
 	var chunks [][]T
 	for i := 0; i < len(slice); i += chunkSize {
