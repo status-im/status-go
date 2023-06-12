@@ -10,11 +10,13 @@ func (s *CommunitySuite) TestCreateCategory() {
 
 	org := s.buildCommunity(&s.identity.PublicKey)
 	org.config.PrivateKey = nil
+	org.config.ID = nil
 
 	_, err := org.CreateCategory(newCategoryID, newCategoryName, []string{})
 	s.Require().Equal(ErrNotAdmin, err)
 
 	org.config.PrivateKey = s.identity
+	org.config.ID = &s.identity.PublicKey
 
 	changes, err := org.CreateCategory(newCategoryID, newCategoryName, []string{})
 
@@ -85,11 +87,13 @@ func (s *CommunitySuite) TestEditCategory() {
 	_, err := org.CreateCategory(newCategoryID, newCategoryName, []string{testChatID1})
 	s.Require().NoError(err)
 	org.config.PrivateKey = nil
+	org.config.ID = nil
 
 	_, err = org.EditCategory(newCategoryID, editedCategoryName, []string{testChatID1})
 	s.Require().Equal(ErrNotAdmin, err)
 
 	org.config.PrivateKey = s.identity
+	org.config.ID = &s.identity.PublicKey
 
 	_, err = org.EditCategory("some-random-category", editedCategoryName, []string{testChatID1})
 	s.Require().Equal(ErrCategoryNotFound, err)
@@ -212,10 +216,12 @@ func (s *CommunitySuite) TestDeleteCategory() {
 	s.Require().Equal(int32(1), description.Chats[testChatID1].Position)
 
 	org.config.PrivateKey = nil
+	org.config.ID = nil
 	_, err = org.DeleteCategory(testCategoryID1)
 	s.Require().Equal(ErrNotAdmin, err)
 
 	org.config.PrivateKey = s.identity
+	org.config.ID = &s.identity.PublicKey
 	_, err = org.DeleteCategory("some-category-id")
 	s.Require().Equal(ErrCategoryNotFound, err)
 
@@ -264,14 +270,16 @@ func (s *CommunitySuite) TestDeleteChatOrder() {
 	_, err = org.CreateCategory(newCategoryID, newCategoryName, []string{testChatID1, testChatID2, testChatID3})
 	s.Require().NoError(err)
 
-	description, err := org.DeleteChat(testChatID2)
+	changes, err := org.DeleteChat(testChatID2)
 	s.Require().NoError(err)
-	s.Require().Equal(int32(0), description.Chats[testChatID1].Position)
-	s.Require().Equal(int32(1), description.Chats[testChatID3].Position)
+	s.Require().Equal(int32(0), org.Chats()[testChatID1].Position)
+	s.Require().Equal(int32(1), org.Chats()[testChatID3].Position)
+	s.Require().Len(changes.ChatsRemoved, 1)
 
-	description, err = org.DeleteChat(testChatID1)
+	changes, err = org.DeleteChat(testChatID1)
 	s.Require().NoError(err)
-	s.Require().Equal(int32(0), description.Chats[testChatID3].Position)
+	s.Require().Equal(int32(0), org.Chats()[testChatID3].Position)
+	s.Require().Len(changes.ChatsRemoved, 1)
 
 	_, err = org.DeleteChat(testChatID3)
 	s.Require().NoError(err)

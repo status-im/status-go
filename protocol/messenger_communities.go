@@ -102,6 +102,31 @@ func (m *Messenger) publishOrgInvitation(org *communities.Community, invitation 
 	return err
 }
 
+func (m *Messenger) publishCommunityAdminEvent(adminEvent *protobuf.CommunityAdminEvent) error {
+	adminPubkey := common.PubkeyToHex(&m.identity.PublicKey)
+	m.logger.Debug("publishing community admin event", zap.String("admin-id", adminPubkey), zap.Any("event", adminEvent))
+	_, err := crypto.DecompressPubkey(adminEvent.CommunityId)
+	if err != nil {
+		return err
+	}
+
+	payload, err := proto.Marshal(adminEvent)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := common.RawMessage{
+		Payload: payload,
+		Sender:  m.identity,
+		// we don't want to wrap in an encryption layer message
+		SkipEncryption: true,
+		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_ADMIN_MESSAGE,
+	}
+
+	_, err = m.sender.SendPublic(context.Background(), types.EncodeHex(adminEvent.CommunityId), rawMessage)
+	return err
+}
+
 func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communities.Subscription) {
 
 	go func() {
@@ -141,7 +166,7 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 						m.logger.Debug("failed to retrieve community by id string", zap.Error(err))
 					}
 
-					if c.IsAdmin() {
+					if c.IsOwner() {
 						err := m.dispatchMagnetlinkMessage(sub.HistoryArchivesSeedingSignal.CommunityID)
 						if err != nil {
 							m.logger.Debug("failed to dispatch magnetlink message", zap.Error(err))
@@ -197,6 +222,13 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					err := m.publishOrg(sub.Community)
 					if err != nil {
 						m.logger.Warn("failed to publish org", zap.Error(err))
+					}
+				}
+
+				if sub.CommunityAdminEvent != nil {
+					err := m.publishCommunityAdminEvent(sub.CommunityAdminEvent)
+					if err != nil {
+						m.logger.Warn("failed to publish community admin event", zap.Error(err))
 					}
 				}
 
@@ -392,7 +424,7 @@ func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Cha
 		return nil, err
 	}
 
-	if community.IsAdmin() {
+	if community.IsOwner() {
 		// Init the community filter so we can receive messages on the community
 		communityFilters, err := m.transport.InitCommunityFilters([]*ecdsa.PrivateKey{community.PrivateKey()})
 		if err != nil {
@@ -677,9 +709,19 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		SkipEncryption: true,
 		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
 	}
+
 	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
 	if err != nil {
 		return nil, err
+	}
+
+	// send request to join also to community admins
+	communityAdmins := community.GetMemberAdmins()
+	for _, communityAdmin := range communityAdmins {
+		_, err := m.sender.SendPrivate(context.Background(), communityAdmin, &rawMessage)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	response := &MessengerResponse{RequestsToJoinCommunity: []*communities.RequestToJoin{requestToJoin}}
@@ -1634,6 +1676,10 @@ func (m *Messenger) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*co
 	return m.communitiesManager.CanceledRequestsToJoinForCommunity(id)
 }
 
+func (m *Messenger) AcceptedRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+	return m.communitiesManager.AcceptedRequestsToJoinForCommunity(id)
+}
+
 func (m *Messenger) RemoveUserFromCommunity(id types.HexBytes, pkString string) (*MessengerResponse, error) {
 	publicKey, err := common.HexToPubkey(pkString)
 	if err != nil {
@@ -1995,6 +2041,10 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 		return err
 	}
 
+	return m.handleCommunityResponse(state, communityResponse)
+}
+
+func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communityResponse *communities.CommunityResponse) error {
 	community := communityResponse.Community
 
 	state.Response.AddCommunity(community)
@@ -2066,6 +2116,16 @@ func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, sign
 	}
 
 	return nil
+}
+
+func (m *Messenger) handleCommunityAdminEvent(state *ReceivedMessageState, signer *ecdsa.PublicKey, description protobuf.CommunityAdminEvent, rawPayload []byte) error {
+
+	communityResponse, err := m.communitiesManager.HandleCommunityAdminEvent(signer, &description, rawPayload)
+	if err != nil {
+		return err
+	}
+
+	return m.handleCommunityResponse(state, communityResponse)
 }
 
 func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, syncCommunity protobuf.SyncCommunity) error {

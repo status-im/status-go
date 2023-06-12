@@ -1556,7 +1556,7 @@ func (m *Messenger) Init() error {
 			continue
 		}
 
-		if !org.IsAdmin() && !communitySettings.HistoryArchiveSupportEnabled {
+		if !org.IsOwner() && !communitySettings.HistoryArchiveSupportEnabled {
 			communitySettings.HistoryArchiveSupportEnabled = true
 			err = m.communitiesManager.UpdateCommunitySettings(*communitySettings)
 			if err != nil {
@@ -2231,7 +2231,7 @@ func (m *Messenger) updateChatFirstMessageTimestamp(chat *Chat, timestamp uint32
 		return err
 	}
 
-	if community.IsAdmin() && chat.UpdateFirstMessageTimestamp(timestamp) {
+	if community.IsOwner() && chat.UpdateFirstMessageTimestamp(timestamp) {
 		community, changes, err := m.communitiesManager.EditChatFirstMessageTimestamp(community.ID(), chat.ID, chat.FirstMessageTimestamp)
 		if err != nil {
 			return err
@@ -4205,6 +4205,17 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.HandleHistoryArchiveMagnetlinkMessage(messageState, publicKey, magnetlinkMessage.MagnetUri, magnetlinkMessage.Clock)
 						if err != nil {
 							logger.Warn("failed to handle CommunityMessageArchiveMagnetlink", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.CommunityAdminEvent:
+						logger.Debug("Handling CommunityAdminEvent")
+						message := msg.ParsedMessage.Interface().(protobuf.CommunityAdminEvent)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
+						err = m.handleCommunityAdminEvent(messageState, publicKey, message, msg.DecryptedPayload)
+						if err != nil {
+							logger.Warn("failed to handle CommunityAdminEvent", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}

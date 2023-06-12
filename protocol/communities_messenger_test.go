@@ -607,7 +607,7 @@ func (s *MessengerCommunitiesSuite) TestInviteUsersToCommunity() {
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
 	s.Require().True(response.Communities()[0].HasMember(&s.bob.identity.PublicKey))
-	s.Require().True(response.Communities()[0].IsMemberAdmin(&s.bob.identity.PublicKey))
+	s.Require().True(response.Communities()[0].IsMemberOwner(&s.bob.identity.PublicKey))
 
 	community := response.Communities()[0]
 
@@ -783,7 +783,7 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.CommunitiesSettings(), 1)
 	s.Require().True(response.Communities()[0].Joined())
-	s.Require().True(response.Communities()[0].IsAdmin())
+	s.Require().True(response.Communities()[0].IsOwner())
 
 	community := response.Communities()[0]
 	communitySettings := response.CommunitiesSettings()[0]
@@ -828,7 +828,7 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 		if len(response.Communities()) == 0 {
 			return errors.New("community not received")
 		}
-		if !response.Communities()[0].IsAdmin() {
+		if !response.Communities()[0].IsOwner() {
 			return errors.New("isn't admin despite import")
 		}
 		return nil
@@ -854,9 +854,9 @@ func (s *MessengerCommunitiesSuite) TestRolesAfterImportCommunity() {
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.CommunitiesSettings(), 1)
 	s.Require().True(response.Communities()[0].Joined())
-	s.Require().True(response.Communities()[0].IsAdmin())
-	s.Require().True(response.Communities()[0].IsMemberAdmin(&s.bob.identity.PublicKey))
-	s.Require().False(response.Communities()[0].IsMemberAdmin(&s.alice.identity.PublicKey))
+	s.Require().True(response.Communities()[0].IsOwner())
+	s.Require().True(response.Communities()[0].IsMemberOwner(&s.bob.identity.PublicKey))
+	s.Require().False(response.Communities()[0].IsMemberOwner(&s.alice.identity.PublicKey))
 
 	community := response.Communities()[0]
 	communitySettings := response.CommunitiesSettings()[0]
@@ -879,7 +879,7 @@ func (s *MessengerCommunitiesSuite) TestRolesAfterImportCommunity() {
 
 	response, err = s.alice.ImportCommunity(ctx, privateKey)
 	s.Require().NoError(err)
-	s.Require().True(response.Communities()[0].IsMemberAdmin(&s.alice.identity.PublicKey))
+	s.Require().True(response.Communities()[0].IsMemberOwner(&s.alice.identity.PublicKey))
 }
 
 func (s *MessengerCommunitiesSuite) TestRequestAccess() {
@@ -2785,7 +2785,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	s.Equal(newCommunity.Muted(), tnc.Muted())
 	s.Equal(newCommunity.Joined(), tnc.Joined())
 	s.Equal(newCommunity.Spectated(), tnc.Spectated())
-	s.Equal(newCommunity.IsAdmin(), tnc.IsAdmin())
+	s.Equal(newCommunity.IsOwner(), tnc.IsOwner())
 	s.Equal(newCommunity.InvitationOnly(), tnc.InvitationOnly())
 }
 

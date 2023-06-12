@@ -26,7 +26,7 @@ func (r *RemoveRoleFromMember) Validate() error {
 		return ErrRemoveRoleFromMemberInvalidUser
 	}
 
-	if r.Role == protobuf.CommunityMember_UNKNOWN_ROLE {
+	if r.Role == protobuf.CommunityMember_ROLE_NONE {
 		return ErrRemoveRoleFromMemberInvalidRole
 	}
 

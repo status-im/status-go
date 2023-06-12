@@ -191,7 +191,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 	}
 	communityItem := struct {
 		ID                          types.HexBytes                                `json:"id"`
-		Admin                       bool                                          `json:"admin"`
+		MemberRole                  protobuf.CommunityMember_Roles                `json:"memberRole"`
 		Verified                    bool                                          `json:"verified"`
 		Joined                      bool                                          `json:"joined"`
 		Spectated                   bool                                          `json:"spectated"`
@@ -207,8 +207,8 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Permissions                 *protobuf.CommunityPermissions                `json:"permissions"`
 		Members                     map[string]*protobuf.CommunityMember          `json:"members"`
 		CanRequestAccess            bool                                          `json:"canRequestAccess"`
-		CanManageUsers              bool                                          `json:"canManageUsers"`
-		CanDeleteMessageForEveryone bool                                          `json:"canDeleteMessageForEveryone"`
+		CanManageUsers              bool                                          `json:"canManageUsers"`              //TODO: we can remove this
+		CanDeleteMessageForEveryone bool                                          `json:"canDeleteMessageForEveryone"` //TODO: we can remove this
 		CanJoin                     bool                                          `json:"canJoin"`
 		Color                       string                                        `json:"color"`
 		RequestedToJoinAt           uint64                                        `json:"requestedToJoinAt,omitempty"`
@@ -222,7 +222,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		ActiveMembersCount          uint64                                        `json:"activeMembersCount"`
 	}{
 		ID:                          o.ID(),
-		Admin:                       o.IsAdmin(),
+		MemberRole:                  o.MemberRole(o.MemberIdentity()),
 		Verified:                    o.config.Verified,
 		Chats:                       make(map[string]CommunityChat),
 		Categories:                  make(map[string]CommunityCategory),
@@ -300,6 +300,18 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 	return json.Marshal(communityItem)
 }
 
+func (o *Community) Identity() *protobuf.ChatIdentity {
+	return o.config.CommunityDescription.Identity
+}
+
+func (o *Community) Permissions() *protobuf.CommunityPermissions {
+	return o.config.CommunityDescription.Permissions
+}
+
+func (o *Community) AdminSettings() *protobuf.CommunityAdminSettings {
+	return o.config.CommunityDescription.AdminSettings
+}
+
 func (o *Community) Name() string {
 	if o != nil &&
 		o.config != nil &&
@@ -352,6 +364,10 @@ func (o *Community) Tags() []CommunityTag {
 		return result
 	}
 	return nil
+}
+
+func (o *Community) TagsRaw() []string {
+	return o.config.CommunityDescription.Tags
 }
 
 func (o *Community) OutroMessage() string {
@@ -480,6 +496,16 @@ type CommunityChanges struct {
 	ShouldMemberLeave bool `json:"memberRemoved"`
 }
 
+// `CommunityAdminEventChanges contain additional changes that don't live on
+// a `Community` but still have to be propagated to other admin and control nodes
+type CommunityAdminEventChanges struct {
+	*CommunityChanges
+	// `RejectedRequestsToJoin` is a map of signer keys to requests to join
+	RejectedRequestsToJoin map[string]*protobuf.CommunityRequestToJoin `json:"rejectedRequestsToJoin"`
+	// `AcceptedRequestsToJoin` is a map of signer keys to requests to join
+	AcceptedRequestsToJoin map[string]*protobuf.CommunityRequestToJoin `json:"acceptedRequestsToJoin"`
+}
+
 func (c *CommunityChanges) HasNewMember(identity string) bool {
 	if len(c.MembersAdded) == 0 {
 		return false
@@ -506,37 +532,14 @@ func (o *Community) CreateChat(chatID string, chat *protobuf.CommunityChat) (*Co
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsAdmin() {
+	if !o.IsOwnerOrAdmin() {
 		return nil, ErrNotAdmin
 	}
 
-	err := validateCommunityChat(o.config.CommunityDescription, chat)
+	err := o.createChat(chatID, chat)
 	if err != nil {
 		return nil, err
 	}
-
-	if o.config.CommunityDescription.Chats == nil {
-		o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
-	}
-	if _, ok := o.config.CommunityDescription.Chats[chatID]; ok {
-		return nil, ErrChatAlreadyExists
-	}
-
-	for _, c := range o.config.CommunityDescription.Chats {
-		if chat.Identity.DisplayName == c.Identity.DisplayName {
-			return nil, ErrInvalidCommunityDescriptionDuplicatedName
-		}
-	}
-
-	// Sets the chat position to be the last within its category
-	chat.Position = 0
-	for _, c := range o.config.CommunityDescription.Chats {
-		if c.CategoryId == chat.CategoryId {
-			chat.Position++
-		}
-	}
-
-	o.config.CommunityDescription.Chats[chatID] = chat
 
 	o.increaseClock()
 
@@ -549,23 +552,14 @@ func (o *Community) EditChat(chatID string, chat *protobuf.CommunityChat) (*Comm
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsAdmin() {
+	if !o.IsOwnerOrAdmin() {
 		return nil, ErrNotAdmin
 	}
 
-	err := validateCommunityChat(o.config.CommunityDescription, chat)
+	err := o.editChat(chatID, chat)
 	if err != nil {
 		return nil, err
 	}
-
-	if o.config.CommunityDescription.Chats == nil {
-		o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
-	}
-	if _, exists := o.config.CommunityDescription.Chats[chatID]; !exists {
-		return nil, ErrChatNotFound
-	}
-
-	o.config.CommunityDescription.Chats[chatID] = chat
 
 	o.increaseClock()
 
@@ -577,31 +571,19 @@ func (o *Community) EditChat(chatID string, chat *protobuf.CommunityChat) (*Comm
 	return changes, nil
 }
 
-func (o *Community) DeleteChat(chatID string) (*protobuf.CommunityDescription, error) {
+func (o *Community) DeleteChat(chatID string) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
+	if !o.IsOwnerOrAdmin() {
 		return nil, ErrNotAdmin
 	}
 
-	if o.config.CommunityDescription.Chats == nil {
-		o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
-	}
-
-	changes := o.emptyCommunityChanges()
-
-	if chat, exists := o.config.CommunityDescription.Chats[chatID]; exists {
-		tmpCatID := chat.CategoryId
-		chat.CategoryId = ""
-		o.SortCategoryChats(changes, tmpCatID)
-	}
-
-	delete(o.config.CommunityDescription.Chats, chatID)
+	changes := o.deleteChat(chatID)
 
 	o.increaseClock()
 
-	return o.config.CommunityDescription, nil
+	return changes, nil
 }
 
 func (o *Community) InviteUserToOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityInvitation, error) {
@@ -612,7 +594,7 @@ func (o *Community) InviteUserToOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityInv
 		return nil, ErrNotAdmin
 	}
 
-	err := o.AddMember(pk, []protobuf.CommunityMember_Roles{})
+	_, err := o.AddMember(pk, []protobuf.CommunityMember_Roles{})
 	if err != nil {
 		return nil, err
 	}
@@ -716,6 +698,10 @@ func (o *Community) hasMemberPermission(member *protobuf.CommunityMember, permis
 }
 
 func (o *Community) hasPermission(pk *ecdsa.PublicKey, roles map[protobuf.CommunityMember_Roles]bool) bool {
+	if pk == nil || o.config.ID == nil {
+		return false
+	}
+
 	if common.IsPubKeyEqual(pk, o.config.ID) {
 		return true
 	}
@@ -788,25 +774,29 @@ func (o *Community) removeMemberFromOrg(pk *ecdsa.PublicKey) {
 	for _, chat := range o.config.CommunityDescription.Chats {
 		delete(chat.Members, key)
 	}
-
-	o.increaseClock()
 }
 
 func (o *Community) RemoveOurselvesFromOrg(pk *ecdsa.PublicKey) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 	o.removeMemberFromOrg(pk)
+	o.increaseClock()
 }
 
 func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityDescription, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
+	if !o.IsOwnerOrAdmin() {
 		return nil, ErrNotAdmin
 	}
 
+	if o.IsMemberOwner(pk) {
+		return nil, ErrNotOwner
+	}
+
 	o.removeMemberFromOrg(pk)
+	o.increaseClock()
 	return o.config.CommunityDescription, nil
 }
 
@@ -826,18 +816,11 @@ func (o *Community) UnbanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Commu
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
+	if !o.IsOwnerOrAdmin() {
 		return nil, ErrNotAdmin
 	}
-	key := common.PubkeyToHex(pk)
 
-	for i, v := range o.config.CommunityDescription.BanList {
-		if v == key {
-			o.config.CommunityDescription.BanList =
-				append(o.config.CommunityDescription.BanList[:i], o.config.CommunityDescription.BanList[i+1:]...)
-			break
-		}
-	}
+	o.unbanUserFromCommunity(pk)
 
 	o.increaseClock()
 
@@ -848,29 +831,15 @@ func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Communi
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
+	if !o.IsOwnerOrAdmin() {
 		return nil, ErrNotAdmin
 	}
-	key := common.PubkeyToHex(pk)
-	if o.hasMember(pk) {
-		// Remove from org
-		delete(o.config.CommunityDescription.Members, key)
 
-		// Remove from chats
-		for _, chat := range o.config.CommunityDescription.Chats {
-			delete(chat.Members, key)
-		}
+	if o.IsMemberOwner(pk) {
+		return nil, ErrNotOwner
 	}
 
-	found := false
-	for _, u := range o.config.CommunityDescription.BanList {
-		if u == key {
-			found = true
-		}
-	}
-	if !found {
-		o.config.CommunityDescription.BanList = append(o.config.CommunityDescription.BanList, key)
-	}
+	o.banUserFromCommunity(pk)
 
 	o.increaseClock()
 
@@ -994,13 +963,9 @@ func (o *Community) MemberIdentity() *ecdsa.PublicKey {
 }
 
 // UpdateCommunityDescription will update the community to the new community description and return a list of changes
-func (o *Community) UpdateCommunityDescription(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawMessage []byte) (*CommunityChanges, error) {
+func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDescription, rawMessage []byte) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
-
-	if !common.IsPubKeyEqual(o.config.ID, signer) {
-		return nil, ErrNotAuthorized
-	}
 
 	// This is done in case tags are updated and a client sends unknown tags
 	description.Tags = requests.RemoveUnknownAndDeduplicateTags(description.Tags)
@@ -1164,6 +1129,25 @@ func (o *Community) UpdateCommunityDescription(signer *ecdsa.PublicKey, descript
 				response.ChatsModified[chatID].CategoryModified = chat.CategoryId
 			}
 		}
+
+		// Check for removed token permissions
+		for id := range o.config.CommunityDescription.TokenPermissions {
+			if _, ok := description.TokenPermissions[id]; !ok {
+				if response.TokenPermissionsRemoved == nil {
+					response.TokenPermissionsRemoved = make([]string, 0)
+				}
+				response.TokenPermissionsRemoved = append(response.TokenPermissionsRemoved, id)
+			}
+		}
+
+		for id, permission := range description.TokenPermissions {
+			if _, ok := o.config.CommunityDescription.TokenPermissions[id]; !ok {
+				if response.TokenPermissionsAdded == nil {
+					response.TokenPermissionsAdded = make(map[string]*protobuf.CommunityTokenPermission)
+				}
+				response.TokenPermissionsAdded[id] = permission
+			}
+		}
 	}
 
 	o.config.CommunityDescription = description
@@ -1173,8 +1157,8 @@ func (o *Community) UpdateCommunityDescription(signer *ecdsa.PublicKey, descript
 }
 
 func (o *Community) UpdateChatFirstMessageTimestamp(chatID string, timestamp uint32) (*CommunityChanges, error) {
-	if !o.IsAdmin() {
-		return nil, ErrNotAdmin
+	if !o.IsOwner() {
+		return nil, ErrNotOwner
 	}
 
 	chat, ok := o.config.CommunityDescription.Chats[chatID]
@@ -1197,7 +1181,7 @@ func (o *Community) ValidateRequestToJoin(signer *ecdsa.PublicKey, request *prot
 	defer o.mutex.Unlock()
 
 	// If we are not admin, fuggetaboutit
-	if !o.IsAdmin() {
+	if !o.IsOwnerOrAdmin() {
 		return ErrNotAdmin
 	}
 
@@ -1218,30 +1202,84 @@ func (o *Community) ValidateRequestToJoin(signer *ecdsa.PublicKey, request *prot
 	return nil
 }
 
+func (o *Community) IsOwner() bool {
+	return o.config.PrivateKey != nil || o.IsMemberOwner(o.config.MemberIdentity)
+}
+
 func (o *Community) IsAdmin() bool {
-	return o.config.PrivateKey != nil
+	return o.IsMemberAdmin(o.config.MemberIdentity)
+}
+
+func (o *Community) IsOwnerOrAdmin() bool {
+	return o.IsOwner() || o.IsAdmin()
+}
+
+func (o *Community) IsMemberOwner(publicKey *ecdsa.PublicKey) bool {
+	return o.hasPermission(publicKey, ownerRolePermission())
 }
 
 func (o *Community) IsMemberAdmin(publicKey *ecdsa.PublicKey) bool {
 	return o.hasPermission(publicKey, adminRolePermissions())
 }
 
+func (o *Community) IsMemberOwnerOrAdmin(publicKey *ecdsa.PublicKey) bool {
+	return o.hasPermission(publicKey, ownerOrAdminRolePermissions())
+}
+
 func canManageUsersRolePermissions() map[protobuf.CommunityMember_Roles]bool {
-	roles := adminRolePermissions()
+	roles := ownerOrAdminRolePermissions()
 	roles[protobuf.CommunityMember_ROLE_MANAGE_USERS] = true
+	return roles
+}
+
+func ownerRolePermission() map[protobuf.CommunityMember_Roles]bool {
+	roles := make(map[protobuf.CommunityMember_Roles]bool)
+	roles[protobuf.CommunityMember_ROLE_OWNER] = true
 	return roles
 }
 
 func adminRolePermissions() map[protobuf.CommunityMember_Roles]bool {
 	roles := make(map[protobuf.CommunityMember_Roles]bool)
-	roles[protobuf.CommunityMember_ROLE_ALL] = true
+	roles[protobuf.CommunityMember_ROLE_ADMIN] = true
 	return roles
 }
 
+func ownerOrAdminRolePermissions() map[protobuf.CommunityMember_Roles]bool {
+	roles := make(map[protobuf.CommunityMember_Roles]bool)
+	roles[protobuf.CommunityMember_ROLE_OWNER] = true
+	roles[protobuf.CommunityMember_ROLE_ADMIN] = true
+	return roles
+}
+
+func (o *Community) MemberRole(pubKey *ecdsa.PublicKey) protobuf.CommunityMember_Roles {
+	if o.IsMemberOwner(pubKey) {
+		return protobuf.CommunityMember_ROLE_OWNER
+	} else if o.IsMemberAdmin(pubKey) {
+		return protobuf.CommunityMember_ROLE_ADMIN
+	} else if o.CanManageUsers(pubKey) {
+		return protobuf.CommunityMember_ROLE_MANAGE_USERS
+	} else if o.CanDeleteMessageForEveryone(pubKey) {
+		return protobuf.CommunityMember_ROLE_MODERATE_CONTENT
+	}
+
+	return protobuf.CommunityMember_ROLE_NONE
+}
+
 func canDeleteMessageForEveryonePermissions() map[protobuf.CommunityMember_Roles]bool {
-	roles := adminRolePermissions()
+	roles := ownerOrAdminRolePermissions()
 	roles[protobuf.CommunityMember_ROLE_MODERATE_CONTENT] = true
 	return roles
+}
+
+func (o *Community) GetMemberAdmins() []*ecdsa.PublicKey {
+	admins := make([]*ecdsa.PublicKey, 0)
+	members := o.GetMemberPubkeys()
+	for _, member := range members {
+		if o.IsMemberAdmin(member) {
+			admins = append(admins, member)
+		}
+	}
+	return admins
 }
 
 func (o *Community) validateRequestToJoinWithChatID(request *protobuf.CommunityRequestToJoin) error {
@@ -1353,8 +1391,8 @@ func (o *Community) toBytes() ([]byte, error) {
 		return nil, ErrNotAdmin
 	}
 
-	// We are not admin, use the received serialized version
-	if o.config.PrivateKey == nil {
+	//We are not owner or admin, use the received serialized version
+	if !o.IsOwnerOrAdmin() {
 		return o.config.MarshaledCommunityDescription, nil
 	}
 
@@ -1455,8 +1493,8 @@ func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermis
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
-		return nil, ErrNotAdmin
+	if !o.IsOwnerOrAdmin() || (o.IsAdmin() && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
+		return nil, ErrNotEnoughPermissions
 	}
 
 	if o.config.CommunityDescription.TokenPermissions == nil {
@@ -1484,8 +1522,8 @@ func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
-		return nil, ErrNotAdmin
+	if !o.IsOwnerOrAdmin() || (o.IsAdmin() && tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
+		return nil, ErrNotEnoughPermissions
 	}
 
 	if o.config.CommunityDescription.TokenPermissions == nil {
@@ -1511,12 +1549,14 @@ func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChange
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
-		return nil, ErrNotAdmin
+	permission, exists := o.config.CommunityDescription.TokenPermissions[permissionID]
+
+	if !exists {
+		return nil, ErrTokenPermissionNotFound
 	}
 
-	if _, exists := o.config.CommunityDescription.TokenPermissions[permissionID]; !exists {
-		return nil, ErrTokenPermissionNotFound
+	if !o.IsOwnerOrAdmin() || (o.IsAdmin() && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
+		return nil, ErrNotEnoughPermissions
 	}
 
 	delete(o.config.CommunityDescription.TokenPermissions, permissionID)
@@ -1665,25 +1705,29 @@ func (o *Community) BuildGrant(key *ecdsa.PublicKey, chatID string) ([]byte, err
 }
 
 func (o *Community) buildGrant(key *ecdsa.PublicKey, chatID string) ([]byte, error) {
-	grant := &protobuf.Grant{
-		CommunityId: o.ID(),
-		MemberId:    crypto.CompressPubkey(key),
-		ChatId:      chatID,
-		Clock:       o.config.CommunityDescription.Clock,
-	}
-	marshaledGrant, err := proto.Marshal(grant)
-	if err != nil {
-		return nil, err
-	}
+	bytes := make([]byte, 0)
+	if o.config.PrivateKey != nil {
+		grant := &protobuf.Grant{
+			CommunityId: o.ID(),
+			MemberId:    crypto.CompressPubkey(key),
+			ChatId:      chatID,
+			Clock:       o.config.CommunityDescription.Clock,
+		}
+		marshaledGrant, err := proto.Marshal(grant)
+		if err != nil {
+			return nil, err
+		}
 
-	signatureMaterial := crypto.Keccak256(marshaledGrant)
+		signatureMaterial := crypto.Keccak256(marshaledGrant)
 
-	signature, err := crypto.Sign(signatureMaterial, o.config.PrivateKey)
-	if err != nil {
-		return nil, err
+		signature, err := crypto.Sign(signatureMaterial, o.config.PrivateKey)
+		if err != nil {
+			return nil, err
+		}
+
+		bytes = append(signature, marshaledGrant...)
 	}
-
-	return append(signature, marshaledGrant...), nil
+	return bytes, nil
 }
 
 func (o *Community) increaseClock() {
@@ -1714,7 +1758,7 @@ func (o *Community) CanManageUsers(pk *ecdsa.PublicKey) bool {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.IsAdmin() {
+	if o.IsOwner() {
 		return true
 	}
 
@@ -1731,13 +1775,14 @@ func (o *Community) CanDeleteMessageForEveryone(pk *ecdsa.PublicKey) bool {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.IsAdmin() {
+	if o.IsOwner() {
 		return true
 	}
 
 	if !o.hasMember(pk) {
 		return false
 	}
+
 	roles := canDeleteMessageForEveryonePermissions()
 	return o.hasPermission(pk, roles)
 }
@@ -1756,7 +1801,7 @@ func (o *Community) canJoin() bool {
 		return false
 	}
 
-	if o.IsAdmin() {
+	if o.IsOwner() {
 		return true
 	}
 
@@ -1800,12 +1845,13 @@ func (o *Community) RequestsToJoin() []*RequestToJoin {
 	return o.config.RequestsToJoin
 }
 
-func (o *Community) AddMember(publicKey *ecdsa.PublicKey, roles []protobuf.CommunityMember_Roles) error {
-	if o.config.PrivateKey == nil {
-		return ErrNotAdmin
+func (o *Community) AddMember(publicKey *ecdsa.PublicKey, roles []protobuf.CommunityMember_Roles) (*CommunityChanges, error) {
+	if !o.IsOwnerOrAdmin() {
+		return nil, ErrNotAdmin
 	}
 
 	memberKey := common.PubkeyToHex(publicKey)
+	changes := o.emptyCommunityChanges()
 
 	if o.config.CommunityDescription.Members == nil {
 		o.config.CommunityDescription.Members = make(map[string]*protobuf.CommunityMember)
@@ -1813,9 +1859,11 @@ func (o *Community) AddMember(publicKey *ecdsa.PublicKey, roles []protobuf.Commu
 
 	if _, ok := o.config.CommunityDescription.Members[memberKey]; !ok {
 		o.config.CommunityDescription.Members[memberKey] = &protobuf.CommunityMember{Roles: roles}
+		changes.MembersAdded[memberKey] = o.config.CommunityDescription.Members[memberKey]
 	}
+
 	o.increaseClock()
-	return nil
+	return changes, nil
 }
 
 func (o *Community) ChatIDs() (chatIDs []string) {
@@ -1833,7 +1881,7 @@ func (o *Community) AddMemberRevealedAccounts(memberID string, accounts []*proto
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
+	if !o.IsOwnerOrAdmin() {
 		return nil, ErrNotAdmin
 	}
 
@@ -1847,6 +1895,27 @@ func (o *Community) AddMemberRevealedAccounts(memberID string, accounts []*proto
 	changes := o.emptyCommunityChanges()
 	changes.MemberWalletsAdded[memberID] = o.config.CommunityDescription.Members[memberID].RevealedAccounts
 	return changes, nil
+}
+
+func (o *Community) createDeepCopy() Community {
+	return Community{
+		config: &Config{
+			PrivateKey:                    o.config.PrivateKey,
+			CommunityDescription:          proto.Clone(o.config.CommunityDescription).(*protobuf.CommunityDescription),
+			MarshaledCommunityDescription: o.config.MarshaledCommunityDescription,
+			ID:                            o.config.ID,
+			Joined:                        o.config.Joined,
+			Requested:                     o.config.Requested,
+			Verified:                      o.config.Verified,
+			Spectated:                     o.config.Spectated,
+			Muted:                         o.config.Muted,
+			Logger:                        o.config.Logger,
+			RequestedToJoinAt:             o.config.RequestedToJoinAt,
+			RequestsToJoin:                o.config.RequestsToJoin,
+			MemberIdentity:                o.config.MemberIdentity,
+			SyncedAt:                      o.config.SyncedAt,
+		},
+	}
 }
 
 func (o *Community) SetActiveMembersCount(activeMembersCount uint64) (updated bool, err error) {
@@ -1902,4 +1971,161 @@ func (d sortSlice) Swap(i, j int) {
 
 func (d sortSlice) Less(i, j int) bool {
 	return d[i].pos < d[j].pos
+}
+
+func (o *Community) unbanUserFromCommunity(pk *ecdsa.PublicKey) {
+	key := common.PubkeyToHex(pk)
+	for i, v := range o.config.CommunityDescription.BanList {
+		if v == key {
+			o.config.CommunityDescription.BanList =
+				append(o.config.CommunityDescription.BanList[:i], o.config.CommunityDescription.BanList[i+1:]...)
+			break
+		}
+	}
+}
+
+func (o *Community) banUserFromCommunity(pk *ecdsa.PublicKey) {
+	key := common.PubkeyToHex(pk)
+	if o.hasMember(pk) {
+		// Remove from org
+		delete(o.config.CommunityDescription.Members, key)
+
+		// Remove from chats
+		for _, chat := range o.config.CommunityDescription.Chats {
+			delete(chat.Members, key)
+		}
+	}
+
+	for _, u := range o.config.CommunityDescription.BanList {
+		if u == key {
+			return
+		}
+	}
+
+	o.config.CommunityDescription.BanList = append(o.config.CommunityDescription.BanList, key)
+}
+
+func (o *Community) editChat(chatID string, chat *protobuf.CommunityChat) error {
+	err := validateCommunityChat(o.config.CommunityDescription, chat)
+	if err != nil {
+		return err
+	}
+
+	if o.config.CommunityDescription.Chats == nil {
+		o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
+	}
+	if _, exists := o.config.CommunityDescription.Chats[chatID]; !exists {
+		return ErrChatNotFound
+	}
+
+	o.config.CommunityDescription.Chats[chatID] = chat
+
+	return nil
+}
+
+func (o *Community) createChat(chatID string, chat *protobuf.CommunityChat) error {
+	err := validateCommunityChat(o.config.CommunityDescription, chat)
+	if err != nil {
+		return err
+	}
+
+	if o.config.CommunityDescription.Chats == nil {
+		o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
+	}
+	if _, ok := o.config.CommunityDescription.Chats[chatID]; ok {
+		return ErrChatAlreadyExists
+	}
+
+	for _, c := range o.config.CommunityDescription.Chats {
+		if chat.Identity.DisplayName == c.Identity.DisplayName {
+			return ErrInvalidCommunityDescriptionDuplicatedName
+		}
+	}
+
+	// Sets the chat position to be the last within its category
+	chat.Position = 0
+	for _, c := range o.config.CommunityDescription.Chats {
+		if c.CategoryId == chat.CategoryId {
+			chat.Position++
+		}
+	}
+
+	o.config.CommunityDescription.Chats[chatID] = chat
+
+	return nil
+}
+
+func (o *Community) deleteChat(chatID string) *CommunityChanges {
+	if o.config.CommunityDescription.Chats == nil {
+		o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
+	}
+
+	changes := o.emptyCommunityChanges()
+
+	if chat, exists := o.config.CommunityDescription.Chats[chatID]; exists {
+		tmpCatID := chat.CategoryId
+		chat.CategoryId = ""
+		o.SortCategoryChats(changes, tmpCatID)
+		changes.ChatsRemoved[chatID] = chat
+	}
+
+	delete(o.config.CommunityDescription.Chats, chatID)
+	return changes
+}
+
+func (o *Community) deleteBecomeMemberTokenPermissions(newPermissions map[string]*protobuf.CommunityTokenPermission) {
+	if len(newPermissions) == 0 {
+		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
+		return
+	}
+
+	prevPermissions := o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+
+	if len(newPermissions) < len(prevPermissions) {
+		for _, permission := range newPermissions {
+			if permissionExists(permission.Id, prevPermissions) {
+				delete(o.config.CommunityDescription.TokenPermissions, permission.Id)
+			}
+		}
+	}
+}
+
+func (o *Community) addBecomeMemberTokenPermissions(newPermissions map[string]*protobuf.CommunityTokenPermission) {
+	if o.config.CommunityDescription.TokenPermissions == nil {
+		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
+	}
+	prevPermissions := o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+	for _, permission := range newPermissions {
+		if !permissionExists(permission.Id, prevPermissions) {
+			o.config.CommunityDescription.TokenPermissions[permission.Id] = permission
+		}
+	}
+}
+
+func (o *Community) updateTokenPermissions(newPermissions map[string]*protobuf.CommunityTokenPermission) {
+	if o.config.CommunityDescription.TokenPermissions == nil {
+		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
+	}
+	for _, newPermission := range newPermissions {
+		o.config.CommunityDescription.TokenPermissions[newPermission.Id] = newPermission
+	}
+}
+
+func (o *Community) addCommunityMember(pk *ecdsa.PublicKey, member *protobuf.CommunityMember) {
+
+	if o.config.CommunityDescription.Members == nil {
+		o.config.CommunityDescription.Members = make(map[string]*protobuf.CommunityMember)
+	}
+
+	memberKey := common.PubkeyToHex(pk)
+	o.config.CommunityDescription.Members[memberKey] = member
+}
+
+func permissionExists(id string, prevPermissions []*protobuf.CommunityTokenPermission) bool {
+	for _, prevPermission := range prevPermissions {
+		if prevPermission.Id == id {
+			return true
+		}
+	}
+	return false
 }
