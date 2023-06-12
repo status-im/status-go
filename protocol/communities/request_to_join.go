@@ -37,10 +37,10 @@ func (r *RequestToJoin) CalculateID() {
 
 func (r *RequestToJoin) ToCommunityRequestToJoinProtobuf() *protobuf.CommunityRequestToJoin {
 	return &protobuf.CommunityRequestToJoin{
-		Clock:             r.Clock,
-		EnsName:           r.ENSName,
-		CommunityId:       r.CommunityID,
-		RevealedAddresses: r.RevealedAddresses,
+		Clock:            r.Clock,
+		EnsName:          r.ENSName,
+		CommunityId:      r.CommunityID,
+		RevealedAccounts: r.RevealedAccounts,
 	}
 }
 

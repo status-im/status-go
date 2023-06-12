@@ -1384,12 +1384,12 @@ func (m *Manager) handleAdditionalAdminChanges(community *Community, adminEvent 
 
 	saveOrUpdateRequestToJoin := func(signer string, request *protobuf.CommunityRequestToJoin, state RequestToJoinState) error {
 		requestToJoin := &RequestToJoin{
-			PublicKey:         signer,
-			Clock:             request.Clock,
-			ENSName:           request.EnsName,
-			CommunityID:       request.CommunityId,
-			State:             state,
-			RevealedAddresses: request.RevealedAddresses,
+			PublicKey:        signer,
+			Clock:            request.Clock,
+			ENSName:          request.EnsName,
+			CommunityID:      request.CommunityId,
+			State:            state,
+			RevealedAccounts: request.RevealedAccounts,
 		}
 
 		requestToJoin.CalculateID()
