@@ -788,6 +788,49 @@ func (s *CommunitySuite) TestChatIDs() {
 	s.Require().Len(chatIDs, 1)
 }
 
+func (s *CommunitySuite) TestChannelTokenPermissionsByType() {
+	org := s.buildCommunity(&s.identity.PublicKey)
+
+	viewOnlyPermissions := []*protobuf.CommunityTokenPermission{
+		&protobuf.CommunityTokenPermission{
+			Id:            "some-id",
+			Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+			TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+			ChatIds:       []string{"some-chat-id"},
+		},
+	}
+
+	viewAndPostPermissions := []*protobuf.CommunityTokenPermission{
+		&protobuf.CommunityTokenPermission{
+			Id:            "some-other-id",
+			Type:          protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL,
+			TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+			ChatIds:       []string{"some-chat-id-2"},
+		},
+	}
+
+	for _, viewOnlyPermission := range viewOnlyPermissions {
+		_, err := org.AddTokenPermission(viewOnlyPermission)
+		s.Require().NoError(err)
+	}
+	for _, viewAndPostPermission := range viewAndPostPermissions {
+		_, err := org.AddTokenPermission(viewAndPostPermission)
+		s.Require().NoError(err)
+	}
+
+	result := org.ChannelTokenPermissionsByType("some-chat-id", protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
+	s.Require().Len(result, 1)
+	s.Require().Equal(result[0].Id, viewOnlyPermissions[0].Id)
+	s.Require().Equal(result[0].TokenCriteria, viewOnlyPermissions[0].TokenCriteria)
+	s.Require().Equal(result[0].ChatIds, viewOnlyPermissions[0].ChatIds)
+
+	result = org.ChannelTokenPermissionsByType("some-chat-id-2", protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
+	s.Require().Len(result, 1)
+	s.Require().Equal(result[0].Id, viewAndPostPermissions[0].Id)
+	s.Require().Equal(result[0].TokenCriteria, viewAndPostPermissions[0].TokenCriteria)
+	s.Require().Equal(result[0].ChatIds, viewAndPostPermissions[0].ChatIds)
+}
+
 func (s *CommunitySuite) emptyCommunityDescription() *protobuf.CommunityDescription {
 	return &protobuf.CommunityDescription{
 		Permissions: &protobuf.CommunityPermissions{},

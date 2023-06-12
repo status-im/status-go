@@ -1325,6 +1325,10 @@ func (api *PublicAPI) CheckPermissionsToJoinCommunity(request *requests.CheckPer
 	return api.service.messenger.CheckPermissionsToJoinCommunity(request)
 }
 
+func (api *PublicAPI) CheckCommunityChannelPermissions(request *requests.CheckCommunityChannelPermissions) (*communities.CheckChannelPermissionsResponse, error) {
+	return api.service.messenger.CheckCommunityChannelPermissions(request)
+}
+
 func (api *PublicAPI) Messenger() *protocol.Messenger {
 	return api.service.messenger
 }

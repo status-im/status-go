@@ -64,7 +64,7 @@ require (
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.7.0
 	golang.org/x/image v0.0.0-20210220032944-ac19c3e999fb
-	google.golang.org/protobuf v1.30.1-0.20230508203708-b8fc77060104 // indirect
+	google.golang.org/protobuf v1.30.1-0.20230508203708-b8fc77060104
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.31.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
