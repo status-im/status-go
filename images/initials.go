@@ -2,13 +2,14 @@ package images
 
 import (
 	"bytes"
-	"github.com/fogleman/gg"
-	"golang.org/x/image/font"
-	"golang.org/x/image/font/opentype"
 	"image/color"
 	"image/png"
 	"io/ioutil"
 	"strings"
+
+	"github.com/fogleman/gg"
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/opentype"
 )
 
 type RGBA struct {

@@ -35,7 +35,7 @@ func AddStatusIndicatorToImage(inputImage []byte, innerColor color.Color, indica
 	dc.SetColor(color.Transparent)
 	for i := x - indicatorRadius; i <= x+indicatorRadius; i++ {
 		for j := y - indicatorRadius; j <= y+indicatorRadius; j++ {
-			if math.Pow(float64(i-x), 2)+math.Pow(float64(j-y), 2) <= math.Pow(float64(indicatorRadius), 2) {
+			if math.Pow(i-x, 2)+math.Pow(j-y, 2) <= math.Pow(indicatorRadius, 2) {
 				dc.SetPixel(int(i), int(j))
 			}
 		}

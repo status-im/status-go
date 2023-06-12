@@ -26,7 +26,7 @@ func CropAvatar(inputImage []byte) ([]byte, error) {
 	for i := 0; i <= width; i++ {
 		for j := 0; j <= width; j++ {
 			if (math.Pow(float64(i-radius), 2) + math.Pow(float64(j-radius), 2)) > math.Pow(float64(radius), 2) {
-				dc.SetPixel(int(i), int(j))
+				dc.SetPixel(i, j)
 			}
 		}
 	}

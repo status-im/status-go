@@ -400,10 +400,8 @@ func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Lo
 
 		if parsed.KeyUID == "" {
 			handleAccountImagesPlaceholder(logger, w, r, parsed)
-			return
 		} else {
 			handleAccountImagesImpl(multiaccountsDB, logger, w, r, parsed)
-			return
 		}
 	}
 }
@@ -499,12 +497,11 @@ func handleAccountInitialsPlaceholder(logger *zap.Logger, w http.ResponseWriter,
 	}
 
 	if parsed.IndicatorSize != 0 {
-		payload, err := images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize, parsed.IndicatorBorder)
+		payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize, parsed.IndicatorBorder)
 		if err != nil {
 			logger.Error("failed to draw status-indicator for initials", zap.Error(err))
 			return
 		}
-		payload = payload
 	}
 
 	if len(payload) == 0 {
@@ -553,10 +550,8 @@ func handleAccountInitials(multiaccountsDB *multiaccounts.Database, logger *zap.
 
 		if parsed.KeyUID == "" && parsed.PublicKey == "" {
 			handleAccountInitialsPlaceholder(logger, w, r, parsed)
-			return
 		} else {
 			handleAccountInitialsImpl(multiaccountsDB, logger, w, r, parsed)
-			return
 		}
 	}
 }
