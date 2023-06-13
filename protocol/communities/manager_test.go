@@ -1030,6 +1030,368 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewAndPostPermissionsCombina
 	s.Require().False(resp.ViewAndPostPermissions.Satisfied)
 }
 
+func (s *ManagerSuite) TestCheckAllChannelsPermissions_EmptyPermissions() {
+
+	m, _ := s.setupManagerForTokenPermissions()
+
+	createRequest := &requests.CreateCommunity{
+		Name:        "channel permission community",
+		Description: "some description",
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+	}
+	community, err := m.CreateCommunity(createRequest, true)
+	s.Require().NoError(err)
+
+	// create community chats
+	chat := &protobuf.CommunityChat{
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "chat1",
+			Description: "description",
+		},
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Members: make(map[string]*protobuf.CommunityMember),
+	}
+
+	_, changes, err := m.CreateChat(community.ID(), chat, true, "")
+	s.Require().NoError(err)
+
+	var chatID string
+	for cid := range changes.ChatsAdded {
+		chatID = community.IDString() + cid
+	}
+
+	response, err := m.CheckAllChannelsPermissions(community.ID(), []gethcommon.Address{
+		gethcommon.HexToAddress("0xD6b912e09E797D291E8D0eA3D3D17F8000e01c32"),
+	})
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	s.Require().Len(response.Channels, 1)
+	// we expect both, viewOnly and viewAndPost permissions to be satisfied
+	// as there aren't any permissions on this channel
+	s.Require().True(response.Channels[chatID].ViewOnlyPermissions.Satisfied)
+	s.Require().True(response.Channels[chatID].ViewAndPostPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID].ViewOnlyPermissions.Permissions, 0)
+	s.Require().Len(response.Channels[chatID].ViewAndPostPermissions.Permissions, 0)
+}
+
+func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
+
+	m, tm := s.setupManagerForTokenPermissions()
+
+	var chatID1 string
+	var chatID2 string
+
+	// create community
+	createRequest := &requests.CreateCommunity{
+		Name:        "channel permission community",
+		Description: "some description",
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+	}
+	community, err := m.CreateCommunity(createRequest, true)
+	s.Require().NoError(err)
+
+	// create first community chat
+	chat := &protobuf.CommunityChat{
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "chat1",
+			Description: "description",
+		},
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Members: make(map[string]*protobuf.CommunityMember),
+	}
+
+	_, changes, err := m.CreateChat(community.ID(), chat, true, "")
+	s.Require().NoError(err)
+
+	for chatID := range changes.ChatsAdded {
+		chatID1 = community.IDString() + chatID
+	}
+
+	// create second community chat
+	chat = &protobuf.CommunityChat{
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "chat2",
+			Description: "description",
+		},
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Members: make(map[string]*protobuf.CommunityMember),
+	}
+
+	_, changes, err = m.CreateChat(community.ID(), chat, true, "")
+	s.Require().NoError(err)
+
+	for chatID := range changes.ChatsAdded {
+		chatID2 = community.IDString() + chatID
+	}
+
+	var chainID uint64 = 5
+	contractAddresses := make(map[uint64]string)
+	contractAddresses[chainID] = "0x3d6afaa395c31fcd391fe3d562e75fe9e8ec7e6a"
+	var decimals uint64 = 18
+
+	accountChainIDsCombination := []*AccountChainIDsCombination{
+		&AccountChainIDsCombination{
+			Address:  gethcommon.HexToAddress("0xD6b912e09E797D291E8D0eA3D3D17F8000e01c32"),
+			ChainIDs: []uint64{chainID},
+		},
+	}
+
+	var tokenCriteria = []*protobuf.TokenCriteria{
+		&protobuf.TokenCriteria{
+			ContractAddresses: contractAddresses,
+			Symbol:            "STT",
+			Type:              protobuf.CommunityTokenType_ERC20,
+			Name:              "Status Test Token",
+			Amount:            "1.000000000000000000",
+			Decimals:          decimals,
+		},
+	}
+
+	// create view only permission
+	viewOnlyPermission := &requests.CreateCommunityTokenPermission{
+		CommunityID:   community.ID(),
+		Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+		TokenCriteria: tokenCriteria,
+		ChatIds:       []string{chatID1, chatID2},
+	}
+
+	_, changes, err = m.CreateCommunityTokenPermission(viewOnlyPermission)
+	s.Require().NoError(err)
+
+	var viewOnlyPermissionID string
+	for permissionID := range changes.TokenPermissionsAdded {
+		viewOnlyPermissionID = permissionID
+	}
+
+	response, err := m.CheckAllChannelsPermissions(community.ID(), []gethcommon.Address{
+		gethcommon.HexToAddress("0xD6b912e09E797D291E8D0eA3D3D17F8000e01c32"),
+	})
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	// we've added to chats to the community, so there should be 2 items
+	s.Require().Len(response.Channels, 2)
+
+	// viewOnly permissions should not be satisfied because the account doesn't
+	// have the necessary funds
+
+	// channel1
+	s.Require().False(response.Channels[chatID1].ViewOnlyPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID1].ViewOnlyPermissions.Permissions, 1)
+	s.Require().Len(response.Channels[chatID1].ViewOnlyPermissions.Permissions[viewOnlyPermissionID].Criteria, 1)
+	s.Require().False(response.Channels[chatID1].ViewOnlyPermissions.Permissions[viewOnlyPermissionID].Criteria[0])
+
+	// channel2
+	s.Require().False(response.Channels[chatID2].ViewOnlyPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID2].ViewOnlyPermissions.Permissions, 1)
+	s.Require().Len(response.Channels[chatID2].ViewOnlyPermissions.Permissions[viewOnlyPermissionID].Criteria, 1)
+	s.Require().False(response.Channels[chatID2].ViewOnlyPermissions.Permissions[viewOnlyPermissionID].Criteria[0])
+
+	// viewAndPost permissions are flagged as not satisfied either because
+	// viewOnly permission is not satisfied and there are no viewAndPost permissions
+
+	// channel1
+	s.Require().False(response.Channels[chatID1].ViewAndPostPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID1].ViewAndPostPermissions.Permissions, 0)
+
+	// channel2
+	s.Require().False(response.Channels[chatID2].ViewAndPostPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID2].ViewAndPostPermissions.Permissions, 0)
+
+	// now change balance such that viewOnly permission should be satisfied
+	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), int64(1*math.Pow(10, float64(decimals))))
+
+	response, err = m.CheckAllChannelsPermissions(community.ID(), []gethcommon.Address{
+		gethcommon.HexToAddress("0xD6b912e09E797D291E8D0eA3D3D17F8000e01c32"),
+	})
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Channels, 2)
+
+	// viewOnly permissions should be satisfied for both channels while
+	// viewAndPost permissions should not be satisfied (as there aren't any)
+
+	// channel1
+	s.Require().True(response.Channels[chatID1].ViewOnlyPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID1].ViewOnlyPermissions.Permissions, 1)
+	s.Require().Len(response.Channels[chatID1].ViewOnlyPermissions.Permissions[viewOnlyPermissionID].Criteria, 1)
+	s.Require().True(response.Channels[chatID1].ViewOnlyPermissions.Permissions[viewOnlyPermissionID].Criteria[0])
+
+	s.Require().False(response.Channels[chatID1].ViewAndPostPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID1].ViewAndPostPermissions.Permissions, 0)
+
+	// channel2
+	s.Require().True(response.Channels[chatID2].ViewOnlyPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID2].ViewOnlyPermissions.Permissions, 1)
+	s.Require().Len(response.Channels[chatID2].ViewOnlyPermissions.Permissions[viewOnlyPermissionID].Criteria, 1)
+	s.Require().True(response.Channels[chatID2].ViewOnlyPermissions.Permissions[viewOnlyPermissionID].Criteria[0])
+
+	s.Require().False(response.Channels[chatID2].ViewAndPostPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID2].ViewAndPostPermissions.Permissions, 0)
+
+	// next, create viewAndPost permission
+	// create view only permission
+	viewAndPostPermission := &requests.CreateCommunityTokenPermission{
+		CommunityID:   community.ID(),
+		Type:          protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL,
+		TokenCriteria: tokenCriteria,
+		ChatIds:       []string{chatID1, chatID2},
+	}
+
+	_, changes, err = m.CreateCommunityTokenPermission(viewAndPostPermission)
+	s.Require().NoError(err)
+
+	var viewAndPostPermissionID string
+	for permissionID := range changes.TokenPermissionsAdded {
+		viewAndPostPermissionID = permissionID
+	}
+
+	// now change balance such that viewAndPost permission is not satisfied
+	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), 0)
+
+	response, err = m.CheckAllChannelsPermissions(community.ID(), []gethcommon.Address{
+		gethcommon.HexToAddress("0xD6b912e09E797D291E8D0eA3D3D17F8000e01c32"),
+	})
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Channels, 2)
+
+	// Both, viewOnly and viewAndPost permissions exist on channel1 and channel2
+	// but shouldn't be satisfied
+
+	// channel1
+	s.Require().False(response.Channels[chatID1].ViewOnlyPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID1].ViewOnlyPermissions.Permissions, 1)
+	s.Require().Len(response.Channels[chatID1].ViewOnlyPermissions.Permissions[viewOnlyPermissionID].Criteria, 1)
+	s.Require().False(response.Channels[chatID1].ViewOnlyPermissions.Permissions[viewOnlyPermissionID].Criteria[0])
+
+	s.Require().False(response.Channels[chatID1].ViewAndPostPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID1].ViewAndPostPermissions.Permissions, 1)
+	s.Require().Len(response.Channels[chatID1].ViewAndPostPermissions.Permissions[viewAndPostPermissionID].Criteria, 1)
+	s.Require().False(response.Channels[chatID1].ViewAndPostPermissions.Permissions[viewAndPostPermissionID].Criteria[0])
+
+	// channel2
+	s.Require().False(response.Channels[chatID2].ViewOnlyPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID2].ViewOnlyPermissions.Permissions, 1)
+	s.Require().Len(response.Channels[chatID2].ViewOnlyPermissions.Permissions[viewOnlyPermissionID].Criteria, 1)
+	s.Require().False(response.Channels[chatID2].ViewOnlyPermissions.Permissions[viewOnlyPermissionID].Criteria[0])
+
+	s.Require().False(response.Channels[chatID2].ViewAndPostPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID2].ViewAndPostPermissions.Permissions, 1)
+	s.Require().Len(response.Channels[chatID2].ViewAndPostPermissions.Permissions[viewAndPostPermissionID].Criteria, 1)
+	s.Require().False(response.Channels[chatID2].ViewAndPostPermissions.Permissions[viewAndPostPermissionID].Criteria[0])
+
+	// now change balance such that both, viewOnly and viewAndPost permission, are satisfied
+	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), int64(1*math.Pow(10, float64(decimals))))
+
+	response, err = m.CheckAllChannelsPermissions(community.ID(), []gethcommon.Address{
+		gethcommon.HexToAddress("0xD6b912e09E797D291E8D0eA3D3D17F8000e01c32"),
+	})
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Channels, 2)
+
+	// Both, viewOnly and viewAndPost permissions exist on channel1 and channel2
+	// and are satisfied
+
+	// channel1
+	s.Require().True(response.Channels[chatID1].ViewOnlyPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID1].ViewOnlyPermissions.Permissions, 1)
+	s.Require().Len(response.Channels[chatID1].ViewOnlyPermissions.Permissions[viewOnlyPermissionID].Criteria, 1)
+	s.Require().True(response.Channels[chatID1].ViewOnlyPermissions.Permissions[viewOnlyPermissionID].Criteria[0])
+
+	s.Require().True(response.Channels[chatID1].ViewAndPostPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID1].ViewAndPostPermissions.Permissions, 1)
+	s.Require().Len(response.Channels[chatID1].ViewAndPostPermissions.Permissions[viewAndPostPermissionID].Criteria, 1)
+	s.Require().True(response.Channels[chatID1].ViewAndPostPermissions.Permissions[viewAndPostPermissionID].Criteria[0])
+
+	// channel2
+	s.Require().True(response.Channels[chatID2].ViewOnlyPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID2].ViewOnlyPermissions.Permissions, 1)
+	s.Require().Len(response.Channels[chatID2].ViewOnlyPermissions.Permissions[viewOnlyPermissionID].Criteria, 1)
+	s.Require().True(response.Channels[chatID2].ViewOnlyPermissions.Permissions[viewOnlyPermissionID].Criteria[0])
+
+	s.Require().True(response.Channels[chatID2].ViewAndPostPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID2].ViewAndPostPermissions.Permissions, 1)
+	s.Require().Len(response.Channels[chatID2].ViewAndPostPermissions.Permissions[viewAndPostPermissionID].Criteria, 1)
+	s.Require().True(response.Channels[chatID2].ViewAndPostPermissions.Permissions[viewAndPostPermissionID].Criteria[0])
+
+	// next, delete viewOnly permission so we can check the viewAndPost permission-only case
+	deleteViewOnlyPermission := &requests.DeleteCommunityTokenPermission{
+		CommunityID:  community.ID(),
+		PermissionID: viewOnlyPermissionID,
+	}
+	_, _, err = m.DeleteCommunityTokenPermission(deleteViewOnlyPermission)
+	s.Require().NoError(err)
+
+	response, err = m.CheckAllChannelsPermissions(community.ID(), []gethcommon.Address{
+		gethcommon.HexToAddress("0xD6b912e09E797D291E8D0eA3D3D17F8000e01c32"),
+	})
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Channels, 2)
+
+	// Both, channel1 and channel2 now have viewAndPost only permissions that should
+	// be satisfied, there's no viewOnly permission anymore the response should mark it
+	// as satisfied as well
+
+	// channel1
+	s.Require().True(response.Channels[chatID1].ViewAndPostPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID1].ViewAndPostPermissions.Permissions, 1)
+	s.Require().Len(response.Channels[chatID1].ViewAndPostPermissions.Permissions[viewAndPostPermissionID].Criteria, 1)
+	s.Require().True(response.Channels[chatID1].ViewAndPostPermissions.Permissions[viewAndPostPermissionID].Criteria[0])
+
+	s.Require().True(response.Channels[chatID1].ViewOnlyPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID1].ViewOnlyPermissions.Permissions, 0)
+
+	// channel2
+	s.Require().True(response.Channels[chatID2].ViewAndPostPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID2].ViewAndPostPermissions.Permissions, 1)
+	s.Require().Len(response.Channels[chatID2].ViewAndPostPermissions.Permissions[viewAndPostPermissionID].Criteria, 1)
+	s.Require().True(response.Channels[chatID2].ViewAndPostPermissions.Permissions[viewAndPostPermissionID].Criteria[0])
+
+	s.Require().True(response.Channels[chatID2].ViewOnlyPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID2].ViewOnlyPermissions.Permissions, 0)
+
+	// now change balance such that viewAndPost permission is no longer satisfied
+	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), 0)
+
+	response, err = m.CheckAllChannelsPermissions(community.ID(), []gethcommon.Address{
+		gethcommon.HexToAddress("0xD6b912e09E797D291E8D0eA3D3D17F8000e01c32"),
+	})
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Channels, 2)
+
+	// because viewAndPost permission is not satisfied and there are no viewOnly permissions
+	// on the channels, the response should mark the viewOnly permissions as not satisfied as well
+
+	// channel1
+	s.Require().False(response.Channels[chatID1].ViewAndPostPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID1].ViewAndPostPermissions.Permissions, 1)
+	s.Require().Len(response.Channels[chatID1].ViewAndPostPermissions.Permissions[viewAndPostPermissionID].Criteria, 1)
+	s.Require().False(response.Channels[chatID1].ViewAndPostPermissions.Permissions[viewAndPostPermissionID].Criteria[0])
+
+	s.Require().False(response.Channels[chatID1].ViewOnlyPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID1].ViewOnlyPermissions.Permissions, 0)
+
+	// channel2
+	s.Require().False(response.Channels[chatID2].ViewAndPostPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID2].ViewAndPostPermissions.Permissions, 1)
+	s.Require().Len(response.Channels[chatID2].ViewAndPostPermissions.Permissions[viewAndPostPermissionID].Criteria, 1)
+	s.Require().False(response.Channels[chatID2].ViewAndPostPermissions.Permissions[viewAndPostPermissionID].Criteria[0])
+
+	s.Require().False(response.Channels[chatID2].ViewOnlyPermissions.Satisfied)
+	s.Require().Len(response.Channels[chatID2].ViewOnlyPermissions.Permissions, 0)
+}
+
 func buildTorrentConfig() params.TorrentConfig {
 	torrentConfig := params.TorrentConfig{
 		Enabled:    true,
