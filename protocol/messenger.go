@@ -217,10 +217,11 @@ func (interceptor EnvelopeEventsInterceptor) EnvelopeSent(identifiers [][]byte) 
 
 		err := interceptor.Messenger.processSentMessages(ids)
 		if err != nil {
-			interceptor.Messenger.logger.Info("Messenger failed to process sent messages", zap.Error(err))
-		} else {
-			interceptor.EnvelopeEventsHandler.EnvelopeSent(identifiers)
+			interceptor.Messenger.logger.Info("messenger failed to process sent messages", zap.Error(err))
 		}
+
+		// We notify the client, regardless whether we were able to mark them as sent
+		interceptor.EnvelopeEventsHandler.EnvelopeSent(identifiers)
 	} else {
 		// NOTE(rasom): In case if interceptor.Messenger is not nil and
 		// some error occurred on processing sent message we don't want
@@ -2090,7 +2091,7 @@ func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Mes
 	return &response, nil
 }
 
-// SendChatMessage takes a minimal message and sends it based on the corresponding chat
+// sendChatMessage takes a minimal message and sends it based on the corresponding chat
 func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
 	displayName, err := m.settings.DisplayName()
 	if err != nil {

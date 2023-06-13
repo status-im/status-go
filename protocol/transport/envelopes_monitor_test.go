@@ -53,6 +53,17 @@ func (s *EnvelopesMonitorSuite) TestEnvelopePosted() {
 	s.Equal(EnvelopeSent, s.monitor.envelopes[testHash])
 }
 
+func (s *EnvelopesMonitorSuite) TestEnvelopePostedOutOfOrder() {
+	s.monitor.handleEvent(types.EnvelopeEvent{
+		Event: types.EventEnvelopeSent,
+		Hash:  testHash,
+	})
+
+	s.monitor.Add(testIDs, testHash, types.NewMessage{})
+	s.Require().Contains(s.monitor.envelopes, testHash)
+	s.Require().Equal(EnvelopeSent, s.monitor.envelopes[testHash])
+}
+
 func (s *EnvelopesMonitorSuite) TestConfirmedWithAcknowledge() {
 	testBatch := types.Hash{1}
 	pkey, err := crypto.GenerateKey()
@@ -74,14 +85,6 @@ func (s *EnvelopesMonitorSuite) TestConfirmedWithAcknowledge() {
 	})
 	s.Contains(s.monitor.envelopes, testHash)
 	s.Equal(EnvelopeSent, s.monitor.envelopes[testHash])
-}
-
-func (s *EnvelopesMonitorSuite) TestIgnored() {
-	s.monitor.handleEvent(types.EnvelopeEvent{
-		Event: types.EventEnvelopeSent,
-		Hash:  testHash,
-	})
-	s.NotContains(s.monitor.envelopes, testHash)
 }
 
 func (s *EnvelopesMonitorSuite) TestRemoved() {
