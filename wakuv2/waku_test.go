@@ -214,7 +214,7 @@ func TestWakuV2Filter(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// Ensure there is 1 active filter subscription
 	require.Len(t, w.filterSubscriptions, 1)
