@@ -2334,6 +2334,41 @@ func (m *Manager) checkChannelPermissions(viewOnlyPermissions []*protobuf.Commun
 	return response, nil
 }
 
+func (m *Manager) CheckAllChannelsPermissions(communityID types.HexBytes, addresses []gethcommon.Address) (*CheckAllChannelsPermissionsResponse, error) {
+
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+	channels := community.Chats()
+
+	allChainIDs, err := m.tokenManager.GetAllChainIDs()
+	if err != nil {
+		return nil, err
+	}
+	accountsAndChainIDs := combineAddressesAndChainIDs(addresses, allChainIDs)
+
+	response := &CheckAllChannelsPermissionsResponse{
+		Channels: make(map[string]*CheckChannelPermissionsResponse),
+	}
+
+	for channelID := range channels {
+		viewOnlyPermissions := community.ChannelTokenPermissionsByType(community.IDString()+channelID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
+		viewAndPostPermissions := community.ChannelTokenPermissionsByType(community.IDString()+channelID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
+
+		checkChannelPermissionsResponse, err := m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountsAndChainIDs, false)
+		if err != nil {
+			return nil, err
+		}
+		response.Channels[community.IDString()+channelID] = checkChannelPermissionsResponse
+	}
+	return response, nil
+}
+
+type CheckAllChannelsPermissionsResponse struct {
+	Channels map[string]*CheckChannelPermissionsResponse `json:"channels"`
+}
+
 func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoinResponse) (*RequestToJoin, error) {
 	pkString := common.PubkeyToHex(&m.identity.PublicKey)
 
