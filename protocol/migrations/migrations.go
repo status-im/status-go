@@ -1977,7 +1977,7 @@ func _1684979808_sync_activity_center_notificationsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1684979808_sync_activity_center_notifications.up.sql", size: 169, mode: os.FileMode(0644), modTime: time.Unix(1686581651, 0)}
+	info := bindataFileInfo{name: "1684979808_sync_activity_center_notifications.up.sql", size: 169, mode: os.FileMode(0644), modTime: time.Unix(1686642106, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd8, 0xf5, 0xf7, 0x94, 0xa9, 0xa1, 0x60, 0x26, 0x9d, 0xca, 0x31, 0xf, 0x14, 0xd, 0x70, 0xf8, 0xab, 0x40, 0x29, 0x73, 0x61, 0xbd, 0x1b, 0xb6, 0xc4, 0x31, 0x77, 0x9e, 0x32, 0xa8, 0xce, 0x6d}}
 	return a, nil
 }
@@ -1997,7 +1997,7 @@ func _1685964183_add_chainids_to_revealed_addressesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1685964183_add_chainids_to_revealed_addresses.up.sql", size: 88, mode: os.FileMode(0644), modTime: time.Unix(1686581651, 0)}
+	info := bindataFileInfo{name: "1685964183_add_chainids_to_revealed_addresses.up.sql", size: 88, mode: os.FileMode(0644), modTime: time.Unix(1686642106, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc, 0xb5, 0xa8, 0xd7, 0xad, 0x9c, 0x54, 0xa5, 0xe9, 0xdb, 0x42, 0x2d, 0xd0, 0xd7, 0x22, 0x1, 0x93, 0xf3, 0x4f, 0x53, 0xf7, 0x1e, 0xbe, 0x4b, 0xac, 0xc7, 0x63, 0x15, 0xdf, 0xe0, 0x6, 0xf8}}
 	return a, nil
 }

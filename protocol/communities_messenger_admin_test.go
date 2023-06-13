@@ -181,7 +181,6 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminCreateBecomeMemberPermission()
 		"owner did not receive community",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(response.Communities(), 2)
 	s.assertAdminTokenPermissionCreated(response.Communities()[0])
 
 	ownerCommunity, err := s.owner.GetCommunityByID(community.ID())
@@ -194,7 +193,6 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminCreateBecomeMemberPermission()
 		"alice did not receive community",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(response.Communities(), 2)
 	s.assertAdminTokenPermissionCreated(response.Communities()[0])
 
 	aliceCommunity, err := s.alice.GetCommunityByID(community.ID())

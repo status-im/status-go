@@ -602,15 +602,17 @@ func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommuni
 		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityBecomeMemberTokenPermissionChangeAdminEvent()})
 	}
 
-	// check existing member permission once, then check periodically
-	go func() {
-		err := m.checkMemberPermissions(community, false)
-		if err != nil {
-			m.logger.Debug("failed to check member permissions", zap.Error(err))
-		}
+	if community.IsOwner() {
+		// check existing member permission once, then check periodically
+		go func() {
+			err := m.checkMemberPermissions(community, false)
+			if err != nil {
+				m.logger.Debug("failed to check member permissions", zap.Error(err))
+			}
 
-		m.CheckMemberPermissionsPeriodically(community.ID())
-	}()
+			m.CheckMemberPermissionsPeriodically(community.ID())
+		}()
+	}
 
 	return community, changes, nil
 }
@@ -1537,7 +1539,10 @@ func (m *Manager) CheckPermissionToJoin(id []byte, addresses []gethcommon.Addres
 		return nil, err
 	}
 
+	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+
+	permissionsToJoin := append(becomeAdminPermissions, becomeMemberPermissions...)
 
 	allChainIDs, err := m.tokenManager.GetAllChainIDs()
 	if err != nil {
@@ -1545,7 +1550,7 @@ func (m *Manager) CheckPermissionToJoin(id []byte, addresses []gethcommon.Addres
 	}
 
 	accountsAndChainIDs := combineAddressesAndChainIDs(addresses, allChainIDs)
-	hasPermission, err := m.checkPermissionToJoin(becomeMemberPermissions, accountsAndChainIDs, false)
+	hasPermission, err := m.checkPermissionToJoin(permissionsToJoin, accountsAndChainIDs, false)
 	if err != nil {
 		return nil, err
 	}
