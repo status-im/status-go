@@ -200,6 +200,10 @@ func migrateEnsUsernames(sqlTx *sql.Tx) error {
 	return nil
 }
 
+func MigrateV3ToV4(v3Path string, v4Path string, password string, kdfIterationsNumber int) error {
+	return sqlite.MigrateV3ToV4(v3Path, v4Path, password, kdfIterationsNumber)
+}
+
 const (
 	batchSize = 1000
 )

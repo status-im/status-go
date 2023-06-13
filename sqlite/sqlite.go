@@ -13,6 +13,7 @@ import (
 	sqlcipher "github.com/mutecomm/go-sqlcipher/v4" // We require go sqlcipher that overrides default implementation
 
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/signal"
 )
 
 const (
@@ -23,14 +24,16 @@ const (
 	ReducedKDFIterationsNumber = 3200
 
 	// WALMode for sqlite.
-	WALMode      = "wal"
-	InMemoryPath = ":memory:"
+	WALMode          = "wal"
+	InMemoryPath     = ":memory:"
+	V4CipherPageSize = 8192
+	V3CipherPageSize = 1024
 )
 
 // DecryptDB completely removes the encryption from the db
 func DecryptDB(oldPath string, newPath string, key string, kdfIterationsNumber int) error {
 
-	db, err := openDB(oldPath, key, kdfIterationsNumber)
+	db, err := openDB(oldPath, key, kdfIterationsNumber, V4CipherPageSize)
 	if err != nil {
 		return err
 	}
@@ -48,16 +51,11 @@ func DecryptDB(oldPath string, newPath string, key string, kdfIterationsNumber i
 	return err
 }
 
-// EncryptDB takes a plaintext database and adds encryption
-func EncryptDB(unencryptedPath string, encryptedPath string, key string, kdfIterationsNumber int) error {
-	_ = os.Remove(encryptedPath)
+func encryptDB(db *sql.DB, encryptedPath string, key string, kdfIterationsNumber int) error {
+	signal.SendReEncryptionStarted()
+	defer signal.SendReEncryptionFinished()
 
-	db, err := OpenUnecryptedDB(unencryptedPath)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec(`ATTACH DATABASE '` + encryptedPath + `' AS encrypted KEY '` + key + `'`)
+	_, err := db.Exec(`ATTACH DATABASE '` + encryptedPath + `' AS encrypted KEY '` + key + `'`)
 	if err != nil {
 		return err
 	}
@@ -71,7 +69,7 @@ func EncryptDB(unencryptedPath string, encryptedPath string, key string, kdfIter
 		return err
 	}
 
-	if _, err := db.Exec("PRAGMA encrypted.cipher_page_size = 1024"); err != nil {
+	if _, err := db.Exec(fmt.Sprintf("PRAGMA encrypted.cipher_page_size = %d", V4CipherPageSize)); err != nil {
 		fmt.Println("failed to set cipher_page_size pragma")
 		return err
 	}
@@ -91,6 +89,17 @@ func EncryptDB(unencryptedPath string, encryptedPath string, key string, kdfIter
 	}
 	_, err = db.Exec(`DETACH DATABASE encrypted`)
 	return err
+}
+
+// EncryptDB takes a plaintext database and adds encryption
+func EncryptDB(unencryptedPath string, encryptedPath string, key string, kdfIterationsNumber int) error {
+	_ = os.Remove(encryptedPath)
+
+	db, err := OpenUnecryptedDB(unencryptedPath)
+	if err != nil {
+		return err
+	}
+	return encryptDB(db, encryptedPath, key, kdfIterationsNumber)
 }
 
 func buildSqlcipherDSN(path string) (string, error) {
@@ -118,7 +127,7 @@ func buildSqlcipherDSN(path string) (string, error) {
 	return path + queryOperator + "_txlock=immediate", nil
 }
 
-func openDB(path string, key string, kdfIterationsNumber int) (*sql.DB, error) {
+func openDB(path string, key string, kdfIterationsNumber int, chiperPageSize int) (*sql.DB, error) {
 	driverName := fmt.Sprintf("sqlcipher_with_extensions-%d", len(sql.Drivers()))
 	sql.Register(driverName, &sqlcipher.SQLiteDriver{
 		ConnectHook: func(conn *sqlcipher.SQLiteConn) error {
@@ -134,7 +143,7 @@ func openDB(path string, key string, kdfIterationsNumber int) (*sql.DB, error) {
 				kdfIterationsNumber = sqlite.ReducedKDFIterationsNumber
 			}
 
-			if _, err := conn.Exec("PRAGMA cipher_page_size = 1024", nil); err != nil {
+			if _, err := conn.Exec(fmt.Sprintf("PRAGMA cipher_page_size = %d", chiperPageSize), nil); err != nil {
 				fmt.Println("failed to set cipher_page_size pragma")
 				return err
 			}
@@ -192,12 +201,18 @@ func openDB(path string, key string, kdfIterationsNumber int) (*sql.DB, error) {
 		db.SetMaxIdleConns(nproc)
 	}
 
+	// Dummy select to check if the key is correct. Will return last error from initialization
+	if _, err := db.Exec("SELECT 'Key check'"); err != nil {
+		db.Close()
+		return nil, err
+	}
+
 	return db, nil
 }
 
 // OpenDB opens not-encrypted database.
 func OpenDB(path string, key string, kdfIterationsNumber int) (*sql.DB, error) {
-	return openDB(path, key, kdfIterationsNumber)
+	return openDB(path, key, kdfIterationsNumber, V4CipherPageSize)
 }
 
 // OpenUnecryptedDB opens database with setting PRAGMA key.
@@ -229,11 +244,14 @@ func OpenUnecryptedDB(path string) (*sql.DB, error) {
 }
 
 func ChangeEncryptionKey(path string, key string, kdfIterationsNumber int, newKey string) error {
+	signal.SendReEncryptionStarted()
+	defer signal.SendReEncryptionFinished()
+
 	if kdfIterationsNumber <= 0 {
 		kdfIterationsNumber = sqlite.ReducedKDFIterationsNumber
 	}
 
-	db, err := openDB(path, key, kdfIterationsNumber)
+	db, err := openDB(path, key, kdfIterationsNumber, V4CipherPageSize)
 
 	if err != nil {
 		return err
@@ -245,4 +263,18 @@ func ChangeEncryptionKey(path string, key string, kdfIterationsNumber int, newKe
 	}
 
 	return nil
+}
+
+// MigrateV3ToV4 migrates database from v3 to v4 format with encryption.
+func MigrateV3ToV4(v3Path string, v4Path string, key string, kdfIterationsNumber int) error {
+
+	db, err := openDB(v3Path, key, kdfIterationsNumber, V3CipherPageSize)
+
+	if err != nil {
+		fmt.Println("failed to open db", err)
+		return err
+	}
+	defer db.Close()
+
+	return encryptDB(db, v4Path, key, kdfIterationsNumber)
 }
