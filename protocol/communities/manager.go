@@ -683,7 +683,7 @@ func (m *Manager) checkMemberPermissions(community *Community, removeAdmins bool
 		memberHasWallet := len(member.RevealedAccounts) > 0
 
 		// Check if user was not treated as an admin without wallet in open community
-		// or user threated as a member without wallet in closed community
+		// or user treated as a member without wallet in closed community
 		if (!memberHasWallet && isAdmin) || (memberPermissions && !memberHasWallet) {
 			_, err = community.RemoveUserFromOrg(memberPubKey)
 			if err != nil {
@@ -694,7 +694,7 @@ func (m *Manager) checkMemberPermissions(community *Community, removeAdmins bool
 
 		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(member.RevealedAccounts)
 
-		// Check if user is still an admin or can became an admin and do update of member role
+		// Check if user is still an admin or can become an admin and do update of member role
 		removeAdminRole := false
 		if adminPermissions {
 			permissionResponse, err := m.checkPermissionToJoin(becomeAdminPermissions, accountsAndChainIDs, true)
@@ -838,7 +838,7 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 	}
 
 	if !community.IsOwnerOrAdmin() {
-		return nil, errors.New("not an admin")
+		return nil, ErrNotEnoughPermissions
 	}
 
 	newDescription, err := request.ToCommunityDescription()
@@ -896,8 +896,8 @@ func (m *Manager) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error) 
 		return nil, err
 	}
 
-	if community.PrivateKey() == nil {
-		return nil, errors.New("not an admin")
+	if !community.IsOwner() {
+		return nil, ErrNotOwner
 	}
 
 	return community.config.PrivateKey, nil
@@ -1580,7 +1580,7 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 
 		// admin token permissions required to became an admin must not cancel request to join
 		// if requirements were not met
-		hasPermission := m.isWaleltsHasAdminPermission(becomeAdminPermissions, accountsAndChainIDs)
+		hasPermission := m.accountsHasAdminPermission(becomeAdminPermissions, accountsAndChainIDs)
 
 		if hasPermission {
 			memberRole = protobuf.CommunityMember_ROLE_ADMIN
@@ -1794,9 +1794,9 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 	if (len(becomeMemberPermissions) > 0 || len(becomeAdminPermissions) > 0) && len(request.RevealedAccounts) > 0 {
 		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(request.RevealedAccounts)
 
-		// admin token permissions required to became an admin must not cancel request to join
+		// admin token permissions required to become an admin must not cancel request to join
 		// if requirements were not met
-		hasPermission = m.isWaleltsHasAdminPermission(becomeAdminPermissions, accountsAndChainIDs)
+		hasPermission = m.accountsHasAdminPermission(becomeAdminPermissions, accountsAndChainIDs)
 
 		// if user does not have admin permissions, check on member permissions
 		if !hasPermission && len(becomeMemberPermissions) > 0 {
@@ -1869,11 +1869,15 @@ func (c *CheckPermissionToJoinResponse) calculateSatisfied() {
 
 	c.Satisfied = false
 	for _, p := range c.Permissions {
+		satisfied := true
 		for _, criteria := range p.Criteria {
-			if criteria {
-				c.Satisfied = true
-				return
+			if !criteria {
+				satisfied = false
+				break
 			}
+		}
+		if satisfied {
+			c.Satisfied = true
 		}
 	}
 }
@@ -3901,12 +3905,14 @@ func revealedAccountsToAccountsAndChainIDsCombination(revealedAccounts []*protob
 	return accountsAndChainIDs
 }
 
-func (m *Manager) isWaleltsHasAdminPermission(becomeAdminPermissions []*protobuf.CommunityTokenPermission, accounts []*AccountChainIDsCombination) bool {
+func (m *Manager) accountsHasAdminPermission(becomeAdminPermissions []*protobuf.CommunityTokenPermission, accounts []*AccountChainIDsCombination) bool {
 	if len(becomeAdminPermissions) > 0 {
 		permissionResponse, err := m.checkPermissionToJoin(becomeAdminPermissions, accounts, true)
-		if err == nil {
-			return permissionResponse.Satisfied
+		if err != nil {
+			m.logger.Warn("check admin permission failed: %v", zap.Error(err))
+			return false
 		}
+		return permissionResponse.Satisfied
 	}
 	return false
 }
