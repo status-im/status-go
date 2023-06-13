@@ -153,13 +153,17 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 		if err != nil {
 			return nil, err
 		}
+
+		areSubTxsCheckedForTxHash := make(map[common.Hash]bool)
+
 		for _, t := range transactionsToLoad {
 			subtransactions, err := d.subTransactionsFromTransactionHash(ctx, t.Log.TxHash, address)
 			if err != nil {
-				log.Error("can't fetch erc20 transfer from log", "error", err)
+				log.Error("can't fetch subTxs for erc20/erc721 transfer", "error", err)
 				return nil, err
 			}
 			rst = append(rst, subtransactions...)
+			areSubTxsCheckedForTxHash[t.Log.TxHash] = true
 		}
 
 		for _, tx := range blk.Transactions() {
@@ -176,24 +180,46 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 				return nil, err
 			}
 
-			if from == address || (tx.To() != nil && *tx.To() == address) {
+			isPlainTransfer := from == address || (tx.To() != nil && *tx.To() == address)
+			mustCheckSubTxs := false
+
+			if !isPlainTransfer {
+				// We might miss some subTransactions of interest for some transaction types. We need to check if we
+				// find the address in the transaction data.
+				switch tx.Type() {
+				case types.OptimismDepositTxType, types.ArbitrumDepositTxType, types.ArbitrumRetryTxType:
+					mustCheckSubTxs = !areSubTxsCheckedForTxHash[tx.Hash()] && w_common.TxDataContainsAddress(tx.Type(), tx.Data(), address)
+				}
+			}
+
+			if isPlainTransfer || mustCheckSubTxs {
 				receipt, err := d.chainClient.TransactionReceipt(ctx, tx.Hash())
 				if err != nil {
 					return nil, err
 				}
-
-				eventType, _ := w_common.GetFirstEvent(receipt.Logs)
 
 				baseGasFee, err := d.chainClient.GetBaseFeeFromBlock(blk.Number())
 				if err != nil {
 					return nil, err
 				}
 
-				// If the transaction is not already some known transfer type, add it
-				// to the list as a plain eth transfer
-				if eventType == w_common.UnknownEventType {
+				// Since we've already got the receipt, check for subTxs of
+				// interest in case we haven't already.
+				if !areSubTxsCheckedForTxHash[tx.Hash()] {
+					subtransactions, err := d.subTransactionsFromTransactionData(tx, receipt, blk, baseGasFee, address)
+					if err != nil {
+						log.Error("can't fetch subTxs for eth transfer", "error", err)
+						return nil, err
+					}
+					rst = append(rst, subtransactions...)
+					areSubTxsCheckedForTxHash[tx.Hash()] = true
+				}
+
+				// If it's a plain ETH transfer, add it to the list
+				if isPlainTransfer {
 					rst = append(rst, Transfer{
 						Type:               w_common.EthTransfer,
+						NetworkID:          tx.ChainId().Uint64(),
 						ID:                 tx.Hash(),
 						Address:            address,
 						BlockNumber:        blk.Number(),
@@ -263,12 +289,16 @@ func (d *ETHDownloader) subTransactionsFromTransactionHash(parent context.Contex
 	if err != nil {
 		return nil, err
 	}
-	from, err := types.Sender(d.signer, tx)
+
+	ctx, cancel = context.WithTimeout(parent, 3*time.Second)
+	receipt, err := d.chainClient.TransactionReceipt(ctx, txHash)
+	cancel()
 	if err != nil {
 		return nil, err
 	}
+
 	ctx, cancel = context.WithTimeout(parent, 3*time.Second)
-	receipt, err := d.chainClient.TransactionReceipt(ctx, txHash)
+	blk, err := d.chainClient.BlockByHash(ctx, receipt.BlockHash)
 	cancel()
 	if err != nil {
 		return nil, err
@@ -279,10 +309,15 @@ func (d *ETHDownloader) subTransactionsFromTransactionHash(parent context.Contex
 		return nil, err
 	}
 
-	ctx, cancel = context.WithTimeout(parent, 3*time.Second)
-	blk, err := d.chainClient.BlockByHash(ctx, receipt.BlockHash)
-	cancel()
+	return d.subTransactionsFromTransactionData(tx, receipt, blk, baseGasFee, address)
+}
+
+func (d *ETHDownloader) subTransactionsFromTransactionData(tx *types.Transaction, receipt *types.Receipt, blk *types.Block, baseGasFee string, address common.Address) ([]Transfer, error) {
+	from, err := types.Sender(d.signer, tx)
 	if err != nil {
+		if err == core.ErrTxTypeNotSupported {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -295,16 +330,18 @@ func (d *ETHDownloader) subTransactionsFromTransactionHash(parent context.Contex
 		mustAppend := false
 		switch eventType {
 		case w_common.Erc20TransferEventType:
-			from, to, _ := w_common.ParseErc20TransferLog(log)
-			if from == address || to == address {
+			trFrom, trTo, _ := w_common.ParseErc20TransferLog(log)
+			if trFrom == address || trTo == address {
 				mustAppend = true
 			}
 		case w_common.Erc721TransferEventType:
-			from, to, _ := w_common.ParseErc721TransferLog(log)
-			if from == address || to == address {
+			trFrom, trTo, _ := w_common.ParseErc721TransferLog(log)
+			if trFrom == address || trTo == address {
 				mustAppend = true
 			}
 		case w_common.UniswapV2SwapEventType, w_common.UniswapV3SwapEventType:
+			mustAppend = true
+		case w_common.HopBridgeTransferSentToL2EventType, w_common.HopBridgeTransferFromL1CompletedEventType:
 			mustAppend = true
 		}
 
@@ -316,6 +353,7 @@ func (d *ETHDownloader) subTransactionsFromTransactionHash(parent context.Contex
 				BlockNumber:        new(big.Int).SetUint64(log.BlockNumber),
 				BlockHash:          log.BlockHash,
 				Loaded:             true,
+				NetworkID:          d.signer.ChainID().Uint64(),
 				From:               from,
 				Log:                log,
 				BaseGasFees:        baseGasFee,

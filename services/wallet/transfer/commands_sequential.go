@@ -296,7 +296,7 @@ func (c *findBlocksCommand) fastIndexErc20(ctx context.Context, fromBlockNumber 
 	group := async.NewGroup(ctx)
 
 	erc20 := &erc20HistoricalCommand{
-		erc20:        NewERC20TransfersDownloader(c.chainClient, []common.Address{c.account}, types.NewLondonSigner(c.chainClient.ToBigInt())),
+		erc20:        NewERC20TransfersDownloader(c.chainClient, []common.Address{c.account}, types.LatestSignerForChainID(c.chainClient.ToBigInt())),
 		chainClient:  c.chainClient,
 		feed:         c.feed,
 		address:      c.account,

@@ -70,7 +70,7 @@ type OnDemandFetchStrategy struct {
 }
 
 func (s *OnDemandFetchStrategy) newControlCommand(chainClient *chain.ClientWithFallback, accounts []common.Address) *controlCommand {
-	signer := types.NewLondonSigner(chainClient.ToBigInt())
+	signer := types.LatestSignerForChainID(chainClient.ToBigInt())
 	ctl := &controlCommand{
 		db:          s.db,
 		chainClient: chainClient,

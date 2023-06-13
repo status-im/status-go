@@ -52,6 +52,10 @@ func NewTransactionManager(db *sql.DB, gethManager *account.GethManager, transac
 	}
 }
 
+var (
+	emptyHash = common.Hash{}
+)
+
 type MultiTransactionType uint8
 
 const (
@@ -61,15 +65,20 @@ const (
 )
 
 type MultiTransaction struct {
-	ID          uint                 `json:"id"`
-	Timestamp   uint64               `json:"timestamp"`
-	FromAddress common.Address       `json:"fromAddress"`
-	ToAddress   common.Address       `json:"toAddress"`
-	FromAsset   string               `json:"fromAsset"`
-	ToAsset     string               `json:"toAsset"`
-	FromAmount  *hexutil.Big         `json:"fromAmount"`
-	ToAmount    *hexutil.Big         `json:"toAmount"`
-	Type        MultiTransactionType `json:"type"`
+	ID            uint                 `json:"id"`
+	Timestamp     uint64               `json:"timestamp"`
+	FromNetworkID uint64               `json:"fromNetworkID"`
+	ToNetworkID   uint64               `json:"toNetworkID"`
+	FromTxHash    common.Hash          `json:"fromTxHash"`
+	ToTxHash      common.Hash          `json:"toTxHash"`
+	FromAddress   common.Address       `json:"fromAddress"`
+	ToAddress     common.Address       `json:"toAddress"`
+	FromAsset     string               `json:"fromAsset"`
+	ToAsset       string               `json:"toAsset"`
+	FromAmount    *hexutil.Big         `json:"fromAmount"`
+	ToAmount      *hexutil.Big         `json:"toAmount"`
+	Type          MultiTransactionType `json:"type"`
+	CrossTxID     string
 }
 
 type MultiTransactionCommand struct {
@@ -321,34 +330,127 @@ func (tm *TransactionManager) Watch(ctx context.Context, transactionHash common.
 	return watchTxCommand.Command()(commandContext)
 }
 
-const multiTransactionColumns = "from_address, from_asset, from_amount, to_address, to_asset, to_amount, type, timestamp"
+const multiTransactionColumns = "from_network_id, from_tx_hash, from_address, from_asset, from_amount, to_network_id, to_tx_hash, to_address, to_asset, to_amount, type, cross_tx_id, timestamp"
+
+func rowsToMultiTransactions(rows *sql.Rows) ([]*MultiTransaction, error) {
+	var multiTransactions []*MultiTransaction
+	for rows.Next() {
+		multiTransaction := &MultiTransaction{}
+		var fromAmountDB, toAmountDB sql.NullString
+		err := rows.Scan(
+			&multiTransaction.ID,
+			&multiTransaction.FromNetworkID,
+			&multiTransaction.FromTxHash,
+			&multiTransaction.FromAddress,
+			&multiTransaction.FromAsset,
+			&fromAmountDB,
+			&multiTransaction.ToNetworkID,
+			&multiTransaction.ToTxHash,
+			&multiTransaction.ToAddress,
+			&multiTransaction.ToAsset,
+			&toAmountDB,
+			&multiTransaction.Type,
+			&multiTransaction.CrossTxID,
+			&multiTransaction.Timestamp,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if fromAmountDB.Valid {
+			multiTransaction.FromAmount = new(hexutil.Big)
+			if _, ok := (*big.Int)(multiTransaction.FromAmount).SetString(fromAmountDB.String, 0); !ok {
+				return nil, errors.New("failed to convert fromAmountDB.String to big.Int: " + fromAmountDB.String)
+			}
+		}
+
+		if toAmountDB.Valid {
+			multiTransaction.ToAmount = new(hexutil.Big)
+			if _, ok := (*big.Int)(multiTransaction.ToAmount).SetString(toAmountDB.String, 0); !ok {
+				return nil, errors.New("failed to convert fromAmountDB.String to big.Int: " + toAmountDB.String)
+			}
+		}
+
+		multiTransactions = append(multiTransactions, multiTransaction)
+	}
+
+	return multiTransactions, nil
+}
 
 func insertMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) (MultiTransactionIDType, error) {
-	insert, err := db.Prepare(fmt.Sprintf(`INSERT OR REPLACE INTO multi_transactions (%s)
-											VALUES(?, ?, ?, ?, ?, ?, ?, ?)`, multiTransactionColumns))
+	insert, err := db.Prepare(fmt.Sprintf(`INSERT INTO multi_transactions (%s)
+											VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, multiTransactionColumns))
 	if err != nil {
 		return 0, err
 	}
+
+	timestamp := time.Now().Unix()
 	result, err := insert.Exec(
+		multiTransaction.FromNetworkID,
+		multiTransaction.FromTxHash,
 		multiTransaction.FromAddress,
 		multiTransaction.FromAsset,
 		multiTransaction.FromAmount.String(),
+		multiTransaction.ToNetworkID,
+		multiTransaction.ToTxHash,
 		multiTransaction.ToAddress,
 		multiTransaction.ToAsset,
 		multiTransaction.ToAmount.String(),
 		multiTransaction.Type,
-		time.Now().Unix(),
+		multiTransaction.CrossTxID,
+		timestamp,
 	)
 	if err != nil {
 		return 0, err
 	}
 	defer insert.Close()
 	multiTransactionID, err := result.LastInsertId()
+
+	multiTransaction.Timestamp = uint64(timestamp)
+	multiTransaction.ID = uint(multiTransactionID)
+
 	return MultiTransactionIDType(multiTransactionID), err
 }
 
 func (tm *TransactionManager) InsertMultiTransaction(multiTransaction *MultiTransaction) (MultiTransactionIDType, error) {
 	return insertMultiTransaction(tm.db, multiTransaction)
+}
+
+func updateMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) error {
+	if MultiTransactionIDType(multiTransaction.ID) == NoMultiTransactionID {
+		return fmt.Errorf("no multitransaction ID")
+	}
+
+	update, err := db.Prepare(fmt.Sprintf(`REPLACE INTO multi_transactions (rowid, %s)
+	VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, multiTransactionColumns))
+
+	if err != nil {
+		return err
+	}
+	_, err = update.Exec(
+		multiTransaction.ID,
+		multiTransaction.FromNetworkID,
+		multiTransaction.FromTxHash,
+		multiTransaction.FromAddress,
+		multiTransaction.FromAsset,
+		multiTransaction.FromAmount.String(),
+		multiTransaction.ToNetworkID,
+		multiTransaction.ToTxHash,
+		multiTransaction.ToAddress,
+		multiTransaction.ToAsset,
+		multiTransaction.ToAmount.String(),
+		multiTransaction.Type,
+		multiTransaction.CrossTxID,
+		time.Now().Unix(),
+	)
+	if err != nil {
+		return err
+	}
+	return update.Close()
+}
+
+func (tm *TransactionManager) UpdateMultiTransaction(multiTransaction *MultiTransaction) error {
+	return updateMultiTransaction(tm.db, multiTransaction)
 }
 
 func (tm *TransactionManager) CreateMultiTransactionFromCommand(ctx context.Context, command *MultiTransactionCommand, data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge, password string) (*MultiTransactionCommandResult, error) {
@@ -427,43 +529,58 @@ func (tm *TransactionManager) GetMultiTransactions(ctx context.Context, ids []Mu
 	}
 	defer rows.Close()
 
-	var multiTransactions []*MultiTransaction
-	for rows.Next() {
-		multiTransaction := &MultiTransaction{}
-		var fromAmountDB, toAmountDB sql.NullString
-		err := rows.Scan(
-			&multiTransaction.ID,
-			&multiTransaction.FromAddress,
-			&multiTransaction.FromAsset,
-			&fromAmountDB,
-			&multiTransaction.ToAddress,
-			&multiTransaction.ToAsset,
-			&toAmountDB,
-			&multiTransaction.Type,
-			&multiTransaction.Timestamp,
-		)
-		if err != nil {
-			return nil, err
-		}
+	return rowsToMultiTransactions(rows)
+}
 
-		if fromAmountDB.Valid {
-			multiTransaction.FromAmount = new(hexutil.Big)
-			if _, ok := (*big.Int)(multiTransaction.FromAmount).SetString(fromAmountDB.String, 0); !ok {
-				return nil, errors.New("failed to convert fromAmountDB.String to big.Int: " + fromAmountDB.String)
-			}
-		}
+func (tm *TransactionManager) getBridgeMultiTransactions(ctx context.Context, toChainID uint64, crossTxID string) ([]*MultiTransaction, error) {
+	stmt, err := tm.db.Prepare(fmt.Sprintf(`SELECT rowid, %s
+											FROM multi_transactions
+											WHERE type=? AND to_network_id=? AND cross_tx_id=?`,
+		multiTransactionColumns))
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
 
-		if toAmountDB.Valid {
-			multiTransaction.ToAmount = new(hexutil.Big)
-			if _, ok := (*big.Int)(multiTransaction.ToAmount).SetString(toAmountDB.String, 0); !ok {
-				return nil, errors.New("failed to convert fromAmountDB.String to big.Int: " + toAmountDB.String)
-			}
-		}
+	rows, err := stmt.Query(MultiTransactionBridge, toChainID, crossTxID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-		multiTransactions = append(multiTransactions, multiTransaction)
+	return rowsToMultiTransactions(rows)
+}
+
+func (tm *TransactionManager) GetBridgeOriginMultiTransaction(ctx context.Context, toChainID uint64, crossTxID string) (*MultiTransaction, error) {
+	multiTxs, err := tm.getBridgeMultiTransactions(ctx, toChainID, crossTxID)
+	if err != nil {
+		return nil, err
 	}
 
-	return multiTransactions, nil
+	for _, multiTx := range multiTxs {
+		// Origin MultiTxs will have a missing "ToTxHash"
+		if multiTx.ToTxHash == emptyHash {
+			return multiTx, nil
+		}
+	}
+
+	return nil, nil
+}
+
+func (tm *TransactionManager) GetBridgeDestinationMultiTransaction(ctx context.Context, toChainID uint64, crossTxID string) (*MultiTransaction, error) {
+	multiTxs, err := tm.getBridgeMultiTransactions(ctx, toChainID, crossTxID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, multiTx := range multiTxs {
+		// Destination MultiTxs will have a missing "FromTxHash"
+		if multiTx.FromTxHash == emptyHash {
+			return multiTx, nil
+		}
+	}
+
+	return nil, nil
 }
 
 func (tm *TransactionManager) getVerifiedWalletAccount(address, password string) (*account.SelectedExtKey, error) {

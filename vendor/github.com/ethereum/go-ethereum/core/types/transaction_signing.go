@@ -51,6 +51,7 @@ func MakeSigner(config *params.ChainConfig, blockNumber *big.Int) Signer {
 	default:
 		signer = FrontierSigner{}
 	}
+	signer = NewArbitrumSigner(signer)
 	return signer
 }
 
@@ -61,7 +62,7 @@ func MakeSigner(config *params.ChainConfig, blockNumber *big.Int) Signer {
 //
 // Use this in transaction-handling code where the current block number is unknown. If you
 // have the current block number available, use MakeSigner instead.
-func LatestSigner(config *params.ChainConfig) Signer {
+func latestSignerImpl(config *params.ChainConfig) Signer {
 	if config.ChainID != nil {
 		if config.LondonBlock != nil {
 			return NewLondonSigner(config.ChainID)
@@ -76,6 +77,10 @@ func LatestSigner(config *params.ChainConfig) Signer {
 	return HomesteadSigner{}
 }
 
+func LatestSigner(config *params.ChainConfig) Signer {
+	return NewArbitrumSigner(latestSignerImpl(config))
+}
+
 // LatestSignerForChainID returns the 'most permissive' Signer available. Specifically,
 // this enables support for EIP-155 replay protection and all implemented EIP-2718
 // transaction types if chainID is non-nil.
@@ -83,11 +88,15 @@ func LatestSigner(config *params.ChainConfig) Signer {
 // Use this in transaction-handling code where the current block number and fork
 // configuration are unknown. If you have a ChainConfig, use LatestSigner instead.
 // If you have a ChainConfig and know the current block number, use MakeSigner instead.
-func LatestSignerForChainID(chainID *big.Int) Signer {
+func latestSignerForChainIDImpl(chainID *big.Int) Signer {
 	if chainID == nil {
 		return HomesteadSigner{}
 	}
 	return NewLondonSigner(chainID)
+}
+
+func LatestSignerForChainID(chainID *big.Int) Signer {
+	return NewArbitrumSigner(latestSignerForChainIDImpl(chainID))
 }
 
 // SignTx signs the transaction using the given signer and private key.
@@ -182,6 +191,14 @@ func NewLondonSigner(chainId *big.Int) Signer {
 }
 
 func (s londonSigner) Sender(tx *Transaction) (common.Address, error) {
+	if tx.Type() == OptimismDepositTxType {
+		switch tx.inner.(type) {
+		case *OptimismDepositTx:
+			return tx.inner.(*OptimismDepositTx).From, nil
+		case *optimismDepositTxWithNonce:
+			return tx.inner.(*optimismDepositTxWithNonce).From, nil
+		}
+	}
 	if tx.Type() != DynamicFeeTxType {
 		return s.eip2930Signer.Sender(tx)
 	}
@@ -201,6 +218,9 @@ func (s londonSigner) Equal(s2 Signer) bool {
 }
 
 func (s londonSigner) SignatureValues(tx *Transaction, sig []byte) (R, S, V *big.Int, err error) {
+	if tx.Type() == OptimismDepositTxType {
+		return nil, nil, nil, fmt.Errorf("deposits do not have a signature")
+	}
 	txdata, ok := tx.inner.(*DynamicFeeTx)
 	if !ok {
 		return s.eip2930Signer.SignatureValues(tx, sig)
@@ -218,6 +238,9 @@ func (s londonSigner) SignatureValues(tx *Transaction, sig []byte) (R, S, V *big
 // Hash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
 func (s londonSigner) Hash(tx *Transaction) common.Hash {
+	if tx.Type() == OptimismDepositTxType {
+		panic("deposits cannot be signed and do not have a signing hash")
+	}
 	if tx.Type() != DynamicFeeTxType {
 		return s.eip2930Signer.Hash(tx)
 	}
