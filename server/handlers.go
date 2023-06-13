@@ -245,7 +245,7 @@ func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
 	}
 
 	hash := params["hash"]
-	if len(urls) != 0 {
+	if len(hash) != 0 {
 		parsed.Hash = hash[0]
 	}
 
