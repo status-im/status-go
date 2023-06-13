@@ -193,7 +193,7 @@ func (c *Controller) LoadTransferByHash(ctx context.Context, rpcClient *rpc.Clie
 		return err
 	}
 
-	signer := types.NewLondonSigner(chainClient.ToBigInt())
+	signer := types.LatestSignerForChainID(chainClient.ToBigInt())
 
 	transfer, err := getTransferByHash(ctx, chainClient, signer, address, hash)
 	if err != nil {
@@ -231,7 +231,7 @@ func (c *Controller) GetTransfersByAddress(ctx context.Context, chainID uint64, 
 func (c *Controller) GetTransfersForIdentities(ctx context.Context, identities []TransactionIdentity) ([]View, error) {
 	rst, err := c.db.GetTransfersForIdentities(ctx, identities)
 	if err != nil {
-		log.Error("[transfer.Controller.GetTransfersByAddress] DB err", err)
+		log.Error("[transfer.Controller.GetTransfersForIdentities] DB err", err)
 		return nil, err
 	}
 

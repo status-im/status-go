@@ -25,16 +25,20 @@ const (
 	Erc721Transfer     Type = "erc721"
 	UniswapV2Swap      Type = "uniswapV2Swap"
 	UniswapV3Swap      Type = "uniswapV3Swap"
+	HopBridgeFrom      Type = "HopBridgeFrom"
+	HopBridgeTo        Type = "HopBridgeTo"
 	unknownTransaction Type = "unknown"
 
 	// Event types
-	WETHDepositEventType    EventType = "wethDepositEvent"
-	WETHWithdrawalEventType EventType = "wethWithdrawalEvent"
-	Erc20TransferEventType  EventType = "erc20Event"
-	Erc721TransferEventType EventType = "erc721Event"
-	UniswapV2SwapEventType  EventType = "uniswapV2SwapEvent"
-	UniswapV3SwapEventType  EventType = "uniswapV3SwapEvent"
-	UnknownEventType        EventType = "unknownEvent"
+	WETHDepositEventType                      EventType = "wethDepositEvent"
+	WETHWithdrawalEventType                   EventType = "wethWithdrawalEvent"
+	Erc20TransferEventType                    EventType = "erc20Event"
+	Erc721TransferEventType                   EventType = "erc721Event"
+	UniswapV2SwapEventType                    EventType = "uniswapV2SwapEvent"
+	UniswapV3SwapEventType                    EventType = "uniswapV3SwapEvent"
+	HopBridgeTransferSentToL2EventType        EventType = "hopBridgeTransferSentToL2Event"
+	HopBridgeTransferFromL1CompletedEventType EventType = "hopBridgeTransferFromL1CompletedEvent"
+	UnknownEventType                          EventType = "unknownEvent"
 
 	// Deposit (index_topic_1 address dst, uint256 wad)
 	wethDepositEventSignature = "Deposit(address,uint256)"
@@ -52,6 +56,11 @@ const (
 	uniswapV2SwapEventSignature = "Swap(address,uint256,uint256,uint256,uint256,address)" // also used by SushiSwap
 	// Swap (index_topic_1 address sender, index_topic_2 address recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)
 	uniswapV3SwapEventSignature = "Swap(address,address,int256,int256,uint160,uint128,int24)"
+
+	// TransferSentToL2 (index_topic_1 uint256 chainId, index_topic_2 address recipient, uint256 amount, uint256 amountOutMin, uint256 deadline, index_topic_3 address relayer, uint256 relayerFee)
+	hopBridgeTransferSentToL2EventSignature = "TransferSentToL2(uint256,address,uint256,uint256,uint256,address,uint256)"
+	// TransferFromL1Completed (index_topic_1 address recipient, uint256 amount, uint256 amountOutMin, uint256 deadline, index_topic_2 address relayer, uint256 relayerFee)
+	HopBridgeTransferFromL1CompletedEventSignature = "TransferFromL1Completed(address,uint256,uint256,uint256,address,uint256)"
 )
 
 var (
@@ -66,6 +75,8 @@ func GetEventType(log *types.Log) EventType {
 	erc20_721TransferEventSignatureHash := GetEventSignatureHash(Erc20_721TransferEventSignature)
 	uniswapV2SwapEventSignatureHash := GetEventSignatureHash(uniswapV2SwapEventSignature)
 	uniswapV3SwapEventSignatureHash := GetEventSignatureHash(uniswapV3SwapEventSignature)
+	hopBridgeTransferSentToL2EventSignatureHash := GetEventSignatureHash(hopBridgeTransferSentToL2EventSignature)
+	hopBridgeTransferFromL1CompletedEventSignatureHash := GetEventSignatureHash(HopBridgeTransferFromL1CompletedEventSignature)
 
 	if len(log.Topics) > 0 {
 		switch log.Topics[0] {
@@ -84,6 +95,10 @@ func GetEventType(log *types.Log) EventType {
 			return UniswapV2SwapEventType
 		case uniswapV3SwapEventSignatureHash:
 			return UniswapV3SwapEventType
+		case hopBridgeTransferSentToL2EventSignatureHash:
+			return HopBridgeTransferSentToL2EventType
+		case hopBridgeTransferFromL1CompletedEventSignatureHash:
+			return HopBridgeTransferFromL1CompletedEventType
 		}
 	}
 
@@ -100,6 +115,10 @@ func EventTypeToSubtransactionType(eventType EventType) Type {
 		return UniswapV2Swap
 	case UniswapV3SwapEventType:
 		return UniswapV3Swap
+	case HopBridgeTransferSentToL2EventType:
+		return HopBridgeFrom
+	case HopBridgeTransferFromL1CompletedEventType:
+		return HopBridgeTo
 	}
 
 	return unknownTransaction
@@ -296,6 +315,74 @@ func ParseUniswapV3Log(ethlog *types.Log) (poolAddress common.Address, sender co
 	return
 }
 
+func ParseHopBridgeTransferSentToL2Log(ethlog *types.Log) (chainID uint64, recipient common.Address, relayer common.Address, amount *big.Int, err error) {
+	chainIDInt := new(big.Int)
+	amount = new(big.Int)
+
+	if len(ethlog.Topics) < 4 {
+		err = fmt.Errorf("not enough topics for HopBridgeTransferSentToL2 event %s, %v", "topics", ethlog.Topics)
+		return
+	}
+
+	if len(ethlog.Topics[1]) != 32 {
+		err = fmt.Errorf("second topic is not padded to 32 byte address %s, %v", "topic", ethlog.Topics[1])
+		return
+	}
+	chainIDInt.SetBytes(ethlog.Topics[1][:])
+	chainID = chainIDInt.Uint64()
+
+	if len(ethlog.Topics[2]) != 32 {
+		err = fmt.Errorf("third topic is not padded to 32 byte address %s, %v", "topic", ethlog.Topics[2])
+		return
+	}
+	copy(recipient[:], ethlog.Topics[2][12:])
+
+	if len(ethlog.Topics[3]) != 32 {
+		err = fmt.Errorf("fourth topic is not padded to 32 byte address %s, %v", "topic", ethlog.Topics[3])
+		return
+	}
+	copy(relayer[:], ethlog.Topics[3][12:])
+
+	if len(ethlog.Data) != 32*4 {
+		err = fmt.Errorf("data is not padded to 4 * 32 bytes big int %s, %v", "data", ethlog.Data)
+		return
+	}
+
+	amount.SetBytes(ethlog.Data[0:32])
+
+	return
+}
+
+func ParseHopBridgeTransferFromL1CompletedLog(ethlog *types.Log) (recipient common.Address, relayer common.Address, amount *big.Int, err error) {
+	amount = new(big.Int)
+
+	if len(ethlog.Topics) < 3 {
+		err = fmt.Errorf("not enough topics for HopBridgeTransferFromL1Completed event %s, %v", "topics", ethlog.Topics)
+		return
+	}
+
+	if len(ethlog.Topics[1]) != 32 {
+		err = fmt.Errorf("second topic is not padded to 32 byte address %s, %v", "topic", ethlog.Topics[1])
+		return
+	}
+	copy(recipient[:], ethlog.Topics[1][12:])
+
+	if len(ethlog.Topics[2]) != 32 {
+		err = fmt.Errorf("third topic is not padded to 32 byte address %s, %v", "topic", ethlog.Topics[2])
+		return
+	}
+	copy(relayer[:], ethlog.Topics[2][12:])
+
+	if len(ethlog.Data) != 32*4 {
+		err = fmt.Errorf("data is not padded to 4 * 32 bytes big int %s, %v", "data", ethlog.Data)
+		return
+	}
+
+	amount.SetBytes(ethlog.Data[0:32])
+
+	return
+}
+
 func GetEventSignatureHash(signature string) common.Hash {
 	return crypto.Keccak256Hash([]byte(signature))
 }
@@ -332,4 +419,36 @@ func ExtractTokenIdentity(dbEntryType Type, log *types.Log, tx *types.Transactio
 	}
 
 	return
+}
+
+func TxDataContainsAddress(txType uint8, txData []byte, address common.Address) bool {
+	// First 4 bytes are related to the methodID
+	const methodIDLen int = 4
+	const paramLen int = 32
+
+	var paramOffset int = 0
+	switch txType {
+	case types.OptimismDepositTxType:
+		// Offset for relayMessage data.
+		// I actually don't know what the 2x32 + 4 bytes mean, but it seems to be constant in all transactions I've
+		// checked. Will update the comment when I find out more about it.
+		paramOffset = 5*32 + 2*32 + 4
+	}
+
+	// Check if address is contained in any 32-byte parameter
+	for paramStart := methodIDLen + paramOffset; paramStart < len(txData); paramStart += paramLen {
+		paramEnd := paramStart + paramLen
+
+		if paramEnd > len(txData) {
+			break
+		}
+
+		// Address bytes should be in the last addressLen positions
+		paramBytes := txData[paramStart:paramEnd]
+		paramAddress := common.BytesToAddress(paramBytes)
+		if address == paramAddress {
+			return true
+		}
+	}
+	return false
 }

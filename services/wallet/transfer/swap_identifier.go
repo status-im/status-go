@@ -203,9 +203,13 @@ func fetchUniswapInfo(ctx context.Context, client *chain.ClientWithFallback, tok
 // We only care about the first and last swap to identify the input/output token and amounts
 func buildUniswapSwapMultitransaction(ctx context.Context, client *chain.ClientWithFallback, tokenManager *token.Manager, transfer *Transfer) (*MultiTransaction, error) {
 	multiTransaction := MultiTransaction{
-		Type:        MultiTransactionSwap,
-		FromAddress: transfer.Address,
-		ToAddress:   transfer.Address,
+		Type:          MultiTransactionSwap,
+		FromNetworkID: transfer.NetworkID,
+		FromTxHash:    transfer.Receipt.TxHash,
+		FromAddress:   transfer.Address,
+		ToNetworkID:   transfer.NetworkID,
+		ToTxHash:      transfer.Receipt.TxHash,
+		ToAddress:     transfer.Address,
 	}
 
 	var firstSwapLog, lastSwapLog *types.Log

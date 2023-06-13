@@ -491,6 +491,26 @@ func (c *transfersCommand) checkAndProcessSwapMultiTx(ctx context.Context, tx Tr
 	return false, nil
 }
 
+func (c *transfersCommand) checkAndProcessBridgeMultiTx(ctx context.Context, tx Transaction) (bool, error) {
+	for _, subTx := range tx {
+		switch subTx.Type {
+		// If the Tx contains any hopBridge subTx, create/update Bridge multiTx
+		case w_common.HopBridgeFrom, w_common.HopBridgeTo:
+			multiTransaction, err := buildHopBridgeMultitransaction(ctx, c.chainClient, c.transactionManager, c.tokenManager, subTx)
+			if err != nil {
+				return false, err
+			}
+
+			if multiTransaction != nil {
+				setMultiTxID(tx, MultiTransactionIDType(multiTransaction.ID))
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
 func (c *transfersCommand) processMultiTransactions(ctx context.Context, allTransfers []Transfer) error {
 	txByTxHash := subTransactionListToTransactionsByTxHash(allTransfers)
 
@@ -505,7 +525,16 @@ func (c *transfersCommand) processMultiTransactions(ctx context.Context, allTran
 		}
 
 		// Then check for a Swap transaction
-		_, err = c.checkAndProcessSwapMultiTx(ctx, tx)
+		txProcessed, err := c.checkAndProcessSwapMultiTx(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if txProcessed {
+			continue
+		}
+
+		// Then check for a Bridge transaction
+		_, err = c.checkAndProcessBridgeMultiTx(ctx, tx)
 		if err != nil {
 			return err
 		}
@@ -694,7 +723,7 @@ func (c *findAndCheckBlockRangeCommand) fastIndexErc20(ctx context.Context, from
 	commands := make([]*erc20HistoricalCommand, len(c.accounts))
 	for i, address := range c.accounts {
 		erc20 := &erc20HistoricalCommand{
-			erc20:        NewERC20TransfersDownloader(c.chainClient, []common.Address{address}, types.NewLondonSigner(c.chainClient.ToBigInt())),
+			erc20:        NewERC20TransfersDownloader(c.chainClient, []common.Address{address}, types.LatestSignerForChainID(c.chainClient.ToBigInt())),
 			chainClient:  c.chainClient,
 			feed:         c.feed,
 			address:      address,
@@ -735,7 +764,7 @@ func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *Blo
 			eth: &ETHDownloader{
 				chainClient: chainClient,
 				accounts:    []common.Address{address},
-				signer:      types.NewLondonSigner(chainClient.ToBigInt()),
+				signer:      types.LatestSignerForChainID(chainClient.ToBigInt()),
 				db:          db,
 			},
 			blockNums:          blocksByAddress[address],
