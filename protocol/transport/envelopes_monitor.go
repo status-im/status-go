@@ -115,10 +115,18 @@ func (m *EnvelopesMonitor) Stop() {
 func (m *EnvelopesMonitor) Add(identifiers [][]byte, envelopeHash types.Hash, message types.NewMessage) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.envelopes[envelopeHash] = EnvelopePosted
 	m.identifiers[envelopeHash] = identifiers
-	m.messages[envelopeHash] = &message
-	m.attempts[envelopeHash] = 1
+	// If it's already been marked as sent, we notify the client
+	if m.envelopes[envelopeHash] == EnvelopeSent {
+		if m.handler != nil {
+			m.handler.EnvelopeSent(m.identifiers[envelopeHash])
+		}
+	} else {
+		// otherwise we keep track of the message
+		m.messages[envelopeHash] = &message
+		m.attempts[envelopeHash] = 1
+		m.envelopes[envelopeHash] = EnvelopePosted
+	}
 }
 
 func (m *EnvelopesMonitor) GetState(hash types.Hash) EnvelopeState {
@@ -174,15 +182,22 @@ func (m *EnvelopesMonitor) handleEventEnvelopeSent(event types.EnvelopeEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	confirmationExpected := event.Batch != (types.Hash{})
+
 	state, ok := m.envelopes[event.Hash]
 
-	// if we didn't send a message using extension - skip it
+	// If confirmations are not expected, we keep track of the envelope
+	// being sent
+	if !ok && !confirmationExpected {
+		m.envelopes[event.Hash] = EnvelopeSent
+		return
+	}
+
 	// if message was already confirmed - skip it
-	if !ok || state == EnvelopeSent {
+	if state == EnvelopeSent {
 		return
 	}
 	m.logger.Debug("envelope is sent", zap.String("hash", event.Hash.String()), zap.String("peer", event.Peer.String()))
-	confirmationExpected := event.Batch != (types.Hash{})
 	if confirmationExpected {
 		if _, ok := m.batches[event.Batch]; !ok {
 			m.batches[event.Batch] = map[types.Hash]struct{}{}
