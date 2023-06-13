@@ -69,7 +69,7 @@ type Manager struct {
 	subscriptions                  []chan *Subscription
 	ensVerifier                    *ens.Verifier
 	identity                       *ecdsa.PrivateKey
-	accountsManager                *account.GethManager
+	accountsManager                account.Interface
 	tokenManager                   TokenManager
 	logger                         *zap.Logger
 	stdoutLogger                   *zap.Logger
@@ -122,7 +122,7 @@ func (t *HistoryArchiveDownloadTask) Cancel() {
 }
 
 type managerOptions struct {
-	accountsManager      *account.GethManager
+	accountsManager      account.Interface
 	tokenManager         TokenManager
 	walletConfig         *params.WalletConfig
 	openseaClientBuilder openseaClientBuilder
@@ -168,7 +168,7 @@ func (m *DefaultTokenManager) GetBalancesByChain(ctx context.Context, accounts, 
 
 type ManagerOption func(*managerOptions)
 
-func WithAccountManager(accountsManager *account.GethManager) ManagerOption {
+func WithAccountManager(accountsManager account.Interface) ManagerOption {
 	return func(opts *managerOptions) {
 		opts.accountsManager = accountsManager
 	}
@@ -1571,15 +1571,15 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 
 	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
-	revealedAccounts := make([]*protobuf.RevealedAccount, 0)
+
+	revealedAccounts, err := m.persistence.GetRequestToJoinRevealedAddresses(dbRequest.ID)
+	if err != nil {
+		return nil, err
+	}
 
 	memberRole := protobuf.CommunityMember_ROLE_NONE
 
 	if len(becomeMemberPermissions) > 0 || len(becomeAdminPermissions) > 0 {
-		revealedAccounts, err := m.persistence.GetRequestToJoinRevealedAddresses(dbRequest.ID)
-		if err != nil {
-			return nil, err
-		}
 
 		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(revealedAccounts)
 
@@ -1845,7 +1845,38 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 			return nil, err
 		}
 		requestToJoin.State = RequestToJoinStateAccepted
-		return requestToJoin, nil
+	}
+
+	// Save revealed addresses + signatures so they can later be added
+	// to the community member list when the request is accepted
+	if len(request.RevealedAccounts) > 0 {
+		// verify if revealed addresses indeed belong to requester
+		for _, revealedAccount := range request.RevealedAccounts {
+			recoverParams := account.RecoverParams{
+				Message:   types.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID(), requestToJoin.ID)),
+				Signature: types.EncodeHex(revealedAccount.Signature),
+			}
+
+			recovered, err := m.accountsManager.Recover(recoverParams)
+			if err != nil {
+				return nil, err
+			}
+			if recovered.Hex() != revealedAccount.Address {
+				// if ownership of only one wallet address cannot be verified,
+				// we mark the request as cancelled and stop
+				err = m.markRequestToJoinAsCanceled(signer, community)
+				if err != nil {
+					return nil, err
+				}
+				requestToJoin.State = RequestToJoinStateDeclined
+				return requestToJoin, nil
+			}
+		}
+
+		err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return requestToJoin, nil

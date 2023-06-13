@@ -111,7 +111,7 @@ type Messenger struct {
 	pushNotificationClient *pushnotificationclient.Client
 	pushNotificationServer *pushnotificationserver.Server
 	communitiesManager     *communities.Manager
-	accountsManager        *account.GethManager
+	accountsManager        account.Interface
 	mentionsManager        *MentionManager
 	logger                 *zap.Logger
 
@@ -254,7 +254,7 @@ func NewMessenger(
 	node types.Node,
 	installationID string,
 	peerStore *mailservers.PeerStore,
-	accountsManager *account.GethManager,
+	accountsManager account.Interface,
 	opts ...Option,
 ) (*Messenger, error) {
 	var messenger *Messenger
@@ -424,7 +424,10 @@ func NewMessenger(
 	managerOptions := []communities.ManagerOption{
 		communities.WithAccountManager(accountsManager),
 	}
-	if c.rpcClient != nil {
+
+	if c.tokenManager != nil {
+		managerOptions = append(managerOptions, communities.WithTokenManager(c.tokenManager))
+	} else if c.rpcClient != nil {
 		tokenManager := token.NewTokenManager(database, c.rpcClient, c.rpcClient.NetworkManager)
 		managerOptions = append(managerOptions, communities.WithTokenManager(communities.NewDefaultTokenManager(tokenManager)))
 	}
