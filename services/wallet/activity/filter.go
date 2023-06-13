@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	eth "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/services/wallet/common"
 )
 
@@ -45,28 +46,25 @@ func allActivityStatusesFilter() []Status {
 type TokenType int
 
 const (
-	AssetTT TokenType = iota
-	CollectiblesTT
+	Native TokenType = iota
+	Erc20
+	Erc721
+	Erc1155
 )
 
-type TokenCode string
+type TokenID *hexutil.Big
 
-// Tokens the following rules apply for its members:
-// empty member: none is selected
-// nil means all
-// see allTokensFilter and noTokensFilter
-type Tokens struct {
-	Assets       []TokenCode   `json:"assets"`
-	Collectibles []eth.Address `json:"collectibles"`
-	EnabledTypes []TokenType   `json:"enabledTypes"`
+// Token supports all tokens. Some fields might be optional, depending on the TokenType
+type Token struct {
+	TokenType TokenType `json:"tokenType"`
+	// ChainID is used for TokenType.Native only to lookup the symbol, all chains will be included in the token filter
+	ChainID common.ChainID `json:"chainId"`
+	Address eth.Address    `json:"address,omitempty"`
+	TokenID TokenID        `json:"tokenId,omitempty"`
 }
 
-func noAssetsFilter() Tokens {
-	return Tokens{[]TokenCode{}, []eth.Address{}, []TokenType{CollectiblesTT}}
-}
-
-func allTokensFilter() Tokens {
-	return Tokens{}
+func allTokensFilter() []Token {
+	return []Token{}
 }
 
 func allAddressesFilter() []eth.Address {
@@ -81,8 +79,13 @@ type Filter struct {
 	Period                Period        `json:"period"`
 	Types                 []Type        `json:"types"`
 	Statuses              []Status      `json:"statuses"`
-	Tokens                Tokens        `json:"tokens"`
 	CounterpartyAddresses []eth.Address `json:"counterpartyAddresses"`
+
+	// Tokens
+	Assets                []Token `json:"assets"`
+	Collectibles          []Token `json:"collectibles"`
+	FilterOutAssets       bool    `json:"filterOutAssets"`
+	FilterOutCollectibles bool    `json:"filterOutCollectibles"`
 }
 
 // TODO: consider sorting by saved address and contacts to offload the client from doing it at runtime

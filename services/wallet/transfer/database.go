@@ -280,7 +280,6 @@ func (db *Database) GetTransfersForIdentities(ctx context.Context, identities []
 	query := newTransfersQuery()
 	for _, identity := range identities {
 		subQuery := newSubQuery()
-		// TODO optimization: consider using tuples in sqlite and IN operator
 		subQuery = subQuery.FilterNetwork(uint64(identity.ChainID)).FilterTransactionHash(identity.Hash).FilterAddress(identity.Address)
 		query.addSubQuery(subQuery, OrSeparator)
 	}
@@ -450,12 +449,17 @@ func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers
 		var txGasPrice, txGasTipCap, txGasFeeCap *int64
 		var txType *uint8
 		var txValue *string
-		var tokenAddress *common.Address
+		var dbAddress *string
 		var tokenID *big.Int
 		if t.Transaction != nil {
 			var value *big.Int
 			if t.Log != nil {
+				var tokenAddress *common.Address
 				_, tokenAddress, tokenID, value = w_common.ExtractTokenIdentity(t.Type, t.Log, t.Transaction)
+				if tokenAddress != nil {
+					dbAddress = new(string)
+					*dbAddress = tokenAddress.Hex()
+				}
 			} else {
 				value = new(big.Int).Set(t.Transaction.Value())
 			}
@@ -478,7 +482,7 @@ func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers
 
 		_, err = insert.Exec(chainID, t.ID, t.BlockHash, (*bigint.SQLBigInt)(t.BlockNumber), t.Timestamp, t.Address, &JSONBlob{t.Transaction}, t.From, &JSONBlob{t.Receipt}, &JSONBlob{t.Log}, t.Type, t.BaseGasFees, t.MultiTransactionID,
 			receiptStatus, receiptType, txHash, logIndex, blockHash, cumulativeGasUsed, contractAddress, gasUsed, transactionIndex,
-			txType, txProtected, txGas, txGasPrice, txGasTipCap, txGasFeeCap, txValue, txNonce, txSize, &sqlite.JSONBlob{Data: tokenAddress}, (*bigint.SQLBigIntBytes)(tokenID))
+			txType, txProtected, txGas, txGasPrice, txGasTipCap, txGasFeeCap, txValue, txNonce, txSize, dbAddress, (*bigint.SQLBigIntBytes)(tokenID))
 		if err != nil {
 			log.Error("can't save transfer", "b-hash", t.BlockHash, "b-n", t.BlockNumber, "a", t.Address, "h", t.ID)
 			return err

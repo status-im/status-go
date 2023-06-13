@@ -95,7 +95,7 @@ func NewService(
 	reader := NewReader(rpcClient, tokenManager, marketManager, accountsDB, NewPersistence(db), walletFeed)
 	history := history.NewService(db, walletFeed, rpcClient, tokenManager, marketManager)
 	currency := currency.NewService(db, walletFeed, tokenManager, marketManager)
-	activity := activity.NewService(db, walletFeed)
+	activity := activity.NewService(db, tokenManager, walletFeed)
 
 	alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKeys)
 	infuraClient := infura.NewClient(config.WalletConfig.InfuraAPIKey, config.WalletConfig.InfuraAPIKeySecret)

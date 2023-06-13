@@ -317,22 +317,14 @@ func migrateWalletJSONBlobs(sqlTx *sql.Tx) error {
 			}
 
 			if nullableTx.Valid {
-				var tokenAddress *common.Address
-				var correctType w_common.Type
-				var tokenID, value *big.Int
-				if nullableL.Valid {
-					correctType, tokenAddress, tokenID, value = w_common.ExtractTokenIdentity(w_common.Type(entryType), l, tx)
-				} else {
-					correctType = w_common.Type(entryType)
-					value = new(big.Int).Set(tx.Value())
-				}
+				correctType, tokenID, value, dbAddress := extractToken(entryType, tx, l, nullableL.Valid)
 
 				gasPrice := sqlite.BigIntToClampedInt64(tx.GasPrice())
 				gasTipCap := sqlite.BigIntToClampedInt64(tx.GasTipCap())
 				gasFeeCap := sqlite.BigIntToClampedInt64(tx.GasFeeCap())
 				valueStr := sqlite.BigIntToPadded128BitsStr(value)
 
-				currentRow = append(currentRow, tx.Type(), tx.Protected(), tx.Gas(), gasPrice, gasTipCap, gasFeeCap, valueStr, tx.Nonce(), int64(tx.Size()), &sqlite.JSONBlob{Data: tokenAddress}, (*bigint.SQLBigIntBytes)(tokenID), correctType)
+				currentRow = append(currentRow, tx.Type(), tx.Protected(), tx.Gas(), gasPrice, gasTipCap, gasFeeCap, valueStr, tx.Nonce(), int64(tx.Size()), dbAddress, (*bigint.SQLBigIntBytes)(tokenID), correctType)
 			} else {
 				for i := 0; i < 11; i++ {
 					currentRow = append(currentRow, nil)
@@ -376,4 +368,19 @@ func migrateWalletJSONBlobs(sqlTx *sql.Tx) error {
 	}
 
 	return nil
+}
+
+func extractToken(entryType string, tx *types.Transaction, l *types.Log, logValid bool) (correctType w_common.Type, tokenID *big.Int, value *big.Int, dbAddress *string) {
+	if logValid {
+		var tokenAddress *common.Address
+		correctType, tokenAddress, tokenID, value = w_common.ExtractTokenIdentity(w_common.Type(entryType), l, tx)
+		if tokenAddress != nil {
+			dbAddress = new(string)
+			*dbAddress = tokenAddress.Hex()
+		}
+	} else {
+		correctType = w_common.Type(entryType)
+		value = new(big.Int).Set(tx.Value())
+	}
+	return
 }

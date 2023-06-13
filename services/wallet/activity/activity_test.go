@@ -20,23 +20,63 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestActivityDB(t *testing.T) (db *sql.DB, close func()) {
+func tokenFromSymbol(chainID *common.ChainID, symbol string) *Token {
+	for i, t := range transfer.TestTokens {
+		if (chainID == nil || t.ChainID == uint64(*chainID)) && t.Symbol == symbol {
+			tokenType := Erc20
+			if testutils.SliceContains(transfer.NativeTokenIndices, i) {
+				tokenType = Native
+			}
+			return &Token{
+				TokenType: tokenType,
+				ChainID:   common.ChainID(t.ChainID),
+				Address:   t.Address,
+			}
+		}
+	}
+	return nil
+}
+
+func setupTestActivityDB(t *testing.T) (deps FilterDependencies, close func()) {
 	db, err := appdatabase.SetupTestMemorySQLDB("wallet-activity-tests")
 	require.NoError(t, err)
+	deps = FilterDependencies{
+		db: db,
+		tokenSymbol: func(token Token) string {
+			switch token.TokenType {
+			case Native:
+				for i, t := range transfer.TestTokens {
+					if t.ChainID == uint64(token.ChainID) && testutils.SliceContains(transfer.NativeTokenIndices, i) {
+						return t.Symbol
+					}
+				}
+			case Erc20:
+				for _, t := range transfer.TestTokens {
+					if t.ChainID == uint64(token.ChainID) && t.Address == token.Address {
+						return t.Symbol
+					}
+				}
+			}
+			// In case of ERC721 and ERC1155 we don't have a symbol and they are not yet handled
+			return ""
+		},
+		// tokenFromSymbol nil chainID accepts first symbol found
+		tokenFromSymbol: tokenFromSymbol,
+	}
 
-	return db, func() {
+	return deps, func() {
 		require.NoError(t, db.Close())
 	}
 }
 
 type testData struct {
-	tr1               transfer.TestTransfer // index 1
-	pendingTr         transfer.TestTransfer // index 2
-	multiTx1Tr1       transfer.TestTransfer // index 3
-	multiTx2Tr1       transfer.TestTransfer // index 4
-	multiTx1Tr2       transfer.TestTransfer // index 5
-	multiTx2Tr2       transfer.TestTransfer // index 6
-	multiTx2PendingTr transfer.TestTransfer // index 7
+	tr1               transfer.TestTransfer // index 1, ETH/Goerli
+	pendingTr         transfer.TestTransfer // index 2, ETH/Optimism
+	multiTx1Tr1       transfer.TestTransfer // index 3, USDC/Mainnet
+	multiTx2Tr1       transfer.TestTransfer // index 4, USDC/Goerli
+	multiTx1Tr2       transfer.TestTransfer // index 5, USDC/Optimism
+	multiTx2Tr2       transfer.TestTransfer // index 6, SNT/Mainnet
+	multiTx2PendingTr transfer.TestTransfer // index 7, DAI/Mainnet
 
 	multiTx1   transfer.TestMultiTransaction
 	multiTx1ID transfer.MultiTransactionIDType
@@ -61,6 +101,7 @@ func mockTestAccountsWithAddresses(t *testing.T, db *sql.DB, addresses []eth_com
 // Generates and adds to the DB 7 transfers and 2 multitransactions.
 // There are only 4 extractable activity entries (transactions + multi-transactions) with timestamps 1-4. The others are associated with a multi-transaction
 func fillTestData(t *testing.T, db *sql.DB) (td testData, fromAddresses, toAddresses []eth_common.Address) {
+	// Generates ETH/Goerli, ETH/Optimism, USDC/Mainnet, USDC/Goerli, USDC/Optimism, SNT/Mainnet, DAI/Mainnet
 	trs, fromAddresses, toAddresses := transfer.GenerateTestTransfers(t, db, 1, 7)
 
 	// Plain transfer
@@ -75,7 +116,8 @@ func fillTestData(t *testing.T, db *sql.DB) (td testData, fromAddresses, toAddre
 	td.multiTx1Tr1 = trs[2]
 	td.multiTx1Tr2 = trs[4]
 
-	td.multiTx1Tr1.Token = testutils.SntSymbol
+	// TODO: This got automatically set by GenerateTestTransfers to USDC/Mainnet
+	//td.multiTx1Tr1.Token = &transfer.SntMainnet
 
 	td.multiTx1 = transfer.GenerateTestSendMultiTransaction(td.multiTx1Tr1)
 	td.multiTx1.ToToken = testutils.DaiSymbol
@@ -93,7 +135,7 @@ func fillTestData(t *testing.T, db *sql.DB) (td testData, fromAddresses, toAddre
 	td.multiTx2PendingTr = trs[6]
 
 	td.multiTx2 = transfer.GenerateTestSendMultiTransaction(td.multiTx2Tr1)
-	td.multiTx1.ToToken = testutils.SntSymbol
+	td.multiTx2.ToToken = testutils.SntSymbol
 	td.multiTx2ID = transfer.InsertTestMultiTransaction(t, db, &td.multiTx2)
 
 	td.multiTx2Tr1.MultiTransactionID = td.multiTx2ID
@@ -109,14 +151,27 @@ func fillTestData(t *testing.T, db *sql.DB) (td testData, fromAddresses, toAddre
 	return td, fromAddresses, toAddresses
 }
 
+func TTrToToken(t *testing.T, tt *transfer.TestTransaction) *Token {
+	token, isNative := transfer.TestTrToToken(t, tt)
+	tokenType := Erc20
+	if isNative {
+		tokenType = Native
+	}
+	return &Token{
+		TokenType: tokenType,
+		ChainID:   common.ChainID(token.ChainID),
+		Address:   token.Address,
+	}
+}
+
 func TestGetActivityEntriesAll(t *testing.T) {
-	db, close := setupTestActivityDB(t)
+	deps, close := setupTestActivityDB(t)
 	defer close()
 
-	td, fromAddresses, toAddresses := fillTestData(t, db)
+	td, fromAddresses, toAddresses := fillTestData(t, deps.db)
 
 	var filter Filter
-	entries, err := getActivityEntries(context.Background(), db, append(toAddresses, fromAddresses...), []common.ChainID{}, filter, 0, 10)
+	entries, err := getActivityEntries(context.Background(), deps, append(toAddresses, fromAddresses...), []common.ChainID{}, filter, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 4, len(entries))
 
@@ -127,119 +182,66 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		curTimestamp--
 	}
 
-	require.True(t, testutils.StructExistsInSlice(Entry{
+	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
 		transaction:    &transfer.TransactionIdentity{ChainID: td.tr1.ChainID, Hash: td.tr1.Hash, Address: td.tr1.From},
 		id:             td.tr1.MultiTransactionID,
 		timestamp:      td.tr1.Timestamp,
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
 		amountOut:      (*hexutil.Big)(big.NewInt(td.tr1.Value)),
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
-	}, entries))
-	require.True(t, testutils.StructExistsInSlice(Entry{
+		tokenOut:       TTrToToken(t, &td.tr1.TestTransaction),
+		tokenIn:        nil,
+	}, entries[3])
+	require.Equal(t, Entry{
 		payloadType:    PendingTransactionPT,
 		transaction:    &transfer.TransactionIdentity{ChainID: td.pendingTr.ChainID, Hash: td.pendingTr.Hash},
 		id:             td.pendingTr.MultiTransactionID,
 		timestamp:      td.pendingTr.Timestamp,
 		activityType:   SendAT,
 		activityStatus: PendingAS,
-		tokenType:      AssetTT,
 		amountOut:      (*hexutil.Big)(big.NewInt(td.pendingTr.Value)),
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
-	}, entries))
-	require.True(t, testutils.StructExistsInSlice(Entry{
+		tokenOut:       TTrToToken(t, &td.pendingTr.TestTransaction),
+		tokenIn:        nil,
+	}, entries[2])
+	require.Equal(t, Entry{
 		payloadType:    MultiTransactionPT,
 		transaction:    nil,
 		id:             td.multiTx1ID,
 		timestamp:      td.multiTx1.Timestamp,
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
 		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx1.FromAmount)),
 		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx1.ToAmount)),
-	}, entries))
-	require.True(t, testutils.StructExistsInSlice(Entry{
+		tokenOut:       tokenFromSymbol(nil, td.multiTx1.FromToken),
+		tokenIn:        tokenFromSymbol(nil, td.multiTx1.ToToken),
+	}, entries[1])
+	require.Equal(t, Entry{
 		payloadType:    MultiTransactionPT,
 		transaction:    nil,
 		id:             td.multiTx2ID,
 		timestamp:      td.multiTx2.Timestamp,
 		activityType:   SendAT,
 		activityStatus: PendingAS,
-		tokenType:      AssetTT,
 		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx2.FromAmount)),
 		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx2.ToAmount)),
-	}, entries))
-
-	// Ensure the sub-transactions of the multi-transactions are not returned
-	require.False(t, testutils.StructExistsInSlice(Entry{
-		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: td.multiTx1Tr1.ChainID, Hash: td.multiTx1Tr1.Hash, Address: td.multiTx1Tr1.To},
-		id:             td.multiTx1Tr1.MultiTransactionID,
-		timestamp:      td.multiTx1Tr1.Timestamp,
-		activityType:   SendAT,
-		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
-		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx1Tr1.Value)),
-		amountIn:       (*hexutil.Big)(big.NewInt(0)),
-	}, entries))
-	require.False(t, testutils.StructExistsInSlice(Entry{
-		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: td.multiTx1Tr2.ChainID, Hash: td.multiTx1Tr2.Hash, Address: td.multiTx1Tr2.To},
-		id:             td.multiTx1Tr2.MultiTransactionID,
-		timestamp:      td.multiTx1Tr2.Timestamp,
-		activityType:   SendAT,
-		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
-		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx1Tr2.Value)),
-		amountIn:       (*hexutil.Big)(big.NewInt(0)),
-	}, entries))
-	require.False(t, testutils.StructExistsInSlice(Entry{
-		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: td.multiTx2Tr1.ChainID, Hash: td.multiTx2Tr1.Hash, Address: td.multiTx2Tr1.To},
-		id:             td.multiTx2Tr1.MultiTransactionID,
-		timestamp:      td.multiTx2Tr1.Timestamp,
-		activityType:   SendAT,
-		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
-		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx2Tr1.Value)),
-		amountIn:       (*hexutil.Big)(big.NewInt(0)),
-	}, entries))
-	require.False(t, testutils.StructExistsInSlice(Entry{
-		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: td.multiTx2Tr2.ChainID, Hash: td.multiTx2Tr2.Hash, Address: td.multiTx2Tr2.To},
-		id:             td.multiTx2Tr2.MultiTransactionID,
-		timestamp:      td.multiTx2Tr2.Timestamp,
-		activityType:   SendAT,
-		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
-		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx2Tr2.Value)),
-		amountIn:       (*hexutil.Big)(big.NewInt(0)),
-	}, entries))
-	require.False(t, testutils.StructExistsInSlice(Entry{
-		payloadType:    PendingTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: td.multiTx2PendingTr.ChainID, Hash: td.multiTx2PendingTr.Hash},
-		id:             td.multiTx2PendingTr.MultiTransactionID,
-		timestamp:      td.multiTx2PendingTr.Timestamp,
-		activityType:   SendAT,
-		activityStatus: PendingAS,
-		tokenType:      AssetTT,
-		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx2PendingTr.Value)),
-		amountIn:       (*hexutil.Big)(big.NewInt(0)),
-	}, entries))
+		tokenOut:       tokenFromSymbol(nil, td.multiTx2.FromToken),
+		tokenIn:        tokenFromSymbol(nil, td.multiTx2.ToToken),
+	}, entries[0])
 }
 
 // TestGetActivityEntriesWithSenderFilter covers the issue with returning the same transaction
 // twice when the sender and receiver have entries in the transfers table
 func TestGetActivityEntriesWithSameTransactionForSenderAndReceiverInDB(t *testing.T) {
-	db, close := setupTestActivityDB(t)
+	deps, close := setupTestActivityDB(t)
 	defer close()
 
 	// Add 4 extractable transactions with timestamps 1-4
-	td, fromAddresses, toAddresses := fillTestData(t, db)
+	td, fromAddresses, toAddresses := fillTestData(t, deps.db)
 
-	mockTestAccountsWithAddresses(t, db, append(fromAddresses, toAddresses...))
+	mockTestAccountsWithAddresses(t, deps.db, append(fromAddresses, toAddresses...))
 
 	// Add another transaction with sender and receiver reversed
 	receiverTr := td.tr1
@@ -251,10 +253,10 @@ func TestGetActivityEntriesWithSameTransactionForSenderAndReceiverInDB(t *testin
 
 	// Ensure they are the oldest transactions (last in the list) and we have a consistent order
 	receiverTr.Timestamp--
-	transfer.InsertTestTransfer(t, db, &receiverTr)
+	transfer.InsertTestTransfer(t, deps.db, &receiverTr)
 
 	var filter Filter
-	entries, err := getActivityEntries(context.Background(), db, []eth.Address{td.tr1.From, receiverTr.From}, []common.ChainID{}, filter, 0, 10)
+	entries, err := getActivityEntries(context.Background(), deps, []eth.Address{td.tr1.From, receiverTr.From}, []common.ChainID{}, filter, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(entries))
 
@@ -267,7 +269,7 @@ func TestGetActivityEntriesWithSameTransactionForSenderAndReceiverInDB(t *testin
 	require.NotEqual(t, eth.Address{}, entries[0].transaction.Address)
 	require.Equal(t, td.tr1.From, entries[0].transaction.Address)
 
-	entries, err = getActivityEntries(context.Background(), db, []eth.Address{}, []common.ChainID{}, filter, 0, 10)
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 5, len(entries))
 
@@ -277,24 +279,24 @@ func TestGetActivityEntriesWithSameTransactionForSenderAndReceiverInDB(t *testin
 }
 
 func TestGetActivityEntriesFilterByTime(t *testing.T) {
-	db, close := setupTestActivityDB(t)
+	deps, close := setupTestActivityDB(t)
 	defer close()
 
-	td, fromTds, toTds := fillTestData(t, db)
+	td, fromTds, toTds := fillTestData(t, deps.db)
 
 	// Add 6 extractable transactions with timestamps 6-12
-	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, db, td.nextIndex, 6)
+	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 6)
 	for i := range trs {
-		transfer.InsertTestTransfer(t, db, &trs[i])
+		transfer.InsertTestTransfer(t, deps.db, &trs[i])
 	}
 
-	mockTestAccountsWithAddresses(t, db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
+	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
 
 	// Test start only
 	var filter Filter
 	filter.Period.StartTimestamp = td.multiTx1.Timestamp
 	filter.Period.EndTimestamp = NoLimitTimestampForPeriod
-	entries, err := getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err := getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 8, len(entries))
 	// Check start and end content
@@ -305,9 +307,10 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		timestamp:      trs[5].Timestamp,
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
 		amountOut:      (*hexutil.Big)(big.NewInt(trs[5].Value)),
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
+		tokenOut:       TTrToToken(t, &trs[5].TestTransaction),
+		tokenIn:        nil,
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    MultiTransactionPT,
@@ -316,14 +319,15 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		timestamp:      td.multiTx1.Timestamp,
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
 		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx1.FromAmount)),
 		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx1.ToAmount)),
+		tokenOut:       tokenFromSymbol(nil, td.multiTx1.FromToken),
+		tokenIn:        tokenFromSymbol(nil, td.multiTx1.ToToken),
 	}, entries[7])
 
 	// Test complete interval
 	filter.Period.EndTimestamp = trs[2].Timestamp
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 5, len(entries))
 	// Check start and end content
@@ -334,9 +338,10 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		timestamp:      trs[2].Timestamp,
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
 		amountOut:      (*hexutil.Big)(big.NewInt(trs[2].Value)),
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
+		tokenOut:       TTrToToken(t, &trs[2].TestTransaction),
+		tokenIn:        nil,
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    MultiTransactionPT,
@@ -345,14 +350,15 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		timestamp:      td.multiTx1.Timestamp,
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
 		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx1.FromAmount)),
 		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx1.ToAmount)),
+		tokenOut:       tokenFromSymbol(nil, td.multiTx1.FromToken),
+		tokenIn:        tokenFromSymbol(nil, td.multiTx1.ToToken),
 	}, entries[4])
 
 	// Test end only
 	filter.Period.StartTimestamp = NoLimitTimestampForPeriod
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 7, len(entries))
 	// Check start and end content
@@ -363,9 +369,10 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		timestamp:      trs[2].Timestamp,
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
 		amountOut:      (*hexutil.Big)(big.NewInt(trs[2].Value)),
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
+		tokenOut:       TTrToToken(t, &trs[2].TestTransaction),
+		tokenIn:        nil,
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
@@ -374,34 +381,35 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		timestamp:      td.tr1.Timestamp,
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
 		amountOut:      (*hexutil.Big)(big.NewInt(td.tr1.Value)),
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
+		tokenOut:       TTrToToken(t, &td.tr1.TestTransaction),
+		tokenIn:        nil,
 	}, entries[6])
 }
 
 func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
-	db, close := setupTestActivityDB(t)
+	deps, close := setupTestActivityDB(t)
 	defer close()
 
 	// Add 10 extractable transactions with timestamps 1-10
-	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, db, 1, 10)
+	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, 1, 10)
 	for i := range trs {
-		transfer.InsertTestTransfer(t, db, &trs[i])
+		transfer.InsertTestTransfer(t, deps.db, &trs[i])
 	}
 
-	mockTestAccountsWithAddresses(t, db, append(fromTrs, toTrs...))
+	mockTestAccountsWithAddresses(t, deps.db, append(fromTrs, toTrs...))
 
 	var filter Filter
 	// Get all
-	entries, err := getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 5)
+	entries, err := getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 5)
 	require.NoError(t, err)
 	require.Equal(t, 5, len(entries))
 
 	// Get time based interval
 	filter.Period.StartTimestamp = trs[2].Timestamp
 	filter.Period.EndTimestamp = trs[8].Timestamp
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 3)
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 3)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(entries))
 	// Check start and end content
@@ -412,9 +420,10 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		timestamp:      trs[8].Timestamp,
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
 		amountOut:      (*hexutil.Big)(big.NewInt(trs[8].Value)),
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
+		tokenOut:       TTrToToken(t, &trs[8].TestTransaction),
+		tokenIn:        nil,
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
@@ -423,13 +432,14 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		timestamp:      trs[6].Timestamp,
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
 		amountOut:      (*hexutil.Big)(big.NewInt(trs[6].Value)),
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
+		tokenOut:       TTrToToken(t, &trs[6].TestTransaction),
+		tokenIn:        nil,
 	}, entries[2])
 
 	// Move window 2 entries forward
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 2, 3)
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 2, 3)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(entries))
 	// Check start and end content
@@ -440,9 +450,10 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		timestamp:      trs[6].Timestamp,
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
 		amountOut:      (*hexutil.Big)(big.NewInt(trs[6].Value)),
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
+		tokenOut:       TTrToToken(t, &trs[6].TestTransaction),
+		tokenIn:        nil,
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
@@ -451,13 +462,14 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		timestamp:      trs[4].Timestamp,
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
 		amountOut:      (*hexutil.Big)(big.NewInt(trs[4].Value)),
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
+		tokenOut:       TTrToToken(t, &trs[4].TestTransaction),
+		tokenIn:        nil,
 	}, entries[2])
 
 	// Move window 4 more entries to test filter cap
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 6, 3)
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 6, 3)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(entries))
 	// Check start and end content
@@ -468,9 +480,10 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		timestamp:      trs[2].Timestamp,
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
 		amountOut:      (*hexutil.Big)(big.NewInt(trs[2].Value)),
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
+		tokenOut:       TTrToToken(t, &trs[2].TestTransaction),
+		tokenIn:        nil,
 	}, entries[0])
 }
 
@@ -493,14 +506,14 @@ func countTypes(entries []Entry) (sendCount, receiveCount, swapCount, buyCount, 
 }
 
 func TestGetActivityEntriesFilterByType(t *testing.T) {
-	db, close := setupTestActivityDB(t)
+	deps, close := setupTestActivityDB(t)
 	defer close()
 
 	// Adds 4 extractable transactions
-	td, _, _ := fillTestData(t, db)
+	td, _, _ := fillTestData(t, deps.db)
 	// Add 5 extractable transactions: one MultiTransactionSwap, two MultiTransactionBridge and two MultiTransactionSend
 	multiTxs := make([]transfer.TestMultiTransaction, 5)
-	trs, _, _ := transfer.GenerateTestTransfers(t, db, td.nextIndex, len(multiTxs)*2)
+	trs, _, _ := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, len(multiTxs)*2)
 	multiTxs[0] = transfer.GenerateTestBridgeMultiTransaction(trs[0], trs[1])
 	multiTxs[1] = transfer.GenerateTestSwapMultiTransaction(trs[2], testutils.SntSymbol, 100) // trs[3]
 	multiTxs[2] = transfer.GenerateTestSendMultiTransaction(trs[4])                           // trs[5]
@@ -510,10 +523,10 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 	var lastMT transfer.MultiTransactionIDType
 	for i := range trs {
 		if i%2 == 0 {
-			lastMT = transfer.InsertTestMultiTransaction(t, db, &multiTxs[i/2])
+			lastMT = transfer.InsertTestMultiTransaction(t, deps.db, &multiTxs[i/2])
 		}
 		trs[i].MultiTransactionID = lastMT
-		transfer.InsertTestTransfer(t, db, &trs[i])
+		transfer.InsertTestTransfer(t, deps.db, &trs[i])
 	}
 
 	// Test filtering out without address involved
@@ -522,12 +535,12 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 	filter.Types = allActivityTypesFilter()
 	// Set tr1 to Receive and pendingTr to Send; rest of two MT remain default Send
 	addresses := []eth_common.Address{td.tr1.To, td.pendingTr.From, td.multiTx1.FromAddress, td.multiTx2.FromAddress, trs[0].From, trs[2].From, trs[4].From, trs[6].From, trs[8].From}
-	entries, err := getActivityEntries(context.Background(), db, addresses, []common.ChainID{}, filter, 0, 15)
+	entries, err := getActivityEntries(context.Background(), deps, addresses, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 9, len(entries))
 
 	filter.Types = []Type{SendAT, SwapAT}
-	entries, err = getActivityEntries(context.Background(), db, addresses, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, addresses, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	// 3 from td Send + 2 trs MT Send + 1 (swap)
 	require.Equal(t, 6, len(entries))
@@ -540,7 +553,7 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 	require.Equal(t, 0, bridgeCount)
 
 	filter.Types = []Type{BridgeAT, ReceiveAT}
-	entries, err = getActivityEntries(context.Background(), db, addresses, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, addresses, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(entries))
 
@@ -552,27 +565,27 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 }
 
 func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
-	db, close := setupTestActivityDB(t)
+	deps, close := setupTestActivityDB(t)
 	defer close()
 
 	// Adds 4 extractable transactions
-	td, fromTds, toTds := fillTestData(t, db)
-	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, db, td.nextIndex, 6)
+	td, fromTds, toTds := fillTestData(t, deps.db)
+	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 6)
 	for i := range trs {
-		transfer.InsertTestTransfer(t, db, &trs[i])
+		transfer.InsertTestTransfer(t, deps.db, &trs[i])
 	}
 
-	mockTestAccountsWithAddresses(t, db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
+	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
 
 	var filter Filter
 
 	addressesFilter := allAddressesFilter()
-	entries, err := getActivityEntries(context.Background(), db, addressesFilter, []common.ChainID{}, filter, 0, 15)
+	entries, err := getActivityEntries(context.Background(), deps, addressesFilter, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 10, len(entries))
 
 	addressesFilter = []eth_common.Address{td.multiTx2.ToAddress, trs[1].From, trs[4].To}
-	entries, err = getActivityEntries(context.Background(), db, addressesFilter, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, addressesFilter, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(entries))
 	require.Equal(t, Entry{
@@ -582,9 +595,10 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 		timestamp:      trs[4].Timestamp,
 		activityType:   ReceiveAT,
 		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
 		amountOut:      (*hexutil.Big)(big.NewInt(0)),
 		amountIn:       (*hexutil.Big)(big.NewInt(trs[4].Value)),
+		tokenOut:       nil,
+		tokenIn:        TTrToToken(t, &trs[4].TestTransaction),
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
@@ -593,9 +607,10 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 		timestamp:      trs[1].Timestamp,
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
-		tokenType:      AssetTT,
 		amountOut:      (*hexutil.Big)(big.NewInt(trs[1].Value)),
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
+		tokenOut:       TTrToToken(t, &trs[1].TestTransaction),
+		tokenIn:        nil,
 	}, entries[1])
 	require.Equal(t, Entry{
 		payloadType:    MultiTransactionPT,
@@ -604,42 +619,43 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 		timestamp:      td.multiTx2.Timestamp,
 		activityType:   SendAT,
 		activityStatus: PendingAS,
-		tokenType:      AssetTT,
 		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx2.FromAmount)),
 		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx2.ToAmount)),
+		tokenOut:       tokenFromSymbol(nil, td.multiTx2.FromToken),
+		tokenIn:        tokenFromSymbol(nil, td.multiTx2.ToToken),
 	}, entries[2])
 }
 
 func TestGetActivityEntriesFilterByStatus(t *testing.T) {
-	db, close := setupTestActivityDB(t)
+	deps, close := setupTestActivityDB(t)
 	defer close()
 
 	// Adds 4 extractable transactions: 1 T, 1 T pending, 1 MT pending, 1 MT with 2xT success
-	td, fromTds, toTds := fillTestData(t, db)
+	td, fromTds, toTds := fillTestData(t, deps.db)
 	// Add 7 extractable transactions: 1 pending, 1 Tr failed, 1 MT failed, 4 success
-	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, db, td.nextIndex, 7)
+	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 7)
 	multiTx := transfer.GenerateTestSendMultiTransaction(trs[6])
-	failedMTID := transfer.InsertTestMultiTransaction(t, db, &multiTx)
+	failedMTID := transfer.InsertTestMultiTransaction(t, deps.db, &multiTx)
 	trs[6].MultiTransactionID = failedMTID
 	for i := range trs {
 		if i == 1 {
-			transfer.InsertTestPendingTransaction(t, db, &trs[i])
+			transfer.InsertTestPendingTransaction(t, deps.db, &trs[i])
 		} else {
 			trs[i].Success = i != 3 && i != 6
-			transfer.InsertTestTransfer(t, db, &trs[i])
+			transfer.InsertTestTransfer(t, deps.db, &trs[i])
 		}
 	}
 
-	mockTestAccountsWithAddresses(t, db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
+	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
 
 	var filter Filter
 	filter.Statuses = allActivityStatusesFilter()
-	entries, err := getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err := getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 11, len(entries))
 
 	filter.Statuses = []Status{PendingAS}
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(entries))
 	require.Equal(t, td.pendingTr.Hash, entries[2].transaction.Hash)
@@ -647,162 +663,192 @@ func TestGetActivityEntriesFilterByStatus(t *testing.T) {
 	require.Equal(t, trs[1].Hash, entries[0].transaction.Hash)
 
 	filter.Statuses = []Status{FailedAS}
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(entries))
 
 	filter.Statuses = []Status{CompleteAS}
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 6, len(entries))
 
 	// Finalized is treated as Complete, would need dynamic blockchain status to track the Finalized level
 	filter.Statuses = []Status{FinalizedAS}
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 6, len(entries))
 
 	// Combined filter
 	filter.Statuses = []Status{FailedAS, PendingAS}
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 5, len(entries))
 }
 
 func TestGetActivityEntriesFilterByTokenType(t *testing.T) {
-	db, close := setupTestActivityDB(t)
+	deps, close := setupTestActivityDB(t)
 	defer close()
 
-	// Adds 4 extractable transactions 2 transactions ETH, one MT SNT to DAI and another MT ETH to SNT
-	td, fromTds, toTds := fillTestData(t, db)
-	// Add 6 extractable transactions with USDC (only erc20 as type in DB)
-	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, db, td.nextIndex, 6)
+	// Adds 4 extractable transactions 2 transactions (ETH/Goerli, ETH/Optimism), one MT USDC to DAI and another MT USDC to SNT
+	td, fromTds, toTds := fillTestData(t, deps.db)
+	// Add 9 transactions DAI/Goerli, ETH/Mainnet, ETH/Goerli, ETH/Optimism, USDC/Mainnet, USDC/Goerli, USDC/Optimism, SNT/Mainnet, DAI/Mainnet
+	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 9)
 	for i := range trs {
-		trs[i].Token = "USDC"
-		transfer.InsertTestTransfer(t, db, &trs[i])
+		tokenAddr := transfer.TestTokens[i].Address
+		trs[i].ChainID = common.ChainID(transfer.TestTokens[i].ChainID)
+		transfer.InsertTestTransferWithToken(t, deps.db, &trs[i], tokenAddr)
 	}
 
-	mockTestAccountsWithAddresses(t, db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
+	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
 
 	var filter Filter
-	filter.Tokens = noAssetsFilter()
-	entries, err := getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	filter.FilterOutAssets = true
+	entries, err := getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(entries))
 
-	filter.Tokens = allTokensFilter()
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	filter.FilterOutAssets = false
+	filter.Assets = allTokensFilter()
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
-	require.Equal(t, 10, len(entries))
+	require.Equal(t, 13, len(entries))
 
-	// Regression when collectibles is nil
-	filter.Tokens = Tokens{[]TokenCode{}, nil, []TokenType{}}
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	// Native tokens are network agnostic, hence all are returned
+	filter.Assets = []Token{{TokenType: Native, ChainID: common.ChainID(transfer.EthMainnet.ChainID)}}
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
-	require.Equal(t, 10, len(entries))
+	require.Equal(t, 5, len(entries))
 
-	filter.Tokens = Tokens{Assets: []TokenCode{"ETH"}, EnabledTypes: []TokenType{AssetTT}}
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	// Test that it doesn't break the filter
+	filter.Assets = []Token{{TokenType: Erc1155}}
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
+	require.Equal(t, 0, len(entries))
+
+	filter.Assets = []Token{{
+		TokenType: Erc20,
+		ChainID:   common.ChainID(transfer.UsdcMainnet.ChainID),
+		Address:   transfer.UsdcMainnet.Address,
+	}}
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	require.NoError(t, err)
+	// Two MT for which ChainID is ignored and one transfer on the main net and the Goerli is ignored
 	require.Equal(t, 3, len(entries))
+	require.Equal(t, Erc20, entries[0].tokenOut.TokenType)
+	require.Equal(t, transfer.UsdcMainnet.Address, entries[0].tokenOut.Address)
+	require.Nil(t, entries[0].tokenIn)
+	// MT has only symbol, the first token is lookup by symbol for both entries
+	require.Equal(t, Erc20, entries[1].tokenOut.TokenType)
+	require.Equal(t, transfer.UsdcMainnet.Address, entries[1].tokenOut.Address)
+	require.Equal(t, Erc20, entries[1].tokenIn.TokenType)
+	require.Equal(t, transfer.SntMainnet.Address, entries[1].tokenIn.Address)
+	require.Equal(t, Erc20, entries[2].tokenOut.TokenType)
+	require.Equal(t, transfer.UsdcMainnet.Address, entries[1].tokenOut.Address)
+	require.Equal(t, Erc20, entries[2].tokenIn.TokenType)
+	require.Equal(t, transfer.UsdcMainnet.Address, entries[1].tokenOut.Address)
 
-	// TODO: update tests after adding token type to transfers
-	filter.Tokens = Tokens{Assets: []TokenCode{"USDC", "DAI"}, EnabledTypes: []TokenType{AssetTT}}
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	filter.Assets = []Token{{
+		TokenType: Erc20,
+		ChainID:   common.ChainID(transfer.UsdcMainnet.ChainID),
+		Address:   transfer.UsdcMainnet.Address,
+	}, {
+		TokenType: Erc20,
+		ChainID:   common.ChainID(transfer.UsdcGoerli.ChainID),
+		Address:   transfer.UsdcGoerli.Address,
+	}}
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
-	require.Equal(t, 1, len(entries))
-
-	// Regression when EnabledTypes ar empty
-	filter.Tokens = Tokens{Assets: []TokenCode{"USDC", "DAI"}, EnabledTypes: []TokenType{}}
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
-	require.NoError(t, err)
-	require.Equal(t, 1, len(entries))
+	// Two MT for which ChainID is ignored and two transfers on the main net and Goerli
+	require.Equal(t, 4, len(entries))
+	require.Equal(t, Erc20, entries[0].tokenOut.TokenType)
+	require.Equal(t, transfer.UsdcGoerli.Address, entries[0].tokenOut.Address)
+	require.Nil(t, entries[0].tokenIn)
 }
 
 func TestGetActivityEntriesFilterByToAddresses(t *testing.T) {
-	db, close := setupTestActivityDB(t)
+	deps, close := setupTestActivityDB(t)
 	defer close()
 
 	// Adds 4 extractable transactions
-	td, fromTds, toTds := fillTestData(t, db)
+	td, fromTds, toTds := fillTestData(t, deps.db)
 	// Add 6 extractable transactions
-	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, db, td.nextIndex, 6)
+	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 6)
 	for i := range trs {
-		transfer.InsertTestTransfer(t, db, &trs[i])
+		transfer.InsertTestTransfer(t, deps.db, &trs[i])
 	}
 
-	mockTestAccountsWithAddresses(t, db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
+	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
 
 	var filter Filter
 	filter.CounterpartyAddresses = allAddressesFilter()
-	entries, err := getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err := getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 10, len(entries))
 
 	filter.CounterpartyAddresses = []eth_common.Address{eth_common.HexToAddress("0x567890")}
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(entries))
 
 	filter.CounterpartyAddresses = []eth_common.Address{td.pendingTr.To, td.multiTx2.ToAddress, trs[3].To}
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(entries))
 
 	filter.CounterpartyAddresses = []eth_common.Address{td.tr1.To, td.pendingTr.From, trs[3].From, trs[5].To}
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(entries))
 }
 func TestGetActivityEntriesFilterByNetworks(t *testing.T) {
-	db, close := setupTestActivityDB(t)
+	deps, close := setupTestActivityDB(t)
 	defer close()
 
 	// Adds 4 extractable transactions
-	td, fromTds, toTds := fillTestData(t, db)
+	td, fromTds, toTds := fillTestData(t, deps.db)
 	// Add 6 extractable transactions
-	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, db, td.nextIndex, 6)
+	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 6)
 	for i := range trs {
-		transfer.InsertTestTransfer(t, db, &trs[i])
+		transfer.InsertTestTransfer(t, deps.db, &trs[i])
 	}
-	mockTestAccountsWithAddresses(t, db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
+	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
 
 	var filter Filter
 	chainIDs := allNetworksFilter()
-	entries, err := getActivityEntries(context.Background(), db, []eth_common.Address{}, chainIDs, filter, 0, 15)
+	entries, err := getActivityEntries(context.Background(), deps, []eth_common.Address{}, chainIDs, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 10, len(entries))
 
 	chainIDs = []common.ChainID{5674839210}
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, chainIDs, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, chainIDs, filter, 0, 15)
 	require.NoError(t, err)
 	// TODO: update after multi-transactions are filterable by ChainID
 	require.Equal(t, 2 /*0*/, len(entries))
 
 	chainIDs = []common.ChainID{td.pendingTr.ChainID, td.multiTx2Tr1.ChainID, trs[3].ChainID}
-	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, chainIDs, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, chainIDs, filter, 0, 15)
 	require.NoError(t, err)
 	// TODO: update after multi-transactions are filterable by ChainID
-	require.Equal(t, 4 /*3*/, len(entries))
+	require.Equal(t, 8 /*6*/, len(entries))
 }
 
 func TestGetActivityEntriesCheckToAndFrom(t *testing.T) {
-	db, close := setupTestActivityDB(t)
+	deps, close := setupTestActivityDB(t)
 	defer close()
 
 	// Adds 6 transactions from which 4 are filered out
-	td, _, _ := fillTestData(t, db)
+	td, _, _ := fillTestData(t, deps.db)
 
 	// Add extra transactions to test To address
-	trs, _, _ := transfer.GenerateTestTransfers(t, db, td.nextIndex, 2)
-	transfer.InsertTestTransfer(t, db, &trs[0])
-	transfer.InsertTestPendingTransaction(t, db, &trs[1])
+	trs, _, _ := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 2)
+	transfer.InsertTestTransfer(t, deps.db, &trs[0])
+	transfer.InsertTestPendingTransaction(t, deps.db, &trs[1])
 
 	addresses := []eth_common.Address{td.tr1.From, td.pendingTr.From,
 		td.multiTx1.FromAddress, td.multiTx2.ToAddress, trs[0].To, trs[1].To}
 
 	var filter Filter
-	entries, err := getActivityEntries(context.Background(), db, addresses, []common.ChainID{}, filter, 0, 15)
+	entries, err := getActivityEntries(context.Background(), deps, addresses, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 6, len(entries))
 
@@ -829,15 +875,15 @@ func TestGetActivityEntriesCheckToAndFrom(t *testing.T) {
 // TODO test sub-transaction count for multi-transactions
 
 func TestGetActivityEntriesCheckContextCancellation(t *testing.T) {
-	db, close := setupTestActivityDB(t)
+	deps, close := setupTestActivityDB(t)
 	defer close()
 
-	_, _, _ = fillTestData(t, db)
+	_, _, _ = fillTestData(t, deps.db)
 
 	cancellableCtx, cancelFn := context.WithCancel(context.Background())
 	cancelFn()
 
-	activities, err := getActivityEntries(cancellableCtx, db, []eth.Address{}, []common.ChainID{}, Filter{}, 0, 10)
+	activities, err := getActivityEntries(cancellableCtx, deps, []eth.Address{}, []common.ChainID{}, Filter{}, 0, 10)
 	require.ErrorIs(t, err, context.Canceled)
 	require.Equal(t, 0, len(activities))
 }
