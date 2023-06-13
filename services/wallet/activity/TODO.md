@@ -40,7 +40,7 @@ Filter requirements
 - [x] `chainID`: aggregate data for activity entries `Bridge`, `Buy`, `Swap`
 - [x] `tokenCode` for activity entries `Send`, `Receive`
   - For `Bridge` its already there and `Buy`, `Swap` is coming soon
-- [ ] `collectibles`: require adding collectible attributes to activity data (probably `token_address` and `tokenId`)
+- [ ] `collectibles`: require adding collectible attributes to activity data (`token_address` and `tokenId`)
 
 UX requirements
 

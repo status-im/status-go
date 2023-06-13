@@ -4,13 +4,13 @@ import (
 	"database/sql"
 	"fmt"
 	"math/big"
-	"strings"
 	"testing"
 
 	eth_common "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/testutils"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/sqlite"
 
 	"github.com/stretchr/testify/require"
@@ -29,8 +29,8 @@ type TestTransaction struct {
 type TestTransfer struct {
 	TestTransaction
 	To    eth_common.Address // [address]
-	Token string             // used to detect type in transfers table
 	Value int64
+	Token *token.Token
 }
 
 type TestMultiTransaction struct {
@@ -45,10 +45,26 @@ type TestMultiTransaction struct {
 	Timestamp            int64
 }
 
+func SeedToToken(seed int) *token.Token {
+	tokenIndex := seed % len(TestTokens)
+	return TestTokens[tokenIndex]
+}
+
+func TestTrToToken(t *testing.T, tt *TestTransaction) (token *token.Token, isNative bool) {
+	// Sanity check that none of the markers changed and they should be equal to seed
+	require.Equal(t, tt.Timestamp, tt.BlkNumber)
+
+	tokenIndex := int(tt.Timestamp) % len(TestTokens)
+	isNative = testutils.SliceContains(NativeTokenIndices, tokenIndex)
+
+	return TestTokens[tokenIndex], isNative
+}
+
 func generateTestTransaction(seed int) TestTransaction {
+	token := SeedToToken(seed)
 	return TestTransaction{
 		Hash:               eth_common.HexToHash(fmt.Sprintf("0x1%d", seed)),
-		ChainID:            common.ChainID(seed),
+		ChainID:            common.ChainID(token.ChainID),
 		From:               eth_common.HexToAddress(fmt.Sprintf("0x2%d", seed)),
 		Timestamp:          int64(seed),
 		BlkNumber:          int64(seed),
@@ -58,11 +74,13 @@ func generateTestTransaction(seed int) TestTransaction {
 }
 
 func generateTestTransfer(seed int) TestTransfer {
+	tokenIndex := seed % len(TestTokens)
+	token := TestTokens[tokenIndex]
 	return TestTransfer{
 		TestTransaction: generateTestTransaction(seed),
-		Token:           "",
 		To:              eth_common.HexToAddress(fmt.Sprintf("0x3%d", seed)),
 		Value:           int64(seed),
+		Token:           token,
 	}
 }
 
@@ -71,8 +89,8 @@ func GenerateTestSendMultiTransaction(tr TestTransfer) TestMultiTransaction {
 		MultiTransactionType: MultiTransactionSend,
 		FromAddress:          tr.From,
 		ToAddress:            tr.To,
-		FromToken:            tr.Token,
-		ToToken:              tr.Token,
+		FromToken:            tr.Token.Symbol,
+		ToToken:              tr.Token.Symbol,
 		FromAmount:           tr.Value,
 		ToAmount:             0,
 		Timestamp:            tr.Timestamp,
@@ -84,7 +102,7 @@ func GenerateTestSwapMultiTransaction(tr TestTransfer, toToken string, toAmount 
 		MultiTransactionType: MultiTransactionSwap,
 		FromAddress:          tr.From,
 		ToAddress:            tr.To,
-		FromToken:            tr.Token,
+		FromToken:            tr.Token.Symbol,
 		ToToken:              toToken,
 		FromAmount:           tr.Value,
 		ToAmount:             toAmount,
@@ -97,14 +115,16 @@ func GenerateTestBridgeMultiTransaction(fromTr, toTr TestTransfer) TestMultiTran
 		MultiTransactionType: MultiTransactionBridge,
 		FromAddress:          fromTr.From,
 		ToAddress:            toTr.To,
-		FromToken:            fromTr.Token,
-		ToToken:              toTr.Token,
+		FromToken:            fromTr.Token.Symbol,
+		ToToken:              toTr.Token.Symbol,
 		FromAmount:           fromTr.Value,
 		ToAmount:             toTr.Value,
 		Timestamp:            fromTr.Timestamp,
 	}
 }
 
+// GenerateTestTransfers will generate transaction based on the TestTokens index and roll over if there are more than
+// len(TestTokens) transactions
 func GenerateTestTransfers(t *testing.T, db *sql.DB, firstStartIndex int, count int) (result []TestTransfer, fromAddresses, toAddresses []eth_common.Address) {
 	for i := firstStartIndex; i < (firstStartIndex + count); i++ {
 		tr := generateTestTransfer(i)
@@ -115,12 +135,88 @@ func GenerateTestTransfers(t *testing.T, db *sql.DB, firstStartIndex int, count 
 	return
 }
 
+var EthMainnet = token.Token{
+	Address: eth_common.HexToAddress("0x"),
+	Name:    "Ether",
+	Symbol:  "ETH",
+	ChainID: 1,
+}
+
+var EthGoerli = token.Token{
+	Address: eth_common.HexToAddress("0x"),
+	Name:    "Ether",
+	Symbol:  "ETH",
+	ChainID: 5,
+}
+
+var EthOptimism = token.Token{
+	Address: eth_common.HexToAddress("0x"),
+	Name:    "Ether",
+	Symbol:  "ETH",
+	ChainID: 10,
+}
+
+var UsdcMainnet = token.Token{
+	Address: eth_common.HexToAddress("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"),
+	Name:    "USD Coin",
+	Symbol:  "USDC",
+	ChainID: 1,
+}
+
+var UsdcGoerli = token.Token{
+	Address: eth_common.HexToAddress("0x98339d8c260052b7ad81c28c16c0b98420f2b46a"),
+	Name:    "USD Coin",
+	Symbol:  "USDC",
+	ChainID: 5,
+}
+
+var UsdcOptimism = token.Token{
+	Address: eth_common.HexToAddress("0x7f5c764cbc14f9669b88837ca1490cca17c31607"),
+	Name:    "USD Coin",
+	Symbol:  "USDC",
+	ChainID: 10,
+}
+
+var SntMainnet = token.Token{
+	Address: eth_common.HexToAddress("0x744d70fdbe2ba4cf95131626614a1763df805b9e"),
+	Name:    "Status Network Token",
+	Symbol:  "SNT",
+	ChainID: 1,
+}
+
+var DaiMainnet = token.Token{
+	Address: eth_common.HexToAddress("0xf2edF1c091f683E3fb452497d9a98A49cBA84666"),
+	Name:    "DAI Stablecoin",
+	Symbol:  "DAI",
+	ChainID: 5,
+}
+
+var DaiGoerli = token.Token{
+	Address: eth_common.HexToAddress("0xf2edF1c091f683E3fb452497d9a98A49cBA84666"),
+	Name:    "DAI Stablecoin",
+	Symbol:  "DAI",
+	ChainID: 5,
+}
+
+// TestTokens contains ETH/Mainnet, ETH/Goerli, ETH/Optimism, USDC/Mainnet, USDC/Goerli, USDC/Optimism, SNT/Mainnet, DAI/Mainnet, DAI/Goerli
+var TestTokens = []*token.Token{
+	&EthMainnet, &EthGoerli, &EthOptimism, &UsdcMainnet, &UsdcGoerli, &UsdcOptimism, &SntMainnet, &DaiMainnet, &DaiGoerli,
+}
+
+var NativeTokenIndices = []int{0, 1, 2}
+
 func InsertTestTransfer(t *testing.T, db *sql.DB, tr *TestTransfer) {
-	// Respect `FOREIGN KEY(network_id,address,blk_hash)` of `transfers` table
+	token := TestTokens[int(tr.Timestamp)%len(TestTokens)]
+	InsertTestTransferWithToken(t, db, tr, token.Address)
+}
+
+func InsertTestTransferWithToken(t *testing.T, db *sql.DB, tr *TestTransfer, tokenAddress eth_common.Address) {
 	tokenType := "eth"
-	if tr.Token != "" && strings.ToUpper(tr.Token) != testutils.EthSymbol {
+	if (tokenAddress != eth_common.Address{}) {
 		tokenType = "erc20"
 	}
+
+	// Respect `FOREIGN KEY(network_id,address,blk_hash)` of `transfers` table
 	blkHash := eth_common.HexToHash("4")
 	value := sqlite.Int64ToPadded128BitsStr(tr.Value)
 
@@ -130,10 +226,10 @@ func InsertTestTransfer(t *testing.T, db *sql.DB, tr *TestTransfer) {
 		) VALUES (?, ?, ?, ?);
 		INSERT INTO transfers (network_id, hash, address, blk_hash, tx,
 			sender, receipt, log, type, blk_number, timestamp, loaded,
-			multi_transaction_id, base_gas_fee, status, amount_padded128hex
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 0, ?, ?)`,
+			multi_transaction_id, base_gas_fee, status, amount_padded128hex, token_address
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 0, ?, ?, ?)`,
 		tr.ChainID, tr.To, tr.BlkNumber, blkHash,
-		tr.ChainID, tr.Hash, tr.To, blkHash, &JSONBlob{}, tr.From, &JSONBlob{}, &JSONBlob{}, tokenType, tr.BlkNumber, tr.Timestamp, tr.MultiTransactionID, tr.Success, value)
+		tr.ChainID, tr.Hash, tr.To, blkHash, &JSONBlob{}, tr.From, &JSONBlob{}, &JSONBlob{}, tokenType, tr.BlkNumber, tr.Timestamp, tr.MultiTransactionID, tr.Success, value, tokenAddress.Hex())
 	require.NoError(t, err)
 }
 

@@ -163,13 +163,53 @@ func (tm *Manager) FindToken(network *params.Network, tokenSymbol string) *Token
 		return tm.ToToken(network)
 	}
 
-	allTokens := tm.getFullTokenList(network.ChainID)
+	return tm.GetToken(network.ChainID, tokenSymbol)
+}
+
+func (tm *Manager) LookupToken(chainID *uint64, tokenSymbol string) (token *Token, isNative bool) {
+	if chainID == nil {
+		networks, err := tm.networkManager.Get(true)
+		if err != nil {
+			return nil, false
+		}
+
+		for _, network := range networks {
+			if tokenSymbol == network.NativeCurrencySymbol {
+				return tm.ToToken(network), true
+			}
+			token := tm.GetToken(network.ChainID, tokenSymbol)
+			if token != nil {
+				return token, false
+			}
+		}
+	} else {
+		network := tm.networkManager.Find(*chainID)
+		if tokenSymbol == network.NativeCurrencySymbol {
+			return tm.ToToken(network), true
+		}
+		return tm.GetToken(*chainID, tokenSymbol), false
+	}
+	return nil, false
+}
+
+// GetToken returns token by chainID and tokenSymbol. Use ToToken for native token
+func (tm *Manager) GetToken(chainID uint64, tokenSymbol string) *Token {
+	allTokens := tm.getFullTokenList(chainID)
 	for _, token := range allTokens {
 		if token.Symbol == tokenSymbol {
 			return token
 		}
 	}
 	return nil
+}
+
+func (tm *Manager) LookupTokenIdentity(chainID uint64, address common.Address, native bool) *Token {
+	network := tm.networkManager.Find(chainID)
+	if native {
+		return tm.ToToken(network)
+	}
+
+	return tm.FindTokenByAddress(chainID, address)
 }
 
 func (tm *Manager) FindTokenByAddress(chainID uint64, address common.Address) *Token {

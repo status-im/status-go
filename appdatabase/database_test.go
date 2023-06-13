@@ -219,7 +219,7 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 		entryType                       string
 		isTokenIDNull                   bool
 	)
-	dbTokenAddress := sqlite.JSONBlob{Data: &tokenAddress}
+	var dbTokenAddress sql.NullString
 	tokenID := new(big.Int)
 	rows, err := db.Query(`SELECT status, receipt_type, tx_hash, log_index, block_hash, cumulative_gas_used, contract_address, gas_used, tx_index,
 		tx_type, protected, gas_limit, gas_price_clamped64, gas_tip_cap_clamped64, gas_fee_cap_clamped64, amount_padded128hex, account_nonce, size, token_address, token_id, type,
@@ -241,6 +241,9 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 			&txType, &protected, &gasLimit, &gasPriceClamped64, &gasTipCapClamped64, &gasFeeCapClamped64, &amount128Hex, &accountNonce, &size, &dbTokenAddress, (*bigint.SQLBigIntBytes)(tokenID), &entryType, &isTokenIDNull)
 		if err != nil {
 			return err
+		}
+		if dbTokenAddress.Valid {
+			tokenAddress = common.HexToAddress(dbTokenAddress.String)
 		}
 		if dbContractAddress.Valid {
 			contractAddress = common.HexToAddress(dbContractAddress.String)

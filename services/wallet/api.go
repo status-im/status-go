@@ -107,7 +107,7 @@ func (api *API) GetTransfersByAddressAndChainID(ctx context.Context, chainID uin
 }
 
 func (api *API) GetTransfersForIdentities(ctx context.Context, identities []transfer.TransactionIdentity) ([]transfer.View, error) {
-	log.Debug("[Wallet: GetTransfersForIdentities] count", len(identities))
+	log.Debug("wallet.api.GetTransfersForIdentities", "identities.len", len(identities))
 
 	return api.s.transferController.GetTransfersForIdentities(ctx, identities)
 }
@@ -520,7 +520,7 @@ func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionComm
 }
 
 func (api *API) GetMultiTransactions(ctx context.Context, transactionIDs []transfer.MultiTransactionIDType) ([]*transfer.MultiTransaction, error) {
-	log.Debug("[WalletAPI:: GetMultiTransactions] for IDs", transactionIDs)
+	log.Debug("wallet.api.GetMultiTransactions", "IDs.len", len(transactionIDs))
 	return api.s.transactionManager.GetMultiTransactions(ctx, transactionIDs)
 }
 
@@ -535,7 +535,8 @@ func (api *API) FetchAllCurrencyFormats() (currency.FormatPerSymbol, error) {
 }
 
 func (api *API) FilterActivityAsync(ctx context.Context, addresses []common.Address, chainIDs []wcommon.ChainID, filter activity.Filter, offset int, limit int) error {
-	log.Debug("[WalletAPI:: FilterActivityAsync] addr.count", len(addresses), "chainIDs.count", len(chainIDs), "filter", filter, "offset", offset, "limit", limit)
+	log.Debug("wallet.api.FilterActivityAsync", "addr.count", len(addresses), "chainIDs.count", len(chainIDs), "offset", offset, "limit", limit)
+
 	return api.s.activity.FilterActivityAsync(ctx, addresses, chainIDs, filter, offset, limit)
 }
 
@@ -545,6 +546,7 @@ type GetAllRecipientsResponse struct {
 }
 
 func (api *API) GetAllRecipients(ctx context.Context, offset int, limit int) (result *GetAllRecipientsResponse, err error) {
+	log.Debug("wallet.api.GetAllRecipients", "offset", offset, "limit", limit)
 	result = &GetAllRecipientsResponse{}
 	result.Addresses, result.HasMore, err = activity.GetRecipients(ctx, api.s.db, offset, limit)
 	return result, err
