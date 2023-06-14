@@ -308,6 +308,7 @@ func (tm *TransactionManager) CreateMultiTransactionFromCommand(ctx context.Cont
 		FromAsset:   command.FromAsset,
 		ToAsset:     command.ToAsset,
 		FromAmount:  command.FromAmount,
+		ToAmount:    new(hexutil.Big),
 		Type:        command.Type,
 	}
 
