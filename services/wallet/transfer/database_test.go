@@ -182,7 +182,7 @@ func TestGetTransfersForIdentities(t *testing.T) {
 	db, _, stop := setupTestDB(t)
 	defer stop()
 
-	trs, _, _ := GenerateTestTransactions(t, db.client, 1, 4)
+	trs, _, _ := GenerateTestTransfers(t, db.client, 1, 4)
 	for i := range trs {
 		InsertTestTransfer(t, db.client, &trs[i])
 	}

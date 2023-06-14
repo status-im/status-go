@@ -36,7 +36,7 @@ func TestGetRecipients(t *testing.T) {
 	defer close()
 
 	// Add 6 extractable transactions
-	trs, _, toTrs := transfer.GenerateTestTransactions(t, db, 0, 6)
+	trs, _, toTrs := transfer.GenerateTestTransfers(t, db, 0, 6)
 	for i := range trs {
 		transfer.InsertTestTransfer(t, db, &trs[i])
 	}

@@ -28,17 +28,21 @@ func setupTestActivityDB(t *testing.T) (db *sql.DB, close func()) {
 }
 
 type testData struct {
-	tr1          transfer.TestTransaction // index 1
-	pendingTr    transfer.TestTransaction // index 2
-	singletonMTr transfer.TestTransaction // index 3
-	mTr          transfer.TestTransaction // index 4
-	singleTr     transfer.TestTransaction // index 5
-	subTr        transfer.TestTransaction // index 6
-	subPendingTr transfer.TestTransaction // index 7
+	tr1               transfer.TestTransfer // index 1
+	pendingTr         transfer.TestTransfer // index 2
+	multiTx1Tr1       transfer.TestTransfer // index 3
+	multiTx2Tr1       transfer.TestTransfer // index 4
+	multiTx1Tr2       transfer.TestTransfer // index 5
+	multiTx2Tr2       transfer.TestTransfer // index 6
+	multiTx2PendingTr transfer.TestTransfer // index 7
 
-	singletonMTID transfer.MultiTransactionIDType
-	mTrID         transfer.MultiTransactionIDType
-	nextIndex     int
+	multiTx1   transfer.TestMultiTransaction
+	multiTx1ID transfer.MultiTransactionIDType
+
+	multiTx2   transfer.TestMultiTransaction
+	multiTx2ID transfer.MultiTransactionIDType
+
+	nextIndex int
 }
 
 func mockTestAccountsWithAddresses(t *testing.T, db *sql.DB, addresses []eth_common.Address) {
@@ -52,36 +56,53 @@ func mockTestAccountsWithAddresses(t *testing.T, db *sql.DB, addresses []eth_com
 	accounts.MockTestAccounts(t, db, mockedAccounts)
 }
 
-// Generates and adds to the DB 7 transactions. 3 transactions, 2 pending and 2 multi transactions (1: 1 x pending and 1: with 2 x complete)
-// There are only 4 extractable transactions and multi-transaction with timestamps 1-4. The other 2 are associated with a multi-transaction
+// Generates and adds to the DB 7 transfers and 2 multitransactions.
+// There are only 4 extractable activity entries (transactions + multi-transactions) with timestamps 1-4. The others are associated with a multi-transaction
 func fillTestData(t *testing.T, db *sql.DB) (td testData, fromAddresses, toAddresses []eth_common.Address) {
-	trs, fromAddresses, toAddresses := transfer.GenerateTestTransactions(t, db, 1, 7)
+	trs, fromAddresses, toAddresses := transfer.GenerateTestTransfers(t, db, 1, 7)
+
+	// Plain transfer
 	td.tr1 = trs[0]
 	transfer.InsertTestTransfer(t, db, &td.tr1)
 
+	// Pending transfer
 	td.pendingTr = trs[1]
 	transfer.InsertTestPendingTransaction(t, db, &td.pendingTr)
 
-	td.singletonMTr = trs[2]
-	td.singletonMTr.FromToken = testutils.SntSymbol
-	td.singletonMTr.ToToken = testutils.DaiSymbol
-	td.singletonMTID = transfer.InsertTestMultiTransaction(t, db, &td.singletonMTr)
+	// Send Multitransaction containing 2 x Plain transfers
+	td.multiTx1Tr1 = trs[2]
+	td.multiTx1Tr2 = trs[4]
 
-	td.mTr = trs[3]
-	td.mTr.ToToken = testutils.SntSymbol
-	td.mTrID = transfer.InsertTestMultiTransaction(t, db, &td.mTr)
+	td.multiTx1Tr1.Token = testutils.SntSymbol
 
-	td.singleTr = trs[4]
-	td.singleTr.MultiTransactionID = td.singletonMTID
-	transfer.InsertTestTransfer(t, db, &td.singleTr)
+	td.multiTx1 = transfer.GenerateTestSendMultiTransaction(td.multiTx1Tr1)
+	td.multiTx1.ToToken = testutils.DaiSymbol
+	td.multiTx1ID = transfer.InsertTestMultiTransaction(t, db, &td.multiTx1)
 
-	td.subTr = trs[5]
-	td.subTr.MultiTransactionID = td.mTrID
-	transfer.InsertTestTransfer(t, db, &td.subTr)
+	td.multiTx1Tr1.MultiTransactionID = td.multiTx1ID
+	transfer.InsertTestTransfer(t, db, &td.multiTx1Tr1)
 
-	td.subPendingTr = trs[6]
-	td.subPendingTr.MultiTransactionID = td.mTrID
-	transfer.InsertTestPendingTransaction(t, db, &td.subPendingTr)
+	td.multiTx1Tr2.MultiTransactionID = td.multiTx1ID
+	transfer.InsertTestTransfer(t, db, &td.multiTx1Tr2)
+
+	// Send Multitransaction containing 2 x Plain transfers + 1 x Pending transfer
+	td.multiTx2Tr1 = trs[3]
+	td.multiTx2Tr2 = trs[5]
+	td.multiTx2PendingTr = trs[6]
+
+	td.multiTx2 = transfer.GenerateTestSendMultiTransaction(td.multiTx2Tr1)
+	td.multiTx1.ToToken = testutils.SntSymbol
+	td.multiTx2ID = transfer.InsertTestMultiTransaction(t, db, &td.multiTx2)
+
+	td.multiTx2Tr1.MultiTransactionID = td.multiTx2ID
+	transfer.InsertTestTransfer(t, db, &td.multiTx2Tr1)
+
+	td.multiTx2Tr2.MultiTransactionID = td.multiTx2ID
+	transfer.InsertTestTransfer(t, db, &td.multiTx2Tr2)
+
+	td.multiTx2PendingTr.MultiTransactionID = td.multiTx2ID
+	transfer.InsertTestPendingTransaction(t, db, &td.multiTx2PendingTr)
+
 	td.nextIndex = 8
 	return td, fromAddresses, toAddresses
 }
@@ -125,8 +146,8 @@ func TestGetActivityEntriesAll(t *testing.T) {
 	require.True(t, testutils.StructExistsInSlice(Entry{
 		payloadType:    MultiTransactionPT,
 		transaction:    nil,
-		id:             td.singletonMTID,
-		timestamp:      td.singletonMTr.Timestamp,
+		id:             td.multiTx1ID,
+		timestamp:      td.multiTx1.Timestamp,
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
@@ -134,8 +155,8 @@ func TestGetActivityEntriesAll(t *testing.T) {
 	require.True(t, testutils.StructExistsInSlice(Entry{
 		payloadType:    MultiTransactionPT,
 		transaction:    nil,
-		id:             td.mTrID,
-		timestamp:      td.mTr.Timestamp,
+		id:             td.multiTx2ID,
+		timestamp:      td.multiTx2.Timestamp,
 		activityType:   SendAT,
 		activityStatus: PendingAS,
 		tokenType:      AssetTT,
@@ -144,18 +165,45 @@ func TestGetActivityEntriesAll(t *testing.T) {
 	// Ensure the sub-transactions of the multi-transactions are not returned
 	require.False(t, testutils.StructExistsInSlice(Entry{
 		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: td.subTr.ChainID, Hash: td.subTr.Hash, Address: td.subTr.To},
-		id:             td.subTr.MultiTransactionID,
-		timestamp:      td.subTr.Timestamp,
+		transaction:    &transfer.TransactionIdentity{ChainID: td.multiTx1Tr1.ChainID, Hash: td.multiTx1Tr1.Hash, Address: td.multiTx1Tr1.To},
+		id:             td.multiTx1Tr1.MultiTransactionID,
+		timestamp:      td.multiTx1Tr1.Timestamp,
+		activityType:   SendAT,
+		activityStatus: CompleteAS,
+		tokenType:      AssetTT,
+	}, entries))
+	require.False(t, testutils.StructExistsInSlice(Entry{
+		payloadType:    SimpleTransactionPT,
+		transaction:    &transfer.TransactionIdentity{ChainID: td.multiTx1Tr2.ChainID, Hash: td.multiTx1Tr2.Hash, Address: td.multiTx1Tr2.To},
+		id:             td.multiTx1Tr2.MultiTransactionID,
+		timestamp:      td.multiTx1Tr2.Timestamp,
+		activityType:   SendAT,
+		activityStatus: CompleteAS,
+		tokenType:      AssetTT,
+	}, entries))
+	require.False(t, testutils.StructExistsInSlice(Entry{
+		payloadType:    SimpleTransactionPT,
+		transaction:    &transfer.TransactionIdentity{ChainID: td.multiTx2Tr1.ChainID, Hash: td.multiTx2Tr1.Hash, Address: td.multiTx2Tr1.To},
+		id:             td.multiTx2Tr1.MultiTransactionID,
+		timestamp:      td.multiTx2Tr1.Timestamp,
+		activityType:   SendAT,
+		activityStatus: CompleteAS,
+		tokenType:      AssetTT,
+	}, entries))
+	require.False(t, testutils.StructExistsInSlice(Entry{
+		payloadType:    SimpleTransactionPT,
+		transaction:    &transfer.TransactionIdentity{ChainID: td.multiTx2Tr2.ChainID, Hash: td.multiTx2Tr2.Hash, Address: td.multiTx2Tr2.To},
+		id:             td.multiTx2Tr2.MultiTransactionID,
+		timestamp:      td.multiTx2Tr2.Timestamp,
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
 	}, entries))
 	require.False(t, testutils.StructExistsInSlice(Entry{
 		payloadType:    PendingTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: td.subPendingTr.ChainID, Hash: td.subPendingTr.Hash},
-		id:             td.subPendingTr.MultiTransactionID,
-		timestamp:      td.subPendingTr.Timestamp,
+		transaction:    &transfer.TransactionIdentity{ChainID: td.multiTx2PendingTr.ChainID, Hash: td.multiTx2PendingTr.Hash},
+		id:             td.multiTx2PendingTr.MultiTransactionID,
+		timestamp:      td.multiTx2PendingTr.Timestamp,
 		activityType:   SendAT,
 		activityStatus: PendingAS,
 		tokenType:      AssetTT,
@@ -215,7 +263,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 	td, fromTds, toTds := fillTestData(t, db)
 
 	// Add 6 extractable transactions with timestamps 6-12
-	trs, fromTrs, toTrs := transfer.GenerateTestTransactions(t, db, td.nextIndex, 6)
+	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, db, td.nextIndex, 6)
 	for i := range trs {
 		transfer.InsertTestTransfer(t, db, &trs[i])
 	}
@@ -224,7 +272,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 
 	// Test start only
 	var filter Filter
-	filter.Period.StartTimestamp = td.singletonMTr.Timestamp
+	filter.Period.StartTimestamp = td.multiTx1.Timestamp
 	filter.Period.EndTimestamp = NoLimitTimestampForPeriod
 	entries, err := getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
@@ -242,8 +290,8 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 	require.Equal(t, Entry{
 		payloadType:    MultiTransactionPT,
 		transaction:    nil,
-		id:             td.singletonMTID,
-		timestamp:      td.singletonMTr.Timestamp,
+		id:             td.multiTx1ID,
+		timestamp:      td.multiTx1.Timestamp,
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
@@ -267,8 +315,8 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 	require.Equal(t, Entry{
 		payloadType:    MultiTransactionPT,
 		transaction:    nil,
-		id:             td.singletonMTID,
-		timestamp:      td.singletonMTr.Timestamp,
+		id:             td.multiTx1ID,
+		timestamp:      td.multiTx1.Timestamp,
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
@@ -305,7 +353,7 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 	defer close()
 
 	// Add 10 extractable transactions with timestamps 1-10
-	trs, fromTrs, toTrs := transfer.GenerateTestTransactions(t, db, 1, 10)
+	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, db, 1, 10)
 	for i := range trs {
 		transfer.InsertTestTransfer(t, db, &trs[i])
 	}
@@ -409,21 +457,21 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 	// Adds 4 extractable transactions
 	td, _, _ := fillTestData(t, db)
 	// Add 5 extractable transactions: one MultiTransactionSwap, two MultiTransactionBridge and two MultiTransactionSend
-	trs, _, _ := transfer.GenerateTestTransactions(t, db, td.nextIndex, 10)
-	trs[0].MultiTransactionType = transfer.MultiTransactionBridge
-	trs[2].MultiTransactionType = transfer.MultiTransactionSwap
-	trs[4].MultiTransactionType = transfer.MultiTransactionSend
-	trs[6].MultiTransactionType = transfer.MultiTransactionBridge
-	trs[8].MultiTransactionType = transfer.MultiTransactionSend
+	multiTxs := make([]transfer.TestMultiTransaction, 5)
+	trs, _, _ := transfer.GenerateTestTransfers(t, db, td.nextIndex, len(multiTxs)*2)
+	multiTxs[0] = transfer.GenerateTestBridgeMultiTransaction(trs[0], trs[1])
+	multiTxs[1] = transfer.GenerateTestSwapMultiTransaction(trs[2], testutils.SntSymbol, 100) // trs[3]
+	multiTxs[2] = transfer.GenerateTestSendMultiTransaction(trs[4])                           // trs[5]
+	multiTxs[3] = transfer.GenerateTestBridgeMultiTransaction(trs[6], trs[7])
+	multiTxs[4] = transfer.GenerateTestSendMultiTransaction(trs[8]) // trs[9]
 
 	var lastMT transfer.MultiTransactionIDType
 	for i := range trs {
 		if i%2 == 0 {
-			lastMT = transfer.InsertTestMultiTransaction(t, db, &trs[i])
-		} else {
-			trs[i].MultiTransactionID = lastMT
-			transfer.InsertTestTransfer(t, db, &trs[i])
+			lastMT = transfer.InsertTestMultiTransaction(t, db, &multiTxs[i/2])
 		}
+		trs[i].MultiTransactionID = lastMT
+		transfer.InsertTestTransfer(t, db, &trs[i])
 	}
 
 	// Test filtering out without address involved
@@ -431,7 +479,7 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 
 	filter.Types = allActivityTypesFilter()
 	// Set tr1 to Receive and pendingTr to Send; rest of two MT remain default Send
-	addresses := []eth_common.Address{td.tr1.To, td.pendingTr.From, td.singletonMTr.From, td.mTr.From, trs[0].From, trs[2].From, trs[4].From, trs[6].From, trs[8].From}
+	addresses := []eth_common.Address{td.tr1.To, td.pendingTr.From, td.multiTx1.FromAddress, td.multiTx2.FromAddress, trs[0].From, trs[2].From, trs[4].From, trs[6].From, trs[8].From}
 	entries, err := getActivityEntries(context.Background(), db, addresses, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 9, len(entries))
@@ -467,7 +515,7 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 
 	// Adds 4 extractable transactions
 	td, fromTds, toTds := fillTestData(t, db)
-	trs, fromTrs, toTrs := transfer.GenerateTestTransactions(t, db, td.nextIndex, 6)
+	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, db, td.nextIndex, 6)
 	for i := range trs {
 		transfer.InsertTestTransfer(t, db, &trs[i])
 	}
@@ -481,7 +529,7 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 10, len(entries))
 
-	addressesFilter = []eth_common.Address{td.mTr.To, trs[1].From, trs[4].To}
+	addressesFilter = []eth_common.Address{td.multiTx2.ToAddress, trs[1].From, trs[4].To}
 	entries, err = getActivityEntries(context.Background(), db, addressesFilter, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(entries))
@@ -506,8 +554,8 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 	require.Equal(t, Entry{
 		payloadType:    MultiTransactionPT,
 		transaction:    nil,
-		id:             td.mTrID,
-		timestamp:      td.mTr.Timestamp,
+		id:             td.multiTx2ID,
+		timestamp:      td.multiTx2.Timestamp,
 		activityType:   SendAT,
 		activityStatus: PendingAS,
 		tokenType:      AssetTT,
@@ -521,8 +569,9 @@ func TestGetActivityEntriesFilterByStatus(t *testing.T) {
 	// Adds 4 extractable transactions: 1 T, 1 T pending, 1 MT pending, 1 MT with 2xT success
 	td, fromTds, toTds := fillTestData(t, db)
 	// Add 7 extractable transactions: 1 pending, 1 Tr failed, 1 MT failed, 4 success
-	trs, fromTrs, toTrs := transfer.GenerateTestTransactions(t, db, td.nextIndex, 7)
-	failedMTID := transfer.InsertTestMultiTransaction(t, db, &trs[6])
+	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, db, td.nextIndex, 7)
+	multiTx := transfer.GenerateTestSendMultiTransaction(trs[6])
+	failedMTID := transfer.InsertTestMultiTransaction(t, db, &multiTx)
 	trs[6].MultiTransactionID = failedMTID
 	for i := range trs {
 		if i == 1 {
@@ -546,7 +595,7 @@ func TestGetActivityEntriesFilterByStatus(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 3, len(entries))
 	require.Equal(t, td.pendingTr.Hash, entries[2].transaction.Hash)
-	require.Equal(t, td.mTrID, entries[1].id)
+	require.Equal(t, td.multiTx2ID, entries[1].id)
 	require.Equal(t, trs[1].Hash, entries[0].transaction.Hash)
 
 	filter.Statuses = []Status{FailedAS}
@@ -579,9 +628,9 @@ func TestGetActivityEntriesFilterByTokenType(t *testing.T) {
 	// Adds 4 extractable transactions 2 transactions ETH, one MT SNT to DAI and another MT ETH to SNT
 	td, fromTds, toTds := fillTestData(t, db)
 	// Add 6 extractable transactions with USDC (only erc20 as type in DB)
-	trs, fromTrs, toTrs := transfer.GenerateTestTransactions(t, db, td.nextIndex, 6)
+	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, db, td.nextIndex, 6)
 	for i := range trs {
-		trs[i].FromToken = "USDC"
+		trs[i].Token = "USDC"
 		transfer.InsertTestTransfer(t, db, &trs[i])
 	}
 
@@ -629,7 +678,7 @@ func TestGetActivityEntriesFilterByToAddresses(t *testing.T) {
 	// Adds 4 extractable transactions
 	td, fromTds, toTds := fillTestData(t, db)
 	// Add 6 extractable transactions
-	trs, fromTrs, toTrs := transfer.GenerateTestTransactions(t, db, td.nextIndex, 6)
+	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, db, td.nextIndex, 6)
 	for i := range trs {
 		transfer.InsertTestTransfer(t, db, &trs[i])
 	}
@@ -647,7 +696,7 @@ func TestGetActivityEntriesFilterByToAddresses(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, len(entries))
 
-	filter.CounterpartyAddresses = []eth_common.Address{td.pendingTr.To, td.mTr.To, trs[3].To}
+	filter.CounterpartyAddresses = []eth_common.Address{td.pendingTr.To, td.multiTx2.ToAddress, trs[3].To}
 	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(entries))
@@ -664,7 +713,7 @@ func TestGetActivityEntriesFilterByNetworks(t *testing.T) {
 	// Adds 4 extractable transactions
 	td, fromTds, toTds := fillTestData(t, db)
 	// Add 6 extractable transactions
-	trs, fromTrs, toTrs := transfer.GenerateTestTransactions(t, db, td.nextIndex, 6)
+	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, db, td.nextIndex, 6)
 	for i := range trs {
 		transfer.InsertTestTransfer(t, db, &trs[i])
 	}
@@ -682,7 +731,7 @@ func TestGetActivityEntriesFilterByNetworks(t *testing.T) {
 	// TODO: update after multi-transactions are filterable by ChainID
 	require.Equal(t, 2 /*0*/, len(entries))
 
-	chainIDs = []common.ChainID{td.pendingTr.ChainID, td.mTr.ChainID, trs[3].ChainID}
+	chainIDs = []common.ChainID{td.pendingTr.ChainID, td.multiTx2Tr1.ChainID, trs[3].ChainID}
 	entries, err = getActivityEntries(context.Background(), db, []eth_common.Address{}, chainIDs, filter, 0, 15)
 	require.NoError(t, err)
 	// TODO: update after multi-transactions are filterable by ChainID
@@ -697,12 +746,12 @@ func TestGetActivityEntriesCheckToAndFrom(t *testing.T) {
 	td, _, _ := fillTestData(t, db)
 
 	// Add extra transactions to test To address
-	trs, _, _ := transfer.GenerateTestTransactions(t, db, td.nextIndex, 2)
+	trs, _, _ := transfer.GenerateTestTransfers(t, db, td.nextIndex, 2)
 	transfer.InsertTestTransfer(t, db, &trs[0])
 	transfer.InsertTestPendingTransaction(t, db, &trs[1])
 
 	addresses := []eth_common.Address{td.tr1.From, td.pendingTr.From,
-		td.singletonMTr.From, td.mTr.To, trs[0].To, trs[1].To}
+		td.multiTx1.FromAddress, td.multiTx2.ToAddress, trs[0].To, trs[1].To}
 
 	var filter Filter
 	entries, err := getActivityEntries(context.Background(), db, addresses, []common.ChainID{}, filter, 0, 15)
@@ -716,8 +765,8 @@ func TestGetActivityEntriesCheckToAndFrom(t *testing.T) {
 	require.Equal(t, SendAT, entries[4].activityType) // td.pendingTr
 
 	// Multi-transactions are always considered as SendAT
-	require.Equal(t, SendAT, entries[3].activityType) // td.singletonMTr
-	require.Equal(t, SendAT, entries[2].activityType) // td.mTr
+	require.Equal(t, SendAT, entries[3].activityType) // td.multiTx1
+	require.Equal(t, SendAT, entries[2].activityType) // td.multiTx2
 
 	require.Equal(t, ReceiveAT, entries[1].activityType)               // trs[0]
 	require.NotEqual(t, eth.Address{}, entries[1].transaction.Address) // trs[0]
