@@ -87,3 +87,8 @@ func BigIntToPadded128BitsStr(val *big.Int) *string {
 	*res = fmt.Sprintf("%032s", hexStr)
 	return res
 }
+
+func Int64ToPadded128BitsStr(val int64) *string {
+	res := fmt.Sprintf("%032x", val)
+	return &res
+}

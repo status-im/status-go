@@ -3,6 +3,7 @@ package activity
 import (
 	"context"
 	"database/sql"
+	"math/big"
 	"testing"
 
 	"github.com/status-im/status-go/appdatabase"
@@ -14,6 +15,7 @@ import (
 
 	eth "github.com/ethereum/go-ethereum/common"
 	eth_common "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/stretchr/testify/require"
 )
@@ -133,6 +135,8 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(td.tr1.Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 	}, entries))
 	require.True(t, testutils.StructExistsInSlice(Entry{
 		payloadType:    PendingTransactionPT,
@@ -142,6 +146,8 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: PendingAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(td.pendingTr.Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 	}, entries))
 	require.True(t, testutils.StructExistsInSlice(Entry{
 		payloadType:    MultiTransactionPT,
@@ -151,6 +157,8 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx1.FromAmount)),
+		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx1.ToAmount)),
 	}, entries))
 	require.True(t, testutils.StructExistsInSlice(Entry{
 		payloadType:    MultiTransactionPT,
@@ -160,6 +168,8 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: PendingAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx2.FromAmount)),
+		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx2.ToAmount)),
 	}, entries))
 
 	// Ensure the sub-transactions of the multi-transactions are not returned
@@ -171,6 +181,8 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx1Tr1.Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 	}, entries))
 	require.False(t, testutils.StructExistsInSlice(Entry{
 		payloadType:    SimpleTransactionPT,
@@ -180,6 +192,8 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx1Tr2.Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 	}, entries))
 	require.False(t, testutils.StructExistsInSlice(Entry{
 		payloadType:    SimpleTransactionPT,
@@ -189,6 +203,8 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx2Tr1.Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 	}, entries))
 	require.False(t, testutils.StructExistsInSlice(Entry{
 		payloadType:    SimpleTransactionPT,
@@ -198,6 +214,8 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx2Tr2.Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 	}, entries))
 	require.False(t, testutils.StructExistsInSlice(Entry{
 		payloadType:    PendingTransactionPT,
@@ -207,6 +225,8 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: PendingAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx2PendingTr.Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 	}, entries))
 }
 
@@ -286,6 +306,8 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(trs[5].Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    MultiTransactionPT,
@@ -295,6 +317,8 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx1.FromAmount)),
+		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx1.ToAmount)),
 	}, entries[7])
 
 	// Test complete interval
@@ -311,6 +335,8 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(trs[2].Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    MultiTransactionPT,
@@ -320,6 +346,8 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx1.FromAmount)),
+		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx1.ToAmount)),
 	}, entries[4])
 
 	// Test end only
@@ -336,6 +364,8 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(trs[2].Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
@@ -345,6 +375,8 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(td.tr1.Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 	}, entries[6])
 }
 
@@ -381,6 +413,8 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(trs[8].Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
@@ -390,6 +424,8 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(trs[6].Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 	}, entries[2])
 
 	// Move window 2 entries forward
@@ -405,6 +441,8 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(trs[6].Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
@@ -414,6 +452,8 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(trs[4].Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 	}, entries[2])
 
 	// Move window 4 more entries to test filter cap
@@ -429,6 +469,8 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(trs[2].Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 	}, entries[0])
 }
 
@@ -541,6 +583,8 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 		activityType:   ReceiveAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(0)),
+		amountIn:       (*hexutil.Big)(big.NewInt(trs[4].Value)),
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
@@ -550,6 +594,8 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: CompleteAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(trs[1].Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 	}, entries[1])
 	require.Equal(t, Entry{
 		payloadType:    MultiTransactionPT,
@@ -559,6 +605,8 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 		activityType:   SendAT,
 		activityStatus: PendingAS,
 		tokenType:      AssetTT,
+		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx2.FromAmount)),
+		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx2.ToAmount)),
 	}, entries[2])
 }
 
