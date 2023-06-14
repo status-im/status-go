@@ -15,7 +15,7 @@ import (
 func setupTestTokenDB(t *testing.T) (*Manager, func()) {
 	db, err := appdatabase.InitializeDB(":memory:", "wallet-token-tests", 1)
 	require.NoError(t, err)
-	return &Manager{db, nil, nil, nil, nil, nil}, func() {
+	return &Manager{db, nil, nil, nil, nil, nil, false}, func() {
 		require.NoError(t, db.Close())
 	}
 }
@@ -100,12 +100,10 @@ func TestTokenOverride(t *testing.T) {
 	}
 	testStore := &DefaultStore{
 		tokenList,
-		false,
 	}
 
 	overrideTokensInPlace(networks, testStore.tokenList)
-	tokens, err := testStore.GetTokens()
-	require.NoError(t, err)
+	tokens := testStore.GetTokens()
 	tokenMap := toTokenMap(tokens)
 	_, found := tokenMap[1][common.Address{1}]
 	require.False(t, found)

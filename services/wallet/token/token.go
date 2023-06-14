@@ -47,12 +47,13 @@ func (t *Token) IsNative() bool {
 
 // Manager is used for accessing token store. It changes the token store based on overridden tokens
 type Manager struct {
-	db             *sql.DB
-	RPCClient      *rpc.Client
-	networkManager *network.Manager
-	stores         []store
-	tokenList      []*Token
-	tokenMap       storeMap
+	db               *sql.DB
+	RPCClient        *rpc.Client
+	networkManager   *network.Manager
+	stores           []store
+	tokenList        []*Token
+	tokenMap         storeMap
+	areTokensFetched bool
 }
 
 func NewTokenManager(
@@ -61,8 +62,7 @@ func NewTokenManager(
 	networkManager *network.Manager,
 ) *Manager {
 	// Order of stores is important when merging token lists. The former prevale
-	tokenManager := &Manager{db, RPCClient, networkManager, []store{newUniswapStore(), newDefaultStore()}, nil, nil}
-
+	tokenManager := &Manager{db, RPCClient, networkManager, []store{newUniswapStore(), newDefaultStore()}, nil, nil, false}
 	return tokenManager
 }
 
@@ -104,7 +104,7 @@ func (tm *Manager) inStore(address common.Address, chainID uint64) bool {
 		return true
 	}
 
-	if !tm.areTokensFetched() {
+	if !tm.areTokensFetched {
 		tm.fetchTokens()
 	}
 
@@ -117,16 +117,6 @@ func (tm *Manager) inStore(address common.Address, chainID uint64) bool {
 	return ok
 }
 
-func (tm *Manager) areTokensFetched() bool {
-	for _, store := range tm.stores {
-		if !store.areTokensFetched() {
-			return false
-		}
-	}
-
-	return true
-}
-
 func (tm *Manager) fetchTokens() {
 	tm.tokenList = nil
 	tm.tokenMap = nil
@@ -137,11 +127,7 @@ func (tm *Manager) fetchTokens() {
 	}
 
 	for _, store := range tm.stores {
-		tokens, err := store.GetTokens()
-		if err != nil {
-			log.Error("can't fetch tokens from store", "error", err)
-			continue
-		}
+		tokens := store.GetTokens()
 		validTokens := make([]*Token, 0)
 		for _, token := range tokens {
 			for _, network := range networks {
@@ -154,7 +140,7 @@ func (tm *Manager) fetchTokens() {
 
 		tm.tokenList = mergeTokenLists([][]*Token{tm.tokenList, validTokens})
 	}
-
+	tm.areTokensFetched = true
 	tm.tokenMap = toTokenMap(tm.tokenList)
 }
 
@@ -230,7 +216,7 @@ func (tm *Manager) GetAllTokensAndNativeCurrencies() ([]*Token, error) {
 }
 
 func (tm *Manager) GetAllTokens() ([]*Token, error) {
-	if !tm.areTokensFetched() {
+	if !tm.areTokensFetched {
 		tm.fetchTokens()
 	}
 
@@ -259,7 +245,7 @@ func (tm *Manager) GetTokensByChainIDs(chainIDs []uint64) ([]*Token, error) {
 }
 
 func (tm *Manager) GetTokens(chainID uint64) ([]*Token, error) {
-	if !tm.areTokensFetched() {
+	if !tm.areTokensFetched {
 		tm.fetchTokens()
 	}
 
