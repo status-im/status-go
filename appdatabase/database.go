@@ -72,6 +72,10 @@ func EncryptDatabase(oldPath, newPath, password string, kdfIterationsNumber int)
 	return sqlite.EncryptDB(oldPath, newPath, password, kdfIterationsNumber)
 }
 
+func ExportDB(path string, password string, kdfIterationsNumber int, newDbPAth string, newPassword string) error {
+	return sqlite.ExportDB(path, password, kdfIterationsNumber, newDbPAth, newPassword)
+}
+
 func ChangeDatabasePassword(path string, password string, kdfIterationsNumber int, newPassword string) error {
 	return sqlite.ChangeEncryptionKey(path, password, kdfIterationsNumber, newPassword)
 }

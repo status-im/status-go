@@ -102,6 +102,16 @@ func EncryptDB(unencryptedPath string, encryptedPath string, key string, kdfIter
 	return encryptDB(db, encryptedPath, key, kdfIterationsNumber)
 }
 
+// Export takes an encrypted database and re-encrypts it in a new file, with a new key
+func ExportDB(encryptedPath string, key string, kdfIterationsNumber int, newPath string, newKey string) error {
+	db, err := openDB(encryptedPath, key, kdfIterationsNumber, V4CipherPageSize)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	return encryptDB(db, newPath, newKey, kdfIterationsNumber)
+}
+
 func buildSqlcipherDSN(path string) (string, error) {
 	if path == InMemoryPath {
 		return InMemoryPath, nil
