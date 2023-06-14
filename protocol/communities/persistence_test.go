@@ -375,7 +375,7 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 	s.Require().NoError(err)
 	s.Require().Len(tokens, 0)
 
-	token := CommunityToken{
+	tokenERC721 := CommunityToken{
 		CommunityID:        "123",
 		TokenType:          protobuf.CommunityTokenType_ERC721,
 		Address:            "0x123",
@@ -391,9 +391,9 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 		Base64Image:        "ABCD",
 	}
 
-	token2 := CommunityToken{
+	tokenERC20 := CommunityToken{
 		CommunityID:        "345",
-		TokenType:          protobuf.CommunityTokenType_ERC721,
+		TokenType:          protobuf.CommunityTokenType_ERC20,
 		Address:            "0x345",
 		Name:               "StatusToken",
 		Symbol:             "STT",
@@ -405,17 +405,18 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 		ChainID:            2,
 		DeployState:        Failed,
 		Base64Image:        "QWERTY",
+		Decimals:           21,
 	}
 
-	err = s.db.AddCommunityToken(&token)
+	err = s.db.AddCommunityToken(&tokenERC721)
 	s.Require().NoError(err)
-	err = s.db.AddCommunityToken(&token2)
+	err = s.db.AddCommunityToken(&tokenERC20)
 	s.Require().NoError(err)
 
 	tokens, err = s.db.GetCommunityTokens("123")
 	s.Require().NoError(err)
 	s.Require().Len(tokens, 1)
-	s.Require().Equal(token, *tokens[0])
+	s.Require().Equal(tokenERC721, *tokens[0])
 
 	err = s.db.UpdateCommunityTokenState(1, "0x123", Deployed)
 	s.Require().NoError(err)
@@ -423,6 +424,11 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 	s.Require().NoError(err)
 	s.Require().Len(tokens, 1)
 	s.Require().Equal(Deployed, tokens[0].DeployState)
+
+	tokens, err = s.db.GetCommunityTokens("345")
+	s.Require().NoError(err)
+	s.Require().Len(tokens, 1)
+	s.Require().Equal(tokenERC20, *tokens[0])
 }
 
 func (s *PersistenceSuite) TestSaveCheckChannelPermissionResponse() {

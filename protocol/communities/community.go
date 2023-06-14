@@ -454,6 +454,7 @@ type CommunityToken struct {
 	ChainID            int                         `json:"chainId"`
 	DeployState        DeployState                 `json:"deployState"`
 	Base64Image        string                      `json:"image"`
+	Decimals           int                         `json:"decimals"`
 }
 
 type CommunitySettings struct {

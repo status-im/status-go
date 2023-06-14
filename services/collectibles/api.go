@@ -14,8 +14,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/contracts/assets"
 	"github.com/status-im/status-go/contracts/collectibles"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -27,7 +29,7 @@ func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, config 
 		RPCClient:       rpcClient,
 		accountsManager: accountsManager,
 		config:          config,
-		db:              NewCollectiblesDatabase(appDb),
+		db:              NewCommunityTokensDatabase(appDb),
 	}
 }
 
@@ -82,7 +84,7 @@ func (d *DeploymentParameters) Validate() error {
 	return nil
 }
 
-func (api *API) Deploy(ctx context.Context, chainID uint64, deploymentParameters DeploymentParameters, txArgs transactions.SendTxArgs, password string) (DeploymentDetails, error) {
+func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deploymentParameters DeploymentParameters, txArgs transactions.SendTxArgs, password string) (DeploymentDetails, error) {
 
 	err := deploymentParameters.Validate()
 	if err != nil {
@@ -109,9 +111,40 @@ func (api *API) Deploy(ctx context.Context, chainID uint64, deploymentParameters
 	return DeploymentDetails{address.Hex(), tx.Hash().Hex()}, nil
 }
 
+func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentParameters DeploymentParameters, txArgs transactions.SendTxArgs, password string) (DeploymentDetails, error) {
+
+	err := deploymentParameters.Validate()
+	if err != nil {
+		return DeploymentDetails{}, err
+	}
+
+	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
+
+	ethClient, err := api.RPCClient.EthClient(chainID)
+	if err != nil {
+		log.Error(err.Error())
+		return DeploymentDetails{}, err
+	}
+
+	address, tx, _, err := assets.DeployAssets(transactOpts, ethClient, deploymentParameters.Name,
+		deploymentParameters.Symbol, deploymentParameters.GetSupply())
+	if err != nil {
+		log.Error(err.Error())
+		return DeploymentDetails{}, err
+	}
+
+	return DeploymentDetails{address.Hex(), tx.Hash().Hex()}, nil
+}
+
 // Returns gas units + 10%
 func (api *API) DeployCollectiblesEstimate(ctx context.Context) (uint64, error) {
 	gasAmount := uint64(1960645)
+	return gasAmount + uint64(float32(gasAmount)*0.1), nil
+}
+
+// Returns gas units + 10%
+func (api *API) DeployAssetsEstimate(ctx context.Context) (uint64, error) {
+	gasAmount := uint64(957483)
 	return gasAmount + uint64(float32(gasAmount)*0.1), nil
 }
 
@@ -121,6 +154,14 @@ func (api *API) newCollectiblesInstance(chainID uint64, contractAddress string) 
 		return nil, err
 	}
 	return collectibles.NewCollectibles(common.HexToAddress(contractAddress), backend)
+}
+
+func (api *API) newAssetsInstance(chainID uint64, contractAddress string) (*assets.Assets, error) {
+	backend, err := api.RPCClient.EthClient(chainID)
+	if err != nil {
+		return nil, err
+	}
+	return assets.NewAssets(common.HexToAddress(contractAddress), backend)
 }
 
 // if we want to mint 2 tokens to addresses ["a", "b"] we need to mint
@@ -177,6 +218,7 @@ func (api *API) EstimateMintTo(ctx context.Context, chainID uint64, contractAddr
 	return api.estimateMethod(ctx, chainID, contractAddress, "mintTo", usersAddresses)
 }
 
+// This is only ERC721 function
 func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, tokenIds []*bigint.BigInt) (string, error) {
 	err := api.validateTokens(tokenIds)
 	if err != nil {
@@ -219,15 +261,32 @@ func (api *API) EstimateRemoteBurn(ctx context.Context, chainID uint64, contract
 
 func (api *API) ContractOwner(ctx context.Context, chainID uint64, contractAddress string) (string, error) {
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
+	tokenType, err := api.db.GetTokenType(chainID, contractAddress)
 	if err != nil {
 		return "", err
 	}
-	owner, err := contractInst.Owner(callOpts)
-	if err != nil {
-		return "", err
+	if tokenType == protobuf.CommunityTokenType_ERC721 {
+		contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
+		if err != nil {
+			return "", err
+		}
+		owner, err := contractInst.Owner(callOpts)
+		if err != nil {
+			return "", err
+		}
+		return owner.String(), nil
+	} else if tokenType == protobuf.CommunityTokenType_ERC20 {
+		contractInst, err := api.newAssetsInstance(chainID, contractAddress)
+		if err != nil {
+			return "", err
+		}
+		owner, err := contractInst.Owner(callOpts)
+		if err != nil {
+			return "", err
+		}
+		return owner.String(), nil
 	}
-	return owner.String(), nil
+	return "", fmt.Errorf("unknown token type: %v", tokenType)
 }
 
 func (api *API) MintedCount(ctx context.Context, chainID uint64, contractAddress string) (*big.Int, error) {
