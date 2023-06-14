@@ -14,34 +14,96 @@ import (
 )
 
 type TestTransaction struct {
-	Hash                 eth_common.Hash
-	ChainID              common.ChainID
-	From                 eth_common.Address // [sender]
-	To                   eth_common.Address // [address]
-	FromToken            string             // used to detect type in transfers table
-	ToToken              string             // only used in multi_transactions table
-	Timestamp            int64
-	Value                int64
-	BlkNumber            int64
-	Success              bool
-	MultiTransactionID   MultiTransactionIDType
-	MultiTransactionType MultiTransactionType
+	Hash               eth_common.Hash
+	ChainID            common.ChainID
+	From               eth_common.Address // [sender]
+	Timestamp          int64
+	BlkNumber          int64
+	Success            bool
+	MultiTransactionID MultiTransactionIDType
 }
 
-func GenerateTestTransactions(t *testing.T, db *sql.DB, firstStartIndex int, count int) (result []TestTransaction, fromAddresses, toAddresses []eth_common.Address) {
+type TestTransfer struct {
+	TestTransaction
+	To    eth_common.Address // [address]
+	Token string             // used to detect type in transfers table
+	Value int64
+}
+
+type TestMultiTransaction struct {
+	MultiTransactionID   MultiTransactionIDType
+	MultiTransactionType MultiTransactionType
+	FromAddress          eth_common.Address
+	ToAddress            eth_common.Address
+	FromToken            string
+	ToToken              string
+	FromAmount           int64
+	ToAmount             int64
+	Timestamp            int64
+}
+
+func generateTestTransaction(seed int) TestTransaction {
+	return TestTransaction{
+		Hash:               eth_common.HexToHash(fmt.Sprintf("0x1%d", seed)),
+		ChainID:            common.ChainID(seed),
+		From:               eth_common.HexToAddress(fmt.Sprintf("0x2%d", seed)),
+		Timestamp:          int64(seed),
+		BlkNumber:          int64(seed),
+		Success:            true,
+		MultiTransactionID: NoMultiTransactionID,
+	}
+}
+
+func generateTestTransfer(seed int) TestTransfer {
+	return TestTransfer{
+		TestTransaction: generateTestTransaction(seed),
+		Token:           "",
+		To:              eth_common.HexToAddress(fmt.Sprintf("0x3%d", seed)),
+		Value:           int64(seed),
+	}
+}
+
+func GenerateTestSendMultiTransaction(tr TestTransfer) TestMultiTransaction {
+	return TestMultiTransaction{
+		MultiTransactionType: MultiTransactionSend,
+		FromAddress:          tr.From,
+		ToAddress:            tr.To,
+		FromToken:            tr.Token,
+		ToToken:              tr.Token,
+		FromAmount:           tr.Value,
+		Timestamp:            tr.Timestamp,
+	}
+}
+
+func GenerateTestSwapMultiTransaction(tr TestTransfer, toToken string, toAmount int64) TestMultiTransaction {
+	return TestMultiTransaction{
+		MultiTransactionType: MultiTransactionSwap,
+		FromAddress:          tr.From,
+		ToAddress:            tr.To,
+		FromToken:            tr.Token,
+		ToToken:              toToken,
+		FromAmount:           tr.Value,
+		ToAmount:             toAmount,
+		Timestamp:            tr.Timestamp,
+	}
+}
+
+func GenerateTestBridgeMultiTransaction(fromTr, toTr TestTransfer) TestMultiTransaction {
+	return TestMultiTransaction{
+		MultiTransactionType: MultiTransactionBridge,
+		FromAddress:          fromTr.From,
+		ToAddress:            toTr.To,
+		FromToken:            fromTr.Token,
+		ToToken:              toTr.Token,
+		FromAmount:           fromTr.Value,
+		ToAmount:             toTr.Value,
+		Timestamp:            fromTr.Timestamp,
+	}
+}
+
+func GenerateTestTransfers(t *testing.T, db *sql.DB, firstStartIndex int, count int) (result []TestTransfer, fromAddresses, toAddresses []eth_common.Address) {
 	for i := firstStartIndex; i < (firstStartIndex + count); i++ {
-		tr := TestTransaction{
-			Hash:                 eth_common.HexToHash(fmt.Sprintf("0x1%d", i)),
-			ChainID:              common.ChainID(i),
-			From:                 eth_common.HexToAddress(fmt.Sprintf("0x2%d", i)),
-			To:                   eth_common.HexToAddress(fmt.Sprintf("0x3%d", i)),
-			Timestamp:            int64(i),
-			Value:                int64(i),
-			BlkNumber:            int64(i),
-			Success:              true,
-			MultiTransactionID:   NoMultiTransactionID,
-			MultiTransactionType: MultiTransactionSend,
-		}
+		tr := generateTestTransfer(i)
 		fromAddresses = append(fromAddresses, tr.From)
 		toAddresses = append(toAddresses, tr.To)
 		result = append(result, tr)
@@ -49,10 +111,10 @@ func GenerateTestTransactions(t *testing.T, db *sql.DB, firstStartIndex int, cou
 	return
 }
 
-func InsertTestTransfer(t *testing.T, db *sql.DB, tr *TestTransaction) {
+func InsertTestTransfer(t *testing.T, db *sql.DB, tr *TestTransfer) {
 	// Respect `FOREIGN KEY(network_id,address,blk_hash)` of `transfers` table
 	tokenType := "eth"
-	if tr.FromToken != "" && strings.ToUpper(tr.FromToken) != testutils.EthSymbol {
+	if tr.Token != "" && strings.ToUpper(tr.Token) != testutils.EthSymbol {
 		tokenType = "erc20"
 	}
 	blkHash := eth_common.HexToHash("4")
@@ -69,7 +131,7 @@ func InsertTestTransfer(t *testing.T, db *sql.DB, tr *TestTransaction) {
 	require.NoError(t, err)
 }
 
-func InsertTestPendingTransaction(t *testing.T, db *sql.DB, tr *TestTransaction) {
+func InsertTestPendingTransaction(t *testing.T, db *sql.DB, tr *TestTransfer) {
 	_, err := db.Exec(`
 		INSERT INTO pending_transactions (network_id, hash, timestamp, from_address, to_address,
 			symbol, gas_price, gas_limit, value, data, type, additional_data, multi_transaction_id
@@ -78,7 +140,7 @@ func InsertTestPendingTransaction(t *testing.T, db *sql.DB, tr *TestTransaction)
 	require.NoError(t, err)
 }
 
-func InsertTestMultiTransaction(t *testing.T, db *sql.DB, tr *TestTransaction) MultiTransactionIDType {
+func InsertTestMultiTransaction(t *testing.T, db *sql.DB, tr *TestMultiTransaction) MultiTransactionIDType {
 	fromTokenType := tr.FromToken
 	if tr.FromToken == "" {
 		fromTokenType = testutils.EthSymbol
@@ -88,11 +150,12 @@ func InsertTestMultiTransaction(t *testing.T, db *sql.DB, tr *TestTransaction) M
 		toTokenType = testutils.EthSymbol
 	}
 	result, err := db.Exec(`
-		INSERT INTO multi_transactions (from_address, from_asset, from_amount, to_address, to_asset, type, timestamp
-		) VALUES (?, ?, 0, ?, ?, ?, ?)`,
-		tr.From, fromTokenType, tr.To, toTokenType, tr.MultiTransactionType, tr.Timestamp)
+		INSERT INTO multi_transactions (from_address, from_asset, from_amount, to_address, to_asset, to_amount, type, timestamp
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		tr.FromAddress, fromTokenType, tr.FromAmount, tr.ToAddress, toTokenType, tr.ToAmount, tr.MultiTransactionType, tr.Timestamp)
 	require.NoError(t, err)
 	rowID, err := result.LastInsertId()
 	require.NoError(t, err)
-	return MultiTransactionIDType(rowID)
+	tr.MultiTransactionID = MultiTransactionIDType(rowID)
+	return tr.MultiTransactionID
 }
