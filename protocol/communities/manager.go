@@ -4022,6 +4022,7 @@ func (m *Manager) AddCommunityToken(token *CommunityToken) (*CommunityToken, err
 		Symbol:            token.Symbol,
 		TokenType:         token.TokenType,
 		Name:              token.Name,
+		Decimals:          uint32(token.Decimals),
 	}
 	_, err = community.AddCommunityTokensMetadata(tokenMetadata)
 	if err != nil {

@@ -32,6 +32,7 @@ message CommunityTokenMetadata {
   CommunityTokenType tokenType = 4;
   string symbol = 5;
   string name = 6;
+  uint32 decimals = 7;
 }
 
 message CommunityPermissions {
