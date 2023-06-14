@@ -137,7 +137,7 @@ func getErc20BatchSize(chainID uint64) *big.Int {
 }
 
 func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
-	log.Info("wallet historical downloader for erc20 transfers start", "address", c.address,
+	log.Info("wallet historical downloader for erc20 transfers start", "chainID", c.chainClient.ChainID, "address", c.address,
 		"from", c.from, "to", c.to)
 
 	start := time.Now()
@@ -158,8 +158,8 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 		}
 		c.foundHeaders = append(c.foundHeaders, headers...)
 	}
-	log.Info("wallet historical downloader for erc20 transfers finished", "address", c.address,
-		"from", c.from, "to", c.to, "time", time.Since(start))
+	log.Info("wallet historical downloader for erc20 transfers finished", "chainID", c.chainClient.ChainID, "address", c.address,
+		"from", c.from, "to", c.to, "time", time.Since(start), "headers", len(c.foundHeaders))
 	return nil
 }
 
@@ -181,8 +181,8 @@ type controlCommand struct {
 	tokenManager       *token.Manager
 }
 
-func (c *controlCommand) LoadTransfers(ctx context.Context, limit int) (map[common.Address][]Transfer, error) {
-	return loadTransfers(ctx, c.accounts, c.blockDAO, c.db, c.chainClient, limit, make(map[common.Address][]*big.Int), c.transactionManager, c.tokenManager)
+func (c *controlCommand) LoadTransfers(ctx context.Context, limit int) error {
+	return loadTransfers(ctx, c.accounts, c.blockDAO, c.db, c.chainClient, limit, make(map[common.Address][]*big.Int), c.transactionManager, c.tokenManager, c.feed)
 }
 
 func (c *controlCommand) Run(parent context.Context) error {
@@ -274,7 +274,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 		return cmnd.error
 	}
 
-	_, err = c.LoadTransfers(parent, numberOfBlocksCheckedPerIteration)
+	err = c.LoadTransfers(parent, numberOfBlocksCheckedPerIteration)
 	if err != nil {
 		if c.NewError(err) {
 			return nil
@@ -321,9 +321,9 @@ func nonArchivalNodeError(err error) bool {
 
 func (c *controlCommand) NewError(err error) bool {
 	c.errorsCount++
-	log.Error("controlCommand error", "error", err, "counter", c.errorsCount)
+	log.Error("controlCommand error", "chainID", c.chainClient.ChainID, "error", err, "counter", c.errorsCount)
 	if nonArchivalNodeError(err) {
-		log.Info("Non archival node detected")
+		log.Info("Non archival node detected", "chainID", c.chainClient.ChainID)
 		c.nonArchivalRPCNode = true
 		c.feed.Send(walletevent.Event{
 			Type: EventNonArchivalNodeDetected,
@@ -524,15 +524,15 @@ func (c *transfersCommand) notifyOfNewTransfers(transfers []Transfer) {
 }
 
 type loadTransfersCommand struct {
-	accounts                []common.Address
-	db                      *Database
-	blockDAO                *BlockDAO
-	chainClient             *chain.ClientWithFallback
-	blocksByAddress         map[common.Address][]*big.Int
-	foundTransfersByAddress map[common.Address][]Transfer
-	transactionManager      *TransactionManager
-	blocksLimit             int
-	tokenManager            *token.Manager
+	accounts           []common.Address
+	db                 *Database
+	blockDAO           *BlockDAO
+	chainClient        *chain.ClientWithFallback
+	blocksByAddress    map[common.Address][]*big.Int
+	transactionManager *TransactionManager
+	blocksLimit        int
+	tokenManager       *token.Manager
+	feed               *event.Feed
 }
 
 func (c *loadTransfersCommand) Command() async.Command {
@@ -542,17 +542,12 @@ func (c *loadTransfersCommand) Command() async.Command {
 	}.Run
 }
 
-func (c *loadTransfersCommand) LoadTransfers(ctx context.Context, limit int, blocksByAddress map[common.Address][]*big.Int) (map[common.Address][]Transfer, error) {
-	return loadTransfers(ctx, c.accounts, c.blockDAO, c.db, c.chainClient, limit, blocksByAddress, c.transactionManager, c.tokenManager)
+func (c *loadTransfersCommand) LoadTransfers(ctx context.Context, limit int, blocksByAddress map[common.Address][]*big.Int) error {
+	return loadTransfers(ctx, c.accounts, c.blockDAO, c.db, c.chainClient, limit, blocksByAddress, c.transactionManager, c.tokenManager, c.feed)
 }
 
 func (c *loadTransfersCommand) Run(parent context.Context) (err error) {
-	transfersByAddress, err := c.LoadTransfers(parent, c.blocksLimit, c.blocksByAddress)
-	if err != nil {
-		return err
-	}
-	c.foundTransfersByAddress = transfersByAddress
-
+	err = c.LoadTransfers(parent, c.blocksLimit, c.blocksByAddress)
 	return
 }
 
@@ -603,6 +598,8 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) error {
 		erc20Headers := erc20HeadersByAddress[address]
 		allHeaders := append(ethHeaders, erc20Headers...)
 
+		log.Debug("allHeaders found for account", "address", address, "allHeaders.len", len(allHeaders))
+
 		// Ensure only 1 DBHeader per block hash.
 		uniqHeaders := []*DBHeader{}
 		if len(allHeaders) > 0 {
@@ -627,6 +624,7 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) error {
 			Balance: c.balanceCache.ReadCachedBalance(address, lastBlockNumber),
 			Nonce:   c.balanceCache.ReadCachedNonce(address, lastBlockNumber),
 		}
+		log.Debug("uniqHeaders found for account", "address", address, "uniqHeaders.len", len(uniqHeaders))
 		err = c.db.ProcessBlocks(c.chainClient.ChainID, address, newFromByAddress[address], to, uniqHeaders)
 		if err != nil {
 			return err
@@ -720,13 +718,12 @@ func (c *findAndCheckBlockRangeCommand) fastIndexErc20(ctx context.Context, from
 
 func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *BlockDAO, db *Database,
 	chainClient *chain.ClientWithFallback, blocksLimitPerAccount int, blocksByAddress map[common.Address][]*big.Int,
-	transactionManager *TransactionManager, tokenManager *token.Manager) (map[common.Address][]Transfer, error) {
+	transactionManager *TransactionManager, tokenManager *token.Manager, feed *event.Feed) error {
 	log.Info("loadTransfers start", "accounts", accounts, "chain", chainClient.ChainID, "limit", blocksLimitPerAccount)
 
 	start := time.Now()
 	group := async.NewGroup(ctx)
 
-	commands := []*transfersCommand{}
 	for _, address := range accounts {
 		transfers := &transfersCommand{
 			db:          db,
@@ -742,25 +739,17 @@ func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *Blo
 			blockNums:          blocksByAddress[address],
 			transactionManager: transactionManager,
 			tokenManager:       tokenManager,
+			feed:               feed,
 		}
-		commands = append(commands, transfers)
 		group.Add(transfers.Command())
 	}
 
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return ctx.Err()
 	case <-group.WaitAsync():
-		transfersByAddress := map[common.Address][]Transfer{}
-		for _, command := range commands {
-			if len(command.fetchedTransfers) == 0 {
-				continue
-			}
-
-			transfersByAddress[command.address] = append(transfersByAddress[command.address], command.fetchedTransfers...)
-		}
 		log.Info("loadTransfers finished for account", "in", time.Since(start), "chain", chainClient.ChainID)
-		return transfersByAddress, nil
+		return nil
 	}
 }
 

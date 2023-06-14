@@ -381,7 +381,7 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 // time to get logs for 100000 blocks = 1.144686979s. with 249 events in the result set.
 func (d *ERC20TransfersDownloader) GetHeadersInRange(parent context.Context, from, to *big.Int) ([]*DBHeader, error) {
 	start := time.Now()
-	log.Debug("get erc20 transfers in range", "from", from, "to", to)
+	log.Debug("get erc20 transfers in range start", "chainID", d.client.ChainID, "from", from, "to", to)
 	headers := []*DBHeader{}
 	ctx := context.Background()
 	for _, address := range d.accounts {
@@ -405,12 +405,21 @@ func (d *ERC20TransfersDownloader) GetHeadersInRange(parent context.Context, fro
 		if len(logs) == 0 {
 			continue
 		}
+
 		rst, err := d.blocksFromLogs(parent, logs, address)
 		if err != nil {
 			return nil, err
 		}
-		headers = append(headers, rst...)
+		if len(rst) == 0 {
+			log.Warn("no headers found in logs for account", "chainID", d.client.ChainID, "address", address, "from", from, "to", to)
+			continue
+		} else {
+			headers = append(headers, rst...)
+			log.Debug("found erc20 transfers for account", "chainID", d.client.ChainID, "address", address,
+				"from", from, "to", to, "headers", len(headers))
+		}
 	}
-	log.Debug("found erc20 transfers between two blocks", "from", from, "to", to, "headers", len(headers), "took", time.Since(start))
+	log.Debug("get erc20 transfers in range end", "chainID", d.client.ChainID,
+		"from", from, "to", to, "headers", len(headers), "took", time.Since(start))
 	return headers, nil
 }
