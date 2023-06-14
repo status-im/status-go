@@ -1455,6 +1455,9 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 	}
 
 	if requestToJoin.State == communities.RequestToJoinStatePending {
+		if state.Response.RequestsToJoinCommunity == nil {
+			state.Response.RequestsToJoinCommunity = make([]*communities.RequestToJoin, 0)
+		}
 		state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, requestToJoin)
 
 		state.Response.AddNotification(NewCommunityRequestToJoinNotification(requestToJoin.ID.String(), community, contact))
@@ -2544,10 +2547,10 @@ func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity) (*Chat, error)
 			return nil, err
 		}
 
-		isMemberAdmin := community.IsMemberAdmin(chatEntity.GetSigPubKey())
+		isMemberOwnerOrAdmin := community.IsMemberOwnerOrAdmin(chatEntity.GetSigPubKey())
 		pinMessageAllowed := community.AllowsAllMembersToPinMessage()
 
-		if (pinMessage && !isMemberAdmin && !pinMessageAllowed) || (!emojiReaction && !canPost) {
+		if (pinMessage && !isMemberOwnerOrAdmin && !pinMessageAllowed) || (!emojiReaction && !canPost) {
 			return nil, errors.New("user can't post")
 		}
 

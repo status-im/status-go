@@ -26,7 +26,7 @@ func (a *AddRoleToMember) Validate() error {
 		return ErrAddRoleToMemberInvalidUser
 	}
 
-	if a.Role == protobuf.CommunityMember_UNKNOWN_ROLE {
+	if a.Role == protobuf.CommunityMember_ROLE_NONE {
 		return ErrAddRoleToMemberInvalidRole
 	}
 

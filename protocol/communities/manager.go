@@ -39,6 +39,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/protocol/v1"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -293,6 +294,7 @@ type Subscription struct {
 	DownloadingHistoryArchivesStartedSignal  *signal.DownloadingHistoryArchivesStartedSignal
 	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
 	ImportingHistoryArchiveMessagesSignal    *signal.ImportingHistoryArchiveMessagesSignal
+	CommunityAdminEvent                      *protobuf.CommunityAdminEvent
 }
 
 type CommunityResponse struct {
@@ -530,7 +532,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 	}
 
 	description.Members = make(map[string]*protobuf.CommunityMember)
-	description.Members[common.PubkeyToHex(&m.identity.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ALL}}
+	description.Members[common.PubkeyToHex(&m.identity.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER}}
 
 	err = ValidateCommunityDescription(description)
 	if err != nil {
@@ -594,14 +596,23 @@ func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommuni
 		return nil, nil, err
 	}
 
-	m.publish(&Subscription{Community: community})
-
-	// check existing member permission once, then check periodically
-	err = m.checkMemberPermissions(community.ID())
-	if err != nil {
-		return nil, nil, err
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityBecomeMemberTokenPermissionChangeAdminEvent()})
 	}
-	go m.CheckMemberPermissionsPeriodically(community.ID())
+
+	if community.IsOwner() {
+		// check existing member permission once, then check periodically
+		go func() {
+			err := m.checkMemberPermissions(community, false)
+			if err != nil {
+				m.logger.Debug("failed to check member permissions", zap.Error(err))
+			}
+
+			m.CheckMemberPermissionsPeriodically(community.ID())
+		}()
+	}
 
 	return community, changes, nil
 }
@@ -627,59 +638,109 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 		return nil, nil, err
 	}
 
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if community.IsAdmin() && tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityBecomeMemberTokenPermissionChangeAdminEvent()})
+	}
 
 	// check if members still fulfill the token criteria of all
 	// BECOME_MEMBER permissions and kick them if necessary
 	//
 	// We do this in a separate routine to not block
 	// this function
-	if tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER {
-		go func() {
-			err := m.checkMemberPermissions(community.ID())
-			if err != nil {
-				m.logger.Debug("failed to check member permissions", zap.Error(err))
-			}
-		}()
-	}
+	go func() {
+		err := m.checkMemberPermissions(community, false)
+		if err != nil {
+			m.logger.Debug("failed to check member permissions", zap.Error(err))
+		}
+	}()
 
 	return community, changes, nil
 }
 
-func (m *Manager) checkMemberPermissions(communityID types.HexBytes) error {
-	community, err := m.GetByID(communityID)
-	if err != nil {
-		return err
-	}
+func (m *Manager) checkMemberPermissions(community *Community, removeAdmins bool) error {
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 
-	if len(becomeMemberPermissions) > 0 {
-		for memberKey, member := range community.Members() {
-			if memberKey == common.PubkeyToHex(&m.identity.PublicKey) {
-				continue
-			}
+	adminPermissions := len(becomeAdminPermissions) > 0
+	memberPermissions := len(becomeMemberPermissions) > 0
 
-			accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(member.RevealedAccounts)
+	if !adminPermissions && !memberPermissions && !removeAdmins {
+		m.publish(&Subscription{Community: community})
+		return nil
+	}
 
-			permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, accountsAndChainIDs, true)
+	for memberKey, member := range community.Members() {
+		memberPubKey, err := common.HexToPubkey(memberKey)
+		if err != nil {
+			return err
+		}
+
+		if memberKey == common.PubkeyToHex(&m.identity.PublicKey) || community.IsMemberOwner(memberPubKey) {
+			continue
+		}
+
+		isAdmin := community.IsMemberAdmin(memberPubKey)
+		memberHasWallet := len(member.RevealedAccounts) > 0
+
+		// Check if user was not treated as an admin without wallet in open community
+		// or user treated as a member without wallet in closed community
+		if (!memberHasWallet && isAdmin) || (memberPermissions && !memberHasWallet) {
+			_, err = community.RemoveUserFromOrg(memberPubKey)
 			if err != nil {
 				return err
 			}
+			continue
+		}
 
-			hasPermission := permissionResponse.Satisfied
+		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(member.RevealedAccounts)
 
-			if !hasPermission {
-				pk, err := common.HexToPubkey(memberKey)
+		// Check if user is still an admin or can become an admin and do update of member role
+		removeAdminRole := false
+		if adminPermissions {
+			permissionResponse, err := m.checkPermissionToJoin(becomeAdminPermissions, accountsAndChainIDs, true)
+			if err != nil {
+				return err
+			} else if permissionResponse.Satisfied && !isAdmin {
+				_, err = community.AddRoleToMember(memberPubKey, protobuf.CommunityMember_ROLE_ADMIN)
 				if err != nil {
 					return err
 				}
-				_, err = community.RemoveUserFromOrg(pk)
-				if err != nil {
-					return err
-				}
+				isAdmin = true
+			} else if !permissionResponse.Satisfied && isAdmin {
+				removeAdminRole = true
+				isAdmin = false
+			}
+		}
+
+		// Remove admin role if user does not pass admin permissions or we do not have admin permissions but have an admin role
+		if removeAdminRole || isAdmin && removeAdmins {
+			_, err = community.RemoveRoleFromMember(memberPubKey, protobuf.CommunityMember_ROLE_ADMIN)
+			if err != nil {
+				return err
+			}
+			isAdmin = false
+		}
+
+		// Skip further validation if user has admin permissions or we do not have member permissions
+		if isAdmin || !memberPermissions {
+			continue
+		}
+
+		permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, accountsAndChainIDs, true)
+		if err != nil {
+			return err
+		}
+
+		if !permissionResponse.Satisfied {
+			_, err = community.RemoveUserFromOrg(memberPubKey)
+			if err != nil {
+				return err
 			}
 		}
 	}
+
 	m.publish(&Subscription{Community: community})
 	return nil
 }
@@ -699,7 +760,13 @@ func (m *Manager) CheckMemberPermissionsPeriodically(communityID types.HexBytes)
 	for {
 		select {
 		case <-ticker.C:
-			err := m.checkMemberPermissions(communityID)
+			community, err := m.GetByID(communityID)
+			if err != nil {
+				m.logger.Debug("can't validate member permissions, community was not found", zap.Error(err))
+				m.periodicMemberPermissionsTasks.Delete(communityID.String())
+			}
+
+			err = m.checkMemberPermissions(community, true)
 			if err != nil {
 				m.logger.Debug("failed to check member permissions", zap.Error(err))
 			}
@@ -729,15 +796,26 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 		return nil, nil, err
 	}
 
-	// Check if there's stil BECOME_MEMBER permissions,
-	// if not we can stop checking token criteria on-chain
-	// for members
-	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
-	if cancel, exists := m.periodicMemberPermissionsTasks.Load(community.IDString()); exists && len(becomeMemberPermissions) == 0 {
-		close(cancel.(chan struct{})) // Need to cast to the chan
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if community.IsAdmin() {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityBecomeMemberTokenPermissionDeleteAdminEvent()})
 	}
 
-	m.publish(&Subscription{Community: community})
+	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
+
+	// Make sure that we remove admins roles if we remove admin permissions
+	err = m.checkMemberPermissions(community, len(becomeAdminPermissions) == 0)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Check if there's stil BECOME_ADMIN and BECOME_MEMBER permissions,
+	// if not we can stop checking token criteria on-chain
+	if cancel, exists := m.periodicMemberPermissionsTasks.Load(community.IDString()); exists &&
+		len(community.TokenPermissions()) == 0 {
+		close(cancel.(chan struct{})) // Need to cast to the chan
+	}
 
 	return community, changes, nil
 }
@@ -760,8 +838,9 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 	if community == nil {
 		return nil, ErrOrgNotFound
 	}
-	if !community.IsAdmin() {
-		return nil, errors.New("not an admin")
+
+	if !community.IsOwnerOrAdmin() {
+		return nil, ErrNotEnoughPermissions
 	}
 
 	newDescription, err := request.ToCommunityDescription()
@@ -804,7 +883,11 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 		return nil, err
 	}
 
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if community.IsAdmin() {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityEditAdminEvent()})
+	}
 
 	return community, nil
 }
@@ -815,8 +898,8 @@ func (m *Manager) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error) 
 		return nil, err
 	}
 
-	if !community.IsAdmin() {
-		return nil, errors.New("not an admin")
+	if !community.IsOwner() {
+		return nil, ErrNotOwner
 	}
 
 	return community.config.PrivateKey, nil
@@ -885,7 +968,11 @@ func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.Communit
 
 	// Advertise changes
 	if publish {
-		m.publish(&Subscription{Community: community})
+		if community.IsOwner() {
+			m.publish(&Subscription{Community: community})
+		} else if community.IsAdmin() {
+			m.publish(&Subscription{CommunityAdminEvent: community.ToCreateChannelAdminEvent(chatID, chat)})
+		}
 	}
 
 	return community, changes, nil
@@ -916,12 +1003,16 @@ func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *prot
 	}
 
 	// Advertise changes
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if community.IsAdmin() {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToEditChannelAdminEvent(chatID, chat)})
+	}
 
 	return community, changes, nil
 }
 
-func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Community, *protobuf.CommunityDescription, error) {
+func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Community, *CommunityChanges, error) {
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, nil, err
@@ -934,7 +1025,7 @@ func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Commun
 	if strings.HasPrefix(chatID, communityID.String()) {
 		chatID = strings.TrimPrefix(chatID, communityID.String())
 	}
-	description, err := community.DeleteChat(chatID)
+	changes, err := community.DeleteChat(chatID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -945,9 +1036,13 @@ func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Commun
 	}
 
 	// Advertise changes
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if community.IsAdmin() {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToDeleteChannelAdminEvent(chatID)})
+	}
 
-	return community, description, nil
+	return community, changes, nil
 }
 
 func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory, publish bool) (*Community, *CommunityChanges, error) {
@@ -982,8 +1077,10 @@ func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory, publ
 	}
 
 	// Advertise changes
-	if publish {
+	if community.IsOwner() {
 		m.publish(&Subscription{Community: community})
+	} else if community.IsAdmin() {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToCreateCategoryAdminEvent(categoryID, request.CategoryName, request.ChatIDs)})
 	}
 
 	return community, changes, nil
@@ -1016,7 +1113,11 @@ func (m *Manager) EditCategory(request *requests.EditCommunityCategory) (*Commun
 	}
 
 	// Advertise changes
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if community.IsAdmin() {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToEditCategoryAdminEvent(request.CategoryID, request.CategoryName, request.ChatIDs)})
+	}
 
 	return community, changes, nil
 }
@@ -1071,7 +1172,11 @@ func (m *Manager) ReorderCategories(request *requests.ReorderCommunityCategories
 	}
 
 	// Advertise changes
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if community.IsAdmin() {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToReorderCategoryAdminEvent(request.CategoryID, request.Position)})
+	}
 
 	return community, changes, nil
 }
@@ -1101,7 +1206,11 @@ func (m *Manager) ReorderChat(request *requests.ReorderCommunityChat) (*Communit
 	}
 
 	// Advertise changes
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if community.IsAdmin() {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToReorderChannelAdminEvent(request.CategoryID, request.ChatID, request.Position)})
+	}
 
 	return community, changes, nil
 }
@@ -1126,7 +1235,11 @@ func (m *Manager) DeleteCategory(request *requests.DeleteCommunityCategory) (*Co
 	}
 
 	// Advertise changes
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if community.IsAdmin() {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToDeleteCategoryAdminEvent(request.CategoryID)})
+	}
 
 	return community, changes, nil
 }
@@ -1137,6 +1250,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	}
 
 	id := crypto.CompressPubkey(signer)
+
 	community, err := m.persistence.GetByID(&m.identity.PublicKey, id)
 	if err != nil {
 		return nil, err
@@ -1157,7 +1271,15 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		}
 	}
 
-	changes, err := community.UpdateCommunityDescription(signer, description, payload)
+	if !common.IsPubKeyEqual(community.PublicKey(), signer) {
+		return nil, ErrNotAuthorized
+	}
+
+	return m.handleCommunityDescriptionMessageCommon(community, description, payload)
+}
+
+func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, description *protobuf.CommunityDescription, payload []byte) (*CommunityResponse, error) {
+	changes, err := community.UpdateCommunityDescription(description, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -1222,6 +1344,108 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		Community: community,
 		Changes:   changes,
 	}, nil
+}
+
+func (m *Manager) HandleCommunityAdminEvent(signer *ecdsa.PublicKey, adminEvent *protobuf.CommunityAdminEvent, payload []byte) (*CommunityResponse, error) {
+	if signer == nil {
+		return nil, errors.New("signer can't be nil")
+	}
+
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, adminEvent.CommunityId)
+	if err != nil {
+		return nil, err
+	}
+
+	if !community.IsMemberAdmin(signer) {
+		return nil, errors.New("user is not an admin")
+	}
+
+	patchedCommDescr, err := community.PatchCommunityDescriptionByAdminEvent(adminEvent)
+	if err != nil {
+		return nil, err
+	}
+
+	marshaledCommDescr, err := proto.Marshal(patchedCommDescr)
+	if err != nil {
+		return nil, err
+	}
+
+	// Some admin changes do not live on a `Community` and need to be handled by
+	// `Manager` here
+	err = m.handleAdditionalAdminChanges(community, adminEvent)
+	if err != nil {
+		return nil, err
+	}
+
+	rawMessage, err := protocol.WrapMessageV1(marshaledCommDescr, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, community.PrivateKey())
+	if err != nil {
+		return nil, err
+	}
+
+	return m.handleCommunityDescriptionMessageCommon(community, patchedCommDescr, rawMessage)
+}
+
+func (m *Manager) handleAdditionalAdminChanges(community *Community, adminEvent *protobuf.CommunityAdminEvent) error {
+
+	saveOrUpdateRequestToJoin := func(signer string, request *protobuf.CommunityRequestToJoin, state RequestToJoinState) error {
+		requestToJoin := &RequestToJoin{
+			PublicKey:        signer,
+			Clock:            request.Clock,
+			ENSName:          request.EnsName,
+			CommunityID:      request.CommunityId,
+			State:            state,
+			RevealedAccounts: request.RevealedAccounts,
+		}
+
+		requestToJoin.CalculateID()
+
+		existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+
+		if existingRequestToJoin != nil {
+			// node already knows about this request to join, so let's compare clocks
+			// and update it if necessary
+			if existingRequestToJoin.Clock <= requestToJoin.Clock {
+				pk, err := common.HexToPubkey(existingRequestToJoin.PublicKey)
+				if err != nil {
+					return err
+				}
+				err = m.persistence.SetRequestToJoinState(common.PubkeyToHex(pk), community.ID(), state)
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			err := m.persistence.SaveRequestToJoin(requestToJoin)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	switch adminEvent.Type {
+	case protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT:
+		for signer, request := range adminEvent.AcceptedRequestsToJoin {
+			err := saveOrUpdateRequestToJoin(signer, request, RequestToJoinStateAccepted)
+			if err != nil {
+				return err
+			}
+		}
+
+	case protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT:
+		for signer, request := range adminEvent.RejectedRequestsToJoin {
+			err := saveOrUpdateRequestToJoin(signer, request, RequestToJoinStateDeclined)
+			if err != nil {
+				return err
+			}
+		}
+
+	default:
+	}
+	return nil
 }
 
 // TODO: This is not fully implemented, we want to save the grant passed at
@@ -1315,7 +1539,10 @@ func (m *Manager) CheckPermissionToJoin(id []byte, addresses []gethcommon.Addres
 		return nil, err
 	}
 
+	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+
+	permissionsToJoin := append(becomeAdminPermissions, becomeMemberPermissions...)
 
 	allChainIDs, err := m.tokenManager.GetAllChainIDs()
 	if err != nil {
@@ -1323,7 +1550,7 @@ func (m *Manager) CheckPermissionToJoin(id []byte, addresses []gethcommon.Addres
 	}
 
 	accountsAndChainIDs := combineAddressesAndChainIDs(addresses, allChainIDs)
-	hasPermission, err := m.checkPermissionToJoin(becomeMemberPermissions, accountsAndChainIDs, false)
+	hasPermission, err := m.checkPermissionToJoin(permissionsToJoin, accountsAndChainIDs, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1342,25 +1569,37 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		return nil, err
 	}
 
+	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 	revealedAccounts := make([]*protobuf.RevealedAccount, 0)
 
-	if len(becomeMemberPermissions) > 0 {
-		revealedAccounts, err = m.persistence.GetRequestToJoinRevealedAddresses(dbRequest.ID)
+	memberRole := protobuf.CommunityMember_ROLE_NONE
+
+	if len(becomeMemberPermissions) > 0 || len(becomeAdminPermissions) > 0 {
+		revealedAccounts, err := m.persistence.GetRequestToJoinRevealedAddresses(dbRequest.ID)
 		if err != nil {
 			return nil, err
 		}
 
 		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(revealedAccounts)
 
-		permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, accountsAndChainIDs, true)
-		if err != nil {
-			return nil, err
-		}
-		hasPermission := permissionResponse.Satisfied
+		// admin token permissions required to became an admin must not cancel request to join
+		// if requirements were not met
+		hasPermission := m.accountsHasAdminPermission(becomeAdminPermissions, accountsAndChainIDs)
 
-		if !hasPermission {
-			return community, ErrNoPermissionToJoin
+		if hasPermission {
+			memberRole = protobuf.CommunityMember_ROLE_ADMIN
+		} else if len(becomeMemberPermissions) > 0 {
+			permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, accountsAndChainIDs, true)
+			if err != nil {
+				return nil, err
+			}
+
+			hasPermission := permissionResponse.Satisfied
+
+			if !hasPermission {
+				return community, ErrNoPermissionToJoin
+			}
 		}
 	}
 
@@ -1369,7 +1608,12 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		return nil, err
 	}
 
-	err = community.AddMember(pk, []protobuf.CommunityMember_Roles{})
+	role := []protobuf.CommunityMember_Roles{}
+	if memberRole != protobuf.CommunityMember_ROLE_NONE {
+		role = []protobuf.CommunityMember_Roles{memberRole}
+	}
+
+	changes, err := community.AddMember(pk, role)
 	if err != nil {
 		return nil, err
 	}
@@ -1388,7 +1632,19 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		return nil, err
 	}
 
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if community.IsAdmin() {
+		acceptedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
+		acceptedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
+
+		adminChanges := &CommunityAdminEventChanges{
+			CommunityChanges:       changes,
+			AcceptedRequestsToJoin: acceptedRequestsToJoin,
+		}
+
+		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityRequestToJoinAcceptAdminEvent(adminChanges)})
+	}
 
 	return community, nil
 }
@@ -1403,7 +1659,36 @@ func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCom
 		return err
 	}
 
-	return m.persistence.SetRequestToJoinState(dbRequest.PublicKey, dbRequest.CommunityID, RequestToJoinStateDeclined)
+	community, err := m.GetByID(dbRequest.CommunityID)
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.SetRequestToJoinState(dbRequest.PublicKey, dbRequest.CommunityID, RequestToJoinStateDeclined)
+	if err != nil {
+		return err
+	}
+
+	// typically, community's clock is increased implicitly when making changes
+	// to it, however in this scenario there are no changes in the community, yet
+	// we need to increase the clock to ensure the admin event is processed by other
+	// nodes.
+	community.increaseClock()
+
+	rejectedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
+	rejectedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
+
+	adminChanges := &CommunityAdminEventChanges{
+		CommunityChanges:       community.emptyCommunityChanges(),
+		RejectedRequestsToJoin: rejectedRequestsToJoin,
+	}
+
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if community.IsAdmin() {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityRequestToJoinRejectAdminEvent(adminChanges)})
+	}
+	return nil
 }
 
 func (m *Manager) isUserRejectedFromCommunity(signer *ecdsa.PublicKey, community *Community, requestClock uint64) (bool, error) {
@@ -1498,47 +1783,36 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		return nil, err
 	}
 
+	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 
 	// If user is already a member, then accept request automatically
 	// It may happen when member removes itself from community and then tries to rejoin
 	// More specifically, CommunityRequestToLeave may be delivered later than CommunityRequestToJoin, or not delivered at all
 	acceptAutomatically := community.AcceptRequestToJoinAutomatically() || community.HasMember(signer)
-	if len(becomeMemberPermissions) == 0 && acceptAutomatically {
-		err = m.markRequestToJoin(signer, community)
-		if err != nil {
-			return nil, err
-		}
-		requestToJoin.State = RequestToJoinStateAccepted
-		return requestToJoin, nil
-	}
+	hasPermission := false
 
-	if len(becomeMemberPermissions) > 0 {
-		// we have token permissions but requester hasn't revealed
-		// any addresses
-		if len(request.RevealedAccounts) == 0 {
-			err = m.markRequestToJoinAsCanceled(signer, community)
+	// if we have admin or member permission and user revealed the address - process verification
+	// if user does not reveal the address and we have member permission only - we decline this request
+	// if user does not reveal the address and we have admin permission only - user allowed to join as a member
+	// in non private community
+	if (len(becomeMemberPermissions) > 0 || len(becomeAdminPermissions) > 0) && len(request.RevealedAccounts) > 0 {
+		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(request.RevealedAccounts)
+
+		// admin token permissions required to become an admin must not cancel request to join
+		// if requirements were not met
+		hasPermission = m.accountsHasAdminPermission(becomeAdminPermissions, accountsAndChainIDs)
+
+		// if user does not have admin permissions, check on member permissions
+		if !hasPermission && len(becomeMemberPermissions) > 0 {
+			permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, accountsAndChainIDs, true)
 			if err != nil {
 				return nil, err
 			}
-			requestToJoin.State = RequestToJoinStateDeclined
-			return requestToJoin, nil
-		}
 
-		// verify if revealed addresses indeed belong to requester
-		for _, revealedAccount := range request.RevealedAccounts {
-			recoverParams := account.RecoverParams{
-				Message:   types.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID(), requestToJoin.ID)),
-				Signature: types.EncodeHex(revealedAccount.Signature),
-			}
+			hasPermission = permissionResponse.Satisfied
 
-			recovered, err := m.accountsManager.Recover(recoverParams)
-			if err != nil {
-				return nil, err
-			}
-			if recovered.Hex() != revealedAccount.Address {
-				// if ownership of only one wallet address cannot be verified,
-				// we mark the request as cancelled and stop
+			if !hasPermission {
 				err = m.markRequestToJoinAsCanceled(signer, community)
 				if err != nil {
 					return nil, err
@@ -1548,39 +1822,30 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 			}
 		}
 
-		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(request.RevealedAccounts)
-
-		// provided wallet addresses seem to be legit, so let's check
-		// if the necessary token permission funds exist
-		permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, accountsAndChainIDs, true)
-		if err != nil {
-			return nil, err
-		}
-		hasPermission := permissionResponse.Satisfied
-
-		if !hasPermission {
-			err = m.markRequestToJoinAsCanceled(signer, community)
-			if err != nil {
-				return nil, err
-			}
-			requestToJoin.State = RequestToJoinStateDeclined
-			return requestToJoin, nil
-		}
-
 		// Save revealed addresses + signatures so they can later be added
 		// to the community member list when the request is accepted
 		err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin)
 		if err != nil {
 			return nil, err
 		}
-
-		if hasPermission && acceptAutomatically {
-			err = m.markRequestToJoin(signer, community)
-			if err != nil {
-				return nil, err
-			}
-			requestToJoin.State = RequestToJoinStateAccepted
+	} else if len(becomeMemberPermissions) > 0 && len(request.RevealedAccounts) == 0 {
+		// we have member token permissions but requester hasn't revealed
+		// any addresses
+		err = m.markRequestToJoinAsCanceled(signer, community)
+		if err != nil {
+			return nil, err
 		}
+		requestToJoin.State = RequestToJoinStateDeclined
+		return requestToJoin, nil
+	}
+
+	if (len(becomeMemberPermissions) == 0 || hasPermission) && acceptAutomatically {
+		err = m.markRequestToJoin(signer, community)
+		if err != nil {
+			return nil, err
+		}
+		requestToJoin.State = RequestToJoinStateAccepted
+		return requestToJoin, nil
 	}
 
 	return requestToJoin, nil
@@ -1987,7 +2252,11 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, err
 	}
 
-	_, err = community.UpdateCommunityDescription(signer, request.Community, appMetadataMsg)
+	if !common.IsPubKeyEqual(community.PublicKey(), signer) && !community.IsMemberAdmin(signer) {
+		return nil, ErrNotAuthorized
+	}
+
+	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg)
 	if err != nil {
 		return nil, err
 	}
@@ -2186,7 +2455,7 @@ func (m *Manager) AddMemberOwnerToCommunity(communityID types.HexBytes, pk *ecds
 		return nil, ErrOrgNotFound
 	}
 
-	err = community.AddMember(pk, []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ALL})
+	_, err = community.AddMember(pk, []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER})
 	if err != nil {
 		return nil, err
 	}
@@ -2219,7 +2488,11 @@ func (m *Manager) RemoveUserFromCommunity(id types.HexBytes, pk *ecdsa.PublicKey
 		return nil, err
 	}
 
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if community.IsAdmin() {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToKickCommunityMemberAdminEvent(common.PubkeyToHex(pk))})
+	}
 
 	return community, nil
 }
@@ -2249,7 +2522,11 @@ func (m *Manager) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunit
 		return nil, err
 	}
 
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if community.IsAdmin() {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToUnbanCommunityMemberAdminEvent(request.User.String())})
+	}
 
 	return community, nil
 }
@@ -2348,7 +2625,11 @@ func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (
 		return nil, err
 	}
 
-	m.publish(&Subscription{Community: community})
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	} else if community.IsAdmin() {
+		m.publish(&Subscription{CommunityAdminEvent: community.ToBanCommunityMemberAdminEvent(request.User.String())})
+	}
 
 	return community, nil
 }
@@ -2427,6 +2708,11 @@ func (m *Manager) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*Requ
 func (m *Manager) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
 	m.logger.Info("fetching canceled invitations", zap.String("community-id", id.String()))
 	return m.persistence.CanceledRequestsToJoinForCommunity(id)
+}
+
+func (m *Manager) AcceptedRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
+	m.logger.Info("fetching canceled invitations", zap.String("community-id", id.String()))
+	return m.persistence.AcceptedRequestsToJoinForCommunity(id)
 }
 
 func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string, grant []byte) (bool, error) {
@@ -3622,4 +3908,16 @@ func revealedAccountsToAccountsAndChainIDsCombination(revealedAccounts []*protob
 		})
 	}
 	return accountsAndChainIDs
+}
+
+func (m *Manager) accountsHasAdminPermission(becomeAdminPermissions []*protobuf.CommunityTokenPermission, accounts []*AccountChainIDsCombination) bool {
+	if len(becomeAdminPermissions) > 0 {
+		permissionResponse, err := m.checkPermissionToJoin(becomeAdminPermissions, accounts, true)
+		if err != nil {
+			m.logger.Warn("check admin permission failed: %v", zap.Error(err))
+			return false
+		}
+		return permissionResponse.Satisfied
+	}
+	return false
 }

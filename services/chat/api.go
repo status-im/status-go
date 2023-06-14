@@ -35,10 +35,8 @@ type PinnedMessages struct {
 }
 
 type Member struct {
-	// Community Roles
-	Roles []protobuf.CommunityMember_Roles `json:"roles,omitempty"`
-	// Admin indicates if the member is an admin of the group chat
-	Admin bool `json:"admin"`
+	// Community Role
+	Role protobuf.CommunityMember_Roles `json:"role,omitempty"`
 	// Joined indicates if the member has joined the group chat
 	Joined bool `json:"joined"`
 }
@@ -88,7 +86,7 @@ type ChannelGroup struct {
 	Chats                   map[string]*Chat                         `json:"chats"`
 	Categories              map[string]communities.CommunityCategory `json:"categories"`
 	EnsName                 string                                   `json:"ensName"`
-	Admin                   bool                                     `json:"admin"`
+	MemberRole              protobuf.CommunityMember_Roles           `json:"memberRole"`
 	Verified                bool                                     `json:"verified"`
 	Description             string                                   `json:"description"`
 	IntroMessage            string                                   `json:"introMessage"`
@@ -169,7 +167,7 @@ func (api *API) getChannelGroups(ctx context.Context, channelGroupID string) (ma
 			Chats:                   chats,
 			Categories:              make(map[string]communities.CommunityCategory),
 			EnsName:                 "", // Not implemented yet in communities
-			Admin:                   true,
+			MemberRole:              protobuf.CommunityMember_ROLE_OWNER,
 			Verified:                true,
 			Description:             "",
 			IntroMessage:            "",
@@ -211,7 +209,7 @@ func (api *API) getChannelGroups(ctx context.Context, channelGroupID string) (ma
 			Images:                  make(map[string]images.IdentityImage),
 			Chats:                   make(map[string]*Chat),
 			Categories:              make(map[string]communities.CommunityCategory),
-			Admin:                   community.IsAdmin(),
+			MemberRole:              community.MemberRole(community.MemberIdentity()),
 			Verified:                community.Verified(),
 			Description:             community.DescriptionText(),
 			IntroMessage:            community.IntroMessage(),
@@ -385,7 +383,12 @@ func getChatMembers(sourceChat *protocol.Chat, community *communities.Community,
 		if sourceChat.ChatType == protocol.ChatTypePrivateGroupChat && len(sourceChat.Members) > 0 {
 			for _, m := range sourceChat.Members {
 				result[m.ID] = Member{
-					Admin:  m.Admin,
+					Role: func() protobuf.CommunityMember_Roles {
+						if m.Admin {
+							return protobuf.CommunityMember_ROLE_OWNER
+						}
+						return protobuf.CommunityMember_ROLE_NONE
+					}(),
 					Joined: true,
 				}
 			}
@@ -404,17 +407,15 @@ func getChatMembers(sourceChat *protocol.Chat, community *communities.Community,
 	}
 
 	if community != nil {
-		for member, m := range community.Description().Members {
+		for member := range community.Description().Members {
 			pubKey, err := common.HexToPubkey(member)
 			if err != nil {
 				return nil, err
 			}
 			result[member] = Member{
-				Roles:  m.Roles,
+				Role:   community.MemberRole(pubKey),
 				Joined: community.Joined(),
-				Admin:  community.IsMemberAdmin(pubKey),
 			}
-
 		}
 		return result, nil
 	}
