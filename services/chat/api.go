@@ -149,7 +149,9 @@ func (api *API) getChannelGroups(ctx context.Context, channelGroupID string) (ma
 			if !chat.IsActivePersonalChat() {
 				continue
 			}
-			totalUnviewedMessageCount += int(chat.UnviewedMessagesCount)
+			if !chat.Muted || chat.UnviewedMentionsCount > 0 {
+				totalUnviewedMessageCount += int(chat.UnviewedMessagesCount)
+			}
 			totalUnviewedMentionsCount += int(chat.UnviewedMentionsCount)
 
 			c, err := api.toAPIChat(chat, nil, pubKey, true)
@@ -197,8 +199,9 @@ func (api *API) getChannelGroups(ctx context.Context, channelGroupID string) (ma
 			if chat.CommunityID != community.IDString() || !chat.Active {
 				continue
 			}
-
-			totalUnviewedMessageCount += int(chat.UnviewedMessagesCount)
+			if !chat.Muted || chat.UnviewedMentionsCount > 0 {
+				totalUnviewedMessageCount += int(chat.UnviewedMessagesCount)
+			}
 			totalUnviewedMentionsCount += int(chat.UnviewedMentionsCount)
 		}
 
