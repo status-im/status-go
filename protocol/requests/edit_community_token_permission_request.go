@@ -29,5 +29,6 @@ func (u *EditCommunityTokenPermission) ToCommunityTokenPermission() protobuf.Com
 		Type:          u.Type,
 		TokenCriteria: u.TokenCriteria,
 		ChatIds:       u.ChatIds,
+		IsPrivate:     u.IsPrivate,
 	}
 }
