@@ -9,6 +9,7 @@ import (
 	eth_common "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/testutils"
+	"github.com/status-im/status-go/sqlite"
 
 	"github.com/stretchr/testify/require"
 )
@@ -118,16 +119,18 @@ func InsertTestTransfer(t *testing.T, db *sql.DB, tr *TestTransfer) {
 		tokenType = "erc20"
 	}
 	blkHash := eth_common.HexToHash("4")
+	value := sqlite.Int64ToPadded128BitsStr(tr.Value)
+
 	_, err := db.Exec(`
 		INSERT OR IGNORE INTO blocks(
 			network_id, address, blk_number, blk_hash
 		) VALUES (?, ?, ?, ?);
 		INSERT INTO transfers (network_id, hash, address, blk_hash, tx,
 			sender, receipt, log, type, blk_number, timestamp, loaded,
-			multi_transaction_id, base_gas_fee, status
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 0, ?)`,
+			multi_transaction_id, base_gas_fee, status, amount_padded128hex
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 0, ?, ?)`,
 		tr.ChainID, tr.To, tr.BlkNumber, blkHash,
-		tr.ChainID, tr.Hash, tr.To, blkHash, &JSONBlob{}, tr.From, &JSONBlob{}, &JSONBlob{}, tokenType, tr.BlkNumber, tr.Timestamp, tr.MultiTransactionID, tr.Success)
+		tr.ChainID, tr.Hash, tr.To, blkHash, &JSONBlob{}, tr.From, &JSONBlob{}, &JSONBlob{}, tokenType, tr.BlkNumber, tr.Timestamp, tr.MultiTransactionID, tr.Success, value)
 	require.NoError(t, err)
 }
 

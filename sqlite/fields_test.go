@@ -57,3 +57,35 @@ func TestBigIntToPadded128BitsStr(t *testing.T) {
 		})
 	}
 }
+
+func TestInt64ToPadded128BitsStr(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    int64
+		expected *string
+	}{
+		{
+			name:     "case nonzero",
+			input:    123456,
+			expected: strToPtr("0000000000000000000000000001e240"),
+		},
+		{
+			name:     "case zero",
+			input:    0,
+			expected: strToPtr("00000000000000000000000000000000"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := Int64ToPadded128BitsStr(tc.input)
+			if result != nil && tc.expected != nil {
+				if *result != *tc.expected {
+					t.Errorf("expected %s, got %s", *tc.expected, *result)
+				}
+			} else if result != nil || tc.expected != nil {
+				t.Errorf("expected %v, got %v", tc.expected, result)
+			}
+		})
+	}
+}

@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 
 	eth "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/services/wallet/common"
@@ -36,6 +38,8 @@ type Entry struct {
 	activityType   Type
 	activityStatus Status
 	tokenType      TokenType
+	amountOut      *hexutil.Big // Used for activityType SendAT, SwapAT, BridgeAT
+	amountIn       *hexutil.Big // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT
 }
 
 type jsonSerializationTemplate struct {
@@ -46,6 +50,8 @@ type jsonSerializationTemplate struct {
 	ActivityType   Type                            `json:"activityType"`
 	ActivityStatus Status                          `json:"activityStatus"`
 	TokenType      TokenType                       `json:"tokenType"`
+	AmountOut      *hexutil.Big                    `json:"amountOut"`
+	AmountIn       *hexutil.Big                    `json:"amountIn"`
 }
 
 func (e *Entry) MarshalJSON() ([]byte, error) {
@@ -57,6 +63,8 @@ func (e *Entry) MarshalJSON() ([]byte, error) {
 		ActivityType:   e.activityType,
 		ActivityStatus: e.activityStatus,
 		TokenType:      e.tokenType,
+		AmountOut:      e.amountOut,
+		AmountIn:       e.amountIn,
 	})
 }
 
@@ -72,18 +80,20 @@ func (e *Entry) UnmarshalJSON(data []byte) error {
 	e.id = aux.ID
 	e.timestamp = aux.Timestamp
 	e.activityType = aux.ActivityType
+	e.amountOut = aux.AmountOut
+	e.amountIn = aux.AmountIn
 	return nil
 }
 
-func newActivityEntryWithPendingTransaction(transaction *transfer.TransactionIdentity, timestamp int64, activityType Type, activityStatus Status) Entry {
-	return newActivityEntryWithTransaction(true, transaction, timestamp, activityType, activityStatus)
+func newActivityEntryWithPendingTransaction(transaction *transfer.TransactionIdentity, timestamp int64, activityType Type, activityStatus Status, amountIn *hexutil.Big, amountOut *hexutil.Big) Entry {
+	return newActivityEntryWithTransaction(true, transaction, timestamp, activityType, activityStatus, amountIn, amountOut)
 }
 
-func newActivityEntryWithSimpleTransaction(transaction *transfer.TransactionIdentity, timestamp int64, activityType Type, activityStatus Status) Entry {
-	return newActivityEntryWithTransaction(false, transaction, timestamp, activityType, activityStatus)
+func newActivityEntryWithSimpleTransaction(transaction *transfer.TransactionIdentity, timestamp int64, activityType Type, activityStatus Status, amountIn *hexutil.Big, amountOut *hexutil.Big) Entry {
+	return newActivityEntryWithTransaction(false, transaction, timestamp, activityType, activityStatus, amountIn, amountOut)
 }
 
-func newActivityEntryWithTransaction(pending bool, transaction *transfer.TransactionIdentity, timestamp int64, activityType Type, activityStatus Status) Entry {
+func newActivityEntryWithTransaction(pending bool, transaction *transfer.TransactionIdentity, timestamp int64, activityType Type, activityStatus Status, amountIn *hexutil.Big, amountOut *hexutil.Big) Entry {
 	payloadType := SimpleTransactionPT
 	if pending {
 		payloadType = PendingTransactionPT
@@ -97,10 +107,12 @@ func newActivityEntryWithTransaction(pending bool, transaction *transfer.Transac
 		activityType:   activityType,
 		activityStatus: activityStatus,
 		tokenType:      AssetTT,
+		amountIn:       amountIn,
+		amountOut:      amountOut,
 	}
 }
 
-func NewActivityEntryWithMultiTransaction(id transfer.MultiTransactionIDType, timestamp int64, activityType Type, activityStatus Status) Entry {
+func NewActivityEntryWithMultiTransaction(id transfer.MultiTransactionIDType, timestamp int64, activityType Type, activityStatus Status, amountIn *hexutil.Big, amountOut *hexutil.Big) Entry {
 	return Entry{
 		payloadType:    MultiTransactionPT,
 		id:             id,
@@ -108,6 +120,8 @@ func NewActivityEntryWithMultiTransaction(id transfer.MultiTransactionIDType, ti
 		activityType:   activityType,
 		activityStatus: activityStatus,
 		tokenType:      AssetTT,
+		amountIn:       amountIn,
+		amountOut:      amountOut,
 	}
 }
 
@@ -290,6 +304,9 @@ const (
 
 		transfers.sender AS from_address,
 		transfers.address AS to_address,
+		transfers.amount_padded128hex AS tr_amount,
+		NULL AS mt_from_amount,
+		NULL AS mt_to_amount,
 
 		CASE
 			WHEN transfers.status IS 1 THEN statusSuccess
@@ -352,6 +369,10 @@ const (
 
 		pending_transactions.from_address AS from_address,
 		pending_transactions.to_address AS to_address,
+		pending_transactions.value AS tr_amount,
+		NULL AS mt_from_amount,
+		NULL AS mt_to_amount,
+
 		statusPending AS agg_status,
 		1 AS agg_count
 	FROM pending_transactions, filter_conditions
@@ -387,6 +408,9 @@ const (
 		NULL as tr_type,
 		multi_transactions.from_address AS from_address,
 		multi_transactions.to_address AS to_address,
+		NULL AS tr_amount,
+		multi_transactions.from_amount AS mt_from_amount,
+		multi_transactions.to_amount AS mt_to_amount,
 
 		CASE
 			WHEN tr_status.min_status = 1 AND pending_status.count IS NULL THEN statusSuccess
@@ -422,6 +446,51 @@ const (
 
 	noEntriesInTmpTableSQLValues = "(NULL)"
 )
+
+func getTrInAndOutAmounts(activityType Type, trAmount sql.NullString) (inAmount *hexutil.Big, outAmount *hexutil.Big) {
+	if trAmount.Valid {
+		amount, ok := new(big.Int).SetString(trAmount.String, 16)
+		if ok {
+			switch activityType {
+			case SendAT:
+				inAmount = (*hexutil.Big)(big.NewInt(0))
+				outAmount = (*hexutil.Big)(amount)
+				return
+			case ReceiveAT:
+				inAmount = (*hexutil.Big)(amount)
+				outAmount = (*hexutil.Big)(big.NewInt(0))
+				return
+			default:
+				log.Warn(fmt.Sprintf("unexpected activity type %d", activityType))
+			}
+		} else {
+			log.Warn(fmt.Sprintf("could not parse amount %s", trAmount.String))
+		}
+	} else {
+		log.Warn(fmt.Sprintf("invalid transaction amount for type %d", activityType))
+	}
+	inAmount = (*hexutil.Big)(big.NewInt(0))
+	outAmount = (*hexutil.Big)(big.NewInt(0))
+	return
+}
+
+func getMtInAndOutAmounts(dbFromAmount sql.NullString, dbToAmount sql.NullString) (inAmount *hexutil.Big, outAmount *hexutil.Big) {
+	if dbFromAmount.Valid && dbToAmount.Valid {
+		fromAmount, frOk := new(big.Int).SetString(dbFromAmount.String, 16)
+		toAmount, toOk := new(big.Int).SetString(dbToAmount.String, 16)
+		if frOk && toOk {
+			inAmount = (*hexutil.Big)(toAmount)
+			outAmount = (*hexutil.Big)(fromAmount)
+			return
+		}
+		log.Warn(fmt.Sprintf("could not parse amounts %s %s", dbFromAmount.String, dbToAmount.String))
+	} else {
+		log.Warn("invalid transaction amounts")
+	}
+	inAmount = (*hexutil.Big)(big.NewInt(0))
+	outAmount = (*hexutil.Big)(big.NewInt(0))
+	return
+}
 
 // getActivityEntries queries the transfers, pending_transactions, and multi_transactions tables
 // based on filter parameters and arguments
@@ -507,7 +576,9 @@ func getActivityEntries(ctx context.Context, db *sql.DB, addresses []eth.Address
 		var dbMtType, dbTrType sql.NullByte
 		var toAddress, fromAddress eth.Address
 		var aggregatedStatus int
-		err := rows.Scan(&transferHash, &pendingHash, &chainID, &multiTxID, &timestamp, &dbMtType, &dbTrType, &fromAddress, &toAddress, &aggregatedStatus, &aggregatedCount)
+		var dbTrAmount sql.NullString
+		var dbMtFromAmount, dbMtToAmount sql.NullString
+		err := rows.Scan(&transferHash, &pendingHash, &chainID, &multiTxID, &timestamp, &dbMtType, &dbTrType, &fromAddress, &toAddress, &dbTrAmount, &dbMtFromAmount, &dbMtToAmount, &aggregatedStatus, &aggregatedCount)
 		if err != nil {
 			return nil, err
 		}
@@ -530,17 +601,20 @@ func getActivityEntries(ctx context.Context, db *sql.DB, addresses []eth.Address
 		var entry Entry
 		if transferHash != nil && chainID.Valid {
 			activityType, filteredAddress := getActivityType(dbTrType)
+			inAmount, outAmount := getTrInAndOutAmounts(activityType, dbTrAmount)
 			entry = newActivityEntryWithSimpleTransaction(
 				&transfer.TransactionIdentity{ChainID: common.ChainID(chainID.Int64), Hash: eth.BytesToHash(transferHash), Address: filteredAddress},
-				timestamp, activityType, activityStatus)
+				timestamp, activityType, activityStatus, inAmount, outAmount)
 		} else if pendingHash != nil && chainID.Valid {
 			activityType, _ := getActivityType(dbTrType)
+			inAmount, outAmount := getTrInAndOutAmounts(activityType, dbTrAmount)
 			entry = newActivityEntryWithPendingTransaction(&transfer.TransactionIdentity{ChainID: common.ChainID(chainID.Int64), Hash: eth.BytesToHash(pendingHash)},
-				timestamp, activityType, activityStatus)
+				timestamp, activityType, activityStatus, inAmount, outAmount)
 		} else if multiTxID.Valid {
+			mtInAmount, mtOutAmount := getMtInAndOutAmounts(dbMtFromAmount, dbMtToAmount)
 			activityType := multiTransactionTypeToActivityType(transfer.MultiTransactionType(dbMtType.Byte))
 			entry = NewActivityEntryWithMultiTransaction(transfer.MultiTransactionIDType(multiTxID.Int64),
-				timestamp, activityType, activityStatus)
+				timestamp, activityType, activityStatus, mtInAmount, mtOutAmount)
 		} else {
 			return nil, errors.New("invalid row data")
 		}
