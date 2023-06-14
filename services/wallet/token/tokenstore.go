@@ -1,11 +1,6 @@
 package token
 
 import (
-	"encoding/json"
-	"errors"
-
-	"github.com/xeipuuv/gojsonschema"
-
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -13,8 +8,7 @@ type addressTokenMap = map[common.Address]*Token
 type storeMap = map[uint64]addressTokenMap
 
 type store interface {
-	GetTokens() ([]*Token, error)
-	areTokensFetched() bool
+	GetTokens() []*Token
 }
 
 var tokenPeg = map[string]string{
@@ -38,38 +32,6 @@ func GetTokenPegSymbol(symbol string) string {
 	return tokenPeg[symbol]
 }
 
-func validateDocument(doc string, schemaURL string) (bool, error) {
-	schemaLoader := gojsonschema.NewReferenceLoader(schemaURL)
-	docLoader := gojsonschema.NewStringLoader(doc)
-
-	result, err := gojsonschema.Validate(schemaLoader, docLoader)
-	if err != nil {
-		return false, err
-	}
-
-	if !result.Valid() {
-		return false, errors.New("Token list does not match schema")
-	}
-
-	return true, nil
-}
-
-func bytesToTokens(tokenListData []byte) ([]*Token, error) {
-	var objmap map[string]json.RawMessage
-	err := json.Unmarshal(tokenListData, &objmap)
-	if err != nil {
-		return nil, err
-	}
-
-	var tokens []*Token
-	err = json.Unmarshal(objmap["tokens"], &tokens)
-	if err != nil {
-		return nil, err
-	}
-
-	return tokens, nil
-}
-
 func toTokenMap(tokens []*Token) storeMap {
 	tokenMap := storeMap{}
 
@@ -87,8 +49,7 @@ func toTokenMap(tokens []*Token) storeMap {
 }
 
 type DefaultStore struct {
-	tokenList     []*Token
-	tokensFetched bool
+	tokenList []*Token
 }
 
 func newDefaultStore() *DefaultStore {
@@ -1711,15 +1672,9 @@ func newDefaultStore() *DefaultStore {
 				ChainID:  421613,
 			},
 		},
-		tokensFetched: false,
 	}
 }
 
-func (ts *DefaultStore) GetTokens() ([]*Token, error) {
-	ts.tokensFetched = true
-	return ts.tokenList, nil
-}
-
-func (ts *DefaultStore) areTokensFetched() bool {
-	return ts.tokensFetched
+func (ts *DefaultStore) GetTokens() []*Token {
+	return ts.tokenList
 }
