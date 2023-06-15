@@ -1,7 +1,10 @@
 package activity
 
 import (
-	eth_common "github.com/ethereum/go-ethereum/common"
+	"context"
+	"database/sql"
+
+	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/services/wallet/common"
 )
 
@@ -53,21 +56,21 @@ type TokenCode string
 // nil means all
 // see allTokensFilter and noTokensFilter
 type Tokens struct {
-	Assets       []TokenCode          `json:"assets"`
-	Collectibles []eth_common.Address `json:"collectibles"`
-	EnabledTypes []TokenType          `json:"enabledTypes"`
+	Assets       []TokenCode   `json:"assets"`
+	Collectibles []eth.Address `json:"collectibles"`
+	EnabledTypes []TokenType   `json:"enabledTypes"`
 }
 
 func noAssetsFilter() Tokens {
-	return Tokens{[]TokenCode{}, []eth_common.Address{}, []TokenType{CollectiblesTT}}
+	return Tokens{[]TokenCode{}, []eth.Address{}, []TokenType{CollectiblesTT}}
 }
 
 func allTokensFilter() Tokens {
 	return Tokens{}
 }
 
-func allAddressesFilter() []eth_common.Address {
-	return []eth_common.Address{}
+func allAddressesFilter() []eth.Address {
+	return []eth.Address{}
 }
 
 func allNetworksFilter() []common.ChainID {
@@ -75,9 +78,59 @@ func allNetworksFilter() []common.ChainID {
 }
 
 type Filter struct {
-	Period                Period               `json:"period"`
-	Types                 []Type               `json:"types"`
-	Statuses              []Status             `json:"statuses"`
-	Tokens                Tokens               `json:"tokens"`
-	CounterpartyAddresses []eth_common.Address `json:"counterpartyAddresses"`
+	Period                Period        `json:"period"`
+	Types                 []Type        `json:"types"`
+	Statuses              []Status      `json:"statuses"`
+	Tokens                Tokens        `json:"tokens"`
+	CounterpartyAddresses []eth.Address `json:"counterpartyAddresses"`
+}
+
+// TODO: consider sorting by saved address and contacts to offload the client from doing it at runtime
+func GetRecipients(ctx context.Context, db *sql.DB, offset int, limit int) (addresses []eth.Address, hasMore bool, err error) {
+	rows, err := db.QueryContext(ctx, `
+		SELECT
+			transfers.address as to_address,
+			transfers.timestamp AS timestamp
+		FROM transfers
+		WHERE transfers.multi_transaction_id = 0
+
+		UNION ALL
+
+		SELECT
+			pending_transactions.to_address AS to_address,
+			pending_transactions.timestamp AS timestamp
+		FROM pending_transactions
+		WHERE pending_transactions.multi_transaction_id = 0
+
+		UNION ALL
+
+		SELECT
+			multi_transactions.to_address AS to_address,
+			multi_transactions.timestamp AS timestamp
+		FROM multi_transactions
+		ORDER BY timestamp DESC
+		LIMIT ? OFFSET ?`, limit, offset)
+	if err != nil {
+		return nil, false, err
+	}
+	defer rows.Close()
+
+	var entries []eth.Address
+	for rows.Next() {
+		var toAddress eth.Address
+		var timestamp int64
+		err := rows.Scan(&toAddress, &timestamp)
+		if err != nil {
+			return nil, false, err
+		}
+		entries = append(entries, toAddress)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, false, err
+	}
+
+	hasMore = len(entries) == limit
+
+	return entries, hasMore, nil
 }
