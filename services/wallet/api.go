@@ -532,3 +532,14 @@ func (api *API) FilterActivityAsync(ctx context.Context, addresses []common.Addr
 	log.Debug("[WalletAPI:: FilterActivityAsync] addr.count", len(addresses), "chainIDs.count", len(chainIDs), "filter", filter, "offset", offset, "limit", limit)
 	return api.s.activity.FilterActivityAsync(ctx, addresses, chainIDs, filter, offset, limit)
 }
+
+type GetAllRecipientsResponse struct {
+	Addresses []common.Address `json:"addresses"`
+	HasMore   bool             `json:"hasMore"`
+}
+
+func (api *API) GetAllRecipients(ctx context.Context, offset int, limit int) (result *GetAllRecipientsResponse, err error) {
+	result = &GetAllRecipientsResponse{}
+	result.Addresses, result.HasMore, err = activity.GetRecipients(ctx, api.s.db, offset, limit)
+	return result, err
+}
