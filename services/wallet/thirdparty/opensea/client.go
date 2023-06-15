@@ -392,7 +392,7 @@ func (o *Client) fetchAssets(queryParams url.Values, limit int) (*AssetContainer
 
 	tmpLimit := AssetLimit
 	if limit > 0 && limit < tmpLimit {
-		tmpLimit = AssetLimit
+		tmpLimit = limit
 	}
 
 	queryParams["limit"] = []string{strconv.Itoa(tmpLimit)}
