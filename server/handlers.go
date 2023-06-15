@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -106,8 +107,11 @@ func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
 		if filepath.IsAbs(imageNames[0]) {
 			if _, err := os.Stat(imageNames[0]); err == nil {
 				parsed.ImagePath = imageNames[0]
-			} else {
+			} else if errors.Is(err, os.ErrNotExist) {
 				logger.Error("ParseParams: image not exit", zap.String("imageName", imageNames[0]))
+				return parsed
+			} else {
+				logger.Error("ParseParams: failed to read image", zap.String("imageName", imageNames[0]), zap.Error(err))
 				return parsed
 			}
 		} else {
@@ -135,8 +139,11 @@ func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
 	if len(fontFiles) != 0 {
 		if _, err := os.Stat(fontFiles[0]); err == nil {
 			parsed.FontFile = fontFiles[0]
-		} else {
+		} else if errors.Is(err, os.ErrNotExist) {
 			logger.Error("ParseParams: font file not exit", zap.String("FontFile", fontFiles[0]))
+			return parsed
+		} else {
+			logger.Error("ParseParams: font file not exit", zap.String("FontFile", fontFiles[0]), zap.Error(err))
 			return parsed
 		}
 	}
@@ -434,7 +441,7 @@ func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *
 	if parsed.Ring {
 		if accColorHash == nil {
 			if parsed.PublicKey == "" {
-				logger.Error("handleAccountInitialsImpl: no public key or color hash, can't draw ring", zap.String("keyUid", parsed.KeyUID), zap.Error(err))
+				logger.Error("handleAccountInitialsImpl: no public key, can't draw ring", zap.String("keyUid", parsed.KeyUID), zap.Error(err))
 				return
 			}
 
