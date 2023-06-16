@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+option go_package = "./;protobuf";
+
+package protobuf;
+
+message CommunityShardKey {
+  bytes communityID = 1;
+  bytes privateKey = 2;
+  string topic = 3;
+  uint64 clock = 4;
+}

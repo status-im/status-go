@@ -996,7 +996,12 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 		return nil, err
 	}
 
-	err = m.SendKeyExchangeMessage(community.ID(), community.ShardCluster(), community.ShardIndex(), []*ecdsa.PublicKey{pk}, common.KeyExMsgReuse)
+	err = m.SendKeyExchangeMessage(community, []*ecdsa.PublicKey{pk}, common.KeyExMsgReuse)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.SendCommunityShardKey(community, []*ecdsa.PublicKey{pk})
 	if err != nil {
 		return nil, err
 	}
@@ -1443,32 +1448,44 @@ func (m *Messenger) SetCommunityShard(communityID types.HexBytes, clusterShard *
 		return nil, err
 	}
 
-	if err = m.transport.StorePubsubTopicKey(community.PubsubTopic(), topicPrivKey); err != nil {
+	err = m.UpdateCommunityFilters(community, topicPrivKey)
+	if err != nil {
 		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddProtectedTopic(community.PubsubTopic(), topicPrivKey)
+
+	return response, nil
+}
+
+func (m *Messenger) UpdateCommunityFilters(community *communities.Community, privKey *ecdsa.PrivateKey) error {
+	if err := m.transport.StorePubsubTopicKey(community.PubsubTopic(), privKey); err != nil {
+		return err
 	}
 
 	var publicFiltersToInit []transport.FiltersToInitialize
 
 	for _, df := range community.DefaultFilters() {
-		_, err = m.transport.RemoveFilterByChatID(df.ChatID)
+		_, err := m.transport.RemoveFilterByChatID(df.ChatID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		publicFiltersToInit = append(publicFiltersToInit, df)
 	}
 
 	for chatID := range community.Chats() {
 		communityChatID := community.IDString() + chatID
-		_, err = m.transport.RemoveFilterByChatID(communityChatID)
+		_, err := m.transport.RemoveFilterByChatID(communityChatID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		publicFiltersToInit = append(publicFiltersToInit, transport.FiltersToInitialize{ChatID: communityChatID, PubsubTopic: community.PubsubTopic()})
 	}
 
-	_, err = m.transport.InitPublicFilters(publicFiltersToInit)
+	_, err := m.transport.InitPublicFilters(publicFiltersToInit)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Init the community filter so we can receive messages on the community
@@ -1478,28 +1495,25 @@ func (m *Messenger) SetCommunityShard(communityID types.HexBytes, clusterShard *
 		PrivKey:      community.PrivateKey(),
 	}})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Init the default community filters
 	_, err = m.transport.InitPublicFilters(publicFiltersToInit)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if err = m.subscribeToCommunityShard(community.ID(), community.ShardCluster(), community.ShardIndex()); err != nil {
-		return nil, err
+		return err
 	}
 
-	err = m.publishOrg(community)
+	err = m.SendCommunityShardKey(community, community.GetMemberPubkeys())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	response := &MessengerResponse{}
-	response.AddProtectedTopic(community.PubsubTopic(), topicPrivKey)
-
-	return response, nil
+	return nil
 }
 
 func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommunityTokenPermission) (*MessengerResponse, error) {
@@ -1705,7 +1719,12 @@ func (m *Messenger) InviteUsersToCommunity(request *requests.InviteUsersToCommun
 		}
 	}
 
-	err = m.SendKeyExchangeMessage(community.ID(), community.ShardCluster(), community.ShardIndex(), publicKeys, common.KeyExMsgReuse)
+	err = m.SendKeyExchangeMessage(community, publicKeys, common.KeyExMsgReuse)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.SendCommunityShardKey(community, publicKeys)
 	if err != nil {
 		return nil, err
 	}
@@ -1815,14 +1834,14 @@ func (m *Messenger) RemoveUserFromCommunity(id types.HexBytes, pkString string) 
 }
 
 // TODO
-func (m *Messenger) SendKeyExchangeMessage(communityID []byte, shardCluster *uint, shardIndex *uint, pubkeys []*ecdsa.PublicKey, msgType common.CommKeyExMsgType) error {
+func (m *Messenger) SendKeyExchangeMessage(community *communities.Community, pubkeys []*ecdsa.PublicKey, msgType common.CommKeyExMsgType) error {
 	rawMessage := common.RawMessage{
 		SkipEncryption:        false,
-		CommunityID:           communityID,
+		CommunityID:           community.ID(),
 		CommunityKeyExMsgType: msgType,
 		Recipients:            pubkeys,
 		MessageType:           protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
-		PubsubTopic:           transport.GetPubsubTopic(shardCluster, shardIndex),
+		PubsubTopic:           transport.GetPubsubTopic(community.ShardCluster(), community.ShardIndex()),
 	}
 	_, err := m.sender.SendCommunityMessage(context.Background(), rawMessage)
 
@@ -1830,6 +1849,40 @@ func (m *Messenger) SendKeyExchangeMessage(communityID []byte, shardCluster *uin
 		return err
 	}
 	return nil
+}
+
+func (m *Messenger) SendCommunityShardKey(community *communities.Community, pubkeys []*ecdsa.PublicKey) error {
+	key, err := m.transport.RetrievePubsubTopicKey(community.PubsubTopic())
+	if err != nil {
+		return err
+	}
+
+	if key == nil {
+		return nil // No community shard key available
+	}
+
+	pubsubTopicKey := &protobuf.CommunityShardKey{
+		Clock:       m.getTimesource().GetCurrentTime(),
+		CommunityID: community.ID(),
+		PrivateKey:  crypto.FromECDSA(key),
+		Topic:       community.PubsubTopic(),
+	}
+
+	encodedMessage, err := proto.Marshal(pubsubTopicKey)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := common.RawMessage{
+		Recipients:          pubkeys,
+		ResendAutomatically: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_SHARD_KEY,
+		Payload:             encodedMessage,
+	}
+
+	_, err = m.sender.SendPubsubTopicKey(context.Background(), &rawMessage)
+
+	return err
 }
 
 func (m *Messenger) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunity) (*MessengerResponse, error) {
@@ -1850,7 +1903,7 @@ func (m *Messenger) BanUserFromCommunity(request *requests.BanUserFromCommunity)
 	}
 
 	// TODO generate new encryption key
-	err = m.SendKeyExchangeMessage(community.ID(), community.ShardCluster(), community.ShardIndex(), community.GetMemberPubkeys(), common.KeyExMsgRekey)
+	err = m.SendKeyExchangeMessage(community, community.GetMemberPubkeys(), common.KeyExMsgRekey)
 	if err != nil {
 		return nil, err
 	}
@@ -2247,13 +2300,45 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 }
 
 func (m *Messenger) handleCommunityAdminEvent(state *ReceivedMessageState, signer *ecdsa.PublicKey, description protobuf.CommunityAdminEvent, rawPayload []byte) error {
-
 	communityResponse, err := m.communitiesManager.HandleCommunityAdminEvent(signer, &description, rawPayload)
 	if err != nil {
 		return err
 	}
 
 	return m.handleCommunityResponse(state, communityResponse)
+}
+
+// handleCommunityShardKey handles the private keys for the community shards
+func (m *Messenger) handleCommunityShardKey(state *ReceivedMessageState, signer *ecdsa.PublicKey, communityShardKey protobuf.CommunityShardKey, rawPayload []byte) error {
+	community, err := m.communitiesManager.GetByID(communityShardKey.CommunityID)
+	if err != nil {
+		return err
+	}
+
+	// If we haven't joined the community, nothing to do
+	if !community.Joined() {
+		return nil
+	}
+
+	if signer == nil {
+		return errors.New("signer can't be nil")
+	}
+
+	if !community.IsMemberAdmin(signer) {
+		return communities.ErrNotAuthorized
+	}
+
+	privKey, err := crypto.ToECDSA(communityShardKey.PrivateKey)
+	if err != nil {
+		return err
+	}
+
+	err = m.UpdateCommunityFilters(community, privKey)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, syncCommunity protobuf.SyncCommunity) error {
@@ -3900,7 +3985,7 @@ func (m *Messenger) UpdateCommunityEncryption(community *communities.Community) 
 			return nil, err
 		}
 
-		err = m.SendKeyExchangeMessage(community.ID(), community.ShardCluster(), community.ShardIndex(), community.GetMemberPubkeys(), common.KeyExMsgReuse)
+		err = m.SendKeyExchangeMessage(community, community.GetMemberPubkeys(), common.KeyExMsgReuse)
 		if err != nil {
 			return nil, err
 		}

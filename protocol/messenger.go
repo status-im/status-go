@@ -4374,6 +4374,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							allMessagesProcessed = false
 							continue
 						}
+					case protobuf.CommunityShardKey:
+						logger.Debug("Handling CommunityShardKey")
+						message := msg.ParsedMessage.Interface().(protobuf.CommunityShardKey)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.ContentTopic, filter.ChatID, msg.Type, message)
+						err = m.handleCommunityShardKey(messageState, publicKey, message, msg.DecryptedPayload)
+						if err != nil {
+							logger.Warn("failed to handle CommunityShardKey", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
 					default:
 						// Check if is an encrypted PushNotificationRegistration
 						if msg.Type == protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION {
