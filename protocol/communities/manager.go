@@ -2020,7 +2020,7 @@ func (m *Manager) checkChannelPermissions(viewOnlyPermissions []*protobuf.Commun
 	hasViewOnlyPermissions := len(viewOnlyPermissions) > 0
 	hasViewAndPostPermissions := len(viewAndPostPermissions) > 0
 
-	if hasViewAndPostPermissions && !hasViewOnlyPermissions {
+	if (hasViewAndPostPermissions && !hasViewOnlyPermissions) || (hasViewOnlyPermissions && hasViewAndPostPermissions && viewAndPostPermissionsResponse.Satisfied) {
 		response.ViewOnlyPermissions.Satisfied = viewAndPostPermissionsResponse.Satisfied
 	} else {
 		response.ViewOnlyPermissions.Satisfied = viewOnlyPermissionsResponse.Satisfied
