@@ -2057,14 +2057,14 @@ func (m *Manager) CheckAllChannelsPermissions(communityID types.HexBytes, addres
 	}
 
 	for channelID := range channels {
-		viewOnlyPermissions := community.ChannelTokenPermissionsByType(channelID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
-		viewAndPostPermissions := community.ChannelTokenPermissionsByType(channelID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
+		viewOnlyPermissions := community.ChannelTokenPermissionsByType(community.IDString() + channelID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
+		viewAndPostPermissions := community.ChannelTokenPermissionsByType(community.IDString() + channelID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
 
 		checkChannelPermissionsResponse, err := m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountsAndChainIDs, false)
 		if err != nil {
 			return nil, err
 		}
-		response.Channels[channelID] = checkChannelPermissionsResponse
+		response.Channels[community.IDString() + channelID] = checkChannelPermissionsResponse
 	}
 	return response, nil
 }
