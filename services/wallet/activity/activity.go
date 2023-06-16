@@ -476,14 +476,18 @@ func getTrInAndOutAmounts(activityType Type, trAmount sql.NullString) (inAmount 
 
 func getMtInAndOutAmounts(dbFromAmount sql.NullString, dbToAmount sql.NullString) (inAmount *hexutil.Big, outAmount *hexutil.Big) {
 	if dbFromAmount.Valid && dbToAmount.Valid {
-		fromAmount, frOk := new(big.Int).SetString(dbFromAmount.String, 16)
-		toAmount, toOk := new(big.Int).SetString(dbToAmount.String, 16)
-		if frOk && toOk {
-			inAmount = (*hexutil.Big)(toAmount)
-			outAmount = (*hexutil.Big)(fromAmount)
-			return
+		fromHexStr := dbFromAmount.String
+		toHexStr := dbToAmount.String
+		if len(fromHexStr) > 2 && len(toHexStr) > 2 {
+			fromAmount, frOk := new(big.Int).SetString(dbFromAmount.String[2:], 16)
+			toAmount, toOk := new(big.Int).SetString(dbToAmount.String[2:], 16)
+			if frOk && toOk {
+				inAmount = (*hexutil.Big)(toAmount)
+				outAmount = (*hexutil.Big)(fromAmount)
+				return
+			}
 		}
-		log.Warn(fmt.Sprintf("could not parse amounts %s %s", dbFromAmount.String, dbToAmount.String))
+		log.Warn(fmt.Sprintf("could not parse amounts %s %s", fromHexStr, toHexStr))
 	} else {
 		log.Warn("invalid transaction amounts")
 	}
@@ -613,6 +617,7 @@ func getActivityEntries(ctx context.Context, db *sql.DB, addresses []eth.Address
 		} else if multiTxID.Valid {
 			mtInAmount, mtOutAmount := getMtInAndOutAmounts(dbMtFromAmount, dbMtToAmount)
 			activityType := multiTransactionTypeToActivityType(transfer.MultiTransactionType(dbMtType.Byte))
+			fmt.Println("getMtInAndOutAmounts", multiTxID.Int64, activityType, mtInAmount, mtOutAmount)
 			entry = NewActivityEntryWithMultiTransaction(transfer.MultiTransactionIDType(multiTxID.Int64),
 				timestamp, activityType, activityStatus, mtInAmount, mtOutAmount)
 		} else {
