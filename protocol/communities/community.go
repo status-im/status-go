@@ -231,6 +231,8 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		TokenPermissions            map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissions"`
 		CommunityTokensMetadata     []*protobuf.CommunityTokenMetadata            `json:"communityTokensMetadata"`
 		ActiveMembersCount          uint64                                        `json:"activeMembersCount"`
+		ShardCluster                *uint                                         `json:"shardCluster"`
+		ShardIndex                  *uint                                         `json:"shardIndex"`
 	}{
 		ID:                          o.ID(),
 		MemberRole:                  o.MemberRole(o.MemberIdentity()),
@@ -248,6 +250,8 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Muted:                       o.config.Muted,
 		Tags:                        o.Tags(),
 		Encrypted:                   o.Encrypted(),
+		ShardCluster:                o.ShardCluster(),
+		ShardIndex:                  o.ShardIndex(),
 	}
 	if o.config.CommunityDescription != nil {
 		for id, c := range o.config.CommunityDescription.Categories {
