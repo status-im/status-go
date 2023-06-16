@@ -3,10 +3,12 @@ package transfer
 import (
 	"database/sql"
 	"fmt"
+	"math/big"
 	"strings"
 	"testing"
 
 	eth_common "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/testutils"
 	"github.com/status-im/status-go/sqlite"
@@ -72,6 +74,7 @@ func GenerateTestSendMultiTransaction(tr TestTransfer) TestMultiTransaction {
 		FromToken:            tr.Token,
 		ToToken:              tr.Token,
 		FromAmount:           tr.Value,
+		ToAmount:             0,
 		Timestamp:            tr.Timestamp,
 	}
 }
@@ -152,10 +155,13 @@ func InsertTestMultiTransaction(t *testing.T, db *sql.DB, tr *TestMultiTransacti
 	if tr.ToToken == "" {
 		toTokenType = testutils.EthSymbol
 	}
+	fromAmount := (*hexutil.Big)(big.NewInt(tr.FromAmount))
+	toAmount := (*hexutil.Big)(big.NewInt(tr.ToAmount))
+
 	result, err := db.Exec(`
 		INSERT INTO multi_transactions (from_address, from_asset, from_amount, to_address, to_asset, to_amount, type, timestamp
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		tr.FromAddress, fromTokenType, tr.FromAmount, tr.ToAddress, toTokenType, tr.ToAmount, tr.MultiTransactionType, tr.Timestamp)
+		tr.FromAddress, fromTokenType, fromAmount.String(), tr.ToAddress, toTokenType, toAmount.String(), tr.MultiTransactionType, tr.Timestamp)
 	require.NoError(t, err)
 	rowID, err := result.LastInsertId()
 	require.NoError(t, err)
