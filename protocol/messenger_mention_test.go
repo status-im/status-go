@@ -252,12 +252,11 @@ func TestGetAtSignIdxs(t *testing.T) {
 }
 
 func TestCalcAtIdxs(t *testing.T) {
-	newText := "@abc"
 	state := MentionState{
 		AtIdxs: []*AtIndexEntry{
 			{From: 0, To: 3, Checked: false},
 		},
-		NewText:      &newText,
+		NewText:      "@abc",
 		PreviousText: "",
 		Start:        0,
 	}
@@ -288,7 +287,7 @@ func TestToInfo(t *testing.T) {
 			},
 			MentionEnd:   19,
 			PreviousText: "",
-			NewText:      &newText,
+			NewText:      newText,
 			Start:        18,
 			End:          18,
 		}
@@ -505,6 +504,9 @@ func TestLastIndexOf(t *testing.T) {
 	//at-sign-idx 0 text @t searched-text t start 2 end 2 new-text
 	atSignIdx = lastIndexOf("@t", charAtSign, 2)
 	require.Equal(t, 0, atSignIdx)
+
+	atSignIdx = lastIndexOf("at", charAtSign, 3)
+	require.Equal(t, -1, atSignIdx)
 }
 
 func TestDiffText(t *testing.T) {
@@ -521,6 +523,7 @@ func TestDiffText(t *testing.T) {
 				end:          0,
 				previousText: "",
 				newText:      "A",
+				operation:    textOperationAdd,
 			},
 		},
 		{
@@ -531,6 +534,7 @@ func TestDiffText(t *testing.T) {
 				end:          1,
 				previousText: "A",
 				newText:      "b",
+				operation:    textOperationAdd,
 			},
 		},
 		{
@@ -541,16 +545,18 @@ func TestDiffText(t *testing.T) {
 				end:          2,
 				previousText: "Ab",
 				newText:      "c",
+				operation:    textOperationAdd,
 			},
 		},
 		{
-			oldText: "Abc",
-			newText: "Ac",
+			oldText: "Ab",
+			newText: "cAb",
 			expected: &TextDiff{
-				start:        1,
-				end:          2,
-				previousText: "Abc",
-				newText:      "",
+				start:        0,
+				end:          0,
+				previousText: "Ab",
+				newText:      "c",
+				operation:    textOperationAdd,
 			},
 		},
 		{
@@ -561,6 +567,7 @@ func TestDiffText(t *testing.T) {
 				end:          1,
 				previousText: "Ac",
 				newText:      "d",
+				operation:    textOperationAdd,
 			},
 		},
 		{
@@ -571,6 +578,7 @@ func TestDiffText(t *testing.T) {
 				end:          2,
 				previousText: "Adc",
 				newText:      " ee ",
+				operation:    textOperationAdd,
 			},
 		},
 		{
@@ -581,6 +589,62 @@ func TestDiffText(t *testing.T) {
 				end:          1,
 				previousText: "Ad ee c",
 				newText:      " fff ",
+				operation:    textOperationAdd,
+			},
+		},
+		{
+			oldText: "Abc",
+			newText: "Ac",
+			expected: &TextDiff{
+				start:        1,
+				end:          1,
+				previousText: "Abc",
+				newText:      "",
+				operation:    textOperationDelete,
+			},
+		},
+		{
+			oldText: "Abcd",
+			newText: "Ab",
+			expected: &TextDiff{
+				start:        2,
+				end:          3,
+				previousText: "Abcd",
+				newText:      "",
+				operation:    textOperationDelete,
+			},
+		},
+		{
+			oldText: "Abcd",
+			newText: "bcd",
+			expected: &TextDiff{
+				start:        0,
+				end:          0,
+				previousText: "Abcd",
+				newText:      "",
+				operation:    textOperationDelete,
+			},
+		},
+		{
+			oldText: "Abcd你好",
+			newText: "Abcd你",
+			expected: &TextDiff{
+				start:        5,
+				end:          5,
+				previousText: "Abcd你好",
+				newText:      "",
+				operation:    textOperationDelete,
+			},
+		},
+		{
+			oldText: "Abcd你好",
+			newText: "Abcd",
+			expected: &TextDiff{
+				start:        4,
+				end:          5,
+				previousText: "Abcd你好",
+				newText:      "",
+				operation:    textOperationDelete,
 			},
 		},
 		{
@@ -588,9 +652,10 @@ func TestDiffText(t *testing.T) {
 			newText: " fff d ee c",
 			expected: &TextDiff{
 				start:        0,
-				end:          1,
+				end:          0,
 				previousText: "A fff d ee c",
 				newText:      "",
+				operation:    textOperationDelete,
 			},
 		},
 		{
@@ -598,15 +663,104 @@ func TestDiffText(t *testing.T) {
 			newText: " fffee c",
 			expected: &TextDiff{
 				start:        4,
-				end:          7,
+				end:          6,
 				previousText: " fff d ee c",
 				newText:      "",
+				operation:    textOperationDelete,
 			},
 		},
 		{
 			oldText:  "abc",
 			newText:  "abc",
 			expected: nil,
+		},
+		{
+			oldText: "abc",
+			newText: "ghij",
+			expected: &TextDiff{
+				start:        0,
+				end:          2,
+				previousText: "abc",
+				newText:      "ghij",
+				operation:    textOperationReplace,
+			},
+		},
+		{
+			oldText: "abc",
+			newText: "babcd",
+			expected: &TextDiff{
+				start:        0,
+				end:          2,
+				previousText: "abc",
+				newText:      "babcd",
+				operation:    textOperationReplace,
+			},
+		},
+		{
+			oldText: "abc",
+			newText: "baebcd",
+			expected: &TextDiff{
+				start:        0,
+				end:          2,
+				previousText: "abc",
+				newText:      "baebcd",
+				operation:    textOperationReplace,
+			},
+		},
+		{
+			oldText: "abc",
+			newText: "aefc",
+			expected: &TextDiff{
+				start:        1,
+				end:          1,
+				previousText: "abc",
+				newText:      "ef",
+				operation:    textOperationReplace,
+			},
+		},
+		{
+			oldText: "abc",
+			newText: "adc",
+			expected: &TextDiff{
+				start:        1,
+				end:          1,
+				previousText: "abc",
+				newText:      "d",
+				operation:    textOperationReplace,
+			},
+		},
+		{
+			oldText: "abc",
+			newText: "abd",
+			expected: &TextDiff{
+				start:        2,
+				end:          2,
+				previousText: "abc",
+				newText:      "d",
+				operation:    textOperationReplace,
+			},
+		},
+		{
+			oldText: "abc",
+			newText: "cbc",
+			expected: &TextDiff{
+				start:        0,
+				end:          0,
+				previousText: "abc",
+				newText:      "c",
+				operation:    textOperationReplace,
+			},
+		},
+		{
+			oldText: "abc",
+			newText: "ffbc",
+			expected: &TextDiff{
+				start:        0,
+				end:          0,
+				previousText: "abc",
+				newText:      "ff",
+				operation:    textOperationReplace,
+			},
 		},
 	}
 	for i, tc := range testCases {
@@ -641,16 +795,19 @@ func TestMentionSuggestionCases(t *testing.T) {
 		{"@u2", 1},
 		{"@u23", 0},
 		{"@u2", 1},
+		{"@u2 abc", 0},
+		{"@u2 abc @u3", 1},
+		{"@u2 abc@u3", 0},
+		{"@u2 abc@u3 ", 0},
+		{"@u2 abc @u3", 1},
 	}
 
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("%d", i+1), func(t *testing.T) {
-			_, err := mentionManager.OnChangeText(chatID, tc.inputText)
+			ctx, err := mentionManager.OnChangeText(chatID, tc.inputText)
 			require.NoError(t, err)
-			ctx, err := mentionManager.CalculateSuggestions(chatID, tc.inputText)
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedSize, len(ctx.MentionSuggestions))
 			t.Logf("Input: %+v, MentionState:%+v, InputSegments:%+v\n", tc.inputText, ctx.MentionState, ctx.InputSegments)
+			require.Equal(t, tc.expectedSize, len(ctx.MentionSuggestions))
 		})
 	}
 }
@@ -691,24 +848,19 @@ func TestMentionSuggestionSpecialChars(t *testing.T) {
 	mentionableUserMap, chatID, mentionManager := setupMentionSuggestionTest(t, nil)
 
 	testCases := []struct {
-		inputText           string
-		expectedSize        int
-		calculateSuggestion bool
+		inputText    string
+		expectedSize int
 	}{
-		{"'", 0, false},
-		{"‘", 0, true},
-		{"‘@", len(mentionableUserMap), true},
+		{"'", 0},
+		{"‘", 0},
+		{"‘@", len(mentionableUserMap)},
 	}
 
 	for _, tc := range testCases {
 		ctx, err := mentionManager.OnChangeText(chatID, tc.inputText)
 		require.NoError(t, err)
-		if tc.calculateSuggestion {
-			ctx, err = mentionManager.CalculateSuggestions(chatID, tc.inputText)
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedSize, len(ctx.MentionSuggestions))
-		}
 		t.Logf("Input: %+v, MentionState:%+v, InputSegments:%+v\n", tc.inputText, ctx.MentionState, ctx.InputSegments)
+		require.Equal(t, tc.expectedSize, len(ctx.MentionSuggestions))
 	}
 }
 
@@ -723,13 +875,12 @@ func TestMentionSuggestionAtSignSpaceCases(t *testing.T) {
 	})
 
 	testCases := []struct {
-		inputText           string
-		expectedSize        int
-		calculateSuggestion bool
+		inputText    string
+		expectedSize int
 	}{
-		{"@", len(mentionableUserMap), true},
-		{"@ ", 0, true},
-		{"@ @", len(mentionableUserMap), true},
+		{"@", len(mentionableUserMap)},
+		{"@ ", 0},
+		{"@ @", len(mentionableUserMap)},
 	}
 
 	var ctx *ChatMentionContext
@@ -738,12 +889,7 @@ func TestMentionSuggestionAtSignSpaceCases(t *testing.T) {
 		ctx, err = mentionManager.OnChangeText(chatID, tc.inputText)
 		require.NoError(t, err)
 		t.Logf("After OnChangeText, Input: %+v, MentionState:%+v, InputSegments:%+v\n", tc.inputText, ctx.MentionState, ctx.InputSegments)
-		if tc.calculateSuggestion {
-			ctx, err = mentionManager.CalculateSuggestions(chatID, tc.inputText)
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedSize, len(ctx.MentionSuggestions))
-			t.Logf("After CalculateSuggestions, Input: %+v, MentionState:%+v, InputSegments:%+v\n", tc.inputText, ctx.MentionState, ctx.InputSegments)
-		}
+		require.Equal(t, tc.expectedSize, len(ctx.MentionSuggestions))
 	}
 	require.Len(t, ctx.InputSegments, 3)
 	require.Equal(t, Mention, ctx.InputSegments[0].Type)
@@ -752,6 +898,29 @@ func TestMentionSuggestionAtSignSpaceCases(t *testing.T) {
 	require.Equal(t, "@", ctx.InputSegments[1].Value)
 	require.Equal(t, Text, ctx.InputSegments[2].Type)
 	require.Equal(t, "@", ctx.InputSegments[2].Value)
+}
+
+func TestSelectMention(t *testing.T) {
+	_, chatID, mentionManager := setupMentionSuggestionTest(t, nil)
+
+	text := "@u2 abc"
+	ctx, err := mentionManager.OnChangeText(chatID, text)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(ctx.MentionSuggestions))
+
+	ctx, err = mentionManager.OnChangeText(chatID, "@u abc")
+	require.NoError(t, err)
+	require.Equal(t, 3, len(ctx.MentionSuggestions))
+
+	ctx, err = mentionManager.SelectMention(chatID, "@u abc", "u2", "0xpk2")
+	require.NoError(t, err)
+	require.Equal(t, 0, len(ctx.MentionSuggestions))
+	require.Equal(t, text, ctx.NewText)
+	require.Equal(t, text, ctx.PreviousText)
+
+	ctx, err = mentionManager.OnChangeText(chatID, text)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(ctx.MentionSuggestions))
 }
 
 func setupMentionSuggestionTest(t *testing.T, mentionableUserMapInput map[string]*MentionableUser) (map[string]*MentionableUser, string, *MentionManager) {
