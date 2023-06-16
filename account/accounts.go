@@ -62,7 +62,14 @@ type RecoverParams struct {
 	Signature string `json:"signature"`
 }
 
-// Manager represents account manager interface.
+// Interface represents account manager interface
+type Interface interface {
+	GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*SelectedExtKey, error)
+	Sign(rpcParams SignParams, verifiedAccount *SelectedExtKey) (result types.HexBytes, err error)
+	Recover(rpcParams RecoverParams) (addr types.Address, err error)
+}
+
+// Manager represents account manager implementation
 type Manager struct {
 	mu         sync.RWMutex
 	rpcClient  *rpc.Client

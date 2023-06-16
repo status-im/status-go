@@ -90,6 +90,7 @@ type config struct {
 	walletService       *wallet.Service
 	httpServer          *server.MediaServer
 	rpcClient           *rpc.Client
+	tokenManager        communities.TokenManager
 
 	verifyTransactionClient  EthClient
 	verifyENSURL             string
@@ -331,6 +332,13 @@ func WithMessageCSV(enabled bool) Option {
 func WithWalletService(s *wallet.Service) Option {
 	return func(c *config) error {
 		c.walletService = s
+		return nil
+	}
+}
+
+func WithTokenManager(tokenManager communities.TokenManager) Option {
+	return func(c *config) error {
+		c.tokenManager = tokenManager
 		return nil
 	}
 }
