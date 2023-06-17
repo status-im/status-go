@@ -728,7 +728,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.handleConnectionChange(m.online())
 	m.handleENSVerificationSubscription(ensSubscription)
 	m.watchConnectionChange()
-	m.watchUnmutedChats()
+	m.watchChatsAndCommunitiesToUnmute()
 	m.watchExpiredMessages()
 	m.watchIdentityImageChanges()
 	m.watchWalletBalances()
@@ -1374,8 +1374,8 @@ func (m *Messenger) watchConnectionChange() {
 	}()
 }
 
-// watchUnmutedChats regularly checks for chats that should be unmuted
-func (m *Messenger) watchUnmutedChats() {
+// watchChatsAndCommunitiesToUnmute regularly checks for chats and communities that should be unmuted
+func (m *Messenger) watchChatsAndCommunitiesToUnmute() {
 	m.logger.Debug("watching unmuted chats")
 	go func() {
 		for {
@@ -1398,6 +1398,10 @@ func (m *Messenger) watchUnmutedChats() {
 					}
 					return true
 				})
+				err := m.CheckCommunitiesToUnmute(response)
+				if err != nil {
+					m.logger.Info("err", zap.Any("", err))
+				}
 				if !response.IsEmpty() {
 					signal.SendNewMessages(response)
 				}

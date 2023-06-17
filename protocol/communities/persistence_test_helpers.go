@@ -32,7 +32,9 @@ func fromSyncCommunityProtobuf(syncCommProto *protobuf.SyncCommunity) RawCommuni
 
 func (p *Persistence) scanRowToStruct(rowScan func(dest ...interface{}) error) (*RawCommunityRow, error) {
 	rcr := new(RawCommunityRow)
+
 	syncedAt := sql.NullTime{}
+	muteTill := sql.NullTime{}
 
 	err := rowScan(
 		&rcr.ID,
@@ -43,6 +45,7 @@ func (p *Persistence) scanRowToStruct(rowScan func(dest ...interface{}) error) (
 		&rcr.Muted,
 		&syncedAt,
 		&rcr.Spectated,
+		&muteTill,
 	)
 	if syncedAt.Valid {
 		rcr.SyncedAt = uint64(syncedAt.Time.Unix())
