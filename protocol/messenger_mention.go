@@ -309,12 +309,16 @@ func (m *MentionManager) OnChangeText(chatID, fullText string) (*ChatMentionCont
 	ctx.MentionState.End = diff.end
 	ctx.MentionState.operation = diff.operation
 
-	ctx.MentionState.AtIdxs = calcAtIdxs(ctx.MentionState)
+	atIndexes, err := calculateAtIndexEntries(ctx.MentionState)
+	if err != nil {
+		return ctx, err
+	}
+	ctx.MentionState.AtIdxs = atIndexes
 	m.logger.Debug("OnChangeText", zap.String("chatID", chatID), zap.Any("state", ctx.MentionState))
 	return m.calculateSuggestions(chatID, fullText)
 }
 
-func (m *MentionManager) recheckAtIdxs(chatID string, text string, publicKey string) (*ChatMentionContext, error) {
+func (m *MentionManager) recheckAtIdxs(chatID string, fullText string, publicKey string) (*ChatMentionContext, error) {
 	user, err := m.mentionableUserGetter.getMentionableUser(chatID, publicKey)
 	if err != nil {
 		return nil, err
@@ -322,8 +326,12 @@ func (m *MentionManager) recheckAtIdxs(chatID string, text string, publicKey str
 	ctx := m.getChatMentionContext(chatID)
 	state := ctx.MentionState
 	mentionableUsers := map[string]*MentionableUser{user.ID: user}
-	newAtIdxs := checkIdxForMentions(text, state.AtIdxs, mentionableUsers)
-	ctx.InputSegments = calculateInput(text, newAtIdxs)
+	newAtIdxs := checkIdxForMentions(fullText, state.AtIdxs, mentionableUsers)
+	inputSegments, success := calculateInput(fullText, newAtIdxs)
+	if !success {
+		m.logger.Warn("recheckAtIdxs: calculateInput failed", zap.String("chatID", chatID), zap.String("fullText", fullText), zap.Any("state", ctx.MentionState))
+	}
+	ctx.InputSegments = inputSegments
 	state.AtIdxs = newAtIdxs
 	return ctx, nil
 }
@@ -357,7 +365,10 @@ func (m *MentionManager) calculateSuggestionsWithMentionableUsers(chatID string,
 	}
 
 	newAtIndexEntries := checkIdxForMentions(fullText, state.AtIdxs, mentionableUsers)
-	calculatedInput := calculateInput(fullText, newAtIndexEntries)
+	calculatedInput, success := calculateInput(fullText, newAtIndexEntries)
+	if !success {
+		m.logger.Warn("calculateSuggestionsWithMentionableUsers: calculateInput failed", zap.String("chatID", chatID), zap.String("fullText", fullText), zap.Any("state", state))
+	}
 
 	var end int
 	switch state.operation {
@@ -704,6 +715,9 @@ func hasMatchingPrefix(text, searchedText string) bool {
 func isMentioned(user *MentionableUser, text string) bool {
 	regexStr := ""
 	for i, name := range user.names() {
+		if name == "" {
+			continue
+		}
 		name = strings.ToLower(name)
 		if i != 0 {
 			regexStr += "|"
@@ -738,6 +752,7 @@ func matchMention(text string, users map[string]*MentionableUser, mentionKeyIdx 
 			return nil
 		case userSuggestionsCnt == 1:
 			user := getFirstUser(userSuggestions)
+			// maybe len(users) == 1 and user input `@` so we need to recheck if the user is really mentioned
 			if isMentioned(user, string(tr[mentionKeyIdx+1:])) {
 				return user
 			}
@@ -839,55 +854,59 @@ func (e *AtIndexEntry) String() string {
 	return fmt.Sprintf("{From: %d, To: %d, Checked: %t, Mentioned: %t, NextAtIdx: %d}", e.From, e.To, e.Checked, e.Mentioned, e.NextAtIdx)
 }
 
-// implementation reference: https://github.com/status-im/status-react/blob/04d0252e013d9c67862e77a3467dd32c3abde934/src/status_im/chat/models/mentions.cljs#L433
-func calcAtIdxs(state *MentionState) []*AtIndexEntry {
+func calculateAtIndexEntries(state *MentionState) ([]*AtIndexEntry, error) {
+	var keptAtIdxs []*AtIndexEntry
+	var oldRunes []rune
+	var newRunes []rune
+	var previousRunes = []rune(state.PreviousText)
+	switch state.operation {
+	case textOperationAdd:
+		newRunes = []rune(state.NewText)
+	case textOperationDelete:
+		oldRunes = previousRunes[state.Start : state.End+1]
+	case textOperationReplace:
+		oldRunes = previousRunes[state.Start : state.End+1]
+		newRunes = []rune(state.NewText)
+	default:
+		return nil, fmt.Errorf("unknown text operation: %d", state.operation)
+	}
+
+	oldLen := len(oldRunes)
+	newLen := len(newRunes)
+	diff := newLen - oldLen
+	oldAtSignIndexes := getAtSignIdxs(string(oldRunes), state.Start)
 	newAtSignIndexes := getAtSignIdxs(state.NewText, state.Start)
-	newAtSignIndexesCount := len(newAtSignIndexes)
-	if len(state.AtIdxs) == 0 {
-		result := make([]*AtIndexEntry, newAtSignIndexesCount)
-		for i, idx := range newAtSignIndexes {
-			result[i] = &AtIndexEntry{
-				From:    idx,
-				Checked: false,
+	for _, entry := range state.AtIdxs {
+		deleted := false
+		for _, idx := range oldAtSignIndexes {
+			if idx == entry.From {
+				deleted = true
 			}
 		}
-		return result
-	}
-
-	newTextLen := len([]rune(state.NewText))
-	oldTextLen := len([]rune(state.PreviousText))
-	oldEnd := state.Start + oldTextLen
-	diff := newTextLen - oldTextLen
-	var keptAtIdxs []*AtIndexEntry
-	for _, entry := range state.AtIdxs {
-		from := entry.From
-		to := entry.To
-		toPlus1 := to + 1
-		if from >= oldEnd {
-			entry.From = from + diff
-			entry.To = to + diff
+		if !deleted {
+			if entry.From >= state.Start { // update range with diff
+				entry.From += diff
+				entry.To += diff
+			}
+			if entry.From < state.Start && entry.To >= state.Start { // impacted after user edit so need to be rechecked
+				entry.Checked = false
+			}
 			keptAtIdxs = append(keptAtIdxs, entry)
-		} else if from < state.Start && toPlus1 < state.Start {
-			// NOTE: (not to+1) means is not checked yet, but (not to+1) seems always false, so we ignore it here temporarily
-			// https://github.com/status-im/status-mobile/blob/04d0252e013d9c67862e77a3467dd32c3abde934/src/status_im/chat/models/mentions.cljs#L454
-			keptAtIdxs = append(keptAtIdxs, entry)
-		} else if from < state.Start && toPlus1 >= state.Start {
-			keptAtIdxs = append(keptAtIdxs, &AtIndexEntry{
-				From:    from,
-				Checked: false,
-			})
 		}
 	}
+	return addNewAtSignIndexes(keptAtIdxs, newAtSignIndexes), nil
+}
 
+func addNewAtSignIndexes(keptAtIdxs []*AtIndexEntry, newAtSignIndexes []int) []*AtIndexEntry {
 	var newAtIndexEntries []*AtIndexEntry
 	var added bool
-	var lastNewIdx *int
+	var lastNewIdx int
+	newAtSignIndexesCount := len(newAtSignIndexes)
 	if newAtSignIndexesCount > 0 {
-		idx := newAtSignIndexes[newAtSignIndexesCount-1]
-		lastNewIdx = &idx
+		lastNewIdx = newAtSignIndexes[newAtSignIndexesCount-1]
 	}
 	for _, entry := range keptAtIdxs {
-		if lastNewIdx != nil && entry.From > *lastNewIdx && !added {
+		if newAtSignIndexesCount > 0 && !added && entry.From > lastNewIdx {
 			newAtIndexEntries = append(newAtIndexEntries, makeAtIdxs(newAtSignIndexes)...)
 			newAtIndexEntries = append(newAtIndexEntries, entry)
 			added = true
@@ -933,7 +952,7 @@ func checkAtIndexEntry(fullText string, entry *AtIndexEntry, mentionableUsers ma
 	if entry.Checked {
 		return entry
 	}
-	result := MatchMention(fullText+charAtSign, mentionableUsers, entry.From)
+	result := MatchMention(fullText, mentionableUsers, entry.From)
 	if result != nil && result.Match != "" {
 		return &AtIndexEntry{
 			From:      entry.From,
@@ -977,37 +996,52 @@ func checkIdxForMentions(fullText string, currentAtIndexEntries []*AtIndexEntry,
 	return nil
 }
 
-func calculateInput(text string, idxs []*AtIndexEntry) []InputSegment {
-	if len(idxs) == 0 {
-		return []InputSegment{{Type: Text, Value: text}}
+func appendInputSegment(result *[]InputSegment, typ SegmentType, value string, fullText *string) {
+	if value != "" {
+		*result = append(*result, InputSegment{Type: typ, Value: value})
+		*fullText += value
 	}
-	idxCount := len(idxs)
-	lastFrom := idxs[idxCount-1].From
+}
+
+func calculateInput(text string, atIndexEntries []*AtIndexEntry) ([]InputSegment, bool) {
+	if len(atIndexEntries) == 0 {
+		return []InputSegment{{Type: Text, Value: text}}, true
+	}
+	idxCount := len(atIndexEntries)
+	lastFrom := atIndexEntries[idxCount-1].From
 
 	var result []InputSegment
-
-	if idxs[0].From != 0 {
-		result = append(result, InputSegment{Type: Text, Value: subs(text, 0, idxs[0].From)})
+	fullText := ""
+	if atIndexEntries[0].From != 0 {
+		t := subs(text, 0, atIndexEntries[0].From)
+		appendInputSegment(&result, Text, t, &fullText)
 	}
 
-	for _, entry := range idxs {
+	for _, entry := range atIndexEntries {
 		from := entry.From
 		to := entry.To
 		nextAtIdx := entry.NextAtIdx
 		mentioned := entry.Mentioned
 
 		if mentioned && nextAtIdx != intUnknown {
-			result = append(result, InputSegment{Type: Mention, Value: subs(text, from, to+1)})
-			result = append(result, InputSegment{Type: Text, Value: subs(text, to+1, nextAtIdx)})
+			t := subs(text, from, to+1)
+			appendInputSegment(&result, Mention, t, &fullText)
+
+			t = subs(text, to+1, nextAtIdx)
+			appendInputSegment(&result, Text, t, &fullText)
 		} else if mentioned && lastFrom == from {
-			result = append(result, InputSegment{Type: Mention, Value: subs(text, from, to+1)})
-			result = append(result, InputSegment{Type: Text, Value: subs(text, to+1)})
+			t := subs(text, from, to+1)
+			appendInputSegment(&result, Mention, t, &fullText)
+
+			t = subs(text, to+1)
+			appendInputSegment(&result, Text, t, &fullText)
 		} else {
-			result = append(result, InputSegment{Type: Text, Value: subs(text, from, to+1)})
+			t := subs(text, from, to+1)
+			appendInputSegment(&result, Text, t, &fullText)
 		}
 	}
 
-	return result
+	return result, fullText == text
 }
 
 func subs(s string, start int, end ...int) string {
