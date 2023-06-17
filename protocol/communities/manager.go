@@ -69,7 +69,7 @@ type Manager struct {
 	subscriptions                  []chan *Subscription
 	ensVerifier                    *ens.Verifier
 	identity                       *ecdsa.PrivateKey
-	accountsManager                account.Interface
+	accountsManager                account.Manager
 	tokenManager                   TokenManager
 	logger                         *zap.Logger
 	stdoutLogger                   *zap.Logger
@@ -122,7 +122,7 @@ func (t *HistoryArchiveDownloadTask) Cancel() {
 }
 
 type managerOptions struct {
-	accountsManager      account.Interface
+	accountsManager      account.Manager
 	tokenManager         TokenManager
 	walletConfig         *params.WalletConfig
 	openseaClientBuilder openseaClientBuilder
@@ -168,7 +168,7 @@ func (m *DefaultTokenManager) GetBalancesByChain(ctx context.Context, accounts, 
 
 type ManagerOption func(*managerOptions)
 
-func WithAccountManager(accountsManager account.Interface) ManagerOption {
+func WithAccountManager(accountsManager account.Manager) ManagerOption {
 	return func(opts *managerOptions) {
 		opts.accountsManager = accountsManager
 	}
@@ -1786,7 +1786,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 				Signature: types.EncodeHex(revealedAccount.Signature),
 			}
 
-			matching, err := m.accountsManager.CheckMatchingRecovered(recoverParams, types.HexToAddress(revealedAccount.Address))
+			matching, err := m.accountsManager.CanRecover(recoverParams, types.HexToAddress(revealedAccount.Address))
 			if err != nil {
 				return nil, err
 			}

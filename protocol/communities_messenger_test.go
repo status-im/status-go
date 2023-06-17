@@ -78,7 +78,7 @@ func (m *AccountManagerMock) GetVerifiedWalletAccount(db *accounts.Database, add
 	return nil, errors.New("address doesn't exist")
 }
 
-func (m *AccountManagerMock) CheckMatchingRecovered(rpcParams account.RecoverParams, revealedAddress types.Address) (bool, error) {
+func (m *AccountManagerMock) CanRecover(rpcParams account.RecoverParams, revealedAddress types.Address) (bool, error) {
 	return true, nil
 }
 
@@ -110,9 +110,9 @@ func (s *MessengerCommunitiesSuite) SetupTest() {
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 
-	s.admin = s.newMessenger(adminPassword, adminAddress)
-	s.bob = s.newMessenger(bobPassword, bobAddress)
-	s.alice = s.newMessenger(alicePassword, aliceAddress)
+	s.admin = s.newMessengerWithWallet(adminPassword, adminAddress)
+	s.bob = s.newMessengerWithWallet(bobPassword, bobAddress)
+	s.alice = s.newMessengerWithWallet(alicePassword, aliceAddress)
 	_, err := s.admin.Start()
 	s.Require().NoError(err)
 	_, err = s.bob.Start()
@@ -128,11 +128,7 @@ func (s *MessengerCommunitiesSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *MessengerCommunitiesSuite) newMessengerWithOptions(shh types.Waku, privateKey *ecdsa.PrivateKey, password string, walletAddress string, options []Option) *Messenger {
-	accountsManager := &AccountManagerMock{}
-	accountsManager.AccountsMap = make(map[string]string)
-	accountsManager.AccountsMap[walletAddress] = types.EncodeHex(crypto.Keccak256([]byte(password)))
-
+func (s *MessengerCommunitiesSuite) newMessengerWithOptions(shh types.Waku, privateKey *ecdsa.PrivateKey, accountsManager account.Manager, options []Option) *Messenger {
 	m, err := NewMessenger(
 		"Test",
 		privateKey,
@@ -177,21 +173,10 @@ func (s *MessengerCommunitiesSuite) newMessengerWithOptions(shh types.Waku, priv
 
 	_ = m.settings.CreateSettings(setting, config)
 
-	// add wallet account with keypair
-	kp := accounts.GetProfileKeypairForTest(false, true, false)
-	kp.Accounts[0].Address = types.HexToAddress(walletAddress)
-	err = m.settings.SaveOrUpdateKeypair(kp)
-	s.Require().NoError(err)
-
-	walletAccounts, err := m.settings.GetAccounts()
-	s.Require().NoError(err)
-	s.Require().Len(walletAccounts, 1)
-	s.Require().Equal(walletAccounts[0].Type, accounts.AccountTypeGenerated)
-
 	return m
 }
 
-func (s *MessengerCommunitiesSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, password string, walletAddress string) *Messenger {
+func (s *MessengerCommunitiesSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, accountsManager account.Manager) *Messenger {
 	tmpfile, err := ioutil.TempFile("", "accounts-tests-")
 	s.Require().NoError(err)
 	madb, err := multiaccounts.InitializeDB(tmpfile.Name())
@@ -209,14 +194,34 @@ func (s *MessengerCommunitiesSuite) newMessengerWithKey(shh types.Waku, privateK
 		WithDatasync(),
 		WithTokenManager(tm),
 	}
-	return s.newMessengerWithOptions(shh, privateKey, password, walletAddress, options)
+	return s.newMessengerWithOptions(shh, privateKey, accountsManager, options)
 }
 
-func (s *MessengerCommunitiesSuite) newMessenger(password string, walletAddress string) *Messenger {
+func (s *MessengerCommunitiesSuite) newMessenger(accountsManager account.Manager) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	return s.newMessengerWithKey(s.shh, privateKey, password, walletAddress)
+	return s.newMessengerWithKey(s.shh, privateKey, accountsManager)
+}
+
+func (s *MessengerCommunitiesSuite) newMessengerWithWallet(password string, walletAddress string) *Messenger {
+	accountsManager := &AccountManagerMock{}
+	accountsManager.AccountsMap = make(map[string]string)
+	accountsManager.AccountsMap[walletAddress] = types.EncodeHex(crypto.Keccak256([]byte(password)))
+
+	messenger := s.newMessenger(accountsManager)
+
+	// add wallet account with keypair
+	kp := accounts.GetProfileKeypairForTest(false, true, false)
+	kp.Accounts[0].Address = types.HexToAddress(walletAddress)
+	err := messenger.settings.SaveOrUpdateKeypair(kp)
+	s.Require().NoError(err)
+
+	walletAccounts, err := messenger.settings.GetAccounts()
+	s.Require().NoError(err)
+	s.Require().Len(walletAccounts, 1)
+	s.Require().Equal(walletAccounts[0].Type, accounts.AccountTypeGenerated)
+	return messenger
 }
 
 func (s *MessengerCommunitiesSuite) requestToJoinCommunity(user *Messenger, communityID types.HexBytes, password string) (*MessengerResponse, error) {
@@ -257,7 +262,7 @@ func (s *MessengerCommunitiesSuite) TestCreateCommunity_WithoutDefaultChannel() 
 }
 
 func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
-	alice := s.newMessenger(alicePassword, aliceAddress)
+	alice := s.newMessengerWithWallet(alicePassword, aliceAddress)
 
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,

@@ -62,15 +62,15 @@ type RecoverParams struct {
 	Signature string `json:"signature"`
 }
 
-// Interface represents account manager interface
-type Interface interface {
+// Manager represents account manager interface
+type Manager interface {
 	GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*SelectedExtKey, error)
 	Sign(rpcParams SignParams, verifiedAccount *SelectedExtKey) (result types.HexBytes, err error)
-	CheckMatchingRecovered(rpcParams RecoverParams, revealedAddress types.Address) (bool, error)
+	CanRecover(rpcParams RecoverParams, revealedAddress types.Address) (bool, error)
 }
 
-// Manager represents account manager implementation
-type Manager struct {
+// DefaultManager represents default account manager implementation
+type DefaultManager struct {
 	mu         sync.RWMutex
 	rpcClient  *rpc.Client
 	rpcTimeout time.Duration
@@ -86,18 +86,18 @@ type Manager struct {
 }
 
 // GetKeystore is only used in tests
-func (m *Manager) GetKeystore() types.KeyStore {
+func (m *DefaultManager) GetKeystore() types.KeyStore {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.keystore
 }
 
 // AccountsGenerator returns accountsGenerator.
-func (m *Manager) AccountsGenerator() *generator.Generator {
+func (m *DefaultManager) AccountsGenerator() *generator.Generator {
 	return m.accountsGenerator
 }
 
-func (m *Manager) GetRandomMnemonic() (string, error) {
+func (m *DefaultManager) GetRandomMnemonic() (string, error) {
 	// generate mnemonic phrase
 	mn := extkeys.NewMnemonic()
 	mnemonic, err := mn.MnemonicPhrase(extkeys.EntropyStrength128, extkeys.EnglishLanguage)
@@ -111,7 +111,7 @@ func (m *Manager) GetRandomMnemonic() (string, error) {
 // BIP44-compatible keys are generated: CKD#1 is stored as account key, CKD#2 stored as sub-account root
 // Public key of CKD#1 is returned, with CKD#2 securely encoded into account key file (to be used for
 // sub-account derivations)
-func (m *Manager) CreateAccount(password string) (generator.GeneratedAccountInfo, Info, string, error) {
+func (m *DefaultManager) CreateAccount(password string) (generator.GeneratedAccountInfo, Info, string, error) {
 	var mkInfo generator.GeneratedAccountInfo
 	info := Info{}
 
@@ -149,7 +149,7 @@ func (m *Manager) CreateAccount(password string) (generator.GeneratedAccountInfo
 
 // RecoverAccount re-creates master key using given details.
 // Once master key is re-generated, it is inserted into keystore (if not already there).
-func (m *Manager) RecoverAccount(password, mnemonic string) (Info, error) {
+func (m *DefaultManager) RecoverAccount(password, mnemonic string) (Info, error) {
 	info := Info{}
 	// re-create extended key (see BIP32)
 	mn := extkeys.NewMnemonic()
@@ -172,7 +172,7 @@ func (m *Manager) RecoverAccount(password, mnemonic string) (Info, error) {
 
 // VerifyAccountPassword tries to decrypt a given account key file, with a provided password.
 // If no error is returned, then account is considered verified.
-func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (*types.Key, error) {
+func (m *DefaultManager) VerifyAccountPassword(keyStoreDir, address, password string) (*types.Key, error) {
 	var err error
 	var foundKeyFile []byte
 
@@ -229,7 +229,7 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 
 // SelectAccount selects current account, by verifying that address has corresponding account which can be decrypted
 // using provided password. Once verification is done, all previous identities are removed).
-func (m *Manager) SelectAccount(loginParams LoginParams) error {
+func (m *DefaultManager) SelectAccount(loginParams LoginParams) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -245,14 +245,14 @@ func (m *Manager) SelectAccount(loginParams LoginParams) error {
 	return nil
 }
 
-func (m *Manager) SetAccountAddresses(main types.Address, secondary ...types.Address) {
+func (m *DefaultManager) SetAccountAddresses(main types.Address, secondary ...types.Address) {
 	m.watchAddresses = []types.Address{main}
 	m.watchAddresses = append(m.watchAddresses, secondary...)
 	m.mainAccountAddress = main
 }
 
 // SetChatAccount initializes selectedChatAccount with privKey
-func (m *Manager) SetChatAccount(privKey *ecdsa.PrivateKey) error {
+func (m *DefaultManager) SetChatAccount(privKey *ecdsa.PrivateKey) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -276,7 +276,7 @@ func (m *Manager) SetChatAccount(privKey *ecdsa.PrivateKey) error {
 }
 
 // MainAccountAddress returns main account address set during login
-func (m *Manager) MainAccountAddress() (types.Address, error) {
+func (m *DefaultManager) MainAccountAddress() (types.Address, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -288,7 +288,7 @@ func (m *Manager) MainAccountAddress() (types.Address, error) {
 }
 
 // WatchAddresses returns currently selected watch addresses.
-func (m *Manager) WatchAddresses() []types.Address {
+func (m *DefaultManager) WatchAddresses() []types.Address {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -296,7 +296,7 @@ func (m *Manager) WatchAddresses() []types.Address {
 }
 
 // SelectedChatAccount returns currently selected chat account
-func (m *Manager) SelectedChatAccount() (*SelectedExtKey, error) {
+func (m *DefaultManager) SelectedChatAccount() (*SelectedExtKey, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -307,7 +307,7 @@ func (m *Manager) SelectedChatAccount() (*SelectedExtKey, error) {
 }
 
 // Logout clears selected accounts.
-func (m *Manager) Logout() {
+func (m *DefaultManager) Logout() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -318,7 +318,7 @@ func (m *Manager) Logout() {
 }
 
 // ImportAccount imports the account specified with privateKey.
-func (m *Manager) ImportAccount(privateKey *ecdsa.PrivateKey, password string) (types.Address, error) {
+func (m *DefaultManager) ImportAccount(privateKey *ecdsa.PrivateKey, password string) (types.Address, error) {
 	if m.keystore == nil {
 		return types.Address{}, ErrAccountKeyStoreMissing
 	}
@@ -332,7 +332,7 @@ func (m *Manager) ImportAccount(privateKey *ecdsa.PrivateKey, password string) (
 // of the Key struct.
 // ImportExtendedKey is used in older version of Status where PrivateKey is set to be the BIP44 key at index 0,
 // and ExtendedKey is the extended key of the BIP44 key at index 1.
-func (m *Manager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
+func (m *DefaultManager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
 	if m.keystore == nil {
 		return "", "", ErrAccountKeyStoreMissing
 	}
@@ -358,7 +358,7 @@ func (m *Manager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, password 
 
 // importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.
 // Once account key is formed, that key is put (if not already) into keystore i.e. key is *encoded* into key file.
-func (m *Manager) importExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
+func (m *DefaultManager) importExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
 	if m.keystore == nil {
 		return "", "", ErrAccountKeyStoreMissing
 	}
@@ -382,7 +382,7 @@ func (m *Manager) importExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extke
 
 // Accounts returns list of addresses for selected account, including
 // subaccounts.
-func (m *Manager) Accounts() ([]types.Address, error) {
+func (m *DefaultManager) Accounts() ([]types.Address, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	addresses := make([]types.Address, 0)
@@ -394,7 +394,7 @@ func (m *Manager) Accounts() ([]types.Address, error) {
 }
 
 // StartOnboarding starts the onboarding process generating accountsCount accounts and returns a slice of OnboardingAccount.
-func (m *Manager) StartOnboarding(accountsCount, mnemonicPhraseLength int) ([]*OnboardingAccount, error) {
+func (m *DefaultManager) StartOnboarding(accountsCount, mnemonicPhraseLength int) ([]*OnboardingAccount, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -409,7 +409,7 @@ func (m *Manager) StartOnboarding(accountsCount, mnemonicPhraseLength int) ([]*O
 }
 
 // RemoveOnboarding reset the current onboarding struct setting it to nil and deleting the accounts from memory.
-func (m *Manager) RemoveOnboarding() {
+func (m *DefaultManager) RemoveOnboarding() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -417,7 +417,7 @@ func (m *Manager) RemoveOnboarding() {
 }
 
 // ImportOnboardingAccount imports the account specified by id and encrypts it with password.
-func (m *Manager) ImportOnboardingAccount(id string, password string) (Info, string, error) {
+func (m *DefaultManager) ImportOnboardingAccount(id string, password string) (Info, string, error) {
 	var info Info
 
 	m.mu.Lock()
@@ -445,7 +445,7 @@ func (m *Manager) ImportOnboardingAccount(id string, password string) (Info, str
 // AddressToDecryptedAccount tries to load decrypted key for a given account.
 // The running node, has a keystore directory which is loaded on start. Key file
 // for a given address is expected to be in that directory prior to node start.
-func (m *Manager) AddressToDecryptedAccount(address, password string) (types.Account, *types.Key, error) {
+func (m *DefaultManager) AddressToDecryptedAccount(address, password string) (types.Account, *types.Key, error) {
 	if m.keystore == nil {
 		return types.Account{}, nil, ErrAccountKeyStoreMissing
 	}
@@ -463,7 +463,7 @@ func (m *Manager) AddressToDecryptedAccount(address, password string) (types.Acc
 	return account, key, err
 }
 
-func (m *Manager) unlockExtendedKey(address, password string) (*SelectedExtKey, error) {
+func (m *DefaultManager) unlockExtendedKey(address, password string) (*SelectedExtKey, error) {
 	account, accountKey, err := m.AddressToDecryptedAccount(address, password)
 	if err != nil {
 		return nil, err
@@ -477,7 +477,7 @@ func (m *Manager) unlockExtendedKey(address, password string) (*SelectedExtKey, 
 	return selectedExtendedKey, nil
 }
 
-func (m *Manager) MigrateKeyStoreDir(oldDir, newDir string, addresses []string) error {
+func (m *DefaultManager) MigrateKeyStoreDir(oldDir, newDir string, addresses []string) error {
 	paths := []string{}
 
 	addressesMap := map[string]struct{}{}
@@ -532,7 +532,7 @@ func (m *Manager) MigrateKeyStoreDir(oldDir, newDir string, addresses []string) 
 	return nil
 }
 
-func (m *Manager) ReEncryptKey(rawKey []byte, pass string, newPass string) (reEncryptedKey []byte, e error) {
+func (m *DefaultManager) ReEncryptKey(rawKey []byte, pass string, newPass string) (reEncryptedKey []byte, e error) {
 	cryptoJSON, e := keystore.RawKeyToCryptoJSON(rawKey)
 	if e != nil {
 		return reEncryptedKey, fmt.Errorf("convert to crypto json error: %v", e)
@@ -560,7 +560,7 @@ func (m *Manager) ReEncryptKey(rawKey []byte, pass string, newPass string) (reEn
 	return gethkeystore.EncryptKey(&gethKey, newPass, n, p)
 }
 
-func (m *Manager) ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) error {
+func (m *DefaultManager) ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) error {
 	rencryptFileAtPath := func(tempKeyDirPath, path string, fileInfo os.FileInfo) error {
 		if fileInfo.IsDir() {
 			return nil
@@ -647,11 +647,11 @@ func (m *Manager) ReEncryptKeyStoreDir(keyDirPath, oldPass, newPass string) erro
 	return nil
 }
 
-func (m *Manager) DeleteAccount(address types.Address) error {
+func (m *DefaultManager) DeleteAccount(address types.Address) error {
 	return m.keystore.Delete(types.Account{Address: address})
 }
 
-func (m *Manager) GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*SelectedExtKey, error) {
+func (m *DefaultManager) GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*SelectedExtKey, error) {
 	exists, err := db.AddressExists(types.HexToAddress(address))
 	if err != nil {
 		return nil, err
@@ -679,7 +679,7 @@ func (m *Manager) GetVerifiedWalletAccount(db *accounts.Database, address, passw
 	}, nil
 }
 
-func (m *Manager) generatePartialAccountKey(db *accounts.Database, address string, password string) (*types.Key, error) {
+func (m *DefaultManager) generatePartialAccountKey(db *accounts.Database, address string, password string) (*types.Key, error) {
 	dbPath, err := db.GetPath(types.HexToAddress(address))
 	path := "m/" + dbPath[strings.LastIndex(dbPath, "/")+1:]
 	if err != nil {
@@ -709,7 +709,7 @@ func (m *Manager) generatePartialAccountKey(db *accounts.Database, address strin
 	return key, nil
 }
 
-func (m *Manager) Recover(rpcParams RecoverParams) (addr types.Address, err error) {
+func (m *DefaultManager) Recover(rpcParams RecoverParams) (addr types.Address, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), m.rpcTimeout)
 	defer cancel()
 	var gethAddr gethcommon.Address
@@ -724,7 +724,7 @@ func (m *Manager) Recover(rpcParams RecoverParams) (addr types.Address, err erro
 	return
 }
 
-func (m *Manager) CheckMatchingRecovered(rpcParams RecoverParams, revealedAddress types.Address) (bool, error) {
+func (m *DefaultManager) CanRecover(rpcParams RecoverParams, revealedAddress types.Address) (bool, error) {
 	recovered, err := m.Recover(rpcParams)
 	if err != nil {
 		return false, err
@@ -732,7 +732,7 @@ func (m *Manager) CheckMatchingRecovered(rpcParams RecoverParams, revealedAddres
 	return recovered == revealedAddress, nil
 }
 
-func (m *Manager) Sign(rpcParams SignParams, verifiedAccount *SelectedExtKey) (result types.HexBytes, err error) {
+func (m *DefaultManager) Sign(rpcParams SignParams, verifiedAccount *SelectedExtKey) (result types.HexBytes, err error) {
 	if !strings.EqualFold(rpcParams.Address, verifiedAccount.Address.Hex()) {
 		err = ErrInvalidPersonalSignAccount
 		return
