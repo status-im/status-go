@@ -4904,15 +4904,8 @@ func (m *Messenger) muteChat(chat *Chat, contact *Contact, mutedTill time.Time) 
 		}
 	}
 
-	if !chat.MuteTill.IsZero() {
-		err := m.reregisterForPushNotifications()
-		if err != nil {
-			return time.Time{}, err
-		}
-		return mutedTill, nil
-	}
-
-	return time.Time{}, m.reregisterForPushNotifications()
+	return mutedTill, m.reregisterForPushNotifications()
+	
 }
 
 // UnmuteChat signals to the messenger that we want to be notified
