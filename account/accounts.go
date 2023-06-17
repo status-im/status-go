@@ -66,7 +66,7 @@ type RecoverParams struct {
 type Interface interface {
 	GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*SelectedExtKey, error)
 	Sign(rpcParams SignParams, verifiedAccount *SelectedExtKey) (result types.HexBytes, err error)
-	Recover(rpcParams RecoverParams) (addr types.Address, err error)
+	CheckMatchingRecovered(rpcParams RecoverParams, revealedAddress types.Address) (bool, error)
 }
 
 // Manager represents account manager implementation
@@ -722,6 +722,14 @@ func (m *Manager) Recover(rpcParams RecoverParams) (addr types.Address, err erro
 	addr = types.Address(gethAddr)
 
 	return
+}
+
+func (m *Manager) CheckMatchingRecovered(rpcParams RecoverParams, revealedAddress types.Address) (bool, error) {
+	recovered, err := m.Recover(rpcParams)
+	if err != nil {
+		return false, err
+	}
+	return recovered == revealedAddress, nil
 }
 
 func (m *Manager) Sign(rpcParams SignParams, verifiedAccount *SelectedExtKey) (result types.HexBytes, err error) {

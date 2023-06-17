@@ -665,7 +665,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		if len(walletAccounts) > 0 {
 			_, err := m.accountsManager.GetVerifiedWalletAccount(m.settings, walletAccounts[0].Address.Hex(), request.Password)
 			if err != nil {
-				return nil, errors.New("wrong password")
+				return nil, err
 			}
 		}
 	}

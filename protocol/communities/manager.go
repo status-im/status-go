@@ -1786,11 +1786,11 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 				Signature: types.EncodeHex(revealedAccount.Signature),
 			}
 
-			recovered, err := m.accountsManager.Recover(recoverParams)
+			matching, err := m.accountsManager.CheckMatchingRecovered(recoverParams, types.HexToAddress(revealedAccount.Address))
 			if err != nil {
 				return nil, err
 			}
-			if recovered.Hex() != revealedAccount.Address {
+			if !matching {
 				// if ownership of only one wallet address cannot be verified,
 				// we mark the request as cancelled and stop
 				err = m.markRequestToJoinAsCanceled(signer, community)
