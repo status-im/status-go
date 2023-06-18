@@ -855,7 +855,7 @@ func (e *AtIndexEntry) String() string {
 }
 
 func calculateAtIndexEntries(state *MentionState) ([]*AtIndexEntry, error) {
-	var keptAtIdxs []*AtIndexEntry
+	var keptAtIndexEntries []*AtIndexEntry
 	var oldRunes []rune
 	var newRunes []rune
 	var previousRunes = []rune(state.PreviousText)
@@ -891,10 +891,10 @@ func calculateAtIndexEntries(state *MentionState) ([]*AtIndexEntry, error) {
 			if entry.From < state.Start && entry.To >= state.Start { // impacted after user edit so need to be rechecked
 				entry.Checked = false
 			}
-			keptAtIdxs = append(keptAtIdxs, entry)
+			keptAtIndexEntries = append(keptAtIndexEntries, entry)
 		}
 	}
-	return addNewAtSignIndexes(keptAtIdxs, newAtSignIndexes), nil
+	return addNewAtSignIndexes(keptAtIndexEntries, newAtSignIndexes), nil
 }
 
 func addNewAtSignIndexes(keptAtIdxs []*AtIndexEntry, newAtSignIndexes []int) []*AtIndexEntry {
