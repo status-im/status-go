@@ -1977,7 +1977,7 @@ func (m *Manager) checkPermissionToJoin(permissions []*protobuf.CommunityTokenPe
 	// if there are no chain IDs that match token criteria chain IDs
 	// we aren't able to check balances on selected networks
 	if len(erc20ChainIDsMap) > 0 && len(chainIDsForERC20) == 0 {
-		return nil, errors.New("no chain IDs found to check token funds on")
+		return response, nil
 	}
 
 	ownedERC20TokenBalances := make(map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, 0)
