@@ -30,7 +30,7 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 		case MutualStateUpdateTypeSent:
 			text = "You sent a contact request to @" + to
 		case MutualStateUpdateTypeAdded:
-			text = "You added  @" + to + " as a contact"
+			text = "@" + from + " added you as a contact"
 		case MutualStateUpdateTypeRemoved:
 			text = "You removed @" + to + " as a contact"
 		default:
@@ -44,7 +44,7 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 		case MutualStateUpdateTypeSent:
 			text = "@" + from + " sent you a contact request"
 		case MutualStateUpdateTypeAdded:
-			text = "@" + from + " added you as a contact"
+			text = "You added @" + to + " as a contact"
 		case MutualStateUpdateTypeRemoved:
 			text = "@" + from + " removed you as a contact"
 		default:
@@ -101,20 +101,6 @@ func (m *Messenger) acceptContactRequest(ctx context.Context, requestID string, 
 		return nil, err
 	}
 	response.AddChat(chat)
-
-	// System message for mutual state update
-	clock, timestamp := chat.NextClockAndTimestamp(m.getTimesource())
-	updateMessage, err := m.prepareMutualStateUpdateMessage(contactRequest.From, MutualStateUpdateTypeAdded, clock, timestamp, true)
-	if err != nil {
-		return nil, err
-	}
-
-	m.prepareMessage(updateMessage, m.httpServer)
-	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
-	if err != nil {
-		return nil, err
-	}
-	response.AddMessage(updateMessage)
 
 	return response, nil
 }
@@ -342,7 +328,27 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 		return nil, err
 	}
 
-	_, clock, err := m.getOneToOneAndNextClock(contact)
+	response := &MessengerResponse{}
+
+	// Check we have a chat before `getOneToOneAndNextClock` call!
+	chat, notANewContact := m.allChats.Load(contact.ID)
+	if notANewContact /* and !contact.hasAddedUs()*/ {
+		clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+		updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, timestamp, !contact.hasAddedUs())
+		if err != nil {
+			return nil, err
+		}
+
+		m.prepareMessage(updateMessage, m.httpServer)
+		err = m.persistence.SaveMessages([]*common.Message{updateMessage})
+		if err != nil {
+			return nil, err
+		}
+		response.AddMessage(updateMessage)
+		response.AddChat(chat)
+	}
+
+	chat, clock, err := m.getOneToOneAndNextClock(contact)
 	if err != nil {
 		return nil, err
 	}
@@ -431,8 +437,6 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 		return nil, err
 	}
 
-	response := &MessengerResponse{}
-
 	if sendContactUpdate {
 		response, err = m.sendContactUpdate(context.Background(), pubKey, displayName, ensName, "", m.dispatchMessage)
 		if err != nil {
@@ -447,16 +451,6 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 		}
 		err = response.Merge(updatedResponse)
 		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Send profile picture with contact request
-	chat, ok := m.allChats.Load(contact.ID)
-	if !ok {
-		chat = OneToOneFromPublicKey(publicKey, m.getTimesource())
-		chat.Active = false
-		if err := m.saveChat(chat); err != nil {
 			return nil, err
 		}
 	}
@@ -499,21 +493,6 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 		if err != nil {
 			return nil, err
 		}
-
-		// System message for mutual state update
-		clock, timestamp = chat.NextClockAndTimestamp(m.transport)
-		updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, timestamp, true)
-		if err != nil {
-			return nil, err
-		}
-
-		m.prepareMessage(updateMessage, m.httpServer)
-		err = m.persistence.SaveMessages([]*common.Message{updateMessage})
-		if err != nil {
-			return nil, err
-		}
-		response.AddMessage(updateMessage)
-		response.AddChat(chat)
 
 		notification := m.generateOutgoingContactRequestNotification(contact, contactRequest)
 		err = m.addActivityCenterNotification(response, notification)

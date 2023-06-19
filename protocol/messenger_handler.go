@@ -355,31 +355,31 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 }
 
 func (m *Messenger) createIncomingContactRequestEventAndNotification(contact *Contact, messageState *ReceivedMessageState, contactRequest *common.Message, createNewNotification bool) error {
-	var updateType MutualStateUpdateType
-	if contactRequest.ContactRequestState == common.ContactRequestStateAccepted {
-		updateType = MutualStateUpdateTypeAdded
-	} else {
-		updateType = MutualStateUpdateTypeSent
-	}
+	// check we have active caht for corresponding contact
+	chat, ok := m.allChats.Load(contact.ID)
+	if ok && chat.Active {
+		var updateType MutualStateUpdateType
+		if contactRequest.ContactRequestState == common.ContactRequestStateAccepted {
+			updateType = MutualStateUpdateTypeAdded
+		} else {
+			updateType = MutualStateUpdateTypeSent
+		}
 
-	// System message for mutual state update
-	chat, clock, err := m.getOneToOneAndNextClock(contact)
-	if err != nil {
-		return err
-	}
-	timestamp := m.getTimesource().GetCurrentTime()
-	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, updateType, clock, timestamp, false)
-	if err != nil {
-		return err
-	}
+		// System message for mutual state update
+		clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+		updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, updateType, clock, timestamp, false)
+		if err != nil {
+			return err
+		}
 
-	m.prepareMessage(updateMessage, m.httpServer)
-	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
-	if err != nil {
-		return err
+		m.prepareMessage(updateMessage, m.httpServer)
+		err = m.persistence.SaveMessages([]*common.Message{updateMessage})
+		if err != nil {
+			return err
+		}
+		messageState.Response.AddMessage(updateMessage)
+		messageState.Response.AddChat(chat)
 	}
-	messageState.Response.AddMessage(updateMessage)
-	messageState.Response.AddChat(chat)
 
 	return m.createIncomingContactRequestNotification(contact, messageState, contactRequest, createNewNotification)
 }
@@ -1109,7 +1109,6 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 		logger.Debug("handled propagated state", zap.Any("state after update", contact.ContactRequestPropagatedState()))
 		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)
-
 	}
 
 	if contact.LastUpdated < message.Clock {
