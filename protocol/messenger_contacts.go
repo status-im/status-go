@@ -71,27 +71,6 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 	return message, nil
 }
 
-func (m *Messenger) removeLastMutualStateUpdateMessage(response *MessengerResponse, contactID string) error {
-	messages, _, err := m.MessageByChatID(contactID, "", 5)
-	if err != nil {
-		return err
-	}
-
-	for _, message := range messages {
-		if message.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_STATE_UPDATE {
-			message.Deleted = true
-			message.DeletedBy = m.myHexIdentity()
-			err = m.persistence.SaveMessages([]*common.Message{message})
-			if err != nil {
-				return err
-			}
-			response.AddMessage(message)
-			response.AddRemovedMessage(&RemovedMessage{MessageID: message.ID, ChatID: contactID, DeletedBy: m.myHexIdentity()})
-		}
-	}
-	return nil
-}
-
 func (m *Messenger) acceptContactRequest(ctx context.Context, requestID string, syncing bool) (*MessengerResponse, error) {
 	contactRequest, err := m.persistence.MessageByID(requestID)
 	if err != nil {
@@ -122,12 +101,6 @@ func (m *Messenger) acceptContactRequest(ctx context.Context, requestID string, 
 		return nil, err
 	}
 	response.AddChat(chat)
-
-	// Remove last sent system message
-	err = m.removeLastMutualStateUpdateMessage(response, contactRequest.From)
-	if err != nil {
-		return nil, err
-	}
 
 	// System message for mutual state update
 	clock, timestamp := chat.NextClockAndTimestamp(m.getTimesource())
@@ -340,12 +313,6 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 
 	response.AddMessage(contactRequest)
 	response.AddContact(contact)
-
-	// Remove last sent system message
-	err = m.removeLastMutualStateUpdateMessage(response, contact.ID)
-	if err != nil {
-		return nil, err
-	}
 
 	// System message for mutual state update
 	chat, clock, err := m.getOneToOneAndNextClock(contact)
