@@ -11,6 +11,7 @@ import (
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/stretchr/testify/require"
+
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	waku_filter "github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"

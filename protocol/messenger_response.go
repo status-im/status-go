@@ -39,7 +39,7 @@ type ClearedHistory struct {
 
 type ProtectedTopic struct {
 	PubsubTopic string `json:"pubsubTopic"`
-	PublicKey   string `json:"privateKey"`
+	PublicKey   string `json:"publicKey"`
 }
 
 type MessengerResponse struct {

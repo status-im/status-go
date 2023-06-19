@@ -265,6 +265,8 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.DeleteForMeMessage))
 	case protobuf.ApplicationMetadataMessage_STATUS_UPDATE:
 		return m.unmarshalProtobufData(new(protobuf.StatusUpdate))
+	case protobuf.ApplicationMetadataMessage_COMMUNITY_SHARD_KEY:
+		return m.unmarshalProtobufData((new(protobuf.CommunityShardKey)))
 	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION:
 		// This message is a bit different as it's encrypted, so we pass it straight through
 		v := reflect.ValueOf(m.UnwrappedPayload)

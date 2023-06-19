@@ -644,9 +644,9 @@ func (o *Community) InviteUserToOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityInv
 	}
 
 	if o.ShardCluster() != nil {
-		response.ShardIndex = int32(*o.ShardCluster())
+		response.ShardCluster = int32(*o.ShardCluster())
 	} else {
-		response.ShardIndex = -1
+		response.ShardCluster = -1
 	}
 
 	grant, err := o.buildGrant(pk, "")
@@ -698,9 +698,9 @@ func (o *Community) InviteUserToChat(pk *ecdsa.PublicKey, chatID string) (*proto
 	}
 
 	if o.ShardCluster() != nil {
-		response.ShardIndex = int32(*o.ShardCluster())
+		response.ShardCluster = int32(*o.ShardCluster())
 	} else {
-		response.ShardIndex = -1
+		response.ShardCluster = -1
 	}
 
 	grant, err := o.buildGrant(pk, chatID)

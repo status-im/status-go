@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/appdatabase"

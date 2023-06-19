@@ -151,6 +151,10 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 	defer f.mutex.Unlock()
 
 	for _, cf := range communityFiltersToInitialize {
+		if cf.PrivKey == nil {
+			continue
+		}
+
 		pubsubTopic := GetPubsubTopic(cf.ShardCluster, cf.ShardIndex)
 		identityStr := PublicKeyToStr(&cf.PrivKey.PublicKey)
 		rawFilter, err := f.addAsymmetric(identityStr, pubsubTopic, cf.PrivKey, true)
