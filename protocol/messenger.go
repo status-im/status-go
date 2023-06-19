@@ -4375,6 +4375,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 					case protobuf.CommunityShardKey:
+						if common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("coming from us, ignoring")
+							continue
+						}
+
 						logger.Debug("Handling CommunityShardKey")
 						message := msg.ParsedMessage.Interface().(protobuf.CommunityShardKey)
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.ContentTopic, filter.ChatID, msg.Type, message)

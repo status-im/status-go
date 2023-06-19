@@ -845,6 +845,12 @@ func (m *Manager) DeleteCommunity(id types.HexBytes) error {
 	return m.persistence.DeleteCommunitySettings(id)
 }
 
+func (m *Manager) UpdateShard(community *Community, shardCluster, shardIndex *uint) error {
+	community.config.ShardCluster = shardCluster
+	community.config.ShardIndex = shardIndex
+	return m.persistence.SaveCommunity(community)
+}
+
 // EditCommunity takes a description, updates the community with the description,
 // saves it and returns it
 func (m *Manager) SetShard(communityID types.HexBytes, shardCluster, shardIndex *uint) (*Community, error) {
@@ -855,14 +861,11 @@ func (m *Manager) SetShard(communityID types.HexBytes, shardCluster, shardIndex 
 	if community == nil {
 		return nil, ErrOrgNotFound
 	}
-	if !community.IsAdmin() {
-		return nil, errors.New("not an admin")
+	if !community.IsOwner() {
+		return nil, errors.New("not admin or owner")
 	}
 
-	community.config.ShardCluster = shardCluster
-	community.config.ShardIndex = shardIndex
-
-	err = m.persistence.SaveCommunity(community)
+	err = m.UpdateShard(community, shardCluster, shardIndex)
 	if err != nil {
 		return nil, err
 	}

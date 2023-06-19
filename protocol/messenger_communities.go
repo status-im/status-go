@@ -102,7 +102,7 @@ func (m *Messenger) publishOrgInvitation(org *communities.Community, invitation 
 	return err
 }
 
-func (m *Messenger) publishCommunityAdminEvent(adminEvent *protobuf.CommunityAdminEvent) error {
+func (m *Messenger) publishCommunityAdminEvent(org *communities.Community, adminEvent *protobuf.CommunityAdminEvent) error {
 	adminPubkey := common.PubkeyToHex(&m.identity.PublicKey)
 	m.logger.Debug("publishing community admin event", zap.String("admin-id", adminPubkey), zap.Any("event", adminEvent))
 	_, err := crypto.DecompressPubkey(adminEvent.CommunityId)
@@ -121,6 +121,7 @@ func (m *Messenger) publishCommunityAdminEvent(adminEvent *protobuf.CommunityAdm
 		// we don't want to wrap in an encryption layer message
 		SkipEncryption: true,
 		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_ADMIN_MESSAGE,
+		PubsubTopic:    org.PubsubTopic(),
 	}
 
 	_, err = m.sender.SendPublic(context.Background(), types.EncodeHex(adminEvent.CommunityId), rawMessage)
@@ -226,7 +227,11 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 				}
 
 				if sub.CommunityAdminEvent != nil {
-					err := m.publishCommunityAdminEvent(sub.CommunityAdminEvent)
+					community, err := m.communitiesManager.GetByID(sub.CommunityAdminEvent.CommunityId)
+					if err != nil {
+						m.logger.Warn("failed to publish community admin event", zap.Error(err))
+					}
+					err = m.publishCommunityAdminEvent(community, sub.CommunityAdminEvent)
 					if err != nil {
 						m.logger.Warn("failed to publish community admin event", zap.Error(err))
 					}
@@ -1453,6 +1458,11 @@ func (m *Messenger) SetCommunityShard(communityID types.HexBytes, clusterShard *
 		return nil, err
 	}
 
+	err = m.SendCommunityShardKey(community, community.GetMemberPubkeys())
+	if err != nil {
+		return nil, err
+	}
+
 	response := &MessengerResponse{}
 	response.AddProtectedTopic(community.PubsubTopic(), topicPrivKey)
 
@@ -1505,11 +1515,6 @@ func (m *Messenger) UpdateCommunityFilters(community *communities.Community, pri
 	}
 
 	if err = m.subscribeToCommunityShard(community.ID(), community.ShardCluster(), community.ShardIndex()); err != nil {
-		return err
-	}
-
-	err = m.SendCommunityShardKey(community, community.GetMemberPubkeys())
-	if err != nil {
 		return err
 	}
 
@@ -1852,6 +1857,10 @@ func (m *Messenger) SendKeyExchangeMessage(community *communities.Community, pub
 }
 
 func (m *Messenger) SendCommunityShardKey(community *communities.Community, pubkeys []*ecdsa.PublicKey) error {
+	if !community.IsOwner() {
+		return nil
+	}
+
 	key, err := m.transport.RetrievePubsubTopicKey(community.PubsubTopic())
 	if err != nil {
 		return err
@@ -1861,14 +1870,26 @@ func (m *Messenger) SendCommunityShardKey(community *communities.Community, pubk
 		return nil // No community shard key available
 	}
 
-	pubsubTopicKey := &protobuf.CommunityShardKey{
+	communityShardKey := &protobuf.CommunityShardKey{
 		Clock:       m.getTimesource().GetCurrentTime(),
 		CommunityID: community.ID(),
 		PrivateKey:  crypto.FromECDSA(key),
 		Topic:       community.PubsubTopic(),
 	}
 
-	encodedMessage, err := proto.Marshal(pubsubTopicKey)
+	if community.ShardIndex() != nil {
+		communityShardKey.ShardIndex = int32(*community.ShardIndex())
+	} else {
+		communityShardKey.ShardIndex = -1
+	}
+
+	if community.ShardCluster() != nil {
+		communityShardKey.ShardCluster = int32(*community.ShardCluster())
+	} else {
+		communityShardKey.ShardCluster = -1
+	}
+
+	encodedMessage, err := proto.Marshal(communityShardKey)
 	if err != nil {
 		return err
 	}
@@ -2324,8 +2345,23 @@ func (m *Messenger) handleCommunityShardKey(state *ReceivedMessageState, signer 
 		return errors.New("signer can't be nil")
 	}
 
-	if !community.IsMemberAdmin(signer) {
+	if !community.IsMemberOwner(signer) {
 		return communities.ErrNotAuthorized
+	}
+
+	var shardCluster, shardIndex *uint
+	if communityShardKey.ShardCluster > -1 {
+		uShardCluster := uint(communityShardKey.ShardCluster)
+		shardCluster = &uShardCluster
+	}
+	if communityShardKey.ShardIndex > -1 {
+		uShardIndex := uint(communityShardKey.ShardIndex)
+		shardIndex = &uShardIndex
+	}
+
+	err = m.communitiesManager.UpdateShard(community, shardCluster, shardIndex)
+	if err != nil {
+		return err
 	}
 
 	privKey, err := crypto.ToECDSA(communityShardKey.PrivateKey)
