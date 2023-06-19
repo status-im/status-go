@@ -53,7 +53,6 @@ func (c *Client) Run(data string) (*thirdparty.DataParsed, error) {
 		return nil, errors.New("input is badly formatted")
 	}
 	methodSigData := data[2:10]
-	fmt.Println(methodSigData)
 	url := fmt.Sprintf("https://www.4byte.directory/api/v1/signatures/?hex_signature=%s", methodSigData)
 	resp, err := c.DoQuery(url)
 	if err != nil {
@@ -70,7 +69,6 @@ func (c *Client) Run(data string) (*thirdparty.DataParsed, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	if signatures.Count == 0 {
 		return nil, err
 	}
@@ -83,7 +81,11 @@ func (c *Client) Run(data string) (*thirdparty.DataParsed, error) {
 		rs := rgx.FindStringSubmatch(signature.Text)
 
 		inputs := make([]string, 0)
-		for index, typ := range strings.Split(rs[1], ",") {
+		rawInputs := strings.Split(rs[1], ",")
+		for index, typ := range rawInputs {
+			if index == len(rawInputs)-1 && typ == "bytes" {
+				continue
+			}
 			inputs = append(inputs, fmt.Sprintf("{\"name\":\"%d\",\"type\":\"%s\"}", index, typ))
 		}
 
@@ -95,6 +97,7 @@ func (c *Client) Run(data string) (*thirdparty.DataParsed, error) {
 		method := contractABI.Methods[name]
 		inputsMap := make(map[string]interface{})
 		if err := method.Inputs.UnpackIntoMap(inputsMap, []byte(data[10:])); err != nil {
+			fmt.Println(err)
 			continue
 		}
 		inputsMapString := make(map[string]string)
