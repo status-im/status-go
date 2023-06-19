@@ -33,7 +33,8 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	s.BackupEnabled = true
 	logLevel := "INFO"
 	s.LogLevel = &logLevel
-	s.ProfilePicturesShowTo = settings.ProfilePicturesShowToContactsOnly
+	s.ProfilePicturesShowTo = settings.ProfilePicturesShowToEveryone
+	s.ProfilePicturesVisibility = settings.ProfilePicturesVisibilityEveryone
 	s.KeyUID = generatedAccountInfo.KeyUID
 	s.Address = types.HexToAddress(generatedAccountInfo.Address)
 	s.WalletRootAddress = types.HexToAddress(derivedAddresses[pathWalletRoot].Address)
@@ -62,7 +63,6 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 
 	s.PreviewPrivacy = true
 	s.Currency = "usd"
-	s.ProfilePicturesVisibility = 1
 	s.LinkPreviewRequestEnabled = true
 
 	visibleTokens := make(map[string][]string)
