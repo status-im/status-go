@@ -1783,6 +1783,38 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		return nil, err
 	}
 
+	if len(request.RevealedAccounts) > 0 {
+		// verify if revealed addresses indeed belong to requester
+		for _, revealedAccount := range request.RevealedAccounts {
+			recoverParams := account.RecoverParams{
+				Message:   types.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID(), requestToJoin.ID)),
+				Signature: types.EncodeHex(revealedAccount.Signature),
+			}
+
+			recovered, err := m.accountsManager.Recover(recoverParams)
+			if err != nil {
+				return nil, err
+			}
+			if recovered.Hex() != revealedAccount.Address {
+				// if ownership of only one wallet address cannot be verified,
+				// we mark the request as cancelled and stop
+				err = m.markRequestToJoinAsCanceled(signer, community)
+				if err != nil {
+					return nil, err
+				}
+				requestToJoin.State = RequestToJoinStateDeclined
+				return requestToJoin, nil
+			}
+		}
+
+		// Save revealed addresses + signatures so they can later be added
+		// to the community member list when the request is accepted
+		err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 
@@ -1845,38 +1877,6 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 			return nil, err
 		}
 		requestToJoin.State = RequestToJoinStateAccepted
-	}
-
-	// Save revealed addresses + signatures so they can later be added
-	// to the community member list when the request is accepted
-	if len(request.RevealedAccounts) > 0 {
-		// verify if revealed addresses indeed belong to requester
-		for _, revealedAccount := range request.RevealedAccounts {
-			recoverParams := account.RecoverParams{
-				Message:   types.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID(), requestToJoin.ID)),
-				Signature: types.EncodeHex(revealedAccount.Signature),
-			}
-
-			recovered, err := m.accountsManager.Recover(recoverParams)
-			if err != nil {
-				return nil, err
-			}
-			if recovered.Hex() != revealedAccount.Address {
-				// if ownership of only one wallet address cannot be verified,
-				// we mark the request as cancelled and stop
-				err = m.markRequestToJoinAsCanceled(signer, community)
-				if err != nil {
-					return nil, err
-				}
-				requestToJoin.State = RequestToJoinStateDeclined
-				return requestToJoin, nil
-			}
-		}
-
-		err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	return requestToJoin, nil
