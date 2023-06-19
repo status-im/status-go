@@ -574,7 +574,14 @@ func (m *Messenger) processSentMessages(ids []string) error {
 
 	for _, id := range ids {
 		rawMessage, err := m.persistence.RawMessageByID(id)
-		if err != nil {
+		// If we have no raw message, we create a temporary one, so that
+		// the sent status is preserved
+		if err == sql.ErrNoRows || rawMessage == nil {
+			rawMessage = &common.RawMessage{
+				ID:          id,
+				MessageType: protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
+			}
+		} else if err != nil {
 			return errors.Wrapf(err, "Can't get raw message with id %v", id)
 		}
 

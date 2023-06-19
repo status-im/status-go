@@ -766,6 +766,29 @@ func TestExpiredMessagesIDs(t *testing.T) {
 	require.Equal(t, 1, len(ids))
 }
 
+func TestDontOverwriteSentStatus(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	//save rawMessage
+	rawMessage := minimalRawMessage("chat-message-id", protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
+	rawMessage.Sent = true
+	err = p.SaveRawMessage(rawMessage)
+	require.NoError(t, err)
+
+	rawMessage.Sent = false
+	rawMessage.ResendAutomatically = true
+	err = p.SaveRawMessage(rawMessage)
+	require.NoError(t, err)
+
+	m, err := p.RawMessageByID(rawMessage.ID)
+	require.NoError(t, err)
+
+	require.True(t, m.Sent)
+	require.True(t, m.ResendAutomatically)
+}
+
 func TestPersistenceEmojiReactions(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)

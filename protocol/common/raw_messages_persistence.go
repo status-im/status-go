@@ -32,6 +32,19 @@ func NewRawMessagesPersistence(db *sql.DB) *RawMessagesPersistence {
 }
 
 func (db RawMessagesPersistence) SaveRawMessage(message *RawMessage) error {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
 	var pubKeys [][]byte
 	for _, pk := range message.Recipients {
 		pubKeys = append(pubKeys, crypto.CompressPubkey(pk))
@@ -44,7 +57,19 @@ func (db RawMessagesPersistence) SaveRawMessage(message *RawMessage) error {
 		return err
 	}
 
-	_, err := db.db.Exec(`
+	// If the message is not sent, we check whether there's a record
+	// in the database already and preserve the state
+	if !message.Sent {
+		oldMessage, err := db.rawMessageByID(tx, message.ID)
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+		if oldMessage != nil {
+			message.Sent = oldMessage.Sent
+		}
+	}
+
+	_, err = tx.Exec(`
 		 INSERT INTO
 		 raw_messages
 		 (
@@ -80,13 +105,30 @@ func (db RawMessagesPersistence) SaveRawMessage(message *RawMessage) error {
 }
 
 func (db RawMessagesPersistence) RawMessageByID(id string) (*RawMessage, error) {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	return db.rawMessageByID(tx, id)
+}
+
+func (db RawMessagesPersistence) rawMessageByID(tx *sql.Tx, id string) (*RawMessage, error) {
 	var rawPubKeys [][]byte
 	var encodedRecipients []byte
 	var skipGroupMessageWrap sql.NullBool
 	var sendOnPersonalTopic sql.NullBool
 	message := &RawMessage{}
 
-	err := db.db.QueryRow(`
+	err := tx.QueryRow(`
 			SELECT
 			  id,
 			  local_chat_id,
