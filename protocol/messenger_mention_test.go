@@ -251,27 +251,6 @@ func TestGetAtSignIdxs(t *testing.T) {
 	}
 }
 
-func TestCalcAtIdxs(t *testing.T) {
-	state := MentionState{
-		AtIdxs: []*AtIndexEntry{
-			{From: 0, To: 3, Checked: false},
-		},
-		NewText:      "@abc",
-		PreviousText: "",
-		Start:        0,
-	}
-	want := []*AtIndexEntry{
-		{From: 0, To: 0, Checked: false},
-		{From: 4, To: 7, Checked: false},
-	}
-
-	got := calcAtIdxs(&state)
-
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("calcAtIdxs() = %v, want %v", got, want)
-	}
-}
-
 func TestToInfo(t *testing.T) {
 	newText := " "
 	t.Run("toInfo base case", func(t *testing.T) {
@@ -891,13 +870,11 @@ func TestMentionSuggestionAtSignSpaceCases(t *testing.T) {
 		t.Logf("After OnChangeText, Input: %+v, MentionState:%+v, InputSegments:%+v\n", tc.inputText, ctx.MentionState, ctx.InputSegments)
 		require.Equal(t, tc.expectedSize, len(ctx.MentionSuggestions))
 	}
-	require.Len(t, ctx.InputSegments, 3)
-	require.Equal(t, Mention, ctx.InputSegments[0].Type)
-	require.Equal(t, "@ @", ctx.InputSegments[0].Value)
+	require.Len(t, ctx.InputSegments, 2)
+	require.Equal(t, Text, ctx.InputSegments[0].Type)
+	require.Equal(t, "@ ", ctx.InputSegments[0].Value)
 	require.Equal(t, Text, ctx.InputSegments[1].Type)
 	require.Equal(t, "@", ctx.InputSegments[1].Value)
-	require.Equal(t, Text, ctx.InputSegments[2].Type)
-	require.Equal(t, "@", ctx.InputSegments[2].Value)
 }
 
 func TestSelectMention(t *testing.T) {
@@ -921,6 +898,73 @@ func TestSelectMention(t *testing.T) {
 	ctx, err = mentionManager.OnChangeText(chatID, text)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(ctx.MentionSuggestions))
+}
+
+func TestInputSegments(t *testing.T) {
+	_, chatID, mentionManager := setupMentionSuggestionTest(t, nil)
+	ctx, err := mentionManager.OnChangeText(chatID, "@u1")
+	require.NoError(t, err)
+	require.Equal(t, 1, len(ctx.InputSegments))
+	require.Equal(t, Text, ctx.InputSegments[0].Type)
+	require.Equal(t, "@u1", ctx.InputSegments[0].Value)
+
+	ctx, err = mentionManager.OnChangeText(chatID, "@u1 @User Number One")
+	require.NoError(t, err)
+	require.Equal(t, 2, len(ctx.InputSegments))
+	require.Equal(t, Text, ctx.InputSegments[0].Type)
+	require.Equal(t, "@u1 ", ctx.InputSegments[0].Value)
+	require.Equal(t, Mention, ctx.InputSegments[1].Type)
+	require.Equal(t, "@User Number One", ctx.InputSegments[1].Value)
+
+	ctx, err = mentionManager.OnChangeText(chatID, "@u1 @User Number O")
+	require.NoError(t, err)
+	require.Equal(t, 2, len(ctx.InputSegments))
+	require.Equal(t, Text, ctx.InputSegments[1].Type)
+	require.Equal(t, "@User Number O", ctx.InputSegments[1].Value)
+
+	ctx, err = mentionManager.OnChangeText(chatID, "@u2 @User Number One")
+	require.NoError(t, err)
+	require.Equal(t, 3, len(ctx.InputSegments))
+	require.Equal(t, Mention, ctx.InputSegments[0].Type)
+	require.Equal(t, "@u2", ctx.InputSegments[0].Value)
+	require.Equal(t, Text, ctx.InputSegments[1].Type)
+	require.Equal(t, " ", ctx.InputSegments[1].Value)
+	require.Equal(t, Mention, ctx.InputSegments[2].Type)
+	require.Equal(t, "@User Number One", ctx.InputSegments[2].Value)
+
+	ctx, err = mentionManager.OnChangeText(chatID, "@u2 @User Number One a ")
+	require.NoError(t, err)
+	require.Equal(t, 4, len(ctx.InputSegments))
+	require.Equal(t, Mention, ctx.InputSegments[2].Type)
+	require.Equal(t, "@User Number One", ctx.InputSegments[2].Value)
+	require.Equal(t, Text, ctx.InputSegments[3].Type)
+	require.Equal(t, " a ", ctx.InputSegments[3].Value)
+
+	ctx, err = mentionManager.OnChangeText(chatID, "@u2 @User Numbed One a ")
+	require.NoError(t, err)
+	require.Equal(t, 3, len(ctx.InputSegments))
+	require.Equal(t, Mention, ctx.InputSegments[0].Type)
+	require.Equal(t, "@u2", ctx.InputSegments[0].Value)
+	require.Equal(t, Text, ctx.InputSegments[2].Type)
+	require.Equal(t, "@User Numbed One a ", ctx.InputSegments[2].Value)
+
+	ctx, err = mentionManager.OnChangeText(chatID, "@ @ ")
+	require.NoError(t, err)
+	require.Equal(t, 2, len(ctx.InputSegments))
+	require.Equal(t, Text, ctx.InputSegments[0].Type)
+	require.Equal(t, "@ ", ctx.InputSegments[0].Value)
+	require.Equal(t, Text, ctx.InputSegments[1].Type)
+	require.Equal(t, "@ ", ctx.InputSegments[1].Value)
+
+	ctx, err = mentionManager.OnChangeText(chatID, "@u3 @ ")
+	require.NoError(t, err)
+	require.Equal(t, 3, len(ctx.InputSegments))
+	require.Equal(t, Mention, ctx.InputSegments[0].Type)
+	require.Equal(t, "@u3", ctx.InputSegments[0].Value)
+	require.Equal(t, Text, ctx.InputSegments[1].Type)
+	require.Equal(t, " ", ctx.InputSegments[1].Value)
+	require.Equal(t, Text, ctx.InputSegments[2].Type)
+	require.Equal(t, "@ ", ctx.InputSegments[2].Value)
 }
 
 func setupMentionSuggestionTest(t *testing.T, mentionableUserMapInput map[string]*MentionableUser) (map[string]*MentionableUser, string, *MentionManager) {
