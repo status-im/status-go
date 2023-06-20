@@ -382,7 +382,7 @@ func (m *MentionManager) calculateSuggestionsWithMentionableUsers(chatID string,
 		m.logger.Error("calculateSuggestionsWithMentionableUsers: unknown textOperation", zap.String("chatID", chatID), zap.String("fullText", fullText), zap.Any("state", state))
 	}
 
-	atSignIdx := lastIndexOf(fullText, charAtSign, end)
+	atSignIdx := lastIndexOfAtSign(fullText, end)
 	var suggestions map[string]*MentionableUser
 	if atSignIdx != -1 {
 		searchedText := strings.ToLower(subs(fullText, atSignIdx+1, end))
@@ -939,7 +939,7 @@ func getAtSignIdxs(text string, delta int) []int {
 
 func getAtSignIdxsHelper(text string, delta int, from int, idxs []int) []int {
 	tr := []rune(text)
-	idx := strings.Index(string(tr[from:]), charAtSign)
+	idx := strings.IndexRune(string(tr[from:]), '@')
 	if idx != -1 {
 		idx = utf8.RuneCountInString(text[:idx])
 		idx += from
@@ -1214,24 +1214,22 @@ func toInfo(inputSegments []InputSegment) *MentionState {
 	return state
 }
 
-// lastIndexOf returns the index of the last occurrence of substr in s starting from index start.
+// lastIndexOfAtSign returns the index of the last occurrence of substr in s starting from index start.
 // If substr is not present in s, it returns -1.
-func lastIndexOf(s, substr string, start int) int {
+func lastIndexOfAtSign(s string, start int) int {
 	if start < 0 {
 		return -1
 	}
 
 	t := []rune(s)
-	tt := []rune(substr)
 	if start >= len(t) {
 		start = len(t) - 1
 	}
 
 	// Reverse the input strings to find the first occurrence of the reversed substr in the reversed s.
 	reversedS := reverse(t[:start+1])
-	reversedSubstr := reverse(tt)
 
-	idx := strings.Index(reversedS, reversedSubstr)
+	idx := strings.IndexRune(reversedS, '@')
 
 	if idx == -1 {
 		return -1
@@ -1239,7 +1237,7 @@ func lastIndexOf(s, substr string, start int) int {
 
 	// Calculate the index in the original string.
 	idx = utf8.RuneCountInString(reversedS[:idx])
-	return start - idx - len(tt) + 1
+	return start - idx
 }
 
 // reverse returns the reversed string of input s.

@@ -482,17 +482,17 @@ func TestSubs(t *testing.T) {
 }
 
 func TestLastIndexOf(t *testing.T) {
-	atSignIdx := lastIndexOf("@", charAtSign, 0)
+	atSignIdx := lastIndexOfAtSign("@", 0)
 	require.Equal(t, 0, atSignIdx)
 
-	atSignIdx = lastIndexOf("@@", charAtSign, 1)
+	atSignIdx = lastIndexOfAtSign("@@", 1)
 	require.Equal(t, 1, atSignIdx)
 
 	//at-sign-idx 0 text @t searched-text t start 2 end 2 new-text
-	atSignIdx = lastIndexOf("@t", charAtSign, 2)
+	atSignIdx = lastIndexOfAtSign("@t", 2)
 	require.Equal(t, 0, atSignIdx)
 
-	atSignIdx = lastIndexOf("at", charAtSign, 3)
+	atSignIdx = lastIndexOfAtSign("at", 3)
 	require.Equal(t, -1, atSignIdx)
 }
 
