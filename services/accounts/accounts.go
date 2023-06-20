@@ -77,6 +77,10 @@ func (api *API) UpdateKeypairName(ctx context.Context, keyUID string, name strin
 	return (*api.messenger).UpdateKeypairName(keyUID, name)
 }
 
+func (api *API) UpdateAccountPosition(ctx context.Context, address types.Address, position int64) error {
+	return api.db.UpdateAccountPosition(address, position)
+}
+
 func (api *API) GetAccounts(ctx context.Context) ([]*accounts.Account, error) {
 	return api.db.GetAccounts()
 }
