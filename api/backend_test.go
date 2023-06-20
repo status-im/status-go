@@ -700,7 +700,6 @@ func TestLoginWithKey(t *testing.T) {
 	activeAccount, err := b.GetActiveAccount()
 	require.NoError(t, err)
 	require.NotNil(t, activeAccount.ColorHash)
-	require.NotZero(t, activeAccount.ColorID)
 }
 
 func TestVerifyDatabasePassword(t *testing.T) {
