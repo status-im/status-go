@@ -125,6 +125,8 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 
 	insertTestTransaction := func(index int, txBlob string, receiptBlob string, logBlob string, ethType bool) error {
 		indexStr := strconv.Itoa(index)
+		senderStr := strconv.Itoa(index + 1)
+
 		var txValue *string
 		if txBlob != "" {
 			txValue = &txBlob
@@ -142,9 +144,9 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 			entryType = "erc20"
 		}
 		_, err = db.Exec(`INSERT OR IGNORE INTO blocks(network_id, address, blk_number, blk_hash) VALUES (?, ?, ?, ?);
-			INSERT INTO transfers (hash, address, network_id, tx, receipt, log, blk_hash, type,  blk_number, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			INSERT INTO transfers (hash, address, sender, network_id, tx, receipt, log, blk_hash, type,  blk_number, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			index, common.HexToAddress(indexStr), index, common.HexToHash(indexStr),
-			common.HexToHash(indexStr), common.HexToAddress(indexStr), index, txValue, receiptValue, logValue, common.HexToHash(indexStr), entryType, index, index)
+			common.HexToHash(indexStr), common.HexToAddress(indexStr), common.HexToAddress(senderStr), index, txValue, receiptValue, logValue, common.HexToHash(indexStr), entryType, index, index)
 		return err
 	}
 
@@ -199,11 +201,20 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 	require.False(t, exists)
 
 	// Run test migration 1686048341_transfers_receipt_json_blob_out.<up/down>.sql
-	err = migrations.MigrateTo(db, customSteps, customSteps[1].Version)
+	err = migrations.MigrateTo(db, customSteps, customSteps[2].Version)
 	require.NoError(t, err)
 
 	// Validate that the migration was run and transfers table has now status column
 	exists, err = ColumnExists(db, "transfers", "status")
+	require.NoError(t, err)
+	require.True(t, exists)
+
+	// Run test migration 1687193315.<up/down>.sql
+	err = migrations.MigrateTo(db, customSteps, customSteps[1].Version)
+	require.NoError(t, err)
+
+	// Validate that the migration was run and transfers table has now txFrom column
+	exists, err = ColumnExists(db, "transfers", "tx_from_address")
 	require.NoError(t, err)
 	require.True(t, exists)
 
@@ -212,17 +223,19 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 		gasLimit, gasPriceClamped64, gasTipCapClamped64          sql.NullInt64
 		gasFeeCapClamped64, accountNonce, size, logIndex, txType sql.NullInt64
 
-		protected                       sql.NullBool
-		dbContractAddress, amount128Hex sql.NullString
-		contractAddress, tokenAddress   common.Address
-		txHash, blockHash               []byte
-		entryType                       string
-		isTokenIDNull                   bool
+		protected                     sql.NullBool
+		amount128Hex                  sql.NullString
+		contractAddress, tokenAddress *common.Address
+		txFrom, txTo                  *common.Address
+		txHash, blockHash             []byte
+		entryType                     string
+		isTokenIDNull                 bool
 	)
-	var dbTokenAddress sql.NullString
+
 	tokenID := new(big.Int)
 	rows, err := db.Query(`SELECT status, receipt_type, tx_hash, log_index, block_hash, cumulative_gas_used, contract_address, gas_used, tx_index,
 		tx_type, protected, gas_limit, gas_price_clamped64, gas_tip_cap_clamped64, gas_fee_cap_clamped64, amount_padded128hex, account_nonce, size, token_address, token_id, type,
+		tx_from_address, tx_to_address,
 
 		CASE
 			WHEN token_id IS NULL THEN 1
@@ -237,16 +250,10 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 		if rows.Err() != nil {
 			return rows.Err()
 		}
-		err := rows.Scan(&status, &receiptType, &txHash, &logIndex, &blockHash, &cumulativeGasUsed, &dbContractAddress, &gasUsed, &txIndex,
-			&txType, &protected, &gasLimit, &gasPriceClamped64, &gasTipCapClamped64, &gasFeeCapClamped64, &amount128Hex, &accountNonce, &size, &dbTokenAddress, (*bigint.SQLBigIntBytes)(tokenID), &entryType, &isTokenIDNull)
+		err := rows.Scan(&status, &receiptType, &txHash, &logIndex, &blockHash, &cumulativeGasUsed, &contractAddress, &gasUsed, &txIndex,
+			&txType, &protected, &gasLimit, &gasPriceClamped64, &gasTipCapClamped64, &gasFeeCapClamped64, &amount128Hex, &accountNonce, &size, &tokenAddress, (*bigint.SQLBigIntBytes)(tokenID), &entryType, &txFrom, &txTo, &isTokenIDNull)
 		if err != nil {
 			return err
-		}
-		if dbTokenAddress.Valid {
-			tokenAddress = common.HexToAddress(dbTokenAddress.String)
-		}
-		if dbContractAddress.Valid {
-			contractAddress = common.HexToAddress(dbContractAddress.String)
 		}
 		return nil
 	}
@@ -262,7 +269,7 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 			require.False(t, amount128Hex.Valid)
 			require.False(t, accountNonce.Valid)
 			require.False(t, size.Valid)
-			require.Equal(t, common.Address{}, tokenAddress)
+			require.Empty(t, tokenAddress)
 			require.True(t, isTokenIDNull)
 			require.Equal(t, string(w_common.EthTransfer), entryType)
 		} else {
@@ -286,26 +293,29 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 			if expectedEntryType == w_common.EthTransfer {
 				require.True(t, amount128Hex.Valid)
 				require.Equal(t, *sqlite.BigIntToPadded128BitsStr(tt.Value()), amount128Hex.String)
-				require.False(t, dbTokenAddress.Valid)
 				require.True(t, isTokenIDNull)
 			} else {
-				actualEntryType, expectedTokenAddress, expectedTokenID, expectedValue := w_common.ExtractTokenIdentity(expectedEntryType, tl, tt)
+				actualEntryType, expectedTokenAddress, expectedTokenID, expectedValue, expectedFrom, expectedTo := w_common.ExtractTokenIdentity(expectedEntryType, tl, tt)
 				if actualEntryType == w_common.Erc20Transfer {
 					require.True(t, amount128Hex.Valid)
 					require.Equal(t, *sqlite.BigIntToPadded128BitsStr(expectedValue), amount128Hex.String)
 					require.True(t, isTokenIDNull)
-					require.True(t, dbTokenAddress.Valid)
-					require.Equal(t, *expectedTokenAddress, tokenAddress)
+					require.Equal(t, *expectedTokenAddress, *tokenAddress)
+					require.Equal(t, *expectedFrom, *txFrom)
+					require.Equal(t, *expectedTo, *txTo)
 				} else if actualEntryType == w_common.Erc721Transfer {
 					require.False(t, amount128Hex.Valid)
 					require.False(t, isTokenIDNull)
 					require.Equal(t, expectedTokenID, expectedTokenID)
-					require.True(t, dbTokenAddress.Valid)
-					require.Equal(t, *expectedTokenAddress, tokenAddress)
+					require.Equal(t, *expectedTokenAddress, *tokenAddress)
+					require.Equal(t, *expectedFrom, *txFrom)
+					require.Equal(t, *expectedTo, *txTo)
 				} else {
 					require.False(t, amount128Hex.Valid)
 					require.True(t, isTokenIDNull)
-					require.False(t, dbTokenAddress.Valid)
+					require.Empty(t, tokenAddress)
+					require.Empty(t, txFrom)
+					require.Empty(t, txTo)
 				}
 
 				require.Equal(t, expectedEntryType, actualEntryType)
@@ -320,7 +330,7 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 			require.Equal(t, []byte(nil), txHash)
 			require.Equal(t, []byte(nil), blockHash)
 			require.False(t, cumulativeGasUsed.Valid)
-			require.Equal(t, common.Address{}, contractAddress)
+			require.Empty(t, contractAddress)
 			require.False(t, gasUsed.Valid)
 			require.False(t, txIndex.Valid)
 		} else {
@@ -332,7 +342,7 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 			require.Equal(t, tr.BlockHash, common.BytesToHash(blockHash))
 			require.True(t, cumulativeGasUsed.Valid)
 			require.Equal(t, int64(tr.CumulativeGasUsed), cumulativeGasUsed.Int64)
-			require.Equal(t, tr.ContractAddress, contractAddress)
+			require.Equal(t, tr.ContractAddress, *contractAddress)
 			require.True(t, gasUsed.Valid)
 			require.Equal(t, int64(tr.GasUsed), gasUsed.Int64)
 			require.True(t, txIndex.Valid)

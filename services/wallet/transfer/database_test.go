@@ -184,7 +184,7 @@ func TestGetTransfersForIdentities(t *testing.T) {
 
 	trs, _, _ := GenerateTestTransfers(t, db.client, 1, 4)
 	for i := range trs {
-		InsertTestTransfer(t, db.client, &trs[i])
+		InsertTestTransfer(t, db.client, trs[i].To, &trs[i])
 	}
 
 	entries, err := db.GetTransfersForIdentities(context.Background(), []TransactionIdentity{

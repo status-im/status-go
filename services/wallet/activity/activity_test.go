@@ -106,7 +106,7 @@ func fillTestData(t *testing.T, db *sql.DB) (td testData, fromAddresses, toAddre
 
 	// Plain transfer
 	td.tr1 = trs[0]
-	transfer.InsertTestTransfer(t, db, &td.tr1)
+	transfer.InsertTestTransfer(t, db, td.tr1.To, &td.tr1)
 
 	// Pending transfer
 	td.pendingTr = trs[1]
@@ -124,10 +124,10 @@ func fillTestData(t *testing.T, db *sql.DB) (td testData, fromAddresses, toAddre
 	td.multiTx1ID = transfer.InsertTestMultiTransaction(t, db, &td.multiTx1)
 
 	td.multiTx1Tr1.MultiTransactionID = td.multiTx1ID
-	transfer.InsertTestTransfer(t, db, &td.multiTx1Tr1)
+	transfer.InsertTestTransfer(t, db, td.multiTx1Tr1.To, &td.multiTx1Tr1)
 
 	td.multiTx1Tr2.MultiTransactionID = td.multiTx1ID
-	transfer.InsertTestTransfer(t, db, &td.multiTx1Tr2)
+	transfer.InsertTestTransfer(t, db, td.multiTx1Tr2.To, &td.multiTx1Tr2)
 
 	// Send Multitransaction containing 2 x Plain transfers + 1 x Pending transfer
 	td.multiTx2Tr1 = trs[3]
@@ -139,10 +139,10 @@ func fillTestData(t *testing.T, db *sql.DB) (td testData, fromAddresses, toAddre
 	td.multiTx2ID = transfer.InsertTestMultiTransaction(t, db, &td.multiTx2)
 
 	td.multiTx2Tr1.MultiTransactionID = td.multiTx2ID
-	transfer.InsertTestTransfer(t, db, &td.multiTx2Tr1)
+	transfer.InsertTestTransfer(t, db, td.multiTx2Tr1.To, &td.multiTx2Tr1)
 
 	td.multiTx2Tr2.MultiTransactionID = td.multiTx2ID
-	transfer.InsertTestTransfer(t, db, &td.multiTx2Tr2)
+	transfer.InsertTestTransfer(t, db, td.multiTx2Tr2.To, &td.multiTx2Tr2)
 
 	td.multiTx2PendingTr.MultiTransactionID = td.multiTx2ID
 	transfer.InsertTestPendingTransaction(t, db, &td.multiTx2PendingTr)
@@ -253,7 +253,7 @@ func TestGetActivityEntriesWithSameTransactionForSenderAndReceiverInDB(t *testin
 
 	// Ensure they are the oldest transactions (last in the list) and we have a consistent order
 	receiverTr.Timestamp--
-	transfer.InsertTestTransfer(t, deps.db, &receiverTr)
+	transfer.InsertTestTransfer(t, deps.db, receiverTr.To, &receiverTr)
 
 	var filter Filter
 	entries, err := getActivityEntries(context.Background(), deps, []eth.Address{td.tr1.From, receiverTr.From}, []common.ChainID{}, filter, 0, 10)
@@ -287,7 +287,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 	// Add 6 extractable transactions with timestamps 6-12
 	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 6)
 	for i := range trs {
-		transfer.InsertTestTransfer(t, deps.db, &trs[i])
+		transfer.InsertTestTransfer(t, deps.db, trs[i].To, &trs[i])
 	}
 
 	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
@@ -395,7 +395,7 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 	// Add 10 extractable transactions with timestamps 1-10
 	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, 1, 10)
 	for i := range trs {
-		transfer.InsertTestTransfer(t, deps.db, &trs[i])
+		transfer.InsertTestTransfer(t, deps.db, trs[i].To, &trs[i])
 	}
 
 	mockTestAccountsWithAddresses(t, deps.db, append(fromTrs, toTrs...))
@@ -526,7 +526,7 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 			lastMT = transfer.InsertTestMultiTransaction(t, deps.db, &multiTxs[i/2])
 		}
 		trs[i].MultiTransactionID = lastMT
-		transfer.InsertTestTransfer(t, deps.db, &trs[i])
+		transfer.InsertTestTransfer(t, deps.db, trs[i].To, &trs[i])
 	}
 
 	// Test filtering out without address involved
@@ -572,7 +572,7 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 	td, fromTds, toTds := fillTestData(t, deps.db)
 	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 6)
 	for i := range trs {
-		transfer.InsertTestTransfer(t, deps.db, &trs[i])
+		transfer.InsertTestTransfer(t, deps.db, trs[i].To, &trs[i])
 	}
 
 	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
@@ -642,7 +642,7 @@ func TestGetActivityEntriesFilterByStatus(t *testing.T) {
 			transfer.InsertTestPendingTransaction(t, deps.db, &trs[i])
 		} else {
 			trs[i].Success = i != 3 && i != 6
-			transfer.InsertTestTransfer(t, deps.db, &trs[i])
+			transfer.InsertTestTransfer(t, deps.db, trs[i].To, &trs[i])
 		}
 	}
 
@@ -696,7 +696,7 @@ func TestGetActivityEntriesFilterByTokenType(t *testing.T) {
 	for i := range trs {
 		tokenAddr := transfer.TestTokens[i].Address
 		trs[i].ChainID = common.ChainID(transfer.TestTokens[i].ChainID)
-		transfer.InsertTestTransferWithToken(t, deps.db, &trs[i], tokenAddr)
+		transfer.InsertTestTransferWithToken(t, deps.db, trs[i].To, &trs[i], tokenAddr)
 	}
 
 	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
@@ -774,7 +774,7 @@ func TestGetActivityEntriesFilterByToAddresses(t *testing.T) {
 	// Add 6 extractable transactions
 	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 6)
 	for i := range trs {
-		transfer.InsertTestTransfer(t, deps.db, &trs[i])
+		transfer.InsertTestTransfer(t, deps.db, trs[i].To, &trs[i])
 	}
 
 	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
@@ -809,7 +809,7 @@ func TestGetActivityEntriesFilterByNetworks(t *testing.T) {
 	// Add 6 extractable transactions
 	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 6)
 	for i := range trs {
-		transfer.InsertTestTransfer(t, deps.db, &trs[i])
+		transfer.InsertTestTransfer(t, deps.db, trs[i].To, &trs[i])
 	}
 	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
 
@@ -841,7 +841,7 @@ func TestGetActivityEntriesCheckToAndFrom(t *testing.T) {
 
 	// Add extra transactions to test To address
 	trs, _, _ := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 2)
-	transfer.InsertTestTransfer(t, deps.db, &trs[0])
+	transfer.InsertTestTransfer(t, deps.db, trs[0].To, &trs[0])
 	transfer.InsertTestPendingTransaction(t, deps.db, &trs[1])
 
 	addresses := []eth_common.Address{td.tr1.From, td.pendingTr.From,

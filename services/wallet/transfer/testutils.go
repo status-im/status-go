@@ -9,9 +9,9 @@ import (
 	eth_common "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/services/wallet/common"
+	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/testutils"
 	"github.com/status-im/status-go/services/wallet/token"
-	"github.com/status-im/status-go/sqlite"
 
 	"github.com/stretchr/testify/require"
 )
@@ -205,31 +205,66 @@ var TestTokens = []*token.Token{
 
 var NativeTokenIndices = []int{0, 1, 2}
 
-func InsertTestTransfer(t *testing.T, db *sql.DB, tr *TestTransfer) {
+func InsertTestTransfer(t *testing.T, db *sql.DB, address eth_common.Address, tr *TestTransfer) {
 	token := TestTokens[int(tr.Timestamp)%len(TestTokens)]
-	InsertTestTransferWithToken(t, db, tr, token.Address)
+	InsertTestTransferWithToken(t, db, address, tr, token.Address)
 }
 
-func InsertTestTransferWithToken(t *testing.T, db *sql.DB, tr *TestTransfer, tokenAddress eth_common.Address) {
+func InsertTestTransferWithToken(t *testing.T, db *sql.DB, address eth_common.Address, tr *TestTransfer, tokenAddress eth_common.Address) {
+	var (
+		tx *sql.Tx
+	)
+	tx, err := db.Begin()
+	require.NoError(t, err)
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	blkHash := eth_common.HexToHash("4")
+
+	block := blockDBFields{
+		chainID:     uint64(tr.ChainID),
+		account:     tr.To,
+		blockNumber: big.NewInt(tr.BlkNumber),
+		blockHash:   blkHash,
+	}
+
+	// Respect `FOREIGN KEY(network_id,address,blk_hash)` of `transfers` table
+	err = insertBlockDBFields(tx, block)
+	require.NoError(t, err)
+
+	receiptStatus := uint64(0)
+	if tr.Success {
+		receiptStatus = 1
+	}
+
 	tokenType := "eth"
 	if (tokenAddress != eth_common.Address{}) {
 		tokenType = "erc20"
 	}
 
-	// Respect `FOREIGN KEY(network_id,address,blk_hash)` of `transfers` table
-	blkHash := eth_common.HexToHash("4")
-	value := sqlite.Int64ToPadded128BitsStr(tr.Value)
-
-	_, err := db.Exec(`
-		INSERT OR IGNORE INTO blocks(
-			network_id, address, blk_number, blk_hash
-		) VALUES (?, ?, ?, ?);
-		INSERT INTO transfers (network_id, hash, address, blk_hash, tx,
-			sender, receipt, log, type, blk_number, timestamp, loaded,
-			multi_transaction_id, base_gas_fee, status, amount_padded128hex, token_address
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 0, ?, ?, ?)`,
-		tr.ChainID, tr.To, tr.BlkNumber, blkHash,
-		tr.ChainID, tr.Hash, tr.To, blkHash, &JSONBlob{}, tr.From, &JSONBlob{}, &JSONBlob{}, tokenType, tr.BlkNumber, tr.Timestamp, tr.MultiTransactionID, tr.Success, value, tokenAddress.Hex())
+	transfer := transferDBFields{
+		chainID:            uint64(tr.ChainID),
+		id:                 tr.Hash,
+		address:            address,
+		blockHash:          blkHash,
+		blockNumber:        big.NewInt(tr.BlkNumber),
+		sender:             tr.From,
+		transferType:       w_common.Type(tokenType),
+		timestamp:          uint64(tr.Timestamp),
+		multiTransactionID: tr.MultiTransactionID,
+		baseGasFees:        "0x0",
+		receiptStatus:      &receiptStatus,
+		txValue:            big.NewInt(tr.Value),
+		txFrom:             &tr.From,
+		txTo:               &tr.To,
+		tokenAddress:       &tokenAddress,
+	}
+	err = updateOrInsertTransfersDBFields(tx, []transferDBFields{transfer})
 	require.NoError(t, err)
 }
 

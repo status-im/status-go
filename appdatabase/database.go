@@ -23,6 +23,7 @@ const nodeCfgMigrationDate = 1640111208
 var customSteps = []sqlite.PostStep{
 	{Version: 1674136690, CustomMigration: migrateEnsUsernames},
 	{Version: 1686048341, CustomMigration: migrateWalletJSONBlobs, RollBackVersion: 1686041510},
+	{Version: 1687193315, CustomMigration: migrateWalletTransferFromToAddresses, RollBackVersion: 1686825075},
 }
 
 // InitializeDB creates db file at a given path and applies migrations.
@@ -317,14 +318,14 @@ func migrateWalletJSONBlobs(sqlTx *sql.Tx) error {
 			}
 
 			if nullableTx.Valid {
-				correctType, tokenID, value, dbAddress := extractToken(entryType, tx, l, nullableL.Valid)
+				correctType, tokenID, value, tokenAddress := extractToken(entryType, tx, l, nullableL.Valid)
 
 				gasPrice := sqlite.BigIntToClampedInt64(tx.GasPrice())
 				gasTipCap := sqlite.BigIntToClampedInt64(tx.GasTipCap())
 				gasFeeCap := sqlite.BigIntToClampedInt64(tx.GasFeeCap())
 				valueStr := sqlite.BigIntToPadded128BitsStr(value)
 
-				currentRow = append(currentRow, tx.Type(), tx.Protected(), tx.Gas(), gasPrice, gasTipCap, gasFeeCap, valueStr, tx.Nonce(), int64(tx.Size()), dbAddress, (*bigint.SQLBigIntBytes)(tokenID), correctType)
+				currentRow = append(currentRow, tx.Type(), tx.Protected(), tx.Gas(), gasPrice, gasTipCap, gasFeeCap, valueStr, tx.Nonce(), int64(tx.Size()), tokenAddress, (*bigint.SQLBigIntBytes)(tokenID), correctType)
 			} else {
 				for i := 0; i < 11; i++ {
 					currentRow = append(currentRow, nil)
@@ -370,17 +371,110 @@ func migrateWalletJSONBlobs(sqlTx *sql.Tx) error {
 	return nil
 }
 
-func extractToken(entryType string, tx *types.Transaction, l *types.Log, logValid bool) (correctType w_common.Type, tokenID *big.Int, value *big.Int, dbAddress *string) {
+func extractToken(entryType string, tx *types.Transaction, l *types.Log, logValid bool) (correctType w_common.Type, tokenID *big.Int, value *big.Int, tokenAddress *common.Address) {
 	if logValid {
-		var tokenAddress *common.Address
-		correctType, tokenAddress, tokenID, value = w_common.ExtractTokenIdentity(w_common.Type(entryType), l, tx)
-		if tokenAddress != nil {
-			dbAddress = new(string)
-			*dbAddress = tokenAddress.Hex()
-		}
+		correctType, tokenAddress, tokenID, value, _, _ = w_common.ExtractTokenIdentity(w_common.Type(entryType), l, tx)
 	} else {
 		correctType = w_common.Type(entryType)
 		value = new(big.Int).Set(tx.Value())
 	}
 	return
+}
+
+func migrateWalletTransferFromToAddresses(sqlTx *sql.Tx) error {
+	var batchEntries [][]interface{}
+
+	// Extract transfer from/to addresses and add the information into the new columns
+	// Re-extract token address and insert it as blob instead of string
+	newColumnsAndIndexSetup := `
+		ALTER TABLE transfers ADD COLUMN tx_from_address BLOB;
+		ALTER TABLE transfers ADD COLUMN tx_to_address BLOB;`
+
+	rowIndex := 0
+	mightHaveRows := true
+
+	_, err := sqlTx.Exec(newColumnsAndIndexSetup)
+	if err != nil {
+		return err
+	}
+
+	for mightHaveRows {
+		var chainID uint64
+		var hash common.Hash
+		var address common.Address
+		var sender common.Address
+		var entryType string
+
+		rows, err := sqlTx.Query(`SELECT hash, address, sender, network_id, tx, log, type FROM transfers WHERE tx IS NOT NULL OR receipt IS NOT NULL LIMIT ? OFFSET ?`, batchSize, rowIndex)
+		if err != nil {
+			return err
+		}
+
+		curProcessed := 0
+		for rows.Next() {
+			tx := &types.Transaction{}
+			l := &types.Log{}
+
+			// Scan row data into the transaction and receipt objects
+			nullableTx := sqlite.JSONBlob{Data: tx}
+			nullableL := sqlite.JSONBlob{Data: l}
+			err = rows.Scan(&hash, &address, &sender, &chainID, &nullableTx, &nullableL, &entryType)
+			if err != nil {
+				rows.Close()
+				return err
+			}
+
+			var currentRow []interface{}
+
+			var tokenAddress *common.Address
+			var txFrom *common.Address
+			var txTo *common.Address
+
+			if nullableTx.Valid {
+				if nullableL.Valid {
+					_, tokenAddress, _, _, txFrom, txTo = w_common.ExtractTokenIdentity(w_common.Type(entryType), l, tx)
+				} else {
+					txFrom = &sender
+					txTo = tx.To()
+				}
+			}
+
+			currentRow = append(currentRow, tokenAddress, txFrom, txTo)
+
+			currentRow = append(currentRow, hash, address, chainID)
+			batchEntries = append(batchEntries, currentRow)
+
+			curProcessed++
+		}
+		rowIndex += curProcessed
+
+		// Check if there was an error in the last rows.Next()
+		rows.Close()
+		if err = rows.Err(); err != nil {
+			return err
+		}
+		mightHaveRows = (curProcessed == batchSize)
+
+		// insert extracted data into the new columns
+		if len(batchEntries) > 0 {
+			var stmt *sql.Stmt
+			stmt, err = sqlTx.Prepare(`UPDATE transfers SET token_address = ?, tx_from_address = ?, tx_to_address = ?
+				WHERE hash = ? AND address = ? AND network_id = ?`)
+			if err != nil {
+				return err
+			}
+
+			for _, dataEntry := range batchEntries {
+				_, err = stmt.Exec(dataEntry...)
+				if err != nil {
+					return err
+				}
+			}
+
+			// Reset placeHolders and batchEntries for the next batch
+			batchEntries = [][]interface{}{}
+		}
+	}
+
+	return nil
 }
