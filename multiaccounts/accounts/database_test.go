@@ -42,6 +42,28 @@ func TestGetAddresses(t *testing.T) {
 	require.Equal(t, []types.Address{{0x01}, {0x02}}, addresses)
 }
 
+func TestUpdateAccountPosition(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	accounts := []*Account{
+		{Address: types.Address{0x01}, Chat: true, Wallet: true},
+		{Address: types.Address{0x02}},
+	}
+	require.NoError(t, db.SaveOrUpdateAccounts(accounts))
+	accountsRes, err := db.GetAccounts()
+	require.NoError(t, err)
+	require.Equal(t, accountsRes[0].Position, int64(1))
+	require.Equal(t, accountsRes[1].Position, int64(2))
+
+	err = db.UpdateAccountPosition(accounts[1].Address, 1)
+	require.NoError(t, err)
+
+	accountsRes, err = db.GetAccounts()
+	require.NoError(t, err)
+	require.Equal(t, accountsRes[0].Position, int64(0))
+	require.Equal(t, accountsRes[1].Position, int64(1))
+}
+
 func TestGetWalletAddress(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
