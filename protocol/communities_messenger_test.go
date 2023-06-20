@@ -3722,3 +3722,31 @@ func (s *MessengerCommunitiesSuite) TestJoinedCommunityMembersSharedAddress() {
 		}
 	}
 }
+
+func (s *MessengerCommunitiesSuite) TestShareCommunityID() {
+	community := s.createCommunity()
+
+	url, err := s.admin.ShareCommunityIDURL(community)
+	s.Require().NoError(err)
+
+	compressedKey, err := s.admin.CompressCommunityID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Equal(url, "https://status.app/c#/"+compressedKey)
+}
+
+func (s *MessengerCommunitiesSuite) TestParseSharedCommunityID() {
+	community := s.createCommunity()
+
+	compressedKey, err := s.admin.CompressCommunityID(community.ID())
+	s.Require().NoError(err)
+
+	url := "https://status.app/c#/" + compressedKey
+	response, err := s.admin.ParseSharedURL(url)
+
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	sharedCommunity := response.Communities()[0]
+	s.Require().Equal(community.ID(), sharedCommunity.ID())
+}

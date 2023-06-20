@@ -88,6 +88,8 @@ var communityAdvertiseIntervalSecond int64 = 60 * 60
 // messageCacheIntervalMs is how long we should keep processed messages in the cache, in ms
 var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 
+var baseStatusUrl string = "https://status.app/"
+
 // Messenger is a entity managing chats and messages.
 // It acts as a bridge between the application and encryption
 // layers.
@@ -6464,4 +6466,32 @@ func (m *Messenger) handleSyncSocialLinks(message *protobuf.SyncSocialLinks, cal
 
 func (m *Messenger) GetDeleteForMeMessages() ([]*protobuf.DeleteForMeMessage, error) {
 	return m.persistence.GetDeleteForMeMessages()
+}
+
+func (m *Messenger) ParseSharedURL(url string) (*MessengerResponse, error) {
+	if !strings.HasPrefix(url, baseStatusUrl) {
+		return nil, errors.New("Url should start with '" + baseStatusUrl + "'")
+	}
+
+	group, data, found := strings.Cut(strings.TrimPrefix(url, baseStatusUrl), "/")
+	if !found {
+		return nil, errors.New("Unexpected url format")
+	}
+
+	switch group {
+	case "c":
+		return m.ParseCommuntySharedURL(data, false)
+	case "c#":
+		return m.ParseCommuntySharedURL(data, true)
+	case "cc":
+		return m.ParseCommuntyChannelSharedURL(data)
+	case "u":
+		return m.ParseProfileSharedURL(data)
+	}
+
+	return nil, errors.New("Unhandled url group")
+}
+
+func (m *Messenger) BaseShareURL(group string) string {
+	return baseStatusUrl + group
 }

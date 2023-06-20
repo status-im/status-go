@@ -2386,6 +2386,21 @@ func (s *MessengerSuite) TestResendExpiredEmojis() {
 	s.True(rawMessage.SendCount >= 2)
 }
 
+func (s *MessengerSuite) TestParseWrongSharedURL() {
+	wrongUrls := [5]string{
+		"http:/status.im/c/0x0123",
+		"https://github.com",
+		"https://status.app//a665",
+		"https://status.app/x/123",
+		"https://status.app/c/0x123asd",
+	}
+	for _, wrongUrl := range wrongUrls {
+		response, err := s.m.ParseSharedURL(wrongUrl)
+		s.Error(err)
+		s.Nil(response)
+	}
+}
+
 func buildImageWithAlbumIDMessage(chat Chat, albumID string) (*common.Message, error) {
 	file, err := os.Open("../_assets/tests/test.jpg")
 	if err != err {

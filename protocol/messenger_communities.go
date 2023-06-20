@@ -26,6 +26,7 @@ import (
 	"github.com/meirf/gopart"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
@@ -1702,6 +1703,84 @@ func (m *Messenger) ShareCommunity(request *requests.ShareCommunity) (*Messenger
 	}
 
 	return response, nil
+}
+
+func (m *Messenger) CompressCommunityID(communityID types.HexBytes) (string, error) {
+	rawId, err := crypto.DecompressPubkey(communityID)
+	if err != nil {
+		return "", err
+	}
+	pubKey := types.EncodeHex(crypto.FromECDSAPub(rawId))
+
+	secp256k1Code := "0xe701"
+	base58btc := "z"
+	multiCodecKey := secp256k1Code + strings.TrimPrefix(pubKey, "0x")
+	cpk, err := multiformat.SerializePublicKey(multiCodecKey, base58btc)
+	if err != nil {
+		return "", err
+	}
+	return cpk, nil
+}
+
+func (m *Messenger) DecompressCommunityID(compressedKey string) (types.HexBytes, error) {
+	rawKey, err := multiformat.DeserializePublicKey(compressedKey, "f")
+	if err != nil {
+		return nil, err
+	}
+
+	secp256k1Code := "fe701"
+	pubKeyBytes := "0x" + strings.TrimPrefix(rawKey, secp256k1Code)
+
+	pubKey, err := common.HexToPubkey(pubKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return crypto.CompressPubkey(pubKey), nil
+}
+
+func (m *Messenger) ParseCommuntySharedURL(urlData string, byID bool) (*MessengerResponse, error) {
+	var community *communities.Community
+	if byID {
+		communityID, err := m.DecompressCommunityID(urlData)
+		if err != nil {
+			return nil, err
+		}
+
+		community, err = m.GetCommunityByID(types.HexBytes(communityID))
+		if err != nil {
+			return nil, err
+		}
+
+		if community == nil {
+			return nil, fmt.Errorf("community with communityID %s not found", communityID)
+		}
+	} else {
+		// TODO: decompress community data
+		return nil, errors.New("not implemented yet")
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+	return response, nil
+}
+
+func (m *Messenger) ShareCommunityIDURL(community *communities.Community) (string, error) {
+	communityPubKey, err := m.CompressCommunityID(community.ID())
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s%s", m.BaseShareURL("c#/"), communityPubKey), nil
+}
+
+func (m *Messenger) ShareCommunityDataURL(community *communities.Community) (string, error) {
+	// TODO: compress community data
+	return "", errors.New("not implemented yet")
+}
+
+func (m *Messenger) ParseCommuntyChannelSharedURL(url string) (*MessengerResponse, error) {
+	// TODO: decompress community key and channel
+	return nil, errors.New("not implemented yet")
 }
 
 func (m *Messenger) MyCanceledRequestsToJoin() ([]*communities.RequestToJoin, error) {

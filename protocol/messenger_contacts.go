@@ -1202,6 +1202,27 @@ func (m *Messenger) BuildContact(request *requests.BuildContact) (*Contact, erro
 	return contact, nil
 }
 
+func (m *Messenger) ParseProfileSharedURL(urlData string) (*MessengerResponse, error) {
+	// TODO: decompress public key
+	pubKey, err := common.HexToPubkey(urlData)
+	if err != nil {
+		return nil, err
+	}
+
+	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: types.EncodeHex(crypto.FromECDSAPub(pubKey))})
+	if err != nil {
+		return nil, err
+	}
+
+	if contact == nil {
+		return nil, fmt.Errorf("contact with publick key %s not found", pubKey)
+	}
+
+	response := &MessengerResponse{}
+	response.AddContact(contact)
+	return response, nil
+}
+
 func (m *Messenger) scheduleSyncFiltersForContact(publicKey *ecdsa.PublicKey) (*transport.Filter, error) {
 	filter, err := m.transport.JoinPrivate(publicKey)
 	if err != nil {

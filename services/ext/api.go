@@ -1337,6 +1337,10 @@ func (api *PublicAPI) CheckAllCommunityChannelsPermissions(request *requests.Che
 	return api.service.messenger.CheckAllCommunityChannelsPermissions(request)
 }
 
+func (api *PublicAPI) ParseSharedURL(url string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ParseSharedURL(url)
+}
+
 func (api *PublicAPI) Messenger() *protocol.Messenger {
 	return api.service.messenger
 }
