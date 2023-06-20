@@ -38,7 +38,7 @@ func TestGetRecipients(t *testing.T) {
 	// Add 6 extractable transactions
 	trs, _, toTrs := transfer.GenerateTestTransfers(t, db, 0, 6)
 	for i := range trs {
-		transfer.InsertTestTransfer(t, db, &trs[i])
+		transfer.InsertTestTransfer(t, db, trs[i].To, &trs[i])
 	}
 
 	entries, hasMore, err := GetRecipients(context.Background(), db, 0, 15)

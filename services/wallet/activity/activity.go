@@ -30,6 +30,10 @@ const (
 	PendingTransactionPT
 )
 
+var (
+	ZeroAddress = eth.Address{}
+)
+
 type Entry struct {
 	payloadType    PayloadType
 	transaction    *transfer.TransactionIdentity
@@ -326,8 +330,8 @@ const (
             ELSE NULL
         END as tr_type,
 
-        transfers.sender AS from_address,
-        transfers.address AS to_address,
+        transfers.tx_from_address AS from_address,
+        transfers.tx_to_address AS to_address,
         transfers.amount_padded128hex AS tr_amount,
         NULL AS mt_from_amount,
         NULL AS mt_to_amount,
@@ -345,9 +349,9 @@ const (
         NULL AS to_token_code
     FROM transfers, filter_conditions
     LEFT JOIN
-        filter_addresses from_join ON HEX(transfers.sender) = from_join.address
+        filter_addresses from_join ON HEX(transfers.tx_from_address) = from_join.address
     LEFT JOIN
-        filter_addresses to_join ON HEX(transfers.address) = to_join.address
+        filter_addresses to_join ON HEX(transfers.tx_to_address) = to_join.address
     WHERE transfers.multi_transaction_id = 0
         AND ((startFilterDisabled OR timestamp >= startTimestamp)
             AND (endFilterDisabled OR timestamp <= endTimestamp)
@@ -355,22 +359,23 @@ const (
         AND (filterActivityTypeAll
             OR (filterActivityTypeSend
                 AND (filterAllAddresses
-                    OR (HEX(transfers.sender) IN filter_addresses)
+                    OR (HEX(transfers.tx_from_address) IN filter_addresses)
                 )
             )
             OR (filterActivityTypeReceive
-                AND (filterAllAddresses OR (HEX(transfers.address) IN filter_addresses))
+                AND (filterAllAddresses
+										OR (HEX(transfers.tx_to_address) IN filter_addresses))
             )
         )
         AND (filterAllAddresses
-            OR (HEX(transfers.sender) IN filter_addresses)
-            OR (HEX(transfers.address) IN filter_addresses)
+            OR (HEX(transfers.tx_from_address) IN filter_addresses)
+            OR (HEX(transfers.tx_to_address) IN filter_addresses)
         )
         AND (filterAllToAddresses
-            OR (HEX(transfers.address) IN filter_to_addresses)
+            OR (HEX(transfers.tx_to_address) IN filter_to_addresses)
         )
         AND (includeAllTokenTypeAssets OR (transfers.type = "eth" AND ("ETH" IN assets_token_codes))
-            OR (transfers.type = "erc20" AND ((transfers.network_id, transfers.token_address) IN assets_erc20)))
+						OR (transfers.type = "erc20" AND ((transfers.network_id, HEX(transfers.token_address)) IN assets_erc20)))
         AND (includeAllNetworks OR (transfers.network_id IN filter_networks))
         AND (filterAllActivityStatus OR ((filterStatusCompleted OR filterStatusFinalized) AND transfers.status = 1)
             OR (filterStatusFailed AND transfers.status = 0)
@@ -523,7 +528,8 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		if sliceChecksCondition(filter.Assets, func(item *Token) bool { return item.TokenType == Erc20 }) {
 			assetsERC20 = joinItems(filter.Assets, func(item Token) string {
 				if item.TokenType == Erc20 {
-					return fmt.Sprintf("%d, '%s'", item.ChainID, item.Address.Hex())
+					// SQL HEX() (Blob->Hex) conversion returns uppercase digits with no 0x prefix
+					return fmt.Sprintf("%d, '%s'", item.ChainID, strings.ToUpper(item.Address.Hex()[2:]))
 				}
 				return ""
 			})
@@ -594,10 +600,11 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		var timestamp int64
 		var dbMtType, dbTrType sql.NullByte
 		var toAddress, fromAddress eth.Address
+		var tokenAddress *eth.Address
 		var aggregatedStatus int
 		var dbTrAmount sql.NullString
 		var dbMtFromAmount, dbMtToAmount sql.NullString
-		var tokenAddress, tokenCode, fromTokenCode, toTokenCode sql.NullString
+		var tokenCode, fromTokenCode, toTokenCode sql.NullString
 		err := rows.Scan(&transferHash, &pendingHash, &chainID, &multiTxID, &timestamp, &dbMtType, &dbTrType, &fromAddress,
 			&toAddress, &dbTrAmount, &dbMtFromAmount, &dbMtToAmount, &aggregatedStatus, &aggregatedCount,
 			&tokenAddress, &tokenCode, &fromTokenCode, &toTokenCode)
@@ -630,8 +637,8 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 
 			// Extract tokens
 			var involvedToken *Token
-			if tokenAddress.Valid && eth.HexToAddress(tokenAddress.String) != eth.HexToAddress("0x") {
-				involvedToken = &Token{TokenType: Erc20, ChainID: common.ChainID(chainID.Int64), Address: eth.HexToAddress(tokenAddress.String)}
+			if tokenAddress != nil && *tokenAddress != ZeroAddress {
+				involvedToken = &Token{TokenType: Erc20, ChainID: common.ChainID(chainID.Int64), Address: *tokenAddress}
 			} else {
 				involvedToken = &Token{TokenType: Native, ChainID: common.ChainID(chainID.Int64)}
 			}

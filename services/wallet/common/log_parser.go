@@ -237,7 +237,7 @@ func GetEventSignatureHash(signature string) common.Hash {
 	return crypto.Keccak256Hash([]byte(signature))
 }
 
-func ExtractTokenIdentity(dbEntryType Type, log *types.Log, tx *types.Transaction) (correctType Type, tokenAddress *common.Address, tokenID *big.Int, value *big.Int) {
+func ExtractTokenIdentity(dbEntryType Type, log *types.Log, tx *types.Transaction) (correctType Type, tokenAddress *common.Address, txTokenID *big.Int, txValue *big.Int, txFrom *common.Address, txTo *common.Address) {
 	// erc721 transfers share signature with erc20 ones, so they both used to be categorized as erc20
 	// by the Downloader. We fix this here since they might be mis-categorized in the db.
 	if dbEntryType == Erc20Transfer {
@@ -250,16 +250,22 @@ func ExtractTokenIdentity(dbEntryType Type, log *types.Log, tx *types.Transactio
 	switch correctType {
 	case EthTransfer:
 		if tx != nil {
-			value = new(big.Int).Set(tx.Value())
+			txValue = new(big.Int).Set(tx.Value())
 		}
 	case Erc20Transfer:
 		tokenAddress = new(common.Address)
 		*tokenAddress = log.Address
-		_, _, value = ParseErc20TransferLog(log)
+		from, to, value := ParseErc20TransferLog(log)
+		txValue = value
+		txFrom = &from
+		txTo = &to
 	case Erc721Transfer:
 		tokenAddress = new(common.Address)
 		*tokenAddress = log.Address
-		_, _, tokenID = ParseErc721TransferLog(log)
+		from, to, tokenID := ParseErc721TransferLog(log)
+		txTokenID = tokenID
+		txFrom = &from
+		txTo = &to
 	}
 
 	return
