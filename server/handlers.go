@@ -288,7 +288,7 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 		return
 	}
 
-	payload, err = images.CropAvatar(payload)
+	payload, err = images.RoundCrop(payload)
 	if err != nil {
 		logger.Error("handleAccountImagesImpl: failed to crop image.", zap.String("keyUid", parsed.KeyUID), zap.String("imageName", parsed.ImageName), zap.Error(err))
 		return
@@ -367,7 +367,7 @@ func handleAccountImagesPlaceholder(logger *zap.Logger, w http.ResponseWriter, r
 		parsed.BgSize = im.Bounds().Dx()
 	}
 
-	payload, err = images.CropAvatar(payload)
+	payload, err = images.RoundCrop(payload)
 	if err != nil {
 		logger.Error("handleAccountImagesPlaceholder: failed to crop image.", zap.String("imageName", parsed.ImagePath), zap.Error(err))
 		return
@@ -605,7 +605,7 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 			return
 		}
 
-		payload, err = images.CropAvatar(payload)
+		payload, err = images.RoundCrop(payload)
 		if err != nil {
 			logger.Error("handleContactImages: failed to crop image.", zap.Error(err))
 			return

@@ -219,6 +219,21 @@ func CreateCircleWithPadding(img image.Image, padding int) *image.RGBA {
 	return circle
 }
 
+func RoundCrop(inputImage []byte) ([]byte, error) {
+	img, _, err := image.Decode(bytes.NewReader(inputImage))
+	if err != nil {
+		return nil, err
+	}
+	result := CreateCircleWithPadding(img, 0)
+
+	var outputImage bytes.Buffer
+	err = png.Encode(&outputImage, result)
+	if err != nil {
+		return nil, err
+	}
+	return outputImage.Bytes(), nil
+}
+
 func PlaceCircleInCenter(paddedImg, circle *image.RGBA) *image.RGBA {
 	bounds := circle.Bounds()
 	centerX := (paddedImg.Bounds().Min.X + paddedImg.Bounds().Max.X) / 2
