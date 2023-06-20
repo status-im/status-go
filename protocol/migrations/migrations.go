@@ -1998,7 +1998,7 @@ func _1685383829_add_communities_mute_tillUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1685383829_add_communities_mute_till.up.sql", size: 69, mode: os.FileMode(0644), modTime: time.Unix(1686766686, 0)}
+	info := bindataFileInfo{name: "1685383829_add_communities_mute_till.up.sql", size: 69, mode: os.FileMode(0644), modTime: time.Unix(1687177139, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xbf, 0x58, 0x96, 0xe5, 0x66, 0xcb, 0xde, 0xed, 0x76, 0xb8, 0x5a, 0x86, 0x81, 0x9a, 0x60, 0x51, 0x12, 0x37, 0x54, 0x9a, 0x36, 0x3e, 0xd1, 0x4a, 0xbe, 0x9a, 0xab, 0x20, 0x7f, 0x1d, 0xf4, 0x73}}
 	return a, nil
 }
