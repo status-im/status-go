@@ -1,8 +1,12 @@
 package urls
 
 import (
+	"bytes"
+	"encoding/base64"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/andybalholm/brotli"
 )
 
 const (
@@ -51,4 +55,33 @@ func stripHTMLTags(s string) string {
 	}
 	s = builder.String()
 	return s
+}
+
+func encodeDataURL(data []byte) (string, error) {
+	bb := bytes.NewBuffer([]byte{})
+	writer := brotli.NewWriter(bb)
+	_, err := writer.Write(data)
+	writer.Close()
+	if err != nil {
+		return "", err
+	}
+
+	return base64.URLEncoding.EncodeToString(bb.Bytes()), nil
+}
+
+func decodeDataURL(data string) ([]byte, error) {
+	decoded, err := base64.URLEncoding.DecodeString(data)
+
+	if err != nil {
+		return nil, err
+	}
+	var output []byte
+	bb := bytes.NewBuffer(decoded)
+	reader := brotli.NewReader(bb)
+	_, err = reader.Read(output)
+	if err != nil {
+		return nil, err
+	}
+
+	return output, nil
 }

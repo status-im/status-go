@@ -293,3 +293,11 @@ func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 		return previewData, fmt.Errorf("link %s isn't whitelisted. Hostname - %s", link, u.Hostname())
 	}
 }
+
+func EncodeDataURL(data []byte) (string, error) {
+	return encodeDataURL(data)
+}
+
+func DecodeDataURL(data string) ([]byte, error) {
+	return decodeDataURL(data)
+}
