@@ -261,6 +261,11 @@ func (s *MessageSender) sendCommunity(
 	rawMessage.ID = types.EncodeHex(messageID)
 	messageIDs := [][]byte{messageID}
 
+	if rawMessage.BeforeDispatch != nil {
+		if err := rawMessage.BeforeDispatch(rawMessage); err != nil {
+			return nil, err
+		}
+	}
 	// Notify before dispatching, otherwise the dispatch subscription might happen
 	// earlier than the scheduled
 	s.notifyOnScheduledMessage(nil, rawMessage)
@@ -350,6 +355,12 @@ func (s *MessageSender) sendPrivate(
 
 	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
 	rawMessage.ID = types.EncodeHex(messageID)
+
+	if rawMessage.BeforeDispatch != nil {
+		if err := rawMessage.BeforeDispatch(rawMessage); err != nil {
+			return nil, err
+		}
+	}
 
 	// Notify before dispatching, otherwise the dispatch subscription might happen
 	// earlier than the scheduled
@@ -510,6 +521,12 @@ func (s *MessageSender) dispatchCommunityChatMessage(ctx context.Context, rawMes
 		PowTime:   whisperPoWTime,
 	}
 
+	if rawMessage.BeforeDispatch != nil {
+		if err := rawMessage.BeforeDispatch(rawMessage); err != nil {
+			return nil, nil, err
+		}
+	}
+
 	// notify before dispatching
 	s.notifyOnScheduledMessage(nil, rawMessage)
 
@@ -563,6 +580,12 @@ func (s *MessageSender) SendPublic(
 
 	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
 	rawMessage.ID = types.EncodeHex(messageID)
+
+	if rawMessage.BeforeDispatch != nil {
+		if err := rawMessage.BeforeDispatch(&rawMessage); err != nil {
+			return nil, err
+		}
+	}
 
 	// notify before dispatching
 	s.notifyOnScheduledMessage(nil, &rawMessage)

@@ -2189,26 +2189,30 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		ResendAutomatically:  true,
 	}
 
+	// We want to save the raw message before dispatching it, to avoid race conditions
+	// since it might get dispatched and confirmed before it's saved.
+	// This is not the best solution, probably it would be better to split
+	// the sent status in a different table and join on query for messages,
+	// but that's a much larger change and it would require an expensive migration of clients
+	rawMessage.BeforeDispatch = func(rawMessage *common.RawMessage) error {
+		if rawMessage.Sent {
+			message.OutgoingStatus = common.OutgoingStatusSent
+		}
+		message.ID = rawMessage.ID
+		err = message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
+		if err != nil {
+			return err
+		}
+
+		err = chat.UpdateFromMessage(message, m.getTimesource())
+		if err != nil {
+			return err
+		}
+
+		return m.persistence.SaveMessages([]*common.Message{message})
+	}
+
 	rawMessage, err = m.dispatchMessage(ctx, rawMessage)
-	if err != nil {
-		return nil, err
-	}
-
-	if rawMessage.Sent {
-		message.OutgoingStatus = common.OutgoingStatusSent
-	}
-	message.ID = rawMessage.ID
-	err = message.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
-	if err != nil {
-		return nil, err
-	}
-
-	err = chat.UpdateFromMessage(message, m.getTimesource())
-	if err != nil {
-		return nil, err
-	}
-
-	err = m.persistence.SaveMessages([]*common.Message{message})
 	if err != nil {
 		return nil, err
 	}

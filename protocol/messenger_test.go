@@ -2354,6 +2354,12 @@ func (s *MessengerSuite) TestMessageSent() {
 	s.True(rawMessage.Sent)
 }
 
+func (s *MessengerSuite) TestProcessSentMessages() {
+	ids := []string{"a"}
+	err := s.m.processSentMessages(ids)
+	s.Require().NoError(err)
+}
+
 func (s *MessengerSuite) TestResendExpiredEmojis() {
 	//send message
 	chat := CreatePublicChat("test-chat", s.m.transport)
