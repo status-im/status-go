@@ -124,6 +124,7 @@ func TestReplaceMentions(t *testing.T) {
 			Contact: &Contact{
 				ID:            "0xpk6",
 				LocalNickname: "特别字符",
+				DisplayName:   "特别 字符",
 			},
 		},
 	}
@@ -194,6 +195,7 @@ func TestReplaceMentions(t *testing.T) {
 
 		{"special chars in username case1", "@特别字符", "@0xpk6"},
 		{"special chars in username case2", "@特别字符 ", "@0xpk6 "},
+		{"special chars in username case3", " @特别 字符 ", " @0xpk6 "},
 	}
 
 	for _, tt := range tests {
