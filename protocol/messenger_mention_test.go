@@ -192,7 +192,8 @@ func TestReplaceMentions(t *testing.T) {
 		{"username or nickname of one is a substring of another case 1", "@User Number One @User Number", "@0xpk1 @0xpk5"},
 		{"username or nickname of one is a substring of another case 2", "@User Number @User Number One ", "@0xpk5 @0xpk1 "},
 
-		{"special chars in username", "@特别字符", "@0xpk6"},
+		{"special chars in username case1", "@特别字符", "@0xpk6"},
+		{"special chars in username case2", "@特别字符 ", "@0xpk6 "},
 	}
 
 	for _, tt := range tests {

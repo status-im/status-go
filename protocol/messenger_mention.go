@@ -35,7 +35,7 @@ const (
 var (
 	specialCharsRegex = regexp.MustCompile("[@~\\\\*_\n>`]{1}")
 	endingCharsRegex  = regexp.MustCompile(endingChars)
-	wordRegex         = regexp.MustCompile("^[\\w\\d\\-]*" + endingChars + "|^[\\S]*$")
+	wordRegex         = regexp.MustCompile("^[\\w\\d\\-]*" + endingChars + "|[\\S]+")
 )
 
 type specialCharLocation struct {
