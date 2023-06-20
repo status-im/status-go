@@ -120,6 +120,12 @@ func TestReplaceMentions(t *testing.T) {
 				LocalNickname: "User Number",
 			},
 		},
+		"0xpk6": {
+			Contact: &Contact{
+				ID:            "0xpk6",
+				LocalNickname: "特别字符",
+			},
+		},
 	}
 
 	tests := []struct {
@@ -185,6 +191,8 @@ func TestReplaceMentions(t *testing.T) {
 
 		{"username or nickname of one is a substring of another case 1", "@User Number One @User Number", "@0xpk1 @0xpk5"},
 		{"username or nickname of one is a substring of another case 2", "@User Number @User Number One ", "@0xpk5 @0xpk1 "},
+
+		{"special chars in username", "@特别字符", "@0xpk6"},
 	}
 
 	for _, tt := range tests {
@@ -833,13 +841,16 @@ func TestMentionSuggestionSpecialChars(t *testing.T) {
 		{"'", 0},
 		{"‘", 0},
 		{"‘@", len(mentionableUserMap)},
+		{"‘@自由人", 1},
 	}
 
-	for _, tc := range testCases {
-		ctx, err := mentionManager.OnChangeText(chatID, tc.inputText)
-		require.NoError(t, err)
-		t.Logf("Input: %+v, MentionState:%+v, InputSegments:%+v\n", tc.inputText, ctx.MentionState, ctx.InputSegments)
-		require.Equal(t, tc.expectedSize, len(ctx.MentionSuggestions))
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("%d", i+1), func(t *testing.T) {
+			ctx, err := mentionManager.OnChangeText(chatID, tc.inputText)
+			require.NoError(t, err)
+			t.Logf("Input: %+v, MentionState:%+v, InputSegments:%+v\n", tc.inputText, ctx.MentionState, ctx.InputSegments)
+			require.Equal(t, tc.expectedSize, len(ctx.MentionSuggestions))
+		})
 	}
 }
 
@@ -878,7 +889,7 @@ func TestMentionSuggestionAtSignSpaceCases(t *testing.T) {
 }
 
 func TestSelectMention(t *testing.T) {
-	_, chatID, mentionManager := setupMentionSuggestionTest(t, nil)
+	mentionableUsers, chatID, mentionManager := setupMentionSuggestionTest(t, nil)
 
 	text := "@u2 abc"
 	ctx, err := mentionManager.OnChangeText(chatID, text)
@@ -887,7 +898,7 @@ func TestSelectMention(t *testing.T) {
 
 	ctx, err = mentionManager.OnChangeText(chatID, "@u abc")
 	require.NoError(t, err)
-	require.Equal(t, 3, len(ctx.MentionSuggestions))
+	require.Equal(t, len(mentionableUsers), len(ctx.MentionSuggestions))
 
 	ctx, err = mentionManager.SelectMention(chatID, "@u abc", "u2", "0xpk2")
 	require.NoError(t, err)
@@ -1022,6 +1033,14 @@ func getDefaultMentionableUserMap() map[string]*MentionableUser {
 				LocalNickname: "u3",
 				ENSVerified:   true,
 				EnsName:       "User Number Three",
+			},
+		},
+		"0xpk4": {
+			Contact: &Contact{
+				ID:            "0xpk4",
+				LocalNickname: "自由人",
+				ENSVerified:   true,
+				EnsName:       "User Number Four",
 			},
 		},
 	}

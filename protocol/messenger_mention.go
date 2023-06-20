@@ -941,6 +941,7 @@ func getAtSignIdxsHelper(text string, delta int, from int, idxs []int) []int {
 	tr := []rune(text)
 	idx := strings.Index(string(tr[from:]), charAtSign)
 	if idx != -1 {
+		idx = utf8.RuneCountInString(text[:idx])
 		idx += from
 		idxs = append(idxs, delta+idx)
 		return getAtSignIdxsHelper(text, delta, idx+1, idxs)
@@ -1237,6 +1238,7 @@ func lastIndexOf(s, substr string, start int) int {
 	}
 
 	// Calculate the index in the original string.
+	idx = utf8.RuneCountInString(reversedS[:idx])
 	return start - idx - len(tt) + 1
 }
 
