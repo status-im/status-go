@@ -282,13 +282,7 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 		parsed.BgSize = identityImage.Width
 	}
 
-	payload, err := images.ResizeImage(identityImage.Payload, parsed.BgSize, parsed.BgSize)
-	if err != nil {
-		logger.Error("handleAccountImagesImpl: failed to resize image.", zap.String("keyUid", parsed.KeyUID), zap.String("imageName", parsed.ImageName), zap.Error(err))
-		return
-	}
-
-	payload, err = images.RoundCrop(payload)
+	payload, err := images.RoundCrop(identityImage.Payload)
 	if err != nil {
 		logger.Error("handleAccountImagesImpl: failed to crop image.", zap.String("keyUid", parsed.KeyUID), zap.String("imageName", parsed.ImageName), zap.Error(err))
 		return
@@ -317,7 +311,7 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 		}
 
 		payload, err = ring.DrawRing(&ring.DrawRingParam{
-			Theme: parsed.Theme, ColorHash: accColorHash, ImageBytes: payload, Height: parsed.BgSize, Width: parsed.BgSize,
+			Theme: parsed.Theme, ColorHash: accColorHash, ImageBytes: payload, Height: identityImage.Height, Width: identityImage.Width,
 		})
 		if err != nil {
 			logger.Error("handleAccountImagesImpl: failed to draw ring for account identity", zap.Error(err))
@@ -326,7 +320,10 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 	}
 
 	if parsed.IndicatorSize != 0 {
-		payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize, parsed.IndicatorBorder)
+		// enlarge indicator size based on identity image size / desired size
+		// or we get a bad quality identity image
+		enlargeIndicatorRatio := identityImage.Width / parsed.BgSize
+		payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize*enlargeIndicatorRatio, parsed.IndicatorBorder*enlargeIndicatorRatio)
 		if err != nil {
 			logger.Error("handleAccountImagesImpl: failed to draw status-indicator for initials", zap.Error(err))
 			return
@@ -363,8 +360,9 @@ func handleAccountImagesPlaceholder(logger *zap.Logger, w http.ResponseWriter, r
 		logger.Error("handleAccountImagesPlaceholder: failed to load image from disk", zap.String("imageName", parsed.ImagePath))
 		return
 	}
+	width := im.Bounds().Dx()
 	if parsed.BgSize == 0 {
-		parsed.BgSize = im.Bounds().Dx()
+		parsed.BgSize = width
 	}
 
 	payload, err = images.RoundCrop(payload)
@@ -374,7 +372,8 @@ func handleAccountImagesPlaceholder(logger *zap.Logger, w http.ResponseWriter, r
 	}
 
 	if parsed.IndicatorSize != 0 {
-		payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize, parsed.IndicatorBorder)
+		enlargeIndicatorRatio := width / parsed.BgSize
+		payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize*enlargeIndicatorRatio, parsed.IndicatorBorder*enlargeIndicatorRatio)
 		if err != nil {
 			logger.Error("handleAccountImagesPlaceholder: failed to draw status-indicator for initials", zap.Error(err))
 			return
@@ -589,20 +588,15 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 			return
 		}
 
-		config, _, err := image.DecodeConfig(bytes.NewReader(payload))
+		img, _, err := image.Decode(bytes.NewReader(payload))
 		if err != nil {
 			logger.Error("failed to decode config.", zap.String("contact id", parsed.PublicKey), zap.String("image type", parsed.ImageName), zap.Error(err))
 			return
 		}
+		width := img.Bounds().Dx()
 
 		if parsed.BgSize == 0 {
-			parsed.BgSize = config.Width
-		}
-
-		payload, err = images.ResizeImage(payload, parsed.BgSize, parsed.BgSize)
-		if err != nil {
-			logger.Error("handleContactImages: failed to crop image.", zap.Error(err))
-			return
+			parsed.BgSize = width
 		}
 
 		payload, err = images.RoundCrop(payload)
@@ -619,7 +613,7 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 			}
 
 			payload, err = ring.DrawRing(&ring.DrawRingParam{
-				Theme: parsed.Theme, ColorHash: colorHash, ImageBytes: payload, Height: parsed.BgSize, Width: parsed.BgSize,
+				Theme: parsed.Theme, ColorHash: colorHash, ImageBytes: payload, Height: width, Width: width,
 			})
 
 			if err != nil {
@@ -629,7 +623,8 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 		}
 
 		if parsed.IndicatorSize != 0 {
-			payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize, parsed.IndicatorBorder)
+			enlargeIndicatorRatio := width / parsed.BgSize
+			payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize*enlargeIndicatorRatio, parsed.IndicatorBorder*enlargeIndicatorRatio)
 			if err != nil {
 				logger.Error("handleAccountImagesImpl: failed to draw status-indicator for initials", zap.Error(err))
 				return
