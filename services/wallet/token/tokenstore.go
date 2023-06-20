@@ -1671,6 +1671,15 @@ func newDefaultStore() *DefaultStore {
 				Decimals: 6,
 				ChainID:  421613,
 			},
+			// Test SNT on Optimism Testnet
+			&Token{
+				Address:  common.HexToAddress("0xfb8dC8748F24F8B155123b0341a762C898511c76"),
+				Name:     "Status Test Token",
+				Symbol:   "STT",
+				Color:    "#f8f8f8",
+				Decimals: 18,
+				ChainID:  420,
+			},
 		},
 	}
 }
