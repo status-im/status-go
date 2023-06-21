@@ -40,6 +40,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/services/wallet/bigint"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -4102,7 +4103,7 @@ func (m *Manager) UpdateCommunityTokenState(chainID int, contractAddress string,
 	return m.persistence.UpdateCommunityTokenState(chainID, contractAddress, deployState)
 }
 
-func (m *Manager) UpdateCommunityTokenSupply(chainID int, contractAddress string, supply int) error {
+func (m *Manager) UpdateCommunityTokenSupply(chainID int, contractAddress string, supply *bigint.BigInt) error {
 	return m.persistence.UpdateCommunityTokenSupply(chainID, contractAddress, supply)
 }
 

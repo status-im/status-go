@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
 const signatureLength = 65
@@ -462,7 +463,7 @@ type CommunityToken struct {
 	Name               string                      `json:"name"`
 	Symbol             string                      `json:"symbol"`
 	Description        string                      `json:"description"`
-	Supply             int                         `json:"supply"`
+	Supply             *bigint.BigInt              `json:"supply"`
 	InfiniteSupply     bool                        `json:"infiniteSupply"`
 	Transferable       bool                        `json:"transferable"`
 	RemoteSelfDestruct bool                        `json:"remoteSelfDestruct"`

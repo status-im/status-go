@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"io/ioutil"
+	"math/big"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
 func TestPersistenceSuite(t *testing.T) {
@@ -382,7 +384,7 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 		Name:               "StatusToken",
 		Symbol:             "STT",
 		Description:        "desc",
-		Supply:             123,
+		Supply:             &bigint.BigInt{Int: big.NewInt(123)},
 		InfiniteSupply:     false,
 		Transferable:       true,
 		RemoteSelfDestruct: true,
@@ -398,7 +400,7 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 		Name:               "StatusToken",
 		Symbol:             "STT",
 		Description:        "desc",
-		Supply:             345,
+		Supply:             &bigint.BigInt{Int: big.NewInt(345)},
 		InfiniteSupply:     false,
 		Transferable:       true,
 		RemoteSelfDestruct: true,

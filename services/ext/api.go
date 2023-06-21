@@ -10,6 +10,7 @@ import (
 
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/bigint"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
@@ -1319,7 +1320,7 @@ func (api *PublicAPI) UpdateCommunityTokenState(chainID int, contractAddress str
 	return api.service.messenger.UpdateCommunityTokenState(chainID, contractAddress, deployState)
 }
 
-func (api *PublicAPI) UpdateCommunityTokenSupply(chainID int, contractAddress string, supply int) error {
+func (api *PublicAPI) UpdateCommunityTokenSupply(chainID int, contractAddress string, supply *bigint.BigInt) error {
 	return api.service.messenger.UpdateCommunityTokenSupply(chainID, contractAddress, supply)
 }
 
