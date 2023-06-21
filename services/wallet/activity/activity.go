@@ -364,7 +364,7 @@ const (
             )
             OR (filterActivityTypeReceive
                 AND (filterAllAddresses
-										OR (HEX(transfers.tx_to_address) IN filter_addresses))
+					OR (HEX(transfers.tx_to_address) IN filter_addresses))
             )
         )
         AND (filterAllAddresses

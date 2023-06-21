@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"testing"
 
+	eth "github.com/ethereum/go-ethereum/common"
+
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/services/wallet/testutils"
 	"github.com/status-im/status-go/services/wallet/transfer"
 
 	"github.com/stretchr/testify/require"
@@ -60,4 +63,66 @@ func TestGetRecipients(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 4, len(entries))
 	require.True(t, hasMore)
+}
+
+func TestGetOldestTimestampEmptyDB(t *testing.T) {
+	db, close := setupTestFilterDB(t)
+	defer close()
+
+	timestamp, err := GetOldestTimestamp(context.Background(), db, []eth.Address{eth.HexToAddress("0x1")})
+	require.NoError(t, err)
+	require.Equal(t, int64(0), timestamp)
+}
+
+func TestGetOldestTimestamp(t *testing.T) {
+	db, close := setupTestFilterDB(t)
+	defer close()
+
+	// Add 6 extractable transactions
+	trs, _, _ := transfer.GenerateTestTransfers(t, db, 0, 7)
+	for i := range trs {
+		if i < 5 {
+			transfer.InsertTestTransfer(t, db, trs[i].To, &trs[i])
+		} else {
+			transfer.InsertTestPendingTransaction(t, db, &trs[i])
+		}
+	}
+
+	multiTxs := []transfer.TestMultiTransaction{
+		transfer.GenerateTestBridgeMultiTransaction(trs[0], trs[1]),
+		transfer.GenerateTestSwapMultiTransaction(trs[2], testutils.SntSymbol, 100),
+	}
+
+	// Extract oldest timestamp, no filter
+	timestamp, err := GetOldestTimestamp(context.Background(), db, []eth.Address{})
+	require.NoError(t, err)
+	require.Equal(t, multiTxs[0].Timestamp, timestamp)
+
+	// Test to filter
+	timestamp, err = GetOldestTimestamp(context.Background(), db, []eth.Address{
+		trs[3].To,
+	})
+	require.NoError(t, err)
+	require.Equal(t, trs[3].Timestamp, timestamp)
+
+	// Test from filter
+	timestamp, err = GetOldestTimestamp(context.Background(), db, []eth.Address{
+		trs[4].From,
+	})
+	require.NoError(t, err)
+	require.Equal(t, trs[4].Timestamp, timestamp)
+
+	// Test MT
+	timestamp, err = GetOldestTimestamp(context.Background(), db, []eth.Address{
+		multiTxs[1].FromAddress, trs[4].To,
+	})
+	require.NoError(t, err)
+	require.Equal(t, multiTxs[1].Timestamp, timestamp)
+
+	// Test Pending
+	timestamp, err = GetOldestTimestamp(context.Background(), db, []eth.Address{
+		trs[6].To,
+	})
+	require.NoError(t, err)
+	require.Equal(t, trs[6].Timestamp, timestamp)
 }

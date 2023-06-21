@@ -3,6 +3,7 @@ package activity
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -91,28 +92,28 @@ type Filter struct {
 // TODO: consider sorting by saved address and contacts to offload the client from doing it at runtime
 func GetRecipients(ctx context.Context, db *sql.DB, offset int, limit int) (addresses []eth.Address, hasMore bool, err error) {
 	rows, err := db.QueryContext(ctx, `
-		SELECT
-			transfers.address as to_address,
-			transfers.timestamp AS timestamp
-		FROM transfers
-		WHERE transfers.multi_transaction_id = 0
+        SELECT
+            transfers.tx_to_address as to_address,
+            transfers.timestamp AS timestamp
+        FROM transfers
+        WHERE transfers.multi_transaction_id = 0
 
-		UNION ALL
+        UNION ALL
 
-		SELECT
-			pending_transactions.to_address AS to_address,
-			pending_transactions.timestamp AS timestamp
-		FROM pending_transactions
-		WHERE pending_transactions.multi_transaction_id = 0
+        SELECT
+            pending_transactions.to_address AS to_address,
+            pending_transactions.timestamp AS timestamp
+        FROM pending_transactions
+        WHERE pending_transactions.multi_transaction_id = 0
 
-		UNION ALL
+        UNION ALL
 
-		SELECT
-			multi_transactions.to_address AS to_address,
-			multi_transactions.timestamp AS timestamp
-		FROM multi_transactions
-		ORDER BY timestamp DESC
-		LIMIT ? OFFSET ?`, limit, offset)
+        SELECT
+            multi_transactions.to_address AS to_address,
+            multi_transactions.timestamp AS timestamp
+        FROM multi_transactions
+        ORDER BY timestamp DESC
+        LIMIT ? OFFSET ?`, limit, offset)
 	if err != nil {
 		return nil, false, err
 	}
@@ -136,4 +137,61 @@ func GetRecipients(ctx context.Context, db *sql.DB, offset int, limit int) (addr
 	hasMore = len(entries) == limit
 
 	return entries, hasMore, nil
+}
+
+func GetOldestTimestamp(ctx context.Context, db *sql.DB, addresses []eth.Address) (timestamp int64, err error) {
+	queryFormatString := `
+		WITH filter_conditions AS (SELECT ? AS filterAllAddresses),
+			filter_addresses(address) AS (
+				SELECT * FROM (VALUES %s) WHERE (SELECT filterAllAddresses FROM filter_conditions) = 0
+			)
+
+		SELECT
+			transfers.tx_from_address AS from_address,
+			transfers.tx_to_address AS to_address,
+			transfers.timestamp AS timestamp
+		FROM transfers, filter_conditions
+		WHERE transfers.multi_transaction_id = 0
+			AND (filterAllAddresses OR HEX(from_address) IN filter_addresses OR HEX(to_address) IN filter_addresses)
+
+		UNION ALL
+
+		SELECT
+			pending_transactions.from_address AS from_address,
+			pending_transactions.to_address AS to_address,
+			pending_transactions.timestamp AS timestamp
+		FROM pending_transactions, filter_conditions
+		WHERE pending_transactions.multi_transaction_id = 0
+			AND (filterAllAddresses OR HEX(from_address) IN filter_addresses OR HEX(to_address) IN filter_addresses)
+
+		UNION ALL
+
+		SELECT
+			multi_transactions.from_address AS from_address,
+			multi_transactions.to_address AS to_address,
+			multi_transactions.timestamp AS timestamp
+		FROM multi_transactions, filter_conditions
+		WHERE filterAllAddresses OR HEX(from_address) IN filter_addresses OR HEX(to_address) IN filter_addresses
+		ORDER BY timestamp ASC
+		LIMIT 1`
+
+	filterAllAddresses := len(addresses) == 0
+	involvedAddresses := noEntriesInTmpTableSQLValues
+	if !filterAllAddresses {
+		involvedAddresses = joinAddresses(addresses)
+	}
+	queryString := fmt.Sprintf(queryFormatString, involvedAddresses)
+
+	row := db.QueryRowContext(ctx, queryString, filterAllAddresses)
+	var fromAddress, toAddress sql.NullString
+	err = row.Scan(&fromAddress, &toAddress, &timestamp)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+
+	if err != nil {
+		return 0, err
+	}
+
+	return timestamp, nil
 }
