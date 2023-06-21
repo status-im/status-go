@@ -3,13 +3,6 @@ _extends: probot-settings
 github-team:
   slug: 'go'
 
-prchecklist:
-  title: Pull Request Checklist
-  checklist:
-    - 'Have you updated the documentation, if impacted (e.g. [docs.status.im](https://status.im/docs/))?'
-    - 'Have you tested changes with mobile?'
-    - 'Have you tested changes with desktop?'
-
 stale:
   daysUntilStale: 90
   daysUntilPullRequestStale: 14

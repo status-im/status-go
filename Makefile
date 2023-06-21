@@ -388,6 +388,13 @@ migration: DEFAULT_MIGRATION_PATH := appdatabase/migrations/sql
 migration:
 	touch $(DEFAULT_MIGRATION_PATH)/$(shell date +%s)_$(D).up.sql
 
+migration-check:
+	bash _assets/scripts/migration_check.sh
+
+install-git-hooks:
+	@ln -s -f $(shell pwd)/_assets/hooks/pre-rebase .git/hooks
+	@ln -s -f $(shell pwd)/_assets/hooks/pre-merge-commit .git/hooks
+
 migration-protocol: DEFAULT_PROTOCOL_PATH := protocol/migrations/sqlite
 migration-protocol:
 	touch $(DEFAULT_PROTOCOL_PATH)/$(shell date +%s)_$(D).up.sql

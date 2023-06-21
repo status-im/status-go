@@ -49,6 +49,11 @@ pipeline {
       } }
     }
 
+    stage('Migration') {
+      steps { script {
+        nix.shell('make migration-check')
+      } }
+    }
 
     stage('Lint') {
       steps { script {
