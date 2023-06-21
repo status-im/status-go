@@ -117,9 +117,10 @@ type SentNotification struct {
 }
 
 type RegistrationOptions struct {
-	PublicChatIDs []string
-	MutedChatIDs  []string
-	ContactIDs    []*ecdsa.PublicKey
+	PublicChatIDs  []string
+	MutedChatIDs   []string
+	BlockedChatIDs []string
+	ContactIDs     []*ecdsa.PublicKey
 }
 
 func (s *SentNotification) HashedPublicKey() []byte {
@@ -1172,10 +1173,11 @@ func (c *Client) buildPushNotificationRegistrationMessage(options *RegistrationO
 		DeviceToken:             c.deviceToken,
 		AllowFromContactsOnly:   c.config.AllowFromContactsOnly,
 		Enabled:                 c.config.RemoteNotificationsEnabled,
-		BlockedChatList:         c.chatIDsHashes(options.MutedChatIDs),
+		BlockedChatList:         c.chatIDsHashes(options.BlockedChatIDs),
 		BlockMentions:           c.config.BlockMentions,
 		AllowedMentionsChatList: c.chatIDsHashes(options.PublicChatIDs),
 		AllowedKeyList:          allowedKeyList,
+		MutedChatList:           c.chatIDsHashes(options.MutedChatIDs),
 	}, nil
 }
 

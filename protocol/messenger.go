@@ -5820,6 +5820,7 @@ func (m *Messenger) pushNotificationOptions() *pushnotificationclient.Registrati
 	var contactIDs []*ecdsa.PublicKey
 	var mutedChatIDs []string
 	var publicChatIDs []string
+	var blockedChatIDs []string
 
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 		if contact.added() && !contact.Blocked {
@@ -5830,7 +5831,7 @@ func (m *Messenger) pushNotificationOptions() *pushnotificationclient.Registrati
 			}
 			contactIDs = append(contactIDs, pk)
 		} else if contact.Blocked {
-			mutedChatIDs = append(mutedChatIDs, contact.ID)
+			blockedChatIDs = append(blockedChatIDs, contact.ID)
 		}
 		return true
 	})
@@ -5846,9 +5847,10 @@ func (m *Messenger) pushNotificationOptions() *pushnotificationclient.Registrati
 	})
 
 	return &pushnotificationclient.RegistrationOptions{
-		ContactIDs:    contactIDs,
-		MutedChatIDs:  mutedChatIDs,
-		PublicChatIDs: publicChatIDs,
+		ContactIDs:     contactIDs,
+		MutedChatIDs:   mutedChatIDs,
+		PublicChatIDs:  publicChatIDs,
+		BlockedChatIDs: blockedChatIDs,
 	}
 }
 

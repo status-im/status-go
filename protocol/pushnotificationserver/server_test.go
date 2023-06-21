@@ -677,6 +677,8 @@ func (s *ServerSuite) TestBuildPushNotificationReport() {
 	author := []byte("author")
 	blockedAuthor := []byte("blocked-author")
 	blockedChatID := []byte("blocked-chat-id")
+	mutedChatID := []byte("muted-chat-id")
+	mutedChatList := [][]byte{mutedChatID, author}
 	blockedChatList := [][]byte{blockedChatID, blockedAuthor}
 	nonJoinedChatID := []byte("non-joined-chat-id")
 	allowedMentionsChatList := [][]byte{chatID}
@@ -695,6 +697,7 @@ func (s *ServerSuite) TestBuildPushNotificationReport() {
 		AccessToken:             accessToken,
 		BlockedChatList:         blockedChatList,
 		AllowedMentionsChatList: allowedMentionsChatList,
+		MutedChatList:           mutedChatList,
 	}
 	blockedMentionsRegistration := &protobuf.PushNotificationRegistration{
 		AccessToken:             accessToken,
@@ -792,6 +795,54 @@ func (s *ServerSuite) TestBuildPushNotificationReport() {
 			pn: &protobuf.PushNotification{
 				Type:        protobuf.PushNotification_MESSAGE,
 				ChatId:      blockedChatID,
+				Author:      author,
+				AccessToken: accessToken,
+			},
+			registration: validRegistration,
+			expectedResponse: &reportResult{
+				sendNotification: false,
+				report: &protobuf.PushNotificationReport{
+					Success: true,
+				},
+			},
+		},
+		{
+			name: "muted chat list message",
+			pn: &protobuf.PushNotification{
+				Type:        protobuf.PushNotification_MESSAGE,
+				ChatId:      mutedChatID,
+				Author:      author,
+				AccessToken: accessToken,
+			},
+			registration: validRegistration,
+			expectedResponse: &reportResult{
+				sendNotification: false,
+				report: &protobuf.PushNotificationReport{
+					Success: true,
+				},
+			},
+		},
+		{
+			name: "unmuted chat and user muted author",
+			pn: &protobuf.PushNotification{
+				Type:        protobuf.PushNotification_MESSAGE,
+				ChatId:      chatID,
+				Author:      author,
+				AccessToken: accessToken,
+			},
+			registration: validRegistration,
+			expectedResponse: &reportResult{
+				sendNotification: true,
+				report: &protobuf.PushNotificationReport{
+					Success: true,
+				},
+			},
+		},
+		{
+			name: "muted chat list mention",
+			pn: &protobuf.PushNotification{
+				Type:        protobuf.PushNotification_MENTION,
+				ChatId:      mutedChatID,
 				Author:      author,
 				AccessToken: accessToken,
 			},
