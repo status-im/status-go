@@ -704,8 +704,22 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		revealedAccounts := make(map[gethcommon.Address]*protobuf.RevealedAccount)
 		revealedAddresses := make([]gethcommon.Address, 0)
 
+		containsAddress := func(addresses []string, targetAddress string) bool {
+			for _, address := range addresses {
+				if address == targetAddress {
+					return true
+				}
+			}
+			return false
+		}
+
 		for _, walletAccount := range walletAccounts {
 			if !walletAccount.Chat && walletAccount.Type != accounts.AccountTypeWatch {
+
+				if len(request.AddressesToReveal) > 0 && !containsAddress(request.AddressesToReveal, walletAccount.Address.Hex()) {
+					continue
+				}
+
 				verifiedAccount, err := m.accountsManager.GetVerifiedWalletAccount(m.settings, walletAccount.Address.Hex(), request.Password)
 				if err != nil {
 					return nil, err

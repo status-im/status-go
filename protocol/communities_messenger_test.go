@@ -48,7 +48,8 @@ const alicePassword = "qwerty"
 const bobPassword = "bob123"
 
 const adminAddress = "0x0100000000000000000000000000000000000000"
-const aliceAddress = "0x0200000000000000000000000000000000000000"
+const aliceAddress1 = "0x0200000000000000000000000000000000000000"
+const aliceAddress2 = "0x0210000000000000000000000000000000000000"
 const bobAddress = "0x0300000000000000000000000000000000000000"
 
 type AccountManagerMock struct {
@@ -110,9 +111,9 @@ func (s *MessengerCommunitiesSuite) SetupTest() {
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 
-	s.admin = s.newMessengerWithWallet(adminPassword, adminAddress)
-	s.bob = s.newMessengerWithWallet(bobPassword, bobAddress)
-	s.alice = s.newMessengerWithWallet(alicePassword, aliceAddress)
+	s.admin = s.newMessengerWithWallet(adminPassword, []string{adminAddress})
+	s.bob = s.newMessengerWithWallet(bobPassword, []string{bobAddress})
+	s.alice = s.newMessengerWithWallet(alicePassword, []string{aliceAddress1, aliceAddress2})
 	_, err := s.admin.Start()
 	s.Require().NoError(err)
 	_, err = s.bob.Start()
@@ -204,29 +205,35 @@ func (s *MessengerCommunitiesSuite) newMessenger(accountsManager account.Manager
 	return s.newMessengerWithKey(s.shh, privateKey, accountsManager)
 }
 
-func (s *MessengerCommunitiesSuite) newMessengerWithWallet(password string, walletAddress string) *Messenger {
+func (s *MessengerCommunitiesSuite) newMessengerWithWallet(password string, walletAddresses []string) *Messenger {
 	accountsManager := &AccountManagerMock{}
 	accountsManager.AccountsMap = make(map[string]string)
-	accountsManager.AccountsMap[walletAddress] = types.EncodeHex(crypto.Keccak256([]byte(password)))
+	for _, walletAddress := range walletAddresses {
+		accountsManager.AccountsMap[walletAddress] = types.EncodeHex(crypto.Keccak256([]byte(password)))
+	}
 
 	messenger := s.newMessenger(accountsManager)
 
 	// add wallet account with keypair
-	kp := accounts.GetProfileKeypairForTest(false, true, false)
-	kp.Accounts[0].Address = types.HexToAddress(walletAddress)
-	err := messenger.settings.SaveOrUpdateKeypair(kp)
-	s.Require().NoError(err)
+	for _, walletAddress := range walletAddresses {
+		kp := accounts.GetProfileKeypairForTest(false, true, false)
+		kp.Accounts[0].Address = types.HexToAddress(walletAddress)
+		err := messenger.settings.SaveOrUpdateKeypair(kp)
+		s.Require().NoError(err)
+	}
 
 	walletAccounts, err := messenger.settings.GetAccounts()
 	s.Require().NoError(err)
-	s.Require().Len(walletAccounts, 1)
-	s.Require().Equal(walletAccounts[0].Type, accounts.AccountTypeGenerated)
+	s.Require().Len(walletAccounts, len(walletAddresses))
+	for i := range walletAddresses {
+		s.Require().Equal(walletAccounts[i].Type, accounts.AccountTypeGenerated)
+	}
 	return messenger
 }
 
-func (s *MessengerCommunitiesSuite) requestToJoinCommunity(user *Messenger, communityID types.HexBytes, password string) (*MessengerResponse, error) {
+func (s *MessengerCommunitiesSuite) requestToJoinCommunity(user *Messenger, communityID types.HexBytes, password string, addresses []string) (*MessengerResponse, error) {
 	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(password)))
-	request := &requests.RequestToJoinCommunity{CommunityID: communityID, Password: passwdHash}
+	request := &requests.RequestToJoinCommunity{CommunityID: communityID, Password: passwdHash, AddressesToReveal: addresses}
 	return user.RequestToJoinCommunity(request)
 }
 
@@ -262,7 +269,7 @@ func (s *MessengerCommunitiesSuite) TestCreateCommunity_WithoutDefaultChannel() 
 }
 
 func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
-	alice := s.newMessengerWithWallet(alicePassword, aliceAddress)
+	alice := s.newMessengerWithWallet(alicePassword, []string{aliceAddress1})
 
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
@@ -577,9 +584,9 @@ func (s *MessengerCommunitiesSuite) advertiseCommunityTo(community *communities.
 	s.Require().NoError(err)
 }
 
-func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Community, user *Messenger, password string) {
+func (s *MessengerCommunitiesSuite) joinCommunityWithAddresses(community *communities.Community, user *Messenger, password string, addresses []string) {
 	// Request to join the community
-	response, err := s.requestToJoinCommunity(user, community.ID(), password)
+	response, err := s.requestToJoinCommunity(user, community.ID(), password, addresses)
 
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -623,6 +630,10 @@ func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Communi
 		return nil
 	})
 	s.Require().NoError(err)
+}
+
+func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Community, user *Messenger, password string) {
+	s.joinCommunityWithAddresses(community, user, password, []string{})
 }
 
 func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
@@ -3709,13 +3720,40 @@ func (s *MessengerCommunitiesSuite) TestJoinedCommunityMembersSharedAddress() {
 
 	for pubKey, member := range community.Members() {
 		if pubKey != common.PubkeyToHex(&s.admin.identity.PublicKey) {
+
+			switch pubKey {
+			case common.PubkeyToHex(&s.alice.identity.PublicKey):
+				s.Require().Len(member.RevealedAccounts, 2)
+				s.Require().Equal(member.RevealedAccounts[0].Address, aliceAddress1)
+				s.Require().Equal(member.RevealedAccounts[1].Address, aliceAddress2)
+			case common.PubkeyToHex(&s.bob.identity.PublicKey):
+				s.Require().Len(member.RevealedAccounts, 1)
+				s.Require().Equal(member.RevealedAccounts[0].Address, bobAddress)
+			default:
+				s.Require().Fail("pubKey does not match expected keys")
+			}
+		}
+	}
+}
+
+func (s *MessengerCommunitiesSuite) TestJoinedCommunityMembersSelectedSharedAddress() {
+	community := s.createCommunity()
+	s.advertiseCommunityTo(community, s.alice)
+
+	s.joinCommunityWithAddresses(community, s.alice, alicePassword, []string{aliceAddress2})
+
+	community, err := s.admin.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+
+	s.Require().Equal(2, community.MembersCount())
+
+	for pubKey, member := range community.Members() {
+		if pubKey != common.PubkeyToHex(&s.admin.identity.PublicKey) {
 			s.Require().Len(member.RevealedAccounts, 1)
 
 			switch pubKey {
 			case common.PubkeyToHex(&s.alice.identity.PublicKey):
-				s.Require().Equal(member.RevealedAccounts[0].Address, aliceAddress)
-			case common.PubkeyToHex(&s.bob.identity.PublicKey):
-				s.Require().Equal(member.RevealedAccounts[0].Address, bobAddress)
+				s.Require().Equal(member.RevealedAccounts[0].Address, aliceAddress2)
 			default:
 				s.Require().Fail("pubKey does not match expected keys")
 			}
