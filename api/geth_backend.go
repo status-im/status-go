@@ -399,7 +399,7 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 		return err
 	}
 
-	if acc.ColorHash == nil || acc.ColorID == 0 {
+	if acc.ColorHash == nil {
 		multiAccount, err := b.updateAccountColorHashAndColorID(acc.KeyUID, accountsDB)
 		if err != nil {
 			return err
@@ -475,7 +475,7 @@ func (b *GethStatusBackend) updateAccountColorHashAndColorID(keyUID string, acco
 	if err != nil {
 		return nil, err
 	}
-	if multiAccount.ColorHash == nil || multiAccount.ColorID == 0 {
+	if multiAccount.ColorHash == nil {
 		keypair, err := accountsDB.GetKeypairByKeyUID(keyUID)
 		if err != nil {
 			return nil, err
@@ -612,7 +612,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		return err
 	}
 
-	if acc.ColorHash == nil || acc.ColorID == 0 {
+	if acc.ColorHash == nil {
 		multiAccount, err := b.updateAccountColorHashAndColorID(acc.KeyUID, accountsDB)
 		if err != nil {
 			return err
