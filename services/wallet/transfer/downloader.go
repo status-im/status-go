@@ -18,12 +18,6 @@ import (
 	w_common "github.com/status-im/status-go/services/wallet/common"
 )
 
-type MultiTransactionIDType int64
-
-const (
-	NoMultiTransactionID = MultiTransactionIDType(0)
-)
-
 func getLogSubTxID(log types.Log) common.Hash {
 	// Get unique ID by using TxHash and log index
 	index := [4]byte{}

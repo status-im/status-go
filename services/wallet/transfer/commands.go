@@ -17,6 +17,7 @@ import (
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/transactions"
 )
 
 const (
@@ -180,11 +181,13 @@ type controlCommand struct {
 	errorsCount        int
 	nonArchivalRPCNode bool
 	transactionManager *TransactionManager
+	pendingTxManager   *transactions.TransactionManager
 	tokenManager       *token.Manager
 }
 
 func (c *controlCommand) LoadTransfers(ctx context.Context, limit int) error {
-	return loadTransfers(ctx, c.accounts, c.blockDAO, c.db, c.chainClient, limit, make(map[common.Address][]*big.Int), c.transactionManager, c.tokenManager, c.feed)
+	return loadTransfers(ctx, c.accounts, c.blockDAO, c.db, c.chainClient, limit, make(map[common.Address][]*big.Int),
+		c.transactionManager, c.pendingTxManager, c.tokenManager, c.feed)
 }
 
 func (c *controlCommand) Run(parent context.Context) error {
@@ -357,6 +360,7 @@ type transfersCommand struct {
 	chainClient        *chain.ClientWithFallback
 	blocksLimit        int
 	transactionManager *TransactionManager
+	pendingTxManager   *transactions.TransactionManager
 	tokenManager       *token.Manager
 	feed               *event.Feed
 
@@ -450,10 +454,10 @@ func (c *transfersCommand) propagatePendingMultiTx(tx Transaction) error {
 	// If any subTx matches a pending entry, mark all of them with the corresponding multiTxID
 	for _, subTx := range tx {
 		// Update MultiTransactionID from pending entry
-		entry, err := c.transactionManager.GetPendingEntry(c.chainClient.ChainID, subTx.ID)
+		entry, err := c.pendingTxManager.GetPendingEntry(c.chainClient.ChainID, subTx.ID)
 		if err == nil {
 			// Propagate the MultiTransactionID, in case the pending entry was a multi-transaction
-			multiTxID = entry.MultiTransactionID
+			multiTxID = MultiTransactionIDType(entry.MultiTransactionID)
 			break
 		} else if err != sql.ErrNoRows {
 			log.Error("GetPendingEntry error", "error", err)
@@ -561,6 +565,7 @@ type loadTransfersCommand struct {
 	chainClient        *chain.ClientWithFallback
 	blocksByAddress    map[common.Address][]*big.Int
 	transactionManager *TransactionManager
+	pendingTxManager   *transactions.TransactionManager
 	blocksLimit        int
 	tokenManager       *token.Manager
 	feed               *event.Feed
@@ -574,7 +579,8 @@ func (c *loadTransfersCommand) Command() async.Command {
 }
 
 func (c *loadTransfersCommand) LoadTransfers(ctx context.Context, limit int, blocksByAddress map[common.Address][]*big.Int) error {
-	return loadTransfers(ctx, c.accounts, c.blockDAO, c.db, c.chainClient, limit, blocksByAddress, c.transactionManager, c.tokenManager, c.feed)
+	return loadTransfers(ctx, c.accounts, c.blockDAO, c.db, c.chainClient, limit, blocksByAddress,
+		c.transactionManager, c.pendingTxManager, c.tokenManager, c.feed)
 }
 
 func (c *loadTransfersCommand) Run(parent context.Context) (err error) {
@@ -749,7 +755,9 @@ func (c *findAndCheckBlockRangeCommand) fastIndexErc20(ctx context.Context, from
 
 func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *BlockDAO, db *Database,
 	chainClient *chain.ClientWithFallback, blocksLimitPerAccount int, blocksByAddress map[common.Address][]*big.Int,
-	transactionManager *TransactionManager, tokenManager *token.Manager, feed *event.Feed) error {
+	transactionManager *TransactionManager, pendingTxManager *transactions.TransactionManager,
+	tokenManager *token.Manager, feed *event.Feed) error {
+
 	log.Info("loadTransfers start", "accounts", accounts, "chain", chainClient.ChainID, "limit", blocksLimitPerAccount)
 
 	start := time.Now()
@@ -769,6 +777,7 @@ func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *Blo
 			},
 			blockNums:          blocksByAddress[address],
 			transactionManager: transactionManager,
+			pendingTxManager:   pendingTxManager,
 			tokenManager:       tokenManager,
 			feed:               feed,
 		}

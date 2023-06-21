@@ -66,6 +66,10 @@ func (t *Transactor) SetNetworkID(networkID uint64) {
 	t.networkID = networkID
 }
 
+func (t *Transactor) NetworkID() uint64 {
+	return t.networkID
+}
+
 // SetRPC sets RPC params, a client and a timeout
 func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 	t.rpcWrapper = newRPCWrapper(rpcClient, rpcClient.UpstreamChainID)

@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/transactions"
 )
 
 type findNewBlocksCommand struct {
@@ -318,8 +319,8 @@ func (c *findBlocksCommand) fastIndexErc20(ctx context.Context, fromBlockNumber 
 }
 
 func loadTransfersLoop(ctx context.Context, account common.Address, blockDAO *BlockDAO, db *Database,
-	chainClient *chain.ClientWithFallback, transactionManager *TransactionManager, tokenManager *token.Manager,
-	feed *event.Feed, blocksLoadedCh <-chan []*DBHeader) {
+	chainClient *chain.ClientWithFallback, transactionManager *TransactionManager, pendingTxManager *transactions.TransactionManager,
+	tokenManager *token.Manager, feed *event.Feed, blocksLoadedCh <-chan []*DBHeader) {
 
 	log.Debug("loadTransfersLoop start", "chain", chainClient.ChainID, "account", account)
 
@@ -339,7 +340,7 @@ func loadTransfersLoop(ctx context.Context, account common.Address, blockDAO *Bl
 			blocksByAddress := map[common.Address][]*big.Int{account: blockNums}
 			go func() {
 				_ = loadTransfers(ctx, []common.Address{account}, blockDAO, db, chainClient, noBlockLimit,
-					blocksByAddress, transactionManager, tokenManager, feed)
+					blocksByAddress, transactionManager, pendingTxManager, tokenManager, feed)
 			}()
 		}
 	}
@@ -347,7 +348,8 @@ func loadTransfersLoop(ctx context.Context, account common.Address, blockDAO *Bl
 
 func newLoadBlocksAndTransfersCommand(account common.Address, db *Database,
 	blockDAO *BlockDAO, chainClient *chain.ClientWithFallback, feed *event.Feed,
-	transactionManager *TransactionManager, tokenManager *token.Manager) *loadBlocksAndTransfersCommand {
+	transactionManager *TransactionManager, pendingTxManager *transactions.TransactionManager,
+	tokenManager *token.Manager) *loadBlocksAndTransfersCommand {
 
 	return &loadBlocksAndTransfersCommand{
 		account:            account,
@@ -358,6 +360,7 @@ func newLoadBlocksAndTransfersCommand(account common.Address, db *Database,
 		feed:               feed,
 		errorsCount:        0,
 		transactionManager: transactionManager,
+		pendingTxManager:   pendingTxManager,
 		tokenManager:       tokenManager,
 		blocksLoadedCh:     make(chan []*DBHeader, 100),
 	}
@@ -374,6 +377,7 @@ type loadBlocksAndTransfersCommand struct {
 	errorsCount   int
 	// nonArchivalRPCNode bool // TODO Make use of it
 	transactionManager *TransactionManager
+	pendingTxManager   *transactions.TransactionManager
 	tokenManager       *token.Manager
 	blocksLoadedCh     chan []*DBHeader
 
@@ -425,8 +429,8 @@ func (c *loadBlocksAndTransfersCommand) Command() async.Command {
 }
 
 func (c *loadBlocksAndTransfersCommand) startTransfersLoop(ctx context.Context) {
-	go loadTransfersLoop(ctx, c.account, c.blockDAO, c.db, c.chainClient, c.transactionManager, c.tokenManager,
-		c.feed, c.blocksLoadedCh)
+	go loadTransfersLoop(ctx, c.account, c.blockDAO, c.db, c.chainClient, c.transactionManager,
+		c.pendingTxManager, c.tokenManager, c.feed, c.blocksLoadedCh)
 }
 
 func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocks(ctx context.Context, group *async.Group, blocksLoadedCh chan []*DBHeader) error {
@@ -524,6 +528,7 @@ func (c *loadBlocksAndTransfersCommand) fetchTransfersForLoadedBlocks(group *asy
 		blockDAO:           c.blockDAO,
 		chainClient:        c.chainClient,
 		transactionManager: c.transactionManager,
+		pendingTxManager:   c.pendingTxManager,
 		tokenManager:       c.tokenManager,
 		blocksByAddress:    blocksMap,
 		feed:               c.feed,

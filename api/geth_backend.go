@@ -16,6 +16,7 @@ import (
 
 	"github.com/imdario/mergo"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -30,18 +31,19 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/common"
+	multiacccommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
-	identityUtils "github.com/status-im/status-go/protocol/identity"
+	identityutils "github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/personal"
+	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/sqlite"
@@ -1064,7 +1066,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 	account := multiaccounts.Account{
 		KeyUID:             info.KeyUID,
 		Name:               request.DisplayName,
-		CustomizationColor: common.CustomizationColor(request.CustomizationColor),
+		CustomizationColor: multiacccommon.CustomizationColor(request.CustomizationColor),
 		KDFIterations:      sqlite.ReducedKDFIterationsNumber,
 	}
 	if request.ImagePath != "" {
@@ -1255,7 +1257,7 @@ func enrichMultiAccountBySubAccounts(account *multiaccounts.Account, subaccs []*
 			}
 			account.ColorHash = colorHash
 
-			colorID, err := identityUtils.ToColorID(pk)
+			colorID, err := identityutils.ToColorID(pk)
 			if err != nil {
 				return err
 			}
@@ -1276,7 +1278,7 @@ func enrichMultiAccountByPublicKey(account *multiaccounts.Account, publicKey typ
 	}
 	account.ColorHash = colorHash
 
-	colorID, err := identityUtils.ToColorID(pk)
+	colorID, err := identityutils.ToColorID(pk)
 	if err != nil {
 		return err
 	}
@@ -1586,7 +1588,12 @@ func (b *GethStatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, pa
 		return
 	}
 
-	go b.statusNode.RPCFiltersService().TriggerTransactionSentToUpstreamEvent(hash)
+	go b.statusNode.RPCFiltersService().TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
+		Hash:    common.Hash(hash),
+		Type:    string(transactions.WalletTransfer),
+		From:    common.Address(sendArgs.From),
+		ChainID: b.transactor.NetworkID(),
+	})
 
 	return
 }
@@ -1602,7 +1609,12 @@ func (b *GethStatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs 
 		return
 	}
 
-	go b.statusNode.RPCFiltersService().TriggerTransactionSentToUpstreamEvent(hash)
+	go b.statusNode.RPCFiltersService().TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
+		Hash:    common.Hash(hash),
+		Type:    string(transactions.WalletTransfer),
+		From:    common.Address(sendArgs.From),
+		ChainID: b.transactor.NetworkID(),
+	})
 
 	return
 }
@@ -1613,7 +1625,12 @@ func (b *GethStatusBackend) SendTransactionWithSignature(sendArgs transactions.S
 		return
 	}
 
-	go b.statusNode.RPCFiltersService().TriggerTransactionSentToUpstreamEvent(hash)
+	go b.statusNode.RPCFiltersService().TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
+		Hash:    common.Hash(hash),
+		Type:    string(transactions.WalletTransfer),
+		From:    common.Address(sendArgs.From),
+		ChainID: b.transactor.NetworkID(),
+	})
 
 	return
 }

@@ -61,7 +61,9 @@ func TestZeroSubsciptionsOptimization(t *testing.T) {
 	assert.Equal(t, int64(0), atomic.LoadInt64(&counter))
 
 	// subscribing an event, checking that it works
-	id, channel := event.Subscribe()
+	id, channelInterface := event.Subscribe()
+	channel, ok := channelInterface.(chan common.Hash)
+	assert.True(t, ok)
 
 	timeout := time.After(1 * time.Second)
 	select {
@@ -128,7 +130,9 @@ func testEventSubscribe(t *testing.T, f func() (blockInfo, error), expectedHashe
 }
 
 func testEvent(t *testing.T, event *latestBlockChangedEvent, expectedHashes []common.Hash) {
-	id, channel := event.Subscribe()
+	id, channelInterface := event.Subscribe()
+	channel, ok := channelInterface.(chan common.Hash)
+	assert.True(t, ok)
 
 	timeout := time.After(1 * time.Second)
 

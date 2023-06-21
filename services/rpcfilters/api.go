@@ -10,6 +10,7 @@ import (
 	"github.com/pborman/uuid"
 
 	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/log"
@@ -31,6 +32,13 @@ type filter interface {
 	pop() interface{}
 	stop()
 	deadline() *time.Timer
+}
+
+type ChainEvent interface {
+	Start() error
+	Stop()
+	Subscribe() (id int, ch interface{})
+	Unsubscribe(id int)
 }
 
 // PublicAPI represents filter API that is exported to `eth` namespace
@@ -123,7 +131,12 @@ func (api *PublicAPI) NewBlockFilter() getrpc.ID {
 	api.filters[id] = f
 
 	go func() {
-		id, s := api.latestBlockChangedEvent.Subscribe()
+		id, si := api.latestBlockChangedEvent.Subscribe()
+		s, ok := si.(chan common.Hash)
+		if !ok {
+			panic("latestBlockChangedEvent returned wrong type")
+		}
+
 		defer api.latestBlockChangedEvent.Unsubscribe(id)
 
 		for {
@@ -154,7 +167,11 @@ func (api *PublicAPI) NewPendingTransactionFilter() getrpc.ID {
 	api.filters[id] = f
 
 	go func() {
-		id, s := api.transactionSentToUpstreamEvent.Subscribe()
+		id, si := api.transactionSentToUpstreamEvent.Subscribe()
+		s, ok := si.(chan *PendingTxInfo)
+		if !ok {
+			panic("transactionSentToUpstreamEvent returned wrong type")
+		}
 		defer api.transactionSentToUpstreamEvent.Unsubscribe(id)
 
 		for {
@@ -167,7 +184,6 @@ func (api *PublicAPI) NewPendingTransactionFilter() getrpc.ID {
 				return
 			}
 		}
-
 	}()
 
 	return id
