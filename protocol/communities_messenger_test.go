@@ -43,11 +43,13 @@ import (
 	"github.com/status-im/status-go/waku"
 )
 
-const AdminPassword = "123456"
-const AlicePassword = "qwerty"
-const BobPassword = "bob123"
+const adminPassword = "123456"
+const alicePassword = "qwerty"
+const bobPassword = "bob123"
 
-var walletAddress = "0x0100000000000000000000000000000000000000"
+const adminAddress = "0x0100000000000000000000000000000000000000"
+const aliceAddress = "0x0200000000000000000000000000000000000000"
+const bobAddress = "0x0300000000000000000000000000000000000000"
 
 type AccountManagerMock struct {
 	AccountsMap map[string]string
@@ -76,8 +78,8 @@ func (m *AccountManagerMock) GetVerifiedWalletAccount(db *accounts.Database, add
 	return nil, errors.New("address doesn't exist")
 }
 
-func (m *AccountManagerMock) Recover(rpcParams account.RecoverParams) (addr types.Address, err error) {
-	return types.HexToAddress(walletAddress), nil
+func (m *AccountManagerMock) CanRecover(rpcParams account.RecoverParams, revealedAddress types.Address) (bool, error) {
+	return true, nil
 }
 
 func (m *AccountManagerMock) Sign(rpcParams account.SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error) {
@@ -108,9 +110,9 @@ func (s *MessengerCommunitiesSuite) SetupTest() {
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 
-	s.admin = s.newMessenger(AdminPassword)
-	s.bob = s.newMessenger(BobPassword)
-	s.alice = s.newMessenger(AlicePassword)
+	s.admin = s.newMessengerWithWallet(adminPassword, adminAddress)
+	s.bob = s.newMessengerWithWallet(bobPassword, bobAddress)
+	s.alice = s.newMessengerWithWallet(alicePassword, aliceAddress)
 	_, err := s.admin.Start()
 	s.Require().NoError(err)
 	_, err = s.bob.Start()
@@ -126,11 +128,7 @@ func (s *MessengerCommunitiesSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *MessengerCommunitiesSuite) newMessengerWithOptions(shh types.Waku, privateKey *ecdsa.PrivateKey, password string, options []Option) *Messenger {
-	accountsManager := &AccountManagerMock{}
-	accountsManager.AccountsMap = make(map[string]string)
-	accountsManager.AccountsMap[walletAddress] = types.EncodeHex(crypto.Keccak256([]byte(password)))
-
+func (s *MessengerCommunitiesSuite) newMessengerWithOptions(shh types.Waku, privateKey *ecdsa.PrivateKey, accountsManager account.Manager, options []Option) *Messenger {
 	m, err := NewMessenger(
 		"Test",
 		privateKey,
@@ -175,21 +173,10 @@ func (s *MessengerCommunitiesSuite) newMessengerWithOptions(shh types.Waku, priv
 
 	_ = m.settings.CreateSettings(setting, config)
 
-	// add wallet account with keypair
-	kp := accounts.GetProfileKeypairForTest(false, true, false)
-	kp.Accounts[0].Address = types.HexToAddress(walletAddress)
-	err = m.settings.SaveOrUpdateKeypair(kp)
-	s.Require().NoError(err)
-
-	walletAccounts, err := m.settings.GetAccounts()
-	s.Require().NoError(err)
-	s.Require().Len(walletAccounts, 1)
-	s.Require().Equal(walletAccounts[0].Type, accounts.AccountTypeGenerated)
-
 	return m
 }
 
-func (s *MessengerCommunitiesSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, password string) *Messenger {
+func (s *MessengerCommunitiesSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, accountsManager account.Manager) *Messenger {
 	tmpfile, err := ioutil.TempFile("", "accounts-tests-")
 	s.Require().NoError(err)
 	madb, err := multiaccounts.InitializeDB(tmpfile.Name())
@@ -207,14 +194,34 @@ func (s *MessengerCommunitiesSuite) newMessengerWithKey(shh types.Waku, privateK
 		WithDatasync(),
 		WithTokenManager(tm),
 	}
-	return s.newMessengerWithOptions(shh, privateKey, password, options)
+	return s.newMessengerWithOptions(shh, privateKey, accountsManager, options)
 }
 
-func (s *MessengerCommunitiesSuite) newMessenger(password string) *Messenger {
+func (s *MessengerCommunitiesSuite) newMessenger(accountsManager account.Manager) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	return s.newMessengerWithKey(s.shh, privateKey, password)
+	return s.newMessengerWithKey(s.shh, privateKey, accountsManager)
+}
+
+func (s *MessengerCommunitiesSuite) newMessengerWithWallet(password string, walletAddress string) *Messenger {
+	accountsManager := &AccountManagerMock{}
+	accountsManager.AccountsMap = make(map[string]string)
+	accountsManager.AccountsMap[walletAddress] = types.EncodeHex(crypto.Keccak256([]byte(password)))
+
+	messenger := s.newMessenger(accountsManager)
+
+	// add wallet account with keypair
+	kp := accounts.GetProfileKeypairForTest(false, true, false)
+	kp.Accounts[0].Address = types.HexToAddress(walletAddress)
+	err := messenger.settings.SaveOrUpdateKeypair(kp)
+	s.Require().NoError(err)
+
+	walletAccounts, err := messenger.settings.GetAccounts()
+	s.Require().NoError(err)
+	s.Require().Len(walletAccounts, 1)
+	s.Require().Equal(walletAccounts[0].Type, accounts.AccountTypeGenerated)
+	return messenger
 }
 
 func (s *MessengerCommunitiesSuite) requestToJoinCommunity(user *Messenger, communityID types.HexBytes, password string) (*MessengerResponse, error) {
@@ -255,7 +262,7 @@ func (s *MessengerCommunitiesSuite) TestCreateCommunity_WithoutDefaultChannel() 
 }
 
 func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
-	alice := s.newMessenger(AlicePassword)
+	alice := s.newMessengerWithWallet(alicePassword, aliceAddress)
 
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
@@ -632,8 +639,8 @@ func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
 	s.advertiseCommunityTo(community, s.bob)
 	s.advertiseCommunityTo(community, s.alice)
 
-	s.joinCommunity(community, s.bob, BobPassword)
-	s.joinCommunity(community, s.alice, AlicePassword)
+	s.joinCommunity(community, s.bob, bobPassword)
+	s.joinCommunity(community, s.alice, alicePassword)
 
 	// Trigger ContactCodeAdvertisement
 	err = s.bob.SetDisplayName("bobby")
@@ -2422,8 +2429,8 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 	s.advertiseCommunityTo(community, s.alice)
 	s.advertiseCommunityTo(community, s.bob)
 
-	s.joinCommunity(community, s.alice, AlicePassword)
-	s.joinCommunity(community, s.bob, BobPassword)
+	s.joinCommunity(community, s.alice, alicePassword)
+	s.joinCommunity(community, s.bob, bobPassword)
 
 	joinedCommunities, err := s.admin.communitiesManager.Joined()
 	s.Require().NoError(err)
@@ -2486,7 +2493,7 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 	s.Require().Equal(3, numberInactiveChats)
 
 	// alice can rejoin
-	s.joinCommunity(community, s.alice, AlicePassword)
+	s.joinCommunity(community, s.alice, alicePassword)
 
 	joinedCommunities, err = s.admin.communitiesManager.Joined()
 	s.Require().NoError(err)
@@ -3533,7 +3540,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequesToJoin() {
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
 
-	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(AlicePassword)))
+	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(alicePassword)))
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), Password: passwdHash}
 	// We try to join the org
 	_, rtj, err := s.alice.communitiesManager.RequestToJoin(&s.alice.identity.PublicKey, request)
@@ -3692,8 +3699,8 @@ func (s *MessengerCommunitiesSuite) TestJoinedCommunityMembersSharedAddress() {
 	s.advertiseCommunityTo(community, s.alice)
 	s.advertiseCommunityTo(community, s.bob)
 
-	s.joinCommunity(community, s.alice, AlicePassword)
-	s.joinCommunity(community, s.bob, BobPassword)
+	s.joinCommunity(community, s.alice, alicePassword)
+	s.joinCommunity(community, s.bob, bobPassword)
 
 	community, err := s.admin.GetCommunityByID(community.ID())
 	s.Require().NoError(err)
@@ -3703,7 +3710,15 @@ func (s *MessengerCommunitiesSuite) TestJoinedCommunityMembersSharedAddress() {
 	for pubKey, member := range community.Members() {
 		if pubKey != common.PubkeyToHex(&s.admin.identity.PublicKey) {
 			s.Require().Len(member.RevealedAccounts, 1)
-			s.Require().Equal(member.RevealedAccounts[0].Address, walletAddress)
+
+			switch pubKey {
+			case common.PubkeyToHex(&s.alice.identity.PublicKey):
+				s.Require().Equal(member.RevealedAccounts[0].Address, aliceAddress)
+			case common.PubkeyToHex(&s.bob.identity.PublicKey):
+				s.Require().Equal(member.RevealedAccounts[0].Address, bobAddress)
+			default:
+				s.Require().Fail("pubKey does not match expected keys")
+			}
 		}
 	}
 }

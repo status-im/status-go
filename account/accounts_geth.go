@@ -11,7 +11,7 @@ import (
 
 // GethManager represents account manager interface.
 type GethManager struct {
-	*Manager
+	*DefaultManager
 
 	gethAccManager *accounts.Manager
 }
@@ -19,13 +19,13 @@ type GethManager struct {
 // NewGethManager returns new node account manager.
 func NewGethManager() *GethManager {
 	m := &GethManager{}
-	m.Manager = &Manager{accountsGenerator: generator.New(m)}
+	m.DefaultManager = &DefaultManager{accountsGenerator: generator.New(m)}
 	return m
 }
 
 func (m *GethManager) SetRPCClient(rpcClient *rpc.Client, rpcTimeout time.Duration) {
-	m.Manager.rpcClient = rpcClient
-	m.Manager.rpcTimeout = rpcTimeout
+	m.DefaultManager.rpcClient = rpcClient
+	m.DefaultManager.rpcTimeout = rpcTimeout
 }
 
 // InitKeystore sets key manager and key store.
