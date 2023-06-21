@@ -17,6 +17,9 @@ import (
 	"github.com/status-im/status-go/services/wallet/token"
 )
 
+const ETHSymbol string = "ETH"
+const WETHSymbol string = "WETH"
+
 func fetchUniswapV2PairInfo(ctx context.Context, client *chain.ClientWithFallback, pairAddress common.Address) (*common.Address, *common.Address, error) {
 	caller, err := uniswapv2.NewUniswapv2Caller(pairAddress, client)
 	if err != nil {
@@ -207,10 +210,16 @@ func buildUniswapSwapMultitransaction(ctx context.Context, client *chain.ClientW
 
 	var firstSwapLog, lastSwapLog *types.Log
 	var firstSwapLogType, lastSwapLogType w_common.EventType
+	hasWETHDepositLog := false
+	hasWETHWithdrawalLog := false
 
 	for _, ethlog := range transfer.Receipt.Logs {
 		logType := w_common.GetEventType(ethlog)
 		switch logType {
+		case w_common.WETHDepositEventType:
+			hasWETHDepositLog = true
+		case w_common.WETHWithdrawalEventType:
+			hasWETHWithdrawalLog = true
 		case w_common.UniswapV2SwapEventType, w_common.UniswapV3SwapEventType:
 			if firstSwapLog == nil {
 				firstSwapLog = ethlog
@@ -233,6 +242,15 @@ func buildUniswapSwapMultitransaction(ctx context.Context, client *chain.ClientW
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	// WETH and ETH have same decimals value, no need to change From/To Amount
+	if multiTransaction.FromAsset == WETHSymbol && hasWETHDepositLog {
+		multiTransaction.FromAsset = ETHSymbol
+	}
+
+	if multiTransaction.ToAsset == WETHSymbol && hasWETHWithdrawalLog {
+		multiTransaction.ToAsset = ETHSymbol
 	}
 
 	return &multiTransaction, nil

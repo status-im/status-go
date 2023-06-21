@@ -28,18 +28,29 @@ const (
 	unknownTransaction Type = "unknown"
 
 	// Event types
+	WETHDepositEventType    EventType = "wethDepositEvent"
+	WETHWithdrawalEventType EventType = "wethWithdrawalEvent"
 	Erc20TransferEventType  EventType = "erc20Event"
 	Erc721TransferEventType EventType = "erc721Event"
 	UniswapV2SwapEventType  EventType = "uniswapV2SwapEvent"
 	UniswapV3SwapEventType  EventType = "uniswapV3SwapEvent"
 	UnknownEventType        EventType = "unknownEvent"
 
+	// Deposit (index_topic_1 address dst, uint256 wad)
+	wethDepositEventSignature = "Deposit(address,uint256)"
+	// Withdrawal (index_topic_1 address src, uint256 wad)
+	wethWithdrawalEventSignature = "Withdrawal(address,uint256)"
+
+	// Transfer (index_topic_1 address from, index_topic_2 address to, uint256 value)
+	// Transfer (index_topic_1 address from, index_topic_2 address to, index_topic_3 uint256 tokenId)
 	Erc20_721TransferEventSignature = "Transfer(address,address,uint256)"
 
 	erc20TransferEventIndexedParameters  = 3 // signature, from, to
 	erc721TransferEventIndexedParameters = 4 // signature, from, to, tokenId
 
+	// Swap (index_topic_1 address sender, uint256 amount0In, uint256 amount1In, uint256 amount0Out, uint256 amount1Out, index_topic_2 address to)
 	uniswapV2SwapEventSignature = "Swap(address,uint256,uint256,uint256,uint256,address)" // also used by SushiSwap
+	// Swap (index_topic_1 address sender, index_topic_2 address recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)
 	uniswapV3SwapEventSignature = "Swap(address,address,int256,int256,uint160,uint128,int24)"
 )
 
@@ -50,12 +61,18 @@ var (
 
 // Detect event type for a cetain item from the Events Log
 func GetEventType(log *types.Log) EventType {
+	wethDepositEventSignatureHash := GetEventSignatureHash(wethDepositEventSignature)
+	wethWithdrawalEventSignatureHash := GetEventSignatureHash(wethWithdrawalEventSignature)
 	erc20_721TransferEventSignatureHash := GetEventSignatureHash(Erc20_721TransferEventSignature)
 	uniswapV2SwapEventSignatureHash := GetEventSignatureHash(uniswapV2SwapEventSignature)
 	uniswapV3SwapEventSignatureHash := GetEventSignatureHash(uniswapV3SwapEventSignature)
 
 	if len(log.Topics) > 0 {
 		switch log.Topics[0] {
+		case wethDepositEventSignatureHash:
+			return WETHDepositEventType
+		case wethWithdrawalEventSignatureHash:
+			return WETHWithdrawalEventType
 		case erc20_721TransferEventSignatureHash:
 			switch len(log.Topics) {
 			case erc20TransferEventIndexedParameters:
@@ -102,6 +119,52 @@ func GetFirstEvent(logs []*types.Log) (EventType, *types.Log) {
 func IsTokenTransfer(logs []*types.Log) bool {
 	eventType, _ := GetFirstEvent(logs)
 	return eventType == Erc20TransferEventType
+}
+
+func ParseWETHDepositLog(ethlog *types.Log) (src common.Address, amount *big.Int) {
+	amount = new(big.Int)
+
+	if len(ethlog.Topics) < 2 {
+		log.Warn("not enough topics for WETH deposit", "topics", ethlog.Topics)
+		return
+	}
+
+	if len(ethlog.Topics[1]) != 32 {
+		log.Warn("second topic is not padded to 32 byte address", "topic", ethlog.Topics[1])
+		return
+	}
+	copy(src[:], ethlog.Topics[1][12:])
+
+	if len(ethlog.Data) != 32 {
+		log.Warn("data is not padded to 32 byte big int", "data", ethlog.Data)
+		return
+	}
+	amount.SetBytes(ethlog.Data)
+
+	return
+}
+
+func ParseWETHWithdrawLog(ethlog *types.Log) (dst common.Address, amount *big.Int) {
+	amount = new(big.Int)
+
+	if len(ethlog.Topics) < 2 {
+		log.Warn("not enough topics for WETH withdraw", "topics", ethlog.Topics)
+		return
+	}
+
+	if len(ethlog.Topics[1]) != 32 {
+		log.Warn("second topic is not padded to 32 byte address", "topic", ethlog.Topics[1])
+		return
+	}
+	copy(dst[:], ethlog.Topics[1][12:])
+
+	if len(ethlog.Data) != 32 {
+		log.Warn("data is not padded to 32 byte big int", "data", ethlog.Data)
+		return
+	}
+	amount.SetBytes(ethlog.Data)
+
+	return
 }
 
 func ParseErc20TransferLog(ethlog *types.Log) (from, to common.Address, amount *big.Int) {
