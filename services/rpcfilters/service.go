@@ -4,8 +4,6 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
-
-	"github.com/status-im/status-go/eth-node/types"
 )
 
 // Make sure that Service implements node.Lifecycle interface.
@@ -68,8 +66,10 @@ func (s *Service) Stop() error {
 	return nil
 }
 
-// TriggerTransactionSentToUpstreamEvent notifies the subscribers
-// of the TransactionSentToUpstream event
-func (s *Service) TriggerTransactionSentToUpstreamEvent(transactionHash types.Hash) {
-	s.transactionSentToUpstreamEvent.Trigger(transactionHash)
+func (s *Service) TransactionSentToUpstreamEvent() ChainEvent {
+	return s.transactionSentToUpstreamEvent
+}
+
+func (s *Service) TriggerTransactionSentToUpstreamEvent(txInfo *PendingTxInfo) {
+	s.transactionSentToUpstreamEvent.Trigger(txInfo)
 }

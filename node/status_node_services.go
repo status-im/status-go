@@ -489,6 +489,7 @@ func (b *StatusNode) walletService(accountsDB *accounts.Database, accountsFeed *
 			b.appDB, accountsDB, b.rpcClient, accountsFeed, b.gethAccountManager, b.transactor, b.config,
 			b.ensService(b.timeSourceNow()),
 			b.stickersService(accountsDB),
+			b.rpcFiltersSrvc,
 			extService,
 		)
 	}

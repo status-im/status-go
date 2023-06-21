@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/transactions"
 )
@@ -71,7 +73,7 @@ func (api *API) signTypedDataV4(typed signercore.TypedData, address string, pass
 }
 
 // SendTransaction creates a new transaction and waits until it's complete.
-func (api *API) sendTransaction(chainID uint64, sendArgs transactions.SendTxArgs, password string) (hash types.Hash, err error) {
+func (api *API) sendTransaction(chainID uint64, sendArgs transactions.SendTxArgs, password string, requestType string) (hash types.Hash, err error) {
 	verifiedAccount, err := api.getVerifiedWalletAccount(sendArgs.From.String(), password)
 	if err != nil {
 		return hash, err
@@ -82,7 +84,12 @@ func (api *API) sendTransaction(chainID uint64, sendArgs transactions.SendTxArgs
 		return
 	}
 
-	go api.s.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(hash)
+	go api.s.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
+		Hash:    common.Hash(hash),
+		Type:    requestType,
+		From:    common.Address(sendArgs.From),
+		ChainID: chainID,
+	})
 
 	return
 }

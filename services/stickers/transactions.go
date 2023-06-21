@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/contracts/snt"
 	"github.com/status-im/status-go/contracts/stickers"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/transactions"
@@ -70,8 +71,12 @@ func (api *API) Buy(ctx context.Context, chainID uint64, txArgs transactions.Sen
 	}
 
 	// TODO: track pending transaction (do this in ENS service too)
-
-	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(types.Hash(tx.Hash()))
+	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
+		Hash:    tx.Hash(),
+		Type:    string(transactions.BuyStickerPack),
+		From:    common.Address(txArgs.From),
+		ChainID: chainID,
+	})
 	return tx.Hash().String(), nil
 }
 

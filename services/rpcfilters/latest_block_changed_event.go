@@ -137,7 +137,7 @@ func (e *latestBlockChangedEvent) Stop() {
 	e.quit = nil
 }
 
-func (e *latestBlockChangedEvent) Subscribe() (int, chan common.Hash) {
+func (e *latestBlockChangedEvent) Subscribe() (int, interface{}) {
 	e.sxMu.Lock()
 	defer e.sxMu.Unlock()
 

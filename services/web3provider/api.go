@@ -327,7 +327,7 @@ func (api *API) ProcessWeb3ReadOnlyRequest(request Web3SendAsyncReadOnlyRequest)
 			return nil, err
 		}
 
-		hash, err := api.sendTransaction(request.Payload.ChainID, trxArgs, request.Payload.Password)
+		hash, err := api.sendTransaction(request.Payload.ChainID, trxArgs, request.Payload.Password, Web3SendAsyncReadOnly)
 		if err != nil {
 			log.Error("could not send transaction message", "err", err)
 			return &Web3SendAsyncReadOnlyResponse{

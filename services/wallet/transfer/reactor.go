@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/transactions"
 )
 
 const (
@@ -64,6 +65,7 @@ type OnDemandFetchStrategy struct {
 	group              *async.Group
 	balanceCache       *balanceCache
 	transactionManager *TransactionManager
+	pendingTxManager   *transactions.TransactionManager
 	tokenManager       *token.Manager
 	chainClients       map[uint64]*chain.ClientWithFallback
 	accounts           []common.Address
@@ -86,6 +88,7 @@ func (s *OnDemandFetchStrategy) newControlCommand(chainClient *chain.ClientWithF
 		feed:               s.feed,
 		errorsCount:        0,
 		transactionManager: s.transactionManager,
+		pendingTxManager:   s.pendingTxManager,
 		tokenManager:       s.tokenManager,
 	}
 
@@ -235,16 +238,19 @@ type Reactor struct {
 	blockDAO           *BlockDAO
 	feed               *event.Feed
 	transactionManager *TransactionManager
+	pendingTxManager   *transactions.TransactionManager
 	tokenManager       *token.Manager
 	strategy           HistoryFetcher
 }
 
-func NewReactor(db *Database, blockDAO *BlockDAO, feed *event.Feed, tm *TransactionManager, tokenManager *token.Manager) *Reactor {
+func NewReactor(db *Database, blockDAO *BlockDAO, feed *event.Feed, tm *TransactionManager,
+	pendingTxManager *transactions.TransactionManager, tokenManager *token.Manager) *Reactor {
 	return &Reactor{
 		db:                 db,
 		blockDAO:           blockDAO,
 		feed:               feed,
 		transactionManager: tm,
+		pendingTxManager:   pendingTxManager,
 		tokenManager:       tokenManager,
 	}
 }
@@ -280,6 +286,7 @@ func (r *Reactor) createFetchStrategy(chainClients map[uint64]*chain.ClientWithF
 			r.blockDAO,
 			r.feed,
 			r.transactionManager,
+			r.pendingTxManager,
 			r.tokenManager,
 			chainClients,
 			accounts,
@@ -291,6 +298,7 @@ func (r *Reactor) createFetchStrategy(chainClients map[uint64]*chain.ClientWithF
 		feed:               r.feed,
 		blockDAO:           r.blockDAO,
 		transactionManager: r.transactionManager,
+		pendingTxManager:   r.pendingTxManager,
 		tokenManager:       r.tokenManager,
 		chainClients:       chainClients,
 		accounts:           accounts,
