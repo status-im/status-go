@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts/assets"
@@ -48,20 +49,20 @@ type DeploymentDetails struct {
 const maxSupply = 999999999
 
 type DeploymentParameters struct {
-	Name               string `json:"name"`
-	Symbol             string `json:"symbol"`
-	Supply             int    `json:"supply"`
-	InfiniteSupply     bool   `json:"infiniteSupply"`
-	Transferable       bool   `json:"transferable"`
-	RemoteSelfDestruct bool   `json:"remoteSelfDestruct"`
-	TokenURI           string `json:"tokenUri"`
+	Name               string         `json:"name"`
+	Symbol             string         `json:"symbol"`
+	Supply             *bigint.BigInt `json:"supply"`
+	InfiniteSupply     bool           `json:"infiniteSupply"`
+	Transferable       bool           `json:"transferable"`
+	RemoteSelfDestruct bool           `json:"remoteSelfDestruct"`
+	TokenURI           string         `json:"tokenUri"`
 }
 
 func (d *DeploymentParameters) GetSupply() *big.Int {
 	if d.InfiniteSupply {
 		return d.GetInfiniteSupply()
 	}
-	return big.NewInt(int64(d.Supply))
+	return d.Supply.Int
 }
 
 // infinite supply for ERC721 is 2^256-1
@@ -71,14 +72,19 @@ func (d *DeploymentParameters) GetInfiniteSupply() *big.Int {
 	return max
 }
 
-func (d *DeploymentParameters) Validate() error {
+func (d *DeploymentParameters) Validate(isAsset bool) error {
 	if len(d.Name) <= 0 {
 		return errors.New("empty collectible name")
 	}
 	if len(d.Symbol) <= 0 {
 		return errors.New("empty collectible symbol")
 	}
-	if !d.InfiniteSupply && (d.Supply < 0 || d.Supply > maxSupply) {
+	var maxForType = big.NewInt(maxSupply)
+	if isAsset {
+		assetMultiplier, _ := big.NewInt(0).SetString("1000000000000000000", 10)
+		maxForType = maxForType.Mul(maxForType, assetMultiplier)
+	}
+	if !d.InfiniteSupply && (d.Supply.Cmp(big.NewInt(0)) < 0 || d.Supply.Cmp(maxForType) > 0) {
 		return fmt.Errorf("wrong supply value: %v", d.Supply)
 	}
 	return nil
@@ -86,7 +92,7 @@ func (d *DeploymentParameters) Validate() error {
 
 func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deploymentParameters DeploymentParameters, txArgs transactions.SendTxArgs, password string) (DeploymentDetails, error) {
 
-	err := deploymentParameters.Validate()
+	err := deploymentParameters.Validate(false)
 	if err != nil {
 		return DeploymentDetails{}, err
 	}
@@ -113,7 +119,7 @@ func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deployme
 
 func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentParameters DeploymentParameters, txArgs transactions.SendTxArgs, password string) (DeploymentDetails, error) {
 
-	err := deploymentParameters.Validate()
+	err := deploymentParameters.Validate(true)
 	if err != nil {
 		return DeploymentDetails{}, err
 	}
@@ -166,15 +172,58 @@ func (api *API) newAssetsInstance(chainID uint64, contractAddress string) (*asse
 
 // if we want to mint 2 tokens to addresses ["a", "b"] we need to mint
 // twice to every address - we need to send to smart contract table ["a", "a", "b", "b"]
-func (api *API) multiplyWalletAddresses(amount int, contractAddresses []string) []string {
+func (api *API) multiplyWalletAddresses(amount *bigint.BigInt, contractAddresses []string) []string {
 	var totalAddresses []string
-	for i := 1; i <= amount; i++ {
+	for i := big.NewInt(1); i.Cmp(amount.Int) <= 0; {
 		totalAddresses = append(totalAddresses, contractAddresses...)
+		i.Add(i, big.NewInt(1))
 	}
 	return totalAddresses
 }
 
-func (api *API) MintTo(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, walletAddresses []string, amount int) (string, error) {
+func (api *API) prepareMintCollectiblesData(walletAddresses []string, amount *bigint.BigInt) []common.Address {
+	totalAddresses := api.multiplyWalletAddresses(amount, walletAddresses)
+	var usersAddresses = []common.Address{}
+	for _, k := range totalAddresses {
+		usersAddresses = append(usersAddresses, common.HexToAddress(k))
+	}
+	return usersAddresses
+}
+
+// Universal minting function for both assets and collectibles.
+// Checks contract type and runs MintCollectibles or MintAssets function.
+func (api *API) MintTokens(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, walletAddresses []string, amount *bigint.BigInt) (string, error) {
+	tokenType, err := api.db.GetTokenType(chainID, contractAddress)
+	if err != nil {
+		return "", err
+	}
+	switch tokenType {
+	case protobuf.CommunityTokenType_ERC721:
+		return api.MintCollectibles(ctx, chainID, contractAddress, txArgs, password, walletAddresses, amount)
+	case protobuf.CommunityTokenType_ERC20:
+		return api.MintAssets(ctx, chainID, contractAddress, txArgs, password, walletAddresses, amount)
+	default:
+		return "", fmt.Errorf("unknown token type: %v", tokenType)
+	}
+}
+
+func (api *API) EstimateMintTokens(ctx context.Context, chainID uint64, contractAddress string, walletAddresses []string, amount *bigint.BigInt) (uint64, error) {
+	tokenType, err := api.db.GetTokenType(chainID, contractAddress)
+	if err != nil {
+		return 0, err
+	}
+	switch tokenType {
+	case protobuf.CommunityTokenType_ERC721:
+		return api.EstimateMintCollectibles(ctx, chainID, contractAddress, walletAddresses, amount)
+	case protobuf.CommunityTokenType_ERC20:
+		return api.EstimateMintAssets(ctx, chainID, contractAddress, walletAddresses, amount)
+	default:
+		return 0, fmt.Errorf("unknown token type: %v", tokenType)
+	}
+}
+
+// Create the amounty of collectible tokens and distribute them to all walletAddresses.
+func (api *API) MintCollectibles(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, walletAddresses []string, amount *bigint.BigInt) (string, error) {
 	err := api.validateWalletsAndAmounts(walletAddresses, amount)
 	if err != nil {
 		return "", err
@@ -185,12 +234,7 @@ func (api *API) MintTo(ctx context.Context, chainID uint64, contractAddress stri
 		return "", err
 	}
 
-	totalAddresses := api.multiplyWalletAddresses(amount, walletAddresses)
-
-	var usersAddresses = []common.Address{}
-	for _, k := range totalAddresses {
-		usersAddresses = append(usersAddresses, common.HexToAddress(k))
-	}
+	usersAddresses := api.prepareMintCollectiblesData(walletAddresses, amount)
 
 	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
 
@@ -202,20 +246,59 @@ func (api *API) MintTo(ctx context.Context, chainID uint64, contractAddress stri
 	return tx.Hash().Hex(), nil
 }
 
-func (api *API) EstimateMintTo(ctx context.Context, chainID uint64, contractAddress string, walletAddresses []string, amount int) (uint64, error) {
+func (api *API) EstimateMintCollectibles(ctx context.Context, chainID uint64, contractAddress string, walletAddresses []string, amount *bigint.BigInt) (uint64, error) {
 	err := api.validateWalletsAndAmounts(walletAddresses, amount)
 	if err != nil {
 		return 0, err
 	}
+	usersAddresses := api.prepareMintCollectiblesData(walletAddresses, amount)
+	return api.estimateMethod(ctx, chainID, contractAddress, "mintTo", usersAddresses)
+}
 
-	totalAddresses := api.multiplyWalletAddresses(amount, walletAddresses)
-
+func (api *API) prepareMintAssetsData(walletAddresses []string, amount *bigint.BigInt) ([]common.Address, []*big.Int) {
 	var usersAddresses = []common.Address{}
-	for _, k := range totalAddresses {
+	var amountsList = []*big.Int{}
+	for _, k := range walletAddresses {
 		usersAddresses = append(usersAddresses, common.HexToAddress(k))
+		amountsList = append(amountsList, amount.Int)
+	}
+	return usersAddresses, amountsList
+}
+
+// Create the amount of assets tokens and distribute them to all walletAddresses.
+// The amount should be in smallest denomination of the asset (like wei) with decimal = 18, eg.
+// if we want to mint 2.34 of the token, then amount should be 234{16 zeros}.
+func (api *API) MintAssets(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, walletAddresses []string, amount *bigint.BigInt) (string, error) {
+	err := api.validateWalletsAndAmounts(walletAddresses, amount)
+	if err != nil {
+		return "", err
 	}
 
-	return api.estimateMethod(ctx, chainID, contractAddress, "mintTo", usersAddresses)
+	contractInst, err := api.newAssetsInstance(chainID, contractAddress)
+	if err != nil {
+		return "", err
+	}
+
+	usersAddresses, amountsList := api.prepareMintAssetsData(walletAddresses, amount)
+
+	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
+
+	tx, err := contractInst.MintTo(transactOpts, usersAddresses, amountsList)
+	if err != nil {
+		return "", err
+	}
+
+	return tx.Hash().Hex(), nil
+}
+
+// Estimate MintAssets cost.
+func (api *API) EstimateMintAssets(ctx context.Context, chainID uint64, contractAddress string, walletAddresses []string, amount *bigint.BigInt) (uint64, error) {
+	err := api.validateWalletsAndAmounts(walletAddresses, amount)
+	if err != nil {
+		return 0, err
+	}
+	usersAddresses, amountsList := api.prepareMintAssetsData(walletAddresses, amount)
+	return api.estimateMethod(ctx, chainID, contractAddress, "mintTo", usersAddresses, amountsList)
 }
 
 // This is only ERC721 function
@@ -245,6 +328,7 @@ func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress 
 	return tx.Hash().Hex(), nil
 }
 
+// This is only ERC721 function
 func (api *API) EstimateRemoteBurn(ctx context.Context, chainID uint64, contractAddress string, tokenIds []*bigint.BigInt) (uint64, error) {
 	err := api.validateTokens(tokenIds)
 	if err != nil {
@@ -302,8 +386,23 @@ func (api *API) MintedCount(ctx context.Context, chainID uint64, contractAddress
 	return mintedCount, nil
 }
 
+func (api *API) RemainingSupply(ctx context.Context, chainID uint64, contractAddress string) (*bigint.BigInt, error) {
+	tokenType, err := api.db.GetTokenType(chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+	switch tokenType {
+	case protobuf.CommunityTokenType_ERC721:
+		return api.remainingCollectiblesSupply(ctx, chainID, contractAddress)
+	case protobuf.CommunityTokenType_ERC20:
+		return api.remainingAssetsSupply(ctx, chainID, contractAddress)
+	default:
+		return nil, fmt.Errorf("unknown token type: %v", tokenType)
+	}
+}
+
 // RemainingSupply = MaxSupply - MintedCount
-func (api *API) RemainingSupply(ctx context.Context, chainID uint64, contractAddress string) (*big.Int, error) {
+func (api *API) remainingCollectiblesSupply(ctx context.Context, chainID uint64, contractAddress string) (*bigint.BigInt, error) {
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
 	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
 	if err != nil {
@@ -319,10 +418,31 @@ func (api *API) RemainingSupply(ctx context.Context, chainID uint64, contractAdd
 	}
 	var res = new(big.Int)
 	res.Sub(maxSupply, mintedCount)
-	return res, nil
+	fmt.Printf("Remaining: %v for chain: %v and addr: %v", res, chainID, contractAddress)
+	return &bigint.BigInt{Int: res}, nil
 }
 
-func (api *API) maxSupply(ctx context.Context, chainID uint64, contractAddress string) (*big.Int, error) {
+// RemainingSupply = MaxSupply - TotalSupply
+func (api *API) remainingAssetsSupply(ctx context.Context, chainID uint64, contractAddress string) (*bigint.BigInt, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+	contractInst, err := api.newAssetsInstance(chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+	maxSupply, err := contractInst.MaxSupply(callOpts)
+	if err != nil {
+		return nil, err
+	}
+	totalSupply, err := contractInst.TotalSupply(callOpts)
+	if err != nil {
+		return nil, err
+	}
+	var res = new(big.Int)
+	res.Sub(maxSupply, totalSupply)
+	return &bigint.BigInt{Int: res}, nil
+}
+
+func (api *API) maxSupplyCollectibles(ctx context.Context, chainID uint64, contractAddress string) (*big.Int, error) {
 	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
 	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
 	if err != nil {
@@ -331,27 +451,87 @@ func (api *API) maxSupply(ctx context.Context, chainID uint64, contractAddress s
 	return contractInst.MaxSupply(callOpts)
 }
 
+func (api *API) maxSupplyAssets(ctx context.Context, chainID uint64, contractAddress string) (*big.Int, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+	contractInst, err := api.newAssetsInstance(chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+	return contractInst.MaxSupply(callOpts)
+}
+
+func (api *API) maxSupply(ctx context.Context, chainID uint64, contractAddress string) (*big.Int, error) {
+	tokenType, err := api.db.GetTokenType(chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	switch tokenType {
+	case protobuf.CommunityTokenType_ERC721:
+		return api.maxSupplyCollectibles(ctx, chainID, contractAddress)
+	case protobuf.CommunityTokenType_ERC20:
+		return api.maxSupplyAssets(ctx, chainID, contractAddress)
+	default:
+		return nil, fmt.Errorf("unknown token type: %v", tokenType)
+	}
+}
+
+func (api *API) prepareNewMaxSupply(ctx context.Context, chainID uint64, contractAddress string, burnAmount *bigint.BigInt) (*big.Int, error) {
+	maxSupply, err := api.maxSupply(ctx, chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+	var newMaxSupply = new(big.Int)
+	newMaxSupply.Sub(maxSupply, burnAmount.Int)
+	return newMaxSupply, nil
+}
+
+func (api *API) setMaxSupplyCollectibles(transactOpts *bind.TransactOpts, chainID uint64, contractAddress string, newMaxSupply *big.Int) (*types.Transaction, error) {
+	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+	return contractInst.SetMaxSupply(transactOpts, newMaxSupply)
+}
+
+func (api *API) setMaxSupplyAssets(transactOpts *bind.TransactOpts, chainID uint64, contractAddress string, newMaxSupply *big.Int) (*types.Transaction, error) {
+	contractInst, err := api.newAssetsInstance(chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+	return contractInst.SetMaxSupply(transactOpts, newMaxSupply)
+}
+
+func (api *API) setMaxSupply(transactOpts *bind.TransactOpts, chainID uint64, contractAddress string, newMaxSupply *big.Int) (*types.Transaction, error) {
+	tokenType, err := api.db.GetTokenType(chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	switch tokenType {
+	case protobuf.CommunityTokenType_ERC721:
+		return api.setMaxSupplyCollectibles(transactOpts, chainID, contractAddress, newMaxSupply)
+	case protobuf.CommunityTokenType_ERC20:
+		return api.setMaxSupplyAssets(transactOpts, chainID, contractAddress, newMaxSupply)
+	default:
+		return nil, fmt.Errorf("unknown token type: %v", tokenType)
+	}
+}
+
 func (api *API) Burn(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, burnAmount *bigint.BigInt) (string, error) {
 	err := api.validateBurnAmount(ctx, burnAmount, chainID, contractAddress)
 	if err != nil {
 		return "", err
 	}
 
-	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
-	if err != nil {
-		return "", err
-	}
-
 	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
 
-	maxSupply, err := api.maxSupply(ctx, chainID, contractAddress)
+	newMaxSupply, err := api.prepareNewMaxSupply(ctx, chainID, contractAddress, burnAmount)
 	if err != nil {
 		return "", err
 	}
-	var newMaxSupply = new(big.Int)
-	newMaxSupply.Sub(maxSupply, burnAmount.Int)
 
-	tx, err := contractInst.SetMaxSupply(transactOpts, newMaxSupply)
+	tx, err := api.setMaxSupply(transactOpts, chainID, contractAddress, newMaxSupply)
 	if err != nil {
 		return "", err
 	}
@@ -365,21 +545,19 @@ func (api *API) EstimateBurn(ctx context.Context, chainID uint64, contractAddres
 		return 0, err
 	}
 
-	maxSupply, err := api.maxSupply(ctx, chainID, contractAddress)
+	newMaxSupply, err := api.prepareNewMaxSupply(ctx, chainID, contractAddress, burnAmount)
 	if err != nil {
 		return 0, err
 	}
-	var newMaxSupply = new(big.Int)
-	newMaxSupply.Sub(maxSupply, burnAmount.Int)
 
 	return api.estimateMethod(ctx, chainID, contractAddress, "setMaxSupply", newMaxSupply)
 }
 
-func (api *API) validateWalletsAndAmounts(walletAddresses []string, amount int) error {
+func (api *API) validateWalletsAndAmounts(walletAddresses []string, amount *bigint.BigInt) error {
 	if len(walletAddresses) == 0 {
 		return errors.New("wallet addresses list is empty")
 	}
-	if amount <= 0 {
+	if amount.Cmp(big.NewInt(0)) <= 0 {
 		return errors.New("amount is <= 0")
 	}
 	return nil
@@ -400,10 +578,26 @@ func (api *API) validateBurnAmount(ctx context.Context, burnAmount *bigint.BigIn
 	if err != nil {
 		return err
 	}
-	if burnAmount.Cmp(remainingSupply) > 1 {
+	if burnAmount.Cmp(remainingSupply.Int) > 1 {
 		return errors.New("burnAmount is bigger than remaining amount")
 	}
 	return nil
+}
+
+func (api *API) packCollectibleMethod(ctx context.Context, methodName string, args ...interface{}) ([]byte, error) {
+	collectiblesABI, err := abi.JSON(strings.NewReader(collectibles.CollectiblesABI))
+	if err != nil {
+		return []byte{}, err
+	}
+	return collectiblesABI.Pack(methodName, args...)
+}
+
+func (api *API) packAssetsMethod(ctx context.Context, methodName string, args ...interface{}) ([]byte, error) {
+	assetsABI, err := abi.JSON(strings.NewReader(assets.AssetsABI))
+	if err != nil {
+		return []byte{}, err
+	}
+	return assetsABI.Pack(methodName, args...)
 }
 
 func (api *API) estimateMethod(ctx context.Context, chainID uint64, contractAddress string, methodName string, args ...interface{}) (uint64, error) {
@@ -413,12 +607,20 @@ func (api *API) estimateMethod(ctx context.Context, chainID uint64, contractAddr
 		return 0, err
 	}
 
-	collectiblesABI, err := abi.JSON(strings.NewReader(collectibles.CollectiblesABI))
+	tokenType, err := api.db.GetTokenType(chainID, contractAddress)
 	if err != nil {
 		return 0, err
 	}
+	var data []byte
 
-	data, err := collectiblesABI.Pack(methodName, args...)
+	switch tokenType {
+	case protobuf.CommunityTokenType_ERC721:
+		data, err = api.packCollectibleMethod(ctx, methodName, args...)
+	case protobuf.CommunityTokenType_ERC20:
+		data, err = api.packAssetsMethod(ctx, methodName, args...)
+	default:
+		err = fmt.Errorf("unknown token type: %v", tokenType)
+	}
 	if err != nil {
 		return 0, err
 	}

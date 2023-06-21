@@ -3,6 +3,7 @@ package collectibles
 import (
 	"database/sql"
 	"io/ioutil"
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -11,6 +12,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
 func TestDatabaseSuite(t *testing.T) {
@@ -24,10 +26,10 @@ type DatabaseSuite struct {
 }
 
 func (s *DatabaseSuite) addCommunityToken(db *sql.DB, token *communities.CommunityToken) error {
-	_, err := db.Exec(`INSERT INTO community_tokens (community_id, address, type, name, symbol, description, supply,
+	_, err := db.Exec(`INSERT INTO community_tokens (community_id, address, type, name, symbol, description, supply_str,
 		infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64, decimals) 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, token.CommunityID, token.Address, token.TokenType, token.Name,
-		token.Symbol, token.Description, token.Supply, token.InfiniteSupply, token.Transferable, token.RemoteSelfDestruct,
+		token.Symbol, token.Description, token.Supply.String(), token.InfiniteSupply, token.Transferable, token.RemoteSelfDestruct,
 		token.ChainID, token.DeployState, token.Base64Image, token.Decimals)
 	return err
 }
@@ -40,7 +42,7 @@ func (s *DatabaseSuite) setupDatabase(db *sql.DB) error {
 		Name:               "StatusToken",
 		Symbol:             "STT",
 		Description:        "desc",
-		Supply:             123,
+		Supply:             &bigint.BigInt{Int: big.NewInt(123)},
 		InfiniteSupply:     false,
 		Transferable:       true,
 		RemoteSelfDestruct: true,
@@ -56,7 +58,7 @@ func (s *DatabaseSuite) setupDatabase(db *sql.DB) error {
 		Name:               "StatusToken",
 		Symbol:             "STT",
 		Description:        "desc",
-		Supply:             345,
+		Supply:             &bigint.BigInt{Int: big.NewInt(345)},
 		InfiniteSupply:     false,
 		Transferable:       true,
 		RemoteSelfDestruct: true,

@@ -38,6 +38,7 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
+	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -3912,7 +3913,7 @@ func (m *Messenger) UpdateCommunityTokenState(chainID int, contractAddress strin
 	return m.communitiesManager.UpdateCommunityTokenState(chainID, contractAddress, deployState)
 }
 
-func (m *Messenger) UpdateCommunityTokenSupply(chainID int, contractAddress string, supply int) error {
+func (m *Messenger) UpdateCommunityTokenSupply(chainID int, contractAddress string, supply *bigint.BigInt) error {
 	return m.communitiesManager.UpdateCommunityTokenSupply(chainID, contractAddress, supply)
 }
 
