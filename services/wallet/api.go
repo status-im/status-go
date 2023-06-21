@@ -551,3 +551,8 @@ func (api *API) GetAllRecipients(ctx context.Context, offset int, limit int) (re
 	result.Addresses, result.HasMore, err = activity.GetRecipients(ctx, api.s.db, offset, limit)
 	return result, err
 }
+
+func (api *API) GetOldestActivityTimestamp(ctx context.Context, addresses []common.Address) (timestamp int64, err error) {
+	log.Debug("wallet.api.GetOldestActivityTimestamp", "addresses.len", len(addresses))
+	return activity.GetOldestTimestamp(ctx, api.s.db, addresses)
+}
