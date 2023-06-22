@@ -64,6 +64,7 @@ func (s *MessengerActivityCenterMessageSuite) TestDeleteOneToOneChat() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
+	defer theirMessenger.Shutdown() // nolint: errcheck
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
 	err = theirMessenger.SaveChat(theirChat)
@@ -127,6 +128,7 @@ func (s *MessengerActivityCenterMessageSuite) TestEveryoneMentionTag() {
 	bob := s.newMessenger()
 	_, err := bob.Start()
 	s.Require().NoError(err)
+	defer bob.Shutdown() // nolint: errcheck
 
 	// Create an community chat
 	response, err := bob.CreateCommunity(description, true)

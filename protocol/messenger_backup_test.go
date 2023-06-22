@@ -73,6 +73,7 @@ func (s *MessengerBackupSuite) TestBackupContacts() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
+	defer bob2.Shutdown() // nolint: errcheck
 
 	// Create 2 contacts
 
@@ -194,6 +195,7 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
+	defer bob2.Shutdown() // nolint: errcheck
 
 	// Check bob1
 	storedBob1DisplayName, err := bob1.settings.DisplayName()
@@ -324,6 +326,7 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
+	defer bob2.Shutdown() // nolint: errcheck
 
 	// Check bob1
 	storedBob1DisplayName, err := bob1.settings.DisplayName()
@@ -433,6 +436,7 @@ func (s *MessengerBackupSuite) TestBackupContactsGreaterThanBatch() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
+	defer bob2.Shutdown() // nolint: errcheck
 
 	// Create contacts
 
@@ -475,6 +479,7 @@ func (s *MessengerBackupSuite) TestBackupRemovedContact() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
+	defer bob2.Shutdown() // nolint: errcheck
 
 	// Create 2 contacts on bob 1
 
@@ -549,6 +554,7 @@ func (s *MessengerBackupSuite) TestBackupLocalNickname() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
+	defer bob2.Shutdown() // nolint: errcheck
 
 	// Set contact nickname
 
@@ -599,6 +605,7 @@ func (s *MessengerBackupSuite) TestBackupBlockedContacts() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
+	defer bob2.Shutdown() // nolint: errcheck
 
 	// Create contact
 	contact1Key, err := crypto.GenerateKey()
@@ -655,6 +662,7 @@ func (s *MessengerBackupSuite) TestBackupCommunities() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
+	defer bob2.Shutdown() // nolint: errcheck
 
 	// Create a communitie
 
@@ -726,6 +734,7 @@ func (s *MessengerBackupSuite) TestBackupKeypairs() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
+	defer bob2.Shutdown() // nolint: errcheck
 
 	// Backup
 	_, err = bob1.BackupData(context.Background())
@@ -810,6 +819,7 @@ func (s *MessengerBackupSuite) TestBackupKeycards() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
+	defer bob2.Shutdown() // nolint: errcheck
 
 	// Backup
 	_, err = bob1.BackupData(context.Background())
@@ -851,6 +861,7 @@ func (s *MessengerBackupSuite) TestBackupWatchOnlyAccounts() {
 	s.Require().NoError(err)
 	_, err = bob2.Start()
 	s.Require().NoError(err)
+	defer bob2.Shutdown() // nolint: errcheck
 
 	// Backup
 	_, err = bob1.BackupData(context.Background())

@@ -1397,7 +1397,7 @@ func buildTorrentConfig() params.TorrentConfig {
 		Enabled:    true,
 		DataDir:    os.TempDir() + "/archivedata",
 		TorrentDir: os.TempDir() + "/torrents",
-		Port:       9999,
+		Port:       0,
 	}
 	return torrentConfig
 }

@@ -431,6 +431,7 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminAcceptMemberRequestToJoin() {
 	user := s.newMessenger()
 	_, err := user.Start()
 	s.Require().NoError(err)
+	defer user.Shutdown() // nolint: errcheck
 
 	s.advertiseCommunityTo(community, user)
 
@@ -508,6 +509,7 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminRejectMemberRequestToJoin() {
 	user := s.newMessenger()
 	_, err := user.Start()
 	s.Require().NoError(err)
+	defer user.Shutdown() // nolint: errcheck
 
 	s.advertiseCommunityTo(community, user)
 

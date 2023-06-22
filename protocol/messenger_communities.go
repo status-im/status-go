@@ -62,6 +62,10 @@ const (
 )
 
 func (m *Messenger) publishOrg(org *communities.Community) error {
+	if org == nil {
+		return nil
+	}
+
 	m.logger.Debug("publishing org", zap.String("org-id", org.IDString()), zap.Any("org", org))
 	payload, err := org.MarshaledDescription()
 	if err != nil {
