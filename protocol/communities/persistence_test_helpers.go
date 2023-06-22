@@ -42,10 +42,10 @@ func (p *Persistence) scanRowToStruct(rowScan func(dest ...interface{}) error) (
 		&rcr.Description,
 		&rcr.Joined,
 		&rcr.Verified,
-		&rcr.Muted,
-		&syncedAt,
 		&rcr.Spectated,
+		&rcr.Muted,
 		&muteTill,
+		&syncedAt,
 	)
 	if syncedAt.Valid {
 		rcr.SyncedAt = uint64(syncedAt.Time.Unix())
