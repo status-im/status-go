@@ -79,28 +79,29 @@ type Chat struct {
 }
 
 type ChannelGroup struct {
-	Type                    ChannelGroupType                         `json:"channelGroupType"`
-	Name                    string                                   `json:"name"`
-	Images                  map[string]images.IdentityImage          `json:"images"`
-	Color                   string                                   `json:"color"`
-	Chats                   map[string]*Chat                         `json:"chats"`
-	Categories              map[string]communities.CommunityCategory `json:"categories"`
-	EnsName                 string                                   `json:"ensName"`
-	MemberRole              protobuf.CommunityMember_Roles           `json:"memberRole"`
-	Verified                bool                                     `json:"verified"`
-	Description             string                                   `json:"description"`
-	IntroMessage            string                                   `json:"introMessage"`
-	OutroMessage            string                                   `json:"outroMessage"`
-	Tags                    []communities.CommunityTag               `json:"tags"`
-	Permissions             *protobuf.CommunityPermissions           `json:"permissions"`
-	Members                 map[string]*protobuf.CommunityMember     `json:"members"`
-	CanManageUsers          bool                                     `json:"canManageUsers"`
-	Muted                   bool                                     `json:"muted"`
-	BanList                 []string                                 `json:"banList"`
-	Encrypted               bool                                     `json:"encrypted"`
-	CommunityTokensMetadata []*protobuf.CommunityTokenMetadata       `json:"communityTokensMetadata"`
-	UnviewedMessagesCount   int                                      `json:"unviewedMessagesCount"`
-	UnviewedMentionsCount   int                                      `json:"unviewedMentionsCount"`
+	Type                            ChannelGroupType                                        `json:"channelGroupType"`
+	Name                            string                                                  `json:"name"`
+	Images                          map[string]images.IdentityImage                         `json:"images"`
+	Color                           string                                                  `json:"color"`
+	Chats                           map[string]*Chat                                        `json:"chats"`
+	Categories                      map[string]communities.CommunityCategory                `json:"categories"`
+	EnsName                         string                                                  `json:"ensName"`
+	MemberRole                      protobuf.CommunityMember_Roles                          `json:"memberRole"`
+	Verified                        bool                                                    `json:"verified"`
+	Description                     string                                                  `json:"description"`
+	IntroMessage                    string                                                  `json:"introMessage"`
+	OutroMessage                    string                                                  `json:"outroMessage"`
+	Tags                            []communities.CommunityTag                              `json:"tags"`
+	Permissions                     *protobuf.CommunityPermissions                          `json:"permissions"`
+	Members                         map[string]*protobuf.CommunityMember                    `json:"members"`
+	CanManageUsers                  bool                                                    `json:"canManageUsers"`
+	Muted                           bool                                                    `json:"muted"`
+	BanList                         []string                                                `json:"banList"`
+	Encrypted                       bool                                                    `json:"encrypted"`
+	CommunityTokensMetadata         []*protobuf.CommunityTokenMetadata                      `json:"communityTokensMetadata"`
+	UnviewedMessagesCount           int                                                     `json:"unviewedMessagesCount"`
+	UnviewedMentionsCount           int                                                     `json:"unviewedMentionsCount"`
+	CheckChannelPermissionResponses map[string]*communities.CheckChannelPermissionsResponse `json:"checkChannelPermissionResponses"`
 }
 
 func NewAPI(service *Service) *API {
@@ -162,24 +163,25 @@ func (api *API) getChannelGroups(ctx context.Context, channelGroupID string) (ma
 		}
 
 		result[pubKey] = ChannelGroup{
-			Type:                    Personal,
-			Name:                    "",
-			Images:                  make(map[string]images.IdentityImage),
-			Color:                   "",
-			Chats:                   chats,
-			Categories:              make(map[string]communities.CommunityCategory),
-			EnsName:                 "", // Not implemented yet in communities
-			MemberRole:              protobuf.CommunityMember_ROLE_OWNER,
-			Verified:                true,
-			Description:             "",
-			IntroMessage:            "",
-			OutroMessage:            "",
-			Tags:                    []communities.CommunityTag{},
-			Permissions:             &protobuf.CommunityPermissions{},
-			Muted:                   false,
-			CommunityTokensMetadata: []*protobuf.CommunityTokenMetadata{},
-			UnviewedMessagesCount:   totalUnviewedMessageCount,
-			UnviewedMentionsCount:   totalUnviewedMentionsCount,
+			Type:                            Personal,
+			Name:                            "",
+			Images:                          make(map[string]images.IdentityImage),
+			Color:                           "",
+			Chats:                           chats,
+			Categories:                      make(map[string]communities.CommunityCategory),
+			EnsName:                         "", // Not implemented yet in communities
+			MemberRole:                      protobuf.CommunityMember_ROLE_OWNER,
+			Verified:                        true,
+			Description:                     "",
+			IntroMessage:                    "",
+			OutroMessage:                    "",
+			Tags:                            []communities.CommunityTag{},
+			Permissions:                     &protobuf.CommunityPermissions{},
+			Muted:                           false,
+			CommunityTokensMetadata:         []*protobuf.CommunityTokenMetadata{},
+			UnviewedMessagesCount:           totalUnviewedMessageCount,
+			UnviewedMentionsCount:           totalUnviewedMentionsCount,
+			CheckChannelPermissionResponses: make(map[string]*communities.CheckChannelPermissionsResponse),
 		}
 	}
 
@@ -206,27 +208,28 @@ func (api *API) getChannelGroups(ctx context.Context, channelGroupID string) (ma
 		}
 
 		chGrp := ChannelGroup{
-			Type:                    Community,
-			Name:                    community.Name(),
-			Color:                   community.Color(),
-			Images:                  make(map[string]images.IdentityImage),
-			Chats:                   make(map[string]*Chat),
-			Categories:              make(map[string]communities.CommunityCategory),
-			MemberRole:              community.MemberRole(community.MemberIdentity()),
-			Verified:                community.Verified(),
-			Description:             community.DescriptionText(),
-			IntroMessage:            community.IntroMessage(),
-			OutroMessage:            community.OutroMessage(),
-			Tags:                    community.Tags(),
-			Permissions:             community.Description().Permissions,
-			Members:                 community.Description().Members,
-			CanManageUsers:          community.CanManageUsers(community.MemberIdentity()),
-			Muted:                   community.Muted(),
-			BanList:                 community.Description().BanList,
-			Encrypted:               community.Encrypted(),
-			CommunityTokensMetadata: community.Description().CommunityTokensMetadata,
-			UnviewedMessagesCount:   totalUnviewedMessageCount,
-			UnviewedMentionsCount:   totalUnviewedMentionsCount,
+			Type:                            Community,
+			Name:                            community.Name(),
+			Color:                           community.Color(),
+			Images:                          make(map[string]images.IdentityImage),
+			Chats:                           make(map[string]*Chat),
+			Categories:                      make(map[string]communities.CommunityCategory),
+			MemberRole:                      community.MemberRole(community.MemberIdentity()),
+			Verified:                        community.Verified(),
+			Description:                     community.DescriptionText(),
+			IntroMessage:                    community.IntroMessage(),
+			OutroMessage:                    community.OutroMessage(),
+			Tags:                            community.Tags(),
+			Permissions:                     community.Description().Permissions,
+			Members:                         community.Description().Members,
+			CanManageUsers:                  community.CanManageUsers(community.MemberIdentity()),
+			Muted:                           community.Muted(),
+			BanList:                         community.Description().BanList,
+			Encrypted:                       community.Encrypted(),
+			CommunityTokensMetadata:         community.Description().CommunityTokensMetadata,
+			UnviewedMessagesCount:           totalUnviewedMessageCount,
+			UnviewedMentionsCount:           totalUnviewedMentionsCount,
+			CheckChannelPermissionResponses: make(map[string]*communities.CheckChannelPermissionsResponse),
 		}
 
 		for t, i := range community.Images() {
@@ -251,6 +254,12 @@ func (api *API) getChannelGroups(ctx context.Context, channelGroupID string) (ma
 				chGrp.Chats[c.ID] = c
 			}
 		}
+
+		response, err := api.s.messenger.GetCommunityCheckChannelPermissionResponses(community.ID())
+		if err != nil {
+			return nil, err
+		}
+		chGrp.CheckChannelPermissionResponses = response.Channels
 
 		result[community.IDString()] = chGrp
 

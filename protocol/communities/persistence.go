@@ -368,6 +368,165 @@ func (p *Persistence) SaveRequestToJoinRevealedAddresses(request *RequestToJoin)
 	return
 }
 
+func (p *Persistence) SaveCheckChannelPermissionResponse(communityID string, chatID string, response *CheckChannelPermissionsResponse) error {
+	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	viewOnlyPermissionIDs := make([]string, 0)
+	viewAndPostPermissionIDs := make([]string, 0)
+
+	for permissionID := range response.ViewOnlyPermissions.Permissions {
+		viewOnlyPermissionIDs = append(viewOnlyPermissionIDs, permissionID)
+	}
+	for permissionID := range response.ViewAndPostPermissions.Permissions {
+		viewAndPostPermissionIDs = append(viewAndPostPermissionIDs, permissionID)
+	}
+
+	_, err = tx.Exec(`INSERT INTO communities_check_channel_permission_responses (community_id,chat_id,view_only_permissions_satisfied,view_and_post_permissions_satisfied, view_only_permission_ids, view_and_post_permission_ids) VALUES (?, ?, ?, ?, ?, ?)`, communityID, chatID, response.ViewOnlyPermissions.Satisfied, response.ViewAndPostPermissions.Satisfied, strings.Join(viewOnlyPermissionIDs[:], ","), strings.Join(viewAndPostPermissionIDs[:], ","))
+	if err != nil {
+		return err
+	}
+
+	saveCriteriaResults := func(permissions map[string]*PermissionTokenCriteriaResult) error {
+		for permissionID, criteriaResult := range permissions {
+
+			criteria := make([]string, 0)
+			for _, val := range criteriaResult.Criteria {
+				criteria = append(criteria, strconv.FormatBool(val))
+			}
+
+			_, err = tx.Exec(`INSERT INTO communities_permission_token_criteria_results (permission_id,community_id, chat_id, criteria) VALUES (?, ?, ?, ?)`, permissionID, communityID, chatID, strings.Join(criteria[:], ","))
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	err = saveCriteriaResults(response.ViewOnlyPermissions.Permissions)
+	if err != nil {
+		return err
+	}
+	return saveCriteriaResults(response.ViewAndPostPermissions.Permissions)
+}
+
+func (p *Persistence) GetCheckChannelPermissionResponses(communityID string) (map[string]*CheckChannelPermissionsResponse, error) {
+
+	rows, err := p.db.Query(`SELECT chat_id, view_only_permissions_satisfied, view_and_post_permissions_satisfied, view_only_permission_ids, view_and_post_permission_ids FROM communities_check_channel_permission_responses WHERE community_id = ?`, communityID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	checkChannelPermissionResponses := make(map[string]*CheckChannelPermissionsResponse, 0)
+
+	for rows.Next() {
+
+		permissionResponse := &CheckChannelPermissionsResponse{
+			ViewOnlyPermissions: &CheckChannelViewOnlyPermissionsResult{
+				Satisfied:   false,
+				Permissions: make(map[string]*PermissionTokenCriteriaResult),
+			},
+			ViewAndPostPermissions: &CheckChannelViewAndPostPermissionsResult{
+				Satisfied:   false,
+				Permissions: make(map[string]*PermissionTokenCriteriaResult),
+			},
+		}
+
+		var chatID string
+		var viewOnlyPermissionIDsString string
+		var viewAndPostPermissionIDsString string
+
+		err := rows.Scan(&chatID, &permissionResponse.ViewOnlyPermissions.Satisfied, &permissionResponse.ViewAndPostPermissions.Satisfied, &viewOnlyPermissionIDsString, &viewAndPostPermissionIDsString)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, permissionID := range strings.Split(viewOnlyPermissionIDsString, ",") {
+			if permissionID != "" {
+				permissionResponse.ViewOnlyPermissions.Permissions[permissionID] = &PermissionTokenCriteriaResult{Criteria: make([]bool, 0)}
+			}
+		}
+		for _, permissionID := range strings.Split(viewAndPostPermissionIDsString, ",") {
+			if permissionID != "" {
+				permissionResponse.ViewAndPostPermissions.Permissions[permissionID] = &PermissionTokenCriteriaResult{Criteria: make([]bool, 0)}
+			}
+		}
+		checkChannelPermissionResponses[chatID] = permissionResponse
+	}
+
+	addCriteriaResult := func(channelResponses map[string]*CheckChannelPermissionsResponse, permissions map[string]*PermissionTokenCriteriaResult, chatID string, viewOnly bool) error {
+		for permissionID := range permissions {
+			criteria, err := p.GetPermissionTokenCriteriaResult(permissionID, communityID, chatID)
+			if err != nil {
+				return err
+			}
+			if viewOnly {
+				channelResponses[chatID].ViewOnlyPermissions.Permissions[permissionID] = criteria
+			} else {
+				channelResponses[chatID].ViewAndPostPermissions.Permissions[permissionID] = criteria
+			}
+		}
+		return nil
+	}
+
+	for chatID, response := range checkChannelPermissionResponses {
+		err := addCriteriaResult(checkChannelPermissionResponses, response.ViewOnlyPermissions.Permissions, chatID, true)
+		if err != nil {
+			return nil, err
+		}
+		err = addCriteriaResult(checkChannelPermissionResponses, response.ViewAndPostPermissions.Permissions, chatID, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return checkChannelPermissionResponses, nil
+}
+
+func (p *Persistence) GetPermissionTokenCriteriaResult(permissionID string, communityID string, chatID string) (*PermissionTokenCriteriaResult, error) {
+	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	criteriaString := ""
+	err = tx.QueryRow(`SELECT criteria FROM communities_permission_token_criteria_results WHERE permission_id = ? AND community_id = ? AND chat_id = ?`, permissionID, communityID, chatID).Scan(&criteriaString)
+	if err != nil {
+		return nil, err
+	}
+
+	criteria := make([]bool, 0)
+	for _, r := range strings.Split(criteriaString, ",") {
+		val, err := strconv.ParseBool(r)
+		if err != nil {
+			return nil, err
+		}
+		criteria = append(criteria, val)
+	}
+
+	return &PermissionTokenCriteriaResult{Criteria: criteria}, nil
+}
+
 func (p *Persistence) GetRequestToJoinRevealedAddresses(requestID []byte) ([]*protobuf.RevealedAccount, error) {
 	revealedAccounts := make([]*protobuf.RevealedAccount, 0)
 	rows, err := p.db.Query(`SELECT address, chain_ids FROM communities_requests_to_join_revealed_addresses WHERE request_id = ?`, requestID)

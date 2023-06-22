@@ -424,3 +424,41 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 	s.Require().Len(tokens, 1)
 	s.Require().Equal(Deployed, tokens[0].DeployState)
 }
+
+func (s *PersistenceSuite) TestSaveCheckChannelPermissionResponse() {
+
+	viewAndPostPermissionResults := make(map[string]*PermissionTokenCriteriaResult)
+	viewAndPostPermissionResults["one"] = &PermissionTokenCriteriaResult{
+		Criteria: []bool{true, true, true, true},
+	}
+	viewAndPostPermissionResults["two"] = &PermissionTokenCriteriaResult{
+		Criteria: []bool{false},
+	}
+	chatID := "some-chat-id"
+	communityID := "some-community-id"
+
+	checkChannelPermissionResponse := &CheckChannelPermissionsResponse{
+		ViewOnlyPermissions: &CheckChannelViewOnlyPermissionsResult{
+			Satisfied:   true,
+			Permissions: make(map[string]*PermissionTokenCriteriaResult),
+		},
+		ViewAndPostPermissions: &CheckChannelViewAndPostPermissionsResult{
+			Satisfied:   true,
+			Permissions: viewAndPostPermissionResults,
+		},
+	}
+
+	err := s.db.SaveCheckChannelPermissionResponse(communityID, chatID, checkChannelPermissionResponse)
+	s.NoError(err)
+
+	responses, err := s.db.GetCheckChannelPermissionResponses(communityID)
+	s.NoError(err)
+	s.Require().Len(responses, 1)
+	s.Require().NotNil(responses[chatID])
+	s.Require().True(responses[chatID].ViewOnlyPermissions.Satisfied)
+	s.Require().Len(responses[chatID].ViewOnlyPermissions.Permissions, 0)
+	s.Require().True(responses[chatID].ViewAndPostPermissions.Satisfied)
+	s.Require().Len(responses[chatID].ViewAndPostPermissions.Permissions, 2)
+	s.Require().Equal(responses[chatID].ViewAndPostPermissions.Permissions["one"].Criteria, []bool{true, true, true, true})
+	s.Require().Equal(responses[chatID].ViewAndPostPermissions.Permissions["two"].Criteria, []bool{false})
+}
