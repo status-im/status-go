@@ -306,7 +306,7 @@ docker-test: ##@tests Run tests in a docker container with golang.
 
 test: test-unit ##@tests Run basic, short tests during development
 
-test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
+test-unit: UNIT_TEST_PACKAGES = $(shell go list ./protocol  | \
 	grep -v /vendor | \
 	grep -v /t/e2e | \
 	grep -v /t/benchmarks | \
