@@ -1337,6 +1337,34 @@ func (api *PublicAPI) CheckAllCommunityChannelsPermissions(request *requests.Che
 	return api.service.messenger.CheckAllCommunityChannelsPermissions(request)
 }
 
+func (api *PublicAPI) CreateCommunityURLWithChatKey(communityID string) (string, error) {
+	return api.service.messenger.CreateCommunityURLWithChatKey(communityID)
+}
+
+func (api *PublicAPI) CreateCommunityURLWithData(communityID string) (string, error) {
+	return api.service.messenger.CreateCommunityURLWithData(communityID)
+}
+
+func (api *PublicAPI) CreateCommunityChannelURLWithChatKey(request *requests.CommunityChannelShareURL) (string, error) {
+	return api.service.messenger.CreateCommunityChannelURLWithChatKey(request)
+}
+
+func (api *PublicAPI) CreateCommunityChannelURLWithData(request *requests.CommunityChannelShareURL) (string, error) {
+	return api.service.messenger.CreateCommunityChannelURLWithData(request)
+}
+
+func (api *PublicAPI) CreateUserURLWithENS(pubkey string) (string, error) {
+	return api.service.messenger.CreateUserURLWithENS(pubkey)
+}
+
+func (api *PublicAPI) CreateUserURLWithChatKey(pubkey string) (string, error) {
+	return api.service.messenger.CreateUserURLWithChatKey(pubkey)
+}
+
+func (api *PublicAPI) CreateUserURLWithData(pubkey string) (string, error) {
+	return api.service.messenger.CreateUserURLWithData(pubkey)
+}
+
 func (api *PublicAPI) Messenger() *protocol.Messenger {
 	return api.service.messenger
 }

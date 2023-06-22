@@ -5,8 +5,9 @@ import (
 )
 
 var (
-	ErrChatIDEmpty     = errors.New("chat ID is empty")
-	ErrChatNotFound    = errors.New("can't find chat")
-	ErrNotImplemented  = errors.New("not implemented")
-	ErrContactNotFound = errors.New("contact not found")
+	ErrChatIDEmpty      = errors.New("chat ID is empty")
+	ErrChatNotFound     = errors.New("can't find chat")
+	ErrNotImplemented   = errors.New("not implemented")
+	ErrContactNotFound  = errors.New("contact not found")
+	ErrCommunityIDEmpty = errors.New("community ID is empty")
 )
