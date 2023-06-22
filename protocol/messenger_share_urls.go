@@ -4,11 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
+
+	"github.com/golang/protobuf/proto"
 
 	"github.com/google/uuid"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/urls"
@@ -212,5 +216,84 @@ func (m *Messenger) CreateUserURLWithData(pubKey string) (string, error) {
 	}
 
 	return fmt.Sprintf(baseShareUrl, "/u", "/", userBase64+"#"+string(signature)), nil
+}
 
+func (m *Messenger) ParseCommunityURL(urlData string, withChatKey bool) (*MessengerResponse, error) {
+	var community *communities.Community
+	if withChatKey {
+		// TODO: decompress community key
+		//communityID, err := m.DecompressCommunityID(urlData)
+		//if err != nil {
+		//	return nil, err
+		//}
+		communityID := types.HexBytes(urlData)
+		community, err := m.GetCommunityByID(communityID)
+		if err != nil {
+			return nil, err
+		}
+
+		if community == nil {
+			return nil, fmt.Errorf("community with communityID %s not found", communityID)
+		}
+	} else {
+		var communityProto protobuf.Community
+		err := proto.Unmarshal([]byte(urlData), &communityProto)
+		if err != nil {
+			return nil, err
+		}
+		// TODO: decompress community data
+		return nil, errors.New("not implemented yet")
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+	return response, nil
+}
+
+func (m *Messenger) ParseCommuntyChannelSharedURL(url string) (*MessengerResponse, error) {
+	return nil, errors.New("not implemented yet")
+}
+
+func (m *Messenger) ParseProfileSharedURL(urlData string) (*MessengerResponse, error) {
+	// TODO: decompress public key
+	pubKey, err := common.HexToPubkey(urlData)
+	if err != nil {
+		return nil, err
+	}
+
+	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: types.EncodeHex(crypto.FromECDSAPub(pubKey))})
+	if err != nil {
+		return nil, err
+	}
+
+	if contact == nil {
+		return nil, fmt.Errorf("contact with publick key %s not found", pubKey)
+	}
+
+	response := &MessengerResponse{}
+	response.AddContact(contact)
+	return response, nil
+}
+
+func (m *Messenger) ParseSharedURL(url string) (*MessengerResponse, error) {
+	var group string
+	var urlData string
+	reader := strings.NewReader(url)
+	_, err := fmt.Fscanf(reader, baseShareUrl, &group, &urlData)
+	if err != nil {
+		return nil, err
+	}
+
+	switch group {
+	case "c":
+		return m.ParseCommunityURL(urlData, false)
+	case "c#":
+		return m.ParseCommunityURL(urlData, true)
+	case "cc":
+		return m.ParseCommuntyChannelSharedURL(urlData)
+	case "u":
+		return m.ParseProfileSharedURL(urlData)
+	}
+
+	return nil, errors.New("unhandled url group")
 }

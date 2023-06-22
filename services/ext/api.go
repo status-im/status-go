@@ -1365,6 +1365,10 @@ func (api *PublicAPI) CreateUserURLWithData(pubkey string) (string, error) {
 	return api.service.messenger.CreateUserURLWithData(pubkey)
 }
 
+func (api *PublicAPI) ParseSharedURL(url string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ParseSharedURL(url)
+}
+
 func (api *PublicAPI) Messenger() *protocol.Messenger {
 	return api.service.messenger
 }
