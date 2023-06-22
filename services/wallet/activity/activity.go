@@ -219,7 +219,6 @@ const (
 	toTrType   = byte(2)
 
 	// TODO: Multi-transaction network information is missing in filtering
-	// TODO: extract token code for non transfer type eth
 	// TODO optimization: consider implementing nullable []byte instead of using strings for addresses
 	//                      or insert binary (X'...' syntax) directly into the query
 	//

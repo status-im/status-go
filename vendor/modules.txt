@@ -116,6 +116,9 @@ github.com/anacrolix/utp
 # github.com/andybalholm/cascadia v1.2.0
 ## explicit; go 1.13
 github.com/andybalholm/cascadia
+# github.com/bahlo/generic-list-go v0.2.0
+## explicit; go 1.18
+github.com/bahlo/generic-list-go
 # github.com/beevik/ntp v0.3.0
 ## explicit
 github.com/beevik/ntp
@@ -151,6 +154,9 @@ github.com/btcsuite/btcd/chaincfg/chainhash
 github.com/btcsuite/btcutil
 github.com/btcsuite/btcutil/base58
 github.com/btcsuite/btcutil/bech32
+# github.com/buger/jsonparser v1.1.1
+## explicit; go 1.13
+github.com/buger/jsonparser
 # github.com/cenkalti/backoff/v3 v3.2.2
 ## explicit; go 1.12
 github.com/cenkalti/backoff/v3
@@ -569,6 +575,10 @@ github.com/libp2p/go-yamux/v4
 # github.com/lucasb-eyer/go-colorful v1.0.3
 ## explicit; go 1.12
 github.com/lucasb-eyer/go-colorful
+# github.com/mailru/easyjson v0.7.7
+## explicit; go 1.12
+github.com/mailru/easyjson/buffer
+github.com/mailru/easyjson/jwriter
 # github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd
 ## explicit; go 1.15
 github.com/marten-seemann/tcp
@@ -1057,6 +1067,9 @@ github.com/wealdtech/go-multicodec
 # github.com/wk8/go-ordered-map v1.0.0
 ## explicit; go 1.14
 github.com/wk8/go-ordered-map
+# github.com/wk8/go-ordered-map/v2 v2.1.7
+## explicit; go 1.18
+github.com/wk8/go-ordered-map/v2
 # github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f
 ## explicit
 github.com/xeipuuv/gojsonpointer
