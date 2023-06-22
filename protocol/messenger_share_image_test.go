@@ -99,6 +99,7 @@ func (s *MessengerShareMessageSuite) TestImageMessageSharing() {
 	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
+	defer theirMessenger.Shutdown() // nolint: errcheck
 
 	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
 	err = theirMessenger.SaveChat(theirChat)

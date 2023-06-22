@@ -312,8 +312,9 @@ test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
 	grep -v /t/benchmarks | \
 	grep -v /transactions/fake )
 test-unit: ##@tests Run unit and integration tests
-	go test -tags '$(BUILD_TAGS)' -timeout 20m -v -failfast $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
-	cd ./waku && go test -tags '$(BUILD_TAGS)' -timeout 20m -v -failfast ./... $(gotest_extraflags)
+	for file in $(UNIT_TEST_PACKAGES); do \
+		go test -tags '$(BUILD_TAGS)' -timeout 20m -v -failfast $$file $(gotest_extraflags); \
+	done
 
 test-unit-race: gotest_extraflags=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag

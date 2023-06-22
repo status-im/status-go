@@ -67,6 +67,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	theirMessenger := s.newMessenger(s.shh)
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
+	defer theirMessenger.Shutdown() // nolint: errcheck
 
 	// Set ENS name
 	err = theirMessenger.settings.SaveSettingField(settings.PreferredName, theirName)
@@ -126,7 +127,6 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	s.Require().Equal(newEnsName, receivedContact.EnsName)
 	s.Require().False(receivedContact.ENSVerified)
 	s.Require().NotEmpty(receivedContact.LastUpdated)
-	s.Require().NoError(theirMessenger.Shutdown())
 }
 
 func (s *MessengerContactUpdateSuite) TestAddContact() {
@@ -135,6 +135,7 @@ func (s *MessengerContactUpdateSuite) TestAddContact() {
 	theirMessenger := s.newMessenger(s.shh)
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
+	defer theirMessenger.Shutdown() // nolint: errcheck
 
 	response, err := theirMessenger.AddContact(context.Background(), &requests.AddContact{ID: contactID})
 	s.Require().NoError(err)
@@ -168,6 +169,7 @@ func (s *MessengerContactUpdateSuite) TestAddContactWithENS() {
 	theirMessenger := s.newMessenger(s.shh)
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
+	defer theirMessenger.Shutdown() // nolint: errcheck
 
 	s.Require().NoError(theirMessenger.ENSVerified(contactID, ensName))
 

@@ -54,6 +54,7 @@ func (s *MessengerDeleteMessageForEveryoneSuite) SetupTest() {
 func (s *MessengerDeleteMessageForEveryoneSuite) TearDownTest() {
 	s.Require().NoError(s.admin.Shutdown())
 	s.Require().NoError(s.bob.Shutdown())
+	s.Require().NoError(s.moderator.Shutdown())
 	_ = s.logger.Sync()
 }
 

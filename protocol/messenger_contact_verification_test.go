@@ -160,6 +160,7 @@ func (s *MessengerVerificationRequests) TestAcceptVerificationRequests() {
 	theirMessenger := s.newMessenger(s.shh)
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
+	defer theirMessenger.Shutdown() // nolint: errcheck
 
 	s.mutualContact(theirMessenger)
 
@@ -285,6 +286,7 @@ func (s *MessengerVerificationRequests) TestTrustedVerificationRequests() {
 	theirMessenger := s.newMessenger(s.shh)
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
+	defer theirMessenger.Shutdown() // nolint: errcheck
 
 	s.mutualContact(theirMessenger)
 
@@ -398,6 +400,7 @@ func (s *MessengerVerificationRequests) TestUnthrustworthyVerificationRequests()
 	theirMessenger := s.newMessenger(s.shh)
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
+	defer theirMessenger.Shutdown() // nolint: errcheck
 
 	s.mutualContact(theirMessenger)
 
@@ -525,6 +528,7 @@ func (s *MessengerVerificationRequests) TestDeclineVerificationRequests() {
 	theirMessenger := s.newMessenger(s.shh)
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
+	defer theirMessenger.Shutdown() // nolint: errcheck
 
 	s.mutualContact(theirMessenger)
 
@@ -636,6 +640,7 @@ func (s *MessengerVerificationRequests) TestCancelVerificationRequest() {
 	theirMessenger := s.newMessenger(s.shh)
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
+	defer theirMessenger.Shutdown() // nolint: errcheck
 
 	s.mutualContact(theirMessenger)
 

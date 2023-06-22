@@ -72,6 +72,7 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 
 	bob, err := newMessengerWithKey(s.shh, key, s.logger, nil)
 	s.Require().NoError(err)
+	defer bob.Shutdown() // nolint: errcheck
 
 	chatID := statusChatID
 
@@ -145,7 +146,6 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 	s.Require().Equal(response.EmojiReactions()[0].ID(), emojiID)
 	s.Require().Equal(response.EmojiReactions()[0].Type, protobuf.EmojiReaction_SAD)
 	s.Require().True(response.EmojiReactions()[0].Retracted)
-	s.Require().NoError(bob.Shutdown())
 }
 
 func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
@@ -153,6 +153,7 @@ func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 	alice := s.newMessenger(s.shh)
 	_, err := alice.Start()
 	s.Require().NoError(err)
+	defer alice.Shutdown() // nolint: errcheck
 	response, err := bob.CreateGroupChatWithMembers(context.Background(), "test", []string{})
 	s.NoError(err)
 
@@ -205,8 +206,6 @@ func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 		"no emoji reaction received",
 	)
 	s.Require().NoError(err)
-	s.Require().NoError(alice.Shutdown())
-
 }
 
 func (s *MessengerEmojiSuite) TestCompressedKeyReturnedWithEmoji() {
