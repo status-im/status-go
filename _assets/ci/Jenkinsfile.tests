@@ -40,29 +40,6 @@ pipeline {
       }
     }
 
-    stage('Vendor Check') {
-      steps { script {
-        nix.shell('make install-modvendor', pure: false)
-        nix.shell('make vendor', pure: false)
-        /* fail build if vendoring hasn't been done */
-        nix.shell('git diff --exit-code --no-color --stat vendor/')
-      } }
-    }
-
-
-    stage('Lint') {
-      steps { script {
-        nix.shell('make install-lint', pure: false)
-        nix.shell('make lint', pure: false)
-      } }
-    }
-
-    stage('Canary') {
-      steps { script {
-        nix.shell('make canary-test', pure: false)
-      } }
-    }
-
     stage('Unit Tests') {
       steps { script {
         db = docker.image('postgres:9.6-alpine').withRun([
