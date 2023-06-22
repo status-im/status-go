@@ -18,7 +18,7 @@ Legend:
 
 Improve on the identified limitations
 
-- [ ] Missing filtering data
+- [x] Missing filtering data
 - [x] Missing cached (not extracted as a column)
   - Extracting the data from the raw data is expensive but might be negligible given that usually we should not expect more than 20 entries per second in the worst case scenario.
 - [x] Table extensions
@@ -47,9 +47,9 @@ UX requirements
 - [x] `status`: for status icon and label
 - [ ] `chainIDs`: for chain icons
   - Missing for `Bridge`, `Buy`, `Swap`
-- [ ] `amount`s: add to the activity.Entry
+- [x] `amount`s: add to the activity.Entry
   - already in DB
-- [ ] `tokenCode`s: add to the activity.Entry
+- [x] `tokenCode`s: add to the activity.Entry
   - already in DB
 - [ ] `to`/`from`/`owner`: add to the activity.Entry
   - already in DB, coming soon
@@ -63,7 +63,7 @@ UX requirements
 
 Extend `entry.nim:ActivityEntry` and `activity.go:Entry` with presentation layer data
 
-- [ ] `activityType`: instead of the current `MultiTransactionType`
+- [x] `activityType`: instead of the current `MultiTransactionType`
 - [x] `status`: for status icon and label
 
 ## Current state
@@ -159,4 +159,3 @@ Will leave the performance concerns for the next milestone
   - Cons:
     - Slower to query (don't know how much yet)
     - Complex query increases maintenance
-
