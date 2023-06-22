@@ -537,7 +537,7 @@ func (s *Server) isMessageNotification(pn *protobuf.PushNotification) bool {
 // the chat is not muted
 // the author is not blocked
 func (s *Server) isValidMessageNotification(pn *protobuf.PushNotification, registration *protobuf.PushNotificationRegistration) bool {
-	return s.isMessageNotification(pn) && !s.contains(registration.BlockedChatList, pn.ChatId) && !s.contains(registration.BlockedChatList, pn.Author)
+	return s.isMessageNotification(pn) && !s.contains(registration.BlockedChatList, pn.ChatId) && !s.contains(registration.MutedChatList, pn.ChatId) && !s.contains(registration.BlockedChatList, pn.Author)
 }
 
 func (s *Server) isRequestToJoinCommunityNotification(pn *protobuf.PushNotification) bool {

@@ -63,11 +63,17 @@ func (s *ClientSuite) SetupTest() {
 
 func (s *ClientSuite) TestBuildPushNotificationRegisterMessage() {
 	mutedChatList := []string{"a", "b"}
+	blockedChatList := []string{"c", "d"}
 
 	// build chat lish hashes
 	var mutedChatListHashes [][]byte
 	for _, chatID := range mutedChatList {
 		mutedChatListHashes = append(mutedChatListHashes, common.Shake256([]byte(chatID)))
+	}
+	// Build Blocked chat list hashes
+	var blockedChatListHashes [][]byte
+	for _, chatID := range blockedChatList {
+		blockedChatListHashes = append(blockedChatListHashes, common.Shake256([]byte(chatID)))
 	}
 
 	contactKey, err := crypto.GenerateKey()
@@ -75,8 +81,9 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessage() {
 	contactIDs := []*ecdsa.PublicKey{&contactKey.PublicKey}
 
 	options := &RegistrationOptions{
-		ContactIDs:   contactIDs,
-		MutedChatIDs: mutedChatList,
+		ContactIDs:     contactIDs,
+		MutedChatIDs:   mutedChatList,
+		BlockedChatIDs: blockedChatList,
 	}
 
 	// Set random generator for uuid
@@ -99,7 +106,8 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessage() {
 		DeviceToken:     testDeviceToken,
 		InstallationId:  s.installationID,
 		Enabled:         true,
-		BlockedChatList: mutedChatListHashes,
+		MutedChatList:   mutedChatListHashes,
+		BlockedChatList: blockedChatListHashes,
 	}
 
 	actualMessage, err := s.client.buildPushNotificationRegistrationMessage(options)
@@ -111,11 +119,18 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessage() {
 func (s *ClientSuite) TestBuildPushNotificationRegisterMessageAllowFromContactsOnly() {
 	mutedChatList := []string{"a", "b"}
 	publicChatList := []string{"c", "d"}
+	blockedChatList := []string{"e", "f"}
 
 	// build muted chat lish hashes
 	var mutedChatListHashes [][]byte
 	for _, chatID := range mutedChatList {
 		mutedChatListHashes = append(mutedChatListHashes, common.Shake256([]byte(chatID)))
+	}
+
+	// build blocked chat lish hashes
+	var blockedChatListHashes [][]byte
+	for _, chatID := range blockedChatList {
+		blockedChatListHashes = append(blockedChatListHashes, common.Shake256([]byte(chatID)))
 	}
 
 	// build public chat lish hashes
@@ -128,9 +143,10 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessageAllowFromContactsO
 	s.Require().NoError(err)
 	contactIDs := []*ecdsa.PublicKey{&contactKey.PublicKey}
 	options := &RegistrationOptions{
-		ContactIDs:    contactIDs,
-		MutedChatIDs:  mutedChatList,
-		PublicChatIDs: publicChatList,
+		ContactIDs:     contactIDs,
+		MutedChatIDs:   mutedChatList,
+		BlockedChatIDs: blockedChatList,
+		PublicChatIDs:  publicChatList,
 	}
 
 	// Set random generator for uuid
@@ -168,7 +184,8 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessageAllowFromContactsO
 		InstallationId:          s.installationID,
 		AllowFromContactsOnly:   true,
 		Enabled:                 true,
-		BlockedChatList:         mutedChatListHashes,
+		BlockedChatList:         blockedChatListHashes,
+		MutedChatList:           mutedChatListHashes,
 		AllowedKeyList:          [][]byte{encryptedToken},
 		AllowedMentionsChatList: publicChatListHashes,
 	}

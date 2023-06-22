@@ -25,6 +25,7 @@ message PushNotificationRegistration {
   string apn_topic = 12;
   bool block_mentions = 13;
   repeated bytes allowed_mentions_chat_list = 14;
+  repeated bytes muted_chat_list = 15;
 }
 
 message PushNotificationRegistrationResponse {
