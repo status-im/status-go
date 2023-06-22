@@ -3910,6 +3910,10 @@ func (m *Messenger) CheckAllCommunityChannelsPermissions(request *requests.Check
 	return m.communitiesManager.CheckAllChannelsPermissions(request.CommunityID, addresses)
 }
 
+func (m *Messenger) GetCommunityCheckChannelPermissionResponses(communityID types.HexBytes) (*communities.CheckAllChannelsPermissionsResponse, error) {
+	return m.communitiesManager.GetCheckChannelPermissionResponses(communityID)
+}
+
 func chunkSlice[T comparable](slice []T, chunkSize int) [][]T {
 	var chunks [][]T
 	for i := 0; i < len(slice); i += chunkSize {

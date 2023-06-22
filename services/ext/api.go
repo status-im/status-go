@@ -1376,6 +1376,10 @@ func (api *PublicAPI) ChatMentionToInputField(chatID, text string) (*protocol.Ch
 	return api.service.messenger.GetMentionsManager().ToInputField(chatID, text)
 }
 
+func (api *PublicAPI) GetCheckChannelPermissionResponses(parent context.Context, communityID types.HexBytes) (*communities.CheckAllChannelsPermissionsResponse, error) {
+	return api.service.messenger.GetCommunityCheckChannelPermissionResponses(communityID)
+}
+
 // -----
 // HELPER
 // -----

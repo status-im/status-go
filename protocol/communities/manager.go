@@ -2272,7 +2272,16 @@ func (m *Manager) CheckChannelPermissions(communityID types.HexBytes, chatID str
 	}
 	accountsAndChainIDs := combineAddressesAndChainIDs(addresses, allChainIDs)
 
-	return m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountsAndChainIDs, false)
+	response, err := m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountsAndChainIDs, false)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.persistence.SaveCheckChannelPermissionResponse(communityID.String(), chatID, response)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
 type CheckChannelPermissionsResponse struct {
@@ -2360,9 +2369,22 @@ func (m *Manager) CheckAllChannelsPermissions(communityID types.HexBytes, addres
 		if err != nil {
 			return nil, err
 		}
+		err = m.persistence.SaveCheckChannelPermissionResponse(community.IDString(), community.IDString()+channelID, checkChannelPermissionsResponse)
+		if err != nil {
+			return nil, err
+		}
 		response.Channels[community.IDString()+channelID] = checkChannelPermissionsResponse
 	}
 	return response, nil
+}
+
+func (m *Manager) GetCheckChannelPermissionResponses(communityID types.HexBytes) (*CheckAllChannelsPermissionsResponse, error) {
+
+	response, err := m.persistence.GetCheckChannelPermissionResponses(communityID.String())
+	if err != nil {
+		return nil, err
+	}
+	return &CheckAllChannelsPermissionsResponse{Channels: response}, nil
 }
 
 type CheckAllChannelsPermissionsResponse struct {
