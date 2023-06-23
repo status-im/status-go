@@ -354,36 +354,6 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 	return m.addActivityCenterNotification(messageState.Response, notification)
 }
 
-func (m *Messenger) createIncomingContactRequestEventAndNotification(contact *Contact, messageState *ReceivedMessageState, contactRequest *common.Message, createNewNotification bool) error {
-	// check we have active caht for corresponding contact
-	chat, ok := m.allChats.Load(contact.ID)
-	if ok && chat.Active {
-		var updateType MutualStateUpdateType
-		if contactRequest.ContactRequestState == common.ContactRequestStateAccepted {
-			updateType = MutualStateUpdateTypeAdded
-		} else {
-			updateType = MutualStateUpdateTypeSent
-		}
-
-		// System message for mutual state update
-		clock, timestamp := chat.NextClockAndTimestamp(m.transport)
-		updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, updateType, clock, timestamp, false)
-		if err != nil {
-			return err
-		}
-
-		m.prepareMessage(updateMessage, m.httpServer)
-		err = m.persistence.SaveMessages([]*common.Message{updateMessage})
-		if err != nil {
-			return err
-		}
-		messageState.Response.AddMessage(updateMessage)
-		messageState.Response.AddChat(chat)
-	}
-
-	return m.createIncomingContactRequestNotification(contact, messageState, contactRequest, createNewNotification)
-}
-
 func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *common.Message) error {
 	message.ID = state.CurrentMessageState.MessageID
 	message.From = state.CurrentMessageState.Contact.ID
@@ -492,7 +462,7 @@ func (m *Messenger) syncContactRequestForInstallationContact(contact *Contact, s
 			return err
 		}
 	} else {
-		err = m.createIncomingContactRequestEventAndNotification(contact, state, contactRequest, true)
+		err = m.createIncomingContactRequestNotification(contact, state, contactRequest, true)
 		if err != nil {
 			return err
 		}
@@ -965,7 +935,7 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 				return err
 			}
 		} else {
-			err = m.createIncomingContactRequestEventAndNotification(contact, state, request, processingResponse.newContactRequestReceived)
+			err = m.createIncomingContactRequestNotification(contact, state, request, processingResponse.newContactRequestReceived)
 			if err != nil {
 				return err
 			}
@@ -1100,7 +1070,7 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 				return err
 			}
 
-			err = m.createIncomingContactRequestEventAndNotification(contact, state, contactRequest, true)
+			err = m.createIncomingContactRequestNotification(contact, state, contactRequest, true)
 			if err != nil {
 				return err
 			}
@@ -1123,7 +1093,7 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 
 		r := contact.ContactRequestReceived(message.ContactRequestClock)
 		if r.newContactRequestReceived {
-			err = m.createIncomingContactRequestEventAndNotification(contact, state, nil, true)
+			err = m.createIncomingContactRequestNotification(contact, state, nil, true)
 			if err != nil {
 				return err
 			}
@@ -2097,7 +2067,31 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 				receivedMessage.ContactRequestState = common.ContactRequestStatePending
 			}
 
-			err = m.createIncomingContactRequestEventAndNotification(contact, state, receivedMessage, true)
+			// Check we have a chat before `getOneToOneAndNextClock` call!
+			chat, notANewContact := m.allChats.Load(contact.ID)
+			if notANewContact {
+				clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+
+				updateMessage := &common.Message{}
+				if contact.mutual() {
+					updateMessage, err = m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeAdded, clock, timestamp, true)
+				} else {
+					updateMessage, err = m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, timestamp, false)
+				}
+				if err != nil {
+					return err
+				}
+
+				m.prepareMessage(updateMessage, m.httpServer)
+				err = m.persistence.SaveMessages([]*common.Message{updateMessage})
+				if err != nil {
+					return err
+				}
+				state.Response.AddMessage(updateMessage)
+				state.Response.AddChat(chat)
+			}
+
+			err = m.createIncomingContactRequestNotification(contact, state, receivedMessage, true)
 			if err != nil {
 				return err
 			}
@@ -2124,7 +2118,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 		state.AllContacts.Store(chatContact.ID, chatContact)
 
 		if sendNotification {
-			err = m.createIncomingContactRequestEventAndNotification(chatContact, state, receivedMessage, true)
+			err = m.createIncomingContactRequestNotification(chatContact, state, receivedMessage, true)
 			if err != nil {
 				return err
 			}

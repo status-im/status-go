@@ -30,7 +30,7 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 		case MutualStateUpdateTypeSent:
 			text = "You sent a contact request to @" + to
 		case MutualStateUpdateTypeAdded:
-			text = "@" + from + " added you as a contact"
+			text = "You added @" + to + " as a contact"
 		case MutualStateUpdateTypeRemoved:
 			text = "You removed @" + to + " as a contact"
 		default:
@@ -44,7 +44,7 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 		case MutualStateUpdateTypeSent:
 			text = "@" + from + " sent you a contact request"
 		case MutualStateUpdateTypeAdded:
-			text = "You added @" + to + " as a contact"
+			text = "@" + from + " added you as a contact"
 		case MutualStateUpdateTypeRemoved:
 			text = "@" + from + " removed you as a contact"
 		default:
@@ -300,25 +300,6 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	response.AddMessage(contactRequest)
 	response.AddContact(contact)
 
-	// System message for mutual state update
-	chat, clock, err := m.getOneToOneAndNextClock(contact)
-	if err != nil {
-		return nil, err
-	}
-	timestamp := m.getTimesource().GetCurrentTime()
-	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeAdded, clock, timestamp, false)
-	if err != nil {
-		return nil, err
-	}
-
-	m.prepareMessage(updateMessage, m.httpServer)
-	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
-	if err != nil {
-		return nil, err
-	}
-	response.AddMessage(updateMessage)
-	response.AddChat(chat)
-
 	return response, nil
 }
 
@@ -332,9 +313,15 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 
 	// Check we have a chat before `getOneToOneAndNextClock` call!
 	chat, notANewContact := m.allChats.Load(contact.ID)
-	if notANewContact /* and !contact.hasAddedUs()*/ {
+	if notANewContact {
 		clock, timestamp := chat.NextClockAndTimestamp(m.transport)
-		updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, timestamp, !contact.hasAddedUs())
+
+		updateMessage := &common.Message{}
+		if contact.hasAddedUs() {
+			updateMessage, err = m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeAdded, clock, timestamp, false)
+		} else {
+			updateMessage, err = m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, timestamp, true)
+		}
 		if err != nil {
 			return nil, err
 		}
