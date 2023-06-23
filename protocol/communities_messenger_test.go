@@ -68,15 +68,9 @@ func (m *TestTokenManager) GetBalancesByChain(ctx context.Context, accounts, tok
 }
 
 func (m *AccountManagerMock) GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*account.SelectedExtKey, error) {
-	if truePassword, ok := m.AccountsMap[address]; ok {
-		if password == truePassword {
-			return &account.SelectedExtKey{
-				Address: types.HexToAddress(address),
-			}, nil
-		}
-		return nil, errors.New("password doesn't match")
-	}
-	return nil, errors.New("address doesn't exist")
+	return &account.SelectedExtKey{
+		Address: types.HexToAddress(address),
+	}, nil
 }
 
 func (m *AccountManagerMock) CanRecover(rpcParams account.RecoverParams, revealedAddress types.Address) (bool, error) {
