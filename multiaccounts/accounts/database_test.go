@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"database/sql"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -48,19 +49,38 @@ func TestUpdateAccountPosition(t *testing.T) {
 	accounts := []*Account{
 		{Address: types.Address{0x01}, Chat: true, Wallet: true},
 		{Address: types.Address{0x02}},
+		{Address: types.Address{0x03}},
+		{Address: types.Address{0x04}},
+		{Address: types.Address{0x05}},
 	}
 	require.NoError(t, db.SaveOrUpdateAccounts(accounts))
-	accounts, err := db.GetAccounts()
+	res, err := db.GetAccounts()
 	require.NoError(t, err)
-	require.Equal(t, accounts[0].Position, int64(1))
-	require.Equal(t, accounts[1].Position, int64(2))
+	validateOrderForRes := func(accOrd []int) {
+		require.Equal(t, len(accounts), len(accOrd))
+		for i, ord := range accOrd {
+			var resJson []byte
+			if accounts[ord].Address != res[i].Address {
+				resJson, _ = json.Marshal(res)
+			}
+			require.Equal(t, accounts[ord].Address, res[i].Address, "account order broken at element %d; result content", i, string(resJson))
+		}
+	}
+	validateOrderForRes([]int{0, 1, 2, 3, 4})
 
-	err = db.UpdateAccountPosition(accounts[1].Address, 1)
+	err = db.UpdateAccountPosition(accounts[0].Address, 4)
 	require.NoError(t, err)
 
-	accounts, err = db.GetAccounts()
-	require.Equal(t, accounts[0].Position, int64(0))
-	require.Equal(t, accounts[1].Position, int64(1))
+	res, err = db.GetAccounts()
+	require.NoError(t, err)
+	validateOrderForRes([]int{1, 2, 3, 0, 4})
+
+	err = db.UpdateAccountPosition(accounts[2].Address, 4)
+	require.NoError(t, err)
+
+	res, err = db.GetAccounts()
+	require.NoError(t, err)
+	validateOrderForRes([]int{1, 3, 0, 2, 4})
 }
 
 func TestGetWalletAddress(t *testing.T) {
