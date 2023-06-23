@@ -70,7 +70,7 @@ pipeline {
           '--env=POSTGRES_HOST_AUTH_METHOD=trust',
           '--publish=5432:5432',
         ].join(' ')) { c ->
-          nix.shell('make test-unit V=1', pure: false)
+          nix.shell('make test-unit V=1 -j1', pure: false)
         }
       } }
       post { cleanup { /* Leftover DB containers. */

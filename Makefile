@@ -306,15 +306,20 @@ docker-test: ##@tests Run tests in a docker container with golang.
 
 test: test-unit ##@tests Run basic, short tests during development
 
-test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
-	grep -v /vendor | \
-	grep -v /t/e2e | \
-	grep -v /t/benchmarks | \
-	grep -v /transactions/fake )
+UNIT_TEST_PACKAGES = $(shell go list ./...  | grep -v -e /vendor -e /t/e2e -e /t/benchmarks -e /transactions/fake)
+UNIT_TESTS = $(foreach UNIT, $(UNIT_TEST_PACKAGES), test-unit_$(UNIT))
+test-unit: $(UNIT_TESTS)
 test-unit: ##@tests Run unit and integration tests
-	for file in $(UNIT_TEST_PACKAGES); do \
-		go test -tags '$(BUILD_TAGS)' -timeout 20m -v -failfast $$file $(gotest_extraflags); \
-	done
+
+# For running individual tests using make.
+test-unit_github.com/status-im/status-go/%: UNIT_PATH = $(shell echo "$@" | cut -d_ -f2-)
+test-unit_github.com/status-im/status-go/%:
+	@echo -e "$(YELLOW)TESTING:$(RESET) $(UNIT_PATH)"
+	go test -tags '$(BUILD_TAGS)' -timeout 20m -v -failfast $(UNIT_PATH) $(gotest_extraflags)
+
+# Secial case for when main.go exists at repo root.
+test-unit_github.com/status-im/status-go:
+	@echo "Nothing to test for repo root."
 
 test-unit-race: gotest_extraflags=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag
