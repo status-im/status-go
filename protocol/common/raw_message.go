@@ -35,4 +35,5 @@ type RawMessage struct {
 	CommunityKeyExMsgType CommKeyExMsgType
 	Ephemeral             bool
 	BeforeDispatch        func(*RawMessage) error
+	HashRatchetGroupID    []byte
 }

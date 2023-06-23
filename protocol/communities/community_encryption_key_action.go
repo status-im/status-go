@@ -63,7 +63,9 @@ func evaluateCommunityLevelEncryptionKeyAction(origin, modified *Community, chan
 func evaluateChannelLevelEncryptionKeyActions(origin, modified *Community, changes *CommunityChanges) *map[string]EncryptionKeyAction {
 	result := make(map[string]EncryptionKeyAction)
 
-	for chatID := range modified.config.CommunityDescription.Chats {
+	for channelID := range modified.config.CommunityDescription.Chats {
+		chatID := modified.IDString() + channelID
+
 		originChannelViewOnlyPermissions := origin.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
 		originChannelViewAndPostPermissions := origin.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
 		originChannelPermissions := append(originChannelViewOnlyPermissions, originChannelViewAndPostPermissions...)
@@ -75,13 +77,13 @@ func evaluateChannelLevelEncryptionKeyActions(origin, modified *Community, chang
 		membersAdded := make(map[string]*protobuf.CommunityMember)
 		membersRemoved := make(map[string]*protobuf.CommunityMember)
 
-		chatChanges, ok := changes.ChatsModified[chatID]
+		chatChanges, ok := changes.ChatsModified[channelID]
 		if ok {
 			membersAdded = chatChanges.MembersAdded
 			membersRemoved = chatChanges.MembersRemoved
 		}
 
-		result[chatID] = *evaluateEncryptionKeyAction(originChannelPermissions, modifiedChannelPermissions, modified.config.CommunityDescription.Members, membersAdded, membersRemoved)
+		result[channelID] = *evaluateEncryptionKeyAction(originChannelPermissions, modifiedChannelPermissions, modified.config.CommunityDescription.Chats[channelID].Members, membersAdded, membersRemoved)
 	}
 
 	return &result

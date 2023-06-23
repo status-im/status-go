@@ -62,28 +62,28 @@ var (
 )
 
 type Manager struct {
-	persistence                    *Persistence
-	encryptor                      *encryption.Protocol
-	ensSubscription                chan []*ens.VerificationRecord
-	subscriptions                  []chan *Subscription
-	ensVerifier                    *ens.Verifier
-	identity                       *ecdsa.PrivateKey
-	accountsManager                account.Manager
-	tokenManager                   TokenManager
-	collectiblesManager            CollectiblesManager
-	logger                         *zap.Logger
-	stdoutLogger                   *zap.Logger
-	transport                      *transport.Transport
-	quit                           chan struct{}
-	torrentConfig                  *params.TorrentConfig
-	torrentClient                  *torrent.Client
-	walletConfig                   *params.WalletConfig
-	historyArchiveTasksWaitGroup   sync.WaitGroup
-	historyArchiveTasks            sync.Map // stores `chan struct{}`
-	periodicMemberPermissionsTasks sync.Map // stores `chan struct{}`
-	torrentTasks                   map[string]metainfo.Hash
-	historyArchiveDownloadTasks    map[string]*HistoryArchiveDownloadTask
-	stopped                        bool
+	persistence                      *Persistence
+	encryptor                        *encryption.Protocol
+	ensSubscription                  chan []*ens.VerificationRecord
+	subscriptions                    []chan *Subscription
+	ensVerifier                      *ens.Verifier
+	identity                         *ecdsa.PrivateKey
+	accountsManager                  account.Manager
+	tokenManager                     TokenManager
+	collectiblesManager              CollectiblesManager
+	logger                           *zap.Logger
+	stdoutLogger                     *zap.Logger
+	transport                        *transport.Transport
+	quit                             chan struct{}
+	torrentConfig                    *params.TorrentConfig
+	torrentClient                    *torrent.Client
+	walletConfig                     *params.WalletConfig
+	historyArchiveTasksWaitGroup     sync.WaitGroup
+	historyArchiveTasks              sync.Map // stores `chan struct{}`
+	periodicMembersReevaluationTasks sync.Map // stores `chan struct{}`
+	torrentTasks                     map[string]metainfo.Hash
+	historyArchiveDownloadTasks      map[string]*HistoryArchiveDownloadTask
+	stopped                          bool
 }
 
 type HistoryArchiveDownloadTask struct {
@@ -614,16 +614,12 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 	return community, changes, nil
 }
 
-func (m *Manager) CheckMemberPermissions(community *Community, removeAdmins bool) error {
+func (m *Manager) ReevaluateMembers(community *Community, removeAdmins bool) error {
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 
-	adminPermissions := len(becomeAdminPermissions) > 0
-	memberPermissions := len(becomeMemberPermissions) > 0
-
-	if !adminPermissions && !memberPermissions && !removeAdmins {
-		return nil
-	}
+	hasMemberPermissions := len(becomeMemberPermissions) > 0
+	hasAdminPermissions := len(becomeAdminPermissions) > 0
 
 	for memberKey, member := range community.Members() {
 		memberPubKey, err := common.HexToPubkey(memberKey)
@@ -640,7 +636,7 @@ func (m *Manager) CheckMemberPermissions(community *Community, removeAdmins bool
 
 		// Check if user was not treated as an admin without wallet in open community
 		// or user treated as a member without wallet in closed community
-		if (!memberHasWallet && isAdmin) || (memberPermissions && !memberHasWallet) {
+		if !memberHasWallet && (hasMemberPermissions || isAdmin) {
 			_, err = community.RemoveUserFromOrg(memberPubKey)
 			if err != nil {
 				return err
@@ -652,7 +648,7 @@ func (m *Manager) CheckMemberPermissions(community *Community, removeAdmins bool
 
 		// Check if user is still an admin or can become an admin and do update of member role
 		removeAdminRole := false
-		if adminPermissions {
+		if hasAdminPermissions {
 			permissionResponse, err := m.checkPermissionToJoin(becomeAdminPermissions, accountsAndChainIDs, true)
 			if err != nil {
 				return err
@@ -677,20 +673,66 @@ func (m *Manager) CheckMemberPermissions(community *Community, removeAdmins bool
 			isAdmin = false
 		}
 
-		// Skip further validation if user has admin permissions or we do not have member permissions
-		if isAdmin || !memberPermissions {
+		if isAdmin {
+			// Make sure admin is added to every channel
+			for channelID := range community.Chats() {
+				if !community.IsMemberInChat(memberPubKey, channelID) {
+					_, err = community.AddMemberToChat(channelID, memberPubKey, []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ADMIN})
+					if err != nil {
+						return err
+					}
+				}
+			}
+			// Skip further validation if user has admin permissions
 			continue
 		}
 
-		permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, accountsAndChainIDs, true)
-		if err != nil {
-			return err
-		}
-
-		if !permissionResponse.Satisfied {
-			_, err = community.RemoveUserFromOrg(memberPubKey)
+		if hasMemberPermissions {
+			permissionResponse, err := m.checkPermissionToJoin(becomeMemberPermissions, accountsAndChainIDs, true)
 			if err != nil {
 				return err
+			}
+
+			if !permissionResponse.Satisfied {
+				_, err = community.RemoveUserFromOrg(memberPubKey)
+				if err != nil {
+					return err
+				}
+				// Skip channels validation if user has been removed
+				continue
+			}
+		}
+
+		// Validate channel permissions
+		for channelID := range community.Chats() {
+			chatID := community.IDString() + channelID
+
+			viewOnlyPermissions := community.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
+			viewAndPostPermissions := community.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
+
+			if len(viewOnlyPermissions) == 0 && len(viewAndPostPermissions) == 0 {
+				continue
+			}
+
+			response, err := m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountsAndChainIDs, true)
+			if err != nil {
+				return err
+			}
+
+			isMemberAlreadyInChannel := community.IsMemberInChat(memberPubKey, channelID)
+
+			if response.ViewOnlyPermissions.Satisfied || response.ViewAndPostPermissions.Satisfied {
+				if !isMemberAlreadyInChannel {
+					_, err := community.AddMemberToChat(channelID, memberPubKey, []protobuf.CommunityMember_Roles{})
+					if err != nil {
+						return err
+					}
+				}
+			} else if isMemberAlreadyInChannel {
+				_, err := community.RemoveUserFromChat(memberPubKey, channelID)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -703,21 +745,13 @@ func (m *Manager) CheckMemberPermissions(community *Community, removeAdmins bool
 	return nil
 }
 
-func (m *Manager) CheckIfStopCheckingPermissionsPeriodically(community *Community) {
-	if cancel, exists := m.periodicMemberPermissionsTasks.Load(community.IDString()); exists &&
-		len(community.TokenPermissions()) == 0 {
-		close(cancel.(chan struct{})) // Need to cast to the chan
-	}
-}
-
-func (m *Manager) CheckMemberPermissionsPeriodically(communityID types.HexBytes) {
-
-	if _, exists := m.periodicMemberPermissionsTasks.Load(communityID.String()); exists {
+func (m *Manager) ReevaluateMembersPeriodically(communityID types.HexBytes) {
+	if _, exists := m.periodicMembersReevaluationTasks.Load(communityID.String()); exists {
 		return
 	}
 
 	cancel := make(chan struct{})
-	m.periodicMemberPermissionsTasks.Store(communityID.String(), cancel)
+	m.periodicMembersReevaluationTasks.Store(communityID.String(), cancel)
 
 	ticker := time.NewTicker(memberPermissionsCheckInterval)
 	defer ticker.Stop()
@@ -728,15 +762,15 @@ func (m *Manager) CheckMemberPermissionsPeriodically(communityID types.HexBytes)
 			community, err := m.GetByID(communityID)
 			if err != nil {
 				m.logger.Debug("can't validate member permissions, community was not found", zap.Error(err))
-				m.periodicMemberPermissionsTasks.Delete(communityID.String())
+				m.periodicMembersReevaluationTasks.Delete(communityID.String())
 			}
 
-			err = m.CheckMemberPermissions(community, true)
+			err = m.ReevaluateMembers(community, true)
 			if err != nil {
 				m.logger.Debug("failed to check member permissions", zap.Error(err))
 			}
 		case <-cancel:
-			m.periodicMemberPermissionsTasks.Delete(communityID.String())
+			m.periodicMembersReevaluationTasks.Delete(communityID.String())
 			return
 		}
 	}
@@ -1524,6 +1558,32 @@ func (m *Manager) accountsSatisfyPermissionsToJoin(community *Community, account
 	return true, false, nil
 }
 
+func (m *Manager) accountsSatisfyPermissionsToJoinChannels(community *Community, accounts []*protobuf.RevealedAccount) (map[string]*protobuf.CommunityChat, error) {
+	result := make(map[string]*protobuf.CommunityChat)
+
+	accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(accounts)
+
+	for channelID, channel := range community.config.CommunityDescription.Chats {
+		channelViewOnlyPermissions := community.ChannelTokenPermissionsByType(community.IDString()+channelID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
+		channelViewAndPostPermissions := community.ChannelTokenPermissionsByType(community.IDString()+channelID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
+		channelPermissions := append(channelViewOnlyPermissions, channelViewAndPostPermissions...)
+
+		if len(channelPermissions) > 0 {
+			permissionResponse, err := m.checkPermissions(channelPermissions, accountsAndChainIDs, true)
+			if err != nil {
+				return nil, err
+			}
+			if permissionResponse.Satisfied {
+				result[channelID] = channel
+			}
+		} else {
+			result[channelID] = channel
+		}
+	}
+
+	return result, nil
+}
+
 func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommunity) (*Community, error) {
 	dbRequest, err := m.persistence.GetRequestToJoin(request.ID)
 	if err != nil {
@@ -1562,6 +1622,18 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 	_, err = community.AddMemberWithRevealedAccounts(dbRequest, memberRoles, revealedAccounts)
 	if err != nil {
 		return nil, err
+	}
+
+	channels, err := m.accountsSatisfyPermissionsToJoinChannels(community, revealedAccounts)
+	if err != nil {
+		return nil, err
+	}
+
+	for channelID := range channels {
+		_, err = community.AddMemberToChat(channelID, pk, memberRoles)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if err := m.markRequestToJoin(pk, community); err != nil {
@@ -2797,8 +2869,17 @@ func (m *Manager) IsEncrypted(communityID string) (bool, error) {
 	}
 
 	return community.Encrypted(), nil
-
 }
+
+func (m *Manager) IsChannelEncrypted(communityID string, chatID string) (bool, error) {
+	community, err := m.GetByIDString(communityID)
+	if err != nil {
+		return false, err
+	}
+
+	return community.ChannelHasTokenPermissions(chatID), nil
+}
+
 func (m *Manager) ShouldHandleSyncCommunity(community *protobuf.SyncCommunity) (bool, error) {
 	return m.persistence.ShouldHandleSyncCommunity(community)
 }

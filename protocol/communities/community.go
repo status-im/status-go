@@ -680,6 +680,20 @@ func (o *Community) GetMember(pk *ecdsa.PublicKey) *protobuf.CommunityMember {
 	return o.getMember(pk)
 }
 
+func (o *Community) getChatMember(pk *ecdsa.PublicKey, chatID string) *protobuf.CommunityMember {
+	if !o.hasMember(pk) {
+		return nil
+	}
+
+	chat, ok := o.config.CommunityDescription.Chats[chatID]
+	if !ok {
+		return nil
+	}
+
+	key := common.PubkeyToHex(pk)
+	return chat.Members[key]
+}
+
 func (o *Community) hasMember(pk *ecdsa.PublicKey) bool {
 
 	member := o.getMember(pk)
@@ -735,18 +749,7 @@ func (o *Community) IsMemberInChat(pk *ecdsa.PublicKey, chatID string) bool {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.hasMember(pk) {
-		return false
-	}
-
-	chat, ok := o.config.CommunityDescription.Chats[chatID]
-	if !ok {
-		return false
-	}
-
-	key := common.PubkeyToHex(pk)
-	_, ok = chat.Members[key]
-	return ok
+	return o.getChatMember(pk, chatID) != nil
 }
 
 func (o *Community) RemoveUserFromChat(pk *ecdsa.PublicKey, chatID string) (*protobuf.CommunityDescription, error) {
@@ -904,14 +907,24 @@ func (o *Community) AddRoleToMember(pk *ecdsa.PublicKey, role protobuf.Community
 	}
 
 	updated := false
-	member := o.getMember(pk)
-	if member != nil {
+	addRole := func(member *protobuf.CommunityMember) {
 		roles := make(map[protobuf.CommunityMember_Roles]bool)
 		roles[role] = true
 		if !o.hasMemberPermission(member, roles) {
 			member.Roles = append(member.Roles, role)
-			o.config.CommunityDescription.Members[common.PubkeyToHex(pk)] = member
 			updated = true
+		}
+	}
+
+	member := o.getMember(pk)
+	if member != nil {
+		addRole(member)
+	}
+
+	for channelID := range o.chats() {
+		chatMember := o.getChatMember(pk, channelID)
+		if chatMember != nil {
+			addRole(member)
 		}
 	}
 
@@ -930,8 +943,7 @@ func (o *Community) RemoveRoleFromMember(pk *ecdsa.PublicKey, role protobuf.Comm
 	}
 
 	updated := false
-	member := o.getMember(pk)
-	if member != nil {
+	removeRole := func(member *protobuf.CommunityMember) {
 		roles := make(map[protobuf.CommunityMember_Roles]bool)
 		roles[role] = true
 		if o.hasMemberPermission(member, roles) {
@@ -942,8 +954,19 @@ func (o *Community) RemoveRoleFromMember(pk *ecdsa.PublicKey, role protobuf.Comm
 				}
 			}
 			member.Roles = newRoles
-			o.config.CommunityDescription.Members[common.PubkeyToHex(pk)] = member
 			updated = true
+		}
+	}
+
+	member := o.getMember(pk)
+	if member != nil {
+		removeRole(member)
+	}
+
+	for channelID := range o.chats() {
+		chatMember := o.getChatMember(pk, channelID)
+		if chatMember != nil {
+			removeRole(member)
 		}
 	}
 
@@ -1329,15 +1352,19 @@ func (o *Community) ToBytes() ([]byte, error) {
 }
 
 func (o *Community) Chats() map[string]*protobuf.CommunityChat {
-	response := make(map[string]*protobuf.CommunityChat)
-
 	// Why are we checking here for nil, it should be the responsibility of the caller
 	if o == nil {
-		return response
+		return make(map[string]*protobuf.CommunityChat)
 	}
 
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
+
+	return o.chats()
+}
+
+func (o *Community) chats() map[string]*protobuf.CommunityChat {
+	response := make(map[string]*protobuf.CommunityChat)
 
 	if o.config != nil && o.config.CommunityDescription != nil {
 		for k, v := range o.config.CommunityDescription.Chats {
@@ -1392,7 +1419,21 @@ func (o *Community) TokenPermissions() map[string]*protobuf.CommunityTokenPermis
 }
 
 func (o *Community) HasTokenPermissions() bool {
-	return len(o.config.CommunityDescription.TokenPermissions) > 0
+	return o.config.CommunityDescription.TokenPermissions != nil && len(o.config.CommunityDescription.TokenPermissions) > 0
+}
+
+func (o *Community) ChannelHasTokenPermissions(chatID string) bool {
+	if !o.HasTokenPermissions() {
+		return false
+	}
+
+	for _, tokenPermission := range o.TokenPermissions() {
+		if includes(tokenPermission.ChatIds, chatID) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func TokenPermissionsByType(permissions map[string]*protobuf.CommunityTokenPermission, permissionType protobuf.CommunityTokenPermission_Type) []*protobuf.CommunityTokenPermission {

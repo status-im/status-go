@@ -1698,12 +1698,12 @@ func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommu
 	if community.IsOwner() {
 		// check existing member permission once, then check periodically
 		go func() {
-			err := m.communitiesManager.CheckMemberPermissions(community, true)
+			err := m.communitiesManager.ReevaluateMembers(community, true)
 			if err != nil {
 				m.logger.Debug("failed to check member permissions", zap.Error(err))
 			}
 
-			m.communitiesManager.CheckMemberPermissionsPeriodically(community.ID())
+			m.communitiesManager.ReevaluateMembersPeriodically(community.ID())
 		}()
 	}
 
@@ -1730,7 +1730,7 @@ func (m *Messenger) EditCommunityTokenPermission(request *requests.EditCommunity
 	// We do this in a separate routine to not block this function
 	if community.IsOwner() {
 		go func() {
-			err := m.communitiesManager.CheckMemberPermissions(community, true)
+			err := m.communitiesManager.ReevaluateMembers(community, true)
 			if err != nil {
 				m.logger.Debug("failed to check member permissions", zap.Error(err))
 			}
@@ -1761,14 +1761,10 @@ func (m *Messenger) DeleteCommunityTokenPermission(request *requests.DeleteCommu
 			becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 
 			// Make sure that we remove admins roles if we remove admin permissions
-			err = m.communitiesManager.CheckMemberPermissions(community, len(becomeAdminPermissions) == 0)
+			err = m.communitiesManager.ReevaluateMembers(community, len(becomeAdminPermissions) == 0)
 			if err != nil {
 				m.logger.Debug("failed to check member permissions", zap.Error(err))
 			}
-
-			// Check if there's still permissions we need to track,
-			// if not we can stop checking token criteria on-chain
-			m.communitiesManager.CheckIfStopCheckingPermissionsPeriodically(community)
 		}()
 	}
 
