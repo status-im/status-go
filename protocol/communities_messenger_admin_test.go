@@ -625,6 +625,18 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminReorderChannelsAndCategories()
 	s.adminReorderChannel(&reorderChatRequest)
 }
 
+func (s *AdminMessengerCommunitiesSuite) TestAdminKickAdmin() {
+	community := s.setUpCommunityAndRoles()
+
+	// admin tries to kick the owner
+	_, err := s.admin.RemoveUserFromCommunity(
+		community.ID(),
+		common.PubkeyToHex(&s.admin.identity.PublicKey),
+	)
+	s.Require().Error(err)
+	s.Require().EqualError(err, "not allowed to remove admin or owner")
+}
+
 func (s *AdminMessengerCommunitiesSuite) TestAdminKickMember() {
 	community := s.setUpCommunityAndRoles()
 
@@ -636,6 +648,20 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminKickMember() {
 	s.Require().Error(err)
 
 	s.adminKickAlice(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
+}
+
+func (s *AdminMessengerCommunitiesSuite) TestAdminBanAdmin() {
+	community := s.setUpCommunityAndRoles()
+
+	// verify that admin can't ban an admin
+	_, err := s.admin.BanUserFromCommunity(
+		&requests.BanUserFromCommunity{
+			CommunityID: community.ID(),
+			User:        common.PubkeyToHexBytes(&s.admin.identity.PublicKey),
+		},
+	)
+	s.Require().Error(err)
+	s.Require().EqualError(err, "not allowed to ban admin or owner")
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminBanUnbanMember() {
