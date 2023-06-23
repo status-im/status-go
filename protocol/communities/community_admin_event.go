@@ -314,8 +314,8 @@ func (o *Community) PatchCommunityDescriptionByAdminEvent(adminEvent *protobuf.C
 			return nil, err
 		}
 
-		if copy.IsMemberOwner(pk) {
-			return nil, errors.New("attempt to kick an owner of the community from the admin side")
+		if copy.IsMemberOwnerOrAdmin(pk) {
+			return nil, errors.New("attempt to kick an owner or admin of the community from the admin side")
 		}
 
 		copy.removeMemberFromOrg(pk)
@@ -326,8 +326,8 @@ func (o *Community) PatchCommunityDescriptionByAdminEvent(adminEvent *protobuf.C
 			return nil, err
 		}
 
-		if copy.IsMemberOwner(pk) {
-			return nil, errors.New("attempt to ban an owner of the community from the admin side")
+		if copy.IsMemberOwnerOrAdmin(pk) {
+			return nil, errors.New("attempt to ban an owner or admin of the community from the admin side")
 		}
 		copy.banUserFromCommunity(pk)
 

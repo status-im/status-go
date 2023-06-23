@@ -795,8 +795,8 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 		return nil, ErrNotAdmin
 	}
 
-	if o.IsMemberOwner(pk) {
-		return nil, ErrNotOwner
+	if o.IsAdmin() && o.IsMemberOwnerOrAdmin(pk) {
+		return nil, ErrCannotRemoveOwnerOrAdmin
 	}
 
 	o.removeMemberFromOrg(pk)
@@ -839,8 +839,8 @@ func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Communi
 		return nil, ErrNotAdmin
 	}
 
-	if o.IsMemberOwner(pk) {
-		return nil, ErrNotOwner
+	if o.IsAdmin() && o.IsMemberOwnerOrAdmin(pk) {
+		return nil, ErrCannotBanOwnerOrAdmin
 	}
 
 	o.banUserFromCommunity(pk)
