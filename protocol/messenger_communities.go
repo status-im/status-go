@@ -1744,7 +1744,6 @@ func (m *Messenger) RemoveUserFromCommunity(id types.HexBytes, pkString string) 
 	return response, nil
 }
 
-// TODO
 func (m *Messenger) SendKeyExchangeMessage(communityID []byte, pubkeys []*ecdsa.PublicKey, msgType common.CommKeyExMsgType) error {
 	rawMessage := common.RawMessage{
 		SkipEncryption:        false,
@@ -1778,10 +1777,11 @@ func (m *Messenger) BanUserFromCommunity(request *requests.BanUserFromCommunity)
 		return nil, err
 	}
 
-	// TODO generate new encryption key
-	err = m.SendKeyExchangeMessage(community.ID(), community.GetMemberPubkeys(), common.KeyExMsgRekey)
-	if err != nil {
-		return nil, err
+	if community.Encrypted() {
+		err = m.SendKeyExchangeMessage(community.ID(), community.GetMemberPubkeys(), common.KeyExMsgRekey)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	response := &MessengerResponse{}
@@ -3802,8 +3802,6 @@ func (m *Messenger) UpdateCommunityEncryption(community *communities.Community) 
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 	isEncrypted := len(becomeMemberPermissions) > 0
 
-	// Check isEncrypted is different to Community's value
-	// If not different return
 	if community.Encrypted() == isEncrypted {
 		return nil, nil
 	}
