@@ -767,7 +767,157 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	s.Require().NoError(err)
 
 	// send message to channel
-	msg = s.sendChatMessage(s.owner, chat.ID, "hello on encrypted community")
+	msg = s.sendChatMessage(s.owner, chat.ID, "hello on encrypted community 2")
+
+	// bob can read the message
+	response, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			for _, message := range r.messages {
+				if message.Text == msg.Text {
+					return true
+				}
+			}
+			return false
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(msg.Text, response.Messages()[0].Text)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions() {
+	community, chat := s.createCommunity()
+
+	// bob joins the community
+	s.advertiseCommunityTo(community, s.bob)
+	s.joinCommunity(community, s.bob, bobPassword, []string{})
+
+	// send message to the channel
+	msg := s.sendChatMessage(s.owner, chat.ID, "hello on open community")
+
+	// bob can read the message
+	response, err := WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			for _, message := range r.messages {
+				if message.Text == msg.Text {
+					return true
+				}
+			}
+			return false
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(msg.Text, response.Messages()[0].Text)
+
+	// setup view channel permission
+	channelPermissionRequest := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+				Symbol:            "TEST",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+		ChatIds: []string{chat.ID},
+	}
+
+	waitOnBobToBeKickedFromChannel := s.waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		for channelID, channel := range sub.Community.Chats() {
+			if channelID == chat.CommunityChatID() && len(channel.Members) == 1 {
+				return true
+			}
+		}
+		return false
+	})
+	waitOnChannelToBeRekeyedOnceBobIsKicked := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
+		for channelID, action := range sub.keyActions.ChannelKeysActions {
+			if channelID == chat.CommunityChatID() && action.ActionType == communities.EncryptionKeyRekey {
+				return true
+			}
+		}
+		return false
+	})
+
+	response, err = s.owner.CreateCommunityTokenPermission(&channelPermissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().True(s.owner.communitiesManager.IsChannelEncrypted(community.IDString(), chat.ID))
+
+	err = <-waitOnBobToBeKickedFromChannel
+	s.Require().NoError(err)
+
+	err = <-waitOnChannelToBeRekeyedOnceBobIsKicked
+	s.Require().NoError(err)
+
+	// send message to the channel
+	msg = s.sendChatMessage(s.owner, chat.ID, "hello on closed channel")
+
+	// bob can't read the message
+	_, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			for _, message := range r.messages {
+				if message.Text == msg.Text {
+					return true
+				}
+			}
+			return false
+		},
+		"no messages",
+	)
+	s.Require().Error(err)
+	s.Require().ErrorContains(err, "no messages")
+
+	// make bob satisfy channel criteria
+	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, channelPermissionRequest.TokenCriteria[0])
+
+	waitOnChannelKeyToBeDistributedToBob := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
+		for channelID, action := range sub.keyActions.ChannelKeysActions {
+			if channelID == chat.CommunityChatID() && action.ActionType == communities.EncryptionKeySendToMembers {
+				for memberPubKey := range action.Members {
+					if memberPubKey == common.PubkeyToHex(&s.bob.identity.PublicKey) {
+						return true
+					}
+
+				}
+			}
+		}
+		return false
+	})
+
+	// force owner to reevaluate channel members
+	// in production it will happen automatically, by periodic check
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	err = s.owner.communitiesManager.ReevaluateMembers(community, true)
+	s.Require().NoError(err)
+
+	err = <-waitOnChannelKeyToBeDistributedToBob
+	s.Require().NoError(err)
+
+	// ensure key is delivered to bob before message is sent
+	// FIXME: this step shouldn't be necessary as we store hash ratchet messages
+	// for later, to decrypt them when the key arrives.
+	// for some reason, without it, the test is flaky
+	_, _ = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			return false
+		},
+		"",
+	)
+
+	// send message to the channel
+	msg = s.sendChatMessage(s.owner, chat.ID, "hello on closed channel 2")
 
 	// bob can read the message
 	response, err = WaitOnMessengerResponse(

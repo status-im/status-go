@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -622,7 +623,8 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Permiss
 }
 
 func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
-	chatID := "0x1234"
+	channelID := "1234"
+	chatID := types.EncodeHex(crypto.CompressPubkey(&s.identity.PublicKey)) + channelID
 	testCases := []struct {
 		name                string
 		originPermissions   []*protobuf.CommunityTokenPermission
@@ -736,7 +738,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 	for _, tc := range testCases {
 		s.Run(tc.name, func() {
 			origin := createTestCommunity(s.identity)
-			_, err := origin.CreateChat(chatID, &protobuf.CommunityChat{
+			_, err := origin.CreateChat(channelID, &protobuf.CommunityChat{
 				Members:     map[string]*protobuf.CommunityMember{},
 				Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_NO_MEMBERSHIP},
 				Identity:    &protobuf.ChatIdentity{},
@@ -752,7 +754,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 			for _, member := range tc.originMembers {
 				_, err := origin.AddMember(member, []protobuf.CommunityMember_Roles{})
 				s.Require().NoError(err)
-				_, err = origin.AddMemberToChat(chatID, member, []protobuf.CommunityMember_Roles{})
+				_, err = origin.AddMemberToChat(channelID, member, []protobuf.CommunityMember_Roles{})
 				s.Require().NoError(err)
 			}
 
@@ -763,12 +765,12 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 			for _, member := range tc.modifiedMembers {
 				_, err := modified.AddMember(member, []protobuf.CommunityMember_Roles{})
 				s.Require().NoError(err)
-				_, err = modified.AddMemberToChat(chatID, member, []protobuf.CommunityMember_Roles{})
+				_, err = modified.AddMemberToChat(channelID, member, []protobuf.CommunityMember_Roles{})
 				s.Require().NoError(err)
 			}
 
 			actions := EvaluateCommunityEncryptionKeyActions(origin, modified)
-			channelAction, ok := actions.ChannelKeysActions[chatID]
+			channelAction, ok := actions.ChannelKeysActions[channelID]
 			s.Require().True(ok)
 			s.Require().Equal(tc.expectedAction.ActionType, channelAction.ActionType)
 			s.Require().Len(tc.expectedAction.Members, len(channelAction.Members))
@@ -783,8 +785,10 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 func (s *CommunityEncryptionKeyActionSuite) TestNilOrigin() {
 	newCommunity := createTestCommunity(s.identity)
 
-	chatID := "0x1234"
-	_, err := newCommunity.CreateChat(chatID, &protobuf.CommunityChat{
+	channelID := "0x1234"
+	chatID := types.EncodeHex(crypto.CompressPubkey(&s.identity.PublicKey)) + channelID
+
+	_, err := newCommunity.CreateChat(channelID, &protobuf.CommunityChat{
 		Members:     map[string]*protobuf.CommunityMember{},
 		Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_NO_MEMBERSHIP},
 		Identity:    &protobuf.ChatIdentity{},
@@ -813,6 +817,6 @@ func (s *CommunityEncryptionKeyActionSuite) TestNilOrigin() {
 	actions := EvaluateCommunityEncryptionKeyActions(nil, newCommunity)
 	s.Require().Equal(actions.CommunityKeyAction.ActionType, EncryptionKeyAdd)
 	s.Require().Len(actions.ChannelKeysActions, 1)
-	s.Require().NotNil(actions.ChannelKeysActions[chatID])
-	s.Require().Equal(actions.ChannelKeysActions[chatID].ActionType, EncryptionKeyAdd)
+	s.Require().NotNil(actions.ChannelKeysActions[channelID])
+	s.Require().Equal(actions.ChannelKeysActions[channelID].ActionType, EncryptionKeyAdd)
 }

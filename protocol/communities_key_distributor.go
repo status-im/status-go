@@ -30,9 +30,9 @@ func (ckd *CommunitiesKeyDistributorImpl) Distribute(community *communities.Comm
 		return err
 	}
 
-	for chatID := range keyActions.ChannelKeysActions {
-		keyAction := keyActions.ChannelKeysActions[chatID]
-		err := ckd.distributeKey(community.ID(), []byte(chatID), &keyAction)
+	for channelID := range keyActions.ChannelKeysActions {
+		keyAction := keyActions.ChannelKeysActions[channelID]
+		err := ckd.distributeKey(community.ID(), []byte(community.IDString()+channelID), &keyAction)
 		if err != nil {
 			return err
 		}
@@ -110,6 +110,7 @@ func (ckd *CommunitiesKeyDistributorImpl) sendKeyExchangeMessage(communityID, ha
 		CommunityKeyExMsgType: msgType,
 		Recipients:            pubkeys,
 		MessageType:           protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
+		HashRatchetGroupID:    hashRatchetGroupID,
 	}
 	_, err := ckd.sender.SendCommunityMessage(context.Background(), rawMessage)
 
