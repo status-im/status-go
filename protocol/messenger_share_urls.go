@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/urls"
@@ -95,29 +96,7 @@ func (m *Messenger) parseCommunityURLWithChatKey(urlData string) (*MessengerResp
 	return response, nil
 }
 
-func (m *Messenger) CreateCommunityURLWithData(communityID string) (string, error) {
-	if len(communityID) == 0 {
-		return "", ErrChatIDEmpty
-	}
-
-	community, err := m.GetCommunityByID(types.HexBytes(communityID))
-
-	if err != nil {
-		return "", err
-	}
-
-	if community == nil {
-		return "", errors.New("community is nil")
-	}
-
-	if community.Encrypted() {
-		pubKey, err := common.HexToPubkey(communityID)
-		if err != nil {
-			return "", err
-		}
-		return fmt.Sprintf("%s/%s/%s", baseShareUrl, "c", types.EncodeHex(crypto.CompressPubkey(pubKey))), nil
-	}
-
+func (m *Messenger) prepareEncodedCommunityData(community *communities.Community) (string, []byte, error) {
 	communityProto := &protobuf.Community{
 		DisplayName:  community.Identity().DisplayName,
 		Description:  community.DescriptionText(),
@@ -127,20 +106,42 @@ func (m *Messenger) CreateCommunityURLWithData(communityID string) (string, erro
 
 	data, err := json.Marshal(communityProto)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	communityBase64, err := urls.EncodeDataURL(data)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	signature, err := crypto.SignBytes([]byte(communityBase64), community.PrivateKey())
 	if err != nil {
+		return "", nil, err
+	}
+	return communityBase64, signature, err
+}
+
+func (m *Messenger) CreateCommunityURLWithData(communityID types.HexBytes) (string, error) {
+	community, err := m.GetCommunityByID(communityID)
+	if err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf("%s/%s/%s#%s", baseShareUrl, "c", communityBase64, string(signature)), nil
+	if community == nil {
+		return "", fmt.Errorf("community with communityID %s not found", communityID)
+	}
+
+	if community.Encrypted() {
+		// TODO: not sure, is it right?
+		return m.CreateCommunityURLWithData(communityID)
+	}
+
+	communityBase64, signature, err := m.prepareEncodedCommunityData(community)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s/c/%s#%s", baseShareUrl, communityBase64, string(signature)), nil
 }
 
 func (m *Messenger) parseCommunityURLWithData(urlData string) (*MessengerResponse, error) {

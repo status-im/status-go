@@ -124,3 +124,16 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithChatKey() {
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Equal(community.ID(), response.Communities()[0].ID())
 }
+
+func (s *MessengerShareUrlsSuite) TestCreateCommunityURLWithData() {
+	community := s.createCommunity()
+
+	url, err := s.m.CreateCommunityURLWithData(community.ID())
+	s.Require().NoError(err)
+
+	communityBase64, signature, err := s.m.prepareEncodedCommunityData(community)
+	s.Require().NoError(err)
+
+	expectedUrl := fmt.Sprintf("%s/c/%s#%s", baseShareUrl, communityBase64, string(signature))
+	s.Require().Equal(expectedUrl, url)
+}
