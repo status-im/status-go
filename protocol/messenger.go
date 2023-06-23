@@ -822,7 +822,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 
 			for _, c := range adminCommunities {
 				if c.Joined() && c.HasTokenPermissions() {
-					go m.communitiesManager.CheckMemberPermissionsPeriodically(c.ID())
+					go m.communitiesManager.ReevaluateMembersPeriodically(c.ID())
 				}
 			}
 		}
@@ -2063,21 +2063,36 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 		}
 
 		logger.Debug("sending community chat message", zap.String("chatName", chat.Name))
-		isEncrypted, err := m.communitiesManager.IsEncrypted(chat.CommunityID)
+		isCommunityEncrypted, err := m.communitiesManager.IsEncrypted(chat.CommunityID)
 		if err != nil {
 			return rawMessage, err
 		}
+		isChannelEncrypted, err := m.communitiesManager.IsChannelEncrypted(chat.CommunityID, chat.ID)
+		if err != nil {
+			return rawMessage, err
+		}
+		isEncrypted := isCommunityEncrypted || isChannelEncrypted
 		if !isEncrypted {
 			id, err = m.sender.SendPublic(ctx, chat.ID, rawMessage)
+			if err != nil {
+				return rawMessage, err
+			}
 		} else {
 			rawMessage.CommunityID, err = types.DecodeHex(chat.CommunityID)
-
-			if err == nil {
-				id, err = m.sender.SendCommunityMessage(ctx, rawMessage)
+			if err != nil {
+				return rawMessage, err
 			}
-		}
-		if err != nil {
-			return rawMessage, err
+
+			if isChannelEncrypted {
+				rawMessage.HashRatchetGroupID = []byte(chat.ID)
+			} else {
+				rawMessage.HashRatchetGroupID = rawMessage.CommunityID
+			}
+
+			id, err = m.sender.SendCommunityMessage(ctx, rawMessage)
+			if err != nil {
+				return rawMessage, err
+			}
 		}
 	case ChatTypePrivateGroupChat:
 		logger.Debug("sending group message", zap.String("chatName", chat.Name))

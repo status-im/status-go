@@ -285,7 +285,7 @@ func (s *MessageSender) sendCommunity(
 	// Check if it's a key exchange message. In this case we send it
 	// to all the recipients
 	if rawMessage.CommunityKeyExMsgType != KeyExMsgNone {
-		keyExMessageSpecs, err := s.protocol.GetKeyExMessageSpecs(rawMessage.CommunityID, s.identity, rawMessage.Recipients, rawMessage.CommunityKeyExMsgType == KeyExMsgRekey)
+		keyExMessageSpecs, err := s.protocol.GetKeyExMessageSpecs(rawMessage.HashRatchetGroupID, s.identity, rawMessage.Recipients, rawMessage.CommunityKeyExMsgType == KeyExMsgRekey)
 		if err != nil {
 			return nil, err
 		}
@@ -307,7 +307,7 @@ func (s *MessageSender) sendCommunity(
 
 	// If it's a chat message, we send it on the community chat topic
 	if ShouldCommunityMessageBeEncrypted(rawMessage.MessageType) {
-		messageSpec, err := s.protocol.BuildHashRatchetMessage(rawMessage.CommunityID, wrappedMessage)
+		messageSpec, err := s.protocol.BuildHashRatchetMessage(rawMessage.HashRatchetGroupID, wrappedMessage)
 		if err != nil {
 			return nil, err
 		}
