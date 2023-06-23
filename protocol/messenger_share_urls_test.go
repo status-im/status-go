@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -11,6 +12,9 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
@@ -57,6 +61,21 @@ func (s *MessengerShareUrlsSuite) newMessenger() *Messenger {
 	return messenger
 }
 
+func (s *MessengerShareUrlsSuite) createCommunity() *communities.Community {
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	// Create an community chat
+	response, err := s.m.CreateCommunity(description, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	return response.Communities()[0]
+}
+
 func (s *MessengerShareUrlsSuite) TestSerializePublicKey() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
@@ -76,4 +95,17 @@ func (s *MessengerShareUrlsSuite) TestDeserializePublicKey() {
 	s.Require().NoError(err)
 	s.Require().Len(publicKey, 33)
 	s.Require().True(strings.HasPrefix(publicKey.String(), "0x"))
+}
+
+func (s *MessengerShareUrlsSuite) TestCreateCommunityURLWithChatKey() {
+	community := s.createCommunity()
+
+	url, err := s.m.CreateCommunityURLWithChatKey(community.ID())
+	s.Require().NoError(err)
+
+	publicKey, err := s.m.SerializePublicKey(community.ID())
+	s.Require().NoError(err)
+
+	expectedUrl := fmt.Sprintf(baseShareUrl, "c", "#", publicKey)
+	s.Require().Equal(expectedUrl, url)
 }

@@ -55,26 +55,25 @@ func (m *Messenger) DeserializePublicKey(compressedKey string) (types.HexBytes, 
 	return crypto.CompressPubkey(pubKey), nil
 }
 
-func (m *Messenger) CreateCommunityURLWithChatKey(communityID string) (string, error) {
+func (m *Messenger) CreateCommunityURLWithChatKey(communityID types.HexBytes) (string, error) {
 	if len(communityID) == 0 {
 		return "", ErrChatIDEmpty
 	}
 
-	community, err := m.GetCommunityByID(types.HexBytes(communityID))
-
+	community, err := m.GetCommunityByID(communityID)
 	if err != nil {
 		return "", err
 	}
 
 	if community == nil {
-		return "", errors.New("community is nil")
+		return "", fmt.Errorf("no community found with id: %s", communityID)
 	}
 
-	pubKey, err := common.HexToPubkey(communityID)
+	pubKey, err := m.SerializePublicKey(communityID)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf(baseShareUrl, "/c", "#", types.EncodeHex(crypto.CompressPubkey(pubKey))), nil
+	return fmt.Sprintf(baseShareUrl, "c", "#", pubKey), nil
 }
 
 func (m *Messenger) CreateCommunityURLWithData(communityID string) (string, error) {
