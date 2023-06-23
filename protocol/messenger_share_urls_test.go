@@ -137,3 +137,24 @@ func (s *MessengerShareUrlsSuite) TestCreateCommunityURLWithData() {
 	expectedUrl := fmt.Sprintf("%s/c/%s#%s", baseShareUrl, communityBase64, string(signature))
 	s.Require().Equal(expectedUrl, url)
 }
+
+func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithData() {
+	community := s.createCommunity()
+
+	communityBase64, signature, err := s.m.prepareEncodedCommunityData(community)
+	s.Require().NoError(err)
+
+	url := fmt.Sprintf("%s/c/%s#%s", baseShareUrl, communityBase64, string(signature))
+
+	response, err := s.m.ParseSharedURL(url)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	restoredCommunity := response.Communities()[0]
+
+	s.Require().Equal(community.Identity().DisplayName, restoredCommunity.Identity().DisplayName)
+	s.Require().Equal(community.Identity().Color, restoredCommunity.Identity().Color)
+	s.Require().Equal(community.Identity().Description, restoredCommunity.Identity().Description)
+	// TODO: color
+}

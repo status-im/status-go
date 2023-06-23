@@ -97,6 +97,7 @@ func (m *Messenger) parseCommunityURLWithChatKey(urlData string) (*MessengerResp
 }
 
 func (m *Messenger) prepareEncodedCommunityData(community *communities.Community) (string, []byte, error) {
+	// TODO: no ID here!
 	communityProto := &protobuf.Community{
 		DisplayName:  community.Identity().DisplayName,
 		Description:  community.DescriptionText(),
@@ -119,6 +120,48 @@ func (m *Messenger) prepareEncodedCommunityData(community *communities.Community
 		return "", nil, err
 	}
 	return communityBase64, signature, err
+}
+
+func (m *Messenger) parseEncodedCommunityData(communityBase64 string, signature string) (*communities.Community, error) {
+	// TODO: verify signatures
+
+	communityData, err := urls.DecodeDataURL(communityBase64)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: no ID here!
+	// TODO: try m.GetCommunityByID() before protobuf
+
+	var communityProto protobuf.Community
+	// TODO: does not restored properly, maybe decoding is wrong?
+	err = proto.Unmarshal(communityData, &communityProto)
+	if err != nil {
+		return nil, err
+	}
+
+	description := &protobuf.CommunityDescription{
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: communityProto.DisplayName,
+			Color:       communityProto.Color,
+			Description: communityProto.Description,
+		},
+		// TODO: members count
+	}
+
+	config := communities.Config{
+		CommunityDescription: description,
+		// TODO: ID & MemberIdentity is required
+		ID:             &m.identity.PublicKey,
+		MemberIdentity: &m.identity.PublicKey,
+	}
+
+	community, err := communities.New(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return community, nil
 }
 
 func (m *Messenger) CreateCommunityURLWithData(communityID types.HexBytes) (string, error) {
@@ -144,15 +187,15 @@ func (m *Messenger) CreateCommunityURLWithData(communityID types.HexBytes) (stri
 	return fmt.Sprintf("%s/c/%s#%s", baseShareUrl, communityBase64, string(signature)), nil
 }
 
-func (m *Messenger) parseCommunityURLWithData(urlData string) (*MessengerResponse, error) {
-	var communityProto protobuf.Community
-	err := proto.Unmarshal([]byte(urlData), &communityProto)
+func (m *Messenger) parseCommunityURLWithData(communityBase64 string, signature string) (*MessengerResponse, error) {
+	community, err := m.parseEncodedCommunityData(communityBase64, signature)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &MessengerResponse{}
-	// TODO: response.AddCommunity(community)
+	response.AddCommunity(community)
+
 	return response, nil
 }
 
@@ -315,22 +358,16 @@ func (m *Messenger) ParseSharedURL(url string) (*MessengerResponse, error) {
 	}
 	urlContents := strings.Split(strings.TrimPrefix(url, baseShareUrl+"/"), "#")
 
-	fmt.Println("-----> url: ", url, "urlContents: ", urlContents)
+	fmt.Println("-----> url: ", url, "urlContents: ", len(urlContents))
 
 	if len(urlContents) == 2 && urlContents[0] == "c" {
+		// TODO: encrypted protobuf can contain '#' and it could not be parsed
 		return m.parseCommunityURLWithChatKey(urlContents[1])
 	}
 
-	// switch group {
-	// case "c":
-	// 	return m.parseCommunityURLWithData(urlData)
-	// case "c#":
-	// 	return m.parseCommunityURLWithChatKey(urlData)
-	// case "cc":
-	// 	return m.parseCommuntyChannelSharedURL(urlData)
-	// case "u":
-	// 	return m.parseProfileSharedURL(urlData)
-	// }
+	if len(urlContents) == 2 && strings.HasPrefix(urlContents[0], "c/") {
+		return m.parseCommunityURLWithData(strings.TrimPrefix(urlContents[0], "c/"), urlContents[1])
+	}
 
 	return nil, errors.New("unhandled url group")
 }
