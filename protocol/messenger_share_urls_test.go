@@ -106,6 +106,21 @@ func (s *MessengerShareUrlsSuite) TestCreateCommunityURLWithChatKey() {
 	publicKey, err := s.m.SerializePublicKey(community.ID())
 	s.Require().NoError(err)
 
-	expectedUrl := fmt.Sprintf(baseShareUrl, "c", "#", publicKey)
+	expectedUrl := fmt.Sprintf("%s/%s%s", baseShareUrl, "c#", publicKey)
 	s.Require().Equal(expectedUrl, url)
+}
+
+func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithChatKey() {
+	community := s.createCommunity()
+
+	publicKey, err := s.m.SerializePublicKey(community.ID())
+	s.Require().NoError(err)
+
+	url := fmt.Sprintf("%s/%s%s", baseShareUrl, "c#", publicKey)
+
+	response, err := s.m.ParseSharedURL(url)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Equal(community.ID(), response.Communities()[0].ID())
 }
