@@ -32,6 +32,7 @@ message SyncSetting {
     BIO = 14;
     MNEMONIC_REMOVED = 15;
     ENS_USERNAMES = 16;
+    INCLUDE_WATCHONLY_ACCOUNT = 17;
   }
 }
 
