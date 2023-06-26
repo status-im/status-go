@@ -1801,36 +1801,44 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		return nil, err
 	}
 
-	if len(request.RevealedAccounts) > 0 {
-		// verify if revealed addresses indeed belong to requester
-		for _, revealedAccount := range request.RevealedAccounts {
-			recoverParams := account.RecoverParams{
-				Message:   types.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID(), requestToJoin.ID)),
-				Signature: types.EncodeHex(revealedAccount.Signature),
-			}
-
-			matching, err := m.accountsManager.CanRecover(recoverParams, types.HexToAddress(revealedAccount.Address))
-			if err != nil {
-				return nil, err
-			}
-			if !matching {
-				// if ownership of only one wallet address cannot be verified,
-				// we mark the request as cancelled and stop
-				err = m.markRequestToJoinAsCanceled(signer, community)
-				if err != nil {
-					return nil, err
-				}
-				requestToJoin.State = RequestToJoinStateDeclined
-				return requestToJoin, nil
-			}
-		}
-
-		// Save revealed addresses + signatures so they can later be added
-		// to the community member list when the request is accepted
-		err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin)
+	if len(request.RevealedAccounts) == 0 {
+		// Requester hasn't revealed any addresses
+		err = m.markRequestToJoinAsCanceled(signer, community)
 		if err != nil {
 			return nil, err
 		}
+		requestToJoin.State = RequestToJoinStateDeclined
+		return requestToJoin, nil
+	}
+
+	// verify if revealed addresses indeed belong to requester
+	for _, revealedAccount := range request.RevealedAccounts {
+		recoverParams := account.RecoverParams{
+			Message:   types.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID(), requestToJoin.ID)),
+			Signature: types.EncodeHex(revealedAccount.Signature),
+		}
+
+		matching, err := m.accountsManager.CanRecover(recoverParams, types.HexToAddress(revealedAccount.Address))
+		if err != nil {
+			return nil, err
+		}
+		if !matching {
+			// if ownership of only one wallet address cannot be verified,
+			// we mark the request as cancelled and stop
+			err = m.markRequestToJoinAsCanceled(signer, community)
+			if err != nil {
+				return nil, err
+			}
+			requestToJoin.State = RequestToJoinStateDeclined
+			return requestToJoin, nil
+		}
+	}
+
+	// Save revealed addresses + signatures so they can later be added
+	// to the community member list when the request is accepted
+	err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin)
+	if err != nil {
+		return nil, err
 	}
 
 	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
@@ -1846,7 +1854,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 	// if user does not reveal the address and we have member permission only - we decline this request
 	// if user does not reveal the address and we have admin permission only - user allowed to join as a member
 	// in non private community
-	if (len(becomeMemberPermissions) > 0 || len(becomeAdminPermissions) > 0) && len(request.RevealedAccounts) > 0 {
+	if len(becomeMemberPermissions) > 0 || len(becomeAdminPermissions) > 0 {
 		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(request.RevealedAccounts)
 
 		// admin token permissions required to become an admin must not cancel request to join
@@ -1878,15 +1886,6 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		if err != nil {
 			return nil, err
 		}
-	} else if len(becomeMemberPermissions) > 0 && len(request.RevealedAccounts) == 0 {
-		// we have member token permissions but requester hasn't revealed
-		// any addresses
-		err = m.markRequestToJoinAsCanceled(signer, community)
-		if err != nil {
-			return nil, err
-		}
-		requestToJoin.State = RequestToJoinStateDeclined
-		return requestToJoin, nil
 	}
 
 	if (len(becomeMemberPermissions) == 0 || hasPermission) && acceptAutomatically {

@@ -668,18 +668,23 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		return nil, err
 	}
 
-	// verify wallet password if there
-	if request.Password != "" {
-		walletAccounts, err := m.settings.GetAccounts()
+	if request.Password == "" {
+		return nil, errors.New("no password provided to reveal addresses")
+	}
+
+	// find wallet accounts
+	walletAccounts, err := m.settings.GetAccounts()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(walletAccounts) > 0 {
+		_, err := m.accountsManager.GetVerifiedWalletAccount(m.settings, walletAccounts[0].Address.Hex(), request.Password)
 		if err != nil {
 			return nil, err
 		}
-		if len(walletAccounts) > 0 {
-			_, err := m.accountsManager.GetVerifiedWalletAccount(m.settings, walletAccounts[0].Address.Hex(), request.Password)
-			if err != nil {
-				return nil, err
-			}
-		}
+	} else {
+		return nil, errors.New("no wallet accounts found")
 	}
 
 	displayName, err := m.settings.DisplayName()
@@ -704,72 +709,63 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		RevealedAccounts: make([]*protobuf.RevealedAccount, 0),
 	}
 
-	// find wallet accounts and attach wallet addresses and
-	// signatures to request
-	if request.Password != "" {
+	// attach wallet addresses and signatures to request
+	revealedAccounts := make(map[gethcommon.Address]*protobuf.RevealedAccount)
+	revealedAddresses := make([]gethcommon.Address, 0)
 
-		walletAccounts, err := m.settings.GetAccounts()
-		if err != nil {
-			return nil, err
-		}
-
-		revealedAccounts := make(map[gethcommon.Address]*protobuf.RevealedAccount)
-		revealedAddresses := make([]gethcommon.Address, 0)
-
-		containsAddress := func(addresses []string, targetAddress string) bool {
-			for _, address := range addresses {
-				if address == targetAddress {
-					return true
-				}
-			}
-			return false
-		}
-
-		for _, walletAccount := range walletAccounts {
-			if !walletAccount.Chat && walletAccount.Type != accounts.AccountTypeWatch {
-
-				if len(request.AddressesToReveal) > 0 && !containsAddress(request.AddressesToReveal, walletAccount.Address.Hex()) {
-					continue
-				}
-
-				verifiedAccount, err := m.accountsManager.GetVerifiedWalletAccount(m.settings, walletAccount.Address.Hex(), request.Password)
-				if err != nil {
-					return nil, err
-				}
-
-				messageToSign := types.EncodeHex(crypto.Keccak256(m.IdentityPublicKeyCompressed(), request.CommunityID, requestToJoin.ID))
-				signParams := account.SignParams{
-					Data:     messageToSign,
-					Address:  verifiedAccount.Address.Hex(),
-					Password: request.Password,
-				}
-				signatureBytes, err := m.accountsManager.Sign(signParams, verifiedAccount)
-				if err != nil {
-					return nil, err
-				}
-
-				revealedAddress := gethcommon.HexToAddress(verifiedAccount.Address.Hex())
-				revealedAddresses = append(revealedAddresses, revealedAddress)
-				revealedAccounts[revealedAddress] = &protobuf.RevealedAccount{
-					Address:   verifiedAccount.Address.Hex(),
-					Signature: signatureBytes,
-					ChainIds:  make([]uint64, 0),
-				}
+	containsAddress := func(addresses []string, targetAddress string) bool {
+		for _, address := range addresses {
+			if address == targetAddress {
+				return true
 			}
 		}
+		return false
+	}
 
-		response, err := m.communitiesManager.CheckPermissionToJoin(community.ID(), revealedAddresses)
-		if err != nil {
-			return nil, err
-		}
+	for _, walletAccount := range walletAccounts {
+		if !walletAccount.Chat && walletAccount.Type != accounts.AccountTypeWatch {
 
-		for _, accountAndChainIDs := range response.ValidCombinations {
-			revealedAccounts[accountAndChainIDs.Address].ChainIds = accountAndChainIDs.ChainIDs
-		}
+			if len(request.AddressesToReveal) > 0 && !containsAddress(request.AddressesToReveal, walletAccount.Address.Hex()) {
+				continue
+			}
 
-		for _, revealedAccount := range revealedAccounts {
-			requestToJoinProto.RevealedAccounts = append(requestToJoinProto.RevealedAccounts, revealedAccount)
+			verifiedAccount, err := m.accountsManager.GetVerifiedWalletAccount(m.settings, walletAccount.Address.Hex(), request.Password)
+			if err != nil {
+				return nil, err
+			}
+
+			messageToSign := types.EncodeHex(crypto.Keccak256(m.IdentityPublicKeyCompressed(), request.CommunityID, requestToJoin.ID))
+			signParams := account.SignParams{
+				Data:     messageToSign,
+				Address:  verifiedAccount.Address.Hex(),
+				Password: request.Password,
+			}
+			signatureBytes, err := m.accountsManager.Sign(signParams, verifiedAccount)
+			if err != nil {
+				return nil, err
+			}
+
+			revealedAddress := gethcommon.HexToAddress(verifiedAccount.Address.Hex())
+			revealedAddresses = append(revealedAddresses, revealedAddress)
+			revealedAccounts[revealedAddress] = &protobuf.RevealedAccount{
+				Address:   verifiedAccount.Address.Hex(),
+				Signature: signatureBytes,
+				ChainIds:  make([]uint64, 0),
+			}
 		}
+	}
+
+	permissionsResponse, err := m.communitiesManager.CheckPermissionToJoin(community.ID(), revealedAddresses)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, accountAndChainIDs := range permissionsResponse.ValidCombinations {
+		revealedAccounts[accountAndChainIDs.Address].ChainIds = accountAndChainIDs.ChainIDs
+	}
+
+	for _, revealedAccount := range revealedAccounts {
+		requestToJoinProto.RevealedAccounts = append(requestToJoinProto.RevealedAccounts, revealedAccount)
 	}
 
 	payload, err := proto.Marshal(requestToJoinProto)
