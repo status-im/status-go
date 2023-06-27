@@ -92,6 +92,7 @@ INSERT INTO settings (
   currency,
   current_network,
   dapps_address,
+  device_name,
   display_name,
   bio,
   eip1581_address,
@@ -114,12 +115,13 @@ INSERT INTO settings (
   profile_pictures_show_to,
   profile_pictures_visibility
 ) VALUES (
-?,?,?,?,?,?,?,?,?,?,?,?,
+?,?,?,?,?,?,?,?,?,?,?,?,?,
 ?,?,?,?,?,?,?,?,?,'id',?,?,?)`,
 		s.Address,
 		s.Currency,
 		s.CurrentNetwork,
 		s.DappsAddress,
+		s.DeviceName,
 		s.DisplayName,
 		s.Bio,
 		s.EIP1581Address,
@@ -529,6 +531,10 @@ func (db *Database) BackupFetched() (result bool, err error) {
 
 func (db *Database) ENSName() (string, error) {
 	return db.makeSelectString(PreferredName)
+}
+
+func (db *Database) DeviceName() (string, error) {
+	return db.makeSelectString(DeviceName)
 }
 
 func (db *Database) DisplayName() (string, error) {

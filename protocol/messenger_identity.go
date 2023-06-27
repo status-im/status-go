@@ -204,11 +204,19 @@ func (m *Messenger) setInstallationHostname() error {
 	}
 
 	if len(imd.Name) == 0 {
-		hn, err := server.GetDeviceName()
+		deviceName, err := m.settings.DeviceName()
 		if err != nil {
 			return err
 		}
-		imd.Name = fmt.Sprintf("%s %s", hn, imd.Name)
+		if deviceName != "" {
+			imd.Name = deviceName
+		} else {
+			hn, err := server.GetDeviceName()
+			if err != nil {
+				return err
+			}
+			imd.Name = fmt.Sprintf("%s %s", hn, imd.Name)
+		}
 	}
 
 	if len(imd.DeviceType) == 0 {

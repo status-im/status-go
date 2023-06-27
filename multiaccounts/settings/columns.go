@@ -73,6 +73,10 @@ var (
 		reactFieldName: "default-sync-period",
 		dBColumnName:   "default_sync_period",
 	}
+	DeviceName = SettingField{
+		reactFieldName: "device-name",
+		dBColumnName:   "device_name",
+	}
 	DisplayName = SettingField{
 		reactFieldName: "display-name",
 		dBColumnName:   "display_name",
@@ -461,6 +465,7 @@ var (
 		CustomBootNodesEnabled,
 		DappsAddress,
 		DefaultSyncPeriod,
+		DeviceName,
 		DisplayName,
 		Bio,
 		EIP1581Address,

@@ -15,6 +15,7 @@ type CreateAccount struct {
 	// BackupDisabledDataDir is the directory where backup is disabled
 	BackupDisabledDataDir string `json:"backupDisabledDataDir"`
 
+	DeviceName         string `json:"deviceName"`
 	DisplayName        string `json:"displayName"`
 	Password           string `json:"password"`
 	ImagePath          string `json:"imagePath"`

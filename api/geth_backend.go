@@ -1029,6 +1029,8 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 	if err != nil {
 		return err
 	}
+
+	settings.DeviceName = request.DeviceName
 	settings.DisplayName = request.DisplayName
 	settings.PreviewPrivacy = request.PreviewPrivacy
 	settings.CurrentNetwork = request.CurrentNetwork

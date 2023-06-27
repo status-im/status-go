@@ -120,6 +120,7 @@ type Settings struct {
 	CustomBootnodes           *json.RawMessage `json:"custom-bootnodes,omitempty"`
 	CustomBootnodesEnabled    *json.RawMessage `json:"custom-bootnodes-enabled?,omitempty"`
 	DappsAddress              types.Address    `json:"dapps-address"`
+	DeviceName                string           `json:"device-name"`
 	DisplayName               string           `json:"display-name"`
 	Bio                       string           `json:"bio,omitempty"`
 	EIP1581Address            types.Address    `json:"eip1581-address"`

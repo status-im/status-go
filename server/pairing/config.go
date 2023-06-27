@@ -36,6 +36,7 @@ type ReceiverConfig struct {
 	// SettingCurrentNetwork corresponding to field current_network from table settings, so that we can override current network from sender
 	SettingCurrentNetwork string `json:"settingCurrentNetwork" validate:"required"`
 
+	DeviceName     string                  `json:"deviceName"`
 	DB             *multiaccounts.Database `json:"-"`
 	LoggedInKeyUID string                  `json:"-"`
 }

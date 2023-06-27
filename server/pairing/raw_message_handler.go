@@ -84,7 +84,7 @@ func (s *SyncRawMessageHandler) PrepareRawMessage(keyUID, deviceType string) (rm
 	return
 }
 
-func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload, nodeConfig *params.NodeConfig, settingCurrentNetwork, deviceType string, rmp *RawMessagesPayload) (err error) {
+func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload, nodeConfig *params.NodeConfig, settingCurrentNetwork, deviceType string, deviceName string, rmp *RawMessagesPayload) (err error) {
 	account := accountPayload.multiaccount
 
 	activeAccount, _ := s.backend.GetActiveAccount()
@@ -105,6 +105,7 @@ func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload,
 			if err != nil {
 				return err
 			}
+			rmp.setting.DeviceName = deviceName
 			rmp.setting.InstallationID = nodeConfig.ShhextConfig.InstallationID
 			rmp.setting.CurrentNetwork = settingCurrentNetwork
 

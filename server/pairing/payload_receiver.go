@@ -238,6 +238,7 @@ type RawMessageStorer struct {
 	nodeConfig            *params.NodeConfig
 	settingCurrentNetwork string
 	deviceType            string
+	deviceName            string
 }
 
 func NewRawMessageStorer(backend *api.GethStatusBackend, payload *RawMessagesPayload, accountPayload *AccountPayload, config *ReceiverConfig) *RawMessageStorer {
@@ -248,6 +249,7 @@ func NewRawMessageStorer(backend *api.GethStatusBackend, payload *RawMessagesPay
 		nodeConfig:            config.NodeConfig,
 		settingCurrentNetwork: config.SettingCurrentNetwork,
 		deviceType:            config.DeviceType,
+		deviceName:            config.DeviceName,
 	}
 }
 
@@ -255,7 +257,7 @@ func (r *RawMessageStorer) Store() error {
 	if r.accountPayload == nil || r.accountPayload.multiaccount == nil {
 		return fmt.Errorf("no known multiaccount when storing raw messages")
 	}
-	return r.syncRawMessageHandler.HandleRawMessage(r.accountPayload, r.nodeConfig, r.settingCurrentNetwork, r.deviceType, r.payload)
+	return r.syncRawMessageHandler.HandleRawMessage(r.accountPayload, r.nodeConfig, r.settingCurrentNetwork, r.deviceType, r.deviceName, r.payload)
 }
 
 /*
