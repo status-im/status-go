@@ -696,7 +696,9 @@ func TestGetActivityEntriesFilterByTokenType(t *testing.T) {
 	for i := range trs {
 		tokenAddr := transfer.TestTokens[i].Address
 		trs[i].ChainID = common.ChainID(transfer.TestTokens[i].ChainID)
-		transfer.InsertTestTransferWithToken(t, deps.db, trs[i].To, &trs[i], tokenAddr)
+		transfer.InsertTestTransferWithOptions(t, deps.db, trs[i].To, &trs[i], &transfer.TestTransferOptions{
+			TokenAddress: tokenAddr,
+		})
 	}
 
 	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
