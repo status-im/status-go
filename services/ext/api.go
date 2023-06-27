@@ -1337,11 +1337,11 @@ func (api *PublicAPI) CheckAllCommunityChannelsPermissions(request *requests.Che
 	return api.service.messenger.CheckAllCommunityChannelsPermissions(request)
 }
 
-func (api *PublicAPI) CreateCommunityURLWithChatKey(communityID string) (string, error) {
-	return api.service.messenger.CreateCommunityURLWithChatKey(communityID)
+func (api *PublicAPI) ShareCommunityURLWithChatKey(communityID types.HexBytes) (string, error) {
+	return api.service.messenger.ShareCommunityURLWithChatKey(communityID)
 }
 
-func (api *PublicAPI) CreateCommunityURLWithData(communityID string) (string, error) {
+func (api *PublicAPI) CreateCommunityURLWithData(communityID types.HexBytes) (string, error) {
 	return api.service.messenger.CreateCommunityURLWithData(communityID)
 }
 
@@ -1365,7 +1365,7 @@ func (api *PublicAPI) CreateUserURLWithData(pubkey string) (string, error) {
 	return api.service.messenger.CreateUserURLWithData(pubkey)
 }
 
-func (api *PublicAPI) ParseSharedURL(url string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) ParseSharedURL(url string) (*protocol.UrlDataResponse, error) {
 	return api.service.messenger.ParseSharedURL(url)
 }
 

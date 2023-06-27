@@ -100,7 +100,7 @@ func (s *MessengerShareUrlsSuite) TestDeserializePublicKey() {
 func (s *MessengerShareUrlsSuite) TestCreateCommunityURLWithChatKey() {
 	community := s.createCommunity()
 
-	url, err := s.m.CreateCommunityURLWithChatKey(community.ID())
+	url, err := s.m.ShareCommunityURLWithChatKey(community.ID())
 	s.Require().NoError(err)
 
 	publicKey, err := s.m.SerializePublicKey(community.ID())
@@ -118,11 +118,16 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithChatKey() {
 
 	url := fmt.Sprintf("%s/%s%s", baseShareUrl, "c#", publicKey)
 
-	response, err := s.m.ParseSharedURL(url)
+	urlData, err := s.m.ParseSharedURL(url)
 	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Equal(community.ID(), response.Communities()[0].ID())
+	s.Require().NotNil(urlData)
+
+	s.Require().NotNil(urlData.Community)
+	s.Require().Equal(community.ID(), urlData.Community.CommunityID)
+	s.Require().Equal(community.Identity().DisplayName, urlData.Community.DisplayName)
+	s.Require().Equal(community.DescriptionText(), urlData.Community.Description)
+	s.Require().Equal(uint32(community.MembersCount()), urlData.Community.MembersCount)
+	s.Require().Equal(community.Identity().GetColor(), urlData.Community.Color)
 }
 
 func (s *MessengerShareUrlsSuite) TestCreateCommunityURLWithData() {
@@ -131,30 +136,35 @@ func (s *MessengerShareUrlsSuite) TestCreateCommunityURLWithData() {
 	url, err := s.m.CreateCommunityURLWithData(community.ID())
 	s.Require().NoError(err)
 
-	communityBase64, signature, err := s.m.prepareEncodedCommunityData(community)
+	communityID, err := s.m.SerializePublicKey(community.ID())
 	s.Require().NoError(err)
 
-	expectedUrl := fmt.Sprintf("%s/c/%s#%s", baseShareUrl, communityBase64, string(signature))
+	communityData, err := s.m.prepareEncodedCommunityData(community)
+	s.Require().NoError(err)
+
+	expectedUrl := fmt.Sprintf("%s/c/%s#%s", baseShareUrl, communityID, communityData)
 	s.Require().Equal(expectedUrl, url)
 }
 
 func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithData() {
 	community := s.createCommunity()
 
-	communityBase64, signature, err := s.m.prepareEncodedCommunityData(community)
+	communityID, err := s.m.SerializePublicKey(community.ID())
 	s.Require().NoError(err)
 
-	url := fmt.Sprintf("%s/c/%s#%s", baseShareUrl, communityBase64, string(signature))
-
-	response, err := s.m.ParseSharedURL(url)
+	communityData, err := s.m.prepareEncodedCommunityData(community)
 	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
 
-	restoredCommunity := response.Communities()[0]
+	url := fmt.Sprintf("%s/c/%s#%s", baseShareUrl, communityID, communityData)
 
-	s.Require().Equal(community.Identity().DisplayName, restoredCommunity.Identity().DisplayName)
-	s.Require().Equal(community.Identity().Color, restoredCommunity.Identity().Color)
-	s.Require().Equal(community.Identity().Description, restoredCommunity.Identity().Description)
-	// TODO: color
+	urlData, err := s.m.ParseSharedURL(url)
+	s.Require().NoError(err)
+	s.Require().NotNil(urlData)
+
+	s.Require().NotNil(urlData.Community)
+	// TODO: s.Require().Equal(community.ID(), urlData.Community.CommunityID)
+	s.Require().Equal(community.Identity().DisplayName, urlData.Community.DisplayName)
+	s.Require().Equal(community.DescriptionText(), urlData.Community.Description)
+	s.Require().Equal(uint32(community.MembersCount()), urlData.Community.MembersCount)
+	s.Require().Equal(community.Identity().GetColor(), urlData.Community.Color)
 }

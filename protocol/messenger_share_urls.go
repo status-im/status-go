@@ -19,6 +19,18 @@ import (
 	"github.com/status-im/status-go/protocol/urls"
 )
 
+type CommunityUrlData struct {
+	CommunityID  types.HexBytes `json:"communityId"`
+	DisplayName  string         `json:"displayName"`
+	Description  string         `json:"description"`
+	MembersCount uint32         `json:"membersCount"`
+	Color        string         `json:"color"`
+}
+
+type UrlDataResponse struct {
+	Community CommunityUrlData `json:"community"`
+}
+
 const baseShareUrl = "https://status.app"
 
 func (m *Messenger) SerializePublicKey(compressedKey types.HexBytes) (string, error) {
@@ -55,7 +67,7 @@ func (m *Messenger) DeserializePublicKey(compressedKey string) (types.HexBytes, 
 	return crypto.CompressPubkey(pubKey), nil
 }
 
-func (m *Messenger) CreateCommunityURLWithChatKey(communityID types.HexBytes) (string, error) {
+func (m *Messenger) ShareCommunityURLWithChatKey(communityID types.HexBytes) (string, error) {
 	if len(communityID) == 0 {
 		return "", ErrChatIDEmpty
 	}
@@ -73,10 +85,10 @@ func (m *Messenger) CreateCommunityURLWithChatKey(communityID types.HexBytes) (s
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s/%s%s", baseShareUrl, "c#", pubKey), nil
+	return fmt.Sprintf("%s/c#%s", baseShareUrl, pubKey), nil
 }
 
-func (m *Messenger) parseCommunityURLWithChatKey(urlData string) (*MessengerResponse, error) {
+func (m *Messenger) parseCommunityURLWithChatKey(urlData string) (*UrlDataResponse, error) {
 	communityID, err := m.DeserializePublicKey(urlData)
 	if err != nil {
 		return nil, err
@@ -91,12 +103,18 @@ func (m *Messenger) parseCommunityURLWithChatKey(urlData string) (*MessengerResp
 		return nil, fmt.Errorf("community with communityID %s not found", communityID)
 	}
 
-	response := &MessengerResponse{}
-	response.AddCommunity(community)
-	return response, nil
+	return &UrlDataResponse{
+		Community: CommunityUrlData{
+			CommunityID:  community.ID(),
+			DisplayName:  community.Identity().DisplayName,
+			Description:  community.DescriptionText(),
+			MembersCount: uint32(community.MembersCount()),
+			Color:        community.Identity().GetColor(),
+		},
+	}, nil
 }
 
-func (m *Messenger) prepareEncodedCommunityData(community *communities.Community) (string, []byte, error) {
+func (m *Messenger) prepareEncodedCommunityData(community *communities.Community) (string, error) {
 	// TODO: no ID here!
 	communityProto := &protobuf.Community{
 		DisplayName:  community.Identity().DisplayName,
@@ -105,63 +123,28 @@ func (m *Messenger) prepareEncodedCommunityData(community *communities.Community
 		Color:        community.Identity().GetColor(),
 	}
 
-	data, err := json.Marshal(communityProto)
+	communityData, err := json.Marshal(communityProto)
 	if err != nil {
-		return "", nil, err
+		return "", err
 	}
 
-	communityBase64, err := urls.EncodeDataURL(data)
+	encodedData, err := urls.EncodeDataURL(communityData)
 	if err != nil {
-		return "", nil, err
+		return "", err
 	}
 
-	signature, err := crypto.SignBytes([]byte(communityBase64), community.PrivateKey())
-	if err != nil {
-		return "", nil, err
-	}
-	return communityBase64, signature, err
-}
+	return encodedData, nil
+	// (string, []byte, error)
+	// communityBase64, err := urls.EncodeDataURL(data)
+	// if err != nil {
+	// 	return "", nil, err
+	// }
 
-func (m *Messenger) parseEncodedCommunityData(communityBase64 string, signature string) (*communities.Community, error) {
-	// TODO: verify signatures
-
-	communityData, err := urls.DecodeDataURL(communityBase64)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: no ID here!
-	// TODO: try m.GetCommunityByID() before protobuf
-
-	var communityProto protobuf.Community
-	// TODO: does not restored properly, maybe decoding is wrong?
-	err = proto.Unmarshal(communityData, &communityProto)
-	if err != nil {
-		return nil, err
-	}
-
-	description := &protobuf.CommunityDescription{
-		Identity: &protobuf.ChatIdentity{
-			DisplayName: communityProto.DisplayName,
-			Color:       communityProto.Color,
-			Description: communityProto.Description,
-		},
-		// TODO: members count
-	}
-
-	config := communities.Config{
-		CommunityDescription: description,
-		// TODO: ID & MemberIdentity is required
-		ID:             &m.identity.PublicKey,
-		MemberIdentity: &m.identity.PublicKey,
-	}
-
-	community, err := communities.New(config)
-	if err != nil {
-		return nil, err
-	}
-
-	return community, nil
+	// signature, err := crypto.SignBytes([]byte(communityBase64), community.PrivateKey())
+	// if err != nil {
+	// 	return "", nil, err
+	// }
+	// return communityBase64, signature, err
 }
 
 func (m *Messenger) CreateCommunityURLWithData(communityID types.HexBytes) (string, error) {
@@ -179,24 +162,62 @@ func (m *Messenger) CreateCommunityURLWithData(communityID types.HexBytes) (stri
 		return m.CreateCommunityURLWithData(communityID)
 	}
 
-	communityBase64, signature, err := m.prepareEncodedCommunityData(community)
+	// communityBase64, signature, err := m.prepareEncodedCommunityData(community)
+	// if err != nil {
+	// 	return "", err
+	// }
+
+	// return fmt.Sprintf("%s/c/%s#%s", baseShareUrl, communityBase64, string(signature)), nil
+	pubKey, err := m.SerializePublicKey(communityID)
 	if err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf("%s/c/%s#%s", baseShareUrl, communityBase64, string(signature)), nil
+	data, err := m.prepareEncodedCommunityData(community)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s/c/%s#%s", baseShareUrl, pubKey, data), nil
 }
 
-func (m *Messenger) parseCommunityURLWithData(communityBase64 string, signature string) (*MessengerResponse, error) {
-	community, err := m.parseEncodedCommunityData(communityBase64, signature)
+func (m *Messenger) parseCommunityURLWithData(keyString string, dataString string) (*UrlDataResponse, error) {
+	communityID, err := m.DeserializePublicKey(keyString)
 	if err != nil {
 		return nil, err
 	}
 
-	response := &MessengerResponse{}
-	response.AddCommunity(community)
+	communityData, err := urls.DecodeDataURL(dataString)
+	if err != nil {
+		return nil, err
+	}
 
-	return response, nil
+	// // TODO: encryption, verify signatures
+	// (communityBase64 string, signature string)
+	// communityData, err := urls.DecodeDataURL(communityBase64)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// TODO: no ID here!
+	// TODO: try m.GetCommunityByID() before protobuf
+
+	var communityProto protobuf.Community
+	// TODO: does not restored properly, maybe decoding is wrong?
+	err = proto.Unmarshal(communityData, &communityProto)
+	if err != nil {
+		return nil, err
+	}
+
+	return &UrlDataResponse{
+		Community: CommunityUrlData{
+			CommunityID:  communityID,
+			DisplayName:  communityProto.DisplayName,
+			Description:  communityProto.Description,
+			MembersCount: communityProto.MembersCount,
+			Color:        communityProto.Color,
+		},
+	}, nil
 }
 
 func (m *Messenger) CreateCommunityChannelURLWithChatKey(request *requests.CommunityChannelShareURL) (string, error) {
@@ -327,11 +348,11 @@ func (m *Messenger) CreateUserURLWithData(pubKey string) (string, error) {
 	return fmt.Sprintf("%s/%s/%s#%s", baseShareUrl, "u", userBase64, string(signature)), nil
 }
 
-func (m *Messenger) parseCommuntyChannelSharedURL(url string) (*MessengerResponse, error) {
+func (m *Messenger) parseCommuntyChannelSharedURL(url string) (*UrlDataResponse, error) {
 	return nil, errors.New("not implemented yet")
 }
 
-func (m *Messenger) parseProfileSharedURL(urlData string) (*MessengerResponse, error) {
+func (m *Messenger) parseProfileSharedURL(urlData string) (*UrlDataResponse, error) {
 	// TODO: decompress public key
 	pubKey, err := common.HexToPubkey(urlData)
 	if err != nil {
@@ -347,12 +368,11 @@ func (m *Messenger) parseProfileSharedURL(urlData string) (*MessengerResponse, e
 		return nil, fmt.Errorf("contact with publick key %s not found", pubKey)
 	}
 
-	response := &MessengerResponse{}
-	response.AddContact(contact)
-	return response, nil
+	// TODDO: impl
+	return nil, nil
 }
 
-func (m *Messenger) ParseSharedURL(url string) (*MessengerResponse, error) {
+func (m *Messenger) ParseSharedURL(url string) (*UrlDataResponse, error) {
 	if !strings.HasPrefix(url, baseShareUrl) {
 		return nil, fmt.Errorf("url should start with '%s'", baseShareUrl)
 	}
