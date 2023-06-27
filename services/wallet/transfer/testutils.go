@@ -207,10 +207,17 @@ var NativeTokenIndices = []int{0, 1, 2}
 
 func InsertTestTransfer(t *testing.T, db *sql.DB, address eth_common.Address, tr *TestTransfer) {
 	token := TestTokens[int(tr.Timestamp)%len(TestTokens)]
-	InsertTestTransferWithToken(t, db, address, tr, token.Address)
+	InsertTestTransferWithOptions(t, db, address, tr, &TestTransferOptions{
+		TokenAddress: token.Address,
+	})
 }
 
-func InsertTestTransferWithToken(t *testing.T, db *sql.DB, address eth_common.Address, tr *TestTransfer, tokenAddress eth_common.Address) {
+type TestTransferOptions struct {
+	TokenAddress     eth_common.Address
+	NullifyAddresses []eth_common.Address
+}
+
+func InsertTestTransferWithOptions(t *testing.T, db *sql.DB, address eth_common.Address, tr *TestTransfer, opt *TestTransferOptions) {
 	var (
 		tx *sql.Tx
 	)
@@ -243,8 +250,20 @@ func InsertTestTransferWithToken(t *testing.T, db *sql.DB, address eth_common.Ad
 	}
 
 	tokenType := "eth"
-	if (tokenAddress != eth_common.Address{}) {
+	if (opt.TokenAddress != eth_common.Address{}) {
 		tokenType = "erc20"
+	}
+
+	// Workaround to simulate writing of NULL values for addresses
+	txTo := &tr.To
+	txFrom := &tr.From
+	for i := 0; i < len(opt.NullifyAddresses); i++ {
+		if opt.NullifyAddresses[i] == tr.To {
+			txTo = nil
+		}
+		if opt.NullifyAddresses[i] == tr.From {
+			txFrom = nil
+		}
 	}
 
 	transfer := transferDBFields{
@@ -260,9 +279,9 @@ func InsertTestTransferWithToken(t *testing.T, db *sql.DB, address eth_common.Ad
 		baseGasFees:        "0x0",
 		receiptStatus:      &receiptStatus,
 		txValue:            big.NewInt(tr.Value),
-		txFrom:             &tr.From,
-		txTo:               &tr.To,
-		tokenAddress:       &tokenAddress,
+		txFrom:             txFrom,
+		txTo:               txTo,
+		tokenAddress:       &opt.TokenAddress,
 	}
 	err = updateOrInsertTransfersDBFields(tx, []transferDBFields{transfer})
 	require.NoError(t, err)

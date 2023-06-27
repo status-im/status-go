@@ -89,31 +89,49 @@ type Filter struct {
 	FilterOutCollectibles bool    `json:"filterOutCollectibles"`
 }
 
-// TODO: consider sorting by saved address and contacts to offload the client from doing it at runtime
 func GetRecipients(ctx context.Context, db *sql.DB, offset int, limit int) (addresses []eth.Address, hasMore bool, err error) {
 	rows, err := db.QueryContext(ctx, `
-        SELECT
-            transfers.tx_to_address as to_address,
-            transfers.timestamp AS timestamp
-        FROM transfers
-        WHERE transfers.multi_transaction_id = 0
+		SELECT
+			to_address,
+			MIN(timestamp) AS min_timestamp
+		FROM (
+			SELECT
+				transfers.tx_to_address as to_address,
+				MIN(transfers.timestamp) AS timestamp
+			FROM
+				transfers
+			WHERE
+				transfers.multi_transaction_id = 0 AND transfers.tx_to_address NOT NULL
+			GROUP BY
+				transfers.tx_to_address
 
-        UNION ALL
+			UNION
 
-        SELECT
-            pending_transactions.to_address AS to_address,
-            pending_transactions.timestamp AS timestamp
-        FROM pending_transactions
-        WHERE pending_transactions.multi_transaction_id = 0
+			SELECT
+				pending_transactions.to_address AS to_address,
+				MIN(pending_transactions.timestamp) AS timestamp
+			FROM
+				pending_transactions
+			WHERE
+				pending_transactions.multi_transaction_id = 0 AND pending_transactions.to_address NOT NULL
+			GROUP BY
+				pending_transactions.to_address
 
-        UNION ALL
+			UNION
 
-        SELECT
-            multi_transactions.to_address AS to_address,
-            multi_transactions.timestamp AS timestamp
-        FROM multi_transactions
-        ORDER BY timestamp DESC
-        LIMIT ? OFFSET ?`, limit, offset)
+			SELECT
+				multi_transactions.to_address AS to_address,
+				MIN(multi_transactions.timestamp) AS timestamp
+			FROM
+				multi_transactions
+			GROUP BY
+				multi_transactions.to_address
+		) AS combined_result
+		GROUP BY
+			to_address
+		ORDER BY
+			min_timestamp DESC
+		LIMIT ? OFFSET ?;`, limit, offset)
 	if err != nil {
 		return nil, false, err
 	}
