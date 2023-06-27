@@ -27,8 +27,15 @@ type CommunityUrlData struct {
 	Color        string         `json:"color"`
 }
 
+type CommunityChannelUrlData struct {
+	Emoji       string `json:"emoji"`
+	DisplayName string `json:"displayName"`
+	Color       string `json:"color"`
+}
+
 type UrlDataResponse struct {
-	Community CommunityUrlData `json:"community"`
+	Community CommunityUrlData        `json:"community"`
+	Channel   CommunityChannelUrlData `json:"channel"`
 }
 
 const baseShareUrl = "https://status.app"
@@ -79,6 +86,16 @@ func (m *Messenger) ShareCommunityURLWithChatKey(communityID types.HexBytes) (st
 	return fmt.Sprintf("%s/c#%s", baseShareUrl, pubKey), nil
 }
 
+func (m *Messenger) prepareCommunityData(community *communities.Community) CommunityUrlData {
+	return CommunityUrlData{
+		CommunityID:  community.ID(),
+		DisplayName:  community.Identity().DisplayName,
+		Description:  community.DescriptionText(),
+		MembersCount: uint32(community.MembersCount()),
+		Color:        community.Identity().GetColor(),
+	}
+}
+
 func (m *Messenger) parseCommunityURLWithChatKey(urlData string) (*UrlDataResponse, error) {
 	communityID, err := m.DeserializePublicKey(urlData)
 	if err != nil {
@@ -95,13 +112,7 @@ func (m *Messenger) parseCommunityURLWithChatKey(urlData string) (*UrlDataRespon
 	}
 
 	return &UrlDataResponse{
-		Community: CommunityUrlData{
-			CommunityID:  community.ID(),
-			DisplayName:  community.Identity().DisplayName,
-			Description:  community.DescriptionText(),
-			MembersCount: uint32(community.MembersCount()),
-			Color:        community.Identity().GetColor(),
-		},
+		Community: m.prepareCommunityData(community),
 	}, nil
 }
 
@@ -195,7 +206,42 @@ func (m *Messenger) ShareCommunityChannelURLWithChatKey(request *requests.Commun
 		return "", err
 	}
 
-	return fmt.Sprintf("%s/cc/%s/%s", baseShareUrl, communityKey, request.ChannelID), nil
+	// TODO: convert ChannelID to 003cdcd5-e065-48f9-b166-b1a94ac75a11 format
+	return fmt.Sprintf("%s/cc/%s#%s", baseShareUrl, request.ChannelID, communityKey), nil
+}
+
+func (m *Messenger) prepareCommunityChannelData(channel *protobuf.CommunityChat) CommunityChannelUrlData {
+	return CommunityChannelUrlData{
+		Emoji:       channel.Identity.Emoji,
+		DisplayName: channel.Identity.DisplayName,
+		Color:       channel.Identity.Color,
+	}
+}
+
+func (m *Messenger) parseCommunityChannelWithChatKey(channelId string, publickKey string) (*UrlDataResponse, error) {
+	communityID, err := m.DeserializePublicKey(publickKey)
+	if err != nil {
+		return nil, err
+	}
+
+	community, err := m.GetCommunityByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	if community == nil {
+		return nil, fmt.Errorf("community with communityID %s not found", communityID)
+	}
+
+	channel, ok := community.Chats()[channelId]
+	if !ok {
+		return nil, fmt.Errorf("channel with channelId %s not found", channelId)
+	}
+
+	return &UrlDataResponse{
+		Community: m.prepareCommunityData(community),
+		Channel:   m.prepareCommunityChannelData(channel),
+	}, nil
 }
 
 func (m *Messenger) CreateCommunityChannelURLWithData(request *requests.CommunityChannelShareURL) (string, error) {
@@ -340,7 +386,7 @@ func (m *Messenger) ParseSharedURL(url string) (*UrlDataResponse, error) {
 	fmt.Println("-----> ParseSharedURL::: url: ", url, "urlContents: ", len(urlContents))
 
 	if len(urlContents) == 2 && urlContents[0] == "c" {
-		// TODO: encrypted protobuf can contain '#' and it could not be parsed
+		// TODO: encrypted protobuf can contain '#'!
 		return m.parseCommunityURLWithChatKey(urlContents[1])
 	}
 
@@ -348,5 +394,9 @@ func (m *Messenger) ParseSharedURL(url string) (*UrlDataResponse, error) {
 		return m.parseCommunityURLWithData(strings.TrimPrefix(urlContents[0], "c/"), urlContents[1])
 	}
 
-	return nil, errors.New("unhandled url group")
+	if len(urlContents) == 2 && strings.HasPrefix(urlContents[0], "cc/") {
+		return m.parseCommunityChannelWithChatKey(strings.TrimPrefix(urlContents[0], "cc/"), urlContents[1])
+	}
+
+	return nil, fmt.Errorf("unhandled shared url: %s", url)
 }
