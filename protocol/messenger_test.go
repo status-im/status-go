@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -50,8 +51,33 @@ type testNode struct {
 	shh types.Waku
 }
 
+type ensVerifierMock struct{}
+
+func (e *ensVerifierMock) verifyENSName(ensInfo enstypes.ENSDetails) enstypes.ENSResponse {
+	return enstypes.ENSResponse{
+		Name:            ensInfo.Name,
+		PublicKeyString: ensInfo.PublicKeyString,
+		VerifiedAt:      time.Now().Unix(),
+		Verified:        true,
+	}
+}
+
+func (e *ensVerifierMock) CheckBatch(ensDetails []enstypes.ENSDetails, rpcEndpoint, contractAddress string) (map[string]enstypes.ENSResponse, error) {
+	response := make(map[string]enstypes.ENSResponse)
+
+	for _, ensInfo := range ensDetails {
+		response[ensInfo.PublicKeyString] = e.verifyENSName(ensInfo)
+	}
+
+	return response, nil
+}
+
+func (e *ensVerifierMock) ReverseResolve(address gethcommon.Address, rpcEndpoint string) (string, error) {
+	return "test", nil
+}
+
 func (n *testNode) NewENSVerifier(_ *zap.Logger) enstypes.ENSVerifier {
-	panic("not implemented")
+	return &ensVerifierMock{}
 }
 
 func (n *testNode) AddPeer(_ string) error {
