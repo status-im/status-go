@@ -46,6 +46,7 @@ func getbaseURL(chainID uint64) (string, error) {
 }
 
 var OpenseaClientInstances = make(map[uint64]*Client)
+var OpenseaClientInstancesLock = sync.RWMutex{}
 var OpenseaHTTPClient *HTTPClient = nil
 
 type TraitValue string
@@ -247,6 +248,9 @@ type Client struct {
 
 // new opensea client.
 func NewOpenseaClient(chainID uint64, apiKey string, feed *event.Feed) (*Client, error) {
+	OpenseaClientInstancesLock.Lock()
+	defer OpenseaClientInstancesLock.Unlock()
+
 	if OpenseaHTTPClient == nil {
 		OpenseaHTTPClient = newHTTPClient()
 	}
