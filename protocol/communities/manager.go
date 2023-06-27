@@ -1084,17 +1084,7 @@ func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory, publ
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Advertise changes
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToCreateCategoryAdminEvent(categoryID, request.CategoryName, request.ChatIDs)})
-	}
+	m.SaveAndPublish(community)
 
 	return community, changes, nil
 }
@@ -1120,17 +1110,7 @@ func (m *Manager) EditCategory(request *requests.EditCommunityCategory) (*Commun
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Advertise changes
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToEditCategoryAdminEvent(request.CategoryID, request.CategoryName, request.ChatIDs)})
-	}
+	m.SaveAndPublish(community)
 
 	return community, changes, nil
 }
@@ -1179,17 +1159,7 @@ func (m *Manager) ReorderCategories(request *requests.ReorderCommunityCategories
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Advertise changes
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToReorderCategoryAdminEvent(request.CategoryID, request.Position)})
-	}
+	m.SaveAndPublish(community)
 
 	return community, changes, nil
 }
@@ -1242,19 +1212,9 @@ func (m *Manager) DeleteCategory(request *requests.DeleteCommunityCategory) (*Co
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, nil, err
-	}
+	m.SaveAndPublish(community)
 
-	// Advertise changes
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToDeleteCategoryAdminEvent(request.CategoryID)})
-	}
-
-	return community, changes, nil
+	return changes.Community, changes, nil
 }
 
 func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte) (*CommunityResponse, error) {
