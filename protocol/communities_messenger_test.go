@@ -14,72 +14,24 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
-
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/account/generator"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/waku"
 )
-
-const adminPassword = "123456"
-const alicePassword = "qwerty"
-const bobPassword = "bob123"
-
-const adminAddress = "0x0100000000000000000000000000000000000000"
-const aliceAddress1 = "0x0200000000000000000000000000000000000000"
-const aliceAddress2 = "0x0210000000000000000000000000000000000000"
-const bobAddress = "0x0300000000000000000000000000000000000000"
-
-type AccountManagerMock struct {
-	AccountsMap map[string]string
-}
-
-type TestTokenManager struct {
-}
-
-func (m *TestTokenManager) GetAllChainIDs() ([]uint64, error) {
-	return []uint64{5}, nil
-}
-
-func (m *TestTokenManager) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
-	return nil, nil
-}
-
-func (m *AccountManagerMock) GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*account.SelectedExtKey, error) {
-	return &account.SelectedExtKey{
-		Address: types.HexToAddress(address),
-	}, nil
-}
-
-func (m *AccountManagerMock) CanRecover(rpcParams account.RecoverParams, revealedAddress types.Address) (bool, error) {
-	return true, nil
-}
-
-func (m *AccountManagerMock) Sign(rpcParams account.SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error) {
-	return types.HexBytes{}, nil
-}
 
 func TestMessengerCommunitiesSuite(t *testing.T) {
 	suite.Run(t, new(MessengerCommunitiesSuite))
@@ -105,9 +57,9 @@ func (s *MessengerCommunitiesSuite) SetupTest() {
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 
-	s.admin = s.newMessengerWithWallet(adminPassword, []string{adminAddress})
-	s.bob = s.newMessengerWithWallet(bobPassword, []string{bobAddress})
-	s.alice = s.newMessengerWithWallet(alicePassword, []string{aliceAddress1, aliceAddress2})
+	s.admin = s.newMessenger()
+	s.bob = s.newMessenger()
+	s.alice = s.newMessenger()
 	_, err := s.admin.Start()
 	s.Require().NoError(err)
 	_, err = s.bob.Start()
@@ -123,112 +75,18 @@ func (s *MessengerCommunitiesSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *MessengerCommunitiesSuite) newMessengerWithOptions(shh types.Waku, privateKey *ecdsa.PrivateKey, accountsManager account.Manager, options []Option) *Messenger {
-	m, err := NewMessenger(
-		"Test",
-		privateKey,
-		&testNode{shh: shh},
-		uuid.New().String(),
-		nil,
-		accountsManager,
-		options...,
-	)
+func (s *MessengerCommunitiesSuite) newMessengerWithKey(privateKey *ecdsa.PrivateKey) *Messenger {
+	messenger, err := newCommunitiesTestMessenger(s.shh, privateKey, s.logger, nil, nil)
 	s.Require().NoError(err)
 
-	err = m.Init()
-	s.Require().NoError(err)
-
-	config := params.NodeConfig{
-		NetworkID: 10,
-		DataDir:   "test",
-	}
-
-	networks := json.RawMessage("{}")
-	setting := settings.Settings{
-		Address:                   types.HexToAddress("0x1122334455667788990011223344556677889900"),
-		AnonMetricsShouldSend:     false,
-		CurrentNetwork:            "mainnet_rpc",
-		DappsAddress:              types.HexToAddress("0x1122334455667788990011223344556677889900"),
-		InstallationID:            "d3efcff6-cffa-560e-a547-21d3858cbc51",
-		KeyUID:                    "0x1122334455667788990011223344556677889900",
-		Name:                      "Test",
-		Networks:                  &networks,
-		LatestDerivedPath:         0,
-		PhotoPath:                 "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
-		PreviewPrivacy:            false,
-		PublicKey:                 "0x04112233445566778899001122334455667788990011223344556677889900112233445566778899001122334455667788990011223344556677889900",
-		SigningPhrase:             "yurt joey vibe",
-		SendPushNotifications:     true,
-		ProfilePicturesVisibility: 1,
-		DefaultSyncPeriod:         777600,
-		UseMailservers:            true,
-		LinkPreviewRequestEnabled: true,
-		SendStatusUpdates:         true,
-		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900")}
-
-	_ = m.settings.CreateSettings(setting, config)
-
-	return m
-}
-
-func (s *MessengerCommunitiesSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, accountsManager account.Manager) *Messenger {
-	tmpfile, err := ioutil.TempFile("", "accounts-tests-")
-	s.Require().NoError(err)
-	madb, err := multiaccounts.InitializeDB(tmpfile.Name())
-	s.Require().NoError(err)
-
-	acc := generator.NewAccount(privateKey, nil)
-	iai := acc.ToIdentifiedAccountInfo("")
-	tm := &TestTokenManager{}
-
-	options := []Option{
-		WithCustomLogger(s.logger),
-		WithDatabaseConfig(":memory:", "somekey", sqlite.ReducedKDFIterationsNumber),
-		WithMultiAccounts(madb),
-		WithAccount(iai.ToMultiAccount()),
-		WithDatasync(),
-		WithTokenManager(tm),
-	}
-	return s.newMessengerWithOptions(shh, privateKey, accountsManager, options)
-}
-
-func (s *MessengerCommunitiesSuite) newMessenger(accountsManager account.Manager) *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	return s.newMessengerWithKey(s.shh, privateKey, accountsManager)
-}
-
-func (s *MessengerCommunitiesSuite) newMessengerWithWallet(password string, walletAddresses []string) *Messenger {
-	accountsManager := &AccountManagerMock{}
-	accountsManager.AccountsMap = make(map[string]string)
-	for _, walletAddress := range walletAddresses {
-		accountsManager.AccountsMap[walletAddress] = types.EncodeHex(crypto.Keccak256([]byte(password)))
-	}
-
-	messenger := s.newMessenger(accountsManager)
-
-	// add wallet account with keypair
-	for _, walletAddress := range walletAddresses {
-		kp := accounts.GetProfileKeypairForTest(false, true, false)
-		kp.Accounts[0].Address = types.HexToAddress(walletAddress)
-		err := messenger.settings.SaveOrUpdateKeypair(kp)
-		s.Require().NoError(err)
-	}
-
-	walletAccounts, err := messenger.settings.GetAccounts()
-	s.Require().NoError(err)
-	s.Require().Len(walletAccounts, len(walletAddresses))
-	for i := range walletAddresses {
-		s.Require().Equal(walletAccounts[i].Type, accounts.AccountTypeGenerated)
-	}
 	return messenger
 }
 
-func (s *MessengerCommunitiesSuite) requestToJoinCommunity(user *Messenger, communityID types.HexBytes, password string, addresses []string) (*MessengerResponse, error) {
-	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(password)))
-	request := &requests.RequestToJoinCommunity{CommunityID: communityID, Password: passwdHash, AddressesToReveal: addresses}
-	return user.RequestToJoinCommunity(request)
+func (s *MessengerCommunitiesSuite) newMessenger() *Messenger {
+	privateKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	return s.newMessengerWithKey(privateKey)
 }
 
 func (s *MessengerCommunitiesSuite) TestCreateCommunity() {
@@ -263,7 +121,7 @@ func (s *MessengerCommunitiesSuite) TestCreateCommunity_WithoutDefaultChannel() 
 }
 
 func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
-	alice := s.newMessengerWithWallet(alicePassword, []string{aliceAddress1})
+	alice := s.newMessenger()
 
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
@@ -520,114 +378,17 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 }
 
 func (s *MessengerCommunitiesSuite) createCommunity() *communities.Community {
-	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		Name:        "status",
-		Color:       "#ffffff",
-		Description: "status community description",
-	}
-
-	// Create an community chat
-	response, err := s.admin.CreateCommunity(description, true)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
-	community := response.Communities()[0]
-	orgChat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		},
-		Identity: &protobuf.ChatIdentity{
-			DisplayName: "status-core",
-			Emoji:       "😎",
-			Description: "status-core community chat",
-		},
-	}
-
-	response, err = s.admin.CreateCommunityChat(community.ID(), orgChat)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
+	community, _ := createCommunity(&s.Suite, s.admin)
 	return community
 }
 
 func (s *MessengerCommunitiesSuite) advertiseCommunityTo(community *communities.Community, user *Messenger) {
-	chat := CreateOneToOneChat(common.PubkeyToHex(&user.identity.PublicKey), &user.identity.PublicKey, user.transport)
-
-	inputMessage := &common.Message{}
-	inputMessage.ChatId = chat.ID
-	inputMessage.Text = "some text"
-	inputMessage.CommunityID = community.IDString()
-
-	err := s.admin.SaveChat(chat)
-	s.Require().NoError(err)
-	_, err = s.admin.SendChatMessage(context.Background(), inputMessage)
-	s.Require().NoError(err)
-
-	// Ensure community is received
-	err = tt.RetryWithBackOff(func() error {
-		response, err := user.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-		return nil
-	})
-	s.Require().NoError(err)
+	advertiseCommunityTo(&s.Suite, community, s.admin, user)
 }
 
-func (s *MessengerCommunitiesSuite) joinCommunityWithAddresses(community *communities.Community, user *Messenger, password string, addresses []string) {
-	// Request to join the community
-	response, err := s.requestToJoinCommunity(user, community.ID(), password, addresses)
-
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
-	s.Require().Len(response.ActivityCenterNotifications(), 1)
-
-	notification := response.ActivityCenterNotifications()[0]
-	s.Require().NotNil(notification)
-	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
-	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
-
-	// Retrieve and accept join request
-	err = tt.RetryWithBackOff(func() error {
-		response, err := s.admin.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("no communities in response (accept join request)")
-		}
-		if !response.Communities()[0].HasMember(&user.identity.PublicKey) {
-			return errors.New("user not accepted")
-		}
-		return nil
-	})
-	s.Require().NoError(err)
-
-	// Retrieve join request response
-	err = tt.RetryWithBackOff(func() error {
-		response, err := user.RetrieveAll()
-
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("no communities in response (join request response)")
-		}
-		if !response.Communities()[0].HasMember(&user.identity.PublicKey) {
-			return errors.New("user not a member")
-		}
-		return nil
-	})
-	s.Require().NoError(err)
-}
-
-func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Community, user *Messenger, password string) {
-	s.joinCommunityWithAddresses(community, user, password, []string{})
+func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Community, user *Messenger) {
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	joinCommunity(&s.Suite, community, s.admin, user, request)
 }
 
 func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
@@ -644,8 +405,8 @@ func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
 	s.advertiseCommunityTo(community, s.bob)
 	s.advertiseCommunityTo(community, s.alice)
 
-	s.joinCommunity(community, s.bob, bobPassword)
-	s.joinCommunity(community, s.alice, alicePassword)
+	s.joinCommunity(community, s.bob)
+	s.joinCommunity(community, s.alice)
 
 	// Trigger ContactCodeAdvertisement
 	err = s.bob.SetDisplayName("bobby")
@@ -2291,151 +2052,13 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 	s.Require().Len(requestsToJoin, 0)
 }
 
-func (s *MessengerCommunitiesSuite) TestCreateTokenPermission() {
-	community := s.createCommunity()
-
-	createTokenPermission := &requests.CreateCommunityTokenPermission{
-		CommunityID: community.ID(),
-		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
-		TokenCriteria: []*protobuf.TokenCriteria{
-			&protobuf.TokenCriteria{
-				Type:              protobuf.CommunityTokenType_ERC20,
-				ContractAddresses: map[uint64]string{uint64(1): "0x123"},
-				Symbol:            "TEST",
-				Amount:            "100",
-				Decimals:          uint64(18),
-			},
-		},
-	}
-
-	response, err := s.admin.CreateCommunityTokenPermission(createTokenPermission)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-
-	tokenPermissions := response.Communities()[0].TokenPermissions()
-	for _, tokenPermission := range tokenPermissions {
-		for _, tc := range tokenPermission.TokenCriteria {
-			s.Require().Equal(tc.Type, protobuf.CommunityTokenType_ERC20)
-			s.Require().Equal(tc.Symbol, "TEST")
-			s.Require().Equal(tc.Amount, "100")
-			s.Require().Equal(tc.Decimals, uint64(18))
-		}
-	}
-}
-
-func (s *MessengerCommunitiesSuite) TestEditTokenPermission() {
-	community := s.createCommunity()
-
-	tokenPermission := &requests.CreateCommunityTokenPermission{
-		CommunityID: community.ID(),
-		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
-		TokenCriteria: []*protobuf.TokenCriteria{
-			&protobuf.TokenCriteria{
-				Type:              protobuf.CommunityTokenType_ERC20,
-				ContractAddresses: map[uint64]string{uint64(1): "0x123"},
-				Symbol:            "TEST",
-				Amount:            "100",
-				Decimals:          uint64(18),
-			},
-		},
-	}
-
-	response, err := s.admin.CreateCommunityTokenPermission(tokenPermission)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-
-	tokenPermissions := response.Communities()[0].TokenPermissions()
-
-	var tokenPermissionID string
-	for id := range tokenPermissions {
-		tokenPermissionID = id
-	}
-
-	tokenPermission.TokenCriteria[0].Symbol = "TESTUpdated"
-	tokenPermission.TokenCriteria[0].Amount = "200"
-	tokenPermission.TokenCriteria[0].Decimals = uint64(20)
-
-	editTokenPermission := &requests.EditCommunityTokenPermission{
-		PermissionID:                   tokenPermissionID,
-		CreateCommunityTokenPermission: *tokenPermission,
-	}
-
-	response2, err := s.admin.EditCommunityTokenPermission(editTokenPermission)
-	s.Require().NoError(err)
-	// wait for `checkMemberPermissions` to finish
-	time.Sleep(1 * time.Second)
-	s.Require().NotNil(response2)
-	s.Require().Len(response2.Communities(), 1)
-
-	tokenPermissions = response2.Communities()[0].TokenPermissions()
-	for _, tokenPermission := range tokenPermissions {
-		for _, tc := range tokenPermission.TokenCriteria {
-			s.Require().Equal(tc.Type, protobuf.CommunityTokenType_ERC20)
-			s.Require().Equal(tc.Symbol, "TESTUpdated")
-			s.Require().Equal(tc.Amount, "200")
-			s.Require().Equal(tc.Decimals, uint64(20))
-		}
-	}
-}
-
-func (s *MessengerCommunitiesSuite) TestRequestAccessWithENSTokenPermission() {
-	community := s.createCommunity()
-
-	createTokenPermission := &requests.CreateCommunityTokenPermission{
-		CommunityID: community.ID(),
-		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
-		TokenCriteria: []*protobuf.TokenCriteria{
-			&protobuf.TokenCriteria{
-				Type:       protobuf.CommunityTokenType_ENS,
-				EnsPattern: "test.stateofus.eth",
-			},
-		},
-	}
-
-	response, err := s.admin.CreateCommunityTokenPermission(createTokenPermission)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-
-	s.advertiseCommunityTo(community, s.alice)
-
-	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-	// We try to join the org
-	response, err = s.alice.RequestToJoinCommunity(requestToJoin)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
-
-	requestToJoin1 := response.RequestsToJoinCommunity[0]
-	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
-
-	// Retrieve request to join
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.admin.RetrieveAll()
-		return err
-	})
-	s.Require().NoError(err)
-	// We don't expect a requestToJoin in the response because due
-	// to missing revealed wallet addresses, the request should've
-	// been declined right away
-	s.Require().Len(response.RequestsToJoinCommunity, 0)
-
-	// Ensure alice is not a member of the community
-	allCommunities, err := s.admin.Communities()
-	if bytes.Equal(allCommunities[0].ID(), community.ID()) {
-		s.Require().False(allCommunities[0].HasMember(&s.alice.identity.PublicKey))
-	}
-}
-
 func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 	community := s.createCommunity()
 	s.advertiseCommunityTo(community, s.alice)
 	s.advertiseCommunityTo(community, s.bob)
 
-	s.joinCommunity(community, s.alice, alicePassword)
-	s.joinCommunity(community, s.bob, bobPassword)
+	s.joinCommunity(community, s.alice)
+	s.joinCommunity(community, s.bob)
 
 	joinedCommunities, err := s.admin.communitiesManager.Joined()
 	s.Require().NoError(err)
@@ -2498,7 +2121,7 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 	s.Require().Equal(3, numberInactiveChats)
 
 	// alice can rejoin
-	s.joinCommunity(community, s.alice, alicePassword)
+	s.joinCommunity(community, s.alice)
 
 	joinedCommunities, err = s.admin.communitiesManager.Joined()
 	s.Require().NoError(err)
@@ -2629,11 +2252,10 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 
 func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
 	// Create new device
-	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alicesOtherDevice := s.newMessengerWithKey(s.alice.identity)
 
 	// Pair devices
-	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, &multidevice.InstallationMetadata{
+	err := alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, &multidevice.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})
@@ -2690,11 +2312,10 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
 
 func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings_EditCommunity() {
 	// Create new device
-	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alicesOtherDevice := s.newMessengerWithKey(s.alice.identity)
 
 	// Pair devices
-	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, &multidevice.InstallationMetadata{
+	err := alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, &multidevice.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})
@@ -2787,8 +2408,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings_EditCommunity() {
 // TestSyncCommunity tests basic sync functionality between 2 Messengers
 func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	// Create new device
-	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alicesOtherDevice := s.newMessengerWithKey(s.alice.identity)
 
 	tcs, err := alicesOtherDevice.communitiesManager.All()
 	s.Require().NoError(err, "alicesOtherDevice.communitiesManager.All")
@@ -2881,8 +2501,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.Require().NoError(err)
 
 	// Create Alice's other device
-	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alicesOtherDevice := s.newMessengerWithKey(s.alice.identity)
 
 	im1 := &multidevice.InstallationMetadata{
 		Name:       "alice's-other-device",
@@ -3124,8 +2743,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	s.Require().NoError(err)
 
 	// Create Alice's other device
-	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.alice.identity, s.logger, nil)
-	s.Require().NoError(err)
+	alicesOtherDevice := s.newMessengerWithKey(s.alice.identity)
 
 	im1 := &multidevice.InstallationMetadata{
 		Name:       "alice's-other-device",
@@ -3451,48 +3069,6 @@ func (s *MessengerCommunitiesSuite) TestExtractDiscordChannelsAndCategories_With
 	s.Require().Len(errs, 1)
 }
 
-func (s *MessengerCommunitiesSuite) TestCommunityTokensMetadata() {
-
-	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		Name:        "status",
-		Color:       "#ffffff",
-		Description: "status community description",
-	}
-
-	// Create an community chat
-	response, err := s.bob.CreateCommunity(description, true)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.CommunitiesSettings(), 1)
-
-	community := response.Communities()[0]
-
-	tokensMetadata := community.CommunityTokensMetadata()
-	s.Require().Len(tokensMetadata, 0)
-
-	newToken := &protobuf.CommunityTokenMetadata{
-		ContractAddresses: map[uint64]string{3: "0xasd"},
-		Description:       "desc1",
-		Image:             "IMG1",
-		TokenType:         protobuf.CommunityTokenType_ERC721,
-		Symbol:            "SMB",
-	}
-
-	_, err = community.AddCommunityTokensMetadata(newToken)
-	s.Require().NoError(err)
-	tokensMetadata = community.CommunityTokensMetadata()
-	s.Require().Len(tokensMetadata, 1)
-
-	s.Require().Equal(tokensMetadata[0].ContractAddresses, newToken.ContractAddresses)
-	s.Require().Equal(tokensMetadata[0].Description, newToken.Description)
-	s.Require().Equal(tokensMetadata[0].Image, newToken.Image)
-	s.Require().Equal(tokensMetadata[0].TokenType, newToken.TokenType)
-	s.Require().Equal(tokensMetadata[0].Symbol, newToken.Symbol)
-	s.Require().Equal(tokensMetadata[0].Name, newToken.Name)
-}
-
 func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequesToJoin() {
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
@@ -3545,8 +3121,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequesToJoin() {
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
 
-	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(alicePassword)))
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), Password: passwdHash}
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 	// We try to join the org
 	_, rtj, err := s.alice.communitiesManager.RequestToJoin(&s.alice.identity.PublicKey, request)
 
@@ -3697,60 +3272,4 @@ func (s *MessengerCommunitiesSuite) TestHandleImport() {
 	s.Require().NoError(err)
 	s.Require().NotNil(chat)
 	s.Require().Equal(0, int(chat.UnviewedMessagesCount))
-}
-
-func (s *MessengerCommunitiesSuite) TestJoinedCommunityMembersSharedAddress() {
-	community := s.createCommunity()
-	s.advertiseCommunityTo(community, s.alice)
-	s.advertiseCommunityTo(community, s.bob)
-
-	s.joinCommunity(community, s.alice, alicePassword)
-	s.joinCommunity(community, s.bob, bobPassword)
-
-	community, err := s.admin.GetCommunityByID(community.ID())
-	s.Require().NoError(err)
-
-	s.Require().Equal(3, community.MembersCount())
-
-	for pubKey, member := range community.Members() {
-		if pubKey != common.PubkeyToHex(&s.admin.identity.PublicKey) {
-
-			switch pubKey {
-			case common.PubkeyToHex(&s.alice.identity.PublicKey):
-				s.Require().Len(member.RevealedAccounts, 2)
-				s.Require().Equal(member.RevealedAccounts[0].Address, aliceAddress1)
-				s.Require().Equal(member.RevealedAccounts[1].Address, aliceAddress2)
-			case common.PubkeyToHex(&s.bob.identity.PublicKey):
-				s.Require().Len(member.RevealedAccounts, 1)
-				s.Require().Equal(member.RevealedAccounts[0].Address, bobAddress)
-			default:
-				s.Require().Fail("pubKey does not match expected keys")
-			}
-		}
-	}
-}
-
-func (s *MessengerCommunitiesSuite) TestJoinedCommunityMembersSelectedSharedAddress() {
-	community := s.createCommunity()
-	s.advertiseCommunityTo(community, s.alice)
-
-	s.joinCommunityWithAddresses(community, s.alice, alicePassword, []string{aliceAddress2})
-
-	community, err := s.admin.GetCommunityByID(community.ID())
-	s.Require().NoError(err)
-
-	s.Require().Equal(2, community.MembersCount())
-
-	for pubKey, member := range community.Members() {
-		if pubKey != common.PubkeyToHex(&s.admin.identity.PublicKey) {
-			s.Require().Len(member.RevealedAccounts, 1)
-
-			switch pubKey {
-			case common.PubkeyToHex(&s.alice.identity.PublicKey):
-				s.Require().Equal(member.RevealedAccounts[0].Address, aliceAddress2)
-			default:
-				s.Require().Fail("pubKey does not match expected keys")
-			}
-		}
-	}
 }
