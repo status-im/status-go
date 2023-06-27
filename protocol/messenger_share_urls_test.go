@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/protocol/urls"
 	"github.com/status-im/status-go/waku"
 )
 
@@ -76,6 +77,17 @@ func (s *MessengerShareUrlsSuite) createCommunity() *communities.Community {
 	return response.Communities()[0]
 }
 
+func (s *MessengerShareUrlsSuite) TestDecodeEncodeDataURL() {
+	testData := []byte("test data 123")
+
+	decodedData, err := urls.EncodeDataURL(testData)
+	s.Require().NoError(err)
+
+	encodedData, err := urls.DecodeDataURL(decodedData)
+	s.Require().NoError(err)
+	s.Require().Equal(testData, encodedData)
+}
+
 func (s *MessengerShareUrlsSuite) TestSerializePublicKey() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
@@ -97,7 +109,7 @@ func (s *MessengerShareUrlsSuite) TestDeserializePublicKey() {
 	s.Require().True(strings.HasPrefix(publicKey.String(), "0x"))
 }
 
-func (s *MessengerShareUrlsSuite) TestCreateCommunityURLWithChatKey() {
+func (s *MessengerShareUrlsSuite) TestShareCommunityURLWithChatKey() {
 	community := s.createCommunity()
 
 	url, err := s.m.ShareCommunityURLWithChatKey(community.ID())
@@ -130,10 +142,10 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithChatKey() {
 	s.Require().Equal(community.Identity().GetColor(), urlData.Community.Color)
 }
 
-func (s *MessengerShareUrlsSuite) TestCreateCommunityURLWithData() {
+func (s *MessengerShareUrlsSuite) TestShareCommunityURLWithData() {
 	community := s.createCommunity()
 
-	url, err := s.m.CreateCommunityURLWithData(community.ID())
+	url, err := s.m.ShareCommunityURLWithData(community.ID())
 	s.Require().NoError(err)
 
 	communityID, err := s.m.SerializePublicKey(community.ID())
@@ -167,4 +179,22 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithData() {
 	s.Require().Equal(community.DescriptionText(), urlData.Community.Description)
 	s.Require().Equal(uint32(community.MembersCount()), urlData.Community.MembersCount)
 	s.Require().Equal(community.Identity().GetColor(), urlData.Community.Color)
+}
+
+func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithChatKey() {
+	community := s.createCommunity()
+	s.Require().Len(community.ChatIDs(), 1)
+
+	request := &requests.CommunityChannelShareURL{
+		CommunityID: community.ID(),
+		ChannelID:   community.ChatIDs()[0],
+	}
+	url, err := s.m.ShareCommunityChannelURLWithChatKey(request)
+	s.Require().NoError(err)
+
+	communityID, err := s.m.SerializePublicKey(community.ID())
+	s.Require().NoError(err)
+
+	expectedUrl := fmt.Sprintf("%s/cc/%s/%s", baseShareUrl, communityID, community.ChatIDs()[0])
+	s.Require().Equal(expectedUrl, url)
 }

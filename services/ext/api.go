@@ -1341,12 +1341,12 @@ func (api *PublicAPI) ShareCommunityURLWithChatKey(communityID types.HexBytes) (
 	return api.service.messenger.ShareCommunityURLWithChatKey(communityID)
 }
 
-func (api *PublicAPI) CreateCommunityURLWithData(communityID types.HexBytes) (string, error) {
-	return api.service.messenger.CreateCommunityURLWithData(communityID)
+func (api *PublicAPI) ShareCommunityURLWithData(communityID types.HexBytes) (string, error) {
+	return api.service.messenger.ShareCommunityURLWithData(communityID)
 }
 
-func (api *PublicAPI) CreateCommunityChannelURLWithChatKey(request *requests.CommunityChannelShareURL) (string, error) {
-	return api.service.messenger.CreateCommunityChannelURLWithChatKey(request)
+func (api *PublicAPI) ShareCommunityChannelURLWithChatKey(request *requests.CommunityChannelShareURL) (string, error) {
+	return api.service.messenger.ShareCommunityChannelURLWithChatKey(request)
 }
 
 func (api *PublicAPI) CreateCommunityChannelURLWithData(request *requests.CommunityChannelShareURL) (string, error) {
