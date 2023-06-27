@@ -296,7 +296,7 @@ type Subscription struct {
 	DownloadingHistoryArchivesStartedSignal  *signal.DownloadingHistoryArchivesStartedSignal
 	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
 	ImportingHistoryArchiveMessagesSignal    *signal.ImportingHistoryArchiveMessagesSignal
-	CommunityAdminEvent                      *protobuf.CommunityAdminEvent
+	CommunityEventsMessage                   *CommunityEventsMessage
 	MemberPermissionsCheckedSignal           *MemberPermissionsCheckedSignal
 }
 

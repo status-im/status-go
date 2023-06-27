@@ -40,6 +40,7 @@ type Config struct {
 	RequestsToJoin                []*RequestToJoin
 	MemberIdentity                *ecdsa.PublicKey
 	SyncedAt                      uint64
+	AdminsEvents                  []CommunityAdminEvent
 }
 
 type Community struct {
@@ -1768,6 +1769,7 @@ func (o *Community) createDeepCopy() Community {
 			RequestsToJoin:                o.config.RequestsToJoin,
 			MemberIdentity:                o.config.MemberIdentity,
 			SyncedAt:                      o.config.SyncedAt,
+			AdminsEvents:                  o.config.AdminsEvents,
 		},
 	}
 }
