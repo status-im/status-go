@@ -974,11 +974,11 @@ func (m *Messenger) CreateCommunityCategory(request *requests.CreateCommunityCat
 	}
 
 	var response MessengerResponse
-	community, changes, err := m.communitiesManager.CreateCategory(request, true)
+	_, changes, err := m.communitiesManager.CreateCategory(request, true)
 	if err != nil {
 		return nil, err
 	}
-	response.AddCommunity(community)
+	response.AddCommunity(changes.Community)
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
 
 	return &response, nil
@@ -1425,17 +1425,17 @@ func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.
 	var response MessengerResponse
 
 	c.Identity.FirstMessageTimestamp = FirstMessageTimestampNoMessage
-	community, changes, err := m.communitiesManager.CreateChat(communityID, c, true, "")
+	changes, err := m.communitiesManager.CreateChat(communityID, c, true, "")
 	if err != nil {
 		return nil, err
 	}
-	response.AddCommunity(community)
+	response.AddCommunity(changes.Community)
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
 
 	var chats []*Chat
 	var chatIDs []string
 	for chatID, chat := range changes.ChatsAdded {
-		c := CreateCommunityChat(community.IDString(), chatID, chat, m.getTimesource())
+		c := CreateCommunityChat(changes.Community.IDString(), chatID, chat, m.getTimesource())
 		chats = append(chats, c)
 		chatIDs = append(chatIDs, c.ID)
 		response.AddChat(c)
@@ -3164,7 +3164,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 
 				// We call `CreateChat` on `communitiesManager` directly to get more control
 				// over whether we want to publish the updated community description.
-				communityWithChats, changes, err := m.communitiesManager.CreateChat(discordCommunity.ID(), communityChat, false, channel.Channel.ID)
+				changes, err := m.communitiesManager.CreateChat(discordCommunity.ID(), communityChat, false, channel.Channel.ID)
 				if err != nil {
 					m.cleanUpImport(communityID)
 					errmsg := err.Error()
@@ -3176,7 +3176,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 					progressUpdates <- importProgress
 					return
 				}
-				discordCommunity = communityWithChats
+				discordCommunity = changes.Community
 
 				// This looks like we keep overriding the chat id value
 				// as we iterate over `ChatsAdded`, however at this point we

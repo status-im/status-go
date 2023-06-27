@@ -500,8 +500,18 @@ func (o *Community) CreateChat(chatID string, chat *protobuf.CommunityChat) (*Co
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsOwnerOrAdmin() {
+	isOwner := o.IsOwner()
+	isAdmin := o.IsAdmin()
+
+	if !isOwner && !isAdmin {
 		return nil, ErrNotAdmin
+	}
+
+	if isAdmin {
+		err := o.addNewCommunityAdminEvent(o.ToCreateChannelAdminEvent(chatID, chat))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err := o.createChat(chatID, chat)
@@ -509,7 +519,9 @@ func (o *Community) CreateChat(chatID string, chat *protobuf.CommunityChat) (*Co
 		return nil, err
 	}
 
-	o.increaseClock()
+	if isOwner {
+		o.increaseClock()
+	}
 
 	changes := o.emptyCommunityChanges()
 	changes.ChatsAdded[chatID] = chat
@@ -520,8 +532,18 @@ func (o *Community) EditChat(chatID string, chat *protobuf.CommunityChat) (*Comm
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsOwnerOrAdmin() {
+	isOwner := o.IsOwner()
+	isAdmin := o.IsAdmin()
+
+	if !isOwner && !isAdmin {
 		return nil, ErrNotAdmin
+	}
+
+	if isAdmin {
+		err := o.addNewCommunityAdminEvent(o.ToEditChannelAdminEvent(chatID, chat))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err := o.editChat(chatID, chat)
@@ -529,7 +551,9 @@ func (o *Community) EditChat(chatID string, chat *protobuf.CommunityChat) (*Comm
 		return nil, err
 	}
 
-	o.increaseClock()
+	if isOwner {
+		o.increaseClock()
+	}
 
 	changes := o.emptyCommunityChanges()
 	changes.ChatsModified[chatID] = &CommunityChatChanges{
@@ -543,13 +567,25 @@ func (o *Community) DeleteChat(chatID string) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsOwnerOrAdmin() {
+	isOwner := o.IsOwner()
+	isAdmin := o.IsAdmin()
+
+	if !isOwner && !isAdmin {
 		return nil, ErrNotAdmin
+	}
+
+	if isAdmin {
+		err := o.addNewCommunityAdminEvent(o.ToDeleteChannelAdminEvent(chatID))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	changes := o.deleteChat(chatID)
 
-	o.increaseClock()
+	if isOwner {
+		o.increaseClock()
+	}
 
 	return changes, nil
 }
@@ -759,7 +795,10 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsOwnerOrAdmin() {
+	isOwner := o.IsOwner()
+	isAdmin := o.IsAdmin()
+
+	if !isOwner && !isAdmin {
 		return nil, ErrNotAdmin
 	}
 
@@ -767,8 +806,19 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 		return nil, ErrCannotRemoveOwnerOrAdmin
 	}
 
+	if isAdmin {
+		err := o.addNewCommunityAdminEvent(o.ToKickCommunityMemberAdminEvent(common.PubkeyToHex(pk)))
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	o.removeMemberFromOrg(pk)
-	o.increaseClock()
+
+	if isOwner {
+		o.increaseClock()
+	}
+
 	return o.config.CommunityDescription, nil
 }
 
@@ -788,13 +838,25 @@ func (o *Community) UnbanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Commu
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsOwnerOrAdmin() {
+	isOwner := o.IsOwner()
+	isAdmin := o.IsAdmin()
+
+	if !isOwner && !isAdmin {
 		return nil, ErrNotAdmin
+	}
+
+	if isAdmin {
+		err := o.addNewCommunityAdminEvent(o.ToUnbanCommunityMemberAdminEvent(common.PubkeyToHex(pk)))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	o.unbanUserFromCommunity(pk)
 
-	o.increaseClock()
+	if isOwner {
+		o.increaseClock()
+	}
 
 	return o.config.CommunityDescription, nil
 }
@@ -803,7 +865,10 @@ func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Communi
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsOwnerOrAdmin() {
+	isOwner := o.IsOwner()
+	isAdmin := o.IsAdmin()
+
+	if !isOwner && !isAdmin {
 		return nil, ErrNotAdmin
 	}
 
@@ -811,9 +876,18 @@ func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Communi
 		return nil, ErrCannotBanOwnerOrAdmin
 	}
 
+	if isAdmin {
+		err := o.addNewCommunityAdminEvent(o.ToBanCommunityMemberAdminEvent(common.PubkeyToHex(pk)))
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	o.banUserFromCommunity(pk)
 
-	o.increaseClock()
+	if isOwner {
+		o.increaseClock()
+	}
 
 	return o.config.CommunityDescription, nil
 }
@@ -890,7 +964,6 @@ func (o *Community) Edit(description *protobuf.CommunityDescription) {
 	}
 	o.config.CommunityDescription.Permissions = description.Permissions
 	o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled = description.AdminSettings.PinMessageAllMembersEnabled
-	o.increaseClock()
 }
 
 func (o *Community) Join() {

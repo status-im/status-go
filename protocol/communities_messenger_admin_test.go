@@ -1305,7 +1305,9 @@ func (s *AdminMessengerCommunitiesSuite) adminDeleteMessage(messageID string) {
 	waitMessageCondition := func(response *MessengerResponse) bool {
 		return len(response.RemovedMessages()) > 0
 	}
-	s.checkClientsReceivedAdminEvent(waitMessageCondition, checkMessageDeleted)
+	s.waitOnMessengerResponse(waitMessageCondition, checkMessageDeleted, s.alice)
+	s.waitOnMessengerResponse(waitMessageCondition, checkMessageDeleted, s.owner)
+
 }
 
 func (s *AdminMessengerCommunitiesSuite) adminPinMessage(pinnedMessage *common.PinMessage) {

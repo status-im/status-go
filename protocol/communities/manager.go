@@ -852,7 +852,10 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 		return nil, ErrOrgNotFound
 	}
 
-	if !community.IsOwnerOrAdmin() {
+	isOwner := community.IsOwner()
+	isAdmin := community.IsAdmin()
+
+	if !isOwner && !isAdmin {
 		return nil, ErrNotEnoughPermissions
 	}
 
@@ -891,16 +894,16 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, err
+	if isOwner {
+		community.increaseClock()
+	} else if isAdmin {
+		err := community.addNewCommunityAdminEvent(community.ToCommunityEditAdminEvent())
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityEditAdminEvent()})
-	}
+	m.SaveAndPublish(community)
 
 	return community, nil
 }
@@ -956,13 +959,13 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey) (*Community, error) {
 	return community, nil
 }
 
-func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.CommunityChat, publish bool, thirdPartyID string) (*Community, *CommunityChanges, error) {
+func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.CommunityChat, publish bool, thirdPartyID string) (*CommunityChanges, error) {
 	community, err := m.GetByID(communityID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if community == nil {
-		return nil, nil, ErrOrgNotFound
+		return nil, ErrOrgNotFound
 	}
 	chatID := uuid.New().String()
 	if thirdPartyID != "" {
@@ -971,24 +974,12 @@ func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.Communit
 
 	changes, err := community.CreateChat(chatID, chat)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, nil, err
-	}
+	m.SaveAndPublish(community)
 
-	// Advertise changes
-	if publish {
-		if community.IsOwner() {
-			m.publish(&Subscription{Community: community})
-		} else if community.IsAdmin() {
-			m.publish(&Subscription{CommunityAdminEvent: community.ToCreateChannelAdminEvent(chatID, chat)})
-		}
-	}
-
-	return community, changes, nil
+	return changes, nil
 }
 
 func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *protobuf.CommunityChat) (*Community, *CommunityChanges, error) {
@@ -1010,17 +1001,7 @@ func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *prot
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Advertise changes
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToEditChannelAdminEvent(chatID, chat)})
-	}
+	m.SaveAndPublish(community)
 
 	return community, changes, nil
 }
@@ -1043,17 +1024,7 @@ func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Commun
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Advertise changes
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToDeleteChannelAdminEvent(chatID)})
-	}
+	m.SaveAndPublish(community)
 
 	return community, changes, nil
 }
@@ -1183,17 +1154,7 @@ func (m *Manager) ReorderChat(request *requests.ReorderCommunityChat) (*Communit
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Advertise changes
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToReorderChannelAdminEvent(request.CategoryID, request.ChatID, request.Position)})
-	}
+	m.SaveAndPublish(community)
 
 	return community, changes, nil
 }
@@ -2717,16 +2678,7 @@ func (m *Manager) RemoveUserFromCommunity(id types.HexBytes, pk *ecdsa.PublicKey
 		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, err
-	}
-
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToKickCommunityMemberAdminEvent(common.PubkeyToHex(pk))})
-	}
+	m.SaveAndPublish(community)
 
 	return community, nil
 }
@@ -2751,16 +2703,7 @@ func (m *Manager) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunit
 		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, err
-	}
-
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToUnbanCommunityMemberAdminEvent(request.User.String())})
-	}
+	m.SaveAndPublish(community)
 
 	return community, nil
 }
@@ -2854,16 +2797,7 @@ func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (
 		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, err
-	}
-
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToBanCommunityMemberAdminEvent(request.User.String())})
-	}
+	m.SaveAndPublish(community)
 
 	return community, nil
 }
