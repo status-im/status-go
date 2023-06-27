@@ -585,92 +585,50 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 	return community, nil
 }
 
-func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommunityTokenPermission) (*Community, *CommunityChanges, error) {
+func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommunityTokenPermission) (*Community, *CommunityChanges, bool, error) {
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	if community == nil {
-		return nil, nil, ErrOrgNotFound
+		return nil, nil, false, ErrOrgNotFound
 	}
 
 	tokenPermission := request.ToCommunityTokenPermission()
 	tokenPermission.Id = uuid.New().String()
-
+	prevEncrypted := community.Encrypted()
 	changes, err := community.AddTokenPermission(&tokenPermission)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityBecomeMemberTokenPermissionChangeAdminEvent()})
-	}
-
-	if community.IsOwner() {
-		// check existing member permission once, then check periodically
-		go func() {
-			err := m.checkMemberPermissions(community, false)
-			if err != nil {
-				m.logger.Debug("failed to check member permissions", zap.Error(err))
-			}
-
-			m.CheckMemberPermissionsPeriodically(community.ID())
-		}()
-	}
-
-	return community, changes, nil
+	encryptionChanged := prevEncrypted != community.Encrypted()
+	return community, changes, encryptionChanged, nil
 }
 
-func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTokenPermission) (*Community, *CommunityChanges, error) {
+func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTokenPermission) (*Community, *CommunityChanges, bool, error) {
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	if community == nil {
-		return nil, nil, ErrOrgNotFound
+		return nil, nil, false, ErrOrgNotFound
 	}
 
 	tokenPermission := request.ToCommunityTokenPermission()
 
+	prevEncrypted := community.Encrypted()
 	changes, err := community.UpdateTokenPermission(tokenPermission.Id, &tokenPermission)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, nil, err
-	}
+	encryptionChanged := prevEncrypted != community.Encrypted()
 
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() && tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityBecomeMemberTokenPermissionChangeAdminEvent()})
-	}
-
-	// check if members still fulfill the token criteria of all
-	// BECOME_MEMBER permissions and kick them if necessary
-	//
-	// We do this in a separate routine to not block
-	// this function
-	go func() {
-		err := m.checkMemberPermissions(community, false)
-		if err != nil {
-			m.logger.Debug("failed to check member permissions", zap.Error(err))
-		}
-	}()
-
-	return community, changes, nil
+	return community, changes, encryptionChanged, nil
 }
 
-func (m *Manager) checkMemberPermissions(community *Community, removeAdmins bool) error {
+func (m *Manager) CheckMemberPermissions(community *Community, removeAdmins bool) error {
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 
@@ -758,6 +716,13 @@ func (m *Manager) checkMemberPermissions(community *Community, removeAdmins bool
 	return nil
 }
 
+func (m *Manager) CheckIfStopCheckingPermissionsPeriodically(community *Community) {
+	if cancel, exists := m.periodicMemberPermissionsTasks.Load(community.IDString()); exists &&
+		len(community.TokenPermissions()) == 0 {
+		close(cancel.(chan struct{})) // Need to cast to the chan
+	}
+}
+
 func (m *Manager) CheckMemberPermissionsPeriodically(communityID types.HexBytes) {
 
 	if _, exists := m.periodicMemberPermissionsTasks.Load(communityID.String()); exists {
@@ -779,7 +744,7 @@ func (m *Manager) CheckMemberPermissionsPeriodically(communityID types.HexBytes)
 				m.periodicMemberPermissionsTasks.Delete(communityID.String())
 			}
 
-			err = m.checkMemberPermissions(community, true)
+			err = m.CheckMemberPermissions(community, true)
 			if err != nil {
 				m.logger.Debug("failed to check member permissions", zap.Error(err))
 			}
@@ -790,47 +755,24 @@ func (m *Manager) CheckMemberPermissionsPeriodically(communityID types.HexBytes)
 	}
 }
 
-func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommunityTokenPermission) (*Community, *CommunityChanges, error) {
+func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommunityTokenPermission) (*Community, *CommunityChanges, bool, error) {
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 	if community == nil {
-		return nil, nil, ErrOrgNotFound
+		return nil, nil, false, ErrOrgNotFound
 	}
 
+	prevEncrypted := community.Encrypted()
 	changes, err := community.DeleteTokenPermission(request.PermissionID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, nil, err
-	}
+	encryptionChanged := prevEncrypted != community.Encrypted()
 
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityBecomeMemberTokenPermissionDeleteAdminEvent()})
-	}
-
-	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
-
-	// Make sure that we remove admins roles if we remove admin permissions
-	err = m.checkMemberPermissions(community, len(becomeAdminPermissions) == 0)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Check if there's stil BECOME_ADMIN and BECOME_MEMBER permissions,
-	// if not we can stop checking token criteria on-chain
-	if cancel, exists := m.periodicMemberPermissionsTasks.Load(community.IDString()); exists &&
-		len(community.TokenPermissions()) == 0 {
-		close(cancel.(chan struct{})) // Need to cast to the chan
-	}
-
-	return community, changes, nil
+	return community, changes, encryptionChanged, nil
 }
 
 func (m *Manager) DeleteCommunity(id types.HexBytes) error {
@@ -1455,10 +1397,7 @@ func (m *Manager) DeletePendingRequestToJoin(request *RequestToJoin) error {
 		return err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return err
-	}
+	m.SaveAndPublish(community)
 
 	return nil
 }
@@ -1593,6 +1532,8 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 	}
 
 	_, err = community.AddMemberRevealedAccounts(dbRequest.PublicKey, revealedAccounts, dbRequest.Clock)
+	// TODOM: resolve
+	//_, err = community.AddMemberWithRevealedAccounts(dbRequest, role, revealedAccounts)
 	if err != nil {
 		return nil, err
 	}
@@ -1601,24 +1542,7 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, err
-	}
-
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		acceptedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
-		acceptedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
-
-		adminChanges := &CommunityAdminEventChanges{
-			CommunityChanges:       changes,
-			AcceptedRequestsToJoin: acceptedRequestsToJoin,
-		}
-
-		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityRequestToJoinAcceptAdminEvent(adminChanges)})
-	}
+	m.SaveAndPublish(community)
 
 	return community, nil
 }
@@ -1643,25 +1567,13 @@ func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCom
 		return err
 	}
 
-	// typically, community's clock is increased implicitly when making changes
-	// to it, however in this scenario there are no changes in the community, yet
-	// we need to increase the clock to ensure the admin event is processed by other
-	// nodes.
-	community.increaseClock()
-
-	rejectedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
-	rejectedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
-
-	adminChanges := &CommunityAdminEventChanges{
-		CommunityChanges:       community.emptyCommunityChanges(),
-		RejectedRequestsToJoin: rejectedRequestsToJoin,
+	err = community.DeclineRequestToJoin(dbRequest)
+	if err != nil {
+		return err
 	}
 
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityRequestToJoinRejectAdminEvent(adminChanges)})
-	}
+	m.SaveAndPublish(community)
+
 	return nil
 }
 
@@ -2447,11 +2359,12 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, err
 	}
 
-	if !common.IsPubKeyEqual(community.PublicKey(), signer) && !community.IsMemberAdmin(signer) {
+	isAdminSigner := community.IsMemberAdmin(signer)
+	if !common.IsPubKeyEqual(community.PublicKey(), signer) && !isAdminSigner {
 		return nil, ErrNotAuthorized
 	}
 
-	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg)
+	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg, !isAdminSigner)
 	if err != nil {
 		return nil, err
 	}
@@ -4021,12 +3934,7 @@ func (m *Manager) AddCommunityToken(token *CommunityToken, croppedImage *images.
 		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, err
-	}
-
-	m.publish(&Subscription{Community: community})
+	m.SaveAndPublish(community)
 
 	return token, m.persistence.AddCommunityToken(token)
 }
@@ -4061,20 +3969,6 @@ func (m *Manager) SetCommunityActiveMembersCount(communityID string, activeMembe
 		m.publish(&Subscription{Community: community})
 	}
 
-	return nil
-}
-
-// UpdateCommunity takes a Community persists it and republishes it.
-// The clock is incremented meaning even a no change update will be republished by the admin, and parsed by the member.
-func (m *Manager) UpdateCommunity(c *Community) error {
-	c.increaseClock()
-
-	err := m.persistence.SaveCommunity(c)
-	if err != nil {
-		return err
-	}
-
-	m.publish(&Subscription{Community: c})
 	return nil
 }
 

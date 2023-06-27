@@ -171,61 +171,10 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminCreateEditDeleteChannels() {
 	s.adminDeleteCommunityChannel(community, newChatID)
 }
 
-func (s *AdminMessengerCommunitiesSuite) TestAdminCreateBecomeMemberPermission() {
+func (s *AdminMessengerCommunitiesSuite) TestAdminCreateEditDeleteBecomeMemberPermission() {
 	community := s.setUpCommunityAndRoles()
-	s.adminCreateTestTokenPermission(community)
-
-	response, err := WaitOnMessengerResponse(
-		s.owner,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"owner did not receive community",
-	)
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionCreated(response.Communities()[0])
-
-	ownerCommunity, err := s.owner.GetCommunityByID(community.ID())
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionCreated(ownerCommunity)
-
-	response, err = WaitOnMessengerResponse(
-		s.alice,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"alice did not receive community",
-	)
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionCreated(response.Communities()[0])
-
-	aliceCommunity, err := s.alice.GetCommunityByID(community.ID())
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionCreated(aliceCommunity)
-}
-
-func (s *AdminMessengerCommunitiesSuite) TestAdminEditBecomeMemberPermission() {
 	// first, create token permission
-	community := s.setUpCommunityAndRoles()
 	tokenPermissionID, createTokenPermission := s.adminCreateTestTokenPermission(community)
-
-	// then, ensure owner receives it
-	_, err := WaitOnMessengerResponse(
-		s.owner,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"owner did not receive community",
-	)
-	s.Require().NoError(err)
-	ownerCommunity, err := s.owner.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionCreated(ownerCommunity)
-
-	// then, ensure alice receives it
-	_, err = WaitOnMessengerResponse(
-		s.alice,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"alice did not receive community",
-	)
-	s.Require().NoError(err)
-	aliceCommunity, err := s.alice.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionCreated(aliceCommunity)
 
 	createTokenPermission.TokenCriteria[0].Symbol = "UPDATED"
 	createTokenPermission.TokenCriteria[0].Amount = "200"
@@ -235,99 +184,16 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminEditBecomeMemberPermission() {
 		CreateCommunityTokenPermission: *createTokenPermission,
 	}
 
-	s.refreshMessengerResponses()
 	// then, admin edits the permission
-	response, err := s.admin.EditCommunityTokenPermission(editTokenPermission)
-	s.Require().NoError(err)
-	s.Require().Len(response.Communities(), 1)
-	s.assertAdminTokenPermissionEdited(response.Communities()[0])
-
-	// then, ensure owner receives and applies edits
-	response, err = WaitOnMessengerResponse(
-		s.owner,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"owner did not receive updated community",
-	)
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionEdited(response.Communities()[0])
-	ownerCommunity, err = s.owner.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionEdited(ownerCommunity)
-
-	// then, ensure alice receives and applies edits
-	response, err = WaitOnMessengerResponse(
-		s.alice,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"alice did not receive updated community",
-	)
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionEdited(response.Communities()[0])
-	aliceCommunity, err = s.alice.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionEdited(aliceCommunity)
-}
-
-func (s *AdminMessengerCommunitiesSuite) TestAdminDeleteBecomeMemberPermission() {
-	community := s.setUpCommunityAndRoles()
-	tokenPermissionID, _ := s.adminCreateTestTokenPermission(community)
-
-	// then, ensure owner receives it
-	_, err := WaitOnMessengerResponse(
-		s.owner,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"owner did not receive community",
-	)
-	s.Require().NoError(err)
-	ownerCommunity, err := s.owner.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionCreated(ownerCommunity)
-
-	// then, ensure alice receives it
-	_, err = WaitOnMessengerResponse(
-		s.alice,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"alice did not receive community",
-	)
-	s.Require().NoError(err)
-	aliceCommunity, err := s.alice.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionCreated(aliceCommunity)
+	s.adminEditTokenPermission(community, editTokenPermission)
 
 	deleteTokenPermission := &requests.DeleteCommunityTokenPermission{
 		CommunityID:  community.ID(),
 		PermissionID: tokenPermissionID,
 	}
 
-	s.refreshMessengerResponses()
-
 	// then, admin deletes previously created token permission
-	_, err = s.admin.DeleteCommunityTokenPermission(deleteTokenPermission)
-	s.Require().NoError(err)
-	adminCommunity, err := s.admin.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(adminCommunity.TokenPermissions(), 0)
-
-	// then, ensure owner receives and applies deletion
-	_, err = WaitOnMessengerResponse(
-		s.owner,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"owner did not receive updated community",
-	)
-	s.Require().NoError(err)
-	ownerCommunity, err = s.owner.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(ownerCommunity.TokenPermissions(), 0)
-
-	// then, ensure alice receives and applies deletion
-	_, err = WaitOnMessengerResponse(
-		s.alice,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"alice did not receive updated community",
-	)
-	s.Require().NoError(err)
-	aliceCommunity, err = s.alice.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(aliceCommunity.TokenPermissions(), 0)
+	s.adminDeleteTokenPermission(community, deleteTokenPermission)
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminCannotCreateBecomeAdminPermission() {
@@ -1050,21 +916,85 @@ func (s *AdminMessengerCommunitiesSuite) checkClientsReceivedAdminEvent(fnWait W
 }
 
 func (s *AdminMessengerCommunitiesSuite) adminCreateTokenPermission(community *communities.Community, request *requests.CreateCommunityTokenPermission, assertFn func(*communities.Community)) (string, *requests.CreateCommunityTokenPermission) {
+	checkTokenPermissionCreation := func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
+		if err != nil {
+			return err
+		}
+
+		if !modifiedCommmunity.HasTokenPermissions() {
+			return errors.New("new token permission was not found")
+		}
+
+		if !modifiedCommmunity.Encrypted() {
+			return errors.New("community must be encrypted")
+		}
+
+		return nil
+	}
+
 	response, err := s.admin.CreateCommunityTokenPermission(request)
 	s.Require().NoError(err)
-	s.Require().Len(response.Communities(), 1)
+	s.Require().Nil(checkTokenPermissionCreation(response))
 
-	adminCommunity, err := s.admin.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	assertFn(adminCommunity)
+	s.checkClientsReceivedAdminEvent(WaitCommunityCondition, checkTokenPermissionCreation)
 
 	var tokenPermissionID string
-	for id := range response.CommunityChanges[0].TokenPermissionsAdded {
-		tokenPermissionID = id
+	for tokenPermissionID = range response.CommunityChanges[0].TokenPermissionsAdded {
+		break
 	}
+
 	s.Require().NotEqual(tokenPermissionID, "")
 
 	return tokenPermissionID, request
+}
+
+func (s *AdminMessengerCommunitiesSuite) adminEditTokenPermission(community *communities.Community, request *requests.EditCommunityTokenPermission) {
+	checkTokenPermissionEdit := func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
+		if err != nil {
+			return err
+		}
+
+		if !modifiedCommmunity.Encrypted() {
+			return errors.New("community must be encrypted")
+		}
+
+		s.assertAdminTokenPermissionEdited(modifiedCommmunity)
+
+		return nil
+	}
+
+	response, err := s.admin.EditCommunityTokenPermission(request)
+	s.Require().NoError(err)
+	s.Require().Nil(checkTokenPermissionEdit(response))
+
+	s.checkClientsReceivedAdminEvent(WaitCommunityCondition, checkTokenPermissionEdit)
+}
+
+func (s *AdminMessengerCommunitiesSuite) adminDeleteTokenPermission(community *communities.Community, request *requests.DeleteCommunityTokenPermission) {
+	checkTokenPermissionDeleted := func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
+		if err != nil {
+			return err
+		}
+
+		if modifiedCommmunity.HasTokenPermissions() {
+			return errors.New("token permission was not deleted")
+		}
+
+		if modifiedCommmunity.Encrypted() {
+			return errors.New("community must be decrypted")
+		}
+
+		return nil
+	}
+
+	response, err := s.admin.DeleteCommunityTokenPermission(request)
+	s.Require().NoError(err)
+	s.Require().Nil(checkTokenPermissionDeleted(response))
+
+	s.checkClientsReceivedAdminEvent(WaitCommunityCondition, checkTokenPermissionDeleted)
 }
 
 func createTestPermissionRequest(community *communities.Community) *requests.CreateCommunityTokenPermission {
@@ -1072,7 +1002,7 @@ func createTestPermissionRequest(community *communities.Community) *requests.Cre
 		CommunityID: community.ID(),
 		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
 		TokenCriteria: []*protobuf.TokenCriteria{
-			&protobuf.TokenCriteria{
+			{
 				Type:              protobuf.CommunityTokenType_ERC20,
 				ContractAddresses: map[uint64]string{uint64(1): "0x123"},
 				Symbol:            "TEST",

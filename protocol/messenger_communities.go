@@ -1590,9 +1590,30 @@ func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommu
 		return nil, err
 	}
 
-	community, changes, err := m.communitiesManager.CreateCommunityTokenPermission(request)
+	community, changes, encryptionChanged, err := m.communitiesManager.CreateCommunityTokenPermission(request)
 	if err != nil {
 		return nil, err
+	}
+
+	if encryptionChanged {
+		err := m.UpdateCommunityEncryption(community)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	m.communitiesManager.SaveAndPublish(community)
+
+	if community.IsOwner() {
+		// check existing member permission once, then check periodically
+		go func() {
+			err := m.communitiesManager.CheckMemberPermissions(community, false)
+			if err != nil {
+				m.logger.Debug("failed to check member permissions", zap.Error(err))
+			}
+
+			m.communitiesManager.CheckMemberPermissionsPeriodically(community.ID())
+		}()
 	}
 
 	response := &MessengerResponse{}
@@ -1607,10 +1628,30 @@ func (m *Messenger) EditCommunityTokenPermission(request *requests.EditCommunity
 		return nil, err
 	}
 
-	community, changes, err := m.communitiesManager.EditCommunityTokenPermission(request)
+	community, changes, encryptionChanged, err := m.communitiesManager.EditCommunityTokenPermission(request)
 	if err != nil {
 		return nil, err
 	}
+
+	if encryptionChanged {
+		err := m.UpdateCommunityEncryption(community)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	m.communitiesManager.SaveAndPublish(community)
+
+	// check if members still fulfill the token criteria of all
+	// BECOME_MEMBER permissions and kick them if necessary
+	//
+	// We do this in a separate routine to not block this function
+	go func() {
+		err := m.communitiesManager.CheckMemberPermissions(community, false)
+		if err != nil {
+			m.logger.Debug("failed to check member permissions", zap.Error(err))
+		}
+	}()
 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
@@ -1624,9 +1665,36 @@ func (m *Messenger) DeleteCommunityTokenPermission(request *requests.DeleteCommu
 		return nil, err
 	}
 
-	community, changes, err := m.communitiesManager.DeleteCommunityTokenPermission(request)
+	community, changes, encryptionChanged, err := m.communitiesManager.DeleteCommunityTokenPermission(request)
 	if err != nil {
 		return nil, err
+	}
+
+	if encryptionChanged {
+		err := m.UpdateCommunityEncryption(community)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	m.communitiesManager.SaveAndPublish(community)
+
+	// check if members still fulfill the token criteria
+	// We do this in a separate routine to not block this function
+	if community.IsOwner() {
+		go func() {
+			becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
+
+			// Make sure that we remove admins roles if we remove admin permissions
+			err = m.communitiesManager.CheckMemberPermissions(community, len(becomeAdminPermissions) == 0)
+			if err != nil {
+				m.logger.Debug("failed to check member permissions", zap.Error(err))
+			}
+
+			// Check if there's still permissions we need to track,
+			// if not we can stop checking token criteria on-chain
+			m.communitiesManager.CheckIfStopCheckingPermissionsPeriodically(community)
+		}()
 	}
 
 	response := &MessengerResponse{}
@@ -3946,14 +4014,7 @@ func (m *Messenger) UpdateCommunityEncryption(community *communities.Community) 
 		return errors.New("community is nil")
 	}
 
-	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
-	isEncrypted := len(becomeMemberPermissions) > 0
-
-	if community.Encrypted() == isEncrypted {
-		return nil
-	}
-
-	if isEncrypted {
+	if community.Encrypted() {
 		// 🪄 The magic that encrypts a community
 		_, err := m.encryptor.GenerateHashRatchetKey(community.ID())
 		if err != nil {
@@ -3967,14 +4028,6 @@ func (m *Messenger) UpdateCommunityEncryption(community *communities.Community) 
 	}
 
 	// 🧙 There is no magic that decrypts a community, we just need to tell everyone to not use encryption
-
-	// Republish the community.
-	community.SetEncrypted(isEncrypted)
-	err := m.communitiesManager.UpdateCommunity(community)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 

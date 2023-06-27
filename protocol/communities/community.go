@@ -1413,27 +1413,28 @@ func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermis
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsOwnerOrAdmin() || (o.IsAdmin() && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
+	isOwner := o.IsOwner()
+	isAdmin := o.IsAdmin()
+
+	if !isOwner && !isAdmin || (isAdmin && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
 		return nil, ErrNotEnoughPermissions
 	}
 
-	if o.config.CommunityDescription.TokenPermissions == nil {
-		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
+	changes, err := o.addTokenPermission(permission)
+	if err != nil {
+		return nil, err
 	}
 
-	if _, exists := o.config.CommunityDescription.TokenPermissions[permission.Id]; exists {
-		return nil, ErrTokenPermissionAlreadyExists
+	if isAdmin {
+		err := o.addNewCommunityAdminEvent(o.ToCommunityTokenPermissionChangeAdminEvent(permission))
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	o.config.CommunityDescription.TokenPermissions[permission.Id] = permission
-
-	o.increaseClock()
-	changes := o.emptyCommunityChanges()
-
-	if changes.TokenPermissionsAdded == nil {
-		changes.TokenPermissionsAdded = make(map[string]*protobuf.CommunityTokenPermission)
+	if isOwner {
+		o.increaseClock()
 	}
-	changes.TokenPermissionsAdded[permission.Id] = permission
 
 	return changes, nil
 }
@@ -1442,25 +1443,28 @@ func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsOwnerOrAdmin() || (o.IsAdmin() && tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
+	isOwner := o.IsOwner()
+	isAdmin := o.IsAdmin()
+
+	if !isOwner && !isAdmin || (isAdmin && tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
 		return nil, ErrNotEnoughPermissions
 	}
 
-	if o.config.CommunityDescription.TokenPermissions == nil {
-		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
-	}
-	if _, ok := o.config.CommunityDescription.TokenPermissions[permissionID]; !ok {
-		return nil, ErrTokenPermissionNotFound
+	changes, err := o.updateTokenPermission(tokenPermission)
+	if err != nil {
+		return nil, err
 	}
 
-	changes := o.emptyCommunityChanges()
-	o.config.CommunityDescription.TokenPermissions[permissionID] = tokenPermission
-	o.increaseClock()
-
-	if changes.TokenPermissionsModified == nil {
-		changes.TokenPermissionsModified = make(map[string]*protobuf.CommunityTokenPermission)
+	if isAdmin {
+		err := o.addNewCommunityAdminEvent(o.ToCommunityTokenPermissionChangeAdminEvent(tokenPermission))
+		if err != nil {
+			return nil, err
+		}
 	}
-	changes.TokenPermissionsModified[permissionID] = o.config.CommunityDescription.TokenPermissions[tokenPermission.Id]
+
+	if isOwner {
+		o.increaseClock()
+	}
 
 	return changes, nil
 }
@@ -1475,14 +1479,29 @@ func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChange
 		return nil, ErrTokenPermissionNotFound
 	}
 
-	if !o.IsOwnerOrAdmin() || (o.IsAdmin() && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
+	isOwner := o.IsOwner()
+	isAdmin := o.IsAdmin()
+
+	if !isOwner && !isAdmin || (isAdmin && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
 		return nil, ErrNotEnoughPermissions
 	}
 
-	delete(o.config.CommunityDescription.TokenPermissions, permissionID)
-	changes := o.emptyCommunityChanges()
-	changes.TokenPermissionsRemoved = append(changes.TokenPermissionsRemoved, permissionID)
-	o.increaseClock()
+	changes, err := o.deleteTokenPermission(permissionID)
+	if err != nil {
+		return nil, err
+	}
+
+	if isAdmin {
+		err := o.addNewCommunityAdminEvent(o.ToCommunityTokenPermissionDeleteAdminEvent(permission))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if isOwner {
+		o.increaseClock()
+	}
+
 	return changes, nil
 }
 
@@ -1818,8 +1837,42 @@ func (o *Community) AddMemberRevealedAccounts(memberID string, accounts []*proto
 	return changes, nil
 }
 
-func (o *Community) createDeepCopy() Community {
-	return Community{
+func (o *Community) AddMemberWithRevealedAccounts(dbRequest *RequestToJoin, roles []protobuf.CommunityMember_Roles, accounts []*protobuf.RevealedAccount) (*CommunityChanges, error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	isOwner := o.IsOwner()
+	isAdmin := o.IsAdmin()
+
+	if !isOwner && !isAdmin {
+		return nil, ErrNotAdmin
+	}
+
+	changes := o.addMemberWithRevealedAccounts(dbRequest.PublicKey, roles, accounts)
+
+	if isAdmin {
+		acceptedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
+		acceptedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
+
+		adminChanges := &CommunityAdminEventChanges{
+			CommunityChanges:       changes,
+			AcceptedRequestsToJoin: acceptedRequestsToJoin,
+		}
+		err := o.addNewCommunityAdminEvent(o.ToCommunityRequestToJoinAcceptAdminEvent(adminChanges))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if isOwner {
+		o.increaseClock()
+	}
+
+	return changes, nil
+}
+
+func (o *Community) createDeepCopy() *Community {
+	return &Community{
 		config: &Config{
 			PrivateKey:                    o.config.PrivateKey,
 			CommunityDescription:          proto.Clone(o.config.CommunityDescription).(*protobuf.CommunityDescription),
@@ -1977,44 +2030,6 @@ func (o *Community) deleteChat(chatID string) *CommunityChanges {
 	return changes
 }
 
-func (o *Community) deleteBecomeMemberTokenPermissions(newPermissions map[string]*protobuf.CommunityTokenPermission) {
-	if len(newPermissions) == 0 {
-		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
-		return
-	}
-
-	prevPermissions := o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
-
-	if len(newPermissions) < len(prevPermissions) {
-		for _, permission := range newPermissions {
-			if permissionExists(permission.Id, prevPermissions) {
-				delete(o.config.CommunityDescription.TokenPermissions, permission.Id)
-			}
-		}
-	}
-}
-
-func (o *Community) addBecomeMemberTokenPermissions(newPermissions map[string]*protobuf.CommunityTokenPermission) {
-	if o.config.CommunityDescription.TokenPermissions == nil {
-		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
-	}
-	prevPermissions := o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
-	for _, permission := range newPermissions {
-		if !permissionExists(permission.Id, prevPermissions) {
-			o.config.CommunityDescription.TokenPermissions[permission.Id] = permission
-		}
-	}
-}
-
-func (o *Community) updateTokenPermissions(newPermissions map[string]*protobuf.CommunityTokenPermission) {
-	if o.config.CommunityDescription.TokenPermissions == nil {
-		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
-	}
-	for _, newPermission := range newPermissions {
-		o.config.CommunityDescription.TokenPermissions[newPermission.Id] = newPermission
-	}
-}
-
 func (o *Community) addCommunityMember(pk *ecdsa.PublicKey, member *protobuf.CommunityMember) {
 
 	if o.config.CommunityDescription.Members == nil {
@@ -2025,11 +2040,296 @@ func (o *Community) addCommunityMember(pk *ecdsa.PublicKey, member *protobuf.Com
 	o.config.CommunityDescription.Members[memberKey] = member
 }
 
-func permissionExists(id string, prevPermissions []*protobuf.CommunityTokenPermission) bool {
-	for _, prevPermission := range prevPermissions {
-		if prevPermission.Id == id {
-			return true
+func (o *Community) collectCommuntyChanges(description *protobuf.CommunityDescription) (*CommunityChanges, error) {
+	// This is done in case tags are updated and a client sends unknown tags
+	description.Tags = requests.RemoveUnknownAndDeduplicateTags(description.Tags)
+
+	err := ValidateCommunityDescription(description)
+	if err != nil {
+		return nil, err
+	}
+
+	response := o.emptyCommunityChanges()
+
+	// We only calculate changes if we joined/spectated the community or we requested access, otherwise not interested
+	if o.config.Joined || o.config.Spectated || o.config.RequestedToJoinAt > 0 {
+		// Check for new members at the org level
+		for pk, member := range description.Members {
+			if _, ok := o.config.CommunityDescription.Members[pk]; !ok {
+				if response.MembersAdded == nil {
+					response.MembersAdded = make(map[string]*protobuf.CommunityMember)
+				}
+				response.MembersAdded[pk] = member
+			}
+		}
+
+		// Check for removed members at the org level
+		for pk, member := range o.config.CommunityDescription.Members {
+			if _, ok := description.Members[pk]; !ok {
+				if response.MembersRemoved == nil {
+					response.MembersRemoved = make(map[string]*protobuf.CommunityMember)
+				}
+				response.MembersRemoved[pk] = member
+			}
+		}
+
+		// check for removed chats
+		for chatID, chat := range o.config.CommunityDescription.Chats {
+			if description.Chats == nil {
+				description.Chats = make(map[string]*protobuf.CommunityChat)
+			}
+			if _, ok := description.Chats[chatID]; !ok {
+				if response.ChatsRemoved == nil {
+					response.ChatsRemoved = make(map[string]*protobuf.CommunityChat)
+				}
+
+				response.ChatsRemoved[chatID] = chat
+			}
+		}
+
+		for chatID, chat := range description.Chats {
+			if o.config.CommunityDescription.Chats == nil {
+				o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
+			}
+
+			if _, ok := o.config.CommunityDescription.Chats[chatID]; !ok {
+				if response.ChatsAdded == nil {
+					response.ChatsAdded = make(map[string]*protobuf.CommunityChat)
+				}
+
+				response.ChatsAdded[chatID] = chat
+			} else {
+				// Check for members added
+				for pk, member := range description.Chats[chatID].Members {
+					if _, ok := o.config.CommunityDescription.Chats[chatID].Members[pk]; !ok {
+						if response.ChatsModified[chatID] == nil {
+							response.ChatsModified[chatID] = &CommunityChatChanges{
+								MembersAdded:   make(map[string]*protobuf.CommunityMember),
+								MembersRemoved: make(map[string]*protobuf.CommunityMember),
+							}
+						}
+
+						response.ChatsModified[chatID].MembersAdded[pk] = member
+					}
+				}
+
+				// check for members removed
+				for pk, member := range o.config.CommunityDescription.Chats[chatID].Members {
+					if _, ok := description.Chats[chatID].Members[pk]; !ok {
+						if response.ChatsModified[chatID] == nil {
+							response.ChatsModified[chatID] = &CommunityChatChanges{
+								MembersAdded:   make(map[string]*protobuf.CommunityMember),
+								MembersRemoved: make(map[string]*protobuf.CommunityMember),
+							}
+						}
+
+						response.ChatsModified[chatID].MembersRemoved[pk] = member
+					}
+				}
+
+				// check if first message timestamp was modified
+				if o.config.CommunityDescription.Chats[chatID].Identity.FirstMessageTimestamp !=
+					description.Chats[chatID].Identity.FirstMessageTimestamp {
+					if response.ChatsModified[chatID] == nil {
+						response.ChatsModified[chatID] = &CommunityChatChanges{
+							MembersAdded:   make(map[string]*protobuf.CommunityMember),
+							MembersRemoved: make(map[string]*protobuf.CommunityMember),
+						}
+					}
+					response.ChatsModified[chatID].FirstMessageTimestampModified = description.Chats[chatID].Identity.FirstMessageTimestamp
+				}
+			}
+		}
+
+		// Check for categories that were removed
+		for categoryID := range o.config.CommunityDescription.Categories {
+			if description.Categories == nil {
+				description.Categories = make(map[string]*protobuf.CommunityCategory)
+			}
+
+			if description.Chats == nil {
+				description.Chats = make(map[string]*protobuf.CommunityChat)
+			}
+
+			if _, ok := description.Categories[categoryID]; !ok {
+				response.CategoriesRemoved = append(response.CategoriesRemoved, categoryID)
+			}
+
+			if o.config.CommunityDescription.Chats == nil {
+				o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
+			}
+		}
+
+		// Check for categories that were added
+		for categoryID, category := range description.Categories {
+			if o.config.CommunityDescription.Categories == nil {
+				o.config.CommunityDescription.Categories = make(map[string]*protobuf.CommunityCategory)
+			}
+			if _, ok := o.config.CommunityDescription.Categories[categoryID]; !ok {
+				if response.CategoriesAdded == nil {
+					response.CategoriesAdded = make(map[string]*protobuf.CommunityCategory)
+				}
+
+				response.CategoriesAdded[categoryID] = category
+			} else {
+				if o.config.CommunityDescription.Categories[categoryID].Name != category.Name || o.config.CommunityDescription.Categories[categoryID].Position != category.Position {
+					response.CategoriesModified[categoryID] = category
+				}
+			}
+		}
+
+		// Check for chat categories that were modified
+		for chatID, chat := range description.Chats {
+			if o.config.CommunityDescription.Chats == nil {
+				o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
+			}
+
+			if _, ok := o.config.CommunityDescription.Chats[chatID]; !ok {
+				continue // It's a new chat
+			}
+
+			if o.config.CommunityDescription.Chats[chatID].CategoryId != chat.CategoryId {
+				if response.ChatsModified[chatID] == nil {
+					response.ChatsModified[chatID] = &CommunityChatChanges{
+						MembersAdded:   make(map[string]*protobuf.CommunityMember),
+						MembersRemoved: make(map[string]*protobuf.CommunityMember),
+					}
+				}
+
+				response.ChatsModified[chatID].CategoryModified = chat.CategoryId
+			}
+		}
+
+		// Check for removed token permissions
+		for id := range o.config.CommunityDescription.TokenPermissions {
+			if _, ok := description.TokenPermissions[id]; !ok {
+				if response.TokenPermissionsRemoved == nil {
+					response.TokenPermissionsRemoved = make([]string, 0)
+				}
+				response.TokenPermissionsRemoved = append(response.TokenPermissionsRemoved, id)
+			}
+		}
+
+		for id, permission := range description.TokenPermissions {
+			if _, ok := o.config.CommunityDescription.TokenPermissions[id]; !ok {
+				if response.TokenPermissionsAdded == nil {
+					response.TokenPermissionsAdded = make(map[string]*protobuf.CommunityTokenPermission)
+				}
+				response.TokenPermissionsAdded[id] = permission
+			}
 		}
 	}
-	return false
+
+	return response, nil
+}
+
+func (o *Community) addTokenPermission(permission *protobuf.CommunityTokenPermission) (*CommunityChanges, error) {
+	if o.config.CommunityDescription.TokenPermissions == nil {
+		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
+	}
+
+	if _, exists := o.config.CommunityDescription.TokenPermissions[permission.Id]; exists {
+		return nil, ErrTokenPermissionAlreadyExists
+	}
+
+	o.config.CommunityDescription.TokenPermissions[permission.Id] = permission
+
+	becomeMemberPermissions := o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+	o.SetEncrypted(len(becomeMemberPermissions) > 0)
+
+	changes := o.emptyCommunityChanges()
+
+	if changes.TokenPermissionsAdded == nil {
+		changes.TokenPermissionsAdded = make(map[string]*protobuf.CommunityTokenPermission)
+	}
+	changes.TokenPermissionsAdded[permission.Id] = permission
+
+	return changes, nil
+}
+
+func (o *Community) updateTokenPermission(permission *protobuf.CommunityTokenPermission) (*CommunityChanges, error) {
+	if o.config.CommunityDescription.TokenPermissions == nil {
+		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
+	}
+	if _, ok := o.config.CommunityDescription.TokenPermissions[permission.Id]; !ok {
+		return nil, ErrTokenPermissionNotFound
+	}
+
+	changes := o.emptyCommunityChanges()
+	o.config.CommunityDescription.TokenPermissions[permission.Id] = permission
+
+	becomeMemberPermissions := o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+	o.SetEncrypted(len(becomeMemberPermissions) > 0)
+
+	if changes.TokenPermissionsModified == nil {
+		changes.TokenPermissionsModified = make(map[string]*protobuf.CommunityTokenPermission)
+	}
+	changes.TokenPermissionsModified[permission.Id] = o.config.CommunityDescription.TokenPermissions[permission.Id]
+
+	return changes, nil
+}
+
+func (o *Community) deleteTokenPermission(permissionID string) (*CommunityChanges, error) {
+	delete(o.config.CommunityDescription.TokenPermissions, permissionID)
+
+	becomeMemberPermissions := o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+	o.SetEncrypted(len(becomeMemberPermissions) > 0)
+
+	changes := o.emptyCommunityChanges()
+	changes.TokenPermissionsRemoved = append(changes.TokenPermissionsRemoved, permissionID)
+	return changes, nil
+}
+
+func (o *Community) addMemberWithRevealedAccounts(memberKey string, roles []protobuf.CommunityMember_Roles, accounts []*protobuf.RevealedAccount) *CommunityChanges {
+	changes := o.emptyCommunityChanges()
+
+	if o.config.CommunityDescription.Members == nil {
+		o.config.CommunityDescription.Members = make(map[string]*protobuf.CommunityMember)
+	}
+
+	if _, ok := o.config.CommunityDescription.Members[memberKey]; !ok {
+		o.config.CommunityDescription.Members[memberKey] = &protobuf.CommunityMember{Roles: roles}
+		changes.MembersAdded[memberKey] = o.config.CommunityDescription.Members[memberKey]
+	}
+
+	o.config.CommunityDescription.Members[memberKey].RevealedAccounts = accounts
+	changes.MemberWalletsAdded[memberKey] = o.config.CommunityDescription.Members[memberKey].RevealedAccounts
+
+	return changes
+}
+
+func (o *Community) DeclineRequestToJoin(dbRequest *RequestToJoin) error {
+	// typically, community's clock is increased implicitly when making changes
+	// to it, however in this scenario there are no changes in the community, yet
+	// we need to increase the clock to ensure the owner event is processed by other
+	// nodes.
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	isOwner := o.IsOwner()
+	isAdmin := o.IsAdmin()
+
+	if !isOwner && !isAdmin {
+		return ErrNotAdmin
+	}
+
+	if isAdmin {
+		rejectedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
+		rejectedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
+
+		adminChanges := &CommunityAdminEventChanges{
+			CommunityChanges:       o.emptyCommunityChanges(),
+			RejectedRequestsToJoin: rejectedRequestsToJoin,
+		}
+		err := o.addNewCommunityAdminEvent(o.ToCommunityRequestToJoinRejectAdminEvent(adminChanges))
+		if err != nil {
+			return err
+		}
+	}
+
+	if isOwner {
+		o.increaseClock()
+	}
+
+	return nil
 }
