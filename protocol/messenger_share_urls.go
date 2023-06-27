@@ -8,7 +8,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/google/uuid"
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -116,7 +115,7 @@ func (m *Messenger) parseCommunityURLWithChatKey(urlData string) (*UrlDataRespon
 	}, nil
 }
 
-func (m *Messenger) prepareEncodedCommunityData(community *communities.Community) (string, error) {
+func (m *Messenger) prepareEncodedCommunityData(community *communities.Community) (string, string, error) {
 	// TODO: no ID here!
 	communityProto := &protobuf.Community{
 		DisplayName:  community.Identity().DisplayName,
@@ -127,15 +126,20 @@ func (m *Messenger) prepareEncodedCommunityData(community *communities.Community
 
 	communityData, err := json.Marshal(communityProto)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	encodedData, err := urls.EncodeDataURL(communityData)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	return encodedData, nil
+	signature, err := crypto.SignBytes([]byte(encodedData), community.PrivateKey())
+	if err != nil {
+		return "", "", err
+	}
+
+	return encodedData, string(signature), nil
 }
 
 func (m *Messenger) ShareCommunityURLWithData(communityID types.HexBytes) (string, error) {
@@ -153,18 +157,12 @@ func (m *Messenger) ShareCommunityURLWithData(communityID types.HexBytes) (strin
 		return m.ShareCommunityURLWithChatKey(communityID)
 	}
 
-	// return fmt.Sprintf("%s/c/%s#%s", baseShareUrl, communityBase64, string(signature)), nil
-	pubKey, err := m.SerializePublicKey(communityID)
+	data, signature, err := m.prepareEncodedCommunityData(community)
 	if err != nil {
 		return "", err
 	}
 
-	data, err := m.prepareEncodedCommunityData(community)
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%s/c/%s#%s", baseShareUrl, pubKey, data), nil
+	return fmt.Sprintf("%s/c/%s#%s", baseShareUrl, data, signature), nil
 }
 
 func (m *Messenger) parseCommunityURLWithData(keyString string, dataString string) (*UrlDataResponse, error) {
@@ -244,23 +242,7 @@ func (m *Messenger) parseCommunityChannelWithChatKey(channelId string, publickKe
 	}, nil
 }
 
-func (m *Messenger) CreateCommunityChannelURLWithData(request *requests.CommunityChannelShareURL) (string, error) {
-	if err := request.Validate(); err != nil {
-		return "", err
-	}
-
-	community, err := m.GetCommunityByID(request.CommunityID)
-
-	if err != nil {
-		return "", err
-	}
-
-	uuid, err := uuid.NewRandom()
-	if err != nil {
-		return "", err
-	}
-
-	chat := community.Chats()[request.ChannelID]
+func (m *Messenger) prepareEncodedCommunityChannelData(community *communities.Community, channel *protobuf.CommunityChat, channelId string) (string, string, error) {
 
 	communityProto := &protobuf.Community{
 		DisplayName:  community.Identity().DisplayName,
@@ -269,31 +251,54 @@ func (m *Messenger) CreateCommunityChannelURLWithData(request *requests.Communit
 		Color:        community.Identity().GetColor(),
 	}
 
-	chatProto := &protobuf.Channel{
-		DisplayName: chat.GetIdentity().DisplayName,
-		Description: chat.GetIdentity().Description,
-		Emoji:       chat.Identity.Emoji,
-		Color:       chat.GetIdentity().Color,
+	channelProto := &protobuf.Channel{
+		DisplayName: channel.Identity.DisplayName,
+		Description: channel.Identity.Description,
+		Emoji:       channel.Identity.Emoji,
+		Color:       channel.GetIdentity().Color,
 		Community:   communityProto,
-		Uuid:        uuid.String(),
+		Uuid:        channelId,
 	}
 
-	data, err := json.Marshal(chatProto)
+	channelData, err := json.Marshal(channelProto)
+	if err != nil {
+		return "", "", err
+	}
+
+	encodedData, err := urls.EncodeDataURL(channelData)
+	if err != nil {
+		return "", "", err
+	}
+
+	signature, err := crypto.SignBytes([]byte(encodedData), community.PrivateKey())
+	if err != nil {
+		return "", "", err
+	}
+
+	return encodedData, string(signature), nil
+}
+
+func (m *Messenger) CreateCommunityChannelURLWithData(request *requests.CommunityChannelShareURL) (string, error) {
+	if err := request.Validate(); err != nil {
+		return "", err
+	}
+
+	community, err := m.GetCommunityByID(request.CommunityID)
 	if err != nil {
 		return "", err
 	}
 
-	chatBase64, err := urls.EncodeDataURL(data)
+	channel := community.Chats()[request.ChannelID]
+	if channel == nil {
+		return "", fmt.Errorf("channel with channelId %s not found", request.ChannelID)
+	}
+
+	data, signature, err := m.prepareEncodedCommunityChannelData(community, channel, request.ChannelID)
 	if err != nil {
 		return "", err
 	}
 
-	signature, err := crypto.SignBytes([]byte(chatBase64), community.PrivateKey())
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%s/%s/%s#%s", baseShareUrl, "/cc", request.ChannelID, string(signature)), nil
+	return fmt.Sprintf("%s/cc/%s#%s", baseShareUrl, data, signature), nil
 }
 
 func (m *Messenger) CreateUserURLWithChatKey(pubKey string) (string, error) {
@@ -395,6 +400,7 @@ func (m *Messenger) ParseSharedURL(url string) (*UrlDataResponse, error) {
 	}
 
 	if len(urlContents) == 2 && strings.HasPrefix(urlContents[0], "cc/") {
+		// TODO: use /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i regexp to pich uuid or pubKey
 		return m.parseCommunityChannelWithChatKey(strings.TrimPrefix(urlContents[0], "cc/"), urlContents[1])
 	}
 

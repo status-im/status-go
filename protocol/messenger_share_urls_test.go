@@ -77,15 +77,49 @@ func (s *MessengerShareUrlsSuite) createCommunity() *communities.Community {
 	return response.Communities()[0]
 }
 
+func (s *MessengerShareUrlsSuite) createCommunityWithChannel() (*communities.Community, *protobuf.CommunityChat, string) {
+	community := s.createCommunity()
+
+	chat := &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "status-core",
+			Emoji:       "😎",
+			Description: "status-core community chat",
+		},
+	}
+	response, err := s.m.CreateCommunityChat(community.ID(), chat)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Chats(), 1)
+
+	community = response.Communities()[0]
+	s.Require().Len(community.Chats(), 1)
+
+	var channelId string
+	var channel *protobuf.CommunityChat
+
+	for key, value := range community.Chats() {
+		channelId = key
+		channel = value
+		break
+	}
+	s.Require().NotNil(channel)
+	return community, channel, channelId
+}
+
 func (s *MessengerShareUrlsSuite) TestDecodeEncodeDataURL() {
 	testData := []byte("test data 123")
 
-	decodedData, err := urls.EncodeDataURL(testData)
+	encodedData, err := urls.EncodeDataURL(testData)
 	s.Require().NoError(err)
 
-	encodedData, err := urls.DecodeDataURL(decodedData)
+	decodedData, err := urls.DecodeDataURL(encodedData)
 	s.Require().NoError(err)
-	s.Require().Equal(testData, encodedData)
+	s.Require().Equal(testData, decodedData)
 }
 
 func (s *MessengerShareUrlsSuite) TestSerializePublicKey() {
@@ -148,26 +182,20 @@ func (s *MessengerShareUrlsSuite) TestShareCommunityURLWithData() {
 	url, err := s.m.ShareCommunityURLWithData(community.ID())
 	s.Require().NoError(err)
 
-	communityID, err := s.m.SerializePublicKey(community.ID())
+	communityData, signature, err := s.m.prepareEncodedCommunityData(community)
 	s.Require().NoError(err)
 
-	communityData, err := s.m.prepareEncodedCommunityData(community)
-	s.Require().NoError(err)
-
-	expectedUrl := fmt.Sprintf("%s/c/%s#%s", baseShareUrl, communityID, communityData)
+	expectedUrl := fmt.Sprintf("%s/c/%s#%s", baseShareUrl, communityData, signature)
 	s.Require().Equal(expectedUrl, url)
 }
 
 func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithData() {
 	community := s.createCommunity()
 
-	communityID, err := s.m.SerializePublicKey(community.ID())
+	communityData, signature, err := s.m.prepareEncodedCommunityData(community)
 	s.Require().NoError(err)
 
-	communityData, err := s.m.prepareEncodedCommunityData(community)
-	s.Require().NoError(err)
-
-	url := fmt.Sprintf("%s/c/%s#%s", baseShareUrl, communityID, communityData)
+	url := fmt.Sprintf("%s/c/%s#%s", baseShareUrl, communityData, signature)
 
 	urlData, err := s.m.ParseSharedURL(url)
 	s.Require().NoError(err)
@@ -200,36 +228,7 @@ func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithChatKey() {
 }
 
 func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithChatKey() {
-	community := s.createCommunity()
-
-	orgChat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		},
-		Identity: &protobuf.ChatIdentity{
-			DisplayName: "status-core",
-			Emoji:       "😎",
-			Description: "status-core community chat",
-		},
-	}
-	response, err := s.m.CreateCommunityChat(community.ID(), orgChat)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Chats(), 1)
-
-	community = response.Communities()[0]
-	s.Require().Len(community.Chats(), 1)
-
-	var channelId string
-	var channel *protobuf.CommunityChat
-
-	for key, value := range community.Chats() {
-		channelId = key
-		channel = value
-		break
-	}
-	s.Require().NotNil(channel)
+	community, channel, channelId := s.createCommunityWithChannel()
 
 	publicKey, err := s.m.SerializePublicKey(community.ID())
 	s.Require().NoError(err)
@@ -251,4 +250,24 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithChatKey() {
 	s.Require().Equal(channel.Identity.Emoji, urlData.Channel.Emoji)
 	s.Require().Equal(channel.Identity.DisplayName, urlData.Channel.DisplayName)
 	s.Require().Equal(channel.Identity.Color, urlData.Channel.Color)
+}
+
+func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithData() {
+	community, channel, channelId := s.createCommunityWithChannel()
+
+	communityChannelData, signature, err := s.m.prepareEncodedCommunityChannelData(community, channel, channelId)
+	s.Require().NoError(err)
+
+	url := fmt.Sprintf("%s/cc/%s#%s", baseShareUrl, communityChannelData, signature)
+
+	urlData, err := s.m.ParseSharedURL(url)
+	s.Require().NoError(err)
+	s.Require().NotNil(urlData)
+
+	s.Require().NotNil(urlData.Community)
+	// TODO: s.Require().Equal(community.ID(), urlData.Community.CommunityID)
+	s.Require().Equal(community.Identity().DisplayName, urlData.Community.DisplayName)
+	s.Require().Equal(community.DescriptionText(), urlData.Community.Description)
+	s.Require().Equal(uint32(community.MembersCount()), urlData.Community.MembersCount)
+	s.Require().Equal(community.Identity().GetColor(), urlData.Community.Color)
 }
