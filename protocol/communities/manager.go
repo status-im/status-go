@@ -845,7 +845,10 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 		}
 	}
 
-	m.SaveAndPublish(community)
+	err = m.SaveAndPublish(community)
+	if err != nil {
+		return nil, err
+	}
 
 	return community, nil
 }
@@ -919,7 +922,10 @@ func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.Communit
 		return nil, err
 	}
 
-	m.SaveAndPublish(community)
+	err = m.SaveAndPublish(community)
+	if err != nil {
+		return nil, err
+	}
 
 	return changes, nil
 }
@@ -943,7 +949,10 @@ func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *prot
 		return nil, nil, err
 	}
 
-	m.SaveAndPublish(community)
+	err = m.SaveAndPublish(community)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return community, changes, nil
 }
@@ -966,7 +975,10 @@ func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Commun
 		return nil, nil, err
 	}
 
-	m.SaveAndPublish(community)
+	err = m.SaveAndPublish(community)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return community, changes, nil
 }
@@ -997,7 +1009,10 @@ func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory, publ
 		return nil, nil, err
 	}
 
-	m.SaveAndPublish(community)
+	err = m.SaveAndPublish(community)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return community, changes, nil
 }
@@ -1023,7 +1038,10 @@ func (m *Manager) EditCategory(request *requests.EditCommunityCategory) (*Commun
 		return nil, nil, err
 	}
 
-	m.SaveAndPublish(community)
+	err = m.SaveAndPublish(community)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return community, changes, nil
 }
@@ -1072,7 +1090,10 @@ func (m *Manager) ReorderCategories(request *requests.ReorderCommunityCategories
 		return nil, nil, err
 	}
 
-	m.SaveAndPublish(community)
+	err = m.SaveAndPublish(community)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return community, changes, nil
 }
@@ -1096,7 +1117,10 @@ func (m *Manager) ReorderChat(request *requests.ReorderCommunityChat) (*Communit
 		return nil, nil, err
 	}
 
-	m.SaveAndPublish(community)
+	err = m.SaveAndPublish(community)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return community, changes, nil
 }
@@ -1115,7 +1139,10 @@ func (m *Manager) DeleteCategory(request *requests.DeleteCommunityCategory) (*Co
 		return nil, nil, err
 	}
 
-	m.SaveAndPublish(community)
+	err = m.SaveAndPublish(community)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return changes.Community, changes, nil
 }
@@ -1234,7 +1261,7 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		return nil, err
 	}
 
-	community, err := m.persistence.GetByID(&m.identity.PublicKey, adminMessage.CommunityId)
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, adminMessage.CommunityID)
 	if err != nil {
 		return nil, err
 	}
@@ -1397,7 +1424,10 @@ func (m *Manager) DeletePendingRequestToJoin(request *RequestToJoin) error {
 		return err
 	}
 
-	m.SaveAndPublish(community)
+	err = m.SaveAndPublish(community)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -1542,7 +1572,10 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		return nil, err
 	}
 
-	m.SaveAndPublish(community)
+	err = m.SaveAndPublish(community)
+	if err != nil {
+		return nil, err
+	}
 
 	return community, nil
 }
@@ -1572,7 +1605,10 @@ func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCom
 		return err
 	}
 
-	m.SaveAndPublish(community)
+	err = m.SaveAndPublish(community)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -2591,7 +2627,10 @@ func (m *Manager) RemoveUserFromCommunity(id types.HexBytes, pk *ecdsa.PublicKey
 		return nil, err
 	}
 
-	m.SaveAndPublish(community)
+	err = m.SaveAndPublish(community)
+	if err != nil {
+		return nil, err
+	}
 
 	return community, nil
 }
@@ -2616,7 +2655,10 @@ func (m *Manager) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunit
 		return nil, err
 	}
 
-	m.SaveAndPublish(community)
+	err = m.SaveAndPublish(community)
+	if err != nil {
+		return nil, err
+	}
 
 	return community, nil
 }
@@ -2710,7 +2752,10 @@ func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (
 		return nil, err
 	}
 
-	m.SaveAndPublish(community)
+	err = m.SaveAndPublish(community)
+	if err != nil {
+		return nil, err
+	}
 
 	return community, nil
 }
@@ -3934,7 +3979,10 @@ func (m *Manager) AddCommunityToken(token *CommunityToken, croppedImage *images.
 		return nil, err
 	}
 
-	m.SaveAndPublish(community)
+	err = m.SaveAndPublish(community)
+	if err != nil {
+		return nil, err
+	}
 
 	return token, m.persistence.AddCommunityToken(token)
 }

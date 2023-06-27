@@ -64,7 +64,7 @@ func CommunityAdminEventFromProtobuf(raw []byte) (*CommunityAdminEvent, error) {
 }
 
 type CommunityEventsMessage struct {
-	CommunityId               []byte                `json:"community_id"`
+	CommunityID               []byte                `json:"community_id"`
 	CommunityDescriptionClock uint64                `json:"community_description_clock"`
 	AdminsEvents              []CommunityAdminEvent `json:"admins_events,omitempty"`
 }
@@ -73,7 +73,7 @@ func (m *CommunityEventsMessage) ToProtobuf() protobuf.CommunityEventsMessage {
 	rawEvents := adminsEventsToBytes(m.AdminsEvents)
 
 	return protobuf.CommunityEventsMessage{
-		CommunityId:               m.CommunityId,
+		CommunityId:               m.CommunityID,
 		CommunityDescriptionClock: m.CommunityDescriptionClock,
 		AdminsEvents:              rawEvents,
 	}
@@ -86,7 +86,7 @@ func CommunityEventsMessageFromProtobuf(raw *protobuf.CommunityEventsMessage) (*
 	}
 
 	return &CommunityEventsMessage{
-		CommunityId:               raw.CommunityId,
+		CommunityID:               raw.CommunityId,
 		CommunityDescriptionClock: raw.CommunityDescriptionClock,
 		AdminsEvents:              events,
 	}, nil
@@ -101,7 +101,7 @@ func (c *Community) mergeCommunityAdminEvents(src []CommunityAdminEvent) {
 	for _, update := range src {
 		var exists bool
 		for _, existing := range c.config.AdminsEvents {
-			if isCommunityAdminEventsEqual(&update, &existing) {
+			if isCommunityAdminEventsEqual(update, existing) {
 				exists = true
 				break
 			}
@@ -215,7 +215,7 @@ func validateCommunityAdminEvent(adminEvent *CommunityAdminEvent) error {
 	return nil
 }
 
-func isCommunityAdminEventsEqual(left *CommunityAdminEvent, right *CommunityAdminEvent) bool {
+func isCommunityAdminEventsEqual(left CommunityAdminEvent, right CommunityAdminEvent) bool {
 	return bytes.Equal(left.RawPayload, right.RawPayload)
 }
 
@@ -242,11 +242,11 @@ func adminsEventsFromBytes(rawEvents [][]byte) ([]CommunityAdminEvent, error) {
 	return events, nil
 }
 
-func adminsEventsToJsonEncodedBytes(adminEvents []CommunityAdminEvent) ([]byte, error) {
+func adminsEventsToJSONEncodedBytes(adminEvents []CommunityAdminEvent) ([]byte, error) {
 	return json.Marshal(adminEvents)
 }
 
-func adminsEventsFromJsonEncodedBytes(jsonEncodedRawEvents []byte) ([]CommunityAdminEvent, error) {
+func adminsEventsFromJSONEncodedBytes(jsonEncodedRawEvents []byte) ([]CommunityAdminEvent, error) {
 	var events []CommunityAdminEvent
 	err := json.Unmarshal(jsonEncodedRawEvents, &events)
 	if err != nil {

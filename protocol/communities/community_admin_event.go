@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/golang/protobuf/proto"
+
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -224,16 +225,16 @@ func (o *Community) UpdateCommuntyByAdminsEvents(adminEventMessage *CommunityEve
 	return changes, nil
 }
 
-func (c *Community) updateCommuntyDescriptionByNewAdminsEvents() error {
-	prevAdminClock := c.config.CommunityDescription.Clock + 1
-	for i := range c.config.AdminsEvents {
-		adminEvent := &c.config.AdminsEvents[i]
+func (o *Community) updateCommuntyDescriptionByNewAdminsEvents() error {
+	prevAdminClock := o.config.CommunityDescription.Clock + 1
+	for i := range o.config.AdminsEvents {
+		adminEvent := &o.config.AdminsEvents[i]
 		if !adminEvent.Applied {
 			err := validateCommunityAdminEvent(adminEvent)
 			if err != nil {
 				return err
 			}
-			err = c.updateCommuntyDescriptionByAdminEvent(adminEvent, prevAdminClock)
+			err = o.updateCommuntyDescriptionByAdminEvent(*adminEvent, prevAdminClock)
 			if err != nil {
 				return err
 			}
@@ -244,11 +245,11 @@ func (c *Community) updateCommuntyDescriptionByNewAdminsEvents() error {
 	return nil
 }
 
-func (c *Community) updateCommuntyDescriptionByAppliedAdminsEvents() error {
-	prevAdminClock := c.config.CommunityDescription.Clock + 1
-	for _, adminEvent := range c.config.AdminsEvents {
+func (o *Community) updateCommuntyDescriptionByAppliedAdminsEvents() error {
+	prevAdminClock := o.config.CommunityDescription.Clock + 1
+	for _, adminEvent := range o.config.AdminsEvents {
 		if adminEvent.Applied {
-			err := c.updateCommuntyDescriptionByAdminEvent(&adminEvent, prevAdminClock)
+			err := o.updateCommuntyDescriptionByAdminEvent(adminEvent, prevAdminClock)
 			if err != nil {
 				return err
 			}
@@ -258,8 +259,8 @@ func (c *Community) updateCommuntyDescriptionByAppliedAdminsEvents() error {
 	return nil
 }
 
-func (c *Community) updateCommuntyDescriptionByAdminEvent(adminEvent *CommunityAdminEvent, prevAdminClock uint64) error {
-	if adminEvent.AdminEventClock <= c.config.CommunityDescription.Clock {
+func (o *Community) updateCommuntyDescriptionByAdminEvent(adminEvent CommunityAdminEvent, prevAdminClock uint64) error {
+	if adminEvent.AdminEventClock <= o.config.CommunityDescription.Clock {
 		return errors.New("clock for admin event is outdated")
 	}
 
@@ -269,74 +270,74 @@ func (c *Community) updateCommuntyDescriptionByAdminEvent(adminEvent *CommunityA
 
 	switch adminEvent.Type {
 	case protobuf.CommunityAdminEvent_COMMUNITY_EDIT:
-		c.config.CommunityDescription.Identity = adminEvent.CommunityConfig.Identity
-		c.config.CommunityDescription.Permissions = adminEvent.CommunityConfig.Permissions
-		c.config.CommunityDescription.AdminSettings = adminEvent.CommunityConfig.AdminSettings
-		c.config.CommunityDescription.IntroMessage = adminEvent.CommunityConfig.IntroMessage
-		c.config.CommunityDescription.OutroMessage = adminEvent.CommunityConfig.OutroMessage
-		c.config.CommunityDescription.Tags = adminEvent.CommunityConfig.Tags
+		o.config.CommunityDescription.Identity = adminEvent.CommunityConfig.Identity
+		o.config.CommunityDescription.Permissions = adminEvent.CommunityConfig.Permissions
+		o.config.CommunityDescription.AdminSettings = adminEvent.CommunityConfig.AdminSettings
+		o.config.CommunityDescription.IntroMessage = adminEvent.CommunityConfig.IntroMessage
+		o.config.CommunityDescription.OutroMessage = adminEvent.CommunityConfig.OutroMessage
+		o.config.CommunityDescription.Tags = adminEvent.CommunityConfig.Tags
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGE:
-		_, exists := c.config.CommunityDescription.TokenPermissions[adminEvent.TokenPermission.Id]
+		_, exists := o.config.CommunityDescription.TokenPermissions[adminEvent.TokenPermission.Id]
 		if exists {
-			_, err := c.updateTokenPermission(adminEvent.TokenPermission)
+			_, err := o.updateTokenPermission(adminEvent.TokenPermission)
 			if err != nil {
 				return err
 			}
 		} else {
-			_, err := c.addTokenPermission(adminEvent.TokenPermission)
+			_, err := o.addTokenPermission(adminEvent.TokenPermission)
 			if err != nil {
 				return err
 			}
 		}
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETE:
-		_, err := c.deleteTokenPermission(adminEvent.TokenPermission.Id)
+		_, err := o.deleteTokenPermission(adminEvent.TokenPermission.Id)
 		if err != nil {
 			return err
 		}
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_CATEGORY_CREATE:
-		_, err := c.createCategory(adminEvent.CategoryData.CategoryId, adminEvent.CategoryData.Name, adminEvent.CategoryData.ChannelsIds)
+		_, err := o.createCategory(adminEvent.CategoryData.CategoryId, adminEvent.CategoryData.Name, adminEvent.CategoryData.ChannelsIds)
 		if err != nil {
 			return err
 		}
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_CATEGORY_DELETE:
-		_, err := c.deleteCategory(adminEvent.CategoryData.CategoryId)
+		_, err := o.deleteCategory(adminEvent.CategoryData.CategoryId)
 		if err != nil {
 			return err
 		}
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_CATEGORY_EDIT:
-		_, err := c.editCategory(adminEvent.CategoryData.CategoryId, adminEvent.CategoryData.Name, adminEvent.CategoryData.ChannelsIds)
+		_, err := o.editCategory(adminEvent.CategoryData.CategoryId, adminEvent.CategoryData.Name, adminEvent.CategoryData.ChannelsIds)
 		if err != nil {
 			return err
 		}
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_CHANNEL_CREATE:
-		err := c.createChat(adminEvent.ChannelData.ChannelId, adminEvent.ChannelData.Channel)
+		err := o.createChat(adminEvent.ChannelData.ChannelId, adminEvent.ChannelData.Channel)
 		if err != nil {
 			return err
 		}
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_CHANNEL_DELETE:
-		c.deleteChat(adminEvent.ChannelData.ChannelId)
+		o.deleteChat(adminEvent.ChannelData.ChannelId)
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_CHANNEL_EDIT:
-		err := c.editChat(adminEvent.ChannelData.ChannelId, adminEvent.ChannelData.Channel)
+		err := o.editChat(adminEvent.ChannelData.ChannelId, adminEvent.ChannelData.Channel)
 		if err != nil {
 			return err
 		}
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_CHANNEL_REORDER:
-		_, err := c.reorderChat(adminEvent.ChannelData.CategoryId, adminEvent.ChannelData.ChannelId, int(adminEvent.ChannelData.Position))
+		_, err := o.reorderChat(adminEvent.ChannelData.CategoryId, adminEvent.ChannelData.ChannelId, int(adminEvent.ChannelData.Position))
 		if err != nil {
 			return err
 		}
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_CATEGORY_REORDER:
-		_, err := c.reorderCategories(adminEvent.CategoryData.CategoryId, int(adminEvent.CategoryData.Position))
+		_, err := o.reorderCategories(adminEvent.CategoryData.CategoryId, int(adminEvent.CategoryData.Position))
 		if err != nil {
 			return err
 		}
@@ -347,18 +348,18 @@ func (c *Community) updateCommuntyDescriptionByAdminEvent(adminEvent *CommunityA
 			if err != nil {
 				return err
 			}
-			if !c.HasMember(pk) {
-				c.addCommunityMember(pk, addedMember)
+			if !o.HasMember(pk) {
+				o.addCommunityMember(pk, addedMember)
 			}
 		}
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT:
-		for pkString, _ := range adminEvent.RejectedRequestsToJoin {
+		for pkString := range adminEvent.RejectedRequestsToJoin {
 			pk, err := common.HexToPubkey(pkString)
 			if err != nil {
 				return err
 			}
-			c.removeMemberFromOrg(pk)
+			o.removeMemberFromOrg(pk)
 		}
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_KICK:
@@ -367,11 +368,11 @@ func (c *Community) updateCommuntyDescriptionByAdminEvent(adminEvent *CommunityA
 			return err
 		}
 
-		if c.IsMemberOwnerOrAdmin(pk) {
+		if o.IsMemberOwnerOrAdmin(pk) {
 			return errors.New("attempt to kick an owner or admin of the community from the admin side")
 		}
 
-		c.removeMemberFromOrg(pk)
+		o.removeMemberFromOrg(pk)
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_BAN:
 		pk, err := common.HexToPubkey(adminEvent.MemberToAction)
@@ -379,17 +380,17 @@ func (c *Community) updateCommuntyDescriptionByAdminEvent(adminEvent *CommunityA
 			return err
 		}
 
-		if c.IsMemberOwnerOrAdmin(pk) {
+		if o.IsMemberOwnerOrAdmin(pk) {
 			return errors.New("attempt to ban an owner or admin of the community from the admin side")
 		}
-		c.banUserFromCommunity(pk)
+		o.banUserFromCommunity(pk)
 
 	case protobuf.CommunityAdminEvent_COMMUNITY_MEMBER_UNBAN:
 		pk, err := common.HexToPubkey(adminEvent.MemberToAction)
 		if err != nil {
 			return err
 		}
-		c.unbanUserFromCommunity(pk)
+		o.unbanUserFromCommunity(pk)
 
 	default:
 		return errors.New("unknown admin community event")
@@ -397,14 +398,14 @@ func (c *Community) updateCommuntyDescriptionByAdminEvent(adminEvent *CommunityA
 	return nil
 }
 
-func (c *Community) NewAdminEventClock() uint64 {
-	if len(c.config.AdminsEvents) == 0 {
-		return c.config.CommunityDescription.Clock + 1
+func (o *Community) NewAdminEventClock() uint64 {
+	if len(o.config.AdminsEvents) == 0 {
+		return o.config.CommunityDescription.Clock + 1
 	}
-	return c.config.AdminsEvents[len(c.config.AdminsEvents)-1].AdminEventClock + 1
+	return o.config.AdminsEvents[len(o.config.AdminsEvents)-1].AdminEventClock + 1
 }
 
-func (c *Community) addNewCommunityAdminEvent(event *CommunityAdminEvent) error {
+func (o *Community) addNewCommunityAdminEvent(event *CommunityAdminEvent) error {
 	err := validateCommunityAdminEvent(event)
 	if err != nil {
 		return err
@@ -415,15 +416,15 @@ func (c *Community) addNewCommunityAdminEvent(event *CommunityAdminEvent) error 
 		return errors.New("converting CommunityAdminEvent to protobuf failed")
 	}
 	event.RawPayload = data
-	c.config.AdminsEvents = append(c.config.AdminsEvents, *event)
+	o.config.AdminsEvents = append(o.config.AdminsEvents, *event)
 
 	return nil
 }
 
-func (c *Community) ToCommunityEventsMessage() *CommunityEventsMessage {
+func (o *Community) ToCommunityEventsMessage() *CommunityEventsMessage {
 	return &CommunityEventsMessage{
-		CommunityId:               c.ID(),
-		CommunityDescriptionClock: c.Clock(),
-		AdminsEvents:              c.config.AdminsEvents,
+		CommunityID:               o.ID(),
+		CommunityDescriptionClock: o.Clock(),
+		AdminsEvents:              o.config.AdminsEvents,
 	}
 }

@@ -1054,7 +1054,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions_EmptyPermissions() {
 		Members: make(map[string]*protobuf.CommunityMember),
 	}
 
-	_, changes, err := m.CreateChat(community.ID(), chat, true, "")
+	changes, err := m.CreateChat(community.ID(), chat, true, "")
 	s.Require().NoError(err)
 
 	var chatID string
@@ -1105,7 +1105,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 		Members: make(map[string]*protobuf.CommunityMember),
 	}
 
-	_, changes, err := m.CreateChat(community.ID(), chat, true, "")
+	changes, err := m.CreateChat(community.ID(), chat, true, "")
 	s.Require().NoError(err)
 
 	for chatID := range changes.ChatsAdded {
@@ -1124,7 +1124,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 		Members: make(map[string]*protobuf.CommunityMember),
 	}
 
-	_, changes, err = m.CreateChat(community.ID(), chat, true, "")
+	changes, err = m.CreateChat(community.ID(), chat, true, "")
 	s.Require().NoError(err)
 
 	for chatID := range changes.ChatsAdded {
@@ -1162,7 +1162,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 		ChatIds:       []string{chatID1, chatID2},
 	}
 
-	_, changes, err = m.CreateCommunityTokenPermission(viewOnlyPermission)
+	_, changes, _, err = m.CreateCommunityTokenPermission(viewOnlyPermission)
 	s.Require().NoError(err)
 
 	var viewOnlyPermissionID string
@@ -1245,7 +1245,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 		ChatIds:       []string{chatID1, chatID2},
 	}
 
-	_, changes, err = m.CreateCommunityTokenPermission(viewAndPostPermission)
+	_, changes, _, err = m.CreateCommunityTokenPermission(viewAndPostPermission)
 	s.Require().NoError(err)
 
 	var viewAndPostPermissionID string
@@ -1328,7 +1328,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 		CommunityID:  community.ID(),
 		PermissionID: viewOnlyPermissionID,
 	}
-	_, _, err = m.DeleteCommunityTokenPermission(deleteViewOnlyPermission)
+	_, _, _, err = m.DeleteCommunityTokenPermission(deleteViewOnlyPermission)
 	s.Require().NoError(err)
 
 	response, err = m.CheckAllChannelsPermissions(community.ID(), []gethcommon.Address{
@@ -1434,7 +1434,7 @@ func (s *ManagerSuite) buildCommunityWithChat() (*Community, string, error) {
 		},
 		Members: make(map[string]*protobuf.CommunityMember),
 	}
-	_, changes, err := s.manager.CreateChat(community.ID(), chat, true, "")
+	changes, err := s.manager.CreateChat(community.ID(), chat, true, "")
 	if err != nil {
 		return nil, "", err
 	}

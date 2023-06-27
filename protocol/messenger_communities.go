@@ -110,7 +110,7 @@ func (m *Messenger) publishOrgInvitation(org *communities.Community, invitation 
 func (m *Messenger) publishCommunityEventsMessage(adminMessage *communities.CommunityEventsMessage) error {
 	adminPubkey := common.PubkeyToHex(&m.identity.PublicKey)
 	m.logger.Debug("publishing community admin event", zap.String("admin-id", adminPubkey), zap.Any("event", adminMessage))
-	_, err := crypto.DecompressPubkey(adminMessage.CommunityId)
+	_, err := crypto.DecompressPubkey(adminMessage.CommunityID)
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func (m *Messenger) publishCommunityEventsMessage(adminMessage *communities.Comm
 		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_ADMIN_MESSAGE,
 	}
 
-	_, err = m.sender.SendPublic(context.Background(), types.EncodeHex(adminMessage.CommunityId), rawMessage)
+	_, err = m.sender.SendPublic(context.Background(), types.EncodeHex(adminMessage.CommunityID), rawMessage)
 	return err
 }
 
@@ -1602,7 +1602,10 @@ func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommu
 		}
 	}
 
-	m.communitiesManager.SaveAndPublish(community)
+	err = m.communitiesManager.SaveAndPublish(community)
+	if err != nil {
+		return nil, err
+	}
 
 	if community.IsOwner() {
 		// check existing member permission once, then check periodically
@@ -1640,7 +1643,10 @@ func (m *Messenger) EditCommunityTokenPermission(request *requests.EditCommunity
 		}
 	}
 
-	m.communitiesManager.SaveAndPublish(community)
+	err = m.communitiesManager.SaveAndPublish(community)
+	if err != nil {
+		return nil, err
+	}
 
 	// check if members still fulfill the token criteria of all
 	// BECOME_MEMBER permissions and kick them if necessary
@@ -1677,7 +1683,10 @@ func (m *Messenger) DeleteCommunityTokenPermission(request *requests.DeleteCommu
 		}
 	}
 
-	m.communitiesManager.SaveAndPublish(community)
+	err = m.communitiesManager.SaveAndPublish(community)
+	if err != nil {
+		return nil, err
+	}
 
 	// check if members still fulfill the token criteria
 	// We do this in a separate routine to not block this function
