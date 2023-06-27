@@ -1021,7 +1021,7 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 
 	// allowEqualClock == true only if this is community event
 	if (allowEqualClock && description.Clock < o.config.CommunityDescription.Clock) ||
-		description.Clock < o.config.CommunityDescription.Clock {
+		description.Clock <= o.config.CommunityDescription.Clock {
 		return response, nil
 	}
 

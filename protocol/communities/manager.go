@@ -4069,10 +4069,10 @@ func (m *Manager) SaveAndPublish(community *Community) error {
 	}
 
 	if community.IsAdmin() {
-		// Admins sends only all admins events. Based on on those events, clients construct CommunityDesctiption
+		// Admins send only all admins events. Based on on those events, clients construct CommunityDesctiption
 		// Constructed CommunityDescription won't be saved on the clients nodes, only when Owner node will
 		// apply these changes to CommunityDescription, new CommunityDescription with the increased
-		// clock will be send to all clients
+		// clock will be sent to all clients
 
 		err := m.persistence.SaveCommunityEvents(community)
 		if err != nil {

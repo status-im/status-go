@@ -11,13 +11,13 @@ import (
 )
 
 type CommunityEvent struct {
-	CommunityEventClock    uint64                                      `json:"clock"`
+	CommunityEventClock    uint64                                      `json:"communityEventClock"`
 	Type                   protobuf.CommunityEvent_EventType           `json:"type"`
-	CommunityConfig        *protobuf.CommunityConfig                   `json:"community_config,omitempty"`
-	TokenPermission        *protobuf.CommunityTokenPermission          `json:"token_permissions,omitempty"`
-	CategoryData           *protobuf.CategoryData                      `json:"category_data,omitempty"`
-	ChannelData            *protobuf.ChannelData                       `json:"channel_data,omitempty"`
-	MemberToAction         string                                      `json:"member_to_action,omitempty"`
+	CommunityConfig        *protobuf.CommunityConfig                   `json:"communityConfig,omitempty"`
+	TokenPermission        *protobuf.CommunityTokenPermission          `json:"tokenPermissions,omitempty"`
+	CategoryData           *protobuf.CategoryData                      `json:"categoryData,omitempty"`
+	ChannelData            *protobuf.ChannelData                       `json:"channelData,omitempty"`
+	MemberToAction         string                                      `json:"memberToAction,omitempty"`
 	MembersAdded           map[string]*protobuf.CommunityMember        `json:"membersAdded,omitempty"`
 	RejectedRequestsToJoin map[string]*protobuf.CommunityRequestToJoin `json:"rejectedRequestsToJoin,omitempty"`
 	AcceptedRequestsToJoin map[string]*protobuf.CommunityRequestToJoin `json:"acceptedRequestsToJoin,omitempty"`
@@ -64,9 +64,9 @@ func CommunityEventFromProtobuf(raw []byte) (*CommunityEvent, error) {
 }
 
 type CommunityEventsMessage struct {
-	CommunityID               []byte           `json:"community_id"`
-	CommunityDescriptionClock uint64           `json:"community_description_clock"`
-	Events                    []CommunityEvent `json:"admins_events,omitempty"`
+	CommunityID               []byte           `json:"communityId"`
+	CommunityDescriptionClock uint64           `json:"communityDescriptionClock"`
+	Events                    []CommunityEvent `json:"events,omitempty"`
 }
 
 func (m *CommunityEventsMessage) ToProtobuf() protobuf.CommunityEventsMessage {
