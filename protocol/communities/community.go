@@ -940,28 +940,21 @@ func (o *Community) MemberIdentity() *ecdsa.PublicKey {
 }
 
 // UpdateCommunityDescription will update the community to the new community description and return a list of changes
-func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDescription, rawMessage []byte) (*CommunityChanges, error) {
+func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDescription, rawMessage []byte, allowEqualClock bool) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	// This is done in case tags are updated and a client sends unknown tags
-	description.Tags = requests.RemoveUnknownAndDeduplicateTags(description.Tags)
-
-	err := ValidateCommunityDescription(description)
-	if err != nil {
-		return nil, err
-	}
-
 	response := o.emptyCommunityChanges()
 
-	if description.Clock <= o.config.CommunityDescription.Clock {
+	// allowEqualClock == true only if this is community event
+	if (allowEqualClock && description.Clock < o.config.CommunityDescription.Clock) ||
+		description.Clock < o.config.CommunityDescription.Clock {
 		return response, nil
 	}
 
-	// We only calculate changes if we joined/spectated the community or we requested access, otherwise not interested
-	if o.config.Joined || o.config.Spectated || o.config.RequestedToJoinAt > 0 {
-		response = EvaluateCommunityChanges(o.config.CommunityDescription, description)
-		response.Community = o
+	response, err := o.collectCommuntyChanges(description)
+	if err != nil {
+		return nil, err
 	}
 
 	o.config.CommunityDescription = description

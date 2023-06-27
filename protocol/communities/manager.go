@@ -1292,7 +1292,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 }
 
 func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, description *protobuf.CommunityDescription, payload []byte) (*CommunityResponse, error) {
-	changes, err := community.UpdateCommunityDescription(description, payload)
+	changes, err := community.UpdateCommunityDescription(description, payload, true)
 	if err != nil {
 		return nil, err
 	}
@@ -1341,6 +1341,8 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 		}
 	}
 
+	community.config.AdminsEvents = []CommunityAdminEvent{}
+
 	err = m.persistence.SaveCommunity(community)
 	if err != nil {
 		return nil, err
@@ -1359,12 +1361,17 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 	}, nil
 }
 
-func (m *Manager) HandleCommunityAdminEvent(signer *ecdsa.PublicKey, adminEvent *protobuf.CommunityAdminEvent, payload []byte) (*CommunityResponse, error) {
+func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message *protobuf.CommunityEventsMessage) (*CommunityResponse, error) {
 	if signer == nil {
 		return nil, errors.New("signer can't be nil")
 	}
 
-	community, err := m.persistence.GetByID(&m.identity.PublicKey, adminEvent.CommunityId)
+	adminMessage, err := CommunityEventsMessageFromProtobuf(message)
+	if err != nil {
+		return nil, err
+	}
+
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, adminMessage.CommunityId)
 	if err != nil {
 		return nil, err
 	}
@@ -1377,32 +1384,52 @@ func (m *Manager) HandleCommunityAdminEvent(signer *ecdsa.PublicKey, adminEvent 
 		return nil, errors.New("user is not an admin")
 	}
 
-	patchedCommDescr, err := community.PatchCommunityDescriptionByAdminEvent(adminEvent)
+	changes, err := community.UpdateCommuntyByAdminsEvents(adminMessage)
 	if err != nil {
 		return nil, err
 	}
 
-	marshaledCommDescr, err := proto.Marshal(patchedCommDescr)
+	err = m.handleAdditionalAdminChanges(changes.Community)
 	if err != nil {
 		return nil, err
 	}
 
-	// Some admin changes do not live on a `Community` and need to be handled by
-	// `Manager` here
-	err = m.handleAdditionalAdminChanges(community, adminEvent)
-	if err != nil {
-		return nil, err
+	// Owner cerifies admins events and publish changes
+	// all other users only apply changes to the community
+	if changes.Community.IsOwner() {
+		marshaledCommDescr, err := proto.Marshal(changes.Community.config.CommunityDescription)
+		if err != nil {
+			return nil, err
+		}
+
+		rawDescription, err := protocol.WrapMessageV1(marshaledCommDescr, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, community.PrivateKey())
+		if err != nil {
+			return nil, err
+		}
+
+		changes.Community.config.MarshaledCommunityDescription = rawDescription
+		changes.Community.config.AdminsEvents = []CommunityAdminEvent{}
+		changes.Community.increaseClock()
+
+		err = m.persistence.SaveCommunity(changes.Community)
+		if err != nil {
+			return nil, err
+		}
+		m.publish(&Subscription{Community: changes.Community})
+	} else {
+		err := m.persistence.SaveCommunityEvents(changes.Community)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	rawMessage, err := protocol.WrapMessageV1(marshaledCommDescr, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, community.PrivateKey())
-	if err != nil {
-		return nil, err
-	}
-
-	return m.handleCommunityDescriptionMessageCommon(community, patchedCommDescr, rawMessage)
+	return &CommunityResponse{
+		Community: changes.Community,
+		Changes:   changes,
+	}, nil
 }
 
-func (m *Manager) handleAdditionalAdminChanges(community *Community, adminEvent *protobuf.CommunityAdminEvent) error {
+func (m *Manager) handleAdditionalAdminChanges(community *Community) error {
 
 	saveOrUpdateRequestToJoin := func(signer string, request *protobuf.CommunityRequestToJoin, state RequestToJoinState) error {
 		requestToJoin := &RequestToJoin{
@@ -1443,24 +1470,27 @@ func (m *Manager) handleAdditionalAdminChanges(community *Community, adminEvent 
 		return nil
 	}
 
-	switch adminEvent.Type {
-	case protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT:
-		for signer, request := range adminEvent.AcceptedRequestsToJoin {
-			err := saveOrUpdateRequestToJoin(signer, request, RequestToJoinStateAccepted)
-			if err != nil {
-				return err
+	for i := range community.config.AdminsEvents {
+		adminEvent := &community.config.AdminsEvents[i]
+		switch adminEvent.Type {
+		case protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT:
+			for signer, request := range adminEvent.AcceptedRequestsToJoin {
+				err := saveOrUpdateRequestToJoin(signer, request, RequestToJoinStateAccepted)
+				if err != nil {
+					return err
+				}
 			}
-		}
 
-	case protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT:
-		for signer, request := range adminEvent.RejectedRequestsToJoin {
-			err := saveOrUpdateRequestToJoin(signer, request, RequestToJoinStateDeclined)
-			if err != nil {
-				return err
+		case protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT:
+			for signer, request := range adminEvent.RejectedRequestsToJoin {
+				err := saveOrUpdateRequestToJoin(signer, request, RequestToJoinStateDeclined)
+				if err != nil {
+					return err
+				}
 			}
-		}
 
-	default:
+		default:
+		}
 	}
 	return nil
 }
@@ -4186,4 +4216,36 @@ func (m *Manager) accountsHasAdminPermission(becomeAdminPermissions []*protobuf.
 		return permissionResponse.Satisfied
 	}
 	return false
+}
+
+func (m *Manager) SaveAndPublish(community *Community) error {
+	if community.IsOwner() {
+		// If owner did not receive all necessary data before (for example not all events were delivered)
+		// remove admin events anyway as CommunityDescription clock will be outdated
+		community.config.AdminsEvents = []CommunityAdminEvent{}
+		err := m.persistence.SaveCommunity(community)
+		if err != nil {
+			return err
+		}
+
+		m.publish(&Subscription{Community: community})
+		return nil
+	}
+
+	if community.IsAdmin() {
+		// Admins sends only all admins events. Based on on those events, clients construct CommunityDesctiption
+		// Constructed CommunityDescription won't be saved on the clients nodes, only when Owner node will
+		// apply these changes to CommunityDescription, new CommunityDescription with the increased
+		// clock will be send to all clients
+
+		err := m.persistence.SaveCommunityEvents(community)
+		if err != nil {
+			return err
+		}
+
+		m.publish(&Subscription{CommunityEventsMessage: community.ToCommunityEventsMessage()})
+		return nil
+	}
+
+	return ErrNotEnoughPermissions
 }

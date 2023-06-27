@@ -107,15 +107,15 @@ func (m *Messenger) publishOrgInvitation(org *communities.Community, invitation 
 	return err
 }
 
-func (m *Messenger) publishCommunityAdminEvent(adminEvent *protobuf.CommunityAdminEvent) error {
+func (m *Messenger) publishCommunityEventsMessage(adminMessage *communities.CommunityEventsMessage) error {
 	adminPubkey := common.PubkeyToHex(&m.identity.PublicKey)
-	m.logger.Debug("publishing community admin event", zap.String("admin-id", adminPubkey), zap.Any("event", adminEvent))
-	_, err := crypto.DecompressPubkey(adminEvent.CommunityId)
+	m.logger.Debug("publishing community admin event", zap.String("admin-id", adminPubkey), zap.Any("event", adminMessage))
+	_, err := crypto.DecompressPubkey(adminMessage.CommunityId)
 	if err != nil {
 		return err
 	}
 
-	payload, err := proto.Marshal(adminEvent)
+	payload, err := adminMessage.Marshal()
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func (m *Messenger) publishCommunityAdminEvent(adminEvent *protobuf.CommunityAdm
 		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_ADMIN_MESSAGE,
 	}
 
-	_, err = m.sender.SendPublic(context.Background(), types.EncodeHex(adminEvent.CommunityId), rawMessage)
+	_, err = m.sender.SendPublic(context.Background(), types.EncodeHex(adminMessage.CommunityId), rawMessage)
 	return err
 }
 
@@ -246,8 +246,8 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					m.logger.Debug("published org")
 				}
 
-				if sub.CommunityAdminEvent != nil {
-					err := m.publishCommunityAdminEvent(sub.CommunityAdminEvent)
+				if sub.CommunityEventsMessage != nil {
+					err := m.publishCommunityEventsMessage(sub.CommunityEventsMessage)
 					if err != nil {
 						m.logger.Warn("failed to publish community admin event", zap.Error(err))
 					}
@@ -2313,9 +2313,9 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 	return nil
 }
 
-func (m *Messenger) handleCommunityAdminEvent(state *ReceivedMessageState, signer *ecdsa.PublicKey, description protobuf.CommunityAdminEvent, rawPayload []byte) error {
+func (m *Messenger) handleCommunityEventsMessage(state *ReceivedMessageState, signer *ecdsa.PublicKey, message protobuf.CommunityEventsMessage) error {
 
-	communityResponse, err := m.communitiesManager.HandleCommunityAdminEvent(signer, &description, rawPayload)
+	communityResponse, err := m.communitiesManager.HandleCommunityEventsMessage(signer, &message)
 	if err != nil {
 		return err
 	}
