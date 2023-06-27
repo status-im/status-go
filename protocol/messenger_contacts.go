@@ -267,6 +267,8 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 }
 
 func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, contactRequestID string) (*MessengerResponse, error) {
+
+	fmt.Println("<<< updateAcceptedContactRequest. contactRequestID: ", contactRequestID)
 	contactRequest, err := m.persistence.MessageByID(contactRequestID)
 	if err != nil {
 		return nil, err
@@ -274,14 +276,22 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 
 	contactRequest.ContactRequestState = common.ContactRequestStateAccepted
 
+	fmt.Println("<<< updateAcceptedContactRequest. contactRequest 1: ", contactRequest)
+	fmt.Println("<<< updateAcceptedContactRequest from ", contactRequest.From)
+
 	err = m.persistence.SetContactRequestState(contactRequest.ID, contactRequest.ContactRequestState)
 	if err != nil {
 		return nil, err
 	}
 
-	contact, _ := m.allContacts.Load(contactRequest.From)
+	fmt.Println("<<< updateAcceptedContactRequest. contactRequest 2: ", contactRequest)
+	fmt.Println("<<< updateAcceptedContactRequest from ", contactRequest.From)
+
+	contact, ok := m.allContacts.Load(contactRequest.From)
+	fmt.Println("<<< updateAcceptedContactRequest load contact: ", ok)
 
 	_, clock, err := m.getOneToOneAndNextClock(contact)
+	fmt.Println("<<< updateAcceptedContactRequest getOneToOneAndNextClock ", clock)
 	if err != nil {
 		return nil, err
 	}

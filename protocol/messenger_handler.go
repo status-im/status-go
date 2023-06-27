@@ -3218,6 +3218,8 @@ func (m *Messenger) HandleSyncContactRequestDecision(state *ReceivedMessageState
 	var err error
 	var response *MessengerResponse
 
+	fmt.Println("<<< HandleSyncContactRequestDecision. message: ", message)
+
 	if message.DecisionStatus == protobuf.SyncContactRequestDecision_ACCEPTED {
 		response, err = m.updateAcceptedContactRequest(nil, message.RequestId)
 	} else {

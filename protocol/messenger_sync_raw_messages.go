@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
@@ -20,6 +21,7 @@ type RawMessageHandler func(ctx context.Context, rawMessage common.RawMessage) (
 func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) error {
 	state := m.buildMessageState()
 	for _, rawMessage := range rawMessages {
+		fmt.Println("<<< rawMessage Type -> ", rawMessage.GetMessageType())
 		switch rawMessage.GetMessageType() {
 		case protobuf.ApplicationMetadataMessage_CONTACT_UPDATE:
 			var message protobuf.ContactUpdate
@@ -111,6 +113,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
+			fmt.Println("<<< HandleSyncInstallationContact ", message)
 			err = m.HandleSyncInstallationContact(state, message)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncInstallationContact when HandleSyncRawMessages", zap.Error(err))
