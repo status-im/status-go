@@ -5850,6 +5850,7 @@ func (m *Messenger) pushNotificationOptions() *pushnotificationclient.Registrati
 	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool) {
 		if chat.Muted {
 			mutedChatIDs = append(mutedChatIDs, chat.ID)
+			return true
 		}
 		if chat.Active && (chat.Public() || chat.CommunityChat()) {
 			publicChatIDs = append(publicChatIDs, chat.ID)
