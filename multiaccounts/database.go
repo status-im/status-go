@@ -17,16 +17,17 @@ type ColorHash [][2]int
 
 // Account stores public information about account.
 type Account struct {
-	Name               string                    `json:"name"`
-	Timestamp          int64                     `json:"timestamp"`
-	Identicon          string                    `json:"identicon"`
-	ColorHash          ColorHash                 `json:"colorHash"`
-	ColorID            int64                     `json:"colorId"`
-	CustomizationColor common.CustomizationColor `json:"customizationColor,omitempty"`
-	KeycardPairing     string                    `json:"keycard-pairing"`
-	KeyUID             string                    `json:"key-uid"`
-	Images             []images.IdentityImage    `json:"images"`
-	KDFIterations      int                       `json:"kdfIterations,omitempty"`
+	Name                        string                    `json:"name"`
+	Timestamp                   int64                     `json:"timestamp"`
+	Identicon                   string                    `json:"identicon"`
+	ColorHash                   ColorHash                 `json:"colorHash"`
+	ColorID                     int64                     `json:"colorId"`
+	CustomizationColor          common.CustomizationColor `json:"customizationColor,omitempty"`
+	KeycardPairing              string                    `json:"keycard-pairing"`
+	KeyUID                      string                    `json:"key-uid"`
+	Images                      []images.IdentityImage    `json:"images"`
+	KDFIterations               int                       `json:"kdfIterations,omitempty"`
+	CustomizationColorUpdatedAt uint64                    `json:"-"`
 }
 
 func (a *Account) ToProtobuf() *protobuf.MultiAccount {
@@ -46,15 +47,16 @@ func (a *Account) ToProtobuf() *protobuf.MultiAccount {
 	}
 
 	return &protobuf.MultiAccount{
-		Name:               a.Name,
-		Timestamp:          a.Timestamp,
-		Identicon:          a.Identicon,
-		ColorHash:          colorHashes,
-		ColorId:            a.ColorID,
-		CustomizationColor: string(a.CustomizationColor),
-		KeycardPairing:     a.KeycardPairing,
-		KeyUid:             a.KeyUID,
-		Images:             identityImages,
+		Name:                        a.Name,
+		Timestamp:                   a.Timestamp,
+		Identicon:                   a.Identicon,
+		ColorHash:                   colorHashes,
+		ColorId:                     a.ColorID,
+		CustomizationColor:          string(a.CustomizationColor),
+		KeycardPairing:              a.KeycardPairing,
+		KeyUid:                      a.KeyUID,
+		Images:                      identityImages,
+		CustomizationColorUpdatedAt: a.CustomizationColorUpdatedAt,
 	}
 }
 
@@ -85,6 +87,7 @@ func (a *Account) FromProtobuf(ma *protobuf.MultiAccount) {
 	a.CustomizationColor = common.CustomizationColor(ma.CustomizationColor)
 	a.KeyUID = ma.KeyUid
 	a.Images = identityImages
+	a.CustomizationColorUpdatedAt = ma.CustomizationColorUpdatedAt
 }
 
 type MultiAccountMarshaller interface {
@@ -122,7 +125,7 @@ func (db *Database) GetAccountKDFIterationsNumber(keyUID string) (kdfIterationsN
 }
 
 func (db *Database) GetAccounts() (rst []Account, err error) {
-	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.identicon, a.colorHash, a.colorId, a.customizationColor, a.keycardPairing, a.keyUid, a.kdfIterations, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target, ii.clock FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid ORDER BY loginTimestamp DESC")
+	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.identicon, a.colorHash, a.colorId, a.customizationColor, a.customizationColorUpdatedAt, a.keycardPairing, a.keyUid, a.kdfIterations, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target, ii.clock FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid ORDER BY loginTimestamp DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -152,6 +155,7 @@ func (db *Database) GetAccounts() (rst []Account, err error) {
 			&accColorHash,
 			&accColorID,
 			&acc.CustomizationColor,
+			&acc.CustomizationColorUpdatedAt,
 			&acc.KeycardPairing,
 			&acc.KeyUID,
 			&acc.KDFIterations,
@@ -213,7 +217,7 @@ func (db *Database) GetAccounts() (rst []Account, err error) {
 }
 
 func (db *Database) GetAccount(keyUID string) (*Account, error) {
-	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.identicon, a.colorHash, a.colorId, a.customizationColor, a.keycardPairing, a.keyUid, a.kdfIterations, ii.key_uid, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target, ii.clock FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid WHERE a.keyUid = ? ORDER BY loginTimestamp DESC", keyUID)
+	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.identicon, a.colorHash, a.colorId, a.customizationColor, a.customizationColorUpdatedAt, a.keycardPairing, a.keyUid, a.kdfIterations, ii.key_uid, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target, ii.clock FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid WHERE a.keyUid = ? ORDER BY loginTimestamp DESC", keyUID)
 	if err != nil {
 		return nil, err
 	}
@@ -245,6 +249,7 @@ func (db *Database) GetAccount(keyUID string) (*Account, error) {
 			&accColorHash,
 			&accColorID,
 			&acc.CustomizationColor,
+			&acc.CustomizationColorUpdatedAt,
 			&acc.KeycardPairing,
 			&acc.KeyUID,
 			&acc.KDFIterations,
@@ -298,7 +303,7 @@ func (db *Database) SaveAccount(account Account) error {
 		account.KDFIterations = sqlite.ReducedKDFIterationsNumber
 	}
 
-	_, err = db.db.Exec("INSERT OR REPLACE INTO accounts (name, identicon, colorHash, colorId, customizationColor, keycardPairing, keyUid, kdfIterations) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", account.Name, account.Identicon, colorHash, account.ColorID, account.CustomizationColor, account.KeycardPairing, account.KeyUID, account.KDFIterations)
+	_, err = db.db.Exec("INSERT OR REPLACE INTO accounts (name, identicon, colorHash, colorId, customizationColor, customizationColorUpdatedAt, keycardPairing, keyUid, kdfIterations) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", account.Name, account.Identicon, colorHash, account.ColorID, account.CustomizationColor, account.CustomizationColorUpdatedAt, account.KeycardPairing, account.KeyUID, account.KDFIterations)
 	if err != nil {
 		return err
 	}
@@ -320,7 +325,7 @@ func (db *Database) UpdateAccount(account Account) error {
 		account.KDFIterations = sqlite.ReducedKDFIterationsNumber
 	}
 
-	_, err = db.db.Exec("UPDATE accounts SET name = ?, identicon = ?, colorHash = ?, colorId = ?, customizationColor = ?, keycardPairing = ?, kdfIterations = ? WHERE keyUid = ?", account.Name, account.Identicon, colorHash, account.ColorID, account.CustomizationColor, account.KeycardPairing, account.KDFIterations, account.KeyUID)
+	_, err = db.db.Exec("UPDATE accounts SET name = ?, identicon = ?, colorHash = ?, colorId = ?, customizationColor = ?, customizationColorUpdatedAt = ?, keycardPairing = ?, kdfIterations = ? WHERE keyUid = ?", account.Name, account.Identicon, colorHash, account.ColorID, account.CustomizationColor, account.CustomizationColorUpdatedAt, account.KeycardPairing, account.KDFIterations, account.KeyUID)
 	return err
 }
 
@@ -331,6 +336,11 @@ func (db *Database) UpdateAccountKeycardPairing(keyUID string, keycardPairing st
 
 func (db *Database) UpdateAccountTimestamp(keyUID string, loginTimestamp int64) error {
 	_, err := db.db.Exec("UPDATE accounts SET loginTimestamp = ? WHERE keyUid = ?", loginTimestamp, keyUID)
+	return err
+}
+
+func (db *Database) UpdateAccountCustomizationColor(keyUID string, color string, updatedAt uint64) error {
+	_, err := db.db.Exec("UPDATE accounts SET customizationColor = ?, customizationColorUpdatedAt = ? WHERE keyUid = ? AND customizationColorUpdatedAt < ?", color, updatedAt, keyUID, updatedAt)
 	return err
 }
 

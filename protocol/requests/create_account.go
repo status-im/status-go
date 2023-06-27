@@ -15,11 +15,12 @@ type CreateAccount struct {
 	// BackupDisabledDataDir is the directory where backup is disabled
 	BackupDisabledDataDir string `json:"backupDisabledDataDir"`
 
-	DeviceName         string `json:"deviceName"`
-	DisplayName        string `json:"displayName"`
-	Password           string `json:"password"`
-	ImagePath          string `json:"imagePath"`
-	CustomizationColor string `json:"customizationColor"`
+	DeviceName                  string `json:"deviceName"`
+	DisplayName                 string `json:"displayName"`
+	Password                    string `json:"password"`
+	ImagePath                   string `json:"imagePath"`
+	CustomizationColor          string `json:"customizationColor"`
+	CustomizationColorUpdatedAt uint64 `json:"-"`
 
 	WakuV2Nameserver  *string `json:"wakuV2Nameserver"`
 	WakuV2LightClient bool    `json:"wakuV2LightClient"`

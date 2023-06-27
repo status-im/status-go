@@ -45,6 +45,7 @@ type MessengerResponse struct {
 	Bookmarks                     []*browsers.Bookmark
 	Settings                      []*settings.SyncSettingField
 	IdentityImages                []images.IdentityImage
+	CustomizationColor            string
 	WatchOnlyAccounts             []*accounts.Account
 	Keypairs                      []*accounts.Keypair
 	DiscordCategories             []*discord.Category
@@ -107,6 +108,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		StatusUpdates                 []UserStatus                         `json:"statusUpdates,omitempty"`
 		Settings                      []*settings.SyncSettingField         `json:"settings,omitempty"`
 		IdentityImages                []images.IdentityImage               `json:"identityImages,omitempty"`
+		CustomizationColor            string                               `json:"customizationColor,omitempty"`
 		WatchOnlyAccounts             []*accounts.Account                  `json:"watchOnlyAccounts,omitempty"`
 		Keypairs                      []*accounts.Keypair                  `json:"keypairs,omitempty"`
 		DiscordCategories             []*discord.Category                  `json:"discordCategories,omitempty"`
@@ -128,6 +130,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		CurrentStatus:           r.currentStatus,
 		Settings:                r.Settings,
 		IdentityImages:          r.IdentityImages,
+		CustomizationColor:      r.CustomizationColor,
 		WatchOnlyAccounts:       r.WatchOnlyAccounts,
 		Keypairs:                r.Keypairs,
 
@@ -313,6 +316,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddBookmarks(response.GetBookmarks())
 	r.CommunityChanges = append(r.CommunityChanges, response.CommunityChanges...)
 	r.BackupHandled = response.BackupHandled
+	r.CustomizationColor = response.CustomizationColor
 	r.WatchOnlyAccounts = append(r.WatchOnlyAccounts, response.WatchOnlyAccounts...)
 	r.Keypairs = append(r.Keypairs, response.Keypairs...)
 	r.SocialLinksInfo = response.SocialLinksInfo

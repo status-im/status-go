@@ -343,7 +343,6 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
 	nodeConfig.MailserversConfig = params.MailserversConfig{Enabled: true}
-	nodeConfig.EnableNTPSync = true
 	nodeConfig.WakuConfig = params.WakuConfig{
 		Enabled:     true,
 		LightClient: true,

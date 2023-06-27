@@ -26,7 +26,6 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "/some/data/path", c.DataDir)
 	assert.Equal(t, "/some/data/path/keystore", c.KeyStoreDir)
-	assert.Equal(t, true, c.EnableNTPSync)
 	// assert Whisper
 	assert.Equal(t, true, c.WakuConfig.Enabled)
 	assert.Equal(t, "/some/data/path/waku", c.WakuConfig.DataDir)

@@ -2965,6 +2965,35 @@ func (m *Messenger) syncEnsUsernameDetail(ctx context.Context, usernameDetail *e
 	return err
 }
 
+func (m *Messenger) syncAccountCustomizationColor(ctx context.Context, acc *multiaccounts.Account) error {
+	if !m.hasPairedDevices() {
+		return nil
+	}
+
+	_, chat := m.getLastClockWithRelatedChat()
+
+	message := &protobuf.SyncAccountCustomizationColor{
+		KeyUid:             acc.KeyUID,
+		CustomizationColor: string(acc.CustomizationColor),
+		UpdatedAt:          acc.CustomizationColorUpdatedAt,
+	}
+
+	encodedMessage, err := proto.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACCOUNT_CUSTOMIZATION_COLOR,
+		ResendAutomatically: true,
+	}
+
+	_, err = m.dispatchMessage(ctx, rawMessage)
+	return err
+}
+
 func (m *Messenger) SyncTrustedUser(ctx context.Context, publicKey string, ts verification.TrustStatus, rawMessageHandler RawMessageHandler) error {
 	if !m.hasPairedDevices() {
 		return nil
@@ -3902,6 +3931,22 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err := m.handleSyncSetting(messageState, &ss)
 						if err != nil {
 							logger.Warn("failed to handle SyncSetting", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.SyncAccountCustomizationColor:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+						sac := msg.ParsedMessage.Interface().(protobuf.SyncAccountCustomizationColor)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, sac)
+						logger.Debug("Handling SyncAccountCustomizationColor", zap.Any("message", sac))
+
+						err := m.handleSyncAccountCustomizationColor(messageState, sac)
+						if err != nil {
+							logger.Warn("failed to handle SyncAccountCustomizationColor", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}

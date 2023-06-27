@@ -297,7 +297,6 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig.ClusterConfig.WakuNodes = nodes
 	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = nodes
 
-	nodeConfig.EnableNTPSync = true
 	nodeConfig.WakuV2Config = params.WakuV2Config{
 		Enabled:        true,
 		EnableDiscV5:   true,

@@ -9,6 +9,8 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/status-im/status-go/timesource"
+
 	"github.com/status-im/status-go/logutils"
 
 	validator "gopkg.in/go-playground/validator.v9"
@@ -280,6 +282,12 @@ func CreateAccountAndLogin(requestJSON string) string {
 
 	api.RunAsync(func() error {
 		log.Debug("starting a node and creating config")
+		var now uint64
+		if now, err = timesource.GetCurrentTimeInMillis(); err != nil {
+			log.Error("CreateAccountAndLogin. failed to get current time in millis", "error", err)
+			return err
+		}
+		request.CustomizationColorUpdatedAt = now
 		err := statusBackend.CreateAccountAndLogin(&request)
 		if err != nil {
 			log.Error("failed to create account", "error", err)
@@ -365,7 +373,14 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 
 	api.RunAsync(func() error {
 		log.Debug("starting a node, and saving account with configuration", "key-uid", account.KeyUID)
-		err := statusBackend.StartNodeWithAccountAndInitialConfig(account, password, settings, &conf, subaccs)
+		var now uint64
+		if now, err = timesource.GetCurrentTimeInMillis(); err != nil {
+			log.Error("SaveAccountAndLogin. failed to get current time in millis", "error", err)
+			return err
+		}
+		account.CustomizationColorUpdatedAt = now
+
+		err = statusBackend.StartNodeWithAccountAndInitialConfig(account, password, settings, &conf, subaccs)
 		if err != nil {
 			log.Error("failed to start node and save account", "key-uid", account.KeyUID, "error", err)
 			return err
@@ -427,7 +442,14 @@ func SaveAccountAndLoginWithKeycard(accountData, password, settingsJSON, configJ
 
 	api.RunAsync(func() error {
 		log.Debug("starting a node, and saving account with configuration", "key-uid", account.KeyUID)
-		err := statusBackend.SaveAccountAndStartNodeWithKey(account, password, settings, &conf, subaccs, keyHex)
+		var now uint64
+		if now, err = timesource.GetCurrentTimeInMillis(); err != nil {
+			log.Error("SaveAccountAndLoginWithKeycard. failed to get current time in millis", "error", err)
+			return err
+		}
+		account.CustomizationColorUpdatedAt = now
+
+		err = statusBackend.SaveAccountAndStartNodeWithKey(account, password, settings, &conf, subaccs, keyHex)
 		if err != nil {
 			log.Error("failed to start node and save account", "key-uid", account.KeyUID, "error", err)
 			return err

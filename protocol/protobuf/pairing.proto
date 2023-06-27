@@ -44,6 +44,7 @@ message MultiAccount {
   string key_uid = 7;
   repeated IdentityImage images = 8;
   string customization_color = 9;
+  uint64 customization_color_updated_at = 10;
 
   message ColorHash {
     repeated int64 index = 1;
@@ -408,4 +409,10 @@ message SyncKeycard {
 message SyncSocialLinks {
   repeated SocialLink social_links = 1;
   uint64 clock = 2;
+}
+
+message SyncAccountCustomizationColor {
+  uint64 updated_at = 1;
+  string customization_color = 2;
+  string key_uid = 3;
 }

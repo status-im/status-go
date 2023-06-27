@@ -171,7 +171,6 @@ func randomNodeConfig() *params.NodeConfig {
 		MaxPeers:                  randomInt(math.MaxInt64),
 		MaxPendingPeers:           randomInt(math.MaxInt64),
 		EnableStatusService:       randomBool(),
-		EnableNTPSync:             randomBool(),
 		BridgeConfig:              params.BridgeConfig{Enabled: randomBool()},
 		WalletConfig:              params.WalletConfig{Enabled: randomBool()},
 		LocalNotificationsConfig:  params.LocalNotificationsConfig{Enabled: randomBool()},

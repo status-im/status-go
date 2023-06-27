@@ -1062,10 +1062,11 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 	}
 
 	account := multiaccounts.Account{
-		KeyUID:             info.KeyUID,
-		Name:               request.DisplayName,
-		CustomizationColor: multiacccommon.CustomizationColor(request.CustomizationColor),
-		KDFIterations:      sqlite.ReducedKDFIterationsNumber,
+		KeyUID:                      info.KeyUID,
+		Name:                        request.DisplayName,
+		CustomizationColor:          multiacccommon.CustomizationColor(request.CustomizationColor),
+		CustomizationColorUpdatedAt: request.CustomizationColorUpdatedAt,
+		KDFIterations:               sqlite.ReducedKDFIterationsNumber,
 	}
 	if request.ImagePath != "" {
 		iis, err := images.GenerateIdentityImages(request.ImagePath, 0, 0, 1000, 1000)

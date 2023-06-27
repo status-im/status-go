@@ -421,9 +421,6 @@ type NodeConfig struct {
 	// EnableStatusService should be true to enable methods under status namespace.
 	EnableStatusService bool
 
-	// EnableNTPSync enables NTP synchronizations
-	EnableNTPSync bool
-
 	// UpstreamConfig extra config for providing upstream infura server.
 	UpstreamConfig UpstreamRPCConfig `json:"UpstreamConfig"`
 
@@ -714,7 +711,6 @@ func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option)
 	c.LogCompressRotated = true
 	c.LogMaxBackups = 3
 	c.LogToStderr = true
-	c.EnableNTPSync = true
 	c.WakuConfig.Enabled = true
 
 	for _, opt := range opts {
@@ -851,7 +847,6 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		LogFile:          "",
 		LogLevel:         "ERROR",
 		NoDiscovery:      true,
-		EnableNTPSync:    true,
 		UpstreamConfig: UpstreamRPCConfig{
 			URL: getUpstreamURL(networkID),
 		},

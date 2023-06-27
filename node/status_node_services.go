@@ -80,7 +80,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = append(services, b.collectiblesService())
 	services = append(services, b.stickersService(accDB))
 	services = append(services, b.updatesService())
-	services = appendIf(config.EnableNTPSync, services, b.timeSource())
 	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accountsFeed, accDB, mediaServer))
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
