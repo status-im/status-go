@@ -40,7 +40,7 @@ type Config struct {
 	RequestsToJoin                []*RequestToJoin
 	MemberIdentity                *ecdsa.PublicKey
 	SyncedAt                      uint64
-	AdminsEvents                  []CommunityAdminEvent
+	Events                        []CommunityEvent
 }
 
 type Community struct {
@@ -482,7 +482,7 @@ type CommunitySettings struct {
 
 // `CommunityAdminEventChanges contain additional changes that don't live on
 // a `Community` but still have to be propagated to other admin and control nodes
-type CommunityAdminEventChanges struct {
+type CommunityEventChanges struct {
 	*CommunityChanges
 	// `RejectedRequestsToJoin` is a map of signer keys to requests to join
 	RejectedRequestsToJoin map[string]*protobuf.CommunityRequestToJoin `json:"rejectedRequestsToJoin"`
@@ -508,7 +508,7 @@ func (o *Community) CreateChat(chatID string, chat *protobuf.CommunityChat) (*Co
 	}
 
 	if isAdmin {
-		err := o.addNewCommunityAdminEvent(o.ToCreateChannelAdminEvent(chatID, chat))
+		err := o.addNewCommunityEvent(o.ToCreateChannelCommunityEvent(chatID, chat))
 		if err != nil {
 			return nil, err
 		}
@@ -540,7 +540,7 @@ func (o *Community) EditChat(chatID string, chat *protobuf.CommunityChat) (*Comm
 	}
 
 	if isAdmin {
-		err := o.addNewCommunityAdminEvent(o.ToEditChannelAdminEvent(chatID, chat))
+		err := o.addNewCommunityEvent(o.ToEditChannelCommunityEvent(chatID, chat))
 		if err != nil {
 			return nil, err
 		}
@@ -575,7 +575,7 @@ func (o *Community) DeleteChat(chatID string) (*CommunityChanges, error) {
 	}
 
 	if isAdmin {
-		err := o.addNewCommunityAdminEvent(o.ToDeleteChannelAdminEvent(chatID))
+		err := o.addNewCommunityEvent(o.ToDeleteChannelCommunityEvent(chatID))
 		if err != nil {
 			return nil, err
 		}
@@ -807,7 +807,7 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 	}
 
 	if isAdmin {
-		err := o.addNewCommunityAdminEvent(o.ToKickCommunityMemberAdminEvent(common.PubkeyToHex(pk)))
+		err := o.addNewCommunityEvent(o.ToKickCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
 		if err != nil {
 			return nil, err
 		}
@@ -846,7 +846,7 @@ func (o *Community) UnbanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Commu
 	}
 
 	if isAdmin {
-		err := o.addNewCommunityAdminEvent(o.ToUnbanCommunityMemberAdminEvent(common.PubkeyToHex(pk)))
+		err := o.addNewCommunityEvent(o.ToUnbanCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
 		if err != nil {
 			return nil, err
 		}
@@ -877,7 +877,7 @@ func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Communi
 	}
 
 	if isAdmin {
-		err := o.addNewCommunityAdminEvent(o.ToBanCommunityMemberAdminEvent(common.PubkeyToHex(pk)))
+		err := o.addNewCommunityEvent(o.ToBanCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
 		if err != nil {
 			return nil, err
 		}
@@ -1426,7 +1426,7 @@ func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermis
 	}
 
 	if isAdmin {
-		err := o.addNewCommunityAdminEvent(o.ToCommunityTokenPermissionChangeAdminEvent(permission))
+		err := o.addNewCommunityEvent(o.ToCommunityTokenPermissionChangeCommunityEvent(permission))
 		if err != nil {
 			return nil, err
 		}
@@ -1456,7 +1456,7 @@ func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *
 	}
 
 	if isAdmin {
-		err := o.addNewCommunityAdminEvent(o.ToCommunityTokenPermissionChangeAdminEvent(tokenPermission))
+		err := o.addNewCommunityEvent(o.ToCommunityTokenPermissionChangeCommunityEvent(tokenPermission))
 		if err != nil {
 			return nil, err
 		}
@@ -1492,7 +1492,7 @@ func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChange
 	}
 
 	if isAdmin {
-		err := o.addNewCommunityAdminEvent(o.ToCommunityTokenPermissionDeleteAdminEvent(permission))
+		err := o.addNewCommunityEvent(o.ToCommunityTokenPermissionDeleteCommunityEvent(permission))
 		if err != nil {
 			return nil, err
 		}
@@ -1854,11 +1854,11 @@ func (o *Community) AddMemberWithRevealedAccounts(dbRequest *RequestToJoin, role
 		acceptedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
 		acceptedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
 
-		adminChanges := &CommunityAdminEventChanges{
+		adminChanges := &CommunityEventChanges{
 			CommunityChanges:       changes,
 			AcceptedRequestsToJoin: acceptedRequestsToJoin,
 		}
-		err := o.addNewCommunityAdminEvent(o.ToCommunityRequestToJoinAcceptAdminEvent(adminChanges))
+		err := o.addNewCommunityEvent(o.ToCommunityRequestToJoinAcceptCommunityEvent(adminChanges))
 		if err != nil {
 			return nil, err
 		}
@@ -1888,7 +1888,7 @@ func (o *Community) createDeepCopy() *Community {
 			RequestsToJoin:                o.config.RequestsToJoin,
 			MemberIdentity:                o.config.MemberIdentity,
 			SyncedAt:                      o.config.SyncedAt,
-			AdminsEvents:                  o.config.AdminsEvents,
+			Events:                        o.config.Events,
 		},
 	}
 }
@@ -2317,11 +2317,11 @@ func (o *Community) DeclineRequestToJoin(dbRequest *RequestToJoin) error {
 		rejectedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
 		rejectedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
 
-		adminChanges := &CommunityAdminEventChanges{
+		adminChanges := &CommunityEventChanges{
 			CommunityChanges:       o.emptyCommunityChanges(),
 			RejectedRequestsToJoin: rejectedRequestsToJoin,
 		}
-		err := o.addNewCommunityAdminEvent(o.ToCommunityRequestToJoinRejectAdminEvent(adminChanges))
+		err := o.addNewCommunityEvent(o.ToCommunityRequestToJoinRejectCommunityEvent(adminChanges))
 		if err != nil {
 			return err
 		}

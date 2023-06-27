@@ -839,7 +839,7 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 	if isOwner {
 		community.increaseClock()
 	} else if isAdmin {
-		err := community.addNewCommunityAdminEvent(community.ToCommunityEditAdminEvent())
+		err := community.addNewCommunityEvent(community.ToCommunityEditCommunityEvent())
 		if err != nil {
 			return nil, err
 		}
@@ -1231,7 +1231,7 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 		}
 	}
 
-	community.config.AdminsEvents = []CommunityAdminEvent{}
+	community.config.Events = []CommunityEvent{}
 
 	err = m.persistence.SaveCommunity(community)
 	if err != nil {
@@ -1274,7 +1274,7 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		return nil, errors.New("user is not an admin")
 	}
 
-	changes, err := community.UpdateCommuntyByAdminsEvents(adminMessage)
+	changes, err := community.UpdateCommuntyByEvents(adminMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -1298,7 +1298,7 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		}
 
 		changes.Community.config.MarshaledCommunityDescription = rawDescription
-		changes.Community.config.AdminsEvents = []CommunityAdminEvent{}
+		changes.Community.config.Events = []CommunityEvent{}
 		changes.Community.increaseClock()
 
 		err = m.persistence.SaveCommunity(changes.Community)
@@ -1360,19 +1360,19 @@ func (m *Manager) handleAdditionalAdminChanges(community *Community) error {
 		return nil
 	}
 
-	for i := range community.config.AdminsEvents {
-		adminEvent := &community.config.AdminsEvents[i]
-		switch adminEvent.Type {
-		case protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT:
-			for signer, request := range adminEvent.AcceptedRequestsToJoin {
+	for i := range community.config.Events {
+		communityEvent := &community.config.Events[i]
+		switch communityEvent.Type {
+		case protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT:
+			for signer, request := range communityEvent.AcceptedRequestsToJoin {
 				err := saveOrUpdateRequestToJoin(signer, request, RequestToJoinStateAccepted)
 				if err != nil {
 					return err
 				}
 			}
 
-		case protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT:
-			for signer, request := range adminEvent.RejectedRequestsToJoin {
+		case protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT:
+			for signer, request := range communityEvent.RejectedRequestsToJoin {
 				err := saveOrUpdateRequestToJoin(signer, request, RequestToJoinStateDeclined)
 				if err != nil {
 					return err
@@ -4058,7 +4058,7 @@ func (m *Manager) SaveAndPublish(community *Community) error {
 	if community.IsOwner() {
 		// If owner did not receive all necessary data before (for example not all events were delivered)
 		// remove admin events anyway as CommunityDescription clock will be outdated
-		community.config.AdminsEvents = []CommunityAdminEvent{}
+		community.config.Events = []CommunityEvent{}
 		err := m.persistence.SaveCommunity(community)
 		if err != nil {
 			return err

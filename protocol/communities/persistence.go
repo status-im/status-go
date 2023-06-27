@@ -57,7 +57,7 @@ func (p *Persistence) SaveCommunity(community *Community) error {
 func (p *Persistence) SaveCommunityEvents(community *Community) error {
 	id := community.ID()
 
-	rawEvents, err := adminsEventsToJSONEncodedBytes(community.config.AdminsEvents)
+	rawEvents, err := communityEventsToJSONEncodedBytes(community.config.Events)
 	if err != nil {
 		return err
 	}
@@ -301,10 +301,10 @@ func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, p
 		return nil, err
 	}
 
-	var adminsEvents []CommunityAdminEvent
+	var events []CommunityEvent
 	if eventsBytes != nil {
 		var err error
-		adminsEvents, err = adminsEventsFromJSONEncodedBytes(eventsBytes)
+		events, err = communityEventsFromJSONEncodedBytes(eventsBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -323,14 +323,14 @@ func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, p
 		RequestedToJoinAt:             requestedToJoinAt,
 		Joined:                        joined,
 		Spectated:                     spectated,
-		AdminsEvents:                  adminsEvents,
+		Events:                        events,
 	}
 	community, err := New(config)
 	if err != nil {
 		return nil, err
 	}
 
-	err = community.updateCommuntyDescriptionByAppliedAdminsEvents()
+	err = community.updateCommuntyDescriptionByAppliedEvents()
 	if err != nil {
 		return nil, err
 	}

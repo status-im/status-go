@@ -4311,7 +4311,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
 						err = m.handleCommunityEventsMessage(messageState, publicKey, message)
 						if err != nil {
-							logger.Warn("failed to handle CommunityAdminEvent", zap.Error(err))
+							logger.Warn("failed to handle CommunityEvent", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}

@@ -34,7 +34,7 @@ func (o *Community) CreateCategory(categoryID string, categoryName string, chatI
 	}
 
 	if isAdmin {
-		err := o.addNewCommunityAdminEvent(o.ToCreateCategoryAdminEvent(categoryID, categoryName, chatIDs))
+		err := o.addNewCommunityEvent(o.ToCreateCategoryCommunityEvent(categoryID, categoryName, chatIDs))
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +74,7 @@ func (o *Community) EditCategory(categoryID string, categoryName string, chatIDs
 	}
 
 	if isAdmin {
-		err := o.addNewCommunityAdminEvent(o.ToEditCategoryAdminEvent(categoryID, categoryName, chatIDs))
+		err := o.addNewCommunityEvent(o.ToEditCategoryCommunityEvent(categoryID, categoryName, chatIDs))
 		if err != nil {
 			return nil, err
 		}
@@ -115,7 +115,7 @@ func (o *Community) ReorderCategories(categoryID string, newPosition int) (*Comm
 	}
 
 	if isAdmin {
-		err := o.addNewCommunityAdminEvent(o.ToReorderCategoryAdminEvent(categoryID, newPosition))
+		err := o.addNewCommunityEvent(o.ToReorderCategoryCommunityEvent(categoryID, newPosition))
 		if err != nil {
 			return nil, err
 		}
@@ -155,7 +155,7 @@ func (o *Community) ReorderChat(categoryID string, chatID string, newPosition in
 	}
 
 	if isAdmin {
-		err := o.addNewCommunityAdminEvent(o.ToReorderChannelAdminEvent(categoryID, chatID, newPosition))
+		err := o.addNewCommunityEvent(o.ToReorderChannelCommunityEvent(categoryID, chatID, newPosition))
 		if err != nil {
 			return nil, err
 		}
@@ -310,7 +310,7 @@ func (o *Community) DeleteCategory(categoryID string) (*CommunityChanges, error)
 	}
 
 	if isAdmin {
-		err := o.addNewCommunityAdminEvent(o.ToDeleteCategoryAdminEvent(categoryID))
+		err := o.addNewCommunityEvent(o.ToDeleteCategoryCommunityEvent(categoryID))
 		if err != nil {
 			return nil, err
 		}

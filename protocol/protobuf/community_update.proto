@@ -6,8 +6,8 @@ package protobuf;
 import "chat_identity.proto";
 import "communities.proto";
 
-message CommunityAdminEvent {
-  uint64 admin_event_clock = 1;
+message CommunityEvent {
+  uint64 community_event_clock = 1;
   EventType type = 2;
   CommunityConfig community_config = 3;
   CommunityTokenPermission token_permission = 4;
@@ -72,5 +72,5 @@ message CommunityEventsMessage {
   uint64 community_description_clock = 2;
   
   // A list of admins events for the channel in bytes
-  repeated bytes admins_events = 3;
+  repeated bytes events = 3;
 }
