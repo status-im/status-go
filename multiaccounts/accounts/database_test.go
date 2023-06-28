@@ -36,7 +36,7 @@ func TestGetAddresses(t *testing.T) {
 		{Address: types.Address{0x01}, Chat: true, Wallet: true},
 		{Address: types.Address{0x02}},
 	}
-	require.NoError(t, db.SaveOrUpdateAccounts(accounts))
+	require.NoError(t, db.SaveOrUpdateAccounts(accounts, false))
 	addresses, err := db.GetAddresses()
 	require.NoError(t, err)
 	require.Equal(t, []types.Address{{0x01}, {0x02}}, addresses)
@@ -46,16 +46,16 @@ func TestUpdateAccountPosition(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 	accounts := []*Account{
-		{Address: types.Address{0x01}, Chat: true, Wallet: true},
-		{Address: types.Address{0x02}},
+		{Address: types.Address{0x01}, Position: 1},
+		{Address: types.Address{0x02}, Position: 2},
 	}
-	require.NoError(t, db.SaveOrUpdateAccounts(accounts))
+	require.NoError(t, db.SaveOrUpdateAccounts(accounts, false))
 	accountsRes, err := db.GetAccounts()
 	require.NoError(t, err)
 	require.Equal(t, accountsRes[0].Position, int64(1))
 	require.Equal(t, accountsRes[1].Position, int64(2))
 
-	err = db.UpdateAccountPosition(accounts[1].Address, 1)
+	err = db.UpdateAccountPosition(accounts[1].Address, 1, 0)
 	require.NoError(t, err)
 
 	accountsRes, err = db.GetAccounts()
@@ -70,7 +70,7 @@ func TestGetWalletAddress(t *testing.T) {
 	address := types.Address{0x01}
 	_, err := db.GetWalletAddress()
 	require.Equal(t, err, sql.ErrNoRows)
-	require.NoError(t, db.SaveOrUpdateAccounts([]*Account{{Address: address, Wallet: true}}))
+	require.NoError(t, db.SaveOrUpdateAccounts([]*Account{{Address: address, Wallet: true}}, false))
 	wallet, err := db.GetWalletAddress()
 	require.NoError(t, err)
 	require.Equal(t, address, wallet)
@@ -82,7 +82,7 @@ func TestGetChatAddress(t *testing.T) {
 	address := types.Address{0x01}
 	_, err := db.GetChatAddress()
 	require.Equal(t, err, sql.ErrNoRows)
-	require.NoError(t, db.SaveOrUpdateAccounts([]*Account{{Address: address, Chat: true}}))
+	require.NoError(t, db.SaveOrUpdateAccounts([]*Account{{Address: address, Chat: true}}, false))
 	chat, err := db.GetChatAddress()
 	require.NoError(t, err)
 	require.Equal(t, address, chat)
@@ -95,7 +95,7 @@ func TestAddressExists(t *testing.T) {
 	accounts := []*Account{
 		{Address: types.Address{0x01}, Chat: true, Wallet: true},
 	}
-	require.NoError(t, db.SaveOrUpdateAccounts(accounts))
+	require.NoError(t, db.SaveOrUpdateAccounts(accounts, false))
 
 	exists, err := db.AddressExists(accounts[0].Address)
 	require.NoError(t, err)
@@ -133,7 +133,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	require.Equal(t, 0, len(dbAccounts))
 
 	// save watch only accounts
-	err = db.SaveOrUpdateAccounts(woAccounts)
+	err = db.SaveOrUpdateAccounts(woAccounts, false)
 	require.NoError(t, err)
 	_, err = db.GetKeypairByKeyUID(woAccounts[0].KeyUID)
 	require.Error(t, err)
@@ -144,7 +144,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	require.Equal(t, woAccounts[0].Address, dbAccounts[0].Address)
 
 	// try to save the same watch only account again
-	err = db.SaveOrUpdateAccounts(woAccounts[:1])
+	err = db.SaveOrUpdateAccounts(woAccounts[:1], false)
 	require.NoError(t, err)
 	dbAccounts, err = db.GetAccounts()
 	require.NoError(t, err)
@@ -161,7 +161,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 		ColorID: common.CustomizationColorPrimary,
 		Emoji:   "emoji-1",
 	}
-	err = db.SaveOrUpdateAccounts([]*Account{wo4})
+	err = db.SaveOrUpdateAccounts([]*Account{wo4}, false)
 	require.NoError(t, err)
 	dbAccounts, err = db.GetAccounts()
 	require.NoError(t, err)
@@ -174,7 +174,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	wo4.Name = wo4.Name + "updated"
 	wo4.ColorID = common.CustomizationColorCamel
 	wo4.Emoji = wo4.Emoji + "updated"
-	err = db.SaveOrUpdateAccounts([]*Account{wo4})
+	err = db.SaveOrUpdateAccounts([]*Account{wo4}, false)
 	require.NoError(t, err)
 	dbAccounts, err = db.GetAccounts()
 	require.NoError(t, err)
@@ -189,7 +189,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	require.True(t, err == ErrDbKeypairNotFound)
 
 	// try to delete watch only account
-	err = db.DeleteAccount(wo4.Address)
+	err = db.DeleteAccount(wo4.Address, 0)
 	require.NoError(t, err)
 	dbAccounts, err = db.GetAccounts()
 	require.NoError(t, err)
@@ -220,7 +220,8 @@ func TestUpdateKeypairName(t *testing.T) {
 
 	// update keypair name
 	kp.Name = kp.Name + "updated"
-	err = db.UpdateKeypairName(kp.KeyUID, kp.Name, kp.Clock)
+	kp.Accounts[0].Name = kp.Name
+	err = db.UpdateKeypairName(kp.KeyUID, kp.Name, kp.Clock, true)
 	require.NoError(t, err)
 
 	// check keypair
@@ -288,7 +289,7 @@ func TestKeypairs(t *testing.T) {
 			accToUpdate := kp.Accounts[ind]
 
 			// try to save the same account again
-			err = db.SaveOrUpdateAccounts([]*Account{accToUpdate})
+			err = db.SaveOrUpdateAccounts([]*Account{accToUpdate}, false)
 			require.NoError(t, err)
 			dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
 			require.NoError(t, err)
@@ -303,7 +304,7 @@ func TestKeypairs(t *testing.T) {
 			accToUpdate.ColorID = common.CustomizationColorBrown
 			accToUpdate.Emoji = accToUpdate.Emoji + "updated"
 
-			err = db.SaveOrUpdateAccounts([]*Account{accToUpdate})
+			err = db.SaveOrUpdateAccounts([]*Account{accToUpdate}, false)
 			require.NoError(t, err)
 			dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
 			require.NoError(t, err)
@@ -335,7 +336,7 @@ func TestKeypairs(t *testing.T) {
 			accToAdd.PublicKey = types.Hex2Bytes("0x000000008")
 			accToAdd.Name = "Generated Acc 8"
 
-			err = db.SaveOrUpdateAccounts([]*Account{accToAdd})
+			err = db.SaveOrUpdateAccounts([]*Account{accToAdd}, false)
 			require.NoError(t, err)
 			dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
 			require.NoError(t, err)
@@ -364,7 +365,7 @@ func TestKeypairs(t *testing.T) {
 				expectedLastUsedDerivationIndex = 1
 			}
 
-			err = db.SaveOrUpdateAccounts([]*Account{accToAdd})
+			err = db.SaveOrUpdateAccounts([]*Account{accToAdd}, false)
 			require.NoError(t, err)
 			dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
 			require.NoError(t, err)
@@ -378,7 +379,7 @@ func TestKeypairs(t *testing.T) {
 			require.Equal(t, accToAdd.Address, dbAcc.Address)
 
 			// delete account
-			err = db.DeleteAccount(accToAdd.Address)
+			err = db.DeleteAccount(accToAdd.Address, 0)
 			require.NoError(t, err)
 			dbAccounts, err = db.GetAccounts()
 			require.NoError(t, err)
@@ -388,7 +389,7 @@ func TestKeypairs(t *testing.T) {
 			require.True(t, err == ErrDbAccountNotFound)
 
 			for _, acc := range dbAccounts {
-				err = db.DeleteAccount(acc.Address)
+				err = db.DeleteAccount(acc.Address, 0)
 				require.NoError(t, err)
 			}
 

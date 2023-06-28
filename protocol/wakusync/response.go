@@ -13,7 +13,6 @@ type WakuBackedUpDataResponse struct {
 	FetchingDataProgress map[string]protobuf.FetchingBackedUpDataDetails // key represents the data/section backup details refer to
 	Profile              *BackedUpProfile
 	Setting              *settings.SyncSettingField
-	Keycards             []*accounts.Keycard
 	Keypair              *accounts.Keypair
 	WatchOnlyAccount     *accounts.Account
 }
@@ -24,14 +23,12 @@ func (sfwr *WakuBackedUpDataResponse) MarshalJSON() ([]byte, error) {
 		FetchingDataProgress map[string]FetchingBackupedDataDetails `json:"fetchingBackedUpDataProgress,omitempty"`
 		Profile              *BackedUpProfile                       `json:"backedUpProfile,omitempty"`
 		Setting              *settings.SyncSettingField             `json:"backedUpSettings,omitempty"`
-		Keycards             []*accounts.Keycard                    `json:"backedUpKeycards,omitempty"`
 		Keypair              *accounts.Keypair                      `json:"backedUpKeypair,omitempty"`
 		WatchOnlyAccount     *accounts.Account                      `json:"backedUpWatchOnlyAccount,omitempty"`
 	}{
 		Clock:            sfwr.Clock,
 		Profile:          sfwr.Profile,
 		Setting:          sfwr.Setting,
-		Keycards:         sfwr.Keycards,
 		Keypair:          sfwr.Keypair,
 		WatchOnlyAccount: sfwr.WatchOnlyAccount,
 	}

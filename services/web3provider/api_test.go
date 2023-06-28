@@ -79,7 +79,7 @@ func setupTestAPI(t *testing.T) (*API, func()) {
 	accounts := []*accounts.Account{
 		{Address: types.HexToAddress(utils.TestConfig.Account1.WalletAddress), Chat: true, Wallet: true},
 	}
-	require.NoError(t, service.accountsDB.SaveOrUpdateAccounts(accounts))
+	require.NoError(t, service.accountsDB.SaveOrUpdateAccounts(accounts, false))
 
 	require.NoError(t, service.accountsDB.CreateSettings(settings, *nodeConfig))
 

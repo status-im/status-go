@@ -7,7 +7,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -199,20 +198,20 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncWalletAccount(state, message, accounts.SyncedFromLocalPairing)
+			err = m.HandleSyncWatchOnlyAccount(state, message)
 			if err != nil {
-				m.logger.Error("failed to HandleSyncWalletAccount when HandleSyncRawMessages", zap.Error(err))
+				m.logger.Error("failed to HandleSyncWatchOnlyAccount when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
-		case protobuf.ApplicationMetadataMessage_SYNC_FULL_KEYPAIR:
-			var message protobuf.SyncKeypairFull
+		case protobuf.ApplicationMetadataMessage_SYNC_KEYPAIR:
+			var message protobuf.SyncKeypair
 			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncKeypairFull(state, message)
+			err = m.HandleSyncKeypair(state, message)
 			if err != nil {
-				m.logger.Error("failed to HandleSyncKeypairFull when HandleSyncRawMessages", zap.Error(err))
+				m.logger.Error("failed to HandleSyncKeypair when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_SAVED_ADDRESS:

@@ -55,6 +55,10 @@ func (m *AccountManagerMock) Sign(rpcParams account.SignParams, verifiedAccount 
 	return types.HexBytes{}, nil
 }
 
+func (m *AccountManagerMock) DeleteAccount(address types.Address) error {
+	return nil
+}
+
 type TokenManagerMock struct {
 	Balances *map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
 }

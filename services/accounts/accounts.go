@@ -78,7 +78,7 @@ func (api *API) UpdateKeypairName(ctx context.Context, keyUID string, name strin
 }
 
 func (api *API) UpdateAccountPosition(ctx context.Context, address types.Address, position int64) error {
-	return api.db.UpdateAccountPosition(address, position)
+	return (*api.messenger).UpdateAccountPosition(address, position)
 }
 
 func (api *API) GetAccounts(ctx context.Context) ([]*accounts.Account, error) {
@@ -102,58 +102,9 @@ func (api *API) GetKeypairByKeyUID(ctx context.Context, keyUID string) (*account
 }
 
 func (api *API) DeleteAccount(ctx context.Context, address types.Address) error {
-	acc, err := api.db.GetAccountByAddress(address)
+	err := (*api.messenger).DeleteAccount(address)
 	if err != nil {
 		return err
-	}
-
-	if acc.Type != accounts.AccountTypeWatch {
-		kp, err := api.db.GetKeypairByKeyUID(acc.KeyUID)
-		if err != nil {
-			return err
-		}
-
-		lastAcccountOfKeypairWithTheSameKey := len(kp.Accounts) == 1
-
-		knownKeycardsForKeyUID, err := api.db.GetKeycardByKeyUID(acc.KeyUID)
-		if err != nil {
-			return err
-		}
-
-		if len(knownKeycardsForKeyUID) == 0 {
-			err = api.manager.DeleteAccount(address)
-			var e *account.ErrCannotLocateKeyFile
-			if err != nil && !errors.As(err, &e) {
-				return err
-			}
-
-			if acc.Type != accounts.AccountTypeKey {
-				if lastAcccountOfKeypairWithTheSameKey {
-					err = api.manager.DeleteAccount(types.Address(common.HexToAddress(kp.DerivedFrom)))
-					var e *account.ErrCannotLocateKeyFile
-					if err != nil && !errors.As(err, &e) {
-						return err
-					}
-				}
-			}
-		} else {
-			if lastAcccountOfKeypairWithTheSameKey {
-				knownKeycards, err := api.db.GetAllKnownKeycards()
-				if err != nil {
-					return err
-				}
-
-				for _, kc := range knownKeycards {
-					if kc.KeyUID == acc.KeyUID {
-						clock := uint64(time.Now().Unix())
-						err = (*api.messenger).RemoveMigratedAccountsForKeycard(ctx, kc.KeycardUID, kc.AccountsAddresses, clock)
-						if err != nil {
-							return err
-						}
-					}
-				}
-			}
-		}
 	}
 
 	api.feed.Send(accountsevent.Event{
@@ -161,7 +112,7 @@ func (api *API) DeleteAccount(ctx context.Context, address types.Address) error 
 		Accounts: []common.Address{common.Address(address)},
 	})
 
-	return (*api.messenger).DeleteAccount(address)
+	return nil
 }
 
 func (api *API) AddKeypair(ctx context.Context, password string, keypair *accounts.Keypair) error {

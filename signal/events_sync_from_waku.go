@@ -15,9 +15,6 @@ const (
 	// EventWakuBackedUpKeypair is emitted while applying fetched keypair data from waku
 	EventWakuBackedUpKeypair = "waku.backedup.keypair"
 
-	// EventWakuBackedUpKeycards is emitted while applying fetched keycard data from waku
-	EventWakuBackedUpKeycards = "waku.backedup.keycards"
-
 	// EventWakuBackedUpWatchOnlyAccount is emitted while applying fetched watch only account data from waku
 	EventWakuBackedUpWatchOnlyAccount = "waku.backedup.watch-only-account" // #nosec G101
 )
@@ -36,10 +33,6 @@ func SendWakuBackedUpSettings(obj json.Marshaler) {
 
 func SendWakuBackedUpKeypair(obj json.Marshaler) {
 	send(EventWakuBackedUpKeypair, obj)
-}
-
-func SendWakuBackedUpKeycards(obj json.Marshaler) {
-	send(EventWakuBackedUpKeycards, obj)
 }
 
 func SendWakuBackedUpWatchOnlyAccount(obj json.Marshaler) {

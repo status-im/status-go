@@ -28,8 +28,8 @@ message Backup {
   FetchingBackedUpDataDetails profileDetails = 8;
   SyncSetting setting = 9;
   FetchingBackedUpDataDetails settingsDetails = 10;
-  SyncKeypairFull fullKeypair = 11;
-  FetchingBackedUpDataDetails fullKeypairDetails = 12;
+  SyncKeypair keypair = 11;
+  FetchingBackedUpDataDetails keypairDetails = 12;
   SyncAccount watchOnlyAccount = 13;
   FetchingBackedUpDataDetails watchOnlyAccountDetails = 14;
 }
@@ -296,6 +296,7 @@ message SyncAccount {
   bool chat = 10;
   bool hidden = 11;
   bool removed = 12;
+  int64 position = 13;
 }
 
 message SyncKeypair {
@@ -307,11 +308,8 @@ message SyncKeypair {
   uint64 last_used_derivation_index = 6;
   string synced_from = 7;
   repeated SyncAccount accounts = 8;
-}
-
-message SyncKeypairFull {
-  SyncKeypair keypair = 1;
-  repeated SyncKeycard keycards = 2;
+  repeated SyncKeycard keycards = 9;
+  bool removed = 10;
 }
 
 message SyncSavedAddress {

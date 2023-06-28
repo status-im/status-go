@@ -67,6 +67,7 @@ type Manager interface {
 	GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*SelectedExtKey, error)
 	Sign(rpcParams SignParams, verifiedAccount *SelectedExtKey) (result types.HexBytes, err error)
 	CanRecover(rpcParams RecoverParams, revealedAddress types.Address) (bool, error)
+	DeleteAccount(address types.Address) error
 }
 
 // DefaultManager represents default account manager implementation
