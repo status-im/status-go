@@ -1550,6 +1550,17 @@ func (m *Manager) CheckPermissionToJoin(id []byte, addresses []gethcommon.Addres
 	}
 
 	accountsAndChainIDs := combineAddressesAndChainIDs(addresses, allChainIDs)
+
+	if len(permissionsToJoin) == 0 {
+		// There are no permissions to join on this community at the moment,
+		// so we reveal all accounts + all chain IDs
+		response := &CheckPermissionsResponse{
+			Satisfied:         true,
+			Permissions:       make(map[string]*PermissionTokenCriteriaResult),
+			ValidCombinations: accountsAndChainIDs,
+		}
+		return response, nil
+	}
 	return m.checkPermissionToJoin(permissionsToJoin, accountsAndChainIDs, false)
 }
 
