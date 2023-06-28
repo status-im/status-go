@@ -540,3 +540,28 @@ func usernamesProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*c
 	us := extractJSONRawMessage(s.Usernames)
 	return buildRawUsernamesSyncMessage(us, clock, chatID)
 }
+
+// IncludeWatchOnlyAccount
+
+func buildRawIncludeWatchOnlyAccountSyncMessage(v bool, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_INCLUDE_WATCHONLY_ACCOUNT,
+		Value: &protobuf.SyncSetting_ValueBool{ValueBool: v},
+		Clock: clock,
+	}
+	rm, err := buildRawSyncSettingMessage(pb, chatID)
+	return rm, pb, err
+}
+
+func includeWatchOnlyAccountProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	v, err := assertBool(value)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return buildRawIncludeWatchOnlyAccountSyncMessage(v, clock, chatID)
+}
+
+func includeWatchOnlyAccountProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	return buildRawIncludeWatchOnlyAccountSyncMessage(s.IncludeWatchOnlyAccount, clock, chatID)
+}

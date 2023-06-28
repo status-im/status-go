@@ -166,6 +166,7 @@ type MembershipUpdateMessage struct {
 	// An optional chat message
 	//
 	// Types that are valid to be assigned to ChatEntity:
+	//
 	//	*MembershipUpdateMessage_Message
 	//	*MembershipUpdateMessage_EmojiReaction
 	ChatEntity           isMembershipUpdateMessage_ChatEntity `protobuf_oneof:"chat_entity"`
