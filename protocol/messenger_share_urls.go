@@ -6,8 +6,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/golang/protobuf/proto"
-
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -19,11 +17,10 @@ import (
 )
 
 type CommunityUrlData struct {
-	CommunityID  types.HexBytes `json:"communityId"`
-	DisplayName  string         `json:"displayName"`
-	Description  string         `json:"description"`
-	MembersCount uint32         `json:"membersCount"`
-	Color        string         `json:"color"`
+	DisplayName  string `json:"displayName"`
+	Description  string `json:"description"`
+	MembersCount uint32 `json:"membersCount"`
+	Color        string `json:"color"`
 }
 
 type CommunityChannelUrlData struct {
@@ -34,7 +31,6 @@ type CommunityChannelUrlData struct {
 }
 
 type ContactUrlData struct {
-	ContactID   string `json:"contactId"`
 	DisplayName string `json:"displayName"`
 }
 
@@ -95,7 +91,6 @@ func (m *Messenger) ShareCommunityURLWithChatKey(communityID types.HexBytes) (st
 
 func (m *Messenger) prepareCommunityData(community *communities.Community) CommunityUrlData {
 	return CommunityUrlData{
-		CommunityID:  community.ID(),
 		DisplayName:  community.Identity().DisplayName,
 		Description:  community.DescriptionText(),
 		MembersCount: uint32(community.MembersCount()),
@@ -173,12 +168,11 @@ func (m *Messenger) ShareCommunityURLWithData(communityID types.HexBytes) (strin
 }
 
 func (m *Messenger) parseCommunityURLWithData(data string, signature string) (*UrlDataResponse, error) {
-	pubKey, err := crypto.SigToPub([]byte(data), []byte(signature))
-	if err != nil {
-		return nil, err
-	}
-
-	communityID := crypto.CompressPubkey(pubKey)
+	// pubKey, err := crypto.SigToPub([]byte(data), []byte(signature))
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// communityID := crypto.CompressPubkey(pubKey)
 
 	communityData, err := urls.DecodeDataURL(data)
 	if err != nil {
@@ -186,14 +180,13 @@ func (m *Messenger) parseCommunityURLWithData(data string, signature string) (*U
 	}
 
 	var communityProto protobuf.Community
-	err = proto.Unmarshal(communityData, &communityProto)
+	err = json.Unmarshal(communityData, &communityProto)
 	if err != nil {
 		return nil, err
 	}
 
 	return &UrlDataResponse{
 		Community: CommunityUrlData{
-			CommunityID:  communityID,
 			DisplayName:  communityProto.DisplayName,
 			Description:  communityProto.Description,
 			MembersCount: communityProto.MembersCount,
@@ -311,12 +304,11 @@ func (m *Messenger) CreateCommunityChannelURLWithData(request *requests.Communit
 }
 
 func (m *Messenger) parseCommunityChannelURLWithData(data string, signature string) (*UrlDataResponse, error) {
-	pubKey, err := crypto.SigToPub([]byte(data), []byte(signature))
-	if err != nil {
-		return nil, err
-	}
-
-	communityID := crypto.CompressPubkey(pubKey)
+	// pubKey, err := crypto.SigToPub([]byte(data), []byte(signature))
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// communityID := crypto.CompressPubkey(pubKey)
 
 	channelData, err := urls.DecodeDataURL(data)
 	if err != nil {
@@ -324,14 +316,13 @@ func (m *Messenger) parseCommunityChannelURLWithData(data string, signature stri
 	}
 
 	var channelProto protobuf.Channel
-	err = proto.Unmarshal(channelData, &channelProto)
+	err = json.Unmarshal(channelData, &channelProto)
 	if err != nil {
 		return nil, err
 	}
 
 	return &UrlDataResponse{
 		Community: CommunityUrlData{
-			CommunityID:  communityID,
 			DisplayName:  channelProto.Community.DisplayName,
 			Description:  channelProto.Community.Description,
 			MembersCount: channelProto.Community.MembersCount,
@@ -365,7 +356,6 @@ func (m *Messenger) ShareUserURLWithChatKey(contactId string) (string, error) {
 
 func (m *Messenger) prepareContactData(contact *Contact) ContactUrlData {
 	return ContactUrlData{
-		ContactID:   contact.ID,
 		DisplayName: contact.DisplayName,
 	}
 }
@@ -445,10 +435,10 @@ func (m *Messenger) ShareUserURLWithData(contactId string) (string, error) {
 }
 
 func (m *Messenger) parseUserURLWithData(data string, signature string) (*UrlDataResponse, error) {
-	_, err := crypto.SigToPub([]byte(data), []byte(signature))
-	if err != nil {
-		return nil, err
-	}
+	// _, err := crypto.SigToPub([]byte(data), []byte(signature))
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	userData, err := urls.DecodeDataURL(data)
 	if err != nil {
@@ -456,7 +446,7 @@ func (m *Messenger) parseUserURLWithData(data string, signature string) (*UrlDat
 	}
 
 	var userProto protobuf.User
-	err = proto.Unmarshal(userData, &userProto)
+	err = json.Unmarshal(userData, &userProto)
 	if err != nil {
 		return nil, err
 	}

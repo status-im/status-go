@@ -198,7 +198,6 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithChatKey() {
 	s.Require().NotNil(urlData)
 
 	s.Require().NotNil(urlData.Community)
-	s.Require().Equal(community.ID(), urlData.Community.CommunityID)
 	s.Require().Equal(community.Identity().DisplayName, urlData.Community.DisplayName)
 	s.Require().Equal(community.DescriptionText(), urlData.Community.Description)
 	s.Require().Equal(uint32(community.MembersCount()), urlData.Community.MembersCount)
@@ -231,7 +230,6 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithData() {
 	s.Require().NotNil(urlData)
 
 	s.Require().NotNil(urlData.Community)
-	s.Require().Equal(community.ID(), urlData.Community.CommunityID)
 	s.Require().Equal(community.Identity().DisplayName, urlData.Community.DisplayName)
 	s.Require().Equal(community.DescriptionText(), urlData.Community.Description)
 	s.Require().Equal(uint32(community.MembersCount()), urlData.Community.MembersCount)
@@ -269,7 +267,6 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithChatKey() {
 	s.Require().NotNil(urlData)
 
 	s.Require().NotNil(urlData.Community)
-	s.Require().Equal(community.ID(), urlData.Community.CommunityID)
 	s.Require().Equal(community.Identity().DisplayName, urlData.Community.DisplayName)
 	s.Require().Equal(community.DescriptionText(), urlData.Community.Description)
 	s.Require().Equal(uint32(community.MembersCount()), urlData.Community.MembersCount)
@@ -333,7 +330,6 @@ func (s *MessengerShareUrlsSuite) TestParseUserURLWithChatKey() {
 	s.Require().NotNil(urlData)
 
 	s.Require().NotNil(urlData.Contact)
-	s.Require().Equal(contact.ID, urlData.Contact.ContactID)
 	s.Require().Equal(contact.DisplayName, urlData.Contact.DisplayName)
 }
 
@@ -357,7 +353,6 @@ func (s *MessengerShareUrlsSuite) TestParseUserURLWithENS() {
 	s.Require().NotNil(urlData)
 
 	s.Require().NotNil(urlData.Contact)
-	s.Require().Equal(contact.ID, urlData.Contact.ContactID)
 	s.Require().Equal(contact.DisplayName, urlData.Contact.DisplayName)
 }
 
