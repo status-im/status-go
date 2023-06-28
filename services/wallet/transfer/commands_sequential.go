@@ -323,23 +323,25 @@ func loadTransfersLoop(ctx context.Context, account common.Address, blockDAO *Bl
 
 	log.Debug("loadTransfersLoop start", "chain", chainClient.ChainID, "account", account)
 
-	select {
-	case <-ctx.Done():
-		log.Info("loadTransfersLoop error", "chain", chainClient.ChainID, "account", account, "error", ctx.Err())
-		return
-	case dbHeaders := <-blocksLoadedCh:
-		log.Debug("loadTransfersOnDemand transfers received", "chain", chainClient.ChainID, "account", account, "headers", len(dbHeaders))
+	for {
+		select {
+		case <-ctx.Done():
+			log.Info("loadTransfersLoop error", "chain", chainClient.ChainID, "account", account, "error", ctx.Err())
+			return
+		case dbHeaders := <-blocksLoadedCh:
+			log.Debug("loadTransfersOnDemand transfers received", "chain", chainClient.ChainID, "account", account, "headers", len(dbHeaders))
 
-		blockNums := make([]*big.Int, len(dbHeaders))
-		for i, dbHeader := range dbHeaders {
-			blockNums[i] = dbHeader.Number
+			blockNums := make([]*big.Int, len(dbHeaders))
+			for i, dbHeader := range dbHeaders {
+				blockNums[i] = dbHeader.Number
+			}
+
+			blocksByAddress := map[common.Address][]*big.Int{account: blockNums}
+			go func() {
+				_ = loadTransfers(ctx, []common.Address{account}, blockDAO, db, chainClient, noBlockLimit,
+					blocksByAddress, transactionManager, tokenManager, feed)
+			}()
 		}
-
-		blocksByAddress := map[common.Address][]*big.Int{account: blockNums}
-		go func() {
-			_ = loadTransfers(ctx, []common.Address{account}, blockDAO, db, chainClient, noBlockLimit,
-				blocksByAddress, transactionManager, tokenManager, feed)
-		}()
 	}
 }
 
@@ -357,7 +359,7 @@ func newLoadBlocksAndTransfersCommand(account common.Address, db *Database,
 		errorsCount:        0,
 		transactionManager: transactionManager,
 		tokenManager:       tokenManager,
-		blocksLoadedCh:     make(chan []*DBHeader),
+		blocksLoadedCh:     make(chan []*DBHeader, 100),
 	}
 }
 
