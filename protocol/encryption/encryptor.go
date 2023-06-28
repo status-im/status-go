@@ -614,10 +614,9 @@ func (s *encryptor) getNextHashRatchetKeyID(groupID []byte) (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
-	currentTime := (uint32)(time.Now().UnixNano() / int64(time.Millisecond))
-	keyIDBump := (uint32)(10)
+	currentTime := GetCurrentTime()
 	if latestKeyID < currentTime {
-		return currentTime + keyIDBump, nil
+		return bumpKeyID(currentTime), nil
 	}
 
 	return latestKeyID + 1, nil

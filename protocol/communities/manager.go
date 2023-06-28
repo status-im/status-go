@@ -4029,15 +4029,3 @@ func (m *Manager) saveAndPublish(community *Community) error {
 
 	return nil
 }
-
-// GetRekeyedAtClock returns the rekeyed_at time of a given community
-// exposes persistence level functionality to exported Manager APIs
-func (m *Manager) GetRekeyedAtClock(id []byte) (time.Time, error) {
-	return m.persistence.GetRekeyedAtClock(id)
-}
-
-// SetRekeyedAtClock sets the rekeyed_at time value of a given community
-// exposes persistence level functionality to exported Manager APIs
-func (m *Manager) SetRekeyedAtClock(id []byte, time time.Time) error {
-	return m.persistence.SetRekeyedAtClock(id, time)
-}

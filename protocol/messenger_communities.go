@@ -2032,8 +2032,7 @@ func (m *Messenger) SendKeyExchangeMessage(communityID []byte, pubkeys []*ecdsa.
 	return nil
 }
 
-// RekeyCommunity takes a communities.Community and triggers a force rekey event,
-// after rekeying has be triggered updates the communities.Community rekeyed_at value to now
+// RekeyCommunity takes a communities.Community.config.ID and triggers a force rekey event for that community
 func (m *Messenger) RekeyCommunity(cID types.HexBytes) error {
 	// Get the community as the member list could have changed
 	c, err := m.GetCommunityByID(cID)
@@ -2042,13 +2041,7 @@ func (m *Messenger) RekeyCommunity(cID types.HexBytes) error {
 	}
 
 	// RekeyCommunity
-	err = m.SendKeyExchangeMessage(c.ID(), c.GetMemberPubkeys(), common.KeyExMsgRekey)
-	if err != nil {
-		return err
-	}
-
-	// update rekey timestamp
-	return m.communitiesManager.SetRekeyedAtClock(c.ID(), time.Now())
+	return m.SendKeyExchangeMessage(c.ID(), c.GetMemberPubkeys(), common.KeyExMsgRekey)
 }
 
 func (m *Messenger) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunity) (*MessengerResponse, error) {
@@ -4224,15 +4217,34 @@ func chunkAttachmentsByByteSize(slice []*protobuf.DiscordMessageAttachment, maxF
 	return chunks
 }
 
+// GetCurrentKeyForGroup returns the latest key timestampID belonging to a key group
+func (m *Messenger) GetCurrentKeyForGroup(groupID []byte) (uint32, error) {
+	return m.sender.GetCurrentKeyForGroup(groupID)
+}
+
+var rekeyCommunities = false
+
 // startCommunityRekeyLoop creates a 5-minute ticker and starts a routine that attempts to rekey every community every tick
 func (m *Messenger) startCommunityRekeyLoop() {
 	logger := m.logger.Named("CommunityRekeyLoop")
+	// TODO reactivate once resolved the issue with key_id see rekeyAllCommunities() for details
+	if !rekeyCommunities { // Always return
+		return
+	}
 
 	var d time.Duration
 	if m.communitiesManager.RekeyInterval != 0 {
-		d = m.communitiesManager.RekeyInterval / 10
+		if m.communitiesManager.RekeyInterval < 10 {
+			d = time.Nanosecond
+		} else {
+			d = m.communitiesManager.RekeyInterval / 10
+		}
 	} else {
 		d = 5 * time.Minute
+	}
+
+	if d > 0 { // Always return
+		return
 	}
 
 	ticker := time.NewTicker(d)
@@ -4260,7 +4272,7 @@ func (m *Messenger) startCommunityRekeyLoop() {
 func (m *Messenger) rekeyAllCommunities(logger *zap.Logger) {
 	// Determine the rekey interval, if the value is not set as a property of m.communitiesManager
 	// default to one hour
-	// TODO in future perhaps have a community level rki rather than a global rki
+	// TODO in future have a community level rki rather than a global rki
 	var rki time.Duration
 	if m.communitiesManager.RekeyInterval == 0 {
 		rki = time.Hour
@@ -4275,7 +4287,19 @@ func (m *Messenger) rekeyAllCommunities(logger *zap.Logger) {
 		return
 	}
 	for _, c := range cs {
-		if c.IsAdmin() && c.Encrypted() && c.RekeyedAt().Add(rki).Before(time.Now()) {
+		keyTimestampID, err := m.GetCurrentKeyForGroup(c.ID())
+		if err != nil {
+			logger.Error("error getting current keyTimestampID for community", zap.Error(err), zap.Binary("community ID", c.ID()))
+			continue
+		}
+
+		// TODO add functionality to encryptor.go that compares the timestamps and returns a bool
+		//  c.RekeyedAt().Add(rki).Before(time.Now())
+		//  keyTimestampID + rki < time.Now()
+		//  Just using the vars that will be used later
+		fmt.Printf("%d, %d", rki, keyTimestampID)
+
+		if c.IsControlNode() && c.Encrypted() { // && c.RekeyedAt().Add(rki).Before(time.Now())
 			err := m.RekeyCommunity(c.ID())
 			if err != nil {
 				logger.Error("error sending rekey message", zap.Error(err), zap.Binary("community ID", c.ID()))
