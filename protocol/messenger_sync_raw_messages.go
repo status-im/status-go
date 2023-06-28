@@ -113,7 +113,6 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			fmt.Println("<<< HandleSyncInstallationContact ", message)
 			err = m.HandleSyncInstallationContact(state, message)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncInstallationContact when HandleSyncRawMessages", zap.Error(err))

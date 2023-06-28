@@ -454,11 +454,15 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 }
 
 func (m *Messenger) syncContactRequestForInstallationContact(contact *Contact, state *ReceivedMessageState, chat *Chat, outgoing bool) error {
+
+	fmt.Println("<<< syncContactRequestForInstallationContact")
+
 	if chat == nil {
 		return fmt.Errorf("no chat restored during the contact synchronisation, contact.ID = %s", contact.ID)
 	}
 
 	contactRequestID, err := m.persistence.LatestPendingContactRequestIDForContact(contact.ID)
+	fmt.Println("<<< syncContactRequestForInstallationContact 1", contactRequestID, err)
 	if err != nil {
 		return err
 	}
@@ -474,6 +478,7 @@ func (m *Messenger) syncContactRequestForInstallationContact(contact *Contact, s
 	}
 
 	contactRequest.ID = defaultContactRequestID(contact.ID)
+	fmt.Println("<<< syncContactRequestForInstallationContact 2", contactRequest)
 
 	state.Response.AddMessage(contactRequest)
 	err = m.persistence.SaveMessages([]*common.Message{contactRequest})
@@ -499,6 +504,9 @@ func (m *Messenger) syncContactRequestForInstallationContact(contact *Contact, s
 
 func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, message protobuf.SyncInstallationContactV2) error {
 	// Ignore own contact installation
+
+	fmt.Println("<<< HandleSyncInstallationContact ", message, m.myHexIdentity())
+
 	if message.Id == m.myHexIdentity() {
 		return nil
 	}
@@ -525,6 +533,7 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 
 		var err error
 		contact, err = buildContactFromPkString(message.Id)
+		fmt.Println("<<< HandleSyncInstallationContact building contact", contact)
 		if err != nil {
 			return err
 		}
@@ -533,6 +542,7 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 	if message.ContactRequestRemoteClock != 0 || message.ContactRequestLocalClock != 0 {
 		// Some local action about contact requests were performed,
 		// process them
+		fmt.Println("<<< HandleSyncInstallationContact 1", message.ContactRequestRemoteClock, message.ContactRequestLocalClock)
 		contact.ProcessSyncContactRequestState(
 			ContactRequestState(message.ContactRequestRemoteState),
 			uint64(message.ContactRequestRemoteClock),
@@ -548,6 +558,8 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 	} else if message.Added || message.HasAddedUs {
 		// NOTE(cammellos): this is for handling backward compatibility, old clients
 		// won't propagate ContactRequestRemoteClock or ContactRequestLocalClock
+
+		fmt.Println("<<< HandleSyncInstallationContact 2", message.Added, message.HasAddedUs)
 
 		if message.Added && contact.LastUpdatedLocally < message.LastUpdatedLocally {
 			contact.ContactRequestSent(message.LastUpdatedLocally)
@@ -661,6 +673,7 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 			state.Response.AddChat(chat)
 		}
 
+		fmt.Println("<<< HandleSyncInstallationContact storing contact", contact)
 		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)
 	}
