@@ -19,6 +19,7 @@ check_migration_order() {
   done
 }
 
+git fetch origin develop
 committed_files=$(git ls-tree -r --name-only HEAD protocol/migrations/sqlite/*.sql | sort)
 staged_files=$(git diff --name-only origin/develop protocol/migrations/sqlite/*.sql | sort)
 
