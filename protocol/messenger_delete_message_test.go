@@ -541,3 +541,70 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageReplyToImage() {
 	s.Require().Len(sendResponse.Messages(), 1)
 	s.Require().NotEmpty(sendResponse.Messages()[0].ImageLocalURL)
 }
+
+func (s *MessengerDeleteMessageSuite) TestDeleteMessageForMeReplyToImage() {
+	theirMessenger := s.newMessenger()
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+	defer theirMessenger.Shutdown() // nolint: errcheck
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	err = theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	err = s.m.SaveChat(ourChat)
+	s.Require().NoError(err)
+
+	inputMessage := buildTestMessage(*theirChat)
+	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.messages) == 1 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+
+	ogMessage := sendResponse.Messages()[0]
+
+	// create an http server
+	mediaServer, err := server.NewMediaServer(nil, nil, nil)
+	s.Require().NoError(err)
+	s.Require().NotNil(mediaServer)
+	s.Require().NoError(mediaServer.Start())
+
+	theirMessenger.httpServer = mediaServer
+
+	// We reply to our own message with an image
+	imageMessage, err := buildImageWithoutAlbumIDMessage(*theirChat)
+	s.NoError(err)
+
+	imageMessage.ResponseTo = ogMessage.ID
+
+	_, err = theirMessenger.SendChatMessages(context.Background(), []*common.Message{imageMessage})
+	s.NoError(err)
+
+	// We check that the URL is correctly returned
+	sendResponse, err = theirMessenger.DeleteMessageForMeAndSync(context.Background(), theirChat.ID, ogMessage.ID)
+
+	s.Require().NoError(err)
+	messages := sendResponse.Messages()
+	s.Require().Len(messages, 2)
+
+	var deletedMessage, replyMessage *common.Message
+	if messages[0].ID == ogMessage.ID {
+		deletedMessage = messages[0]
+		replyMessage = messages[1]
+	} else {
+		deletedMessage = messages[1]
+		replyMessage = messages[0]
+	}
+
+	s.Require().True(deletedMessage.DeletedForMe)
+	s.Require().NotEmpty(replyMessage.ImageLocalURL)
+}

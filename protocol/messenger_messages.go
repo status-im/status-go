@@ -288,7 +288,10 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string
 		if err != nil {
 			return nil, err
 		}
+
 		response.AddMessages(updatedMessages)
+
+		m.prepareMessages(response.messages)
 
 	}
 	response.AddChat(chat)
