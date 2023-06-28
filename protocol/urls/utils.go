@@ -61,7 +61,11 @@ func encodeDataURL(data []byte) (string, error) {
 	bb := bytes.NewBuffer([]byte{})
 	writer := brotli.NewWriter(bb)
 	_, err := writer.Write(data)
-	writer.Close()
+	if err != nil {
+		return "", err
+	}
+
+	err = writer.Close()
 	if err != nil {
 		return "", err
 	}
@@ -71,17 +75,17 @@ func encodeDataURL(data []byte) (string, error) {
 
 func decodeDataURL(data string) ([]byte, error) {
 	decoded, err := base64.URLEncoding.DecodeString(data)
-
 	if err != nil {
 		return nil, err
 	}
-	var output []byte
+
+	output := make([]byte, 4096)
 	bb := bytes.NewBuffer(decoded)
 	reader := brotli.NewReader(bb)
-	_, err = reader.Read(output)
+	n, err := reader.Read(output)
 	if err != nil {
 		return nil, err
 	}
 
-	return output, nil
+	return output[:n], nil
 }

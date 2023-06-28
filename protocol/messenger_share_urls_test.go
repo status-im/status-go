@@ -136,14 +136,19 @@ func (s *MessengerShareUrlsSuite) createCommunityWithChannel() (*communities.Com
 }
 
 func (s *MessengerShareUrlsSuite) TestDecodeEncodeDataURL() {
-	testData := []byte("test data 123")
+	ts := [][]byte{
+		[]byte("test data 123"),
+		[]byte("test data 123test data 123test data 123test data 123test data 123"),
+	}
 
-	encodedData, err := urls.EncodeDataURL(testData)
-	s.Require().NoError(err)
+	for i := range ts {
+		encodedData, err := urls.EncodeDataURL(ts[i])
+		s.Require().NoError(err)
 
-	decodedData, err := urls.DecodeDataURL(encodedData)
-	s.Require().NoError(err)
-	s.Require().Equal(testData, decodedData)
+		decodedData, err := urls.DecodeDataURL(encodedData)
+		s.Require().NoError(err)
+		s.Require().Equal(ts[i], decodedData)
+	}
 }
 
 func (s *MessengerShareUrlsSuite) TestSerializePublicKey() {
