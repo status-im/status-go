@@ -1598,7 +1598,7 @@ func _1687249080_add_position_accountsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1687249080_add_position_accounts.up..sql", size: 2053, mode: os.FileMode(0644), modTime: time.Unix(1687956811, 0)}
+	info := bindataFileInfo{name: "1687249080_add_position_accounts.up..sql", size: 2053, mode: os.FileMode(0644), modTime: time.Unix(1687959161, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf3, 0x47, 0x9f, 0xb4, 0xe3, 0xc, 0x35, 0x15, 0x74, 0xc3, 0x72, 0x57, 0x9f, 0x3b, 0xc9, 0xd5, 0x9b, 0x31, 0xef, 0xd6, 0x21, 0xc4, 0x27, 0x8e, 0x37, 0xd5, 0x5, 0xdb, 0x3d, 0xcf, 0x37, 0xbb}}
 	return a, nil
 }
