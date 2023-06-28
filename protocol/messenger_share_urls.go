@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/golang/protobuf/proto"
@@ -29,6 +30,7 @@ type CommunityUrlData struct {
 type CommunityChannelUrlData struct {
 	Emoji       string `json:"emoji"`
 	DisplayName string `json:"displayName"`
+	Description string `json:"description"`
 	Color       string `json:"color"`
 }
 
@@ -38,6 +40,7 @@ type UrlDataResponse struct {
 }
 
 const baseShareUrl = "https://status.app"
+const channelUuidRegExp = "/^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i"
 
 func (m *Messenger) SerializePublicKey(compressedKey types.HexBytes) (string, error) {
 	rawKey, err := crypto.DecompressPubkey(compressedKey)
@@ -212,6 +215,7 @@ func (m *Messenger) prepareCommunityChannelData(channel *protobuf.CommunityChat)
 	return CommunityChannelUrlData{
 		Emoji:       channel.Identity.Emoji,
 		DisplayName: channel.Identity.DisplayName,
+		Description: channel.Identity.Description,
 		Color:       channel.Identity.Color,
 	}
 }
@@ -301,6 +305,38 @@ func (m *Messenger) CreateCommunityChannelURLWithData(request *requests.Communit
 	return fmt.Sprintf("%s/cc/%s#%s", baseShareUrl, data, signature), nil
 }
 
+func (m *Messenger) parseCommunityChannelWithData(data string, signature string) (*UrlDataResponse, error) {
+	// TODO: get PubKey from signature
+
+	channelData, err := urls.DecodeDataURL(data)
+	if err != nil {
+		return nil, err
+	}
+
+	var channelProto protobuf.Channel
+	// TODO: does not restored properly, maybe decoding is wrong?
+	err = proto.Unmarshal(channelData, &channelProto)
+	if err != nil {
+		return nil, err
+	}
+
+	return &UrlDataResponse{
+		Community: CommunityUrlData{
+			//			CommunityID:  communityID,
+			DisplayName:  channelProto.Community.DisplayName,
+			Description:  channelProto.Community.Description,
+			MembersCount: channelProto.Community.MembersCount,
+			Color:        channelProto.Community.Color,
+		},
+		Channel: CommunityChannelUrlData{
+			Emoji:       channelProto.Emoji,
+			DisplayName: channelProto.DisplayName,
+			Description: channelProto.Description,
+			Color:       channelProto.Color,
+		},
+	}, nil
+}
+
 func (m *Messenger) CreateUserURLWithChatKey(pubKey string) (string, error) {
 	if len(pubKey) == 0 {
 		return "", errors.New("pubkey is empty")
@@ -358,10 +394,6 @@ func (m *Messenger) CreateUserURLWithData(pubKey string) (string, error) {
 	return fmt.Sprintf("%s/%s/%s#%s", baseShareUrl, "u", userBase64, string(signature)), nil
 }
 
-func (m *Messenger) parseCommuntyChannelSharedURL(url string) (*UrlDataResponse, error) {
-	return nil, errors.New("not implemented yet")
-}
-
 func (m *Messenger) parseProfileSharedURL(urlData string) (*UrlDataResponse, error) {
 	// TODO: decompress public key
 	pubKey, err := common.HexToPubkey(urlData)
@@ -400,8 +432,17 @@ func (m *Messenger) ParseSharedURL(url string) (*UrlDataResponse, error) {
 	}
 
 	if len(urlContents) == 2 && strings.HasPrefix(urlContents[0], "cc/") {
-		// TODO: use /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i regexp to pich uuid or pubKey
-		return m.parseCommunityChannelWithChatKey(strings.TrimPrefix(urlContents[0], "cc/"), urlContents[1])
+		first := strings.TrimPrefix(urlContents[0], "cc/")
+
+		isChannel, err := regexp.MatchString(channelUuidRegExp, first)
+		if err != nil {
+			return nil, err
+		}
+		if isChannel {
+			return m.parseCommunityChannelWithChatKey(first, urlContents[1])
+		} else {
+			return m.parseCommunityChannelWithData(first, urlContents[1])
+		}
 	}
 
 	return nil, fmt.Errorf("unhandled shared url: %s", url)
