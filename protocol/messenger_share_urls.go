@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -34,9 +33,15 @@ type CommunityChannelUrlData struct {
 	Color       string `json:"color"`
 }
 
+type ContactUrlData struct {
+	ContactID   string `json:"contactId"`
+	DisplayName string `json:"displayName"`
+}
+
 type UrlDataResponse struct {
 	Community CommunityUrlData        `json:"community"`
 	Channel   CommunityChannelUrlData `json:"channel"`
+	Contact   ContactUrlData          `json:"contact"`
 }
 
 const baseShareUrl = "https://status.app"
@@ -81,11 +86,11 @@ func (m *Messenger) ShareCommunityURLWithChatKey(communityID types.HexBytes) (st
 		return "", ErrChatIDEmpty
 	}
 
-	pubKey, err := m.SerializePublicKey(communityID)
+	shortKey, err := m.SerializePublicKey(communityID)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s/c#%s", baseShareUrl, pubKey), nil
+	return fmt.Sprintf("%s/c#%s", baseShareUrl, shortKey), nil
 }
 
 func (m *Messenger) prepareCommunityData(community *communities.Community) CommunityUrlData {
@@ -119,7 +124,6 @@ func (m *Messenger) parseCommunityURLWithChatKey(urlData string) (*UrlDataRespon
 }
 
 func (m *Messenger) prepareEncodedCommunityData(community *communities.Community) (string, string, error) {
-	// TODO: no ID here!
 	communityProto := &protobuf.Community{
 		DisplayName:  community.Identity().DisplayName,
 		Description:  community.DescriptionText(),
@@ -168,19 +172,20 @@ func (m *Messenger) ShareCommunityURLWithData(communityID types.HexBytes) (strin
 	return fmt.Sprintf("%s/c/%s#%s", baseShareUrl, data, signature), nil
 }
 
-func (m *Messenger) parseCommunityURLWithData(keyString string, dataString string) (*UrlDataResponse, error) {
-	communityID, err := m.DeserializePublicKey(keyString)
+func (m *Messenger) parseCommunityURLWithData(data string, signature string) (*UrlDataResponse, error) {
+	pubKey, err := crypto.SigToPub([]byte(data), []byte(signature))
 	if err != nil {
 		return nil, err
 	}
 
-	communityData, err := urls.DecodeDataURL(dataString)
+	communityID := crypto.CompressPubkey(pubKey)
+
+	communityData, err := urls.DecodeDataURL(data)
 	if err != nil {
 		return nil, err
 	}
 
 	var communityProto protobuf.Community
-	// TODO: does not restored properly, maybe decoding is wrong?
 	err = proto.Unmarshal(communityData, &communityProto)
 	if err != nil {
 		return nil, err
@@ -202,13 +207,13 @@ func (m *Messenger) ShareCommunityChannelURLWithChatKey(request *requests.Commun
 		return "", err
 	}
 
-	communityKey, err := m.SerializePublicKey(request.CommunityID)
+	shortKey, err := m.SerializePublicKey(request.CommunityID)
 	if err != nil {
 		return "", err
 	}
 
 	// TODO: convert ChannelID to 003cdcd5-e065-48f9-b166-b1a94ac75a11 format
-	return fmt.Sprintf("%s/cc/%s#%s", baseShareUrl, request.ChannelID, communityKey), nil
+	return fmt.Sprintf("%s/cc/%s#%s", baseShareUrl, request.ChannelID, shortKey), nil
 }
 
 func (m *Messenger) prepareCommunityChannelData(channel *protobuf.CommunityChat) CommunityChannelUrlData {
@@ -220,7 +225,7 @@ func (m *Messenger) prepareCommunityChannelData(channel *protobuf.CommunityChat)
 	}
 }
 
-func (m *Messenger) parseCommunityChannelWithChatKey(channelId string, publickKey string) (*UrlDataResponse, error) {
+func (m *Messenger) parseCommunityChannelURLWithChatKey(channelId string, publickKey string) (*UrlDataResponse, error) {
 	communityID, err := m.DeserializePublicKey(publickKey)
 	if err != nil {
 		return nil, err
@@ -305,8 +310,13 @@ func (m *Messenger) CreateCommunityChannelURLWithData(request *requests.Communit
 	return fmt.Sprintf("%s/cc/%s#%s", baseShareUrl, data, signature), nil
 }
 
-func (m *Messenger) parseCommunityChannelWithData(data string, signature string) (*UrlDataResponse, error) {
-	// TODO: get PubKey from signature
+func (m *Messenger) parseCommunityChannelURLWithData(data string, signature string) (*UrlDataResponse, error) {
+	pubKey, err := crypto.SigToPub([]byte(data), []byte(signature))
+	if err != nil {
+		return nil, err
+	}
+
+	communityID := crypto.CompressPubkey(pubKey)
 
 	channelData, err := urls.DecodeDataURL(data)
 	if err != nil {
@@ -314,7 +324,6 @@ func (m *Messenger) parseCommunityChannelWithData(data string, signature string)
 	}
 
 	var channelProto protobuf.Channel
-	// TODO: does not restored properly, maybe decoding is wrong?
 	err = proto.Unmarshal(channelData, &channelProto)
 	if err != nil {
 		return nil, err
@@ -322,7 +331,7 @@ func (m *Messenger) parseCommunityChannelWithData(data string, signature string)
 
 	return &UrlDataResponse{
 		Community: CommunityUrlData{
-			//			CommunityID:  communityID,
+			CommunityID:  communityID,
 			DisplayName:  channelProto.Community.DisplayName,
 			Description:  channelProto.Community.Description,
 			MembersCount: channelProto.Community.MembersCount,
@@ -337,81 +346,126 @@ func (m *Messenger) parseCommunityChannelWithData(data string, signature string)
 	}, nil
 }
 
-func (m *Messenger) CreateUserURLWithChatKey(pubKey string) (string, error) {
-	if len(pubKey) == 0 {
-		return "", errors.New("pubkey is empty")
+func (m *Messenger) ShareUserURLWithChatKey(contactId string) (string, error) {
+	if len(contactId) == 0 {
+		return "", ErrChatIDEmpty
 	}
-	contact, ok := m.allContacts.Load(pubKey)
-	if !ok {
-		return "", ErrContactNotFound
-	}
-	pubkey, err := contact.PublicKey()
+
+	publicKey, err := common.HexToPubkey(contactId)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s/%s/%s", baseShareUrl, "u#", types.EncodeHex(crypto.CompressPubkey(pubkey))), nil
+
+	shortKey, err := m.SerializePublicKey(crypto.CompressPubkey(publicKey))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s/u#%s", baseShareUrl, shortKey), nil
 }
 
-func (m *Messenger) CreateUserURLWithENS(pubKey string) (string, error) {
-	if len(pubKey) == 0 {
-		return "", errors.New("pubkey is empty")
+func (m *Messenger) prepareContactData(contact *Contact) ContactUrlData {
+	return ContactUrlData{
+		ContactID:   contact.ID,
+		DisplayName: contact.DisplayName,
 	}
-	contact, ok := m.allContacts.Load(pubKey)
+}
+
+func (m *Messenger) parseUserURLWithChatKey(urlData string) (*UrlDataResponse, error) {
+	contactId, err := m.DeserializePublicKey(urlData)
+	if err != nil {
+		return nil, err
+	}
+
+	contact, ok := m.allContacts.Load(contactId.String())
+	if !ok {
+		return nil, ErrContactNotFound
+	}
+
+	return &UrlDataResponse{
+		Contact: m.prepareContactData(contact),
+	}, nil
+}
+
+func (m *Messenger) ShareUserURLWithENS(contactId string) (string, error) {
+	if len(contactId) == 0 {
+		return "", ErrChatIDEmpty
+	}
+
+	contact, ok := m.allContacts.Load(contactId)
 	if !ok {
 		return "", ErrContactNotFound
 	}
-	return fmt.Sprintf("%s/%s/%s", baseShareUrl, "/u#", contact.EnsName), nil
+	return fmt.Sprintf("%s/u#%s", baseShareUrl, contact.EnsName), nil
 }
 
-func (m *Messenger) CreateUserURLWithData(pubKey string) (string, error) {
-	if len(pubKey) == 0 {
-		return "", errors.New("pubkey is empty")
-	}
-	contact, ok := m.allContacts.Load(pubKey)
-	if !ok {
-		return "", ErrContactNotFound
+func (m *Messenger) parseUserURLWithENS(ensName string) (*UrlDataResponse, error) {
+	if len(ensName) == 0 {
+		return nil, ErrChatIDEmpty
 	}
 
+	// TODO: fetch contact by ens name
+	return nil, fmt.Errorf("not implemented yet")
+}
+
+func (m *Messenger) prepareEncodedUserData(contact *Contact) (string, string, error) {
 	userProto := &protobuf.User{
 		DisplayName: contact.DisplayName,
 	}
 
-	data, err := json.Marshal(userProto)
+	userData, err := json.Marshal(userProto)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	userBase64, err := urls.EncodeDataURL(data)
+	encodedData, err := urls.EncodeDataURL(userData)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	signature, err := crypto.SignBytes([]byte(userBase64), m.identity)
+	signature, err := crypto.SignBytes([]byte(encodedData), m.identity)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	return fmt.Sprintf("%s/%s/%s#%s", baseShareUrl, "u", userBase64, string(signature)), nil
+	return encodedData, string(signature), nil
 }
 
-func (m *Messenger) parseProfileSharedURL(urlData string) (*UrlDataResponse, error) {
-	// TODO: decompress public key
-	pubKey, err := common.HexToPubkey(urlData)
+func (m *Messenger) ShareUserURLWithData(contactId string) (string, error) {
+	contact, ok := m.allContacts.Load(contactId)
+	if !ok {
+		return "", ErrContactNotFound
+	}
+
+	data, signature, err := m.prepareEncodedUserData(contact)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s/u/%s#%s", baseShareUrl, data, signature), nil
+}
+
+func (m *Messenger) parseUserURLWithData(data string, signature string) (*UrlDataResponse, error) {
+	_, err := crypto.SigToPub([]byte(data), []byte(signature))
 	if err != nil {
 		return nil, err
 	}
 
-	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: types.EncodeHex(crypto.FromECDSAPub(pubKey))})
+	userData, err := urls.DecodeDataURL(data)
 	if err != nil {
 		return nil, err
 	}
 
-	if contact == nil {
-		return nil, fmt.Errorf("contact with publick key %s not found", pubKey)
+	var userProto protobuf.User
+	err = proto.Unmarshal(userData, &userProto)
+	if err != nil {
+		return nil, err
 	}
 
-	// TODDO: impl
-	return nil, nil
+	return &UrlDataResponse{
+		Contact: ContactUrlData{
+			DisplayName: userProto.DisplayName,
+		},
+	}, nil
 }
 
 func (m *Messenger) ParseSharedURL(url string) (*UrlDataResponse, error) {
@@ -423,7 +477,6 @@ func (m *Messenger) ParseSharedURL(url string) (*UrlDataResponse, error) {
 	fmt.Println("-----> ParseSharedURL::: url: ", url, "urlContents: ", len(urlContents))
 
 	if len(urlContents) == 2 && urlContents[0] == "c" {
-		// TODO: encrypted protobuf can contain '#'!
 		return m.parseCommunityURLWithChatKey(urlContents[1])
 	}
 
@@ -439,10 +492,22 @@ func (m *Messenger) ParseSharedURL(url string) (*UrlDataResponse, error) {
 			return nil, err
 		}
 		if isChannel {
-			return m.parseCommunityChannelWithChatKey(first, urlContents[1])
+			return m.parseCommunityChannelURLWithChatKey(first, urlContents[1])
 		} else {
-			return m.parseCommunityChannelWithData(first, urlContents[1])
+			return m.parseCommunityChannelURLWithData(first, urlContents[1])
 		}
+	}
+
+	if len(urlContents) == 2 && urlContents[0] == "u" {
+		if strings.HasPrefix(urlContents[1], "zQ3sh") {
+			return m.parseUserURLWithChatKey(urlContents[1])
+		} else {
+			return m.parseUserURLWithENS(urlContents[1])
+		}
+	}
+
+	if len(urlContents) == 2 && strings.HasPrefix(urlContents[0], "u/") {
+		return m.parseUserURLWithData(strings.TrimPrefix(urlContents[0], "c/"), urlContents[1])
 	}
 
 	return nil, fmt.Errorf("unhandled shared url: %s", url)
