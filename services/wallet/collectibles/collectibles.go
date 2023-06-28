@@ -2,6 +2,7 @@ package collectibles
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -254,6 +255,9 @@ func (o *Manager) processAssets(chainID uint64, assets []opensea.Asset) error {
 		}
 
 		if isMetadataEmpty(asset) {
+			if o.metadataProvider == nil {
+				return fmt.Errorf("NFTMetadataProvider not available")
+			}
 			tokenURI, err := o.fetchTokenURI(chainID, id)
 
 			if err != nil {
