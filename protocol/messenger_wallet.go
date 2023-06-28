@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
@@ -83,17 +84,59 @@ func (m *Messenger) UpdateKeypairName(keyUID string, name string) error {
 		return ErrCannotChangeKeypairName
 	}
 	clock, _ := m.getLastClockWithRelatedChat()
-	err := m.settings.UpdateKeypairName(keyUID, name, clock)
+	err := m.settings.UpdateKeypairName(keyUID, name, clock, keyUID == m.account.KeyUID)
 	if err != nil {
 		return err
 	}
 
-	dbKeypair, err := m.settings.GetKeypairByKeyUID(m.account.KeyUID)
+	return m.resolveAndSyncKeypairOrJustWalletAccount(keyUID, types.Address{}, clock, m.dispatchMessage)
+}
+
+func (m *Messenger) UpdateAccountPosition(address types.Address, position int64) error {
+	acc, err := m.settings.GetAccountByAddress(address)
 	if err != nil {
 		return err
 	}
 
-	return m.syncKeypair(dbKeypair, false, m.dispatchMessage)
+	clock, _ := m.getLastClockWithRelatedChat()
+	acc.Clock = clock
+
+	err = m.settings.UpdateAccountPosition(address, position, clock)
+	if err != nil {
+		return err
+	}
+
+	return m.resolveAndSyncKeypairOrJustWalletAccount(acc.KeyUID, acc.Address, acc.Clock, m.dispatchMessage)
+}
+
+func (m *Messenger) resolveAndSetAccountPropsMaintainedByBackend(acc *accounts.Account) error {
+	// Account position is fully maintained by the backend, no need client to set it explicitly.
+	// To support DragAndDrop feature for accounts there is exposed `UpdateAccountPosition` which
+	// moves an account to the passed position.
+	//
+	// Account operability is fully maintained by the backend, for new accounts created on this device
+	// it is always set to fully operable, while for accounts received by syncing process or fetched from waku
+	// is set by logic placed in `resolveAccountOperability` function.
+	//
+	// TODO: making not or partially operable accounts fully operable will be added later, but for sure it will
+	// be handled by the backend only, no need client to set it explicitly.
+
+	dbAccount, err := m.settings.GetAccountByAddress(acc.Address)
+	if err != nil && err != accounts.ErrDbAccountNotFound {
+		return err
+	}
+	if dbAccount != nil {
+		acc.Position = dbAccount.Position
+		acc.Operable = dbAccount.Operable
+	} else {
+		pos, err := m.settings.GetPositionForNextNewAccount()
+		if err != nil {
+			return err
+		}
+		acc.Position = pos
+		acc.Operable = accounts.AccountFullyOperable
+	}
+	return nil
 }
 
 func (m *Messenger) SaveOrUpdateKeypair(keypair *accounts.Keypair) error {
@@ -106,56 +149,121 @@ func (m *Messenger) SaveOrUpdateKeypair(keypair *accounts.Keypair) error {
 
 	for _, acc := range keypair.Accounts {
 		acc.Clock = clock
+		err := m.resolveAndSetAccountPropsMaintainedByBackend(acc)
+		if err != nil {
+			return err
+		}
 	}
 
 	err := m.settings.SaveOrUpdateKeypair(keypair)
 	if err != nil {
 		return err
 	}
-	return m.syncKeypair(keypair, false, m.dispatchMessage)
+
+	return m.resolveAndSyncKeypairOrJustWalletAccount(keypair.KeyUID, types.Address{}, keypair.Clock, m.dispatchMessage)
 }
 
 func (m *Messenger) SaveOrUpdateAccount(acc *accounts.Account) error {
 	clock, _ := m.getLastClockWithRelatedChat()
 	acc.Clock = clock
 
-	err := m.settings.SaveOrUpdateAccounts([]*accounts.Account{acc})
+	err := m.resolveAndSetAccountPropsMaintainedByBackend(acc)
 	if err != nil {
 		return err
 	}
-	return m.syncWalletAccount(acc, m.dispatchMessage)
+
+	err = m.settings.SaveOrUpdateAccounts([]*accounts.Account{acc}, true)
+	if err != nil {
+		return err
+	}
+
+	return m.resolveAndSyncKeypairOrJustWalletAccount(acc.KeyUID, acc.Address, acc.Clock, m.dispatchMessage)
+}
+
+func (m *Messenger) deleteKeystoreFileForAddress(address types.Address) error {
+	acc, err := m.settings.GetAccountByAddress(address)
+	if err != nil {
+		return err
+	}
+
+	if acc.Operable == accounts.AccountNonOperable || acc.Operable == accounts.AccountPartiallyOperable {
+		return nil
+	}
+
+	if acc.Type != accounts.AccountTypeWatch {
+		kp, err := m.settings.GetKeypairByKeyUID(acc.KeyUID)
+		if err != nil {
+			return err
+		}
+
+		lastAcccountOfKeypairWithTheSameKey := len(kp.Accounts) == 1
+
+		knownKeycardsForKeyUID, err := m.settings.GetKeycardByKeyUID(acc.KeyUID)
+		if err != nil {
+			return err
+		}
+
+		if len(knownKeycardsForKeyUID) == 0 {
+			err = m.accountsManager.DeleteAccount(address)
+			var e *account.ErrCannotLocateKeyFile
+			if err != nil && !errors.As(err, &e) {
+				return err
+			}
+
+			if acc.Type != accounts.AccountTypeKey {
+				if lastAcccountOfKeypairWithTheSameKey {
+					err = m.accountsManager.DeleteAccount(types.Address(ethcommon.HexToAddress(kp.DerivedFrom)))
+					var e *account.ErrCannotLocateKeyFile
+					if err != nil && !errors.As(err, &e) {
+						return err
+					}
+				}
+			}
+		} else {
+			if lastAcccountOfKeypairWithTheSameKey {
+				knownKeycards, err := m.settings.GetAllKnownKeycards()
+				if err != nil {
+					return err
+				}
+
+				for _, kc := range knownKeycards {
+					if kc.KeyUID == acc.KeyUID {
+						clock := uint64(time.Now().Unix())
+						err = m.RemoveMigratedAccountsForKeycard(context.Background(), kc.KeycardUID, kc.AccountsAddresses, clock)
+						if err != nil {
+							return err
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 func (m *Messenger) DeleteAccount(address types.Address) error {
+	err := m.deleteKeystoreFileForAddress(address)
+	if err != nil {
+		return err
+	}
 
 	acc, err := m.settings.GetAccountByAddress(address)
 	if err != nil {
 		return err
 	}
 
-	err = m.settings.DeleteAccount(address)
+	clock, _ := m.getLastClockWithRelatedChat()
+
+	err = m.settings.DeleteAccount(address, clock)
 	if err != nil {
 		return err
 	}
 
-	clock, chat := m.getLastClockWithRelatedChat()
-	acc.Clock = clock
-	acc.Removed = true
-
-	err = m.syncWalletAccount(acc, m.dispatchMessage)
-	if err != nil {
-		return err
-	}
-
-	chat.LastClockValue = clock
-	return m.saveChat(chat)
+	return m.resolveAndSyncKeypairOrJustWalletAccount(acc.KeyUID, acc.Address, clock, m.dispatchMessage)
 }
 
 func (m *Messenger) prepareSyncAccountMessage(acc *accounts.Account) *protobuf.SyncAccount {
-	if acc.Chat {
-		return nil
-	}
-
 	return &protobuf.SyncAccount{
 		Clock:     acc.Clock,
 		Address:   acc.Address.Bytes(),
@@ -169,6 +277,7 @@ func (m *Messenger) prepareSyncAccountMessage(acc *accounts.Account) *protobuf.S
 		Chat:      acc.Chat,
 		Hidden:    acc.Hidden,
 		Removed:   acc.Removed,
+		Position:  acc.Position,
 	}
 }
 
@@ -194,6 +303,7 @@ func (m *Messenger) prepareSyncKeypairMessage(kp *accounts.Keypair) (*protobuf.S
 		DerivedFrom:             kp.DerivedFrom,
 		LastUsedDerivationIndex: kp.LastUsedDerivationIndex,
 		SyncedFrom:              kp.SyncedFrom,
+		Removed:                 kp.Removed,
 	}
 
 	if kp.SyncedFrom == "" {
@@ -213,24 +323,13 @@ func (m *Messenger) prepareSyncKeypairMessage(kp *accounts.Keypair) (*protobuf.S
 		message.Accounts = append(message.Accounts, sAcc)
 	}
 
-	return message, nil
-}
-
-func (m *Messenger) prepareSyncKeypairFullMessage(kp *accounts.Keypair) (*protobuf.SyncKeypairFull, error) {
-	syncKpMsg, err := m.prepareSyncKeypairMessage(kp)
-	if err != nil {
-		return nil, err
-	}
-
 	syncKcMsgs, err := m.prepareSyncKeycardsMessage(kp.KeyUID)
 	if err != nil {
 		return nil, err
 	}
+	message.Keycards = syncKcMsgs
 
-	return &protobuf.SyncKeypairFull{
-		Keypair:  syncKpMsg,
-		Keycards: syncKcMsgs,
-	}, nil
+	return message, nil
 }
 
 func (m *Messenger) syncWalletAccount(acc *accounts.Account, rawMessageHandler RawMessageHandler) error {
@@ -261,7 +360,7 @@ func (m *Messenger) syncWalletAccount(acc *accounts.Account, rawMessageHandler R
 	return err
 }
 
-func (m *Messenger) syncKeypair(keypair *accounts.Keypair, fullKeypairSync bool, rawMessageHandler RawMessageHandler) (err error) {
+func (m *Messenger) syncKeypair(keypair *accounts.Keypair, rawMessageHandler RawMessageHandler) (err error) {
 	if !m.hasPairedDevices() {
 		return nil
 	}
@@ -273,32 +372,70 @@ func (m *Messenger) syncKeypair(keypair *accounts.Keypair, fullKeypairSync bool,
 	rawMessage := common.RawMessage{
 		LocalChatID:         chat.ID,
 		ResendAutomatically: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_KEYPAIR,
 	}
 
-	if fullKeypairSync {
-		message, err := m.prepareSyncKeypairFullMessage(keypair)
-		if err != nil {
-			return err
-		}
+	message, err := m.prepareSyncKeypairMessage(keypair)
+	if err != nil {
+		return err
+	}
 
-		rawMessage.MessageType = protobuf.ApplicationMetadataMessage_SYNC_FULL_KEYPAIR
-		rawMessage.Payload, err = proto.Marshal(message)
-		if err != nil {
-			return err
-		}
-	} else {
-		message, err := m.prepareSyncKeypairMessage(keypair)
-		if err != nil {
-			return err
-		}
-
-		rawMessage.MessageType = protobuf.ApplicationMetadataMessage_SYNC_KEYPAIR
-		rawMessage.Payload, err = proto.Marshal(message)
-		if err != nil {
-			return err
-		}
+	rawMessage.Payload, err = proto.Marshal(message)
+	if err != nil {
+		return err
 	}
 
 	_, err = rawMessageHandler(ctx, rawMessage)
 	return err
+}
+
+// This function resolves which protobuf message needs to be sent.
+//
+// If `KeyUID` is empty (means it's a watch only account) we send `protobuf.SyncAccount` message
+// otherwise means the account belong to a keypai, hence we send `protobuf.SyncKeypair` message
+func (m *Messenger) resolveAndSyncKeypairOrJustWalletAccount(keyUID string, address types.Address, clock uint64, rawMessageHandler RawMessageHandler) error {
+	if !m.hasPairedDevices() {
+		return nil
+	}
+
+	if keyUID == "" {
+		dbAccount, err := m.settings.GetAccountByAddress(address)
+		if err != nil && err != accounts.ErrDbAccountNotFound {
+			return err
+		}
+		if dbAccount == nil {
+			dbAccount = &accounts.Account{
+				Address: address,
+				Clock:   clock,
+				Removed: true,
+			}
+		}
+		err = m.syncWalletAccount(dbAccount, rawMessageHandler)
+		if err != nil {
+			return err
+		}
+	} else {
+		dbKeypair, err := m.settings.GetKeypairByKeyUID(keyUID)
+		if err != nil && err != accounts.ErrDbKeypairNotFound {
+			return err
+		}
+
+		if dbKeypair == nil {
+			// In case entire keypair was removed (happens if user removes the last account for a keypair).
+			dbKeypair = &accounts.Keypair{
+				KeyUID:  keyUID,
+				Clock:   clock,
+				Removed: true,
+			}
+		}
+
+		err = m.syncKeypair(dbKeypair, rawMessageHandler)
+		if err != nil {
+			return err
+		}
+	}
+
+	_, chat := m.getLastClockWithRelatedChat()
+	chat.LastClockValue = clock
+	return m.saveChat(chat)
 }

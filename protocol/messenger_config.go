@@ -58,7 +58,6 @@ type MessengerSignalsHandler interface {
 	SendWakuBackedUpProfile(response *wakusync.WakuBackedUpDataResponse)
 	SendWakuBackedUpSettings(response *wakusync.WakuBackedUpDataResponse)
 	SendWakuBackedUpKeypair(response *wakusync.WakuBackedUpDataResponse)
-	SendWakuBackedUpKeycards(response *wakusync.WakuBackedUpDataResponse)
 	SendWakuBackedUpWatchOnlyAccount(response *wakusync.WakuBackedUpDataResponse)
 }
 

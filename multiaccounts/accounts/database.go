@@ -18,6 +18,7 @@ import (
 )
 
 const (
+	statusChatPath         = "m/43'/60'/1581'/0'/0"
 	statusWalletRootPath   = "m/44'/60'/0'/0/"
 	zeroAddress            = "0x0000000000000000000000000000000000000000"
 	SyncedFromBackup       = "backup"        // means a account is coming from backed up data
@@ -25,6 +26,7 @@ const (
 )
 
 var (
+	errDbPassedParameterIsNil         = errors.New("accounts: passed parameter is nil")
 	errDbTransactionIsNil             = errors.New("accounts: database transaction is nil")
 	ErrDbKeypairNotFound              = errors.New("accounts: keypair is not found")
 	ErrDbAccountNotFound              = errors.New("accounts: account is not found")
@@ -40,7 +42,9 @@ type Keypair struct {
 	LastUsedDerivationIndex uint64      `json:"last-used-derivation-index,omitempty"`
 	SyncedFrom              string      `json:"synced-from,omitempty"` // keeps an info which device this keypair is added from can be one of two values defined in constants or device name (custom)
 	Clock                   uint64      `json:"clock,omitempty"`
-	Accounts                []*Account  `json:"accounts"`
+	Accounts                []*Account  `json:"accounts,omitempty"`
+	Keycards                []*Keycard  `json:"keycards,omitempty"`
+	Removed                 bool        `json:"removed,omitempty"`
 }
 
 type Account struct {
@@ -156,6 +160,8 @@ func (a *Keypair) MarshalJSON() ([]byte, error) {
 		SyncedFrom              string      `json:"synced-from"`
 		Clock                   uint64      `json:"clock"`
 		Accounts                []*Account  `json:"accounts"`
+		Keycards                []*Keycard  `json:"keycards"`
+		Removed                 bool        `json:"removed"`
 	}{
 		KeyUID:                  a.KeyUID,
 		Name:                    a.Name,
@@ -165,6 +171,8 @@ func (a *Keypair) MarshalJSON() ([]byte, error) {
 		SyncedFrom:              a.SyncedFrom,
 		Clock:                   a.Clock,
 		Accounts:                a.Accounts,
+		Keycards:                a.Keycards,
+		Removed:                 a.Removed,
 	}
 
 	return json.Marshal(item)
@@ -180,6 +188,8 @@ func (a *Keypair) CopyKeypair() *Keypair {
 		LastUsedDerivationIndex: a.LastUsedDerivationIndex,
 		SyncedFrom:              a.SyncedFrom,
 		Accounts:                make([]*Account, len(a.Accounts)),
+		Keycards:                make([]*Keycard, len(a.Keycards)),
+		Removed:                 a.Removed,
 	}
 
 	for i, acc := range a.Accounts {
@@ -200,6 +210,17 @@ func (a *Keypair) CopyKeypair() *Keypair {
 			Operable:  acc.Operable,
 			CreatedAt: acc.CreatedAt,
 			Position:  acc.Position,
+		}
+	}
+
+	for i, kc := range a.Keycards {
+		kp.Keycards[i] = &Keycard{
+			KeycardUID:        kc.KeycardUID,
+			KeycardName:       kc.KeycardName,
+			KeycardLocked:     kc.KeycardLocked,
+			AccountsAddresses: kc.AccountsAddresses,
+			KeyUID:            kc.KeyUID,
+			LastUpdateClock:   kc.LastUpdateClock,
 		}
 	}
 
@@ -248,7 +269,7 @@ func (db *Database) Close() error {
 	return db.db.Close()
 }
 
-func getAccountTypeForKeypairType(kpType KeypairType) AccountType {
+func GetAccountTypeForKeypairType(kpType KeypairType) AccountType {
 	switch kpType {
 	case KeypairTypeProfile:
 		return AccountTypeGenerated
@@ -368,7 +389,7 @@ func (db *Database) processKeypairs(rows *sql.Rows) ([]*Keypair, error) {
 			acc.PublicKey = make(types.HexBytes, lth)
 			copy(acc.PublicKey, pubkey)
 		}
-		acc.Type = getAccountTypeForKeypairType(kp.Type)
+		acc.Type = GetAccountTypeForKeypairType(kp.Type)
 
 		if _, ok := keypairMap[kp.KeyUID]; !ok {
 			keypairMap[kp.KeyUID] = kp
@@ -396,6 +417,21 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string) ([]*Keypair, error) {
 		err   error
 		where string
 	)
+	if tx == nil {
+		tx, err = db.db.Begin()
+		defer func() {
+			if err == nil {
+				err = tx.Commit()
+				return
+			}
+			_ = tx.Rollback()
+		}()
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	if keyUID != "" {
 		where = "WHERE k.key_uid = ?"
 	}
@@ -427,35 +463,38 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string) ([]*Keypair, error) {
 		ORDER BY
 			ka.position`, where)
 
-	if tx == nil {
-		if where != "" {
-			rows, err = db.db.Query(query, keyUID)
-		} else {
-			rows, err = db.db.Query(query)
-		}
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		stmt, err := tx.Prepare(query)
-		if err != nil {
-			return nil, err
-		}
-		defer stmt.Close()
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
 
-		if where != "" {
-			rows, err = stmt.Query(keyUID)
-		} else {
-			rows, err = stmt.Query()
-		}
-		if err != nil {
-			return nil, err
-		}
+	if where != "" {
+		rows, err = stmt.Query(keyUID)
+	} else {
+		rows, err = stmt.Query()
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	defer rows.Close()
 
-	return db.processKeypairs(rows)
+	keypairs, err := db.processKeypairs(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, kp := range keypairs {
+		keycards, err := db.getAllRows(tx, true)
+		if err != nil {
+			return nil, err
+		}
+
+		kp.Keycards = keycards
+	}
+
+	return keypairs, nil
 }
 
 func (db *Database) getKeypairByKeyUID(tx *sql.Tx, keyUID string) (*Keypair, error) {
@@ -624,7 +663,7 @@ func (db *Database) GetWatchOnlyAccounts() (res []*Account, err error) {
 	return
 }
 
-func (db *Database) IsAnyAccountPartalyOrFullyOperableForKeyUID(keyUID string) (bool, error) {
+func (db *Database) IsAnyAccountPartiallyOrFullyOperableForKeyUID(keyUID string) (bool, error) {
 	kp, err := db.getKeypairByKeyUID(nil, keyUID)
 	if err != nil {
 		return false, err
@@ -642,7 +681,7 @@ func (db *Database) DeleteKeypair(keyUID string) error {
 	return db.deleteKeypair(nil, keyUID)
 }
 
-func (db *Database) DeleteAccount(address types.Address) error {
+func (db *Database) DeleteAccount(address types.Address, clock uint64) error {
 	tx, err := db.db.Begin()
 	defer func() {
 		if err == nil {
@@ -683,36 +722,70 @@ func (db *Database) DeleteAccount(address types.Address) error {
 	defer delete.Close()
 
 	_, err = delete.Exec(address)
+	if err != nil {
+		return err
+	}
+
+	// Update keypair clock if any but the watch only account was deleted.
+	if kp != nil {
+		err = db.updateKeypairClock(tx, acc.KeyUID, clock)
+		return err
+	}
+
+	return nil
+}
+
+func updateKeypairLastUsedIndex(tx *sql.Tx, keyUID string, index uint64, clock uint64, updateKeypairClock bool) error {
+	if tx == nil {
+		return errDbTransactionIsNil
+	}
+	var (
+		err      error
+		setClock string
+	)
+	if updateKeypairClock {
+		setClock = ", clock = ?"
+	}
+
+	query := fmt.Sprintf( // nolint: gosec
+		`
+		UPDATE
+				keypairs
+			SET
+				last_used_derivation_index = ?
+				%s
+			WHERE
+				key_uid = ?`, setClock)
+
+	if setClock != "" {
+		_, err = tx.Exec(query, index, clock, keyUID)
+	} else {
+		_, err = tx.Exec(query, index, keyUID)
+	}
 
 	return err
 }
 
-func updateKeypairLastUsedIndex(tx *sql.Tx, keyUID string, index uint64, clock uint64) error {
+func (db *Database) updateKeypairClock(tx *sql.Tx, keyUID string, clock uint64) error {
 	if tx == nil {
 		return errDbTransactionIsNil
 	}
+
 	_, err := tx.Exec(`
 			UPDATE
 				keypairs
 			SET
-				last_used_derivation_index = ?,
 				clock = ?
 			WHERE
 				key_uid = ?`,
-		index, clock, keyUID)
+		clock, keyUID)
 
 	return err
 }
 
-func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account) (err error) {
+func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, updateKeypairClock bool) (err error) {
 	if tx == nil {
 		return errDbTransactionIsNil
-	}
-
-	var maxPosition uint64
-	err = tx.QueryRow("SELECT MAX(position) FROM keypairs_accounts").Scan(&maxPosition)
-	if err != nil {
-		maxPosition = 0
 	}
 
 	for _, acc := range accounts {
@@ -736,19 +809,12 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account) (err e
 			return err
 		}
 
-		if !exists {
-			maxPosition++
-			_, err = tx.Exec(`
-				INSERT OR IGNORE INTO
-					keypairs_accounts (address, key_uid, pubkey, path, wallet, chat, position, created_at, updated_at)
-				VALUES
-					(?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'));
-			`, acc.Address, keyUID, acc.PublicKey, acc.Path, acc.Wallet, acc.Chat, maxPosition)
-			if err != nil {
-				return err
-			}
-		}
 		_, err = tx.Exec(`
+			INSERT OR IGNORE INTO
+				keypairs_accounts (address, key_uid, pubkey, path, wallet, chat, created_at, updated_at)
+			VALUES
+				(?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'));
+
 			UPDATE
 				keypairs_accounts
 			SET
@@ -757,13 +823,25 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account) (err e
 				emoji = ?,
 				hidden = ?,
 				operable = ?,
-				clock = ?
+				clock = ?,
+				position = ?,
+				updated_at = datetime('now')
 			WHERE
 				address = ?;
-		`, acc.Name, acc.ColorID, acc.Emoji, acc.Hidden, acc.Operable, acc.Clock, acc.Address)
+		`,
+			acc.Address, keyUID, acc.PublicKey, acc.Path, acc.Wallet, acc.Chat,
+			acc.Name, acc.ColorID, acc.Emoji, acc.Hidden, acc.Operable, acc.Clock, acc.Position, acc.Address)
 
 		if err != nil {
 			return err
+		}
+
+		// Update keypair clock if any but the watch only account has changed.
+		if relatedKeypair != nil && updateKeypairClock {
+			err = db.updateKeypairClock(tx, acc.KeyUID, acc.Clock)
+			if err != nil {
+				return err
+			}
 		}
 
 		if strings.HasPrefix(acc.Path, statusWalletRootPath) {
@@ -781,16 +859,19 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account) (err e
 				return false
 			}
 
-			expectedNewKeypairIndex := relatedKeypair.LastUsedDerivationIndex
-			for {
-				expectedNewKeypairIndex++
-				if !accountsContainPath(relatedKeypair.Accounts, statusWalletRootPath+strconv.FormatUint(expectedNewKeypairIndex, 10)) {
-					break
+			expectedNewKeypairIndex := uint64(0)
+			if relatedKeypair != nil {
+				expectedNewKeypairIndex = relatedKeypair.LastUsedDerivationIndex
+				for {
+					expectedNewKeypairIndex++
+					if !accountsContainPath(relatedKeypair.Accounts, statusWalletRootPath+strconv.FormatUint(expectedNewKeypairIndex, 10)) {
+						break
+					}
 				}
 			}
 
 			if accIndex == expectedNewKeypairIndex {
-				err = updateKeypairLastUsedIndex(tx, acc.KeyUID, accIndex, acc.Clock)
+				err = updateKeypairLastUsedIndex(tx, acc.KeyUID, accIndex, acc.Clock, updateKeypairClock)
 				if err != nil {
 					return err
 				}
@@ -801,7 +882,7 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account) (err e
 	return nil
 }
 
-func (db *Database) SaveOrUpdateAccounts(accounts []*Account) error {
+func (db *Database) SaveOrUpdateAccounts(accounts []*Account, updateKeypairClock bool) error {
 	if len(accounts) == 0 {
 		return errors.New("no provided accounts to save/update")
 	}
@@ -817,11 +898,15 @@ func (db *Database) SaveOrUpdateAccounts(accounts []*Account) error {
 		}
 		_ = tx.Rollback()
 	}()
-	err = db.saveOrUpdateAccounts(tx, accounts)
+	err = db.saveOrUpdateAccounts(tx, accounts, updateKeypairClock)
 	return err
 }
 
 func (db *Database) SaveOrUpdateKeypair(keypair *Keypair) error {
+	if keypair == nil {
+		return errDbPassedParameterIsNil
+	}
+
 	tx, err := db.db.Begin()
 	if err != nil {
 		return err
@@ -870,10 +955,10 @@ func (db *Database) SaveOrUpdateKeypair(keypair *Keypair) error {
 	if err != nil {
 		return err
 	}
-	return db.saveOrUpdateAccounts(tx, keypair.Accounts)
+	return db.saveOrUpdateAccounts(tx, keypair.Accounts, false)
 }
 
-func (db *Database) UpdateKeypairName(keyUID string, name string, clock uint64) error {
+func (db *Database) UpdateKeypairName(keyUID string, name string, clock uint64, updateChatAccountName bool) error {
 	tx, err := db.db.Begin()
 	if err != nil {
 		return err
@@ -900,8 +985,26 @@ func (db *Database) UpdateKeypairName(keyUID string, name string, clock uint64) 
 		WHERE
 			key_uid = ?;
 	`, name, clock, keyUID)
+	if err != nil {
+		return err
+	}
 
-	return err
+	if updateChatAccountName {
+		_, err = tx.Exec(`
+			UPDATE
+				keypairs_accounts
+			SET
+				name = ?,
+				clock = ?
+			WHERE
+				key_uid = ?
+			AND
+				path = ?;
+		`, name, clock, keyUID, statusChatPath)
+		return err
+	}
+
+	return nil
 }
 
 func (db *Database) GetWalletAddress() (rst types.Address, err error) {
@@ -976,8 +1079,8 @@ func (db *Database) GetNodeConfig() (*params.NodeConfig, error) {
 	return nodecfg.GetNodeConfigFromDB(db.db)
 }
 
-// this doesn't update clock
-func (db *Database) UpdateAccountToFullyOperable(keyUID string, address types.Address) (err error) {
+// This function should not update the clock, cause it marks accounts locally.
+func (db *Database) SetAccountOperability(address types.Address, operable AccountOperable) (err error) {
 	tx, err := db.db.Begin()
 	defer func() {
 		if err == nil {
@@ -996,24 +1099,30 @@ func (db *Database) UpdateAccountToFullyOperable(keyUID string, address types.Ad
 		return err
 	}
 
-	_, err = tx.Exec(`UPDATE keypairs_accounts SET operable = ?	WHERE address = ?`, AccountFullyOperable, address)
+	_, err = tx.Exec(`UPDATE keypairs_accounts SET operable = ?	WHERE address = ?`, operable, address)
 	return err
+}
+
+func (db *Database) GetPositionForNextNewAccount() (int64, error) {
+	var pos sql.NullInt64
+	err := db.db.QueryRow("SELECT MAX(position) FROM keypairs_accounts").Scan(&pos)
+	if err != nil {
+		return 0, err
+	}
+	if pos.Valid {
+		return pos.Int64 + 1, nil
+	}
+	return 0, nil
 }
 
 // The UpdateAccountPosition function rearranges accounts based on the new position assigned to a given address.
 // Please note that this function does not ensure a sequential order
-func (db *Database) UpdateAccountPosition(address types.Address, newPosition int64) (err error) {
-	var maxPosition int64
-	var minPosition int64
-	err = db.db.QueryRow("SELECT MAX(position), MIN(position) FROM keypairs_accounts").Scan(&maxPosition, &minPosition)
-	if err != nil {
-		return err
-	}
-	var currentPosition int64
-	err = db.db.QueryRow("SELECT position FROM keypairs_accounts where address = ?", address).Scan(&currentPosition)
-	if err != nil {
-		return err
-	}
+func (db *Database) UpdateAccountPosition(address types.Address, newPosition int64, clock uint64) (err error) {
+	var (
+		maxPosition     int64
+		minPosition     int64
+		currentPosition int64
+	)
 	tx, err := db.db.Begin()
 	defer func() {
 		if err == nil {
@@ -1023,9 +1132,15 @@ func (db *Database) UpdateAccountPosition(address types.Address, newPosition int
 		_ = tx.Rollback()
 	}()
 
+	err = tx.QueryRow("SELECT MAX(position), MIN(position) FROM keypairs_accounts").Scan(&maxPosition, &minPosition)
 	if err != nil {
 		return err
 	}
+	acc, err := db.getAccountByAddress(tx, address)
+	if err != nil {
+		return err
+	}
+	currentPosition = acc.Position
 
 	if newPosition == maxPosition {
 		newPosition++
@@ -1044,6 +1159,12 @@ func (db *Database) UpdateAccountPosition(address types.Address, newPosition int
 
 	_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE address = ?", newPosition, address)
 	if err != nil {
+		return err
+	}
+
+	// Update keypair clock if any but the watch only account was deleted.
+	if acc.KeyUID != "" {
+		err = db.updateKeypairClock(tx, acc.KeyUID, clock)
 		return err
 	}
 

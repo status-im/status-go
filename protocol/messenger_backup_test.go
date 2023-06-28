@@ -757,9 +757,6 @@ func (s *MessengerBackupSuite) TestBackupKeypairs() {
 	s.Require().Equal(accounts.SyncedFromBackup, dbProfileKp2.SyncedFrom)
 
 	for _, acc := range profileKp.Accounts {
-		if acc.Chat {
-			continue
-		}
 		s.Require().True(contains(dbProfileKp2.Accounts, acc, accounts.SameAccounts))
 	}
 
@@ -849,7 +846,7 @@ func (s *MessengerBackupSuite) TestBackupWatchOnlyAccounts() {
 	bob1 := s.m
 
 	woAccounts := accounts.GetWatchOnlyAccountsForTest()
-	err := bob1.settings.SaveOrUpdateAccounts(woAccounts)
+	err := bob1.settings.SaveOrUpdateAccounts(woAccounts, false)
 	s.Require().NoError(err)
 	dbWoAccounts1, err := bob1.settings.GetWatchOnlyAccounts()
 	s.Require().NoError(err)

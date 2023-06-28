@@ -11,7 +11,7 @@ func MockTestAccounts(t *testing.T, db *sql.DB, accounts []*Account) {
 	d, err := NewDB(db)
 	require.NoError(t, err)
 
-	err = d.SaveOrUpdateAccounts(accounts)
+	err = d.SaveOrUpdateAccounts(accounts, false)
 	require.NoError(t, err)
 	res, err := d.GetAccounts()
 	require.NoError(t, err)

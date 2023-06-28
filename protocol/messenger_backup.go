@@ -96,7 +96,7 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		return 0, errors[0]
 	}
 
-	fullKeypairsToBackup, err := m.backupKeypairs()
+	keypairsToBackup, err := m.backupKeypairs()
 	if err != nil {
 		return 0, err
 	}
@@ -125,9 +125,9 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 				DataNumber:  uint32(0),
 				TotalNumber: uint32(len(settings)),
 			},
-			FullKeypairDetails: &protobuf.FetchingBackedUpDataDetails{
+			KeypairDetails: &protobuf.FetchingBackedUpDataDetails{
 				DataNumber:  uint32(0),
-				TotalNumber: uint32(len(fullKeypairsToBackup)),
+				TotalNumber: uint32(len(keypairsToBackup)),
 			},
 			WatchOnlyAccountDetails: &protobuf.FetchingBackedUpDataDetails{
 				DataNumber:  uint32(0),
@@ -181,10 +181,10 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 	}
 
 	// Update keypairs messages encode and dispatch
-	for i, d := range fullKeypairsToBackup {
+	for i, d := range keypairsToBackup {
 		pb := backupDetailsOnly()
-		pb.FullKeypairDetails.DataNumber = uint32(i + 1)
-		pb.FullKeypair = d.FullKeypair
+		pb.KeypairDetails.DataNumber = uint32(i + 1)
+		pb.Keypair = d.Keypair
 		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
 		if err != nil {
 			return 0, err
@@ -430,13 +430,13 @@ func (m *Messenger) backupKeypairs() ([]*protobuf.Backup, error) {
 	for _, kp := range keypairs {
 
 		kp.SyncedFrom = accounts.SyncedFromBackup
-		fullKeypair, err := m.prepareSyncKeypairFullMessage(kp)
+		keypair, err := m.prepareSyncKeypairMessage(kp)
 		if err != nil {
 			return nil, err
 		}
 
 		backupMessage := &protobuf.Backup{
-			FullKeypair: fullKeypair,
+			Keypair: keypair,
 		}
 
 		backupMessages = append(backupMessages, backupMessage)

@@ -120,7 +120,60 @@ func (kp *Keycards) processResult(rows *sql.Rows, groupByKeycard bool) ([]*Keyca
 	return keycards, nil
 }
 
-func (kp *Keycards) getAllRows(groupByKeycard bool) ([]*Keycard, error) {
+func (kp *Keycards) getAllRows(tx *sql.Tx, groupByKeycard bool) ([]*Keycard, error) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	query := // nolint: gosec
+		`
+		SELECT
+			k.keycard_uid,
+			k.keycard_name,
+			k.keycard_locked,
+			ka.account_address,
+			k.key_uid,
+			k.last_update_clock
+		FROM
+			keycards AS k
+		LEFT JOIN
+			keycards_accounts AS ka
+		ON
+			k.keycard_uid = ka.keycard_uid
+		ORDER BY
+			key_uid`
+
+	if tx == nil {
+		rows, err = kp.db.Query(query)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		stmt, err := tx.Prepare(query)
+		if err != nil {
+			return nil, err
+		}
+		defer stmt.Close()
+
+		rows, err = stmt.Query()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	defer rows.Close()
+	return kp.processResult(rows, groupByKeycard)
+}
+
+func (kp *Keycards) GetAllKnownKeycards() ([]*Keycard, error) {
+	return kp.getAllRows(nil, true)
+}
+
+func (kp *Keycards) GetAllKnownKeycardsGroupedByKeyUID() ([]*Keycard, error) {
+	return kp.getAllRows(nil, false)
+}
+
+func (kp *Keycards) GetKeycardByKeyUID(keyUID string) ([]*Keycard, error) {
 	rows, err := kp.db.Query(`
 		SELECT
 			k.keycard_uid,
@@ -130,44 +183,10 @@ func (kp *Keycards) getAllRows(groupByKeycard bool) ([]*Keycard, error) {
 			k.key_uid,
 			k.last_update_clock
 		FROM
-			keycards AS k 
-		LEFT JOIN 
-			keycards_accounts AS ka 
-		ON 
-			k.keycard_uid = ka.keycard_uid
-		ORDER BY
-			key_uid
-	`)
-	if err != nil {
-		return nil, err
-	}
-
-	defer rows.Close()
-	return kp.processResult(rows, groupByKeycard)
-}
-
-func (kp *Keycards) GetAllKnownKeycards() ([]*Keycard, error) {
-	return kp.getAllRows(true)
-}
-
-func (kp *Keycards) GetAllKnownKeycardsGroupedByKeyUID() ([]*Keycard, error) {
-	return kp.getAllRows(false)
-}
-
-func (kp *Keycards) GetKeycardByKeyUID(keyUID string) ([]*Keycard, error) {
-	rows, err := kp.db.Query(`
-		SELECT 
-			k.keycard_uid,
-			k.keycard_name,
-			k.keycard_locked,
-			ka.account_address,
-			k.key_uid,
-			k.last_update_clock
-		FROM
-			keycards AS k 
-		LEFT JOIN 
-			keycards_accounts AS ka 
-		ON 
+			keycards AS k
+		LEFT JOIN
+			keycards_accounts AS ka
+		ON
 			k.keycard_uid = ka.keycard_uid
 		WHERE
 			k.key_uid = ?
@@ -205,11 +224,11 @@ func (kp *Keycards) setLastUpdateClock(tx *sql.Tx, kcUID string, clock uint64) (
 	}
 
 	_, err = tx.Exec(`
-		UPDATE 
-			keycards 
-		SET 
-			last_update_clock = ? 
-		WHERE 
+		UPDATE
+			keycards
+		SET
+			last_update_clock = ?
+		WHERE
 			keycard_uid = ?`,
 		clock, kcUID)
 

@@ -109,6 +109,11 @@ func (s *MessengerSyncWalletSuite) TestProfileKeypairNameChange() {
 
 func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	profileKp := accounts.GetProfileKeypairForTest(true, true, true)
+	// set clocks for accounts
+	profileKp.Clock = uint64(len(profileKp.Accounts) - 1)
+	for i, acc := range profileKp.Accounts {
+		acc.Clock = uint64(i)
+	}
 
 	// Create a main account on alice
 	err := s.m.settings.SaveOrUpdateKeypair(profileKp)
@@ -183,7 +188,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 
 	// Store watch only accounts on alice's device
 	woAccounts := accounts.GetWatchOnlyAccountsForTest()
-	err = s.m.settings.SaveOrUpdateAccounts(woAccounts)
+	err = s.m.settings.SaveOrUpdateAccounts(woAccounts, false)
 	s.Require().NoError(err)
 	dbWoAccounts1, err := s.m.settings.GetWatchOnlyAccounts()
 	s.Require().NoError(err)
@@ -205,16 +210,37 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 		}
 
 		if len(response.Keypairs) != 3 || // 3 keypairs (profile, seed, priv key)
-			len(response.Accounts) != len(woAccounts) {
+			len(response.WatchOnlyAccounts) != len(woAccounts) {
 			return errors.New("no sync wallet account received")
 		}
 		return nil
 	})
 	s.Require().NoError(err)
 
-	dbProfileKp2, err = s.m.settings.GetKeypairByKeyUID(profileKp.KeyUID)
+	dbProfileKp2, err = alicesOtherDevice.settings.GetKeypairByKeyUID(profileKp.KeyUID)
 	s.Require().NoError(err)
-	s.Require().True(accounts.SameKeypairsWithDifferentSyncedFrom(profileKp, dbProfileKp2, true, "", accounts.AccountFullyOperable))
+	s.Require().True(profileKp.KeyUID == dbProfileKp2.KeyUID &&
+		profileKp.Name == dbProfileKp2.Name &&
+		profileKp.Type == dbProfileKp2.Type &&
+		profileKp.DerivedFrom == dbProfileKp2.DerivedFrom &&
+		profileKp.LastUsedDerivationIndex == dbProfileKp2.LastUsedDerivationIndex &&
+		profileKp.Clock == dbProfileKp2.Clock &&
+		len(profileKp.Accounts) == len(dbProfileKp2.Accounts))
+	// chat and default wallet account should be fully operable, other accounts partially operable
+	for i := range profileKp.Accounts {
+		match := false
+		expectedOperableValue := accounts.AccountPartiallyOperable
+		if profileKp.Accounts[i].Chat || profileKp.Accounts[i].Wallet {
+			expectedOperableValue = accounts.AccountFullyOperable
+		}
+		for j := range dbProfileKp2.Accounts {
+			if accounts.SameAccountsWithDifferentOperable(profileKp.Accounts[i], dbProfileKp2.Accounts[j], expectedOperableValue) {
+				match = true
+				break
+			}
+		}
+		s.Require().True(match)
+	}
 
 	dbSeedPhraseKp2, err := alicesOtherDevice.settings.GetKeypairByKeyUID(seedPhraseKp.KeyUID)
 	s.Require().NoError(err)
@@ -252,7 +278,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 		}
 
 		if len(response.Keypairs) != 1 {
-			return errors.New("no sync wallet account received")
+			return errors.New("no sync keypairs received")
 		}
 		return nil
 	})
@@ -280,8 +306,8 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 			return err
 		}
 
-		if len(response.Accounts) != len(accountsToUpdate) {
-			return errors.New("no sync wallet account received")
+		if len(response.Keypairs) != 2 {
+			return errors.New("no sync keypairs received")
 		}
 		return nil
 	})

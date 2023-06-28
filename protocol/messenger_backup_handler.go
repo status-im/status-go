@@ -3,7 +3,6 @@ package protocol
 import (
 	"database/sql"
 
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	ensservice "github.com/status-im/status-go/services/ens"
 
 	"github.com/status-im/status-go/protocol/identity"
@@ -50,7 +49,7 @@ func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.B
 		errors = append(errors, err)
 	}
 
-	err = m.handleFullKeypair(message.FullKeypair)
+	err = m.handleKeypair(message.Keypair)
 	if err != nil {
 		errors = append(errors, err)
 	}
@@ -70,7 +69,7 @@ func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.B
 		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeyContacts, message.ContactsDetails)
 		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeyCommunities, message.CommunitiesDetails)
 		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeySettings, message.SettingsDetails)
-		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeyKeypairs, message.FullKeypairDetails)
+		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeyKeypairs, message.KeypairDetails)
 		response.AddFetchingBackedUpDataDetails(SyncWakuSectionKeyWatchOnlyAccounts, message.WatchOnlyAccountDetails)
 
 		m.config.messengerSignalsHandler.SendWakuFetchingBackupProgress(&response)
@@ -197,13 +196,16 @@ func (m *Messenger) handleBackedUpSettings(message *protobuf.SyncSetting) error 
 	return nil
 }
 
-func (m *Messenger) handleFullKeypair(message *protobuf.SyncKeypairFull) error {
+func (m *Messenger) handleKeypair(message *protobuf.SyncKeypair) error {
 	if message == nil {
 		return nil
 	}
 
-	keypair, keycards, err := m.handleSyncKeypairFull(message)
+	keypair, err := m.handleSyncKeypair(message)
 	if err != nil {
+		if err == ErrTryingToStoreOldKeypair {
+			return nil
+		}
 		return err
 	}
 
@@ -213,12 +215,6 @@ func (m *Messenger) handleFullKeypair(message *protobuf.SyncKeypairFull) error {
 		}
 
 		m.config.messengerSignalsHandler.SendWakuBackedUpKeypair(&kpResponse)
-
-		kcResponse := wakusync.WakuBackedUpDataResponse{
-			Keycards: keycards,
-		}
-
-		m.config.messengerSignalsHandler.SendWakuBackedUpKeycards(&kcResponse)
 	}
 
 	return nil
@@ -229,8 +225,11 @@ func (m *Messenger) handleWatchOnlyAccount(message *protobuf.SyncAccount) error 
 		return nil
 	}
 
-	acc, err := m.handleSyncWalletAccount(message, accounts.SyncedFromBackup)
+	acc, err := m.handleSyncWatchOnlyAccount(message)
 	if err != nil {
+		if err == ErrTryingToStoreOldWalletAccount {
+			return nil
+		}
 		return err
 	}
 

@@ -45,7 +45,7 @@ type MessengerResponse struct {
 	Bookmarks                     []*browsers.Bookmark
 	Settings                      []*settings.SyncSettingField
 	IdentityImages                []images.IdentityImage
-	Accounts                      []*accounts.Account
+	WatchOnlyAccounts             []*accounts.Account
 	Keypairs                      []*accounts.Keypair
 	DiscordCategories             []*discord.Category
 	DiscordChannels               []*discord.Channel
@@ -74,7 +74,6 @@ type MessengerResponse struct {
 	trustStatus                 map[string]verification.TrustStatus
 	emojiReactions              map[string]*EmojiReaction
 	savedAddresses              map[string]*wallet.SavedAddress
-	Keycards                    []*accounts.Keycard
 	keycardActions              []*accounts.KeycardAction
 	SocialLinksInfo             *identity.SocialLinksInfo
 	ensUsernameDetails          []*ensservice.UsernameDetail
@@ -109,7 +108,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		StatusUpdates                 []UserStatus                         `json:"statusUpdates,omitempty"`
 		Settings                      []*settings.SyncSettingField         `json:"settings,omitempty"`
 		IdentityImages                []images.IdentityImage               `json:"identityImages,omitempty"`
-		Accounts                      []*accounts.Account                  `json:"accounts,omitempty"`
+		WatchOnlyAccounts             []*accounts.Account                  `json:"watchOnlyAccounts,omitempty"`
 		Keypairs                      []*accounts.Keypair                  `json:"keypairs,omitempty"`
 		DiscordCategories             []*discord.Category                  `json:"discordCategories,omitempty"`
 		DiscordChannels               []*discord.Channel                   `json:"discordChannels,omitempty"`
@@ -117,7 +116,6 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DiscordMessages               []*protobuf.DiscordMessage           `json:"discordMessages,omitempty"`
 		DiscordMessageAttachments     []*protobuf.DiscordMessageAttachment `json:"discordMessageAtachments,omitempty"`
 		SavedAddresses                []*wallet.SavedAddress               `json:"savedAddresses,omitempty"`
-		Keycards                      []*accounts.Keycard                  `json:"keycards,omitempty"`
 		KeycardActions                []*accounts.KeycardAction            `json:"keycardActions,omitempty"`
 		SocialLinksInfo               *identity.SocialLinksInfo            `json:"socialLinksInfo,omitempty"`
 		EnsUsernameDetails            []*ensservice.UsernameDetail         `json:"ensUsernameDetails,omitempty"`
@@ -132,7 +130,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		CurrentStatus:           r.currentStatus,
 		Settings:                r.Settings,
 		IdentityImages:          r.IdentityImages,
-		Accounts:                r.Accounts,
+		WatchOnlyAccounts:       r.WatchOnlyAccounts,
 		Keypairs:                r.Keypairs,
 
 		Messages:                      r.Messages(),
@@ -153,7 +151,6 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DiscordCategories:             r.DiscordCategories,
 		DiscordChannels:               r.DiscordChannels,
 		DiscordOldestMessageTimestamp: r.DiscordOldestMessageTimestamp,
-		Keycards:                      r.Keycards,
 		KeycardActions:                r.KeycardActions(),
 		SocialLinksInfo:               r.SocialLinksInfo,
 		EnsUsernameDetails:            r.EnsUsernameDetails(),
@@ -273,7 +270,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.removedMessages)+
 		len(r.Mailservers)+
 		len(r.IdentityImages)+
-		len(r.Accounts)+
+		len(r.WatchOnlyAccounts)+
 		len(r.Keypairs)+
 		len(r.notifications)+
 		len(r.statusUpdates)+
@@ -282,7 +279,6 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.verificationRequests)+
 		len(r.RequestsToJoinCommunity)+
 		len(r.savedAddresses)+
-		len(r.Keycards)+
 		len(r.keycardActions) == 0 &&
 		len(r.ensUsernameDetails) == 0 &&
 		r.currentStatus == nil &&
@@ -322,9 +318,8 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddBookmarks(response.GetBookmarks())
 	r.CommunityChanges = append(r.CommunityChanges, response.CommunityChanges...)
 	r.BackupHandled = response.BackupHandled
-	r.Accounts = append(r.Accounts, response.Accounts...)
+	r.WatchOnlyAccounts = append(r.WatchOnlyAccounts, response.WatchOnlyAccounts...)
 	r.Keypairs = append(r.Keypairs, response.Keypairs...)
-	r.Keycards = append(r.Keycards, response.Keycards...)
 	r.SocialLinksInfo = response.SocialLinksInfo
 
 	return nil
