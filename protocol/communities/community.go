@@ -40,7 +40,6 @@ type Config struct {
 	RequestsToJoin                []*RequestToJoin
 	MemberIdentity                *ecdsa.PublicKey
 	SyncedAt                      uint64
-	RekeyedAt                     time.Time
 	EventsData                    *EventsData
 }
 
@@ -1965,11 +1964,6 @@ func (o *Community) SetActiveMembersCount(activeMembersCount uint64) (updated bo
 	o.increaseClock()
 
 	return true, nil
-}
-
-// RekeyedAt returns the RekeyedAt value from the underlying Community.config
-func (o *Community) RekeyedAt() time.Time {
-	return o.config.RekeyedAt
 }
 
 type sortSlice []sorterHelperIdx

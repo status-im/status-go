@@ -1042,6 +1042,11 @@ func (s *MessageSender) StartDatasync() {
 	s.datasync = ds
 }
 
+// GetCurrentKeyForGroup returns the latest key timestampID belonging to a key group
+func (s *MessageSender) GetCurrentKeyForGroup(groupID []byte) (uint32, error) {
+	return s.protocol.GetCurrentKeyForGroup(groupID)
+}
+
 // GetKeyIDsForGroup returns a slice of key IDs belonging to a given group ID
 func (s *MessageSender) GetKeyIDsForGroup(groupID []byte) ([]uint32, error) {
 	return s.protocol.GetKeyIDsForGroup(groupID)
