@@ -3,6 +3,7 @@ package wallet
 import (
 	"database/sql"
 	"encoding/json"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -59,7 +60,11 @@ func NewService(
 		Publisher: walletFeed,
 	}
 	blockchainStatus := make(map[uint64]string)
+	mutex := sync.Mutex{}
 	rpcClient.SetWalletNotifier(func(chainID uint64, message string) {
+		mutex.Lock()
+		defer mutex.Unlock()
+
 		if len(blockchainStatus) == 0 {
 			networks, err := rpcClient.NetworkManager.Get(false)
 			if err != nil {
