@@ -9,6 +9,8 @@ type Login struct {
 	KeyUID        string `json:"keyUid"`
 	KdfIterations int    `json:"kdfIterations"`
 
+	WakuV2Nameserver string `json:"wakuV2Nameserver"`
+
 	WalletSecretsConfig
 }
 

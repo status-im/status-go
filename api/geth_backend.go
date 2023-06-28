@@ -534,6 +534,10 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		return err
 	}
 
+	if b.config.WakuV2Config.Enabled && request.WakuV2Nameserver != "" {
+		b.config.WakuV2Config.Nameserver = request.WakuV2Nameserver
+	}
+
 	b.overrideNetworks(b.config, request)
 
 	err = b.setupLogSettings()
