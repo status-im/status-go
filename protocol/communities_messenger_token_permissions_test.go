@@ -136,14 +136,22 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string
 	return messenger
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) joinCommunityWithAddresses(community *communities.Community, user *Messenger, password string, addresses []string) {
+func (s *MessengerCommunitiesTokenPermissionsSuite) joinCommunity(community *communities.Community, user *Messenger, password string, addresses []string) {
 	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(password)))
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), Password: passwdHash, AddressesToReveal: addresses}
 	joinCommunity(&s.Suite, community, s.owner, user, request)
 }
 
+func (s *MessengerCommunitiesTokenPermissionsSuite) advertiseCommunityTo(community *communities.Community, user *Messenger) {
+	advertiseCommunityTo(&s.Suite, community, s.owner, user)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) createCommunity() (*communities.Community, *Chat) {
+	return createCommunity(&s.Suite, s.owner)
+}
+
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestCreateTokenPermission() {
-	community, _ := createCommunity(&s.Suite, s.owner)
+	community, _ := s.createCommunity()
 
 	createTokenPermission := &requests.CreateCommunityTokenPermission{
 		CommunityID: community.ID(),
@@ -176,7 +184,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestCreateTokenPermission() 
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditTokenPermission() {
-	community, _ := createCommunity(&s.Suite, s.owner)
+	community, _ := s.createCommunity()
 
 	tokenPermission := &requests.CreateCommunityTokenPermission{
 		CommunityID: community.ID(),
@@ -232,21 +240,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditTokenPermission() {
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestCommunityTokensMetadata() {
-	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		Name:        "status",
-		Color:       "#ffffff",
-		Description: "status community description",
-	}
-
-	// Create an community chat
-	response, err := s.bob.CreateCommunity(description, true)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.CommunitiesSettings(), 1)
-
-	community := response.Communities()[0]
+	community, _ := s.createCommunity()
 
 	tokensMetadata := community.CommunityTokensMetadata()
 	s.Require().Len(tokensMetadata, 0)
@@ -259,7 +253,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestCommunityTokensMetadata(
 		Symbol:            "SMB",
 	}
 
-	_, err = community.AddCommunityTokensMetadata(newToken)
+	_, err := community.AddCommunityTokensMetadata(newToken)
 	s.Require().NoError(err)
 	tokensMetadata = community.CommunityTokensMetadata()
 	s.Require().Len(tokensMetadata, 1)
@@ -273,7 +267,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestCommunityTokensMetadata(
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSTokenPermission() {
-	community, _ := createCommunity(&s.Suite, s.owner)
+	community, _ := s.createCommunity()
 
 	createTokenPermission := &requests.CreateCommunityTokenPermission{
 		CommunityID: community.ID(),
@@ -291,7 +285,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSToke
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
 
-	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)
+	s.advertiseCommunityTo(community, s.alice)
 
 	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 	// We try to join the org
@@ -322,12 +316,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSToke
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSharedAddress() {
-	community, _ := createCommunity(&s.Suite, s.owner)
-	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)
-	advertiseCommunityTo(&s.Suite, community, s.owner, s.bob)
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.alice)
+	s.advertiseCommunityTo(community, s.bob)
 
-	s.joinCommunityWithAddresses(community, s.alice, alicePassword, []string{})
-	s.joinCommunityWithAddresses(community, s.bob, bobPassword, []string{})
+	s.joinCommunity(community, s.alice, alicePassword, []string{})
+	s.joinCommunity(community, s.bob, bobPassword, []string{})
 
 	community, err := s.owner.GetCommunityByID(community.ID())
 	s.Require().NoError(err)
@@ -353,10 +347,10 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSh
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSelectedSharedAddress() {
-	community, _ := createCommunity(&s.Suite, s.owner)
-	advertiseCommunityTo(&s.Suite, community, s.owner, s.alice)
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.alice)
 
-	s.joinCommunityWithAddresses(community, s.alice, alicePassword, []string{aliceAddress2})
+	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress2})
 
 	community, err := s.owner.GetCommunityByID(community.ID())
 	s.Require().NoError(err)
