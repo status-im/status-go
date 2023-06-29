@@ -93,10 +93,12 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	bob1 := s.m
 	bob2, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, []Option{WithPushNotifications()})
 	s.Require().NoError(err)
+	defer bob2.Shutdown() // nolint: errcheck
 
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	server := s.newPushNotificationServer(s.shh, serverKey)
+	defer server.Shutdown() // nolint: errcheck
 
 	alice := s.newMessenger(s.shh)
 	// start alice and enable sending push notifications
@@ -270,9 +272,6 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 		return nil
 	})
 	s.Require().NoError(err)
-	s.Require().NoError(bob2.Shutdown())
-	s.Require().NoError(alice.Shutdown())
-	s.Require().NoError(server.Shutdown())
 }
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactOnly() {
@@ -282,6 +281,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	server := s.newPushNotificationServer(s.shh, serverKey)
+	defer server.Shutdown() // nolint: errcheck
 
 	alice := s.newMessenger(s.shh)
 	// start alice and enable push notifications
@@ -414,8 +414,6 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	})
 
 	s.Require().NoError(err)
-	s.Require().NoError(alice.Shutdown())
-	s.Require().NoError(server.Shutdown())
 }
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
@@ -425,6 +423,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	server := s.newPushNotificationServer(s.shh, serverKey)
+	defer server.Shutdown() // nolint: errcheck
 
 	alice := s.newMessenger(s.shh)
 	// another contact to invalidate the token
@@ -643,8 +642,6 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	})
 
 	s.Require().NoError(err)
-	s.Require().NoError(alice.Shutdown())
-	s.Require().NoError(server.Shutdown())
 }
 
 func (s *MessengerPushNotificationSuite) TestContactCode() {
