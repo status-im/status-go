@@ -41,7 +41,7 @@ type UrlDataResponse struct {
 }
 
 const baseShareUrl = "https://status.app"
-const channelUuidRegExp = "/^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i"
+const channelUuidRegExp = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$"
 
 func (m *Messenger) SerializePublicKey(compressedKey types.HexBytes) (string, error) {
 	rawKey, err := crypto.DecompressPubkey(compressedKey)
@@ -351,6 +351,7 @@ func (m *Messenger) ShareUserURLWithChatKey(contactId string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	return fmt.Sprintf("%s/u#%s", baseShareUrl, shortKey), nil
 }
 
@@ -361,12 +362,19 @@ func (m *Messenger) prepareContactData(contact *Contact) ContactUrlData {
 }
 
 func (m *Messenger) parseUserURLWithChatKey(urlData string) (*UrlDataResponse, error) {
-	contactId, err := m.DeserializePublicKey(urlData)
+	pubKeyBytes, err := m.DeserializePublicKey(urlData)
 	if err != nil {
 		return nil, err
 	}
 
-	contact, ok := m.allContacts.Load(contactId.String())
+	pubKey, err := crypto.DecompressPubkey(pubKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	contactId := common.PubkeyToHex(pubKey)
+
+	contact, ok := m.allContacts.Load(contactId)
 	if !ok {
 		return nil, ErrContactNotFound
 	}
@@ -497,7 +505,7 @@ func (m *Messenger) ParseSharedURL(url string) (*UrlDataResponse, error) {
 	}
 
 	if len(urlContents) == 2 && strings.HasPrefix(urlContents[0], "u/") {
-		return m.parseUserURLWithData(strings.TrimPrefix(urlContents[0], "c/"), urlContents[1])
+		return m.parseUserURLWithData(strings.TrimPrefix(urlContents[0], "u/"), urlContents[1])
 	}
 
 	return nil, fmt.Errorf("unhandled shared url: %s", url)
