@@ -3,6 +3,8 @@ package protocol
 import (
 	"bytes"
 	"context"
+	"errors"
+	"math/big"
 	"testing"
 	"time"
 
@@ -23,6 +25,8 @@ import (
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
+
+const testChainID1 = 1
 
 const ownerPassword = "123456"
 const alicePassword = "qwerty"
@@ -52,14 +56,20 @@ func (m *AccountManagerMock) Sign(rpcParams account.SignParams, verifiedAccount 
 }
 
 type TokenManagerMock struct {
+	Balances *map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
 }
 
 func (m *TokenManagerMock) GetAllChainIDs() ([]uint64, error) {
-	return []uint64{5}, nil
+	chainIDs := make([]uint64, 0, len(*m.Balances))
+	for key := range *m.Balances {
+		chainIDs = append(chainIDs, key)
+	}
+	return chainIDs, nil
 }
 
 func (m *TokenManagerMock) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
-	return nil, nil
+	time.Sleep(100 * time.Millisecond) // simulate response time
+	return *m.Balances, nil
 }
 
 func TestMessengerCommunitiesTokenPermissionsSuite(t *testing.T) {
@@ -75,6 +85,8 @@ type MessengerCommunitiesTokenPermissionsSuite struct {
 	// a single Waku service should be shared.
 	shh    types.Waku
 	logger *zap.Logger
+
+	mockedBalances map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big // chainID, account, token, balance
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
@@ -95,6 +107,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 	s.Require().NoError(err)
 	_, err = s.alice.Start()
 	s.Require().NoError(err)
+
+	s.mockedBalances = make(map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	s.mockedBalances[testChainID1] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	s.mockedBalances[testChainID1][gethcommon.HexToAddress(aliceAddress1)] = make(map[gethcommon.Address]*hexutil.Big)
+	s.mockedBalances[testChainID1][gethcommon.HexToAddress(aliceAddress2)] = make(map[gethcommon.Address]*hexutil.Big)
+	s.mockedBalances[testChainID1][gethcommon.HexToAddress(bobAddress)] = make(map[gethcommon.Address]*hexutil.Big)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
@@ -111,7 +129,9 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string
 		accountsManagerMock.AccountsMap[walletAddress] = types.EncodeHex(crypto.Keccak256([]byte(password)))
 	}
 
-	tokenManagerMock := &TokenManagerMock{}
+	tokenManagerMock := &TokenManagerMock{
+		Balances: &s.mockedBalances,
+	}
 
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
@@ -150,6 +170,56 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) createCommunity() (*communit
 	return createCommunity(&s.Suite, s.owner)
 }
 
+func (s *MessengerCommunitiesTokenPermissionsSuite) sendChatMessage(sender *Messenger, chatID string, text string) *common.Message {
+	return sendChatMessage(&s.Suite, sender, chatID, text)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) makeAddressSatisfyTheCriteria(chainID uint64, address string, criteria *protobuf.TokenCriteria) {
+	walletAddress := gethcommon.HexToAddress(address)
+	contractAddress := gethcommon.HexToAddress(criteria.ContractAddresses[chainID])
+	balance, ok := new(big.Int).SetString(criteria.Amount, 10)
+	s.Require().True(ok)
+	decimalsFactor := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(criteria.Decimals)), nil)
+	balance.Mul(balance, decimalsFactor)
+
+	s.mockedBalances[chainID][walletAddress][contractAddress] = (*hexutil.Big)(balance)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) waitOnCommunitiesEvent(user *Messenger, condition func(*communities.Subscription) bool) <-chan error {
+	errCh := make(chan error, 1)
+
+	go func() {
+		defer close(errCh)
+
+		for {
+			select {
+			case sub, more := <-user.communitiesManager.Subscribe():
+				if !more {
+					errCh <- errors.New("channel closed when waiting for communities event")
+					return
+				}
+
+				if condition(sub) {
+					return
+				}
+
+			case <-time.After(500 * time.Millisecond):
+				errCh <- errors.New("timed out when waiting for communities event")
+				return
+			}
+		}
+	}()
+
+	return errCh
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) waitOnCommunityEncryption(community *communities.Community) <-chan error {
+	s.Require().False(community.Encrypted())
+	return s.waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		return sub.Community != nil && sub.Community.IDString() == community.IDString() && sub.Community.Encrypted()
+	})
+}
+
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestCreateTokenPermission() {
 	community, _ := s.createCommunity()
 
@@ -159,7 +229,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestCreateTokenPermission() 
 		TokenCriteria: []*protobuf.TokenCriteria{
 			&protobuf.TokenCriteria{
 				Type:              protobuf.CommunityTokenType_ERC20,
-				ContractAddresses: map[uint64]string{uint64(1): "0x123"},
+				ContractAddresses: map[uint64]string{uint64(testChainID1): "0x123"},
 				Symbol:            "TEST",
 				Amount:            "100",
 				Decimals:          uint64(18),
@@ -192,7 +262,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditTokenPermission() {
 		TokenCriteria: []*protobuf.TokenCriteria{
 			&protobuf.TokenCriteria{
 				Type:              protobuf.CommunityTokenType_ERC20,
-				ContractAddresses: map[uint64]string{uint64(1): "0x123"},
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
 				Symbol:            "TEST",
 				Amount:            "100",
 				Decimals:          uint64(18),
@@ -246,7 +316,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestCommunityTokensMetadata(
 	s.Require().Len(tokensMetadata, 0)
 
 	newToken := &protobuf.CommunityTokenMetadata{
-		ContractAddresses: map[uint64]string{3: "0xasd"},
+		ContractAddresses: map[uint64]string{testChainID1: "0xasd"},
 		Description:       "desc1",
 		Image:             "IMG1",
 		TokenType:         protobuf.CommunityTokenType_ERC721,
@@ -369,4 +439,107 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSe
 			}
 		}
 	}
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions() {
+	community, chat := s.createCommunity()
+
+	// bob joins the community
+	s.advertiseCommunityTo(community, s.bob)
+	s.joinCommunity(community, s.bob, bobPassword, []string{})
+
+	// send message to the channel
+	msg := s.sendChatMessage(s.owner, chat.ID, "hello on open community")
+
+	// bob can read the message
+	response, err := WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			for _, message := range r.messages {
+				if message.Text == msg.Text {
+					return true
+				}
+			}
+			return false
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(msg.Text, response.Messages()[0].Text)
+
+	// setup become member permission
+	permissionRequest := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+				Symbol:            "TEST",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+
+	waitOnCommunityEncryptionErrCh := s.waitOnCommunityEncryption(community)
+
+	response, err = s.owner.CreateCommunityTokenPermission(&permissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+
+	err = <-waitOnCommunityEncryptionErrCh
+	s.Require().NoError(err)
+
+	// bob should be kicked from the community,
+	// because he doesn't meet the criteria
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(community.Members(), 1)
+
+	// send message to channel
+	msg = s.sendChatMessage(s.owner, chat.ID, "hello on encrypted community")
+
+	// bob can't read the message
+	_, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			for _, message := range r.messages {
+				if message.Text == msg.Text {
+					return true
+				}
+			}
+			return false
+		},
+		"no messages",
+	)
+	s.Require().Error(err)
+	s.Require().ErrorContains(err, "no messages")
+
+	// make bob satisfy the criteria
+	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, permissionRequest.TokenCriteria[0])
+
+	// bob re-joins the community
+	s.joinCommunity(community, s.bob, bobPassword, []string{})
+
+	// send message to channel
+	msg = s.sendChatMessage(s.owner, chat.ID, "hello on encrypted community")
+
+	// bob can read the message
+	response, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			for _, message := range r.messages {
+				if message.Text == msg.Text {
+					return true
+				}
+			}
+			return false
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(msg.Text, response.Messages()[0].Text)
 }

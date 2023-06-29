@@ -227,6 +227,22 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					if err != nil {
 						m.logger.Warn("failed to publish org", zap.Error(err))
 					}
+
+					for _, invitation := range sub.Invitations {
+						err := m.publishOrgInvitation(sub.Community, invitation)
+						if err != nil {
+							m.logger.Warn("failed to publish org invitation", zap.Error(err))
+						}
+					}
+
+					if sub.MemberPermissionsCheckedSignal != nil {
+						err := m.UpdateCommunityEncryption(sub.Community)
+						if err != nil {
+							m.logger.Warn("failed to update community encryption", zap.Error(err))
+						}
+					}
+
+					m.logger.Debug("published org")
 				}
 
 				if sub.CommunityAdminEvent != nil {
@@ -236,14 +252,6 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					}
 				}
 
-				for _, invitation := range sub.Invitations {
-					err := m.publishOrgInvitation(sub.Community, invitation)
-					if err != nil {
-						m.logger.Warn("failed to publish org invitation", zap.Error(err))
-					}
-				}
-
-				m.logger.Debug("published org")
 			case <-ticker.C:
 				// If we are not online, we don't even try
 				if !m.online() {
@@ -1460,16 +1468,8 @@ func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommu
 		return nil, err
 	}
 
-	response, err := m.UpdateCommunityEncryption(community)
-	if err != nil {
-		return nil, err
-	}
-
-	if response == nil {
-		response = &MessengerResponse{}
-		response.AddCommunity(community)
-	}
-
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
 
 	return response, nil
@@ -1485,16 +1485,8 @@ func (m *Messenger) EditCommunityTokenPermission(request *requests.EditCommunity
 		return nil, err
 	}
 
-	response, err := m.UpdateCommunityEncryption(community)
-	if err != nil {
-		return nil, err
-	}
-
-	if response == nil {
-		response = &MessengerResponse{}
-		response.AddCommunity(community)
-	}
-
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
 
 	return response, nil
@@ -1510,17 +1502,10 @@ func (m *Messenger) DeleteCommunityTokenPermission(request *requests.DeleteCommu
 		return nil, err
 	}
 
-	response, err := m.UpdateCommunityEncryption(community)
-	if err != nil {
-		return nil, err
-	}
-
-	if response == nil {
-		response = &MessengerResponse{}
-		response.AddCommunity(community)
-	}
-
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
+
 	return response, nil
 }
 
@@ -3812,28 +3797,28 @@ func (m *Messenger) UpdateCommunityTokenSupply(chainID int, contractAddress stri
 // This functionality introduces some race conditions:
 //   - community description is processed by members before the receiving the key exchange messages
 //   - members maybe sending encrypted messages after the community description is updated and a new member joins
-func (m *Messenger) UpdateCommunityEncryption(community *communities.Community) (*MessengerResponse, error) {
+func (m *Messenger) UpdateCommunityEncryption(community *communities.Community) error {
 	if community == nil {
-		return nil, errors.New("community is nil")
+		return errors.New("community is nil")
 	}
 
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 	isEncrypted := len(becomeMemberPermissions) > 0
 
 	if community.Encrypted() == isEncrypted {
-		return nil, nil
+		return nil
 	}
 
 	if isEncrypted {
 		// 🪄 The magic that encrypts a community
 		_, err := m.encryptor.GenerateHashRatchetKey(community.ID())
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		err = m.SendKeyExchangeMessage(community.ID(), community.GetMemberPubkeys(), common.KeyExMsgReuse)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
@@ -3843,14 +3828,10 @@ func (m *Messenger) UpdateCommunityEncryption(community *communities.Community) 
 	community.SetEncrypted(isEncrypted)
 	err := m.communitiesManager.UpdateCommunity(community)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	response := &MessengerResponse{}
-	response.AddCommunity(community)
-
-	return response, nil
-
+	return nil
 }
 
 func (m *Messenger) CheckPermissionsToJoinCommunity(request *requests.CheckPermissionToJoinCommunity) (*communities.CheckPermissionToJoinResponse, error) {
