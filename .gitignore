@@ -74,3 +74,8 @@ _assets/compose/bootnode/keys
 
 # do not vendor nested vendor/ dirs
 vendor/**/vendor
+
+# nodejs package
+
+package.json
+package-lock.json

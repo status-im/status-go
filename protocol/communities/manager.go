@@ -84,6 +84,7 @@ type Manager struct {
 	periodicMemberPermissionsTasks sync.Map // stores `chan struct{}`
 	torrentTasks                   map[string]metainfo.Hash
 	historyArchiveDownloadTasks    map[string]*HistoryArchiveDownloadTask
+	stopped                        bool
 }
 
 type openseaClient interface {
@@ -313,6 +314,7 @@ func (m *Manager) Subscribe() chan *Subscription {
 }
 
 func (m *Manager) Start() error {
+	m.stopped = false
 	if m.ensVerifier != nil {
 		m.runENSVerificationLoop()
 	}
@@ -347,6 +349,7 @@ func (m *Manager) runENSVerificationLoop() {
 }
 
 func (m *Manager) Stop() error {
+	m.stopped = true
 	close(m.quit)
 	for _, c := range m.subscriptions {
 		close(c)
@@ -462,6 +465,9 @@ func (m *Manager) TorrentClientStarted() bool {
 }
 
 func (m *Manager) publish(subscription *Subscription) {
+	if m.stopped {
+		return
+	}
 	for _, s := range m.subscriptions {
 		select {
 		case s <- subscription:
