@@ -36,6 +36,7 @@ var mainnet = params.Network{
 	IsTest:                 false,
 	Layer:                  1,
 	Enabled:                true,
+	RelatedChainID:         goerliChainID,
 }
 
 var goerli = params.Network{
@@ -53,6 +54,7 @@ var goerli = params.Network{
 	IsTest:                 true,
 	Layer:                  1,
 	Enabled:                true,
+	RelatedChainID:         mainnetChainID,
 }
 
 var optimism = params.Network{
@@ -70,6 +72,7 @@ var optimism = params.Network{
 	IsTest:                 false,
 	Layer:                  2,
 	Enabled:                true,
+	RelatedChainID:         optimismGoerliChainID,
 }
 
 var optimismGoerli = params.Network{
@@ -87,6 +90,7 @@ var optimismGoerli = params.Network{
 	IsTest:                 true,
 	Layer:                  2,
 	Enabled:                false,
+	RelatedChainID:         optimismChainID,
 }
 var arbitrum = params.Network{
 	ChainID:                arbitrumChainID,
@@ -103,6 +107,7 @@ var arbitrum = params.Network{
 	IsTest:                 false,
 	Layer:                  2,
 	Enabled:                true,
+	RelatedChainID:         arbitrumGoerliChainID,
 }
 
 var arbitrumGoerli = params.Network{
@@ -120,6 +125,7 @@ var arbitrumGoerli = params.Network{
 	IsTest:                 true,
 	Layer:                  2,
 	Enabled:                false,
+	RelatedChainID:         arbitrumChainID,
 }
 
 var defaultNetworks = []params.Network{

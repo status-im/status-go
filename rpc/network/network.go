@@ -8,7 +8,12 @@ import (
 	"github.com/status-im/status-go/params"
 )
 
-const baseQuery = "SELECT chain_id, chain_name, rpc_url, fallback_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name FROM networks"
+type CombinedNetwork struct {
+	Prod *params.Network
+	Test *params.Network
+}
+
+const baseQuery = "SELECT chain_id, chain_name, rpc_url, fallback_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name, related_chain_id FROM networks"
 
 func newNetworksQuery() *networksQuery {
 	buf := bytes.NewBuffer(nil)
@@ -59,6 +64,7 @@ func (nq *networksQuery) exec(db *sql.DB) ([]*params.Network, error) {
 			&network.ChainID, &network.ChainName, &network.RPCURL, &network.FallbackURL, &network.BlockExplorerURL, &network.IconURL,
 			&network.NativeCurrencyName, &network.NativeCurrencySymbol,
 			&network.NativeCurrencyDecimals, &network.IsTest, &network.Layer, &network.Enabled, &network.ChainColor, &network.ShortName,
+			&network.RelatedChainID,
 		)
 		if err != nil {
 			return nil, err
@@ -129,6 +135,14 @@ func (nm *Manager) Init(networks []params.Network) error {
 						errors += fmt.Sprintf("error updating network fallback_url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
 					}
 				}
+
+				if currentNetworks[j].RelatedChainID != networks[i].RelatedChainID {
+					// Update fallback_url if it's different
+					err := nm.UpdateRelatedChainID(currentNetworks[j].ChainID, networks[i].RelatedChainID)
+					if err != nil {
+						errors += fmt.Sprintf("error updating network fallback_url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
+					}
+				}
 				break
 			}
 		}
@@ -151,10 +165,11 @@ func (nm *Manager) Init(networks []params.Network) error {
 
 func (nm *Manager) Upsert(network *params.Network) error {
 	_, err := nm.db.Exec(
-		"INSERT OR REPLACE INTO networks (chain_id, chain_name, rpc_url, fallback_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"INSERT OR REPLACE INTO networks (chain_id, chain_name, rpc_url, fallback_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name, related_chain_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		network.ChainID, network.ChainName, network.RPCURL, network.FallbackURL, network.BlockExplorerURL, network.IconURL,
 		network.NativeCurrencyName, network.NativeCurrencySymbol, network.NativeCurrencyDecimals,
 		network.IsTest, network.Layer, network.Enabled, network.ChainColor, network.ShortName,
+		network.RelatedChainID,
 	)
 	return err
 }
@@ -174,6 +189,11 @@ func (nm *Manager) UpdateFallbackURL(chainID uint64, fallbackURL string) error {
 	return err
 }
 
+func (nm *Manager) UpdateRelatedChainID(chainID uint64, relatedChainID uint64) error {
+	_, err := nm.db.Exec(`UPDATE networks SET related_chain_id = ? WHERE chain_id = ?`, relatedChainID, chainID)
+	return err
+}
+
 func (nm *Manager) Find(chainID uint64) *params.Network {
 	networks, err := newNetworksQuery().filterChainID(chainID).exec(nm.db)
 	if len(networks) != 1 || err != nil {
@@ -189,6 +209,44 @@ func (nm *Manager) Get(onlyEnabled bool) ([]*params.Network, error) {
 	}
 
 	return query.exec(nm.db)
+}
+
+func (nm *Manager) GetCombinedNetworks() ([]*CombinedNetwork, error) {
+	query := newNetworksQuery()
+	networks, err := query.exec(nm.db)
+	if err != nil {
+		return nil, err
+	}
+	var combinedNetworks []*CombinedNetwork
+	for _, network := range networks {
+		found := false
+		for _, n := range combinedNetworks {
+			if (n.Test != nil && network.ChainID == n.Test.RelatedChainID) || (n.Prod != nil && network.ChainID == n.Prod.RelatedChainID) {
+				found = true
+				if network.IsTest {
+					n.Test = network
+					break
+				} else {
+					n.Prod = network
+					break
+				}
+			}
+		}
+
+		if found {
+			continue
+		}
+
+		newCombined := &CombinedNetwork{}
+		if network.IsTest {
+			newCombined.Test = network
+		} else {
+			newCombined.Prod = network
+		}
+		combinedNetworks = append(combinedNetworks, newCombined)
+	}
+
+	return combinedNetworks, nil
 }
 
 func (nm *Manager) GetConfiguredNetworks() []params.Network {
