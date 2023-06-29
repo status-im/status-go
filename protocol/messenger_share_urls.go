@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -119,6 +120,25 @@ func (m *Messenger) parseCommunityURLWithChatKey(urlData string) (*URLDataRespon
 	}, nil
 }
 
+func (m *Messenger) prepareEncodedRawData(rawData []byte, privateKey *ecdsa.PrivateKey) (string, string, error) {
+	encodedData, err := urls.EncodeDataURL(rawData)
+	if err != nil {
+		return "", "", err
+	}
+
+	signature, err := crypto.SignBytes([]byte(encodedData), privateKey)
+	if err != nil {
+		return "", "", err
+	}
+
+	encodedSignature, err := urls.EncodeDataURL(signature)
+	if err != nil {
+		return "", "", err
+	}
+
+	return encodedData, encodedSignature, nil
+}
+
 func (m *Messenger) prepareEncodedCommunityData(community *communities.Community) (string, string, error) {
 	communityProto := &protobuf.Community{
 		DisplayName:  community.Identity().DisplayName,
@@ -132,17 +152,7 @@ func (m *Messenger) prepareEncodedCommunityData(community *communities.Community
 		return "", "", err
 	}
 
-	encodedData, err := urls.EncodeDataURL(communityData)
-	if err != nil {
-		return "", "", err
-	}
-
-	signature, err := crypto.SignBytes([]byte(encodedData), community.PrivateKey())
-	if err != nil {
-		return "", "", err
-	}
-
-	return encodedData, string(signature), nil
+	return m.prepareEncodedRawData(communityData, community.PrivateKey())
 }
 
 func (m *Messenger) ShareCommunityURLWithData(communityID types.HexBytes) (string, error) {
@@ -168,8 +178,17 @@ func (m *Messenger) ShareCommunityURLWithData(communityID types.HexBytes) (strin
 	return fmt.Sprintf("%s/c/%s#%s", baseShareURL, data, signature), nil
 }
 
+func (m *Messenger) verifySignature(data string, rawSignature string) (*ecdsa.PublicKey, error) {
+	signature, err := urls.DecodeDataURL(rawSignature)
+	if err != nil {
+		return nil, err
+	}
+
+	return crypto.SigToPub(crypto.Keccak256([]byte(data)), signature)
+}
+
 func (m *Messenger) parseCommunityURLWithData(data string, signature string) (*URLDataResponse, error) {
-	_, err := crypto.SigToPub(crypto.Keccak256([]byte(data)), []byte(signature))
+	_, err := m.verifySignature(data, signature)
 	if err != nil {
 		return nil, err
 	}
@@ -268,17 +287,7 @@ func (m *Messenger) prepareEncodedCommunityChannelData(community *communities.Co
 		return "", "", err
 	}
 
-	encodedData, err := urls.EncodeDataURL(channelData)
-	if err != nil {
-		return "", "", err
-	}
-
-	signature, err := crypto.SignBytes([]byte(encodedData), community.PrivateKey())
-	if err != nil {
-		return "", "", err
-	}
-
-	return encodedData, string(signature), nil
+	return m.prepareEncodedRawData(channelData, community.PrivateKey())
 }
 
 func (m *Messenger) ShareCommunityChannelURLWithData(request *requests.CommunityChannelShareURL) (string, error) {
@@ -305,7 +314,7 @@ func (m *Messenger) ShareCommunityChannelURLWithData(request *requests.Community
 }
 
 func (m *Messenger) parseCommunityChannelURLWithData(data string, signature string) (*URLDataResponse, error) {
-	_, err := crypto.SigToPub(crypto.Keccak256([]byte(data)), []byte(signature))
+	_, err := m.verifySignature(data, signature)
 	if err != nil {
 		return nil, err
 	}
@@ -415,17 +424,7 @@ func (m *Messenger) prepareEncodedUserData(contact *Contact) (string, string, er
 		return "", "", err
 	}
 
-	encodedData, err := urls.EncodeDataURL(userData)
-	if err != nil {
-		return "", "", err
-	}
-
-	signature, err := crypto.SignBytes([]byte(encodedData), m.identity)
-	if err != nil {
-		return "", "", err
-	}
-
-	return encodedData, string(signature), nil
+	return m.prepareEncodedRawData(userData, m.identity)
 }
 
 func (m *Messenger) ShareUserURLWithData(contactID string) (string, error) {
@@ -443,7 +442,7 @@ func (m *Messenger) ShareUserURLWithData(contactID string) (string, error) {
 }
 
 func (m *Messenger) parseUserURLWithData(data string, signature string) (*URLDataResponse, error) {
-	_, err := crypto.SigToPub(crypto.Keccak256([]byte(data)), []byte(signature))
+	_, err := m.verifySignature(data, signature)
 	if err != nil {
 		return nil, err
 	}
@@ -471,7 +470,6 @@ func (m *Messenger) ParseSharedURL(url string) (*URLDataResponse, error) {
 	if !strings.HasPrefix(url, baseShareURL) {
 		return nil, fmt.Errorf("url should start with '%s'", baseShareURL)
 	}
-	fmt.Println("-----> ParseSharedURL::: url: ", url)
 
 	urlContents := regexp.MustCompile(`\#`).Split(strings.TrimPrefix(url, baseShareURL+"/"), 2)
 	if len(urlContents) != 2 {
