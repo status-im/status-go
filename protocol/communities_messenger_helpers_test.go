@@ -203,3 +203,18 @@ func joinCommunity(s *suite.Suite, community *communities.Community, owner *Mess
 	})
 	s.Require().NoError(err)
 }
+
+func sendChatMessage(s *suite.Suite, sender *Messenger, chatID string, text string) *common.Message {
+	msg := &common.Message{
+		ChatMessage: protobuf.ChatMessage{
+			ChatId:      chatID,
+			ContentType: protobuf.ChatMessage_TEXT_PLAIN,
+			Text:        text,
+		},
+	}
+
+	_, err := sender.SendChatMessage(context.Background(), msg)
+	s.Require().NoError(err)
+
+	return msg
+}

@@ -295,6 +295,10 @@ type Subscription struct {
 	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
 	ImportingHistoryArchiveMessagesSignal    *signal.ImportingHistoryArchiveMessagesSignal
 	CommunityAdminEvent                      *protobuf.CommunityAdminEvent
+	MemberPermissionsCheckedSignal           *MemberPermissionsCheckedSignal
+}
+
+type MemberPermissionsCheckedSignal struct {
 }
 
 type CommunityResponse struct {
@@ -667,7 +671,6 @@ func (m *Manager) checkMemberPermissions(community *Community, removeAdmins bool
 	memberPermissions := len(becomeMemberPermissions) > 0
 
 	if !adminPermissions && !memberPermissions && !removeAdmins {
-		m.publish(&Subscription{Community: community})
 		return nil
 	}
 
@@ -741,7 +744,10 @@ func (m *Manager) checkMemberPermissions(community *Community, removeAdmins bool
 		}
 	}
 
-	m.publish(&Subscription{Community: community})
+	m.publish(&Subscription{
+		Community:                      community,
+		MemberPermissionsCheckedSignal: &MemberPermissionsCheckedSignal{},
+	})
 	return nil
 }
 
