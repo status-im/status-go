@@ -17,7 +17,7 @@ import (
 	"github.com/status-im/status-go/protocol/urls"
 )
 
-type CommunityUrlData struct {
+type CommunityURLData struct {
 	DisplayName  string `json:"displayName"`
 	Description  string `json:"description"`
 	MembersCount uint32 `json:"membersCount"`
@@ -37,7 +37,7 @@ type ContactURLData struct {
 }
 
 type URLDataResponse struct {
-	Community CommunityUrlData        `json:"community"`
+	Community CommunityURLData        `json:"community"`
 	Channel   CommunityChannelURLData `json:"channel"`
 	Contact   ContactURLData          `json:"contact"`
 }
@@ -91,8 +91,8 @@ func (m *Messenger) ShareCommunityURLWithChatKey(communityID types.HexBytes) (st
 	return fmt.Sprintf("%s/c#%s", baseShareURL, shortKey), nil
 }
 
-func (m *Messenger) prepareCommunityData(community *communities.Community) CommunityUrlData {
-	return CommunityUrlData{
+func (m *Messenger) prepareCommunityData(community *communities.Community) CommunityURLData {
+	return CommunityURLData{
 		DisplayName:  community.Identity().DisplayName,
 		Description:  community.DescriptionText(),
 		MembersCount: uint32(community.MembersCount()),
@@ -205,7 +205,7 @@ func (m *Messenger) parseCommunityURLWithData(data string, signature string) (*U
 	}
 
 	return &URLDataResponse{
-		Community: CommunityUrlData{
+		Community: CommunityURLData{
 			DisplayName:  communityProto.DisplayName,
 			Description:  communityProto.Description,
 			MembersCount: communityProto.MembersCount,
@@ -224,7 +224,15 @@ func (m *Messenger) ShareCommunityChannelURLWithChatKey(request *requests.Commun
 		return "", err
 	}
 
-	// TODO: convert ChannelID to 003cdcd5-e065-48f9-b166-b1a94ac75a11 format
+	valid, err := regexp.MatchString(channelUUIDRegExp, request.ChannelID)
+	if err != nil {
+		return "", err
+	}
+
+	if !valid {
+		return "", fmt.Errorf("channelID should be UUID, got %s", request.ChannelID)
+	}
+
 	return fmt.Sprintf("%s/cc/%s#%s", baseShareURL, request.ChannelID, shortKey), nil
 }
 
@@ -238,6 +246,15 @@ func (m *Messenger) prepareCommunityChannelData(channel *protobuf.CommunityChat)
 }
 
 func (m *Messenger) parseCommunityChannelURLWithChatKey(channelID string, publickKey string) (*URLDataResponse, error) {
+	valid, err := regexp.MatchString(channelUUIDRegExp, channelID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !valid {
+		return nil, fmt.Errorf("channelID should be UUID, got %s", channelID)
+	}
+
 	communityID, err := m.DeserializePublicKey(publickKey)
 	if err != nil {
 		return nil, err
@@ -252,7 +269,6 @@ func (m *Messenger) parseCommunityChannelURLWithChatKey(channelID string, public
 		return nil, fmt.Errorf("community with communityID %s not found", communityID)
 	}
 
-	// TODO: channelID should be converted to compressed public key
 	channel, ok := community.Chats()[channelID]
 	if !ok {
 		return nil, fmt.Errorf("channel with channelID %s not found", channelID)
@@ -295,6 +311,15 @@ func (m *Messenger) ShareCommunityChannelURLWithData(request *requests.Community
 		return "", err
 	}
 
+	valid, err := regexp.MatchString(channelUUIDRegExp, request.ChannelID)
+	if err != nil {
+		return "", err
+	}
+
+	if !valid {
+		return "nil", fmt.Errorf("channelID should be UUID, got %s", request.ChannelID)
+	}
+
 	community, err := m.GetCommunityByID(request.CommunityID)
 	if err != nil {
 		return "", err
@@ -331,7 +356,7 @@ func (m *Messenger) parseCommunityChannelURLWithData(data string, signature stri
 	}
 
 	return &URLDataResponse{
-		Community: CommunityUrlData{
+		Community: CommunityURLData{
 			DisplayName:  channelProto.Community.DisplayName,
 			Description:  channelProto.Community.Description,
 			MembersCount: channelProto.Community.MembersCount,

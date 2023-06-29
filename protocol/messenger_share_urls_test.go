@@ -291,7 +291,6 @@ func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithData() {
 	communityData, signature, err := s.m.prepareEncodedCommunityChannelData(community, channel, channelID)
 	s.Require().NoError(err)
 
-	// TODO: channel ID is not uuid
 	expectedURL := fmt.Sprintf("%s/cc/%s#%s", baseShareURL, communityData, signature)
 	s.Require().Equal(expectedURL, url)
 }
