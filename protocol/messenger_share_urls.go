@@ -169,11 +169,10 @@ func (m *Messenger) ShareCommunityURLWithData(communityID types.HexBytes) (strin
 }
 
 func (m *Messenger) parseCommunityURLWithData(data string, signature string) (*UrlDataResponse, error) {
-	// pubKey, err := crypto.SigToPub([]byte(data), []byte(signature))
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// communityID := crypto.CompressPubkey(pubKey)
+	_, err := crypto.SigToPub(crypto.Keccak256([]byte(data)), []byte(signature))
+	if err != nil {
+		return nil, err
+	}
 
 	communityData, err := urls.DecodeDataURL(data)
 	if err != nil {
@@ -305,11 +304,10 @@ func (m *Messenger) ShareCommunityChannelURLWithData(request *requests.Community
 }
 
 func (m *Messenger) parseCommunityChannelURLWithData(data string, signature string) (*UrlDataResponse, error) {
-	// pubKey, err := crypto.SigToPub([]byte(data), []byte(signature))
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// communityID := crypto.CompressPubkey(pubKey)
+	_, err := crypto.SigToPub(crypto.Keccak256([]byte(data)), []byte(signature))
+	if err != nil {
+		return nil, err
+	}
 
 	channelData, err := urls.DecodeDataURL(data)
 	if err != nil {
@@ -444,10 +442,10 @@ func (m *Messenger) ShareUserURLWithData(contactId string) (string, error) {
 }
 
 func (m *Messenger) parseUserURLWithData(data string, signature string) (*UrlDataResponse, error) {
-	// _, err := crypto.SigToPub([]byte(data), []byte(signature))
-	// if err != nil {
-	// 	return nil, err
-	// }
+	_, err := crypto.SigToPub(crypto.Keccak256([]byte(data)), []byte(signature))
+	if err != nil {
+		return nil, err
+	}
 
 	userData, err := urls.DecodeDataURL(data)
 	if err != nil {
