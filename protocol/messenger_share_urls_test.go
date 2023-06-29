@@ -123,16 +123,16 @@ func (s *MessengerShareUrlsSuite) createCommunityWithChannel() (*communities.Com
 	community = response.Communities()[0]
 	s.Require().Len(community.Chats(), 1)
 
-	var channelId string
+	var channelID string
 	var channel *protobuf.CommunityChat
 
 	for key, value := range community.Chats() {
-		channelId = key
+		channelID = key
 		channel = value
 		break
 	}
 	s.Require().NotNil(channel)
-	return community, channel, channelId
+	return community, channel, channelID
 }
 
 func (s *MessengerShareUrlsSuite) TestDecodeEncodeDataURL() {
@@ -181,8 +181,8 @@ func (s *MessengerShareUrlsSuite) TestShareCommunityURLWithChatKey() {
 	shortKey, err := s.m.SerializePublicKey(community.ID())
 	s.Require().NoError(err)
 
-	expectedUrl := fmt.Sprintf("%s/c#%s", baseShareUrl, shortKey)
-	s.Require().Equal(expectedUrl, url)
+	expectedURL := fmt.Sprintf("%s/c#%s", baseShareURL, shortKey)
+	s.Require().Equal(expectedURL, url)
 }
 
 func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithChatKey() {
@@ -191,7 +191,7 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithChatKey() {
 	shortKey, err := s.m.SerializePublicKey(community.ID())
 	s.Require().NoError(err)
 
-	url := fmt.Sprintf("%s/c#%s", baseShareUrl, shortKey)
+	url := fmt.Sprintf("%s/c#%s", baseShareURL, shortKey)
 
 	urlData, err := s.m.ParseSharedURL(url)
 	s.Require().NoError(err)
@@ -213,8 +213,8 @@ func (s *MessengerShareUrlsSuite) TestShareCommunityURLWithData() {
 	communityData, signature, err := s.m.prepareEncodedCommunityData(community)
 	s.Require().NoError(err)
 
-	expectedUrl := fmt.Sprintf("%s/c/%s#%s", baseShareUrl, communityData, signature)
-	s.Require().Equal(expectedUrl, url)
+	expectedURL := fmt.Sprintf("%s/c/%s#%s", baseShareURL, communityData, signature)
+	s.Require().Equal(expectedURL, url)
 }
 
 func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithData() {
@@ -223,7 +223,7 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithData() {
 	communityData, signature, err := s.m.prepareEncodedCommunityData(community)
 	s.Require().NoError(err)
 
-	url := fmt.Sprintf("%s/c/%s#%s", baseShareUrl, communityData, signature)
+	url := fmt.Sprintf("%s/c/%s#%s", baseShareURL, communityData, signature)
 
 	urlData, err := s.m.ParseSharedURL(url)
 	s.Require().NoError(err)
@@ -238,11 +238,11 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithData() {
 
 func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithChatKey() {
 	community := s.createCommunity()
-	channelId := "003cdcd5-e065-48f9-b166-b1a94ac75a11"
+	channelID := "003cdcd5-e065-48f9-b166-b1a94ac75a11"
 
 	request := &requests.CommunityChannelShareURL{
 		CommunityID: community.ID(),
-		ChannelID:   channelId,
+		ChannelID:   channelID,
 	}
 	url, err := s.m.ShareCommunityChannelURLWithChatKey(request)
 	s.Require().NoError(err)
@@ -250,17 +250,17 @@ func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithChatKey() {
 	shortKey, err := s.m.SerializePublicKey(community.ID())
 	s.Require().NoError(err)
 
-	expectedUrl := fmt.Sprintf("%s/cc/%s#%s", baseShareUrl, channelId, shortKey)
-	s.Require().Equal(expectedUrl, url)
+	expectedURL := fmt.Sprintf("%s/cc/%s#%s", baseShareURL, channelID, shortKey)
+	s.Require().Equal(expectedURL, url)
 }
 
 func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithChatKey() {
-	community, channel, channelId := s.createCommunityWithChannel()
+	community, channel, channelID := s.createCommunityWithChannel()
 
 	shortKey, err := s.m.SerializePublicKey(community.ID())
 	s.Require().NoError(err)
 
-	url := fmt.Sprintf("%s/cc/%s#%s", baseShareUrl, channelId, shortKey)
+	url := fmt.Sprintf("%s/cc/%s#%s", baseShareURL, channelID, shortKey)
 
 	urlData, err := s.m.ParseSharedURL(url)
 	s.Require().NoError(err)
@@ -279,30 +279,30 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithChatKey() {
 }
 
 func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithData() {
-	community, channel, channelId := s.createCommunityWithChannel()
+	community, channel, channelID := s.createCommunityWithChannel()
 
 	request := &requests.CommunityChannelShareURL{
 		CommunityID: community.ID(),
-		ChannelID:   channelId,
+		ChannelID:   channelID,
 	}
 	url, err := s.m.ShareCommunityChannelURLWithData(request)
 	s.Require().NoError(err)
 
-	communityData, signature, err := s.m.prepareEncodedCommunityChannelData(community, channel, channelId)
+	communityData, signature, err := s.m.prepareEncodedCommunityChannelData(community, channel, channelID)
 	s.Require().NoError(err)
 
 	// TODO: channel ID is not uuid
-	expectedUrl := fmt.Sprintf("%s/cc/%s#%s", baseShareUrl, communityData, signature)
-	s.Require().Equal(expectedUrl, url)
+	expectedURL := fmt.Sprintf("%s/cc/%s#%s", baseShareURL, communityData, signature)
+	s.Require().Equal(expectedURL, url)
 }
 
 func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithData() {
-	community, channel, channelId := s.createCommunityWithChannel()
+	community, channel, channelID := s.createCommunityWithChannel()
 
-	communityChannelData, signature, err := s.m.prepareEncodedCommunityChannelData(community, channel, channelId)
+	communityChannelData, signature, err := s.m.prepareEncodedCommunityChannelData(community, channel, channelID)
 	s.Require().NoError(err)
 
-	url := fmt.Sprintf("%s/cc/%s#%s", baseShareUrl, communityChannelData, signature)
+	url := fmt.Sprintf("%s/cc/%s#%s", baseShareURL, communityChannelData, signature)
 
 	urlData, err := s.m.ParseSharedURL(url)
 	s.Require().NoError(err)
@@ -332,8 +332,8 @@ func (s *MessengerShareUrlsSuite) TestShareUserURLWithChatKey() {
 	shortKey, err := s.m.SerializePublicKey(crypto.CompressPubkey(publicKey))
 	s.Require().NoError(err)
 
-	expectedUrl := fmt.Sprintf("%s/u#%s", baseShareUrl, shortKey)
-	s.Require().Equal(expectedUrl, url)
+	expectedURL := fmt.Sprintf("%s/u#%s", baseShareURL, shortKey)
+	s.Require().Equal(expectedURL, url)
 }
 
 func (s *MessengerShareUrlsSuite) TestParseUserURLWithChatKey() {
@@ -345,7 +345,7 @@ func (s *MessengerShareUrlsSuite) TestParseUserURLWithChatKey() {
 	shortKey, err := s.m.SerializePublicKey(crypto.CompressPubkey(publicKey))
 	s.Require().NoError(err)
 
-	url := fmt.Sprintf("%s/u#%s", baseShareUrl, shortKey)
+	url := fmt.Sprintf("%s/u#%s", baseShareURL, shortKey)
 
 	urlData, err := s.m.ParseSharedURL(url)
 	s.Require().NoError(err)
@@ -362,15 +362,15 @@ func (s *MessengerShareUrlsSuite) TestShareUserURLWithENS() {
 	url, err := s.m.ShareUserURLWithENS(contact.ID)
 	s.Require().NoError(err)
 
-	expectedUrl := fmt.Sprintf("%s/u#%s", baseShareUrl, contact.EnsName)
-	s.Require().Equal(expectedUrl, url)
+	expectedURL := fmt.Sprintf("%s/u#%s", baseShareURL, contact.EnsName)
+	s.Require().Equal(expectedURL, url)
 }
 
 // TODO: ens in the next ticket
 // func (s *MessengerShareUrlsSuite) TestParseUserURLWithENS() {
 // 	_, contact := s.createContact()
 
-// 	url := fmt.Sprintf("%s/u#%s", baseShareUrl, contact.EnsName)
+// 	url := fmt.Sprintf("%s/u#%s", baseShareURL, contact.EnsName)
 
 // 	urlData, err := s.m.ParseSharedURL(url)
 // 	s.Require().NoError(err)
@@ -390,8 +390,8 @@ func (s *MessengerShareUrlsSuite) TestShareUserURLWithData() {
 	userData, signature, err := s.m.prepareEncodedUserData(contact)
 	s.Require().NoError(err)
 
-	expectedUrl := fmt.Sprintf("%s/u/%s#%s", baseShareUrl, userData, signature)
-	s.Require().Equal(expectedUrl, url)
+	expectedURL := fmt.Sprintf("%s/u/%s#%s", baseShareURL, userData, signature)
+	s.Require().Equal(expectedURL, url)
 }
 
 func (s *MessengerShareUrlsSuite) TestParseUserURLWithData() {
@@ -400,7 +400,7 @@ func (s *MessengerShareUrlsSuite) TestParseUserURLWithData() {
 	userData, signature, err := s.m.prepareEncodedUserData(contact)
 	s.Require().NoError(err)
 
-	url := fmt.Sprintf("%s/u/%s#%s", baseShareUrl, userData, signature)
+	url := fmt.Sprintf("%s/u/%s#%s", baseShareURL, userData, signature)
 
 	urlData, err := s.m.ParseSharedURL(url)
 	s.Require().NoError(err)

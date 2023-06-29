@@ -1353,19 +1353,19 @@ func (api *PublicAPI) ShareCommunityChannelURLWithData(request *requests.Communi
 	return api.service.messenger.ShareCommunityChannelURLWithData(request)
 }
 
-func (api *PublicAPI) ShareUserURLWithENS(pubkey string) (string, error) {
-	return api.service.messenger.ShareUserURLWithENS(pubkey)
+func (api *PublicAPI) ShareUserURLWithENS(pubKey string) (string, error) {
+	return api.service.messenger.ShareUserURLWithENS(pubKey)
 }
 
-func (api *PublicAPI) ShareUserURLWithChatKey(pubkey string) (string, error) {
-	return api.service.messenger.ShareUserURLWithChatKey(pubkey)
+func (api *PublicAPI) ShareUserURLWithChatKey(pubKey string) (string, error) {
+	return api.service.messenger.ShareUserURLWithChatKey(pubKey)
 }
 
-func (api *PublicAPI) ShareUserURLWithData(pubkey string) (string, error) {
-	return api.service.messenger.ShareUserURLWithData(pubkey)
+func (api *PublicAPI) ShareUserURLWithData(pubKey string) (string, error) {
+	return api.service.messenger.ShareUserURLWithData(pubKey)
 }
 
-func (api *PublicAPI) ParseSharedURL(url string) (*protocol.UrlDataResponse, error) {
+func (api *PublicAPI) ParseSharedURL(url string) (*protocol.URLDataResponse, error) {
 	return api.service.messenger.ParseSharedURL(url)
 }
 
