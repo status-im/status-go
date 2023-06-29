@@ -32,6 +32,7 @@ type CommunityChannelUrlData struct {
 
 type ContactUrlData struct {
 	DisplayName string `json:"displayName"`
+	Description string `json:"description"`
 }
 
 type UrlDataResponse struct {
@@ -280,7 +281,7 @@ func (m *Messenger) prepareEncodedCommunityChannelData(community *communities.Co
 	return encodedData, string(signature), nil
 }
 
-func (m *Messenger) CreateCommunityChannelURLWithData(request *requests.CommunityChannelShareURL) (string, error) {
+func (m *Messenger) ShareCommunityChannelURLWithData(request *requests.CommunityChannelShareURL) (string, error) {
 	if err := request.Validate(); err != nil {
 		return "", err
 	}
@@ -462,6 +463,7 @@ func (m *Messenger) parseUserURLWithData(data string, signature string) (*UrlDat
 	return &UrlDataResponse{
 		Contact: ContactUrlData{
 			DisplayName: userProto.DisplayName,
+			Description: userProto.Description,
 		},
 	}, nil
 }
@@ -470,19 +472,22 @@ func (m *Messenger) ParseSharedURL(url string) (*UrlDataResponse, error) {
 	if !strings.HasPrefix(url, baseShareUrl) {
 		return nil, fmt.Errorf("url should start with '%s'", baseShareUrl)
 	}
-	urlContents := strings.Split(strings.TrimPrefix(url, baseShareUrl+"/"), "#")
+	fmt.Println("-----> ParseSharedURL::: url: ", url)
 
-	fmt.Println("-----> ParseSharedURL::: url: ", url, "urlContents: ", len(urlContents))
+	urlContents := regexp.MustCompile(`\#`).Split(strings.TrimPrefix(url, baseShareUrl+"/"), 2)
+	if len(urlContents) != 2 {
+		return nil, fmt.Errorf("url should contain at least one `#` separator")
+	}
 
-	if len(urlContents) == 2 && urlContents[0] == "c" {
+	if urlContents[0] == "c" {
 		return m.parseCommunityURLWithChatKey(urlContents[1])
 	}
 
-	if len(urlContents) == 2 && strings.HasPrefix(urlContents[0], "c/") {
+	if strings.HasPrefix(urlContents[0], "c/") {
 		return m.parseCommunityURLWithData(strings.TrimPrefix(urlContents[0], "c/"), urlContents[1])
 	}
 
-	if len(urlContents) == 2 && strings.HasPrefix(urlContents[0], "cc/") {
+	if strings.HasPrefix(urlContents[0], "cc/") {
 		first := strings.TrimPrefix(urlContents[0], "cc/")
 
 		isChannel, err := regexp.MatchString(channelUuidRegExp, first)
@@ -496,7 +501,7 @@ func (m *Messenger) ParseSharedURL(url string) (*UrlDataResponse, error) {
 		}
 	}
 
-	if len(urlContents) == 2 && urlContents[0] == "u" {
+	if urlContents[0] == "u" {
 		if strings.HasPrefix(urlContents[1], "zQ3sh") {
 			return m.parseUserURLWithChatKey(urlContents[1])
 		} else {
@@ -504,7 +509,7 @@ func (m *Messenger) ParseSharedURL(url string) (*UrlDataResponse, error) {
 		}
 	}
 
-	if len(urlContents) == 2 && strings.HasPrefix(urlContents[0], "u/") {
+	if strings.HasPrefix(urlContents[0], "u/") {
 		return m.parseUserURLWithData(strings.TrimPrefix(urlContents[0], "u/"), urlContents[1])
 	}
 

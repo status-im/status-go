@@ -1349,20 +1349,20 @@ func (api *PublicAPI) ShareCommunityChannelURLWithChatKey(request *requests.Comm
 	return api.service.messenger.ShareCommunityChannelURLWithChatKey(request)
 }
 
-func (api *PublicAPI) CreateCommunityChannelURLWithData(request *requests.CommunityChannelShareURL) (string, error) {
-	return api.service.messenger.CreateCommunityChannelURLWithData(request)
+func (api *PublicAPI) ShareCommunityChannelURLWithData(request *requests.CommunityChannelShareURL) (string, error) {
+	return api.service.messenger.ShareCommunityChannelURLWithData(request)
 }
 
-func (api *PublicAPI) CreateUserURLWithENS(pubkey string) (string, error) {
-	return api.service.messenger.CreateUserURLWithENS(pubkey)
+func (api *PublicAPI) ShareUserURLWithENS(pubkey string) (string, error) {
+	return api.service.messenger.ShareUserURLWithENS(pubkey)
 }
 
-func (api *PublicAPI) CreateUserURLWithChatKey(pubkey string) (string, error) {
-	return api.service.messenger.CreateUserURLWithChatKey(pubkey)
+func (api *PublicAPI) ShareUserURLWithChatKey(pubkey string) (string, error) {
+	return api.service.messenger.ShareUserURLWithChatKey(pubkey)
 }
 
-func (api *PublicAPI) CreateUserURLWithData(pubkey string) (string, error) {
-	return api.service.messenger.CreateUserURLWithData(pubkey)
+func (api *PublicAPI) ShareUserURLWithData(pubkey string) (string, error) {
+	return api.service.messenger.ShareUserURLWithData(pubkey)
 }
 
 func (api *PublicAPI) ParseSharedURL(url string) (*protocol.UrlDataResponse, error) {

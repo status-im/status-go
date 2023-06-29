@@ -281,6 +281,24 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithChatKey() {
 func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithData() {
 	community, channel, channelId := s.createCommunityWithChannel()
 
+	request := &requests.CommunityChannelShareURL{
+		CommunityID: community.ID(),
+		ChannelID:   channelId,
+	}
+	url, err := s.m.ShareCommunityChannelURLWithData(request)
+	s.Require().NoError(err)
+
+	communityData, signature, err := s.m.prepareEncodedCommunityChannelData(community, channel, channelId)
+	s.Require().NoError(err)
+
+	// TODO: channel ID is not uuid
+	expectedUrl := fmt.Sprintf("%s/cc/%s#%s", baseShareUrl, communityData, signature)
+	s.Require().Equal(expectedUrl, url)
+}
+
+func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithData() {
+	community, channel, channelId := s.createCommunityWithChannel()
+
 	communityChannelData, signature, err := s.m.prepareEncodedCommunityChannelData(community, channel, channelId)
 	s.Require().NoError(err)
 
@@ -295,6 +313,11 @@ func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithData() {
 	s.Require().Equal(community.DescriptionText(), urlData.Community.Description)
 	s.Require().Equal(uint32(community.MembersCount()), urlData.Community.MembersCount)
 	s.Require().Equal(community.Identity().GetColor(), urlData.Community.Color)
+
+	s.Require().NotNil(urlData.Channel)
+	s.Require().Equal(channel.Identity.Emoji, urlData.Channel.Emoji)
+	s.Require().Equal(channel.Identity.DisplayName, urlData.Channel.DisplayName)
+	s.Require().Equal(channel.Identity.Color, urlData.Channel.Color)
 }
 
 func (s *MessengerShareUrlsSuite) TestShareUserURLWithChatKey() {
@@ -330,6 +353,7 @@ func (s *MessengerShareUrlsSuite) TestParseUserURLWithChatKey() {
 
 	s.Require().NotNil(urlData.Contact)
 	s.Require().Equal(contact.DisplayName, urlData.Contact.DisplayName)
+	s.Require().Equal(contact.Bio, urlData.Contact.DisplayName)
 }
 
 func (s *MessengerShareUrlsSuite) TestShareUserURLWithENS() {
@@ -354,6 +378,7 @@ func (s *MessengerShareUrlsSuite) TestShareUserURLWithENS() {
 
 // 	s.Require().NotNil(urlData.Contact)
 // 	s.Require().Equal(contact.DisplayName, urlData.Contact.DisplayName)
+//  s.Require().Equal(contact.Bio, urlData.Contact.DisplayName)
 // }
 
 func (s *MessengerShareUrlsSuite) TestShareUserURLWithData() {
@@ -382,5 +407,6 @@ func (s *MessengerShareUrlsSuite) TestParseUserURLWithData() {
 	s.Require().NotNil(urlData)
 
 	s.Require().NotNil(urlData.Contact)
-	s.Require().Equal(contact.DisplayName, urlData.Community.DisplayName)
+	s.Require().Equal(contact.DisplayName, urlData.Contact.DisplayName)
+	s.Require().Equal(contact.Bio, urlData.Contact.Description)
 }
