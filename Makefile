@@ -313,6 +313,7 @@ test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
 	grep -v /transactions/fake )
 test-unit: ##@tests Run unit and integration tests
 	for file in $(UNIT_TEST_PACKAGES); do \
+		set -e; \
 		go test -tags '$(BUILD_TAGS)' -timeout 20m -v -failfast $$file $(gotest_extraflags); \
 	done
 
