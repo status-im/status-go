@@ -25,7 +25,7 @@ var (
 
 // AccountPayload represents the payload structure a Server handles
 type AccountPayload struct {
-	keys            map[string][]byte
+	keys            map[string][]byte // nolint: structcheck
 	multiaccount    *multiaccounts.Account
 	password        string
 	chatKey         string
