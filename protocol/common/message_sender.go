@@ -211,6 +211,15 @@ func (s *MessageSender) SendGroup(
 	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
 	rawMessage.ID = types.EncodeHex(messageID)
 
+	// We call it only once, and we nil the function after so it doesn't get called again
+	if rawMessage.BeforeDispatch != nil {
+		if err := rawMessage.BeforeDispatch(&rawMessage); err != nil {
+			return nil, err
+		}
+	}
+
+	rawMessage.BeforeDispatch = nil
+
 	// Send to each recipients
 	for _, recipient := range recipients {
 		_, err = s.sendPrivate(ctx, recipient, &rawMessage)
