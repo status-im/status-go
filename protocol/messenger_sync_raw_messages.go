@@ -3,8 +3,6 @@ package protocol
 import (
 	"context"
 	"errors"
-	"fmt"
-
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
@@ -21,7 +19,6 @@ type RawMessageHandler func(ctx context.Context, rawMessage common.RawMessage) (
 func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) error {
 	state := m.buildMessageState()
 	for _, rawMessage := range rawMessages {
-		fmt.Println("<<< rawMessage Type -> ", rawMessage.GetMessageType())
 		switch rawMessage.GetMessageType() {
 		case protobuf.ApplicationMetadataMessage_CONTACT_UPDATE:
 			var message protobuf.ContactUpdate
@@ -110,6 +107,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 		case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_CONTACT:
 			var message protobuf.SyncInstallationContactV2
 			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			m.logger.Debug("handling sync raw message SYNC_INSTALLATION_CONTACT", zap.Any("message", message))
 			if err != nil {
 				return err
 			}
@@ -187,6 +185,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 		case protobuf.ApplicationMetadataMessage_SYNC_CONTACT_REQUEST_DECISION:
 			var message protobuf.SyncContactRequestDecision
 			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			m.logger.Debug("handling sync raw message SYNC_CONTACT_REQUEST_DECISION", zap.Any("message", message))
 			if err != nil {
 				return err
 			}

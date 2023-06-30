@@ -3,6 +3,9 @@ package pairing
 import (
 	"context"
 	"encoding/json"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/protocol/tt"
+	"go.uber.org/zap"
 	"path/filepath"
 	"testing"
 	"time"
@@ -48,15 +51,19 @@ func TestSyncDeviceSuite(t *testing.T) {
 
 type SyncDeviceSuite struct {
 	suite.Suite
+	logger                 *zap.Logger
 	password               string
 	clientAsSenderTmpdir   string
 	clientAsReceiverTmpdir string
+	pairThreeDevicesTmpdir string
 }
 
 func (s *SyncDeviceSuite) SetupTest() {
+	s.logger = tt.MustCreateTestLogger()
 	s.password = "password"
 	s.clientAsSenderTmpdir = s.T().TempDir()
 	s.clientAsReceiverTmpdir = s.T().TempDir()
+	s.pairThreeDevicesTmpdir = s.T().TempDir()
 }
 
 func (s *SyncDeviceSuite) prepareBackendWithAccount(tmpdir string) *api.GethStatusBackend {
@@ -121,6 +128,128 @@ func (s *SyncDeviceSuite) prepareBackendWithoutAccount(tmpdir string) *api.GethS
 	backend := api.NewGethStatusBackend()
 	backend.UpdateRootDataDir(tmpdir)
 	return backend
+}
+
+func (s *SyncDeviceSuite) pairAccounts(serverBackend *api.GethStatusBackend, serverDir string,
+	clientBackend *api.GethStatusBackend, clientDir string) {
+
+	// Start sender server
+
+	serverActiveAccount, err := serverBackend.GetActiveAccount()
+	require.NoError(s.T(), err)
+
+	serverKeystorePath := filepath.Join(serverDir, keystoreDir, serverActiveAccount.KeyUID)
+	serverConfig := &SenderServerConfig{
+		SenderConfig: &SenderConfig{
+			KeystorePath: serverKeystorePath,
+			DeviceType:   "desktop",
+			KeyUID:       serverActiveAccount.KeyUID,
+			Password:     s.password,
+		},
+		ServerConfig: new(ServerConfig),
+	}
+
+	configBytes, err := json.Marshal(serverConfig)
+	require.NoError(s.T(), err)
+
+	connectionString, err := StartUpSenderServer(serverBackend, string(configBytes))
+	require.NoError(s.T(), err)
+
+	// Start receiving client
+
+	err = clientBackend.AccountManager().InitKeystore(filepath.Join(clientDir, keystoreDir))
+	require.NoError(s.T(), err)
+
+	err = clientBackend.OpenAccounts()
+	require.NoError(s.T(), err)
+
+	clientNodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
+	require.NoError(s.T(), err)
+
+	expectedKDFIterations := 2048
+	clientKeystoreDir := filepath.Join(clientDir, keystoreDir)
+	clientPayloadSourceConfig := ReceiverClientConfig{
+		ReceiverConfig: &ReceiverConfig{
+			KeystorePath:          clientKeystoreDir,
+			DeviceType:            "desktop",
+			KDFIterations:         expectedKDFIterations,
+			NodeConfig:            clientNodeConfig,
+			SettingCurrentNetwork: currentNetwork,
+		},
+		ClientConfig: new(ClientConfig),
+	}
+	clientNodeConfig.RootDataDir = clientDir
+
+	clientConfigBytes, err := json.Marshal(clientPayloadSourceConfig)
+	require.NoError(s.T(), err)
+
+	err = StartUpReceivingClient(clientBackend, connectionString, string(clientConfigBytes))
+	require.NoError(s.T(), err)
+
+	require.True(s.T(), serverBackend.Messenger().HasPairedDevices())
+	require.True(s.T(), clientBackend.Messenger().HasPairedDevices())
+}
+
+func (s *SyncDeviceSuite) sendContactRequest(request *requests.SendContactRequest, messenger *protocol.Messenger) {
+	senderPublicKey := common.PubkeyToHex(messenger.IdentityPublicKey())
+	s.logger.Info("sendContactRequest", zap.String("sender", senderPublicKey), zap.String("receiver", request.ID))
+
+	resp, err := messenger.SendContactRequest(context.Background(), request)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+}
+
+func (s *SyncDeviceSuite) receiveContactRequest(messageText string, messenger *protocol.Messenger) *common.Message {
+	receiverPublicKey := types.EncodeHex(crypto.FromECDSAPub(messenger.IdentityPublicKey()))
+	s.logger.Info("receiveContactRequest", zap.String("receiver", receiverPublicKey))
+
+	// Wait for the message to reach its destination
+	resp, err := protocol.WaitOnMessengerResponse(
+		messenger,
+		func(r *protocol.MessengerResponse) bool {
+			return len(r.Contacts) == 1 && len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1
+		},
+		"no messages",
+	)
+
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+
+	contactRequest := protocol.FindFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
+	s.Require().NotNil(contactRequest)
+
+	return contactRequest
+}
+
+func (s *SyncDeviceSuite) acceptContactRequest(contactRequest *common.Message, sender *protocol.Messenger, receiver *protocol.Messenger) {
+	senderPublicKey := types.EncodeHex(crypto.FromECDSAPub(sender.IdentityPublicKey()))
+	receiverPublicKey := types.EncodeHex(crypto.FromECDSAPub(receiver.IdentityPublicKey()))
+	s.logger.Info("acceptContactRequest", zap.String("sender", senderPublicKey), zap.String("receiver", receiverPublicKey))
+
+	_, err := receiver.AcceptContactRequest(context.Background(), &requests.AcceptContactRequest{ID: types.Hex2Bytes(contactRequest.ID)})
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	resp, err := protocol.WaitOnMessengerResponse(
+		sender,
+		func(r *protocol.MessengerResponse) bool {
+			return len(r.Contacts) == 1 && len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+}
+
+func (s *SyncDeviceSuite) checkMutualContact(backend *api.GethStatusBackend, contactPublicKey string) {
+	messenger := backend.Messenger()
+	contacts := messenger.MutualContacts()
+	s.Require().Len(contacts, 1)
+	contact := contacts[0]
+	s.Require().Equal(contactPublicKey, contact.ID)
+	s.Require().Equal(protocol.ContactRequestStateSent, contact.ContactRequestLocalState)
+	s.Require().Equal(protocol.ContactRequestStateReceived, contact.ContactRequestRemoteState)
+	s.Require().NotNil(contact.DisplayName)
 }
 
 func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
@@ -377,6 +506,59 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.NoError(s.T(), err)
 	err = StartUpReceivingClient(clientBackend, cs, string(clientConfigBytes))
 	require.NoError(s.T(), err)
+}
+
+func (s *SyncDeviceSuite) TestPairingThreeDevices() {
+	bobTmpDir := filepath.Join(s.pairThreeDevicesTmpdir, "bob")
+	bobBackend := s.prepareBackendWithAccount(bobTmpDir)
+	bobMessenger := bobBackend.Messenger()
+	_, err := bobMessenger.Start()
+	s.Require().NoError(err)
+
+	alice1TmpDir := filepath.Join(s.pairThreeDevicesTmpdir, "alice1")
+	alice1Backend := s.prepareBackendWithAccount(alice1TmpDir)
+	alice1Messenger := alice1Backend.Messenger()
+	_, err = alice1Messenger.Start()
+	s.Require().NoError(err)
+
+	alice2TmpDir := filepath.Join(s.pairThreeDevicesTmpdir, "alice2")
+	alice2Backend := s.prepareBackendWithoutAccount(alice2TmpDir)
+
+	alice3TmpDir := filepath.Join(s.pairThreeDevicesTmpdir, "alice3")
+	alice3Backend := s.prepareBackendWithAccount(alice3TmpDir)
+
+	defer func() {
+		require.NoError(s.T(), bobBackend.Logout())
+		require.NoError(s.T(), alice1Backend.Logout())
+		require.NoError(s.T(), alice2Backend.Logout())
+		require.NoError(s.T(), alice3Backend.Logout())
+	}()
+
+	// Make Alice and Bob mutual contacts
+	messageText := "hello!"
+	bobPublicKey := types.EncodeHex(crypto.FromECDSAPub(bobMessenger.IdentityPublicKey()))
+	request := &requests.SendContactRequest{
+		ID:      bobPublicKey,
+		Message: messageText,
+	}
+	s.sendContactRequest(request, alice1Messenger)
+	contactRequest := s.receiveContactRequest(messageText, bobMessenger)
+	s.acceptContactRequest(contactRequest, alice1Messenger, bobMessenger)
+	s.checkMutualContact(alice1Backend, bobPublicKey)
+
+	// Pair alice-1 <-> alice-2
+	s.logger.Info("pairing Alice-1 and Alice-2")
+	s.pairAccounts(alice1Backend, alice1TmpDir, alice2Backend, alice2TmpDir)
+
+	s.checkMutualContact(alice2Backend, bobPublicKey)
+	// TODO: Check if Alice-2 has herself as contact?
+	// TODO: Check if Alice-2 has an accepted contact request from Bob?
+
+	// Pair Alice-2 <-> ALice-3
+	s.logger.Info("pairing Alice-2 and Alice-3")
+	s.pairAccounts(alice2Backend, alice2TmpDir, alice3Backend, alice3TmpDir)
+
+	s.checkMutualContact(alice3Backend, bobPublicKey)
 }
 
 func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {

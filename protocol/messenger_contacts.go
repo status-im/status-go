@@ -268,30 +268,29 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 
 func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, contactRequestID string) (*MessengerResponse, error) {
 
-	fmt.Println("<<< updateAcceptedContactRequest. contactRequestID: ", contactRequestID)
+	m.logger.Debug("updateAcceptedContactRequest", zap.String("contactRequestID", contactRequestID))
+
 	contactRequest, err := m.persistence.MessageByID(contactRequestID)
 	if err != nil {
+		m.logger.Error("contact request not found", zap.String("contactRequestID", contactRequestID), zap.Error(err))
 		return nil, err
 	}
 
 	contactRequest.ContactRequestState = common.ContactRequestStateAccepted
-
-	fmt.Println("<<< updateAcceptedContactRequest. contactRequest 1: ", contactRequest)
-	fmt.Println("<<< updateAcceptedContactRequest from ", contactRequest.From)
 
 	err = m.persistence.SetContactRequestState(contactRequest.ID, contactRequest.ContactRequestState)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("<<< updateAcceptedContactRequest. contactRequest 2: ", contactRequest)
-	fmt.Println("<<< updateAcceptedContactRequest from ", contactRequest.From)
-
 	contact, ok := m.allContacts.Load(contactRequest.From)
-	fmt.Println("<<< updateAcceptedContactRequest load contact: ", ok)
+	if !ok {
+		m.logger.Error("failed to update contact request: contact not found", zap.String("contact id", contactRequest.From))
+		// TODO: Uncomment return error when #3667 crash is fixed
+		//	return nil, errors.New("failed to update contact request: contact not found")
+	}
 
 	_, clock, err := m.getOneToOneAndNextClock(contact)
-	fmt.Println("<<< updateAcceptedContactRequest getOneToOneAndNextClock ", clock)
 	if err != nil {
 		return nil, err
 	}
