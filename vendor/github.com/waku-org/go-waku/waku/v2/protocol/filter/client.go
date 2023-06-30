@@ -50,8 +50,8 @@ type ContentFilter struct {
 }
 
 type WakuFilterPushResult struct {
-	err    error
-	peerID peer.ID
+	Err    error
+	PeerID peer.ID
 }
 
 // NewWakuRelay returns a new instance of Waku Filter struct setup according to the chosen parameter and options
@@ -292,6 +292,41 @@ func (wf *WakuFilterLightnode) Subscriptions() []*SubscriptionDetails {
 	return output
 }
 
+func (wf *WakuFilterLightnode) cleanupSubscriptions(peerID peer.ID, contentFilter ContentFilter) {
+	wf.subscriptions.Lock()
+	defer wf.subscriptions.Unlock()
+
+	peerSubscription, ok := wf.subscriptions.items[peerID]
+	if !ok {
+		return
+	}
+
+	subscriptionDetailList, ok := peerSubscription.subscriptionsPerTopic[contentFilter.Topic]
+	if !ok {
+		return
+	}
+
+	for subscriptionDetailID, subscriptionDetail := range subscriptionDetailList {
+		subscriptionDetail.Remove(contentFilter.ContentTopics...)
+		if len(subscriptionDetail.ContentTopics) == 0 {
+			delete(subscriptionDetailList, subscriptionDetailID)
+		} else {
+			subscriptionDetailList[subscriptionDetailID] = subscriptionDetail
+		}
+	}
+
+	if len(subscriptionDetailList) == 0 {
+		delete(wf.subscriptions.items[peerID].subscriptionsPerTopic, contentFilter.Topic)
+	} else {
+		wf.subscriptions.items[peerID].subscriptionsPerTopic[contentFilter.Topic] = subscriptionDetailList
+	}
+
+	if len(wf.subscriptions.items[peerID].subscriptionsPerTopic) == 0 {
+		delete(wf.subscriptions.items, peerID)
+	}
+
+}
+
 // Unsubscribe is used to stop receiving messages from a peer that match a content filter
 func (wf *WakuFilterLightnode) Unsubscribe(ctx context.Context, contentFilter ContentFilter, opts ...FilterUnsubscribeOption) (<-chan WakuFilterPushResult, error) {
 	if contentFilter.Topic == "" {
@@ -329,11 +364,14 @@ func (wf *WakuFilterLightnode) Unsubscribe(ctx context.Context, contentFilter Co
 				contentFilter)
 			if err != nil {
 				wf.log.Error("could not unsubscribe from peer", logging.HostID("peerID", peerID), zap.Error(err))
+				return
 			}
 
+			wf.cleanupSubscriptions(peerID, contentFilter)
+
 			resultChan <- WakuFilterPushResult{
-				err:    err,
-				peerID: peerID,
+				Err:    err,
+				PeerID: peerID,
 			}
 		}(peerID)
 	}
@@ -375,7 +413,7 @@ func (wf *WakuFilterLightnode) UnsubscribeAll(ctx context.Context, opts ...Filte
 		}
 		localWg.Add(1)
 		go func(peerID peer.ID) {
-			defer wf.wg.Done()
+			defer localWg.Done()
 			err := wf.request(
 				ctx,
 				&FilterSubscribeParameters{selectedPeer: peerID},
@@ -385,9 +423,13 @@ func (wf *WakuFilterLightnode) UnsubscribeAll(ctx context.Context, opts ...Filte
 				wf.log.Error("could not unsubscribe from peer", logging.HostID("peerID", peerID), zap.Error(err))
 			}
 
+			wf.subscriptions.Lock()
+			delete(wf.subscriptions.items, peerID)
+			defer wf.subscriptions.Unlock()
+
 			resultChan <- WakuFilterPushResult{
-				err:    err,
-				peerID: peerID,
+				Err:    err,
+				PeerID: peerID,
 			}
 		}(peerID)
 	}

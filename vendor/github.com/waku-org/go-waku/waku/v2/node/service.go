@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/peer"
+	v2 "github.com/waku-org/go-waku/waku/v2"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 )
 
@@ -22,5 +22,5 @@ type ReceptorService interface {
 
 type PeerConnectorService interface {
 	Service
-	PeerChannel() chan<- peer.AddrInfo
+	PeerChannel() chan<- v2.PeerData
 }

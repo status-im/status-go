@@ -23,5 +23,5 @@ func NewFilterError(code int, message string) FilterError {
 }
 
 func (e *FilterError) Error() string {
-	return fmt.Sprintf("error %d: %s", e.Code, e.Message)
+	return fmt.Sprintf("%d - %s", e.Code, e.Message)
 }

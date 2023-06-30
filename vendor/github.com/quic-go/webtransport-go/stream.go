@@ -46,6 +46,8 @@ type sendStream struct {
 	streamHdr []byte
 
 	onClose func()
+
+	once sync.Once
 }
 
 var _ SendStream = &sendStream{}
@@ -54,15 +56,15 @@ func newSendStream(str quic.SendStream, hdr []byte, onClose func()) *sendStream 
 	return &sendStream{str: str, streamHdr: hdr, onClose: onClose}
 }
 
-func (s *sendStream) maybeSendStreamHeader() error {
-	if len(s.streamHdr) == 0 {
-		return nil
-	}
-	if _, err := s.str.Write(s.streamHdr); err != nil {
-		return err
-	}
-	s.streamHdr = nil
-	return nil
+func (s *sendStream) maybeSendStreamHeader() (err error) {
+	s.once.Do(func() {
+		if _, e := s.str.Write(s.streamHdr); e != nil {
+			err = e
+			return
+		}
+		s.streamHdr = nil
+	})
+	return
 }
 
 func (s *sendStream) Write(b []byte) (int, error) {

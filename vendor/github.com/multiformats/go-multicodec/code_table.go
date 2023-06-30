@@ -288,6 +288,9 @@ const (
 	// Bls12_381G1g2Pub is a draft code tagged "key" and described by: BLS12-381 concatenated public keys in both the G1 and G2 fields.
 	Bls12_381G1g2Pub Code = 0xee // bls12_381-g1g2-pub
 
+	// Sr25519Pub is a draft code tagged "key" and described by: Sr25519 public key.
+	Sr25519Pub Code = 0xef // sr25519-pub
+
 	// DashBlock is a draft code tagged "ipld" and described by: Dash Block.
 	DashBlock Code = 0xf0 // dash-block
 
@@ -306,17 +309,20 @@ const (
 	// Udp is a draft code tagged "multiaddr".
 	Udp Code = 0x0111 // udp
 
-	// P2pWebrtcStar is a draft code tagged "multiaddr".
+	// P2pWebrtcStar is a deprecated code tagged "multiaddr" and described by: Use webrtc or webrtc-direct instead.
 	P2pWebrtcStar Code = 0x0113 // p2p-webrtc-star
 
-	// P2pWebrtcDirect is a draft code tagged "multiaddr".
+	// P2pWebrtcDirect is a deprecated code tagged "multiaddr" and described by: Use webrtc or webrtc-direct instead.
 	P2pWebrtcDirect Code = 0x0114 // p2p-webrtc-direct
 
-	// P2pStardust is a draft code tagged "multiaddr".
+	// P2pStardust is a deprecated code tagged "multiaddr".
 	P2pStardust Code = 0x0115 // p2p-stardust
 
-	// Webrtc is a draft code tagged "multiaddr" and described by: WebRTC.
-	Webrtc Code = 0x0118 // webrtc
+	// WebrtcDirect is a draft code tagged "multiaddr" and described by: ICE-lite webrtc transport with SDP munging during connection establishment and without use of a STUN server.
+	WebrtcDirect Code = 0x0118 // webrtc-direct
+
+	// Webrtc is a draft code tagged "multiaddr" and described by: webrtc transport where connection establishment is according to w3c spec.
+	Webrtc Code = 0x0119 // webrtc
 
 	// P2pCircuit is a permanent code tagged "multiaddr".
 	P2pCircuit Code = 0x0122 // p2p-circuit
@@ -429,6 +435,9 @@ const (
 	// TransportGraphsyncFilecoinv1 is a draft code tagged "transport" and described by: Filecoin graphsync datatransfer.
 	TransportGraphsyncFilecoinv1 Code = 0x0910 // transport-graphsync-filecoinv1
 
+	// TransportIpfsGatewayHttp is a draft code tagged "transport" and described by: HTTP IPFS Gateway trustless datatransfer.
+	TransportIpfsGatewayHttp Code = 0x0920 // transport-ipfs-gateway-http
+
 	// Multidid is a draft code tagged "multiformat" and described by: Compact encoding for Decentralized Identifers.
 	Multidid Code = 0x0d1d // multidid
 
@@ -492,11 +501,26 @@ const (
 	// X25519Priv is a draft code tagged "key" and described by: Curve25519 private key.
 	X25519Priv Code = 0x1302 // x25519-priv
 
+	// Sr25519Priv is a draft code tagged "key" and described by: Sr25519 private key.
+	Sr25519Priv Code = 0x1303 // sr25519-priv
+
 	// RsaPriv is a draft code tagged "key" and described by: RSA private key.
 	RsaPriv Code = 0x1305 // rsa-priv
 
+	// P256Priv is a draft code tagged "key" and described by: P-256 private key.
+	P256Priv Code = 0x1306 // p256-priv
+
+	// P384Priv is a draft code tagged "key" and described by: P-384 private key.
+	P384Priv Code = 0x1307 // p384-priv
+
+	// P521Priv is a draft code tagged "key" and described by: P-521 private key.
+	P521Priv Code = 0x1308 // p521-priv
+
 	// Kangarootwelve is a draft code tagged "multihash" and described by: KangarooTwelve is an extendable-output hash function based on Keccak-p.
 	Kangarootwelve Code = 0x1d01 // kangarootwelve
+
+	// AesGcm256 is a draft code tagged "encryption" and described by: AES Galois/Counter Mode with 256-bit key and 12-byte IV.
+	AesGcm256 Code = 0x2000 // aes-gcm-256
 
 	// Silverpine is a draft code tagged "multiaddr" and described by: Experimental QUIC over yggdrasil and ironwood routing protocol.
 	Silverpine Code = 0x3f42 // silverpine
@@ -1669,6 +1693,7 @@ var knownCodes = []Code{
 	X25519Pub,
 	Ed25519Pub,
 	Bls12_381G1g2Pub,
+	Sr25519Pub,
 	DashBlock,
 	DashTx,
 	SwarmManifest,
@@ -1678,6 +1703,7 @@ var knownCodes = []Code{
 	P2pWebrtcStar,
 	P2pWebrtcDirect,
 	P2pStardust,
+	WebrtcDirect,
 	Webrtc,
 	P2pCircuit,
 	DagJson,
@@ -1716,6 +1742,7 @@ var knownCodes = []Code{
 	CarMultihashIndexSorted,
 	TransportBitswap,
 	TransportGraphsyncFilecoinv1,
+	TransportIpfsGatewayHttp,
 	Multidid,
 	Sha2_256Trunc254Padded,
 	Sha2_224,
@@ -1737,8 +1764,13 @@ var knownCodes = []Code{
 	Ed25519Priv,
 	Secp256k1Priv,
 	X25519Priv,
+	Sr25519Priv,
 	RsaPriv,
+	P256Priv,
+	P384Priv,
+	P521Priv,
 	Kangarootwelve,
+	AesGcm256,
 	Silverpine,
 	Sm3_256,
 	Blake2b8,
@@ -2106,6 +2138,9 @@ func (c Code) Tag() string {
 		Cidv3:
 		return "cid"
 
+	case AesGcm256:
+		return "encryption"
+
 	case FilCommitmentUnsealed,
 		FilCommitmentSealed:
 		return "filecoin"
@@ -2185,6 +2220,7 @@ func (c Code) Tag() string {
 		X25519Pub,
 		Ed25519Pub,
 		Bls12_381G1g2Pub,
+		Sr25519Pub,
 		P256Pub,
 		P384Pub,
 		P521Pub,
@@ -2195,7 +2231,11 @@ func (c Code) Tag() string {
 		Ed25519Priv,
 		Secp256k1Priv,
 		X25519Priv,
+		Sr25519Priv,
 		RsaPriv,
+		P256Priv,
+		P384Priv,
+		P521Priv,
 		Jwk_jcsPub:
 		return "key"
 
@@ -2219,6 +2259,7 @@ func (c Code) Tag() string {
 		P2pWebrtcStar,
 		P2pWebrtcDirect,
 		P2pStardust,
+		WebrtcDirect,
 		Webrtc,
 		P2pCircuit,
 		Udt,
@@ -2638,7 +2679,8 @@ func (c Code) Tag() string {
 		return "softhash"
 
 	case TransportBitswap,
-		TransportGraphsyncFilecoinv1:
+		TransportGraphsyncFilecoinv1,
+		TransportIpfsGatewayHttp:
 		return "transport"
 
 	case Varsig,

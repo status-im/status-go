@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"encoding/json"
 	"sync"
 
 	"github.com/google/uuid"
@@ -237,4 +238,23 @@ func iterateSubscriptionSet(logger *zap.Logger, subscriptions SubscriptionSet, e
 			}
 		}(subscription)
 	}
+}
+
+func (s *SubscriptionDetails) MarshalJSON() ([]byte, error) {
+	type resultType struct {
+		PeerID        string   `json:"peerID"`
+		PubsubTopic   string   `json:"pubsubTopic"`
+		ContentTopics []string `json:"contentTopics"`
+	}
+
+	result := resultType{
+		PeerID:      s.PeerID.Pretty(),
+		PubsubTopic: s.PubsubTopic,
+	}
+
+	for c := range s.ContentTopics {
+		result.ContentTopics = append(result.ContentTopics, c)
+	}
+
+	return json.Marshal(result)
 }

@@ -1,7 +1,6 @@
 package libp2pquic
 
 import (
-	"errors"
 	"sync"
 
 	tpt "github.com/libp2p/go-libp2p/core/transport"
@@ -30,7 +29,7 @@ func (l *virtualListener) Multiaddr() ma.Multiaddr {
 }
 
 func (l *virtualListener) Close() error {
-	l.acceptRunnner.RmAcceptForVersion(l.version)
+	l.acceptRunnner.RmAcceptForVersion(l.version, tpt.ErrListenerClosed)
 	return l.t.CloseVirtualListener(l)
 }
 
@@ -65,7 +64,7 @@ func (r *acceptLoopRunner) AcceptForVersion(v quic.VersionNumber) chan acceptVal
 	return ch
 }
 
-func (r *acceptLoopRunner) RmAcceptForVersion(v quic.VersionNumber) {
+func (r *acceptLoopRunner) RmAcceptForVersion(v quic.VersionNumber, err error) {
 	r.muxerMu.Lock()
 	defer r.muxerMu.Unlock()
 
@@ -78,7 +77,7 @@ func (r *acceptLoopRunner) RmAcceptForVersion(v quic.VersionNumber) {
 	if !ok {
 		panic("expected chan in accept muxer")
 	}
-	ch <- acceptVal{err: errors.New("listener Accept closed")}
+	ch <- acceptVal{err: err}
 	delete(r.muxer, v)
 }
 
@@ -104,7 +103,7 @@ func (r *acceptLoopRunner) innerAccept(l *listener, expectedVersion quic.Version
 	// Check if we have a buffered connection first from an earlier Accept call
 	case v, ok := <-bufferedConnChan:
 		if !ok {
-			return nil, errors.New("listener closed")
+			return nil, tpt.ErrListenerClosed
 		}
 		return v.conn, v.err
 	default:
@@ -166,7 +165,7 @@ func (r *acceptLoopRunner) Accept(l *listener, expectedVersion quic.VersionNumbe
 			}
 		case v, ok := <-bufferedConnChan:
 			if !ok {
-				return nil, errors.New("listener closed")
+				return nil, tpt.ErrListenerClosed
 			}
 			conn = v.conn
 			err = v.err

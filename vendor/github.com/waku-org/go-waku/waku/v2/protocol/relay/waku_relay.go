@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/tag"
@@ -28,10 +30,14 @@ const WakuRelayID_v200 = protocol.ID("/vac/waku/relay/2.0.0")
 var DefaultWakuTopic string = waku_proto.DefaultPubsubTopic().String()
 
 type WakuRelay struct {
-	host       host.Host
-	opts       []pubsub.Option
-	pubsub     *pubsub.PubSub
-	timesource timesource.Timesource
+	host                host.Host
+	opts                []pubsub.Option
+	pubsub              *pubsub.PubSub
+	params              pubsub.GossipSubParams
+	peerScoreParams     *pubsub.PeerScoreParams
+	peerScoreThresholds *pubsub.PeerScoreThresholds
+	topicParams         *pubsub.TopicScoreParams
+	timesource          timesource.Timesource
 
 	log *zap.Logger
 
@@ -64,27 +70,117 @@ func NewWakuRelay(bcaster Broadcaster, minPeersToPublish int, timesource timesou
 	w.wg = sync.WaitGroup{}
 	w.log = log.Named("relay")
 
-	// default options required by WakuRelay
-	opts = append(opts, pubsub.WithMessageSignaturePolicy(pubsub.StrictNoSign))
-	opts = append(opts, pubsub.WithNoAuthor())
-	opts = append(opts, pubsub.WithMessageIdFn(msgIdFn))
-	opts = append(opts, pubsub.WithGossipSubProtocols(
-		[]protocol.ID{pubsub.GossipSubID_v11, pubsub.GossipSubID_v10, pubsub.FloodSubID, WakuRelayID_v200},
-		func(feat pubsub.GossipSubFeature, proto protocol.ID) bool {
-			switch feat {
-			case pubsub.GossipSubFeatureMesh:
-				return proto == pubsub.GossipSubID_v11 || proto == pubsub.GossipSubID_v10
-			case pubsub.GossipSubFeaturePX:
-				return proto == pubsub.GossipSubID_v11
-			default:
-				return false
-			}
-		},
-	))
+	cfg := pubsub.DefaultGossipSubParams()
+	cfg.PruneBackoff = time.Minute
+	cfg.UnsubscribeBackoff = 5 * time.Second
+	cfg.GossipFactor = 0.25
+	cfg.D = 6
+	cfg.Dlo = 4
+	cfg.Dhi = 12
+	cfg.Dout = 3
+	cfg.Dlazy = 6
+	cfg.HeartbeatInterval = time.Second
+	cfg.HistoryLength = 6
+	cfg.HistoryGossip = 3
+	cfg.FanoutTTL = time.Minute
 
-	w.opts = opts
+	w.peerScoreParams = &pubsub.PeerScoreParams{
+		Topics:        make(map[string]*pubsub.TopicScoreParams),
+		DecayInterval: 12 * time.Second, // how often peer scoring is updated
+		DecayToZero:   0.01,             // below this we consider the parameter to be zero
+		RetainScore:   10 * time.Minute, // remember peer score during x after it disconnects
+		// p5: application specific, unset
+		AppSpecificScore: func(p peer.ID) float64 {
+			return 0
+		},
+		AppSpecificWeight: 0.0,
+		// p6: penalizes peers sharing more than threshold ips
+		IPColocationFactorWeight:    -50,
+		IPColocationFactorThreshold: 5.0,
+		// p7: penalizes bad behaviour (weight and decay)
+		BehaviourPenaltyWeight: -10,
+		BehaviourPenaltyDecay:  0.986,
+	}
+
+	w.peerScoreThresholds = &pubsub.PeerScoreThresholds{
+		GossipThreshold:             -100,   // no gossip is sent to peers below this score
+		PublishThreshold:            -1000,  // no self-published msgs are sent to peers below this score
+		GraylistThreshold:           -10000, // used to trigger disconnections + ignore peer if below this score
+		OpportunisticGraftThreshold: 0,      // grafts better peers if the mesh median score drops below this. unset.
+	}
+
+	w.topicParams = &pubsub.TopicScoreParams{
+		TopicWeight: 1,
+		// p1: favours peers already in the mesh
+		TimeInMeshWeight:  0.01,
+		TimeInMeshQuantum: time.Second,
+		TimeInMeshCap:     10.0,
+		// p2: rewards fast peers
+		FirstMessageDeliveriesWeight: 1.0,
+		FirstMessageDeliveriesDecay:  0.5,
+		FirstMessageDeliveriesCap:    10.0,
+		// p3: penalizes lazy peers. safe low value
+		MeshMessageDeliveriesWeight:     0,
+		MeshMessageDeliveriesDecay:      0,
+		MeshMessageDeliveriesCap:        0,
+		MeshMessageDeliveriesThreshold:  0,
+		MeshMessageDeliveriesWindow:     0,
+		MeshMessageDeliveriesActivation: 0,
+		// p3b: tracks history of prunes
+		MeshFailurePenaltyWeight: 0,
+		MeshFailurePenaltyDecay:  0,
+		// p4: penalizes invalid messages. highly penalize peers sending wrong messages
+		InvalidMessageDeliveriesWeight: -100.0,
+		InvalidMessageDeliveriesDecay:  0.5,
+	}
+
+	// default options required by WakuRelay
+	w.opts = append([]pubsub.Option{
+		pubsub.WithMessageSignaturePolicy(pubsub.StrictNoSign),
+		pubsub.WithNoAuthor(),
+		pubsub.WithMessageIdFn(msgIdFn),
+		pubsub.WithGossipSubProtocols(
+			[]protocol.ID{WakuRelayID_v200, pubsub.GossipSubID_v11, pubsub.GossipSubID_v10, pubsub.FloodSubID},
+			func(feat pubsub.GossipSubFeature, proto protocol.ID) bool {
+				switch feat {
+				case pubsub.GossipSubFeatureMesh:
+					return proto == pubsub.GossipSubID_v11 || proto == pubsub.GossipSubID_v10 || proto == WakuRelayID_v200
+				case pubsub.GossipSubFeaturePX:
+					return proto == pubsub.GossipSubID_v11 || proto == WakuRelayID_v200
+				default:
+					return false
+				}
+			},
+		),
+		pubsub.WithGossipSubParams(cfg),
+		pubsub.WithFloodPublish(true),
+		pubsub.WithSeenMessagesTTL(2 * time.Minute),
+		pubsub.WithPeerScore(w.peerScoreParams, w.peerScoreThresholds),
+		pubsub.WithPeerScoreInspect(w.peerScoreInspector, 6*time.Second),
+		pubsub.WithDefaultValidator(func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool {
+			msg := new(pb.WakuMessage)
+			err := proto.Unmarshal(message.Data, msg)
+			return err == nil
+		}),
+	}, opts...)
 
 	return w
+}
+
+func (w *WakuRelay) peerScoreInspector(peerScoresSnapshots map[peer.ID]*pubsub.PeerScoreSnapshot) {
+	if w.host == nil {
+		return
+	}
+
+	for pid, snap := range peerScoresSnapshots {
+		if snap.Score < w.peerScoreThresholds.GraylistThreshold {
+			// Disconnect bad peers
+			err := w.host.Network().ClosePeer(pid)
+			if err != nil {
+				w.log.Error("could not disconnect peer", logging.HostID("peer", pid), zap.Error(err))
+			}
+		}
+	}
 }
 
 // Sets the host to be able to mount or consume a protocol
@@ -147,21 +243,17 @@ func (w *WakuRelay) upsertTopic(topic string) (*pubsub.Topic, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		err = newTopic.SetScoreParams(w.topicParams)
+		if err != nil {
+			return nil, err
+		}
+
 		w.wakuRelayTopics[topic] = newTopic
 		pubSubTopic = newTopic
 	}
 	return pubSubTopic, nil
 }
-
-/*
-func (w *WakuRelay) validatorFactory(pubsubTopic string) func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool {
-	return func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool {
-		msg := new(pb.WakuMessage)
-		err := proto.Unmarshal(message.Data, msg)
-		return err == nil
-	}
-}
-*/
 
 func (w *WakuRelay) subscribe(topic string) (subs *pubsub.Subscription, err error) {
 	sub, ok := w.relaySubs[topic]
@@ -170,15 +262,6 @@ func (w *WakuRelay) subscribe(topic string) (subs *pubsub.Subscription, err erro
 		if err != nil {
 			return nil, err
 		}
-
-		/*
-					// TODO: Add a function to validate the WakuMessage integrity
-			   		// Rejects messages that are not WakuMessage
-					err = w.pubsub.RegisterTopicValidator(topic, w.validatorFactory(topic))
-					if err != nil {
-						return nil, err
-					}
-		*/
 
 		sub, err = pubSubTopic.Subscribe()
 		if err != nil {
@@ -360,4 +443,9 @@ func (w *WakuRelay) subscribeToTopic(pubsubTopic string, sub *pubsub.Subscriptio
 			}
 		}
 	}
+
+}
+
+func (w *WakuRelay) Params() pubsub.GossipSubParams {
+	return w.params
 }

@@ -24,7 +24,9 @@ func Sum(data []byte, code uint64, length int) (Multihash, error) {
 	}
 
 	// Feed data in.
-	hasher.Write(data)
+	if _, err := hasher.Write(data); err != nil {
+		return nil, err
+	}
 
 	return encodeHash(hasher, code, length)
 }

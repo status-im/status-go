@@ -134,3 +134,11 @@ func mergeSubtrees(cvs *[maxSIMD][8]uint32, numCVs uint64, key *[8]uint32, flags
 func wordsToBytes(words [16]uint32, block *[64]byte) {
 	*block = *(*[64]byte)(unsafe.Pointer(&words))
 }
+
+func bytesToCV(b []byte) [8]uint32 {
+	return *(*[8]uint32)(unsafe.Pointer(&b[0]))
+}
+
+func cvToBytes(cv *[8]uint32) *[32]byte {
+	return (*[32]byte)(unsafe.Pointer(cv))
+}

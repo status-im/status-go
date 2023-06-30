@@ -1,3 +1,4 @@
+//go:build !amd64
 // +build !amd64
 
 package blake3
@@ -73,4 +74,20 @@ func wordsToBytes(words [16]uint32, block *[64]byte) {
 	for i, w := range words {
 		binary.LittleEndian.PutUint32(block[4*i:], w)
 	}
+}
+
+func bytesToCV(b []byte) [8]uint32 {
+	var cv [8]uint32
+	for i := range cv {
+		cv[i] = binary.LittleEndian.Uint32(b[4*i:])
+	}
+	return cv
+}
+
+func cvToBytes(cv *[8]uint32) *[32]byte {
+	var b [32]byte
+	for i, w := range cv {
+		binary.LittleEndian.PutUint32(b[4*i:], w)
+	}
+	return &b
 }

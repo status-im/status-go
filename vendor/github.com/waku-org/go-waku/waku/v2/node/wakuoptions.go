@@ -16,6 +16,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	basichost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	"github.com/libp2p/go-libp2p/p2p/muxer/mplex"
 	"github.com/libp2p/go-libp2p/p2p/muxer/yamux"
@@ -51,6 +52,7 @@ type WakuNodeParameters struct {
 	addressFactory basichost.AddrsFactory
 	privKey        *ecdsa.PrivateKey
 	libP2POpts     []libp2p.Option
+	peerstore      peerstore.Peerstore
 
 	enableNTP bool
 	ntpURLs   []string
@@ -80,11 +82,10 @@ type WakuNodeParameters struct {
 	resumeNodes     []multiaddr.Multiaddr
 	messageProvider store.MessageProvider
 
-	enableRendezvous bool
-	rendezvousNodes  []multiaddr.Multiaddr
-
+	rendezvousNodes        []multiaddr.Multiaddr
 	enableRendezvousServer bool
-	rendezvousDB           *rendezvous.DB
+
+	rendezvousDB *rendezvous.DB
 
 	discoveryMinPeers int
 
@@ -310,6 +311,13 @@ func WithLibP2POptions(opts ...libp2p.Option) WakuNodeOption {
 	}
 }
 
+func WithPeerStore(ps peerstore.Peerstore) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.peerstore = ps
+		return nil
+	}
+}
+
 // NoDefaultWakuTopic will stop the node from subscribing to the default
 // pubsub topic automatically
 func NoDefaultWakuTopic() WakuNodeOption {
@@ -478,7 +486,6 @@ func WithWebsockets(address string, port int) WakuNodeOption {
 // WithRendezvous is a WakuOption used to enable rendezvous as a discovery
 func WithRendezvous(rendezvousPoints []multiaddr.Multiaddr) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
-		params.enableRendezvous = true
 		params.rendezvousNodes = rendezvousPoints
 		return nil
 	}
