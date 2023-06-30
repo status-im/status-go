@@ -26,6 +26,35 @@ var customSteps = []sqlite.PostStep{
 	{Version: 1687193315, CustomMigration: migrateWalletTransferFromToAddresses, RollBackVersion: 1686825075},
 }
 
+func doMigration(db *sql.DB) error {
+	lastMigration, migrationTableExists, err := sqlite.GetLastMigrationVersion(db)
+	if err != nil {
+		return err
+	}
+
+	if !migrationTableExists || (lastMigration > 0 && lastMigration < nodeCfgMigrationDate) {
+		// If it's the first time migration's being run, or latest migration happened before migrating the nodecfg table
+		err = migrationsprevnodecfg.Migrate(db)
+		if err != nil {
+			return err
+		}
+
+		// NodeConfig migration cannot be done with SQL
+		err = nodecfg.MigrateNodeConfig(db)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Run all the new migrations
+	err = migrations.Migrate(db, customSteps)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // InitializeDB creates db file at a given path and applies migrations.
 func InitializeDB(path, password string, kdfIterationsNumber int) (*sql.DB, error) {
 	db, err := sqlite.OpenDB(path, password, kdfIterationsNumber)
@@ -33,27 +62,7 @@ func InitializeDB(path, password string, kdfIterationsNumber int) (*sql.DB, erro
 		return nil, err
 	}
 
-	lastMigration, migrationTableExists, err := sqlite.GetLastMigrationVersion(db)
-	if err != nil {
-		return nil, err
-	}
-
-	if !migrationTableExists || (lastMigration > 0 && lastMigration < nodeCfgMigrationDate) {
-		// If it's the first time migration's being run, or latest migration happened before migrating the nodecfg table
-		err = migrationsprevnodecfg.Migrate(db)
-		if err != nil {
-			return nil, err
-		}
-
-		// NodeConfig migration cannot be done with SQL
-		err = nodecfg.MigrateNodeConfig(db)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Run all the new migrations
-	err = migrations.Migrate(db, customSteps)
+	err = doMigration(db)
 	if err != nil {
 		return nil, err
 	}
