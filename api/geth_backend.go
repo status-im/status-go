@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/status-im/status-go/images"
+
 	"github.com/imdario/mergo"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -25,7 +27,6 @@ import (
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -1028,6 +1029,13 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 		CustomizationColor: common.CustomizationColor(request.CustomizationColor),
 		KDFIterations:      sqlite.ReducedKDFIterationsNumber,
 	}
+	if request.ImagePath != "" {
+		iis, err := images.GenerateIdentityImages(request.ImagePath, 0, 0, 1000, 1000)
+		if err != nil {
+			return err
+		}
+		account.Images = iis
+	}
 
 	settings, err := defaultSettings(info, derivedAddresses, nil)
 	if err != nil {
@@ -1074,23 +1082,11 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 		Path:      pathDefaultChat,
 	}
 
-	accounts := []*accounts.Account{walletAccount, chatAccount}
-	err = b.StartNodeWithAccountAndInitialConfig(account, request.Password, *settings, nodeConfig, accounts)
+	subAccounts := []*accounts.Account{walletAccount, chatAccount}
+	err = b.StartNodeWithAccountAndInitialConfig(account, request.Password, *settings, nodeConfig, subAccounts)
 	if err != nil {
 		b.log.Error("start node", err)
 		return err
-	}
-
-	if request.ImagePath != "" {
-		iis, err := images.GenerateIdentityImages(request.ImagePath, 0, 0, 1000, 1000)
-		if err != nil {
-			return err
-		}
-
-		err = b.multiaccountsDB.StoreIdentityImages(info.KeyUID, iis, false)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
