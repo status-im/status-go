@@ -172,6 +172,24 @@ func (s *MessengerShareUrlsSuite) TestDeserializePublicKey() {
 	s.Require().True(strings.HasPrefix(shortKey.String(), "0x"))
 }
 
+func (s *MessengerShareUrlsSuite) TestParseWrongUrls() {
+	urls := map[string]string{
+		"https://status.appc/#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11":  "unhandled shared url",
+		"https://status.app/cc#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11": "unhandled shared url",
+		"https://status.app/a#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11":  "unhandled shared url",
+		"https://status.app/u/": "url should contain at least one `#` separator",
+		"https://status.im/u#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11": "url should start with 'https://status.app'",
+	}
+
+	for url, expectedError := range urls {
+		urlData, err := s.m.ParseSharedURL(url)
+		s.Require().Error(err)
+
+		s.Require().True(strings.HasPrefix(err.Error(), expectedError))
+		s.Require().Nil(urlData)
+	}
+}
+
 func (s *MessengerShareUrlsSuite) TestShareCommunityURLWithChatKey() {
 	community := s.createCommunity()
 

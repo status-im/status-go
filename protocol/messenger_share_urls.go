@@ -80,10 +80,6 @@ func (m *Messenger) DeserializePublicKey(compressedKey string) (types.HexBytes, 
 }
 
 func (m *Messenger) ShareCommunityURLWithChatKey(communityID types.HexBytes) (string, error) {
-	if len(communityID) == 0 {
-		return "", ErrChatIDEmpty
-	}
-
 	shortKey, err := m.SerializePublicKey(communityID)
 	if err != nil {
 		return "", err
@@ -276,7 +272,6 @@ func (m *Messenger) parseCommunityChannelURLWithChatKey(channelID string, public
 }
 
 func (m *Messenger) prepareEncodedCommunityChannelData(community *communities.Community, channel *protobuf.CommunityChat, channelID string) (string, string, error) {
-
 	communityProto := &protobuf.Community{
 		DisplayName:  community.Identity().DisplayName,
 		Description:  community.DescriptionText(),
@@ -367,10 +362,6 @@ func (m *Messenger) parseCommunityChannelURLWithData(data string, signature stri
 }
 
 func (m *Messenger) ShareUserURLWithChatKey(contactID string) (string, error) {
-	if len(contactID) == 0 {
-		return "", ErrChatIDEmpty
-	}
-
 	publicKey, err := common.HexToPubkey(contactID)
 	if err != nil {
 		return "", err
@@ -414,10 +405,6 @@ func (m *Messenger) parseUserURLWithChatKey(urlData string) (*URLDataResponse, e
 }
 
 func (m *Messenger) ShareUserURLWithENS(contactID string) (string, error) {
-	if len(contactID) == 0 {
-		return "", ErrChatIDEmpty
-	}
-
 	contact, ok := m.allContacts.Load(contactID)
 	if !ok {
 		return "", ErrContactNotFound
@@ -426,10 +413,6 @@ func (m *Messenger) ShareUserURLWithENS(contactID string) (string, error) {
 }
 
 func (m *Messenger) parseUserURLWithENS(ensName string) (*URLDataResponse, error) {
-	if len(ensName) == 0 {
-		return nil, ErrChatIDEmpty
-	}
-
 	// TODO: fetch contact by ens name
 	return nil, fmt.Errorf("not implemented yet")
 }
