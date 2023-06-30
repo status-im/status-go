@@ -2,11 +2,11 @@ package protocol
 
 import (
 	"crypto/ecdsa"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -143,7 +143,7 @@ func (m *Messenger) prepareEncodedCommunityData(community *communities.Community
 		Color:        community.Identity().GetColor(),
 	}
 
-	communityData, err := json.Marshal(communityProto)
+	communityData, err := proto.Marshal(communityProto)
 	if err != nil {
 		return "", "", err
 	}
@@ -190,7 +190,7 @@ func (m *Messenger) parseCommunityURLWithData(data string, signature string) (*U
 	}
 
 	var communityProto protobuf.Community
-	err = json.Unmarshal(communityData, &communityProto)
+	err = proto.Unmarshal(communityData, &communityProto)
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +288,7 @@ func (m *Messenger) prepareEncodedCommunityChannelData(community *communities.Co
 		Uuid:        channelID,
 	}
 
-	channelData, err := json.Marshal(channelProto)
+	channelData, err := proto.Marshal(channelProto)
 	if err != nil {
 		return "", "", err
 	}
@@ -340,7 +340,7 @@ func (m *Messenger) parseCommunityChannelURLWithData(data string, signature stri
 	}
 
 	var channelProto protobuf.Channel
-	err = json.Unmarshal(channelData, &channelProto)
+	err = proto.Unmarshal(channelData, &channelProto)
 	if err != nil {
 		return nil, err
 	}
@@ -422,7 +422,7 @@ func (m *Messenger) prepareEncodedUserData(contact *Contact) (string, string, er
 		DisplayName: contact.DisplayName,
 	}
 
-	userData, err := json.Marshal(userProto)
+	userData, err := proto.Marshal(userProto)
 	if err != nil {
 		return "", "", err
 	}
@@ -456,7 +456,7 @@ func (m *Messenger) parseUserURLWithData(data string, signature string) (*URLDat
 	}
 
 	var userProto protobuf.User
-	err = json.Unmarshal(userData, &userProto)
+	err = proto.Unmarshal(userData, &userProto)
 	if err != nil {
 		return nil, err
 	}
