@@ -119,6 +119,7 @@ type Settings struct {
 	CurrentNetwork            string           `json:"networks/current-network"`
 	CustomBootnodes           *json.RawMessage `json:"custom-bootnodes,omitempty"`
 	CustomBootnodesEnabled    *json.RawMessage `json:"custom-bootnodes-enabled?,omitempty"`
+	CustomizationColor        string           `json:"customizationColor,omitempty"`
 	DappsAddress              types.Address    `json:"dapps-address"`
 	DeviceName                string           `json:"device-name"`
 	DisplayName               string           `json:"display-name"`

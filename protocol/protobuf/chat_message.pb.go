@@ -955,7 +955,6 @@ type ChatMessage struct {
 	// The type of the content of the message
 	ContentType ChatMessage_ContentType `protobuf:"varint,8,opt,name=content_type,json=contentType,proto3,enum=protobuf.ChatMessage_ContentType" json:"content_type,omitempty"`
 	// Types that are valid to be assigned to Payload:
-	//
 	//	*ChatMessage_Sticker
 	//	*ChatMessage_Image
 	//	*ChatMessage_Audio

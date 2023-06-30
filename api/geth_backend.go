@@ -1044,6 +1044,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 
 	settings.DeviceName = request.DeviceName
 	settings.DisplayName = request.DisplayName
+	settings.CustomizationColor = request.CustomizationColor
 	settings.PreviewPrivacy = request.PreviewPrivacy
 	settings.CurrentNetwork = request.CurrentNetwork
 
