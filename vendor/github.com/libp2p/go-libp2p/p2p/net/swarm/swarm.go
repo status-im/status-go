@@ -100,6 +100,14 @@ func WithResourceManager(m network.ResourceManager) Option {
 	}
 }
 
+// WithDialRanker configures swarm to use d as the DialRanker
+func WithDialRanker(d network.DialRanker) Option {
+	return func(s *Swarm) error {
+		s.dialRanker = d
+		return nil
+	}
+}
+
 // Swarm is a connection muxer, allowing connections to other peers to
 // be opened and closed, while still using the same Chan for all
 // communication. The Chan sends/receives Messages, which note the
@@ -163,6 +171,8 @@ type Swarm struct {
 
 	bwc           metrics.Reporter
 	metricsTracer MetricsTracer
+
+	dialRanker network.DialRanker
 }
 
 // NewSwarm constructs a Swarm.
@@ -181,6 +191,7 @@ func NewSwarm(local peer.ID, peers peerstore.Peerstore, eventBus event.Bus, opts
 		dialTimeout:      defaultDialTimeout,
 		dialTimeoutLocal: defaultDialTimeoutLocal,
 		maResolver:       madns.DefaultResolver,
+		dialRanker:       DefaultDialRanker,
 	}
 
 	s.conns.m = make(map[peer.ID][]*Conn)
@@ -229,7 +240,7 @@ func (s *Swarm) close() {
 
 	for l := range listeners {
 		go func(l transport.Listener) {
-			if err := l.Close(); err != nil {
+			if err := l.Close(); err != nil && err != transport.ErrListenerClosed {
 				log.Errorf("error when shutting down listener: %s", err)
 			}
 		}(l)
@@ -329,12 +340,7 @@ func (s *Swarm) addConn(tc transport.CapableConn, dir network.Direction) (*Conn,
 	}
 
 	c.streams.m = make(map[*Stream]struct{})
-	if len(s.conns.m[p]) == 0 { // first connection
-		s.emitter.Emit(event.EvtPeerConnectednessChanged{
-			Peer:          p,
-			Connectedness: network.Connected,
-		})
-	}
+	isFirstConnection := len(s.conns.m[p]) == 0
 	s.conns.m[p] = append(s.conns.m[p], c)
 
 	// Add two swarm refs:
@@ -346,6 +352,15 @@ func (s *Swarm) addConn(tc transport.CapableConn, dir network.Direction) (*Conn,
 	// Disconnect notifications until after the Connect notifications done.
 	c.notifyLk.Lock()
 	s.conns.Unlock()
+
+	// Emit event after releasing `s.conns` lock so that a consumer can still
+	// use swarm methods that need the `s.conns` lock.
+	if isFirstConnection {
+		s.emitter.Emit(event.EvtPeerConnectednessChanged{
+			Peer:          p,
+			Connectedness: network.Connected,
+		})
+	}
 
 	s.notifyAll(func(f network.Notifiee) {
 		f.Connected(s, c)
@@ -626,25 +641,32 @@ func (s *Swarm) removeConn(c *Conn) {
 	p := c.RemotePeer()
 
 	s.conns.Lock()
-	defer s.conns.Unlock()
 
 	cs := s.conns.m[p]
+
+	if len(cs) == 1 {
+		delete(s.conns.m, p)
+		s.conns.Unlock()
+
+		// Emit event after releasing `s.conns` lock so that a consumer can still
+		// use swarm methods that need the `s.conns` lock.
+		s.emitter.Emit(event.EvtPeerConnectednessChanged{
+			Peer:          p,
+			Connectedness: network.NotConnected,
+		})
+		return
+	}
+
+	defer s.conns.Unlock()
+
 	for i, ci := range cs {
 		if ci == c {
-			if len(cs) == 1 {
-				delete(s.conns.m, p)
-				s.emitter.Emit(event.EvtPeerConnectednessChanged{
-					Peer:          p,
-					Connectedness: network.NotConnected,
-				})
-			} else {
-				// NOTE: We're intentionally preserving order.
-				// This way, connections to a peer are always
-				// sorted oldest to newest.
-				copy(cs[i:], cs[i+1:])
-				cs[len(cs)-1] = nil
-				s.conns.m[p] = cs[:len(cs)-1]
-			}
+			// NOTE: We're intentionally preserving order.
+			// This way, connections to a peer are always
+			// sorted oldest to newest.
+			copy(cs[i:], cs[i+1:])
+			cs[len(cs)-1] = nil
+			s.conns.m[p] = cs[:len(cs)-1]
 			break
 		}
 	}

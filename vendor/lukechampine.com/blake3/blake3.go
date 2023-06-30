@@ -161,8 +161,8 @@ func newHasher(key [8]uint32, flags uint32, size int) *Hasher {
 	}
 }
 
-// New returns a Hasher for the specified size and key. If key is nil, the hash
-// is unkeyed. Otherwise, len(key) must be 32.
+// New returns a Hasher for the specified digest size and key. If key is nil,
+// the hash is unkeyed. Otherwise, len(key) must be 32.
 func New(size int, key []byte) *Hasher {
 	if key == nil {
 		return newHasher(iv, 0, size)
@@ -176,7 +176,7 @@ func New(size int, key []byte) *Hasher {
 
 // Sum256 and Sum512 always use the same hasher state, so we can save some time
 // when hashing small inputs by constructing the hasher ahead of time.
-var defaultHasher = New(0, nil)
+var defaultHasher = New(64, nil)
 
 // Sum256 returns the unkeyed BLAKE3 hash of b, truncated to 256 bits.
 func Sum256(b []byte) (out [32]byte) {
@@ -206,11 +206,11 @@ func Sum512(b []byte) (out [64]byte) {
 // DeriveKey derives a subkey from ctx and srcKey. ctx should be hardcoded,
 // globally unique, and application-specific. A good format for ctx strings is:
 //
-//    [application] [commit timestamp] [purpose]
+//	[application] [commit timestamp] [purpose]
 //
 // e.g.:
 //
-//    example.com 2019-12-25 16:18:03 session tokens v1
+//	example.com 2019-12-25 16:18:03 session tokens v1
 //
 // The purpose of these requirements is to ensure that an attacker cannot trick
 // two different applications into using the same context string.

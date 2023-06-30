@@ -8,11 +8,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peerstore"
+
 	"github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	"github.com/waku-org/go-waku/logging"
+	"github.com/waku-org/go-waku/waku/v2/peers"
+
 	"go.uber.org/zap"
 
 	lru "github.com/hashicorp/golang-lru"
@@ -33,7 +38,7 @@ type PeerConnectionStrategy struct {
 	wg          sync.WaitGroup
 	minPeers    int
 	dialTimeout time.Duration
-	peerCh      chan peer.AddrInfo
+	peerCh      chan PeerData
 	dialCh      chan peer.AddrInfo
 
 	backoff backoff.BackoffFactory
@@ -67,8 +72,14 @@ type connCacheData struct {
 	strat   backoff.BackoffStrategy
 }
 
+type PeerData struct {
+	Origin   peers.Origin
+	AddrInfo peer.AddrInfo
+	ENR      *enode.Node
+}
+
 // PeerChannel exposes the channel on which discovered peers should be pushed
-func (c *PeerConnectionStrategy) PeerChannel() chan<- peer.AddrInfo {
+func (c *PeerConnectionStrategy) PeerChannel() chan<- PeerData {
 	return c.peerCh
 }
 
@@ -85,7 +96,7 @@ func (c *PeerConnectionStrategy) Start(ctx context.Context) error {
 
 	ctx, cancel := context.WithCancel(ctx)
 	c.cancel = cancel
-	c.peerCh = make(chan peer.AddrInfo)
+	c.peerCh = make(chan PeerData)
 	c.dialCh = make(chan peer.AddrInfo)
 
 	c.wg.Add(3)
@@ -171,7 +182,20 @@ func (c *PeerConnectionStrategy) workPublisher(ctx context.Context) {
 				case <-ctx.Done():
 					return
 				case p := <-c.peerCh:
-					c.publishWork(ctx, p)
+					c.host.Peerstore().AddAddrs(p.AddrInfo.ID, p.AddrInfo.Addrs, peerstore.AddressTTL)
+					err := c.host.Peerstore().(peers.WakuPeerstore).SetOrigin(p.AddrInfo.ID, p.Origin)
+					if err != nil {
+						c.logger.Error("could not set origin", zap.Error(err), logging.HostID("peer", p.AddrInfo.ID))
+					}
+
+					if p.ENR != nil {
+						err = c.host.Peerstore().(peers.WakuPeerstore).SetENR(p.AddrInfo.ID, p.ENR)
+						if err != nil {
+							c.logger.Error("could not store enr", zap.Error(err), logging.HostID("peer", p.AddrInfo.ID), zap.String("enr", p.ENR.String()))
+						}
+					}
+
+					c.publishWork(ctx, p.AddrInfo)
 				case <-time.After(1 * time.Second):
 					// This timeout is to not lock the goroutine
 					break
@@ -236,6 +260,7 @@ func (c *PeerConnectionStrategy) dialPeers(ctx context.Context) {
 				defer cancel()
 				err := c.host.Connect(ctx, pi)
 				if err != nil && !errors.Is(err, context.Canceled) {
+					c.host.Peerstore().(peers.WakuPeerstore).AddConnFailure(pi)
 					c.logger.Info("connecting to peer", logging.HostID("peerID", pi.ID), zap.Error(err))
 				}
 				<-sem

@@ -27,7 +27,7 @@ var (
 
 // ErrInconsistentLen is returned when a decoded multihash has an inconsistent length
 type ErrInconsistentLen struct {
-	dm          *DecodedMultihash
+	dm          DecodedMultihash
 	lengthFound int
 }
 
@@ -222,12 +222,26 @@ func Cast(buf []byte) (Multihash, error) {
 
 // Decode parses multihash bytes into a DecodedMultihash.
 func Decode(buf []byte) (*DecodedMultihash, error) {
-	rlen, code, hdig, err := readMultihashFromBuf(buf)
+	// outline decode allowing the &dm expression to be inlined into the caller.
+	// This moves the heap allocation into the caller and if the caller doesn't
+	// leak dm the compiler will use a stack allocation instead.
+	// If you do not outline this &dm always heap allocate since the pointer is
+	// returned which cause a heap allocation because Decode's stack frame is
+	// about to disapear.
+	dm, err := decode(buf)
 	if err != nil {
 		return nil, err
 	}
+	return &dm, nil
+}
 
-	dm := &DecodedMultihash{
+func decode(buf []byte) (dm DecodedMultihash, err error) {
+	rlen, code, hdig, err := readMultihashFromBuf(buf)
+	if err != nil {
+		return DecodedMultihash{}, err
+	}
+
+	dm = DecodedMultihash{
 		Code:   code,
 		Name:   Codes[code],
 		Length: len(hdig),
@@ -235,7 +249,7 @@ func Decode(buf []byte) (*DecodedMultihash, error) {
 	}
 
 	if len(buf) != rlen {
-		return nil, ErrInconsistentLen{dm, rlen}
+		return dm, ErrInconsistentLen{dm, rlen}
 	}
 
 	return dm, nil

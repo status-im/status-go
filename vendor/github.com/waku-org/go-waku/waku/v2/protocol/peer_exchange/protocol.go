@@ -10,10 +10,10 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/peer"
 	libp2pProtocol "github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-msgio/pbio"
 	"github.com/waku-org/go-waku/logging"
+	v2 "github.com/waku-org/go-waku/waku/v2"
 	"github.com/waku-org/go-waku/waku/v2/discv5"
 	"github.com/waku-org/go-waku/waku/v2/metrics"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
@@ -45,7 +45,7 @@ type WakuPeerExchange struct {
 }
 
 type PeerConnector interface {
-	PeerChannel() chan<- peer.AddrInfo
+	PeerChannel() chan<- v2.PeerData
 }
 
 // NewWakuPeerExchange returns a new instance of WakuPeerExchange struct

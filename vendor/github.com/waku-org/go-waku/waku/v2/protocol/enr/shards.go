@@ -53,9 +53,9 @@ func WithWakuRelayShardingTopics(topics ...string) ENROption {
 
 // ENR record accessors
 
-func RelayShardingIndicesList(localnode *enode.LocalNode) (*protocol.RelayShards, error) {
+func RelayShardingIndicesList(record *enr.Record) (*protocol.RelayShards, error) {
 	var field []byte
-	if err := localnode.Node().Record().Load(enr.WithEntry(ShardingIndicesListEnrField, field)); err != nil {
+	if err := record.Load(enr.WithEntry(ShardingIndicesListEnrField, field)); err != nil {
 		return nil, nil
 	}
 
@@ -67,10 +67,13 @@ func RelayShardingIndicesList(localnode *enode.LocalNode) (*protocol.RelayShards
 	return &res, nil
 }
 
-func RelayShardingBitVector(localnode *enode.LocalNode) (*protocol.RelayShards, error) {
+func RelayShardingBitVector(record *enr.Record) (*protocol.RelayShards, error) {
 	var field []byte
-	if err := localnode.Node().Record().Load(enr.WithEntry(ShardingBitVectorEnrField, field)); err != nil {
-		return nil, nil
+	if err := record.Load(enr.WithEntry(ShardingBitVectorEnrField, field)); err != nil {
+		if enr.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
 	}
 
 	res, err := protocol.FromBitVector(field)
@@ -81,8 +84,8 @@ func RelayShardingBitVector(localnode *enode.LocalNode) (*protocol.RelayShards, 
 	return &res, nil
 }
 
-func RelaySharding(localnode *enode.LocalNode) (*protocol.RelayShards, error) {
-	res, err := RelayShardingIndicesList(localnode)
+func RelaySharding(record *enr.Record) (*protocol.RelayShards, error) {
+	res, err := RelayShardingIndicesList(record)
 	if err != nil {
 		return nil, err
 	}
@@ -91,17 +94,17 @@ func RelaySharding(localnode *enode.LocalNode) (*protocol.RelayShards, error) {
 		return res, nil
 	}
 
-	return RelayShardingBitVector(localnode)
+	return RelayShardingBitVector(record)
 }
 
 // Utils
 
-func ContainsShard(localnode *enode.LocalNode, cluster uint16, index uint16) bool {
+func ContainsShard(record *enr.Record, cluster uint16, index uint16) bool {
 	if index > protocol.MaxShardIndex {
 		return false
 	}
 
-	rs, err := RelaySharding(localnode)
+	rs, err := RelaySharding(record)
 	if err != nil {
 		return false
 	}
@@ -109,19 +112,22 @@ func ContainsShard(localnode *enode.LocalNode, cluster uint16, index uint16) boo
 	return rs.Contains(cluster, index)
 }
 
-func ContainsShardWithNsTopic(localnode *enode.LocalNode, topic protocol.NamespacedPubsubTopic) bool {
+func ContainsShardWithNsTopic(record *enr.Record, topic protocol.NamespacedPubsubTopic) bool {
 	if topic.Kind() != protocol.StaticSharding {
 		return false
 	}
 	shardTopic := topic.(protocol.StaticShardingPubsubTopic)
-	return ContainsShard(localnode, shardTopic.Cluster(), shardTopic.Shard())
-
+	return ContainsShard(record, shardTopic.Cluster(), shardTopic.Shard())
 }
 
-func ContainsShardTopic(localnode *enode.LocalNode, topic string) bool {
+func ContainsRelayShard(record *enr.Record, topic protocol.StaticShardingPubsubTopic) bool {
+	return ContainsShardWithNsTopic(record, topic)
+}
+
+func ContainsShardTopic(record *enr.Record, topic string) bool {
 	shardTopic, err := protocol.ToShardedPubsubTopic(topic)
 	if err != nil {
 		return false
 	}
-	return ContainsShardWithNsTopic(localnode, shardTopic)
+	return ContainsShardWithNsTopic(record, shardTopic)
 }

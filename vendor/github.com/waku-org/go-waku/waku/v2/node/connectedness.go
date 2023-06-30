@@ -162,8 +162,10 @@ func (w *WakuNode) Status() (isOnline bool, hasHistory bool) {
 		hasHistory = true
 	}
 
-	if hasRelay || hasLightPush && (hasStore || hasFilter) {
-		isOnline = true
+	if w.opts.enableFilterLightNode && !w.opts.enableRelay {
+		isOnline = hasLightPush && hasFilter
+	} else {
+		isOnline = hasRelay || hasLightPush && (hasStore || hasFilter)
 	}
 
 	return

@@ -1,11 +1,11 @@
 /*
-	This package has no purpose except to register the blake3 hash function.
+This package has no purpose except to register the blake3 hash function.
 
-	It is meant to be used as a side-effecting import, e.g.
+It is meant to be used as a side-effecting import, e.g.
 
-		import (
-			_ "github.com/multiformats/go-multihash/register/blake3"
-		)
+	import (
+		_ "github.com/multiformats/go-multihash/register/blake3"
+	)
 */
 package blake3
 
@@ -14,7 +14,7 @@ import (
 
 	"lukechampine.com/blake3"
 
-	"github.com/multiformats/go-multihash/core"
+	multihash "github.com/multiformats/go-multihash/core"
 )
 
 const DefaultSize = 32

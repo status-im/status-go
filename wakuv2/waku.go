@@ -55,6 +55,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/metrics"
 
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
+	"github.com/waku-org/go-waku/waku/v2/peers"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
@@ -1526,7 +1527,7 @@ func (w *Waku) AddStorePeer(address string) (peer.ID, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, store.StoreID_v20beta4)
+	peerID, err := w.node.AddPeer(addr, peers.Static, store.StoreID_v20beta4)
 	if err != nil {
 		return "", err
 	}
@@ -1543,7 +1544,7 @@ func (w *Waku) AddRelayPeer(address string) (peer.ID, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, relay.WakuRelayID_v200)
+	peerID, err := w.node.AddPeer(addr, peers.Static, relay.WakuRelayID_v200)
 	if err != nil {
 		return "", err
 	}

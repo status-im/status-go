@@ -25,6 +25,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
+	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoremem"
 	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/proto"
 	ws "github.com/libp2p/go-libp2p/p2p/transport/websocket"
 	ma "github.com/multiformats/go-multiaddr"
@@ -35,6 +36,7 @@ import (
 	v2 "github.com/waku-org/go-waku/waku/v2"
 	"github.com/waku-org/go-waku/waku/v2/discv5"
 	"github.com/waku-org/go-waku/waku/v2/metrics"
+	"github.com/waku-org/go-waku/waku/v2/peers"
 	"github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_filter"
@@ -79,6 +81,8 @@ type WakuNode struct {
 	opts       *WakuNodeParameters
 	log        *zap.Logger
 	timesource timesource.Timesource
+
+	peerstore peerstore.Peerstore
 
 	relay           Service
 	lightPush       Service
@@ -138,6 +142,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 
 	if params.logger == nil {
 		params.logger = utils.Logger()
+		//golog.SetPrimaryCore(params.logger.Core())
 		golog.SetAllLoggers(params.logLevel)
 	}
 
@@ -186,6 +191,19 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	w.keepAliveFails = make(map[peer.ID]int)
 	w.wakuFlag = enr.NewWakuEnrBitfield(w.opts.enableLightPush, w.opts.enableLegacyFilter, w.opts.enableStore, w.opts.enableRelay)
 	w.circuitRelayNodes = make(chan peer.AddrInfo)
+
+	// Setup peerstore wrapper
+	if params.peerstore != nil {
+		w.peerstore = peers.NewWakuPeerstore(params.peerstore)
+		params.libP2POpts = append(params.libP2POpts, libp2p.Peerstore(w.peerstore))
+	} else {
+		ps, err := pstoremem.NewPeerstore()
+		if err != nil {
+			return nil, err
+		}
+		w.peerstore = peers.NewWakuPeerstore(ps)
+		params.libP2POpts = append(params.libP2POpts, libp2p.Peerstore(w.peerstore))
+	}
 
 	// Use circuit relay with nodes received on circuitRelayNodes channel
 	params.libP2POpts = append(params.libP2POpts, libp2p.EnableAutoRelayWithPeerSource(
@@ -256,7 +274,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		rendezvousPoints = append(rendezvousPoints, peerID)
 	}
 
-	w.rendezvous = rendezvous.NewRendezvous(w.opts.enableRendezvousServer, w.opts.rendezvousDB, w.opts.enableRendezvous, rendezvousPoints, w.peerConnector, w.log)
+	w.rendezvous = rendezvous.NewRendezvous(w.opts.enableRendezvousServer, w.opts.rendezvousDB, rendezvousPoints, w.peerConnector, w.log)
 	w.relay = relay.NewWakuRelay(w.bcaster, w.opts.minRelayPeersToPublish, w.timesource, w.log, w.opts.wOpts...)
 	w.legacyFilter = legacy_filter.NewWakuFilter(w.bcaster, w.opts.isLegacyFilterFullnode, w.timesource, w.log, w.opts.legacyFilterOpts...)
 	w.filterFullnode = filter.NewWakuFilterFullnode(w.timesource, w.log, w.opts.filterOpts...)
@@ -314,13 +332,22 @@ func (w *WakuNode) watchMultiaddressChanges(ctx context.Context) {
 
 // Start initializes all the protocols that were setup in the WakuNode
 func (w *WakuNode) Start(ctx context.Context) error {
+	connGater := v2.NewConnectionGater(w.log)
+
 	ctx, cancel := context.WithCancel(ctx)
 	w.cancel = cancel
+	w.opts.libP2POpts = append(w.opts.libP2POpts, libp2p.ConnectionGater(connGater))
 
 	host, err := libp2p.New(w.opts.libP2POpts...)
 	if err != nil {
 		return err
 	}
+
+	host.Network().Notify(&network.NotifyBundle{
+		DisconnectedF: func(net network.Network, conn network.Conn) {
+			go connGater.NotifyDisconnect(conn.RemoteMultiaddr())
+		},
+	})
 
 	w.host = host
 
@@ -447,7 +474,7 @@ func (w *WakuNode) Start(ctx context.Context) error {
 	}
 
 	w.rendezvous.SetHost(host)
-	if w.opts.enableRendezvousServer || w.opts.enableRendezvous {
+	if w.opts.enableRendezvousServer {
 		err := w.rendezvous.Start(ctx)
 		if err != nil {
 			return err
@@ -477,7 +504,7 @@ func (w *WakuNode) Stop() {
 	defer w.identificationEventSub.Close()
 	defer w.addressChangesSub.Close()
 
-	if w.opts.enableRendezvousServer || w.opts.enableRendezvous {
+	if w.opts.enableRendezvousServer {
 		w.rendezvous.Stop()
 	}
 
@@ -625,6 +652,14 @@ func (w *WakuNode) PeerExchange() *peer_exchange.WakuPeerExchange {
 	return nil
 }
 
+// Rendezvous is used to access any operation related to Rendezvous
+func (w *WakuNode) Rendezvous() *rendezvous.Rendezvous {
+	if result, ok := w.rendezvous.(*rendezvous.Rendezvous); ok {
+		return result
+	}
+	return nil
+}
+
 // Broadcaster is used to access the message broadcaster that is used to push
 // messages to different protocols
 func (w *WakuNode) Broadcaster() relay.Broadcaster {
@@ -689,7 +724,7 @@ func (w *WakuNode) startStore(ctx context.Context, sub relay.Subscription) error
 
 		var peerIDs []peer.ID
 		for _, n := range w.opts.resumeNodes {
-			pID, err := w.AddPeer(n, store.StoreID_v20beta4)
+			pID, err := w.AddPeer(n, peers.Static, store.StoreID_v20beta4)
 			if err != nil {
 				w.log.Warn("adding peer to peerstore", logging.MultiAddrs("peer", n), zap.Error(err))
 			}
@@ -713,10 +748,15 @@ func (w *WakuNode) startStore(ctx context.Context, sub relay.Subscription) error
 	return nil
 }
 
-func (w *WakuNode) addPeer(info *peer.AddrInfo, protocols ...protocol.ID) error {
+func (w *WakuNode) addPeer(info *peer.AddrInfo, origin peers.Origin, protocols ...protocol.ID) error {
 	w.log.Info("adding peer to peerstore", logging.HostID("peer", info.ID))
-	w.host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.PermanentAddrTTL)
-	err := w.host.Peerstore().AddProtocols(info.ID, protocols...)
+	err := w.host.Peerstore().(peers.WakuPeerstore).SetOrigin(info.ID, origin)
+	if err != nil {
+		return err
+	}
+
+	w.host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.AddressTTL)
+	err = w.host.Peerstore().AddProtocols(info.ID, protocols...)
 	if err != nil {
 		return err
 	}
@@ -725,13 +765,13 @@ func (w *WakuNode) addPeer(info *peer.AddrInfo, protocols ...protocol.ID) error 
 }
 
 // AddPeer is used to add a peer and the protocols it support to the node peerstore
-func (w *WakuNode) AddPeer(address ma.Multiaddr, protocols ...protocol.ID) (peer.ID, error) {
+func (w *WakuNode) AddPeer(address ma.Multiaddr, origin peers.Origin, protocols ...protocol.ID) (peer.ID, error) {
 	info, err := peer.AddrInfoFromP2pAddr(address)
 	if err != nil {
 		return "", err
 	}
 
-	return info.ID, w.addPeer(info, protocols...)
+	return info.ID, w.addPeer(info, origin, protocols...)
 }
 
 // DialPeerWithMultiAddress is used to connect to a peer using a multiaddress
@@ -767,9 +807,11 @@ func (w *WakuNode) DialPeerWithInfo(ctx context.Context, peerInfo peer.AddrInfo)
 func (w *WakuNode) connect(ctx context.Context, info peer.AddrInfo) error {
 	err := w.host.Connect(ctx, info)
 	if err != nil {
+		w.host.Peerstore().(peers.WakuPeerstore).AddConnFailure(info)
 		return err
 	}
 
+	w.host.Peerstore().(peers.WakuPeerstore).ResetConnFailures(info)
 	stats.Record(ctx, metrics.Dials.M(1))
 	return nil
 }
