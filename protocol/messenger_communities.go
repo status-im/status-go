@@ -3778,8 +3778,8 @@ func (m *Messenger) GetAllCommunityTokens() ([]*communities.CommunityToken, erro
 	return m.communitiesManager.GetAllCommunityTokens()
 }
 
-func (m *Messenger) AddCommunityToken(token *communities.CommunityToken) (*communities.CommunityToken, error) {
-	return m.communitiesManager.AddCommunityToken(token)
+func (m *Messenger) AddCommunityToken(token *communities.CommunityToken, croppedImage *images.CroppedImage) (*communities.CommunityToken, error) {
+	return m.communitiesManager.AddCommunityToken(token, croppedImage)
 }
 
 func (m *Messenger) UpdateCommunityTokenState(chainID int, contractAddress string, deployState communities.DeployState) error {

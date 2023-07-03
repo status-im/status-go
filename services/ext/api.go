@@ -18,6 +18,7 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol"
@@ -1305,8 +1306,8 @@ func (api *PublicAPI) GetAllCommunityTokens() ([]*communities.CommunityToken, er
 	return api.service.messenger.GetAllCommunityTokens()
 }
 
-func (api *PublicAPI) AddCommunityToken(token *communities.CommunityToken) (*communities.CommunityToken, error) {
-	return api.service.messenger.AddCommunityToken(token)
+func (api *PublicAPI) AddCommunityToken(token *communities.CommunityToken, croppedImage *images.CroppedImage) (*communities.CommunityToken, error) {
+	return api.service.messenger.AddCommunityToken(token, croppedImage)
 }
 
 func (api *PublicAPI) UpdateCommunityTokenState(chainID int, contractAddress string, deployState communities.DeployState) error {

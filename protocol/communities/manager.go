@@ -4003,7 +4003,7 @@ func (m *Manager) ImageToBase64(uri string) string {
 	return base64img
 }
 
-func (m *Manager) AddCommunityToken(token *CommunityToken) (*CommunityToken, error) {
+func (m *Manager) AddCommunityToken(token *CommunityToken, croppedImage *images.CroppedImage) (*CommunityToken, error) {
 
 	community, err := m.GetByIDString(token.CommunityID)
 	if err != nil {
@@ -4013,7 +4013,20 @@ func (m *Manager) AddCommunityToken(token *CommunityToken) (*CommunityToken, err
 		return nil, ErrOrgNotFound
 	}
 
-	token.Base64Image = m.ImageToBase64(token.Base64Image)
+	if croppedImage != nil && croppedImage.ImagePath != "" {
+		bytes, err := images.OpenAndAdjustImage(*croppedImage, true)
+		if err != nil {
+			return nil, err
+		}
+
+		base64img, err := images.GetPayloadDataURI(bytes)
+		if err != nil {
+			return nil, err
+		}
+		token.Base64Image = base64img
+	} else {
+		token.Base64Image = m.ImageToBase64(token.Base64Image)
+	}
 
 	tokenMetadata := &protobuf.CommunityTokenMetadata{
 		ContractAddresses: map[uint64]string{uint64(token.ChainID): token.Address},
