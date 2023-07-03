@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"go.uber.org/zap"
 	"sync"
 
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
@@ -53,10 +54,16 @@ func (cm *chatMap) Delete(chatID string) {
 */
 
 type contactMap struct {
-	sm sync.Map
+	sm     sync.Map
+	me     *Contact
+	logger *zap.Logger
 }
 
 func (cm *contactMap) Load(contactID string) (*Contact, bool) {
+	if contactID == cm.me.ID {
+		cm.logger.Warn("contacts map: loading own identity", zap.String("contactID", contactID))
+		return cm.me, true
+	}
 	contact, ok := cm.sm.Load(contactID)
 	if contact == nil {
 		return nil, ok
@@ -65,6 +72,10 @@ func (cm *contactMap) Load(contactID string) (*Contact, bool) {
 }
 
 func (cm *contactMap) Store(contactID string, contact *Contact) {
+	if contactID == cm.me.ID {
+		cm.logger.Warn("contacts map: storing own identity", zap.String("contactID", contactID))
+		return
+	}
 	cm.sm.Store(contactID, contact)
 }
 
@@ -76,6 +87,10 @@ func (cm *contactMap) Range(f func(contactID string, contact *Contact) (shouldCo
 }
 
 func (cm *contactMap) Delete(contactID string) {
+	if contactID == cm.me.ID {
+		cm.logger.Warn("contacts map: deleting own identity", zap.String("contactID", contactID))
+		return
+	}
 	cm.sm.Delete(contactID)
 }
 

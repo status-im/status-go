@@ -451,6 +451,12 @@ func NewMessenger(
 
 	savedAddressesManager := wallet.NewSavedAddressesManager(c.db)
 
+	myPublicKeyString := types.EncodeHex(crypto.FromECDSAPub(&identity.PublicKey))
+	myContact, err := buildContact(myPublicKeyString, &identity.PublicKey)
+	if err != nil {
+		return nil, errors.New("failed to build contact of ourself: " + err.Error())
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	messenger = &Messenger{
@@ -472,17 +478,20 @@ func NewMessenger(
 		featureFlags:               c.featureFlags,
 		systemMessagesTranslations: c.systemMessagesTranslations,
 		allChats:                   new(chatMap),
-		allContacts:                new(contactMap),
-		allInstallations:           new(installationMap),
-		installationID:             installationID,
-		modifiedInstallations:      new(stringBoolMap),
-		verifyTransactionClient:    c.verifyTransactionClient,
-		database:                   database,
-		multiAccounts:              c.multiAccount,
-		settings:                   settings,
-		peerStore:                  peerStore,
-		verificationDatabase:       verification.NewPersistence(database),
-		mailservers:                mailservers,
+		allContacts: &contactMap{
+			logger: logger,
+			me:     myContact,
+		},
+		allInstallations:        new(installationMap),
+		installationID:          installationID,
+		modifiedInstallations:   new(stringBoolMap),
+		verifyTransactionClient: c.verifyTransactionClient,
+		database:                database,
+		multiAccounts:           c.multiAccount,
+		settings:                settings,
+		peerStore:               peerStore,
+		verificationDatabase:    verification.NewPersistence(database),
+		mailservers:             mailservers,
 		mailserverCycle: mailserverCycle{
 			peers:                     make(map[string]peerStatus),
 			availabilitySubscriptions: make([]chan struct{}, 0),
@@ -823,6 +832,10 @@ func (m *Messenger) IdentityPublicKey() *ecdsa.PublicKey {
 
 func (m *Messenger) IdentityPublicKeyCompressed() []byte {
 	return crypto.CompressPubkey(m.IdentityPublicKey())
+}
+
+func (m *Messenger) IdentityPublicKeyString() string {
+	return types.EncodeHex(crypto.FromECDSAPub(m.IdentityPublicKey()))
 }
 
 // cleanTopics remove any topic that does not have a Listen flag set

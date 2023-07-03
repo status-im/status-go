@@ -546,19 +546,23 @@ func (s *SyncDeviceSuite) TestPairingThreeDevices() {
 	s.acceptContactRequest(contactRequest, alice1Messenger, bobMessenger)
 	s.checkMutualContact(alice1Backend, bobPublicKey)
 
+	// We shouldn't sync ourselves as a contact, so we check there's only Bob
+	// https://github.com/status-im/status-go/issues/3667
+	s.Require().Equal(1, len(alice1Backend.Messenger().Contacts()))
+
 	// Pair alice-1 <-> alice-2
 	s.logger.Info("pairing Alice-1 and Alice-2")
 	s.pairAccounts(alice1Backend, alice1TmpDir, alice2Backend, alice2TmpDir)
 
 	s.checkMutualContact(alice2Backend, bobPublicKey)
-	// TODO: Check if Alice-2 has herself as contact?
-	// TODO: Check if Alice-2 has an accepted contact request from Bob?
+	s.Require().Equal(1, len(alice2Backend.Messenger().Contacts()))
 
 	// Pair Alice-2 <-> ALice-3
 	s.logger.Info("pairing Alice-2 and Alice-3")
 	s.pairAccounts(alice2Backend, alice2TmpDir, alice3Backend, alice3TmpDir)
 
 	s.checkMutualContact(alice3Backend, bobPublicKey)
+	s.Require().Equal(1, len(alice3Backend.Messenger().Contacts()))
 }
 
 func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {
