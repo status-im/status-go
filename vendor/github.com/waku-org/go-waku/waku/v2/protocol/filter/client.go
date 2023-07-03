@@ -256,10 +256,6 @@ func (wf *WakuFilterLightnode) getUnsubscribeParameters(opts ...FilterUnsubscrib
 		opt(params)
 	}
 
-	if !params.unsubscribeAll && params.selectedPeer == "" {
-		return nil, ErrNoPeersAvailable
-	}
-
 	return params, nil
 }
 
@@ -350,7 +346,7 @@ func (wf *WakuFilterLightnode) Unsubscribe(ctx context.Context, contentFilter Co
 	resultChan := make(chan WakuFilterPushResult, len(wf.subscriptions.items))
 
 	for peerID := range wf.subscriptions.items {
-		if !params.unsubscribeAll && peerID != params.selectedPeer {
+		if params.selectedPeer != "" && peerID != params.selectedPeer {
 			continue
 		}
 
@@ -363,8 +359,13 @@ func (wf *WakuFilterLightnode) Unsubscribe(ctx context.Context, contentFilter Co
 				pb.FilterSubscribeRequest_UNSUBSCRIBE,
 				contentFilter)
 			if err != nil {
-				wf.log.Error("could not unsubscribe from peer", logging.HostID("peerID", peerID), zap.Error(err))
-				return
+				ferr, ok := err.(*FilterError)
+				if ok && ferr.Code == http.StatusNotFound {
+					wf.log.Warn("peer does not have a subscription", logging.HostID("peerID", peerID), zap.Error(err))
+				} else {
+					wf.log.Error("could not unsubscribe from peer", logging.HostID("peerID", peerID), zap.Error(err))
+					return
+				}
 			}
 
 			wf.cleanupSubscriptions(peerID, contentFilter)
@@ -408,7 +409,7 @@ func (wf *WakuFilterLightnode) UnsubscribeAll(ctx context.Context, opts ...Filte
 	resultChan := make(chan WakuFilterPushResult, len(wf.subscriptions.items))
 
 	for peerID := range wf.subscriptions.items {
-		if !params.unsubscribeAll && peerID != params.selectedPeer {
+		if params.selectedPeer != "" && peerID != params.selectedPeer {
 			continue
 		}
 		localWg.Add(1)

@@ -169,6 +169,10 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 		PeerExchange:   true,
 	}
 
+	if request.WakuV2LightClient {
+		nodeConfig.WakuV2Config.LightClient = true
+	}
+
 	if request.WakuV2Nameserver != nil {
 		nodeConfig.WakuV2Config.Nameserver = *request.WakuV2Nameserver
 	}

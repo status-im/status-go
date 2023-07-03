@@ -21,7 +21,8 @@ type CreateAccount struct {
 	ImagePath          string `json:"imagePath"`
 	CustomizationColor string `json:"customizationColor"`
 
-	WakuV2Nameserver *string `json:"wakuV2Nameserver"`
+	WakuV2Nameserver  *string `json:"wakuV2Nameserver"`
+	WakuV2LightClient bool    `json:"wakuV2LightClient"`
 
 	LogLevel    *string `json:"logLevel"`
 	LogFilePath string  `json:"logFilePath"`
