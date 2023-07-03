@@ -374,6 +374,21 @@ func (o *Community) TagsRaw() []string {
 	return o.config.CommunityDescription.Tags
 }
 
+func (o *Community) TagsIndices() []uint32 {
+	var indices []uint32
+	for _, t := range o.config.CommunityDescription.Tags {
+		i := uint32(0)
+		for k := range requests.TagsEmojies {
+			if k == t {
+				indices = append(indices, i)
+			}
+			i++
+		}
+	}
+
+	return indices
+}
+
 func (o *Community) OutroMessage() string {
 	if o != nil &&
 		o.config != nil &&

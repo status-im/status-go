@@ -141,6 +141,7 @@ func (m *Messenger) prepareEncodedCommunityData(community *communities.Community
 		Description:  community.DescriptionText(),
 		MembersCount: uint32(community.MembersCount()),
 		Color:        community.Identity().GetColor(),
+		TagIndices:   community.TagsIndices(),
 	}
 
 	communityData, err := proto.Marshal(communityProto)
