@@ -422,8 +422,15 @@ func (api *PublicAPI) EditCommunity(request *requests.EditCommunity) (*protocol.
 }
 
 // Sets the community shard for a community and updates all active filters for the community
-func (api *PublicAPI) SetCommunityShard(communityID types.HexBytes, shardCluster *uint, shardIndex *uint) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SetCommunityShard(communityID, shardCluster, shardIndex)
+func (api *PublicAPI) SetCommunityShard(communityID types.HexBytes, cluster *uint, index *uint) (*protocol.MessengerResponse, error) {
+	shard := ClusterIndexToShard(cluster, index)
+	return api.service.messenger.SetCommunityShard(communityID, shard)
+}
+
+// Sets the community control shard for a community
+func (api *PublicAPI) SetCommunityControlShard(communityID types.HexBytes, cluster *uint, index *uint) (*protocol.MessengerResponse, error) {
+	shard := ClusterIndexToShard(cluster, index)
+	return api.service.messenger.SetCommunityControlShard(communityID, shard)
 }
 
 // ExportCommunity exports the private key of the community with given ID
@@ -1125,12 +1132,14 @@ func (api *PublicAPI) EnsVerified(pk, ensName string) error {
 	return api.service.messenger.ENSVerified(pk, ensName)
 }
 
-func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string, shardCluster *uint, shardIndex *uint) (*communities.Community, error) {
-	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID, shardCluster, shardIndex, true)
+func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string, cluster *uint, index *uint) (*communities.Community, error) {
+	shard := ClusterIndexToShard(cluster, index)
+	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID, shard, true)
 }
 
 func (api *PublicAPI) RequestCommunityInfoFromMailserverAsync(communityID string, cluster *uint, index *uint) error {
-	return api.service.messenger.RequestCommunityInfoFromMailserverAsync(communityID, cluster, index)
+	shard := ClusterIndexToShard(cluster, index)
+	return api.service.messenger.RequestCommunityInfoFromMailserverAsync(communityID, shard)
 }
 
 func (api *PublicAPI) ActivityCenterNotifications(request protocol.ActivityCenterNotificationsRequest) (*protocol.ActivityCenterPaginationResponse, error) {
@@ -1473,4 +1482,15 @@ func topicsToBloom(topics ...types.TopicType) []byte {
 // TopicsToBloom squashes all topics into a single bloom filter.
 func TopicsToBloom(topics ...types.TopicType) []byte {
 	return topicsToBloom(topics...)
+}
+
+func ClusterIndexToShard(cluster *uint, index *uint) *communities.Shard {
+	var shard *communities.Shard
+	if cluster != nil && index != nil {
+		shard = &communities.Shard{
+			Cluster: *cluster,
+			Index:   *index,
+		}
+	}
+	return shard
 }

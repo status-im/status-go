@@ -93,6 +93,7 @@
 // 1684979808_sync_activity_center_notifications.up.sql (169B)
 // 1685964183_add_chainids_to_revealed_addresses.up.sql (88B)
 // 1686048343_community_shard.up.sql (311B)
+// 1686048344_community_control_shard.up.sql (172B)
 // README.md (554B)
 // doc.go (850B)
 
@@ -1978,7 +1979,7 @@ func _1684979808_sync_activity_center_notificationsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1684979808_sync_activity_center_notifications.up.sql", size: 169, mode: os.FileMode(0664), modTime: time.Unix(1686939668, 0)}
+	info := bindataFileInfo{name: "1684979808_sync_activity_center_notifications.up.sql", size: 169, mode: os.FileMode(0664), modTime: time.Unix(1687991048, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd8, 0xf5, 0xf7, 0x94, 0xa9, 0xa1, 0x60, 0x26, 0x9d, 0xca, 0x31, 0xf, 0x14, 0xd, 0x70, 0xf8, 0xab, 0x40, 0x29, 0x73, 0x61, 0xbd, 0x1b, 0xb6, 0xc4, 0x31, 0x77, 0x9e, 0x32, 0xa8, 0xce, 0x6d}}
 	return a, nil
 }
@@ -1998,7 +1999,7 @@ func _1685964183_add_chainids_to_revealed_addressesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1685964183_add_chainids_to_revealed_addresses.up.sql", size: 88, mode: os.FileMode(0664), modTime: time.Unix(1686939668, 0)}
+	info := bindataFileInfo{name: "1685964183_add_chainids_to_revealed_addresses.up.sql", size: 88, mode: os.FileMode(0664), modTime: time.Unix(1687991048, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc, 0xb5, 0xa8, 0xd7, 0xad, 0x9c, 0x54, 0xa5, 0xe9, 0xdb, 0x42, 0x2d, 0xd0, 0xd7, 0x22, 0x1, 0x93, 0xf3, 0x4f, 0x53, 0xf7, 0x1e, 0xbe, 0x4b, 0xac, 0xc7, 0x63, 0x15, 0xdf, 0xe0, 0x6, 0xf8}}
 	return a, nil
 }
@@ -2018,8 +2019,28 @@ func _1686048343_community_shardUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1686048343_community_shard.up.sql", size: 311, mode: os.FileMode(0664), modTime: time.Unix(1686946354, 0)}
+	info := bindataFileInfo{name: "1686048343_community_shard.up.sql", size: 311, mode: os.FileMode(0664), modTime: time.Unix(1688399226, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7, 0x6d, 0xd4, 0x37, 0xd1, 0xec, 0x2c, 0xa6, 0xd9, 0x57, 0x9c, 0xe9, 0x18, 0x40, 0x1a, 0xc3, 0x9b, 0x87, 0x21, 0x90, 0xd2, 0xfd, 0x3b, 0xd1, 0xd, 0x16, 0xc8, 0x61, 0x51, 0x8, 0xd8, 0xca}}
+	return a, nil
+}
+
+var __1686048344_community_control_shardUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\xce\xcf\xcd\x2d\xcd\xcb\x2c\xc9\x4c\x2d\x8e\x47\x62\x2b\x38\xba\xb8\x28\x38\xfb\xfb\x84\xfa\xfa\x29\x24\xe7\xe7\x95\x14\xe5\xe7\xc4\x17\x67\x24\x16\xa5\xc4\x27\xe7\x94\x16\x97\xa4\x16\x29\x78\xfa\x85\x28\xb8\xb8\xba\x39\x86\xfa\x84\x28\xf8\x85\xfa\xf8\x58\x73\x51\x64\x6c\x66\x5e\x4a\x6a\x05\x16\x43\x01\x01\x00\x00\xff\xff\x60\xf5\xda\xd6\xac\x00\x00\x00")
+
+func _1686048344_community_control_shardUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1686048344_community_control_shardUpSql,
+		"1686048344_community_control_shard.up.sql",
+	)
+}
+
+func _1686048344_community_control_shardUpSql() (*asset, error) {
+	bytes, err := _1686048344_community_control_shardUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1686048344_community_control_shard.up.sql", size: 172, mode: os.FileMode(0664), modTime: time.Unix(1688399711, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7, 0xb0, 0xa7, 0xe5, 0x24, 0x8d, 0x2d, 0x2f, 0xcb, 0xad, 0x9d, 0xca, 0xb2, 0x30, 0x91, 0x66, 0xf4, 0xe6, 0x4a, 0xbf, 0xc1, 0x2a, 0x18, 0xcb, 0xa2, 0x80, 0x47, 0x0, 0xba, 0xec, 0x99, 0xd}}
 	return a, nil
 }
 
@@ -2340,6 +2361,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1686048343_community_shard.up.sql": _1686048343_community_shardUpSql,
 
+	"1686048344_community_control_shard.up.sql": _1686048344_community_control_shardUpSql,
+
 	"README.md": readmeMd,
 
 	"doc.go": docGo,
@@ -2479,8 +2502,9 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1684979808_sync_activity_center_notifications.up.sql":                        &bintree{_1684979808_sync_activity_center_notificationsUpSql, map[string]*bintree{}},
 	"1685964183_add_chainids_to_revealed_addresses.up.sql":                        &bintree{_1685964183_add_chainids_to_revealed_addressesUpSql, map[string]*bintree{}},
 	"1686048343_community_shard.up.sql":                                           &bintree{_1686048343_community_shardUpSql, map[string]*bintree{}},
-	"README.md":                                                                   &bintree{readmeMd, map[string]*bintree{}},
-	"doc.go":                                                                      &bintree{docGo, map[string]*bintree{}},
+	"1686048344_community_control_shard.up.sql":                                   &bintree{_1686048344_community_control_shardUpSql, map[string]*bintree{}},
+	"README.md": &bintree{readmeMd, map[string]*bintree{}},
+	"doc.go":    &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

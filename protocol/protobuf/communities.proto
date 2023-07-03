@@ -93,6 +93,8 @@ message CommunityDescription {
   map<string, CommunityTokenPermission> token_permissions = 15;
   repeated CommunityTokenMetadata community_tokens_metadata = 16;
   uint64 active_members_count = 17;
+  uint32 relay_shard_cluster = 18;
+  uint32 relay_shard_index = 19;
 }
 
 message CommunityAdminSettings {

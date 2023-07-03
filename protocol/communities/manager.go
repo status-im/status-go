@@ -20,6 +20,7 @@ import (
 	"github.com/anacrolix/torrent/bencode"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/golang/protobuf/proto"
+
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/google/uuid"
@@ -474,8 +475,7 @@ func (m *Manager) All() ([]*Community, error) {
 
 type CommunityShard struct {
 	CommunityID string `json:"communityID"`
-	Cluster     *uint  `json:"cluster"`
-	Index       *uint  `json:"index"`
+	Shard       *Shard `json:"shard"`
 }
 
 type KnownCommunitiesResponse struct {
@@ -500,8 +500,7 @@ func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []types.HexByt
 
 		response.ContractCommunities = append(response.ContractCommunities, CommunityShard{
 			CommunityID: communityID,
-			Cluster:     community.ShardCluster(),
-			Index:       community.ShardIndex(),
+			Shard:       community.Shard(),
 		})
 
 		if community != nil {
@@ -509,8 +508,7 @@ func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []types.HexByt
 		} else {
 			response.UnknownCommunities = append(response.UnknownCommunities, CommunityShard{
 				CommunityID: communityID,
-				Cluster:     community.ShardCluster(),
-				Index:       community.ShardIndex(),
+				Shard:       community.Shard(),
 			})
 		}
 	}
@@ -568,8 +566,8 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 		Joined:               true,
 		MemberIdentity:       &m.identity.PublicKey,
 		CommunityDescription: description,
-		ShardCluster:         nil,
-		ShardIndex:           nil,
+		Shard:                nil,
+		ControlMsgShard:      nil,
 	}
 	community, err := New(config)
 	if err != nil {
@@ -845,15 +843,17 @@ func (m *Manager) DeleteCommunity(id types.HexBytes) error {
 	return m.persistence.DeleteCommunitySettings(id)
 }
 
-func (m *Manager) UpdateShard(community *Community, shardCluster, shardIndex *uint) error {
-	community.config.ShardCluster = shardCluster
-	community.config.ShardIndex = shardIndex
+func (m *Manager) UpdateShard(community *Community, shard *Shard) error {
+	community.config.Shard = shard
 	return m.persistence.SaveCommunity(community)
 }
 
-// EditCommunity takes a description, updates the community with the description,
-// saves it and returns it
-func (m *Manager) SetShard(communityID types.HexBytes, shardCluster, shardIndex *uint) (*Community, error) {
+func (m *Manager) UpdateCtrlMsgShard(community *Community, shard *Shard) error {
+	community.config.ControlMsgShard = shard
+	return m.persistence.SaveCommunity(community)
+}
+
+func (m *Manager) SetControlMsgShard(communityID types.HexBytes, shard *Shard) (*Community, error) {
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
@@ -865,7 +865,29 @@ func (m *Manager) SetShard(communityID types.HexBytes, shardCluster, shardIndex 
 		return nil, errors.New("not admin or owner")
 	}
 
-	err = m.UpdateShard(community, shardCluster, shardIndex)
+	err = m.UpdateCtrlMsgShard(community, shard)
+	if err != nil {
+		return nil, err
+	}
+
+	m.publish(&Subscription{Community: community})
+
+	return community, nil
+}
+
+func (m *Manager) SetShard(communityID types.HexBytes, shard *Shard) (*Community, error) {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+	if !community.IsOwner() {
+		return nil, errors.New("not admin or owner")
+	}
+
+	err = m.UpdateShard(community, shard)
 	if err != nil {
 		return nil, err
 	}
@@ -2803,7 +2825,7 @@ func (m *Manager) GetPubsubTopic(communityID string) (string, error) {
 		return relay.DefaultWakuTopic, nil
 	}
 
-	return transport.GetPubsubTopic(community.ShardCluster(), community.ShardIndex()), nil
+	return transport.GetPubsubTopic(community.Shard().TransportShard()), nil
 }
 
 func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string, grant []byte) (bool, error) {

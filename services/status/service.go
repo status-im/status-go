@@ -10,6 +10,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/communities"
 )
 
 // Make sure that Service implements node.Lifecycle interface.
@@ -74,7 +75,15 @@ func (p *PublicAPI) CommunityInfo(communityID types.HexBytes, shardCluster *uint
 		return nil, ErrNotInitialized
 	}
 
-	community, err := p.service.messenger.RequestCommunityInfoFromMailserver(communityID.String(), shardCluster, shardIndex, true)
+	var shard *communities.Shard
+	if shardCluster != nil && shardIndex != nil {
+		shard = &communities.Shard{
+			Cluster: *shardCluster,
+			Index:   *shardIndex,
+		}
+	}
+
+	community, err := p.service.messenger.RequestCommunityInfoFromMailserver(communityID.String(), shard, true)
 	if err != nil {
 		return nil, err
 	}

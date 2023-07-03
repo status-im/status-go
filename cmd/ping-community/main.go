@@ -29,6 +29,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
 	wakuextn "github.com/status-im/status-go/services/wakuext"
@@ -147,7 +148,15 @@ func main() {
 
 	messenger := wakuextservice.Messenger()
 
-	community, err := messenger.RequestCommunityInfoFromMailserver(*communityID, shardCluster, shardIndex, true)
+	var shard *communities.Shard
+	if shardIndex != nil && shardCluster != nil {
+		shard = &communities.Shard{
+			Cluster: *shardCluster,
+			Index:   *shardIndex,
+		}
+	}
+
+	community, err := messenger.RequestCommunityInfoFromMailserver(*communityID, shard, true)
 	if err != nil {
 
 		logger.Error("community error", "error", err)

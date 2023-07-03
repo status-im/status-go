@@ -13,9 +13,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
+
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
-	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/connection"
@@ -674,9 +675,9 @@ func (t *Transport) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, err
 	return t.waku.RetrievePubsubTopicKey(topic)
 }
 
-func GetPubsubTopic(shardCluster *uint, shardIndex *uint) string {
-	if shardCluster != nil && shardIndex != nil {
-		return protocol.NewStaticShardingPubsubTopic(uint16(*shardCluster), uint16(*shardIndex)).String()
+func GetPubsubTopic(shard *Shard) string {
+	if shard != nil {
+		return protocol.NewStaticShardingPubsubTopic(uint16(shard.Cluster), uint16(shard.Index)).String()
 		// return "/waku/2/status-signed-test-1"
 	}
 
