@@ -20,9 +20,10 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
+
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -1589,9 +1590,8 @@ func (m *Messenger) Init() error {
 
 	for _, c := range adminCommunities {
 		communityFiltersToInitialize = append(communityFiltersToInitialize, transport.CommunityFilterToInitialize{
-			ShardCluster: c.ShardCluster(),
-			ShardIndex:   c.ShardIndex(),
-			PrivKey:      c.PrivateKey(),
+			Shard:   c.Shard().TransportShard(),
+			PrivKey: c.PrivateKey(),
 		})
 	}
 
@@ -1643,7 +1643,7 @@ func (m *Messenger) Init() error {
 				communityInfo[chat.CommunityID] = community
 			}
 
-			filtersToInit = append(filtersToInit, transport.FiltersToInitialize{ChatID: chat.ID, PubsubTopic: transport.GetPubsubTopic(community.ShardCluster(), community.ShardIndex())})
+			filtersToInit = append(filtersToInit, transport.FiltersToInitialize{ChatID: chat.ID, PubsubTopic: transport.GetPubsubTopic(community.Shard().TransportShard())})
 		case ChatTypeOneToOne:
 			pk, err := chat.PublicKey()
 			if err != nil {

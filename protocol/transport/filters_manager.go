@@ -7,8 +7,9 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
+
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/eth-node/types"
 )
@@ -121,6 +122,11 @@ func (f *FiltersManager) Init(
 	return allFilters, nil
 }
 
+type Shard struct {
+	Cluster uint
+	Index   uint
+}
+
 type FiltersToInitialize struct {
 	ChatID      string
 	PubsubTopic string
@@ -140,9 +146,8 @@ func (f *FiltersManager) InitPublicFilters(publicFiltersToInit []FiltersToInitia
 }
 
 type CommunityFilterToInitialize struct {
-	ShardCluster *uint
-	ShardIndex   *uint
-	PrivKey      *ecdsa.PrivateKey
+	Shard   *Shard
+	PrivKey *ecdsa.PrivateKey
 }
 
 func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []CommunityFilterToInitialize) ([]*Filter, error) {
@@ -155,7 +160,7 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 			continue
 		}
 
-		pubsubTopic := GetPubsubTopic(cf.ShardCluster, cf.ShardIndex)
+		pubsubTopic := GetPubsubTopic(cf.Shard)
 		identityStr := PublicKeyToStr(&cf.PrivKey.PublicKey)
 		rawFilter, err := f.addAsymmetric(identityStr, pubsubTopic, cf.PrivKey, true)
 		if err != nil {
