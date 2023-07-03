@@ -3,30 +3,25 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/account/generator"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
+
+const userPassword = "user123"
+const userAddress = "0x0100000000000000000000000000000000000000"
 
 func TestAdminMessengerCommunitiesSuite(t *testing.T) {
 	suite.Run(t, new(AdminMessengerCommunitiesSuite))
@@ -52,9 +47,9 @@ func (s *AdminMessengerCommunitiesSuite) SetupTest() {
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 
-	s.owner = s.newMessenger()
-	s.admin = s.newMessenger()
-	s.alice = s.newMessenger()
+	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress})
+	s.admin = s.newMessenger(adminPassword, []string{adminAddress})
+	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2})
 	_, err := s.owner.Start()
 	s.Require().NoError(err)
 	_, err = s.admin.Start()
@@ -70,77 +65,18 @@ func (s *AdminMessengerCommunitiesSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *AdminMessengerCommunitiesSuite) newMessengerWithOptions(shh types.Waku, privateKey *ecdsa.PrivateKey, options []Option) *Messenger {
-	m, err := NewMessenger(
-		"Test",
-		privateKey,
-		&testNode{shh: shh},
-		uuid.New().String(),
-		nil,
-		nil,
-		options...,
-	)
+func (s *AdminMessengerCommunitiesSuite) newMessengerWithKey(privateKey *ecdsa.PrivateKey, password string, walletAddresses []string) *Messenger {
+	messenger, err := newCommunitiesTestMessenger(s.shh, privateKey, s.logger, &TokenManagerStub{}, password, walletAddresses)
 	s.Require().NoError(err)
 
-	err = m.Init()
-	s.Require().NoError(err)
-
-	config := params.NodeConfig{
-		NetworkID: 10,
-		DataDir:   "test",
-	}
-
-	networks := json.RawMessage("{}")
-	setting := settings.Settings{
-		Address:                   types.HexToAddress("0x1122334455667788990011223344556677889900"),
-		AnonMetricsShouldSend:     false,
-		CurrentNetwork:            "mainnet_rpc",
-		DappsAddress:              types.HexToAddress("0x1122334455667788990011223344556677889900"),
-		InstallationID:            "d3efcff6-cffa-560e-a547-21d3858cbc51",
-		KeyUID:                    "0x1122334455667788990011223344556677889900",
-		Name:                      "Test",
-		Networks:                  &networks,
-		PhotoPath:                 "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
-		PreviewPrivacy:            false,
-		PublicKey:                 "0x04112233445566778899001122334455667788990011223344556677889900112233445566778899001122334455667788990011223344556677889900",
-		SigningPhrase:             "yurt joey vibe",
-		SendPushNotifications:     true,
-		ProfilePicturesVisibility: 1,
-		DefaultSyncPeriod:         777600,
-		UseMailservers:            true,
-		LinkPreviewRequestEnabled: true,
-		SendStatusUpdates:         true,
-		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900")}
-
-	_ = m.settings.CreateSettings(setting, config)
-
-	return m
+	return messenger
 }
 
-func (s *AdminMessengerCommunitiesSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
-	tmpfile, err := ioutil.TempFile("", "accounts-tests-")
-	s.Require().NoError(err)
-	madb, err := multiaccounts.InitializeDB(tmpfile.Name())
-	s.Require().NoError(err)
-
-	acc := generator.NewAccount(privateKey, nil)
-	iai := acc.ToIdentifiedAccountInfo("")
-
-	options := []Option{
-		WithCustomLogger(s.logger),
-		WithDatabaseConfig(":memory:", "somekey", sqlite.ReducedKDFIterationsNumber),
-		WithMultiAccounts(madb),
-		WithAccount(iai.ToMultiAccount()),
-		WithDatasync(),
-	}
-	return s.newMessengerWithOptions(shh, privateKey, options)
-}
-
-func (s *AdminMessengerCommunitiesSuite) newMessenger() *Messenger {
+func (s *AdminMessengerCommunitiesSuite) newMessenger(password string, walletAddresses []string) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	return s.newMessengerWithKey(s.shh, privateKey)
+	return s.newMessengerWithKey(privateKey, password, walletAddresses)
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminEditCommunityDescription() {
@@ -428,7 +364,7 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminAcceptMemberRequestToJoin() {
 	community := s.setUpOnRequestCommunityAndRoles()
 
 	// set up additional user that will send request to join
-	user := s.newMessenger()
+	user := s.newMessenger(userPassword, []string{userAddress})
 	_, err := user.Start()
 	s.Require().NoError(err)
 	defer user.Shutdown() // nolint: errcheck
@@ -506,7 +442,7 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminRejectMemberRequestToJoin() {
 	community := s.setUpOnRequestCommunityAndRoles()
 
 	// set up additional user that will send request to join
-	user := s.newMessenger()
+	user := s.newMessenger(userPassword, []string{userAddress})
 	_, err := user.Start()
 	s.Require().NoError(err)
 	defer user.Shutdown() // nolint: errcheck
@@ -747,8 +683,8 @@ func (s *AdminMessengerCommunitiesSuite) setUpOnRequestCommunityAndRoles() *comm
 
 	s.refreshMessengerResponses()
 
-	s.joinOnRequestCommunity(community, s.admin)
-	s.joinOnRequestCommunity(community, s.alice)
+	s.joinOnRequestCommunity(community, s.admin, adminPassword)
+	s.joinOnRequestCommunity(community, s.alice, alicePassword)
 
 	s.refreshMessengerResponses()
 
@@ -770,8 +706,8 @@ func (s *AdminMessengerCommunitiesSuite) setUpCommunityAndRoles() *communities.C
 	// add admin and alice to the community
 	s.advertiseCommunityTo(community, s.admin)
 	s.advertiseCommunityTo(community, s.alice)
-	s.joinCommunity(community, s.admin)
-	s.joinCommunity(community, s.alice)
+	s.joinCommunity(community, s.admin, adminPassword)
+	s.joinCommunity(community, s.alice, alicePassword)
 
 	s.refreshMessengerResponses()
 
@@ -808,9 +744,12 @@ func (s *AdminMessengerCommunitiesSuite) advertiseCommunityTo(community *communi
 	s.Require().NoError(err)
 }
 
-func (s *AdminMessengerCommunitiesSuite) joinOnRequestCommunity(community *communities.Community, user *Messenger) {
+func (s *AdminMessengerCommunitiesSuite) joinOnRequestCommunity(community *communities.Community, user *Messenger, password string) {
 	// Request to join the community
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := &requests.RequestToJoinCommunity{
+		CommunityID: community.ID(),
+		Password:    types.EncodeHex(crypto.Keccak256([]byte(password))),
+	}
 	response, err := user.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -855,9 +794,12 @@ func (s *AdminMessengerCommunitiesSuite) joinOnRequestCommunity(community *commu
 	s.Require().True(userCommunity.HasMember(&user.identity.PublicKey))
 }
 
-func (s *AdminMessengerCommunitiesSuite) joinCommunity(community *communities.Community, user *Messenger) {
+func (s *AdminMessengerCommunitiesSuite) joinCommunity(community *communities.Community, user *Messenger, password string) {
 	// Request to join the community
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := &requests.RequestToJoinCommunity{
+		CommunityID: community.ID(),
+		Password:    types.EncodeHex(crypto.Keccak256([]byte(password))),
+	}
 	response, err := user.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
