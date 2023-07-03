@@ -220,6 +220,7 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithChatKey() {
 	s.Require().Equal(community.DescriptionText(), urlData.Community.Description)
 	s.Require().Equal(uint32(community.MembersCount()), urlData.Community.MembersCount)
 	s.Require().Equal(community.Identity().GetColor(), urlData.Community.Color)
+	s.Require().Equal(community.TagsIndices(), urlData.Community.TagIndices)
 }
 
 func (s *MessengerShareUrlsSuite) TestShareCommunityURLWithData() {
@@ -252,6 +253,7 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithData() {
 	s.Require().Equal(community.DescriptionText(), urlData.Community.Description)
 	s.Require().Equal(uint32(community.MembersCount()), urlData.Community.MembersCount)
 	s.Require().Equal(community.Identity().GetColor(), urlData.Community.Color)
+	s.Require().Equal(community.TagsIndices(), urlData.Community.TagIndices)
 }
 
 func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithChatKey() {
@@ -289,6 +291,7 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithChatKey() {
 	s.Require().Equal(community.DescriptionText(), urlData.Community.Description)
 	s.Require().Equal(uint32(community.MembersCount()), urlData.Community.MembersCount)
 	s.Require().Equal(community.Identity().GetColor(), urlData.Community.Color)
+	s.Require().Equal(community.TagsIndices(), urlData.Community.TagIndices)
 
 	s.Require().NotNil(urlData.Channel)
 	s.Require().Equal(channel.Identity.Emoji, urlData.Channel.Emoji)
@@ -330,6 +333,7 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithData() {
 	s.Require().Equal(community.DescriptionText(), urlData.Community.Description)
 	s.Require().Equal(uint32(community.MembersCount()), urlData.Community.MembersCount)
 	s.Require().Equal(community.Identity().GetColor(), urlData.Community.Color)
+	s.Require().Equal(community.TagsIndices(), urlData.Community.TagIndices)
 
 	s.Require().NotNil(urlData.Channel)
 	s.Require().Equal(channel.Identity.Emoji, urlData.Channel.Emoji)

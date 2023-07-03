@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/proto"
+
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -18,10 +19,11 @@ import (
 )
 
 type CommunityURLData struct {
-	DisplayName  string `json:"displayName"`
-	Description  string `json:"description"`
-	MembersCount uint32 `json:"membersCount"`
-	Color        string `json:"color"`
+	DisplayName  string   `json:"displayName"`
+	Description  string   `json:"description"`
+	MembersCount uint32   `json:"membersCount"`
+	Color        string   `json:"color"`
+	TagIndices   []uint32 `json:"tagIndices"`
 }
 
 type CommunityChannelURLData struct {
@@ -93,6 +95,7 @@ func (m *Messenger) prepareCommunityData(community *communities.Community) Commu
 		Description:  community.DescriptionText(),
 		MembersCount: uint32(community.MembersCount()),
 		Color:        community.Identity().GetColor(),
+		TagIndices:   community.TagsIndices(),
 	}
 }
 
@@ -202,6 +205,7 @@ func (m *Messenger) parseCommunityURLWithData(data string, signature string) (*U
 			Description:  communityProto.Description,
 			MembersCount: communityProto.MembersCount,
 			Color:        communityProto.Color,
+			TagIndices:   communityProto.TagIndices,
 		},
 	}, nil
 }
@@ -278,6 +282,7 @@ func (m *Messenger) prepareEncodedCommunityChannelData(community *communities.Co
 		Description:  community.DescriptionText(),
 		MembersCount: uint32(community.MembersCount()),
 		Color:        community.Identity().GetColor(),
+		TagIndices:   community.TagsIndices(),
 	}
 
 	channelProto := &protobuf.Channel{
@@ -352,6 +357,7 @@ func (m *Messenger) parseCommunityChannelURLWithData(data string, signature stri
 			Description:  channelProto.Community.Description,
 			MembersCount: channelProto.Community.MembersCount,
 			Color:        channelProto.Community.Color,
+			TagIndices:   channelProto.Community.TagIndices,
 		},
 		Channel: CommunityChannelURLData{
 			Emoji:       channelProto.Emoji,
