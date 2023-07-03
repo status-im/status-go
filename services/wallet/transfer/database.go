@@ -483,7 +483,7 @@ func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers
 			txNonce = new(uint64)
 			*txNonce = t.Transaction.Nonce()
 			txSize = new(uint64)
-			*txSize = uint64(t.Transaction.Size())
+			*txSize = t.Transaction.Size()
 		}
 
 		dbFields := transferDBFields{
