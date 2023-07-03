@@ -175,6 +175,7 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 
 			if err != nil {
 				if err == core.ErrTxTypeNotSupported {
+					log.Error("Tx Type not supported", "tx chain id", tx.ChainId(), "type", tx.Type(), "error", err)
 					continue
 				}
 				return nil, err
@@ -187,7 +188,7 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 				// We might miss some subTransactions of interest for some transaction types. We need to check if we
 				// find the address in the transaction data.
 				switch tx.Type() {
-				case types.OptimismDepositTxType, types.ArbitrumDepositTxType, types.ArbitrumRetryTxType:
+				case types.DynamicFeeTxType, types.OptimismDepositTxType, types.ArbitrumDepositTxType, types.ArbitrumRetryTxType:
 					mustCheckSubTxs = !areSubTxsCheckedForTxHash[tx.Hash()] && w_common.TxDataContainsAddress(tx.Type(), tx.Data(), address)
 				}
 			}
@@ -342,6 +343,8 @@ func (d *ETHDownloader) subTransactionsFromTransactionData(tx *types.Transaction
 		case w_common.UniswapV2SwapEventType, w_common.UniswapV3SwapEventType:
 			mustAppend = true
 		case w_common.HopBridgeTransferSentToL2EventType, w_common.HopBridgeTransferFromL1CompletedEventType:
+			mustAppend = true
+		case w_common.HopBridgeWithdrawalBondedEventType, w_common.HopBridgeTransferSentEventType:
 			mustAppend = true
 		}
 

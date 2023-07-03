@@ -38,6 +38,8 @@ const (
 	UniswapV3SwapEventType                    EventType = "uniswapV3SwapEvent"
 	HopBridgeTransferSentToL2EventType        EventType = "hopBridgeTransferSentToL2Event"
 	HopBridgeTransferFromL1CompletedEventType EventType = "hopBridgeTransferFromL1CompletedEvent"
+	HopBridgeWithdrawalBondedEventType        EventType = "hopBridgeWithdrawalBondedEvent"
+	HopBridgeTransferSentEventType            EventType = "hopBridgeTransferSentEvent"
 	UnknownEventType                          EventType = "unknownEvent"
 
 	// Deposit (index_topic_1 address dst, uint256 wad)
@@ -61,6 +63,10 @@ const (
 	hopBridgeTransferSentToL2EventSignature = "TransferSentToL2(uint256,address,uint256,uint256,uint256,address,uint256)"
 	// TransferFromL1Completed (index_topic_1 address recipient, uint256 amount, uint256 amountOutMin, uint256 deadline, index_topic_2 address relayer, uint256 relayerFee)
 	HopBridgeTransferFromL1CompletedEventSignature = "TransferFromL1Completed(address,uint256,uint256,uint256,address,uint256)"
+	// WithdrawalBonded (index_topic_1 bytes32 transferID, uint256 amount)
+	hopBridgeWithdrawalBondedEventSignature = "WithdrawalBonded(bytes32,uint256)"
+	// TransferSent (index_topic_1 bytes32 transferID, index_topic_2 uint256 chainId, index_topic_3 address recipient, uint256 amount, bytes32 transferNonce, uint256 bonderFee, uint256 index, uint256 amountOutMin, uint256 deadline)
+	hopBridgeTransferSentEventSignature = "TransferSent(bytes32,uint256,address,uint256,bytes32,uint256,uint256,uint256,uint256)"
 )
 
 var (
@@ -77,6 +83,8 @@ func GetEventType(log *types.Log) EventType {
 	uniswapV3SwapEventSignatureHash := GetEventSignatureHash(uniswapV3SwapEventSignature)
 	hopBridgeTransferSentToL2EventSignatureHash := GetEventSignatureHash(hopBridgeTransferSentToL2EventSignature)
 	hopBridgeTransferFromL1CompletedEventSignatureHash := GetEventSignatureHash(HopBridgeTransferFromL1CompletedEventSignature)
+	hopBridgeWithdrawalBondedEventSignatureHash := GetEventSignatureHash(hopBridgeWithdrawalBondedEventSignature)
+	hopBridgeTransferSentEventSignatureHash := GetEventSignatureHash(hopBridgeTransferSentEventSignature)
 
 	if len(log.Topics) > 0 {
 		switch log.Topics[0] {
@@ -99,6 +107,10 @@ func GetEventType(log *types.Log) EventType {
 			return HopBridgeTransferSentToL2EventType
 		case hopBridgeTransferFromL1CompletedEventSignatureHash:
 			return HopBridgeTransferFromL1CompletedEventType
+		case hopBridgeWithdrawalBondedEventSignatureHash:
+			return HopBridgeWithdrawalBondedEventType
+		case hopBridgeTransferSentEventSignatureHash:
+			return HopBridgeTransferSentEventType
 		}
 	}
 
@@ -115,9 +127,9 @@ func EventTypeToSubtransactionType(eventType EventType) Type {
 		return UniswapV2Swap
 	case UniswapV3SwapEventType:
 		return UniswapV3Swap
-	case HopBridgeTransferSentToL2EventType:
+	case HopBridgeTransferSentToL2EventType, HopBridgeTransferSentEventType:
 		return HopBridgeFrom
-	case HopBridgeTransferFromL1CompletedEventType:
+	case HopBridgeTransferFromL1CompletedEventType, HopBridgeWithdrawalBondedEventType:
 		return HopBridgeTo
 	}
 
@@ -379,6 +391,80 @@ func ParseHopBridgeTransferFromL1CompletedLog(ethlog *types.Log) (recipient comm
 	}
 
 	amount.SetBytes(ethlog.Data[0:32])
+
+	return
+}
+
+func ParseHopWithdrawalBondedLog(ethlog *types.Log) (transferID *big.Int, amount *big.Int, err error) {
+	transferID = new(big.Int)
+	amount = new(big.Int)
+
+	if len(ethlog.Topics) < 2 {
+		err = fmt.Errorf("not enough topics for HopWithdrawalBonded event %s, %v", "topics", ethlog.Topics)
+		return
+	}
+
+	if len(ethlog.Topics[1]) != 32 {
+		err = fmt.Errorf("second topic is not padded to 32 byte address %s, %v", "topic", ethlog.Topics[1])
+		return
+	}
+	transferID.SetBytes(ethlog.Topics[1][:])
+
+	if len(ethlog.Data) != 32*1 {
+		err = fmt.Errorf("data is not padded to 1 * 32 bytes big int %s, %v", "data", ethlog.Data)
+		return
+	}
+
+	amount.SetBytes(ethlog.Data[0:32])
+
+	return
+}
+
+func ParseHopBridgeTransferSentLog(ethlog *types.Log) (transferID *big.Int, chainID uint64, recipient common.Address, amount *big.Int, transferNonce *big.Int, bonderFee *big.Int, index *big.Int, amountOutMin *big.Int, deadline *big.Int, err error) {
+	transferID = new(big.Int)
+	chainIDInt := new(big.Int)
+	amount = new(big.Int)
+	transferNonce = new(big.Int)
+	bonderFee = new(big.Int)
+	index = new(big.Int)
+	amountOutMin = new(big.Int)
+	deadline = new(big.Int)
+
+	if len(ethlog.Topics) < 4 {
+		err = fmt.Errorf("not enough topics for HopBridgeTransferSent event %s, %v", "topics", ethlog.Topics)
+		return
+	}
+
+	if len(ethlog.Topics[1]) != 32 {
+		err = fmt.Errorf("second topic is not padded to 32 byte big int %s, %v", "topic", ethlog.Topics[1])
+		return
+	}
+	transferID.SetBytes(ethlog.Topics[1][:])
+
+	if len(ethlog.Topics[2]) != 32 {
+		err = fmt.Errorf("third topic is not padded to 32 byte big int %s, %v", "topic", ethlog.Topics[2])
+		return
+	}
+	chainIDInt.SetBytes(ethlog.Topics[2][:])
+	chainID = chainIDInt.Uint64()
+
+	if len(ethlog.Topics[3]) != 32 {
+		err = fmt.Errorf("fourth topic is not padded to 32 byte address %s, %v", "topic", ethlog.Topics[3])
+		return
+	}
+	copy(recipient[:], ethlog.Topics[2][12:])
+
+	if len(ethlog.Data) != 32*6 {
+		err = fmt.Errorf("data is not padded to 6 * 32 bytes big int %s, %v", "data", ethlog.Data)
+		return
+	}
+
+	amount.SetBytes(ethlog.Data[0:32])
+	transferNonce.SetBytes(ethlog.Data[32:64])
+	bonderFee.SetBytes(ethlog.Data[64:96])
+	index.SetBytes(ethlog.Data[96:128])
+	amountOutMin.SetBytes(ethlog.Data[128:160])
+	deadline.SetBytes(ethlog.Data[160:192])
 
 	return
 }
