@@ -647,7 +647,7 @@ func unwrapDatasyncMessage(m *v1protocol.StatusMessage, datasync *datasync.DataS
 // layer message, or in case of Raw methods, the processing stops at the layer
 // before.
 // It returns an error only if the processing of required steps failed.
-func (s *MessageSender) HandleMessages(shhMessage *types.Message, applicationLayer bool) ([]*v1protocol.StatusMessage, [][]byte, error) {
+func (s *MessageSender) HandleMessages(shhMessage *types.Message) ([]*v1protocol.StatusMessage, [][]byte, error) {
 	logger := s.logger.With(zap.String("site", "handleMessages"))
 	hlogger := logger.With(zap.ByteString("hash", shhMessage.Hash))
 	var statusMessage v1protocol.StatusMessage
@@ -715,11 +715,9 @@ func (s *MessageSender) HandleMessages(shhMessage *types.Message, applicationLay
 			hlogger.Error("failed to handle application metadata layer message", zap.Error(err))
 		}
 
-		if applicationLayer {
-			err = statusMessage.HandleApplication()
-			if err != nil {
-				hlogger.Error("failed to handle application layer message", zap.Error(err))
-			}
+		err = statusMessage.HandleApplication()
+		if err != nil {
+			hlogger.Error("failed to handle application layer message", zap.Error(err))
 		}
 	}
 

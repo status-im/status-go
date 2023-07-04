@@ -3248,7 +3248,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 	for filter, messages := range messagesToHandle {
 		for _, shhMessage := range messages {
 
-			statusMessages, _, err := m.sender.HandleMessages(shhMessage, true)
+			statusMessages, _, err := m.sender.HandleMessages(shhMessage)
 			if err != nil {
 				logger.Info("failed to decode messages", zap.Error(err))
 				continue
@@ -3397,7 +3397,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				}
 			}
 
-			statusMessages, acks, err := m.sender.HandleMessages(shhMessage, true)
+			statusMessages, acks, err := m.sender.HandleMessages(shhMessage)
 			if err != nil {
 				logger.Info("failed to decode messages", zap.Error(err))
 				continue
