@@ -159,7 +159,7 @@ func (s *MessageSender) SendPrivate(
 	// Currently we don't support sending through datasync and setting custom waku fields,
 	// as the datasync interface is not rich enough to propagate that information, so we
 	// would have to add some complexity to handle this.
-	if rawMessage.ResendAutomatically && (rawMessage.Sender != nil || rawMessage.SkipEncryption || rawMessage.SendOnPersonalTopic) {
+	if rawMessage.ResendAutomatically && (rawMessage.Sender != nil || rawMessage.SkipProtocolLayer || rawMessage.SendOnPersonalTopic) {
 		return nil, errors.New("setting identity, skip-encryption or personal topic and datasync not supported")
 	}
 
@@ -395,8 +395,8 @@ func (s *MessageSender) sendPrivate(
 				return nil, err
 			}
 		}
-	} else if rawMessage.SkipEncryption {
-		// When SkipEncryption is set we don't pass the message to the encryption layer
+	} else if rawMessage.SkipProtocolLayer {
+		// When SkipProtocolLayer is set we don't pass the message to the encryption layer
 		messageIDs := [][]byte{messageID}
 		hash, newMessage, err := s.sendPrivateRawMessage(ctx, rawMessage, recipient, wrappedMessage, messageIDs)
 		if err != nil {
@@ -404,7 +404,7 @@ func (s *MessageSender) sendPrivate(
 			return nil, errors.Wrap(err, "failed to send a message spec")
 		}
 
-		s.logger.Debug("sent private message skipEncryption", zap.String("messageID", messageID.String()), zap.String("hash", types.EncodeHex(hash)))
+		s.logger.Debug("sent private message skipProtocolLayer", zap.String("messageID", messageID.String()), zap.String("hash", types.EncodeHex(hash)))
 
 		s.transport.Track(messageIDs, hash, newMessage)
 
@@ -571,7 +571,7 @@ func (s *MessageSender) SendPublic(
 		return nil, errors.Wrap(err, "failed to wrap a public message in the encryption layer")
 	}
 
-	if !rawMessage.SkipEncryption {
+	if !rawMessage.SkipProtocolLayer {
 		newMessage, err = MessageSpecToWhisper(messageSpec)
 		if err != nil {
 			return nil, err

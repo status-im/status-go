@@ -76,8 +76,8 @@ func (m *Messenger) publishOrg(org *communities.Community) error {
 		Payload: payload,
 		Sender:  org.PrivateKey(),
 		// we don't want to wrap in an encryption layer message
-		SkipEncryption: true,
-		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION,
+		SkipProtocolLayer: true,
+		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION,
 	}
 	_, err = m.sender.SendPublic(context.Background(), org.IDString(), rawMessage)
 	return err
@@ -99,8 +99,8 @@ func (m *Messenger) publishOrgInvitation(org *communities.Community, invitation 
 		Payload: payload,
 		Sender:  org.PrivateKey(),
 		// we don't want to wrap in an encryption layer message
-		SkipEncryption: true,
-		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_INVITATION,
+		SkipProtocolLayer: true,
+		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_INVITATION,
 	}
 	_, err = m.sender.SendPrivate(context.Background(), pk, &rawMessage)
 	return err
@@ -123,8 +123,8 @@ func (m *Messenger) publishCommunityAdminEvent(adminEvent *protobuf.CommunityAdm
 		Payload: payload,
 		Sender:  m.identity,
 		// we don't want to wrap in an encryption layer message
-		SkipEncryption: true,
-		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_ADMIN_MESSAGE,
+		SkipProtocolLayer: true,
+		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_ADMIN_MESSAGE,
 	}
 
 	_, err = m.sender.SendPublic(context.Background(), types.EncodeHex(adminEvent.CommunityId), rawMessage)
@@ -778,10 +778,10 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	}
 
 	rawMessage := common.RawMessage{
-		Payload:        payload,
-		CommunityID:    community.ID(),
-		SkipEncryption: true,
-		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
+		Payload:           payload,
+		CommunityID:       community.ID(),
+		SkipProtocolLayer: true,
+		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
 	}
 
 	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
@@ -949,10 +949,10 @@ func (m *Messenger) CancelRequestToJoinCommunity(request *requests.CancelRequest
 	}
 
 	rawMessage := common.RawMessage{
-		Payload:        payload,
-		CommunityID:    community.ID(),
-		SkipEncryption: true,
-		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN,
+		Payload:           payload,
+		CommunityID:       community.ID(),
+		SkipProtocolLayer: true,
+		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN,
 	}
 	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
 
@@ -1044,10 +1044,10 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 	}
 
 	rawMessage := &common.RawMessage{
-		Payload:        payload,
-		Sender:         community.PrivateKey(),
-		SkipEncryption: true,
-		MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
+		Payload:           payload,
+		Sender:            community.PrivateKey(),
+		SkipProtocolLayer: true,
+		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
 	}
 
 	_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
@@ -1156,10 +1156,10 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 		}
 
 		rawMessage := common.RawMessage{
-			Payload:        payload,
-			CommunityID:    communityID,
-			SkipEncryption: true,
-			MessageType:    protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE,
+			Payload:           payload,
+			CommunityID:       communityID,
+			SkipProtocolLayer: true,
+			MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE,
 		}
 		_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
 		if err != nil {
@@ -1749,7 +1749,7 @@ func (m *Messenger) RemoveUserFromCommunity(id types.HexBytes, pkString string) 
 
 func (m *Messenger) SendKeyExchangeMessage(communityID []byte, pubkeys []*ecdsa.PublicKey, msgType common.CommKeyExMsgType) error {
 	rawMessage := common.RawMessage{
-		SkipEncryption:        false,
+		SkipProtocolLayer:     false,
 		CommunityID:           communityID,
 		CommunityKeyExMsgType: msgType,
 		Recipients:            pubkeys,
