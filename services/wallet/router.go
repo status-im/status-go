@@ -554,8 +554,14 @@ func (r *Router) suggestedRoutes(
 						continue
 					}
 
-					if bonderFees.Cmp(maxAmountIn.ToInt()) >= 0 {
-						continue
+					if maxAmountIn.ToInt().Cmp(amountIn) >= 0 {
+						if bonderFees.Cmp(amountIn) >= 0 {
+							continue
+						}
+					} else {
+						if bonderFees.Cmp(maxAmountIn.ToInt()) >= 0 {
+							continue
+						}
 					}
 
 					gasLimit := uint64(0)
