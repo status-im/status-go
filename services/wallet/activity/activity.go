@@ -330,6 +330,7 @@ const (
 
         transfers.tx_from_address AS from_address,
         transfers.tx_to_address AS to_address,
+		transfers.address AS owner_address,
         transfers.amount_padded128hex AS tr_amount,
         NULL AS mt_from_amount,
         NULL AS mt_to_amount,
@@ -402,6 +403,7 @@ const (
 
         pending_transactions.from_address AS from_address,
         pending_transactions.to_address AS to_address,
+		NULL AS owner_address,
         pending_transactions.value AS tr_amount,
         NULL AS mt_from_amount,
         NULL AS mt_to_amount,
@@ -446,6 +448,7 @@ const (
         NULL as tr_type,
         multi_transactions.from_address AS from_address,
         multi_transactions.to_address AS to_address,
+		NULL AS owner_address,
         NULL AS tr_amount,
         multi_transactions.from_amount AS mt_from_amount,
         multi_transactions.to_amount AS mt_to_amount,
@@ -598,14 +601,14 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		var timestamp int64
 		var dbMtType, dbTrType sql.NullByte
 		var toAddress, fromAddress eth.Address
-		var toAddressDB sql.RawBytes
+		var toAddressDB, ownerAddressDB sql.RawBytes
 		var tokenAddress *eth.Address
 		var aggregatedStatus int
 		var dbTrAmount sql.NullString
 		var dbMtFromAmount, dbMtToAmount sql.NullString
 		var tokenCode, fromTokenCode, toTokenCode sql.NullString
 		err := rows.Scan(&transferHash, &pendingHash, &chainID, &multiTxID, &timestamp, &dbMtType, &dbTrType, &fromAddress,
-			&toAddressDB, &dbTrAmount, &dbMtFromAmount, &dbMtToAmount, &aggregatedStatus, &aggregatedCount,
+			&toAddressDB, &ownerAddressDB, &dbTrAmount, &dbMtFromAmount, &dbMtToAmount, &aggregatedStatus, &aggregatedCount,
 			&tokenAddress, &tokenCode, &fromTokenCode, &toTokenCode)
 		if err != nil {
 			return nil, err
@@ -633,8 +636,9 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		var entry Entry
 		if transferHash != nil && chainID.Valid {
 			// Extract activity type: SendAT/ReceiveAT
-			activityType, filteredAddress := getActivityType(dbTrType)
+			activityType, _ := getActivityType(dbTrType)
 
+			ownerAddress := eth.BytesToAddress(ownerAddressDB)
 			inAmount, outAmount := getTrInAndOutAmounts(activityType, dbTrAmount)
 
 			// Extract tokens
@@ -651,7 +655,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 			}
 
 			entry = newActivityEntryWithSimpleTransaction(
-				&transfer.TransactionIdentity{ChainID: common.ChainID(chainID.Int64), Hash: eth.BytesToHash(transferHash), Address: filteredAddress},
+				&transfer.TransactionIdentity{ChainID: common.ChainID(chainID.Int64), Hash: eth.BytesToHash(transferHash), Address: ownerAddress},
 				timestamp, activityType, activityStatus, inAmount, outAmount, tokenOut, tokenIn)
 		} else if pendingHash != nil && chainID.Valid {
 			// Extract activity type: PendingAT

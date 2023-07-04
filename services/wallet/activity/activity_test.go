@@ -184,7 +184,7 @@ func TestGetActivityEntriesAll(t *testing.T) {
 
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: td.tr1.ChainID, Hash: td.tr1.Hash, Address: td.tr1.From},
+		transaction:    &transfer.TransactionIdentity{ChainID: td.tr1.ChainID, Hash: td.tr1.Hash, Address: td.tr1.To},
 		id:             td.tr1.MultiTransactionID,
 		timestamp:      td.tr1.Timestamp,
 		activityType:   SendAT,
@@ -267,7 +267,8 @@ func TestGetActivityEntriesWithSameTransactionForSenderAndReceiverInDB(t *testin
 
 	require.Equal(t, SendAT, entries[0].activityType)
 	require.NotEqual(t, eth.Address{}, entries[0].transaction.Address)
-	require.Equal(t, td.tr1.From, entries[0].transaction.Address)
+	// TODO: extract and use to/from Address to compare instead of identity
+	require.Equal(t, td.tr1.To, entries[0].transaction.Address)
 
 	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 10)
 	require.NoError(t, err)
@@ -302,7 +303,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 	// Check start and end content
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: trs[5].ChainID, Hash: trs[5].Hash, Address: trs[5].From},
+		transaction:    &transfer.TransactionIdentity{ChainID: trs[5].ChainID, Hash: trs[5].Hash, Address: trs[5].To},
 		id:             0,
 		timestamp:      trs[5].Timestamp,
 		activityType:   SendAT,
@@ -333,7 +334,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 	// Check start and end content
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: trs[2].ChainID, Hash: trs[2].Hash, Address: trs[2].From},
+		transaction:    &transfer.TransactionIdentity{ChainID: trs[2].ChainID, Hash: trs[2].Hash, Address: trs[2].To},
 		id:             0,
 		timestamp:      trs[2].Timestamp,
 		activityType:   SendAT,
@@ -364,7 +365,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 	// Check start and end content
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: trs[2].ChainID, Hash: trs[2].Hash, Address: trs[2].From},
+		transaction:    &transfer.TransactionIdentity{ChainID: trs[2].ChainID, Hash: trs[2].Hash, Address: trs[2].To},
 		id:             0,
 		timestamp:      trs[2].Timestamp,
 		activityType:   SendAT,
@@ -376,7 +377,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: td.tr1.ChainID, Hash: td.tr1.Hash, Address: td.tr1.From},
+		transaction:    &transfer.TransactionIdentity{ChainID: td.tr1.ChainID, Hash: td.tr1.Hash, Address: td.tr1.To},
 		id:             0,
 		timestamp:      td.tr1.Timestamp,
 		activityType:   SendAT,
@@ -415,7 +416,7 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 	// Check start and end content
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: trs[8].ChainID, Hash: trs[8].Hash, Address: trs[8].From},
+		transaction:    &transfer.TransactionIdentity{ChainID: trs[8].ChainID, Hash: trs[8].Hash, Address: trs[8].To},
 		id:             0,
 		timestamp:      trs[8].Timestamp,
 		activityType:   SendAT,
@@ -427,7 +428,7 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: trs[6].ChainID, Hash: trs[6].Hash, Address: trs[6].From},
+		transaction:    &transfer.TransactionIdentity{ChainID: trs[6].ChainID, Hash: trs[6].Hash, Address: trs[6].To},
 		id:             0,
 		timestamp:      trs[6].Timestamp,
 		activityType:   SendAT,
@@ -445,7 +446,7 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 	// Check start and end content
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: trs[6].ChainID, Hash: trs[6].Hash, Address: trs[6].From},
+		transaction:    &transfer.TransactionIdentity{ChainID: trs[6].ChainID, Hash: trs[6].Hash, Address: trs[6].To},
 		id:             0,
 		timestamp:      trs[6].Timestamp,
 		activityType:   SendAT,
@@ -457,7 +458,7 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: trs[4].ChainID, Hash: trs[4].Hash, Address: trs[4].From},
+		transaction:    &transfer.TransactionIdentity{ChainID: trs[4].ChainID, Hash: trs[4].Hash, Address: trs[4].To},
 		id:             0,
 		timestamp:      trs[4].Timestamp,
 		activityType:   SendAT,
@@ -475,7 +476,7 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 	// Check start and end content
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: trs[2].ChainID, Hash: trs[2].Hash, Address: trs[2].From},
+		transaction:    &transfer.TransactionIdentity{ChainID: trs[2].ChainID, Hash: trs[2].Hash, Address: trs[2].To},
 		id:             0,
 		timestamp:      trs[2].Timestamp,
 		activityType:   SendAT,
@@ -602,7 +603,7 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: trs[1].ChainID, Hash: trs[1].Hash, Address: trs[1].From},
+		transaction:    &transfer.TransactionIdentity{ChainID: trs[1].ChainID, Hash: trs[1].Hash, Address: trs[1].To},
 		id:             0,
 		timestamp:      trs[1].Timestamp,
 		activityType:   SendAT,
@@ -856,7 +857,8 @@ func TestGetActivityEntriesCheckToAndFrom(t *testing.T) {
 
 	require.Equal(t, SendAT, entries[5].activityType)                  // td.tr1
 	require.NotEqual(t, eth.Address{}, entries[5].transaction.Address) // td.tr1
-	require.Equal(t, td.tr1.From, entries[5].transaction.Address)      // td.tr1
+	// TODO: extract to/from Address and use it for comparison instead of identity address
+	require.Equal(t, td.tr1.To, entries[5].transaction.Address) // td.tr1
 
 	require.Equal(t, SendAT, entries[4].activityType) // td.pendingTr
 
