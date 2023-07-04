@@ -7,18 +7,14 @@ import (
 	"errors"
 	"io/ioutil"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/account/generator"
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
@@ -29,52 +25,7 @@ import (
 	"github.com/status-im/status-go/protocol/tt"
 )
 
-const ownerPassword = "123456"
-const adminPassword = "q1w2e3r4"
-const alicePassword = "qwerty"
-const bobPassword = "bob123"
-
-const ownerAddress = "0x0100000000000000000000000000000000000000"
-const adminAddress = "0x0123000000000000000000000000000000000000"
-const aliceAddress1 = "0x0200000000000000000000000000000000000000"
-const aliceAddress2 = "0x0210000000000000000000000000000000000000"
-const bobAddress = "0x0300000000000000000000000000000000000000"
-
-type AccountManagerMock struct {
-	AccountsMap map[string]string
-}
-
-func (m *AccountManagerMock) GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*account.SelectedExtKey, error) {
-	return &account.SelectedExtKey{
-		Address: types.HexToAddress(address),
-	}, nil
-}
-
-func (m *AccountManagerMock) CanRecover(rpcParams account.RecoverParams, revealedAddress types.Address) (bool, error) {
-	return true, nil
-}
-
-func (m *AccountManagerMock) Sign(rpcParams account.SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error) {
-	return types.HexBytes{}, nil
-}
-
-type TokenManagerStub struct{}
-
-func (m *TokenManagerStub) GetAllChainIDs() ([]uint64, error) {
-	return []uint64{}, nil
-}
-
-func (m *TokenManagerStub) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
-	return map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big{}, nil
-}
-
-func newCommunitiesTestMessenger(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, tokenManager communities.TokenManager, password string, walletAddresses []string) (*Messenger, error) {
-	accountsManagerMock := &AccountManagerMock{}
-	accountsManagerMock.AccountsMap = make(map[string]string)
-	for _, walletAddress := range walletAddresses {
-		accountsManagerMock.AccountsMap[walletAddress] = types.EncodeHex(crypto.Keccak256([]byte(password)))
-	}
-
+func newCommunitiesTestMessenger(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, accountsManager account.Manager, tokenManager communities.TokenManager) (*Messenger, error) {
 	tmpfile, err := ioutil.TempFile("", "accounts-tests-")
 	if err != nil {
 		return nil, err
@@ -102,7 +53,7 @@ func newCommunitiesTestMessenger(shh types.Waku, privateKey *ecdsa.PrivateKey, l
 		&testNode{shh: shh},
 		uuid.New().String(),
 		nil,
-		accountsManagerMock,
+		accountsManager,
 		options...,
 	)
 	if err != nil {
@@ -144,20 +95,6 @@ func newCommunitiesTestMessenger(shh types.Waku, privateKey *ecdsa.PrivateKey, l
 
 	_ = m.settings.CreateSettings(setting, config)
 
-	// add wallet account with keypair
-	for _, walletAddress := range walletAddresses {
-		kp := accounts.GetProfileKeypairForTest(false, true, false)
-		kp.Accounts[0].Address = types.HexToAddress(walletAddress)
-		err := m.settings.SaveOrUpdateKeypair(kp)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	_, err = m.settings.GetAccounts()
-	if err != nil {
-		return nil, err
-	}
 	return m, nil
 }
 
