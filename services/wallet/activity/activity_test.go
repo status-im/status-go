@@ -838,7 +838,7 @@ func TestGetActivityEntriesCheckToAndFrom(t *testing.T) {
 	deps, close := setupTestActivityDB(t)
 	defer close()
 
-	// Adds 6 transactions from which 4 are filered out
+	// Adds 6 transactions from which 4 are filtered out
 	td, _, _ := fillTestData(t, deps.db)
 
 	// Add extra transactions to test To address
