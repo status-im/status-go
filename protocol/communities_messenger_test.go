@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -32,6 +34,9 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/waku"
 )
+
+const dummyPassword = "abcd"
+const dummyAddress = "0x0100000000000000000000000000000000000000"
 
 func TestMessengerCommunitiesSuite(t *testing.T) {
 	suite.Run(t, new(MessengerCommunitiesSuite))
@@ -76,7 +81,19 @@ func (s *MessengerCommunitiesSuite) TearDownTest() {
 }
 
 func (s *MessengerCommunitiesSuite) newMessengerWithKey(privateKey *ecdsa.PrivateKey) *Messenger {
-	messenger, err := newCommunitiesTestMessenger(s.shh, privateKey, s.logger, nil, nil)
+	accountsManagerMock := &AccountManagerMock{}
+
+	mockedBalances := make(map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	tokenManagerMock := &TokenManagerMock{
+		Balances: &mockedBalances,
+	}
+
+	messenger, err := newCommunitiesTestMessenger(s.shh, privateKey, s.logger, accountsManagerMock, tokenManagerMock)
+	s.Require().NoError(err)
+
+	kp := accounts.GetProfileKeypairForTest(false, true, false)
+	kp.Accounts[0].Address = types.HexToAddress(dummyAddress)
+	err = messenger.settings.SaveOrUpdateKeypair(kp)
 	s.Require().NoError(err)
 
 	return messenger
@@ -387,7 +404,7 @@ func (s *MessengerCommunitiesSuite) advertiseCommunityTo(community *communities.
 }
 
 func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Community, user *Messenger) {
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), Password: dummyPassword, AddressesToReveal: []string{dummyAddress}}
 	joinCommunity(&s.Suite, community, s.admin, user, request)
 }
 
