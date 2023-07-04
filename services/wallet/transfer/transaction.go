@@ -381,16 +381,15 @@ func (tm *TransactionManager) GetMultiTransactions(ctx context.Context, ids []Mu
 	var multiTransactions []*MultiTransaction
 	for rows.Next() {
 		multiTransaction := &MultiTransaction{}
-		var fromAmount string
-		var toAmount string
+		var fromAmountDB, toAmountDB sql.NullString
 		err := rows.Scan(
 			&multiTransaction.ID,
 			&multiTransaction.FromAddress,
 			&multiTransaction.FromAsset,
-			&fromAmount,
+			&fromAmountDB,
 			&multiTransaction.ToAddress,
 			&multiTransaction.ToAsset,
-			&toAmount,
+			&toAmountDB,
 			&multiTransaction.Type,
 			&multiTransaction.Timestamp,
 		)
@@ -398,16 +397,18 @@ func (tm *TransactionManager) GetMultiTransactions(ctx context.Context, ids []Mu
 			return nil, err
 		}
 
-		multiTransaction.FromAmount = new(hexutil.Big)
-		_, ok := (*big.Int)(multiTransaction.FromAmount).SetString(fromAmount, 0)
-		if !ok {
-			return nil, errors.New("failed to convert fromAmount to big.Int: " + fromAmount)
+		if fromAmountDB.Valid {
+			multiTransaction.FromAmount = new(hexutil.Big)
+			if _, ok := (*big.Int)(multiTransaction.FromAmount).SetString(fromAmountDB.String, 0); !ok {
+				return nil, errors.New("failed to convert fromAmountDB.String to big.Int: " + fromAmountDB.String)
+			}
 		}
 
-		multiTransaction.ToAmount = new(hexutil.Big)
-		_, ok = (*big.Int)(multiTransaction.ToAmount).SetString(toAmount, 0)
-		if !ok {
-			return nil, errors.New("failed to convert toAmount to big.Int: " + toAmount)
+		if toAmountDB.Valid {
+			multiTransaction.ToAmount = new(hexutil.Big)
+			if _, ok := (*big.Int)(multiTransaction.ToAmount).SetString(toAmountDB.String, 0); !ok {
+				return nil, errors.New("failed to convert fromAmountDB.String to big.Int: " + toAmountDB.String)
+			}
 		}
 
 		multiTransactions = append(multiTransactions, multiTransaction)
