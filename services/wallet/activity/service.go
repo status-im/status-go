@@ -93,7 +93,7 @@ func (s *Service) FilterActivityAsync(ctx context.Context, addresses []common.Ad
 			res.ErrorCode = ErrorCodeSuccess
 		}
 
-		s.sendResponseEvent(EventActivityFilteringDone, res)
+		s.sendResponseEvent(EventActivityFilteringDone, res, err)
 	})
 }
 
@@ -126,7 +126,7 @@ func (s *Service) GetRecipientsAsync(ctx context.Context, offset int, limit int)
 			res.ErrorCode = ErrorCodeFailed
 		}
 
-		s.sendResponseEvent(EventActivityGetRecipientsDone, result)
+		s.sendResponseEvent(EventActivityGetRecipientsDone, result, err)
 	})
 }
 
@@ -151,7 +151,7 @@ func (s *Service) GetOldestTimestampAsync(ctx context.Context, addresses []commo
 			res.ErrorCode = ErrorCodeSuccess
 		}
 
-		s.sendResponseEvent(EventActivityGetOldestTimestampDone, res)
+		s.sendResponseEvent(EventActivityGetOldestTimestampDone, res, err)
 	})
 }
 
@@ -192,10 +192,12 @@ func (s *Service) getDeps() FilterDependencies {
 	}
 }
 
-func (s *Service) sendResponseEvent(eventType walletevent.EventType, payloadObj interface{}) {
+func (s *Service) sendResponseEvent(eventType walletevent.EventType, payloadObj interface{}, resErr error) {
 	payload, err := json.Marshal(payloadObj)
 	if err != nil {
-		log.Error("Error marshaling response: %v", err)
+		log.Error("Error marshaling response: %v; result error: %w", err, resErr)
+	} else {
+		err = resErr
 	}
 
 	log.Debug("wallet.api.activity.Service RESPONSE", "eventType", eventType, "error", err, "payload.len", len(payload))

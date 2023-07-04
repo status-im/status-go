@@ -889,3 +889,31 @@ func TestGetActivityEntriesCheckContextCancellation(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 	require.Equal(t, 0, len(activities))
 }
+
+func TestGetActivityEntriesNullAddresses(t *testing.T) {
+	deps, close := setupTestActivityDB(t)
+	defer close()
+
+	// Add 6 extractable transactions
+	trs, _, _ := transfer.GenerateTestTransfers(t, deps.db, 0, 4)
+	multiTx := transfer.GenerateTestBridgeMultiTransaction(trs[0], trs[1])
+	multiTx.ToAddress = eth_common.Address{}
+
+	trs[0].MultiTransactionID = transfer.InsertTestMultiTransaction(t, deps.db, &multiTx)
+	trs[1].MultiTransactionID = trs[0].MultiTransactionID
+
+	for i := 0; i < 3; i++ {
+		transfer.InsertTestTransferWithOptions(t, deps.db, trs[i].To, &trs[i], &transfer.TestTransferOptions{
+			NullifyAddresses: []eth_common.Address{trs[i].To},
+		})
+	}
+
+	trs[3].To = eth_common.Address{}
+	transfer.InsertTestPendingTransaction(t, deps.db, &trs[3])
+
+	mockTestAccountsWithAddresses(t, deps.db, []eth_common.Address{trs[0].From, trs[1].From, trs[2].From, trs[3].From})
+
+	activities, err := getActivityEntries(context.Background(), deps, allAddressesFilter(), allNetworksFilter(), Filter{}, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(activities))
+}

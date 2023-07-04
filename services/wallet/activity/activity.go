@@ -298,8 +298,7 @@ const (
             FROM
               transfers
             WHERE transfers.multi_transaction_id != 0
-            GROUP BY
-                transfers.multi_transaction_id
+            GROUP BY transfers.multi_transaction_id
         ),
         pending_status AS (
             SELECT
@@ -464,7 +463,7 @@ const (
         multi_transactions.from_asset AS from_token_code,
         multi_transactions.to_asset AS to_token_code
     FROM multi_transactions, filter_conditions
-    JOIN tr_status ON multi_transactions.ROWID = tr_status.multi_transaction_id
+    LEFT JOIN tr_status ON multi_transactions.ROWID = tr_status.multi_transaction_id
     LEFT JOIN pending_status ON multi_transactions.ROWID = pending_status.multi_transaction_id
     WHERE
         ((startFilterDisabled OR multi_transactions.timestamp >= startTimestamp)
@@ -599,18 +598,22 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		var timestamp int64
 		var dbMtType, dbTrType sql.NullByte
 		var toAddress, fromAddress eth.Address
+		var toAddressDB sql.RawBytes
 		var tokenAddress *eth.Address
 		var aggregatedStatus int
 		var dbTrAmount sql.NullString
 		var dbMtFromAmount, dbMtToAmount sql.NullString
 		var tokenCode, fromTokenCode, toTokenCode sql.NullString
 		err := rows.Scan(&transferHash, &pendingHash, &chainID, &multiTxID, &timestamp, &dbMtType, &dbTrType, &fromAddress,
-			&toAddress, &dbTrAmount, &dbMtFromAmount, &dbMtToAmount, &aggregatedStatus, &aggregatedCount,
+			&toAddressDB, &dbTrAmount, &dbMtFromAmount, &dbMtToAmount, &aggregatedStatus, &aggregatedCount,
 			&tokenAddress, &tokenCode, &fromTokenCode, &toTokenCode)
 		if err != nil {
 			return nil, err
 		}
 
+		if len(toAddressDB) > 0 {
+			toAddress = eth.BytesToAddress(toAddressDB)
+		}
 		getActivityType := func(trType sql.NullByte) (activityType Type, filteredAddress eth.Address) {
 			if trType.Valid {
 				if trType.Byte == fromTrType {
@@ -619,7 +622,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 					return ReceiveAT, toAddress
 				}
 			}
-			log.Warn(fmt.Sprintf("unexpected activity type. Missing [%s, %s] in the addresses table?", fromAddress, toAddress))
+			log.Warn(fmt.Sprintf("unexpected activity type. Missing from [%s] or to [%s] in addresses?", fromAddress, toAddress))
 			return ReceiveAT, toAddress
 		}
 
