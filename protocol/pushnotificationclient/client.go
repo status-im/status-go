@@ -1298,7 +1298,7 @@ func (c *Client) registerWithServer(registration *protobuf.PushNotificationRegis
 		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION,
 		// We send on personal topic to avoid a lot of traffic on the partitioned topic
 		SendOnPersonalTopic: true,
-		SkipEncryption:      true,
+		SkipProtocolLayer:   true,
 	}
 
 	_, err = c.messageSender.SendPrivate(context.Background(), server.PublicKey, &rawMessage)
@@ -1406,8 +1406,8 @@ func (c *Client) SendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 			Sender:  ephemeralKey,
 			// we skip encryption as we don't want to save any key material
 			// for an ephemeral key, no need to use pfs as these are throw away keys
-			SkipEncryption: true,
-			MessageType:    protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REQUEST,
+			SkipProtocolLayer: true,
+			MessageType:       protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REQUEST,
 		}
 
 		_, err = c.messageSender.SendPrivate(context.Background(), serverPublicKey, &rawMessage)
@@ -1686,8 +1686,8 @@ func (c *Client) queryPushNotificationInfo(publicKey *ecdsa.PublicKey) error {
 		Payload: encodedMessage,
 		Sender:  ephemeralKey,
 		// we don't want to wrap in an encryption layer message
-		SkipEncryption: true,
-		MessageType:    protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY,
+		SkipProtocolLayer: true,
+		MessageType:       protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY,
 	}
 
 	_, err = c.messageSender.AddEphemeralKey(ephemeralKey)

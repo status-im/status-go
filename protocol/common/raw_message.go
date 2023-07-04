@@ -23,7 +23,7 @@ type RawMessage struct {
 	SendCount             int
 	Sent                  bool
 	ResendAutomatically   bool
-	SkipEncryption        bool
+	SkipProtocolLayer     bool // don't wrap message into ProtocolMessage
 	SendPushNotification  bool
 	MessageType           protobuf.ApplicationMetadataMessage_Type
 	Payload               []byte

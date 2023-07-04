@@ -229,7 +229,7 @@ func (m *Messenger) encodeAndDispatchBackupMessage(ctx context.Context, message 
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID:         chatID,
 		Payload:             encodedMessage,
-		SkipEncryption:      true,
+		SkipProtocolLayer:   true,
 		SendOnPersonalTopic: true,
 		MessageType:         protobuf.ApplicationMetadataMessage_BACKUP,
 	})

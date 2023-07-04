@@ -1959,7 +1959,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 		//SendPrivate will alter message identity and possibly datasyncid, so we save an unchanged
 		//message for sending to paired devices later
 		specCopyForPairedDevices := rawMessage
-		if !common.IsPubKeyEqual(publicKey, &m.identity.PublicKey) || rawMessage.SkipEncryption {
+		if !common.IsPubKeyEqual(publicKey, &m.identity.PublicKey) || rawMessage.SkipProtocolLayer {
 			id, err = m.sender.SendPrivate(ctx, publicKey, &rawMessage)
 
 			if err != nil {
