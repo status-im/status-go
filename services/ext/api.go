@@ -1337,6 +1337,38 @@ func (api *PublicAPI) CheckAllCommunityChannelsPermissions(request *requests.Che
 	return api.service.messenger.CheckAllCommunityChannelsPermissions(request)
 }
 
+func (api *PublicAPI) ShareCommunityURLWithChatKey(communityID types.HexBytes) (string, error) {
+	return api.service.messenger.ShareCommunityURLWithChatKey(communityID)
+}
+
+func (api *PublicAPI) ShareCommunityURLWithData(communityID types.HexBytes) (string, error) {
+	return api.service.messenger.ShareCommunityURLWithData(communityID)
+}
+
+func (api *PublicAPI) ShareCommunityChannelURLWithChatKey(request *requests.CommunityChannelShareURL) (string, error) {
+	return api.service.messenger.ShareCommunityChannelURLWithChatKey(request)
+}
+
+func (api *PublicAPI) ShareCommunityChannelURLWithData(request *requests.CommunityChannelShareURL) (string, error) {
+	return api.service.messenger.ShareCommunityChannelURLWithData(request)
+}
+
+func (api *PublicAPI) ShareUserURLWithENS(pubKey string) (string, error) {
+	return api.service.messenger.ShareUserURLWithENS(pubKey)
+}
+
+func (api *PublicAPI) ShareUserURLWithChatKey(pubKey string) (string, error) {
+	return api.service.messenger.ShareUserURLWithChatKey(pubKey)
+}
+
+func (api *PublicAPI) ShareUserURLWithData(pubKey string) (string, error) {
+	return api.service.messenger.ShareUserURLWithData(pubKey)
+}
+
+func (api *PublicAPI) ParseSharedURL(url string) (*protocol.URLDataResponse, error) {
+	return api.service.messenger.ParseSharedURL(url)
+}
+
 func (api *PublicAPI) Messenger() *protocol.Messenger {
 	return api.service.messenger
 }
