@@ -928,6 +928,7 @@ func (o *Community) Edit(description *protobuf.CommunityDescription) {
 
 func (o *Community) Join() {
 	o.config.Joined = true
+	o.config.Spectated = false
 }
 
 func (o *Community) Leave() {
