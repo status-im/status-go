@@ -32,16 +32,16 @@ type SignatureList struct {
 }
 
 type Client struct {
-	client *http.Client
+	Client *http.Client
+	URL    string
 }
 
 func NewClient() *Client {
-	return &Client{client: &http.Client{Timeout: time.Minute}}
+	return &Client{Client: &http.Client{Timeout: time.Second * 5}, URL: "https://www.4byte.directory"}
 }
 
 func (c *Client) DoQuery(url string) (*http.Response, error) {
-	resp, err := c.client.Get(url)
-
+	resp, err := c.Client.Get(url)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,9 @@ func (c *Client) Run(data string) (*thirdparty.DataParsed, error) {
 		return nil, errors.New("input is badly formatted")
 	}
 	methodSigData := data[2:10]
-	url := fmt.Sprintf("https://www.4byte.directory/api/v1/signatures/?hex_signature=%s", methodSigData)
+	fmt.Println(c.URL)
+	url := fmt.Sprintf("%s/api/v1/signatures/?hex_signature=%s", c.URL, methodSigData)
+	fmt.Println(url)
 	resp, err := c.DoQuery(url)
 	if err != nil {
 		return nil, err
