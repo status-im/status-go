@@ -53,7 +53,7 @@ func (s SendType) isAvailableBetween(from, to *params.Network) bool {
 }
 
 func (s SendType) isAvailableFor(network *params.Network) bool {
-	if s == Transfer {
+	if s == Transfer || s == Bridge {
 		return true
 	}
 
@@ -476,7 +476,6 @@ func (r *Router) suggestedRoutes(
 		if network.IsTest != areTestNetworksEnabled {
 			continue
 		}
-
 		if containsNetworkChainID(network, disabledFromChainIDs) {
 			continue
 		}
@@ -484,17 +483,14 @@ func (r *Router) suggestedRoutes(
 		if !sendType.isAvailableFor(network) {
 			continue
 		}
-
 		token := r.s.tokenManager.FindToken(network, tokenSymbol)
 		if token == nil {
 			continue
 		}
-
 		nativeToken := r.s.tokenManager.FindToken(network, network.NativeCurrencySymbol)
 		if nativeToken == nil {
 			continue
 		}
-
 		group.Add(func(c context.Context) error {
 			gasFees, err := r.s.feesManager.suggestedFees(ctx, network.ChainID)
 			if err != nil {
