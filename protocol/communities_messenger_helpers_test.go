@@ -36,6 +36,7 @@ import (
 	"github.com/status-im/status-go/services/communitytokens"
 	walletToken "github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/transactions"
 	waku "github.com/status-im/status-go/wakuv2"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -87,6 +88,18 @@ func (m *TokenManagerMock) FindOrCreateTokenByAddress(ctx context.Context, chain
 type CollectiblesServiceMock struct {
 	Collectibles map[uint64]map[string]*communitytokens.CollectibleContractData
 	Assets       map[uint64]map[string]*communitytokens.AssetContractData
+	Signers      map[string]string
+}
+
+func (c *CollectiblesServiceMock) SetSignerPubkeyForCommunity(communityID []byte, signerPubKey string) {
+	if c.Signers == nil {
+		c.Signers = make(map[string]string)
+	}
+	c.Signers[types.EncodeHex(communityID)] = signerPubKey
+}
+
+func (c *CollectiblesServiceMock) SetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, newSignerPubKey string) (string, error) {
+	return "", nil
 }
 
 func (c *CollectiblesServiceMock) GetCollectibleContractData(chainID uint64, contractAddress string) (*communitytokens.CollectibleContractData, error) {
@@ -111,6 +124,13 @@ func (c *CollectiblesServiceMock) SetMockCollectibleContractData(chainID uint64,
 	}
 	c.Collectibles[chainID] = make(map[string]*communitytokens.CollectibleContractData)
 	c.Collectibles[chainID][contractAddress] = collectible
+}
+
+func (c *CollectiblesServiceMock) SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error) {
+	if c.Signers == nil {
+		c.Signers = make(map[string]string)
+	}
+	return c.Signers[communityID], nil
 }
 
 func (c *CollectiblesServiceMock) SetMockAssetContractData(chainID uint64, contractAddress string, assetData *communitytokens.AssetContractData) {

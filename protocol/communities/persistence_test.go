@@ -34,10 +34,10 @@ func (s *PersistenceSuite) SetupTest() {
 	s.db = nil
 
 	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	s.NoError(err, "creating sqlite db instance")
+	s.Require().NoError(err, "creating sqlite db instance")
 
 	err = sqlite.Migrate(db)
-	s.NoError(err, "protocol migrate")
+	s.Require().NoError(err, "protocol migrate")
 
 	s.db = &Persistence{db: db, timesource: &TimeSourceStub{}}
 }
@@ -87,28 +87,28 @@ func (s *PersistenceSuite) TestShouldHandleSyncCommunity() {
 
 	// check an empty db to see if a community should be synced
 	should, err := s.db.ShouldHandleSyncCommunity(sc)
-	s.NoError(err, "SaveSyncCommunity")
+	s.Require().NoError(err, "SaveSyncCommunity")
 	s.True(should)
 
 	// add a new community to the db
 	err = s.db.saveRawCommunityRow(fromSyncCommunityProtobuf(sc))
-	s.NoError(err, "saveRawCommunityRow")
+	s.Require().NoError(err, "saveRawCommunityRow")
 
 	rcrs, err := s.db.getAllCommunitiesRaw()
-	s.NoError(err, "should have no error from getAllCommunitiesRaw")
+	s.Require().NoError(err, "should have no error from getAllCommunitiesRaw")
 	s.Len(rcrs, 2, "length of all communities raw should be 2")
 
 	// check again to see is the community should be synced
 	sc.Clock--
 	should, err = s.db.ShouldHandleSyncCommunity(sc)
-	s.NoError(err, "SaveSyncCommunity")
+	s.Require().NoError(err, "SaveSyncCommunity")
 	s.False(should)
 
 	// check again to see is the community should be synced
 	sc.Clock++
 	sc.Clock++
 	should, err = s.db.ShouldHandleSyncCommunity(sc)
-	s.NoError(err, "SaveSyncCommunity")
+	s.Require().NoError(err, "SaveSyncCommunity")
 	s.True(should)
 }
 
@@ -122,41 +122,41 @@ func (s *PersistenceSuite) TestSetSyncClock() {
 
 	// add a new community to the db
 	err := s.db.saveRawCommunityRow(fromSyncCommunityProtobuf(sc))
-	s.NoError(err, "saveRawCommunityRow")
+	s.Require().NoError(err, "saveRawCommunityRow")
 
 	// retrieve row from db synced_at must be zero
 	rcr, err := s.db.getRawCommunityRow(sc.Id)
-	s.NoError(err, "getRawCommunityRow")
-	s.Zero(rcr.SyncedAt, "synced_at must be zero value")
+	s.Require().NoError(err, "getRawCommunityRow")
+	s.Require().Zero(rcr.SyncedAt, "synced_at must be zero value")
 
 	// Set the synced_at value
 	clock := uint64(time.Now().Unix())
 	err = s.db.SetSyncClock(sc.Id, clock)
-	s.NoError(err, "SetSyncClock")
+	s.Require().NoError(err, "SetSyncClock")
 
 	// Retrieve row from db and check clock matches synced_at value
 	rcr, err = s.db.getRawCommunityRow(sc.Id)
-	s.NoError(err, "getRawCommunityRow")
-	s.Equal(clock, rcr.SyncedAt, "synced_at must equal the value of the clock")
+	s.Require().NoError(err, "getRawCommunityRow")
+	s.Require().Equal(clock, rcr.SyncedAt, "synced_at must equal the value of the clock")
 
 	// Set Synced At with an older clock value
 	olderClock := clock - uint64(256)
 	err = s.db.SetSyncClock(sc.Id, olderClock)
-	s.NoError(err, "SetSyncClock")
+	s.Require().NoError(err, "SetSyncClock")
 
 	// Retrieve row from db and check olderClock matches synced_at value
 	rcr, err = s.db.getRawCommunityRow(sc.Id)
-	s.NoError(err, "getRawCommunityRow")
-	s.NotEqual(olderClock, rcr.SyncedAt, "synced_at must not equal the value of the olderClock value")
+	s.Require().NoError(err, "getRawCommunityRow")
+	s.Require().NotEqual(olderClock, rcr.SyncedAt, "synced_at must not equal the value of the olderClock value")
 
 	// Set Synced At with a newer clock value
 	newerClock := clock + uint64(512)
 	err = s.db.SetSyncClock(sc.Id, newerClock)
-	s.NoError(err, "SetSyncClock")
+	s.Require().NoError(err, "SetSyncClock")
 
 	// Retrieve row from db and check olderClock matches synced_at value
 	rcr, err = s.db.getRawCommunityRow(sc.Id)
-	s.NoError(err, "getRawCommunityRow")
+	s.Require().NoError(err, "getRawCommunityRow")
 	s.Equal(newerClock, rcr.SyncedAt, "synced_at must equal the value of the newerClock value")
 }
 
@@ -170,28 +170,28 @@ func (s *PersistenceSuite) TestSetPrivateKey() {
 
 	// add a new community to the db with no private key
 	err := s.db.saveRawCommunityRow(fromSyncCommunityProtobuf(sc))
-	s.NoError(err, "saveRawCommunityRow")
+	s.Require().NoError(err, "saveRawCommunityRow")
 
 	// retrieve row from db, private key must be zero
 	rcr, err := s.db.getRawCommunityRow(sc.Id)
-	s.NoError(err, "getRawCommunityRow")
+	s.Require().NoError(err, "getRawCommunityRow")
 	s.Zero(rcr.PrivateKey, "private key must be zero value")
 
 	// Set private key
 	pk, err := crypto.GenerateKey()
-	s.NoError(err, "crypto.GenerateKey")
+	s.Require().NoError(err, "crypto.GenerateKey")
 	err = s.db.SetPrivateKey(sc.Id, pk)
-	s.NoError(err, "SetPrivateKey")
+	s.Require().NoError(err, "SetPrivateKey")
 
 	// retrieve row from db again, private key must match the given key
 	rcr, err = s.db.getRawCommunityRow(sc.Id)
-	s.NoError(err, "getRawCommunityRow")
+	s.Require().NoError(err, "getRawCommunityRow")
 	s.Equal(crypto.FromECDSA(pk), rcr.PrivateKey, "private key must match given key")
 }
 
 func (s *PersistenceSuite) TestJoinedAndPendingCommunitiesWithRequests() {
 	identity, err := crypto.GenerateKey()
-	s.NoError(err, "crypto.GenerateKey shouldn't give any error")
+	s.Require().NoError(err, "crypto.GenerateKey shouldn't give any error")
 
 	clock := uint64(time.Now().Unix())
 
@@ -199,14 +199,14 @@ func (s *PersistenceSuite) TestJoinedAndPendingCommunitiesWithRequests() {
 	com := s.makeNewCommunity(identity)
 	com.Join()
 	sc, err := com.ToSyncInstallationCommunityProtobuf(clock, nil)
-	s.NoError(err, "Community.ToSyncInstallationCommunityProtobuf shouldn't give any error")
+	s.Require().NoError(err, "Community.ToSyncInstallationCommunityProtobuf shouldn't give any error")
 	err = s.db.saveRawCommunityRow(fromSyncCommunityProtobuf(sc))
-	s.NoError(err, "saveRawCommunityRow")
+	s.Require().NoError(err, "saveRawCommunityRow")
 
 	// Add a new community that we have requested to join, but not yet joined
 	com2 := s.makeNewCommunity(identity)
 	err = s.db.SaveCommunity(com2)
-	s.NoError(err, "SaveCommunity shouldn't give any error")
+	s.Require().NoError(err, "SaveCommunity shouldn't give any error")
 
 	rtj := &RequestToJoin{
 		ID:          types.HexBytes{1, 2, 3, 4, 5, 6, 7, 8},
@@ -216,10 +216,10 @@ func (s *PersistenceSuite) TestJoinedAndPendingCommunitiesWithRequests() {
 		State:       RequestToJoinStatePending,
 	}
 	err = s.db.SaveRequestToJoin(rtj)
-	s.NoError(err, "SaveRequestToJoin shouldn't give any error")
+	s.Require().NoError(err, "SaveRequestToJoin shouldn't give any error")
 
 	comms, err := s.db.JoinedAndPendingCommunitiesWithRequests(&identity.PublicKey)
-	s.NoError(err, "JoinedAndPendingCommunitiesWithRequests shouldn't give any error")
+	s.Require().NoError(err, "JoinedAndPendingCommunitiesWithRequests shouldn't give any error")
 	s.Len(comms, 2, "Should have 2 communities")
 
 	for _, comm := range comms {
@@ -243,7 +243,7 @@ func (s *PersistenceSuite) TestSaveRequestToLeave() {
 	}
 
 	err := s.db.SaveRequestToLeave(rtl)
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	// older clocks should not be saved
 	rtl.Clock = 1
@@ -253,7 +253,7 @@ func (s *PersistenceSuite) TestSaveRequestToLeave() {
 
 func (s *PersistenceSuite) makeNewCommunity(identity *ecdsa.PrivateKey) *Community {
 	comPrivKey, err := crypto.GenerateKey()
-	s.NoError(err, "crypto.GenerateKey shouldn't give any error")
+	s.Require().NoError(err, "crypto.GenerateKey shouldn't give any error")
 
 	com, err := New(Config{
 		MemberIdentity: &identity.PublicKey,
@@ -263,7 +263,7 @@ func (s *PersistenceSuite) makeNewCommunity(identity *ecdsa.PrivateKey) *Communi
 	s.NoError(err, "New shouldn't give any error")
 
 	md, err := com.MarshaledDescription()
-	s.NoError(err, "Community.MarshaledDescription shouldn't give any error")
+	s.Require().NoError(err, "Community.MarshaledDescription shouldn't give any error")
 	com.config.CommunityDescriptionProtocolMessage = md
 
 	return com
@@ -280,11 +280,11 @@ func (s *PersistenceSuite) TestGetSyncedRawCommunity() {
 
 	// add a new community to the db
 	err := s.db.saveRawCommunityRowWithoutSyncedAt(fromSyncCommunityProtobuf(sc))
-	s.NoError(err, "saveRawCommunityRow")
+	s.Require().NoError(err, "saveRawCommunityRow")
 
 	// retrieve row from db synced_at must be zero
 	rcr, err := s.db.getRawCommunityRow(sc.Id)
-	s.NoError(err, "getRawCommunityRow")
+	s.Require().NoError(err, "getRawCommunityRow")
 	s.Zero(rcr.SyncedAt, "synced_at must be zero value")
 
 	// retrieve synced row from db, should fail
@@ -295,16 +295,16 @@ func (s *PersistenceSuite) TestGetSyncedRawCommunity() {
 	// Set the synced_at value
 	clock := uint64(time.Now().Unix())
 	err = s.db.SetSyncClock(sc.Id, clock)
-	s.NoError(err, "SetSyncClock")
+	s.Require().NoError(err, "SetSyncClock")
 
 	// retrieve row from db synced_at must not be zero
 	rcr, err = s.db.getRawCommunityRow(sc.Id)
-	s.NoError(err, "getRawCommunityRow")
+	s.Require().NoError(err, "getRawCommunityRow")
 	s.NotZero(rcr.SyncedAt, "synced_at must be zero value")
 
 	// retrieve synced row from db, should succeed
 	src, err = s.db.getSyncedRawCommunity(sc.Id)
-	s.NoError(err)
+	s.Require().NoError(err)
 	s.NotNil(src)
 	s.Equal(clock, src.SyncedAt)
 }
@@ -319,20 +319,20 @@ func (s *PersistenceSuite) TestGetCommunitiesSettings() {
 	for i := range settings {
 		stg := settings[i]
 		err := s.db.SaveCommunitySettings(stg)
-		s.NoError(err)
+		s.Require().NoError(err)
 	}
 
 	rst, err := s.db.GetCommunitiesSettings()
-	s.NoError(err)
+	s.Require().NoError(err)
 	s.Equal(settings, rst)
 }
 
 func (s *PersistenceSuite) TestSaveCommunitySettings() {
 	settings := CommunitySettings{CommunityID: "0x01", HistoryArchiveSupportEnabled: false}
 	err := s.db.SaveCommunitySettings(settings)
-	s.NoError(err)
+	s.Require().NoError(err)
 	rst, err := s.db.GetCommunitiesSettings()
-	s.NoError(err)
+	s.Require().NoError(err)
 	s.Equal(1, len(rst))
 }
 
@@ -340,14 +340,14 @@ func (s *PersistenceSuite) TestDeleteCommunitySettings() {
 	settings := CommunitySettings{CommunityID: "0x01", HistoryArchiveSupportEnabled: false}
 
 	err := s.db.SaveCommunitySettings(settings)
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	rst, err := s.db.GetCommunitiesSettings()
-	s.NoError(err)
+	s.Require().NoError(err)
 	s.Equal(1, len(rst))
-	s.NoError(s.db.DeleteCommunitySettings(types.HexBytes{0x01}))
+	s.Require().NoError(s.db.DeleteCommunitySettings(types.HexBytes{0x01}))
 	rst2, err := s.db.GetCommunitiesSettings()
-	s.NoError(err)
+	s.Require().NoError(err)
 	s.Equal(0, len(rst2))
 }
 
@@ -357,17 +357,17 @@ func (s *PersistenceSuite) TestUpdateCommunitySettings() {
 		{CommunityID: "0x02", HistoryArchiveSupportEnabled: false},
 	}
 
-	s.NoError(s.db.SaveCommunitySettings(settings[0]))
-	s.NoError(s.db.SaveCommunitySettings(settings[1]))
+	s.Require().NoError(s.db.SaveCommunitySettings(settings[0]))
+	s.Require().NoError(s.db.SaveCommunitySettings(settings[1]))
 
 	settings[0].HistoryArchiveSupportEnabled = true
 	settings[1].HistoryArchiveSupportEnabled = false
 
-	s.NoError(s.db.UpdateCommunitySettings(settings[0]))
-	s.NoError(s.db.UpdateCommunitySettings(settings[1]))
+	s.Require().NoError(s.db.UpdateCommunitySettings(settings[0]))
+	s.Require().NoError(s.db.UpdateCommunitySettings(settings[1]))
 
 	rst, err := s.db.GetCommunitiesSettings()
-	s.NoError(err)
+	s.Require().NoError(err)
 	s.Equal(settings, rst)
 }
 
@@ -496,10 +496,10 @@ func (s *PersistenceSuite) TestSaveCheckChannelPermissionResponse() {
 	}
 
 	err := s.db.SaveCheckChannelPermissionResponse(communityID, chatID, checkChannelPermissionResponse)
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	responses, err := s.db.GetCheckChannelPermissionResponses(communityID)
-	s.NoError(err)
+	s.Require().NoError(err)
 	s.Require().Len(responses, 1)
 	s.Require().NotNil(responses[chatID])
 	s.Require().True(responses[chatID].ViewOnlyPermissions.Satisfied)
@@ -512,7 +512,7 @@ func (s *PersistenceSuite) TestSaveCheckChannelPermissionResponse() {
 
 func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses() {
 	identity, err := crypto.GenerateKey()
-	s.NoError(err, "crypto.GenerateKey shouldn't give any error")
+	s.Require().NoError(err, "crypto.GenerateKey shouldn't give any error")
 
 	clock := uint64(time.Now().Unix())
 	communityID := types.HexBytes{7, 7, 7, 7, 7, 7, 7, 7}
@@ -521,7 +521,7 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses()
 
 	// No data in database
 	rtjResult, err := s.db.GetCommunityRequestsToJoinWithRevealedAddresses(communityID)
-	s.NoError(err, "GetCommunityRequestsToJoinWithRevealedAddresses shouldn't give any error")
+	s.Require().NoError(err, "GetCommunityRequestsToJoinWithRevealedAddresses shouldn't give any error")
 	s.Require().Len(rtjResult, 0)
 
 	// RTJ with 2 revealed Addresses
@@ -541,13 +541,13 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses()
 		},
 	}
 	err = s.db.SaveRequestToJoin(expectedRtj1)
-	s.NoError(err, "SaveRequestToJoin shouldn't give any error")
+	s.Require().NoError(err, "SaveRequestToJoin shouldn't give any error")
 
 	err = s.db.SaveRequestToJoinRevealedAddresses(expectedRtj1.ID, expectedRtj1.RevealedAccounts)
-	s.NoError(err, "SaveRequestToJoinRevealedAddresses shouldn't give any error")
+	s.Require().NoError(err, "SaveRequestToJoinRevealedAddresses shouldn't give any error")
 
 	rtjResult, err = s.db.GetCommunityRequestsToJoinWithRevealedAddresses(communityID)
-	s.NoError(err, "GetCommunityRequestsToJoinWithRevealedAddresses shouldn't give any error")
+	s.Require().NoError(err, "GetCommunityRequestsToJoinWithRevealedAddresses shouldn't give any error")
 	s.Require().Len(rtjResult, 1)
 	s.Require().Equal(expectedRtj1.ID, rtjResult[0].ID)
 	s.Require().Equal(expectedRtj1.PublicKey, rtjResult[0].PublicKey)
@@ -575,13 +575,13 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses()
 		},
 	}
 	err = s.db.SaveRequestToJoin(expectedRtj2)
-	s.NoError(err, "SaveRequestToJoin shouldn't give any error")
+	s.Require().NoError(err, "SaveRequestToJoin shouldn't give any error")
 
 	err = s.db.SaveRequestToJoinRevealedAddresses(expectedRtj2.ID, expectedRtj2.RevealedAccounts)
-	s.NoError(err, "SaveRequestToJoinRevealedAddresses shouldn't give any error")
+	s.Require().NoError(err, "SaveRequestToJoinRevealedAddresses shouldn't give any error")
 
 	rtjResult, err = s.db.GetCommunityRequestsToJoinWithRevealedAddresses(communityID)
-	s.NoError(err, "GetCommunityRequestsToJoinWithRevealedAddresses shouldn't give any error")
+	s.Require().NoError(err, "GetCommunityRequestsToJoinWithRevealedAddresses shouldn't give any error")
 	s.Require().Len(rtjResult, 2)
 
 	s.Require().Len(rtjResult[1].RevealedAccounts, 1)
@@ -598,10 +598,10 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses()
 		State:       RequestToJoinStateAccepted,
 	}
 	err = s.db.SaveRequestToJoin(expectedRtjWithoutRevealedAccounts)
-	s.NoError(err, "SaveRequestToJoin shouldn't give any error")
+	s.Require().NoError(err, "SaveRequestToJoin shouldn't give any error")
 
 	rtjResult, err = s.db.GetCommunityRequestsToJoinWithRevealedAddresses(communityID)
-	s.NoError(err, "GetCommunityRequestsToJoinWithRevealedAddresses shouldn't give any error")
+	s.Require().NoError(err, "GetCommunityRequestsToJoinWithRevealedAddresses shouldn't give any error")
 	s.Require().Len(rtjResult, 3)
 
 	s.Require().Len(rtjResult[2].RevealedAccounts, 0)
@@ -620,10 +620,10 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses()
 		},
 	}
 	err = s.db.SaveRequestToJoin(expectedRtjWithEmptyAddress)
-	s.NoError(err, "SaveRequestToJoin shouldn't give any error")
+	s.Require().NoError(err, "SaveRequestToJoin shouldn't give any error")
 
 	rtjResult, err = s.db.GetCommunityRequestsToJoinWithRevealedAddresses(communityID)
-	s.NoError(err, "GetCommunityRequestsToJoinWithRevealedAddresses shouldn't give any error")
+	s.Require().NoError(err, "GetCommunityRequestsToJoinWithRevealedAddresses shouldn't give any error")
 	s.Require().Len(rtjResult, 4)
 	s.Require().Len(rtjResult[3].RevealedAccounts, 0)
 }

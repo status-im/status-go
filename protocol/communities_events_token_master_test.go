@@ -239,7 +239,7 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAddTokenMasterAndOwnerT
 
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterReceiveOwnerTokenFromControlNode() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
-	testAddAndSyncTokenFromControlNode(s, community, token.OwnerLevel)
+	testAddAndSyncOwnerTokenFromControlNode(s, community, token.OwnerLevel)
 }
 
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterReceiveTokenMasterTokenFromControlNode() {
