@@ -63,7 +63,6 @@ import (
 
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/wakuv2/common"
 	"github.com/status-im/status-go/wakuv2/persistence"
@@ -154,6 +153,9 @@ type Waku struct {
 
 	// discV5BootstrapNodes is the ENR to be used to fetch bootstrap nodes for discovery
 	discV5BootstrapNodes []string
+
+	onHistoricMessagesRequestFailed func([]byte, peer.ID, error)
+	onPeerStats                     func(types.ConnStatus)
 }
 
 func getUsableUDPPort() (int, error) {
@@ -169,7 +171,7 @@ func getUsableUDPPort() (int, error) {
 }
 
 // New creates a WakuV2 client ready to communicate through the LibP2P network.
-func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource) (*Waku, error) {
+func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *sql.DB, ts *timesource.NTPTimeSource, onHistoricMessagesRequestFailed func([]byte, peer.ID, error), onPeerStats func(types.ConnStatus)) (*Waku, error) {
 	var err error
 	if logger == nil {
 		logger, err = zap.NewDevelopment()
@@ -194,26 +196,28 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 	logger.Debug("starting wakuv2 with config", zap.Any("config", cfg))
 
 	waku := &Waku{
-		appDB:                   appDB,
-		cfg:                     cfg,
-		privateKeys:             make(map[string]*ecdsa.PrivateKey),
-		symKeys:                 make(map[string][]byte),
-		envelopes:               make(map[gethcommon.Hash]*common.ReceivedMessage),
-		expirations:             make(map[uint32]mapset.Set),
-		msgQueue:                make(chan *common.ReceivedMessage, messageQueueLimit),
-		sendQueue:               make(chan *protocol.Envelope, 1000),
-		connStatusChan:          make(chan node.ConnStatus, 100),
-		connStatusSubscriptions: make(map[string]*types.ConnStatusSubscription),
-		wg:                      sync.WaitGroup{},
-		dnsAddressCache:         make(map[string][]dnsdisc.DiscoveredNode),
-		dnsAddressCacheLock:     &sync.RWMutex{},
-		storeMsgIDs:             make(map[gethcommon.Hash]bool),
-		filterPeerDisconnectMap: make(map[peer.ID]int64),
-		filterSubscriptions:     make(map[*common.Filter]map[string]*filter.SubscriptionDetails),
-		timesource:              ts,
-		storeMsgIDsMu:           sync.RWMutex{},
-		logger:                  logger,
-		discV5BootstrapNodes:    cfg.DiscV5BootstrapNodes,
+		appDB:                           appDB,
+		cfg:                             cfg,
+		privateKeys:                     make(map[string]*ecdsa.PrivateKey),
+		symKeys:                         make(map[string][]byte),
+		envelopes:                       make(map[gethcommon.Hash]*common.ReceivedMessage),
+		expirations:                     make(map[uint32]mapset.Set),
+		msgQueue:                        make(chan *common.ReceivedMessage, messageQueueLimit),
+		sendQueue:                       make(chan *protocol.Envelope, 1000),
+		connStatusChan:                  make(chan node.ConnStatus, 100),
+		connStatusSubscriptions:         make(map[string]*types.ConnStatusSubscription),
+		wg:                              sync.WaitGroup{},
+		dnsAddressCache:                 make(map[string][]dnsdisc.DiscoveredNode),
+		dnsAddressCacheLock:             &sync.RWMutex{},
+		storeMsgIDs:                     make(map[gethcommon.Hash]bool),
+		filterPeerDisconnectMap:         make(map[peer.ID]int64),
+		filterSubscriptions:             make(map[*common.Filter]map[string]*filter.SubscriptionDetails),
+		timesource:                      ts,
+		storeMsgIDsMu:                   sync.RWMutex{},
+		logger:                          logger,
+		discV5BootstrapNodes:            cfg.DiscV5BootstrapNodes,
+		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
+		onPeerStats:                     onPeerStats,
 	}
 	// This fn is being mocked in test
 	waku.isFilterSubAlive = func(sub *filter.SubscriptionDetails) error {
@@ -1135,7 +1139,9 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, topics []common.TopicT
 	result, err := w.query(ctx, peerID, topics, from, to, opts)
 	if err != nil {
 		w.logger.Error("error querying storenode", zap.String("requestID", hexutil.Encode(requestID)), zap.String("peerID", peerID.String()), zap.Error(err))
-		signal.SendHistoricMessagesRequestFailed(requestID, peerID, err)
+		if w.onHistoricMessagesRequestFailed != nil {
+			w.onHistoricMessagesRequestFailed(requestID, peerID, err)
+		}
 		return nil, err
 	}
 
@@ -1215,7 +1221,9 @@ func (w *Waku) Start() error {
 					}
 				}
 				w.connStatusMu.Unlock()
-				signal.SendPeerStats(latestConnStatus)
+				if w.onPeerStats != nil {
+					w.onPeerStats(latestConnStatus)
+				}
 
 				if w.cfg.EnableDiscV5 {
 					// Restarting DiscV5

@@ -27,7 +27,7 @@ import (
 )
 
 func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
-	w, err := New("", "", nil, nil, nil, nil)
+	w, err := New("", "", nil, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("Error creating WakuV2 client: %v", err)
 	}

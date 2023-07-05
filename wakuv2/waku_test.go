@@ -28,7 +28,7 @@ func TestDiscoveryV5(t *testing.T) {
 	config.DiscV5BootstrapNodes = []string{testENRBootstrap}
 	config.DiscoveryLimit = 20
 	config.UDPPort = 9001
-	w, err := New("", "", config, nil, nil, nil)
+	w, err := New("", "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	require.NoError(t, w.Start())
@@ -53,7 +53,7 @@ func TestRestartDiscoveryV5(t *testing.T) {
 	config.DiscV5BootstrapNodes = []string{"enrtree://AOGECG2SPND25EEFMAJ5WF3KSGJNSGV356DSTL2YVLLZWIV6SAYBM@1.1.1.2"}
 	config.DiscoveryLimit = 20
 	config.UDPPort = 9002
-	w, err := New("", "", config, nil, nil, nil)
+	w, err := New("", "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 
 	require.NoError(t, w.Start())
@@ -107,7 +107,7 @@ func TestBasicWakuV2(t *testing.T) {
 	config.DiscoveryLimit = 20
 	config.UDPPort = 9001
 	config.WakuNodes = []string{enrTreeAddress}
-	w, err := New("", "", config, nil, nil, nil)
+	w, err := New("", "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
 
@@ -182,7 +182,7 @@ func TestWakuV2Filter(t *testing.T) {
 	config.UDPPort = 9001
 	config.WakuNodes = []string{enrTreeAddress}
 	fleet := "status.test" // Need a name fleet so that LightClient is not set to false
-	w, err := New("", fleet, config, nil, nil, nil)
+	w, err := New("", fleet, config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
 

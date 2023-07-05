@@ -1,5 +1,10 @@
 package signal
 
+import (
+	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
+)
+
 const (
 	// EventNodeStarted is triggered when underlying node is started
 	EventNodeStarted = "node.started"
@@ -28,7 +33,9 @@ type NodeCrashEvent struct {
 
 // NodeLoginEvent returns the result of the login event
 type NodeLoginEvent struct {
-	Error string `json:"error,omitempty"`
+	Error    string                 `json:"error,omitempty"`
+	Settings *settings.Settings     `json:"settings,omitempty"`
+	Account  *multiaccounts.Account `json:"account,omitempty"`
 }
 
 // SendNodeCrashed emits a signal when status node has crashed, and
@@ -62,8 +69,8 @@ func SendChainDataRemoved() {
 	send(EventChainDataRemoved, nil)
 }
 
-func SendLoggedIn(err error) {
-	event := NodeLoginEvent{}
+func SendLoggedIn(account *multiaccounts.Account, settings *settings.Settings, err error) {
+	event := NodeLoginEvent{Settings: settings, Account: account}
 	if err != nil {
 		event.Error = err.Error()
 	}
