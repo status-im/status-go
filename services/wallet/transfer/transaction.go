@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
@@ -21,7 +22,13 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/bridge"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
+)
+
+const (
+	// PendingTransactionUpdate is emitted when a pending transaction is updated (added or deleted)
+	EventPendingTransactionUpdate walletevent.EventType = "pending-transaction-update"
 )
 
 type TransactionManager struct {
@@ -30,22 +37,23 @@ type TransactionManager struct {
 	transactor  *transactions.Transactor
 	config      *params.NodeConfig
 	accountsDB  *accounts.Database
+	eventFeed   *event.Feed
 }
 
 func NewTransactionManager(db *sql.DB, gethManager *account.GethManager, transactor *transactions.Transactor,
-	config *params.NodeConfig, accountsDB *accounts.Database) *TransactionManager {
+	config *params.NodeConfig, accountsDB *accounts.Database, eventFeed *event.Feed) *TransactionManager {
 	return &TransactionManager{
 		db:          db,
 		gethManager: gethManager,
 		transactor:  transactor,
 		config:      config,
 		accountsDB:  accountsDB,
+		eventFeed:   eventFeed,
 	}
 }
 
 type MultiTransactionType uint8
 
-// TODO: extend with know types
 const (
 	MultiTransactionSend = iota
 	MultiTransactionSwap
@@ -252,11 +260,52 @@ func (tm *TransactionManager) AddPending(transaction PendingTransaction) error {
 		transaction.AdditionalData,
 		transaction.MultiTransactionID,
 	)
+
+	// Notify listeners of new pending transaction (used in activity history)
+	if err == nil {
+		tm.notifyPendingTransactionListeners(transaction.ChainID, []common.Address{transaction.From, transaction.To}, transaction.Timestamp)
+	}
 	return err
 }
 
+func (tm *TransactionManager) notifyPendingTransactionListeners(chainID uint64, addresses []common.Address, timestamp uint64) {
+	if tm.eventFeed != nil {
+		tm.eventFeed.Send(walletevent.Event{
+			Type:     EventPendingTransactionUpdate,
+			ChainID:  chainID,
+			Accounts: addresses,
+			At:       int64(timestamp),
+		})
+	}
+}
+
 func (tm *TransactionManager) DeletePending(chainID uint64, hash common.Hash) error {
-	_, err := tm.db.Exec(`DELETE FROM pending_transactions WHERE network_id = ? AND hash = ?`, chainID, hash)
+	tx, err := tm.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	row := tx.QueryRow(`SELECT from_address, to_address, timestamp FROM pending_transactions WHERE network_id = ? AND hash = ?`, chainID, hash)
+	var from, to common.Address
+	var timestamp uint64
+	err = row.Scan(&from, &to, &timestamp)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`DELETE FROM pending_transactions WHERE network_id = ? AND hash = ?`, chainID, hash)
+	if err != nil {
+		return err
+	}
+	err = tx.Commit()
+	if err == nil {
+		tm.notifyPendingTransactionListeners(chainID, []common.Address{from, to}, timestamp)
+	}
 	return err
 }
 

@@ -322,8 +322,8 @@ const (
             WHEN to_join.address IS NOT NULL AND from_join.address IS NULL THEN toTrType
             WHEN from_join.address IS NOT NULL AND to_join.address IS NOT NULL THEN
                 CASE
-                    WHEN from_join.address < to_join.address THEN 1
-                    ELSE 2
+                    WHEN from_join.address < to_join.address THEN fromTrType
+                    ELSE toTrType
                 END
             ELSE NULL
         END as tr_type,
@@ -391,12 +391,12 @@ const (
         NULL AS mt_type,
 
         CASE
-            WHEN from_join.address IS NOT NULL AND to_join.address IS NULL THEN 1
-            WHEN to_join.address IS NOT NULL AND from_join.address IS NULL THEN 2
+            WHEN from_join.address IS NOT NULL AND to_join.address IS NULL THEN fromTrType
+            WHEN to_join.address IS NOT NULL AND from_join.address IS NULL THEN toTrType
             WHEN from_join.address IS NOT NULL AND to_join.address IS NOT NULL THEN
                 CASE
-                    WHEN from_join.address < to_join.address THEN 1
-                    ELSE 2
+                    WHEN from_join.address < to_join.address THEN fromTrType
+                    ELSE toTrType
                 END
             ELSE NULL
         END as tr_type,
@@ -454,7 +454,7 @@ const (
         multi_transactions.to_amount AS mt_to_amount,
 
         CASE
-            WHEN tr_status.min_status = 1 AND pending_status.count IS NULL THEN statusSuccess
+            WHEN tr_status.min_status = 1 AND COALESCE(pending_status.count, 0) = 0 THEN statusSuccess
             WHEN tr_status.min_status = 0 THEN statusFailed
             ELSE statusPending
         END AS agg_status,
@@ -655,10 +655,13 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 			}
 
 			entry = newActivityEntryWithSimpleTransaction(
-				&transfer.TransactionIdentity{ChainID: common.ChainID(chainID.Int64), Hash: eth.BytesToHash(transferHash), Address: ownerAddress},
+				&transfer.TransactionIdentity{ChainID: common.ChainID(chainID.Int64),
+					Hash:    eth.BytesToHash(transferHash),
+					Address: ownerAddress,
+				},
 				timestamp, activityType, activityStatus, inAmount, outAmount, tokenOut, tokenIn)
 		} else if pendingHash != nil && chainID.Valid {
-			// Extract activity type: PendingAT
+			// Extract activity type: SendAT/ReceiveAT
 			activityType, _ := getActivityType(dbTrType)
 
 			inAmount, outAmount := getTrInAndOutAmounts(activityType, dbTrAmount)
@@ -669,7 +672,10 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 				tokenOut = deps.tokenFromSymbol(&cID, tokenCode.String)
 			}
 
-			entry = newActivityEntryWithPendingTransaction(&transfer.TransactionIdentity{ChainID: common.ChainID(chainID.Int64), Hash: eth.BytesToHash(pendingHash)},
+			entry = newActivityEntryWithPendingTransaction(
+				&transfer.TransactionIdentity{ChainID: common.ChainID(chainID.Int64),
+					Hash: eth.BytesToHash(pendingHash),
+				},
 				timestamp, activityType, activityStatus, inAmount, outAmount, tokenOut, tokenIn)
 		} else if multiTxID.Valid {
 			mtInAmount, mtOutAmount := getMtInAndOutAmounts(dbMtFromAmount, dbMtToAmount)
