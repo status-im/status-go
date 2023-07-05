@@ -1,7 +1,10 @@
 package protocol
 
 import (
+	"fmt"
 	"go.uber.org/zap"
+	"runtime/debug"
+	"strings"
 	"sync"
 
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
@@ -59,9 +62,65 @@ type contactMap struct {
 	logger *zap.Logger
 }
 
+func min(a int, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func printStack(stack []byte) {
+	const start = 1 // skip top 2 lines (Stack() and Load()/Store() calls)
+	const depth = 3
+	stackString := string(stack[:])
+	stackArray := strings.Split(stackString, "\n")
+	stackArray = stackArray[1 : len(stackArray)-1] // drop "goroutine X [running]:" and last empty line
+	var files []string
+	var funcs []string
+	for i, v := range stackArray {
+		l := strings.TrimSpace(v)
+		if i%2 == 0 {
+			funcs = append(funcs, l)
+		} else {
+			files = append(files, l)
+		}
+	}
+	end := len(funcs)
+	//end := min(start + depth, len(funcs) - 1)
+	var maxFuncLen = 0
+	for i := start; i < end; i++ {
+		if maxFuncLen < len(funcs[i]) {
+			maxFuncLen = len(funcs[i])
+		}
+	}
+	for i := start; i < end; i++ {
+		fmt.Printf("| %-*s\t%s\n", maxFuncLen, funcs[i], files[i])
+	}
+}
+
+type StackItem struct {
+	File     string `json:"file"`
+	Function string `json:"function"`
+}
+
+func stackItems(stack []byte) []*StackItem {
+	stackString := string(stack[:])
+	stackArray := strings.Split(stackString, "\n")
+	stackArray = stackArray[1 : len(stackArray)-1] // drop "goroutine X [running]:" and last empty line
+	var items []*StackItem
+	for i := 0; i < len(stackArray); i += 2 {
+		items = append(items, &StackItem{
+			Function: strings.TrimSpace(stackArray[i]),
+			File:     strings.TrimSpace(stackArray[i+1]),
+		})
+	}
+	return items
+}
+
 func (cm *contactMap) Load(contactID string) (*Contact, bool) {
 	if contactID == cm.me.ID {
-		cm.logger.Warn("contacts map: loading own identity", zap.String("contactID", contactID))
+		stack := debug.Stack()
+		cm.logger.Info("contacts map: loading own identity", zap.String("contactID", contactID), zap.Any("stack", stackItems(stack)))
 		return cm.me, true
 	}
 	contact, ok := cm.sm.Load(contactID)
@@ -73,7 +132,8 @@ func (cm *contactMap) Load(contactID string) (*Contact, bool) {
 
 func (cm *contactMap) Store(contactID string, contact *Contact) {
 	if contactID == cm.me.ID {
-		cm.logger.Warn("contacts map: storing own identity", zap.String("contactID", contactID))
+		stack := debug.Stack()
+		cm.logger.Info("contacts map: storing own identity", zap.String("contactID", contactID), zap.Any("stack", stackItems(stack)))
 		return
 	}
 	cm.sm.Store(contactID, contact)

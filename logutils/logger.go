@@ -1,6 +1,7 @@
 package logutils
 
 import (
+	tt "github.com/status-im/status-go/protocol/tt"
 	"sync"
 
 	"go.uber.org/zap"
@@ -22,11 +23,7 @@ var (
 // to status-go logger.
 func ZapLogger() *zap.Logger {
 	_initZapLogger.Do(func() {
-		var err error
-		_zapLogger, err = NewZapLoggerWithAdapter(Logger())
-		if err != nil {
-			panic(err)
-		}
+		_zapLogger = tt.MustCreateTestLogger()
 	})
 	return _zapLogger
 }
