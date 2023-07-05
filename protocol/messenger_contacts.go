@@ -286,8 +286,7 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	contact, ok := m.allContacts.Load(contactRequest.From)
 	if !ok {
 		m.logger.Error("failed to update contact request: contact not found", zap.String("contact id", contactRequest.From))
-		// TODO: Uncomment return error when #3667 crash is fixed
-		//	return nil, errors.New("failed to update contact request: contact not found")
+		return nil, errors.New("failed to update contact request: contact not found")
 	}
 
 	_, clock, err := m.getOneToOneAndNextClock(contact)

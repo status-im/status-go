@@ -3436,10 +3436,13 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				}
 
 				senderID := contactIDFromPublicKey(publicKey)
+				m.logger.Info("processing message", zap.Any("type", msg.Type), zap.String("senderID", senderID))
+
+				contact, contactFound := messageState.AllContacts.Load(senderID)
 
 				if _, ok := m.requestedContacts[senderID]; !ok {
 					// Check for messages from blocked users
-					if contact, ok := messageState.AllContacts.Load(senderID); ok && contact.Blocked {
+					if contactFound && contact.Blocked {
 						continue
 					}
 				}
@@ -3455,10 +3458,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					continue
 				}
 
-				var contact *Contact
-				if c, ok := messageState.AllContacts.Load(senderID); ok {
-					contact = c
-				} else {
+				if !contactFound {
 					c, err := buildContact(senderID, publicKey)
 					if err != nil {
 						logger.Info("failed to build contact", zap.Error(err))

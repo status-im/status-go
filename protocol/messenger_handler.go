@@ -455,8 +455,6 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 
 func (m *Messenger) syncContactRequestForInstallationContact(contact *Contact, state *ReceivedMessageState, chat *Chat, outgoing bool) error {
 
-	m.logger.Debug("syncContactRequestForInstallationContact")
-
 	if chat == nil {
 		return fmt.Errorf("no chat restored during the contact synchronisation, contact.ID = %s", contact.ID)
 	}
@@ -478,7 +476,6 @@ func (m *Messenger) syncContactRequestForInstallationContact(contact *Contact, s
 	}
 
 	contactRequest.ID = defaultContactRequestID(contact.ID)
-	m.logger.Warn("syncContactRequestForInstallationContact: generated contact request", zap.Any("contactRequest", contactRequest))
 
 	state.Response.AddMessage(contactRequest)
 	err = m.persistence.SaveMessages([]*common.Message{contactRequest})
