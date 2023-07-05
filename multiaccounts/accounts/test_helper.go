@@ -257,7 +257,7 @@ func GetProfileKeycardForTest() *Keycard {
 		KeycardLocked:     false,
 		AccountsAddresses: keycard1Addresses,
 		KeyUID:            profileKp.KeyUID,
-		LastUpdateClock:   100,
+		Position:          0,
 	}
 }
 
@@ -273,7 +273,7 @@ func GetKeycardForSeedImportedKeypair1ForTest() *Keycard {
 		KeycardLocked:     false,
 		AccountsAddresses: keycard2Addresses,
 		KeyUID:            seed1Kp.KeyUID,
-		LastUpdateClock:   200,
+		Position:          1,
 	}
 }
 
@@ -289,8 +289,26 @@ func GetKeycardForSeedImportedKeypair2ForTest() *Keycard {
 		KeycardLocked:     false,
 		AccountsAddresses: keycard4Addresses,
 		KeyUID:            seed2Kp.KeyUID,
-		LastUpdateClock:   300,
+		Position:          2,
 	}
+}
+
+func Contains[T comparable](container []T, element T, isEqual func(T, T) bool) bool {
+	for _, e := range container {
+		if isEqual(e, element) {
+			return true
+		}
+	}
+	return false
+}
+
+func HaveSameElements[T comparable](a []T, b []T, isEqual func(T, T) bool) bool {
+	for _, v := range a {
+		if !Contains(b, v, isEqual) {
+			return false
+		}
+	}
+	return true
 }
 
 func SameAccounts(expected, real *Account) bool {
@@ -379,7 +397,7 @@ func SameKeycards(expected, real *Keycard) bool {
 		expected.KeyUID == real.KeyUID &&
 		expected.KeycardName == real.KeycardName &&
 		expected.KeycardLocked == real.KeycardLocked &&
-		expected.LastUpdateClock == real.LastUpdateClock &&
+		expected.Position == real.Position &&
 		len(expected.AccountsAddresses) == len(real.AccountsAddresses)
 
 	if same {

@@ -402,24 +402,7 @@ message SyncKeycard {
   bool locked = 3;
   string key_uid = 4;
   repeated bytes addresses = 5;
-  uint64 clock = 6;
-}
-
-message SyncKeycardAction {
-  Action action = 1;
-  string oldKeycardUid = 2;
-  SyncKeycard keycard = 3;
-
-  enum Action {
-    KEYCARD_ADDED = 0;
-    ACCOUNTS_ADDED = 1;
-    KEYCARD_DELETED = 2;
-    ACCOUNTS_REMOVED = 3;
-    LOCKED = 4;
-    UNLOCKED = 5;
-    UID_UPDATED = 6;
-    NAME_CHANGED = 7;
-  }
+  uint64 position = 6;
 }
 
 message SyncSocialLinks {

@@ -79,6 +79,9 @@ func (s *MessengerSyncKeycardsStateSuite) SetupTest() {
 	kp1 := accounts.GetProfileKeypairForTest(true, true, true)
 	kp2 := accounts.GetSeedImportedKeypair1ForTest()
 	kp3 := accounts.GetSeedImportedKeypair2ForTest()
+	kp1.Clock = 1
+	kp2.Clock = 1
+	kp3.Clock = 1
 
 	err = s.main.settings.SaveOrUpdateKeypair(kp1)
 	s.Require().NoError(err)
@@ -90,11 +93,15 @@ func (s *MessengerSyncKeycardsStateSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.Require().Equal(3, len(dbKeypairs))
 
-	err = s.other.SaveOrUpdateKeypair(kp1)
+	kp1.Clock = 0
+	kp2.Clock = 0
+	kp3.Clock = 0
+
+	err = s.other.settings.SaveOrUpdateKeypair(kp1)
 	s.Require().NoError(err)
-	err = s.other.SaveOrUpdateKeypair(kp2)
+	err = s.other.settings.SaveOrUpdateKeypair(kp2)
 	s.Require().NoError(err)
-	err = s.other.SaveOrUpdateKeypair(kp3)
+	err = s.other.settings.SaveOrUpdateKeypair(kp3)
 	s.Require().NoError(err)
 	dbKeypairs, err = s.other.settings.GetKeypairs()
 	s.Require().NoError(err)
@@ -116,338 +123,173 @@ func (s *MessengerSyncKeycardsStateSuite) newMessenger(shh types.Waku) *Messenge
 	return messenger
 }
 
-// TODO: commented tests below will be handled in the seocnd step of planned improvements
+func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverHasNoKeycards() {
+	senderDb := s.main.settings
+	dbOnReceiver := s.other.settings
 
-// func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverHasNoKeycards() {
-// 	senderDb := s.main.settings
-// 	dbOnReceiver := s.other.settings
+	keycard1 := accounts.GetProfileKeycardForTest()
 
-// 	keycard1 := accounts.GetProfileKeycardForTest()
+	keycard2 := accounts.GetKeycardForSeedImportedKeypair1ForTest()
 
-// 	keycard2 := accounts.GetKeycardForSeedImportedKeypair1ForTest()
+	keycard2Copy := accounts.GetKeycardForSeedImportedKeypair1ForTest()
+	keycard2Copy.KeycardUID = keycard2Copy.KeycardUID + "C"
+	keycard2Copy.KeycardName = keycard2Copy.KeycardName + "Copy"
 
-// 	keycard2Copy := accounts.GetKeycardForSeedImportedKeypair1ForTest()
-// 	keycard2Copy.KeycardUID = keycard2Copy.KeycardUID + "C"
-// 	keycard2Copy.KeycardName = keycard2Copy.KeycardName + "Copy"
-// 	keycard2Copy.LastUpdateClock = keycard2Copy.LastUpdateClock + 1
+	keycard3 := accounts.GetKeycardForSeedImportedKeypair2ForTest()
 
-// 	keycard3 := accounts.GetKeycardForSeedImportedKeypair2ForTest()
+	// Add keycards on sender
+	err := senderDb.SaveOrUpdateKeycard(*keycard1, 0, false)
+	s.Require().NoError(err)
+	err = senderDb.SaveOrUpdateKeycard(*keycard2, 0, false)
+	s.Require().NoError(err)
+	err = senderDb.SaveOrUpdateKeycard(*keycard2Copy, 0, false)
+	s.Require().NoError(err)
+	err = senderDb.SaveOrUpdateKeycard(*keycard3, 0, false)
+	s.Require().NoError(err)
 
-// 	// Add keycards on sender
-// 	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
-// 	addedKc, addedAccs, err = senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard2)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
-// 	addedKc, addedAccs, err = senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard2Copy)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
-// 	addedKc, addedAccs, err = senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard3)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
+	// Trigger's a sync between devices
+	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
+	s.Require().NoError(err)
 
-// 	// Trigger's a sync between devices
-// 	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
-// 	s.Require().NoError(err)
+	// Wait for the response
+	_, err = WaitOnMessengerResponse(
+		s.other,
+		func(r *MessengerResponse) bool {
+			success := len(r.Keypairs) == 3
+			for _, kp := range r.Keypairs {
+				if kp.KeyUID == keycard1.KeyUID {
+					success = success && len(kp.Keycards) == 1
+				} else if kp.KeyUID == keycard2.KeyUID {
+					success = success && len(kp.Keycards) == 2
+				} else if kp.KeyUID == keycard3.KeyUID {
+					success = success && len(kp.Keycards) == 1
+				}
+			}
+			return success
+		},
+		"expected to receive keycards",
+	)
+	s.Require().NoError(err)
 
-// 	// Wait for the response
-// 	_, err = WaitOnMessengerResponse(
-// 		s.other,
-// 		func(r *MessengerResponse) bool {
-// 			success := len(r.Keypairs) == 3
-// 			for _, kp := range r.Keypairs {
-// 				if kp.KeyUID == keycard1.KeyUID {
-// 					success = success && len(kp.Keycards) == 1
-// 				} else if kp.KeyUID == keycard2.KeyUID {
-// 					success = success && len(kp.Keycards) == 2
-// 				} else if kp.KeyUID == keycard3.KeyUID {
-// 					success = success && len(kp.Keycards) == 1
-// 				}
-// 			}
-// 			return success
-// 		},
-// 		"expected to receive keycards",
-// 	)
-// 	s.Require().NoError(err)
+	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(4, len(syncedKeycards))
+	s.Require().True(accounts.Contains(syncedKeycards, keycard1, accounts.SameKeycards))
+	s.Require().True(accounts.Contains(syncedKeycards, keycard2, accounts.SameKeycards))
+	s.Require().True(accounts.Contains(syncedKeycards, keycard2Copy, accounts.SameKeycards))
+	s.Require().True(accounts.Contains(syncedKeycards, keycard3, accounts.SameKeycards))
+}
 
-// 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(4, len(syncedKeycards))
-// 	s.Require().True(contains(syncedKeycards, keycard1, accounts.SameKeycards))
-// 	s.Require().True(contains(syncedKeycards, keycard2, accounts.SameKeycards))
-// 	s.Require().True(contains(syncedKeycards, keycard2Copy, accounts.SameKeycards))
-// 	s.Require().True(contains(syncedKeycards, keycard3, accounts.SameKeycards))
-// }
+func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfKeycardsWereDeletedOnSenderSide() {
+	senderDb := s.main.settings
+	dbOnReceiver := s.other.settings
 
-// func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverHasKeycardsOlderThanSender() {
-// 	senderDb := s.main.settings
-// 	dbOnReceiver := s.other.settings
+	// Add keycards on sender
+	keycard1 := accounts.GetProfileKeycardForTest()
 
-// 	keycard1 := accounts.GetProfileKeycardForTest()
+	keycard2 := accounts.GetKeycardForSeedImportedKeypair1ForTest()
 
-// 	keycard2 := accounts.GetKeycardForSeedImportedKeypair1ForTest()
+	keycard2Copy := accounts.GetKeycardForSeedImportedKeypair1ForTest()
+	keycard2Copy.KeycardUID = keycard2Copy.KeycardUID + "C"
+	keycard2Copy.KeycardName = keycard2Copy.KeycardName + "Copy"
 
-// 	// Add keycards on sender
-// 	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
-// 	addedKc, addedAccs, err = senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard2)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
+	keycard3 := accounts.GetKeycardForSeedImportedKeypair2ForTest()
 
-// 	// Add keycards on receiver - partially
-// 	keycardR1 := accounts.GetProfileKeycardForTest()
-// 	keycardR1.KeycardName = "CardNameToBeChanged-0"
-// 	keycardR1.AccountsAddresses = keycardR1.AccountsAddresses[2:3]
-// 	keycardR1.LastUpdateClock = keycardR1.LastUpdateClock - 1
+	// Add keycards on sender
+	err := senderDb.SaveOrUpdateKeycard(*keycard1, 0, false)
+	s.Require().NoError(err)
+	err = senderDb.SaveOrUpdateKeycard(*keycard2, 0, false)
+	s.Require().NoError(err)
 
-// 	keycardR2 := accounts.GetKeycardForSeedImportedKeypair1ForTest()
-// 	keycardR2.KeycardName = "CardNameToBeChanged-1"
-// 	keycardR2.LastUpdateClock = keycardR2.LastUpdateClock - 1
+	// Add keycards on receiver
+	err = dbOnReceiver.SaveOrUpdateKeycard(*keycard1, 0, false)
+	s.Require().NoError(err)
+	err = dbOnReceiver.SaveOrUpdateKeycard(*keycard2, 0, false)
+	s.Require().NoError(err)
+	err = dbOnReceiver.SaveOrUpdateKeycard(*keycard2Copy, 0, false)
+	s.Require().NoError(err)
+	err = dbOnReceiver.SaveOrUpdateKeycard(*keycard3, 0, false)
+	s.Require().NoError(err)
 
-// 	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardR1)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
-// 	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardR2)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
+	// Trigger's a sync between devices
+	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
+	s.Require().NoError(err)
 
-// 	// Trigger's a sync between devices
-// 	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
-// 	s.Require().NoError(err)
+	// Wait for the response
+	_, err = WaitOnMessengerResponse(
+		s.other,
+		func(r *MessengerResponse) bool {
+			success := len(r.Keypairs) == 3
+			for _, kp := range r.Keypairs {
+				if kp.KeyUID == keycard1.KeyUID {
+					success = success && len(kp.Keycards) == 1
+				} else if kp.KeyUID == keycard2.KeyUID {
+					success = success && len(kp.Keycards) == 1
+				}
+			}
+			return success
+		},
+		"expected to receive keycards",
+	)
+	s.Require().NoError(err)
 
-// 	// Wait for the response
-// 	_, err = WaitOnMessengerResponse(
-// 		s.other,
-// 		func(r *MessengerResponse) bool {
-// 			success := len(r.Keypairs) == 3
-// 			for _, kp := range r.Keypairs {
-// 				if kp.KeyUID == keycardR1.KeyUID {
-// 					success = success && len(kp.Keycards) == 1
-// 				} else if kp.KeyUID == keycardR2.KeyUID {
-// 					success = success && len(kp.Keycards) == 1
-// 				}
-// 			}
-// 			return success
-// 		},
-// 		"expected to receive keycards",
-// 	)
-// 	s.Require().NoError(err)
+	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(2, len(syncedKeycards))
+	s.Require().True(accounts.Contains(syncedKeycards, keycard1, accounts.SameKeycards))
+	s.Require().True(accounts.Contains(syncedKeycards, keycard2, accounts.SameKeycards))
+}
 
-// 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(2, len(syncedKeycards))
-// 	s.Require().True(contains(syncedKeycards, keycard1, accounts.SameKeycards))
-// 	s.Require().True(contains(syncedKeycards, keycard2, accounts.SameKeycards))
-// }
+func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverAndSenderHasNoKeycardsInCommon() {
+	senderDb := s.main.settings
+	dbOnReceiver := s.other.settings
 
-// func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverHasKeycardsNewerThanSender() {
-// 	senderDb := s.main.settings
-// 	dbOnReceiver := s.other.settings
+	// Add keycards on sender
+	keycard1 := accounts.GetProfileKeycardForTest()
 
-// 	keycard1 := accounts.GetProfileKeycardForTest()
+	keycard2 := accounts.GetKeycardForSeedImportedKeypair1ForTest()
 
-// 	keycard2 := accounts.GetKeycardForSeedImportedKeypair1ForTest()
+	keycard2Copy := accounts.GetKeycardForSeedImportedKeypair1ForTest()
+	keycard2Copy.KeycardUID = keycard2Copy.KeycardUID + "C"
+	keycard2Copy.KeycardName = keycard2Copy.KeycardName + "Copy"
 
-// 	// Add keycards on sender
-// 	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
-// 	addedKc, addedAccs, err = senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard2)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
+	keycard3 := accounts.GetKeycardForSeedImportedKeypair2ForTest()
 
-// 	// Add keycards on receiver - partially
-// 	keycardR1 := accounts.GetProfileKeycardForTest()
-// 	keycardR1.KeycardName = "CardNameToBeChanged-0"
-// 	keycardR1.AccountsAddresses = keycardR1.AccountsAddresses[2:3]
-// 	keycardR1.LastUpdateClock = keycardR1.LastUpdateClock + 1
+	// Add keycards on sender
+	err := senderDb.SaveOrUpdateKeycard(*keycard2, 0, false)
+	s.Require().NoError(err)
+	err = senderDb.SaveOrUpdateKeycard(*keycard2Copy, 0, false)
+	s.Require().NoError(err)
 
-// 	keycardR2 := accounts.GetKeycardForSeedImportedKeypair1ForTest()
-// 	keycardR2.KeycardName = "CardNameToBeChanged-1"
-// 	keycardR2.LastUpdateClock = keycardR2.LastUpdateClock + 1
+	// Add keycards on receiver
+	err = dbOnReceiver.SaveOrUpdateKeycard(*keycard1, 0, false)
+	s.Require().NoError(err)
+	err = dbOnReceiver.SaveOrUpdateKeycard(*keycard3, 0, false)
+	s.Require().NoError(err)
 
-// 	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardR1)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
-// 	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycardR2)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
+	// Trigger's a sync between devices
+	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
+	s.Require().NoError(err)
 
-// 	// Trigger's a sync between devices
-// 	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
-// 	s.Require().NoError(err)
+	// Wait for the response
+	_, err = WaitOnMessengerResponse(
+		s.other,
+		func(r *MessengerResponse) bool {
+			success := len(r.Keypairs) == 3
+			for _, kp := range r.Keypairs {
+				if kp.KeyUID == keycard2.KeyUID {
+					success = success && len(kp.Keycards) == 2
+				}
+			}
+			return success
+		},
+		"expected to receive keycards",
+	)
+	s.Require().NoError(err)
 
-// 	// Wait for the response
-// 	_, err = WaitOnMessengerResponse(
-// 		s.other,
-// 		func(r *MessengerResponse) bool {
-// 			success := len(r.Keypairs) == 3
-// 			for _, kp := range r.Keypairs {
-// 				if kp.KeyUID == keycardR1.KeyUID {
-// 					success = success && len(kp.Keycards) == 1
-// 				} else if kp.KeyUID == keycardR2.KeyUID {
-// 					success = success && len(kp.Keycards) == 1
-// 				}
-// 			}
-// 			return success
-// 		},
-// 		"expected to receive keycards",
-// 	)
-// 	s.Require().NoError(err)
-
-// 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(2, len(syncedKeycards))
-// 	s.Require().True(contains(syncedKeycards, keycardR1, accounts.SameKeycards))
-// 	s.Require().True(contains(syncedKeycards, keycardR2, accounts.SameKeycards))
-// }
-
-// func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfKeycardsWereDeletedOnSenderSide() {
-// 	senderDb := s.main.settings
-// 	dbOnReceiver := s.other.settings
-
-// 	// Add keycards on sender
-// 	keycard1 := accounts.GetProfileKeycardForTest()
-
-// 	keycard2 := accounts.GetKeycardForSeedImportedKeypair1ForTest()
-
-// 	keycard2Copy := accounts.GetKeycardForSeedImportedKeypair1ForTest()
-// 	keycard2Copy.KeycardUID = keycard2Copy.KeycardUID + "C"
-// 	keycard2Copy.KeycardName = keycard2Copy.KeycardName + "Copy"
-// 	keycard2Copy.LastUpdateClock = keycard2Copy.LastUpdateClock + 1
-
-// 	keycard3 := accounts.GetKeycardForSeedImportedKeypair2ForTest()
-
-// 	// Add keycards on sender
-// 	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
-// 	addedKc, addedAccs, err = senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard2)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
-
-// 	// Add keycards on receiver
-// 	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
-// 	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard2)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
-// 	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard2Copy)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
-// 	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard3)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
-
-// 	// Trigger's a sync between devices
-// 	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
-// 	s.Require().NoError(err)
-
-// 	// Wait for the response
-// 	_, err = WaitOnMessengerResponse(
-// 		s.other,
-// 		func(r *MessengerResponse) bool {
-// 			success := len(r.Keypairs) == 3
-// 			for _, kp := range r.Keypairs {
-// 				if kp.KeyUID == keycard1.KeyUID {
-// 					success = success && len(kp.Keycards) == 1
-// 				} else if kp.KeyUID == keycard2.KeyUID {
-// 					success = success && len(kp.Keycards) == 1
-// 				}
-// 			}
-// 			return success
-// 		},
-// 		"expected to receive keycards",
-// 	)
-// 	s.Require().NoError(err)
-
-// 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(2, len(syncedKeycards))
-// 	s.Require().True(contains(syncedKeycards, keycard1, accounts.SameKeycards))
-// 	s.Require().True(contains(syncedKeycards, keycard2, accounts.SameKeycards))
-// }
-
-// func (s *MessengerSyncKeycardsStateSuite) TestSyncKeycardsIfReceiverAndSenderHasNoKeycardsInCommon() {
-// 	senderDb := s.main.settings
-// 	dbOnReceiver := s.other.settings
-
-// 	// Add keycards on sender
-// 	keycard1 := accounts.GetProfileKeycardForTest()
-
-// 	keycard2 := accounts.GetKeycardForSeedImportedKeypair1ForTest()
-
-// 	keycard2Copy := accounts.GetKeycardForSeedImportedKeypair1ForTest()
-// 	keycard2Copy.KeycardUID = keycard2Copy.KeycardUID + "C"
-// 	keycard2Copy.KeycardName = keycard2Copy.KeycardName + "Copy"
-// 	keycard2Copy.LastUpdateClock = keycard2Copy.LastUpdateClock + 1
-
-// 	keycard3 := accounts.GetKeycardForSeedImportedKeypair2ForTest()
-
-// 	// Add keycards on sender
-// 	addedKc, addedAccs, err := senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard2)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
-// 	addedKc, addedAccs, err = senderDb.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard2Copy)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
-
-// 	// Add keycards on receiver
-// 	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
-// 	addedKc, addedAccs, err = dbOnReceiver.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard3)
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(true, addedKc)
-// 	s.Require().Equal(false, addedAccs)
-
-// 	// Trigger's a sync between devices
-// 	err = s.main.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
-// 	s.Require().NoError(err)
-
-// 	// Wait for the response
-// 	_, err = WaitOnMessengerResponse(
-// 		s.other,
-// 		func(r *MessengerResponse) bool {
-// 			success := len(r.Keypairs) == 3
-// 			for _, kp := range r.Keypairs {
-// 				if kp.KeyUID == keycard2.KeyUID {
-// 					success = success && len(kp.Keycards) == 2
-// 				}
-// 			}
-// 			return success
-// 		},
-// 		"expected to receive keycards",
-// 	)
-// 	s.Require().NoError(err)
-
-// 	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
-// 	s.Require().NoError(err)
-// 	s.Require().Equal(2, len(syncedKeycards))
-// 	s.Require().True(contains(syncedKeycards, keycard2, accounts.SameKeycards))
-// 	s.Require().True(contains(syncedKeycards, keycard2Copy, accounts.SameKeycards))
-// }
+	syncedKeycards, err := dbOnReceiver.GetAllKnownKeycards()
+	s.Require().NoError(err)
+	s.Require().Equal(2, len(syncedKeycards))
+	s.Require().True(accounts.Contains(syncedKeycards, keycard2, accounts.SameKeycards))
+	s.Require().True(accounts.Contains(syncedKeycards, keycard2Copy, accounts.SameKeycards))
+}

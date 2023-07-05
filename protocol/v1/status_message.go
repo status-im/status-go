@@ -320,8 +320,6 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData((new(protobuf.SyncContactRequestDecision)))
 	case protobuf.ApplicationMetadataMessage_SYNC_SAVED_ADDRESS:
 		return m.unmarshalProtobufData(new(protobuf.SyncSavedAddress))
-	case protobuf.ApplicationMetadataMessage_SYNC_KEYCARD_ACTION:
-		return m.unmarshalProtobufData(new(protobuf.SyncKeycardAction))
 	case protobuf.ApplicationMetadataMessage_SYNC_SOCIAL_LINKS:
 		return m.unmarshalProtobufData(new(protobuf.SyncSocialLinks))
 	case protobuf.ApplicationMetadataMessage_SYNC_ENS_USERNAME_DETAIL:

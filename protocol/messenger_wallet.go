@@ -198,7 +198,7 @@ func (m *Messenger) deleteKeystoreFileForAddress(address types.Address) error {
 
 		lastAcccountOfKeypairWithTheSameKey := len(kp.Accounts) == 1
 
-		knownKeycardsForKeyUID, err := m.settings.GetKeycardByKeyUID(acc.KeyUID)
+		knownKeycardsForKeyUID, err := m.settings.GetKeycardsWithSameKeyUID(acc.KeyUID)
 		if err != nil {
 			return err
 		}
@@ -216,23 +216,6 @@ func (m *Messenger) deleteKeystoreFileForAddress(address types.Address) error {
 					var e *account.ErrCannotLocateKeyFile
 					if err != nil && !errors.As(err, &e) {
 						return err
-					}
-				}
-			}
-		} else {
-			if lastAcccountOfKeypairWithTheSameKey {
-				knownKeycards, err := m.settings.GetAllKnownKeycards()
-				if err != nil {
-					return err
-				}
-
-				for _, kc := range knownKeycards {
-					if kc.KeyUID == acc.KeyUID {
-						clock := uint64(time.Now().Unix())
-						err = m.RemoveMigratedAccountsForKeycard(context.Background(), kc.KeycardUID, kc.AccountsAddresses, clock)
-						if err != nil {
-							return err
-						}
 					}
 				}
 			}

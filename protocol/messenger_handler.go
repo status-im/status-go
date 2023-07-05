@@ -3036,13 +3036,13 @@ func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, syn
 		// We're here when we receive a keypair from the paired device which is either:
 		// 1. regular keypair or
 		// 2. was just converted from keycard to a regular keypair.
-		dbKeycardsForKeyUID, err := m.settings.GetKeycardByKeyUID(syncAcc.KeyUid)
-		if err != nil && err != accounts.ErrDbKeypairNotFound {
+		dbKeycardsForKeyUID, err := m.settings.GetKeycardsWithSameKeyUID(syncAcc.KeyUid)
+		if err != nil {
 			return accounts.AccountNonOperable, err
 		}
 
 		if len(dbKeycardsForKeyUID) > 0 {
-			// We're here in 2. case from above and in this case we need to mark all accounts for this keypair non operable
+			// We're here in case 2. from above and in this case we need to mark all accounts for this keypair non operable
 			return accounts.AccountNonOperable, nil
 		}
 	}
@@ -3174,7 +3174,7 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.
 		}
 	}
 
-	err = m.settings.DeleteKeypair(message.KeyUid)
+	err = m.settings.DeleteKeypair(message.KeyUid) // deleting keypair will delete related keycards as well
 	if err != nil && err != accounts.ErrDbKeypairNotFound {
 		return nil, err
 	}
@@ -3192,12 +3192,11 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.
 	for _, sKc := range message.Keycards {
 		kc := accounts.Keycard{}
 		kc.FromSyncKeycard(sKc)
+		err = m.settings.SaveOrUpdateKeycard(kc, message.Clock, false)
+		if err != nil {
+			return nil, err
+		}
 		kp.Keycards = append(kp.Keycards, &kc)
-	}
-
-	err = m.settings.ApplyKeycardsForKeypairWithKeyUID(kp.KeyUID, kp.Keycards)
-	if err != nil {
-		return nil, err
 	}
 
 	return kp, nil

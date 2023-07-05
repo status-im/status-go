@@ -999,7 +999,7 @@ func TestConvertAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check that there is no registered keycards
-	keycards, err := db.GetKeycardByKeyUID(genAccInfo.KeyUID)
+	keycards, err := db.GetKeycardsWithSameKeyUID(genAccInfo.KeyUID)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(keycards))
 
@@ -1026,7 +1026,7 @@ func TestConvertAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check that there is a registered keycard
-	keycards, err = db1.GetKeycardByKeyUID(genAccInfo.KeyUID)
+	keycards, err = db1.GetKeycardsWithSameKeyUID(genAccInfo.KeyUID)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(keycards))
 
@@ -1059,7 +1059,7 @@ func TestConvertAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check that there is no registered keycards
-	keycards, err = db2.GetKeycardByKeyUID(genAccInfo.KeyUID)
+	keycards, err = db2.GetKeycardsWithSameKeyUID(genAccInfo.KeyUID)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(keycards))
 

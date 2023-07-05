@@ -4315,20 +4315,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							allMessagesProcessed = false
 							continue
 						}
-					case protobuf.SyncKeycardAction:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						p := msg.ParsedMessage.Interface().(protobuf.SyncKeycardAction)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						err = m.handleSyncKeycardActivity(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle SyncKeycardAction", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
 					case protobuf.SyncSocialLinks:
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
