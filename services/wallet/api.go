@@ -328,14 +328,14 @@ func (api *API) GetOpenseaAssetsByOwnerAndContractAddressWithCursor(ctx context.
 	return api.s.collectiblesManager.FetchAllAssetsByOwnerAndContractAddress(chainID, owner, contractAddresses, cursor, limit)
 }
 
-func (api *API) GetOpenseaAssetsByNFTUniqueID(ctx context.Context, chainID uint64, uniqueIDs []thirdparty.NFTUniqueID, limit int) (*opensea.AssetContainer, error) {
+func (api *API) GetOpenseaAssetsByNFTUniqueID(ctx context.Context, chainID uint64, uniqueIDs []thirdparty.CollectibleUniqueID, limit int) (*opensea.AssetContainer, error) {
 	log.Debug("call to GetOpenseaAssetsByNFTUniqueID")
 	return api.s.collectiblesManager.FetchAssetsByNFTUniqueID(chainID, uniqueIDs, limit)
 }
 
-func (api *API) GetCollectibleOwnersByContractAddress(chainID uint64, contractAddress common.Address) (*thirdparty.NFTContractOwnership, error) {
+func (api *API) GetCollectibleOwnersByContractAddress(chainID uint64, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
 	log.Debug("call to GetCollectibleOwnersByContractAddress")
-	return api.s.collectiblesManager.FetchNFTOwnersByContractAddress(chainID, contractAddress)
+	return api.s.collectiblesManager.FetchCollectibleOwnersByContractAddress(chainID, contractAddress)
 }
 
 func (api *API) FetchBalancesByOwnerAndContractAddress(chainID uint64, ownerAddress common.Address, contractAddresses []common.Address) (thirdparty.TokenBalancesPerContractAddress, error) {

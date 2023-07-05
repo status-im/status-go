@@ -381,7 +381,7 @@ func (o *Client) FetchAllAssetsByOwner(owner common.Address, cursor string, limi
 	return o.fetchAssets(queryParams, limit)
 }
 
-func (o *Client) FetchAssetsByNFTUniqueID(uniqueIDs []thirdparty.NFTUniqueID, limit int) (*AssetContainer, error) {
+func (o *Client) FetchAssetsByNFTUniqueID(uniqueIDs []thirdparty.CollectibleUniqueID, limit int) (*AssetContainer, error) {
 	queryParams := url.Values{}
 
 	for _, uniqueID := range uniqueIDs {

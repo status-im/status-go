@@ -58,18 +58,18 @@ type TokenBalance struct {
 	Balance *bigint.BigInt    `json:"balance"`
 }
 
-type NFTOwner struct {
+type CollectibleOwner struct {
 	OwnerAddress  common.Address `json:"ownerAddress"`
 	TokenBalances []TokenBalance `json:"tokenBalances"`
 }
 
-type NFTContractOwnership struct {
-	Owners  []NFTOwner `json:"ownerAddresses"`
-	PageKey string     `json:"pageKey"`
+type CollectibleContractOwnership struct {
+	Owners  []CollectibleOwner `json:"ownerAddresses"`
+	PageKey string             `json:"pageKey"`
 }
 
 type Client struct {
-	thirdparty.NFTContractOwnershipProvider
+	thirdparty.CollectibleContractOwnershipProvider
 	client          *http.Client
 	apiKeys         map[uint64]string
 	IsConnected     bool
@@ -98,8 +98,8 @@ func (o *Client) IsChainSupported(chainID uint64) bool {
 	return err == nil
 }
 
-func alchemyOwnershipToCommon(contractAddress common.Address, alchemyOwnership NFTContractOwnership) (*thirdparty.NFTContractOwnership, error) {
-	owners := make([]thirdparty.NFTOwner, 0, len(alchemyOwnership.Owners))
+func alchemyOwnershipToCommon(contractAddress common.Address, alchemyOwnership CollectibleContractOwnership) (*thirdparty.CollectibleContractOwnership, error) {
+	owners := make([]thirdparty.CollectibleOwner, 0, len(alchemyOwnership.Owners))
 	for _, alchemyOwner := range alchemyOwnership.Owners {
 		balances := make([]thirdparty.TokenBalance, 0, len(alchemyOwner.TokenBalances))
 
@@ -109,7 +109,7 @@ func alchemyOwnershipToCommon(contractAddress common.Address, alchemyOwnership N
 				Balance: alchemyBalance.Balance,
 			})
 		}
-		owner := thirdparty.NFTOwner{
+		owner := thirdparty.CollectibleOwner{
 			OwnerAddress:  alchemyOwner.OwnerAddress,
 			TokenBalances: balances,
 		}
@@ -117,7 +117,7 @@ func alchemyOwnershipToCommon(contractAddress common.Address, alchemyOwnership N
 		owners = append(owners, owner)
 	}
 
-	ownership := thirdparty.NFTContractOwnership{
+	ownership := thirdparty.CollectibleContractOwnership{
 		ContractAddress: contractAddress,
 		Owners:          owners,
 	}
@@ -125,7 +125,7 @@ func alchemyOwnershipToCommon(contractAddress common.Address, alchemyOwnership N
 	return &ownership, nil
 }
 
-func (o *Client) FetchNFTOwnersByContractAddress(chainID uint64, contractAddress common.Address) (*thirdparty.NFTContractOwnership, error) {
+func (o *Client) FetchCollectibleOwnersByContractAddress(chainID uint64, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
 	queryParams := url.Values{
 		"contractAddress":   {contractAddress.String()},
 		"withTokenBalances": {"true"},
@@ -152,7 +152,7 @@ func (o *Client) FetchNFTOwnersByContractAddress(chainID uint64, contractAddress
 		return nil, err
 	}
 
-	var alchemyOwnership NFTContractOwnership
+	var alchemyOwnership CollectibleContractOwnership
 	err = json.Unmarshal(body, &alchemyOwnership)
 	if err != nil {
 		return nil, err

@@ -181,7 +181,7 @@ func (s *Service) GetFeed() *event.Feed {
 }
 
 // Set external Collectibles metadata provider
-func (s *Service) SetNFTMetadataProvider(provider thirdparty.NFTMetadataProvider) {
+func (s *Service) SetCollectibleMetadataProvider(provider thirdparty.CollectibleMetadataProvider) {
 	s.collectiblesManager.SetMetadataProvider(provider)
 }
 
