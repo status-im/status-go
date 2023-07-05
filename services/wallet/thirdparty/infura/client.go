@@ -16,21 +16,21 @@ import (
 
 const baseURL = "https://nft.api.infura.io"
 
-type NFTOwner struct {
+type CollectibleOwner struct {
 	ContractAddress common.Address `json:"tokenAddress"`
 	TokenID         *bigint.BigInt `json:"tokenId"`
 	Amount          *bigint.BigInt `json:"amount"`
 	OwnerAddress    common.Address `json:"ownerOf"`
 }
 
-type NFTContractOwnership struct {
-	Owners  []NFTOwner `json:"owners"`
-	Network string     `json:"network"`
-	Cursor  string     `json:"cursor"`
+type CollectibleContractOwnership struct {
+	Owners  []CollectibleOwner `json:"owners"`
+	Network string             `json:"network"`
+	Cursor  string             `json:"cursor"`
 }
 
 type Client struct {
-	thirdparty.NFTContractOwnershipProvider
+	thirdparty.CollectibleContractOwnershipProvider
 	client          *http.Client
 	apiKey          string
 	apiKeySecret    string
@@ -71,8 +71,8 @@ func (o *Client) IsChainSupported(chainID uint64) bool {
 	return false
 }
 
-func infuraOwnershipToCommon(contractAddress common.Address, ownersMap map[common.Address][]NFTOwner) (*thirdparty.NFTContractOwnership, error) {
-	owners := make([]thirdparty.NFTOwner, 0, len(ownersMap))
+func infuraOwnershipToCommon(contractAddress common.Address, ownersMap map[common.Address][]CollectibleOwner) (*thirdparty.CollectibleContractOwnership, error) {
+	owners := make([]thirdparty.CollectibleOwner, 0, len(ownersMap))
 
 	for ownerAddress, ownerTokens := range ownersMap {
 		tokenBalances := make([]thirdparty.TokenBalance, 0, len(ownerTokens))
@@ -84,13 +84,13 @@ func infuraOwnershipToCommon(contractAddress common.Address, ownersMap map[commo
 			})
 		}
 
-		owners = append(owners, thirdparty.NFTOwner{
+		owners = append(owners, thirdparty.CollectibleOwner{
 			OwnerAddress:  ownerAddress,
 			TokenBalances: tokenBalances,
 		})
 	}
 
-	ownership := thirdparty.NFTContractOwnership{
+	ownership := thirdparty.CollectibleContractOwnership{
 		ContractAddress: contractAddress,
 		Owners:          owners,
 	}
@@ -98,9 +98,9 @@ func infuraOwnershipToCommon(contractAddress common.Address, ownersMap map[commo
 	return &ownership, nil
 }
 
-func (o *Client) FetchNFTOwnersByContractAddress(chainID uint64, contractAddress common.Address) (*thirdparty.NFTContractOwnership, error) {
+func (o *Client) FetchCollectibleOwnersByContractAddress(chainID uint64, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
 	cursor := ""
-	ownersMap := make(map[common.Address][]NFTOwner)
+	ownersMap := make(map[common.Address][]CollectibleOwner)
 
 	for {
 		url := fmt.Sprintf("%s/networks/%d/nfts/%s/owners", baseURL, chainID, contractAddress.String())
@@ -121,7 +121,7 @@ func (o *Client) FetchNFTOwnersByContractAddress(chainID uint64, contractAddress
 			return nil, err
 		}
 
-		var infuraOwnership NFTContractOwnership
+		var infuraOwnership CollectibleContractOwnership
 		err = json.Unmarshal(body, &infuraOwnership)
 		if err != nil {
 			return nil, err

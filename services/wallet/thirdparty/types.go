@@ -1,10 +1,5 @@
 package thirdparty
 
-import (
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/services/wallet/bigint"
-)
-
 type HistoricalPrice struct {
 	Timestamp int64   `json:"time"`
 	Value     float64 `json:"close"`
@@ -39,49 +34,6 @@ type MarketDataProvider interface {
 	FetchHistoricalHourlyPrices(symbol string, currency string, limit int, aggregate int) ([]HistoricalPrice, error)
 	FetchTokenMarketValues(symbols []string, currency string) (map[string]TokenMarketValues, error)
 	FetchTokenDetails(symbols []string) (map[string]TokenDetails, error)
-}
-
-type NFTUniqueID struct {
-	ContractAddress common.Address `json:"contractAddress"`
-	TokenID         *bigint.BigInt `json:"tokenID"`
-}
-
-func (k *NFTUniqueID) HashKey() string {
-	return k.ContractAddress.String() + "+" + k.TokenID.String()
-}
-
-type NFTMetadata struct {
-	Name               string `json:"name"`
-	Description        string `json:"description"`
-	CollectionImageURL string `json:"collection_image"`
-	ImageURL           string `json:"image"`
-}
-
-type NFTMetadataProvider interface {
-	CanProvideNFTMetadata(chainID uint64, id NFTUniqueID, tokenURI string) (bool, error)
-	FetchNFTMetadata(chainID uint64, id NFTUniqueID, tokenURI string) (*NFTMetadata, error)
-}
-
-type TokenBalance struct {
-	TokenID *bigint.BigInt `json:"tokenId"`
-	Balance *bigint.BigInt `json:"balance"`
-}
-
-type TokenBalancesPerContractAddress = map[common.Address][]TokenBalance
-
-type NFTOwner struct {
-	OwnerAddress  common.Address `json:"ownerAddress"`
-	TokenBalances []TokenBalance `json:"tokenBalances"`
-}
-
-type NFTContractOwnership struct {
-	ContractAddress common.Address `json:"contractAddress"`
-	Owners          []NFTOwner     `json:"owners"`
-}
-
-type NFTContractOwnershipProvider interface {
-	FetchNFTOwnersByContractAddress(chainID uint64, contractAddress common.Address) (*NFTContractOwnership, error)
-	IsChainSupported(chainID uint64) bool
 }
 
 type DataParsed struct {

@@ -62,7 +62,7 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional API to whisper-based protocols like Whisper or Waku.
 type Service struct {
-	thirdparty.NFTMetadataProvider
+	thirdparty.CollectibleMetadataProvider
 	messenger       *protocol.Messenger
 	identity        *ecdsa.PrivateKey
 	cancelMessenger chan struct{}
@@ -545,12 +545,12 @@ func tokenURIToCommunityID(tokenURI string) string {
 	return communityID
 }
 
-func (s *Service) CanProvideNFTMetadata(chainID uint64, id thirdparty.NFTUniqueID, tokenURI string) (bool, error) {
+func (s *Service) CanProvideCollectibleMetadata(chainID uint64, id thirdparty.CollectibleUniqueID, tokenURI string) (bool, error) {
 	ret := tokenURI != "" && tokenURIToCommunityID(tokenURI) != ""
 	return ret, nil
 }
 
-func (s *Service) FetchNFTMetadata(chainID uint64, id thirdparty.NFTUniqueID, tokenURI string) (*thirdparty.NFTMetadata, error) {
+func (s *Service) FetchCollectibleMetadata(chainID uint64, id thirdparty.CollectibleUniqueID, tokenURI string) (*thirdparty.CollectibleMetadata, error) {
 	if s.messenger == nil {
 		return nil, fmt.Errorf("messenger not ready")
 	}
@@ -574,7 +574,7 @@ func (s *Service) FetchNFTMetadata(chainID uint64, id thirdparty.NFTUniqueID, to
 		for _, tokenMetadata := range tokensMetadata {
 			contractAddresses := tokenMetadata.GetContractAddresses()
 			if contractAddresses[chainID] == id.ContractAddress.Hex() {
-				return &thirdparty.NFTMetadata{
+				return &thirdparty.CollectibleMetadata{
 					Name:               tokenMetadata.GetName(),
 					Description:        tokenMetadata.GetDescription(),
 					CollectionImageURL: tokenMetadata.GetImage(),
