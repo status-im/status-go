@@ -60,6 +60,7 @@ import (
 	"github.com/status-im/status-go/protocol/verification"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/services/communitytokens"
 	ensservice "github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/ext/mailservers"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
@@ -175,6 +176,8 @@ type Messenger struct {
 	localPairing bool
 	// flag to enable backedup messages processing, false by default
 	processBackedupMessages bool
+
+	communityTokensService communitytokens.ServiceInterface
 }
 
 type connStatus int
@@ -462,7 +465,7 @@ func NewMessenger(
 		managerOptions = append(managerOptions, communities.WithCommunityTokensService(c.communityTokensService))
 	}
 
-	communitiesManager, err := communities.NewManager(identity, database, encryptionProtocol, logger, ensVerifier, transp, transp, c.torrentConfig, managerOptions...)
+	communitiesManager, err := communities.NewManager(identity, database, encryptionProtocol, logger, ensVerifier, c.communityTokensService, transp, transp, c.torrentConfig, managerOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -495,6 +498,7 @@ func NewMessenger(
 		anonMetricsClient:      anonMetricsClient,
 		anonMetricsServer:      anonMetricsServer,
 		telemetryClient:        telemetryClient,
+		communityTokensService: c.communityTokensService,
 		pushNotificationClient: pushNotificationClient,
 		pushNotificationServer: pushNotificationServer,
 		communitiesManager:     communitiesManager,
@@ -3579,7 +3583,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 	logger := m.logger.With(zap.String("site", "RetrieveAll"))
 
-	controlledCommunitiesChatIDs, err := m.communitiesManager.GetControlledCommunitiesChatIDs()
+	controlledCommunitiesChatIDs, err := m.communitiesManager.GetOwnedCommunitiesChatIDs()
 	if err != nil {
 		logger.Info("failed to retrieve admin communities", zap.Error(err))
 	}
@@ -3690,62 +3694,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				}
 			}
 
-			// Process any community changes
-			for _, changes := range messageState.Response.CommunityChanges {
-				if changes.ShouldMemberJoin {
-					response, err := m.joinCommunity(context.TODO(), changes.Community.ID(), false)
-					if err != nil {
-						logger.Error("cannot join community", zap.Error(err))
-						continue
-					}
-
-					if err := messageState.Response.Merge(response); err != nil {
-						logger.Error("cannot merge join community response", zap.Error(err))
-						continue
-					}
-
-				} else if changes.ShouldMemberLeave {
-					// this means we've been kicked by the community owner/admin,
-					// in this case we don't want to unsubscribe from community updates
-					// so we still get notified accordingly when something changes,
-					// hence, we're setting `unsubscribeFromCommunity` to `false` here
-					response, err := m.leaveCommunity(changes.Community.ID(), false)
-					if err != nil {
-						logger.Error("cannot leave community", zap.Error(err))
-						continue
-					}
-
-					if err := messageState.Response.Merge(response); err != nil {
-						logger.Error("cannot merge join community response", zap.Error(err))
-						continue
-					}
-
-					// Activity Center notification
-					now := m.getCurrentTimeInMillis()
-					notification := &ActivityCenterNotification{
-						ID:          types.FromHex(uuid.New().String()),
-						Type:        ActivityCenterNotificationTypeCommunityKicked,
-						Timestamp:   now,
-						CommunityID: changes.Community.IDString(),
-						Read:        false,
-						UpdatedAt:   now,
-					}
-
-					err = m.addActivityCenterNotification(response, notification)
-					if err != nil {
-						logger.Error("failed to save notification", zap.Error(err))
-						continue
-					}
-
-					if err := messageState.Response.Merge(response); err != nil {
-						logger.Error("cannot merge notification response", zap.Error(err))
-						continue
-					}
-				}
-			}
-
-			// Clean up as not used by clients currently
-			messageState.Response.CommunityChanges = nil
+			m.processCommunityChanges(messageState)
 
 			// NOTE: for now we confirm messages as processed regardless whether we
 			// actually processed them, this is because we need to differentiate

@@ -438,11 +438,7 @@ func (api *API) NewMasterTokenInstance(chainID uint64, contractAddress string) (
 }
 
 func (api *API) NewOwnerTokenInstance(chainID uint64, contractAddress string) (*ownertoken.OwnerToken, error) {
-	backend, err := api.s.manager.rpcClient.EthClient(chainID)
-	if err != nil {
-		return nil, err
-	}
-	return ownertoken.NewOwnerToken(common.HexToAddress(contractAddress), backend)
+	return api.s.NewOwnerTokenInstance(chainID, contractAddress)
 }
 
 func (api *API) NewCommunityTokenDeployerInstance(chainID uint64) (*communitytokendeployer.CommunityTokenDeployer, error) {
@@ -450,11 +446,7 @@ func (api *API) NewCommunityTokenDeployerInstance(chainID uint64) (*communitytok
 }
 
 func (api *API) NewCommunityOwnerTokenRegistryInstance(chainID uint64, contractAddress string) (*communityownertokenregistry.CommunityOwnerTokenRegistry, error) {
-	backend, err := api.s.manager.rpcClient.EthClient(chainID)
-	if err != nil {
-		return nil, err
-	}
-	return communityownertokenregistry.NewCommunityOwnerTokenRegistry(common.HexToAddress(contractAddress), backend)
+	return api.s.NewCommunityOwnerTokenRegistryInstance(chainID, contractAddress)
 }
 
 func (api *API) NewCollectiblesInstance(chainID uint64, contractAddress string) (*collectibles.Collectibles, error) {
@@ -871,83 +863,21 @@ func (api *API) estimateMethod(ctx context.Context, chainID uint64, contractAddr
 
 // Gets signer public key from smart contract with a given chainId and address
 func (api *API) GetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string) (string, error) {
-	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	contractInst, err := api.NewOwnerTokenInstance(chainID, contractAddress)
-	if err != nil {
-		return "", err
-	}
-	signerPubKey, err := contractInst.SignerPublicKey(callOpts)
-	if err != nil {
-		return "", err
-	}
-	return common.Bytes2Hex(signerPubKey), nil
+	return api.s.GetSignerPubKey(ctx, chainID, contractAddress)
 }
 
 // Gets signer public key directly from deployer contract
 func (api *API) SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error) {
-	// 1. Get Owner Token contract address from deployer contract - SafeGetOwnerTokenAddress()
-	ownerTokenAddr, err := api.SafeGetOwnerTokenAddress(ctx, chainID, communityID)
-	if err != nil {
-		return "", err
-	}
-	// 2. Get Signer from owner token contract - GetSignerPubKey()
-	return api.GetSignerPubKey(ctx, chainID, ownerTokenAddr)
+	return api.s.SafeGetSignerPubKey(ctx, chainID, communityID)
 }
 
 // Gets owner token contract address from deployer contract
 func (api *API) SafeGetOwnerTokenAddress(ctx context.Context, chainID uint64, communityID string) (string, error) {
-	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	deployerContractInst, err := api.NewCommunityTokenDeployerInstance(chainID)
-	if err != nil {
-		return "", err
-	}
-	registryAddr, err := deployerContractInst.DeploymentRegistry(callOpts)
-	if err != nil {
-		return "", err
-	}
-	registryContractInst, err := api.NewCommunityOwnerTokenRegistryInstance(chainID, registryAddr.Hex())
-	if err != nil {
-		return "", err
-	}
-	communityEthAddress, err := convert33BytesPubKeyToEthAddress(communityID)
-	if err != nil {
-		return "", err
-	}
-	ownerTokenAddress, err := registryContractInst.GetEntry(callOpts, communityEthAddress)
-
-	return ownerTokenAddress.Hex(), err
+	return api.s.SafeGetOwnerTokenAddress(ctx, chainID, communityID)
 }
 
 func (api *API) SetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, newSignerPubKey string) (string, error) {
-	if len(newSignerPubKey) <= 0 {
-		return "", fmt.Errorf("signerPubKey is empty")
-	}
-
-	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
-
-	contractInst, err := api.NewOwnerTokenInstance(chainID, contractAddress)
-	if err != nil {
-		return "", err
-	}
-
-	tx, err := contractInst.SetSignerPublicKey(transactOpts, common.FromHex(newSignerPubKey))
-	if err != nil {
-		return "", err
-	}
-
-	err = api.s.pendingTracker.TrackPendingTransaction(
-		wcommon.ChainID(chainID),
-		tx.Hash(),
-		common.Address(txArgs.From),
-		transactions.SetSignerPublicKey,
-		transactions.AutoDelete,
-	)
-	if err != nil {
-		log.Error("TrackPendingTransaction error", "error", err)
-		return "", err
-	}
-
-	return tx.Hash().Hex(), nil
+	return api.s.SetSignerPubKey(ctx, chainID, contractAddress, txArgs, password, newSignerPubKey)
 }
 
 func (api *API) EstimateSetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, fromAddress string, newSignerPubKey string) (uint64, error) {

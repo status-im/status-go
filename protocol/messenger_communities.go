@@ -16,6 +16,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/google/uuid"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -42,6 +43,7 @@ import (
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/transactions"
 )
 
 // 7 days interval
@@ -232,6 +234,7 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 				if sub.ImportingHistoryArchiveMessagesSignal != nil {
 					m.config.messengerSignalsHandler.ImportingHistoryArchiveMessages(sub.ImportingHistoryArchiveMessagesSignal.CommunityID)
 				}
+
 			case <-m.quit:
 				return
 			}
@@ -345,6 +348,24 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 						m.logger.Warn("failed to publish community private members sync message", zap.Error(err))
 					}
 				}
+				if sub.TokenCommunityValidated != nil {
+					state := m.buildMessageState()
+
+					err := m.handleCommunityResponse(state, sub.TokenCommunityValidated)
+					if err != nil {
+						m.logger.Error("failed to handle community response", zap.Error(err))
+					}
+
+					m.processCommunityChanges(state)
+
+					response, err := m.saveDataAndPrepareResponse(state)
+					if err != nil {
+						m.logger.Error("failed to save data and prepare response")
+					}
+
+					signal.SendNewMessages(response)
+
+				}
 
 			case <-ticker.C:
 				// If we are not online, we don't even try
@@ -357,7 +378,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					continue
 				}
 
-				controlledCommunities, err := m.communitiesManager.ControlledCommunities()
+				controlledCommunities, err := m.communitiesManager.Owned()
 				if err != nil {
 					m.logger.Warn("failed to retrieve orgs", zap.Error(err))
 				}
@@ -391,7 +412,7 @@ func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
 		for {
 			select {
 			case <-ticker.C:
-				controlledCommunities, err := m.communitiesManager.ControlledCommunities()
+				controlledCommunities, err := m.communitiesManager.Owned()
 				if err != nil {
 					m.logger.Error("failed to update community active members count", zap.Error(err))
 				}
@@ -2789,9 +2810,14 @@ func (m *Messenger) passStoredCommunityInfoToSignalHandler(communityID string) {
 
 // handleCommunityDescription handles an community description
 func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawPayload []byte) error {
-	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload, nil)
+	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload, nil, nil)
 	if err != nil {
 		return err
+	}
+
+	// If response is nil, but not error, it will be processed async
+	if communityResponse == nil {
+		return nil
 	}
 
 	return m.handleCommunityResponse(state, communityResponse)
@@ -3546,7 +3572,7 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 		return err
 	}
 
-	controlledCommunities, err := m.communitiesManager.ControlledCommunities()
+	controlledCommunities, err := m.communitiesManager.Owned()
 	if err != nil {
 		return err
 	}
@@ -5013,4 +5039,79 @@ func (m *Messenger) GetCommunityMembersForWalletAddresses(communityID types.HexB
 	}
 
 	return membersForAddresses, nil
+}
+
+func (m *Messenger) processCommunityChanges(messageState *ReceivedMessageState) {
+	// Process any community changes
+	for _, changes := range messageState.Response.CommunityChanges {
+		if changes.ShouldMemberJoin {
+			response, err := m.joinCommunity(context.TODO(), changes.Community.ID(), false)
+			if err != nil {
+				m.logger.Error("cannot join community", zap.Error(err))
+				continue
+			}
+
+			if err := messageState.Response.Merge(response); err != nil {
+				m.logger.Error("cannot merge join community response", zap.Error(err))
+				continue
+			}
+
+		} else if changes.ShouldMemberLeave {
+			// this means we've been kicked by the community owner/admin,
+			// in this case we don't want to unsubscribe from community updates
+			// so we still get notified accordingly when something changes,
+			// hence, we're setting `unsubscribeFromCommunity` to `false` here
+			response, err := m.leaveCommunity(changes.Community.ID(), false)
+			if err != nil {
+				m.logger.Error("cannot leave community", zap.Error(err))
+				continue
+			}
+
+			if err := messageState.Response.Merge(response); err != nil {
+				m.logger.Error("cannot merge join community response", zap.Error(err))
+				continue
+			}
+
+			// Activity Center notification
+			now := m.getCurrentTimeInMillis()
+			notification := &ActivityCenterNotification{
+				ID:          types.FromHex(uuid.New().String()),
+				Type:        ActivityCenterNotificationTypeCommunityKicked,
+				Timestamp:   now,
+				CommunityID: changes.Community.IDString(),
+				Read:        false,
+				UpdatedAt:   now,
+			}
+
+			err = m.addActivityCenterNotification(response, notification)
+			if err != nil {
+				m.logger.Error("failed to save notification", zap.Error(err))
+				continue
+			}
+
+			if err := messageState.Response.Merge(response); err != nil {
+				m.logger.Error("cannot merge notification response", zap.Error(err))
+				continue
+			}
+		}
+	}
+	// Clean up as not used by clients currently
+	messageState.Response.CommunityChanges = nil
+}
+
+func (m *Messenger) SetCommunitySignerPubKey(ctx context.Context, communityID []byte, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, newSignerPubKey string) (string, error) {
+	if m.communityTokensService == nil {
+		return "", errors.New("tokens service not initialized")
+	}
+	transactionHash, err := m.communityTokensService.SetSignerPubKey(ctx, chainID, contractAddress, txArgs, password, newSignerPubKey)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = m.communitiesManager.UpdatePrivateKeyAndControlNode(communityID, m.identity)
+	if err != nil {
+		return "", err
+	}
+
+	return transactionHash, nil
 }

@@ -58,6 +58,12 @@ var pieceLength = 100 * 1024
 const maxArchiveSizeInBytes = 30000000
 
 var memberPermissionsCheckInterval = 1 * time.Hour
+var validateInterval = 2 * time.Minute
+
+// Used for testing only
+func SetValidateInterval(duration time.Duration) {
+	validateInterval = duration
+}
 
 // errors
 var (
@@ -71,6 +77,7 @@ type Manager struct {
 	ensSubscription                  chan []*ens.VerificationRecord
 	subscriptions                    []chan *Subscription
 	ensVerifier                      *ens.Verifier
+	ownerVerifier                    OwnerVerifier
 	identity                         *ecdsa.PrivateKey
 	accountsManager                  account.Manager
 	tokenManager                     TokenManager
@@ -200,7 +207,11 @@ func WithCommunityTokensService(communityTokensService communitytokens.ServiceIn
 	}
 }
 
-func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Protocol, logger *zap.Logger, verifier *ens.Verifier, transport *transport.Transport, timesource common.TimeSource, torrentConfig *params.TorrentConfig, opts ...ManagerOption) (*Manager, error) {
+type OwnerVerifier interface {
+	SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error)
+}
+
+func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Protocol, logger *zap.Logger, ensverifier *ens.Verifier, ownerVerifier OwnerVerifier, transport *transport.Transport, timesource common.TimeSource, torrentConfig *params.TorrentConfig, opts ...ManagerOption) (*Manager, error) {
 	if identity == nil {
 		return nil, errors.New("empty identity")
 	}
@@ -231,6 +242,7 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 		stdoutLogger:                stdoutLogger,
 		encryptor:                   encryptor,
 		identity:                    identity,
+		ownerVerifier:               ownerVerifier,
 		quit:                        make(chan struct{}),
 		transport:                   transport,
 		timesource:                  timesource,
@@ -264,11 +276,11 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 		manager.communityTokensService = managerConfig.communityTokensService
 	}
 
-	if verifier != nil {
+	if ensverifier != nil {
 
-		sub := verifier.Subscribe()
+		sub := ensverifier.Subscribe()
 		manager.ensSubscription = sub
-		manager.ensVerifier = verifier
+		manager.ensVerifier = ensverifier
 	}
 
 	return manager, nil
@@ -314,6 +326,7 @@ type Subscription struct {
 	AcceptedRequestsToJoin                   []types.HexBytes
 	RejectedRequestsToJoin                   []types.HexBytes
 	CommunityPrivilegedMemberSyncMessage     *CommunityPrivilegedMemberSyncMessage
+	TokenCommunityValidated                  *CommunityResponse
 }
 
 type CommunityResponse struct {
@@ -339,6 +352,10 @@ func (m *Manager) Start() error {
 		m.runENSVerificationLoop()
 	}
 
+	if m.ownerVerifier != nil {
+		m.runOwnerVerificationLoop()
+	}
+
 	if m.torrentConfig != nil && m.torrentConfig.Enabled {
 		err := m.StartTorrentClient()
 		if err != nil {
@@ -362,7 +379,88 @@ func (m *Manager) runENSVerificationLoop() {
 					return
 				}
 				m.logger.Info("received records", zap.Any("records", records))
+			}
+		}
+	}()
+}
 
+// Only for testing
+func (m *Manager) CommunitiesToValidate() (map[string][]communityToValidate, error) { // nolint: golint
+	return m.persistence.getCommunitiesToValidate()
+}
+
+func (m *Manager) runOwnerVerificationLoop() {
+	m.logger.Info("starting owner verification loop")
+	go func() {
+		for {
+			select {
+			case <-m.quit:
+				m.logger.Debug("quitting owner verification loop")
+				return
+			case <-time.After(validateInterval):
+				// If ownerverifier is nil, we skip, this is useful for testing
+				if m.ownerVerifier == nil {
+					continue
+				}
+
+				communitiesToValidate, err := m.persistence.getCommunitiesToValidate()
+
+				if err != nil {
+					m.logger.Error("failed to fetch communities to validate", zap.Error(err))
+					continue
+				}
+				for id, communities := range communitiesToValidate {
+					m.logger.Info("validating communities", zap.String("id", id), zap.Int("count", len(communities)))
+
+					for _, communityToValidate := range communities {
+						signer, description, err := m.unwrapCommunityDescriptionMessage(communityToValidate.payload)
+						if err != nil {
+							m.logger.Error("failed to unwrap community", zap.Error(err))
+							continue
+						}
+
+						chainID := CommunityDescriptionTokenOwnerChainID(description)
+						if chainID == 0 {
+							// This should not happen
+							m.logger.Error("chain id is 0, ignoring")
+							continue
+						}
+
+						m.logger.Info("validating community", zap.String("id", types.EncodeHex(communityToValidate.id)), zap.String("signer", common.PubkeyToHex(signer)))
+
+						ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+						defer cancel()
+
+						owner, err := m.ownerVerifier.SafeGetSignerPubKey(ctx, chainID, id)
+						if err != nil {
+							m.logger.Error("failed to get owner", zap.Error(err))
+							continue
+						}
+
+						ownerPK, err := common.HexToPubkey(owner)
+						if err != nil {
+							m.logger.Error("failed to convert pk string to ecdsa", zap.Error(err))
+							continue
+						}
+
+						// TODO: handle shards
+						response, err := m.HandleCommunityDescriptionMessage(signer, description, communityToValidate.payload, nil, ownerPK)
+						if err != nil {
+							m.logger.Error("failed to handle community", zap.Error(err))
+							continue
+						}
+						if response != nil {
+
+							m.logger.Info("community validated", zap.String("id", types.EncodeHex(communityToValidate.id)), zap.String("signer", common.PubkeyToHex(signer)))
+							m.publish(&Subscription{TokenCommunityValidated: response})
+							err := m.persistence.DeleteCommunitiesToValidateByCommunityID(communityToValidate.id)
+							if err != nil {
+								m.logger.Error("failed to delete community to validate", zap.Error(err))
+							}
+							break
+						}
+					}
+				}
 			}
 		}
 	}()
@@ -639,6 +737,23 @@ func (m *Manager) ControlledCommunities() ([]*Community, error) {
 	return communities, nil
 }
 
+func (m *Manager) Owned() ([]*Community, error) {
+	communities, err := m.persistence.CommunitiesWithPrivateKey(&m.identity.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	var ownedCommunities []*Community
+
+	for _, community := range communities {
+		if community.IsControlNode() {
+			ownedCommunities = append(ownedCommunities, community)
+		}
+	}
+
+	return ownedCommunities, nil
+}
+
 // CreateCommunity takes a description, generates an ID for it, saves it and return it
 func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish bool) (*Community, error) {
 
@@ -662,9 +777,12 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 		return nil, err
 	}
 
+	description.ID = types.EncodeHex(crypto.CompressPubkey(&key.PublicKey))
+
 	config := Config{
 		ID:                   &key.PublicKey,
 		PrivateKey:           key,
+		ControlNode:          &key.PublicKey,
 		Logger:               m.logger,
 		Joined:               true,
 		MemberIdentity:       &m.identity.PublicKey,
@@ -1094,11 +1212,13 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey) (*Community, error) {
 			Joined:               true,
 			MemberIdentity:       &m.identity.PublicKey,
 			CommunityDescription: description,
+			ControlNode:          &m.identity.PublicKey,
 		}
 		community, err = New(config, m.timesource)
 		if err != nil {
 			return nil, err
 		}
+
 	} else {
 		community.config.PrivateKey = key
 	}
@@ -1355,12 +1475,42 @@ func (m *Manager) DeleteCategory(request *requests.DeleteCommunityCategory) (*Co
 	return changes.Community, changes, nil
 }
 
-func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte, shard *common.Shard) (*CommunityResponse, error) {
+func (m *Manager) Queue(signer *ecdsa.PublicKey, community *Community, clock uint64, payload []byte) error {
+
+	m.logger.Info("queuing community", zap.String("id", community.IDString()), zap.String("signer", common.PubkeyToHex(signer)))
+
+	communityToValidate := communityToValidate{
+		id:         community.ID(),
+		clock:      clock,
+		payload:    payload,
+		validateAt: uint64(time.Now().UnixNano()),
+		signer:     crypto.CompressPubkey(signer),
+	}
+	err := m.persistence.SaveCommunityToValidate(communityToValidate)
+	if err != nil {
+		m.logger.Error("failed to save community", zap.Error(err))
+		return err
+	}
+
+	return nil
+}
+
+func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte, shard *common.Shard, verifiedOwner *ecdsa.PublicKey) (*CommunityResponse, error) {
 	if signer == nil {
 		return nil, errors.New("signer can't be nil")
 	}
 
-	id := crypto.CompressPubkey(signer)
+	var id []byte
+	var err error
+	if len(description.ID) != 0 {
+		id, err = types.DecodeHex(description.ID)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Backward compatibility
+		id = crypto.CompressPubkey(signer)
+	}
 
 	community, err := m.GetByID(id)
 	if err != nil {
@@ -1370,22 +1520,61 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	// Workaround for https://github.com/status-im/status-desktop/issues/12188
 	HydrateChannelsMembers(types.EncodeHex(id), description)
 
+	// We should queue only if the community has a token owner, and the owner has been verified
+	hasTokenOwnership := HasTokenOwnership(description)
+	shouldQueue := hasTokenOwnership && verifiedOwner == nil
+
 	if community == nil {
+		pubKey, err := crypto.DecompressPubkey(id)
+		if err != nil {
+			return nil, err
+		}
 		config := Config{
 			CommunityDescription:                description,
 			Logger:                              m.logger,
 			CommunityDescriptionProtocolMessage: payload,
 			MemberIdentity:                      &m.identity.PublicKey,
-			ID:                                  signer,
 			Shard:                               shard,
+			ID:                                  pubKey,
+			ControlNode:                         signer,
 		}
+
 		community, err = New(config, m.timesource)
 		if err != nil {
 			return nil, err
 		}
+
+		// A new community, we need to check if we need to validate async.
+		// That would be the case if it has a contract. We queue everything and process separately
+
+		if shouldQueue {
+			return nil, m.Queue(signer, community, description.Clock, payload)
+		}
+
+	} else {
+		// we only queue if the clock is greater
+		if shouldQueue && community.config.CommunityDescription.Clock < description.Clock {
+			return nil, m.Queue(signer, community, description.Clock, payload)
+		}
 	}
 
-	if !common.IsPubKeyEqual(community.PublicKey(), signer) {
+	// Override verified owner
+	if verifiedOwner != nil {
+		m.logger.Info("updating verified owner", zap.String("communityID", community.IDString()), zap.String("owner", common.PubkeyToHex(verifiedOwner)))
+
+		// If we are not the verified owner anymore, drop the private key
+		if !common.IsPubKeyEqual(verifiedOwner, &m.identity.PublicKey) {
+			community.config.PrivateKey = nil
+		}
+
+		community.setControlNode(verifiedOwner)
+	}
+
+	// If it has token ownership, we check the control node
+	// otherwise we check the public key
+	if hasTokenOwnership && !common.IsPubKeyEqual(community.ControlNode(), signer) {
+		return nil, ErrNotAuthorized
+	} else if !hasTokenOwnership && !common.IsPubKeyEqual(community.PublicKey(), signer) {
 		return nil, ErrNotAuthorized
 	}
 
@@ -1427,7 +1616,7 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 	}
 
 	pkString := common.PubkeyToHex(&m.identity.PublicKey)
-	if description.CommunityTokensMetadata != nil && len(description.CommunityTokensMetadata) > 0 {
+	if m.tokenManager != nil && description.CommunityTokensMetadata != nil && len(description.CommunityTokensMetadata) > 0 {
 		for _, tokenMetadata := range description.CommunityTokensMetadata {
 			if tokenMetadata.TokenType != protobuf.CommunityTokenType_ERC20 {
 				continue
@@ -2926,30 +3115,39 @@ func (m *Manager) HandleCommunityRequestToLeave(signer *ecdsa.PublicKey, proto *
 	return nil
 }
 
-func (m *Manager) HandleWrappedCommunityDescriptionMessage(payload []byte, shard *common.Shard) (*CommunityResponse, error) {
-	m.logger.Debug("Handling wrapped community description message")
+func (m *Manager) unwrapCommunityDescriptionMessage(payload []byte) (*ecdsa.PublicKey, *protobuf.CommunityDescription, error) {
 
 	applicationMetadataMessage := &protobuf.ApplicationMetadataMessage{}
 	err := proto.Unmarshal(payload, applicationMetadataMessage)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if applicationMetadataMessage.Type != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
-		return nil, ErrInvalidMessage
+		return nil, nil, ErrInvalidMessage
 	}
 	signer, err := applicationMetadataMessage.RecoverKey()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	description := &protobuf.CommunityDescription{}
 
 	err = proto.Unmarshal(applicationMetadataMessage.Payload, description)
 	if err != nil {
+		return nil, nil, err
+	}
+
+	return signer, description, nil
+}
+
+func (m *Manager) HandleWrappedCommunityDescriptionMessage(payload []byte, shard *common.Shard) (*CommunityResponse, error) {
+	m.logger.Debug("Handling wrapped community description message")
+	signer, description, err := m.unwrapCommunityDescriptionMessage(payload)
+	if err != nil {
 		return nil, err
 	}
 
-	return m.HandleCommunityDescriptionMessage(signer, description, payload, shard)
+	return m.HandleCommunityDescriptionMessage(signer, description, payload, shard, nil)
 }
 
 func (m *Manager) JoinCommunity(id types.HexBytes, forceJoin bool) (*Community, error) {
@@ -3461,14 +3659,14 @@ func (m *Manager) UpdateCommunitySettings(settings CommunitySettings) error {
 	return m.persistence.UpdateCommunitySettings(settings)
 }
 
-func (m *Manager) GetControlledCommunitiesChatIDs() (map[string]bool, error) {
-	controlledCommunities, err := m.ControlledCommunities()
+func (m *Manager) GetOwnedCommunitiesChatIDs() (map[string]bool, error) {
+	ownedCommunities, err := m.Owned()
 	if err != nil {
 		return nil, err
 	}
 
 	chatIDs := make(map[string]bool)
-	for _, c := range controlledCommunities {
+	for _, c := range ownedCommunities {
 		if c.Joined() {
 			for _, id := range c.ChatIDs() {
 				chatIDs[id] = true
@@ -4413,6 +4611,9 @@ func (m *Manager) GetAllCommunityTokens() ([]*community_token.CommunityToken, er
 }
 
 func (m *Manager) ImageToBase64(uri string) string {
+	if uri == "" {
+		return ""
+	}
 	file, err := os.Open(uri)
 	if err != nil {
 		m.logger.Error(err.Error())
@@ -4841,6 +5042,64 @@ func (m *Manager) createCommunityTokenPermission(request *requests.CreateCommuni
 	}
 
 	return community, changes, nil
+
+}
+
+func (m *Manager) UpdateControlNode(communityID types.HexBytes, pubKey *ecdsa.PublicKey) (*Community, error) {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	if community.ControlNode().Equal(pubKey) {
+		return community, nil
+	}
+
+	community.setControlNode(pubKey)
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	return community, nil
+}
+
+func (m *Manager) UpdatePrivateKeyAndControlNode(communityID types.HexBytes, pk *ecdsa.PrivateKey) (*Community, error) {
+	_, err := m.UpdatePrivateKey(communityID, pk)
+	if err != nil {
+		return nil, err
+	}
+
+	community, err := m.UpdateControlNode(communityID, &pk.PublicKey)
+
+	if err != nil {
+		return nil, err
+	}
+
+	m.publish(&Subscription{Community: community})
+	return community, nil
+}
+
+func (m *Manager) UpdatePrivateKey(communityID types.HexBytes, pk *ecdsa.PrivateKey) (*Community, error) {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	community.setPrivateKey(pk)
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	return community, nil
 }
 
 func (m *Manager) shareRequestsToJoinWithNewPrivilegedMembers(community *Community, newPrivilegedMembers map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey) error {

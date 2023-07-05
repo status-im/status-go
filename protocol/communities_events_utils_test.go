@@ -1864,7 +1864,41 @@ func testAddAndSyncTokenFromControlNode(base CommunityEventsTestsInterface, comm
 	syncTokens, err = base.GetMember().communitiesManager.GetAllCommunityTokens()
 	s.Require().NoError(err)
 	s.Require().Len(syncTokens, 0)
+}
 
+func testAddAndSyncOwnerTokenFromControlNode(base CommunityEventsTestsInterface, community *communities.Community,
+	privilegesLvl token.PrivilegesLevel) {
+	tokenERC721 := createCommunityToken(community.IDString(), privilegesLvl)
+	addCommunityTokenToCommunityTokensService(base, tokenERC721)
+
+	s := base.GetSuite()
+
+	_, err := base.GetControlNode().SaveCommunityToken(tokenERC721, nil)
+	s.Require().NoError(err)
+
+	err = base.GetControlNode().AddCommunityToken(tokenERC721.CommunityID, tokenERC721.ChainID, tokenERC721.Address)
+	s.Require().NoError(err)
+
+	tokens, err := base.GetEventSender().communitiesManager.GetAllCommunityTokens()
+	s.Require().NoError(err)
+	s.Require().Len(tokens, 0)
+
+	// we only check that the community has been queued for validation
+	checkTokenAdded := func(response *MessengerResponse) error {
+		member := base.GetMember()
+		communitiesToValidate, err := member.communitiesManager.CommunitiesToValidate()
+		if err != nil {
+			return err
+		}
+		if len(communitiesToValidate) == 0 || communitiesToValidate[community.IDString()] == nil {
+
+			return errors.New("no communities to validate")
+		}
+
+		return nil
+	}
+
+	waitOnMessengerResponse(s, checkTokenAdded, base.GetMember())
 }
 
 func testEventSenderCannotCreatePrivilegedCommunityPermission(base CommunityEventsTestsInterface, community *communities.Community, pType protobuf.CommunityTokenPermission_Type) {

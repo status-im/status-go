@@ -267,7 +267,9 @@ func (s *AdminCommunityEventsSuite) TestAdminAddTokenMasterAndOwnerToken() {
 
 func (s *AdminCommunityEventsSuite) TestAdminReceiveOwnerTokenFromControlNode() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
-	testAddAndSyncTokenFromControlNode(s, community, token.OwnerLevel)
+
+	testAddAndSyncOwnerTokenFromControlNode(s, community, token.OwnerLevel)
+
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminReceiveTokenMasterTokenFromControlNode() {

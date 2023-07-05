@@ -17,8 +17,10 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	userimages "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
+	v1 "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -44,18 +46,24 @@ type ManagerSuite struct {
 	manager *Manager
 }
 
-func (s *ManagerSuite) SetupTest() {
+func (s *ManagerSuite) buildManager(ownerVerifier OwnerVerifier) *Manager {
 	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
-	s.NoError(err, "creating sqlite db instance")
+	s.Require().NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
-	s.NoError(err, "protocol migrate")
+	s.Require().NoError(err, "protocol migrate")
 
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	s.Require().NoError(err)
-	m, err := NewManager(key, db, nil, nil, nil, nil, &TimeSourceStub{}, nil)
+	m, err := NewManager(key, db, nil, nil, nil, ownerVerifier, nil, &TimeSourceStub{}, nil)
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
+	return m
+}
+
+func (s *ManagerSuite) SetupTest() {
+	m := s.buildManager(nil)
+	SetValidateInterval(30 * time.Millisecond)
 	s.manager = m
 }
 
@@ -161,7 +169,7 @@ func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testCollect
 		WithTokenManager(tm),
 	}
 
-	m, err := NewManager(key, db, nil, nil, nil, nil, &TimeSourceStub{}, nil, options...)
+	m, err := NewManager(key, db, nil, nil, nil, nil, nil, &TimeSourceStub{}, nil, options...)
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
@@ -274,7 +282,7 @@ func (s *ManagerSuite) TestCreateCommunity() {
 
 	request := &requests.CreateCommunity{
 		Name:        "status",
-		Description: "status community description",
+		Description: "token membership description",
 		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
 	}
 
@@ -382,7 +390,8 @@ func (s *ManagerSuite) TestGetControlledCommunitiesChatIDs() {
 	s.Require().NoError(err)
 	s.Require().NotNil(community)
 
-	controlledChatIDs, err := s.manager.GetControlledCommunitiesChatIDs()
+	controlledChatIDs, err := s.manager.GetOwnedCommunitiesChatIDs()
+
 	s.Require().NoError(err)
 	s.Require().Len(controlledChatIDs, 1)
 }
@@ -1537,4 +1546,351 @@ func (s *ManagerSuite) buildCommunityWithChat() (*Community, string, error) {
 		break
 	}
 	return community, chatID, nil
+}
+
+type testOwnerVerifier struct {
+	called    int
+	ownersMap map[string]string
+}
+
+func (t *testOwnerVerifier) SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error) {
+	t.called++
+	return t.ownersMap[communityID], nil
+}
+
+func (s *ManagerSuite) TestCommunityQueue() {
+
+	owner, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	verifier := &testOwnerVerifier{}
+	m := s.buildManager(verifier)
+
+	createRequest := &requests.CreateCommunity{
+		Name:        "status",
+		Description: "status community description",
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+	}
+	community, err := s.manager.CreateCommunity(createRequest, true)
+	s.Require().NoError(err)
+
+	// set verifier public key
+	verifier.ownersMap = make(map[string]string)
+	verifier.ownersMap[community.IDString()] = common.PubkeyToHex(&owner.PublicKey)
+
+	description := community.config.CommunityDescription
+
+	// safety check
+	s.Require().Equal(uint64(0), CommunityDescriptionTokenOwnerChainID(description))
+
+	// set up permissions
+	description.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
+	description.TokenPermissions["some-id"] = &protobuf.CommunityTokenPermission{
+		Type: protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER,
+		Id:   "some-token-id",
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				ContractAddresses: map[uint64]string{
+					2: "some-address",
+				},
+			},
+		}}
+
+	// Should have now a token owner
+	s.Require().Equal(uint64(2), CommunityDescriptionTokenOwnerChainID(description))
+
+	payload, err := community.MarshaledDescription()
+	s.Require().NoError(err)
+
+	payload, err = v1.WrapMessageV1(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, owner)
+	s.Require().NoError(err)
+
+	// Create a signer, that is not the owner
+	notTheOwner, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	subscription := m.Subscribe()
+
+	response, err := m.HandleCommunityDescriptionMessage(&notTheOwner.PublicKey, description, payload, nil, nil)
+	s.Require().NoError(err)
+
+	// No response, as it should be queued
+	s.Require().Nil(response)
+
+	published := false
+
+	for !published {
+		select {
+		case event := <-subscription:
+			if event.TokenCommunityValidated == nil {
+				continue
+			}
+			published = true
+		case <-time.After(2 * time.Second):
+			s.FailNow("no subscription")
+		}
+	}
+
+	// Check it's not called multiple times
+	s.Require().Equal(1, verifier.called)
+	// Cleans up the communities to validate
+	communitiesToValidate, err := m.persistence.getCommunitiesToValidate()
+	s.Require().NoError(err)
+	s.Require().Empty(communitiesToValidate)
+}
+
+// 1) We create a community
+// 2) We have 2 owners, but only new owner is returned by the contract
+// 3) We receive the old owner community first
+// 4) We receive the new owner community second
+// 5) We start the queue
+// 6) We should only process 4, and ignore anything else if that is successful, as that's the most recent
+
+func (s *ManagerSuite) TestCommunityQueueMultipleDifferentSigners() {
+
+	newOwner, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	oldOwner, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	verifier := &testOwnerVerifier{}
+	m := s.buildManager(verifier)
+
+	createRequest := &requests.CreateCommunity{
+		Name:        "status",
+		Description: "status community description",
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+	}
+	community, err := s.manager.CreateCommunity(createRequest, true)
+	s.Require().NoError(err)
+
+	// set verifier public key
+	verifier.ownersMap = make(map[string]string)
+	verifier.ownersMap[community.IDString()] = common.PubkeyToHex(&newOwner.PublicKey)
+
+	description := community.config.CommunityDescription
+
+	// safety check
+	s.Require().Equal(uint64(0), CommunityDescriptionTokenOwnerChainID(description))
+
+	// set up permissions
+	description.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
+	description.TokenPermissions["some-id"] = &protobuf.CommunityTokenPermission{
+		Type: protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER,
+		Id:   "some-token-id",
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				ContractAddresses: map[uint64]string{
+					2: "some-address",
+				},
+			},
+		}}
+
+	// Should have now a token owner
+	s.Require().Equal(uint64(2), CommunityDescriptionTokenOwnerChainID(description))
+
+	// We nil owner verifier so that messages won't be processed
+	m.ownerVerifier = nil
+
+	// Send message from old owner first
+
+	payload, err := community.MarshaledDescription()
+	s.Require().NoError(err)
+
+	payload, err = v1.WrapMessageV1(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, oldOwner)
+	s.Require().NoError(err)
+
+	subscription := m.Subscribe()
+
+	response, err := m.HandleCommunityDescriptionMessage(&oldOwner.PublicKey, description, payload, nil, nil)
+	s.Require().NoError(err)
+
+	// No response, as it should be queued
+	s.Require().Nil(response)
+
+	// Send message from new owner now
+
+	community.config.CommunityDescription.Clock++
+
+	clock2 := community.config.CommunityDescription.Clock
+
+	payload, err = community.MarshaledDescription()
+	s.Require().NoError(err)
+
+	payload, err = v1.WrapMessageV1(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, newOwner)
+	s.Require().NoError(err)
+
+	response, err = m.HandleCommunityDescriptionMessage(&newOwner.PublicKey, description, payload, nil, nil)
+	s.Require().NoError(err)
+
+	// No response, as it should be queued
+	s.Require().Nil(response)
+
+	count, err := m.persistence.getCommunitiesToValidateCount()
+	s.Require().NoError(err)
+	s.Require().Equal(2, count)
+
+	communitiesToValidate, err := m.persistence.getCommunitiesToValidate()
+	s.Require().NoError(err)
+	s.Require().NotNil(communitiesToValidate)
+	s.Require().NotNil(communitiesToValidate[community.IDString()])
+	s.Require().Len(communitiesToValidate[community.IDString()], 2)
+
+	// We set owner verifier so that we start processing the queue
+	m.ownerVerifier = verifier
+
+	published := false
+
+	for !published {
+		select {
+		case event := <-subscription:
+			if event.TokenCommunityValidated == nil {
+				continue
+			}
+			published = true
+		case <-time.After(2 * time.Second):
+			s.FailNow("no subscription")
+		}
+	}
+
+	// Check it's not called multiple times, since we should be checking newest first
+	s.Require().Equal(1, verifier.called)
+	// Cleans up the communities to validate
+	communitiesToValidate, err = m.persistence.getCommunitiesToValidate()
+	s.Require().NoError(err)
+	s.Require().Empty(communitiesToValidate)
+
+	// Check clock of community is of the last community description
+	fetchedCommunity, err := m.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Equal(clock2, fetchedCommunity.config.CommunityDescription.Clock)
+
+}
+
+// 1) We create a community
+// 2) We have 2 owners, but only old owner is returned by the contract
+// 3) We receive the old owner community first
+// 4) We receive the new owner community second (that could be a malicious user)
+// 5) We start the queue
+// 6) We should process both, but ignore the last community description
+
+func (s *ManagerSuite) TestCommunityQueueMultipleDifferentSignersIgnoreIfNotReturned() {
+
+	newOwner, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	oldOwner, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	verifier := &testOwnerVerifier{}
+	m := s.buildManager(verifier)
+
+	createRequest := &requests.CreateCommunity{
+		Name:        "status",
+		Description: "status community description",
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+	}
+	community, err := s.manager.CreateCommunity(createRequest, true)
+	s.Require().NoError(err)
+
+	// set verifier public key
+	verifier.ownersMap = make(map[string]string)
+	verifier.ownersMap[community.IDString()] = common.PubkeyToHex(&oldOwner.PublicKey)
+
+	description := community.config.CommunityDescription
+
+	// safety check
+	s.Require().Equal(uint64(0), CommunityDescriptionTokenOwnerChainID(description))
+
+	// set up permissions
+	description.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
+	description.TokenPermissions["some-id"] = &protobuf.CommunityTokenPermission{
+		Type: protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER,
+		Id:   "some-token-id",
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				ContractAddresses: map[uint64]string{
+					2: "some-address",
+				},
+			},
+		}}
+
+	// Should have now a token owner
+	s.Require().Equal(uint64(2), CommunityDescriptionTokenOwnerChainID(description))
+
+	// We nil owner verifier so that messages won't be processed
+	m.ownerVerifier = nil
+
+	clock1 := community.config.CommunityDescription.Clock
+	// Send message from old owner first
+
+	payload, err := community.MarshaledDescription()
+	s.Require().NoError(err)
+
+	payload, err = v1.WrapMessageV1(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, oldOwner)
+	s.Require().NoError(err)
+
+	subscription := m.Subscribe()
+
+	response, err := m.HandleCommunityDescriptionMessage(&oldOwner.PublicKey, description, payload, nil, nil)
+	s.Require().NoError(err)
+
+	// No response, as it should be queued
+	s.Require().Nil(response)
+
+	// Send message from new owner now
+
+	community.config.CommunityDescription.Clock++
+
+	payload, err = community.MarshaledDescription()
+	s.Require().NoError(err)
+
+	payload, err = v1.WrapMessageV1(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, newOwner)
+	s.Require().NoError(err)
+
+	response, err = m.HandleCommunityDescriptionMessage(&newOwner.PublicKey, description, payload, nil, nil)
+	s.Require().NoError(err)
+
+	// No response, as it should be queued
+	s.Require().Nil(response)
+
+	count, err := m.persistence.getCommunitiesToValidateCount()
+	s.Require().NoError(err)
+	s.Require().Equal(2, count)
+
+	communitiesToValidate, err := m.persistence.getCommunitiesToValidate()
+	s.Require().NoError(err)
+	s.Require().NotNil(communitiesToValidate)
+	s.Require().NotNil(communitiesToValidate[community.IDString()])
+	s.Require().Len(communitiesToValidate[community.IDString()], 2)
+
+	// We set owner verifier so that we start processing the queue
+	m.ownerVerifier = verifier
+
+	published := false
+
+	for !published {
+		select {
+		case event := <-subscription:
+			if event.TokenCommunityValidated == nil {
+				continue
+			}
+			published = true
+		case <-time.After(2 * time.Second):
+			s.FailNow("no subscription")
+		}
+	}
+
+	// Check it's not called multiple times, since we should be checking newest first
+	s.Require().Equal(2, verifier.called)
+	// Cleans up the communities to validate
+	communitiesToValidate, err = m.persistence.getCommunitiesToValidate()
+	s.Require().NoError(err)
+	s.Require().Empty(communitiesToValidate)
+
+	// Check clock of community is of the first community description
+	fetchedCommunity, err := m.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Equal(clock1, fetchedCommunity.config.CommunityDescription.Clock)
 }

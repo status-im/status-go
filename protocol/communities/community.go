@@ -29,6 +29,7 @@ const signatureLength = 65
 
 type Config struct {
 	PrivateKey                          *ecdsa.PrivateKey
+	ControlNode                         *ecdsa.PublicKey
 	CommunityDescription                *protobuf.CommunityDescription
 	CommunityDescriptionProtocolMessage []byte // community in a wrapped & signed (by owner) protocol message
 	ID                                  *ecdsa.PublicKey
@@ -1280,6 +1281,22 @@ func (o *Community) PrivateKey() *ecdsa.PrivateKey {
 	return o.config.PrivateKey
 }
 
+func (o *Community) setPrivateKey(pk *ecdsa.PrivateKey) {
+	if pk != nil {
+		o.config.PrivateKey = pk
+	}
+}
+
+func (o *Community) ControlNode() *ecdsa.PublicKey {
+	return o.config.ControlNode
+}
+
+func (o *Community) setControlNode(pubKey *ecdsa.PublicKey) {
+	if pubKey != nil {
+		o.config.ControlNode = pubKey
+	}
+}
+
 func (o *Community) PublicKey() *ecdsa.PublicKey {
 	return o.config.ID
 }
@@ -1314,12 +1331,13 @@ func (o *Community) toProtocolMessageBytes() ([]byte, error) {
 		return o.config.CommunityDescriptionProtocolMessage, nil
 	}
 
-	// serialize and sign
+	// serialize
 	payload, err := o.marshaledDescription()
 	if err != nil {
 		return nil, err
 	}
 
+	// sign
 	return protocol.WrapMessageV1(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, o.config.PrivateKey)
 }
 
@@ -1784,7 +1802,7 @@ func (o *Community) BuildGrant(key *ecdsa.PublicKey, chatID string) ([]byte, err
 
 func (o *Community) buildGrant(key *ecdsa.PublicKey, chatID string) ([]byte, error) {
 	bytes := make([]byte, 0)
-	if o.config.PrivateKey != nil {
+	if o.IsControlNode() {
 		grant := &protobuf.Grant{
 			CommunityId: o.ID(),
 			MemberId:    crypto.CompressPubkey(key),
@@ -2308,6 +2326,31 @@ func (o *Community) ValidateEvent(event *CommunityEvent, signer *ecdsa.PublicKey
 }
 
 func (o *Community) MemberCanManageToken(member *ecdsa.PublicKey, token *community_token.CommunityToken) bool {
-	return o.IsMemberOwner(member) || (o.IsMemberTokenMaster(member) &&
+	return o.IsMemberOwner(member) || o.IsControlNode() || (o.IsMemberTokenMaster(member) &&
 		token.PrivilegesLevel != community_token.OwnerLevel && token.PrivilegesLevel != community_token.MasterLevel)
+}
+
+func CommunityDescriptionTokenOwnerChainID(description *protobuf.CommunityDescription) uint64 {
+	if description == nil {
+		return 0
+	}
+
+	// We look in TokenPermissions for a token that grants BECOME_TOKEN_OWNER rights
+	// There should be only one, and it's only a single chainID
+	for _, p := range description.TokenPermissions {
+		if p.Type == protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER && len(p.TokenCriteria) != 0 {
+
+			for _, criteria := range p.TokenCriteria {
+				for chainID := range criteria.ContractAddresses {
+					return chainID
+				}
+			}
+		}
+	}
+
+	return 0
+}
+
+func HasTokenOwnership(description *protobuf.CommunityDescription) bool {
+	return uint64(0) != CommunityDescriptionTokenOwnerChainID(description)
 }
