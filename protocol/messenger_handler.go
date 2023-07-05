@@ -2067,29 +2067,27 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 				receivedMessage.ContactRequestState = common.ContactRequestStatePending
 			}
 
-			// Check we have a chat before `getOneToOneAndNextClock` call!
-			chat, notANewContact := m.allChats.Load(contact.ID)
-			if notANewContact {
-				clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+			// Mutual update message must be before CR message
+			clock := receivedMessage.Clock - 1
+			_, timestamp := chat.NextClockAndTimestamp(m.transport)
 
-				updateMessage := &common.Message{}
-				if contact.mutual() {
-					updateMessage, err = m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeAdded, clock, timestamp, true)
-				} else {
-					updateMessage, err = m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, timestamp, false)
-				}
-				if err != nil {
-					return err
-				}
-
-				m.prepareMessage(updateMessage, m.httpServer)
-				err = m.persistence.SaveMessages([]*common.Message{updateMessage})
-				if err != nil {
-					return err
-				}
-				state.Response.AddMessage(updateMessage)
-				state.Response.AddChat(chat)
+			updateMessage := &common.Message{}
+			if contact.mutual() {
+				updateMessage, err = m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeAdded, clock, timestamp, true)
+			} else {
+				updateMessage, err = m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, timestamp, false)
 			}
+			if err != nil {
+				return err
+			}
+
+			m.prepareMessage(updateMessage, m.httpServer)
+			err = m.persistence.SaveMessages([]*common.Message{updateMessage})
+			if err != nil {
+				return err
+			}
+			state.Response.AddMessage(updateMessage)
+			state.Response.AddChat(chat)
 
 			err = m.createIncomingContactRequestNotification(contact, state, receivedMessage, true)
 			if err != nil {
@@ -2161,7 +2159,6 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 			return err
 		}
 	}
-
 	// Set in the modified maps chat
 	state.Response.AddChat(chat)
 	// TODO(samyoul) remove storing of an updated reference pointer?
