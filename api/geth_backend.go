@@ -312,7 +312,7 @@ func (b *GethStatusBackend) runDBFileMigrations(account multiaccounts.Account, p
 	}
 
 	if _, err = os.Stat(v3Path); err == nil {
-		if err := appdatabase.MigrateV3ToV4(v3Path, v4Path, password, account.KDFIterations); err != nil {
+		if err := appdatabase.MigrateV3ToV4(v3Path, v4Path, password, account.KDFIterations, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished); err != nil {
 			_ = os.Remove(v4Path)
 			_ = os.Remove(v4Path + "-shm")
 			_ = os.Remove(v4Path + "-wal")
@@ -450,11 +450,13 @@ func (b *GethStatusBackend) StartNodeWithKey(acc multiaccounts.Account, password
 	if err != nil {
 		// Stop node for clean up
 		_ = b.StopNode()
+		return err
 	}
+	// get logged in
 	if !b.localPairing {
-		signal.SendLoggedIn(err)
+		return b.LoggedIn(acc.KeyUID, err)
 	}
-	return err
+	return nil
 }
 
 func (b *GethStatusBackend) OverwriteNodeConfigValues(conf *params.NodeConfig, n *params.NodeConfig) (*params.NodeConfig, error) {
@@ -504,9 +506,9 @@ func (b *GethStatusBackend) LoginAccount(request *requests.Login) error {
 	if err != nil {
 		// Stop node for clean up
 		_ = b.StopNode()
+		return err
 	}
-	signal.SendLoggedIn(err)
-	return err
+	return b.LoggedIn(request.KeyUID, err)
 }
 
 func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
@@ -665,6 +667,20 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	return nil
 }
 
+func (b *GethStatusBackend) GetSettings() (*settings.Settings, error) {
+	accountDB, err := accounts.NewDB(b.appDB)
+	if err != nil {
+		return nil, err
+	}
+
+	settings, err := accountDB.GetSettings()
+	if err != nil {
+		return nil, err
+	}
+
+	return &settings, nil
+}
+
 func (b *GethStatusBackend) MigrateKeyStoreDir(acc multiaccounts.Account, password, oldDir, newDir string) error {
 	err := b.ensureAppDBOpened(acc, password)
 	if err != nil {
@@ -704,11 +720,31 @@ func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, pass
 	if err != nil {
 		// Stop node for clean up
 		_ = b.StopNode()
+		return err
 	}
+	// get logged in
 	if !b.localPairing {
-		signal.SendLoggedIn(err)
+		return b.LoggedIn(acc.KeyUID, err)
 	}
-	return err
+	return nil
+}
+
+func (b *GethStatusBackend) LoggedIn(keyUID string, err error) error {
+	if err != nil {
+		signal.SendLoggedIn(nil, nil, err)
+		return nil
+	}
+	settings, err := b.GetSettings()
+	if err != nil {
+		return err
+	}
+	account, err := b.getAccountByKeyUID(keyUID)
+	if err != nil {
+		return err
+	}
+
+	signal.SendLoggedIn(account, settings, nil)
+	return nil
 }
 
 func (b *GethStatusBackend) ExportUnencryptedDatabase(acc multiaccounts.Account, password, directory string) error {
@@ -746,7 +782,7 @@ func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account,
 
 	path := filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db", acc.KeyUID))
 
-	err := appdatabase.EncryptDatabase(databasePath, path, password, acc.KDFIterations)
+	err := appdatabase.EncryptDatabase(databasePath, path, password, acc.KDFIterations, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
 	if err != nil {
 		b.log.Error("failed to initialize db", "err", err)
 		return err
@@ -795,7 +831,7 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 	}()
 
 	// Exporting database to a temporary file with a new password
-	err = appdatabase.ExportDB(dbPath, password, account.KDFIterations, newDBPath, newPassword)
+	err = appdatabase.ExportDB(dbPath, password, account.KDFIterations, newDBPath, newPassword, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
 	if err != nil {
 		return err
 	}

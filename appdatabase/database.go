@@ -69,16 +69,16 @@ func DecryptDatabase(oldPath, newPath, password string, kdfIterationsNumber int)
 
 // EncryptDatabase creates an encrypted copy of the database and copies it to the
 // user path
-func EncryptDatabase(oldPath, newPath, password string, kdfIterationsNumber int) error {
-	return sqlite.EncryptDB(oldPath, newPath, password, kdfIterationsNumber)
+func EncryptDatabase(oldPath, newPath, password string, kdfIterationsNumber int, onStart func(), onEnd func()) error {
+	return sqlite.EncryptDB(oldPath, newPath, password, kdfIterationsNumber, onStart, onEnd)
 }
 
-func ExportDB(path string, password string, kdfIterationsNumber int, newDbPAth string, newPassword string) error {
-	return sqlite.ExportDB(path, password, kdfIterationsNumber, newDbPAth, newPassword)
+func ExportDB(path string, password string, kdfIterationsNumber int, newDbPAth string, newPassword string, onStart func(), onEnd func()) error {
+	return sqlite.ExportDB(path, password, kdfIterationsNumber, newDbPAth, newPassword, onStart, onEnd)
 }
 
-func ChangeDatabasePassword(path string, password string, kdfIterationsNumber int, newPassword string) error {
-	return sqlite.ChangeEncryptionKey(path, password, kdfIterationsNumber, newPassword)
+func ChangeDatabasePassword(path string, password string, kdfIterationsNumber int, newPassword string, onStart func(), onEnd func()) error {
+	return sqlite.ChangeEncryptionKey(path, password, kdfIterationsNumber, newPassword, onStart, onEnd)
 }
 
 // GetDBFilename takes an instance of sql.DB and returns the filename of the "main" database
@@ -205,8 +205,8 @@ func migrateEnsUsernames(sqlTx *sql.Tx) error {
 	return nil
 }
 
-func MigrateV3ToV4(v3Path string, v4Path string, password string, kdfIterationsNumber int) error {
-	return sqlite.MigrateV3ToV4(v3Path, v4Path, password, kdfIterationsNumber)
+func MigrateV3ToV4(v3Path string, v4Path string, password string, kdfIterationsNumber int, onStart func(), onEnd func()) error {
+	return sqlite.MigrateV3ToV4(v3Path, v4Path, password, kdfIterationsNumber, onStart, onEnd)
 }
 
 const (

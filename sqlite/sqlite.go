@@ -13,7 +13,6 @@ import (
 	sqlcipher "github.com/mutecomm/go-sqlcipher/v4" // We require go sqlcipher that overrides default implementation
 
 	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/signal"
 )
 
 const (
@@ -51,9 +50,13 @@ func DecryptDB(oldPath string, newPath string, key string, kdfIterationsNumber i
 	return err
 }
 
-func encryptDB(db *sql.DB, encryptedPath string, key string, kdfIterationsNumber int) error {
-	signal.SendReEncryptionStarted()
-	defer signal.SendReEncryptionFinished()
+func encryptDB(db *sql.DB, encryptedPath string, key string, kdfIterationsNumber int, onStart func(), onEnd func()) error {
+	if onStart != nil {
+		onStart()
+	}
+	if onEnd != nil {
+		defer onEnd()
+	}
 
 	_, err := db.Exec(`ATTACH DATABASE '` + encryptedPath + `' AS encrypted KEY '` + key + `'`)
 	if err != nil {
@@ -92,24 +95,24 @@ func encryptDB(db *sql.DB, encryptedPath string, key string, kdfIterationsNumber
 }
 
 // EncryptDB takes a plaintext database and adds encryption
-func EncryptDB(unencryptedPath string, encryptedPath string, key string, kdfIterationsNumber int) error {
+func EncryptDB(unencryptedPath string, encryptedPath string, key string, kdfIterationsNumber int, onStart func(), onEnd func()) error {
 	_ = os.Remove(encryptedPath)
 
 	db, err := OpenUnecryptedDB(unencryptedPath)
 	if err != nil {
 		return err
 	}
-	return encryptDB(db, encryptedPath, key, kdfIterationsNumber)
+	return encryptDB(db, encryptedPath, key, kdfIterationsNumber, onStart, onEnd)
 }
 
 // Export takes an encrypted database and re-encrypts it in a new file, with a new key
-func ExportDB(encryptedPath string, key string, kdfIterationsNumber int, newPath string, newKey string) error {
+func ExportDB(encryptedPath string, key string, kdfIterationsNumber int, newPath string, newKey string, onStart func(), onEnd func()) error {
 	db, err := openDB(encryptedPath, key, kdfIterationsNumber, V4CipherPageSize)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
-	return encryptDB(db, newPath, newKey, kdfIterationsNumber)
+	return encryptDB(db, newPath, newKey, kdfIterationsNumber, onStart, onEnd)
 }
 
 func buildSqlcipherDSN(path string) (string, error) {
@@ -253,9 +256,14 @@ func OpenUnecryptedDB(path string) (*sql.DB, error) {
 	return db, nil
 }
 
-func ChangeEncryptionKey(path string, key string, kdfIterationsNumber int, newKey string) error {
-	signal.SendReEncryptionStarted()
-	defer signal.SendReEncryptionFinished()
+func ChangeEncryptionKey(path string, key string, kdfIterationsNumber int, newKey string, onStart func(), onEnd func()) error {
+	if onStart != nil {
+		onStart()
+	}
+
+	if onEnd != nil {
+		defer onEnd()
+	}
 
 	if kdfIterationsNumber <= 0 {
 		kdfIterationsNumber = sqlite.ReducedKDFIterationsNumber
@@ -276,7 +284,7 @@ func ChangeEncryptionKey(path string, key string, kdfIterationsNumber int, newKe
 }
 
 // MigrateV3ToV4 migrates database from v3 to v4 format with encryption.
-func MigrateV3ToV4(v3Path string, v4Path string, key string, kdfIterationsNumber int) error {
+func MigrateV3ToV4(v3Path string, v4Path string, key string, kdfIterationsNumber int, onStart func(), onEnd func()) error {
 
 	db, err := openDB(v3Path, key, kdfIterationsNumber, V3CipherPageSize)
 
@@ -286,5 +294,5 @@ func MigrateV3ToV4(v3Path string, v4Path string, key string, kdfIterationsNumber
 	}
 	defer db.Close()
 
-	return encryptDB(db, v4Path, key, kdfIterationsNumber)
+	return encryptDB(db, v4Path, key, kdfIterationsNumber, onStart, onEnd)
 }
