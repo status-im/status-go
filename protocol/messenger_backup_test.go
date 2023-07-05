@@ -757,7 +757,7 @@ func (s *MessengerBackupSuite) TestBackupKeypairs() {
 	s.Require().Equal(accounts.SyncedFromBackup, dbProfileKp2.SyncedFrom)
 
 	for _, acc := range profileKp.Accounts {
-		s.Require().True(contains(dbProfileKp2.Accounts, acc, accounts.SameAccounts))
+		s.Require().True(accounts.Contains(dbProfileKp2.Accounts, acc, accounts.SameAccounts))
 	}
 
 	dbSeedKp2, err := bob2.settings.GetKeypairByKeyUID(seedKp.KeyUID)
@@ -778,7 +778,6 @@ func (s *MessengerBackupSuite) TestBackupKeycards() {
 	keycard2Copy := accounts.GetKeycardForSeedImportedKeypair1ForTest()
 	keycard2Copy.KeycardUID = keycard2Copy.KeycardUID + "C"
 	keycard2Copy.KeycardName = keycard2Copy.KeycardName + "Copy"
-	keycard2Copy.LastUpdateClock = keycard2Copy.LastUpdateClock + 1
 
 	kp3 := accounts.GetSeedImportedKeypair2ForTest()
 	keycard3 := accounts.GetKeycardForSeedImportedKeypair2ForTest()
@@ -794,22 +793,14 @@ func (s *MessengerBackupSuite) TestBackupKeycards() {
 	s.Require().NoError(err)
 	s.Require().Equal(3, len(dbKeypairs))
 
-	addedKc, addedAccs, err := bob1.settings.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard1)
+	err = bob1.settings.SaveOrUpdateKeycard(*keycard1, 0, false)
 	s.Require().NoError(err)
-	s.Require().Equal(true, addedKc)
-	s.Require().Equal(false, addedAccs)
-	addedKc, addedAccs, err = bob1.settings.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard2)
+	err = bob1.settings.SaveOrUpdateKeycard(*keycard2, 0, false)
 	s.Require().NoError(err)
-	s.Require().Equal(true, addedKc)
-	s.Require().Equal(false, addedAccs)
-	addedKc, addedAccs, err = bob1.settings.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard2Copy)
+	err = bob1.settings.SaveOrUpdateKeycard(*keycard2Copy, 0, false)
 	s.Require().NoError(err)
-	s.Require().Equal(true, addedKc)
-	s.Require().Equal(false, addedAccs)
-	addedKc, addedAccs, err = bob1.settings.AddKeycardOrAddAccountsIfKeycardIsAdded(*keycard3)
+	err = bob1.settings.SaveOrUpdateKeycard(*keycard3, 0, false)
 	s.Require().NoError(err)
-	s.Require().Equal(true, addedKc)
-	s.Require().Equal(false, addedAccs)
 
 	// Create bob2
 	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
@@ -835,10 +826,10 @@ func (s *MessengerBackupSuite) TestBackupKeycards() {
 	syncedKeycards, err := bob2.settings.GetAllKnownKeycards()
 	s.Require().NoError(err)
 	s.Require().Equal(4, len(syncedKeycards))
-	s.Require().True(contains(syncedKeycards, keycard1, accounts.SameKeycards))
-	s.Require().True(contains(syncedKeycards, keycard2, accounts.SameKeycards))
-	s.Require().True(contains(syncedKeycards, keycard2Copy, accounts.SameKeycards))
-	s.Require().True(contains(syncedKeycards, keycard3, accounts.SameKeycards))
+	s.Require().True(accounts.Contains(syncedKeycards, keycard1, accounts.SameKeycards))
+	s.Require().True(accounts.Contains(syncedKeycards, keycard2, accounts.SameKeycards))
+	s.Require().True(accounts.Contains(syncedKeycards, keycard2Copy, accounts.SameKeycards))
+	s.Require().True(accounts.Contains(syncedKeycards, keycard3, accounts.SameKeycards))
 }
 
 func (s *MessengerBackupSuite) TestBackupWatchOnlyAccounts() {

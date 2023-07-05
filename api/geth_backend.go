@@ -923,23 +923,25 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 			return err
 		}
 
+		position, err := accountDB.GetPositionForNextNewKeycard()
+		if err != nil {
+			return err
+		}
+
 		kc := accounts.Keycard{
-			KeycardUID:      keycardUID,
-			KeycardName:     displayName,
-			KeycardLocked:   false,
-			KeyUID:          account.KeyUID,
-			LastUpdateClock: uint64(time.Now().Unix()),
+			KeycardUID:    keycardUID,
+			KeycardName:   displayName,
+			KeycardLocked: false,
+			KeyUID:        account.KeyUID,
+			Position:      position,
 		}
 
 		for _, acc := range keypair.Accounts {
 			kc.AccountsAddresses = append(kc.AccountsAddresses, acc.Address)
 		}
-		addedKc, _, err := accountDB.AddKeycardOrAddAccountsIfKeycardIsAdded(kc)
+		err = accountDB.SaveOrUpdateKeycard(kc, uint64(time.Now().Unix()), true)
 		if err != nil {
 			return err
-		}
-		if !addedKc {
-			return errors.New("couldn't register a keycard to keycards table")
 		}
 	}
 
@@ -1191,7 +1193,7 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 		return err
 	}
 
-	err = db.DeleteAllKeycardsWithKeyUID(accountInfo.KeyUID)
+	err = db.DeleteAllKeycardsWithKeyUID(accountInfo.KeyUID, uint64(time.Now().Unix()))
 	if err != nil {
 		return err
 	}

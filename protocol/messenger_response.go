@@ -74,7 +74,6 @@ type MessengerResponse struct {
 	trustStatus                 map[string]verification.TrustStatus
 	emojiReactions              map[string]*EmojiReaction
 	savedAddresses              map[string]*wallet.SavedAddress
-	keycardActions              []*accounts.KeycardAction
 	SocialLinksInfo             *identity.SocialLinksInfo
 	ensUsernameDetails          []*ensservice.UsernameDetail
 }
@@ -116,7 +115,6 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DiscordMessages               []*protobuf.DiscordMessage           `json:"discordMessages,omitempty"`
 		DiscordMessageAttachments     []*protobuf.DiscordMessageAttachment `json:"discordMessageAtachments,omitempty"`
 		SavedAddresses                []*wallet.SavedAddress               `json:"savedAddresses,omitempty"`
-		KeycardActions                []*accounts.KeycardAction            `json:"keycardActions,omitempty"`
 		SocialLinksInfo               *identity.SocialLinksInfo            `json:"socialLinksInfo,omitempty"`
 		EnsUsernameDetails            []*ensservice.UsernameDetail         `json:"ensUsernameDetails,omitempty"`
 	}{
@@ -151,7 +149,6 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DiscordCategories:             r.DiscordCategories,
 		DiscordChannels:               r.DiscordChannels,
 		DiscordOldestMessageTimestamp: r.DiscordOldestMessageTimestamp,
-		KeycardActions:                r.KeycardActions(),
 		SocialLinksInfo:               r.SocialLinksInfo,
 		EnsUsernameDetails:            r.EnsUsernameDetails(),
 	}
@@ -279,7 +276,6 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.verificationRequests)+
 		len(r.RequestsToJoinCommunity)+
 		len(r.savedAddresses)+
-		len(r.keycardActions) == 0 &&
 		len(r.ensUsernameDetails) == 0 &&
 		r.currentStatus == nil &&
 		r.activityCenterState == nil &&
@@ -312,7 +308,6 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddEmojiReactions(response.EmojiReactions())
 	r.AddInstallations(response.Installations)
 	r.AddSavedAddresses(response.SavedAddresses())
-	r.AddKeycardActions(response.KeycardActions())
 	r.AddEnsUsernameDetails(response.EnsUsernameDetails())
 	r.AddRequestsToJoinCommunity(response.RequestsToJoinCommunity)
 	r.AddBookmarks(response.GetBookmarks())
@@ -461,18 +456,6 @@ func (r *MessengerResponse) SavedAddresses() []*wallet.SavedAddress {
 		ers = append(ers, er)
 	}
 	return ers
-}
-
-func (r *MessengerResponse) AddKeycardAction(keycardAction *accounts.KeycardAction) {
-	r.keycardActions = append(r.keycardActions, keycardAction)
-}
-
-func (r *MessengerResponse) AddKeycardActions(keycardActions []*accounts.KeycardAction) {
-	r.keycardActions = append(r.keycardActions, keycardActions...)
-}
-
-func (r *MessengerResponse) KeycardActions() []*accounts.KeycardAction {
-	return r.keycardActions
 }
 
 func (r *MessengerResponse) AddEnsUsernameDetail(detail *ensservice.UsernameDetail) {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"strings"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
@@ -52,7 +51,7 @@ func (api *API) SaveAccount(ctx context.Context, account *accounts.Account) erro
 	return nil
 }
 
-// Setting `Keypair` without `Accounts` will update keypair only.
+// Setting `Keypair` without `Accounts` will update keypair only, `Keycards` won't be saved/updated this way.
 func (api *API) SaveKeypair(ctx context.Context, keypair *accounts.Keypair) error {
 	log.Info("[AccountsAPI::SaveKeypair]")
 	err := (*api.messenger).SaveOrUpdateKeypair(keypair)
@@ -327,13 +326,14 @@ func (api *API) VerifyPassword(password string) bool {
 }
 
 // If keypair is migrated from keycard to app, then `accountsComingFromKeycard` should be set to true, otherwise false.
-func (api *API) AddKeycardOrAddAccountsIfKeycardIsAdded(ctx context.Context, kcUID string, kpName string, keyUID string,
-	accountAddresses []string, accountsComingFromKeycard bool) error {
-	if len(accountAddresses) == 0 {
+// If keycard is new `Position` will be determined and set by the backend and `KeycardLocked` will be set to false.
+// If keycard is already added, `Position` and `KeycardLocked` will be unchanged.
+func (api *API) SaveOrUpdateKeycard(ctx context.Context, keycard *accounts.Keycard, accountsComingFromKeycard bool) error {
+	if len(keycard.AccountsAddresses) == 0 {
 		return errors.New("cannot migrate a keypair without accounts")
 	}
 
-	kpDb, err := api.db.GetKeypairByKeyUID(keyUID)
+	kpDb, err := api.db.GetKeypairByKeyUID(keycard.KeyUID)
 	if err != nil {
 		if err == accounts.ErrDbKeypairNotFound {
 			return errors.New("cannot migrate an unknown keypair")
@@ -341,23 +341,12 @@ func (api *API) AddKeycardOrAddAccountsIfKeycardIsAdded(ctx context.Context, kcU
 		return err
 	}
 
-	kp := accounts.Keycard{
-		KeycardUID:      kcUID,
-		KeycardName:     kpName,
-		KeycardLocked:   false,
-		KeyUID:          keyUID,
-		LastUpdateClock: uint64(time.Now().Unix()),
-	}
-	for _, addr := range accountAddresses {
-		kp.AccountsAddresses = append(kp.AccountsAddresses, types.Address(common.HexToAddress(addr)))
-	}
-
-	knownKeycardsForKeyUID, err := api.db.GetKeycardByKeyUID(keyUID)
+	relatedKeycardsByKeyUID, err := api.db.GetKeycardsWithSameKeyUID(keycard.KeyUID)
 	if err != nil {
 		return err
 	}
 
-	added, err := (*api.messenger).AddKeycardOrAddAccountsIfKeycardIsAdded(ctx, &kp)
+	err = (*api.messenger).SaveOrUpdateKeycard(ctx, keycard)
 	if err != nil {
 		return err
 	}
@@ -365,8 +354,8 @@ func (api *API) AddKeycardOrAddAccountsIfKeycardIsAdded(ctx context.Context, kcU
 	if !accountsComingFromKeycard {
 		// Once we migrate a keypair, corresponding keystore files need to be deleted
 		// if the keypair being migrated is not already migrated (in case user is creating a copy of an existing Keycard)
-		if added && len(knownKeycardsForKeyUID) == 0 {
-			for _, addr := range kp.AccountsAddresses {
+		if len(relatedKeycardsByKeyUID) == 0 {
+			for _, addr := range keycard.AccountsAddresses {
 				err = api.manager.DeleteAccount(addr)
 				if err != nil {
 					return err
@@ -383,52 +372,42 @@ func (api *API) AddKeycardOrAddAccountsIfKeycardIsAdded(ctx context.Context, kcU
 	return nil
 }
 
-func (api *API) RemoveMigratedAccountsForKeycard(ctx context.Context, kcUID string, accountAddresses []string) error {
-	clock := uint64(time.Now().Unix())
-	var addresses []types.Address
-	for _, addr := range accountAddresses {
-		addresses = append(addresses, types.HexToAddress(addr))
-	}
-	return (*api.messenger).RemoveMigratedAccountsForKeycard(ctx, kcUID, addresses, clock)
-}
-
 func (api *API) GetAllKnownKeycards(ctx context.Context) ([]*accounts.Keycard, error) {
 	return api.db.GetAllKnownKeycards()
 }
 
-func (api *API) GetAllKnownKeycardsGroupedByKeyUID(ctx context.Context) ([]*accounts.Keycard, error) {
-	return api.db.GetAllKnownKeycardsGroupedByKeyUID()
+func (api *API) GetKeycardsWithSameKeyUID(ctx context.Context, keyUID string) ([]*accounts.Keycard, error) {
+	return api.db.GetKeycardsWithSameKeyUID(keyUID)
 }
 
-func (api *API) GetKeycardByKeyUID(ctx context.Context, keyUID string) ([]*accounts.Keycard, error) {
-	return api.db.GetKeycardByKeyUID(keyUID)
+func (api *API) GetKeycardByKeycardUID(ctx context.Context, keycardUID string) (*accounts.Keycard, error) {
+	return api.db.GetKeycardByKeycardUID(keycardUID)
 }
 
-func (api *API) SetKeycardName(ctx context.Context, kcUID string, kpName string) error {
-	clock := uint64(time.Now().Unix())
-	return (*api.messenger).SetKeycardName(ctx, kcUID, kpName, clock)
+func (api *API) SetKeycardName(ctx context.Context, keycardUID string, kpName string) error {
+	return (*api.messenger).SetKeycardName(ctx, keycardUID, kpName)
 }
 
-func (api *API) KeycardLocked(ctx context.Context, kcUID string) error {
-	clock := uint64(time.Now().Unix())
-	return (*api.messenger).KeycardLocked(ctx, kcUID, clock)
+func (api *API) KeycardLocked(ctx context.Context, keycardUID string) error {
+	return (*api.messenger).KeycardLocked(ctx, keycardUID)
 }
 
-func (api *API) KeycardUnlocked(ctx context.Context, kcUID string) error {
-	clock := uint64(time.Now().Unix())
-	return (*api.messenger).KeycardUnlocked(ctx, kcUID, clock)
+func (api *API) KeycardUnlocked(ctx context.Context, keycardUID string) error {
+	return (*api.messenger).KeycardUnlocked(ctx, keycardUID)
 }
 
-func (api *API) DeleteKeycard(ctx context.Context, kcUID string) error {
-	clock := uint64(time.Now().Unix())
-	return (*api.messenger).DeleteKeycard(ctx, kcUID, clock)
+func (api *API) DeleteKeycardAccounts(ctx context.Context, keycardUID string, accountAddresses []types.Address) error {
+	return (*api.messenger).DeleteKeycardAccounts(ctx, keycardUID, accountAddresses)
+}
+
+func (api *API) DeleteKeycard(ctx context.Context, keycardUID string) error {
+	return (*api.messenger).DeleteKeycard(ctx, keycardUID)
 }
 
 func (api *API) DeleteAllKeycardsWithKeyUID(ctx context.Context, keyUID string) error {
-	return api.db.DeleteAllKeycardsWithKeyUID(keyUID)
+	return (*api.messenger).DeleteAllKeycardsWithKeyUID(ctx, keyUID)
 }
 
-func (api *API) UpdateKeycardUID(ctx context.Context, oldKcUID string, newKcUID string) error {
-	clock := uint64(time.Now().Unix())
-	return (*api.messenger).UpdateKeycardUID(ctx, oldKcUID, newKcUID, clock)
+func (api *API) UpdateKeycardUID(ctx context.Context, oldKeycardUID string, newKeycardUID string) error {
+	return (*api.messenger).UpdateKeycardUID(ctx, oldKeycardUID, newKeycardUID)
 }

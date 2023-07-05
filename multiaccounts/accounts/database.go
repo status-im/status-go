@@ -220,7 +220,6 @@ func (a *Keypair) CopyKeypair() *Keypair {
 			KeycardLocked:     kc.KeycardLocked,
 			AccountsAddresses: kc.AccountsAddresses,
 			KeyUID:            kc.KeyUID,
-			LastUpdateClock:   kc.LastUpdateClock,
 		}
 	}
 
@@ -242,7 +241,6 @@ type Database struct {
 	*settings.Database
 	*notificationssettings.NotificationsSettings
 	*sociallinkssettings.SocialLinksSettings
-	*Keycards
 	db *sql.DB
 }
 
@@ -254,9 +252,8 @@ func NewDB(db *sql.DB) (*Database, error) {
 	}
 	sn := notificationssettings.NewNotificationsSettings(db)
 	ssl := sociallinkssettings.NewSocialLinksSettings(db)
-	kc := NewKeycards(db)
 
-	return &Database{sDB, sn, ssl, kc, db}, nil
+	return &Database{sDB, sn, ssl, db}, nil
 }
 
 // DB Gets db sql.DB
@@ -486,7 +483,7 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string) ([]*Keypair, error) {
 	}
 
 	for _, kp := range keypairs {
-		keycards, err := db.getAllRows(tx, true)
+		keycards, err := db.getKeycards(tx, kp.KeyUID, "")
 		if err != nil {
 			return nil, err
 		}
@@ -803,11 +800,6 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, update
 			}
 			keyUID = &acc.KeyUID
 		}
-		var exists bool
-		err = tx.QueryRow("SELECT EXISTS (SELECT 1 FROM keypairs_accounts WHERE address = ?)", acc.Address).Scan(&exists)
-		if err != nil {
-			return err
-		}
 
 		_, err = tx.Exec(`
 			INSERT OR IGNORE INTO
@@ -882,6 +874,7 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, update
 	return nil
 }
 
+// Saves accounts, if an account already exists, it will be updated.
 func (db *Database) SaveOrUpdateAccounts(accounts []*Account, updateKeypairClock bool) error {
 	if len(accounts) == 0 {
 		return errors.New("no provided accounts to save/update")
@@ -902,6 +895,10 @@ func (db *Database) SaveOrUpdateAccounts(accounts []*Account, updateKeypairClock
 	return err
 }
 
+// Saves a keypair and its accounts, if a keypair with `key_uid` already exists, it will be updated,
+// if any of its accounts exists it will be updated as well, otherwise it will be added.
+// Since keypair type contains `Keycards` as well, they are excluded from the saving/updating this way regardless they
+// are set or not.
 func (db *Database) SaveOrUpdateKeypair(keypair *Keypair) error {
 	if keypair == nil {
 		return errDbPassedParameterIsNil
@@ -1061,6 +1058,23 @@ func (db *Database) GetAddresses() (rst []types.Address, err error) {
 	}
 
 	return rst, nil
+}
+
+func (db *Database) keypairExists(tx *sql.Tx, keyUID string) (exists bool, err error) {
+	query := `SELECT EXISTS (SELECT 1 FROM keypairs WHERE key_uid = ?)`
+
+	if tx == nil {
+		err = db.db.QueryRow(query, keyUID).Scan(&exists)
+	} else {
+		err = tx.QueryRow(query, keyUID).Scan(&exists)
+	}
+
+	return exists, err
+}
+
+// KeypairExists returns true if given address is stored in database.
+func (db *Database) KeypairExists(keyUID string) (exists bool, err error) {
+	return db.keypairExists(nil, keyUID)
 }
 
 // AddressExists returns true if given address is stored in database.
