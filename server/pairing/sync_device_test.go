@@ -3,12 +3,14 @@ package pairing
 import (
 	"context"
 	"encoding/json"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/protocol/tt"
-	"go.uber.org/zap"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/protocol/tt"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"

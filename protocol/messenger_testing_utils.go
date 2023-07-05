@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"errors"
+
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
