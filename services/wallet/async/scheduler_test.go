@@ -1,4 +1,4 @@
-package activity
+package async
 
 import (
 	"context"
