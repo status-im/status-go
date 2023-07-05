@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/event"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -17,7 +18,7 @@ import (
 func setupTestTransactionDB(t *testing.T) (*TransactionManager, func()) {
 	db, err := appdatabase.SetupTestMemorySQLDB("wallet-transfer-transaction-tests")
 	require.NoError(t, err)
-	return &TransactionManager{db, nil, nil, nil, nil}, func() {
+	return &TransactionManager{db, nil, nil, nil, nil, &event.Feed{}}, func() {
 		require.NoError(t, db.Close())
 	}
 }
