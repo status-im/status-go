@@ -28,17 +28,18 @@ var ErrOldRequestToJoin = errors.New("old request to join")
 var ErrOldRequestToLeave = errors.New("old request to leave")
 
 const OR = " OR "
-const communitiesBaseQuery = `SELECT c.id, c.private_key, c.description,c.joined,c.spectated,c.verified,c.muted,c.muted_till,r.clock FROM communities_communities c LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?`
+const communitiesBaseQuery = `SELECT c.id,c.private_key,c.control_node,c.description,c.joined,c.spectated,c.verified,c.muted,c.muted_till,r.clock FROM communities_communities c LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?`
 
 func (p *Persistence) SaveCommunity(community *Community) error {
 	id := community.ID()
 	privateKey := community.PrivateKey()
+	controlNode := community.ControlNode()
 	description, err := community.ToBytes()
 	if err != nil {
 		return err
 	}
 
-	_, err = p.db.Exec(`INSERT INTO communities_communities (id, private_key, description, joined, spectated, verified) VALUES (?, ?, ?, ?, ?, ?)`, id, crypto.FromECDSA(privateKey), description, community.config.Joined, community.config.Spectated, community.config.Verified)
+	_, err = p.db.Exec(`INSERT INTO communities_communities (id, private_key, control_node, description, joined, spectated, verified) VALUES (?, ?, ?, ?, ?, ?, ?)`, id, crypto.FromECDSA(privateKey), crypto.FromECDSAPub(controlNode), description, community.config.Joined, community.config.Spectated, community.config.Verified)
 	return err
 }
 
@@ -102,16 +103,16 @@ func (p *Persistence) queryCommunities(memberIdentity *ecdsa.PublicKey, query st
 	}()
 
 	for rows.Next() {
-		var publicKeyBytes, privateKeyBytes, descriptionBytes []byte
+		var publicKeyBytes, privateKeyBytes, controlNodeBytes, descriptionBytes []byte
 		var joined, spectated, verified, muted bool
 		var muteTill sql.NullTime
 		var requestedToJoinAt sql.NullInt64
-		err := rows.Scan(&publicKeyBytes, &privateKeyBytes, &descriptionBytes, &joined, &spectated, &verified, &muted, &muteTill, &requestedToJoinAt)
+		err := rows.Scan(&publicKeyBytes, &privateKeyBytes, &controlNodeBytes, &descriptionBytes, &joined, &spectated, &verified, &muted, &muteTill, &requestedToJoinAt)
 		if err != nil {
 			return nil, err
 		}
 
-		org, err := unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(requestedToJoinAt.Int64), p.logger)
+		org, err := unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, controlNodeBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(requestedToJoinAt.Int64), p.logger)
 		if err != nil {
 			return nil, err
 		}
@@ -151,7 +152,7 @@ func (p *Persistence) rowsToCommunities(memberIdentity *ecdsa.PublicKey, rows *s
 		var comm *Community
 
 		// Community specific fields
-		var publicKeyBytes, privateKeyBytes, descriptionBytes []byte
+		var publicKeyBytes, privateKeyBytes, controlNodeBytes, descriptionBytes []byte
 		var joined, spectated, verified, muted bool
 		var muteTill sql.NullTime
 
@@ -161,13 +162,13 @@ func (p *Persistence) rowsToCommunities(memberIdentity *ecdsa.PublicKey, rows *s
 		var rtjClock, rtjState sql.NullInt64
 
 		err = rows.Scan(
-			&publicKeyBytes, &privateKeyBytes, &descriptionBytes, &joined, &spectated, &verified, &muted, &muteTill,
+			&publicKeyBytes, &privateKeyBytes, &controlNodeBytes, &descriptionBytes, &joined, &spectated, &verified, &muted, &muteTill,
 			&rtjID, &rtjPublicKey, &rtjClock, &rtjENSName, &rtjChatID, &rtjCommunityID, &rtjState)
 		if err != nil {
 			return nil, err
 		}
 
-		comm, err = unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(rtjClock.Int64), p.logger)
+		comm, err = unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, controlNodeBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(rtjClock.Int64), p.logger)
 		if err != nil {
 			return nil, err
 		}
@@ -220,7 +221,7 @@ func (p *Persistence) CreatedCommunities(memberIdentity *ecdsa.PublicKey) ([]*Co
 }
 
 func (p *Persistence) GetByID(memberIdentity *ecdsa.PublicKey, id []byte) (*Community, error) {
-	var publicKeyBytes, privateKeyBytes, descriptionBytes []byte
+	var publicKeyBytes, privateKeyBytes, controlNodeBytes, descriptionBytes []byte
 	var joined bool
 	var spectated bool
 	var verified bool
@@ -228,7 +229,7 @@ func (p *Persistence) GetByID(memberIdentity *ecdsa.PublicKey, id []byte) (*Comm
 	var muteTill sql.NullTime
 	var requestedToJoinAt sql.NullInt64
 
-	err := p.db.QueryRow(communitiesBaseQuery+` WHERE c.id = ?`, common.PubkeyToHex(memberIdentity), id).Scan(&publicKeyBytes, &privateKeyBytes, &descriptionBytes, &joined, &spectated, &verified, &muted, &muteTill, &requestedToJoinAt)
+	err := p.db.QueryRow(communitiesBaseQuery+` WHERE c.id = ?`, common.PubkeyToHex(memberIdentity), id).Scan(&publicKeyBytes, &privateKeyBytes, &controlNodeBytes, &descriptionBytes, &joined, &spectated, &verified, &muted, &muteTill, &requestedToJoinAt)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -236,12 +237,13 @@ func (p *Persistence) GetByID(memberIdentity *ecdsa.PublicKey, id []byte) (*Comm
 		return nil, err
 	}
 
-	return unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(requestedToJoinAt.Int64), p.logger)
+	return unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, controlNodeBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(requestedToJoinAt.Int64), p.logger)
 }
 
-func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, privateKeyBytes, descriptionBytes []byte, joined, spectated, verified, muted bool, muteTill time.Time, requestedToJoinAt uint64, logger *zap.Logger) (*Community, error) {
+func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, privateKeyBytes, controlNodeBytes, descriptionBytes []byte, joined, spectated, verified, muted bool, muteTill time.Time, requestedToJoinAt uint64, logger *zap.Logger) (*Community, error) {
 
 	var privateKey *ecdsa.PrivateKey
+	var controlNode *ecdsa.PublicKey
 	var err error
 
 	if privateKeyBytes != nil {
@@ -250,6 +252,13 @@ func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, p
 			return nil, err
 		}
 	}
+	if controlNodeBytes != nil {
+		controlNode, err = crypto.UnmarshalPubkey(controlNodeBytes)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	metadata := &protobuf.ApplicationMetadataMessage{}
 
 	err = proto.Unmarshal(descriptionBytes, metadata)
@@ -271,6 +280,7 @@ func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, p
 
 	config := Config{
 		PrivateKey:                    privateKey,
+		ControlNode:                   controlNode,
 		CommunityDescription:          description,
 		MemberIdentity:                memberIdentity,
 		MarshaledCommunityDescription: descriptionBytes,
@@ -1146,7 +1156,7 @@ func (p *Persistence) getCommunityTokensInternal(rows *sql.Rows) ([]*CommunityTo
 
 func (p *Persistence) AddCommunityToken(token *CommunityToken) error {
 	_, err := p.db.Exec(`INSERT INTO community_tokens (community_id, address, type, name, symbol, description, supply,
-		infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64, decimals) 
+		infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64, decimals)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, token.CommunityID, token.Address, token.TokenType, token.Name,
 		token.Symbol, token.Description, token.Supply, token.InfiniteSupply, token.Transferable, token.RemoteSelfDestruct,
 		token.ChainID, token.DeployState, token.Base64Image, token.Decimals)

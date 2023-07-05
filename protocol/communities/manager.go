@@ -556,9 +556,12 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 		return nil, err
 	}
 
+	description.ID = types.EncodeHex(crypto.CompressPubkey(&key.PublicKey))
+
 	config := Config{
 		ID:                   &key.PublicKey,
 		PrivateKey:           key,
+		ControlNode:          &key.PublicKey,
 		Logger:               m.logger,
 		Joined:               true,
 		MemberIdentity:       &m.identity.PublicKey,
@@ -1256,12 +1259,21 @@ func (m *Manager) DeleteCategory(request *requests.DeleteCommunityCategory) (*Co
 	return community, changes, nil
 }
 
+// TODO: re-implement me
 func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte) (*CommunityResponse, error) {
+	// queue descriptions from signers (one description per signer per community, higher clock wins)
+	// async trigger control node resolution (no more than once per N secs)
+	// when control node is resolved, handle description from control node, if any, then clear the queue
+	// signal community changes
+
 	if signer == nil {
 		return nil, errors.New("signer can't be nil")
 	}
 
-	id := crypto.CompressPubkey(signer)
+	id, err := types.DecodeHex(description.ID)
+	if err != nil {
+		return nil, err
+	}
 
 	community, err := m.persistence.GetByID(&m.identity.PublicKey, id)
 	if err != nil {
@@ -1269,12 +1281,17 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	}
 
 	if community == nil {
+		pubKey, err := crypto.DecompressPubkey(id)
+		if err != nil {
+			return nil, err
+		}
 		config := Config{
 			CommunityDescription:          description,
 			Logger:                        m.logger,
 			MarshaledCommunityDescription: payload,
 			MemberIdentity:                &m.identity.PublicKey,
-			ID:                            signer,
+			ID:                            pubKey,
+			ControlNode:                   signer,
 		}
 
 		community, err = New(config)
@@ -1283,7 +1300,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		}
 	}
 
-	if !common.IsPubKeyEqual(community.PublicKey(), signer) {
+	if !common.IsPubKeyEqual(community.ControlNode(), signer) {
 		return nil, ErrNotAuthorized
 	}
 
@@ -4118,4 +4135,88 @@ func (m *Manager) accountsHasAdminPermission(becomeAdminPermissions []*protobuf.
 		return permissionResponse.Satisfied
 	}
 	return false
+}
+
+func (m *Manager) UpdateControlNode(communityID types.HexBytes, controlNode types.HexBytes) (*Community, error) {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	pubKey, err := crypto.UnmarshalPubkey(controlNode)
+	if err != nil {
+		return nil, err
+	}
+
+	if community.ControlNode().Equal(pubKey) {
+		return community, nil
+	}
+
+	community.setControlNode(pubKey)
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	return community, nil
+}
+
+// FIXME: temporary for POC's tests, remove me once communities use timestamp hinted lamport clocks
+func (m *Manager) IncreaseClock(communityID types.HexBytes) (*Community, error) {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	community.increaseClock()
+	community.increaseClock()
+	community.increaseClock()
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	return community, nil
+}
+
+func (m *Manager) UpdatePrivateKey(communityID types.HexBytes, pk *ecdsa.PrivateKey) (*Community, error) {
+	community, err := m.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	community.setPrivateKey(pk)
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	return community, nil
+}
+
+// TODO: implement me
+func ResolveControlNode(communityID types.HexBytes) (*ecdsa.PublicKey, error) {
+	// find first ownerToken deployed by community pubkey (communityID)
+	// if there is no ownerToken deployed, then return community pubkey (communityID)
+	// ownerToken.getSigner()
+	// if the signer is nil, return community pubkey (communityID)
+	// otherwise return signer
+
+	controlNode, err := crypto.DecompressPubkey(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	return controlNode, nil
 }

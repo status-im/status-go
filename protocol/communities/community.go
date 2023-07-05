@@ -25,6 +25,7 @@ const signatureLength = 65
 
 type Config struct {
 	PrivateKey                    *ecdsa.PrivateKey
+	ControlNode                   *ecdsa.PublicKey
 	CommunityDescription          *protobuf.CommunityDescription
 	MarshaledCommunityDescription []byte
 	ID                            *ecdsa.PublicKey
@@ -1227,8 +1228,9 @@ func (o *Community) ValidateRequestToJoin(signer *ecdsa.PublicKey, request *prot
 	return nil
 }
 
+// TODO: rename to `IsControlNode`
 func (o *Community) IsOwner() bool {
-	return o.config.PrivateKey != nil || o.IsMemberOwner(o.config.MemberIdentity)
+	return o.config.PrivateKey != nil && o.config.ControlNode != nil && o.config.PrivateKey.PublicKey.Equal(o.config.ControlNode)
 }
 
 func (o *Community) IsAdmin() bool {
@@ -1388,6 +1390,22 @@ func (o *Community) DefaultFilters() []string {
 
 func (o *Community) PrivateKey() *ecdsa.PrivateKey {
 	return o.config.PrivateKey
+}
+
+func (o *Community) setPrivateKey(pk *ecdsa.PrivateKey) {
+	if pk != nil {
+		o.config.PrivateKey = pk
+	}
+}
+
+func (o *Community) ControlNode() *ecdsa.PublicKey {
+	return o.config.ControlNode
+}
+
+func (o *Community) setControlNode(pubKey *ecdsa.PublicKey) {
+	if pubKey != nil {
+		o.config.ControlNode = pubKey
+	}
 }
 
 func (o *Community) PublicKey() *ecdsa.PublicKey {

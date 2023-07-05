@@ -94,6 +94,7 @@ message CommunityDescription {
   map<string, CommunityTokenPermission> token_permissions = 15;
   repeated CommunityTokenMetadata community_tokens_metadata = 16;
   uint64 active_members_count = 17;
+  string ID = 18;
 }
 
 message CommunityAdminSettings {
