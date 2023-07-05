@@ -403,9 +403,12 @@ func (s *MessengerCommunitiesSuite) advertiseCommunityTo(community *communities.
 	advertiseCommunityTo(&s.Suite, community, s.admin, user)
 }
 
+func createRequestToJoinCommunity(community *communities.Community) *requests.RequestToJoinCommunity {
+	return &requests.RequestToJoinCommunity{CommunityID: community.ID(), Password: dummyPassword, AddressesToReveal: []string{dummyAddress}}
+}
+
 func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Community, user *Messenger) {
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), Password: dummyPassword, AddressesToReveal: []string{dummyAddress}}
-	joinCommunity(&s.Suite, community, s.admin, user, request)
+	joinCommunity(&s.Suite, community, s.admin, user, createRequestToJoinCommunity(community))
 }
 
 func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
@@ -784,7 +787,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 
 	s.Require().NoError(err)
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := createRequestToJoinCommunity(community)
 	// We try to join the org
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
@@ -992,7 +995,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	s.Require().NoError(err)
 
 	// Alice request to join community
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := createRequestToJoinCommunity(community)
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -1099,7 +1102,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	s.Require().True(notification.Deleted)
 
 	// Alice request to join community
-	request = &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request = createRequestToJoinCommunity(community)
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -1182,7 +1185,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	s.Require().NoError(err)
 
 	// Alice request to join community
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := createRequestToJoinCommunity(community)
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -1348,7 +1351,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	s.Require().False(notificationState.HasSeen)
 
 	// Alice request to join community
-	request = &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request = createRequestToJoinCommunity(community)
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -1431,7 +1434,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 
 	s.Require().NoError(err)
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := createRequestToJoinCommunity(community)
 	// We try to join the org
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
@@ -1606,7 +1609,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 
 	s.Require().NoError(err)
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := createRequestToJoinCommunity(community)
 	// We try to join the org
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
@@ -1752,7 +1755,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().Len(requestsToJoin, 0)
 
 	// We request again
-	request2 := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request2 := createRequestToJoinCommunity(community)
 	// We try to join the org, it should error as we are already a member
 	response, err = s.alice.RequestToJoinCommunity(request2)
 	s.Require().Error(err)
@@ -1810,7 +1813,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().False(aliceCommunity.HasMember(&s.alice.identity.PublicKey))
 
 	// Alice can request access again
-	request3 := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request3 := createRequestToJoinCommunity(community)
 	response, err = s.alice.RequestToJoinCommunity(request3)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -1906,7 +1909,7 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 
 	s.Require().NoError(err)
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := createRequestToJoinCommunity(community)
 	// We try to join the org
 	response, err = s.alice.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
@@ -2597,7 +2600,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	}
 
 	// Alice requests to join the new community
-	response, err = s.alice.RequestToJoinCommunity(&requests.RequestToJoinCommunity{CommunityID: community.ID()})
+	response, err = s.alice.RequestToJoinCommunity(createRequestToJoinCommunity(community))
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
@@ -3138,7 +3141,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequesToJoin() {
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := createRequestToJoinCommunity(community)
 	// We try to join the org
 	_, rtj, err := s.alice.communitiesManager.RequestToJoin(&s.alice.identity.PublicKey, request)
 
