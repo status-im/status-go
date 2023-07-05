@@ -13,12 +13,12 @@ import (
 	"testing"
 	"time"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -401,10 +401,6 @@ func (s *MessengerCommunitiesSuite) createCommunity() *communities.Community {
 
 func (s *MessengerCommunitiesSuite) advertiseCommunityTo(community *communities.Community, user *Messenger) {
 	advertiseCommunityTo(&s.Suite, community, s.admin, user)
-}
-
-func createRequestToJoinCommunity(community *communities.Community) *requests.RequestToJoinCommunity {
-	return &requests.RequestToJoinCommunity{CommunityID: community.ID(), Password: dummyPassword, AddressesToReveal: []string{dummyAddress}}
 }
 
 func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Community, user *Messenger) {

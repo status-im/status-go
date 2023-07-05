@@ -357,7 +357,10 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestRequestAccessWithENSToke
 
 	s.advertiseCommunityTo(community, s.alice)
 
-	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	requestToJoin := &requests.RequestToJoinCommunity{
+		CommunityID: community.ID(),
+		Password:    types.EncodeHex(crypto.Keccak256([]byte(alicePassword))),
+	}
 	// We try to join the org
 	response, err = s.alice.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)

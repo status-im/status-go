@@ -3,27 +3,22 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/account/generator"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
@@ -70,77 +65,30 @@ func (s *AdminMessengerCommunitiesSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *AdminMessengerCommunitiesSuite) newMessengerWithOptions(shh types.Waku, privateKey *ecdsa.PrivateKey, options []Option) *Messenger {
-	m, err := NewMessenger(
-		"Test",
-		privateKey,
-		&testNode{shh: shh},
-		uuid.New().String(),
-		nil,
-		nil,
-		options...,
-	)
-	s.Require().NoError(err)
+func (s *AdminMessengerCommunitiesSuite) newMessengerWithKey(privateKey *ecdsa.PrivateKey) *Messenger {
+	accountsManagerMock := &AccountManagerMock{}
 
-	err = m.Init()
-	s.Require().NoError(err)
-
-	config := params.NodeConfig{
-		NetworkID: 10,
-		DataDir:   "test",
+	mockedBalances := make(map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	tokenManagerMock := &TokenManagerMock{
+		Balances: &mockedBalances,
 	}
 
-	networks := json.RawMessage("{}")
-	setting := settings.Settings{
-		Address:                   types.HexToAddress("0x1122334455667788990011223344556677889900"),
-		AnonMetricsShouldSend:     false,
-		CurrentNetwork:            "mainnet_rpc",
-		DappsAddress:              types.HexToAddress("0x1122334455667788990011223344556677889900"),
-		InstallationID:            "d3efcff6-cffa-560e-a547-21d3858cbc51",
-		KeyUID:                    "0x1122334455667788990011223344556677889900",
-		Name:                      "Test",
-		Networks:                  &networks,
-		PhotoPath:                 "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
-		PreviewPrivacy:            false,
-		PublicKey:                 "0x04112233445566778899001122334455667788990011223344556677889900112233445566778899001122334455667788990011223344556677889900",
-		SigningPhrase:             "yurt joey vibe",
-		SendPushNotifications:     true,
-		ProfilePicturesVisibility: 1,
-		DefaultSyncPeriod:         777600,
-		UseMailservers:            true,
-		LinkPreviewRequestEnabled: true,
-		SendStatusUpdates:         true,
-		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900")}
-
-	_ = m.settings.CreateSettings(setting, config)
-
-	return m
-}
-
-func (s *AdminMessengerCommunitiesSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
-	tmpfile, err := ioutil.TempFile("", "accounts-tests-")
-	s.Require().NoError(err)
-	madb, err := multiaccounts.InitializeDB(tmpfile.Name())
+	messenger, err := newCommunitiesTestMessenger(s.shh, privateKey, s.logger, accountsManagerMock, tokenManagerMock)
 	s.Require().NoError(err)
 
-	acc := generator.NewAccount(privateKey, nil)
-	iai := acc.ToIdentifiedAccountInfo("")
+	kp := accounts.GetProfileKeypairForTest(false, true, false)
+	kp.Accounts[0].Address = types.HexToAddress(dummyAddress)
+	err = messenger.settings.SaveOrUpdateKeypair(kp)
+	s.Require().NoError(err)
 
-	options := []Option{
-		WithCustomLogger(s.logger),
-		WithDatabaseConfig(":memory:", "somekey", sqlite.ReducedKDFIterationsNumber),
-		WithMultiAccounts(madb),
-		WithAccount(iai.ToMultiAccount()),
-		WithDatasync(),
-	}
-	return s.newMessengerWithOptions(shh, privateKey, options)
+	return messenger
 }
 
 func (s *AdminMessengerCommunitiesSuite) newMessenger() *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	return s.newMessengerWithKey(s.shh, privateKey)
+	return s.newMessengerWithKey(privateKey)
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminEditCommunityDescription() {
@@ -436,7 +384,7 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminAcceptMemberRequestToJoin() {
 	s.advertiseCommunityTo(community, user)
 
 	// user sends request to join
-	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	requestToJoin := createRequestToJoinCommunity(community)
 	response, err := user.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -514,7 +462,7 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminRejectMemberRequestToJoin() {
 	s.advertiseCommunityTo(community, user)
 
 	// user sends request to join
-	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	requestToJoin := createRequestToJoinCommunity(community)
 	response, err := user.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -810,7 +758,7 @@ func (s *AdminMessengerCommunitiesSuite) advertiseCommunityTo(community *communi
 
 func (s *AdminMessengerCommunitiesSuite) joinOnRequestCommunity(community *communities.Community, user *Messenger) {
 	// Request to join the community
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := createRequestToJoinCommunity(community)
 	response, err := user.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -857,7 +805,7 @@ func (s *AdminMessengerCommunitiesSuite) joinOnRequestCommunity(community *commu
 
 func (s *AdminMessengerCommunitiesSuite) joinCommunity(community *communities.Community, user *Messenger) {
 	// Request to join the community
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := createRequestToJoinCommunity(community)
 	response, err := user.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)

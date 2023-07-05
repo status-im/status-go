@@ -204,6 +204,10 @@ func joinCommunity(s *suite.Suite, community *communities.Community, owner *Mess
 	s.Require().NoError(err)
 }
 
+func createRequestToJoinCommunity(community *communities.Community) *requests.RequestToJoinCommunity {
+	return &requests.RequestToJoinCommunity{CommunityID: community.ID(), Password: dummyPassword, AddressesToReveal: []string{dummyAddress}}
+}
+
 func sendChatMessage(s *suite.Suite, sender *Messenger, chatID string, text string) *common.Message {
 	msg := &common.Message{
 		ChatMessage: protobuf.ChatMessage{
