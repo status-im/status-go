@@ -251,6 +251,8 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.CommunityInvitation))
 	case protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN:
 		return m.unmarshalProtobufData(new(protobuf.CommunityRequestToJoin))
+	case protobuf.ApplicationMetadataMessage_COMMUNITY_EDIT_SHARED_ADDRESSES:
+		return m.unmarshalProtobufData(new(protobuf.CommunityEditRevealedAccounts))
 	case protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE:
 		return m.unmarshalProtobufData(new(protobuf.CommunityRequestToJoinResponse))
 	case protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN:

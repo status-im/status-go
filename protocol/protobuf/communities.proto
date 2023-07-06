@@ -23,6 +23,7 @@ message CommunityMember {
   }
   repeated Roles roles = 1;
   repeated RevealedAccount revealed_accounts = 2;
+  uint64 last_update_clock = 3;
 }
 
 message CommunityTokenMetadata {
@@ -134,6 +135,12 @@ message CommunityRequestToJoin {
   bytes community_id = 4;
   string display_name = 5;
   repeated RevealedAccount revealed_accounts = 6;
+}
+
+message CommunityEditRevealedAccounts {
+  uint64 clock = 1;
+  bytes community_id = 2;
+  repeated RevealedAccount revealed_accounts = 3;
 }
 
 message CommunityCancelRequestToJoin {
