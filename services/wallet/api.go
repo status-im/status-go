@@ -115,7 +115,7 @@ func (api *API) GetTransfersForIdentities(ctx context.Context, identities []tran
 func (api *API) FetchDecodedTxData(ctx context.Context, data string) (*thirdparty.DataParsed, error) {
 	log.Debug("[Wallet: FetchDecodedTxData]")
 
-	return api.s.decoder.Run(data)
+	return api.s.decoder.Decode(data)
 }
 
 // Deprecated: GetCachedBalances is deprecated. Use GetTokensBalances instead

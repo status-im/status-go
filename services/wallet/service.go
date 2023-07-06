@@ -27,7 +27,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/alchemy"
 	"github.com/status-im/status-go/services/wallet/thirdparty/coingecko"
 	"github.com/status-im/status-go/services/wallet/thirdparty/cryptocompare"
-	"github.com/status-im/status-go/services/wallet/thirdparty/fourbyte"
 	"github.com/status-im/status-go/services/wallet/thirdparty/infura"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
@@ -127,7 +126,7 @@ func NewService(
 		history:               history,
 		currency:              currency,
 		activity:              activity,
-		decoder:               fourbyte.NewClient(),
+		decoder:               NewDecoder(),
 	}
 }
 
@@ -155,7 +154,7 @@ type Service struct {
 	history               *history.Service
 	currency              *currency.Service
 	activity              *activity.Service
-	decoder               thirdparty.DecoderProvider
+	decoder               *Decoder
 }
 
 // Start signals transmitter.
