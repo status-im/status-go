@@ -766,15 +766,15 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	if m.torrentClientReady() {
-		adminCommunities, err := m.communitiesManager.Created()
-		if err == nil && len(adminCommunities) > 0 {
+		ownedCommunities, err := m.communitiesManager.Owned()
+		if err == nil && len(ownedCommunities) > 0 {
 			available := m.SubscribeMailserverAvailable()
 			go func() {
 				<-available
-				m.InitHistoryArchiveTasks(adminCommunities)
+				m.InitHistoryArchiveTasks(ownedCommunities)
 			}()
 
-			for _, c := range adminCommunities {
+			for _, c := range ownedCommunities {
 				if c.Joined() && c.HasTokenPermissions() {
 					go m.communitiesManager.CheckMemberPermissionsPeriodically(c.ID())
 				}
@@ -1589,18 +1589,18 @@ func (m *Messenger) Init() error {
 		publicChatIDs = append(publicChatIDs, org.DefaultFilters()...)
 	}
 
-	// Init filters for the communities we are an admin of
-	var adminCommunitiesPks []*ecdsa.PrivateKey
-	adminCommunities, err := m.communitiesManager.Created()
+	// Init filters for the communities we are an owner of
+	var ownedCommunitiesPks []*ecdsa.PrivateKey
+	ownedCommunities, err := m.communitiesManager.Owned()
 	if err != nil {
 		return err
 	}
 
-	for _, c := range adminCommunities {
-		adminCommunitiesPks = append(adminCommunitiesPks, c.PrivateKey())
+	for _, c := range ownedCommunities {
+		ownedCommunitiesPks = append(ownedCommunitiesPks, c.PrivateKey())
 	}
 
-	_, err = m.transport.InitCommunityFilters(adminCommunitiesPks)
+	_, err = m.transport.InitCommunityFilters(ownedCommunitiesPks)
 	if err != nil {
 		return err
 	}
@@ -3377,7 +3377,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 	logger := m.logger.With(zap.String("site", "RetrieveAll"))
 
-	adminCommunitiesChatIDs, err := m.communitiesManager.GetAdminCommunitiesChatIDs()
+	adminCommunitiesChatIDs, err := m.communitiesManager.GetOwnedCommunitiesChatIDs()
 	if err != nil {
 		logger.Info("failed to retrieve admin communities", zap.Error(err))
 	}

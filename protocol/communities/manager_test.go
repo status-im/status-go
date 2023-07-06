@@ -298,7 +298,7 @@ func (s *ManagerSuite) TestGetAdminCommuniesChatIDs() {
 	s.Require().NoError(err)
 	s.Require().NotNil(community)
 
-	adminChatIDs, err := s.manager.GetAdminCommunitiesChatIDs()
+	adminChatIDs, err := s.manager.GetOwnedCommunitiesChatIDs()
 	s.Require().NoError(err)
 	s.Require().Len(adminChatIDs, 1)
 }

@@ -263,7 +263,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					continue
 				}
 
-				orgs, err := m.communitiesManager.Created()
+				orgs, err := m.communitiesManager.Owned()
 				if err != nil {
 					m.logger.Warn("failed to retrieve orgs", zap.Error(err))
 				}
@@ -300,7 +300,7 @@ func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
 		for {
 			select {
 			case <-ticker.C:
-				ownedCommunities, err := m.communitiesManager.Created()
+				ownedCommunities, err := m.communitiesManager.Owned()
 				if err != nil {
 					m.logger.Error("failed to update community active members count", zap.Error(err))
 				}
@@ -1125,6 +1125,11 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 		return nil, err
 	}
 
+	community, ok := mr.communities[communityID.String()]
+	if !ok {
+		return nil, communities.ErrOrgNotFound
+	}
+
 	err = m.communitiesManager.DeleteCommunitySettings(communityID)
 	if err != nil {
 		return nil, err
@@ -1132,19 +1137,12 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 
 	m.communitiesManager.StopHistoryArchiveTasksInterval(communityID)
 
-	if com, ok := mr.communities[communityID.String()]; ok {
-		err = m.syncCommunity(context.Background(), com, m.dispatchMessage)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	isAdmin, err := m.communitiesManager.IsAdminCommunityByID(communityID)
+	err = m.syncCommunity(context.Background(), community, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
 
-	if !isAdmin {
+	if !community.IsOwner() {
 		requestToLeaveProto := &protobuf.CommunityRequestToLeave{
 			Clock:       uint64(time.Now().Unix()),
 			CommunityId: communityID,
@@ -2648,7 +2646,7 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 		return err
 	}
 
-	communities, err := m.communitiesManager.Created()
+	communities, err := m.communitiesManager.Owned()
 	if err != nil {
 		return err
 	}

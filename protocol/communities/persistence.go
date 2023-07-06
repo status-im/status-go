@@ -215,7 +215,7 @@ WHERE NOT c.Joined AND (r.community_id IS NULL or r.state != ?)`
 	return p.rowsToCommunities(memberIdentity, rows)
 }
 
-func (p *Persistence) CreatedCommunities(memberIdentity *ecdsa.PublicKey) ([]*Community, error) {
+func (p *Persistence) CommunitiesWithPrivateKey(memberIdentity *ecdsa.PublicKey) ([]*Community, error) {
 	query := communitiesBaseQuery + ` WHERE c.private_key IS NOT NULL`
 	return p.queryCommunities(memberIdentity, query)
 }
