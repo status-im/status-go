@@ -517,8 +517,8 @@ func (m *Manager) DeletedCommunities() ([]*Community, error) {
 	return m.persistence.DeletedCommunities(&m.identity.PublicKey)
 }
 
-func (m *Manager) Created() ([]*Community, error) {
-	return m.persistence.CreatedCommunities(&m.identity.PublicKey)
+func (m *Manager) ControlledCommunities() ([]*Community, error) {
+	return m.persistence.CommunitiesWithPrivateKey(&m.identity.PublicKey)
 }
 
 // CreateCommunity takes a description, generates an ID for it, saves it and return it
@@ -2973,14 +2973,14 @@ func (m *Manager) UpdateCommunitySettings(settings CommunitySettings) error {
 	return m.persistence.UpdateCommunitySettings(settings)
 }
 
-func (m *Manager) GetAdminCommunitiesChatIDs() (map[string]bool, error) {
-	adminCommunities, err := m.Created()
+func (m *Manager) GetControlledCommunitiesChatIDs() (map[string]bool, error) {
+	controlledCommunities, err := m.ControlledCommunities()
 	if err != nil {
 		return nil, err
 	}
 
 	chatIDs := make(map[string]bool)
-	for _, c := range adminCommunities {
+	for _, c := range controlledCommunities {
 		if c.Joined() {
 			for _, id := range c.ChatIDs() {
 				chatIDs[id] = true
@@ -2988,37 +2988,6 @@ func (m *Manager) GetAdminCommunitiesChatIDs() (map[string]bool, error) {
 		}
 	}
 	return chatIDs, nil
-}
-
-func (m *Manager) IsAdminCommunityByID(communityID types.HexBytes) (bool, error) {
-	pubKey, err := crypto.DecompressPubkey(communityID)
-	if err != nil {
-		return false, err
-	}
-	return m.IsAdminCommunity(pubKey)
-}
-
-func (m *Manager) IsAdminCommunity(pubKey *ecdsa.PublicKey) (bool, error) {
-	adminCommunities, err := m.Created()
-	if err != nil {
-		return false, err
-	}
-
-	for _, c := range adminCommunities {
-		if c.PrivateKey().PublicKey.Equal(pubKey) {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func (m *Manager) IsJoinedCommunity(pubKey *ecdsa.PublicKey) (bool, error) {
-	community, err := m.GetByID(crypto.CompressPubkey(pubKey))
-	if err != nil {
-		return false, err
-	}
-
-	return community != nil && community.Joined(), nil
 }
 
 func (m *Manager) GetCommunityChatsFilters(communityID types.HexBytes) ([]*transport.Filter, error) {
@@ -4138,7 +4107,7 @@ func (m *Manager) saveAndPublish(community *Community) error {
 //
 // However, it's safe to run this migration/fixup multiple times.
 func (m *Manager) fixupChannelMembers() error {
-	controlledCommunities, err := m.Created()
+	controlledCommunities, err := m.ControlledCommunities()
 	if err != nil {
 		return err
 	}
