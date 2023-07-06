@@ -812,15 +812,15 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	if m.torrentClientReady() {
-		adminCommunities, err := m.communitiesManager.Created()
-		if err == nil && len(adminCommunities) > 0 {
+		controlledCommunities, err := m.communitiesManager.ControlledCommunities()
+		if err == nil && len(controlledCommunities) > 0 {
 			available := m.SubscribeMailserverAvailable()
 			go func() {
 				<-available
-				m.InitHistoryArchiveTasks(adminCommunities)
+				m.InitHistoryArchiveTasks(controlledCommunities)
 			}()
 
-			for _, c := range adminCommunities {
+			for _, c := range controlledCommunities {
 				if c.Joined() && c.HasTokenPermissions() {
 					go m.communitiesManager.ReevaluateMembersPeriodically(c.ID())
 				}
@@ -1658,18 +1658,18 @@ func (m *Messenger) Init() error {
 		publicChatIDs = append(publicChatIDs, org.DefaultFilters()...)
 	}
 
-	// Init filters for the communities we are an admin of
-	var adminCommunitiesPks []*ecdsa.PrivateKey
-	adminCommunities, err := m.communitiesManager.Created()
+	// Init filters for the communities we control
+	var controlledCommunitiesPks []*ecdsa.PrivateKey
+	controlledCommunities, err := m.communitiesManager.ControlledCommunities()
 	if err != nil {
 		return err
 	}
 
-	for _, c := range adminCommunities {
-		adminCommunitiesPks = append(adminCommunitiesPks, c.PrivateKey())
+	for _, c := range controlledCommunities {
+		controlledCommunitiesPks = append(controlledCommunitiesPks, c.PrivateKey())
 	}
 
-	_, err = m.transport.InitCommunityFilters(adminCommunitiesPks)
+	_, err = m.transport.InitCommunityFilters(controlledCommunitiesPks)
 	if err != nil {
 		return err
 	}
@@ -3498,7 +3498,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 	logger := m.logger.With(zap.String("site", "RetrieveAll"))
 
-	adminCommunitiesChatIDs, err := m.communitiesManager.GetAdminCommunitiesChatIDs()
+	controlledCommunitiesChatIDs, err := m.communitiesManager.GetControlledCommunitiesChatIDs()
 	if err != nil {
 		logger.Info("failed to retrieve admin communities", zap.Error(err))
 	}
@@ -3510,7 +3510,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			// Indicates tha all messages in the batch have been processed correctly
 			allMessagesProcessed := true
 
-			if adminCommunitiesChatIDs[filter.ChatID] && storeWakuMessages {
+			if controlledCommunitiesChatIDs[filter.ChatID] && storeWakuMessages {
 				logger.Debug("storing waku message")
 				err := m.communitiesManager.StoreWakuMessage(shhMessage)
 				if err != nil {

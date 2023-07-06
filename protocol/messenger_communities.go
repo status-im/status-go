@@ -217,13 +217,13 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 	recentlyPublishedOrgs := func() map[string]*communities.Community {
 		result := make(map[string]*communities.Community)
 
-		ownedOrgs, err := m.communitiesManager.Created()
+		controlledCommunities, err := m.communitiesManager.ControlledCommunities()
 		if err != nil {
 			m.logger.Warn("failed to retrieve orgs", zap.Error(err))
 			return result
 		}
 
-		for _, org := range ownedOrgs {
+		for _, org := range controlledCommunities {
 			result[org.IDString()] = org
 		}
 
@@ -295,13 +295,13 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					continue
 				}
 
-				orgs, err := m.communitiesManager.Created()
+				controlledCommunities, err := m.communitiesManager.ControlledCommunities()
 				if err != nil {
 					m.logger.Warn("failed to retrieve orgs", zap.Error(err))
 				}
 
-				for idx := range orgs {
-					org := orgs[idx]
+				for idx := range controlledCommunities {
+					org := controlledCommunities[idx]
 					_, beingImported := m.importingCommunities[org.IDString()]
 					if !beingImported {
 						publishOrgAndDistributeEncryptionKeys(org)
@@ -329,12 +329,12 @@ func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
 		for {
 			select {
 			case <-ticker.C:
-				ownedCommunities, err := m.communitiesManager.Created()
+				controlledCommunities, err := m.communitiesManager.ControlledCommunities()
 				if err != nil {
 					m.logger.Error("failed to update community active members count", zap.Error(err))
 				}
 
-				for _, community := range ownedCommunities {
+				for _, community := range controlledCommunities {
 					lastUpdated, ok := communitiesLastUpdated[community.IDString()]
 					if !ok {
 						lastUpdated = 0
@@ -1364,6 +1364,11 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 		return nil, err
 	}
 
+	community, ok := mr.communities[communityID.String()]
+	if !ok {
+		return nil, communities.ErrOrgNotFound
+	}
+
 	err = m.communitiesManager.DeleteCommunitySettings(communityID)
 	if err != nil {
 		return nil, err
@@ -1371,19 +1376,12 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 
 	m.communitiesManager.StopHistoryArchiveTasksInterval(communityID)
 
-	if com, ok := mr.communities[communityID.String()]; ok {
-		err = m.syncCommunity(context.Background(), com, m.dispatchMessage)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	isAdmin, err := m.communitiesManager.IsAdminCommunityByID(communityID)
+	err = m.syncCommunity(context.Background(), community, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
 
-	if !isAdmin {
+	if !community.IsControlNode() {
 		requestToLeaveProto := &protobuf.CommunityRequestToLeave{
 			Clock:       uint64(time.Now().Unix()),
 			CommunityId: communityID,
@@ -2915,13 +2913,13 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 		return err
 	}
 
-	communities, err := m.communitiesManager.Created()
+	controlledCommunities, err := m.communitiesManager.ControlledCommunities()
 	if err != nil {
 		return err
 	}
 
-	if len(communities) > 0 {
-		go m.InitHistoryArchiveTasks(communities)
+	if len(controlledCommunities) > 0 {
+		go m.InitHistoryArchiveTasks(controlledCommunities)
 	}
 	m.config.messengerSignalsHandler.HistoryArchivesProtocolEnabled()
 	return nil

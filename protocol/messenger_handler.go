@@ -1186,23 +1186,27 @@ func (m *Messenger) HandleCommunityInvitation(state *ReceivedMessageState, signe
 }
 
 func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessageState, communityPubKey *ecdsa.PublicKey, magnetlink string, clock uint64) error {
-
 	id := types.HexBytes(crypto.CompressPubkey(communityPubKey))
+
+	community, err := m.communitiesManager.GetByID(id)
+	if err != nil {
+		m.logger.Debug("Couldn't get community for community with id: ", zap.Any("id", id))
+		return err
+	}
+	if community == nil {
+		return nil
+	}
+
 	settings, err := m.communitiesManager.GetCommunitySettingsByID(id)
 	if err != nil {
 		m.logger.Debug("Couldn't get community settings for community with id: ", zap.Any("id", id))
 		return err
 	}
+	if settings == nil {
+		return nil
+	}
 
-	if m.torrentClientReady() && settings != nil && settings.HistoryArchiveSupportEnabled {
-		signedByOwnedCommunity, err := m.communitiesManager.IsAdminCommunity(communityPubKey)
-		if err != nil {
-			return err
-		}
-		joinedCommunity, err := m.communitiesManager.IsJoinedCommunity(communityPubKey)
-		if err != nil {
-			return err
-		}
+	if m.torrentClientReady() && settings.HistoryArchiveSupportEnabled {
 		lastClock, err := m.communitiesManager.GetMagnetlinkMessageClock(id)
 		if err != nil {
 			return err
@@ -1214,7 +1218,7 @@ func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessage
 		// We are only interested in a community archive magnet link
 		// if it originates from a community that the current account is
 		// part of and doesn't own the private key at the same time
-		if !signedByOwnedCommunity && joinedCommunity && clock >= lastClock {
+		if !community.IsControlNode() && community.Joined() && clock >= lastClock {
 			if lastSeenMagnetlink == magnetlink {
 				m.communitiesManager.LogStdout("already processed this magnetlink")
 				return nil

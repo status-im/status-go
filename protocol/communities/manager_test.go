@@ -370,15 +370,14 @@ func (s *ManagerSuite) TestEditCommunity() {
 	s.Require().Equal(storedCommunity.config.CommunityDescription.Identity.Description, update.CreateCommunity.Description)
 }
 
-func (s *ManagerSuite) TestGetAdminCommuniesChatIDs() {
-
+func (s *ManagerSuite) TestGetControlledCommunitiesChatIDs() {
 	community, _, err := s.buildCommunityWithChat()
 	s.Require().NoError(err)
 	s.Require().NotNil(community)
 
-	adminChatIDs, err := s.manager.GetAdminCommunitiesChatIDs()
+	controlledChatIDs, err := s.manager.GetControlledCommunitiesChatIDs()
 	s.Require().NoError(err)
-	s.Require().Len(adminChatIDs, 1)
+	s.Require().Len(controlledChatIDs, 1)
 }
 
 func (s *ManagerSuite) TestStartAndStopTorrentClient() {
