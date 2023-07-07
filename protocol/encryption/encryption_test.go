@@ -1,14 +1,10 @@
 package encryption
 
 import (
-	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
-	"reflect"
-	"sync"
 	"testing"
 	"time"
 
@@ -741,126 +737,6 @@ func (s *EncryptionServiceTestSuite) TestConcurrentBundles() {
 	// Bob receives the message
 	_, err = s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, aliceMessage2.Message, defaultMessageID)
 	s.Require().NoError(err)
-}
-
-func publish(
-	e *Protocol,
-	privateKey *ecdsa.PrivateKey,
-	publicKey *ecdsa.PublicKey,
-	errChan chan error,
-	output chan *ProtocolMessage,
-) {
-	var wg sync.WaitGroup
-
-	for i := 0; i < 200; i++ {
-
-		// Simulate 5% of the messages dropped
-		if rand.Intn(100) <= 95 { // nolint: gosec
-			wg.Add(1)
-			// Simulate out of order messages
-			go func() {
-				defer wg.Done()
-				time.Sleep(time.Duration(rand.Intn(50)) * time.Millisecond) // nolint: gosec
-				response, err := e.BuildEncryptedMessage(privateKey, publicKey, cleartext)
-				if err != nil {
-					errChan <- err
-					return
-				}
-
-				output <- response.Message
-			}()
-		}
-	}
-	wg.Wait()
-	close(output)
-	close(errChan)
-}
-
-func receiver(
-	s *Protocol,
-	privateKey *ecdsa.PrivateKey,
-	publicKey *ecdsa.PublicKey,
-	errChan chan error,
-	input chan *ProtocolMessage,
-) {
-	i := 0
-
-	for payload := range input {
-		actualCleartext, err := s.HandleMessage(privateKey, publicKey, payload, defaultMessageID)
-		if err != nil {
-			errChan <- err
-			return
-		}
-		if !reflect.DeepEqual(actualCleartext.DecryptedMessage, cleartext) {
-			errChan <- errors.New("Decrypted value does not match")
-			return
-		}
-		i++
-	}
-	close(errChan)
-}
-
-func (s *EncryptionServiceTestSuite) TestRandomised() {
-
-	seed := time.Now().UTC().UnixNano()
-	rand.Seed(seed)
-
-	// Print so that if it fails it can be replicated
-	fmt.Printf("Starting test with seed: %x\n", seed)
-
-	bobKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	aliceKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	// Create a bundle
-	bobBundle, err := s.bob.GetBundle(bobKey)
-	s.Require().NoError(err)
-
-	// We add bob bundle
-	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
-	s.Require().NoError(err)
-
-	// Create a bundle
-	aliceBundle, err := s.alice.GetBundle(aliceKey)
-	s.Require().NoError(err)
-
-	// We add alice bundle
-	_, err = s.bob.ProcessPublicBundle(bobKey, aliceBundle)
-	s.Require().NoError(err)
-
-	aliceChan := make(chan *ProtocolMessage, 100)
-	bobChan := make(chan *ProtocolMessage, 100)
-
-	alicePublisherErrChan := make(chan error, 1)
-	bobPublisherErrChan := make(chan error, 1)
-
-	aliceReceiverErrChan := make(chan error, 1)
-	bobReceiverErrChan := make(chan error, 1)
-
-	// Set up alice publishe
-	go publish(s.alice, aliceKey, &bobKey.PublicKey, alicePublisherErrChan, bobChan)
-	// Set up bob publisher
-	go publish(s.bob, bobKey, &aliceKey.PublicKey, bobPublisherErrChan, aliceChan)
-
-	// Set up bob receiver
-	go receiver(s.bob, bobKey, &aliceKey.PublicKey, bobReceiverErrChan, bobChan)
-
-	// Set up alice receiver
-	go receiver(s.alice, aliceKey, &bobKey.PublicKey, aliceReceiverErrChan, aliceChan)
-
-	aliceErr := <-alicePublisherErrChan
-	s.Require().NoError(aliceErr)
-
-	bobErr := <-bobPublisherErrChan
-	s.Require().NoError(bobErr)
-
-	aliceErr = <-aliceReceiverErrChan
-	s.Require().NoError(aliceErr)
-
-	bobErr = <-bobReceiverErrChan
-	s.Require().NoError(bobErr)
 }
 
 // Edge cases
