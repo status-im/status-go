@@ -103,6 +103,10 @@ func (wakuPX *WakuPeerExchange) handleResponse(ctx context.Context, response *pb
 		wakuPX.wg.Add(1)
 		go func() {
 			defer wakuPX.wg.Done()
+
+			peerCh := make(chan v2.PeerData)
+			defer close(peerCh)
+			wakuPX.peerConnector.Subscribe(ctx, peerCh)
 			for _, p := range discoveredPeers {
 				peer := v2.PeerData{
 					Origin:   peers.PeerExchange,
@@ -112,7 +116,7 @@ func (wakuPX *WakuPeerExchange) handleResponse(ctx context.Context, response *pb
 				select {
 				case <-ctx.Done():
 					return
-				case wakuPX.peerConnector.PeerChannel() <- peer:
+				case peerCh <- peer:
 				}
 			}
 		}()

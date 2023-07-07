@@ -14,7 +14,6 @@ import (
 )
 
 const maxAllowedPingFailures = 2
-const maxPublishAttempt = 5
 
 func disconnectPeers(host host.Host, logger *zap.Logger) {
 	logger.Warn("keep alive hasnt been executed recently. Killing all connections to peers")

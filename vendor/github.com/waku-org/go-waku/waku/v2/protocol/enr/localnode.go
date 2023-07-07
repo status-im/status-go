@@ -91,7 +91,6 @@ func WithUDPPort(udpPort uint) ENROption {
 }
 
 func Update(localnode *enode.LocalNode, enrOptions ...ENROption) error {
-	localnode.SetFallbackIP(net.IP{127, 0, 0, 1})
 	for _, opt := range enrOptions {
 		err := opt(localnode)
 		if err != nil {

@@ -34,18 +34,14 @@ type Rendezvous struct {
 	rendezvousSvc *rvs.RendezvousService
 
 	rendezvousPoints []*rendezvousPoint
-	peerConnector    PeerConnector
+	peerCh           chan v2.PeerData
 
 	log    *zap.Logger
 	wg     sync.WaitGroup
 	cancel context.CancelFunc
 }
 
-type PeerConnector interface {
-	PeerChannel() chan<- v2.PeerData
-}
-
-func NewRendezvous(enableServer bool, db *DB, rendezvousPoints []peer.ID, peerConnector PeerConnector, log *zap.Logger) *Rendezvous {
+func NewRendezvous(enableServer bool, db *DB, rendezvousPoints []peer.ID, log *zap.Logger) *Rendezvous {
 	logger := log.Named("rendezvous")
 
 	var rendevousPoints []*rendezvousPoint
@@ -59,7 +55,7 @@ func NewRendezvous(enableServer bool, db *DB, rendezvousPoints []peer.ID, peerCo
 		enableServer:     enableServer,
 		db:               db,
 		rendezvousPoints: rendevousPoints,
-		peerConnector:    peerConnector,
+		peerCh:           make(chan v2.PeerData),
 		log:              logger,
 	}
 }
@@ -124,7 +120,7 @@ func (r *Rendezvous) Discover(ctx context.Context, topic string, numPeers int) {
 						AddrInfo: addr,
 					}
 					select {
-					case r.peerConnector.PeerChannel() <- peer:
+					case r.peerCh <- peer:
 					case <-ctx.Done():
 						return
 					}
@@ -192,6 +188,10 @@ func (r *Rendezvous) RegisterRelayShards(ctx context.Context, rs protocol.RelayS
 	for _, idx := range rs.Indices {
 		go r.RegisterShard(ctx, rs.Cluster, idx)
 	}
+}
+
+func (r *Rendezvous) PeerChannel() <-chan v2.PeerData {
+	return r.peerCh
 }
 
 func (r *Rendezvous) Stop() {

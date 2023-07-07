@@ -53,8 +53,8 @@ func (rs RelayShards) Contains(cluster uint16, index uint16) bool {
 	}
 
 	found := false
-	for _, i := range rs.Indices {
-		if i == index {
+	for _, idx := range rs.Indices {
+		if idx == index {
 			found = true
 		}
 	}

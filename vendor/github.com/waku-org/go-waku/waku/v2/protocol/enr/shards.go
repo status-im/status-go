@@ -8,12 +8,18 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 )
 
+func deleteShardingENREntries(localnode *enode.LocalNode) {
+	localnode.Delete(enr.WithEntry(ShardingBitVectorEnrField, struct{}{}))
+	localnode.Delete(enr.WithEntry(ShardingIndicesListEnrField, struct{}{}))
+}
+
 func WithWakuRelayShardingIndicesList(rs protocol.RelayShards) ENROption {
 	return func(localnode *enode.LocalNode) error {
 		value, err := rs.IndicesList()
 		if err != nil {
 			return err
 		}
+		deleteShardingENREntries(localnode)
 		localnode.Set(enr.WithEntry(ShardingIndicesListEnrField, value))
 		return nil
 	}
@@ -21,6 +27,7 @@ func WithWakuRelayShardingIndicesList(rs protocol.RelayShards) ENROption {
 
 func WithWakuRelayShardingBitVector(rs protocol.RelayShards) ENROption {
 	return func(localnode *enode.LocalNode) error {
+		deleteShardingENREntries(localnode)
 		localnode.Set(enr.WithEntry(ShardingBitVectorEnrField, rs.BitVector()))
 		return nil
 	}
@@ -55,8 +62,11 @@ func WithWakuRelayShardingTopics(topics ...string) ENROption {
 
 func RelayShardingIndicesList(record *enr.Record) (*protocol.RelayShards, error) {
 	var field []byte
-	if err := record.Load(enr.WithEntry(ShardingIndicesListEnrField, field)); err != nil {
-		return nil, nil
+	if err := record.Load(enr.WithEntry(ShardingIndicesListEnrField, &field)); err != nil {
+		if enr.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
 	}
 
 	res, err := protocol.FromIndicesList(field)
@@ -69,7 +79,7 @@ func RelayShardingIndicesList(record *enr.Record) (*protocol.RelayShards, error)
 
 func RelayShardingBitVector(record *enr.Record) (*protocol.RelayShards, error) {
 	var field []byte
-	if err := record.Load(enr.WithEntry(ShardingBitVectorEnrField, field)); err != nil {
+	if err := record.Load(enr.WithEntry(ShardingBitVectorEnrField, &field)); err != nil {
 		if enr.IsNotFound(err) {
 			return nil, nil
 		}

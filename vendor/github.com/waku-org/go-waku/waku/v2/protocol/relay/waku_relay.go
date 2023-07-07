@@ -7,9 +7,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/event"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/tag"
 	"go.uber.org/zap"
@@ -50,9 +52,25 @@ type WakuRelay struct {
 	wakuRelayTopics map[string]*pubsub.Topic
 	relaySubs       map[string]*pubsub.Subscription
 
+	events   event.Bus
+	emitters struct {
+		EvtRelaySubscribed   event.Emitter
+		EvtRelayUnsubscribed event.Emitter
+	}
+
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
+}
+
+// EvtRelaySubscribed is an event emitted when a new subscription to a pubsub topic is created
+type EvtRelaySubscribed struct {
+	Topic string
+}
+
+// EvtRelayUnsubscribed is an event emitted when a subscription to a pubsub topic is closed
+type EvtRelayUnsubscribed struct {
+	Topic string
 }
 
 func msgIdFn(pmsg *pubsub_pb.Message) string {
@@ -69,6 +87,7 @@ func NewWakuRelay(bcaster Broadcaster, minPeersToPublish int, timesource timesou
 	w.minPeersToPublish = minPeersToPublish
 	w.wg = sync.WaitGroup{}
 	w.log = log.Named("relay")
+	w.events = eventbus.NewBus()
 
 	cfg := pubsub.DefaultGossipSubParams()
 	cfg.PruneBackoff = time.Minute
@@ -200,6 +219,15 @@ func (w *WakuRelay) Start(ctx context.Context) error {
 	}
 	w.pubsub = ps
 
+	w.emitters.EvtRelaySubscribed, err = w.events.Emitter(new(EvtRelaySubscribed))
+	if err != nil {
+		return err
+	}
+	w.emitters.EvtRelayUnsubscribed, err = w.events.Emitter(new(EvtRelayUnsubscribed))
+	if err != nil {
+		return err
+	}
+
 	w.log.Info("Relay protocol started")
 	return nil
 }
@@ -234,8 +262,8 @@ func (w *WakuRelay) SetPubSub(pubSub *pubsub.PubSub) {
 }
 
 func (w *WakuRelay) upsertTopic(topic string) (*pubsub.Topic, error) {
-	defer w.topicsMutex.Unlock()
 	w.topicsMutex.Lock()
+	defer w.topicsMutex.Unlock()
 
 	pubSubTopic, ok := w.wakuRelayTopics[topic]
 	if !ok { // Joins topic if node hasn't joined yet
@@ -267,7 +295,14 @@ func (w *WakuRelay) subscribe(topic string) (subs *pubsub.Subscription, err erro
 		if err != nil {
 			return nil, err
 		}
+
 		w.relaySubs[topic] = sub
+
+		err = w.emitters.EvtRelaySubscribed.Emit(EvtRelaySubscribed{topic})
+		if err != nil {
+			return nil, err
+		}
+
 		if w.bcaster != nil {
 			w.wg.Add(1)
 			go w.subscribeToTopic(topic, sub)
@@ -328,7 +363,8 @@ func (w *WakuRelay) Stop() {
 	}
 
 	w.host.RemoveStreamHandler(WakuRelayID_v200)
-
+	w.emitters.EvtRelaySubscribed.Close()
+	w.emitters.EvtRelayUnsubscribed.Close()
 	w.cancel()
 	w.wg.Wait()
 }
@@ -383,6 +419,11 @@ func (w *WakuRelay) Unsubscribe(ctx context.Context, topic string) error {
 		return err
 	}
 	delete(w.wakuRelayTopics, topic)
+
+	err = w.emitters.EvtRelayUnsubscribed.Emit(EvtRelayUnsubscribed{topic})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -448,4 +489,9 @@ func (w *WakuRelay) subscribeToTopic(pubsubTopic string, sub *pubsub.Subscriptio
 
 func (w *WakuRelay) Params() pubsub.GossipSubParams {
 	return w.params
+}
+
+// Events returns the event bus on which WakuRelay events will be emitted
+func (w *WakuRelay) Events() event.Bus {
+	return w.events
 }

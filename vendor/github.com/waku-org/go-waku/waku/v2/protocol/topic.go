@@ -159,7 +159,6 @@ func (n StaticShardingPubsubTopic) String() string {
 
 func (s *StaticShardingPubsubTopic) Parse(topic string) error {
 	if !strings.HasPrefix(topic, StaticShardingPubsubTopicPrefix) {
-		fmt.Println(topic, StaticShardingPubsubTopicPrefix)
 		return ErrInvalidShardedTopicPrefix
 	}
 
