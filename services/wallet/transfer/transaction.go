@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
@@ -19,6 +20,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/bridge"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -26,6 +28,9 @@ type MultiTransactionIDType int64
 
 const (
 	NoMultiTransactionID = MultiTransactionIDType(0)
+
+	// EventMTTransactionUpdate is emitted when a multi-transaction is updated (added or deleted)
+	EventMTTransactionUpdate walletevent.EventType = "multi-transaction-update"
 )
 
 type TransactionManager struct {
@@ -35,12 +40,18 @@ type TransactionManager struct {
 	config         *params.NodeConfig
 	accountsDB     *accounts.Database
 	pendingManager *transactions.TransactionManager
+	eventFeed      *event.Feed
 }
 
-func NewTransactionManager(db *sql.DB, gethManager *account.GethManager, transactor *transactions.Transactor,
-	config *params.NodeConfig, accountsDB *accounts.Database,
-	pendingTxManager *transactions.TransactionManager) *TransactionManager {
-
+func NewTransactionManager(
+	db *sql.DB,
+	gethManager *account.GethManager,
+	transactor *transactions.Transactor,
+	config *params.NodeConfig,
+	accountsDB *accounts.Database,
+	pendingTxManager *transactions.TransactionManager,
+	eventFeed *event.Feed,
+) *TransactionManager {
 	return &TransactionManager{
 		db:             db,
 		gethManager:    gethManager,
@@ -48,6 +59,7 @@ func NewTransactionManager(db *sql.DB, gethManager *account.GethManager, transac
 		config:         config,
 		accountsDB:     accountsDB,
 		pendingManager: pendingTxManager,
+		eventFeed:      eventFeed,
 	}
 }
 
@@ -147,6 +159,7 @@ func rowsToMultiTransactions(rows *sql.Rows) ([]*MultiTransaction, error) {
 	return multiTransactions, nil
 }
 
+// insertMultiTransaction inserts a multi transaction into the database and updates multi-transaction ID and timestamp
 func insertMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) (MultiTransactionIDType, error) {
 	insert, err := db.Prepare(fmt.Sprintf(`INSERT INTO multi_transactions (%s)
 											VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, multiTransactionColumns))
@@ -183,7 +196,34 @@ func insertMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) (Mul
 }
 
 func (tm *TransactionManager) InsertMultiTransaction(multiTransaction *MultiTransaction) (MultiTransactionIDType, error) {
-	return insertMultiTransaction(tm.db, multiTransaction)
+	return tm.insertMultiTransactionAndNotify(tm.db, multiTransaction, nil)
+}
+
+func (tm *TransactionManager) insertMultiTransactionAndNotify(db *sql.DB, multiTransaction *MultiTransaction, chainIDs []uint64) (MultiTransactionIDType, error) {
+	id, err := insertMultiTransaction(db, multiTransaction)
+	if err != nil {
+		publishMultiTransactionUpdatedEvent(db, multiTransaction, tm.eventFeed, chainIDs)
+	}
+	return id, err
+}
+
+// publishMultiTransactionUpdatedEvent notify listeners of new multi transaction (used in activity history)
+func publishMultiTransactionUpdatedEvent(db *sql.DB, multiTransaction *MultiTransaction, eventFeed *event.Feed, chainIDs []uint64) {
+	publishFn := func(chainID uint64) {
+		eventFeed.Send(walletevent.Event{
+			Type:     EventMTTransactionUpdate,
+			ChainID:  chainID,
+			Accounts: []common.Address{multiTransaction.FromAddress, multiTransaction.ToAddress},
+			At:       int64(multiTransaction.Timestamp),
+		})
+	}
+	if len(chainIDs) > 0 {
+		for _, chainID := range chainIDs {
+			publishFn(chainID)
+		}
+	} else {
+		publishFn(0)
+	}
 }
 
 func updateMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) error {
@@ -228,7 +268,11 @@ func (tm *TransactionManager) CreateMultiTransactionFromCommand(ctx context.Cont
 
 	multiTransaction := multiTransactionFromCommand(command)
 
-	multiTransactionID, err := insertMultiTransaction(tm.db, multiTransaction)
+	chainIDs := make([]uint64, 0, len(data))
+	for _, tx := range data {
+		chainIDs = append(chainIDs, tx.ChainID)
+	}
+	multiTransactionID, err := tm.insertMultiTransactionAndNotify(tm.db, multiTransaction, chainIDs)
 	if err != nil {
 		return nil, err
 	}
