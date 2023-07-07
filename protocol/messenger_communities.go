@@ -1839,10 +1839,25 @@ func (m *Messenger) findCommunityInfoFromDB(communityID string) (*communities.Co
 	return community, nil
 }
 
+func (m *Messenger) GetCommunityIDFromKey(communityKey string) string {
+	// Check if the key is a private key
+	privateKey, err := crypto.HexToECDSA(communityKey[2:])
+	communityID := ""
+	if err != nil {
+		// Not a private key, use the public key
+		communityID = communityKey
+	} else {
+		// It is a privateKey
+		communityID = types.HexBytes(crypto.CompressPubkey(&privateKey.PublicKey)).String()
+	}
+	return communityID
+}
+
 // RequestCommunityInfoFromMailserver installs filter for community and requests its details
 // from mailserver. It waits until it has the community before returning it.
 // If useDatabase is true, it searches for community in database and does not request mailserver.
-func (m *Messenger) RequestCommunityInfoFromMailserver(communityID string, useDatabase bool) (*communities.Community, error) {
+func (m *Messenger) RequestCommunityInfoFromMailserver(privateOrPublicKey string, useDatabase bool) (*communities.Community, error) {
+	communityID := m.GetCommunityIDFromKey(privateOrPublicKey)
 	if useDatabase {
 		community, err := m.findCommunityInfoFromDB(communityID)
 		if err != nil {
@@ -1858,7 +1873,9 @@ func (m *Messenger) RequestCommunityInfoFromMailserver(communityID string, useDa
 
 // RequestCommunityInfoFromMailserverAsync installs filter for community and requests its details
 // from mailserver. When response received it will be passed through signals handler
-func (m *Messenger) RequestCommunityInfoFromMailserverAsync(communityID string) error {
+func (m *Messenger) RequestCommunityInfoFromMailserverAsync(privateOrPublicKey string) error {
+	communityID := m.GetCommunityIDFromKey(privateOrPublicKey)
+
 	community, err := m.findCommunityInfoFromDB(communityID)
 	if err != nil {
 		return err
