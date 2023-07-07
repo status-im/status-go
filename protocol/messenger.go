@@ -450,6 +450,10 @@ func NewMessenger(
 		managerOptions = append(managerOptions, communities.WithWalletConfig(c.walletConfig))
 	}
 
+	if c.collectiblesService != nil {
+		managerOptions = append(managerOptions, communities.WithCollectiblesService(c.collectiblesService))
+	}
+
 	communitiesManager, err := communities.NewManager(identity, database, encryptionProtocol, logger, ensVerifier, transp, c.torrentConfig, managerOptions...)
 	if err != nil {
 		return nil, err

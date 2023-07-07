@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/account"
@@ -33,11 +34,13 @@ import (
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
+	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/services/collectibles"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -78,6 +81,7 @@ type Manager struct {
 	torrentConfig                    *params.TorrentConfig
 	torrentClient                    *torrent.Client
 	walletConfig                     *params.WalletConfig
+	collectiblesService              *collectibles.Service
 	historyArchiveTasksWaitGroup     sync.WaitGroup
 	historyArchiveTasks              sync.Map // stores `chan struct{}`
 	periodicMembersReevaluationTasks sync.Map // stores `chan struct{}`
@@ -112,6 +116,7 @@ type managerOptions struct {
 	tokenManager        TokenManager
 	collectiblesManager CollectiblesManager
 	walletConfig        *params.WalletConfig
+	collectiblesService *collectibles.Service
 }
 
 type TokenManager interface {
@@ -182,6 +187,12 @@ func WithWalletConfig(walletConfig *params.WalletConfig) ManagerOption {
 	}
 }
 
+func WithCollectiblesService(collectiblesService *collectibles.Service) ManagerOption {
+	return func(opts *managerOptions) {
+		opts.collectiblesService = collectiblesService
+	}
+}
+
 func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Protocol, logger *zap.Logger, verifier *ens.Verifier, transport *transport.Transport, torrentConfig *params.TorrentConfig, opts ...ManagerOption) (*Manager, error) {
 	if identity == nil {
 		return nil, errors.New("empty identity")
@@ -234,6 +245,10 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 
 	if managerConfig.walletConfig != nil {
 		manager.walletConfig = managerConfig.walletConfig
+	}
+
+	if managerConfig.collectiblesService != nil {
+		manager.collectiblesService = managerConfig.collectiblesService
 	}
 
 	if verifier != nil {
@@ -4036,11 +4051,11 @@ func findIndexFile(files []*torrent.File) (index int, ok bool) {
 	return 0, false
 }
 
-func (m *Manager) GetCommunityTokens(communityID string) ([]*CommunityToken, error) {
+func (m *Manager) GetCommunityTokens(communityID string) ([]*community_token.CommunityToken, error) {
 	return m.persistence.GetCommunityTokens(communityID)
 }
 
-func (m *Manager) GetAllCommunityTokens() ([]*CommunityToken, error) {
+func (m *Manager) GetAllCommunityTokens() ([]*community_token.CommunityToken, error) {
 	return m.persistence.GetAllCommunityTokens()
 }
 
@@ -4065,7 +4080,16 @@ func (m *Manager) ImageToBase64(uri string) string {
 	return base64img
 }
 
-func (m *Manager) SaveCommunityToken(token *CommunityToken, croppedImage *images.CroppedImage) (*CommunityToken, error) {
+func (m *Manager) SaveCommunityToken(token *community_token.CommunityToken, croppedImage *images.CroppedImage) (*community_token.CommunityToken, error) {
+
+	community, err := m.GetByIDString(token.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
 	if croppedImage != nil && croppedImage.ImagePath != "" {
 		bytes, err := images.OpenAndAdjustImage(*croppedImage, true)
 		if err != nil {
@@ -4116,7 +4140,7 @@ func (m *Manager) AddCommunityToken(communityID string, chainID int, address str
 	return m.saveAndPublish(community)
 }
 
-func (m *Manager) UpdateCommunityTokenState(chainID int, contractAddress string, deployState DeployState) error {
+func (m *Manager) UpdateCommunityTokenState(chainID int, contractAddress string, deployState community_token.DeployState) error {
 	return m.persistence.UpdateCommunityTokenState(chainID, contractAddress, deployState)
 }
 
@@ -4305,4 +4329,77 @@ func (m *Manager) ReevaluatePrivelegedMember(community *Community, tokenPermissi
 	}
 
 	return alreadyHasPrivilegedRole, nil
+}
+
+func (m *Manager) HandleCommunityTokensMetadata(communityID string, communityTokens []*protobuf.CommunityTokenMetadata) error {
+	for _, tokenMetadata := range communityTokens {
+		for chainID, address := range tokenMetadata.ContractAddresses {
+			exists, err := m.persistence.HasCommunityToken(communityID, address, int(chainID))
+			if err != nil {
+				return err
+			}
+			if !exists {
+
+				communityToken := &community_token.CommunityToken{
+					CommunityID:        communityID,
+					Address:            address,
+					TokenType:          tokenMetadata.TokenType,
+					Name:               tokenMetadata.Name,
+					Symbol:             tokenMetadata.Symbol,
+					Description:        tokenMetadata.Description,
+					Transferable:       true,
+					RemoteSelfDestruct: false,
+					ChainID:            int(chainID),
+					DeployState:        community_token.Deployed,
+					Base64Image:        tokenMetadata.Image,
+					Decimals:           int(tokenMetadata.Decimals),
+				}
+
+				callOpts := &bind.CallOpts{Context: context.Background(), Pending: false}
+
+				switch tokenMetadata.TokenType {
+				case protobuf.CommunityTokenType_ERC721:
+					contract, err := m.collectiblesService.API().GetContractInstance(chainID, address)
+					if err != nil {
+						return err
+					}
+					totalSupply, err := contract.TotalSupply(callOpts)
+					if err != nil {
+						return err
+					}
+					transferable, err := contract.Transferable(callOpts)
+					if err != nil {
+						return err
+					}
+					remoteBurnable, err := contract.RemoteBurnable(callOpts)
+					if err != nil {
+						return err
+					}
+
+					communityToken.Supply = &bigint.BigInt{Int: totalSupply}
+					communityToken.Transferable = transferable
+					communityToken.RemoteSelfDestruct = remoteBurnable
+					communityToken.InfiniteSupply = collectibles.GetInfiniteSupply().Cmp(totalSupply) == 0
+
+				case protobuf.CommunityTokenType_ERC20:
+					contract, err := m.collectiblesService.API().GetAssetContractInstance(chainID, address)
+					if err != nil {
+						return err
+					}
+					totalSupply, err := contract.TotalSupply(callOpts)
+					if err != nil {
+						return err
+					}
+					communityToken.Supply = &bigint.BigInt{Int: totalSupply}
+					communityToken.InfiniteSupply = collectibles.GetInfiniteSupply().Cmp(totalSupply) == 0
+				}
+
+				err = m.persistence.AddCommunityToken(communityToken)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }

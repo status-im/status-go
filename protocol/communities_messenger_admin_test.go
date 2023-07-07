@@ -13,7 +13,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -253,7 +253,7 @@ func (s *AdminCommunityEventsSuite) TestAdminPinMessage() {
 func (s *AdminCommunityEventsSuite) TestAdminAddCommunityToken() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
 
-	tokenERC721 := &communities.CommunityToken{
+	tokenERC721 := &token.CommunityToken{
 		CommunityID:        community.IDString(),
 		TokenType:          protobuf.CommunityTokenType_ERC721,
 		Address:            "0x123",
@@ -265,7 +265,7 @@ func (s *AdminCommunityEventsSuite) TestAdminAddCommunityToken() {
 		Transferable:       true,
 		RemoteSelfDestruct: true,
 		ChainID:            1,
-		DeployState:        communities.Deployed,
+		DeployState:        token.Deployed,
 		Base64Image:        "ABCD",
 	}
 

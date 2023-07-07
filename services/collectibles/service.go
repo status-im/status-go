@@ -28,6 +28,10 @@ func (s *Service) Protocols() []p2p.Protocol {
 	return []p2p.Protocol{}
 }
 
+func (s *Service) API() *API {
+	return s.api
+}
+
 // APIs returns a list of new APIs.
 func (s *Service) APIs() []ethRpc.API {
 	return []ethRpc.API{

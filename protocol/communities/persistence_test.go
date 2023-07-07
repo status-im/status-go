@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -378,7 +379,7 @@ func (s *PersistenceSuite) TestGetCommunityToken() {
 	s.Require().NoError(err)
 	s.Require().Len(tokens, 0)
 
-	tokenERC721 := CommunityToken{
+	tokenERC721 := token.CommunityToken{
 		CommunityID:        "123",
 		TokenType:          protobuf.CommunityTokenType_ERC721,
 		Address:            "0x123",
@@ -390,7 +391,7 @@ func (s *PersistenceSuite) TestGetCommunityToken() {
 		Transferable:       true,
 		RemoteSelfDestruct: true,
 		ChainID:            1,
-		DeployState:        InProgress,
+		DeployState:        token.InProgress,
 		Base64Image:        "ABCD",
 	}
 
@@ -407,7 +408,7 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 	s.Require().NoError(err)
 	s.Require().Len(tokens, 0)
 
-	tokenERC721 := CommunityToken{
+	tokenERC721 := token.CommunityToken{
 		CommunityID:        "123",
 		TokenType:          protobuf.CommunityTokenType_ERC721,
 		Address:            "0x123",
@@ -419,11 +420,11 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 		Transferable:       true,
 		RemoteSelfDestruct: true,
 		ChainID:            1,
-		DeployState:        InProgress,
+		DeployState:        token.InProgress,
 		Base64Image:        "ABCD",
 	}
 
-	tokenERC20 := CommunityToken{
+	tokenERC20 := token.CommunityToken{
 		CommunityID:        "345",
 		TokenType:          protobuf.CommunityTokenType_ERC20,
 		Address:            "0x345",
@@ -435,7 +436,7 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 		Transferable:       true,
 		RemoteSelfDestruct: true,
 		ChainID:            2,
-		DeployState:        Failed,
+		DeployState:        token.Failed,
 		Base64Image:        "QWERTY",
 		Decimals:           21,
 	}
@@ -450,12 +451,12 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 	s.Require().Len(tokens, 1)
 	s.Require().Equal(tokenERC721, *tokens[0])
 
-	err = s.db.UpdateCommunityTokenState(1, "0x123", Deployed)
+	err = s.db.UpdateCommunityTokenState(1, "0x123", token.Deployed)
 	s.Require().NoError(err)
 	tokens, err = s.db.GetCommunityTokens("123")
 	s.Require().NoError(err)
 	s.Require().Len(tokens, 1)
-	s.Require().Equal(Deployed, tokens[0].DeployState)
+	s.Require().Equal(token.Deployed, tokens[0].DeployState)
 
 	tokens, err = s.db.GetCommunityTokens("345")
 	s.Require().NoError(err)
