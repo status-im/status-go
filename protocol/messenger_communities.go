@@ -2558,7 +2558,7 @@ importMessageArchivesLoop:
 					continue importMessageArchivesLoop
 				}
 
-				response, err := m.handleArchiveMessages(messagesChunk, communityID)
+				response, err := m.handleArchiveMessages(messagesChunk)
 				if err != nil {
 					m.communitiesManager.LogStdout("failed to handle archive messages", zap.Error(err))
 					continue importMessageArchivesLoop
