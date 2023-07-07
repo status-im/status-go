@@ -10,6 +10,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -1233,7 +1234,7 @@ func testEventSenderCannotEditBecomeAdminPermission(base CommunityEventsTestsInt
 }
 
 func testEventSenderAddedCommunityToken(base CommunityEventsTestsInterface, community *communities.Community) {
-	tokenERC721 := &communities.CommunityToken{
+	tokenERC721 := &token.CommunityToken{
 		CommunityID:        community.IDString(),
 		TokenType:          protobuf.CommunityTokenType_ERC721,
 		Address:            "0x123",
@@ -1245,7 +1246,7 @@ func testEventSenderAddedCommunityToken(base CommunityEventsTestsInterface, comm
 		Transferable:       true,
 		RemoteSelfDestruct: true,
 		ChainID:            1,
-		DeployState:        communities.Deployed,
+		DeployState:        token.Deployed,
 		Base64Image:        "ABCD",
 	}
 

@@ -493,6 +493,10 @@ func (b *StatusNode) SetWalletCollectibleMetadataProvider(provider thirdparty.Co
 	}
 }
 
+func (b *StatusNode) CollectiblesService() *collectibles.Service {
+	return b.collectiblesSrvc
+}
+
 func (b *StatusNode) walletService(accountsDB *accounts.Database, accountsFeed *event.Feed) *wallet.Service {
 	if b.walletSrvc == nil {
 		b.walletSrvc = wallet.NewService(

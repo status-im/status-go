@@ -44,6 +44,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/services/collectibles"
 	"github.com/status-im/status-go/services/ext/mailservers"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
@@ -115,7 +116,7 @@ func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
 	return enode.ParseV4(rawURL)
 }
 
-func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *sql.DB, httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, accountManager *account.GethManager, rpcClient *rpc.Client, walletService *wallet.Service, logger *zap.Logger) error {
+func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *sql.DB, httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, accountManager *account.GethManager, rpcClient *rpc.Client, walletService *wallet.Service, collectiblesService *collectibles.Service, logger *zap.Logger) error {
 	var err error
 	if !s.config.ShhextConfig.PFSEnabled {
 		return nil
@@ -154,7 +155,7 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *
 	s.multiAccountsDB = multiAccountDb
 	s.account = acc
 
-	options, err := buildMessengerOptions(s.config, identity, db, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, walletService, logger, &MessengerSignalsHandler{})
+	options, err := buildMessengerOptions(s.config, identity, db, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, walletService, collectiblesService, logger, &MessengerSignalsHandler{})
 	if err != nil {
 		return err
 	}
@@ -411,6 +412,7 @@ func buildMessengerOptions(
 	envelopesMonitorConfig *transport.EnvelopesMonitorConfig,
 	accountsDB *accounts.Database,
 	walletService *wallet.Service,
+	collectiblesService *collectibles.Service,
 	logger *zap.Logger,
 	messengerSignalsHandler protocol.MessengerSignalsHandler,
 ) ([]protocol.Option, error) {
@@ -432,6 +434,7 @@ func buildMessengerOptions(
 		protocol.WithMessageCSV(config.OutputMessageCSVEnabled),
 		protocol.WithWalletConfig(&config.WalletConfig),
 		protocol.WithWalletService(walletService),
+		protocol.WithCollectiblesService(collectiblesService),
 	}
 
 	if config.ShhextConfig.DataSyncEnabled {

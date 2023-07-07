@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/linkpreview"
@@ -1318,15 +1319,15 @@ func (api *PublicAPI) BuildContact(request *requests.BuildContact) (*protocol.Co
 	return api.service.messenger.BuildContact(request)
 }
 
-func (api *PublicAPI) GetCommunityTokens(communityID string) ([]*communities.CommunityToken, error) {
+func (api *PublicAPI) GetCommunityTokens(communityID string) ([]*token.CommunityToken, error) {
 	return api.service.messenger.GetCommunityTokens(communityID)
 }
 
-func (api *PublicAPI) GetAllCommunityTokens() ([]*communities.CommunityToken, error) {
+func (api *PublicAPI) GetAllCommunityTokens() ([]*token.CommunityToken, error) {
 	return api.service.messenger.GetAllCommunityTokens()
 }
 
-func (api *PublicAPI) SaveCommunityToken(token *communities.CommunityToken, croppedImage *images.CroppedImage) (*communities.CommunityToken, error) {
+func (api *PublicAPI) SaveCommunityToken(token *token.CommunityToken, croppedImage *images.CroppedImage) (*token.CommunityToken, error) {
 	return api.service.messenger.SaveCommunityToken(token, croppedImage)
 }
 
@@ -1334,7 +1335,7 @@ func (api *PublicAPI) AddCommunityToken(communityID string, chainID int, address
 	return api.service.messenger.AddCommunityToken(communityID, chainID, address)
 }
 
-func (api *PublicAPI) UpdateCommunityTokenState(chainID int, contractAddress string, deployState communities.DeployState) error {
+func (api *PublicAPI) UpdateCommunityTokenState(chainID int, contractAddress string, deployState token.DeployState) error {
 	return api.service.messenger.UpdateCommunityTokenState(chainID, contractAddress, deployState)
 }
 

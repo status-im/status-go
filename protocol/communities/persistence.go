@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
@@ -1163,7 +1164,7 @@ func (p *Persistence) GetCommunityChatIDs(communityID types.HexBytes) ([]string,
 	return ids, nil
 }
 
-func (p *Persistence) GetAllCommunityTokens() ([]*CommunityToken, error) {
+func (p *Persistence) GetAllCommunityTokens() ([]*token.CommunityToken, error) {
 	rows, err := p.db.Query(`SELECT community_id, address, type, name, symbol, description, supply_str,
 	infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64, decimals
 	FROM community_tokens`)
@@ -1175,7 +1176,7 @@ func (p *Persistence) GetAllCommunityTokens() ([]*CommunityToken, error) {
 	return p.getCommunityTokensInternal(rows)
 }
 
-func (p *Persistence) GetCommunityTokens(communityID string) ([]*CommunityToken, error) {
+func (p *Persistence) GetCommunityTokens(communityID string) ([]*token.CommunityToken, error) {
 	rows, err := p.db.Query(`SELECT community_id, address, type, name, symbol, description, supply_str,
 	infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64, decimals
 	FROM community_tokens WHERE community_id = ?`, communityID)
@@ -1187,8 +1188,8 @@ func (p *Persistence) GetCommunityTokens(communityID string) ([]*CommunityToken,
 	return p.getCommunityTokensInternal(rows)
 }
 
-func (p *Persistence) GetCommunityToken(communityID string, chainID int, address string) (*CommunityToken, error) {
-	token := CommunityToken{}
+func (p *Persistence) GetCommunityToken(communityID string, chainID int, address string) (*token.CommunityToken, error) {
+	token := token.CommunityToken{}
 	var supplyStr string
 	err := p.db.QueryRow(`SELECT community_id, address, type, name, symbol, description, supply_str, infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64, decimals FROM community_tokens WHERE community_id = ? AND chain_id = ? AND address = ?`, communityID, chainID, address).Scan(&token.CommunityID, &token.Address, &token.TokenType, &token.Name,
 		&token.Symbol, &token.Description, &supplyStr, &token.InfiniteSupply, &token.Transferable,
@@ -1207,11 +1208,11 @@ func (p *Persistence) GetCommunityToken(communityID string, chainID int, address
 	return &token, nil
 }
 
-func (p *Persistence) getCommunityTokensInternal(rows *sql.Rows) ([]*CommunityToken, error) {
-	tokens := []*CommunityToken{}
+func (p *Persistence) getCommunityTokensInternal(rows *sql.Rows) ([]*token.CommunityToken, error) {
+	tokens := []*token.CommunityToken{}
 
 	for rows.Next() {
-		token := CommunityToken{}
+		token := token.CommunityToken{}
 		var supplyStr string
 		err := rows.Scan(&token.CommunityID, &token.Address, &token.TokenType, &token.Name,
 			&token.Symbol, &token.Description, &supplyStr, &token.InfiniteSupply, &token.Transferable,
@@ -1232,7 +1233,16 @@ func (p *Persistence) getCommunityTokensInternal(rows *sql.Rows) ([]*CommunityTo
 	return tokens, nil
 }
 
-func (p *Persistence) AddCommunityToken(token *CommunityToken) error {
+func (p *Persistence) HasCommunityToken(communityID string, address string, chainID int) (bool, error) {
+	var count int
+	err := p.db.QueryRow(`SELECT count(1) FROM community_tokens WHERE community_id = ? AND address = ? AND chain_id = ?`, communityID, address, chainID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (p *Persistence) AddCommunityToken(token *token.CommunityToken) error {
 	_, err := p.db.Exec(`INSERT INTO community_tokens (community_id, address, type, name, symbol, description, supply_str,
 		infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64, decimals)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, token.CommunityID, token.Address, token.TokenType, token.Name,
@@ -1241,7 +1251,7 @@ func (p *Persistence) AddCommunityToken(token *CommunityToken) error {
 	return err
 }
 
-func (p *Persistence) UpdateCommunityTokenState(chainID int, contractAddress string, deployState DeployState) error {
+func (p *Persistence) UpdateCommunityTokenState(chainID int, contractAddress string, deployState token.DeployState) error {
 	_, err := p.db.Exec(`UPDATE community_tokens SET deploy_state = ? WHERE address = ? AND chain_id = ?`, deployState, contractAddress, chainID)
 	return err
 }

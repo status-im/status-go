@@ -24,6 +24,7 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/wakusync"
+	"github.com/status-im/status-go/services/collectibles"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
 )
@@ -87,6 +88,7 @@ type config struct {
 	torrentConfig       *params.TorrentConfig
 	walletConfig        *params.WalletConfig
 	walletService       *wallet.Service
+	collectiblesService *collectibles.Service
 	httpServer          *server.MediaServer
 	rpcClient           *rpc.Client
 	tokenManager        communities.TokenManager
@@ -331,6 +333,13 @@ func WithMessageCSV(enabled bool) Option {
 func WithWalletService(s *wallet.Service) Option {
 	return func(c *config) error {
 		c.walletService = s
+		return nil
+	}
+}
+
+func WithCollectiblesService(s *collectibles.Service) Option {
+	return func(c *config) error {
+		c.collectiblesService = s
 		return nil
 	}
 }

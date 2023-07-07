@@ -70,6 +70,10 @@ func (d *DeploymentParameters) GetSupply() *big.Int {
 
 // infinite supply for ERC721 is 2^256-1
 func (d *DeploymentParameters) GetInfiniteSupply() *big.Int {
+	return GetInfiniteSupply()
+}
+
+func GetInfiniteSupply() *big.Int {
 	max := new(big.Int).Exp(big.NewInt(2), big.NewInt(256), nil)
 	max.Sub(max, big.NewInt(1))
 	return max
@@ -405,6 +409,22 @@ func (api *API) EstimateRemoteBurn(ctx context.Context, chainID uint64, contract
 	}
 
 	return api.estimateMethod(ctx, chainID, contractAddress, "remoteBurn", tempTokenIds)
+}
+
+func (api *API) GetContractInstance(chainID uint64, contractAddress string) (*collectibles.Collectibles, error) {
+	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+	return contractInst, nil
+}
+
+func (api *API) GetAssetContractInstance(chainID uint64, contractAddress string) (*assets.Assets, error) {
+	contractInst, err := api.newAssetsInstance(chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+	return contractInst, nil
 }
 
 func (api *API) ContractOwner(ctx context.Context, chainID uint64, contractAddress string) (string, error) {

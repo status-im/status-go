@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -25,7 +25,7 @@ type DatabaseSuite struct {
 	db *Database
 }
 
-func (s *DatabaseSuite) addCommunityToken(db *sql.DB, token *communities.CommunityToken) error {
+func (s *DatabaseSuite) addCommunityToken(db *sql.DB, token *token.CommunityToken) error {
 	_, err := db.Exec(`INSERT INTO community_tokens (community_id, address, type, name, symbol, description, supply_str,
 		infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64, decimals) 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, token.CommunityID, token.Address, token.TokenType, token.Name,
@@ -35,7 +35,7 @@ func (s *DatabaseSuite) addCommunityToken(db *sql.DB, token *communities.Communi
 }
 
 func (s *DatabaseSuite) setupDatabase(db *sql.DB) error {
-	token721 := &communities.CommunityToken{
+	token721 := &token.CommunityToken{
 		CommunityID:        "123",
 		TokenType:          protobuf.CommunityTokenType_ERC721,
 		Address:            "0x123",
@@ -47,11 +47,11 @@ func (s *DatabaseSuite) setupDatabase(db *sql.DB) error {
 		Transferable:       true,
 		RemoteSelfDestruct: true,
 		ChainID:            1,
-		DeployState:        communities.InProgress,
+		DeployState:        token.InProgress,
 		Base64Image:        "ABCD",
 	}
 
-	token20 := &communities.CommunityToken{
+	token20 := &token.CommunityToken{
 		CommunityID:        "345",
 		TokenType:          protobuf.CommunityTokenType_ERC20,
 		Address:            "0x345",
@@ -63,7 +63,7 @@ func (s *DatabaseSuite) setupDatabase(db *sql.DB) error {
 		Transferable:       true,
 		RemoteSelfDestruct: true,
 		ChainID:            2,
-		DeployState:        communities.Failed,
+		DeployState:        token.Failed,
 		Base64Image:        "QWERTY",
 		Decimals:           21,
 	}

@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -2446,6 +2447,20 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		}
 	}
 
+	id := crypto.CompressPubkey(orgPubKey)
+	savedCommunity, err := m.communitiesManager.GetByID(id)
+	if err != nil {
+		return err
+	}
+
+	if savedCommunity.HasPermissionToSendCommunityEvents() || savedCommunity.IsControlNode() {
+		err := m.handleCommunityTokensMetadata(savedCommunity.IDString(), savedCommunity.CommunityTokensMetadata())
+		if err != nil {
+			logger.Debug("m.handleCommunityTokensMetadata", zap.Error(err))
+			return err
+		}
+	}
+
 	// if we are not waiting for approval, join or leave the community
 	if !pending {
 		var mr *MessengerResponse
@@ -2499,6 +2514,10 @@ func (m *Messenger) handleSyncCommunitySettings(messageState *ReceivedMessageSta
 
 	messageState.Response.AddCommunitySettings(communitySettings)
 	return nil
+}
+
+func (m *Messenger) handleCommunityTokensMetadata(communityID string, communityTokens []*protobuf.CommunityTokenMetadata) error {
+	return m.communitiesManager.HandleCommunityTokensMetadata(communityID, communityTokens)
 }
 
 func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community) {
@@ -3946,15 +3965,15 @@ func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c
 	return wakuMessages, nil
 }
 
-func (m *Messenger) GetCommunityTokens(communityID string) ([]*communities.CommunityToken, error) {
+func (m *Messenger) GetCommunityTokens(communityID string) ([]*token.CommunityToken, error) {
 	return m.communitiesManager.GetCommunityTokens(communityID)
 }
 
-func (m *Messenger) GetAllCommunityTokens() ([]*communities.CommunityToken, error) {
+func (m *Messenger) GetAllCommunityTokens() ([]*token.CommunityToken, error) {
 	return m.communitiesManager.GetAllCommunityTokens()
 }
 
-func (m *Messenger) SaveCommunityToken(token *communities.CommunityToken, croppedImage *images.CroppedImage) (*communities.CommunityToken, error) {
+func (m *Messenger) SaveCommunityToken(token *token.CommunityToken, croppedImage *images.CroppedImage) (*token.CommunityToken, error) {
 	return m.communitiesManager.SaveCommunityToken(token, croppedImage)
 }
 
@@ -3962,7 +3981,7 @@ func (m *Messenger) AddCommunityToken(communityID string, chainID int, address s
 	return m.communitiesManager.AddCommunityToken(communityID, chainID, address)
 }
 
-func (m *Messenger) UpdateCommunityTokenState(chainID int, contractAddress string, deployState communities.DeployState) error {
+func (m *Messenger) UpdateCommunityTokenState(chainID int, contractAddress string, deployState token.DeployState) error {
 	return m.communitiesManager.UpdateCommunityTokenState(chainID, contractAddress, deployState)
 }
 
