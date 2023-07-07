@@ -2,7 +2,6 @@ package node
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -32,7 +31,6 @@ import (
 	"go.opencensus.io/stats"
 
 	"github.com/waku-org/go-waku/logging"
-	"github.com/waku-org/go-waku/waku/try"
 	v2 "github.com/waku-org/go-waku/waku/v2"
 	"github.com/waku-org/go-waku/waku/v2/discv5"
 	"github.com/waku-org/go-waku/waku/v2/metrics"
@@ -82,11 +80,11 @@ type WakuNode struct {
 	log        *zap.Logger
 	timesource timesource.Timesource
 
-	peerstore peerstore.Peerstore
+	peerstore     peerstore.Peerstore
+	peerConnector *v2.PeerConnectionStrategy
 
 	relay           Service
 	lightPush       Service
-	peerConnector   PeerConnectorService
 	discoveryV5     Service
 	peerExchange    Service
 	rendezvous      Service
@@ -274,7 +272,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		rendezvousPoints = append(rendezvousPoints, peerID)
 	}
 
-	w.rendezvous = rendezvous.NewRendezvous(w.opts.enableRendezvousServer, w.opts.rendezvousDB, rendezvousPoints, w.peerConnector, w.log)
+	w.rendezvous = rendezvous.NewRendezvous(w.opts.enableRendezvousServer, w.opts.rendezvousDB, rendezvousPoints, w.log)
 	w.relay = relay.NewWakuRelay(w.bcaster, w.opts.minRelayPeersToPublish, w.timesource, w.log, w.opts.wOpts...)
 	w.legacyFilter = legacy_filter.NewWakuFilter(w.bcaster, w.opts.isLegacyFilterFullnode, w.timesource, w.log, w.opts.legacyFilterOpts...)
 	w.filterFullnode = filter.NewWakuFilterFullnode(w.timesource, w.log, w.opts.filterOpts...)
@@ -336,9 +334,10 @@ func (w *WakuNode) Start(ctx context.Context) error {
 
 	ctx, cancel := context.WithCancel(ctx)
 	w.cancel = cancel
-	w.opts.libP2POpts = append(w.opts.libP2POpts, libp2p.ConnectionGater(connGater))
 
-	host, err := libp2p.New(w.opts.libP2POpts...)
+	libP2POpts := append(w.opts.libP2POpts, libp2p.ConnectionGater(connGater))
+
+	host, err := libp2p.New(libP2POpts...)
 	if err != nil {
 		return err
 	}
@@ -402,14 +401,6 @@ func (w *WakuNode) Start(ctx context.Context) error {
 		err := w.relay.Start(ctx)
 		if err != nil {
 			return err
-		}
-
-		if !w.opts.noDefaultWakuTopic {
-			sub, err := w.Relay().Subscribe(ctx)
-			if err != nil {
-				return err
-			}
-			sub.Unsubscribe()
 		}
 	}
 
@@ -666,34 +657,6 @@ func (w *WakuNode) Broadcaster() relay.Broadcaster {
 	return w.bcaster
 }
 
-// Publish will attempt to publish a message via WakuRelay if there are enough
-// peers available, otherwise it will attempt to publish via Lightpush protocol
-func (w *WakuNode) Publish(ctx context.Context, msg *pb.WakuMessage) error {
-	if !w.opts.enableLightPush && !w.opts.enableRelay {
-		return errors.New("cannot publish message, relay and lightpush are disabled")
-	}
-
-	hash := msg.Hash(relay.DefaultWakuTopic)
-	err := try.Do(func(attempt int) (bool, error) {
-		var err error
-
-		relay := w.Relay()
-		lightpush := w.Lightpush()
-
-		if relay == nil || !relay.EnoughPeersToPublish() {
-			w.log.Debug("publishing message via lightpush", logging.HexBytes("hash", hash))
-			_, err = lightpush.Publish(ctx, msg)
-		} else {
-			w.log.Debug("publishing message via relay", logging.HexBytes("hash", hash))
-			_, err = relay.Publish(ctx, msg)
-		}
-
-		return attempt < maxPublishAttempt, err
-	})
-
-	return err
-}
-
 func (w *WakuNode) mountDiscV5() error {
 	discV5Options := []discv5.DiscoveryV5Option{
 		discv5.WithBootnodes(w.opts.discV5bootnodes),
@@ -718,33 +681,6 @@ func (w *WakuNode) startStore(ctx context.Context, sub relay.Subscription) error
 		return err
 	}
 
-	if len(w.opts.resumeNodes) != 0 {
-		// TODO: extract this to a function and run it when you go offline
-		// TODO: determine if a store is listening to a topic
-
-		var peerIDs []peer.ID
-		for _, n := range w.opts.resumeNodes {
-			pID, err := w.AddPeer(n, peers.Static, store.StoreID_v20beta4)
-			if err != nil {
-				w.log.Warn("adding peer to peerstore", logging.MultiAddrs("peer", n), zap.Error(err))
-			}
-			peerIDs = append(peerIDs, pID)
-		}
-
-		if !w.opts.noDefaultWakuTopic {
-			w.wg.Add(1)
-			go func() {
-				defer w.wg.Done()
-
-				ctxWithTimeout, ctxCancel := context.WithTimeout(ctx, 20*time.Second)
-				defer ctxCancel()
-				if _, err := w.store.(store.Store).Resume(ctxWithTimeout, string(relay.DefaultWakuTopic), peerIDs); err != nil {
-					w.log.Error("Could not resume history", zap.Error(err))
-					time.Sleep(10 * time.Second)
-				}
-			}()
-		}
-	}
 	return nil
 }
 

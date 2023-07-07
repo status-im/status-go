@@ -31,6 +31,10 @@ var (
 	ErrInvalidId        = errors.New("invalid request id")
 )
 
+type PeerConnector interface {
+	Subscribe(context.Context, <-chan v2.PeerData)
+}
+
 type WakuPeerExchange struct {
 	h    host.Host
 	disc *discv5.DiscoveryV5
@@ -44,10 +48,6 @@ type WakuPeerExchange struct {
 	enrCache      *enrCache
 }
 
-type PeerConnector interface {
-	PeerChannel() chan<- v2.PeerData
-}
-
 // NewWakuPeerExchange returns a new instance of WakuPeerExchange struct
 func NewWakuPeerExchange(disc *discv5.DiscoveryV5, peerConnector PeerConnector, log *zap.Logger) (*WakuPeerExchange, error) {
 	newEnrCache, err := newEnrCache(MaxCacheSize)
@@ -59,6 +59,7 @@ func NewWakuPeerExchange(disc *discv5.DiscoveryV5, peerConnector PeerConnector, 
 	wakuPX.log = log.Named("wakupx")
 	wakuPX.enrCache = newEnrCache
 	wakuPX.peerConnector = peerConnector
+
 	return wakuPX, nil
 }
 

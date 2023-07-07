@@ -66,7 +66,6 @@ type WakuNodeParameters struct {
 	logger   *zap.Logger
 	logLevel logging.LogLevel
 
-	noDefaultWakuTopic     bool
 	enableRelay            bool
 	enableLegacyFilter     bool
 	isLegacyFilterFullnode bool
@@ -79,7 +78,6 @@ type WakuNodeParameters struct {
 	minRelayPeersToPublish int
 
 	enableStore     bool
-	resumeNodes     []multiaddr.Multiaddr
 	messageProvider store.MessageProvider
 
 	rendezvousNodes        []multiaddr.Multiaddr
@@ -318,15 +316,6 @@ func WithPeerStore(ps peerstore.Peerstore) WakuNodeOption {
 	}
 }
 
-// NoDefaultWakuTopic will stop the node from subscribing to the default
-// pubsub topic automatically
-func NoDefaultWakuTopic() WakuNodeOption {
-	return func(params *WakuNodeParameters) error {
-		params.noDefaultWakuTopic = true
-		return nil
-	}
-}
-
 // WithWakuRelay enables the Waku V2 Relay protocol. This WakuNodeOption
 // accepts a list of WakuRelay gossipsub option to setup the protocol
 func WithWakuRelay(opts ...pubsub.Option) WakuNodeOption {
@@ -400,12 +389,10 @@ func WithWakuFilterFullNode(filterOpts ...filter.Option) WakuNodeOption {
 }
 
 // WithWakuStore enables the Waku V2 Store protocol and if the messages should
-// be stored or not in a message provider. If resumeNodes are specified, the
-// store will attempt to resume message history using those nodes
-func WithWakuStore(resumeNodes ...multiaddr.Multiaddr) WakuNodeOption {
+// be stored or not in a message provider.
+func WithWakuStore() WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableStore = true
-		params.resumeNodes = resumeNodes
 		return nil
 	}
 }

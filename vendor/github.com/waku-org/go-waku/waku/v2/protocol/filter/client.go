@@ -424,9 +424,7 @@ func (wf *WakuFilterLightnode) UnsubscribeAll(ctx context.Context, opts ...Filte
 				wf.log.Error("could not unsubscribe from peer", logging.HostID("peerID", peerID), zap.Error(err))
 			}
 
-			wf.subscriptions.Lock()
 			delete(wf.subscriptions.items, peerID)
-			defer wf.subscriptions.Unlock()
 
 			resultChan <- WakuFilterPushResult{
 				Err:    err,
