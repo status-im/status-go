@@ -923,6 +923,21 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 			chat.Active = true
 		}
 
+		// Add mutual state update message for incoming contact request
+		clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+
+		updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeAdded, clock, timestamp, false)
+		if err != nil {
+			return err
+		}
+
+		m.prepareMessage(updateMessage, m.httpServer)
+		err = m.persistence.SaveMessages([]*common.Message{updateMessage})
+		if err != nil {
+			return err
+		}
+		state.Response.AddMessage(updateMessage)
+
 		state.Response.AddChat(chat)
 		state.AllChats.Store(chat.ID, chat)
 	}
@@ -2067,16 +2082,9 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 				receivedMessage.ContactRequestState = common.ContactRequestStatePending
 			}
 
-			// Mutual update message must be before CR message
+			// Add mutual state update message for outgoing contact request
 			clock := receivedMessage.Clock - 1
-			_, timestamp := chat.NextClockAndTimestamp(m.transport)
-
-			updateMessage := &common.Message{}
-			if contact.mutual() {
-				updateMessage, err = m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeAdded, clock, timestamp, true)
-			} else {
-				updateMessage, err = m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, timestamp, false)
-			}
+			updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, receivedMessage.Timestamp, false)
 			if err != nil {
 				return err
 			}
@@ -2087,7 +2095,6 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 				return err
 			}
 			state.Response.AddMessage(updateMessage)
-			state.Response.AddChat(chat)
 
 			err = m.createIncomingContactRequestNotification(contact, state, receivedMessage, true)
 			if err != nil {

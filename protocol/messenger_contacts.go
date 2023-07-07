@@ -30,7 +30,7 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 		case MutualStateUpdateTypeSent:
 			text = "You sent a contact request to @" + to
 		case MutualStateUpdateTypeAdded:
-			text = "You added @" + to + " as a contact"
+			text = "You accepted @" + to + "'s contact request"
 		case MutualStateUpdateTypeRemoved:
 			text = "You removed @" + to + " as a contact"
 		default:
@@ -44,7 +44,7 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 		case MutualStateUpdateTypeSent:
 			text = "@" + from + " sent you a contact request"
 		case MutualStateUpdateTypeAdded:
-			text = "@" + from + " added you as a contact"
+			text = "@" + from + " accepted your contact request"
 		case MutualStateUpdateTypeRemoved:
 			text = "@" + from + " removed you as a contact"
 		default:
@@ -300,6 +300,26 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	response.AddMessage(contactRequest)
 	response.AddContact(contact)
 
+	// Add mutual state update message for incoming contact request
+	chat, ok := m.allChats.Load(contact.ID)
+	if !ok {
+		return nil, errors.New("no chat found for accepted contact request")
+	}
+	clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+
+	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeAdded, clock, timestamp, true)
+	if err != nil {
+		return nil, err
+	}
+
+	m.prepareMessage(updateMessage, m.httpServer)
+	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
+	if err != nil {
+		return nil, err
+	}
+	response.AddMessage(updateMessage)
+	response.AddChat(chat)
+
 	return response, nil
 }
 
@@ -438,26 +458,22 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 		return nil, err
 	}
 
-	// Add mutual state update message
-	clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+	// Add mutual state update message for outgoing contact request
+	if len(contactRequestID) == 0 {
+		clock, timestamp := chat.NextClockAndTimestamp(m.transport)
+		updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, timestamp, true)
+		if err != nil {
+			return nil, err
+		}
 
-	updateMessage := &common.Message{}
-	if contact.mutual() {
-		updateMessage, err = m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeAdded, clock, timestamp, false)
-	} else {
-		updateMessage, err = m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeSent, clock, timestamp, true)
+		m.prepareMessage(updateMessage, m.httpServer)
+		err = m.persistence.SaveMessages([]*common.Message{updateMessage})
+		if err != nil {
+			return nil, err
+		}
+		response.AddMessage(updateMessage)
+		response.AddChat(chat)
 	}
-	if err != nil {
-		return nil, err
-	}
-
-	m.prepareMessage(updateMessage, m.httpServer)
-	err = m.persistence.SaveMessages([]*common.Message{updateMessage})
-	if err != nil {
-		return nil, err
-	}
-	response.AddMessage(updateMessage)
-	response.AddChat(chat)
 
 	// Add outgoing contact request notification
 	if createOutgoingContactRequestNotification {
@@ -593,11 +609,6 @@ func (m *Messenger) removeContact(ctx context.Context, response *MessengerRespon
 	response.AddChat(chat)
 
 	// Next we retract a contact request
-	_, clock, err = m.getOneToOneAndNextClock(contact)
-	if err != nil {
-		return err
-	}
-
 	contact.RetractContactRequest(clock)
 	contact.LastUpdatedLocally = m.getTimesource().GetCurrentTime()
 
