@@ -40,7 +40,12 @@ type Config struct {
 	RequestsToJoin                []*RequestToJoin
 	MemberIdentity                *ecdsa.PublicKey
 	SyncedAt                      uint64
-	Events                        []CommunityEvent
+	EventsData                    *EventsData
+}
+
+type EventsData struct {
+	CommunityDescription *protobuf.CommunityDescription
+	Events               []CommunityEvent
 }
 
 type Community struct {
@@ -1019,13 +1024,16 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 
 	response := o.emptyCommunityChanges()
 
-	// allowEqualClock == true only if this is community event
-	if (allowEqualClock && description.Clock < o.config.CommunityDescription.Clock) ||
-		description.Clock <= o.config.CommunityDescription.Clock {
+	// allowEqualClock == true only if this was a description from the handling request to join sent by an admin
+	if allowEqualClock {
+		if description.Clock < o.config.CommunityDescription.Clock {
+			return response, nil
+		}
+	} else if description.Clock <= o.config.CommunityDescription.Clock {
 		return response, nil
 	}
 
-	response, err := o.collectCommuntyChanges(description)
+	response, err := o.collectCommunityChanges(description)
 	if err != nil {
 		return nil, err
 	}
@@ -1888,7 +1896,7 @@ func (o *Community) createDeepCopy() *Community {
 			RequestsToJoin:                o.config.RequestsToJoin,
 			MemberIdentity:                o.config.MemberIdentity,
 			SyncedAt:                      o.config.SyncedAt,
-			Events:                        o.config.Events,
+			EventsData:                    o.config.EventsData,
 		},
 	}
 }
@@ -2040,7 +2048,7 @@ func (o *Community) addCommunityMember(pk *ecdsa.PublicKey, member *protobuf.Com
 	o.config.CommunityDescription.Members[memberKey] = member
 }
 
-func (o *Community) collectCommuntyChanges(description *protobuf.CommunityDescription) (*CommunityChanges, error) {
+func (o *Community) collectCommunityChanges(description *protobuf.CommunityDescription) (*CommunityChanges, error) {
 	// This is done in case tags are updated and a client sends unknown tags
 	description.Tags = requests.RemoveUnknownAndDeduplicateTags(description.Tags)
 
@@ -2299,10 +2307,6 @@ func (o *Community) addMemberWithRevealedAccounts(memberKey string, roles []prot
 }
 
 func (o *Community) DeclineRequestToJoin(dbRequest *RequestToJoin) error {
-	// typically, community's clock is increased implicitly when making changes
-	// to it, however in this scenario there are no changes in the community, yet
-	// we need to increase the clock to ensure the owner event is processed by other
-	// nodes.
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -2328,6 +2332,10 @@ func (o *Community) DeclineRequestToJoin(dbRequest *RequestToJoin) error {
 	}
 
 	if isOwner {
+		// typically, community's clock is increased implicitly when making changes
+		// to it, however in this scenario there are no changes in the community, yet
+		// we need to increase the clock to ensure the owner event is processed by other
+		// nodes.
 		o.increaseClock()
 	}
 

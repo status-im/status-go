@@ -2,11 +2,13 @@ package communities
 
 import (
 	"errors"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/v1"
 )
 
 func (o *Community) ToCreateChannelCommunityEvent(channelID string, channel *protobuf.CommunityChat) *CommunityEvent {
@@ -192,82 +194,74 @@ func (o *Community) ToCommunityRequestToJoinRejectCommunityEvent(changes *Commun
 	}
 }
 
-func (o *Community) UpdateCommuntyByEvents(communityEventMessage *CommunityEventsMessage) (*CommunityChanges, error) {
+func (o *Community) UpdateCommunityByEvents(communityEventMessage *CommunityEventsMessage) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if communityEventMessage.CommunityDescriptionClock != o.config.CommunityDescription.Clock {
-		return nil, errors.New("clock for admin event message is outdated")
+	// Validate that clock was not outdated and that `CommunityDescription` in
+	// `CommunityEventsMessage` was not modified
+	err := o.validateEventsMessage(communityEventMessage)
+	if err != nil {
+		return nil, err
 	}
-
-	// Merge community admin events to existing community. Admin events must be stored to the db
-	// during saving the community
-	o.mergeCommunityEvents(communityEventMessage.Events)
 
 	// Create a deep copy of current community so we can update CommunityDescription by new admin events
 	copy := o.createDeepCopy()
 
-	// Update the copy of the Community with the new community events
-	err := copy.updateCommuntyDescriptionByNewEvents()
+	// Merge community admin events to existing community. Admin events must be stored to the db
+	// during saving the community
+	o.mergeCommunityEvents(communityEventMessage)
+
+	copy.config.CommunityDescription = communityEventMessage.CommunityDescription
+	copy.config.EventsData = o.config.EventsData
+
+	// Update the copy of the CommunityDescription by community events
+	err = copy.updateCommunityDescriptionByEvents()
 	if err != nil {
 		return nil, err
 	}
 
 	// Collect `CommunityChanges` data by searching a difference between `CommunityDescrption`
-	// with applied events and `CommunityDescrption` with new events
-	changes, err := o.collectCommuntyChanges(copy.config.CommunityDescription)
+	// from the DB and `CommunityDescrption` patched by community events
+	changes, err := o.collectCommunityChanges(copy.config.CommunityDescription)
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO: need to figure out is it ok to save marshaledCommunityDescription without the signature
+	marshaledCommDescr, err := proto.Marshal(copy.config.CommunityDescription)
+	if err != nil {
+		return nil, err
+	}
+
+	rawMessage, err := protocol.WrapMessageV1(marshaledCommDescr, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, copy.PrivateKey())
+	if err != nil {
+		return nil, err
+	}
+
+	copy.config.MarshaledCommunityDescription = rawMessage
 
 	changes.Community = copy
 
 	return changes, nil
 }
 
-func (o *Community) updateCommuntyDescriptionByNewEvents() error {
-	prevAdminClock := o.config.CommunityDescription.Clock + 1
-	for i := range o.config.Events {
-		communityEvent := &o.config.Events[i]
-		if !communityEvent.Applied {
-			err := validateCommunityEvent(communityEvent)
-			if err != nil {
-				return err
-			}
-			err = o.updateCommuntyDescriptionByCommunityEvent(*communityEvent, prevAdminClock)
-			if err != nil {
-				return err
-			}
+func (o *Community) updateCommunityDescriptionByEvents() error {
+	for i := range o.config.EventsData.Events {
+		communityEvent := &o.config.EventsData.Events[i]
+		err := validateCommunityEvent(communityEvent)
+		if err != nil {
+			return err
 		}
-		prevAdminClock = communityEvent.CommunityEventClock
-		communityEvent.Applied = true
+		err = o.updateCommunityDescriptionByCommunityEvent(*communityEvent)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (o *Community) updateCommuntyDescriptionByAppliedEvents() error {
-	prevAdminClock := o.config.CommunityDescription.Clock + 1
-	for _, communityEvent := range o.config.Events {
-		if communityEvent.Applied {
-			err := o.updateCommuntyDescriptionByCommunityEvent(communityEvent, prevAdminClock)
-			if err != nil {
-				return err
-			}
-		}
-		prevAdminClock = communityEvent.CommunityEventClock
-	}
-	return nil
-}
-
-func (o *Community) updateCommuntyDescriptionByCommunityEvent(communityEvent CommunityEvent, prevAdminClock uint64) error {
-	if communityEvent.CommunityEventClock <= o.config.CommunityDescription.Clock {
-		return errors.New("clock for admin event is outdated")
-	}
-
-	if !(prevAdminClock == communityEvent.CommunityEventClock || prevAdminClock+1 == communityEvent.CommunityEventClock) {
-		return errors.New("clock for admin event is not in order or contains missing event")
-	}
-
+func (o *Community) updateCommunityDescriptionByCommunityEvent(communityEvent CommunityEvent) error {
 	switch communityEvent.Type {
 	case protobuf.CommunityEvent_COMMUNITY_EDIT:
 		o.config.CommunityDescription.Identity = communityEvent.CommunityConfig.Identity
@@ -391,18 +385,12 @@ func (o *Community) updateCommuntyDescriptionByCommunityEvent(communityEvent Com
 			return err
 		}
 		o.unbanUserFromCommunity(pk)
-
-	default:
-		return errors.New("unknown admin community event")
 	}
 	return nil
 }
 
 func (o *Community) NewCommunityEventClock() uint64 {
-	if len(o.config.Events) == 0 {
-		return o.config.CommunityDescription.Clock + 1
-	}
-	return o.config.Events[len(o.config.Events)-1].CommunityEventClock + 1
+	return uint64(time.Now().Unix())
 }
 
 func (o *Community) addNewCommunityEvent(event *CommunityEvent) error {
@@ -416,15 +404,30 @@ func (o *Community) addNewCommunityEvent(event *CommunityEvent) error {
 		return errors.New("converting CommunityEvent to protobuf failed")
 	}
 	event.RawPayload = data
-	o.config.Events = append(o.config.Events, *event)
+	if o.config.EventsData == nil {
+		o.config.EventsData = &EventsData{
+			CommunityDescription: proto.Clone(o.config.CommunityDescription).(*protobuf.CommunityDescription),
+			Events:               []CommunityEvent{*event},
+		}
+	} else {
+		o.config.EventsData.Events = append(o.config.EventsData.Events, *event)
+	}
 
 	return nil
 }
 
 func (o *Community) ToCommunityEventsMessage() *CommunityEventsMessage {
 	return &CommunityEventsMessage{
-		CommunityID:               o.ID(),
-		CommunityDescriptionClock: o.Clock(),
-		Events:                    o.config.Events,
+		CommunityID:          o.ID(),
+		CommunityDescription: o.config.EventsData.CommunityDescription,
+		Events:               o.config.EventsData.Events,
 	}
+}
+
+func (o *Community) validateEventsMessage(event *CommunityEventsMessage) error {
+	// TODO check hashes
+	if event.CommunityDescription.Clock != o.config.CommunityDescription.Clock {
+		return errors.New("clock for admin event message is outdated")
+	}
+	return nil
 }

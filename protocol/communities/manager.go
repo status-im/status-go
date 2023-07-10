@@ -39,7 +39,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
-	"github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
@@ -830,6 +829,13 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 		return nil, err
 	}
 
+	if isAdmin {
+		err := community.addNewCommunityEvent(community.ToCommunityEditCommunityEvent())
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Edit the community values
 	community.Edit(newDescription)
 	if err != nil {
@@ -838,11 +844,6 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 
 	if isOwner {
 		community.increaseClock()
-	} else if isAdmin {
-		err := community.addNewCommunityEvent(community.ToCommunityEditCommunityEvent())
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	err = m.SaveAndPublish(community)
@@ -1182,7 +1183,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 }
 
 func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, description *protobuf.CommunityDescription, payload []byte) (*CommunityResponse, error) {
-	changes, err := community.UpdateCommunityDescription(description, payload, true)
+	changes, err := community.UpdateCommunityDescription(description, payload, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1231,7 +1232,10 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 		}
 	}
 
-	community.config.Events = []CommunityEvent{}
+	err = m.persistence.DeleteCommunityEvents(community.ID())
+	if err != nil {
+		return nil, err
+	}
 
 	err = m.persistence.SaveCommunity(community)
 	if err != nil {
@@ -1274,7 +1278,7 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		return nil, errors.New("user is not an admin")
 	}
 
-	changes, err := community.UpdateCommuntyByEvents(adminMessage)
+	changes, err := community.UpdateCommunityByEvents(adminMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -1287,26 +1291,18 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 	// Owner cerifies admins events and publish changes
 	// all other users only apply changes to the community
 	if changes.Community.IsOwner() {
-		marshaledCommDescr, err := proto.Marshal(changes.Community.config.CommunityDescription)
-		if err != nil {
-			return nil, err
-		}
-
-		rawDescription, err := protocol.WrapMessageV1(marshaledCommDescr, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, community.PrivateKey())
-		if err != nil {
-			return nil, err
-		}
-
-		changes.Community.config.MarshaledCommunityDescription = rawDescription
-		changes.Community.config.Events = []CommunityEvent{}
 		changes.Community.increaseClock()
-
 		err = m.persistence.SaveCommunity(changes.Community)
 		if err != nil {
 			return nil, err
 		}
+
 		m.publish(&Subscription{Community: changes.Community})
 	} else {
+		err = m.persistence.SaveCommunity(changes.Community)
+		if err != nil {
+			return nil, err
+		}
 		err := m.persistence.SaveCommunityEvents(changes.Community)
 		if err != nil {
 			return nil, err
@@ -1360,8 +1356,8 @@ func (m *Manager) handleAdditionalAdminChanges(community *Community) error {
 		return nil
 	}
 
-	for i := range community.config.Events {
-		communityEvent := &community.config.Events[i]
+	for i := range community.config.EventsData.Events {
+		communityEvent := &community.config.EventsData.Events[i]
 		switch communityEvent.Type {
 		case protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT:
 			for signer, request := range communityEvent.AcceptedRequestsToJoin {
@@ -1459,11 +1455,6 @@ func (m *Manager) CancelRequestToJoin(request *requests.CancelRequestToJoinCommu
 
 	dbRequest.State = RequestToJoinStateCanceled
 	if err := m.markRequestToJoinAsCanceled(pk, community); err != nil {
-		return nil, nil, err
-	}
-
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
 		return nil, nil, err
 	}
 
@@ -2396,16 +2387,18 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 	}
 
 	isAdminSigner := community.IsMemberAdmin(signer)
-	if !common.IsPubKeyEqual(community.PublicKey(), signer) && !isAdminSigner {
+	isOwnerSigner := common.IsPubKeyEqual(community.PublicKey(), signer)
+	if !isOwnerSigner && !isAdminSigner {
 		return nil, ErrNotAuthorized
 	}
 
-	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg, !isAdminSigner)
+	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg, isAdminSigner)
 	if err != nil {
 		return nil, err
 	}
 
 	err = m.persistence.SaveCommunity(community)
+
 	if err != nil {
 		return nil, err
 	}
@@ -4055,14 +4048,23 @@ func (m *Manager) accountsHasAdminPermission(becomeAdminPermissions []*protobuf.
 }
 
 func (m *Manager) SaveAndPublish(community *Community) error {
+	err := m.persistence.SaveCommunity(community)
+	if err != nil {
+		return err
+	}
+
 	if community.IsOwner() {
 		// If owner did not receive all necessary data before (for example not all events were delivered)
 		// remove admin events anyway as CommunityDescription clock will be outdated
-		community.config.Events = []CommunityEvent{}
-		err := m.persistence.SaveCommunity(community)
-		if err != nil {
-			return err
-		}
+		// err := m.persistence.SaveCommunity(community)
+		// if err != nil {
+		// 	return err
+		// }
+
+		// err = m.persistence.DeleteCommunityEvents(community.ID())
+		// if err != nil {
+		// 	return err
+		// }
 
 		m.publish(&Subscription{Community: community})
 		return nil

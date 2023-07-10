@@ -68,8 +68,8 @@ message ChannelData {
 message CommunityEventsMessage {
   bytes community_id = 1;
   
-  // Latest CommunityDescription clock
-  uint64 community_description_clock = 2;
+  // Latest CommunityDescription for the events
+  CommunityDescription community_description = 2;
   
   // A list of admins events for the channel in bytes
   repeated bytes events = 3;

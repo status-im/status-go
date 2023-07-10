@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/golang/protobuf/proto"
+
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -64,18 +65,18 @@ func CommunityEventFromProtobuf(raw []byte) (*CommunityEvent, error) {
 }
 
 type CommunityEventsMessage struct {
-	CommunityID               []byte           `json:"communityId"`
-	CommunityDescriptionClock uint64           `json:"communityDescriptionClock"`
-	Events                    []CommunityEvent `json:"events,omitempty"`
+	CommunityID          []byte                         `json:"communityId"`
+	CommunityDescription *protobuf.CommunityDescription `json:"communityDescription"`
+	Events               []CommunityEvent               `json:"events,omitempty"`
 }
 
 func (m *CommunityEventsMessage) ToProtobuf() protobuf.CommunityEventsMessage {
 	rawEvents := communityEventsToBytes(m.Events)
 
 	return protobuf.CommunityEventsMessage{
-		CommunityId:               m.CommunityID,
-		CommunityDescriptionClock: m.CommunityDescriptionClock,
-		Events:                    rawEvents,
+		CommunityId:          m.CommunityID,
+		CommunityDescription: m.CommunityDescription,
+		Events:               rawEvents,
 	}
 }
 
@@ -86,9 +87,9 @@ func CommunityEventsMessageFromProtobuf(raw *protobuf.CommunityEventsMessage) (*
 	}
 
 	return &CommunityEventsMessage{
-		CommunityID:               raw.CommunityId,
-		CommunityDescriptionClock: raw.CommunityDescriptionClock,
-		Events:                    events,
+		CommunityID:          raw.CommunityId,
+		CommunityDescription: raw.CommunityDescription,
+		Events:               events,
 	}, nil
 }
 
@@ -97,17 +98,25 @@ func (m *CommunityEventsMessage) Marshal() ([]byte, error) {
 	return proto.Marshal(&pb)
 }
 
-func (c *Community) mergeCommunityEvents(src []CommunityEvent) {
-	for _, update := range src {
+func (c *Community) mergeCommunityEvents(communityEventMessage *CommunityEventsMessage) {
+	if c.config.EventsData == nil {
+		c.config.EventsData = &EventsData{
+			CommunityDescription: communityEventMessage.CommunityDescription,
+			Events:               communityEventMessage.Events,
+		}
+		return
+	}
+
+	for _, update := range communityEventMessage.Events {
 		var exists bool
-		for _, existing := range c.config.Events {
+		for _, existing := range c.config.EventsData.Events {
 			if isCommunityEventsEqual(update, existing) {
 				exists = true
 				break
 			}
 		}
 		if !exists {
-			c.config.Events = append(c.config.Events, update)
+			c.config.EventsData.Events = append(c.config.EventsData.Events, update)
 		}
 	}
 
@@ -115,16 +124,12 @@ func (c *Community) mergeCommunityEvents(src []CommunityEvent) {
 }
 
 func (c *Community) sortCommunityEvents() {
-	sort.Slice(c.config.Events, func(i, j int) bool {
-		return c.config.Events[i].CommunityEventClock < c.config.Events[j].CommunityEventClock
+	sort.Slice(c.config.EventsData.Events, func(i, j int) bool {
+		return c.config.EventsData.Events[i].CommunityEventClock < c.config.EventsData.Events[j].CommunityEventClock
 	})
 }
 
 func validateCommunityEvent(communityEvent *CommunityEvent) error {
-	if communityEvent.Type == protobuf.CommunityEvent_UNKNOWN {
-		return errors.New("unknown admin event")
-	}
-
 	switch communityEvent.Type {
 	case protobuf.CommunityEvent_COMMUNITY_EDIT:
 		if communityEvent.CommunityConfig == nil || communityEvent.CommunityConfig.Identity == nil ||
@@ -208,9 +213,6 @@ func validateCommunityEvent(communityEvent *CommunityEvent) error {
 		if len(communityEvent.MemberToAction) == 0 {
 			return errors.New("invalid community member unban event")
 		}
-
-	default:
-		return errors.New("unknown admin community event")
 	}
 	return nil
 }
