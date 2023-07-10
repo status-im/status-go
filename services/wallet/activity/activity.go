@@ -297,8 +297,9 @@ const (
               COUNT(*) AS count
             FROM
               transfers
-            WHERE transfers.multi_transaction_id != 0
-            GROUP BY transfers.multi_transaction_id
+            WHERE transfers.loaded == 1
+                AND transfers.multi_transaction_id != 0
+			GROUP BY transfers.multi_transaction_id
         ),
         pending_status AS (
             SELECT
@@ -351,9 +352,11 @@ const (
         filter_addresses from_join ON HEX(transfers.tx_from_address) = from_join.address
     LEFT JOIN
         filter_addresses to_join ON HEX(transfers.tx_to_address) = to_join.address
-    WHERE transfers.multi_transaction_id = 0
-        AND ((startFilterDisabled OR timestamp >= startTimestamp)
-            AND (endFilterDisabled OR timestamp <= endTimestamp)
+    WHERE
+		transfers.loaded == 1
+	    AND transfers.multi_transaction_id = 0
+        AND ((startFilterDisabled OR transfers.timestamp >= startTimestamp)
+            AND (endFilterDisabled OR transfers.timestamp <= endTimestamp)
         )
         AND (filterActivityTypeAll
             OR (filterActivityTypeSend

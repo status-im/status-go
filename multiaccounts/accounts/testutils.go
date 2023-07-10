@@ -7,13 +7,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func MockTestAccounts(t *testing.T, db *sql.DB, accounts []*Account) {
+func MockTestAccounts(tb testing.TB, db *sql.DB, accounts []*Account) {
 	d, err := NewDB(db)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	err = d.SaveOrUpdateAccounts(accounts, false)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 	res, err := d.GetAccounts()
-	require.NoError(t, err)
-	require.Equal(t, accounts[0].Address, res[0].Address)
+	require.NoError(tb, err)
+	require.Equal(tb, accounts[0].Address, res[0].Address)
 }
