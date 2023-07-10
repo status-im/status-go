@@ -1,27 +1,34 @@
 package fourbyte
 
-// TODO: use mocked data if it make sense, instead of testing the servers UP status
-//
-// func TestRun(t *testing.T) {
-// 	client := NewClient()
-// 	res, err := client.Run("0x40e8d703000000000000000000000000670dca62b3418bddd08cbc69cb4490a5a3382a9f0000000000000000000000000000000000000000000000000000000000000064")
-// 	require.Nil(t, err)
-// 	require.Equal(t, res.Signature, "processDepositQueue(address,uint256)")
-// 	require.Equal(t, res.Name, "processDepositQueue")
-// 	require.Equal(t, res.ID, "0xf94d2")
-// 	require.Equal(t, res.Inputs, map[string]string{
-// 		"0": "0x3030303030303030303030303637306463613632",
-// 		"1": "44417128579249187980157595307322491418158007948522794164811090501355597543782",
-// 	})
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
 
-// 	res, err = client.Run("0xb88d4fde000000000000000000000000af1857535160973f42c34cb20f5ed7cd29099ad9000000000000000000000000baa4b7858c3277da9cb9cdadf405f2017afea19a00000000000000000000000000000000000000000000000000000000000000cb00000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000360c6ebe")
-// 	require.Nil(t, err)
-// 	require.Equal(t, res.Signature, "safeTransferFrom(address,address,uint256,bytes)")
-// 	require.Equal(t, res.Name, "safeTransferFrom")
-// 	require.Equal(t, res.ID, "0x73e0")
-// 	require.Equal(t, res.Inputs, map[string]string{
-// 		"0": "0x3030303030303030303030306166313835373533",
-// 		"1": "0x3463623230663565643763643239303939616439",
-// 		"2": "21796157974083048550319244236929488537086114760591164995666220774418197985333",
-// 	})
-// }
+	"github.com/stretchr/testify/require"
+)
+
+func TestRun(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		_, err := w.Write([]byte("{\"count\":1,\"next\":null,\"previous\":null,\"results\":[{\"id\":145,\"created_at\":\"2016-07-09T03:58:28.234977Z\",\"text_signature\":\"transfer(address,uint256)\",\"hex_signature\":\"0xa9059cbb\",\"bytes_signature\":\"0xa9059cbb\"}]}"))
+		if err != nil {
+			return
+		}
+	}))
+	defer srv.Close()
+
+	fb := NewClient()
+	fb.Client = srv.Client()
+	fb.URL = srv.URL
+
+	res, err := fb.Run("0xa9059cbb000000000000000000000000e0e40d81121d41a7d85d8d2462b475074f9df5ec0000000000000000000000000000000000000000000000000000000077359400")
+	require.Nil(t, err)
+	require.Equal(t, res.Signature, "transfer(address,uint256)")
+	require.Equal(t, res.ID, "0x91")
+	require.Equal(t, res.Name, "transfer")
+	require.Equal(t, res.Inputs, map[string]string{
+		"0": "0x3030303030303030303030306530653430643831",
+		"1": "22252012820881184517742036120632151212095838186768864961872069019727748752739",
+	})
+}
