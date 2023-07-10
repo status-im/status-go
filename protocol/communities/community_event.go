@@ -218,7 +218,7 @@ func (o *Community) UpdateCommunityByEvents(communityEventMessage *CommunityEven
 		return nil, err
 	}
 
-	copy.config.MarshaledCommunityDescription = rawMessage
+	copy.config.CommunityDescriptionProtocolMessage = rawMessage
 
 	changes.Community = copy
 
@@ -384,16 +384,16 @@ func (o *Community) addNewCommunityEvent(event *CommunityEvent) error {
 	}
 
 	// All events must be built on top of the control node CommunityDescription
-	// If there were no events before, extract CommunityDescription from MarshaledCommunityDescription
+	// If there were no events before, extract CommunityDescription from CommunityDescriptionProtocolMessage
 	// and check the signature
 	if o.config.EventsData == nil || len(o.config.EventsData.EventsBaseCommunityDescription) == 0 {
-		_, err := validateAndGetEventsMessageCommunityDescription(o.config.MarshaledCommunityDescription, o.config.ID)
+		_, err := validateAndGetEventsMessageCommunityDescription(o.config.CommunityDescriptionProtocolMessage, o.config.ID)
 		if err != nil {
 			return err
 		}
 
 		o.config.EventsData = &EventsData{
-			EventsBaseCommunityDescription: o.config.MarshaledCommunityDescription,
+			EventsBaseCommunityDescription: o.config.CommunityDescriptionProtocolMessage,
 			Events:                         []CommunityEvent{},
 		}
 	}

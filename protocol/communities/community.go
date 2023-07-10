@@ -25,22 +25,22 @@ import (
 const signatureLength = 65
 
 type Config struct {
-	PrivateKey                    *ecdsa.PrivateKey
-	CommunityDescription          *protobuf.CommunityDescription
-	MarshaledCommunityDescription []byte
-	ID                            *ecdsa.PublicKey
-	Joined                        bool
-	Requested                     bool
-	Verified                      bool
-	Spectated                     bool
-	Muted                         bool
-	MuteTill                      time.Time
-	Logger                        *zap.Logger
-	RequestedToJoinAt             uint64
-	RequestsToJoin                []*RequestToJoin
-	MemberIdentity                *ecdsa.PublicKey
-	SyncedAt                      uint64
-	EventsData                    *EventsData
+	PrivateKey                          *ecdsa.PrivateKey
+	CommunityDescription                *protobuf.CommunityDescription
+	CommunityDescriptionProtocolMessage []byte // community in a wrapped & signed (by owner) protocol message
+	ID                                  *ecdsa.PublicKey
+	Joined                              bool
+	Requested                           bool
+	Verified                            bool
+	Spectated                           bool
+	Muted                               bool
+	MuteTill                            time.Time
+	Logger                              *zap.Logger
+	RequestedToJoinAt                   uint64
+	RequestsToJoin                      []*RequestToJoin
+	MemberIdentity                      *ecdsa.PublicKey
+	SyncedAt                            uint64
+	EventsData                          *EventsData
 }
 
 type EventsData struct {
@@ -612,11 +612,11 @@ func (o *Community) InviteUserToOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityInv
 	}
 
 	response := &protobuf.CommunityInvitation{}
-	marshaledCommunity, err := o.toBytes()
+	wrappedCommunity, err := o.toProtocolMessageBytes()
 	if err != nil {
 		return nil, err
 	}
-	response.CommunityDescription = marshaledCommunity
+	response.WrappedCommunityDescription = wrappedCommunity
 
 	grant, err := o.buildGrant(pk, "")
 	if err != nil {
@@ -654,11 +654,11 @@ func (o *Community) InviteUserToChat(pk *ecdsa.PublicKey, chatID string) (*proto
 	o.increaseClock()
 
 	response := &protobuf.CommunityInvitation{}
-	marshaledCommunity, err := o.toBytes()
+	wrappedCommunity, err := o.toProtocolMessageBytes()
 	if err != nil {
 		return nil, err
 	}
-	response.CommunityDescription = marshaledCommunity
+	response.WrappedCommunityDescription = wrappedCommunity
 
 	grant, err := o.buildGrant(pk, chatID)
 	if err != nil {
@@ -1070,7 +1070,7 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 	}
 
 	o.config.CommunityDescription = description
-	o.config.MarshaledCommunityDescription = rawMessage
+	o.config.CommunityDescriptionProtocolMessage = rawMessage
 
 	return response, nil
 }
@@ -1337,17 +1337,16 @@ func (o *Community) MarshaledDescription() ([]byte, error) {
 	return o.marshaledDescription()
 }
 
-func (o *Community) toBytes() ([]byte, error) {
-
+func (o *Community) toProtocolMessageBytes() ([]byte, error) {
 	// This should not happen, as we can only serialize on our side if we
 	// created the community
-	if !o.IsControlNode() && len(o.config.MarshaledCommunityDescription) == 0 {
+	if !o.IsControlNode() && len(o.config.CommunityDescriptionProtocolMessage) == 0 {
 		return nil, ErrNotControlNode
 	}
 
 	// If we are not a control node, use the received serialized version
 	if !o.IsControlNode() {
-		return o.config.MarshaledCommunityDescription, nil
+		return o.config.CommunityDescriptionProtocolMessage, nil
 	}
 
 	// serialize and sign
@@ -1359,11 +1358,11 @@ func (o *Community) toBytes() ([]byte, error) {
 	return protocol.WrapMessageV1(payload, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, o.config.PrivateKey)
 }
 
-// ToBytes returns the community in a wrapped & signed protocol message
-func (o *Community) ToBytes() ([]byte, error) {
+// ToProtocolMessageBytes returns the community in a wrapped & signed protocol message
+func (o *Community) ToProtocolMessageBytes() ([]byte, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
-	return o.toBytes()
+	return o.toProtocolMessageBytes()
 }
 
 func (o *Community) Chats() map[string]*protobuf.CommunityChat {
@@ -2027,21 +2026,21 @@ func (o *Community) AddMemberWithRevealedAccounts(dbRequest *RequestToJoin, role
 func (o *Community) CreateDeepCopy() *Community {
 	return &Community{
 		config: &Config{
-			PrivateKey:                    o.config.PrivateKey,
-			CommunityDescription:          proto.Clone(o.config.CommunityDescription).(*protobuf.CommunityDescription),
-			MarshaledCommunityDescription: o.config.MarshaledCommunityDescription,
-			ID:                            o.config.ID,
-			Joined:                        o.config.Joined,
-			Requested:                     o.config.Requested,
-			Verified:                      o.config.Verified,
-			Spectated:                     o.config.Spectated,
-			Muted:                         o.config.Muted,
-			Logger:                        o.config.Logger,
-			RequestedToJoinAt:             o.config.RequestedToJoinAt,
-			RequestsToJoin:                o.config.RequestsToJoin,
-			MemberIdentity:                o.config.MemberIdentity,
-			SyncedAt:                      o.config.SyncedAt,
-			EventsData:                    o.config.EventsData,
+			PrivateKey:                          o.config.PrivateKey,
+			CommunityDescription:                proto.Clone(o.config.CommunityDescription).(*protobuf.CommunityDescription),
+			CommunityDescriptionProtocolMessage: o.config.CommunityDescriptionProtocolMessage,
+			ID:                                  o.config.ID,
+			Joined:                              o.config.Joined,
+			Requested:                           o.config.Requested,
+			Verified:                            o.config.Verified,
+			Spectated:                           o.config.Spectated,
+			Muted:                               o.config.Muted,
+			Logger:                              o.config.Logger,
+			RequestedToJoinAt:                   o.config.RequestedToJoinAt,
+			RequestsToJoin:                      o.config.RequestsToJoin,
+			MemberIdentity:                      o.config.MemberIdentity,
+			SyncedAt:                            o.config.SyncedAt,
+			EventsData:                          o.config.EventsData,
 		},
 	}
 }

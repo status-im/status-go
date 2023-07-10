@@ -123,12 +123,12 @@ func (s *CommunitySuite) TestInviteUserToOrg() {
 	s.Require().True(org.HasMember(&newMember.PublicKey))
 
 	// Check member has been added to response
-	s.Require().NotNil(response.CommunityDescription)
+	s.Require().NotNil(response.WrappedCommunityDescription)
 
 	metadata := &protobuf.ApplicationMetadataMessage{}
 	description := &protobuf.CommunityDescription{}
 
-	s.Require().NoError(proto.Unmarshal(response.CommunityDescription, metadata))
+	s.Require().NoError(proto.Unmarshal(response.WrappedCommunityDescription, metadata))
 	s.Require().NoError(proto.Unmarshal(metadata.Payload, description))
 
 	_, ok := description.Members[common.PubkeyToHex(&newMember.PublicKey)]
@@ -299,12 +299,12 @@ func (s *CommunitySuite) TestInviteUserToChat() {
 	s.Require().True(org.IsMemberInChat(&newMember.PublicKey, testChatID1))
 
 	// Check member has been added to response
-	s.Require().NotNil(response.CommunityDescription)
+	s.Require().NotNil(response.WrappedCommunityDescription)
 
 	metadata := &protobuf.ApplicationMetadataMessage{}
 	description := &protobuf.CommunityDescription{}
 
-	s.Require().NoError(proto.Unmarshal(response.CommunityDescription, metadata))
+	s.Require().NoError(proto.Unmarshal(response.WrappedCommunityDescription, metadata))
 	s.Require().NoError(proto.Unmarshal(metadata.Payload, description))
 
 	_, ok := description.Members[common.PubkeyToHex(&newMember.PublicKey)]

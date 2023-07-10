@@ -5,7 +5,7 @@ import (
 )
 
 func (o *Community) ToSyncCommunityProtobuf(clock uint64, communitySettings *CommunitySettings) (*protobuf.SyncCommunity, error) {
-	md, err := o.ToBytes()
+	wrappedCommunity, err := o.ToProtocolMessageBytes()
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +29,7 @@ func (o *Community) ToSyncCommunityProtobuf(clock uint64, communitySettings *Com
 	return &protobuf.SyncCommunity{
 		Clock:          clock,
 		Id:             o.ID(),
-		Description:    md,
+		Description:    wrappedCommunity,
 		Joined:         o.Joined(),
 		Verified:       o.Verified(),
 		Muted:          o.Muted(),
