@@ -239,14 +239,14 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 	return response, nil
 }
 
-func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string, messageID string) (*MessengerResponse, error) {
+func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, localChatID string, messageID string) (*MessengerResponse, error) {
 	message, err := m.persistence.MessageByID(messageID)
 	if err != nil {
 		return nil, err
 	}
 
 	// A valid added chat is required.
-	chat, ok := m.allChats.Load(chatID)
+	chat, ok := m.allChats.Load(localChatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -260,7 +260,7 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, chatID string
 		return nil, ErrInvalidDeleteTypeAuthor
 	}
 
-	messagesToDelete, err := m.getConnectedMessages(message, message.ChatId)
+	messagesToDelete, err := m.getConnectedMessages(message, localChatID)
 	if err != nil {
 		return nil, err
 	}
