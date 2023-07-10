@@ -445,6 +445,86 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSe
 	}
 }
 
+func (s *MessengerCommunitiesTokenPermissionsSuite) validateAliceAddress(community *communities.Community, wantedAddress string) error {
+	for pubKey, member := range community.Members() {
+		if pubKey != common.PubkeyToHex(&s.owner.identity.PublicKey) {
+			s.Require().Len(member.RevealedAccounts, 1)
+
+			switch pubKey {
+			case common.PubkeyToHex(&s.alice.identity.PublicKey):
+				if member.RevealedAccounts[0].Address != wantedAddress {
+					return errors.New("Alice's address does not match the wanted address. Wanted " + wantedAddress + ", Found: " + member.RevealedAccounts[0].Address)
+				}
+			default:
+				return errors.New("pubKey does not match expected keys")
+			}
+		}
+	}
+	return nil
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.alice)
+
+	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress2})
+
+	community, err := s.owner.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+
+	s.Require().Equal(2, community.MembersCount())
+
+	err = s.validateAliceAddress(community, aliceAddress2)
+	s.Require().NoError(err)
+
+	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(alicePassword)))
+	request := &requests.EditSharedAddresses{CommunityID: community.ID(), Password: passwdHash, AddressesToReveal: []string{aliceAddress1}}
+	response, err := s.alice.EditSharedAddressesForCommunity(request)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	// Retrieve address change
+	err = tt.RetryWithBackOff(func() error {
+		response, err := s.owner.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("no communities in response (address change reception)")
+		}
+		community := response.Communities()[0]
+		return s.validateAliceAddress(community, aliceAddress1)
+	})
+	s.Require().NoError(err)
+
+	// Also check that the owner has the new address in their DB
+	community, err = s.owner.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+
+	err = s.validateAliceAddress(community, aliceAddress1)
+	s.Require().NoError(err)
+
+	// Retrieve community description change
+	err = tt.RetryWithBackOff(func() error {
+		response, err := s.alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("no communities in response (address change reception)")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+
+	// Check that Alice's community is updated with the new addresses
+	community, err = s.alice.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+
+	err = s.validateAliceAddress(community, aliceAddress1)
+	s.Require().NoError(err)
+}
+
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions() {
 	community, chat := s.createCommunity()
 

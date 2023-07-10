@@ -4190,6 +4190,15 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							logger.Warn("failed to handle CommunityRequestToJoin", zap.Error(err))
 							continue
 						}
+					case protobuf.CommunityEditRevealedAccounts:
+						logger.Debug("Handling CommunityEditRevealedAccounts")
+						request := msg.ParsedMessage.Interface().(protobuf.CommunityEditRevealedAccounts)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, request)
+						err = m.HandleCommunityEditSharedAddresses(messageState, publicKey, request)
+						if err != nil {
+							logger.Warn("failed to handle CommunityEditRevealedAccounts", zap.Error(err))
+							continue
+						}
 					case protobuf.CommunityCancelRequestToJoin:
 						logger.Debug("Handling CommunityCancelRequestToJoin")
 						request := msg.ParsedMessage.Interface().(protobuf.CommunityCancelRequestToJoin)

@@ -49,6 +49,7 @@ var (
 	ErrSomeFieldsMissingForWalletAccount     = errors.New("some fields are missing for wallet account")
 	ErrTryingToRemoveUnexistingWalletAccount = errors.New("trying to remove an unexisting wallet account")
 	ErrUnknownKeypairForWalletAccount        = errors.New("keypair is not known for the wallet account")
+	ErrInvalidCommunityID                    = errors.New("invalid community id")
 )
 
 // HandleMembershipUpdate updates a Chat instance according to the membership updates.
@@ -1356,7 +1357,7 @@ func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessag
 
 func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageState, signer *ecdsa.PublicKey, cancelRequestToJoinProto protobuf.CommunityCancelRequestToJoin) error {
 	if cancelRequestToJoinProto.CommunityId == nil {
-		return errors.New("invalid community id")
+		return ErrInvalidCommunityID
 	}
 
 	requestToJoin, err := m.communitiesManager.HandleCommunityCancelRequestToJoin(signer, &cancelRequestToJoinProto)
@@ -1399,7 +1400,7 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageSta
 // HandleCommunityRequestToJoin handles an community request to join
 func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, signer *ecdsa.PublicKey, requestToJoinProto protobuf.CommunityRequestToJoin) error {
 	if requestToJoinProto.CommunityId == nil {
-		return errors.New("invalid community id")
+		return ErrInvalidCommunityID
 	}
 
 	timeNow := uint64(time.Now().Unix())
@@ -1505,9 +1506,29 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 	return nil
 }
 
+// HandleCommunityEditSharedAddresses handles an edit a user has made to their shared addresses
+func (m *Messenger) HandleCommunityEditSharedAddresses(state *ReceivedMessageState, signer *ecdsa.PublicKey, editRevealedAddressesProto protobuf.CommunityEditRevealedAccounts) error {
+	if editRevealedAddressesProto.CommunityId == nil {
+		return ErrInvalidCommunityID
+	}
+
+	err := m.communitiesManager.HandleCommunityEditSharedAddresses(signer, &editRevealedAddressesProto)
+	if err != nil {
+		return err
+	}
+
+	community, err := m.communitiesManager.GetByIDString(string(editRevealedAddressesProto.GetCommunityId()))
+	if err != nil {
+		return err
+	}
+
+	state.Response.AddCommunity(community)
+	return nil
+}
+
 func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageState, signer *ecdsa.PublicKey, requestToJoinResponseProto protobuf.CommunityRequestToJoinResponse) error {
 	if requestToJoinResponseProto.CommunityId == nil {
-		return errors.New("invalid community id")
+		return ErrInvalidCommunityID
 	}
 
 	updatedRequest, err := m.communitiesManager.HandleCommunityRequestToJoinResponse(signer, &requestToJoinResponseProto)
@@ -1592,7 +1613,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 
 func (m *Messenger) HandleCommunityRequestToLeave(state *ReceivedMessageState, signer *ecdsa.PublicKey, requestToLeaveProto protobuf.CommunityRequestToLeave) error {
 	if requestToLeaveProto.CommunityId == nil {
-		return errors.New("invalid community id")
+		return ErrInvalidCommunityID
 	}
 
 	err := m.communitiesManager.HandleCommunityRequestToLeave(signer, &requestToLeaveProto)

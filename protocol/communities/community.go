@@ -685,6 +685,10 @@ func (o *Community) getMember(pk *ecdsa.PublicKey) *protobuf.CommunityMember {
 	return member
 }
 
+func (o *Community) GetMember(pk *ecdsa.PublicKey) *protobuf.CommunityMember {
+	return o.getMember(pk)
+}
+
 func (o *Community) hasMember(pk *ecdsa.PublicKey) bool {
 
 	member := o.getMember(pk)
@@ -1222,6 +1226,27 @@ func (o *Community) ValidateRequestToJoin(signer *ecdsa.PublicKey, request *prot
 	err := o.validateRequestToJoinWithoutChatID(request)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// ValidateRequestToJoin validates a request, checks that the right permissions are applied
+func (o *Community) ValidateEditSharedAddresses(signer *ecdsa.PublicKey, request *protobuf.CommunityEditRevealedAccounts) error {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	// If we are not admin, fuggetaboutit
+	if !o.IsOwnerOrAdmin() {
+		return ErrNotAdmin
+	}
+
+	if len(request.RevealedAccounts) == 0 {
+		return errors.New("no addresses were shared")
+	}
+
+	if request.Clock < o.config.CommunityDescription.Members[common.PubkeyToHex(signer)].LastUpdateClock {
+		return errors.New("edit request is older than the last one we have. Ignore")
 	}
 
 	return nil
@@ -1921,7 +1946,7 @@ func (o *Community) AllowsAllMembersToPinMessage() bool {
 	return o.config.CommunityDescription.AdminSettings != nil && o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled
 }
 
-func (o *Community) AddMemberRevealedAccounts(memberID string, accounts []*protobuf.RevealedAccount) (*CommunityChanges, error) {
+func (o *Community) AddMemberRevealedAccounts(memberID string, accounts []*protobuf.RevealedAccount, clock uint64) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -1934,6 +1959,7 @@ func (o *Community) AddMemberRevealedAccounts(memberID string, accounts []*proto
 	}
 
 	o.config.CommunityDescription.Members[memberID].RevealedAccounts = accounts
+	o.config.CommunityDescription.Members[memberID].LastUpdateClock = clock
 	o.increaseClock()
 
 	changes := o.emptyCommunityChanges()

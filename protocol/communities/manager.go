@@ -1636,7 +1636,7 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		return nil, err
 	}
 
-	_, err = community.AddMemberRevealedAccounts(dbRequest.PublicKey, revealedAccounts)
+	_, err = community.AddMemberRevealedAccounts(dbRequest.PublicKey, revealedAccounts, dbRequest.Clock)
 	if err != nil {
 		return nil, err
 	}
@@ -1898,6 +1898,52 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 	}
 
 	return requestToJoin, nil
+}
+
+func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, request *protobuf.CommunityEditRevealedAccounts) error {
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityId)
+	if err != nil {
+		return err
+	}
+	if community == nil {
+		return ErrOrgNotFound
+	}
+	if err := community.ValidateEditSharedAddresses(signer, request); err != nil {
+		return err
+	}
+
+	// verify if revealed addresses indeed belong to requester
+	for _, revealedAccount := range request.RevealedAccounts {
+		recoverParams := account.RecoverParams{
+			Message:   types.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID())),
+			Signature: types.EncodeHex(revealedAccount.Signature),
+		}
+
+		matching, err := m.accountsManager.CanRecover(recoverParams, types.HexToAddress(revealedAccount.Address))
+		if err != nil {
+			return err
+		}
+		if !matching {
+			// if ownership of only one wallet address cannot be verified we stop
+			return errors.New("wrong wallet address used")
+		}
+	}
+
+	_, err = community.AddMemberRevealedAccounts(common.PubkeyToHex(signer), request.RevealedAccounts, request.Clock)
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return err
+	}
+
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+	}
+
+	return nil
 }
 
 type CheckPermissionsResponse struct {

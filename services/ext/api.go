@@ -566,6 +566,11 @@ func (api *PublicAPI) RequestToJoinCommunity(request *requests.RequestToJoinComm
 	return api.service.messenger.RequestToJoinCommunity(request)
 }
 
+// EditSharedAddressesForCommunity edits the addresses that are shared with the owner of the community
+func (api *PublicAPI) EditSharedAddressesForCommunity(request *requests.EditSharedAddresses) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.EditSharedAddressesForCommunity(request)
+}
+
 // CheckAndClearPendingRequestToJoinCommunity to delete pending request to join a community which are older than 7 days
 func (api *PublicAPI) CheckAndDeletePendingRequestToJoinCommunity() (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CheckAndDeletePendingRequestToJoinCommunity(true)
