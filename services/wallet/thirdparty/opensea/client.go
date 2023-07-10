@@ -18,6 +18,7 @@ import (
 
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/connection"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -49,10 +50,6 @@ func getbaseURL(chainID uint64) (string, error) {
 
 	return "", ErrChainIDNotSupported
 }
-
-var OpenseaClientInstances = make(map[uint64]*Client)
-var OpenseaClientInstancesLock = sync.RWMutex{}
-var OpenseaHTTPClient *HTTPClient = nil
 
 type TraitValue string
 
@@ -242,81 +239,37 @@ func (o *HTTPClient) doContentTypeRequest(url string) (string, error) {
 }
 
 type Client struct {
-	client          *HTTPClient
-	url             string
-	apiKey          string
-	IsConnected     bool
-	LastCheckedAt   int64
-	IsConnectedLock sync.RWMutex
-	feed            *event.Feed
+	client           *HTTPClient
+	apiKey           string
+	connectionStatus *connection.Status
 }
 
 // new opensea client.
-func NewOpenseaClient(chainID uint64, apiKey string, feed *event.Feed) (*Client, error) {
-	OpenseaClientInstancesLock.Lock()
-	defer OpenseaClientInstancesLock.Unlock()
+func NewClient(apiKey string, feed *event.Feed) *Client {
+	return &Client{
+		client:           newHTTPClient(),
+		apiKey:           apiKey,
+		connectionStatus: connection.NewStatus(EventCollectibleStatusChanged, feed),
+	}
+}
 
-	if OpenseaHTTPClient == nil {
-		OpenseaHTTPClient = newHTTPClient()
-	}
-
-	var tmpAPIKey string = ""
-	if chainID == ChainIDRequiringAPIKey {
-		tmpAPIKey = apiKey
-	}
-	if client, ok := OpenseaClientInstances[chainID]; ok {
-		if client.apiKey == tmpAPIKey {
-			return client, nil
-		}
-	}
+func (o *Client) FetchAllCollectionsByOwner(chainID uint64, owner common.Address) ([]OwnedCollection, error) {
+	offset := 0
+	var collections []OwnedCollection
 
 	baseURL, err := getbaseURL(chainID)
 	if err != nil {
 		return nil, err
 	}
 
-	openseaClient := &Client{
-		client:        OpenseaHTTPClient,
-		url:           baseURL,
-		apiKey:        tmpAPIKey,
-		IsConnected:   true,
-		LastCheckedAt: time.Now().Unix(),
-		feed:          feed,
-	}
-	OpenseaClientInstances[chainID] = openseaClient
-	return openseaClient, nil
-}
-
-func (o *Client) setIsConnected(value bool) {
-	o.IsConnectedLock.Lock()
-	defer o.IsConnectedLock.Unlock()
-	o.LastCheckedAt = time.Now().Unix()
-	if value != o.IsConnected {
-		message := "down"
-		if value {
-			message = "up"
-		}
-		if o.feed != nil {
-			o.feed.Send(walletevent.Event{
-				Type:     EventCollectibleStatusChanged,
-				Accounts: []common.Address{},
-				Message:  message,
-				At:       time.Now().Unix(),
-			})
-		}
-	}
-	o.IsConnected = value
-}
-func (o *Client) FetchAllCollectionsByOwner(owner common.Address) ([]OwnedCollection, error) {
-	offset := 0
-	var collections []OwnedCollection
 	for {
-		url := fmt.Sprintf("%s/collections?asset_owner=%s&offset=%d&limit=%d", o.url, owner, offset, CollectionLimit)
+		url := fmt.Sprintf("%s/collections?asset_owner=%s&offset=%d&limit=%d", baseURL, owner, offset, CollectionLimit)
 		body, err := o.client.doGetRequest(url, o.apiKey)
 		if err != nil {
-			o.setIsConnected(false)
+			o.connectionStatus.SetIsConnected(false)
 			return nil, err
 		}
+		o.connectionStatus.SetIsConnected(true)
 
 		// if Json is not returned there must be an error
 		if !json.Valid(body) {
@@ -326,7 +279,6 @@ func (o *Client) FetchAllCollectionsByOwner(owner common.Address) ([]OwnedCollec
 		var tmp []OwnedCollection
 		err = json.Unmarshal(body, &tmp)
 		if err != nil {
-			o.setIsConnected(false)
 			return nil, err
 		}
 
@@ -336,11 +288,10 @@ func (o *Client) FetchAllCollectionsByOwner(owner common.Address) ([]OwnedCollec
 			break
 		}
 	}
-	o.setIsConnected(true)
 	return collections, nil
 }
 
-func (o *Client) FetchAllAssetsByOwnerAndCollection(owner common.Address, collectionSlug string, cursor string, limit int) (*AssetContainer, error) {
+func (o *Client) FetchAllAssetsByOwnerAndCollection(chainID uint64, owner common.Address, collectionSlug string, cursor string, limit int) (*AssetContainer, error) {
 	queryParams := url.Values{
 		"owner":      {owner.String()},
 		"collection": {collectionSlug},
@@ -350,10 +301,10 @@ func (o *Client) FetchAllAssetsByOwnerAndCollection(owner common.Address, collec
 		queryParams["cursor"] = []string{cursor}
 	}
 
-	return o.fetchAssets(queryParams, limit)
+	return o.fetchAssets(chainID, queryParams, limit)
 }
 
-func (o *Client) FetchAllAssetsByOwnerAndContractAddress(owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*AssetContainer, error) {
+func (o *Client) FetchAllAssetsByOwnerAndContractAddress(chainID uint64, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*AssetContainer, error) {
 	queryParams := url.Values{
 		"owner": {owner.String()},
 	}
@@ -366,10 +317,10 @@ func (o *Client) FetchAllAssetsByOwnerAndContractAddress(owner common.Address, c
 		queryParams["cursor"] = []string{cursor}
 	}
 
-	return o.fetchAssets(queryParams, limit)
+	return o.fetchAssets(chainID, queryParams, limit)
 }
 
-func (o *Client) FetchAllAssetsByOwner(owner common.Address, cursor string, limit int) (*AssetContainer, error) {
+func (o *Client) FetchAllAssetsByOwner(chainID uint64, owner common.Address, cursor string, limit int) (*AssetContainer, error) {
 	queryParams := url.Values{
 		"owner": {owner.String()},
 	}
@@ -378,10 +329,10 @@ func (o *Client) FetchAllAssetsByOwner(owner common.Address, cursor string, limi
 		queryParams["cursor"] = []string{cursor}
 	}
 
-	return o.fetchAssets(queryParams, limit)
+	return o.fetchAssets(chainID, queryParams, limit)
 }
 
-func (o *Client) FetchAssetsByNFTUniqueID(uniqueIDs []thirdparty.CollectibleUniqueID, limit int) (*AssetContainer, error) {
+func (o *Client) FetchAssetsByNFTUniqueID(chainID uint64, uniqueIDs []thirdparty.CollectibleUniqueID, limit int) (*AssetContainer, error) {
 	queryParams := url.Values{}
 
 	for _, uniqueID := range uniqueIDs {
@@ -389,10 +340,10 @@ func (o *Client) FetchAssetsByNFTUniqueID(uniqueIDs []thirdparty.CollectibleUniq
 		queryParams.Add("asset_contract_addresses", uniqueID.ContractAddress.String())
 	}
 
-	return o.fetchAssets(queryParams, limit)
+	return o.fetchAssets(chainID, queryParams, limit)
 }
 
-func (o *Client) fetchAssets(queryParams url.Values, limit int) (*AssetContainer, error) {
+func (o *Client) fetchAssets(chainID uint64, queryParams url.Values, limit int) (*AssetContainer, error) {
 	assets := new(AssetContainer)
 
 	if len(queryParams["cursor"]) > 0 {
@@ -404,15 +355,22 @@ func (o *Client) fetchAssets(queryParams url.Values, limit int) (*AssetContainer
 		tmpLimit = limit
 	}
 
+	baseURL, err := getbaseURL(chainID)
+
+	if err != nil {
+		return nil, err
+	}
+
 	queryParams["limit"] = []string{strconv.Itoa(tmpLimit)}
 	for {
-		url := o.url + "/assets?" + queryParams.Encode()
+		url := baseURL + "/assets?" + queryParams.Encode()
 
 		body, err := o.client.doGetRequest(url, o.apiKey)
 		if err != nil {
-			o.setIsConnected(false)
+			o.connectionStatus.SetIsConnected(false)
 			return nil, err
 		}
+		o.connectionStatus.SetIsConnected(true)
 
 		// if Json is not returned there must be an error
 		if !json.Valid(body) {
@@ -422,7 +380,6 @@ func (o *Client) fetchAssets(queryParams url.Values, limit int) (*AssetContainer
 		container := AssetContainer{}
 		err = json.Unmarshal(body, &container)
 		if err != nil {
-			o.setIsConnected(false)
 			return nil, err
 		}
 
@@ -452,6 +409,5 @@ func (o *Client) fetchAssets(queryParams url.Values, limit int) (*AssetContainer
 		}
 	}
 
-	o.setIsConnected(true)
 	return assets, nil
 }

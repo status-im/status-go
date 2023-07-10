@@ -2110,6 +2110,8 @@ func (m *Manager) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tok
 
 	ownedERC721Tokens := make(CollectiblesByChain)
 
+	client := m.openseaClientBuilder.NewOpenseaClient(m.walletConfig.OpenseaAPIKey, nil)
+
 	for chainID, erc721Tokens := range tokenRequirements {
 
 		skipChain := true
