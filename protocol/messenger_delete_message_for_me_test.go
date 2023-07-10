@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
@@ -27,6 +28,7 @@ type MessengerDeleteMessageForMeSuite struct {
 	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
 	alice1     *Messenger
 	alice2     *Messenger
+	m          *Messenger
 	// If one wants to send messages between different instances of Messenger,
 	// a single waku service should be shared.
 	shh    types.Waku
@@ -209,4 +211,80 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 	otherMessage, err := otherMessenger.MessageByID(messageID)
 	s.Require().NoError(err)
 	s.Require().False(otherMessage.DeletedForMe)
+}
+
+func (s *MessengerDeleteMessageForMeSuite) TestDeleteImageMessageFromReceiverSide() {
+	
+	alice := s.otherNewMessenger()
+	_, err := alice.Start()
+	s.Require().NoError(err)
+	defer alice.Shutdown() // nolint: errcheck
+
+	bob := s.otherNewMessenger()
+	_, err = bob.Start()
+	s.Require().NoError(err)
+	defer bob.Shutdown() // nolint: errcheck
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, alice.transport)
+	err = alice.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.transport)
+	err = bob.SaveChat(ourChat)
+	s.Require().NoError(err)
+
+	messageCount := 3
+	var album []*common.Message
+	for i := 0; i < messageCount; i++ {
+		image, err := buildImageWithoutAlbumIDMessage(*ourChat)
+		s.NoError(err)
+		album = append(album, image)
+	}
+
+	response, err := bob.SendChatMessages(context.Background(), album)
+	s.NoError(err)
+
+	// Check that album count was the number of the images sent
+	imagesCount := uint32(0)
+	for _, message := range response.Messages() {
+		if message.ContentType == protobuf.ChatMessage_IMAGE {
+			imagesCount++
+		}
+	}
+	for _, message := range response.Messages() {
+		s.Require().NotNil(message.GetImage())
+		s.Require().Equal(message.GetImage().AlbumImagesCount, imagesCount)
+	}
+
+	s.Require().Equal(messageCount, len(response.Messages()), "it returns the messages")
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), messageCount)
+
+	response, err = WaitOnMessengerResponse(
+		alice,
+		func(r *MessengerResponse) bool { return len(r.messages) == messageCount },
+		"no messages",
+	)
+
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), messageCount)
+	for _, message := range response.Messages() {
+		image := message.GetImage()
+		s.Require().NotNil(image, "Message.ID=%s", message.ID)
+		s.Require().Equal(image.AlbumImagesCount, imagesCount)
+		s.Require().NotEmpty(image.AlbumId, "Message.ID=%s", message.ID)
+	}
+
+	messages := response.Messages()
+	firstMessageID := messages[0].ID
+	localChatID := messages[0].LocalChatID
+	sendResponse, err := alice.DeleteMessageForMeAndSync(context.Background(), localChatID, firstMessageID)
+	s.Require().NoError(err)
+	s.Require().Len(sendResponse.Messages(), 3)
+	s.Require().Len(sendResponse.Chats(), 1)
+
+	// LastMessage marked as deleted
+	s.Require().Equal(sendResponse.Chats()[0].LastMessage.ID, album[2].ID)
+	s.Require().Equal(sendResponse.Chats()[0].LastMessage.DeletedForMe, true)
 }
