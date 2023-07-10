@@ -125,7 +125,7 @@ func GenerateTestBridgeMultiTransaction(fromTr, toTr TestTransfer) TestMultiTran
 
 // GenerateTestTransfers will generate transaction based on the TestTokens index and roll over if there are more than
 // len(TestTokens) transactions
-func GenerateTestTransfers(t *testing.T, db *sql.DB, firstStartIndex int, count int) (result []TestTransfer, fromAddresses, toAddresses []eth_common.Address) {
+func GenerateTestTransfers(tb testing.TB, db *sql.DB, firstStartIndex int, count int) (result []TestTransfer, fromAddresses, toAddresses []eth_common.Address) {
 	for i := firstStartIndex; i < (firstStartIndex + count); i++ {
 		tr := generateTestTransfer(i)
 		fromAddresses = append(fromAddresses, tr.From)
@@ -205,9 +205,9 @@ var TestTokens = []*token.Token{
 
 var NativeTokenIndices = []int{0, 1, 2}
 
-func InsertTestTransfer(t *testing.T, db *sql.DB, address eth_common.Address, tr *TestTransfer) {
+func InsertTestTransfer(tb testing.TB, db *sql.DB, address eth_common.Address, tr *TestTransfer) {
 	token := TestTokens[int(tr.Timestamp)%len(TestTokens)]
-	InsertTestTransferWithOptions(t, db, address, tr, &TestTransferOptions{
+	InsertTestTransferWithOptions(tb, db, address, tr, &TestTransferOptions{
 		TokenAddress: token.Address,
 	})
 }
@@ -217,12 +217,12 @@ type TestTransferOptions struct {
 	NullifyAddresses []eth_common.Address
 }
 
-func InsertTestTransferWithOptions(t *testing.T, db *sql.DB, address eth_common.Address, tr *TestTransfer, opt *TestTransferOptions) {
+func InsertTestTransferWithOptions(tb testing.TB, db *sql.DB, address eth_common.Address, tr *TestTransfer, opt *TestTransferOptions) {
 	var (
 		tx *sql.Tx
 	)
 	tx, err := db.Begin()
-	require.NoError(t, err)
+	require.NoError(tb, err)
 	defer func() {
 		if err == nil {
 			err = tx.Commit()
@@ -242,7 +242,7 @@ func InsertTestTransferWithOptions(t *testing.T, db *sql.DB, address eth_common.
 
 	// Respect `FOREIGN KEY(network_id,address,blk_hash)` of `transfers` table
 	err = insertBlockDBFields(tx, block)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	receiptStatus := uint64(0)
 	if tr.Success {
@@ -284,19 +284,19 @@ func InsertTestTransferWithOptions(t *testing.T, db *sql.DB, address eth_common.
 		tokenAddress:       &opt.TokenAddress,
 	}
 	err = updateOrInsertTransfersDBFields(tx, []transferDBFields{transfer})
-	require.NoError(t, err)
+	require.NoError(tb, err)
 }
 
-func InsertTestPendingTransaction(t *testing.T, db *sql.DB, tr *TestTransfer) {
+func InsertTestPendingTransaction(tb testing.TB, db *sql.DB, tr *TestTransfer) {
 	_, err := db.Exec(`
 		INSERT INTO pending_transactions (network_id, hash, timestamp, from_address, to_address,
 			symbol, gas_price, gas_limit, value, data, type, additional_data, multi_transaction_id
 		) VALUES (?, ?, ?, ?, ?, 'ETH', 0, 0, ?, '', 'test', '', ?)`,
 		tr.ChainID, tr.Hash, tr.Timestamp, tr.From, tr.To, tr.Value, tr.MultiTransactionID)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 }
 
-func InsertTestMultiTransaction(t *testing.T, db *sql.DB, tr *TestMultiTransaction) MultiTransactionIDType {
+func InsertTestMultiTransaction(tb testing.TB, db *sql.DB, tr *TestMultiTransaction) MultiTransactionIDType {
 	fromTokenType := tr.FromToken
 	if tr.FromToken == "" {
 		fromTokenType = testutils.EthSymbol
@@ -312,9 +312,9 @@ func InsertTestMultiTransaction(t *testing.T, db *sql.DB, tr *TestMultiTransacti
 		INSERT INTO multi_transactions (from_address, from_asset, from_amount, to_address, to_asset, to_amount, type, timestamp
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		tr.FromAddress, fromTokenType, fromAmount.String(), tr.ToAddress, toTokenType, toAmount.String(), tr.MultiTransactionType, tr.Timestamp)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 	rowID, err := result.LastInsertId()
-	require.NoError(t, err)
+	require.NoError(tb, err)
 	tr.MultiTransactionID = MultiTransactionIDType(rowID)
 	return tr.MultiTransactionID
 }
