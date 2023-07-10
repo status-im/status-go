@@ -28,7 +28,6 @@ type MessengerDeleteMessageForMeSuite struct {
 	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
 	alice1     *Messenger
 	alice2     *Messenger
-	m          *Messenger
 	// If one wants to send messages between different instances of Messenger,
 	// a single waku service should be shared.
 	shh    types.Waku
@@ -214,7 +213,7 @@ func (s *MessengerDeleteMessageForMeSuite) TestDeleteMessageForMe() {
 }
 
 func (s *MessengerDeleteMessageForMeSuite) TestDeleteImageMessageFromReceiverSide() {
-	
+
 	alice := s.otherNewMessenger()
 	_, err := alice.Start()
 	s.Require().NoError(err)
