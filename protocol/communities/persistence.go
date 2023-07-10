@@ -39,14 +39,14 @@ const communitiesBaseQuery = `
 func (p *Persistence) SaveCommunity(community *Community) error {
 	id := community.ID()
 	privateKey := community.PrivateKey()
-	description, err := community.ToBytes()
+	wrappedCommunity, err := community.ToProtocolMessageBytes()
 	if err != nil {
 		return err
 	}
 
 	_, err = p.db.Exec(`
 		INSERT INTO communities_communities (id, private_key, description, joined, spectated, verified, muted, muted_till) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, crypto.FromECDSA(privateKey), description, community.config.Joined, community.config.Spectated, community.config.Verified, community.config.Muted, community.config.MuteTill)
+		id, crypto.FromECDSA(privateKey), wrappedCommunity, community.config.Joined, community.config.Spectated, community.config.Verified, community.config.Muted, community.config.MuteTill)
 	return err
 }
 
@@ -282,7 +282,7 @@ func (p *Persistence) GetByID(memberIdentity *ecdsa.PublicKey, id []byte) (*Comm
 	return unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(requestedToJoinAt.Int64), eventsBytes, eventsDescriptionBytes, p.logger)
 }
 
-func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, privateKeyBytes, descriptionBytes []byte, joined,
+func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, privateKeyBytes, wrappedCommunity []byte, joined,
 	spectated, verified, muted bool, muteTill time.Time, requestedToJoinAt uint64, eventsBytes []byte,
 	eventsDescriptionBytes []byte, logger *zap.Logger) (*Community, error) {
 
@@ -296,7 +296,7 @@ func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, p
 		}
 	}
 
-	description, err := decodeCommunityDescription(descriptionBytes)
+	description, err := decodeWrappedCommunityDescription(wrappedCommunity)
 	if err != nil {
 		return nil, err
 	}
@@ -312,19 +312,19 @@ func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, p
 	}
 
 	config := Config{
-		PrivateKey:                    privateKey,
-		CommunityDescription:          description,
-		MemberIdentity:                memberIdentity,
-		MarshaledCommunityDescription: descriptionBytes,
-		Logger:                        logger,
-		ID:                            id,
-		Verified:                      verified,
-		Muted:                         muted,
-		MuteTill:                      muteTill,
-		RequestedToJoinAt:             requestedToJoinAt,
-		Joined:                        joined,
-		Spectated:                     spectated,
-		EventsData:                    eventsData,
+		PrivateKey:                          privateKey,
+		CommunityDescription:                description,
+		MemberIdentity:                      memberIdentity,
+		CommunityDescriptionProtocolMessage: wrappedCommunity,
+		Logger:                              logger,
+		ID:                                  id,
+		Verified:                            verified,
+		Muted:                               muted,
+		MuteTill:                            muteTill,
+		RequestedToJoinAt:                   requestedToJoinAt,
+		Joined:                              joined,
+		Spectated:                           spectated,
+		EventsData:                          eventsData,
 	}
 	community, err := New(config)
 	if err != nil {
@@ -1234,7 +1234,7 @@ func (p *Persistence) getCommunityTokensInternal(rows *sql.Rows) ([]*CommunityTo
 
 func (p *Persistence) AddCommunityToken(token *CommunityToken) error {
 	_, err := p.db.Exec(`INSERT INTO community_tokens (community_id, address, type, name, symbol, description, supply_str,
-		infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64, decimals) 
+		infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64, decimals)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, token.CommunityID, token.Address, token.TokenType, token.Name,
 		token.Symbol, token.Description, token.Supply.String(), token.InfiniteSupply, token.Transferable, token.RemoteSelfDestruct,
 		token.ChainID, token.DeployState, token.Base64Image, token.Decimals)
@@ -1256,10 +1256,10 @@ func (p *Persistence) RemoveCommunityToken(chainID int, contractAddress string) 
 	return err
 }
 
-func decodeCommunityDescription(descriptionBytes []byte) (*protobuf.CommunityDescription, error) {
+func decodeWrappedCommunityDescription(wrappedDescriptionBytes []byte) (*protobuf.CommunityDescription, error) {
 	metadata := &protobuf.ApplicationMetadataMessage{}
 
-	err := proto.Unmarshal(descriptionBytes, metadata)
+	err := proto.Unmarshal(wrappedDescriptionBytes, metadata)
 	if err != nil {
 		return nil, err
 	}

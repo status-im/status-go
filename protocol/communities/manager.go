@@ -1215,11 +1215,11 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 
 	if community == nil {
 		config := Config{
-			CommunityDescription:          description,
-			Logger:                        m.logger,
-			MarshaledCommunityDescription: payload,
-			MemberIdentity:                &m.identity.PublicKey,
-			ID:                            signer,
+			CommunityDescription:                description,
+			Logger:                              m.logger,
+			CommunityDescriptionProtocolMessage: payload,
+			MemberIdentity:                      &m.identity.PublicKey,
+			ID:                                  signer,
 		}
 
 		community, err = New(config)

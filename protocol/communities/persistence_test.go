@@ -266,7 +266,7 @@ func (s *PersistenceSuite) makeNewCommunity(identity *ecdsa.PrivateKey) *Communi
 
 	md, err := com.MarshaledDescription()
 	s.NoError(err, "Community.MarshaledDescription shouldn't give any error")
-	com.config.MarshaledCommunityDescription = md
+	com.config.CommunityDescriptionProtocolMessage = md
 
 	return com
 }

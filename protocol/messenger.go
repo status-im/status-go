@@ -2214,7 +2214,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 			return nil, errors.New("community not found")
 		}
 
-		wrappedCommunity, err := community.ToBytes()
+		wrappedCommunity, err := community.ToProtocolMessageBytes()
 		if err != nil {
 			return nil, err
 		}
@@ -4315,7 +4315,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						logger.Debug("Handling CommunityInvitation")
 						invitation := msg.ParsedMessage.Interface().(protobuf.CommunityInvitation)
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, invitation)
-						err = m.HandleCommunityInvitation(messageState, publicKey, invitation, invitation.CommunityDescription)
+						err = m.HandleCommunityInvitation(messageState, publicKey, invitation, invitation.WrappedCommunityDescription)
 						if err != nil {
 							logger.Warn("failed to handle CommunityInvitation", zap.Error(err))
 							allMessagesProcessed = false
