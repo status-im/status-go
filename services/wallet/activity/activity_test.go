@@ -14,7 +14,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/transfer"
 
 	eth "github.com/ethereum/go-ethereum/common"
-	eth_common "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/stretchr/testify/require"
@@ -87,7 +86,7 @@ type testData struct {
 	nextIndex int
 }
 
-func mockTestAccountsWithAddresses(t *testing.T, db *sql.DB, addresses []eth_common.Address) {
+func mockTestAccountsWithAddresses(t *testing.T, db *sql.DB, addresses []eth.Address) {
 	mockedAccounts := []*accounts.Account{}
 	for _, address := range addresses {
 		mockedAccounts = append(mockedAccounts, &accounts.Account{
@@ -100,7 +99,7 @@ func mockTestAccountsWithAddresses(t *testing.T, db *sql.DB, addresses []eth_com
 
 // Generates and adds to the DB 7 transfers and 2 multitransactions.
 // There are only 4 extractable activity entries (transactions + multi-transactions) with timestamps 1-4. The others are associated with a multi-transaction
-func fillTestData(t *testing.T, db *sql.DB) (td testData, fromAddresses, toAddresses []eth_common.Address) {
+func fillTestData(t *testing.T, db *sql.DB) (td testData, fromAddresses, toAddresses []eth.Address) {
 	// Generates ETH/Goerli, ETH/Optimism, USDC/Mainnet, USDC/Goerli, USDC/Optimism, SNT/Mainnet, DAI/Mainnet
 	trs, fromAddresses, toAddresses := transfer.GenerateTestTransfers(t, db, 1, 7)
 
@@ -297,7 +296,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 	var filter Filter
 	filter.Period.StartTimestamp = td.multiTx1.Timestamp
 	filter.Period.EndTimestamp = NoLimitTimestampForPeriod
-	entries, err := getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err := getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 8, len(entries))
 	// Check start and end content
@@ -328,7 +327,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 
 	// Test complete interval
 	filter.Period.EndTimestamp = trs[2].Timestamp
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 5, len(entries))
 	// Check start and end content
@@ -359,7 +358,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 
 	// Test end only
 	filter.Period.StartTimestamp = NoLimitTimestampForPeriod
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 7, len(entries))
 	// Check start and end content
@@ -403,14 +402,14 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 
 	var filter Filter
 	// Get all
-	entries, err := getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 5)
+	entries, err := getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 5)
 	require.NoError(t, err)
 	require.Equal(t, 5, len(entries))
 
 	// Get time based interval
 	filter.Period.StartTimestamp = trs[2].Timestamp
 	filter.Period.EndTimestamp = trs[8].Timestamp
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 3)
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 3)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(entries))
 	// Check start and end content
@@ -440,7 +439,7 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 	}, entries[2])
 
 	// Move window 2 entries forward
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 2, 3)
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 2, 3)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(entries))
 	// Check start and end content
@@ -470,7 +469,7 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 	}, entries[2])
 
 	// Move window 4 more entries to test filter cap
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 6, 3)
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 6, 3)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(entries))
 	// Check start and end content
@@ -535,7 +534,7 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 
 	filter.Types = allActivityTypesFilter()
 	// Set tr1 to Receive and pendingTr to Send; rest of two MT remain default Send
-	addresses := []eth_common.Address{td.tr1.To, td.pendingTr.From, td.multiTx1.FromAddress, td.multiTx2.FromAddress, trs[0].From, trs[2].From, trs[4].From, trs[6].From, trs[8].From}
+	addresses := []eth.Address{td.tr1.To, td.pendingTr.From, td.multiTx1.FromAddress, td.multiTx2.FromAddress, trs[0].From, trs[2].From, trs[4].From, trs[6].From, trs[8].From}
 	entries, err := getActivityEntries(context.Background(), deps, addresses, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 9, len(entries))
@@ -585,7 +584,7 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 10, len(entries))
 
-	addressesFilter = []eth_common.Address{td.multiTx2.ToAddress, trs[1].From, trs[4].To}
+	addressesFilter = []eth.Address{td.multiTx2.ToAddress, trs[1].From, trs[4].To}
 	entries, err = getActivityEntries(context.Background(), deps, addressesFilter, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(entries))
@@ -651,12 +650,12 @@ func TestGetActivityEntriesFilterByStatus(t *testing.T) {
 
 	var filter Filter
 	filter.Statuses = allActivityStatusesFilter()
-	entries, err := getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err := getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 11, len(entries))
 
 	filter.Statuses = []Status{PendingAS}
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(entries))
 	require.Equal(t, td.pendingTr.Hash, entries[2].transaction.Hash)
@@ -664,24 +663,24 @@ func TestGetActivityEntriesFilterByStatus(t *testing.T) {
 	require.Equal(t, trs[1].Hash, entries[0].transaction.Hash)
 
 	filter.Statuses = []Status{FailedAS}
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(entries))
 
 	filter.Statuses = []Status{CompleteAS}
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 6, len(entries))
 
 	// Finalized is treated as Complete, would need dynamic blockchain status to track the Finalized level
 	filter.Statuses = []Status{FinalizedAS}
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 6, len(entries))
 
 	// Combined filter
 	filter.Statuses = []Status{FailedAS, PendingAS}
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 5, len(entries))
 }
@@ -706,25 +705,25 @@ func TestGetActivityEntriesFilterByTokenType(t *testing.T) {
 
 	var filter Filter
 	filter.FilterOutAssets = true
-	entries, err := getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err := getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(entries))
 
 	filter.FilterOutAssets = false
 	filter.Assets = allTokensFilter()
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 13, len(entries))
 
 	// Native tokens are network agnostic, hence all are returned
 	filter.Assets = []Token{{TokenType: Native, ChainID: common.ChainID(transfer.EthMainnet.ChainID)}}
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 5, len(entries))
 
 	// Test that it doesn't break the filter
 	filter.Assets = []Token{{TokenType: Erc1155}}
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(entries))
 
@@ -733,7 +732,7 @@ func TestGetActivityEntriesFilterByTokenType(t *testing.T) {
 		ChainID:   common.ChainID(transfer.UsdcMainnet.ChainID),
 		Address:   transfer.UsdcMainnet.Address,
 	}}
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	// Two MT for which ChainID is ignored and one transfer on the main net and the Goerli is ignored
 	require.Equal(t, 3, len(entries))
@@ -759,7 +758,7 @@ func TestGetActivityEntriesFilterByTokenType(t *testing.T) {
 		ChainID:   common.ChainID(transfer.UsdcGoerli.ChainID),
 		Address:   transfer.UsdcGoerli.Address,
 	}}
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	// Two MT for which ChainID is ignored and two transfers on the main net and Goerli
 	require.Equal(t, 4, len(entries))
@@ -784,22 +783,22 @@ func TestGetActivityEntriesFilterByToAddresses(t *testing.T) {
 
 	var filter Filter
 	filter.CounterpartyAddresses = allAddressesFilter()
-	entries, err := getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	entries, err := getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 10, len(entries))
 
-	filter.CounterpartyAddresses = []eth_common.Address{eth_common.HexToAddress("0x567890")}
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	filter.CounterpartyAddresses = []eth.Address{eth.HexToAddress("0x567890")}
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(entries))
 
-	filter.CounterpartyAddresses = []eth_common.Address{td.pendingTr.To, td.multiTx2.ToAddress, trs[3].To}
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	filter.CounterpartyAddresses = []eth.Address{td.pendingTr.To, td.multiTx2.ToAddress, trs[3].To}
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(entries))
 
-	filter.CounterpartyAddresses = []eth_common.Address{td.tr1.To, td.pendingTr.From, trs[3].From, trs[5].To}
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, []common.ChainID{}, filter, 0, 15)
+	filter.CounterpartyAddresses = []eth.Address{td.tr1.To, td.pendingTr.From, trs[3].From, trs[5].To}
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(entries))
 }
@@ -818,18 +817,18 @@ func TestGetActivityEntriesFilterByNetworks(t *testing.T) {
 
 	var filter Filter
 	chainIDs := allNetworksFilter()
-	entries, err := getActivityEntries(context.Background(), deps, []eth_common.Address{}, chainIDs, filter, 0, 15)
+	entries, err := getActivityEntries(context.Background(), deps, []eth.Address{}, chainIDs, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 10, len(entries))
 
 	chainIDs = []common.ChainID{5674839210}
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, chainIDs, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, chainIDs, filter, 0, 15)
 	require.NoError(t, err)
 	// TODO: update after multi-transactions are filterable by ChainID
 	require.Equal(t, 2 /*0*/, len(entries))
 
 	chainIDs = []common.ChainID{td.pendingTr.ChainID, td.multiTx2Tr1.ChainID, trs[3].ChainID}
-	entries, err = getActivityEntries(context.Background(), deps, []eth_common.Address{}, chainIDs, filter, 0, 15)
+	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, chainIDs, filter, 0, 15)
 	require.NoError(t, err)
 	// TODO: update after multi-transactions are filterable by ChainID
 	require.Equal(t, 8 /*6*/, len(entries))
@@ -847,7 +846,7 @@ func TestGetActivityEntriesCheckToAndFrom(t *testing.T) {
 	transfer.InsertTestTransfer(t, deps.db, trs[0].To, &trs[0])
 	transfer.InsertTestPendingTransaction(t, deps.db, &trs[1])
 
-	addresses := []eth_common.Address{td.tr1.From, td.pendingTr.From,
+	addresses := []eth.Address{td.tr1.From, td.pendingTr.From,
 		td.multiTx1.FromAddress, td.multiTx2.ToAddress, trs[0].To, trs[1].To}
 
 	var filter Filter
@@ -899,21 +898,21 @@ func TestGetActivityEntriesNullAddresses(t *testing.T) {
 	// Add 6 extractable transactions
 	trs, _, _ := transfer.GenerateTestTransfers(t, deps.db, 0, 4)
 	multiTx := transfer.GenerateTestBridgeMultiTransaction(trs[0], trs[1])
-	multiTx.ToAddress = eth_common.Address{}
+	multiTx.ToAddress = eth.Address{}
 
 	trs[0].MultiTransactionID = transfer.InsertTestMultiTransaction(t, deps.db, &multiTx)
 	trs[1].MultiTransactionID = trs[0].MultiTransactionID
 
 	for i := 0; i < 3; i++ {
 		transfer.InsertTestTransferWithOptions(t, deps.db, trs[i].To, &trs[i], &transfer.TestTransferOptions{
-			NullifyAddresses: []eth_common.Address{trs[i].To},
+			NullifyAddresses: []eth.Address{trs[i].To},
 		})
 	}
 
-	trs[3].To = eth_common.Address{}
+	trs[3].To = eth.Address{}
 	transfer.InsertTestPendingTransaction(t, deps.db, &trs[3])
 
-	mockTestAccountsWithAddresses(t, deps.db, []eth_common.Address{trs[0].From, trs[1].From, trs[2].From, trs[3].From})
+	mockTestAccountsWithAddresses(t, deps.db, []eth.Address{trs[0].From, trs[1].From, trs[2].From, trs[3].From})
 
 	activities, err := getActivityEntries(context.Background(), deps, allAddressesFilter(), allNetworksFilter(), Filter{}, 0, 10)
 	require.NoError(t, err)
