@@ -22,6 +22,7 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 	var text string
 	var to string
 	var from string
+	var contentType protobuf.ChatMessage_ContentType
 	if outgoing {
 		to = contactID
 		from = m.myHexIdentity()
@@ -29,10 +30,13 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 		switch updateType {
 		case MutualStateUpdateTypeSent:
 			text = "You sent a contact request to @" + to
+			contentType = protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT
 		case MutualStateUpdateTypeAdded:
 			text = "You accepted @" + to + "'s contact request"
+			contentType = protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED
 		case MutualStateUpdateTypeRemoved:
 			text = "You removed @" + to + " as a contact"
+			contentType = protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED
 		default:
 			return nil, fmt.Errorf("unhandled outgoing MutualStateUpdateType = %d", updateType)
 		}
@@ -43,10 +47,13 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 		switch updateType {
 		case MutualStateUpdateTypeSent:
 			text = "@" + from + " sent you a contact request"
+			contentType = protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT
 		case MutualStateUpdateTypeAdded:
 			text = "@" + from + " accepted your contact request"
+			contentType = protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED
 		case MutualStateUpdateTypeRemoved:
 			text = "@" + from + " removed you as a contact"
+			contentType = protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED
 		default:
 			return nil, fmt.Errorf("unhandled incoming MutualStateUpdateType = %d", updateType)
 		}
@@ -57,7 +64,7 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 			ChatId:      contactID,
 			Text:        text,
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
-			ContentType: protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_STATE_UPDATE,
+			ContentType: contentType,
 			Clock:       clock,
 			Timestamp:   timestamp,
 		},

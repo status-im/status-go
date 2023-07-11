@@ -74,7 +74,7 @@ func (s *MessengerContactRequestSuite) sendContactRequest(request *requests.Send
 	// Check CR and mutual state update messages
 	s.Require().Len(resp.Messages(), 2)
 
-	mutualStateUpdate := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_STATE_UPDATE)
+	mutualStateUpdate := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT)
 	s.Require().NotNil(mutualStateUpdate)
 
 	s.Require().NotNil(mutualStateUpdate.ID)
@@ -138,7 +138,7 @@ func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string,
 	s.Require().Equal(common.ContactRequestStatePending, contactRequest.ContactRequestState)
 	s.Require().Equal(messageText, contactRequest.Text)
 
-	mutualStateUpdate := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_STATE_UPDATE)
+	mutualStateUpdate := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT)
 	s.Require().NotNil(mutualStateUpdate)
 
 	s.Require().Equal(mutualStateUpdate.From, contactRequest.From)
@@ -195,7 +195,7 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 	contactRequestMsg := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
 	s.Require().NotNil(contactRequestMsg)
 
-	mutualStateUpdate := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_STATE_UPDATE)
+	mutualStateUpdate := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED)
 	s.Require().NotNil(mutualStateUpdate)
 
 	s.Require().Equal(contactRequestMsg.ID, contactRequest.ID)
@@ -255,7 +255,7 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 	contactRequestMsg = s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
 	s.Require().NotNil(contactRequestMsg)
 
-	mutualStateUpdate = s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_STATE_UPDATE)
+	mutualStateUpdate = s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED)
 	s.Require().NotNil(mutualStateUpdate)
 
 	s.Require().Equal(contactRequest.ID, contactRequestMsg.ID)
@@ -526,7 +526,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	contactRequestMsg := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
 	s.Require().NotNil(contactRequestMsg)
 
-	mutualStateUpdate := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_STATE_UPDATE)
+	mutualStateUpdate := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED)
 	s.Require().NotNil(mutualStateUpdate)
 
 	s.Require().Equal(contactRequestMsg.ID, contactRequest.ID)
@@ -570,7 +570,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 	contactRequestMsg = s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
 	s.Require().NotNil(contactRequestMsg)
 
-	mutualStateUpdate = s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_STATE_UPDATE)
+	mutualStateUpdate = s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED)
 	s.Require().NotNil(mutualStateUpdate)
 
 	s.Require().Equal(common.ContactRequestStateAccepted, contactRequestMsg.ContactRequestState)
