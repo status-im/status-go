@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -80,7 +81,7 @@ func (s *MessengerContactRequestSuite) sendContactRequest(request *requests.Send
 	s.Require().NotNil(mutualStateUpdate.ID)
 	s.Require().Equal(mutualStateUpdate.From, messenger.myHexIdentity())
 	s.Require().Equal(mutualStateUpdate.ChatId, request.ID)
-	s.Require().Equal(mutualStateUpdate.Text, "You sent a contact request to @"+request.ID)
+	s.Require().Equal(mutualStateUpdate.Text, fmt.Sprintf(outgoingMutualStateEventSentDefaultText, request.ID))
 
 	contactRequest := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
 	s.Require().NotNil(contactRequest)
@@ -143,7 +144,7 @@ func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string,
 
 	s.Require().Equal(mutualStateUpdate.From, contactRequest.From)
 	s.Require().Equal(mutualStateUpdate.ChatId, contactRequest.From)
-	s.Require().Equal(mutualStateUpdate.Text, "@"+contactRequest.From+" sent you a contact request")
+	s.Require().Equal(mutualStateUpdate.Text, fmt.Sprintf(incomingMutualStateEventSentDefaultText, contactRequest.From))
 
 	// Check activity center notification is of the right type
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
@@ -203,7 +204,7 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 
 	s.Require().Equal(mutualStateUpdate.ChatId, contactRequestMsg.From)
 	s.Require().Equal(mutualStateUpdate.From, contactRequestMsg.ChatId)
-	s.Require().Equal(mutualStateUpdate.Text, "You accepted @"+mutualStateUpdate.ChatId+"'s contact request")
+	s.Require().Equal(mutualStateUpdate.Text, fmt.Sprintf(outgoingMutualStateEventAcceptedDefaultText, contactRequestMsg.From))
 
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].ID.String(), contactRequest.ID)
@@ -264,7 +265,7 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 
 	s.Require().Equal(mutualStateUpdate.From, contactRequestMsg.ChatId)
 	s.Require().Equal(mutualStateUpdate.ChatId, contactRequestMsg.ChatId)
-	s.Require().Equal(mutualStateUpdate.Text, "@"+mutualStateUpdate.From+" accepted your contact request")
+	s.Require().Equal(mutualStateUpdate.Text, fmt.Sprintf(incomingMutualStateEventAcceptedDefaultText, contactRequestMsg.ChatId))
 
 	// Make sure we consider them a mutual contact, sender side
 	mutualContacts = s.m.MutualContacts()
