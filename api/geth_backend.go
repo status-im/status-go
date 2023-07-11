@@ -721,13 +721,12 @@ func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, pass
 	if err != nil {
 		// Stop node for clean up
 		_ = b.StopNode()
-		return err
 	}
 	// get logged in
 	if !b.localPairing {
 		return b.LoggedIn(acc.KeyUID, err)
 	}
-	return nil
+	return err
 }
 
 func (b *GethStatusBackend) LoggedIn(keyUID string, err error) error {
