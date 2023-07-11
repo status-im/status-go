@@ -508,7 +508,6 @@ func (b *GethStatusBackend) LoginAccount(request *requests.Login) error {
 	if err != nil {
 		// Stop node for clean up
 		_ = b.StopNode()
-		return err
 	}
 	return b.LoggedIn(request.KeyUID, err)
 }
@@ -734,7 +733,7 @@ func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, pass
 func (b *GethStatusBackend) LoggedIn(keyUID string, err error) error {
 	if err != nil {
 		signal.SendLoggedIn(nil, nil, err)
-		return nil
+		return err
 	}
 	settings, err := b.GetSettings()
 	if err != nil {
