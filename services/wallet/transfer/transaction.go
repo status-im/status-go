@@ -113,6 +113,7 @@ type TransactionIdentity struct {
 }
 
 const multiTransactionColumns = "from_network_id, from_tx_hash, from_address, from_asset, from_amount, to_network_id, to_tx_hash, to_address, to_asset, to_amount, type, cross_tx_id, timestamp"
+const selectMultiTransactionColumns = "COALESCE(from_network_id, 0), from_tx_hash, from_address, from_asset, from_amount, COALESCE(to_network_id, 0), to_tx_hash, to_address, to_asset, to_amount, type, cross_tx_id, timestamp"
 
 func rowsToMultiTransactions(rows *sql.Rows) ([]*MultiTransaction, error) {
 	var multiTransactions []*MultiTransaction
@@ -381,7 +382,7 @@ func (tm *TransactionManager) GetMultiTransactions(ctx context.Context, ids []Mu
 	stmt, err := tm.db.Prepare(fmt.Sprintf(`SELECT rowid, %s
 											FROM multi_transactions
 											WHERE rowid in (%s)`,
-		multiTransactionColumns,
+		selectMultiTransactionColumns,
 		strings.Join(placeholders, ",")))
 	if err != nil {
 		return nil, err
