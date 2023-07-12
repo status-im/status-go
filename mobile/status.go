@@ -9,8 +9,6 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/status-im/status-go/logutils"
-
 	validator "gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -27,6 +25,7 @@ import (
 	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
@@ -1051,9 +1050,9 @@ func GetConnectionStringForBeingBootstrapped(configJSON string) string {
 		return makeJSONResponse(fmt.Errorf("no config given, PayloadSourceConfig is expected"))
 	}
 
-	statusBackend.SetLocalPairing(true)
+	statusBackend.LocalPairingStateManager.SetPairing(true)
 	defer func() {
-		statusBackend.SetLocalPairing(false)
+		statusBackend.LocalPairingStateManager.SetPairing(false)
 	}()
 
 	cs, err := pairing.StartUpReceiverServer(statusBackend, configJSON)
@@ -1080,9 +1079,9 @@ func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string 
 		return makeJSONResponse(fmt.Errorf("no config given, SendingServerConfig is expected"))
 	}
 
-	statusBackend.SetLocalPairing(true)
+	statusBackend.LocalPairingStateManager.SetPairing(true)
 	defer func() {
-		statusBackend.SetLocalPairing(false)
+		statusBackend.LocalPairingStateManager.SetPairing(false)
 	}()
 
 	cs, err := pairing.StartUpSenderServer(statusBackend, configJSON)
@@ -1101,22 +1100,23 @@ func GetConnectionStringForBootstrappingAnotherDevice(configJSON string) string 
 // Example: A mobile device (device with a camera) receiving account data from
 // a device with a screen (mobile or desktop devices)
 func InputConnectionStringForBootstrapping(cs, configJSON string) string {
+	var err error
 	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, ReceiverClientConfig is expected"))
 	}
 
-	statusBackend.SetLocalPairing(true)
-	defer func() {
-		statusBackend.SetLocalPairing(false)
-	}()
-
-	err := pairing.StartUpReceivingClient(statusBackend, cs, configJSON)
+	err = statusBackend.LocalPairingStateManager.StartPairing(cs)
+	defer func() { statusBackend.LocalPairingStateManager.StopPairing(cs, err) }()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
-	err = statusBackend.Logout()
-	return makeJSONResponse(err)
+	err = pairing.StartUpReceivingClient(statusBackend, cs, configJSON)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return makeJSONResponse(statusBackend.Logout())
 }
 
 // InputConnectionStringForBootstrappingAnotherDevice starts a pairing.SendingClient
@@ -1127,16 +1127,18 @@ func InputConnectionStringForBootstrapping(cs, configJSON string) string {
 //
 // Example: A mobile (device with camera) sending account data to a desktop device (device without camera)
 func InputConnectionStringForBootstrappingAnotherDevice(cs, configJSON string) string {
+	var err error
 	if configJSON == "" {
 		return makeJSONResponse(fmt.Errorf("no config given, SenderClientConfig is expected"))
 	}
 
-	statusBackend.SetLocalPairing(true)
-	defer func() {
-		statusBackend.SetLocalPairing(false)
-	}()
+	err = statusBackend.LocalPairingStateManager.StartPairing(cs)
+	defer func() { statusBackend.LocalPairingStateManager.StopPairing(cs, err) }()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
 
-	err := pairing.StartUpSendingClient(statusBackend, cs, configJSON)
+	err = pairing.StartUpSendingClient(statusBackend, cs, configJSON)
 	return makeJSONResponse(err)
 }
 

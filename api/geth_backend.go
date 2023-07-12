@@ -12,10 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/walletdatabase"
-
 	"github.com/imdario/mergo"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -27,9 +23,11 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -43,6 +41,7 @@ import (
 	"github.com/status-im/status-go/protocol/identity/colorhash"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/server/pairing/statecontrol"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcfilters"
@@ -50,6 +49,7 @@ import (
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
 var (
@@ -81,18 +81,18 @@ type GethStatusBackend struct {
 	walletDB    *sql.DB
 	config      *params.NodeConfig
 
-	statusNode           *node.StatusNode
-	personalAPI          *personal.PublicAPI
-	multiaccountsDB      *multiaccounts.Database
-	account              *multiaccounts.Account
-	accountManager       *account.GethManager
-	transactor           *transactions.Transactor
-	connectionState      connection.State
-	appState             appState
-	selectedAccountKeyID string
-	log                  log.Logger
-	allowAllRPC          bool // used only for tests, disables api method restrictions
-	localPairing         bool // used to disable login/logout signalling
+	statusNode               *node.StatusNode
+	personalAPI              *personal.PublicAPI
+	multiaccountsDB          *multiaccounts.Database
+	account                  *multiaccounts.Account
+	accountManager           *account.GethManager
+	transactor               *transactions.Transactor
+	connectionState          connection.State
+	appState                 appState
+	selectedAccountKeyID     string
+	log                      log.Logger
+	allowAllRPC              bool // used only for tests, disables api method restrictions
+	LocalPairingStateManager *statecontrol.ProcessStateManager
 }
 
 // NewGethStatusBackend create a new GethStatusBackend instance
@@ -116,7 +116,8 @@ func (b *GethStatusBackend) initialize() {
 	b.personalAPI = personalAPI
 	b.statusNode.SetMultiaccountsDB(b.multiaccountsDB)
 	b.log = log.New("package", "status-go/api.GethStatusBackend")
-	b.localPairing = false
+	b.LocalPairingStateManager = new(statecontrol.ProcessStateManager)
+	b.LocalPairingStateManager.SetPairing(false)
 }
 
 // StatusNode returns reference to node manager
@@ -493,7 +494,7 @@ func (b *GethStatusBackend) StartNodeWithKey(acc multiaccounts.Account, password
 		return err
 	}
 	// get logged in
-	if !b.localPairing {
+	if !b.LocalPairingStateManager.IsPairing() {
 		return b.LoggedIn(acc.KeyUID, err)
 	}
 	return nil
@@ -761,7 +762,7 @@ func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, pass
 		_ = b.StopNode()
 	}
 	// get logged in
-	if !b.localPairing {
+	if !b.LocalPairingStateManager.IsPairing() {
 		return b.LoggedIn(acc.KeyUID, err)
 	}
 	return err
@@ -1659,7 +1660,7 @@ func (b *GethStatusBackend) stopNode() error {
 	if b.statusNode == nil || !b.IsNodeRunning() {
 		return nil
 	}
-	if !b.localPairing {
+	if !b.LocalPairingStateManager.IsPairing() {
 		defer signal.SendNodeStopped()
 	}
 
@@ -2265,10 +2266,6 @@ func (b *GethStatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) e
 	}
 
 	return nil
-}
-
-func (b *GethStatusBackend) SetLocalPairing(value bool) {
-	b.localPairing = value
 }
 
 func (b *GethStatusBackend) getAppDBPath(keyUID string) string {
