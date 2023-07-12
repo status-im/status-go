@@ -2,18 +2,22 @@ package wallet
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
+	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/wallet/activity"
 	"github.com/status-im/status-go/services/wallet/bridge"
+	wcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -21,8 +25,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/transactions"
-
-	wcommon "github.com/status-im/status-go/services/wallet/common"
 )
 
 func NewAPI(s *Service) *API {
@@ -527,4 +529,15 @@ func (api *API) GetOldestActivityTimestampAsync(ctx context.Context, addresses [
 
 	api.s.activity.GetOldestTimestampAsync(ctx, addresses)
 	return nil
+}
+
+func (api *API) FetchChainIDForURL(ctx context.Context, rpcURL string) (*big.Int, error) {
+	log.Debug("wallet.api.VerifyURL", rpcURL)
+
+	rpcClient, err := gethrpc.Dial(rpcURL)
+	if err != nil {
+		return nil, fmt.Errorf("dial upstream server: %s", err)
+	}
+	client := ethclient.NewClient(rpcClient)
+	return client.ChainID(ctx)
 }
