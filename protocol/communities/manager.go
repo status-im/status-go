@@ -2890,7 +2890,17 @@ func (m *Manager) GetByIDString(idString string) (*Community, error) {
 	return m.GetByID(id)
 }
 
-func (m *Manager) RequestToJoin(requester *ecdsa.PublicKey, request *requests.RequestToJoinCommunity) (*Community, *RequestToJoin, error) {
+func (m *Manager) SaveRequestToJoinAndCommunity(requestToJoin *RequestToJoin, community *Community) (*Community, *RequestToJoin, error) {
+	if err := m.persistence.SaveRequestToJoin(requestToJoin); err != nil {
+		return nil, nil, err
+	}
+	community.config.RequestedToJoinAt = uint64(time.Now().Unix())
+	community.AddRequestToJoin(requestToJoin)
+
+	return community, requestToJoin, nil
+}
+
+func (m *Manager) CreateRequestToJoin(requester *ecdsa.PublicKey, request *requests.RequestToJoinCommunity) (*Community, *RequestToJoin, error) {
 	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityID)
 	if err != nil {
 		return nil, nil, err
@@ -2913,12 +2923,6 @@ func (m *Manager) RequestToJoin(requester *ecdsa.PublicKey, request *requests.Re
 	}
 
 	requestToJoin.CalculateID()
-
-	if err := m.persistence.SaveRequestToJoin(requestToJoin); err != nil {
-		return nil, nil, err
-	}
-	community.config.RequestedToJoinAt = uint64(time.Now().Unix())
-	community.AddRequestToJoin(requestToJoin)
 
 	return community, requestToJoin, nil
 }

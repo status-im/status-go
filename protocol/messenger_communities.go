@@ -743,11 +743,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		return nil, err
 	}
 
-	community, requestToJoin, err := m.communitiesManager.RequestToJoin(&m.identity.PublicKey, request)
-	if err != nil {
-		return nil, err
-	}
-	err = m.syncCommunity(context.Background(), community, m.dispatchMessage)
+	community, requestToJoin, err := m.communitiesManager.CreateRequestToJoin(&m.identity.PublicKey, request)
 	if err != nil {
 		return nil, err
 	}
@@ -777,6 +773,9 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		if err != nil {
 			return nil, err
 		}
+		if !response.Satisfied {
+			return nil, errors.New("permission to join not satisfied")
+		}
 
 		for _, accountAndChainIDs := range response.ValidCombinations {
 			revealedAccounts[accountAndChainIDs.Address].ChainIds = accountAndChainIDs.ChainIDs
@@ -785,6 +784,15 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		for _, revealedAccount := range revealedAccounts {
 			requestToJoinProto.RevealedAccounts = append(requestToJoinProto.RevealedAccounts, revealedAccount)
 		}
+	}
+
+	community, _, err = m.communitiesManager.SaveRequestToJoinAndCommunity(requestToJoin, community)
+	if err != nil {
+		return nil, err
+	}
+	err = m.syncCommunity(context.Background(), community, m.dispatchMessage)
+	if err != nil {
+		return nil, err
 	}
 
 	payload, err := proto.Marshal(requestToJoinProto)
