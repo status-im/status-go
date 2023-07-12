@@ -2,7 +2,6 @@ package node
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"net"
 	"sync"
@@ -48,6 +47,8 @@ import (
 
 	"github.com/waku-org/go-waku/waku/v2/utils"
 )
+
+const discoveryConnectTimeout = 20 * time.Second
 
 type Peer struct {
 	ID        peer.ID        `json:"peerID"`
@@ -244,9 +245,9 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	// Setup peer connection strategy
 	cacheSize := 600
 	rngSrc := rand.NewSource(rand.Int63())
-	minBackoff, maxBackoff := time.Second*30, time.Hour
+	minBackoff, maxBackoff := time.Minute, time.Hour
 	bkf := backoff.NewExponentialBackoff(minBackoff, maxBackoff, backoff.FullJitter, time.Second, 5.0, 0, rand.New(rngSrc))
-	w.peerConnector, err = v2.NewPeerConnectionStrategy(cacheSize, w.opts.discoveryMinPeers, network.DialPeerTimeout, bkf, w.log)
+	w.peerConnector, err = v2.NewPeerConnectionStrategy(cacheSize, w.opts.discoveryMinPeers, discoveryConnectTimeout, bkf, w.log)
 	if err != nil {
 		w.log.Error("creating peer connection strategy", zap.Error(err))
 	}
@@ -272,7 +273,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 		rendezvousPoints = append(rendezvousPoints, peerID)
 	}
 
-	w.rendezvous = rendezvous.NewRendezvous(w.opts.enableRendezvousServer, w.opts.rendezvousDB, rendezvousPoints, w.log)
+	w.rendezvous = rendezvous.NewRendezvous(w.opts.enableRendezvousServer, w.opts.rendezvousDB, rendezvousPoints, w.peerConnector, w.log)
 	w.relay = relay.NewWakuRelay(w.bcaster, w.opts.minRelayPeersToPublish, w.timesource, w.log, w.opts.wOpts...)
 	w.legacyFilter = legacy_filter.NewWakuFilter(w.bcaster, w.opts.isLegacyFilterFullnode, w.timesource, w.log, w.opts.legacyFilterOpts...)
 	w.filterFullnode = filter.NewWakuFilterFullnode(w.timesource, w.log, w.opts.filterOpts...)
@@ -563,12 +564,7 @@ func (w *WakuNode) watchENRChanges(ctx context.Context) {
 
 // ListenAddresses returns all the multiaddresses used by the host
 func (w *WakuNode) ListenAddresses() []ma.Multiaddr {
-	hostInfo, _ := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s", w.host.ID().Pretty()))
-	var result []ma.Multiaddr
-	for _, addr := range w.host.Addrs() {
-		result = append(result, addr.Encapsulate(hostInfo))
-	}
-	return result
+	return utils.EncapsulatePeerID(w.host.ID(), w.host.Addrs()...)
 }
 
 // ENR returns the ENR address of the node
@@ -817,7 +813,7 @@ func (w *WakuNode) Peers() ([]*Peer, error) {
 			return nil, err
 		}
 
-		addrs := w.host.Peerstore().Addrs(peerId)
+		addrs := utils.EncapsulatePeerID(peerId, w.host.Peerstore().Addrs(peerId)...)
 		peers = append(peers, &Peer{
 			ID:        peerId,
 			Protocols: protocols,
