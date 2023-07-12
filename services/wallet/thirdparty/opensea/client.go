@@ -2,6 +2,7 @@ package opensea
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -32,17 +33,21 @@ const RequestTimeout = 5 * time.Second
 const GetRequestRetryMaxCount = 15
 const GetRequestWaitTime = 300 * time.Millisecond
 
-const ChainIDRequiringAPIKey = 1
+const ChainIDRequiringAPIKey = walletCommon.EthereumMainnet
+
+var (
+	ErrChainIDNotSupported = errors.New("chainID not supported by opensea API")
+)
 
 func getbaseURL(chainID uint64) (string, error) {
 	switch chainID {
-	case walletCommon.EthereumMainnet, walletCommon.OptimismMainnet, walletCommon.ArbitrumMainnet:
+	case walletCommon.EthereumMainnet:
 		return "https://api.opensea.io/api/v1", nil
-	case walletCommon.EthereumGoerli, walletCommon.OptimismGoerli, walletCommon.ArbitrumGoerli:
+	case walletCommon.EthereumGoerli:
 		return "https://testnets-api.opensea.io/api/v1", nil
 	}
 
-	return "", fmt.Errorf("chainID not supported: %d", chainID)
+	return "", ErrChainIDNotSupported
 }
 
 var OpenseaClientInstances = make(map[uint64]*Client)
