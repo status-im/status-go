@@ -1369,6 +1369,10 @@ func (m *Manager) HandleCommunityAdminEvent(signer *ecdsa.PublicKey, adminEvent 
 		return nil, err
 	}
 
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
 	if !community.IsMemberAdmin(signer) {
 		return nil, errors.New("user is not an admin")
 	}
