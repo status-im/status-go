@@ -267,8 +267,12 @@ func (m *Messenger) SendContactRequest(ctx context.Context, request *requests.Se
 }
 
 func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, contactRequestID string) (*MessengerResponse, error) {
+
+	m.logger.Debug("updateAcceptedContactRequest", zap.String("contactRequestID", contactRequestID))
+
 	contactRequest, err := m.persistence.MessageByID(contactRequestID)
 	if err != nil {
+		m.logger.Error("contact request not found", zap.String("contactRequestID", contactRequestID), zap.Error(err))
 		return nil, err
 	}
 
@@ -279,7 +283,11 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 		return nil, err
 	}
 
-	contact, _ := m.allContacts.Load(contactRequest.From)
+	contact, ok := m.allContacts.Load(contactRequest.From)
+	if !ok {
+		m.logger.Error("failed to update contact request: contact not found", zap.String("contact id", contactRequest.From))
+		return nil, errors.New("failed to update contact request: contact not found")
+	}
 
 	_, clock, err := m.getOneToOneAndNextClock(contact)
 	if err != nil {

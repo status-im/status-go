@@ -2439,24 +2439,3 @@ type testTimeSource struct{}
 func (t *testTimeSource) GetCurrentTime() uint64 {
 	return uint64(time.Now().Unix())
 }
-
-// WaitOnMessengerResponse Wait until the condition is true or the timeout is reached.
-func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bool, errorMessage string) (*MessengerResponse, error) {
-	response := &MessengerResponse{}
-	err := tt.RetryWithBackOff(func() error {
-		var err error
-		r, err := m.RetrieveAll()
-		if err := response.Merge(r); err != nil {
-			panic(err)
-		}
-
-		if err == nil && !condition(response) {
-			err = errors.New(errorMessage)
-		}
-		return err
-	})
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}

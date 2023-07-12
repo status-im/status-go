@@ -456,6 +456,7 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 }
 
 func (m *Messenger) syncContactRequestForInstallationContact(contact *Contact, state *ReceivedMessageState, chat *Chat, outgoing bool) error {
+
 	if chat == nil {
 		return fmt.Errorf("no chat restored during the contact synchronisation, contact.ID = %s", contact.ID)
 	}
@@ -466,6 +467,7 @@ func (m *Messenger) syncContactRequestForInstallationContact(contact *Contact, s
 	}
 
 	if contactRequestID != "" {
+		m.logger.Warn("syncContactRequestForInstallationContact: skipping as contact request found", zap.String("contactRequestID", contactRequestID))
 		return nil
 	}
 
@@ -501,7 +503,9 @@ func (m *Messenger) syncContactRequestForInstallationContact(contact *Contact, s
 
 func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, message protobuf.SyncInstallationContactV2) error {
 	// Ignore own contact installation
+
 	if message.Id == m.myHexIdentity() {
+		m.logger.Warn("HandleSyncInstallationContact: skipping own contact")
 		return nil
 	}
 

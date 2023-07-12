@@ -62,12 +62,7 @@ func (s *MessengerContactRequestSuite) newMessenger(shh types.Waku) *Messenger {
 }
 
 func (s *MessengerContactRequestSuite) findFirstByContentType(messages []*common.Message, contentType protobuf.ChatMessage_ContentType) *common.Message {
-	for _, message := range messages {
-		if message.ContentType == contentType {
-			return message
-		}
-	}
-	return nil
+	return FindFirstByContentType(messages, contentType)
 }
 
 func (s *MessengerContactRequestSuite) sendContactRequest(request *requests.SendContactRequest, messenger *Messenger) {
