@@ -468,7 +468,7 @@ func (s *MessengerBackupSuite) TestBackupContactsGreaterThanBatch() {
 	)
 	s.Require().NoError(err)
 
-	s.Require().Less(BackupContactsPerBatch*2, len(bob2.Contacts()))
+	s.Require().Equal(BackupContactsPerBatch*2, len(bob2.Contacts()))
 	s.Require().Len(bob2.AddedContacts(), BackupContactsPerBatch*2)
 }
 
