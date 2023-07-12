@@ -120,15 +120,16 @@ func rowsToMultiTransactions(rows *sql.Rows) ([]*MultiTransaction, error) {
 	for rows.Next() {
 		multiTransaction := &MultiTransaction{}
 		var fromAmountDB, toAmountDB sql.NullString
+		var fromTxHash, toTxHash sql.RawBytes
 		err := rows.Scan(
 			&multiTransaction.ID,
 			&multiTransaction.FromNetworkID,
-			&multiTransaction.FromTxHash,
+			&fromTxHash,
 			&multiTransaction.FromAddress,
 			&multiTransaction.FromAsset,
 			&fromAmountDB,
 			&multiTransaction.ToNetworkID,
-			&multiTransaction.ToTxHash,
+			&toTxHash,
 			&multiTransaction.ToAddress,
 			&multiTransaction.ToAsset,
 			&toAmountDB,
@@ -136,6 +137,12 @@ func rowsToMultiTransactions(rows *sql.Rows) ([]*MultiTransaction, error) {
 			&multiTransaction.CrossTxID,
 			&multiTransaction.Timestamp,
 		)
+		if len(fromTxHash) > 0 {
+			multiTransaction.FromTxHash = common.BytesToHash(fromTxHash)
+		}
+		if len(toTxHash) > 0 {
+			multiTransaction.ToTxHash = common.BytesToHash(toTxHash)
+		}
 		if err != nil {
 			return nil, err
 		}
