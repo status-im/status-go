@@ -1126,7 +1126,10 @@ func (s *MessengerContactRequestSuite) TestBobSendsContactRequestAfterDecliningO
 }
 
 func (s *MessengerContactRequestSuite) TestBuildContact() {
-	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+	contactKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&contactKey.PublicKey))
+
 	contact, err := s.m.BuildContact(&requests.BuildContact{PublicKey: contactID})
 	s.Require().NoError(err)
 
