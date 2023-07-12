@@ -42,7 +42,7 @@ type Manager struct {
 	walletFeed                        *event.Feed
 }
 
-func NewManager(rpcClient *rpc.Client, mainContractOwnershipProvider thirdparty.NFTContractOwnershipProvider, fallbackContractOwnershipProvider thirdparty.NFTContractOwnershipProvider, metadataProvider thirdparty.NFTMetadataProvider, openseaAPIKey string, walletFeed *event.Feed) *Manager {
+func NewManager(rpcClient *rpc.Client, mainContractOwnershipProvider thirdparty.NFTContractOwnershipProvider, fallbackContractOwnershipProvider thirdparty.NFTContractOwnershipProvider, openseaAPIKey string, walletFeed *event.Feed) *Manager {
 	hystrix.ConfigureCommand(hystrixContractOwnershipClientName, hystrix.CommandConfig{
 		Timeout:               10000,
 		MaxConcurrentRequests: 100,
@@ -54,7 +54,6 @@ func NewManager(rpcClient *rpc.Client, mainContractOwnershipProvider thirdparty.
 		rpcClient:                         rpcClient,
 		mainContractOwnershipProvider:     mainContractOwnershipProvider,
 		fallbackContractOwnershipProvider: fallbackContractOwnershipProvider,
-		metadataProvider:                  metadataProvider,
 		openseaAPIKey:                     openseaAPIKey,
 		nftCache:                          make(map[uint64]map[string]opensea.Asset),
 		walletFeed:                        walletFeed,
@@ -88,6 +87,11 @@ func makeContractOwnershipCall(main func() (any, error), fallback func() (any, e
 	case err := <-errChan:
 		return nil, err
 	}
+}
+
+// Used to break circular dependency, call once as soon as possible after initialization
+func (o *Manager) SetMetadataProvider(metadataProvider thirdparty.NFTMetadataProvider) {
+	o.metadataProvider = metadataProvider
 }
 
 func (o *Manager) FetchAllCollectionsByOwner(chainID uint64, owner common.Address) ([]opensea.OwnedCollection, error) {

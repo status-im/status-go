@@ -51,7 +51,6 @@ func NewService(
 	ens *ens.Service,
 	stickers *stickers.Service,
 	rpcFilterSrvc *rpcfilters.Service,
-	nftMetadataProvider thirdparty.NFTMetadataProvider,
 ) *Service {
 	cryptoOnRampManager := NewCryptoOnRampManager(&CryptoOnRampOptions{
 		dataSourceType: DataSourceStatic,
@@ -107,7 +106,7 @@ func NewService(
 
 	alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKeys)
 	infuraClient := infura.NewClient(config.WalletConfig.InfuraAPIKey, config.WalletConfig.InfuraAPIKeySecret)
-	collectiblesManager := collectibles.NewManager(rpcClient, alchemyClient, infuraClient, nftMetadataProvider, config.WalletConfig.OpenseaAPIKey, walletFeed)
+	collectiblesManager := collectibles.NewManager(rpcClient, alchemyClient, infuraClient, config.WalletConfig.OpenseaAPIKey, walletFeed)
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
@@ -179,6 +178,11 @@ func (s *Service) Start() error {
 // GetFeed returns signals feed.
 func (s *Service) GetFeed() *event.Feed {
 	return s.transferController.TransferFeed
+}
+
+// Set external Collectibles metadata provider
+func (s *Service) SetNFTMetadataProvider(provider thirdparty.NFTMetadataProvider) {
+	s.collectiblesManager.SetMetadataProvider(provider)
 }
 
 // Stop reactor and close db.

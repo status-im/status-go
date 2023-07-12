@@ -45,6 +45,7 @@ import (
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/web3provider"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/waku"
@@ -88,6 +89,19 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = append(services, b.gifService(accDB))
 	services = append(services, b.ChatService(accDB))
 
+	// Wallet Service is used by wakuExtSrvc/wakuV2ExtSrvc
+	// Keep this initialization before the other two
+	if config.WalletConfig.Enabled {
+		walletService := b.walletService(accDB, accountsFeed)
+		services = append(services, walletService)
+	}
+
+	// CollectiblesManager needs the WakuExt service to get metadata for
+	// Community collectibles.
+	// Messenger needs the CollectiblesManager to get the list of collectibles owned
+	// by a certain account and check community entry permissions.
+	// We handle circular dependency between the two by delaying ininitalization of the CollectibleMetadataProvider
+	// in the CollectiblesManager.
 	if config.WakuConfig.Enabled {
 		wakuService, err := b.wakuService(&config.WakuConfig, &config.ClusterConfig)
 		if err != nil {
@@ -104,6 +118,8 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 		b.wakuExtSrvc = wakuext
 
 		services = append(services, wakuext)
+
+		b.SetWalletNFTMetadataProvider(wakuext)
 	}
 
 	if config.WakuV2Config.Enabled {
@@ -129,13 +145,8 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 		b.wakuV2ExtSrvc = wakuext
 
 		services = append(services, wakuext)
-	}
 
-	// Wallet Service makes use of wakuExtSrvc/wakuV2ExtSrvc
-	// Keep this initialization below the other two
-	if config.WalletConfig.Enabled {
-		walletService := b.walletService(accDB, accountsFeed)
-		services = append(services, walletService)
+		b.SetWalletNFTMetadataProvider(wakuext)
 	}
 
 	// We ignore for now local notifications flag as users who are upgrading have no mean to enable it
@@ -477,20 +488,19 @@ func (b *StatusNode) WalletService() *wallet.Service {
 	return b.walletSrvc
 }
 
+func (b *StatusNode) SetWalletNFTMetadataProvider(provider thirdparty.NFTMetadataProvider) {
+	if b.walletSrvc != nil {
+		b.walletSrvc.SetNFTMetadataProvider(provider)
+	}
+}
+
 func (b *StatusNode) walletService(accountsDB *accounts.Database, accountsFeed *event.Feed) *wallet.Service {
 	if b.walletSrvc == nil {
-		var extService *ext.Service
-		if b.WakuV2ExtService() != nil {
-			extService = b.WakuV2ExtService().Service
-		} else if b.WakuExtService() != nil {
-			extService = b.WakuExtService().Service
-		}
 		b.walletSrvc = wallet.NewService(
 			b.appDB, accountsDB, b.rpcClient, accountsFeed, b.gethAccountManager, b.transactor, b.config,
 			b.ensService(b.timeSourceNow()),
 			b.stickersService(accountsDB),
 			b.rpcFiltersSrvc,
-			extService,
 		)
 	}
 	return b.walletSrvc
