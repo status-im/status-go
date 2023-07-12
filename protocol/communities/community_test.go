@@ -61,6 +61,44 @@ func (s *CommunitySuite) SetupTest() {
 
 }
 
+func (s *CommunitySuite) TestHasPermission() {
+	// returns false if empty public key is passed
+	community := &Community{}
+	ownerKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	nonMemberKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	memberKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	s.Require().False(community.hasPermission(nil, adminRolePermissions()))
+
+	// returns false if key is passed, but config is nil
+	s.Require().False(community.hasPermission(&nonMemberKey.PublicKey, adminRolePermissions()))
+
+	// returns true if the user is the owner
+
+	communityDescription := &protobuf.CommunityDescription{}
+	communityDescription.Members = make(map[string]*protobuf.CommunityMember)
+	communityDescription.Members[common.PubkeyToHex(&memberKey.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ADMIN}}
+
+	community.config = &Config{ID: &ownerKey.PublicKey, CommunityDescription: communityDescription}
+
+	s.Require().True(community.hasPermission(&ownerKey.PublicKey, adminRolePermissions()))
+
+	// return false if user is not a member
+	s.Require().False(community.hasPermission(&nonMemberKey.PublicKey, adminRolePermissions()))
+
+	// return true if user is a member and has permissions
+	s.Require().True(community.hasPermission(&memberKey.PublicKey, adminRolePermissions()))
+
+	// return false if user is a member and does not have permissions
+	s.Require().False(community.hasPermission(&memberKey.PublicKey, ownerRolePermission()))
+
+}
+
 func (s *CommunitySuite) TestInviteUserToOrg() {
 	newMember, err := crypto.GenerateKey()
 	s.Require().NoError(err)
