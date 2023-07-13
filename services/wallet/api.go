@@ -338,6 +338,11 @@ func (api *API) GetCollectibleOwnersByContractAddress(chainID uint64, contractAd
 	return api.s.collectiblesManager.FetchNFTOwnersByContractAddress(chainID, contractAddress)
 }
 
+func (api *API) FetchBalancesByOwnerAndContractAddress(chainID uint64, ownerAddress common.Address, contractAddresses []common.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
+	log.Debug("call to FetchBalancesByOwnerAndContractAddress")
+	return api.s.collectiblesManager.FetchBalancesByOwnerAndContractAddress(chainID, ownerAddress, contractAddresses)
+}
+
 func (api *API) AddEthereumChain(ctx context.Context, network params.Network) error {
 	log.Debug("call to AddEthereumChain")
 	return api.s.rpcClient.NetworkManager.Upsert(&network)
