@@ -67,6 +67,8 @@ type TokenBalance struct {
 	Balance *bigint.BigInt `json:"balance"`
 }
 
+type TokenBalancesPerContractAddress = map[common.Address][]TokenBalance
+
 type NFTOwner struct {
 	OwnerAddress  common.Address `json:"ownerAddress"`
 	TokenBalances []TokenBalance `json:"tokenBalances"`

@@ -422,8 +422,17 @@ func NewMessenger(
 
 	ensVerifier := ens.New(node, logger, transp, database, c.verifyENSURL, c.verifyENSContractAddress)
 
+	var walletAPI *wallet.API
+	if c.walletService != nil {
+		walletAPI = wallet.NewAPI(c.walletService)
+	}
+
 	managerOptions := []communities.ManagerOption{
 		communities.WithAccountManager(accountsManager),
+	}
+
+	if walletAPI != nil {
+		managerOptions = append(managerOptions, communities.WithCollectiblesManager(walletAPI))
 	}
 
 	if c.tokenManager != nil {
@@ -526,7 +535,7 @@ func NewMessenger(
 	messenger.mentionsManager = NewMentionManager(messenger)
 
 	if c.walletService != nil {
-		messenger.walletAPI = wallet.NewAPI(c.walletService)
+		messenger.walletAPI = walletAPI
 	}
 
 	if c.outputMessagesCSV {
