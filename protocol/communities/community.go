@@ -479,44 +479,6 @@ type CommunitySettings struct {
 	Clock                        uint64 `json:"clock"`
 }
 
-type CommunityChatChanges struct {
-	ChatModified                  *protobuf.CommunityChat
-	MembersAdded                  map[string]*protobuf.CommunityMember
-	MembersRemoved                map[string]*protobuf.CommunityMember
-	CategoryModified              string
-	PositionModified              int
-	FirstMessageTimestampModified uint32
-}
-
-type CommunityChanges struct {
-	Community      *Community                           `json:"community"`
-	MembersAdded   map[string]*protobuf.CommunityMember `json:"membersAdded"`
-	MembersRemoved map[string]*protobuf.CommunityMember `json:"membersRemoved"`
-
-	TokenPermissionsAdded    map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissionsAdded"`
-	TokenPermissionsModified map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissionsModified"`
-	TokenPermissionsRemoved  []string                                      `json:"tokenPermissionsRemoved"`
-
-	ChatsRemoved  map[string]*protobuf.CommunityChat `json:"chatsRemoved"`
-	ChatsAdded    map[string]*protobuf.CommunityChat `json:"chatsAdded"`
-	ChatsModified map[string]*CommunityChatChanges   `json:"chatsModified"`
-
-	CategoriesRemoved  []string                               `json:"categoriesRemoved"`
-	CategoriesAdded    map[string]*protobuf.CommunityCategory `json:"categoriesAdded"`
-	CategoriesModified map[string]*protobuf.CommunityCategory `json:"categoriesModified"`
-
-	MemberWalletsRemoved []string                               `json:"memberWalletsRemoved"`
-	MemberWalletsAdded   map[string][]*protobuf.RevealedAccount `json:"memberWalletsAdded"`
-
-	// ShouldMemberJoin indicates whether the user should join this community
-	// automatically
-	ShouldMemberJoin bool `json:"memberAdded"`
-
-	// ShouldMemberJoin indicates whether the user should leave this community
-	// automatically
-	ShouldMemberLeave bool `json:"memberRemoved"`
-}
-
 // `CommunityAdminEventChanges contain additional changes that don't live on
 // a `Community` but still have to be propagated to other admin and control nodes
 type CommunityAdminEventChanges struct {
@@ -527,24 +489,8 @@ type CommunityAdminEventChanges struct {
 	AcceptedRequestsToJoin map[string]*protobuf.CommunityRequestToJoin `json:"acceptedRequestsToJoin"`
 }
 
-func (c *CommunityChanges) HasNewMember(identity string) bool {
-	if len(c.MembersAdded) == 0 {
-		return false
-	}
-	_, ok := c.MembersAdded[identity]
-	return ok
-}
-
-func (c *CommunityChanges) HasMemberLeft(identity string) bool {
-	if len(c.MembersRemoved) == 0 {
-		return false
-	}
-	_, ok := c.MembersRemoved[identity]
-	return ok
-}
-
 func (o *Community) emptyCommunityChanges() *CommunityChanges {
-	changes := emptyCommunityChanges()
+	changes := EmptyCommunityChanges()
 	changes.Community = o
 	return changes
 }
@@ -1013,171 +959,8 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 
 	// We only calculate changes if we joined/spectated the community or we requested access, otherwise not interested
 	if o.config.Joined || o.config.Spectated || o.config.RequestedToJoinAt > 0 {
-		// Check for new members at the org level
-		for pk, member := range description.Members {
-			if _, ok := o.config.CommunityDescription.Members[pk]; !ok {
-				if response.MembersAdded == nil {
-					response.MembersAdded = make(map[string]*protobuf.CommunityMember)
-				}
-				response.MembersAdded[pk] = member
-			}
-		}
-
-		// Check for removed members at the org level
-		for pk, member := range o.config.CommunityDescription.Members {
-			if _, ok := description.Members[pk]; !ok {
-				if response.MembersRemoved == nil {
-					response.MembersRemoved = make(map[string]*protobuf.CommunityMember)
-				}
-				response.MembersRemoved[pk] = member
-			}
-		}
-
-		// check for removed chats
-		for chatID, chat := range o.config.CommunityDescription.Chats {
-			if description.Chats == nil {
-				description.Chats = make(map[string]*protobuf.CommunityChat)
-			}
-			if _, ok := description.Chats[chatID]; !ok {
-				if response.ChatsRemoved == nil {
-					response.ChatsRemoved = make(map[string]*protobuf.CommunityChat)
-				}
-
-				response.ChatsRemoved[chatID] = chat
-			}
-		}
-
-		for chatID, chat := range description.Chats {
-			if o.config.CommunityDescription.Chats == nil {
-				o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
-			}
-
-			if _, ok := o.config.CommunityDescription.Chats[chatID]; !ok {
-				if response.ChatsAdded == nil {
-					response.ChatsAdded = make(map[string]*protobuf.CommunityChat)
-				}
-
-				response.ChatsAdded[chatID] = chat
-			} else {
-				// Check for members added
-				for pk, member := range description.Chats[chatID].Members {
-					if _, ok := o.config.CommunityDescription.Chats[chatID].Members[pk]; !ok {
-						if response.ChatsModified[chatID] == nil {
-							response.ChatsModified[chatID] = &CommunityChatChanges{
-								MembersAdded:   make(map[string]*protobuf.CommunityMember),
-								MembersRemoved: make(map[string]*protobuf.CommunityMember),
-							}
-						}
-
-						response.ChatsModified[chatID].MembersAdded[pk] = member
-					}
-				}
-
-				// check for members removed
-				for pk, member := range o.config.CommunityDescription.Chats[chatID].Members {
-					if _, ok := description.Chats[chatID].Members[pk]; !ok {
-						if response.ChatsModified[chatID] == nil {
-							response.ChatsModified[chatID] = &CommunityChatChanges{
-								MembersAdded:   make(map[string]*protobuf.CommunityMember),
-								MembersRemoved: make(map[string]*protobuf.CommunityMember),
-							}
-						}
-
-						response.ChatsModified[chatID].MembersRemoved[pk] = member
-					}
-				}
-
-				// check if first message timestamp was modified
-				if o.config.CommunityDescription.Chats[chatID].Identity.FirstMessageTimestamp !=
-					description.Chats[chatID].Identity.FirstMessageTimestamp {
-					if response.ChatsModified[chatID] == nil {
-						response.ChatsModified[chatID] = &CommunityChatChanges{
-							MembersAdded:   make(map[string]*protobuf.CommunityMember),
-							MembersRemoved: make(map[string]*protobuf.CommunityMember),
-						}
-					}
-					response.ChatsModified[chatID].FirstMessageTimestampModified = description.Chats[chatID].Identity.FirstMessageTimestamp
-				}
-			}
-		}
-
-		// Check for categories that were removed
-		for categoryID := range o.config.CommunityDescription.Categories {
-			if description.Categories == nil {
-				description.Categories = make(map[string]*protobuf.CommunityCategory)
-			}
-
-			if description.Chats == nil {
-				description.Chats = make(map[string]*protobuf.CommunityChat)
-			}
-
-			if _, ok := description.Categories[categoryID]; !ok {
-				response.CategoriesRemoved = append(response.CategoriesRemoved, categoryID)
-			}
-
-			if o.config.CommunityDescription.Chats == nil {
-				o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
-			}
-		}
-
-		// Check for categories that were added
-		for categoryID, category := range description.Categories {
-			if o.config.CommunityDescription.Categories == nil {
-				o.config.CommunityDescription.Categories = make(map[string]*protobuf.CommunityCategory)
-			}
-			if _, ok := o.config.CommunityDescription.Categories[categoryID]; !ok {
-				if response.CategoriesAdded == nil {
-					response.CategoriesAdded = make(map[string]*protobuf.CommunityCategory)
-				}
-
-				response.CategoriesAdded[categoryID] = category
-			} else {
-				if o.config.CommunityDescription.Categories[categoryID].Name != category.Name || o.config.CommunityDescription.Categories[categoryID].Position != category.Position {
-					response.CategoriesModified[categoryID] = category
-				}
-			}
-		}
-
-		// Check for chat categories that were modified
-		for chatID, chat := range description.Chats {
-			if o.config.CommunityDescription.Chats == nil {
-				o.config.CommunityDescription.Chats = make(map[string]*protobuf.CommunityChat)
-			}
-
-			if _, ok := o.config.CommunityDescription.Chats[chatID]; !ok {
-				continue // It's a new chat
-			}
-
-			if o.config.CommunityDescription.Chats[chatID].CategoryId != chat.CategoryId {
-				if response.ChatsModified[chatID] == nil {
-					response.ChatsModified[chatID] = &CommunityChatChanges{
-						MembersAdded:   make(map[string]*protobuf.CommunityMember),
-						MembersRemoved: make(map[string]*protobuf.CommunityMember),
-					}
-				}
-
-				response.ChatsModified[chatID].CategoryModified = chat.CategoryId
-			}
-		}
-
-		// Check for removed token permissions
-		for id := range o.config.CommunityDescription.TokenPermissions {
-			if _, ok := description.TokenPermissions[id]; !ok {
-				if response.TokenPermissionsRemoved == nil {
-					response.TokenPermissionsRemoved = make([]string, 0)
-				}
-				response.TokenPermissionsRemoved = append(response.TokenPermissionsRemoved, id)
-			}
-		}
-
-		for id, permission := range description.TokenPermissions {
-			if _, ok := o.config.CommunityDescription.TokenPermissions[id]; !ok {
-				if response.TokenPermissionsAdded == nil {
-					response.TokenPermissionsAdded = make(map[string]*protobuf.CommunityTokenPermission)
-				}
-				response.TokenPermissionsAdded[id] = permission
-			}
-		}
+		response = EvaluateCommunityChanges(o.config.CommunityDescription, description)
+		response.Community = o
 	}
 
 	o.config.CommunityDescription = description
@@ -2005,24 +1788,6 @@ func (o *Community) SetActiveMembersCount(activeMembersCount uint64) (updated bo
 	o.increaseClock()
 
 	return true, nil
-}
-
-func emptyCommunityChanges() *CommunityChanges {
-	return &CommunityChanges{
-		MembersAdded:   make(map[string]*protobuf.CommunityMember),
-		MembersRemoved: make(map[string]*protobuf.CommunityMember),
-
-		ChatsRemoved:  make(map[string]*protobuf.CommunityChat),
-		ChatsAdded:    make(map[string]*protobuf.CommunityChat),
-		ChatsModified: make(map[string]*CommunityChatChanges),
-
-		CategoriesRemoved:  []string{},
-		CategoriesAdded:    make(map[string]*protobuf.CommunityCategory),
-		CategoriesModified: make(map[string]*protobuf.CommunityCategory),
-
-		MemberWalletsRemoved: []string{},
-		MemberWalletsAdded:   make(map[string][]*protobuf.RevealedAccount),
-	}
 }
 
 type sortSlice []sorterHelperIdx
