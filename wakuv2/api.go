@@ -267,13 +267,13 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 }
 
 // UninstallFilter is alias for Unsubscribe
-func (api *PublicWakuAPI) UninstallFilter(id string) {
-	api.w.Unsubscribe(id) // nolint: errcheck
+func (api *PublicWakuAPI) UninstallFilter(ctx context.Context, id string) {
+	api.w.Unsubscribe(ctx, id) // nolint: errcheck
 }
 
 // Unsubscribe disables and removes an existing filter.
-func (api *PublicWakuAPI) Unsubscribe(id string) {
-	api.w.Unsubscribe(id) // nolint: errcheck
+func (api *PublicWakuAPI) Unsubscribe(ctx context.Context, id string) {
+	api.w.Unsubscribe(ctx, id) // nolint: errcheck
 }
 
 // Criteria holds various filter options for inbound messages.
@@ -365,7 +365,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 					}
 				}
 			case <-rpcSub.Err():
-				_ = api.w.Unsubscribe(id)
+				_ = api.w.Unsubscribe(context.Background(), id)
 				return
 			}
 		}
@@ -450,7 +450,7 @@ func (api *PublicWakuAPI) DeleteMessageFilter(id string) (bool, error) {
 	defer api.mu.Unlock()
 
 	delete(api.lastUsed, id)
-	return true, api.w.Unsubscribe(id)
+	return true, api.w.Unsubscribe(context.Background(), id)
 }
 
 // NewMessageFilter creates a new filter that can be used to poll for

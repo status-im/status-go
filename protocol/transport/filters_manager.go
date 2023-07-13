@@ -2,6 +2,7 @@ package transport
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"sync"
@@ -37,7 +38,7 @@ type FiltersService interface {
 	DeleteSymKey(id string) bool
 
 	Subscribe(opts *types.SubscriptionOptions) (string, error)
-	Unsubscribe(id string) error
+	Unsubscribe(ctx context.Context, id string) error
 	UnsubscribeMany(ids []string) error
 }
 
@@ -188,7 +189,7 @@ func (f *FiltersManager) InitWithFilters(filters []*Filter) ([]*Filter, error) {
 	return f.Init(chatIDs, publicKeys)
 }
 
-func (f *FiltersManager) Reset() error {
+func (f *FiltersManager) Reset(ctx context.Context) error {
 	var filters []*Filter
 
 	f.mutex.Lock()
@@ -197,7 +198,7 @@ func (f *FiltersManager) Reset() error {
 	}
 	f.mutex.Unlock()
 
-	return f.Remove(filters...)
+	return f.Remove(ctx, filters...)
 }
 
 func (f *FiltersManager) Filters() (result []*Filter) {
@@ -271,12 +272,12 @@ func (f *FiltersManager) FilterByChatID(chatID string) *Filter {
 }
 
 // Remove remove all the filters associated with a chat/identity
-func (f *FiltersManager) Remove(filters ...*Filter) error {
+func (f *FiltersManager) Remove(ctx context.Context, filters ...*Filter) error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
 	for _, filter := range filters {
-		if err := f.service.Unsubscribe(filter.FilterID); err != nil {
+		if err := f.service.Unsubscribe(ctx, filter.FilterID); err != nil {
 			return err
 		}
 		if filter.SymKeyID != "" {
@@ -325,7 +326,7 @@ func (f *FiltersManager) RemoveFilterByChatID(chatID string) (*Filter, error) {
 		return nil, nil
 	}
 
-	err := f.Remove(filter)
+	err := f.Remove(context.Background(), filter)
 	if err != nil {
 		return nil, err
 	}
