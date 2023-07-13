@@ -333,6 +333,32 @@ func (api *API) EstimateMintAssets(ctx context.Context, chainID uint64, contract
 }
 
 // This is only ERC721 function
+func (api *API) RemoteDestructedAmount(ctx context.Context, chainID uint64, contractAddress string) (*bigint.BigInt, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	// total supply = airdropped only (w/o burnt)
+	totalSupply, err := contractInst.TotalSupply(callOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	// minted = all created tokens (airdropped and remotely destructed)
+	mintedCount, err := contractInst.MintedCount(callOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	var res = new(big.Int)
+	res.Sub(mintedCount, totalSupply)
+
+	return &bigint.BigInt{Int: res}, nil
+}
+
+// This is only ERC721 function
 func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, tokenIds []*bigint.BigInt) (string, error) {
 	err := api.validateTokens(tokenIds)
 	if err != nil {
@@ -409,19 +435,6 @@ func (api *API) ContractOwner(ctx context.Context, chainID uint64, contractAddre
 		return owner.String(), nil
 	}
 	return "", fmt.Errorf("unknown token type: %v", tokenType)
-}
-
-func (api *API) MintedCount(ctx context.Context, chainID uint64, contractAddress string) (*big.Int, error) {
-	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
-	contractInst, err := api.newCollectiblesInstance(chainID, contractAddress)
-	if err != nil {
-		return nil, err
-	}
-	mintedCount, err := contractInst.MintedCount(callOpts)
-	if err != nil {
-		return nil, err
-	}
-	return mintedCount, nil
 }
 
 func (api *API) RemainingSupply(ctx context.Context, chainID uint64, contractAddress string) (*bigint.BigInt, error) {
