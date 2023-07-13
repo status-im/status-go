@@ -29,6 +29,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,7 +39,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -46,7 +47,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %w", name, err)
+		return nil, fmt.Errorf("read %q: %v", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -578,42 +579,56 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"1536754952_initial_schema.down.sql":            _1536754952_initial_schemaDownSql,
-	"1536754952_initial_schema.up.sql":              _1536754952_initial_schemaUpSql,
-	"1539249977_update_ratchet_info.down.sql":       _1539249977_update_ratchet_infoDownSql,
-	"1539249977_update_ratchet_info.up.sql":         _1539249977_update_ratchet_infoUpSql,
-	"1540715431_add_version.down.sql":               _1540715431_add_versionDownSql,
-	"1540715431_add_version.up.sql":                 _1540715431_add_versionUpSql,
-	"1541164797_add_installations.down.sql":         _1541164797_add_installationsDownSql,
-	"1541164797_add_installations.up.sql":           _1541164797_add_installationsUpSql,
-	"1558084410_add_secret.down.sql":                _1558084410_add_secretDownSql,
-	"1558084410_add_secret.up.sql":                  _1558084410_add_secretUpSql,
-	"1558588866_add_version.down.sql":               _1558588866_add_versionDownSql,
-	"1558588866_add_version.up.sql":                 _1558588866_add_versionUpSql,
-	"1559627659_add_contact_code.down.sql":          _1559627659_add_contact_codeDownSql,
-	"1559627659_add_contact_code.up.sql":            _1559627659_add_contact_codeUpSql,
-	"1561368210_add_installation_metadata.down.sql": _1561368210_add_installation_metadataDownSql,
-	"1561368210_add_installation_metadata.up.sql":   _1561368210_add_installation_metadataUpSql,
-	"1632236298_add_communities.down.sql":           _1632236298_add_communitiesDownSql,
-	"1632236298_add_communities.up.sql":             _1632236298_add_communitiesUpSql,
-	"1636536507_add_index_bundles.up.sql":           _1636536507_add_index_bundlesUpSql,
-	"doc.go":                                        docGo,
-}
+	"1536754952_initial_schema.down.sql": _1536754952_initial_schemaDownSql,
 
-// AssetDebug is true if the assets were built with the debug flag enabled.
-const AssetDebug = false
+	"1536754952_initial_schema.up.sql": _1536754952_initial_schemaUpSql,
+
+	"1539249977_update_ratchet_info.down.sql": _1539249977_update_ratchet_infoDownSql,
+
+	"1539249977_update_ratchet_info.up.sql": _1539249977_update_ratchet_infoUpSql,
+
+	"1540715431_add_version.down.sql": _1540715431_add_versionDownSql,
+
+	"1540715431_add_version.up.sql": _1540715431_add_versionUpSql,
+
+	"1541164797_add_installations.down.sql": _1541164797_add_installationsDownSql,
+
+	"1541164797_add_installations.up.sql": _1541164797_add_installationsUpSql,
+
+	"1558084410_add_secret.down.sql": _1558084410_add_secretDownSql,
+
+	"1558084410_add_secret.up.sql": _1558084410_add_secretUpSql,
+
+	"1558588866_add_version.down.sql": _1558588866_add_versionDownSql,
+
+	"1558588866_add_version.up.sql": _1558588866_add_versionUpSql,
+
+	"1559627659_add_contact_code.down.sql": _1559627659_add_contact_codeDownSql,
+
+	"1559627659_add_contact_code.up.sql": _1559627659_add_contact_codeUpSql,
+
+	"1561368210_add_installation_metadata.down.sql": _1561368210_add_installation_metadataDownSql,
+
+	"1561368210_add_installation_metadata.up.sql": _1561368210_add_installation_metadataUpSql,
+
+	"1632236298_add_communities.down.sql": _1632236298_add_communitiesDownSql,
+
+	"1632236298_add_communities.up.sql": _1632236298_add_communitiesUpSql,
+
+	"1636536507_add_index_bundles.up.sql": _1636536507_add_index_bundlesUpSql,
+
+	"doc.go": docGo,
+}
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//
-//	data/
-//	  foo.txt
-//	  img/
-//	    a.png
-//	    b.png
-//
+//     data/
+//       foo.txt
+//       img/
+//         a.png
+//         b.png
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -646,26 +661,26 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"1536754952_initial_schema.down.sql":            {_1536754952_initial_schemaDownSql, map[string]*bintree{}},
-	"1536754952_initial_schema.up.sql":              {_1536754952_initial_schemaUpSql, map[string]*bintree{}},
-	"1539249977_update_ratchet_info.down.sql":       {_1539249977_update_ratchet_infoDownSql, map[string]*bintree{}},
-	"1539249977_update_ratchet_info.up.sql":         {_1539249977_update_ratchet_infoUpSql, map[string]*bintree{}},
-	"1540715431_add_version.down.sql":               {_1540715431_add_versionDownSql, map[string]*bintree{}},
-	"1540715431_add_version.up.sql":                 {_1540715431_add_versionUpSql, map[string]*bintree{}},
-	"1541164797_add_installations.down.sql":         {_1541164797_add_installationsDownSql, map[string]*bintree{}},
-	"1541164797_add_installations.up.sql":           {_1541164797_add_installationsUpSql, map[string]*bintree{}},
-	"1558084410_add_secret.down.sql":                {_1558084410_add_secretDownSql, map[string]*bintree{}},
-	"1558084410_add_secret.up.sql":                  {_1558084410_add_secretUpSql, map[string]*bintree{}},
-	"1558588866_add_version.down.sql":               {_1558588866_add_versionDownSql, map[string]*bintree{}},
-	"1558588866_add_version.up.sql":                 {_1558588866_add_versionUpSql, map[string]*bintree{}},
-	"1559627659_add_contact_code.down.sql":          {_1559627659_add_contact_codeDownSql, map[string]*bintree{}},
-	"1559627659_add_contact_code.up.sql":            {_1559627659_add_contact_codeUpSql, map[string]*bintree{}},
-	"1561368210_add_installation_metadata.down.sql": {_1561368210_add_installation_metadataDownSql, map[string]*bintree{}},
-	"1561368210_add_installation_metadata.up.sql":   {_1561368210_add_installation_metadataUpSql, map[string]*bintree{}},
-	"1632236298_add_communities.down.sql":           {_1632236298_add_communitiesDownSql, map[string]*bintree{}},
-	"1632236298_add_communities.up.sql":             {_1632236298_add_communitiesUpSql, map[string]*bintree{}},
-	"1636536507_add_index_bundles.up.sql":           {_1636536507_add_index_bundlesUpSql, map[string]*bintree{}},
-	"doc.go":                                        {docGo, map[string]*bintree{}},
+	"1536754952_initial_schema.down.sql":            &bintree{_1536754952_initial_schemaDownSql, map[string]*bintree{}},
+	"1536754952_initial_schema.up.sql":              &bintree{_1536754952_initial_schemaUpSql, map[string]*bintree{}},
+	"1539249977_update_ratchet_info.down.sql":       &bintree{_1539249977_update_ratchet_infoDownSql, map[string]*bintree{}},
+	"1539249977_update_ratchet_info.up.sql":         &bintree{_1539249977_update_ratchet_infoUpSql, map[string]*bintree{}},
+	"1540715431_add_version.down.sql":               &bintree{_1540715431_add_versionDownSql, map[string]*bintree{}},
+	"1540715431_add_version.up.sql":                 &bintree{_1540715431_add_versionUpSql, map[string]*bintree{}},
+	"1541164797_add_installations.down.sql":         &bintree{_1541164797_add_installationsDownSql, map[string]*bintree{}},
+	"1541164797_add_installations.up.sql":           &bintree{_1541164797_add_installationsUpSql, map[string]*bintree{}},
+	"1558084410_add_secret.down.sql":                &bintree{_1558084410_add_secretDownSql, map[string]*bintree{}},
+	"1558084410_add_secret.up.sql":                  &bintree{_1558084410_add_secretUpSql, map[string]*bintree{}},
+	"1558588866_add_version.down.sql":               &bintree{_1558588866_add_versionDownSql, map[string]*bintree{}},
+	"1558588866_add_version.up.sql":                 &bintree{_1558588866_add_versionUpSql, map[string]*bintree{}},
+	"1559627659_add_contact_code.down.sql":          &bintree{_1559627659_add_contact_codeDownSql, map[string]*bintree{}},
+	"1559627659_add_contact_code.up.sql":            &bintree{_1559627659_add_contact_codeUpSql, map[string]*bintree{}},
+	"1561368210_add_installation_metadata.down.sql": &bintree{_1561368210_add_installation_metadataDownSql, map[string]*bintree{}},
+	"1561368210_add_installation_metadata.up.sql":   &bintree{_1561368210_add_installation_metadataUpSql, map[string]*bintree{}},
+	"1632236298_add_communities.down.sql":           &bintree{_1632236298_add_communitiesDownSql, map[string]*bintree{}},
+	"1632236298_add_communities.up.sql":             &bintree{_1632236298_add_communitiesUpSql, map[string]*bintree{}},
+	"1636536507_add_index_bundles.up.sql":           &bintree{_1636536507_add_index_bundlesUpSql, map[string]*bintree{}},
+	"doc.go":                                        &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
@@ -682,7 +697,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}
