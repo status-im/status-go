@@ -345,7 +345,7 @@ func (p *Persistence) SaveRequestToJoinRevealedAddresses(request *RequestToJoin)
 		_ = tx.Rollback()
 	}()
 
-	query := `INSERT OR REPLACE INTO communities_requests_to_join_revealed_addresses (request_id, address, chain_ids) VALUES (?, ?, ?)`
+	query := `INSERT OR REPLACE INTO communities_requests_to_join_revealed_addresses (request_id, address, chain_ids, is_airdrop_address) VALUES (?, ?, ?, ?)`
 	stmt, err := tx.Prepare(query)
 	if err != nil {
 		return
@@ -362,6 +362,7 @@ func (p *Persistence) SaveRequestToJoinRevealedAddresses(request *RequestToJoin)
 			request.ID,
 			account.Address,
 			strings.Join(chainIDs, ","),
+			account.IsAirdropAddress,
 		)
 		if err != nil {
 			return
@@ -531,7 +532,7 @@ func (p *Persistence) GetPermissionTokenCriteriaResult(permissionID string, comm
 
 func (p *Persistence) GetRequestToJoinRevealedAddresses(requestID []byte) ([]*protobuf.RevealedAccount, error) {
 	revealedAccounts := make([]*protobuf.RevealedAccount, 0)
-	rows, err := p.db.Query(`SELECT address, chain_ids FROM communities_requests_to_join_revealed_addresses WHERE request_id = ?`, requestID)
+	rows, err := p.db.Query(`SELECT address, chain_ids, is_airdrop_address FROM communities_requests_to_join_revealed_addresses WHERE request_id = ?`, requestID)
 	if err != nil {
 		return nil, err
 	}
@@ -540,7 +541,8 @@ func (p *Persistence) GetRequestToJoinRevealedAddresses(requestID []byte) ([]*pr
 	for rows.Next() {
 		address := ""
 		chainIDsStr := ""
-		err := rows.Scan(&address, &chainIDsStr)
+		isAirDropAddress := false
+		err := rows.Scan(&address, &chainIDsStr, &isAirDropAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -557,8 +559,9 @@ func (p *Persistence) GetRequestToJoinRevealedAddresses(requestID []byte) ([]*pr
 		}
 
 		revealedAccount := &protobuf.RevealedAccount{
-			Address:  address,
-			ChainIds: chainIDs,
+			Address:          address,
+			ChainIds:         chainIDs,
+			IsAirdropAddress: isAirDropAddress,
 		}
 		revealedAccounts = append(revealedAccounts, revealedAccount)
 	}
