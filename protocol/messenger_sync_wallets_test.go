@@ -5,16 +5,11 @@ import (
 	"errors"
 	"testing"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/waku"
 
 	"github.com/stretchr/testify/suite"
-
-	"github.com/status-im/status-go/eth-node/types"
 )
 
 func TestMessengerSyncWalletSuite(t *testing.T) {
@@ -23,36 +18,6 @@ func TestMessengerSyncWalletSuite(t *testing.T) {
 
 type MessengerSyncWalletSuite struct {
 	MessengerBaseTestSuite
-}
-
-func (s *MessengerSyncWalletSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-
-	s.m = s.newMessenger(s.shh)
-	s.privateKey = s.m.identity
-	// We start the messenger in order to receive installations
-	_, err := s.m.Start()
-	s.Require().NoError(err)
-}
-
-func (s *MessengerSyncWalletSuite) TearDownTest() {
-	s.Require().NoError(s.m.Shutdown())
-}
-
-func (s *MessengerSyncWalletSuite) newMessenger(shh types.Waku) *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
-	s.Require().NoError(err)
-
-	return messenger
 }
 
 // user should not be able to change a keypair name directly, it follows display name

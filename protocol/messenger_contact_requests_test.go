@@ -7,15 +7,12 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/waku"
 )
 
 func TestMessengerContactRequestSuite(t *testing.T) {
@@ -24,34 +21,6 @@ func TestMessengerContactRequestSuite(t *testing.T) {
 
 type MessengerContactRequestSuite struct {
 	MessengerBaseTestSuite
-}
-
-func (s *MessengerContactRequestSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-
-	s.m = s.newMessenger(s.shh)
-	s.privateKey = s.m.identity
-	_, err := s.m.Start()
-	s.Require().NoError(err)
-}
-
-func (s *MessengerContactRequestSuite) TearDownTest() {
-	s.Require().NoError(s.m.Shutdown())
-}
-
-func (s *MessengerContactRequestSuite) newMessenger(shh types.Waku) *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
-	s.Require().NoError(err)
-	return messenger
 }
 
 func (s *MessengerContactRequestSuite) findFirstByContentType(messages []*common.Message, contentType protobuf.ChatMessage_ContentType) *common.Message {
@@ -380,7 +349,7 @@ func (s *MessengerContactRequestSuite) syncInstallationContactV2FromContact(cont
 func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() { //nolint: unused
 	messageText := "hello!"
 
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	defer theirMessenger.Shutdown() // nolint: errcheck
@@ -398,7 +367,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequest() { //
 func (s *MessengerContactRequestSuite) TestReceiveAndDismissContactRequest() {
 	messageText := "hello!"
 
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	defer theirMessenger.Shutdown() // nolint: errcheck
@@ -416,7 +385,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndDismissContactRequest() {
 func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest() { //nolint: unused
 	messageText := "hello!"
 
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	defer theirMessenger.Shutdown() // nolint: errcheck
@@ -437,7 +406,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequestTwice() { //nolint: unused
 	messageText := "hello!"
 
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	defer theirMessenger.Shutdown() // nolint: errcheck
@@ -494,7 +463,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequestTwice()
 func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact() {
 	messageText := "hello!"
 
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	defer theirMessenger.Shutdown() // nolint: errcheck
@@ -589,7 +558,7 @@ func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact(
 func (s *MessengerContactRequestSuite) TestDismissLatestContactRequestForContact() {
 	messageText := "hello!"
 
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	defer theirMessenger.Shutdown() // nolint: errcheck
@@ -635,7 +604,7 @@ func (s *MessengerContactRequestSuite) TestPairedDevicesRemoveContact() {
 	pairTwoDevices(&s.Suite, alice1, alice2)
 	pairTwoDevices(&s.Suite, alice2, alice1)
 
-	bob := s.newMessenger(s.shh)
+	bob := s.newMessenger()
 	_, err = bob.Start()
 	s.Require().NoError(err)
 	defer bob.Shutdown() // nolint: errcheck
@@ -699,7 +668,7 @@ func (s *MessengerContactRequestSuite) TestAliceRecoverStateSendContactRequest()
 
 	alice1 := s.m
 
-	bob := s.newMessenger(s.shh)
+	bob := s.newMessenger()
 	_, err := bob.Start()
 	s.Require().NoError(err)
 	defer bob.Shutdown() // nolint: errcheck
@@ -771,7 +740,7 @@ func (s *MessengerContactRequestSuite) TestAliceRecoverStateReceiveContactReques
 
 	alice1 := s.m
 
-	bob := s.newMessenger(s.shh)
+	bob := s.newMessenger()
 	_, err := bob.Start()
 	s.Require().NoError(err)
 	defer bob.Shutdown() // nolint: errcheck
@@ -852,7 +821,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsCorrectOrd
 
 	alice1 := s.m
 
-	bob := s.newMessenger(s.shh)
+	bob := s.newMessenger()
 	_, err := bob.Start()
 	s.Require().NoError(err)
 	defer bob.Shutdown() // nolint: errcheck
@@ -902,7 +871,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsWrongOrder
 
 	alice1 := s.m
 
-	bob := s.newMessenger(s.shh)
+	bob := s.newMessenger()
 	_, err := bob.Start()
 	s.Require().NoError(err)
 	defer bob.Shutdown() // nolint: errcheck
@@ -954,7 +923,7 @@ func (s *MessengerContactRequestSuite) TestAliceOfflineRetractsAndAddsWrongOrder
 func (s *MessengerContactRequestSuite) TestAliceResendsContactRequestAfterRemovingBobFromContacts() {
 	messageTextFirst := "hello 1!"
 
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	defer theirMessenger.Shutdown() // nolint: errcheck
@@ -1010,7 +979,7 @@ func (s *MessengerContactRequestSuite) TestBobSendsContactRequestAfterDecliningO
 
 	alice := s.m
 
-	bob := s.newMessenger(s.shh)
+	bob := s.newMessenger()
 	_, err := bob.Start()
 	s.Require().NoError(err)
 	defer bob.Shutdown() // nolint: errcheck
@@ -1193,7 +1162,7 @@ func (s *MessengerContactRequestSuite) TestBobRestoresIncomingContactRequestFrom
 
 	alice := s.m
 
-	bob1 := s.newMessenger(s.shh)
+	bob1 := s.newMessenger()
 	_, err := bob1.Start()
 	s.Require().NoError(err)
 	defer bob1.Shutdown() // nolint: errcheck
@@ -1273,7 +1242,7 @@ func (s *MessengerContactRequestSuite) TestAliceRestoresOutgoingContactRequestFr
 
 	alice1 := s.m
 
-	bob := s.newMessenger(s.shh)
+	bob := s.newMessenger()
 	_, err := bob.Start()
 	s.Require().NoError(err)
 	defer bob.Shutdown() // nolint: errcheck

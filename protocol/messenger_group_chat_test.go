@@ -8,13 +8,9 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/crypto"
 	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/waku"
 )
 
 func TestGroupChatSuite(t *testing.T) {
@@ -25,16 +21,6 @@ type MessengerGroupChatSuite struct {
 	MessengerBaseTestSuite
 }
 
-func (s *MessengerGroupChatSuite) newMessenger() *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, []Option{})
-	s.Require().NoError(err)
-
-	return messenger
-}
-
 func (s *MessengerGroupChatSuite) startNewMessenger() *Messenger {
 	messenger := s.newMessenger()
 
@@ -42,19 +28,6 @@ func (s *MessengerGroupChatSuite) startNewMessenger() *Messenger {
 	s.Require().NoError(err)
 
 	return messenger
-}
-
-func (s *MessengerGroupChatSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-}
-
-func (s *MessengerGroupChatSuite) TearDownTest() {
 }
 
 func (s *MessengerGroupChatSuite) createGroupChat(creator *Messenger, name string, members []string) *Chat {
