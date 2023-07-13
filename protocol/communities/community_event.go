@@ -199,12 +199,9 @@ func (o *Community) UpdateCommunityByEvents(communityEventMessage *CommunityEven
 		return nil, err
 	}
 
-	// Collect `CommunityChanges` data by searching a difference between `CommunityDescrption`
-	// from the DB and `CommunityDescrption` patched by community events
-	changes, err := o.collectCommunityChanges(copy.config.CommunityDescription)
-	if err != nil {
-		return nil, err
-	}
+	// Evaluate `CommunityChanges` data by searching a difference between `CommunityDescription`
+	// from the DB and `CommunityDescription` patched by community events
+	changes := EvaluateCommunityChanges(o.config.CommunityDescription, copy.config.CommunityDescription)
 
 	// TODO: need to figure out is it ok to save marshaledCommunityDescription without the signature
 	marshaledCommDescr, err := proto.Marshal(copy.config.CommunityDescription)
