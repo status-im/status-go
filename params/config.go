@@ -511,6 +511,7 @@ type Network struct {
 	ChainColor             string          `json:"chainColor"`
 	ShortName              string          `json:"shortName"`
 	TokenOverrides         []TokenOverride `json:"tokenOverrides"`
+	RelatedChainID         uint64          `json:"relatedChainId"`
 }
 
 // WalletConfig extra configuration for wallet.Service.

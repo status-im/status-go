@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/wallet/activity"
 	"github.com/status-im/status-go/services/wallet/bridge"
 	"github.com/status-im/status-go/services/wallet/currency"
@@ -345,9 +346,9 @@ func (api *API) DeleteEthereumChain(ctx context.Context, chainID uint64) error {
 	return api.s.rpcClient.NetworkManager.Delete(chainID)
 }
 
-func (api *API) GetEthereumChains(ctx context.Context, onlyEnabled bool) ([]*params.Network, error) {
+func (api *API) GetEthereumChains(ctx context.Context) ([]*network.CombinedNetwork, error) {
 	log.Debug("call to GetEthereumChains")
-	return api.s.rpcClient.NetworkManager.Get(onlyEnabled)
+	return api.s.rpcClient.NetworkManager.GetCombinedNetworks()
 }
 
 func (api *API) FetchPrices(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]float64, error) {

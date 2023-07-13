@@ -26,6 +26,7 @@ var initNetworks = []params.Network{
 		IsTest:                 false,
 		Layer:                  1,
 		Enabled:                true,
+		RelatedChainID:         5,
 	},
 	{
 		ChainID:                5,
@@ -39,6 +40,7 @@ var initNetworks = []params.Network{
 		IsTest:                 true,
 		Layer:                  1,
 		Enabled:                false,
+		RelatedChainID:         1,
 	},
 	{
 		ChainID:                10,
@@ -52,6 +54,7 @@ var initNetworks = []params.Network{
 		IsTest:                 false,
 		Layer:                  2,
 		Enabled:                true,
+		RelatedChainID:         420,
 	},
 }
 
@@ -90,6 +93,23 @@ func TestGet(t *testing.T) {
 	networks, err := nm.Get(true)
 	require.Nil(t, err)
 	require.Equal(t, 2, len(networks))
+}
+
+func TestGetCombinedNetworks(t *testing.T) {
+	db, stop := setupTestNetworkDB(t)
+	defer stop()
+
+	nm := &Manager{db: db}
+	err := nm.Init(initNetworks)
+	require.NoError(t, err)
+
+	combinedNetworks, err := nm.GetCombinedNetworks()
+	require.Nil(t, err)
+	require.Equal(t, 2, len(combinedNetworks))
+	require.Equal(t, uint64(1), combinedNetworks[0].Prod.ChainID)
+	require.Equal(t, uint64(5), combinedNetworks[0].Test.ChainID)
+	require.Equal(t, uint64(10), combinedNetworks[1].Prod.ChainID)
+	require.Nil(t, combinedNetworks[1].Test)
 }
 
 func TestDelete(t *testing.T) {
