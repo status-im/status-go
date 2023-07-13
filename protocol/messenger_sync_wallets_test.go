@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"errors"
 	"testing"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/status-im/status-go/waku"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
 )
@@ -24,15 +22,7 @@ func TestMessengerSyncWalletSuite(t *testing.T) {
 }
 
 type MessengerSyncWalletSuite struct {
-	suite.Suite
-	m          *Messenger        // main instance of Messenger
-	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
-
-	// If one wants to send messages between different instances of Messenger,
-	// a single Waku service should be shared.
-	shh types.Waku
-
-	logger *zap.Logger
+	MessengerBaseTestSuite
 }
 
 func (s *MessengerSyncWalletSuite) SetupTest() {

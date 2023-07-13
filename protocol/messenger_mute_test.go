@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"crypto/ecdsa"
 	"testing"
 	"time"
 
@@ -21,15 +20,7 @@ func TestMessengerMuteSuite(t *testing.T) {
 }
 
 type MessengerMuteSuite struct {
-	suite.Suite
-	m          *Messenger        // main instance of Messenger
-	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
-
-	// If one wants to send messages between different instances of Messenger,
-	// a single Waku service should be shared.
-	shh types.Waku
-
-	logger *zap.Logger
+	MessengerBaseTestSuite
 }
 
 func (s *MessengerMuteSuite) SetupTest() {
