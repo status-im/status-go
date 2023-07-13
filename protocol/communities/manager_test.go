@@ -14,14 +14,14 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 	userimages "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
-	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
+	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 
 	"github.com/golang/protobuf/proto"
 	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
@@ -63,6 +63,17 @@ func intToBig(n int64) *hexutil.Big {
 	return (*hexutil.Big)(big.NewInt(n))
 }
 
+func uintToDecBig(n uint64) *bigint.BigInt {
+	return &bigint.BigInt{Int: big.NewInt(int64(n))}
+}
+
+func tokenBalance(tokenID uint64, balance uint64) thirdparty.TokenBalance {
+	return thirdparty.TokenBalance{
+		TokenID: uintToDecBig(tokenID),
+		Balance: uintToDecBig(balance),
+	}
+}
+
 func (s *ManagerSuite) getHistoryTasksCount() int {
 	// sync.Map doesn't have a Len function, so we need to count manually
 	count := 0
@@ -73,11 +84,26 @@ func (s *ManagerSuite) getHistoryTasksCount() int {
 	return count
 }
 
-type openseaClientTestBuilder struct {
+type testCollectiblesManager struct {
+	response map[uint64]map[gethcommon.Address]thirdparty.TokenBalancesPerContractAddress
 }
 
-func (b *openseaClientTestBuilder) NewOpenseaClient(chainID uint64, apiKey string, feed *event.Feed) (openseaClient, error) {
-	return opensea.NewOpenseaClient(chainID, apiKey, nil)
+func (m *testCollectiblesManager) setResponse(chainID uint64, walletAddress gethcommon.Address, contractAddress gethcommon.Address, balances []thirdparty.TokenBalance) {
+	if m.response == nil {
+		m.response = make(map[uint64]map[gethcommon.Address]thirdparty.TokenBalancesPerContractAddress)
+	}
+	if m.response[chainID] == nil {
+		m.response[chainID] = make(map[gethcommon.Address]thirdparty.TokenBalancesPerContractAddress)
+	}
+	if m.response[chainID][walletAddress] == nil {
+		m.response[chainID][walletAddress] = make(thirdparty.TokenBalancesPerContractAddress)
+	}
+
+	m.response[chainID][walletAddress][contractAddress] = balances
+}
+
+func (m *testCollectiblesManager) FetchBalancesByOwnerAndContractAddress(chainID uint64, ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
+	return m.response[chainID][ownerAddress], nil
 }
 
 type testTokenManager struct {
@@ -110,7 +136,7 @@ func (m *testTokenManager) GetBalancesByChain(ctx context.Context, accounts, tok
 	return m.response, nil
 }
 
-func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testTokenManager) {
+func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testCollectiblesManager, *testTokenManager) {
 	db, err := appdatabase.InitializeDB(sqlite.InMemoryPath, "", sqlite.ReducedKDFIterationsNumber)
 	s.NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
@@ -120,13 +146,14 @@ func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testTokenMa
 	s.Require().NoError(err)
 	s.Require().NoError(err)
 
+	cm := &testCollectiblesManager{}
 	tm := &testTokenManager{}
 
 	options := []ManagerOption{
 		WithWalletConfig(&params.WalletConfig{
 			OpenseaAPIKey: "some-key",
 		}),
-		WithOpenseaClientBuilder(&openseaClientTestBuilder{}),
+		WithCollectiblesManager(cm),
 		WithTokenManager(tm),
 	}
 
@@ -134,11 +161,11 @@ func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testTokenMa
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
-	return m, tm
+	return m, cm, tm
 }
 
 func (s *ManagerSuite) TestRetrieveTokens() {
-	m, tm := s.setupManagerForTokenPermissions()
+	m, _, tm := s.setupManagerForTokenPermissions()
 
 	var chainID uint64 = 5
 	contractAddresses := make(map[uint64]string)
@@ -179,6 +206,56 @@ func (s *ManagerSuite) TestRetrieveTokens() {
 
 	// Set response to 0
 	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), 0)
+	resp, err = m.checkPermissionToJoin(permissions, accountChainIDsCombination, false)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+	s.Require().False(resp.Satisfied)
+}
+
+func (s *ManagerSuite) TestRetrieveCollectibles() {
+	m, cm, _ := s.setupManagerForTokenPermissions()
+
+	var chainID uint64 = 5
+	contractAddresses := make(map[uint64]string)
+	contractAddresses[chainID] = "0x3d6afaa395c31fcd391fe3d562e75fe9e8ec7e6a"
+
+	tokenID := uint64(10)
+	var tokenBalances []thirdparty.TokenBalance
+
+	var tokenCriteria = []*protobuf.TokenCriteria{
+		&protobuf.TokenCriteria{
+			ContractAddresses: contractAddresses,
+			TokenIds:          []uint64{tokenID},
+			Type:              protobuf.CommunityTokenType_ERC721,
+		},
+	}
+
+	var permissions = []*protobuf.CommunityTokenPermission{
+		&protobuf.CommunityTokenPermission{
+			Id:            "some-id",
+			Type:          protobuf.CommunityTokenPermission_BECOME_MEMBER,
+			TokenCriteria: tokenCriteria,
+		},
+	}
+
+	accountChainIDsCombination := []*AccountChainIDsCombination{
+		&AccountChainIDsCombination{
+			Address:  gethcommon.HexToAddress("0xD6b912e09E797D291E8D0eA3D3D17F8000e01c32"),
+			ChainIDs: []uint64{chainID},
+		},
+	}
+
+	// Set response to exactly the right one
+	tokenBalances = []thirdparty.TokenBalance{tokenBalance(tokenID, 1)}
+	cm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), tokenBalances)
+	resp, err := m.checkPermissionToJoin(permissions, accountChainIDsCombination, false)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+	s.Require().True(resp.Satisfied)
+
+	// Set balances to 0
+	tokenBalances = []thirdparty.TokenBalance{}
+	cm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), tokenBalances)
 	resp, err = m.checkPermissionToJoin(permissions, accountChainIDsCombination, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
@@ -812,7 +889,7 @@ func (s *ManagerSuite) TestUnseedHistoryArchiveTorrent() {
 
 func (s *ManagerSuite) TestCheckChannelPermissions_NoPermissions() {
 
-	m, tm := s.setupManagerForTokenPermissions()
+	m, _, tm := s.setupManagerForTokenPermissions()
 
 	var chainID uint64 = 5
 	contractAddresses := make(map[uint64]string)
@@ -841,7 +918,7 @@ func (s *ManagerSuite) TestCheckChannelPermissions_NoPermissions() {
 
 func (s *ManagerSuite) TestCheckChannelPermissions_ViewOnlyPermissions() {
 
-	m, tm := s.setupManagerForTokenPermissions()
+	m, _, tm := s.setupManagerForTokenPermissions()
 
 	var chainID uint64 = 5
 	contractAddresses := make(map[uint64]string)
@@ -899,7 +976,7 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewOnlyPermissions() {
 
 func (s *ManagerSuite) TestCheckChannelPermissions_ViewAndPostPermissions() {
 
-	m, tm := s.setupManagerForTokenPermissions()
+	m, _, tm := s.setupManagerForTokenPermissions()
 
 	var chainID uint64 = 5
 	contractAddresses := make(map[uint64]string)
@@ -958,7 +1035,7 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewAndPostPermissions() {
 
 func (s *ManagerSuite) TestCheckChannelPermissions_ViewAndPostPermissionsCombination() {
 
-	m, tm := s.setupManagerForTokenPermissions()
+	m, _, tm := s.setupManagerForTokenPermissions()
 
 	var chainID uint64 = 5
 	contractAddresses := make(map[uint64]string)
@@ -1032,7 +1109,7 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewAndPostPermissionsCombina
 
 func (s *ManagerSuite) TestCheckAllChannelsPermissions_EmptyPermissions() {
 
-	m, _ := s.setupManagerForTokenPermissions()
+	m, _, _ := s.setupManagerForTokenPermissions()
 
 	createRequest := &requests.CreateCommunity{
 		Name:        "channel permission community",
@@ -1079,7 +1156,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions_EmptyPermissions() {
 
 func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 
-	m, tm := s.setupManagerForTokenPermissions()
+	m, _, tm := s.setupManagerForTokenPermissions()
 
 	var chatID1 string
 	var chatID2 string

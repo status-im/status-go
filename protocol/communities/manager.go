@@ -27,7 +27,6 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -42,7 +41,7 @@ import (
 	"github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
-	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/signal"
 )
@@ -72,11 +71,11 @@ type Manager struct {
 	identity                       *ecdsa.PrivateKey
 	accountsManager                account.Manager
 	tokenManager                   TokenManager
+	collectiblesManager            CollectiblesManager
 	logger                         *zap.Logger
 	stdoutLogger                   *zap.Logger
 	transport                      *transport.Transport
 	quit                           chan struct{}
-	openseaClientBuilder           openseaClientBuilder
 	torrentConfig                  *params.TorrentConfig
 	torrentClient                  *torrent.Client
 	walletConfig                   *params.WalletConfig
@@ -86,21 +85,6 @@ type Manager struct {
 	torrentTasks                   map[string]metainfo.Hash
 	historyArchiveDownloadTasks    map[string]*HistoryArchiveDownloadTask
 	stopped                        bool
-}
-
-type openseaClient interface {
-	FetchAllAssetsByOwnerAndContractAddress(owner gethcommon.Address, contractAddresses []gethcommon.Address, cursor string, limit int) (*opensea.AssetContainer, error)
-}
-
-type openseaClientBuilder interface {
-	NewOpenseaClient(uint64, string, *event.Feed) (openseaClient, error)
-}
-
-type defaultOpenseaBuilder struct {
-}
-
-func (b *defaultOpenseaBuilder) NewOpenseaClient(chainID uint64, apiKey string, feed *event.Feed) (openseaClient, error) {
-	return opensea.NewOpenseaClient(chainID, apiKey, nil)
 }
 
 type HistoryArchiveDownloadTask struct {
@@ -124,10 +108,10 @@ func (t *HistoryArchiveDownloadTask) Cancel() {
 }
 
 type managerOptions struct {
-	accountsManager      account.Manager
-	tokenManager         TokenManager
-	walletConfig         *params.WalletConfig
-	openseaClientBuilder openseaClientBuilder
+	accountsManager     account.Manager
+	tokenManager        TokenManager
+	collectiblesManager CollectiblesManager
+	walletConfig        *params.WalletConfig
 }
 
 type TokenManager interface {
@@ -158,6 +142,10 @@ func (m *DefaultTokenManager) GetAllChainIDs() ([]uint64, error) {
 	return chainIDs, nil
 }
 
+type CollectiblesManager interface {
+	FetchBalancesByOwnerAndContractAddress(chainID uint64, ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error)
+}
+
 func (m *DefaultTokenManager) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error) {
 	clients, err := m.tokenManager.RPCClient.EthClients(chainIDs)
 	if err != nil {
@@ -176,9 +164,9 @@ func WithAccountManager(accountsManager account.Manager) ManagerOption {
 	}
 }
 
-func WithOpenseaClientBuilder(builder openseaClientBuilder) ManagerOption {
+func WithCollectiblesManager(collectiblesManager CollectiblesManager) ManagerOption {
 	return func(opts *managerOptions) {
-		opts.openseaClientBuilder = builder
+		opts.collectiblesManager = collectiblesManager
 	}
 }
 
@@ -236,18 +224,16 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 		manager.accountsManager = managerConfig.accountsManager
 	}
 
+	if managerConfig.collectiblesManager != nil {
+		manager.collectiblesManager = managerConfig.collectiblesManager
+	}
+
 	if managerConfig.tokenManager != nil {
 		manager.tokenManager = managerConfig.tokenManager
 	}
 
 	if managerConfig.walletConfig != nil {
 		manager.walletConfig = managerConfig.walletConfig
-	}
-
-	if managerConfig.openseaClientBuilder != nil {
-		manager.openseaClientBuilder = managerConfig.openseaClientBuilder
-	} else {
-		manager.openseaClientBuilder = &defaultOpenseaBuilder{}
 	}
 
 	if verifier != nil {
@@ -2105,8 +2091,9 @@ func (m *Manager) checkPermissions(permissions []*protobuf.CommunityTokenPermiss
 							continue
 						}
 
-						if _, exists := ownedERC721Tokens[chainID][account][strings.ToLower(address)]; exists {
-
+						tokenBalances := ownedERC721Tokens[chainID][account][gethcommon.HexToAddress(address)]
+						if len(tokenBalances) > 0 {
+							// 'account' owns some TokenID owned from contract 'address'
 							if _, exists := accountsChainIDsCombinations[account]; !exists {
 								accountsChainIDsCombinations[account] = make(map[uint64]bool)
 							}
@@ -2122,8 +2109,8 @@ func (m *Manager) checkPermissions(permissions []*protobuf.CommunityTokenPermiss
 							for _, tokenID := range tokenRequirement.TokenIds {
 								tokenIDBigInt := new(big.Int).SetUint64(tokenID)
 
-								for _, asset := range ownedERC721Tokens[chainID][account][strings.ToLower(address)] {
-									if asset.TokenID.Cmp(tokenIDBigInt) == 0 {
+								for _, asset := range tokenBalances {
+									if asset.TokenID.Cmp(tokenIDBigInt) == 0 && asset.Balance.Sign() > 0 {
 										tokenRequirementMet = true
 										accountsChainIDsCombinations[account][chainID] = true
 										break tokenIDsLoop
@@ -2246,15 +2233,14 @@ func (m *Manager) checkPermissions(permissions []*protobuf.CommunityTokenPermiss
 	return response, nil
 }
 
-type CollectiblesByChain = map[uint64]map[gethcommon.Address]map[string][]opensea.Asset
+type CollectiblesByChain = map[uint64]map[gethcommon.Address]thirdparty.TokenBalancesPerContractAddress
 
 func (m *Manager) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tokenRequirements map[uint64]map[string]*protobuf.TokenCriteria, chainIDs []uint64) (CollectiblesByChain, error) {
-
-	if m.walletConfig == nil || m.walletConfig.OpenseaAPIKey == "" {
-		return nil, errors.New("no opensea client")
+	if m.collectiblesManager == nil {
+		return nil, errors.New("no collectibles manager")
 	}
 
-	ownedERC721Tokens := make(map[uint64]map[gethcommon.Address]map[string][]opensea.Asset)
+	ownedERC721Tokens := make(CollectiblesByChain)
 
 	for chainID, erc721Tokens := range tokenRequirements {
 
@@ -2269,41 +2255,22 @@ func (m *Manager) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tok
 			continue
 		}
 
-		client, err := m.openseaClientBuilder.NewOpenseaClient(chainID, m.walletConfig.OpenseaAPIKey, nil)
-		if err != nil {
-			return nil, err
-		}
-
 		contractAddresses := make([]gethcommon.Address, 0)
 		for contractAddress := range erc721Tokens {
 			contractAddresses = append(contractAddresses, gethcommon.HexToAddress(contractAddress))
 		}
 
 		if _, exists := ownedERC721Tokens[chainID]; !exists {
-			ownedERC721Tokens[chainID] = make(map[gethcommon.Address]map[string][]opensea.Asset)
+			ownedERC721Tokens[chainID] = make(map[gethcommon.Address]thirdparty.TokenBalancesPerContractAddress)
 		}
 
 		for _, owner := range walletAddresses {
-			assets, err := client.FetchAllAssetsByOwnerAndContractAddress(owner, contractAddresses, "", 5)
+			balances, err := m.collectiblesManager.FetchBalancesByOwnerAndContractAddress(chainID, owner, contractAddresses)
 			if err != nil {
 				m.logger.Info("couldn't fetch owner assets", zap.Error(err))
 				return nil, err
 			}
-
-			if len(assets.Assets) == 0 {
-				continue
-			}
-
-			if _, exists := ownedERC721Tokens[chainID][owner]; !exists {
-				ownedERC721Tokens[chainID][owner] = make(map[string][]opensea.Asset, 0)
-			}
-
-			for _, asset := range assets.Assets {
-				if _, exists := ownedERC721Tokens[chainID][owner][asset.Contract.Address]; !exists {
-					ownedERC721Tokens[chainID][owner][asset.Contract.Address] = make([]opensea.Asset, 0)
-				}
-				ownedERC721Tokens[chainID][owner][asset.Contract.Address] = append(ownedERC721Tokens[chainID][owner][asset.Contract.Address], asset)
-			}
+			ownedERC721Tokens[chainID][owner] = balances
 		}
 	}
 	return ownedERC721Tokens, nil

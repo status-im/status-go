@@ -3,6 +3,7 @@ package collectibles
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"strings"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/contracts/collectibles"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 )
@@ -119,6 +121,48 @@ func (o *Manager) FetchAllAssetsByOwnerAndCollection(chainID uint64, owner commo
 	}
 
 	return assetContainer, nil
+}
+
+// Need to combine different providers to support all needed ChainIDs
+func (o *Manager) FetchBalancesByOwnerAndContractAddress(chainID uint64, ownerAddress common.Address, contractAddresses []common.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
+	ret := make(thirdparty.TokenBalancesPerContractAddress)
+
+	for _, contractAddress := range contractAddresses {
+		ret[contractAddress] = make([]thirdparty.TokenBalance, 0)
+	}
+
+	// Try with more direct endpoint first (OpenSea)
+	assetsContainer, err := o.FetchAllAssetsByOwnerAndContractAddress(chainID, ownerAddress, contractAddresses, "", 0)
+	if err == opensea.ErrChainIDNotSupported {
+		// Use contract ownership providers
+		for _, contractAddress := range contractAddresses {
+			ownership, err := o.FetchNFTOwnersByContractAddress(chainID, contractAddress)
+			if err != nil {
+				return nil, err
+			}
+			for _, nftOwner := range ownership.Owners {
+				if nftOwner.OwnerAddress == ownerAddress {
+					ret[contractAddress] = nftOwner.TokenBalances
+					break
+				}
+			}
+		}
+	} else if err == nil {
+		// OpenSea could provide
+		for _, asset := range assetsContainer.Assets {
+			contractAddress := common.HexToAddress(asset.Contract.Address)
+			balance := thirdparty.TokenBalance{
+				TokenID: asset.TokenID,
+				Balance: &bigint.BigInt{Int: big.NewInt(1)},
+			}
+			ret[contractAddress] = append(ret[contractAddress], balance)
+		}
+	} else {
+		// OpenSea could have provided, but returned error
+		return nil, err
+	}
+
+	return ret, nil
 }
 
 func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(chainID uint64, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*opensea.AssetContainer, error) {
