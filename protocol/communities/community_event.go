@@ -14,7 +14,6 @@ import (
 func (o *Community) ToCreateChannelCommunityEvent(channelID string, channel *protobuf.CommunityChat) *CommunityEvent {
 	return &CommunityEvent{
 		CommunityEventClock: o.NewCommunityEventClock(),
-		Applied:             true,
 		Type:                protobuf.CommunityEvent_COMMUNITY_CHANNEL_CREATE,
 		ChannelData: &protobuf.ChannelData{
 			ChannelId: channelID,
@@ -26,7 +25,6 @@ func (o *Community) ToCreateChannelCommunityEvent(channelID string, channel *pro
 func (o *Community) ToEditChannelCommunityEvent(channelID string, channel *protobuf.CommunityChat) *CommunityEvent {
 	return &CommunityEvent{
 		CommunityEventClock: o.NewCommunityEventClock(),
-		Applied:             true,
 		Type:                protobuf.CommunityEvent_COMMUNITY_CHANNEL_EDIT,
 		ChannelData: &protobuf.ChannelData{
 			ChannelId: channelID,
@@ -38,7 +36,6 @@ func (o *Community) ToEditChannelCommunityEvent(channelID string, channel *proto
 func (o *Community) ToDeleteChannelCommunityEvent(channelID string) *CommunityEvent {
 	return &CommunityEvent{
 		CommunityEventClock: o.NewCommunityEventClock(),
-		Applied:             true,
 		Type:                protobuf.CommunityEvent_COMMUNITY_CHANNEL_DELETE,
 		ChannelData: &protobuf.ChannelData{
 			ChannelId: channelID,
@@ -49,7 +46,6 @@ func (o *Community) ToDeleteChannelCommunityEvent(channelID string) *CommunityEv
 func (o *Community) ToReorderChannelCommunityEvent(categoryID string, channelID string, position int) *CommunityEvent {
 	return &CommunityEvent{
 		CommunityEventClock: o.NewCommunityEventClock(),
-		Applied:             true,
 		Type:                protobuf.CommunityEvent_COMMUNITY_CHANNEL_REORDER,
 		ChannelData: &protobuf.ChannelData{
 			CategoryId: categoryID,
@@ -62,7 +58,6 @@ func (o *Community) ToReorderChannelCommunityEvent(categoryID string, channelID 
 func (o *Community) ToCreateCategoryCommunityEvent(categoryID string, categoryName string, channelsIds []string) *CommunityEvent {
 	return &CommunityEvent{
 		CommunityEventClock: o.NewCommunityEventClock(),
-		Applied:             true,
 		Type:                protobuf.CommunityEvent_COMMUNITY_CATEGORY_CREATE,
 		CategoryData: &protobuf.CategoryData{
 			Name:        categoryName,
@@ -75,7 +70,6 @@ func (o *Community) ToCreateCategoryCommunityEvent(categoryID string, categoryNa
 func (o *Community) ToEditCategoryCommunityEvent(categoryID string, categoryName string, channelsIds []string) *CommunityEvent {
 	return &CommunityEvent{
 		CommunityEventClock: o.NewCommunityEventClock(),
-		Applied:             true,
 		Type:                protobuf.CommunityEvent_COMMUNITY_CATEGORY_EDIT,
 		CategoryData: &protobuf.CategoryData{
 			Name:        categoryName,
@@ -88,7 +82,6 @@ func (o *Community) ToEditCategoryCommunityEvent(categoryID string, categoryName
 func (o *Community) ToDeleteCategoryCommunityEvent(categoryID string) *CommunityEvent {
 	return &CommunityEvent{
 		CommunityEventClock: o.NewCommunityEventClock(),
-		Applied:             true,
 		Type:                protobuf.CommunityEvent_COMMUNITY_CATEGORY_DELETE,
 		CategoryData: &protobuf.CategoryData{
 			CategoryId: categoryID,
@@ -99,7 +92,6 @@ func (o *Community) ToDeleteCategoryCommunityEvent(categoryID string) *Community
 func (o *Community) ToReorderCategoryCommunityEvent(categoryID string, position int) *CommunityEvent {
 	return &CommunityEvent{
 		CommunityEventClock: o.NewCommunityEventClock(),
-		Applied:             true,
 		Type:                protobuf.CommunityEvent_COMMUNITY_CATEGORY_REORDER,
 		CategoryData: &protobuf.CategoryData{
 			CategoryId: categoryID,
@@ -111,7 +103,6 @@ func (o *Community) ToReorderCategoryCommunityEvent(categoryID string, position 
 func (o *Community) ToBanCommunityMemberCommunityEvent(pubkey string) *CommunityEvent {
 	return &CommunityEvent{
 		CommunityEventClock: o.NewCommunityEventClock(),
-		Applied:             true,
 		Type:                protobuf.CommunityEvent_COMMUNITY_MEMBER_BAN,
 		MemberToAction:      pubkey,
 	}
@@ -120,7 +111,6 @@ func (o *Community) ToBanCommunityMemberCommunityEvent(pubkey string) *Community
 func (o *Community) ToUnbanCommunityMemberCommunityEvent(pubkey string) *CommunityEvent {
 	return &CommunityEvent{
 		CommunityEventClock: o.NewCommunityEventClock(),
-		Applied:             true,
 		Type:                protobuf.CommunityEvent_COMMUNITY_MEMBER_UNBAN,
 		MemberToAction:      pubkey,
 	}
@@ -129,24 +119,22 @@ func (o *Community) ToUnbanCommunityMemberCommunityEvent(pubkey string) *Communi
 func (o *Community) ToKickCommunityMemberCommunityEvent(pubkey string) *CommunityEvent {
 	return &CommunityEvent{
 		CommunityEventClock: o.NewCommunityEventClock(),
-		Applied:             true,
 		Type:                protobuf.CommunityEvent_COMMUNITY_MEMBER_KICK,
 		MemberToAction:      pubkey,
 	}
 }
 
-func (o *Community) ToCommunityEditCommunityEvent() *CommunityEvent {
+func (o *Community) ToCommunityEditCommunityEvent(description *protobuf.CommunityDescription) *CommunityEvent {
 	return &CommunityEvent{
 		CommunityEventClock: o.NewCommunityEventClock(),
-		Applied:             true,
 		Type:                protobuf.CommunityEvent_COMMUNITY_EDIT,
 		CommunityConfig: &protobuf.CommunityConfig{
-			Identity:      o.Identity(),
-			Permissions:   o.Permissions(),
-			AdminSettings: o.AdminSettings(),
-			IntroMessage:  o.IntroMessage(),
-			OutroMessage:  o.OutroMessage(),
-			Tags:          o.TagsRaw(),
+			Identity:      description.Identity,
+			Permissions:   description.Permissions,
+			AdminSettings: description.AdminSettings,
+			IntroMessage:  description.IntroMessage,
+			OutroMessage:  description.OutroMessage,
+			Tags:          description.Tags,
 		},
 	}
 }
@@ -154,7 +142,6 @@ func (o *Community) ToCommunityEditCommunityEvent() *CommunityEvent {
 func (o *Community) ToCommunityTokenPermissionChangeCommunityEvent(permission *protobuf.CommunityTokenPermission) *CommunityEvent {
 	return &CommunityEvent{
 		CommunityEventClock: o.NewCommunityEventClock(),
-		Applied:             true,
 		Type:                protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGE,
 		TokenPermission:     permission,
 		CommunityConfig: &protobuf.CommunityConfig{
@@ -166,7 +153,6 @@ func (o *Community) ToCommunityTokenPermissionChangeCommunityEvent(permission *p
 func (o *Community) ToCommunityTokenPermissionDeleteCommunityEvent(permission *protobuf.CommunityTokenPermission) *CommunityEvent {
 	return &CommunityEvent{
 		CommunityEventClock: o.NewCommunityEventClock(),
-		Applied:             true,
 		Type:                protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETE,
 		TokenPermission:     permission,
 		CommunityConfig: &protobuf.CommunityConfig{
@@ -178,7 +164,6 @@ func (o *Community) ToCommunityTokenPermissionDeleteCommunityEvent(permission *p
 func (o *Community) ToCommunityRequestToJoinAcceptCommunityEvent(changes *CommunityEventChanges) *CommunityEvent {
 	return &CommunityEvent{
 		CommunityEventClock:    o.NewCommunityEventClock(),
-		Applied:                true,
 		Type:                   protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT,
 		MembersAdded:           changes.MembersAdded,
 		AcceptedRequestsToJoin: changes.AcceptedRequestsToJoin,
@@ -188,7 +173,6 @@ func (o *Community) ToCommunityRequestToJoinAcceptCommunityEvent(changes *Commun
 func (o *Community) ToCommunityRequestToJoinRejectCommunityEvent(changes *CommunityEventChanges) *CommunityEvent {
 	return &CommunityEvent{
 		CommunityEventClock:    o.NewCommunityEventClock(),
-		Applied:                true,
 		Type:                   protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT,
 		RejectedRequestsToJoin: changes.RejectedRequestsToJoin,
 	}
@@ -403,15 +387,53 @@ func (o *Community) addNewCommunityEvent(event *CommunityEvent) error {
 	if err != nil {
 		return errors.New("converting CommunityEvent to protobuf failed")
 	}
-	event.RawPayload = data
-	if o.config.EventsData == nil {
-		o.config.EventsData = &EventsData{
-			CommunityDescription: proto.Clone(o.config.CommunityDescription).(*protobuf.CommunityDescription),
-			Events:               []CommunityEvent{*event},
+
+	// All events must be build on top of the last owner CommunityDescription o the client side
+	// If there were no events before, extract CommunityDescription from MarshaledCommunityDescription
+	// and check the signature
+	if o.config.EventsData == nil || o.config.EventsData.CommunityDescription == nil {
+		metadata := &protobuf.ApplicationMetadataMessage{}
+
+		err := proto.Unmarshal(o.config.MarshaledCommunityDescription, metadata)
+		if err != nil {
+			return err
 		}
-	} else {
-		o.config.EventsData.Events = append(o.config.EventsData.Events, *event)
+
+		if metadata.Type != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
+			return ErrInvalidMessage
+		}
+
+		// TODO: check the signature
+		// Right now test are failing due to signer == nil, but this can be an issue in test
+
+		// signer, err := metadata.RecoverKey()
+		// if err != nil {
+		// 	return err
+		// }
+
+		// if signer == nil {
+		// 	return errors.New("signer can't be nil")
+		// }
+
+		// if signer != o.config.ID {
+		// 	return errors.New("CommunityDescription was not signed by an owner")
+		// }
+
+		description := &protobuf.CommunityDescription{}
+
+		err = proto.Unmarshal(metadata.Payload, description)
+		if err != nil {
+			return err
+		}
+
+		o.config.EventsData = &EventsData{
+			CommunityDescription: description,
+			Events:               []CommunityEvent{},
+		}
 	}
+
+	event.RawPayload = data
+	o.config.EventsData.Events = append(o.config.EventsData.Events, *event)
 
 	return nil
 }

@@ -1610,7 +1610,7 @@ func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommu
 	if community.IsOwner() {
 		// check existing member permission once, then check periodically
 		go func() {
-			err := m.communitiesManager.CheckMemberPermissions(community, false)
+			err := m.communitiesManager.CheckMemberPermissions(community, true)
 			if err != nil {
 				m.logger.Debug("failed to check member permissions", zap.Error(err))
 			}
@@ -1653,7 +1653,7 @@ func (m *Messenger) EditCommunityTokenPermission(request *requests.EditCommunity
 	//
 	// We do this in a separate routine to not block this function
 	go func() {
-		err := m.communitiesManager.CheckMemberPermissions(community, false)
+		err := m.communitiesManager.CheckMemberPermissions(community, true)
 		if err != nil {
 			m.logger.Debug("failed to check member permissions", zap.Error(err))
 		}

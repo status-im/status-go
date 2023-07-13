@@ -23,7 +23,6 @@ type CommunityEvent struct {
 	RejectedRequestsToJoin map[string]*protobuf.CommunityRequestToJoin `json:"rejectedRequestsToJoin,omitempty"`
 	AcceptedRequestsToJoin map[string]*protobuf.CommunityRequestToJoin `json:"acceptedRequestsToJoin,omitempty"`
 	RawPayload             []byte                                      `json:"rawPayload"`
-	Applied                bool                                        `json:"applied"`
 }
 
 func (e *CommunityEvent) ToProtobuf() *protobuf.CommunityEvent {

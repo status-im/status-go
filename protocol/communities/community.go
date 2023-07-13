@@ -1095,9 +1095,9 @@ func (o *Community) ValidateEditSharedAddresses(signer *ecdsa.PublicKey, request
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	// If we are not admin, fuggetaboutit
-	if !o.IsOwnerOrAdmin() {
-		return ErrNotAdmin
+	// If we are not owner, fuggetaboutit
+	if !o.IsOwner() {
+		return ErrNotOwner
 	}
 
 	if len(request.RevealedAccounts) == 0 {
@@ -1856,7 +1856,7 @@ func (o *Community) AddMemberWithRevealedAccounts(dbRequest *RequestToJoin, role
 		return nil, ErrNotAdmin
 	}
 
-	changes := o.addMemberWithRevealedAccounts(dbRequest.PublicKey, roles, accounts)
+	changes := o.addMemberWithRevealedAccounts(dbRequest.PublicKey, roles, accounts, dbRequest.Clock)
 
 	if isAdmin {
 		acceptedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
@@ -2288,7 +2288,7 @@ func (o *Community) deleteTokenPermission(permissionID string) (*CommunityChange
 	return changes, nil
 }
 
-func (o *Community) addMemberWithRevealedAccounts(memberKey string, roles []protobuf.CommunityMember_Roles, accounts []*protobuf.RevealedAccount) *CommunityChanges {
+func (o *Community) addMemberWithRevealedAccounts(memberKey string, roles []protobuf.CommunityMember_Roles, accounts []*protobuf.RevealedAccount, clock uint64) *CommunityChanges {
 	changes := o.emptyCommunityChanges()
 
 	if o.config.CommunityDescription.Members == nil {
@@ -2301,6 +2301,7 @@ func (o *Community) addMemberWithRevealedAccounts(memberKey string, roles []prot
 	}
 
 	o.config.CommunityDescription.Members[memberKey].RevealedAccounts = accounts
+	o.config.CommunityDescription.Members[memberKey].LastUpdateClock = clock
 	changes.MemberWalletsAdded[memberKey] = o.config.CommunityDescription.Members[memberKey].RevealedAccounts
 
 	return changes

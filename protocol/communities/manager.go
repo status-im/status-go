@@ -830,7 +830,7 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 	}
 
 	if isAdmin {
-		err := community.addNewCommunityEvent(community.ToCommunityEditCommunityEvent())
+		err := community.addNewCommunityEvent(community.ToCommunityEditCommunityEvent(newDescription))
 		if err != nil {
 			return nil, err
 		}
@@ -1547,14 +1547,14 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		role = []protobuf.CommunityMember_Roles{memberRole}
 	}
 
-	changes, err := community.AddMember(pk, role)
-	if err != nil {
-		return nil, err
-	}
+	// _, err = community.AddMember(pk, role)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	_, err = community.AddMemberRevealedAccounts(dbRequest.PublicKey, revealedAccounts, dbRequest.Clock)
+	// _, err = community.AddMemberRevealedAccounts(dbRequest.PublicKey, revealedAccounts, dbRequest.Clock)
 	// TODOM: resolve
-	//_, err = community.AddMemberWithRevealedAccounts(dbRequest, role, revealedAccounts)
+	_, err = community.AddMemberWithRevealedAccounts(dbRequest, role, revealedAccounts)
 	if err != nil {
 		return nil, err
 	}
@@ -4054,28 +4054,11 @@ func (m *Manager) SaveAndPublish(community *Community) error {
 	}
 
 	if community.IsOwner() {
-		// If owner did not receive all necessary data before (for example not all events were delivered)
-		// remove admin events anyway as CommunityDescription clock will be outdated
-		// err := m.persistence.SaveCommunity(community)
-		// if err != nil {
-		// 	return err
-		// }
-
-		// err = m.persistence.DeleteCommunityEvents(community.ID())
-		// if err != nil {
-		// 	return err
-		// }
-
 		m.publish(&Subscription{Community: community})
 		return nil
 	}
 
 	if community.IsAdmin() {
-		// Admins send only all admins events. Based on on those events, clients construct CommunityDesctiption
-		// Constructed CommunityDescription won't be saved on the clients nodes, only when Owner node will
-		// apply these changes to CommunityDescription, new CommunityDescription with the increased
-		// clock will be sent to all clients
-
 		err := m.persistence.SaveCommunityEvents(community)
 		if err != nil {
 			return err
@@ -4085,5 +4068,5 @@ func (m *Manager) SaveAndPublish(community *Community) error {
 		return nil
 	}
 
-	return ErrNotEnoughPermissions
+	return nil
 }
