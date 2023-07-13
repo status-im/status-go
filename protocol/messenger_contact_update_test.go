@@ -32,23 +32,10 @@ func (s *MessengerContactUpdateSuite) SetupTest() {
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 
-	s.m = s.newMessenger(s.shh)
+	s.m = s.newMessenger()
 	s.privateKey = s.m.identity
 	_, err := s.m.Start()
 	s.Require().NoError(err)
-}
-
-func (s *MessengerContactUpdateSuite) TearDownTest() {
-	s.Require().NoError(s.m.Shutdown())
-}
-
-func (s *MessengerContactUpdateSuite) newMessenger(shh types.Waku) *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
-	s.Require().NoError(err)
-	return messenger
 }
 
 func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
@@ -56,7 +43,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	defer theirMessenger.Shutdown() // nolint: errcheck
@@ -124,7 +111,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 func (s *MessengerContactUpdateSuite) TestAddContact() {
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	defer theirMessenger.Shutdown() // nolint: errcheck
@@ -158,7 +145,7 @@ func (s *MessengerContactUpdateSuite) TestAddContactWithENS() {
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 	ensName := "blah.stateofus.eth"
 
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	defer theirMessenger.Shutdown() // nolint: errcheck

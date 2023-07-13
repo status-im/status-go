@@ -9,13 +9,11 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/waku"
 )
 
 const statusChatID = "status"
@@ -27,36 +25,6 @@ func TestMessengerInstallationSuite(t *testing.T) {
 
 type MessengerInstallationSuite struct {
 	MessengerBaseTestSuite
-}
-
-func (s *MessengerInstallationSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-
-	s.m = s.newMessenger(s.shh)
-	s.privateKey = s.m.identity
-	// We start the messenger in order to receive installations
-	_, err := s.m.Start()
-	s.Require().NoError(err)
-}
-
-func (s *MessengerInstallationSuite) TearDownTest() {
-	s.Require().NoError(s.m.Shutdown())
-}
-
-func (s *MessengerInstallationSuite) newMessenger(shh types.Waku) *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
-	s.Require().NoError(err)
-
-	return messenger
 }
 
 func (s *MessengerInstallationSuite) TestReceiveInstallation() {
@@ -297,7 +265,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
 	// pair
 	bob2, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
 	s.Require().NoError(err)
-	alice := s.newMessenger(s.shh)
+	alice := s.newMessenger()
 
 	err = bob2.SetInstallationMetadata(bob2.installationID, &multidevice.InstallationMetadata{
 		Name:       "their-name",

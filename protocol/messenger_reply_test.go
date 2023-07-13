@@ -6,12 +6,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/waku"
 )
 
 func TestMessengerReplySuite(t *testing.T) {
@@ -20,34 +16,6 @@ func TestMessengerReplySuite(t *testing.T) {
 
 type MessengerReplySuite struct {
 	MessengerBaseTestSuite
-}
-
-func (s *MessengerReplySuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-
-	s.m = s.newMessenger(s.shh)
-	s.privateKey = s.m.identity
-	_, err := s.m.Start()
-	s.Require().NoError(err)
-}
-
-func (s *MessengerReplySuite) TearDownTest() {
-	s.Require().NoError(s.m.Shutdown())
-}
-
-func (s *MessengerReplySuite) newMessenger(shh types.Waku) *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
-	s.Require().NoError(err)
-	return messenger
 }
 
 func (s *MessengerReplySuite) TestReceiveReply() {
