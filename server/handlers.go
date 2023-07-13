@@ -57,7 +57,7 @@ func handleRequestDownloaderMissing(logger *zap.Logger) http.HandlerFunc {
 	}
 }
 
-type ParsedParams struct {
+type ImageParams struct {
 	KeyUID          string
 	PublicKey       string
 	ImageName       string
@@ -85,8 +85,8 @@ type ParsedParams struct {
 	Download bool
 }
 
-func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
-	parsed := ParsedParams{}
+func ParseImageParams(logger *zap.Logger, params url.Values) ImageParams {
+	parsed := ImageParams{}
 	parsed.Color = color.Transparent
 	parsed.BgColor = color.Transparent
 	parsed.IndicatorColor = color.Transparent
@@ -160,12 +160,12 @@ func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
 
 	colors := params["color"]
 	if len(colors) != 0 {
-		color, err := images.ParseColor(colors[0])
+		textColor, err := images.ParseColor(colors[0])
 		if err != nil {
 			logger.Error("ParseParams: invalid color", zap.String("Color", colors[0]))
 			return parsed
 		}
-		parsed.Color = color
+		parsed.Color = textColor
 	}
 
 	sizeStrs := params["size"]
@@ -262,7 +262,7 @@ func ParseParams(logger *zap.Logger, params url.Values) ParsedParams {
 	return parsed
 }
 
-func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *zap.Logger, w http.ResponseWriter, r *http.Request, parsed ParsedParams) {
+func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *zap.Logger, w http.ResponseWriter, parsed ImageParams) {
 	if parsed.KeyUID == "" {
 		logger.Error("handleAccountImagesImpl: no keyUid")
 		return
@@ -305,7 +305,7 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 
 			accColorHash, err = colorhash.GenerateFor(parsed.PublicKey)
 			if err != nil {
-				logger.Error("handleAccountImagesImpl: could not generate color hash", zap.String("keyUid", parsed.KeyUID))
+				logger.Error("handleAccountImagesImpl: could not generate color hash", zap.String("keyUid", parsed.KeyUID), zap.Error(err))
 				return
 			}
 		}
@@ -349,7 +349,7 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 	}
 }
 
-func handleAccountImagesPlaceholder(logger *zap.Logger, w http.ResponseWriter, r *http.Request, parsed ParsedParams) {
+func handleAccountImagesPlaceholder(logger *zap.Logger, w http.ResponseWriter, parsed ImageParams) {
 	if parsed.ImagePath == "" {
 		logger.Error("handleAccountImagesPlaceholder: no imagePath")
 		return
@@ -399,20 +399,21 @@ func handleAccountImagesPlaceholder(logger *zap.Logger, w http.ResponseWriter, r
 	}
 }
 
+// handleAccountImages render multiaccounts custom profile image
 func handleAccountImages(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
-		parsed := ParseParams(logger, params)
+		parsed := ParseImageParams(logger, params)
 
 		if parsed.KeyUID == "" {
-			handleAccountImagesPlaceholder(logger, w, r, parsed)
+			handleAccountImagesPlaceholder(logger, w, parsed)
 		} else {
-			handleAccountImagesImpl(multiaccountsDB, logger, w, r, parsed)
+			handleAccountImagesImpl(multiaccountsDB, logger, w, parsed)
 		}
 	}
 }
 
-func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *zap.Logger, w http.ResponseWriter, r *http.Request, parsed ParsedParams) {
+func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *zap.Logger, w http.ResponseWriter, parsed ImageParams) {
 	var name = parsed.FullName
 	var accColorHash multiaccounts.ColorHash
 	var account *multiaccounts.Account
@@ -487,7 +488,7 @@ func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *
 	}
 }
 
-func handleAccountInitialsPlaceholder(logger *zap.Logger, w http.ResponseWriter, r *http.Request, parsed ParsedParams) {
+func handleAccountInitialsPlaceholder(logger *zap.Logger, w http.ResponseWriter, parsed ImageParams) {
 	if parsed.FullName == "" {
 		logger.Error("handleAccountInitialsPlaceholder: no full name")
 		return
@@ -528,10 +529,11 @@ func handleAccountInitialsPlaceholder(logger *zap.Logger, w http.ResponseWriter,
 	}
 }
 
+// handleAccountInitials render multiaccounts/contacts initials avatar image
 func handleAccountInitials(multiaccountsDB *multiaccounts.Database, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
-		parsed := ParseParams(logger, params)
+		parsed := ParseImageParams(logger, params)
 
 		if parsed.FontFile == "" {
 			logger.Error("handleAccountInitials: no fontFile")
@@ -555,13 +557,14 @@ func handleAccountInitials(multiaccountsDB *multiaccounts.Database, logger *zap.
 		}
 
 		if parsed.KeyUID == "" && parsed.PublicKey == "" {
-			handleAccountInitialsPlaceholder(logger, w, r, parsed)
+			handleAccountInitialsPlaceholder(logger, w, parsed)
 		} else {
-			handleAccountInitialsImpl(multiaccountsDB, logger, w, r, parsed)
+			handleAccountInitialsImpl(multiaccountsDB, logger, w, parsed)
 		}
 	}
 }
 
+// handleContactImages render contacts custom profile image
 func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 	if db == nil {
 		return handleRequestDBMissing(logger)
@@ -569,7 +572,7 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
-		parsed := ParseParams(logger, params)
+		parsed := ParseImageParams(logger, params)
 
 		if parsed.PublicKey == "" {
 			logger.Error("no publicKey")
@@ -672,27 +675,27 @@ func getTheme(params url.Values, logger *zap.Logger) ring.Theme {
 func handleIdenticon(logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
-		parsed := ParseParams(logger, params)
+		parsed := ParseImageParams(logger, params)
 
 		if parsed.PublicKey == "" {
 			logger.Error("no publicKey")
 			return
 		}
 
-		image, err := identicon.Generate(parsed.PublicKey)
+		identiconImage, err := identicon.Generate(parsed.PublicKey)
 		if err != nil {
 			logger.Error("could not generate identicon")
 		}
 
-		if image != nil && parsed.Ring {
+		if identiconImage != nil && parsed.Ring {
 			colorHash, err := colorhash.GenerateFor(parsed.PublicKey)
 			if err != nil {
 				logger.Error("could not generate color hash")
 				return
 			}
 
-			image, err = ring.DrawRing(&ring.DrawRingParam{
-				Theme: parsed.Theme, ColorHash: colorHash, ImageBytes: image, Height: identicon.Height, Width: identicon.Width,
+			identiconImage, err = ring.DrawRing(&ring.DrawRingParam{
+				Theme: parsed.Theme, ColorHash: colorHash, ImageBytes: identiconImage, Height: identicon.Height, Width: identicon.Width,
 			})
 			if err != nil {
 				logger.Error("failed to draw ring", zap.Error(err))
@@ -703,7 +706,7 @@ func handleIdenticon(logger *zap.Logger) http.HandlerFunc {
 		w.Header().Set("Cache-Control", "max-age:290304000, public")
 		w.Header().Set("Expires", time.Now().AddDate(60, 0, 0).Format(http.TimeFormat))
 
-		_, err = w.Write(image)
+		_, err = w.Write(identiconImage)
 		if err != nil {
 			logger.Error("failed to write image", zap.Error(err))
 		}
@@ -717,7 +720,7 @@ func handleDiscordAuthorAvatar(db *sql.DB, logger *zap.Logger) http.HandlerFunc 
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
-		parsed := ParseParams(logger, params)
+		parsed := ParseImageParams(logger, params)
 
 		if parsed.AuthorID == "" {
 			logger.Error("no authorIDs")
@@ -756,7 +759,7 @@ func handleDiscordAttachment(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
-		parsed := ParseParams(logger, params)
+		parsed := ParseImageParams(logger, params)
 
 		if parsed.MessageID == "" {
 			logger.Error("no messageID")
@@ -799,7 +802,7 @@ func handleImage(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
-		parsed := ParseParams(logger, params)
+		parsed := ParseImageParams(logger, params)
 
 		if parsed.MessageID == "" {
 			logger.Error("no messageID")
@@ -838,7 +841,7 @@ func handleAudio(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
-		parsed := ParseParams(logger, params)
+		parsed := ParseImageParams(logger, params)
 
 		if parsed.MessageID == "" {
 			logger.Error("no messageID")
@@ -873,7 +876,7 @@ func handleIPFS(downloader *ipfs.Downloader, logger *zap.Logger) http.HandlerFun
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
-		parsed := ParseParams(logger, params)
+		parsed := ParseImageParams(logger, params)
 
 		if parsed.Hash == "" {
 			logger.Error("no hash")
@@ -946,7 +949,7 @@ func getThumbnailPayload(db *sql.DB, logger *zap.Logger, msgID string, thumbnail
 func handleLinkPreviewThumbnail(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
-		parsed := ParseParams(logger, params)
+		parsed := ParseImageParams(logger, params)
 
 		if parsed.MessageID == "" {
 			http.Error(w, "missing query parameter 'message-id'", http.StatusBadRequest)

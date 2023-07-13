@@ -35,7 +35,7 @@ func ExtractInitials(fullName string, amountInitials int) string {
 	return initials.String()
 }
 
-// uppercaseRatio is <height of any upper case> / dc.FontHeight() (line height)
+// GenerateInitialsImage uppercaseRatio is <height of any upper case> / dc.FontHeight() (line height)
 // 0.60386123 for Inter-UI-Medium.otf
 func GenerateInitialsImage(initials string, bgColor, fontColor color.Color, fontFile string, size int, fontSize float64, uppercaseRatio float64) ([]byte, error) {
 	// Load otf file
