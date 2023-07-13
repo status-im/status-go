@@ -2,13 +2,11 @@ package protocol
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -25,15 +23,7 @@ func TestMessengerEmojiSuite(t *testing.T) {
 }
 
 type MessengerEmojiSuite struct {
-	suite.Suite
-	m          *Messenger        // main instance of Messenger
-	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
-
-	// If one wants to send messages between different instances of Messenger,
-	// a single Waku service should be shared.
-	shh types.Waku
-
-	logger *zap.Logger
+	MessengerBaseTestSuite
 }
 
 func (s *MessengerEmojiSuite) SetupTest() {

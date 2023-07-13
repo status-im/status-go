@@ -7,11 +7,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -24,12 +22,7 @@ func TestGroupChatSuite(t *testing.T) {
 }
 
 type MessengerGroupChatSuite struct {
-	suite.Suite
-
-	// If one wants to send messages between different instances of Messenger,
-	// a single Waku service should be shared.
-	shh    types.Waku
-	logger *zap.Logger
+	MessengerBaseTestSuite
 }
 
 func (s *MessengerGroupChatSuite) newMessenger() *Messenger {

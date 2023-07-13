@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -10,7 +9,6 @@ import (
 	"github.com/status-im/status-go/protocol/identity"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -29,13 +27,7 @@ func TestMessengerBackupSuite(t *testing.T) {
 }
 
 type MessengerBackupSuite struct {
-	suite.Suite
-	m          *Messenger        // main instance of Messenger
-	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
-	// If one wants to send messages between different instances of Messenger,
-	// a single waku service should be shared.
-	shh    types.Waku
-	logger *zap.Logger
+	MessengerBaseTestSuite
 }
 
 func (s *MessengerBackupSuite) SetupTest() {
@@ -55,15 +47,6 @@ func (s *MessengerBackupSuite) SetupTest() {
 
 func (s *MessengerBackupSuite) TearDownTest() {
 	s.Require().NoError(s.m.Shutdown())
-}
-
-func (s *MessengerBackupSuite) newMessenger() *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
-	s.Require().NoError(err)
-	return messenger
 }
 
 func (s *MessengerBackupSuite) TestBackupContacts() {
