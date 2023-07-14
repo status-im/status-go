@@ -698,7 +698,7 @@ func (o *Community) hasMemberPermission(member *protobuf.CommunityMember, permis
 }
 
 func (o *Community) hasPermission(pk *ecdsa.PublicKey, roles map[protobuf.CommunityMember_Roles]bool) bool {
-	if pk == nil || o.config.ID == nil {
+	if pk == nil || o.config == nil || o.config.ID == nil {
 		return false
 	}
 
