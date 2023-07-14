@@ -130,7 +130,7 @@ type Waku interface {
 
 	Subscribe(opts *SubscriptionOptions) (string, error)
 	GetFilter(id string) Filter
-	Unsubscribe(id string) error
+	Unsubscribe(ctx context.Context, id string) error
 	UnsubscribeMany(ids []string) error
 
 	// RequestHistoricMessages sends a message with p2pRequestCode to a specific peer,

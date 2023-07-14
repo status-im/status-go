@@ -204,7 +204,7 @@ func (w *gethWakuWrapper) GetFilter(id string) types.Filter {
 	return NewWakuFilterWrapper(w.waku.GetFilter(id), id)
 }
 
-func (w *gethWakuWrapper) Unsubscribe(id string) error {
+func (w *gethWakuWrapper) Unsubscribe(ctx context.Context, id string) error {
 	return w.waku.Unsubscribe(id)
 }
 

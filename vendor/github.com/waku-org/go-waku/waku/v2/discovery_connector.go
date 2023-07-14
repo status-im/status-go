@@ -79,7 +79,7 @@ type PeerData struct {
 	ENR      *enode.Node
 }
 
-// PeerChannel receives channels on which discovered peers should be pushed
+// Subscribe receives channels on which discovered peers should be pushed
 func (c *PeerConnectionStrategy) Subscribe(ctx context.Context, ch <-chan PeerData) {
 	if c.cancel != nil {
 		c.wg.Add(1)
