@@ -5072,6 +5072,18 @@ func (m *Messenger) muteChat(chat *Chat, contact *Contact, mutedTill time.Time) 
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	m.allChats.Store(chat.ID, chat)
 
+	if chat.CommunityChat() {
+		community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
+		if err != nil {
+			return err
+		}
+
+		err = m.communitiesManager.SetMuted(community.ID(), false)
+		if err != nil {
+			return err
+		}
+	}
+
 	if contact != nil {
 		err := m.syncContact(context.Background(), contact, m.dispatchMessage)
 		if err != nil {
