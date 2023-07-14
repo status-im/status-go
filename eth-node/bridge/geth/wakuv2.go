@@ -152,8 +152,8 @@ func (w *gethWakuV2Wrapper) GetFilter(id string) types.Filter {
 	return NewWakuV2FilterWrapper(w.waku.GetFilter(id), id)
 }
 
-func (w *gethWakuV2Wrapper) Unsubscribe(id string) error {
-	return w.waku.Unsubscribe(id)
+func (w *gethWakuV2Wrapper) Unsubscribe(ctx context.Context, id string) error {
+	return w.waku.Unsubscribe(ctx, id)
 }
 
 func (w *gethWakuV2Wrapper) UnsubscribeMany(ids []string) error {

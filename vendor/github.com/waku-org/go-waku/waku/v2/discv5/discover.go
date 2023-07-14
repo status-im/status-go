@@ -241,6 +241,12 @@ func (d *DiscoveryV5) Stop() {
 
 	d.wg.Wait()
 
+	defer func() {
+		if r := recover(); r != nil {
+			d.log.Info("recovering from panic and quitting")
+		}
+	}()
+
 	close(d.peerCh)
 }
 
@@ -444,8 +450,4 @@ restartLoop:
 
 func (d *DiscoveryV5) IsStarted() bool {
 	return d.started.Load()
-}
-
-func (d *DiscoveryV5) PeerChannel() <-chan v2.PeerData {
-	return d.peerCh
 }

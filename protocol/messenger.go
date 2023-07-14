@@ -521,7 +521,17 @@ func NewMessenger(
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
 			encryptionProtocol.Stop,
-			transp.ResetFilters,
+			func() error {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+				defer cancel()
+				err := transp.ResetFilters(ctx)
+				if err != nil {
+					logger.Warn("could not reset filters", zap.Error(err))
+				}
+				// We don't want to thrown an error in this case, this is a soft
+				// fail
+				return nil
+			},
 			transp.Stop,
 			func() error { sender.Stop(); return nil },
 			// Currently this often fails, seems like it's safe to ignore them

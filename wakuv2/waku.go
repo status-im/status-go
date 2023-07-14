@@ -1027,11 +1027,11 @@ func (w *Waku) Subscribe(f *common.Filter) (string, error) {
 }
 
 // Unsubscribe removes an installed message handler.
-func (w *Waku) Unsubscribe(id string) error {
+func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
 	f := w.filters.Get(id)
 	if f != nil && w.settings.LightClient {
 		contentFilter := w.buildContentFilter(f.Topics)
-		if _, err := w.node.FilterLightnode().Unsubscribe(context.Background(), contentFilter); err != nil {
+		if _, err := w.node.FilterLightnode().Unsubscribe(ctx, contentFilter); err != nil {
 			return fmt.Errorf("failed to unsubscribe: %w", err)
 		}
 	}
