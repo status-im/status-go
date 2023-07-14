@@ -521,7 +521,11 @@ func NewMessenger(
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
 			encryptionProtocol.Stop,
-			transp.ResetFilters,
+			func() error {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+				defer cancel()
+				return transp.ResetFilters(ctx)
+			},
 			transp.Stop,
 			func() error { sender.Stop(); return nil },
 			// Currently this often fails, seems like it's safe to ignore them

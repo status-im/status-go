@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
@@ -33,6 +32,8 @@ type PeerConnector interface {
 }
 
 type DiscoveryV5 struct {
+	sync.RWMutex
+
 	params    *discV5Parameters
 	host      host.Host
 	config    discover.Config
@@ -46,9 +47,8 @@ type DiscoveryV5 struct {
 
 	log *zap.Logger
 
-	started atomic.Bool
-	cancel  context.CancelFunc
-	wg      *sync.WaitGroup
+	cancel context.CancelFunc
+	wg     *sync.WaitGroup
 }
 
 type discV5Parameters struct {
@@ -188,9 +188,10 @@ func (d *DiscoveryV5) SetHost(h host.Host) {
 
 // only works if the discovery v5 hasn't been started yet.
 func (d *DiscoveryV5) Start(ctx context.Context) error {
-	// compare and swap sets the discovery v5 to `started` state
-	// and prevents multiple calls to the start method by being atomic.
-	if !d.started.CompareAndSwap(false, true) {
+	d.Lock()
+	defer d.Unlock()
+
+	if d.cancel != nil {
 		return nil
 	}
 
@@ -217,6 +218,9 @@ func (d *DiscoveryV5) Start(ctx context.Context) error {
 }
 
 func (d *DiscoveryV5) SetBootnodes(nodes []*enode.Node) error {
+	d.Lock()
+	defer d.Unlock()
+
 	if d.listener == nil {
 		return ErrNoDiscV5Listener
 	}
@@ -227,7 +231,10 @@ func (d *DiscoveryV5) SetBootnodes(nodes []*enode.Node) error {
 // only works if the discovery v5 is in running state
 // so we can assume that cancel method is set
 func (d *DiscoveryV5) Stop() {
-	if !d.started.CompareAndSwap(true, false) { // if Discoveryv5 is running, set started to false
+	d.Lock()
+	defer d.Unlock()
+
+	if d.cancel == nil {
 		return
 	}
 
@@ -242,6 +249,8 @@ func (d *DiscoveryV5) Stop() {
 	d.wg.Wait()
 
 	close(d.peerCh)
+
+	d.cancel = nil
 }
 
 /*
@@ -287,6 +296,9 @@ func evaluateNode(node *enode.Node) bool {
 // used for caching enr address in peerExchange
 // used for connecting to peers in discovery_connector
 func (d *DiscoveryV5) Iterator() (enode.Iterator, error) {
+	d.Lock()
+	defer d.Unlock()
+
 	if d.listener == nil {
 		return nil, ErrNoDiscV5Listener
 	}
@@ -300,6 +312,9 @@ func (d *DiscoveryV5) Iterator() (enode.Iterator, error) {
 }
 
 func (d *DiscoveryV5) FindPeersWithPredicate(ctx context.Context, predicate func(*enode.Node) bool) (enode.Iterator, error) {
+	d.Lock()
+	defer d.Unlock()
+
 	if d.listener == nil {
 		return nil, ErrNoDiscV5Listener
 	}
@@ -313,6 +328,9 @@ func (d *DiscoveryV5) FindPeersWithPredicate(ctx context.Context, predicate func
 }
 
 func (d *DiscoveryV5) FindPeersWithShard(ctx context.Context, cluster, index uint16) (enode.Iterator, error) {
+	d.Lock()
+	defer d.Unlock()
+
 	if d.listener == nil {
 		return nil, ErrNoDiscV5Listener
 	}
@@ -443,7 +461,10 @@ restartLoop:
 }
 
 func (d *DiscoveryV5) IsStarted() bool {
-	return d.started.Load()
+	d.RLock()
+	defer d.RUnlock()
+
+	return d.cancel == nil
 }
 
 func (d *DiscoveryV5) PeerChannel() <-chan v2.PeerData {

@@ -79,7 +79,7 @@ type PeerData struct {
 	ENR      *enode.Node
 }
 
-// PeerChannel receives channels on which discovered peers should be pushed
+// Subscribe receives channels on which discovered peers should be pushed
 func (c *PeerConnectionStrategy) Subscribe(ctx context.Context, ch <-chan PeerData) {
 	if c.cancel != nil {
 		c.wg.Add(1)
@@ -202,9 +202,6 @@ func (c *PeerConnectionStrategy) publishWork(ctx context.Context, p peer.AddrInf
 	case c.dialCh <- p:
 	case <-ctx.Done():
 		return
-	case <-time.After(1 * time.Second):
-		// This timeout is to not lock the goroutine
-		return
 	}
 }
 
@@ -250,13 +247,6 @@ func (c *PeerConnectionStrategy) workPublisher(ctx context.Context) {
 
 func (c *PeerConnectionStrategy) dialPeers(ctx context.Context) {
 	defer c.wg.Done()
-
-	maxGoRoutines := c.minPeers
-	if maxGoRoutines > 15 {
-		maxGoRoutines = 15
-	}
-
-	sem := make(chan struct{}, maxGoRoutines)
 	for {
 		select {
 		case pi, ok := <-c.dialCh:
@@ -265,6 +255,10 @@ func (c *PeerConnectionStrategy) dialPeers(ctx context.Context) {
 			}
 
 			if pi.ID == c.host.ID() || pi.ID == "" {
+				continue
+			}
+
+			if c.host.Network().Connectedness(pi.ID) == network.Connected {
 				continue
 			}
 
@@ -287,24 +281,14 @@ func (c *PeerConnectionStrategy) dialPeers(ctx context.Context) {
 			}
 			c.mux.Unlock()
 
-			if c.host.Network().Connectedness(pi.ID) == network.Connected {
-				continue
+			dialCtx, dialCtxCancel := context.WithTimeout(c.workerCtx, c.dialTimeout)
+			err := c.host.Connect(dialCtx, pi)
+			if err != nil && !errors.Is(err, context.Canceled) {
+				c.host.Peerstore().(peers.WakuPeerstore).AddConnFailure(pi)
+				c.logger.Info("connecting to peer", logging.HostID("peerID", pi.ID), zap.Error(err))
 			}
+			dialCtxCancel()
 
-			sem <- struct{}{}
-			c.wg.Add(1)
-			go func(pi peer.AddrInfo) {
-				defer c.wg.Done()
-
-				ctx, cancel := context.WithTimeout(c.workerCtx, c.dialTimeout)
-				defer cancel()
-				err := c.host.Connect(ctx, pi)
-				if err != nil && !errors.Is(err, context.Canceled) {
-					c.host.Peerstore().(peers.WakuPeerstore).AddConnFailure(pi)
-					c.logger.Info("connecting to peer", logging.HostID("peerID", pi.ID), zap.Error(err))
-				}
-				<-sem
-			}(pi)
 		case <-ctx.Done():
 			return
 		}

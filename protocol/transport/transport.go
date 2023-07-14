@@ -169,15 +169,15 @@ func (t *Transport) InitCommunityFilters(pks []*ecdsa.PrivateKey) ([]*Filter, er
 }
 
 func (t *Transport) RemoveFilters(filters []*Filter) error {
-	return t.filters.Remove(filters...)
+	return t.filters.Remove(context.Background(), filters...)
 }
 
 func (t *Transport) RemoveFilterByChatID(chatID string) (*Filter, error) {
 	return t.filters.RemoveFilterByChatID(chatID)
 }
 
-func (t *Transport) ResetFilters() error {
-	return t.filters.Reset()
+func (t *Transport) ResetFilters(ctx context.Context) error {
+	return t.filters.Reset(ctx)
 }
 
 func (t *Transport) ProcessNegotiatedSecret(secret types.NegotiatedSecret) (*Filter, error) {
@@ -197,7 +197,7 @@ func (t *Transport) LeavePublic(chatID string) error {
 	if chat != nil {
 		return nil
 	}
-	return t.filters.Remove(chat)
+	return t.filters.Remove(context.Background(), chat)
 }
 
 func (t *Transport) JoinPrivate(publicKey *ecdsa.PublicKey) (*Filter, error) {

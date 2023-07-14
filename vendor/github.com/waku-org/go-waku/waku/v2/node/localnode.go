@@ -305,15 +305,27 @@ func (w *WakuNode) watchTopicShards(ctx context.Context) error {
 				return
 			case <-evtRelayUnsubscribed.Out():
 			case <-evtRelaySubscribed.Out():
-				rs, err := protocol.TopicsToRelayShards(w.Relay().Topics()...)
+				topics := w.Relay().Topics()
+				rs, err := protocol.TopicsToRelayShards(topics...)
 				if err != nil {
 					w.log.Warn("could not set ENR shard info", zap.Error(err))
 					continue
 				}
 
-				if len(rs) > 1 {
-					w.log.Warn("use sharded topics within the same cluster")
-					continue
+				if len(rs) > 0 {
+					if len(rs) > 1 {
+						w.log.Warn("could not set ENR shard info", zap.String("error", "use sharded topics within the same cluster"))
+						continue
+					}
+
+					tcount := 0
+					for _, r := range rs {
+						tcount += len(r.Indices)
+					}
+					if tcount != len(topics) {
+						w.log.Warn("could not set ENR shard info", zap.String("error", "can't use a mix of static shards and named shards"))
+						continue
+					}
 				}
 
 				if len(rs) == 1 {
