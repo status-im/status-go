@@ -448,6 +448,62 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	s.retractContactRequest(contactID, theirMessenger)
 }
 
+// The scenario tested is as follow:
+// 1) Alice sends a contact request to Bob
+// 2) Bob declines the contact request
+// 3) Alice fails to send a new contact request to Bob
+func (s *MessengerContactRequestSuite) TestAliceTriesToSpamBobWithContactRequests() {
+	messageTextAlice := "You wanna play with fire, Bobby?!"
+	alice := s.m
+
+	bob := s.newMessenger(s.shh)
+	_, err := bob.Start()
+	s.Require().NoError(err)
+	defer bob.Shutdown() // nolint: errcheck
+
+	bobID := types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
+
+	// Alice sends a contact request to Bob
+	request := &requests.SendContactRequest{
+		ID:      bobID,
+		Message: messageTextAlice,
+	}
+	s.sendContactRequest(request, alice)
+
+	contactRequest := s.receiveContactRequest(messageTextAlice, bob)
+	s.Require().NotNil(contactRequest)
+
+	// Bob declines the contact request
+	s.declineContactRequest(contactRequest, bob)
+
+	// Alice sends a new contact request
+	resp, err := alice.SendContactRequest(context.Background(), request)
+	s.Require().NoError(err)
+	s.Require().NotNil(resp)
+
+	// Check CR and mutual state update messages
+	s.Require().Len(resp.Messages(), 2)
+
+	contactRequest = s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
+	s.Require().NotNil(contactRequest)
+
+	s.Require().Equal(common.ContactRequestStatePending, contactRequest.ContactRequestState)
+	s.Require().Equal(request.Message, contactRequest.Text)
+
+	// We should not receive a CR from a rejected contact
+	_, err = WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Messages()) > 0 &&
+				s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST) != nil
+		},
+		"no messages",
+	)
+	s.Require().Error(err)
+	s.Require().ErrorContains(err, "no messages")
+
+}
+
 func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequestTwice() { //nolint: unused
 	messageText := "hello!"
 
@@ -483,30 +539,17 @@ func (s *MessengerContactRequestSuite) TestReceiveAndAcceptContactRequestTwice()
 	s.Require().Equal(mutualStateUpdate.From, s.m.myHexIdentity())
 	s.Require().Equal(mutualStateUpdate.ChatId, request.ID)
 
-	// Wait for the message to reach its destination
-	resp, err = WaitOnMessengerResponse(
+	// We should not receive a CR from a mutual contact
+	_, err = WaitOnMessengerResponse(
 		theirMessenger,
 		func(r *MessengerResponse) bool {
-			return len(r.Messages()) > 0
+			return len(r.Messages()) > 0 &&
+				s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST) != nil
 		},
 		"no messages",
 	)
-	s.Require().NoError(err)
-
-	s.Require().Len(resp.Messages(), 1)
-
-	contactRequest = s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
-	s.Require().NotNil(contactRequest)
-
-	s.Require().Equal(common.ContactRequestStateAccepted, contactRequest.ContactRequestState)
-	s.Require().Equal(request.Message, contactRequest.Text)
-
-	// Nothing should have changed, on both sides
-	mutualContacts := s.m.MutualContacts()
-	s.Require().Len(mutualContacts, 1)
-
-	mutualContacts = theirMessenger.MutualContacts()
-	s.Require().Len(mutualContacts, 1)
+	s.Require().Error(err)
+	s.Require().ErrorContains(err, "no messages")
 }
 
 func (s *MessengerContactRequestSuite) TestAcceptLatestContactRequestForContact() {
@@ -1077,56 +1120,6 @@ func (s *MessengerContactRequestSuite) TestBobSendsContactRequestAfterDecliningO
 	s.Require().Len(resp.Contacts, 1)
 	contact := resp.Contacts[0]
 	s.Require().True(contact.mutual())
-
-	// Make sure contact is added on the sender side
-	contacts := bob.AddedContacts()
-	s.Require().Len(contacts, 1)
-	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestLocalState)
-	s.Require().NotNil(contacts[0].DisplayName)
-
-	// Wait for the message to reach its destination
-	resp, err = WaitOnMessengerResponse(
-		alice,
-		func(r *MessengerResponse) bool {
-			return len(r.Contacts) == 1 && len(r.Messages()) == 2 && len(r.ActivityCenterNotifications()) == 1
-		},
-		"no messages",
-	)
-
-	// Check contact request has been received
-	s.Require().NoError(err)
-	s.Require().NotNil(resp)
-
-	contactRequestMsg := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
-	s.Require().NotNil(contactRequestMsg)
-
-	// Check CR message, it should be accepted
-	s.Require().Len(resp.Messages(), 2)
-
-	contactRequest = s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_CONTACT_REQUEST)
-	s.Require().NotNil(contactRequest)
-
-	s.Require().Equal(common.ContactRequestStateAccepted, contactRequest.ContactRequestState)
-	s.Require().Equal(requestFromBob.Message, contactRequest.Text)
-
-	// Check pending notification
-	s.Require().Len(resp.ActivityCenterNotifications(), 1)
-	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
-	s.Require().Equal(contactRequest.ID, resp.ActivityCenterNotifications()[0].Message.ID)
-	s.Require().Equal(contactRequest.ContactRequestState, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
-	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, false)
-
-	// Check contacts Alice's side
-	s.Require().Len(resp.Contacts, 1)
-	contact = resp.Contacts[0]
-	s.Require().True(contact.mutual())
-
-	// Make sure contact is added on the receiver's side
-	contacts = alice.AddedContacts()
-	s.Require().Len(contacts, 1)
-	s.Require().Equal(ContactRequestStateSent, contacts[0].ContactRequestLocalState)
-	s.Require().NotNil(contacts[0].DisplayName)
-	s.Require().True(contacts[0].mutual())
 }
 
 func (s *MessengerContactRequestSuite) TestBuildContact() {

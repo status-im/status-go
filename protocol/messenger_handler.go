@@ -2090,6 +2090,11 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 			}
 		}
 
+		if chatContact.mutual() || chatContact.dismissed() {
+			m.logger.Info("ignoring contact request message for a mutual or dismissed contact")
+			return nil
+		}
+
 		sendNotification, err := handleContactRequestChatMessage(receivedMessage, chatContact, isSyncMessage, m.logger)
 		if err != nil {
 			m.logger.Error("failed to handle contact request message", zap.Error(err))
