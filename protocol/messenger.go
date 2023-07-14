@@ -764,6 +764,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.handleENSVerificationSubscription(ensSubscription)
 	m.watchConnectionChange()
 	m.watchChatsAndCommunitiesToUnmute()
+	m.watchCommunitiesToUnmute()
 	m.watchExpiredMessages()
 	m.watchIdentityImageChanges()
 	m.watchWalletBalances()
@@ -1437,10 +1438,30 @@ func (m *Messenger) watchChatsAndCommunitiesToUnmute() {
 					}
 					return true
 				})
-				err := m.CheckCommunitiesToUnmute(response)
-				if err != nil {
-					m.logger.Info("err", zap.Any("", err))
+
+				if !response.IsEmpty() {
+					signal.SendNewMessages(response)
 				}
+			case <-m.quit:
+				return
+			}
+		}
+	}()
+}
+
+// watchCommunitiesToUnmute regularly checks for communities that should be unmuted
+func (m *Messenger) watchCommunitiesToUnmute() {
+	m.logger.Debug("watching unmuted communities")
+	go func() {
+		for {
+			select {
+			case <-time.After(3 * time.Second): // Poll every 3 seconds
+				response, err := m.CheckCommunitiesToUnmute()
+				if err != nil {
+					return
+				}
+
+				m.logger.Debug("response unmute community ************* ", zap.Any("  ", response))
 				if !response.IsEmpty() {
 					signal.SendNewMessages(response)
 				}

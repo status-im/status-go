@@ -1426,10 +1426,13 @@ func (m *Manager) UpdateClockInRequestToJoin(id types.HexBytes, clock uint64) er
 	return m.persistence.UpdateClockInRequestToJoin(id, clock)
 }
 
-func (m *Manager) SetMuted(id types.HexBytes, muted bool, mutedTill time.Time) error {
-	return m.persistence.SetMuted(id, muted, mutedTill)
+func (m *Manager) SetMuted(id types.HexBytes, muted bool) error {
+	return m.persistence.SetMuted(id, muted)
 }
 
+func (m *Manager) MuteCommunityTill(communityID []byte, muteTill time.Time) error {
+	return m.persistence.MuteCommunityTill(communityID, muteTill)
+}
 func (m *Manager) CancelRequestToJoin(request *requests.CancelRequestToJoinCommunity) (*RequestToJoin, *Community, error) {
 	dbRequest, err := m.persistence.GetRequestToJoin(request.ID)
 	if err != nil {

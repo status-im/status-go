@@ -2973,17 +2973,121 @@ func (s *MessengerCommunitiesSuite) TestCheckCommunitiesToUnmute() {
 	}
 	s.Require().NotNil(newCommunity)
 
-	currTime, _ := time.Parse(time.RFC3339, time.Now().Add(-time.Hour).Format(time.RFC3339))
+	currTime, err := time.Parse(time.RFC3339, time.Now().Add(-time.Hour).Format(time.RFC3339))
+	s.Require().NoError(err)
 
-	err = s.alice.communitiesManager.SetMuted(newCommunity.ID(), true, currTime)
+	err = s.alice.communitiesManager.SetMuted(newCommunity.ID(), true)
 	s.Require().NoError(err, "SetMuted to community")
 
-	response := &MessengerResponse{}
+	err = s.alice.communitiesManager.MuteCommunityTill(newCommunity.ID(), currTime)
+	s.Require().NoError(err, "SetMuteTill to community")
 
-	err = s.alice.CheckCommunitiesToUnmute(response)
-
+	response, err := s.alice.CheckCommunitiesToUnmute()
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1, "CheckCommunitiesToUnmute should unmute the community")
+
+	community, err := s.alice.communitiesManager.GetByID(newCommunity.ID())
+	s.Require().NoError(err)
+	s.Require().False(community.Muted())
+
+}
+
+func (s *MessengerCommunitiesSuite) TestMuteAllCommunityChats() {
+	// Create a community
+	createCommunityReq := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Name:        "new community",
+		Color:       "#000000",
+		Description: "new community description",
+	}
+
+	mr, err := s.alice.CreateCommunity(createCommunityReq, true)
+	s.Require().NoError(err, "s.alice.CreateCommunity")
+	var newCommunity *communities.Community
+	for _, com := range mr.Communities() {
+		if com.Name() == createCommunityReq.Name {
+			newCommunity = com
+		}
+	}
+	s.Require().NotNil(newCommunity)
+
+	orgChat1 := &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "status-core",
+			Emoji:       "😎",
+			Description: "status-core community chat",
+		},
+	}
+
+	orgChat2 := &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "status-core2",
+			Emoji:       "😎",
+			Description: "status-core community chat2",
+		},
+	}
+
+	mr, err = s.alice.CreateCommunityChat(newCommunity.ID(), orgChat1)
+	s.Require().NoError(err)
+	s.Require().NotNil(mr)
+	s.Require().Len(mr.Communities(), 1)
+	s.Require().Len(mr.Chats(), 1)
+
+	mr, err = s.alice.CreateCommunityChat(newCommunity.ID(), orgChat2)
+	s.Require().NoError(err)
+	s.Require().NotNil(mr)
+	s.Require().Len(mr.Communities(), 1)
+	s.Require().Len(mr.Chats(), 1)
+
+	muteDuration, err := s.alice.MuteDuration(MuteFor15Min)
+	s.Require().NoError(err)
+
+	time, err := s.alice.MuteAllCommunityChats(&requests.MuteCommunity{
+		CommunityID: newCommunity.ID(),
+		MutedType:   MuteFor15Min,
+	})
+	s.Require().NoError(err)
+	s.Require().NotNil(time)
+
+	aliceCommunity, err := s.alice.GetCommunityByID(newCommunity.ID())
+	s.Require().NoError(err)
+	s.Require().True(aliceCommunity.Muted())
+
+	for _, chat := range s.alice.Chats() {
+		if chat.CommunityID == newCommunity.IDString() {
+			s.Require().True(chat.Muted)
+			s.Require().Equal(chat.MuteTill, muteDuration)
+		}
+	}
+
+	for _, chat := range s.alice.Chats() {
+		if chat.CommunityID == newCommunity.IDString() {
+			err = s.alice.UnmuteChat(chat.ID)
+			s.Require().NoError(err)
+			s.Require().False(chat.Muted)
+			break
+		}
+	}
+
+	aliceCommunity, err = s.alice.GetCommunityByID(newCommunity.ID())
+	s.Require().NoError(err)
+	s.Require().False(aliceCommunity.Muted())
+
+	time, err = s.alice.UnMuteAllCommunityChats(newCommunity.IDString())
+	s.Require().NoError(err)
+	s.Require().NotNil(time)
+	s.Require().False(newCommunity.Muted())
+
+	for _, chat := range s.alice.Chats() {
+		s.Require().False(chat.Muted)
+	}
+
 }
 
 func (s *MessengerCommunitiesSuite) TestExtractDiscordChannelsAndCategories() {
