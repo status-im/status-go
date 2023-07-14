@@ -45,9 +45,8 @@ func (p *Persistence) SaveCommunity(community *Community) error {
 	}
 
 	_, err = p.db.Exec(`
-		INSERT INTO communities_communities (id, private_key, description, joined, spectated, verified) VALUES (?, ?, ?, ?, ?, ?);`,
-		id, crypto.FromECDSA(privateKey), description, community.config.Joined, community.config.Spectated, community.config.Verified)
-
+		INSERT INTO communities_communities (id, private_key, description, joined, spectated, verified, muted, muted_till) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, crypto.FromECDSA(privateKey), description, community.config.Joined, community.config.Spectated, community.config.Verified, community.config.Muted, community.config.MuteTill)
 	return err
 }
 
