@@ -82,11 +82,12 @@ func (s *CommunitySuite) TestHasPermission() {
 
 	communityDescription := &protobuf.CommunityDescription{}
 	communityDescription.Members = make(map[string]*protobuf.CommunityMember)
+	communityDescription.Members[common.PubkeyToHex(&ownerKey.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER}}
 	communityDescription.Members[common.PubkeyToHex(&memberKey.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ADMIN}}
 
 	community.config = &Config{ID: &ownerKey.PublicKey, CommunityDescription: communityDescription}
 
-	s.Require().True(community.hasPermission(&ownerKey.PublicKey, adminRolePermissions()))
+	s.Require().True(community.hasPermission(&ownerKey.PublicKey, ownerRolePermission()))
 
 	// return false if user is not a member
 	s.Require().False(community.hasPermission(&nonMemberKey.PublicKey, adminRolePermissions()))

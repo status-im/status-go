@@ -715,10 +715,6 @@ func (o *Community) hasPermission(pk *ecdsa.PublicKey, roles map[protobuf.Commun
 		return false
 	}
 
-	if common.IsPubKeyEqual(pk, o.config.ID) {
-		return true
-	}
-
 	member := o.getMember(pk)
 	if member == nil {
 		return false
