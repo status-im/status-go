@@ -161,8 +161,16 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) joinCommunity(community *communities.Community, user *Messenger, password string, addresses []string) {
+	s.joinCommunityWithAirdropAddress(community, user, password, addresses, "")
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) joinCommunityWithAirdropAddress(community *communities.Community, user *Messenger, password string, addresses []string, airdropAddress string) {
 	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(password)))
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), Password: passwdHash, AddressesToReveal: addresses}
+	if airdropAddress == "" && len(addresses) > 0 {
+		airdropAddress = addresses[0]
+	}
+
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), Password: passwdHash, AddressesToReveal: addresses, AirdropAddress: airdropAddress}
 	joinCommunity(&s.Suite, community, s.owner, user, request)
 }
 
@@ -412,9 +420,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSh
 				s.Require().Len(member.RevealedAccounts, 2)
 				s.Require().Equal(member.RevealedAccounts[0].Address, aliceAddress1)
 				s.Require().Equal(member.RevealedAccounts[1].Address, aliceAddress2)
+				s.Require().Equal(true, member.RevealedAccounts[0].IsAirdropAddress)
 			case common.PubkeyToHex(&s.bob.identity.PublicKey):
 				s.Require().Len(member.RevealedAccounts, 1)
 				s.Require().Equal(member.RevealedAccounts[0].Address, bobAddress)
+				s.Require().Equal(true, member.RevealedAccounts[0].IsAirdropAddress)
 			default:
 				s.Require().Fail("pubKey does not match expected keys")
 			}
@@ -440,6 +450,34 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSe
 			switch pubKey {
 			case common.PubkeyToHex(&s.alice.identity.PublicKey):
 				s.Require().Equal(member.RevealedAccounts[0].Address, aliceAddress2)
+				s.Require().Equal(true, member.RevealedAccounts[0].IsAirdropAddress)
+			default:
+				s.Require().Fail("pubKey does not match expected keys")
+			}
+		}
+	}
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersMultipleSelectedSharedAddresses() {
+	community, _ := s.createCommunity()
+	s.advertiseCommunityTo(community, s.alice)
+
+	s.joinCommunityWithAirdropAddress(community, s.alice, alicePassword, []string{aliceAddress1, aliceAddress2}, aliceAddress2)
+
+	community, err := s.owner.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+
+	s.Require().Equal(2, community.MembersCount())
+
+	for pubKey, member := range community.Members() {
+		if pubKey != common.PubkeyToHex(&s.owner.identity.PublicKey) {
+			s.Require().Len(member.RevealedAccounts, 2)
+
+			switch pubKey {
+			case common.PubkeyToHex(&s.alice.identity.PublicKey):
+				s.Require().Equal(member.RevealedAccounts[0].Address, aliceAddress1)
+				s.Require().Equal(member.RevealedAccounts[1].Address, aliceAddress2)
+				s.Require().Equal(true, member.RevealedAccounts[1].IsAirdropAddress)
 			default:
 				s.Require().Fail("pubKey does not match expected keys")
 			}
@@ -480,7 +518,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 	s.Require().NoError(err)
 
 	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(alicePassword)))
-	request := &requests.EditSharedAddresses{CommunityID: community.ID(), Password: passwdHash, AddressesToReveal: []string{aliceAddress1}}
+	request := &requests.EditSharedAddresses{CommunityID: community.ID(), Password: passwdHash, AddressesToReveal: []string{aliceAddress1}, AirdropAddress: aliceAddress1}
 	response, err := s.alice.EditSharedAddressesForCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -614,7 +652,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 
 	// bob tries to join, but he doesn't satisfy so the request isn't sent
 	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(bobPassword)))
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), Password: passwdHash, AddressesToReveal: []string{bobAddress}}
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), Password: passwdHash, AddressesToReveal: []string{bobAddress}, AirdropAddress: bobAddress}
 	_, err = s.bob.RequestToJoinCommunity(request)
 	s.Require().Error(err)
 	s.Require().ErrorContains(err, "permission to join not satisfied")

@@ -126,6 +126,7 @@ message RevealedAccount {
   string address = 1;
   bytes signature = 2;
   repeated uint64 chain_ids = 3;
+  bool isAirdropAddress = 4;
 }
 
 message CommunityRequestToJoin {
