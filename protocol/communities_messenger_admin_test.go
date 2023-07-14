@@ -926,10 +926,6 @@ func (s *AdminMessengerCommunitiesSuite) adminCreateTokenPermission(community *c
 			return errors.New("new token permission was not found")
 		}
 
-		if !modifiedCommmunity.Encrypted() {
-			return errors.New("community must be encrypted")
-		}
-
 		return nil
 	}
 
@@ -956,10 +952,6 @@ func (s *AdminMessengerCommunitiesSuite) adminEditTokenPermission(community *com
 			return err
 		}
 
-		if !modifiedCommmunity.Encrypted() {
-			return errors.New("community must be encrypted")
-		}
-
 		s.assertAdminTokenPermissionEdited(modifiedCommmunity)
 
 		return nil
@@ -981,10 +973,6 @@ func (s *AdminMessengerCommunitiesSuite) adminDeleteTokenPermission(community *c
 
 		if modifiedCommmunity.HasTokenPermissions() {
 			return errors.New("token permission was not deleted")
-		}
-
-		if modifiedCommmunity.Encrypted() {
-			return errors.New("community must be decrypted")
 		}
 
 		return nil

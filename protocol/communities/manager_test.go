@@ -1162,7 +1162,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 		ChatIds:       []string{chatID1, chatID2},
 	}
 
-	_, changes, _, err = m.CreateCommunityTokenPermission(viewOnlyPermission)
+	_, changes, err = m.CreateCommunityTokenPermission(viewOnlyPermission)
 	s.Require().NoError(err)
 
 	var viewOnlyPermissionID string
@@ -1245,7 +1245,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 		ChatIds:       []string{chatID1, chatID2},
 	}
 
-	_, changes, _, err = m.CreateCommunityTokenPermission(viewAndPostPermission)
+	_, changes, err = m.CreateCommunityTokenPermission(viewAndPostPermission)
 	s.Require().NoError(err)
 
 	var viewAndPostPermissionID string
@@ -1328,7 +1328,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 		CommunityID:  community.ID(),
 		PermissionID: viewOnlyPermissionID,
 	}
-	_, _, _, err = m.DeleteCommunityTokenPermission(deleteViewOnlyPermission)
+	_, _, err = m.DeleteCommunityTokenPermission(deleteViewOnlyPermission)
 	s.Require().NoError(err)
 
 	response, err = m.CheckAllChannelsPermissions(community.ID(), []gethcommon.Address{

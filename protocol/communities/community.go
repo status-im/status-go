@@ -2242,9 +2242,6 @@ func (o *Community) addTokenPermission(permission *protobuf.CommunityTokenPermis
 
 	o.config.CommunityDescription.TokenPermissions[permission.Id] = permission
 
-	becomeMemberPermissions := o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
-	o.SetEncrypted(len(becomeMemberPermissions) > 0)
-
 	changes := o.emptyCommunityChanges()
 
 	if changes.TokenPermissionsAdded == nil {
@@ -2266,9 +2263,6 @@ func (o *Community) updateTokenPermission(permission *protobuf.CommunityTokenPer
 	changes := o.emptyCommunityChanges()
 	o.config.CommunityDescription.TokenPermissions[permission.Id] = permission
 
-	becomeMemberPermissions := o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
-	o.SetEncrypted(len(becomeMemberPermissions) > 0)
-
 	if changes.TokenPermissionsModified == nil {
 		changes.TokenPermissionsModified = make(map[string]*protobuf.CommunityTokenPermission)
 	}
@@ -2279,9 +2273,6 @@ func (o *Community) updateTokenPermission(permission *protobuf.CommunityTokenPer
 
 func (o *Community) deleteTokenPermission(permissionID string) (*CommunityChanges, error) {
 	delete(o.config.CommunityDescription.TokenPermissions, permissionID)
-
-	becomeMemberPermissions := o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
-	o.SetEncrypted(len(becomeMemberPermissions) > 0)
 
 	changes := o.emptyCommunityChanges()
 	changes.TokenPermissionsRemoved = append(changes.TokenPermissionsRemoved, permissionID)

@@ -144,9 +144,6 @@ func (o *Community) ToCommunityTokenPermissionChangeCommunityEvent(permission *p
 		CommunityEventClock: o.NewCommunityEventClock(),
 		Type:                protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGE,
 		TokenPermission:     permission,
-		CommunityConfig: &protobuf.CommunityConfig{
-			Encrypted: o.Encrypted(),
-		},
 	}
 }
 
@@ -155,9 +152,6 @@ func (o *Community) ToCommunityTokenPermissionDeleteCommunityEvent(permission *p
 		CommunityEventClock: o.NewCommunityEventClock(),
 		Type:                protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETE,
 		TokenPermission:     permission,
-		CommunityConfig: &protobuf.CommunityConfig{
-			Encrypted: o.Encrypted(),
-		},
 	}
 }
 

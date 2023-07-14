@@ -584,47 +584,52 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 	return community, nil
 }
 
-func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommunityTokenPermission) (*Community, *CommunityChanges, bool, error) {
+func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommunityTokenPermission) (*Community, *CommunityChanges, error) {
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, err
 	}
 	if community == nil {
-		return nil, nil, false, ErrOrgNotFound
+		return nil, nil, ErrOrgNotFound
 	}
 
 	tokenPermission := request.ToCommunityTokenPermission()
 	tokenPermission.Id = uuid.New().String()
-	prevEncrypted := community.Encrypted()
 	changes, err := community.AddTokenPermission(&tokenPermission)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, err
 	}
 
-	encryptionChanged := prevEncrypted != community.Encrypted()
-	return community, changes, encryptionChanged, nil
+	err = m.saveAndPublish(community)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return community, changes, nil
 }
 
-func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTokenPermission) (*Community, *CommunityChanges, bool, error) {
+func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTokenPermission) (*Community, *CommunityChanges, error) {
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, err
 	}
 	if community == nil {
-		return nil, nil, false, ErrOrgNotFound
+		return nil, nil, ErrOrgNotFound
 	}
 
 	tokenPermission := request.ToCommunityTokenPermission()
 
-	prevEncrypted := community.Encrypted()
 	changes, err := community.UpdateTokenPermission(tokenPermission.Id, &tokenPermission)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, err
 	}
 
-	encryptionChanged := prevEncrypted != community.Encrypted()
+	err = m.saveAndPublish(community)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	return community, changes, encryptionChanged, nil
+	return community, changes, nil
 }
 
 func (m *Manager) CheckMemberPermissions(community *Community, removeAdmins bool) error {
@@ -754,24 +759,26 @@ func (m *Manager) CheckMemberPermissionsPeriodically(communityID types.HexBytes)
 	}
 }
 
-func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommunityTokenPermission) (*Community, *CommunityChanges, bool, error) {
+func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommunityTokenPermission) (*Community, *CommunityChanges, error) {
 	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, err
 	}
 	if community == nil {
-		return nil, nil, false, ErrOrgNotFound
+		return nil, nil, ErrOrgNotFound
 	}
 
-	prevEncrypted := community.Encrypted()
 	changes, err := community.DeleteTokenPermission(request.PermissionID)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, err
 	}
 
-	encryptionChanged := prevEncrypted != community.Encrypted()
+	err = m.saveAndPublish(community)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	return community, changes, encryptionChanged, nil
+	return community, changes, nil
 }
 
 func (m *Manager) DeleteCommunity(id types.HexBytes) error {
@@ -846,7 +853,7 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 		community.increaseClock()
 	}
 
-	err = m.SaveAndPublish(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, err
 	}
@@ -923,7 +930,7 @@ func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.Communit
 		return nil, err
 	}
 
-	err = m.SaveAndPublish(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, err
 	}
@@ -950,7 +957,7 @@ func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *prot
 		return nil, nil, err
 	}
 
-	err = m.SaveAndPublish(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -976,7 +983,7 @@ func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Commun
 		return nil, nil, err
 	}
 
-	err = m.SaveAndPublish(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1010,7 +1017,7 @@ func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory, publ
 		return nil, nil, err
 	}
 
-	err = m.SaveAndPublish(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1039,7 +1046,7 @@ func (m *Manager) EditCategory(request *requests.EditCommunityCategory) (*Commun
 		return nil, nil, err
 	}
 
-	err = m.SaveAndPublish(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1091,7 +1098,7 @@ func (m *Manager) ReorderCategories(request *requests.ReorderCommunityCategories
 		return nil, nil, err
 	}
 
-	err = m.SaveAndPublish(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1118,7 +1125,7 @@ func (m *Manager) ReorderChat(request *requests.ReorderCommunityChat) (*Communit
 		return nil, nil, err
 	}
 
-	err = m.SaveAndPublish(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1140,7 +1147,7 @@ func (m *Manager) DeleteCategory(request *requests.DeleteCommunityCategory) (*Co
 		return nil, nil, err
 	}
 
-	err = m.SaveAndPublish(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1420,7 +1427,7 @@ func (m *Manager) DeletePendingRequestToJoin(request *RequestToJoin) error {
 		return err
 	}
 
-	err = m.SaveAndPublish(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return err
 	}
@@ -1563,7 +1570,7 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		return nil, err
 	}
 
-	err = m.SaveAndPublish(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, err
 	}
@@ -1596,7 +1603,7 @@ func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCom
 		return err
 	}
 
-	err = m.SaveAndPublish(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return err
 	}
@@ -2620,7 +2627,7 @@ func (m *Manager) RemoveUserFromCommunity(id types.HexBytes, pk *ecdsa.PublicKey
 		return nil, err
 	}
 
-	err = m.SaveAndPublish(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, err
 	}
@@ -2648,7 +2655,7 @@ func (m *Manager) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunit
 		return nil, err
 	}
 
-	err = m.SaveAndPublish(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, err
 	}
@@ -2745,7 +2752,7 @@ func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (
 		return nil, err
 	}
 
-	err = m.SaveAndPublish(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, err
 	}
@@ -3972,7 +3979,7 @@ func (m *Manager) AddCommunityToken(token *CommunityToken, croppedImage *images.
 		return nil, err
 	}
 
-	err = m.SaveAndPublish(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, err
 	}
@@ -4013,6 +4020,20 @@ func (m *Manager) SetCommunityActiveMembersCount(communityID string, activeMembe
 	return nil
 }
 
+// UpdateCommunity takes a Community persists it and republishes it.
+// The clock is incremented meaning even a no change update will be republished by the admin, and parsed by the member.
+func (m *Manager) UpdateCommunity(c *Community) error {
+	c.increaseClock()
+
+	err := m.persistence.SaveCommunity(c)
+	if err != nil {
+		return err
+	}
+
+	m.publish(&Subscription{Community: c})
+	return nil
+}
+
 func combineAddressesAndChainIDs(addresses []gethcommon.Address, chainIDs []uint64) []*AccountChainIDsCombination {
 	combinations := make([]*AccountChainIDsCombination, 0)
 	for _, address := range addresses {
@@ -4047,7 +4068,7 @@ func (m *Manager) accountsHasAdminPermission(becomeAdminPermissions []*protobuf.
 	return false
 }
 
-func (m *Manager) SaveAndPublish(community *Community) error {
+func (m *Manager) saveAndPublish(community *Community) error {
 	err := m.persistence.SaveCommunity(community)
 	if err != nil {
 		return err
