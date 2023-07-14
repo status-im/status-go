@@ -230,7 +230,7 @@ func (p *Persistence) rowsToCommunities(memberIdentity *ecdsa.PublicKey, rows *s
 func (p *Persistence) JoinedAndPendingCommunitiesWithRequests(memberIdentity *ecdsa.PublicKey) (comms []*Community, err error) {
 	query := `SELECT
 c.id, c.private_key, c.description, c.joined, c.spectated, c.verified, c.muted, c.muted_till,
-r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.community_id, r.state, ae.rawEvents
+r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.community_id, r.state, ae.rawEvents, ae.rawDescription
 FROM communities_communities c
 LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?
 LEFT JOIN communitiesEvents ae ON c.id = ae.id
@@ -247,7 +247,7 @@ WHERE c.Joined OR r.state = ?`
 func (p *Persistence) DeletedCommunities(memberIdentity *ecdsa.PublicKey) (comms []*Community, err error) {
 	query := `SELECT
 c.id, c.private_key, c.description, c.joined, c.spectated, c.verified, c.muted, c.muted_till,
-r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.community_id, r.state, ae.rawEvents
+r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.community_id, r.state, ae.rawEvents, ae.rawDescription
 FROM communities_communities c
 LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?
 LEFT JOIN communitiesEvents ae ON c.id = ae.id
