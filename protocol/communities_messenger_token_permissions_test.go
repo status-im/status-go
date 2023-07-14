@@ -578,6 +578,15 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	err = <-waitOnCommunityEncryptionErrCh
 	s.Require().NoError(err)
 
+	_, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0
+		},
+		"no community",
+	)
+	s.Require().NoError(err)
+
 	// bob should be kicked from the community,
 	// because he doesn't meet the criteria
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
@@ -602,6 +611,18 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	)
 	s.Require().Error(err)
 	s.Require().ErrorContains(err, "no messages")
+
+	// bob tries to join, but he doesn't satisfy so the request isn't sent
+	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(bobPassword)))
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), Password: passwdHash, AddressesToReveal: []string{bobAddress}}
+	_, err = s.bob.RequestToJoinCommunity(request)
+	s.Require().Error(err)
+	s.Require().ErrorContains(err, "permission to join not satisfied")
+
+	// make sure bob does not have a pending request to join
+	requests, err := s.bob.MyPendingRequestsToJoin()
+	s.Require().NoError(err)
+	s.Require().Len(requests, 0)
 
 	// make bob satisfy the criteria
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, permissionRequest.TokenCriteria[0])

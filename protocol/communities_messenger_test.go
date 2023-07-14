@@ -3123,7 +3123,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequesToJoin() {
 
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 	// We try to join the org
-	_, rtj, err := s.alice.communitiesManager.RequestToJoin(&s.alice.identity.PublicKey, request)
+	_, rtj, err := s.alice.communitiesManager.CreateRequestToJoin(&s.alice.identity.PublicKey, request)
 
 	s.Require().NoError(err)
 
