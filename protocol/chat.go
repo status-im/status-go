@@ -221,6 +221,9 @@ type ChatPreview struct {
 	// Members array to represent how many there are for chats preview of group chats
 	Members []ChatMember `json:"members"`
 
+	// MembershipUpdates is all the membership events in the chat
+	MembershipUpdates []v1protocol.MembershipUpdateEvent `json:"membershipUpdateEvents"`
+
 	OutgoingStatus   string `json:"outgoingStatus,omitempty"`
 	ResponseTo       string `json:"responseTo"`
 	AlbumImagesCount uint32 `json:"albumImagesCount,omitempty"`
