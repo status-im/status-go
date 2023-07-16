@@ -44,6 +44,7 @@ var (
 	ErrMessageForWrongChatType               = errors.New("message for the wrong chat type")
 	ErrNotWatchOnlyAccount                   = errors.New("an account is not a watch only account")
 	ErrWalletAccountNotSupportedForMobileApp = errors.New("handling account is not supported for mobile app")
+	ErrTryingToApplyOldWalletAccountsOrder   = errors.New("trying to apply old wallet accounts order")
 	ErrTryingToStoreOldWalletAccount         = errors.New("trying to store an old wallet account")
 	ErrTryingToStoreOldKeypair               = errors.New("trying to store an old keypair")
 	ErrSomeFieldsMissingForWalletAccount     = errors.New("some fields are missing for wallet account")
@@ -3120,6 +3121,38 @@ func (m *Messenger) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*
 	return acc, nil
 }
 
+func (m *Messenger) handleSyncAccountsPositions(message *protobuf.SyncAccountsPositions) ([]*accounts.Account, error) {
+	if len(message.Accounts) == 0 {
+		return nil, nil
+	}
+
+	dbLastUpdate, err := m.settings.GetClockOfLastAccountsPositionChange()
+	if err != nil {
+		return nil, err
+	}
+
+	if message.Clock <= dbLastUpdate {
+		return nil, ErrTryingToApplyOldWalletAccountsOrder
+	}
+
+	var accs []*accounts.Account
+	for _, sAcc := range message.Accounts {
+		acc := &accounts.Account{
+			Address:  types.BytesToAddress(sAcc.Address),
+			KeyUID:   sAcc.KeyUid,
+			Position: sAcc.Position,
+		}
+		accs = append(accs, acc)
+	}
+
+	err = m.settings.SetWalletAccountsPositions(accs, message.Clock)
+	if err != nil {
+		return nil, err
+	}
+
+	return accs, nil
+}
+
 func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.Keypair, error) {
 	if message == nil {
 		return nil, errors.New("handleSyncKeypair receive a nil message")
@@ -3216,6 +3249,24 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.
 	}
 
 	return kp, nil
+}
+
+func (m *Messenger) HandleSyncAccountsPositions(state *ReceivedMessageState, message protobuf.SyncAccountsPositions) error {
+	accs, err := m.handleSyncAccountsPositions(&message)
+	if err != nil {
+		if err == ErrTryingToApplyOldWalletAccountsOrder ||
+			err == accounts.ErrAccountWrongPosition ||
+			err == accounts.ErrNotTheSameNumberOdAccountsToApplyReordering ||
+			err == accounts.ErrNotTheSameAccountsToApplyReordering {
+			m.logger.Warn("syncing accounts order issue", zap.Error(err))
+			return nil
+		}
+		return err
+	}
+
+	state.Response.AccountsPositions = append(state.Response.AccountsPositions, accs...)
+
+	return nil
 }
 
 func (m *Messenger) HandleSyncWatchOnlyAccount(state *ReceivedMessageState, message protobuf.SyncAccount) error {

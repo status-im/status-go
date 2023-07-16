@@ -4390,6 +4390,21 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							allMessagesProcessed = false
 							continue
 						}
+					case protobuf.SyncAccountsPositions:
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						p := msg.ParsedMessage.Interface().(protobuf.SyncAccountsPositions)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
+						logger.Debug("Handling SyncAccountsPositions", zap.Any("message", p))
+						err = m.HandleSyncAccountsPositions(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle SyncAccountsPositions", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
 					case protobuf.SyncContactRequestDecision:
 						logger.Info("SyncContactRequestDecision")
 						p := msg.ParsedMessage.Interface().(protobuf.SyncContactRequestDecision)

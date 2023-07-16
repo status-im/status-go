@@ -92,26 +92,20 @@ func (m *Messenger) UpdateKeypairName(keyUID string, name string) error {
 	return m.resolveAndSyncKeypairOrJustWalletAccount(keyUID, types.Address{}, clock, m.dispatchMessage)
 }
 
-func (m *Messenger) UpdateAccountPosition(address types.Address, position int64) error {
-	acc, err := m.settings.GetAccountByAddress(address)
-	if err != nil {
-		return err
-	}
-
+func (m *Messenger) MoveWalletAccount(fromPosition int64, toPosition int64) error {
 	clock, _ := m.getLastClockWithRelatedChat()
-	acc.Clock = clock
 
-	err = m.settings.UpdateAccountPosition(address, position, clock)
+	err := m.settings.MoveWalletAccount(fromPosition, toPosition, clock)
 	if err != nil {
 		return err
 	}
 
-	return m.resolveAndSyncKeypairOrJustWalletAccount(acc.KeyUID, acc.Address, acc.Clock, m.dispatchMessage)
+	return m.syncAccountsPositions(m.dispatchMessage)
 }
 
 func (m *Messenger) resolveAndSetAccountPropsMaintainedByBackend(acc *accounts.Account) error {
 	// Account position is fully maintained by the backend, no need client to set it explicitly.
-	// To support DragAndDrop feature for accounts there is exposed `UpdateAccountPosition` which
+	// To support DragAndDrop feature for accounts there is exposed `MoveWalletAccount` which
 	// moves an account to the passed position.
 	//
 	// Account operability is fully maintained by the backend, for new accounts created on this device
@@ -313,6 +307,53 @@ func (m *Messenger) prepareSyncKeypairMessage(kp *accounts.Keypair) (*protobuf.S
 	message.Keycards = syncKcMsgs
 
 	return message, nil
+}
+
+func (m *Messenger) syncAccountsPositions(rawMessageHandler RawMessageHandler) error {
+	if !m.hasPairedDevices() {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, chat := m.getLastClockWithRelatedChat()
+
+	allDbAccounts, err := m.settings.GetAccounts()
+	if err != nil {
+		return err
+	}
+
+	lastUpdate, err := m.settings.GetClockOfLastAccountsPositionChange()
+	if err != nil {
+		return err
+	}
+
+	message := &protobuf.SyncAccountsPositions{
+		Clock: lastUpdate,
+	}
+
+	for _, acc := range allDbAccounts {
+		if acc.Chat {
+			continue
+		}
+		message.Accounts = append(message.Accounts, m.prepareSyncAccountMessage(acc))
+	}
+
+	encodedMessage, err := proto.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := common.RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACCOUNTS_POSITIONS,
+		ResendAutomatically: true,
+	}
+
+	_, err = rawMessageHandler(ctx, rawMessage)
+	return err
 }
 
 func (m *Messenger) syncWalletAccount(acc *accounts.Account, rawMessageHandler RawMessageHandler) error {

@@ -214,6 +214,17 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				m.logger.Error("failed to HandleSyncKeypair when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
+		case protobuf.ApplicationMetadataMessage_SYNC_ACCOUNTS_POSITIONS:
+			var message protobuf.SyncAccountsPositions
+			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
+			if err != nil {
+				return err
+			}
+			err = m.HandleSyncAccountsPositions(state, message)
+			if err != nil {
+				m.logger.Error("failed to HandleSyncAccountsPositions when HandleSyncRawMessages", zap.Error(err))
+				continue
+			}
 		case protobuf.ApplicationMetadataMessage_SYNC_SAVED_ADDRESS:
 			var message protobuf.SyncSavedAddress
 			err := proto.Unmarshal(rawMessage.GetPayload(), &message)

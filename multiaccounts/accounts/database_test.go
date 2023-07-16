@@ -2,6 +2,7 @@ package accounts
 
 import (
 	"database/sql"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,6 +10,8 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/common"
+	"github.com/status-im/status-go/multiaccounts/settings"
+	"github.com/status-im/status-go/params"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
@@ -42,26 +45,92 @@ func TestGetAddresses(t *testing.T) {
 	require.Equal(t, []types.Address{{0x01}, {0x02}}, addresses)
 }
 
-func TestUpdateAccountPosition(t *testing.T) {
+func TestMoveWalletAccount(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
+
+	networks := json.RawMessage("{}")
+	setting := settings.Settings{
+		Networks: &networks,
+	}
+	config := params.NodeConfig{}
+	err := db.CreateSettings(setting, config)
+	require.NoError(t, err)
+
 	accounts := []*Account{
-		{Address: types.Address{0x01}, Position: 1},
-		{Address: types.Address{0x02}, Position: 2},
+		{Address: types.Address{0x01}, Type: AccountTypeWatch, Position: 0},
+		{Address: types.Address{0x02}, Type: AccountTypeWatch, Position: 1},
+		{Address: types.Address{0x03}, Type: AccountTypeWatch, Position: 2},
+		{Address: types.Address{0x04}, Type: AccountTypeWatch, Position: 3},
+		{Address: types.Address{0x05}, Type: AccountTypeWatch, Position: 4},
+		{Address: types.Address{0x06}, Type: AccountTypeWatch, Position: 5},
 	}
 	require.NoError(t, db.SaveOrUpdateAccounts(accounts, false))
-	accountsRes, err := db.GetAccounts()
+	dbAccounts, err := db.GetAccounts()
 	require.NoError(t, err)
-	require.Equal(t, accountsRes[0].Position, int64(1))
-	require.Equal(t, accountsRes[1].Position, int64(2))
+	require.Len(t, dbAccounts, len(accounts))
+	for i := 0; i < len(accounts); i++ {
+		require.True(t, SameAccounts(accounts[i], dbAccounts[i]))
+	}
 
-	err = db.UpdateAccountPosition(accounts[1].Address, 1, 0)
+	clock := uint64(1000)
+	err = db.MoveWalletAccount(-1, 4, clock)
+	require.ErrorIs(t, err, ErrMovingAccountToWrongPosition)
+	err = db.MoveWalletAccount(4, -1, clock)
+	require.ErrorIs(t, err, ErrMovingAccountToWrongPosition)
+	err = db.MoveWalletAccount(4, 4, clock)
+	require.ErrorIs(t, err, ErrMovingAccountToWrongPosition)
+
+	// Move down account from position 1 to position 4
+	err = db.MoveWalletAccount(1, 4, clock)
 	require.NoError(t, err)
 
-	accountsRes, err = db.GetAccounts()
+	// Expected after moving down
+	accounts = []*Account{
+		{Address: types.Address{0x01}, Type: AccountTypeWatch, Position: 0},
+		{Address: types.Address{0x03}, Type: AccountTypeWatch, Position: 1},
+		{Address: types.Address{0x04}, Type: AccountTypeWatch, Position: 2},
+		{Address: types.Address{0x05}, Type: AccountTypeWatch, Position: 3},
+		{Address: types.Address{0x02}, Type: AccountTypeWatch, Position: 4}, // acc with addr 0x02 is at position 4 (moved from position 1)
+		{Address: types.Address{0x06}, Type: AccountTypeWatch, Position: 5},
+	}
+
+	dbAccounts, err = db.GetAccounts()
 	require.NoError(t, err)
-	require.Equal(t, accountsRes[0].Position, int64(0))
-	require.Equal(t, accountsRes[1].Position, int64(1))
+	for i := 0; i < len(accounts); i++ {
+		require.True(t, SameAccounts(accounts[i], dbAccounts[i]))
+	}
+
+	// Check clock
+	dbClock, err := db.GetClockOfLastAccountsPositionChange()
+	require.NoError(t, err)
+	require.Equal(t, clock, dbClock)
+
+	// Move up account from position 5 to position 0
+	clock = 2000
+	err = db.MoveWalletAccount(5, 0, clock)
+	require.NoError(t, err)
+
+	// Expected after moving up
+	accounts = []*Account{
+		{Address: types.Address{0x06}, Type: AccountTypeWatch, Position: 0}, // acc with addr 0x06 is at position 0 (moved from position 5)
+		{Address: types.Address{0x01}, Type: AccountTypeWatch, Position: 1},
+		{Address: types.Address{0x03}, Type: AccountTypeWatch, Position: 2},
+		{Address: types.Address{0x04}, Type: AccountTypeWatch, Position: 3},
+		{Address: types.Address{0x05}, Type: AccountTypeWatch, Position: 4},
+		{Address: types.Address{0x02}, Type: AccountTypeWatch, Position: 5},
+	}
+
+	dbAccounts, err = db.GetAccounts()
+	require.NoError(t, err)
+	for i := 0; i < len(accounts); i++ {
+		require.True(t, SameAccounts(accounts[i], dbAccounts[i]))
+	}
+
+	// Check clock
+	dbClock, err = db.GetClockOfLastAccountsPositionChange()
+	require.NoError(t, err)
+	require.Equal(t, clock, dbClock)
 }
 
 func TestGetWalletAddress(t *testing.T) {
