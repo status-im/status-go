@@ -108,7 +108,7 @@ func (s *EventToSystemMessageSuite) TestRun() {
 		},
 		{
 			Name:     "member removed event",
-			Event:    v1protocol.NewMemberRemovedEvent("a", 12),
+			Event:    v1protocol.NewMemberRemovedEvent([]string{"a"}, 12),
 			From:     "admin",
 			Expected: "@a left the group",
 		},

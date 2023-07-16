@@ -238,10 +238,10 @@ func NewAdminsAddedEvent(admins []string, clock uint64) MembershipUpdateEvent {
 	}
 }
 
-func NewMemberRemovedEvent(member string, clock uint64) MembershipUpdateEvent {
+func NewMemberRemovedEvent(members []string, clock uint64) MembershipUpdateEvent {
 	return MembershipUpdateEvent{
 		Type:       protobuf.MembershipUpdateEvent_MEMBER_REMOVED,
-		Members:    []string{member},
+		Members:    members,
 		ClockValue: clock,
 	}
 }

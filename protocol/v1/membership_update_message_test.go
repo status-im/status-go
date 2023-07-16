@@ -148,7 +148,7 @@ func TestGroupProcessEvent(t *testing.T) {
 			Group:  createGroup(nil, []string{"0xabc", "0xdef"}, []string{"0xdef", "0xabc"}, emptyName, emptyColor, emptyImage),
 			Result: createGroup(nil, []string{"0xdef"}, []string{"0xdef"}, emptyName, emptyColor, emptyImage),
 			From:   "0xabc",
-			Event:  NewMemberRemovedEvent("0xabc", 0),
+			Event:  NewMemberRemovedEvent([]string{"0xabc"}, 0),
 		},
 		{
 			Name:   "member-joined event",
@@ -264,21 +264,21 @@ func TestGroupValidateEvent(t *testing.T) {
 			Name:   "member-removed allowed because removing themselves",
 			From:   "0xabc",
 			Group:  createGroup(nil, nil),
-			Event:  NewMemberRemovedEvent("0xabc", 0),
+			Event:  NewMemberRemovedEvent([]string{"0xabc"}, 0),
 			Result: true,
 		},
 		{
 			Name:   "member-removed allowed because from is admin",
 			From:   "0xabc",
 			Group:  createGroup([]string{"0xabc"}, []string{"0x123"}),
-			Event:  NewMemberRemovedEvent("0x123", 0),
+			Event:  NewMemberRemovedEvent([]string{"0x123"}, 0),
 			Result: true,
 		},
 		{
 			Name:   "member-removed not allowed for non-admins",
 			From:   "0x123",
 			Group:  createGroup([]string{"0xabc"}, []string{"0x123", "0x456"}),
-			Event:  NewMemberRemovedEvent("0x456", 0),
+			Event:  NewMemberRemovedEvent([]string{"0x456"}, 0),
 			Result: false,
 		},
 		{
@@ -452,7 +452,7 @@ func TestAbridgedEventsMembers(t *testing.T) {
 	require.Len(t, g.AbridgedEvents(), 2)
 
 	// We remove one of the users
-	event = NewMemberRemovedEvent(member3ID, clock)
+	event = NewMemberRemovedEvent([]string{member3ID}, clock)
 	event.From = creatorID
 	event.ChatID = g.chatID
 	err = g.ProcessEvent(event)
@@ -476,7 +476,7 @@ func TestAbridgedEventsMembers(t *testing.T) {
 	require.Len(t, g.AbridgedEvents(), 4)
 
 	// We remove the member just added
-	event = NewMemberRemovedEvent(member4ID, clock)
+	event = NewMemberRemovedEvent([]string{member4ID}, clock)
 	event.From = creatorID
 	event.ChatID = g.chatID
 	err = g.ProcessEvent(event)

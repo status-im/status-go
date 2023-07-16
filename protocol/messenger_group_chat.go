@@ -147,19 +147,16 @@ func (m *Messenger) RemoveMembersFromGroupChat(ctx context.Context, chatID strin
 
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
-	for _, member := range members {
-		// Remove member
-		event := v1protocol.NewMemberRemovedEvent(member, clock)
-		event.ChatID = chat.ID
-		err = event.Sign(m.identity)
-		if err != nil {
-			return nil, err
-		}
+	event := v1protocol.NewMemberRemovedEvent(members, clock)
+	event.ChatID = chat.ID
+	err = event.Sign(m.identity)
+	if err != nil {
+		return nil, err
+	}
 
-		err = group.ProcessEvent(event)
-		if err != nil {
-			return nil, err
-		}
+	err = group.ProcessEvent(event)
+	if err != nil {
+		return nil, err
 	}
 
 	encodedMessage, err := m.sender.EncodeMembershipUpdate(group, nil)
@@ -177,8 +174,8 @@ func (m *Messenger) RemoveMembersFromGroupChat(ctx context.Context, chatID strin
 	}
 
 	chat.updateChatFromGroupMembershipChanges(group)
-
-	return m.addMessagesAndChat(chat, buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations), &response)
+	
+	return m.addMessagesAndChat(chat, buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations), &response)
 }
 
 func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, members []string) (*MessengerResponse, error) {
@@ -684,7 +681,7 @@ func (m *Messenger) leaveGroupChat(ctx context.Context, response *MessengerRespo
 		}
 		clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 		event := v1protocol.NewMemberRemovedEvent(
-			contactIDFromPublicKey(&m.identity.PublicKey),
+			[]string{contactIDFromPublicKey(&m.identity.PublicKey)},
 			clock,
 		)
 		event.ChatID = chat.ID
