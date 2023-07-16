@@ -26,12 +26,16 @@ const (
 )
 
 var (
-	errDbPassedParameterIsNil         = errors.New("accounts: passed parameter is nil")
-	errDbTransactionIsNil             = errors.New("accounts: database transaction is nil")
-	ErrDbKeypairNotFound              = errors.New("accounts: keypair is not found")
-	ErrDbAccountNotFound              = errors.New("accounts: account is not found")
-	ErrKeypairDifferentAccountsKeyUID = errors.New("cannot store keypair with different accounts' key uid than keypair's key uid")
-	ErrKeypairWithoutAccounts         = errors.New("cannot store keypair without accounts")
+	errDbPassedParameterIsNil                      = errors.New("accounts: passed parameter is nil")
+	errDbTransactionIsNil                          = errors.New("accounts: database transaction is nil")
+	ErrDbKeypairNotFound                           = errors.New("accounts: keypair is not found")
+	ErrDbAccountNotFound                           = errors.New("accounts: account is not found")
+	ErrAccountWrongPosition                        = errors.New("accounts: trying to set wrong position to account")
+	ErrNotTheSameNumberOdAccountsToApplyReordering = errors.New("accounts: there is different number of accounts between received sync message and db accounts")
+	ErrNotTheSameAccountsToApplyReordering         = errors.New("accounts: there are differences between accounts in received sync message and db accounts")
+	ErrMovingAccountToWrongPosition                = errors.New("accounts: trying to move account to a wrong position")
+	ErrKeypairDifferentAccountsKeyUID              = errors.New("cannot store keypair with different accounts' key uid than keypair's key uid")
+	ErrKeypairWithoutAccounts                      = errors.New("cannot store keypair without accounts")
 )
 
 type Keypair struct {
@@ -1129,14 +1133,34 @@ func (db *Database) GetPositionForNextNewAccount() (int64, error) {
 	return 0, nil
 }
 
-// The UpdateAccountPosition function rearranges accounts based on the new position assigned to a given address.
-// Please note that this function does not ensure a sequential order
-func (db *Database) UpdateAccountPosition(address types.Address, newPosition int64, clock uint64) (err error) {
-	var (
-		maxPosition     int64
-		minPosition     int64
-		currentPosition int64
-	)
+// This function should not be used directly, it is called from the functions which reorders accounts.
+func (db *Database) setClockOfLastAccountsPositionChange(tx *sql.Tx, clock uint64) error {
+	if tx == nil {
+		return nil
+	}
+	_, err := tx.Exec("UPDATE settings SET wallet_accounts_position_change_clock = ? WHERE synthetic_id = 'id'", clock)
+	return err
+}
+
+func (db *Database) GetClockOfLastAccountsPositionChange() (result uint64, err error) {
+	query := "SELECT wallet_accounts_position_change_clock FROM settings WHERE synthetic_id = 'id'"
+	err = db.db.QueryRow(query).Scan(&result)
+	if err != nil {
+		return 0, err
+	}
+	return result, err
+}
+
+// Sets positions for passed accounts.
+func (db *Database) SetWalletAccountsPositions(accounts []*Account, clock uint64) (err error) {
+	if len(accounts) == 0 {
+		return nil
+	}
+	for _, acc := range accounts {
+		if acc.Position < 0 {
+			return ErrAccountWrongPosition
+		}
+	}
 	tx, err := db.db.Begin()
 	defer func() {
 		if err == nil {
@@ -1146,41 +1170,98 @@ func (db *Database) UpdateAccountPosition(address types.Address, newPosition int
 		_ = tx.Rollback()
 	}()
 
-	err = tx.QueryRow("SELECT MAX(position), MIN(position) FROM keypairs_accounts").Scan(&maxPosition, &minPosition)
-	if err != nil {
-		return err
-	}
-	acc, err := db.getAccountByAddress(tx, address)
-	if err != nil {
-		return err
-	}
-	currentPosition = acc.Position
-
-	if newPosition == maxPosition {
-		newPosition++
-	} else if newPosition == minPosition {
-		newPosition--
-	} else if newPosition > currentPosition {
-		_, err = tx.Exec("UPDATE keypairs_accounts SET position = position + 1 WHERE position > ?", newPosition)
-		newPosition++
-	} else if newPosition < currentPosition {
-		newPosition--
-		_, err = tx.Exec("UPDATE keypairs_accounts SET position = position - 1 WHERE position <= ?", newPosition)
-	}
+	dbAccounts, err := db.getAccounts(tx, types.Address{})
 	if err != nil {
 		return err
 	}
 
-	_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE address = ?", newPosition, address)
+	// we need to subtract 1, because of the chat account
+	if len(dbAccounts)-1 != len(accounts) {
+		return ErrNotTheSameNumberOdAccountsToApplyReordering
+	}
+
+	for _, dbAcc := range dbAccounts {
+		if dbAcc.Chat {
+			continue
+		}
+		found := false
+		for _, acc := range accounts {
+			if dbAcc.Address == acc.Address {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return ErrNotTheSameAccountsToApplyReordering
+		}
+	}
+
+	for _, acc := range accounts {
+		_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE address = ?", acc.Position, acc.Address)
+		if err != nil {
+			return err
+		}
+	}
+
+	return db.setClockOfLastAccountsPositionChange(tx, clock)
+}
+
+// Moves wallet account fromPosition to toPosition.
+func (db *Database) MoveWalletAccount(fromPosition int64, toPosition int64, clock uint64) (err error) {
+	if fromPosition < 0 || toPosition < 0 || fromPosition == toPosition {
+		return ErrMovingAccountToWrongPosition
+	}
+	tx, err := db.db.Begin()
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	var (
+		newMaxPosition int64
+		newMinPosition int64
+	)
+	err = tx.QueryRow("SELECT MAX(position), MIN(position) FROM keypairs_accounts").Scan(&newMaxPosition, &newMinPosition)
 	if err != nil {
 		return err
 	}
+	newMaxPosition++
+	newMinPosition--
 
-	// Update keypair clock if any but the watch only account was deleted.
-	if acc.KeyUID != "" {
-		err = db.updateKeypairClock(tx, acc.KeyUID, clock)
-		return err
+	if toPosition > fromPosition {
+		_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE position = ?", newMaxPosition, fromPosition)
+		if err != nil {
+			return err
+		}
+		for i := fromPosition + 1; i <= toPosition; i++ {
+			_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE position = ?", i-1, i)
+			if err != nil {
+				return err
+			}
+		}
+		_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE position = ?", toPosition, newMaxPosition)
+		if err != nil {
+			return err
+		}
+	} else {
+		_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE position = ?", newMinPosition, fromPosition)
+		if err != nil {
+			return err
+		}
+		for i := fromPosition - 1; i >= toPosition; i-- {
+			_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE position = ?", i+1, i)
+			if err != nil {
+				return err
+			}
+		}
+		_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE position = ?", toPosition, newMinPosition)
+		if err != nil {
+			return err
+		}
 	}
 
-	return nil
+	return db.setClockOfLastAccountsPositionChange(tx, clock)
 }

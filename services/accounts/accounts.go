@@ -76,8 +76,8 @@ func (api *API) UpdateKeypairName(ctx context.Context, keyUID string, name strin
 	return (*api.messenger).UpdateKeypairName(keyUID, name)
 }
 
-func (api *API) UpdateAccountPosition(ctx context.Context, address types.Address, position int64) error {
-	return (*api.messenger).UpdateAccountPosition(address, position)
+func (api *API) MoveWalletAccount(ctx context.Context, fromPosition int64, toPosition int64) error {
+	return (*api.messenger).MoveWalletAccount(fromPosition, toPosition)
 }
 
 func (api *API) GetAccounts(ctx context.Context) ([]*accounts.Account, error) {

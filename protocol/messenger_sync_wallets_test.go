@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
@@ -274,4 +275,172 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	for _, acc := range accountsToUpdate {
 		s.Require().True(contains(dbProfileKp2.Accounts, acc, accounts.SameAccounts))
 	}
+}
+
+func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
+	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp.Accounts[0].Position = -1 // Chat account must be at position -1 always
+
+	woAccounts := []*accounts.Account{
+		{Address: types.Address{0x11}, Type: accounts.AccountTypeWatch, Position: 0},
+		{Address: types.Address{0x12}, Type: accounts.AccountTypeWatch, Position: 1},
+		{Address: types.Address{0x13}, Type: accounts.AccountTypeWatch, Position: 2},
+		{Address: types.Address{0x14}, Type: accounts.AccountTypeWatch, Position: 3},
+		{Address: types.Address{0x15}, Type: accounts.AccountTypeWatch, Position: 4},
+		{Address: types.Address{0x16}, Type: accounts.AccountTypeWatch, Position: 5},
+	}
+
+	// Create a main account on alice
+	err := s.m.settings.SaveOrUpdateKeypair(profileKp)
+	s.Require().NoError(err, "profile keypair alice.settings.SaveOrUpdateKeypair")
+	// Store watch only accounts on alice's device
+	err = s.m.settings.SaveOrUpdateAccounts(woAccounts, false)
+	s.Require().NoError(err, "wo accounts alice.settings.SaveOrUpdateKeypair")
+
+	dbAccounts, err := s.m.settings.GetAccounts()
+	s.Require().NoError(err)
+	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
+
+	// Create a main account on alice's other device
+	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
+	s.Require().NoError(err)
+	err = alicesOtherDevice.settings.SaveOrUpdateKeypair(profileKp)
+	s.Require().NoError(err, "profile keypair alice.settings.SaveOrUpdateKeypair")
+	// Store watch only accounts on alice's other device
+	err = alicesOtherDevice.settings.SaveOrUpdateAccounts(woAccounts, false)
+	s.Require().NoError(err, "wo accounts alice.settings.SaveOrUpdateKeypair")
+
+	dbAccounts, err = alicesOtherDevice.settings.GetAccounts()
+	s.Require().NoError(err)
+	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
+
+	// Pair devices
+	im1 := &multidevice.InstallationMetadata{
+		Name:       "alice's-other-device",
+		DeviceType: "alice's-other-device-type",
+	}
+	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, im1)
+	s.Require().NoError(err)
+	response, err := alicesOtherDevice.SendPairInstallation(context.Background(), nil)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().False(response.Chats()[0].Active)
+
+	// Wait for the message to reach its destination
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Installations) > 0 },
+		"installation not received",
+	)
+
+	s.Require().NoError(err)
+	actualInstallation := response.Installations[0]
+	s.Require().Equal(alicesOtherDevice.installationID, actualInstallation.ID)
+	s.Require().NotNil(actualInstallation.InstallationMetadata)
+	s.Require().Equal("alice's-other-device", actualInstallation.InstallationMetadata.Name)
+	s.Require().Equal("alice's-other-device-type", actualInstallation.InstallationMetadata.DeviceType)
+
+	err = s.m.EnableInstallation(alicesOtherDevice.installationID)
+	s.Require().NoError(err)
+
+	// Move down account from position 1 to position 4
+	err = s.m.MoveWalletAccount(1, 4)
+	s.Require().NoError(err)
+
+	// Expected after moving down
+	woAccounts = []*accounts.Account{
+		{Address: types.Address{0x11}, Type: accounts.AccountTypeWatch, Position: 0},
+		{Address: types.Address{0x13}, Type: accounts.AccountTypeWatch, Position: 1},
+		{Address: types.Address{0x14}, Type: accounts.AccountTypeWatch, Position: 2},
+		{Address: types.Address{0x15}, Type: accounts.AccountTypeWatch, Position: 3},
+		{Address: types.Address{0x12}, Type: accounts.AccountTypeWatch, Position: 4}, // acc with addr 0x12 is at position 4 (moved from position 1)
+		{Address: types.Address{0x16}, Type: accounts.AccountTypeWatch, Position: 5},
+	}
+
+	dbAccounts, err = s.m.settings.GetAccounts()
+	s.Require().NoError(err)
+	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
+	for i := 0; i < len(woAccounts); i++ {
+		s.Require().True(accounts.SameAccounts(woAccounts[i], dbAccounts[i+1]))
+	}
+
+	// Sync between devices is triggered automatically
+	err = tt.RetryWithBackOff(func() error {
+		response, err := alicesOtherDevice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(response.AccountsPositions) != len(woAccounts) {
+			return errors.New("no sync message received for accounts reordering")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+
+	// check on alice's other device
+	dbAccounts, err = alicesOtherDevice.settings.GetAccounts()
+	s.Require().NoError(err)
+	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
+	for i := 0; i < len(woAccounts); i++ {
+		s.Require().True(accounts.SameAccounts(woAccounts[i], dbAccounts[i+1]))
+	}
+
+	// compare times
+	dbClock, err := s.m.settings.GetClockOfLastAccountsPositionChange()
+	s.Require().NoError(err)
+	dbClockOtherDevice, err := s.m.settings.GetClockOfLastAccountsPositionChange()
+	s.Require().NoError(err)
+	s.Require().Equal(dbClock, dbClockOtherDevice)
+
+	// Move up account from position 5 to position 0
+	err = s.m.MoveWalletAccount(5, 0)
+	s.Require().NoError(err)
+
+	// Expected after moving down
+	woAccounts = []*accounts.Account{
+		{Address: types.Address{0x16}, Type: accounts.AccountTypeWatch, Position: 0}, // acc with addr 0x16 is at position 0 (moved from position 5)
+		{Address: types.Address{0x11}, Type: accounts.AccountTypeWatch, Position: 1},
+		{Address: types.Address{0x13}, Type: accounts.AccountTypeWatch, Position: 2},
+		{Address: types.Address{0x14}, Type: accounts.AccountTypeWatch, Position: 3},
+		{Address: types.Address{0x15}, Type: accounts.AccountTypeWatch, Position: 4},
+		{Address: types.Address{0x12}, Type: accounts.AccountTypeWatch, Position: 5},
+	}
+
+	dbAccounts, err = s.m.settings.GetAccounts()
+	s.Require().NoError(err)
+	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
+	for i := 0; i < len(woAccounts); i++ {
+		s.Require().True(accounts.SameAccounts(woAccounts[i], dbAccounts[i+1]))
+	}
+
+	// Sync between devices is triggered automatically
+	err = tt.RetryWithBackOff(func() error {
+		response, err := alicesOtherDevice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(response.AccountsPositions) != len(woAccounts) {
+			return errors.New("no sync message received for accounts reordering")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+
+	// check on alice's other device
+	dbAccounts, err = alicesOtherDevice.settings.GetAccounts()
+	s.Require().NoError(err)
+	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
+	for i := 0; i < len(woAccounts); i++ {
+		s.Require().True(accounts.SameAccounts(woAccounts[i], dbAccounts[i+1]))
+	}
+
+	// compare times
+	dbClock, err = s.m.settings.GetClockOfLastAccountsPositionChange()
+	s.Require().NoError(err)
+	dbClockOtherDevice, err = s.m.settings.GetClockOfLastAccountsPositionChange()
+	s.Require().NoError(err)
+	s.Require().Equal(dbClock, dbClockOtherDevice)
 }

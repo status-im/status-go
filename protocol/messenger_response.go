@@ -48,6 +48,7 @@ type MessengerResponse struct {
 	CustomizationColor            string
 	WatchOnlyAccounts             []*accounts.Account
 	Keypairs                      []*accounts.Keypair
+	AccountsPositions             []*accounts.Account
 	DiscordCategories             []*discord.Category
 	DiscordChannels               []*discord.Channel
 	DiscordOldestMessageTimestamp int
@@ -111,6 +112,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		CustomizationColor            string                               `json:"customizationColor,omitempty"`
 		WatchOnlyAccounts             []*accounts.Account                  `json:"watchOnlyAccounts,omitempty"`
 		Keypairs                      []*accounts.Keypair                  `json:"keypairs,omitempty"`
+		AccountsPositions             []*accounts.Account                  `json:"accountsPositions,omitempty"`
 		DiscordCategories             []*discord.Category                  `json:"discordCategories,omitempty"`
 		DiscordChannels               []*discord.Channel                   `json:"discordChannels,omitempty"`
 		DiscordOldestMessageTimestamp int                                  `json:"discordOldestMessageTimestamp"`
@@ -133,6 +135,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		CustomizationColor:      r.CustomizationColor,
 		WatchOnlyAccounts:       r.WatchOnlyAccounts,
 		Keypairs:                r.Keypairs,
+		AccountsPositions:       r.AccountsPositions,
 
 		Messages:                      r.Messages(),
 		VerificationRequests:          r.VerificationRequests(),
@@ -272,6 +275,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.IdentityImages)+
 		len(r.WatchOnlyAccounts)+
 		len(r.Keypairs)+
+		len(r.AccountsPositions)+
 		len(r.notifications)+
 		len(r.statusUpdates)+
 		len(r.activityCenterNotifications)+
@@ -319,6 +323,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.CustomizationColor = response.CustomizationColor
 	r.WatchOnlyAccounts = append(r.WatchOnlyAccounts, response.WatchOnlyAccounts...)
 	r.Keypairs = append(r.Keypairs, response.Keypairs...)
+	r.WatchOnlyAccounts = append(r.AccountsPositions, response.AccountsPositions...)
 	r.SocialLinksInfo = response.SocialLinksInfo
 
 	return nil

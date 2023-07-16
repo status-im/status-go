@@ -313,6 +313,13 @@ message SyncKeypair {
   bool removed = 10;
 }
 
+// this message is used for syncing accounts positions only, for syncing any other info consider
+// `SyncAccount` or `SyncKeypair` message
+message SyncAccountsPositions {
+  uint64 clock = 1;
+  repeated SyncAccount accounts = 2;
+}
+
 message SyncSavedAddress {
   reserved 4;
   bytes  address = 1;
