@@ -144,7 +144,7 @@ func (s *AdminMessengerCommunitiesSuite) newMessenger() *Messenger {
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminEditCommunityDescription() {
-	// TODO admin test: update to include edit tags, logo, banner, request to join required setting, pin setting, etc...
+	// TODO admin test: update to include edit tags, logo, banner, pin setting, etc...
 	community := s.setUpCommunityAndRoles()
 	s.adminEditsCommunityDescription(community)
 }
@@ -957,14 +957,16 @@ func (s *AdminMessengerCommunitiesSuite) adminEditsCommunityDescription(communit
 	expectedName := "edited community name"
 	expectedColor := "#000000"
 	expectedDescr := "edited community description"
+	expectedHistoryArchiveSupportEnabled := false
 
 	response, err := s.admin.EditCommunity(&requests.EditCommunity{
 		CommunityID: community.ID(),
 		CreateCommunity: requests.CreateCommunity{
-			Membership:  protobuf.CommunityPermissions_ON_REQUEST,
-			Name:        expectedName,
-			Color:       expectedColor,
-			Description: expectedDescr,
+			Membership:                   protobuf.CommunityPermissions_ON_REQUEST,
+			Name:                         expectedName,
+			Color:                        expectedColor,
+			Description:                  expectedDescr,
+			HistoryArchiveSupportEnabled: expectedHistoryArchiveSupportEnabled,
 		},
 	})
 
@@ -972,18 +974,27 @@ func (s *AdminMessengerCommunitiesSuite) adminEditsCommunityDescription(communit
 		if len(response.Communities()) == 0 {
 			return errors.New("community not received")
 		}
+		community := response.Communities()[0]
 
-		rCommunities := response.Communities()
-		if expectedName != rCommunities[0].Name() {
+		if expectedName != community.Name() {
 			return errors.New("incorrect community name")
 		}
 
-		if expectedColor != rCommunities[0].Color() {
+		if expectedColor != community.Color() {
 			return errors.New("incorrect community color")
 		}
 
-		if expectedDescr != rCommunities[0].DescriptionText() {
+		if expectedDescr != community.DescriptionText() {
 			return errors.New("incorrect community description")
+		}
+
+		if len(response.CommunitiesSettings()) == 0 {
+			return errors.New("community settings not received")
+		}
+		communitySettings := response.CommunitiesSettings()[0]
+
+		if expectedHistoryArchiveSupportEnabled != communitySettings.HistoryArchiveSupportEnabled {
+			return errors.New("incorrect HistoryArchiveSupportEnabled community setting")
 		}
 
 		return nil
@@ -992,7 +1003,7 @@ func (s *AdminMessengerCommunitiesSuite) adminEditsCommunityDescription(communit
 	s.Require().NoError(err)
 	s.Require().Nil(checkCommunityEdit(response))
 
-	s.checkClientsReceivedAdminEvent(WaitCommunityCondition, checkCommunityEdit)
+	s.checkClientsReceivedAdminEvent(WaitCommunityWithSettingsCondition, checkCommunityEdit)
 }
 
 func (s *AdminMessengerCommunitiesSuite) refreshMessengerResponses() {
@@ -1017,6 +1028,10 @@ type WaitResponseValidator func(*MessengerResponse) bool
 
 func WaitCommunityCondition(r *MessengerResponse) bool {
 	return len(r.Communities()) > 0
+}
+
+func WaitCommunityWithSettingsCondition(r *MessengerResponse) bool {
+	return len(r.Communities()) > 0 && len(r.CommunitiesSettings()) > 0
 }
 
 func WaitMessageCondition(response *MessengerResponse) bool {

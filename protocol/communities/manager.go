@@ -304,8 +304,9 @@ type MemberPermissionsCheckedSignal struct {
 }
 
 type CommunityResponse struct {
-	Community *Community        `json:"community"`
-	Changes   *CommunityChanges `json:"changes"`
+	Community         *Community         `json:"community"`
+	Changes           *CommunityChanges  `json:"changes"`
+	CommunitySettings *CommunitySettings `json:"settings"`
 }
 
 func (m *Manager) Subscribe() chan *Subscription {
@@ -899,7 +900,14 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 	if community.IsOwner() {
 		m.publish(&Subscription{Community: community})
 	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityEditAdminEvent()})
+		settings, err := m.persistence.GetCommunitySettingsByID(request.CommunityID)
+		if err != nil {
+			return nil, err
+		}
+
+		event := community.ToCommunityEditAdminEvent()
+		event.CommunityConfig.HistoryArchiveSupportEnabled = settings.HistoryArchiveSupportEnabled
+		m.publish(&Subscription{CommunityAdminEvent: event})
 	}
 
 	return community, nil
@@ -1399,7 +1407,37 @@ func (m *Manager) HandleCommunityAdminEvent(signer *ecdsa.PublicKey, adminEvent 
 		return nil, err
 	}
 
-	return m.handleCommunityDescriptionMessageCommon(community, patchedCommDescr, rawMessage)
+	response, err := m.handleCommunityDescriptionMessageCommon(community, patchedCommDescr, rawMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	if adminEvent.CommunityConfig != nil {
+		settings, err := m.persistence.GetCommunitySettingsByID(community.ID())
+		if err != nil {
+			return nil, err
+		}
+
+		if settings == nil {
+			settings = &CommunitySettings{
+				CommunityID:                  string(adminEvent.CommunityId),
+				HistoryArchiveSupportEnabled: adminEvent.CommunityConfig.HistoryArchiveSupportEnabled,
+				Clock:                        adminEvent.Clock,
+			}
+		}
+
+		if adminEvent.Clock > settings.Clock {
+			settings.HistoryArchiveSupportEnabled = adminEvent.CommunityConfig.HistoryArchiveSupportEnabled
+			settings.Clock = adminEvent.Clock
+		}
+
+		err = m.persistence.SaveCommunitySettings(*settings)
+		if err != nil {
+			return nil, err
+		}
+		response.CommunitySettings = settings
+	}
+	return response, nil
 }
 
 func (m *Manager) handleAdditionalAdminChanges(community *Community, adminEvent *protobuf.CommunityAdminEvent) error {
@@ -1440,6 +1478,7 @@ func (m *Manager) handleAdditionalAdminChanges(community *Community, adminEvent 
 				return err
 			}
 		}
+
 		return nil
 	}
 

@@ -46,7 +46,8 @@ message CommunityConfig {
   CommunityAdminSettings admin_settings = 3;
   string intro_message = 4;
   string outro_message = 5;
-  repeated string tags = 6;
+  bool history_archive_support_enabled = 6;
+  repeated string tags = 7;
 }
 
 message CategoryData {

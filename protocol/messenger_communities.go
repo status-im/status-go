@@ -2250,6 +2250,10 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 		return nil
 	}
 
+	if communityResponse.CommunitySettings != nil {
+		state.Response.AddCommunitySettings(communityResponse.CommunitySettings)
+	}
+
 	removedChatIDs := make([]string, 0)
 	for id := range communityResponse.Changes.ChatsRemoved {
 		chatID := community.IDString() + id
