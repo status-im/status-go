@@ -96,24 +96,25 @@ var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 // Similarly, it needs to expose an interface to manage
 // mailservers because they can also be managed by the user.
 type Messenger struct {
-	node                   types.Node
-	server                 *p2p.Server
-	peerStore              *mailservers.PeerStore
-	config                 *config
-	identity               *ecdsa.PrivateKey
-	persistence            *sqlitePersistence
-	transport              *transport.Transport
-	encryptor              *encryption.Protocol
-	sender                 *common.MessageSender
-	ensVerifier            *ens.Verifier
-	anonMetricsClient      *anonmetrics.Client
-	anonMetricsServer      *anonmetrics.Server
-	pushNotificationClient *pushnotificationclient.Client
-	pushNotificationServer *pushnotificationserver.Server
-	communitiesManager     *communities.Manager
-	accountsManager        account.Manager
-	mentionsManager        *MentionManager
-	logger                 *zap.Logger
+	node                      types.Node
+	server                    *p2p.Server
+	peerStore                 *mailservers.PeerStore
+	config                    *config
+	identity                  *ecdsa.PrivateKey
+	persistence               *sqlitePersistence
+	transport                 *transport.Transport
+	encryptor                 *encryption.Protocol
+	sender                    *common.MessageSender
+	ensVerifier               *ens.Verifier
+	anonMetricsClient         *anonmetrics.Client
+	anonMetricsServer         *anonmetrics.Server
+	pushNotificationClient    *pushnotificationclient.Client
+	pushNotificationServer    *pushnotificationserver.Server
+	communitiesManager        *communities.Manager
+	communitiesKeyDistributor CommunitiesKeyDistributor
+	accountsManager           account.Manager
+	mentionsManager           *MentionManager
+	logger                    *zap.Logger
 
 	outputCSV bool
 	csvFile   *os.File
@@ -469,19 +470,23 @@ func NewMessenger(
 	ctx, cancel := context.WithCancel(context.Background())
 
 	messenger = &Messenger{
-		config:                     &c,
-		node:                       node,
-		identity:                   identity,
-		persistence:                sqlitePersistence,
-		transport:                  transp,
-		encryptor:                  encryptionProtocol,
-		sender:                     sender,
-		anonMetricsClient:          anonMetricsClient,
-		anonMetricsServer:          anonMetricsServer,
-		telemetryClient:            telemetryClient,
-		pushNotificationClient:     pushNotificationClient,
-		pushNotificationServer:     pushNotificationServer,
-		communitiesManager:         communitiesManager,
+		config:                 &c,
+		node:                   node,
+		identity:               identity,
+		persistence:            sqlitePersistence,
+		transport:              transp,
+		encryptor:              encryptionProtocol,
+		sender:                 sender,
+		anonMetricsClient:      anonMetricsClient,
+		anonMetricsServer:      anonMetricsServer,
+		telemetryClient:        telemetryClient,
+		pushNotificationClient: pushNotificationClient,
+		pushNotificationServer: pushNotificationServer,
+		communitiesManager:     communitiesManager,
+		communitiesKeyDistributor: &CommunitiesKeyDistributorImpl{
+			sender:    sender,
+			encryptor: encryptionProtocol,
+		},
 		accountsManager:            accountsManager,
 		ensVerifier:                ensVerifier,
 		featureFlags:               c.featureFlags,

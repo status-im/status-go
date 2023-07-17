@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
@@ -76,6 +77,77 @@ func (m *TokenManagerMock) GetBalancesByChain(ctx context.Context, accounts, tok
 	return *m.Balances, nil
 }
 
+type CommunityAndKeyActions struct {
+	community  *communities.Community
+	keyActions *communities.EncryptionKeyActions
+}
+
+type TestCommunitiesKeyDistributor struct {
+	CommunitiesKeyDistributorImpl
+
+	subscriptions map[chan *CommunityAndKeyActions]bool
+	mutex         sync.RWMutex
+}
+
+func (tckd *TestCommunitiesKeyDistributor) Distribute(community *communities.Community, keyActions *communities.EncryptionKeyActions) error {
+	err := tckd.CommunitiesKeyDistributorImpl.Distribute(community, keyActions)
+	if err != nil {
+		return err
+	}
+
+	// notify distribute finished
+	tckd.mutex.RLock()
+	for s := range tckd.subscriptions {
+		s <- &CommunityAndKeyActions{
+			community:  community,
+			keyActions: keyActions,
+		}
+	}
+	tckd.mutex.RUnlock()
+
+	return nil
+}
+
+func (tckd *TestCommunitiesKeyDistributor) waitOnKeyDistribution(condition func(*CommunityAndKeyActions) bool) <-chan error {
+	errCh := make(chan error, 1)
+
+	subscription := make(chan *CommunityAndKeyActions)
+	tckd.mutex.Lock()
+	tckd.subscriptions[subscription] = true
+	tckd.mutex.Unlock()
+
+	go func() {
+		defer func() {
+			close(errCh)
+
+			tckd.mutex.Lock()
+			delete(tckd.subscriptions, subscription)
+			tckd.mutex.Unlock()
+			close(subscription)
+		}()
+
+		for {
+			select {
+			case s, more := <-subscription:
+				if !more {
+					errCh <- errors.New("channel closed when waiting for key distribution")
+					return
+				}
+
+				if condition(s) {
+					return
+				}
+
+			case <-time.After(500 * time.Millisecond):
+				errCh <- errors.New("timed out when waiting for key distribution")
+				return
+			}
+		}
+	}()
+
+	return errCh
+}
+
 func TestMessengerCommunitiesTokenPermissionsSuite(t *testing.T) {
 	suite.Run(t, new(MessengerCommunitiesTokenPermissionsSuite))
 }
@@ -142,6 +214,14 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string
 
 	messenger, err := newCommunitiesTestMessenger(s.shh, privateKey, s.logger, accountsManagerMock, tokenManagerMock)
 	s.Require().NoError(err)
+
+	currentDistributorObj, ok := messenger.communitiesKeyDistributor.(*CommunitiesKeyDistributorImpl)
+	s.Require().True(ok)
+	messenger.communitiesKeyDistributor = &TestCommunitiesKeyDistributor{
+		CommunitiesKeyDistributorImpl: *currentDistributorObj,
+		subscriptions:                 map[chan *CommunityAndKeyActions]bool{},
+		mutex:                         sync.RWMutex{},
+	}
 
 	// add wallet account with keypair
 	for _, walletAddress := range walletAddresses {
@@ -225,11 +305,10 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) waitOnCommunitiesEvent(user 
 	return errCh
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) waitOnCommunityEncryption(community *communities.Community) <-chan error {
-	s.Require().False(community.Encrypted())
-	return s.waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
-		return sub.Community != nil && sub.Community.IDString() == community.IDString() && sub.Community.Encrypted()
-	})
+func (s *MessengerCommunitiesTokenPermissionsSuite) waitOnKeyDistribution(condition func(*CommunityAndKeyActions) bool) <-chan error {
+	testCommunitiesKeyDistributor, ok := s.owner.communitiesKeyDistributor.(*TestCommunitiesKeyDistributor)
+	s.Require().True(ok)
+	return testCommunitiesKeyDistributor.waitOnKeyDistribution(condition)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestCreateTokenPermission() {
@@ -607,15 +686,28 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 		},
 	}
 
-	waitOnCommunityEncryptionErrCh := s.waitOnCommunityEncryption(community)
+	waitOnBobToBeKicked := s.waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		return len(sub.Community.Members()) == 1
+	})
+	waitOnCommunityToBeRekeyedOnceBobIsKicked := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
+		return len(sub.community.Description().Members) == 1 &&
+			sub.keyActions.CommunityKeyAction.ActionType == communities.EncryptionKeyRekey
+	})
 
 	response, err = s.owner.CreateCommunityTokenPermission(&permissionRequest)
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
 
-	err = <-waitOnCommunityEncryptionErrCh
+	err = <-waitOnBobToBeKicked
 	s.Require().NoError(err)
 
+	// bob should be kicked from the community,
+	// because he doesn't meet the criteria
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(community.Members(), 1)
+
+	// bob receives community changes
 	_, err = WaitOnMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
@@ -625,11 +717,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	)
 	s.Require().NoError(err)
 
-	// bob should be kicked from the community,
-	// because he doesn't meet the criteria
-	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	err = <-waitOnCommunityToBeRekeyedOnceBobIsKicked
 	s.Require().NoError(err)
-	s.Require().Len(community.Members(), 1)
 
 	// send message to channel
 	msg = s.sendChatMessage(s.owner, chat.ID, "hello on encrypted community")
@@ -665,8 +754,17 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	// make bob satisfy the criteria
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, permissionRequest.TokenCriteria[0])
 
+	waitOnCommunityKeyToBeDistributedToBob := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
+		return len(sub.community.Description().Members) == 2 &&
+			len(sub.keyActions.CommunityKeyAction.Members) == 1 &&
+			sub.keyActions.CommunityKeyAction.ActionType == communities.EncryptionKeySendToMembers
+	})
+
 	// bob re-joins the community
 	s.joinCommunity(community, s.bob, bobPassword, []string{})
+
+	err = <-waitOnCommunityKeyToBeDistributedToBob
+	s.Require().NoError(err)
 
 	// send message to channel
 	msg = s.sendChatMessage(s.owner, chat.ID, "hello on encrypted community")

@@ -365,7 +365,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Permiss
 	for _, tc := range testCases {
 		s.Run(tc.name, func() {
 			origin := createTestCommunity(s.identity)
-			modified := origin.createDeepCopy()
+			modified := origin.CreateDeepCopy()
 
 			for _, permission := range tc.originPermissions {
 				_, err := origin.AddTokenPermission(permission)
@@ -498,7 +498,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Members
 				_, err := origin.AddTokenPermission(permission)
 				s.Require().NoError(err)
 			}
-			modified := origin.createDeepCopy()
+			modified := origin.CreateDeepCopy()
 
 			for _, member := range tc.originMembers {
 				_, err := origin.AddMember(member, []protobuf.CommunityMember_Roles{})
@@ -595,7 +595,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Permiss
 	for _, tc := range testCases {
 		s.Run(tc.name, func() {
 			origin := createTestCommunity(s.identity)
-			modified := origin.createDeepCopy()
+			modified := origin.CreateDeepCopy()
 
 			for _, permission := range tc.originPermissions {
 				_, err := origin.AddTokenPermission(permission)
@@ -743,7 +743,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 			})
 			s.Require().NoError(err)
 
-			modified := origin.createDeepCopy()
+			modified := origin.CreateDeepCopy()
 
 			for _, permission := range tc.originPermissions {
 				_, err := origin.AddTokenPermission(permission)
@@ -778,4 +778,41 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 			}
 		})
 	}
+}
+
+func (s *CommunityEncryptionKeyActionSuite) TestNilOrigin() {
+	newCommunity := createTestCommunity(s.identity)
+
+	chatID := "0x1234"
+	_, err := newCommunity.CreateChat(chatID, &protobuf.CommunityChat{
+		Members:     map[string]*protobuf.CommunityMember{},
+		Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_NO_MEMBERSHIP},
+		Identity:    &protobuf.ChatIdentity{},
+	})
+	s.Require().NoError(err)
+
+	newCommunityPermissions := []*protobuf.CommunityTokenPermission{
+		&protobuf.CommunityTokenPermission{
+			Id:            "some-id-1",
+			Type:          protobuf.CommunityTokenPermission_BECOME_MEMBER,
+			TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+			ChatIds:       []string{},
+		},
+		&protobuf.CommunityTokenPermission{
+			Id:            "some-id-2",
+			Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+			TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+			ChatIds:       []string{chatID},
+		},
+	}
+	for _, permission := range newCommunityPermissions {
+		_, err := newCommunity.AddTokenPermission(permission)
+		s.Require().NoError(err)
+	}
+
+	actions := EvaluateCommunityEncryptionKeyActions(nil, newCommunity)
+	s.Require().Equal(actions.CommunityKeyAction.ActionType, EncryptionKeyAdd)
+	s.Require().Len(actions.ChannelKeysActions, 1)
+	s.Require().NotNil(actions.ChannelKeysActions[chatID])
+	s.Require().Equal(actions.ChannelKeysActions[chatID].ActionType, EncryptionKeyAdd)
 }

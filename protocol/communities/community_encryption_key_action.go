@@ -26,6 +26,24 @@ type EncryptionKeyActions struct {
 }
 
 func EvaluateCommunityEncryptionKeyActions(origin, modified *Community) *EncryptionKeyActions {
+	if origin == nil {
+		// `modified` is a new community, create empty `origin` community
+		origin = &Community{
+			config: &Config{
+				CommunityDescription: &protobuf.CommunityDescription{
+					Members:                 map[string]*protobuf.CommunityMember{},
+					Permissions:             &protobuf.CommunityPermissions{},
+					Identity:                &protobuf.ChatIdentity{},
+					Chats:                   map[string]*protobuf.CommunityChat{},
+					Categories:              map[string]*protobuf.CommunityCategory{},
+					AdminSettings:           &protobuf.CommunityAdminSettings{},
+					TokenPermissions:        map[string]*protobuf.CommunityTokenPermission{},
+					CommunityTokensMetadata: []*protobuf.CommunityTokenMetadata{},
+				},
+			},
+		}
+	}
+
 	changes := EvaluateCommunityChanges(origin.Description(), modified.Description())
 
 	result := &EncryptionKeyActions{
