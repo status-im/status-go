@@ -210,10 +210,43 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 
 // handleCommunitiesSubscription handles events from communities
 func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscription) {
-
 	var lastPublished int64
 	// We check every 5 minutes if we need to publish
 	ticker := time.NewTicker(5 * time.Minute)
+
+	recentlyPublishedOrgs := func() map[string]*communities.Community {
+		result := make(map[string]*communities.Community)
+
+		ownedOrgs, err := m.communitiesManager.Created()
+		if err != nil {
+			m.logger.Warn("failed to retrieve orgs", zap.Error(err))
+			return result
+		}
+
+		for _, org := range ownedOrgs {
+			result[org.IDString()] = org
+		}
+
+		return result
+	}()
+
+	publishOrgAndDistributeEncryptionKeys := func(community *communities.Community) {
+		err := m.publishOrg(community)
+		if err != nil {
+			m.logger.Warn("failed to publish org", zap.Error(err))
+			return
+		}
+		m.logger.Debug("published org")
+
+		// evaluate and distribute encryption keys (if any)
+		encryptionKeyActions := communities.EvaluateCommunityEncryptionKeyActions(recentlyPublishedOrgs[community.IDString()], community)
+		err = m.communitiesKeyDistributor.Distribute(community, encryptionKeyActions)
+		if err != nil {
+			m.logger.Warn("failed to distribute encryption keys", zap.Error(err))
+		}
+
+		recentlyPublishedOrgs[community.IDString()] = community.CreateDeepCopy()
+	}
 
 	go func() {
 		for {
@@ -223,10 +256,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					return
 				}
 				if sub.Community != nil {
-					err := m.publishOrg(sub.Community)
-					if err != nil {
-						m.logger.Warn("failed to publish org", zap.Error(err))
-					}
+					publishOrgAndDistributeEncryptionKeys(sub.Community)
 
 					for _, invitation := range sub.Invitations {
 						err := m.publishOrgInvitation(sub.Community, invitation)
@@ -234,16 +264,6 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 							m.logger.Warn("failed to publish org invitation", zap.Error(err))
 						}
 					}
-
-					if sub.MemberPermissionsCheckedSignal != nil {
-						becomeMemberPermissions := sub.Community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
-						err := m.UpdateCommunityEncryption(sub.Community, len(becomeMemberPermissions) > 0)
-						if err != nil {
-							m.logger.Warn("failed to update community encryption", zap.Error(err))
-						}
-					}
-
-					m.logger.Debug("published org")
 				}
 
 				if sub.CommunityEventsMessage != nil {
@@ -273,10 +293,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					org := orgs[idx]
 					_, beingImported := m.importingCommunities[org.IDString()]
 					if !beingImported {
-						err := m.publishOrg(org)
-						if err != nil {
-							m.logger.Warn("failed to publish org", zap.Error(err))
-						}
+						publishOrgAndDistributeEncryptionKeys(org)
 					}
 				}
 
@@ -1252,11 +1269,6 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 		return nil, err
 	}
 
-	err = m.SendKeyExchangeMessage(community.ID(), []*ecdsa.PublicKey{pk}, common.KeyExMsgReuse)
-	if err != nil {
-		return nil, err
-	}
-
 	rawMessage := &common.RawMessage{
 		Payload:           payload,
 		Sender:            community.PrivateKey(),
@@ -1909,11 +1921,6 @@ func (m *Messenger) InviteUsersToCommunity(request *requests.InviteUsersToCommun
 		}
 	}
 
-	err = m.SendKeyExchangeMessage(community.ID(), publicKeys, common.KeyExMsgReuse)
-	if err != nil {
-		return nil, err
-	}
-
 	community, err = m.communitiesManager.InviteUsersToCommunity(request.CommunityID, publicKeys)
 	if err != nil {
 		return nil, err
@@ -2018,34 +2025,6 @@ func (m *Messenger) RemoveUserFromCommunity(id types.HexBytes, pkString string) 
 	return response, nil
 }
 
-func (m *Messenger) SendKeyExchangeMessage(communityID []byte, pubkeys []*ecdsa.PublicKey, msgType common.CommKeyExMsgType) error {
-	rawMessage := common.RawMessage{
-		SkipProtocolLayer:     false,
-		CommunityID:           communityID,
-		CommunityKeyExMsgType: msgType,
-		Recipients:            pubkeys,
-		MessageType:           protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
-	}
-	_, err := m.sender.SendCommunityMessage(context.Background(), rawMessage)
-
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// RekeyCommunity takes a communities.Community.config.ID and triggers a force rekey event for that community
-func (m *Messenger) RekeyCommunity(cID types.HexBytes) error {
-	// Get the community as the member list could have changed
-	c, err := m.GetCommunityByID(cID)
-	if err != nil {
-		return err
-	}
-
-	// RekeyCommunity
-	return m.SendKeyExchangeMessage(c.ID(), c.GetMemberPubkeys(), common.KeyExMsgRekey)
-}
-
 func (m *Messenger) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunity) (*MessengerResponse, error) {
 	community, err := m.communitiesManager.UnbanUserFromCommunity(request)
 	if err != nil {
@@ -2061,13 +2040,6 @@ func (m *Messenger) BanUserFromCommunity(request *requests.BanUserFromCommunity)
 	community, err := m.communitiesManager.BanUserFromCommunity(request)
 	if err != nil {
 		return nil, err
-	}
-
-	if community.Encrypted() {
-		err = m.SendKeyExchangeMessage(community.ID(), community.GetMemberPubkeys(), common.KeyExMsgRekey)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	response := &MessengerResponse{}
@@ -4084,49 +4056,6 @@ func (m *Messenger) RemoveCommunityToken(chainID int, contractAddress string) er
 	return m.communitiesManager.RemoveCommunityToken(chainID, contractAddress)
 }
 
-// UpdateCommunityEncryption takes a communityID string and an encryption state, then finds the community and
-// encrypts / decrypts the community. Community is republished along with any keys if needed.
-//
-// Note: This function cannot decrypt previously encrypted messages, and it cannot encrypt previous unencrypted messages.
-// This functionality introduces some race conditions:
-//   - community description is processed by members before the receiving the key exchange messages
-//   - members maybe sending encrypted messages after the community description is updated and a new member joins
-func (m *Messenger) UpdateCommunityEncryption(community *communities.Community, useEncryption bool) error {
-	if community == nil {
-		return errors.New("community is nil")
-	}
-
-	// Check isEncrypted is different to Community's value
-	// If not different return
-	if community.Encrypted() == useEncryption {
-		return nil
-	}
-
-	if useEncryption {
-		// 🪄 The magic that encrypts a community
-		_, err := m.encryptor.GenerateHashRatchetKey(community.ID())
-		if err != nil {
-			return err
-		}
-
-		err = m.SendKeyExchangeMessage(community.ID(), community.GetMemberPubkeys(), common.KeyExMsgReuse)
-		if err != nil {
-			return err
-		}
-	}
-
-	// 🧙 There is no magic that decrypts a community, we just need to tell everyone to not use encryption
-
-	// Republish the community.
-	community.SetEncrypted(useEncryption)
-	err := m.communitiesManager.UpdateCommunity(community)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (m *Messenger) CheckPermissionsToJoinCommunity(request *requests.CheckPermissionToJoinCommunity) (*communities.CheckPermissionToJoinResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
@@ -4232,6 +4161,18 @@ func (m *Messenger) GetCurrentKeyForGroup(groupID []byte) (uint32, error) {
 	return m.sender.GetCurrentKeyForGroup(groupID)
 }
 
+// RekeyCommunity takes a communities.Community.config.ID and triggers a force rekey event for that community
+func (m *Messenger) RekeyCommunity(cID types.HexBytes) error {
+	// Get the community as the member list could have changed
+	c, err := m.GetCommunityByID(cID)
+	if err != nil {
+		return err
+	}
+
+	// RekeyCommunity
+	return m.communitiesKeyDistributor.Rekey(c)
+}
+
 var rekeyCommunities = false
 
 // startCommunityRekeyLoop creates a 5-minute ticker and starts a routine that attempts to rekey every community every tick
@@ -4251,10 +4192,6 @@ func (m *Messenger) startCommunityRekeyLoop() {
 		}
 	} else {
 		d = 5 * time.Minute
-	}
-
-	if d > 0 { // Always return
-		return
 	}
 
 	ticker := time.NewTicker(d)
