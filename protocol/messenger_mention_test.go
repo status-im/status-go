@@ -979,6 +979,34 @@ func TestInputSegments(t *testing.T) {
 	require.Equal(t, " ", ctx.InputSegments[1].Value)
 	require.Equal(t, Text, ctx.InputSegments[2].Type)
 	require.Equal(t, "@ ", ctx.InputSegments[2].Value)
+
+	_, err = mentionManager.OnChangeText(chatID, " @ @User Number Three ")
+	require.NoError(t, err)
+	_, err = mentionManager.OnChangeText(chatID, "@U @ @User Number Three ")
+	require.NoError(t, err)
+	ctx, err = mentionManager.SelectMention(chatID, "@U @ @User Number Three ", "User Number Three", "0xpk3")
+	require.NoError(t, err)
+	require.Equal(t, 2, mentionTypeNum(ctx.InputSegments))
+
+	ctx, _ = mentionManager.OnChangeText(chatID, "@User Number Threea")
+	require.Equal(t, 0, mentionTypeNum(ctx.InputSegments))
+
+	ctx, _ = mentionManager.OnChangeText(chatID, "@User Number Threea\n@u2\nabc@u3 asa")
+	require.Equal(t, 2, mentionTypeNum(ctx.InputSegments))
+	ctx, _ = mentionManager.OnChangeText(chatID, "@User Number Thre\n@u2\nabc@u3 asa")
+	require.Equal(t, 2, mentionTypeNum(ctx.InputSegments))
+	require.Equal(t, "@u2", ctx.InputSegments[1].Value)
+	require.Equal(t, "@u3", ctx.InputSegments[3].Value)
+}
+
+func mentionTypeNum(inputSegments []InputSegment) int {
+	var num int
+	for _, s := range inputSegments {
+		if s.Type == Mention {
+			num++
+		}
+	}
+	return num
 }
 
 func setupMentionSuggestionTest(t *testing.T, mentionableUserMapInput map[string]*MentionableUser) (map[string]*MentionableUser, string, *MentionManager) {

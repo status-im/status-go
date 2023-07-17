@@ -318,24 +318,6 @@ func (m *MentionManager) OnChangeText(chatID, fullText string) (*ChatMentionCont
 	return m.calculateSuggestions(chatID, fullText)
 }
 
-func (m *MentionManager) recheckAtIdxs(chatID string, fullText string, publicKey string) (*ChatMentionContext, error) {
-	user, err := m.mentionableUserGetter.getMentionableUser(chatID, publicKey)
-	if err != nil {
-		return nil, err
-	}
-	ctx := m.getChatMentionContext(chatID)
-	state := ctx.MentionState
-	mentionableUsers := map[string]*MentionableUser{user.ID: user}
-	newAtIdxs := checkIdxForMentions(fullText, state.AtIdxs, mentionableUsers)
-	inputSegments, success := calculateInput(fullText, newAtIdxs)
-	if !success {
-		m.logger.Warn("recheckAtIdxs: calculateInput failed", zap.String("chatID", chatID), zap.String("fullText", fullText), zap.Any("state", ctx.MentionState))
-	}
-	ctx.InputSegments = inputSegments
-	state.AtIdxs = newAtIdxs
-	return ctx, nil
-}
-
 func (m *MentionManager) calculateSuggestions(chatID, fullText string) (*ChatMentionContext, error) {
 	ctx := m.getChatMentionContext(chatID)
 
@@ -419,11 +401,10 @@ func (m *MentionManager) SelectMention(chatID, text, primaryName, publicKey stri
 
 	ctx.NewText = string(tr[:atSignIdx+1]) + primaryName + space + string(tr[mentionEnd:])
 
-	ctx, err := m.recheckAtIdxs(chatID, ctx.NewText, publicKey)
+	ctx, err := m.OnChangeText(chatID, ctx.NewText)
 	if err != nil {
 		return nil, err
 	}
-	ctx.PreviousText = ctx.NewText
 	m.clearSuggestions(chatID)
 	return ctx, nil
 }
@@ -735,6 +716,9 @@ func MatchMention(text string, users map[string]*MentionableUser, mentionKeyIdx 
 
 func matchMention(text string, users map[string]*MentionableUser, mentionKeyIdx int, nextWordIdx int, words []string) *MentionableUser {
 	tr := []rune(text)
+	if nextWordIdx >= len(tr) {
+		return nil
+	}
 	if word := wordRegex.FindString(string(tr[nextWordIdx:])); word != "" {
 		newWords := append(words, word)
 
@@ -888,7 +872,7 @@ func calculateAtIndexEntries(state *MentionState) ([]*AtIndexEntry, error) {
 				entry.From += diff
 				entry.To += diff
 			}
-			if entry.From < state.Start && entry.To >= state.Start { // impacted after user edit so need to be rechecked
+			if entry.From < state.Start && entry.To+1 >= state.Start { // impacted after user edit so need to be rechecked
 				entry.Checked = false
 			}
 			keptAtIndexEntries = append(keptAtIndexEntries, entry)
