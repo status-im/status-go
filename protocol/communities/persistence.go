@@ -31,10 +31,10 @@ var ErrOldRequestToLeave = errors.New("old request to leave")
 
 const OR = " OR "
 const communitiesBaseQuery = `
-	SELECT c.id, c.private_key, c.description, c.joined, c.spectated, c.verified, c.muted, c.muted_till, r.clock, ae.rawEvents, ae.rawDescription
+	SELECT c.id, c.private_key, c.description, c.joined, c.spectated, c.verified, c.muted, c.muted_till, r.clock, ae.raw_events, ae.raw_description
 	FROM communities_communities c
 	LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?
-	LEFT JOIN communitiesEvents ae ON c.id = ae.id`
+	LEFT JOIN communities_events ae ON c.id = ae.id`
 
 func (p *Persistence) SaveCommunity(community *Community) error {
 	id := community.ID()
@@ -52,7 +52,7 @@ func (p *Persistence) SaveCommunity(community *Community) error {
 }
 
 func (p *Persistence) DeleteCommunityEvents(id types.HexBytes) error {
-	_, err := p.db.Exec(`DELETE FROM communitiesEvents WHERE id = ?;`, id)
+	_, err := p.db.Exec(`DELETE FROM communities_events WHERE id = ?;`, id)
 	return err
 }
 
@@ -74,7 +74,7 @@ func (p *Persistence) SaveCommunityEvents(community *Community) error {
 	}
 
 	_, err = p.db.Exec(`
-		INSERT INTO communitiesEvents (id, rawEvents, rawDescription) VALUES (?, ?, ?);`,
+		INSERT INTO communities_events (id, raw_events, raw_description) VALUES (?, ?, ?);`,
 		id, rawEvents, rawDescription)
 
 	return err
@@ -82,7 +82,7 @@ func (p *Persistence) SaveCommunityEvents(community *Community) error {
 
 func (p *Persistence) DeleteCommunity(id types.HexBytes) error {
 	_, err := p.db.Exec(`DELETE FROM communities_communities WHERE id = ?;
-						 DELETE FROM communitiesEvents WHERE id = ?;`, id, id)
+						 DELETE FROM communities_events WHERE id = ?;`, id, id)
 	return err
 }
 
@@ -230,10 +230,10 @@ func (p *Persistence) rowsToCommunities(memberIdentity *ecdsa.PublicKey, rows *s
 func (p *Persistence) JoinedAndPendingCommunitiesWithRequests(memberIdentity *ecdsa.PublicKey) (comms []*Community, err error) {
 	query := `SELECT
 c.id, c.private_key, c.description, c.joined, c.spectated, c.verified, c.muted, c.muted_till,
-r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.community_id, r.state, ae.rawEvents, ae.rawDescription
+r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.community_id, r.state, ae.raw_events, ae.raw_description
 FROM communities_communities c
 LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?
-LEFT JOIN communitiesEvents ae ON c.id = ae.id
+LEFT JOIN communities_events ae ON c.id = ae.id
 WHERE c.Joined OR r.state = ?`
 
 	rows, err := p.db.Query(query, common.PubkeyToHex(memberIdentity), RequestToJoinStatePending)
@@ -247,10 +247,10 @@ WHERE c.Joined OR r.state = ?`
 func (p *Persistence) DeletedCommunities(memberIdentity *ecdsa.PublicKey) (comms []*Community, err error) {
 	query := `SELECT
 c.id, c.private_key, c.description, c.joined, c.spectated, c.verified, c.muted, c.muted_till,
-r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.community_id, r.state, ae.rawEvents, ae.rawDescription
+r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.community_id, r.state, ae.raw_events, ae.raw_description
 FROM communities_communities c
 LEFT JOIN communities_requests_to_join r ON c.id = r.community_id AND r.public_key = ?
-LEFT JOIN communitiesEvents ae ON c.id = ae.id
+LEFT JOIN communities_events ae ON c.id = ae.id
 WHERE NOT c.Joined AND (r.community_id IS NULL or r.state != ?)`
 
 	rows, err := p.db.Query(query, common.PubkeyToHex(memberIdentity), RequestToJoinStatePending)

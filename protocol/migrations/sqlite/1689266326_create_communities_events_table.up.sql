@@ -1,5 +1,5 @@
-CREATE TABLE IF NOT EXISTS communitiesEvents (
+CREATE TABLE IF NOT EXISTS communities_events (
   id BLOB NOT NULL PRIMARY KEY ON CONFLICT REPLACE,
-  rawEvents BLOB NOT NULL,
-  rawDescription BLOB NOT NULL
+  raw_events BLOB NOT NULL,
+  raw_description BLOB NOT NULL
   );
