@@ -449,6 +449,7 @@ func (o *Community) GetMemberPubkeys() []*ecdsa.PublicKey {
 	}
 	return nil
 }
+
 func (o *Community) initialize() {
 	if o.config.CommunityDescription == nil {
 		o.config.CommunityDescription = &protobuf.CommunityDescription{}
@@ -987,10 +988,6 @@ func (o *Community) Encrypted() bool {
 	return o.config.CommunityDescription.Encrypted
 }
 
-func (o *Community) SetEncrypted(encrypted bool) {
-	o.config.CommunityDescription.Encrypted = encrypted
-}
-
 func (o *Community) Joined() bool {
 	return o.config.Joined
 }
@@ -1430,6 +1427,10 @@ func includes(channelIDs []string, channelID string) bool {
 	return false
 }
 
+func (o *Community) updateEncrypted() {
+	o.config.CommunityDescription.Encrypted = len(o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)) > 0
+}
+
 func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermission) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
@@ -1454,6 +1455,7 @@ func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermis
 	}
 
 	if isControlNode {
+		o.updateEncrypted()
 		o.increaseClock()
 	}
 
@@ -1484,6 +1486,7 @@ func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *
 	}
 
 	if isControlNode {
+		o.updateEncrypted()
 		o.increaseClock()
 	}
 
@@ -1520,6 +1523,7 @@ func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChange
 	}
 
 	if isControlNode {
+		o.updateEncrypted()
 		o.increaseClock()
 	}
 
@@ -1924,7 +1928,7 @@ func (o *Community) AddMemberWithRevealedAccounts(dbRequest *RequestToJoin, role
 	return changes, nil
 }
 
-func (o *Community) createDeepCopy() *Community {
+func (o *Community) CreateDeepCopy() *Community {
 	return &Community{
 		config: &Config{
 			PrivateKey:                    o.config.PrivateKey,

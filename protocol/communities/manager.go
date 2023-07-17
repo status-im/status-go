@@ -283,10 +283,6 @@ type Subscription struct {
 	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
 	ImportingHistoryArchiveMessagesSignal    *signal.ImportingHistoryArchiveMessagesSignal
 	CommunityEventsMessage                   *CommunityEventsMessage
-	MemberPermissionsCheckedSignal           *MemberPermissionsCheckedSignal
-}
-
-type MemberPermissionsCheckedSignal struct {
 }
 
 type CommunityResponse struct {
@@ -700,10 +696,11 @@ func (m *Manager) CheckMemberPermissions(community *Community, removeAdmins bool
 		}
 	}
 
-	m.publish(&Subscription{
-		Community:                      community,
-		MemberPermissionsCheckedSignal: &MemberPermissionsCheckedSignal{},
-	})
+	err := m.saveAndPublish(community)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

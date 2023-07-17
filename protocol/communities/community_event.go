@@ -188,7 +188,7 @@ func (o *Community) UpdateCommunityByEvents(communityEventMessage *CommunityEven
 	}
 
 	// Create a deep copy of current community so we can update CommunityDescription by new admin events
-	copy := o.createDeepCopy()
+	copy := o.CreateDeepCopy()
 
 	// Merge community admin events to existing community. Admin events must be stored to the db
 	// during saving the community
