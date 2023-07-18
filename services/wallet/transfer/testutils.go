@@ -291,7 +291,7 @@ func InsertTestPendingTransaction(tb testing.TB, db *sql.DB, tr *TestTransfer) {
 	_, err := db.Exec(`
 		INSERT INTO pending_transactions (network_id, hash, timestamp, from_address, to_address,
 			symbol, gas_price, gas_limit, value, data, type, additional_data, multi_transaction_id
-		) VALUES (?, ?, ?, ?, ?, 'ETH', 0, 0, ?, '', 'test', '', ?)`,
+		) VALUES (?, ?, ?, ?, ?, 'ETH', 0, 0, ?, '', 'eth', '', ?)`,
 		tr.ChainID, tr.Hash, tr.Timestamp, tr.From, tr.To, tr.Value, tr.MultiTransactionID)
 	require.NoError(tb, err)
 }
