@@ -15,8 +15,8 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
-func getBaseURL(chainID uint64) (string, error) {
-	switch chainID {
+func getBaseURL(chainID walletCommon.ChainID) (string, error) {
+	switch uint64(chainID) {
 	case walletCommon.EthereumMainnet:
 		return "https://eth-mainnet.g.alchemy.com", nil
 	case walletCommon.EthereumGoerli:
@@ -43,7 +43,7 @@ func getAPIKeySubpath(apiKey string) string {
 	return apiKey
 }
 
-func getNFTBaseURL(chainID uint64, apiKey string) (string, error) {
+func getNFTBaseURL(chainID walletCommon.ChainID, apiKey string) (string, error) {
 	baseURL, err := getBaseURL(chainID)
 
 	if err != nil {
@@ -93,7 +93,7 @@ func (o *Client) doQuery(url string) (*http.Response, error) {
 	return resp, nil
 }
 
-func (o *Client) IsChainSupported(chainID uint64) bool {
+func (o *Client) IsChainSupported(chainID walletCommon.ChainID) bool {
 	_, err := getBaseURL(chainID)
 	return err == nil
 }
@@ -125,13 +125,13 @@ func alchemyOwnershipToCommon(contractAddress common.Address, alchemyOwnership C
 	return &ownership, nil
 }
 
-func (o *Client) FetchCollectibleOwnersByContractAddress(chainID uint64, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
+func (o *Client) FetchCollectibleOwnersByContractAddress(chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
 	queryParams := url.Values{
 		"contractAddress":   {contractAddress.String()},
 		"withTokenBalances": {"true"},
 	}
 
-	url, err := getNFTBaseURL(chainID, o.apiKeys[chainID])
+	url, err := getNFTBaseURL(chainID, o.apiKeys[uint64(chainID)])
 
 	if err != nil {
 		return nil, err

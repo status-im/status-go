@@ -545,12 +545,12 @@ func tokenURIToCommunityID(tokenURI string) string {
 	return communityID
 }
 
-func (s *Service) CanProvideCollectibleMetadata(chainID uint64, id thirdparty.CollectibleUniqueID, tokenURI string) (bool, error) {
+func (s *Service) CanProvideCollectibleMetadata(id thirdparty.CollectibleUniqueID, tokenURI string) (bool, error) {
 	ret := tokenURI != "" && tokenURIToCommunityID(tokenURI) != ""
 	return ret, nil
 }
 
-func (s *Service) FetchCollectibleMetadata(chainID uint64, id thirdparty.CollectibleUniqueID, tokenURI string) (*thirdparty.CollectibleMetadata, error) {
+func (s *Service) FetchCollectibleMetadata(id thirdparty.CollectibleUniqueID, tokenURI string) (*thirdparty.CollectibleData, error) {
 	if s.messenger == nil {
 		return nil, fmt.Errorf("messenger not ready")
 	}
@@ -573,12 +573,16 @@ func (s *Service) FetchCollectibleMetadata(chainID uint64, id thirdparty.Collect
 
 		for _, tokenMetadata := range tokensMetadata {
 			contractAddresses := tokenMetadata.GetContractAddresses()
-			if contractAddresses[chainID] == id.ContractAddress.Hex() {
-				return &thirdparty.CollectibleMetadata{
-					Name:               tokenMetadata.GetName(),
-					Description:        tokenMetadata.GetDescription(),
-					CollectionImageURL: tokenMetadata.GetImage(),
-					ImageURL:           tokenMetadata.GetImage(),
+			if contractAddresses[uint64(id.ChainID)] == id.ContractAddress.Hex() {
+				return &thirdparty.CollectibleData{
+					ID:          id,
+					Name:        tokenMetadata.GetName(),
+					Description: tokenMetadata.GetDescription(),
+					ImageURL:    tokenMetadata.GetImage(),
+					CollectionData: thirdparty.CollectionData{
+						Name:     tokenMetadata.GetName(),
+						ImageURL: tokenMetadata.GetImage(),
+					},
 				}, nil
 			}
 		}

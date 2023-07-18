@@ -63,8 +63,8 @@ func (o *Client) doQuery(url string) (*http.Response, error) {
 	return resp, nil
 }
 
-func (o *Client) IsChainSupported(chainID uint64) bool {
-	switch chainID {
+func (o *Client) IsChainSupported(chainID walletCommon.ChainID) bool {
+	switch uint64(chainID) {
 	case walletCommon.EthereumMainnet, walletCommon.EthereumGoerli, walletCommon.EthereumSepolia, walletCommon.ArbitrumMainnet:
 		return true
 	}
@@ -98,7 +98,7 @@ func infuraOwnershipToCommon(contractAddress common.Address, ownersMap map[commo
 	return &ownership, nil
 }
 
-func (o *Client) FetchCollectibleOwnersByContractAddress(chainID uint64, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
+func (o *Client) FetchCollectibleOwnersByContractAddress(chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
 	cursor := ""
 	ownersMap := make(map[common.Address][]CollectibleOwner)
 

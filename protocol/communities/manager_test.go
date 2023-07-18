@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 
 	"github.com/golang/protobuf/proto"
@@ -102,8 +103,8 @@ func (m *testCollectiblesManager) setResponse(chainID uint64, walletAddress geth
 	m.response[chainID][walletAddress][contractAddress] = balances
 }
 
-func (m *testCollectiblesManager) FetchBalancesByOwnerAndContractAddress(chainID uint64, ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
-	return m.response[chainID][ownerAddress], nil
+func (m *testCollectiblesManager) FetchBalancesByOwnerAndContractAddress(chainID walletCommon.ChainID, ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
+	return m.response[uint64(chainID)][ownerAddress], nil
 }
 
 type testTokenManager struct {
