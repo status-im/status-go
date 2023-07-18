@@ -1004,7 +1004,7 @@ func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAcco
 		return err
 	}
 
-	return b.generateOrImportAccount(request.Mnemonic, &request.CreateAccount)
+	return b.generateOrImportAccount(request.Mnemonic, 0, &request.CreateAccount)
 }
 
 func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error) {
@@ -1018,7 +1018,7 @@ func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error)
 	return info.KeyUID, nil
 }
 
-func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *requests.CreateAccount) error {
+func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizationColorClock uint64, request *requests.CreateAccount) error {
 	keystoreDir := keystoreRelativePath
 
 	b.UpdateRootDataDir(request.BackupDisabledDataDir)
@@ -1063,15 +1063,11 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 		return err
 	}
 
-	clock, err := timesource.GetCurrentTimeInMillis()
-	if err != nil {
-		return err
-	}
 	account := multiaccounts.Account{
 		KeyUID:                  info.KeyUID,
 		Name:                    request.DisplayName,
 		CustomizationColor:      multiacccommon.CustomizationColor(request.CustomizationColor),
-		CustomizationColorClock: clock,
+		CustomizationColorClock: customizationColorClock,
 		KDFIterations:           sqlite.ReducedKDFIterationsNumber,
 	}
 	if request.ImagePath != "" {
@@ -1143,8 +1139,11 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 	if err := request.Validate(); err != nil {
 		return err
 	}
-
-	return b.generateOrImportAccount("", request)
+	customizationColorClock, err := timesource.GetCurrentTimeInMillis()
+	if err != nil {
+		return err
+	}
+	return b.generateOrImportAccount("", customizationColorClock, request)
 }
 
 func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPassword string, newPassword string) error {
