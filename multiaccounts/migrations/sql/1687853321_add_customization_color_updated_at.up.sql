@@ -1,1 +1,1 @@
-ALTER TABLE accounts ADD COLUMN customizationColorUpdatedAt INT NOT NULL DEFAULT 0;
+ALTER TABLE accounts ADD COLUMN customizationColorClock INT NOT NULL DEFAULT 0;

@@ -39,7 +39,7 @@ func (api *MultiAccountsAPI) UpdateAccount(account multiaccounts.Account) error 
 		if err != nil {
 			return err
 		}
-		account.CustomizationColorUpdatedAt = updatedAt
+		account.CustomizationColorClock = updatedAt
 	}
 	return api.db.UpdateAccount(account)
 }

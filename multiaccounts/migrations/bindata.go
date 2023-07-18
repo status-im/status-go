@@ -11,7 +11,7 @@
 // 1649317600_add_color_hash.up.sql (201B)
 // 1660238799_accounts_kdf.up.sql (115B)
 // 1679505708_add_customization_color.up.sql (78B)
-// 1687853321_add_customization_color_updated_at.up.sql (84B)
+// 1687853321_add_customization_color_updated_at.up.sql (80B)
 // doc.go (74B)
 
 package migrations
@@ -301,7 +301,7 @@ func _1679505708_add_customization_colorUpSql() (*asset, error) {
 	return a, nil
 }
 
-var __1687853321_add_customization_color_updated_atUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\x31\x0a\x42\x31\x0c\x06\xe0\xdd\x53\xfc\x47\x70\x77\x8a\xaf\x15\x84\x98\x07\x92\x1c\xa0\xb4\x0e\x05\x6d\xc4\xa6\x8b\xa7\x7f\x1f\xb1\xe6\x27\x94\xae\x9c\x51\x6a\xf5\x35\x62\x82\x52\xc2\xb6\xb3\x3d\x04\x75\xcd\xf0\x4f\xff\x97\xe8\x3e\x36\x7f\xfb\xcf\xbe\xad\xc4\xab\x51\xe0\x2e\x0a\xd9\x15\x62\xcc\x48\xf9\x46\xc6\x8a\xf3\xe5\x74\x04\x00\x00\xff\xff\xf9\xab\x98\x51\x54\x00\x00\x00")
+var __1687853321_add_customization_color_updated_atUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\x31\x0a\x43\x21\x0c\x06\xe0\xbd\xa7\xf8\x8f\xd0\xbd\x53\xaa\x16\x0a\x69\x84\x12\x0f\x20\x99\xa4\xd6\xc0\x53\x97\x77\xfa\xf7\x11\x6b\xfa\x42\xe9\xc9\x09\xd5\xcc\xf7\x58\x13\x14\x23\x42\xe6\xf2\x11\xd8\x9e\xcb\xff\xed\xac\xab\xf9\x08\xde\xfd\x08\xdd\xed\x87\xb7\x28\x24\x2b\xa4\x30\x23\xa6\x17\x15\x56\xdc\x1f\xb7\x2b\x00\x00\xff\xff\xfd\x48\x7a\xa4\x50\x00\x00\x00")
 
 func _1687853321_add_customization_color_updated_atUpSqlBytes() ([]byte, error) {
 	return bindataRead(
@@ -316,8 +316,8 @@ func _1687853321_add_customization_color_updated_atUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1687853321_add_customization_color_updated_at.up.sql", size: 84, mode: os.FileMode(0644), modTime: time.Unix(1689677237, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x54, 0x4d, 0x90, 0x21, 0x9d, 0x9, 0x55, 0x59, 0x85, 0x11, 0x36, 0x55, 0x7d, 0xa9, 0xfc, 0x61, 0xca, 0x28, 0xe2, 0xbe, 0x64, 0xaa, 0x56, 0x2e, 0xbf, 0x3d, 0x27, 0x6a, 0xc4, 0x5b, 0xc3, 0xb5}}
+	info := bindataFileInfo{name: "1687853321_add_customization_color_updated_at.up.sql", size: 80, mode: os.FileMode(0644), modTime: time.Unix(1689682239, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa8, 0xc2, 0x9, 0xec, 0xf4, 0xd1, 0x46, 0x29, 0xc5, 0xce, 0x4d, 0xd4, 0xf, 0x9c, 0xfa, 0x62, 0x1, 0x29, 0xe6, 0xd2, 0xd5, 0xe, 0xf0, 0x27, 0x81, 0x4a, 0x82, 0x25, 0x5f, 0x67, 0xff, 0xd1}}
 	return a, nil
 }
 

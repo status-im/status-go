@@ -44,7 +44,7 @@ message MultiAccount {
   string key_uid = 7;
   repeated IdentityImage images = 8;
   string customization_color = 9;
-  uint64 customization_color_updated_at = 10;
+  uint64 customization_color_clock = 10;
 
   message ColorHash {
     repeated int64 index = 1;

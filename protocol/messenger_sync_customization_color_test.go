@@ -127,12 +127,12 @@ func (s *MessengerSyncAccountCustomizationColorSuite) TestSyncCustomizationColor
 	acc2, err := s.alice2.multiAccounts.GetAccount(s.alice2.account.KeyUID)
 	s.Require().NoError(err)
 	s.Require().Equal(acc.CustomizationColor, common.CustomizationColor(""))
-	s.Require().Equal(acc.CustomizationColorUpdatedAt, uint64(0))
+	s.Require().Equal(acc.CustomizationColorClock, uint64(0))
 	s.Require().Equal(acc2.CustomizationColor, common.CustomizationColor(""))
-	s.Require().Equal(acc2.CustomizationColorUpdatedAt, uint64(0))
+	s.Require().Equal(acc2.CustomizationColorClock, uint64(0))
 
 	acc.CustomizationColor = common.CustomizationColorBlue
-	acc.CustomizationColorUpdatedAt = 1
+	acc.CustomizationColorClock = 1
 	err = s.alice.syncAccountCustomizationColor(context.TODO(), acc)
 	s.Require().NoError(err)
 	_, err = WaitOnMessengerResponse(s.alice2, func(r *MessengerResponse) bool {

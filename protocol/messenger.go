@@ -2975,7 +2975,7 @@ func (m *Messenger) syncAccountCustomizationColor(ctx context.Context, acc *mult
 	message := &protobuf.SyncAccountCustomizationColor{
 		KeyUid:             acc.KeyUID,
 		CustomizationColor: string(acc.CustomizationColor),
-		UpdatedAt:          acc.CustomizationColorUpdatedAt,
+		UpdatedAt:          acc.CustomizationColorClock,
 	}
 
 	encodedMessage, err := proto.Marshal(message)

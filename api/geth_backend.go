@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/status-im/status-go/timesource"
+
 	"github.com/status-im/status-go/images"
 
 	"github.com/imdario/mergo"
@@ -1061,12 +1063,16 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, request *re
 		return err
 	}
 
+	clock, err := timesource.GetCurrentTimeInMillis()
+	if err != nil {
+		return err
+	}
 	account := multiaccounts.Account{
-		KeyUID:                      info.KeyUID,
-		Name:                        request.DisplayName,
-		CustomizationColor:          multiacccommon.CustomizationColor(request.CustomizationColor),
-		CustomizationColorUpdatedAt: request.CustomizationColorUpdatedAt,
-		KDFIterations:               sqlite.ReducedKDFIterationsNumber,
+		KeyUID:                  info.KeyUID,
+		Name:                    request.DisplayName,
+		CustomizationColor:      multiacccommon.CustomizationColor(request.CustomizationColor),
+		CustomizationColorClock: clock,
+		KDFIterations:           sqlite.ReducedKDFIterationsNumber,
 	}
 	if request.ImagePath != "" {
 		iis, err := images.GenerateIdentityImages(request.ImagePath, 0, 0, 1000, 1000)
