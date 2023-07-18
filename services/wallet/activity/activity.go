@@ -34,44 +34,71 @@ var (
 	ZeroAddress = eth.Address{}
 )
 
+type TransferType = int
+
+const (
+	TransferTypeEth TransferType = iota + 1
+	TransferTypeErc20
+	TransferTypeErc721
+	TransferTypeErc1155
+)
+
 type Entry struct {
-	payloadType    PayloadType
-	transaction    *transfer.TransactionIdentity
-	id             transfer.MultiTransactionIDType
-	timestamp      int64
-	activityType   Type
-	activityStatus Status
-	amountOut      *hexutil.Big // Used for activityType SendAT, SwapAT, BridgeAT
-	amountIn       *hexutil.Big // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT
-	tokenOut       *Token       // Used for activityType SendAT, SwapAT, BridgeAT
-	tokenIn        *Token       // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT
+	payloadType     PayloadType
+	transaction     *transfer.TransactionIdentity
+	id              transfer.MultiTransactionIDType
+	timestamp       int64
+	activityType    Type
+	activityStatus  Status
+	amountOut       *hexutil.Big // Used for activityType SendAT, SwapAT, BridgeAT
+	amountIn        *hexutil.Big // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT
+	tokenOut        *Token       // Used for activityType SendAT, SwapAT, BridgeAT
+	tokenIn         *Token       // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT
+	sender          *eth.Address
+	recipient       *eth.Address
+	chainIDOut      *common.ChainID
+	chainIDIn       *common.ChainID
+	transferType    *TransferType
+	contractAddress *eth.Address
 }
 
 type jsonSerializationTemplate struct {
-	PayloadType    PayloadType                     `json:"payloadType"`
-	Transaction    *transfer.TransactionIdentity   `json:"transaction"`
-	ID             transfer.MultiTransactionIDType `json:"id"`
-	Timestamp      int64                           `json:"timestamp"`
-	ActivityType   Type                            `json:"activityType"`
-	ActivityStatus Status                          `json:"activityStatus"`
-	AmountOut      *hexutil.Big                    `json:"amountOut"`
-	AmountIn       *hexutil.Big                    `json:"amountIn"`
-	TokenOut       *Token                          `json:"tokenOut,omitempty"`
-	TokenIn        *Token                          `json:"tokenIn,omitempty"`
+	PayloadType     PayloadType                     `json:"payloadType"`
+	Transaction     *transfer.TransactionIdentity   `json:"transaction"`
+	ID              transfer.MultiTransactionIDType `json:"id"`
+	Timestamp       int64                           `json:"timestamp"`
+	ActivityType    Type                            `json:"activityType"`
+	ActivityStatus  Status                          `json:"activityStatus"`
+	AmountOut       *hexutil.Big                    `json:"amountOut"`
+	AmountIn        *hexutil.Big                    `json:"amountIn"`
+	TokenOut        *Token                          `json:"tokenOut,omitempty"`
+	TokenIn         *Token                          `json:"tokenIn,omitempty"`
+	Sender          *eth.Address                    `json:"sender,omitempty"`
+	Recipient       *eth.Address                    `json:"recipient,omitempty"`
+	ChainIDOut      *common.ChainID                 `json:"chainIdOut,omitempty"`
+	ChainIDIn       *common.ChainID                 `json:"chainIdIn,omitempty"`
+	TransferType    *TransferType                   `json:"transferType,omitempty"`
+	ContractAddress *eth.Address                    `json:"contractAddress,omitempty"`
 }
 
 func (e *Entry) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonSerializationTemplate{
-		PayloadType:    e.payloadType,
-		Transaction:    e.transaction,
-		ID:             e.id,
-		Timestamp:      e.timestamp,
-		ActivityType:   e.activityType,
-		ActivityStatus: e.activityStatus,
-		AmountOut:      e.amountOut,
-		AmountIn:       e.amountIn,
-		TokenOut:       e.tokenOut,
-		TokenIn:        e.tokenIn,
+		PayloadType:     e.payloadType,
+		Transaction:     e.transaction,
+		ID:              e.id,
+		Timestamp:       e.timestamp,
+		ActivityType:    e.activityType,
+		ActivityStatus:  e.activityStatus,
+		AmountOut:       e.amountOut,
+		AmountIn:        e.amountIn,
+		TokenOut:        e.tokenOut,
+		TokenIn:         e.tokenIn,
+		Sender:          e.sender,
+		Recipient:       e.recipient,
+		ChainIDOut:      e.chainIDOut,
+		ChainIDIn:       e.chainIDIn,
+		TransferType:    e.transferType,
+		ContractAddress: e.contractAddress,
 	})
 }
 
@@ -87,20 +114,29 @@ func (e *Entry) UnmarshalJSON(data []byte) error {
 	e.id = aux.ID
 	e.timestamp = aux.Timestamp
 	e.activityType = aux.ActivityType
+	e.activityStatus = aux.ActivityStatus
 	e.amountOut = aux.AmountOut
 	e.amountIn = aux.AmountIn
+	e.tokenOut = aux.TokenOut
+	e.tokenIn = aux.TokenIn
+	e.sender = aux.Sender
+	e.recipient = aux.Recipient
+	e.chainIDOut = aux.ChainIDOut
+	e.chainIDIn = aux.ChainIDIn
+	e.transferType = aux.TransferType
+	e.contractAddress = aux.ContractAddress
 	return nil
 }
 
-func newActivityEntryWithPendingTransaction(transaction *transfer.TransactionIdentity, timestamp int64, activityType Type, activityStatus Status, amountIn *hexutil.Big, amountOut *hexutil.Big, tokenOut *Token, tokenIn *Token) Entry {
-	return newActivityEntryWithTransaction(true, transaction, timestamp, activityType, activityStatus, amountIn, amountOut, tokenOut, tokenIn)
+func newActivityEntryWithPendingTransaction(transaction *transfer.TransactionIdentity, timestamp int64, activityType Type, activityStatus Status) Entry {
+	return newActivityEntryWithTransaction(true, transaction, timestamp, activityType, activityStatus)
 }
 
-func newActivityEntryWithSimpleTransaction(transaction *transfer.TransactionIdentity, timestamp int64, activityType Type, activityStatus Status, amountIn *hexutil.Big, amountOut *hexutil.Big, tokenOut *Token, tokenIn *Token) Entry {
-	return newActivityEntryWithTransaction(false, transaction, timestamp, activityType, activityStatus, amountIn, amountOut, tokenOut, tokenIn)
+func newActivityEntryWithSimpleTransaction(transaction *transfer.TransactionIdentity, timestamp int64, activityType Type, activityStatus Status) Entry {
+	return newActivityEntryWithTransaction(false, transaction, timestamp, activityType, activityStatus)
 }
 
-func newActivityEntryWithTransaction(pending bool, transaction *transfer.TransactionIdentity, timestamp int64, activityType Type, activityStatus Status, amountIn *hexutil.Big, amountOut *hexutil.Big, tokenOut *Token, tokenIn *Token) Entry {
+func newActivityEntryWithTransaction(pending bool, transaction *transfer.TransactionIdentity, timestamp int64, activityType Type, activityStatus Status) Entry {
 	payloadType := SimpleTransactionPT
 	if pending {
 		payloadType = PendingTransactionPT
@@ -113,24 +149,16 @@ func newActivityEntryWithTransaction(pending bool, transaction *transfer.Transac
 		timestamp:      timestamp,
 		activityType:   activityType,
 		activityStatus: activityStatus,
-		amountIn:       amountIn,
-		amountOut:      amountOut,
-		tokenOut:       tokenOut,
-		tokenIn:        tokenIn,
 	}
 }
 
-func NewActivityEntryWithMultiTransaction(id transfer.MultiTransactionIDType, timestamp int64, activityType Type, activityStatus Status, amountIn *hexutil.Big, amountOut *hexutil.Big, tokenOut *Token, tokenIn *Token) Entry {
+func NewActivityEntryWithMultiTransaction(id transfer.MultiTransactionIDType, timestamp int64, activityType Type, activityStatus Status) Entry {
 	return Entry{
 		payloadType:    MultiTransactionPT,
 		id:             id,
 		timestamp:      timestamp,
 		activityType:   activityType,
 		activityStatus: activityStatus,
-		amountIn:       amountIn,
-		amountOut:      amountOut,
-		tokenOut:       tokenOut,
-		tokenIn:        tokenIn,
 	}
 }
 
@@ -346,7 +374,11 @@ const (
         transfers.token_address AS token_address,
         NULL AS token_code,
         NULL AS from_token_code,
-        NULL AS to_token_code
+        NULL AS to_token_code,
+		NULL AS out_network_id,
+		NULL AS in_network_id,
+		transfers.type AS type,
+		transfers.contract_address AS contract_address
     FROM transfers, filter_conditions
     LEFT JOIN
         filter_addresses from_join ON HEX(transfers.tx_from_address) = from_join.address
@@ -417,7 +449,11 @@ const (
         NULL AS token_address,
         pending_transactions.symbol AS token_code,
         NULL AS from_token_code,
-        NULL AS to_token_code
+        NULL AS to_token_code,
+		NULL AS out_network_id,
+		NULL AS in_network_id,
+		pending_transactions.type AS type,
+		NULL as contract_address
     FROM pending_transactions, filter_conditions
     LEFT JOIN
         filter_addresses from_join ON HEX(pending_transactions.from_address) = from_join.address
@@ -467,7 +503,11 @@ const (
         NULL AS token_address,
         NULL AS token_code,
         multi_transactions.from_asset AS from_token_code,
-        multi_transactions.to_asset AS to_token_code
+        multi_transactions.to_asset AS to_token_code,
+		multi_transactions.from_network_id AS out_network_id,
+		multi_transactions.to_network_id AS in_network_id,
+		NULL AS type,
+		NULL as contract_address
     FROM multi_transactions, filter_conditions
     LEFT JOIN tr_status ON multi_transactions.ROWID = tr_status.multi_transaction_id
     LEFT JOIN pending_status ON multi_transactions.ROWID = pending_status.multi_transaction_id
@@ -600,19 +640,19 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 	var entries []Entry
 	for rows.Next() {
 		var transferHash, pendingHash []byte
-		var chainID, multiTxID, aggregatedCount sql.NullInt64
+		var chainID, outChainIDDB, inChainIDDB, multiTxID, aggregatedCount sql.NullInt64
 		var timestamp int64
 		var dbMtType, dbTrType sql.NullByte
 		var toAddress, fromAddress eth.Address
-		var toAddressDB, ownerAddressDB sql.RawBytes
+		var toAddressDB, ownerAddressDB, contractAddressDB sql.RawBytes
 		var tokenAddress *eth.Address
 		var aggregatedStatus int
 		var dbTrAmount sql.NullString
-		var dbMtFromAmount, dbMtToAmount sql.NullString
+		var dbMtFromAmount, dbMtToAmount, contractType sql.NullString
 		var tokenCode, fromTokenCode, toTokenCode sql.NullString
 		err := rows.Scan(&transferHash, &pendingHash, &chainID, &multiTxID, &timestamp, &dbMtType, &dbTrType, &fromAddress,
 			&toAddressDB, &ownerAddressDB, &dbTrAmount, &dbMtFromAmount, &dbMtToAmount, &aggregatedStatus, &aggregatedCount,
-			&tokenAddress, &tokenCode, &fromTokenCode, &toTokenCode)
+			&tokenAddress, &tokenCode, &fromTokenCode, &toTokenCode, &outChainIDDB, &inChainIDDB, &contractType, &contractAddressDB)
 		if err != nil {
 			return nil, err
 		}
@@ -635,7 +675,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		// Can be mapped directly because the values are injected into the query
 		activityStatus := Status(aggregatedStatus)
 		var tokenOut, tokenIn *Token
-
+		var outChainID, inChainID *common.ChainID
 		var entry Entry
 		if transferHash != nil && chainID.Valid {
 			// Extract activity type: SendAT/ReceiveAT
@@ -644,7 +684,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 			ownerAddress := eth.BytesToAddress(ownerAddressDB)
 			inAmount, outAmount := getTrInAndOutAmounts(activityType, dbTrAmount)
 
-			// Extract tokens
+			// Extract tokens and chains
 			var involvedToken *Token
 			if tokenAddress != nil && *tokenAddress != ZeroAddress {
 				involvedToken = &Token{TokenType: Erc20, ChainID: common.ChainID(chainID.Int64), Address: *tokenAddress}
@@ -653,8 +693,12 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 			}
 			if activityType == SendAT {
 				tokenOut = involvedToken
+				outChainID = new(common.ChainID)
+				*outChainID = common.ChainID(chainID.Int64)
 			} else {
 				tokenIn = involvedToken
+				inChainID = new(common.ChainID)
+				*inChainID = common.ChainID(chainID.Int64)
 			}
 
 			entry = newActivityEntryWithSimpleTransaction(
@@ -662,7 +706,10 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 					Hash:    eth.BytesToHash(transferHash),
 					Address: ownerAddress,
 				},
-				timestamp, activityType, activityStatus, inAmount, outAmount, tokenOut, tokenIn)
+				timestamp, activityType, activityStatus)
+			// Complete the data
+			entry.amountOut = outAmount
+			entry.amountIn = inAmount
 		} else if pendingHash != nil && chainID.Valid {
 			// Extract activity type: SendAT/ReceiveAT
 			activityType, _ := getActivityType(dbTrType)
@@ -674,31 +721,65 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 				cID := common.ChainID(chainID.Int64)
 				tokenOut = deps.tokenFromSymbol(&cID, tokenCode.String)
 			}
+			outChainID = new(common.ChainID)
+			*outChainID = common.ChainID(chainID.Int64)
 
 			entry = newActivityEntryWithPendingTransaction(
 				&transfer.TransactionIdentity{ChainID: common.ChainID(chainID.Int64),
 					Hash: eth.BytesToHash(pendingHash),
 				},
-				timestamp, activityType, activityStatus, inAmount, outAmount, tokenOut, tokenIn)
+				timestamp, activityType, activityStatus)
+			// Complete the data
+			entry.amountOut = outAmount
+			entry.amountIn = inAmount
 		} else if multiTxID.Valid {
 			mtInAmount, mtOutAmount := getMtInAndOutAmounts(dbMtFromAmount, dbMtToAmount)
 
 			// Extract activity type: SendAT/SwapAT/BridgeAT
 			activityType := multiTransactionTypeToActivityType(transfer.MultiTransactionType(dbMtType.Byte))
 
+			if outChainIDDB.Valid && outChainIDDB.Int64 != 0 {
+				outChainID = new(common.ChainID)
+				*outChainID = common.ChainID(outChainIDDB.Int64)
+			}
+			if inChainIDDB.Valid && inChainIDDB.Int64 != 0 {
+				inChainID = new(common.ChainID)
+				*inChainID = common.ChainID(inChainIDDB.Int64)
+			}
+
 			// Extract tokens
 			if fromTokenCode.Valid {
-				tokenOut = deps.tokenFromSymbol(nil, fromTokenCode.String)
+				tokenOut = deps.tokenFromSymbol(outChainID, fromTokenCode.String)
 			}
 			if toTokenCode.Valid {
-				tokenIn = deps.tokenFromSymbol(nil, toTokenCode.String)
+				tokenIn = deps.tokenFromSymbol(inChainID, toTokenCode.String)
 			}
 
 			entry = NewActivityEntryWithMultiTransaction(transfer.MultiTransactionIDType(multiTxID.Int64),
-				timestamp, activityType, activityStatus, mtInAmount, mtOutAmount, tokenOut, tokenIn)
+				timestamp, activityType, activityStatus)
+			// Complete the data
+			entry.amountOut = mtOutAmount
+			entry.amountIn = mtInAmount
 		} else {
 			return nil, errors.New("invalid row data")
 		}
+		// Complete common data
+		entry.tokenOut = tokenOut
+		entry.tokenIn = tokenIn
+		entry.sender = &fromAddress
+		entry.recipient = &toAddress
+		entry.sender = &fromAddress
+		entry.recipient = &toAddress
+		entry.chainIDOut = outChainID
+		entry.chainIDIn = inChainID
+		if contractType.Valid {
+			entry.transferType = contractTypeFromDBType(contractType.String)
+		}
+		if len(contractAddressDB) > 0 {
+			entry.contractAddress = new(eth.Address)
+			*entry.contractAddress = eth.BytesToAddress(contractAddressDB)
+		}
+
 		entries = append(entries, entry)
 	}
 
@@ -756,4 +837,19 @@ func getMtInAndOutAmounts(dbFromAmount sql.NullString, dbToAmount sql.NullString
 	inAmount = (*hexutil.Big)(big.NewInt(0))
 	outAmount = (*hexutil.Big)(big.NewInt(0))
 	return
+}
+
+func contractTypeFromDBType(dbType string) (transferType *TransferType) {
+	transferType = new(TransferType)
+	switch common.Type(dbType) {
+	case common.EthTransfer:
+		*transferType = TransferTypeEth
+	case common.Erc20Transfer:
+		*transferType = TransferTypeErc20
+	case common.Erc721Transfer:
+		*transferType = TransferTypeErc721
+	default:
+		return nil
+	}
+	return transferType
 }

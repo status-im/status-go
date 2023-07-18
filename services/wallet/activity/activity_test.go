@@ -175,6 +175,16 @@ func TTrToToken(t *testing.T, tt *transfer.TestTransaction) *Token {
 	}
 }
 
+func expectedTokenType(tokenAddress eth.Address) *TransferType {
+	transferType := new(TransferType)
+	if (tokenAddress != eth.Address{}) {
+		*transferType = TransferTypeErc20
+	} else {
+		*transferType = TransferTypeEth
+	}
+	return transferType
+}
+
 func TestGetActivityEntriesAll(t *testing.T) {
 	deps, close := setupTestActivityDB(t)
 	defer close()
@@ -204,6 +214,11 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 		tokenOut:       TTrToToken(t, &td.tr1.TestTransaction),
 		tokenIn:        nil,
+		sender:         &td.tr1.From,
+		recipient:      &td.tr1.To,
+		chainIDOut:     &td.tr1.ChainID,
+		chainIDIn:      nil,
+		transferType:   expectedTokenType(td.tr1.Token.Address),
 	}, entries[3])
 	require.Equal(t, Entry{
 		payloadType:    PendingTransactionPT,
@@ -216,6 +231,11 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 		tokenOut:       TTrToToken(t, &td.pendingTr.TestTransaction),
 		tokenIn:        nil,
+		sender:         &td.pendingTr.From,
+		recipient:      &td.pendingTr.To,
+		chainIDOut:     &td.pendingTr.ChainID,
+		chainIDIn:      nil,
+		transferType:   expectedTokenType(eth.Address{}),
 	}, entries[2])
 	require.Equal(t, Entry{
 		payloadType:    MultiTransactionPT,
@@ -228,6 +248,8 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx1.ToAmount)),
 		tokenOut:       tokenFromSymbol(nil, td.multiTx1.FromToken),
 		tokenIn:        tokenFromSymbol(nil, td.multiTx1.ToToken),
+		sender:         &td.multiTx1.FromAddress,
+		recipient:      &td.multiTx1.ToAddress,
 	}, entries[1])
 	require.Equal(t, Entry{
 		payloadType:    MultiTransactionPT,
@@ -240,6 +262,8 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx2.ToAmount)),
 		tokenOut:       tokenFromSymbol(nil, td.multiTx2.FromToken),
 		tokenIn:        tokenFromSymbol(nil, td.multiTx2.ToToken),
+		sender:         &td.multiTx2.FromAddress,
+		recipient:      &td.multiTx2.ToAddress,
 	}, entries[0])
 }
 
@@ -311,6 +335,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 	entries, err := getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 8, len(entries))
+
 	// Check start and end content
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
@@ -323,6 +348,11 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 		tokenOut:       TTrToToken(t, &trs[5].TestTransaction),
 		tokenIn:        nil,
+		sender:         &trs[5].From,
+		recipient:      &trs[5].To,
+		chainIDOut:     &trs[5].ChainID,
+		chainIDIn:      nil,
+		transferType:   expectedTokenType(trs[5].Token.Address),
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    MultiTransactionPT,
@@ -335,6 +365,11 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx1.ToAmount)),
 		tokenOut:       tokenFromSymbol(nil, td.multiTx1.FromToken),
 		tokenIn:        tokenFromSymbol(nil, td.multiTx1.ToToken),
+		sender:         &td.multiTx1.FromAddress,
+		recipient:      &td.multiTx1.ToAddress,
+		chainIDOut:     nil,
+		chainIDIn:      nil,
+		transferType:   nil,
 	}, entries[7])
 
 	// Test complete interval
@@ -342,6 +377,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 5, len(entries))
+
 	// Check start and end content
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
@@ -354,6 +390,11 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 		tokenOut:       TTrToToken(t, &trs[2].TestTransaction),
 		tokenIn:        nil,
+		sender:         &trs[2].From,
+		recipient:      &trs[2].To,
+		chainIDOut:     &trs[2].ChainID,
+		chainIDIn:      nil,
+		transferType:   expectedTokenType(trs[2].Token.Address),
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    MultiTransactionPT,
@@ -366,6 +407,11 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx1.ToAmount)),
 		tokenOut:       tokenFromSymbol(nil, td.multiTx1.FromToken),
 		tokenIn:        tokenFromSymbol(nil, td.multiTx1.ToToken),
+		sender:         &td.multiTx1.FromAddress,
+		recipient:      &td.multiTx1.ToAddress,
+		chainIDOut:     nil,
+		chainIDIn:      nil,
+		transferType:   nil,
 	}, entries[4])
 
 	// Test end only
@@ -385,6 +431,11 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 		tokenOut:       TTrToToken(t, &trs[2].TestTransaction),
 		tokenIn:        nil,
+		sender:         &trs[2].From,
+		recipient:      &trs[2].To,
+		chainIDOut:     &trs[2].ChainID,
+		chainIDIn:      nil,
+		transferType:   expectedTokenType(trs[2].Token.Address),
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
@@ -397,6 +448,11 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 		tokenOut:       TTrToToken(t, &td.tr1.TestTransaction),
 		tokenIn:        nil,
+		sender:         &td.tr1.From,
+		recipient:      &td.tr1.To,
+		chainIDOut:     &td.tr1.ChainID,
+		chainIDIn:      nil,
+		transferType:   expectedTokenType(td.tr1.Token.Address),
 	}, entries[6])
 }
 
@@ -436,6 +492,11 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 		tokenOut:       TTrToToken(t, &trs[8].TestTransaction),
 		tokenIn:        nil,
+		sender:         &trs[8].From,
+		recipient:      &trs[8].To,
+		chainIDOut:     &trs[8].ChainID,
+		chainIDIn:      nil,
+		transferType:   expectedTokenType(trs[8].Token.Address),
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
@@ -448,6 +509,11 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 		tokenOut:       TTrToToken(t, &trs[6].TestTransaction),
 		tokenIn:        nil,
+		sender:         &trs[6].From,
+		recipient:      &trs[6].To,
+		chainIDOut:     &trs[6].ChainID,
+		chainIDIn:      nil,
+		transferType:   expectedTokenType(trs[6].Token.Address),
 	}, entries[2])
 
 	// Move window 2 entries forward
@@ -466,6 +532,11 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 		tokenOut:       TTrToToken(t, &trs[6].TestTransaction),
 		tokenIn:        nil,
+		sender:         &trs[6].From,
+		recipient:      &trs[6].To,
+		chainIDOut:     &trs[6].ChainID,
+		chainIDIn:      nil,
+		transferType:   expectedTokenType(trs[6].Token.Address),
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
@@ -478,6 +549,11 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 		tokenOut:       TTrToToken(t, &trs[4].TestTransaction),
 		tokenIn:        nil,
+		sender:         &trs[4].From,
+		recipient:      &trs[4].To,
+		chainIDOut:     &trs[4].ChainID,
+		chainIDIn:      nil,
+		transferType:   expectedTokenType(trs[4].Token.Address),
 	}, entries[2])
 
 	// Move window 4 more entries to test filter cap
@@ -496,6 +572,11 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 		tokenOut:       TTrToToken(t, &trs[2].TestTransaction),
 		tokenIn:        nil,
+		sender:         &trs[2].From,
+		recipient:      &trs[2].To,
+		chainIDOut:     &trs[2].ChainID,
+		chainIDIn:      nil,
+		transferType:   expectedTokenType(trs[2].Token.Address),
 	}, entries[0])
 }
 
@@ -611,6 +692,11 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 		amountIn:       (*hexutil.Big)(big.NewInt(trs[4].Value)),
 		tokenOut:       nil,
 		tokenIn:        TTrToToken(t, &trs[4].TestTransaction),
+		sender:         &trs[4].From,
+		recipient:      &trs[4].To,
+		chainIDOut:     nil,
+		chainIDIn:      &trs[4].ChainID,
+		transferType:   expectedTokenType(trs[4].Token.Address),
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
@@ -623,6 +709,11 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 		tokenOut:       TTrToToken(t, &trs[1].TestTransaction),
 		tokenIn:        nil,
+		sender:         &trs[1].From,
+		recipient:      &trs[1].To,
+		chainIDOut:     &trs[1].ChainID,
+		chainIDIn:      nil,
+		transferType:   expectedTokenType(trs[1].Token.Address),
 	}, entries[1])
 	require.Equal(t, Entry{
 		payloadType:    MultiTransactionPT,
@@ -635,6 +726,10 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx2.ToAmount)),
 		tokenOut:       tokenFromSymbol(nil, td.multiTx2.FromToken),
 		tokenIn:        tokenFromSymbol(nil, td.multiTx2.ToToken),
+		sender:         &td.multiTx2.FromAddress,
+		recipient:      &td.multiTx2.ToAddress,
+		chainIDOut:     nil,
+		chainIDIn:      nil,
 	}, entries[2])
 }
 

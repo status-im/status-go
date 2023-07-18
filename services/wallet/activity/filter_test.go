@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	eth "github.com/ethereum/go-ethereum/common"
-	eth_common "github.com/ethereum/go-ethereum/common"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/services/wallet/testutils"
@@ -26,7 +25,7 @@ func setupTestFilterDB(t *testing.T) (db *sql.DB, close func()) {
 }
 
 // insertTestData inserts 6 extractable activity entries: 2 transfers, 2 pending transactions and 2 multi transactions
-func insertTestData(t *testing.T, db *sql.DB, nullifyToForIndexes []int) (trs []transfer.TestTransfer, toTrs []eth_common.Address, multiTxs []transfer.TestMultiTransaction) {
+func insertTestData(t *testing.T, db *sql.DB, nullifyToForIndexes []int) (trs []transfer.TestTransfer, toTrs []eth.Address, multiTxs []transfer.TestMultiTransaction) {
 	// Add 6 extractable transactions
 	trs, _, toTrs = transfer.GenerateTestTransfers(t, db, 0, 7)
 	multiTxs = []transfer.TestMultiTransaction{
@@ -35,10 +34,10 @@ func insertTestData(t *testing.T, db *sql.DB, nullifyToForIndexes []int) (trs []
 	}
 	for j := range nullifyToForIndexes {
 		if nullifyToForIndexes[j] == 1 {
-			multiTxs[0].ToAddress = eth_common.Address{}
+			multiTxs[0].ToAddress = eth.Address{}
 		}
 		if nullifyToForIndexes[j] == 2 {
-			multiTxs[1].ToAddress = eth_common.Address{}
+			multiTxs[1].ToAddress = eth.Address{}
 		}
 	}
 
@@ -48,7 +47,7 @@ func insertTestData(t *testing.T, db *sql.DB, nullifyToForIndexes []int) (trs []
 
 	for i := range trs {
 		if i < 5 {
-			var nullifyAddresses []eth_common.Address
+			var nullifyAddresses []eth.Address
 			for j := range nullifyToForIndexes {
 				if i == nullifyToForIndexes[j] {
 					nullifyAddresses = append(nullifyAddresses, trs[i].To)
@@ -60,7 +59,7 @@ func insertTestData(t *testing.T, db *sql.DB, nullifyToForIndexes []int) (trs []
 		} else {
 			for j := range nullifyToForIndexes {
 				if i == nullifyToForIndexes[j] {
-					trs[i].To = eth_common.Address{}
+					trs[i].To = eth.Address{}
 				}
 			}
 			transfer.InsertTestPendingTransaction(t, db, &trs[i])
@@ -190,7 +189,7 @@ func TestGetOldestTimestamp_NullAddresses(t *testing.T) {
 	defer close()
 
 	trs, _, _ := transfer.GenerateTestTransfers(t, db, 0, 3)
-	nullifyAddresses := []eth_common.Address{
+	nullifyAddresses := []eth.Address{
 		trs[0].To, trs[2].To, trs[1].From,
 	}
 	for i := range trs {
