@@ -176,9 +176,9 @@ func (o *Community) UpdateCommunityByEvents(communityEventMessage *CommunityEven
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	// Validate that clock was not outdated and that `CommunityDescription` in
-	// `CommunityEventsMessage` was not modified
-	err := o.validateEventsMessage(communityEventMessage)
+	// Validate CommunityEventsMessage and extract CommunityDescription on top of which events
+	// were generated
+	description, err := o.validateEventsMessageAndGetCommunityDescription(communityEventMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +190,7 @@ func (o *Community) UpdateCommunityByEvents(communityEventMessage *CommunityEven
 	// during saving the community
 	o.mergeCommunityEvents(communityEventMessage)
 
-	copy.config.CommunityDescription = communityEventMessage.CommunityDescription
+	copy.config.CommunityDescription = description
 	copy.config.EventsData = o.config.EventsData
 
 	// Update the copy of the CommunityDescription by community events
@@ -385,7 +385,7 @@ func (o *Community) addNewCommunityEvent(event *CommunityEvent) error {
 	// All events must be build on top of the last owner CommunityDescription o the client side
 	// If there were no events before, extract CommunityDescription from MarshaledCommunityDescription
 	// and check the signature
-	if o.config.EventsData == nil || o.config.EventsData.CommunityDescription == nil {
+	if o.config.EventsData == nil || len(o.config.EventsData.EventsBaseCommunityDescription) == 0 {
 		metadata := &protobuf.ApplicationMetadataMessage{}
 
 		err := proto.Unmarshal(o.config.MarshaledCommunityDescription, metadata)
@@ -413,16 +413,9 @@ func (o *Community) addNewCommunityEvent(event *CommunityEvent) error {
 		// 	return errors.New("CommunityDescription was not signed by an owner")
 		// }
 
-		description := &protobuf.CommunityDescription{}
-
-		err = proto.Unmarshal(metadata.Payload, description)
-		if err != nil {
-			return err
-		}
-
 		o.config.EventsData = &EventsData{
-			CommunityDescription: description,
-			Events:               []CommunityEvent{},
+			EventsBaseCommunityDescription: o.config.MarshaledCommunityDescription,
+			Events:                         []CommunityEvent{},
 		}
 	}
 
@@ -434,16 +427,35 @@ func (o *Community) addNewCommunityEvent(event *CommunityEvent) error {
 
 func (o *Community) ToCommunityEventsMessage() *CommunityEventsMessage {
 	return &CommunityEventsMessage{
-		CommunityID:          o.ID(),
-		CommunityDescription: o.config.EventsData.CommunityDescription,
-		Events:               o.config.EventsData.Events,
+		CommunityID:                    o.ID(),
+		EventsBaseCommunityDescription: o.config.EventsData.EventsBaseCommunityDescription,
+		Events:                         o.config.EventsData.Events,
 	}
 }
 
-func (o *Community) validateEventsMessage(event *CommunityEventsMessage) error {
-	// TODO check hashes
-	if event.CommunityDescription.Clock != o.config.CommunityDescription.Clock {
-		return errors.New("clock for admin event message is outdated")
+func (o *Community) validateEventsMessageAndGetCommunityDescription(event *CommunityEventsMessage) (*protobuf.CommunityDescription, error) {
+	// TODO validate CommunityDescription is signed by the owner
+
+	metadata := &protobuf.ApplicationMetadataMessage{}
+
+	err := proto.Unmarshal(event.EventsBaseCommunityDescription, metadata)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+
+	if metadata.Type != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
+		return nil, ErrInvalidMessage
+	}
+
+	description := &protobuf.CommunityDescription{}
+
+	err = proto.Unmarshal(metadata.Payload, description)
+	if err != nil {
+		return nil, err
+	}
+
+	if description.Clock != o.config.CommunityDescription.Clock {
+		return nil, errors.New("clock for admin event message is outdated")
+	}
+	return description, nil
 }

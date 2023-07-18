@@ -64,18 +64,18 @@ func CommunityEventFromProtobuf(raw []byte) (*CommunityEvent, error) {
 }
 
 type CommunityEventsMessage struct {
-	CommunityID          []byte                         `json:"communityId"`
-	CommunityDescription *protobuf.CommunityDescription `json:"communityDescription"`
-	Events               []CommunityEvent               `json:"events,omitempty"`
+	CommunityID                    []byte           `json:"communityId"`
+	EventsBaseCommunityDescription []byte           `json:"eventsBaseCommunityDescription"`
+	Events                         []CommunityEvent `json:"events,omitempty"`
 }
 
 func (m *CommunityEventsMessage) ToProtobuf() protobuf.CommunityEventsMessage {
 	rawEvents := communityEventsToBytes(m.Events)
 
 	return protobuf.CommunityEventsMessage{
-		CommunityId:          m.CommunityID,
-		CommunityDescription: m.CommunityDescription,
-		Events:               rawEvents,
+		CommunityId:                    m.CommunityID,
+		EventsBaseCommunityDescription: m.EventsBaseCommunityDescription,
+		Events:                         rawEvents,
 	}
 }
 
@@ -86,9 +86,9 @@ func CommunityEventsMessageFromProtobuf(raw *protobuf.CommunityEventsMessage) (*
 	}
 
 	return &CommunityEventsMessage{
-		CommunityID:          raw.CommunityId,
-		CommunityDescription: raw.CommunityDescription,
-		Events:               events,
+		CommunityID:                    raw.CommunityId,
+		EventsBaseCommunityDescription: raw.EventsBaseCommunityDescription,
+		Events:                         events,
 	}, nil
 }
 
@@ -100,8 +100,8 @@ func (m *CommunityEventsMessage) Marshal() ([]byte, error) {
 func (c *Community) mergeCommunityEvents(communityEventMessage *CommunityEventsMessage) {
 	if c.config.EventsData == nil {
 		c.config.EventsData = &EventsData{
-			CommunityDescription: communityEventMessage.CommunityDescription,
-			Events:               communityEventMessage.Events,
+			EventsBaseCommunityDescription: communityEventMessage.EventsBaseCommunityDescription,
+			Events:                         communityEventMessage.Events,
 		}
 		return
 	}

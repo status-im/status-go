@@ -44,8 +44,8 @@ type Config struct {
 }
 
 type EventsData struct {
-	CommunityDescription *protobuf.CommunityDescription
-	Events               []CommunityEvent
+	EventsBaseCommunityDescription []byte
+	Events                         []CommunityEvent
 }
 
 type Community struct {

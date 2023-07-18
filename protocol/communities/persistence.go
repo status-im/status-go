@@ -68,14 +68,9 @@ func (p *Persistence) SaveCommunityEvents(community *Community) error {
 		return err
 	}
 
-	rawDescription, err := community.ToBytes()
-	if err != nil {
-		return err
-	}
-
 	_, err = p.db.Exec(`
 		INSERT INTO communities_events (id, raw_events, raw_description) VALUES (?, ?, ?);`,
-		id, rawEvents, rawDescription)
+		id, rawEvents, community.config.EventsData.EventsBaseCommunityDescription)
 
 	return err
 }
@@ -1261,13 +1256,8 @@ func decodeEventsData(eventsBytes []byte, eventsDescriptionBytes []byte) (*Event
 		}
 	}
 
-	eventsDescription, err := decodeCommunityDescription(eventsDescriptionBytes)
-	if err != nil {
-		return nil, err
-	}
-
 	return &EventsData{
-		CommunityDescription: eventsDescription,
-		Events:               events,
+		EventsBaseCommunityDescription: eventsDescriptionBytes,
+		Events:                         events,
 	}, nil
 }

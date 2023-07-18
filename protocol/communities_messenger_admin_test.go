@@ -601,6 +601,96 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminAirdropTokens() {
 	// TODO admin test: Airdrop Tokens (restricted)
 }
 
+func (s *AdminMessengerCommunitiesSuite) TestMemberReceiveAdminEventsWhenOwnerOffline() {
+	community := s.setUpCommunityAndRoles()
+
+	// To simulate behavior when owner is offline, we will not use owner for listening new events
+	// In this scenario member will reveive list of events
+
+	newAdminChat := &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "chat from admin",
+			Emoji:       "",
+			Description: "chat created by an admin",
+		},
+	}
+
+	checkChannelCreated := func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
+		if err != nil {
+			return err
+		}
+
+		for _, chat := range modifiedCommmunity.Chats() {
+			if chat.GetIdentity().GetDisplayName() == newAdminChat.GetIdentity().GetDisplayName() {
+				return nil
+			}
+		}
+
+		return errors.New("couldn't find created chat in response")
+	}
+
+	response, err := s.admin.CreateCommunityChat(community.ID(), newAdminChat)
+	s.Require().NoError(err)
+	s.Require().NoError(checkChannelCreated(response))
+	s.Require().Len(response.CommunityChanges, 1)
+	s.Require().Len(response.CommunityChanges[0].ChatsAdded, 1)
+	var addedChatID string
+	for addedChatID = range response.CommunityChanges[0].ChatsAdded {
+		break
+	}
+
+	s.waitOnMessengerResponse(WaitCommunityCondition, checkChannelCreated, s.alice)
+	s.waitOnMessengerResponse(WaitCommunityCondition, checkChannelCreated, s.admin)
+
+	newAdminChat.Identity.DisplayName = "modified chat from admin"
+
+	checkChannelEdited := func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
+		if err != nil {
+			return err
+		}
+
+		for _, chat := range modifiedCommmunity.Chats() {
+			if chat.GetIdentity().GetDisplayName() == newAdminChat.GetIdentity().GetDisplayName() {
+				return nil
+			}
+		}
+
+		return errors.New("couldn't find modified chat in response")
+	}
+
+	response, err = s.admin.EditCommunityChat(community.ID(), addedChatID, newAdminChat)
+	s.Require().NoError(err)
+	s.Require().NoError(checkChannelEdited(response))
+
+	s.waitOnMessengerResponse(WaitCommunityCondition, checkChannelEdited, s.alice)
+	s.waitOnMessengerResponse(WaitCommunityCondition, checkChannelEdited, s.admin)
+
+	checkChannelDeleted := func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
+		if err != nil {
+			return err
+		}
+
+		if _, exists := modifiedCommmunity.Chats()[addedChatID]; exists {
+			return errors.New("channel was not deleted")
+		}
+
+		return nil
+	}
+
+	response, err = s.admin.DeleteCommunityChat(community.ID(), addedChatID)
+	s.Require().NoError(err)
+	s.Require().NoError(checkChannelDeleted(response))
+
+	s.waitOnMessengerResponse(WaitCommunityCondition, checkChannelDeleted, s.alice)
+	s.waitOnMessengerResponse(WaitCommunityCondition, checkChannelDeleted, s.admin)
+}
+
 func (s *AdminMessengerCommunitiesSuite) setUpOnRequestCommunityAndRoles() *communities.Community {
 	tcs2, err := s.owner.communitiesManager.All()
 	s.Require().NoError(err, "admin.communitiesManager.All")
@@ -1076,11 +1166,6 @@ func (s *AdminMessengerCommunitiesSuite) adminEditCommunityChannel(community *co
 
 		return errors.New("couldn't find modified chat in response")
 	}
-
-	_, err := WaitOnMessengerResponse(s.admin, func(response *MessengerResponse) bool {
-		return true
-	}, "community description changed message not received")
-	s.Require().NoError(err)
 
 	response, err := s.admin.EditCommunityChat(community.ID(), channelID, editChannel)
 	s.Require().NoError(err)

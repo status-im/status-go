@@ -67,8 +67,8 @@ message ChannelData {
 message CommunityEventsMessage {
   bytes community_id = 1;
   
-  // Latest CommunityDescription for the events
-  CommunityDescription community_description = 2;
+  // Events base CommunityDescription with owner signature on top of which events were generated
+  bytes events_base_community_description = 2;
   
   // A list of admins events for the channel in bytes
   repeated bytes events = 3;
