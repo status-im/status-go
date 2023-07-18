@@ -4152,7 +4152,8 @@ func (m *Manager) SaveCommunityToken(token *community_token.CommunityToken, crop
 			return nil, err
 		}
 		token.Base64Image = base64img
-	} else {
+	} else if !images.IsPayloadDataURI(token.Base64Image) {
+		// if image is already base64 do not convert (owner and master tokens have already base64 image)
 		token.Base64Image = m.ImageToBase64(token.Base64Image)
 	}
 
@@ -4193,6 +4194,10 @@ func (m *Manager) AddCommunityToken(communityID string, chainID int, address str
 
 func (m *Manager) UpdateCommunityTokenState(chainID int, contractAddress string, deployState community_token.DeployState) error {
 	return m.persistence.UpdateCommunityTokenState(chainID, contractAddress, deployState)
+}
+
+func (m *Manager) UpdateCommunityTokenAddress(chainID int, oldContractAddress string, newContractAddress string) error {
+	return m.persistence.UpdateCommunityTokenAddress(chainID, oldContractAddress, newContractAddress)
 }
 
 func (m *Manager) UpdateCommunityTokenSupply(chainID int, contractAddress string, supply *bigint.BigInt) error {
@@ -4414,7 +4419,7 @@ func (m *Manager) HandleCommunityTokensMetadata(communityID string, communityTok
 
 				switch tokenMetadata.TokenType {
 				case protobuf.CommunityTokenType_ERC721:
-					contract, err := m.collectiblesService.API().GetContractInstance(chainID, address)
+					contract, err := m.collectiblesService.API().GetCollectiblesContractInstance(chainID, address)
 					if err != nil {
 						return err
 					}

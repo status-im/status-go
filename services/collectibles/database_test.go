@@ -27,10 +27,10 @@ type DatabaseSuite struct {
 
 func (s *DatabaseSuite) addCommunityToken(db *sql.DB, token *token.CommunityToken) error {
 	_, err := db.Exec(`INSERT INTO community_tokens (community_id, address, type, name, symbol, description, supply_str,
-		infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64, decimals) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, token.CommunityID, token.Address, token.TokenType, token.Name,
+		infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64, decimals, deployer, privileges_level) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, token.CommunityID, token.Address, token.TokenType, token.Name,
 		token.Symbol, token.Description, token.Supply.String(), token.InfiniteSupply, token.Transferable, token.RemoteSelfDestruct,
-		token.ChainID, token.DeployState, token.Base64Image, token.Decimals)
+		token.ChainID, token.DeployState, token.Base64Image, token.Decimals, token.Deployer, token.PrivilegesLevel)
 	return err
 }
 
@@ -49,6 +49,8 @@ func (s *DatabaseSuite) setupDatabase(db *sql.DB) error {
 		ChainID:            1,
 		DeployState:        token.InProgress,
 		Base64Image:        "ABCD",
+		Deployer:           "0xDEP1",
+		PrivilegesLevel:    token.OwnerLevel,
 	}
 
 	token20 := &token.CommunityToken{
@@ -66,6 +68,8 @@ func (s *DatabaseSuite) setupDatabase(db *sql.DB) error {
 		DeployState:        token.Failed,
 		Base64Image:        "QWERTY",
 		Decimals:           21,
+		Deployer:           "0xDEP2",
+		PrivilegesLevel:    token.CommunityLevel,
 	}
 
 	err := s.addCommunityToken(db, token721)

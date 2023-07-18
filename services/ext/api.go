@@ -1349,6 +1349,10 @@ func (api *PublicAPI) UpdateCommunityTokenState(chainID int, contractAddress str
 	return api.service.messenger.UpdateCommunityTokenState(chainID, contractAddress, deployState)
 }
 
+func (api *PublicAPI) UpdateCommunityTokenAddress(chainID int, oldContractAddress string, newContractAddress string) error {
+	return api.service.messenger.UpdateCommunityTokenAddress(chainID, oldContractAddress, newContractAddress)
+}
+
 func (api *PublicAPI) UpdateCommunityTokenSupply(chainID int, contractAddress string, supply *bigint.BigInt) error {
 	return api.service.messenger.UpdateCommunityTokenSupply(chainID, contractAddress, supply)
 }

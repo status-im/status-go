@@ -17,37 +17,37 @@ func TestDeploymentParameters(t *testing.T) {
 	}{
 		{
 			name:       "emptyName",
-			parameters: DeploymentParameters{"", "SYMBOL", &bigint.BigInt{Int: big.NewInt(int64(123))}, false, false, false, ""},
+			parameters: DeploymentParameters{"", "SYMBOL", &bigint.BigInt{Int: big.NewInt(int64(123))}, false, false, false, "", "", ""},
 			isError:    true,
 		},
 		{
 			name:       "emptySymbol",
-			parameters: DeploymentParameters{"NAME", "", &bigint.BigInt{Int: big.NewInt(123)}, false, false, false, ""},
+			parameters: DeploymentParameters{"NAME", "", &bigint.BigInt{Int: big.NewInt(123)}, false, false, false, "", "", ""},
 			isError:    true,
 		},
 		{
 			name:       "negativeSupply",
-			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(-123)}, false, false, false, ""},
+			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(-123)}, false, false, false, "", "", ""},
 			isError:    true,
 		},
 		{
 			name:       "zeroSupply",
-			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(0)}, false, false, false, ""},
+			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(0)}, false, false, false, "", "", ""},
 			isError:    false,
 		},
 		{
 			name:       "negativeSupplyAndInfinite",
-			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(-123)}, true, false, false, ""},
+			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(-123)}, true, false, false, "", "", ""},
 			isError:    false,
 		},
 		{
 			name:       "supplyGreaterThanMax",
-			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(maxSupply + 1)}, false, false, false, ""},
+			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(maxSupply + 1)}, false, false, false, "", "", ""},
 			isError:    true,
 		},
 		{
 			name:       "supplyIsMax",
-			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(maxSupply)}, false, false, false, ""},
+			parameters: DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(maxSupply)}, false, false, false, "", "", ""},
 			isError:    false,
 		},
 	}
@@ -63,10 +63,10 @@ func TestDeploymentParameters(t *testing.T) {
 		})
 	}
 
-	notInfiniteSupplyParams := DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(123)}, false, false, false, ""}
+	notInfiniteSupplyParams := DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(123)}, false, false, false, "", "", ""}
 	requiredSupply := big.NewInt(123)
 	require.Equal(t, notInfiniteSupplyParams.GetSupply(), requiredSupply)
-	infiniteSupplyParams := DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(123)}, true, false, false, ""}
+	infiniteSupplyParams := DeploymentParameters{"NAME", "SYM", &bigint.BigInt{Int: big.NewInt(123)}, true, false, false, "", "", ""}
 	requiredSupply = infiniteSupplyParams.GetInfiniteSupply()
 	require.Equal(t, infiniteSupplyParams.GetSupply(), requiredSupply)
 }

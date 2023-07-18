@@ -9,6 +9,7 @@ import (
 	"image/jpeg"
 	"io"
 	"regexp"
+	"strings"
 
 	"github.com/nfnt/resize"
 )
@@ -126,4 +127,8 @@ func GetPayloadFromURI(uri string) ([]byte, error) {
 		return nil, errors.New("wrong uri format")
 	}
 	return base64.StdEncoding.DecodeString(res[2])
+}
+
+func IsPayloadDataURI(uri string) bool {
+	return strings.HasPrefix(uri, "data:image")
 }

@@ -422,6 +422,8 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 		ChainID:            1,
 		DeployState:        token.InProgress,
 		Base64Image:        "ABCD",
+		Deployer:           "0xDep1",
+		PrivilegesLevel:    token.OwnerLevel,
 	}
 
 	tokenERC20 := token.CommunityToken{
@@ -439,6 +441,8 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 		DeployState:        token.Failed,
 		Base64Image:        "QWERTY",
 		Decimals:           21,
+		Deployer:           "0xDep2",
+		PrivilegesLevel:    token.CommunityLevel,
 	}
 
 	err = s.db.AddCommunityToken(&tokenERC721)
@@ -462,6 +466,13 @@ func (s *PersistenceSuite) TestGetCommunityTokens() {
 	s.Require().NoError(err)
 	s.Require().Len(tokens, 1)
 	s.Require().Equal(tokenERC20, *tokens[0])
+
+	err = s.db.UpdateCommunityTokenAddress(1, "0x123", "0x123-newAddr")
+	s.Require().NoError(err)
+	tokens, err = s.db.GetCommunityTokens("123")
+	s.Require().NoError(err)
+	s.Require().Len(tokens, 1)
+	s.Require().Equal("0x123-newAddr", tokens[0].Address)
 }
 
 func (s *PersistenceSuite) TestSaveCheckChannelPermissionResponse() {

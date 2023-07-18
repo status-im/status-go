@@ -103,6 +103,7 @@ const (
 	AirdropCommunityToken     PendingTrxType = "AirdropCommunityToken"
 	RemoteDestructCollectible PendingTrxType = "RemoteDestructCollectible"
 	BurnCommunityToken        PendingTrxType = "BurnCommunityToken"
+	DeployOwnerToken          PendingTrxType = "DeployOwnerToken"
 )
 
 type PendingTransaction struct {
