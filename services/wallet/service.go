@@ -109,6 +109,7 @@ func NewService(
 	infuraClient := infura.NewClient(config.WalletConfig.InfuraAPIKey, config.WalletConfig.InfuraAPIKeySecret)
 	openseaClient := opensea.NewClient(config.WalletConfig.OpenseaAPIKey, walletFeed)
 	collectiblesManager := collectibles.NewManager(rpcClient, alchemyClient, infuraClient, openseaClient)
+	collectibles := collectibles.NewService(db, walletFeed, rpcClient.NetworkManager, collectiblesManager)
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
@@ -120,6 +121,7 @@ func NewService(
 		transferController:    transferController,
 		cryptoOnRampManager:   cryptoOnRampManager,
 		collectiblesManager:   collectiblesManager,
+		collectibles:          collectibles,
 		feesManager:           &FeeManager{rpcClient},
 		gethManager:           gethManager,
 		marketManager:         marketManager,
@@ -152,6 +154,7 @@ type Service struct {
 	marketManager         *market.Manager
 	started               bool
 	collectiblesManager   *collectibles.Manager
+	collectibles          *collectibles.Service
 	gethManager           *account.GethManager
 	transactor            *transactions.Transactor
 	ens                   *ens.Service
@@ -173,6 +176,7 @@ func (s *Service) Start() error {
 	err := s.signals.Start()
 	s.history.Start()
 	_ = s.pendingTxManager.Start()
+	s.collectibles.Start()
 	s.started = true
 	return err
 }
@@ -197,6 +201,7 @@ func (s *Service) Stop() error {
 	s.history.Stop()
 	s.activity.Stop()
 	s.pendingTxManager.Stop()
+	s.collectibles.Stop()
 	s.started = false
 	log.Info("wallet stopped")
 	return nil
