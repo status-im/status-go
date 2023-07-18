@@ -299,13 +299,27 @@ func (api *API) GetCryptoOnRamps(ctx context.Context) ([]CryptoOnRamp, error) {
 	return api.s.cryptoOnRampManager.Get()
 }
 
-func (api *API) GetOpenseaCollectionsByOwner(ctx context.Context, chainID uint64, owner common.Address) ([]opensea.OwnedCollection, error) {
-	log.Debug("call to get opensea collections")
+/*
+   Collectibles API Start
+*/
+
+func (api *API) FetchBalancesByOwnerAndContractAddress(chainID wcommon.ChainID, ownerAddress common.Address, contractAddresses []common.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
+	log.Debug("call to FetchBalancesByOwnerAndContractAddress")
+	return api.s.collectiblesManager.FetchBalancesByOwnerAndContractAddress(chainID, ownerAddress, contractAddresses)
+}
+
+// Old Collectibles API - To be deprecated
+func (api *API) GetOpenseaCollectionsByOwner(ctx context.Context, chainID wcommon.ChainID, owner common.Address) ([]opensea.OwnedCollection, error) {
+	log.Debug("call to GetOpenseaCollectionsByOwner")
 	return api.s.collectiblesManager.FetchAllCollectionsByOwner(chainID, owner)
 }
 
-// Kept for compatibility with mobile app
-func (api *API) GetOpenseaAssetsByOwnerAndCollection(ctx context.Context, chainID uint64, owner common.Address, collectionSlug string, limit int) ([]opensea.Asset, error) {
+func (api *API) GetOpenseaAssetsByOwnerAndCollectionWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, collectionSlug string, cursor string, limit int) (*opensea.AssetContainer, error) {
+	log.Debug("call to GetOpenseaAssetsByOwnerAndCollectionWithCursor")
+	return api.s.collectiblesManager.FetchAllOpenseaAssetsByOwnerAndCollection(chainID, owner, collectionSlug, cursor, limit)
+}
+
+func (api *API) GetOpenseaAssetsByOwnerAndCollection(ctx context.Context, chainID wcommon.ChainID, owner common.Address, collectionSlug string, limit int) ([]opensea.Asset, error) {
 	container, err := api.GetOpenseaAssetsByOwnerAndCollectionWithCursor(ctx, chainID, owner, collectionSlug, "", limit)
 	if err != nil {
 		return nil, err
@@ -313,35 +327,34 @@ func (api *API) GetOpenseaAssetsByOwnerAndCollection(ctx context.Context, chainI
 	return container.Assets, nil
 }
 
-func (api *API) GetOpenseaAssetsByOwnerAndCollectionWithCursor(ctx context.Context, chainID uint64, owner common.Address, collectionSlug string, cursor string, limit int) (*opensea.AssetContainer, error) {
-	log.Debug("call to get opensea assets")
+func (api *API) GetCollectiblesByOwnerAndCollectionWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, collectionSlug string, cursor string, limit int) (*thirdparty.CollectibleDataContainer, error) {
+	log.Debug("call to GetCollectiblesByOwnerAndCollectionWithCursor")
 	return api.s.collectiblesManager.FetchAllAssetsByOwnerAndCollection(chainID, owner, collectionSlug, cursor, limit)
 }
 
-func (api *API) GetOpenseaAssetsByOwnerWithCursor(ctx context.Context, chainID uint64, owner common.Address, cursor string, limit int) (*opensea.AssetContainer, error) {
-	log.Debug("call to FetchAllAssetsByOwner")
+func (api *API) GetCollectiblesByOwnerWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.CollectibleDataContainer, error) {
+	log.Debug("call to GetCollectiblesByOwnerWithCursor")
 	return api.s.collectiblesManager.FetchAllAssetsByOwner(chainID, owner, cursor, limit)
 }
 
-func (api *API) GetOpenseaAssetsByOwnerAndContractAddressWithCursor(ctx context.Context, chainID uint64, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*opensea.AssetContainer, error) {
-	log.Debug("call to GetOpenseaAssetsByOwnerAndContractAddressWithCursor")
+func (api *API) GetCollectiblesByOwnerAndContractAddressWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.CollectibleDataContainer, error) {
+	log.Debug("call to GetCollectiblesByOwnerAndContractAddressWithCursor")
 	return api.s.collectiblesManager.FetchAllAssetsByOwnerAndContractAddress(chainID, owner, contractAddresses, cursor, limit)
 }
 
-func (api *API) GetOpenseaAssetsByNFTUniqueID(ctx context.Context, chainID uint64, uniqueIDs []thirdparty.CollectibleUniqueID, limit int) (*opensea.AssetContainer, error) {
-	log.Debug("call to GetOpenseaAssetsByNFTUniqueID")
-	return api.s.collectiblesManager.FetchAssetsByNFTUniqueID(chainID, uniqueIDs, limit)
+func (api *API) GetCollectiblesByUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.CollectibleData, error) {
+	log.Debug("call to GetCollectiblesByUniqueID")
+	return api.s.collectiblesManager.FetchAssetsByCollectibleUniqueID(uniqueIDs)
 }
 
-func (api *API) GetCollectibleOwnersByContractAddress(chainID uint64, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
+func (api *API) GetCollectibleOwnersByContractAddress(chainID wcommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
 	log.Debug("call to GetCollectibleOwnersByContractAddress")
 	return api.s.collectiblesManager.FetchCollectibleOwnersByContractAddress(chainID, contractAddress)
 }
 
-func (api *API) FetchBalancesByOwnerAndContractAddress(chainID uint64, ownerAddress common.Address, contractAddresses []common.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
-	log.Debug("call to FetchBalancesByOwnerAndContractAddress")
-	return api.s.collectiblesManager.FetchBalancesByOwnerAndContractAddress(chainID, ownerAddress, contractAddresses)
-}
+/*
+   Collectibles API End
+*/
 
 func (api *API) AddEthereumChain(ctx context.Context, network params.Network) error {
 	log.Debug("call to AddEthereumChain")

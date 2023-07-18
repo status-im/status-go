@@ -143,7 +143,7 @@ func (m *DefaultTokenManager) GetAllChainIDs() ([]uint64, error) {
 }
 
 type CollectiblesManager interface {
-	FetchBalancesByOwnerAndContractAddress(chainID uint64, ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error)
+	FetchBalancesByOwnerAndContractAddress(chainID walletcommon.ChainID, ownerAddress gethcommon.Address, contractAddresses []gethcommon.Address) (thirdparty.TokenBalancesPerContractAddress, error)
 }
 
 func (m *DefaultTokenManager) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (BalancesByChain, error) {
@@ -1949,7 +1949,8 @@ func (m *Manager) checkPermissions(permissions []*protobuf.CommunityTokenPermiss
 				}
 
 			chainIDLoopERC721:
-				for chainID, address := range tokenRequirement.ContractAddresses {
+				for chainID, addressStr := range tokenRequirement.ContractAddresses {
+					contractAddress := gethcommon.HexToAddress(addressStr)
 					if _, exists := ownedERC721Tokens[chainID]; !exists || len(ownedERC721Tokens[chainID]) == 0 {
 						continue chainIDLoopERC721
 					}
@@ -1959,7 +1960,7 @@ func (m *Manager) checkPermissions(permissions []*protobuf.CommunityTokenPermiss
 							continue
 						}
 
-						tokenBalances := ownedERC721Tokens[chainID][account][gethcommon.HexToAddress(address)]
+						tokenBalances := ownedERC721Tokens[chainID][account][contractAddress]
 						if len(tokenBalances) > 0 {
 							// 'account' owns some TokenID owned from contract 'address'
 							if _, exists := accountsChainIDsCombinations[account]; !exists {
@@ -2110,8 +2111,6 @@ func (m *Manager) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tok
 
 	ownedERC721Tokens := make(CollectiblesByChain)
 
-	client := m.openseaClientBuilder.NewOpenseaClient(m.walletConfig.OpenseaAPIKey, nil)
-
 	for chainID, erc721Tokens := range tokenRequirements {
 
 		skipChain := true
@@ -2135,7 +2134,7 @@ func (m *Manager) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tok
 		}
 
 		for _, owner := range walletAddresses {
-			balances, err := m.collectiblesManager.FetchBalancesByOwnerAndContractAddress(chainID, owner, contractAddresses)
+			balances, err := m.collectiblesManager.FetchBalancesByOwnerAndContractAddress(walletcommon.ChainID(chainID), owner, contractAddresses)
 			if err != nil {
 				m.logger.Info("couldn't fetch owner assets", zap.Error(err))
 				return nil, err

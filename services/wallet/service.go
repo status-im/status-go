@@ -29,6 +29,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/coingecko"
 	"github.com/status-im/status-go/services/wallet/thirdparty/cryptocompare"
 	"github.com/status-im/status-go/services/wallet/thirdparty/infura"
+	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -106,7 +107,8 @@ func NewService(
 
 	alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKeys)
 	infuraClient := infura.NewClient(config.WalletConfig.InfuraAPIKey, config.WalletConfig.InfuraAPIKeySecret)
-	collectiblesManager := collectibles.NewManager(rpcClient, alchemyClient, infuraClient, config.WalletConfig.OpenseaAPIKey, walletFeed)
+	openseaClient := opensea.NewClient(config.WalletConfig.OpenseaAPIKey, walletFeed)
+	collectiblesManager := collectibles.NewManager(rpcClient, alchemyClient, infuraClient, openseaClient)
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,

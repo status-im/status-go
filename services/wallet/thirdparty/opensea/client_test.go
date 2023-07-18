@@ -9,6 +9,9 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/services/wallet/bigint"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/connection"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 
 	"github.com/stretchr/testify/assert"
 
@@ -20,8 +23,27 @@ const (
 	ExpectedExpiredKeyError = "invalid json: Expired API key"
 )
 
+func initTestClient(srv *httptest.Server) *Client {
+	urlGetter := func(chainID walletCommon.ChainID, path string) (string, error) {
+		return srv.URL, nil
+	}
+
+	status := connection.NewStatus("", nil)
+
+	client := &HTTPClient{
+		client: srv.Client(),
+	}
+	opensea := &Client{
+		client:           client,
+		connectionStatus: status,
+		urlGetter:        urlGetter,
+	}
+
+	return opensea
+}
+
 func TestFetchAllCollectionsByOwner(t *testing.T) {
-	expected := []OwnedCollection{{
+	expectedOS := []OwnedCollection{{
 		Collection: Collection{
 			Name:     "Rocky",
 			Slug:     "rocky",
@@ -29,7 +51,7 @@ func TestFetchAllCollectionsByOwner(t *testing.T) {
 		},
 		OwnedAssetCount: &bigint.BigInt{Int: big.NewInt(1)},
 	}}
-	response, _ := json.Marshal(expected)
+	response, _ := json.Marshal(expectedOS)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		_, err := w.Write(response)
@@ -39,15 +61,9 @@ func TestFetchAllCollectionsByOwner(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := &HTTPClient{
-		client: srv.Client(),
-	}
-	opensea := &Client{
-		client: client,
-		url:    srv.URL,
-	}
-	res, err := opensea.FetchAllCollectionsByOwner(common.Address{1})
-	assert.Equal(t, expected, res)
+	opensea := initTestClient(srv)
+	res, err := opensea.FetchAllCollectionsByOwner(walletCommon.ChainID(1), common.Address{1})
+	assert.Equal(t, expectedOS, res)
 	assert.Nil(t, err)
 }
 
@@ -61,34 +77,56 @@ func TestFetchAllCollectionsByOwnerWithInValidJson(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := &HTTPClient{
-		client: srv.Client(),
-	}
-	opensea := &Client{
-		client: client,
-		url:    srv.URL,
-	}
-	res, err := opensea.FetchAllCollectionsByOwner(common.Address{1})
+	opensea := initTestClient(srv)
+	res, err := opensea.FetchAllCollectionsByOwner(walletCommon.ChainID(1), common.Address{1})
 	assert.Nil(t, res)
 	assert.Equal(t, err, fmt.Errorf(ExpectedExpiredKeyError))
 }
 
 func TestFetchAllAssetsByOwnerAndCollection(t *testing.T) {
-	expected := AssetContainer{
+	expectedOS := AssetContainer{
 		Assets: []Asset{{
 			ID:                1,
+			TokenID:           &bigint.BigInt{Int: big.NewInt(1)},
 			Name:              "Rocky",
 			Description:       "Rocky Balboa",
 			Permalink:         "permalink",
 			ImageThumbnailURL: "ImageThumbnailURL",
 			ImageURL:          "ImageUrl",
-			Contract:          Contract{Address: "1"},
-			Collection:        Collection{Name: "Rocky"},
+			Contract: Contract{
+				Address:         "1",
+				ChainIdentifier: "ethereum",
+			},
+			Collection: Collection{
+				Name:   "Rocky",
+				Traits: map[string]CollectionTrait{},
+			},
+			Traits: []Trait{},
 		}},
 		NextCursor:     "",
 		PreviousCursor: "",
 	}
-	response, _ := json.Marshal(expected)
+	expectedCommon := thirdparty.CollectibleDataContainer{
+		Collectibles: []thirdparty.CollectibleData{{
+			ID: thirdparty.CollectibleUniqueID{
+				ChainID:         1,
+				ContractAddress: common.HexToAddress("0x1"),
+				TokenID:         &bigint.BigInt{Int: big.NewInt(1)},
+			},
+			Name:        "Rocky",
+			Description: "Rocky Balboa",
+			Permalink:   "permalink",
+			ImageURL:    "ImageUrl",
+			Traits:      []thirdparty.CollectibleTrait{},
+			CollectionData: thirdparty.CollectionData{
+				Name:   "Rocky",
+				Traits: map[string]thirdparty.CollectionTrait{},
+			},
+		}},
+		NextCursor:     "",
+		PreviousCursor: "",
+	}
+	response, _ := json.Marshal(expectedOS)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		_, err := w.Write(response)
@@ -98,16 +136,10 @@ func TestFetchAllAssetsByOwnerAndCollection(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := &HTTPClient{
-		client: srv.Client(),
-	}
-	opensea := &Client{
-		client: client,
-		url:    srv.URL,
-	}
-	res, err := opensea.FetchAllAssetsByOwnerAndCollection(common.Address{1}, "rocky", "", 200)
+	opensea := initTestClient(srv)
+	res, err := opensea.FetchAllAssetsByOwnerAndCollection(walletCommon.ChainID(1), common.Address{1}, "rocky", "", 200)
 	assert.Nil(t, err)
-	assert.Equal(t, expected, *res)
+	assert.Equal(t, expectedCommon, *res)
 }
 
 func TestFetchAllAssetsByOwnerAndCollectionInvalidJson(t *testing.T) {
@@ -120,14 +152,8 @@ func TestFetchAllAssetsByOwnerAndCollectionInvalidJson(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := &HTTPClient{
-		client: srv.Client(),
-	}
-	opensea := &Client{
-		client: client,
-		url:    srv.URL,
-	}
-	res, err := opensea.FetchAllAssetsByOwnerAndCollection(common.Address{1}, "rocky", "", 200)
+	opensea := initTestClient(srv)
+	res, err := opensea.FetchAllAssetsByOwnerAndCollection(walletCommon.ChainID(1), common.Address{1}, "rocky", "", 200)
 	assert.Nil(t, res)
 	assert.Equal(t, fmt.Errorf(ExpectedExpiredKeyError), err)
 }

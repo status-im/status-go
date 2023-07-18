@@ -16,6 +16,9 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/connection"
@@ -36,12 +39,17 @@ const GetRequestWaitTime = 300 * time.Millisecond
 
 const ChainIDRequiringAPIKey = walletCommon.EthereumMainnet
 
+const FetchNoLimit = 0
+
 var (
 	ErrChainIDNotSupported = errors.New("chainID not supported by opensea API")
 )
 
-func getbaseURL(chainID uint64) (string, error) {
-	switch chainID {
+type urlGetter func(walletCommon.ChainID, string) (string, error)
+
+func getbaseURL(chainID walletCommon.ChainID) (string, error) {
+	// v1 Endpoints only support L1 chain
+	switch uint64(chainID) {
 	case walletCommon.EthereumMainnet:
 		return "https://api.opensea.io/api/v1", nil
 	case walletCommon.EthereumGoerli:
@@ -49,6 +57,34 @@ func getbaseURL(chainID uint64) (string, error) {
 	}
 
 	return "", ErrChainIDNotSupported
+}
+
+func getURL(chainID walletCommon.ChainID, path string) (string, error) {
+	baseURL, err := getbaseURL(chainID)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s/%s", baseURL, path), nil
+}
+
+func chainStringToChainID(chainString string) walletCommon.ChainID {
+	chainID := walletCommon.UnknownChainID
+	switch chainString {
+	case "ethereum":
+		chainID = walletCommon.EthereumMainnet
+	case "arbitrum":
+		chainID = walletCommon.ArbitrumMainnet
+	case "optimism":
+		chainID = walletCommon.OptimismMainnet
+	case "goerli":
+		chainID = walletCommon.EthereumGoerli
+	case "arbitrum_goerli":
+		chainID = walletCommon.ArbitrumGoerli
+	case "optimism_goerli":
+		chainID = walletCommon.OptimismGoerli
+	}
+	return walletCommon.ChainID(chainID)
 }
 
 type TraitValue string
@@ -78,7 +114,8 @@ type AssetContainer struct {
 }
 
 type Contract struct {
-	Address string `json:"address"`
+	Address         string `json:"address"`
+	ChainIdentifier string `json:"chain_identifier"`
 }
 
 type Trait struct {
@@ -141,6 +178,62 @@ type Collection struct {
 type OwnedCollection struct {
 	Collection
 	OwnedAssetCount *bigint.BigInt `json:"owned_asset_count"`
+}
+
+func (c *Asset) id() thirdparty.CollectibleUniqueID {
+	return thirdparty.CollectibleUniqueID{
+		ChainID:         chainStringToChainID(c.Contract.ChainIdentifier),
+		ContractAddress: common.HexToAddress(c.Contract.Address),
+		TokenID:         c.TokenID,
+	}
+}
+
+func openseaToCollectibleTraits(traits []Trait) []thirdparty.CollectibleTrait {
+	ret := make([]thirdparty.CollectibleTrait, 0, len(traits))
+	caser := cases.Title(language.Und, cases.NoLower)
+	for _, orig := range traits {
+		dest := thirdparty.CollectibleTrait{
+			TraitType:   strings.Replace(orig.TraitType, "_", " ", 1),
+			Value:       caser.String(string(orig.Value)),
+			DisplayType: orig.DisplayType,
+			MaxValue:    orig.MaxValue,
+		}
+
+		ret = append(ret, dest)
+	}
+	return ret
+}
+
+func (c *Collection) toCommon() thirdparty.CollectionData {
+	ret := thirdparty.CollectionData{
+		Name:     c.Name,
+		Slug:     c.Slug,
+		ImageURL: c.ImageURL,
+		Traits:   make(map[string]thirdparty.CollectionTrait),
+	}
+	for traitType, trait := range c.Traits {
+		ret.Traits[traitType] = thirdparty.CollectionTrait{
+			Min: trait.Min,
+			Max: trait.Max,
+		}
+	}
+	return ret
+}
+
+func (c *Asset) toCommon() thirdparty.CollectibleData {
+	return thirdparty.CollectibleData{
+		ID:                 c.id(),
+		Name:               c.Name,
+		Description:        c.Description,
+		Permalink:          c.Permalink,
+		ImageURL:           c.ImageURL,
+		AnimationURL:       c.AnimationURL,
+		AnimationMediaType: c.AnimationMediaType,
+		Traits:             openseaToCollectibleTraits(c.Traits),
+		BackgroundColor:    c.BackgroundColor,
+		TokenURI:           c.TokenURI,
+		CollectionData:     c.Collection.toCommon(),
+	}
 }
 
 type HTTPClient struct {
@@ -242,6 +335,7 @@ type Client struct {
 	client           *HTTPClient
 	apiKey           string
 	connectionStatus *connection.Status
+	urlGetter        urlGetter
 }
 
 // new opensea client.
@@ -250,20 +344,21 @@ func NewClient(apiKey string, feed *event.Feed) *Client {
 		client:           newHTTPClient(),
 		apiKey:           apiKey,
 		connectionStatus: connection.NewStatus(EventCollectibleStatusChanged, feed),
+		urlGetter:        getURL,
 	}
 }
 
-func (o *Client) FetchAllCollectionsByOwner(chainID uint64, owner common.Address) ([]OwnedCollection, error) {
+func (o *Client) FetchAllCollectionsByOwner(chainID walletCommon.ChainID, owner common.Address) ([]OwnedCollection, error) {
 	offset := 0
 	var collections []OwnedCollection
 
-	baseURL, err := getbaseURL(chainID)
-	if err != nil {
-		return nil, err
-	}
-
 	for {
-		url := fmt.Sprintf("%s/collections?asset_owner=%s&offset=%d&limit=%d", baseURL, owner, offset, CollectionLimit)
+		path := fmt.Sprintf("collections?asset_owner=%s&offset=%d&limit=%d", owner, offset, CollectionLimit)
+		url, err := o.urlGetter(chainID, path)
+		if err != nil {
+			return nil, err
+		}
+
 		body, err := o.client.doGetRequest(url, o.apiKey)
 		if err != nil {
 			o.connectionStatus.SetIsConnected(false)
@@ -291,7 +386,7 @@ func (o *Client) FetchAllCollectionsByOwner(chainID uint64, owner common.Address
 	return collections, nil
 }
 
-func (o *Client) FetchAllAssetsByOwnerAndCollection(chainID uint64, owner common.Address, collectionSlug string, cursor string, limit int) (*AssetContainer, error) {
+func (o *Client) FetchAllAssetsByOwnerAndCollection(chainID walletCommon.ChainID, owner common.Address, collectionSlug string, cursor string, limit int) (*thirdparty.CollectibleDataContainer, error) {
 	queryParams := url.Values{
 		"owner":      {owner.String()},
 		"collection": {collectionSlug},
@@ -304,7 +399,7 @@ func (o *Client) FetchAllAssetsByOwnerAndCollection(chainID uint64, owner common
 	return o.fetchAssets(chainID, queryParams, limit)
 }
 
-func (o *Client) FetchAllAssetsByOwnerAndContractAddress(chainID uint64, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*AssetContainer, error) {
+func (o *Client) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.CollectibleDataContainer, error) {
 	queryParams := url.Values{
 		"owner": {owner.String()},
 	}
@@ -320,7 +415,7 @@ func (o *Client) FetchAllAssetsByOwnerAndContractAddress(chainID uint64, owner c
 	return o.fetchAssets(chainID, queryParams, limit)
 }
 
-func (o *Client) FetchAllAssetsByOwner(chainID uint64, owner common.Address, cursor string, limit int) (*AssetContainer, error) {
+func (o *Client) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.CollectibleDataContainer, error) {
 	queryParams := url.Values{
 		"owner": {owner.String()},
 	}
@@ -332,18 +427,107 @@ func (o *Client) FetchAllAssetsByOwner(chainID uint64, owner common.Address, cur
 	return o.fetchAssets(chainID, queryParams, limit)
 }
 
-func (o *Client) FetchAssetsByNFTUniqueID(chainID uint64, uniqueIDs []thirdparty.CollectibleUniqueID, limit int) (*AssetContainer, error) {
+func (o *Client) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.CollectibleData, error) {
 	queryParams := url.Values{}
 
-	for _, uniqueID := range uniqueIDs {
-		queryParams.Add("token_ids", uniqueID.TokenID.String())
-		queryParams.Add("asset_contract_addresses", uniqueID.ContractAddress.String())
+	ret := make([]thirdparty.CollectibleData, 0, len(uniqueIDs))
+
+	idsPerChainID := thirdparty.GroupCollectibleUIDsByChainID(uniqueIDs)
+	for chainID, ids := range idsPerChainID {
+		for _, id := range ids {
+			queryParams.Add("token_ids", id.TokenID.String())
+			queryParams.Add("asset_contract_addresses", id.ContractAddress.String())
+		}
+
+		data, err := o.fetchAssets(chainID, queryParams, FetchNoLimit)
+		if err != nil {
+			return nil, err
+		}
+
+		ret = append(ret, data.Collectibles...)
 	}
 
-	return o.fetchAssets(chainID, queryParams, limit)
+	return ret, nil
 }
 
-func (o *Client) fetchAssets(chainID uint64, queryParams url.Values, limit int) (*AssetContainer, error) {
+func (o *Client) fetchAssets(chainID walletCommon.ChainID, queryParams url.Values, limit int) (*thirdparty.CollectibleDataContainer, error) {
+	assets := new(thirdparty.CollectibleDataContainer)
+
+	if len(queryParams["cursor"]) > 0 {
+		assets.PreviousCursor = queryParams["cursor"][0]
+	}
+
+	tmpLimit := AssetLimit
+	if limit > FetchNoLimit && limit < tmpLimit {
+		tmpLimit = limit
+	}
+
+	queryParams["limit"] = []string{strconv.Itoa(tmpLimit)}
+	for {
+		path := "assets?" + queryParams.Encode()
+		url, err := o.urlGetter(chainID, path)
+		if err != nil {
+			return nil, err
+		}
+
+		body, err := o.client.doGetRequest(url, o.apiKey)
+		if err != nil {
+			o.connectionStatus.SetIsConnected(false)
+			return nil, err
+		}
+		o.connectionStatus.SetIsConnected(true)
+
+		// if Json is not returned there must be an error
+		if !json.Valid(body) {
+			return nil, fmt.Errorf("invalid json: %s", string(body))
+		}
+
+		container := AssetContainer{}
+		err = json.Unmarshal(body, &container)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, asset := range container.Assets {
+			if len(asset.AnimationURL) > 0 {
+				asset.AnimationMediaType, err = o.client.doContentTypeRequest(asset.AnimationURL)
+				if err != nil {
+					asset.AnimationURL = ""
+				}
+			}
+			assets.Collectibles = append(assets.Collectibles, asset.toCommon())
+		}
+		assets.NextCursor = container.NextCursor
+
+		if len(assets.NextCursor) == 0 {
+			break
+		}
+
+		queryParams["cursor"] = []string{assets.NextCursor}
+
+		if limit > FetchNoLimit && len(assets.Collectibles) >= limit {
+			break
+		}
+	}
+
+	return assets, nil
+}
+
+// Only here for compatibility with mobile app, to be removed
+func (o *Client) FetchAllOpenseaAssetsByOwnerAndCollection(chainID walletCommon.ChainID, owner common.Address, collectionSlug string, cursor string, limit int) (*AssetContainer, error) {
+	queryParams := url.Values{
+		"owner":      {owner.String()},
+		"collection": {collectionSlug},
+	}
+
+	if len(cursor) > 0 {
+		queryParams["cursor"] = []string{cursor}
+	}
+
+	return o.fetchOpenseaAssets(chainID, queryParams, limit)
+}
+
+func (o *Client) fetchOpenseaAssets(chainID walletCommon.ChainID, queryParams url.Values, limit int) (*AssetContainer, error) {
 	assets := new(AssetContainer)
 
 	if len(queryParams["cursor"]) > 0 {

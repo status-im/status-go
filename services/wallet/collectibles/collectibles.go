@@ -12,10 +12,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/contracts/collectibles"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 )
@@ -23,8 +23,6 @@ import (
 const requestTimeout = 5 * time.Second
 
 const hystrixContractOwnershipClientName = "contractOwnershipClient"
-
-const maxNFTDescriptionLength = 1024
 
 // ERC721 does not support function "TokenURI" if call
 // returns error starting with one of these strings
@@ -39,11 +37,11 @@ type Manager struct {
 	fallbackContractOwnershipProvider thirdparty.CollectibleContractOwnershipProvider
 	metadataProvider                  thirdparty.CollectibleMetadataProvider
 	opensea                           *opensea.Client
-	nftCache                          map[uint64]map[string]opensea.Asset
+	nftCache                          map[walletCommon.ChainID]map[string]thirdparty.CollectibleData
 	nftCacheLock                      sync.RWMutex
 }
 
-func NewManager(rpcClient *rpc.Client, mainContractOwnershipProvider thirdparty.CollectibleContractOwnershipProvider, fallbackContractOwnershipProvider thirdparty.CollectibleContractOwnershipProvider, openseaAPIKey string, walletFeed *event.Feed) *Manager {
+func NewManager(rpcClient *rpc.Client, mainContractOwnershipProvider thirdparty.CollectibleContractOwnershipProvider, fallbackContractOwnershipProvider thirdparty.CollectibleContractOwnershipProvider, opensea *opensea.Client) *Manager {
 	hystrix.ConfigureCommand(hystrixContractOwnershipClientName, hystrix.CommandConfig{
 		Timeout:               10000,
 		MaxConcurrentRequests: 100,
@@ -55,8 +53,7 @@ func NewManager(rpcClient *rpc.Client, mainContractOwnershipProvider thirdparty.
 		rpcClient:                         rpcClient,
 		mainContractOwnershipProvider:     mainContractOwnershipProvider,
 		fallbackContractOwnershipProvider: fallbackContractOwnershipProvider,
-		opensea:                           opensea.NewClient(openseaAPIKey, walletFeed),
-		nftCache:                          make(map[uint64]map[string]opensea.Asset),
+		opensea:                           opensea,
 	}
 }
 
@@ -94,17 +91,21 @@ func (o *Manager) SetMetadataProvider(metadataProvider thirdparty.CollectibleMet
 	o.metadataProvider = metadataProvider
 }
 
-func (o *Manager) FetchAllCollectionsByOwner(chainID uint64, owner common.Address) ([]opensea.OwnedCollection, error) {
+func (o *Manager) FetchAllCollectionsByOwner(chainID walletCommon.ChainID, owner common.Address) ([]opensea.OwnedCollection, error) {
 	return o.opensea.FetchAllCollectionsByOwner(chainID, owner)
 }
 
-func (o *Manager) FetchAllAssetsByOwnerAndCollection(chainID uint64, owner common.Address, collectionSlug string, cursor string, limit int) (*opensea.AssetContainer, error) {
+func (o *Manager) FetchAllOpenseaAssetsByOwnerAndCollection(chainID walletCommon.ChainID, owner common.Address, collectionSlug string, cursor string, limit int) (*opensea.AssetContainer, error) {
+	return o.opensea.FetchAllOpenseaAssetsByOwnerAndCollection(chainID, owner, collectionSlug, cursor, limit)
+}
+
+func (o *Manager) FetchAllAssetsByOwnerAndCollection(chainID walletCommon.ChainID, owner common.Address, collectionSlug string, cursor string, limit int) (*thirdparty.CollectibleDataContainer, error) {
 	assetContainer, err := o.opensea.FetchAllAssetsByOwnerAndCollection(chainID, owner, collectionSlug, cursor, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	err = o.processAssets(chainID, assetContainer.Assets)
+	err = o.processAssets(assetContainer.Collectibles)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +114,7 @@ func (o *Manager) FetchAllAssetsByOwnerAndCollection(chainID uint64, owner commo
 }
 
 // Need to combine different providers to support all needed ChainIDs
-func (o *Manager) FetchBalancesByOwnerAndContractAddress(chainID uint64, ownerAddress common.Address, contractAddresses []common.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
+func (o *Manager) FetchBalancesByOwnerAndContractAddress(chainID walletCommon.ChainID, ownerAddress common.Address, contractAddresses []common.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
 	ret := make(thirdparty.TokenBalancesPerContractAddress)
 
 	for _, contractAddress := range contractAddresses {
@@ -138,10 +139,10 @@ func (o *Manager) FetchBalancesByOwnerAndContractAddress(chainID uint64, ownerAd
 		}
 	} else if err == nil {
 		// OpenSea could provide
-		for _, asset := range assetsContainer.Assets {
-			contractAddress := common.HexToAddress(asset.Contract.Address)
+		for _, collectible := range assetsContainer.Collectibles {
+			contractAddress := collectible.ID.ContractAddress
 			balance := thirdparty.TokenBalance{
-				TokenID: asset.TokenID,
+				TokenID: collectible.ID.TokenID,
 				Balance: &bigint.BigInt{Int: big.NewInt(1)},
 			}
 			ret[contractAddress] = append(ret[contractAddress], balance)
@@ -154,13 +155,13 @@ func (o *Manager) FetchBalancesByOwnerAndContractAddress(chainID uint64, ownerAd
 	return ret, nil
 }
 
-func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(chainID uint64, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*opensea.AssetContainer, error) {
+func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.CollectibleDataContainer, error) {
 	assetContainer, err := o.opensea.FetchAllAssetsByOwnerAndContractAddress(chainID, owner, contractAddresses, cursor, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	err = o.processAssets(chainID, assetContainer.Assets)
+	err = o.processAssets(assetContainer.Collectibles)
 	if err != nil {
 		return nil, err
 	}
@@ -168,13 +169,13 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(chainID uint64, owner 
 	return assetContainer, nil
 }
 
-func (o *Manager) FetchAllAssetsByOwner(chainID uint64, owner common.Address, cursor string, limit int) (*opensea.AssetContainer, error) {
+func (o *Manager) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.CollectibleDataContainer, error) {
 	assetContainer, err := o.opensea.FetchAllAssetsByOwner(chainID, owner, cursor, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	err = o.processAssets(chainID, assetContainer.Assets)
+	err = o.processAssets(assetContainer.Collectibles)
 	if err != nil {
 		return nil, err
 	}
@@ -182,31 +183,25 @@ func (o *Manager) FetchAllAssetsByOwner(chainID uint64, owner common.Address, cu
 	return assetContainer, nil
 }
 
-func (o *Manager) FetchAssetsByNFTUniqueID(chainID uint64, uniqueIDs []thirdparty.CollectibleUniqueID, limit int) (*opensea.AssetContainer, error) {
-	assetContainer := new(opensea.AssetContainer)
-
-	idsToFetch := o.getIDsNotInCache(chainID, uniqueIDs)
+func (o *Manager) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.CollectibleData, error) {
+	idsToFetch := o.getIDsNotInCollectiblesDataCache(uniqueIDs)
 	if len(idsToFetch) > 0 {
-		fetchedAssetContainer, err := o.opensea.FetchAssetsByNFTUniqueID(chainID, idsToFetch, limit)
+		fetchedAssets, err := o.opensea.FetchAssetsByCollectibleUniqueID(idsToFetch)
 		if err != nil {
 			return nil, err
 		}
 
-		err = o.processAssets(chainID, fetchedAssetContainer.Assets)
+		err = o.processAssets(fetchedAssets)
 		if err != nil {
 			return nil, err
 		}
 
-		assetContainer.NextCursor = fetchedAssetContainer.NextCursor
-		assetContainer.PreviousCursor = fetchedAssetContainer.PreviousCursor
 	}
 
-	assetContainer.Assets = o.getCachedAssets(chainID, uniqueIDs)
-
-	return assetContainer, nil
+	return o.getCacheCollectiblesData(uniqueIDs), nil
 }
 
-func (o *Manager) FetchCollectibleOwnersByContractAddress(chainID uint64, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
+func (o *Manager) FetchCollectibleOwnersByContractAddress(chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
 	mainFunc := func() (any, error) {
 		return o.mainContractOwnershipProvider.FetchCollectibleOwnersByContractAddress(chainID, contractAddress)
 	}
@@ -224,15 +219,15 @@ func (o *Manager) FetchCollectibleOwnersByContractAddress(chainID uint64, contra
 	return owners.(*thirdparty.CollectibleContractOwnership), nil
 }
 
-func isMetadataEmpty(asset opensea.Asset) bool {
+func isMetadataEmpty(asset thirdparty.CollectibleData) bool {
 	return asset.Name == "" &&
 		asset.Description == "" &&
 		asset.ImageURL == "" &&
 		asset.TokenURI == ""
 }
 
-func (o *Manager) fetchTokenURI(chainID uint64, id thirdparty.CollectibleUniqueID) (string, error) {
-	backend, err := o.rpcClient.EthClient(chainID)
+func (o *Manager) fetchTokenURI(id thirdparty.CollectibleUniqueID) (string, error) {
+	backend, err := o.rpcClient.EthClient(uint64(id.ChainID))
 	if err != nil {
 		return "", err
 	}
@@ -262,25 +257,15 @@ func (o *Manager) fetchTokenURI(chainID uint64, id thirdparty.CollectibleUniqueI
 	return tokenURI, err
 }
 
-func (o *Manager) processAssets(chainID uint64, assets []opensea.Asset) error {
-	o.nftCacheLock.Lock()
-	defer o.nftCacheLock.Unlock()
-
-	if _, ok := o.nftCache[chainID]; !ok {
-		o.nftCache[chainID] = make(map[string]opensea.Asset)
-	}
-
+func (o *Manager) processAssets(assets []thirdparty.CollectibleData) error {
 	for idx, asset := range assets {
-		id := thirdparty.CollectibleUniqueID{
-			ContractAddress: common.HexToAddress(asset.Contract.Address),
-			TokenID:         asset.TokenID,
-		}
+		id := asset.ID
 
 		if isMetadataEmpty(asset) {
 			if o.metadataProvider == nil {
 				return fmt.Errorf("CollectibleMetadataProvider not available")
 			}
-			tokenURI, err := o.fetchTokenURI(chainID, id)
+			tokenURI, err := o.fetchTokenURI(id)
 
 			if err != nil {
 				return err
@@ -288,70 +273,82 @@ func (o *Manager) processAssets(chainID uint64, assets []opensea.Asset) error {
 
 			assets[idx].TokenURI = tokenURI
 
-			canProvide, err := o.metadataProvider.CanProvideCollectibleMetadata(chainID, id, tokenURI)
+			canProvide, err := o.metadataProvider.CanProvideCollectibleMetadata(id, tokenURI)
 
 			if err != nil {
 				return err
 			}
 
 			if canProvide {
-				metadata, err := o.metadataProvider.FetchCollectibleMetadata(chainID, id, tokenURI)
+				metadata, err := o.metadataProvider.FetchCollectibleMetadata(id, tokenURI)
 				if err != nil {
 					return err
 				}
 
 				if metadata != nil {
-					assets[idx].Name = metadata.Name
-					assets[idx].Description = metadata.Description
-					assets[idx].Collection.ImageURL = metadata.CollectionImageURL
-					assets[idx].ImageURL = metadata.ImageURL
+					assets[idx] = *metadata
 				}
 			}
 		}
 
-		// The NFT description field could be arbitrarily large, causing memory management issues upstream.
-		// Trim it to a reasonable length here.
-		if len(assets[idx].Description) > maxNFTDescriptionLength {
-			assets[idx].Description = assets[idx].Description[:maxNFTDescriptionLength]
-		}
-
-		o.nftCache[chainID][id.HashKey()] = assets[idx]
+		o.setCacheCollectibleData(assets[idx])
 	}
 
 	return nil
 }
 
-func (o *Manager) getIDsNotInCache(chainID uint64, uniqueIDs []thirdparty.CollectibleUniqueID) []thirdparty.CollectibleUniqueID {
+func (o *Manager) isIDInCollectiblesDataCache(id thirdparty.CollectibleUniqueID) bool {
 	o.nftCacheLock.RLock()
 	defer o.nftCacheLock.RUnlock()
-
-	idsToFetch := make([]thirdparty.CollectibleUniqueID, 0, len(uniqueIDs))
-	if _, ok := o.nftCache[chainID]; !ok {
-		idsToFetch = uniqueIDs
-	} else {
-		for _, id := range uniqueIDs {
-			if _, ok := o.nftCache[chainID][id.HashKey()]; !ok {
-				idsToFetch = append(idsToFetch, id)
-			}
+	if _, ok := o.nftCache[id.ChainID]; ok {
+		if _, ok := o.nftCache[id.ChainID][id.HashKey()]; ok {
+			return true
 		}
+	}
+
+	return false
+}
+
+func (o *Manager) getIDsNotInCollectiblesDataCache(uniqueIDs []thirdparty.CollectibleUniqueID) []thirdparty.CollectibleUniqueID {
+	idsToFetch := make([]thirdparty.CollectibleUniqueID, 0, len(uniqueIDs))
+	for _, id := range uniqueIDs {
+		if o.isIDInCollectiblesDataCache(id) {
+			continue
+		}
+		idsToFetch = append(idsToFetch, id)
 	}
 	return idsToFetch
 }
 
-func (o *Manager) getCachedAssets(chainID uint64, uniqueIDs []thirdparty.CollectibleUniqueID) []opensea.Asset {
+func (o *Manager) getCacheCollectiblesData(uniqueIDs []thirdparty.CollectibleUniqueID) []thirdparty.CollectibleData {
 	o.nftCacheLock.RLock()
 	defer o.nftCacheLock.RUnlock()
 
-	assets := make([]opensea.Asset, 0, len(uniqueIDs))
-
-	if _, ok := o.nftCache[chainID]; ok {
-		for _, id := range uniqueIDs {
-
-			if asset, ok := o.nftCache[chainID][id.HashKey()]; ok {
+	assets := make([]thirdparty.CollectibleData, 0, len(uniqueIDs))
+	for _, id := range uniqueIDs {
+		if _, ok := o.nftCache[id.ChainID]; ok {
+			if asset, ok := o.nftCache[id.ChainID][id.HashKey()]; ok {
 				assets = append(assets, asset)
+				continue
 			}
 		}
+		emptyAsset := thirdparty.CollectibleData{
+			ID: id,
+		}
+		assets = append(assets, emptyAsset)
+	}
+	return assets
+}
+
+func (o *Manager) setCacheCollectibleData(data thirdparty.CollectibleData) {
+	o.nftCacheLock.Lock()
+	defer o.nftCacheLock.Unlock()
+
+	id := data.ID
+
+	if _, ok := o.nftCache[id.ChainID]; !ok {
+		o.nftCache[id.ChainID] = make(map[string]thirdparty.CollectibleData)
 	}
 
-	return assets
+	o.nftCache[id.ChainID][id.HashKey()] = data
 }
