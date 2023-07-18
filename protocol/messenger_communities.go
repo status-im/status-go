@@ -480,7 +480,7 @@ func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Cha
 		return nil, err
 	}
 
-	if community.IsOwner() {
+	if community.IsOwner() && community.HasPrivateKey() {
 		// Init the community filter so we can receive messages on the community
 		communityFilters, err := m.transport.InitCommunityFilters([]*ecdsa.PrivateKey{community.PrivateKey()})
 		if err != nil {
@@ -1804,6 +1804,18 @@ func (m *Messenger) EditCommunity(request *requests.EditCommunity) (*MessengerRe
 	if err != nil {
 		return nil, err
 	}
+
+	return response, nil
+}
+
+func (m *Messenger) RemovePrivateKey(id types.HexBytes) (*MessengerResponse, error) {
+	community, err := m.communitiesManager.RemovePrivateKey(id)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
 
 	return response, nil
 }

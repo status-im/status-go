@@ -625,6 +625,7 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 	s.Require().Len(response.CommunitiesSettings(), 1)
 	s.Require().True(response.Communities()[0].Joined())
 	s.Require().True(response.Communities()[0].IsOwner())
+	s.Require().True(response.Communities()[0].HasPrivateKey())
 
 	community := response.Communities()[0]
 	communitySettings := response.CommunitiesSettings()[0]
@@ -669,13 +670,40 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 		if len(response.Communities()) == 0 {
 			return errors.New("community not received")
 		}
-		if !response.Communities()[0].IsOwner() {
+		if !response.Communities()[0].IsOwner() || !response.Communities()[0].HasPrivateKey() {
 			return errors.New("isn't admin despite import")
 		}
 		return nil
 	})
 
 	s.Require().NoError(err)
+}
+
+func (s *MessengerCommunitiesSuite) TestRemovePrivateKey() {
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	// Create an community chat
+	response, err := s.bob.CreateCommunity(description, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	community := response.Communities()[0]
+	s.Require().True(community.IsOwner())
+	s.Require().True(community.HasPrivateKey())
+
+	response, err = s.bob.RemovePrivateKey(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+
+	community = response.Communities()[0]
+	s.Require().True(community.IsOwner())
+	s.Require().False(community.HasPrivateKey())
 }
 
 func (s *MessengerCommunitiesSuite) TestRolesAfterImportCommunity() {

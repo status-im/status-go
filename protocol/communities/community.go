@@ -1117,7 +1117,11 @@ func (o *Community) ValidateEditSharedAddresses(signer *ecdsa.PublicKey, request
 }
 
 func (o *Community) IsOwner() bool {
-	return o.config.PrivateKey != nil || o.IsMemberOwner(o.config.MemberIdentity)
+	return o.IsMemberOwner(o.config.MemberIdentity)
+}
+
+func (o *Community) HasPrivateKey() bool {
+	return o.config.PrivateKey != nil
 }
 
 func (o *Community) IsAdmin() bool {
