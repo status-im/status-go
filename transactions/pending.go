@@ -94,15 +94,15 @@ func (tm *TransactionManager) Stop() {
 type PendingTrxType string
 
 const (
-	RegisterENS                   PendingTrxType = "RegisterENS"
-	ReleaseENS                    PendingTrxType = "ReleaseENS"
-	SetPubKey                     PendingTrxType = "SetPubKey"
-	BuyStickerPack                PendingTrxType = "BuyStickerPack"
-	WalletTransfer                PendingTrxType = "WalletTransfer"
-	CollectibleDeployment         PendingTrxType = "CollectibleDeployment"
-	CollectibleAirdrop            PendingTrxType = "CollectibleAirdrop"
-	CollectibleRemoteSelfDestruct PendingTrxType = "CollectibleRemoteSelfDestruct"
-	CollectibleBurn               PendingTrxType = "CollectibleBurn"
+	RegisterENS               PendingTrxType = "RegisterENS"
+	ReleaseENS                PendingTrxType = "ReleaseENS"
+	SetPubKey                 PendingTrxType = "SetPubKey"
+	BuyStickerPack            PendingTrxType = "BuyStickerPack"
+	WalletTransfer            PendingTrxType = "WalletTransfer"
+	DeployCommunityToken      PendingTrxType = "DeployCommunityToken"
+	AirdropCommunityToken     PendingTrxType = "AirdropCommunityToken"
+	RemoteDestructCollectible PendingTrxType = "RemoteDestructCollectible"
+	BurnCommunityToken        PendingTrxType = "BurnCommunityToken"
 )
 
 type PendingTransaction struct {
