@@ -625,7 +625,7 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 	s.Require().Len(response.CommunitiesSettings(), 1)
 	s.Require().True(response.Communities()[0].Joined())
 	s.Require().True(response.Communities()[0].IsOwner())
-	s.Require().True(response.Communities()[0].HasPrivateKey())
+	s.Require().True(response.Communities()[0].IsControlNode())
 
 	community := response.Communities()[0]
 	communitySettings := response.CommunitiesSettings()[0]
@@ -670,7 +670,7 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 		if len(response.Communities()) == 0 {
 			return errors.New("community not received")
 		}
-		if !response.Communities()[0].IsOwner() || !response.Communities()[0].HasPrivateKey() {
+		if !response.Communities()[0].IsControlNode() {
 			return errors.New("isn't admin despite import")
 		}
 		return nil
@@ -695,7 +695,7 @@ func (s *MessengerCommunitiesSuite) TestRemovePrivateKey() {
 
 	community := response.Communities()[0]
 	s.Require().True(community.IsOwner())
-	s.Require().True(community.HasPrivateKey())
+	s.Require().True(community.IsControlNode())
 
 	response, err = s.bob.RemovePrivateKey(community.ID())
 	s.Require().NoError(err)
@@ -703,7 +703,7 @@ func (s *MessengerCommunitiesSuite) TestRemovePrivateKey() {
 
 	community = response.Communities()[0]
 	s.Require().True(community.IsOwner())
-	s.Require().False(community.HasPrivateKey())
+	s.Require().False(community.IsControlNode())
 }
 
 func (s *MessengerCommunitiesSuite) TestRolesAfterImportCommunity() {

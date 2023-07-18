@@ -853,12 +853,8 @@ func (m *Manager) RemovePrivateKey(id types.HexBytes) (*Community, error) {
 		return community, err
 	}
 
-	if !community.IsOwner() {
-		return community, ErrNotOwner
-	}
-
-	if !community.HasPrivateKey() {
-		return community, ErrNoPrivateKey
+	if !community.IsControlNode() {
+		return community, ErrNotControlNode
 	}
 
 	community.config.PrivateKey = nil
@@ -875,12 +871,8 @@ func (m *Manager) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error) 
 		return nil, err
 	}
 
-	if !community.IsOwner() {
-		return nil, ErrNotOwner
-	}
-
-	if !community.HasPrivateKey() {
-		return nil, ErrNoPrivateKey
+	if !community.IsControlNode() {
+		return nil, ErrNotControlNode
 	}
 
 	return community.config.PrivateKey, nil

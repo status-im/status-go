@@ -599,8 +599,8 @@ func (o *Community) InviteUserToOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityInv
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
-		return nil, ErrNotAdmin
+	if !o.IsControlNode() {
+		return nil, ErrNotControlNode
 	}
 
 	_, err := o.AddMember(pk, []protobuf.CommunityMember_Roles{})
@@ -629,8 +629,8 @@ func (o *Community) InviteUserToChat(pk *ecdsa.PublicKey, chatID string) (*proto
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
-		return nil, ErrNotAdmin
+	if !o.IsControlNode() {
+		return nil, ErrNotControlNode
 	}
 	memberKey := common.PubkeyToHex(pk)
 
@@ -751,8 +751,8 @@ func (o *Community) RemoveUserFromChat(pk *ecdsa.PublicKey, chatID string) (*pro
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
-		return nil, ErrNotAdmin
+	if !o.IsControlNode() {
+		return nil, ErrNotControlNode
 	}
 	if !o.hasMember(pk) {
 		return o.config.CommunityDescription, nil
@@ -826,8 +826,8 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 func (o *Community) AddCommunityTokensMetadata(token *protobuf.CommunityTokenMetadata) (*protobuf.CommunityDescription, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
-	if o.config.PrivateKey == nil {
-		return nil, ErrNotAdmin
+	if !o.IsControlNode() {
+		return nil, ErrNotControlNode
 	}
 	o.config.CommunityDescription.CommunityTokensMetadata = append(o.config.CommunityDescription.CommunityTokensMetadata, token)
 	o.increaseClock()
@@ -897,8 +897,8 @@ func (o *Community) AddRoleToMember(pk *ecdsa.PublicKey, role protobuf.Community
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
-		return nil, ErrNotAdmin
+	if !o.IsControlNode() {
+		return nil, ErrNotControlNode
 	}
 
 	updated := false
@@ -923,8 +923,8 @@ func (o *Community) RemoveRoleFromMember(pk *ecdsa.PublicKey, role protobuf.Comm
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
-		return nil, ErrNotAdmin
+	if !o.IsControlNode() {
+		return nil, ErrNotControlNode
 	}
 
 	updated := false
@@ -1050,8 +1050,8 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 }
 
 func (o *Community) UpdateChatFirstMessageTimestamp(chatID string, timestamp uint32) (*CommunityChanges, error) {
-	if !o.IsOwner() {
-		return nil, ErrNotOwner
+	if !o.IsControlNode() {
+		return nil, ErrNotControlNode
 	}
 
 	chat, ok := o.config.CommunityDescription.Chats[chatID]
@@ -1117,10 +1117,10 @@ func (o *Community) ValidateEditSharedAddresses(signer *ecdsa.PublicKey, request
 }
 
 func (o *Community) IsOwner() bool {
-	return o.IsMemberOwner(o.config.MemberIdentity)
+	return o.IsMemberOwner(o.config.MemberIdentity) || o.IsControlNode()
 }
 
-func (o *Community) HasPrivateKey() bool {
+func (o *Community) IsControlNode() bool {
 	return o.config.PrivateKey != nil
 }
 
@@ -1305,8 +1305,8 @@ func (o *Community) toBytes() ([]byte, error) {
 
 	// This should not happen, as we can only serialize on our side if we
 	// created the community
-	if o.config.PrivateKey == nil && len(o.config.MarshaledCommunityDescription) == 0 {
-		return nil, ErrNotAdmin
+	if !o.IsControlNode() && len(o.config.MarshaledCommunityDescription) == 0 {
+		return nil, ErrNotControlNode
 	}
 
 	//We are not owner or admin, use the received serialized version
@@ -1950,8 +1950,8 @@ func (o *Community) SetActiveMembersCount(activeMembersCount uint64) (updated bo
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.config.PrivateKey == nil {
-		return false, ErrNotAdmin
+	if !o.IsControlNode() {
+		return false, ErrNotControlNode
 	}
 
 	if activeMembersCount == o.config.CommunityDescription.ActiveMembersCount {

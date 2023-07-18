@@ -1623,7 +1623,7 @@ func (m *Messenger) Init() error {
 			continue
 		}
 
-		if !org.IsOwner() && !communitySettings.HistoryArchiveSupportEnabled {
+		if !org.IsControlNode() && !communitySettings.HistoryArchiveSupportEnabled {
 			communitySettings.HistoryArchiveSupportEnabled = true
 			err = m.communitiesManager.UpdateCommunitySettings(*communitySettings)
 			if err != nil {
