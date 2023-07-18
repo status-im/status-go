@@ -305,7 +305,22 @@ func (api *API) GetCryptoOnRamps(ctx context.Context) ([]CryptoOnRamp, error) {
 
 func (api *API) FetchBalancesByOwnerAndContractAddress(chainID wcommon.ChainID, ownerAddress common.Address, contractAddresses []common.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
 	log.Debug("call to FetchBalancesByOwnerAndContractAddress")
+
 	return api.s.collectiblesManager.FetchBalancesByOwnerAndContractAddress(chainID, ownerAddress, contractAddresses)
+}
+
+func (api *API) FilterOwnedCollectiblesAsync(ctx context.Context, chainIDs []wcommon.ChainID, addresses []common.Address, offset int, limit int) error {
+	log.Debug("wallet.api.FilterOwnedCollectiblesAsync", "chainIDs.count", len(chainIDs), "addr.count", len(addresses), "offset", offset, "limit", limit)
+
+	api.s.collectibles.FilterOwnedCollectiblesAsync(ctx, chainIDs, addresses, offset, limit)
+	return nil
+}
+
+func (api *API) GetCollectiblesDataAsync(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) error {
+	log.Debug("wallet.api.GetCollectiblesDetailsAsync")
+
+	api.s.collectibles.GetCollectiblesDataAsync(ctx, uniqueIDs)
+	return nil
 }
 
 // Old Collectibles API - To be deprecated
