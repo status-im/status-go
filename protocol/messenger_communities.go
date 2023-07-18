@@ -4160,6 +4160,10 @@ func (m *Messenger) UpdateCommunityTokenState(chainID int, contractAddress strin
 	return m.communitiesManager.UpdateCommunityTokenState(chainID, contractAddress, deployState)
 }
 
+func (m *Messenger) UpdateCommunityTokenAddress(chainID int, oldContractAddress string, newContractAddress string) error {
+	return m.communitiesManager.UpdateCommunityTokenAddress(chainID, oldContractAddress, newContractAddress)
+}
+
 func (m *Messenger) UpdateCommunityTokenSupply(chainID int, contractAddress string, supply *bigint.BigInt) error {
 	return m.communitiesManager.UpdateCommunityTokenSupply(chainID, contractAddress, supply)
 }

@@ -15,12 +15,16 @@ contract CommunityERC20 is
      */
     uint256 public maxSupply;
 
+    uint8 private customDecimals;
+
     constructor(
         string memory _name,
         string memory _symbol,
+        uint8 _decimals,
         uint256 _maxSupply
     ) ERC20(_name, _symbol) {
         maxSupply = _maxSupply;
+        customDecimals = _decimals;
     }
 
     // Events
@@ -48,6 +52,9 @@ contract CommunityERC20 is
     }
 
     // Public functions
+    function decimals() public view virtual override returns (uint8) {
+        return customDecimals;
+    }
 
     // Internal functions
 

@@ -13,6 +13,14 @@ const (
 	Deployed
 )
 
+type PrivilegesLevel uint8
+
+const (
+	OwnerLevel PrivilegesLevel = iota
+	MasterLevel
+	CommunityLevel
+)
+
 type CommunityToken struct {
 	TokenType          protobuf.CommunityTokenType `json:"tokenType"`
 	CommunityID        string                      `json:"communityId"`
@@ -28,4 +36,6 @@ type CommunityToken struct {
 	DeployState        DeployState                 `json:"deployState"`
 	Base64Image        string                      `json:"image"`
 	Decimals           int                         `json:"decimals"`
+	Deployer           string                      `json:"deployer"`
+	PrivilegesLevel    PrivilegesLevel             `json:"privilegesLevel"`
 }
