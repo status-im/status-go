@@ -8,6 +8,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/rpcfilters"
 )
 
 // Collectibles service
@@ -16,9 +17,9 @@ type Service struct {
 }
 
 // Returns a new Collectibles Service.
-func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, config *params.NodeConfig, appDb *sql.DB) *Service {
+func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig, appDb *sql.DB) *Service {
 	return &Service{
-		NewAPI(rpcClient, accountsManager, config, appDb),
+		NewAPI(rpcClient, accountsManager, rpcFiltersSrvc, config, appDb),
 	}
 }
 

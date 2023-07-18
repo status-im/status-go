@@ -20,15 +20,17 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/transactions"
 )
 
-func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, config *params.NodeConfig, appDb *sql.DB) *API {
+func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig, appDb *sql.DB) *API {
 	return &API{
 		RPCClient:       rpcClient,
 		accountsManager: accountsManager,
+		rpcFiltersSrvc:  rpcFiltersSrvc,
 		config:          config,
 		db:              NewCommunityTokensDatabase(appDb),
 	}
@@ -37,6 +39,7 @@ func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, config 
 type API struct {
 	RPCClient       *rpc.Client
 	accountsManager *account.GethManager
+	rpcFiltersSrvc  *rpcfilters.Service
 	config          *params.NodeConfig
 	db              *Database
 }
@@ -114,6 +117,13 @@ func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deployme
 		return DeploymentDetails{}, err
 	}
 
+	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
+		Hash:    tx.Hash(),
+		Type:    string(transactions.DeployCommunityToken),
+		From:    common.Address(txArgs.From),
+		ChainID: chainID,
+	})
+
 	return DeploymentDetails{address.Hex(), tx.Hash().Hex()}, nil
 }
 
@@ -138,6 +148,13 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 		log.Error(err.Error())
 		return DeploymentDetails{}, err
 	}
+
+	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
+		Hash:    tx.Hash(),
+		Type:    string(transactions.DeployCommunityToken),
+		From:    common.Address(txArgs.From),
+		ChainID: chainID,
+	})
 
 	return DeploymentDetails{address.Hex(), tx.Hash().Hex()}, nil
 }
@@ -243,6 +260,13 @@ func (api *API) MintCollectibles(ctx context.Context, chainID uint64, contractAd
 		return "", err
 	}
 
+	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
+		Hash:    tx.Hash(),
+		Type:    string(transactions.AirdropCommunityToken),
+		From:    common.Address(txArgs.From),
+		ChainID: chainID,
+	})
+
 	return tx.Hash().Hex(), nil
 }
 
@@ -288,6 +312,13 @@ func (api *API) MintAssets(ctx context.Context, chainID uint64, contractAddress 
 		return "", err
 	}
 
+	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
+		Hash:    tx.Hash(),
+		Type:    string(transactions.AirdropCommunityToken),
+		From:    common.Address(txArgs.From),
+		ChainID: chainID,
+	})
+
 	return tx.Hash().Hex(), nil
 }
 
@@ -324,6 +355,13 @@ func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress 
 	if err != nil {
 		return "", err
 	}
+
+	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
+		Hash:    tx.Hash(),
+		Type:    string(transactions.RemoteDestructCollectible),
+		From:    common.Address(txArgs.From),
+		ChainID: chainID,
+	})
 
 	return tx.Hash().Hex(), nil
 }
@@ -418,7 +456,6 @@ func (api *API) remainingCollectiblesSupply(ctx context.Context, chainID uint64,
 	}
 	var res = new(big.Int)
 	res.Sub(maxSupply, mintedCount)
-	fmt.Printf("Remaining: %v for chain: %v and addr: %v", res, chainID, contractAddress)
 	return &bigint.BigInt{Int: res}, nil
 }
 
@@ -535,6 +572,13 @@ func (api *API) Burn(ctx context.Context, chainID uint64, contractAddress string
 	if err != nil {
 		return "", err
 	}
+
+	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
+		Hash:    tx.Hash(),
+		Type:    string(transactions.BurnCommunityToken),
+		From:    common.Address(txArgs.From),
+		ChainID: chainID,
+	})
 
 	return tx.Hash().Hex(), nil
 }

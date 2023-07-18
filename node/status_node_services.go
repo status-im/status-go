@@ -419,7 +419,7 @@ func (b *StatusNode) ensService(timesource func() time.Time) *ens.Service {
 
 func (b *StatusNode) collectiblesService() *collectibles.Service {
 	if b.collectiblesSrvc == nil {
-		b.collectiblesSrvc = collectibles.NewService(b.rpcClient, b.gethAccountManager, b.config, b.appDB)
+		b.collectiblesSrvc = collectibles.NewService(b.rpcClient, b.gethAccountManager, b.rpcFiltersSrvc, b.config, b.appDB)
 	}
 	return b.collectiblesSrvc
 }
