@@ -10,8 +10,6 @@ import (
 	"github.com/beevik/ntp"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/rpc"
 )
 
 const (
@@ -40,6 +38,10 @@ var defaultServers = []string{
 }
 var errUpdateOffset = errors.New("failed to compute offset")
 
+var ntpTimeSource *NTPTimeSource
+var ntpTimeSourceCreator func() *NTPTimeSource
+var now func() time.Time
+
 type ntpQuery func(string, ntp.QueryOptions) (*ntp.Response, error)
 
 type queryResponse struct {
@@ -62,6 +64,23 @@ func (e multiRPCError) Error() string {
 	}
 	b.WriteString(".")
 	return b.String()
+}
+
+func init() {
+	ntpTimeSourceCreator = func() *NTPTimeSource {
+		if ntpTimeSource != nil {
+			return ntpTimeSource
+		}
+		ntpTimeSource = &NTPTimeSource{
+			servers:           defaultServers,
+			allowedFailures:   DefaultMaxAllowedFailures,
+			fastNTPSyncPeriod: FastNTPSyncPeriod,
+			slowNTPSyncPeriod: SlowNTPSyncPeriod,
+			timeQuery:         ntp.QueryWithOptions,
+		}
+		return ntpTimeSource
+	}
+	now = time.Now
 }
 
 func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (time.Duration, error) {
@@ -117,13 +136,12 @@ func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (t
 
 // Default initializes time source with default config values.
 func Default() *NTPTimeSource {
-	return &NTPTimeSource{
-		servers:           defaultServers,
-		allowedFailures:   DefaultMaxAllowedFailures,
-		fastNTPSyncPeriod: FastNTPSyncPeriod,
-		slowNTPSyncPeriod: SlowNTPSyncPeriod,
-		timeQuery:         ntp.QueryWithOptions,
-	}
+	return ntpTimeSourceCreator()
+}
+
+type timeCallback struct {
+	wg       *sync.WaitGroup
+	callback func(time.Time)
 }
 
 // NTPTimeSource provides source of time that tries to be resistant to time skews.
@@ -135,18 +153,36 @@ type NTPTimeSource struct {
 	slowNTPSyncPeriod time.Duration
 	timeQuery         ntpQuery // for ease of testing
 
-	quit chan struct{}
-	wg   sync.WaitGroup
+	quit          chan struct{}
+	wg            sync.WaitGroup
+	started       bool
+	updatedOffset bool
+	callbacks     []timeCallback
 
 	mu           sync.RWMutex
 	latestOffset time.Duration
+}
+
+// AddCallback adds callback that will be called when offset is updated.
+// If offset is already updated once, callback will be called immediately.
+func (s *NTPTimeSource) AddCallback(callback func(time.Time)) *sync.WaitGroup {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var wg sync.WaitGroup
+	if s.updatedOffset {
+		callback(now().Add(s.latestOffset))
+	} else {
+		wg.Add(1)
+		s.callbacks = append(s.callbacks, timeCallback{wg: &wg, callback: callback})
+	}
+	return &wg
 }
 
 // Now returns time adjusted by latest known offset
 func (s *NTPTimeSource) Now() time.Time {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return time.Now().Add(s.latestOffset)
+	return now().Add(s.latestOffset)
 }
 
 func (s *NTPTimeSource) updateOffset() error {
@@ -157,14 +193,25 @@ func (s *NTPTimeSource) updateOffset() error {
 	}
 	log.Info("Difference with ntp servers", "offset", offset)
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.latestOffset = offset
-	s.mu.Unlock()
+	s.updatedOffset = true
+
+	for _, c := range s.callbacks {
+		c.callback(now().Add(s.latestOffset))
+		c.wg.Done()
+	}
+	s.callbacks = nil
 	return nil
 }
 
 // runPeriodically runs periodically the given function based on NTPTimeSource
 // synchronization limits (fastNTPSyncPeriod / slowNTPSyncPeriod)
 func (s *NTPTimeSource) runPeriodically(fn func() error) error {
+	if s.started {
+		return nil
+	}
+
 	var period time.Duration
 	s.quit = make(chan struct{})
 	// we try to do it synchronously so that user can have reliable messages right away
@@ -186,11 +233,8 @@ func (s *NTPTimeSource) runPeriodically(fn func() error) error {
 		}
 	}()
 
+	s.started = true
 	return nil
-}
-
-func (s *NTPTimeSource) StartService() error {
-	return s.runPeriodically(s.updateOffset)
 }
 
 // Start runs a goroutine that updates local offset every updatePeriod.
@@ -205,15 +249,18 @@ func (s *NTPTimeSource) Stop() error {
 	}
 	close(s.quit)
 	s.wg.Wait()
+	s.started = false
 	return nil
 }
 
-// APIs used to be conformant with service interface
-func (s *NTPTimeSource) APIs() []rpc.API {
-	return nil
-}
-
-// Protocols used to conformant with service interface
-func (s *NTPTimeSource) Protocols() []p2p.Protocol {
-	return nil
+func GetCurrentTimeInMillis() (uint64, error) {
+	ts := Default()
+	if err := ts.Start(); err != nil {
+		return 0, err
+	}
+	var t uint64
+	ts.AddCallback(func(now time.Time) {
+		t = uint64(now.UnixNano() / int64(time.Millisecond))
+	}).Wait()
+	return t, nil
 }

@@ -271,7 +271,6 @@ func MakeTestNodeConfigWithDataDir(name, dataDir string, networkID uint64) (*par
 	} else {
 		cfg.Name = name
 	}
-	cfg.EnableNTPSync = true
 	cfg.NoDiscovery = true
 	cfg.LightEthConfig.Enabled = false
 	if dataDir != "" {

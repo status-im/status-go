@@ -244,3 +244,47 @@ func TestRunningPeriodically(t *testing.T) {
 		}
 	})
 }
+
+func TestGetCurrentTimeInMillis(t *testing.T) {
+	invokeTimes := 3
+	numResponses := len(mockedServers) * invokeTimes
+	responseOffset := 10 * time.Second
+	tc := &testCase{
+		servers:   mockedServers,
+		responses: make([]queryResponse, numResponses),
+		expected:  responseOffset,
+	}
+	for i := range tc.responses {
+		tc.responses[i] = queryResponse{Offset: responseOffset}
+	}
+
+	ntpTimeSourceCreator = func() *NTPTimeSource {
+		return &NTPTimeSource{
+			servers:           tc.servers,
+			allowedFailures:   tc.allowedFailures,
+			timeQuery:         tc.query,
+			slowNTPSyncPeriod: SlowNTPSyncPeriod,
+		}
+	}
+	now = func() time.Time {
+		return time.Unix(1, 0)
+	}
+
+	expectedTime := uint64(11000)
+	n, e := GetCurrentTimeInMillis()
+	require.NoError(t, e)
+	require.Equal(t, expectedTime, n)
+	// test repeat invoke GetCurrentTimeInMillis
+	n, e = GetCurrentTimeInMillis()
+	require.NoError(t, e)
+	require.Equal(t, expectedTime, n)
+	e = Default().Stop()
+	require.NoError(t, e)
+
+	// test invoke after stop
+	n, e = GetCurrentTimeInMillis()
+	require.NoError(t, e)
+	require.Equal(t, expectedTime, n)
+	e = Default().Stop()
+	require.NoError(t, e)
+}

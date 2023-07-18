@@ -332,6 +332,8 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.SyncActivityCenterNotificationState))
 	case protobuf.ApplicationMetadataMessage_COMMUNITY_ADMIN_MESSAGE:
 		return m.unmarshalProtobufData(new(protobuf.CommunityAdminEvent))
+	case protobuf.ApplicationMetadataMessage_SYNC_ACCOUNT_CUSTOMIZATION_COLOR:
+		return m.unmarshalProtobufData(new(protobuf.SyncAccountCustomizationColor))
 	}
 
 	return nil

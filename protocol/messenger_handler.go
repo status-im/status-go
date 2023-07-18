@@ -2305,6 +2305,16 @@ func (m *Messenger) handleSyncSetting(messageState *ReceivedMessageState, messag
 	return nil
 }
 
+func (m *Messenger) handleSyncAccountCustomizationColor(state *ReceivedMessageState, message protobuf.SyncAccountCustomizationColor) error {
+	err := m.multiAccounts.UpdateAccountCustomizationColor(message.GetKeyUid(), message.GetCustomizationColor(), message.GetUpdatedAt())
+	if err != nil {
+		return err
+	}
+
+	state.Response.CustomizationColor = message.GetCustomizationColor()
+	return nil
+}
+
 func (m *Messenger) HandleRequestTransaction(messageState *ReceivedMessageState, command protobuf.RequestTransaction) error {
 	err := ValidateReceivedRequestTransaction(&command, messageState.CurrentMessageState.WhisperTimestamp)
 	if err != nil {

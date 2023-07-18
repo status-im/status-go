@@ -3,6 +3,8 @@ package accounts
 import (
 	"errors"
 
+	"github.com/status-im/status-go/timesource"
+
 	"github.com/status-im/status-go/server"
 
 	"github.com/status-im/status-go/images"
@@ -25,6 +27,20 @@ type MultiAccountsAPI struct {
 }
 
 func (api *MultiAccountsAPI) UpdateAccount(account multiaccounts.Account) error {
+	oldAcc, err := api.db.GetAccount(account.KeyUID)
+	if err != nil {
+		return err
+	}
+	if oldAcc == nil {
+		return errors.New("UpdateAccount but account not found")
+	}
+	if oldAcc.CustomizationColor != account.CustomizationColor {
+		updatedAt, err := timesource.GetCurrentTimeInMillis()
+		if err != nil {
+			return err
+		}
+		account.CustomizationColorClock = updatedAt
+	}
 	return api.db.UpdateAccount(account)
 }
 

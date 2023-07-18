@@ -153,7 +153,6 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
 	nodeConfig.MailserversConfig = params.MailserversConfig{Enabled: true}
-	nodeConfig.EnableNTPSync = true
 
 	nodes := []string{"enrtree://AOGECG2SPND25EEFMAJ5WF3KSGJNSGV356DSTL2YVLLZWIV6SAYBM@prod.nodes.status.im"}
 	nodeConfig.ClusterConfig.WakuNodes = nodes

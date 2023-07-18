@@ -10,7 +10,6 @@ import (
 
 func TestWakuLightModeEnabledSetsEmptyBloomFilter(t *testing.T) {
 	statusNode, err := createAndStartStatusNode(&params.NodeConfig{
-		EnableNTPSync: true,
 		WakuConfig: params.WakuConfig{
 			Enabled:     true,
 			LightClient: true,
@@ -33,7 +32,6 @@ func TestWakuLightModeEnabledSetsEmptyBloomFilter(t *testing.T) {
 
 func TestWakuLightModeEnabledSetsNilBloomFilter(t *testing.T) {
 	statusNode, err := createAndStartStatusNode(&params.NodeConfig{
-		EnableNTPSync: true,
 		WakuConfig: params.WakuConfig{
 			Enabled:     true,
 			LightClient: false,

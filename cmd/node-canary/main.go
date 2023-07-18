@@ -271,7 +271,6 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 		nodeConfig.LogFile = *logFile
 	}
 
-	nodeConfig.EnableNTPSync = true
 	nodeConfig.NoDiscovery = true
 	nodeConfig.ListenAddr = ""
 	if *staticEnodeAddr != "" {
