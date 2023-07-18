@@ -107,15 +107,15 @@ func (m *Messenger) publishOrgInvitation(org *communities.Community, invitation 
 	return err
 }
 
-func (m *Messenger) publishCommunityAdminEvent(adminEvent *protobuf.CommunityAdminEvent) error {
+func (m *Messenger) publishCommunityEventsMessage(adminMessage *communities.CommunityEventsMessage) error {
 	adminPubkey := common.PubkeyToHex(&m.identity.PublicKey)
-	m.logger.Debug("publishing community admin event", zap.String("admin-id", adminPubkey), zap.Any("event", adminEvent))
-	_, err := crypto.DecompressPubkey(adminEvent.CommunityId)
+	m.logger.Debug("publishing community admin event", zap.String("admin-id", adminPubkey), zap.Any("event", adminMessage))
+	_, err := crypto.DecompressPubkey(adminMessage.CommunityID)
 	if err != nil {
 		return err
 	}
 
-	payload, err := proto.Marshal(adminEvent)
+	payload, err := adminMessage.Marshal()
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func (m *Messenger) publishCommunityAdminEvent(adminEvent *protobuf.CommunityAdm
 		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_ADMIN_MESSAGE,
 	}
 
-	_, err = m.sender.SendPublic(context.Background(), types.EncodeHex(adminEvent.CommunityId), rawMessage)
+	_, err = m.sender.SendPublic(context.Background(), types.EncodeHex(adminMessage.CommunityID), rawMessage)
 	return err
 }
 
@@ -246,8 +246,8 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					m.logger.Debug("published org")
 				}
 
-				if sub.CommunityAdminEvent != nil {
-					err := m.publishCommunityAdminEvent(sub.CommunityAdminEvent)
+				if sub.CommunityEventsMessage != nil {
+					err := m.publishCommunityEventsMessage(sub.CommunityEventsMessage)
 					if err != nil {
 						m.logger.Warn("failed to publish community admin event", zap.Error(err))
 					}
@@ -974,11 +974,11 @@ func (m *Messenger) CreateCommunityCategory(request *requests.CreateCommunityCat
 	}
 
 	var response MessengerResponse
-	community, changes, err := m.communitiesManager.CreateCategory(request, true)
+	_, changes, err := m.communitiesManager.CreateCategory(request, true)
 	if err != nil {
 		return nil, err
 	}
-	response.AddCommunity(community)
+	response.AddCommunity(changes.Community)
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
 
 	return &response, nil
@@ -1425,17 +1425,17 @@ func (m *Messenger) CreateCommunityChat(communityID types.HexBytes, c *protobuf.
 	var response MessengerResponse
 
 	c.Identity.FirstMessageTimestamp = FirstMessageTimestampNoMessage
-	community, changes, err := m.communitiesManager.CreateChat(communityID, c, true, "")
+	changes, err := m.communitiesManager.CreateChat(communityID, c, true, "")
 	if err != nil {
 		return nil, err
 	}
-	response.AddCommunity(community)
+	response.AddCommunity(changes.Community)
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
 
 	var chats []*Chat
 	var chatIDs []string
 	for chatID, chat := range changes.ChatsAdded {
-		c := CreateCommunityChat(community.IDString(), chatID, chat, m.getTimesource())
+		c := CreateCommunityChat(changes.Community.IDString(), chatID, chat, m.getTimesource())
 		chats = append(chats, c)
 		chatIDs = append(chatIDs, c.ID)
 		response.AddChat(c)
@@ -1595,6 +1595,18 @@ func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommu
 		return nil, err
 	}
 
+	if community.IsOwner() {
+		// check existing member permission once, then check periodically
+		go func() {
+			err := m.communitiesManager.CheckMemberPermissions(community, true)
+			if err != nil {
+				m.logger.Debug("failed to check member permissions", zap.Error(err))
+			}
+
+			m.communitiesManager.CheckMemberPermissionsPeriodically(community.ID())
+		}()
+	}
+
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
@@ -1612,6 +1624,19 @@ func (m *Messenger) EditCommunityTokenPermission(request *requests.EditCommunity
 		return nil, err
 	}
 
+	// check if members still fulfill the token criteria of all
+	// BECOME_MEMBER permissions and kick them if necessary
+	//
+	// We do this in a separate routine to not block this function
+	if community.IsOwner() {
+		go func() {
+			err := m.communitiesManager.CheckMemberPermissions(community, true)
+			if err != nil {
+				m.logger.Debug("failed to check member permissions", zap.Error(err))
+			}
+		}()
+	}
+
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
 	response.CommunityChanges = []*communities.CommunityChanges{changes}
@@ -1627,6 +1652,24 @@ func (m *Messenger) DeleteCommunityTokenPermission(request *requests.DeleteCommu
 	community, changes, err := m.communitiesManager.DeleteCommunityTokenPermission(request)
 	if err != nil {
 		return nil, err
+	}
+
+	// check if members still fulfill the token criteria
+	// We do this in a separate routine to not block this function
+	if community.IsOwner() {
+		go func() {
+			becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
+
+			// Make sure that we remove admins roles if we remove admin permissions
+			err = m.communitiesManager.CheckMemberPermissions(community, len(becomeAdminPermissions) == 0)
+			if err != nil {
+				m.logger.Debug("failed to check member permissions", zap.Error(err))
+			}
+
+			// Check if there's still permissions we need to track,
+			// if not we can stop checking token criteria on-chain
+			m.communitiesManager.CheckIfStopCheckingPermissionsPeriodically(community)
+		}()
 	}
 
 	response := &MessengerResponse{}
@@ -2313,9 +2356,9 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 	return nil
 }
 
-func (m *Messenger) handleCommunityAdminEvent(state *ReceivedMessageState, signer *ecdsa.PublicKey, description protobuf.CommunityAdminEvent, rawPayload []byte) error {
+func (m *Messenger) handleCommunityEventsMessage(state *ReceivedMessageState, signer *ecdsa.PublicKey, message protobuf.CommunityEventsMessage) error {
 
-	communityResponse, err := m.communitiesManager.HandleCommunityAdminEvent(signer, &description, rawPayload)
+	communityResponse, err := m.communitiesManager.HandleCommunityEventsMessage(signer, &message)
 	if err != nil {
 		return err
 	}
@@ -3164,7 +3207,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 
 				// We call `CreateChat` on `communitiesManager` directly to get more control
 				// over whether we want to publish the updated community description.
-				communityWithChats, changes, err := m.communitiesManager.CreateChat(discordCommunity.ID(), communityChat, false, channel.Channel.ID)
+				changes, err := m.communitiesManager.CreateChat(discordCommunity.ID(), communityChat, false, channel.Channel.ID)
 				if err != nil {
 					m.cleanUpImport(communityID)
 					errmsg := err.Error()
@@ -3176,7 +3219,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 					progressUpdates <- importProgress
 					return
 				}
-				discordCommunity = communityWithChats
+				discordCommunity = changes.Community
 
 				// This looks like we keep overriding the chat id value
 				// as we iterate over `ChatsAdded`, however at this point we

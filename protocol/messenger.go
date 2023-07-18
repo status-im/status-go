@@ -4305,13 +4305,13 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-					case protobuf.CommunityAdminEvent:
-						logger.Debug("Handling CommunityAdminEvent")
-						message := msg.ParsedMessage.Interface().(protobuf.CommunityAdminEvent)
+					case protobuf.CommunityEventsMessage:
+						logger.Debug("Handling CommunityEventsMessage")
+						message := msg.ParsedMessage.Interface().(protobuf.CommunityEventsMessage)
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
-						err = m.handleCommunityAdminEvent(messageState, publicKey, message, msg.DecryptedPayload)
+						err = m.handleCommunityEventsMessage(messageState, publicKey, message)
 						if err != nil {
-							logger.Warn("failed to handle CommunityAdminEvent", zap.Error(err))
+							logger.Warn("failed to handle CommunityEvent", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}

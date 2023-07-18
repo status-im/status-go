@@ -171,61 +171,10 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminCreateEditDeleteChannels() {
 	s.adminDeleteCommunityChannel(community, newChatID)
 }
 
-func (s *AdminMessengerCommunitiesSuite) TestAdminCreateBecomeMemberPermission() {
+func (s *AdminMessengerCommunitiesSuite) TestAdminCreateEditDeleteBecomeMemberPermission() {
 	community := s.setUpCommunityAndRoles()
-	s.adminCreateTestTokenPermission(community)
-
-	response, err := WaitOnMessengerResponse(
-		s.owner,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"owner did not receive community",
-	)
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionCreated(response.Communities()[0])
-
-	ownerCommunity, err := s.owner.GetCommunityByID(community.ID())
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionCreated(ownerCommunity)
-
-	response, err = WaitOnMessengerResponse(
-		s.alice,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"alice did not receive community",
-	)
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionCreated(response.Communities()[0])
-
-	aliceCommunity, err := s.alice.GetCommunityByID(community.ID())
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionCreated(aliceCommunity)
-}
-
-func (s *AdminMessengerCommunitiesSuite) TestAdminEditBecomeMemberPermission() {
 	// first, create token permission
-	community := s.setUpCommunityAndRoles()
 	tokenPermissionID, createTokenPermission := s.adminCreateTestTokenPermission(community)
-
-	// then, ensure owner receives it
-	_, err := WaitOnMessengerResponse(
-		s.owner,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"owner did not receive community",
-	)
-	s.Require().NoError(err)
-	ownerCommunity, err := s.owner.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionCreated(ownerCommunity)
-
-	// then, ensure alice receives it
-	_, err = WaitOnMessengerResponse(
-		s.alice,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"alice did not receive community",
-	)
-	s.Require().NoError(err)
-	aliceCommunity, err := s.alice.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionCreated(aliceCommunity)
 
 	createTokenPermission.TokenCriteria[0].Symbol = "UPDATED"
 	createTokenPermission.TokenCriteria[0].Amount = "200"
@@ -235,99 +184,16 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminEditBecomeMemberPermission() {
 		CreateCommunityTokenPermission: *createTokenPermission,
 	}
 
-	s.refreshMessengerResponses()
 	// then, admin edits the permission
-	response, err := s.admin.EditCommunityTokenPermission(editTokenPermission)
-	s.Require().NoError(err)
-	s.Require().Len(response.Communities(), 1)
-	s.assertAdminTokenPermissionEdited(response.Communities()[0])
-
-	// then, ensure owner receives and applies edits
-	response, err = WaitOnMessengerResponse(
-		s.owner,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"owner did not receive updated community",
-	)
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionEdited(response.Communities()[0])
-	ownerCommunity, err = s.owner.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionEdited(ownerCommunity)
-
-	// then, ensure alice receives and applies edits
-	response, err = WaitOnMessengerResponse(
-		s.alice,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"alice did not receive updated community",
-	)
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionEdited(response.Communities()[0])
-	aliceCommunity, err = s.alice.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionEdited(aliceCommunity)
-}
-
-func (s *AdminMessengerCommunitiesSuite) TestAdminDeleteBecomeMemberPermission() {
-	community := s.setUpCommunityAndRoles()
-	tokenPermissionID, _ := s.adminCreateTestTokenPermission(community)
-
-	// then, ensure owner receives it
-	_, err := WaitOnMessengerResponse(
-		s.owner,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"owner did not receive community",
-	)
-	s.Require().NoError(err)
-	ownerCommunity, err := s.owner.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionCreated(ownerCommunity)
-
-	// then, ensure alice receives it
-	_, err = WaitOnMessengerResponse(
-		s.alice,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"alice did not receive community",
-	)
-	s.Require().NoError(err)
-	aliceCommunity, err := s.alice.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.assertAdminTokenPermissionCreated(aliceCommunity)
+	s.adminEditTokenPermission(community, editTokenPermission)
 
 	deleteTokenPermission := &requests.DeleteCommunityTokenPermission{
 		CommunityID:  community.ID(),
 		PermissionID: tokenPermissionID,
 	}
 
-	s.refreshMessengerResponses()
-
 	// then, admin deletes previously created token permission
-	_, err = s.admin.DeleteCommunityTokenPermission(deleteTokenPermission)
-	s.Require().NoError(err)
-	adminCommunity, err := s.admin.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(adminCommunity.TokenPermissions(), 0)
-
-	// then, ensure owner receives and applies deletion
-	_, err = WaitOnMessengerResponse(
-		s.owner,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"owner did not receive updated community",
-	)
-	s.Require().NoError(err)
-	ownerCommunity, err = s.owner.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(ownerCommunity.TokenPermissions(), 0)
-
-	// then, ensure alice receives and applies deletion
-	_, err = WaitOnMessengerResponse(
-		s.alice,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"alice did not receive updated community",
-	)
-	s.Require().NoError(err)
-	aliceCommunity, err = s.alice.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(aliceCommunity.TokenPermissions(), 0)
+	s.adminDeleteTokenPermission(community, deleteTokenPermission)
 }
 
 func (s *AdminMessengerCommunitiesSuite) TestAdminCannotCreateBecomeAdminPermission() {
@@ -735,6 +601,96 @@ func (s *AdminMessengerCommunitiesSuite) TestAdminAirdropTokens() {
 	// TODO admin test: Airdrop Tokens (restricted)
 }
 
+func (s *AdminMessengerCommunitiesSuite) TestMemberReceiveAdminEventsWhenOwnerOffline() {
+	community := s.setUpCommunityAndRoles()
+
+	// To simulate behavior when owner is offline, we will not use owner for listening new events
+	// In this scenario member will reveive list of events
+
+	newAdminChat := &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "chat from admin",
+			Emoji:       "",
+			Description: "chat created by an admin",
+		},
+	}
+
+	checkChannelCreated := func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
+		if err != nil {
+			return err
+		}
+
+		for _, chat := range modifiedCommmunity.Chats() {
+			if chat.GetIdentity().GetDisplayName() == newAdminChat.GetIdentity().GetDisplayName() {
+				return nil
+			}
+		}
+
+		return errors.New("couldn't find created chat in response")
+	}
+
+	response, err := s.admin.CreateCommunityChat(community.ID(), newAdminChat)
+	s.Require().NoError(err)
+	s.Require().NoError(checkChannelCreated(response))
+	s.Require().Len(response.CommunityChanges, 1)
+	s.Require().Len(response.CommunityChanges[0].ChatsAdded, 1)
+	var addedChatID string
+	for addedChatID = range response.CommunityChanges[0].ChatsAdded {
+		break
+	}
+
+	s.waitOnMessengerResponse(WaitCommunityCondition, checkChannelCreated, s.alice)
+	s.waitOnMessengerResponse(WaitCommunityCondition, checkChannelCreated, s.admin)
+
+	newAdminChat.Identity.DisplayName = "modified chat from admin"
+
+	checkChannelEdited := func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
+		if err != nil {
+			return err
+		}
+
+		for _, chat := range modifiedCommmunity.Chats() {
+			if chat.GetIdentity().GetDisplayName() == newAdminChat.GetIdentity().GetDisplayName() {
+				return nil
+			}
+		}
+
+		return errors.New("couldn't find modified chat in response")
+	}
+
+	response, err = s.admin.EditCommunityChat(community.ID(), addedChatID, newAdminChat)
+	s.Require().NoError(err)
+	s.Require().NoError(checkChannelEdited(response))
+
+	s.waitOnMessengerResponse(WaitCommunityCondition, checkChannelEdited, s.alice)
+	s.waitOnMessengerResponse(WaitCommunityCondition, checkChannelEdited, s.admin)
+
+	checkChannelDeleted := func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
+		if err != nil {
+			return err
+		}
+
+		if _, exists := modifiedCommmunity.Chats()[addedChatID]; exists {
+			return errors.New("channel was not deleted")
+		}
+
+		return nil
+	}
+
+	response, err = s.admin.DeleteCommunityChat(community.ID(), addedChatID)
+	s.Require().NoError(err)
+	s.Require().NoError(checkChannelDeleted(response))
+
+	s.waitOnMessengerResponse(WaitCommunityCondition, checkChannelDeleted, s.alice)
+	s.waitOnMessengerResponse(WaitCommunityCondition, checkChannelDeleted, s.admin)
+}
+
 func (s *AdminMessengerCommunitiesSuite) setUpOnRequestCommunityAndRoles() *communities.Community {
 	tcs2, err := s.owner.communitiesManager.All()
 	s.Require().NoError(err, "admin.communitiesManager.All")
@@ -1023,42 +979,100 @@ func WaitMessageCondition(response *MessengerResponse) bool {
 	return len(response.Messages()) > 0
 }
 
-func (s *AdminMessengerCommunitiesSuite) checkClientsReceivedAdminEvent(fnWait WaitResponseValidator, fn MessageResponseValidator) {
+func (s *AdminMessengerCommunitiesSuite) waitOnMessengerResponse(fnWait WaitResponseValidator, fn MessageResponseValidator, user *Messenger) {
 	response, err := WaitOnMessengerResponse(
-		s.alice,
+		user,
 		fnWait,
 		"MessengerResponse data not received",
 	)
 	s.Require().NoError(err)
 	s.Require().NoError(fn(response))
+}
 
-	response, err = WaitOnMessengerResponse(
-		s.owner,
-		fnWait,
-		"MessengerResponse data not received",
-	)
-	s.Require().NoError(err)
-	s.Require().NoError(fn(response))
-
-	s.refreshMessengerResponses()
+func (s *AdminMessengerCommunitiesSuite) checkClientsReceivedAdminEvent(fnWait WaitResponseValidator, fn MessageResponseValidator) {
+	// Wait and verify Alice received admin event
+	s.waitOnMessengerResponse(fnWait, fn, s.alice)
+	// Wait and verify Admin received his own admin event
+	s.waitOnMessengerResponse(fnWait, fn, s.admin)
+	// Wait and verify Owner received admin event
+	// Owner will publish CommunityDescription update
+	s.waitOnMessengerResponse(fnWait, fn, s.owner)
+	// Wait and verify Alice received the Owner CommunityDescription update
+	s.waitOnMessengerResponse(fnWait, fn, s.alice)
+	// Wait and verify Admin received the Owner CommunityDescription update
+	s.waitOnMessengerResponse(fnWait, fn, s.admin)
+	// Wait and verify Owner received his own CommunityDescription update
+	s.waitOnMessengerResponse(fnWait, fn, s.owner)
 }
 
 func (s *AdminMessengerCommunitiesSuite) adminCreateTokenPermission(community *communities.Community, request *requests.CreateCommunityTokenPermission, assertFn func(*communities.Community)) (string, *requests.CreateCommunityTokenPermission) {
+	checkTokenPermissionCreation := func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
+		if err != nil {
+			return err
+		}
+
+		if !modifiedCommmunity.HasTokenPermissions() {
+			return errors.New("new token permission was not found")
+		}
+
+		return nil
+	}
+
 	response, err := s.admin.CreateCommunityTokenPermission(request)
 	s.Require().NoError(err)
-	s.Require().Len(response.Communities(), 1)
+	s.Require().Nil(checkTokenPermissionCreation(response))
 
-	adminCommunity, err := s.admin.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	assertFn(adminCommunity)
+	s.checkClientsReceivedAdminEvent(WaitCommunityCondition, checkTokenPermissionCreation)
 
 	var tokenPermissionID string
-	for id := range response.CommunityChanges[0].TokenPermissionsAdded {
-		tokenPermissionID = id
+	for tokenPermissionID = range response.CommunityChanges[0].TokenPermissionsAdded {
+		break
 	}
+
 	s.Require().NotEqual(tokenPermissionID, "")
 
 	return tokenPermissionID, request
+}
+
+func (s *AdminMessengerCommunitiesSuite) adminEditTokenPermission(community *communities.Community, request *requests.EditCommunityTokenPermission) {
+	checkTokenPermissionEdit := func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
+		if err != nil {
+			return err
+		}
+
+		s.assertAdminTokenPermissionEdited(modifiedCommmunity)
+
+		return nil
+	}
+
+	response, err := s.admin.EditCommunityTokenPermission(request)
+	s.Require().NoError(err)
+	s.Require().Nil(checkTokenPermissionEdit(response))
+
+	s.checkClientsReceivedAdminEvent(WaitCommunityCondition, checkTokenPermissionEdit)
+}
+
+func (s *AdminMessengerCommunitiesSuite) adminDeleteTokenPermission(community *communities.Community, request *requests.DeleteCommunityTokenPermission) {
+	checkTokenPermissionDeleted := func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
+		if err != nil {
+			return err
+		}
+
+		if modifiedCommmunity.HasTokenPermissions() {
+			return errors.New("token permission was not deleted")
+		}
+
+		return nil
+	}
+
+	response, err := s.admin.DeleteCommunityTokenPermission(request)
+	s.Require().NoError(err)
+	s.Require().Nil(checkTokenPermissionDeleted(response))
+
+	s.checkClientsReceivedAdminEvent(WaitCommunityCondition, checkTokenPermissionDeleted)
 }
 
 func createTestPermissionRequest(community *communities.Community) *requests.CreateCommunityTokenPermission {
@@ -1066,7 +1080,7 @@ func createTestPermissionRequest(community *communities.Community) *requests.Cre
 		CommunityID: community.ID(),
 		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
 		TokenCriteria: []*protobuf.TokenCriteria{
-			&protobuf.TokenCriteria{
+			{
 				Type:              protobuf.CommunityTokenType_ERC20,
 				ContractAddresses: map[uint64]string{uint64(1): "0x123"},
 				Symbol:            "TEST",
@@ -1108,19 +1122,9 @@ func (s *AdminMessengerCommunitiesSuite) assertAdminTokenPermissionEdited(commun
 
 func (s *AdminMessengerCommunitiesSuite) adminCreateCommunityChannel(community *communities.Community, newChannel *protobuf.CommunityChat) string {
 	checkChannelCreated := func(response *MessengerResponse) error {
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-
-		var modifiedCommmunity *communities.Community = nil
-		for _, c := range response.Communities() {
-			if c.IDString() == community.IDString() {
-				modifiedCommmunity = c
-			}
-		}
-
-		if modifiedCommmunity == nil {
-			return errors.New("couldn't find community in response")
+		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
+		if err != nil {
+			return err
 		}
 
 		for _, chat := range modifiedCommmunity.Chats() {
@@ -1149,19 +1153,9 @@ func (s *AdminMessengerCommunitiesSuite) adminCreateCommunityChannel(community *
 
 func (s *AdminMessengerCommunitiesSuite) adminEditCommunityChannel(community *communities.Community, editChannel *protobuf.CommunityChat, channelID string) {
 	checkChannelEdited := func(response *MessengerResponse) error {
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-
-		var modifiedCommmunity *communities.Community = nil
-		for _, c := range response.Communities() {
-			if c.IDString() == community.IDString() {
-				modifiedCommmunity = c
-			}
-		}
-
-		if modifiedCommmunity == nil {
-			return errors.New("couldn't find community in response")
+		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
+		if err != nil {
+			return err
 		}
 
 		for _, chat := range modifiedCommmunity.Chats() {
@@ -1173,11 +1167,6 @@ func (s *AdminMessengerCommunitiesSuite) adminEditCommunityChannel(community *co
 		return errors.New("couldn't find modified chat in response")
 	}
 
-	_, err := WaitOnMessengerResponse(s.admin, func(response *MessengerResponse) bool {
-		return true
-	}, "community description changed message not received")
-	s.Require().NoError(err)
-
 	response, err := s.admin.EditCommunityChat(community.ID(), channelID, editChannel)
 	s.Require().NoError(err)
 	s.Require().NoError(checkChannelEdited(response))
@@ -1187,19 +1176,9 @@ func (s *AdminMessengerCommunitiesSuite) adminEditCommunityChannel(community *co
 
 func (s *AdminMessengerCommunitiesSuite) adminDeleteCommunityChannel(community *communities.Community, channelID string) {
 	checkChannelDeleted := func(response *MessengerResponse) error {
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-
-		var modifiedCommmunity *communities.Community = nil
-		for _, c := range response.Communities() {
-			if c.IDString() == community.IDString() {
-				modifiedCommmunity = c
-			}
-		}
-
-		if modifiedCommmunity == nil {
-			return errors.New("couldn't find community in response")
+		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
+		if err != nil {
+			return err
 		}
 
 		if _, exists := modifiedCommmunity.Chats()[channelID]; exists {
@@ -1218,19 +1197,9 @@ func (s *AdminMessengerCommunitiesSuite) adminDeleteCommunityChannel(community *
 
 func (s *AdminMessengerCommunitiesSuite) adminCreateCommunityCategory(community *communities.Community, newCategory *requests.CreateCommunityCategory) string {
 	checkCategoryCreated := func(response *MessengerResponse) error {
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-
-		var modifiedCommmunity *communities.Community = nil
-		for _, c := range response.Communities() {
-			if c.IDString() == community.IDString() {
-				modifiedCommmunity = c
-			}
-		}
-
-		if modifiedCommmunity == nil {
-			return errors.New("couldn't find community in response")
+		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
+		if err != nil {
+			return err
 		}
 
 		for _, category := range modifiedCommmunity.Categories() {
@@ -1260,19 +1229,9 @@ func (s *AdminMessengerCommunitiesSuite) adminCreateCommunityCategory(community 
 
 func (s *AdminMessengerCommunitiesSuite) adminEditCommunityCategory(communityID string, editCategory *requests.EditCommunityCategory) {
 	checkCategoryEdited := func(response *MessengerResponse) error {
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-
-		var modifiedCommmunity *communities.Community = nil
-		for _, c := range response.Communities() {
-			if c.IDString() == communityID {
-				modifiedCommmunity = c
-			}
-		}
-
-		if modifiedCommmunity == nil {
-			return errors.New("couldn't find community in response")
+		modifiedCommmunity, err := getModifiedCommunity(response, communityID)
+		if err != nil {
+			return err
 		}
 
 		for _, category := range modifiedCommmunity.Categories() {
@@ -1281,7 +1240,7 @@ func (s *AdminMessengerCommunitiesSuite) adminEditCommunityCategory(communityID 
 			}
 		}
 
-		return errors.New("couldn't find created Category in the response")
+		return errors.New("couldn't find edited Category in the response")
 	}
 
 	response, err := s.admin.EditCommunityCategory(editCategory)
@@ -1293,19 +1252,9 @@ func (s *AdminMessengerCommunitiesSuite) adminEditCommunityCategory(communityID 
 
 func (s *AdminMessengerCommunitiesSuite) adminDeleteCommunityCategory(communityID string, deleteCategory *requests.DeleteCommunityCategory) {
 	checkCategoryDeleted := func(response *MessengerResponse) error {
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-
-		var modifiedCommmunity *communities.Community = nil
-		for _, c := range response.Communities() {
-			if c.IDString() == communityID {
-				modifiedCommmunity = c
-			}
-		}
-
-		if modifiedCommmunity == nil {
-			return errors.New("couldn't find community in response")
+		modifiedCommmunity, err := getModifiedCommunity(response, communityID)
+		if err != nil {
+			return err
 		}
 
 		if _, exists := modifiedCommmunity.Chats()[deleteCategory.CategoryID]; exists {
@@ -1359,7 +1308,9 @@ func (s *AdminMessengerCommunitiesSuite) adminDeleteMessage(messageID string) {
 	waitMessageCondition := func(response *MessengerResponse) bool {
 		return len(response.RemovedMessages()) > 0
 	}
-	s.checkClientsReceivedAdminEvent(waitMessageCondition, checkMessageDeleted)
+	s.waitOnMessengerResponse(waitMessageCondition, checkMessageDeleted, s.alice)
+	s.waitOnMessengerResponse(waitMessageCondition, checkMessageDeleted, s.owner)
+
 }
 
 func (s *AdminMessengerCommunitiesSuite) adminPinMessage(pinnedMessage *common.PinMessage) {
@@ -1374,25 +1325,15 @@ func (s *AdminMessengerCommunitiesSuite) adminPinMessage(pinnedMessage *common.P
 	s.Require().NoError(err)
 	s.Require().NoError(checkPinned(response))
 
-	s.checkClientsReceivedAdminEvent(WaitMessageCondition, checkPinned)
+	s.waitOnMessengerResponse(WaitMessageCondition, checkPinned, s.alice)
+	s.waitOnMessengerResponse(WaitMessageCondition, checkPinned, s.owner)
 }
 
 func (s *AdminMessengerCommunitiesSuite) adminBanAlice(banRequest *requests.BanUserFromCommunity) {
-
 	checkBanned := func(response *MessengerResponse) error {
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-
-		var modifiedCommmunity *communities.Community = nil
-		for _, c := range response.Communities() {
-			if c.IDString() == types.EncodeHex(banRequest.CommunityID) {
-				modifiedCommmunity = c
-			}
-		}
-
-		if modifiedCommmunity == nil {
-			return errors.New("couldn't find community in response")
+		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(banRequest.CommunityID))
+		if err != nil {
+			return err
 		}
 
 		if modifiedCommmunity.HasMember(&s.alice.identity.PublicKey) {
@@ -1415,19 +1356,9 @@ func (s *AdminMessengerCommunitiesSuite) adminBanAlice(banRequest *requests.BanU
 
 func (s *AdminMessengerCommunitiesSuite) adminUnbanAlice(unbanRequest *requests.UnbanUserFromCommunity) {
 	checkUnbanned := func(response *MessengerResponse) error {
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-
-		var modifiedCommmunity *communities.Community = nil
-		for _, c := range response.Communities() {
-			if c.IDString() == types.EncodeHex(unbanRequest.CommunityID) {
-				modifiedCommmunity = c
-			}
-		}
-
-		if modifiedCommmunity == nil {
-			return errors.New("couldn't find community in response")
+		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(unbanRequest.CommunityID))
+		if err != nil {
+			return err
 		}
 
 		if modifiedCommmunity.IsBanned(&s.alice.identity.PublicKey) {
@@ -1452,19 +1383,9 @@ func (s *AdminMessengerCommunitiesSuite) adminUnbanAlice(unbanRequest *requests.
 
 func (s *AdminMessengerCommunitiesSuite) adminKickAlice(communityID types.HexBytes, pubkey string) {
 	checkKicked := func(response *MessengerResponse) error {
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-
-		var modifiedCommmunity *communities.Community = nil
-		for _, c := range response.Communities() {
-			if c.IDString() == types.EncodeHex(communityID) {
-				modifiedCommmunity = c
-			}
-		}
-
-		if modifiedCommmunity == nil {
-			return errors.New("couldn't find community in response")
+		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(communityID))
+		if err != nil {
+			return err
 		}
 
 		if modifiedCommmunity.HasMember(&s.alice.identity.PublicKey) {
@@ -1487,19 +1408,9 @@ func (s *AdminMessengerCommunitiesSuite) adminKickAlice(communityID types.HexByt
 
 func (s *AdminMessengerCommunitiesSuite) adminReorderCategory(reorderRequest *requests.ReorderCommunityCategories) {
 	checkCategoryReorder := func(response *MessengerResponse) error {
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-
-		var modifiedCommmunity *communities.Community = nil
-		for _, c := range response.Communities() {
-			if c.IDString() == types.EncodeHex(reorderRequest.CommunityID) {
-				modifiedCommmunity = c
-			}
-		}
-
-		if modifiedCommmunity == nil {
-			return errors.New("couldn't find community in response")
+		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(reorderRequest.CommunityID))
+		if err != nil {
+			return err
 		}
 
 		category, exist := modifiedCommmunity.Categories()[reorderRequest.CategoryID]
@@ -1523,19 +1434,9 @@ func (s *AdminMessengerCommunitiesSuite) adminReorderCategory(reorderRequest *re
 
 func (s *AdminMessengerCommunitiesSuite) adminReorderChannel(reorderRequest *requests.ReorderCommunityChat) {
 	checkChannelReorder := func(response *MessengerResponse) error {
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-
-		var modifiedCommmunity *communities.Community = nil
-		for _, c := range response.Communities() {
-			if c.IDString() == types.EncodeHex(reorderRequest.CommunityID) {
-				modifiedCommmunity = c
-			}
-		}
-
-		if modifiedCommmunity == nil {
-			return errors.New("couldn't find community in response")
+		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(reorderRequest.CommunityID))
+		if err != nil {
+			return err
 		}
 
 		chat, exist := modifiedCommmunity.Chats()[reorderRequest.ChatID]
@@ -1559,4 +1460,23 @@ func (s *AdminMessengerCommunitiesSuite) adminReorderChannel(reorderRequest *req
 	s.Require().NoError(checkChannelReorder(response))
 
 	s.checkClientsReceivedAdminEvent(WaitCommunityCondition, checkChannelReorder)
+}
+
+func getModifiedCommunity(response *MessengerResponse, communityID string) (*communities.Community, error) {
+	if len(response.Communities()) == 0 {
+		return nil, errors.New("community not received")
+	}
+
+	var modifiedCommmunity *communities.Community = nil
+	for _, c := range response.Communities() {
+		if c.IDString() == communityID {
+			modifiedCommmunity = c
+		}
+	}
+
+	if modifiedCommmunity == nil {
+		return nil, errors.New("couldn't find community in response")
+	}
+
+	return modifiedCommmunity, nil
 }

@@ -39,7 +39,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
-	"github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
@@ -296,7 +295,7 @@ type Subscription struct {
 	DownloadingHistoryArchivesStartedSignal  *signal.DownloadingHistoryArchivesStartedSignal
 	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
 	ImportingHistoryArchiveMessagesSignal    *signal.ImportingHistoryArchiveMessagesSignal
-	CommunityAdminEvent                      *protobuf.CommunityAdminEvent
+	CommunityEventsMessage                   *CommunityEventsMessage
 	MemberPermissionsCheckedSignal           *MemberPermissionsCheckedSignal
 }
 
@@ -596,33 +595,14 @@ func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommuni
 
 	tokenPermission := request.ToCommunityTokenPermission()
 	tokenPermission.Id = uuid.New().String()
-
 	changes, err := community.AddTokenPermission(&tokenPermission)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityBecomeMemberTokenPermissionChangeAdminEvent()})
-	}
-
-	if community.IsOwner() {
-		// check existing member permission once, then check periodically
-		go func() {
-			err := m.checkMemberPermissions(community, false)
-			if err != nil {
-				m.logger.Debug("failed to check member permissions", zap.Error(err))
-			}
-
-			m.CheckMemberPermissionsPeriodically(community.ID())
-		}()
 	}
 
 	return community, changes, nil
@@ -644,33 +624,15 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() && tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityBecomeMemberTokenPermissionChangeAdminEvent()})
-	}
-
-	// check if members still fulfill the token criteria of all
-	// BECOME_MEMBER permissions and kick them if necessary
-	//
-	// We do this in a separate routine to not block
-	// this function
-	go func() {
-		err := m.checkMemberPermissions(community, false)
-		if err != nil {
-			m.logger.Debug("failed to check member permissions", zap.Error(err))
-		}
-	}()
-
 	return community, changes, nil
 }
 
-func (m *Manager) checkMemberPermissions(community *Community, removeAdmins bool) error {
+func (m *Manager) CheckMemberPermissions(community *Community, removeAdmins bool) error {
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 
@@ -758,6 +720,13 @@ func (m *Manager) checkMemberPermissions(community *Community, removeAdmins bool
 	return nil
 }
 
+func (m *Manager) CheckIfStopCheckingPermissionsPeriodically(community *Community) {
+	if cancel, exists := m.periodicMemberPermissionsTasks.Load(community.IDString()); exists &&
+		len(community.TokenPermissions()) == 0 {
+		close(cancel.(chan struct{})) // Need to cast to the chan
+	}
+}
+
 func (m *Manager) CheckMemberPermissionsPeriodically(communityID types.HexBytes) {
 
 	if _, exists := m.periodicMemberPermissionsTasks.Load(communityID.String()); exists {
@@ -779,7 +748,7 @@ func (m *Manager) CheckMemberPermissionsPeriodically(communityID types.HexBytes)
 				m.periodicMemberPermissionsTasks.Delete(communityID.String())
 			}
 
-			err = m.checkMemberPermissions(community, true)
+			err = m.CheckMemberPermissions(community, true)
 			if err != nil {
 				m.logger.Debug("failed to check member permissions", zap.Error(err))
 			}
@@ -804,30 +773,9 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityBecomeMemberTokenPermissionDeleteAdminEvent()})
-	}
-
-	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
-
-	// Make sure that we remove admins roles if we remove admin permissions
-	err = m.checkMemberPermissions(community, len(becomeAdminPermissions) == 0)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Check if there's stil BECOME_ADMIN and BECOME_MEMBER permissions,
-	// if not we can stop checking token criteria on-chain
-	if cancel, exists := m.periodicMemberPermissionsTasks.Load(community.IDString()); exists &&
-		len(community.TokenPermissions()) == 0 {
-		close(cancel.(chan struct{})) // Need to cast to the chan
 	}
 
 	return community, changes, nil
@@ -852,7 +800,10 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 		return nil, ErrOrgNotFound
 	}
 
-	if !community.IsOwnerOrAdmin() {
+	isOwner := community.IsOwner()
+	isAdmin := community.IsAdmin()
+
+	if !isOwner && !isAdmin {
 		return nil, ErrNotEnoughPermissions
 	}
 
@@ -885,21 +836,26 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 		return nil, err
 	}
 
+	if isAdmin {
+		err := community.addNewCommunityEvent(community.ToCommunityEditCommunityEvent(newDescription))
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Edit the community values
 	community.Edit(newDescription)
 	if err != nil {
 		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, err
+	if isOwner {
+		community.increaseClock()
 	}
 
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityEditAdminEvent()})
+	err = m.saveAndPublish(community)
+	if err != nil {
+		return nil, err
 	}
 
 	return community, nil
@@ -956,13 +912,13 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey) (*Community, error) {
 	return community, nil
 }
 
-func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.CommunityChat, publish bool, thirdPartyID string) (*Community, *CommunityChanges, error) {
+func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.CommunityChat, publish bool, thirdPartyID string) (*CommunityChanges, error) {
 	community, err := m.GetByID(communityID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if community == nil {
-		return nil, nil, ErrOrgNotFound
+		return nil, ErrOrgNotFound
 	}
 	chatID := uuid.New().String()
 	if thirdPartyID != "" {
@@ -971,24 +927,15 @@ func (m *Manager) CreateChat(communityID types.HexBytes, chat *protobuf.Communit
 
 	changes, err := community.CreateChat(chatID, chat)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	// Advertise changes
-	if publish {
-		if community.IsOwner() {
-			m.publish(&Subscription{Community: community})
-		} else if community.IsAdmin() {
-			m.publish(&Subscription{CommunityAdminEvent: community.ToCreateChannelAdminEvent(chatID, chat)})
-		}
-	}
-
-	return community, changes, nil
+	return changes, nil
 }
 
 func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *protobuf.CommunityChat) (*Community, *CommunityChanges, error) {
@@ -1010,16 +957,9 @@ func (m *Manager) EditChat(communityID types.HexBytes, chatID string, chat *prot
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	// Advertise changes
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToEditChannelAdminEvent(chatID, chat)})
 	}
 
 	return community, changes, nil
@@ -1043,16 +983,9 @@ func (m *Manager) DeleteChat(communityID types.HexBytes, chatID string) (*Commun
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	// Advertise changes
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToDeleteChannelAdminEvent(chatID)})
 	}
 
 	return community, changes, nil
@@ -1084,16 +1017,9 @@ func (m *Manager) CreateCategory(request *requests.CreateCommunityCategory, publ
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	// Advertise changes
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToCreateCategoryAdminEvent(categoryID, request.CategoryName, request.ChatIDs)})
 	}
 
 	return community, changes, nil
@@ -1120,16 +1046,9 @@ func (m *Manager) EditCategory(request *requests.EditCommunityCategory) (*Commun
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	// Advertise changes
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToEditCategoryAdminEvent(request.CategoryID, request.CategoryName, request.ChatIDs)})
 	}
 
 	return community, changes, nil
@@ -1179,16 +1098,9 @@ func (m *Manager) ReorderCategories(request *requests.ReorderCommunityCategories
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	// Advertise changes
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToReorderCategoryAdminEvent(request.CategoryID, request.Position)})
 	}
 
 	return community, changes, nil
@@ -1213,16 +1125,9 @@ func (m *Manager) ReorderChat(request *requests.ReorderCommunityChat) (*Communit
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	// Advertise changes
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToReorderChannelAdminEvent(request.CategoryID, request.ChatID, request.Position)})
 	}
 
 	return community, changes, nil
@@ -1242,19 +1147,12 @@ func (m *Manager) DeleteCategory(request *requests.DeleteCommunityCategory) (*Co
 		return nil, nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Advertise changes
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToDeleteCategoryAdminEvent(request.CategoryID)})
-	}
-
-	return community, changes, nil
+	return changes.Community, changes, nil
 }
 
 func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte) (*CommunityResponse, error) {
@@ -1292,7 +1190,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 }
 
 func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, description *protobuf.CommunityDescription, payload []byte) (*CommunityResponse, error) {
-	changes, err := community.UpdateCommunityDescription(description, payload)
+	changes, err := community.UpdateCommunityDescription(description, payload, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1341,6 +1239,11 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 		}
 	}
 
+	err = m.persistence.DeleteCommunityEvents(community.ID())
+	if err != nil {
+		return nil, err
+	}
+
 	err = m.persistence.SaveCommunity(community)
 	if err != nil {
 		return nil, err
@@ -1359,12 +1262,17 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 	}, nil
 }
 
-func (m *Manager) HandleCommunityAdminEvent(signer *ecdsa.PublicKey, adminEvent *protobuf.CommunityAdminEvent, payload []byte) (*CommunityResponse, error) {
+func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message *protobuf.CommunityEventsMessage) (*CommunityResponse, error) {
 	if signer == nil {
 		return nil, errors.New("signer can't be nil")
 	}
 
-	community, err := m.persistence.GetByID(&m.identity.PublicKey, adminEvent.CommunityId)
+	adminMessage, err := CommunityEventsMessageFromProtobuf(message)
+	if err != nil {
+		return nil, err
+	}
+
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, adminMessage.CommunityID)
 	if err != nil {
 		return nil, err
 	}
@@ -1377,32 +1285,44 @@ func (m *Manager) HandleCommunityAdminEvent(signer *ecdsa.PublicKey, adminEvent 
 		return nil, errors.New("user is not an admin")
 	}
 
-	patchedCommDescr, err := community.PatchCommunityDescriptionByAdminEvent(adminEvent)
+	changes, err := community.UpdateCommunityByEvents(adminMessage)
 	if err != nil {
 		return nil, err
 	}
 
-	marshaledCommDescr, err := proto.Marshal(patchedCommDescr)
+	err = m.handleAdditionalAdminChanges(changes.Community)
 	if err != nil {
 		return nil, err
 	}
 
-	// Some admin changes do not live on a `Community` and need to be handled by
-	// `Manager` here
-	err = m.handleAdditionalAdminChanges(community, adminEvent)
-	if err != nil {
-		return nil, err
+	// Owner cerifies admins events and publish changes
+	// all other users only apply changes to the community
+	if changes.Community.IsOwner() {
+		changes.Community.increaseClock()
+		err = m.persistence.SaveCommunity(changes.Community)
+		if err != nil {
+			return nil, err
+		}
+
+		m.publish(&Subscription{Community: changes.Community})
+	} else {
+		err = m.persistence.SaveCommunity(changes.Community)
+		if err != nil {
+			return nil, err
+		}
+		err := m.persistence.SaveCommunityEvents(changes.Community)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	rawMessage, err := protocol.WrapMessageV1(marshaledCommDescr, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, community.PrivateKey())
-	if err != nil {
-		return nil, err
-	}
-
-	return m.handleCommunityDescriptionMessageCommon(community, patchedCommDescr, rawMessage)
+	return &CommunityResponse{
+		Community: changes.Community,
+		Changes:   changes,
+	}, nil
 }
 
-func (m *Manager) handleAdditionalAdminChanges(community *Community, adminEvent *protobuf.CommunityAdminEvent) error {
+func (m *Manager) handleAdditionalAdminChanges(community *Community) error {
 
 	saveOrUpdateRequestToJoin := func(signer string, request *protobuf.CommunityRequestToJoin, state RequestToJoinState) error {
 		requestToJoin := &RequestToJoin{
@@ -1443,24 +1363,27 @@ func (m *Manager) handleAdditionalAdminChanges(community *Community, adminEvent 
 		return nil
 	}
 
-	switch adminEvent.Type {
-	case protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT:
-		for signer, request := range adminEvent.AcceptedRequestsToJoin {
-			err := saveOrUpdateRequestToJoin(signer, request, RequestToJoinStateAccepted)
-			if err != nil {
-				return err
+	for i := range community.config.EventsData.Events {
+		communityEvent := &community.config.EventsData.Events[i]
+		switch communityEvent.Type {
+		case protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT:
+			for signer, request := range communityEvent.AcceptedRequestsToJoin {
+				err := saveOrUpdateRequestToJoin(signer, request, RequestToJoinStateAccepted)
+				if err != nil {
+					return err
+				}
 			}
-		}
 
-	case protobuf.CommunityAdminEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT:
-		for signer, request := range adminEvent.RejectedRequestsToJoin {
-			err := saveOrUpdateRequestToJoin(signer, request, RequestToJoinStateDeclined)
-			if err != nil {
-				return err
+		case protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT:
+			for signer, request := range communityEvent.RejectedRequestsToJoin {
+				err := saveOrUpdateRequestToJoin(signer, request, RequestToJoinStateDeclined)
+				if err != nil {
+					return err
+				}
 			}
-		}
 
-	default:
+		default:
+		}
 	}
 	return nil
 }
@@ -1504,7 +1427,7 @@ func (m *Manager) DeletePendingRequestToJoin(request *RequestToJoin) error {
 		return err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return err
 	}
@@ -1539,11 +1462,6 @@ func (m *Manager) CancelRequestToJoin(request *requests.CancelRequestToJoinCommu
 
 	dbRequest.State = RequestToJoinStateCanceled
 	if err := m.markRequestToJoinAsCanceled(pk, community); err != nil {
-		return nil, nil, err
-	}
-
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
 		return nil, nil, err
 	}
 
@@ -1636,12 +1554,14 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		role = []protobuf.CommunityMember_Roles{memberRole}
 	}
 
-	changes, err := community.AddMember(pk, role)
-	if err != nil {
-		return nil, err
-	}
+	// _, err = community.AddMember(pk, role)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	_, err = community.AddMemberRevealedAccounts(dbRequest.PublicKey, revealedAccounts, dbRequest.Clock)
+	// _, err = community.AddMemberRevealedAccounts(dbRequest.PublicKey, revealedAccounts, dbRequest.Clock)
+	// TODOM: resolve
+	_, err = community.AddMemberWithRevealedAccounts(dbRequest, role, revealedAccounts)
 	if err != nil {
 		return nil, err
 	}
@@ -1650,23 +1570,9 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, err
-	}
-
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		acceptedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
-		acceptedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
-
-		adminChanges := &CommunityAdminEventChanges{
-			CommunityChanges:       changes,
-			AcceptedRequestsToJoin: acceptedRequestsToJoin,
-		}
-
-		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityRequestToJoinAcceptAdminEvent(adminChanges)})
 	}
 
 	return community, nil
@@ -1692,25 +1598,16 @@ func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCom
 		return err
 	}
 
-	// typically, community's clock is increased implicitly when making changes
-	// to it, however in this scenario there are no changes in the community, yet
-	// we need to increase the clock to ensure the admin event is processed by other
-	// nodes.
-	community.increaseClock()
-
-	rejectedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
-	rejectedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
-
-	adminChanges := &CommunityAdminEventChanges{
-		CommunityChanges:       community.emptyCommunityChanges(),
-		RejectedRequestsToJoin: rejectedRequestsToJoin,
+	err = community.DeclineRequestToJoin(dbRequest)
+	if err != nil {
+		return err
 	}
 
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToCommunityRequestToJoinRejectAdminEvent(adminChanges)})
+	err = m.saveAndPublish(community)
+	if err != nil {
+		return err
 	}
+
 	return nil
 }
 
@@ -2496,16 +2393,19 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, err
 	}
 
-	if !common.IsPubKeyEqual(community.PublicKey(), signer) && !community.IsMemberAdmin(signer) {
+	isAdminSigner := community.IsMemberAdmin(signer)
+	isOwnerSigner := common.IsPubKeyEqual(community.PublicKey(), signer)
+	if !isOwnerSigner && !isAdminSigner {
 		return nil, ErrNotAuthorized
 	}
 
-	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg)
+	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg, isAdminSigner)
 	if err != nil {
 		return nil, err
 	}
 
 	err = m.persistence.SaveCommunity(community)
+
 	if err != nil {
 		return nil, err
 	}
@@ -2727,15 +2627,9 @@ func (m *Manager) RemoveUserFromCommunity(id types.HexBytes, pk *ecdsa.PublicKey
 		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, err
-	}
-
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToKickCommunityMemberAdminEvent(common.PubkeyToHex(pk))})
 	}
 
 	return community, nil
@@ -2761,15 +2655,9 @@ func (m *Manager) UnbanUserFromCommunity(request *requests.UnbanUserFromCommunit
 		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, err
-	}
-
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToUnbanCommunityMemberAdminEvent(request.User.String())})
 	}
 
 	return community, nil
@@ -2864,15 +2752,9 @@ func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (
 		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, err
-	}
-
-	if community.IsOwner() {
-		m.publish(&Subscription{Community: community})
-	} else if community.IsAdmin() {
-		m.publish(&Subscription{CommunityAdminEvent: community.ToBanCommunityMemberAdminEvent(request.User.String())})
 	}
 
 	return community, nil
@@ -4097,12 +3979,10 @@ func (m *Manager) AddCommunityToken(token *CommunityToken, croppedImage *images.
 		return nil, err
 	}
 
-	err = m.persistence.SaveCommunity(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, err
 	}
-
-	m.publish(&Subscription{Community: community})
 
 	return token, m.persistence.AddCommunityToken(token)
 }
@@ -4186,4 +4066,28 @@ func (m *Manager) accountsHasAdminPermission(becomeAdminPermissions []*protobuf.
 		return permissionResponse.Satisfied
 	}
 	return false
+}
+
+func (m *Manager) saveAndPublish(community *Community) error {
+	err := m.persistence.SaveCommunity(community)
+	if err != nil {
+		return err
+	}
+
+	if community.IsOwner() {
+		m.publish(&Subscription{Community: community})
+		return nil
+	}
+
+	if community.IsAdmin() {
+		err := m.persistence.SaveCommunityEvents(community)
+		if err != nil {
+			return err
+		}
+
+		m.publish(&Subscription{CommunityEventsMessage: community.ToCommunityEventsMessage()})
+		return nil
+	}
+
+	return nil
 }

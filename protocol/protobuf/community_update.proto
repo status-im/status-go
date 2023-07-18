@@ -6,18 +6,17 @@ package protobuf;
 import "chat_identity.proto";
 import "communities.proto";
 
-message CommunityAdminEvent {
-  uint64 clock = 1;
-  bytes community_id = 2;
-  EventType type = 3;
-  CommunityConfig community_config = 4;
-  map<string, CommunityTokenPermission> token_permissions = 5;
-  CategoryData category_data = 6;
-  ChannelData channel_data = 7;
-  string member_to_action = 8;
-  map<string,CommunityMember> membersAdded = 9;
-  map<string,CommunityRequestToJoin> rejectedRequestsToJoin = 10;
-  map<string,CommunityRequestToJoin> acceptedRequestsToJoin = 11;
+message CommunityEvent {
+  uint64 community_event_clock = 1;
+  EventType type = 2;
+  CommunityConfig community_config = 3;
+  CommunityTokenPermission token_permission = 4;
+  CategoryData category_data = 5;
+  ChannelData channel_data = 6;
+  string member_to_action = 7;
+  map<string,CommunityMember> membersAdded = 8;
+  map<string,CommunityRequestToJoin> rejectedRequestsToJoin = 9;
+  map<string,CommunityRequestToJoin> acceptedRequestsToJoin = 10;
   
   enum EventType {
     UNKNOWN = 0;
@@ -61,4 +60,16 @@ message ChannelData {
   string channel_id = 2;
   int32 position = 3;
   CommunityChat channel = 4;
+}
+
+// CommunityEventsMessage is a message used to propagate information
+// about community changes.
+message CommunityEventsMessage {
+  bytes community_id = 1;
+  
+  // Events base CommunityDescription with owner signature on top of which events were generated
+  bytes events_base_community_description = 2;
+  
+  // A list of admins events for the channel in bytes
+  repeated bytes events = 3;
 }

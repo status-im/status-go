@@ -26,8 +26,18 @@ func (o *Community) CreateCategory(categoryID string, categoryName string, chatI
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsOwnerOrAdmin() {
+	isOwner := o.IsOwner()
+	isAdmin := o.IsAdmin()
+
+	if !isOwner && !isAdmin {
 		return nil, ErrNotAdmin
+	}
+
+	if isAdmin {
+		err := o.addNewCommunityEvent(o.ToCreateCategoryCommunityEvent(categoryID, categoryName, chatIDs))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	changes, err := o.createCategory(categoryID, categoryName, chatIDs)
@@ -35,7 +45,9 @@ func (o *Community) CreateCategory(categoryID string, categoryName string, chatI
 		return nil, err
 	}
 
-	o.increaseClock()
+	if isOwner {
+		o.increaseClock()
+	}
 
 	changes.CategoriesAdded[categoryID] = o.config.CommunityDescription.Categories[categoryID]
 	for i, cid := range chatIDs {
@@ -54,8 +66,19 @@ func (o *Community) EditCategory(categoryID string, categoryName string, chatIDs
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsOwnerOrAdmin() {
+	isOwner := o.IsOwner()
+	isAdmin := o.IsAdmin()
+
+	if !isOwner && !isAdmin {
 		return nil, ErrNotAdmin
+	}
+
+	if isAdmin {
+		err := o.addNewCommunityEvent(o.ToEditCategoryCommunityEvent(categoryID, categoryName, chatIDs))
+		if err != nil {
+			return nil, err
+		}
+
 	}
 
 	changes, err := o.editCategory(categoryID, categoryName, chatIDs)
@@ -63,7 +86,9 @@ func (o *Community) EditCategory(categoryID string, categoryName string, chatIDs
 		return nil, err
 	}
 
-	o.increaseClock()
+	if isOwner {
+		o.increaseClock()
+	}
 
 	changes.CategoriesModified[categoryID] = o.config.CommunityDescription.Categories[categoryID]
 	for i, cid := range chatIDs {
@@ -82,8 +107,18 @@ func (o *Community) ReorderCategories(categoryID string, newPosition int) (*Comm
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsOwnerOrAdmin() {
+	isOwner := o.IsOwner()
+	isAdmin := o.IsAdmin()
+
+	if !isOwner && !isAdmin {
 		return nil, ErrNotAdmin
+	}
+
+	if isAdmin {
+		err := o.addNewCommunityEvent(o.ToReorderCategoryCommunityEvent(categoryID, newPosition))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	changes, err := o.reorderCategories(categoryID, newPosition)
@@ -91,7 +126,9 @@ func (o *Community) ReorderCategories(categoryID string, newPosition int) (*Comm
 		return nil, err
 	}
 
-	o.increaseClock()
+	if isOwner {
+		o.increaseClock()
+	}
 
 	return changes, nil
 }
@@ -110,8 +147,18 @@ func (o *Community) ReorderChat(categoryID string, chatID string, newPosition in
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsOwnerOrAdmin() {
+	isOwner := o.IsOwner()
+	isAdmin := o.IsAdmin()
+
+	if !isOwner && !isAdmin {
 		return nil, ErrNotAdmin
+	}
+
+	if isAdmin {
+		err := o.addNewCommunityEvent(o.ToReorderChannelCommunityEvent(categoryID, chatID, newPosition))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	changes, err := o.reorderChat(categoryID, chatID, newPosition)
@@ -119,7 +166,9 @@ func (o *Community) ReorderChat(categoryID string, chatID string, newPosition in
 		return nil, err
 	}
 
-	o.increaseClock()
+	if isOwner {
+		o.increaseClock()
+	}
 
 	return changes, nil
 }
@@ -253,8 +302,18 @@ func (o *Community) DeleteCategory(categoryID string) (*CommunityChanges, error)
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsOwnerOrAdmin() {
+	isOwner := o.IsOwner()
+	isAdmin := o.IsAdmin()
+
+	if !isOwner && !isAdmin {
 		return nil, ErrNotAdmin
+	}
+
+	if isAdmin {
+		err := o.addNewCommunityEvent(o.ToDeleteCategoryCommunityEvent(categoryID))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	changes, err := o.deleteCategory(categoryID)
@@ -262,7 +321,9 @@ func (o *Community) DeleteCategory(categoryID string) (*CommunityChanges, error)
 		return nil, err
 	}
 
-	o.increaseClock()
+	if isOwner {
+		o.increaseClock()
+	}
 
 	return changes, nil
 }
