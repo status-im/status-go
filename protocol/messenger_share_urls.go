@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"crypto/ecdsa"
 	"fmt"
 	"regexp"
 	"strings"
@@ -24,6 +23,7 @@ type CommunityURLData struct {
 	MembersCount uint32   `json:"membersCount"`
 	Color        string   `json:"color"`
 	TagIndices   []uint32 `json:"tagIndices"`
+	CommunityID  string   `json:"communityId"`
 }
 
 type CommunityChannelURLData struct {
@@ -31,11 +31,13 @@ type CommunityChannelURLData struct {
 	DisplayName string `json:"displayName"`
 	Description string `json:"description"`
 	Color       string `json:"color"`
+	ChannelUUID string `json:"channelUuid"`
 }
 
 type ContactURLData struct {
 	DisplayName string `json:"displayName"`
 	Description string `json:"description"`
+	PublicKey   string `json:"publicKey"`
 }
 
 type URLDataResponse struct {
@@ -96,6 +98,7 @@ func (m *Messenger) prepareCommunityData(community *communities.Community) Commu
 		MembersCount: uint32(community.MembersCount()),
 		Color:        community.Identity().GetColor(),
 		TagIndices:   community.TagsIndices(),
+		CommunityID:  community.IDString(),
 	}
 }
 
@@ -119,25 +122,6 @@ func (m *Messenger) parseCommunityURLWithChatKey(urlData string) (*URLDataRespon
 	}, nil
 }
 
-func (m *Messenger) prepareEncodedRawData(rawData []byte, privateKey *ecdsa.PrivateKey) (string, string, error) {
-	encodedData, err := urls.EncodeDataURL(rawData)
-	if err != nil {
-		return "", "", err
-	}
-
-	signature, err := crypto.SignBytes([]byte(encodedData), privateKey)
-	if err != nil {
-		return "", "", err
-	}
-
-	encodedSignature, err := urls.EncodeDataURL(signature)
-	if err != nil {
-		return "", "", err
-	}
-
-	return encodedData, encodedSignature, nil
-}
-
 func (m *Messenger) prepareEncodedCommunityData(community *communities.Community) (string, string, error) {
 	communityProto := &protobuf.Community{
 		DisplayName:  community.Identity().DisplayName,
@@ -152,7 +136,16 @@ func (m *Messenger) prepareEncodedCommunityData(community *communities.Community
 		return "", "", err
 	}
 
-	return m.prepareEncodedRawData(communityData, community.PrivateKey())
+	shortKey, err := m.SerializePublicKey(community.ID())
+	if err != nil {
+		return "", "", err
+	}
+	encodedData, err := urls.EncodeDataURL(communityData)
+	if err != nil {
+		return "", "", err
+	}
+
+	return encodedData, shortKey, nil
 }
 
 func (m *Messenger) ShareCommunityURLWithData(communityID types.HexBytes) (string, error) {
@@ -165,25 +158,16 @@ func (m *Messenger) ShareCommunityURLWithData(communityID types.HexBytes) (strin
 		return "", fmt.Errorf("community with communityID %s not found", communityID)
 	}
 
-	data, signature, err := m.prepareEncodedCommunityData(community)
+	data, shortKey, err := m.prepareEncodedCommunityData(community)
 	if err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf("%s/c/%s#%s", baseShareURL, data, signature), nil
+	return fmt.Sprintf("%s/c/%s#%s", baseShareURL, data, shortKey), nil
 }
 
-func (m *Messenger) verifySignature(data string, rawSignature string) (*ecdsa.PublicKey, error) {
-	signature, err := urls.DecodeDataURL(rawSignature)
-	if err != nil {
-		return nil, err
-	}
-
-	return crypto.SigToPub(crypto.Keccak256([]byte(data)), signature)
-}
-
-func (m *Messenger) parseCommunityURLWithData(data string, signature string) (*URLDataResponse, error) {
-	_, err := m.verifySignature(data, signature)
+func (m *Messenger) parseCommunityURLWithData(data string, chatKey string) (*URLDataResponse, error) {
+	communityID, err := m.DeserializePublicKey(chatKey)
 	if err != nil {
 		return nil, err
 	}
@@ -206,6 +190,7 @@ func (m *Messenger) parseCommunityURLWithData(data string, signature string) (*U
 			MembersCount: communityProto.MembersCount,
 			Color:        communityProto.Color,
 			TagIndices:   communityProto.TagIndices,
+			CommunityID:  types.EncodeHex(communityID),
 		},
 	}, nil
 }
@@ -299,7 +284,16 @@ func (m *Messenger) prepareEncodedCommunityChannelData(community *communities.Co
 		return "", "", err
 	}
 
-	return m.prepareEncodedRawData(channelData, community.PrivateKey())
+	shortKey, err := m.SerializePublicKey(community.ID())
+	if err != nil {
+		return "", "", err
+	}
+	encodedData, err := urls.EncodeDataURL(channelData)
+	if err != nil {
+		return "", "", err
+	}
+
+	return encodedData, shortKey, nil
 }
 
 func (m *Messenger) ShareCommunityChannelURLWithData(request *requests.CommunityChannelShareURL) (string, error) {
@@ -326,16 +320,16 @@ func (m *Messenger) ShareCommunityChannelURLWithData(request *requests.Community
 		return "", fmt.Errorf("channel with channelID %s not found", request.ChannelID)
 	}
 
-	data, signature, err := m.prepareEncodedCommunityChannelData(community, channel, request.ChannelID)
+	data, shortKey, err := m.prepareEncodedCommunityChannelData(community, channel, request.ChannelID)
 	if err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf("%s/cc/%s#%s", baseShareURL, data, signature), nil
+	return fmt.Sprintf("%s/cc/%s#%s", baseShareURL, data, shortKey), nil
 }
 
-func (m *Messenger) parseCommunityChannelURLWithData(data string, signature string) (*URLDataResponse, error) {
-	_, err := m.verifySignature(data, signature)
+func (m *Messenger) parseCommunityChannelURLWithData(data string, chatKey string) (*URLDataResponse, error) {
+	communityID, err := m.DeserializePublicKey(chatKey)
 	if err != nil {
 		return nil, err
 	}
@@ -358,12 +352,14 @@ func (m *Messenger) parseCommunityChannelURLWithData(data string, signature stri
 			MembersCount: channelProto.Community.MembersCount,
 			Color:        channelProto.Community.Color,
 			TagIndices:   channelProto.Community.TagIndices,
+			CommunityID:  types.EncodeHex(communityID),
 		},
 		Channel: CommunityChannelURLData{
 			Emoji:       channelProto.Emoji,
 			DisplayName: channelProto.DisplayName,
 			Description: channelProto.Description,
 			Color:       channelProto.Color,
+			ChannelUUID: channelProto.Uuid,
 		},
 	}, nil
 }
@@ -434,7 +430,22 @@ func (m *Messenger) prepareEncodedUserData(contact *Contact) (string, string, er
 		return "", "", err
 	}
 
-	return m.prepareEncodedRawData(userData, m.identity)
+	pk, err := contact.PublicKey()
+	if err != nil {
+		return "", "", err
+	}
+
+	shortKey, err := m.SerializePublicKey(crypto.CompressPubkey(pk))
+	if err != nil {
+		return "", "", err
+	}
+
+	encodedData, err := urls.EncodeDataURL(userData)
+	if err != nil {
+		return "", "", err
+	}
+
+	return encodedData, shortKey, nil
 }
 
 func (m *Messenger) ShareUserURLWithData(contactID string) (string, error) {
@@ -443,20 +454,15 @@ func (m *Messenger) ShareUserURLWithData(contactID string) (string, error) {
 		return "", ErrContactNotFound
 	}
 
-	data, signature, err := m.prepareEncodedUserData(contact)
+	data, shortKey, err := m.prepareEncodedUserData(contact)
 	if err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf("%s/u/%s#%s", baseShareURL, data, signature), nil
+	return fmt.Sprintf("%s/u/%s#%s", baseShareURL, data, shortKey), nil
 }
 
-func (m *Messenger) parseUserURLWithData(data string, signature string) (*URLDataResponse, error) {
-	_, err := m.verifySignature(data, signature)
-	if err != nil {
-		return nil, err
-	}
-
+func (m *Messenger) parseUserURLWithData(data string, chatKey string) (*URLDataResponse, error) {
 	userData, err := urls.DecodeDataURL(data)
 	if err != nil {
 		return nil, err
@@ -472,6 +478,7 @@ func (m *Messenger) parseUserURLWithData(data string, signature string) (*URLDat
 		Contact: ContactURLData{
 			DisplayName: userProto.DisplayName,
 			Description: userProto.Description,
+			PublicKey:   chatKey,
 		},
 	}, nil
 }
