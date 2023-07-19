@@ -283,8 +283,9 @@ func GetAccountTypeForKeypairType(kpType KeypairType) AccountType {
 	}
 }
 
-func (db *Database) processKeypairs(rows *sql.Rows) ([]*Keypair, error) {
+func (db *Database) processRows(rows *sql.Rows) ([]*Keypair, []*Account, error) {
 	keypairMap := make(map[string]*Keypair)
+	allAccounts := []*Account{}
 
 	var (
 		kpKeyUID                  sql.NullString
@@ -321,7 +322,7 @@ func (db *Database) processKeypairs(rows *sql.Rows) ([]*Keypair, error) {
 			&accAddress, &accKeyUID, &pubkey, &accPath, &accName, &accColorID, &accEmoji,
 			&accWallet, &accChat, &accHidden, &accOperable, &accClock, &accCreatedAt, &accPosition)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// check keypair fields
@@ -392,14 +393,17 @@ func (db *Database) processKeypairs(rows *sql.Rows) ([]*Keypair, error) {
 		}
 		acc.Type = GetAccountTypeForKeypairType(kp.Type)
 
-		if _, ok := keypairMap[kp.KeyUID]; !ok {
-			keypairMap[kp.KeyUID] = kp
+		if kp.KeyUID != "" {
+			if _, ok := keypairMap[kp.KeyUID]; !ok {
+				keypairMap[kp.KeyUID] = kp
+			}
+			keypairMap[kp.KeyUID].Accounts = append(keypairMap[kp.KeyUID].Accounts, acc)
 		}
-		keypairMap[kp.KeyUID].Accounts = append(keypairMap[kp.KeyUID].Accounts, acc)
+		allAccounts = append(allAccounts, acc)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Convert map to list
@@ -408,7 +412,7 @@ func (db *Database) processKeypairs(rows *sql.Rows) ([]*Keypair, error) {
 		keypairs = append(keypairs, keypair)
 	}
 
-	return keypairs, nil
+	return keypairs, allAccounts, nil
 }
 
 // If `keyUID` is passed only keypairs which match the passed `keyUID` will be returned, if `keyUID` is empty, all keypairs will be returned.
@@ -481,7 +485,7 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string) ([]*Keypair, error) {
 
 	defer rows.Close()
 
-	keypairs, err := db.processKeypairs(rows)
+	keypairs, _, err := db.processRows(rows)
 	if err != nil {
 		return nil, err
 	}
@@ -577,13 +581,9 @@ func (db *Database) getAccounts(tx *sql.Tx, address types.Address) ([]*Account, 
 	}
 
 	defer rows.Close()
-	keypairs, err := db.processKeypairs(rows)
+	_, allAccounts, err := db.processRows(rows)
 	if err != nil {
 		return nil, err
-	}
-	allAccounts := []*Account{}
-	for _, kp := range keypairs {
-		allAccounts = append(allAccounts, kp.Accounts...)
 	}
 
 	return allAccounts, nil
@@ -828,6 +828,12 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, update
 			acc.Address, keyUID, acc.PublicKey, acc.Path, acc.Wallet, acc.Chat,
 			acc.Name, acc.ColorID, acc.Emoji, acc.Hidden, acc.Operable, acc.Clock, acc.Position, acc.Address)
 
+		if err != nil {
+			return err
+		}
+
+		// Update positions change clock when adding new/updating account
+		err = db.setClockOfLastAccountsPositionChange(tx, acc.Clock)
 		if err != nil {
 			return err
 		}
@@ -1149,6 +1155,37 @@ func (db *Database) GetClockOfLastAccountsPositionChange() (result uint64, err e
 		return 0, err
 	}
 	return result, err
+}
+
+// Updates positions of accounts respecting current order.
+func (db *Database) ResolveAccountsPositions(clock uint64) (err error) {
+	tx, err := db.db.Begin()
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	// returns all accounts ordered by position
+	dbAccounts, err := db.getAccounts(tx, types.Address{})
+	if err != nil {
+		return err
+	}
+
+	// starting from -1, cause `getAccounts` returns chat account as well
+	for i := 0; i < len(dbAccounts); i++ {
+		expectedPosition := int64(i - 1)
+		if dbAccounts[i].Position != expectedPosition {
+			_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE address = ?", expectedPosition, dbAccounts[i].Address)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return db.setClockOfLastAccountsPositionChange(tx, clock)
 }
 
 // Sets positions for passed accounts.

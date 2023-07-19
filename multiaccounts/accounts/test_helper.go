@@ -327,6 +327,10 @@ func SameAccounts(expected, real *Account) bool {
 		expected.Removed == real.Removed
 }
 
+func SameAccountsIncludingPosition(expected, real *Account) bool {
+	return SameAccounts(expected, real) && expected.Position == real.Position
+}
+
 func SameAccountsWithDifferentOperable(expected, real *Account, expectedOperableValue AccountOperable) bool {
 	return SameAccounts(expected, real) && real.Operable == expectedOperableValue
 }

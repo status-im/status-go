@@ -2601,6 +2601,11 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		return err
 	}
 
+	err = m.syncAccountsPositions(rawMessageHandler)
+	if err != nil {
+		return err
+	}
+
 	return m.syncSocialLinks(context.Background(), rawMessageHandler)
 }
 

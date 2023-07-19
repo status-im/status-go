@@ -362,7 +362,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	s.Require().NoError(err)
 	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
 	for i := 0; i < len(woAccounts); i++ {
-		s.Require().True(accounts.SameAccounts(woAccounts[i], dbAccounts[i+1]))
+		s.Require().True(accounts.SameAccountsIncludingPosition(woAccounts[i], dbAccounts[i+1]))
 	}
 
 	// Sync between devices is triggered automatically
@@ -384,7 +384,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	s.Require().NoError(err)
 	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
 	for i := 0; i < len(woAccounts); i++ {
-		s.Require().True(accounts.SameAccounts(woAccounts[i], dbAccounts[i+1]))
+		s.Require().True(accounts.SameAccountsIncludingPosition(woAccounts[i], dbAccounts[i+1]))
 	}
 
 	// compare times
@@ -412,7 +412,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	s.Require().NoError(err)
 	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
 	for i := 0; i < len(woAccounts); i++ {
-		s.Require().True(accounts.SameAccounts(woAccounts[i], dbAccounts[i+1]))
+		s.Require().True(accounts.SameAccountsIncludingPosition(woAccounts[i], dbAccounts[i+1]))
 	}
 
 	// Sync between devices is triggered automatically
@@ -434,7 +434,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	s.Require().NoError(err)
 	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
 	for i := 0; i < len(woAccounts); i++ {
-		s.Require().True(accounts.SameAccounts(woAccounts[i], dbAccounts[i+1]))
+		s.Require().True(accounts.SameAccountsIncludingPosition(woAccounts[i], dbAccounts[i+1]))
 	}
 
 	// compare times
@@ -443,4 +443,179 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	dbClockOtherDevice, err = s.m.settings.GetClockOfLastAccountsPositionChange()
 	s.Require().NoError(err)
 	s.Require().Equal(dbClock, dbClockOtherDevice)
+}
+
+func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
+	profileKp := accounts.GetProfileKeypairForTest(true, true, true)
+	// set clocks for accounts
+	profileKp.Clock = uint64(len(profileKp.Accounts) - 1)
+	i := -1
+	for _, acc := range profileKp.Accounts {
+		acc.Clock = uint64(i + 1)
+		acc.Position = int64(i)
+		acc.Operable = accounts.AccountNonOperable
+		i++
+	}
+
+	// Create a main account on alice
+	err := s.m.settings.SaveOrUpdateKeypair(profileKp)
+	s.Require().NoError(err, "profile keypair alice.settings.SaveOrUpdateKeypair")
+	// Store seed phrase keypair with accounts on alice's device
+	seedPhraseKp := accounts.GetSeedImportedKeypair1ForTest()
+	for _, acc := range seedPhraseKp.Accounts {
+		acc.Clock = uint64(i + 1)
+		acc.Position = int64(i)
+		acc.Operable = accounts.AccountNonOperable
+		i++
+	}
+	err = s.m.settings.SaveOrUpdateKeypair(seedPhraseKp)
+	s.Require().NoError(err, "seed phrase keypair alice.settings.SaveOrUpdateKeypair")
+	// Store private key keypair with accounts on alice's device
+	privKeyKp := accounts.GetPrivKeyImportedKeypairForTest()
+	for _, acc := range privKeyKp.Accounts {
+		acc.Clock = uint64(i + 1)
+		acc.Position = int64(i)
+		acc.Operable = accounts.AccountNonOperable
+		i++
+	}
+	err = s.m.settings.SaveOrUpdateKeypair(privKeyKp)
+	s.Require().NoError(err, "private key keypair alice.settings.SaveOrUpdateKeypair")
+	// Store watch only accounts on alice's device
+	woAccounts := accounts.GetWatchOnlyAccountsForTest()
+	for _, acc := range woAccounts {
+		acc.Clock = uint64(i + 1)
+		acc.Position = int64(i)
+		acc.Operable = accounts.AccountFullyOperable
+		i++
+	}
+	err = s.m.settings.SaveOrUpdateAccounts(woAccounts, false)
+	s.Require().NoError(err)
+	// Check accounts
+	dbAccounts1, err := s.m.settings.GetAccounts()
+	s.Require().NoError(err)
+	totalNumOfAccounts := len(profileKp.Accounts) + len(seedPhraseKp.Accounts) + len(privKeyKp.Accounts) + len(woAccounts)
+	s.Require().Equal(totalNumOfAccounts, len(dbAccounts1))
+
+	// Create new device and add main account to
+	alicesOtherDevice, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, nil)
+	s.Require().NoError(err)
+	// Store only chat and default wallet account on other device
+	profileKpOtherDevice := accounts.GetProfileKeypairForTest(true, true, false)
+	err = alicesOtherDevice.settings.SaveOrUpdateKeypair(profileKpOtherDevice)
+	s.Require().NoError(err, "profile keypair alicesOtherDevice.settings.SaveOrUpdateKeypair")
+
+	// Pair devices
+	im1 := &multidevice.InstallationMetadata{
+		Name:       "alice's-other-device",
+		DeviceType: "alice's-other-device-type",
+	}
+	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, im1)
+	s.Require().NoError(err)
+	response, err := alicesOtherDevice.SendPairInstallation(context.Background(), nil)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().False(response.Chats()[0].Active)
+
+	// Wait for the message to reach its destination
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Installations) > 0 },
+		"installation not received",
+	)
+
+	s.Require().NoError(err)
+	actualInstallation := response.Installations[0]
+	s.Require().Equal(alicesOtherDevice.installationID, actualInstallation.ID)
+	s.Require().NotNil(actualInstallation.InstallationMetadata)
+	s.Require().Equal("alice's-other-device", actualInstallation.InstallationMetadata.Name)
+	s.Require().Equal("alice's-other-device-type", actualInstallation.InstallationMetadata.DeviceType)
+
+	err = s.m.EnableInstallation(alicesOtherDevice.installationID)
+	s.Require().NoError(err)
+
+	// Trigger's a sync between devices
+	err = s.m.SyncDevices(context.Background(), "ens-name", "profile-image", nil)
+	s.Require().NoError(err)
+
+	err = tt.RetryWithBackOff(func() error {
+		response, err := alicesOtherDevice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(response.Keypairs) != 3 || // 3 keypairs (profile, seed, priv key)
+			len(response.WatchOnlyAccounts) != len(woAccounts) ||
+			len(response.AccountsPositions) != totalNumOfAccounts-1 /* we don't include chat account in position ordering*/ {
+			return errors.New("no sync wallet account received")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+
+	dbAccounts2, err := alicesOtherDevice.settings.GetAccounts()
+	s.Require().NoError(err)
+	s.Require().Equal(totalNumOfAccounts, len(dbAccounts2))
+
+	s.Require().True(haveSameElements(dbAccounts1, dbAccounts2, accounts.SameAccountsIncludingPosition))
+
+	// Delete keypair related account on alice's primary device
+	accToDelete := seedPhraseKp.Accounts[1]
+	err = s.m.DeleteAccount(accToDelete.Address)
+	s.Require().NoError(err, "delete account on alice primary device")
+
+	totalNumOfAccounts-- //one acc less
+
+	err = tt.RetryWithBackOff(func() error {
+		response, err := alicesOtherDevice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(response.Keypairs) != 1 {
+			return errors.New("no sync keypairs received")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+
+	dbAccounts1, err = s.m.settings.GetAccounts()
+	s.Require().NoError(err)
+	s.Require().Equal(totalNumOfAccounts, len(dbAccounts1))
+
+	dbAccounts2, err = alicesOtherDevice.settings.GetAccounts()
+	s.Require().NoError(err)
+	s.Require().Equal(totalNumOfAccounts, len(dbAccounts2))
+
+	s.Require().True(haveSameElements(dbAccounts1, dbAccounts2, accounts.SameAccountsIncludingPosition))
+
+	// Delete watch only account on alice's primary device
+	accToDelete = woAccounts[1]
+	err = s.m.DeleteAccount(accToDelete.Address)
+	s.Require().NoError(err, "delete account on alice primary device")
+
+	totalNumOfAccounts-- //one acc less
+
+	err = tt.RetryWithBackOff(func() error {
+		response, err := alicesOtherDevice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if len(response.WatchOnlyAccounts) != 1 {
+			return errors.New("no sync keypairs received")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+
+	dbAccounts1, err = s.m.settings.GetAccounts()
+	s.Require().NoError(err)
+	s.Require().Equal(totalNumOfAccounts, len(dbAccounts1))
+
+	dbAccounts2, err = alicesOtherDevice.settings.GetAccounts()
+	s.Require().NoError(err)
+	s.Require().Equal(totalNumOfAccounts, len(dbAccounts2))
+
+	s.Require().True(haveSameElements(dbAccounts1, dbAccounts2, accounts.SameAccountsIncludingPosition))
 }
