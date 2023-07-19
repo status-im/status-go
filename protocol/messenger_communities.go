@@ -2542,20 +2542,6 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		}
 	}
 
-	// associate private key with community if set
-	if syncCommunity.PrivateKey != nil {
-		orgPrivKey, err := crypto.ToECDSA(syncCommunity.PrivateKey)
-		if err != nil {
-			logger.Debug("crypto.ToECDSA", zap.Error(err))
-			return err
-		}
-		err = m.communitiesManager.SetPrivateKey(syncCommunity.Id, orgPrivKey)
-		if err != nil {
-			logger.Debug("m.communitiesManager.SetPrivateKey", zap.Error(err))
-			return err
-		}
-	}
-
 	// if we are not waiting for approval, join or leave the community
 	if !pending {
 		var mr *MessengerResponse

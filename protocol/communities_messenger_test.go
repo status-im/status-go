@@ -2507,7 +2507,11 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	s.Equal(newCommunity.Name(), tnc.Name())
 	s.Equal(newCommunity.DescriptionText(), tnc.DescriptionText())
 	s.Equal(newCommunity.IDString(), tnc.IDString())
-	s.Equal(newCommunity.PrivateKey(), tnc.PrivateKey())
+
+	// Private Key for synced community should be null
+	s.Require().NotNil(newCommunity.PrivateKey())
+	s.Require().Nil(tnc.PrivateKey())
+
 	s.Equal(newCommunity.PublicKey(), tnc.PublicKey())
 	s.Equal(newCommunity.Verified(), tnc.Verified())
 	s.Equal(newCommunity.Muted(), tnc.Muted())
