@@ -305,6 +305,14 @@ func (api *PublicAPI) UnmuteCommunityCategory(communityID string, categoryID str
 	return api.service.messenger.SetMutePropertyOnChatsByCategory(&requests.MuteCategory{CommunityID: communityID, CategoryID: categoryID, MutedType: protocol.Unmuted}, false)
 }
 
+func (api *PublicAPI) MuteCommunityChats(request *requests.MuteCommunity) (time.Time, error) {
+	return api.service.messenger.MuteAllCommunityChats(request)
+}
+
+func (api *PublicAPI) UnMuteCommunityChats(communityID string) (time.Time, error) {
+	return api.service.messenger.UnMuteAllCommunityChats(communityID)
+}
+
 func (api *PublicAPI) MuteChatV2(parent context.Context, request *requests.MuteChat) (time.Time, error) {
 	return api.service.messenger.MuteChatV2(request)
 }

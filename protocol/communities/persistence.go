@@ -45,9 +45,8 @@ func (p *Persistence) SaveCommunity(community *Community) error {
 	}
 
 	_, err = p.db.Exec(`
-		INSERT INTO communities_communities (id, private_key, description, joined, spectated, verified) VALUES (?, ?, ?, ?, ?, ?);`,
-		id, crypto.FromECDSA(privateKey), description, community.config.Joined, community.config.Spectated, community.config.Verified)
-
+		INSERT INTO communities_communities (id, private_key, description, joined, spectated, verified, muted, muted_till) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, crypto.FromECDSA(privateKey), description, community.config.Joined, community.config.Spectated, community.config.Verified, community.config.Muted, community.config.MuteTill)
 	return err
 }
 
@@ -764,9 +763,14 @@ func (p *Persistence) UpdateClockInRequestToJoin(id []byte, clock uint64) error 
 	return err
 }
 
-func (p *Persistence) SetMuted(communityID []byte, muted bool, mutedTill time.Time) error {
+func (p *Persistence) SetMuted(communityID []byte, muted bool) error {
+	_, err := p.db.Exec(`UPDATE communities_communities SET muted = ? WHERE id = ?`, muted, communityID)
+	return err
+}
+
+func (p *Persistence) MuteCommunityTill(communityID []byte, mutedTill time.Time) error {
 	mutedTillFormatted := mutedTill.Format(time.RFC3339)
-	_, err := p.db.Exec(`UPDATE communities_communities SET muted = ?, muted_till = ? WHERE id = ?`, muted, mutedTillFormatted, communityID)
+	_, err := p.db.Exec(`UPDATE communities_communities SET muted_till = ? WHERE id = ?`, mutedTillFormatted, communityID)
 	return err
 }
 

@@ -60,6 +60,8 @@ func (s *PersistenceSuite) TestSaveCommunity() {
 			Joined:               true,
 			Spectated:            true,
 			Verified:             true,
+			Muted:                true,
+			MuteTill:             time.Time{},
 			CommunityDescription: &protobuf.CommunityDescription{},
 		},
 	}
@@ -72,6 +74,8 @@ func (s *PersistenceSuite) TestSaveCommunity() {
 	s.Equal(true, communities[1].Joined())
 	s.Equal(true, communities[1].Spectated())
 	s.Equal(true, communities[1].Verified())
+	s.Equal(true, communities[1].Muted())
+	s.Equal(time.Time{}, communities[1].MuteTill())
 }
 
 func (s *PersistenceSuite) TestShouldHandleSyncCommunity() {

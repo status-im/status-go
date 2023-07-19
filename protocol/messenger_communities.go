@@ -335,25 +335,47 @@ func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
 	}()
 }
 
-func (m *Messenger) CheckCommunitiesToUnmute(response *MessengerResponse) error {
+func (m *Messenger) CheckCommunitiesToUnmute() (*MessengerResponse, error) {
 	m.logger.Debug("watching communities to unmute")
+	response := &MessengerResponse{}
 	communities, err := m.communitiesManager.All()
 	if err != nil {
-		return fmt.Errorf("couldn't get all communities: %v", err)
+		return nil, fmt.Errorf("couldn't get all communities: %v", err)
 	}
 	for _, community := range communities {
-		communityMuteTill, _ := time.Parse(time.RFC3339, community.MuteTill().Format(time.RFC3339))
-		currTime, _ := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+		communityMuteTill, err := time.Parse(time.RFC3339, community.MuteTill().Format(time.RFC3339))
+		if err != nil {
+			return nil, err
+		}
+		currTime, err := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+		if err != nil {
+			return nil, err
+		}
+
 		if currTime.After(communityMuteTill) && !communityMuteTill.Equal(time.Time{}) && community.Muted() {
-			err := m.communitiesManager.SetMuted(community.ID(), false, time.Time{})
+			err := m.communitiesManager.SetMuted(community.ID(), false)
 			if err != nil {
 				m.logger.Info("CheckCommunitiesToUnmute err", zap.Any("Couldn't unmute community", err))
 				break
 			}
-			response.AddCommunity(community)
+
+			err = m.MuteCommunityTill(community.ID(), time.Time{})
+			if err != nil {
+				m.logger.Info("MuteCommunityTill err", zap.Any("Could not set mute community till", err))
+				break
+			}
+
+			unmutedCommunity, err := m.communitiesManager.GetByID(community.ID())
+			if err != nil {
+				return nil, err
+			}
+			response.AddCommunity(unmutedCommunity)
+
 		}
+
 	}
-	return nil
+
+	return response, nil
 }
 
 func (m *Messenger) updateCommunityActiveMembers(communityID string) error {
@@ -608,16 +630,10 @@ func (m *Messenger) SpectateCommunity(communityID types.HexBytes) (*MessengerRes
 	return response, nil
 }
 
-func (m *Messenger) SetMuted(request *requests.MuteCommunity) error {
-	if err := request.Validate(); err != nil {
-		return err
-	}
-	if request.MutedType == Unmuted {
-		return m.communitiesManager.SetMuted(request.CommunityID, false, time.Time{})
-	}
+func (m *Messenger) MuteDuration(mutedType requests.MutingVariation) (time.Time, error) {
 	var MuteTill time.Time
 
-	switch request.MutedType {
+	switch mutedType {
 	case MuteTill1Min:
 		MuteTill = time.Now().Add(MuteFor1MinDuration)
 	case MuteFor15Min:
@@ -631,12 +647,83 @@ func (m *Messenger) SetMuted(request *requests.MuteCommunity) error {
 	default:
 		MuteTill = time.Time{}
 	}
-	muteTillTimeRemoveMs, err := time.Parse(time.RFC3339, MuteTill.Format(time.RFC3339))
 
+	muteTillTimeRemoveMs, err := time.Parse(time.RFC3339, MuteTill.Format(time.RFC3339))
 	if err != nil {
+		return time.Time{}, err
+	}
+
+	return muteTillTimeRemoveMs, nil
+}
+
+func (m *Messenger) SetMuted(request *requests.MuteCommunity) error {
+	if err := request.Validate(); err != nil {
 		return err
 	}
-	return m.communitiesManager.SetMuted(request.CommunityID, true, muteTillTimeRemoveMs)
+
+	if request.MutedType == Unmuted {
+		return m.communitiesManager.SetMuted(request.CommunityID, false)
+	}
+
+	return m.communitiesManager.SetMuted(request.CommunityID, true)
+}
+
+func (m *Messenger) MuteCommunityTill(communityID []byte, muteTill time.Time) error {
+	return m.communitiesManager.MuteCommunityTill(communityID, muteTill)
+}
+
+func (m *Messenger) MuteAllCommunityChats(request *requests.MuteCommunity) (time.Time, error) {
+	return m.UpdateMuteCommunityStatus(request.CommunityID.String(), true, request.MutedType)
+}
+
+func (m *Messenger) UnMuteAllCommunityChats(communityID string) (time.Time, error) {
+	return m.UpdateMuteCommunityStatus(communityID, false, Unmuted)
+}
+
+func (m *Messenger) UpdateMuteCommunityStatus(communityID string, muted bool, mutedType requests.MutingVariation) (time.Time, error) {
+	community, err := m.communitiesManager.GetByIDString(communityID)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	request := &requests.MuteCommunity{
+		CommunityID: community.ID(),
+		MutedType:   mutedType,
+	}
+
+	err = m.SetMuted(request)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	muteTill, err := m.MuteDuration(mutedType)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	err = m.MuteCommunityTill(community.ID(), muteTill)
+
+	for _, chatID := range community.CommunityChatsIDs() {
+		if muted {
+			_, err := m.MuteChat(&requests.MuteChat{ChatID: communityID + chatID, MutedType: mutedType})
+			if err != nil {
+				return time.Time{}, err
+			}
+
+		} else {
+			err = m.UnmuteChat(communityID + chatID)
+			if err != nil {
+				return time.Time{}, err
+			}
+
+		}
+
+		if err != nil {
+			return time.Time{}, err
+		}
+	}
+
+	return muteTill, err
 }
 
 func (m *Messenger) SetMutePropertyOnChatsByCategory(request *requests.MuteCategory, muted bool) error {
