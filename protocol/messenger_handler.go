@@ -3102,6 +3102,10 @@ func (m *Messenger) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*
 
 		if message.Removed {
 			err = m.settings.DeleteAccount(accAddress, message.Clock)
+			if err != nil {
+				return nil, err
+			}
+			err = m.settings.ResolveAccountsPositions(message.Clock)
 			dbAccount.Removed = true
 			return dbAccount, err
 		}
@@ -3131,7 +3135,9 @@ func (m *Messenger) handleSyncAccountsPositions(message *protobuf.SyncAccountsPo
 		return nil, err
 	}
 
-	if message.Clock <= dbLastUpdate {
+	// Since adding new account updates `ClockOfLastAccountsPositionChange` we should handle account order changes
+	// even they are with the same clock, that ensures the correct order in case of syncing devices.
+	if message.Clock < dbLastUpdate {
 		return nil, ErrTryingToApplyOldWalletAccountsOrder
 	}
 
@@ -3230,10 +3236,21 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.
 
 	// if entire keypair was removed, there is no point to continue
 	if kp.Removed {
+		err = m.settings.ResolveAccountsPositions(message.Clock)
+		if err != nil {
+			return nil, err
+		}
 		return kp, nil
 	}
 
+	// save keypair first
 	err = m.settings.SaveOrUpdateKeypair(kp)
+	if err != nil {
+		return nil, err
+	}
+
+	// then resolve accounts positions, cause some accounts might be removed
+	err = m.settings.ResolveAccountsPositions(message.Clock)
 	if err != nil {
 		return nil, err
 	}
@@ -3248,7 +3265,12 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.
 		kp.Keycards = append(kp.Keycards, &kc)
 	}
 
-	return kp, nil
+	// getting keypair form the db, cause keypair related accounts positions might be changed
+	dbKeypair, err = m.settings.GetKeypairByKeyUID(message.KeyUid)
+	if err != nil {
+		return nil, err
+	}
+	return dbKeypair, nil
 }
 
 func (m *Messenger) HandleSyncAccountsPositions(state *ReceivedMessageState, message protobuf.SyncAccountsPositions) error {

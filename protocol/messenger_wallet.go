@@ -237,7 +237,20 @@ func (m *Messenger) DeleteAccount(address types.Address) error {
 		return err
 	}
 
-	return m.resolveAndSyncKeypairOrJustWalletAccount(acc.KeyUID, acc.Address, clock, m.dispatchMessage)
+	err = m.resolveAndSyncKeypairOrJustWalletAccount(acc.KeyUID, acc.Address, clock, m.dispatchMessage)
+	if err != nil {
+		return err
+	}
+
+	// In case when user deletes an account, we need to send sync message after an account gets deleted,
+	// and then (after that) update the positions of other accoutns. That's needed to handle properly
+	// accounts order on the paired devices.
+	err = m.settings.ResolveAccountsPositions(clock)
+	if err != nil {
+		return err
+	}
+	// Since some keypairs may be received out of expected order, we're aligning that by sending accounts position sync msg.
+	return m.syncAccountsPositions(m.dispatchMessage)
 }
 
 func (m *Messenger) prepareSyncAccountMessage(acc *accounts.Account) *protobuf.SyncAccount {
