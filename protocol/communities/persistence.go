@@ -588,8 +588,8 @@ func (p *Persistence) GetRequestToJoinRevealedAddresses(requestID []byte) ([]*pr
 	for rows.Next() {
 		address := ""
 		chainIDsStr := ""
-		isAirDropAddress := false
-		err := rows.Scan(&address, &chainIDsStr, &isAirDropAddress)
+		var isAirdropAddress sql.NullBool
+		err := rows.Scan(&address, &chainIDsStr, &isAirdropAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -608,7 +608,10 @@ func (p *Persistence) GetRequestToJoinRevealedAddresses(requestID []byte) ([]*pr
 		revealedAccount := &protobuf.RevealedAccount{
 			Address:          address,
 			ChainIds:         chainIDs,
-			IsAirdropAddress: isAirDropAddress,
+			IsAirdropAddress: false,
+		}
+		if isAirdropAddress.Valid {
+			revealedAccount.IsAirdropAddress = isAirdropAddress.Bool
 		}
 		revealedAccounts = append(revealedAccounts, revealedAccount)
 	}
