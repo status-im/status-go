@@ -3085,6 +3085,11 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.
 	if message == nil {
 		return nil, errors.New("handleSyncKeypair receive a nil message")
 	}
+
+	if message.KeyUid == "" {
+		return nil, errors.New("empty KeyUID")
+	}
+
 	dbKeypair, err := m.settings.GetKeypairByKeyUID(message.KeyUid)
 	if err != nil && err != accounts.ErrDbKeypairNotFound {
 		return nil, err
