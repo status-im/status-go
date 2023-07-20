@@ -713,6 +713,11 @@ func (m *Messenger) ToBackground() {
 }
 
 func (m *Messenger) Start() (*MessengerResponse, error) {
+	now := time.Now().UnixMilli()
+	if err := m.settings.CheckAndDeleteExpiredKeypairsAndAccounts(uint64(now)); err != nil {
+		return nil, err
+	}
+
 	m.logger.Info("starting messenger", zap.String("identity", types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))))
 	// Start push notification server
 	if m.pushNotificationServer != nil {
@@ -2559,7 +2564,8 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		}
 	}
 
-	keypairs, err := m.settings.GetKeypairs()
+	// we have to sync deleted keypairs as well
+	keypairs, err := m.settings.GetKeypairs(true)
 	if err != nil {
 		return err
 	}
@@ -2574,7 +2580,8 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		}
 	}
 
-	woAccounts, err := m.settings.GetWatchOnlyAccounts()
+	// we have to sync deleted watch only accounts as well
+	woAccounts, err := m.settings.GetWatchOnlyAccounts(true)
 	if err != nil {
 		return err
 	}

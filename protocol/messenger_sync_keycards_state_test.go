@@ -89,7 +89,7 @@ func (s *MessengerSyncKeycardsStateSuite) SetupTest() {
 	s.Require().NoError(err)
 	err = s.main.settings.SaveOrUpdateKeypair(kp3)
 	s.Require().NoError(err)
-	dbKeypairs, err := s.main.settings.GetKeypairs()
+	dbKeypairs, err := s.main.settings.GetKeypairs(false)
 	s.Require().NoError(err)
 	s.Require().Equal(3, len(dbKeypairs))
 
@@ -103,7 +103,7 @@ func (s *MessengerSyncKeycardsStateSuite) SetupTest() {
 	s.Require().NoError(err)
 	err = s.other.settings.SaveOrUpdateKeypair(kp3)
 	s.Require().NoError(err)
-	dbKeypairs, err = s.other.settings.GetKeypairs()
+	dbKeypairs, err = s.other.settings.GetKeypairs(false)
 	s.Require().NoError(err)
 	s.Require().Equal(3, len(dbKeypairs))
 }

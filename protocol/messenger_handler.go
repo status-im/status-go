@@ -48,7 +48,6 @@ var (
 	ErrTryingToStoreOldWalletAccount         = errors.New("trying to store an old wallet account")
 	ErrTryingToStoreOldKeypair               = errors.New("trying to store an old keypair")
 	ErrSomeFieldsMissingForWalletAccount     = errors.New("some fields are missing for wallet account")
-	ErrTryingToRemoveUnexistingWalletAccount = errors.New("trying to remove an unexisting wallet account")
 	ErrUnknownKeypairForWalletAccount        = errors.New("keypair is not known for the wallet account")
 	ErrInvalidCommunityID                    = errors.New("invalid community id")
 )
@@ -3105,17 +3104,13 @@ func (m *Messenger) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*
 		}
 
 		if message.Removed {
-			err = m.settings.DeleteAccount(accAddress, message.Clock)
+			err = m.settings.RemoveAccount(accAddress, message.Clock)
 			if err != nil {
 				return nil, err
 			}
 			err = m.settings.ResolveAccountsPositions(message.Clock)
 			dbAccount.Removed = true
 			return dbAccount, err
-		}
-	} else {
-		if message.Removed {
-			return nil, ErrTryingToRemoveUnexistingWalletAccount
 		}
 	}
 
@@ -3233,7 +3228,8 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.
 		}
 	}
 
-	err = m.settings.DeleteKeypair(message.KeyUid) // deleting keypair will delete related keycards as well
+	// deleting keypair will delete related keycards as well
+	err = m.settings.RemoveKeypair(message.KeyUid, message.Clock)
 	if err != nil && err != accounts.ErrDbKeypairNotFound {
 		return nil, err
 	}

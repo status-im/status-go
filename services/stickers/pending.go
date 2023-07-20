@@ -80,7 +80,7 @@ func (api *API) ProcessPending(chainID uint64) (pendingChanged StickerPackCollec
 		return nil, err
 	}
 
-	accs, err := api.accountsDB.GetAccounts()
+	accs, err := api.accountsDB.GetAccounts(false)
 	if err != nil {
 		return nil, err
 	}

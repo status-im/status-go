@@ -27,7 +27,7 @@ func (m *Messenger) retrieveWalletBalances() error {
 	if m.walletAPI == nil {
 		m.logger.Warn("wallet api not enabled")
 	}
-	accounts, err := m.settings.GetAccounts()
+	accounts, err := m.settings.GetAccounts(false)
 	if err != nil {
 		return err
 	}
@@ -192,12 +192,7 @@ func (m *Messenger) deleteKeystoreFileForAddress(address types.Address) error {
 
 		lastAcccountOfKeypairWithTheSameKey := len(kp.Accounts) == 1
 
-		knownKeycardsForKeyUID, err := m.settings.GetKeycardsWithSameKeyUID(acc.KeyUID)
-		if err != nil {
-			return err
-		}
-
-		if len(knownKeycardsForKeyUID) == 0 {
+		if len(kp.Keycards) == 0 {
 			err = m.accountsManager.DeleteAccount(address)
 			var e *account.ErrCannotLocateKeyFile
 			if err != nil && !errors.As(err, &e) {
@@ -220,19 +215,27 @@ func (m *Messenger) deleteKeystoreFileForAddress(address types.Address) error {
 }
 
 func (m *Messenger) DeleteAccount(address types.Address) error {
-	err := m.deleteKeystoreFileForAddress(address)
+	acc, err := m.settings.GetAccountByAddress(address)
 	if err != nil {
 		return err
 	}
 
-	acc, err := m.settings.GetAccountByAddress(address)
+	if acc.Chat {
+		return accounts.ErrCannotRemoveProfileAccount
+	}
+
+	if acc.Wallet {
+		return accounts.ErrCannotRemoveDefaultWalletAccount
+	}
+
+	err = m.deleteKeystoreFileForAddress(address)
 	if err != nil {
 		return err
 	}
 
 	clock, _ := m.getLastClockWithRelatedChat()
 
-	err = m.settings.DeleteAccount(address, clock)
+	err = m.settings.RemoveAccount(address, clock)
 	if err != nil {
 		return err
 	}
@@ -243,6 +246,46 @@ func (m *Messenger) DeleteAccount(address types.Address) error {
 	}
 
 	// In case when user deletes an account, we need to send sync message after an account gets deleted,
+	// and then (after that) update the positions of other accoutns. That's needed to handle properly
+	// accounts order on the paired devices.
+	err = m.settings.ResolveAccountsPositions(clock)
+	if err != nil {
+		return err
+	}
+	// Since some keypairs may be received out of expected order, we're aligning that by sending accounts position sync msg.
+	return m.syncAccountsPositions(m.dispatchMessage)
+}
+
+func (m *Messenger) DeleteKeypair(keyUID string) error {
+	kp, err := m.settings.GetKeypairByKeyUID(keyUID)
+	if err != nil {
+		return err
+	}
+
+	if kp.Type == accounts.KeypairTypeProfile {
+		return accounts.ErrCannotRemoveProfileKeypair
+	}
+
+	for _, acc := range kp.Accounts {
+		err = m.deleteKeystoreFileForAddress(acc.Address)
+		if err != nil {
+			return err
+		}
+	}
+
+	clock, _ := m.getLastClockWithRelatedChat()
+
+	err = m.settings.RemoveKeypair(keyUID, clock)
+	if err != nil {
+		return err
+	}
+
+	err = m.resolveAndSyncKeypairOrJustWalletAccount(kp.KeyUID, types.Address{}, clock, m.dispatchMessage)
+	if err != nil {
+		return err
+	}
+
+	// In case when user deletes entire keypair, we need to send sync message after a keypair gets deleted,
 	// and then (after that) update the positions of other accoutns. That's needed to handle properly
 	// accounts order on the paired devices.
 	err = m.settings.ResolveAccountsPositions(clock)
@@ -332,7 +375,7 @@ func (m *Messenger) syncAccountsPositions(rawMessageHandler RawMessageHandler) e
 
 	_, chat := m.getLastClockWithRelatedChat()
 
-	allDbAccounts, err := m.settings.GetAccounts()
+	allDbAccounts, err := m.settings.GetAccounts(false)
 	if err != nil {
 		return err
 	}
@@ -436,34 +479,43 @@ func (m *Messenger) resolveAndSyncKeypairOrJustWalletAccount(keyUID string, addr
 	}
 
 	if keyUID == "" {
-		dbAccount, err := m.settings.GetAccountByAddress(address)
-		if err != nil && err != accounts.ErrDbAccountNotFound {
+		var dbAccount *accounts.Account
+		allDbAccounts, err := m.settings.GetAccounts(true) // removed accounts included
+		if err != nil {
 			return err
 		}
-		if dbAccount == nil {
-			dbAccount = &accounts.Account{
-				Address: address,
-				Clock:   clock,
-				Removed: true,
+
+		for _, acc := range allDbAccounts {
+			if acc.Address == address {
+				dbAccount = acc
+				break
 			}
 		}
+
+		if dbAccount == nil {
+			return accounts.ErrDbAccountNotFound
+		}
+
 		err = m.syncWalletAccount(dbAccount, rawMessageHandler)
 		if err != nil {
 			return err
 		}
 	} else {
-		dbKeypair, err := m.settings.GetKeypairByKeyUID(keyUID)
-		if err != nil && err != accounts.ErrDbKeypairNotFound {
+		var dbKeypair *accounts.Keypair
+		allDbKeypairs, err := m.settings.GetKeypairs(true) // removed keypairs included
+		if err != nil {
 			return err
 		}
 
-		if dbKeypair == nil {
-			// In case entire keypair was removed (happens if user removes the last account for a keypair).
-			dbKeypair = &accounts.Keypair{
-				KeyUID:  keyUID,
-				Clock:   clock,
-				Removed: true,
+		for _, kp := range allDbKeypairs {
+			if kp.KeyUID == keyUID {
+				dbKeypair = kp
+				break
 			}
+		}
+
+		if dbKeypair == nil {
+			return accounts.ErrDbKeypairNotFound
 		}
 
 		err = m.syncKeypair(dbKeypair, rawMessageHandler)

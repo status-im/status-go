@@ -433,7 +433,7 @@ func (api *API) GetDerivedAddressesForMnemonic(ctx context.Context, mnemonic str
 
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)
 func (api *API) getDerivedAddresses(id string, paths []string) ([]*DerivedAddress, error) {
-	addedAccounts, err := api.s.accountsDB.GetAccounts()
+	addedAccounts, err := api.s.accountsDB.GetAccounts(false)
 	if err != nil {
 		return nil, err
 	}
