@@ -201,6 +201,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 	communityItem := struct {
 		ID                          types.HexBytes                                `json:"id"`
 		MemberRole                  protobuf.CommunityMember_Roles                `json:"memberRole"`
+		IsControlNode               bool                                          `json:"isControlNode"`
 		Verified                    bool                                          `json:"verified"`
 		Joined                      bool                                          `json:"joined"`
 		Spectated                   bool                                          `json:"spectated"`
@@ -233,6 +234,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 	}{
 		ID:                          o.ID(),
 		MemberRole:                  o.MemberRole(o.MemberIdentity()),
+		IsControlNode:               o.IsControlNode(),
 		Verified:                    o.config.Verified,
 		Chats:                       make(map[string]CommunityChat),
 		Categories:                  make(map[string]CommunityCategory),
