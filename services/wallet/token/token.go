@@ -184,7 +184,7 @@ func (tm *Manager) LookupToken(chainID *uint64, tokenSymbol string) (token *Toke
 		}
 	} else {
 		network := tm.networkManager.Find(*chainID)
-		if tokenSymbol == network.NativeCurrencySymbol {
+		if network != nil && tokenSymbol == network.NativeCurrencySymbol {
 			return tm.ToToken(network), true
 		}
 		return tm.GetToken(*chainID, tokenSymbol), false
