@@ -645,11 +645,12 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		var dbMtType, dbTrType sql.NullByte
 		var toAddress, fromAddress eth.Address
 		var toAddressDB, ownerAddressDB, contractAddressDB sql.RawBytes
-		var tokenAddress *eth.Address
+		var tokenAddress, contractAddress *eth.Address
 		var aggregatedStatus int
 		var dbTrAmount sql.NullString
 		var dbMtFromAmount, dbMtToAmount, contractType sql.NullString
 		var tokenCode, fromTokenCode, toTokenCode sql.NullString
+		var transferType *TransferType
 		err := rows.Scan(&transferHash, &pendingHash, &chainID, &multiTxID, &timestamp, &dbMtType, &dbTrType, &fromAddress,
 			&toAddressDB, &ownerAddressDB, &dbTrAmount, &dbMtFromAmount, &dbMtToAmount, &aggregatedStatus, &aggregatedCount,
 			&tokenAddress, &tokenCode, &fromTokenCode, &toTokenCode, &outChainIDDB, &inChainIDDB, &contractType, &contractAddressDB)
@@ -660,9 +661,21 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		if len(toAddressDB) > 0 {
 			toAddress = eth.BytesToAddress(toAddressDB)
 		}
+
+		if contractType.Valid {
+			transferType = contractTypeFromDBType(contractType.String)
+		}
+		if len(contractAddressDB) > 0 {
+			contractAddress = new(eth.Address)
+			*contractAddress = eth.BytesToAddress(contractAddressDB)
+		}
+
 		getActivityType := func(trType sql.NullByte) (activityType Type, filteredAddress eth.Address) {
 			if trType.Valid {
 				if trType.Byte == fromTrType {
+					if toAddress == ZeroAddress && transferType != nil && *transferType == TransferTypeEth && contractAddress != nil && *contractAddress != ZeroAddress {
+						return ContractDeploymentAT, fromAddress
+					}
 					return SendAT, fromAddress
 				} else if trType.Byte == toTrType {
 					return ReceiveAT, toAddress
@@ -677,6 +690,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		var tokenOut, tokenIn *Token
 		var outChainID, inChainID *common.ChainID
 		var entry Entry
+
 		if transferHash != nil && chainID.Valid {
 			// Extract activity type: SendAT/ReceiveAT
 			activityType, _ := getActivityType(dbTrType)
@@ -691,6 +705,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 			} else {
 				involvedToken = &Token{TokenType: Native, ChainID: common.ChainID(chainID.Int64)}
 			}
+
 			if activityType == SendAT {
 				tokenOut = involvedToken
 				outChainID = new(common.ChainID)
@@ -772,13 +787,8 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		entry.recipient = &toAddress
 		entry.chainIDOut = outChainID
 		entry.chainIDIn = inChainID
-		if contractType.Valid {
-			entry.transferType = contractTypeFromDBType(contractType.String)
-		}
-		if len(contractAddressDB) > 0 {
-			entry.contractAddress = new(eth.Address)
-			*entry.contractAddress = eth.BytesToAddress(contractAddressDB)
-		}
+		entry.transferType = transferType
+		entry.contractAddress = contractAddress
 
 		entries = append(entries, entry)
 	}

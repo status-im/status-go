@@ -25,6 +25,7 @@ const (
 	BuyAT
 	SwapAT
 	BridgeAT
+	ContractDeploymentAT
 )
 
 func allActivityTypesFilter() []Type {
