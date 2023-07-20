@@ -688,7 +688,7 @@ func TestLoginWithKey(t *testing.T) {
 	b.UpdateRootDataDir(conf.DataDir)
 	require.NoError(t, b.OpenAccounts())
 
-	require.NoError(t, b.StartNodeWithKey(main, "test-pass", keyhex))
+	require.NoError(t, b.StartNodeWithKey(main, "test-pass", keyhex, conf))
 	defer func() {
 		assert.NoError(t, b.Logout())
 		assert.NoError(t, b.StopNode())
