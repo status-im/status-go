@@ -386,7 +386,7 @@ func (o *Community) addNewCommunityEvent(event *CommunityEvent) error {
 		return errors.New("converting CommunityEvent to protobuf failed")
 	}
 
-	// All events must be build on top of the control node CommunityDescription
+	// All events must be built on top of the control node CommunityDescription
 	// If there were no events before, extract CommunityDescription from MarshaledCommunityDescription
 	// and check the signature
 	if o.config.EventsData == nil || len(o.config.EventsData.EventsBaseCommunityDescription) == 0 {
