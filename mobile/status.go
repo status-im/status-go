@@ -440,15 +440,20 @@ func SaveAccountAndLoginWithKeycard(accountData, password, settingsJSON, configJ
 
 // LoginWithKeycard initializes an account with a chat key and encryption key used for PFS.
 // It purges all the previous identities from Whisper, and injects the key as shh identity.
-func LoginWithKeycard(accountData, password, keyHex string) string {
+func LoginWithKeycard(accountData, password, keyHex string, configJSON string) string {
 	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(accountData), &account)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+	var conf params.NodeConfig
+	err = json.Unmarshal([]byte(configJSON), &conf)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
 	api.RunAsync(func() error {
 		log.Debug("start a node with account", "key-uid", account.KeyUID)
-		err := statusBackend.StartNodeWithKey(account, password, keyHex)
+		err := statusBackend.StartNodeWithKey(account, password, keyHex, &conf)
 		if err != nil {
 			log.Error("failed to start a node", "key-uid", account.KeyUID, "error", err)
 			return err

@@ -374,7 +374,7 @@ func (b *GethStatusBackend) setupLogSettings() error {
 // and uses it in application.
 // TODO: we should use a proper struct with optional values instead of duplicating the regular functions
 // with small variants for keycard, this created too many bugs
-func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password string, keyHex string) error {
+func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password string, keyHex string, inputNodeCfg *params.NodeConfig) error {
 	if acc.KDFIterations == 0 {
 		kdfIterations, err := b.multiaccountsDB.GetAccountKDFIterationsNumber(acc.KeyUID)
 		if err != nil {
@@ -389,7 +389,7 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 		return err
 	}
 
-	err = b.loadNodeConfig(nil)
+	err = b.loadNodeConfig(inputNodeCfg)
 	if err != nil {
 		return err
 	}
@@ -449,8 +449,8 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 	return nil
 }
 
-func (b *GethStatusBackend) StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string) error {
-	err := b.startNodeWithKey(acc, password, keyHex)
+func (b *GethStatusBackend) StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string, nodecfg *params.NodeConfig) error {
+	err := b.startNodeWithKey(acc, password, keyHex, nodecfg)
 	if err != nil {
 		// Stop node for clean up
 		_ = b.StopNode()
@@ -1308,7 +1308,7 @@ func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(account multiaccounts
 	if err != nil {
 		return err
 	}
-	return b.StartNodeWithKey(account, password, keyHex)
+	return b.StartNodeWithKey(account, password, keyHex, nodecfg)
 }
 
 // StartNodeWithAccountAndInitialConfig is used after account and config was generated.

@@ -171,6 +171,8 @@ type Messenger struct {
 
 	// flag to disable checking #hasPairedDevices
 	localPairing bool
+	// flag to enable backedup messages processing, false by default
+	processBackedupMessages bool
 }
 
 type connStatus int
@@ -593,6 +595,10 @@ func NewMessenger(
 
 func (m *Messenger) SetP2PServer(server *p2p.Server) {
 	m.server = server
+}
+
+func (m *Messenger) EnableBackedupMessagesProcessing() {
+	m.processBackedupMessages = true
 }
 
 func (m *Messenger) processSentMessages(ids []string) error {
@@ -3781,6 +3787,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.Backup:
+						if !m.processBackedupMessages {
+							continue
+						}
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
 							continue

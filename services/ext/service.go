@@ -173,6 +173,9 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *
 	}
 	s.messenger = messenger
 	s.messenger.SetP2PServer(s.server)
+	if s.config.ProcessBackedupMessages {
+		s.messenger.EnableBackedupMessagesProcessing()
+	}
 	return messenger.Init()
 }
 

@@ -97,7 +97,7 @@ func (s *SyncRawMessageHandler) HandleRawMessage(accountPayload *AccountPayload,
 			if len(accountPayload.chatKey) == 0 {
 				err = s.backend.StartNodeWithAccount(*account, accountPayload.password, nodeConfig)
 			} else {
-				err = s.backend.StartNodeWithKey(*account, accountPayload.password, accountPayload.chatKey)
+				err = s.backend.StartNodeWithKey(*account, accountPayload.password, accountPayload.chatKey, nodeConfig)
 			}
 		} else {
 			accountManager := s.backend.AccountManager()

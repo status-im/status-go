@@ -485,6 +485,9 @@ type NodeConfig struct {
 	PushNotificationServerConfig pushnotificationserver.Config `json:"PushNotificationServerConfig"`
 
 	OutputMessageCSVEnabled bool
+
+	// ProcessBackedupMessages should be set to true when user follows recovery (using seed phrase or keycard) onboarding flow
+	ProcessBackedupMessages bool
 }
 
 type TokenOverride struct {

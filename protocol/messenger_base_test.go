@@ -115,6 +115,8 @@ func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *z
 		return nil, err
 	}
 
+	m.EnableBackedupMessagesProcessing()
+
 	_, err = m.Start()
 	if err != nil {
 		return nil, err
