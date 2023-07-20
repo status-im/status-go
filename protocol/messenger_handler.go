@@ -1414,7 +1414,11 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 		}
 		_, err = m.AcceptRequestToJoinCommunity(accept)
 		if err != nil {
-			return err
+			if err == communities.ErrNoPermissionToJoin {
+				requestToJoin.State = communities.RequestToJoinStateDeclined
+			} else {
+				return err
+			}
 		}
 	}
 
