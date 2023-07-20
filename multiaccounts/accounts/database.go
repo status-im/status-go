@@ -56,22 +56,24 @@ type Keypair struct {
 }
 
 type Account struct {
-	Address   types.Address             `json:"address"`
-	KeyUID    string                    `json:"key-uid"`
-	Wallet    bool                      `json:"wallet"`
-	Chat      bool                      `json:"chat"`
-	Type      AccountType               `json:"type,omitempty"`
-	Path      string                    `json:"path,omitempty"`
-	PublicKey types.HexBytes            `json:"public-key,omitempty"`
-	Name      string                    `json:"name"`
-	Emoji     string                    `json:"emoji"`
-	ColorID   common.CustomizationColor `json:"colorId,omitempty"`
-	Hidden    bool                      `json:"hidden"`
-	Clock     uint64                    `json:"clock,omitempty"`
-	Removed   bool                      `json:"removed,omitempty"`
-	Operable  AccountOperable           `json:"operable"` // describes an account's operability (read an explanation at the top of this file)
-	CreatedAt int64                     `json:"createdAt"`
-	Position  int64                     `json:"position"`
+	Address               types.Address             `json:"address"`
+	KeyUID                string                    `json:"key-uid"`
+	Wallet                bool                      `json:"wallet"`
+	Chat                  bool                      `json:"chat"`
+	Type                  AccountType               `json:"type,omitempty"`
+	Path                  string                    `json:"path,omitempty"`
+	PublicKey             types.HexBytes            `json:"public-key,omitempty"`
+	Name                  string                    `json:"name"`
+	Emoji                 string                    `json:"emoji"`
+	ColorID               common.CustomizationColor `json:"colorId,omitempty"`
+	Hidden                bool                      `json:"hidden"`
+	Clock                 uint64                    `json:"clock,omitempty"`
+	Removed               bool                      `json:"removed,omitempty"`
+	Operable              AccountOperable           `json:"operable"` // describes an account's operability (read an explanation at the top of this file)
+	CreatedAt             int64                     `json:"createdAt"`
+	Position              int64                     `json:"position"`
+	ProdPreferredChainIDs string                    `json:"prodPreferredChainIds"`
+	TestPreferredChainIDs string                    `json:"testPreferredChainIds"`
 }
 
 type KeypairType string
@@ -107,6 +109,9 @@ const (
 	AccountNonOperable       AccountOperable = "no"        // an account is non operable it is not a keycard account and there is no keystore file for it and no keystore file for the address it is derived from
 	AccountPartiallyOperable AccountOperable = "partially" // an account is partially operable if it is not a keycard account and there is created keystore file for the address it is derived from
 	AccountFullyOperable     AccountOperable = "fully"     // an account is fully operable if it is not a keycard account and there is a keystore file for it
+
+	ProdPreferredChainIDsDefault = "1:10:42161"
+	TestPreferredChainIDsDefault = "5:420:421613"
 )
 
 // IsOwnAccount returns true if this is an account we have the private key for
@@ -118,41 +123,45 @@ func (a *Account) IsOwnAccount() bool {
 
 func (a *Account) MarshalJSON() ([]byte, error) {
 	item := struct {
-		Address          types.Address             `json:"address"`
-		MixedcaseAddress string                    `json:"mixedcase-address"`
-		KeyUID           string                    `json:"key-uid"`
-		Wallet           bool                      `json:"wallet"`
-		Chat             bool                      `json:"chat"`
-		Type             AccountType               `json:"type"`
-		Path             string                    `json:"path"`
-		PublicKey        types.HexBytes            `json:"public-key"`
-		Name             string                    `json:"name"`
-		Emoji            string                    `json:"emoji"`
-		ColorID          common.CustomizationColor `json:"colorId"`
-		Hidden           bool                      `json:"hidden"`
-		Clock            uint64                    `json:"clock"`
-		Removed          bool                      `json:"removed"`
-		Operable         AccountOperable           `json:"operable"`
-		CreatedAt        int64                     `json:"createdAt"`
-		Position         int64                     `json:"position"`
+		Address               types.Address             `json:"address"`
+		MixedcaseAddress      string                    `json:"mixedcase-address"`
+		KeyUID                string                    `json:"key-uid"`
+		Wallet                bool                      `json:"wallet"`
+		Chat                  bool                      `json:"chat"`
+		Type                  AccountType               `json:"type"`
+		Path                  string                    `json:"path"`
+		PublicKey             types.HexBytes            `json:"public-key"`
+		Name                  string                    `json:"name"`
+		Emoji                 string                    `json:"emoji"`
+		ColorID               common.CustomizationColor `json:"colorId"`
+		Hidden                bool                      `json:"hidden"`
+		Clock                 uint64                    `json:"clock"`
+		Removed               bool                      `json:"removed"`
+		Operable              AccountOperable           `json:"operable"`
+		CreatedAt             int64                     `json:"createdAt"`
+		Position              int64                     `json:"position"`
+		ProdPreferredChainIDs string                    `json:"prodPreferredChainIds"`
+		TestPreferredChainIDs string                    `json:"testPreferredChainIds"`
 	}{
-		Address:          a.Address,
-		MixedcaseAddress: a.Address.Hex(),
-		KeyUID:           a.KeyUID,
-		Wallet:           a.Wallet,
-		Chat:             a.Chat,
-		Type:             a.Type,
-		Path:             a.Path,
-		PublicKey:        a.PublicKey,
-		Name:             a.Name,
-		Emoji:            a.Emoji,
-		ColorID:          a.ColorID,
-		Hidden:           a.Hidden,
-		Clock:            a.Clock,
-		Removed:          a.Removed,
-		Operable:         a.Operable,
-		CreatedAt:        a.CreatedAt,
-		Position:         a.Position,
+		Address:               a.Address,
+		MixedcaseAddress:      a.Address.Hex(),
+		KeyUID:                a.KeyUID,
+		Wallet:                a.Wallet,
+		Chat:                  a.Chat,
+		Type:                  a.Type,
+		Path:                  a.Path,
+		PublicKey:             a.PublicKey,
+		Name:                  a.Name,
+		Emoji:                 a.Emoji,
+		ColorID:               a.ColorID,
+		Hidden:                a.Hidden,
+		Clock:                 a.Clock,
+		Removed:               a.Removed,
+		Operable:              a.Operable,
+		CreatedAt:             a.CreatedAt,
+		Position:              a.Position,
+		ProdPreferredChainIDs: a.ProdPreferredChainIDs,
+		TestPreferredChainIDs: a.TestPreferredChainIDs,
 	}
 
 	return json.Marshal(item)
@@ -202,22 +211,24 @@ func (a *Keypair) CopyKeypair() *Keypair {
 
 	for i, acc := range a.Accounts {
 		kp.Accounts[i] = &Account{
-			Address:   acc.Address,
-			KeyUID:    acc.KeyUID,
-			Wallet:    acc.Wallet,
-			Chat:      acc.Chat,
-			Type:      acc.Type,
-			Path:      acc.Path,
-			PublicKey: acc.PublicKey,
-			Name:      acc.Name,
-			Emoji:     acc.Emoji,
-			ColorID:   acc.ColorID,
-			Hidden:    acc.Hidden,
-			Clock:     acc.Clock,
-			Removed:   acc.Removed,
-			Operable:  acc.Operable,
-			CreatedAt: acc.CreatedAt,
-			Position:  acc.Position,
+			Address:               acc.Address,
+			KeyUID:                acc.KeyUID,
+			Wallet:                acc.Wallet,
+			Chat:                  acc.Chat,
+			Type:                  acc.Type,
+			Path:                  acc.Path,
+			PublicKey:             acc.PublicKey,
+			Name:                  acc.Name,
+			Emoji:                 acc.Emoji,
+			ColorID:               acc.ColorID,
+			Hidden:                acc.Hidden,
+			Clock:                 acc.Clock,
+			Removed:               acc.Removed,
+			Operable:              acc.Operable,
+			CreatedAt:             acc.CreatedAt,
+			Position:              acc.Position,
+			ProdPreferredChainIDs: acc.ProdPreferredChainIDs,
+			TestPreferredChainIDs: acc.TestPreferredChainIDs,
 		}
 	}
 
@@ -303,20 +314,22 @@ func (db *Database) processRows(rows *sql.Rows) ([]*Keypair, []*Account, error) 
 	)
 
 	var (
-		accAddress   sql.NullString
-		accKeyUID    sql.NullString
-		accPath      sql.NullString
-		accName      sql.NullString
-		accColorID   sql.NullString
-		accEmoji     sql.NullString
-		accWallet    sql.NullBool
-		accChat      sql.NullBool
-		accHidden    sql.NullBool
-		accOperable  sql.NullString
-		accClock     sql.NullInt64
-		accCreatedAt sql.NullTime
-		accPosition  sql.NullInt64
-		accRemoved   sql.NullBool
+		accAddress               sql.NullString
+		accKeyUID                sql.NullString
+		accPath                  sql.NullString
+		accName                  sql.NullString
+		accColorID               sql.NullString
+		accEmoji                 sql.NullString
+		accWallet                sql.NullBool
+		accChat                  sql.NullBool
+		accHidden                sql.NullBool
+		accOperable              sql.NullString
+		accClock                 sql.NullInt64
+		accCreatedAt             sql.NullTime
+		accPosition              sql.NullInt64
+		accRemoved               sql.NullBool
+		accProdPreferredChainIDs sql.NullString
+		accTestPreferredChainIDs sql.NullString
 	)
 
 	for rows.Next() {
@@ -326,7 +339,8 @@ func (db *Database) processRows(rows *sql.Rows) ([]*Keypair, []*Account, error) 
 		err := rows.Scan(
 			&kpKeyUID, &kpName, &kpType, &kpDerivedFrom, &kpLastUsedDerivationIndex, &kpSyncedFrom, &kpClock, &kpRemoved,
 			&accAddress, &accKeyUID, &pubkey, &accPath, &accName, &accColorID, &accEmoji,
-			&accWallet, &accChat, &accHidden, &accOperable, &accClock, &accCreatedAt, &accPosition, &accRemoved)
+			&accWallet, &accChat, &accHidden, &accOperable, &accClock, &accCreatedAt, &accPosition, &accRemoved,
+			&accProdPreferredChainIDs, &accTestPreferredChainIDs)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -395,6 +409,12 @@ func (db *Database) processRows(rows *sql.Rows) ([]*Keypair, []*Account, error) 
 		}
 		if accPosition.Valid {
 			acc.Position = accPosition.Int64
+		}
+		if accProdPreferredChainIDs.Valid {
+			acc.ProdPreferredChainIDs = accProdPreferredChainIDs.String
+		}
+		if accTestPreferredChainIDs.Valid {
+			acc.TestPreferredChainIDs = accTestPreferredChainIDs.String
 		}
 		if lth := len(pubkey); lth > 0 {
 			acc.PublicKey = make(types.HexBytes, lth)
@@ -483,7 +503,9 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string, includeRemoved bool) 
 			ka.clock,
 			ka.created_at,
 			ka.position,
-			ka.removed
+			ka.removed,
+			ka.prod_preferred_chain_ids,
+			ka.test_preferred_chain_ids
 		FROM
 			keypairs k
 		LEFT JOIN
@@ -542,7 +564,6 @@ func (db *Database) getKeypairByKeyUID(tx *sql.Tx, keyUID string) (*Keypair, err
 	if len(keypairs) == 0 {
 		return nil, ErrDbKeypairNotFound
 	}
-
 	return keypairs[0], nil
 }
 
@@ -584,7 +605,9 @@ func (db *Database) getAccounts(tx *sql.Tx, address types.Address, includeRemove
 			ka.clock,
 			ka.created_at,
 			ka.position,
-			ka.removed
+			ka.removed,
+			ka.prod_preferred_chain_ids,
+			ka.test_preferred_chain_ids
 		FROM
 			keypairs_accounts ka
 		LEFT JOIN
@@ -924,6 +947,21 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, update
 			}
 			keyUID = &acc.KeyUID
 		}
+		var exists bool
+		err = tx.QueryRow("SELECT EXISTS (SELECT 1 FROM keypairs_accounts WHERE address = ?)", acc.Address).Scan(&exists)
+		if err != nil {
+			return err
+		}
+
+		// Apply default values if account is new and not a watch only
+		if !exists && acc.Type != AccountTypeWatch {
+			if acc.ProdPreferredChainIDs == "" {
+				acc.ProdPreferredChainIDs = ProdPreferredChainIDsDefault
+			}
+			if acc.TestPreferredChainIDs == "" {
+				acc.TestPreferredChainIDs = TestPreferredChainIDsDefault
+			}
+		}
 
 		_, err = tx.Exec(`
 			INSERT OR IGNORE INTO
@@ -942,12 +980,15 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, update
 				clock = ?,
 				position = ?,
 				updated_at = datetime('now'),
-				removed = ?
+				removed = ?,
+				prod_preferred_chain_ids = ?,
+				test_preferred_chain_ids = ?
 			WHERE
 				address = ?;
 		`,
 			acc.Address, keyUID, acc.PublicKey, acc.Path, acc.Wallet, acc.Chat,
-			acc.Name, acc.ColorID, acc.Emoji, acc.Hidden, acc.Operable, acc.Clock, acc.Position, acc.Removed, acc.Address)
+			acc.Name, acc.ColorID, acc.Emoji, acc.Hidden, acc.Operable, acc.Clock, acc.Position, acc.Removed,
+			acc.ProdPreferredChainIDs, acc.TestPreferredChainIDs, acc.Address)
 
 		if err != nil {
 			return err
