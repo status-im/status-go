@@ -146,12 +146,12 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	woAccounts := accounts.GetWatchOnlyAccountsForTest()
 	err = s.m.settings.SaveOrUpdateAccounts(woAccounts, false)
 	s.Require().NoError(err)
-	dbWoAccounts1, err := s.m.settings.GetWatchOnlyAccounts()
+	dbWoAccounts1, err := s.m.settings.GetWatchOnlyAccounts(false)
 	s.Require().NoError(err)
 	s.Require().Equal(len(woAccounts), len(dbWoAccounts1))
 	s.Require().True(haveSameElements(woAccounts, dbWoAccounts1, accounts.SameAccounts))
 
-	dbAccounts1, err := s.m.settings.GetAccounts()
+	dbAccounts1, err := s.m.settings.GetAccounts(false)
 	s.Require().NoError(err)
 	s.Require().Equal(len(profileKp.Accounts)+len(seedPhraseKp.Accounts)+len(privKeyKp.Accounts)+len(woAccounts), len(dbAccounts1))
 
@@ -206,12 +206,12 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	s.Require().NoError(err)
 	s.Require().True(accounts.SameKeypairsWithDifferentSyncedFrom(privKeyKp, dbPrivKeyKp2, true, "", accounts.AccountNonOperable))
 
-	dbWoAccounts2, err := alicesOtherDevice.settings.GetWatchOnlyAccounts()
+	dbWoAccounts2, err := alicesOtherDevice.settings.GetWatchOnlyAccounts(false)
 	s.Require().NoError(err)
 	s.Require().Equal(len(woAccounts), len(dbWoAccounts2))
 	s.Require().True(haveSameElements(woAccounts, dbWoAccounts2, accounts.SameAccounts))
 
-	dbAccounts2, err := alicesOtherDevice.settings.GetAccounts()
+	dbAccounts2, err := alicesOtherDevice.settings.GetAccounts(false)
 	s.Require().NoError(err)
 	s.Require().Equal(len(profileKp.Accounts)+len(seedPhraseKp.Accounts)+len(privKeyKp.Accounts)+len(woAccounts), len(dbAccounts2))
 
@@ -297,7 +297,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	err = s.m.settings.SaveOrUpdateAccounts(woAccounts, false)
 	s.Require().NoError(err, "wo accounts alice.settings.SaveOrUpdateKeypair")
 
-	dbAccounts, err := s.m.settings.GetAccounts()
+	dbAccounts, err := s.m.settings.GetAccounts(false)
 	s.Require().NoError(err)
 	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
 
@@ -310,7 +310,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	err = alicesOtherDevice.settings.SaveOrUpdateAccounts(woAccounts, false)
 	s.Require().NoError(err, "wo accounts alice.settings.SaveOrUpdateKeypair")
 
-	dbAccounts, err = alicesOtherDevice.settings.GetAccounts()
+	dbAccounts, err = alicesOtherDevice.settings.GetAccounts(false)
 	s.Require().NoError(err)
 	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
 
@@ -358,7 +358,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 		{Address: types.Address{0x16}, Type: accounts.AccountTypeWatch, Position: 5},
 	}
 
-	dbAccounts, err = s.m.settings.GetAccounts()
+	dbAccounts, err = s.m.settings.GetAccounts(false)
 	s.Require().NoError(err)
 	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
 	for i := 0; i < len(woAccounts); i++ {
@@ -380,7 +380,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	s.Require().NoError(err)
 
 	// check on alice's other device
-	dbAccounts, err = alicesOtherDevice.settings.GetAccounts()
+	dbAccounts, err = alicesOtherDevice.settings.GetAccounts(false)
 	s.Require().NoError(err)
 	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
 	for i := 0; i < len(woAccounts); i++ {
@@ -408,7 +408,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 		{Address: types.Address{0x12}, Type: accounts.AccountTypeWatch, Position: 5},
 	}
 
-	dbAccounts, err = s.m.settings.GetAccounts()
+	dbAccounts, err = s.m.settings.GetAccounts(false)
 	s.Require().NoError(err)
 	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
 	for i := 0; i < len(woAccounts); i++ {
@@ -430,7 +430,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountsReorder() {
 	s.Require().NoError(err)
 
 	// check on alice's other device
-	dbAccounts, err = alicesOtherDevice.settings.GetAccounts()
+	dbAccounts, err = alicesOtherDevice.settings.GetAccounts(false)
 	s.Require().NoError(err)
 	s.Require().Equal(len(woAccounts), len(dbAccounts)-1)
 	for i := 0; i < len(woAccounts); i++ {
@@ -491,7 +491,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	err = s.m.settings.SaveOrUpdateAccounts(woAccounts, false)
 	s.Require().NoError(err)
 	// Check accounts
-	dbAccounts1, err := s.m.settings.GetAccounts()
+	dbAccounts1, err := s.m.settings.GetAccounts(false)
 	s.Require().NoError(err)
 	totalNumOfAccounts := len(profileKp.Accounts) + len(seedPhraseKp.Accounts) + len(privKeyKp.Accounts) + len(woAccounts)
 	s.Require().Equal(totalNumOfAccounts, len(dbAccounts1))
@@ -553,7 +553,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	})
 	s.Require().NoError(err)
 
-	dbAccounts2, err := alicesOtherDevice.settings.GetAccounts()
+	dbAccounts2, err := alicesOtherDevice.settings.GetAccounts(false)
 	s.Require().NoError(err)
 	s.Require().Equal(totalNumOfAccounts, len(dbAccounts2))
 
@@ -579,11 +579,11 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	})
 	s.Require().NoError(err)
 
-	dbAccounts1, err = s.m.settings.GetAccounts()
+	dbAccounts1, err = s.m.settings.GetAccounts(false)
 	s.Require().NoError(err)
 	s.Require().Equal(totalNumOfAccounts, len(dbAccounts1))
 
-	dbAccounts2, err = alicesOtherDevice.settings.GetAccounts()
+	dbAccounts2, err = alicesOtherDevice.settings.GetAccounts(false)
 	s.Require().NoError(err)
 	s.Require().Equal(totalNumOfAccounts, len(dbAccounts2))
 
@@ -609,11 +609,11 @@ func (s *MessengerSyncWalletSuite) TestSyncWalletAccountOrderAfterDeletion() {
 	})
 	s.Require().NoError(err)
 
-	dbAccounts1, err = s.m.settings.GetAccounts()
+	dbAccounts1, err = s.m.settings.GetAccounts(false)
 	s.Require().NoError(err)
 	s.Require().Equal(totalNumOfAccounts, len(dbAccounts1))
 
-	dbAccounts2, err = alicesOtherDevice.settings.GetAccounts()
+	dbAccounts2, err = alicesOtherDevice.settings.GetAccounts(false)
 	s.Require().NoError(err)
 	s.Require().Equal(totalNumOfAccounts, len(dbAccounts2))
 

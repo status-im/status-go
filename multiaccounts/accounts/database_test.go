@@ -66,7 +66,7 @@ func TestMoveWalletAccount(t *testing.T) {
 		{Address: types.Address{0x06}, Type: AccountTypeWatch, Position: 5},
 	}
 	require.NoError(t, db.SaveOrUpdateAccounts(accounts, false))
-	dbAccounts, err := db.GetAccounts()
+	dbAccounts, err := db.GetAccounts(false)
 	require.NoError(t, err)
 	require.Len(t, dbAccounts, len(accounts))
 	for i := 0; i < len(accounts); i++ {
@@ -95,7 +95,7 @@ func TestMoveWalletAccount(t *testing.T) {
 		{Address: types.Address{0x06}, Type: AccountTypeWatch, Position: 5},
 	}
 
-	dbAccounts, err = db.GetAccounts()
+	dbAccounts, err = db.GetAccounts(false)
 	require.NoError(t, err)
 	for i := 0; i < len(accounts); i++ {
 		require.True(t, SameAccounts(accounts[i], dbAccounts[i]))
@@ -121,7 +121,7 @@ func TestMoveWalletAccount(t *testing.T) {
 		{Address: types.Address{0x02}, Type: AccountTypeWatch, Position: 5},
 	}
 
-	dbAccounts, err = db.GetAccounts()
+	dbAccounts, err = db.GetAccounts(false)
 	require.NoError(t, err)
 	for i := 0; i < len(accounts); i++ {
 		require.True(t, SameAccounts(accounts[i], dbAccounts[i]))
@@ -184,7 +184,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	defer stop()
 
 	// check the db
-	dbAccounts, err := db.GetAccounts()
+	dbAccounts, err := db.GetAccounts(false)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(dbAccounts))
 
@@ -197,7 +197,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	require.Error(t, err)
 
 	// check the db after that trying to save keypair with watch only accounts
-	dbAccounts, err = db.GetAccounts()
+	dbAccounts, err = db.GetAccounts(false)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(dbAccounts))
 
@@ -207,7 +207,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	_, err = db.GetKeypairByKeyUID(woAccounts[0].KeyUID)
 	require.Error(t, err)
 	require.True(t, err == ErrDbKeypairNotFound)
-	dbAccounts, err = db.GetAccounts()
+	dbAccounts, err = db.GetAccounts(false)
 	require.NoError(t, err)
 	require.Equal(t, len(woAccounts), len(dbAccounts))
 	require.Equal(t, woAccounts[0].Address, dbAccounts[0].Address)
@@ -215,7 +215,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	// try to save the same watch only account again
 	err = db.SaveOrUpdateAccounts(woAccounts[:1], false)
 	require.NoError(t, err)
-	dbAccounts, err = db.GetAccounts()
+	dbAccounts, err = db.GetAccounts(false)
 	require.NoError(t, err)
 	require.Equal(t, len(woAccounts), len(dbAccounts))
 	dbAcc, err := db.GetAccountByAddress(woAccounts[:1][0].Address)
@@ -232,7 +232,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	}
 	err = db.SaveOrUpdateAccounts([]*Account{wo4}, false)
 	require.NoError(t, err)
-	dbAccounts, err = db.GetAccounts()
+	dbAccounts, err = db.GetAccounts(false)
 	require.NoError(t, err)
 	require.Equal(t, len(woAccounts)+1, len(dbAccounts))
 	dbAcc, err = db.GetAccountByAddress(wo4.Address)
@@ -245,7 +245,7 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	wo4.Emoji = wo4.Emoji + "updated"
 	err = db.SaveOrUpdateAccounts([]*Account{wo4}, false)
 	require.NoError(t, err)
-	dbAccounts, err = db.GetAccounts()
+	dbAccounts, err = db.GetAccounts(false)
 	require.NoError(t, err)
 	require.Equal(t, len(woAccounts)+1, len(dbAccounts))
 	dbAcc, err = db.GetAccountByAddress(wo4.Address)
@@ -253,14 +253,14 @@ func TestWatchOnlyAccounts(t *testing.T) {
 	require.Equal(t, wo4.Address, dbAcc.Address)
 
 	// try to delete keypair for watch only account
-	err = db.DeleteKeypair(wo4.KeyUID)
+	err = db.RemoveKeypair(wo4.KeyUID, 0)
 	require.Error(t, err)
 	require.True(t, err == ErrDbKeypairNotFound)
 
 	// try to delete watch only account
-	err = db.DeleteAccount(wo4.Address, 0)
+	err = db.RemoveAccount(wo4.Address, 0)
 	require.NoError(t, err)
-	dbAccounts, err = db.GetAccounts()
+	dbAccounts, err = db.GetAccounts(false)
 	require.NoError(t, err)
 	require.Equal(t, len(woAccounts), len(dbAccounts))
 	_, err = db.GetAccountByAddress(wo4.Address)
@@ -275,14 +275,14 @@ func TestUpdateKeypairName(t *testing.T) {
 	kp := GetProfileKeypairForTest(true, false, false)
 
 	// check the db
-	dbAccounts, err := db.GetAccounts()
+	dbAccounts, err := db.GetAccounts(false)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(dbAccounts))
 
 	// save keypair
 	err = db.SaveOrUpdateKeypair(kp)
 	require.NoError(t, err)
-	dbKeypairs, err := db.GetKeypairs()
+	dbKeypairs, err := db.GetKeypairs(false)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(dbKeypairs))
 	require.True(t, SameKeypairs(kp, dbKeypairs[0]))
@@ -313,10 +313,10 @@ func TestKeypairs(t *testing.T) {
 			defer stop()
 
 			// check the db
-			dbKeypairs, err := db.GetKeypairs()
+			dbKeypairs, err := db.GetKeypairs(false)
 			require.NoError(t, err)
 			require.Equal(t, 0, len(dbKeypairs))
-			dbAccounts, err := db.GetAccounts()
+			dbAccounts, err := db.GetAccounts(false)
 			require.NoError(t, err)
 			require.Equal(t, 0, len(dbAccounts))
 
@@ -328,7 +328,7 @@ func TestKeypairs(t *testing.T) {
 			// save keypair
 			err = db.SaveOrUpdateKeypair(kp)
 			require.NoError(t, err)
-			dbKeypairs, err = db.GetKeypairs()
+			dbKeypairs, err = db.GetKeypairs(false)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(dbKeypairs))
 			dbKp, err := db.GetKeypairByKeyUID(kp.KeyUID)
@@ -336,12 +336,12 @@ func TestKeypairs(t *testing.T) {
 			require.Equal(t, len(kp.Accounts), len(dbKp.Accounts))
 			kp.LastUsedDerivationIndex = expectedLastUsedDerivationIndex
 			require.Equal(t, kp.KeyUID, dbKp.KeyUID)
-			dbAccounts, err = db.GetAccounts()
+			dbAccounts, err = db.GetAccounts(false)
 			require.NoError(t, err)
 			require.Equal(t, len(kp.Accounts), len(dbAccounts))
 
 			// delete keypair
-			err = db.DeleteKeypair(kp.KeyUID)
+			err = db.RemoveKeypair(kp.KeyUID, 0)
 			require.NoError(t, err)
 			_, err = db.GetKeypairByKeyUID(kp.KeyUID)
 			require.Error(t, err)
@@ -350,7 +350,7 @@ func TestKeypairs(t *testing.T) {
 			// save keypair again to test the flow below
 			err = db.SaveOrUpdateKeypair(kp)
 			require.NoError(t, err)
-			dbKeypairs, err = db.GetKeypairs()
+			dbKeypairs, err = db.GetKeypairs(false)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(dbKeypairs))
 
@@ -364,7 +364,7 @@ func TestKeypairs(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, len(kp.Accounts), len(dbKp.Accounts))
 			require.Equal(t, kp.KeyUID, dbKp.KeyUID)
-			dbAccounts, err = db.GetAccounts()
+			dbAccounts, err = db.GetAccounts(false)
 			require.NoError(t, err)
 			require.Equal(t, len(kp.Accounts), len(dbAccounts))
 
@@ -378,7 +378,7 @@ func TestKeypairs(t *testing.T) {
 			dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
 			require.NoError(t, err)
 			require.Equal(t, len(kp.Accounts), len(dbKp.Accounts))
-			dbAccounts, err = db.GetAccounts()
+			dbAccounts, err = db.GetAccounts(false)
 			require.NoError(t, err)
 			require.Equal(t, len(kp.Accounts), len(dbAccounts))
 			dbAcc, err := db.GetAccountByAddress(accToUpdate.Address)
@@ -390,7 +390,7 @@ func TestKeypairs(t *testing.T) {
 			kpToUpdate.Name = kpToUpdate.Name + "updated"
 			err = db.SaveOrUpdateKeypair(kp)
 			require.NoError(t, err)
-			dbKeypairs, err = db.GetKeypairs()
+			dbKeypairs, err = db.GetKeypairs(false)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(dbKeypairs))
 			dbKp, err = db.GetKeypairByKeyUID(kp.KeyUID)
@@ -411,7 +411,7 @@ func TestKeypairs(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, len(kp.Accounts)+1, len(dbKp.Accounts))
 			require.Equal(t, kp.LastUsedDerivationIndex, dbKp.LastUsedDerivationIndex)
-			dbAccounts, err = db.GetAccounts()
+			dbAccounts, err = db.GetAccounts(false)
 			require.NoError(t, err)
 			require.Equal(t, len(kp.Accounts)+1, len(dbAccounts))
 			dbAcc, err = db.GetAccountByAddress(accToUpdate.Address)
@@ -440,7 +440,7 @@ func TestKeypairs(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, len(kp.Accounts)+2, len(dbKp.Accounts))
 			require.Equal(t, expectedLastUsedDerivationIndex, dbKp.LastUsedDerivationIndex)
-			dbAccounts, err = db.GetAccounts()
+			dbAccounts, err = db.GetAccounts(false)
 			require.NoError(t, err)
 			require.Equal(t, len(kp.Accounts)+2, len(dbAccounts))
 			dbAcc, err = db.GetAccountByAddress(accToUpdate.Address)
@@ -448,9 +448,9 @@ func TestKeypairs(t *testing.T) {
 			require.Equal(t, accToAdd.Address, dbAcc.Address)
 
 			// delete account
-			err = db.DeleteAccount(accToAdd.Address, 0)
+			err = db.RemoveAccount(accToAdd.Address, 0)
 			require.NoError(t, err)
-			dbAccounts, err = db.GetAccounts()
+			dbAccounts, err = db.GetAccounts(false)
 			require.NoError(t, err)
 			require.Equal(t, len(kp.Accounts)+1, len(dbAccounts))
 			_, err = db.GetAccountByAddress(accToAdd.Address)
@@ -458,7 +458,7 @@ func TestKeypairs(t *testing.T) {
 			require.True(t, err == ErrDbAccountNotFound)
 
 			for _, acc := range dbAccounts {
-				err = db.DeleteAccount(acc.Address, 0)
+				err = db.RemoveAccount(acc.Address, 0)
 				require.NoError(t, err)
 			}
 

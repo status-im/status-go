@@ -81,15 +81,15 @@ func (api *API) MoveWalletAccount(ctx context.Context, fromPosition int64, toPos
 }
 
 func (api *API) GetAccounts(ctx context.Context) ([]*accounts.Account, error) {
-	return api.db.GetAccounts()
+	return api.db.GetAccounts(false)
 }
 
 func (api *API) GetWatchOnlyAccounts(ctx context.Context) ([]*accounts.Account, error) {
-	return api.db.GetWatchOnlyAccounts()
+	return api.db.GetWatchOnlyAccounts(false)
 }
 
 func (api *API) GetKeypairs(ctx context.Context) ([]*accounts.Keypair, error) {
-	return api.db.GetKeypairs()
+	return api.db.GetKeypairs(false)
 }
 
 func (api *API) GetAccountByAddress(ctx context.Context, address types.Address) (*accounts.Account, error) {
@@ -109,6 +109,33 @@ func (api *API) DeleteAccount(ctx context.Context, address types.Address) error 
 	api.feed.Send(accountsevent.Event{
 		Type:     accountsevent.EventTypeRemoved,
 		Accounts: []common.Address{common.Address(address)},
+	})
+
+	return nil
+}
+
+func (api *API) DeleteKeypair(ctx context.Context, keyUID string) error {
+	keypair, err := api.db.GetKeypairByKeyUID(keyUID)
+	if err != nil {
+		return err
+	}
+
+	err = (*api.messenger).DeleteKeypair(keyUID)
+	if err != nil {
+		return err
+	}
+
+	var addresses []common.Address
+	for _, acc := range keypair.Accounts {
+		if acc.Chat {
+			continue
+		}
+		addresses = append(addresses, common.Address(acc.Address))
+	}
+
+	api.feed.Send(accountsevent.Event{
+		Type:     accountsevent.EventTypeRemoved,
+		Accounts: addresses,
 	})
 
 	return nil

@@ -236,6 +236,27 @@ func (db *Database) deleteKeycard(tx *sql.Tx, kcUID string) (err error) {
 	return err
 }
 
+func (db *Database) deleteAllKeycardsWithKeyUID(tx *sql.Tx, keyUID string) (err error) {
+	if tx == nil {
+		return errKeycardDbTransactionIsNil
+	}
+
+	delete, err := tx.Prepare(`
+		DELETE
+		FROM
+			keycards
+		WHERE
+			key_uid = ?
+	`)
+	if err != nil {
+		return err
+	}
+	defer delete.Close()
+
+	_, err = delete.Exec(keyUID)
+	return err
+}
+
 func (db *Database) deleteKeycardAccounts(tx *sql.Tx, kcUID string, accountAddresses []types.Address) (err error) {
 	if tx == nil {
 		return errKeycardDbTransactionIsNil
@@ -435,19 +456,7 @@ func (db *Database) DeleteAllKeycardsWithKeyUID(keyUID string, clock uint64) (er
 		_ = tx.Rollback()
 	}()
 
-	delete, err := tx.Prepare(`
-		DELETE
-		FROM
-			keycards
-		WHERE
-			key_uid = ?
-	`)
-	if err != nil {
-		return err
-	}
-	defer delete.Close()
-
-	_, err = delete.Exec(keyUID)
+	err = db.deleteAllKeycardsWithKeyUID(tx, keyUID)
 	if err != nil {
 		return err
 	}

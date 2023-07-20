@@ -421,7 +421,7 @@ func (m *Messenger) backupProfile(ctx context.Context, clock uint64) ([]*protobu
 }
 
 func (m *Messenger) backupKeypairs() ([]*protobuf.Backup, error) {
-	keypairs, err := m.settings.GetKeypairs()
+	keypairs, err := m.settings.GetKeypairs(false)
 	if err != nil {
 		return nil, err
 	}
@@ -446,7 +446,7 @@ func (m *Messenger) backupKeypairs() ([]*protobuf.Backup, error) {
 }
 
 func (m *Messenger) backupWatchOnlyAccounts() ([]*protobuf.Backup, error) {
-	accounts, err := m.settings.GetWatchOnlyAccounts()
+	accounts, err := m.settings.GetWatchOnlyAccounts(true)
 	if err != nil {
 		return nil, err
 	}
