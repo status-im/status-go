@@ -3024,21 +3024,23 @@ func (m *Messenger) updateUnviewedCounts(chat *Chat, mentionedOrReplied bool) {
 
 func mapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability accounts.AccountOperable, accType accounts.AccountType) *accounts.Account {
 	return &accounts.Account{
-		Address:   types.BytesToAddress(message.Address),
-		KeyUID:    message.KeyUid,
-		PublicKey: types.HexBytes(message.PublicKey),
-		Type:      accType,
-		Path:      message.Path,
-		Name:      message.Name,
-		ColorID:   multiaccountscommon.CustomizationColor(message.ColorId),
-		Emoji:     message.Emoji,
-		Wallet:    message.Wallet,
-		Chat:      message.Chat,
-		Hidden:    message.Hidden,
-		Clock:     message.Clock,
-		Operable:  accountOperability,
-		Removed:   message.Removed,
-		Position:  message.Position,
+		Address:               types.BytesToAddress(message.Address),
+		KeyUID:                message.KeyUid,
+		PublicKey:             types.HexBytes(message.PublicKey),
+		Type:                  accType,
+		Path:                  message.Path,
+		Name:                  message.Name,
+		ColorID:               multiaccountscommon.CustomizationColor(message.ColorId),
+		Emoji:                 message.Emoji,
+		Wallet:                message.Wallet,
+		Chat:                  message.Chat,
+		Hidden:                message.Hidden,
+		Clock:                 message.Clock,
+		Operable:              accountOperability,
+		Removed:               message.Removed,
+		Position:              message.Position,
+		ProdPreferredChainIDs: message.ProdPreferredChainIDs,
+		TestPreferredChainIDs: message.TestPreferredChainIDs,
 	}
 }
 

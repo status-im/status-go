@@ -299,6 +299,8 @@ message SyncAccount {
   bool hidden = 11;
   bool removed = 12;
   int64 position = 13;
+  string prodPreferredChainIDs = 14;
+  string testPreferredChainIDs = 15;
 }
 
 message SyncKeypair {

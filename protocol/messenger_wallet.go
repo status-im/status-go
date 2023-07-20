@@ -298,19 +298,21 @@ func (m *Messenger) DeleteKeypair(keyUID string) error {
 
 func (m *Messenger) prepareSyncAccountMessage(acc *accounts.Account) *protobuf.SyncAccount {
 	return &protobuf.SyncAccount{
-		Clock:     acc.Clock,
-		Address:   acc.Address.Bytes(),
-		KeyUid:    acc.KeyUID,
-		PublicKey: acc.PublicKey,
-		Path:      acc.Path,
-		Name:      acc.Name,
-		ColorId:   string(acc.ColorID),
-		Emoji:     acc.Emoji,
-		Wallet:    acc.Wallet,
-		Chat:      acc.Chat,
-		Hidden:    acc.Hidden,
-		Removed:   acc.Removed,
-		Position:  acc.Position,
+		Clock:                 acc.Clock,
+		Address:               acc.Address.Bytes(),
+		KeyUid:                acc.KeyUID,
+		PublicKey:             acc.PublicKey,
+		Path:                  acc.Path,
+		Name:                  acc.Name,
+		ColorId:               string(acc.ColorID),
+		Emoji:                 acc.Emoji,
+		Wallet:                acc.Wallet,
+		Chat:                  acc.Chat,
+		Hidden:                acc.Hidden,
+		Removed:               acc.Removed,
+		Position:              acc.Position,
+		ProdPreferredChainIDs: acc.ProdPreferredChainIDs,
+		TestPreferredChainIDs: acc.TestPreferredChainIDs,
 	}
 }
 

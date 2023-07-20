@@ -41,35 +41,39 @@ func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccou
 
 	if includeChatAccount {
 		profileAccount := &Account{
-			Address:   types.Address{0x01},
-			KeyUID:    kp.KeyUID,
-			Wallet:    false,
-			Chat:      true,
-			Type:      AccountTypeGenerated,
-			Path:      "m/43'/60'/1581'/0'/0",
-			PublicKey: types.Hex2Bytes("0x000000001"),
-			Name:      "Profile Name",
-			Operable:  AccountFullyOperable,
+			Address:               types.Address{0x01},
+			KeyUID:                kp.KeyUID,
+			Wallet:                false,
+			Chat:                  true,
+			Type:                  AccountTypeGenerated,
+			Path:                  "m/43'/60'/1581'/0'/0",
+			PublicKey:             types.Hex2Bytes("0x000000001"),
+			Name:                  "Profile Name",
+			Operable:              AccountFullyOperable,
+			ProdPreferredChainIDs: "1",
+			TestPreferredChainIDs: "5",
 		}
 		kp.Accounts = append(kp.Accounts, profileAccount)
 	}
 
 	if includeDefaultWalletAccount {
 		defaultWalletAccount := &Account{
-			Address:   types.Address{0x02},
-			KeyUID:    kp.KeyUID,
-			Wallet:    true,
-			Chat:      false,
-			Type:      AccountTypeGenerated,
-			Path:      "m/44'/60'/0'/0/0",
-			PublicKey: types.Hex2Bytes("0x000000002"),
-			Name:      "Generated Acc 1",
-			Emoji:     "emoji-1",
-			ColorID:   common.CustomizationColorPrimary,
-			Hidden:    false,
-			Clock:     0,
-			Removed:   false,
-			Operable:  AccountFullyOperable,
+			Address:               types.Address{0x02},
+			KeyUID:                kp.KeyUID,
+			Wallet:                true,
+			Chat:                  false,
+			Type:                  AccountTypeGenerated,
+			Path:                  "m/44'/60'/0'/0/0",
+			PublicKey:             types.Hex2Bytes("0x000000002"),
+			Name:                  "Generated Acc 1",
+			Emoji:                 "emoji-1",
+			ColorID:               common.CustomizationColorPrimary,
+			Hidden:                false,
+			Clock:                 0,
+			Removed:               false,
+			Operable:              AccountFullyOperable,
+			ProdPreferredChainIDs: "1",
+			TestPreferredChainIDs: "5",
 		}
 		kp.Accounts = append(kp.Accounts, defaultWalletAccount)
 		kp.LastUsedDerivationIndex = 0
@@ -77,39 +81,43 @@ func GetProfileKeypairForTest(includeChatAccount bool, includeDefaultWalletAccou
 
 	if includeAdditionalAccounts {
 		generatedWalletAccount1 := &Account{
-			Address:   types.Address{0x03},
-			KeyUID:    kp.KeyUID,
-			Wallet:    false,
-			Chat:      false,
-			Type:      AccountTypeGenerated,
-			Path:      "m/44'/60'/0'/0/1",
-			PublicKey: types.Hex2Bytes("0x000000003"),
-			Name:      "Generated Acc 2",
-			Emoji:     "emoji-2",
-			ColorID:   common.CustomizationColorPrimary,
-			Hidden:    false,
-			Clock:     0,
-			Removed:   false,
-			Operable:  AccountFullyOperable,
+			Address:               types.Address{0x03},
+			KeyUID:                kp.KeyUID,
+			Wallet:                false,
+			Chat:                  false,
+			Type:                  AccountTypeGenerated,
+			Path:                  "m/44'/60'/0'/0/1",
+			PublicKey:             types.Hex2Bytes("0x000000003"),
+			Name:                  "Generated Acc 2",
+			Emoji:                 "emoji-2",
+			ColorID:               common.CustomizationColorPrimary,
+			Hidden:                false,
+			Clock:                 0,
+			Removed:               false,
+			Operable:              AccountFullyOperable,
+			ProdPreferredChainIDs: "1",
+			TestPreferredChainIDs: "5",
 		}
 		kp.Accounts = append(kp.Accounts, generatedWalletAccount1)
 		kp.LastUsedDerivationIndex = 1
 
 		generatedWalletAccount2 := &Account{
-			Address:   types.Address{0x04},
-			KeyUID:    kp.KeyUID,
-			Wallet:    false,
-			Chat:      false,
-			Type:      AccountTypeGenerated,
-			Path:      "m/44'/60'/0'/0/2",
-			PublicKey: types.Hex2Bytes("0x000000004"),
-			Name:      "Generated Acc 3",
-			Emoji:     "emoji-3",
-			ColorID:   common.CustomizationColorPrimary,
-			Hidden:    false,
-			Clock:     0,
-			Removed:   false,
-			Operable:  AccountFullyOperable,
+			Address:               types.Address{0x04},
+			KeyUID:                kp.KeyUID,
+			Wallet:                false,
+			Chat:                  false,
+			Type:                  AccountTypeGenerated,
+			Path:                  "m/44'/60'/0'/0/2",
+			PublicKey:             types.Hex2Bytes("0x000000004"),
+			Name:                  "Generated Acc 3",
+			Emoji:                 "emoji-3",
+			ColorID:               common.CustomizationColorPrimary,
+			Hidden:                false,
+			Clock:                 0,
+			Removed:               false,
+			Operable:              AccountFullyOperable,
+			ProdPreferredChainIDs: "1",
+			TestPreferredChainIDs: "5",
 		}
 		kp.Accounts = append(kp.Accounts, generatedWalletAccount2)
 		kp.LastUsedDerivationIndex = 2
@@ -324,7 +332,9 @@ func SameAccounts(expected, real *Account) bool {
 		expected.ColorID == real.ColorID &&
 		expected.Hidden == real.Hidden &&
 		expected.Clock == real.Clock &&
-		expected.Removed == real.Removed
+		expected.Removed == real.Removed &&
+		expected.ProdPreferredChainIDs == real.ProdPreferredChainIDs &&
+		expected.TestPreferredChainIDs == real.TestPreferredChainIDs
 }
 
 func SameAccountsIncludingPosition(expected, real *Account) bool {
