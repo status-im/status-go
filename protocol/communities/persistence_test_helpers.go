@@ -20,7 +20,6 @@ type RawCommunityRow struct {
 func fromSyncCommunityProtobuf(syncCommProto *protobuf.SyncCommunity) RawCommunityRow {
 	return RawCommunityRow{
 		ID:          syncCommProto.Id,
-		PrivateKey:  syncCommProto.PrivateKey,
 		Description: syncCommProto.Description,
 		Joined:      syncCommProto.Joined,
 		Spectated:   syncCommProto.Spectated,

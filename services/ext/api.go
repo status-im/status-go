@@ -430,6 +430,11 @@ func (api *PublicAPI) EditCommunity(request *requests.EditCommunity) (*protocol.
 	return api.service.messenger.EditCommunity(request)
 }
 
+// RemovePrivateKey removes the private key of the community with given ID
+func (api *PublicAPI) RemovePrivateKey(id types.HexBytes) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RemovePrivateKey(id)
+}
+
 // ExportCommunity exports the private key of the community with given ID
 func (api *PublicAPI) ExportCommunity(id types.HexBytes) (types.HexBytes, error) {
 	key, err := api.service.messenger.ExportCommunity(id)

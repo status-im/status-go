@@ -171,7 +171,7 @@ func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communi
 						m.logger.Debug("failed to retrieve community by id string", zap.Error(err))
 					}
 
-					if c.IsOwner() {
+					if c.IsControlNode() {
 						err := m.dispatchMagnetlinkMessage(sub.HistoryArchivesSeedingSignal.CommunityID)
 						if err != nil {
 							m.logger.Debug("failed to dispatch magnetlink message", zap.Error(err))
@@ -480,7 +480,7 @@ func (m *Messenger) initCommunityChats(community *communities.Community) ([]*Cha
 		return nil, err
 	}
 
-	if community.IsOwner() {
+	if community.IsControlNode() {
 		// Init the community filter so we can receive messages on the community
 		communityFilters, err := m.transport.InitCommunityFilters([]*ecdsa.PrivateKey{community.PrivateKey()})
 		if err != nil {
@@ -1808,6 +1808,18 @@ func (m *Messenger) EditCommunity(request *requests.EditCommunity) (*MessengerRe
 	return response, nil
 }
 
+func (m *Messenger) RemovePrivateKey(id types.HexBytes) (*MessengerResponse, error) {
+	community, err := m.communitiesManager.RemovePrivateKey(id)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+
+	return response, nil
+}
+
 func (m *Messenger) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error) {
 	return m.communitiesManager.ExportCommunity(id)
 }
@@ -2526,20 +2538,6 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		err = m.handleSyncCommunitySettings(messageState, *syncCommunity.Settings)
 		if err != nil {
 			logger.Debug("m.handleSyncCommunitySettings error", zap.Error(err))
-			return err
-		}
-	}
-
-	// associate private key with community if set
-	if syncCommunity.PrivateKey != nil {
-		orgPrivKey, err := crypto.ToECDSA(syncCommunity.PrivateKey)
-		if err != nil {
-			logger.Debug("crypto.ToECDSA", zap.Error(err))
-			return err
-		}
-		err = m.communitiesManager.SetPrivateKey(syncCommunity.Id, orgPrivKey)
-		if err != nil {
-			logger.Debug("m.communitiesManager.SetPrivateKey", zap.Error(err))
 			return err
 		}
 	}

@@ -138,7 +138,8 @@ message SyncInstallationPublicChat {
 message SyncCommunity {
   uint64 clock = 1;
   bytes id = 2;
-  bytes private_key = 3;
+  // Don't sync private_key because we want to have only one control node
+  bytes private_key = 3 [deprecated = true];
   bytes description = 4;
   bool joined = 5;
   bool verified = 6;

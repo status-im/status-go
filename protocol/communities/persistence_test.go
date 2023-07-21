@@ -81,7 +81,6 @@ func (s *PersistenceSuite) TestSaveCommunity() {
 func (s *PersistenceSuite) TestShouldHandleSyncCommunity() {
 	sc := &protobuf.SyncCommunity{
 		Id:          []byte("0x123456"),
-		PrivateKey:  []byte("0xfedcba"),
 		Description: []byte("this is a description"),
 		Joined:      true,
 		Verified:    true,
@@ -118,7 +117,6 @@ func (s *PersistenceSuite) TestShouldHandleSyncCommunity() {
 func (s *PersistenceSuite) TestSetSyncClock() {
 	sc := &protobuf.SyncCommunity{
 		Id:          []byte("0x123456"),
-		PrivateKey:  []byte("0xfedcba"),
 		Description: []byte("this is a description"),
 		Joined:      true,
 		Verified:    true,
@@ -276,7 +274,6 @@ func (s *PersistenceSuite) makeNewCommunity(identity *ecdsa.PrivateKey) *Communi
 func (s *PersistenceSuite) TestGetSyncedRawCommunity() {
 	sc := &protobuf.SyncCommunity{
 		Id:          []byte("0x123456"),
-		PrivateKey:  []byte("0xfedcba"),
 		Description: []byte("this is a description"),
 		Joined:      true,
 		Verified:    true,

@@ -109,7 +109,7 @@ func (s *CommunitySuite) TestInviteUserToOrg() {
 	org.config.ID = nil
 	// Not an admin
 	_, err = org.InviteUserToOrg(&s.member2.PublicKey)
-	s.Require().Equal(ErrNotAdmin, err)
+	s.Require().Equal(ErrNotControlNode, err)
 
 	// Add admin to community
 	org.config.PrivateKey = s.identity
@@ -284,7 +284,7 @@ func (s *CommunitySuite) TestInviteUserToChat() {
 	org.config.ID = nil
 	// Not an admin
 	_, err = org.InviteUserToChat(&s.member2.PublicKey, testChatID1)
-	s.Require().Equal(ErrNotAdmin, err)
+	s.Require().Equal(ErrNotControlNode, err)
 
 	// Add admin to community
 	org.config.PrivateKey = s.identity

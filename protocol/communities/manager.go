@@ -847,14 +847,32 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 	return community, nil
 }
 
+func (m *Manager) RemovePrivateKey(id types.HexBytes) (*Community, error) {
+	community, err := m.GetByID(id)
+	if err != nil {
+		return community, err
+	}
+
+	if !community.IsControlNode() {
+		return community, ErrNotControlNode
+	}
+
+	community.config.PrivateKey = nil
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return community, err
+	}
+	return community, nil
+}
+
 func (m *Manager) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error) {
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
 	}
 
-	if !community.IsOwner() {
-		return nil, ErrNotOwner
+	if !community.IsControlNode() {
+		return nil, ErrNotControlNode
 	}
 
 	return community.config.PrivateKey, nil
