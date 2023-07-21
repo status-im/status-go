@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 
@@ -167,6 +168,10 @@ type ChatMentionContext struct {
 	MentionState       *MentionState
 	PreviousText       string // user input text before the last change
 	NewText            string
+
+	CallID    uint64
+	mu        *sync.Mutex
+	MaxCallID uint64
 }
 
 func NewChatMentionContext(chatID string) *ChatMentionContext {
@@ -174,6 +179,7 @@ func NewChatMentionContext(chatID string) *ChatMentionContext {
 		ChatID:             chatID,
 		MentionSuggestions: make(map[string]*MentionableUser),
 		MentionState:       new(MentionState),
+		mu:                 new(sync.Mutex),
 	}
 }
 
@@ -295,11 +301,27 @@ func (m *MentionManager) ReplaceWithPublicKey(chatID, text string) (string, erro
 	return newText, nil
 }
 
-func (m *MentionManager) OnChangeText(chatID, fullText string) (*ChatMentionContext, error) {
+func withCallID(ctx *ChatMentionContext, callID uint64) *ChatMentionContext {
+	result := *ctx
+	result.CallID = callID
+	return &result
+}
+
+func (m *MentionManager) OnChangeText(chatID, fullText string, callID uint64) (*ChatMentionContext, error) {
 	ctx := m.getChatMentionContext(chatID)
+	if callID > 0 {
+		ctx.mu.Lock()
+		if callID <= ctx.MaxCallID {
+			ctx.mu.Unlock()
+			return withCallID(ctx, callID), fmt.Errorf("callID is less than or equal to maxCallID, callID: %d, maxCallID: %d", callID, ctx.MaxCallID)
+		}
+		ctx.MaxCallID = callID
+		ctx.mu.Unlock()
+	}
+
 	diff := diffText(ctx.PreviousText, fullText)
 	if diff == nil {
-		return ctx, nil
+		return withCallID(ctx, callID), nil
 	}
 	ctx.PreviousText = fullText
 	if ctx.MentionState == nil {
@@ -313,11 +335,12 @@ func (m *MentionManager) OnChangeText(chatID, fullText string) (*ChatMentionCont
 
 	atIndexes, err := calculateAtIndexEntries(ctx.MentionState)
 	if err != nil {
-		return ctx, err
+		return withCallID(ctx, callID), err
 	}
 	ctx.MentionState.AtIdxs = atIndexes
 	m.logger.Debug("OnChangeText", zap.String("chatID", chatID), zap.Any("state", ctx.MentionState))
-	return m.calculateSuggestions(chatID, fullText)
+	ctx, err = m.calculateSuggestions(chatID, fullText)
+	return withCallID(ctx, callID), err
 }
 
 func (m *MentionManager) calculateSuggestions(chatID, fullText string) (*ChatMentionContext, error) {
@@ -403,7 +426,7 @@ func (m *MentionManager) SelectMention(chatID, text, primaryName, publicKey stri
 
 	ctx.NewText = string(tr[:atSignIdx+1]) + primaryName + space + string(tr[mentionEnd:])
 
-	ctx, err := m.OnChangeText(chatID, ctx.NewText)
+	_, err := m.OnChangeText(chatID, ctx.NewText, 0)
 	if err != nil {
 		return nil, err
 	}
