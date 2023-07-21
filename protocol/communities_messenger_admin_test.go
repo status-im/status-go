@@ -720,7 +720,6 @@ func (s *AdminMessengerCommunitiesSuite) setUpCommunityAndRoles() *communities.C
 
 	// owner creates a community and chat
 	community := s.createCommunity(protobuf.CommunityPermissions_NO_MEMBERSHIP)
-	//_ = s.createCommunityChat(community)
 	s.refreshMessengerResponses()
 
 	// add admin and alice to the community

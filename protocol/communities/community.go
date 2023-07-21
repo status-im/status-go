@@ -1305,8 +1305,8 @@ func (o *Community) toBytes() ([]byte, error) {
 		return nil, ErrNotAdmin
 	}
 
-	//We are not owner or admin, use the received serialized version
-	if !o.IsOwnerOrAdmin() {
+	// If we are not a control node, use the received serialized version
+	if !o.IsOwner() {
 		return o.config.MarshaledCommunityDescription, nil
 	}
 

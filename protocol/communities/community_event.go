@@ -1,6 +1,7 @@
 package communities
 
 import (
+	"crypto/ecdsa"
 	"errors"
 	"time"
 
@@ -176,11 +177,14 @@ func (o *Community) UpdateCommunityByEvents(communityEventMessage *CommunityEven
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	// Validate CommunityEventsMessage and extract CommunityDescription on top of which events
-	// were generated
-	description, err := o.validateEventsMessageAndGetCommunityDescription(communityEventMessage)
+	// Validate that EventsBaseCommunityDescription was signed by the control node
+	description, err := validateAndGetEventsMessageCommunityDescription(communityEventMessage.EventsBaseCommunityDescription, o.config.ID)
 	if err != nil {
 		return nil, err
+	}
+
+	if description.Clock != o.config.CommunityDescription.Clock {
+		return nil, errors.New("clock for admin event message is outdated")
 	}
 
 	// Create a deep copy of current community so we can update CommunityDescription by new admin events
@@ -379,36 +383,14 @@ func (o *Community) addNewCommunityEvent(event *CommunityEvent) error {
 		return errors.New("converting CommunityEvent to protobuf failed")
 	}
 
-	// All events must be build on top of the last owner CommunityDescription o the client side
+	// All events must be built on top of the control node CommunityDescription
 	// If there were no events before, extract CommunityDescription from MarshaledCommunityDescription
 	// and check the signature
 	if o.config.EventsData == nil || len(o.config.EventsData.EventsBaseCommunityDescription) == 0 {
-		metadata := &protobuf.ApplicationMetadataMessage{}
-
-		err := proto.Unmarshal(o.config.MarshaledCommunityDescription, metadata)
+		_, err := validateAndGetEventsMessageCommunityDescription(o.config.MarshaledCommunityDescription, o.config.ID)
 		if err != nil {
 			return err
 		}
-
-		if metadata.Type != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
-			return ErrInvalidMessage
-		}
-
-		// TODO: check the signature
-		// Right now test are failing due to signer == nil, but this can be an issue in test
-
-		// signer, err := metadata.RecoverKey()
-		// if err != nil {
-		// 	return err
-		// }
-
-		// if signer == nil {
-		// 	return errors.New("signer can't be nil")
-		// }
-
-		// if signer != o.config.ID {
-		// 	return errors.New("CommunityDescription was not signed by an owner")
-		// }
 
 		o.config.EventsData = &EventsData{
 			EventsBaseCommunityDescription: o.config.MarshaledCommunityDescription,
@@ -430,18 +412,25 @@ func (o *Community) ToCommunityEventsMessage() *CommunityEventsMessage {
 	}
 }
 
-func (o *Community) validateEventsMessageAndGetCommunityDescription(event *CommunityEventsMessage) (*protobuf.CommunityDescription, error) {
-	// TODO validate CommunityDescription is signed by the owner
-
+func validateAndGetEventsMessageCommunityDescription(signedDescription []byte, signerPubkey *ecdsa.PublicKey) (*protobuf.CommunityDescription, error) {
 	metadata := &protobuf.ApplicationMetadataMessage{}
 
-	err := proto.Unmarshal(event.EventsBaseCommunityDescription, metadata)
+	err := proto.Unmarshal(signedDescription, metadata)
 	if err != nil {
 		return nil, err
 	}
 
 	if metadata.Type != protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION {
 		return nil, ErrInvalidMessage
+	}
+
+	signer, err := metadata.RecoverKey()
+	if err != nil {
+		return nil, err
+	}
+
+	if !signer.Equal(signerPubkey) {
+		return nil, errors.New("CommunityDescription was not signed by an owner")
 	}
 
 	description := &protobuf.CommunityDescription{}
@@ -451,8 +440,5 @@ func (o *Community) validateEventsMessageAndGetCommunityDescription(event *Commu
 		return nil, err
 	}
 
-	if description.Clock != o.config.CommunityDescription.Clock {
-		return nil, errors.New("clock for admin event message is outdated")
-	}
 	return description, nil
 }
