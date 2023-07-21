@@ -507,14 +507,14 @@ func (o *Community) CreateChat(chatID string, chat *protobuf.CommunityChat) (*Co
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isOwner := o.IsOwner()
-	isAdmin := o.IsAdmin()
+	isControlNode := o.IsControlNode()
+	allowedToSendEvents := o.IsOwnerOrAdmin()
 
-	if !isOwner && !isAdmin {
+	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotAdmin
 	}
 
-	if isAdmin {
+	if allowedToSendEvents {
 		err := o.addNewCommunityEvent(o.ToCreateChannelCommunityEvent(chatID, chat))
 		if err != nil {
 			return nil, err
@@ -526,7 +526,7 @@ func (o *Community) CreateChat(chatID string, chat *protobuf.CommunityChat) (*Co
 		return nil, err
 	}
 
-	if isOwner {
+	if isControlNode {
 		o.increaseClock()
 	}
 
@@ -539,14 +539,14 @@ func (o *Community) EditChat(chatID string, chat *protobuf.CommunityChat) (*Comm
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isOwner := o.IsOwner()
-	isAdmin := o.IsAdmin()
+	isControlNode := o.IsControlNode()
+	allowedToSendEvents := o.IsOwnerOrAdmin()
 
-	if !isOwner && !isAdmin {
+	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotAdmin
 	}
 
-	if isAdmin {
+	if allowedToSendEvents {
 		err := o.addNewCommunityEvent(o.ToEditChannelCommunityEvent(chatID, chat))
 		if err != nil {
 			return nil, err
@@ -558,7 +558,7 @@ func (o *Community) EditChat(chatID string, chat *protobuf.CommunityChat) (*Comm
 		return nil, err
 	}
 
-	if isOwner {
+	if isControlNode {
 		o.increaseClock()
 	}
 
@@ -574,14 +574,14 @@ func (o *Community) DeleteChat(chatID string) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isOwner := o.IsOwner()
-	isAdmin := o.IsAdmin()
+	isControlNode := o.IsControlNode()
+	allowedToSendEvents := o.IsOwnerOrAdmin()
 
-	if !isOwner && !isAdmin {
+	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotAdmin
 	}
 
-	if isAdmin {
+	if allowedToSendEvents {
 		err := o.addNewCommunityEvent(o.ToDeleteChannelCommunityEvent(chatID))
 		if err != nil {
 			return nil, err
@@ -590,7 +590,7 @@ func (o *Community) DeleteChat(chatID string) (*CommunityChanges, error) {
 
 	changes := o.deleteChat(chatID)
 
-	if isOwner {
+	if isControlNode {
 		o.increaseClock()
 	}
 
@@ -798,18 +798,18 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isOwner := o.IsOwner()
-	isAdmin := o.IsAdmin()
+	isControlNode := o.IsControlNode()
+	allowedToSendEvents := o.IsOwnerOrAdmin()
 
-	if !isOwner && !isAdmin {
+	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotAdmin
 	}
 
-	if o.IsAdmin() && o.IsMemberOwnerOrAdmin(pk) {
+	if allowedToSendEvents && o.IsMemberOwnerOrAdmin(pk) {
 		return nil, ErrCannotRemoveOwnerOrAdmin
 	}
 
-	if isAdmin {
+	if allowedToSendEvents {
 		err := o.addNewCommunityEvent(o.ToKickCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
 		if err != nil {
 			return nil, err
@@ -818,7 +818,7 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 
 	o.removeMemberFromOrg(pk)
 
-	if isOwner {
+	if isControlNode {
 		o.increaseClock()
 	}
 
@@ -841,14 +841,14 @@ func (o *Community) UnbanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Commu
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isOwner := o.IsOwner()
-	isAdmin := o.IsAdmin()
+	isControlNode := o.IsControlNode()
+	allowedToSendEvents := o.IsOwnerOrAdmin()
 
-	if !isOwner && !isAdmin {
+	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotAdmin
 	}
 
-	if isAdmin {
+	if allowedToSendEvents {
 		err := o.addNewCommunityEvent(o.ToUnbanCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
 		if err != nil {
 			return nil, err
@@ -857,7 +857,7 @@ func (o *Community) UnbanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Commu
 
 	o.unbanUserFromCommunity(pk)
 
-	if isOwner {
+	if isControlNode {
 		o.increaseClock()
 	}
 
@@ -868,18 +868,18 @@ func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Communi
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isOwner := o.IsOwner()
-	isAdmin := o.IsAdmin()
+	isControlNode := o.IsControlNode()
+	allowedToSendEvents := o.IsOwnerOrAdmin()
 
-	if !isOwner && !isAdmin {
+	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotAdmin
 	}
 
-	if o.IsAdmin() && o.IsMemberOwnerOrAdmin(pk) {
+	if allowedToSendEvents && o.IsMemberOwnerOrAdmin(pk) {
 		return nil, ErrCannotBanOwnerOrAdmin
 	}
 
-	if isAdmin {
+	if allowedToSendEvents {
 		err := o.addNewCommunityEvent(o.ToBanCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
 		if err != nil {
 			return nil, err
@@ -888,7 +888,7 @@ func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Communi
 
 	o.banUserFromCommunity(pk)
 
-	if isOwner {
+	if isControlNode {
 		o.increaseClock()
 	}
 
@@ -1076,7 +1076,7 @@ func (o *Community) ValidateRequestToJoin(signer *ecdsa.PublicKey, request *prot
 	defer o.mutex.Unlock()
 
 	// If we are not admin, fuggetaboutit
-	if !o.IsOwnerOrAdmin() {
+	if !o.IsControlNode() && !o.IsOwnerOrAdmin() {
 		return ErrNotAdmin
 	}
 
@@ -1103,7 +1103,7 @@ func (o *Community) ValidateEditSharedAddresses(signer *ecdsa.PublicKey, request
 	defer o.mutex.Unlock()
 
 	// If we are not owner, fuggetaboutit
-	if !o.IsOwner() {
+	if !o.IsControlNode() {
 		return ErrNotOwner
 	}
 
@@ -1119,7 +1119,7 @@ func (o *Community) ValidateEditSharedAddresses(signer *ecdsa.PublicKey, request
 }
 
 func (o *Community) IsOwner() bool {
-	return o.IsMemberOwner(o.config.MemberIdentity) || o.IsControlNode()
+	return o.IsMemberOwner(o.config.MemberIdentity)
 }
 
 func (o *Community) IsControlNode() bool {
@@ -1131,7 +1131,7 @@ func (o *Community) IsAdmin() bool {
 }
 
 func (o *Community) IsOwnerOrAdmin() bool {
-	return o.IsOwner() || o.IsAdmin()
+	return !o.IsControlNode() && (o.IsOwner() || o.IsAdmin())
 }
 
 func (o *Community) IsMemberOwner(publicKey *ecdsa.PublicKey) bool {
@@ -1312,7 +1312,7 @@ func (o *Community) toBytes() ([]byte, error) {
 	}
 
 	// If we are not a control node, use the received serialized version
-	if !o.IsOwner() {
+	if !o.IsControlNode() {
 		return o.config.MarshaledCommunityDescription, nil
 	}
 
@@ -1436,10 +1436,10 @@ func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermis
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isOwner := o.IsOwner()
-	isAdmin := o.IsAdmin()
+	isControlNode := o.IsControlNode()
+	allowedToSendEvents := o.IsOwnerOrAdmin()
 
-	if !isOwner && !isAdmin || (isAdmin && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
+	if !isControlNode && !allowedToSendEvents || (allowedToSendEvents && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
 		return nil, ErrNotEnoughPermissions
 	}
 
@@ -1448,14 +1448,14 @@ func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermis
 		return nil, err
 	}
 
-	if isAdmin {
+	if allowedToSendEvents {
 		err := o.addNewCommunityEvent(o.ToCommunityTokenPermissionChangeCommunityEvent(permission))
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	if isOwner {
+	if isControlNode {
 		o.increaseClock()
 	}
 
@@ -1466,10 +1466,10 @@ func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isOwner := o.IsOwner()
-	isAdmin := o.IsAdmin()
+	isControlNode := o.IsControlNode()
+	allowedToSendEvents := o.IsOwnerOrAdmin()
 
-	if !isOwner && !isAdmin || (isAdmin && tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
+	if !isControlNode && !allowedToSendEvents || (allowedToSendEvents && tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
 		return nil, ErrNotEnoughPermissions
 	}
 
@@ -1478,14 +1478,14 @@ func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *
 		return nil, err
 	}
 
-	if isAdmin {
+	if allowedToSendEvents {
 		err := o.addNewCommunityEvent(o.ToCommunityTokenPermissionChangeCommunityEvent(tokenPermission))
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	if isOwner {
+	if isControlNode {
 		o.increaseClock()
 	}
 
@@ -1502,10 +1502,10 @@ func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChange
 		return nil, ErrTokenPermissionNotFound
 	}
 
-	isOwner := o.IsOwner()
-	isAdmin := o.IsAdmin()
+	isControlNode := o.IsControlNode()
+	allowedToSendEvents := o.IsOwnerOrAdmin()
 
-	if !isOwner && !isAdmin || (isAdmin && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
+	if !isControlNode && !allowedToSendEvents || (allowedToSendEvents && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
 		return nil, ErrNotEnoughPermissions
 	}
 
@@ -1514,14 +1514,14 @@ func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChange
 		return nil, err
 	}
 
-	if isAdmin {
+	if allowedToSendEvents {
 		err := o.addNewCommunityEvent(o.ToCommunityTokenPermissionDeleteCommunityEvent(permission))
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	if isOwner {
+	if isControlNode {
 		o.increaseClock()
 	}
 
@@ -1720,7 +1720,7 @@ func (o *Community) CanManageUsers(pk *ecdsa.PublicKey) bool {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.IsOwner() {
+	if o.IsControlNode() {
 		return true
 	}
 
@@ -1737,7 +1737,7 @@ func (o *Community) CanDeleteMessageForEveryone(pk *ecdsa.PublicKey) bool {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.IsOwner() {
+	if o.IsControlNode() {
 		return true
 	}
 
@@ -1763,7 +1763,7 @@ func (o *Community) canJoin() bool {
 		return false
 	}
 
-	if o.IsOwner() {
+	if o.IsControlNode() {
 		return true
 	}
 
@@ -1808,7 +1808,7 @@ func (o *Community) RequestsToJoin() []*RequestToJoin {
 }
 
 func (o *Community) AddMember(publicKey *ecdsa.PublicKey, roles []protobuf.CommunityMember_Roles) (*CommunityChanges, error) {
-	if !o.IsOwnerOrAdmin() {
+	if !o.IsControlNode() && !o.IsOwnerOrAdmin() {
 		return nil, ErrNotAdmin
 	}
 
@@ -1832,7 +1832,7 @@ func (o *Community) AddMemberToChat(chatID string, publicKey *ecdsa.PublicKey, r
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsOwnerOrAdmin() {
+	if !o.IsControlNode() && !o.IsOwnerOrAdmin() {
 		return nil, ErrNotAuthorized
 	}
 
@@ -1875,7 +1875,7 @@ func (o *Community) AddMemberRevealedAccounts(memberID string, accounts []*proto
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsOwnerOrAdmin() {
+	if !o.IsControlNode() && !o.IsOwnerOrAdmin() {
 		return nil, ErrNotAdmin
 	}
 
@@ -1896,16 +1896,16 @@ func (o *Community) AddMemberWithRevealedAccounts(dbRequest *RequestToJoin, role
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isOwner := o.IsOwner()
-	isAdmin := o.IsAdmin()
+	isControlNode := o.IsControlNode()
+	allowedToSendEvents := o.IsOwnerOrAdmin()
 
-	if !isOwner && !isAdmin {
+	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotAdmin
 	}
 
 	changes := o.addMemberWithRevealedAccounts(dbRequest.PublicKey, roles, accounts, dbRequest.Clock)
 
-	if isAdmin {
+	if allowedToSendEvents {
 		acceptedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
 		acceptedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
 
@@ -1919,7 +1919,7 @@ func (o *Community) AddMemberWithRevealedAccounts(dbRequest *RequestToJoin, role
 		}
 	}
 
-	if isOwner {
+	if isControlNode {
 		o.increaseClock()
 	}
 
@@ -2171,14 +2171,14 @@ func (o *Community) DeclineRequestToJoin(dbRequest *RequestToJoin) error {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isOwner := o.IsOwner()
-	isAdmin := o.IsAdmin()
+	isControlNode := o.IsControlNode()
+	allowedToSendEvents := o.IsOwnerOrAdmin()
 
-	if !isOwner && !isAdmin {
+	if !isControlNode && !allowedToSendEvents {
 		return ErrNotAdmin
 	}
 
-	if isAdmin {
+	if allowedToSendEvents {
 		rejectedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
 		rejectedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
 
@@ -2192,7 +2192,7 @@ func (o *Community) DeclineRequestToJoin(dbRequest *RequestToJoin) error {
 		}
 	}
 
-	if isOwner {
+	if isControlNode {
 		// typically, community's clock is increased implicitly when making changes
 		// to it, however in this scenario there are no changes in the community, yet
 		// we need to increase the clock to ensure the owner event is processed by other

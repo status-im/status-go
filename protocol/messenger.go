@@ -2314,7 +2314,7 @@ func (m *Messenger) updateChatFirstMessageTimestamp(chat *Chat, timestamp uint32
 		return err
 	}
 
-	if community.IsOwner() && chat.UpdateFirstMessageTimestamp(timestamp) {
+	if community.IsControlNode() && chat.UpdateFirstMessageTimestamp(timestamp) {
 		community, changes, err := m.communitiesManager.EditChatFirstMessageTimestamp(community.ID(), chat.ID, chat.FirstMessageTimestamp)
 		if err != nil {
 			return err

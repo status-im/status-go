@@ -1682,7 +1682,7 @@ func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommu
 		return nil, err
 	}
 
-	if community.IsOwner() {
+	if community.IsControlNode() {
 		// check existing member permission once, then check periodically
 		go func() {
 			err := m.communitiesManager.CheckMemberPermissions(community, true)
@@ -1715,7 +1715,7 @@ func (m *Messenger) EditCommunityTokenPermission(request *requests.EditCommunity
 	// BECOME_MEMBER permissions and kick them if necessary
 	//
 	// We do this in a separate routine to not block this function
-	if community.IsOwner() {
+	if community.IsControlNode() {
 		go func() {
 			err := m.communitiesManager.CheckMemberPermissions(community, true)
 			if err != nil {
@@ -1743,7 +1743,7 @@ func (m *Messenger) DeleteCommunityTokenPermission(request *requests.DeleteCommu
 
 	// check if members still fulfill the token criteria
 	// We do this in a separate routine to not block this function
-	if community.IsOwner() {
+	if community.IsControlNode() {
 		go func() {
 			becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 
