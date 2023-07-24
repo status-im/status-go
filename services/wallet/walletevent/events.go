@@ -17,4 +17,5 @@ type Event struct {
 	Message     string           `json:"message"`
 	At          int64            `json:"at"`
 	ChainID     uint64           `json:"chainId"`
+	RequestID   *int             `json:"requestId,omitempty"`
 }

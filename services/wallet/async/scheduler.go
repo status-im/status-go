@@ -28,7 +28,7 @@ const (
 )
 
 type TaskType struct {
-	ID     int
+	ID     int64
 	Policy ReplacementPolicy
 }
 
