@@ -543,24 +543,24 @@ func (api *API) FetchAllCurrencyFormats() (currency.FormatPerSymbol, error) {
 	return api.s.currency.FetchAllCurrencyFormats()
 }
 
-func (api *API) FilterActivityAsync(ctx context.Context, addresses []common.Address, chainIDs []wcommon.ChainID, filter activity.Filter, offset int, limit int) error {
-	log.Debug("wallet.api.FilterActivityAsync", "addr.count", len(addresses), "chainIDs.count", len(chainIDs), "offset", offset, "limit", limit)
+func (api *API) FilterActivityAsync(requestID int32, addresses []common.Address, chainIDs []wcommon.ChainID, filter activity.Filter, offset int, limit int) error {
+	log.Debug("wallet.api.FilterActivityAsync", "requestID", requestID, "addr.count", len(addresses), "chainIDs.count", len(chainIDs), "offset", offset, "limit", limit)
 
-	api.s.activity.FilterActivityAsync(ctx, addresses, chainIDs, filter, offset, limit)
+	api.s.activity.FilterActivityAsync(requestID, addresses, chainIDs, filter, offset, limit)
 	return nil
 }
 
-func (api *API) GetRecipientsAsync(ctx context.Context, offset int, limit int) (ignored bool, err error) {
+func (api *API) GetRecipientsAsync(requestID int32, offset int, limit int) (ignored bool, err error) {
 	log.Debug("wallet.api.GetRecipientsAsync", "offset", offset, "limit", limit)
 
-	ignored = api.s.activity.GetRecipientsAsync(ctx, offset, limit)
+	ignored = api.s.activity.GetRecipientsAsync(requestID, offset, limit)
 	return ignored, err
 }
 
-func (api *API) GetOldestActivityTimestampAsync(ctx context.Context, addresses []common.Address) error {
+func (api *API) GetOldestActivityTimestampAsync(requestID int32, addresses []common.Address) error {
 	log.Debug("wallet.api.GetOldestActivityTimestamp", "addresses.len", len(addresses))
 
-	api.s.activity.GetOldestTimestampAsync(ctx, addresses)
+	api.s.activity.GetOldestTimestampAsync(requestID, addresses)
 	return nil
 }
 
