@@ -1341,6 +1341,10 @@ func (api *PublicAPI) UpdateCommunityTokenSupply(chainID int, contractAddress st
 	return api.service.messenger.UpdateCommunityTokenSupply(chainID, contractAddress, supply)
 }
 
+func (api *PublicAPI) RemoveCommunityToken(chainID int, contractAddress string) error {
+	return api.service.messenger.RemoveCommunityToken(chainID, contractAddress)
+}
+
 func (api *PublicAPI) ToggleCollapsedCommunityCategory(request *requests.ToggleCollapsedCommunityCategory) error {
 	return api.service.messenger.ToggleCollapsedCommunityCategory(request)
 }
