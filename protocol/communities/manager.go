@@ -3937,6 +3937,10 @@ func (m *Manager) UpdateCommunityTokenSupply(chainID int, contractAddress string
 	return m.persistence.UpdateCommunityTokenSupply(chainID, contractAddress, supply)
 }
 
+func (m *Manager) RemoveCommunityToken(chainID int, contractAddress string) error {
+	return m.persistence.RemoveCommunityToken(chainID, contractAddress)
+}
+
 func (m *Manager) SetCommunityActiveMembersCount(communityID string, activeMembersCount uint64) error {
 	community, err := m.GetByIDString(communityID)
 	if err != nil {

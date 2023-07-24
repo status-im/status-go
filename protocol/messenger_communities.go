@@ -4078,6 +4078,10 @@ func (m *Messenger) UpdateCommunityTokenSupply(chainID int, contractAddress stri
 	return m.communitiesManager.UpdateCommunityTokenSupply(chainID, contractAddress, supply)
 }
 
+func (m *Messenger) RemoveCommunityToken(chainID int, contractAddress string) error {
+	return m.communitiesManager.RemoveCommunityToken(chainID, contractAddress)
+}
+
 // UpdateCommunityEncryption takes a communityID string and an encryption state, then finds the community and
 // encrypts / decrypts the community. Community is republished along with any keys if needed.
 //

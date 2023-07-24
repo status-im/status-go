@@ -1251,6 +1251,11 @@ func (p *Persistence) UpdateCommunityTokenSupply(chainID int, contractAddress st
 	return err
 }
 
+func (p *Persistence) RemoveCommunityToken(chainID int, contractAddress string) error {
+	_, err := p.db.Exec(`DELETE FROM community_tokens WHERE chain_id = ? AND address = ?`, chainID, contractAddress)
+	return err
+}
+
 func decodeCommunityDescription(descriptionBytes []byte) (*protobuf.CommunityDescription, error) {
 	metadata := &protobuf.ApplicationMetadataMessage{}
 
