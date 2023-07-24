@@ -10,8 +10,11 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc/network"
 
+	"github.com/status-im/status-go/services/accounts/accountsevent"
+	walletaccounts "github.com/status-im/status-go/services/wallet/accounts"
 	"github.com/status-im/status-go/services/wallet/async"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -40,21 +43,27 @@ var (
 )
 
 type Service struct {
-	manager        *Manager
-	db             *sql.DB
-	eventFeed      *event.Feed
+	manager      *Manager
+	db           *sql.DB
+	walletFeed   *event.Feed
+	accountsDB   *accounts.Database
+	accountsFeed *event.Feed
+
 	networkManager *network.Manager
 	cancelFn       context.CancelFunc
 
-	group     *async.Group
-	scheduler *async.Scheduler
+	group           *async.Group
+	scheduler       *async.Scheduler
+	accountsWatcher *walletaccounts.Watcher
 }
 
-func NewService(db *sql.DB, eventFeed *event.Feed, networkManager *network.Manager, manager *Manager) *Service {
+func NewService(db *sql.DB, walletFeed *event.Feed, accountsDB *accounts.Database, accountsFeed *event.Feed, networkManager *network.Manager, manager *Manager) *Service {
 	return &Service{
 		manager:        manager,
 		db:             db,
-		eventFeed:      eventFeed,
+		walletFeed:     walletFeed,
+		accountsDB:     accountsDB,
+		accountsFeed:   accountsFeed,
 		networkManager: networkManager,
 		scheduler:      async.NewScheduler(),
 	}
@@ -144,7 +153,8 @@ func (s *Service) GetCollectiblesDataAsync(ctx context.Context, uniqueIDs []thir
 		s.sendResponseEvent(EventGetCollectiblesDataDone, res, err)
 	})
 }
-func (s *Service) Start() {
+
+func (s *Service) startPeriodicalOwnershipFetch() {
 	if s.group != nil {
 		return
 	}
@@ -156,14 +166,14 @@ func (s *Service) Start() {
 	command := newRefreshOwnedCollectiblesCommand(
 		s.manager,
 		s.db,
-		s.eventFeed,
+		s.walletFeed,
 		s.networkManager,
 	)
 
 	s.group.Add(command.Command())
 }
 
-func (s *Service) Stop() {
+func (s *Service) stopPeriodicalOwnershipFetch() {
 	if s.cancelFn != nil {
 		s.cancelFn()
 		s.cancelFn = nil
@@ -173,6 +183,47 @@ func (s *Service) Stop() {
 		s.group.Wait()
 		s.group = nil
 	}
+}
+
+func (s *Service) startAccountsWatcher() {
+	if s.accountsWatcher != nil {
+		return
+	}
+
+	accountChangeCb := func(changedAddresses []common.Address, eventType accountsevent.EventType, currentAddresses []common.Address) {
+		// Whenever an account gets added, restart fetch
+		// TODO: Fetch only added accounts
+		if eventType == accountsevent.EventTypeAdded {
+			s.stopPeriodicalOwnershipFetch()
+			s.startPeriodicalOwnershipFetch()
+		}
+	}
+
+	s.accountsWatcher = walletaccounts.NewWatcher(s.accountsDB, s.accountsFeed, accountChangeCb)
+
+	s.accountsWatcher.Start()
+}
+
+func (s *Service) stopAccountsWatcher() {
+	if s.accountsWatcher != nil {
+		s.accountsWatcher.Stop()
+		s.accountsWatcher = nil
+	}
+}
+
+func (s *Service) Start() {
+	// Setup periodical collectibles refresh
+	s.startPeriodicalOwnershipFetch()
+
+	// Setup collectibles fetch when a new account gets added
+	s.startAccountsWatcher()
+}
+
+func (s *Service) Stop() {
+	s.stopAccountsWatcher()
+
+	s.stopPeriodicalOwnershipFetch()
+
 	s.scheduler.Stop()
 }
 
@@ -186,7 +237,7 @@ func (s *Service) sendResponseEvent(eventType walletevent.EventType, payloadObj 
 
 	log.Debug("wallet.api.collectibles.Service RESPONSE", "eventType", eventType, "error", err, "payload.len", len(payload))
 
-	s.eventFeed.Send(walletevent.Event{
+	s.walletFeed.Send(walletevent.Event{
 		Type:    eventType,
 		Message: string(payload),
 	})
