@@ -762,7 +762,7 @@ func (m *Messenger) getAccountsToShare(addressesToReveal []string, airdropAddres
 
 	containsAddress := func(addresses []string, targetAddress string) bool {
 		for _, address := range addresses {
-			if address == targetAddress {
+			if types.HexToAddress(address) == types.HexToAddress(targetAddress) {
 				return true
 			}
 		}
@@ -797,7 +797,7 @@ func (m *Messenger) getAccountsToShare(addressesToReveal []string, airdropAddres
 		revealedAddress := gethcommon.HexToAddress(verifiedAccount.Address.Hex())
 		revealedAddresses = append(revealedAddresses, revealedAddress)
 		address := verifiedAccount.Address.Hex()
-		isAirdropAddress := address == airdropAddress
+		isAirdropAddress := types.HexToAddress(address) == types.HexToAddress(airdropAddress)
 		if airdropAddress == "" {
 			isAirdropAddress = i == 0
 		}
