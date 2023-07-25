@@ -3878,16 +3878,7 @@ func (m *Manager) ImageToBase64(uri string) string {
 	return base64img
 }
 
-func (m *Manager) AddCommunityToken(token *CommunityToken, croppedImage *images.CroppedImage) (*CommunityToken, error) {
-
-	community, err := m.GetByIDString(token.CommunityID)
-	if err != nil {
-		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
-
+func (m *Manager) SaveCommunityToken(token *CommunityToken, croppedImage *images.CroppedImage) (*CommunityToken, error) {
 	if croppedImage != nil && croppedImage.ImagePath != "" {
 		bytes, err := images.OpenAndAdjustImage(*croppedImage, true)
 		if err != nil {
@@ -3903,6 +3894,24 @@ func (m *Manager) AddCommunityToken(token *CommunityToken, croppedImage *images.
 		token.Base64Image = m.ImageToBase64(token.Base64Image)
 	}
 
+	return token, m.persistence.AddCommunityToken(token)
+}
+
+func (m *Manager) AddCommunityToken(communityID string, chainID int, address string) error {
+
+	community, err := m.GetByIDString(communityID)
+	if err != nil {
+		return err
+	}
+	if community == nil {
+		return ErrOrgNotFound
+	}
+
+	token, err := m.persistence.GetCommunityToken(communityID, chainID, address)
+	if err != nil {
+		return err
+	}
+
 	tokenMetadata := &protobuf.CommunityTokenMetadata{
 		ContractAddresses: map[uint64]string{uint64(token.ChainID): token.Address},
 		Description:       token.Description,
@@ -3914,15 +3923,10 @@ func (m *Manager) AddCommunityToken(token *CommunityToken, croppedImage *images.
 	}
 	_, err = community.AddCommunityTokensMetadata(tokenMetadata)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = m.saveAndPublish(community)
-	if err != nil {
-		return nil, err
-	}
-
-	return token, m.persistence.AddCommunityToken(token)
+	return m.saveAndPublish(community)
 }
 
 func (m *Manager) UpdateCommunityTokenState(chainID int, contractAddress string, deployState DeployState) error {

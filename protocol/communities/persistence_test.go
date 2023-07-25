@@ -373,6 +373,35 @@ func (s *PersistenceSuite) TestUpdateCommunitySettings() {
 	s.Equal(settings, rst)
 }
 
+func (s *PersistenceSuite) TestGetCommunityToken() {
+	tokens, err := s.db.GetCommunityTokens("123")
+	s.Require().NoError(err)
+	s.Require().Len(tokens, 0)
+
+	tokenERC721 := CommunityToken{
+		CommunityID:        "123",
+		TokenType:          protobuf.CommunityTokenType_ERC721,
+		Address:            "0x123",
+		Name:               "StatusToken",
+		Symbol:             "STT",
+		Description:        "desc",
+		Supply:             &bigint.BigInt{Int: big.NewInt(123)},
+		InfiniteSupply:     false,
+		Transferable:       true,
+		RemoteSelfDestruct: true,
+		ChainID:            1,
+		DeployState:        InProgress,
+		Base64Image:        "ABCD",
+	}
+
+	err = s.db.AddCommunityToken(&tokenERC721)
+	s.Require().NoError(err)
+
+	token, err := s.db.GetCommunityToken("123", 1, "0x123")
+	s.Require().NoError(err)
+	s.Require().Equal(&tokenERC721, token)
+}
+
 func (s *PersistenceSuite) TestGetCommunityTokens() {
 	tokens, err := s.db.GetCommunityTokens("123")
 	s.Require().NoError(err)

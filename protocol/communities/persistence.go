@@ -1187,6 +1187,26 @@ func (p *Persistence) GetCommunityTokens(communityID string) ([]*CommunityToken,
 	return p.getCommunityTokensInternal(rows)
 }
 
+func (p *Persistence) GetCommunityToken(communityID string, chainID int, address string) (*CommunityToken, error) {
+	token := CommunityToken{}
+	var supplyStr string
+	err := p.db.QueryRow(`SELECT community_id, address, type, name, symbol, description, supply_str, infinite_supply, transferable, remote_self_destruct, chain_id, deploy_state, image_base64, decimals FROM community_tokens WHERE community_id = ? AND chain_id = ? AND address = ?`, communityID, chainID, address).Scan(&token.CommunityID, &token.Address, &token.TokenType, &token.Name,
+		&token.Symbol, &token.Description, &supplyStr, &token.InfiniteSupply, &token.Transferable,
+		&token.RemoteSelfDestruct, &token.ChainID, &token.DeployState, &token.Base64Image, &token.Decimals)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	supplyBigInt, ok := new(big.Int).SetString(supplyStr, 10)
+	if ok {
+		token.Supply = &bigint.BigInt{Int: supplyBigInt}
+	} else {
+		token.Supply = &bigint.BigInt{Int: big.NewInt(0)}
+	}
+	return &token, nil
+}
+
 func (p *Persistence) getCommunityTokensInternal(rows *sql.Rows) ([]*CommunityToken, error) {
 	tokens := []*CommunityToken{}
 
