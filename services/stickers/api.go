@@ -105,7 +105,7 @@ func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, 
 
 func (api *API) Market(chainID uint64) ([]StickerPack, error) {
 	// TODO: eventually this should be changed to include pagination
-	accs, err := api.accountsDB.GetAccounts(false)
+	accs, err := api.accountsDB.GetActiveAccounts()
 	if err != nil {
 		return nil, err
 	}

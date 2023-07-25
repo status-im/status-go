@@ -151,7 +151,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string
 		s.Require().NoError(err)
 	}
 
-	walletAccounts, err := messenger.settings.GetAccounts(false)
+	walletAccounts, err := messenger.settings.GetActiveAccounts()
 	s.Require().NoError(err)
 	s.Require().Len(walletAccounts, len(walletAddresses))
 	for i := range walletAddresses {

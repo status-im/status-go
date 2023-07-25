@@ -81,7 +81,7 @@ func (api *API) MoveWalletAccount(ctx context.Context, fromPosition int64, toPos
 }
 
 func (api *API) GetAccounts(ctx context.Context) ([]*accounts.Account, error) {
-	return api.db.GetAccounts(false)
+	return api.db.GetActiveAccounts()
 }
 
 func (api *API) GetWatchOnlyAccounts(ctx context.Context) ([]*accounts.Account, error) {
@@ -89,7 +89,7 @@ func (api *API) GetWatchOnlyAccounts(ctx context.Context) ([]*accounts.Account, 
 }
 
 func (api *API) GetKeypairs(ctx context.Context) ([]*accounts.Keypair, error) {
-	return api.db.GetKeypairs(false)
+	return api.db.GetActiveKeypairs()
 }
 
 func (api *API) GetAccountByAddress(ctx context.Context, address types.Address) (*accounts.Account, error) {

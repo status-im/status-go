@@ -713,8 +713,14 @@ func (db *Database) markKeypairRemoved(tx *sql.Tx, keyUID string, clock uint64) 
 	return err
 }
 
-func (db *Database) GetKeypairs(includeRemoved bool) ([]*Keypair, error) {
-	return db.getKeypairs(nil, "", includeRemoved)
+// Returns active keypairs (excluding removed and excluding removed accounts).
+func (db *Database) GetActiveKeypairs() ([]*Keypair, error) {
+	return db.getKeypairs(nil, "", false)
+}
+
+// Returns all keypairs (including removed and removed accounts).
+func (db *Database) GetAllKeypairs() ([]*Keypair, error) {
+	return db.getKeypairs(nil, "", true)
 }
 
 // Returns keypair if it is not marked as removed and its accounts which are not marked as removed.
@@ -722,8 +728,14 @@ func (db *Database) GetKeypairByKeyUID(keyUID string) (*Keypair, error) {
 	return db.getKeypairByKeyUID(nil, keyUID)
 }
 
-func (db *Database) GetAccounts(includeRemoved bool) ([]*Account, error) {
-	return db.getAccounts(nil, types.Address{}, includeRemoved)
+// Returns active accounts (excluding removed).
+func (db *Database) GetActiveAccounts() ([]*Account, error) {
+	return db.getAccounts(nil, types.Address{}, false)
+}
+
+// Returns all accounts (including removed).
+func (db *Database) GetAllAccounts() ([]*Account, error) {
+	return db.getAccounts(nil, types.Address{}, true)
 }
 
 // Returns account if it is not marked as removed.
