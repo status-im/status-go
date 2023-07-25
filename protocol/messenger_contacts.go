@@ -78,7 +78,7 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 		From:             from,
 		WhisperTimestamp: timestamp,
 		LocalChatID:      contactID,
-		Seen:             outgoing,
+		Seen:             true,
 		ID:               types.EncodeHex(crypto.Keccak256([]byte(fmt.Sprintf("%s%s%d%d", from, to, updateType, clock)))),
 	}
 
