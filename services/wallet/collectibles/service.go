@@ -165,7 +165,7 @@ func (s *Service) startPeriodicalOwnershipFetch() {
 
 	command := newRefreshOwnedCollectiblesCommand(
 		s.manager,
-		s.db,
+		s.accountsDB,
 		s.walletFeed,
 		s.networkManager,
 	)
