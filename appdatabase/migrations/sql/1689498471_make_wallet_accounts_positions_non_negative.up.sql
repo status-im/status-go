@@ -5,7 +5,7 @@ UPDATE
 SET
   position = (SELECT MIN(position) - 1 AS min_pos FROM keypairs_accounts)
 WHERE
-  chat = TRUE;
+  chat = 1;
 
 CREATE TABLE keypairs_accounts_tmp (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
