@@ -1304,7 +1304,7 @@ func (m *SyncInstallationPublicChat) GetId() string {
 type SyncCommunity struct {
 	Clock uint64 `protobuf:"varint,1,opt,name=clock,proto3" json:"clock,omitempty"`
 	Id    []byte `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
-	// Don't sync private_key vecause we want to have only one control node
+	// Don't sync private_key because we want to have only one control node
 	PrivateKey           []byte                         `protobuf:"bytes,3,opt,name=private_key,json=privateKey,proto3" json:"private_key,omitempty"` // Deprecated: Do not use.
 	Description          []byte                         `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
 	Joined               bool                           `protobuf:"varint,5,opt,name=joined,proto3" json:"joined,omitempty"`
