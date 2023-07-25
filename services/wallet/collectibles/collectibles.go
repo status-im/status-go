@@ -2,6 +2,7 @@ package collectibles
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"math/big"
 	"strings"
@@ -19,6 +20,9 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 )
+
+const FetchNoLimit = 0
+const FetchFromStartCursor = ""
 
 const requestTimeout = 5 * time.Second
 
@@ -39,11 +43,10 @@ type Manager struct {
 	opensea                           *opensea.Client
 	nftCache                          map[walletCommon.ChainID]map[string]thirdparty.CollectibleData
 	nftCacheLock                      sync.RWMutex
-	ownershipCache                    map[walletCommon.ChainID]map[common.Address][]thirdparty.CollectibleUniqueID
-	ownershipCacheLock                sync.RWMutex
+	ownershipDB                       *OwnershipDB
 }
 
-func NewManager(rpcClient *rpc.Client, mainContractOwnershipProvider thirdparty.CollectibleContractOwnershipProvider, fallbackContractOwnershipProvider thirdparty.CollectibleContractOwnershipProvider, opensea *opensea.Client) *Manager {
+func NewManager(rpcClient *rpc.Client, db *sql.DB, mainContractOwnershipProvider thirdparty.CollectibleContractOwnershipProvider, fallbackContractOwnershipProvider thirdparty.CollectibleContractOwnershipProvider, opensea *opensea.Client) *Manager {
 	hystrix.ConfigureCommand(hystrixContractOwnershipClientName, hystrix.CommandConfig{
 		Timeout:               10000,
 		MaxConcurrentRequests: 100,
@@ -57,7 +60,7 @@ func NewManager(rpcClient *rpc.Client, mainContractOwnershipProvider thirdparty.
 		fallbackContractOwnershipProvider: fallbackContractOwnershipProvider,
 		opensea:                           opensea,
 		nftCache:                          make(map[walletCommon.ChainID]map[string]thirdparty.CollectibleData),
-		ownershipCache:                    make(map[walletCommon.ChainID]map[common.Address][]thirdparty.CollectibleUniqueID),
+		ownershipDB:                       NewOwnershipDB(db),
 	}
 }
 
@@ -126,7 +129,7 @@ func (o *Manager) FetchBalancesByOwnerAndContractAddress(chainID walletCommon.Ch
 	}
 
 	// Try with more direct endpoint first (OpenSea)
-	assetsContainer, err := o.FetchAllAssetsByOwnerAndContractAddress(chainID, ownerAddress, contractAddresses, "", 0)
+	assetsContainer, err := o.FetchAllAssetsByOwnerAndContractAddress(chainID, ownerAddress, contractAddresses, FetchFromStartCursor, FetchNoLimit)
 	if err == opensea.ErrChainIDNotSupported {
 		// Use contract ownership providers
 		for _, contractAddress := range contractAddresses {
@@ -188,7 +191,7 @@ func (o *Manager) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner comm
 }
 
 func (o *Manager) UpdateOwnedCollectibles(chainID walletCommon.ChainID, owner common.Address) error {
-	assetContainer, err := o.FetchAllAssetsByOwner(chainID, owner, "", 0)
+	assetContainer, err := o.FetchAllAssetsByOwner(chainID, owner, FetchFromStartCursor, FetchNoLimit)
 	if err != nil {
 		return err
 	}
@@ -207,37 +210,18 @@ func (o *Manager) UpdateOwnedCollectibles(chainID walletCommon.ChainID, owner co
 }
 
 func (o *Manager) GetOwnedCollectibles(chainIDs []walletCommon.ChainID, owners []common.Address, offset int, limit int) ([]thirdparty.CollectibleUniqueID, bool, error) {
-	o.ownershipCacheLock.RLock()
-	defer o.ownershipCacheLock.RUnlock()
-
-	ids := make([]thirdparty.CollectibleUniqueID, 0)
-
-	for _, chainID := range chainIDs {
-		if _, ok := o.ownershipCache[chainID]; !ok {
-			continue
-		}
-		for _, owner := range owners {
-			ids = append(ids, o.ownershipCache[chainID][owner]...)
-		}
+	// Request one more than limit, to check if DB has more available
+	ids, err := o.ownershipDB.GetOwnedCollectibles(chainIDs, owners, offset, limit+1)
+	if err != nil {
+		return nil, false, err
 	}
 
-	// For compatibility with SQL OFFSET, skip first 'offset' elems
-	lowIdx := offset + 1
-
-	if len(ids) <= lowIdx {
-		return nil, false, nil
+	hasMore := len(ids) > limit
+	if hasMore {
+		ids = ids[:limit]
 	}
 
-	highIdx := offset + limit
-	if len(ids) < highIdx {
-		highIdx = len(ids)
-	}
-
-	hasMore := len(ids) > highIdx
-
-	ret := ids[lowIdx:highIdx]
-
-	return ret, hasMore, nil
+	return ids, hasMore, nil
 }
 
 func (o *Manager) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.CollectibleData, error) {
@@ -320,21 +304,11 @@ func (o *Manager) processOwnedAssets(chainID walletCommon.ChainID, address commo
 		ownership = append(ownership, asset.ID)
 	}
 
-	o.setCacheOwnedCollectibles(chainID, address, ownership)
-
-	return nil
+	return o.setCacheOwnedCollectibles(chainID, address, ownership)
 }
 
-func (o *Manager) setCacheOwnedCollectibles(chainID walletCommon.ChainID, address common.Address, ownership []thirdparty.CollectibleUniqueID) {
-	o.ownershipCacheLock.Lock()
-	defer o.ownershipCacheLock.Unlock()
-
-	if _, ok := o.ownershipCache[chainID]; !ok {
-		o.ownershipCache[chainID] = make(map[common.Address][]thirdparty.CollectibleUniqueID)
-	}
-
-	// Ownership data should be fully replaced with newest list
-	o.ownershipCache[chainID][address] = ownership
+func (o *Manager) setCacheOwnedCollectibles(chainID walletCommon.ChainID, address common.Address, ownership []thirdparty.CollectibleUniqueID) error {
+	return o.ownershipDB.Update(chainID, address, ownership)
 }
 
 func (o *Manager) processAssets(assets []thirdparty.CollectibleData) error {

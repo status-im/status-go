@@ -2,7 +2,6 @@ package collectibles
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -22,16 +21,16 @@ const (
 
 type refreshOwnedCollectiblesCommand struct {
 	manager        *Manager
-	db             *sql.DB
-	eventFeed      *event.Feed
+	accountsDB     *accounts.Database
+	walletFeed     *event.Feed
 	networkManager *network.Manager
 }
 
-func newRefreshOwnedCollectiblesCommand(manager *Manager, db *sql.DB, eventFeed *event.Feed, networkManager *network.Manager) *refreshOwnedCollectiblesCommand {
+func newRefreshOwnedCollectiblesCommand(manager *Manager, accountsDB *accounts.Database, walletFeed *event.Feed, networkManager *network.Manager) *refreshOwnedCollectiblesCommand {
 	return &refreshOwnedCollectiblesCommand{
 		manager:        manager,
-		db:             db,
-		eventFeed:      eventFeed,
+		accountsDB:     accountsDB,
+		walletFeed:     walletFeed,
 		networkManager: networkManager,
 	}
 }
@@ -56,7 +55,7 @@ func (c *refreshOwnedCollectiblesCommand) Run(ctx context.Context) (err error) {
 }
 
 func (c *refreshOwnedCollectiblesCommand) triggerEvent(eventType walletevent.EventType, account statustypes.Address, message string) {
-	c.eventFeed.Send(walletevent.Event{
+	c.walletFeed.Send(walletevent.Event{
 		Type: eventType,
 		Accounts: []common.Address{
 			common.Address(account),
@@ -66,12 +65,7 @@ func (c *refreshOwnedCollectiblesCommand) triggerEvent(eventType walletevent.Eve
 }
 
 func (c *refreshOwnedCollectiblesCommand) updateOwnershipForAllAccounts(ctx context.Context) error {
-	accountsDB, err := accounts.NewDB(c.db)
-	if err != nil {
-		return err
-	}
-
-	addresses, err := accountsDB.GetWalletAddresses()
+	addresses, err := c.accountsDB.GetWalletAddresses()
 	if err != nil {
 		return err
 	}

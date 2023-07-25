@@ -78,6 +78,7 @@ require (
 	github.com/andybalholm/brotli v1.0.5
 	github.com/gorilla/sessions v1.2.1
 	github.com/ipfs/go-log/v2 v2.5.1
+	github.com/jmoiron/sqlx v1.3.5
 	github.com/ladydascalie/currency v1.6.0
 	github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.2
