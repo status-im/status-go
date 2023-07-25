@@ -1368,6 +1368,10 @@ func (api *PublicAPI) CheckAllCommunityChannelsPermissions(request *requests.Che
 	return api.service.messenger.CheckAllCommunityChannelsPermissions(request)
 }
 
+func (api *PublicAPI) CollectCommunityMetrics(request *requests.CommunityMetricsRequest) (*protocol.CommunityMetricsResponse, error) {
+	return api.service.messenger.CollectCommunityMetrics(request)
+}
+
 func (api *PublicAPI) ShareCommunityURLWithChatKey(communityID types.HexBytes) (string, error) {
 	return api.service.messenger.ShareCommunityURLWithChatKey(communityID)
 }
