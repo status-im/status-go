@@ -1325,8 +1325,12 @@ func (api *PublicAPI) GetAllCommunityTokens() ([]*communities.CommunityToken, er
 	return api.service.messenger.GetAllCommunityTokens()
 }
 
-func (api *PublicAPI) AddCommunityToken(token *communities.CommunityToken, croppedImage *images.CroppedImage) (*communities.CommunityToken, error) {
-	return api.service.messenger.AddCommunityToken(token, croppedImage)
+func (api *PublicAPI) SaveCommunityToken(token *communities.CommunityToken, croppedImage *images.CroppedImage) (*communities.CommunityToken, error) {
+	return api.service.messenger.SaveCommunityToken(token, croppedImage)
+}
+
+func (api *PublicAPI) AddCommunityToken(communityID string, chainID int, address string) error {
+	return api.service.messenger.AddCommunityToken(communityID, chainID, address)
 }
 
 func (api *PublicAPI) UpdateCommunityTokenState(chainID int, contractAddress string, deployState communities.DeployState) error {

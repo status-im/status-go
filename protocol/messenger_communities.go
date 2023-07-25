@@ -4062,8 +4062,12 @@ func (m *Messenger) GetAllCommunityTokens() ([]*communities.CommunityToken, erro
 	return m.communitiesManager.GetAllCommunityTokens()
 }
 
-func (m *Messenger) AddCommunityToken(token *communities.CommunityToken, croppedImage *images.CroppedImage) (*communities.CommunityToken, error) {
-	return m.communitiesManager.AddCommunityToken(token, croppedImage)
+func (m *Messenger) SaveCommunityToken(token *communities.CommunityToken, croppedImage *images.CroppedImage) (*communities.CommunityToken, error) {
+	return m.communitiesManager.SaveCommunityToken(token, croppedImage)
+}
+
+func (m *Messenger) AddCommunityToken(communityID string, chainID int, address string) error {
+	return m.communitiesManager.AddCommunityToken(communityID, chainID, address)
 }
 
 func (m *Messenger) UpdateCommunityTokenState(chainID int, contractAddress string, deployState communities.DeployState) error {
