@@ -127,9 +127,6 @@ func fillTestData(t *testing.T, db *sql.DB) (td testData, fromAddresses, toAddre
 	td.multiTx1Tr1 = trs[2]
 	td.multiTx1Tr2 = trs[4]
 
-	// TODO: This got automatically set by GenerateTestTransfers to USDC/Mainnet
-	//td.multiTx1Tr1.Token = &transfer.SntMainnet
-
 	td.multiTx1 = transfer.GenerateTestSendMultiTransaction(td.multiTx1Tr1)
 	td.multiTx1.ToToken = testutils.DaiSymbol
 	td.multiTx1ID = transfer.InsertTestMultiTransaction(t, db, &td.multiTx1)
@@ -302,8 +299,7 @@ func TestGetActivityEntriesWithSameTransactionForSenderAndReceiverInDB(t *testin
 
 	require.Equal(t, SendAT, entries[0].activityType)
 	require.NotEqual(t, eth.Address{}, entries[0].transaction.Address)
-	// TODO: extract and use to/from Address to compare instead of identity
-	require.Equal(t, td.tr1.To, entries[0].transaction.Address)
+	require.Equal(t, td.tr1.To, *entries[0].recipient)
 
 	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 10)
 	require.NoError(t, err)
@@ -909,15 +905,45 @@ func TestGetActivityEntriesFilterByToAddresses(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 2, len(entries))
 }
+
 func TestGetActivityEntriesFilterByNetworks(t *testing.T) {
 	deps, close := setupTestActivityDB(t)
 	defer close()
 
 	// Adds 4 extractable transactions
 	td, fromTds, toTds := fillTestData(t, deps.db)
+
+	chainToEntryCount := make(map[common.ChainID]map[int]int)
+	recordPresence := func(chainID common.ChainID, entry int) {
+		if _, ok := chainToEntryCount[chainID]; !ok {
+			chainToEntryCount[chainID] = make(map[int]int)
+			chainToEntryCount[chainID][entry] = 1
+		} else {
+			if _, ok := chainToEntryCount[chainID][entry]; !ok {
+				chainToEntryCount[chainID][entry] = 1
+			} else {
+				chainToEntryCount[chainID][entry]++
+			}
+		}
+	}
+	recordPresence(td.tr1.ChainID, 0)
+	recordPresence(td.pendingTr.ChainID, 1)
+	recordPresence(td.multiTx1Tr1.ChainID, 2)
+	if td.multiTx1Tr2.ChainID != td.multiTx1Tr1.ChainID {
+		recordPresence(td.multiTx1Tr2.ChainID, 2)
+	}
+	recordPresence(td.multiTx2Tr1.ChainID, 3)
+	if td.multiTx2Tr2.ChainID != td.multiTx2Tr1.ChainID {
+		recordPresence(td.multiTx2Tr2.ChainID, 3)
+	}
+	if td.multiTx2PendingTr.ChainID != td.multiTx2Tr1.ChainID && td.multiTx2PendingTr.ChainID != td.multiTx2Tr2.ChainID {
+		recordPresence(td.multiTx2PendingTr.ChainID, 3)
+	}
+
 	// Add 6 extractable transactions
 	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 6)
 	for i := range trs {
+		recordPresence(trs[i].ChainID, 4+i)
 		transfer.InsertTestTransfer(t, deps.db, trs[i].To, &trs[i])
 	}
 	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
@@ -931,14 +957,67 @@ func TestGetActivityEntriesFilterByNetworks(t *testing.T) {
 	chainIDs = []common.ChainID{5674839210}
 	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, chainIDs, filter, 0, 15)
 	require.NoError(t, err)
-	// TODO: update after multi-transactions are filterable by ChainID
-	require.Equal(t, 2 /*0*/, len(entries))
+	require.Equal(t, 0, len(entries))
 
 	chainIDs = []common.ChainID{td.pendingTr.ChainID, td.multiTx2Tr1.ChainID, trs[3].ChainID}
 	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, chainIDs, filter, 0, 15)
 	require.NoError(t, err)
-	// TODO: update after multi-transactions are filterable by ChainID
-	require.Equal(t, 8 /*6*/, len(entries))
+	expectedResults := make(map[int]int)
+	for _, chainID := range chainIDs {
+		for entry := range chainToEntryCount[chainID] {
+			if _, ok := expectedResults[entry]; !ok {
+				expectedResults[entry]++
+			}
+		}
+	}
+	require.Equal(t, len(expectedResults), len(entries))
+}
+
+func TestGetActivityEntriesFilterByNetworksOfSubTransactions(t *testing.T) {
+	deps, close := setupTestActivityDB(t)
+	defer close()
+
+	// Add 6 extractable transactions
+	trs, _, toTrs := transfer.GenerateTestTransfers(t, deps.db, 0, 5)
+	trs[0].ChainID = 1231
+	trs[1].ChainID = 1232
+	trs[2].ChainID = 1233
+	mt1 := transfer.GenerateTestBridgeMultiTransaction(trs[0], trs[1])
+	trs[0].MultiTransactionID = transfer.InsertTestMultiTransaction(t, deps.db, &mt1)
+	trs[1].MultiTransactionID = mt1.MultiTransactionID
+	trs[2].MultiTransactionID = mt1.MultiTransactionID
+
+	trs[3].ChainID = 1234
+	mt2 := transfer.GenerateTestSwapMultiTransaction(trs[3], testutils.SntSymbol, 100)
+	trs[3].MultiTransactionID = transfer.InsertTestMultiTransaction(t, deps.db, &mt2)
+
+	for i := range trs {
+		if i == 2 {
+			transfer.InsertTestPendingTransaction(t, deps.db, &trs[i])
+		} else {
+			transfer.InsertTestTransfer(t, deps.db, trs[i].To, &trs[i])
+		}
+	}
+
+	var filter Filter
+	chainIDs := allNetworksFilter()
+	entries, err := getActivityEntries(context.Background(), deps, toTrs, chainIDs, filter, 0, 15)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(entries))
+
+	// Extract sub-transactions by pending
+	chainIDs = []common.ChainID{trs[0].ChainID, trs[1].ChainID}
+	entries, err = getActivityEntries(context.Background(), deps, toTrs, chainIDs, filter, 0, 15)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(entries))
+	require.Equal(t, entries[0].id, mt1.MultiTransactionID)
+
+	// Extract sub-transactions by
+	chainIDs = []common.ChainID{trs[2].ChainID}
+	entries, err = getActivityEntries(context.Background(), deps, toTrs, chainIDs, filter, 0, 15)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(entries))
+	require.Equal(t, entries[0].id, mt1.MultiTransactionID)
 }
 
 func TestGetActivityEntriesCheckToAndFrom(t *testing.T) {
@@ -963,8 +1042,7 @@ func TestGetActivityEntriesCheckToAndFrom(t *testing.T) {
 
 	require.Equal(t, SendAT, entries[5].activityType)                  // td.tr1
 	require.NotEqual(t, eth.Address{}, entries[5].transaction.Address) // td.tr1
-	// TODO: extract to/from Address and use it for comparison instead of identity address
-	require.Equal(t, td.tr1.To, entries[5].transaction.Address) // td.tr1
+	require.Equal(t, td.tr1.To, *entries[5].recipient)                 // td.tr1
 
 	require.Equal(t, SendAT, entries[4].activityType) // td.pendingTr
 
@@ -981,8 +1059,6 @@ func TestGetActivityEntriesCheckToAndFrom(t *testing.T) {
 	// TODO: add accounts to DB for proper detection of sender/receiver
 	// TODO: Test with all addresses
 }
-
-// TODO test sub-transaction count for multi-transactions
 
 func TestGetActivityEntriesCheckContextCancellation(t *testing.T) {
 	deps, close := setupTestActivityDB(t)
