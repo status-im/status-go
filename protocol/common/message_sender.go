@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"fmt"
 	"sync"
 	"time"
 
@@ -256,11 +257,15 @@ func (s *MessageSender) sendCommunity(
 	ctx context.Context,
 	rawMessage *RawMessage,
 ) ([]byte, error) {
-	s.logger.Debug("sending community message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(&rawMessage.Sender.PublicKey))))
 
 	// Set sender
 	if rawMessage.Sender == nil {
 		rawMessage.Sender = s.identity
+	}
+	s.logger.Debug("sending community message", zap.String("sender", types.EncodeHex(crypto.FromECDSAPub(&rawMessage.Sender.PublicKey))))
+	fmt.Println("sending community message sender:", types.EncodeHex(crypto.FromECDSAPub(&rawMessage.Sender.PublicKey)))
+	for _, rec := range rawMessage.Recipients {
+		fmt.Println("recipient", types.EncodeHex(crypto.FromECDSAPub(rec)))
 	}
 
 	messageID, err := s.getMessageID(rawMessage)
@@ -307,6 +312,7 @@ func (s *MessageSender) sendCommunity(
 
 	// If it's a chat message, we send it on the community chat topic
 	if ShouldCommunityMessageBeEncrypted(rawMessage.MessageType) {
+		fmt.Println("Should be encrypted")
 		messageSpec, err := s.protocol.BuildHashRatchetMessage(rawMessage.CommunityID, wrappedMessage)
 		if err != nil {
 			return nil, err
@@ -329,6 +335,7 @@ func (s *MessageSender) sendCommunity(
 		s.notifyOnSentMessage(sentMessage)
 
 	} else {
+		fmt.Println("Sending to community topic")
 
 		payload := wrappedMessage
 
@@ -343,6 +350,7 @@ func (s *MessageSender) sendCommunity(
 		}
 
 		s.logger.Debug("sent community message ", zap.String("messageID", messageID.String()), zap.String("hash", types.EncodeHex(hash)))
+		fmt.Println("sent community message ", zap.String("messageID", messageID.String()), zap.String("hash", types.EncodeHex(hash)))
 	}
 
 	s.transport.Track(messageIDs, hash, newMessage)

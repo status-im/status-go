@@ -357,11 +357,14 @@ func (t *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.
 
 	// We load the filter to make sure we can post on it
 	filter, err := t.filters.LoadPublic(PubkeyToHex(publicKey)[2:])
+	fmt.Println("Community pub key", PubkeyToHex(publicKey)[2:])
+	fmt.Println("Filter", filter.FilterID)
 	if err != nil {
 		return nil, err
 	}
 
 	newMessage.Topic = filter.Topic
+	fmt.Println("Topic", filter.Topic.String())
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
 	t.logger.Debug("SENDING message", zap.Binary("topic", filter.Topic[:]))
