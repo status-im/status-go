@@ -752,7 +752,7 @@ func (m *Messenger) SetMutePropertyOnChatsByCategory(request *requests.MuteCateg
 // getAccountsToShare is used to get the wallet accounts to share either when requesting to join a community or when editing
 // requestToJoinID can be empty when editing
 func (m *Messenger) getAccountsToShare(addressesToReveal []string, airdropAddress string, communityID types.HexBytes, password string, requestToJoinID []byte) (map[gethcommon.Address]*protobuf.RevealedAccount, []gethcommon.Address, error) {
-	walletAccounts, err := m.settings.GetAccounts(false)
+	walletAccounts, err := m.settings.GetActiveAccounts()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -819,7 +819,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	}
 
 	if request.Password != "" {
-		walletAccounts, err := m.settings.GetAccounts(false)
+		walletAccounts, err := m.settings.GetActiveAccounts()
 		if err != nil {
 			return nil, err
 		}
@@ -975,7 +975,7 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 		return nil, err
 	}
 
-	walletAccounts, err := m.settings.GetAccounts(false)
+	walletAccounts, err := m.settings.GetActiveAccounts()
 	if err != nil {
 		return nil, err
 	}
@@ -4122,7 +4122,7 @@ func (m *Messenger) CheckPermissionsToJoinCommunity(request *requests.CheckPermi
 		return nil, err
 	}
 
-	accounts, err := m.settings.GetAccounts(false)
+	accounts, err := m.settings.GetActiveAccounts()
 	if err != nil {
 		return nil, err
 	}
@@ -4141,7 +4141,7 @@ func (m *Messenger) CheckCommunityChannelPermissions(request *requests.CheckComm
 		return nil, err
 	}
 
-	accounts, err := m.settings.GetAccounts(false)
+	accounts, err := m.settings.GetActiveAccounts()
 	if err != nil {
 		return nil, err
 	}
@@ -4160,7 +4160,7 @@ func (m *Messenger) CheckAllCommunityChannelsPermissions(request *requests.Check
 		return nil, err
 	}
 
-	accounts, err := m.settings.GetAccounts(false)
+	accounts, err := m.settings.GetActiveAccounts()
 	if err != nil {
 		return nil, err
 	}

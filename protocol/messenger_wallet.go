@@ -27,7 +27,7 @@ func (m *Messenger) retrieveWalletBalances() error {
 	if m.walletAPI == nil {
 		m.logger.Warn("wallet api not enabled")
 	}
-	accounts, err := m.settings.GetAccounts(false)
+	accounts, err := m.settings.GetActiveAccounts()
 	if err != nil {
 		return err
 	}
@@ -375,7 +375,7 @@ func (m *Messenger) syncAccountsPositions(rawMessageHandler RawMessageHandler) e
 
 	_, chat := m.getLastClockWithRelatedChat()
 
-	allDbAccounts, err := m.settings.GetAccounts(false)
+	allDbAccounts, err := m.settings.GetActiveAccounts()
 	if err != nil {
 		return err
 	}
@@ -480,7 +480,7 @@ func (m *Messenger) resolveAndSyncKeypairOrJustWalletAccount(keyUID string, addr
 
 	if keyUID == "" {
 		var dbAccount *accounts.Account
-		allDbAccounts, err := m.settings.GetAccounts(true) // removed accounts included
+		allDbAccounts, err := m.settings.GetAllAccounts() // removed accounts included
 		if err != nil {
 			return err
 		}
@@ -502,7 +502,7 @@ func (m *Messenger) resolveAndSyncKeypairOrJustWalletAccount(keyUID string, addr
 		}
 	} else {
 		var dbKeypair *accounts.Keypair
-		allDbKeypairs, err := m.settings.GetKeypairs(true) // removed keypairs included
+		allDbKeypairs, err := m.settings.GetAllKeypairs() // removed keypairs included
 		if err != nil {
 			return err
 		}

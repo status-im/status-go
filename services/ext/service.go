@@ -322,7 +322,7 @@ func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct
 	for {
 		select {
 		case <-ticker.C:
-			accounts, err := s.accountsDB.GetAccounts(false)
+			accounts, err := s.accountsDB.GetActiveAccounts()
 			if err != nil {
 				log.Error("failed to retrieve accounts", "err", err)
 			}

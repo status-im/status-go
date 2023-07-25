@@ -694,7 +694,7 @@ func (b *GethStatusBackend) MigrateKeyStoreDir(acc multiaccounts.Account, passwo
 	if err != nil {
 		return err
 	}
-	accounts, err := accountDB.GetAccounts(false)
+	accounts, err := accountDB.GetActiveAccounts()
 	if err != nil {
 		return err
 	}
@@ -1168,7 +1168,7 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 		return err
 	}
 
-	knownAccounts, err := db.GetAccounts(false)
+	knownAccounts, err := db.GetActiveAccounts()
 	if err != nil {
 		return err
 	}

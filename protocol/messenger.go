@@ -2565,7 +2565,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 	}
 
 	// we have to sync deleted keypairs as well
-	keypairs, err := m.settings.GetKeypairs(true)
+	keypairs, err := m.settings.GetAllKeypairs()
 	if err != nil {
 		return err
 	}

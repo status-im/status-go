@@ -28,7 +28,7 @@ func TestKeycards(t *testing.T) {
 	require.NoError(t, err)
 	err = db.SaveOrUpdateKeypair(kp2)
 	require.NoError(t, err)
-	dbKeypairs, err := db.GetKeypairs(false)
+	dbKeypairs, err := db.GetActiveKeypairs()
 	require.NoError(t, err)
 	require.Equal(t, 2, len(dbKeypairs))
 
@@ -168,7 +168,7 @@ func TestKeycardsRemovalWhenDeletingKeypair(t *testing.T) {
 	// Pre-condition
 	err := db.SaveOrUpdateKeypair(kp2)
 	require.NoError(t, err)
-	dbKeypairs, err := db.GetKeypairs(false)
+	dbKeypairs, err := db.GetActiveKeypairs()
 	require.NoError(t, err)
 	require.Equal(t, 1, len(dbKeypairs))
 
@@ -197,7 +197,7 @@ func TestKeycardsRemovalWhenDeletingKeypair(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check db state after deletion
-	dbKeypairs, err = db.GetKeypairs(false)
+	dbKeypairs, err = db.GetActiveKeypairs()
 	require.NoError(t, err)
 	require.Equal(t, 0, len(dbKeypairs))
 

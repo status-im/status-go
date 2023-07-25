@@ -772,7 +772,7 @@ func (s *MessengerBackupSuite) TestBackupKeycards() {
 	s.Require().NoError(err)
 	err = bob1.settings.SaveOrUpdateKeypair(kp3)
 	s.Require().NoError(err)
-	dbKeypairs, err := bob1.settings.GetKeypairs(false)
+	dbKeypairs, err := bob1.settings.GetActiveKeypairs()
 	s.Require().NoError(err)
 	s.Require().Equal(3, len(dbKeypairs))
 
