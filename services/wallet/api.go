@@ -471,28 +471,28 @@ func (api *API) AddressExists(ctx context.Context, address types.Address) (bool,
 
 // Returns details for the passed address (response doesn't include derivation path)
 func (api *API) GetAddressDetails(ctx context.Context, chainID uint64, address string) (*DerivedAddress, error) {
-	commonAddr := common.HexToAddress(address)
-	addressExists, err := api.s.accountsDB.AddressExists(types.Address(commonAddr))
-	if err != nil {
-		return nil, err
+	result := &DerivedAddress{
+		Address: common.HexToAddress(address),
 	}
+	addressExists, err := api.s.accountsDB.AddressExists(types.Address(result.Address))
+	if err != nil {
+		return result, err
+	}
+
+	result.AlreadyCreated = addressExists
 
 	chainClient, err := api.s.rpcClient.EthClient(chainID)
 	if err != nil {
-		return nil, err
+		return result, err
 	}
 
-	balance, err := api.s.tokenManager.GetChainBalance(ctx, chainClient, commonAddr)
+	balance, err := api.s.tokenManager.GetChainBalance(ctx, chainClient, result.Address)
 	if err != nil {
-		return nil, err
+		return result, err
 	}
 
-	return &DerivedAddress{
-		Address:        commonAddr,
-		Path:           "",
-		AlreadyCreated: addressExists,
-		HasActivity:    balance.Cmp(big.NewInt(0)) != 0,
-	}, nil
+	result.HasActivity = balance.Cmp(big.NewInt(0)) != 0
+	return result, nil
 }
 
 func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionCommand *transfer.MultiTransactionCommand, data []*bridge.TransactionBridge, password string) (*transfer.MultiTransactionCommandResult, error) {
