@@ -169,9 +169,9 @@ type ChatMentionContext struct {
 	PreviousText       string // user input text before the last change
 	NewText            string
 
-	CallID    uint64
-	mu        *sync.Mutex
-	MaxCallID uint64
+	CallID       uint64
+	mu           *sync.Mutex
+	LatestCallID uint64
 }
 
 func NewChatMentionContext(chatID string) *ChatMentionContext {
@@ -311,11 +311,11 @@ func (m *MentionManager) OnChangeText(chatID, fullText string, callID uint64) (*
 	ctx := m.getChatMentionContext(chatID)
 	if callID > 0 {
 		ctx.mu.Lock()
-		if callID <= ctx.MaxCallID {
+		if callID <= ctx.LatestCallID {
 			ctx.mu.Unlock()
-			return withCallID(ctx, callID), fmt.Errorf("callID is less than or equal to maxCallID, callID: %d, maxCallID: %d", callID, ctx.MaxCallID)
+			return withCallID(ctx, callID), fmt.Errorf("callID is less than or equal to latestCallID, callID: %d, maxCallID: %d", callID, ctx.LatestCallID)
 		}
-		ctx.MaxCallID = callID
+		ctx.LatestCallID = callID
 		ctx.mu.Unlock()
 	}
 
