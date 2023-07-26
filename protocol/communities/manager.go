@@ -717,6 +717,11 @@ func (m *Manager) ReevaluateMembers(community *Community, removeAdmins bool) err
 			viewAndPostPermissions := community.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
 
 			if len(viewOnlyPermissions) == 0 && len(viewAndPostPermissions) == 0 {
+				// ensure all members are added back if channel permissions were removed
+				_, err = community.PopulateChatWithAllMembers(channelID)
+				if err != nil {
+					return err
+				}
 				continue
 			}
 

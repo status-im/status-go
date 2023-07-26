@@ -2222,6 +2222,7 @@ func (o *Community) deleteTokenPermission(permissionID string) (*CommunityChange
 	delete(o.config.CommunityDescription.TokenPermissions, permissionID)
 
 	changes := o.emptyCommunityChanges()
+
 	changes.TokenPermissionsRemoved[permissionID] = permission
 	return changes, nil
 }
