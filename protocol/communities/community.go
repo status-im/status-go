@@ -1147,6 +1147,7 @@ func manageCommunityRolePermissions() map[protobuf.CommunityMember_Roles]bool {
 	roles := make(map[protobuf.CommunityMember_Roles]bool)
 	roles[protobuf.CommunityMember_ROLE_OWNER] = true
 	roles[protobuf.CommunityMember_ROLE_ADMIN] = true
+	roles[protobuf.CommunityMember_ROLE_TOKEN_MASTER] = true
 	return roles
 }
 

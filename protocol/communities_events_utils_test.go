@@ -1131,3 +1131,84 @@ func testMemberReceiveEventsWhenControlNodeOffline(base CommunityEventsTestsInte
 	waitOnMessengerResponse(s, WaitCommunityCondition, checkChannelDeleted, member)
 	waitOnMessengerResponse(s, WaitCommunityCondition, checkChannelDeleted, eventSender)
 }
+
+func testEventSenderCannotDeleteBecomeAdminPermission(base CommunityEventsTestsInterface, community *communities.Community) {
+	permissionRequest := createTestPermissionRequest(community)
+	permissionRequest.Type = protobuf.CommunityTokenPermission_BECOME_ADMIN
+
+	// control node creates BECOME_ADMIN permission
+	response, err := base.GetControlNode().CreateCommunityTokenPermission(permissionRequest)
+	s := base.GetSuite()
+	s.Require().NoError(err)
+
+	var tokenPermissionID string
+	for id := range response.CommunityChanges[0].TokenPermissionsAdded {
+		tokenPermissionID = id
+	}
+	s.Require().NotEqual(tokenPermissionID, "")
+
+	// then, ensure event sender receives updated community
+	_, err = WaitOnMessengerResponse(
+		base.GetEventSender(),
+		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		"event sender did not receive updated community",
+	)
+	s.Require().NoError(err)
+	eventSenderCommunity, err := base.GetEventSender().communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	assertCheckTokenPermissionCreated(s, eventSenderCommunity)
+
+	deleteTokenPermission := &requests.DeleteCommunityTokenPermission{
+		CommunityID:  community.ID(),
+		PermissionID: tokenPermissionID,
+	}
+
+	// then event sender tries to delete BECOME_ADMIN permission which should fail
+	response, err = base.GetEventSender().DeleteCommunityTokenPermission(deleteTokenPermission)
+	s.Require().Error(err)
+	s.Require().Nil(response)
+}
+
+func testEventSenderCannotEditBecomeAdminPermission(base CommunityEventsTestsInterface, community *communities.Community) {
+	permissionRequest := createTestPermissionRequest(community)
+	permissionRequest.Type = protobuf.CommunityTokenPermission_BECOME_ADMIN
+
+	// control node creates BECOME_ADMIN permission
+	response, err := base.GetControlNode().CreateCommunityTokenPermission(permissionRequest)
+	s := base.GetSuite()
+	s.Require().NoError(err)
+
+	var tokenPermissionID string
+	for id := range response.CommunityChanges[0].TokenPermissionsAdded {
+		tokenPermissionID = id
+	}
+	s.Require().NotEqual(tokenPermissionID, "")
+
+	ownerCommunity, err := base.GetControlNode().communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	assertCheckTokenPermissionCreated(s, ownerCommunity)
+
+	// then, ensure event sender receives updated community
+	_, err = WaitOnMessengerResponse(
+		base.GetEventSender(),
+		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		"event sender did not receive updated community",
+	)
+	s.Require().NoError(err)
+	eventSenderCommunity, err := base.GetEventSender().communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	assertCheckTokenPermissionCreated(s, eventSenderCommunity)
+
+	permissionRequest.TokenCriteria[0].Symbol = "UPDATED"
+	permissionRequest.TokenCriteria[0].Amount = "200"
+
+	permissionEditRequest := &requests.EditCommunityTokenPermission{
+		PermissionID:                   tokenPermissionID,
+		CreateCommunityTokenPermission: *permissionRequest,
+	}
+
+	// then, event sender tries to edit permission
+	response, err = base.GetEventSender().EditCommunityTokenPermission(permissionEditRequest)
+	s.Require().Error(err)
+	s.Require().Nil(response)
+}
