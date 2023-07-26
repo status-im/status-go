@@ -108,7 +108,7 @@ func NewService(
 	alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKeys)
 	infuraClient := infura.NewClient(config.WalletConfig.InfuraAPIKey, config.WalletConfig.InfuraAPIKeySecret)
 	openseaClient := opensea.NewClient(config.WalletConfig.OpenseaAPIKey, walletFeed)
-	collectiblesManager := collectibles.NewManager(rpcClient, db, alchemyClient, infuraClient, openseaClient)
+	collectiblesManager := collectibles.NewManager(rpcClient, alchemyClient, infuraClient, openseaClient)
 	collectibles := collectibles.NewService(db, walletFeed, accountsDB, accountFeed, rpcClient.NetworkManager, collectiblesManager)
 	return &Service{
 		db:                    db,

@@ -2,7 +2,6 @@ package collectibles
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"math/big"
 	"strings"
@@ -43,10 +42,9 @@ type Manager struct {
 	opensea                           *opensea.Client
 	nftCache                          map[walletCommon.ChainID]map[string]thirdparty.CollectibleData
 	nftCacheLock                      sync.RWMutex
-	ownershipDB                       *OwnershipDB
 }
 
-func NewManager(rpcClient *rpc.Client, db *sql.DB, mainContractOwnershipProvider thirdparty.CollectibleContractOwnershipProvider, fallbackContractOwnershipProvider thirdparty.CollectibleContractOwnershipProvider, opensea *opensea.Client) *Manager {
+func NewManager(rpcClient *rpc.Client, mainContractOwnershipProvider thirdparty.CollectibleContractOwnershipProvider, fallbackContractOwnershipProvider thirdparty.CollectibleContractOwnershipProvider, opensea *opensea.Client) *Manager {
 	hystrix.ConfigureCommand(hystrixContractOwnershipClientName, hystrix.CommandConfig{
 		Timeout:               10000,
 		MaxConcurrentRequests: 100,
@@ -60,7 +58,6 @@ func NewManager(rpcClient *rpc.Client, db *sql.DB, mainContractOwnershipProvider
 		fallbackContractOwnershipProvider: fallbackContractOwnershipProvider,
 		opensea:                           opensea,
 		nftCache:                          make(map[walletCommon.ChainID]map[string]thirdparty.CollectibleData),
-		ownershipDB:                       NewOwnershipDB(db),
 	}
 }
 
@@ -190,38 +187,15 @@ func (o *Manager) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner comm
 	return assetContainer, nil
 }
 
-func (o *Manager) UpdateOwnedCollectibles(chainID walletCommon.ChainID, owner common.Address) error {
-	assetContainer, err := o.FetchAllAssetsByOwner(chainID, owner, FetchFromStartCursor, FetchNoLimit)
+func (o *Manager) FetchCollectibleOwnershipByOwner(chainID walletCommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.CollectibleOwnershipContainer, error) {
+	assetContainer, err := o.FetchAllAssetsByOwner(chainID, owner, cursor, limit)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = o.processOwnedAssets(chainID, owner, assetContainer.Collectibles)
-	if err != nil {
-		return err
-	}
+	ret := assetContainer.ToOwnershipContainer()
 
-	err = o.processAssets(assetContainer.Collectibles)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (o *Manager) GetOwnedCollectibles(chainIDs []walletCommon.ChainID, owners []common.Address, offset int, limit int) ([]thirdparty.CollectibleUniqueID, bool, error) {
-	// Request one more than limit, to check if DB has more available
-	ids, err := o.ownershipDB.GetOwnedCollectibles(chainIDs, owners, offset, limit+1)
-	if err != nil {
-		return nil, false, err
-	}
-
-	hasMore := len(ids) > limit
-	if hasMore {
-		ids = ids[:limit]
-	}
-
-	return ids, hasMore, nil
+	return &ret, nil
 }
 
 func (o *Manager) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.CollectibleData, error) {
@@ -296,19 +270,6 @@ func (o *Manager) fetchTokenURI(id thirdparty.CollectibleUniqueID) (string, erro
 	}
 
 	return tokenURI, err
-}
-
-func (o *Manager) processOwnedAssets(chainID walletCommon.ChainID, address common.Address, assets []thirdparty.CollectibleData) error {
-	ownership := make([]thirdparty.CollectibleUniqueID, 0, len(assets))
-	for _, asset := range assets {
-		ownership = append(ownership, asset.ID)
-	}
-
-	return o.setCacheOwnedCollectibles(chainID, address, ownership)
-}
-
-func (o *Manager) setCacheOwnedCollectibles(chainID walletCommon.ChainID, address common.Address, ownership []thirdparty.CollectibleUniqueID) error {
-	return o.ownershipDB.Update(chainID, address, ownership)
 }
 
 func (o *Manager) processAssets(assets []thirdparty.CollectibleData) error {

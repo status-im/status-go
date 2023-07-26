@@ -44,7 +44,7 @@ var (
 
 type Service struct {
 	manager      *Manager
-	db           *sql.DB
+	ownershipDB  *OwnershipDB
 	walletFeed   *event.Feed
 	accountsDB   *accounts.Database
 	accountsFeed *event.Feed
@@ -60,7 +60,7 @@ type Service struct {
 func NewService(db *sql.DB, walletFeed *event.Feed, accountsDB *accounts.Database, accountsFeed *event.Feed, networkManager *network.Manager, manager *Manager) *Service {
 	return &Service{
 		manager:        manager,
-		db:             db,
+		ownershipDB:    NewOwnershipDB(db),
 		walletFeed:     walletFeed,
 		accountsDB:     accountsDB,
 		accountsFeed:   accountsFeed,
@@ -101,7 +101,7 @@ type filterOwnedCollectiblesTaskReturnType struct {
 // All calls will trigger an EventOwnedCollectiblesFilteringDone event with the result of the filtering
 func (s *Service) FilterOwnedCollectiblesAsync(ctx context.Context, chainIDs []walletCommon.ChainID, addresses []common.Address, offset int, limit int) {
 	s.scheduler.Enqueue(filterOwnedCollectiblesTask, func(ctx context.Context) (interface{}, error) {
-		collectibles, hasMore, err := s.manager.GetOwnedCollectibles(chainIDs, addresses, offset, limit)
+		collectibles, hasMore, err := s.GetOwnedCollectibles(chainIDs, addresses, offset, limit)
 		if err != nil {
 			return nil, err
 		}
@@ -165,6 +165,7 @@ func (s *Service) startPeriodicalOwnershipFetch() {
 
 	command := newRefreshOwnedCollectiblesCommand(
 		s.manager,
+		s.ownershipDB,
 		s.accountsDB,
 		s.walletFeed,
 		s.networkManager,
@@ -241,4 +242,19 @@ func (s *Service) sendResponseEvent(eventType walletevent.EventType, payloadObj 
 		Type:    eventType,
 		Message: string(payload),
 	})
+}
+
+func (s *Service) GetOwnedCollectibles(chainIDs []walletCommon.ChainID, owners []common.Address, offset int, limit int) ([]thirdparty.CollectibleUniqueID, bool, error) {
+	// Request one more than limit, to check if DB has more available
+	ids, err := s.ownershipDB.GetOwnedCollectibles(chainIDs, owners, offset, limit+1)
+	if err != nil {
+		return nil, false, err
+	}
+
+	hasMore := len(ids) > limit
+	if hasMore {
+		ids = ids[:limit]
+	}
+
+	return ids, hasMore, nil
 }

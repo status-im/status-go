@@ -74,10 +74,30 @@ type CollectibleHeader struct {
 	CollectionName     string              `json:"collection_name"`
 }
 
+type CollectibleOwnershipContainer struct {
+	Collectibles   []CollectibleUniqueID
+	NextCursor     string
+	PreviousCursor string
+}
+
 type CollectibleDataContainer struct {
 	Collectibles   []CollectibleData
 	NextCursor     string
 	PreviousCursor string
+}
+
+func (c *CollectibleDataContainer) ToOwnershipContainer() CollectibleOwnershipContainer {
+	ret := CollectibleOwnershipContainer{
+		Collectibles:   make([]CollectibleUniqueID, 0, len(c.Collectibles)),
+		NextCursor:     c.NextCursor,
+		PreviousCursor: c.PreviousCursor,
+	}
+
+	for _, collectible := range c.Collectibles {
+		ret.Collectibles = append(ret.Collectibles, collectible.ID)
+	}
+
+	return ret
 }
 
 func (c *CollectibleData) toHeader() CollectibleHeader {
