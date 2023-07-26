@@ -40,14 +40,14 @@ func (o *Community) CreateCategory(categoryID string, categoryName string, chatI
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isOwner := o.IsOwner()
-	isAdmin := o.IsAdmin()
+	isControlNode := o.IsControlNode()
+	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
 
-	if !isOwner && !isAdmin {
+	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotAdmin
 	}
 
-	if isAdmin {
+	if allowedToSendEvents {
 		err := o.addNewCommunityEvent(o.ToCreateCategoryCommunityEvent(categoryID, categoryName, chatIDs))
 		if err != nil {
 			return nil, err
@@ -59,7 +59,7 @@ func (o *Community) CreateCategory(categoryID string, categoryName string, chatI
 		return nil, err
 	}
 
-	if isOwner {
+	if isControlNode {
 		o.increaseClock()
 	}
 
@@ -80,14 +80,14 @@ func (o *Community) EditCategory(categoryID string, categoryName string, chatIDs
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isOwner := o.IsOwner()
-	isAdmin := o.IsAdmin()
+	isControlNode := o.IsControlNode()
+	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
 
-	if !isOwner && !isAdmin {
+	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotAdmin
 	}
 
-	if isAdmin {
+	if allowedToSendEvents {
 		err := o.addNewCommunityEvent(o.ToEditCategoryCommunityEvent(categoryID, categoryName, chatIDs))
 		if err != nil {
 			return nil, err
@@ -100,7 +100,7 @@ func (o *Community) EditCategory(categoryID string, categoryName string, chatIDs
 		return nil, err
 	}
 
-	if isOwner {
+	if isControlNode {
 		o.increaseClock()
 	}
 
@@ -121,14 +121,14 @@ func (o *Community) ReorderCategories(categoryID string, newPosition int) (*Comm
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isOwner := o.IsOwner()
-	isAdmin := o.IsAdmin()
+	isControlNode := o.IsControlNode()
+	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
 
-	if !isOwner && !isAdmin {
+	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotAdmin
 	}
 
-	if isAdmin {
+	if allowedToSendEvents {
 		err := o.addNewCommunityEvent(o.ToReorderCategoryCommunityEvent(categoryID, newPosition))
 		if err != nil {
 			return nil, err
@@ -140,7 +140,7 @@ func (o *Community) ReorderCategories(categoryID string, newPosition int) (*Comm
 		return nil, err
 	}
 
-	if isOwner {
+	if isControlNode {
 		o.increaseClock()
 	}
 
@@ -161,14 +161,14 @@ func (o *Community) ReorderChat(categoryID string, chatID string, newPosition in
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isOwner := o.IsOwner()
-	isAdmin := o.IsAdmin()
+	isControlNode := o.IsControlNode()
+	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
 
-	if !isOwner && !isAdmin {
+	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotAdmin
 	}
 
-	if isAdmin {
+	if allowedToSendEvents {
 		err := o.addNewCommunityEvent(o.ToReorderChannelCommunityEvent(categoryID, chatID, newPosition))
 		if err != nil {
 			return nil, err
@@ -180,7 +180,7 @@ func (o *Community) ReorderChat(categoryID string, chatID string, newPosition in
 		return nil, err
 	}
 
-	if isOwner {
+	if isControlNode {
 		o.increaseClock()
 	}
 
@@ -316,14 +316,14 @@ func (o *Community) DeleteCategory(categoryID string) (*CommunityChanges, error)
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isOwner := o.IsOwner()
-	isAdmin := o.IsAdmin()
+	isControlNode := o.IsControlNode()
+	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
 
-	if !isOwner && !isAdmin {
+	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotAdmin
 	}
 
-	if isAdmin {
+	if allowedToSendEvents {
 		err := o.addNewCommunityEvent(o.ToDeleteCategoryCommunityEvent(categoryID))
 		if err != nil {
 			return nil, err
@@ -335,7 +335,7 @@ func (o *Community) DeleteCategory(categoryID string) (*CommunityChanges, error)
 		return nil, err
 	}
 
-	if isOwner {
+	if isControlNode {
 		o.increaseClock()
 	}
 

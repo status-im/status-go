@@ -204,6 +204,53 @@ func joinCommunity(s *suite.Suite, community *communities.Community, owner *Mess
 	s.Require().NoError(err)
 }
 
+func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, controlNode *Messenger, user *Messenger) {
+	// Request to join the community
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	response, err := user.RequestToJoinCommunity(request)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	requestToJoin := response.RequestsToJoinCommunity[0]
+	s.Require().Equal(requestToJoin.PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+
+	response, err = WaitOnMessengerResponse(
+		controlNode,
+		func(r *MessengerResponse) bool {
+			return len(r.RequestsToJoinCommunity) > 0
+		},
+		"control node did not receive community request to join",
+	)
+	s.Require().NoError(err)
+
+	userRequestToJoin := response.RequestsToJoinCommunity[0]
+	s.Require().Equal(userRequestToJoin.PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+
+	// accept join request
+	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: requestToJoin.ID}
+	response, err = controlNode.AcceptRequestToJoinCommunity(acceptRequestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	updatedCommunity := response.Communities()[0]
+	s.Require().NotNil(updatedCommunity)
+	s.Require().True(updatedCommunity.HasMember(&user.identity.PublicKey))
+
+	// receive request to join response
+	_, err = WaitOnMessengerResponse(
+		user,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0
+		},
+		"user did not receive request to join response",
+	)
+	s.Require().NoError(err)
+	userCommunity, err := user.GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(userCommunity.HasMember(&user.identity.PublicKey))
+}
+
 func sendChatMessage(s *suite.Suite, sender *Messenger, chatID string, text string) *common.Message {
 	msg := &common.Message{
 		ChatMessage: protobuf.ChatMessage{
@@ -217,4 +264,30 @@ func sendChatMessage(s *suite.Suite, sender *Messenger, chatID string, text stri
 	s.Require().NoError(err)
 
 	return msg
+}
+
+func grantPermission(s *suite.Suite, community *communities.Community, controlNode *Messenger, target *Messenger, role protobuf.CommunityMember_Roles) {
+	responseAddRole, err := controlNode.AddRoleToMember(&requests.AddRoleToMember{
+		CommunityID: community.ID(),
+		User:        common.PubkeyToHexBytes(target.IdentityPublicKey()),
+		Role:        protobuf.CommunityMember_ROLE_ADMIN,
+	})
+	s.Require().NoError(err)
+
+	checkRole := func(response *MessengerResponse) bool {
+		if len(response.Communities()) == 0 {
+			return false
+		}
+		rCommunities := response.Communities()
+		s.Require().Len(rCommunities, 1)
+		s.Require().True(rCommunities[0].IsMemberAdmin(target.IdentityPublicKey()))
+		return true
+	}
+
+	checkRole(responseAddRole)
+
+	_, err = WaitOnMessengerResponse(target, func(response *MessengerResponse) bool {
+		return checkRole(response)
+	}, "community description changed message not received")
+	s.Require().NoError(err)
 }

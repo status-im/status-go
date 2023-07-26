@@ -787,10 +787,10 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 		return nil, ErrOrgNotFound
 	}
 
-	isOwner := community.IsOwner()
-	isAdmin := community.IsAdmin()
+	isControlNode := community.IsControlNode()
+	allowedToSendEvents := community.HasPermissionToSendCommunityEvents()
 
-	if !isOwner && !isAdmin {
+	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotEnoughPermissions
 	}
 
@@ -823,7 +823,7 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 		return nil, err
 	}
 
-	if isAdmin {
+	if allowedToSendEvents {
 		err := community.addNewCommunityEvent(community.ToCommunityEditCommunityEvent(newDescription))
 		if err != nil {
 			return nil, err
@@ -836,7 +836,7 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 		return nil, err
 	}
 
-	if isOwner {
+	if isControlNode {
 		community.increaseClock()
 	}
 
@@ -1300,9 +1300,9 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		return nil, err
 	}
 
-	// Owner cerifies admins events and publish changes
-	// all other users only apply changes to the community
-	if changes.Community.IsOwner() {
+	// Control node cerifies community events and publish changes
+	// all other nodes only apply changes to the community
+	if changes.Community.IsControlNode() {
 		changes.Community.increaseClock()
 		err = m.persistence.SaveCommunity(changes.Community)
 		if err != nil {
@@ -1798,7 +1798,7 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 		return err
 	}
 
-	if community.IsOwner() {
+	if community.IsControlNode() {
 		m.publish(&Subscription{Community: community})
 	}
 
@@ -2331,13 +2331,13 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, err
 	}
 
-	isAdminSigner := community.IsMemberAdmin(signer)
-	isOwnerSigner := common.IsPubKeyEqual(community.PublicKey(), signer)
-	if !isOwnerSigner && !isAdminSigner {
+	isOwnerOrAdminSigner := community.IsMemberOwnerOrAdmin(signer)
+	isControlNodeSigner := common.IsPubKeyEqual(community.PublicKey(), signer)
+	if !isControlNodeSigner && !isOwnerOrAdminSigner {
 		return nil, ErrNotAuthorized
 	}
 
-	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg, isAdminSigner)
+	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg, isOwnerOrAdminSigner && !isControlNodeSigner)
 	if err != nil {
 		return nil, err
 	}
@@ -4012,12 +4012,10 @@ func (m *Manager) saveAndPublish(community *Community) error {
 		return err
 	}
 
-	if community.IsOwner() {
+	if community.IsControlNode() {
 		m.publish(&Subscription{Community: community})
 		return nil
-	}
-
-	if community.IsAdmin() {
+	} else if community.HasPermissionToSendCommunityEvents() {
 		err := m.persistence.SaveCommunityEvents(community)
 		if err != nil {
 			return err

@@ -627,7 +627,6 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.CommunitiesSettings(), 1)
 	s.Require().True(response.Communities()[0].Joined())
-	s.Require().True(response.Communities()[0].IsOwner())
 	s.Require().True(response.Communities()[0].IsControlNode())
 
 	community := response.Communities()[0]
@@ -697,7 +696,7 @@ func (s *MessengerCommunitiesSuite) TestRemovePrivateKey() {
 	s.Require().Len(response.Communities(), 1)
 
 	community := response.Communities()[0]
-	s.Require().True(community.IsOwner())
+	s.Require().True(community.IsControlNode())
 	s.Require().True(community.IsControlNode())
 
 	response, err = s.bob.RemovePrivateKey(community.ID())
@@ -705,7 +704,7 @@ func (s *MessengerCommunitiesSuite) TestRemovePrivateKey() {
 	s.Require().Len(response.Communities(), 1)
 
 	community = response.Communities()[0]
-	s.Require().True(community.IsOwner())
+	s.Require().True(community.IsOwnerWithoutCommunityKey())
 	s.Require().False(community.IsControlNode())
 }
 
@@ -726,7 +725,7 @@ func (s *MessengerCommunitiesSuite) TestRolesAfterImportCommunity() {
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.CommunitiesSettings(), 1)
 	s.Require().True(response.Communities()[0].Joined())
-	s.Require().True(response.Communities()[0].IsOwner())
+	s.Require().True(response.Communities()[0].IsControlNode())
 	s.Require().True(response.Communities()[0].IsMemberOwner(&s.bob.identity.PublicKey))
 	s.Require().False(response.Communities()[0].IsMemberOwner(&s.alice.identity.PublicKey))
 
@@ -2520,8 +2519,12 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	s.Equal(newCommunity.Muted(), tnc.Muted())
 	s.Equal(newCommunity.Joined(), tnc.Joined())
 	s.Equal(newCommunity.Spectated(), tnc.Spectated())
-	s.Equal(newCommunity.IsOwner(), tnc.IsOwner())
 	s.Equal(newCommunity.InvitationOnly(), tnc.InvitationOnly())
+
+	s.True(newCommunity.IsControlNode())
+	s.False(newCommunity.IsOwnerWithoutCommunityKey())
+	s.True(tnc.IsOwnerWithoutCommunityKey())
+	s.False(tnc.IsControlNode())
 }
 
 // TestSyncCommunity_RequestToJoin tests more complex pairing and syncing scenario where one paired device
