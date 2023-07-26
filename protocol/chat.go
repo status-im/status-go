@@ -32,7 +32,9 @@ const (
 	ChatTypeOneToOne ChatType = iota + 1
 	ChatTypePublic
 	ChatTypePrivateGroupChat
+	// Deprecated: profile chats are no more supported
 	ChatTypeProfile
+	// Deprecated: timeline chats are no more supported
 	ChatTypeTimeline
 	ChatTypeCommunityChat
 )
@@ -63,6 +65,7 @@ const (
 const pkStringLength = 68
 
 // timelineChatID is a magic constant id for your own timeline
+// Deprecated: timeline chats are no more supported
 const timelineChatID = "@timeline70bd746ddcc12beb96b2c9d572d0784ab137ffc774f5383e50585a932080b57cca0484b259e61cecbaa33a4c98a300a"
 
 type Chat struct {
@@ -241,10 +244,12 @@ func (c *Chat) Public() bool {
 	return c.ChatType == ChatTypePublic
 }
 
+// Deprecated: profile chats are no more supported
 func (c *Chat) ProfileUpdates() bool {
 	return c.ChatType == ChatTypeProfile || len(c.Profile) > 0
 }
 
+// Deprecated: timeline chats are no more supported
 func (c *Chat) Timeline() bool {
 	return c.ChatType == ChatTypeTimeline
 }
@@ -527,11 +532,14 @@ func CreatePublicChat(name string, timesource common.TimeSource) *Chat {
 	}
 }
 
+// Deprecated: profile chats are no more supported
 func buildProfileChatID(publicKeyString string) string {
 	return "@" + publicKeyString
 }
 
+// Deprecated: profile chats are no more supported
 func CreateProfileChat(pubkey string, timesource common.TimeSource) *Chat {
+	return nil // NOTE: return nil to prevent usage of deprecated function
 
 	id := buildProfileChatID(pubkey)
 	return &Chat{
@@ -562,7 +570,10 @@ func CreateGroupChat(timesource common.TimeSource) Chat {
 	}
 }
 
+// Deprecated: timeline chats are no more supported
 func CreateTimelineChat(timesource common.TimeSource) *Chat {
+	return nil // NOTE: return nil to prevent usage of deprecated function
+
 	return &Chat{
 		ID:        timelineChatID,
 		Name:      "#" + timelineChatID,

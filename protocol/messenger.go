@@ -1716,16 +1716,21 @@ func (m *Messenger) Init() error {
 			return errors.New("invalid chat type")
 		}
 	}
+
+	// Timeline and profile chats are deprecated.
+	// This code can be removed after some reasonable time.
+
 	// upsert timeline chat
-	err = m.ensureTimelineChat()
-	if err != nil {
-		return err
-	}
+	//err = m.ensureTimelineChat()
+	//if err != nil {
+	//	return err
+	//}
+
 	// upsert profile chat
-	err = m.ensureMyOwnProfileChat()
-	if err != nil {
-		return err
-	}
+	//err = m.ensureMyOwnProfileChat()
+	//if err != nil {
+	//	return err
+	//}
 
 	// Get chat IDs and public keys from the contacts.
 	contacts, err := m.persistence.Contacts()

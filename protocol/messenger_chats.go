@@ -231,7 +231,11 @@ func (m *Messenger) CreatePublicChat(request *requests.CreatePublicChat) (*Messe
 	return m.createPublicChat(chatID, response)
 }
 
+// Deprecated: profile chats are deprecated
 func (m *Messenger) CreateProfileChat(request *requests.CreateProfileChat) (*MessengerResponse, error) {
+	// NOTE: return nil to prevent usage of deprecated function
+	return nil, errors.New("profile chats are deprecated")
+
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
@@ -528,7 +532,10 @@ func (m *Messenger) Join(chat *Chat) ([]*transport.Filter, error) {
 	}
 }
 
+// Deprecated: Profile chats are no more supported
 func (m *Messenger) buildProfileChat(id string) *Chat {
+	return nil // Return nil to prevent usage of deprecated function
+
 	// Create the corresponding profile chat
 	profileChatID := buildProfileChatID(id)
 	profileChat, ok := m.allChats.Load(profileChatID)
@@ -541,7 +548,10 @@ func (m *Messenger) buildProfileChat(id string) *Chat {
 
 }
 
+// Deprecated: timeline chats are no more supported
 func (m *Messenger) ensureTimelineChat() error {
+	return errors.New("timeline chats are deprecated")
+
 	chat, err := m.persistence.Chat(timelineChatID)
 	if err != nil {
 		return err
@@ -556,7 +566,11 @@ func (m *Messenger) ensureTimelineChat() error {
 	return m.saveChat(chat)
 }
 
+// Deprecated: profile chats are no more supported
 func (m *Messenger) ensureMyOwnProfileChat() error {
+	// Return error to prevent usage of deprecated function
+	return errors.New("profile chats are deprecated")
+
 	chatID := common.PubkeyToHex(&m.identity.PublicKey)
 	_, ok := m.allChats.Load(chatID)
 	if ok {
