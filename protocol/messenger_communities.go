@@ -1870,6 +1870,8 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 	return response, nil
 }
 
+// Deprecated: Community invites are no longer sent to users.
+// Instead, the community is just shared and access requests is required from users.
 func (m *Messenger) InviteUsersToCommunity(request *requests.InviteUsersToCommunity) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
