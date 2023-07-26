@@ -2581,7 +2581,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 	}
 
 	// we have to sync deleted watch only accounts as well
-	woAccounts, err := m.settings.GetWatchOnlyAccounts(true)
+	woAccounts, err := m.settings.GetAllWatchOnlyAccounts()
 	if err != nil {
 		return err
 	}

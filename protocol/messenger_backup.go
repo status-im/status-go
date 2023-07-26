@@ -446,7 +446,7 @@ func (m *Messenger) backupKeypairs() ([]*protobuf.Backup, error) {
 }
 
 func (m *Messenger) backupWatchOnlyAccounts() ([]*protobuf.Backup, error) {
-	accounts, err := m.settings.GetWatchOnlyAccounts(true)
+	accounts, err := m.settings.GetAllWatchOnlyAccounts()
 	if err != nil {
 		return nil, err
 	}

@@ -822,7 +822,7 @@ func (s *MessengerBackupSuite) TestBackupWatchOnlyAccounts() {
 	woAccounts := accounts.GetWatchOnlyAccountsForTest()
 	err := bob1.settings.SaveOrUpdateAccounts(woAccounts, false)
 	s.Require().NoError(err)
-	dbWoAccounts1, err := bob1.settings.GetWatchOnlyAccounts(false)
+	dbWoAccounts1, err := bob1.settings.GetActiveWatchOnlyAccounts()
 	s.Require().NoError(err)
 	s.Require().Equal(len(woAccounts), len(dbWoAccounts1))
 	s.Require().True(haveSameElements(woAccounts, dbWoAccounts1, accounts.SameAccounts))
@@ -848,7 +848,7 @@ func (s *MessengerBackupSuite) TestBackupWatchOnlyAccounts() {
 	)
 	s.Require().NoError(err)
 
-	dbWoAccounts2, err := bob2.settings.GetWatchOnlyAccounts(false)
+	dbWoAccounts2, err := bob2.settings.GetActiveWatchOnlyAccounts()
 	s.Require().NoError(err)
 	s.Require().Equal(len(woAccounts), len(dbWoAccounts2))
 	s.Require().True(haveSameElements(woAccounts, dbWoAccounts2, accounts.SameAccounts))
