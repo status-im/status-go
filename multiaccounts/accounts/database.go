@@ -743,8 +743,23 @@ func (db *Database) GetAccountByAddress(address types.Address) (*Account, error)
 	return db.getAccountByAddress(nil, address)
 }
 
-func (db *Database) GetWatchOnlyAccounts(includeRemoved bool) (res []*Account, err error) {
-	accounts, err := db.getAccounts(nil, types.Address{}, includeRemoved)
+// Returns active watch only accounts (excluding removed).
+func (db *Database) GetActiveWatchOnlyAccounts() (res []*Account, err error) {
+	accounts, err := db.getAccounts(nil, types.Address{}, false)
+	if err != nil {
+		return nil, err
+	}
+	for _, acc := range accounts {
+		if acc.Type == AccountTypeWatch {
+			res = append(res, acc)
+		}
+	}
+	return
+}
+
+// Returns all watch only accounts (including removed).
+func (db *Database) GetAllWatchOnlyAccounts() (res []*Account, err error) {
+	accounts, err := db.getAccounts(nil, types.Address{}, true)
 	if err != nil {
 		return nil, err
 	}

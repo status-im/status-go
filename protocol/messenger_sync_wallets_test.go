@@ -146,7 +146,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	woAccounts := accounts.GetWatchOnlyAccountsForTest()
 	err = s.m.settings.SaveOrUpdateAccounts(woAccounts, false)
 	s.Require().NoError(err)
-	dbWoAccounts1, err := s.m.settings.GetWatchOnlyAccounts(false)
+	dbWoAccounts1, err := s.m.settings.GetActiveWatchOnlyAccounts()
 	s.Require().NoError(err)
 	s.Require().Equal(len(woAccounts), len(dbWoAccounts1))
 	s.Require().True(haveSameElements(woAccounts, dbWoAccounts1, accounts.SameAccounts))
@@ -206,7 +206,7 @@ func (s *MessengerSyncWalletSuite) TestSyncWallets() {
 	s.Require().NoError(err)
 	s.Require().True(accounts.SameKeypairsWithDifferentSyncedFrom(privKeyKp, dbPrivKeyKp2, true, "", accounts.AccountNonOperable))
 
-	dbWoAccounts2, err := alicesOtherDevice.settings.GetWatchOnlyAccounts(false)
+	dbWoAccounts2, err := alicesOtherDevice.settings.GetActiveWatchOnlyAccounts()
 	s.Require().NoError(err)
 	s.Require().Equal(len(woAccounts), len(dbWoAccounts2))
 	s.Require().True(haveSameElements(woAccounts, dbWoAccounts2, accounts.SameAccounts))

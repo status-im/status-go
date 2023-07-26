@@ -85,7 +85,7 @@ func (api *API) GetAccounts(ctx context.Context) ([]*accounts.Account, error) {
 }
 
 func (api *API) GetWatchOnlyAccounts(ctx context.Context) ([]*accounts.Account, error) {
-	return api.db.GetWatchOnlyAccounts(false)
+	return api.db.GetActiveWatchOnlyAccounts()
 }
 
 func (api *API) GetKeypairs(ctx context.Context) ([]*accounts.Keypair, error) {
