@@ -481,6 +481,9 @@ func (api *PublicAPI) DeleteCommunityChat(communityID types.HexBytes, chatID str
 }
 
 // InviteUsersToCommunity invites the users with pks to the community with ID
+//
+// Deprecated: Community invites are no longer sent to users.
+// Instead, the community is just shared and access requests is required from users.
 func (api *PublicAPI) InviteUsersToCommunity(request *requests.InviteUsersToCommunity) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.InviteUsersToCommunity(request)
 }
