@@ -10,24 +10,16 @@ import (
 type CommunityMetricsResponse struct {
 	Type        requests.CommunityMetricsRequestType `json:"type"`
 	CommunityID types.HexBytes                       `json:"communityId"`
-	Entries     map[uint64]int32                     `json:"entries"`
-}
-
-func initRangesMap(start uint64, end uint64, step uint64) map[uint64]int32 {
-	result := map[uint64]int32{}
-	for timestamp := start; timestamp <= end; timestamp += step {
-		result[timestamp] = 0
-	}
-	return result
+	Entries     map[uint64]uint                      `json:"entries"`
 }
 
 func floorToRange(value uint64, start uint64, end uint64, step uint64) uint64 {
-	for timestamp := start; timestamp <= end; timestamp += step {
+	for timestamp := start + step; timestamp < end; timestamp += step {
 		if value <= timestamp {
 			return timestamp
 		}
 	}
-	return 0
+	return end
 }
 
 func (m *Messenger) collectCommunityMessagesMetrics(request *requests.CommunityMetricsRequest) (*CommunityMetricsResponse, error) {
@@ -46,11 +38,10 @@ func (m *Messenger) collectCommunityMessagesMetrics(request *requests.CommunityM
 		return nil, err
 	}
 
-	timestampStep := (request.EndTimestamp - request.StartTimestamp) / uint64(request.MaxCount)
-	entries := initRangesMap(request.StartTimestamp, request.EndTimestamp, timestampStep)
-
+	entries := map[uint64]uint{}
 	for _, timestamp := range timestamps {
-		entries[floorToRange(timestamp, request.StartTimestamp, request.EndTimestamp, timestampStep)] += 1
+		value := floorToRange(timestamp, request.StartTimestamp, request.EndTimestamp, request.StepTimestamp)
+		entries[value] += 1
 	}
 
 	response := &CommunityMetricsResponse{

@@ -7,13 +7,14 @@ import (
 
 func (db sqlitePersistence) fetchMessagesTimestampsForPeriod(tx *sql.Tx, chatID string, startTimestamp uint64, endTimestamp uint64) ([]uint64, error) {
 	rows, err := tx.Query(`
-		SELECT timestamp FROM user_messages 
+		SELECT whisper_timestamp FROM user_messages 
 		WHERE local_chat_id = ? AND 
-		timestamp >= ? AND 
-		timestamp <= ?`,
+		whisper_timestamp >= ? AND 
+		whisper_timestamp <= ?`,
 		chatID,
 		startTimestamp,
-		endTimestamp)
+		endTimestamp,
+	)
 	if err != nil {
 		return []uint64{}, err
 	}
