@@ -20,6 +20,7 @@ message CommunityMember {
     ROLE_MANAGE_USERS = 2;
     ROLE_MODERATE_CONTENT = 3;
     ROLE_ADMIN = 4;
+    ROLE_TOKEN_MASTER = 5;
   }
   repeated Roles roles = 1;
   repeated RevealedAccount revealed_accounts = 2;

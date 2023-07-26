@@ -118,46 +118,7 @@ func (s *AdminCommunityEventsSuite) TestAdminCannotCreateBecomeAdminPermission()
 
 func (s *AdminCommunityEventsSuite) TestAdminCannotEditBecomeAdminPermission() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
-	permissionRequest := createTestPermissionRequest(community)
-	permissionRequest.Type = protobuf.CommunityTokenPermission_BECOME_ADMIN
-
-	// owner creates BECOME_ADMIN permission
-	response, err := s.owner.CreateCommunityTokenPermission(permissionRequest)
-	s.Require().NoError(err)
-
-	var tokenPermissionID string
-	for id := range response.CommunityChanges[0].TokenPermissionsAdded {
-		tokenPermissionID = id
-	}
-	s.Require().NotEqual(tokenPermissionID, "")
-
-	ownerCommunity, err := s.owner.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	assertCheckTokenPermissionCreated(&s.Suite, ownerCommunity)
-
-	// then, ensure admin receives updated community
-	_, err = WaitOnMessengerResponse(
-		s.admin,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"admin did not receive updated community",
-	)
-	s.Require().NoError(err)
-	adminCommunity, err := s.admin.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	assertCheckTokenPermissionCreated(&s.Suite, adminCommunity)
-
-	permissionRequest.TokenCriteria[0].Symbol = "UPDATED"
-	permissionRequest.TokenCriteria[0].Amount = "200"
-
-	permissionEditRequest := &requests.EditCommunityTokenPermission{
-		PermissionID:                   tokenPermissionID,
-		CreateCommunityTokenPermission: *permissionRequest,
-	}
-
-	// then, admin tries to edit permission
-	response, err = s.admin.EditCommunityTokenPermission(permissionEditRequest)
-	s.Require().Error(err)
-	s.Require().Nil(response)
+	testEventSenderCannotEditBecomeAdminPermission(s, community)
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminCannotDeleteBecomeAdminPermission() {
