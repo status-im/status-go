@@ -530,6 +530,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 
 	description.Members = make(map[string]*protobuf.CommunityMember)
 	description.Members[common.PubkeyToHex(&m.identity.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER}}
+	m.logger.Debug("CreateCommunityTest ", zap.Any("members ", description.Members))
 
 	err = ValidateCommunityDescription(description)
 	if err != nil {
@@ -2476,10 +2477,24 @@ func (m *Manager) JoinCommunity(id types.HexBytes, forceJoin bool) (*Community, 
 		return community, ErrOrgAlreadyJoined
 	}
 	community.Join()
+
+	_, err = community.AddMember(&m.identity.PublicKey, []protobuf.CommunityMember_Roles{})
+	if err != nil {
+		return nil, err
+	}
+
 	err = m.persistence.SaveCommunity(community)
 	if err != nil {
 		return nil, err
 	}
+
+	savedCommunity, err := m.GetByID(community.ID())
+	if err != nil {
+		return nil, err
+	}
+	m.logger.Debug("Saved community data ", zap.Any("savedCommunity saved ", savedCommunity))
+	m.logger.Info("Saved community members", zap.Any("savedCommunity members ", savedCommunity.Members()))
+
 	return community, nil
 }
 

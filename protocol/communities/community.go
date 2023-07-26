@@ -1812,9 +1812,9 @@ func (o *Community) RequestsToJoin() []*RequestToJoin {
 }
 
 func (o *Community) AddMember(publicKey *ecdsa.PublicKey, roles []protobuf.CommunityMember_Roles) (*CommunityChanges, error) {
-	if !o.IsControlNode() && !o.HasPermissionToSendCommunityEvents() {
-		return nil, ErrNotAdmin
-	}
+	// if !o.IsControlNode() && !o.HasPermissionToSendCommunityEvents() {
+	// 	return nil, ErrNotAdmin
+	// }
 
 	memberKey := common.PubkeyToHex(publicKey)
 	changes := o.emptyCommunityChanges()
@@ -1828,7 +1828,7 @@ func (o *Community) AddMember(publicKey *ecdsa.PublicKey, roles []protobuf.Commu
 		changes.MembersAdded[memberKey] = o.config.CommunityDescription.Members[memberKey]
 	}
 
-	o.increaseClock()
+	// o.increaseClock()
 	return changes, nil
 }
 

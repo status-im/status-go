@@ -556,10 +556,8 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 	logger := m.logger.Named("joinCommunity")
 
 	response := &MessengerResponse{}
-
 	community, err := m.communitiesManager.JoinCommunity(communityID, forceJoin)
 	if err != nil {
-		logger.Debug("m.communitiesManager.JoinCommunity error", zap.Error(err))
 		return nil, err
 	}
 

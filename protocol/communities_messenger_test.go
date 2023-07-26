@@ -2716,6 +2716,87 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	s.Equal(aCom, aoCom)
 }
 
+func (s *MessengerCommunitiesSuite) TestOpenCommunityMembers() {
+	// Check bob the admin has only one community
+	tcs2, err := s.bob.communitiesManager.All()
+	s.Require().NoError(err, "admin.communitiesManager.All")
+	s.Len(tcs2, 1, "Must have 1 communities")
+
+	// Bob the admin creates a community
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:        "new community",
+		Color:       "#000000",
+		Description: "new community description",
+	}
+	mr, err := s.bob.CreateCommunity(description, true)
+	s.Require().NoError(err, "CreateCommunity")
+	s.Require().NotNil(mr)
+	s.Len(mr.Communities(), 1)
+
+	community := mr.Communities()[0]
+
+	// Check that admin has 2 communities
+	acs, err := s.bob.communitiesManager.All()
+	s.Require().NoError(err, "communitiesManager.All")
+	s.Len(acs, 2, "Must have 2 communities")
+
+	// Check that Alice has only 1 community on either device
+	cs, err := s.alice.communitiesManager.All()
+	s.Require().NoError(err, "communitiesManager.All")
+	s.Len(cs, 1, "Must have 1 communities")
+
+	tcs1, err := s.alice.communitiesManager.All()
+	s.Require().NoError(err, "alicesOtherDevice.communitiesManager.All")
+	s.Len(tcs1, 1, "Must have 1 communities")
+
+	// Bob the admin opens up a 1-1 chat with alice
+	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.alice.transport)
+	s.Require().NoError(s.bob.SaveChat(chat))
+
+	// Bob the admin shares with Alice, via public chat, an invite link to the new community
+	message := buildTestMessage(*chat)
+	message.CommunityID = community.IDString()
+	response, err := s.bob.SendChatMessage(context.Background(), message)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	// Retrieve community link & community
+	err = tt.RetryWithBackOff(func() error {
+		response, err = s.alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("no communities received from 1-1")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+
+	// Check that alice now has 2 communities
+	cs, err = s.alice.communitiesManager.All()
+	s.Require().NoError(err, "communitiesManager.All")
+	s.Len(cs, 2, "Must have 2 communities")
+	for _, c := range cs {
+		s.False(c.Joined(), "Must not have joined the community")
+	}
+
+	// alice joins the community
+	mr, err = s.alice.JoinCommunity(context.Background(), community.ID(), false)
+	s.Require().NoError(err, "s.alice.JoinCommunity")
+	s.Require().NotNil(mr)
+	s.Len(mr.Communities(), 1)
+	aCom := mr.Communities()[0]
+	s.Require().True(aCom.HasMember(s.alice.IdentityPublicKey()))
+
+	// Check that the joined community has the correct values
+	s.Equal(community.ID(), aCom.ID())
+	s.Equal(uint64(0x2), aCom.Clock())
+	s.Equal(community.PublicKey(), aCom.PublicKey())
+
+}
+
 func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
 	// Create a community
 	createCommunityReq := &requests.CreateCommunity{
