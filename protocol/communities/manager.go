@@ -3920,6 +3920,8 @@ func (m *Manager) AddCommunityToken(communityID string, chainID int, address str
 		TokenType:         token.TokenType,
 		Name:              token.Name,
 		Decimals:          uint32(token.Decimals),
+		Supply:            token.Supply.String(),
+		InfiniteSupply:    token.InfiniteSupply,
 	}
 	_, err = community.AddCommunityTokensMetadata(tokenMetadata)
 	if err != nil {

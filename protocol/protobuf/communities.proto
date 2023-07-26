@@ -35,6 +35,8 @@ message CommunityTokenMetadata {
   string symbol = 5;
   string name = 6;
   uint32 decimals = 7;
+  string supply = 8;
+  bool infinite_supply = 9;
 }
 
 message CommunityPermissions {
