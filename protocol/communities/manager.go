@@ -788,7 +788,7 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 	}
 
 	isControlNode := community.IsControlNode()
-	allowedToSendEvents := community.IsOwnerOrAdmin()
+	allowedToSendEvents := community.HasPermissionToSendCommunityEvents()
 
 	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotEnoughPermissions
@@ -4015,7 +4015,7 @@ func (m *Manager) saveAndPublish(community *Community) error {
 	if community.IsControlNode() {
 		m.publish(&Subscription{Community: community})
 		return nil
-	} else if community.IsOwnerOrAdmin() {
+	} else if community.HasPermissionToSendCommunityEvents() {
 		err := m.persistence.SaveCommunityEvents(community)
 		if err != nil {
 			return err

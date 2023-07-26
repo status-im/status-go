@@ -41,7 +41,7 @@ func (o *Community) CreateCategory(categoryID string, categoryName string, chatI
 	defer o.mutex.Unlock()
 
 	isControlNode := o.IsControlNode()
-	allowedToSendEvents := o.IsOwnerOrAdmin()
+	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
 
 	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotAdmin
@@ -81,7 +81,7 @@ func (o *Community) EditCategory(categoryID string, categoryName string, chatIDs
 	defer o.mutex.Unlock()
 
 	isControlNode := o.IsControlNode()
-	allowedToSendEvents := o.IsOwnerOrAdmin()
+	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
 
 	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotAdmin
@@ -122,7 +122,7 @@ func (o *Community) ReorderCategories(categoryID string, newPosition int) (*Comm
 	defer o.mutex.Unlock()
 
 	isControlNode := o.IsControlNode()
-	allowedToSendEvents := o.IsOwnerOrAdmin()
+	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
 
 	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotAdmin
@@ -162,7 +162,7 @@ func (o *Community) ReorderChat(categoryID string, chatID string, newPosition in
 	defer o.mutex.Unlock()
 
 	isControlNode := o.IsControlNode()
-	allowedToSendEvents := o.IsOwnerOrAdmin()
+	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
 
 	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotAdmin
@@ -317,7 +317,7 @@ func (o *Community) DeleteCategory(categoryID string) (*CommunityChanges, error)
 	defer o.mutex.Unlock()
 
 	isControlNode := o.IsControlNode()
-	allowedToSendEvents := o.IsOwnerOrAdmin()
+	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
 
 	if !isControlNode && !allowedToSendEvents {
 		return nil, ErrNotAdmin
