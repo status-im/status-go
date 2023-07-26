@@ -1903,6 +1903,39 @@ func (o *Community) AddMemberToChat(chatID string, publicKey *ecdsa.PublicKey, r
 	return changes, nil
 }
 
+func (o *Community) PopulateChatWithAllMembers(chatID string) (*CommunityChanges, error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if !o.IsControlNode() {
+		return o.emptyCommunityChanges(), ErrNotControlNode
+	}
+
+	return o.populateChatWithAllMembers(chatID)
+}
+
+func (o *Community) populateChatWithAllMembers(chatID string) (*CommunityChanges, error) {
+	result := o.emptyCommunityChanges()
+
+	chat, exists := o.chats()[chatID]
+	if !exists {
+		return result, ErrChatNotFound
+	}
+
+	membersAdded := make(map[string]*protobuf.CommunityMember)
+	for pubKey, member := range o.Members() {
+		if chat.Members[pubKey] == nil {
+			membersAdded[pubKey] = member
+		}
+	}
+	result.ChatsModified[chatID] = &CommunityChatChanges{
+		MembersAdded: membersAdded,
+	}
+
+	chat.Members = o.Members()
+	return result, nil
+}
+
 func (o *Community) ChatIDs() (chatIDs []string) {
 	for id := range o.config.CommunityDescription.Chats {
 		chatIDs = append(chatIDs, o.IDString()+id)
