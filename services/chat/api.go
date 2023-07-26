@@ -419,7 +419,11 @@ func getChatMembers(sourceChat *protocol.Chat, community *communities.Community,
 	}
 
 	if community != nil {
-		for member := range community.Description().Members {
+		channel, exists := community.Chats()[sourceChat.CommunityChatID()]
+		if !exists {
+			return result, communities.ErrChatNotFound
+		}
+		for member := range channel.Members {
 			pubKey, err := common.HexToPubkey(member)
 			if err != nil {
 				return nil, err
