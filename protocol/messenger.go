@@ -3296,7 +3296,8 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 	// for same message with multiple images
 	var idToUse string
 
-	if message.GetImage() != nil {
+	image := message.GetImage()
+	if image != nil && image.GetAlbumId() != "" {
 		idToUse = message.GetImage().GetAlbumId()
 	} else {
 		idToUse = message.ID
