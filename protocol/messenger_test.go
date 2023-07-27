@@ -22,6 +22,7 @@ import (
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/deprecation"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
@@ -342,7 +343,10 @@ func (s *MessengerSuite) TestSendPublic() {
 }
 
 func (s *MessengerSuite) TestSendProfile() {
-	return // Early exit to skip testing deprecated code
+	// Early exit to skip testing deprecated code
+	if deprecation.ChatProfileDeprecated {
+		return
+	}
 
 	chat := CreateProfileChat("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), s.m.transport)
 	chat.LastClockValue = uint64(100000000000000)

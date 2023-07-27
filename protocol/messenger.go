@@ -42,6 +42,7 @@ import (
 	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/deprecation"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
@@ -1721,16 +1722,20 @@ func (m *Messenger) Init() error {
 	// This code can be removed after some reasonable time.
 
 	// upsert timeline chat
-	//err = m.ensureTimelineChat()
-	//if err != nil {
-	//	return err
-	//}
+	if !deprecation.ChatProfileDeprecated {
+		err = m.ensureTimelineChat()
+		if err != nil {
+			return err
+		}
+	}
 
 	// upsert profile chat
-	//err = m.ensureMyOwnProfileChat()
-	//if err != nil {
-	//	return err
-	//}
+	if !deprecation.ChatTimelineDeprecated {
+		err = m.ensureMyOwnProfileChat()
+		if err != nil {
+			return err
+		}
+	}
 
 	// Get chat IDs and public keys from the contacts.
 	contacts, err := m.persistence.Contacts()
