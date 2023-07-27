@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/protocol/deprecation"
 	"github.com/status-im/status-go/protocol/requests"
 )
 
@@ -42,8 +43,16 @@ func (s *MessengerMuteSuite) TestSetMute() {
 	_, error := s.m.MuteChat(&requests.MuteChat{ChatID: chatID, MutedType: 5})
 	s.NoError(error)
 
+	var expectedChatsCount = 1
+	if !deprecation.ChatProfileDeprecated {
+		expectedChatsCount++
+	}
+	if !deprecation.ChatTimelineDeprecated {
+		expectedChatsCount++
+	}
+
 	allChats := s.m.Chats()
-	s.Require().Len(allChats, 3)
+	s.Require().Len(allChats, expectedChatsCount)
 
 	var actualChat *Chat
 
