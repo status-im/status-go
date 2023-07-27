@@ -3085,7 +3085,7 @@ func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, syn
 	return accountsOperability, nil
 }
 
-func (m *Messenger) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*accounts.Account, error) {
+func (m *Messenger) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount, fromBackup bool) (*accounts.Account, error) {
 	if message.KeyUid != "" {
 		return nil, ErrNotWatchOnlyAccount
 	}
@@ -3108,9 +3108,15 @@ func (m *Messenger) handleSyncWatchOnlyAccount(message *protobuf.SyncAccount) (*
 			if err != nil {
 				return nil, err
 			}
-			err = m.settings.ResolveAccountsPositions(message.Clock)
+			// if keypair is retrieved from backed up data, no need for resolving accounts positions
+			if !fromBackup {
+				err = m.settings.ResolveAccountsPositions(message.Clock)
+				if err != nil {
+					return nil, err
+				}
+			}
 			dbAccount.Removed = true
-			return dbAccount, err
+			return dbAccount, nil
 		}
 	}
 
@@ -3193,6 +3199,15 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.
 
 	for _, sAcc := range message.Accounts {
 		syncKpMigratedToKeycard := len(message.Keycards) > 0
+		if message.SyncedFrom == accounts.SyncedFromBackup && kp.Type == accounts.KeypairTypeProfile {
+			// if a profile keypair is coming from backup, we're handling within this block the case when a recovering
+			// was inititiated via keycard, while backed up profile keypair data refers to a regular profile
+			multiAcc, err := m.multiAccounts.GetAccount(kp.KeyUID)
+			if err != nil {
+				return nil, err
+			}
+			syncKpMigratedToKeycard = multiAcc != nil && multiAcc.KeycardPairing != ""
+		}
 		accountOperability, err := m.resolveAccountOperability(sAcc, syncKpMigratedToKeycard, accountReceivedFromLocalPairing)
 		if err != nil {
 			return nil, err
@@ -3236,9 +3251,12 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.
 
 	// if entire keypair was removed, there is no point to continue
 	if kp.Removed {
-		err = m.settings.ResolveAccountsPositions(message.Clock)
-		if err != nil {
-			return nil, err
+		// if keypair is retrieved from backed up data, no need for resolving accounts positions
+		if message.SyncedFrom != accounts.SyncedFromBackup {
+			err = m.settings.ResolveAccountsPositions(message.Clock)
+			if err != nil {
+				return nil, err
+			}
 		}
 		return kp, nil
 	}
@@ -3249,10 +3267,13 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.
 		return nil, err
 	}
 
-	// then resolve accounts positions, cause some accounts might be removed
-	err = m.settings.ResolveAccountsPositions(message.Clock)
-	if err != nil {
-		return nil, err
+	// if keypair is retrieved from backed up data, no need for resolving accounts positions
+	if message.SyncedFrom != accounts.SyncedFromBackup {
+		// then resolve accounts positions, cause some accounts might be removed
+		err = m.settings.ResolveAccountsPositions(message.Clock)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	for _, sKc := range message.Keycards {
@@ -3292,7 +3313,7 @@ func (m *Messenger) HandleSyncAccountsPositions(state *ReceivedMessageState, mes
 }
 
 func (m *Messenger) HandleSyncWatchOnlyAccount(state *ReceivedMessageState, message protobuf.SyncAccount) error {
-	acc, err := m.handleSyncWatchOnlyAccount(&message)
+	acc, err := m.handleSyncWatchOnlyAccount(&message, false)
 	if err != nil {
 		if err == ErrTryingToStoreOldWalletAccount {
 			return nil
