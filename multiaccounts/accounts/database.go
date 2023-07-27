@@ -433,9 +433,10 @@ func (db *Database) processRows(rows *sql.Rows) ([]*Keypair, []*Account, error) 
 // If `includeRemoved` is true and `keyUID` is empty, then all keypairs will be returned (regardless how they are flagged).
 func (db *Database) getKeypairs(tx *sql.Tx, keyUID string, includeRemoved bool) ([]*Keypair, error) {
 	var (
-		rows  *sql.Rows
-		err   error
-		where string
+		rows           *sql.Rows
+		err            error
+		mainQueryWhere string
+		subQueryWhere  string
 	)
 	if tx == nil {
 		tx, err = db.db.Begin()
@@ -452,12 +453,16 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string, includeRemoved bool) 
 	}
 
 	if keyUID != "" {
-		where = "WHERE k.key_uid = ?"
+		mainQueryWhere = "WHERE k.key_uid = ?"
 		if !includeRemoved {
-			where += " AND k.removed = 0"
+			mainQueryWhere += " AND k.removed = 0"
 		}
 	} else if !includeRemoved {
-		where = "WHERE k.removed = 0"
+		mainQueryWhere = "WHERE k.removed = 0"
+	}
+
+	if !includeRemoved {
+		subQueryWhere = "WHERE removed = 0"
 	}
 
 	query := fmt.Sprintf( // nolint: gosec
@@ -486,14 +491,13 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string, includeRemoved bool) 
 				SELECT *
 				FROM
 					keypairs_accounts
-				WHERE
-					removed = 0
+				%s
 			) AS ka
 		ON
 			k.key_uid = ka.key_uid
 		%s
 		ORDER BY
-			ka.position`, where)
+			ka.position`, subQueryWhere, mainQueryWhere)
 
 	stmt, err := tx.Prepare(query)
 	if err != nil {

@@ -1372,7 +1372,15 @@ func (b *GethStatusBackend) saveAccountsAndSettings(settings settings.Settings, 
 		LastUsedDerivationIndex: 0,
 	}
 
+	// When creating a new account, the chat account should have position -1, cause it doesn't participate
+	// in the wallet view and default wallet account should be at position 0.
 	for _, acc := range subaccs {
+		if acc.Chat {
+			acc.Position = -1
+		}
+		if acc.Wallet {
+			acc.Position = 0
+		}
 		acc.Operable = accounts.AccountFullyOperable
 		keypair.Accounts = append(keypair.Accounts, acc)
 	}
