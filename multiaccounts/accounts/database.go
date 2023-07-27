@@ -454,10 +454,10 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string, includeRemoved bool) 
 	if keyUID != "" {
 		where = "WHERE k.key_uid = ?"
 		if !includeRemoved {
-			where += " AND k.removed = FALSE"
+			where += " AND k.removed = 0"
 		}
 	} else if !includeRemoved {
-		where = "WHERE k.removed = FALSE"
+		where = "WHERE k.removed = 0"
 	}
 
 	query := fmt.Sprintf( // nolint: gosec
@@ -487,7 +487,7 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string, includeRemoved bool) 
 				FROM
 					keypairs_accounts
 				WHERE
-					removed = FALSE
+					removed = 0
 			) AS ka
 		ON
 			k.key_uid = ka.key_uid
@@ -556,10 +556,10 @@ func (db *Database) getAccounts(tx *sql.Tx, address types.Address, includeRemove
 	if filterByAddress {
 		where = "WHERE ka.address = ?"
 		if !includeRemoved {
-			where += " AND ka.removed = FALSE"
+			where += " AND ka.removed = 0"
 		}
 	} else if !includeRemoved {
-		where = "WHERE ka.removed = FALSE"
+		where = "WHERE ka.removed = 0"
 	}
 
 	query := fmt.Sprintf( // nolint: gosec
@@ -653,7 +653,7 @@ func (db *Database) markAccountRemoved(tx *sql.Tx, address types.Address, clock 
 		UPDATE
 			keypairs_accounts
 		SET
-			removed = TRUE,
+			removed = 1,
 			clock = ?
 		WHERE
 			address = ?
@@ -692,7 +692,7 @@ func (db *Database) markKeypairRemoved(tx *sql.Tx, keyUID string, clock uint64) 
 		UPDATE
 			keypairs
 		SET
-			removed = TRUE,
+			removed = 1,
 			clock = ?
 		WHERE
 			key_uid = ?
@@ -1138,7 +1138,7 @@ func (db *Database) GetWalletAddress() (rst types.Address, err error) {
 }
 
 func (db *Database) GetWalletAddresses() (rst []types.Address, err error) {
-	rows, err := db.db.Query("SELECT address FROM keypairs_accounts WHERE chat = 0 AND removed = FALSE ORDER BY created_at")
+	rows, err := db.db.Query("SELECT address FROM keypairs_accounts WHERE chat = 0 AND removed = 0 ORDER BY created_at")
 	if err != nil {
 		return nil, err
 	}
@@ -1166,7 +1166,7 @@ func (db *Database) GetChatAddress() (rst types.Address, err error) {
 }
 
 func (db *Database) GetAddresses() (rst []types.Address, err error) {
-	rows, err := db.db.Query("SELECT address FROM keypairs_accounts WHERE removed = FALSE ORDER BY created_at")
+	rows, err := db.db.Query("SELECT address FROM keypairs_accounts WHERE removed = 0 ORDER BY created_at")
 	if err != nil {
 		return nil, err
 	}
@@ -1189,7 +1189,7 @@ func (db *Database) GetAddresses() (rst []types.Address, err error) {
 }
 
 func (db *Database) keypairExists(tx *sql.Tx, keyUID string) (exists bool, err error) {
-	query := `SELECT EXISTS (SELECT 1 FROM keypairs WHERE key_uid = ? AND removed = FALSE)`
+	query := `SELECT EXISTS (SELECT 1 FROM keypairs WHERE key_uid = ? AND removed = 0)`
 
 	if tx == nil {
 		err = db.db.QueryRow(query, keyUID).Scan(&exists)
@@ -1207,13 +1207,13 @@ func (db *Database) KeypairExists(keyUID string) (exists bool, err error) {
 
 // AddressExists returns true if given address is stored in database.
 func (db *Database) AddressExists(address types.Address) (exists bool, err error) {
-	err = db.db.QueryRow("SELECT EXISTS (SELECT 1 FROM keypairs_accounts WHERE address = ? AND removed = FALSE)", address).Scan(&exists)
+	err = db.db.QueryRow("SELECT EXISTS (SELECT 1 FROM keypairs_accounts WHERE address = ? AND removed = 0)", address).Scan(&exists)
 	return exists, err
 }
 
 // GetPath returns true if account with given address was recently key and doesn't have a key yet
 func (db *Database) GetPath(address types.Address) (path string, err error) {
-	err = db.db.QueryRow("SELECT path FROM keypairs_accounts WHERE address = ? AND removed = FALSE", address).Scan(&path)
+	err = db.db.QueryRow("SELECT path FROM keypairs_accounts WHERE address = ? AND removed = 0", address).Scan(&path)
 	return path, err
 }
 
@@ -1246,7 +1246,7 @@ func (db *Database) SetAccountOperability(address types.Address, operable Accoun
 
 func (db *Database) GetPositionForNextNewAccount() (int64, error) {
 	var pos sql.NullInt64
-	err := db.db.QueryRow("SELECT MAX(position) FROM keypairs_accounts WHERE removed = FALSE").Scan(&pos)
+	err := db.db.QueryRow("SELECT MAX(position) FROM keypairs_accounts WHERE removed = 0").Scan(&pos)
 	if err != nil {
 		return 0, err
 	}
@@ -1387,7 +1387,7 @@ func (db *Database) MoveWalletAccount(fromPosition int64, toPosition int64, cloc
 		newMaxPosition int64
 		newMinPosition int64
 	)
-	err = tx.QueryRow("SELECT MAX(position), MIN(position) FROM keypairs_accounts WHERE removed = FALSE").Scan(&newMaxPosition, &newMinPosition)
+	err = tx.QueryRow("SELECT MAX(position), MIN(position) FROM keypairs_accounts WHERE removed = 0").Scan(&newMaxPosition, &newMinPosition)
 	if err != nil {
 		return err
 	}
@@ -1395,32 +1395,32 @@ func (db *Database) MoveWalletAccount(fromPosition int64, toPosition int64, cloc
 	newMinPosition--
 
 	if toPosition > fromPosition {
-		_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE position = ? AND removed = FALSE", newMaxPosition, fromPosition)
+		_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE position = ? AND removed = 0", newMaxPosition, fromPosition)
 		if err != nil {
 			return err
 		}
 		for i := fromPosition + 1; i <= toPosition; i++ {
-			_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE position = ? AND removed = FALSE", i-1, i)
+			_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE position = ? AND removed = 0", i-1, i)
 			if err != nil {
 				return err
 			}
 		}
-		_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE position = ? AND removed = FALSE", toPosition, newMaxPosition)
+		_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE position = ? AND removed = 0", toPosition, newMaxPosition)
 		if err != nil {
 			return err
 		}
 	} else {
-		_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE position = ? AND removed = FALSE", newMinPosition, fromPosition)
+		_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE position = ? AND removed = 0", newMinPosition, fromPosition)
 		if err != nil {
 			return err
 		}
 		for i := fromPosition - 1; i >= toPosition; i-- {
-			_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE position = ? AND removed = FALSE", i+1, i)
+			_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE position = ? AND removed = 0", i+1, i)
 			if err != nil {
 				return err
 			}
 		}
-		_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE position = ? AND removed = FALSE", toPosition, newMinPosition)
+		_, err = tx.Exec("UPDATE keypairs_accounts SET position = ? WHERE position = ? AND removed = 0", toPosition, newMinPosition)
 		if err != nil {
 			return err
 		}
