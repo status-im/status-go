@@ -7,12 +7,12 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
-	"github.com/status-im/status-go/protocol/deprecation"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"

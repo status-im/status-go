@@ -3,7 +3,7 @@ package requests
 import (
 	"errors"
 
-	"github.com/status-im/status-go/protocol/deprecation"
+	"github.com/status-im/status-go/deprecation"
 )
 
 // Deprecated: errCreateProfileChatInvalidID shouldn't be used
