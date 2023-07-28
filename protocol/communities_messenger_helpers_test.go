@@ -246,9 +246,20 @@ func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, co
 		"user did not receive request to join response",
 	)
 	s.Require().NoError(err)
+
 	userCommunity, err := user.GetCommunityByID(community.ID())
 	s.Require().NoError(err)
 	s.Require().True(userCommunity.HasMember(&user.identity.PublicKey))
+
+	// We can't identify which owner is a control node, so owner will receive twice request to join event
+	_, err = WaitOnMessengerResponse(
+		controlNode,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0
+		},
+		"user did not receive request to join response",
+	)
+	s.Require().NoError(err)
 }
 
 func sendChatMessage(s *suite.Suite, sender *Messenger, chatID string, text string) *common.Message {
@@ -270,7 +281,7 @@ func grantPermission(s *suite.Suite, community *communities.Community, controlNo
 	responseAddRole, err := controlNode.AddRoleToMember(&requests.AddRoleToMember{
 		CommunityID: community.ID(),
 		User:        common.PubkeyToHexBytes(target.IdentityPublicKey()),
-		Role:        protobuf.CommunityMember_ROLE_ADMIN,
+		Role:        role,
 	})
 	s.Require().NoError(err)
 
@@ -280,14 +291,25 @@ func grantPermission(s *suite.Suite, community *communities.Community, controlNo
 		}
 		rCommunities := response.Communities()
 		s.Require().Len(rCommunities, 1)
-		s.Require().True(rCommunities[0].IsMemberAdmin(target.IdentityPublicKey()))
+		switch role {
+		case protobuf.CommunityMember_ROLE_OWNER:
+			s.Require().True(rCommunities[0].IsMemberOwner(target.IdentityPublicKey()))
+		case protobuf.CommunityMember_ROLE_ADMIN:
+			s.Require().True(rCommunities[0].IsMemberAdmin(target.IdentityPublicKey()))
+		case protobuf.CommunityMember_ROLE_TOKEN_MASTER:
+			s.Require().True(rCommunities[0].IsMemberTokenMaster(target.IdentityPublicKey()))
+		default:
+			return false
+		}
+
 		return true
 	}
 
-	checkRole(responseAddRole)
+	s.Require().True(checkRole(responseAddRole))
 
-	_, err = WaitOnMessengerResponse(target, func(response *MessengerResponse) bool {
-		return checkRole(response)
+	response, err := WaitOnMessengerResponse(target, func(response *MessengerResponse) bool {
+		return len(response.Communities()) > 0
 	}, "community description changed message not received")
 	s.Require().NoError(err)
+	s.Require().True(checkRole(response))
 }

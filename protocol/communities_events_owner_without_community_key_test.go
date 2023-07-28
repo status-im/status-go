@@ -244,7 +244,7 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerBanOwnerWithoutC
 	testOwnerBanTheSameRole(s, community)
 }
 
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestAdminBanControlNode() {
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerBanControlNode() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)
 	testOwnerBanControlNode(s, community)
 }

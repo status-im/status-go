@@ -91,8 +91,8 @@ func setUpCommunityAndRoles(base CommunityEventsTestsInterface, role protobuf.Co
 
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 	joinCommunity(suite, community, base.GetControlNode(), base.GetEventSender(), request)
+	refreshMessengerResponses(base)
 	joinCommunity(suite, community, base.GetControlNode(), base.GetMember(), request)
-
 	refreshMessengerResponses(base)
 
 	// grant permissions to the event sender
@@ -344,14 +344,14 @@ func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role pr
 
 	// control node creates a community and chat
 	community := createTestCommunity(base, protobuf.CommunityPermissions_ON_REQUEST)
+	refreshMessengerResponses(base)
+
 	advertiseCommunityTo(s, community, base.GetControlNode(), base.GetEventSender())
 	advertiseCommunityTo(s, community, base.GetControlNode(), base.GetMember())
 
-	refreshMessengerResponses(base)
-
 	joinOnRequestCommunity(s, community, base.GetControlNode(), base.GetEventSender())
+	refreshMessengerResponses(base)
 	joinOnRequestCommunity(s, community, base.GetControlNode(), base.GetMember())
-
 	refreshMessengerResponses(base)
 
 	// grant permissions to event sender

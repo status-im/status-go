@@ -36,10 +36,10 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 		if err != nil {
 			return nil, err
 		}
-		isMemberOwnerOrAdmin := community.IsMemberOwnerOrAdmin(&m.identity.PublicKey)
+		hasPermission := community.IsPrivilegedMember(&m.identity.PublicKey)
 		pinMessageAllowed := community.AllowsAllMembersToPinMessage()
 
-		if !pinMessageAllowed && !isMemberOwnerOrAdmin {
+		if !pinMessageAllowed && !hasPermission {
 			return nil, errors.New("member can't pin message")
 		}
 	}
