@@ -924,12 +924,14 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		return nil, err
 	}
 
-	// send request to join also to community admins
-	communityAdmins := community.GetMemberAdmins()
-	for _, communityAdmin := range communityAdmins {
-		_, err := m.sender.SendPrivate(context.Background(), communityAdmin, &rawMessage)
-		if err != nil {
-			return nil, err
+	if !community.AcceptRequestToJoinAutomatically() {
+		// send request to join also to community privileged members
+		privilegedMembers := community.GetPrivilegedMembers()
+		for _, privilegedMember := range privilegedMembers {
+			_, err := m.sender.SendPrivate(context.Background(), privilegedMember, &rawMessage)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -1057,10 +1059,10 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 		return nil, err
 	}
 
-	// send edit message also to community admins
-	communityAdmins := community.GetMemberAdmins()
-	for _, communityAdmin := range communityAdmins {
-		_, err := m.sender.SendPrivate(context.Background(), communityAdmin, &rawMessage)
+	// send edit message also to privileged members
+	privilegedMembers := community.GetPrivilegedMembers()
+	for _, privilegedMember := range privilegedMembers {
+		_, err := m.sender.SendPrivate(context.Background(), privilegedMember, &rawMessage)
 		if err != nil {
 			return nil, err
 		}

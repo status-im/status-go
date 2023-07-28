@@ -341,8 +341,8 @@ func (o *Community) updateCommunityDescriptionByCommunityEvent(communityEvent Co
 			return err
 		}
 
-		if o.IsMemberOwnerOrAdmin(pk) {
-			return errors.New("attempt to kick an owner or admin of the community from the admin side")
+		if !o.IsControlNode() && o.IsPrivilegedMember(pk) {
+			return errors.New("attempt to kick an control node or privileged user from non-control node side")
 		}
 
 		o.removeMemberFromOrg(pk)
@@ -353,8 +353,8 @@ func (o *Community) updateCommunityDescriptionByCommunityEvent(communityEvent Co
 			return err
 		}
 
-		if o.IsMemberOwnerOrAdmin(pk) {
-			return errors.New("attempt to ban an owner or admin of the community from the admin side")
+		if !o.IsControlNode() && o.IsPrivilegedMember(pk) {
+			return errors.New("attempt to ban an control node or privileged user from non-control node side")
 		}
 		o.banUserFromCommunity(pk)
 
@@ -427,6 +427,10 @@ func validateAndGetEventsMessageCommunityDescription(signedDescription []byte, s
 	signer, err := metadata.RecoverKey()
 	if err != nil {
 		return nil, err
+	}
+
+	if signer == nil {
+		return nil, errors.New("CommunityDescription does not contain the control node signature")
 	}
 
 	if !signer.Equal(signerPubkey) {

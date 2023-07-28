@@ -1327,8 +1327,8 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		return nil, ErrOrgNotFound
 	}
 
-	if !community.IsMemberAdmin(signer) {
-		return nil, errors.New("user is not an admin")
+	if !community.IsPrivilegedMember(signer) {
+		return nil, errors.New("user has not permissions to send events")
 	}
 
 	changes, err := community.UpdateCommunityByEvents(adminMessage)
@@ -2411,13 +2411,13 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, err
 	}
 
-	isOwnerOrAdminSigner := community.IsMemberOwnerOrAdmin(signer)
+	isPrivilegedUserSigner := community.IsPrivilegedMember(signer)
 	isControlNodeSigner := common.IsPubKeyEqual(community.PublicKey(), signer)
-	if !isControlNodeSigner && !isOwnerOrAdminSigner {
+	if !isControlNodeSigner && !isPrivilegedUserSigner {
 		return nil, ErrNotAuthorized
 	}
 
-	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg, isOwnerOrAdminSigner && !isControlNodeSigner)
+	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg, isPrivilegedUserSigner && !isControlNodeSigner)
 	if err != nil {
 		return nil, err
 	}

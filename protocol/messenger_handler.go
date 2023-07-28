@@ -2589,10 +2589,10 @@ func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity) (*Chat, error)
 			return nil, err
 		}
 
-		isMemberOwnerOrAdmin := community.IsMemberOwnerOrAdmin(chatEntity.GetSigPubKey())
+		hasPermission := community.IsPrivilegedMember(chatEntity.GetSigPubKey())
 		pinMessageAllowed := community.AllowsAllMembersToPinMessage()
 
-		if (pinMessage && !isMemberOwnerOrAdmin && !pinMessageAllowed) || (!emojiReaction && !canPost) {
+		if (pinMessage && !hasPermission && !pinMessageAllowed) || (!emojiReaction && !canPost) {
 			return nil, errors.New("user can't post")
 		}
 

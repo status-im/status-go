@@ -809,7 +809,7 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 		return nil, ErrNotAdmin
 	}
 
-	if allowedToSendEvents && o.IsMemberOwnerOrAdmin(pk) {
+	if !isControlNode && o.IsPrivilegedMember(pk) {
 		return nil, ErrCannotRemoveOwnerOrAdmin
 	}
 
@@ -879,7 +879,7 @@ func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Communi
 		return nil, ErrNotAdmin
 	}
 
-	if allowedToSendEvents && o.IsMemberOwnerOrAdmin(pk) {
+	if !isControlNode && o.IsPrivilegedMember(pk) {
 		return nil, ErrCannotBanOwnerOrAdmin
 	}
 
@@ -1147,6 +1147,17 @@ func (o *Community) IsOwnerWithoutCommunityKey() bool {
 	return o.config.PrivateKey == nil && o.IsMemberOwner(o.config.MemberIdentity)
 }
 
+func (o *Community) GetPrivilegedMembers() []*ecdsa.PublicKey {
+	privilegedMembers := make([]*ecdsa.PublicKey, 0)
+	members := o.GetMemberPubkeys()
+	for _, member := range members {
+		if o.IsPrivilegedMember(member) {
+			privilegedMembers = append(privilegedMembers, member)
+		}
+	}
+	return privilegedMembers
+}
+
 func (o *Community) HasPermissionToSendCommunityEvents() bool {
 	return !o.IsControlNode() && o.hasPermission(o.config.MemberIdentity, manageCommunityRolePermissions())
 }
@@ -1155,11 +1166,15 @@ func (o *Community) IsMemberOwner(publicKey *ecdsa.PublicKey) bool {
 	return o.hasPermission(publicKey, ownerRolePermission())
 }
 
+func (o *Community) IsMemberTokenMaster(publicKey *ecdsa.PublicKey) bool {
+	return o.hasPermission(publicKey, tokenMasterRolePermissions())
+}
+
 func (o *Community) IsMemberAdmin(publicKey *ecdsa.PublicKey) bool {
 	return o.hasPermission(publicKey, adminRolePermissions())
 }
 
-func (o *Community) IsMemberOwnerOrAdmin(publicKey *ecdsa.PublicKey) bool {
+func (o *Community) IsPrivilegedMember(publicKey *ecdsa.PublicKey) bool {
 	return o.hasPermission(publicKey, manageCommunityRolePermissions())
 }
 
@@ -1189,6 +1204,12 @@ func adminRolePermissions() map[protobuf.CommunityMember_Roles]bool {
 	return roles
 }
 
+func tokenMasterRolePermissions() map[protobuf.CommunityMember_Roles]bool {
+	roles := make(map[protobuf.CommunityMember_Roles]bool)
+	roles[protobuf.CommunityMember_ROLE_TOKEN_MASTER] = true
+	return roles
+}
+
 func (o *Community) MemberRole(pubKey *ecdsa.PublicKey) protobuf.CommunityMember_Roles {
 	if o.IsMemberOwner(pubKey) {
 		return protobuf.CommunityMember_ROLE_OWNER
@@ -1207,17 +1228,6 @@ func canDeleteMessageForEveryonePermissions() map[protobuf.CommunityMember_Roles
 	roles := manageCommunityRolePermissions()
 	roles[protobuf.CommunityMember_ROLE_MODERATE_CONTENT] = true
 	return roles
-}
-
-func (o *Community) GetMemberAdmins() []*ecdsa.PublicKey {
-	admins := make([]*ecdsa.PublicKey, 0)
-	members := o.GetMemberPubkeys()
-	for _, member := range members {
-		if o.IsMemberAdmin(member) {
-			admins = append(admins, member)
-		}
-	}
-	return admins
 }
 
 func (o *Community) validateRequestToJoinWithChatID(request *protobuf.CommunityRequestToJoin) error {
