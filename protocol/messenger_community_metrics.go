@@ -2,52 +2,94 @@ package protocol
 
 import (
 	"errors"
+	"sort"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/requests"
 )
 
+type MetricsIntervalResponse struct {
+	StartTimestamp uint64   `json:"startTimestamp"`
+	EndTimestamp   uint64   `json:"endTimestamp"`
+	Timestamps     []uint64 `json:"timestamps"`
+	Count          int      `json:"count"`
+}
+
 type CommunityMetricsResponse struct {
 	Type        requests.CommunityMetricsRequestType `json:"type"`
 	CommunityID types.HexBytes                       `json:"communityId"`
-	Entries     map[uint64]uint                      `json:"entries"`
+	Intervals   []MetricsIntervalResponse            `json:"intervals"`
 }
 
-func floorToRange(value uint64, start uint64, end uint64, step uint64) uint64 {
-	for timestamp := start + step; timestamp < end; timestamp += step {
-		if value <= timestamp {
-			return timestamp
-		}
-	}
-	return end
-}
-
-func (m *Messenger) collectCommunityMessagesMetrics(request *requests.CommunityMetricsRequest) (*CommunityMetricsResponse, error) {
-	community, err := m.GetCommunityByID(request.CommunityID)
+func (m *Messenger) getChatIdsForCommunity(communityID types.HexBytes) ([]string, error) {
+	community, err := m.GetCommunityByID(communityID)
 	if err != nil {
-		return nil, err
+		return []string{}, err
 	}
 
 	if community == nil {
-		return nil, errors.New("no community found")
+		return []string{}, errors.New("no community found")
 	}
+	return community.ChatIDs(), nil
+}
 
-	// TODO: timestamp summary should be stored in special table, not calculated here
-	timestamps, err := m.persistence.FetchMessageTimestampsForChatsByPeriod(community.ChatIDs(), request.StartTimestamp, request.EndTimestamp)
+func (m *Messenger) collectCommunityMessagesTimestamps(request *requests.CommunityMetricsRequest) (*CommunityMetricsResponse, error) {
+	chatIDs, err := m.getChatIdsForCommunity(request.CommunityID)
 	if err != nil {
 		return nil, err
 	}
 
-	entries := map[uint64]uint{}
-	for _, timestamp := range timestamps {
-		value := floorToRange(timestamp, request.StartTimestamp, request.EndTimestamp, request.StepTimestamp)
-		entries[value] += 1
+	intervals := []MetricsIntervalResponse{}
+	for _, sourceInterval := range request.Intervals {
+		// TODO: messages count should be stored in special table, not calculated here
+		timestamps, err := m.persistence.SelectMessagesTimestampsForChatsByPeriod(chatIDs, sourceInterval.StartTimestamp, sourceInterval.EndTimestamp)
+		if err != nil {
+			return nil, err
+		}
+
+		// there is no built-in sort for uint64
+		sort.Slice(timestamps, func(i, j int) bool { return timestamps[i] < timestamps[j] })
+
+		intervals = append(intervals, MetricsIntervalResponse{
+			StartTimestamp: sourceInterval.StartTimestamp,
+			EndTimestamp:   sourceInterval.EndTimestamp,
+			Timestamps:     timestamps,
+		})
 	}
 
 	response := &CommunityMetricsResponse{
 		Type:        request.Type,
 		CommunityID: request.CommunityID,
-		Entries:     entries,
+		Intervals:   intervals,
+	}
+
+	return response, nil
+}
+
+func (m *Messenger) collectCommunityMessagesCount(request *requests.CommunityMetricsRequest) (*CommunityMetricsResponse, error) {
+	chatIDs, err := m.getChatIdsForCommunity(request.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+
+	intervals := []MetricsIntervalResponse{}
+	for _, sourceInterval := range request.Intervals {
+		// TODO: messages count should be stored in special table, not calculated here
+		count, err := m.persistence.SelectMessagesCountForChatsByPeriod(chatIDs, sourceInterval.StartTimestamp, sourceInterval.EndTimestamp)
+		if err != nil {
+			return nil, err
+		}
+		intervals = append(intervals, MetricsIntervalResponse{
+			StartTimestamp: sourceInterval.StartTimestamp,
+			EndTimestamp:   sourceInterval.EndTimestamp,
+			Count:          count,
+		})
+	}
+
+	response := &CommunityMetricsResponse{
+		Type:        request.Type,
+		CommunityID: request.CommunityID,
+		Intervals:   intervals,
 	}
 
 	return response, nil
@@ -59,8 +101,10 @@ func (m *Messenger) CollectCommunityMetrics(request *requests.CommunityMetricsRe
 	}
 
 	switch request.Type {
-	case requests.CommunityMetricsRequestMessages:
-		return m.collectCommunityMessagesMetrics(request)
+	case requests.CommunityMetricsRequestMessagesTimestamps:
+		return m.collectCommunityMessagesTimestamps(request)
+	case requests.CommunityMetricsRequestMessagesCount:
+		return m.collectCommunityMessagesCount(request)
 	default:
 		return nil, errors.New("metrics is not implemented yet")
 	}

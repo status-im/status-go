@@ -10,6 +10,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+
 	"github.com/stretchr/testify/suite"
 )
 
@@ -21,7 +22,7 @@ type MessengerCommunityMetricsSuite struct {
 	MessengerBaseTestSuite
 }
 
-func (s *MessengerCommunityMetricsSuite) prepareCommunity() *communities.Community {
+func (s *MessengerCommunityMetricsSuite) prepareCommunityAndChatIDs() (*communities.Community, []string) {
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
 		Name:        "status",
@@ -29,12 +30,63 @@ func (s *MessengerCommunityMetricsSuite) prepareCommunity() *communities.Communi
 		Description: "status community description",
 	}
 	response, err := s.m.CreateCommunity(description, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
 
+	s.Require().Len(response.Communities(), 1)
+	community := response.Communities()[0]
+
+	s.Require().Len(community.ChatIDs(), 1)
+	chatIDs := community.ChatIDs()
+
+	// Create another chat
+	chat := &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "status",
+			Emoji:       "👍",
+			Description: "status community chat",
+		},
+	}
+	response, err = s.m.CreateCommunityChat(community.ID(), chat)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Chats(), 1)
 
-	return response.Communities()[0]
+	chatIDs = append(chatIDs, response.Chats()[0].ID)
+
+	return community, chatIDs
+}
+
+func (s *MessengerCommunityMetricsSuite) prepareCommunityChatMessages(communityID string, chatIDs []string) {
+	s.generateMessages(chatIDs[0], communityID, []uint64{
+		// out ouf range messages in the beginning
+		1690162000,
+		// 1st column, 1 message
+		1690372200,
+		// 2nd column, 1 message
+		1690372800,
+		// 3rd column, 1 message
+		1690373000,
+		// out ouf range messages in the end
+		1690373100,
+	})
+
+	s.generateMessages(chatIDs[1], communityID, []uint64{
+		// out ouf range messages in the beginning
+		1690151000,
+		// 1st column, 2 messages
+		1690372000,
+		1690372100,
+		// 2nd column, 1 message
+		1690372700,
+		// 3rd column empty
+		// out ouf range messages in the end
+		1690373100,
+	})
 }
 
 func (s *MessengerCommunityMetricsSuite) generateMessages(chatID string, communityID string, timestamps []uint64) {
@@ -65,15 +117,12 @@ func (s *MessengerCommunityMetricsSuite) generateMessages(chatID string, communi
 	s.Require().NoError(err)
 }
 
-func (s *MessengerCommunityMetricsSuite) TestCollectCommunityMessagesMetricsEmpty() {
-	community := s.prepareCommunity()
+func (s *MessengerCommunityMetricsSuite) TestCollectCommunityMetricsEmptyInterval() {
+	community, _ := s.prepareCommunityAndChatIDs()
 
 	request := &requests.CommunityMetricsRequest{
-		CommunityID:    community.ID(),
-		Type:           requests.CommunityMetricsRequestMessages,
-		StartTimestamp: 1690279200,
-		EndTimestamp:   1690282800, // one hour
-		StepTimestamp:  100,
+		CommunityID: community.ID(),
+		Type:        requests.CommunityMetricsRequestMessagesTimestamps,
 	}
 
 	// Expect empty metrics
@@ -82,125 +131,77 @@ func (s *MessengerCommunityMetricsSuite) TestCollectCommunityMessagesMetricsEmpt
 	s.Require().NotNil(resp)
 
 	// Entries count should be empty
-	s.Require().Len(resp.Entries, 0)
+	s.Require().Len(resp.Intervals, 0)
 }
 
-func (s *MessengerCommunityMetricsSuite) TestCollectCommunityMessagesMetricsOneChat() {
-	community := s.prepareCommunity()
+func (s *MessengerCommunityMetricsSuite) TestCollectCommunityMessagesTimestamps() {
+	community, chatIDs := s.prepareCommunityAndChatIDs()
 
-	s.Require().Len(community.ChatIDs(), 1)
-	chatId := community.ChatIDs()[0]
-
-	s.generateMessages(chatId, string(community.ID()), []uint64{
-		// out ouf range messages in the begining
-		1690162000,
-		1690371999,
-		// 1st column, 3 message
-		1690372000,
-		1690372100,
-		1690372200,
-		// 2nd column, 2 messages
-		1690372700,
-		1690372800,
-		// 3rd column, 1 message
-		1690373000,
-		// out ouf range messages in the end
-		1690373100,
-		1690374000,
-		1690383000,
-	})
+	s.prepareCommunityChatMessages(string(community.ID()), chatIDs)
 
 	// Request metrics
 	request := &requests.CommunityMetricsRequest{
-		CommunityID:    community.ID(),
-		Type:           requests.CommunityMetricsRequestMessages,
-		StartTimestamp: 1690372000,
-		EndTimestamp:   1690373000, // one hour
-		StepTimestamp:  300,
+		CommunityID: community.ID(),
+		Type:        requests.CommunityMetricsRequestMessagesTimestamps,
+		Intervals: []requests.MetricsIntervalRequest{
+			requests.MetricsIntervalRequest{
+				StartTimestamp: 1690372000,
+				EndTimestamp:   1690372300,
+			},
+			requests.MetricsIntervalRequest{
+				StartTimestamp: 1690372400,
+				EndTimestamp:   1690372800,
+			},
+			requests.MetricsIntervalRequest{
+				StartTimestamp: 1690372900,
+				EndTimestamp:   1690373000,
+			},
+		},
 	}
 
 	resp, err := s.m.CollectCommunityMetrics(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
-	// floor(1000 / 300) == 3
-	s.Require().Len(resp.Entries, 3)
+	s.Require().Len(resp.Intervals, 3)
 
-	s.Require().Equal(resp.Entries[1690372300], uint(3))
-	// No entries for 1690372600
-	s.Require().Equal(resp.Entries[1690372900], uint(2))
-	s.Require().Equal(resp.Entries[1690373000], uint(1))
+	s.Require().Equal(resp.Intervals[0].Timestamps, []uint64{1690372000, 1690372100, 1690372200})
+	s.Require().Equal(resp.Intervals[1].Timestamps, []uint64{1690372700, 1690372800})
+	s.Require().Equal(resp.Intervals[2].Timestamps, []uint64{1690373000})
 }
 
-func (s *MessengerCommunityMetricsSuite) TestCollectCommunityMessagesMetricsMultipleChats() {
-	community := s.prepareCommunity()
+func (s *MessengerCommunityMetricsSuite) TestCollectCommunityMessagesCount() {
+	community, chatIDs := s.prepareCommunityAndChatIDs()
 
-	s.Require().Len(community.ChatIDs(), 1)
-	chatIds := community.ChatIDs()
-
-	// Create another chat
-	chat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		},
-		Identity: &protobuf.ChatIdentity{
-			DisplayName: "status",
-			Emoji:       "👍",
-			Description: "status community chat",
-		},
-	}
-	response, err := s.m.CreateCommunityChat(community.ID(), chat)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Chats(), 1)
-
-	chatIds = append(chatIds, response.Chats()[0].ID)
-
-	s.generateMessages(chatIds[0], string(community.ID()), []uint64{
-		// out ouf range messages in the begining
-		1690162000,
-		// 1st column, 1 message
-		1690372200,
-		// 2nd column, 1 message
-		1690372800,
-		// 3rd column, 1 message
-		1690373000,
-		// out ouf range messages in the end
-		1690373100,
-	})
-
-	s.generateMessages(chatIds[1], string(community.ID()), []uint64{
-		// out ouf range messages in the begining
-		1690152000,
-		// 1st column, 2 messages
-		1690372000,
-		1690372100,
-		// 2nd column, 1 message
-		1690372700,
-		// 3rd column empty
-		// out ouf range messages in the end
-		1690373100,
-	})
+	s.prepareCommunityChatMessages(string(community.ID()), chatIDs)
 
 	// Request metrics
 	request := &requests.CommunityMetricsRequest{
-		CommunityID:    community.ID(),
-		Type:           requests.CommunityMetricsRequestMessages,
-		StartTimestamp: 1690372000,
-		EndTimestamp:   1690373000, // one hour
-		StepTimestamp:  300,
+		CommunityID: community.ID(),
+		Type:        requests.CommunityMetricsRequestMessagesCount,
+		Intervals: []requests.MetricsIntervalRequest{
+			requests.MetricsIntervalRequest{
+				StartTimestamp: 1690372000,
+				EndTimestamp:   1690372300,
+			},
+			requests.MetricsIntervalRequest{
+				StartTimestamp: 1690372400,
+				EndTimestamp:   1690372800,
+			},
+			requests.MetricsIntervalRequest{
+				StartTimestamp: 1690372900,
+				EndTimestamp:   1690373000,
+			},
+		},
 	}
 
 	resp, err := s.m.CollectCommunityMetrics(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
-	// floor(1000 / 300) == 3
-	s.Require().Len(resp.Entries, 3)
+	s.Require().Len(resp.Intervals, 3)
 
-	s.Require().Equal(resp.Entries[1690372300], uint(3))
-	// No entries for 1690372600
-	s.Require().Equal(resp.Entries[1690372900], uint(2))
-	s.Require().Equal(resp.Entries[1690373000], uint(1))
+	s.Require().Equal(resp.Intervals[0].Count, 3)
+	s.Require().Equal(resp.Intervals[1].Count, 2)
+	s.Require().Equal(resp.Intervals[2].Count, 1)
 }

@@ -1,20 +1,30 @@
 package protocol
 
 import (
-	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 )
 
-func (db sqlitePersistence) fetchMessagesTimestampsForPeriod(tx *sql.Tx, chatID string, startTimestamp uint64, endTimestamp uint64) ([]uint64, error) {
-	rows, err := tx.Query(`
-		SELECT whisper_timestamp FROM user_messages 
-		WHERE local_chat_id = ? AND 
-		whisper_timestamp >= ? AND 
-		whisper_timestamp <= ?`,
-		chatID,
-		startTimestamp,
-		endTimestamp,
-	)
+const selectTimestampsQuery = "SELECT whisper_timestamp FROM user_messages WHERE %s whisper_timestamp >= ? AND whisper_timestamp <= ?"
+const selectCountQuery = "SELECT COUNT(*) FROM user_messages WHERE %s whisper_timestamp >= ? AND whisper_timestamp <= ?"
+
+func querySeveralChats(chatIDs []string) string {
+	if len(chatIDs) == 0 {
+		return ""
+	}
+
+	var conditions []string
+	for _, chatID := range chatIDs {
+		conditions = append(conditions, fmt.Sprintf("local_chat_id = '%s'", chatID))
+	}
+	return fmt.Sprintf("(%s) AND", strings.Join(conditions, " OR "))
+}
+
+func (db sqlitePersistence) SelectMessagesTimestampsForChatsByPeriod(chatIDs []string, startTimestamp uint64, endTimestamp uint64) ([]uint64, error) {
+	query := fmt.Sprintf(selectTimestampsQuery, querySeveralChats(chatIDs))
+
+	rows, err := db.db.Query(query, startTimestamp, endTimestamp)
 	if err != nil {
 		return []uint64{}, err
 	}
@@ -33,44 +43,16 @@ func (db sqlitePersistence) fetchMessagesTimestampsForPeriod(tx *sql.Tx, chatID 
 	return timestamps, nil
 }
 
-func (db sqlitePersistence) FetchMessageTimestampsForChatByPeriod(chatID string, startTimestamp uint64, endTimestamp uint64) ([]uint64, error) {
-	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
-	if err != nil {
-		return []uint64{}, err
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		// don't shadow original error
-		_ = tx.Rollback()
-	}()
+func (db sqlitePersistence) SelectMessagesCountForChatsByPeriod(chatIDs []string, startTimestamp uint64, endTimestamp uint64) (int, error) {
+	query := fmt.Sprintf(selectCountQuery, querySeveralChats(chatIDs))
 
-	return db.fetchMessagesTimestampsForPeriod(tx, chatID, startTimestamp, endTimestamp)
-}
-
-func (db sqlitePersistence) FetchMessageTimestampsForChatsByPeriod(chatIDs []string, startTimestamp uint64, endTimestamp uint64) ([]uint64, error) {
-	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
-	if err != nil {
-		return []uint64{}, err
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
+	var count int
+	if err := db.db.QueryRow(query, startTimestamp, endTimestamp).Scan(&count); err != nil {
+		if err == sql.ErrNoRows {
+			return 0, nil
 		}
-		// don't shadow original error
-		_ = tx.Rollback()
-	}()
-
-	var timestamps []uint64
-	for _, chatID := range chatIDs {
-		chatTimestamps, err := db.fetchMessagesTimestampsForPeriod(tx, chatID, startTimestamp, endTimestamp)
-		if err != nil {
-			return []uint64{}, err
-		}
-		timestamps = append(timestamps, chatTimestamps...)
+		return 0, err
 	}
-	return timestamps, nil
+
+	return count, nil
 }
