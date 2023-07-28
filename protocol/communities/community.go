@@ -772,6 +772,10 @@ func (o *Community) RemoveUserFromChat(pk *ecdsa.PublicKey, chatID string) (*pro
 	key := common.PubkeyToHex(pk)
 	delete(chat.Members, key)
 
+	if o.IsControlNode() {
+		o.increaseClock()
+	}
+
 	return o.config.CommunityDescription, nil
 }
 
@@ -1900,6 +1904,10 @@ func (o *Community) AddMemberToChat(chatID string, publicKey *ecdsa.PublicKey, r
 		},
 	}
 
+	if o.IsControlNode() {
+		o.increaseClock()
+	}
+
 	return changes, nil
 }
 
@@ -1933,6 +1941,8 @@ func (o *Community) populateChatWithAllMembers(chatID string) (*CommunityChanges
 	}
 
 	chat.Members = o.Members()
+	o.increaseClock()
+
 	return result, nil
 }
 
