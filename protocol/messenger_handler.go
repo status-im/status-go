@@ -3193,10 +3193,6 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.
 		}
 		// in case of keypair update, we need to keep `synced_from` field as it was when keypair was introduced to this device for the first time
 		kp.SyncedFrom = dbKeypair.SyncedFrom
-	} else {
-		if kp.Removed {
-			return nil, nil
-		}
 	}
 
 	for _, sAcc := range message.Accounts {
@@ -3221,11 +3217,9 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.
 
 	if kp.Removed {
 		// delete all keystore files
-		for _, dbAcc := range dbKeypair.Accounts {
-			err = m.deleteKeystoreFileForAddress(dbAcc.Address)
-			if err != nil {
-				return nil, err
-			}
+		err = m.deleteKeystoreFilesForKeypair(dbKeypair)
+		if err != nil {
+			return nil, err
 		}
 	} else if !accountReceivedFromLocalPairing && dbKeypair != nil {
 		for _, dbAcc := range dbKeypair.Accounts {
@@ -3251,8 +3245,8 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.
 		return nil, err
 	}
 
-	// if entire keypair was removed, there is no point to continue
-	if kp.Removed {
+	// if entire keypair was removed and keypair is already in db, there is no point to continue
+	if kp.Removed && dbKeypair != nil {
 		// if keypair is retrieved from backed up data, no need for resolving accounts positions
 		if message.SyncedFrom != accounts.SyncedFromBackup {
 			err = m.settings.ResolveAccountsPositions(message.Clock)

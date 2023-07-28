@@ -190,8 +190,6 @@ func (m *Messenger) deleteKeystoreFileForAddress(address types.Address) error {
 			return err
 		}
 
-		lastAcccountOfKeypairWithTheSameKey := len(kp.Accounts) == 1
-
 		if len(kp.Keycards) == 0 {
 			err = m.accountsManager.DeleteAccount(address)
 			var e *account.ErrCannotLocateKeyFile
@@ -200,6 +198,7 @@ func (m *Messenger) deleteKeystoreFileForAddress(address types.Address) error {
 			}
 
 			if acc.Type != accounts.AccountTypeKey {
+				lastAcccountOfKeypairWithTheSameKey := len(kp.Accounts) == 1
 				if lastAcccountOfKeypairWithTheSameKey {
 					err = m.accountsManager.DeleteAccount(types.Address(ethcommon.HexToAddress(kp.DerivedFrom)))
 					var e *account.ErrCannotLocateKeyFile
@@ -212,6 +211,40 @@ func (m *Messenger) deleteKeystoreFileForAddress(address types.Address) error {
 	}
 
 	return nil
+}
+
+func (m *Messenger) deleteKeystoreFilesForKeypair(keypair *accounts.Keypair) (err error) {
+	if keypair == nil || len(keypair.Keycards) > 0 {
+		return
+	}
+
+	anyAccountFullyOrPartiallyOperable := false
+	for _, acc := range keypair.Accounts {
+		if acc.Removed || acc.Operable == accounts.AccountNonOperable {
+			continue
+		}
+		if !anyAccountFullyOrPartiallyOperable {
+			anyAccountFullyOrPartiallyOperable = true
+		}
+		if acc.Operable == accounts.AccountPartiallyOperable {
+			continue
+		}
+		err = m.accountsManager.DeleteAccount(acc.Address)
+		var e *account.ErrCannotLocateKeyFile
+		if err != nil && !errors.As(err, &e) {
+			return err
+		}
+	}
+
+	if anyAccountFullyOrPartiallyOperable && keypair.Type != accounts.KeypairTypeKey {
+		err = m.accountsManager.DeleteAccount(types.Address(ethcommon.HexToAddress(keypair.DerivedFrom)))
+		var e *account.ErrCannotLocateKeyFile
+		if err != nil && !errors.As(err, &e) {
+			return err
+		}
+	}
+
+	return
 }
 
 func (m *Messenger) DeleteAccount(address types.Address) error {
@@ -266,11 +299,9 @@ func (m *Messenger) DeleteKeypair(keyUID string) error {
 		return accounts.ErrCannotRemoveProfileKeypair
 	}
 
-	for _, acc := range kp.Accounts {
-		err = m.deleteKeystoreFileForAddress(acc.Address)
-		if err != nil {
-			return err
-		}
+	err = m.deleteKeystoreFilesForKeypair(kp)
+	if err != nil {
+		return err
 	}
 
 	clock, _ := m.getLastClockWithRelatedChat()
