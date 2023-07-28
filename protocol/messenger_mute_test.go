@@ -43,16 +43,8 @@ func (s *MessengerMuteSuite) TestSetMute() {
 	_, error := s.m.MuteChat(&requests.MuteChat{ChatID: chatID, MutedType: 5})
 	s.NoError(error)
 
-	var expectedChatsCount = 1
-	if !deprecation.ChatProfileDeprecated {
-		expectedChatsCount++
-	}
-	if !deprecation.ChatTimelineDeprecated {
-		expectedChatsCount++
-	}
-
 	allChats := s.m.Chats()
-	s.Require().Len(allChats, expectedChatsCount)
+	s.Require().Len(allChats, deprecation.AddChatsCount(1))
 
 	var actualChat *Chat
 
@@ -102,7 +94,7 @@ func (s *MessengerMuteSuite) TestSetMuteForDuration() {
 	s.Require().NoError(err)
 
 	allChats := s.m.Chats()
-	s.Require().Len(allChats, 3)
+	s.Require().Len(allChats, deprecation.AddChatsCount(1))
 
 	var actualChat *Chat
 
