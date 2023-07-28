@@ -1705,8 +1705,8 @@ func (api *PublicAPI) ChatMentionReplaceWithPublicKey(chatID, text string) (stri
 // 2. user input "c", call this function with text "abc"
 // whatever, we should ensure ChatMentionOnChangeText know(invoked) the latest full text.
 // ChatMentionOnChangeText will maintain state of fulltext and diff between previous/latest full text internally.
-func (api *PublicAPI) ChatMentionOnChangeText(chatID, text string, callID uint64) (*protocol.ChatMentionContext, error) {
-	return api.service.messenger.GetMentionsManager().OnChangeText(chatID, text, callID)
+func (api *PublicAPI) ChatMentionOnChangeText(chatID, text string, callID uint64, callTime int64) (*protocol.ChatMentionContext, error) {
+	return api.service.messenger.GetMentionsManager().OnChangeText(chatID, text, callID, callTime)
 }
 
 // ChatMentionSelectMention select mention from mention suggestion list
