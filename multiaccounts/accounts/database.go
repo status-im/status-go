@@ -555,8 +555,8 @@ func (db *Database) getKeypairs(tx *sql.Tx, keyUID string, includeRemoved bool) 
 	return keypairs, nil
 }
 
-func (db *Database) getKeypairByKeyUID(tx *sql.Tx, keyUID string) (*Keypair, error) {
-	keypairs, err := db.getKeypairs(tx, keyUID, false)
+func (db *Database) getKeypairByKeyUID(tx *sql.Tx, keyUID string, includeRemoved bool) (*Keypair, error) {
+	keypairs, err := db.getKeypairs(tx, keyUID, includeRemoved)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
@@ -700,7 +700,7 @@ func (db *Database) markKeypairRemoved(tx *sql.Tx, keyUID string, clock uint64) 
 		return errDbTransactionIsNil
 	}
 
-	keypair, err := db.getKeypairByKeyUID(tx, keyUID)
+	keypair, err := db.getKeypairByKeyUID(tx, keyUID, false)
 	if err != nil {
 		return err
 	}
@@ -752,7 +752,7 @@ func (db *Database) GetAllKeypairs() ([]*Keypair, error) {
 
 // Returns keypair if it is not marked as removed and its accounts which are not marked as removed.
 func (db *Database) GetKeypairByKeyUID(keyUID string) (*Keypair, error) {
-	return db.getKeypairByKeyUID(nil, keyUID)
+	return db.getKeypairByKeyUID(nil, keyUID, false)
 }
 
 // Returns active accounts (excluding removed).
@@ -799,7 +799,7 @@ func (db *Database) GetAllWatchOnlyAccounts() (res []*Account, err error) {
 }
 
 func (db *Database) IsAnyAccountPartiallyOrFullyOperableForKeyUID(keyUID string) (bool, error) {
-	kp, err := db.getKeypairByKeyUID(nil, keyUID)
+	kp, err := db.getKeypairByKeyUID(nil, keyUID, false)
 	if err != nil {
 		return false, err
 	}
@@ -847,7 +847,7 @@ func (db *Database) RemoveAccount(address types.Address, clock uint64) error {
 		return err
 	}
 
-	kp, err := db.getKeypairByKeyUID(tx, acc.KeyUID)
+	kp, err := db.getKeypairByKeyUID(tx, acc.KeyUID, false)
 	if err != nil && err != ErrDbKeypairNotFound {
 		return err
 	}
@@ -937,7 +937,7 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, update
 		// only watch only accounts have an empty `KeyUID` field
 		var keyUID *string
 		if acc.KeyUID != "" {
-			relatedKeypair, err = db.getKeypairByKeyUID(tx, acc.KeyUID)
+			relatedKeypair, err = db.getKeypairByKeyUID(tx, acc.KeyUID, true)
 			if err != nil {
 				if err == sql.ErrNoRows {
 					// all accounts, except watch only accounts, must have a row in `keypairs` table with the same key uid
@@ -948,7 +948,7 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, update
 			keyUID = &acc.KeyUID
 		}
 		var exists bool
-		err = tx.QueryRow("SELECT EXISTS (SELECT 1 FROM keypairs_accounts WHERE address = ?)", acc.Address).Scan(&exists)
+		err = tx.QueryRow("SELECT EXISTS (SELECT 1 FROM keypairs_accounts WHERE address = ? AND removed = 0)", acc.Address).Scan(&exists)
 		if err != nil {
 			return err
 		}
@@ -1089,7 +1089,7 @@ func (db *Database) SaveOrUpdateKeypair(keypair *Keypair) error {
 	}()
 
 	// If keypair is being saved, not updated, then it must be at least one account and all accounts must have the same key uid.
-	dbKeypair, err := db.getKeypairByKeyUID(tx, keypair.KeyUID)
+	dbKeypair, err := db.getKeypairByKeyUID(tx, keypair.KeyUID, true)
 	if err != nil && err != ErrDbKeypairNotFound {
 		return err
 	}
@@ -1141,7 +1141,7 @@ func (db *Database) UpdateKeypairName(keyUID string, name string, clock uint64, 
 		_ = tx.Rollback()
 	}()
 
-	_, err = db.getKeypairByKeyUID(tx, keyUID)
+	_, err = db.getKeypairByKeyUID(tx, keyUID, false)
 	if err != nil {
 		return err
 	}
