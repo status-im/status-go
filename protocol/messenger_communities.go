@@ -238,8 +238,19 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 		}
 		m.logger.Debug("published org")
 
+		recentlyPublishedOrg := recentlyPublishedOrgs[community.IDString()]
+
+		// signal client with published community
+		if m.config.messengerSignalsHandler != nil {
+			if recentlyPublishedOrg == nil || community.Clock() > recentlyPublishedOrg.Clock() {
+				response := &MessengerResponse{}
+				response.AddCommunity(community)
+				m.config.messengerSignalsHandler.MessengerResponse(response)
+			}
+		}
+
 		// evaluate and distribute encryption keys (if any)
-		encryptionKeyActions := communities.EvaluateCommunityEncryptionKeyActions(recentlyPublishedOrgs[community.IDString()], community)
+		encryptionKeyActions := communities.EvaluateCommunityEncryptionKeyActions(recentlyPublishedOrg, community)
 		err = m.communitiesKeyDistributor.Distribute(community, encryptionKeyActions)
 		if err != nil {
 			m.logger.Warn("failed to distribute encryption keys", zap.Error(err))
