@@ -207,6 +207,54 @@ func Test_UnfurlURLs_YouTube(t *testing.T) {
 	assertContainsLongString(t, expected.Thumbnail.DataURI, preview.Thumbnail.DataURI, 100)
 }
 
+func Test_UnfurlURLs_giphy(t *testing.T) {
+	url := "https://www.giphy.com/stickers/happyplaceshow-transparent-sof2kXOSK5beJdb7xH"
+
+	expected := common.LinkPreview{
+		URL:      url,
+		Hostname: "www.giphy.com",
+		Title:    "Floating Tv Show Sticker by Happy Place for iOS & Android | GIPHY",
+		Thumbnail: common.LinkPreviewThumbnail{
+			URL: "https://media4.giphy.com/media/sof2kXOSK5beJdb7xH/giphy.gif",
+		},
+	}
+
+	transport := StubTransport{}
+	transport.AddURLMatcher(
+		"https://giphy.com/services/oembed",
+		[]byte(`
+		{
+			"title": "Floating Tv Show Sticker by Happy Place for iOS & Android | GIPHY",
+			"url": "https://media4.giphy.com/media/sof2kXOSK5beJdb7xH/giphy.gif",
+			"height": 480,
+			"width": 400,
+			"author_name": "Happy Place",
+			"author_url": "https://giphy.com/happyplaceshow",
+			"provider_name": "GIPHY",
+			"provider_url": "https://giphy.com/",
+			"type": "photo"
+		}
+		`),
+	)
+	transport.fallbackToDefaultTransport = true
+
+	stubbedClient := http.Client{Transport: &transport}
+
+	previews, err := UnfurlURLs(nil, stubbedClient, []string{url})
+	require.NoError(t, err)
+	require.Len(t, previews, 1)
+	preview := previews[0]
+
+	require.Equal(t, expected.URL, preview.URL)
+	require.Equal(t, expected.Hostname, preview.Hostname)
+	require.Equal(t, expected.Title, preview.Title)
+	require.Equal(t, expected.Description, preview.Description)
+	require.Equal(t, expected.Thumbnail.Width, preview.Thumbnail.Width)
+	require.Equal(t, expected.Thumbnail.Height, preview.Thumbnail.Height)
+	require.Equal(t, expected.Thumbnail.URL, preview.Thumbnail.URL)
+	assertContainsLongString(t, expected.Thumbnail.DataURI, preview.Thumbnail.DataURI, 100)
+}
+
 func Test_UnfurlURLs_Reddit(t *testing.T) {
 	url := "https://www.reddit.com/r/Bitcoin/comments/13j0tzr/the_best_bitcoin_explanation_of_all_times/?utm_source=share"
 	expected := common.LinkPreview{

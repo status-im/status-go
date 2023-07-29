@@ -130,7 +130,7 @@ type OEmbedUnfurler struct {
 
 type OEmbedResponse struct {
 	Title        string `json:"title"`
-	ThumbnailURL string `json:"thumbnail_url"`
+	ThumbnailURL string `json:"url"`
 }
 
 func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
@@ -181,6 +181,7 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 	}
 
 	preview.Title = oembedResponse.Title
+	preview.Thumbnail.URL = oembedResponse.ThumbnailURL
 	return preview, nil
 }
 
@@ -252,6 +253,21 @@ func newUnfurler(logger *zap.Logger, httpClient http.Client, url *neturl.URL) Un
 	case "reddit.com":
 		return OEmbedUnfurler{
 			oembedEndpoint: "https://www.reddit.com/oembed",
+			url:            url,
+			logger:         logger,
+			httpClient:     httpClient,
+		}
+	case "giphy.com", "media.giphy.com":
+		return OEmbedUnfurler{
+			oembedEndpoint: "https://giphy.com/services/oembed",
+			url:            url,
+			logger:         logger,
+			httpClient:     httpClient,
+		}
+	case "tenor.com", "media.tenor.com":
+		// TODO: Investigate a way to unfurl previews that contain iframes (Webviews?)
+		return OEmbedUnfurler{
+			oembedEndpoint: "https://tenor.com/oembed",
 			url:            url,
 			logger:         logger,
 			httpClient:     httpClient,
