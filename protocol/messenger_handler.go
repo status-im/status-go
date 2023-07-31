@@ -479,9 +479,9 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 		return nil
 	}
 
-	removedOrBlocked := message.Removed || message.Blocked
+	removed := message.Removed && !message.Blocked
 	chat, ok := state.AllChats.Load(message.Id)
-	if !ok && (message.Added || message.HasAddedUs || message.Muted) && !removedOrBlocked {
+	if !ok && (message.Added || message.HasAddedUs || message.Muted) && !removed {
 		pubKey, err := common.HexToPubkey(message.Id)
 		if err != nil {
 			return err
@@ -492,9 +492,9 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 		chat.Active = false
 	}
 
-	contact, ok := state.AllContacts.Load(message.Id)
-	if !ok {
-		if message.Removed {
+	contact, contactFound := state.AllContacts.Load(message.Id)
+	if !contactFound {
+		if message.Removed && !message.Blocked {
 			// Nothing to do in case if contact doesn't exist
 			return nil
 		}
@@ -566,7 +566,7 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 	// The correct solution is to either sync profile image (expensive)
 	// or split the clock for image/display name, so they can be synced
 	// independently.
-	if contact.LastUpdated < message.LastUpdated {
+	if !contactFound || (contact.LastUpdated < message.LastUpdated) {
 		if message.DisplayName != "" {
 			contact.DisplayName = message.DisplayName
 		}
