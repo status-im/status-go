@@ -1217,6 +1217,8 @@ func tokenMasterRolePermissions() map[protobuf.CommunityMember_Roles]bool {
 func (o *Community) MemberRole(pubKey *ecdsa.PublicKey) protobuf.CommunityMember_Roles {
 	if o.IsMemberOwner(pubKey) {
 		return protobuf.CommunityMember_ROLE_OWNER
+	} else if o.IsMemberTokenMaster(pubKey) {
+		return protobuf.CommunityMember_ROLE_TOKEN_MASTER
 	} else if o.IsMemberAdmin(pubKey) {
 		return protobuf.CommunityMember_ROLE_ADMIN
 	} else if o.CanManageUsers(pubKey) {
