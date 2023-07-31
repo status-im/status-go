@@ -452,6 +452,12 @@ func (api *PublicAPI) ImportCommunity(ctx context.Context, hexPrivateKey string)
 		return nil, err
 	}
 	return api.service.messenger.ImportCommunity(ctx, privateKey)
+}
+
+// GetCommunityPublicKeyFromPrivateKey gets the community's public key from its private key
+func (api *PublicAPI) GetCommunityPublicKeyFromPrivateKey(ctx context.Context, hexPrivateKey string) string {
+	publicKey := api.service.messenger.GetCommunityIDFromKey(hexPrivateKey)
+	return publicKey
 
 }
 
