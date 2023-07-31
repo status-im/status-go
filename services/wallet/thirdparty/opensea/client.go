@@ -3,22 +3,14 @@ package opensea
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
-
-	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/connection"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -26,8 +18,10 @@ import (
 )
 
 const (
-	EventCollectibleStatusChanged walletevent.EventType = "wallet-collectible-status-changed"
+	EventCollectibleStatusChanged walletevent.EventType = "wallet-collectible-opensea-v1-status-changed"
 )
+
+const OpenseaV1ID = "openseaV1"
 
 const AssetLimit = 200
 const CollectionLimit = 300
@@ -37,8 +31,6 @@ const GetRequestRetryMaxCount = 15
 const GetRequestWaitTime = 300 * time.Millisecond
 
 const ChainIDRequiringAPIKey = walletCommon.EthereumMainnet
-
-const FetchNoLimit = 0
 
 type urlGetter func(walletCommon.ChainID, string) (string, error)
 
@@ -55,7 +47,7 @@ func getBaseURL(chainID walletCommon.ChainID) (string, error) {
 }
 
 func (o *Client) ID() string {
-	return "opensea"
+	return OpenseaV1ID
 }
 
 func (o *Client) IsChainSupported(chainID walletCommon.ChainID) bool {
@@ -70,279 +62,6 @@ func getURL(chainID walletCommon.ChainID, path string) (string, error) {
 	}
 
 	return fmt.Sprintf("%s/%s", baseURL, path), nil
-}
-
-func chainStringToChainID(chainString string) walletCommon.ChainID {
-	chainID := walletCommon.UnknownChainID
-	switch chainString {
-	case "ethereum":
-		chainID = walletCommon.EthereumMainnet
-	case "arbitrum":
-		chainID = walletCommon.ArbitrumMainnet
-	case "optimism":
-		chainID = walletCommon.OptimismMainnet
-	case "goerli":
-		chainID = walletCommon.EthereumGoerli
-	case "arbitrum_goerli":
-		chainID = walletCommon.ArbitrumGoerli
-	case "optimism_goerli":
-		chainID = walletCommon.OptimismGoerli
-	}
-	return walletCommon.ChainID(chainID)
-}
-
-type TraitValue string
-
-func (st *TraitValue) UnmarshalJSON(b []byte) error {
-	var item interface{}
-	if err := json.Unmarshal(b, &item); err != nil {
-		return err
-	}
-
-	switch v := item.(type) {
-	case float64:
-		*st = TraitValue(strconv.FormatFloat(v, 'f', 2, 64))
-	case int:
-		*st = TraitValue(strconv.Itoa(v))
-	case string:
-		*st = TraitValue(v)
-
-	}
-	return nil
-}
-
-type AssetContainer struct {
-	Assets         []Asset `json:"assets"`
-	NextCursor     string  `json:"next"`
-	PreviousCursor string  `json:"previous"`
-}
-
-type Contract struct {
-	Address         string `json:"address"`
-	ChainIdentifier string `json:"chain_identifier"`
-}
-
-type Trait struct {
-	TraitType   string     `json:"trait_type"`
-	Value       TraitValue `json:"value"`
-	DisplayType string     `json:"display_type"`
-	MaxValue    string     `json:"max_value"`
-}
-
-type PaymentToken struct {
-	ID       int    `json:"id"`
-	Symbol   string `json:"symbol"`
-	Address  string `json:"address"`
-	ImageURL string `json:"image_url"`
-	Name     string `json:"name"`
-	Decimals int    `json:"decimals"`
-	EthPrice string `json:"eth_price"`
-	UsdPrice string `json:"usd_price"`
-}
-
-type LastSale struct {
-	PaymentToken PaymentToken `json:"payment_token"`
-}
-
-type SellOrder struct {
-	CurrentPrice string `json:"current_price"`
-}
-
-type Asset struct {
-	ID                 int            `json:"id"`
-	TokenID            *bigint.BigInt `json:"token_id"`
-	Name               string         `json:"name"`
-	Description        string         `json:"description"`
-	Permalink          string         `json:"permalink"`
-	ImageThumbnailURL  string         `json:"image_thumbnail_url"`
-	ImageURL           string         `json:"image_url"`
-	AnimationURL       string         `json:"animation_url"`
-	AnimationMediaType string         `json:"animation_media_type"`
-	Contract           Contract       `json:"asset_contract"`
-	Collection         Collection     `json:"collection"`
-	Traits             []Trait        `json:"traits"`
-	LastSale           LastSale       `json:"last_sale"`
-	SellOrders         []SellOrder    `json:"sell_orders"`
-	BackgroundColor    string         `json:"background_color"`
-	TokenURI           string         `json:"token_metadata"`
-}
-
-type CollectionTrait struct {
-	Min float64 `json:"min"`
-	Max float64 `json:"max"`
-}
-
-type Collection struct {
-	Name     string                     `json:"name"`
-	Slug     string                     `json:"slug"`
-	ImageURL string                     `json:"image_url"`
-	Traits   map[string]CollectionTrait `json:"traits"`
-}
-
-type OwnedCollection struct {
-	Collection
-	OwnedAssetCount *bigint.BigInt `json:"owned_asset_count"`
-}
-
-func (c *Asset) id() thirdparty.CollectibleUniqueID {
-	return thirdparty.CollectibleUniqueID{
-		ContractID: thirdparty.ContractID{
-			ChainID: chainStringToChainID(c.Contract.ChainIdentifier),
-			Address: common.HexToAddress(c.Contract.Address),
-		},
-		TokenID: c.TokenID,
-	}
-}
-
-func openseaToCollectibleTraits(traits []Trait) []thirdparty.CollectibleTrait {
-	ret := make([]thirdparty.CollectibleTrait, 0, len(traits))
-	caser := cases.Title(language.Und, cases.NoLower)
-	for _, orig := range traits {
-		dest := thirdparty.CollectibleTrait{
-			TraitType:   strings.Replace(orig.TraitType, "_", " ", 1),
-			Value:       caser.String(string(orig.Value)),
-			DisplayType: orig.DisplayType,
-			MaxValue:    orig.MaxValue,
-		}
-
-		ret = append(ret, dest)
-	}
-	return ret
-}
-
-func (c *Asset) toCollectionData() thirdparty.CollectionData {
-	ret := thirdparty.CollectionData{
-		ID:       c.id().ContractID,
-		Name:     c.Collection.Name,
-		Slug:     c.Collection.Slug,
-		ImageURL: c.Collection.ImageURL,
-		Traits:   make(map[string]thirdparty.CollectionTrait),
-	}
-	for traitType, trait := range c.Collection.Traits {
-		ret.Traits[traitType] = thirdparty.CollectionTrait{
-			Min: trait.Min,
-			Max: trait.Max,
-		}
-	}
-	return ret
-}
-
-func (c *Asset) toCollectiblesData() thirdparty.CollectibleData {
-	return thirdparty.CollectibleData{
-		ID:                 c.id(),
-		Name:               c.Name,
-		Description:        c.Description,
-		Permalink:          c.Permalink,
-		ImageURL:           c.ImageURL,
-		AnimationURL:       c.AnimationURL,
-		AnimationMediaType: c.AnimationMediaType,
-		Traits:             openseaToCollectibleTraits(c.Traits),
-		BackgroundColor:    c.BackgroundColor,
-		TokenURI:           c.TokenURI,
-	}
-}
-
-func (c *Asset) toCommon() thirdparty.FullCollectibleData {
-	collection := c.toCollectionData()
-	return thirdparty.FullCollectibleData{
-		CollectibleData: c.toCollectiblesData(),
-		CollectionData:  &collection,
-	}
-}
-
-type HTTPClient struct {
-	client         *http.Client
-	getRequestLock sync.RWMutex
-}
-
-func newHTTPClient() *HTTPClient {
-	return &HTTPClient{
-		client: &http.Client{
-			Timeout: RequestTimeout,
-		},
-	}
-}
-
-func (o *HTTPClient) doGetRequest(url string, apiKey string) ([]byte, error) {
-	// Ensure only one thread makes a request at a time
-	o.getRequestLock.Lock()
-	defer o.getRequestLock.Unlock()
-
-	retryCount := 0
-	statusCode := http.StatusOK
-
-	// Try to do the request without an apiKey first
-	tmpAPIKey := ""
-
-	for {
-		req, err := http.NewRequest(http.MethodGet, url, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:96.0) Gecko/20100101 Firefox/96.0")
-		if len(tmpAPIKey) > 0 {
-			req.Header.Set("X-API-KEY", tmpAPIKey)
-		}
-
-		resp, err := o.client.Do(req)
-		if err != nil {
-			return nil, err
-		}
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				log.Error("failed to close opensea request body", "err", err)
-			}
-		}()
-
-		statusCode = resp.StatusCode
-		switch resp.StatusCode {
-		case http.StatusOK:
-			body, err := ioutil.ReadAll(resp.Body)
-			return body, err
-		case http.StatusTooManyRequests:
-			if retryCount < GetRequestRetryMaxCount {
-				// sleep and retry
-				time.Sleep(GetRequestWaitTime)
-				retryCount++
-				continue
-			}
-			// break and error
-		case http.StatusForbidden:
-			// Request requires an apiKey, set it and retry
-			if tmpAPIKey == "" && apiKey != "" {
-				tmpAPIKey = apiKey
-				// sleep and retry
-				time.Sleep(GetRequestWaitTime)
-				continue
-			}
-			// break and error
-		default:
-			// break and error
-		}
-		break
-	}
-	return nil, fmt.Errorf("unsuccessful request: %d %s", statusCode, http.StatusText(statusCode))
-}
-
-func (o *HTTPClient) doContentTypeRequest(url string) (string, error) {
-	req, err := http.NewRequest(http.MethodHead, url, nil)
-	if err != nil {
-		return "", err
-	}
-
-	resp, err := o.client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Error("failed to close head request body", "err", err)
-		}
-	}()
-
-	return resp.Header.Get("Content-Type"), nil
 }
 
 type Client struct {
@@ -453,7 +172,7 @@ func (o *Client) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.Collect
 			queryParams.Add("asset_contract_addresses", id.ContractID.Address.String())
 		}
 
-		data, err := o.fetchAssets(chainID, queryParams, FetchNoLimit)
+		data, err := o.fetchAssets(chainID, queryParams, thirdparty.FetchNoLimit)
 		if err != nil {
 			return nil, err
 		}
@@ -472,7 +191,7 @@ func (o *Client) fetchAssets(chainID walletCommon.ChainID, queryParams url.Value
 	}
 
 	tmpLimit := AssetLimit
-	if limit > FetchNoLimit && limit < tmpLimit {
+	if limit > thirdparty.FetchNoLimit && limit < tmpLimit {
 		tmpLimit = limit
 	}
 
@@ -503,12 +222,6 @@ func (o *Client) fetchAssets(chainID walletCommon.ChainID, queryParams url.Value
 		}
 
 		for _, asset := range container.Assets {
-			if len(asset.AnimationURL) > 0 {
-				asset.AnimationMediaType, err = o.client.doContentTypeRequest(asset.AnimationURL)
-				if err != nil {
-					asset.AnimationURL = ""
-				}
-			}
 			assets.Items = append(assets.Items, asset.toCommon())
 		}
 		assets.NextCursor = container.NextCursor
@@ -519,7 +232,7 @@ func (o *Client) fetchAssets(chainID walletCommon.ChainID, queryParams url.Value
 
 		queryParams["cursor"] = []string{assets.NextCursor}
 
-		if limit > FetchNoLimit && len(assets.Items) >= limit {
+		if limit > thirdparty.FetchNoLimit && len(assets.Items) >= limit {
 			break
 		}
 	}
@@ -585,12 +298,6 @@ func (o *Client) fetchOpenseaAssets(chainID walletCommon.ChainID, queryParams ur
 			for i := range asset.Traits {
 				asset.Traits[i].TraitType = strings.Replace(asset.Traits[i].TraitType, "_", " ", 1)
 				asset.Traits[i].Value = TraitValue(strings.Title(string(asset.Traits[i].Value)))
-			}
-			if len(asset.AnimationURL) > 0 {
-				asset.AnimationMediaType, err = o.client.doContentTypeRequest(asset.AnimationURL)
-				if err != nil {
-					asset.AnimationURL = ""
-				}
 			}
 			assets.Assets = append(assets.Assets, asset)
 		}

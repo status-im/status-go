@@ -13,6 +13,9 @@ var (
 	ErrChainIDNotSupported = errors.New("chainID not supported")
 )
 
+const FetchNoLimit = 0
+const FetchFromStartCursor = ""
+
 type CollectibleProvider interface {
 	ID() string
 	IsChainSupported(chainID w_common.ChainID) bool
