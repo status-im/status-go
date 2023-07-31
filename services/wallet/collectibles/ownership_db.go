@@ -54,7 +54,7 @@ func insertAddressOwnership(creator statementCreator, ownerAddress common.Addres
 	}
 
 	for _, c := range collectibles {
-		_, err = insertOwnership.Exec(c.ChainID, c.ContractAddress, (*bigint.SQLBigIntBytes)(c.TokenID.Int), ownerAddress)
+		_, err = insertOwnership.Exec(c.ContractID.ChainID, c.ContractID.Address, (*bigint.SQLBigIntBytes)(c.TokenID.Int), ownerAddress)
 		if err != nil {
 			return err
 		}
@@ -101,8 +101,8 @@ func rowsToCollectibles(rows *sql.Rows) ([]thirdparty.CollectibleUniqueID, error
 			TokenID: &bigint.BigInt{Int: big.NewInt(0)},
 		}
 		err := rows.Scan(
-			&id.ChainID,
-			&id.ContractAddress,
+			&id.ContractID.ChainID,
+			&id.ContractID.Address,
 			(*bigint.SQLBigIntBytes)(id.TokenID.Int),
 		)
 		if err != nil {

@@ -63,6 +63,10 @@ func (o *Client) doQuery(url string) (*http.Response, error) {
 	return resp, nil
 }
 
+func (o *Client) ID() string {
+	return "infura"
+}
+
 func (o *Client) IsChainSupported(chainID walletCommon.ChainID) bool {
 	switch uint64(chainID) {
 	case walletCommon.EthereumMainnet, walletCommon.EthereumGoerli, walletCommon.EthereumSepolia, walletCommon.ArbitrumMainnet:

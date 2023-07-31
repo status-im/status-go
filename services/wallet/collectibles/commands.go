@@ -154,9 +154,9 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 			break
 		}
 
-		log.Debug("partial loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "page", pageNr, "found", len(partialOwnership.Collectibles), "collectibles")
+		log.Debug("partial loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "page", pageNr, "found", len(partialOwnership.Items), "collectibles")
 
-		c.partialOwnership = append(c.partialOwnership, partialOwnership.Collectibles...)
+		c.partialOwnership = append(c.partialOwnership, partialOwnership.Items...)
 
 		pageNr++
 		cursor = partialOwnership.NextCursor

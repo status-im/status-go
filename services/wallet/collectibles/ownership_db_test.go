@@ -27,9 +27,11 @@ func generateTestCollectibles(chainID w_common.ChainID, count int) (result []thi
 	for i := 0; i < count; i++ {
 		bigI := big.NewInt(int64(i))
 		newCollectible := thirdparty.CollectibleUniqueID{
-			ChainID:         chainID,
-			ContractAddress: common.BigToAddress(bigI),
-			TokenID:         &bigint.BigInt{Int: bigI},
+			ContractID: thirdparty.ContractID{
+				ChainID: chainID,
+				Address: common.BigToAddress(bigI),
+			},
+			TokenID: &bigint.BigInt{Int: bigI},
 		}
 		result = append(result, newCollectible)
 	}
@@ -98,9 +100,11 @@ func TestLargeTokenID(t *testing.T) {
 
 	ownedListChain := []thirdparty.CollectibleUniqueID{
 		{
-			ChainID:         chainID,
-			ContractAddress: common.HexToAddress("0x1234"),
-			TokenID:         &bigint.BigInt{Int: big.NewInt(0).SetBytes([]byte("0x1234567890123456789012345678901234567890"))},
+			ContractID: thirdparty.ContractID{
+				ChainID: chainID,
+				Address: common.HexToAddress("0x1234"),
+			},
+			TokenID: &bigint.BigInt{Int: big.NewInt(0).SetBytes([]byte("0x1234567890123456789012345678901234567890"))},
 		},
 	}
 

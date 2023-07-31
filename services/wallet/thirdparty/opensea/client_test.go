@@ -106,23 +106,33 @@ func TestFetchAllAssetsByOwnerAndCollection(t *testing.T) {
 		NextCursor:     "",
 		PreviousCursor: "",
 	}
-	expectedCommon := thirdparty.CollectibleDataContainer{
-		Collectibles: []thirdparty.CollectibleData{{
-			ID: thirdparty.CollectibleUniqueID{
-				ChainID:         1,
-				ContractAddress: common.HexToAddress("0x1"),
-				TokenID:         &bigint.BigInt{Int: big.NewInt(1)},
+	expectedCommon := thirdparty.FullCollectibleDataContainer{
+		Items: []thirdparty.FullCollectibleData{
+			thirdparty.FullCollectibleData{
+				CollectibleData: thirdparty.CollectibleData{
+					ID: thirdparty.CollectibleUniqueID{
+						ContractID: thirdparty.ContractID{
+							ChainID: 1,
+							Address: common.HexToAddress("0x1"),
+						},
+						TokenID: &bigint.BigInt{Int: big.NewInt(1)},
+					},
+					Name:        "Rocky",
+					Description: "Rocky Balboa",
+					Permalink:   "permalink",
+					ImageURL:    "ImageUrl",
+					Traits:      []thirdparty.CollectibleTrait{},
+				},
+				CollectionData: &thirdparty.CollectionData{
+					ID: thirdparty.ContractID{
+						ChainID: 1,
+						Address: common.HexToAddress("0x1"),
+					},
+					Name:   "Rocky",
+					Traits: map[string]thirdparty.CollectionTrait{},
+				},
 			},
-			Name:        "Rocky",
-			Description: "Rocky Balboa",
-			Permalink:   "permalink",
-			ImageURL:    "ImageUrl",
-			Traits:      []thirdparty.CollectibleTrait{},
-			CollectionData: thirdparty.CollectionData{
-				Name:   "Rocky",
-				Traits: map[string]thirdparty.CollectionTrait{},
-			},
-		}},
+		},
 		NextCursor:     "",
 		PreviousCursor: "",
 	}

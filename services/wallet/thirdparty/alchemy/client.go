@@ -33,7 +33,16 @@ func getBaseURL(chainID walletCommon.ChainID) (string, error) {
 		return "https://arb-goerli.g.alchemy.com", nil
 	}
 
-	return "", fmt.Errorf("chainID not supported: %d", chainID)
+	return "", thirdparty.ErrChainIDNotSupported
+}
+
+func (o *Client) ID() string {
+	return "alchemy"
+}
+
+func (o *Client) IsChainSupported(chainID walletCommon.ChainID) bool {
+	_, err := getBaseURL(chainID)
+	return err == nil
 }
 
 func getAPIKeySubpath(apiKey string) string {
@@ -91,11 +100,6 @@ func (o *Client) doQuery(url string) (*http.Response, error) {
 	}
 
 	return resp, nil
-}
-
-func (o *Client) IsChainSupported(chainID walletCommon.ChainID) bool {
-	_, err := getBaseURL(chainID)
-	return err == nil
 }
 
 func alchemyOwnershipToCommon(contractAddress common.Address, alchemyOwnership CollectibleContractOwnership) (*thirdparty.CollectibleContractOwnership, error) {

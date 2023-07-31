@@ -28,7 +28,7 @@ const (
 	EventCollectiblesOwnershipUpdateFinishedWithError walletevent.EventType = "wallet-collectibles-ownership-update-finished-with-error"
 
 	EventOwnedCollectiblesFilteringDone walletevent.EventType = "wallet-owned-collectibles-filtering-done"
-	EventGetCollectiblesDataDone        walletevent.EventType = "wallet-get-collectibles-data-done"
+	EventGetCollectiblesDetailsDone     walletevent.EventType = "wallet-get-collectibles-details-done"
 )
 
 var (
@@ -78,21 +78,21 @@ const (
 )
 
 type FilterOwnedCollectiblesResponse struct {
-	Collectibles []thirdparty.CollectibleHeader `json:"collectibles"`
-	Offset       int                            `json:"offset"`
+	Collectibles []CollectibleHeader `json:"collectibles"`
+	Offset       int                 `json:"offset"`
 	// Used to indicate that there might be more collectibles that were not returned
 	// based on a simple heuristic
 	HasMore   bool      `json:"hasMore"`
 	ErrorCode ErrorCode `json:"errorCode"`
 }
 
-type GetCollectiblesDataResponse struct {
-	Collectibles []thirdparty.CollectibleData `json:"collectibles"`
-	ErrorCode    ErrorCode                    `json:"errorCode"`
+type GetCollectiblesDetailsResponse struct {
+	Collectibles []CollectibleDetails `json:"collectibles"`
+	ErrorCode    ErrorCode            `json:"errorCode"`
 }
 
 type filterOwnedCollectiblesTaskReturnType struct {
-	collectibles []thirdparty.CollectibleHeader
+	collectibles []CollectibleHeader
 	hasMore      bool
 }
 
@@ -111,7 +111,7 @@ func (s *Service) FilterOwnedCollectiblesAsync(ctx context.Context, chainIDs []w
 		}
 
 		return filterOwnedCollectiblesTaskReturnType{
-			collectibles: thirdparty.CollectiblesToHeaders(data),
+			collectibles: fullCollectiblesDataToHeaders(data),
 			hasMore:      hasMore,
 		}, err
 	}, func(result interface{}, taskType async.TaskType, err error) {
@@ -133,24 +133,24 @@ func (s *Service) FilterOwnedCollectiblesAsync(ctx context.Context, chainIDs []w
 	})
 }
 
-func (s *Service) GetCollectiblesDataAsync(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) {
+func (s *Service) GetCollectiblesDetailsAsync(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) {
 	s.scheduler.Enqueue(getCollectiblesDataTask, func(ctx context.Context) (interface{}, error) {
 		collectibles, err := s.manager.FetchAssetsByCollectibleUniqueID(uniqueIDs)
 		return collectibles, err
 	}, func(result interface{}, taskType async.TaskType, err error) {
-		res := GetCollectiblesDataResponse{
+		res := GetCollectiblesDetailsResponse{
 			ErrorCode: ErrorCodeFailed,
 		}
 
 		if errors.Is(err, context.Canceled) || errors.Is(err, async.ErrTaskOverwritten) {
 			res.ErrorCode = ErrorCodeTaskCanceled
 		} else if err == nil {
-			collectibles := result.([]thirdparty.CollectibleData)
-			res.Collectibles = collectibles
+			collectibles := result.([]thirdparty.FullCollectibleData)
+			res.Collectibles = fullCollectiblesDataToDetails(collectibles)
 			res.ErrorCode = ErrorCodeSuccess
 		}
 
-		s.sendResponseEvent(EventGetCollectiblesDataDone, res, err)
+		s.sendResponseEvent(EventGetCollectiblesDetailsDone, res, err)
 	})
 }
 
