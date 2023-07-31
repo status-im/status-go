@@ -12,8 +12,8 @@ var ErrInvalidTimestampIntervals = errors.New("community metrics request invalid
 type CommunityMetricsRequestType uint
 
 const (
-	CommunityMetricsRequestMessagesTimestamps CommunityMetricsRequestType = iota + 1
-	CommunityMetricsRequestMessagesCount      CommunityMetricsRequestType = iota + 1
+	CommunityMetricsRequestMessagesTimestamps CommunityMetricsRequestType = iota
+	CommunityMetricsRequestMessagesCount
 	CommunityMetricsRequestMembers
 	CommunityMetricsRequestControlNodeUptime
 )

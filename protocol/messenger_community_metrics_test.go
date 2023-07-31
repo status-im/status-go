@@ -117,6 +117,30 @@ func (s *MessengerCommunityMetricsSuite) generateMessages(chatID string, communi
 	s.Require().NoError(err)
 }
 
+func (s *MessengerCommunityMetricsSuite) TestCollectCommunityMetricsInvalidRequest() {
+	community, _ := s.prepareCommunityAndChatIDs()
+
+	request := &requests.CommunityMetricsRequest{
+		CommunityID: community.ID(),
+		Type:        requests.CommunityMetricsRequestMessagesTimestamps,
+		Intervals: []requests.MetricsIntervalRequest{
+			requests.MetricsIntervalRequest{
+				StartTimestamp: 1690372400,
+				EndTimestamp:   1690371800,
+			},
+			requests.MetricsIntervalRequest{
+				StartTimestamp: 1690371900,
+				EndTimestamp:   1690373000,
+			},
+		},
+	}
+
+	// Expect error
+	_, err := s.m.CollectCommunityMetrics(request)
+	s.Require().Error(err)
+	s.Require().Equal(err, requests.ErrInvalidTimestampIntervals)
+}
+
 func (s *MessengerCommunityMetricsSuite) TestCollectCommunityMetricsEmptyInterval() {
 	community, _ := s.prepareCommunityAndChatIDs()
 

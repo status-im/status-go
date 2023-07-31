@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -39,8 +40,8 @@ func (m *Messenger) collectCommunityMessagesTimestamps(request *requests.Communi
 		return nil, err
 	}
 
-	intervals := []MetricsIntervalResponse{}
-	for _, sourceInterval := range request.Intervals {
+	intervals := make([]MetricsIntervalResponse, len(request.Intervals))
+	for i, sourceInterval := range request.Intervals {
 		// TODO: messages count should be stored in special table, not calculated here
 		timestamps, err := m.persistence.SelectMessagesTimestampsForChatsByPeriod(chatIDs, sourceInterval.StartTimestamp, sourceInterval.EndTimestamp)
 		if err != nil {
@@ -50,11 +51,11 @@ func (m *Messenger) collectCommunityMessagesTimestamps(request *requests.Communi
 		// there is no built-in sort for uint64
 		sort.Slice(timestamps, func(i, j int) bool { return timestamps[i] < timestamps[j] })
 
-		intervals = append(intervals, MetricsIntervalResponse{
+		intervals[i] = MetricsIntervalResponse{
 			StartTimestamp: sourceInterval.StartTimestamp,
 			EndTimestamp:   sourceInterval.EndTimestamp,
 			Timestamps:     timestamps,
-		})
+		}
 	}
 
 	response := &CommunityMetricsResponse{
@@ -72,18 +73,18 @@ func (m *Messenger) collectCommunityMessagesCount(request *requests.CommunityMet
 		return nil, err
 	}
 
-	intervals := []MetricsIntervalResponse{}
-	for _, sourceInterval := range request.Intervals {
+	intervals := make([]MetricsIntervalResponse, len(request.Intervals))
+	for i, sourceInterval := range request.Intervals {
 		// TODO: messages count should be stored in special table, not calculated here
 		count, err := m.persistence.SelectMessagesCountForChatsByPeriod(chatIDs, sourceInterval.StartTimestamp, sourceInterval.EndTimestamp)
 		if err != nil {
 			return nil, err
 		}
-		intervals = append(intervals, MetricsIntervalResponse{
+		intervals[i] = MetricsIntervalResponse{
 			StartTimestamp: sourceInterval.StartTimestamp,
 			EndTimestamp:   sourceInterval.EndTimestamp,
 			Count:          count,
-		})
+		}
 	}
 
 	response := &CommunityMetricsResponse{
@@ -106,6 +107,6 @@ func (m *Messenger) CollectCommunityMetrics(request *requests.CommunityMetricsRe
 	case requests.CommunityMetricsRequestMessagesCount:
 		return m.collectCommunityMessagesCount(request)
 	default:
-		return nil, errors.New("metrics is not implemented yet")
+		return nil, fmt.Errorf("metrics for %d is not implemented yet", request.Type)
 	}
 }

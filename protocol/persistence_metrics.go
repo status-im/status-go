@@ -40,6 +40,11 @@ func (db sqlitePersistence) SelectMessagesTimestampsForChatsByPeriod(chatIDs []s
 		timestamps = append(timestamps, timestamp)
 	}
 
+	err = rows.Err()
+	if err != nil {
+		return []uint64{}, err
+	}
+
 	return timestamps, nil
 }
 
