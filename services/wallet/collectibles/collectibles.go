@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/contracts/collectibles"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -19,9 +21,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 )
-
-const FetchNoLimit = 0
-const FetchFromStartCursor = ""
 
 const requestTimeout = 5 * time.Second
 
@@ -40,6 +39,7 @@ type Manager struct {
 	fallbackContractOwnershipProvider thirdparty.CollectibleContractOwnershipProvider
 	metadataProvider                  thirdparty.CollectibleMetadataProvider
 	opensea                           *opensea.Client
+	httpClient                        *http.Client
 	collectiblesDataCache             map[string]thirdparty.CollectibleData
 	collectiblesDataCacheLock         sync.RWMutex
 	collectionsDataCache              map[string]thirdparty.CollectionData
@@ -59,8 +59,11 @@ func NewManager(rpcClient *rpc.Client, mainContractOwnershipProvider thirdparty.
 		mainContractOwnershipProvider:     mainContractOwnershipProvider,
 		fallbackContractOwnershipProvider: fallbackContractOwnershipProvider,
 		opensea:                           opensea,
-		collectiblesDataCache:             make(map[string]thirdparty.CollectibleData),
-		collectionsDataCache:              make(map[string]thirdparty.CollectionData),
+		httpClient: &http.Client{
+			Timeout: requestTimeout,
+		},
+		collectiblesDataCache: make(map[string]thirdparty.CollectibleData),
+		collectionsDataCache:  make(map[string]thirdparty.CollectionData),
 	}
 }
 
@@ -91,6 +94,25 @@ func makeContractOwnershipCall(main func() (any, error), fallback func() (any, e
 	case err := <-errChan:
 		return nil, err
 	}
+}
+
+func (o *Manager) doContentTypeRequest(url string) (string, error) {
+	req, err := http.NewRequest(http.MethodHead, url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := o.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Error("failed to close head request body", "err", err)
+		}
+	}()
+
+	return resp.Header.Get("Content-Type"), nil
 }
 
 // Used to break circular dependency, call once as soon as possible after initialization
@@ -129,7 +151,7 @@ func (o *Manager) FetchBalancesByOwnerAndContractAddress(chainID walletCommon.Ch
 	}
 
 	// Try with more direct endpoint first (OpenSea)
-	assetsContainer, err := o.FetchAllAssetsByOwnerAndContractAddress(chainID, ownerAddress, contractAddresses, FetchFromStartCursor, FetchNoLimit)
+	assetsContainer, err := o.FetchAllAssetsByOwnerAndContractAddress(chainID, ownerAddress, contractAddresses, thirdparty.FetchFromStartCursor, thirdparty.FetchNoLimit)
 	if err == thirdparty.ErrChainIDNotSupported {
 		// Use contract ownership providers
 		for _, contractAddress := range contractAddresses {
@@ -279,6 +301,7 @@ func (o *Manager) processFullCollectibleData(assets []thirdparty.FullCollectible
 	for idx, asset := range assets {
 		id := asset.CollectibleData.ID
 
+		// Get Metadata from alternate source if empty
 		if isMetadataEmpty(asset.CollectibleData) {
 			if o.metadataProvider == nil {
 				return fmt.Errorf("CollectibleMetadataProvider not available")
@@ -307,6 +330,15 @@ func (o *Manager) processFullCollectibleData(assets []thirdparty.FullCollectible
 					assets[idx] = *metadata
 				}
 			}
+		}
+
+		// Get Animation MediaType
+		if len(assets[idx].CollectibleData.AnimationURL) > 0 {
+			contentType, err := o.doContentTypeRequest(assets[idx].CollectibleData.AnimationURL)
+			if err != nil {
+				assets[idx].CollectibleData.AnimationURL = ""
+			}
+			assets[idx].CollectibleData.AnimationMediaType = contentType
 		}
 
 		o.setCacheCollectibleData(assets[idx].CollectibleData)

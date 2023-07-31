@@ -10,10 +10,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
+
+const AlchemyID = "alchemy"
 
 func getBaseURL(chainID walletCommon.ChainID) (string, error) {
 	switch uint64(chainID) {
@@ -37,7 +38,7 @@ func getBaseURL(chainID walletCommon.ChainID) (string, error) {
 }
 
 func (o *Client) ID() string {
-	return "alchemy"
+	return AlchemyID
 }
 
 func (o *Client) IsChainSupported(chainID walletCommon.ChainID) bool {
@@ -60,21 +61,6 @@ func getNFTBaseURL(chainID walletCommon.ChainID, apiKey string) (string, error) 
 	}
 
 	return fmt.Sprintf("%s/nft/v2/%s", baseURL, getAPIKeySubpath(apiKey)), nil
-}
-
-type TokenBalance struct {
-	TokenID *bigint.HexBigInt `json:"tokenId"`
-	Balance *bigint.BigInt    `json:"balance"`
-}
-
-type CollectibleOwner struct {
-	OwnerAddress  common.Address `json:"ownerAddress"`
-	TokenBalances []TokenBalance `json:"tokenBalances"`
-}
-
-type CollectibleContractOwnership struct {
-	Owners  []CollectibleOwner `json:"ownerAddresses"`
-	PageKey string             `json:"pageKey"`
 }
 
 type Client struct {
@@ -100,33 +86,6 @@ func (o *Client) doQuery(url string) (*http.Response, error) {
 	}
 
 	return resp, nil
-}
-
-func alchemyOwnershipToCommon(contractAddress common.Address, alchemyOwnership CollectibleContractOwnership) (*thirdparty.CollectibleContractOwnership, error) {
-	owners := make([]thirdparty.CollectibleOwner, 0, len(alchemyOwnership.Owners))
-	for _, alchemyOwner := range alchemyOwnership.Owners {
-		balances := make([]thirdparty.TokenBalance, 0, len(alchemyOwner.TokenBalances))
-
-		for _, alchemyBalance := range alchemyOwner.TokenBalances {
-			balances = append(balances, thirdparty.TokenBalance{
-				TokenID: &bigint.BigInt{Int: alchemyBalance.TokenID.Int},
-				Balance: alchemyBalance.Balance,
-			})
-		}
-		owner := thirdparty.CollectibleOwner{
-			OwnerAddress:  alchemyOwner.OwnerAddress,
-			TokenBalances: balances,
-		}
-
-		owners = append(owners, owner)
-	}
-
-	ownership := thirdparty.CollectibleContractOwnership{
-		ContractAddress: contractAddress,
-		Owners:          owners,
-	}
-
-	return &ownership, nil
 }
 
 func (o *Client) FetchCollectibleOwnersByContractAddress(chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {

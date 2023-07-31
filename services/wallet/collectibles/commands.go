@@ -136,7 +136,7 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 	log.Debug("start loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account)
 
 	pageNr := 0
-	cursor := FetchFromStartCursor
+	cursor := thirdparty.FetchFromStartCursor
 
 	c.triggerEvent(EventCollectiblesOwnershipUpdateStarted, c.chainID, c.account, "")
 	// Fetch collectibles in chunks
@@ -161,7 +161,7 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 		pageNr++
 		cursor = partialOwnership.NextCursor
 
-		if cursor == FetchFromStartCursor {
+		if cursor == thirdparty.FetchFromStartCursor {
 			err = c.ownershipDB.Update(c.chainID, c.account, c.partialOwnership)
 			if err != nil {
 				log.Error("failed updating ownershipDB in loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "error", err)
