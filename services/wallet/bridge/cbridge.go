@@ -178,6 +178,10 @@ func (s *CBridge) Can(from, to *params.Network, token *token.Token, balance *big
 	}
 
 	found := false
+	if _, ok := transferConfig.ChainToken[fromAvailable.GetId()]; !ok {
+		return false, nil
+	}
+
 	for _, tokenInfo := range transferConfig.ChainToken[fromAvailable.GetId()].Token {
 		if tokenInfo.Token.Symbol == token.Symbol {
 			found = true
