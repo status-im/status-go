@@ -350,13 +350,21 @@ func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role pr
 	advertiseCommunityTo(s, community, base.GetControlNode(), base.GetMember())
 
 	joinOnRequestCommunity(s, community, base.GetControlNode(), base.GetEventSender())
-	refreshMessengerResponses(base)
 	joinOnRequestCommunity(s, community, base.GetControlNode(), base.GetMember())
-	refreshMessengerResponses(base)
+
+	checkMemberJoined := func(response *MessengerResponse) error {
+		return checkMemberJoinedToTheCommunity(response, base.GetMember().IdentityPublicKey())
+	}
+
+	waitOnMessengerResponse(s, WaitCommunityCondition, checkMemberJoined, base.GetEventSender())
 
 	// grant permissions to event sender
 	grantPermission(s, community, base.GetControlNode(), base.GetEventSender(), role)
-	refreshMessengerResponses(base)
+	checkPermissionGranted := func(response *MessengerResponse) error {
+		return checkRolePermissionInResponse(response, base.GetEventSender().IdentityPublicKey(), role)
+	}
+
+	waitOnMessengerResponse(s, WaitCommunityCondition, checkPermissionGranted, base.GetMember())
 
 	return community
 }
@@ -833,6 +841,15 @@ func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community
 		base.GetEventSender(),
 		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
 		"event sender did not receive community request to join",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	// control node receives request to join
+	response, err = WaitOnMessengerResponse(
+		base.GetControlNode(),
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		"control node did not receive community request to join",
 	)
 	s.Require().NoError(err)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)

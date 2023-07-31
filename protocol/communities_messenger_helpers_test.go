@@ -241,7 +241,7 @@ func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, co
 	_, err = WaitOnMessengerResponse(
 		user,
 		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0
+			return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&user.identity.PublicKey)
 		},
 		"user did not receive request to join response",
 	)
@@ -251,13 +251,12 @@ func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, co
 	s.Require().NoError(err)
 	s.Require().True(userCommunity.HasMember(&user.identity.PublicKey))
 
-	// We can't identify which owner is a control node, so owner will receive twice request to join event
 	_, err = WaitOnMessengerResponse(
 		controlNode,
 		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0
+			return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&user.identity.PublicKey)
 		},
-		"user did not receive request to join response",
+		"control node did not receive request to join response",
 	)
 	s.Require().NoError(err)
 }
@@ -284,32 +283,54 @@ func grantPermission(s *suite.Suite, community *communities.Community, controlNo
 		Role:        role,
 	})
 	s.Require().NoError(err)
+	s.Require().NoError(checkRolePermissionInResponse(responseAddRole, target.IdentityPublicKey(), role))
 
-	checkRole := func(response *MessengerResponse) bool {
+	response, err := WaitOnMessengerResponse(target, func(response *MessengerResponse) bool {
 		if len(response.Communities()) == 0 {
 			return false
 		}
-		rCommunities := response.Communities()
-		s.Require().Len(rCommunities, 1)
-		switch role {
-		case protobuf.CommunityMember_ROLE_OWNER:
-			s.Require().True(rCommunities[0].IsMemberOwner(target.IdentityPublicKey()))
-		case protobuf.CommunityMember_ROLE_ADMIN:
-			s.Require().True(rCommunities[0].IsMemberAdmin(target.IdentityPublicKey()))
-		case protobuf.CommunityMember_ROLE_TOKEN_MASTER:
-			s.Require().True(rCommunities[0].IsMemberTokenMaster(target.IdentityPublicKey()))
-		default:
-			return false
-		}
 
-		return true
-	}
+		err := checkRolePermissionInResponse(response, target.IdentityPublicKey(), role)
 
-	s.Require().True(checkRole(responseAddRole))
-
-	response, err := WaitOnMessengerResponse(target, func(response *MessengerResponse) bool {
-		return len(response.Communities()) > 0
+		return err == nil
 	}, "community description changed message not received")
 	s.Require().NoError(err)
-	s.Require().True(checkRole(response))
+	s.Require().NoError(checkRolePermissionInResponse(response, target.IdentityPublicKey(), role))
+}
+
+func checkRolePermissionInResponse(response *MessengerResponse, member *ecdsa.PublicKey, role protobuf.CommunityMember_Roles) error {
+	if len(response.Communities()) == 0 {
+		return errors.New("Response does not contain communities")
+	}
+	rCommunities := response.Communities()
+	switch role {
+	case protobuf.CommunityMember_ROLE_OWNER:
+		if !rCommunities[0].IsMemberOwner(member) {
+			return errors.New("Member without owner role")
+		}
+	case protobuf.CommunityMember_ROLE_ADMIN:
+		if !rCommunities[0].IsMemberAdmin(member) {
+			return errors.New("Member without admin role")
+		}
+	case protobuf.CommunityMember_ROLE_TOKEN_MASTER:
+		if !rCommunities[0].IsMemberTokenMaster(member) {
+			return errors.New("Member without token master role")
+		}
+	default:
+		return errors.New("Can't check unknonw member role")
+	}
+
+	return nil
+}
+
+func checkMemberJoinedToTheCommunity(response *MessengerResponse, member *ecdsa.PublicKey) error {
+	if len(response.Communities()) == 0 {
+		return errors.New("No communities in the response")
+	}
+
+	if !response.Communities()[0].HasMember(member) {
+		return errors.New("Member was not added to the community")
+	}
+
+	return nil
 }
