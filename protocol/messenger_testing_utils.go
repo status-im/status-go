@@ -23,10 +23,7 @@ func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bo
 		}
 		return err
 	})
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
+	return response, err
 }
 
 func FindFirstByContentType(messages []*common.Message, contentType protobuf.ChatMessage_ContentType) *common.Message {
