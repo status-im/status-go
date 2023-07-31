@@ -286,7 +286,13 @@ func grantPermission(s *suite.Suite, community *communities.Community, controlNo
 	s.Require().NoError(checkRolePermissionInResponse(responseAddRole, target.IdentityPublicKey(), role))
 
 	response, err := WaitOnMessengerResponse(target, func(response *MessengerResponse) bool {
-		return len(response.Communities()) > 0
+		if len(response.Communities()) == 0 {
+			return false
+		}
+
+		err := checkRolePermissionInResponse(response, target.IdentityPublicKey(), role)
+
+		return err == nil
 	}, "community description changed message not received")
 	s.Require().NoError(err)
 	s.Require().NoError(checkRolePermissionInResponse(response, target.IdentityPublicKey(), role))
