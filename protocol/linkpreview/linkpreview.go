@@ -130,6 +130,11 @@ type OEmbedUnfurler struct {
 
 type OEmbedResponse struct {
 	Title        string `json:"title"`
+	ThumbnailURL string `json:"thumbnail_url"`
+}
+
+type giphyOembedResponse struct {
+	Title        string `json:"title"`
 	ThumbnailURL string `json:"url"`
 }
 
@@ -151,7 +156,6 @@ func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
 
 func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 	preview := newDefaultLinkPreview(u.url)
-
 	oembedURL, err := u.newOEmbedURL()
 	if err != nil {
 		return preview, err
@@ -168,20 +172,38 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 	}
 
 	var oembedResponse OEmbedResponse
-	if err != nil {
-		return preview, err
-	}
-	err = json.Unmarshal(oembedBytes, &oembedResponse)
+	var giphyOembed giphyOembedResponse
 	if err != nil {
 		return preview, err
 	}
 
-	if oembedResponse.Title == "" {
+	type responseOembed struct {
+		title string
+		url   string
+	}
+
+	var response responseOembed
+	if strings.Contains(u.url.String(), "giphy") {
+		err = json.Unmarshal(oembedBytes, &giphyOembed)
+		response.title = giphyOembed.Title
+		response.url = giphyOembed.ThumbnailURL
+
+	} else {
+		err = json.Unmarshal(oembedBytes, &oembedResponse)
+		response.title = oembedResponse.Title
+		response.url = oembedResponse.ThumbnailURL
+	}
+
+	if err != nil {
+		return preview, err
+	}
+
+	if response.title == "" {
 		return preview, fmt.Errorf("missing required title in oEmbed response")
 	}
 
-	preview.Title = oembedResponse.Title
-	preview.Thumbnail.URL = oembedResponse.ThumbnailURL
+	preview.Title = response.title
+	preview.Thumbnail.URL = response.url
 	return preview, nil
 }
 
