@@ -189,6 +189,10 @@ func (s *MessengerCommunityMetricsSuite) TestCollectCommunityMessagesTimestamps(
 
 	s.Require().Len(resp.Intervals, 3)
 
+	s.Require().Equal(resp.Intervals[0].Count, 3)
+	s.Require().Equal(resp.Intervals[1].Count, 2)
+	s.Require().Equal(resp.Intervals[2].Count, 1)
+
 	s.Require().Equal(resp.Intervals[0].Timestamps, []uint64{1690372000, 1690372100, 1690372200})
 	s.Require().Equal(resp.Intervals[1].Timestamps, []uint64{1690372700, 1690372800})
 	s.Require().Equal(resp.Intervals[2].Timestamps, []uint64{1690373000})

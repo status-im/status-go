@@ -55,6 +55,7 @@ func (m *Messenger) collectCommunityMessagesTimestamps(request *requests.Communi
 			StartTimestamp: sourceInterval.StartTimestamp,
 			EndTimestamp:   sourceInterval.EndTimestamp,
 			Timestamps:     timestamps,
+			Count:          len(timestamps),
 		}
 	}
 
