@@ -59,6 +59,7 @@ type MessengerSignalsHandler interface {
 	SendWakuBackedUpSettings(response *wakusync.WakuBackedUpDataResponse)
 	SendWakuBackedUpKeypair(response *wakusync.WakuBackedUpDataResponse)
 	SendWakuBackedUpWatchOnlyAccount(response *wakusync.WakuBackedUpDataResponse)
+	SendCuratedCommunitiesUpdate(response *communities.KnownCommunitiesResponse)
 }
 
 type config struct {

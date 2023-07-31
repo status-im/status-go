@@ -403,6 +403,46 @@ func (m *Messenger) SpectatedCommunities() ([]*communities.Community, error) {
 	return m.communitiesManager.Spectated()
 }
 
+// Regularly gets list of curated communities and signals them to client
+func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
+	logger := m.logger.Named("startCuratedCommunitiesUpdateLoop")
+
+	const errorTimeout = 10 * time.Second
+	const successTimeout = 120 * time.Second
+	const unknownCommunitiesFoundTimeout = 3 * time.Second
+
+	go func() {
+		for {
+			var timeTillNextUpdate time.Duration
+
+			response, err := m.CuratedCommunities()
+			if err != nil {
+				timeTillNextUpdate = errorTimeout
+			} else {
+
+				m.config.messengerSignalsHandler.SendCuratedCommunitiesUpdate(response)
+
+				if len(response.UnknownCommunities) == 0 {
+					//next update shouldn't happen soon
+					timeTillNextUpdate = successTimeout
+				} else {
+					//unknown communities already requested from mailserver, so we wait just a bit before
+					//next attempt to get their info
+					timeTillNextUpdate = unknownCommunitiesFoundTimeout
+				}
+			}
+
+			logger.Debug("Next curated communities update will happen in", zap.Duration("timeTillNextUpdate", timeTillNextUpdate))
+
+			select {
+			case <-time.After(timeTillNextUpdate):
+			case <-m.quit:
+				return
+			}
+		}
+	}()
+}
+
 func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse, error) {
 	// Revert code to https://github.com/status-im/status-go/blob/e6a3f63ec7f2fa691878ed35f921413dc8acfc66/protocol/messenger_communities.go#L211-L226 once the curated communities contract is deployed to mainnet
 
@@ -425,6 +465,11 @@ func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse,
 			backend = b
 		}
 	}
+
+	if backend == nil {
+		return nil, errors.New("failed to initialize backend before requesting curated communities")
+	}
+
 	directory, err := m.contractMaker.NewDirectoryWithBackend(chainID, backend)
 	if err != nil {
 		return nil, err

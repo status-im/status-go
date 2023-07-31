@@ -164,3 +164,7 @@ func (m *MessengerSignalsHandler) SendWakuBackedUpKeypair(response *wakusync.Wak
 func (m *MessengerSignalsHandler) SendWakuBackedUpWatchOnlyAccount(response *wakusync.WakuBackedUpDataResponse) {
 	signal.SendWakuBackedUpWatchOnlyAccount(response)
 }
+
+func (m *MessengerSignalsHandler) SendCuratedCommunitiesUpdate(response *communities.KnownCommunitiesResponse) {
+	signal.SendCuratedCommunitiesUpdate(response)
+}
