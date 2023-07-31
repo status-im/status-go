@@ -128,14 +128,12 @@ type OEmbedUnfurler struct {
 	url *neturl.URL
 }
 
-type OEmbedResponse struct {
+type OEmbedPhotoResponse struct {
 	Title        string `json:"title"`
+	PhotoUrl     string `json:"url"`
 	ThumbnailURL string `json:"thumbnail_url"`
-}
-
-type giphyOembedResponse struct {
-	Title        string `json:"title"`
-	ThumbnailURL string `json:"url"`
+	Width        int    `json:"width"`
+	Height       int    `json:"height"`
 }
 
 func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
@@ -171,39 +169,32 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 		return preview, err
 	}
 
-	var oembedResponse OEmbedResponse
-	var giphyOembed giphyOembedResponse
+	var oembedResponse OEmbedPhotoResponse
 	if err != nil {
 		return preview, err
 	}
 
-	type responseOembed struct {
-		title string
-		url   string
-	}
-
-	var response responseOembed
-	if strings.Contains(u.url.String(), "giphy") {
-		err = json.Unmarshal(oembedBytes, &giphyOembed)
-		response.title = giphyOembed.Title
-		response.url = giphyOembed.ThumbnailURL
-
-	} else {
-		err = json.Unmarshal(oembedBytes, &oembedResponse)
-		response.title = oembedResponse.Title
-		response.url = oembedResponse.ThumbnailURL
-	}
+	err = json.Unmarshal(oembedBytes, &oembedResponse)
 
 	if err != nil {
 		return preview, err
 	}
 
-	if response.title == "" {
+	if oembedResponse.Title == "" {
 		return preview, fmt.Errorf("missing required title in oEmbed response")
 	}
 
-	preview.Title = response.title
-	preview.Thumbnail.URL = response.url
+	preview.Title = oembedResponse.Title
+	var urlToUse string
+
+	if oembedResponse.ThumbnailURL == "" {
+		urlToUse = oembedResponse.PhotoUrl
+	} else {
+		urlToUse = oembedResponse.ThumbnailURL
+	}
+
+	preview.Thumbnail.URL = urlToUse
+
 	return preview, nil
 }
 
@@ -287,7 +278,6 @@ func newUnfurler(logger *zap.Logger, httpClient http.Client, url *neturl.URL) Un
 			httpClient:     httpClient,
 		}
 	case "tenor.com", "media.tenor.com":
-		// TODO: Investigate a way to unfurl previews that contain iframes (Webviews?)
 		return OEmbedUnfurler{
 			oembedEndpoint: "https://tenor.com/oembed",
 			url:            url,
