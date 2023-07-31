@@ -649,7 +649,7 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 	}
 
 	// Block contact
-	_, err = s.m.BlockContact(blockedContact.ID)
+	_, err = s.m.BlockContact(blockedContact.ID, false)
 	s.Require().NoError(err)
 
 	// Blocked contact sends message, we should not receive it
@@ -1397,7 +1397,7 @@ func (s *MessengerSuite) TestBlockContact() {
 	err = s.m.SaveMessages(messages)
 	s.Require().NoError(err)
 
-	response, err := s.m.BlockContact(contact.ID)
+	response, err := s.m.BlockContact(contact.ID, false)
 	s.Require().NoError(err)
 
 	blockedContacts := s.m.BlockedContacts()

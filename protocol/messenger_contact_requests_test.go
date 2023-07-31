@@ -1463,7 +1463,7 @@ func (s *MessengerContactRequestSuite) blockContactAndSync(alice1 *Messenger, al
 	s.Require().NoError(err)
 
 	// Alice-1 blocks Bob
-	_, err = alice1.BlockContact(bobPublicKey)
+	_, err = alice1.BlockContact(bobPublicKey, false)
 	s.Require().NoError(err)
 	s.Require().Len(alice1.BlockedContacts(), 1)
 	s.Require().Equal(bobPublicKey, alice1.BlockedContacts()[0].ID)
@@ -1521,26 +1521,11 @@ func (s *MessengerContactRequestSuite) unblockContactAndSync(alice1 *Messenger, 
 	s.Require().NoError(err)
 	s.Require().Len(alice1.BlockedContacts(), 0)
 
-	// Bob wait for a message being unblocked
-	resp, err := WaitOnMessengerResponse(bob, func(r *MessengerResponse) bool {
-		// FIXME: When unblocked, we show 'Alice removed you as contact' again
-		// WARNING: Do we actually expect any messages here?
-		return len(r.Contacts) == 1 && len(r.Messages()) == 1
-	}, "bob didn't receive anything after being unblocked")
-	s.logResponse(resp, "Bob wait for a message being unblocked")
-	s.Require().NoError(err)
-	s.Require().NotNil(resp)
-
-	s.Require().Len(resp.Contacts, 1)
-	respContact := resp.Contacts[0]
-	s.Require().Equal(respContact.ID, alice1.IdentityPublicKeyString())
-	s.Require().False(respContact.Blocked)
-	s.Require().False(respContact.Removed)
-	s.Require().Equal(respContact.ContactRequestLocalState, ContactRequestStateNone)
-	s.Require().Equal(respContact.ContactRequestRemoteState, ContactRequestStateNone)
+	// Bob doesn't receive any message on blocking.
+	// No response wait here.
 
 	// Wait for Alice-2 to receive Bob unblocked state
-	resp, err = WaitOnMessengerResponse(alice2, func(r *MessengerResponse) bool {
+	resp, err := WaitOnMessengerResponse(alice2, func(r *MessengerResponse) bool {
 		return len(r.Contacts) == 1
 	}, "Alice-2 didn't receive Bob unblocked state")
 	s.logResponse(resp, "Wait for Alice-2 to receive Bob unblocked state")
@@ -1549,7 +1534,7 @@ func (s *MessengerContactRequestSuite) unblockContactAndSync(alice1 *Messenger, 
 
 	// Check that Alice-2 has Bob unblocked and removed
 	s.Require().Len(alice2.Contacts(), 1)
-	respContact = alice2.Contacts()[0]
+	respContact := alice2.Contacts()[0]
 	s.Require().Equal(bobPublicKey, respContact.ID)
 	s.Require().False(respContact.Blocked)
 	s.Require().True(respContact.Removed)

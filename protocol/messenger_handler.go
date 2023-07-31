@@ -609,7 +609,7 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 		if message.Blocked != contact.Blocked {
 			if message.Blocked {
 				state.AllContacts.Store(contact.ID, contact)
-				response, err := m.BlockContact(contact.ID)
+				response, err := m.BlockContact(contact.ID, true)
 				if err != nil {
 					return err
 				}

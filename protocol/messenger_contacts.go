@@ -792,15 +792,17 @@ func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNic
 	return response, nil
 }
 
-func (m *Messenger) blockContact(response *MessengerResponse, contactID string, isDesktopFunc bool) (*Contact, []*Chat, error) {
+func (m *Messenger) blockContact(response *MessengerResponse, contactID string, isDesktopFunc bool, syncing bool) error {
 	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: contactID})
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
+
+	response.AddContact(contact)
 
 	_, clock, err := m.getOneToOneAndNextClock(contact)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	contact.Block(clock)
@@ -809,13 +811,10 @@ func (m *Messenger) blockContact(response *MessengerResponse, contactID string, 
 
 	chats, err := m.persistence.BlockContact(contact, isDesktopFunc)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	err = m.sendRetractContactRequest(contact)
-	if err != nil {
-		return nil, nil, err
-	}
+	response.AddChats(chats)
 
 	m.allContacts.Store(contact.ID, contact)
 	for _, chat := range chats {
@@ -827,71 +826,81 @@ func (m *Messenger) blockContact(response *MessengerResponse, contactID string, 
 		m.allChats.Delete(buildProfileChatID(contact.ID))
 	}
 
-	err = m.syncContact(context.Background(), contact, m.dispatchMessage)
-	if err != nil {
-		return nil, nil, err
+	if !syncing {
+		err = m.sendRetractContactRequest(contact)
+		if err != nil {
+			return err
+		}
+
+		err = m.syncContact(context.Background(), contact, m.dispatchMessage)
+		if err != nil {
+			return err
+		}
+
+		// We remove anything that's related to this contact request
+		notifications, err := m.persistence.DeleteChatContactRequestActivityCenterNotifications(contact.ID, m.getCurrentTimeInMillis())
+		if err != nil {
+			return err
+		}
+
+		err = m.syncActivityCenterNotifications(notifications)
+		if err != nil {
+			m.logger.Error("BlockContact, error syncing activity center notifications", zap.Error(err))
+			return err
+		}
 	}
 
 	// re-register for push notifications
 	err = m.reregisterForPushNotifications()
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	// We remove anything that's related to this contact request
-	notifications, err := m.persistence.DeleteChatContactRequestActivityCenterNotifications(contact.ID, m.getCurrentTimeInMillis())
-	if err != nil {
-		return nil, nil, err
-	}
-
-	err = m.syncActivityCenterNotifications(notifications)
-	if err != nil {
-		m.logger.Error("BlockContact, error syncing activity center notifications", zap.Error(err))
-		return nil, nil, err
-	}
-
-	return contact, chats, nil
+	return nil
 }
 
-func (m *Messenger) BlockContact(contactID string) (*MessengerResponse, error) {
+func (m *Messenger) BlockContact(contactID string, syncing bool) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
-	contact, chats, err := m.blockContact(response, contactID, false)
+	err := m.blockContact(response, contactID, false, syncing)
 	if err != nil {
 		return nil, err
 	}
-	response.AddChats(chats)
-	response.AddContact(contact)
 
+	// WARNING: Move this to private `blockContact`?
 	response, err = m.DeclineAllPendingGroupInvitesFromUser(response, contactID)
 	if err != nil {
 		return nil, err
 	}
 
-	notifications, err := m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID, m.getCurrentTimeInMillis())
-	if err != nil {
-		return nil, err
-	}
+	// AC notifications are synced separately
+	// NOTE: Should we still do the local part (persistence.dismiss...) and only skip the syncing?
+	//		 This would make the solution
+	if !syncing {
+		notifications, err := m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID, m.getCurrentTimeInMillis())
+		if err != nil {
+			return nil, err
+		}
 
-	err = m.syncActivityCenterNotifications(notifications)
-	if err != nil {
-		m.logger.Error("BlockContact, error syncing activity center notifications", zap.Error(err))
-		return nil, err
+		err = m.syncActivityCenterNotifications(notifications)
+		if err != nil {
+			m.logger.Error("BlockContact, error syncing activity center notifications", zap.Error(err))
+			return nil, err
+		}
 	}
 
 	return response, nil
 }
 
 // The same function as the one above.
+// Should be removed with https://github.com/status-im/status-desktop/issues/8805
 func (m *Messenger) BlockContactDesktop(contactID string) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
-	contact, chats, err := m.blockContact(response, contactID, true)
+	err := m.blockContact(response, contactID, true, false)
 	if err != nil {
 		return nil, err
 	}
-	response.AddChats(chats)
-	response.AddContact(contact)
 
 	response, err = m.DeclineAllPendingGroupInvitesFromUser(response, contactID)
 	if err != nil {
