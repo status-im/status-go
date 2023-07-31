@@ -1752,6 +1752,11 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		return nil, ErrOrgNotFound
 	}
 
+	// don't process request as admin if community is configured as auto-accept
+	if community.HasPermissionToSendCommunityEvents() && community.AcceptRequestToJoinAutomatically() {
+		return nil, errors.New("ignoring request to join, community is set to auto-accept")
+	}
+
 	isUserRejected, err := m.isUserRejectedFromCommunity(signer, community, request.Clock)
 	if err != nil {
 		return nil, err
