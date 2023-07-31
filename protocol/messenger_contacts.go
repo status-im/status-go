@@ -867,7 +867,6 @@ func (m *Messenger) BlockContact(contactID string, syncing bool) (*MessengerResp
 		return nil, err
 	}
 
-	// WARNING: Move this to private `blockContact`?
 	response, err = m.DeclineAllPendingGroupInvitesFromUser(response, contactID)
 	if err != nil {
 		return nil, err
@@ -875,7 +874,9 @@ func (m *Messenger) BlockContact(contactID string, syncing bool) (*MessengerResp
 
 	// AC notifications are synced separately
 	// NOTE: Should we still do the local part (persistence.dismiss...) and only skip the syncing?
-	//		 This would make the solution
+	//		 This would make the solution more reliable even in case AC notification sync is not recevied.
+	//		 This should be considered separately, I'm not sure if that's safe.
+	//		 https://github.com/status-im/status-go/issues/3720
 	if !syncing {
 		notifications, err := m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID, m.getCurrentTimeInMillis())
 		if err != nil {

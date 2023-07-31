@@ -3,10 +3,10 @@ package protocol
 import (
 	"context"
 	"fmt"
-	"go.uber.org/zap"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -150,13 +150,11 @@ func (s *MessengerContactRequestSuite) receiveContactRequest(messageText string,
 	return contactRequest
 }
 
+// This function partially logs given MessengerResponse with description.
+// This is helpful for testing response content during long tests.
+// Logged contents: Messages, Contacts, ActivityCenterNotifications
 func (s *MessengerContactRequestSuite) logResponse(response *MessengerResponse, description string) {
-	s.logger.Debug("<<< response", zap.String("description", description))
-
-	// Messages
-	// ActivityCenterNotifications
-	// Contacts
-	// Chats
+	s.logger.Debug("MessengerResponse", zap.String("description", description))
 
 	for i, message := range response.Messages() {
 		s.logger.Debug("message",
@@ -165,9 +163,6 @@ func (s *MessengerContactRequestSuite) logResponse(response *MessengerResponse, 
 			zap.Any("ContentType", message.ContentType),
 		)
 	}
-	//
-	// 1. Alice. Mutual: false. Blocked: false. Removed: false.
-	//	contactRequestRemoteState: 0. contactRequestLocalState: 0.
 
 	for i, contact := range response.Contacts {
 		s.logger.Debug("contact",
@@ -178,9 +173,6 @@ func (s *MessengerContactRequestSuite) logResponse(response *MessengerResponse, 
 			zap.Any("crLocalState", contact.ContactRequestRemoteState),
 		)
 	}
-
-	// 1. id: <0xacf1ecb6>. Type: 11 (contact removed).
-	// Name: Awkward Wheat Ray (Alice). Author: Alice. Timestamp: 1689669610993
 
 	for i, notification := range response.ActivityCenterNotifications() {
 		messageText := ""
@@ -250,33 +242,8 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(
 	s.Require().Len(mutualContacts, 1)
 
 	// Wait for the message to reach its destination
-	resp, err = WaitOnMessengerResponse(
-		sender,
+	resp, err = WaitOnMessengerResponse(sender,
 		func(r *MessengerResponse) bool {
-
-			/*
-				- MessengerContactRequestSuite - first iteration:
-
-					Messages:
-					1. "@<user> accepted your contact request". ContentType: 16 (SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED). MessageType: 1.
-					2. "hello-1"							  . ContentType: 11 (CONTACT_REQUEST).						MessageType: 1.
-
-					ActivityCenterNotifications:
-					1. Message: <hello-1>.	 		Type: 5 (CR).
-
-				- MessengerContactRequestSuite - second iteration:
-
-					Messages:
-					1. "@<user> accepted your contact request". ContentType: 16 (SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED). MessageType: 1.
-					2. "hello-2"							  . ContentType: 11 (CONTACT_REQUEST).						MessageType: 1.
-
-					ActivityCenterNotifications:
-					1. Message: <gen-pubkey-0x20>.	Type: 5 (CR).
-					2. Message: <hello-1>.	 		Type: 5 (CR).
-					3. Message: <hello-2>.	 		Type: 5 (CR).
-
-			*/
-
 			return len(r.Contacts) == 1 && len(r.Messages()) == 2
 		},
 		"contact request acceptance not received",
@@ -285,8 +252,8 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
-	// WARNING: Uncomment these checks when bug fixed
-	//// Check activity center notification is of the right type
+	// WARNING: Uncomment these checks when bug fixed https://github.com/status-im/status-go/issues/3801
+	// Check activity center notification is of the right type
 	//s.Require().Len(resp.ActivityCenterNotifications(), 1)
 	//s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
 	//s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
@@ -321,7 +288,7 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(
 	contact := resp.Contacts[0]
 	s.Require().True(contact.mutual())
 
-	// WARNING: Uncomment these checks when bug fixed
+	// WARNING: Uncomment these checks when bug fixed https://github.com/status-im/status-go/issues/3801
 	// Check contact's primary name matches notification's name
 	//s.Require().Equal(resp.ActivityCenterNotifications()[0].Name, contact.PrimaryName())
 
@@ -1437,24 +1404,20 @@ func (s *MessengerContactRequestSuite) makeMutualContactsAndSync(alice1 *Messeng
 
 	// Wait for Alice-2 to sync new contact
 	resp, _ := WaitOnMessengerResponse(alice2, func(r *MessengerResponse) bool {
-		// WARNING:
-		// 			1. "hello-1" message (sometimes) dropped. Probably because contact arrives earlier.
-		//			2. AC Notifications duplicated.
-		//			3. Should we also get a system message "You added Bob as contact"?
-		// FIXME:
-		// 			No condition here. There are randomly received 1-3 messages.
+		// FIXME: https://github.com/status-im/status-go/issues/3803
+		// 		  No condition here. There are randomly received 1-3 messages.
 		return false // len(r.Contacts) == 1 && len(r.Messages()) == 3
 	}, "alice-2 didn't receive bob contact")
 	s.logResponse(resp, "Wait for Alice-2 to sync new contact")
 	s.Require().NotNil(resp)
-	//s.Require().NoError(err)	// WARNING: Uncomment when bug fixed.
+	//s.Require().NoError(err)	// WARNING: Uncomment when bug fixed. https://github.com/status-im/status-go/issues/3803
 
 	// Check that Alice-2 has Bob as a contact
 	s.Require().Len(alice2.Contacts(), 1)
 	s.Require().Equal(bobPublicKey, alice2.Contacts()[0].ID)
 
-	// TODO: Check response messages
-	// TODO: Check response AC notifications
+	// TODO: https://github.com/status-im/status-go/issues/3803
+	// 		 Check response messages and AC notifications when
 }
 
 func (s *MessengerContactRequestSuite) blockContactAndSync(alice1 *Messenger, alice2 *Messenger, bob *Messenger) {
@@ -1511,7 +1474,7 @@ func (s *MessengerContactRequestSuite) blockContactAndSync(alice1 *Messenger, al
 	s.Require().Equal(ContactRequestStateReceived, respContact.ContactRequestRemoteState)
 
 	// Check chats list
-	//s.Require().Len(alice2.Chats(), 1) // FIXME: profile and timeline chats appear at this stage
+	//s.Require().Len(alice2.Chats(), 1) // FIXME: Uncomment after https://github.com/status-im/status-go/issues/3800
 }
 
 func (s *MessengerContactRequestSuite) unblockContactAndSync(alice1 *Messenger, alice2 *Messenger, bob *Messenger) {
@@ -1542,7 +1505,7 @@ func (s *MessengerContactRequestSuite) unblockContactAndSync(alice1 *Messenger, 
 	s.Require().Equal(respContact.ContactRequestRemoteState, ContactRequestStateNone)
 
 	// Check chats list
-	//s.Require().Len(alice2.Chats(), 1) // WARNING: Uncomment when chats bug fixed
+	//s.Require().Len(alice2.Chats(), 1) // FIXME: Uncomment after https://github.com/status-im/status-go/issues/3800
 }
 
 func (s *MessengerContactRequestSuite) TestBlockedContactSyncing() {
@@ -1551,8 +1514,7 @@ func (s *MessengerContactRequestSuite) TestBlockedContactSyncing() {
 	_, err := bob.Start()
 	s.Require().NoError(err)
 	defer bob.Shutdown() // nolint: errcheck
-	err = bob.SetDisplayName("bob-1")
-	//s.Require().NoError(err)
+	_ = bob.SetDisplayName("bob-1")
 	s.logger.Info("Bob account set up", zap.String("publicKey", bob.IdentityPublicKeyString()))
 
 	// Setup Alice-1
