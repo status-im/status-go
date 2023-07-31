@@ -316,10 +316,10 @@ func (api *API) FilterOwnedCollectiblesAsync(ctx context.Context, chainIDs []wco
 	return nil
 }
 
-func (api *API) GetCollectiblesDataAsync(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) error {
+func (api *API) GetCollectiblesDetailsAsync(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) error {
 	log.Debug("wallet.api.GetCollectiblesDetailsAsync")
 
-	api.s.collectibles.GetCollectiblesDataAsync(ctx, uniqueIDs)
+	api.s.collectibles.GetCollectiblesDetailsAsync(ctx, uniqueIDs)
 	return nil
 }
 
@@ -342,22 +342,22 @@ func (api *API) GetOpenseaAssetsByOwnerAndCollection(ctx context.Context, chainI
 	return container.Assets, nil
 }
 
-func (api *API) GetCollectiblesByOwnerAndCollectionWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, collectionSlug string, cursor string, limit int) (*thirdparty.CollectibleDataContainer, error) {
+func (api *API) GetCollectiblesByOwnerAndCollectionWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, collectionSlug string, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
 	log.Debug("call to GetCollectiblesByOwnerAndCollectionWithCursor")
 	return api.s.collectiblesManager.FetchAllAssetsByOwnerAndCollection(chainID, owner, collectionSlug, cursor, limit)
 }
 
-func (api *API) GetCollectiblesByOwnerWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.CollectibleDataContainer, error) {
+func (api *API) GetCollectiblesByOwnerWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
 	log.Debug("call to GetCollectiblesByOwnerWithCursor")
 	return api.s.collectiblesManager.FetchAllAssetsByOwner(chainID, owner, cursor, limit)
 }
 
-func (api *API) GetCollectiblesByOwnerAndContractAddressWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.CollectibleDataContainer, error) {
+func (api *API) GetCollectiblesByOwnerAndContractAddressWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
 	log.Debug("call to GetCollectiblesByOwnerAndContractAddressWithCursor")
 	return api.s.collectiblesManager.FetchAllAssetsByOwnerAndContractAddress(chainID, owner, contractAddresses, cursor, limit)
 }
 
-func (api *API) GetCollectiblesByUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.CollectibleData, error) {
+func (api *API) GetCollectiblesByUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
 	log.Debug("call to GetCollectiblesByUniqueID")
 	return api.s.collectiblesManager.FetchAssetsByCollectibleUniqueID(uniqueIDs)
 }

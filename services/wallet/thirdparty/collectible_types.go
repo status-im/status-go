@@ -1,6 +1,7 @@
 package thirdparty
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -8,24 +9,41 @@ import (
 	w_common "github.com/status-im/status-go/services/wallet/common"
 )
 
+var (
+	ErrChainIDNotSupported = errors.New("chainID not supported")
+)
+
+type CollectibleProvider interface {
+	ID() string
+	IsChainSupported(chainID w_common.ChainID) bool
+}
+
+type ContractID struct {
+	ChainID w_common.ChainID `json:"chainID"`
+	Address common.Address   `json:"address"`
+}
+
+func (k *ContractID) HashKey() string {
+	return fmt.Sprintf("%d+%s", k.ChainID, k.Address.String())
+}
+
 type CollectibleUniqueID struct {
-	ChainID         w_common.ChainID `json:"chainID"`
-	ContractAddress common.Address   `json:"contractAddress"`
-	TokenID         *bigint.BigInt   `json:"tokenID"`
+	ContractID ContractID     `json:"contractID"`
+	TokenID    *bigint.BigInt `json:"tokenID"`
 }
 
 func (k *CollectibleUniqueID) HashKey() string {
-	return fmt.Sprintf("%d+%s+%s", k.ChainID, k.ContractAddress.String(), k.TokenID.String())
+	return fmt.Sprintf("%s+%s", k.ContractID.HashKey(), k.TokenID.String())
 }
 
 func GroupCollectibleUIDsByChainID(uids []CollectibleUniqueID) map[w_common.ChainID][]CollectibleUniqueID {
 	ret := make(map[w_common.ChainID][]CollectibleUniqueID)
 
 	for _, uid := range uids {
-		if _, ok := ret[uid.ChainID]; !ok {
-			ret[uid.ChainID] = make([]CollectibleUniqueID, 0, len(uids))
+		if _, ok := ret[uid.ContractID.ChainID]; !ok {
+			ret[uid.ContractID.ChainID] = make([]CollectibleUniqueID, 0, len(uids))
 		}
-		ret[uid.ChainID] = append(ret[uid.ChainID], uid)
+		ret[uid.ContractID.ChainID] = append(ret[uid.ContractID.ChainID], uid)
 	}
 
 	return ret
@@ -36,7 +54,9 @@ type CollectionTrait struct {
 	Max float64 `json:"max"`
 }
 
+// Collection info
 type CollectionData struct {
+	ID       ContractID                 `json:"id"`
 	Name     string                     `json:"name"`
 	Slug     string                     `json:"slug"`
 	ImageURL string                     `json:"image_url"`
@@ -50,6 +70,7 @@ type CollectibleTrait struct {
 	MaxValue    string `json:"max_value"`
 }
 
+// Collectible info
 type CollectibleData struct {
 	ID                 CollectibleUniqueID `json:"id"`
 	Name               string              `json:"name"`
@@ -61,75 +82,46 @@ type CollectibleData struct {
 	Traits             []CollectibleTrait  `json:"traits"`
 	BackgroundColor    string              `json:"background_color"`
 	TokenURI           string              `json:"token_uri"`
-	CollectionData     CollectionData      `json:"collection_data"`
 }
 
-type CollectibleHeader struct {
-	ID                 CollectibleUniqueID `json:"id"`
-	Name               string              `json:"name"`
-	ImageURL           string              `json:"image_url"`
-	AnimationURL       string              `json:"animation_url"`
-	AnimationMediaType string              `json:"animation_media_type"`
-	BackgroundColor    string              `json:"background_color"`
-	CollectionName     string              `json:"collection_name"`
+// Combined Collection+Collectible info returned by the CollectibleProvider
+// Some providers may not return the CollectionData in the same API call, so it's optional
+type FullCollectibleData struct {
+	CollectibleData CollectibleData
+	CollectionData  *CollectionData
 }
 
-type CollectibleOwnershipContainer struct {
-	Collectibles   []CollectibleUniqueID
+type CollectiblesContainer[T any] struct {
+	Items          []T
 	NextCursor     string
 	PreviousCursor string
 }
 
-type CollectibleDataContainer struct {
-	Collectibles   []CollectibleData
-	NextCursor     string
-	PreviousCursor string
-}
+type CollectibleOwnershipContainer CollectiblesContainer[CollectibleUniqueID]
+type CollectionDataContainer CollectiblesContainer[CollectionData]
+type CollectibleDataContainer CollectiblesContainer[CollectibleData]
+type FullCollectibleDataContainer CollectiblesContainer[FullCollectibleData]
 
-func (c *CollectibleDataContainer) ToOwnershipContainer() CollectibleOwnershipContainer {
-	ret := CollectibleOwnershipContainer{
-		Collectibles:   make([]CollectibleUniqueID, 0, len(c.Collectibles)),
-		NextCursor:     c.NextCursor,
-		PreviousCursor: c.PreviousCursor,
+// Tried to find a way to make this generic, but couldn't, so the code below is duplicated somewhere else
+func collectibleItemsToIDs(items []FullCollectibleData) []CollectibleUniqueID {
+	ret := make([]CollectibleUniqueID, 0, len(items))
+	for _, item := range items {
+		ret = append(ret, item.CollectibleData.ID)
 	}
-
-	for _, collectible := range c.Collectibles {
-		ret.Collectibles = append(ret.Collectibles, collectible.ID)
-	}
-
 	return ret
 }
 
-func (c *CollectibleData) toHeader() CollectibleHeader {
-	return CollectibleHeader{
-		ID:                 c.ID,
-		Name:               c.Name,
-		ImageURL:           c.ImageURL,
-		AnimationURL:       c.AnimationURL,
-		AnimationMediaType: c.AnimationMediaType,
-		BackgroundColor:    c.BackgroundColor,
-		CollectionName:     c.CollectionData.Name,
+func (c *FullCollectibleDataContainer) ToOwnershipContainer() CollectibleOwnershipContainer {
+	return CollectibleOwnershipContainer{
+		Items:          collectibleItemsToIDs(c.Items),
+		NextCursor:     c.NextCursor,
+		PreviousCursor: c.PreviousCursor,
 	}
-}
-
-func CollectiblesToHeaders(collectibles []CollectibleData) []CollectibleHeader {
-	res := make([]CollectibleHeader, 0, len(collectibles))
-
-	for _, c := range collectibles {
-		res = append(res, c.toHeader())
-	}
-
-	return res
-}
-
-type CollectibleOwnershipProvider interface {
-	CanProvideAccountOwnership(chainID uint64) (bool, error)
-	FetchAccountOwnership(chainID uint64, address common.Address) (*CollectibleData, error)
 }
 
 type CollectibleMetadataProvider interface {
 	CanProvideCollectibleMetadata(id CollectibleUniqueID, tokenURI string) (bool, error)
-	FetchCollectibleMetadata(id CollectibleUniqueID, tokenURI string) (*CollectibleData, error)
+	FetchCollectibleMetadata(id CollectibleUniqueID, tokenURI string) (*FullCollectibleData, error)
 }
 
 type TokenBalance struct {

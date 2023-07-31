@@ -2,7 +2,6 @@ package opensea
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -41,13 +40,9 @@ const ChainIDRequiringAPIKey = walletCommon.EthereumMainnet
 
 const FetchNoLimit = 0
 
-var (
-	ErrChainIDNotSupported = errors.New("chainID not supported by opensea API")
-)
-
 type urlGetter func(walletCommon.ChainID, string) (string, error)
 
-func getbaseURL(chainID walletCommon.ChainID) (string, error) {
+func getBaseURL(chainID walletCommon.ChainID) (string, error) {
 	// v1 Endpoints only support L1 chain
 	switch uint64(chainID) {
 	case walletCommon.EthereumMainnet:
@@ -56,11 +51,20 @@ func getbaseURL(chainID walletCommon.ChainID) (string, error) {
 		return "https://testnets-api.opensea.io/api/v1", nil
 	}
 
-	return "", ErrChainIDNotSupported
+	return "", thirdparty.ErrChainIDNotSupported
+}
+
+func (o *Client) ID() string {
+	return "opensea"
+}
+
+func (o *Client) IsChainSupported(chainID walletCommon.ChainID) bool {
+	_, err := getBaseURL(chainID)
+	return err == nil
 }
 
 func getURL(chainID walletCommon.ChainID, path string) (string, error) {
-	baseURL, err := getbaseURL(chainID)
+	baseURL, err := getBaseURL(chainID)
 	if err != nil {
 		return "", err
 	}
@@ -182,9 +186,11 @@ type OwnedCollection struct {
 
 func (c *Asset) id() thirdparty.CollectibleUniqueID {
 	return thirdparty.CollectibleUniqueID{
-		ChainID:         chainStringToChainID(c.Contract.ChainIdentifier),
-		ContractAddress: common.HexToAddress(c.Contract.Address),
-		TokenID:         c.TokenID,
+		ContractID: thirdparty.ContractID{
+			ChainID: chainStringToChainID(c.Contract.ChainIdentifier),
+			Address: common.HexToAddress(c.Contract.Address),
+		},
+		TokenID: c.TokenID,
 	}
 }
 
@@ -204,14 +210,15 @@ func openseaToCollectibleTraits(traits []Trait) []thirdparty.CollectibleTrait {
 	return ret
 }
 
-func (c *Collection) toCommon() thirdparty.CollectionData {
+func (c *Asset) toCollectionData() thirdparty.CollectionData {
 	ret := thirdparty.CollectionData{
-		Name:     c.Name,
-		Slug:     c.Slug,
-		ImageURL: c.ImageURL,
+		ID:       c.id().ContractID,
+		Name:     c.Collection.Name,
+		Slug:     c.Collection.Slug,
+		ImageURL: c.Collection.ImageURL,
 		Traits:   make(map[string]thirdparty.CollectionTrait),
 	}
-	for traitType, trait := range c.Traits {
+	for traitType, trait := range c.Collection.Traits {
 		ret.Traits[traitType] = thirdparty.CollectionTrait{
 			Min: trait.Min,
 			Max: trait.Max,
@@ -220,7 +227,7 @@ func (c *Collection) toCommon() thirdparty.CollectionData {
 	return ret
 }
 
-func (c *Asset) toCommon() thirdparty.CollectibleData {
+func (c *Asset) toCollectiblesData() thirdparty.CollectibleData {
 	return thirdparty.CollectibleData{
 		ID:                 c.id(),
 		Name:               c.Name,
@@ -232,7 +239,14 @@ func (c *Asset) toCommon() thirdparty.CollectibleData {
 		Traits:             openseaToCollectibleTraits(c.Traits),
 		BackgroundColor:    c.BackgroundColor,
 		TokenURI:           c.TokenURI,
-		CollectionData:     c.Collection.toCommon(),
+	}
+}
+
+func (c *Asset) toCommon() thirdparty.FullCollectibleData {
+	collection := c.toCollectionData()
+	return thirdparty.FullCollectibleData{
+		CollectibleData: c.toCollectiblesData(),
+		CollectionData:  &collection,
 	}
 }
 
@@ -386,7 +400,7 @@ func (o *Client) FetchAllCollectionsByOwner(chainID walletCommon.ChainID, owner 
 	return collections, nil
 }
 
-func (o *Client) FetchAllAssetsByOwnerAndCollection(chainID walletCommon.ChainID, owner common.Address, collectionSlug string, cursor string, limit int) (*thirdparty.CollectibleDataContainer, error) {
+func (o *Client) FetchAllAssetsByOwnerAndCollection(chainID walletCommon.ChainID, owner common.Address, collectionSlug string, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
 	queryParams := url.Values{
 		"owner":      {owner.String()},
 		"collection": {collectionSlug},
@@ -399,7 +413,7 @@ func (o *Client) FetchAllAssetsByOwnerAndCollection(chainID walletCommon.ChainID
 	return o.fetchAssets(chainID, queryParams, limit)
 }
 
-func (o *Client) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.CollectibleDataContainer, error) {
+func (o *Client) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
 	queryParams := url.Values{
 		"owner": {owner.String()},
 	}
@@ -415,7 +429,7 @@ func (o *Client) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.Ch
 	return o.fetchAssets(chainID, queryParams, limit)
 }
 
-func (o *Client) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.CollectibleDataContainer, error) {
+func (o *Client) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
 	queryParams := url.Values{
 		"owner": {owner.String()},
 	}
@@ -427,16 +441,16 @@ func (o *Client) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner commo
 	return o.fetchAssets(chainID, queryParams, limit)
 }
 
-func (o *Client) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.CollectibleData, error) {
+func (o *Client) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
 	queryParams := url.Values{}
 
-	ret := make([]thirdparty.CollectibleData, 0, len(uniqueIDs))
+	ret := make([]thirdparty.FullCollectibleData, 0, len(uniqueIDs))
 
 	idsPerChainID := thirdparty.GroupCollectibleUIDsByChainID(uniqueIDs)
 	for chainID, ids := range idsPerChainID {
 		for _, id := range ids {
 			queryParams.Add("token_ids", id.TokenID.String())
-			queryParams.Add("asset_contract_addresses", id.ContractAddress.String())
+			queryParams.Add("asset_contract_addresses", id.ContractID.Address.String())
 		}
 
 		data, err := o.fetchAssets(chainID, queryParams, FetchNoLimit)
@@ -444,14 +458,14 @@ func (o *Client) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.Collect
 			return nil, err
 		}
 
-		ret = append(ret, data.Collectibles...)
+		ret = append(ret, data.Items...)
 	}
 
 	return ret, nil
 }
 
-func (o *Client) fetchAssets(chainID walletCommon.ChainID, queryParams url.Values, limit int) (*thirdparty.CollectibleDataContainer, error) {
-	assets := new(thirdparty.CollectibleDataContainer)
+func (o *Client) fetchAssets(chainID walletCommon.ChainID, queryParams url.Values, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
+	assets := new(thirdparty.FullCollectibleDataContainer)
 
 	if len(queryParams["cursor"]) > 0 {
 		assets.PreviousCursor = queryParams["cursor"][0]
@@ -495,7 +509,7 @@ func (o *Client) fetchAssets(chainID walletCommon.ChainID, queryParams url.Value
 					asset.AnimationURL = ""
 				}
 			}
-			assets.Collectibles = append(assets.Collectibles, asset.toCommon())
+			assets.Items = append(assets.Items, asset.toCommon())
 		}
 		assets.NextCursor = container.NextCursor
 
@@ -505,7 +519,7 @@ func (o *Client) fetchAssets(chainID walletCommon.ChainID, queryParams url.Value
 
 		queryParams["cursor"] = []string{assets.NextCursor}
 
-		if limit > FetchNoLimit && len(assets.Collectibles) >= limit {
+		if limit > FetchNoLimit && len(assets.Items) >= limit {
 			break
 		}
 	}
@@ -539,7 +553,7 @@ func (o *Client) fetchOpenseaAssets(chainID walletCommon.ChainID, queryParams ur
 		tmpLimit = limit
 	}
 
-	baseURL, err := getbaseURL(chainID)
+	baseURL, err := getBaseURL(chainID)
 
 	if err != nil {
 		return nil, err
