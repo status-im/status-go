@@ -172,10 +172,10 @@ func (u OEmbedUnfurler) handlePhotoOembedType(preview common.LinkPreview, respon
 			preview.Thumbnail = t
 		}
 	}
-	return preview
 }
 
-func (u OEmbedUnfurler) handleVideoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
+func (u OEmb
+edUnfurler) handleVideoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
 	if response.ThumbnailURL != "" {
 		t, err := fetchThumbnail(u.logger, u.httpClient, response.ThumbnailURL)
 		if err != nil {
@@ -184,7 +184,6 @@ func (u OEmbedUnfurler) handleVideoOembedType(preview common.LinkPreview, respon
 			preview.Thumbnail = t
 		}
 	}
-	return preview
 }
 
 func handleRichOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
