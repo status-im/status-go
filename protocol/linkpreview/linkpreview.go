@@ -162,7 +162,7 @@ func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
 	return oembedURL, nil
 }
 
-func handlePhotoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
+func handlePhotoOembedType(preview *common.LinkPreview, response OEmbedBaseResponse) {
 	if response.URL != "" {
 		preview.Thumbnail.URL = response.URL
 	}
@@ -172,10 +172,9 @@ func handlePhotoOembedType(preview common.LinkPreview, response OEmbedBaseRespon
 	if response.Height != 0 {
 		preview.Thumbnail.Height = response.Height
 	}
-	return preview
 }
 
-func handleVideoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
+func handleVideoOembedType(preview *common.LinkPreview, response OEmbedBaseResponse) {
 	if response.HTML != "" {
 		preview.HTML = response.HTML
 	}
@@ -188,10 +187,9 @@ func handleVideoOembedType(preview common.LinkPreview, response OEmbedBaseRespon
 	if response.Height != 0 {
 		preview.Thumbnail.Height = response.Height
 	}
-	return preview
 }
 
-func handleRichOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
+func handleRichOembedType(preview *common.LinkPreview, response OEmbedBaseResponse) {
 	if response.HTML != "" {
 		preview.HTML = response.HTML
 	}
@@ -201,7 +199,6 @@ func handleRichOembedType(preview common.LinkPreview, response OEmbedBaseRespons
 	if response.Height != 0 {
 		preview.Thumbnail.Height = response.Height
 	}
-	return preview
 }
 
 func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
@@ -216,17 +213,18 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 		"accept-language": headerAcceptLanguage,
 		"user-agent":      headerUserAgent,
 	}
+
 	oembedBytes, err := fetchBody(u.logger, u.httpClient, oembedURL.String(), headers)
 	if err != nil {
 		return preview, err
 	}
 
 	var oembedResponse OEmbedBaseResponse
+
+	err = json.Unmarshal(oembedBytes, &oembedResponse)
 	if err != nil {
 		return preview, err
 	}
-
-	err = json.Unmarshal(oembedBytes, &oembedResponse)
 
 	if oembedResponse.Title != "" {
 		preview.Title = oembedResponse.Title
@@ -234,13 +232,13 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 
 	switch oembedResponse.Type {
 	case "photo":
-		return handlePhotoOembedType(preview, oembedResponse), nil
+		handlePhotoOembedType(&preview, oembedResponse)
 
 	case "video":
-		return handleVideoOembedType(preview, oembedResponse), nil
+		handleVideoOembedType(&preview, oembedResponse)
 
 	case "rich":
-		return handleRichOembedType(preview, oembedResponse), nil
+		handleRichOembedType(&preview, oembedResponse)
 	default:
 		return preview, fmt.Errorf("unexpected oembed type: %v", oembedResponse.Type)
 	}
