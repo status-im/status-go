@@ -39,7 +39,7 @@ type TransactionManager struct {
 	transactor     *transactions.Transactor
 	config         *params.NodeConfig
 	accountsDB     *accounts.Database
-	pendingManager *transactions.TransactionManager
+	pendingTracker *transactions.PendingTxTracker
 	eventFeed      *event.Feed
 }
 
@@ -49,7 +49,7 @@ func NewTransactionManager(
 	transactor *transactions.Transactor,
 	config *params.NodeConfig,
 	accountsDB *accounts.Database,
-	pendingTxManager *transactions.TransactionManager,
+	pendingTxManager *transactions.PendingTxTracker,
 	eventFeed *event.Feed,
 ) *TransactionManager {
 	return &TransactionManager{
@@ -58,7 +58,7 @@ func NewTransactionManager(
 		transactor:     transactor,
 		config:         config,
 		accountsDB:     accountsDB,
-		pendingManager: pendingTxManager,
+		pendingTracker: pendingTxManager,
 		eventFeed:      eventFeed,
 	}
 }
@@ -307,7 +307,7 @@ func (tm *TransactionManager) storePendingTransactions(multiTransaction *MultiTr
 
 	txs := createPendingTransactions(hashes, data, multiTransaction)
 	for _, tx := range txs {
-		err := tm.pendingManager.AddPending(tx)
+		err := tm.pendingTracker.StoreAndTrackPendingTx(tx)
 		if err != nil {
 			return err
 		}
@@ -329,10 +329,13 @@ func createPendingTransactions(hashes map[uint64][]types.Hash, data []*bridge.Tr
 				To:                 common.Address(tx.To()),
 				Data:               tx.Data().String(),
 				Type:               transactions.WalletTransfer,
-				ChainID:            tx.ChainID,
+				ChainID:            wallet_common.ChainID(tx.ChainID),
 				MultiTransactionID: int64(multiTransaction.ID),
 				Symbol:             multiTransaction.FromAsset,
+				AutoDelete:         new(bool),
 			}
+			// Transaction downloader will delete pending transaction as soon as it is confirmed
+			*pendingTransaction.AutoDelete = false
 			txs = append(txs, pendingTransaction)
 		}
 	}

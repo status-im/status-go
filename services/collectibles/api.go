@@ -22,17 +22,17 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	wcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/transactions"
 )
 
-func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig, appDb *sql.DB) *API {
+func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, pendingTracker *transactions.PendingTxTracker, config *params.NodeConfig, appDb *sql.DB) *API {
 	return &API{
 		RPCClient:       rpcClient,
 		accountsManager: accountsManager,
-		rpcFiltersSrvc:  rpcFiltersSrvc,
+		pendingTracker:  pendingTracker,
 		config:          config,
 		db:              NewCommunityTokensDatabase(appDb),
 	}
@@ -41,7 +41,7 @@ func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFilt
 type API struct {
 	RPCClient       *rpc.Client
 	accountsManager *account.GethManager
-	rpcFiltersSrvc  *rpcfilters.Service
+	pendingTracker  *transactions.PendingTxTracker
 	config          *params.NodeConfig
 	db              *Database
 }
@@ -126,12 +126,17 @@ func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deployme
 		return DeploymentDetails{}, err
 	}
 
-	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
-		Hash:    tx.Hash(),
-		Type:    string(transactions.DeployCommunityToken),
-		From:    common.Address(txArgs.From),
-		ChainID: chainID,
-	})
+	err = api.pendingTracker.TrackPendingTransaction(
+		wcommon.ChainID(chainID),
+		tx.Hash(),
+		common.Address(txArgs.From),
+		transactions.DeployCommunityToken,
+		transactions.AutoDelete,
+	)
+	if err != nil {
+		log.Error("TrackPendingTransaction error", "error", err)
+		return DeploymentDetails{}, err
+	}
 
 	return DeploymentDetails{address.Hex(), tx.Hash().Hex()}, nil
 }
@@ -166,12 +171,17 @@ func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64, ownerToken
 		return DeploymentDetails{}, err
 	}
 
-	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
-		Hash:    tx.Hash(),
-		Type:    string(transactions.DeployOwnerToken),
-		From:    common.Address(txArgs.From),
-		ChainID: chainID,
-	})
+	err = api.pendingTracker.TrackPendingTransaction(
+		wcommon.ChainID(chainID),
+		tx.Hash(),
+		common.Address(txArgs.From),
+		transactions.DeployOwnerToken,
+		transactions.AutoDelete,
+	)
+	if err != nil {
+		log.Error("TrackPendingTransaction error", "error", err)
+		return DeploymentDetails{}, err
+	}
 
 	return DeploymentDetails{address.Hex(), tx.Hash().Hex()}, nil
 }
@@ -229,12 +239,17 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 		return DeploymentDetails{}, err
 	}
 
-	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
-		Hash:    tx.Hash(),
-		Type:    string(transactions.DeployCommunityToken),
-		From:    common.Address(txArgs.From),
-		ChainID: chainID,
-	})
+	err = api.pendingTracker.TrackPendingTransaction(
+		wcommon.ChainID(chainID),
+		tx.Hash(),
+		common.Address(txArgs.From),
+		transactions.DeployCommunityToken,
+		transactions.AutoDelete,
+	)
+	if err != nil {
+		log.Error("TrackPendingTransaction error", "error", err)
+		return DeploymentDetails{}, err
+	}
 
 	return DeploymentDetails{address.Hex(), tx.Hash().Hex()}, nil
 }
@@ -321,12 +336,17 @@ func (api *API) MintTokens(ctx context.Context, chainID uint64, contractAddress 
 		return "", err
 	}
 
-	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
-		Hash:    tx.Hash(),
-		Type:    string(transactions.AirdropCommunityToken),
-		From:    common.Address(txArgs.From),
-		ChainID: chainID,
-	})
+	err = api.pendingTracker.TrackPendingTransaction(
+		wcommon.ChainID(chainID),
+		tx.Hash(),
+		common.Address(txArgs.From),
+		transactions.AirdropCommunityToken,
+		transactions.AutoDelete,
+	)
+	if err != nil {
+		log.Error("TrackPendingTransaction error", "error", err)
+		return "", err
+	}
 
 	return tx.Hash().Hex(), nil
 }
@@ -426,12 +446,17 @@ func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress 
 		return "", err
 	}
 
-	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
-		Hash:    tx.Hash(),
-		Type:    string(transactions.RemoteDestructCollectible),
-		From:    common.Address(txArgs.From),
-		ChainID: chainID,
-	})
+	err = api.pendingTracker.TrackPendingTransaction(
+		wcommon.ChainID(chainID),
+		tx.Hash(),
+		common.Address(txArgs.From),
+		transactions.RemoteDestructCollectible,
+		transactions.AutoDelete,
+	)
+	if err != nil {
+		log.Error("TrackPendingTransaction error", "error", err)
+		return "", err
+	}
 
 	return tx.Hash().Hex(), nil
 }
@@ -589,12 +614,17 @@ func (api *API) Burn(ctx context.Context, chainID uint64, contractAddress string
 		return "", err
 	}
 
-	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
-		Hash:    tx.Hash(),
-		Type:    string(transactions.BurnCommunityToken),
-		From:    common.Address(txArgs.From),
-		ChainID: chainID,
-	})
+	err = api.pendingTracker.TrackPendingTransaction(
+		wcommon.ChainID(chainID),
+		tx.Hash(),
+		common.Address(txArgs.From),
+		transactions.BurnCommunityToken,
+		transactions.AutoDelete,
+	)
+	if err != nil {
+		log.Error("TrackPendingTransaction error", "error", err)
+		return "", err
+	}
 
 	return tx.Hash().Hex(), nil
 }

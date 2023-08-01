@@ -58,7 +58,11 @@ func TestDBProcessBlocks(t *testing.T) {
 			From:        common.Address{1},
 		},
 	}
-	require.NoError(t, db.SaveTransfersMarkBlocksLoaded(777, address, transfers, []*big.Int{big.NewInt(1), big.NewInt(2)}))
+	tx, err := db.client.BeginTx(context.Background(), nil)
+	require.NoError(t, err)
+
+	require.NoError(t, saveTransfersMarkBlocksLoaded(tx, 777, address, transfers, []*big.Int{big.NewInt(1), big.NewInt(2)}))
+	require.NoError(t, tx.Commit())
 }
 
 func TestDBProcessTransfer(t *testing.T) {

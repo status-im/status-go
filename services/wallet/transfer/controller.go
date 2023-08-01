@@ -3,6 +3,7 @@ package transfer
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -27,13 +28,13 @@ type Controller struct {
 	TransferFeed       *event.Feed
 	group              *async.Group
 	transactionManager *TransactionManager
-	pendingTxManager   *transactions.TransactionManager
+	pendingTxManager   *transactions.PendingTxTracker
 	tokenManager       *token.Manager
 	loadAllTransfers   bool
 }
 
 func NewTransferController(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed, transferFeed *event.Feed,
-	transactionManager *TransactionManager, pendingTxManager *transactions.TransactionManager, tokenManager *token.Manager, loadAllTransfers bool) *Controller {
+	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker, tokenManager *token.Manager, loadAllTransfers bool) *Controller {
 
 	blockDAO := &BlockDAO{db}
 	return &Controller{
@@ -211,9 +212,18 @@ func (c *Controller) LoadTransferByHash(ctx context.Context, rpcClient *rpc.Clie
 		return err
 	}
 
-	blocks := []*big.Int{transfer.BlockNumber}
-	err = c.db.SaveTransfersMarkBlocksLoaded(rpcClient.UpstreamChainID, address, transfers, blocks)
+	tx, err := c.db.client.BeginTx(ctx, nil)
 	if err != nil {
+		return err
+	}
+
+	blocks := []*big.Int{transfer.BlockNumber}
+	err = saveTransfersMarkBlocksLoaded(tx, rpcClient.UpstreamChainID, address, transfers, blocks)
+	if err != nil {
+		rollErr := tx.Rollback()
+		if rollErr != nil {
+			return fmt.Errorf("failed to rollback transaction due to error: %v", err)
+		}
 		return err
 	}
 

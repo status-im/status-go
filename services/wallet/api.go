@@ -2,6 +2,8 @@ package wallet
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -24,6 +26,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -232,67 +235,61 @@ func (api *API) DeleteSavedAddress(ctx context.Context, address common.Address, 
 }
 
 func (api *API) GetPendingTransactions(ctx context.Context) ([]*transactions.PendingTransaction, error) {
-	log.Debug("call to get pending transactions")
-	rst, err := api.s.pendingTxManager.GetAllPending([]uint64{api.s.rpcClient.UpstreamChainID})
-	log.Debug("result from database for pending transactions", "len", len(rst))
-	return rst, err
-}
-
-func (api *API) GetPendingTransactionsByChainIDs(ctx context.Context, chainIDs []uint64) ([]*transactions.PendingTransaction, error) {
-	log.Debug("call to get pending transactions")
-	rst, err := api.s.pendingTxManager.GetAllPending(chainIDs)
-	log.Debug("result from database for pending transactions", "len", len(rst))
+	log.Debug("wallet.api.GetPendingTransactions")
+	rst, err := api.s.pendingTxManager.GetAllPending()
+	log.Debug("wallet.api.GetPendingTransactions RESULT", "len", len(rst))
 	return rst, err
 }
 
 func (api *API) GetPendingTransactionsForIdentities(ctx context.Context, identities []transfer.TransactionIdentity) (
 	result []*transactions.PendingTransaction, err error) {
 
-	log.Debug("call to GetPendingTransactionsForIdentities")
+	log.Debug("wallet.api.GetPendingTransactionsForIdentities")
 
 	result = make([]*transactions.PendingTransaction, 0, len(identities))
 	var pt *transactions.PendingTransaction
 	for _, identity := range identities {
-		pt, err = api.s.pendingTxManager.GetPendingEntry(uint64(identity.ChainID), identity.Hash)
+		pt, err = api.s.pendingTxManager.GetPendingEntry(identity.ChainID, identity.Hash)
 		result = append(result, pt)
 	}
 
-	log.Debug("result from GetPendingTransactionsForIdentities", "len", len(result))
+	log.Debug("wallet.api.GetPendingTransactionsForIdentities RES", "len", len(result))
 	return
 }
 
-func (api *API) GetPendingOutboundTransactionsByAddress(ctx context.Context, address common.Address) (
-	[]*transactions.PendingTransaction, error) {
+// TODO - #11861: Remove this and replace with EventPendingTransactionStatusChanged event and Delete to confirm the transaction where it is needed
+func (api *API) WatchTransactionByChainID(ctx context.Context, chainID uint64, transactionHash common.Hash) (err error) {
+	log.Debug("wallet.api.WatchTransactionByChainID", "chainID", chainID, "transactionHash", transactionHash)
+	var status *transactions.TxStatus
+	defer log.Debug("wallet.api.WatchTransactionByChainID return", "err", err, "chainID", chainID, "transactionHash", transactionHash)
 
-	log.Debug("call to get pending outbound transactions by address")
-	rst, err := api.s.pendingTxManager.GetPendingByAddress([]uint64{api.s.rpcClient.UpstreamChainID}, address)
-	log.Debug("result from database for pending transactions by address", "len", len(rst))
-	return rst, err
-}
+	// Workaround to keep the blocking call until the clients use the PendingTxTracker APIs
+	eventChan := make(chan walletevent.Event, 2)
+	sub := api.s.feed.Subscribe(eventChan)
+	defer sub.Unsubscribe()
 
-func (api *API) GetPendingOutboundTransactionsByAddressAndChainID(ctx context.Context, chainIDs []uint64,
-	address common.Address) ([]*transactions.PendingTransaction, error) {
-
-	log.Debug("call to get pending outbound transactions by address")
-	rst, err := api.s.pendingTxManager.GetPendingByAddress(chainIDs, address)
-	log.Debug("result from database for pending transactions by address", "len", len(rst))
-	return rst, err
-}
-
-func (api *API) WatchTransaction(ctx context.Context, transactionHash common.Hash) error {
-	chainClient, err := api.s.rpcClient.EthClient(api.s.rpcClient.UpstreamChainID)
-	if err != nil {
-		return err
+	status, err = api.s.pendingTxManager.Watch(ctx, wcommon.ChainID(chainID), transactionHash)
+	if err == nil && *status != transactions.Pending {
+		return nil
 	}
-	return api.s.pendingTxManager.Watch(ctx, transactionHash, chainClient)
-}
 
-func (api *API) WatchTransactionByChainID(ctx context.Context, chainID uint64, transactionHash common.Hash) error {
-	chainClient, err := api.s.rpcClient.EthClient(chainID)
-	if err != nil {
-		return err
+	for {
+		select {
+		case we := <-eventChan:
+			if transactions.EventPendingTransactionStatusChanged == we.Type {
+				var p transactions.StatusChangedPayload
+				err = json.Unmarshal([]byte(we.Message), &p)
+				if err != nil {
+					return err
+				}
+				if p.ChainID == wcommon.ChainID(chainID) && p.Hash == transactionHash {
+					return nil
+				}
+			}
+		case <-time.After(10 * time.Minute):
+			return errors.New("timeout watching for pending transaction")
+		}
 	}
-	return api.s.pendingTxManager.Watch(ctx, transactionHash, chainClient)
 }
 
 func (api *API) GetCryptoOnRamps(ctx context.Context) ([]CryptoOnRamp, error) {

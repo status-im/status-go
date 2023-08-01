@@ -17,7 +17,6 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ens"
-	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/stickers"
 	"github.com/status-im/status-go/services/wallet/activity"
 	"github.com/status-im/status-go/services/wallet/collectibles"
@@ -51,14 +50,15 @@ func NewService(
 	config *params.NodeConfig,
 	ens *ens.Service,
 	stickers *stickers.Service,
-	rpcFilterSrvc *rpcfilters.Service,
+	pendingTxManager *transactions.PendingTxTracker,
+	feed *event.Feed,
 ) *Service {
 	cryptoOnRampManager := NewCryptoOnRampManager(&CryptoOnRampOptions{
 		dataSourceType: DataSourceStatic,
 	})
-	walletFeed := &event.Feed{}
+
 	signals := &walletevent.SignalsTransmitter{
-		Publisher: walletFeed,
+		Publisher: feed,
 	}
 	blockchainStatus := make(map[uint64]string)
 	mutex := sync.Mutex{}
@@ -83,7 +83,7 @@ func NewService(
 			return
 		}
 
-		walletFeed.Send(walletevent.Event{
+		feed.Send(walletevent.Event{
 			Type:     EventBlockchainStatusChanged,
 			Accounts: []common.Address{},
 			Message:  string(encodedmessage),
@@ -93,21 +93,20 @@ func NewService(
 	})
 	tokenManager := token.NewTokenManager(db, rpcClient, rpcClient.NetworkManager)
 	savedAddressesManager := &SavedAddressesManager{db: db}
-	pendingTxManager := transactions.NewTransactionManager(db, rpcFilterSrvc.TransactionSentToUpstreamEvent(), walletFeed)
-	transactionManager := transfer.NewTransactionManager(db, gethManager, transactor, config, accountsDB, pendingTxManager, walletFeed)
-	transferController := transfer.NewTransferController(db, rpcClient, accountFeed, walletFeed, transactionManager, pendingTxManager,
+	transactionManager := transfer.NewTransactionManager(db, gethManager, transactor, config, accountsDB, pendingTxManager, feed)
+	transferController := transfer.NewTransferController(db, rpcClient, accountFeed, feed, transactionManager, pendingTxManager,
 		tokenManager, config.WalletConfig.LoadAllTransfers)
 	cryptoCompare := cryptocompare.NewClient()
 	coingecko := coingecko.NewClient()
-	marketManager := market.NewManager(cryptoCompare, coingecko, walletFeed)
-	reader := NewReader(rpcClient, tokenManager, marketManager, accountsDB, NewPersistence(db), walletFeed)
-	history := history.NewService(db, walletFeed, rpcClient, tokenManager, marketManager)
-	currency := currency.NewService(db, walletFeed, tokenManager, marketManager)
-	activity := activity.NewService(db, tokenManager, walletFeed, accountsDB)
+	marketManager := market.NewManager(cryptoCompare, coingecko, feed)
+	reader := NewReader(rpcClient, tokenManager, marketManager, accountsDB, NewPersistence(db), feed)
+	history := history.NewService(db, feed, rpcClient, tokenManager, marketManager)
+	currency := currency.NewService(db, feed, tokenManager, marketManager)
+	activity := activity.NewService(db, tokenManager, feed, accountsDB)
 
 	openseaHTTPClient := opensea.NewHTTPClient()
-	openseaClient := opensea.NewClient(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient, walletFeed)
-	openseaV2Client := opensea.NewClientV2(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient, walletFeed)
+	openseaClient := opensea.NewClient(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient, feed)
+	openseaV2Client := opensea.NewClientV2(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient, feed)
 	infuraClient := infura.NewClient(config.WalletConfig.InfuraAPIKey, config.WalletConfig.InfuraAPIKeySecret)
 	alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKeys)
 
@@ -138,7 +137,7 @@ func NewService(
 	}
 
 	collectiblesManager := collectibles.NewManager(db, rpcClient, contractOwnershipProviders, accountOwnershipProviders, collectibleDataProviders, collectionDataProviders, openseaClient)
-	collectibles := collectibles.NewService(db, walletFeed, accountsDB, accountFeed, rpcClient.NetworkManager, collectiblesManager)
+	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, rpcClient.NetworkManager, collectiblesManager)
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
@@ -157,8 +156,7 @@ func NewService(
 		transactor:            transactor,
 		ens:                   ens,
 		stickers:              stickers,
-		rpcFilterSrvc:         rpcFilterSrvc,
-		feed:                  walletFeed,
+		feed:                  feed,
 		signals:               signals,
 		reader:                reader,
 		history:               history,
@@ -176,7 +174,7 @@ type Service struct {
 	savedAddressesManager *SavedAddressesManager
 	tokenManager          *token.Manager
 	transactionManager    *transfer.TransactionManager
-	pendingTxManager      *transactions.TransactionManager
+	pendingTxManager      *transactions.PendingTxTracker
 	cryptoOnRampManager   *CryptoOnRampManager
 	transferController    *transfer.Controller
 	feesManager           *FeeManager
@@ -188,7 +186,6 @@ type Service struct {
 	transactor            *transactions.Transactor
 	ens                   *ens.Service
 	stickers              *stickers.Service
-	rpcFilterSrvc         *rpcfilters.Service
 	feed                  *event.Feed
 	signals               *walletevent.SignalsTransmitter
 	reader                *Reader
@@ -204,15 +201,9 @@ func (s *Service) Start() error {
 	s.currency.Start()
 	err := s.signals.Start()
 	s.history.Start()
-	_ = s.pendingTxManager.Start()
 	s.collectibles.Start()
 	s.started = true
 	return err
-}
-
-// GetFeed returns signals feed.
-func (s *Service) GetFeed() *event.Feed {
-	return s.transferController.TransferFeed
 }
 
 // Set external Collectibles metadata provider
@@ -229,7 +220,6 @@ func (s *Service) Stop() error {
 	s.reader.Stop()
 	s.history.Stop()
 	s.activity.Stop()
-	s.pendingTxManager.Stop()
 	s.collectibles.Stop()
 	s.started = false
 	log.Info("wallet stopped")
