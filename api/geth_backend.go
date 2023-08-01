@@ -12,8 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/timesource"
-
 	"github.com/status-im/status-go/images"
 
 	"github.com/imdario/mergo"
@@ -1139,11 +1137,7 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 	if err := request.Validate(); err != nil {
 		return err
 	}
-	customizationColorClock, err := timesource.GetCurrentTimeInMillis()
-	if err != nil {
-		return err
-	}
-	return b.generateOrImportAccount("", customizationColorClock, request)
+	return b.generateOrImportAccount("", 1, request)
 }
 
 func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPassword string, newPassword string) error {

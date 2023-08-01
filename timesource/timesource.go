@@ -189,6 +189,12 @@ func (s *NTPTimeSource) updateOffset() error {
 	offset, err := computeOffset(s.timeQuery, s.servers, s.allowedFailures)
 	if err != nil {
 		log.Error("failed to compute offset", "error", err)
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		for _, c := range s.callbacks {
+			c.callback(now())
+			c.wg.Done()
+		}
 		return errUpdateOffset
 	}
 	log.Info("Difference with ntp servers", "offset", offset)
@@ -262,5 +268,8 @@ func GetCurrentTimeInMillis() (uint64, error) {
 	ts.AddCallback(func(now time.Time) {
 		t = uint64(now.UnixNano() / int64(time.Millisecond))
 	}).Wait()
-	return t, nil
+	if ts.updatedOffset {
+		return t, nil
+	}
+	return 0, errUpdateOffset
 }
