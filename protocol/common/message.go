@@ -98,6 +98,7 @@ type LinkPreview struct {
 	Hostname    string               `json:"hostname"`
 	Title       string               `json:"title,omitempty"`
 	Description string               `json:"description,omitempty"`
+	HTML        string               `json:"height,omitempty"`
 	Thumbnail   LinkPreviewThumbnail `json:"thumbnail,omitempty"`
 }
 

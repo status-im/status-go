@@ -128,12 +128,22 @@ type OEmbedUnfurler struct {
 	url *neturl.URL
 }
 
-type OEmbedPhotoResponse struct {
-	Title        string `json:"title"`
-	PhotoUrl     string `json:"url"`
-	ThumbnailURL string `json:"thumbnail_url"`
-	Width        int    `json:"width"`
-	Height       int    `json:"height"`
+type OEmbedBaseResponse struct {
+	Type            string `json:"type"`
+	Version         string `json:"version"`
+	Title           string `json:"title,omitempty"`
+	AuthorName      string `json:"author_name,omitempty"`
+	AuthorURL       string `json:"author_url,omitempty"`
+	ProviderName    string `json:"provider_name,omitempty"`
+	ProviderURL     string `json:"provider_url,omitempty"`
+	ThumbnailURL    string `json:"thumbnail_url,omitempty"`
+	URL             string `json:"url,omitempty"`
+	HTML            string `json:"html,omitempty"`
+	CacheAge        int    `json:"cache_age,omitempty"`
+	ThumbnailWidth  int    `json:"thumbnail_width,omitempty"`
+	ThumbnailHeight int    `json:"thumbnail_height,omitempty"`
+	Width           int    `json:"width,omitempty"`
+	Height          int    `json:"height,omitempty"`
 }
 
 func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
@@ -150,6 +160,46 @@ func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
 	}.Encode()
 
 	return oembedURL, nil
+}
+
+func handlePhotoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) (common.LinkPreview, error) {
+
+	if response.URL != "" {
+		preview.Thumbnail.URL = response.URL
+	}
+	if response.Width != 0 {
+		preview.Thumbnail.URL = response.URL
+	}
+	if response.Height != 0 {
+		preview.Thumbnail.URL = response.URL
+	}
+	return preview, nil
+}
+
+func handleVideoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) (common.LinkPreview, error) {
+	if response.HTML != "" {
+		preview.HTML = response.HTML
+	}
+	if response.Width != 0 {
+		preview.Thumbnail.URL = response.URL
+	}
+	if response.Height != 0 {
+		preview.Thumbnail.URL = response.URL
+	}
+	return preview, nil
+}
+
+func handleRichOembedType(preview common.LinkPreview, response OEmbedBaseResponse) (common.LinkPreview, error) {
+	if response.HTML != "" {
+		preview.HTML = response.HTML
+	}
+	if response.Width != 0 {
+		preview.Thumbnail.URL = response.URL
+	}
+	if response.Height != 0 {
+		preview.Thumbnail.URL = response.URL
+	}
+	return preview, nil
 }
 
 func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
@@ -169,33 +219,28 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 		return preview, err
 	}
 
-	var oembedResponse OEmbedPhotoResponse
+	var oembedResponse OEmbedBaseResponse
 	if err != nil {
 		return preview, err
 	}
 
 	err = json.Unmarshal(oembedBytes, &oembedResponse)
-
-	if err != nil {
-		return preview, err
+	if oembedResponse.Title != "" {
+		preview.Title = oembedResponse.Title
 	}
+	switch oembedResponse.Type {
 
-	if oembedResponse.Title == "" {
-		return preview, fmt.Errorf("missing required title in oEmbed response")
+	case "photo":
+		return handlePhotoOembedType(preview, oembedResponse)
+
+	case "video":
+		return handleVideoOembedType(preview, oembedResponse)
+
+	case "rich":
+		return handleRichOembedType(preview, oembedResponse)
+	default:
+		return preview, fmt.Errorf("unexpected oembed type: %v", oembedResponse.Type)
 	}
-
-	preview.Title = oembedResponse.Title
-	var urlToUse string
-
-	if oembedResponse.ThumbnailURL == "" {
-		urlToUse = oembedResponse.PhotoUrl
-	} else {
-		urlToUse = oembedResponse.ThumbnailURL
-	}
-
-	preview.Thumbnail.URL = urlToUse
-
-	return preview, nil
 }
 
 type OpenGraphMetadata struct {
