@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -56,8 +57,7 @@ func (o *Client) ID() string {
 
 func (o *Client) IsChainSupported(chainID walletCommon.ChainID) bool {
 	switch uint64(chainID) {
-	case walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet:
-	case walletCommon.EthereumGoerli, walletCommon.EthereumSepolia:
+	case walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.EthereumGoerli, walletCommon.EthereumSepolia:
 		return true
 	}
 	return false
@@ -104,4 +104,152 @@ func (o *Client) FetchCollectibleOwnersByContractAddress(chainID walletCommon.Ch
 	}
 
 	return infuraOwnershipToCommon(contractAddress, ownersMap)
+}
+
+func (o *Client) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
+	queryParams := url.Values{}
+
+	if len(cursor) > 0 {
+		queryParams["cursor"] = []string{cursor}
+	}
+
+	return o.fetchOwnedAssets(chainID, owner, queryParams, limit)
+}
+
+func (o *Client) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
+	queryParams := url.Values{}
+
+	if len(cursor) > 0 {
+		queryParams["cursor"] = []string{cursor}
+	}
+
+	for _, contractAddress := range contractAddresses {
+		queryParams.Add("tokenAddress", contractAddress.String())
+	}
+
+	return o.fetchOwnedAssets(chainID, owner, queryParams, limit)
+}
+
+func (o *Client) fetchOwnedAssets(chainID walletCommon.ChainID, owner common.Address, queryParams url.Values, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
+	assets := new(thirdparty.FullCollectibleDataContainer)
+
+	if len(queryParams["cursor"]) > 0 {
+		assets.PreviousCursor = queryParams["cursor"][0]
+	}
+
+	for {
+		url := fmt.Sprintf("%s/networks/%d/accounts/%s/assets/nfts?%s", baseURL, chainID, owner.String(), queryParams.Encode())
+
+		resp, err := o.doQuery(url)
+		if err != nil {
+			return nil, err
+		}
+
+		defer resp.Body.Close()
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		// if Json is not returned there must be an error
+		if !json.Valid(body) {
+			return nil, fmt.Errorf("invalid json: %s", string(body))
+		}
+
+		container := NFTList{}
+		err = json.Unmarshal(body, &container)
+		if err != nil {
+			return nil, err
+		}
+
+		assets.Items = append(assets.Items, container.toCommon()...)
+		assets.NextCursor = container.Cursor
+
+		if len(assets.NextCursor) == 0 {
+			break
+		}
+
+		queryParams["cursor"] = []string{assets.NextCursor}
+
+		if limit != thirdparty.FetchNoLimit && len(assets.Items) >= limit {
+			break
+		}
+	}
+
+	return assets, nil
+}
+
+func (o *Client) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
+	ret := make([]thirdparty.FullCollectibleData, 0, len(uniqueIDs))
+
+	for _, id := range uniqueIDs {
+		url := fmt.Sprintf("%s/networks/%d/nfts/%s/tokens/%s", baseURL, id.ContractID.ChainID, id.ContractID.Address.String(), id.TokenID.String())
+
+		resp, err := o.doQuery(url)
+		if err != nil {
+			return nil, err
+		}
+
+		defer resp.Body.Close()
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		// if Json is not returned there must be an error
+		if !json.Valid(body) {
+			return nil, fmt.Errorf("invalid json: %s", string(body))
+		}
+
+		asset := Asset{}
+		err = json.Unmarshal(body, &asset)
+		if err != nil {
+			return nil, err
+		}
+
+		item := asset.toCommon(id)
+
+		ret = append(ret, item)
+	}
+
+	return ret, nil
+}
+
+func (o *Client) FetchCollectionDataByContractID(contractIDs []thirdparty.ContractID) ([]thirdparty.CollectionData, error) {
+	ret := make([]thirdparty.CollectionData, 0, len(contractIDs))
+
+	for _, id := range contractIDs {
+		url := fmt.Sprintf("%s/networks/%d/nfts/%s", baseURL, id.ChainID, id.Address.String())
+
+		resp, err := o.doQuery(url)
+		if err != nil {
+			return nil, err
+		}
+
+		defer resp.Body.Close()
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		// if Json is not returned there must be an error
+		if !json.Valid(body) {
+			return nil, fmt.Errorf("invalid json: %s", string(body))
+		}
+
+		contract := ContractMetadata{}
+		err = json.Unmarshal(body, &contract)
+		if err != nil {
+			return nil, err
+		}
+
+		item := contract.toCommon(id)
+
+		ret = append(ret, item)
+	}
+
+	return ret, nil
 }

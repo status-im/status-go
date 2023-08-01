@@ -145,6 +145,12 @@ type CollectibleContractOwnership struct {
 }
 
 type CollectibleContractOwnershipProvider interface {
+	CollectibleProvider
 	FetchCollectibleOwnersByContractAddress(chainID w_common.ChainID, contractAddress common.Address) (*CollectibleContractOwnership, error)
-	IsChainSupported(chainID w_common.ChainID) bool
+}
+
+type CollectibleAccountOwnershipProvider interface {
+	CollectibleProvider
+	FetchAllAssetsByOwner(chainID w_common.ChainID, owner common.Address, cursor string, limit int) (*FullCollectibleDataContainer, error)
+	FetchAllAssetsByOwnerAndContractAddress(chainID w_common.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*FullCollectibleDataContainer, error)
 }
