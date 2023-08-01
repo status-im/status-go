@@ -215,9 +215,15 @@ func Test_UnfurlURLs_giphy(t *testing.T) {
 		Hostname: "www.giphy.com",
 		Title:    "Floating Tv Show Sticker by Happy Place for iOS & Android | GIPHY",
 		Thumbnail: common.LinkPreviewThumbnail{
+<<<<<<< HEAD
 			URL:    "https://media4.giphy.com/media/sof2kXOSK5beJdb7xH/giphy.gif",
 			Height: 480,
 			Width:  480,
+=======
+			URL: "https://media4.giphy.com/media/sof2kXOSK5beJdb7xH/giphy.gif",
+			Height: 480,
+			Width: 400,
+>>>>>>> bc9cbcd69 (Fix tests)
 		},
 	}
 
