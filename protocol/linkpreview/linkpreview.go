@@ -162,43 +162,43 @@ func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
 	return oembedURL, nil
 }
 
-func handlePhotoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) (common.LinkPreview, error) {
+func handlePhotoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
 	if response.URL != "" {
 		preview.Thumbnail.URL = response.URL
 	}
 	if response.Width != 0 {
-		preview.Thumbnail.URL = response.URL
+		preview.Thumbnail.Width = response.Width
 	}
 	if response.Height != 0 {
-		preview.Thumbnail.URL = response.URL
+		preview.Thumbnail.Height = response.Height
 	}
-	return preview, nil
+	return preview
 }
 
-func handleVideoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) (common.LinkPreview, error) {
+func handleVideoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
 	if response.HTML != "" {
 		preview.HTML = response.HTML
 	}
 	if response.Width != 0 {
-		preview.Thumbnail.URL = response.URL
+		preview.Thumbnail.Width = response.Width
 	}
 	if response.Height != 0 {
-		preview.Thumbnail.URL = response.URL
+		preview.Thumbnail.Height = response.Height
 	}
-	return preview, nil
+	return preview
 }
 
-func handleRichOembedType(preview common.LinkPreview, response OEmbedBaseResponse) (common.LinkPreview, error) {
+func handleRichOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
 	if response.HTML != "" {
 		preview.HTML = response.HTML
 	}
 	if response.Width != 0 {
-		preview.Thumbnail.URL = response.URL
+		preview.Thumbnail.Width = response.Width
 	}
 	if response.Height != 0 {
-		preview.Thumbnail.URL = response.URL
+		preview.Thumbnail.Height = response.Height
 	}
-	return preview, nil
+	return preview
 }
 
 func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
@@ -228,15 +228,16 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 	if oembedResponse.Title != "" {
 		preview.Title = oembedResponse.Title
 	}
+
 	switch oembedResponse.Type {
 	case "photo":
-		return handlePhotoOembedType(preview, oembedResponse)
+		return handlePhotoOembedType(preview, oembedResponse), nil
 
 	case "video":
-		return handleVideoOembedType(preview, oembedResponse)
+		return handleVideoOembedType(preview, oembedResponse), nil
 
 	case "rich":
-		return handleRichOembedType(preview, oembedResponse)
+		return handleRichOembedType(preview, oembedResponse), nil
 	default:
 		return preview, fmt.Errorf("unexpected oembed type: %v", oembedResponse.Type)
 	}
