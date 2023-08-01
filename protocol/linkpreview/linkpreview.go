@@ -163,15 +163,8 @@ func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
 }
 
 func handlePhotoOembedType(preview *common.LinkPreview, response OEmbedBaseResponse) {
-
 	if response.URL != "" {
 		preview.Thumbnail.URL = response.URL
-	}
-	if response.Width != 0 {
-		preview.Thumbnail.Width = response.Width
-	}
-	if response.Height != 0 {
-		preview.Thumbnail.Height = response.Height
 	}
 }
 
