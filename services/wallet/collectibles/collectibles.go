@@ -2,6 +2,7 @@ package collectibles
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -33,20 +34,24 @@ var noTokenURIErrorPrefixes = []string{
 	"abi: attempting to unmarshall",
 }
 
+var (
+	ErrNoProvidersAvailableForChainID = errors.New("no providers available for chainID")
+)
+
 type Manager struct {
-	rpcClient                         *rpc.Client
-	mainContractOwnershipProvider     thirdparty.CollectibleContractOwnershipProvider
-	fallbackContractOwnershipProvider thirdparty.CollectibleContractOwnershipProvider
-	metadataProvider                  thirdparty.CollectibleMetadataProvider
-	opensea                           *opensea.Client
-	httpClient                        *http.Client
-	collectiblesDataCache             map[string]thirdparty.CollectibleData
-	collectiblesDataCacheLock         sync.RWMutex
-	collectionsDataCache              map[string]thirdparty.CollectionData
-	collectionsDataCacheLock          sync.RWMutex
+	rpcClient                  *rpc.Client
+	contractOwnershipProviders []thirdparty.CollectibleContractOwnershipProvider
+	accountOwnershipProviders  []thirdparty.CollectibleAccountOwnershipProvider
+	metadataProvider           thirdparty.CollectibleMetadataProvider
+	opensea                    *opensea.Client
+	httpClient                 *http.Client
+	collectiblesDataCache      map[string]thirdparty.CollectibleData
+	collectiblesDataCacheLock  sync.RWMutex
+	collectionsDataCache       map[string]thirdparty.CollectionData
+	collectionsDataCacheLock   sync.RWMutex
 }
 
-func NewManager(rpcClient *rpc.Client, mainContractOwnershipProvider thirdparty.CollectibleContractOwnershipProvider, fallbackContractOwnershipProvider thirdparty.CollectibleContractOwnershipProvider, opensea *opensea.Client) *Manager {
+func NewManager(rpcClient *rpc.Client, contractOwnershipProviders []thirdparty.CollectibleContractOwnershipProvider, accountOwnershipProviders []thirdparty.CollectibleAccountOwnershipProvider, opensea *opensea.Client) *Manager {
 	hystrix.ConfigureCommand(hystrixContractOwnershipClientName, hystrix.CommandConfig{
 		Timeout:               10000,
 		MaxConcurrentRequests: 100,
@@ -55,10 +60,10 @@ func NewManager(rpcClient *rpc.Client, mainContractOwnershipProvider thirdparty.
 	})
 
 	return &Manager{
-		rpcClient:                         rpcClient,
-		mainContractOwnershipProvider:     mainContractOwnershipProvider,
-		fallbackContractOwnershipProvider: fallbackContractOwnershipProvider,
-		opensea:                           opensea,
+		rpcClient:                  rpcClient,
+		contractOwnershipProviders: contractOwnershipProviders,
+		accountOwnershipProviders:  accountOwnershipProviders,
+		opensea:                    opensea,
 		httpClient: &http.Client{
 			Timeout: requestTimeout,
 		},
@@ -150,9 +155,9 @@ func (o *Manager) FetchBalancesByOwnerAndContractAddress(chainID walletCommon.Ch
 		ret[contractAddress] = make([]thirdparty.TokenBalance, 0)
 	}
 
-	// Try with more direct endpoint first (OpenSea)
+	// Try with account ownership providers first
 	assetsContainer, err := o.FetchAllAssetsByOwnerAndContractAddress(chainID, ownerAddress, contractAddresses, thirdparty.FetchFromStartCursor, thirdparty.FetchNoLimit)
-	if err == thirdparty.ErrChainIDNotSupported {
+	if err == ErrNoProvidersAvailableForChainID {
 		// Use contract ownership providers
 		for _, contractAddress := range contractAddresses {
 			ownership, err := o.FetchCollectibleOwnersByContractAddress(chainID, contractAddress)
@@ -167,7 +172,7 @@ func (o *Manager) FetchBalancesByOwnerAndContractAddress(chainID walletCommon.Ch
 			}
 		}
 	} else if err == nil {
-		// OpenSea could provide
+		// Account ownership providers succeeded
 		for _, fullData := range assetsContainer.Items {
 			contractAddress := fullData.CollectibleData.ID.ContractID.Address
 			balance := thirdparty.TokenBalance{
@@ -185,31 +190,47 @@ func (o *Manager) FetchBalancesByOwnerAndContractAddress(chainID walletCommon.Ch
 }
 
 func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
-	assetContainer, err := o.opensea.FetchAllAssetsByOwnerAndContractAddress(chainID, owner, contractAddresses, cursor, limit)
-	if err != nil {
-		return nil, err
+	for _, provider := range o.accountOwnershipProviders {
+		if !provider.IsChainSupported(chainID) {
+			continue
+		}
+
+		assetContainer, err := provider.FetchAllAssetsByOwnerAndContractAddress(chainID, owner, contractAddresses, cursor, limit)
+		if err != nil {
+			return nil, err
+		}
+
+		err = o.processFullCollectibleData(assetContainer.Items)
+		if err != nil {
+			return nil, err
+		}
+
+		return assetContainer, nil
 	}
 
-	err = o.processFullCollectibleData(assetContainer.Items)
-	if err != nil {
-		return nil, err
-	}
-
-	return assetContainer, nil
+	return nil, ErrNoProvidersAvailableForChainID
 }
 
 func (o *Manager) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
-	assetContainer, err := o.opensea.FetchAllAssetsByOwner(chainID, owner, cursor, limit)
-	if err != nil {
-		return nil, err
+	for _, provider := range o.accountOwnershipProviders {
+		if !provider.IsChainSupported(chainID) {
+			continue
+		}
+
+		assetContainer, err := provider.FetchAllAssetsByOwner(chainID, owner, cursor, limit)
+		if err != nil {
+			return nil, err
+		}
+
+		err = o.processFullCollectibleData(assetContainer.Items)
+		if err != nil {
+			return nil, err
+		}
+
+		return assetContainer, nil
 	}
 
-	err = o.processFullCollectibleData(assetContainer.Items)
-	if err != nil {
-		return nil, err
-	}
-
-	return assetContainer, nil
+	return nil, ErrNoProvidersAvailableForChainID
 }
 
 func (o *Manager) FetchCollectibleOwnershipByOwner(chainID walletCommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.CollectibleOwnershipContainer, error) {
@@ -241,22 +262,50 @@ func (o *Manager) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.Collec
 	return o.getCacheFullCollectibleData(uniqueIDs), nil
 }
 
-func (o *Manager) FetchCollectibleOwnersByContractAddress(chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
-	mainFunc := func() (any, error) {
-		return o.mainContractOwnershipProvider.FetchCollectibleOwnersByContractAddress(chainID, contractAddress)
-	}
-	var fallbackFunc func() (any, error) = nil
-	if o.fallbackContractOwnershipProvider != nil && o.fallbackContractOwnershipProvider.IsChainSupported(chainID) {
-		fallbackFunc = func() (any, error) {
-			return o.fallbackContractOwnershipProvider.FetchCollectibleOwnersByContractAddress(chainID, contractAddress)
+func (o *Manager) getContractOwnershipProviders(chainID walletCommon.ChainID) (mainProvider thirdparty.CollectibleContractOwnershipProvider, fallbackProvider thirdparty.CollectibleContractOwnershipProvider) {
+	mainProvider = nil
+	fallbackProvider = nil
+
+	for _, provider := range o.contractOwnershipProviders {
+		if provider.IsChainSupported(chainID) {
+			if mainProvider == nil {
+				// First provider found
+				mainProvider = provider
+				continue
+			}
+			// Second provider found
+			fallbackProvider = provider
+			break
 		}
 	}
-	owners, err := makeContractOwnershipCall(mainFunc, fallbackFunc)
+	return
+}
+
+func getCollectibleOwnersByContractAddressFunc(chainID walletCommon.ChainID, contractAddress common.Address, provider thirdparty.CollectibleContractOwnershipProvider) func() (any, error) {
+	if provider == nil {
+		return nil
+	}
+	return func() (any, error) {
+		return provider.FetchCollectibleOwnersByContractAddress(chainID, contractAddress)
+	}
+}
+
+func (o *Manager) FetchCollectibleOwnersByContractAddress(chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
+	mainProvider, fallbackProvider := o.getContractOwnershipProviders(chainID)
+	if mainProvider == nil {
+		return nil, ErrNoProvidersAvailableForChainID
+	}
+
+	mainFn := getCollectibleOwnersByContractAddressFunc(chainID, contractAddress, mainProvider)
+	fallbackFn := getCollectibleOwnersByContractAddressFunc(chainID, contractAddress, fallbackProvider)
+
+	owners, err := makeContractOwnershipCall(mainFn, fallbackFn)
 	if err != nil {
 		return nil, err
 	}
 
 	return owners.(*thirdparty.CollectibleContractOwnership), nil
+
 }
 
 func isMetadataEmpty(asset thirdparty.CollectibleData) bool {
@@ -345,6 +394,7 @@ func (o *Manager) processFullCollectibleData(assets []thirdparty.FullCollectible
 		if assets[idx].CollectionData != nil {
 			o.setCacheCollectionData(*assets[idx].CollectionData)
 		}
+		// TODO: Fetch collection metadata separately
 	}
 
 	return nil
@@ -389,26 +439,6 @@ func (o *Manager) setCacheCollectibleData(data thirdparty.CollectibleData) {
 	defer o.collectiblesDataCacheLock.Unlock()
 
 	o.collectiblesDataCache[data.ID.HashKey()] = data
-}
-
-func (o *Manager) isIDInContractDataCache(id thirdparty.ContractID) bool {
-	o.collectionsDataCacheLock.RLock()
-	defer o.collectionsDataCacheLock.RUnlock()
-	if _, ok := o.collectionsDataCache[id.HashKey()]; ok {
-		return true
-	}
-	return false
-}
-
-func (o *Manager) getIDsNotInContractDataCache(ids []thirdparty.ContractID) []thirdparty.ContractID {
-	idsToFetch := make([]thirdparty.ContractID, 0, len(ids))
-	for _, id := range ids {
-		if o.isIDInContractDataCache(id) {
-			continue
-		}
-		idsToFetch = append(idsToFetch, id)
-	}
-	return idsToFetch
 }
 
 func (o *Manager) getCacheCollectionData(ids []thirdparty.ContractID) map[string]*thirdparty.CollectionData {

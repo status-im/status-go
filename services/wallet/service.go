@@ -105,10 +105,23 @@ func NewService(
 	currency := currency.NewService(db, walletFeed, tokenManager, marketManager)
 	activity := activity.NewService(db, tokenManager, walletFeed)
 
-	alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKeys)
-	infuraClient := infura.NewClient(config.WalletConfig.InfuraAPIKey, config.WalletConfig.InfuraAPIKeySecret)
 	openseaClient := opensea.NewClient(config.WalletConfig.OpenseaAPIKey, walletFeed)
-	collectiblesManager := collectibles.NewManager(rpcClient, alchemyClient, infuraClient, openseaClient)
+	infuraClient := infura.NewClient(config.WalletConfig.InfuraAPIKey, config.WalletConfig.InfuraAPIKeySecret)
+	alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKeys)
+
+	// Try OpenSea, Infura, Alchemy in that order
+	contractOwnershipProviders := []thirdparty.CollectibleContractOwnershipProvider{
+		infuraClient,
+		alchemyClient,
+	}
+
+	accountOwnershipProviders := []thirdparty.CollectibleAccountOwnershipProvider{
+		openseaClient,
+		infuraClient,
+		alchemyClient,
+	}
+
+	collectiblesManager := collectibles.NewManager(rpcClient, contractOwnershipProviders, accountOwnershipProviders, openseaClient)
 	collectibles := collectibles.NewService(db, walletFeed, accountsDB, accountFeed, rpcClient.NetworkManager, collectiblesManager)
 	return &Service{
 		db:                    db,
