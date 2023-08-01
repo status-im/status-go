@@ -60,7 +60,7 @@ func getNFTBaseURL(chainID walletCommon.ChainID, apiKey string) (string, error) 
 		return "", err
 	}
 
-	return fmt.Sprintf("%s/nft/v2/%s", baseURL, getAPIKeySubpath(apiKey)), nil
+	return fmt.Sprintf("%s/nft/v3/%s", baseURL, getAPIKeySubpath(apiKey)), nil
 }
 
 type Client struct {
@@ -89,37 +89,128 @@ func (o *Client) doQuery(url string) (*http.Response, error) {
 }
 
 func (o *Client) FetchCollectibleOwnersByContractAddress(chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
+	ownership := thirdparty.CollectibleContractOwnership{
+		ContractAddress: contractAddress,
+		Owners:          make([]thirdparty.CollectibleOwner, 0),
+	}
+
 	queryParams := url.Values{
 		"contractAddress":   {contractAddress.String()},
 		"withTokenBalances": {"true"},
 	}
 
-	url, err := getNFTBaseURL(chainID, o.apiKeys[uint64(chainID)])
+	baseURL, err := getNFTBaseURL(chainID, o.apiKeys[uint64(chainID)])
 
 	if err != nil {
 		return nil, err
 	}
 
-	url = url + "/getOwnersForCollection?" + queryParams.Encode()
+	for {
+		url := fmt.Sprintf("%s/getOwnersForContract?%s", baseURL, queryParams.Encode())
 
-	resp, err := o.doQuery(url)
+		resp, err := o.doQuery(url)
+
+		if err != nil {
+			return nil, err
+		}
+
+		defer resp.Body.Close()
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		var alchemyOwnership CollectibleContractOwnership
+		err = json.Unmarshal(body, &alchemyOwnership)
+		if err != nil {
+			return nil, err
+		}
+
+		ownership.Owners = append(ownership.Owners, alchemyCollectibleOwnersToCommon(alchemyOwnership.Owners)...)
+
+		if alchemyOwnership.PageKey == "" {
+			break
+		}
+
+		queryParams["pageKey"] = []string{alchemyOwnership.PageKey}
+	}
+
+	return &ownership, nil
+}
+
+func (o *Client) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
+	queryParams := url.Values{}
+
+	return o.fetchOwnedAssets(chainID, owner, queryParams, cursor, limit)
+}
+
+func (o *Client) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
+	queryParams := url.Values{}
+
+	for _, contractAddress := range contractAddresses {
+		queryParams.Add("contractAddresses", contractAddress.String())
+	}
+
+	return o.fetchOwnedAssets(chainID, owner, queryParams, cursor, limit)
+}
+
+func (o *Client) fetchOwnedAssets(chainID walletCommon.ChainID, owner common.Address, queryParams url.Values, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
+	assets := new(thirdparty.FullCollectibleDataContainer)
+
+	queryParams["owner"] = []string{owner.String()}
+	queryParams["withMetadata"] = []string{"true"}
+
+	if len(cursor) > 0 {
+		queryParams["pageKey"] = []string{cursor}
+		assets.PreviousCursor = cursor
+	}
+
+	baseURL, err := getNFTBaseURL(chainID, o.apiKeys[uint64(chainID)])
 
 	if err != nil {
 		return nil, err
 	}
 
-	defer resp.Body.Close()
+	for {
+		url := fmt.Sprintf("%s/getNFTsForOwner?%s", baseURL, queryParams.Encode())
 
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+		resp, err := o.doQuery(url)
+		if err != nil {
+			return nil, err
+		}
+
+		defer resp.Body.Close()
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		// if Json is not returned there must be an error
+		if !json.Valid(body) {
+			return nil, fmt.Errorf("invalid json: %s", string(body))
+		}
+
+		container := NFTList{}
+		err = json.Unmarshal(body, &container)
+		if err != nil {
+			return nil, err
+		}
+
+		assets.Items = append(assets.Items, container.toCommon(chainID)...)
+		assets.NextCursor = container.PageKey
+
+		if len(assets.NextCursor) == 0 {
+			break
+		}
+
+		queryParams["cursor"] = []string{assets.NextCursor}
+
+		if limit != thirdparty.FetchNoLimit && len(assets.Items) >= limit {
+			break
+		}
 	}
 
-	var alchemyOwnership CollectibleContractOwnership
-	err = json.Unmarshal(body, &alchemyOwnership)
-	if err != nil {
-		return nil, err
-	}
-
-	return alchemyOwnershipToCommon(contractAddress, alchemyOwnership)
+	return assets, nil
 }
