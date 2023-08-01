@@ -203,7 +203,6 @@ func FakeGenericImageLinkPreviewData(httpClient http.Client, title string, link 
 	preview.URL = link
 =======
 func handlePhotoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) (common.LinkPreview, error) {
-
 	if response.URL != "" {
 		preview.Thumbnail.URL = response.URL
 	}
@@ -296,11 +295,11 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 	}
 
 	err = json.Unmarshal(oembedBytes, &oembedResponse)
+
 	if oembedResponse.Title != "" {
 		preview.Title = oembedResponse.Title
 	}
 	switch oembedResponse.Type {
-
 	case "photo":
 		return handlePhotoOembedType(preview, oembedResponse)
 
