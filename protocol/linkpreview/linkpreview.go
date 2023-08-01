@@ -163,6 +163,7 @@ func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
 }
 
 func handlePhotoOembedType(preview *common.LinkPreview, response OEmbedBaseResponse) {
+
 	if response.URL != "" {
 		preview.Thumbnail.URL = response.URL
 	}
@@ -175,9 +176,6 @@ func handlePhotoOembedType(preview *common.LinkPreview, response OEmbedBaseRespo
 }
 
 func handleVideoOembedType(preview *common.LinkPreview, response OEmbedBaseResponse) {
-	if response.HTML != "" {
-		preview.HTML = response.HTML
-	}
 	if response.ThumbnailURL != "" {
 		preview.Thumbnail.URL = response.ThumbnailURL
 	}
@@ -190,8 +188,8 @@ func handleVideoOembedType(preview *common.LinkPreview, response OEmbedBaseRespo
 }
 
 func handleRichOembedType(preview *common.LinkPreview, response OEmbedBaseResponse) {
-	if response.HTML != "" {
-		preview.HTML = response.HTML
+	if response.ThumbnailURL != "" {
+		preview.Thumbnail.URL = response.ThumbnailURL
 	}
 	if response.Width != 0 {
 		preview.Thumbnail.Width = response.Width
