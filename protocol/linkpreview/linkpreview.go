@@ -232,6 +232,7 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 	if err != nil {
 		return preview, err
 	}
+	switch oembedResponse.Type {
 
 	if oembedResponse.Title != "" {
 		preview.Title = oembedResponse.Title
