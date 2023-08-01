@@ -257,6 +257,7 @@ func Test_UnfurlURLs_giphy(t *testing.T) {
 	require.Equal(t, expected.Title, preview.Title)
 	require.Equal(t, expected.Thumbnail.Width, preview.Thumbnail.Width)
 	require.Equal(t, expected.Thumbnail.Height, preview.Thumbnail.Height)
+<<<<<<< HEAD
 }
 
 func Test_UnfurlURLs_tenor(t *testing.T) {
@@ -277,6 +278,9 @@ func Test_UnfurlURLs_tenor(t *testing.T) {
 
 	require.Equal(t, expected.URL, preview.URL)
 	require.Equal(t, expected.Title, preview.Title)
+=======
+	require.Equal(t, expected.Thumbnail.URL, preview.Thumbnail.URL)
+>>>>>>> 12ed46e43 (Fix tests)
 }
 
 func Test_UnfurlURLs_Reddit(t *testing.T) {
