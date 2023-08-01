@@ -163,6 +163,7 @@ func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
 	return oembedURL, nil
 }
 
+<<<<<<< HEAD
 func (u OEmbedUnfurler) handlePhotoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
 	if response.URL != "" {
 		t, err := fetchThumbnail(u.logger, u.httpClient, response.URL)
@@ -200,6 +201,45 @@ func FakeGenericImageLinkPreviewData(httpClient http.Client, title string, link 
 
 	preview.Title = title
 	preview.URL = link
+=======
+func handlePhotoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) (common.LinkPreview, error) {
+
+	if response.URL != "" {
+		preview.Thumbnail.URL = response.URL
+	}
+	if response.Width != 0 {
+		preview.Thumbnail.URL = response.URL
+	}
+	if response.Height != 0 {
+		preview.Thumbnail.URL = response.URL
+	}
+	return preview, nil
+}
+
+func handleVideoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) (common.LinkPreview, error) {
+	if response.HTML != "" {
+		preview.HTML = response.HTML
+	}
+	if response.Width != 0 {
+		preview.Thumbnail.URL = response.URL
+	}
+	if response.Height != 0 {
+		preview.Thumbnail.URL = response.URL
+	}
+	return preview, nil
+}
+
+func handleRichOembedType(preview common.LinkPreview, response OEmbedBaseResponse) (common.LinkPreview, error) {
+	if response.HTML != "" {
+		preview.HTML = response.HTML
+	}
+	if response.Width != 0 {
+		preview.Thumbnail.URL = response.URL
+	}
+	if response.Height != 0 {
+		preview.Thumbnail.URL = response.URL
+	}
+>>>>>>> 842e9429d (Replicate oembed standards)
 	return preview, nil
 }
 
@@ -225,6 +265,7 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 	}
 
 	var oembedResponse OEmbedBaseResponse
+<<<<<<< HEAD
 
 	err = json.Unmarshal(oembedBytes, &oembedResponse)
 	if err != nil {
@@ -249,6 +290,29 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 	default:
 		return preview, fmt.Errorf("unexpected oembed type: %v", oembedResponse.Type)
 	}
+=======
+	if err != nil {
+		return preview, err
+	}
+
+	err = json.Unmarshal(oembedBytes, &oembedResponse)
+	if oembedResponse.Title != "" {
+		preview.Title = oembedResponse.Title
+	}
+	switch oembedResponse.Type {
+
+	case "photo":
+		return handlePhotoOembedType(preview, oembedResponse)
+
+	case "video":
+		return handleVideoOembedType(preview, oembedResponse)
+
+	case "rich":
+		return handleRichOembedType(preview, oembedResponse)
+	default:
+		return preview, fmt.Errorf("unexpected oembed type: %v", oembedResponse.Type)
+	}
+>>>>>>> 842e9429d (Replicate oembed standards)
 }
 
 type OpenGraphMetadata struct {
