@@ -2,7 +2,7 @@ package transfer
 
 import (
 	"context"
-	"database/sql"
+	"fmt"
 	"math/big"
 	"strings"
 	"time"
@@ -187,7 +187,7 @@ type controlCommand struct {
 	errorsCount        int
 	nonArchivalRPCNode bool
 	transactionManager *TransactionManager
-	pendingTxManager   *transactions.TransactionManager
+	pendingTxManager   *transactions.PendingTxTracker
 	tokenManager       *token.Manager
 }
 
@@ -366,7 +366,7 @@ type transfersCommand struct {
 	chainClient        *chain.ClientWithFallback
 	blocksLimit        int
 	transactionManager *TransactionManager
-	pendingTxManager   *transactions.TransactionManager
+	pendingTxManager   *transactions.PendingTxTracker
 	tokenManager       *token.Manager
 	feed               *event.Feed
 
@@ -410,9 +410,9 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 			}
 
 			if len(allTransfers) > 0 {
-				err = c.db.SaveTransfersMarkBlocksLoaded(c.chainClient.ChainID, c.address, allTransfers, []*big.Int{blockNum})
+				err := c.saveAndConfirmPending(allTransfers, blockNum)
 				if err != nil {
-					log.Error("SaveTransfers error", "error", err)
+					log.Error("saveAndConfirmPending error", "error", err)
 					return err
 				}
 			} else {
@@ -448,33 +448,59 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 	return nil
 }
 
+func (c *transfersCommand) saveAndConfirmPending(allTransfers []Transfer, blockNum *big.Int) error {
+	tx, err := c.db.client.Begin()
+	if err != nil {
+		return err
+	}
+
+	notifyFunctions := make([]func(), 0)
+	// Confirm all pending transactions that are included in this block
+	for i, transfer := range allTransfers {
+		txType, MTID, err := transactions.GetTransferData(tx, w_common.ChainID(transfer.NetworkID), transfer.Receipt.TxHash)
+		if err != nil {
+			log.Error("GetTransferData error", "error", err)
+		}
+		if MTID != nil {
+			allTransfers[i].MultiTransactionID = MultiTransactionIDType(*MTID)
+		}
+		if txType != nil && *txType == transactions.WalletTransfer {
+			notify, err := c.pendingTxManager.DeleteBySQLTx(tx, w_common.ChainID(transfer.NetworkID), transfer.Receipt.TxHash)
+			if err != nil && err != transactions.ErrStillPending {
+				log.Error("DeleteBySqlTx error", "error", err)
+			}
+			notifyFunctions = append(notifyFunctions, notify)
+		}
+	}
+
+	err = saveTransfersMarkBlocksLoaded(tx, c.chainClient.ChainID, c.address, allTransfers, []*big.Int{blockNum})
+	if err != nil {
+		log.Error("SaveTransfers error", "error", err)
+		return err
+	}
+
+	if err == nil {
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+		for _, notify := range notifyFunctions {
+			notify()
+		}
+	} else {
+		err = tx.Rollback()
+		if err != nil {
+			return fmt.Errorf("failed to rollback: %w", err)
+		}
+	}
+	return nil
+}
+
 // Mark all subTxs of a given Tx with the same multiTxID
 func setMultiTxID(tx Transaction, multiTxID MultiTransactionIDType) {
 	for _, subTx := range tx {
 		subTx.MultiTransactionID = multiTxID
 	}
-}
-
-func (c *transfersCommand) propagatePendingMultiTx(tx Transaction) error {
-	multiTxID := NoMultiTransactionID
-	// If any subTx matches a pending entry, mark all of them with the corresponding multiTxID
-	for _, subTx := range tx {
-		// Update MultiTransactionID from pending entry
-		entry, err := c.pendingTxManager.GetPendingEntry(c.chainClient.ChainID, subTx.ID)
-		if err == nil {
-			// Propagate the MultiTransactionID, in case the pending entry was a multi-transaction
-			multiTxID = MultiTransactionIDType(entry.MultiTransactionID)
-			break
-		} else if err != sql.ErrNoRows {
-			log.Error("GetPendingEntry error", "error", err)
-			return err
-		}
-	}
-
-	if multiTxID != NoMultiTransactionID {
-		setMultiTxID(tx, multiTxID)
-	}
-	return nil
 }
 
 func (c *transfersCommand) checkAndProcessSwapMultiTx(ctx context.Context, tx Transaction) (bool, error) {
@@ -527,13 +553,6 @@ func (c *transfersCommand) processMultiTransactions(ctx context.Context, allTran
 	// Detect / Generate multitransactions
 	// Iterate over all detected transactions
 	for _, tx := range txByTxHash {
-		var err error
-		// First check for pre-existing pending transaction
-		err = c.propagatePendingMultiTx(tx)
-		if err != nil {
-			return err
-		}
-
 		// Then check for a Swap transaction
 		txProcessed, err := c.checkAndProcessSwapMultiTx(ctx, tx)
 		if err != nil {
@@ -571,7 +590,7 @@ type loadTransfersCommand struct {
 	chainClient        *chain.ClientWithFallback
 	blocksByAddress    map[common.Address][]*big.Int
 	transactionManager *TransactionManager
-	pendingTxManager   *transactions.TransactionManager
+	pendingTxManager   *transactions.PendingTxTracker
 	blocksLimit        int
 	tokenManager       *token.Manager
 	feed               *event.Feed
@@ -761,7 +780,7 @@ func (c *findAndCheckBlockRangeCommand) fastIndexErc20(ctx context.Context, from
 
 func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *BlockDAO, db *Database,
 	chainClient *chain.ClientWithFallback, blocksLimitPerAccount int, blocksByAddress map[common.Address][]*big.Int,
-	transactionManager *TransactionManager, pendingTxManager *transactions.TransactionManager,
+	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
 	tokenManager *token.Manager, feed *event.Feed) error {
 
 	log.Info("loadTransfers start", "accounts", accounts, "chain", chainClient.ChainID, "limit", blocksLimitPerAccount)

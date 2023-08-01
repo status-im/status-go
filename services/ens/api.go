@@ -32,20 +32,20 @@ import (
 	"github.com/status-im/status-go/contracts/snt"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/utils"
+	wcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/transactions"
 )
 
 const StatusDomain = "stateofus.eth"
 
-func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig, appDb *sql.DB, timeSource func() time.Time, syncUserDetailFunc *syncUsernameDetail) *API {
+func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, pendingTracker *transactions.PendingTxTracker, config *params.NodeConfig, appDb *sql.DB, timeSource func() time.Time, syncUserDetailFunc *syncUsernameDetail) *API {
 	return &API{
 		contractMaker: &contracts.ContractMaker{
 			RPCClient: rpcClient,
 		},
 		accountsManager: accountsManager,
-		rpcFiltersSrvc:  rpcFiltersSrvc,
+		pendingTracker:  pendingTracker,
 		config:          config,
 		addrPerChain:    make(map[uint64]common.Address),
 		db:              NewEnsDatabase(appDb),
@@ -68,7 +68,7 @@ type syncUsernameDetail func(context.Context, *UsernameDetail) error
 type API struct {
 	contractMaker   *contracts.ContractMaker
 	accountsManager *account.GethManager
-	rpcFiltersSrvc  *rpcfilters.Service
+	pendingTracker  *transactions.PendingTxTracker
 	config          *params.NodeConfig
 
 	addrPerChain      map[uint64]common.Address
@@ -353,12 +353,17 @@ func (api *API) Release(ctx context.Context, chainID uint64, txArgs transactions
 		return "", err
 	}
 
-	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
-		Hash:    tx.Hash(),
-		Type:    string(transactions.ReleaseENS),
-		From:    common.Address(txArgs.From),
-		ChainID: chainID,
-	})
+	err = api.pendingTracker.TrackPendingTransaction(
+		wcommon.ChainID(chainID),
+		tx.Hash(),
+		common.Address(txArgs.From),
+		transactions.ReleaseENS,
+		transactions.AutoDelete,
+	)
+	if err != nil {
+		log.Error("TrackPendingTransaction error", "error", err)
+		return "", err
+	}
 
 	err = api.Remove(ctx, chainID, fullDomainName(username))
 
@@ -443,14 +448,19 @@ func (api *API) Register(ctx context.Context, chainID uint64, txArgs transaction
 		return "", err
 	}
 
-	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
-		Hash:    tx.Hash(),
-		Type:    string(transactions.RegisterENS),
-		From:    common.Address(txArgs.From),
-		ChainID: chainID,
-	})
-	err = api.Add(ctx, chainID, fullDomainName(username))
+	err = api.pendingTracker.TrackPendingTransaction(
+		wcommon.ChainID(chainID),
+		tx.Hash(),
+		common.Address(txArgs.From),
+		transactions.RegisterENS,
+		transactions.AutoDelete,
+	)
+	if err != nil {
+		log.Error("TrackPendingTransaction error", "error", err)
+		return "", err
+	}
 
+	err = api.Add(ctx, chainID, fullDomainName(username))
 	if err != nil {
 		log.Warn("Registering ENS username: transaction successful, but adding failed")
 	}
@@ -554,12 +564,18 @@ func (api *API) SetPubKey(ctx context.Context, chainID uint64, txArgs transactio
 		return "", err
 	}
 
-	go api.rpcFiltersSrvc.TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
-		Hash:    tx.Hash(),
-		Type:    string(transactions.SetPubKey),
-		From:    common.Address(txArgs.From),
-		ChainID: chainID,
-	})
+	err = api.pendingTracker.TrackPendingTransaction(
+		wcommon.ChainID(chainID),
+		tx.Hash(),
+		common.Address(txArgs.From),
+		transactions.SetPubKey,
+		transactions.AutoDelete,
+	)
+	if err != nil {
+		log.Error("TrackPendingTransaction error", "error", err)
+		return "", err
+	}
+
 	err = api.Add(ctx, chainID, fullDomainName(username))
 
 	if err != nil {

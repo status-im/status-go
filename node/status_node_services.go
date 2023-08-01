@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/transactions"
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -77,6 +78,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = append(services, b.peerService())
 	services = append(services, b.personalService())
 	services = append(services, b.statusPublicService())
+	services = append(services, b.pendingTrackerService(&b.walletFeed))
 	services = append(services, b.ensService(b.timeSourceNow()))
 	services = append(services, b.collectiblesService())
 	services = append(services, b.stickersService(accDB))
@@ -92,7 +94,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	// Wallet Service is used by wakuExtSrvc/wakuV2ExtSrvc
 	// Keep this initialization before the other two
 	if config.WalletConfig.Enabled {
-		walletService := b.walletService(accDB, accountsFeed)
+		walletService := b.walletService(accDB, accountsFeed, &b.walletFeed)
 		services = append(services, walletService)
 	}
 
@@ -413,21 +415,28 @@ func (b *StatusNode) browsersService() *browsers.Service {
 
 func (b *StatusNode) ensService(timesource func() time.Time) *ens.Service {
 	if b.ensSrvc == nil {
-		b.ensSrvc = ens.NewService(b.rpcClient, b.gethAccountManager, b.rpcFiltersSrvc, b.config, b.appDB, timesource)
+		b.ensSrvc = ens.NewService(b.rpcClient, b.gethAccountManager, b.pendingTracker, b.config, b.appDB, timesource)
 	}
 	return b.ensSrvc
 }
 
+func (b *StatusNode) pendingTrackerService(walletFeed *event.Feed) *transactions.PendingTxTracker {
+	if b.pendingTracker == nil {
+		b.pendingTracker = transactions.NewPendingTxTracker(b.appDB, b.rpcClient, b.rpcFiltersSrvc, walletFeed)
+	}
+	return b.pendingTracker
+}
+
 func (b *StatusNode) collectiblesService() *collectibles.Service {
 	if b.collectiblesSrvc == nil {
-		b.collectiblesSrvc = collectibles.NewService(b.rpcClient, b.gethAccountManager, b.rpcFiltersSrvc, b.config, b.appDB)
+		b.collectiblesSrvc = collectibles.NewService(b.rpcClient, b.gethAccountManager, b.pendingTracker, b.config, b.appDB)
 	}
 	return b.collectiblesSrvc
 }
 
 func (b *StatusNode) stickersService(accountDB *accounts.Database) *stickers.Service {
 	if b.stickersSrvc == nil {
-		b.stickersSrvc = stickers.NewService(accountDB, b.rpcClient, b.gethAccountManager, b.rpcFiltersSrvc, b.config, b.downloader, b.httpServer)
+		b.stickersSrvc = stickers.NewService(accountDB, b.rpcClient, b.gethAccountManager, b.config, b.downloader, b.httpServer, b.pendingTracker)
 	}
 	return b.stickersSrvc
 }
@@ -498,13 +507,14 @@ func (b *StatusNode) CollectiblesService() *collectibles.Service {
 	return b.collectiblesSrvc
 }
 
-func (b *StatusNode) walletService(accountsDB *accounts.Database, accountsFeed *event.Feed) *wallet.Service {
+func (b *StatusNode) walletService(accountsDB *accounts.Database, accountsFeed *event.Feed, walletFeed *event.Feed) *wallet.Service {
 	if b.walletSrvc == nil {
 		b.walletSrvc = wallet.NewService(
 			b.walletDB, accountsDB, b.rpcClient, accountsFeed, b.gethAccountManager, b.transactor, b.config,
 			b.ensService(b.timeSourceNow()),
 			b.stickersService(accountsDB),
-			b.rpcFiltersSrvc,
+			b.pendingTracker,
+			walletFeed,
 		)
 	}
 	return b.walletSrvc
@@ -546,6 +556,10 @@ func (b *StatusNode) RPCFiltersService() *rpcfilters.Service {
 	return b.rpcFiltersSrvc
 }
 
+func (b *StatusNode) PendingTracker() *transactions.PendingTxTracker {
+	return b.pendingTracker
+}
+
 func (b *StatusNode) StopLocalNotifications() error {
 	if b.localNotificationsSrvc == nil {
 		return nil
@@ -580,7 +594,7 @@ func (b *StatusNode) StartLocalNotifications() error {
 		}
 	}
 
-	err := b.localNotificationsSrvc.SubscribeWallet(b.walletSrvc.GetFeed())
+	err := b.localNotificationsSrvc.SubscribeWallet(&b.walletFeed)
 
 	if err != nil {
 		b.log.Error("LocalNotifications service could not subscribe to wallet on StartLocalNotifications", "error", err)

@@ -20,8 +20,8 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/transactions"
 )
 
 const maxConcurrentRequests = 3
@@ -41,7 +41,7 @@ type API struct {
 	contractMaker   *contracts.ContractMaker
 	accountsManager *account.GethManager
 	accountsDB      *accounts.Database
-	rpcFiltersSrvc  *rpcfilters.Service
+	pendingTracker  *transactions.PendingTxTracker
 
 	keyStoreDir string
 	downloader  *ipfs.Downloader
@@ -86,14 +86,14 @@ type ednStickerPackInfo struct {
 	Meta ednStickerPack
 }
 
-func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, keyStoreDir string, downloader *ipfs.Downloader, httpServer *server.MediaServer) *API {
+func NewAPI(ctx context.Context, acc *accounts.Database, rpcClient *rpc.Client, accountsManager *account.GethManager, pendingTracker *transactions.PendingTxTracker, keyStoreDir string, downloader *ipfs.Downloader, httpServer *server.MediaServer) *API {
 	result := &API{
 		contractMaker: &contracts.ContractMaker{
 			RPCClient: rpcClient,
 		},
 		accountsManager: accountsManager,
 		accountsDB:      acc,
-		rpcFiltersSrvc:  rpcFiltersSrvc,
+		pendingTracker:  pendingTracker,
 		keyStoreDir:     keyStoreDir,
 		downloader:      downloader,
 		ctx:             ctx,

@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/rpcstats"
+	"github.com/status-im/status-go/services/wallet/common"
 )
 
 const (
@@ -31,6 +32,10 @@ var (
 
 // Handler defines handler for RPC methods.
 type Handler func(context.Context, uint64, ...interface{}) (interface{}, error)
+
+type ClientInterface interface {
+	AbstractEthClient(chainID common.ChainID) (chain.ClientInterface, error)
+}
 
 // Client represents RPC client with custom routing
 // scheme. It automatically decides where RPC call
@@ -147,6 +152,16 @@ func (c *Client) getClientUsingCache(chainID uint64) (*chain.ClientWithFallback,
 // Ethclient returns ethclient.Client per chain
 func (c *Client) EthClient(chainID uint64) (*chain.ClientWithFallback, error) {
 	client, err := c.getClientUsingCache(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+// AbstractEthClient returns a partial abstraction used by new components for testing purposes
+func (c *Client) AbstractEthClient(chainID common.ChainID) (chain.ClientInterface, error) {
+	client, err := c.getClientUsingCache(uint64(chainID))
 	if err != nil {
 		return nil, err
 	}

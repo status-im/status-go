@@ -9,20 +9,20 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/rpcfilters"
+	"github.com/status-im/status-go/transactions"
 )
 
 // NewService initializes service instance.
-func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig, appDb *sql.DB, timeSource func() time.Time) *Service {
+func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, pendingTracker *transactions.PendingTxTracker, config *params.NodeConfig, appDb *sql.DB, timeSource func() time.Time) *Service {
 	service := &Service{
 		rpcClient,
 		accountsManager,
-		rpcFiltersSrvc,
+		pendingTracker,
 		config,
 		nil,
 		nil,
 	}
-	service.api = NewAPI(rpcClient, accountsManager, rpcFiltersSrvc, config, appDb, timeSource, &service.syncUserDetailFunc)
+	service.api = NewAPI(rpcClient, accountsManager, pendingTracker, config, appDb, timeSource, &service.syncUserDetailFunc)
 	return service
 }
 
@@ -30,7 +30,7 @@ func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, rpc
 type Service struct {
 	rpcClient          *rpc.Client
 	accountsManager    *account.GethManager
-	rpcFiltersSrvc     *rpcfilters.Service
+	pendingTracker     *transactions.PendingTxTracker
 	config             *params.NodeConfig
 	api                *API
 	syncUserDetailFunc syncUsernameDetail

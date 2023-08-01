@@ -16,7 +16,7 @@ import (
 )
 
 func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, feed *event.Feed,
-	transactionManager *TransactionManager, pendingTxManager *transactions.TransactionManager,
+	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
 	tokenManager *token.Manager,
 	chainClients map[uint64]*chain.ClientWithFallback,
 	accounts []common.Address) *SequentialFetchStrategy {
@@ -40,7 +40,7 @@ type SequentialFetchStrategy struct {
 	mu                 sync.Mutex
 	group              *async.Group
 	transactionManager *TransactionManager
-	pendingTxManager   *transactions.TransactionManager
+	pendingTxManager   *transactions.PendingTxTracker
 	tokenManager       *token.Manager
 	chainClients       map[uint64]*chain.ClientWithFallback
 	accounts           []common.Address

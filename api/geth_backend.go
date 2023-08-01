@@ -44,8 +44,8 @@ import (
 	"github.com/status-im/status-go/server/pairing/statecontrol"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/typeddata"
+	wcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/transactions"
@@ -1730,12 +1730,17 @@ func (b *GethStatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, pa
 		return
 	}
 
-	go b.statusNode.RPCFiltersService().TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
-		Hash:    common.Hash(hash),
-		Type:    string(transactions.WalletTransfer),
-		From:    common.Address(sendArgs.From),
-		ChainID: b.transactor.NetworkID(),
-	})
+	err = b.statusNode.PendingTracker().TrackPendingTransaction(
+		wcommon.ChainID(b.transactor.NetworkID()),
+		common.Hash(hash),
+		common.Address(sendArgs.From),
+		transactions.WalletTransfer,
+		transactions.AutoDelete,
+	)
+	if err != nil {
+		log.Error("TrackPendingTransaction error", "error", err)
+		return
+	}
 
 	return
 }
@@ -1751,12 +1756,17 @@ func (b *GethStatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs 
 		return
 	}
 
-	go b.statusNode.RPCFiltersService().TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
-		Hash:    common.Hash(hash),
-		Type:    string(transactions.WalletTransfer),
-		From:    common.Address(sendArgs.From),
-		ChainID: b.transactor.NetworkID(),
-	})
+	err = b.statusNode.PendingTracker().TrackPendingTransaction(
+		wcommon.ChainID(b.transactor.NetworkID()),
+		common.Hash(hash),
+		common.Address(sendArgs.From),
+		transactions.WalletTransfer,
+		transactions.AutoDelete,
+	)
+	if err != nil {
+		log.Error("TrackPendingTransaction error", "error", err)
+		return
+	}
 
 	return
 }
@@ -1767,12 +1777,17 @@ func (b *GethStatusBackend) SendTransactionWithSignature(sendArgs transactions.S
 		return
 	}
 
-	go b.statusNode.RPCFiltersService().TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
-		Hash:    common.Hash(hash),
-		Type:    string(transactions.WalletTransfer),
-		From:    common.Address(sendArgs.From),
-		ChainID: b.transactor.NetworkID(),
-	})
+	err = b.statusNode.PendingTracker().TrackPendingTransaction(
+		wcommon.ChainID(b.transactor.NetworkID()),
+		common.Hash(hash),
+		common.Address(sendArgs.From),
+		transactions.WalletTransfer,
+		transactions.AutoDelete,
+	)
+	if err != nil {
+		log.Error("TrackPendingTransaction error", "error", err)
+		return
+	}
 
 	return
 }
