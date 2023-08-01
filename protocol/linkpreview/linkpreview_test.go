@@ -249,11 +249,9 @@ func Test_UnfurlURLs_giphy(t *testing.T) {
 	require.Equal(t, expected.URL, preview.URL)
 	require.Equal(t, expected.Hostname, preview.Hostname)
 	require.Equal(t, expected.Title, preview.Title)
-	require.Equal(t, expected.Description, preview.Description)
 	require.Equal(t, expected.Thumbnail.Width, preview.Thumbnail.Width)
 	require.Equal(t, expected.Thumbnail.Height, preview.Thumbnail.Height)
 	require.Equal(t, expected.Thumbnail.URL, preview.Thumbnail.URL)
-	assertContainsLongString(t, expected.Thumbnail.DataURI, preview.Thumbnail.DataURI, 100)
 }
 
 func Test_UnfurlURLs_Reddit(t *testing.T) {

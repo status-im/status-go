@@ -179,6 +179,9 @@ func handleVideoOembedType(preview common.LinkPreview, response OEmbedBaseRespon
 	if response.HTML != "" {
 		preview.HTML = response.HTML
 	}
+	if response.ThumbnailURL != "" {
+		preview.Thumbnail.URL = response.ThumbnailURL
+	}
 	if response.Width != 0 {
 		preview.Thumbnail.Width = response.Width
 	}
