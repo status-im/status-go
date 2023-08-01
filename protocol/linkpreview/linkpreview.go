@@ -182,10 +182,10 @@ func handleVideoOembedType(preview *common.LinkPreview, response OEmbedBaseRespo
 		preview.Thumbnail.URL = response.ThumbnailURL
 	}
 	if response.Width != 0 {
-		preview.Thumbnail.Width = response.Width
+		preview.Thumbnail.Width = response.ThumbnailWidth
 	}
 	if response.Height != 0 {
-		preview.Thumbnail.Height = response.Height
+		preview.Thumbnail.Height = response.ThumbnailHeight
 	}
 }
 
