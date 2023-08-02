@@ -89,10 +89,10 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameSync() {
 
 	// Store only chat and default wallet account on other device
 	profileKpOtherDevice := accounts.GetProfileKeypairForTest(true, true, false)
-	profileKp.KeyUID = s.m.account.KeyUID
-	profileKp.Name = DefaultProfileDisplayName
-	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
-	profileKp.Accounts[1].KeyUID = s.m.account.KeyUID
+	profileKpOtherDevice.KeyUID = s.m.account.KeyUID
+	profileKpOtherDevice.Name = DefaultProfileDisplayName
+	profileKpOtherDevice.Accounts[0].KeyUID = s.m.account.KeyUID
+	profileKpOtherDevice.Accounts[1].KeyUID = s.m.account.KeyUID
 
 	err = alicesOtherDevice.settings.SaveOrUpdateKeypair(profileKpOtherDevice)
 	s.Require().NoError(err, "profile keypair alicesOtherDevice.settings.SaveOrUpdateKeypair")
@@ -142,10 +142,25 @@ func (s *MessengerProfileDisplayNameHandlerSuite) TestDisplayNameSync() {
 			return err
 		}
 
-		if len(response.Keypairs) != 1 || len(response.Settings) != 1 {
-			return errors.New("no sync data received")
+		foundKp := false
+		for _, kp := range response.Keypairs {
+			if kp.KeyUID == profileKp.KeyUID {
+				foundKp = true
+			}
 		}
-		return nil
+
+		foundSetting := false
+		for _, s := range response.Settings {
+			v, _ := s.Value.(string)
+			if v == testDisplayName {
+				foundSetting = true
+			}
+		}
+
+		if foundKp && foundSetting {
+			return nil
+		}
+		return errors.New("no sync data received")
 	})
 	s.Require().NoError(err)
 

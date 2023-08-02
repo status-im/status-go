@@ -451,6 +451,11 @@ var (
 			protobufType:      protobuf.SyncSetting_INCLUDE_WATCHONLY_ACCOUNT,
 		},
 	}
+	ProfileMigrationNeeded = SettingField{
+		reactFieldName: "profile-migration-needed",
+		dBColumnName:   "profile_migration_needed",
+		valueHandler:   BoolHandler,
+	}
 
 	SettingFieldRegister = []SettingField{
 		AnonMetricsShouldSend,
@@ -521,6 +526,7 @@ var (
 		WalletVisibleTokens,
 		WebviewAllowPermissionRequests,
 		IncludeWatchOnlyAccount,
+		ProfileMigrationNeeded,
 	}
 )
 

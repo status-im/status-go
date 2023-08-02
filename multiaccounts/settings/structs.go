@@ -191,6 +191,7 @@ type Settings struct {
 	GifAPIKey                      string                        `json:"gifs/api-key"`
 	TestNetworksEnabled            bool                          `json:"test-networks-enabled?,omitempty"`
 	IncludeWatchOnlyAccount        bool                          `json:"include-watch-only-account?,omitempty"`
+	ProfileMigrationNeeded         bool                          `json:"profile-migration-needed,omitempty"`
 }
 
 func (s Settings) MarshalJSON() ([]byte, error) {
