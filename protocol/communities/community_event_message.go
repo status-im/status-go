@@ -192,7 +192,7 @@ func validateCommunityEvent(communityEvent *CommunityEvent) error {
 		}
 
 	case protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT:
-		if len(communityEvent.MembersAdded) == 0 {
+		if communityEvent.AcceptedRequestsToJoin == nil {
 			return errors.New("invalid community request to join accepted event")
 		}
 

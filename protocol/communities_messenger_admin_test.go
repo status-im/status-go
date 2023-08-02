@@ -128,20 +128,69 @@ func (s *AdminCommunityEventsSuite) TestAdminCannotDeleteBecomeAdminPermission()
 	testEventSenderCannotDeleteBecomeAdminPermission(s, community)
 }
 
+func (s *AdminCommunityEventsSuite) TestAdminAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders() {
+	additionalAdmin := s.newMessenger()
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{additionalAdmin})
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalAdmin)
+}
+
+func (s *AdminCommunityEventsSuite) TestAdminAcceptMemberRequestToJoinNotConfirmedByControlNode() {
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{})
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	testAcceptMemberRequestToJoinNotConfirmedByControlNode(s, community, user)
+}
+
 func (s *AdminCommunityEventsSuite) TestAdminAcceptMemberRequestToJoin() {
-	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{})
 
 	// set up additional user that will send request to join
 	user := s.newMessenger()
 	testAcceptMemberRequestToJoin(s, community, user)
 }
 
+func (s *AdminCommunityEventsSuite) TestAdminRejectMemberRequestToJoinResponseSharedWithOtherEventSenders() {
+	additionalAdmin := s.newMessenger()
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{additionalAdmin})
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	testRejectMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalAdmin)
+}
+
+func (s *AdminCommunityEventsSuite) TestAdminRejectMemberRequestToJoinNotConfirmedByControlNode() {
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{})
+
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	testRejectMemberRequestToJoinNotConfirmedByControlNode(s, community, user)
+}
+
 func (s *AdminCommunityEventsSuite) TestAdminRejectMemberRequestToJoin() {
-	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{})
 
 	// set up additional user that will send request to join
 	user := s.newMessenger()
 	testRejectMemberRequestToJoin(s, community, user)
+}
+
+func (s *AdminCommunityEventsSuite) TestAdminRequestToJoinStateCannotBeOverridden() {
+	additionalAdmin := s.newMessenger()
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{additionalAdmin})
+
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	testEventSenderCannotOverrideRequestToJoinState(s, community, user, additionalAdmin)
+}
+
+func (s *AdminCommunityEventsSuite) TestAdminControlNodeHandlesMultipleEventSenderRequestToJoinDecisions() {
+	additionalAdmin := s.newMessenger()
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{additionalAdmin})
+
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(s, community, user, additionalAdmin)
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminCreateEditDeleteCategories() {

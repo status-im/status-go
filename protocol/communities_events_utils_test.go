@@ -338,7 +338,7 @@ func assertCheckTokenPermissionCreated(s *suite.Suite, community *communities.Co
 	s.Require().Equal(permissions[0].TokenCriteria[0].Decimals, uint64(18))
 }
 
-func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role protobuf.CommunityMember_Roles) *communities.Community {
+func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role protobuf.CommunityMember_Roles, additionalEventSenders []*Messenger) *communities.Community {
 	tcs2, err := base.GetControlNode().communitiesManager.All()
 	s := base.GetSuite()
 	s.Require().NoError(err, "eventSender.communitiesManager.All")
@@ -365,8 +365,19 @@ func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role pr
 	checkPermissionGranted := func(response *MessengerResponse) error {
 		return checkRolePermissionInResponse(response, base.GetEventSender().IdentityPublicKey(), role)
 	}
-
 	waitOnMessengerResponse(s, WaitCommunityCondition, checkPermissionGranted, base.GetMember())
+
+	for _, eventSender := range additionalEventSenders {
+		advertiseCommunityTo(s, community, base.GetControlNode(), eventSender)
+		joinOnRequestCommunity(s, community, base.GetControlNode(), eventSender)
+
+		grantPermission(s, community, base.GetControlNode(), eventSender, role)
+		checkPermissionGranted = func(response *MessengerResponse) error {
+			return checkRolePermissionInResponse(response, eventSender.IdentityPublicKey(), role)
+		}
+		waitOnMessengerResponse(s, WaitCommunityCondition, checkPermissionGranted, base.GetMember())
+		waitOnMessengerResponse(s, WaitCommunityCondition, checkPermissionGranted, base.GetEventSender())
+	}
 
 	return community
 }
@@ -761,7 +772,8 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
-	_ = response.RequestsToJoinCommunity[0]
+
+	sentRequest := response.RequestsToJoinCommunity[0]
 
 	// event sender receives request to join
 	response, err = WaitOnMessengerResponse(
@@ -772,19 +784,107 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	s.Require().NoError(err)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
 
-	receivedRequest := response.RequestsToJoinCommunity[0]
+	// event sender has not accepted request yet
+	eventSenderCommunity, err := base.GetEventSender().GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().False(eventSenderCommunity.HasMember(&user.identity.PublicKey))
+
+	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: sentRequest.ID}
+	response, err = base.GetEventSender().AcceptRequestToJoinCommunity(acceptRequestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	// we don't expect `user` to be a member already, because `eventSender` merely
+	// forwards its accept decision to the control node
+	s.Require().False(response.Communities()[0].HasMember(&user.identity.PublicKey))
+
+	// user receives community admin event without being a member yet
+	response, err = WaitOnMessengerResponse(
+		user,
+		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		"user did not receive community request to join response",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	// `user` should not be part of the community yet, we need to wait for
+	// the control node to confirm `eventSender`s decision
+	s.Require().False(response.Communities()[0].HasMember(&user.identity.PublicKey))
+
+	// control node receives community event with accepted membership request
+	response, err = WaitOnMessengerResponse(
+		base.GetControlNode(),
+		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		"control node did not receive community request to join response",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+
+	// at this point, the request to join is marked as accepted by control node
+	acceptedRequests, err := base.GetControlNode().AcceptedRequestsToJoinForCommunity(community.ID())
+	s.Require().NoError(err)
+	// we expect 3 here (1 event senders, 1 member + 1 from user)
+	s.Require().Len(acceptedRequests, 3)
+	s.Require().Equal(acceptedRequests[2].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+
+	// user receives updated community
+	_, err = WaitOnMessengerResponse(
+		user,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&user.identity.PublicKey)
+		},
+		"alice did not receive community request to join response",
+	)
+	s.Require().NoError(err)
+}
+
+func testAcceptMemberRequestToJoinNotConfirmedByControlNode(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger) {
+	// set up additional user that will send request to join
+	_, err := user.Start()
+
+	s := base.GetSuite()
+
+	s.Require().NoError(err)
+	defer user.Shutdown() // nolint: errcheck
+
+	advertiseCommunityTo(s, community, base.GetControlNode(), user)
+
+	// user sends request to join
+	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	response, err := user.RequestToJoinCommunity(requestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	sentRequest := response.RequestsToJoinCommunity[0]
+
+	// event sender receives request to join
+	response, err = WaitOnMessengerResponse(
+		base.GetEventSender(),
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		"event sender did not receive community request to join",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
 
 	// event sender has not accepted request yet
 	eventSenderCommunity, err := base.GetEventSender().GetCommunityByID(community.ID())
 	s.Require().NoError(err)
 	s.Require().False(eventSenderCommunity.HasMember(&user.identity.PublicKey))
 
-	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: receivedRequest.ID}
+	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: sentRequest.ID}
 	response, err = base.GetEventSender().AcceptRequestToJoinCommunity(acceptRequestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
-	s.Require().True(response.Communities()[0].HasMember(&user.identity.PublicKey))
+	// we don't expect `user` to be a member already, because `eventSender` merely
+	// forwards its accept decision to the control node
+	s.Require().False(response.Communities()[0].HasMember(&user.identity.PublicKey))
+
+	// at this point, the request to join is in accepted/pending state
+	acceptedPendingRequests, err := base.GetEventSender().AcceptedPendingRequestsToJoinForCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(acceptedPendingRequests, 1)
+	s.Require().Equal(acceptedPendingRequests[0].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
 
 	// user receives request to join response
 	response, err = WaitOnMessengerResponse(
@@ -794,32 +894,179 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	)
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
-	s.Require().True(response.Communities()[0].HasMember(&user.identity.PublicKey))
+	// `user` should not be part of the community yet, because control node
+	// hasn't confirmed the decistion yet
+	s.Require().False(response.Communities()[0].HasMember(&user.identity.PublicKey))
+}
 
-	// control node receives updated community
-	response, err = WaitOnMessengerResponse(
-		base.GetControlNode(),
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"control node did not receive community request to join response",
+func testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger, additionalEventSender *Messenger) {
+	// set up additional user that will send request to join
+	_, err := user.Start()
+
+	s := base.GetSuite()
+
+	s.Require().NoError(err)
+	defer user.Shutdown() // nolint: errcheck
+
+	advertiseCommunityTo(s, community, base.GetControlNode(), user)
+
+	// user sends request to join
+	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	response, err := user.RequestToJoinCommunity(requestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	sentRequest := response.RequestsToJoinCommunity[0]
+
+	// event sender receives request to join
+	_, err = WaitOnMessengerResponse(
+		base.GetEventSender(),
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		"event sender did not receive community request to join",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(response.Communities(), 1)
 
-	requests, err := base.GetControlNode().AcceptedRequestsToJoinForCommunity(community.ID())
-	// there's now two requests to join (event sender and member) + 1 from user
-	s.Require().NoError(err)
-	s.Require().Len(requests, 3)
-	s.Require().True(response.Communities()[0].HasMember(&user.identity.PublicKey))
-
-	// member receives updated community
-	response, err = WaitOnMessengerResponse(
-		base.GetMember(),
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"alice did not receive community request to join response",
+	// event sender 2 receives request to join
+	_, err = WaitOnMessengerResponse(
+		additionalEventSender,
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		"event sender did not receive community request to join",
 	)
 	s.Require().NoError(err)
+
+	// event sender 1 accepts request
+	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: sentRequest.ID}
+	response, err = base.GetEventSender().AcceptRequestToJoinCommunity(acceptRequestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
-	s.Require().True(response.Communities()[0].HasMember(&user.identity.PublicKey))
+
+	// event sender 2 receives decision of other event sender
+	_, err = WaitOnMessengerResponse(
+		additionalEventSender,
+		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		"event sender did not receive community request to join",
+	)
+	s.Require().NoError(err)
+
+	// at this point, the request to join is in accepted/pending state for event sender 2
+	acceptedPendingRequests, err := additionalEventSender.AcceptedPendingRequestsToJoinForCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(acceptedPendingRequests, 1)
+	s.Require().Equal(acceptedPendingRequests[0].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+}
+
+func testRejectMemberRequestToJoinResponseSharedWithOtherEventSenders(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger, additionalEventSender *Messenger) {
+	// set up additional user that will send request to join
+	_, err := user.Start()
+
+	s := base.GetSuite()
+
+	s.Require().NoError(err)
+	defer user.Shutdown() // nolint: errcheck
+
+	advertiseCommunityTo(s, community, base.GetControlNode(), user)
+
+	// user sends request to join
+	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	response, err := user.RequestToJoinCommunity(requestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	sentRequest := response.RequestsToJoinCommunity[0]
+
+	// event sender receives request to join
+	response, err = WaitOnMessengerResponse(
+		base.GetEventSender(),
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		"event sender did not receive community request to join",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	// event sender 2 receives request to join
+	response, err = WaitOnMessengerResponse(
+		additionalEventSender,
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		"event sender did not receive community request to join",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	rejectRequestToJoin := &requests.DeclineRequestToJoinCommunity{ID: sentRequest.ID}
+	response, err = base.GetEventSender().DeclineRequestToJoinCommunity(rejectRequestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	// event sender 2 receives decision of other event sender
+	_, err = WaitOnMessengerResponse(
+		additionalEventSender,
+		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		"event sender did not receive community request to join",
+	)
+	s.Require().NoError(err)
+
+	// at this point, the request to join is in declined/pending state for event sender 2
+	rejectedPendingRequests, err := additionalEventSender.DeclinedPendingRequestsToJoinForCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(rejectedPendingRequests, 1)
+	s.Require().Equal(rejectedPendingRequests[0].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+}
+
+func testRejectMemberRequestToJoinNotConfirmedByControlNode(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger) {
+	// set up additional user that will send request to join
+	_, err := user.Start()
+
+	s := base.GetSuite()
+
+	s.Require().NoError(err)
+	defer user.Shutdown() // nolint: errcheck
+
+	advertiseCommunityTo(s, community, base.GetControlNode(), user)
+
+	// user sends request to join
+	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	response, err := user.RequestToJoinCommunity(requestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	sentRequest := response.RequestsToJoinCommunity[0]
+
+	// event sender receives request to join
+	response, err = WaitOnMessengerResponse(
+		base.GetEventSender(),
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		"event sender did not receive community request to join",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	// event sender has not accepted request
+	eventSenderCommunity, err := base.GetEventSender().GetCommunityByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().False(eventSenderCommunity.HasMember(&user.identity.PublicKey))
+
+	declineRequestToJoin := &requests.DeclineRequestToJoinCommunity{ID: sentRequest.ID}
+	response, err = base.GetEventSender().DeclineRequestToJoinCommunity(declineRequestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	// at this point, the request to join is in decline/pending state
+	declinedPendingRequests, err := base.GetEventSender().DeclinedPendingRequestsToJoinForCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(declinedPendingRequests, 1)
+	s.Require().Equal(declinedPendingRequests[0].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+
+	// user won't receive anything
+	_, err = WaitOnMessengerResponse(
+		user,
+		func(r *MessengerResponse) bool { return len(r.Communities()) == 0 },
+		"user did not receive community request to join response",
+	)
+	s.Require().NoError(err)
 }
 
 func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger) {
@@ -837,6 +1084,8 @@ func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	sentRequest := response.RequestsToJoinCommunity[0]
 
 	// event sender receives request to join
 	response, err = WaitOnMessengerResponse(
@@ -856,15 +1105,13 @@ func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	s.Require().NoError(err)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
 
-	receivedRequest := response.RequestsToJoinCommunity[0]
-
 	// event sender has not accepted request yet
 	eventSenderCommunity, err := base.GetEventSender().GetCommunityByID(community.ID())
 	s.Require().NoError(err)
 	s.Require().False(eventSenderCommunity.HasMember(&user.identity.PublicKey))
 
 	// event sender rejects request to join
-	rejectRequestToJoin := &requests.DeclineRequestToJoinCommunity{ID: receivedRequest.ID}
+	rejectRequestToJoin := &requests.DeclineRequestToJoinCommunity{ID: sentRequest.ID}
 	_, err = base.GetEventSender().DeclineRequestToJoinCommunity(rejectRequestToJoin)
 	s.Require().NoError(err)
 
@@ -884,6 +1131,168 @@ func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	requests, err := base.GetControlNode().DeclinedRequestsToJoinForCommunity(community.ID())
 	s.Require().Len(requests, 1)
 	s.Require().NoError(err)
+}
+
+func testEventSenderCannotOverrideRequestToJoinState(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger, additionalEventSender *Messenger) {
+	_, err := user.Start()
+
+	s := base.GetSuite()
+	s.Require().NoError(err)
+	defer user.Shutdown() // nolint: errcheck
+
+	advertiseCommunityTo(s, community, base.GetControlNode(), user)
+
+	// user sends request to join
+	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	response, err := user.RequestToJoinCommunity(requestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	sentRequest := response.RequestsToJoinCommunity[0]
+
+	// event sender receives request to join
+	_, err = WaitOnMessengerResponse(
+		base.GetEventSender(),
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		"event sender did not receive community request to join",
+	)
+	s.Require().NoError(err)
+
+	// event sender 2 receives request to join
+	_, err = WaitOnMessengerResponse(
+		additionalEventSender,
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		"event sender did not receive community request to join",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	// request is pending for event sener 2
+	pendingRequests, err := additionalEventSender.PendingRequestsToJoinForCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(pendingRequests)
+	s.Require().Len(pendingRequests, 1)
+
+	// event sender 1 rejects request to join
+	rejectRequestToJoin := &requests.DeclineRequestToJoinCommunity{ID: sentRequest.ID}
+	_, err = base.GetEventSender().DeclineRequestToJoinCommunity(rejectRequestToJoin)
+	s.Require().NoError(err)
+
+	// request to join is now marked as rejected pending for event sender 1
+	rejectedPendingRequests, err := base.GetEventSender().DeclinedPendingRequestsToJoinForCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(rejectedPendingRequests)
+	s.Require().Len(rejectedPendingRequests, 1)
+
+	// event sender 2 receives event sender 1's decision
+	_, err = WaitOnMessengerResponse(
+		additionalEventSender,
+		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		"event sender did not receive community request to join",
+	)
+	s.Require().NoError(err)
+
+	// request to join is now marked as rejected pending for event sender 2
+	rejectedPendingRequests, err = additionalEventSender.DeclinedPendingRequestsToJoinForCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(rejectedPendingRequests)
+	s.Require().Len(rejectedPendingRequests, 1)
+
+	// event sender 2 should not be able to override that pending state
+	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: sentRequest.ID}
+	_, err = additionalEventSender.AcceptRequestToJoinCommunity(acceptRequestToJoin)
+	s.Require().Error(err)
+}
+
+func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger, additionalEventSender *Messenger) {
+	_, err := user.Start()
+
+	s := base.GetSuite()
+	s.Require().NoError(err)
+	defer user.Shutdown() // nolint: errcheck
+
+	advertiseCommunityTo(s, community, base.GetControlNode(), user)
+
+	// user sends request to join
+	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	response, err := user.RequestToJoinCommunity(requestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	sentRequest := response.RequestsToJoinCommunity[0]
+
+	// event sender receives request to join
+	_, err = WaitOnMessengerResponse(
+		base.GetEventSender(),
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		"event sender did not receive community request to join",
+	)
+	s.Require().NoError(err)
+
+	// event sender 2 receives request to join
+	_, err = WaitOnMessengerResponse(
+		additionalEventSender,
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		"event sender did not receive community request to join",
+	)
+	s.Require().NoError(err)
+
+	// control node receives request to join
+	_, err = WaitOnMessengerResponse(
+		base.GetControlNode(),
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		"event sender did not receive community request to join",
+	)
+	s.Require().NoError(err)
+
+	// event sender 1 rejects request to join
+	rejectRequestToJoin := &requests.DeclineRequestToJoinCommunity{ID: sentRequest.ID}
+	_, err = base.GetEventSender().DeclineRequestToJoinCommunity(rejectRequestToJoin)
+	s.Require().NoError(err)
+	// request to join is now marked as rejected pending for event sender 1
+	rejectedPendingRequests, err := base.GetEventSender().DeclinedPendingRequestsToJoinForCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(rejectedPendingRequests)
+	s.Require().Len(rejectedPendingRequests, 1)
+
+	// control node receives event sender 1's and 2's decision
+	_, err = WaitOnMessengerResponse(
+		base.GetControlNode(),
+		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		"control node did not receive event senders decision",
+	)
+	s.Require().NoError(err)
+	// request to join is now marked as rejected
+	rejectedRequests, err := base.GetControlNode().DeclinedRequestsToJoinForCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(rejectedRequests)
+	s.Require().Len(rejectedRequests, 1)
+
+	// event sender 2 accepts request to join
+	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: sentRequest.ID}
+	_, err = additionalEventSender.AcceptRequestToJoinCommunity(acceptRequestToJoin)
+	s.Require().NoError(err)
+	// request to join is now marked as accepted pending for event sender 2
+	acceptedPendingRequests, err := additionalEventSender.AcceptedPendingRequestsToJoinForCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(acceptedPendingRequests)
+	s.Require().Len(acceptedPendingRequests, 1)
+
+	// control node now receives event sender 2's decision
+	_, err = WaitOnMessengerResponse(
+		base.GetControlNode(),
+		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		"control node did not receive event senders decision",
+	)
+	s.Require().NoError(err)
+	rejectedRequests, err = base.GetControlNode().DeclinedRequestsToJoinForCommunity(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(rejectedRequests)
+	s.Require().Len(rejectedRequests, 1)
+	// we expect user's request to join still to be rejected
+	s.Require().Equal(rejectedRequests[0].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
 }
 
 func testCreateEditDeleteCategories(base CommunityEventsTestsInterface, community *communities.Community) {

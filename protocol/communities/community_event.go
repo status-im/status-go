@@ -160,7 +160,6 @@ func (o *Community) ToCommunityRequestToJoinAcceptCommunityEvent(changes *Commun
 	return &CommunityEvent{
 		CommunityEventClock:    o.NewCommunityEventClock(),
 		Type:                   protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT,
-		MembersAdded:           changes.MembersAdded,
 		AcceptedRequestsToJoin: changes.AcceptedRequestsToJoin,
 	}
 }
@@ -321,26 +320,6 @@ func (o *Community) updateCommunityDescriptionByCommunityEvent(communityEvent Co
 		_, err := o.reorderCategories(communityEvent.CategoryData.CategoryId, int(communityEvent.CategoryData.Position))
 		if err != nil {
 			return err
-		}
-
-	case protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT:
-		for pkString, addedMember := range communityEvent.MembersAdded {
-			pk, err := common.HexToPubkey(pkString)
-			if err != nil {
-				return err
-			}
-			if !o.HasMember(pk) {
-				o.addCommunityMember(pk, addedMember)
-			}
-		}
-
-	case protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT:
-		for pkString := range communityEvent.RejectedRequestsToJoin {
-			pk, err := common.HexToPubkey(pkString)
-			if err != nil {
-				return err
-			}
-			o.removeMemberFromOrg(pk)
 		}
 
 	case protobuf.CommunityEvent_COMMUNITY_MEMBER_KICK:

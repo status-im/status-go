@@ -198,20 +198,68 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerCannotDeleteBeco
 	s.Require().Nil(response)
 }
 
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders() {
+	additionalOwner := s.newMessenger()
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{additionalOwner})
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalOwner)
+}
+
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAcceptMemberRequestToJoinNotConfirmedByControlNode() {
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{})
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	testAcceptMemberRequestToJoinNotConfirmedByControlNode(s, community, user)
+}
+
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAcceptMemberRequestToJoin() {
-	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{})
 
 	// set up additional user that will send request to join
 	user := s.newMessenger()
 	testAcceptMemberRequestToJoin(s, community, user)
 }
 
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRejectMemberRequestToJoinResponseSharedWithOtherEventSenders() {
+	additionalOwner := s.newMessenger()
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{additionalOwner})
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalOwner)
+}
+
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRejectMemberRequestToJoinNotConfirmedByControlNode() {
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{})
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	testRejectMemberRequestToJoinNotConfirmedByControlNode(s, community, user)
+}
+
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRejectMemberRequestToJoin() {
-	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{})
 
 	// set up additional user that will send request to join
 	user := s.newMessenger()
 	testRejectMemberRequestToJoin(s, community, user)
+}
+
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRequestToJoinStateCannotBeOverridden() {
+	additionalOwner := s.newMessenger()
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{additionalOwner})
+
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	testEventSenderCannotOverrideRequestToJoinState(s, community, user, additionalOwner)
+}
+
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerControlNodeHandlesMultipleEventSenderRequestToJoinDecisions() {
+	additionalOwner := s.newMessenger()
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{additionalOwner})
+
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(s, community, user, additionalOwner)
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerCreateEditDeleteCategories() {
