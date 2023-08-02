@@ -163,33 +163,20 @@ func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
 }
 
 func handlePhotoOembedType(preview *common.LinkPreview, response OEmbedBaseResponse) {
-	if response.URL != "" {
 		preview.Thumbnail.URL = response.URL
-	}
 }
 
 func handleVideoOembedType(preview *common.LinkPreview, response OEmbedBaseResponse) {
-	if response.ThumbnailURL != "" {
+
 		preview.Thumbnail.URL = response.ThumbnailURL
-	}
-	if response.Width != 0 {
-		preview.Thumbnail.Width = response.ThumbnailWidth
-	}
-	if response.Height != 0 {
 		preview.Thumbnail.Height = response.ThumbnailHeight
-	}
 }
 
 func handleRichOembedType(preview *common.LinkPreview, response OEmbedBaseResponse) {
-	if response.ThumbnailURL != "" {
-		preview.Thumbnail.URL = response.ThumbnailURL
-	}
-	if response.Width != 0 {
+
 		preview.Thumbnail.Width = response.Width
-	}
-	if response.Height != 0 {
 		preview.Thumbnail.Height = response.Height
-	}
+		preview.Thumbnail.URL = response.ThumbnailURL
 }
 
 func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
@@ -230,6 +217,7 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 
 	case "rich":
 		handleRichOembedType(&preview, oembedResponse)
+
 	default:
 		return preview, fmt.Errorf("unexpected oembed type: %v", oembedResponse.Type)
 	}
