@@ -167,13 +167,11 @@ func handlePhotoOembedType(preview *common.LinkPreview, response OEmbedBaseRespo
 }
 
 func handleVideoOembedType(preview *common.LinkPreview, response OEmbedBaseResponse) {
-
 		preview.Thumbnail.URL = response.ThumbnailURL
 		preview.Thumbnail.Height = response.ThumbnailHeight
 }
 
 func handleRichOembedType(preview *common.LinkPreview, response OEmbedBaseResponse) {
-
 		preview.Thumbnail.Width = response.Width
 		preview.Thumbnail.Height = response.Height
 		preview.Thumbnail.URL = response.ThumbnailURL
