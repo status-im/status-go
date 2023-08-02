@@ -718,16 +718,16 @@ func (o *Community) isBanned(pk *ecdsa.PublicKey) bool {
 	return false
 }
 
-func (o *Community) hasMemberPermission(member *protobuf.CommunityMember, permissions map[protobuf.CommunityMember_Roles]bool) bool {
+func (o *Community) memberHasRoles(member *protobuf.CommunityMember, roles map[protobuf.CommunityMember_Roles]bool) bool {
 	for _, r := range member.Roles {
-		if permissions[r] {
+		if roles[r] {
 			return true
 		}
 	}
 	return false
 }
 
-func (o *Community) hasPermission(pk *ecdsa.PublicKey, roles map[protobuf.CommunityMember_Roles]bool) bool {
+func (o *Community) hasRoles(pk *ecdsa.PublicKey, roles map[protobuf.CommunityMember_Roles]bool) bool {
 	if pk == nil || o.config == nil || o.config.ID == nil {
 		return false
 	}
@@ -737,7 +737,7 @@ func (o *Community) hasPermission(pk *ecdsa.PublicKey, roles map[protobuf.Commun
 		return false
 	}
 
-	return o.hasMemberPermission(member, roles)
+	return o.memberHasRoles(member, roles)
 }
 
 func (o *Community) HasMember(pk *ecdsa.PublicKey) bool {
@@ -915,7 +915,7 @@ func (o *Community) AddRoleToMember(pk *ecdsa.PublicKey, role protobuf.Community
 	addRole := func(member *protobuf.CommunityMember) {
 		roles := make(map[protobuf.CommunityMember_Roles]bool)
 		roles[role] = true
-		if !o.hasMemberPermission(member, roles) {
+		if !o.memberHasRoles(member, roles) {
 			member.Roles = append(member.Roles, role)
 			updated = true
 		}
@@ -951,7 +951,7 @@ func (o *Community) RemoveRoleFromMember(pk *ecdsa.PublicKey, role protobuf.Comm
 	removeRole := func(member *protobuf.CommunityMember) {
 		roles := make(map[protobuf.CommunityMember_Roles]bool)
 		roles[role] = true
-		if o.hasMemberPermission(member, roles) {
+		if o.memberHasRoles(member, roles) {
 			var newRoles []protobuf.CommunityMember_Roles
 			for _, r := range member.Roles {
 				if r != role {
@@ -1163,26 +1163,26 @@ func (o *Community) GetPrivilegedMembers() []*ecdsa.PublicKey {
 }
 
 func (o *Community) HasPermissionToSendCommunityEvents() bool {
-	return !o.IsControlNode() && o.hasPermission(o.config.MemberIdentity, manageCommunityRolePermissions())
+	return !o.IsControlNode() && o.hasRoles(o.config.MemberIdentity, manageCommunityRoles())
 }
 
 func (o *Community) IsMemberOwner(publicKey *ecdsa.PublicKey) bool {
-	return o.hasPermission(publicKey, ownerRolePermission())
+	return o.hasRoles(publicKey, ownerRole())
 }
 
 func (o *Community) IsMemberTokenMaster(publicKey *ecdsa.PublicKey) bool {
-	return o.hasPermission(publicKey, tokenMasterRolePermissions())
+	return o.hasRoles(publicKey, tokenMasterRole())
 }
 
 func (o *Community) IsMemberAdmin(publicKey *ecdsa.PublicKey) bool {
-	return o.hasPermission(publicKey, adminRolePermissions())
+	return o.hasRoles(publicKey, adminRole())
 }
 
 func (o *Community) IsPrivilegedMember(publicKey *ecdsa.PublicKey) bool {
-	return o.hasPermission(publicKey, manageCommunityRolePermissions())
+	return o.hasRoles(publicKey, manageCommunityRoles())
 }
 
-func manageCommunityRolePermissions() map[protobuf.CommunityMember_Roles]bool {
+func manageCommunityRoles() map[protobuf.CommunityMember_Roles]bool {
 	roles := make(map[protobuf.CommunityMember_Roles]bool)
 	roles[protobuf.CommunityMember_ROLE_OWNER] = true
 	roles[protobuf.CommunityMember_ROLE_ADMIN] = true
@@ -1190,27 +1190,33 @@ func manageCommunityRolePermissions() map[protobuf.CommunityMember_Roles]bool {
 	return roles
 }
 
-func canManageUsersRolePermissions() map[protobuf.CommunityMember_Roles]bool {
-	roles := manageCommunityRolePermissions()
+func manageUsersRole() map[protobuf.CommunityMember_Roles]bool {
+	roles := manageCommunityRoles()
 	roles[protobuf.CommunityMember_ROLE_MANAGE_USERS] = true
 	return roles
 }
 
-func ownerRolePermission() map[protobuf.CommunityMember_Roles]bool {
+func ownerRole() map[protobuf.CommunityMember_Roles]bool {
 	roles := make(map[protobuf.CommunityMember_Roles]bool)
 	roles[protobuf.CommunityMember_ROLE_OWNER] = true
 	return roles
 }
 
-func adminRolePermissions() map[protobuf.CommunityMember_Roles]bool {
+func adminRole() map[protobuf.CommunityMember_Roles]bool {
 	roles := make(map[protobuf.CommunityMember_Roles]bool)
 	roles[protobuf.CommunityMember_ROLE_ADMIN] = true
 	return roles
 }
 
-func tokenMasterRolePermissions() map[protobuf.CommunityMember_Roles]bool {
+func tokenMasterRole() map[protobuf.CommunityMember_Roles]bool {
 	roles := make(map[protobuf.CommunityMember_Roles]bool)
 	roles[protobuf.CommunityMember_ROLE_TOKEN_MASTER] = true
+	return roles
+}
+
+func moderateContentRole() map[protobuf.CommunityMember_Roles]bool {
+	roles := manageCommunityRoles()
+	roles[protobuf.CommunityMember_ROLE_MODERATE_CONTENT] = true
 	return roles
 }
 
@@ -1228,12 +1234,6 @@ func (o *Community) MemberRole(pubKey *ecdsa.PublicKey) protobuf.CommunityMember
 	}
 
 	return protobuf.CommunityMember_ROLE_NONE
-}
-
-func canDeleteMessageForEveryonePermissions() map[protobuf.CommunityMember_Roles]bool {
-	roles := manageCommunityRolePermissions()
-	roles[protobuf.CommunityMember_ROLE_MODERATE_CONTENT] = true
-	return roles
 }
 
 func (o *Community) validateRequestToJoinWithChatID(request *protobuf.CommunityRequestToJoin) error {
@@ -1786,8 +1786,8 @@ func (o *Community) CanManageUsers(pk *ecdsa.PublicKey) bool {
 		return false
 	}
 
-	roles := canManageUsersRolePermissions()
-	return o.hasPermission(pk, roles)
+	roles := manageUsersRole()
+	return o.hasRoles(pk, roles)
 
 }
 
@@ -1803,8 +1803,8 @@ func (o *Community) CanDeleteMessageForEveryone(pk *ecdsa.PublicKey) bool {
 		return false
 	}
 
-	roles := canDeleteMessageForEveryonePermissions()
-	return o.hasPermission(pk, roles)
+	roles := moderateContentRole()
+	return o.hasRoles(pk, roles)
 }
 
 func (o *Community) isMember() bool {
@@ -1842,9 +1842,9 @@ func (o *Community) nextClock() uint64 {
 
 func (o *Community) CanManageUsersPublicKeys() ([]*ecdsa.PublicKey, error) {
 	var response []*ecdsa.PublicKey
-	roles := canManageUsersRolePermissions()
+	roles := manageUsersRole()
 	for pkString, member := range o.config.CommunityDescription.Members {
-		if o.hasMemberPermission(member, roles) {
+		if o.memberHasRoles(member, roles) {
 			pk, err := common.HexToPubkey(pkString)
 			if err != nil {
 				return nil, err
