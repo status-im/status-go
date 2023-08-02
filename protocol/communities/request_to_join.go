@@ -16,6 +16,8 @@ const (
 	RequestToJoinStateDeclined
 	RequestToJoinStateAccepted
 	RequestToJoinStateCanceled
+	RequestToJoinStateAcceptedPending
+	RequestToJoinStateDeclinedPending
 )
 
 type RequestToJoin struct {
@@ -70,6 +72,10 @@ func (r *RequestToJoin) InitFromSyncProtobuf(proto *protobuf.SyncCommunityReques
 
 func (r *RequestToJoin) Empty() bool {
 	return len(r.ID)+len(r.PublicKey)+int(r.Clock)+len(r.ENSName)+len(r.ChatID)+len(r.CommunityID)+int(r.State) == 0
+}
+
+func (r *RequestToJoin) MarkedAsPendingByPrivilegedAccount() bool {
+	return r.State == RequestToJoinStateAcceptedPending || r.State == RequestToJoinStateDeclinedPending
 }
 
 func AddTimeoutToRequestToJoinClock(clock uint64) (uint64, error) {

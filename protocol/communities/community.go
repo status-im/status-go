@@ -753,7 +753,6 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 	}
 
 	o.removeMemberFromOrg(pk)
-
 	if isControlNode {
 		o.increaseClock()
 	}
@@ -1940,31 +1939,14 @@ func (o *Community) AddMemberWithRevealedAccounts(dbRequest *RequestToJoin, role
 	defer o.mutex.Unlock()
 
 	isControlNode := o.IsControlNode()
-	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
 
-	if !isControlNode && !allowedToSendEvents {
+	if !isControlNode {
 		return nil, ErrNotAdmin
 	}
 
 	changes := o.addMemberWithRevealedAccounts(dbRequest.PublicKey, roles, accounts, dbRequest.Clock)
 
-	if allowedToSendEvents {
-		acceptedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
-		acceptedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
-
-		adminChanges := &CommunityEventChanges{
-			CommunityChanges:       changes,
-			AcceptedRequestsToJoin: acceptedRequestsToJoin,
-		}
-		err := o.addNewCommunityEvent(o.ToCommunityRequestToJoinAcceptCommunityEvent(adminChanges))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if isControlNode {
-		o.increaseClock()
-	}
+	o.increaseClock()
 
 	return changes, nil
 }
@@ -2128,16 +2110,6 @@ func (o *Community) deleteChat(chatID string) *CommunityChanges {
 
 	delete(o.config.CommunityDescription.Chats, chatID)
 	return changes
-}
-
-func (o *Community) addCommunityMember(pk *ecdsa.PublicKey, member *protobuf.CommunityMember) {
-
-	if o.config.CommunityDescription.Members == nil {
-		o.config.CommunityDescription.Members = make(map[string]*protobuf.CommunityMember)
-	}
-
-	memberKey := common.PubkeyToHex(pk)
-	o.config.CommunityDescription.Members[memberKey] = member
 }
 
 func (o *Community) addTokenPermission(permission *protobuf.CommunityTokenPermission) (*CommunityChanges, error) {

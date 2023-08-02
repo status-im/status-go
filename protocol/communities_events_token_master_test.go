@@ -124,18 +124,66 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterCannotDeleteBecomeAdmin
 	testEventSenderCannotDeleteBecomeAdminPermission(s, community)
 }
 
+func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAcceptMemberRequestToJoinNotConfirmedByControlNode() {
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{})
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	testAcceptMemberRequestToJoinNotConfirmedByControlNode(s, community, user)
+}
+
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAcceptMemberRequestToJoin() {
-	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{})
 	// set up additional user that will send request to join
 	user := s.newMessenger()
 	testAcceptMemberRequestToJoin(s, community, user)
 }
 
+func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders() {
+	additionalTokenMaster := s.newMessenger()
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{additionalTokenMaster})
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalTokenMaster)
+}
+
+func (s *TokenMasterCommunityEventsSuite) TestTokenMasterRejectMemberRequestToJoinResponseSharedWithOtherEventSenders() {
+	additionalTokenMaster := s.newMessenger()
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{additionalTokenMaster})
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	testRejectMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalTokenMaster)
+}
+
+func (s *TokenMasterCommunityEventsSuite) TestTokenMasterRejectMemberRequestToJoinNotConfirmedByControlNode() {
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{})
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	testRejectMemberRequestToJoinNotConfirmedByControlNode(s, community, user)
+}
+
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterRejectMemberRequestToJoin() {
-	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{})
 	// set up additional user that will send request to join
 	user := s.newMessenger()
 	testRejectMemberRequestToJoin(s, community, user)
+}
+
+func (s *TokenMasterCommunityEventsSuite) TestTokenMasterRequestToJoinStateCannotBeOverridden() {
+	additionalTokenMaster := s.newMessenger()
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{additionalTokenMaster})
+
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	testEventSenderCannotOverrideRequestToJoinState(s, community, user, additionalTokenMaster)
+}
+
+func (s *TokenMasterCommunityEventsSuite) TestTokenMasterControlNodeHandlesMultipleEventSenderRequestToJoinDecisions() {
+	additionalTokenMaster := s.newMessenger()
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{additionalTokenMaster})
+
+	// set up additional user that will send request to join
+	user := s.newMessenger()
+	testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(s, community, user, additionalTokenMaster)
 }
 
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterCreateEditDeleteCategories() {

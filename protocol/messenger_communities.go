@@ -254,6 +254,33 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					}
 				}
 
+				if sub.AcceptedRequestsToJoin != nil {
+					for _, requestID := range sub.AcceptedRequestsToJoin {
+						accept := &requests.AcceptRequestToJoinCommunity{
+							ID: requestID,
+						}
+						_, err := m.AcceptRequestToJoinCommunity(accept)
+						if err != nil {
+							m.logger.Warn("failed to accept request to join ", zap.Error(err))
+						}
+						// TODO INFORM ADMINS
+					}
+				}
+
+				if sub.RejectedRequestsToJoin != nil {
+					for _, requestID := range sub.RejectedRequestsToJoin {
+						reject := &requests.DeclineRequestToJoinCommunity{
+							ID: requestID,
+						}
+						_, err := m.DeclineRequestToJoinCommunity(reject)
+						if err != nil {
+							m.logger.Warn("failed to decline request to join ", zap.Error(err))
+						}
+
+						// TODO INFORM ADMINS
+					}
+				}
+
 			case <-ticker.C:
 				// If we are not online, we don't even try
 				if !m.online() {
@@ -951,7 +978,15 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	}
 
 	if !community.AcceptRequestToJoinAutomatically() {
-		// send request to join also to community privileged members
+		// send request to join also to community admins but without revealed addresses
+		requestToJoinProto.RevealedAccounts = make([]*protobuf.RevealedAccount, 0)
+		payload, err = proto.Marshal(requestToJoinProto)
+		if err != nil {
+			return nil, err
+		}
+
+		rawMessage.Payload = payload
+
 		privilegedMembers := community.GetPrivilegedMembers()
 		for _, privilegedMember := range privilegedMembers {
 			_, err := m.sender.SendPrivate(context.Background(), privilegedMember, &rawMessage)
@@ -1320,6 +1355,9 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 
 	if notification != nil {
 		notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
+		if community.HasPermissionToSendCommunityEvents() {
+			notification.MembershipStatus = ActivityCenterMembershipStatusAcceptedPending
+		}
 		notification.Read = true
 		notification.Accepted = true
 		notification.UpdatedAt = m.getCurrentTimeInMillis()
@@ -1353,7 +1391,19 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 	response := &MessengerResponse{}
 
 	if notification != nil {
+		dbRequest, err := m.communitiesManager.GetRequestToJoin(request.ID)
+		if err != nil {
+			return nil, err
+		}
+		community, err := m.communitiesManager.GetByID(dbRequest.CommunityID)
+		if err != nil {
+			return nil, err
+		}
+
 		notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
+		if community.HasPermissionToSendCommunityEvents() {
+			notification.MembershipStatus = ActivityCenterMembershipStatusDeclinedPending
+		}
 		notification.Read = true
 		notification.Dismissed = true
 		notification.UpdatedAt = m.getCurrentTimeInMillis()
@@ -1970,6 +2020,14 @@ func (m *Messenger) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*co
 
 func (m *Messenger) AcceptedRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.AcceptedRequestsToJoinForCommunity(id)
+}
+
+func (m *Messenger) AcceptedPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+	return m.communitiesManager.AcceptedPendingRequestsToJoinForCommunity(id)
+}
+
+func (m *Messenger) DeclinedPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+	return m.communitiesManager.DeclinedPendingRequestsToJoinForCommunity(id)
 }
 
 func (m *Messenger) RemoveUserFromCommunity(id types.HexBytes, pkString string) (*MessengerResponse, error) {

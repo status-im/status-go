@@ -1384,13 +1384,15 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 		return err
 	}
 
-	if requestToJoin.State == communities.RequestToJoinStateAccepted {
+	if requestToJoin.State == communities.RequestToJoinStateAccepted || requestToJoin.State == communities.RequestToJoinStateAcceptedPending {
 		accept := &requests.AcceptRequestToJoinCommunity{
 			ID: requestToJoin.ID,
 		}
 		_, err = m.AcceptRequestToJoinCommunity(accept)
 		if err != nil {
 			if err == communities.ErrNoPermissionToJoin {
+				// only control node will end up here as it's the only one that
+				// performed token permission checks
 				requestToJoin.State = communities.RequestToJoinStateDeclined
 			} else {
 				return err
@@ -1398,7 +1400,9 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 		}
 	}
 
-	if requestToJoin.State == communities.RequestToJoinStateDeclined {
+	declinedOrDeclinedPending := requestToJoin.State == communities.RequestToJoinStateDeclined || requestToJoin.State == communities.RequestToJoinStateDeclinedPending
+
+	if declinedOrDeclinedPending {
 		cancel := &requests.DeclineRequestToJoinCommunity{
 			ID: requestToJoin.ID,
 		}

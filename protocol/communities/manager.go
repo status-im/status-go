@@ -287,6 +287,8 @@ type Subscription struct {
 	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
 	ImportingHistoryArchiveMessagesSignal    *signal.ImportingHistoryArchiveMessagesSignal
 	CommunityEventsMessage                   *CommunityEventsMessage
+	AcceptedRequestsToJoin                   []types.HexBytes
+	RejectedRequestsToJoin                   []types.HexBytes
 }
 
 type CommunityResponse struct {
@@ -1353,42 +1355,8 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 
 func (m *Manager) handleAdditionalAdminChanges(community *Community) error {
 
-	saveOrUpdateRequestToJoin := func(signer string, request *protobuf.CommunityRequestToJoin, state RequestToJoinState) error {
-		requestToJoin := &RequestToJoin{
-			PublicKey:        signer,
-			Clock:            request.Clock,
-			ENSName:          request.EnsName,
-			CommunityID:      request.CommunityId,
-			State:            state,
-			RevealedAccounts: request.RevealedAccounts,
-		}
-
-		requestToJoin.CalculateID()
-
-		existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
-		if err != nil && err != sql.ErrNoRows {
-			return err
-		}
-
-		if existingRequestToJoin != nil {
-			// node already knows about this request to join, so let's compare clocks
-			// and update it if necessary
-			if existingRequestToJoin.Clock <= requestToJoin.Clock {
-				pk, err := common.HexToPubkey(existingRequestToJoin.PublicKey)
-				if err != nil {
-					return err
-				}
-				err = m.persistence.SetRequestToJoinState(common.PubkeyToHex(pk), community.ID(), state)
-				if err != nil {
-					return err
-				}
-			}
-		} else {
-			err := m.persistence.SaveRequestToJoin(requestToJoin)
-			if err != nil {
-				return err
-			}
-		}
+	if !(community.IsControlNode() || community.HasPermissionToSendCommunityEvents()) {
+		// we're a normal user/member node, so there's nothing for us to do here
 		return nil
 	}
 
@@ -1396,23 +1364,145 @@ func (m *Manager) handleAdditionalAdminChanges(community *Community) error {
 		communityEvent := &community.config.EventsData.Events[i]
 		switch communityEvent.Type {
 		case protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT:
-			for signer, request := range communityEvent.AcceptedRequestsToJoin {
-				err := saveOrUpdateRequestToJoin(signer, request, RequestToJoinStateAccepted)
-				if err != nil {
-					return err
-				}
+			err := m.handleCommunityEventRequestAccepted(community, communityEvent)
+			if err != nil {
+				return err
 			}
 
 		case protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT:
-			for signer, request := range communityEvent.RejectedRequestsToJoin {
-				err := saveOrUpdateRequestToJoin(signer, request, RequestToJoinStateDeclined)
-				if err != nil {
-					return err
-				}
+			err := m.handleCommunityEventRequestRejected(community, communityEvent)
+			if err != nil {
+				return err
 			}
 
 		default:
 		}
+	}
+	return nil
+}
+
+func (m *Manager) saveOrUpdateRequestToJoin(signer string, communityID types.HexBytes, requestToJoin *RequestToJoin) (bool, error) {
+	updated := false
+
+	existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
+	if err != nil && err != sql.ErrNoRows {
+		return updated, err
+	}
+
+	if existingRequestToJoin != nil {
+		// node already knows about this request to join, so let's compare clocks
+		// and update it if necessary
+		if existingRequestToJoin.Clock <= requestToJoin.Clock {
+			pk, err := common.HexToPubkey(existingRequestToJoin.PublicKey)
+			if err != nil {
+				return updated, err
+			}
+			err = m.persistence.SetRequestToJoinState(common.PubkeyToHex(pk), communityID, requestToJoin.State)
+			if err != nil {
+				return updated, err
+			}
+			updated = true
+		}
+	} else {
+		err := m.persistence.SaveRequestToJoin(requestToJoin)
+		if err != nil {
+			return updated, err
+		}
+	}
+	return updated, nil
+}
+
+func (m *Manager) handleCommunityEventRequestAccepted(community *Community, communityEvent *CommunityEvent) error {
+	requestToJoinState := RequestToJoinStateAccepted
+	if community.HasPermissionToSendCommunityEvents() {
+		// if we're an admin and we receive this admin event, we know the state is `pending`
+		requestToJoinState = RequestToJoinStateAcceptedPending
+	}
+
+	acceptedRequestsToJoin := make([]types.HexBytes, 0)
+
+	for signer, request := range communityEvent.AcceptedRequestsToJoin {
+		requestToJoin := &RequestToJoin{
+			PublicKey:   signer,
+			Clock:       request.Clock,
+			ENSName:     request.EnsName,
+			CommunityID: request.CommunityId,
+			State:       requestToJoinState,
+		}
+		requestToJoin.CalculateID()
+
+		if community.HasPermissionToSendCommunityEvents() {
+			existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
+			if err != nil && err != sql.ErrNoRows {
+				return err
+			}
+			if existingRequestToJoin.MarkedAsPendingByPrivilegedAccount() {
+				// the request is already in some pending state so we won't override it again
+				continue
+			}
+		}
+
+		requestUpdated, err := m.saveOrUpdateRequestToJoin(signer, community.ID(), requestToJoin)
+		if err != nil {
+			return err
+		}
+
+		if community.IsControlNode() && requestUpdated {
+			// We only collect requestToJoinIDs which had a state update.
+			// If there wasn't a state update, it means we've seen the request for the first time,
+			// which means we don't have revealed addresses here (as they aren't propagated by
+			// admin nodes), so we don't want to trigger an `AcceptRequestToJoin` in such cases.
+			acceptedRequestsToJoin = append(acceptedRequestsToJoin, requestToJoin.ID)
+		}
+	}
+	if community.IsControlNode() {
+		m.publish(&Subscription{AcceptedRequestsToJoin: acceptedRequestsToJoin})
+	}
+	return nil
+}
+
+func (m *Manager) handleCommunityEventRequestRejected(community *Community, communityEvent *CommunityEvent) error {
+	requestToJoinState := RequestToJoinStateDeclined
+	if community.HasPermissionToSendCommunityEvents() {
+		// if we're an admin and we receive this admin event, we want to see the same
+		// state that the other admin has decided for
+		requestToJoinState = RequestToJoinStateDeclinedPending
+	}
+
+	rejectedRequestsToJoin := make([]types.HexBytes, 0)
+
+	for signer, request := range communityEvent.RejectedRequestsToJoin {
+		requestToJoin := &RequestToJoin{
+			PublicKey:   signer,
+			Clock:       request.Clock,
+			ENSName:     request.EnsName,
+			CommunityID: request.CommunityId,
+			State:       requestToJoinState,
+		}
+		requestToJoin.CalculateID()
+
+		if community.HasPermissionToSendCommunityEvents() {
+			existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
+			if err != nil && err != sql.ErrNoRows {
+				return err
+			}
+			if existingRequestToJoin.MarkedAsPendingByPrivilegedAccount() {
+				// the request is already in some pending state so we won't override it again
+				continue
+			}
+		}
+
+		requestUpdated, err := m.saveOrUpdateRequestToJoin(signer, community.ID(), requestToJoin)
+		if err != nil {
+			return err
+		}
+		if community.IsControlNode() && requestUpdated {
+			rejectedRequestsToJoin = append(rejectedRequestsToJoin, requestToJoin.ID)
+		}
+	}
+
+	if community.IsControlNode() {
+		m.publish(&Subscription{RejectedRequestsToJoin: rejectedRequestsToJoin})
 	}
 	return nil
 }
@@ -1428,6 +1518,10 @@ func (m *Manager) markRequestToJoin(pk *ecdsa.PublicKey, community *Community) e
 
 func (m *Manager) markRequestToJoinAsCanceled(pk *ecdsa.PublicKey, community *Community) error {
 	return m.persistence.SetRequestToJoinState(common.PubkeyToHex(pk), community.ID(), RequestToJoinStateCanceled)
+}
+
+func (m *Manager) markRequestToJoinAsAcceptedPending(pk *ecdsa.PublicKey, community *Community) error {
+	return m.persistence.SetRequestToJoinState(common.PubkeyToHex(pk), community.ID(), RequestToJoinStateAcceptedPending)
 }
 
 func (m *Manager) DeletePendingRequestToJoin(request *RequestToJoin) error {
@@ -1575,54 +1669,84 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		return nil, err
 	}
 
-	community, err := m.GetByID(dbRequest.CommunityID)
-	if err != nil {
-		return nil, err
-	}
-
-	revealedAccounts, err := m.persistence.GetRequestToJoinRevealedAddresses(dbRequest.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	permissionsSatisfied, role, err := m.accountsSatisfyPermissionsToJoin(community, revealedAccounts)
-	if err != nil {
-		return nil, err
-	}
-
-	if !permissionsSatisfied {
-		return community, ErrNoPermissionToJoin
-	}
-
-	memberRoles := []protobuf.CommunityMember_Roles{}
-	if role != protobuf.CommunityMember_ROLE_NONE {
-		memberRoles = []protobuf.CommunityMember_Roles{role}
-	}
-
 	pk, err := common.HexToPubkey(dbRequest.PublicKey)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = community.AddMemberWithRevealedAccounts(dbRequest, memberRoles, revealedAccounts)
+	community, err := m.GetByID(dbRequest.CommunityID)
 	if err != nil {
 		return nil, err
 	}
 
-	channels, err := m.accountsSatisfyPermissionsToJoinChannels(community, revealedAccounts)
-	if err != nil {
-		return nil, err
-	}
+	if community.HasPermissionToSendCommunityEvents() {
+		if dbRequest.MarkedAsPendingByPrivilegedAccount() {
+			// if the request is in any pending state, it means our admin node has either
+			// already made a decision in the past, or previously received a decision by
+			// another admin, which in both cases means we're not allowed to override this
+			// state again
+			return nil, errors.New("request to join is already in pending state")
+		}
 
-	for channelID := range channels {
-		_, err = community.AddMemberToChat(channelID, pk, memberRoles)
+		// admins do not perform permission checks, they merely mark the
+		// request as accepted (pending) and forward their decision to the control node
+		acceptedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
+		acceptedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
+
+		adminChanges := &CommunityEventChanges{
+			AcceptedRequestsToJoin: acceptedRequestsToJoin,
+		}
+
+		err := community.addNewCommunityEvent(community.ToCommunityRequestToJoinAcceptCommunityEvent(adminChanges))
 		if err != nil {
+			return nil, err
+		}
+
+		if err := m.markRequestToJoinAsAcceptedPending(pk, community); err != nil {
 			return nil, err
 		}
 	}
 
-	if err := m.markRequestToJoin(pk, community); err != nil {
-		return nil, err
+	if community.IsControlNode() {
+		revealedAccounts, err := m.persistence.GetRequestToJoinRevealedAddresses(dbRequest.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		permissionsSatisfied, role, err := m.accountsSatisfyPermissionsToJoin(community, revealedAccounts)
+		if err != nil {
+			return nil, err
+		}
+
+		if !permissionsSatisfied {
+			return community, ErrNoPermissionToJoin
+		}
+
+		memberRoles := []protobuf.CommunityMember_Roles{}
+		if role != protobuf.CommunityMember_ROLE_NONE {
+			memberRoles = []protobuf.CommunityMember_Roles{role}
+		}
+
+		_, err = community.AddMemberWithRevealedAccounts(dbRequest, memberRoles, revealedAccounts)
+		if err != nil {
+			return nil, err
+		}
+
+		channels, err := m.accountsSatisfyPermissionsToJoinChannels(community, revealedAccounts)
+		if err != nil {
+			return nil, err
+		}
+
+		for channelID := range channels {
+			_, err = community.AddMemberToChat(channelID, pk, memberRoles)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if err := m.markRequestToJoin(pk, community); err != nil {
+			return nil, err
+		}
 	}
 
 	err = m.saveAndPublish(community)
@@ -1648,7 +1772,11 @@ func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCom
 		return err
 	}
 
-	err = m.persistence.SetRequestToJoinState(dbRequest.PublicKey, dbRequest.CommunityID, RequestToJoinStateDeclined)
+	requestToJoinState := RequestToJoinStateDeclined
+	if community.HasPermissionToSendCommunityEvents() {
+		requestToJoinState = RequestToJoinStateDeclinedPending
+	}
+	err = m.persistence.SetRequestToJoinState(dbRequest.PublicKey, dbRequest.CommunityID, requestToJoinState)
 	if err != nil {
 		return err
 	}
@@ -1727,7 +1855,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 	}
 
 	// don't process request as admin if community is configured as auto-accept
-	if community.HasPermissionToSendCommunityEvents() && community.AcceptRequestToJoinAutomatically() {
+	if !community.IsControlNode() && community.AcceptRequestToJoinAutomatically() {
 		return nil, errors.New("ignoring request to join, community is set to auto-accept")
 	}
 
@@ -1759,11 +1887,29 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 
 	requestToJoin.CalculateID()
 
-	if err := m.persistence.SaveRequestToJoin(requestToJoin); err != nil {
+	existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
+	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
 
-	if len(request.RevealedAccounts) > 0 {
+	if existingRequestToJoin != nil {
+		// request to join was already processed by an admin and waits to get
+		// confirmation for its decision
+		//
+		// we're only interested in immediately declining any declined/pending
+		// requests here, because if it's accepted/pending, we still need to perform
+		// some checks
+		if existingRequestToJoin.State == RequestToJoinStateDeclinedPending {
+			requestToJoin.State = RequestToJoinStateDeclined
+			return requestToJoin, nil
+		}
+	} else {
+		if err := m.persistence.SaveRequestToJoin(requestToJoin); err != nil {
+			return nil, err
+		}
+	}
+
+	if len(request.RevealedAccounts) > 0 && community.IsControlNode() {
 		// verify if revealed addresses indeed belong to requester
 		for _, revealedAccount := range request.RevealedAccounts {
 			recoverParams := account.RecoverParams{
@@ -1784,7 +1930,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		}
 
 		// Save revealed addresses + signatures so they can later be added
-		// to the community member list when the request is accepted
+		// to the control node's local table of known revealed addresses
 		err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin)
 		if err != nil {
 			return nil, err
@@ -1796,22 +1942,42 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 	// More specifically, CommunityRequestToLeave may be delivered later than CommunityRequestToJoin, or not delivered at all
 	acceptAutomatically := community.AcceptRequestToJoinAutomatically() || community.HasMember(signer)
 	if acceptAutomatically {
-		err = m.markRequestToJoin(signer, community)
-		if err != nil {
-			return nil, err
+		if community.IsControlNode() {
+			err = m.markRequestToJoin(signer, community)
+			if err != nil {
+				return nil, err
+			}
+			// Don't check permissions here,
+			// it will be done further in the processing pipeline.
+			requestToJoin.State = RequestToJoinStateAccepted
+		} else {
+			err = m.markRequestToJoinAsAcceptedPending(signer, community)
+			if err != nil {
+				return nil, err
+			}
+			requestToJoin.State = RequestToJoinStateAcceptedPending
 		}
-		// Don't check permissions here,
-		// it will be done further in the processing pipeline.
-		requestToJoin.State = RequestToJoinStateAccepted
 		return requestToJoin, nil
 	}
 
-	permissionsSatisfied, _, err := m.accountsSatisfyPermissionsToJoin(community, request.RevealedAccounts)
-	if err != nil {
-		return nil, err
-	}
-	if !permissionsSatisfied {
-		requestToJoin.State = RequestToJoinStateDeclined
+	if community.IsControlNode() && len(request.RevealedAccounts) > 0 {
+		permissionsSatisfied, _, err := m.accountsSatisfyPermissionsToJoin(community, request.RevealedAccounts)
+		if err != nil {
+			return nil, err
+		}
+		if !permissionsSatisfied {
+			requestToJoin.State = RequestToJoinStateDeclined
+		}
+		if permissionsSatisfied && existingRequestToJoin.State == RequestToJoinStateAcceptedPending {
+			err = m.markRequestToJoin(signer, community)
+			if err != nil {
+				return nil, err
+			}
+			// if the request to join was already accepted by another admin,
+			// we mark it as accepted so it won't be in pending state, even if the community
+			// is not set to auto-accept
+			requestToJoin.State = RequestToJoinStateAccepted
+		}
 	}
 
 	return requestToJoin, nil
@@ -2799,6 +2965,14 @@ func (m *Manager) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*Requ
 func (m *Manager) AcceptedRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
 	m.logger.Info("fetching canceled invitations", zap.String("community-id", id.String()))
 	return m.persistence.AcceptedRequestsToJoinForCommunity(id)
+}
+
+func (m *Manager) AcceptedPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
+	return m.persistence.AcceptedPendingRequestsToJoinForCommunity(id)
+}
+
+func (m *Manager) DeclinedPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
+	return m.persistence.DeclinedPendingRequestsToJoinForCommunity(id)
 }
 
 func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string, grant []byte) (bool, error) {
