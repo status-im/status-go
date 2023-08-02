@@ -90,7 +90,7 @@ func (s *Service) Start() {
 		s.timer = time.NewTimer(balanceHistoryUpdateInterval)
 
 		update := func() (exit bool) {
-			err := s.updateBalanceHistoryForAllEnabledNetworks(s.serviceContext)
+			err := s.updateBalanceHistory(s.serviceContext)
 			if s.serviceContext.Err() != nil {
 				s.triggerEvent(EventBalanceHistoryUpdateFinished, statustypes.Address{}, "Service canceled")
 				s.timer.Stop()
@@ -471,11 +471,11 @@ func sortTimeAsc(data map[chainIdentity][]*DataPoint, pos map[chainIdentity]int)
 	return res
 }
 
-// updateBalanceHistoryForAllEnabledNetworks iterates over all enabled and supported networks for the s.visibleTokenSymbol
+// updateBalanceHistory iterates over all networks depending on test/prod for the s.visibleTokenSymbol
 // and updates the balance history for the given address
 //
 // expects ctx to have cancellation support and processing to be cancelled by the caller
-func (s *Service) updateBalanceHistoryForAllEnabledNetworks(ctx context.Context) error {
+func (s *Service) updateBalanceHistory(ctx context.Context) error {
 	accountsDB, err := accounts.NewDB(s.db)
 	if err != nil {
 		return err
@@ -486,7 +486,12 @@ func (s *Service) updateBalanceHistoryForAllEnabledNetworks(ctx context.Context)
 		return err
 	}
 
-	networks, err := s.networkManager.Get(true)
+	areTestNetworksEnabled, err := accountsDB.GetTestNetworksEnabled()
+	if err != nil {
+		return err
+	}
+
+	networks, err := s.networkManager.Get(false)
 	if err != nil {
 		return err
 	}
@@ -495,6 +500,9 @@ func (s *Service) updateBalanceHistoryForAllEnabledNetworks(ctx context.Context)
 		s.triggerEvent(EventBalanceHistoryUpdateStarted, address, "")
 
 		for _, network := range networks {
+			if network.IsTest != areTestNetworksEnabled {
+				continue
+			}
 			tokensForChain, err := s.tokenManager.GetTokens(network.ChainID)
 			if err != nil {
 				tokensForChain = make([]*token.Token, 0)
