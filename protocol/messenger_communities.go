@@ -2104,7 +2104,7 @@ func (m *Messenger) findCommunityInfoFromDB(communityID string) (*communities.Co
 }
 
 func (m *Messenger) GetCommunityIDFromKey(communityKey string) string {
-	// Check if the key is a private key
+	// Check if the key is a private key. strip the 0x at the start
 	privateKey, err := crypto.HexToECDSA(communityKey[2:])
 	communityID := ""
 	if err != nil {
