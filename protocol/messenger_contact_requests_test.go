@@ -298,6 +298,16 @@ func (s *MessengerContactRequestSuite) retractContactRequest(contactID string, t
 	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestLocalState)
 	s.Require().Equal(ContactRequestStateNone, resp.Contacts[0].ContactRequestRemoteState)
 
+	// Check outgoing mutual state message
+	s.Require().Len(resp.Messages(), 1)
+	mutualStateUpdate := s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED)
+	s.Require().NotNil(mutualStateUpdate)
+
+	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+	s.Require().Equal(mutualStateUpdate.From, myID)
+	s.Require().Equal(mutualStateUpdate.ChatId, contactID)
+	s.Require().Equal(mutualStateUpdate.Text, fmt.Sprintf(outgoingMutualStateEventRemovedDefaultText, contactID))
+
 	// Wait for the message to reach its destination
 	resp, err = WaitOnMessengerResponse(
 		theirMessenger,
@@ -310,7 +320,6 @@ func (s *MessengerContactRequestSuite) retractContactRequest(contactID string, t
 	s.Require().NotNil(resp)
 	s.Require().Len(resp.Contacts, 1)
 
-	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 	s.Require().Equal(myID, resp.Contacts[0].ID)
 
 	s.Require().False(resp.Contacts[0].added())
@@ -322,6 +331,15 @@ func (s *MessengerContactRequestSuite) retractContactRequest(contactID string, t
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
 	s.Require().Equal(ActivityCenterNotificationTypeContactRemoved, resp.ActivityCenterNotifications()[0].Type)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, false)
+
+	// Check incoming mutual state message
+	s.Require().Len(resp.Messages(), 1)
+	mutualStateUpdate = s.findFirstByContentType(resp.Messages(), protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED)
+	s.Require().NotNil(mutualStateUpdate)
+
+	s.Require().Equal(mutualStateUpdate.From, myID)
+	s.Require().Equal(mutualStateUpdate.ChatId, myID)
+	s.Require().Equal(mutualStateUpdate.Text, fmt.Sprintf(incomingMutualStateEventRemovedDefaultText, myID))
 }
 
 func (s *MessengerContactRequestSuite) syncInstallationContactV2FromContact(contact *Contact) protobuf.SyncInstallationContactV2 {
