@@ -1060,6 +1060,11 @@ func replaceDBFile(dbPath string, newDBPath string) (cleanup func(), err error) 
 }
 
 func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s settings.Settings, keycardUID string, password string, newPassword string) error {
+	messenger := b.Messenger()
+	if messenger == nil {
+		return errors.New("cannot resolve messenger instance")
+	}
+
 	err := b.multiaccountsDB.UpdateAccountKeycardPairing(account.KeyUID, account.KeycardPairing)
 	if err != nil {
 		return err
@@ -1103,6 +1108,11 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 		return err
 	}
 
+	err = accountDB.SaveSettingField(settings.ProfileMigrationNeeded, false)
+	if err != nil {
+		return err
+	}
+
 	// This check is added due to mobile app cause it doesn't support a Keycard features as desktop app.
 	// We should remove the following line once mobile and desktop app align.
 	if len(keycardUID) > 0 {
@@ -1127,7 +1137,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 		for _, acc := range keypair.Accounts {
 			kc.AccountsAddresses = append(kc.AccountsAddresses, acc.Address)
 		}
-		err = accountDB.SaveOrUpdateKeycard(kc, uint64(time.Now().Unix()), true)
+		err = messenger.SaveOrUpdateKeycard(context.Background(), &kc)
 		if err != nil {
 			return err
 		}
@@ -1332,6 +1342,11 @@ func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccoun
 }
 
 func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPassword string, newPassword string) error {
+	messenger := b.Messenger()
+	if messenger == nil {
+		return errors.New("cannot resolve messenger instance")
+	}
+
 	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
 	accountInfo, err := b.accountManager.AccountsGenerator().ImportMnemonic(mnemonicNoExtraSpaces, "")
 	if err != nil {
@@ -1384,7 +1399,7 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 		return err
 	}
 
-	err = db.DeleteAllKeycardsWithKeyUID(accountInfo.KeyUID, uint64(time.Now().Unix()))
+	err = messenger.DeleteAllKeycardsWithKeyUID(context.Background(), accountInfo.KeyUID)
 	if err != nil {
 		return err
 	}
@@ -1400,6 +1415,11 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 	}
 
 	err = db.SaveSettingField(settings.KeycardPairing, "")
+	if err != nil {
+		return err
+	}
+
+	err = db.SaveSettingField(settings.ProfileMigrationNeeded, false)
 	if err != nil {
 		return err
 	}

@@ -29,6 +29,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/sqlite"
@@ -919,15 +920,9 @@ func TestConvertAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	backend.rootDataDir = rootDataDir
-	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
-	config.DataDir = rootDataDir
-	config.KeyStoreDir = keyStoreDir
+	require.NoError(t, backend.AccountManager().InitKeystore(keyStoreDir))
+	err = backend.OpenAccounts()
 	require.NoError(t, err)
-	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
-	require.NoError(t, backend.StartNode(config))
-	defer func() {
-		require.NoError(t, backend.StopNode())
-	}()
 
 	genAccInfo, err := backend.AccountManager().AccountsGenerator().ImportMnemonic(mnemonic, "")
 	assert.NoError(t, err)
@@ -943,9 +938,20 @@ func TestConvertAccount(t *testing.T) {
 	derivedAccounts, err := backend.AccountManager().AccountsGenerator().StoreDerivedAccounts(genAccInfo.ID, password, allGeneratedPaths)
 	assert.NoError(t, err)
 
+	chatKey := derivedAccounts[pathEIP1581Chat].PrivateKey[2:]
 	chatAddress := derivedAccounts[pathEIP1581Chat].Address
 	found = keystoreContainsFileForAccount(keyStoreDir, chatAddress)
 	require.True(t, found)
+
+	defaultSettings, err := defaultSettings(genAccInfo, derivedAccounts, nil)
+	require.NoError(t, err)
+	nodeConfig, err := defaultNodeConfig(defaultSettings.InstallationID, &requests.CreateAccount{
+		NetworkID: 1,
+		LogLevel:  defaultSettings.LogLevel,
+	})
+	require.NoError(t, err)
+	nodeConfig.DataDir = rootDataDir
+	nodeConfig.KeyStoreDir = keyStoreDir
 
 	profileKeypair := &accounts.Keypair{
 		KeyUID:      genAccInfo.KeyUID,
@@ -973,7 +979,7 @@ func TestConvertAccount(t *testing.T) {
 		if p == pathDefaultWalletAccount ||
 			p == customWalletPath1 ||
 			p == customWalletPath2 {
-			profileKeypair.Accounts = append(profileKeypair.Accounts, &accounts.Account{
+			wAcc := &accounts.Account{
 				Address: types.HexToAddress(dAccInfo.Address),
 				KeyUID:  genAccInfo.KeyUID,
 				Wallet:  false,
@@ -983,7 +989,11 @@ func TestConvertAccount(t *testing.T) {
 				Name:    "derivacc" + p,
 				Hidden:  false,
 				Removed: false,
-			})
+			}
+			if p == pathDefaultWalletAccount {
+				wAcc.Wallet = true
+			}
+			profileKeypair.Accounts = append(profileKeypair.Accounts, wAcc)
 		}
 	}
 
@@ -996,35 +1006,13 @@ func TestConvertAccount(t *testing.T) {
 	err = backend.ensureAppDBOpened(account, password)
 	require.NoError(t, err)
 
-	s := settings.Settings{
-		Address:           types.HexToAddress(masterAddress),
-		DisplayName:       "UserDisplayName",
-		CurrentNetwork:    "mainnet_rpc",
-		DappsAddress:      types.HexToAddress(derivedAccounts[pathDefaultWalletAccount].Address),
-		EIP1581Address:    types.HexToAddress(derivedAccounts[pathEIP1581Root].Address),
-		InstallationID:    "d3efcff6-cffa-560e-a547-21d3858cbc51",
-		KeyUID:            account.KeyUID,
-		LatestDerivedPath: 0,
-		Name:              "Jittery Cornflowerblue Kingbird",
-		Networks:          &networks,
-		PhotoPath:         "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
-		PreviewPrivacy:    false,
-		PublicKey:         accountInfo.PublicKey,
-		SigningPhrase:     "yurt joey vibe",
-		WalletRootAddress: types.HexToAddress(derivedAccounts[pathWalletRoot].Address),
-	}
-
-	err = backend.saveAccountsAndSettings(
-		s,
-		&params.NodeConfig{},
-		profileKeypair.Accounts)
+	err = backend.StartNodeWithAccountAndInitialConfig(account, password, *defaultSettings, nodeConfig, profileKeypair.Accounts)
 	require.NoError(t, err)
-
-	err = backend.OpenAccounts()
+	multiaccounts, err := backend.GetAccounts()
 	require.NoError(t, err)
-
-	err = backend.SaveAccount(account)
-	require.NoError(t, err)
+	require.NotEmpty(t, multiaccounts[0].ColorHash)
+	serverMessenger := backend.Messenger()
+	require.NotNil(t, serverMessenger)
 
 	files, err := ioutil.ReadDir(rootDataDir)
 	require.NoError(t, err)
@@ -1066,6 +1054,18 @@ func TestConvertAccount(t *testing.T) {
 		require.False(t, found)
 	}
 
+	require.NoError(t, backend.Logout())
+	require.NoError(t, backend.StopNode())
+
+	require.NoError(t, backend.AccountManager().InitKeystore(keyStoreDir))
+	require.NoError(t, backend.OpenAccounts())
+
+	require.NoError(t, backend.StartNodeWithKey(account, keycardPassword, chatKey, nodeConfig))
+	defer func() {
+		assert.NoError(t, backend.Logout())
+		assert.NoError(t, backend.StopNode())
+	}()
+
 	// Ensure we're able to open the DB
 	err = backend.ensureAppDBOpened(keycardAccount, keycardPassword)
 	require.NoError(t, err)
@@ -1078,9 +1078,6 @@ func TestConvertAccount(t *testing.T) {
 	keycards, err = db1.GetKeycardsWithSameKeyUID(genAccInfo.KeyUID)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(keycards))
-
-	b1 := NewGethStatusBackend()
-	require.NoError(t, b1.OpenAccounts())
 
 	// Converting to a regular account
 	err = backend.ConvertToRegularAccount(mnemonic, keycardPassword, password)
@@ -1111,9 +1108,6 @@ func TestConvertAccount(t *testing.T) {
 	keycards, err = db2.GetKeycardsWithSameKeyUID(genAccInfo.KeyUID)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(keycards))
-
-	b2 := NewGethStatusBackend()
-	require.NoError(t, b2.OpenAccounts())
 }
 
 func copyFile(srcFolder string, dstFolder string, fileName string, t *testing.T) {

@@ -3105,7 +3105,7 @@ func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, syn
 		return accounts.AccountOperable(syncAcc.Operable), nil
 	}
 
-	if syncKpMigratedToKeycard {
+	if syncKpMigratedToKeycard || m.account.KeyUID == syncAcc.KeyUid {
 		return accounts.AccountFullyOperable, nil
 	}
 
@@ -3232,6 +3232,40 @@ func (m *Messenger) handleSyncAccountsPositions(message *protobuf.SyncAccountsPo
 	}
 
 	return accs, nil
+}
+
+func (m *Messenger) handleProfileKeypairMigration(state *ReceivedMessageState, fromLocalPairing bool, message *protobuf.SyncKeypair) (handled bool, err error) {
+	if message == nil {
+		return false, errors.New("handleProfileKeypairMigration receive a nil message")
+	}
+
+	if fromLocalPairing {
+		return false, nil
+	}
+
+	if m.account.KeyUID != message.KeyUid {
+		return false, nil
+	}
+
+	dbKeypair, err := m.settings.GetKeypairByKeyUID(message.KeyUid)
+	if err != nil {
+		return false, err
+	}
+
+	if dbKeypair.Clock >= message.Clock {
+		return false, nil
+	}
+
+	migrationNeeded := dbKeypair.MigratedToKeycard() && len(message.Keycards) == 0 || // `true` if profile keypair was migrated to the app on one of paired devices
+		!dbKeypair.MigratedToKeycard() && len(message.Keycards) > 0 // `true` if profile keypair was migrated to a Keycard on one of paired devices
+	err = m.settings.SaveSettingField(settings.ProfileMigrationNeeded, migrationNeeded)
+	if err != nil {
+		return false, err
+	}
+
+	state.Response.AddSetting(&settings.SyncSettingField{SettingField: settings.ProfileMigrationNeeded, Value: migrationNeeded})
+
+	return migrationNeeded, nil
 }
 
 func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPairing bool, acNofificationCallback func() error) (*accounts.Keypair, error) {
@@ -3418,6 +3452,16 @@ func (m *Messenger) HandleSyncKeypair(state *ReceivedMessageState, message *prot
 }
 
 func (m *Messenger) handleSyncKeypairInternal(state *ReceivedMessageState, message *protobuf.SyncKeypair, fromLocalPairing bool) error {
+	// check for the profile keypair migration first on paired device
+	handled, err := m.handleProfileKeypairMigration(state, fromLocalPairing, message)
+	if err != nil {
+		return err
+	}
+
+	if handled {
+		return nil
+	}
+
 	kp, err := m.handleSyncKeypair(message, fromLocalPairing, func() error {
 		return m.addNewKeypairAddedOnPairedDeviceACNotification(message.KeyUid, state.Response)
 	})
