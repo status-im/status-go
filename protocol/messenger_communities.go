@@ -455,22 +455,22 @@ func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse,
 	if err != nil {
 		return nil, err
 	}
-	var backend *ethclient.Client
+	var ethClient *ethclient.Client
 	for _, n := range nodeConfig.Networks {
 		if n.ChainID == chainID {
-			b, err := ethclient.Dial(n.RPCURL)
+			e, err := ethclient.Dial(n.RPCURL)
 			if err != nil {
 				return nil, err
 			}
-			backend = b
+			ethClient = e
 		}
 	}
 
-	if backend == nil {
+	if ethClient == nil {
 		return nil, errors.New("failed to initialize backend before requesting curated communities")
 	}
 
-	directory, err := m.contractMaker.NewDirectoryWithBackend(chainID, backend)
+	directory, err := m.contractMaker.NewDirectoryWithBackend(chainID, ethClient)
 	if err != nil {
 		return nil, err
 	}
