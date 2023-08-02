@@ -396,7 +396,7 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 
 	// Increase unviewed count
 	if !common.IsPubKeyEqual(message.SigPubKey, &m.identity.PublicKey) {
-		m.updateUnviewedCounts(chat, message.Mentioned || message.Replied)
+		m.updateUnviewedCounts(chat, message)
 		message.OutgoingStatus = ""
 	} else {
 		// Our own message, mark as sent
@@ -2041,7 +2041,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 			}
 		}
 		if !skipUpdateUnviewedCountForAlbums {
-			m.updateUnviewedCounts(chat, receivedMessage.Mentioned || receivedMessage.Replied)
+			m.updateUnviewedCounts(chat, receivedMessage)
 		}
 	}
 
@@ -2992,9 +2992,11 @@ func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, er
 	return contact.added(), nil
 }
 
-func (m *Messenger) updateUnviewedCounts(chat *Chat, mentionedOrReplied bool) {
-	chat.UnviewedMessagesCount++
-	if mentionedOrReplied {
+func (m *Messenger) updateUnviewedCounts(chat *Chat, message *common.Message) {
+	if message.Timestamp > chat.LastMessage.Timestamp+1000*60*2 {
+		chat.UnviewedMessagesCount += 1
+	}
+	if message.Mentioned || message.Replied {
 		chat.UnviewedMentionsCount++
 	}
 }
