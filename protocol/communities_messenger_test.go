@@ -380,9 +380,8 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	s.Require().Len(response.RemovedChats(), 3)
 }
 
-func (s *MessengerCommunitiesSuite) createCommunity() *communities.Community {
-	community, _ := createCommunity(&s.Suite, s.admin)
-	return community
+func (s *MessengerCommunitiesSuite) createCommunity() (*communities.Community, *Chat) {
+	return createCommunity(&s.Suite, s.admin)
 }
 
 func (s *MessengerCommunitiesSuite) advertiseCommunityTo(community *communities.Community, user *Messenger) {
@@ -404,7 +403,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
 	s.Require().NoError(err)
 
 	// create community and make bob and alice join to it
-	community := s.createCommunity()
+	community, _ := s.createCommunity()
 	s.advertiseCommunityTo(community, s.bob)
 	s.advertiseCommunityTo(community, s.alice)
 
@@ -437,152 +436,27 @@ func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
 	s.Require().NoError(err)
 }
 
-func (s *MessengerCommunitiesSuite) TestInviteUsersToCommunity() {
-	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		Name:        "status",
-		Color:       "#ffffff",
-		Description: "status community description",
-	}
-
-	// Create an community chat
-	response, err := s.bob.CreateCommunity(description, true)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().True(response.Communities()[0].HasMember(&s.bob.identity.PublicKey))
-	s.Require().True(response.Communities()[0].IsMemberOwner(&s.bob.identity.PublicKey))
-
-	community := response.Communities()[0]
-
-	response, err = s.bob.InviteUsersToCommunity(
-		&requests.InviteUsersToCommunity{
-			CommunityID: community.ID(),
-			Users:       []types.HexBytes{common.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
-		},
-	)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-
-	community = response.Communities()[0]
-	s.Require().True(community.HasMember(&s.alice.identity.PublicKey))
-
-	// Pull message and make sure org is received
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-		return nil
-	})
-
-	s.Require().NoError(err)
-	communities, err := s.alice.Communities()
-	s.Require().NoError(err)
-	s.Require().Len(communities, 2)
-	s.Require().Len(response.Communities(), 1)
-
-	community = response.Communities()[0]
-	s.Require().True(community.HasMember(&s.alice.identity.PublicKey))
-}
-
 func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
-	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_INVITATION_ONLY,
-		Name:        "status",
-		Color:       "#ffffff",
-		Description: "status community description",
-	}
+	community, chat := s.createCommunity()
 
-	// Create an community chat
-	response, err := s.bob.CreateCommunity(description, true)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Communities()[0].Chats(), 1)
-	s.Require().Len(response.Chats(), 1)
-
-	community := response.Communities()[0]
-
-	// Create chat
-	orgChat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		},
-		Identity: &protobuf.ChatIdentity{
-			DisplayName: "status-core",
-			Description: "status-core community chat",
-		},
-	}
-
-	response, err = s.bob.CreateCommunityChat(community.ID(), orgChat)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Communities()[0].Chats(), 2)
-	s.Require().Len(response.Chats(), 1)
-
-	response, err = s.bob.InviteUsersToCommunity(
-		&requests.InviteUsersToCommunity{
-			CommunityID: community.ID(),
-			Users:       []types.HexBytes{common.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
-		},
-	)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-
-	community = response.Communities()[0]
-	s.Require().True(community.HasMember(&s.alice.identity.PublicKey))
-
-	// Pull message and make sure org is received
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-		return nil
-	})
-
-	s.Require().NoError(err)
-	communities, err := s.alice.Communities()
-	s.Require().NoError(err)
-	s.Require().Len(communities, 2)
-	s.Require().Len(response.Communities(), 1)
-
-	communityID := response.Communities()[0].ID()
-	s.Require().Equal(communityID, community.ID())
+	s.advertiseCommunityTo(community, s.alice)
+	s.joinCommunity(community, s.alice)
 
 	ctx := context.Background()
 
-	// We join the org
-	response, err = s.alice.JoinCommunity(ctx, community.ID(), false)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Communities()[0].Chats(), 2)
-	s.Require().True(response.Communities()[0].Joined())
-	s.Require().Len(response.Chats(), 2)
-
-	chatID := response.Chats()[1].ID
+	chatID := chat.ID
 	inputMessage := &common.Message{}
 	inputMessage.ChatId = chatID
 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = "some text"
 
-	_, err = s.alice.SendChatMessage(ctx, inputMessage)
+	_, err := s.alice.SendChatMessage(ctx, inputMessage)
 	s.Require().NoError(err)
 
+	var response *MessengerResponse
 	// Pull message and make sure org is received
 	err = tt.RetryWithBackOff(func() error {
-		response, err = s.bob.RetrieveAll()
+		response, err = s.admin.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -613,27 +487,7 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 	ctx := context.Background()
 
-	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		Name:        "status",
-		Color:       "#ffffff",
-		Description: "status community description",
-	}
-
-	// Create an community chat
-	response, err := s.bob.CreateCommunity(description, true)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.CommunitiesSettings(), 1)
-	s.Require().True(response.Communities()[0].Joined())
-	s.Require().True(response.Communities()[0].IsControlNode())
-
-	community := response.Communities()[0]
-	communitySettings := response.CommunitiesSettings()[0]
-
-	s.Require().Equal(communitySettings.CommunityID, community.IDString())
-	s.Require().Equal(communitySettings.HistoryArchiveSupportEnabled, false)
+	community, _ := s.createCommunity()
 
 	category := &requests.CreateCommunityCategory{
 		CommunityID:  community.ID(),
@@ -641,27 +495,19 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 		ChatIDs:      []string{},
 	}
 
-	response, err = s.bob.CreateCommunityCategory(category)
+	response, err := s.admin.CreateCommunityCategory(category)
 	s.Require().NoError(err)
 	community = response.Communities()[0]
 
-	privateKey, err := s.bob.ExportCommunity(community.ID())
+	privateKey, err := s.admin.ExportCommunity(community.ID())
 	s.Require().NoError(err)
 
 	_, err = s.alice.ImportCommunity(ctx, privateKey)
 	s.Require().NoError(err)
 
-	// Invite user on bob side
-	newUser, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	_, err = s.bob.InviteUsersToCommunity(
-		&requests.InviteUsersToCommunity{
-			CommunityID: community.ID(),
-			Users:       []types.HexBytes{common.PubkeyToHexBytes(&newUser.PublicKey)},
-		},
-	)
-	s.Require().NoError(err)
+	// Invite user on admin side
+	s.advertiseCommunityTo(community, s.bob)
+	s.joinCommunity(community, s.bob)
 
 	// Pull message and make sure org is received
 	err = tt.RetryWithBackOff(func() error {
@@ -2083,7 +1929,7 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 }
 
 func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
-	community := s.createCommunity()
+	community, _ := s.createCommunity()
 	s.advertiseCommunityTo(community, s.alice)
 	s.advertiseCommunityTo(community, s.bob)
 
@@ -2224,35 +2070,12 @@ func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 }
 
 func (s *MessengerCommunitiesSuite) TestBanUser() {
-	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		Name:        "status",
-		Color:       "#ffffff",
-		Description: "status community description",
-	}
+	community, _ := s.createCommunity()
 
-	// Create an community chat
-	response, err := s.bob.CreateCommunity(description, true)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
+	s.advertiseCommunityTo(community, s.alice)
+	s.joinCommunity(community, s.alice)
 
-	community := response.Communities()[0]
-
-	response, err = s.bob.InviteUsersToCommunity(
-		&requests.InviteUsersToCommunity{
-			CommunityID: community.ID(),
-			Users:       []types.HexBytes{common.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
-		},
-	)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-
-	community = response.Communities()[0]
-	s.Require().True(community.HasMember(&s.alice.identity.PublicKey))
-
-	response, err = s.bob.BanUserFromCommunity(
+	response, err := s.admin.BanUserFromCommunity(
 		&requests.BanUserFromCommunity{
 			CommunityID: community.ID(),
 			User:        common.PubkeyToHexBytes(&s.alice.identity.PublicKey),
@@ -2266,7 +2089,7 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
 	s.Require().True(community.IsBanned(&s.alice.identity.PublicKey))
 
-	response, err = s.bob.UnbanUserFromCommunity(
+	response, err = s.admin.UnbanUserFromCommunity(
 		&requests.UnbanUserFromCommunity{
 			CommunityID: community.ID(),
 			User:        common.PubkeyToHexBytes(&s.alice.identity.PublicKey),
@@ -3211,36 +3034,13 @@ func (s *MessengerCommunitiesSuite) TestExtractDiscordChannelsAndCategories_With
 	s.Require().Len(errs, 1)
 }
 
-func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequesToJoin() {
-	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		Name:        "status",
-		Color:       "#ffffff",
-		Description: "status community description",
-	}
+func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
+	community, _ := s.createCommunity()
 
-	// Create an community chat
-	response, err := s.bob.CreateCommunity(description, true)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
+	s.advertiseCommunityTo(community, s.alice)
+	s.joinCommunity(community, s.alice)
 
-	community := response.Communities()[0]
-
-	response, err = s.bob.InviteUsersToCommunity(
-		&requests.InviteUsersToCommunity{
-			CommunityID: community.ID(),
-			Users:       []types.HexBytes{common.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
-		},
-	)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-
-	community = response.Communities()[0]
-	s.Require().True(community.HasMember(&s.alice.identity.PublicKey))
-
-	response, err = s.bob.BanUserFromCommunity(
+	response, err := s.admin.BanUserFromCommunity(
 		&requests.BanUserFromCommunity{
 			CommunityID: community.ID(),
 			User:        common.PubkeyToHexBytes(&s.alice.identity.PublicKey),
@@ -3282,98 +3082,21 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequesToJoin() {
 
 	s.Require().NoError(err)
 
-	messageState := s.bob.buildMessageState()
+	messageState := s.admin.buildMessageState()
 
-	err = s.bob.HandleCommunityRequestToJoin(messageState, &s.alice.identity.PublicKey, *requestToJoinProto)
+	err = s.admin.HandleCommunityRequestToJoin(messageState, &s.alice.identity.PublicKey, *requestToJoinProto)
 
 	s.Require().ErrorContains(err, "can't request access")
 }
 
 func (s *MessengerCommunitiesSuite) TestHandleImport() {
-	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_INVITATION_ONLY,
-		Name:        "status",
-		Color:       "#ffffff",
-		Description: "status community description",
-	}
+	community, chat := s.createCommunity()
 
-	// Create a community
-	response, err := s.bob.CreateCommunity(description, true)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Communities()[0].Chats(), 1)
-	s.Require().Len(response.Chats(), 1)
-
-	community := response.Communities()[0]
-
-	// Create chat
-	orgChat := &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		},
-		Identity: &protobuf.ChatIdentity{
-			DisplayName: "status-core",
-			Description: "status-core community chat",
-		},
-	}
-	response, err = s.bob.CreateCommunityChat(community.ID(), orgChat)
-
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Communities()[0].Chats(), 2)
-	s.Require().Len(response.Chats(), 1)
-
-	response, err = s.bob.InviteUsersToCommunity(
-		&requests.InviteUsersToCommunity{
-			CommunityID: community.ID(),
-			Users:       []types.HexBytes{common.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
-		},
-	)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-
-	community = response.Communities()[0]
-	s.Require().True(community.HasMember(&s.alice.identity.PublicKey))
-
-	// Pull message and make sure org is received
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-		return nil
-	})
-
-	s.Require().NoError(err)
-	communities, err := s.alice.Communities()
-	s.Require().NoError(err)
-	s.Require().Len(communities, 2)
-	s.Require().Len(response.Communities(), 1)
-
-	communityID := response.Communities()[0].ID()
-	s.Require().Equal(communityID, community.ID())
-
-	ctx := context.Background()
-
-	// We join the org
-	response, err = s.alice.JoinCommunity(ctx, community.ID(), false)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().Len(response.Communities()[0].Chats(), 2)
-	s.Require().True(response.Communities()[0].Joined())
-	s.Require().Len(response.Chats(), 2)
-
-	chatID := response.Chats()[1].ID
+	s.advertiseCommunityTo(community, s.alice)
+	s.joinCommunity(community, s.alice)
 
 	// Check that there are no messages in the chat at first
-	chat, err := s.alice.persistence.Chat(chatID)
+	chat, err := s.alice.persistence.Chat(chat.ID)
 	s.Require().NoError(err)
 	s.Require().NotNil(chat)
 	s.Require().Equal(0, int(chat.UnviewedMessagesCount))
@@ -3381,7 +3104,7 @@ func (s *MessengerCommunitiesSuite) TestHandleImport() {
 	// Create an message that will be imported
 	testMessage := protobuf.ChatMessage{
 		Text:        "abc123",
-		ChatId:      chatID,
+		ChatId:      chat.ID,
 		ContentType: protobuf.ChatMessage_TEXT_PLAIN,
 		MessageType: protobuf.MessageType_COMMUNITY_CHAT,
 		Clock:       1,
@@ -3392,15 +3115,15 @@ func (s *MessengerCommunitiesSuite) TestHandleImport() {
 	wrappedPayload, err := v1protocol.WrapMessageV1(
 		encodedPayload,
 		protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
-		s.bob.identity,
+		s.admin.identity,
 	)
 	s.Require().NoError(err)
 
 	message := &types.Message{}
-	message.Sig = crypto.FromECDSAPub(&s.bob.identity.PublicKey)
+	message.Sig = crypto.FromECDSAPub(&s.admin.identity.PublicKey)
 	message.Payload = wrappedPayload
 
-	filter := s.alice.transport.FilterByChatID(chatID)
+	filter := s.alice.transport.FilterByChatID(chat.ID)
 	importedMessages := make(map[transport.Filter][]*types.Message, 0)
 
 	importedMessages[*filter] = append(importedMessages[*filter], message)
@@ -3410,7 +3133,7 @@ func (s *MessengerCommunitiesSuite) TestHandleImport() {
 	s.Require().NoError(err)
 
 	// Get the chat again and see that there is still no unread message because we don't count import messages
-	chat, err = s.alice.persistence.Chat(chatID)
+	chat, err = s.alice.persistence.Chat(chat.ID)
 	s.Require().NoError(err)
 	s.Require().NotNil(chat)
 	s.Require().Equal(0, int(chat.UnviewedMessagesCount))

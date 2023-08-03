@@ -1158,33 +1158,6 @@ func (m *Messenger) HandlePairInstallation(state *ReceivedMessageState, message 
 	return nil
 }
 
-// HandleCommunityInvitation handles an community invitation
-func (m *Messenger) HandleCommunityInvitation(state *ReceivedMessageState, signer *ecdsa.PublicKey, invitation protobuf.CommunityInvitation, rawPayload []byte) error {
-	if invitation.PublicKey == nil {
-		return errors.New("invalid pubkey")
-	}
-	pk, err := crypto.DecompressPubkey(invitation.PublicKey)
-	if err != nil {
-		return err
-	}
-
-	if !common.IsPubKeyEqual(pk, &m.identity.PublicKey) {
-		return errors.New("invitation not for us")
-	}
-
-	communityResponse, err := m.communitiesManager.HandleCommunityInvitation(signer, &invitation, rawPayload)
-	if err != nil {
-		return err
-	}
-
-	community := communityResponse.Community
-
-	state.Response.AddCommunity(community)
-	state.Response.CommunityChanges = append(state.Response.CommunityChanges, communityResponse.Changes)
-
-	return nil
-}
-
 func (m *Messenger) HandleHistoryArchiveMagnetlinkMessage(state *ReceivedMessageState, communityPubKey *ecdsa.PublicKey, magnetlink string, clock uint64) error {
 	id := types.HexBytes(crypto.CompressPubkey(communityPubKey))
 
