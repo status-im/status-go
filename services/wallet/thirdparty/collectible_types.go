@@ -52,6 +52,19 @@ func GroupCollectibleUIDsByChainID(uids []CollectibleUniqueID) map[w_common.Chai
 	return ret
 }
 
+func GroupContractIDsByChainID(ids []ContractID) map[w_common.ChainID][]ContractID {
+	ret := make(map[w_common.ChainID][]ContractID)
+
+	for _, id := range ids {
+		if _, ok := ret[id.ChainID]; !ok {
+			ret[id.ChainID] = make([]ContractID, 0, len(ids))
+		}
+		ret[id.ChainID] = append(ret[id.ChainID], id)
+	}
+
+	return ret
+}
+
 type CollectionTrait struct {
 	Min float64 `json:"min"`
 	Max float64 `json:"max"`
@@ -153,4 +166,10 @@ type CollectibleAccountOwnershipProvider interface {
 	CollectibleProvider
 	FetchAllAssetsByOwner(chainID w_common.ChainID, owner common.Address, cursor string, limit int) (*FullCollectibleDataContainer, error)
 	FetchAllAssetsByOwnerAndContractAddress(chainID w_common.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*FullCollectibleDataContainer, error)
+}
+
+type CollectibleDataProvider interface {
+	CollectibleProvider
+	FetchAssetsByCollectibleUniqueID(uniqueIDs []CollectibleUniqueID) ([]FullCollectibleData, error)
+	FetchCollectionsDataByContractID(ids []ContractID) ([]CollectionData, error)
 }

@@ -119,6 +119,40 @@ func (o *Client) FetchAllCollectionsByOwner(chainID walletCommon.ChainID, owner 
 	return collections, nil
 }
 
+func (o *Client) FetchCollectionsDataByContractID(ids []thirdparty.ContractID) ([]thirdparty.CollectionData, error) {
+	ret := make([]thirdparty.CollectionData, 0, len(ids))
+
+	for _, id := range ids {
+		path := fmt.Sprintf("asset_contract/%s", id.Address.String())
+		url, err := o.urlGetter(id.ChainID, path)
+		if err != nil {
+			return nil, err
+		}
+
+		body, err := o.client.doGetRequest(url, o.apiKey)
+		if err != nil {
+			o.connectionStatus.SetIsConnected(false)
+			return nil, err
+		}
+		o.connectionStatus.SetIsConnected(true)
+
+		// if Json is not returned there must be an error
+		if !json.Valid(body) {
+			return nil, fmt.Errorf("invalid json: %s", string(body))
+		}
+
+		var tmp AssetContract
+		err = json.Unmarshal(body, &tmp)
+		if err != nil {
+			return nil, err
+		}
+
+		ret = append(ret, tmp.Collection.toCollectionData(id))
+	}
+
+	return ret, nil
+}
+
 func (o *Client) FetchAllAssetsByOwnerAndCollection(chainID walletCommon.ChainID, owner common.Address, collectionSlug string, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
 	queryParams := url.Values{
 		"owner":      {owner.String()},

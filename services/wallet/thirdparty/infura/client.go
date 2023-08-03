@@ -217,7 +217,7 @@ func (o *Client) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.Collect
 	return ret, nil
 }
 
-func (o *Client) FetchCollectionDataByContractID(contractIDs []thirdparty.ContractID) ([]thirdparty.CollectionData, error) {
+func (o *Client) FetchCollectionsDataByContractID(contractIDs []thirdparty.ContractID) ([]thirdparty.CollectionData, error) {
 	ret := make([]thirdparty.CollectionData, 0, len(contractIDs))
 
 	for _, id := range contractIDs {

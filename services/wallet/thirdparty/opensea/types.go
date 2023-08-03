@@ -126,6 +126,10 @@ type OwnedCollection struct {
 	OwnedAssetCount *bigint.BigInt `json:"owned_asset_count"`
 }
 
+type AssetContract struct {
+	Collection Collection `json:"collection"`
+}
+
 func (c *Asset) id() thirdparty.CollectibleUniqueID {
 	return thirdparty.CollectibleUniqueID{
 		ContractID: thirdparty.ContractID{
@@ -152,15 +156,15 @@ func openseaToCollectibleTraits(traits []Trait) []thirdparty.CollectibleTrait {
 	return ret
 }
 
-func (c *Asset) toCollectionData() thirdparty.CollectionData {
+func (c *Collection) toCollectionData(id thirdparty.ContractID) thirdparty.CollectionData {
 	ret := thirdparty.CollectionData{
-		ID:       c.id().ContractID,
-		Name:     c.Collection.Name,
-		Slug:     c.Collection.Slug,
-		ImageURL: c.Collection.ImageURL,
+		ID:       id,
+		Name:     c.Name,
+		Slug:     c.Slug,
+		ImageURL: c.ImageURL,
 		Traits:   make(map[string]thirdparty.CollectionTrait),
 	}
-	for traitType, trait := range c.Collection.Traits {
+	for traitType, trait := range c.Traits {
 		ret.Traits[traitType] = thirdparty.CollectionTrait{
 			Min: trait.Min,
 			Max: trait.Max,
@@ -184,7 +188,7 @@ func (c *Asset) toCollectiblesData() thirdparty.CollectibleData {
 }
 
 func (c *Asset) toCommon() thirdparty.FullCollectibleData {
-	collection := c.toCollectionData()
+	collection := c.Collection.toCollectionData(c.id().ContractID)
 	return thirdparty.FullCollectibleData{
 		CollectibleData: c.toCollectiblesData(),
 		CollectionData:  &collection,
