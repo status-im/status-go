@@ -86,7 +86,7 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 	return message, nil
 }
 
-func (m *Messenger) acceptContactRequest(ctx context.Context, requestID string, syncing bool) (*MessengerResponse, error) {
+func (m *Messenger) acceptContactRequest(ctx context.Context, requestID string, fromSyncing bool) (*MessengerResponse, error) {
 	contactRequest, err := m.persistence.MessageByID(requestID)
 	if err != nil {
 		m.logger.Error("could not find contact request message", zap.Error(err))
@@ -95,7 +95,7 @@ func (m *Messenger) acceptContactRequest(ctx context.Context, requestID string, 
 
 	m.logger.Info("acceptContactRequest")
 
-	response, err := m.addContact(ctx, contactRequest.From, "", "", "", contactRequest.ID, "", syncing, false, false)
+	response, err := m.addContact(ctx, contactRequest.From, "", "", "", contactRequest.ID, "", fromSyncing, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func (m *Messenger) AcceptContactRequest(ctx context.Context, request *requests.
 	return response, nil
 }
 
-func (m *Messenger) declineContactRequest(requestID string, syncing bool) (*MessengerResponse, error) {
+func (m *Messenger) declineContactRequest(requestID string, fromSyncing bool) (*MessengerResponse, error) {
 	m.logger.Info("declineContactRequest")
 	contactRequest, err := m.persistence.MessageByID(requestID)
 	if err != nil {
@@ -153,7 +153,7 @@ func (m *Messenger) declineContactRequest(requestID string, syncing bool) (*Mess
 
 	response := &MessengerResponse{}
 
-	if !syncing {
+	if !fromSyncing {
 		_, clock, err := m.getOneToOneAndNextClock(contact)
 		if err != nil {
 			return nil, err
@@ -334,7 +334,7 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 	return response, nil
 }
 
-func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, displayName, contactRequestID string, contactRequestText string, syncing bool, sendContactUpdate bool, createOutgoingContactRequestNotification bool) (*MessengerResponse, error) {
+func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, displayName, contactRequestID string, contactRequestText string, fromSyncing bool, sendContactUpdate bool, createOutgoingContactRequestNotification bool) (*MessengerResponse, error) {
 	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: pubKey})
 	if err != nil {
 		return nil, err
@@ -368,7 +368,7 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 	contact.LastUpdatedLocally = clock
 	contact.ContactRequestSent(clock)
 
-	if !syncing {
+	if !fromSyncing {
 		// We sync the contact with the other devices
 		err := m.syncContact(context.Background(), contact, m.dispatchMessage)
 		if err != nil {
@@ -792,7 +792,7 @@ func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNic
 	return response, nil
 }
 
-func (m *Messenger) blockContact(response *MessengerResponse, contactID string, isDesktopFunc bool, syncing bool) error {
+func (m *Messenger) blockContact(response *MessengerResponse, contactID string, isDesktopFunc bool, fromSyncing bool) error {
 	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: contactID})
 	if err != nil {
 		return err
@@ -826,7 +826,7 @@ func (m *Messenger) blockContact(response *MessengerResponse, contactID string, 
 		m.allChats.Delete(buildProfileChatID(contact.ID))
 	}
 
-	if !syncing {
+	if !fromSyncing {
 		err = m.sendRetractContactRequest(contact)
 		if err != nil {
 			return err
@@ -859,10 +859,10 @@ func (m *Messenger) blockContact(response *MessengerResponse, contactID string, 
 	return nil
 }
 
-func (m *Messenger) BlockContact(contactID string, syncing bool) (*MessengerResponse, error) {
+func (m *Messenger) BlockContact(contactID string, fromSyncing bool) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
-	err := m.blockContact(response, contactID, false, syncing)
+	err := m.blockContact(response, contactID, false, fromSyncing)
 	if err != nil {
 		return nil, err
 	}
@@ -877,7 +877,7 @@ func (m *Messenger) BlockContact(contactID string, syncing bool) (*MessengerResp
 	//		 This would make the solution more reliable even in case AC notification sync is not recevied.
 	//		 This should be considered separately, I'm not sure if that's safe.
 	//		 https://github.com/status-im/status-go/issues/3720
-	if !syncing {
+	if !fromSyncing {
 		notifications, err := m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID, m.getCurrentTimeInMillis())
 		if err != nil {
 			return nil, err
