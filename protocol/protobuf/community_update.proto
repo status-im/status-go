@@ -17,6 +17,7 @@ message CommunityEvent {
   map<string,CommunityMember> membersAdded = 8;
   map<string,CommunityRequestToJoin> rejectedRequestsToJoin = 9;
   map<string,CommunityRequestToJoin> acceptedRequestsToJoin = 10;
+  CommunityTokenMetadata token_metadata = 11;
   
   enum EventType {
     UNKNOWN = 0;
@@ -36,6 +37,7 @@ message CommunityEvent {
     COMMUNITY_MEMBER_KICK = 14;
     COMMUNITY_MEMBER_BAN = 15;
     COMMUNITY_MEMBER_UNBAN = 16;
+    COMMUNITY_TOKEN_ADD = 17;
   }
 }
 

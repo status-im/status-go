@@ -22,6 +22,7 @@ type CommunityEvent struct {
 	MembersAdded           map[string]*protobuf.CommunityMember        `json:"membersAdded,omitempty"`
 	RejectedRequestsToJoin map[string]*protobuf.CommunityRequestToJoin `json:"rejectedRequestsToJoin,omitempty"`
 	AcceptedRequestsToJoin map[string]*protobuf.CommunityRequestToJoin `json:"acceptedRequestsToJoin,omitempty"`
+	TokenMetadata          *protobuf.CommunityTokenMetadata            `json:"tokenMetadata,omitempty"`
 	RawPayload             []byte                                      `json:"rawPayload"`
 }
 
@@ -37,6 +38,7 @@ func (e *CommunityEvent) ToProtobuf() *protobuf.CommunityEvent {
 		MembersAdded:           e.MembersAdded,
 		RejectedRequestsToJoin: e.RejectedRequestsToJoin,
 		AcceptedRequestsToJoin: e.AcceptedRequestsToJoin,
+		TokenMetadata:          e.TokenMetadata,
 	}
 }
 
@@ -59,6 +61,7 @@ func CommunityEventFromProtobuf(raw []byte) (*CommunityEvent, error) {
 		MembersAdded:           decodedEvent.MembersAdded,
 		RejectedRequestsToJoin: decodedEvent.RejectedRequestsToJoin,
 		AcceptedRequestsToJoin: decodedEvent.AcceptedRequestsToJoin,
+		TokenMetadata:          decodedEvent.TokenMetadata,
 		RawPayload:             encodedEvent,
 	}, nil
 }
@@ -211,6 +214,11 @@ func validateCommunityEvent(communityEvent *CommunityEvent) error {
 	case protobuf.CommunityEvent_COMMUNITY_MEMBER_UNBAN:
 		if len(communityEvent.MemberToAction) == 0 {
 			return errors.New("invalid community member unban event")
+		}
+
+	case protobuf.CommunityEvent_COMMUNITY_TOKEN_ADD:
+		if communityEvent.TokenMetadata == nil || len(communityEvent.TokenMetadata.ContractAddresses) == 0 {
+			return errors.New("invalid add community token event")
 		}
 	}
 	return nil

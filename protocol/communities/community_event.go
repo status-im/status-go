@@ -173,6 +173,14 @@ func (o *Community) ToCommunityRequestToJoinRejectCommunityEvent(changes *Commun
 	}
 }
 
+func (o *Community) ToAddTokenMetadataCommunityEvent(tokenMetadata *protobuf.CommunityTokenMetadata) *CommunityEvent {
+	return &CommunityEvent{
+		CommunityEventClock: o.NewCommunityEventClock(),
+		Type:                protobuf.CommunityEvent_COMMUNITY_TOKEN_ADD,
+		TokenMetadata:       tokenMetadata,
+	}
+}
+
 func (o *Community) UpdateCommunityByEvents(communityEventMessage *CommunityEventsMessage) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
@@ -364,6 +372,9 @@ func (o *Community) updateCommunityDescriptionByCommunityEvent(communityEvent Co
 			return err
 		}
 		o.unbanUserFromCommunity(pk)
+
+	case protobuf.CommunityEvent_COMMUNITY_TOKEN_ADD:
+		o.config.CommunityDescription.CommunityTokensMetadata = append(o.config.CommunityDescription.CommunityTokensMetadata, communityEvent.TokenMetadata)
 	}
 	return nil
 }

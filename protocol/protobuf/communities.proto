@@ -70,6 +70,7 @@ message CommunityTokenPermission {
     BECOME_MEMBER = 2;
     CAN_VIEW_CHANNEL = 3;
     CAN_VIEW_AND_POST_CHANNEL = 4;
+    BECOME_TOKEN_MASTER = 5;
   }
 
   string id = 1;

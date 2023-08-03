@@ -264,14 +264,9 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerPinMessage() {
 	testEventSenderPinMessage(s, community)
 }
 
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerMintToken() {
-	setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)
-	// TODO owner test: Mint Tokens (rescticted)
-}
-
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAirdropTokens() {
-	setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)
-	// TODO owner test: Airdrop Tokens (restricted)
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAddCommunityToken() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)
+	testEventSenderAddedCommunityToken(s, community)
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestMemberReceiveOwnerEventsWhenControlNodeOffline() {
