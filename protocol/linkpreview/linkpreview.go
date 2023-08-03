@@ -249,7 +249,6 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 	default:
 		return preview, fmt.Errorf("unexpected oembed type: %v", oembedResponse.Type)
 	}
-	return preview, nil
 }
 
 type OpenGraphMetadata struct {
