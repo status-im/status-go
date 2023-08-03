@@ -162,19 +162,35 @@ func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
 	return oembedURL, nil
 }
 
-func handlePhotoOembedType(preview *common.LinkPreview, response OEmbedBaseResponse) {
+func (u OEmbedUnfurler) handlePhotoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
+	if response.URL != "" {
+		t, err := fetchThumbnail(u.logger, u.httpClient, response.URL)
+		if err != nil {
+			// Given we want to fetch thumbnails on a best-effort basis, if an error
+			// happens we simply log it.
+			u.logger.Info("failed to fetch thumbnail", zap.String("url", u.url.String()), zap.Error(err))
+		} else {
+			preview.Thumbnail = t
+		}
+	}
 	preview.Thumbnail.URL = response.URL
+	preview.Thumbnail.Height = response.Height
+	preview.Thumbnail.Width = response.Height
+	return preview
 }
 
-func handleVideoOembedType(preview *common.LinkPreview, response OEmbedBaseResponse) {
+func handleVideoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
 	preview.Thumbnail.URL = response.ThumbnailURL
 	preview.Thumbnail.Height = response.ThumbnailHeight
+	preview.Thumbnail.Width = response.Width
+	return preview
 }
 
-func handleRichOembedType(preview *common.LinkPreview, response OEmbedBaseResponse) {
+func handleRichOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
 	preview.Thumbnail.Width = response.Width
 	preview.Thumbnail.Height = response.Height
 	preview.Thumbnail.URL = response.ThumbnailURL
+	return preview
 }
 
 func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
@@ -208,18 +224,17 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 
 	switch oembedResponse.Type {
 	case "photo":
-		handlePhotoOembedType(&preview, oembedResponse)
+		return u.handlePhotoOembedType(preview, oembedResponse), nil
 
 	case "video":
-		handleVideoOembedType(&preview, oembedResponse)
+		return handleVideoOembedType(preview, oembedResponse), nil
 
 	case "rich":
-		handleRichOembedType(&preview, oembedResponse)
+		return handleRichOembedType(preview, oembedResponse), nil
 
 	default:
 		return preview, fmt.Errorf("unexpected oembed type: %v", oembedResponse.Type)
 	}
-	return preview, nil
 }
 
 type OpenGraphMetadata struct {
