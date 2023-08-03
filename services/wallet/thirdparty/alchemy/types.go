@@ -95,6 +95,10 @@ type Contract struct {
 	OpenSeaMetadata OpenSeaMetadata `json:"openSeaMetadata"`
 }
 
+type ContractList struct {
+	Contracts []Contract `json:"contracts"`
+}
+
 type Image struct {
 	ImageURL             string `json:"pngUrl"`
 	CachedAnimationURL   string `json:"cachedUrl"`
@@ -111,10 +115,27 @@ type Asset struct {
 	TokenURI    string         `json:"tokenUri"`
 }
 
-type NFTList struct {
+type OwnedNFTList struct {
 	OwnedNFTs  []Asset        `json:"ownedNfts"`
 	TotalCount *bigint.BigInt `json:"totalCount"`
 	PageKey    string         `json:"pageKey"`
+}
+
+type NFTList struct {
+	NFTs []Asset `json:"nfts"`
+}
+
+type BatchContractAddresses struct {
+	Addresses []common.Address `json:"contractAddresses"`
+}
+
+type BatchTokenIDs struct {
+	IDs []TokenID `json:"tokens"`
+}
+
+type TokenID struct {
+	ContractAddress common.Address `json:"contractAddress"`
+	TokenID         *bigint.BigInt `json:"tokenId"`
 }
 
 func alchemyToCollectibleTraits(attributes []Attribute) []thirdparty.CollectibleTrait {
@@ -131,11 +152,11 @@ func alchemyToCollectibleTraits(attributes []Attribute) []thirdparty.Collectible
 	return ret
 }
 
-func (c *Asset) toCollectionData(id thirdparty.ContractID) thirdparty.CollectionData {
+func (c *Contract) toCollectionData(id thirdparty.ContractID) thirdparty.CollectionData {
 	ret := thirdparty.CollectionData{
 		ID:       id,
-		Name:     c.Contract.Name,
-		ImageURL: c.Contract.OpenSeaMetadata.ImageURL,
+		Name:     c.Name,
+		ImageURL: c.OpenSeaMetadata.ImageURL,
 	}
 	return ret
 }
@@ -152,16 +173,16 @@ func (c *Asset) toCollectiblesData(id thirdparty.CollectibleUniqueID) thirdparty
 }
 
 func (c *Asset) toCommon(id thirdparty.CollectibleUniqueID) thirdparty.FullCollectibleData {
-	contractData := c.toCollectionData(id.ContractID)
+	contractData := c.Contract.toCollectionData(id.ContractID)
 	return thirdparty.FullCollectibleData{
 		CollectibleData: c.toCollectiblesData(id),
 		CollectionData:  &contractData,
 	}
 }
 
-func (l *NFTList) toCommon(chainID walletCommon.ChainID) []thirdparty.FullCollectibleData {
-	ret := make([]thirdparty.FullCollectibleData, 0, len(l.OwnedNFTs))
-	for _, asset := range l.OwnedNFTs {
+func alchemyToCollectiblesData(chainID walletCommon.ChainID, l []Asset) []thirdparty.FullCollectibleData {
+	ret := make([]thirdparty.FullCollectibleData, 0, len(l))
+	for _, asset := range l {
 		id := thirdparty.CollectibleUniqueID{
 			ContractID: thirdparty.ContractID{
 				ChainID: chainID,
@@ -170,6 +191,19 @@ func (l *NFTList) toCommon(chainID walletCommon.ChainID) []thirdparty.FullCollec
 			TokenID: asset.TokenID,
 		}
 		item := asset.toCommon(id)
+		ret = append(ret, item)
+	}
+	return ret
+}
+
+func alchemyToCollectionsData(chainID walletCommon.ChainID, l []Contract) []thirdparty.CollectionData {
+	ret := make([]thirdparty.CollectionData, 0, len(l))
+	for _, contract := range l {
+		id := thirdparty.ContractID{
+			ChainID: chainID,
+			Address: contract.Address,
+		}
+		item := contract.toCollectionData(id)
 		ret = append(ret, item)
 	}
 	return ret

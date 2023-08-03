@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 )
 
 const AlchemyID = "alchemy"
+const nftMetadataBatchLimit = 100
+const contractMetadataBatchLimit = 100
 
 func getBaseURL(chainID walletCommon.ChainID) (string, error) {
 	switch uint64(chainID) {
@@ -81,6 +84,31 @@ func NewClient(apiKeys map[uint64]string) *Client {
 func (o *Client) doQuery(url string) (*http.Response, error) {
 	resp, err := o.client.Get(url)
 
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func (o *Client) doPostWithJSON(url string, payload any) (*http.Response, error) {
+	payloadJSON, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	payloadString := string(payloadJSON)
+	payloadReader := strings.NewReader(payloadString)
+
+	req, err := http.NewRequest("POST", url, payloadReader)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("accept", "application/json")
+	req.Header.Add("content-type", "application/json")
+
+	resp, err := o.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -192,13 +220,13 @@ func (o *Client) fetchOwnedAssets(chainID walletCommon.ChainID, owner common.Add
 			return nil, fmt.Errorf("invalid json: %s", string(body))
 		}
 
-		container := NFTList{}
+		container := OwnedNFTList{}
 		err = json.Unmarshal(body, &container)
 		if err != nil {
 			return nil, err
 		}
 
-		assets.Items = append(assets.Items, container.toCommon(chainID)...)
+		assets.Items = append(assets.Items, alchemyToCollectiblesData(chainID, container.OwnedNFTs)...)
 		assets.NextCursor = container.PageKey
 
 		if len(assets.NextCursor) == 0 {
@@ -213,4 +241,168 @@ func (o *Client) fetchOwnedAssets(chainID walletCommon.ChainID, owner common.Add
 	}
 
 	return assets, nil
+}
+
+func getCollectibleUniqueIDBatches(ids []thirdparty.CollectibleUniqueID) []BatchTokenIDs {
+	batches := make([]BatchTokenIDs, 0)
+
+	for startIdx := 0; startIdx < len(ids); startIdx += nftMetadataBatchLimit {
+		endIdx := startIdx + nftMetadataBatchLimit
+		if endIdx > len(ids) {
+			endIdx = len(ids)
+		}
+
+		pageIDs := ids[startIdx:endIdx]
+
+		batchIDs := BatchTokenIDs{
+			IDs: make([]TokenID, 0, len(pageIDs)),
+		}
+		for _, id := range pageIDs {
+			batchID := TokenID{
+				ContractAddress: id.ContractID.Address,
+				TokenID:         id.TokenID,
+			}
+			batchIDs.IDs = append(batchIDs.IDs, batchID)
+		}
+
+		batches = append(batches, batchIDs)
+	}
+
+	return batches
+}
+
+func (o *Client) fetchAssetsByBatchTokenIDs(chainID walletCommon.ChainID, batchIDs BatchTokenIDs) ([]thirdparty.FullCollectibleData, error) {
+	baseURL, err := getNFTBaseURL(chainID, o.apiKeys[uint64(chainID)])
+	if err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf("%s/getNFTMetadataBatch", baseURL)
+
+	resp, err := o.doPostWithJSON(url, batchIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// if Json is not returned there must be an error
+	if !json.Valid(body) {
+		return nil, fmt.Errorf("invalid json: %s", string(body))
+	}
+
+	assets := NFTList{}
+	err = json.Unmarshal(body, &assets)
+	if err != nil {
+		return nil, err
+	}
+
+	ret := alchemyToCollectiblesData(chainID, assets.NFTs)
+
+	return ret, nil
+}
+
+func (o *Client) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
+	ret := make([]thirdparty.FullCollectibleData, 0, len(uniqueIDs))
+
+	idsPerChainID := thirdparty.GroupCollectibleUIDsByChainID(uniqueIDs)
+
+	for chainID, ids := range idsPerChainID {
+		batches := getCollectibleUniqueIDBatches(ids)
+		for _, batch := range batches {
+			assets, err := o.fetchAssetsByBatchTokenIDs(chainID, batch)
+			if err != nil {
+				return nil, err
+			}
+
+			ret = append(ret, assets...)
+		}
+	}
+
+	return ret, nil
+}
+
+func getContractAddressBatches(ids []thirdparty.ContractID) []BatchContractAddresses {
+	batches := make([]BatchContractAddresses, 0)
+
+	for startIdx := 0; startIdx < len(ids); startIdx += contractMetadataBatchLimit {
+		endIdx := startIdx + contractMetadataBatchLimit
+		if endIdx > len(ids) {
+			endIdx = len(ids)
+		}
+
+		pageIDs := ids[startIdx:endIdx]
+
+		batchIDs := BatchContractAddresses{
+			Addresses: make([]common.Address, 0, len(pageIDs)),
+		}
+		for _, id := range pageIDs {
+			batchIDs.Addresses = append(batchIDs.Addresses, id.Address)
+		}
+
+		batches = append(batches, batchIDs)
+	}
+
+	return batches
+}
+
+func (o *Client) fetchCollectionsDataByBatchContractAddresses(chainID walletCommon.ChainID, batchAddresses BatchContractAddresses) ([]thirdparty.CollectionData, error) {
+	baseURL, err := getNFTBaseURL(chainID, o.apiKeys[uint64(chainID)])
+	if err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf("%s/getContractMetadataBatch", baseURL)
+
+	resp, err := o.doPostWithJSON(url, batchAddresses)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// if Json is not returned there must be an error
+	if !json.Valid(body) {
+		return nil, fmt.Errorf("invalid json: %s", string(body))
+	}
+
+	collections := ContractList{}
+	err = json.Unmarshal(body, &collections)
+	if err != nil {
+		return nil, err
+	}
+
+	ret := alchemyToCollectionsData(chainID, collections.Contracts)
+
+	return ret, nil
+}
+
+func (o *Client) FetchCollectionsDataByContractID(contractIDs []thirdparty.ContractID) ([]thirdparty.CollectionData, error) {
+	ret := make([]thirdparty.CollectionData, 0, len(contractIDs))
+
+	idsPerChainID := thirdparty.GroupContractIDsByChainID(contractIDs)
+
+	for chainID, ids := range idsPerChainID {
+		batches := getContractAddressBatches(ids)
+		for _, batch := range batches {
+			contractsData, err := o.fetchCollectionsDataByBatchContractAddresses(chainID, batch)
+			if err != nil {
+				return nil, err
+			}
+
+			ret = append(ret, contractsData...)
+		}
+	}
+
+	return ret, nil
 }

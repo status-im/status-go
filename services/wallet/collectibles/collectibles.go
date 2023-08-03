@@ -42,6 +42,7 @@ type Manager struct {
 	rpcClient                  *rpc.Client
 	contractOwnershipProviders []thirdparty.CollectibleContractOwnershipProvider
 	accountOwnershipProviders  []thirdparty.CollectibleAccountOwnershipProvider
+	collectibleDataProviders   []thirdparty.CollectibleDataProvider
 	metadataProvider           thirdparty.CollectibleMetadataProvider
 	opensea                    *opensea.Client
 	httpClient                 *http.Client
@@ -51,7 +52,7 @@ type Manager struct {
 	collectionsDataCacheLock   sync.RWMutex
 }
 
-func NewManager(rpcClient *rpc.Client, contractOwnershipProviders []thirdparty.CollectibleContractOwnershipProvider, accountOwnershipProviders []thirdparty.CollectibleAccountOwnershipProvider, opensea *opensea.Client) *Manager {
+func NewManager(rpcClient *rpc.Client, contractOwnershipProviders []thirdparty.CollectibleContractOwnershipProvider, accountOwnershipProviders []thirdparty.CollectibleAccountOwnershipProvider, collectibleDataProviders []thirdparty.CollectibleDataProvider, opensea *opensea.Client) *Manager {
 	hystrix.ConfigureCommand(hystrixContractOwnershipClientName, hystrix.CommandConfig{
 		Timeout:               10000,
 		MaxConcurrentRequests: 100,
@@ -63,6 +64,7 @@ func NewManager(rpcClient *rpc.Client, contractOwnershipProviders []thirdparty.C
 		rpcClient:                  rpcClient,
 		contractOwnershipProviders: contractOwnershipProviders,
 		accountOwnershipProviders:  accountOwnershipProviders,
+		collectibleDataProviders:   collectibleDataProviders,
 		opensea:                    opensea,
 		httpClient: &http.Client{
 			Timeout: requestTimeout,
@@ -70,6 +72,14 @@ func NewManager(rpcClient *rpc.Client, contractOwnershipProviders []thirdparty.C
 		collectiblesDataCache: make(map[string]thirdparty.CollectibleData),
 		collectionsDataCache:  make(map[string]thirdparty.CollectionData),
 	}
+}
+
+func refMapToList[K comparable, T any](m map[K]*T) []T {
+	list := make([]T, 0, len(m))
+	for _, v := range m {
+		list = append(list, *v)
+	}
+	return list
 }
 
 func makeContractOwnershipCall(main func() (any, error), fallback func() (any, error)) (any, error) {
@@ -246,20 +256,55 @@ func (o *Manager) FetchCollectibleOwnershipByOwner(chainID walletCommon.ChainID,
 }
 
 func (o *Manager) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
-	idsToFetch := o.getIDsNotInCollectiblesDataCache(uniqueIDs)
-	if len(idsToFetch) > 0 {
-		fetchedAssets, err := o.opensea.FetchAssetsByCollectibleUniqueID(idsToFetch)
-		if err != nil {
-			return nil, err
-		}
+	idsPerChainID := thirdparty.GroupCollectibleUIDsByChainID(o.getIDsNotInCollectiblesDataCache(uniqueIDs))
 
-		err = o.processFullCollectibleData(fetchedAssets)
-		if err != nil {
-			return nil, err
+	for chainID, idsToFetch := range idsPerChainID {
+		for _, provider := range o.collectibleDataProviders {
+			if !provider.IsChainSupported(chainID) {
+				continue
+			}
+
+			fetchedAssets, err := o.opensea.FetchAssetsByCollectibleUniqueID(idsToFetch)
+			if err != nil {
+				return nil, err
+			}
+
+			err = o.processFullCollectibleData(fetchedAssets)
+			if err != nil {
+				return nil, err
+			}
+
+			break
 		}
 	}
 
 	return o.getCacheFullCollectibleData(uniqueIDs), nil
+}
+
+func (o *Manager) FetchCollectionsDataByContractID(ids []thirdparty.ContractID) ([]thirdparty.CollectionData, error) {
+	idsPerChainID := thirdparty.GroupContractIDsByChainID(o.getIDsNotInCollectionDataCache(ids))
+
+	for chainID, idsToFetch := range idsPerChainID {
+		for _, provider := range o.collectibleDataProviders {
+			if !provider.IsChainSupported(chainID) {
+				continue
+			}
+
+			fetchedCollections, err := provider.FetchCollectionsDataByContractID(idsToFetch)
+			if err != nil {
+				return nil, err
+			}
+
+			err = o.processCollectionData(fetchedCollections)
+			if err != nil {
+				return nil, err
+			}
+
+			break
+		}
+	}
+
+	return refMapToList(o.getCacheCollectionData(ids)), nil
 }
 
 func (o *Manager) getContractOwnershipProviders(chainID walletCommon.ChainID) (mainProvider thirdparty.CollectibleContractOwnershipProvider, fallbackProvider thirdparty.CollectibleContractOwnershipProvider) {
@@ -347,6 +392,8 @@ func (o *Manager) fetchTokenURI(id thirdparty.CollectibleUniqueID) (string, erro
 }
 
 func (o *Manager) processFullCollectibleData(assets []thirdparty.FullCollectibleData) error {
+	missingCollectionIDs := make([]thirdparty.ContractID, 0)
+
 	for idx, asset := range assets {
 		id := asset.CollectibleData.ID
 
@@ -393,10 +440,26 @@ func (o *Manager) processFullCollectibleData(assets []thirdparty.FullCollectible
 		o.setCacheCollectibleData(assets[idx].CollectibleData)
 		if assets[idx].CollectionData != nil {
 			o.setCacheCollectionData(*assets[idx].CollectionData)
+		} else {
+			missingCollectionIDs = append(missingCollectionIDs, id.ContractID)
 		}
-		// TODO: Fetch collection metadata separately
 	}
 
+	if len(missingCollectionIDs) > 0 {
+		// Calling this ensures collection data is fetched and cached (if not already available)
+		_, err := o.FetchCollectionsDataByContractID(missingCollectionIDs)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (o *Manager) processCollectionData(collections []thirdparty.CollectionData) error {
+	for _, collection := range collections {
+		o.setCacheCollectionData(collection)
+	}
 	return nil
 }
 
@@ -439,6 +502,26 @@ func (o *Manager) setCacheCollectibleData(data thirdparty.CollectibleData) {
 	defer o.collectiblesDataCacheLock.Unlock()
 
 	o.collectiblesDataCache[data.ID.HashKey()] = data
+}
+
+func (o *Manager) isIDInCollectionDataCache(id thirdparty.ContractID) bool {
+	o.collectionsDataCacheLock.RLock()
+	defer o.collectionsDataCacheLock.RUnlock()
+	if _, ok := o.collectionsDataCache[id.HashKey()]; ok {
+		return true
+	}
+	return false
+}
+
+func (o *Manager) getIDsNotInCollectionDataCache(ids []thirdparty.ContractID) []thirdparty.ContractID {
+	idsToFetch := make([]thirdparty.ContractID, 0, len(ids))
+	for _, id := range ids {
+		if o.isIDInCollectionDataCache(id) {
+			continue
+		}
+		idsToFetch = append(idsToFetch, id)
+	}
+	return idsToFetch
 }
 
 func (o *Manager) getCacheCollectionData(ids []thirdparty.ContractID) map[string]*thirdparty.CollectionData {
