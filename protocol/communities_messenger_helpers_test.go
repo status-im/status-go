@@ -111,7 +111,16 @@ func createCommunity(s *suite.Suite, owner *Messenger) (*communities.Community, 
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 
+	s.Require().Len(response.Communities(), 1)
 	community := response.Communities()[0]
+	s.Require().True(community.Joined())
+	s.Require().True(community.IsControlNode())
+
+	s.Require().Len(response.CommunitiesSettings(), 1)
+	communitySettings := response.CommunitiesSettings()[0]
+	s.Require().Equal(communitySettings.CommunityID, community.IDString())
+	s.Require().Equal(communitySettings.HistoryArchiveSupportEnabled, false)
+
 	orgChat := &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
 			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,

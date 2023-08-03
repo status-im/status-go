@@ -277,7 +277,6 @@ func (md archiveMDSlice) Less(i, j int) bool {
 
 type Subscription struct {
 	Community                                *Community
-	Invitations                              []*protobuf.CommunityInvitation
 	CreatingHistoryArchivesSignal            *signal.CreatingHistoryArchivesSignal
 	HistoryArchivesCreatedSignal             *signal.HistoryArchivesCreatedSignal
 	NoHistoryArchivesCreatedSignal           *signal.NoHistoryArchivesCreatedSignal
@@ -1418,21 +1417,6 @@ func (m *Manager) handleAdditionalAdminChanges(community *Community) error {
 	return nil
 }
 
-// TODO: This is not fully implemented, we want to save the grant passed at
-// this stage and make sure it's used when publishing.
-func (m *Manager) HandleCommunityInvitation(signer *ecdsa.PublicKey, invitation *protobuf.CommunityInvitation, payload []byte) (*CommunityResponse, error) {
-	m.logger.Debug("Handling wrapped community description message")
-
-	community, err := m.HandleWrappedCommunityDescriptionMessage(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	// Save grant
-
-	return community, nil
-}
-
 // markRequestToJoin marks all the pending requests to join as completed
 // if we are members
 func (m *Manager) markRequestToJoin(pk *ecdsa.PublicKey, community *Community) error {
@@ -2560,43 +2544,6 @@ func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
 	}
 
 	return community, nil
-}
-
-func (m *Manager) inviteUsersToCommunity(community *Community, pks []*ecdsa.PublicKey) (*Community, error) {
-	var invitations []*protobuf.CommunityInvitation
-	for _, pk := range pks {
-		invitation, err := community.InviteUserToOrg(pk)
-		if err != nil {
-			return nil, err
-		}
-		// We mark the user request (if any) as completed
-		if err := m.markRequestToJoin(pk, community); err != nil {
-			return nil, err
-		}
-
-		invitations = append(invitations, invitation)
-	}
-
-	err := m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, err
-	}
-
-	m.publish(&Subscription{Community: community, Invitations: invitations})
-
-	return community, nil
-}
-
-func (m *Manager) InviteUsersToCommunity(communityID types.HexBytes, pks []*ecdsa.PublicKey) (*Community, error) {
-	community, err := m.GetByID(communityID)
-	if err != nil {
-		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
-
-	return m.inviteUsersToCommunity(community, pks)
 }
 
 func (m *Manager) AddMemberOwnerToCommunity(communityID types.HexBytes, pk *ecdsa.PublicKey) (*Community, error) {

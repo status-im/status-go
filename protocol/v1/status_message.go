@@ -247,8 +247,6 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.GroupChatInvitation))
 	case protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION:
 		return m.unmarshalProtobufData(new(protobuf.CommunityDescription))
-	case protobuf.ApplicationMetadataMessage_COMMUNITY_INVITATION:
-		return m.unmarshalProtobufData(new(protobuf.CommunityInvitation))
 	case protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN:
 		return m.unmarshalProtobufData(new(protobuf.CommunityRequestToJoin))
 	case protobuf.ApplicationMetadataMessage_COMMUNITY_EDIT_SHARED_ADDRESSES:

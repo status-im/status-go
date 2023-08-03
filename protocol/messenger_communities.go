@@ -83,29 +83,6 @@ func (m *Messenger) publishOrg(org *communities.Community) error {
 	return err
 }
 
-func (m *Messenger) publishOrgInvitation(org *communities.Community, invitation *protobuf.CommunityInvitation) error {
-	m.logger.Debug("publishing org invitation", zap.String("org-id", org.IDString()), zap.Any("org", org))
-	pk, err := crypto.DecompressPubkey(invitation.PublicKey)
-	if err != nil {
-		return err
-	}
-
-	payload, err := proto.Marshal(invitation)
-	if err != nil {
-		return err
-	}
-
-	rawMessage := common.RawMessage{
-		Payload: payload,
-		Sender:  org.PrivateKey(),
-		// we don't want to wrap in an encryption layer message
-		SkipProtocolLayer: true,
-		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_INVITATION,
-	}
-	_, err = m.sender.SendPrivate(context.Background(), pk, &rawMessage)
-	return err
-}
-
 func (m *Messenger) publishCommunityEventsMessage(adminMessage *communities.CommunityEventsMessage) error {
 	adminPubkey := common.PubkeyToHex(&m.identity.PublicKey)
 	m.logger.Debug("publishing community admin event", zap.String("admin-id", adminPubkey), zap.Any("event", adminMessage))
@@ -268,13 +245,6 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 				}
 				if sub.Community != nil {
 					publishOrgAndDistributeEncryptionKeys(sub.Community)
-
-					for _, invitation := range sub.Invitations {
-						err := m.publishOrgInvitation(sub.Community, invitation)
-						if err != nil {
-							m.logger.Warn("failed to publish org invitation", zap.Error(err))
-						}
-					}
 				}
 
 				if sub.CommunityEventsMessage != nil {
@@ -1883,62 +1853,6 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 		communities = append(communities, community)
 		go m.InitHistoryArchiveTasks(communities)
 	}
-	return response, nil
-}
-
-// Deprecated: Community invites are no longer sent to users.
-// Instead, the community is just shared and access requests is required from users.
-func (m *Messenger) InviteUsersToCommunity(request *requests.InviteUsersToCommunity) (*MessengerResponse, error) {
-	if err := request.Validate(); err != nil {
-		return nil, err
-	}
-
-	response := &MessengerResponse{}
-	var messages []*common.Message
-
-	var publicKeys []*ecdsa.PublicKey
-	community, err := m.communitiesManager.GetByID(request.CommunityID)
-
-	if err != nil {
-		return nil, err
-	}
-
-	for _, pkBytes := range request.Users {
-		publicKey, err := common.HexToPubkey(pkBytes.String())
-		if err != nil {
-			return nil, err
-		}
-		publicKeys = append(publicKeys, publicKey)
-
-		message := &common.Message{}
-		message.ChatId = pkBytes.String()
-		message.CommunityID = request.CommunityID.String()
-		message.Text = fmt.Sprintf("You have been invited to community %s", community.Name())
-		messages = append(messages, message)
-		r, err := m.CreateOneToOneChat(&requests.CreateOneToOneChat{ID: pkBytes})
-		if err != nil {
-			return nil, err
-		}
-
-		if err := response.Merge(r); err != nil {
-			return nil, err
-		}
-	}
-
-	community, err = m.communitiesManager.InviteUsersToCommunity(request.CommunityID, publicKeys)
-	if err != nil {
-		return nil, err
-	}
-	sendMessagesResponse, err := m.SendChatMessages(context.Background(), messages)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := response.Merge(sendMessagesResponse); err != nil {
-		return nil, err
-	}
-
-	response.AddCommunity(community)
 	return response, nil
 }
 

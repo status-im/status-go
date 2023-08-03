@@ -117,13 +117,6 @@ message CommunityCategory {
   int32 position = 3;
 }
 
-message CommunityInvitation {
-  bytes wrapped_community_description = 1; // community in a wrapped & signed (by owner) protocol message
-  bytes grant = 2;
-  string chat_id = 3;
-  bytes public_key = 4;
-}
-
 message RevealedAccount {
   string address = 1;
   bytes signature = 2;

@@ -100,49 +100,6 @@ func (s *CommunitySuite) TestHasPermission() {
 
 }
 
-func (s *CommunitySuite) TestInviteUserToOrg() {
-	newMember, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	org := s.buildCommunity(&s.identity.PublicKey)
-	org.config.PrivateKey = nil
-	org.config.ID = nil
-	// Not an admin
-	_, err = org.InviteUserToOrg(&s.member2.PublicKey)
-	s.Require().Equal(ErrNotControlNode, err)
-
-	// Add admin to community
-	org.config.PrivateKey = s.identity
-	org.config.ID = &s.identity.PublicKey
-
-	response, err := org.InviteUserToOrg(&newMember.PublicKey)
-	s.Require().Nil(err)
-	s.Require().NotNil(response)
-
-	// Check member has been added
-	s.Require().True(org.HasMember(&newMember.PublicKey))
-
-	// Check member has been added to response
-	s.Require().NotNil(response.WrappedCommunityDescription)
-
-	metadata := &protobuf.ApplicationMetadataMessage{}
-	description := &protobuf.CommunityDescription{}
-
-	s.Require().NoError(proto.Unmarshal(response.WrappedCommunityDescription, metadata))
-	s.Require().NoError(proto.Unmarshal(metadata.Payload, description))
-
-	_, ok := description.Members[common.PubkeyToHex(&newMember.PublicKey)]
-	s.Require().True(ok)
-
-	// Check grant validates
-	s.Require().NotNil(org.config.ID)
-	s.Require().NotNil(response.Grant)
-
-	grant, err := org.VerifyGrantSignature(response.Grant)
-	s.Require().NoError(err)
-	s.Require().NotNil(grant)
-}
-
 func (s *CommunitySuite) TestCreateChat() {
 	newChatID := "new-chat-id"
 	org := s.buildCommunity(&s.identity.PublicKey)
@@ -273,56 +230,6 @@ func (s *CommunitySuite) TestDeleteChat() {
 	s.Require().Nil(org.Chats()[testChatID1])
 	s.Require().Len(changes.ChatsRemoved, 1)
 	s.Require().Equal(uint64(2), org.Clock())
-}
-
-func (s *CommunitySuite) TestInviteUserToChat() {
-	newMember, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	org := s.buildCommunity(&s.identity.PublicKey)
-	org.config.PrivateKey = nil
-	org.config.ID = nil
-	// Not an admin
-	_, err = org.InviteUserToChat(&s.member2.PublicKey, testChatID1)
-	s.Require().Equal(ErrNotControlNode, err)
-
-	// Add admin to community
-	org.config.PrivateKey = s.identity
-	org.config.ID = &s.identity.PublicKey
-
-	response, err := org.InviteUserToChat(&newMember.PublicKey, testChatID1)
-	s.Require().Nil(err)
-	s.Require().NotNil(response)
-
-	// Check member has been added
-	s.Require().True(org.HasMember(&newMember.PublicKey))
-	s.Require().True(org.IsMemberInChat(&newMember.PublicKey, testChatID1))
-
-	// Check member has been added to response
-	s.Require().NotNil(response.WrappedCommunityDescription)
-
-	metadata := &protobuf.ApplicationMetadataMessage{}
-	description := &protobuf.CommunityDescription{}
-
-	s.Require().NoError(proto.Unmarshal(response.WrappedCommunityDescription, metadata))
-	s.Require().NoError(proto.Unmarshal(metadata.Payload, description))
-
-	_, ok := description.Members[common.PubkeyToHex(&newMember.PublicKey)]
-	s.Require().True(ok)
-
-	_, ok = description.Chats[testChatID1].Members[common.PubkeyToHex(&newMember.PublicKey)]
-	s.Require().True(ok)
-
-	s.Require().Equal(testChatID1, response.ChatId)
-
-	// Check grant validates
-	s.Require().NotNil(org.config.ID)
-	s.Require().NotNil(response.Grant)
-
-	grant, err := org.VerifyGrantSignature(response.Grant)
-	s.Require().NoError(err)
-	s.Require().NotNil(grant)
-	s.Require().Equal(testChatID1, grant.ChatId)
 }
 
 func (s *CommunitySuite) TestRemoveUserFromChat() {

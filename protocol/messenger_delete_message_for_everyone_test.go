@@ -70,8 +70,14 @@ func (s *MessengerDeleteMessageForEveryoneSuite) newMessenger() *Messenger {
 func (s *MessengerDeleteMessageForEveryoneSuite) TestDeleteMessageForEveryone() {
 	community := s.createCommunity()
 	communityChat := s.createCommunityChat(community)
-	s.inviteAndJoin(community, s.moderator)
-	s.inviteAndJoin(community, s.bob)
+
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+
+	advertiseCommunityTo(&s.Suite, community, s.admin, s.moderator)
+	joinCommunity(&s.Suite, community, s.admin, s.moderator, request)
+
+	advertiseCommunityTo(&s.Suite, community, s.admin, s.bob)
+	joinCommunity(&s.Suite, community, s.admin, s.bob, request)
 
 	response, err := s.admin.AddRoleToMember(&requests.AddRoleToMember{
 		CommunityID: community.ID(),
@@ -157,36 +163,4 @@ func (s *MessengerDeleteMessageForEveryoneSuite) createCommunityChat(community *
 	s.Require().Len(response.Communities(), 1)
 	s.Require().Len(response.Chats(), 1)
 	return response.Chats()[0]
-}
-
-func (s *MessengerDeleteMessageForEveryoneSuite) inviteAndJoin(community *communities.Community, target *Messenger) {
-	response, err := s.admin.InviteUsersToCommunity(&requests.InviteUsersToCommunity{
-		CommunityID: community.ID(),
-		Users:       []types.HexBytes{common.PubkeyToHexBytes(&target.identity.PublicKey)},
-	})
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-
-	community = response.Communities()[0]
-	s.Require().True(community.HasMember(&target.identity.PublicKey))
-
-	_, err = WaitOnMessengerResponse(target, func(response *MessengerResponse) bool {
-		return len(response.Communities()) > 0
-	}, "community not received")
-	s.Require().NoError(err)
-
-	response, err = target.JoinCommunity(context.Background(), community.ID(), false)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().True(response.Communities()[0].Joined())
-	s.Require().Len(response.Chats(), 1)
-
-	s.Require().NoError(target.SaveChat(response.Chats()[0]))
-
-	_, err = WaitOnMessengerResponse(target, func(response *MessengerResponse) bool {
-		return len(response.Messages()) > 0
-	}, "message 'You have been invited to community' not received")
-	s.Require().NoError(err)
 }
