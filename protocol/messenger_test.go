@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/deprecation"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -163,7 +164,7 @@ func (s *MessengerSuite) TestInit() {
 				_, err = s.m.AddContact(context.Background(), &requests.AddContact{ID: types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey))})
 				s.Require().NoError(err)
 			},
-			AddedFilters: 2,
+			AddedFilters: deprecation.AddProfileFiltersCount(1),
 		},
 	}
 
@@ -175,7 +176,7 @@ func (s *MessengerSuite) TestInit() {
 			s.Require().NoError(err)
 			filters := s.m.transport.Filters()
 			expectedFilters += tc.AddedFilters
-			s.Equal(expectedFilters+1, len(filters))
+			s.Equal(deprecation.AddTimelineFiltersCount(expectedFilters), len(filters))
 		})
 	}
 }
@@ -306,7 +307,7 @@ func (s *MessengerSuite) TestMarkAllRead() {
 	s.Require().NoError(err)
 
 	chats := s.m.Chats()
-	s.Require().Len(chats, 3)
+	s.Require().Len(chats, deprecation.AddChatsCount(1))
 	for idx := range chats {
 		if chats[idx].ID == chat.ID {
 			s.Require().Equal(uint(0), chats[idx].UnviewedMessagesCount)
@@ -342,6 +343,11 @@ func (s *MessengerSuite) TestSendPublic() {
 }
 
 func (s *MessengerSuite) TestSendProfile() {
+	// Early exit to skip testing deprecated code
+	if deprecation.ChatProfileDeprecated {
+		return
+	}
+
 	chat := CreateProfileChat("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), s.m.transport)
 	chat.LastClockValue = uint64(100000000000000)
 	err := s.m.SaveChat(chat)
@@ -1057,7 +1063,7 @@ func (s *MessengerSuite) TestChatPersistencePublic() {
 
 	s.Require().NoError(s.m.SaveChat(chat))
 	savedChats := s.m.Chats()
-	s.Require().Equal(3, len(savedChats))
+	s.Require().Equal(deprecation.AddChatsCount(1), len(savedChats))
 }
 
 func (s *MessengerSuite) TestDeleteChat() {
@@ -1078,11 +1084,11 @@ func (s *MessengerSuite) TestDeleteChat() {
 
 	s.Require().NoError(s.m.SaveChat(chat))
 	savedChats := s.m.Chats()
-	s.Require().Equal(3, len(savedChats))
+	s.Require().Equal(deprecation.AddChatsCount(1), len(savedChats))
 
 	s.Require().NoError(s.m.DeleteChat(chatID))
 	savedChats = s.m.Chats()
-	s.Require().Equal(2, len(savedChats))
+	s.Require().Equal(deprecation.AddChatsCount(0), len(savedChats))
 }
 
 func (s *MessengerSuite) TestChatPersistenceUpdate() {
@@ -1102,7 +1108,7 @@ func (s *MessengerSuite) TestChatPersistenceUpdate() {
 
 	s.Require().NoError(s.m.SaveChat(chat))
 	savedChats := s.m.Chats()
-	s.Require().Equal(3, len(savedChats))
+	s.Require().Equal(deprecation.AddChatsCount(1), len(savedChats))
 
 	var actualChat *Chat
 	for idx := range savedChats {
@@ -1152,7 +1158,7 @@ func (s *MessengerSuite) TestChatPersistenceOneToOne() {
 
 	s.Require().NoError(s.m.SaveChat(chat))
 	savedChats := s.m.Chats()
-	s.Require().Equal(3, len(savedChats))
+	s.Require().Equal(deprecation.AddChatsCount(1), len(savedChats))
 
 	var actualChat *Chat
 	for idx := range savedChats {
@@ -1233,7 +1239,7 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 	}
 	s.Require().NoError(s.m.SaveChat(chat))
 	savedChats := s.m.Chats()
-	s.Require().Equal(3, len(savedChats))
+	s.Require().Equal(deprecation.AddChatsCount(1), len(savedChats))
 
 	var actualChat *Chat
 	for idx := range savedChats {
@@ -1425,7 +1431,7 @@ func (s *MessengerSuite) TestBlockContact() {
 
 	// The chat is deleted
 	actualChats := s.m.Chats()
-	s.Require().Equal(4, len(actualChats))
+	s.Require().Equal(deprecation.AddChatsCount(2), len(actualChats))
 
 	// The messages have been deleted
 	chat2Messages, _, err := s.m.MessageByChatID(chat2.ID, "", 20)

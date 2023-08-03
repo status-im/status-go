@@ -32,6 +32,7 @@ import (
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/contracts"
+	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
@@ -1721,15 +1722,24 @@ func (m *Messenger) Init() error {
 			return errors.New("invalid chat type")
 		}
 	}
+
+	// Timeline and profile chats are deprecated.
+	// This code can be removed after some reasonable time.
+
 	// upsert timeline chat
-	err = m.ensureTimelineChat()
-	if err != nil {
-		return err
+	if !deprecation.ChatProfileDeprecated {
+		err = m.ensureTimelineChat()
+		if err != nil {
+			return err
+		}
 	}
+
 	// upsert profile chat
-	err = m.ensureMyOwnProfileChat()
-	if err != nil {
-		return err
+	if !deprecation.ChatTimelineDeprecated {
+		err = m.ensureMyOwnProfileChat()
+		if err != nil {
+			return err
+		}
 	}
 
 	// Get chat IDs and public keys from the contacts.

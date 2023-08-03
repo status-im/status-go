@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	userimage "github.com/status-im/status-go/images"
@@ -32,7 +33,11 @@ const (
 	ChatTypeOneToOne ChatType = iota + 1
 	ChatTypePublic
 	ChatTypePrivateGroupChat
+	// Deprecated: CreateProfileChat shouldn't be used
+	// and is only left here in case profile chat feature is re-introduced.
 	ChatTypeProfile
+	// Deprecated: ChatTypeTimeline shouldn't be used
+	// and is only left here in case profile chat feature is re-introduced.
 	ChatTypeTimeline
 	ChatTypeCommunityChat
 )
@@ -63,6 +68,7 @@ const (
 const pkStringLength = 68
 
 // timelineChatID is a magic constant id for your own timeline
+// Deprecated: timeline chats are no more supported
 const timelineChatID = "@timeline70bd746ddcc12beb96b2c9d572d0784ab137ffc774f5383e50585a932080b57cca0484b259e61cecbaa33a4c98a300a"
 
 type Chat struct {
@@ -241,10 +247,14 @@ func (c *Chat) Public() bool {
 	return c.ChatType == ChatTypePublic
 }
 
+// Deprecated: ProfileUpdates shouldn't be used
+// and is only left here in case profile chat feature is re-introduced.
 func (c *Chat) ProfileUpdates() bool {
 	return c.ChatType == ChatTypeProfile || len(c.Profile) > 0
 }
 
+// Deprecated: Timeline shouldn't be used
+// and is only left here in case profile chat feature is re-introduced.
 func (c *Chat) Timeline() bool {
 	return c.ChatType == ChatTypeTimeline
 }
@@ -527,11 +537,19 @@ func CreatePublicChat(name string, timesource common.TimeSource) *Chat {
 	}
 }
 
+// Deprecated: buildProfileChatID shouldn't be used
+// and is only left here in case profile chat feature is re-introduced.
 func buildProfileChatID(publicKeyString string) string {
 	return "@" + publicKeyString
 }
 
+// Deprecated: CreateProfileChat shouldn't be used
+// and is only left here in case profile chat feature is re-introduced.
 func CreateProfileChat(pubkey string, timesource common.TimeSource) *Chat {
+	// Return nil to prevent usage of deprecated function
+	if deprecation.ChatProfileDeprecated {
+		return nil
+	}
 
 	id := buildProfileChatID(pubkey)
 	return &Chat{
@@ -562,7 +580,14 @@ func CreateGroupChat(timesource common.TimeSource) Chat {
 	}
 }
 
+// Deprecated: CreateTimelineChat shouldn't be used
+// and is only left here in case profile chat feature is re-introduced.
 func CreateTimelineChat(timesource common.TimeSource) *Chat {
+	// Return nil to prevent usage of deprecated function
+	if deprecation.ChatTimelineDeprecated {
+		return nil
+	}
+
 	return &Chat{
 		ID:        timelineChatID,
 		Name:      "#" + timelineChatID,

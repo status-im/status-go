@@ -10,6 +10,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -395,16 +396,22 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 		return nil, err
 	}
 
-	// Create the corresponding chat
-	profileChat := m.buildProfileChat(contact.ID)
+	// Profile chats are deprecated.
+	// Code below can be removed after some reasonable time.
 
-	_, err = m.Join(profileChat)
-	if err != nil {
-		return nil, err
-	}
+	//Create the corresponding chat
+	var profileChat *Chat
+	if !deprecation.ChatProfileDeprecated {
+		profileChat = m.buildProfileChat(contact.ID)
 
-	if err := m.saveChat(profileChat); err != nil {
-		return nil, err
+		_, err = m.Join(profileChat)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := m.saveChat(profileChat); err != nil {
+			return nil, err
+		}
 	}
 
 	publicKey, err := contact.PublicKey()
@@ -454,12 +461,17 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 		return nil, err
 	}
 
-	// Add chat
-	response.AddChat(profileChat)
+	// Profile chats are deprecated.
+	// Code below can be removed after some reasonable time.
 
-	_, err = m.transport.InitFilters([]string{profileChat.ID}, []*ecdsa.PublicKey{publicKey})
-	if err != nil {
-		return nil, err
+	// Add chat
+	if !deprecation.ChatProfileDeprecated {
+		response.AddChat(profileChat)
+
+		_, err = m.transport.InitFilters([]string{profileChat.ID}, []*ecdsa.PublicKey{publicKey})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Publish contact code
@@ -643,18 +655,23 @@ func (m *Messenger) removeContact(ctx context.Context, response *MessengerRespon
 		return err
 	}
 
-	// Create the corresponding profile chat
-	profileChatID := buildProfileChatID(contact.ID)
-	_, ok = m.allChats.Load(profileChatID)
+	// Profile chats are deprecated.
+	// Code below can be removed after some reasonable time.
 
-	if ok {
-		chatResponse, err := m.deactivateChat(profileChatID, 0, false, true)
-		if err != nil {
-			return err
-		}
-		err = response.Merge(chatResponse)
-		if err != nil {
-			return err
+	//Create the corresponding profile chat
+	if !deprecation.ChatProfileDeprecated {
+		profileChatID := buildProfileChatID(contact.ID)
+		_, ok = m.allChats.Load(profileChatID)
+
+		if ok {
+			chatResponse, err := m.deactivateChat(profileChatID, 0, false, true)
+			if err != nil {
+				return err
+			}
+			err = response.Merge(chatResponse)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

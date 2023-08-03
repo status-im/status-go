@@ -180,9 +180,8 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(contactRequest *comm
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Name, resp.Contacts[0].PrimaryName())
 
 	// Check we have active chat in the response
-	s.Require().Len(resp.Chats(), 2)
-	s.Require().True(resp.Chats()[0].Active) // This is unactive profile chat
-	s.Require().True(resp.Chats()[1].Active)
+	s.Require().Len(resp.Chats(), 1)
+	s.Require().True(resp.Chats()[0].Active)
 
 	// Make sure the sender is added to our contacts
 	contacts := receiver.AddedContacts()

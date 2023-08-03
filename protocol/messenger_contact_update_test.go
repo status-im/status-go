@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/deprecation"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -63,14 +64,24 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	// It should add the contact
 	s.Require().True(contact.added())
 
-	// It should create a profile chat & a one to one chat
-	s.Require().Len(response.Chats(), 2)
-	chats := response.Chats()
-	if chats[0].ChatType == ChatTypeOneToOne {
-		s.Require().False(chats[0].Active)
+	if deprecation.ChatProfileDeprecated {
+		// It should a one to one chat
+		s.Require().Len(response.Chats(), 1)
+		s.Require().False(response.Chats()[0].Active)
 	} else {
-		s.Require().False(chats[1].Active)
+		// It should create a profile chat & a one to one chat
+		s.Require().Len(response.Chats(), 2)
+		chats := response.Chats()
+		if chats[0].ChatType == ChatTypeOneToOne {
+			s.Require().False(chats[0].Active)
+		} else {
+			s.Require().False(chats[1].Active)
+		}
 	}
+
+	//// It should a one to one chat
+	//s.Require().Len(response.Chats(), 1)
+	//s.Require().False(response.Chats()[0].Active)
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
@@ -123,8 +134,13 @@ func (s *MessengerContactUpdateSuite) TestAddContact() {
 	s.Require().Len(response.Contacts, 1)
 	contact := response.Contacts[0]
 
-	// It adds the profile chat and the one to one chat
-	s.Require().Len(response.Chats(), 2)
+	if deprecation.ChatProfileDeprecated {
+		// It adds the one to one chat
+		s.Require().Len(response.Chats(), 1)
+	} else {
+		// It adds the profile chat and the one to one chat
+		s.Require().Len(response.Chats(), 2)
+	}
 
 	// It should add the contact
 	s.Require().True(contact.added())
@@ -162,8 +178,13 @@ func (s *MessengerContactUpdateSuite) TestAddContactWithENS() {
 	s.Require().Len(response.Contacts, 1)
 	contact := response.Contacts[0]
 
-	// It adds the profile chat and the one to one chat
-	s.Require().Len(response.Chats(), 2)
+	if deprecation.ChatProfileDeprecated {
+		// It adds the one to one chat
+		s.Require().Len(response.Chats(), 1)
+	} else {
+		// It adds the profile chat and the one to one chat
+		s.Require().Len(response.Chats(), 2)
+	}
 
 	// It should add the contact
 	s.Require().True(contact.added())
