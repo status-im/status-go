@@ -1453,6 +1453,21 @@ func (api *PublicAPI) GetCheckChannelPermissionResponses(parent context.Context,
 	return api.service.messenger.GetCommunityCheckChannelPermissionResponses(communityID)
 }
 
+// CreateClosedCommunity used only for test purposes
+func (api *PublicAPI) CreateClosedCommunity() (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateClosedCommunity()
+}
+
+// CreateOpenCommunity used only for test purposes
+func (api *PublicAPI) CreateOpenCommunity() (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateOpenCommunity()
+}
+
+// CreateTokenGatedCommunity used only for test purposes
+func (api *PublicAPI) CreateTokenGatedCommunity() (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateTokenGatedCommunity()
+}
+
 // -----
 // HELPER
 // -----
