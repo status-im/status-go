@@ -1095,6 +1095,9 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 	if err != nil {
 		return err
 	}
+	if mnemonic != "" {
+		nodeConfig.ProcessBackedupMessages = true
+	}
 
 	// when we set nodeConfig.KeyStoreDir, value of nodeConfig.KeyStoreDir should not contain the rootDataDir
 	// loadNodeConfig will add rootDataDir to nodeConfig.KeyStoreDir
