@@ -711,6 +711,9 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 					}
 					return SendAT, fromAddress
 				} else if trType.Byte == toTrType {
+					if fromAddress == ZeroAddress && transferType != nil && *transferType == TransferTypeErc721 {
+						return MintAT, toAddress
+					}
 					return ReceiveAT, toAddress
 				}
 			}
