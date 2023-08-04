@@ -288,7 +288,7 @@ func (c *Contact) DismissContactRequest(clock uint64) ContactRequestProcessingRe
 
 // Remote actions
 
-func (c *Contact) contactRequestRetracted(clock uint64, syncing bool, r ContactRequestProcessingResponse) ContactRequestProcessingResponse {
+func (c *Contact) contactRequestRetracted(clock uint64, fromSyncing bool, r ContactRequestProcessingResponse) ContactRequestProcessingResponse {
 	if clock <= c.ContactRequestRemoteClock {
 		return r
 	}
@@ -298,7 +298,7 @@ func (c *Contact) contactRequestRetracted(clock uint64, syncing bool, r ContactR
 	// the side it was sent from. The only exception is when the contact
 	// request has been explicitly dismissed, in which case we don't
 	// change state
-	if c.ContactRequestLocalState != ContactRequestStateDismissed && !syncing {
+	if c.ContactRequestLocalState != ContactRequestStateDismissed && !fromSyncing {
 		c.ContactRequestLocalClock = clock
 		c.ContactRequestLocalState = ContactRequestStateNone
 	}
@@ -308,8 +308,8 @@ func (c *Contact) contactRequestRetracted(clock uint64, syncing bool, r ContactR
 	return r
 }
 
-func (c *Contact) ContactRequestRetracted(clock uint64, syncing bool) ContactRequestProcessingResponse {
-	return c.contactRequestRetracted(clock, syncing, ContactRequestProcessingResponse{})
+func (c *Contact) ContactRequestRetracted(clock uint64, fromSyncing bool) ContactRequestProcessingResponse {
+	return c.contactRequestRetracted(clock, fromSyncing, ContactRequestProcessingResponse{})
 }
 
 func (c *Contact) contactRequestReceived(clock uint64, r ContactRequestProcessingResponse) ContactRequestProcessingResponse {

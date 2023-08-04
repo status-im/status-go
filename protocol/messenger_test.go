@@ -649,7 +649,7 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 	}
 
 	// Block contact
-	_, err = s.m.BlockContact(blockedContact.ID)
+	_, err = s.m.BlockContact(blockedContact.ID, false)
 	s.Require().NoError(err)
 
 	// Blocked contact sends message, we should not receive it
@@ -1397,7 +1397,7 @@ func (s *MessengerSuite) TestBlockContact() {
 	err = s.m.SaveMessages(messages)
 	s.Require().NoError(err)
 
-	response, err := s.m.BlockContact(contact.ID)
+	response, err := s.m.BlockContact(contact.ID, false)
 	s.Require().NoError(err)
 
 	blockedContacts := s.m.BlockedContacts()
@@ -1431,7 +1431,7 @@ func (s *MessengerSuite) TestBlockContact() {
 
 	// The chat is deleted
 	actualChats := s.m.Chats()
-	s.Require().Equal(deprecation.AddChatsCount(2), len(actualChats))
+	s.Require().Equal(deprecation.AddChatsCount(3), len(actualChats))
 
 	// The messages have been deleted
 	chat2Messages, _, err := s.m.MessageByChatID(chat2.ID, "", 20)

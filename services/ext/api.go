@@ -327,7 +327,7 @@ func (api *PublicAPI) UnmuteChat(parent context.Context, chatID string) error {
 
 func (api *PublicAPI) BlockContact(parent context.Context, contactID string) (*protocol.MessengerResponse, error) {
 	api.log.Info("blocking contact", "contact", contactID)
-	return api.service.messenger.BlockContact(contactID)
+	return api.service.messenger.BlockContact(contactID, false)
 }
 
 // This function is the same as the one above, but used only on the desktop side, since at the end it doesn't set
