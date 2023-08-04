@@ -200,14 +200,14 @@ func (s *ManagerSuite) TestRetrieveTokens() {
 	}
 	// Set response to exactly the right one
 	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), int64(1*math.Pow(10, float64(decimals))))
-	resp, err := m.checkPermissionToJoin(permissions, accountChainIDsCombination, false)
+	resp, err := m.checkPermissions(permissions, accountChainIDsCombination, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 	s.Require().True(resp.Satisfied)
 
 	// Set response to 0
 	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), 0)
-	resp, err = m.checkPermissionToJoin(permissions, accountChainIDsCombination, false)
+	resp, err = m.checkPermissions(permissions, accountChainIDsCombination, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 	s.Require().False(resp.Satisfied)
@@ -249,7 +249,7 @@ func (s *ManagerSuite) TestRetrieveCollectibles() {
 	// Set response to exactly the right one
 	tokenBalances = []thirdparty.TokenBalance{tokenBalance(tokenID, 1)}
 	cm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), tokenBalances)
-	resp, err := m.checkPermissionToJoin(permissions, accountChainIDsCombination, false)
+	resp, err := m.checkPermissions(permissions, accountChainIDsCombination, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 	s.Require().True(resp.Satisfied)
@@ -257,7 +257,7 @@ func (s *ManagerSuite) TestRetrieveCollectibles() {
 	// Set balances to 0
 	tokenBalances = []thirdparty.TokenBalance{}
 	cm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), tokenBalances)
-	resp, err = m.checkPermissionToJoin(permissions, accountChainIDsCombination, false)
+	resp, err = m.checkPermissions(permissions, accountChainIDsCombination, false)
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 	s.Require().False(resp.Satisfied)

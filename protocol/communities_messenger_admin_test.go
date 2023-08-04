@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"crypto/ecdsa"
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -11,8 +12,10 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/waku"
 )
 
@@ -191,14 +194,30 @@ func (s *AdminCommunityEventsSuite) TestAdminPinMessage() {
 	testEventSenderPinMessage(s, community)
 }
 
-func (s *AdminCommunityEventsSuite) TestAdminMintToken() {
-	setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
-	// TODO admin test: Mint Tokens (rescticted)
-}
+func (s *AdminCommunityEventsSuite) TestAdminAddCommunityToken() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
 
-func (s *AdminCommunityEventsSuite) TestAdminAirdropTokens() {
-	setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
-	// TODO admin test: Airdrop Tokens (restricted)
+	tokenERC721 := &communities.CommunityToken{
+		CommunityID:        community.IDString(),
+		TokenType:          protobuf.CommunityTokenType_ERC721,
+		Address:            "0x123",
+		Name:               "StatusToken",
+		Symbol:             "STT",
+		Description:        "desc",
+		Supply:             &bigint.BigInt{Int: big.NewInt(123)},
+		InfiniteSupply:     false,
+		Transferable:       true,
+		RemoteSelfDestruct: true,
+		ChainID:            1,
+		DeployState:        communities.Deployed,
+		Base64Image:        "ABCD",
+	}
+
+	_, err := s.admin.SaveCommunityToken(tokenERC721, nil)
+	s.Require().NoError(err)
+
+	err = s.admin.AddCommunityToken(tokenERC721.CommunityID, tokenERC721.ChainID, tokenERC721.Address)
+	s.Require().Error(err)
 }
 
 func (s *AdminCommunityEventsSuite) TestMemberReceiveAdminEventsWhenOwnerOffline() {

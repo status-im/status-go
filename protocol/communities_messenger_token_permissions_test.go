@@ -3,6 +3,7 @@ package protocol
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"math/big"
 	"sync"
@@ -898,7 +899,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 	// in production it will happen automatically, by periodic check
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
-	err = s.owner.communitiesManager.ReevaluateMembers(community, true)
+	err = s.owner.communitiesManager.ReevaluateMembers(community)
 	s.Require().NoError(err)
 
 	err = <-waitOnChannelKeyToBeDistributedToBob
@@ -935,4 +936,247 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
 	s.Require().Equal(msg.Text, response.Messages()[0].Text)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivilegedRoleInOpenCommunity(permissionType protobuf.CommunityTokenPermission_Type) {
+	community, _ := s.createCommunity()
+
+	createTokenPermission := &requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        permissionType,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+				Symbol:            "TEST",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+
+	response, err := s.owner.CreateCommunityTokenPermission(createTokenPermission)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().True(response.Communities()[0].HasTokenPermissions())
+
+	waitOnCommunityPermissionCreated := s.waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		return sub.Community.HasTokenPermissions()
+	})
+
+	err = <-waitOnCommunityPermissionCreated
+	s.Require().NoError(err)
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(community.HasTokenPermissions())
+
+	s.advertiseCommunityTo(community, s.alice)
+
+	var tokenPermission *protobuf.CommunityTokenPermission
+	for _, tokenPermission = range community.TokenPermissions() {
+		break
+	}
+
+	s.makeAddressSatisfyTheCriteria(testChainID1, aliceAddress1, tokenPermission.TokenCriteria[0])
+
+	// join community as a privileged user
+	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress1})
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, community))
+
+	// the control node re-evaluates the roles of the participants, checking that the privileged user has not lost his role
+	err = s.owner.communitiesManager.ReevaluateMembers(community)
+	s.Require().NoError(err)
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, community))
+
+	// remove privileged token permission and reevaluate member permissions
+	deleteTokenPermission := &requests.DeleteCommunityTokenPermission{
+		CommunityID:  community.ID(),
+		PermissionID: tokenPermission.Id,
+	}
+
+	response, err = s.owner.DeleteCommunityTokenPermission(deleteTokenPermission)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().False(response.Communities()[0].HasTokenPermissions())
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().False(community.HasTokenPermissions())
+
+	err = s.owner.communitiesManager.ReevaluateMembers(community)
+	s.Require().NoError(err)
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(community.HasMember(&s.alice.identity.PublicKey))
+	s.Require().False(checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, community))
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInOpenCommunity() {
+	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInOpenCommunity() {
+	s.testReevaluateMemberPrivilegedRoleInOpenCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivilegedRoleInClosedCommunity(permissionType protobuf.CommunityTokenPermission_Type) {
+	community, _ := s.createCommunity()
+
+	createTokenPermission := &requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        permissionType,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+				Symbol:            "TEST",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+
+	response, err := s.owner.CreateCommunityTokenPermission(createTokenPermission)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().True(response.Communities()[0].HasTokenPermissions())
+
+	createTokenMemberPermission := &requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x124"},
+				Symbol:            "TEST2",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+
+	response, err = s.owner.CreateCommunityTokenPermission(createTokenMemberPermission)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().True(response.Communities()[0].HasTokenPermissions())
+
+	waitOnCommunityPermissionCreated := s.waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		return len(sub.Community.TokenPermissions()) == 2
+	})
+
+	err = <-waitOnCommunityPermissionCreated
+	s.Require().NoError(err)
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(community.TokenPermissions(), 2)
+
+	s.advertiseCommunityTo(community, s.alice)
+
+	var tokenPermission *protobuf.CommunityTokenPermission
+	var tokenMemberPermission *protobuf.CommunityTokenPermission
+	for _, permission := range community.TokenPermissions() {
+		if permission.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER {
+			tokenMemberPermission = permission
+		} else {
+			tokenPermission = permission
+		}
+	}
+
+	s.makeAddressSatisfyTheCriteria(testChainID1, aliceAddress1, tokenPermission.TokenCriteria[0])
+	s.makeAddressSatisfyTheCriteria(testChainID1, aliceAddress1, tokenMemberPermission.TokenCriteria[0])
+
+	// join community as a privileged user
+	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress1})
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, community))
+
+	// the control node reevaluates the roles of the participants, checking that the privileged user has not lost his role
+	err = s.owner.communitiesManager.ReevaluateMembers(community)
+	s.Require().NoError(err)
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, community))
+
+	deleteTokenPermission := &requests.DeleteCommunityTokenPermission{
+		CommunityID:  community.ID(),
+		PermissionID: tokenPermission.Id,
+	}
+
+	// remove privileged token permission and reevaluate member permissions
+	response, err = s.owner.DeleteCommunityTokenPermission(deleteTokenPermission)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Communities()[0].TokenPermissions(), 1)
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities()[0].TokenPermissions(), 1)
+
+	err = s.owner.communitiesManager.ReevaluateMembers(community)
+	s.Require().NoError(err)
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(community.HasMember(&s.alice.identity.PublicKey))
+	s.Require().False(checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, community))
+
+	// delete member permissions and reevaluate user permissions
+	deleteMemberTokenPermission := &requests.DeleteCommunityTokenPermission{
+		CommunityID:  community.ID(),
+		PermissionID: tokenMemberPermission.Id,
+	}
+
+	response, err = s.owner.DeleteCommunityTokenPermission(deleteMemberTokenPermission)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Communities()[0].TokenPermissions(), 0)
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities()[0].TokenPermissions(), 0)
+
+	err = s.owner.communitiesManager.ReevaluateMembers(community)
+	s.Require().NoError(err)
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(community.HasMember(&s.alice.identity.PublicKey))
+
+	s.Require().False(checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, community))
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberAdminRoleInClosedCommunity() {
+	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_ADMIN)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateMemberTokenMasterRoleInClosedCommunity() {
+	s.testReevaluateMemberPrivilegedRoleInClosedCommunity(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
+}
+
+func checkRoleBasedOnThePermissionType(permissionType protobuf.CommunityTokenPermission_Type, member *ecdsa.PublicKey, community *communities.Community) bool {
+	switch permissionType {
+	case protobuf.CommunityTokenPermission_BECOME_ADMIN:
+		return community.IsMemberAdmin(member)
+	case protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER:
+		return community.IsMemberTokenMaster(member)
+	default:
+		panic("Unknown permission, please, update the test")
+	}
 }

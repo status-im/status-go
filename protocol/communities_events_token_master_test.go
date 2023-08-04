@@ -188,14 +188,9 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterPinMessage() {
 	testEventSenderPinMessage(s, community)
 }
 
-func (s *TokenMasterCommunityEventsSuite) TestTokenMasterMintToken() {
-	setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
-	// TODO TokenMaster test: Mint Tokens
-}
-
-func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAirdropTokens() {
-	setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
-	// TODO TokenMaster test: Airdrop Tokens
+func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAddCommunityToken() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
+	testEventSenderAddedCommunityToken(s, community)
 }
 
 func (s *TokenMasterCommunityEventsSuite) TestMemberReceiveTokenMasterEventsWhenControlNodeOffline() {

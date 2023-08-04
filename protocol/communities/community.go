@@ -836,11 +836,25 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 func (o *Community) AddCommunityTokensMetadata(token *protobuf.CommunityTokenMetadata) (*protobuf.CommunityDescription, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
-	if !o.IsControlNode() {
-		return nil, ErrNotControlNode
+
+	isControlNode := o.IsControlNode()
+	allowedToSendTokenEvents := o.IsOwnerWithoutCommunityKey() || o.IsTokenMaster()
+	if !isControlNode && !allowedToSendTokenEvents {
+		return nil, ErrInvalidManageTokensPermission
 	}
+
+	if allowedToSendTokenEvents {
+		err := o.addNewCommunityEvent(o.ToAddTokenMetadataCommunityEvent(token))
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	o.config.CommunityDescription.CommunityTokensMetadata = append(o.config.CommunityDescription.CommunityTokensMetadata, token)
-	o.increaseClock()
+
+	if isControlNode {
+		o.increaseClock()
+	}
 
 	return o.config.CommunityDescription, nil
 }
@@ -1149,6 +1163,10 @@ func (o *Community) IsControlNode() bool {
 
 func (o *Community) IsOwnerWithoutCommunityKey() bool {
 	return o.config.PrivateKey == nil && o.IsMemberOwner(o.config.MemberIdentity)
+}
+
+func (o *Community) IsTokenMaster() bool {
+	return o.IsMemberTokenMaster(o.config.MemberIdentity)
 }
 
 func (o *Community) GetPrivilegedMembers() []*ecdsa.PublicKey {

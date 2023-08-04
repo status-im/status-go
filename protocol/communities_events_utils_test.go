@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"errors"
+	"math/big"
 
 	"github.com/stretchr/testify/suite"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
 type CommunityEventsTestsInterface interface {
@@ -1228,4 +1230,47 @@ func testEventSenderCannotEditBecomeAdminPermission(base CommunityEventsTestsInt
 	response, err = base.GetEventSender().EditCommunityTokenPermission(permissionEditRequest)
 	s.Require().Error(err)
 	s.Require().Nil(response)
+}
+
+func testEventSenderAddedCommunityToken(base CommunityEventsTestsInterface, community *communities.Community) {
+	tokenERC721 := &communities.CommunityToken{
+		CommunityID:        community.IDString(),
+		TokenType:          protobuf.CommunityTokenType_ERC721,
+		Address:            "0x123",
+		Name:               "StatusToken",
+		Symbol:             "STT",
+		Description:        "desc",
+		Supply:             &bigint.BigInt{Int: big.NewInt(123)},
+		InfiniteSupply:     false,
+		Transferable:       true,
+		RemoteSelfDestruct: true,
+		ChainID:            1,
+		DeployState:        communities.Deployed,
+		Base64Image:        "ABCD",
+	}
+
+	s := base.GetSuite()
+
+	_, err := base.GetEventSender().SaveCommunityToken(tokenERC721, nil)
+	s.Require().NoError(err)
+
+	err = base.GetEventSender().AddCommunityToken(tokenERC721.CommunityID, tokenERC721.ChainID, tokenERC721.Address)
+	s.Require().NoError(err)
+
+	checkTokenAdded := func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
+		if err != nil {
+			return err
+		}
+
+		for _, tokenMetadata := range modifiedCommmunity.CommunityTokensMetadata() {
+			if tokenMetadata.Name == tokenERC721.Name {
+				return nil
+			}
+		}
+
+		return errors.New("Token was not found")
+	}
+
+	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkTokenAdded)
 }
