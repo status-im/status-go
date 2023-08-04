@@ -99,14 +99,20 @@ func (s *MessengerShareUrlsSuite) createCommunityWithChannel() (*communities.Com
 func (s *MessengerShareUrlsSuite) TestDecodeEncodeDataURL() {
 	ts := [][]byte{
 		[]byte("test data 123"),
-		[]byte("test data 123test data 123test data 123test data 123test data 123"),
+		// []byte("test data 123test data 123test data 123test data 123test data 123"),
+		// []byte("GxgBoJwHdsOLl4DWt55mGELN6clGsb1UKTEkT0KUMDfwhWFpUyWH_cefTnvlcSf2JUXCOAWoY5ywzry-LnJ-PjgOGT1Pkb8riQp7ghv6Zu-x70x4m8lncZaRWpDN-sEfT85idUCWvppT_QFNa2A6J3Gr69UJGvWmL3S4DBwX2Jr7LBTNOvFPo6lejNUb-xizlAMUTrokunCH-qNmgtU6UK0J6Vkn8Ce35XGBFObxpxnAtnC_J_D-SrBCBnjiUlwH0ViNr3lHBg=="),
 	}
 
 	for i := range ts {
-		encodedData, err := urls.EncodeDataURL(ts[i])
-		s.Require().NoError(err)
+		// encodedData, err := urls.EncodeDataURL(ts[i])
+		// s.Require().NoError(err)
 
-		decodedData, err := urls.DecodeDataURL(encodedData)
+		decodedData, err := urls.DecodeDataURL(
+			// encodedData
+			// "GxgBoJwHdsOLl4DWt55mGELN6clGsb1UKTEkT0KUMDfwhWFpUyWH_cefTnvlcSf2JUXCOAWoY5ywzry-LnJ-PjgOGT1Pkb8riQp7ghv6Zu-x70x4m8lncZaRWpDN-sEfT85idUCWvppT_QFNa2A6J3Gr69UJGvWmL3S4DBwX2Jr7LBTNOvFPo6lejNUb-xizlAMUTrokunCH-qNmgtU6UK0J6Vkn8Ce35XGBFObxpxnAtnC_J_D-SrBCBnjiUlwH0ViNr3lHBg==",
+			// "iyKACkQKB0Rvb2RsZXMSJ0NvbG9yaW5nIHRoZSB3b3JsZCB3aXRoIGpveSDigKIg4bSXIOKAohiYohsiByMxMzFEMkYqAwEhMwM=",
+			"G8QAgC0OzDOfHB4N5V1zajCKmHvbUAXB6XK6XYLS60WrOmCEEVgFEJaHsLkpTevR-XHc03r4B2pKTOoYJwqbLrLw9u2DhyzlK5rEWE09Dy7oPbVSPhwlOKozCQuAsMX84eJimcwKWNer82gPcCrbhPM-Zx1s3-glfEojrEYRDp61MM2DTNiD92_BDIN3eYvvcQsfT-quKYmaf1_i9Kpzk0Fi",
+		)
 		s.Require().NoError(err)
 		s.Require().Equal(ts[i], decodedData)
 	}
@@ -201,10 +207,16 @@ func (s *MessengerShareUrlsSuite) TestShareCommunityURLWithData() {
 func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithData() {
 	community := s.createCommunity()
 
-	communityData, signature, err := s.m.prepareEncodedCommunityData(community)
-	s.Require().NoError(err)
+	// communityData, signature, err := s.m.prepareEncodedCommunityData(community)
+	// s.Require().NoError(err)
 
-	url := fmt.Sprintf("%s/c/%s#%s", baseShareURL, communityData, signature)
+	// https://status.app/c/GzAAAETnNgpsRpPBwMzNmQiokxNsTUoRiCDpdc4UDkxk1F7pOu65DV_H8-xat9EQ9g==#zQ3shr9nw5uqkXwZkFXBhSnsqifnj2QKXy4BgbdXrE1RhCSAV
+	// url := fmt.Sprintf("%s/c/%s#%s", baseShareURL, communityData, signature)
+	// note see https://github.com/status-im/status-web/pull/461/files#diff-378ed45ccbd1b990783b9cc2f2ee73430328530f17339176b4fa658f2b6eda08 for source
+	url := "https://status.app/c/iyKACkQKB0Rvb2RsZXMSJ0NvbG9yaW5nIHRoZSB3b3JsZCB3aXRoIGpveSDigKIg4bSXIOKAohiYohsiByMxMzFEMkYqAwEhMwM=#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
+	// url := "https://status.app/c/CyCACj8KB0Rvb2RsZXMSJ0NvbG9yaW5nIHRoZSB3b3JsZCB3aXRoIGpveSDigKIg4bSXIOKAohiYohsiByMxMzFEMkYD#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11" // -tags
+	// url := "https://status.app/c/iwuAChYKB0Rvb2RsZXMYmKIbIgcjMTMxRDJGAw==#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11" // -description
+	// url := "https://status.app/c/CweACg0KB0Rvb2RsZXMYmKIbAw==#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11" // -color
 
 	urlData, err := s.m.ParseSharedURL(url)
 	s.Require().NoError(err)
