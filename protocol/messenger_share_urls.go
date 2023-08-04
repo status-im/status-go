@@ -177,8 +177,14 @@ func (m *Messenger) parseCommunityURLWithData(data string, chatKey string) (*URL
 		return nil, err
 	}
 
+	var urlDataProto protobuf.URLData
+	err = proto.Unmarshal(communityData, &urlDataProto)
+	if err != nil {
+		return nil, err
+	}
+
 	var communityProto protobuf.Community
-	err = proto.Unmarshal(communityData, &communityProto)
+	err = proto.Unmarshal(urlDataProto.Content, &communityProto)
 	if err != nil {
 		return nil, err
 	}
