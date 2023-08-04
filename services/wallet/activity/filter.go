@@ -26,6 +26,7 @@ const (
 	SwapAT
 	BridgeAT
 	ContractDeploymentAT
+	MintAT
 )
 
 func allActivityTypesFilter() []Type {
