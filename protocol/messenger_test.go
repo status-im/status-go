@@ -1431,7 +1431,7 @@ func (s *MessengerSuite) TestBlockContact() {
 
 	// The chat is deleted
 	actualChats := s.m.Chats()
-	s.Require().Equal(deprecation.AddChatsCount(2), len(actualChats))
+	s.Require().Equal(deprecation.AddChatsCount(3), len(actualChats))
 
 	// The messages have been deleted
 	chat2Messages, _, err := s.m.MessageByChatID(chat2.ID, "", 20)
