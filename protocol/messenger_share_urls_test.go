@@ -99,20 +99,14 @@ func (s *MessengerShareUrlsSuite) createCommunityWithChannel() (*communities.Com
 func (s *MessengerShareUrlsSuite) TestDecodeEncodeDataURL() {
 	ts := [][]byte{
 		[]byte("test data 123"),
-		// []byte("test data 123test data 123test data 123test data 123test data 123"),
-		// []byte("GxgBoJwHdsOLl4DWt55mGELN6clGsb1UKTEkT0KUMDfwhWFpUyWH_cefTnvlcSf2JUXCOAWoY5ywzry-LnJ-PjgOGT1Pkb8riQp7ghv6Zu-x70x4m8lncZaRWpDN-sEfT85idUCWvppT_QFNa2A6J3Gr69UJGvWmL3S4DBwX2Jr7LBTNOvFPo6lejNUb-xizlAMUTrokunCH-qNmgtU6UK0J6Vkn8Ce35XGBFObxpxnAtnC_J_D-SrBCBnjiUlwH0ViNr3lHBg=="),
+		[]byte("test data 123test data 123test data 123test data 123test data 123"),
 	}
 
 	for i := range ts {
-		// encodedData, err := urls.EncodeDataURL(ts[i])
-		// s.Require().NoError(err)
+		encodedData, err := urls.EncodeDataURL(ts[i])
+		s.Require().NoError(err)
 
-		decodedData, err := urls.DecodeDataURL(
-			// encodedData
-			// "GxgBoJwHdsOLl4DWt55mGELN6clGsb1UKTEkT0KUMDfwhWFpUyWH_cefTnvlcSf2JUXCOAWoY5ywzry-LnJ-PjgOGT1Pkb8riQp7ghv6Zu-x70x4m8lncZaRWpDN-sEfT85idUCWvppT_QFNa2A6J3Gr69UJGvWmL3S4DBwX2Jr7LBTNOvFPo6lejNUb-xizlAMUTrokunCH-qNmgtU6UK0J6Vkn8Ce35XGBFObxpxnAtnC_J_D-SrBCBnjiUlwH0ViNr3lHBg==",
-			// "iyKACkQKB0Rvb2RsZXMSJ0NvbG9yaW5nIHRoZSB3b3JsZCB3aXRoIGpveSDigKIg4bSXIOKAohiYohsiByMxMzFEMkYqAwEhMwM=",
-			"G8QAgC0OzDOfHB4N5V1zajCKmHvbUAXB6XK6XYLS60WrOmCEEVgFEJaHsLkpTevR-XHc03r4B2pKTOoYJwqbLrLw9u2DhyzlK5rEWE09Dy7oPbVSPhwlOKozCQuAsMX84eJimcwKWNer82gPcCrbhPM-Zx1s3-glfEojrEYRDp61MM2DTNiD92_BDIN3eYvvcQsfT-quKYmaf1_i9Kpzk0Fi",
-		)
+		decodedData, err := urls.DecodeDataURL(encodedData)
 		s.Require().NoError(err)
 		s.Require().Equal(ts[i], decodedData)
 	}
