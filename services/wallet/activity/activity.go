@@ -392,6 +392,7 @@ const (
 		1 AS agg_count,
 
 		transfers.token_address AS token_address,
+		transfers.token_id AS token_id,
 		NULL AS token_code,
 		NULL AS from_token_code,
 		NULL AS to_token_code,
@@ -468,6 +469,7 @@ const (
 		1 AS agg_count,
 
 		NULL AS token_address,
+		NULL AS token_id,
 		pending_transactions.symbol AS token_code,
 		NULL AS from_token_code,
 		NULL AS to_token_code,
@@ -522,6 +524,7 @@ const (
 		COALESCE(tr_status.count, 0) + COALESCE(pending_status.count, 0) AS agg_count,
 
 		NULL AS token_address,
+		NULL AS token_id,
 		NULL AS token_code,
 		multi_transactions.from_asset AS from_token_code,
 		multi_transactions.to_asset AS to_token_code,
@@ -677,7 +680,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		var timestamp int64
 		var dbMtType, dbTrType sql.NullByte
 		var toAddress, fromAddress eth.Address
-		var toAddressDB, ownerAddressDB, contractAddressDB sql.RawBytes
+		var toAddressDB, ownerAddressDB, contractAddressDB, dbTokenID sql.RawBytes
 		var tokenAddress, contractAddress *eth.Address
 		var aggregatedStatus int
 		var dbTrAmount sql.NullString
@@ -686,7 +689,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		var transferType *TransferType
 		err := rows.Scan(&transferHash, &pendingHash, &chainID, &multiTxID, &timestamp, &dbMtType, &dbTrType, &fromAddress,
 			&toAddressDB, &ownerAddressDB, &dbTrAmount, &dbMtFromAmount, &dbMtToAmount, &aggregatedStatus, &aggregatedCount,
-			&tokenAddress, &tokenCode, &fromTokenCode, &toTokenCode, &outChainIDDB, &inChainIDDB, &contractType, &contractAddressDB)
+			&tokenAddress, &dbTokenID, &tokenCode, &fromTokenCode, &toTokenCode, &outChainIDDB, &inChainIDDB, &contractType, &contractAddressDB)
 		if err != nil {
 			return nil, err
 		}
@@ -723,6 +726,11 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		var tokenOut, tokenIn *Token
 		var outChainID, inChainID *common.ChainID
 		var entry Entry
+		var tokenID TokenID
+		if len(dbTokenID) > 0 {
+			t := new(big.Int).SetBytes(dbTokenID)
+			tokenID = (*hexutil.Big)(t)
+		}
 
 		if transferHash != nil && chainID.Valid {
 			// Extract activity type: SendAT/ReceiveAT
@@ -734,9 +742,9 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 			// Extract tokens and chains
 			var involvedToken *Token
 			if tokenAddress != nil && *tokenAddress != ZeroAddress {
-				involvedToken = &Token{TokenType: Erc20, ChainID: common.ChainID(chainID.Int64), Address: *tokenAddress}
+				involvedToken = &Token{TokenType: Erc20, ChainID: common.ChainID(chainID.Int64), TokenID: tokenID, Address: *tokenAddress}
 			} else {
-				involvedToken = &Token{TokenType: Native, ChainID: common.ChainID(chainID.Int64)}
+				involvedToken = &Token{TokenType: Native, ChainID: common.ChainID(chainID.Int64), TokenID: tokenID}
 			}
 
 			if activityType == SendAT {
