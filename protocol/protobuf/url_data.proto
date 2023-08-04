@@ -30,10 +30,3 @@ message URLData {
  // Community, Channel, or User
  bytes content = 1;
 }
-
-// Field on CommunityDescription, CommunityChat and ContactCodeAdvertisement
-message URLParams {
- string encoded_url_data = 1;
- // Signature of encoded URL data
- string encoded_signature = 2;
-}
