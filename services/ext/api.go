@@ -459,7 +459,11 @@ func (api *PublicAPI) ImportCommunity(ctx context.Context, hexPrivateKey string)
 func (api *PublicAPI) GetCommunityPublicKeyFromPrivateKey(ctx context.Context, hexPrivateKey string) string {
 	publicKey := api.service.messenger.GetCommunityIDFromKey(hexPrivateKey)
 	return publicKey
+}
 
+// Get community members contact list for provided wallet addresses
+func (api *PublicAPI) GetCommunityMembersForWalletAddresses(communityID types.HexBytes, chainID uint64) (map[string]*protocol.Contact, error) {
+	return api.service.messenger.GetCommunityMembersForWalletAddresses(communityID, chainID)
 }
 
 // Speeds up importing messages from archives
