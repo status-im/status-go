@@ -23,6 +23,7 @@ message CommunityMember {
     ROLE_TOKEN_MASTER = 5;
   }
   repeated Roles roles = 1;
+  // deprecated, do not put accounts here
   repeated RevealedAccount revealed_accounts = 2;
   uint64 last_update_clock = 3;
 }
