@@ -576,6 +576,11 @@ func (p *Persistence) GetPermissionTokenCriteriaResult(permissionID string, comm
 	return &PermissionTokenCriteriaResult{Criteria: criteria}, nil
 }
 
+func (p *Persistence) RemoveRequestToJoinRevealedAddresses(requestID []byte) error {
+	_, err := p.db.Exec(`DELETE FROM communities_requests_to_join_revealed_addresses WHERE request_id = ?`, requestID)
+	return err
+}
+
 func (p *Persistence) GetRequestToJoinRevealedAddresses(requestID []byte) ([]*protobuf.RevealedAccount, error) {
 	revealedAccounts := make([]*protobuf.RevealedAccount, 0)
 	rows, err := p.db.Query(`SELECT address, chain_ids, is_airdrop_address FROM communities_requests_to_join_revealed_addresses WHERE request_id = ?`, requestID)

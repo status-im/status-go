@@ -628,7 +628,7 @@ func (m *Manager) ReevaluateMembers(community *Community) error {
 
 	hasMemberPermissions := len(becomeMemberPermissions) > 0
 
-	for memberKey, member := range community.Members() {
+	for memberKey := range community.Members() {
 		memberPubKey, err := common.HexToPubkey(memberKey)
 		if err != nil {
 			return err
@@ -640,7 +640,13 @@ func (m *Manager) ReevaluateMembers(community *Community) error {
 
 		isTokenMaster := community.IsMemberTokenMaster(memberPubKey)
 		isAdmin := community.IsMemberAdmin(memberPubKey)
-		memberHasWallet := len(member.RevealedAccounts) > 0
+		requestID := CalculateRequestID(memberKey, community.ID())
+		revealedAccounts, err := m.persistence.GetRequestToJoinRevealedAddresses(requestID)
+		if err != nil {
+			return err
+		}
+
+		memberHasWallet := len(revealedAccounts) > 0
 
 		// Check if user has privilege role without sharing the account to controlNode
 		// or user treated as a member without wallet in closed community
@@ -652,7 +658,7 @@ func (m *Manager) ReevaluateMembers(community *Community) error {
 			continue
 		}
 
-		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(member.RevealedAccounts)
+		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(revealedAccounts)
 
 		isTokenMaster, err = m.ReevaluatePrivelegedMember(community, becomeTokenMasterPermissions, accountsAndChainIDs, memberPubKey,
 			protobuf.CommunityMember_ROLE_TOKEN_MASTER, isTokenMaster)
@@ -1727,7 +1733,7 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 			memberRoles = []protobuf.CommunityMember_Roles{role}
 		}
 
-		_, err = community.AddMemberWithRevealedAccounts(dbRequest, memberRoles, revealedAccounts)
+		_, err = community.AddMember(pk, memberRoles)
 		if err != nil {
 			return nil, err
 		}
@@ -2012,7 +2018,18 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 		}
 	}
 
-	_, err = community.AddMemberRevealedAccounts(common.PubkeyToHex(signer), request.RevealedAccounts, request.Clock)
+	requestToJoin := &RequestToJoin{
+		PublicKey:        common.PubkeyToHex(signer),
+		CommunityID:      community.ID(),
+		RevealedAccounts: request.RevealedAccounts,
+	}
+	requestToJoin.CalculateID()
+
+	err = m.persistence.RemoveRequestToJoinRevealedAddresses(requestToJoin.ID)
+	if err != nil {
+		return err
+	}
+	err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin)
 	if err != nil {
 		return err
 	}
@@ -4235,6 +4252,11 @@ func (m *Manager) fixupChannelMembers() error {
 	}
 
 	return nil
+}
+
+func (m *Manager) GetRevealedAddresses(communityID types.HexBytes, memberPk string) ([]*protobuf.RevealedAccount, error) {
+	requestID := CalculateRequestID(memberPk, communityID)
+	return m.persistence.GetRequestToJoinRevealedAddresses(requestID)
 }
 
 func (m *Manager) ReevaluatePrivelegedMember(community *Community, tokenPermissions []*protobuf.CommunityTokenPermission,

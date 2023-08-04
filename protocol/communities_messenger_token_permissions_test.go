@@ -412,19 +412,21 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSh
 
 	s.Require().Equal(3, community.MembersCount())
 
-	for pubKey, member := range community.Members() {
+	for pubKey := range community.Members() {
 		if pubKey != common.PubkeyToHex(&s.owner.identity.PublicKey) {
+			revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), pubKey)
+			s.Require().NoError(err)
 
 			switch pubKey {
 			case common.PubkeyToHex(&s.alice.identity.PublicKey):
-				s.Require().Len(member.RevealedAccounts, 2)
-				s.Require().Equal(member.RevealedAccounts[0].Address, aliceAddress1)
-				s.Require().Equal(member.RevealedAccounts[1].Address, aliceAddress2)
-				s.Require().Equal(true, member.RevealedAccounts[0].IsAirdropAddress)
+				s.Require().Len(revealedAccounts, 2)
+				s.Require().Equal(revealedAccounts[0].Address, aliceAddress1)
+				s.Require().Equal(revealedAccounts[1].Address, aliceAddress2)
+				s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
 			case common.PubkeyToHex(&s.bob.identity.PublicKey):
-				s.Require().Len(member.RevealedAccounts, 1)
-				s.Require().Equal(member.RevealedAccounts[0].Address, bobAddress)
-				s.Require().Equal(true, member.RevealedAccounts[0].IsAirdropAddress)
+				s.Require().Len(revealedAccounts, 1)
+				s.Require().Equal(revealedAccounts[0].Address, bobAddress)
+				s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
 			default:
 				s.Require().Fail("pubKey does not match expected keys")
 			}
@@ -443,14 +445,16 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSe
 
 	s.Require().Equal(2, community.MembersCount())
 
-	for pubKey, member := range community.Members() {
+	for pubKey := range community.Members() {
 		if pubKey != common.PubkeyToHex(&s.owner.identity.PublicKey) {
-			s.Require().Len(member.RevealedAccounts, 1)
+			revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), pubKey)
+			s.Require().NoError(err)
+			s.Require().Len(revealedAccounts, 1)
 
 			switch pubKey {
 			case common.PubkeyToHex(&s.alice.identity.PublicKey):
-				s.Require().Equal(member.RevealedAccounts[0].Address, aliceAddress2)
-				s.Require().Equal(true, member.RevealedAccounts[0].IsAirdropAddress)
+				s.Require().Equal(revealedAccounts[0].Address, aliceAddress2)
+				s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
 			default:
 				s.Require().Fail("pubKey does not match expected keys")
 			}
@@ -469,15 +473,17 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersMu
 
 	s.Require().Equal(2, community.MembersCount())
 
-	for pubKey, member := range community.Members() {
+	for pubKey := range community.Members() {
 		if pubKey != common.PubkeyToHex(&s.owner.identity.PublicKey) {
-			s.Require().Len(member.RevealedAccounts, 2)
+			revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), pubKey)
+			s.Require().NoError(err)
+			s.Require().Len(revealedAccounts, 2)
 
 			switch pubKey {
 			case common.PubkeyToHex(&s.alice.identity.PublicKey):
-				s.Require().Equal(member.RevealedAccounts[0].Address, aliceAddress1)
-				s.Require().Equal(member.RevealedAccounts[1].Address, aliceAddress2)
-				s.Require().Equal(true, member.RevealedAccounts[1].IsAirdropAddress)
+				s.Require().Equal(revealedAccounts[0].Address, aliceAddress1)
+				s.Require().Equal(revealedAccounts[1].Address, aliceAddress2)
+				s.Require().Equal(true, revealedAccounts[1].IsAirdropAddress)
 			default:
 				s.Require().Fail("pubKey does not match expected keys")
 			}
@@ -485,19 +491,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersMu
 	}
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) validateAliceAddress(community *communities.Community, wantedAddress string) error {
-	for pubKey, member := range community.Members() {
-		if pubKey != common.PubkeyToHex(&s.owner.identity.PublicKey) {
-			s.Require().Len(member.RevealedAccounts, 1)
+func (s *MessengerCommunitiesTokenPermissionsSuite) validateAddress(accounts []*protobuf.RevealedAccount, wantedAddress string) error {
 
-			switch pubKey {
-			case common.PubkeyToHex(&s.alice.identity.PublicKey):
-				if member.RevealedAccounts[0].Address != wantedAddress {
-					return errors.New("Alice's address does not match the wanted address. Wanted " + wantedAddress + ", Found: " + member.RevealedAccounts[0].Address)
-				}
-			default:
-				return errors.New("pubKey does not match expected keys")
-			}
+	for _, account := range accounts {
+		if account.Address != wantedAddress {
+			return errors.New("revealed address does not match the wanted address. Wanted " + wantedAddress + ", Found: " + account.Address)
 		}
 	}
 	return nil
@@ -511,10 +509,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 
 	community, err := s.owner.GetCommunityByID(community.ID())
 	s.Require().NoError(err)
-
 	s.Require().Equal(2, community.MembersCount())
 
-	err = s.validateAliceAddress(community, aliceAddress2)
+	revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().NoError(err)
+
+	err = s.validateAddress(revealedAccounts, aliceAddress2)
 	s.Require().NoError(err)
 
 	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(alicePassword)))
@@ -532,16 +532,13 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 		if len(response.Communities()) == 0 {
 			return errors.New("no communities in response (address change reception)")
 		}
-		community := response.Communities()[0]
-		return s.validateAliceAddress(community, aliceAddress1)
+		return nil
 	})
 	s.Require().NoError(err)
-
-	// Also check that the owner has the new address in their DB
-	community, err = s.owner.GetCommunityByID(community.ID())
+	revealedAccounts, err = s.owner.communitiesManager.GetRevealedAddresses(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().NoError(err)
 
-	err = s.validateAliceAddress(community, aliceAddress1)
+	err = s.validateAddress(revealedAccounts, aliceAddress1)
 	s.Require().NoError(err)
 
 	// Retrieve community description change
@@ -555,13 +552,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 		}
 		return nil
 	})
-	s.Require().NoError(err)
-
-	// Check that Alice's community is updated with the new addresses
-	community, err = s.alice.GetCommunityByID(community.ID())
-	s.Require().NoError(err)
-
-	err = s.validateAliceAddress(community, aliceAddress1)
 	s.Require().NoError(err)
 }
 
