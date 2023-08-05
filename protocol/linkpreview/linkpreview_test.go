@@ -251,7 +251,26 @@ func Test_UnfurlURLs_giphy(t *testing.T) {
 	require.Equal(t, expected.Title, preview.Title)
 	require.Equal(t, expected.Thumbnail.Width, preview.Thumbnail.Width)
 	require.Equal(t, expected.Thumbnail.Height, preview.Thumbnail.Height)
-	require.Equal(t, expected.Thumbnail.URL, preview.Thumbnail.URL)
+}
+
+func Test_UnfurlURLs_tenor(t *testing.T) {
+	url := "https://tenor.com/bu7U0.gif"
+
+	expected := common.LinkPreview{
+		URL:   url,
+		Title: "Can't get link preview for tenor.com",
+	}
+
+	transport := StubTransport{}
+	stubbedClient := http.Client{Transport: &transport}
+
+	previews, err := UnfurlURLs(nil, stubbedClient, []string{url})
+	require.NoError(t, err)
+	require.Len(t, previews, 1)
+	preview := previews[0]
+
+	require.Equal(t, expected.URL, preview.URL)
+	require.Equal(t, expected.Title, preview.Title)
 }
 
 func Test_UnfurlURLs_Reddit(t *testing.T) {

@@ -125,7 +125,8 @@ type OEmbedUnfurler struct {
 	// https://www.youtube.com/oembed.
 	oembedEndpoint string
 	// url is the actual URL to be unfurled.
-	url *neturl.URL
+	url                 *neturl.URL
+	generateFakePreview bool
 }
 
 type OEmbedBaseResponse struct {
@@ -193,8 +194,22 @@ func handleRichOembedType(preview common.LinkPreview, response OEmbedBaseRespons
 	return preview
 }
 
+func FakeGenericImageLinkPreviewData(httpClient http.Client, title string, link string) (preview common.LinkPreview, err error) {
+	_, err = neturl.Parse(link)
+	if err != nil {
+		return preview, fmt.Errorf("Failed to parse link %s", link)
+	}
+
+	preview.Title = title
+	preview.URL = link
+	return preview, nil
+}
+
 func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 	preview := newDefaultLinkPreview(u.url)
+	if u.generateFakePreview {
+		return FakeGenericImageLinkPreviewData(u.httpClient, "Can't get link preview for "+u.url.Hostname(), u.url.String())
+	}
 	oembedURL, err := u.newOEmbedURL()
 	if err != nil {
 		return preview, err
@@ -318,10 +333,11 @@ func newUnfurler(logger *zap.Logger, httpClient http.Client, url *neturl.URL) Un
 		}
 	case "tenor.com", "media.tenor.com":
 		return OEmbedUnfurler{
-			oembedEndpoint: "https://tenor.com/oembed",
-			url:            url,
-			logger:         logger,
-			httpClient:     httpClient,
+			oembedEndpoint:      "https://tenor.com/oembed",
+			url:                 url,
+			logger:              logger,
+			httpClient:          httpClient,
+			generateFakePreview: true,
 		}
 	default:
 		return OpenGraphUnfurler{
