@@ -220,7 +220,6 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 		"accept-language": headerAcceptLanguage,
 		"user-agent":      headerUserAgent,
 	}
-
 	oembedBytes, err := fetchBody(u.logger, u.httpClient, oembedURL.String(), headers)
 	if err != nil {
 		return preview, err
