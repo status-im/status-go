@@ -172,6 +172,7 @@ func (u OEmbedUnfurler) handlePhotoOembedType(preview common.LinkPreview, respon
 			preview.Thumbnail = t
 		}
 	}
+	return preview
 }
 
 func (u OEmbedUnfurler) handleVideoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
@@ -183,6 +184,7 @@ func (u OEmbedUnfurler) handleVideoOembedType(preview common.LinkPreview, respon
 			preview.Thumbnail = t
 		}
 	}
+	return preview
 }
 
 func handleRichOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
@@ -230,7 +232,6 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 	if err != nil {
 		return preview, err
 	}
-	switch oembedResponse.Type {
 
 	if oembedResponse.Title != "" {
 		preview.Title = oembedResponse.Title
@@ -249,7 +250,6 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 	default:
 		return preview, fmt.Errorf("unexpected oembed type: %v", oembedResponse.Type)
 	}
-	return preview, nil
 }
 
 type OpenGraphMetadata struct {
