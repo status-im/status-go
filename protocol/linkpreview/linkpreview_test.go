@@ -217,7 +217,7 @@ func Test_UnfurlURLs_giphy(t *testing.T) {
 		Thumbnail: common.LinkPreviewThumbnail{
 			URL:    "https://media4.giphy.com/media/sof2kXOSK5beJdb7xH/giphy.gif",
 			Height: 480,
-			Width:  480,
+			Width:  400,
 		},
 	}
 

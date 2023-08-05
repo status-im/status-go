@@ -167,23 +167,23 @@ func (u OEmbedUnfurler) handlePhotoOembedType(preview common.LinkPreview, respon
 	if response.URL != "" {
 		t, err := fetchThumbnail(u.logger, u.httpClient, response.URL)
 		if err != nil {
-			// Given we want to fetch thumbnails on a best-effort basis, if an error
-			// happens we simply log it.
 			u.logger.Info("failed to fetch thumbnail", zap.String("url", u.url.String()), zap.Error(err))
 		} else {
 			preview.Thumbnail = t
 		}
 	}
-	preview.Thumbnail.URL = response.URL
-	preview.Thumbnail.Height = response.Height
-	preview.Thumbnail.Width = response.Height
 	return preview
 }
 
-func handleVideoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
-	preview.Thumbnail.URL = response.ThumbnailURL
-	preview.Thumbnail.Height = response.ThumbnailHeight
-	preview.Thumbnail.Width = response.Width
+func (u OEmbedUnfurler) handleVideoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
+	if response.ThumbnailURL != "" {
+		t, err := fetchThumbnail(u.logger, u.httpClient, response.ThumbnailURL)
+		if err != nil {
+			u.logger.Info("failed to fetch thumbnail", zap.String("url", u.url.String()), zap.Error(err))
+		} else {
+			preview.Thumbnail = t
+		}
+	}
 	return preview
 }
 
@@ -242,7 +242,7 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 		return u.handlePhotoOembedType(preview, oembedResponse), nil
 
 	case "video":
-		return handleVideoOembedType(preview, oembedResponse), nil
+		return u.handleVideoOembedType(preview, oembedResponse), nil
 
 	case "rich":
 		return handleRichOembedType(preview, oembedResponse), nil
