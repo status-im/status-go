@@ -238,6 +238,7 @@ func Test_UnfurlURLs_giphy(t *testing.T) {
 		}
 		`),
 	)
+	transport.fallbackToDefaultTransport = true
 
 	stubbedClient := http.Client{Transport: &transport}
 

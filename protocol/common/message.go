@@ -88,6 +88,7 @@ type LinkPreviewThumbnail struct {
 	// Non-empty when the thumbnail is available via the media server, i.e. after
 	// the chat message is sent.
 	URL string `json:"url,omitempty"`
+	ExternalURL string `json:"external_url,omitempty"`
 	// Non-empty when the thumbnail payload needs to be shared with the client,
 	// but before it has been persisted.
 	DataURI string `json:"dataUri,omitempty"`
@@ -790,16 +791,16 @@ func (m *Message) ConvertLinkPreviewsToProto() ([]*protobuf.UnfurledLink, error)
 			}
 		}
 
-		ThumbnailExternalURL := preview.Thumbnail.URL
+		ThumbnailExternalURL := preview.Thumbnail.ExternalURL
 
 		ul := &protobuf.UnfurledLink{
-			Url:              preview.URL,
-			Title:            preview.Title,
-			Description:      preview.Description,
-			ThumbnailWidth:   uint32(preview.Thumbnail.Width),
-			ThumbnailHeight:  uint32(preview.Thumbnail.Height),
-			ThumbnailPayload: payload,
-			ThumbnailExternalURL: ThumbnailExternalURL,
+			Url:                  preview.URL,
+			Title:                preview.Title,
+			Description:          preview.Description,
+			ThumbnailWidth:       uint32(preview.Thumbnail.Width),
+			ThumbnailHeight:      uint32(preview.Thumbnail.Height),
+			ThumbnailPayload:     payload,
+			ThumbnailExternalUrl: ThumbnailExternalURL,
 		}
 		unfurledLinks = append(unfurledLinks, ul)
 	}
@@ -832,10 +833,18 @@ func (m *Message) ConvertFromProtoToLinkPreviews(makeMediaServerURL func(msgID s
 			Title:       link.Title,
 			URL:         link.Url,
 		}
+
+		lp.Thumbnail.ExternalURL = link.ThumbnailExternalUrl
+
+		if lp.Thumbnail.ExternalURL != "" {
+			lp.Thumbnail.ExternalURL = link.ThumbnailExternalUrl
+		} else {
+			lp.Thumbnail.URL = makeMediaServerURL(m.ID, link.Url)
+		}
+		
 		if payload := link.GetThumbnailPayload(); payload != nil {
 			lp.Thumbnail.Width = int(link.ThumbnailWidth)
 			lp.Thumbnail.Height = int(link.ThumbnailHeight)
-			lp.Thumbnail.URL = makeMediaServerURL(m.ID, link.Url)
 		}
 		previews = append(previews, lp)
 	}

@@ -93,7 +93,7 @@ func newDefaultLinkPreview(url *neturl.URL) common.LinkPreview {
 	}
 }
 
-func fetchThumbnail(logger *zap.Logger, httpClient http.Client, url string) (common.LinkPreviewThumbnail, error) {
+func fetchThumbnail(logger *zap.Logger, httpClient http.Client, url string, external bool) (common.LinkPreviewThumbnail, error) {
 	var thumbnail common.LinkPreviewThumbnail
 
 	imgBytes, err := fetchBody(logger, httpClient, url, nil)
@@ -112,6 +112,10 @@ func fetchThumbnail(logger *zap.Logger, httpClient http.Client, url string) (com
 		return thumbnail, fmt.Errorf("could not build data URI: %w", err)
 	}
 	thumbnail.URL = url
+
+	if external {
+		thumbnail.ExternalURL = url
+	}
 
 	return thumbnail, nil
 }
@@ -164,7 +168,7 @@ func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
 
 func (u OEmbedUnfurler) handlePhotoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
 	if response.URL != "" {
-		t, err := fetchThumbnail(u.logger, u.httpClient, response.URL)
+		t, err := fetchThumbnail(u.logger, u.httpClient, response.URL, true)
 		if err != nil {
 			u.logger.Info("failed to fetch thumbnail", zap.String("url", u.url.String()), zap.Error(err))
 		} else {
@@ -176,7 +180,7 @@ func (u OEmbedUnfurler) handlePhotoOembedType(preview common.LinkPreview, respon
 
 func (u OEmbedUnfurler) handleVideoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
 	if response.ThumbnailURL != "" {
-		t, err := fetchThumbnail(u.logger, u.httpClient, response.ThumbnailURL)
+		t, err := fetchThumbnail(u.logger, u.httpClient, response.ThumbnailURL, true)
 		if err != nil {
 			u.logger.Info("failed to fetch thumbnail", zap.String("url", u.url.String()), zap.Error(err))
 		} else {
@@ -292,7 +296,7 @@ func (u OpenGraphUnfurler) unfurl() (common.LinkPreview, error) {
 	}
 
 	if ogMetadata.ThumbnailURL != "" {
-		t, err := fetchThumbnail(u.logger, u.httpClient, ogMetadata.ThumbnailURL)
+		t, err := fetchThumbnail(u.logger, u.httpClient, ogMetadata.ThumbnailURL, false)
 		if err != nil {
 			// Given we want to fetch thumbnails on a best-effort basis, if an error
 			// happens we simply log it.
