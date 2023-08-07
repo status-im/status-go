@@ -107,14 +107,15 @@ func fetchThumbnail(logger *zap.Logger, httpClient http.Client, url string, exte
 	}
 	thumbnail.Width = width
 	thumbnail.Height = height
-
-	if err != nil {
-		return thumbnail, fmt.Errorf("could not build data URI: %w", err)
-	}
-	thumbnail.URL = url
-
+	
 	if external {
 		thumbnail.ExternalURL = url
+	} else {
+		dataURI, err := images.GetPayloadDataURI(imgBytes)
+		if err != nil {
+			return thumbnail, fmt.Errorf("could not build data URI: %w", err)
+		}
+		thumbnail.DataURI = dataURI
 	}
 
 	return thumbnail, nil
