@@ -2,12 +2,12 @@ package collectibles
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/afex/hystrix-go/hystrix"
@@ -46,13 +46,11 @@ type Manager struct {
 	metadataProvider           thirdparty.CollectibleMetadataProvider
 	opensea                    *opensea.Client
 	httpClient                 *http.Client
-	collectiblesDataCache      map[string]thirdparty.CollectibleData
-	collectiblesDataCacheLock  sync.RWMutex
-	collectionsDataCache       map[string]thirdparty.CollectionData
-	collectionsDataCacheLock   sync.RWMutex
+	collectiblesDataDB         *CollectibleDataDB
+	collectionsDataDB          *CollectionDataDB
 }
 
-func NewManager(rpcClient *rpc.Client, contractOwnershipProviders []thirdparty.CollectibleContractOwnershipProvider, accountOwnershipProviders []thirdparty.CollectibleAccountOwnershipProvider, collectibleDataProviders []thirdparty.CollectibleDataProvider, opensea *opensea.Client) *Manager {
+func NewManager(db *sql.DB, rpcClient *rpc.Client, contractOwnershipProviders []thirdparty.CollectibleContractOwnershipProvider, accountOwnershipProviders []thirdparty.CollectibleAccountOwnershipProvider, collectibleDataProviders []thirdparty.CollectibleDataProvider, opensea *opensea.Client) *Manager {
 	hystrix.ConfigureCommand(hystrixContractOwnershipClientName, hystrix.CommandConfig{
 		Timeout:               10000,
 		MaxConcurrentRequests: 100,
@@ -69,15 +67,15 @@ func NewManager(rpcClient *rpc.Client, contractOwnershipProviders []thirdparty.C
 		httpClient: &http.Client{
 			Timeout: requestTimeout,
 		},
-		collectiblesDataCache: make(map[string]thirdparty.CollectibleData),
-		collectionsDataCache:  make(map[string]thirdparty.CollectionData),
+		collectiblesDataDB: NewCollectibleDataDB(db),
+		collectionsDataDB:  NewCollectionDataDB(db),
 	}
 }
 
-func refMapToList[K comparable, T any](m map[K]*T) []T {
+func mapToList[K comparable, T any](m map[K]T) []T {
 	list := make([]T, 0, len(m))
 	for _, v := range m {
-		list = append(list, *v)
+		list = append(list, v)
 	}
 	return list
 }
@@ -256,9 +254,14 @@ func (o *Manager) FetchCollectibleOwnershipByOwner(chainID walletCommon.ChainID,
 }
 
 func (o *Manager) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
-	idsPerChainID := thirdparty.GroupCollectibleUIDsByChainID(o.getIDsNotInCollectiblesDataCache(uniqueIDs))
+	missingIDs, err := o.collectiblesDataDB.GetIDsNotInDB(uniqueIDs)
+	if err != nil {
+		return nil, err
+	}
 
-	for chainID, idsToFetch := range idsPerChainID {
+	missingIDsPerChainID := thirdparty.GroupCollectibleUIDsByChainID(missingIDs)
+
+	for chainID, idsToFetch := range missingIDsPerChainID {
 		for _, provider := range o.collectibleDataProviders {
 			if !provider.IsChainSupported(chainID) {
 				continue
@@ -278,13 +281,18 @@ func (o *Manager) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.Collec
 		}
 	}
 
-	return o.getCacheFullCollectibleData(uniqueIDs), nil
+	return o.getCacheFullCollectibleData(uniqueIDs)
 }
 
 func (o *Manager) FetchCollectionsDataByContractID(ids []thirdparty.ContractID) ([]thirdparty.CollectionData, error) {
-	idsPerChainID := thirdparty.GroupContractIDsByChainID(o.getIDsNotInCollectionDataCache(ids))
+	missingIDs, err := o.collectionsDataDB.GetIDsNotInDB(ids)
+	if err != nil {
+		return nil, err
+	}
 
-	for chainID, idsToFetch := range idsPerChainID {
+	missingIDsPerChainID := thirdparty.GroupContractIDsByChainID(missingIDs)
+
+	for chainID, idsToFetch := range missingIDsPerChainID {
 		for _, provider := range o.collectibleDataProviders {
 			if !provider.IsChainSupported(chainID) {
 				continue
@@ -304,7 +312,12 @@ func (o *Manager) FetchCollectionsDataByContractID(ids []thirdparty.ContractID) 
 		}
 	}
 
-	return refMapToList(o.getCacheCollectionData(ids)), nil
+	data, err := o.collectionsDataDB.GetData(ids)
+	if err != nil {
+		return nil, err
+	}
+
+	return mapToList(data), nil
 }
 
 func (o *Manager) getContractOwnershipProviders(chainID walletCommon.ChainID) (mainProvider thirdparty.CollectibleContractOwnershipProvider, fallbackProvider thirdparty.CollectibleContractOwnershipProvider) {
@@ -392,9 +405,11 @@ func (o *Manager) fetchTokenURI(id thirdparty.CollectibleUniqueID) (string, erro
 }
 
 func (o *Manager) processFullCollectibleData(assets []thirdparty.FullCollectibleData) error {
+	collectiblesData := make([]thirdparty.CollectibleData, 0, len(assets))
+	collectionsData := make([]thirdparty.CollectionData, 0, len(assets))
 	missingCollectionIDs := make([]thirdparty.ContractID, 0)
 
-	for idx, asset := range assets {
+	for _, asset := range assets {
 		id := asset.CollectibleData.ID
 
 		// Get Metadata from alternate source if empty
@@ -408,7 +423,7 @@ func (o *Manager) processFullCollectibleData(assets []thirdparty.FullCollectible
 				return err
 			}
 
-			assets[idx].CollectibleData.TokenURI = tokenURI
+			asset.CollectibleData.TokenURI = tokenURI
 
 			canProvide, err := o.metadataProvider.CanProvideCollectibleMetadata(id, tokenURI)
 
@@ -423,26 +438,36 @@ func (o *Manager) processFullCollectibleData(assets []thirdparty.FullCollectible
 				}
 
 				if metadata != nil {
-					assets[idx] = *metadata
+					asset = *metadata
 				}
 			}
 		}
 
 		// Get Animation MediaType
-		if len(assets[idx].CollectibleData.AnimationURL) > 0 {
-			contentType, err := o.doContentTypeRequest(assets[idx].CollectibleData.AnimationURL)
+		if len(asset.CollectibleData.AnimationURL) > 0 {
+			contentType, err := o.doContentTypeRequest(asset.CollectibleData.AnimationURL)
 			if err != nil {
-				assets[idx].CollectibleData.AnimationURL = ""
+				asset.CollectibleData.AnimationURL = ""
 			}
-			assets[idx].CollectibleData.AnimationMediaType = contentType
+			asset.CollectibleData.AnimationMediaType = contentType
 		}
 
-		o.setCacheCollectibleData(assets[idx].CollectibleData)
-		if assets[idx].CollectionData != nil {
-			o.setCacheCollectionData(*assets[idx].CollectionData)
+		collectiblesData = append(collectiblesData, asset.CollectibleData)
+		if asset.CollectionData != nil {
+			collectionsData = append(collectionsData, *asset.CollectionData)
 		} else {
 			missingCollectionIDs = append(missingCollectionIDs, id.ContractID)
 		}
+	}
+
+	err := o.collectiblesDataDB.SetData(collectiblesData)
+	if err != nil {
+		return err
+	}
+
+	err = o.collectionsDataDB.SetData(collectionsData)
+	if err != nil {
+		return err
 	}
 
 	if len(missingCollectionIDs) > 0 {
@@ -457,120 +482,50 @@ func (o *Manager) processFullCollectibleData(assets []thirdparty.FullCollectible
 }
 
 func (o *Manager) processCollectionData(collections []thirdparty.CollectionData) error {
-	for _, collection := range collections {
-		o.setCacheCollectionData(collection)
-	}
-	return nil
+	return o.collectionsDataDB.SetData(collections)
 }
 
-func (o *Manager) isIDInCollectiblesDataCache(id thirdparty.CollectibleUniqueID) bool {
-	o.collectiblesDataCacheLock.RLock()
-	defer o.collectiblesDataCacheLock.RUnlock()
-	if _, ok := o.collectiblesDataCache[id.HashKey()]; ok {
-		return true
-	}
-	return false
-}
-
-func (o *Manager) getIDsNotInCollectiblesDataCache(uniqueIDs []thirdparty.CollectibleUniqueID) []thirdparty.CollectibleUniqueID {
-	idsToFetch := make([]thirdparty.CollectibleUniqueID, 0, len(uniqueIDs))
-	for _, id := range uniqueIDs {
-		if o.isIDInCollectiblesDataCache(id) {
-			continue
-		}
-		idsToFetch = append(idsToFetch, id)
-	}
-	return idsToFetch
-}
-
-func (o *Manager) getCacheCollectiblesData(uniqueIDs []thirdparty.CollectibleUniqueID) map[string]*thirdparty.CollectibleData {
-	o.collectiblesDataCacheLock.RLock()
-	defer o.collectiblesDataCacheLock.RUnlock()
-
-	collectibles := make(map[string]*thirdparty.CollectibleData)
-	for _, id := range uniqueIDs {
-		if collectible, ok := o.collectiblesDataCache[id.HashKey()]; ok {
-			collectibles[id.HashKey()] = &collectible
-			continue
-		}
-	}
-	return collectibles
-}
-
-func (o *Manager) setCacheCollectibleData(data thirdparty.CollectibleData) {
-	o.collectiblesDataCacheLock.Lock()
-	defer o.collectiblesDataCacheLock.Unlock()
-
-	o.collectiblesDataCache[data.ID.HashKey()] = data
-}
-
-func (o *Manager) isIDInCollectionDataCache(id thirdparty.ContractID) bool {
-	o.collectionsDataCacheLock.RLock()
-	defer o.collectionsDataCacheLock.RUnlock()
-	if _, ok := o.collectionsDataCache[id.HashKey()]; ok {
-		return true
-	}
-	return false
-}
-
-func (o *Manager) getIDsNotInCollectionDataCache(ids []thirdparty.ContractID) []thirdparty.ContractID {
-	idsToFetch := make([]thirdparty.ContractID, 0, len(ids))
-	for _, id := range ids {
-		if o.isIDInCollectionDataCache(id) {
-			continue
-		}
-		idsToFetch = append(idsToFetch, id)
-	}
-	return idsToFetch
-}
-
-func (o *Manager) getCacheCollectionData(ids []thirdparty.ContractID) map[string]*thirdparty.CollectionData {
-	o.collectionsDataCacheLock.RLock()
-	defer o.collectionsDataCacheLock.RUnlock()
-
-	collections := make(map[string]*thirdparty.CollectionData)
-	for _, id := range ids {
-		if collection, ok := o.collectionsDataCache[id.HashKey()]; ok {
-			collections[id.HashKey()] = &collection
-			continue
-		}
-	}
-	return collections
-}
-
-func (o *Manager) setCacheCollectionData(data thirdparty.CollectionData) {
-	o.collectionsDataCacheLock.Lock()
-	defer o.collectionsDataCacheLock.Unlock()
-
-	o.collectionsDataCache[data.ID.HashKey()] = data
-}
-
-func (o *Manager) getCacheFullCollectibleData(uniqueIDs []thirdparty.CollectibleUniqueID) []thirdparty.FullCollectibleData {
+func (o *Manager) getCacheFullCollectibleData(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
 	ret := make([]thirdparty.FullCollectibleData, 0, len(uniqueIDs))
 
-	collectiblesData := o.getCacheCollectiblesData(uniqueIDs)
+	collectiblesData, err := o.collectiblesDataDB.GetData(uniqueIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	contractIDs := make([]thirdparty.ContractID, 0, len(uniqueIDs))
 	for _, id := range uniqueIDs {
 		contractIDs = append(contractIDs, id.ContractID)
 	}
 
-	collectionsData := o.getCacheCollectionData(contractIDs)
+	collectionsData, err := o.collectionsDataDB.GetData(contractIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	for _, id := range uniqueIDs {
-		collectibleData := collectiblesData[id.HashKey()]
-		if collectibleData == nil {
+		collectibleData, ok := collectiblesData[id.HashKey()]
+		if !ok {
 			// Use empty data, set only ID
-			collectibleData = &thirdparty.CollectibleData{
+			collectibleData = thirdparty.CollectibleData{
 				ID: id,
 			}
 		}
 
+		collectionData, ok := collectionsData[id.ContractID.HashKey()]
+		if !ok {
+			// Use empty data, set only ID
+			collectionData = thirdparty.CollectionData{
+				ID: id.ContractID,
+			}
+		}
+
 		fullData := thirdparty.FullCollectibleData{
-			CollectibleData: *collectibleData,
-			CollectionData:  collectionsData[id.ContractID.HashKey()],
+			CollectibleData: collectibleData,
+			CollectionData:  &collectionData,
 		}
 		ret = append(ret, fullData)
 	}
-	return ret
+
+	return ret, nil
 }
