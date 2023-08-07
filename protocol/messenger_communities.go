@@ -4257,16 +4257,21 @@ func (m *Messenger) CheckPermissionsToJoinCommunity(request *requests.CheckPermi
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
-
-	accounts, err := m.settings.GetActiveAccounts()
-	if err != nil {
-		return nil, err
-	}
-
 	var addresses []gethcommon.Address
 
-	for _, a := range accounts {
-		addresses = append(addresses, gethcommon.HexToAddress(a.Address.Hex()))
+	if len(request.Addresses) == 0 {
+		accounts, err := m.settings.GetActiveAccounts()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, a := range accounts {
+			addresses = append(addresses, gethcommon.HexToAddress(a.Address.Hex()))
+		}
+	} else {
+		for _, v := range request.Addresses {
+			addresses = append(addresses, gethcommon.HexToAddress(v))
+		}
 	}
 
 	return m.communitiesManager.CheckPermissionToJoin(request.CommunityID, addresses)
