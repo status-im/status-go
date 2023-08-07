@@ -760,8 +760,8 @@ func (m *Message) LoadImage() error {
 
 func isValidLinkPreviewForProto(preview LinkPreview) bool {
 	return preview.Title != "" && preview.URL != "" &&
-		((preview.Thumbnail.DataURI == "" && preview.Thumbnail.Width == 0 && preview.Thumbnail.Height == 0) ||
-			(preview.Thumbnail.DataURI != "" && preview.Thumbnail.Width > 0 && preview.Thumbnail.Height > 0))
+		((preview.Thumbnail.Width == 0 && preview.Thumbnail.Height == 0) ||
+			(preview.Thumbnail.Width > 0 && preview.Thumbnail.Height > 0))
 }
 
 // ConvertLinkPreviewsToProto expects previews to be correctly sent by the
@@ -790,6 +790,8 @@ func (m *Message) ConvertLinkPreviewsToProto() ([]*protobuf.UnfurledLink, error)
 			}
 		}
 
+		ThumbnailExternalURL := preview.Thumbnail.URL
+
 		ul := &protobuf.UnfurledLink{
 			Url:              preview.URL,
 			Title:            preview.Title,
@@ -797,6 +799,7 @@ func (m *Message) ConvertLinkPreviewsToProto() ([]*protobuf.UnfurledLink, error)
 			ThumbnailWidth:   uint32(preview.Thumbnail.Width),
 			ThumbnailHeight:  uint32(preview.Thumbnail.Height),
 			ThumbnailPayload: payload,
+			ThumbnailExternalURL: ThumbnailExternalURL,
 		}
 		unfurledLinks = append(unfurledLinks, ul)
 	}
