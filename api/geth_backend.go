@@ -816,7 +816,7 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 		return err
 	}
 
-	file, err := os.CreateTemp("", "*-v4.db")
+	file, err := os.CreateTemp(filepath.Dir(b.rootDataDir), "*-v4.db")
 	if err != nil {
 		return err
 	}
