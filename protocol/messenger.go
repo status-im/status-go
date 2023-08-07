@@ -795,6 +795,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 	m.startSyncSettingsLoop()
 	m.startCommunityRekeyLoop()
+	m.startCuratedCommunitiesUpdateLoop()
 
 	if err := m.cleanTopics(); err != nil {
 		return nil, err

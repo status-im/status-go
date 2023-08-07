@@ -13,6 +13,9 @@ const (
 
 	// EventStatusUpdatesTimedOut Event Automatic Status Updates Timed out
 	EventStatusUpdatesTimedOut = "status.updates.timedout"
+
+	// EventCuratedCommunitiesUpdate triggered when it is time to refresh the list of curated communities
+	EventCuratedCommunitiesUpdate = "curated.communities.update"
 )
 
 // MessageDeliveredSignal specifies chat and message that was delivered
@@ -51,4 +54,8 @@ func SendCommunityInfoFound(community interface{}) {
 
 func SendStatusUpdatesTimedOut(statusUpdates interface{}) {
 	send(EventStatusUpdatesTimedOut, statusUpdates)
+}
+
+func SendCuratedCommunitiesUpdate(curatedCommunitiesUpdate interface{}) {
+	send(EventCuratedCommunitiesUpdate, curatedCommunitiesUpdate)
 }
