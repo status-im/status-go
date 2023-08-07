@@ -21,8 +21,6 @@ const (
 	EventCollectibleStatusChanged walletevent.EventType = "wallet-collectible-opensea-v1-status-changed"
 )
 
-const OpenseaV1ID = "openseaV1"
-
 const AssetLimit = 200
 const CollectionLimit = 300
 

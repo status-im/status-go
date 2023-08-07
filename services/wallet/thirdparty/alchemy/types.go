@@ -15,6 +15,8 @@ import (
 	"golang.org/x/text/language"
 )
 
+const AlchemyID = "alchemy"
+
 type TokenBalance struct {
 	TokenID *bigint.BigInt `json:"tokenId"`
 	Balance *bigint.BigInt `json:"balance"`
@@ -155,6 +157,7 @@ func alchemyToCollectibleTraits(attributes []Attribute) []thirdparty.Collectible
 func (c *Contract) toCollectionData(id thirdparty.ContractID) thirdparty.CollectionData {
 	ret := thirdparty.CollectionData{
 		ID:       id,
+		Provider: AlchemyID,
 		Name:     c.Name,
 		ImageURL: c.OpenSeaMetadata.ImageURL,
 	}
@@ -164,6 +167,7 @@ func (c *Contract) toCollectionData(id thirdparty.ContractID) thirdparty.Collect
 func (c *Asset) toCollectiblesData(id thirdparty.CollectibleUniqueID) thirdparty.CollectibleData {
 	return thirdparty.CollectibleData{
 		ID:           id,
+		Provider:     AlchemyID,
 		Name:         c.Name,
 		Description:  c.Description,
 		ImageURL:     c.Image.ImageURL,

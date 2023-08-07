@@ -15,6 +15,8 @@ import (
 	"golang.org/x/text/language"
 )
 
+const InfuraID = "infura"
+
 func chainStringToChainID(chainString string) walletCommon.ChainID {
 	chainID := walletCommon.UnknownChainID
 	switch chainString {
@@ -129,6 +131,7 @@ type NFTList struct {
 func (c *Asset) toCollectiblesData(id thirdparty.CollectibleUniqueID) thirdparty.CollectibleData {
 	return thirdparty.CollectibleData{
 		ID:           id,
+		Provider:     InfuraID,
 		Name:         c.Metadata.Name,
 		Description:  c.Metadata.Description,
 		Permalink:    c.Metadata.Permalink,
@@ -177,7 +180,8 @@ func infuraToCollectibleTraits(attributes []Attribute) []thirdparty.CollectibleT
 
 func (c *ContractMetadata) toCommon(id thirdparty.ContractID) thirdparty.CollectionData {
 	return thirdparty.CollectionData{
-		ID:   id,
-		Name: c.Name,
+		ID:       id,
+		Provider: InfuraID,
+		Name:     c.Name,
 	}
 }
