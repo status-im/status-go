@@ -729,8 +729,8 @@ func (s *MessengerContactRequestSuite) TestPairedDevicesRemoveContact() {
 
 	prepAliceMessengersForPairing(&s.Suite, alice1, alice2)
 
-	pairTwoDevices(&s.Suite, alice1, alice2)
-	pairTwoDevices(&s.Suite, alice2, alice1)
+	PairDevices(&s.Suite, alice1, alice2)
+	PairDevices(&s.Suite, alice2, alice1)
 
 	bob := s.newMessenger()
 	_, err = bob.Start()
@@ -1532,8 +1532,8 @@ func (s *MessengerContactRequestSuite) TestBlockedContactSyncing() {
 	// NOTE: This doesn't include initial data sync. Local pairing could be used.
 	s.logger.Info("pairing Alice-1 and Alice-2")
 	prepAliceMessengersForPairing(&s.Suite, alice1, alice2)
-	pairTwoDevices(&s.Suite, alice1, alice2)
-	pairTwoDevices(&s.Suite, alice2, alice1)
+	PairDevices(&s.Suite, alice1, alice2)
+	PairDevices(&s.Suite, alice2, alice1)
 	s.logger.Info("pairing Alice-1 and Alice-2 finished")
 
 	// Loop cr-block-unblock. Some bugs happen at second iteration.
