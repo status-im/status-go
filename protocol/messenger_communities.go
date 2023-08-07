@@ -1135,6 +1135,27 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 	return response, nil
 }
 
+func (m *Messenger) GetRevealedAccounts(communityID types.HexBytes, memberPk string) ([]*protobuf.RevealedAccount, error) {
+	return m.communitiesManager.GetRevealedAddresses(communityID, memberPk)
+}
+
+func (m *Messenger) GetRevealedAccountsForAllMembers(communityID types.HexBytes) (map[string][]*protobuf.RevealedAccount, error) {
+	community, err := m.communitiesManager.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+	membersRevealedAccounts := map[string][]*protobuf.RevealedAccount{}
+	for _, memberPubKey := range community.GetMemberPubkeys() {
+		memberPubKeyStr := common.PubkeyToHex(memberPubKey)
+		accounts, err := m.communitiesManager.GetRevealedAddresses(communityID, memberPubKeyStr)
+		if err != nil {
+			return nil, err
+		}
+		membersRevealedAccounts[memberPubKeyStr] = accounts
+	}
+	return membersRevealedAccounts, nil
+}
+
 func (m *Messenger) CreateCommunityCategory(request *requests.CreateCommunityCategory) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
