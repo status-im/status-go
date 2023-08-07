@@ -183,5 +183,6 @@ func (c *ContractMetadata) toCommon(id thirdparty.ContractID) thirdparty.Collect
 		ID:       id,
 		Provider: InfuraID,
 		Name:     c.Name,
+		Traits:   make(map[string]thirdparty.CollectionTrait, 0),
 	}
 }

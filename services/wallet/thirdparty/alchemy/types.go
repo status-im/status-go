@@ -94,7 +94,7 @@ type Contract struct {
 	Name            string          `json:"name"`
 	Symbol          string          `json:"symbol"`
 	TokenType       string          `json:"tokenType"`
-	OpenSeaMetadata OpenSeaMetadata `json:"openSeaMetadata"`
+	OpenSeaMetadata OpenSeaMetadata `json:"openseaMetadata"`
 }
 
 type ContractList struct {
@@ -160,6 +160,7 @@ func (c *Contract) toCollectionData(id thirdparty.ContractID) thirdparty.Collect
 		Provider: AlchemyID,
 		Name:     c.Name,
 		ImageURL: c.OpenSeaMetadata.ImageURL,
+		Traits:   make(map[string]thirdparty.CollectionTrait, 0),
 	}
 	return ret
 }
