@@ -71,6 +71,10 @@ func (api *API) SaveKeypair(ctx context.Context, keypair *accounts.Keypair) erro
 	return nil
 }
 
+func (api *API) HasPairedDevices(ctx context.Context) bool {
+	return (*api.messenger).HasPairedDevices()
+}
+
 // Setting `Keypair` without `Accounts` will update keypair only.
 func (api *API) UpdateKeypairName(ctx context.Context, keyUID string, name string) error {
 	return (*api.messenger).UpdateKeypairName(keyUID, name)
@@ -312,6 +316,30 @@ func (api *API) ImportPrivateKey(ctx context.Context, privateKey string, passwor
 	return err
 }
 
+// Creates all keystore files for a keypair and mark it in db as fully operable.
+func (api *API) MakePrivateKeyKeypairFullyOperable(ctx context.Context, privateKey string, password string) error {
+	info, err := api.manager.AccountsGenerator().ImportPrivateKey(privateKey)
+	if err != nil {
+		return err
+	}
+
+	kp, err := api.db.GetKeypairByKeyUID(info.KeyUID)
+	if err != nil {
+		return err
+	}
+
+	if kp == nil {
+		return errors.New("keypair for the provided private key is not known")
+	}
+
+	_, err = api.manager.AccountsGenerator().StoreAccount(info.ID, password)
+	if err != nil {
+		return err
+	}
+
+	return api.db.MarkKeypairFullyOperable(info.KeyUID)
+}
+
 // Imports a new mnemonic and creates local keystore file.
 func (api *API) ImportMnemonic(ctx context.Context, mnemonic string, password string) error {
 	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
@@ -332,6 +360,42 @@ func (api *API) ImportMnemonic(ctx context.Context, mnemonic string, password st
 
 	_, err = api.manager.AccountsGenerator().StoreAccount(generatedAccountInfo.ID, password)
 	return err
+}
+
+// Creates all keystore files for a keypair and mark it in db as fully operable.
+func (api *API) MakeSeedPhraseKeypairFullyOperable(ctx context.Context, mnemonic string, password string) error {
+	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
+
+	generatedAccountInfo, err := api.manager.AccountsGenerator().ImportMnemonic(mnemonicNoExtraSpaces, "")
+	if err != nil {
+		return err
+	}
+
+	kp, err := api.db.GetKeypairByKeyUID(generatedAccountInfo.KeyUID)
+	if err != nil {
+		return err
+	}
+
+	if kp == nil {
+		return errors.New("keypair for the provided seed phrase is not known")
+	}
+
+	_, err = api.manager.AccountsGenerator().StoreAccount(generatedAccountInfo.ID, password)
+	if err != nil {
+		return err
+	}
+
+	var paths []string
+	for _, acc := range kp.Accounts {
+		paths = append(paths, acc.Path)
+	}
+
+	_, err = api.manager.AccountsGenerator().StoreDerivedAccounts(generatedAccountInfo.ID, password, paths)
+	if err != nil {
+		return err
+	}
+
+	return api.db.MarkKeypairFullyOperable(generatedAccountInfo.KeyUID)
 }
 
 // Creates a random new mnemonic.

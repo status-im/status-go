@@ -1266,8 +1266,38 @@ func (db *Database) GetNodeConfig() (*params.NodeConfig, error) {
 	return nodecfg.GetNodeConfigFromDB(db.db)
 }
 
-// This function should not update the clock, cause it marks accounts locally.
-func (db *Database) SetAccountOperability(address types.Address, operable AccountOperable) (err error) {
+// This function should not update the clock, cause it marks keypair/accounts locally.
+func (db *Database) MarkKeypairFullyOperable(keyUID string) (err error) {
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	kp, err := db.getKeypairByKeyUID(tx, keyUID, false)
+	if err != nil {
+		return err
+	}
+
+	for _, acc := range kp.Accounts {
+		_, err = tx.Exec(`UPDATE keypairs_accounts SET operable = ?	WHERE address = ?`, AccountFullyOperable, acc.Address)
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err = tx.Exec(`UPDATE keypairs SET synced_from = "" WHERE key_uid = ?`, keyUID)
+	return err
+}
+
+// This function should not update the clock, cause it marks a keypair locally.
+func (db *Database) SetKeypairSyncedFrom(address types.Address, operable AccountOperable) (err error) {
 	tx, err := db.db.Begin()
 	if err != nil {
 		return err
