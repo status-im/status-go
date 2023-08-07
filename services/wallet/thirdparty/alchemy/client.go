@@ -15,7 +15,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
-const AlchemyID = "alchemy"
 const nftMetadataBatchLimit = 100
 const contractMetadataBatchLimit = 100
 

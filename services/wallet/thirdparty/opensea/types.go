@@ -15,6 +15,8 @@ import (
 	"golang.org/x/text/language"
 )
 
+const OpenseaV1ID = "openseaV1"
+
 func chainStringToChainID(chainString string) walletCommon.ChainID {
 	chainID := walletCommon.UnknownChainID
 	switch chainString {
@@ -159,6 +161,7 @@ func openseaToCollectibleTraits(traits []Trait) []thirdparty.CollectibleTrait {
 func (c *Collection) toCollectionData(id thirdparty.ContractID) thirdparty.CollectionData {
 	ret := thirdparty.CollectionData{
 		ID:       id,
+		Provider: OpenseaV1ID,
 		Name:     c.Name,
 		Slug:     c.Slug,
 		ImageURL: c.ImageURL,
@@ -176,6 +179,7 @@ func (c *Collection) toCollectionData(id thirdparty.ContractID) thirdparty.Colle
 func (c *Asset) toCollectiblesData() thirdparty.CollectibleData {
 	return thirdparty.CollectibleData{
 		ID:              c.id(),
+		Provider:        OpenseaV1ID,
 		Name:            c.Name,
 		Description:     c.Description,
 		Permalink:       c.Permalink,

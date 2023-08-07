@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/sqlite"
 )
 
 type OwnershipDB struct {
@@ -27,12 +28,7 @@ func NewOwnershipDB(sqlDb *sql.DB) *OwnershipDB {
 const ownershipColumns = "chain_id, contract_address, token_id, owner_address"
 const selectOwnershipColumns = "chain_id, contract_address, token_id"
 
-// statementCreator allows to pass transaction or database to use in consumer.
-type statementCreator interface {
-	Prepare(query string) (*sql.Stmt, error)
-}
-
-func removeAddressOwnership(creator statementCreator, chainID w_common.ChainID, ownerAddress common.Address) error {
+func removeAddressOwnership(creator sqlite.StatementCreator, chainID w_common.ChainID, ownerAddress common.Address) error {
 	deleteOwnership, err := creator.Prepare("DELETE FROM collectibles_ownership_cache WHERE chain_id = ? AND owner_address = ?")
 	if err != nil {
 		return err
@@ -46,7 +42,7 @@ func removeAddressOwnership(creator statementCreator, chainID w_common.ChainID, 
 	return nil
 }
 
-func insertAddressOwnership(creator statementCreator, ownerAddress common.Address, collectibles []thirdparty.CollectibleUniqueID) error {
+func insertAddressOwnership(creator sqlite.StatementCreator, ownerAddress common.Address, collectibles []thirdparty.CollectibleUniqueID) error {
 	insertOwnership, err := creator.Prepare(fmt.Sprintf(`INSERT INTO collectibles_ownership_cache (%s) 
 																				VALUES (?, ?, ?, ?)`, ownershipColumns))
 	if err != nil {

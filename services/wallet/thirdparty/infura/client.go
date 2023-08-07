@@ -15,7 +15,6 @@ import (
 )
 
 const baseURL = "https://nft.api.infura.io"
-const InfuraID = "infura"
 
 type Client struct {
 	thirdparty.CollectibleContractOwnershipProvider

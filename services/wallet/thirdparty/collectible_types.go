@@ -73,6 +73,7 @@ type CollectionTrait struct {
 // Collection info
 type CollectionData struct {
 	ID       ContractID                 `json:"id"`
+	Provider string                     `json:"provider"`
 	Name     string                     `json:"name"`
 	Slug     string                     `json:"slug"`
 	ImageURL string                     `json:"image_url"`
@@ -89,6 +90,7 @@ type CollectibleTrait struct {
 // Collectible info
 type CollectibleData struct {
 	ID                 CollectibleUniqueID `json:"id"`
+	Provider           string              `json:"provider"`
 	Name               string              `json:"name"`
 	Description        string              `json:"description"`
 	Permalink          string              `json:"permalink"`
