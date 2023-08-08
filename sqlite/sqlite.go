@@ -27,6 +27,7 @@ const (
 	InMemoryPath     = ":memory:"
 	V4CipherPageSize = 8192
 	V3CipherPageSize = 1024
+	sqlMainDatabase  = "main"
 )
 
 // DecryptDB completely removes the encryption from the db
@@ -58,7 +59,22 @@ func encryptDB(db *sql.DB, encryptedPath string, key string, kdfIterationsNumber
 		defer onEnd()
 	}
 
-	_, err := db.Exec(`ATTACH DATABASE '` + encryptedPath + `' AS encrypted KEY '` + key + `'`)
+	attachedDbName := "encrypted"
+	err := attachDatabaseWithDefaultSettings(db, encryptedPath, attachedDbName, key, kdfIterationsNumber)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(fmt.Sprintf(`SELECT sqlcipher_export('%s')`, attachedDbName))
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(fmt.Sprintf(`DETACH DATABASE %s`, attachedDbName))
+	return err
+}
+
+func attachDatabaseWithDefaultSettings(db *sql.DB, attachedDbPath string, attachedDbName string, key string, kdfIterationsNumber int) error {
+	_, err := db.Exec(fmt.Sprintf(`ATTACH DATABASE '%s' AS %s KEY '%s'`, attachedDbPath, attachedDbName, key))
 	if err != nil {
 		return err
 	}
@@ -67,31 +83,39 @@ func encryptDB(db *sql.DB, encryptedPath string, key string, kdfIterationsNumber
 		kdfIterationsNumber = sqlite.ReducedKDFIterationsNumber
 	}
 
-	_, err = db.Exec(fmt.Sprintf("PRAGMA encrypted.kdf_iter = '%d'", kdfIterationsNumber))
+	if _, err := db.Exec(fmt.Sprintf(`PRAGMA %s.busy_timeout = 60000`, attachedDbName)); err != nil {
+		return errors.New("failed to set `busy_timeout` pragma on attached db")
+	}
+
+	return setDatabaseCipherSettings(db, kdfIterationsNumber, attachedDbName)
+}
+
+func setDatabaseCipherSettings(db *sql.DB, kdfIterationsNumber int, dbNameOpt ...string) error {
+	dbName := sqlMainDatabase
+	if len(dbNameOpt) > 0 {
+		dbName = dbNameOpt[0]
+	}
+
+	_, err := db.Exec(fmt.Sprintf("PRAGMA %s.kdf_iter = '%d'", dbName, kdfIterationsNumber))
 	if err != nil {
 		return err
 	}
 
-	if _, err := db.Exec(fmt.Sprintf("PRAGMA encrypted.cipher_page_size = %d", V4CipherPageSize)); err != nil {
+	if _, err := db.Exec(fmt.Sprintf("PRAGMA %s.cipher_page_size = %d", dbName, V4CipherPageSize)); err != nil {
 		fmt.Println("failed to set cipher_page_size pragma")
 		return err
 	}
-	if _, err := db.Exec("PRAGMA encrypted.cipher_hmac_algorithm = HMAC_SHA1"); err != nil {
+	if _, err := db.Exec(fmt.Sprintf("PRAGMA %s.cipher_hmac_algorithm = HMAC_SHA1", dbName)); err != nil {
 		fmt.Println("failed to set cipher_hmac_algorithm pragma")
 		return err
 	}
 
-	if _, err := db.Exec("PRAGMA encrypted.cipher_kdf_algorithm = PBKDF2_HMAC_SHA1"); err != nil {
+	if _, err := db.Exec(fmt.Sprintf("PRAGMA %s.cipher_kdf_algorithm = PBKDF2_HMAC_SHA1", dbName)); err != nil {
 		fmt.Println("failed to set cipher_kdf_algorithm pragma")
 		return err
 	}
 
-	_, err = db.Exec(`SELECT sqlcipher_export('encrypted')`)
-	if err != nil {
-		return err
-	}
-	_, err = db.Exec(`DETACH DATABASE encrypted`)
-	return err
+	return nil
 }
 
 // EncryptDB takes a plaintext database and adds encryption
@@ -140,7 +164,7 @@ func buildSqlcipherDSN(path string) (string, error) {
 	return path + queryOperator + "_txlock=immediate", nil
 }
 
-func openDB(path string, key string, kdfIterationsNumber int, chiperPageSize int) (*sql.DB, error) {
+func openDB(path string, key string, kdfIterationsNumber int, cipherPageSize int) (*sql.DB, error) {
 	driverName := fmt.Sprintf("sqlcipher_with_extensions-%d", len(sql.Drivers()))
 	sql.Register(driverName, &sqlcipher.SQLiteDriver{
 		ConnectHook: func(conn *sqlcipher.SQLiteConn) error {
@@ -156,7 +180,7 @@ func openDB(path string, key string, kdfIterationsNumber int, chiperPageSize int
 				kdfIterationsNumber = sqlite.ReducedKDFIterationsNumber
 			}
 
-			if _, err := conn.Exec(fmt.Sprintf("PRAGMA cipher_page_size = %d", chiperPageSize), nil); err != nil {
+			if _, err := conn.Exec(fmt.Sprintf("PRAGMA cipher_page_size = %d", cipherPageSize), nil); err != nil {
 				fmt.Println("failed to set cipher_page_size pragma")
 				return err
 			}
@@ -189,7 +213,6 @@ func openDB(path string, key string, kdfIterationsNumber int, chiperPageSize int
 	})
 
 	dsn, err := buildSqlcipherDSN(path)
-
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +246,7 @@ func openDB(path string, key string, kdfIterationsNumber int, chiperPageSize int
 	return db, nil
 }
 
-// OpenDB opens not-encrypted database.
+// OpenDB opens encrypted database.
 func OpenDB(path string, key string, kdfIterationsNumber int) (*sql.DB, error) {
 	return openDB(path, key, kdfIterationsNumber, V4CipherPageSize)
 }

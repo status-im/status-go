@@ -10,7 +10,7 @@ import (
 
 // Migrate applies migrations.
 // see Migrate in vendor/status-go/sqlite/migrate.go
-func Migrate(db *sql.DB, customSteps []sqlite.PostStep) error {
+func Migrate(db *sql.DB, customSteps []*sqlite.PostStep) error {
 	return sqlite.Migrate(db, bindata.Resource(
 		AssetNames(),
 		func(name string) ([]byte, error) {

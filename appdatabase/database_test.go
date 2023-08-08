@@ -182,7 +182,7 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 	err = insertTestTransaction(9, uniswapV3TxTestData, uniswapV3ReceiptTestData, uniswapV3LogTestData, false)
 	require.NoError(t, err)
 
-	failMigrationSteps := []sqlite.PostStep{
+	failMigrationSteps := []*sqlite.PostStep{
 		{
 			Version: customSteps[1].Version,
 			CustomMigration: func(sqlTx *sql.Tx) error {
