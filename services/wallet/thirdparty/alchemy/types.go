@@ -16,8 +16,8 @@ import (
 )
 
 type TokenBalance struct {
-	TokenID *bigint.HexBigInt `json:"tokenId"`
-	Balance *bigint.BigInt    `json:"balance"`
+	TokenID *bigint.BigInt `json:"tokenId"`
+	Balance *bigint.BigInt `json:"balance"`
 }
 
 type CollectibleOwner struct {
@@ -26,7 +26,7 @@ type CollectibleOwner struct {
 }
 
 type CollectibleContractOwnership struct {
-	Owners  []CollectibleOwner `json:"ownerAddresses"`
+	Owners  []CollectibleOwner `json:"owners"`
 	PageKey string             `json:"pageKey"`
 }
 
