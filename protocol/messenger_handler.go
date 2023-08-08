@@ -3001,7 +3001,7 @@ func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, er
 
 func (m *Messenger) updateUnviewedCounts(chat *Chat, message *common.Message) {
 	if message.Timestamp > chat.LastMessage.Timestamp+IncreaseUnviewedMessagesCountTimeout {
-		chat.UnviewedMessagesCount += 1
+		chat.UnviewedMessagesCount++
 	}
 	if message.Mentioned || message.Replied {
 		chat.UnviewedMentionsCount++
