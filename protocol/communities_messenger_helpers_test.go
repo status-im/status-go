@@ -6,15 +6,22 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
@@ -24,6 +31,88 @@ import (
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 )
+
+type AccountManagerMock struct {
+	AccountsMap map[string]string
+}
+
+func (m *AccountManagerMock) GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*account.SelectedExtKey, error) {
+	return &account.SelectedExtKey{
+		Address: types.HexToAddress(address),
+	}, nil
+}
+
+func (m *AccountManagerMock) CanRecover(rpcParams account.RecoverParams, revealedAddress types.Address) (bool, error) {
+	return true, nil
+}
+
+func (m *AccountManagerMock) Sign(rpcParams account.SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error) {
+	return types.HexBytes{}, nil
+}
+
+func (m *AccountManagerMock) DeleteAccount(address types.Address) error {
+	return nil
+}
+
+type TokenManagerMock struct {
+	Balances *map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
+}
+
+func (m *TokenManagerMock) GetAllChainIDs() ([]uint64, error) {
+	chainIDs := make([]uint64, 0, len(*m.Balances))
+	for key := range *m.Balances {
+		chainIDs = append(chainIDs, key)
+	}
+	return chainIDs, nil
+}
+
+func (m *TokenManagerMock) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
+	time.Sleep(100 * time.Millisecond) // simulate response time
+	return *m.Balances, nil
+}
+
+func newMessenger(s *suite.Suite, shh types.Waku, logger *zap.Logger, password string, walletAddresses []string,
+	mockedBalances *map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big) *Messenger {
+	accountsManagerMock := &AccountManagerMock{}
+	accountsManagerMock.AccountsMap = make(map[string]string)
+	for _, walletAddress := range walletAddresses {
+		accountsManagerMock.AccountsMap[walletAddress] = types.EncodeHex(crypto.Keccak256([]byte(password)))
+	}
+
+	tokenManagerMock := &TokenManagerMock{
+		Balances: mockedBalances,
+	}
+
+	privateKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	messenger, err := newCommunitiesTestMessenger(shh, privateKey, logger, accountsManagerMock, tokenManagerMock)
+	s.Require().NoError(err)
+
+	currentDistributorObj, ok := messenger.communitiesKeyDistributor.(*CommunitiesKeyDistributorImpl)
+	s.Require().True(ok)
+	messenger.communitiesKeyDistributor = &TestCommunitiesKeyDistributor{
+		CommunitiesKeyDistributorImpl: *currentDistributorObj,
+		subscriptions:                 map[chan *CommunityAndKeyActions]bool{},
+		mutex:                         sync.RWMutex{},
+	}
+
+	// add wallet account with keypair
+	for _, walletAddress := range walletAddresses {
+		kp := accounts.GetProfileKeypairForTest(false, true, false)
+		kp.Accounts[0].Address = types.HexToAddress(walletAddress)
+		err := messenger.settings.SaveOrUpdateKeypair(kp)
+		s.Require().NoError(err)
+	}
+
+	walletAccounts, err := messenger.settings.GetActiveAccounts()
+	s.Require().NoError(err)
+	s.Require().Len(walletAccounts, len(walletAddresses))
+	for i := range walletAddresses {
+		s.Require().Equal(walletAccounts[i].Type, accounts.AccountTypeGenerated)
+	}
+	return messenger
+}
 
 func newCommunitiesTestMessenger(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, accountsManager account.Manager, tokenManager communities.TokenManager) (*Messenger, error) {
 	tmpfile, err := ioutil.TempFile("", "accounts-tests-")

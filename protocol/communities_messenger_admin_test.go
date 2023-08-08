@@ -1,15 +1,16 @@
 package protocol
 
 import (
-	"crypto/ecdsa"
 	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
+
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -30,8 +31,9 @@ type AdminCommunityEventsSuite struct {
 	alice *Messenger
 	// If one wants to send messages between different instances of Messenger,
 	// a single Waku service should be shared.
-	shh    types.Waku
-	logger *zap.Logger
+	shh            types.Waku
+	logger         *zap.Logger
+	mockedBalances map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big // chainID, account, token, balance
 }
 
 func (s *AdminCommunityEventsSuite) GetControlNode() *Messenger {
@@ -59,15 +61,17 @@ func (s *AdminCommunityEventsSuite) SetupTest() {
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 
-	s.owner = s.newMessenger()
-	s.admin = s.newMessenger()
-	s.alice = s.newMessenger()
+	s.owner = s.newMessenger("", []string{})
+	s.admin = s.newMessenger("qwerty", []string{commmunitiesEventsEventSenderAddress})
+	s.alice = s.newMessenger("", []string{})
 	_, err := s.owner.Start()
 	s.Require().NoError(err)
 	_, err = s.admin.Start()
 	s.Require().NoError(err)
 	_, err = s.alice.Start()
 	s.Require().NoError(err)
+
+	s.mockedBalances = createMockedWalletBalance(&s.Suite)
 }
 
 func (s *AdminCommunityEventsSuite) TearDownTest() {
@@ -77,18 +81,8 @@ func (s *AdminCommunityEventsSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *AdminCommunityEventsSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
-	messenger, err := newCommunitiesTestMessenger(shh, privateKey, s.logger, nil, nil)
-	s.Require().NoError(err)
-
-	return messenger
-}
-
-func (s *AdminCommunityEventsSuite) newMessenger() *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	return s.newMessengerWithKey(s.shh, privateKey)
+func (s *AdminCommunityEventsSuite) newMessenger(password string, walletAddresses []string) *Messenger {
+	return newMessenger(&s.Suite, s.shh, s.logger, password, walletAddresses, &s.mockedBalances)
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminEditCommunityDescription() {
@@ -104,42 +98,55 @@ func (s *AdminCommunityEventsSuite) TestAdminCreateEditDeleteChannels() {
 
 func (s *AdminCommunityEventsSuite) TestAdminCreateEditDeleteBecomeMemberPermission() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
-	testCreateEditDeleteBecomeMemberPermission(s, community)
+	testCreateEditDeleteBecomeMemberPermission(s, community, protobuf.CommunityTokenPermission_BECOME_MEMBER)
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminCannotCreateBecomeAdminPermission() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
+	testEventSenderCannotCreatePrivilegedCommunityPermission(s, community, protobuf.CommunityTokenPermission_BECOME_ADMIN)
+}
 
-	permissionRequest := createTestPermissionRequest(community)
-	permissionRequest.Type = protobuf.CommunityTokenPermission_BECOME_ADMIN
-
-	response, err := s.admin.CreateCommunityTokenPermission(permissionRequest)
-	s.Require().Nil(response)
-	s.Require().Error(err)
+func (s *AdminCommunityEventsSuite) TestAdminCannotCreateBecomeTokenMasterPermission() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
+	testEventSenderCannotCreatePrivilegedCommunityPermission(s, community, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminCannotEditBecomeAdminPermission() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
-	testEventSenderCannotEditBecomeAdminPermission(s, community)
+	testEventSenderCannotEditPrivilegedCommunityPermission(
+		s, community, protobuf.CommunityTokenPermission_BECOME_ADMIN, protobuf.CommunityTokenPermission_BECOME_ADMIN)
+}
+
+func (s *AdminCommunityEventsSuite) TestAdminCannotEditBecomeTokenMasterPermission() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
+	testEventSenderCannotEditPrivilegedCommunityPermission(
+		s, community, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER, protobuf.CommunityTokenPermission_BECOME_ADMIN)
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminCannotDeleteBecomeAdminPermission() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
-	testEventSenderCannotDeleteBecomeAdminPermission(s, community)
+	testEventSenderCannotDeletePrivilegedCommunityPermission(
+		s, community, protobuf.CommunityTokenPermission_BECOME_ADMIN, protobuf.CommunityTokenPermission_BECOME_ADMIN)
+}
+
+func (s *AdminCommunityEventsSuite) TestAdminCannotDeleteBecomeTokenMasterPermission() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
+	testEventSenderCannotDeletePrivilegedCommunityPermission(
+		s, community, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER, protobuf.CommunityTokenPermission_BECOME_ADMIN)
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders() {
-	additionalAdmin := s.newMessenger()
+	additionalAdmin := s.newMessenger("qwerty", []string{commmunitiesEventsEventSenderAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{additionalAdmin})
 	// set up additional user that will send request to join
-	user := s.newMessenger()
+	user := s.newMessenger("", []string{})
 	testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalAdmin)
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminAcceptMemberRequestToJoinNotConfirmedByControlNode() {
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{})
 	// set up additional user that will send request to join
-	user := s.newMessenger()
+	user := s.newMessenger("", []string{})
 	testAcceptMemberRequestToJoinNotConfirmedByControlNode(s, community, user)
 }
 
@@ -147,15 +154,15 @@ func (s *AdminCommunityEventsSuite) TestAdminAcceptMemberRequestToJoin() {
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{})
 
 	// set up additional user that will send request to join
-	user := s.newMessenger()
+	user := s.newMessenger("", []string{})
 	testAcceptMemberRequestToJoin(s, community, user)
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminRejectMemberRequestToJoinResponseSharedWithOtherEventSenders() {
-	additionalAdmin := s.newMessenger()
+	additionalAdmin := s.newMessenger("qwerty", []string{commmunitiesEventsEventSenderAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{additionalAdmin})
 	// set up additional user that will send request to join
-	user := s.newMessenger()
+	user := s.newMessenger("", []string{})
 	testRejectMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalAdmin)
 }
 
@@ -163,7 +170,7 @@ func (s *AdminCommunityEventsSuite) TestAdminRejectMemberRequestToJoinNotConfirm
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{})
 
 	// set up additional user that will send request to join
-	user := s.newMessenger()
+	user := s.newMessenger("", []string{})
 	testRejectMemberRequestToJoinNotConfirmedByControlNode(s, community, user)
 }
 
@@ -171,25 +178,25 @@ func (s *AdminCommunityEventsSuite) TestAdminRejectMemberRequestToJoin() {
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{})
 
 	// set up additional user that will send request to join
-	user := s.newMessenger()
+	user := s.newMessenger("", []string{})
 	testRejectMemberRequestToJoin(s, community, user)
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminRequestToJoinStateCannotBeOverridden() {
-	additionalAdmin := s.newMessenger()
+	additionalAdmin := s.newMessenger("qwerty", []string{commmunitiesEventsEventSenderAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{additionalAdmin})
 
 	// set up additional user that will send request to join
-	user := s.newMessenger()
+	user := s.newMessenger("", []string{})
 	testEventSenderCannotOverrideRequestToJoinState(s, community, user, additionalAdmin)
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminControlNodeHandlesMultipleEventSenderRequestToJoinDecisions() {
-	additionalAdmin := s.newMessenger()
+	additionalAdmin := s.newMessenger("qwerty", []string{commmunitiesEventsEventSenderAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{additionalAdmin})
 
 	// set up additional user that will send request to join
-	user := s.newMessenger()
+	user := s.newMessenger("", []string{})
 	testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(s, community, user, additionalAdmin)
 }
 

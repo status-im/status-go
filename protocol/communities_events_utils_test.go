@@ -7,6 +7,9 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -21,6 +24,10 @@ type CommunityEventsTestsInterface interface {
 	GetMember() *Messenger
 	GetSuite() *suite.Suite
 }
+
+const commmunitiesEventsTestTokenAddress = "0x0400000000000000000000000000000000000000"
+const commmunitiesEventsTestChainID = 1
+const commmunitiesEventsEventSenderAddress = "0x0200000000000000000000000000000000000000"
 
 type MessageResponseValidator func(*MessengerResponse) error
 type WaitResponseValidator func(*MessengerResponse) bool
@@ -77,6 +84,24 @@ func refreshMessengerResponses(base CommunityEventsTestsInterface) {
 	base.GetSuite().Require().NoError(err)
 }
 
+func createMockedWalletBalance(s *suite.Suite) map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big {
+	eventSenderAddress := gethcommon.HexToAddress(commmunitiesEventsEventSenderAddress)
+
+	mockedBalances := make(map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	mockedBalances[testChainID1] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
+	mockedBalances[testChainID1][eventSenderAddress] = make(map[gethcommon.Address]*hexutil.Big)
+
+	// event sender will have token with `commmunitiesEventsTestTokenAddress``
+	contractAddress := gethcommon.HexToAddress(commmunitiesEventsTestTokenAddress)
+	balance, ok := new(big.Int).SetString("200", 10)
+	s.Require().True(ok)
+	decimalsFactor := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(18)), nil)
+	balance.Mul(balance, decimalsFactor)
+
+	mockedBalances[commmunitiesEventsTestChainID][eventSenderAddress][contractAddress] = (*hexutil.Big)(balance)
+	return mockedBalances
+}
+
 func setUpCommunityAndRoles(base CommunityEventsTestsInterface, role protobuf.CommunityMember_Roles) *communities.Community {
 	tcs2, err := base.GetControlNode().communitiesManager.All()
 	suite := base.GetSuite()
@@ -91,9 +116,21 @@ func setUpCommunityAndRoles(base CommunityEventsTestsInterface, role protobuf.Co
 	advertiseCommunityTo(suite, community, base.GetControlNode(), base.GetEventSender())
 	advertiseCommunityTo(suite, community, base.GetControlNode(), base.GetMember())
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	request := &requests.RequestToJoinCommunity{
+		CommunityID:       community.ID(),
+		AddressesToReveal: []string{commmunitiesEventsEventSenderAddress},
+		Password:          "qwerty1",
+		AirdropAddress:    commmunitiesEventsEventSenderAddress,
+	}
 	joinCommunity(suite, community, base.GetControlNode(), base.GetEventSender(), request)
 	refreshMessengerResponses(base)
+
+	request = &requests.RequestToJoinCommunity{
+		CommunityID:       community.ID(),
+		AddressesToReveal: []string{"0x0300000000000000000000000000000000000000"},
+		Password:          "qwerty2",
+		AirdropAddress:    "0x0300000000000000000000000000000000000000",
+	}
 	joinCommunity(suite, community, base.GetControlNode(), base.GetMember(), request)
 	refreshMessengerResponses(base)
 
@@ -220,14 +257,14 @@ func deleteCommunityChannel(base CommunityEventsTestsInterface, community *commu
 	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkChannelDeleted)
 }
 
-func createTestPermissionRequest(community *communities.Community) *requests.CreateCommunityTokenPermission {
+func createTestPermissionRequest(community *communities.Community, pType protobuf.CommunityTokenPermission_Type) *requests.CreateCommunityTokenPermission {
 	return &requests.CreateCommunityTokenPermission{
 		CommunityID: community.ID(),
-		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		Type:        pType,
 		TokenCriteria: []*protobuf.TokenCriteria{
 			{
 				Type:              protobuf.CommunityTokenType_ERC20,
-				ContractAddresses: map[uint64]string{uint64(1): "0x123"},
+				ContractAddresses: map[uint64]string{uint64(commmunitiesEventsTestChainID): commmunitiesEventsTestTokenAddress},
 				Symbol:            "TEST",
 				Amount:            "100",
 				Decimals:          uint64(18),
@@ -243,7 +280,7 @@ func createTokenPermission(base CommunityEventsTestsInterface, community *commun
 			return err
 		}
 
-		if !modifiedCommmunity.HasTokenPermissions() {
+		if len(modifiedCommmunity.TokenPermissionsByType(request.Type)) == 0 {
 			return errors.New("new token permission was not found")
 		}
 
@@ -267,8 +304,8 @@ func createTokenPermission(base CommunityEventsTestsInterface, community *commun
 	return tokenPermissionID, request
 }
 
-func createTestTokenPermission(base CommunityEventsTestsInterface, community *communities.Community) (string, *requests.CreateCommunityTokenPermission) {
-	createTokenPermissionRequest := createTestPermissionRequest(community)
+func createTestTokenPermission(base CommunityEventsTestsInterface, community *communities.Community, pType protobuf.CommunityTokenPermission_Type) (string, *requests.CreateCommunityTokenPermission) {
+	createTokenPermissionRequest := createTestPermissionRequest(community, pType)
 	return createTokenPermission(base, community, createTokenPermissionRequest)
 }
 
@@ -280,7 +317,7 @@ func editTokenPermission(base CommunityEventsTestsInterface, community *communit
 			return err
 		}
 
-		assertCheckTokenPermissionEdited(s, modifiedCommmunity)
+		assertCheckTokenPermissionEdited(s, modifiedCommmunity, request.CreateCommunityTokenPermission.Type)
 
 		return nil
 	}
@@ -292,8 +329,8 @@ func editTokenPermission(base CommunityEventsTestsInterface, community *communit
 	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkTokenPermissionEdit)
 }
 
-func assertCheckTokenPermissionEdited(s *suite.Suite, community *communities.Community) {
-	permissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
+func assertCheckTokenPermissionEdited(s *suite.Suite, community *communities.Community, pType protobuf.CommunityTokenPermission_Type) {
+	permissions := community.TokenPermissionsByType(pType)
 	s.Require().Len(permissions, 1)
 	s.Require().Len(permissions[0].TokenCriteria, 1)
 	s.Require().Equal(permissions[0].TokenCriteria[0].Type, protobuf.CommunityTokenType_ERC20)
@@ -324,12 +361,8 @@ func deleteTokenPermission(base CommunityEventsTestsInterface, community *commun
 	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkTokenPermissionDeleted)
 }
 
-func assertCheckTokenPermissionCreated(s *suite.Suite, community *communities.Community) {
-	permissions := make([]*protobuf.CommunityTokenPermission, 0)
-	tokenPermissions := community.TokenPermissions()
-	for _, p := range tokenPermissions {
-		permissions = append(permissions, p)
-	}
+func assertCheckTokenPermissionCreated(s *suite.Suite, community *communities.Community, pType protobuf.CommunityTokenPermission_Type) {
+	permissions := community.TokenPermissionsByType(pType)
 	s.Require().Len(permissions, 1)
 	s.Require().Len(permissions[0].TokenCriteria, 1)
 	s.Require().Equal(permissions[0].TokenCriteria[0].Type, protobuf.CommunityTokenType_ERC20)
@@ -712,6 +745,40 @@ func editCommunityDescription(base CommunityEventsTestsInterface, community *com
 	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkCommunityEdit)
 }
 
+func controlNodeCreatesCommunityPermission(base CommunityEventsTestsInterface, community *communities.Community, permissionRequest *requests.CreateCommunityTokenPermission) string {
+	// control node creates permission
+	response, err := base.GetControlNode().CreateCommunityTokenPermission(permissionRequest)
+	s := base.GetSuite()
+	s.Require().NoError(err)
+
+	var tokenPermissionID string
+	for id := range response.CommunityChanges[0].TokenPermissionsAdded {
+		tokenPermissionID = id
+	}
+	s.Require().NotEqual(tokenPermissionID, "")
+
+	ownerCommunity, err := base.GetControlNode().communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	assertCheckTokenPermissionCreated(s, ownerCommunity, permissionRequest.Type)
+
+	// then, ensure event sender receives updated community
+	_, err = WaitOnMessengerResponse(
+		base.GetEventSender(),
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0 &&
+				len(r.Communities()[0].TokenPermissionsByType(permissionRequest.Type)) > 0
+		},
+		"event sender did not receive community token permission",
+	)
+	s.Require().NoError(err)
+	eventSenderCommunity, err := base.GetEventSender().communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	assertCheckTokenPermissionCreated(s, eventSenderCommunity, permissionRequest.Type)
+	s.Require().True(eventSenderCommunity.HasPermissionToSendCommunityEvents())
+
+	return tokenPermissionID
+}
+
 func testCreateEditDeleteChannels(base CommunityEventsTestsInterface, community *communities.Community) {
 	newChat := &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
@@ -731,9 +798,9 @@ func testCreateEditDeleteChannels(base CommunityEventsTestsInterface, community 
 	deleteCommunityChannel(base, community, newChatID)
 }
 
-func testCreateEditDeleteBecomeMemberPermission(base CommunityEventsTestsInterface, community *communities.Community) {
+func testCreateEditDeleteBecomeMemberPermission(base CommunityEventsTestsInterface, community *communities.Community, pType protobuf.CommunityTokenPermission_Type) {
 	// first, create token permission
-	tokenPermissionID, createTokenPermission := createTestTokenPermission(base, community)
+	tokenPermissionID, createTokenPermission := createTestTokenPermission(base, community, pType)
 
 	createTokenPermission.TokenCriteria[0].Symbol = "UPDATED"
 	createTokenPermission.TokenCriteria[0].Amount = "200"
@@ -1560,72 +1627,42 @@ func testMemberReceiveEventsWhenControlNodeOffline(base CommunityEventsTestsInte
 	waitOnMessengerResponse(s, WaitCommunityCondition, checkChannelDeleted, eventSender)
 }
 
-func testEventSenderCannotDeleteBecomeAdminPermission(base CommunityEventsTestsInterface, community *communities.Community) {
-	permissionRequest := createTestPermissionRequest(community)
-	permissionRequest.Type = protobuf.CommunityTokenPermission_BECOME_ADMIN
-
-	// control node creates BECOME_ADMIN permission
-	response, err := base.GetControlNode().CreateCommunityTokenPermission(permissionRequest)
-	s := base.GetSuite()
-	s.Require().NoError(err)
-
-	var tokenPermissionID string
-	for id := range response.CommunityChanges[0].TokenPermissionsAdded {
-		tokenPermissionID = id
+func testEventSenderCannotDeletePrivilegedCommunityPermission(base CommunityEventsTestsInterface, community *communities.Community,
+	testPermissionType protobuf.CommunityTokenPermission_Type, rolePermissionType protobuf.CommunityTokenPermission_Type) {
+	// Community should have eventSenderRole permission or eventSender will loose his role
+	// after control node create a new community permission
+	if testPermissionType != rolePermissionType {
+		rolePermission := createTestPermissionRequest(community, rolePermissionType)
+		controlNodeCreatesCommunityPermission(base, community, rolePermission)
 	}
-	s.Require().NotEqual(tokenPermissionID, "")
 
-	// then, ensure event sender receives updated community
-	_, err = WaitOnMessengerResponse(
-		base.GetEventSender(),
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"event sender did not receive updated community",
-	)
-	s.Require().NoError(err)
-	eventSenderCommunity, err := base.GetEventSender().communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	assertCheckTokenPermissionCreated(s, eventSenderCommunity)
+	permissionRequest := createTestPermissionRequest(community, testPermissionType)
+	tokenPermissionID := controlNodeCreatesCommunityPermission(base, community, permissionRequest)
 
 	deleteTokenPermission := &requests.DeleteCommunityTokenPermission{
 		CommunityID:  community.ID(),
 		PermissionID: tokenPermissionID,
 	}
 
-	// then event sender tries to delete BECOME_ADMIN permission which should fail
-	response, err = base.GetEventSender().DeleteCommunityTokenPermission(deleteTokenPermission)
+	// then event sender tries to delete permission which should fail
+	response, err := base.GetEventSender().DeleteCommunityTokenPermission(deleteTokenPermission)
+	s := base.GetSuite()
 	s.Require().Error(err)
 	s.Require().Nil(response)
 }
 
-func testEventSenderCannotEditBecomeAdminPermission(base CommunityEventsTestsInterface, community *communities.Community) {
-	permissionRequest := createTestPermissionRequest(community)
-	permissionRequest.Type = protobuf.CommunityTokenPermission_BECOME_ADMIN
+func testEventSenderCannotEditPrivilegedCommunityPermission(base CommunityEventsTestsInterface, community *communities.Community,
+	testPermissionType protobuf.CommunityTokenPermission_Type, rolePermissionType protobuf.CommunityTokenPermission_Type) {
 
-	// control node creates BECOME_ADMIN permission
-	response, err := base.GetControlNode().CreateCommunityTokenPermission(permissionRequest)
-	s := base.GetSuite()
-	s.Require().NoError(err)
-
-	var tokenPermissionID string
-	for id := range response.CommunityChanges[0].TokenPermissionsAdded {
-		tokenPermissionID = id
+	// Community should have eventSenderRole permission or eventSender will loose his role
+	// after control node create a new community permission
+	if testPermissionType != rolePermissionType {
+		rolePermission := createTestPermissionRequest(community, rolePermissionType)
+		controlNodeCreatesCommunityPermission(base, community, rolePermission)
 	}
-	s.Require().NotEqual(tokenPermissionID, "")
 
-	ownerCommunity, err := base.GetControlNode().communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	assertCheckTokenPermissionCreated(s, ownerCommunity)
-
-	// then, ensure event sender receives updated community
-	_, err = WaitOnMessengerResponse(
-		base.GetEventSender(),
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"event sender did not receive updated community",
-	)
-	s.Require().NoError(err)
-	eventSenderCommunity, err := base.GetEventSender().communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	assertCheckTokenPermissionCreated(s, eventSenderCommunity)
+	permissionRequest := createTestPermissionRequest(community, testPermissionType)
+	tokenPermissionID := controlNodeCreatesCommunityPermission(base, community, permissionRequest)
 
 	permissionRequest.TokenCriteria[0].Symbol = "UPDATED"
 	permissionRequest.TokenCriteria[0].Amount = "200"
@@ -1636,7 +1673,8 @@ func testEventSenderCannotEditBecomeAdminPermission(base CommunityEventsTestsInt
 	}
 
 	// then, event sender tries to edit permission
-	response, err = base.GetEventSender().EditCommunityTokenPermission(permissionEditRequest)
+	response, err := base.GetEventSender().EditCommunityTokenPermission(permissionEditRequest)
+	s := base.GetSuite()
 	s.Require().Error(err)
 	s.Require().Nil(response)
 }
@@ -1682,4 +1720,13 @@ func testEventSenderAddedCommunityToken(base CommunityEventsTestsInterface, comm
 	}
 
 	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkTokenAdded)
+}
+
+func testEventSenderCannotCreatePrivilegedCommunityPermission(base CommunityEventsTestsInterface, community *communities.Community, pType protobuf.CommunityTokenPermission_Type) {
+	permissionRequest := createTestPermissionRequest(community, pType)
+
+	response, err := base.GetEventSender().CreateCommunityTokenPermission(permissionRequest)
+	s := base.GetSuite()
+	s.Require().Nil(response)
+	s.Require().Error(err)
 }
