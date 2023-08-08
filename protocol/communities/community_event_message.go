@@ -23,7 +23,8 @@ type CommunityEvent struct {
 	RejectedRequestsToJoin map[string]*protobuf.CommunityRequestToJoin `json:"rejectedRequestsToJoin,omitempty"`
 	AcceptedRequestsToJoin map[string]*protobuf.CommunityRequestToJoin `json:"acceptedRequestsToJoin,omitempty"`
 	TokenMetadata          *protobuf.CommunityTokenMetadata            `json:"tokenMetadata,omitempty"`
-	RawPayload             []byte                                      `json:"rawPayload"`
+	Payload                []byte                                      `json:"payload"`
+	Signature              []byte                                      `json:"signature"`
 }
 
 func (e *CommunityEvent) ToProtobuf() *protobuf.CommunityEvent {
@@ -41,15 +42,13 @@ func (e *CommunityEvent) ToProtobuf() *protobuf.CommunityEvent {
 		TokenMetadata:          e.TokenMetadata,
 	}
 }
-
-func CommunityEventFromProtobuf(raw []byte) (*CommunityEvent, error) {
+func communityEventFromProtobuf(msg *protobuf.SignedCommunityEvent) (*CommunityEvent, error) {
 	decodedEvent := protobuf.CommunityEvent{}
-	encodedEvent := raw
-
-	err := proto.Unmarshal(encodedEvent, &decodedEvent)
+	err := proto.Unmarshal(msg.Payload, &decodedEvent)
 	if err != nil {
 		return nil, err
 	}
+
 	return &CommunityEvent{
 		CommunityEventClock:    decodedEvent.CommunityEventClock,
 		Type:                   decodedEvent.Type,
@@ -62,7 +61,8 @@ func CommunityEventFromProtobuf(raw []byte) (*CommunityEvent, error) {
 		RejectedRequestsToJoin: decodedEvent.RejectedRequestsToJoin,
 		AcceptedRequestsToJoin: decodedEvent.AcceptedRequestsToJoin,
 		TokenMetadata:          decodedEvent.TokenMetadata,
-		RawPayload:             encodedEvent,
+		Payload:                msg.Payload,
+		Signature:              msg.Signature,
 	}, nil
 }
 
@@ -73,26 +73,39 @@ type CommunityEventsMessage struct {
 }
 
 func (m *CommunityEventsMessage) ToProtobuf() protobuf.CommunityEventsMessage {
-	rawEvents := communityEventsToBytes(m.Events)
-
-	return protobuf.CommunityEventsMessage{
+	result := protobuf.CommunityEventsMessage{
 		CommunityId:                    m.CommunityID,
 		EventsBaseCommunityDescription: m.EventsBaseCommunityDescription,
-		Events:                         rawEvents,
+		SignedEvents:                   []*protobuf.SignedCommunityEvent{},
 	}
+
+	for _, event := range m.Events {
+		signedEvent := &protobuf.SignedCommunityEvent{
+			Signature: event.Signature,
+			Payload:   event.Payload,
+		}
+		result.SignedEvents = append(result.SignedEvents, signedEvent)
+	}
+
+	return result
 }
 
-func CommunityEventsMessageFromProtobuf(raw *protobuf.CommunityEventsMessage) (*CommunityEventsMessage, error) {
-	events, err := communityEventsFromBytes(raw.Events)
-	if err != nil {
-		return nil, err
+func CommunityEventsMessageFromProtobuf(msg *protobuf.CommunityEventsMessage) (*CommunityEventsMessage, error) {
+	result := &CommunityEventsMessage{
+		CommunityID:                    msg.CommunityId,
+		EventsBaseCommunityDescription: msg.EventsBaseCommunityDescription,
+		Events:                         []CommunityEvent{},
 	}
 
-	return &CommunityEventsMessage{
-		CommunityID:                    raw.CommunityId,
-		EventsBaseCommunityDescription: raw.EventsBaseCommunityDescription,
-		Events:                         events,
-	}, nil
+	for _, signedEvent := range msg.SignedEvents {
+		event, err := communityEventFromProtobuf(signedEvent)
+		if err != nil {
+			return nil, err
+		}
+		result.Events = append(result.Events, *event)
+	}
+
+	return result, nil
 }
 
 func (m *CommunityEventsMessage) Marshal() ([]byte, error) {
@@ -225,30 +238,7 @@ func validateCommunityEvent(communityEvent *CommunityEvent) error {
 }
 
 func isCommunityEventsEqual(left CommunityEvent, right CommunityEvent) bool {
-	return bytes.Equal(left.RawPayload, right.RawPayload)
-}
-
-func communityEventsToBytes(communityEvents []CommunityEvent) [][]byte {
-	var rawEvents [][]byte
-	for _, e := range communityEvents {
-		var encodedEvent []byte
-		encodedEvent = append(encodedEvent, e.RawPayload...)
-		rawEvents = append(rawEvents, encodedEvent)
-	}
-
-	return rawEvents
-}
-
-func communityEventsFromBytes(rawEvents [][]byte) ([]CommunityEvent, error) {
-	var events []CommunityEvent
-	for _, e := range rawEvents {
-		verifiedEvent, err := CommunityEventFromProtobuf(e)
-		if err != nil {
-			return nil, err
-		}
-		events = append(events, *verifiedEvent)
-	}
-	return events, nil
+	return bytes.Equal(left.Payload, right.Payload)
 }
 
 func communityEventsToJSONEncodedBytes(communityEvents []CommunityEvent) ([]byte, error) {
