@@ -18,7 +18,7 @@ message CommunityEvent {
   map<string,CommunityRequestToJoin> rejectedRequestsToJoin = 9;
   map<string,CommunityRequestToJoin> acceptedRequestsToJoin = 10;
   CommunityTokenMetadata token_metadata = 11;
-  
+
   enum EventType {
     UNKNOWN = 0;
     COMMUNITY_EDIT = 1;
@@ -64,14 +64,25 @@ message ChannelData {
   CommunityChat channel = 4;
 }
 
+message SignedCommunityEvent {
+  // Signature of the payload field
+  bytes signature = 1;
+  // Marshaled CommunityEvent
+  bytes payload = 2;
+}
+
 // CommunityEventsMessage is a message used to propagate information
 // about community changes.
 message CommunityEventsMessage {
   bytes community_id = 1;
-  
+
   // Events base CommunityDescription with owner signature on top of which events were generated
   bytes events_base_community_description = 2;
-  
+
   // A list of admins events for the channel in bytes
-  repeated bytes events = 3;
+  // Deprecated: use signed_events instead.
+  repeated bytes events = 3 [deprecated=true];
+
+  // A list of signed community events
+  repeated SignedCommunityEvent signed_events = 4;
 }

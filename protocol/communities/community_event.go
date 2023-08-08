@@ -233,13 +233,8 @@ func (o *Community) UpdateCommunityByEvents(communityEventMessage *CommunityEven
 }
 
 func (o *Community) updateCommunityDescriptionByEvents() error {
-	for i := range o.config.EventsData.Events {
-		communityEvent := &o.config.EventsData.Events[i]
-		err := validateCommunityEvent(communityEvent)
-		if err != nil {
-			return err
-		}
-		err = o.updateCommunityDescriptionByCommunityEvent(*communityEvent)
+	for _, event := range o.config.EventsData.Events {
+		err := o.updateCommunityDescriptionByCommunityEvent(event)
 		if err != nil {
 			return err
 		}
@@ -368,11 +363,6 @@ func (o *Community) addNewCommunityEvent(event *CommunityEvent) error {
 		return err
 	}
 
-	data, err := proto.Marshal(event.ToProtobuf())
-	if err != nil {
-		return errors.New("converting CommunityEvent to protobuf failed")
-	}
-
 	// All events must be built on top of the control node CommunityDescription
 	// If there were no events before, extract CommunityDescription from CommunityDescriptionProtocolMessage
 	// and check the signature
@@ -388,7 +378,11 @@ func (o *Community) addNewCommunityEvent(event *CommunityEvent) error {
 		}
 	}
 
-	event.RawPayload = data
+	event.Payload, err = proto.Marshal(event.ToProtobuf())
+	if err != nil {
+		return err
+	}
+
 	o.config.EventsData.Events = append(o.config.EventsData.Events, *event)
 
 	return nil

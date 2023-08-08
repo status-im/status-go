@@ -1299,17 +1299,66 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 	}, nil
 }
 
+func (m *Manager) signEvents(community *Community) error {
+	for i := range community.config.EventsData.Events {
+		communityEvent := &community.config.EventsData.Events[i]
+		if communityEvent.Signature == nil || len(communityEvent.Signature) == 0 {
+			var err error
+			communityEvent.Signature, err = crypto.Sign(crypto.Keccak256(communityEvent.Payload), m.identity)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (m *Manager) validateAndFilterEvents(community *Community, events []CommunityEvent) []CommunityEvent {
+	validatedEvents := make([]CommunityEvent, 0, len(events))
+
+	validateEvent := func(event *CommunityEvent) error {
+		if event.Signature == nil || len(event.Signature) == 0 {
+			return errors.New("missing signature")
+		}
+
+		signer, err := crypto.SigToPub(
+			crypto.Keccak256(event.Payload),
+			event.Signature,
+		)
+		if err != nil {
+			return errors.New("failed to recover signer")
+		}
+
+		err = community.ValidateEvent(event, signer)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	for i := range events {
+		if err := validateEvent(&events[i]); err == nil {
+			validatedEvents = append(validatedEvents, events[i])
+		} else {
+			m.logger.Warn("invalid community event", zap.Error(err))
+		}
+	}
+
+	return validatedEvents
+}
+
 func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message *protobuf.CommunityEventsMessage) (*CommunityResponse, error) {
 	if signer == nil {
 		return nil, errors.New("signer can't be nil")
 	}
 
-	adminMessage, err := CommunityEventsMessageFromProtobuf(message)
+	eventsMessage, err := CommunityEventsMessageFromProtobuf(message)
 	if err != nil {
 		return nil, err
 	}
 
-	community, err := m.persistence.GetByID(&m.identity.PublicKey, adminMessage.CommunityID)
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, eventsMessage.CommunityID)
 	if err != nil {
 		return nil, err
 	}
@@ -1322,7 +1371,9 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		return nil, errors.New("user has not permissions to send events")
 	}
 
-	changes, err := community.UpdateCommunityByEvents(adminMessage)
+	eventsMessage.Events = m.validateAndFilterEvents(community, eventsMessage.Events)
+
+	changes, err := community.UpdateCommunityByEvents(eventsMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -4211,7 +4262,11 @@ func (m *Manager) saveAndPublish(community *Community) error {
 		m.publish(&Subscription{Community: community})
 		return nil
 	} else if community.HasPermissionToSendCommunityEvents() {
-		err := m.persistence.SaveCommunityEvents(community)
+		err := m.signEvents(community)
+		if err != nil {
+			return err
+		}
+		err = m.persistence.SaveCommunityEvents(community)
 		if err != nil {
 			return err
 		}

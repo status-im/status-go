@@ -2230,3 +2230,24 @@ func (o *Community) DeclineRequestToJoin(dbRequest *RequestToJoin) error {
 
 	return nil
 }
+
+func (o *Community) ValidateEvent(event *CommunityEvent, signer *ecdsa.PublicKey) error {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	err := validateCommunityEvent(event)
+	if err != nil {
+		return err
+	}
+
+	member := o.getMember(signer)
+	if member == nil {
+		return ErrMemberNotFound
+	}
+
+	if !RolesAuthorizedToPerformEvent(member.Roles, event) {
+		return ErrNotAuthorized
+	}
+
+	return nil
+}
