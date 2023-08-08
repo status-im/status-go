@@ -1444,7 +1444,7 @@ func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermis
 	allowedToManageMemberPermissions := o.IsTokenMaster() || o.IsAdmin()
 	allowedToManageAllPermissions := o.IsOwnerWithoutCommunityKey()
 
-	if !isControlNode && !allowedToManageMemberPermissions && !allowedToManageAllPermissions ||
+	if (!isControlNode && !allowedToManageMemberPermissions && !allowedToManageAllPermissions) ||
 		(allowedToManageMemberPermissions && permission.Type != protobuf.CommunityTokenPermission_BECOME_MEMBER) {
 		return nil, ErrNotEnoughPermissions
 	}
@@ -1477,7 +1477,7 @@ func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *
 	allowedToManageMemberPermissions := o.IsTokenMaster() || o.IsAdmin()
 	allowedToManageAllPermissions := o.IsOwnerWithoutCommunityKey()
 
-	if !isControlNode && !allowedToManageMemberPermissions && !allowedToManageAllPermissions ||
+	if (!isControlNode && !allowedToManageMemberPermissions && !allowedToManageAllPermissions) ||
 		(allowedToManageMemberPermissions && tokenPermission.Type != protobuf.CommunityTokenPermission_BECOME_MEMBER) {
 		return nil, ErrNotEnoughPermissions
 	}
@@ -1516,7 +1516,7 @@ func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChange
 	allowedToManageMemberPermissions := o.IsTokenMaster() || o.IsAdmin()
 	allowedToManageAllPermissions := o.IsOwnerWithoutCommunityKey()
 
-	if !isControlNode && !allowedToManageMemberPermissions && !allowedToManageAllPermissions ||
+	if (!isControlNode && !allowedToManageMemberPermissions && !allowedToManageAllPermissions) ||
 		(allowedToManageMemberPermissions && permission.Type != protobuf.CommunityTokenPermission_BECOME_MEMBER) {
 		return nil, ErrNotEnoughPermissions
 	}

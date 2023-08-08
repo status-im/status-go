@@ -851,6 +851,15 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	s.Require().NoError(err)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
 
+	// control node receives request to join
+	response, err = WaitOnMessengerResponse(
+		base.GetControlNode(),
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		"event sender did not receive community request to join",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
 	// event sender has not accepted request yet
 	eventSenderCommunity, err := base.GetEventSender().GetCommunityByID(community.ID())
 	s.Require().NoError(err)
