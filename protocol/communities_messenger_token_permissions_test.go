@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"bytes"
-	"context"
 	"crypto/ecdsa"
 	"errors"
 	"math/big"
@@ -15,11 +14,9 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/account"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -38,45 +35,6 @@ const ownerAddress = "0x0100000000000000000000000000000000000000"
 const aliceAddress1 = "0x0200000000000000000000000000000000000000"
 const aliceAddress2 = "0x0210000000000000000000000000000000000000"
 const bobAddress = "0x0300000000000000000000000000000000000000"
-
-type AccountManagerMock struct {
-	AccountsMap map[string]string
-}
-
-func (m *AccountManagerMock) GetVerifiedWalletAccount(db *accounts.Database, address, password string) (*account.SelectedExtKey, error) {
-	return &account.SelectedExtKey{
-		Address: types.HexToAddress(address),
-	}, nil
-}
-
-func (m *AccountManagerMock) CanRecover(rpcParams account.RecoverParams, revealedAddress types.Address) (bool, error) {
-	return true, nil
-}
-
-func (m *AccountManagerMock) Sign(rpcParams account.SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error) {
-	return types.HexBytes{}, nil
-}
-
-func (m *AccountManagerMock) DeleteAccount(address types.Address) error {
-	return nil
-}
-
-type TokenManagerMock struct {
-	Balances *map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big
-}
-
-func (m *TokenManagerMock) GetAllChainIDs() ([]uint64, error) {
-	chainIDs := make([]uint64, 0, len(*m.Balances))
-	for key := range *m.Balances {
-		chainIDs = append(chainIDs, key)
-	}
-	return chainIDs, nil
-}
-
-func (m *TokenManagerMock) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
-	time.Sleep(100 * time.Millisecond) // simulate response time
-	return *m.Balances, nil
-}
 
 type CommunityAndKeyActions struct {
 	community  *communities.Community
@@ -200,45 +158,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string) *Messenger {
-	accountsManagerMock := &AccountManagerMock{}
-	accountsManagerMock.AccountsMap = make(map[string]string)
-	for _, walletAddress := range walletAddresses {
-		accountsManagerMock.AccountsMap[walletAddress] = types.EncodeHex(crypto.Keccak256([]byte(password)))
-	}
-
-	tokenManagerMock := &TokenManagerMock{
-		Balances: &s.mockedBalances,
-	}
-
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	messenger, err := newCommunitiesTestMessenger(s.shh, privateKey, s.logger, accountsManagerMock, tokenManagerMock)
-	s.Require().NoError(err)
-
-	currentDistributorObj, ok := messenger.communitiesKeyDistributor.(*CommunitiesKeyDistributorImpl)
-	s.Require().True(ok)
-	messenger.communitiesKeyDistributor = &TestCommunitiesKeyDistributor{
-		CommunitiesKeyDistributorImpl: *currentDistributorObj,
-		subscriptions:                 map[chan *CommunityAndKeyActions]bool{},
-		mutex:                         sync.RWMutex{},
-	}
-
-	// add wallet account with keypair
-	for _, walletAddress := range walletAddresses {
-		kp := accounts.GetProfileKeypairForTest(false, true, false)
-		kp.Accounts[0].Address = types.HexToAddress(walletAddress)
-		err := messenger.settings.SaveOrUpdateKeypair(kp)
-		s.Require().NoError(err)
-	}
-
-	walletAccounts, err := messenger.settings.GetActiveAccounts()
-	s.Require().NoError(err)
-	s.Require().Len(walletAccounts, len(walletAddresses))
-	for i := range walletAddresses {
-		s.Require().Equal(walletAccounts[i].Type, accounts.AccountTypeGenerated)
-	}
-	return messenger
+	return newMessenger(&s.Suite, s.shh, s.logger, password, walletAddresses, &s.mockedBalances)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) joinCommunity(community *communities.Community, user *Messenger, password string, addresses []string) {

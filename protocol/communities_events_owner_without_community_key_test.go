@@ -1,18 +1,18 @@
 package protocol
 
 import (
-	"crypto/ecdsa"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
+
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
@@ -28,8 +28,9 @@ type OwnerWithoutCommunityKeyCommunityEventsSuite struct {
 	alice                    *Messenger
 	// If one wants to send messages between different instances of Messenger,
 	// a single Waku service should be shared.
-	shh    types.Waku
-	logger *zap.Logger
+	shh            types.Waku
+	logger         *zap.Logger
+	mockedBalances map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big // chainID, account, token, balance
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) GetControlNode() *Messenger {
@@ -57,15 +58,17 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) SetupTest() {
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 
-	s.controlNode = s.newMessenger()
-	s.ownerWithoutCommunityKey = s.newMessenger()
-	s.alice = s.newMessenger()
+	s.controlNode = s.newMessenger("", []string{})
+	s.ownerWithoutCommunityKey = s.newMessenger("qwerty", []string{commmunitiesEventsEventSenderAddress})
+	s.alice = s.newMessenger("", []string{})
 	_, err := s.controlNode.Start()
 	s.Require().NoError(err)
 	_, err = s.ownerWithoutCommunityKey.Start()
 	s.Require().NoError(err)
 	_, err = s.alice.Start()
 	s.Require().NoError(err)
+
+	s.mockedBalances = createMockedWalletBalance(&s.Suite)
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TearDownTest() {
@@ -75,18 +78,8 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
-	messenger, err := newCommunitiesTestMessenger(shh, privateKey, s.logger, nil, nil)
-	s.Require().NoError(err)
-
-	return messenger
-}
-
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) newMessenger() *Messenger {
-	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	return s.newMessengerWithKey(s.shh, privateKey)
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) newMessenger(password string, walletAddresses []string) *Messenger {
+	return newMessenger(&s.Suite, s.shh, s.logger, password, walletAddresses, &s.mockedBalances)
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerEditCommunityDescription() {
@@ -102,114 +95,31 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerCreateEditDelete
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerCreateEditDeleteBecomeMemberPermission() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)
-	testCreateEditDeleteBecomeMemberPermission(s, community)
+	testCreateEditDeleteBecomeMemberPermission(s, community, protobuf.CommunityTokenPermission_BECOME_MEMBER)
 }
 
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerCannotCreateBecomeAdminPermission() {
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerCreateEditDeleteBecomeAdminPermission() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)
-
-	permissionRequest := createTestPermissionRequest(community)
-	permissionRequest.Type = protobuf.CommunityTokenPermission_BECOME_ADMIN
-
-	response, err := s.ownerWithoutCommunityKey.CreateCommunityTokenPermission(permissionRequest)
-	s.Require().Nil(response)
-	s.Require().Error(err)
+	testCreateEditDeleteBecomeMemberPermission(s, community, protobuf.CommunityTokenPermission_BECOME_ADMIN)
 }
 
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerCannotEditBecomeAdminPermission() {
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerCreateEditDeleteBecomeTokenMasterPermission() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)
-	permissionRequest := createTestPermissionRequest(community)
-	permissionRequest.Type = protobuf.CommunityTokenPermission_BECOME_ADMIN
-
-	// control node creates BECOME_ADMIN permission
-	response, err := s.controlNode.CreateCommunityTokenPermission(permissionRequest)
-	s.Require().NoError(err)
-
-	var tokenPermissionID string
-	for id := range response.CommunityChanges[0].TokenPermissionsAdded {
-		tokenPermissionID = id
-	}
-	s.Require().NotEqual(tokenPermissionID, "")
-
-	ownerCommunity, err := s.controlNode.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	assertCheckTokenPermissionCreated(&s.Suite, ownerCommunity)
-
-	// then, ensure event sender receives updated community
-	_, err = WaitOnMessengerResponse(
-		s.ownerWithoutCommunityKey,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"event sender did not receive updated community",
-	)
-	s.Require().NoError(err)
-	eventSenderCommunity, err := s.ownerWithoutCommunityKey.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	assertCheckTokenPermissionCreated(&s.Suite, eventSenderCommunity)
-
-	permissionRequest.TokenCriteria[0].Symbol = "UPDATED"
-	permissionRequest.TokenCriteria[0].Amount = "200"
-
-	permissionEditRequest := &requests.EditCommunityTokenPermission{
-		PermissionID:                   tokenPermissionID,
-		CreateCommunityTokenPermission: *permissionRequest,
-	}
-
-	// then, event sender tries to edit permission
-	response, err = s.ownerWithoutCommunityKey.EditCommunityTokenPermission(permissionEditRequest)
-	s.Require().Error(err)
-	s.Require().Nil(response)
-}
-
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerCannotDeleteBecomeAdminPermission() {
-
-	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)
-	permissionRequest := createTestPermissionRequest(community)
-	permissionRequest.Type = protobuf.CommunityTokenPermission_BECOME_ADMIN
-
-	// control node creates BECOME_ADMIN permission
-	response, err := s.controlNode.CreateCommunityTokenPermission(permissionRequest)
-	s.Require().NoError(err)
-
-	var tokenPermissionID string
-	for id := range response.CommunityChanges[0].TokenPermissionsAdded {
-		tokenPermissionID = id
-	}
-	s.Require().NotEqual(tokenPermissionID, "")
-
-	// then, ensure event sender receives updated community
-	_, err = WaitOnMessengerResponse(
-		s.ownerWithoutCommunityKey,
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
-		"event sender did not receive updated community",
-	)
-	s.Require().NoError(err)
-	eventSenderCommunity, err := s.ownerWithoutCommunityKey.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	assertCheckTokenPermissionCreated(&s.Suite, eventSenderCommunity)
-
-	deleteTokenPermission := &requests.DeleteCommunityTokenPermission{
-		CommunityID:  community.ID(),
-		PermissionID: tokenPermissionID,
-	}
-
-	// then event sender tries to delete BECOME_ADMIN permission which should fail
-	response, err = s.ownerWithoutCommunityKey.DeleteCommunityTokenPermission(deleteTokenPermission)
-	s.Require().Error(err)
-	s.Require().Nil(response)
+	testCreateEditDeleteBecomeMemberPermission(s, community, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders() {
-	additionalOwner := s.newMessenger()
+	additionalOwner := s.newMessenger("", []string{})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{additionalOwner})
 	// set up additional user that will send request to join
-	user := s.newMessenger()
+	user := s.newMessenger("", []string{})
 	testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalOwner)
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAcceptMemberRequestToJoinNotConfirmedByControlNode() {
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{})
 	// set up additional user that will send request to join
-	user := s.newMessenger()
+	user := s.newMessenger("", []string{})
 	testAcceptMemberRequestToJoinNotConfirmedByControlNode(s, community, user)
 }
 
@@ -217,22 +127,22 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAcceptMemberRequ
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{})
 
 	// set up additional user that will send request to join
-	user := s.newMessenger()
+	user := s.newMessenger("", []string{})
 	testAcceptMemberRequestToJoin(s, community, user)
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRejectMemberRequestToJoinResponseSharedWithOtherEventSenders() {
-	additionalOwner := s.newMessenger()
+	additionalOwner := s.newMessenger("", []string{})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{additionalOwner})
 	// set up additional user that will send request to join
-	user := s.newMessenger()
+	user := s.newMessenger("", []string{})
 	testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalOwner)
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRejectMemberRequestToJoinNotConfirmedByControlNode() {
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{})
 	// set up additional user that will send request to join
-	user := s.newMessenger()
+	user := s.newMessenger("", []string{})
 	testRejectMemberRequestToJoinNotConfirmedByControlNode(s, community, user)
 }
 
@@ -240,25 +150,25 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRejectMemberRequ
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{})
 
 	// set up additional user that will send request to join
-	user := s.newMessenger()
+	user := s.newMessenger("", []string{})
 	testRejectMemberRequestToJoin(s, community, user)
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRequestToJoinStateCannotBeOverridden() {
-	additionalOwner := s.newMessenger()
+	additionalOwner := s.newMessenger("", []string{})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{additionalOwner})
 
 	// set up additional user that will send request to join
-	user := s.newMessenger()
+	user := s.newMessenger("", []string{})
 	testEventSenderCannotOverrideRequestToJoinState(s, community, user, additionalOwner)
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerControlNodeHandlesMultipleEventSenderRequestToJoinDecisions() {
-	additionalOwner := s.newMessenger()
+	additionalOwner := s.newMessenger("", []string{})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{additionalOwner})
 
 	// set up additional user that will send request to join
-	user := s.newMessenger()
+	user := s.newMessenger("", []string{})
 	testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(s, community, user, additionalOwner)
 }
 

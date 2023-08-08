@@ -1096,6 +1096,10 @@ func (o *Community) IsTokenMaster() bool {
 	return o.IsMemberTokenMaster(o.config.MemberIdentity)
 }
 
+func (o *Community) IsAdmin() bool {
+	return o.IsMemberAdmin(o.config.MemberIdentity)
+}
+
 func (o *Community) GetPrivilegedMembers() []*ecdsa.PublicKey {
 	privilegedMembers := make([]*ecdsa.PublicKey, 0)
 	members := o.GetMemberPubkeys()
@@ -1437,9 +1441,11 @@ func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermis
 	defer o.mutex.Unlock()
 
 	isControlNode := o.IsControlNode()
-	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
+	allowedToManageMemberPermissions := o.IsTokenMaster() || o.IsAdmin()
+	allowedToManageAllPermissions := o.IsOwnerWithoutCommunityKey()
 
-	if !isControlNode && !allowedToSendEvents || (allowedToSendEvents && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
+	if (!isControlNode && !allowedToManageMemberPermissions && !allowedToManageAllPermissions) ||
+		(allowedToManageMemberPermissions && permission.Type != protobuf.CommunityTokenPermission_BECOME_MEMBER) {
 		return nil, ErrNotEnoughPermissions
 	}
 
@@ -1448,7 +1454,7 @@ func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermis
 		return nil, err
 	}
 
-	if allowedToSendEvents {
+	if allowedToManageMemberPermissions || allowedToManageAllPermissions {
 		err := o.addNewCommunityEvent(o.ToCommunityTokenPermissionChangeCommunityEvent(permission))
 		if err != nil {
 			return nil, err
@@ -1468,9 +1474,11 @@ func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *
 	defer o.mutex.Unlock()
 
 	isControlNode := o.IsControlNode()
-	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
+	allowedToManageMemberPermissions := o.IsTokenMaster() || o.IsAdmin()
+	allowedToManageAllPermissions := o.IsOwnerWithoutCommunityKey()
 
-	if !isControlNode && !allowedToSendEvents || (allowedToSendEvents && tokenPermission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
+	if (!isControlNode && !allowedToManageMemberPermissions && !allowedToManageAllPermissions) ||
+		(allowedToManageMemberPermissions && tokenPermission.Type != protobuf.CommunityTokenPermission_BECOME_MEMBER) {
 		return nil, ErrNotEnoughPermissions
 	}
 
@@ -1479,7 +1487,7 @@ func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *
 		return nil, err
 	}
 
-	if allowedToSendEvents {
+	if allowedToManageMemberPermissions || allowedToManageAllPermissions {
 		err := o.addNewCommunityEvent(o.ToCommunityTokenPermissionChangeCommunityEvent(tokenPermission))
 		if err != nil {
 			return nil, err
@@ -1505,9 +1513,11 @@ func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChange
 	}
 
 	isControlNode := o.IsControlNode()
-	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
+	allowedToManageMemberPermissions := o.IsTokenMaster() || o.IsAdmin()
+	allowedToManageAllPermissions := o.IsOwnerWithoutCommunityKey()
 
-	if !isControlNode && !allowedToSendEvents || (allowedToSendEvents && permission.Type == protobuf.CommunityTokenPermission_BECOME_ADMIN) {
+	if (!isControlNode && !allowedToManageMemberPermissions && !allowedToManageAllPermissions) ||
+		(allowedToManageMemberPermissions && permission.Type != protobuf.CommunityTokenPermission_BECOME_MEMBER) {
 		return nil, ErrNotEnoughPermissions
 	}
 
@@ -1516,7 +1526,7 @@ func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChange
 		return nil, err
 	}
 
-	if allowedToSendEvents {
+	if allowedToManageMemberPermissions || allowedToManageAllPermissions {
 		err := o.addNewCommunityEvent(o.ToCommunityTokenPermissionDeleteCommunityEvent(permission))
 		if err != nil {
 			return nil, err
