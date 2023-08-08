@@ -499,7 +499,9 @@ type Network struct {
 	ChainID                uint64          `json:"chainId"`
 	ChainName              string          `json:"chainName"`
 	RPCURL                 string          `json:"rpcUrl"`
+	OriginalRPCURL         string          `json:"originalRpcUrl"`
 	FallbackURL            string          `json:"fallbackURL"`
+	OriginalFallbackURL    string          `json:"originalFallbackURL"`
 	BlockExplorerURL       string          `json:"blockExplorerUrl,omitempty"`
 	IconURL                string          `json:"iconUrl,omitempty"`
 	NativeCurrencyName     string          `json:"nativeCurrencyName,omitempty"`

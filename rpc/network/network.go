@@ -51,7 +51,7 @@ func (nq *networksQuery) filterChainID(chainID uint64) *networksQuery {
 	return nq
 }
 
-func (nq *networksQuery) exec(db *sql.DB) ([]*params.Network, error) {
+func (nq *networksQuery) exec(db *sql.DB, configuredNetworks []params.Network) ([]*params.Network, error) {
 	rows, err := db.Query(nq.buf.String(), nq.args...)
 	if err != nil {
 		return nil, err
@@ -69,6 +69,26 @@ func (nq *networksQuery) exec(db *sql.DB) ([]*params.Network, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		for _, configuredNetwork := range configuredNetworks {
+			if configuredNetwork.ChainID == network.ChainID {
+				if network.RPCURL == "" {
+					network.RPCURL = configuredNetwork.RPCURL
+				}
+				network.OriginalRPCURL = configuredNetwork.RPCURL
+				break
+			}
+		}
+
+		for _, configuredNetwork := range configuredNetworks {
+			if configuredNetwork.ChainID == network.ChainID {
+				if network.FallbackURL == "" {
+					network.FallbackURL = configuredNetwork.FallbackURL
+				}
+				network.OriginalFallbackURL = configuredNetwork.FallbackURL
+				break
+			}
+		}
 		res = append(res, &network)
 	}
 
@@ -76,8 +96,8 @@ func (nq *networksQuery) exec(db *sql.DB) ([]*params.Network, error) {
 }
 
 type Manager struct {
-	db       *sql.DB
-	networks []params.Network
+	db                 *sql.DB
+	configuredNetworks []params.Network
 }
 
 func NewManager(db *sql.DB) *Manager {
@@ -99,7 +119,7 @@ func (nm *Manager) Init(networks []params.Network) error {
 	if networks == nil {
 		return nil
 	}
-	nm.networks = networks
+	nm.configuredNetworks = networks
 
 	var errors string
 	currentNetworks, _ := nm.Get(false)
@@ -114,28 +134,12 @@ func (nm *Manager) Init(networks []params.Network) error {
 		}
 	}
 
-	// Add new networks and update rpc url for the old ones
+	// Add new networks and update related chain id for the old ones
 	for i := range networks {
 		found := false
 		for j := range currentNetworks {
 			if currentNetworks[j].ChainID == networks[i].ChainID {
 				found = true
-				if currentNetworks[j].RPCURL != networks[i].RPCURL {
-					// Update rpc_url if it's different
-					err := nm.UpdateRPCURL(currentNetworks[j].ChainID, networks[i].RPCURL)
-					if err != nil {
-						errors += fmt.Sprintf("error updating network rpc_url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
-					}
-				}
-
-				if currentNetworks[j].FallbackURL != networks[i].FallbackURL {
-					// Update fallback_url if it's different
-					err := nm.UpdateFallbackURL(currentNetworks[j].ChainID, networks[i].FallbackURL)
-					if err != nil {
-						errors += fmt.Sprintf("error updating network fallback_url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
-					}
-				}
-
 				if currentNetworks[j].RelatedChainID != networks[i].RelatedChainID {
 					// Update fallback_url if it's different
 					err := nm.UpdateRelatedChainID(currentNetworks[j].ChainID, networks[i].RelatedChainID)
@@ -164,9 +168,22 @@ func (nm *Manager) Init(networks []params.Network) error {
 }
 
 func (nm *Manager) Upsert(network *params.Network) error {
+	rpcURL := network.RPCURL
+	fallbackURL := network.FallbackURL
+	for _, n := range nm.configuredNetworks {
+		if n.ChainID == network.ChainID {
+			if rpcURL == n.RPCURL {
+				rpcURL = ""
+			}
+			if fallbackURL == n.FallbackURL {
+				fallbackURL = ""
+			}
+			break
+		}
+	}
 	_, err := nm.db.Exec(
 		"INSERT OR REPLACE INTO networks (chain_id, chain_name, rpc_url, fallback_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name, related_chain_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		network.ChainID, network.ChainName, network.RPCURL, network.FallbackURL, network.BlockExplorerURL, network.IconURL,
+		network.ChainID, network.ChainName, rpcURL, fallbackURL, network.BlockExplorerURL, network.IconURL,
 		network.NativeCurrencyName, network.NativeCurrencySymbol, network.NativeCurrencyDecimals,
 		network.IsTest, network.Layer, network.Enabled, network.ChainColor, network.ShortName,
 		network.RelatedChainID,
@@ -179,23 +196,13 @@ func (nm *Manager) Delete(chainID uint64) error {
 	return err
 }
 
-func (nm *Manager) UpdateRPCURL(chainID uint64, rpcURL string) error {
-	_, err := nm.db.Exec(`UPDATE networks SET rpc_url = ? WHERE chain_id = ?`, rpcURL, chainID)
-	return err
-}
-
-func (nm *Manager) UpdateFallbackURL(chainID uint64, fallbackURL string) error {
-	_, err := nm.db.Exec(`UPDATE networks SET fallback_url = ? WHERE chain_id = ?`, fallbackURL, chainID)
-	return err
-}
-
 func (nm *Manager) UpdateRelatedChainID(chainID uint64, relatedChainID uint64) error {
 	_, err := nm.db.Exec(`UPDATE networks SET related_chain_id = ? WHERE chain_id = ?`, relatedChainID, chainID)
 	return err
 }
 
 func (nm *Manager) Find(chainID uint64) *params.Network {
-	networks, err := newNetworksQuery().filterChainID(chainID).exec(nm.db)
+	networks, err := newNetworksQuery().filterChainID(chainID).exec(nm.db, nm.configuredNetworks)
 	if len(networks) != 1 || err != nil {
 		return nil
 	}
@@ -208,12 +215,12 @@ func (nm *Manager) Get(onlyEnabled bool) ([]*params.Network, error) {
 		query.filterEnabled(true)
 	}
 
-	return query.exec(nm.db)
+	return query.exec(nm.db, nm.configuredNetworks)
 }
 
 func (nm *Manager) GetCombinedNetworks() ([]*CombinedNetwork, error) {
 	query := newNetworksQuery()
-	networks, err := query.exec(nm.db)
+	networks, err := query.exec(nm.db, nm.configuredNetworks)
 	if err != nil {
 		return nil, err
 	}
@@ -250,5 +257,5 @@ func (nm *Manager) GetCombinedNetworks() ([]*CombinedNetwork, error) {
 }
 
 func (nm *Manager) GetConfiguredNetworks() []params.Network {
-	return nm.networks
+	return nm.configuredNetworks
 }
