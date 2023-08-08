@@ -39,6 +39,13 @@ const (
 	requestAddressForTransactionDeclinedMessage = "Request address for transaction declined"
 )
 
+const (
+	// IncreaseUnviewedMessagesCountTimeout
+	// this timeout indicates how long the time between received messages should be
+	// for a new message to increase the unviewed messages counter
+	IncreaseUnviewedMessagesCountTimeout = 1000 * 60 * 2
+)
+
 var (
 	ErrMessageNotAllowed                     = errors.New("message from a non-contact")
 	ErrMessageForWrongChatType               = errors.New("message for the wrong chat type")
@@ -2993,7 +3000,7 @@ func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, er
 }
 
 func (m *Messenger) updateUnviewedCounts(chat *Chat, message *common.Message) {
-	if message.Timestamp > chat.LastMessage.Timestamp+1000*60*2 {
+	if message.Timestamp > chat.LastMessage.Timestamp+IncreaseUnviewedMessagesCountTimeout {
 		chat.UnviewedMessagesCount += 1
 	}
 	if message.Mentioned || message.Replied {
