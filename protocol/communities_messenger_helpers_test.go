@@ -432,3 +432,31 @@ func checkMemberJoinedToTheCommunity(response *MessengerResponse, member *ecdsa.
 
 	return nil
 }
+
+func waitOnCommunitiesEvent(user *Messenger, condition func(*communities.Subscription) bool) <-chan error {
+	errCh := make(chan error, 1)
+
+	go func() {
+		defer close(errCh)
+
+		for {
+			select {
+			case sub, more := <-user.communitiesManager.Subscribe():
+				if !more {
+					errCh <- errors.New("channel closed when waiting for communities event")
+					return
+				}
+
+				if condition(sub) {
+					return
+				}
+
+			case <-time.After(500 * time.Millisecond):
+				errCh <- errors.New("timed out when waiting for communities event")
+				return
+			}
+		}
+	}()
+
+	return errCh
+}

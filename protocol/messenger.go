@@ -4392,7 +4392,18 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
 						err = m.handleCommunityEventsMessage(messageState, publicKey, message)
 						if err != nil {
-							logger.Warn("failed to handle CommunityEvent", zap.Error(err))
+							logger.Warn("failed to handle CommunityEventsMessage", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.CommunityEventsMessageRejected:
+						logger.Debug("Handling CommunityEventsMessageRejected")
+						message := msg.ParsedMessage.Interface().(protobuf.CommunityEventsMessageRejected)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
+						err = m.handleCommunityEventsMessageRejected(messageState, publicKey, message)
+						if err != nil {
+							logger.Warn("failed to handle CommunityEventsMessageRejected", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}

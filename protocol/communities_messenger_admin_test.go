@@ -13,8 +13,10 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/waku"
@@ -279,4 +281,74 @@ func (s *AdminCommunityEventsSuite) TestAdminAddCommunityToken() {
 func (s *AdminCommunityEventsSuite) TestMemberReceiveAdminEventsWhenOwnerOffline() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
 	testMemberReceiveEventsWhenControlNodeOffline(s, community)
+}
+
+func (s *AdminCommunityEventsSuite) TestAdminResendRejectedEvents() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
+
+	// admin modifies community description
+	adminEditRequest := &requests.EditCommunity{
+		CommunityID: community.ID(),
+		CreateCommunity: requests.CreateCommunity{
+			Name:        "admin name",
+			Description: "admin description",
+			Color:       "#FFFFFF",
+			Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		},
+	}
+	_, err := s.admin.EditCommunity(adminEditRequest)
+	s.Require().NoError(err)
+
+	// in the meantime, control node updates community description as well
+	ownerEditRequest := &requests.EditCommunity{
+		CommunityID: community.ID(),
+		CreateCommunity: requests.CreateCommunity{
+			Name:        "control node name",
+			Description: "control node description",
+			Color:       "#FFFFFF",
+			Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		},
+	}
+	_, err = s.owner.EditCommunity(ownerEditRequest)
+	s.Require().NoError(err)
+
+	waitOnAdminEventsRejection := waitOnCommunitiesEvent(s.owner, func(s *communities.Subscription) bool {
+		return s.CommunityEventsMessageInvalidClock != nil
+	})
+
+	// control node receives admin event and rejects it
+	_, err = WaitOnMessengerResponse(s.owner, func(response *MessengerResponse) bool {
+		select {
+		case err := <-waitOnAdminEventsRejection:
+			s.Require().NoError(err)
+			return true
+		default:
+			return false
+		}
+	}, "")
+	s.Require().NoError(err)
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Equal(ownerEditRequest.Description, community.DescriptionText())
+
+	// admin receives rejected events and re-applies them
+	// there is no signal whatsoever, we just wait for admin to process all incoming messages
+	_, _ = WaitOnMessengerResponse(s.admin, func(response *MessengerResponse) bool {
+		return false
+	}, "")
+
+	// control node receives re-applied admin event and accepts it
+	response, err := WaitOnMessengerResponse(s.owner, func(response *MessengerResponse) bool {
+		return len(response.Communities()) > 0
+	}, "no communities in response")
+	s.Require().NoError(err)
+	s.Require().Equal(adminEditRequest.Description, response.Communities()[0].DescriptionText())
+
+	// admin receives updated community description
+	response, err = WaitOnMessengerResponse(s.admin, func(response *MessengerResponse) bool {
+		return len(response.Communities()) > 0
+	}, "no communities in response")
+	s.Require().NoError(err)
+	s.Require().Equal(adminEditRequest.Description, response.Communities()[0].DescriptionText())
 }

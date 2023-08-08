@@ -84,15 +84,10 @@ func (m *Messenger) publishOrg(org *communities.Community) error {
 	return err
 }
 
-func (m *Messenger) publishCommunityEventsMessage(adminMessage *communities.CommunityEventsMessage) error {
-	adminPubkey := common.PubkeyToHex(&m.identity.PublicKey)
-	m.logger.Debug("publishing community admin event", zap.String("admin-id", adminPubkey), zap.Any("event", adminMessage))
-	_, err := crypto.DecompressPubkey(adminMessage.CommunityID)
-	if err != nil {
-		return err
-	}
+func (m *Messenger) publishCommunityEvents(msg *communities.CommunityEventsMessage) error {
+	m.logger.Debug("publishing community events", zap.String("admin-id", common.PubkeyToHex(&m.identity.PublicKey)), zap.Any("event", msg))
 
-	payload, err := adminMessage.Marshal()
+	payload, err := msg.Marshal()
 	if err != nil {
 		return err
 	}
@@ -102,10 +97,40 @@ func (m *Messenger) publishCommunityEventsMessage(adminMessage *communities.Comm
 		Sender:  m.identity,
 		// we don't want to wrap in an encryption layer message
 		SkipProtocolLayer: true,
-		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_ADMIN_MESSAGE,
+		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_EVENTS_MESSAGE,
 	}
 
-	_, err = m.sender.SendPublic(context.Background(), types.EncodeHex(adminMessage.CommunityID), rawMessage)
+	// TODO: resend in case of failure?
+	_, err = m.sender.SendPublic(context.Background(), types.EncodeHex(msg.CommunityID), rawMessage)
+	return err
+}
+
+func (m *Messenger) publishCommunityEventsRejected(community *communities.Community, msg *communities.CommunityEventsMessage) error {
+	if !community.IsControlNode() {
+		return communities.ErrNotControlNode
+	}
+	m.logger.Debug("publishing community events rejected", zap.Any("event", msg))
+
+	communityEventsMessage := msg.ToProtobuf()
+	communityEventsMessageRejected := &protobuf.CommunityEventsMessageRejected{
+		Msg: &communityEventsMessage,
+	}
+
+	payload, err := proto.Marshal(communityEventsMessageRejected)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := common.RawMessage{
+		Payload: payload,
+		Sender:  community.PrivateKey(),
+		// we don't want to wrap in an encryption layer message
+		SkipProtocolLayer: true,
+		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_EVENTS_MESSAGE_REJECTED,
+	}
+
+	// TODO: resend in case of failure?
+	_, err = m.sender.SendPublic(context.Background(), types.EncodeHex(msg.CommunityID), rawMessage)
 	return err
 }
 
@@ -249,9 +274,17 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 				}
 
 				if sub.CommunityEventsMessage != nil {
-					err := m.publishCommunityEventsMessage(sub.CommunityEventsMessage)
+					err := m.publishCommunityEvents(sub.CommunityEventsMessage)
 					if err != nil {
-						m.logger.Warn("failed to publish community admin event", zap.Error(err))
+						m.logger.Warn("failed to publish community events", zap.Error(err))
+					}
+				}
+
+				if sub.CommunityEventsMessageInvalidClock != nil {
+					err := m.publishCommunityEventsRejected(sub.CommunityEventsMessageInvalidClock.Community,
+						sub.CommunityEventsMessageInvalidClock.CommunityEventsMessage)
+					if err != nil {
+						m.logger.Warn("failed to publish community events rejected", zap.Error(err))
 					}
 				}
 
@@ -2485,13 +2518,30 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 }
 
 func (m *Messenger) handleCommunityEventsMessage(state *ReceivedMessageState, signer *ecdsa.PublicKey, message protobuf.CommunityEventsMessage) error {
-
 	communityResponse, err := m.communitiesManager.HandleCommunityEventsMessage(signer, &message)
 	if err != nil {
 		return err
 	}
 
 	return m.handleCommunityResponse(state, communityResponse)
+}
+
+// Re-sends rejected events, if any.
+func (m *Messenger) handleCommunityEventsMessageRejected(state *ReceivedMessageState, signer *ecdsa.PublicKey, message protobuf.CommunityEventsMessageRejected) error {
+	reapplyEventsMessage, err := m.communitiesManager.HandleCommunityEventsMessageRejected(signer, &message)
+	if err != nil {
+		return err
+	}
+	if reapplyEventsMessage == nil {
+		return nil
+	}
+
+	err = m.publishCommunityEvents(reapplyEventsMessage)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, syncCommunity protobuf.SyncCommunity) error {

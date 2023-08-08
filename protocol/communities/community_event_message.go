@@ -2,12 +2,14 @@ package communities
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"sort"
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -42,6 +44,7 @@ func (e *CommunityEvent) ToProtobuf() *protobuf.CommunityEvent {
 		TokenMetadata:          e.TokenMetadata,
 	}
 }
+
 func communityEventFromProtobuf(msg *protobuf.SignedCommunityEvent) (*CommunityEvent, error) {
 	decodedEvent := protobuf.CommunityEvent{}
 	err := proto.Unmarshal(msg.Payload, &decodedEvent)
@@ -64,6 +67,32 @@ func communityEventFromProtobuf(msg *protobuf.SignedCommunityEvent) (*CommunityE
 		Payload:                msg.Payload,
 		Signature:              msg.Signature,
 	}, nil
+}
+
+func (e *CommunityEvent) RecoverSigner() (*ecdsa.PublicKey, error) {
+	if e.Signature == nil || len(e.Signature) == 0 {
+		return nil, errors.New("missing signature")
+	}
+
+	signer, err := crypto.SigToPub(
+		crypto.Keccak256(e.Payload),
+		e.Signature,
+	)
+	if err != nil {
+		return nil, errors.New("failed to recover signer")
+	}
+
+	return signer, nil
+}
+
+func (e *CommunityEvent) Sign(pk *ecdsa.PrivateKey) error {
+	sig, err := crypto.Sign(crypto.Keccak256(e.Payload), pk)
+	if err != nil {
+		return err
+	}
+
+	e.Signature = sig
+	return nil
 }
 
 type CommunityEventsMessage struct {

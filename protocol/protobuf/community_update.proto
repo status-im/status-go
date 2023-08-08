@@ -86,3 +86,7 @@ message CommunityEventsMessage {
   // A list of signed community events
   repeated SignedCommunityEvent signed_events = 4;
 }
+
+message CommunityEventsMessageRejected {
+  CommunityEventsMessage msg = 1;
+}

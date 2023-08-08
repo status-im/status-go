@@ -302,6 +302,7 @@ type Subscription struct {
 	DownloadingHistoryArchivesFinishedSignal *signal.DownloadingHistoryArchivesFinishedSignal
 	ImportingHistoryArchiveMessagesSignal    *signal.ImportingHistoryArchiveMessagesSignal
 	CommunityEventsMessage                   *CommunityEventsMessage
+	CommunityEventsMessageInvalidClock       *CommunityEventsMessageInvalidClockSignal
 	AcceptedRequestsToJoin                   []types.HexBytes
 	RejectedRequestsToJoin                   []types.HexBytes
 }
@@ -309,6 +310,11 @@ type Subscription struct {
 type CommunityResponse struct {
 	Community *Community        `json:"community"`
 	Changes   *CommunityChanges `json:"changes"`
+}
+
+type CommunityEventsMessageInvalidClockSignal struct {
+	Community              *Community
+	CommunityEventsMessage *CommunityEventsMessage
 }
 
 func (m *Manager) Subscribe() chan *Subscription {
@@ -1318,8 +1324,7 @@ func (m *Manager) signEvents(community *Community) error {
 	for i := range community.config.EventsData.Events {
 		communityEvent := &community.config.EventsData.Events[i]
 		if communityEvent.Signature == nil || len(communityEvent.Signature) == 0 {
-			var err error
-			communityEvent.Signature, err = crypto.Sign(crypto.Keccak256(communityEvent.Payload), m.identity)
+			err := communityEvent.Sign(m.identity)
 			if err != nil {
 				return err
 			}
@@ -1332,16 +1337,9 @@ func (m *Manager) validateAndFilterEvents(community *Community, events []Communi
 	validatedEvents := make([]CommunityEvent, 0, len(events))
 
 	validateEvent := func(event *CommunityEvent) error {
-		if event.Signature == nil || len(event.Signature) == 0 {
-			return errors.New("missing signature")
-		}
-
-		signer, err := crypto.SigToPub(
-			crypto.Keccak256(event.Payload),
-			event.Signature,
-		)
+		signer, err := event.RecoverSigner()
 		if err != nil {
-			return errors.New("failed to recover signer")
+			return err
 		}
 
 		err = community.ValidateEvent(event, signer)
@@ -1390,6 +1388,13 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 
 	changes, err := community.UpdateCommunityByEvents(eventsMessage)
 	if err != nil {
+		if err == ErrInvalidCommunityEventClock && community.IsControlNode() {
+			m.publish(&Subscription{
+				CommunityEventsMessageInvalidClock: &CommunityEventsMessageInvalidClockSignal{
+					Community:              community,
+					CommunityEventsMessage: eventsMessage,
+				}})
+		}
 		return nil, err
 	}
 
@@ -1423,6 +1428,54 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		Community: changes.Community,
 		Changes:   changes,
 	}, nil
+}
+
+// Creates new CommunityEventsMessage by re-applying our rejected events on top of latest known CommunityDescription.
+// Returns nil if none of our events were rejected.
+func (m *Manager) HandleCommunityEventsMessageRejected(signer *ecdsa.PublicKey, message *protobuf.CommunityEventsMessageRejected) (*CommunityEventsMessage, error) {
+	if signer == nil {
+		return nil, errors.New("signer can't be nil")
+	}
+
+	id := crypto.CompressPubkey(signer)
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, id)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	eventsMessage, err := CommunityEventsMessageFromProtobuf(message.Msg)
+	if err != nil {
+		return nil, err
+	}
+	eventsMessage.Events = m.validateAndFilterEvents(community, eventsMessage.Events)
+
+	myRejectedEvents := make([]CommunityEvent, 0)
+	for _, rejectedEvent := range eventsMessage.Events {
+		rejectedEventSigner, err := rejectedEvent.RecoverSigner()
+		if err != nil {
+			continue
+		}
+
+		if rejectedEventSigner.Equal(m.identity.Public()) {
+			myRejectedEvents = append(myRejectedEvents, rejectedEvent)
+		}
+	}
+
+	if len(myRejectedEvents) == 0 {
+		return nil, nil
+	}
+
+	// Re-apply rejected events on top of latest known `CommunityDescription`
+	community.config.EventsData = &EventsData{
+		EventsBaseCommunityDescription: community.config.CommunityDescriptionProtocolMessage,
+		Events:                         myRejectedEvents,
+	}
+	reapplyEventsMessage := community.ToCommunityEventsMessage()
+
+	return reapplyEventsMessage, nil
 }
 
 func (m *Manager) handleAdditionalAdminChanges(community *Community) error {
