@@ -11,6 +11,8 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
+var ErrInvalidCommunityEventClock = errors.New("clock for admin event message is outdated")
+
 func (o *Community) ToCreateChannelCommunityEvent(channelID string, channel *protobuf.CommunityChat) *CommunityEvent {
 	return &CommunityEvent{
 		CommunityEventClock: o.NewCommunityEventClock(),
@@ -190,7 +192,7 @@ func (o *Community) UpdateCommunityByEvents(communityEventMessage *CommunityEven
 	}
 
 	if description.Clock != o.config.CommunityDescription.Clock {
-		return nil, errors.New("clock for admin event message is outdated")
+		return nil, ErrInvalidCommunityEventClock
 	}
 
 	// Create a deep copy of current community so we can update CommunityDescription by new admin events

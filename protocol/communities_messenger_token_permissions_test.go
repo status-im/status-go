@@ -198,34 +198,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) makeAddressSatisfyTheCriteri
 	s.mockedBalances[chainID][walletAddress][contractAddress] = (*hexutil.Big)(balance)
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) waitOnCommunitiesEvent(user *Messenger, condition func(*communities.Subscription) bool) <-chan error {
-	errCh := make(chan error, 1)
-
-	go func() {
-		defer close(errCh)
-
-		for {
-			select {
-			case sub, more := <-user.communitiesManager.Subscribe():
-				if !more {
-					errCh <- errors.New("channel closed when waiting for communities event")
-					return
-				}
-
-				if condition(sub) {
-					return
-				}
-
-			case <-time.After(500 * time.Millisecond):
-				errCh <- errors.New("timed out when waiting for communities event")
-				return
-			}
-		}
-	}()
-
-	return errCh
-}
-
 func (s *MessengerCommunitiesTokenPermissionsSuite) waitOnKeyDistribution(condition func(*CommunityAndKeyActions) bool) <-chan error {
 	testCommunitiesKeyDistributor, ok := s.owner.communitiesKeyDistributor.(*TestCommunitiesKeyDistributor)
 	s.Require().True(ok)
@@ -597,7 +569,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 		},
 	}
 
-	waitOnBobToBeKicked := s.waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+	waitOnBobToBeKicked := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
 		return len(sub.Community.Members()) == 1
 	})
 	waitOnCommunityToBeRekeyedOnceBobIsKicked := s.waitOnKeyDistribution(func(sub *CommunityAndKeyActions) bool {
@@ -885,7 +857,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 		ChatIds: []string{chat.ID},
 	}
 
-	waitOnBobToBeKickedFromChannel := s.waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+	waitOnBobToBeKickedFromChannel := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
 		for channelID, channel := range sub.Community.Chats() {
 			if channelID == chat.CommunityChatID() && len(channel.Members) == 1 {
 				return true
@@ -1015,7 +987,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().Len(response.Communities(), 1)
 	s.Require().True(response.Communities()[0].HasTokenPermissions())
 
-	waitOnCommunityPermissionCreated := s.waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
 		return sub.Community.HasTokenPermissions()
 	})
 
@@ -1125,7 +1097,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().Len(response.Communities(), 1)
 	s.Require().True(response.Communities()[0].HasTokenPermissions())
 
-	waitOnCommunityPermissionCreated := s.waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
 		return len(sub.Community.TokenPermissions()) == 2
 	})
 
