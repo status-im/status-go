@@ -14,8 +14,7 @@ func (a DbInitializer) Initialize(path, password string, kdfIterationsNumber int
 	return InitializeDB(path, password, kdfIterationsNumber)
 }
 
-var walletCustomSteps = []sqlite.PostStep{
-}
+var walletCustomSteps = []*sqlite.PostStep{}
 
 func doMigration(db *sql.DB) error {
 	// Run all the new migrations

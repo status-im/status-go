@@ -10,9 +10,11 @@ import (
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 )
 
+type CustomMigrationFunc func(tx *sql.Tx) error
+
 type PostStep struct {
 	Version         uint
-	CustomMigration func(tx *sql.Tx) error
+	CustomMigration CustomMigrationFunc
 	RollBackVersion uint
 }
 
@@ -36,7 +38,7 @@ var migrationTable = "status_go_" + sqlcipher.DefaultMigrationsTable
 //
 // untilVersion, for testing purposes optional parameter, can be used to limit the migration to a specific version.
 // Pass nil to migrate to the latest available version.
-func Migrate(db *sql.DB, resources *bindata.AssetSource, customSteps []PostStep, untilVersion *uint) error {
+func Migrate(db *sql.DB, resources *bindata.AssetSource, customSteps []*PostStep, untilVersion *uint) error {
 	source, err := bindata.WithInstance(resources)
 	if err != nil {
 		return fmt.Errorf("failed to create bindata migration source: %w", err)
@@ -82,7 +84,7 @@ func Migrate(db *sql.DB, resources *bindata.AssetSource, customSteps []PostStep,
 
 // runCustomMigrations performs source migrations from current to each custom steps, then runs custom migration callback
 // until it executes all custom migrations or an error occurs and it tries to rollback to RollBackVersion if > 0.
-func runCustomMigrations(m *migrate.Migrate, db *sql.DB, customSteps []PostStep, customIndex int, untilVersion *uint) error {
+func runCustomMigrations(m *migrate.Migrate, db *sql.DB, customSteps []*PostStep, customIndex int, untilVersion *uint) error {
 	for customIndex < len(customSteps) && (untilVersion == nil || customSteps[customIndex].Version <= *untilVersion) {
 		customStep := customSteps[customIndex]
 
@@ -99,7 +101,8 @@ func runCustomMigrations(m *migrate.Migrate, db *sql.DB, customSteps []PostStep,
 	return nil
 }
 
-func runCustomMigrationStep(db *sql.DB, customStep PostStep, m *migrate.Migrate) error {
+func runCustomMigrationStep(db *sql.DB, customStep *PostStep, m *migrate.Migrate) error {
+
 	sqlTx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -116,7 +119,7 @@ func runCustomMigrationStep(db *sql.DB, customStep PostStep, m *migrate.Migrate)
 	return nil
 }
 
-func rollbackCustomMigration(m *migrate.Migrate, customStep PostStep, customErr error) error {
+func rollbackCustomMigration(m *migrate.Migrate, customStep *PostStep, customErr error) error {
 	if customStep.RollBackVersion > 0 {
 		err := m.Migrate(customStep.RollBackVersion)
 		newV, _, _ := m.Version()
@@ -135,7 +138,8 @@ func runRemainingMigrations(m *migrate.Migrate, untilVersion *uint) error {
 		}
 	} else {
 		if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-			return fmt.Errorf("failed to migrate up: %w", err)
+			ver, _, _ := m.Version()
+			return fmt.Errorf("failed to migrate up: %w, current version: %d", err, ver)
 		}
 	}
 	return nil

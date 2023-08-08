@@ -20,7 +20,7 @@ import (
 
 const nodeCfgMigrationDate = 1640111208
 
-var customSteps = []sqlite.PostStep{
+var customSteps = []*sqlite.PostStep{
 	{Version: 1674136690, CustomMigration: migrateEnsUsernames},
 	{Version: 1686048341, CustomMigration: migrateWalletJSONBlobs, RollBackVersion: 1686041510},
 	{Version: 1687193315, CustomMigration: migrateWalletTransferFromToAddresses, RollBackVersion: 1686825075},
