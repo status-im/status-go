@@ -543,3 +543,32 @@ func TestAbridgedEventsAdmins(t *testing.T) {
 	// All the events are relevant here, so it should be the same
 	require.Len(t, g.AbridgedEvents(), 3)
 }
+
+func TestWasEverMember(t *testing.T) {
+	key, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	g, err := NewGroupWithCreator("abc", "#fa6565", 20, key)
+	require.NoError(t, err)
+
+	wasMember, err := g.WasEverMember(publicKeyToString(&key.PublicKey))
+	require.NoError(t, err)
+	require.True(t, wasMember)
+
+	key2, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	wasMember, err = g.WasEverMember(publicKeyToString(&key2.PublicKey))
+	require.NoError(t, err)
+	require.False(t, wasMember)
+
+	// Add a new member
+	event := NewMembersAddedEvent([]string{publicKeyToString(&key2.PublicKey)}, 21)
+	event.From = publicKeyToString(&key.PublicKey)
+	event.ChatID = g.chatID
+	err = g.ProcessEvent(event)
+	require.NoError(t, err)
+
+	wasMember, err = g.WasEverMember(publicKeyToString(&key2.PublicKey))
+	require.NoError(t, err)
+	require.True(t, wasMember)
+}

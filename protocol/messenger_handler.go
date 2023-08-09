@@ -138,12 +138,17 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 			return err
 		}
 
-		// A new chat must contain us
-		if !group.IsMember(ourKey) {
+		// A new chat must have contained us at some point
+		wasEverMember, err := group.WasEverMember(ourKey)
+		if err != nil {
+			return err
+		}
+
+		if !wasEverMember {
 			return errors.New("can't create a new group chat without us being a member")
 		}
-		// A new chat always adds us
-		wasUserAdded = true
+
+		wasUserAdded = group.IsMember(ourKey)
 		newChat := CreateGroupChat(messageState.Timesource)
 		// We set group chat inactive and create a notification instead
 		// unless is coming from us or a contact or were waiting for approval.

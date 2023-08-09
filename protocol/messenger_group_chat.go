@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
 
@@ -124,15 +125,16 @@ func (m *Messenger) CreateGroupChatFromInvitation(name string, chatID string, ad
 	return &response, m.saveChat(&chat)
 }
 
-func (m *Messenger) RemoveMembersFromGroupChat(ctx context.Context, chatID string, members []string) (*MessengerResponse, error) {
-	var response MessengerResponse
+type removeMembersFromGroupChatResponse struct {
+	oldRecipients   []*ecdsa.PublicKey
+	group           *v1protocol.Group
+	encodedProtobuf []byte
+}
+
+func (m *Messenger) removeMembersFromGroupChat(ctx context.Context, chat *Chat, members []string) (*removeMembersFromGroupChatResponse, error) {
+	chatID := chat.ID
 	logger := m.logger.With(zap.String("site", "RemoveMembersFromGroupChat"))
 	logger.Info("Removing members form group chat", zap.String("chatID", chatID), zap.Any("members", members))
-	chat, ok := m.allChats.Load(chatID)
-	if !ok {
-		return nil, ErrChatNotFound
-	}
-
 	group, err := newProtocolGroupFromChat(chat)
 	if err != nil {
 		return nil, err
@@ -162,21 +164,42 @@ func (m *Messenger) RemoveMembersFromGroupChat(ctx context.Context, chatID strin
 		}
 	}
 
-	encodedMessage, err := m.sender.EncodeMembershipUpdate(group, nil)
+	encoded, err := m.sender.EncodeMembershipUpdate(group, nil)
 	if err != nil {
 		return nil, err
 	}
+
+	return &removeMembersFromGroupChatResponse{
+		oldRecipients:   oldRecipients,
+		group:           group,
+		encodedProtobuf: encoded,
+	}, nil
+}
+
+func (m *Messenger) RemoveMembersFromGroupChat(ctx context.Context, chatID string, members []string) (*MessengerResponse, error) {
+	var response MessengerResponse
+
+	chat, ok := m.allChats.Load(chatID)
+	if !ok {
+		return nil, ErrChatNotFound
+	}
+
+	removeMembersResponse, err := m.removeMembersFromGroupChat(ctx, chat, members)
+	if err != nil {
+		return nil, err
+	}
+
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID: chat.ID,
-		Payload:     encodedMessage,
+		Payload:     removeMembersResponse.encodedProtobuf,
 		MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
-		Recipients:  oldRecipients,
+		Recipients:  removeMembersResponse.oldRecipients,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	chat.updateChatFromGroupMembershipChanges(group)
+	chat.updateChatFromGroupMembershipChanges(removeMembersResponse.group)
 
 	return m.addMessagesAndChat(chat, buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations), &response)
 }
