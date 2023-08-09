@@ -21,8 +21,7 @@ const (
 	statusChatPath           = "m/43'/60'/1581'/0'/0"
 	statusWalletRootPath     = "m/44'/60'/0'/0/"
 	zeroAddress              = "0x0000000000000000000000000000000000000000"
-	SyncedFromBackup         = "backup"        // means a account is coming from backed up data
-	SyncedFromLocalPairing   = "local-pairing" // means a account is coming from another device when user is reocovering Status account
+	SyncedFromBackup         = "backup" // means a keypair is coming from backed up data
 	ThirtyDaysInMilliseconds = 30 * 24 * 60 * 60 * 1000
 )
 
@@ -1266,8 +1265,12 @@ func (db *Database) GetNodeConfig() (*params.NodeConfig, error) {
 	return nodecfg.GetNodeConfigFromDB(db.db)
 }
 
-// This function should not update the clock, cause it marks keypair/accounts locally.
-func (db *Database) MarkKeypairFullyOperable(keyUID string) (err error) {
+// Basically this function should not update the clock, cause it marks keypair/accounts locally. But...
+// we need to cover the case when user recovers a Status account from waku, then pairs another device via
+// local pairing and then imports seed/private key for the non profile keypair on one of those two devices
+// to make that keypair fully operable. In that case we need to inform other device about the change, that
+// other device may offer other options for importing that keypair on it.
+func (db *Database) MarkKeypairFullyOperable(keyUID string, clock uint64) (err error) {
 	tx, err := db.db.Begin()
 	if err != nil {
 		return err
@@ -1293,7 +1296,11 @@ func (db *Database) MarkKeypairFullyOperable(keyUID string) (err error) {
 	}
 
 	_, err = tx.Exec(`UPDATE keypairs SET synced_from = "" WHERE key_uid = ?`, keyUID)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return db.updateKeypairClock(tx, keyUID, clock)
 }
 
 // This function should not update the clock, cause it marks a keypair locally.

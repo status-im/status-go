@@ -2464,7 +2464,6 @@ func (m *Messenger) syncProfilePictures(rawMessageHandler RawMessageHandler) err
 // SyncDevices sends all public chats and contacts to paired devices
 // TODO remove use of photoPath in contacts
 func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, rawMessageHandler RawMessageHandler) (err error) {
-	syncedFromLocalPairing := rawMessageHandler != nil
 	if rawMessageHandler == nil {
 		rawMessageHandler = m.dispatchMessage
 	}
@@ -2606,9 +2605,6 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 	}
 
 	for _, kp := range keypairs {
-		if syncedFromLocalPairing {
-			kp.SyncedFrom = accounts.SyncedFromLocalPairing
-		}
 		err = m.syncKeypair(kp, rawMessageHandler)
 		if err != nil {
 			return err
@@ -4425,7 +4421,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						p := msg.ParsedMessage.Interface().(protobuf.SyncKeypair)
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
 						logger.Debug("Handling SyncKeypair", zap.Any("message", p))
-						err = m.HandleSyncKeypair(messageState, p)
+						err = m.HandleSyncKeypair(messageState, p, false)
 						if err != nil {
 							logger.Warn("failed to handle SyncKeypair", zap.Error(err))
 							allMessagesProcessed = false

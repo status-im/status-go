@@ -3150,7 +3150,7 @@ func (m *Messenger) handleSyncAccountsPositions(message *protobuf.SyncAccountsPo
 	return accs, nil
 }
 
-func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.Keypair, error) {
+func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPairing bool) (*accounts.Keypair, error) {
 	if message == nil {
 		return nil, errors.New("handleSyncKeypair receive a nil message")
 	}
@@ -3170,13 +3170,17 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.
 		Removed:                 message.Removed,
 	}
 
-	accountReceivedFromLocalPairing := message.SyncedFrom == accounts.SyncedFromLocalPairing
 	if dbKeypair != nil {
 		if dbKeypair.Clock >= kp.Clock {
 			return nil, ErrTryingToStoreOldKeypair
 		}
 		// in case of keypair update, we need to keep `synced_from` field as it was when keypair was introduced to this device for the first time
-		kp.SyncedFrom = dbKeypair.SyncedFrom
+		// but in case if keypair on this device came from the backup (e.g. device A recovered from waku, then device B paired with the device A
+		// via local pairing, before device A made its keypairs fully operable) we need to update syncedFrom when user on this device when that
+		// keypair becomes operable on any of other paired devices
+		if dbKeypair.SyncedFrom != accounts.SyncedFromBackup {
+			kp.SyncedFrom = dbKeypair.SyncedFrom
+		}
 	}
 
 	for _, sAcc := range message.Accounts {
@@ -3190,7 +3194,7 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.
 			}
 			syncKpMigratedToKeycard = multiAcc != nil && multiAcc.KeycardPairing != ""
 		}
-		accountOperability, err := m.resolveAccountOperability(sAcc, syncKpMigratedToKeycard, accountReceivedFromLocalPairing)
+		accountOperability, err := m.resolveAccountOperability(sAcc, syncKpMigratedToKeycard, fromLocalPairing)
 		if err != nil {
 			return nil, err
 		}
@@ -3205,7 +3209,7 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair) (*accounts.
 		if err != nil {
 			return nil, err
 		}
-	} else if !accountReceivedFromLocalPairing && dbKeypair != nil {
+	} else if !fromLocalPairing && dbKeypair != nil {
 		for _, dbAcc := range dbKeypair.Accounts {
 			found := false
 			for _, acc := range kp.Accounts {
@@ -3306,8 +3310,8 @@ func (m *Messenger) HandleSyncWatchOnlyAccount(state *ReceivedMessageState, mess
 	return nil
 }
 
-func (m *Messenger) HandleSyncKeypair(state *ReceivedMessageState, message protobuf.SyncKeypair) error {
-	kp, err := m.handleSyncKeypair(&message)
+func (m *Messenger) HandleSyncKeypair(state *ReceivedMessageState, message protobuf.SyncKeypair, fromLocalPairing bool) error {
+	kp, err := m.handleSyncKeypair(&message, fromLocalPairing)
 	if err != nil {
 		if err == ErrTryingToStoreOldKeypair {
 			return nil
