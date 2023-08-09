@@ -587,6 +587,16 @@ func (api *PublicAPI) EditSharedAddressesForCommunity(request *requests.EditShar
 	return api.service.messenger.EditSharedAddressesForCommunity(request)
 }
 
+// GetRevealedAccounts gets the revealed addresses for a member in a community
+func (api *PublicAPI) GetRevealedAccounts(communityID types.HexBytes, memberPk string) ([]*protobuf.RevealedAccount, error) {
+	return api.service.messenger.GetRevealedAccounts(communityID, memberPk)
+}
+
+// GetRevealedAccountsForAllMembers gets the revealed addresses for all the members of a community
+func (api *PublicAPI) GetRevealedAccountsForAllMembers(communityID types.HexBytes) (map[string][]*protobuf.RevealedAccount, error) {
+	return api.service.messenger.GetRevealedAccountsForAllMembers(communityID)
+}
+
 // CheckAndClearPendingRequestToJoinCommunity to delete pending request to join a community which are older than 7 days
 func (api *PublicAPI) CheckAndDeletePendingRequestToJoinCommunity() (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CheckAndDeletePendingRequestToJoinCommunity(true)
