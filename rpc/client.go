@@ -42,9 +42,10 @@ type Client struct {
 	upstreamURL     string
 	UpstreamChainID uint64
 
-	local      *gethrpc.Client
-	upstream   *chain.ClientWithFallback
-	rpcClients map[uint64]*chain.ClientWithFallback
+	local           *gethrpc.Client
+	upstream        *chain.ClientWithFallback
+	rpcClientsMutex sync.RWMutex
+	rpcClients      map[uint64]*chain.ClientWithFallback
 
 	router         *router
 	NetworkManager *network.Manager
@@ -107,6 +108,8 @@ func (c *Client) SetWalletNotifier(notifier func(chainID uint64, message string)
 }
 
 func (c *Client) getClientUsingCache(chainID uint64) (*chain.ClientWithFallback, error) {
+	c.rpcClientsMutex.Lock()
+	defer c.rpcClientsMutex.Unlock()
 	if rpcClient, ok := c.rpcClients[chainID]; ok {
 		if rpcClient.WalletNotifier == nil {
 			rpcClient.WalletNotifier = c.walletNotifier
