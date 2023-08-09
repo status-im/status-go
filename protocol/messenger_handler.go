@@ -3026,6 +3026,9 @@ func mapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability a
 }
 
 func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, syncKpMigratedToKeycard bool, accountReceivedFromLocalPairing bool) (accounts.AccountOperable, error) {
+	if accountReceivedFromLocalPairing {
+		return accounts.AccountOperable(syncAcc.Operable), nil
+	}
 	accountsOperability := accounts.AccountNonOperable
 	dbAccount, err := m.settings.GetAccountByAddress(types.BytesToAddress(syncAcc.Address))
 	if err != nil && err != accounts.ErrDbAccountNotFound {
@@ -3050,7 +3053,7 @@ func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, syn
 		}
 	}
 
-	if syncKpMigratedToKeycard || accountReceivedFromLocalPairing || syncAcc.Chat || syncAcc.Wallet {
+	if syncKpMigratedToKeycard || syncAcc.Chat || syncAcc.Wallet {
 		accountsOperability = accounts.AccountFullyOperable
 	} else {
 		partiallyOrFullyOperable, err := m.settings.IsAnyAccountPartiallyOrFullyOperableForKeyUID(syncAcc.KeyUid)
