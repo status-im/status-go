@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 
 	userimage "github.com/status-im/status-go/images"
@@ -408,4 +409,48 @@ func (s *MessengerGroupChatSuite) TestGroupChatHandleDeleteMemberMessage() {
 
 	defer s.NoError(admin.Shutdown())
 	defer s.NoError(member.Shutdown())
+}
+
+func (s *MessengerGroupChatSuite) TestGroupChatMembersRemovalOutOfOrder() {
+	admin := s.startNewMessenger()
+	memberA := s.startNewMessenger()
+	members := []string{common.PubkeyToHex(&memberA.identity.PublicKey)}
+
+	s.makeMutualContacts(admin, memberA)
+
+	groupChat := s.createGroupChat(admin, "test_group_chat", members)
+
+	removeMembersResponse, err := admin.removeMembersFromGroupChat(context.Background(), groupChat, []string{common.PubkeyToHex(&memberA.identity.PublicKey)})
+	s.Require().NoError(err)
+
+	encodedMessage := removeMembersResponse.encodedProtobuf
+
+	message := protobuf.MembershipUpdateMessage{}
+	err = proto.Unmarshal(encodedMessage, &message)
+	s.Require().NoError(err)
+
+	response := &MessengerResponse{}
+
+	messageState := &ReceivedMessageState{
+		ExistingMessagesMap: make(map[string]bool),
+		Response:            response,
+		AllChats:            new(chatMap),
+		Timesource:          memberA.getTimesource(),
+	}
+
+	c, err := buildContact(admin.myHexIdentity(), &admin.identity.PublicKey)
+	s.Require().NoError(err)
+
+	messageState.CurrentMessageState = &CurrentMessageState{
+		Contact: c,
+	}
+
+	err = memberA.HandleMembershipUpdate(messageState, nil, &message, memberA.systemMessagesTranslations)
+
+	s.Require().NoError(err)
+	s.Require().NotNil(messageState.Response)
+	s.Require().Len(messageState.Response.Chats(), 1)
+	s.Require().Len(messageState.Response.Chats()[0].Members, 1)
+	defer s.NoError(admin.Shutdown())
+	defer s.NoError(memberA.Shutdown())
 }

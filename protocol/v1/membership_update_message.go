@@ -490,6 +490,15 @@ func (g Group) Creator() (string, error) {
 	return first.From, nil
 }
 
+func (g Group) isCreator(id string) (bool, error) {
+	c, err := g.Creator()
+	if err != nil {
+		return false, err
+	}
+
+	return id == c, nil
+}
+
 func (g Group) validateChatID(chatID string) bool {
 	creator, err := g.Creator()
 	if err != nil || creator == "" {
@@ -502,6 +511,28 @@ func (g Group) validateChatID(chatID string) bool {
 
 func (g Group) IsMember(id string) bool {
 	return g.members.Has(id)
+}
+
+func (g Group) WasEverMember(id string) (bool, error) {
+	isCreator, err := g.isCreator(id)
+	if err != nil {
+		return false, err
+	}
+
+	if isCreator {
+		return true, nil
+	}
+
+	for _, event := range g.events {
+		if event.Type == protobuf.MembershipUpdateEvent_MEMBERS_ADDED {
+			for _, member := range event.Members {
+				if member == id {
+					return true, nil
+				}
+			}
+		}
+	}
+	return false, nil
 }
 
 // validateEvent returns true if a given event is valid.
