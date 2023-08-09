@@ -341,6 +341,7 @@ func (m *Messenger) prepareSyncAccountMessage(acc *accounts.Account) *protobuf.S
 		Chat:                  acc.Chat,
 		Hidden:                acc.Hidden,
 		Removed:               acc.Removed,
+		Operable:              acc.Operable.String(),
 		Position:              acc.Position,
 		ProdPreferredChainIDs: acc.ProdPreferredChainIDs,
 		TestPreferredChainIDs: acc.TestPreferredChainIDs,

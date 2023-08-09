@@ -301,6 +301,7 @@ message SyncAccount {
   int64 position = 13;
   string prodPreferredChainIDs = 14;
   string testPreferredChainIDs = 15;
+  string operable = 16;
 }
 
 message SyncKeypair {
