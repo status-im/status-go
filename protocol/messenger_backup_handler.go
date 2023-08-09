@@ -211,7 +211,7 @@ func (m *Messenger) handleKeypair(message *protobuf.SyncKeypair) error {
 		message.Keycards = []*protobuf.SyncKeycard{}
 	}
 
-	keypair, err := m.handleSyncKeypair(message)
+	keypair, err := m.handleSyncKeypair(message, false)
 	if err != nil {
 		if err == ErrTryingToStoreOldKeypair {
 			return nil

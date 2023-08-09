@@ -337,7 +337,7 @@ func (api *API) MakePrivateKeyKeypairFullyOperable(ctx context.Context, privateK
 		return err
 	}
 
-	return api.db.MarkKeypairFullyOperable(info.KeyUID)
+	return (*api.messenger).MarkKeypairFullyOperable(info.KeyUID)
 }
 
 // Imports a new mnemonic and creates local keystore file.
@@ -395,7 +395,7 @@ func (api *API) MakeSeedPhraseKeypairFullyOperable(ctx context.Context, mnemonic
 		return err
 	}
 
-	return api.db.MarkKeypairFullyOperable(generatedAccountInfo.KeyUID)
+	return (*api.messenger).MarkKeypairFullyOperable(generatedAccountInfo.KeyUID)
 }
 
 // Creates a random new mnemonic.

@@ -209,7 +209,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncKeypair(state, message)
+			err = m.HandleSyncKeypair(state, message, true)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncKeypair when HandleSyncRawMessages", zap.Error(err))
 				continue

@@ -174,6 +174,17 @@ func (m *Messenger) SaveOrUpdateAccount(acc *accounts.Account) error {
 	return m.resolveAndSyncKeypairOrJustWalletAccount(acc.KeyUID, acc.Address, acc.Clock, m.dispatchMessage)
 }
 
+func (m *Messenger) MarkKeypairFullyOperable(keyUID string) error {
+	clock, _ := m.getLastClockWithRelatedChat()
+
+	err := m.settings.MarkKeypairFullyOperable(keyUID, clock)
+	if err != nil {
+		return err
+	}
+
+	return m.resolveAndSyncKeypairOrJustWalletAccount(keyUID, types.Address{}, clock, m.dispatchMessage)
+}
+
 func (m *Messenger) deleteKeystoreFileForAddress(address types.Address) error {
 	acc, err := m.settings.GetAccountByAddress(address)
 	if err != nil {
