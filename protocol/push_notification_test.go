@@ -915,7 +915,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 	s.Require().Len(response.Communities(), 1)
 	community := response.Communities()[0]
 
-	// Send an community message
+	// Send a community message
 	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, alice.transport)
 
 	inputMessage := &common.Message{}

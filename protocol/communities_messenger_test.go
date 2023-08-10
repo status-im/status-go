@@ -146,7 +146,7 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 	s.Require().Equal(communitySettings.CommunityID, community.IDString())
 	s.Require().Equal(communitySettings.HistoryArchiveSupportEnabled, false)
 
-	// Send an community message
+	// Send a community message
 	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, s.alice.transport)
 
 	inputMessage := &common.Message{}
@@ -253,7 +253,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	chats := community.Chats()
 	s.Require().Len(chats, 2)
 
-	// Send an community message
+	// Send a community message
 	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.bob.transport)
 
 	inputMessage := &common.Message{}
@@ -2103,17 +2103,30 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 	s.Require().False(community.IsBanned(&s.alice.identity.PublicKey))
 }
 
-func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
-	// Create new device
-	alicesOtherDevice := s.newMessengerWithKey(s.alice.identity)
+func (s *MessengerCommunitiesSuite) createOtherDevice(m1 *Messenger) *Messenger {
+	m2 := s.newMessengerWithKey(m1.identity)
+
+	tcs, err := m2.communitiesManager.All()
+	s.Require().NoError(err, "m2.communitiesManager.All")
+	s.Len(tcs, 1, "Must have 1 communities")
 
 	// Pair devices
-	err := alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, &multidevice.InstallationMetadata{
-		Name:       "their-name",
-		DeviceType: "their-device-type",
-	})
+	metadata := &multidevice.InstallationMetadata{
+		Name:       "other-device",
+		DeviceType: "other-device-type",
+	}
+	err = m2.SetInstallationMetadata(m2.installationID, metadata)
 	s.Require().NoError(err)
 
+	_, err = m2.Start()
+	s.Require().NoError(err)
+
+	return m2
+}
+
+func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
+	// Create new device
+	alicesOtherDevice := s.createOtherDevice(s.alice)
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
 	// Create a community
@@ -2165,15 +2178,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
 
 func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings_EditCommunity() {
 	// Create new device
-	alicesOtherDevice := s.newMessengerWithKey(s.alice.identity)
-
-	// Pair devices
-	err := alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, &multidevice.InstallationMetadata{
-		Name:       "their-name",
-		DeviceType: "their-device-type",
-	})
-	s.Require().NoError(err)
-
+	alicesOtherDevice := s.createOtherDevice(s.alice)
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
 	// Create a community
@@ -2260,20 +2265,9 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings_EditCommunity() {
 
 // TestSyncCommunity tests basic sync functionality between 2 Messengers
 func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
+
 	// Create new device
-	alicesOtherDevice := s.newMessengerWithKey(s.alice.identity)
-
-	tcs, err := alicesOtherDevice.communitiesManager.All()
-	s.Require().NoError(err, "alicesOtherDevice.communitiesManager.All")
-	s.Len(tcs, 1, "Must have 1 communities")
-
-	// Pair devices
-	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, &multidevice.InstallationMetadata{
-		Name:       "their-name",
-		DeviceType: "their-device-type",
-	})
-	s.Require().NoError(err)
-
+	alicesOtherDevice := s.createOtherDevice(s.alice)
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
 	// Create a community
@@ -2317,7 +2311,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	s.Require().NoError(err)
 
 	// Count the number of communities in their device
-	tcs, err = alicesOtherDevice.communitiesManager.All()
+	tcs, err := alicesOtherDevice.communitiesManager.All()
 	s.Require().NoError(err)
 	s.Len(tcs, 2, "There must be 2 communities")
 
@@ -2362,14 +2356,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.Require().NoError(err)
 
 	// Create Alice's other device
-	alicesOtherDevice := s.newMessengerWithKey(s.alice.identity)
-
-	im1 := &multidevice.InstallationMetadata{
-		Name:       "alice's-other-device",
-		DeviceType: "alice's-other-device-type",
-	}
-	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, im1)
-	s.Require().NoError(err)
+	alicesOtherDevice := s.createOtherDevice(s.alice)
 
 	// Pair alice's two devices
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
@@ -2574,14 +2561,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	s.Require().NoError(err)
 
 	// Create Alice's other device
-	alicesOtherDevice := s.newMessengerWithKey(s.alice.identity)
-
-	im1 := &multidevice.InstallationMetadata{
-		Name:       "alice's-other-device",
-		DeviceType: "alice's-other-device-type",
-	}
-	err = alicesOtherDevice.SetInstallationMetadata(alicesOtherDevice.installationID, im1)
-	s.Require().NoError(err)
+	alicesOtherDevice := s.createOtherDevice(s.alice)
 
 	// Pair alice's two devices
 	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
