@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/walletdatabase"
 
@@ -246,6 +247,7 @@ func (b *GethStatusBackend) DeleteMultiaccount(keyUID string, keyStoreDir string
 		return err
 	}
 
+	appDbPath := b.getAppDBPath(keyUID)
 	dbFiles := []string{
 		filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", keyUID)),
 		filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql-shm", keyUID)),
@@ -253,9 +255,9 @@ func (b *GethStatusBackend) DeleteMultiaccount(keyUID string, keyStoreDir string
 		filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", keyUID)),
 		filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db-shm", keyUID)),
 		filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db-wal", keyUID)),
-		filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db", keyUID)),
-		filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db-shm", keyUID)),
-		filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db-wal", keyUID)),
+		appDbPath,
+		appDbPath + "-shm",
+		appDbPath + "-wal",
 	}
 	for _, path := range dbFiles {
 		if _, err := os.Stat(path); err == nil {
@@ -301,7 +303,7 @@ func (b *GethStatusBackend) runDBFileMigrations(account multiaccounts.Account, p
 	// Migrate file path to fix issue https://github.com/status-im/status-go/issues/2027
 	unsupportedPath := filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", account.KeyUID))
 	v3Path := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", account.KeyUID))
-	v4Path := filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db", account.KeyUID))
+	v4Path := b.getAppDBPath(account.KeyUID)
 
 	_, err := os.Stat(unsupportedPath)
 	if err == nil {
@@ -378,7 +380,7 @@ func (b *GethStatusBackend) ensureWalletDBOpened(account multiaccounts.Account, 
 		return errors.New("root datadir wasn't provided")
 	}
 
-	dbWalletPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s-wallet.db", account.KeyUID))
+	dbWalletPath := b.getWalletDBPath(account.KeyUID)
 	b.walletDB, err = walletdatabase.InitializeDB(dbWalletPath, password, account.KDFIterations)
 	if err != nil {
 		b.log.Error("failed to initialize wallet db", "err", err)
@@ -798,7 +800,7 @@ func (b *GethStatusBackend) ExportUnencryptedDatabase(acc multiaccounts.Account,
 		return err
 	}
 
-	err = appdatabase.DecryptDatabase(dbPath, directory, password, acc.KDFIterations)
+	err = dbsetup.DecryptDatabase(dbPath, directory, password, acc.KDFIterations)
 	if err != nil {
 		b.log.Error("failed to initialize db", "err", err)
 		return err
@@ -816,9 +818,9 @@ func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account,
 		return errors.New("root datadir wasn't provided")
 	}
 
-	path := filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db", acc.KeyUID))
+	path := b.getAppDBPath(acc.KeyUID)
 
-	err := appdatabase.EncryptDatabase(databasePath, path, password, acc.KDFIterations, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
+	err := dbsetup.EncryptDatabase(databasePath, path, password, acc.KDFIterations, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
 	if err != nil {
 		b.log.Error("failed to initialize db", "err", err)
 		return err
@@ -845,29 +847,59 @@ func (b *GethStatusBackend) reEncryptKeyStoreDir(currentPassword string, newPass
 }
 
 func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password string, newPassword string) error {
-	dbPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db", keyUID))
-
 	account, err := b.multiaccountsDB.GetAccount(keyUID)
 	if err != nil {
 		return err
 	}
 
-	file, err := os.CreateTemp("", "*-v4.db")
+	internalDbPath, err := dbsetup.GetDBFilename(b.appDB)
+	if err != nil {
+		return fmt.Errorf("failed to get database file name, %w", err)
+	}
+
+	isCurrentAccount := b.getAppDBPath(keyUID) == internalDbPath
+	restartNode := func() {
+		if isCurrentAccount {
+			if err != nil {
+				_ = b.startNodeWithAccount(*account, password, nil)
+			} else {
+				_ = b.startNodeWithAccount(*account, newPassword, nil)
+			}
+		}
+	}
+	defer restartNode()
+
+	logout := func() {
+		if isCurrentAccount {
+			_ = b.Logout()
+		}
+	}
+	noLogout := func() {}
+
+	err = b.changeWalletDBPassword(account, logout, password, newPassword)
 	if err != nil {
 		return err
 	}
 
-	newDBPath := file.Name()
-	defer func() {
-		_ = file.Close()
-		_ = os.Remove(newDBPath)
-		_ = os.Remove(newDBPath + "-wal")
-		_ = os.Remove(newDBPath + "-shm")
-		_ = os.Remove(newDBPath + "-journal")
-	}()
+	// Already logged out
+	err = b.changeAppDBPassword(account, noLogout, password, newPassword)
+	if err != nil {
+		return err
+	}
 
+	return nil
+}
+
+func (b *GethStatusBackend) changeAppDBPassword(account *multiaccounts.Account, logout func(), password string, newPassword string) error {
+	tmpDbPath, cleanup, err := b.createTempDBFile("v4.db")
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	dbPath := b.getAppDBPath(account.KeyUID)
 	// Exporting database to a temporary file with a new password
-	err = appdatabase.ExportDB(dbPath, password, account.KDFIterations, newDBPath, newPassword, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
+	err = dbsetup.ExportDB(dbPath, password, account.KDFIterations, tmpDbPath, newPassword, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
 	if err != nil {
 		return err
 	}
@@ -879,32 +911,81 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 
 	// Replacing the old database with the new one requires closing all connections to the database
 	// This is done by stopping the node and restarting it with the new DB
-	appDBPath, _ := appdatabase.GetDBFilename(b.appDB)
-	changeCurrentAccountPassword := appDBPath == dbPath
-	if changeCurrentAccountPassword {
-		_ = b.Logout()
-	}
+	logout()
 
 	// Replacing the old database files with the new ones, ignoring the wal and shm errors
-	err = os.Rename(newDBPath, dbPath)
+	replaceCleanup, err := replaceDBFile(dbPath, tmpDbPath)
+	if replaceCleanup != nil {
+		defer replaceCleanup()
+	}
+
 	if err != nil {
 		// Restore the old account
 		_ = b.reEncryptKeyStoreDir(newPassword, password)
-		if changeCurrentAccountPassword {
-			_ = b.startNodeWithAccount(*account, password, nil)
-		}
 		return err
 	}
 
-	_ = os.Remove(dbPath + "-wal")
-	_ = os.Remove(dbPath + "-shm")
-	_ = os.Rename(newDBPath+"-wal", dbPath+"-wal")
-	_ = os.Rename(newDBPath+"-shm", dbPath+"-shm")
-
-	if changeCurrentAccountPassword {
-		return b.startNodeWithAccount(*account, newPassword, nil)
-	}
 	return nil
+}
+
+func (b *GethStatusBackend) changeWalletDBPassword(account *multiaccounts.Account, logout func(), password string, newPassword string) error {
+	tmpDbPath, cleanup, err := b.createTempDBFile("wallet.db")
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	dbPath := b.getWalletDBPath(account.KeyUID)
+	// Exporting database to a temporary file with a new password
+	err = dbsetup.ExportDB(dbPath, password, account.KDFIterations, tmpDbPath, newPassword, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
+	if err != nil {
+		return err
+	}
+
+	// Replacing the old database with the new one requires closing all connections to the database
+	// This is done by stopping the node and restarting it with the new DB
+	logout()
+
+	// Replacing the old database files with the new ones, ignoring the wal and shm errors
+	replaceCleanup, err := replaceDBFile(dbPath, tmpDbPath)
+	if replaceCleanup != nil {
+		defer replaceCleanup()
+	}
+	return err
+}
+
+func (b *GethStatusBackend) createTempDBFile(pattern string) (tmpDbPath string, cleanup func(), err error) {
+	if len(b.rootDataDir) == 0 {
+		err = errors.New("root datadir wasn't provided")
+		return
+	}
+	file, err := os.CreateTemp(filepath.Dir(b.rootDataDir), "*-"+pattern)
+	tmpDbPath = file.Name()
+	cleanup = func() {
+		filePath := file.Name()
+		_ = file.Close()
+		_ = os.Remove(filePath)
+		_ = os.Remove(filePath + "-wal")
+		_ = os.Remove(filePath + "-shm")
+		_ = os.Remove(filePath + "-journal")
+	}
+	return
+}
+
+func replaceDBFile(dbPath string, newDBPath string) (cleanup func(), err error) {
+	err = os.Rename(newDBPath, dbPath)
+	if err != nil {
+		return
+	}
+
+	cleanup = func() {
+		_ = os.Remove(dbPath + "-wal")
+		_ = os.Remove(dbPath + "-shm")
+		_ = os.Rename(newDBPath+"-wal", dbPath+"-wal")
+		_ = os.Rename(newDBPath+"-shm", dbPath+"-shm")
+	}
+
+	return
 }
 
 func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Account, s settings.Settings, keycardUID string, password string, newPassword string) error {
@@ -996,7 +1077,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 		return err
 	}
 
-	err = b.closeAppDB()
+	err = b.closeDBs()
 	if err != nil {
 		return err
 	}
@@ -1191,7 +1272,7 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 		return err
 	}
 
-	err = b.ensureDBsOpened(multiaccounts.Account{KeyUID: accountInfo.KeyUID, KDFIterations: kdfIterations}, newPassword)
+	err = b.ensureDBsOpened(multiaccounts.Account{KeyUID: accountInfo.KeyUID, KDFIterations: kdfIterations}, currPassword)
 	if err != nil {
 		return err
 	}
@@ -1252,7 +1333,7 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 		return err
 	}
 
-	err = b.closeAppDB()
+	err = b.closeDBs()
 	if err != nil {
 		return err
 	}
@@ -1271,7 +1352,7 @@ func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password strin
 		return err
 	}
 
-	err = b.closeAppDB()
+	err = b.closeDBs()
 	if err != nil {
 		return err
 	}
@@ -1937,14 +2018,12 @@ func (b *GethStatusBackend) Logout() error {
 	if err != nil {
 		return err
 	}
-	err = b.closeAppDB()
+	err = b.closeDBs()
 	if err != nil {
 		return err
 	}
 
 	b.AccountManager().Logout()
-	b.appDB = nil
-	b.walletDB = nil
 	b.account = nil
 
 	if b.statusNode != nil {
@@ -1973,6 +2052,14 @@ func (b *GethStatusBackend) cleanupServices() error {
 	return b.statusNode.Cleanup()
 }
 
+func (b *GethStatusBackend) closeDBs() error {
+	err := b.closeWalletDB()
+	if err != nil {
+		return err
+	}
+	return b.closeAppDB()
+}
+
 func (b *GethStatusBackend) closeAppDB() error {
 	if b.appDB != nil {
 		err := b.appDB.Close()
@@ -1981,6 +2068,17 @@ func (b *GethStatusBackend) closeAppDB() error {
 		}
 		b.appDB = nil
 		return nil
+	}
+	return nil
+}
+
+func (b *GethStatusBackend) closeWalletDB() error {
+	if b.walletDB != nil {
+		err := b.walletDB.Close()
+		if err != nil {
+			return err
+		}
+		b.walletDB = nil
 	}
 	return nil
 }
@@ -2156,4 +2254,12 @@ func (b *GethStatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) e
 
 func (b *GethStatusBackend) SetLocalPairing(value bool) {
 	b.localPairing = value
+}
+
+func (b *GethStatusBackend) getAppDBPath(keyUID string) string {
+	return filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db", keyUID))
+}
+
+func (b *GethStatusBackend) getWalletDBPath(keyUID string) string {
+	return filepath.Join(b.rootDataDir, fmt.Sprintf("%s-wallet.db", keyUID))
 }

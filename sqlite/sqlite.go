@@ -200,7 +200,7 @@ func openDB(path string, key string, kdfIterationsNumber int, cipherPageSize int
 
 			// readers do not block writers and faster i/o operations
 			if _, err := conn.Exec("PRAGMA journal_mode=WAL", []driver.Value{}); err != nil && path != InMemoryPath {
-				return errors.New("failed to set `journal_mode` pragma")
+				return fmt.Errorf("failed to set `journal_mode` pragma: %w", err)
 			}
 
 			// workaround to mitigate the issue of "database is locked" errors during concurrent write operations

@@ -304,7 +304,7 @@ const (
 			? AS includeAllNetworks
 		),
 		filter_addresses(address) AS (
-			SELECT HEX(address) FROM keypairs_accounts WHERE (SELECT filterAllAddresses FROM filter_conditions) != 0
+			SELECT HEX(address) FROM %s WHERE (SELECT filterAllAddresses FROM filter_conditions) != 0
 			UNION ALL
 			SELECT * FROM (VALUES %s) WHERE (SELECT filterAllAddresses FROM filter_conditions) = 0
 		),
@@ -666,7 +666,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		return nil, err
 	}
 
-	queryString := fmt.Sprintf(queryFormatString, involvedAddresses, toAddresses, assetsTokenCodes, assetsERC20, networks,
+	queryString := fmt.Sprintf(queryFormatString, keypairAccountsTable, involvedAddresses, toAddresses, assetsTokenCodes, assetsERC20, networks,
 		joinedMTTypes)
 
 	rows, err := deps.db.QueryContext(ctx, queryString,
