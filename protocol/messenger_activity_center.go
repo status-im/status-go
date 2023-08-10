@@ -41,6 +41,14 @@ func (m *Messenger) ActivityCenterNotifications(request ActivityCenterNotificati
 		return nil, err
 	}
 
+	if m.httpServer != nil {
+		for _, notification := range notifications {
+			if notification.Message != nil {
+				m.prepareMessage(notification.Message, m.httpServer)
+			}
+		}
+	}
+
 	return &ActivityCenterPaginationResponse{
 		Cursor:        cursor,
 		Notifications: notifications,
