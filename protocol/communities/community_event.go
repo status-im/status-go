@@ -9,7 +9,6 @@ import (
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/v1"
 )
 
 func (o *Community) ToCreateChannelCommunityEvent(channelID string, channel *protobuf.CommunityChat) *CommunityEvent {
@@ -202,6 +201,7 @@ func (o *Community) UpdateCommunityByEvents(communityEventMessage *CommunityEven
 	o.mergeCommunityEvents(communityEventMessage)
 
 	copy.config.CommunityDescription = description
+	copy.config.CommunityDescriptionProtocolMessage = communityEventMessage.EventsBaseCommunityDescription
 	copy.config.EventsData = o.config.EventsData
 
 	// Update the copy of the CommunityDescription by community events
@@ -213,32 +213,23 @@ func (o *Community) UpdateCommunityByEvents(communityEventMessage *CommunityEven
 	// Evaluate `CommunityChanges` data by searching a difference between `CommunityDescription`
 	// from the DB and `CommunityDescription` patched by community events
 	changes := EvaluateCommunityChanges(o.config.CommunityDescription, copy.config.CommunityDescription)
-
-	// TODO: need to figure out is it ok to save marshaledCommunityDescription without the signature
-	marshaledCommDescr, err := proto.Marshal(copy.config.CommunityDescription)
-	if err != nil {
-		return nil, err
-	}
-
-	rawMessage, err := protocol.WrapMessageV1(marshaledCommDescr, protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION, copy.PrivateKey())
-	if err != nil {
-		return nil, err
-	}
-
-	copy.config.CommunityDescriptionProtocolMessage = rawMessage
-
 	changes.Community = copy
 
 	return changes, nil
 }
 
 func (o *Community) updateCommunityDescriptionByEvents() error {
+	if o.config.EventsData == nil {
+		return nil
+	}
+
 	for _, event := range o.config.EventsData.Events {
 		err := o.updateCommunityDescriptionByCommunityEvent(event)
 		if err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
