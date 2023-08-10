@@ -57,41 +57,6 @@ func (s *MessengerSyncAccountCustomizationColorSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func pairDevices(s *suite.Suite, device1, device2 *Messenger) {
-	// Send pairing data
-	response, err := device1.SendPairInstallation(context.Background(), nil)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Len(response.Chats(), 1)
-	s.False(response.Chats()[0].Active)
-
-	i, ok := device1.allInstallations.Load(device1.installationID)
-	s.Require().True(ok)
-
-	// Wait for the message to reach its destination
-	response, err = WaitOnMessengerResponse(
-		device2,
-		func(r *MessengerResponse) bool {
-			for _, installation := range r.Installations {
-				if installation.ID == device1.installationID {
-					return installation.InstallationMetadata != nil &&
-						i.InstallationMetadata.Name == installation.InstallationMetadata.Name &&
-						i.InstallationMetadata.DeviceType == installation.InstallationMetadata.DeviceType
-				}
-			}
-			return false
-
-		},
-		"installation not received",
-	)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
-	// Ensure installation is enabled
-	err = device2.EnableInstallation(device1.installationID)
-	s.Require().NoError(err)
-}
-
 func prepareAliceMessengersForPairing(s *suite.Suite, alice1, alice2 *Messenger) {
 	// Set Alice's installation metadata
 	aim := &multidevice.InstallationMetadata{
@@ -111,8 +76,8 @@ func prepareAliceMessengersForPairing(s *suite.Suite, alice1, alice2 *Messenger)
 }
 
 func (s *MessengerSyncAccountCustomizationColorSuite) TestSyncCustomizationColor() {
-	pairDevices(&s.Suite, s.alice2, s.alice)
-	pairDevices(&s.Suite, s.alice, s.alice2)
+	PairDevices(&s.Suite, s.alice2, s.alice)
+	PairDevices(&s.Suite, s.alice, s.alice2)
 
 	s.Require().Equal(s.alice.account.KeyUID, s.alice2.account.KeyUID)
 

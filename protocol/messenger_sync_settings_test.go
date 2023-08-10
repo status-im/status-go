@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
@@ -181,41 +180,6 @@ func (s *MessengerSyncSettingsSuite) newMessenger() *Messenger {
 	return s.newMessengerWithKey(s.shh, privateKey)
 }
 
-func pairTwoDevices(s *suite.Suite, device1, device2 *Messenger) {
-	// Send pairing data
-	response, err := device1.SendPairInstallation(context.Background(), nil)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Len(response.Chats(), 1)
-	s.False(response.Chats()[0].Active)
-
-	i, ok := device1.allInstallations.Load(device1.installationID)
-	s.Require().True(ok)
-
-	// Wait for the message to reach its destination
-	response, err = WaitOnMessengerResponse(
-		device2,
-		func(r *MessengerResponse) bool {
-			for _, installation := range r.Installations {
-				if installation.ID == device1.installationID {
-					return installation.InstallationMetadata != nil &&
-						i.InstallationMetadata.Name == installation.InstallationMetadata.Name &&
-						i.InstallationMetadata.DeviceType == installation.InstallationMetadata.DeviceType
-				}
-			}
-			return false
-
-		},
-		"installation not received",
-	)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
-	// Ensure installation is enabled
-	err = device2.EnableInstallation(device1.installationID)
-	s.Require().NoError(err)
-}
-
 func prepAliceMessengersForPairing(s *suite.Suite, alice1, alice2 *Messenger) {
 	// Set Alice's installation metadata
 	aim := &multidevice.InstallationMetadata{
@@ -236,8 +200,8 @@ func prepAliceMessengersForPairing(s *suite.Suite, alice1, alice2 *Messenger) {
 
 func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 	// Pair alice's two devices
-	pairTwoDevices(&s.Suite, s.alice2, s.alice)
-	pairTwoDevices(&s.Suite, s.alice, s.alice2)
+	PairDevices(&s.Suite, s.alice2, s.alice)
+	PairDevices(&s.Suite, s.alice, s.alice2)
 
 	// Check alice 1 settings values
 	as, err := s.alice.settings.GetSettings()
@@ -321,7 +285,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
 	s.Require().Nil(aos.StickersRecentStickers)
 
 	// Pair devices. Allows alice to send to alicesOtherDevice
-	pairTwoDevices(&s.Suite, s.alice2, s.alice)
+	PairDevices(&s.Suite, s.alice2, s.alice)
 
 	// Add sticker pack to alice device
 	stickerPacks := make(stickers.StickerPackCollection)
@@ -376,7 +340,7 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_PreferredName() {
 	s.Require().Nil(aos.PreferredName)
 
 	// Pair devices. Allows alice to send to alicesOtherDevice
-	pairTwoDevices(&s.Suite, s.alice2, s.alice)
+	PairDevices(&s.Suite, s.alice2, s.alice)
 
 	// Update Alice's PreferredName
 	err = s.alice.settings.SaveSettingField(settings.PreferredName, pf2)

@@ -2114,7 +2114,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
 	})
 	s.Require().NoError(err)
 
-	s.pairTwoDevices(alicesOtherDevice, s.alice, "their-name", "their-device-type")
+	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
 	// Create a community
 	createCommunityReq := &requests.CreateCommunity{
@@ -2174,7 +2174,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings_EditCommunity() {
 	})
 	s.Require().NoError(err)
 
-	s.pairTwoDevices(alicesOtherDevice, s.alice, "their-name", "their-device-type")
+	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
 	// Create a community
 	createCommunityReq := &requests.CreateCommunity{
@@ -2274,7 +2274,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	})
 	s.Require().NoError(err)
 
-	s.pairTwoDevices(alicesOtherDevice, s.alice, "their-name", "their-device-type")
+	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
 
 	// Create a community
 	createCommunityReq := &requests.CreateCommunity{
@@ -2372,8 +2372,8 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.Require().NoError(err)
 
 	// Pair alice's two devices
-	s.pairTwoDevices(alicesOtherDevice, s.alice, im1.Name, im1.DeviceType)
-	s.pairTwoDevices(s.alice, alicesOtherDevice, aim.Name, aim.DeviceType)
+	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
+	PairDevices(&s.Suite, s.alice, alicesOtherDevice)
 
 	// Check bob the admin has only one community
 	tcs2, err := s.bob.communitiesManager.All()
@@ -2564,36 +2564,6 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 	s.Equal(aRtj.State, bobRtj.State)
 }
 
-func (s *MessengerCommunitiesSuite) pairTwoDevices(device1, device2 *Messenger, deviceName, deviceType string) {
-	// Send pairing data
-	response, err := device1.SendPairInstallation(context.Background(), nil)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Len(response.Chats(), 1)
-	s.False(response.Chats()[0].Active)
-
-	// Wait for the message to reach its destination
-	response, err = WaitOnMessengerResponse(
-		device2,
-		func(r *MessengerResponse) bool {
-			for _, installation := range r.Installations {
-				if installation.ID == device1.installationID {
-					return installation.InstallationMetadata != nil && deviceName == installation.InstallationMetadata.Name && deviceType == installation.InstallationMetadata.DeviceType
-				}
-			}
-			return false
-
-		},
-		"installation not received",
-	)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-
-	// Ensure installation is enabled
-	err = device2.EnableInstallation(device1.installationID)
-	s.Require().NoError(err)
-}
-
 func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	// Set Alice's installation metadata
 	aim := &multidevice.InstallationMetadata{
@@ -2614,8 +2584,8 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 	s.Require().NoError(err)
 
 	// Pair alice's two devices
-	s.pairTwoDevices(alicesOtherDevice, s.alice, im1.Name, im1.DeviceType)
-	s.pairTwoDevices(s.alice, alicesOtherDevice, aim.Name, aim.DeviceType)
+	PairDevices(&s.Suite, alicesOtherDevice, s.alice)
+	PairDevices(&s.Suite, s.alice, alicesOtherDevice)
 
 	// Check bob the admin has only one community
 	tcs2, err := s.bob.communitiesManager.All()
