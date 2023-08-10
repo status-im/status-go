@@ -938,6 +938,11 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 		}
 		state.Response.AddMessage(updateMessage)
 
+		chat.UnviewedMessagesCount++
+		err = chat.UpdateFromMessage(updateMessage, m.getTimesource())
+		if err != nil {
+			return err
+		}
 		state.Response.AddChat(chat)
 		state.AllChats.Store(chat.ID, chat)
 	}
@@ -974,7 +979,7 @@ func (m *Messenger) HandleAcceptContactRequest(state *ReceivedMessageState, mess
 	return nil
 }
 
-func (m *Messenger) handleRetractContactRequest(response *MessengerResponse, contact *Contact, message protobuf.RetractContactRequest) error {
+func (m *Messenger) handleRetractContactRequest(state *ReceivedMessageState, contact *Contact, message protobuf.RetractContactRequest) error {
 	if contact.ID == m.myHexIdentity() {
 		m.logger.Debug("retraction coming from us, ignoring")
 		return nil
@@ -992,6 +997,7 @@ func (m *Messenger) handleRetractContactRequest(response *MessengerResponse, con
 	if err != nil {
 		return err
 	}
+
 	timestamp := m.getTimesource().GetCurrentTime()
 	updateMessage, err := m.prepareMutualStateUpdateMessage(contact.ID, MutualStateUpdateTypeRemoved, clock, timestamp, false)
 	if err != nil {
@@ -1003,8 +1009,13 @@ func (m *Messenger) handleRetractContactRequest(response *MessengerResponse, con
 	if err != nil {
 		return err
 	}
-	response.AddMessage(updateMessage)
-	response.AddChat(chat)
+	state.Response.AddMessage(updateMessage)
+	chat.UnviewedMessagesCount++
+	err = chat.UpdateFromMessage(updateMessage, m.getTimesource())
+	if err != nil {
+		return err
+	}
+	state.Response.AddChat(chat)
 
 	notification := &ActivityCenterNotification{
 		ID:        types.FromHex(uuid.New().String()),
@@ -1017,7 +1028,7 @@ func (m *Messenger) handleRetractContactRequest(response *MessengerResponse, con
 		UpdatedAt: m.getCurrentTimeInMillis(),
 	}
 
-	err = m.addActivityCenterNotification(response, notification)
+	err = m.addActivityCenterNotification(state.Response, notification)
 	if err != nil {
 		m.logger.Warn("failed to create activity center notification", zap.Error(err))
 		return err
@@ -1030,7 +1041,7 @@ func (m *Messenger) handleRetractContactRequest(response *MessengerResponse, con
 
 func (m *Messenger) HandleRetractContactRequest(state *ReceivedMessageState, message protobuf.RetractContactRequest) error {
 	contact := state.CurrentMessageState.Contact
-	err := m.handleRetractContactRequest(state.Response, contact, message)
+	err := m.handleRetractContactRequest(state, contact, message)
 	if err != nil {
 		return err
 	}
