@@ -240,7 +240,7 @@ setup-dev: ##@setup Install all necessary tools for development
 setup-dev: install-lint install-mock install-modvendor install-protobuf tidy install-os-deps
 
 setup-build: ##@setup Install all necessary build tools
-setup-build: install-lint install-release install-gomobile
+setup-build: install-lint install-release install-gomobile install-junit-report
 
 install-os-deps: ##@install Operating System Dependencies
 	_assets/scripts/install_deps.sh
@@ -253,6 +253,9 @@ install-gomobile: ##@install Go Mobile Build Tools
 
 install-lint: ##@install Install Linting Tools
 	GO111MODULE=on go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
+
+install-junit-report: ##@install Install Junit Report Tool for Jenkins integration
+	GO111MODULE=on go install github.com/jstemmer/go-junit-report/v2@latest
 
 install-mock: ##@install Install Module Mocking Tools
 	GO111MODULE=on go install github.com/golang/mock/mockgen@v1.4.4
@@ -314,7 +317,9 @@ test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
 test-unit: ##@tests Run unit and integration tests
 	for file in $(UNIT_TEST_PACKAGES); do \
 		set -e; \
-		go test -tags '$(BUILD_TAGS)' -timeout 20m -v -failfast $$file $(gotest_extraflags); \
+		path=$$(echo $$file | cut -d\/ -f 4-); \
+		go test -tags '$(BUILD_TAGS)' -timeout 20m -v -failfast $$file $(gotest_extraflags) | \
+		  go-junit-report -iocopy -out $${path}/report.xml; \
 	done
 
 test-unit-race: gotest_extraflags=-race

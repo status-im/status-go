@@ -48,6 +48,9 @@ func OverrideRootLog(enabled bool, levelStr string, fileOpts FileOptions, termin
 		disableRootLog()
 		return nil
 	}
+	if os.Getenv("CI") == "true" {
+		terminal = false
+	}
 	var (
 		handler log.Handler
 	)

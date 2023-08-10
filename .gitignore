@@ -79,3 +79,6 @@ vendor/**/vendor
 
 package.json
 package-lock.json
+
+# junit reports for Jenkins integration
+report.xml

@@ -85,7 +85,10 @@ pipeline {
   } // stages
 
   post {
-    always  { script { env.PKG_URL = "${currentBuild.absoluteUrl}/consoleText" } }
+    always  {
+      script { env.PKG_URL = "${currentBuild.absoluteUrl}/consoleText" }
+      junit '**/report.xml'
+    }
     success { script { github.notifyPR(true) } }
     failure { script { github.notifyPR(false) } }
     cleanup { dir(env.TMPDIR) { deleteDir() } }
