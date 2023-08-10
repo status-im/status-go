@@ -698,6 +698,150 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	s.Require().Equal(msg.Text, response.Messages()[0].Text)
 }
 
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPermission() {
+	community, _ := s.createCommunity()
+
+	// setup become admin permission
+	permissionRequest := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_ADMIN,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+				Symbol:            "TEST",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+
+	response, err := s.owner.CreateCommunityTokenPermission(&permissionRequest)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+
+	s.advertiseCommunityTo(community, s.bob)
+
+	// Bob should still be able to join even if there is a permission to be an admin
+	s.joinCommunity(community, s.bob, bobPassword, []string{})
+
+	// Verify that we have Bob's revealed account
+	revealedAccounts, err := s.owner.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccounts, 1)
+	s.Require().Equal(bobAddress, revealedAccounts[0].Address)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWithMemberAndAdminPermission() {
+	community, _ := s.createCommunity()
+
+	// setup become member permission
+	permissionRequestMember := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+				Symbol:            "TEST",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+	response, err := s.owner.CreateCommunityTokenPermission(&permissionRequestMember)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+
+	// setup become admin permission
+	permissionRequestAdmin := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_ADMIN,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x124"},
+				Symbol:            "TESTADMIN",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+	response, err = s.owner.CreateCommunityTokenPermission(&permissionRequestAdmin)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+
+	// make bob satisfy the member criteria
+	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, permissionRequestMember.TokenCriteria[0])
+
+	s.advertiseCommunityTo(community, s.bob)
+
+	// Bob should still be able to join even though he doesn't satisfy the admin requirement
+	// because he satisfies the member one
+	s.joinCommunity(community, s.bob, bobPassword, []string{})
+
+	// Verify that we have Bob's revealed account
+	revealedAccounts, err := s.owner.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccounts, 1)
+	s.Require().Equal(bobAddress, revealedAccounts[0].Address)
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsAdminWithMemberAndAdminPermission() {
+	community, _ := s.createCommunity()
+
+	// setup become member permission
+	permissionRequestMember := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x123"},
+				Symbol:            "TEST",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+	response, err := s.owner.CreateCommunityTokenPermission(&permissionRequestMember)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+
+	// setup become admin permission
+	permissionRequestAdmin := requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_BECOME_ADMIN,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				Type:              protobuf.CommunityTokenType_ERC20,
+				ContractAddresses: map[uint64]string{testChainID1: "0x124"},
+				Symbol:            "TESTADMIN",
+				Amount:            "100",
+				Decimals:          uint64(18),
+			},
+		},
+	}
+	response, err = s.owner.CreateCommunityTokenPermission(&permissionRequestAdmin)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+
+	// make bob satisfy the admin criteria
+	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, permissionRequestAdmin.TokenCriteria[0])
+
+	s.advertiseCommunityTo(community, s.bob)
+
+	// Bob should still be able to join even though he doesn't satisfy the member requirement
+	// because he satisfies the admin one
+	s.joinCommunity(community, s.bob, bobPassword, []string{})
+
+	// Verify that we have Bob's revealed account
+	revealedAccounts, err := s.owner.GetRevealedAccounts(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccounts, 1)
+	s.Require().Equal(bobAddress, revealedAccounts[0].Address)
+}
+
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions() {
 	community, chat := s.createCommunity()
 

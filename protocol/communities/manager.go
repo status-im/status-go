@@ -1671,7 +1671,7 @@ func (m *Manager) CheckPermissionToJoin(id []byte, addresses []gethcommon.Addres
 
 	accountsAndChainIDs := combineAddressesAndChainIDs(addresses, allChainIDs)
 
-	if len(permissionsToJoin) == 0 {
+	if len(becomeMemberPermissions) == 0 || len(permissionsToJoin) == 0 {
 		// There are no permissions to join on this community at the moment,
 		// so we reveal all accounts + all chain IDs
 		response := &CheckPermissionsResponse{
@@ -1682,6 +1682,7 @@ func (m *Manager) CheckPermissionToJoin(id []byte, addresses []gethcommon.Addres
 		return response, nil
 	}
 	return m.checkPermissions(permissionsToJoin, accountsAndChainIDs, false)
+
 }
 
 func (m *Manager) accountsSatisfyPermissionsToJoin(community *Community, accounts []*protobuf.RevealedAccount) (bool, protobuf.CommunityMember_Roles, error) {
