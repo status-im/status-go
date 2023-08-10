@@ -17,6 +17,10 @@ func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bo
 	err := tt.RetryWithBackOff(func() error {
 		var err error
 		r, err := m.RetrieveAll()
+		if err != nil {
+			panic(err)
+		}
+
 		if err := response.Merge(r); err != nil {
 			panic(err)
 		}
