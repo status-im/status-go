@@ -2966,7 +2966,17 @@ func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (
 }
 
 func (m *Manager) GetByID(id []byte) (*Community, error) {
-	return m.persistence.GetByID(&m.identity.PublicKey, id)
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, id)
+	if err != nil {
+		return nil, err
+	}
+
+	err = community.updateCommunityDescriptionByEvents()
+	if err != nil {
+		return nil, err
+	}
+
+	return community, nil
 }
 
 func (m *Manager) GetByIDString(idString string) (*Community, error) {
@@ -2989,6 +2999,11 @@ func (m *Manager) SaveRequestToJoinAndCommunity(requestToJoin *RequestToJoin, co
 
 func (m *Manager) CreateRequestToJoin(requester *ecdsa.PublicKey, request *requests.RequestToJoinCommunity) (*Community, *RequestToJoin, error) {
 	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = community.updateCommunityDescriptionByEvents()
 	if err != nil {
 		return nil, nil, err
 	}
