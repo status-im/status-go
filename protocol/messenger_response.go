@@ -667,6 +667,14 @@ func (r *MessengerResponse) Messages() []*common.Message {
 	return ms
 }
 
+func (r *MessengerResponse) messageIds() map[string]struct{} {
+	var ids = map[string]struct{}{}
+	for _, message := range r.Messages() {
+		ids[message.ID] = struct{}{}
+	}
+	return ids
+}
+
 func (r *MessengerResponse) AddDiscordMessageAuthor(author *protobuf.DiscordMessageAuthor) {
 	if r.discordMessageAuthors == nil {
 		r.discordMessageAuthors = make(map[string]*protobuf.DiscordMessageAuthor)
