@@ -16,6 +16,7 @@ import (
 
 	"github.com/status-im/status-go/appdatabase/migrations"
 	migrationsprevnodecfg "github.com/status-im/status-go/appdatabase/migrationsprevnodecfg"
+	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
@@ -31,7 +32,7 @@ func Test_GetDBFilename(t *testing.T) {
 		require.NoError(t, stop())
 	}()
 
-	fn, err := GetDBFilename(db)
+	fn, err := dbsetup.GetDBFilename(db)
 	require.NoError(t, err)
 	require.True(t, len(fn) > 0)
 
@@ -42,7 +43,7 @@ func Test_GetDBFilename(t *testing.T) {
 		require.NoError(t, mdb.Close())
 	}()
 
-	fn, err = GetDBFilename(mdb)
+	fn, err = dbsetup.GetDBFilename(mdb)
 	require.NoError(t, err)
 	require.Equal(t, "", fn)
 }

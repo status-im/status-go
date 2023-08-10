@@ -3,6 +3,7 @@ package activity
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -1271,4 +1272,60 @@ func BenchmarkGetActivityEntries(bArg *testing.B) {
 			}
 		})
 	}
+}
+
+func TestUpdateWalletKeypairsAccountsTable(t *testing.T) {
+	// initialize
+	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	require.NoError(t, err)
+	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+	accountsAppDb, err := accounts.NewDB(appDb)
+	require.NoError(t, err)
+	accountsWalletDb, err := accounts.NewDB(walletDb)
+	require.NoError(t, err)
+
+	// Check initially empty
+	addressesApp, err := accountsAppDb.GetWalletAddresses()
+	require.NoError(t, err)
+	require.Empty(t, addressesApp)
+	addressesWallet, err := accountsWalletDb.GetWalletAddresses()
+	require.Error(t, err) // no such table error
+	require.Empty(t, addressesWallet)
+
+	// Insert 2 addresses in app db, but only 1 is a wallet
+	addresses := []types.Address{{0x01}, {0x02}, {0x03}}
+	accounts := []*accounts.Account{
+		{Address: addresses[0], Chat: true, Wallet: true},
+		{Address: addresses[1], Wallet: true},
+		{Address: addresses[2]},
+	}
+	err = accountsAppDb.SaveOrUpdateAccounts(accounts, false)
+	require.NoError(t, err)
+
+	// Check only 2 wallet accs is returned in app db
+	addressesApp, err = accountsAppDb.GetWalletAddresses()
+	require.NoError(t, err)
+	require.Len(t, addressesApp, 2)
+
+	// update wallet DB
+	err = updateKeypairsAccountsTable(accountsAppDb, walletDb)
+	require.NoError(t, err)
+
+	// Check only 2 wallet acc is returned in wallet db
+	var count int
+	err = walletDb.QueryRow(fmt.Sprintf("SELECT count(address) FROM %s", keypairAccountsTable)).Scan(&count)
+	require.NoError(t, err)
+	require.Equal(t, count, 2)
+
+	// Compare addresses between app and wallet db
+	rows, err := walletDb.Query(fmt.Sprintf("SELECT address FROM %s", keypairAccountsTable))
+	require.NoError(t, err)
+	for rows.Next() {
+		var address types.Address
+		err = rows.Scan(&address)
+		require.NoError(t, err)
+		require.Contains(t, addresses, address)
+	}
+	defer rows.Close()
 }

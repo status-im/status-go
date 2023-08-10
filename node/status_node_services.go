@@ -633,9 +633,11 @@ func (b *StatusNode) Cleanup() error {
 		}
 	}
 
-	err := b.ensSrvc.Stop()
-	if err != nil {
-		return err
+	if b.ensSrvc != nil {
+		err := b.ensSrvc.Stop()
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

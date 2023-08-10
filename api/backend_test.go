@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/typeddata"
+	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions"
@@ -1195,4 +1196,42 @@ func TestLoginAndMigrationsStillWorkWithExistingUsers(t *testing.T) {
 
 	login(t, conf)
 	login(t, conf) // Login twice to catch weird errors that only appear after logout
+}
+
+func TestChangeDatabasePassword(t *testing.T) {
+	backend := NewGethStatusBackend()
+	backend.UpdateRootDataDir(t.TempDir())
+
+	account := multiaccounts.Account{
+		Name:          "TestAccount",
+		Timestamp:     1,
+		KeyUID:        "0x7c46c8f6f059ab72d524f2a6d356904db30bb0392636172ab3929a6bd2220f84",
+		KDFIterations: 1,
+	}
+
+	oldPassword := "password"
+	newPassword := "newPassword"
+
+	// Initialize accounts DB
+	err := backend.OpenAccounts()
+	require.NoError(t, err)
+	err = backend.SaveAccount(account)
+	require.NoError(t, err)
+
+	// Created DBs with old password
+	err = backend.ensureDBsOpened(account, oldPassword)
+	require.NoError(t, err)
+
+	// Change password
+	err = backend.ChangeDatabasePassword(account.KeyUID, oldPassword, newPassword)
+	require.NoError(t, err)
+
+	// Test that DBs can be opened with new password
+	appDb, err := sqlite.OpenDB(backend.getAppDBPath(account.KeyUID), newPassword, account.KDFIterations)
+	require.NoError(t, err)
+	appDb.Close()
+
+	walletDb, err := sqlite.OpenDB(backend.getWalletDBPath(account.KeyUID), newPassword, account.KDFIterations)
+	require.NoError(t, err)
+	walletDb.Close()
 }

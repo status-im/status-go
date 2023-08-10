@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/nodecfg"
@@ -32,7 +32,7 @@ type Database struct {
 
 // MakeNewDB ensures that a singleton instance of Database is returned per sqlite db file
 func MakeNewDB(db *sql.DB) (*Database, error) {
-	filename, err := appdatabase.GetDBFilename(db)
+	filename, err := dbsetup.GetDBFilename(db)
 	if err != nil {
 		return nil, err
 	}
