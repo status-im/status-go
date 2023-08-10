@@ -23,28 +23,27 @@ const (
 	EventActivityGetOldestTimestampDone walletevent.EventType = "wallet-activity-get-oldest-timestamp-result"
 )
 
-const (
-	filterTaskID                 = int32(1)
-	filterTaskPolicy             = async.ReplacementPolicyCancelOld
-	getRecipientsTaskID          = int32(2)
-	getRecipientsTaskPolicy      = async.ReplacementPolicyIgnoreNew
-	getOldestTimestampTaskID     = int32(3)
-	getOldestTimestampTaskPolicy = async.ReplacementPolicyCancelOld
-)
-
-func makeTaskType(requestID int32, originalID int32, policy async.ReplacementPolicy) async.TaskType {
-	return async.TaskType{
-		ID:     int64(requestID)<<32 | int64(originalID),
-		Policy: policy,
+var (
+	filterTask = async.TaskType{
+		ID:     1,
+		Policy: async.ReplacementPolicyCancelOld,
 	}
-}
+	getRecipientsTask = async.TaskType{
+		ID:     2,
+		Policy: async.ReplacementPolicyIgnoreNew,
+	}
+	getOldestTimestampTask = async.TaskType{
+		ID:     3,
+		Policy: async.ReplacementPolicyCancelOld,
+	}
+)
 
 type Service struct {
 	db           *sql.DB
 	tokenManager *token.Manager
 	eventFeed    *event.Feed
 
-	scheduler *async.Scheduler
+	scheduler *async.MultiClientScheduler
 }
 
 func NewService(db *sql.DB, tokenManager *token.Manager, eventFeed *event.Feed) *Service {
@@ -52,7 +51,7 @@ func NewService(db *sql.DB, tokenManager *token.Manager, eventFeed *event.Feed) 
 		db:           db,
 		tokenManager: tokenManager,
 		eventFeed:    eventFeed,
-		scheduler:    async.NewScheduler(),
+		scheduler:    async.NewMultiClientScheduler(),
 	}
 }
 
@@ -77,7 +76,7 @@ type FilterResponse struct {
 // and it cancels the current one if a new one is started
 // All calls will trigger an EventActivityFilteringDone event with the result of the filtering
 func (s *Service) FilterActivityAsync(requestID int32, addresses []common.Address, chainIDs []w_common.ChainID, filter Filter, offset int, limit int) {
-	s.scheduler.Enqueue(makeTaskType(requestID, filterTaskID, filterTaskPolicy), func(ctx context.Context) (interface{}, error) {
+	s.scheduler.Enqueue(requestID, filterTask, func(ctx context.Context) (interface{}, error) {
 		activities, err := getActivityEntries(ctx, s.getDeps(), addresses, chainIDs, filter, offset, limit)
 		return activities, err
 	}, func(result interface{}, taskType async.TaskType, err error) {
@@ -112,7 +111,7 @@ type GetRecipientsResponse struct {
 // this call won't receive an answer but client should rely on the answer from the previous call.
 // If no task is already scheduled false will be returned
 func (s *Service) GetRecipientsAsync(requestID int32, offset int, limit int) bool {
-	return s.scheduler.Enqueue(makeTaskType(requestID, getRecipientsTaskID, getRecipientsTaskPolicy), func(ctx context.Context) (interface{}, error) {
+	return s.scheduler.Enqueue(requestID, getRecipientsTask, func(ctx context.Context) (interface{}, error) {
 		var err error
 		result := &GetRecipientsResponse{
 			Offset:    offset,
@@ -138,7 +137,7 @@ type GetOldestTimestampResponse struct {
 }
 
 func (s *Service) GetOldestTimestampAsync(requestID int32, addresses []common.Address) {
-	s.scheduler.Enqueue(makeTaskType(requestID, getOldestTimestampTaskID, getOldestTimestampTaskPolicy), func(ctx context.Context) (interface{}, error) {
+	s.scheduler.Enqueue(requestID, getOldestTimestampTask, func(ctx context.Context) (interface{}, error) {
 		timestamp, err := GetOldestTimestamp(ctx, s.db, addresses)
 		return timestamp, err
 	}, func(result interface{}, taskType async.TaskType, err error) {

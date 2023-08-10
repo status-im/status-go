@@ -1,9 +1,7 @@
-package activity
+package async
 
 import (
 	"testing"
-
-	"github.com/status-im/status-go/services/wallet/async"
 
 	"github.com/stretchr/testify/require"
 )
@@ -14,7 +12,7 @@ func Test_makeTaskType(t *testing.T) {
 		secondRequestID  int32
 		firstOriginalID  int32
 		secondOriginalID int32
-		policy           async.ReplacementPolicy
+		policy           ReplacementPolicy
 	}
 	tests := []struct {
 		name             string
@@ -28,7 +26,7 @@ func Test_makeTaskType(t *testing.T) {
 				secondRequestID:  2,
 				firstOriginalID:  1,
 				secondOriginalID: 1,
-				policy:           async.ReplacementPolicyCancelOld,
+				policy:           ReplacementPolicyCancelOld,
 			},
 			wantDifferentIDs: true,
 		},
@@ -39,7 +37,7 @@ func Test_makeTaskType(t *testing.T) {
 				secondRequestID:  1,
 				firstOriginalID:  2,
 				secondOriginalID: 3,
-				policy:           async.ReplacementPolicyCancelOld,
+				policy:           ReplacementPolicyCancelOld,
 			},
 			wantDifferentIDs: true,
 		},
@@ -50,15 +48,25 @@ func Test_makeTaskType(t *testing.T) {
 				secondRequestID:  1,
 				firstOriginalID:  1,
 				secondOriginalID: 1,
-				policy:           async.ReplacementPolicyCancelOld,
+				policy:           ReplacementPolicyCancelOld,
 			},
 			wantDifferentIDs: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			firstTT := makeTaskType(tt.args.firstRequestID, tt.args.firstOriginalID, tt.args.policy)
-			secondTT := makeTaskType(tt.args.secondRequestID, tt.args.secondOriginalID, tt.args.policy)
+			firstTT := makeTaskType(
+				tt.args.firstRequestID,
+				TaskType{
+					ID:     int64(tt.args.firstOriginalID),
+					Policy: tt.args.policy,
+				})
+			secondTT := makeTaskType(
+				tt.args.secondRequestID,
+				TaskType{
+					ID:     int64(tt.args.secondOriginalID),
+					Policy: tt.args.policy,
+				})
 			if tt.wantDifferentIDs {
 				require.NotEqual(t, firstTT.ID, secondTT.ID)
 			} else {
