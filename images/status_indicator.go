@@ -10,7 +10,7 @@ import (
 	"github.com/fogleman/gg"
 )
 
-func AddStatusIndicatorToImage(inputImage []byte, innerColor color.Color, indicatorSize, indicatorBorder int) ([]byte, error) {
+func AddStatusIndicatorToImage(inputImage []byte, innerColor color.Color, indicatorSize, indicatorBorder float64) ([]byte, error) {
 	// decode the input image
 	img, _, err := image.Decode(bytes.NewReader(inputImage))
 	if err != nil {
@@ -21,7 +21,7 @@ func AddStatusIndicatorToImage(inputImage []byte, innerColor color.Color, indica
 	width := img.Bounds().Max.X
 	height := img.Bounds().Max.Y
 
-	indicatorRadius := float64(indicatorSize / 2)
+	indicatorRadius := indicatorSize / 2
 
 	// calculate the center point
 	x := float64(width) - indicatorRadius
@@ -42,7 +42,7 @@ func AddStatusIndicatorToImage(inputImage []byte, innerColor color.Color, indica
 	}
 
 	// draw inner circle
-	dc.DrawCircle(x, y, indicatorRadius-float64(indicatorBorder))
+	dc.DrawCircle(x, y, indicatorRadius-indicatorBorder)
 	dc.SetColor(innerColor)
 	dc.Fill()
 

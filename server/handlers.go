@@ -72,8 +72,8 @@ type ImageParams struct {
 	UppercaseRatio  float64
 	Theme           ring.Theme
 	Ring            bool
-	IndicatorSize   int
-	IndicatorBorder int
+	IndicatorSize   float64
+	IndicatorBorder float64
 	IndicatorColor  color.Color
 
 	AuthorID     string
@@ -210,7 +210,7 @@ func ParseImageParams(logger *zap.Logger, params url.Values) ImageParams {
 
 	indicatorSizeStrs := params["indicatorSize"]
 	if len(indicatorSizeStrs) != 0 {
-		indicatorSize, err := strconv.Atoi(indicatorSizeStrs[0])
+		indicatorSize, err := strconv.ParseFloat(indicatorSizeStrs[0], 64)
 		if err != nil {
 			logger.Error("ParseParams: invalid indicatorSize", zap.String("indicatorSize", indicatorSizeStrs[0]))
 			indicatorSize = 0
@@ -220,7 +220,7 @@ func ParseImageParams(logger *zap.Logger, params url.Values) ImageParams {
 
 	indicatorBorderStrs := params["indicatorBorder"]
 	if len(indicatorBorderStrs) != 0 {
-		indicatorBorder, err := strconv.Atoi(indicatorBorderStrs[0])
+		indicatorBorder, err := strconv.ParseFloat(indicatorBorderStrs[0], 64)
 		if err != nil {
 			logger.Error("ParseParams: invalid indicatorBorder", zap.String("indicatorBorder", indicatorBorderStrs[0]))
 			indicatorBorder = 0
@@ -322,7 +322,7 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 	if parsed.IndicatorSize != 0 {
 		// enlarge indicator size based on identity image size / desired size
 		// or we get a bad quality identity image
-		enlargeIndicatorRatio := identityImage.Width / parsed.BgSize
+		enlargeIndicatorRatio := float64(identityImage.Width / parsed.BgSize)
 		payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize*enlargeIndicatorRatio, parsed.IndicatorBorder*enlargeIndicatorRatio)
 		if err != nil {
 			logger.Error("handleAccountImagesImpl: failed to draw status-indicator for initials", zap.Error(err))
@@ -372,7 +372,7 @@ func handleAccountImagesPlaceholder(logger *zap.Logger, w http.ResponseWriter, p
 	}
 
 	if parsed.IndicatorSize != 0 {
-		enlargeIndicatorRatio := width / parsed.BgSize
+		enlargeIndicatorRatio := float64(width / parsed.BgSize)
 		payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize*enlargeIndicatorRatio, parsed.IndicatorBorder*enlargeIndicatorRatio)
 		if err != nil {
 			logger.Error("handleAccountImagesPlaceholder: failed to draw status-indicator for initials", zap.Error(err))
@@ -626,7 +626,7 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 		}
 
 		if parsed.IndicatorSize != 0 {
-			enlargeIndicatorRatio := width / parsed.BgSize
+			enlargeIndicatorRatio := float64(width / parsed.BgSize)
 			payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize*enlargeIndicatorRatio, parsed.IndicatorBorder*enlargeIndicatorRatio)
 			if err != nil {
 				logger.Error("handleAccountImagesImpl: failed to draw status-indicator for initials", zap.Error(err))
