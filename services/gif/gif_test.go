@@ -3,25 +3,19 @@ package gif
 import (
 	"database/sql"
 	"encoding/json"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func setupSQLTestDb(t *testing.T) (*sql.DB, func()) {
-	tmpfile, err := ioutil.TempFile("", "local-notifications-tests-")
+	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "local-notifications-tests-")
 	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "local-notifications-tests", sqlite.ReducedKDFIterationsNumber)
-	require.NoError(t, err)
-	return db, func() {
-		require.NoError(t, os.Remove(tmpfile.Name()))
-	}
+	return db, func() { require.NoError(t, cleanup()) }
 }
 
 func setupTestDB(t *testing.T, db *sql.DB) (*accounts.Database, func()) {

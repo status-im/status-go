@@ -4,26 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
-	tmpfile, err := ioutil.TempFile("", "perm-tests-")
+	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "perm-tests-")
 	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "perm-tests", sqlite.ReducedKDFIterationsNumber)
-	require.NoError(t, err)
-	return NewDB(db), func() {
-		require.NoError(t, db.Close())
-		require.NoError(t, os.Remove(tmpfile.Name()))
-	}
+	return NewDB(db), func() { require.NoError(t, cleanup()) }
 }
 
 func setupTestAPI(t *testing.T) (*API, func()) {

@@ -7,14 +7,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-
-	"github.com/status-im/status-go/appdatabase"
 )
 
 func setupTestTransactionDB(t *testing.T) (*TransactionManager, func()) {
-	db, err := appdatabase.SetupTestMemorySQLDB("wallet-transfer-transaction-tests")
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	return &TransactionManager{db, nil, nil, nil, nil, nil, nil}, func() {
 		require.NoError(t, db.Close())

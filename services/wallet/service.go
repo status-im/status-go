@@ -103,7 +103,7 @@ func NewService(
 	reader := NewReader(rpcClient, tokenManager, marketManager, accountsDB, NewPersistence(db), walletFeed)
 	history := history.NewService(db, walletFeed, rpcClient, tokenManager, marketManager)
 	currency := currency.NewService(db, walletFeed, tokenManager, marketManager)
-	activity := activity.NewService(db, tokenManager, walletFeed)
+	activity := activity.NewService(db, tokenManager, walletFeed, accountsDB)
 
 	openseaClient := opensea.NewClient(config.WalletConfig.OpenseaAPIKey, walletFeed)
 	infuraClient := infura.NewClient(config.WalletConfig.InfuraAPIKey, config.WalletConfig.InfuraAPIKeySecret)

@@ -46,6 +46,7 @@ import (
 	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/web3provider"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/waku"
@@ -512,7 +513,7 @@ func (b *StatusNode) walletService(accountsDB *accounts.Database, accountsFeed *
 func (b *StatusNode) localNotificationsService(network uint64) (*localnotifications.Service, error) {
 	var err error
 	if b.localNotificationsSrvc == nil {
-		b.localNotificationsSrvc, err = localnotifications.NewService(b.appDB, network)
+		b.localNotificationsSrvc, err = localnotifications.NewService(b.appDB, transfer.NewDB(b.walletDB), network)
 		if err != nil {
 			return nil, err
 		}

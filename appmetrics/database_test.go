@@ -3,27 +3,19 @@ package appmetrics
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/stretchr/testify/require"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
-	tmpfile, err := ioutil.TempFile("", "appmetrics-tests-")
+	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "appmetrics-tests")
 	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "appmetrics-tests", sqlite.ReducedKDFIterationsNumber)
-	require.NoError(t, err)
-
-	return NewDB(db), func() {
-		require.NoError(t, db.Close())
-		require.NoError(t, os.Remove(tmpfile.Name()))
-	}
+	return NewDB(db), func() { require.NoError(t, cleanup()) }
 }
 
 func TestSaveAppMetrics(t *testing.T) {

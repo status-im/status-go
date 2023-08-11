@@ -18,6 +18,7 @@ import (
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
@@ -28,8 +29,9 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
 type AccountManagerMock struct {
@@ -127,9 +129,20 @@ func newCommunitiesTestMessenger(shh types.Waku, privateKey *ecdsa.PrivateKey, l
 	acc := generator.NewAccount(privateKey, nil)
 	iai := acc.ToIdentifiedAccountInfo("")
 
+	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	if err != nil {
+		return nil, err
+	}
+
+	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	if err != nil {
+		return nil, err
+	}
+
 	options := []Option{
 		WithCustomLogger(logger),
-		WithDatabaseConfig(":memory:", "somekey", sqlite.ReducedKDFIterationsNumber),
+		WithDatabase(appDb),
+		WithWalletDatabase(walletDb),
 		WithMultiAccounts(madb),
 		WithAccount(iai.ToMultiAccount()),
 		WithDatasync(),

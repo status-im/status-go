@@ -4,23 +4,24 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/appdatabase"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/stickers"
+	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/waku"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
 var (
@@ -162,12 +163,16 @@ func (s *MessengerSyncSettingsSuite) newMessengerWithOptions(shh types.Waku, pri
 }
 
 func (s *MessengerSyncSettingsSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
-	tmpFile, err := ioutil.TempFile("", "")
+	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	s.Require().NoError(err)
+
+	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err)
 
 	options := []Option{
 		WithCustomLogger(s.logger),
-		WithDatabaseConfig(tmpFile.Name(), "", sqlite.ReducedKDFIterationsNumber),
+		WithDatabase(appDb),
+		WithWalletDatabase(walletDb),
 		WithDatasync(),
 	}
 	return s.newMessengerWithOptions(shh, privateKey, options)

@@ -95,9 +95,8 @@ type Service struct {
 	accountsDB        *accounts.Database
 }
 
-func NewService(appDB *sql.DB, chainID uint64) (*Service, error) {
+func NewService(appDB *sql.DB, walletDB *transfer.Database, chainID uint64) (*Service, error) {
 	db := NewDB(appDB, chainID)
-	walletDB := transfer.NewDB(appDB)
 	accountsDB, err := accounts.NewDB(appDB)
 	if err != nil {
 		return nil, err

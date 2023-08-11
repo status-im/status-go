@@ -8,12 +8,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
 func setupTestTransactionDB(t *testing.T) (*TransactionManager, func()) {
-	db, err := appdatabase.SetupTestMemorySQLDB("wallet-transfer-transaction-tests")
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	return &TransactionManager{db, nil, nil, nil}, func() {
 		require.NoError(t, db.Close())

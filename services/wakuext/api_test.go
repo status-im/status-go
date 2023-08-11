@@ -26,9 +26,9 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/ext"
-	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/waku"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
 func TestRequestMessagesErrors(t *testing.T) {
@@ -121,9 +121,8 @@ func TestInitProtocol(t *testing.T) {
 	nodeWrapper := ext.NewTestNodeWrapper(nil, waku)
 	service := New(config, nodeWrapper, nil, nil, db)
 
-	tmpdir := t.TempDir()
-
-	sqlDB, err := appdatabase.InitializeDB(fmt.Sprintf("%s/db.sql", tmpdir), "password", sqlite.ReducedKDFIterationsNumber)
+	appDB, cleanupDB, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "db.sql")
+	defer func() { require.NoError(t, cleanupDB()) }()
 	require.NoError(t, err)
 
 	tmpfile, err := ioutil.TempFile("", "multi-accounts-tests-")
@@ -133,7 +132,11 @@ func TestInitProtocol(t *testing.T) {
 
 	acc := &multiaccounts.Account{KeyUID: "0xdeadbeef"}
 
-	err = service.InitProtocol("Test", privateKey, sqlDB, nil, multiAccounts, acc, nil, nil, nil, nil, zap.NewNop())
+	walletDB, cleanupWalletDB, err := helpers.SetupTestSQLDB(walletdatabase.DbInitializer{}, "db-wallet.sql")
+	defer func() { require.NoError(t, cleanupWalletDB()) }()
+	require.NoError(t, err)
+
+	err = service.InitProtocol("Test", privateKey, appDB, walletDB, nil, multiAccounts, acc, nil, nil, nil, nil, zap.NewNop())
 	require.NoError(t, err)
 }
 
@@ -185,11 +188,14 @@ func (s *ShhExtSuite) createAndAddNode() {
 	s.Require().NoError(err)
 	nodeWrapper := ext.NewTestNodeWrapper(nil, gethbridge.NewGethWakuWrapper(w))
 	service := New(config, nodeWrapper, nil, nil, db)
-	sqlDB, err := appdatabase.InitializeDB(fmt.Sprintf("%s/%d", s.dir, idx), "password", sqlite.ReducedKDFIterationsNumber)
+
+	appDB, cleanupDB, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, fmt.Sprintf("%d", idx))
 	s.Require().NoError(err)
+	defer func() { s.Require().NoError(cleanupDB()) }()
 
 	tmpfile, err := ioutil.TempFile("", "multi-accounts-tests-")
 	s.Require().NoError(err)
+
 	multiAccounts, err := multiaccounts.InitializeDB(tmpfile.Name())
 	s.Require().NoError(err)
 
@@ -198,7 +204,10 @@ func (s *ShhExtSuite) createAndAddNode() {
 
 	acc := &multiaccounts.Account{KeyUID: "0xdeadbeef"}
 
-	err = service.InitProtocol("Test", privateKey, sqlDB, nil, multiAccounts, acc, nil, nil, nil, nil, zap.NewNop())
+	walletDB, err := helpers.SetupTestMemorySQLDB(&walletdatabase.DbInitializer{})
+	s.Require().NoError(err)
+
+	err = service.InitProtocol("Test", privateKey, appDB, walletDB, nil, multiAccounts, acc, nil, nil, nil, nil, zap.NewNop())
 	s.NoError(err)
 
 	stack.RegisterLifecycle(service)

@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/async"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/token"
@@ -40,15 +41,17 @@ var (
 
 type Service struct {
 	db           *sql.DB
+	accountsDB   *accounts.Database
 	tokenManager *token.Manager
 	eventFeed    *event.Feed
 
 	scheduler *async.MultiClientScheduler
 }
 
-func NewService(db *sql.DB, tokenManager *token.Manager, eventFeed *event.Feed) *Service {
+func NewService(db *sql.DB, tokenManager *token.Manager, eventFeed *event.Feed, accountsDb *accounts.Database) *Service {
 	return &Service{
 		db:           db,
+		accountsDB:   accountsDb,
 		tokenManager: tokenManager,
 		eventFeed:    eventFeed,
 		scheduler:    async.NewMultiClientScheduler(),
@@ -162,7 +165,8 @@ func (s *Service) Stop() {
 
 func (s *Service) getDeps() FilterDependencies {
 	return FilterDependencies{
-		db: s.db,
+		db:         s.db,
+		accountsDb: s.accountsDB,
 		tokenSymbol: func(t Token) string {
 			info := s.tokenManager.LookupTokenIdentity(uint64(t.ChainID), t.Address, t.TokenType == Native)
 			if info == nil {

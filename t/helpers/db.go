@@ -1,22 +1,24 @@
-package appdatabase
+package helpers
 
 import (
 	"database/sql"
 	"io/ioutil"
 	"os"
 
+	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/protocol/sqlite"
 )
 
-const kdfIterationsNumberForTests = 3200
+const kdfIterationsNumberForTests = 1
 
 // SetupTestSQLDB creates a temporary sqlite database file, initialises and then returns with a teardown func
-func SetupTestSQLDB(prefix string) (*sql.DB, func() error, error) {
+func SetupTestSQLDB(dbInit dbsetup.DatabaseInitializer, prefix string) (*sql.DB, func() error, error) {
 	tmpfile, err := ioutil.TempFile("", prefix)
 	if err != nil {
 		return nil, nil, err
 	}
-	db, err := InitializeDB(tmpfile.Name(), prefix, kdfIterationsNumberForTests)
+
+	db, err := dbInit.Initialize(tmpfile.Name(), "password", kdfIterationsNumberForTests)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -30,8 +32,8 @@ func SetupTestSQLDB(prefix string) (*sql.DB, func() error, error) {
 	}, nil
 }
 
-func SetupTestMemorySQLDB(prefix string) (*sql.DB, error) {
-	db, err := InitializeDB(sqlite.InMemoryPath, prefix, kdfIterationsNumberForTests)
+func SetupTestMemorySQLDB(dbInit dbsetup.DatabaseInitializer) (*sql.DB, error) {
+	db, err := dbInit.Initialize(sqlite.InMemoryPath, "password", kdfIterationsNumberForTests)
 	if err != nil {
 		return nil, err
 	}

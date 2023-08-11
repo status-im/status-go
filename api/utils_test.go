@@ -16,7 +16,7 @@ import (
 func TestHashMessage(t *testing.T) {
 	utils.Init()
 
-	backend, stop1, stop2, err := setupGethStatusBackend()
+	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
 	defer func() {
 		err := stop1()
 		if err != nil {
@@ -25,6 +25,12 @@ func TestHashMessage(t *testing.T) {
 	}()
 	defer func() {
 		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stopWallet()
 		if err != nil {
 			require.NoError(t, backend.StopNode())
 		}

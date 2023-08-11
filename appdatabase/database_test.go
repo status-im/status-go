@@ -20,11 +20,12 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func Test_GetDBFilename(t *testing.T) {
 	// Test with a temp file instance
-	db, stop, err := SetupTestSQLDB("test")
+	db, stop, err := helpers.SetupTestSQLDB(DbInitializer{}, "test")
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, stop())
@@ -35,7 +36,7 @@ func Test_GetDBFilename(t *testing.T) {
 	require.True(t, len(fn) > 0)
 
 	// Test with in memory instance
-	mdb, err := InitializeDB(":memory:", "test", sqlite.ReducedKDFIterationsNumber)
+	mdb, err := helpers.SetupTestMemorySQLDB(DbInitializer{})
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, mdb.Close())
@@ -115,11 +116,11 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Validate that transfers table has no status column
-	exists, err := ColumnExists(db, "transfers", "status")
+	exists, err := helpers.ColumnExists(db, "transfers", "status")
 	require.NoError(t, err)
 	require.False(t, exists)
 
-	exists, err = ColumnExists(db, "transfers", "status")
+	exists, err = helpers.ColumnExists(db, "transfers", "status")
 	require.NoError(t, err)
 	require.False(t, exists)
 
@@ -196,7 +197,7 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 	err = migrations.MigrateTo(db, failMigrationSteps, customSteps[1].Version)
 	require.Error(t, err)
 
-	exists, err = ColumnExists(db, "transfers", "status")
+	exists, err = helpers.ColumnExists(db, "transfers", "status")
 	require.NoError(t, err)
 	require.False(t, exists)
 
@@ -205,7 +206,7 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Validate that the migration was run and transfers table has now status column
-	exists, err = ColumnExists(db, "transfers", "status")
+	exists, err = helpers.ColumnExists(db, "transfers", "status")
 	require.NoError(t, err)
 	require.True(t, exists)
 
@@ -214,7 +215,7 @@ func TestMigrateWalletJsonBlobs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Validate that the migration was run and transfers table has now txFrom column
-	exists, err = ColumnExists(db, "transfers", "tx_from_address")
+	exists, err = helpers.ColumnExists(db, "transfers", "tx_from_address")
 	require.NoError(t, err)
 	require.True(t, exists)
 
