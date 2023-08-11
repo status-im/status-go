@@ -131,13 +131,6 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterCannotDeleteBecomeToken
 		s, community, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
 }
 
-func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAcceptMemberRequestToJoinNotConfirmedByControlNode() {
-	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{})
-	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
-	testAcceptMemberRequestToJoinNotConfirmedByControlNode(s, community, user)
-}
-
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAcceptMemberRequestToJoin() {
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{})
 	// set up additional user that will send request to join
@@ -159,13 +152,6 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterRejectMemberRequestToJo
 	// set up additional user that will send request to join
 	user := s.newMessenger("", []string{})
 	testRejectMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalTokenMaster)
-}
-
-func (s *TokenMasterCommunityEventsSuite) TestTokenMasterRejectMemberRequestToJoinNotConfirmedByControlNode() {
-	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{})
-	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
-	testRejectMemberRequestToJoinNotConfirmedByControlNode(s, community, user)
 }
 
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterRejectMemberRequestToJoin() {

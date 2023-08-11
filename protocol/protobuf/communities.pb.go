@@ -189,12 +189,13 @@ func (m *Grant) GetClock() uint64 {
 }
 
 type CommunityMember struct {
-	Roles                []CommunityMember_Roles `protobuf:"varint,1,rep,packed,name=roles,proto3,enum=protobuf.CommunityMember_Roles" json:"roles,omitempty"`
-	RevealedAccounts     []*RevealedAccount      `protobuf:"bytes,2,rep,name=revealed_accounts,json=revealedAccounts,proto3" json:"revealed_accounts,omitempty"`
-	LastUpdateClock      uint64                  `protobuf:"varint,3,opt,name=last_update_clock,json=lastUpdateClock,proto3" json:"last_update_clock,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                `json:"-"`
-	XXX_unrecognized     []byte                  `json:"-"`
-	XXX_sizecache        int32                   `json:"-"`
+	Roles []CommunityMember_Roles `protobuf:"varint,1,rep,packed,name=roles,proto3,enum=protobuf.CommunityMember_Roles" json:"roles,omitempty"`
+	// deprecated, do not put accounts here
+	RevealedAccounts     []*RevealedAccount `protobuf:"bytes,2,rep,name=revealed_accounts,json=revealedAccounts,proto3" json:"revealed_accounts,omitempty"`
+	LastUpdateClock      uint64             `protobuf:"varint,3,opt,name=last_update_clock,json=lastUpdateClock,proto3" json:"last_update_clock,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}           `json:"-"`
+	XXX_unrecognized     []byte             `json:"-"`
+	XXX_sizecache        int32              `json:"-"`
 }
 
 func (m *CommunityMember) Reset()         { *m = CommunityMember{} }

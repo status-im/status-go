@@ -4408,6 +4408,17 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
+					case protobuf.CommunityPrivilegedUserSyncMessage:
+						logger.Debug("Handling CommunityPrivilegedUserSyncMessage")
+						message := msg.ParsedMessage.Interface().(protobuf.CommunityPrivilegedUserSyncMessage)
+						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
+						err = m.handleCommunityPrivilegedUserSyncMessage(messageState, publicKey, message)
+						if err != nil {
+							logger.Warn("failed to handle CommunityPrivilegedUserSyncMessage", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
 					case protobuf.AnonymousMetricBatch:
 						logger.Debug("Handling AnonymousMetricBatch")
 						if m.anonMetricsServer == nil {
