@@ -39,6 +39,10 @@ func (k *CollectibleUniqueID) HashKey() string {
 	return fmt.Sprintf("%s+%s", k.ContractID.HashKey(), k.TokenID.String())
 }
 
+func (k *CollectibleUniqueID) Same(other *CollectibleUniqueID) bool {
+	return k.ContractID.ChainID == other.ContractID.ChainID && k.ContractID.Address == other.ContractID.Address && k.TokenID.Cmp(other.TokenID.Int) == 0
+}
+
 func GroupCollectibleUIDsByChainID(uids []CollectibleUniqueID) map[w_common.ChainID][]CollectibleUniqueID {
 	ret := make(map[w_common.ChainID][]CollectibleUniqueID)
 

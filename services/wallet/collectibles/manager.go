@@ -38,6 +38,10 @@ var (
 	ErrNoProvidersAvailableForChainID = errors.New("no providers available for chainID")
 )
 
+type ManagerInterface interface {
+	FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error)
+}
+
 type Manager struct {
 	rpcClient                  *rpc.Client
 	contractOwnershipProviders []thirdparty.CollectibleContractOwnershipProvider

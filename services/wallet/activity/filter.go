@@ -55,15 +55,13 @@ const (
 	Erc1155
 )
 
-type TokenID *hexutil.Big
-
 // Token supports all tokens. Some fields might be optional, depending on the TokenType
 type Token struct {
 	TokenType TokenType `json:"tokenType"`
 	// ChainID is used for TokenType.Native only to lookup the symbol, all chains will be included in the token filter
 	ChainID common.ChainID `json:"chainId"`
 	Address eth.Address    `json:"address,omitempty"`
-	TokenID TokenID        `json:"tokenId,omitempty"`
+	TokenID *hexutil.Big   `json:"tokenId,omitempty"`
 }
 
 func allTokensFilter() []Token {

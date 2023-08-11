@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
@@ -12,7 +13,9 @@ import (
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/collectibles"
 	w_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -20,6 +23,7 @@ import (
 const (
 	// FilterResponse json is sent as a message in the EventActivityFilteringDone event
 	EventActivityFilteringDone          walletevent.EventType = "wallet-activity-filtering-done"
+	EventActivityFilteringUpdate        walletevent.EventType = "wallet-activity-filtering-entries-updated"
 	EventActivityGetRecipientsDone      walletevent.EventType = "wallet-activity-get-recipients-result"
 	EventActivityGetOldestTimestampDone walletevent.EventType = "wallet-activity-get-oldest-timestamp-result"
 )
@@ -42,17 +46,19 @@ var (
 type Service struct {
 	db           *sql.DB
 	accountsDB   *accounts.Database
-	tokenManager *token.Manager
+	tokenManager token.ManagerInterface
+	collectibles collectibles.ManagerInterface
 	eventFeed    *event.Feed
 
 	scheduler *async.MultiClientScheduler
 }
 
-func NewService(db *sql.DB, tokenManager *token.Manager, eventFeed *event.Feed, accountsDb *accounts.Database) *Service {
+func NewService(db *sql.DB, tokenManager token.ManagerInterface, collectibles collectibles.ManagerInterface, eventFeed *event.Feed, accountsDb *accounts.Database) *Service {
 	return &Service{
 		db:           db,
 		accountsDB:   accountsDb,
 		tokenManager: tokenManager,
+		collectibles: collectibles,
 		eventFeed:    eventFeed,
 		scheduler:    async.NewMultiClientScheduler(),
 	}
@@ -98,6 +104,11 @@ func (s *Service) FilterActivityAsync(requestID int32, addresses []common.Addres
 		}
 
 		s.sendResponseEvent(&requestID, EventActivityFilteringDone, res, err)
+
+		// Report details post-response to ensure updates have a match
+		if res.Activities != nil {
+			go s.lazyLoadDetails(requestID, res.Activities)
+		}
 	})
 }
 
@@ -107,6 +118,63 @@ func (s *Service) GetMultiTxDetails(ctx context.Context, multiTxID int) (*EntryD
 
 func (s *Service) GetTxDetails(ctx context.Context, id string) (*EntryDetails, error) {
 	return getTxDetails(ctx, s.db, id)
+}
+
+// lazyLoadDetails check if any of the entries have details that are not loaded then fetch and emit result
+func (s *Service) lazyLoadDetails(requestID int32, entries []Entry) {
+	res := make([]*EntryData, 0)
+	var err error
+	ids := make([]thirdparty.CollectibleUniqueID, 0)
+	entriesForIds := make([]*Entry, 0)
+	for i := range entries {
+		if !entries[i].isNFT() {
+			continue
+		}
+
+		id := entries[i].anyIdentity()
+		if id == nil {
+			continue
+		}
+
+		ids = append(ids, *id)
+		entriesForIds = append(entriesForIds, &entries[i])
+	}
+
+	if len(ids) == 0 {
+		return
+	}
+
+	log.Debug("wallet.activity.Service lazyLoadDetails", "requestID", requestID, "entries.len", len(entries), "ids.len", len(ids))
+
+	colData, err := s.collectibles.FetchAssetsByCollectibleUniqueID(ids)
+	if err != nil {
+		log.Error("Error fetching collectible details", "error", err)
+		return
+	}
+
+	for _, col := range colData {
+		data := &EntryData{
+			NftName: w_common.NewAndSet(col.CollectibleData.Name),
+			NftURL:  w_common.NewAndSet(col.CollectibleData.ImageURL),
+		}
+		for i := range ids {
+			if col.CollectibleData.ID.Same(&ids[i]) {
+				if entriesForIds[i].payloadType == MultiTransactionPT {
+					data.ID = w_common.NewAndSet(entriesForIds[i].id)
+				} else {
+					data.Transaction = entriesForIds[i].transaction
+				}
+
+				data.PayloadType = entriesForIds[i].payloadType
+			}
+		}
+
+		res = append(res, data)
+	}
+
+	if len(res) > 0 {
+		s.sendResponseEvent(&requestID, EventActivityFilteringUpdate, res, err)
+	}
 }
 
 type GetRecipientsResponse struct {
@@ -213,7 +281,11 @@ func (s *Service) sendResponseEvent(requestID *int32, eventType walletevent.Even
 		err = resErr
 	}
 
-	log.Debug("wallet.api.activity.Service RESPONSE", "requestID", requestID, "eventType", eventType, "error", err, "payload.len", len(payload))
+	requestIDStr := "nil"
+	if requestID != nil {
+		requestIDStr = strconv.Itoa(int(*requestID))
+	}
+	log.Debug("wallet.api.activity.Service RESPONSE", "requestID", requestIDStr, "eventType", eventType, "error", err, "payload.len", len(payload))
 
 	event := walletevent.Event{
 		Type:    eventType,

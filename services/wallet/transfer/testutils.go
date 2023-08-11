@@ -218,6 +218,7 @@ func InsertTestTransfer(tb testing.TB, db *sql.DB, address eth_common.Address, t
 
 type TestTransferOptions struct {
 	TokenAddress     eth_common.Address
+	TokenID          *big.Int
 	NullifyAddresses []eth_common.Address
 }
 
@@ -255,7 +256,11 @@ func InsertTestTransferWithOptions(tb testing.TB, db *sql.DB, address eth_common
 
 	tokenType := "eth"
 	if (opt.TokenAddress != eth_common.Address{}) {
-		tokenType = "erc20"
+		if opt.TokenID == nil {
+			tokenType = "erc20"
+		} else {
+			tokenType = "erc721"
+		}
 	}
 
 	// Workaround to simulate writing of NULL values for addresses
@@ -288,6 +293,7 @@ func InsertTestTransferWithOptions(tb testing.TB, db *sql.DB, address eth_common
 		txNonce:            &tr.Nonce,
 		tokenAddress:       &opt.TokenAddress,
 		contractAddress:    &tr.Contract,
+		tokenID:            opt.TokenID,
 	}
 	err = updateOrInsertTransfersDBFields(tx, []transferDBFields{transfer})
 	require.NoError(tb, err)
