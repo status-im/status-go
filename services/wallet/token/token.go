@@ -45,6 +45,11 @@ func (t *Token) IsNative() bool {
 	return t.Address == nativeChainAddress
 }
 
+type ManagerInterface interface {
+	LookupTokenIdentity(chainID uint64, address common.Address, native bool) *Token
+	LookupToken(chainID *uint64, tokenSymbol string) (token *Token, isNative bool)
+}
+
 // Manager is used for accessing token store. It changes the token store based on overridden tokens
 type Manager struct {
 	db               *sql.DB

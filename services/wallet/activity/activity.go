@@ -16,7 +16,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/transactions"
 
@@ -48,80 +50,99 @@ const (
 )
 
 type Entry struct {
-	payloadType    PayloadType
-	transaction    *transfer.TransactionIdentity
-	id             transfer.MultiTransactionIDType
-	timestamp      int64
-	activityType   Type
-	activityStatus Status
-	amountOut      *hexutil.Big // Used for activityType SendAT, SwapAT, BridgeAT
-	amountIn       *hexutil.Big // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT
-	tokenOut       *Token       // Used for activityType SendAT, SwapAT, BridgeAT
-	tokenIn        *Token       // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT
-	symbolOut      *string
-	symbolIn       *string
-	sender         *eth.Address
-	recipient      *eth.Address
-	chainIDOut     *common.ChainID
-	chainIDIn      *common.ChainID
-	transferType   *TransferType
+	payloadType     PayloadType
+	transaction     *transfer.TransactionIdentity
+	id              transfer.MultiTransactionIDType
+	timestamp       int64
+	activityType    Type
+	activityStatus  Status
+	amountOut       *hexutil.Big // Used for activityType SendAT, SwapAT, BridgeAT
+	amountIn        *hexutil.Big // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT
+	tokenOut        *Token       // Used for activityType SendAT, SwapAT, BridgeAT
+	tokenIn         *Token       // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT
+	symbolOut       *string
+	symbolIn        *string
+	sender          *eth.Address
+	recipient       *eth.Address
+	chainIDOut      *common.ChainID
+	chainIDIn       *common.ChainID
+	transferType    *TransferType
+	contractAddress *eth.Address
 }
 
-type jsonSerializationTemplate struct {
-	PayloadType    PayloadType                     `json:"payloadType"`
-	Transaction    *transfer.TransactionIdentity   `json:"transaction"`
-	ID             transfer.MultiTransactionIDType `json:"id"`
-	Timestamp      int64                           `json:"timestamp"`
-	ActivityType   Type                            `json:"activityType"`
-	ActivityStatus Status                          `json:"activityStatus"`
-	AmountOut      *hexutil.Big                    `json:"amountOut"`
-	AmountIn       *hexutil.Big                    `json:"amountIn"`
-	TokenOut       *Token                          `json:"tokenOut,omitempty"`
-	TokenIn        *Token                          `json:"tokenIn,omitempty"`
-	SymbolOut      *string                         `json:"symbolOut,omitempty"`
-	SymbolIn       *string                         `json:"symbolIn,omitempty"`
-	Sender         *eth.Address                    `json:"sender,omitempty"`
-	Recipient      *eth.Address                    `json:"recipient,omitempty"`
-	ChainIDOut     *common.ChainID                 `json:"chainIdOut,omitempty"`
-	ChainIDIn      *common.ChainID                 `json:"chainIdIn,omitempty"`
-	TransferType   *TransferType                   `json:"transferType,omitempty"`
+type EntryData struct {
+	PayloadType     PayloadType                      `json:"payloadType"`
+	Transaction     *transfer.TransactionIdentity    `json:"transaction,omitempty"`
+	ID              *transfer.MultiTransactionIDType `json:"id,omitempty"`
+	Timestamp       *int64                           `json:"timestamp,omitempty"`
+	ActivityType    *Type                            `json:"activityType,omitempty"`
+	ActivityStatus  *Status                          `json:"activityStatus,omitempty"`
+	AmountOut       *hexutil.Big                     `json:"amountOut,omitempty"`
+	AmountIn        *hexutil.Big                     `json:"amountIn,omitempty"`
+	TokenOut        *Token                           `json:"tokenOut,omitempty"`
+	TokenIn         *Token                           `json:"tokenIn,omitempty"`
+	SymbolOut       *string                          `json:"symbolOut,omitempty"`
+	SymbolIn        *string                          `json:"symbolIn,omitempty"`
+	Sender          *eth.Address                     `json:"sender,omitempty"`
+	Recipient       *eth.Address                     `json:"recipient,omitempty"`
+	ChainIDOut      *common.ChainID                  `json:"chainIdOut,omitempty"`
+	ChainIDIn       *common.ChainID                  `json:"chainIdIn,omitempty"`
+	TransferType    *TransferType                    `json:"transferType,omitempty"`
+	ContractAddress *eth.Address                     `json:"contractAddress,omitempty"`
+
+	NftName *string `json:"nftName,omitempty"`
+	NftURL  *string `json:"nftUrl,omitempty"`
 }
 
 func (e *Entry) MarshalJSON() ([]byte, error) {
-	return json.Marshal(jsonSerializationTemplate{
-		PayloadType:    e.payloadType,
-		Transaction:    e.transaction,
-		ID:             e.id,
-		Timestamp:      e.timestamp,
-		ActivityType:   e.activityType,
-		ActivityStatus: e.activityStatus,
-		AmountOut:      e.amountOut,
-		AmountIn:       e.amountIn,
-		TokenOut:       e.tokenOut,
-		TokenIn:        e.tokenIn,
-		SymbolOut:      e.symbolOut,
-		SymbolIn:       e.symbolIn,
-		Sender:         e.sender,
-		Recipient:      e.recipient,
-		ChainIDOut:     e.chainIDOut,
-		ChainIDIn:      e.chainIDIn,
-		TransferType:   e.transferType,
-	})
+	data := EntryData{
+		Timestamp:       &e.timestamp,
+		ActivityType:    &e.activityType,
+		ActivityStatus:  &e.activityStatus,
+		AmountOut:       e.amountOut,
+		AmountIn:        e.amountIn,
+		TokenOut:        e.tokenOut,
+		TokenIn:         e.tokenIn,
+		SymbolOut:       e.symbolOut,
+		SymbolIn:        e.symbolIn,
+		Sender:          e.sender,
+		Recipient:       e.recipient,
+		ChainIDOut:      e.chainIDOut,
+		ChainIDIn:       e.chainIDIn,
+		TransferType:    e.transferType,
+		ContractAddress: e.contractAddress,
+	}
+
+	if e.payloadType == MultiTransactionPT {
+		data.ID = common.NewAndSet(e.id)
+	} else {
+		data.Transaction = e.transaction
+	}
+
+	data.PayloadType = e.payloadType
+
+	return json.Marshal(data)
 }
 
 func (e *Entry) UnmarshalJSON(data []byte) error {
-	aux := jsonSerializationTemplate{}
-
+	aux := EntryData{}
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
-
 	e.payloadType = aux.PayloadType
 	e.transaction = aux.Transaction
-	e.id = aux.ID
-	e.timestamp = aux.Timestamp
-	e.activityType = aux.ActivityType
-	e.activityStatus = aux.ActivityStatus
+	if aux.ID != nil {
+		e.id = *aux.ID
+	}
+	if aux.Timestamp != nil {
+		e.timestamp = *aux.Timestamp
+	}
+	if aux.ActivityType != nil {
+		e.activityType = *aux.ActivityType
+	}
+	if aux.ActivityStatus != nil {
+		e.activityStatus = *aux.ActivityStatus
+	}
 	e.amountOut = aux.AmountOut
 	e.amountIn = aux.AmountIn
 	e.tokenOut = aux.TokenOut
@@ -172,6 +193,42 @@ func NewActivityEntryWithMultiTransaction(id transfer.MultiTransactionIDType, ti
 
 func (e *Entry) PayloadType() PayloadType {
 	return e.payloadType
+}
+
+func (e *Entry) isNFT() bool {
+	tt := e.transferType
+	return tt != nil && (*tt == TransferTypeErc721 || *tt == TransferTypeErc1155) && ((e.tokenIn != nil && e.tokenIn.TokenID != nil) || (e.tokenOut != nil && e.tokenOut.TokenID != nil))
+}
+
+// TODO - #11952: use only one of (big.Int, bigint.BigInt and hexutil.Big)
+func tokenIDToWalletBigInt(tokenID *hexutil.Big) *bigint.BigInt {
+	if tokenID == nil {
+		return nil
+	}
+
+	bi := new(big.Int).Set((*big.Int)(tokenID))
+	return &bigint.BigInt{Int: bi}
+}
+
+func (e *Entry) anyIdentity() *thirdparty.CollectibleUniqueID {
+	if e.tokenIn != nil {
+		return &thirdparty.CollectibleUniqueID{
+			ContractID: thirdparty.ContractID{
+				ChainID: e.tokenIn.ChainID,
+				Address: e.tokenIn.Address,
+			},
+			TokenID: tokenIDToWalletBigInt(e.tokenIn.TokenID),
+		}
+	} else if e.tokenOut != nil {
+		return &thirdparty.CollectibleUniqueID{
+			ContractID: thirdparty.ContractID{
+				ChainID: e.tokenOut.ChainID,
+				Address: e.tokenOut.Address,
+			},
+			TokenID: tokenIDToWalletBigInt(e.tokenOut.TokenID),
+		}
+	}
+	return nil
 }
 
 func multiTransactionTypeToActivityType(mtType transfer.MultiTransactionType) Type {
@@ -749,13 +806,14 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		activityStatus := Status(aggregatedStatus)
 		var outChainID, inChainID *common.ChainID
 		var entry Entry
-		var tokenID TokenID
+		var tokenID *hexutil.Big
 		if len(dbTokenID) > 0 {
-			t := new(big.Int).SetBytes(dbTokenID)
-			tokenID = (*hexutil.Big)(t)
+			tokenID = (*hexutil.Big)(new(big.Int).SetBytes(dbTokenID))
 		}
 
 		if transferHash != nil && chainID.Valid {
+			// Process `transfers` row
+
 			// Extract activity type: SendAT/ReceiveAT
 			activityType, _ := getActivityType(dbTrType)
 
@@ -795,6 +853,8 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 			entry.amountOut = outAmount
 			entry.amountIn = inAmount
 		} else if pendingHash != nil && chainID.Valid {
+			// Process `pending_transactions` row
+
 			// Extract activity type: SendAT/ReceiveAT
 			activityType, _ := getActivityType(dbTrType)
 
@@ -822,6 +882,8 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 			entry.amountIn = inAmount
 
 		} else if multiTxID.Valid {
+			// Process `multi_transactions` row
+
 			mtInAmount, mtOutAmount := getMtInAndOutAmounts(dbMtFromAmount, dbMtToAmount)
 
 			// Extract activity type: SendAT/SwapAT/BridgeAT
@@ -947,6 +1009,10 @@ func updateKeypairsAccountsTable(accountsDb *accounts.Database, db *sql.DB) erro
 		return err
 	}
 
+	// TODO: remove dependency on accounts table by removing"all accounts filter" optimization; see #11980
+	if accountsDb == nil {
+		return nil
+	}
 	addresses, err := accountsDb.GetWalletAddresses()
 	if err != nil {
 		log.Error("failed to get wallet addresses", "err", err)
@@ -977,14 +1043,15 @@ func updateKeypairsAccountsTable(accountsDb *accounts.Database, db *sql.DB) erro
 	return nil
 }
 
+// lookupAndFillInTokens ignores NFTs
 func lookupAndFillInTokens(deps FilterDependencies, tokenOut *Token, tokenIn *Token) (symbolOut *string, symbolIn *string) {
-	if tokenOut != nil {
+	if tokenOut != nil && tokenOut.TokenID == nil {
 		symbol := deps.tokenSymbol(*tokenOut)
 		if len(symbol) > 0 {
 			symbolOut = common.NewAndSet(symbol)
 		}
 	}
-	if tokenIn != nil {
+	if tokenIn != nil && tokenIn.TokenID == nil {
 		symbol := deps.tokenSymbol(*tokenIn)
 		if len(symbol) > 0 {
 			symbolIn = common.NewAndSet(symbol)

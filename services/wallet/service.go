@@ -102,7 +102,6 @@ func NewService(
 	reader := NewReader(rpcClient, tokenManager, marketManager, accountsDB, NewPersistence(db), feed)
 	history := history.NewService(db, accountsDB, feed, rpcClient, tokenManager, marketManager)
 	currency := currency.NewService(db, feed, tokenManager, marketManager)
-	activity := activity.NewService(db, tokenManager, feed, accountsDB)
 
 	openseaHTTPClient := opensea.NewHTTPClient()
 	openseaClient := opensea.NewClient(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient, feed)
@@ -138,6 +137,9 @@ func NewService(
 
 	collectiblesManager := collectibles.NewManager(db, rpcClient, contractOwnershipProviders, accountOwnershipProviders, collectibleDataProviders, collectionDataProviders, openseaClient)
 	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, rpcClient.NetworkManager, collectiblesManager)
+
+	activity := activity.NewService(db, tokenManager, collectiblesManager, feed, accountsDB)
+
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,

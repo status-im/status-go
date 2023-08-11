@@ -358,3 +358,37 @@ func TestScheduler_Enqueue_ValidateOrder(t *testing.T) {
 	require.Equal(t, 2, resChanCount[testTask2], "expected tow task call for type: %d had %d", 2, taskSuccessCount[testTask2])
 	require.Equal(t, 1, resChanCount[testTask3], "expected one task call for type: %d had %d", 3, taskSuccessCount[testTask3])
 }
+
+func TestScheduler_Enqueue_InResult(t *testing.T) {
+	s := NewScheduler()
+	callChan := make(chan int, 6)
+
+	s.Enqueue(TaskType{ID: 1, Policy: ReplacementPolicyCancelOld},
+		func(ctx context.Context) (interface{}, error) {
+			callChan <- 0
+			return nil, nil
+		}, func(res interface{}, taskType TaskType, err error) {
+			callChan <- 1
+			s.Enqueue(TaskType{1, ReplacementPolicyCancelOld}, func(ctx context.Context) (interface{}, error) {
+				callChan <- 2
+				return nil, nil
+			}, func(res interface{}, taskType TaskType, err error) {
+				callChan <- 3
+				s.Enqueue(TaskType{1, ReplacementPolicyCancelOld}, func(ctx context.Context) (interface{}, error) {
+					callChan <- 4
+					return nil, nil
+				}, func(res interface{}, taskType TaskType, err error) {
+					callChan <- 5
+				})
+			})
+		},
+	)
+	for i := 0; i < 6; i++ {
+		select {
+		case res := <-callChan:
+			require.Equal(t, i, res)
+		case <-time.After(1 * time.Second):
+			require.Fail(t, "test not completed in time")
+		}
+	}
+}

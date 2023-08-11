@@ -150,8 +150,8 @@ func (s *Scheduler) runTask(tc *taskContext, taskFn taskFunction, resFn func(int
 }
 
 // finishedTask is the only one that can remove a task from the queue
-// if the current running task is
-func (s *Scheduler) finishedTask(finishedRes interface{}, finishedTask *taskContext, finishedResFn resultFunction, finishedErr error) {
+// if the current running task completed (doNotDeleteCurrentTask is true)
+func (s *Scheduler) finishedTask(finishedRes interface{}, doneTask *taskContext, finishedResFn resultFunction, finishedErr error) {
 	s.queueMutex.Lock()
 
 	// We always have a running task
@@ -175,7 +175,7 @@ func (s *Scheduler) finishedTask(finishedRes interface{}, finishedTask *taskCont
 	s.queueMutex.Unlock()
 
 	// Report result
-	finishedResFn(finishedRes, finishedTask.taskType, finishedErr)
+	finishedResFn(finishedRes, doneTask.taskType, finishedErr)
 }
 
 func (s *Scheduler) Stop() {
