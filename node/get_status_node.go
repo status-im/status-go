@@ -77,6 +77,7 @@ type StatusNode struct {
 
 	appDB           *sql.DB
 	multiaccountsDB *multiaccounts.Database
+	walletDB        *sql.DB
 
 	config    *params.NodeConfig // Status node configuration
 	gethNode  *node.Node         // reference to Geth P2P stack/node
@@ -694,4 +695,8 @@ func (n *StatusNode) SetAppDB(db *sql.DB) {
 
 func (n *StatusNode) SetMultiaccountsDB(db *multiaccounts.Database) {
 	n.multiaccountsDB = db
+}
+
+func (n *StatusNode) SetWalletDB(db *sql.DB) {
+	n.walletDB = db
 }

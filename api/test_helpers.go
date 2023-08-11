@@ -60,7 +60,7 @@ func setupWalletTest(t *testing.T, password string) (backend *GethStatusBackend,
 		KeyUID:         masterAccInfo.KeyUID,
 	}
 
-	err = backend.ensureAppDBOpened(account, password)
+	err = backend.ensureDBsOpened(account, password)
 	require.NoError(t, err)
 
 	walletRootAddress := masterAccInfo.Derived[pathWalletRoot].Address

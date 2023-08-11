@@ -116,7 +116,7 @@ func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
 	return enode.ParseV4(rawURL)
 }
 
-func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *sql.DB, httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, accountManager *account.GethManager, rpcClient *rpc.Client, walletService *wallet.Service, collectiblesService *collectibles.Service, logger *zap.Logger) error {
+func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appDb, walletDb *sql.DB, httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, accountManager *account.GethManager, rpcClient *rpc.Client, walletService *wallet.Service, collectiblesService *collectibles.Service, logger *zap.Logger) error {
 	var err error
 	if !s.config.ShhextConfig.PFSEnabled {
 		return nil
@@ -148,14 +148,14 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, db *
 		EnvelopeEventsHandler: EnvelopeSignalHandler{},
 		Logger:                logger,
 	}
-	s.accountsDB, err = accounts.NewDB(db)
+	s.accountsDB, err = accounts.NewDB(appDb)
 	if err != nil {
 		return err
 	}
 	s.multiAccountsDB = multiAccountDb
 	s.account = acc
 
-	options, err := buildMessengerOptions(s.config, identity, db, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, walletService, collectiblesService, logger, &MessengerSignalsHandler{})
+	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, walletService, collectiblesService, logger, &MessengerSignalsHandler{})
 	if err != nil {
 		return err
 	}
@@ -404,7 +404,8 @@ func (s *Service) Stop() error {
 func buildMessengerOptions(
 	config params.NodeConfig,
 	identity *ecdsa.PrivateKey,
-	db *sql.DB,
+	appDb *sql.DB,
+	walletDb *sql.DB,
 	httpServer *server.MediaServer,
 	rpcClient *rpc.Client,
 	multiAccounts *multiaccounts.Database,
@@ -419,11 +420,12 @@ func buildMessengerOptions(
 	options := []protocol.Option{
 		protocol.WithCustomLogger(logger),
 		protocol.WithPushNotifications(),
-		protocol.WithDatabase(db),
+		protocol.WithDatabase(appDb),
+		protocol.WithWalletDatabase(walletDb),
 		protocol.WithMultiAccounts(multiAccounts),
-		protocol.WithMailserversDatabase(mailserversDB.NewDB(db)),
+		protocol.WithMailserversDatabase(mailserversDB.NewDB(appDb)),
 		protocol.WithAccount(account),
-		protocol.WithBrowserDatabase(browsers.NewDB(db)),
+		protocol.WithBrowserDatabase(browsers.NewDB(appDb)),
 		protocol.WithEnvelopesMonitorConfig(envelopesMonitorConfig),
 		protocol.WithSignalsHandler(messengerSignalsHandler),
 		protocol.WithENSVerificationConfig(publishMessengerResponse, config.ShhextConfig.VerifyENSURL, config.ShhextConfig.VerifyENSContractAddress),

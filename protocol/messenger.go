@@ -28,7 +28,6 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/contracts"
@@ -200,12 +199,6 @@ type mailserverCycle struct {
 	availabilitySubscriptions []chan struct{}
 }
 
-type dbConfig struct {
-	dbPath          string
-	dbKey           string
-	dbKDFIterations int
-}
-
 type EnvelopeEventsInterceptor struct {
 	EnvelopeEventsHandler transport.EnvelopeEventsHandler
 	Messenger             *Messenger
@@ -285,21 +278,12 @@ func NewMessenger(
 	}
 
 	// Configure the database.
-	database := c.db
-	if c.db == nil && c.dbConfig == (dbConfig{}) {
+	if c.appDb == nil {
 		return nil, errors.New("database instance or database path needs to be provided")
 	}
-	if c.db == nil {
-		logger.Info("opening a database", zap.String("dbPath", c.dbConfig.dbPath), zap.Int("KDFIterations", c.dbConfig.dbKDFIterations))
-		var err error
-		database, err = appdatabase.InitializeDB(c.dbConfig.dbPath, c.dbConfig.dbKey, c.dbConfig.dbKDFIterations)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to initialize database from the db config")
-		}
-	}
+	database := c.appDb
 
 	// Apply any post database creation changes to the database
-	c.db = database
 	for _, opt := range c.afterDbCreatedHooks {
 		if err := opt(&c); err != nil {
 			return nil, err
@@ -466,7 +450,7 @@ func NewMessenger(
 
 	mailservers := mailserversDB.NewDB(database)
 
-	savedAddressesManager := wallet.NewSavedAddressesManager(c.db)
+	savedAddressesManager := wallet.NewSavedAddressesManager(c.walletDb)
 
 	myPublicKeyString := types.EncodeHex(crypto.FromECDSAPub(&identity.PublicKey))
 	myContact, err := buildContact(myPublicKeyString, &identity.PublicKey)

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/walletdatabase"
 
 	"github.com/imdario/mergo"
 
@@ -76,6 +77,7 @@ type GethStatusBackend struct {
 	// rootDataDir is the same for all networks.
 	rootDataDir string
 	appDB       *sql.DB
+	walletDB    *sql.DB
 	config      *params.NodeConfig
 
 	statusNode           *node.StatusNode
@@ -328,6 +330,20 @@ func (b *GethStatusBackend) runDBFileMigrations(account multiaccounts.Account, p
 	return v4Path, nil
 }
 
+func (b *GethStatusBackend) ensureDBsOpened(account multiaccounts.Account, password string) (err error) {
+	// After wallet DB initial migration, the tables moved to wallet DB are removed from appDB
+	// so better migrate wallet DB first to avoid removal if wallet DB migration fails
+	if err = b.ensureWalletDBOpened(account, password); err != nil {
+		return err
+	}
+
+	if err = b.ensureAppDBOpened(account, password); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, password string) (err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -349,6 +365,26 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 		return err
 	}
 	b.statusNode.SetAppDB(b.appDB)
+	return nil
+}
+
+func (b *GethStatusBackend) ensureWalletDBOpened(account multiaccounts.Account, password string) (err error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.walletDB != nil {
+		return nil
+	}
+	if len(b.rootDataDir) == 0 {
+		return errors.New("root datadir wasn't provided")
+	}
+
+	dbWalletPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s-wallet.db", account.KeyUID))
+	b.walletDB, err = walletdatabase.InitializeDB(dbWalletPath, password, account.KDFIterations)
+	if err != nil {
+		b.log.Error("failed to initialize wallet db", "err", err)
+		return err
+	}
+	b.statusNode.SetWalletDB(b.walletDB)
 	return nil
 }
 
@@ -382,7 +418,7 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 		acc.KDFIterations = kdfIterations
 	}
 
-	err := b.ensureAppDBOpened(acc, password)
+	err := b.ensureDBsOpened(acc, password)
 	if err != nil {
 		return err
 	}
@@ -528,7 +564,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		acc.KDFIterations = sqlite.ReducedKDFIterationsNumber
 	}
 
-	err := b.ensureAppDBOpened(acc, password)
+	err := b.ensureDBsOpened(acc, password)
 	if err != nil {
 		return err
 	}
@@ -600,7 +636,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 }
 
 func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string, inputNodeCfg *params.NodeConfig) error {
-	err := b.ensureAppDBOpened(acc, password)
+	err := b.ensureDBsOpened(acc, password)
 	if err != nil {
 		return err
 	}
@@ -683,7 +719,7 @@ func (b *GethStatusBackend) GetSettings() (*settings.Settings, error) {
 }
 
 func (b *GethStatusBackend) MigrateKeyStoreDir(acc multiaccounts.Account, password, oldDir, newDir string) error {
-	err := b.ensureAppDBOpened(acc, password)
+	err := b.ensureDBsOpened(acc, password)
 	if err != nil {
 		return err
 	}
@@ -877,7 +913,7 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 		return err
 	}
 
-	err = b.ensureAppDBOpened(account, password)
+	err = b.ensureDBsOpened(account, password)
 	if err != nil {
 		return err
 	}
@@ -1155,7 +1191,7 @@ func (b *GethStatusBackend) ConvertToRegularAccount(mnemonic string, currPasswor
 		return err
 	}
 
-	err = b.ensureAppDBOpened(multiaccounts.Account{KeyUID: accountInfo.KeyUID, KDFIterations: kdfIterations}, newPassword)
+	err = b.ensureDBsOpened(multiaccounts.Account{KeyUID: accountInfo.KeyUID, KDFIterations: kdfIterations}, newPassword)
 	if err != nil {
 		return err
 	}
@@ -1230,7 +1266,7 @@ func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password strin
 		return err
 	}
 
-	err = b.ensureAppDBOpened(multiaccounts.Account{KeyUID: keyUID, KDFIterations: kdfIterations}, password)
+	err = b.ensureDBsOpened(multiaccounts.Account{KeyUID: keyUID, KDFIterations: kdfIterations}, password)
 	if err != nil {
 		return err
 	}
@@ -1297,7 +1333,7 @@ func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(account multiaccounts
 	if err != nil {
 		return err
 	}
-	err = b.ensureAppDBOpened(account, password)
+	err = b.ensureDBsOpened(account, password)
 	if err != nil {
 		return err
 	}
@@ -1328,7 +1364,7 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	if err != nil {
 		return err
 	}
-	err = b.ensureAppDBOpened(account, password)
+	err = b.ensureDBsOpened(account, password)
 	if err != nil {
 		return err
 	}
@@ -1908,6 +1944,7 @@ func (b *GethStatusBackend) Logout() error {
 
 	b.AccountManager().Logout()
 	b.appDB = nil
+	b.walletDB = nil
 	b.account = nil
 
 	if b.statusNode != nil {
@@ -2003,7 +2040,7 @@ func (b *GethStatusBackend) injectAccountsIntoWakuService(w types.WakuKeyManager
 	}
 
 	if st != nil {
-		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.statusNode.HTTPServer(), b.multiaccountsDB, acc, b.accountManager, b.statusNode.RPCClient(), b.statusNode.WalletService(), b.statusNode.CollectiblesService(), logutils.ZapLogger()); err != nil {
+		if err := st.InitProtocol(b.statusNode.GethNode().Config().Name, identity, b.appDB, b.walletDB, b.statusNode.HTTPServer(), b.multiaccountsDB, acc, b.accountManager, b.statusNode.RPCClient(), b.statusNode.WalletService(), b.statusNode.CollectiblesService(), logutils.ZapLogger()); err != nil {
 			return err
 		}
 		// Set initial connection state

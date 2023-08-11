@@ -274,7 +274,7 @@ install-xtools: ##@install Install Miscellaneous Go Tools
 	GO111MODULE=on go install golang.org/x/tools/go/packages/...@v0.1.5
 
 generate: ##@other Regenerate assets and other auto-generated stuff
-	go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/...
+	go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/... ./walletdatabase/...
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)
@@ -396,6 +396,10 @@ migration:
 
 migration-check:
 	bash _assets/scripts/migration_check.sh
+
+migration-wallet: DEFAULT_WALLET_MIGRATION_PATH := walletdatabase/migrations/sql
+migration-wallet:
+	touch $(DEFAULT_WALLET_MIGRATION_PATH)/$(shell date +%s)_$(D).up.sql
 
 install-git-hooks:
 	@ln -s -f $(shell pwd)/_assets/hooks/pre-rebase .git/hooks

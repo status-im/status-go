@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/transfer"
 
@@ -29,6 +30,8 @@ const (
 	SimpleTransactionPT
 	PendingTransactionPT
 )
+
+const keypairAccountsTable = "keypairs_accounts"
 
 var (
 	ZeroAddress = eth.Address{}
@@ -575,6 +578,7 @@ const (
 
 type FilterDependencies struct {
 	db              *sql.DB
+	accountsDb      *accounts.Database
 	tokenSymbol     func(token Token) string
 	tokenFromSymbol func(chainID *common.ChainID, symbol string) *Token
 }
@@ -654,6 +658,13 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 	joinedMTTypes := joinItems(mtTypes, func(t transfer.MultiTransactionType) string {
 		return strconv.Itoa(int(t))
 	})
+
+	// Since the filter query needs addresses which are in a different database, we need to update the
+	// keypairs_accounts table in the current database with the latest addresses from the accounts database
+	err := updateKeypairsAccountsTable(deps.accountsDb, deps.db)
+	if err != nil {
+		return nil, err
+	}
 
 	queryString := fmt.Sprintf(queryFormatString, involvedAddresses, toAddresses, assetsTokenCodes, assetsERC20, networks,
 		joinedMTTypes)
@@ -906,4 +917,42 @@ func contractTypeFromDBType(dbType string) (transferType *TransferType) {
 		return nil
 	}
 	return transferType
+}
+
+func updateKeypairsAccountsTable(accountsDb *accounts.Database, db *sql.DB) error {
+	_, err := db.Exec(fmt.Sprintf("CREATE TEMP TABLE IF NOT EXISTS %s (address VARCHAR PRIMARY KEY)",
+		keypairAccountsTable))
+	if err != nil {
+		log.Error("failed to create 'keypairs_accounts' table", "err", err)
+		return err
+	}
+
+	addresses, err := accountsDb.GetWalletAddresses()
+	if err != nil {
+		log.Error("failed to get wallet addresses", "err", err)
+		return err
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	for _, address := range addresses {
+		_, err = tx.Exec(fmt.Sprintf("INSERT OR IGNORE INTO %s (address) VALUES (?)", keypairAccountsTable), address)
+		if err != nil {
+			log.Error("failed to insert wallet addresses", "err", err)
+			return err
+		}
+	}
+
+	return nil
 }
