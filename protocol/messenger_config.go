@@ -76,10 +76,8 @@ type config struct {
 
 	featureFlags common.FeatureFlags
 
-	// A path to a database or a database instance is required.
-	// The database instance has a higher priority.
-	dbConfig            dbConfig
-	db                  *sql.DB
+	appDb               *sql.DB
+	walletDb            *sql.DB
 	afterDbCreatedHooks []Option
 	multiAccount        *multiaccounts.Database
 	mailserversDatabase *mailservers.Database
@@ -131,13 +129,6 @@ func WithCustomLogger(logger *zap.Logger) Option {
 	}
 }
 
-func WithDatabaseConfig(dbPath string, dbKey string, dbKDFIterations int) Option {
-	return func(c *config) error {
-		c.dbConfig = dbConfig{dbPath: dbPath, dbKey: dbKey, dbKDFIterations: dbKDFIterations}
-		return nil
-	}
-}
-
 func WithVerifyTransactionClient(client EthClient) Option {
 	return func(c *config) error {
 		c.verifyTransactionClient = client
@@ -147,7 +138,14 @@ func WithVerifyTransactionClient(client EthClient) Option {
 
 func WithDatabase(db *sql.DB) Option {
 	return func(c *config) error {
-		c.db = db
+		c.appDb = db
+		return nil
+	}
+}
+
+func WithWalletDatabase(db *sql.DB) Option {
+	return func(c *config) error {
+		c.walletDb = db
 		return nil
 	}
 }
@@ -155,7 +153,7 @@ func WithDatabase(db *sql.DB) Option {
 func WithToplevelDatabaseMigrations() Option {
 	return func(c *config) error {
 		c.afterDbCreatedHooks = append(c.afterDbCreatedHooks, func(c *config) error {
-			return migrations.Migrate(c.db, nil)
+			return migrations.Migrate(c.appDb, nil)
 		})
 		return nil
 	}
@@ -173,7 +171,7 @@ func WithAppSettings(s settings.Settings, nc params.NodeConfig) Option {
 				s.Networks = networks
 			}
 
-			sDB, err := accounts.NewDB(c.db)
+			sDB, err := accounts.NewDB(c.appDb)
 			if err != nil {
 				return err
 			}
@@ -209,7 +207,7 @@ func WithBrowserDatabase(bd *browsers.Database) Option {
 		c.browserDatabase = bd
 		if c.browserDatabase == nil {
 			c.afterDbCreatedHooks = append(c.afterDbCreatedHooks, func(c *config) error {
-				c.browserDatabase = browsers.NewDB(c.db)
+				c.browserDatabase = browsers.NewDB(c.appDb)
 				return nil
 			})
 		}

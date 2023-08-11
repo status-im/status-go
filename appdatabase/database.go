@@ -26,6 +26,13 @@ var customSteps = []sqlite.PostStep{
 	{Version: 1687193315, CustomMigration: migrateWalletTransferFromToAddresses, RollBackVersion: 1686825075},
 }
 
+type DbInitializer struct {
+}
+
+func (a DbInitializer) Initialize(path, password string, kdfIterationsNumber int) (*sql.DB, error) {
+	return InitializeDB(path, password, kdfIterationsNumber)
+}
+
 func doMigration(db *sql.DB) error {
 	lastMigration, migrationTableExists, err := sqlite.GetLastMigrationVersion(db)
 	if err != nil {
