@@ -2110,7 +2110,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		return nil, err
 	}
 
-	if existingRequestToJoin != nil {
+	if existingRequestToJoin != nil && existingRequestToJoin.State != RequestToJoinStateCanceled {
 		// request to join was already processed by an admin and waits to get
 		// confirmation for its decision
 		//

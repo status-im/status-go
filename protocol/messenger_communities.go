@@ -1308,6 +1308,19 @@ func (m *Messenger) CancelRequestToJoinCommunity(request *requests.CancelRequest
 		return nil, err
 	}
 
+	if !community.AcceptRequestToJoinAutomatically() {
+		// send cancelation to community admins also
+		rawMessage.Payload = payload
+
+		privilegedMembers := community.GetPrivilegedMembers()
+		for _, privilegedMember := range privilegedMembers {
+			_, err := m.sender.SendPrivate(context.Background(), privilegedMember, &rawMessage)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
 	response.RequestsToJoinCommunity = append(response.RequestsToJoinCommunity, requestToJoin)
@@ -1354,17 +1367,18 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 		return nil, err
 	}
 
-	pk, err := common.HexToPubkey(requestToJoin.PublicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	grant, err := community.BuildGrant(pk, "")
-	if err != nil {
-		return nil, err
-	}
-
 	if community.IsControlNode() {
+		// If we are the control node, we send the response to the user
+		pk, err := common.HexToPubkey(requestToJoin.PublicKey)
+		if err != nil {
+			return nil, err
+		}
+
+		grant, err := community.BuildGrant(pk, "")
+		if err != nil {
+			return nil, err
+		}
+
 		requestToJoinResponseProto := &protobuf.CommunityRequestToJoinResponse{
 			Clock:       community.Clock(),
 			Accepted:    true,
@@ -2157,6 +2171,26 @@ func (m *Messenger) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, err
 
 func (m *Messenger) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.PendingRequestsToJoinForCommunity(id)
+}
+
+func (m *Messenger) AllPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+	pendingRequests, err := m.communitiesManager.PendingRequestsToJoinForCommunity(id)
+	if err != nil {
+		return nil, err
+	}
+	acceptedPendingRequests, err := m.communitiesManager.AcceptedPendingRequestsToJoinForCommunity(id)
+	if err != nil {
+		return nil, err
+	}
+	declinedPendingRequests, err := m.communitiesManager.DeclinedPendingRequestsToJoinForCommunity(id)
+	if err != nil {
+		return nil, err
+	}
+
+	pendingRequests = append(pendingRequests, acceptedPendingRequests...)
+	pendingRequests = append(pendingRequests, declinedPendingRequests...)
+
+	return pendingRequests, nil
 }
 
 func (m *Messenger) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {

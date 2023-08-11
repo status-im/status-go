@@ -353,6 +353,7 @@ func (p *Persistence) SaveRequestToJoin(request *RequestToJoin) (err error) {
 		return err
 	}
 
+	fmt.Println("Save request ples ", request.ID, request.State)
 	defer func() {
 		if err == nil {
 			err = tx.Commit()
@@ -374,7 +375,7 @@ func (p *Persistence) SaveRequestToJoin(request *RequestToJoin) (err error) {
 		return ErrOldRequestToJoin
 	}
 
-	_, err = tx.Exec(`INSERT INTO communities_requests_to_join(id,public_key,clock,ens_name,chat_id,community_id,state) VALUES (?, ?, ?, ?, ?, ?, ?)`, request.ID, request.PublicKey, request.Clock, request.ENSName, request.ChatID, request.CommunityID, request.State)
+	_, err = tx.Exec(`INSERT OR REPLACE INTO communities_requests_to_join(id,public_key,clock,ens_name,chat_id,community_id,state) VALUES (?, ?, ?, ?, ?, ?, ?)`, request.ID, request.PublicKey, request.Clock, request.ENSName, request.ChatID, request.CommunityID, request.State)
 	return err
 }
 

@@ -1376,6 +1376,15 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageSta
 
 // HandleCommunityRequestToJoin handles an community request to join
 func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, signer *ecdsa.PublicKey, requestToJoinProto protobuf.CommunityRequestToJoin) error {
+	if state.Response.RequestsToJoinCommunity != nil {
+		for _, request := range state.Response.RequestsToJoinCommunity {
+			if request.PublicKey == common.PubkeyToHex(signer) {
+				// We have aready handled this request to join
+				return nil
+			}
+		}
+	}
+
 	if requestToJoinProto.CommunityId == nil {
 		return ErrInvalidCommunityID
 	}
