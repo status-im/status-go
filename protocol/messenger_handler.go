@@ -938,11 +938,11 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 		}
 		state.Response.AddMessage(updateMessage)
 
-		chat.UnviewedMessagesCount++
 		err = chat.UpdateFromMessage(updateMessage, m.getTimesource())
 		if err != nil {
 			return err
 		}
+		chat.UnviewedMessagesCount++
 		state.Response.AddChat(chat)
 		state.AllChats.Store(chat.ID, chat)
 	}
@@ -1010,11 +1010,12 @@ func (m *Messenger) handleRetractContactRequest(state *ReceivedMessageState, con
 		return err
 	}
 	state.Response.AddMessage(updateMessage)
-	chat.UnviewedMessagesCount++
+
 	err = chat.UpdateFromMessage(updateMessage, m.getTimesource())
 	if err != nil {
 		return err
 	}
+	chat.UnviewedMessagesCount++
 	state.Response.AddChat(chat)
 
 	notification := &ActivityCenterNotification{

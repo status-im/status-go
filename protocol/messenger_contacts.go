@@ -494,6 +494,10 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 			return nil, err
 		}
 		response.AddMessage(updateMessage)
+		err = chat.UpdateFromMessage(updateMessage, m.getTimesource())
+		if err != nil {
+			return nil, err
+		}
 		response.AddChat(chat)
 	}
 
@@ -628,6 +632,10 @@ func (m *Messenger) removeContact(ctx context.Context, response *MessengerRespon
 		return err
 	}
 	response.AddMessage(updateMessage)
+	err = chat.UpdateFromMessage(updateMessage, m.getTimesource())
+	if err != nil {
+		return err
+	}
 	response.AddChat(chat)
 
 	// Next we retract a contact request
