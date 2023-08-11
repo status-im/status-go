@@ -2803,6 +2803,12 @@ func (s *MessengerCommunitiesSuite) TestCheckCommunitiesToUnmute() {
 
 }
 
+func (s *MessengerCommunitiesSuite) TestCommunityNotInDB() {
+	community, err := s.alice.communitiesManager.GetByID([]byte("0x123"))
+	s.Require().Nil(err)
+	s.Require().Nil(community)
+}
+
 func (s *MessengerCommunitiesSuite) TestMuteAllCommunityChats() {
 	// Create a community
 	createCommunityReq := &requests.CreateCommunity{

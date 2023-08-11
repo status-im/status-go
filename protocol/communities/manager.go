@@ -2971,6 +2971,9 @@ func (m *Manager) GetByID(id []byte) (*Community, error) {
 	if err != nil {
 		return nil, err
 	}
+	if community == nil {
+		return nil, nil
+	}
 
 	err = community.updateCommunityDescriptionByEvents()
 	if err != nil {
