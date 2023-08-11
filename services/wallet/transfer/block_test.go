@@ -6,13 +6,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/sqlite"
 )
 
 func setupTestTransferDB(t *testing.T) (*BlockDAO, func()) {
-	db, err := appdatabase.InitializeDB(sqlite.InMemoryPath, "wallet-tests", sqlite.ReducedKDFIterationsNumber)
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	return &BlockDAO{db}, func() {
 		require.NoError(t, db.Close())

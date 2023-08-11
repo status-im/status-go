@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 type TestServiceAPI struct{}
@@ -23,21 +23,7 @@ func (api *TestServiceAPI) SomeMethod(_ context.Context) (string, error) {
 }
 
 func setupTestDB() (*sql.DB, func() error, error) {
-	tmpfile, err := ioutil.TempFile("", "tests")
-	if err != nil {
-		return nil, nil, err
-	}
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "tests", sqlite.ReducedKDFIterationsNumber)
-	if err != nil {
-		return nil, nil, err
-	}
-	return db, func() error {
-		err := db.Close()
-		if err != nil {
-			return err
-		}
-		return os.Remove(tmpfile.Name())
-	}, nil
+	return helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "tests")
 }
 
 func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {

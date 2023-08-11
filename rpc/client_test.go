@@ -4,30 +4,23 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 )
 
 func setupTestNetworkDB(t *testing.T) (*sql.DB, func()) {
-	tmpfile, err := ioutil.TempFile("", "rpc-network-tests-")
+	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "rpc-network-tests")
 	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "rpc-network-tests", sqlite.ReducedKDFIterationsNumber)
-	require.NoError(t, err)
-	return db, func() {
-		require.NoError(t, db.Close())
-		require.NoError(t, os.Remove(tmpfile.Name()))
-	}
+	return db, func() { require.NoError(t, cleanup()) }
 }
 
 func TestBlockedRoutesCall(t *testing.T) {

@@ -12,6 +12,8 @@ import (
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/testutils"
 	"github.com/status-im/status-go/services/wallet/transfer"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
 
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -37,17 +39,28 @@ func tokenFromSymbol(chainID *common.ChainID, symbol string) *Token {
 }
 
 func setupTestActivityDBStorageChoice(tb testing.TB, inMemory bool) (deps FilterDependencies, close func()) {
-	var db *sql.DB
+	var db, appDb *sql.DB
 	var err error
 	cleanupDB := func() error { return nil }
+	cleanupWalletDB := func() error { return nil }
 	if inMemory {
-		db, err = appdatabase.SetupTestMemorySQLDB("wallet-activity-tests")
+		db, err = helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+		require.NoError(tb, err)
+		appDb, err = helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+		require.NoError(tb, err)
 	} else {
-		db, cleanupDB, err = appdatabase.SetupTestSQLDB("wallet-activity-tests")
+		db, cleanupWalletDB, err = helpers.SetupTestSQLDB(walletdatabase.DbInitializer{}, "wallet-activity-tests")
+		require.NoError(tb, err)
+		appDb, cleanupDB, err = helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "wallet-activity-tests")
+		require.NoError(tb, err)
 	}
+
+	accountsDb, err := accounts.NewDB(appDb)
 	require.NoError(tb, err)
+
 	deps = FilterDependencies{
-		db: db,
+		db:         db,
+		accountsDb: accountsDb,
 		tokenSymbol: func(token Token) string {
 			switch token.TokenType {
 			case Native:
@@ -71,8 +84,8 @@ func setupTestActivityDBStorageChoice(tb testing.TB, inMemory bool) (deps Filter
 	}
 
 	return deps, func() {
-		require.NoError(tb, db.Close())
 		require.NoError(tb, cleanupDB())
+		require.NoError(tb, cleanupWalletDB())
 	}
 }
 
@@ -98,7 +111,7 @@ type testData struct {
 	nextIndex int
 }
 
-func mockTestAccountsWithAddresses(tb testing.TB, db *sql.DB, addresses []eth.Address) {
+func mockTestAccountsWithAddresses(tb testing.TB, db *accounts.Database, addresses []eth.Address) {
 	mockedAccounts := []*accounts.Account{}
 	for _, address := range addresses {
 		mockedAccounts = append(mockedAccounts, &accounts.Account{
@@ -273,7 +286,7 @@ func TestGetActivityEntriesWithSameTransactionForSenderAndReceiverInDB(t *testin
 	// Add 4 extractable transactions with timestamps 1-4
 	td, fromAddresses, toAddresses := fillTestData(t, deps.db)
 
-	mockTestAccountsWithAddresses(t, deps.db, append(fromAddresses, toAddresses...))
+	mockTestAccountsWithAddresses(t, deps.accountsDb, append(fromAddresses, toAddresses...))
 
 	// Add another transaction with sender and receiver reversed
 	receiverTr := td.tr1
@@ -322,7 +335,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		transfer.InsertTestTransfer(t, deps.db, trs[i].To, &trs[i])
 	}
 
-	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
+	mockTestAccountsWithAddresses(t, deps.accountsDb, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
 
 	// Test start only
 	var filter Filter
@@ -462,7 +475,7 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		transfer.InsertTestTransfer(t, deps.db, trs[i].To, &trs[i])
 	}
 
-	mockTestAccountsWithAddresses(t, deps.db, append(fromTrs, toTrs...))
+	mockTestAccountsWithAddresses(t, deps.accountsDb, append(fromTrs, toTrs...))
 
 	var filter Filter
 	// Get all
@@ -664,7 +677,7 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 		transfer.InsertTestTransfer(t, deps.db, trs[i].To, &trs[i])
 	}
 
-	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
+	mockTestAccountsWithAddresses(t, deps.accountsDb, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
 
 	var filter Filter
 
@@ -749,7 +762,7 @@ func TestGetActivityEntriesFilterByStatus(t *testing.T) {
 		}
 	}
 
-	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
+	mockTestAccountsWithAddresses(t, deps.accountsDb, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
 
 	var filter Filter
 	filter.Statuses = allActivityStatusesFilter()
@@ -804,7 +817,7 @@ func TestGetActivityEntriesFilterByTokenType(t *testing.T) {
 		})
 	}
 
-	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
+	mockTestAccountsWithAddresses(t, deps.accountsDb, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
 
 	var filter Filter
 	filter.FilterOutAssets = true
@@ -882,7 +895,7 @@ func TestGetActivityEntriesFilterByToAddresses(t *testing.T) {
 		transfer.InsertTestTransfer(t, deps.db, trs[i].To, &trs[i])
 	}
 
-	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
+	mockTestAccountsWithAddresses(t, deps.accountsDb, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
 
 	var filter Filter
 	filter.CounterpartyAddresses = allAddressesFilter()
@@ -946,7 +959,7 @@ func TestGetActivityEntriesFilterByNetworks(t *testing.T) {
 		recordPresence(trs[i].ChainID, 4+i)
 		transfer.InsertTestTransfer(t, deps.db, trs[i].To, &trs[i])
 	}
-	mockTestAccountsWithAddresses(t, deps.db, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
+	mockTestAccountsWithAddresses(t, deps.accountsDb, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
 
 	var filter Filter
 	chainIDs := allNetworksFilter()
@@ -1094,7 +1107,7 @@ func TestGetActivityEntriesNullAddresses(t *testing.T) {
 	trs[3].To = eth.Address{}
 	transfer.InsertTestPendingTransaction(t, deps.db, &trs[3])
 
-	mockTestAccountsWithAddresses(t, deps.db, []eth.Address{trs[0].From, trs[1].From, trs[2].From, trs[3].From})
+	mockTestAccountsWithAddresses(t, deps.accountsDb, []eth.Address{trs[0].From, trs[1].From, trs[2].From, trs[3].From})
 
 	activities, err := getActivityEntries(context.Background(), deps, allAddressesFilter(), allNetworksFilter(), Filter{}, 0, 10)
 	require.NoError(t, err)
@@ -1163,7 +1176,7 @@ func setupBenchmark(b *testing.B, inMemory bool, resultCount int) (deps FilterDe
 		transfer.InsertTestPendingTransaction(b, deps.db, &trs[i])
 	}
 
-	mockTestAccountsWithAddresses(b, deps.db, accounts)
+	mockTestAccountsWithAddresses(b, deps.accountsDb, accounts)
 	return
 }
 

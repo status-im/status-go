@@ -2,17 +2,17 @@ package collectibles
 
 import (
 	"database/sql"
-	"io/ioutil"
 	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
 func TestDatabaseSuite(t *testing.T) {
@@ -82,10 +82,7 @@ func (s *DatabaseSuite) setupDatabase(db *sql.DB) error {
 func (s *DatabaseSuite) SetupTest() {
 	s.db = nil
 
-	dbPath, err := ioutil.TempFile("", "status-go-community-tokens-db-")
-	s.NoError(err, "creating temp file for db")
-
-	db, err := appdatabase.InitializeDB(dbPath.Name(), "", sqlite.ReducedKDFIterationsNumber)
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	s.NoError(err, "creating sqlite db instance")
 
 	err = sqlite.Migrate(db)

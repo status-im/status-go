@@ -137,7 +137,7 @@ func (s *MessengerSyncSavedAddressesSuite) TestSyncExistingSavedAddresses() {
 		IsTest:    isTestChain2,
 	}
 
-	savedAddressesManager := wallet.NewSavedAddressesManager(s.main.persistence.db)
+	savedAddressesManager := s.main.savedAddressesManager
 
 	_, err := savedAddressesManager.UpdateMetadataAndUpsertSavedAddress(sa1)
 	s.Require().NoError(err)

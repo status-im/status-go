@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 var (
@@ -48,7 +49,7 @@ var (
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
-	db, stop, err := appdatabase.SetupTestSQLDB("settings-tests-")
+	db, stop, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "settings-tests-")
 	if err != nil {
 		require.NoError(t, stop())
 	}

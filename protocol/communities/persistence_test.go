@@ -3,7 +3,6 @@ package communities
 import (
 	"crypto/ecdsa"
 	"database/sql"
-	"io/ioutil"
 	"math/big"
 	"testing"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/services/wallet/bigint"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestPersistenceSuite(t *testing.T) {
@@ -33,10 +33,7 @@ type PersistenceSuite struct {
 func (s *PersistenceSuite) SetupTest() {
 	s.db = nil
 
-	dbPath, err := ioutil.TempFile("", "")
-	s.NoError(err, "creating temp file for db")
-
-	db, err := appdatabase.InitializeDB(dbPath.Name(), "", sqlite.ReducedKDFIterationsNumber)
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.NoError(err, "creating sqlite db instance")
 
 	err = sqlite.Migrate(db)

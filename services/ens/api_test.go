@@ -3,8 +3,6 @@ package ens
 import (
 	"context"
 	"database/sql"
-	"io/ioutil"
-	"os"
 	"testing"
 	"time"
 
@@ -16,20 +14,15 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
 	statusRPC "github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions/fake"
 )
 
 func createDB(t *testing.T) (*sql.DB, func()) {
-	tmpfile, err := ioutil.TempFile("", "service-ens-tests-")
+	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "service-ens-tests-")
 	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "service-ens-tests", sqlite.ReducedKDFIterationsNumber)
-	require.NoError(t, err)
-	return db, func() {
-		require.NoError(t, db.Close())
-		require.NoError(t, os.Remove(tmpfile.Name()))
-	}
+	return db, func() { require.NoError(t, cleanup()) }
 }
 
 func setupTestAPI(t *testing.T) (*API, func()) {

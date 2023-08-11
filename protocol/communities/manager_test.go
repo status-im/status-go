@@ -5,7 +5,6 @@ import (
 	"context"
 	"image"
 	"image/png"
-	"io/ioutil"
 	"math"
 	"math/big"
 	"os"
@@ -23,6 +22,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/golang/protobuf/proto"
 	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
@@ -44,9 +44,7 @@ type ManagerSuite struct {
 }
 
 func (s *ManagerSuite) SetupTest() {
-	dbPath, err := ioutil.TempFile("", "")
-	s.NoError(err, "creating temp file for db")
-	db, err := appdatabase.InitializeDB(dbPath.Name(), "", sqlite.ReducedKDFIterationsNumber)
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
 	s.NoError(err, "protocol migrate")
@@ -138,7 +136,7 @@ func (m *testTokenManager) GetBalancesByChain(ctx context.Context, accounts, tok
 }
 
 func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testCollectiblesManager, *testTokenManager) {
-	db, err := appdatabase.InitializeDB(sqlite.InMemoryPath, "", sqlite.ReducedKDFIterationsNumber)
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.NoError(err, "creating sqlite db instance")
 	err = sqlite.Migrate(db)
 	s.NoError(err, "protocol migrate")

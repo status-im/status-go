@@ -6,16 +6,17 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
 
 	"github.com/stretchr/testify/require"
 )
 
 func setupOwnershipDBTest(t *testing.T) (*OwnershipDB, func()) {
-	db, err := appdatabase.InitializeDB(":memory:", "wallet-collecitibles-ownership-db-tests", 1)
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	return NewOwnershipDB(db), func() {
 		require.NoError(t, db.Close())

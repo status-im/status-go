@@ -14,18 +14,19 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
 	statusRPC "github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/thirdparty/cryptocompare"
+	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/transactions/fake"
+	"github.com/status-im/status-go/walletdatabase"
 
 	"github.com/stretchr/testify/require"
 )
 
 func setupDummyServiceNoDependencies(t *testing.T) (service *Service, closeFn func()) {
-	db, err := appdatabase.InitializeDB(":memory:", "wallet-history-service-tests", 1)
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	cryptoCompare := cryptocompare.NewClient()
 

@@ -12,24 +12,15 @@ import (
 	"github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
-	db, stop, err := appdatabase.SetupTestSQLDB("settings-tests-")
-	if err != nil {
-		require.NoError(t, stop())
-	}
+	db, stop, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "settings-tests-")
 	require.NoError(t, err)
-
 	d, err := NewDB(db)
-	if err != nil {
-		require.NoError(t, stop())
-	}
 	require.NoError(t, err)
-
-	return d, func() {
-		require.NoError(t, stop())
-	}
+	return d, func() { require.NoError(t, stop()) }
 }
 
 func TestGetAddresses(t *testing.T) {

@@ -2,25 +2,18 @@ package browsers
 
 import (
 	"context"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
-	tmpfile, err := ioutil.TempFile("", "browsers-tests-")
+	db, cleanup, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "browsers-tests")
 	require.NoError(t, err)
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "browsers-tests", sqlite.ReducedKDFIterationsNumber)
-	require.NoError(t, err)
-	return NewDB(db), func() {
-		require.NoError(t, db.Close())
-		require.NoError(t, os.Remove(tmpfile.Name()))
-	}
+	return NewDB(db), func() { require.NoError(t, cleanup()) }
 }
 
 func setupTestAPI(t *testing.T) (*API, func()) {

@@ -10,12 +10,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/status-im/status-go/appdatabase"
 	w_common "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
 func setupTestDB(t *testing.T) (*Database, *BlockDAO, func()) {
-	db, err := appdatabase.SetupTestMemorySQLDB("wallet-transfer-tests")
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	return NewDB(db), &BlockDAO{db}, func() {
 		require.NoError(t, db.Close())

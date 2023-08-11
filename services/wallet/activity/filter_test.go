@@ -8,15 +8,16 @@ import (
 
 	eth "github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/services/wallet/testutils"
 	"github.com/status-im/status-go/services/wallet/transfer"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
 
 	"github.com/stretchr/testify/require"
 )
 
 func setupTestFilterDB(t *testing.T) (db *sql.DB, close func()) {
-	db, err := appdatabase.SetupTestMemorySQLDB("wallet-activity-tests-filter")
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	return db, func() {

@@ -7,10 +7,11 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/protocol/identity"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func openTestDB(t *testing.T) (*SocialLinksSettings, func()) {
-	db, stop, err := appdatabase.SetupTestSQLDB("settings-social-links-tests-")
+	db, stop, err := helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "settings-social-links-tests-")
 	if err != nil {
 		require.NoError(t, stop())
 	}

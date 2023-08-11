@@ -12,15 +12,14 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
 
 	"github.com/stretchr/testify/require"
 )
 
 func setupBalanceTest(t *testing.T) (*Balance, func()) {
-	db, err := appdatabase.InitializeDB(":memory:", "wallet-history-balance-tests", sqlite.ReducedKDFIterationsNumber)
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	return NewBalance(NewBalanceDB(db)), func() {
 		require.NoError(t, db.Close())

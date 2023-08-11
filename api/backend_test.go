@@ -31,9 +31,10 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/typeddata"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
 var (
@@ -57,21 +58,11 @@ var (
 )
 
 func setupTestDB() (*sql.DB, func() error, error) {
-	tmpfile, err := ioutil.TempFile("", "tests")
-	if err != nil {
-		return nil, nil, err
-	}
-	db, err := appdatabase.InitializeDB(tmpfile.Name(), "tests", sqlite.ReducedKDFIterationsNumber)
-	if err != nil {
-		return nil, nil, err
-	}
-	return db, func() error {
-		err := db.Close()
-		if err != nil {
-			return err
-		}
-		return os.Remove(tmpfile.Name())
-	}, nil
+	return helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "tests")
+}
+
+func setupTestWalletDB() (*sql.DB, func() error, error) {
+	return helpers.SetupTestSQLDB(walletdatabase.DbInitializer{}, "tests")
 }
 
 func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {
@@ -92,24 +83,33 @@ func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {
 	}, nil
 }
 
-func setupGethStatusBackend() (*GethStatusBackend, func() error, func() error, error) {
+func setupGethStatusBackend() (*GethStatusBackend, func() error, func() error, func() error, error) {
 	db, stop1, err := setupTestDB()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	backend := NewGethStatusBackend()
 	backend.StatusNode().SetAppDB(db)
 
 	ma, stop2, err := setupTestMultiDB()
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
 	backend.StatusNode().SetMultiaccountsDB(ma)
 
-	return backend, stop1, stop2, err
+	walletDb, stop3, err := setupTestWalletDB()
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	backend.StatusNode().SetWalletDB(walletDb)
+
+	return backend, stop1, stop2, stop3, err
 }
 
 func TestBackendStartNodeConcurrently(t *testing.T) {
 	utils.Init()
 
-	backend, stop1, stop2, err := setupGethStatusBackend()
+	backend, stop1, stop2, stop3, err := setupGethStatusBackend()
 	defer func() {
 		err := stop1()
 		if err != nil {
@@ -118,6 +118,12 @@ func TestBackendStartNodeConcurrently(t *testing.T) {
 	}()
 	defer func() {
 		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stop3()
 		if err != nil {
 			require.NoError(t, backend.StopNode())
 		}
@@ -158,7 +164,7 @@ func TestBackendStartNodeConcurrently(t *testing.T) {
 func TestBackendRestartNodeConcurrently(t *testing.T) {
 	utils.Init()
 
-	backend, stop1, stop2, err := setupGethStatusBackend()
+	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
 	defer func() {
 		err := stop1()
 		if err != nil {
@@ -167,6 +173,12 @@ func TestBackendRestartNodeConcurrently(t *testing.T) {
 	}()
 	defer func() {
 		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stopWallet()
 		if err != nil {
 			require.NoError(t, backend.StopNode())
 		}
@@ -200,7 +212,7 @@ func TestBackendRestartNodeConcurrently(t *testing.T) {
 func TestBackendGettersConcurrently(t *testing.T) {
 	utils.Init()
 
-	backend, stop1, stop2, err := setupGethStatusBackend()
+	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
 	defer func() {
 		err := stop1()
 		if err != nil {
@@ -209,6 +221,12 @@ func TestBackendGettersConcurrently(t *testing.T) {
 	}()
 	defer func() {
 		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stopWallet()
 		if err != nil {
 			require.NoError(t, backend.StopNode())
 		}
@@ -299,7 +317,7 @@ func TestBackendConnectionChangesToOffline(t *testing.T) {
 func TestBackendCallRPCConcurrently(t *testing.T) {
 	utils.Init()
 
-	backend, stop1, stop2, err := setupGethStatusBackend()
+	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
 	defer func() {
 		err := stop1()
 		if err != nil {
@@ -308,6 +326,12 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 	}()
 	defer func() {
 		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stopWallet()
 		if err != nil {
 			require.NoError(t, backend.StopNode())
 		}
@@ -389,7 +413,7 @@ func TestAppStateChange(t *testing.T) {
 func TestBlockedRPCMethods(t *testing.T) {
 	utils.Init()
 
-	backend, stop1, stop2, err := setupGethStatusBackend()
+	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
 	defer func() {
 		err := stop1()
 		if err != nil {
@@ -398,6 +422,12 @@ func TestBlockedRPCMethods(t *testing.T) {
 	}()
 	defer func() {
 		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stopWallet()
 		if err != nil {
 			require.NoError(t, backend.StopNode())
 		}
@@ -443,7 +473,7 @@ func TestCallRPCWithStoppedNode(t *testing.T) {
 func TestStartStopMultipleTimes(t *testing.T) {
 	utils.Init()
 
-	backend, stop1, stop2, err := setupGethStatusBackend()
+	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
 	defer func() {
 		err := stop1()
 		if err != nil {
@@ -452,6 +482,12 @@ func TestStartStopMultipleTimes(t *testing.T) {
 	}()
 	defer func() {
 		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stopWallet()
 		if err != nil {
 			require.NoError(t, backend.StopNode())
 		}
@@ -476,7 +512,7 @@ func TestStartStopMultipleTimes(t *testing.T) {
 func TestHashTypedData(t *testing.T) {
 	utils.Init()
 
-	backend, stop1, stop2, err := setupGethStatusBackend()
+	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
 	defer func() {
 		err := stop1()
 		if err != nil {
@@ -485,6 +521,12 @@ func TestHashTypedData(t *testing.T) {
 	}()
 	defer func() {
 		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stopWallet()
 		if err != nil {
 			require.NoError(t, backend.StopNode())
 		}
@@ -854,7 +896,7 @@ func TestConvertAccount(t *testing.T) {
 
 	utils.Init()
 
-	backend, stop1, stop2, err := setupGethStatusBackend()
+	backend, stop1, stop2, stopWallet, err := setupGethStatusBackend()
 	defer func() {
 		err := stop1()
 		if err != nil {
@@ -863,6 +905,12 @@ func TestConvertAccount(t *testing.T) {
 	}()
 	defer func() {
 		err := stop2()
+		if err != nil {
+			require.NoError(t, backend.StopNode())
+		}
+	}()
+	defer func() {
+		err := stopWallet()
 		if err != nil {
 			require.NoError(t, backend.StopNode())
 		}

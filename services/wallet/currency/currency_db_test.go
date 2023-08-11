@@ -5,11 +5,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
 func setupTestCurrencyDB(t *testing.T) (*DB, func()) {
-	db, err := appdatabase.InitializeDB(":memory:", "wallet-currency-db-tests-", 1)
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	return NewCurrencyDB(db), func() {
 		require.NoError(t, db.Close())

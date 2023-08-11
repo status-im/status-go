@@ -11,15 +11,17 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/appdatabase"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/waku"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
 const DefaultProfileDisplayName = ""
@@ -80,9 +82,19 @@ func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *z
 	acc := generator.NewAccount(privateKey, nil)
 	iai := acc.ToIdentifiedAccountInfo("")
 
+	walletDb, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	if err != nil {
+		return nil, err
+	}
+	appDb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	if err != nil {
+		return nil, err
+	}
+
 	options := []Option{
 		WithCustomLogger(logger),
-		WithDatabaseConfig(":memory:", "somekey", sqlite.ReducedKDFIterationsNumber),
+		WithDatabase(appDb),
+		WithWalletDatabase(walletDb),
 		WithMultiAccounts(madb),
 		WithAccount(iai.ToMultiAccount()),
 		WithDatasync(),

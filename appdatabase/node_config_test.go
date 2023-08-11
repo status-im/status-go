@@ -4,10 +4,8 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"math/big"
-	"os"
 	"sort"
 	"testing"
 	"time"
@@ -20,18 +18,13 @@ import (
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func setupTestDB(t *testing.T) (*sql.DB, func()) {
-	tmpfile, err := ioutil.TempFile("", "settings-tests-")
+	db, cleanup, err := helpers.SetupTestSQLDB(DbInitializer{}, "settings-tests-")
 	require.NoError(t, err)
-	db, err := InitializeDB(tmpfile.Name(), "settings-tests", sqlite.ReducedKDFIterationsNumber)
-	require.NoError(t, err)
-	return db, func() {
-		require.NoError(t, db.Close())
-		require.NoError(t, os.Remove(tmpfile.Name()))
-	}
+	return db, func() { require.NoError(t, cleanup()) }
 }
 
 func TestGetNodeConfig(t *testing.T) {

@@ -1,7 +1,6 @@
 package localnotifications
 
 import (
-	"database/sql"
 	"fmt"
 	"math/big"
 	"strings"
@@ -14,16 +13,20 @@ import (
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
+	"github.com/status-im/status-go/walletdatabase"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 )
 
-func createWalletDb(t *testing.T, db *sql.DB) (*transfer.Database, func()) {
+func createWalletDb(t *testing.T) (*transfer.Database, func()) {
+	db, cleanup, err := helpers.SetupTestSQLDB(walletdatabase.DbInitializer{}, "local-notifications-tests-wallet-")
+	require.NoError(t, err)
 	return transfer.NewDB(db), func() {
-		require.NoError(t, db.Close())
+		require.NoError(t, cleanup())
 	}
 }
 
@@ -31,7 +34,10 @@ func TestServiceStartStop(t *testing.T) {
 	db, stop := setupAppTestDb(t)
 	defer stop()
 
-	s, err := NewService(db, 1777)
+	walletDb, walletStop := createWalletDb(t)
+	defer walletStop()
+
+	s, err := NewService(db, walletDb, 1777)
 	require.NoError(t, err)
 	require.NoError(t, s.Start())
 	require.Equal(t, true, s.IsStarted())
@@ -44,8 +50,11 @@ func TestWalletSubscription(t *testing.T) {
 	db, stop := setupAppTestDb(t)
 	defer stop()
 
+	walletDb, walletStop := createWalletDb(t)
+	defer walletStop()
+
 	feed := &event.Feed{}
-	s, err := NewService(db, 1777)
+	s, err := NewService(db, walletDb, 1777)
 	require.NoError(t, err)
 	require.NoError(t, s.Start())
 	require.Equal(t, true, s.IsStarted())
@@ -67,10 +76,10 @@ func TestTransactionNotification(t *testing.T) {
 	db, stop := setupAppTestDb(t)
 	defer stop()
 
-	walletDb, stop := createWalletDb(t, db)
-	defer stop()
+	walletDb, walletStop := createWalletDb(t)
+	defer walletStop()
 
-	s, err := NewService(db, 1777)
+	s, err := NewService(db, walletDb, 1777)
 	require.NoError(t, err)
 	require.NoError(t, s.Start())
 	require.Equal(t, true, s.IsStarted())

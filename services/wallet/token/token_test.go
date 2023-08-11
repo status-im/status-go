@@ -8,12 +8,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
 func setupTestTokenDB(t *testing.T) (*Manager, func()) {
-	db, err := appdatabase.InitializeDB(":memory:", "wallet-token-tests", 1)
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	return &Manager{db, nil, nil, nil, nil, nil, false}, func() {
 		require.NoError(t, db.Close())
