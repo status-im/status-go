@@ -109,3 +109,16 @@ func (s *DatabaseSuite) TestGetTokenType() {
 	_, err = s.db.GetTokenType(10, "0x777")
 	s.Require().Error(err)
 }
+
+func (s *DatabaseSuite) TestGetPrivilegesLevel() {
+	privLevel, err := s.db.GetTokenPrivilegesLevel(1, "0x123")
+	s.Require().NoError(err)
+	s.Equal(privLevel, token.OwnerLevel)
+
+	privLevel, err = s.db.GetTokenPrivilegesLevel(2, "0x345")
+	s.Require().NoError(err)
+	s.Equal(privLevel, token.CommunityLevel)
+
+	_, err = s.db.GetTokenType(10, "0x777")
+	s.Require().Error(err)
+}
