@@ -136,11 +136,21 @@ func (m *Messenger) prepareEncodedCommunityData(community *communities.Community
 		return "", "", err
 	}
 
+	urlDataProto := &protobuf.URLData{
+		Content: communityData,
+	}
+
+	urlData, err := proto.Marshal(urlDataProto)
+	if err != nil {
+		return "", "", err
+	}
+
 	shortKey, err := m.SerializePublicKey(community.ID())
 	if err != nil {
 		return "", "", err
 	}
-	encodedData, err := urls.EncodeDataURL(communityData)
+
+	encodedData, err := urls.EncodeDataURL(urlData)
 	if err != nil {
 		return "", "", err
 	}
@@ -172,13 +182,19 @@ func (m *Messenger) parseCommunityURLWithData(data string, chatKey string) (*URL
 		return nil, err
 	}
 
-	communityData, err := urls.DecodeDataURL(data)
+	urlData, err := urls.DecodeDataURL(data)
+	if err != nil {
+		return nil, err
+	}
+
+	var urlDataProto protobuf.URLData
+	err = proto.Unmarshal(urlData, &urlDataProto)
 	if err != nil {
 		return nil, err
 	}
 
 	var communityProto protobuf.Community
-	err = proto.Unmarshal(communityData, &communityProto)
+	err = proto.Unmarshal(urlDataProto.Content, &communityProto)
 	if err != nil {
 		return nil, err
 	}
@@ -284,11 +300,20 @@ func (m *Messenger) prepareEncodedCommunityChannelData(community *communities.Co
 		return "", "", err
 	}
 
+	urlDataProto := &protobuf.URLData{
+		Content: channelData,
+	}
+
+	urlData, err := proto.Marshal(urlDataProto)
+	if err != nil {
+		return "", "", err
+	}
+
 	shortKey, err := m.SerializePublicKey(community.ID())
 	if err != nil {
 		return "", "", err
 	}
-	encodedData, err := urls.EncodeDataURL(channelData)
+	encodedData, err := urls.EncodeDataURL(urlData)
 	if err != nil {
 		return "", "", err
 	}
@@ -334,13 +359,19 @@ func (m *Messenger) parseCommunityChannelURLWithData(data string, chatKey string
 		return nil, err
 	}
 
-	channelData, err := urls.DecodeDataURL(data)
+	urlData, err := urls.DecodeDataURL(data)
+	if err != nil {
+		return nil, err
+	}
+
+	var urlDataProto protobuf.URLData
+	err = proto.Unmarshal(urlData, &urlDataProto)
 	if err != nil {
 		return nil, err
 	}
 
 	var channelProto protobuf.Channel
-	err = proto.Unmarshal(channelData, &channelProto)
+	err = proto.Unmarshal(urlDataProto.Content, &channelProto)
 	if err != nil {
 		return nil, err
 	}
@@ -421,15 +452,6 @@ func (m *Messenger) parseUserURLWithENS(ensName string) (*URLDataResponse, error
 }
 
 func (m *Messenger) prepareEncodedUserData(contact *Contact) (string, string, error) {
-	userProto := &protobuf.User{
-		DisplayName: contact.DisplayName,
-	}
-
-	userData, err := proto.Marshal(userProto)
-	if err != nil {
-		return "", "", err
-	}
-
 	pk, err := contact.PublicKey()
 	if err != nil {
 		return "", "", err
@@ -440,7 +462,25 @@ func (m *Messenger) prepareEncodedUserData(contact *Contact) (string, string, er
 		return "", "", err
 	}
 
-	encodedData, err := urls.EncodeDataURL(userData)
+	userProto := &protobuf.User{
+		DisplayName: contact.DisplayName,
+	}
+
+	userData, err := proto.Marshal(userProto)
+	if err != nil {
+		return "", "", err
+	}
+
+	urlDataProto := &protobuf.URLData{
+		Content: userData,
+	}
+
+	urlData, err := proto.Marshal(urlDataProto)
+	if err != nil {
+		return "", "", err
+	}
+
+	encodedData, err := urls.EncodeDataURL(urlData)
 	if err != nil {
 		return "", "", err
 	}
@@ -463,13 +503,19 @@ func (m *Messenger) ShareUserURLWithData(contactID string) (string, error) {
 }
 
 func (m *Messenger) parseUserURLWithData(data string, chatKey string) (*URLDataResponse, error) {
-	userData, err := urls.DecodeDataURL(data)
+	urlData, err := urls.DecodeDataURL(data)
+	if err != nil {
+		return nil, err
+	}
+
+	var urlDataProto protobuf.URLData
+	err = proto.Unmarshal(urlData, &urlDataProto)
 	if err != nil {
 		return nil, err
 	}
 
 	var userProto protobuf.User
-	err = proto.Unmarshal(userData, &userProto)
+	err = proto.Unmarshal(urlDataProto.Content, &userProto)
 	if err != nil {
 		return nil, err
 	}
