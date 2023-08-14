@@ -447,8 +447,18 @@ func (m *Messenger) ShareUserURLWithENS(contactID string) (string, error) {
 }
 
 func (m *Messenger) parseUserURLWithENS(ensName string) (*URLDataResponse, error) {
-	// TODO: fetch contact by ens name
-	return nil, fmt.Errorf("not implemented yet")
+	contact, err := m.GetContactByENSName(ensName)
+	if err != nil {
+		return nil, err
+	}
+
+	if contact == nil {
+		return nil, ErrContactNotFound
+	}
+
+	return &URLDataResponse{
+		Contact: m.prepareContactData(contact),
+	}, nil
 }
 
 func (m *Messenger) prepareEncodedUserData(contact *Contact) (string, string, error) {

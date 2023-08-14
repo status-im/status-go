@@ -375,20 +375,19 @@ func (s *MessengerShareUrlsSuite) TestShareUserURLWithENS() {
 	s.Require().Equal(expectedURL, url)
 }
 
-// TODO: ens in the next ticket
-// func (s *MessengerShareUrlsSuite) TestParseUserURLWithENS() {
-// 	_, contact := s.createContact()
+func (s *MessengerShareUrlsSuite) TestParseUserURLWithENS() {
+	_, contact := s.createContact()
 
-// 	url := fmt.Sprintf("%s/u#%s", baseShareURL, contact.EnsName)
+	url := fmt.Sprintf("%s/u#%s", baseShareURL, contact.EnsName)
 
-// 	urlData, err := s.m.ParseSharedURL(url)
-// 	s.Require().NoError(err)
-// 	s.Require().NotNil(urlData)
+	urlData, err := s.m.ParseSharedURL(url)
+	s.Require().NoError(err)
+	s.Require().NotNil(urlData)
 
-// 	s.Require().NotNil(urlData.Contact)
-// 	s.Require().Equal(contact.DisplayName, urlData.Contact.DisplayName)
-//  s.Require().Equal(contact.Bio, urlData.Contact.DisplayName)
-// }
+	s.Require().NotNil(urlData.Contact)
+	s.Require().Equal(contact.DisplayName, urlData.Contact.DisplayName)
+	s.Require().Equal(contact.Bio, urlData.Contact.DisplayName)
+}
 
 func (s *MessengerShareUrlsSuite) TestParseUserURLWithData() {
 	url := "https://status.app/u/G10A4B0JdgwyRww90WXtnP1oNH1ZLQNM0yX0Ja9YyAMjrqSZIYINOHCbFhrnKRAcPGStPxCMJDSZlGCKzmZrJcimHY8BbcXlORrElv_BbQEegnMDPx1g9C5VVNl0fE4y#zQ3shwQPhRuDJSjVGVBnTjCdgXy5i9WQaeVPdGJD6yTarJQSj"

@@ -1196,6 +1196,11 @@ func (m *Messenger) BuildContact(request *requests.BuildContact) (*Contact, erro
 	return contact, nil
 }
 
+func (m *Messenger) GetContactByENSName(ensName string) (*Contact, error) {
+	// FIXME: get contact with m.backend.StatusNode().EnsService().API().PublicKeyOf(ensName)
+	return nil, nil
+}
+
 func (m *Messenger) scheduleSyncFiltersForContact(publicKey *ecdsa.PublicKey) (*transport.Filter, error) {
 	filter, err := m.transport.JoinPrivate(publicKey)
 	if err != nil {
