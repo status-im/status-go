@@ -110,9 +110,10 @@ type AccountPayloadStorer struct {
 	*AccountPayload
 	multiaccountsDB *multiaccounts.Database
 
-	keystorePath   string
-	kdfIterations  int
-	loggedInKeyUID string
+	keystorePath              string
+	kdfIterations             int
+	loggedInKeyUID            string
+	transferringKeystoreFiles bool
 }
 
 func NewAccountPayloadStorer(p *AccountPayload, config *ReceiverConfig) (*AccountPayloadStorer, error) {
@@ -128,6 +129,7 @@ func NewAccountPayloadStorer(p *AccountPayload, config *ReceiverConfig) (*Accoun
 	ppr.kdfIterations = config.KDFIterations
 	ppr.keystorePath = config.KeystorePath
 	ppr.loggedInKeyUID = config.LoggedInKeyUID
+	ppr.transferringKeystoreFiles = config.TransferringKeystoreFiles
 	return ppr, nil
 }
 
@@ -148,6 +150,10 @@ func (aps *AccountPayloadStorer) Store() error {
 
 	if err = aps.storeKeys(aps.keystorePath); err != nil && err != ErrKeyFileAlreadyExists {
 		return err
+	}
+
+	if aps.transferringKeystoreFiles {
+		return nil
 	}
 
 	// skip storing multiaccount if key already exists
@@ -185,7 +191,9 @@ func (aps *AccountPayloadStorer) storeKeys(keyStorePath string) error {
 		} else if err != nil {
 			return err
 		} else {
-			return ErrKeyFileAlreadyExists
+			if !aps.transferringKeystoreFiles {
+				return ErrKeyFileAlreadyExists
+			}
 		}
 	}
 
@@ -342,6 +350,11 @@ func NewPayloadReceivers(logger *zap.Logger, pe *PayloadEncryptor, backend *api.
 	if err != nil {
 		return nil, nil, nil, err
 	}
+
+	if config.TransferringKeystoreFiles {
+		return ar, nil, nil, nil
+	}
+
 	rmr := NewRawMessagePayloadReceiver(p, pe, backend, config)
 	imr := NewInstallationPayloadMounterReceiver(pe, backend, config.DeviceType)
 	return ar, rmr, imr, nil

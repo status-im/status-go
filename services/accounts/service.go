@@ -82,3 +82,12 @@ func (s *Service) GetSettings() (settings.Settings, error) {
 func (s *Service) GetMessenger() *protocol.Messenger {
 	return s.messenger
 }
+
+func (s *Service) VerifyPassword(password string) bool {
+	address, err := s.db.GetChatAddress()
+	if err != nil {
+		return false
+	}
+	_, err = s.manager.VerifyAccountPassword(s.config.KeyStoreDir, address.Hex(), password)
+	return err == nil
+}

@@ -1140,6 +1140,36 @@ func InputConnectionStringForBootstrappingAnotherDevice(cs, configJSON string) s
 	return makeJSONResponse(err)
 }
 
+// GetConnectionStringForExportingKeypairsKeystores starts a pairing.SenderServer
+// then generates a pairing.ConnectionParams. Used when the device is Logged in and therefore has Account keys
+// and the device might not have a camera, to transfer kestore files of provided key uids.
+func GetConnectionStringForExportingKeypairsKeystores(configJSON string) string {
+	if configJSON == "" {
+		return makeJSONResponse(fmt.Errorf("no config given, SendingServerConfig is expected"))
+	}
+
+	cs, err := pairing.StartUpSenderServer(statusBackend, configJSON)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return cs
+}
+
+// InputConnectionStringForImportingKeypairsKeystores starts a pairing.ReceiverClient
+// The given server.ConnectionParams string will determine the server.Mode
+// Used when the device is Logged in and has Account keys and has a camera to read a QR code
+//
+// Example: A mobile device (device with a camera) receiving account data from
+// a device with a screen (mobile or desktop devices)
+func InputConnectionStringForImportingKeypairsKeystores(cs, configJSON string) string {
+	if configJSON == "" {
+		return makeJSONResponse(fmt.Errorf("no config given, ReceiverClientConfig is expected"))
+	}
+
+	err := pairing.StartUpReceivingClient(statusBackend, cs, configJSON)
+	return makeJSONResponse(err)
+}
+
 func ValidateConnectionString(cs string) string {
 	err := pairing.ValidateConnectionString(cs)
 	if err == nil {

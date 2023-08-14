@@ -13,6 +13,7 @@ import (
 	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/eth-node/keystore"
 )
 
@@ -172,5 +173,68 @@ func emptyDir(dir string) error {
 			}
 		}
 	}
+	return nil
+}
+
+func validatePairedDevices(backend *api.GethStatusBackend) error {
+	accountService := backend.StatusNode().AccountService()
+	if accountService == nil {
+		return fmt.Errorf("cannot resolve accounts service instance")
+	}
+
+	if !accountService.GetMessenger().HasPairedDevices() {
+		return fmt.Errorf("there are no known paired devices")
+	}
+
+	return nil
+}
+
+func validateSenderConfig(backend *api.GethStatusBackend, conf *SenderServerConfig) error {
+	if len(conf.SenderConfig.ChatKey) == 0 {
+		err := validateAndVerifyPassword(conf, conf.SenderConfig)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(conf.SenderConfig.UnimportedKeypairs) > 0 {
+		err := validatePairedDevices(backend)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateReceiverClientConfig(backend *api.GethStatusBackend, conf *ReceiverClientConfig) error {
+	if conf.ReceiverConfig.TransferringKeystoreFiles {
+		err := validatePairedDevices(backend)
+		if err != nil {
+			return err
+		}
+
+		selectedAccount, err := backend.GetActiveAccount()
+		if err != nil {
+			return err
+		}
+
+		if selectedAccount.KeyUID != conf.ReceiverConfig.KeyUID {
+			return fmt.Errorf("receiver configuration is not meant for the selected account")
+		}
+
+		if selectedAccount.KeycardPairing == "" {
+			accountService := backend.StatusNode().AccountService()
+			if !accountService.VerifyPassword(conf.ReceiverConfig.Password) {
+				return fmt.Errorf("provided password is not correct")
+			}
+		}
+	} else {
+		err := validateAndVerifyNodeConfig(conf, conf.ReceiverConfig)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

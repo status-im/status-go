@@ -14,10 +14,11 @@ type SenderConfig struct {
 	// DeviceType SendPairInstallation need this information
 	DeviceType string `json:"deviceType" validate:"required"`
 
-	KeyUID          string `json:"keyUID" validate:"required,keyuid"`
-	Password        string `json:"password" validate:"required"`
-	ChatKey         string `json:"chatKey"` // set only in case of a Keycard user, otherwise empty
-	KeycardPairings string `json:"keycardPairings"`
+	KeyUID             string   `json:"keyUID" validate:"required,keyuid"`
+	Password           string   `json:"password" validate:"required"`
+	ChatKey            string   `json:"chatKey"` // set only in case of a Keycard user, otherwise empty
+	KeycardPairings    string   `json:"keycardPairings"`
+	UnimportedKeypairs []string `json:"unimportedKeypairs"` // used to select keypairs we're transferring keystore files for
 
 	DB *multiaccounts.Database `json:"-"`
 }
@@ -39,6 +40,10 @@ type ReceiverConfig struct {
 	DeviceName     string                  `json:"deviceName"`
 	DB             *multiaccounts.Database `json:"-"`
 	LoggedInKeyUID string                  `json:"-"`
+
+	TransferringKeystoreFiles bool   `json:"transferringKeystoreFiles"` // informs receiver that only keystore files are expected
+	Password                  string `json:"password"`                  // necessary in case of transferring keystores
+	KeyUID                    string `json:"keyUID"`                    // necessary in case of transferring keystores
 }
 
 type ServerConfig struct {

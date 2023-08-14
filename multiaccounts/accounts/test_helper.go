@@ -131,7 +131,7 @@ func GetSeedImportedKeypair1ForTest() *Keypair {
 		KeyUID:      "0000000000000000000000000000000000000000000000000000000000000002",
 		Name:        "Seed Imported 1",
 		Type:        KeypairTypeSeed,
-		DerivedFrom: "0x0002",
+		DerivedFrom: types.Address{0x20}.String(),
 	}
 
 	seedGeneratedWalletAccount1 := &Account{

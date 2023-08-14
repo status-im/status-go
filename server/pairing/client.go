@@ -429,31 +429,33 @@ func (c *ReceiverClient) sendInstallationData() error {
 }
 
 // setupReceivingClient creates a new ReceiverClient after parsing string inputs
-func setupReceivingClient(backend *api.GethStatusBackend, cs, configJSON string) (*ReceiverClient, error) {
+func setupReceivingClient(backend *api.GethStatusBackend, cs, configJSON string) (*ReceiverClient, *ReceiverClientConfig, error) {
 	ccp := new(ConnectionParams)
 	err := ccp.FromString(cs)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	conf := NewReceiverClientConfig()
 	err = json.Unmarshal([]byte(configJSON), conf)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	err = validateAndVerifyNodeConfig(conf, conf.ReceiverConfig)
+
+	err = validateReceiverClientConfig(backend, conf)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	conf.ReceiverConfig.DB = backend.GetMultiaccountDB()
 
-	return NewReceiverClient(backend, ccp, conf)
+	client, err := NewReceiverClient(backend, ccp, conf)
+	return client, conf, err
 }
 
 // StartUpReceivingClient creates a ReceiverClient and triggers all `receive` calls in sequence to the SenderServer
 func StartUpReceivingClient(backend *api.GethStatusBackend, cs, configJSON string) error {
-	c, err := setupReceivingClient(backend, cs, configJSON)
+	c, conf, err := setupReceivingClient(backend, cs, configJSON)
 	if err != nil {
 		return err
 	}
@@ -465,6 +467,10 @@ func StartUpReceivingClient(backend *api.GethStatusBackend, cs, configJSON strin
 	err = c.receiveAccountData()
 	if err != nil {
 		return err
+	}
+
+	if conf.ReceiverConfig.TransferringKeystoreFiles {
+		return nil
 	}
 
 	err = c.getChallenge()

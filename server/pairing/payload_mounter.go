@@ -1,6 +1,8 @@
 package pairing
 
 import (
+	"strings"
+
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/api"
@@ -66,7 +68,7 @@ func (bpm *BasePayloadMounter) Mount() error {
 
 // NewAccountPayloadMounter generates a new and initialised AccountPayload flavoured BasePayloadMounter
 // responsible for the whole lifecycle of an AccountPayload
-func NewAccountPayloadMounter(pe *PayloadEncryptor, config *SenderConfig, logger *zap.Logger) (*BasePayloadMounter, error) {
+func NewAccountPayloadMounter(pe *PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig, logger *zap.Logger) (*BasePayloadMounter, error) {
 	l := logger.Named("AccountPayloadLoader")
 	l.Debug("fired", zap.Any("config", config))
 
@@ -74,7 +76,7 @@ func NewAccountPayloadMounter(pe *PayloadEncryptor, config *SenderConfig, logger
 
 	// A new SHARED AccountPayload
 	p := new(AccountPayload)
-	apl, err := NewAccountPayloadLoader(p, config)
+	apl, err := NewAccountPayloadLoader(backend, p, config)
 	if err != nil {
 		return nil, err
 	}
@@ -90,12 +92,13 @@ func NewAccountPayloadMounter(pe *PayloadEncryptor, config *SenderConfig, logger
 type AccountPayloadLoader struct {
 	*AccountPayload
 
-	multiaccountsDB *multiaccounts.Database
-	keystorePath    string
-	keyUID          string
+	multiaccountsDB         *multiaccounts.Database
+	keystorePath            string
+	keyUID                  string
+	keystoreFilesToTransfer []string
 }
 
-func NewAccountPayloadLoader(p *AccountPayload, config *SenderConfig) (*AccountPayloadLoader, error) {
+func NewAccountPayloadLoader(backend *api.GethStatusBackend, p *AccountPayload, config *SenderConfig) (*AccountPayloadLoader, error) {
 	ppr := &AccountPayloadLoader{
 		AccountPayload: p,
 	}
@@ -110,6 +113,23 @@ func NewAccountPayloadLoader(p *AccountPayload, config *SenderConfig) (*AccountP
 	ppr.chatKey = config.ChatKey
 	ppr.keycardPairings = config.KeycardPairings
 	ppr.keystorePath = config.KeystorePath
+
+	if len(config.UnimportedKeypairs) > 0 {
+		accountService := backend.StatusNode().AccountService()
+
+		for _, keyUID := range config.UnimportedKeypairs {
+			kp, err := accountService.GetKeypairByKeyUID(keyUID)
+			if err != nil {
+				return ppr, nil
+			}
+
+			ppr.keystoreFilesToTransfer = append(ppr.keystoreFilesToTransfer, kp.DerivedFrom[2:])
+			for _, acc := range kp.Accounts {
+				ppr.keystoreFilesToTransfer = append(ppr.keystoreFilesToTransfer, acc.Address.Hex()[2:])
+			}
+		}
+	}
+
 	return ppr, nil
 }
 
@@ -118,6 +138,22 @@ func (apl *AccountPayloadLoader) Load() error {
 	err := loadKeys(apl.keys, apl.keystorePath)
 	if err != nil {
 		return err
+	}
+
+	transferingKeystoreFiles := len(apl.keystoreFilesToTransfer) > 0
+	if transferingKeystoreFiles {
+		// Create a new map to filter keys
+		filteredMap := make(map[string][]byte)
+		for key, value := range apl.keys {
+			for _, keepKey := range apl.keystoreFilesToTransfer {
+				if strings.Contains(key, strings.ToLower(keepKey)) {
+					filteredMap[key] = value
+					break
+				}
+			}
+		}
+
+		apl.keys = filteredMap
 	}
 
 	err = validateKeys(apl.keys, apl.password)
@@ -235,9 +271,12 @@ func (r *InstallationPayloadLoader) Load() error {
 // NewPayloadMounters returns PayloadMounter s configured to handle local pairing transfers of:
 //   - AccountPayload, RawMessagePayload and InstallationPayload
 func NewPayloadMounters(logger *zap.Logger, pe *PayloadEncryptor, backend *api.GethStatusBackend, config *SenderConfig) (PayloadMounter, PayloadMounter, PayloadMounterReceiver, error) {
-	am, err := NewAccountPayloadMounter(pe, config, logger)
+	am, err := NewAccountPayloadMounter(pe, backend, config, logger)
 	if err != nil {
 		return nil, nil, nil, err
+	}
+	if len(config.UnimportedKeypairs) > 0 {
+		return am, nil, nil, nil
 	}
 	rmm := NewRawMessagePayloadMounter(logger, pe, backend, config)
 	imr := NewInstallationPayloadMounterReceiver(pe, backend, config.DeviceType)

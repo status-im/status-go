@@ -3,7 +3,10 @@ package pairing
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,20 +32,25 @@ import (
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	accservice "github.com/status-im/status-go/services/accounts"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/sqlite"
 )
 
 const (
-	pathWalletRoot    = "m/44'/60'/0'/0"
-	pathEIP1581       = "m/43'/60'/1581'"
-	pathDefaultChat   = pathEIP1581 + "/0'/0"
-	pathDefaultWallet = pathWalletRoot + "/0"
-	currentNetwork    = "mainnet_rpc"
-	socialLinkURL     = "https://github.com/status-im"
-	ensUsername       = "bob.stateofus.eth"
-	ensChainID        = 1
-	publicChatID      = "localpairtest"
+	pathWalletRoot     = "m/44'/60'/0'/0"
+	pathEIP1581        = "m/43'/60'/1581'"
+	pathDefaultChat    = pathEIP1581 + "/0'/0"
+	pathDefaultWallet  = pathWalletRoot + "/0"
+	currentNetwork     = "mainnet_rpc"
+	socialLinkURL      = "https://github.com/status-im"
+	ensUsername        = "bob.stateofus.eth"
+	ensChainID         = 1
+	publicChatID       = "localpairtest"
+	profileMnemonic    = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon"
+	seedPhraseMnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+	path0              = "m/44'/60'/0'/0/0"
+	path1              = "m/44'/60'/0'/0/1"
 )
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
@@ -68,13 +76,25 @@ func (s *SyncDeviceSuite) SetupTest() {
 	s.pairThreeDevicesTmpdir = s.T().TempDir()
 }
 
-func (s *SyncDeviceSuite) prepareBackendWithAccount(tmpdir string) *api.GethStatusBackend {
+func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *api.GethStatusBackend {
 	backend := s.prepareBackendWithoutAccount(tmpdir)
 	accountManager := backend.AccountManager()
-	generator := accountManager.AccountsGenerator()
-	generatedAccountInfos, err := generator.GenerateAndDeriveAddresses(12, 1, "", paths)
-	require.NoError(s.T(), err)
-	generatedAccountInfo := generatedAccountInfos[0]
+	accGenerator := accountManager.AccountsGenerator()
+
+	var (
+		generatedAccountInfo generator.GeneratedAndDerivedAccountInfo
+		err                  error
+	)
+	if len(mnemonic) > 0 {
+		generatedAccountInfo.GeneratedAccountInfo, err = accGenerator.ImportMnemonic(mnemonic, "")
+		require.NoError(s.T(), err)
+		generatedAccountInfo.Derived, err = accGenerator.DeriveAddresses(generatedAccountInfo.ID, paths)
+		require.NoError(s.T(), err)
+	} else {
+		generatedAccountInfos, err := accGenerator.GenerateAndDeriveAddresses(12, 1, "", paths)
+		require.NoError(s.T(), err)
+		generatedAccountInfo = generatedAccountInfos[0]
+	}
 	account := multiaccounts.Account{
 		KeyUID:        generatedAccountInfo.KeyUID,
 		KDFIterations: sqlite.ReducedKDFIterationsNumber,
@@ -84,7 +104,7 @@ func (s *SyncDeviceSuite) prepareBackendWithAccount(tmpdir string) *api.GethStat
 	err = backend.OpenAccounts()
 	require.NoError(s.T(), err)
 	derivedAddresses := generatedAccountInfo.Derived
-	_, err = generator.StoreDerivedAccounts(generatedAccountInfo.ID, s.password, paths)
+	_, err = accGenerator.StoreDerivedAccounts(generatedAccountInfo.ID, s.password, paths)
 	require.NoError(s.T(), err)
 
 	settings, err := defaultSettings(generatedAccountInfo.GeneratedAccountInfo, derivedAddresses, nil)
@@ -256,7 +276,7 @@ func (s *SyncDeviceSuite) checkMutualContact(backend *api.GethStatusBackend, con
 
 func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	clientTmpDir := filepath.Join(s.clientAsSenderTmpdir, "client")
-	clientBackend := s.prepareBackendWithAccount(clientTmpDir)
+	clientBackend := s.prepareBackendWithAccount("", clientTmpDir)
 	serverTmpDir := filepath.Join(s.clientAsSenderTmpdir, "server")
 	serverBackend := s.prepareBackendWithoutAccount(serverTmpDir)
 	defer func() {
@@ -380,7 +400,7 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	ctx := context.TODO()
 
 	serverTmpDir := filepath.Join(s.clientAsReceiverTmpdir, "server")
-	serverBackend := s.prepareBackendWithAccount(serverTmpDir)
+	serverBackend := s.prepareBackendWithAccount("", serverTmpDir)
 	defer func() {
 		require.NoError(s.T(), clientBackend.Logout())
 		require.NoError(s.T(), serverBackend.Logout())
@@ -512,13 +532,13 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 
 func (s *SyncDeviceSuite) TestPairingThreeDevices() {
 	bobTmpDir := filepath.Join(s.pairThreeDevicesTmpdir, "bob")
-	bobBackend := s.prepareBackendWithAccount(bobTmpDir)
+	bobBackend := s.prepareBackendWithAccount("", bobTmpDir)
 	bobMessenger := bobBackend.Messenger()
 	_, err := bobMessenger.Start()
 	s.Require().NoError(err)
 
 	alice1TmpDir := filepath.Join(s.pairThreeDevicesTmpdir, "alice1")
-	alice1Backend := s.prepareBackendWithAccount(alice1TmpDir)
+	alice1Backend := s.prepareBackendWithAccount("", alice1TmpDir)
 	alice1Messenger := alice1Backend.Messenger()
 	_, err = alice1Messenger.Start()
 	s.Require().NoError(err)
@@ -527,7 +547,7 @@ func (s *SyncDeviceSuite) TestPairingThreeDevices() {
 	alice2Backend := s.prepareBackendWithoutAccount(alice2TmpDir)
 
 	alice3TmpDir := filepath.Join(s.pairThreeDevicesTmpdir, "alice3")
-	alice3Backend := s.prepareBackendWithAccount(alice3TmpDir)
+	alice3Backend := s.prepareBackendWithAccount("", alice3TmpDir)
 
 	defer func() {
 		require.NoError(s.T(), bobBackend.Logout())
@@ -687,4 +707,161 @@ func buildTestMessage(chat *protocol.Chat) *common.Message {
 	}
 
 	return message
+}
+
+func (s *SyncDeviceSuite) getSeedPhraseKeypairForTest(backend *api.GethStatusBackend, server bool) *accounts.Keypair {
+	generatedAccount, err := backend.AccountManager().AccountsGenerator().ImportMnemonic(seedPhraseMnemonic, "")
+	require.NoError(s.T(), err)
+	generatedDerivedAccs, err := backend.AccountManager().AccountsGenerator().DeriveAddresses(generatedAccount.ID, []string{path0, path1})
+	require.NoError(s.T(), err)
+
+	seedPhraseKp := &accounts.Keypair{
+		KeyUID:      generatedAccount.KeyUID,
+		Name:        "SeedPhraseImported",
+		Type:        accounts.KeypairTypeSeed,
+		DerivedFrom: generatedAccount.Address,
+	}
+	i := 0
+	for path, ga := range generatedDerivedAccs {
+		acc := &accounts.Account{
+			Address:   types.HexToAddress(ga.Address),
+			KeyUID:    generatedAccount.KeyUID,
+			Wallet:    false,
+			Chat:      false,
+			Type:      accounts.AccountTypeSeed,
+			Path:      path,
+			PublicKey: types.HexBytes(ga.PublicKey),
+			Name:      fmt.Sprintf("Acc_%d", i),
+			Operable:  accounts.AccountFullyOperable,
+			Emoji:     fmt.Sprintf("Emoji_%d", i),
+			ColorID:   "blue",
+		}
+		if !server {
+			acc.Operable = accounts.AccountNonOperable
+		}
+		seedPhraseKp.Accounts = append(seedPhraseKp.Accounts, acc)
+		i++
+	}
+
+	return seedPhraseKp
+}
+
+func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
+	ctx := context.TODO()
+
+	serverTmpDir := filepath.Join(s.clientAsReceiverTmpdir, "server")
+	serverBackend := s.prepareBackendWithAccount(profileMnemonic, serverTmpDir)
+
+	clientTmpDir := filepath.Join(s.clientAsReceiverTmpdir, "client")
+	clientBackend := s.prepareBackendWithAccount(profileMnemonic, clientTmpDir)
+	defer func() {
+		require.NoError(s.T(), clientBackend.Logout())
+		require.NoError(s.T(), serverBackend.Logout())
+	}()
+
+	serverBackend.Messenger().SetLocalPairing(true)
+	clientBackend.Messenger().SetLocalPairing(true)
+
+	serverActiveAccount, err := serverBackend.GetActiveAccount()
+	require.NoError(s.T(), err)
+
+	clientActiveAccount, err := clientBackend.GetActiveAccount()
+	require.NoError(s.T(), err)
+
+	require.True(s.T(), serverActiveAccount.KeyUID == clientActiveAccount.KeyUID)
+
+	serverSeedPhraseKp := s.getSeedPhraseKeypairForTest(serverBackend, true)
+	serverAccountsAPI := serverBackend.StatusNode().AccountService().APIs()[1].Service.(*accservice.API)
+	err = serverAccountsAPI.ImportMnemonic(ctx, seedPhraseMnemonic, s.password)
+	require.NoError(s.T(), err, "importing mnemonic for new keypair on server")
+	err = serverAccountsAPI.AddKeypair(ctx, s.password, serverSeedPhraseKp)
+	require.NoError(s.T(), err, "saving seed phrase keypair on server with keystore files created")
+
+	clientSeedPhraseKp := s.getSeedPhraseKeypairForTest(serverBackend, true)
+	clientAccountsAPI := clientBackend.StatusNode().AccountService().APIs()[1].Service.(*accservice.API)
+	err = clientAccountsAPI.SaveKeypair(ctx, clientSeedPhraseKp)
+	require.NoError(s.T(), err, "saving seed phrase keypair on client without keystore files")
+
+	containsKeystoreFile := func(directory, key string) bool {
+		files, err := os.ReadDir(directory)
+		if err != nil {
+			return false
+		}
+
+		for _, file := range files {
+			if strings.Contains(file.Name(), strings.ToLower(key)) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// check server - server should contain keystore files for imported seed phrase
+	serverKeystorePath := filepath.Join(serverTmpDir, keystoreDir, serverActiveAccount.KeyUID)
+	require.True(s.T(), containsKeystoreFile(serverKeystorePath, serverSeedPhraseKp.DerivedFrom[2:]))
+	for _, acc := range serverSeedPhraseKp.Accounts {
+		require.True(s.T(), containsKeystoreFile(serverKeystorePath, acc.Address.String()[2:]))
+	}
+
+	// check client - client should not contain keystore files for imported seed phrase
+	clientKeystorePath := filepath.Join(clientTmpDir, keystoreDir, clientActiveAccount.KeyUID)
+	require.False(s.T(), containsKeystoreFile(clientKeystorePath, clientSeedPhraseKp.DerivedFrom[2:]))
+	for _, acc := range clientSeedPhraseKp.Accounts {
+		require.False(s.T(), containsKeystoreFile(clientKeystorePath, acc.Address.String()[2:]))
+	}
+
+	// prepare sender
+	var config = &SenderServerConfig{
+		SenderConfig: &SenderConfig{
+			KeystorePath:       serverKeystorePath,
+			DeviceType:         "desktop",
+			KeyUID:             serverActiveAccount.KeyUID,
+			Password:           s.password,
+			UnimportedKeypairs: []string{serverSeedPhraseKp.KeyUID},
+		},
+		ServerConfig: new(ServerConfig),
+	}
+	configBytes, err := json.Marshal(config)
+	require.NoError(s.T(), err)
+	cs, err := StartUpSenderServer(serverBackend, string(configBytes))
+	require.NoError(s.T(), err)
+
+	// prepare receiver
+	expectedKDFIterations := 2048
+	clientPayloadSourceConfig := ReceiverClientConfig{
+		ReceiverConfig: &ReceiverConfig{
+			KeystorePath:              clientKeystorePath,
+			DeviceType:                "iphone",
+			KDFIterations:             expectedKDFIterations,
+			TransferringKeystoreFiles: true,
+			Password:                  s.password,
+			KeyUID:                    clientActiveAccount.KeyUID,
+		},
+		ClientConfig: new(ClientConfig),
+	}
+	clientConfigBytes, err := json.Marshal(clientPayloadSourceConfig)
+	require.NoError(s.T(), err)
+	err = StartUpReceivingClient(clientBackend, cs, string(clientConfigBytes))
+	require.NoError(s.T(), err)
+
+	// check client - client should contain keystore files for imported seed phrase
+	accountManager := clientBackend.AccountManager()
+	accGenerator := accountManager.AccountsGenerator()
+	require.True(s.T(), containsKeystoreFile(clientKeystorePath, clientSeedPhraseKp.DerivedFrom[2:]))
+	for _, acc := range clientSeedPhraseKp.Accounts {
+		require.True(s.T(), containsKeystoreFile(clientKeystorePath, acc.Address.String()[2:]))
+	}
+
+	// reinit keystore on client
+	require.NoError(s.T(), accountManager.InitKeystore(clientKeystorePath))
+
+	// check keystore on client
+	genAccInfo, err := accGenerator.LoadAccount(clientSeedPhraseKp.DerivedFrom, s.password)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), clientSeedPhraseKp.KeyUID, genAccInfo.KeyUID)
+	for _, acc := range clientSeedPhraseKp.Accounts {
+		genAccInfo, err := accGenerator.LoadAccount(acc.Address.String(), s.password)
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), acc.Address.String(), genAccInfo.Address)
+	}
 }

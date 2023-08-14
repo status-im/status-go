@@ -148,7 +148,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_LoadPayloads() {
 	pp := new(AccountPayload)
 
 	// Make and Load() PairingPayloadRepository 1
-	ppr, err := NewAccountPayloadLoader(pp, pms.config1)
+	ppr, err := NewAccountPayloadLoader(nil, pp, pms.config1)
 	pms.Require().NoError(err)
 	err = ppr.Load()
 	pms.Require().NoError(err)
@@ -182,7 +182,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_MarshalToProtobuf() {
 	pp := new(AccountPayload)
 
 	// Make and Load() PairingPayloadRepository 1
-	ppr, err := NewAccountPayloadLoader(pp, pms.config1)
+	ppr, err := NewAccountPayloadLoader(nil, pp, pms.config1)
 	pms.Require().NoError(err)
 	err = ppr.Load()
 	pms.Require().NoError(err)
@@ -212,7 +212,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_UnmarshalProtobuf() {
 	pp := new(AccountPayload)
 
 	// Make and Load() PairingPayloadRepository 1
-	ppr, err := NewAccountPayloadLoader(pp, pms.config1)
+	ppr, err := NewAccountPayloadLoader(nil, pp, pms.config1)
 	pms.Require().NoError(err)
 	err = ppr.Load()
 	pms.Require().NoError(err)
@@ -266,7 +266,7 @@ func (pms *PayloadMarshallerSuite) TestPayloadMarshaller_StorePayloads() {
 	pp := new(AccountPayload)
 
 	// Make and Load() PairingPayloadRepository 1
-	ppr, err := NewAccountPayloadLoader(pp, pms.config1)
+	ppr, err := NewAccountPayloadLoader(nil, pp, pms.config1)
 	pms.Require().NoError(err)
 	err = ppr.Load()
 	pms.Require().NoError(err)

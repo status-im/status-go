@@ -140,16 +140,24 @@ func NewSenderServer(backend *api.GethStatusBackend, config *SenderServerConfig)
 }
 
 func (s *SenderServer) startSendingData() error {
-	s.SetHandlers(server.HandlerPatternMap{
-		pairingChallenge:      handlePairingChallenge(s.challengeGiver),
-		pairingSendAccount:    middlewareChallenge(s.challengeGiver, handleSendAccount(s.GetLogger(), s.accountMounter)),
-		pairingSendSyncDevice: middlewareChallenge(s.challengeGiver, handlePairingSyncDeviceSend(s.GetLogger(), s.rawMessageMounter)),
+	handlersMap := server.HandlerPatternMap{
+		pairingChallenge: handlePairingChallenge(s.challengeGiver),
+	}
+	if s.accountMounter != nil {
+		handlersMap[pairingSendAccount] = middlewareChallenge(s.challengeGiver, handleSendAccount(s.GetLogger(), s.accountMounter))
+	}
+	if s.rawMessageMounter != nil {
+		handlersMap[pairingSendSyncDevice] = middlewareChallenge(s.challengeGiver, handlePairingSyncDeviceSend(s.GetLogger(), s.rawMessageMounter))
+	}
+	if s.installationMounter != nil {
 		// TODO implement refactor of installation data exchange to follow the send/receive pattern of
 		//  the other handlers.
 		//  https://github.com/status-im/status-go/issues/3304
 		// receive installation data from receiver
-		pairingReceiveInstallation: middlewareChallenge(s.challengeGiver, handleReceiveInstallation(s.GetLogger(), s.installationMounter)),
-	})
+		handlersMap[pairingReceiveInstallation] = middlewareChallenge(s.challengeGiver, handleReceiveInstallation(s.GetLogger(), s.installationMounter))
+	}
+
+	s.SetHandlers(handlersMap)
 	return s.Start()
 }
 
@@ -161,6 +169,15 @@ func MakeFullSenderServer(backend *api.GethStatusBackend, config *SenderServerCo
 	}
 
 	config.SenderConfig.DB = backend.GetMultiaccountDB()
+
+	if len(config.SenderConfig.UnimportedKeypairs) > 0 {
+		acc, err := backend.GetActiveAccount()
+		if err != nil {
+			return nil, err
+		}
+		config.SenderConfig.KeyUID = acc.KeyUID
+	}
+
 	return NewSenderServer(backend, config)
 }
 
@@ -172,11 +189,10 @@ func StartUpSenderServer(backend *api.GethStatusBackend, configJSON string) (str
 	if err != nil {
 		return "", err
 	}
-	if len(conf.SenderConfig.ChatKey) == 0 {
-		err = validateAndVerifyPassword(conf, conf.SenderConfig)
-		if err != nil {
-			return "", err
-		}
+
+	err = validateSenderConfig(backend, conf)
+	if err != nil {
+		return "", err
 	}
 
 	ps, err := MakeFullSenderServer(backend, conf)
