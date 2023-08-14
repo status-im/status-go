@@ -94,11 +94,12 @@ type LinkPreviewThumbnail struct {
 }
 
 type LinkPreview struct {
-	URL         string               `json:"url"`
-	Hostname    string               `json:"hostname"`
-	Title       string               `json:"title,omitempty"`
-	Description string               `json:"description,omitempty"`
-	Thumbnail   LinkPreviewThumbnail `json:"thumbnail,omitempty"`
+	Type        protobuf.UnfurledLink_LinkType `json:"type"`
+	URL         string                         `json:"url"`
+	Hostname    string                         `json:"hostname"`
+	Title       string                         `json:"title,omitempty"`
+	Description string                         `json:"description,omitempty"`
+	Thumbnail   LinkPreviewThumbnail           `json:"thumbnail,omitempty"`
 }
 
 const EveryoneMentionTag = "0x00001"
@@ -758,10 +759,20 @@ func (m *Message) LoadImage() error {
 	return nil
 }
 
+func isValidLinkPreviewThumbnail(thumbnail LinkPreviewThumbnail) bool {
+	return (thumbnail.DataURI == "" && thumbnail.Width == 0 && thumbnail.Height == 0) ||
+		(thumbnail.DataURI != "" && thumbnail.Width > 0 && thumbnail.Height > 0)
+}
+
 func isValidLinkPreviewForProto(preview LinkPreview) bool {
-	return preview.Title != "" && preview.URL != "" &&
-		((preview.Thumbnail.DataURI == "" && preview.Thumbnail.Width == 0 && preview.Thumbnail.Height == 0) ||
-			(preview.Thumbnail.DataURI != "" && preview.Thumbnail.Width > 0 && preview.Thumbnail.Height > 0))
+	switch preview.Type {
+	case protobuf.UnfurledLink_IMAGE:
+		return preview.URL != "" && isValidLinkPreviewThumbnail(preview.Thumbnail)
+	case protobuf.UnfurledLink_LINK:
+		return preview.Title != "" && preview.URL != "" && isValidLinkPreviewThumbnail(preview.Thumbnail)
+	default:
+		return false
+	}
 }
 
 // ConvertLinkPreviewsToProto expects previews to be correctly sent by the
@@ -791,6 +802,7 @@ func (m *Message) ConvertLinkPreviewsToProto() ([]*protobuf.UnfurledLink, error)
 		}
 
 		ul := &protobuf.UnfurledLink{
+			Type:             preview.Type,
 			Url:              preview.URL,
 			Title:            preview.Title,
 			Description:      preview.Description,
@@ -827,6 +839,7 @@ func (m *Message) ConvertFromProtoToLinkPreviews(makeMediaServerURL func(msgID s
 			Description: link.Description,
 			Hostname:    hostname,
 			Title:       link.Title,
+			Type:        link.Type,
 			URL:         link.Url,
 		}
 		if payload := link.GetThumbnailPayload(); payload != nil {
