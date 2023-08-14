@@ -38,6 +38,7 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 	}
 	s.SetHandlers(HandlerPatternMap{
 		accountImagesPath:        handleAccountImages(s.multiaccountsDB, s.logger),
+		accountInitialsPath:      handleAccountInitials(s.multiaccountsDB, s.logger),
 		audioPath:                handleAudio(s.db, s.logger),
 		contactImagesPath:        handleContactImages(s.db, s.logger),
 		discordAttachmentsPath:   handleDiscordAttachment(s.db, s.logger),
