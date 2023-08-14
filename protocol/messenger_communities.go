@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/exp/slices"
 	"golang.org/x/time/rate"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -4365,4 +4366,28 @@ func (m *Messenger) rekeyAllCommunities(logger *zap.Logger) {
 			}
 		}
 	}
+}
+
+func (m *Messenger) GetCommunityMembersForWalletAddresses(communityID types.HexBytes, chainID uint64) (map[string]*Contact, error) {
+	community, err := m.communitiesManager.GetByID(communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	membersForAddresses := map[string]*Contact{}
+
+	for memberID, member := range community.Members() {
+		for _, revealedAddress := range member.RevealedAccounts {
+			if slices.Contains(revealedAddress.ChainIds, chainID) {
+				contact, ok := m.allContacts.Load(memberID)
+				if ok {
+					membersForAddresses[revealedAddress.Address] = contact
+				} else {
+					m.logger.Error("community member is not a contact", zap.String("contact ID", memberID))
+				}
+			}
+		}
+	}
+
+	return membersForAddresses, nil
 }
