@@ -263,6 +263,11 @@ func (s *AdminCommunityEventsSuite) TestAdminAddCommunityToken() {
 	s.Require().Error(err)
 }
 
+func (s *TokenMasterCommunityEventsSuite) TestAdminAddTokenMasterAndOwnerToken() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
+	testEventSenderAddTokenMasterAndOwnerToken(s, community)
+}
+
 func (s *AdminCommunityEventsSuite) TestMemberReceiveAdminEventsWhenOwnerOffline() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
 	testMemberReceiveEventsWhenControlNodeOffline(s, community)

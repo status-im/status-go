@@ -1503,11 +1503,6 @@ func (m *Manager) HandleCommunityPrivilegedUserSyncMessage(signer *ecdsa.PublicK
 		return errors.New("user has no permissions to process privileged sync message")
 	}
 
-	isControlNodeMsg := common.IsPubKeyEqual(community.PublicKey(), signer)
-	if !(isControlNodeMsg || community.IsPrivilegedMember(signer)) {
-		return errors.New("user has no permissions to send privileged sync message")
-	}
-
 	err = validateCommunityPrivilegedUserSyncMessage(message)
 	if err != nil {
 		return err
@@ -1517,7 +1512,7 @@ func (m *Manager) HandleCommunityPrivilegedUserSyncMessage(signer *ecdsa.PublicK
 	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN:
 		fallthrough
 	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_REJECT_REQUEST_TO_JOIN:
-		if !isControlNodeMsg {
+		if !common.IsPubKeyEqual(community.PublicKey(), signer) {
 			return errors.New("accepted/requested to join sync messages can be send only by the control node")
 		}
 
@@ -1543,6 +1538,23 @@ func (m *Manager) HandleCommunityPrivilegedUserSyncMessage(signer *ecdsa.PublicK
 				return err
 			}
 		}
+	case protobuf.CommunityPrivilegedUserSyncMessage_ADD_COMMUNITY_TOKENS:
+		for _, token := range message.CommunityTokens {
+			token := community_token.FromCommunityTokenProtobuf(token)
+			if !community.MemberCanManageToken(community.MemberIdentity(), token) {
+				return ErrInvalidManageTokensPermission
+			}
+
+			exist, err := m.persistence.HasCommunityToken(token.CommunityID, token.Address, token.ChainID)
+			if err != nil {
+				return err
+			}
+
+			if !exist {
+				return m.persistence.AddCommunityToken(token)
+			}
+		}
+
 	}
 
 	return nil
@@ -4239,6 +4251,10 @@ func findIndexFile(files []*torrent.File) (index int, ok bool) {
 	return 0, false
 }
 
+func (m *Manager) GetCommunityToken(communityID string, chainID int, address string) (*community_token.CommunityToken, error) {
+	return m.persistence.GetCommunityToken(communityID, chainID, address)
+}
+
 func (m *Manager) GetCommunityTokens(communityID string) ([]*community_token.CommunityToken, error) {
 	return m.persistence.GetCommunityTokens(communityID)
 }
@@ -4297,19 +4313,21 @@ func (m *Manager) SaveCommunityToken(token *community_token.CommunityToken, crop
 	return token, m.persistence.AddCommunityToken(token)
 }
 
-func (m *Manager) AddCommunityToken(communityID string, chainID int, address string) error {
+func (m *Manager) AddCommunityToken(token *community_token.CommunityToken) (*Community, error) {
+	if token == nil {
+		return nil, errors.New("Token is absent in database")
+	}
 
-	community, err := m.GetByIDString(communityID)
+	community, err := m.GetByIDString(token.CommunityID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if community == nil {
-		return ErrOrgNotFound
+		return nil, ErrOrgNotFound
 	}
 
-	token, err := m.persistence.GetCommunityToken(communityID, chainID, address)
-	if err != nil {
-		return err
+	if !community.MemberCanManageToken(&m.identity.PublicKey, token) {
+		return nil, ErrInvalidManageTokensPermission
 	}
 
 	tokenMetadata := &protobuf.CommunityTokenMetadata{
@@ -4323,10 +4341,10 @@ func (m *Manager) AddCommunityToken(communityID string, chainID int, address str
 	}
 	_, err = community.AddCommunityTokensMetadata(tokenMetadata)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return m.saveAndPublish(community)
+	return community, m.saveAndPublish(community)
 }
 
 func (m *Manager) UpdateCommunityTokenState(chainID int, contractAddress string, deployState community_token.DeployState) error {
@@ -4623,7 +4641,16 @@ func validateCommunityPrivilegedUserSyncMessage(message *protobuf.CommunityPrivi
 				return errors.New("no communityId in request to join in CommunityPrivilegedUserSyncMessage message")
 			}
 		}
+	case protobuf.CommunityPrivilegedUserSyncMessage_ADD_COMMUNITY_TOKENS:
+		if message.CommunityTokens == nil {
+			return errors.New("invalid add token CommunityPrivilegedUserSyncMessage message")
+		}
+		for _, token := range message.CommunityTokens {
+			if token == nil || len(token.Address) == 0 || len(token.CommunityId) == 0 ||
+				token.ChainId == 0 || len(token.Supply) == 0 {
+				return errors.New("invalid token data in CommunityPrivilegedUserSyncMessage message")
+			}
+		}
 	}
-
 	return nil
 }

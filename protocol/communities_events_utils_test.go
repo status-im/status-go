@@ -1634,9 +1634,81 @@ func testEventSenderCannotEditPrivilegedCommunityPermission(base CommunityEvents
 	s.Require().Nil(response)
 }
 
-func testEventSenderAddedCommunityToken(base CommunityEventsTestsInterface, community *communities.Community) {
-	tokenERC721 := &token.CommunityToken{
-		CommunityID:        community.IDString(),
+func testAddAndSyncTokenFromControlNode(base CommunityEventsTestsInterface, community *communities.Community,
+	privilegesLvl token.PrivilegesLevel, expectedSync bool) {
+	tokenERC721 := createCommunityToken(community.IDString(), privilegesLvl)
+
+	s := base.GetSuite()
+
+	_, err := base.GetControlNode().SaveCommunityToken(tokenERC721, nil)
+	s.Require().NoError(err)
+
+	err = base.GetControlNode().AddCommunityToken(tokenERC721.CommunityID, tokenERC721.ChainID, tokenERC721.Address)
+	s.Require().NoError(err)
+
+	tokens, err := base.GetEventSender().communitiesManager.GetAllCommunityTokens()
+	s.Require().NoError(err)
+	s.Require().Len(tokens, 0)
+
+	checkTokenAdded := func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
+		if err != nil {
+			return err
+		}
+
+		for _, tokenMetadata := range modifiedCommmunity.CommunityTokensMetadata() {
+			if tokenMetadata.Name == tokenERC721.Name {
+				return nil
+			}
+		}
+
+		return errors.New("Token was not found")
+	}
+
+	waitOnMessengerResponse(s, WaitCommunityCondition, checkTokenAdded, base.GetMember())
+	waitOnMessengerResponse(s, WaitCommunityCondition, checkTokenAdded, base.GetEventSender())
+
+	// check control node sent sync message to the event sender
+	_, err = WaitOnMessengerResponse(
+		base.GetEventSender(),
+		func(r *MessengerResponse) bool {
+			tokens, err := base.GetEventSender().communitiesManager.GetAllCommunityTokens()
+			return err == nil && len(tokens) == 1
+		},
+		"no token sync message from control node",
+	)
+
+	if expectedSync {
+		s.Require().NoError(err)
+	} else {
+		s.Require().Error(err)
+	}
+
+	// check member did not receive sync message with the token
+	_, err = WaitOnMessengerResponse(
+		base.GetMember(),
+		func(r *MessengerResponse) bool {
+			tokens, err := base.GetMember().communitiesManager.GetAllCommunityTokens()
+			return err == nil && len(tokens) == 1
+		},
+		"no token sync message from control node",
+	)
+
+	s.Require().Error(err)
+}
+
+func testEventSenderCannotCreatePrivilegedCommunityPermission(base CommunityEventsTestsInterface, community *communities.Community, pType protobuf.CommunityTokenPermission_Type) {
+	permissionRequest := createTestPermissionRequest(community, pType)
+
+	response, err := base.GetEventSender().CreateCommunityTokenPermission(permissionRequest)
+	s := base.GetSuite()
+	s.Require().Nil(response)
+	s.Require().Error(err)
+}
+
+func createCommunityToken(communityID string, privilegesLevel token.PrivilegesLevel) *token.CommunityToken {
+	return &token.CommunityToken{
+		CommunityID:        communityID,
 		TokenType:          protobuf.CommunityTokenType_ERC721,
 		Address:            "0x123",
 		Name:               "StatusToken",
@@ -1649,7 +1721,13 @@ func testEventSenderAddedCommunityToken(base CommunityEventsTestsInterface, comm
 		ChainID:            1,
 		DeployState:        token.Deployed,
 		Base64Image:        "ABCD",
+		PrivilegesLevel:    privilegesLevel,
 	}
+}
+
+func testAddAndSyncTokenFromEventSenderByControlNode(base CommunityEventsTestsInterface, community *communities.Community,
+	privilegesLvl token.PrivilegesLevel) {
+	tokenERC721 := createCommunityToken(community.IDString(), privilegesLvl)
 
 	s := base.GetSuite()
 
@@ -1658,6 +1736,10 @@ func testEventSenderAddedCommunityToken(base CommunityEventsTestsInterface, comm
 
 	err = base.GetEventSender().AddCommunityToken(tokenERC721.CommunityID, tokenERC721.ChainID, tokenERC721.Address)
 	s.Require().NoError(err)
+
+	tokens, err := base.GetControlNode().communitiesManager.GetAllCommunityTokens()
+	s.Require().NoError(err)
+	s.Require().Len(tokens, 0)
 
 	checkTokenAdded := func(response *MessengerResponse) error {
 		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
@@ -1675,13 +1757,50 @@ func testEventSenderAddedCommunityToken(base CommunityEventsTestsInterface, comm
 	}
 
 	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkTokenAdded)
+
+	// check event sender sent sync message to the control node
+	_, err = WaitOnMessengerResponse(
+		base.GetControlNode(),
+		func(r *MessengerResponse) bool {
+			tokens, err := base.GetControlNode().communitiesManager.GetAllCommunityTokens()
+			return err == nil && len(tokens) == 1
+		},
+		"no token sync message from event sender",
+	)
+
+	s.Require().NoError(err)
+
+	// check member did not receive sync message with the token
+	_, err = WaitOnMessengerResponse(
+		base.GetMember(),
+		func(r *MessengerResponse) bool {
+			tokens, err := base.GetMember().communitiesManager.GetAllCommunityTokens()
+			return err == nil && len(tokens) == 1
+		},
+		"no token sync message from event sender",
+	)
+
+	s.Require().Error(err)
 }
 
-func testEventSenderCannotCreatePrivilegedCommunityPermission(base CommunityEventsTestsInterface, community *communities.Community, pType protobuf.CommunityTokenPermission_Type) {
-	permissionRequest := createTestPermissionRequest(community, pType)
+func testEventSenderAddTokenMasterAndOwnerToken(base CommunityEventsTestsInterface, community *communities.Community) {
+	ownerToken := createCommunityToken(community.IDString(), token.OwnerLevel)
 
-	response, err := base.GetEventSender().CreateCommunityTokenPermission(permissionRequest)
 	s := base.GetSuite()
-	s.Require().Nil(response)
-	s.Require().Error(err)
+
+	_, err := base.GetEventSender().SaveCommunityToken(ownerToken, nil)
+	s.Require().NoError(err)
+
+	err = base.GetEventSender().AddCommunityToken(ownerToken.CommunityID, ownerToken.ChainID, ownerToken.Address)
+	s.Require().Error(err, communities.ErrInvalidManageTokensPermission)
+
+	tokenMasterToken := ownerToken
+	tokenMasterToken.PrivilegesLevel = token.MasterLevel
+	tokenMasterToken.Address = "0x124"
+
+	_, err = base.GetEventSender().SaveCommunityToken(tokenMasterToken, nil)
+	s.Require().NoError(err)
+
+	err = base.GetEventSender().AddCommunityToken(ownerToken.CommunityID, ownerToken.ChainID, ownerToken.Address)
+	s.Require().Error(err, communities.ErrInvalidManageTokensPermission)
 }
