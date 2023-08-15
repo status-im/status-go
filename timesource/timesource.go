@@ -14,7 +14,7 @@ import (
 
 const (
 	// DefaultMaxAllowedFailures defines how many failures will be tolerated.
-	DefaultMaxAllowedFailures = 1
+	DefaultMaxAllowedFailures = 4
 
 	// FastNTPSyncPeriod period between ntp synchronizations before the first
 	// successful connection.
@@ -31,10 +31,14 @@ const (
 // defaultServers will be resolved to the closest available,
 // and with high probability resolved to the different IPs
 var defaultServers = []string{
-	"0.pool.ntp.org",
-	"1.pool.ntp.org",
-	"2.pool.ntp.org",
-	"3.pool.ntp.org",
+	"time.apple.com",
+	"pool.ntp.org",
+	"time.cloudflare.com",
+	"time.windows.com",
+	"ntp.neu.edu.cn",
+	"ntp.nict.jp",
+	"amazon.pool.ntp.org",
+	"android.pool.ntp.org",
 }
 var errUpdateOffset = errors.New("failed to compute offset")
 
