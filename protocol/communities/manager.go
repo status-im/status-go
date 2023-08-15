@@ -1337,7 +1337,14 @@ func (m *Manager) validateAndFilterEvents(community *Community, events []Communi
 	validatedEvents := make([]CommunityEvent, 0, len(events))
 
 	validateEvent := func(event *CommunityEvent) error {
-		signer, err := event.RecoverSigner()
+		if event.Signature == nil || len(event.Signature) == 0 {
+			return errors.New("missing signature")
+		}
+
+		signer, err := crypto.SigToPub(
+			crypto.Keccak256(event.Payload),
+			event.Signature,
+		)
 		if err != nil {
 			return err
 		}
@@ -1478,6 +1485,69 @@ func (m *Manager) HandleCommunityEventsMessageRejected(signer *ecdsa.PublicKey, 
 	return reapplyEventsMessage, nil
 }
 
+func (m *Manager) HandleCommunityPrivilegedUserSyncMessage(signer *ecdsa.PublicKey, message *protobuf.CommunityPrivilegedUserSyncMessage) error {
+	if signer == nil {
+		return errors.New("signer can't be nil")
+	}
+
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, message.CommunityId)
+	if err != nil {
+		return err
+	}
+
+	if community == nil {
+		return ErrOrgNotFound
+	}
+
+	if !community.IsPrivilegedMember(&m.identity.PublicKey) {
+		return errors.New("user has no permissions to process privileged sync message")
+	}
+
+	isControlNodeMsg := common.IsPubKeyEqual(community.PublicKey(), signer)
+	if !(isControlNodeMsg || community.IsPrivilegedMember(signer)) {
+		return errors.New("user has no permissions to send privileged sync message")
+	}
+
+	err = validateCommunityPrivilegedUserSyncMessage(message)
+	if err != nil {
+		return err
+	}
+
+	switch message.Type {
+	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN:
+		fallthrough
+	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_REJECT_REQUEST_TO_JOIN:
+		if !isControlNodeMsg {
+			return errors.New("accepted/requested to join sync messages can be send only by the control node")
+		}
+
+		var state RequestToJoinState
+		if message.Type == protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN {
+			state = RequestToJoinStateAccepted
+		} else {
+			state = RequestToJoinStateDeclined
+		}
+
+		for signer, requestToJoinProto := range message.RequestToJoin {
+			requestToJoin := &RequestToJoin{
+				PublicKey:   signer,
+				Clock:       requestToJoinProto.Clock,
+				ENSName:     requestToJoinProto.EnsName,
+				CommunityID: requestToJoinProto.CommunityId,
+				State:       state,
+			}
+			requestToJoin.CalculateID()
+
+			_, err := m.saveOrUpdateRequestToJoin(signer, community.ID(), requestToJoin)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 func (m *Manager) handleAdditionalAdminChanges(community *Community) error {
 
 	if !(community.IsControlNode() || community.HasPermissionToSendCommunityEvents()) {
@@ -1538,12 +1608,6 @@ func (m *Manager) saveOrUpdateRequestToJoin(signer string, communityID types.Hex
 }
 
 func (m *Manager) handleCommunityEventRequestAccepted(community *Community, communityEvent *CommunityEvent) error {
-	requestToJoinState := RequestToJoinStateAccepted
-	if community.HasPermissionToSendCommunityEvents() {
-		// if we're an admin and we receive this admin event, we know the state is `pending`
-		requestToJoinState = RequestToJoinStateAcceptedPending
-	}
-
 	acceptedRequestsToJoin := make([]types.HexBytes, 0)
 
 	for signer, request := range communityEvent.AcceptedRequestsToJoin {
@@ -1552,19 +1616,27 @@ func (m *Manager) handleCommunityEventRequestAccepted(community *Community, comm
 			Clock:       request.Clock,
 			ENSName:     request.EnsName,
 			CommunityID: request.CommunityId,
-			State:       requestToJoinState,
+			State:       RequestToJoinStateAcceptedPending,
 		}
 		requestToJoin.CalculateID()
 
-		if community.HasPermissionToSendCommunityEvents() {
-			existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
-			if err != nil && err != sql.ErrNoRows {
-				return err
+		existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+
+		if community.IsControlNode() {
+			// If request to join exists in control node, save request as RequestToJoinStateAccepted
+			// If request to join does not exist in control node, save request as RequestToJoinStateAcceptedPending
+			// as privileged users don't have revealed addresses. This can happen if control node received
+			// community event message before user request to join
+			if existingRequestToJoin != nil {
+				requestToJoin.State = RequestToJoinStateAccepted
 			}
-			if existingRequestToJoin.MarkedAsPendingByPrivilegedAccount() {
-				// the request is already in some pending state so we won't override it again
-				continue
-			}
+		} else if community.HasPermissionToSendCommunityEvents() && existingRequestToJoin.State != RequestToJoinStatePending {
+			// the request is already in some pending state or was processed by a control node,
+			// so we won't override it again
+			continue
 		}
 
 		requestUpdated, err := m.saveOrUpdateRequestToJoin(signer, community.ID(), requestToJoin)
@@ -1587,13 +1659,6 @@ func (m *Manager) handleCommunityEventRequestAccepted(community *Community, comm
 }
 
 func (m *Manager) handleCommunityEventRequestRejected(community *Community, communityEvent *CommunityEvent) error {
-	requestToJoinState := RequestToJoinStateDeclined
-	if community.HasPermissionToSendCommunityEvents() {
-		// if we're an admin and we receive this admin event, we want to see the same
-		// state that the other admin has decided for
-		requestToJoinState = RequestToJoinStateDeclinedPending
-	}
-
 	rejectedRequestsToJoin := make([]types.HexBytes, 0)
 
 	for signer, request := range communityEvent.RejectedRequestsToJoin {
@@ -1602,19 +1667,27 @@ func (m *Manager) handleCommunityEventRequestRejected(community *Community, comm
 			Clock:       request.Clock,
 			ENSName:     request.EnsName,
 			CommunityID: request.CommunityId,
-			State:       requestToJoinState,
+			State:       RequestToJoinStateDeclinedPending,
 		}
 		requestToJoin.CalculateID()
 
-		if community.HasPermissionToSendCommunityEvents() {
-			existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
-			if err != nil && err != sql.ErrNoRows {
-				return err
+		existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+
+		if community.IsControlNode() {
+			// If request to join exists in control node, save request as RequestToJoinStateDeclined
+			// If request to join does not exist in control node, save request as RequestToJoinStateDeclinedPending
+			// as privileged users don't have revealed addresses. This can happen if control node received
+			// community event message before user request to join
+			if existingRequestToJoin != nil {
+				requestToJoin.State = RequestToJoinStateDeclined
 			}
-			if existingRequestToJoin.MarkedAsPendingByPrivilegedAccount() {
-				// the request is already in some pending state so we won't override it again
-				continue
-			}
+		} else if community.HasPermissionToSendCommunityEvents() && existingRequestToJoin.State != RequestToJoinStatePending {
+			// the request is already in some pending state or was processed by a control node,
+			// so we won't override it again
+			continue
 		}
 
 		requestUpdated, err := m.saveOrUpdateRequestToJoin(signer, community.ID(), requestToJoin)
@@ -1789,12 +1862,7 @@ func (m *Manager) accountsSatisfyPermissionsToJoinChannels(community *Community,
 	return result, nil
 }
 
-func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommunity) (*Community, error) {
-	dbRequest, err := m.persistence.GetRequestToJoin(request.ID)
-	if err != nil {
-		return nil, err
-	}
-
+func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, error) {
 	pk, err := common.HexToPubkey(dbRequest.PublicKey)
 	if err != nil {
 		return nil, err
@@ -1805,7 +1873,7 @@ func (m *Manager) AcceptRequestToJoin(request *requests.AcceptRequestToJoinCommu
 		return nil, err
 	}
 
-	if community.HasPermissionToSendCommunityEvents() {
+	if community.HasPermissionToSendCommunityEvents() && !community.IsControlNode() {
 		if dbRequest.MarkedAsPendingByPrivilegedAccount() {
 			// if the request is in any pending state, it means our admin node has either
 			// already made a decision in the past, or previously received a decision by
@@ -1887,15 +1955,10 @@ func (m *Manager) GetRequestToJoin(ID types.HexBytes) (*RequestToJoin, error) {
 	return m.persistence.GetRequestToJoin(ID)
 }
 
-func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCommunity) error {
-	dbRequest, err := m.persistence.GetRequestToJoin(request.ID)
-	if err != nil {
-		return err
-	}
-
+func (m *Manager) DeclineRequestToJoin(dbRequest *RequestToJoin) (*Community, error) {
 	community, err := m.GetByID(dbRequest.CommunityID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	requestToJoinState := RequestToJoinStateDeclined
@@ -1904,20 +1967,20 @@ func (m *Manager) DeclineRequestToJoin(request *requests.DeclineRequestToJoinCom
 	}
 	err = m.persistence.SetRequestToJoinState(dbRequest.PublicKey, dbRequest.CommunityID, requestToJoinState)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = community.DeclineRequestToJoin(dbRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = m.saveAndPublish(community)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return community, nil
 }
 
 func (m *Manager) isUserRejectedFromCommunity(signer *ecdsa.PublicKey, community *Community, requestClock uint64) (bool, error) {
@@ -2026,7 +2089,9 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		// requests here, because if it's accepted/pending, we still need to perform
 		// some checks
 		if existingRequestToJoin.State == RequestToJoinStateDeclinedPending {
-			requestToJoin.State = RequestToJoinStateDeclined
+			if community.IsControlNode() {
+				requestToJoin.State = RequestToJoinStateDeclined
+			}
 			return requestToJoin, nil
 		}
 	} else {
@@ -4533,5 +4598,32 @@ func (m *Manager) HandleCommunityTokensMetadata(communityID string, communityTok
 			}
 		}
 	}
+	return nil
+}
+
+func validateCommunityPrivilegedUserSyncMessage(message *protobuf.CommunityPrivilegedUserSyncMessage) error {
+	if message == nil {
+		return errors.New("invalid CommunityPrivilegedUserSyncMessage message")
+	}
+
+	if message.CommunityId == nil || len(message.CommunityId) == 0 {
+		return errors.New("invalid CommunityId in CommunityPrivilegedUserSyncMessage message")
+	}
+
+	switch message.Type {
+	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN:
+		fallthrough
+	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_REJECT_REQUEST_TO_JOIN:
+		if message.RequestToJoin == nil || len(message.RequestToJoin) == 0 {
+			return errors.New("invalid request to join in CommunityPrivilegedUserSyncMessage message")
+		}
+
+		for _, requestToJoinProto := range message.RequestToJoin {
+			if len(requestToJoinProto.CommunityId) == 0 {
+				return errors.New("no communityId in request to join in CommunityPrivilegedUserSyncMessage message")
+			}
+		}
+	}
+
 	return nil
 }

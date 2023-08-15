@@ -116,13 +116,6 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAcceptMemberRequ
 	testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalOwner)
 }
 
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAcceptMemberRequestToJoinNotConfirmedByControlNode() {
-	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{})
-	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
-	testAcceptMemberRequestToJoinNotConfirmedByControlNode(s, community, user)
-}
-
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAcceptMemberRequestToJoin() {
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{})
 
@@ -137,13 +130,6 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRejectMemberRequ
 	// set up additional user that will send request to join
 	user := s.newMessenger("", []string{})
 	testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalOwner)
-}
-
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRejectMemberRequestToJoinNotConfirmedByControlNode() {
-	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{})
-	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
-	testRejectMemberRequestToJoinNotConfirmedByControlNode(s, community, user)
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRejectMemberRequestToJoin() {

@@ -14,11 +14,12 @@ import (
 	"golang.org/x/exp/slices"
 	"golang.org/x/time/rate"
 
+	"github.com/golang/protobuf/proto"
+
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethclient"
 
-	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -298,7 +299,6 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 						if err != nil {
 							m.logger.Warn("failed to accept request to join ", zap.Error(err))
 						}
-						// TODO INFORM ADMINS
 					}
 				}
 
@@ -311,8 +311,6 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 						if err != nil {
 							m.logger.Warn("failed to decline request to join ", zap.Error(err))
 						}
-
-						// TODO INFORM ADMINS
 					}
 				}
 
@@ -1351,7 +1349,7 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 		return nil, err
 	}
 
-	community, err := m.communitiesManager.AcceptRequestToJoin(request)
+	community, err := m.communitiesManager.AcceptRequestToJoin(requestToJoin)
 	if err != nil {
 		return nil, err
 	}
@@ -1366,38 +1364,75 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 		return nil, err
 	}
 
-	requestToJoinResponseProto := &protobuf.CommunityRequestToJoinResponse{
-		Clock:       community.Clock(),
-		Accepted:    true,
-		CommunityId: community.ID(),
-		Community:   community.Description(),
-		Grant:       grant,
-	}
+	if community.IsControlNode() {
+		requestToJoinResponseProto := &protobuf.CommunityRequestToJoinResponse{
+			Clock:       community.Clock(),
+			Accepted:    true,
+			CommunityId: community.ID(),
+			Community:   community.Description(),
+			Grant:       grant,
+		}
 
-	if m.torrentClientReady() && m.communitiesManager.TorrentFileExists(community.IDString()) {
-		magnetlink, err := m.communitiesManager.GetHistoryArchiveMagnetlink(community.ID())
+		if m.torrentClientReady() && m.communitiesManager.TorrentFileExists(community.IDString()) {
+			magnetlink, err := m.communitiesManager.GetHistoryArchiveMagnetlink(community.ID())
+			if err != nil {
+				m.logger.Warn("couldn't get magnet link for community", zap.Error(err))
+				return nil, err
+			}
+			requestToJoinResponseProto.MagnetUri = magnetlink
+		}
+
+		payload, err := proto.Marshal(requestToJoinResponseProto)
 		if err != nil {
-			m.logger.Warn("couldn't get magnet link for community", zap.Error(err))
 			return nil, err
 		}
-		requestToJoinResponseProto.MagnetUri = magnetlink
-	}
 
-	payload, err := proto.Marshal(requestToJoinResponseProto)
-	if err != nil {
-		return nil, err
-	}
+		rawMessage := &common.RawMessage{
+			Payload:           payload,
+			Sender:            community.PrivateKey(),
+			SkipProtocolLayer: true,
+			MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
+		}
 
-	rawMessage := &common.RawMessage{
-		Payload:           payload,
-		Sender:            community.PrivateKey(),
-		SkipProtocolLayer: true,
-		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
-	}
+		_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
+		if err != nil {
+			return nil, err
+		}
 
-	_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
-	if err != nil {
-		return nil, err
+		// Notify privileged members that request to join was accepted
+		// Send request to join without revealed addresses
+		requestToJoin.RevealedAccounts = make([]*protobuf.RevealedAccount, 0)
+		acceptedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
+		acceptedRequestsToJoin[requestToJoin.PublicKey] = requestToJoin.ToCommunityRequestToJoinProtobuf()
+
+		syncMsg := &protobuf.CommunityPrivilegedUserSyncMessage{
+			Type:          protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN,
+			CommunityId:   community.ID(),
+			RequestToJoin: acceptedRequestsToJoin,
+		}
+
+		payloadSyncMsg, err := proto.Marshal(syncMsg)
+		if err != nil {
+			return nil, err
+		}
+
+		rawSyncMessage := &common.RawMessage{
+			Payload:           payloadSyncMsg,
+			Sender:            community.PrivateKey(),
+			SkipProtocolLayer: true,
+			MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE,
+		}
+
+		privilegedMembers := community.GetPrivilegedMembers()
+		for _, privilegedMember := range privilegedMembers {
+			if privilegedMember.Equal(&m.identity.PublicKey) {
+				continue
+			}
+			_, err := m.sender.SendPrivate(context.Background(), privilegedMember, rawSyncMessage)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	response := &MessengerResponse{}
@@ -1433,9 +1468,51 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 		return nil, err
 	}
 
-	err := m.communitiesManager.DeclineRequestToJoin(request)
+	dbRequest, err := m.communitiesManager.GetRequestToJoin(request.ID)
 	if err != nil {
 		return nil, err
+	}
+
+	community, err := m.communitiesManager.DeclineRequestToJoin(dbRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	if community.IsControlNode() {
+		// Notify privileged members that request to join was rejected
+		// Send request to join without revealed addresses
+		dbRequest.RevealedAccounts = make([]*protobuf.RevealedAccount, 0)
+		declinedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
+		declinedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
+
+		syncMsg := &protobuf.CommunityPrivilegedUserSyncMessage{
+			Type:          protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_REJECT_REQUEST_TO_JOIN,
+			CommunityId:   community.ID(),
+			RequestToJoin: declinedRequestsToJoin,
+		}
+
+		payloadSyncMsg, err := proto.Marshal(syncMsg)
+		if err != nil {
+			return nil, err
+		}
+
+		rawSyncMessage := &common.RawMessage{
+			Payload:           payloadSyncMsg,
+			Sender:            community.PrivateKey(),
+			SkipProtocolLayer: true,
+			MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE,
+		}
+
+		privilegedMembers := community.GetPrivilegedMembers()
+		for _, privilegedMember := range privilegedMembers {
+			if privilegedMember.Equal(&m.identity.PublicKey) {
+				continue
+			}
+			_, err := m.sender.SendPrivate(context.Background(), privilegedMember, rawSyncMessage)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	// Activity Center notification
@@ -2543,6 +2620,10 @@ func (m *Messenger) handleCommunityEventsMessageRejected(state *ReceivedMessageS
 	}
 
 	return nil
+}
+
+func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMessageState, signer *ecdsa.PublicKey, message protobuf.CommunityPrivilegedUserSyncMessage) error {
+	return m.communitiesManager.HandleCommunityPrivilegedUserSyncMessage(signer, &message)
 }
 
 func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, syncCommunity protobuf.SyncCommunity) error {

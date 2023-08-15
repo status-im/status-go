@@ -145,13 +145,6 @@ func (s *AdminCommunityEventsSuite) TestAdminAcceptMemberRequestToJoinResponseSh
 	testAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalAdmin)
 }
 
-func (s *AdminCommunityEventsSuite) TestAdminAcceptMemberRequestToJoinNotConfirmedByControlNode() {
-	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{})
-	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
-	testAcceptMemberRequestToJoinNotConfirmedByControlNode(s, community, user)
-}
-
 func (s *AdminCommunityEventsSuite) TestAdminAcceptMemberRequestToJoin() {
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{})
 
@@ -166,14 +159,6 @@ func (s *AdminCommunityEventsSuite) TestAdminRejectMemberRequestToJoinResponseSh
 	// set up additional user that will send request to join
 	user := s.newMessenger("", []string{})
 	testRejectMemberRequestToJoinResponseSharedWithOtherEventSenders(s, community, user, additionalAdmin)
-}
-
-func (s *AdminCommunityEventsSuite) TestAdminRejectMemberRequestToJoinNotConfirmedByControlNode() {
-	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{})
-
-	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
-	testRejectMemberRequestToJoinNotConfirmedByControlNode(s, community, user)
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminRejectMemberRequestToJoin() {

@@ -336,6 +336,8 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.SyncAccountCustomizationColor))
 	case protobuf.ApplicationMetadataMessage_SYNC_ACCOUNTS_POSITIONS:
 		return m.unmarshalProtobufData(new(protobuf.SyncAccountsPositions))
+	case protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE:
+		return m.unmarshalProtobufData(new(protobuf.CommunityPrivilegedUserSyncMessage))
 	}
 
 	return nil

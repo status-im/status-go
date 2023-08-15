@@ -1412,9 +1412,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 		}
 	}
 
-	declinedOrDeclinedPending := requestToJoin.State == communities.RequestToJoinStateDeclined || requestToJoin.State == communities.RequestToJoinStateDeclinedPending
-
-	if declinedOrDeclinedPending {
+	if requestToJoin.State == communities.RequestToJoinStateDeclined || requestToJoin.State == communities.RequestToJoinStateDeclinedPending {
 		cancel := &requests.DeclineRequestToJoinCommunity{
 			ID: requestToJoin.ID,
 		}
