@@ -12,6 +12,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
@@ -231,7 +232,27 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterPinMessage() {
 
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAddCommunityToken() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
-	testEventSenderAddedCommunityToken(s, community)
+	testAddAndSyncTokenFromEventSenderByControlNode(s, community, token.CommunityLevel)
+}
+
+func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAddTokenMasterAndOwnerToken() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
+	testEventSenderAddTokenMasterAndOwnerToken(s, community)
+}
+
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestTokenMasterSyncOwnerTokenFromControlNode() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
+	testAddAndSyncTokenFromControlNode(s, community, token.OwnerLevel, false)
+}
+
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestTokenMasterSyncTokenMasterTokenFromControlNode() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
+	testAddAndSyncTokenFromControlNode(s, community, token.MasterLevel, false)
+}
+
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestTokenMasterSyncCommunityTokenFromControlNode() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
+	testAddAndSyncTokenFromControlNode(s, community, token.CommunityLevel, true)
 }
 
 func (s *TokenMasterCommunityEventsSuite) TestMemberReceiveTokenMasterEventsWhenControlNodeOffline() {

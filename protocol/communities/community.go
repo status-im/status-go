@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
+	community_token "github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/v1"
@@ -2224,4 +2225,9 @@ func (o *Community) ValidateEvent(event *CommunityEvent, signer *ecdsa.PublicKey
 	}
 
 	return nil
+}
+
+func (o *Community) MemberCanManageToken(member *ecdsa.PublicKey, token *community_token.CommunityToken) bool {
+	return o.IsMemberOwner(member) || (o.IsMemberTokenMaster(member) &&
+		token.PrivilegesLevel != community_token.OwnerLevel && token.PrivilegesLevel != community_token.MasterLevel)
 }

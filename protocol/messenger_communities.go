@@ -4234,7 +4234,47 @@ func (m *Messenger) SaveCommunityToken(token *token.CommunityToken, croppedImage
 }
 
 func (m *Messenger) AddCommunityToken(communityID string, chainID int, address string) error {
-	return m.communitiesManager.AddCommunityToken(communityID, chainID, address)
+	communityToken, err := m.communitiesManager.GetCommunityToken(communityID, chainID, address)
+	if err != nil {
+		return err
+	}
+
+	community, err := m.communitiesManager.AddCommunityToken(communityToken)
+	if err != nil {
+		return err
+	}
+
+	syncMsg := &protobuf.CommunityPrivilegedUserSyncMessage{
+		Type:            protobuf.CommunityPrivilegedUserSyncMessage_ADD_COMMUNITY_TOKENS,
+		CommunityId:     community.ID(),
+		CommunityTokens: []*protobuf.CommunityToken{token.ToCommunityTokenProtobuf(communityToken)},
+	}
+
+	payloadSyncMsg, err := proto.Marshal(syncMsg)
+	if err != nil {
+		return err
+	}
+
+	rawSyncMessage := &common.RawMessage{
+		Payload:           payloadSyncMsg,
+		Sender:            m.identity,
+		SkipProtocolLayer: true,
+		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE,
+	}
+
+	for _, member := range community.GetMemberPubkeys() {
+		if member.Equal(&m.identity.PublicKey) {
+			continue
+		}
+
+		if community.MemberCanManageToken(member, communityToken) {
+			_, err := m.sender.SendPrivate(context.Background(), member, rawSyncMessage)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (m *Messenger) UpdateCommunityTokenState(chainID int, contractAddress string, deployState token.DeployState) error {

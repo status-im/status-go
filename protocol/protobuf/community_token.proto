@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+option go_package = "./;protobuf";
+package protobuf;
+
+import "enums.proto";
+
+message CommunityToken {
+	CommunityTokenType token_type = 1;
+	string community_id = 2;
+	string address = 3;
+	string name = 4;
+	string symbol = 5;
+	string description = 6;
+	string supply = 7;
+	bool infinite_supply = 8;
+	bool transferable = 9;
+	bool remote_self_destruct = 10;
+	int32 chain_id = 11;
+	DeployState deploy_state = 12;
+	string base64_image = 13;
+	int32 decimals = 14;
+	string deployer = 15;
+	PrivilegesLevel privileges_level = 16;
+
+  enum DeployState {
+    UNKNOWN = 0;
+    FAILED = 1;
+    IN_PROGRESS = 2;
+    DEPLOYED = 3;
+  }
+
+  enum PrivilegesLevel {
+	OWNER_LEVEL = 0;
+	MASTER_LEVEL = 1;
+	COMMUNITY_LEVEL = 2;
+  }
+}

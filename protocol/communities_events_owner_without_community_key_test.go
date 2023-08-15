@@ -12,6 +12,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
@@ -210,7 +211,32 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerPinMessage() {
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAddCommunityToken() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)
-	testEventSenderAddedCommunityToken(s, community)
+	testAddAndSyncTokenFromEventSenderByControlNode(s, community, token.CommunityLevel)
+}
+
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAddOwnerToken() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)
+	testAddAndSyncTokenFromEventSenderByControlNode(s, community, token.OwnerLevel)
+}
+
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerAddTokenMasterToken() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)
+	testAddAndSyncTokenFromEventSenderByControlNode(s, community, token.MasterLevel)
+}
+
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerSyncOwnerTokenFromControlNode() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)
+	testAddAndSyncTokenFromControlNode(s, community, token.OwnerLevel, true)
+}
+
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerSyncTokenMasterTokenFromControlNode() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)
+	testAddAndSyncTokenFromControlNode(s, community, token.MasterLevel, true)
+}
+
+func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerSyncCommunityTokenFromControlNode() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER)
+	testAddAndSyncTokenFromControlNode(s, community, token.CommunityLevel, true)
 }
 
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestMemberReceiveOwnerEventsWhenControlNodeOffline() {
