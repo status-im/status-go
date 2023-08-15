@@ -11,7 +11,8 @@ var (
 )
 
 type CheckPermissionToJoinCommunity struct {
-	CommunityID types.HexBytes
+	CommunityID types.HexBytes `json:"communityId"`
+	Addresses   []string       `json:"addresses"`
 }
 
 func (u *CheckPermissionToJoinCommunity) Validate() error {
