@@ -353,7 +353,6 @@ func (p *Persistence) SaveRequestToJoin(request *RequestToJoin) (err error) {
 		return err
 	}
 
-	fmt.Println("Save request ples ", request.ID, request.State)
 	defer func() {
 		if err == nil {
 			err = tx.Commit()

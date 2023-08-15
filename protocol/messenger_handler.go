@@ -1379,7 +1379,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, si
 	if state.Response.RequestsToJoinCommunity != nil {
 		for _, request := range state.Response.RequestsToJoinCommunity {
 			if request.PublicKey == common.PubkeyToHex(signer) {
-				// We have aready handled this request to join
+				// We have already handled this request to join
 				return nil
 			}
 		}

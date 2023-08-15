@@ -1502,78 +1502,51 @@ func (m *Manager) HandleCommunityEventsMessageRejected(signer *ecdsa.PublicKey, 
 	return reapplyEventsMessage, nil
 }
 
-func (m *Manager) HandleCommunityPrivilegedUserSyncMessage(signer *ecdsa.PublicKey, message *protobuf.CommunityPrivilegedUserSyncMessage) error {
-	if signer == nil {
-		return errors.New("signer can't be nil")
+func (m *Manager) HandleRequestToJoinPrivilegedUserSyncMessage(message *protobuf.CommunityPrivilegedUserSyncMessage, communityID types.HexBytes) ([]*RequestToJoin, error) {
+	var state RequestToJoinState
+	if message.Type == protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN {
+		state = RequestToJoinStateAccepted
+	} else {
+		state = RequestToJoinStateDeclined
 	}
 
-	community, err := m.persistence.GetByID(&m.identity.PublicKey, message.CommunityId)
-	if err != nil {
-		return err
+	requestsToJoin := make([]*RequestToJoin, 0)
+	for signer, requestToJoinProto := range message.RequestToJoin {
+		requestToJoin := &RequestToJoin{
+			PublicKey:   signer,
+			Clock:       requestToJoinProto.Clock,
+			ENSName:     requestToJoinProto.EnsName,
+			CommunityID: requestToJoinProto.CommunityId,
+			State:       state,
+		}
+		requestToJoin.CalculateID()
+
+		_, err := m.saveOrUpdateRequestToJoin(signer, communityID, requestToJoin)
+		if err != nil {
+			return nil, err
+		}
+		requestsToJoin = append(requestsToJoin, requestToJoin)
 	}
 
-	if community == nil {
-		return ErrOrgNotFound
-	}
+	return requestsToJoin, nil
+}
 
-	if !community.IsPrivilegedMember(&m.identity.PublicKey) {
-		return errors.New("user has no permissions to process privileged sync message")
-	}
-
-	err = validateCommunityPrivilegedUserSyncMessage(message)
-	if err != nil {
-		return err
-	}
-
-	switch message.Type {
-	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN:
-		fallthrough
-	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_REJECT_REQUEST_TO_JOIN:
-		if !common.IsPubKeyEqual(community.PublicKey(), signer) {
-			return errors.New("accepted/requested to join sync messages can be send only by the control node")
+func (m *Manager) HandleAddCommunityTokenPrivilegedUserSyncMessage(message *protobuf.CommunityPrivilegedUserSyncMessage, community *Community) error {
+	for _, token := range message.CommunityTokens {
+		token := community_token.FromCommunityTokenProtobuf(token)
+		if !community.MemberCanManageToken(community.MemberIdentity(), token) {
+			return ErrInvalidManageTokensPermission
 		}
 
-		var state RequestToJoinState
-		if message.Type == protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN {
-			state = RequestToJoinStateAccepted
-		} else {
-			state = RequestToJoinStateDeclined
+		exist, err := m.persistence.HasCommunityToken(token.CommunityID, token.Address, token.ChainID)
+		if err != nil {
+			return err
 		}
 
-		for signer, requestToJoinProto := range message.RequestToJoin {
-			requestToJoin := &RequestToJoin{
-				PublicKey:   signer,
-				Clock:       requestToJoinProto.Clock,
-				ENSName:     requestToJoinProto.EnsName,
-				CommunityID: requestToJoinProto.CommunityId,
-				State:       state,
-			}
-			requestToJoin.CalculateID()
-
-			_, err := m.saveOrUpdateRequestToJoin(signer, community.ID(), requestToJoin)
-			if err != nil {
-				return err
-			}
+		if !exist {
+			return m.persistence.AddCommunityToken(token)
 		}
-	case protobuf.CommunityPrivilegedUserSyncMessage_ADD_COMMUNITY_TOKENS:
-		for _, token := range message.CommunityTokens {
-			token := community_token.FromCommunityTokenProtobuf(token)
-			if !community.MemberCanManageToken(community.MemberIdentity(), token) {
-				return ErrInvalidManageTokensPermission
-			}
-
-			exist, err := m.persistence.HasCommunityToken(token.CommunityID, token.Address, token.ChainID)
-			if err != nil {
-				return err
-			}
-
-			if !exist {
-				return m.persistence.AddCommunityToken(token)
-			}
-		}
-
 	}
-
 	return nil
 }
 
@@ -4636,7 +4609,7 @@ func (m *Manager) HandleCommunityTokensMetadata(communityID string, communityTok
 	return nil
 }
 
-func validateCommunityPrivilegedUserSyncMessage(message *protobuf.CommunityPrivilegedUserSyncMessage) error {
+func (m *Manager) ValidateCommunityPrivilegedUserSyncMessage(message *protobuf.CommunityPrivilegedUserSyncMessage) error {
 	if message == nil {
 		return errors.New("invalid CommunityPrivilegedUserSyncMessage message")
 	}

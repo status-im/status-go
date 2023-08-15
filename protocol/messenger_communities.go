@@ -2673,7 +2673,55 @@ func (m *Messenger) handleCommunityEventsMessageRejected(state *ReceivedMessageS
 }
 
 func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMessageState, signer *ecdsa.PublicKey, message protobuf.CommunityPrivilegedUserSyncMessage) error {
-	return m.communitiesManager.HandleCommunityPrivilegedUserSyncMessage(signer, &message)
+	if signer == nil {
+		return errors.New("signer can't be nil")
+	}
+
+	community, err := m.communitiesManager.GetByID(message.CommunityId)
+	if err != nil {
+		return err
+	}
+
+	if community == nil {
+		return errors.New("community not found")
+	}
+
+	if !community.IsPrivilegedMember(&m.identity.PublicKey) {
+		return errors.New("user has no permissions to process privileged sync message")
+	}
+
+	isControlNodeMsg := common.IsPubKeyEqual(community.PublicKey(), signer)
+	if !(isControlNodeMsg || community.IsPrivilegedMember(signer)) {
+		return errors.New("user has no permissions to send privileged sync message")
+	}
+
+	err = m.communitiesManager.ValidateCommunityPrivilegedUserSyncMessage(&message)
+	if err != nil {
+		return err
+	}
+
+	switch message.Type {
+	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN:
+		fallthrough
+	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_REJECT_REQUEST_TO_JOIN:
+		if !common.IsPubKeyEqual(community.PublicKey(), signer) {
+			return errors.New("accepted/requested to join sync messages can be send only by the control node")
+		}
+		requestsToJoin, err := m.communitiesManager.HandleRequestToJoinPrivilegedUserSyncMessage(&message, community.ID())
+		if err != nil {
+			return nil
+		}
+		state.Response.AddRequestsToJoinCommunity(requestsToJoin)
+
+	case protobuf.CommunityPrivilegedUserSyncMessage_ADD_COMMUNITY_TOKENS:
+		// TODO add tokens to the Response
+		err = m.communitiesManager.HandleAddCommunityTokenPrivilegedUserSyncMessage(&message, community)
+		if err != nil {
+			return nil
+		}
+	}
+
+	return nil
 }
 
 func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, syncCommunity protobuf.SyncCommunity) error {
