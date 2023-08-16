@@ -173,5 +173,9 @@ type CollectibleAccountOwnershipProvider interface {
 type CollectibleDataProvider interface {
 	CollectibleProvider
 	FetchAssetsByCollectibleUniqueID(uniqueIDs []CollectibleUniqueID) ([]FullCollectibleData, error)
+}
+
+type CollectionDataProvider interface {
+	CollectibleProvider
 	FetchCollectionsDataByContractID(ids []ContractID) ([]CollectionData, error)
 }

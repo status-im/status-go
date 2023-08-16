@@ -43,6 +43,7 @@ type Manager struct {
 	contractOwnershipProviders []thirdparty.CollectibleContractOwnershipProvider
 	accountOwnershipProviders  []thirdparty.CollectibleAccountOwnershipProvider
 	collectibleDataProviders   []thirdparty.CollectibleDataProvider
+	collectionDataProviders    []thirdparty.CollectionDataProvider
 	metadataProvider           thirdparty.CollectibleMetadataProvider
 	opensea                    *opensea.Client
 	httpClient                 *http.Client
@@ -50,7 +51,7 @@ type Manager struct {
 	collectionsDataDB          *CollectionDataDB
 }
 
-func NewManager(db *sql.DB, rpcClient *rpc.Client, contractOwnershipProviders []thirdparty.CollectibleContractOwnershipProvider, accountOwnershipProviders []thirdparty.CollectibleAccountOwnershipProvider, collectibleDataProviders []thirdparty.CollectibleDataProvider, opensea *opensea.Client) *Manager {
+func NewManager(db *sql.DB, rpcClient *rpc.Client, contractOwnershipProviders []thirdparty.CollectibleContractOwnershipProvider, accountOwnershipProviders []thirdparty.CollectibleAccountOwnershipProvider, collectibleDataProviders []thirdparty.CollectibleDataProvider, collectionDataProviders []thirdparty.CollectionDataProvider, opensea *opensea.Client) *Manager {
 	hystrix.ConfigureCommand(hystrixContractOwnershipClientName, hystrix.CommandConfig{
 		Timeout:               10000,
 		MaxConcurrentRequests: 100,
@@ -63,6 +64,7 @@ func NewManager(db *sql.DB, rpcClient *rpc.Client, contractOwnershipProviders []
 		contractOwnershipProviders: contractOwnershipProviders,
 		accountOwnershipProviders:  accountOwnershipProviders,
 		collectibleDataProviders:   collectibleDataProviders,
+		collectionDataProviders:    collectionDataProviders,
 		opensea:                    opensea,
 		httpClient: &http.Client{
 			Timeout: requestTimeout,
@@ -293,7 +295,7 @@ func (o *Manager) FetchCollectionsDataByContractID(ids []thirdparty.ContractID) 
 	missingIDsPerChainID := thirdparty.GroupContractIDsByChainID(missingIDs)
 
 	for chainID, idsToFetch := range missingIDsPerChainID {
-		for _, provider := range o.collectibleDataProviders {
+		for _, provider := range o.collectionDataProviders {
 			if !provider.IsChainSupported(chainID) {
 				continue
 			}
