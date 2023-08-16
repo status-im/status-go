@@ -173,9 +173,9 @@ func ValidateConnectionString(cs string) error {
 	return err
 }
 
-// addrToIpNet casts addr to IPNet.
+// addrToIPNet casts addr to IPNet.
 // Returns nil if addr is not of IPNet type.
-func addrToIpNet(addr net.Addr) *net.IPNet {
+func addrToIPNet(addr net.Addr) *net.IPNet {
 	switch v := addr.(type) {
 	case *net.IPNet:
 		return v
@@ -239,7 +239,7 @@ func GetLocalAddresses() ([][]net.IP, error) {
 		for _, addr := range addrs {
 
 			var ip net.IP
-			if ipNet := addrToIpNet(addr); ip == nil {
+			if ipNet := addrToIPNet(addr); ipNet == nil {
 				continue
 			} else {
 				ip = ipNet.IP
@@ -248,7 +248,9 @@ func GetLocalAddresses() ([][]net.IP, error) {
 			niIps = append(niIps, ip)
 		}
 
-		ips = append(ips, niIps)
+		if len(niIps) > 0 {
+			ips = append(ips, niIps)
+		}
 	}
 
 	return ips, nil
@@ -269,9 +271,9 @@ func GetLocalAddressesForPairingServer() ([]net.IP, error) {
 func FindReachableAddresses(remoteIps []net.IP, localNets []net.IPNet) []net.IP {
 	var result []net.IP
 	for _, localNet := range localNets {
-		for _, remoteIp := range remoteIps {
-			if localNet.Contains(remoteIp) {
-				result = append(result, remoteIp)
+		for _, remoteIP := range remoteIps {
+			if localNet.Contains(remoteIP) {
+				result = append(result, remoteIP)
 			}
 		}
 	}
@@ -295,7 +297,7 @@ func GetAllAvailableNetworks() ([]net.IPNet, error) {
 		}
 
 		for _, localAddr := range addrs {
-			localNets = append(localNets, *addrToIpNet(localAddr))
+			localNets = append(localNets, *addrToIPNet(localAddr))
 		}
 	}
 	return localNets, nil
