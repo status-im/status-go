@@ -127,7 +127,13 @@ func NewService(
 		alchemyClient,
 	}
 
-	collectiblesManager := collectibles.NewManager(db, rpcClient, contractOwnershipProviders, accountOwnershipProviders, collectibleDataProviders, openseaClient)
+	collectionDataProviders := []thirdparty.CollectionDataProvider{
+		openseaClient,
+		infuraClient,
+		alchemyClient,
+	}
+
+	collectiblesManager := collectibles.NewManager(db, rpcClient, contractOwnershipProviders, accountOwnershipProviders, collectibleDataProviders, collectionDataProviders, openseaClient)
 	collectibles := collectibles.NewService(db, walletFeed, accountsDB, accountFeed, rpcClient.NetworkManager, collectiblesManager)
 	return &Service{
 		db:                    db,
