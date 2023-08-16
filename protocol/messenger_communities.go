@@ -4506,15 +4506,22 @@ func (m *Messenger) GetCommunityMembersForWalletAddresses(communityID types.HexB
 
 	membersForAddresses := map[string]*Contact{}
 
-	for memberID, member := range community.Members() {
-		for _, revealedAddress := range member.RevealedAccounts {
-			if slices.Contains(revealedAddress.ChainIds, chainID) {
-				contact, ok := m.allContacts.Load(memberID)
-				if ok {
-					membersForAddresses[revealedAddress.Address] = contact
-				} else {
-					m.logger.Error("community member is not a contact", zap.String("contact ID", memberID))
-				}
+	for _, memberPubKey := range community.GetMemberPubkeys() {
+		memberPubKeyStr := common.PubkeyToHex(memberPubKey)
+		revealedAccounts, err := m.communitiesManager.GetRevealedAddresses(communityID, memberPubKeyStr)
+		if err != nil {
+			return nil, err
+		}
+		for _, revealedAccount := range revealedAccounts {
+			if !slices.Contains(revealedAccount.ChainIds, chainID) {
+				continue
+			}
+
+			contact, ok := m.allContacts.Load(memberPubKeyStr)
+			if ok {
+				membersForAddresses[revealedAccount.Address] = contact
+			} else {
+				m.logger.Error("community member is not a contact", zap.String("contact ID", memberPubKeyStr))
 			}
 		}
 	}
