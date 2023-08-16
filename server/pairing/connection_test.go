@@ -1,6 +1,7 @@
 package pairing
 
 import (
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -67,4 +68,121 @@ func (s *ConnectionParamsSuite) TestConnectionParams_Generate() {
 
 	s.Require().True(cp.publicKey.Equal(&s.PK.PublicKey))
 	s.Require().Equal(s.AES, cp.aesKey)
+}
+
+func (s *ConnectionParamsSuite) TestConnectionParams_GetLocalAddressesForPairingServer() {
+
+	allIps := [][]net.IP{
+		{
+			net.IPv4(127, 0, 0, 1),
+			net.IPv6loopback,
+		},
+		{
+			net.IPv4(192, 168, 1, 42),
+			net.IP{0xfc, 0x80, 0, 0, 0, 0, 0, 0, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08},
+		},
+		{
+			net.IPv4(11, 12, 13, 14),
+		},
+		{
+			net.IP{0xfc, 0x80, 0, 0, 0, 0, 0, 0, 0xff, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08},
+		},
+		{
+			net.IP{0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0xff, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08},
+		},
+	}
+
+	// First NI is a loop-back
+	ni0 := allIps[0]
+	s.Require().NotNil(ni0[0].To4())
+	s.Require().True(ni0[0].IsLoopback())
+	s.Require().Len(ni0[1], net.IPv6len)
+	s.Require().True(ni0[1].IsLoopback())
+
+	// Second NI's both IP addresses fits the needs. IPv6 should be filtered out.
+	ni1 := allIps[1]
+	s.Require().NotNil(ni1[0].To4())
+	s.Require().True(ni1[0].IsGlobalUnicast())
+	s.Require().True(ni1[0].IsPrivate())
+	s.Require().Len(ni1[1], net.IPv6len)
+	s.Require().True(ni1[1].IsGlobalUnicast())
+	s.Require().True(ni1[1].IsPrivate())
+
+	// Next NI should be filtered out as non-private
+	ni2 := allIps[2]
+	s.Require().NotNil(ni2[0].To4())
+	s.Require().False(ni2[0].IsPrivate())
+
+	// Next NI fits the needs, should be taken,
+	// as no preferred IPv4 is available on this NI.
+	ni3 := allIps[3]
+	s.Require().Len(ni3[0], net.IPv6len)
+	s.Require().True(ni3[0].IsGlobalUnicast())
+	s.Require().True(ni3[0].IsPrivate())
+
+	// Last NI has a link-local unicast address,
+	// which should be filtered out as non-private.
+	ni4 := allIps[4]
+	s.Require().Len(ni4[0], net.IPv6len)
+	s.Require().True(ni4[0].IsLinkLocalUnicast())
+	s.Require().False(ni4[0].IsGlobalUnicast())
+	s.Require().False(ni4[0].IsPrivate())
+
+	ips := FilterAddressesForPairingServer(allIps)
+	s.Require().Len(ips, 2)
+	s.Require().NotNil(ips[0].To4())
+	s.Require().NotNil(ni1[0].To4())
+	s.Require().Equal(ips[0].To4(), ni1[0].To4())
+	s.Require().Equal(ips[1], ni3[0])
+}
+
+func (s *ConnectionParamsSuite) TestConnectionParams_FindReachableAddresses() {
+	var remoteIps []net.IP
+	var localNets []net.IPNet
+	var ips []net.IP
+
+	// Test 1
+	remoteIps = []net.IP{
+		net.IPv4(10, 1, 2, 3),
+		net.IPv4(172, 16, 2, 42),
+		net.IPv4(192, 168, 1, 42),
+	}
+	localNets = []net.IPNet{
+		{IP: net.IPv4(192, 168, 1, 43), Mask: net.IPv4Mask(255, 255, 255, 0)},
+	}
+	ips = FindReachableAddresses(remoteIps, localNets)
+	s.Require().Len(ips, 1)
+	s.Require().Equal(ips[0], remoteIps[2])
+
+	// Test 2
+	remoteIps = []net.IP{
+		net.IPv4(10, 1, 2, 3),
+		net.IPv4(172, 16, 2, 42),
+		net.IPv4(192, 168, 1, 42),
+	}
+	localNets = []net.IPNet{
+		{IP: net.IPv4(10, 1, 1, 1), Mask: net.IPv4Mask(255, 255, 0, 0)},
+		{IP: net.IPv4(172, 16, 2, 43), Mask: net.IPv4Mask(255, 255, 255, 0)},
+		{IP: net.IPv4(192, 168, 2, 43), Mask: net.IPv4Mask(255, 255, 255, 0)},
+	}
+	ips = FindReachableAddresses(remoteIps, localNets)
+	s.Require().Len(ips, 2)
+	s.Require().Equal(ips[0], remoteIps[0])
+	s.Require().Equal(ips[1], remoteIps[1])
+
+	// Test 3
+	remoteIps = []net.IP{
+		net.IPv4(10, 1, 2, 3),
+		net.IPv4(172, 16, 2, 42),
+		net.IPv4(192, 168, 1, 42),
+	}
+	localNets = []net.IPNet{}
+	ips = FindReachableAddresses(remoteIps, localNets)
+	s.Require().Len(ips, 0)
+
+	// Test 4
+	remoteIps = []net.IP{}
+	localNets = []net.IPNet{}
+	ips = FindReachableAddresses(remoteIps, localNets)
+	s.Require().Len(ips, 0)
 }
