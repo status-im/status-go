@@ -3019,7 +3019,10 @@ func (m *Messenger) updateUnviewedCounts(chat *Chat, message *common.Message) {
 	if chat == nil {
 		return
 	}
-	if chat.LastMessage == nil || chat.LastMessage.IsSystemMessage() || message.Timestamp > chat.LastMessage.Timestamp+IncreaseUnviewedMessagesCountTimeout {
+	if chat.LastMessage == nil ||
+		chat.LastMessage.IsSystemMessage() ||
+		!chat.LastMessage.New ||
+		message.Timestamp > chat.LastMessage.Timestamp+IncreaseUnviewedMessagesCountTimeout {
 		chat.UnviewedMessagesCount++
 	}
 	if message.Mentioned || message.Replied {
