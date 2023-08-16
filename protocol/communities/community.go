@@ -483,31 +483,26 @@ func (o *Community) CreateChat(chatID string, chat *protobuf.CommunityChat) (*Co
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isControlNode := o.IsControlNode()
-	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
-
-	if !isControlNode && !allowedToSendEvents {
-		return nil, ErrNotAdmin
-	}
-
-	if allowedToSendEvents {
-		err := o.addNewCommunityEvent(o.ToCreateChannelCommunityEvent(chatID, chat))
-		if err != nil {
-			return nil, err
-		}
+	if !(o.IsControlNode() || o.hasPermissionToSendCommunityEvent(protobuf.CommunityEvent_COMMUNITY_CHANNEL_CREATE)) {
+		return nil, ErrNotAuthorized
 	}
 
 	err := o.createChat(chatID, chat)
 	if err != nil {
 		return nil, err
 	}
-
-	if isControlNode {
-		o.increaseClock()
-	}
-
 	changes := o.emptyCommunityChanges()
 	changes.ChatsAdded[chatID] = chat
+
+	if o.IsControlNode() {
+		o.increaseClock()
+	} else {
+		err := o.addNewCommunityEvent(o.ToCreateChannelCommunityEvent(chatID, chat))
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return changes, nil
 }
 
@@ -515,32 +510,26 @@ func (o *Community) EditChat(chatID string, chat *protobuf.CommunityChat) (*Comm
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isControlNode := o.IsControlNode()
-	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
-
-	if !isControlNode && !allowedToSendEvents {
-		return nil, ErrNotAdmin
-	}
-
-	if allowedToSendEvents {
-		err := o.addNewCommunityEvent(o.ToEditChannelCommunityEvent(chatID, chat))
-		if err != nil {
-			return nil, err
-		}
+	if !(o.IsControlNode() || o.hasPermissionToSendCommunityEvent(protobuf.CommunityEvent_COMMUNITY_CHANNEL_EDIT)) {
+		return nil, ErrNotAuthorized
 	}
 
 	err := o.editChat(chatID, chat)
 	if err != nil {
 		return nil, err
 	}
-
-	if isControlNode {
-		o.increaseClock()
-	}
-
 	changes := o.emptyCommunityChanges()
 	changes.ChatsModified[chatID] = &CommunityChatChanges{
 		ChatModified: chat,
+	}
+
+	if o.IsControlNode() {
+		o.increaseClock()
+	} else {
+		err := o.addNewCommunityEvent(o.ToEditChannelCommunityEvent(chatID, chat))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return changes, nil
@@ -550,24 +539,19 @@ func (o *Community) DeleteChat(chatID string) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isControlNode := o.IsControlNode()
-	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
-
-	if !isControlNode && !allowedToSendEvents {
-		return nil, ErrNotAdmin
-	}
-
-	if allowedToSendEvents {
-		err := o.addNewCommunityEvent(o.ToDeleteChannelCommunityEvent(chatID))
-		if err != nil {
-			return nil, err
-		}
+	if !(o.IsControlNode() || o.hasPermissionToSendCommunityEvent(protobuf.CommunityEvent_COMMUNITY_CHANNEL_DELETE)) {
+		return nil, ErrNotAuthorized
 	}
 
 	changes := o.deleteChat(chatID)
 
-	if isControlNode {
+	if o.IsControlNode() {
 		o.increaseClock()
+	} else {
+		err := o.addNewCommunityEvent(o.ToDeleteChannelCommunityEvent(chatID))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return changes, nil
@@ -619,6 +603,15 @@ func (o *Community) isBanned(pk *ecdsa.PublicKey) bool {
 		}
 	}
 	return false
+}
+
+func (o *Community) rolesOf(pk *ecdsa.PublicKey) []protobuf.CommunityMember_Roles {
+	member := o.getMember(pk)
+	if member == nil {
+		return nil
+	}
+
+	return member.Roles
 }
 
 func (o *Community) memberHasRoles(member *protobuf.CommunityMember, roles map[protobuf.CommunityMember_Roles]bool) bool {
@@ -709,27 +702,23 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isControlNode := o.IsControlNode()
-	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
-
-	if !isControlNode && !allowedToSendEvents {
-		return nil, ErrNotAdmin
+	if !(o.IsControlNode() || o.hasPermissionToSendCommunityEvent(protobuf.CommunityEvent_COMMUNITY_MEMBER_KICK)) {
+		return nil, ErrNotAuthorized
 	}
 
-	if !isControlNode && o.IsPrivilegedMember(pk) {
+	if !o.IsControlNode() && o.IsPrivilegedMember(pk) {
 		return nil, ErrCannotRemoveOwnerOrAdmin
 	}
 
-	if allowedToSendEvents {
+	o.removeMemberFromOrg(pk)
+
+	if o.IsControlNode() {
+		o.increaseClock()
+	} else {
 		err := o.addNewCommunityEvent(o.ToKickCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	o.removeMemberFromOrg(pk)
-	if isControlNode {
-		o.increaseClock()
 	}
 
 	return o.config.CommunityDescription, nil
@@ -739,23 +728,19 @@ func (o *Community) AddCommunityTokensMetadata(token *protobuf.CommunityTokenMet
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isControlNode := o.IsControlNode()
-	allowedToSendTokenEvents := o.IsOwnerWithoutCommunityKey() || o.IsTokenMaster()
-	if !isControlNode && !allowedToSendTokenEvents {
-		return nil, ErrInvalidManageTokensPermission
-	}
-
-	if allowedToSendTokenEvents {
-		err := o.addNewCommunityEvent(o.ToAddTokenMetadataCommunityEvent(token))
-		if err != nil {
-			return nil, err
-		}
+	if !(o.IsControlNode() || o.hasPermissionToSendCommunityEvent(protobuf.CommunityEvent_COMMUNITY_TOKEN_ADD)) {
+		return nil, ErrNotAuthorized
 	}
 
 	o.config.CommunityDescription.CommunityTokensMetadata = append(o.config.CommunityDescription.CommunityTokensMetadata, token)
 
-	if isControlNode {
+	if o.IsControlNode() {
 		o.increaseClock()
+	} else {
+		err := o.addNewCommunityEvent(o.ToAddTokenMetadataCommunityEvent(token))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return o.config.CommunityDescription, nil
@@ -765,24 +750,19 @@ func (o *Community) UnbanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Commu
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isControlNode := o.IsControlNode()
-	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
-
-	if !isControlNode && !allowedToSendEvents {
-		return nil, ErrNotAdmin
-	}
-
-	if allowedToSendEvents {
-		err := o.addNewCommunityEvent(o.ToUnbanCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
-		if err != nil {
-			return nil, err
-		}
+	if !(o.IsControlNode() || o.hasPermissionToSendCommunityEvent(protobuf.CommunityEvent_COMMUNITY_MEMBER_UNBAN)) {
+		return nil, ErrNotAuthorized
 	}
 
 	o.unbanUserFromCommunity(pk)
 
-	if isControlNode {
+	if o.IsControlNode() {
 		o.increaseClock()
+	} else {
+		err := o.addNewCommunityEvent(o.ToUnbanCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return o.config.CommunityDescription, nil
@@ -792,28 +772,23 @@ func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Communi
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isControlNode := o.IsControlNode()
-	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
-
-	if !isControlNode && !allowedToSendEvents {
-		return nil, ErrNotAdmin
+	if !(o.IsControlNode() || o.hasPermissionToSendCommunityEvent(protobuf.CommunityEvent_COMMUNITY_MEMBER_BAN)) {
+		return nil, ErrNotAuthorized
 	}
 
-	if !isControlNode && o.IsPrivilegedMember(pk) {
+	if !o.IsControlNode() && o.IsPrivilegedMember(pk) {
 		return nil, ErrCannotBanOwnerOrAdmin
-	}
-
-	if allowedToSendEvents {
-		err := o.addNewCommunityEvent(o.ToBanCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	o.banUserFromCommunity(pk)
 
-	if isControlNode {
+	if o.IsControlNode() {
 		o.increaseClock()
+	} else {
+		err := o.addNewCommunityEvent(o.ToBanCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return o.config.CommunityDescription, nil
@@ -1088,6 +1063,15 @@ func (o *Community) GetPrivilegedMembers() []*ecdsa.PublicKey {
 
 func (o *Community) HasPermissionToSendCommunityEvents() bool {
 	return !o.IsControlNode() && o.hasRoles(o.config.MemberIdentity, manageCommunityRoles())
+}
+
+func (o *Community) hasPermissionToSendCommunityEvent(event protobuf.CommunityEvent_EventType) bool {
+	return !o.IsControlNode() && canRolesPerformEvent(o.rolesOf(o.config.MemberIdentity), event)
+}
+
+func (o *Community) hasPermissionToSendTokenPermissionCommunityEvent(event protobuf.CommunityEvent_EventType, permissionType protobuf.CommunityTokenPermission_Type) bool {
+	roles := o.rolesOf(o.config.MemberIdentity)
+	return !o.IsControlNode() && canRolesPerformEvent(roles, event) && canRolesModifyPermission(roles, permissionType)
 }
 
 func (o *Community) IsMemberOwner(publicKey *ecdsa.PublicKey) bool {
@@ -1399,13 +1383,8 @@ func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermis
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isControlNode := o.IsControlNode()
-	allowedToManageMemberPermissions := o.IsTokenMaster() || o.IsAdmin()
-	allowedToManageAllPermissions := o.IsOwnerWithoutCommunityKey()
-
-	if (!isControlNode && !allowedToManageMemberPermissions && !allowedToManageAllPermissions) ||
-		(allowedToManageMemberPermissions && permission.Type != protobuf.CommunityTokenPermission_BECOME_MEMBER) {
-		return nil, ErrNotEnoughPermissions
+	if !(o.IsControlNode() || o.hasPermissionToSendTokenPermissionCommunityEvent(protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGE, permission.Type)) {
+		return nil, ErrNotAuthorized
 	}
 
 	changes, err := o.addTokenPermission(permission)
@@ -1413,16 +1392,14 @@ func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermis
 		return nil, err
 	}
 
-	if allowedToManageMemberPermissions || allowedToManageAllPermissions {
+	if o.IsControlNode() {
+		o.updateEncrypted()
+		o.increaseClock()
+	} else {
 		err := o.addNewCommunityEvent(o.ToCommunityTokenPermissionChangeCommunityEvent(permission))
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	if isControlNode {
-		o.updateEncrypted()
-		o.increaseClock()
 	}
 
 	return changes, nil
@@ -1432,13 +1409,8 @@ func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isControlNode := o.IsControlNode()
-	allowedToManageMemberPermissions := o.IsTokenMaster() || o.IsAdmin()
-	allowedToManageAllPermissions := o.IsOwnerWithoutCommunityKey()
-
-	if (!isControlNode && !allowedToManageMemberPermissions && !allowedToManageAllPermissions) ||
-		(allowedToManageMemberPermissions && tokenPermission.Type != protobuf.CommunityTokenPermission_BECOME_MEMBER) {
-		return nil, ErrNotEnoughPermissions
+	if !(o.IsControlNode() || o.hasPermissionToSendTokenPermissionCommunityEvent(protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGE, tokenPermission.Type)) {
+		return nil, ErrNotAuthorized
 	}
 
 	changes, err := o.updateTokenPermission(tokenPermission)
@@ -1446,16 +1418,14 @@ func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *
 		return nil, err
 	}
 
-	if allowedToManageMemberPermissions || allowedToManageAllPermissions {
+	if o.IsControlNode() {
+		o.updateEncrypted()
+		o.increaseClock()
+	} else {
 		err := o.addNewCommunityEvent(o.ToCommunityTokenPermissionChangeCommunityEvent(tokenPermission))
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	if isControlNode {
-		o.updateEncrypted()
-		o.increaseClock()
 	}
 
 	return changes, nil
@@ -1466,18 +1436,12 @@ func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChange
 	defer o.mutex.Unlock()
 
 	permission, exists := o.config.CommunityDescription.TokenPermissions[permissionID]
-
 	if !exists {
 		return nil, ErrTokenPermissionNotFound
 	}
 
-	isControlNode := o.IsControlNode()
-	allowedToManageMemberPermissions := o.IsTokenMaster() || o.IsAdmin()
-	allowedToManageAllPermissions := o.IsOwnerWithoutCommunityKey()
-
-	if (!isControlNode && !allowedToManageMemberPermissions && !allowedToManageAllPermissions) ||
-		(allowedToManageMemberPermissions && permission.Type != protobuf.CommunityTokenPermission_BECOME_MEMBER) {
-		return nil, ErrNotEnoughPermissions
+	if !(o.IsControlNode() || o.hasPermissionToSendTokenPermissionCommunityEvent(protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETE, permission.Type)) {
+		return nil, ErrNotAuthorized
 	}
 
 	changes, err := o.deleteTokenPermission(permissionID)
@@ -1485,16 +1449,14 @@ func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChange
 		return nil, err
 	}
 
-	if allowedToManageMemberPermissions || allowedToManageAllPermissions {
+	if o.IsControlNode() {
+		o.updateEncrypted()
+		o.increaseClock()
+	} else {
 		err := o.addNewCommunityEvent(o.ToCommunityTokenPermissionDeleteCommunityEvent(permission))
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	if isControlNode {
-		o.updateEncrypted()
-		o.increaseClock()
 	}
 
 	return changes, nil
@@ -1761,8 +1723,8 @@ func (o *Community) RequestsToJoin() []*RequestToJoin {
 }
 
 func (o *Community) AddMember(publicKey *ecdsa.PublicKey, roles []protobuf.CommunityMember_Roles) (*CommunityChanges, error) {
-	if !o.IsControlNode() && !o.HasPermissionToSendCommunityEvents() {
-		return nil, ErrNotAdmin
+	if !o.IsControlNode() {
+		return nil, ErrNotControlNode
 	}
 
 	memberKey := common.PubkeyToHex(publicKey)
@@ -1785,8 +1747,8 @@ func (o *Community) AddMemberToChat(chatID string, publicKey *ecdsa.PublicKey, r
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !o.IsControlNode() && !o.HasPermissionToSendCommunityEvents() {
-		return nil, ErrNotAuthorized
+	if !o.IsControlNode() {
+		return nil, ErrNotControlNode
 	}
 
 	memberKey := common.PubkeyToHex(publicKey)
@@ -1863,35 +1825,12 @@ func (o *Community) AllowsAllMembersToPinMessage() bool {
 	return o.config.CommunityDescription.AdminSettings != nil && o.config.CommunityDescription.AdminSettings.PinMessageAllMembersEnabled
 }
 
-func (o *Community) AddMemberRevealedAccounts(memberID string, accounts []*protobuf.RevealedAccount, clock uint64) (*CommunityChanges, error) {
-	o.mutex.Lock()
-	defer o.mutex.Unlock()
-
-	if !o.IsControlNode() && !o.HasPermissionToSendCommunityEvents() {
-		return nil, ErrNotAdmin
-	}
-
-	if _, ok := o.config.CommunityDescription.Members[memberID]; !ok {
-		return nil, ErrMemberNotFound
-	}
-
-	o.config.CommunityDescription.Members[memberID].RevealedAccounts = accounts
-	o.config.CommunityDescription.Members[memberID].LastUpdateClock = clock
-	o.increaseClock()
-
-	changes := o.emptyCommunityChanges()
-	changes.MemberWalletsAdded[memberID] = o.config.CommunityDescription.Members[memberID].RevealedAccounts
-	return changes, nil
-}
-
 func (o *Community) AddMemberWithRevealedAccounts(dbRequest *RequestToJoin, roles []protobuf.CommunityMember_Roles, accounts []*protobuf.RevealedAccount) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isControlNode := o.IsControlNode()
-
-	if !isControlNode {
-		return nil, ErrNotAdmin
+	if !o.IsControlNode() {
+		return nil, ErrNotControlNode
 	}
 
 	changes := o.addMemberWithRevealedAccounts(dbRequest.PublicKey, roles, accounts, dbRequest.Clock)
@@ -2139,14 +2078,17 @@ func (o *Community) DeclineRequestToJoin(dbRequest *RequestToJoin) error {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	isControlNode := o.IsControlNode()
-	allowedToSendEvents := o.HasPermissionToSendCommunityEvents()
-
-	if !isControlNode && !allowedToSendEvents {
-		return ErrNotAdmin
+	if !(o.IsControlNode() || o.hasPermissionToSendCommunityEvent(protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT)) {
+		return ErrNotAuthorized
 	}
 
-	if allowedToSendEvents {
+	if o.IsControlNode() {
+		// typically, community's clock is increased implicitly when making changes
+		// to it, however in this scenario there are no changes in the community, yet
+		// we need to increase the clock to ensure the owner event is processed by other
+		// nodes.
+		o.increaseClock()
+	} else {
 		rejectedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
 		rejectedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
 
@@ -2158,14 +2100,6 @@ func (o *Community) DeclineRequestToJoin(dbRequest *RequestToJoin) error {
 		if err != nil {
 			return err
 		}
-	}
-
-	if isControlNode {
-		// typically, community's clock is increased implicitly when making changes
-		// to it, however in this scenario there are no changes in the community, yet
-		// we need to increase the clock to ensure the owner event is processed by other
-		// nodes.
-		o.increaseClock()
 	}
 
 	return nil

@@ -119,7 +119,7 @@ func (s *CommunitySuite) TestCreateChat() {
 		Permissions: permissions,
 	})
 
-	s.Require().Equal(ErrNotAdmin, err)
+	s.Require().Equal(ErrNotAuthorized, err)
 
 	org.config.PrivateKey = s.identity
 	org.config.ID = &s.identity.PublicKey
@@ -189,7 +189,7 @@ func (s *CommunitySuite) TestEditChat() {
 		Identity:    editedIdentity,
 		Permissions: editedPermissions,
 	})
-	s.Require().Equal(ErrNotAdmin, err)
+	s.Require().Equal(ErrNotAuthorized, err)
 
 	description := org.config.CommunityDescription
 	org.config.PrivateKey = s.identity
@@ -218,7 +218,7 @@ func (s *CommunitySuite) TestDeleteChat() {
 	org.config.ID = nil
 
 	_, err := org.DeleteChat(testChatID1)
-	s.Require().Equal(ErrNotAdmin, err)
+	s.Require().Equal(ErrNotAuthorized, err)
 
 	org.config.PrivateKey = s.identity
 	org.config.ID = &s.identity.PublicKey
@@ -238,7 +238,7 @@ func (s *CommunitySuite) TestRemoveUserFromChat() {
 	org.config.ID = nil
 	// Not an admin
 	_, err := org.RemoveUserFromOrg(&s.member1.PublicKey)
-	s.Require().Equal(ErrNotAdmin, err)
+	s.Require().Equal(ErrNotAuthorized, err)
 
 	// Add admin to community
 	org.config.PrivateKey = s.identity
@@ -266,7 +266,7 @@ func (s *CommunitySuite) TestRemoveUserFormOrg() {
 	org.config.ID = nil
 	// Not an admin
 	_, err := org.RemoveUserFromOrg(&s.member1.PublicKey)
-	s.Require().Equal(ErrNotAdmin, err)
+	s.Require().Equal(ErrNotAuthorized, err)
 
 	// Add admin to community
 	org.config.PrivateKey = s.identity

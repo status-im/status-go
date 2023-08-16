@@ -840,13 +840,6 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 		return nil, ErrOrgNotFound
 	}
 
-	isControlNode := community.IsControlNode()
-	allowedToSendEvents := community.HasPermissionToSendCommunityEvents()
-
-	if !isControlNode && !allowedToSendEvents {
-		return nil, ErrNotEnoughPermissions
-	}
-
 	newDescription, err := request.ToCommunityDescription()
 	if err != nil {
 		return nil, fmt.Errorf("Can't create community description: %v", err)
@@ -876,11 +869,8 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 		return nil, err
 	}
 
-	if allowedToSendEvents {
-		err := community.addNewCommunityEvent(community.ToCommunityEditCommunityEvent(newDescription))
-		if err != nil {
-			return nil, err
-		}
+	if !(community.IsControlNode() || community.hasPermissionToSendCommunityEvent(protobuf.CommunityEvent_COMMUNITY_EDIT)) {
+		return nil, ErrNotAuthorized
 	}
 
 	// Edit the community values
@@ -889,8 +879,13 @@ func (m *Manager) EditCommunity(request *requests.EditCommunity) (*Community, er
 		return nil, err
 	}
 
-	if isControlNode {
+	if community.IsControlNode() {
 		community.increaseClock()
+	} else {
+		err := community.addNewCommunityEvent(community.ToCommunityEditCommunityEvent(newDescription))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = m.saveAndPublish(community)
@@ -1878,7 +1873,7 @@ func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, err
 		return nil, err
 	}
 
-	if community.HasPermissionToSendCommunityEvents() && !community.IsControlNode() {
+	if community.hasPermissionToSendCommunityEvent(protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT) && !community.IsControlNode() {
 		if dbRequest.MarkedAsPendingByPrivilegedAccount() {
 			// if the request is in any pending state, it means our admin node has either
 			// already made a decision in the past, or previously received a decision by

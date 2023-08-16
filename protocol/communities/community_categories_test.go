@@ -13,7 +13,7 @@ func (s *CommunitySuite) TestCreateCategory() {
 	org.config.ID = nil
 
 	_, err := org.CreateCategory(newCategoryID, newCategoryName, []string{})
-	s.Require().Equal(ErrNotAdmin, err)
+	s.Require().Equal(ErrNotAuthorized, err)
 
 	org.config.PrivateKey = s.identity
 	org.config.ID = &s.identity.PublicKey
@@ -90,7 +90,7 @@ func (s *CommunitySuite) TestEditCategory() {
 	org.config.ID = nil
 
 	_, err = org.EditCategory(newCategoryID, editedCategoryName, []string{testChatID1})
-	s.Require().Equal(ErrNotAdmin, err)
+	s.Require().Equal(ErrNotAuthorized, err)
 
 	org.config.PrivateKey = s.identity
 	org.config.ID = &s.identity.PublicKey
@@ -218,7 +218,7 @@ func (s *CommunitySuite) TestDeleteCategory() {
 	org.config.PrivateKey = nil
 	org.config.ID = nil
 	_, err = org.DeleteCategory(testCategoryID1)
-	s.Require().Equal(ErrNotAdmin, err)
+	s.Require().Equal(ErrNotAuthorized, err)
 
 	org.config.PrivateKey = s.identity
 	org.config.ID = &s.identity.PublicKey
