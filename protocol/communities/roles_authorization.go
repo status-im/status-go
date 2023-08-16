@@ -40,11 +40,10 @@ var adminAuthorizedPermissionTypes = []protobuf.CommunityTokenPermission_Type{
 	protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL,
 }
 
-var tokenMasterAuthorizedPermissionTypes = append(adminAuthorizedPermissionTypes, []protobuf.CommunityTokenPermission_Type{
-	protobuf.CommunityTokenPermission_BECOME_ADMIN,
-}...)
+var tokenMasterAuthorizedPermissionTypes = append(adminAuthorizedPermissionTypes, []protobuf.CommunityTokenPermission_Type{}...)
 
 var ownerAuthorizedPermissionTypes = append(tokenMasterAuthorizedPermissionTypes, []protobuf.CommunityTokenPermission_Type{
+	protobuf.CommunityTokenPermission_BECOME_ADMIN,
 	protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER,
 }...)
 
