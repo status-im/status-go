@@ -2642,6 +2642,41 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 		return err
 	}
 
+	for _, requestToJoin := range communityResponse.RequestsToJoin {
+		// Activity Center notification
+		notification, err := m.persistence.GetActivityCenterNotificationByID(requestToJoin.ID)
+		if err != nil {
+			return err
+		}
+
+		if notification != nil {
+			notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
+			switch requestToJoin.State {
+			case communities.RequestToJoinStateDeclined:
+				notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
+			case communities.RequestToJoinStateAccepted:
+				notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
+			case communities.RequestToJoinStateAcceptedPending:
+				notification.MembershipStatus = ActivityCenterMembershipStatusAcceptedPending
+			case communities.RequestToJoinStateDeclinedPending:
+				notification.MembershipStatus = ActivityCenterMembershipStatusDeclinedPending
+			default:
+				notification.MembershipStatus = ActivityCenterMembershipStatusPending
+
+			}
+
+			notification.Read = true
+			notification.Accepted = true
+			notification.UpdatedAt = m.getCurrentTimeInMillis()
+
+			err = m.addActivityCenterNotification(state.Response, notification)
+			if err != nil {
+				m.logger.Error("failed to save notification", zap.Error(err))
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
