@@ -79,7 +79,9 @@ func (m *Messenger) ChatsPreview() []*ChatPreview {
 			}
 
 			if chat.LastMessage != nil {
+				m.prepareMessage(chat.LastMessage, m.httpServer)
 
+				chatPreview.ImageLocalURL = chat.LastMessage.ImageLocalURL
 				chatPreview.OutgoingStatus = chat.LastMessage.OutgoingStatus
 				chatPreview.ResponseTo = chat.LastMessage.ResponseTo
 				chatPreview.ContentType = chat.LastMessage.ContentType

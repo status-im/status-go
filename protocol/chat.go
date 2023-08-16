@@ -218,6 +218,9 @@ type ChatPreview struct {
 
 	ContentType protobuf.ChatMessage_ContentType `json:"contentType,omitempty"`
 
+	// ImageLocalURL is the local url of the image
+	ImageLocalURL string `json:"imageLocalUrl,omitempty"`
+
 	// Highlight is used for highlight chats
 	Highlight bool `json:"highlight,omitempty"`
 

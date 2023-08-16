@@ -2329,9 +2329,8 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	response.AddChat(chat)
 
 	m.logger.Debug("sent message", zap.String("id", message.ID))
-	m.prepareMessages(response.messages)
 
-	return &response, m.saveChat(chat)
+	return response.Prepare(m), m.saveChat(chat)
 }
 
 func whisperToUnixTimestamp(whisperTimestamp uint64) uint32 {
@@ -4732,7 +4731,7 @@ func (m *Messenger) saveDataAndPrepareResponse(messageState *ReceivedMessageStat
 		return nil, err
 	}
 
-	m.prepareMessages(messageState.Response.messages)
+	messageState.Response.Prepare(m)
 
 	for _, message := range messageState.Response.messages {
 		if _, ok := newMessagesIds[message.ID]; ok {
@@ -4861,6 +4860,9 @@ func (m *Messenger) prepareMessages(messages map[string]*common.Message) {
 }
 
 func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
+	if s == nil {
+		return
+	}
 	if msg.QuotedMessage != nil && msg.QuotedMessage.ContentType == int64(protobuf.ChatMessage_IMAGE) {
 		msg.QuotedMessage.ImageLocalURL = s.MakeImageURL(msg.QuotedMessage.ID)
 	}

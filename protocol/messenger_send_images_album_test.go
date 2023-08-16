@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/server"
 
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
@@ -116,6 +117,14 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), messageCount)
 
+	// create an http server
+	mediaServer, err := server.NewMediaServer(nil, nil, nil)
+	s.Require().NoError(err)
+	s.Require().NotNil(mediaServer)
+	s.Require().NoError(mediaServer.Start())
+
+	theirMessenger.httpServer = mediaServer
+
 	response, err = WaitOnMessengerResponse(
 		theirMessenger,
 		func(r *MessengerResponse) bool { return len(r.messages) == messageCount },
@@ -124,6 +133,9 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {
 
 	s.Require().NoError(err)
 	s.Require().Len(response.Chats(), 1)
+	chat := response.Chats()[0]
+	s.Require().NotNil(chat.LastMessage)
+	s.Require().NotEmpty(chat.LastMessage.ImageLocalURL)
 	s.Require().Len(response.Messages(), messageCount)
 	for _, message := range response.Messages() {
 		image := message.GetImage()
