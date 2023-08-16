@@ -15,16 +15,15 @@ message Grant {
 
 message CommunityMember {
   enum Roles {
+    reserved 2, 3;
+    reserved "ROLE_MANAGE_USERS", "ROLE_MODERATE_CONTENT";
     ROLE_NONE = 0;
     ROLE_OWNER = 1;
-    ROLE_MANAGE_USERS = 2;
-    ROLE_MODERATE_CONTENT = 3;
     ROLE_ADMIN = 4;
     ROLE_TOKEN_MASTER = 5;
   }
   repeated Roles roles = 1;
-  // deprecated, do not put accounts here
-  repeated RevealedAccount revealed_accounts = 2;
+  repeated RevealedAccount revealed_accounts = 2 [deprecated = true];
   uint64 last_update_clock = 3;
 }
 

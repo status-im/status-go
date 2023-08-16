@@ -82,7 +82,7 @@ func (s *MessengerDeleteMessageForEveryoneSuite) TestDeleteMessageForEveryone() 
 	response, err := s.admin.AddRoleToMember(&requests.AddRoleToMember{
 		CommunityID: community.ID(),
 		User:        common.PubkeyToHexBytes(s.moderator.IdentityPublicKey()),
-		Role:        protobuf.CommunityMember_ROLE_MODERATE_CONTENT,
+		Role:        protobuf.CommunityMember_ROLE_ADMIN,
 	})
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
