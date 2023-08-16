@@ -1337,14 +1337,7 @@ func (m *Manager) validateAndFilterEvents(community *Community, events []Communi
 	validatedEvents := make([]CommunityEvent, 0, len(events))
 
 	validateEvent := func(event *CommunityEvent) error {
-		if event.Signature == nil || len(event.Signature) == 0 {
-			return errors.New("missing signature")
-		}
-
-		signer, err := crypto.SigToPub(
-			crypto.Keccak256(event.Payload),
-			event.Signature,
-		)
+		signer, err := event.RecoverSigner()
 		if err != nil {
 			return err
 		}
