@@ -28,12 +28,10 @@ var tokenMasterAuthorizedEventTypes = append(adminAuthorizedEventTypes, []protob
 var ownerAuthorizedEventTypes = tokenMasterAuthorizedEventTypes
 
 var rolesToAuthorizedEventTypes = map[protobuf.CommunityMember_Roles][]protobuf.CommunityEvent_EventType{
-	protobuf.CommunityMember_ROLE_NONE:             []protobuf.CommunityEvent_EventType{},
-	protobuf.CommunityMember_ROLE_OWNER:            ownerAuthorizedEventTypes,
-	protobuf.CommunityMember_ROLE_MANAGE_USERS:     []protobuf.CommunityEvent_EventType{},
-	protobuf.CommunityMember_ROLE_MODERATE_CONTENT: []protobuf.CommunityEvent_EventType{},
-	protobuf.CommunityMember_ROLE_ADMIN:            adminAuthorizedEventTypes,
-	protobuf.CommunityMember_ROLE_TOKEN_MASTER:     tokenMasterAuthorizedEventTypes,
+	protobuf.CommunityMember_ROLE_NONE:         []protobuf.CommunityEvent_EventType{},
+	protobuf.CommunityMember_ROLE_OWNER:        ownerAuthorizedEventTypes,
+	protobuf.CommunityMember_ROLE_ADMIN:        adminAuthorizedEventTypes,
+	protobuf.CommunityMember_ROLE_TOKEN_MASTER: tokenMasterAuthorizedEventTypes,
 }
 
 var adminAuthorizedPermissionTypes = []protobuf.CommunityTokenPermission_Type{
@@ -51,12 +49,10 @@ var ownerAuthorizedPermissionTypes = append(tokenMasterAuthorizedPermissionTypes
 }...)
 
 var rolesToAuthorizedPermissionTypes = map[protobuf.CommunityMember_Roles][]protobuf.CommunityTokenPermission_Type{
-	protobuf.CommunityMember_ROLE_NONE:             []protobuf.CommunityTokenPermission_Type{},
-	protobuf.CommunityMember_ROLE_OWNER:            ownerAuthorizedPermissionTypes,
-	protobuf.CommunityMember_ROLE_MANAGE_USERS:     []protobuf.CommunityTokenPermission_Type{},
-	protobuf.CommunityMember_ROLE_MODERATE_CONTENT: []protobuf.CommunityTokenPermission_Type{},
-	protobuf.CommunityMember_ROLE_ADMIN:            adminAuthorizedPermissionTypes,
-	protobuf.CommunityMember_ROLE_TOKEN_MASTER:     tokenMasterAuthorizedPermissionTypes,
+	protobuf.CommunityMember_ROLE_NONE:         []protobuf.CommunityTokenPermission_Type{},
+	protobuf.CommunityMember_ROLE_OWNER:        ownerAuthorizedPermissionTypes,
+	protobuf.CommunityMember_ROLE_ADMIN:        adminAuthorizedPermissionTypes,
+	protobuf.CommunityMember_ROLE_TOKEN_MASTER: tokenMasterAuthorizedPermissionTypes,
 }
 
 func canRolesPerformEvent(roles []protobuf.CommunityMember_Roles, eventType protobuf.CommunityEvent_EventType) bool {

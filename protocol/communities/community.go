@@ -1114,12 +1114,6 @@ func manageCommunityRoles() map[protobuf.CommunityMember_Roles]bool {
 	return roles
 }
 
-func manageUsersRole() map[protobuf.CommunityMember_Roles]bool {
-	roles := manageCommunityRoles()
-	roles[protobuf.CommunityMember_ROLE_MANAGE_USERS] = true
-	return roles
-}
-
 func ownerRole() map[protobuf.CommunityMember_Roles]bool {
 	roles := make(map[protobuf.CommunityMember_Roles]bool)
 	roles[protobuf.CommunityMember_ROLE_OWNER] = true
@@ -1138,12 +1132,6 @@ func tokenMasterRole() map[protobuf.CommunityMember_Roles]bool {
 	return roles
 }
 
-func moderateContentRole() map[protobuf.CommunityMember_Roles]bool {
-	roles := manageCommunityRoles()
-	roles[protobuf.CommunityMember_ROLE_MODERATE_CONTENT] = true
-	return roles
-}
-
 func (o *Community) MemberRole(pubKey *ecdsa.PublicKey) protobuf.CommunityMember_Roles {
 	if o.IsMemberOwner(pubKey) {
 		return protobuf.CommunityMember_ROLE_OWNER
@@ -1151,10 +1139,6 @@ func (o *Community) MemberRole(pubKey *ecdsa.PublicKey) protobuf.CommunityMember
 		return protobuf.CommunityMember_ROLE_TOKEN_MASTER
 	} else if o.IsMemberAdmin(pubKey) {
 		return protobuf.CommunityMember_ROLE_ADMIN
-	} else if o.CanManageUsers(pubKey) {
-		return protobuf.CommunityMember_ROLE_MANAGE_USERS
-	} else if o.CanDeleteMessageForEveryone(pubKey) {
-		return protobuf.CommunityMember_ROLE_MODERATE_CONTENT
 	}
 
 	return protobuf.CommunityMember_ROLE_NONE
@@ -1708,33 +1692,14 @@ func (o *Community) CanManageUsers(pk *ecdsa.PublicKey) bool {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.IsControlNode() {
-		return true
-	}
-
-	if !o.hasMember(pk) {
-		return false
-	}
-
-	roles := manageUsersRole()
-	return o.hasRoles(pk, roles)
-
+	return o.IsPrivilegedMember(pk)
 }
 
 func (o *Community) CanDeleteMessageForEveryone(pk *ecdsa.PublicKey) bool {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if o.IsControlNode() {
-		return true
-	}
-
-	if !o.hasMember(pk) {
-		return false
-	}
-
-	roles := moderateContentRole()
-	return o.hasRoles(pk, roles)
+	return o.IsPrivilegedMember(pk)
 }
 
 func (o *Community) isMember() bool {
@@ -1772,7 +1737,7 @@ func (o *Community) nextClock() uint64 {
 
 func (o *Community) CanManageUsersPublicKeys() ([]*ecdsa.PublicKey, error) {
 	var response []*ecdsa.PublicKey
-	roles := manageUsersRole()
+	roles := manageCommunityRoles()
 	for pkString, member := range o.config.CommunityDescription.Members {
 		if o.memberHasRoles(member, roles) {
 			pk, err := common.HexToPubkey(pkString)
