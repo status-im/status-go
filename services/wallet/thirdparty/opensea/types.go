@@ -17,24 +17,7 @@ import (
 
 const OpenseaV1ID = "openseaV1"
 
-func chainStringToChainID(chainString string) walletCommon.ChainID {
-	chainID := walletCommon.UnknownChainID
-	switch chainString {
-	case "ethereum":
-		chainID = walletCommon.EthereumMainnet
-	case "arbitrum":
-		chainID = walletCommon.ArbitrumMainnet
-	case "optimism":
-		chainID = walletCommon.OptimismMainnet
-	case "goerli":
-		chainID = walletCommon.EthereumGoerli
-	case "arbitrum_goerli":
-		chainID = walletCommon.ArbitrumGoerli
-	case "optimism_goerli":
-		chainID = walletCommon.OptimismGoerli
-	}
-	return walletCommon.ChainID(chainID)
-}
+type urlGetter func(walletCommon.ChainID, string) (string, error)
 
 type TraitValue string
 
