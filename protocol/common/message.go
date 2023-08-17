@@ -768,10 +768,8 @@ func isValidLinkPreviewForProto(preview LinkPreview) bool {
 	switch preview.Type {
 	case protobuf.UnfurledLink_IMAGE:
 		return preview.URL != "" && isValidLinkPreviewThumbnail(preview.Thumbnail)
-	case protobuf.UnfurledLink_LINK:
+	default: // Validate as a link type by default.
 		return preview.Title != "" && preview.URL != "" && isValidLinkPreviewThumbnail(preview.Thumbnail)
-	default:
-		return false
 	}
 }
 
