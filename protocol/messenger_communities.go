@@ -1451,6 +1451,7 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
+	response.AddRequestToJoinCommunity(requestToJoin)
 
 	// Activity Center notification
 	notification, err := m.persistence.GetActivityCenterNotificationByID(request.ID)
