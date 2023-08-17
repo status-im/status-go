@@ -771,11 +771,11 @@ func (s *CommunitySuite) TestChannelTokenPermissionsByType() {
 	}
 
 	for _, viewOnlyPermission := range viewOnlyPermissions {
-		_, err := org.AddTokenPermission(viewOnlyPermission)
+		_, err := org.UpsertTokenPermission(viewOnlyPermission)
 		s.Require().NoError(err)
 	}
 	for _, viewAndPostPermission := range viewAndPostPermissions {
-		_, err := org.AddTokenPermission(viewAndPostPermission)
+		_, err := org.UpsertTokenPermission(viewAndPostPermission)
 		s.Require().NoError(err)
 	}
 

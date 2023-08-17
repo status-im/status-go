@@ -246,17 +246,9 @@ func (o *Community) updateCommunityDescriptionByCommunityEvent(communityEvent Co
 		o.config.CommunityDescription.Tags = communityEvent.CommunityConfig.Tags
 
 	case protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGE:
-		_, exists := o.config.CommunityDescription.TokenPermissions[communityEvent.TokenPermission.Id]
-		if exists {
-			_, err := o.updateTokenPermission(communityEvent.TokenPermission)
-			if err != nil {
-				return err
-			}
-		} else {
-			_, err := o.addTokenPermission(communityEvent.TokenPermission)
-			if err != nil {
-				return err
-			}
+		_, err := o.upsertTokenPermission(communityEvent.TokenPermission)
+		if err != nil {
+			return err
 		}
 
 	case protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETE:

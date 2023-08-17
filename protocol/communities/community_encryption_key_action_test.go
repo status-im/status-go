@@ -369,12 +369,12 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Permiss
 			modified := origin.CreateDeepCopy()
 
 			for _, permission := range tc.originPermissions {
-				_, err := origin.AddTokenPermission(permission)
+				_, err := origin.UpsertTokenPermission(permission)
 				s.Require().NoError(err)
 			}
 
 			for _, permission := range tc.modifiedPermissions {
-				_, err := modified.AddTokenPermission(permission)
+				_, err := modified.UpsertTokenPermission(permission)
 				s.Require().NoError(err)
 			}
 
@@ -496,7 +496,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Members
 		s.Run(tc.name, func() {
 			origin := createTestCommunity(s.identity)
 			for _, permission := range tc.permissions {
-				_, err := origin.AddTokenPermission(permission)
+				_, err := origin.UpsertTokenPermission(permission)
 				s.Require().NoError(err)
 			}
 			modified := origin.CreateDeepCopy()
@@ -599,7 +599,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Permiss
 			modified := origin.CreateDeepCopy()
 
 			for _, permission := range tc.originPermissions {
-				_, err := origin.AddTokenPermission(permission)
+				_, err := origin.UpsertTokenPermission(permission)
 				s.Require().NoError(err)
 			}
 			for _, member := range tc.originMembers {
@@ -608,7 +608,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Permiss
 			}
 
 			for _, permission := range tc.modifiedPermissions {
-				_, err := modified.AddTokenPermission(permission)
+				_, err := modified.UpsertTokenPermission(permission)
 				s.Require().NoError(err)
 			}
 			for _, member := range tc.modifiedMembers {
@@ -748,7 +748,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 			modified := origin.CreateDeepCopy()
 
 			for _, permission := range tc.originPermissions {
-				_, err := origin.AddTokenPermission(permission)
+				_, err := origin.UpsertTokenPermission(permission)
 				s.Require().NoError(err)
 			}
 			for _, member := range tc.originMembers {
@@ -759,7 +759,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 			}
 
 			for _, permission := range tc.modifiedPermissions {
-				_, err := modified.AddTokenPermission(permission)
+				_, err := modified.UpsertTokenPermission(permission)
 				s.Require().NoError(err)
 			}
 			for _, member := range tc.modifiedMembers {
@@ -810,7 +810,7 @@ func (s *CommunityEncryptionKeyActionSuite) TestNilOrigin() {
 		},
 	}
 	for _, permission := range newCommunityPermissions {
-		_, err := newCommunity.AddTokenPermission(permission)
+		_, err := newCommunity.UpsertTokenPermission(permission)
 		s.Require().NoError(err)
 	}
 
