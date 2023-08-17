@@ -2165,7 +2165,7 @@ func _1689931300_add_community_tokens_deployer_and_priv_levelUpSql() (*asset, er
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1689931300_add_community_tokens_deployer_and_priv_level.up.sql", size: 156, mode: os.FileMode(0644), modTime: time.Unix(1692045698, 0)}
+	info := bindataFileInfo{name: "1689931300_add_community_tokens_deployer_and_priv_level.up.sql", size: 156, mode: os.FileMode(0644), modTime: time.Unix(1692220039, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3f, 0x24, 0xd9, 0x4d, 0xe, 0x4b, 0xe3, 0x4c, 0xd1, 0xc, 0x72, 0xd4, 0x99, 0xe4, 0xb9, 0xb8, 0xe9, 0x38, 0x9e, 0x11, 0x48, 0xea, 0xe3, 0x5d, 0xd9, 0xd0, 0xef, 0x96, 0x38, 0x5a, 0xd4, 0xa5}}
 	return a, nil
 }

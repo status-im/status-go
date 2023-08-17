@@ -71,6 +71,7 @@ message CommunityTokenPermission {
     CAN_VIEW_CHANNEL = 3;
     CAN_VIEW_AND_POST_CHANNEL = 4;
     BECOME_TOKEN_MASTER = 5;
+    BECOME_TOKEN_OWNER = 6;
   }
 
   string id = 1;

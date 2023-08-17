@@ -821,6 +821,35 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 	return community, changes, nil
 }
 
+func (m *Manager) ReevaluateCommunityMembersPermissions(request *requests.ReevaluateCommunityMembersPermissions) (*Community, error) {
+	community, err := m.GetByID(request.CommunityID)
+	if err != nil {
+		return nil, err
+	}
+
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	// TODO: Control node needs to be notified to do a permission check if TokenMasters did airdrop
+	// of the token which is using in a community permissions
+	if !community.IsControlNode() {
+		return nil, ErrNotEnoughPermissions
+	}
+
+	err = m.ReevaluateMembers(community)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.saveAndPublish(community)
+	if err != nil {
+		return nil, err
+	}
+
+	return community, nil
+}
+
 func (m *Manager) DeleteCommunity(id types.HexBytes) error {
 	err := m.persistence.DeleteCommunity(id)
 	if err != nil {
