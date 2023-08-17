@@ -1,12 +1,9 @@
 package pairing
 
 import (
-	"fmt"
-	"net"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/server/servertest"

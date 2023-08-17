@@ -2,6 +2,10 @@ package server
 
 import (
 	"net"
+
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/logutils"
 )
 
 var (
@@ -81,18 +85,19 @@ func GetLocalAddresses() ([][]net.IP, error) {
 
 		addrs, err := ni.Addrs()
 		if err != nil {
-			return nil, err
+			logutils.ZapLogger().Warn("failed to get addresses of network interface",
+				zap.String("networkInterface", ni.Name),
+				zap.Error(err))
+			continue
 		}
 
 		for _, addr := range addrs {
-
 			var ip net.IP
 			if ipNet := addrToIPNet(addr); ipNet == nil {
 				continue
 			} else {
 				ip = ipNet.IP
 			}
-
 			niIps = append(niIps, ip)
 		}
 
@@ -116,10 +121,10 @@ func GetLocalAddressesForPairingServer() ([]net.IP, error) {
 
 // FindReachableAddresses returns a filtered remoteIps array,
 // in which each IP matches one or more of given localNets.
-func FindReachableAddresses(remoteIps []net.IP, localNets []net.IPNet) []net.IP {
+func FindReachableAddresses(remoteIPs []net.IP, localNets []net.IPNet) []net.IP {
 	var result []net.IP
 	for _, localNet := range localNets {
-		for _, remoteIP := range remoteIps {
+		for _, remoteIP := range remoteIPs {
 			if localNet.Contains(remoteIP) {
 				result = append(result, remoteIP)
 			}
@@ -141,7 +146,10 @@ func GetAllAvailableNetworks() ([]net.IPNet, error) {
 	for _, ni := range nis {
 		addrs, err := ni.Addrs()
 		if err != nil {
-			return nil, err
+			logutils.ZapLogger().Warn("failed to get addresses of network interface",
+				zap.String("networkInterface", ni.Name),
+				zap.Error(err))
+			continue
 		}
 
 		for _, localAddr := range addrs {

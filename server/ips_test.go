@@ -2,12 +2,13 @@ package server
 
 import (
 	"fmt"
-	"github.com/status-im/status-go/server/servertest"
 	"net"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/server/servertest"
 )
 
 func TestIPsTestingSuite(t *testing.T) {
