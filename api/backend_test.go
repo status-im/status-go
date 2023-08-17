@@ -1199,8 +1199,18 @@ func TestLoginAndMigrationsStillWorkWithExistingUsers(t *testing.T) {
 }
 
 func TestChangeDatabasePassword(t *testing.T) {
+	oldPassword := "password"
+	newPassword := "newPassword"
+
 	backend := NewGethStatusBackend()
 	backend.UpdateRootDataDir(t.TempDir())
+
+	// Setup keystore to test decryption of it
+	keyStoreDir := t.TempDir()
+	require.NoError(t, backend.accountManager.InitKeystore(keyStoreDir))
+
+	_, accountInfo, _, err := backend.accountManager.CreateAccount(oldPassword)
+	require.NoError(t, err)
 
 	account := multiaccounts.Account{
 		Name:          "TestAccount",
@@ -1209,11 +1219,8 @@ func TestChangeDatabasePassword(t *testing.T) {
 		KDFIterations: 1,
 	}
 
-	oldPassword := "password"
-	newPassword := "newPassword"
-
 	// Initialize accounts DB
-	err := backend.OpenAccounts()
+	err = backend.OpenAccounts()
 	require.NoError(t, err)
 	err = backend.SaveAccount(account)
 	require.NoError(t, err)
@@ -1234,4 +1241,11 @@ func TestChangeDatabasePassword(t *testing.T) {
 	walletDb, err := sqlite.OpenDB(backend.getWalletDBPath(account.KeyUID), newPassword, account.KDFIterations)
 	require.NoError(t, err)
 	walletDb.Close()
+
+	// Test that keystore can be decrypted with the new password
+	acc, key, err := backend.accountManager.AddressToDecryptedAccount(accountInfo.WalletAddress, newPassword)
+	require.NoError(t, err)
+	require.NotNil(t, acc)
+	require.NotNil(t, key)
+	require.Equal(t, acc.Address, key.Address)
 }

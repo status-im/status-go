@@ -858,9 +858,15 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 	}
 
 	isCurrentAccount := b.getAppDBPath(keyUID) == internalDbPath
+
 	restartNode := func() {
 		if isCurrentAccount {
 			if err != nil {
+				// TODO https://github.com/status-im/status-go/issues/3906
+				// Fix restarting node, as it always fails but the error is ignored
+				// because UI calls Logout and Quit afterwards. It should not be UI-dependent
+				// and should be handled gracefully here if it makes sense to run dummy node after
+				// logout
 				_ = b.startNodeWithAccount(*account, password, nil)
 			} else {
 				_ = b.startNodeWithAccount(*account, newPassword, nil)
@@ -876,14 +882,23 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 	}
 	noLogout := func() {}
 
-	err = b.changeWalletDBPassword(account, logout, password, newPassword)
+	// First change app DB password, because it also reencrypts the keystore,
+	// otherwise if we call changeWalletDbPassword first and logout, we will fail
+	// to reencrypt	the keystore
+	err = b.changeAppDBPassword(account, logout, password, newPassword)
 	if err != nil {
 		return err
 	}
 
-	// Already logged out
-	err = b.changeAppDBPassword(account, noLogout, password, newPassword)
+	// Already logged out but pass a param to decouple the logic for testing
+	err = b.changeWalletDBPassword(account, noLogout, password, newPassword)
 	if err != nil {
+		// Revert the password to original
+		err2 := b.changeAppDBPassword(account, noLogout, newPassword, password)
+		if err2 != nil {
+			log.Error("failed to revert app db password", "err", err2)
+		}
+
 		return err
 	}
 
