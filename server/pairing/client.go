@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -50,7 +49,7 @@ func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
 
 		serverCert, err = getServerCert(u)
 		if err != nil {
-			certErrs = errors.Join(certErrs, err)
+			certErrs = fmt.Errorf("%wconnecting to '%s' failed: %w; ", certErrs, u, err)
 			continue
 		}
 
@@ -59,7 +58,7 @@ func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
 	}
 
 	if serverCert == nil {
-		certErrs = errors.Join(errors.New("failed to connect to any of given addresses"), certErrs)
+		certErrs = fmt.Errorf("failed to connect to any of given addresses. %w", certErrs)
 		signal.SendLocalPairingEvent(Event{Type: EventConnectionError, Error: certErrs.Error(), Action: ActionConnect})
 		return nil, certErrs
 	}
