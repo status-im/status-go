@@ -21,8 +21,8 @@ func makeRandomSerialNumber() (*big.Int, error) {
 	return rand.Int(rand.Reader, serialNumberLimit)
 }
 
-func GenerateX509Cert(sn *big.Int, from, to time.Time, hostname string) *x509.Certificate {
-	c := &x509.Certificate{
+func GenerateX509Cert(sn *big.Int, from, to time.Time, IPAddresses []net.IP, DNSNames []string) *x509.Certificate {
+	return &x509.Certificate{
 		SerialNumber:          sn,
 		Subject:               pkix.Name{Organization: []string{"Self-signed cert"}},
 		NotBefore:             from,
@@ -31,16 +31,9 @@ func GenerateX509Cert(sn *big.Int, from, to time.Time, hostname string) *x509.Ce
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
 		IsCA:                  true,
+		IPAddresses:           IPAddresses,
+		DNSNames:              DNSNames,
 	}
-
-	ip := net.ParseIP(hostname)
-	if ip != nil {
-		c.IPAddresses = []net.IP{ip}
-	} else {
-		c.DNSNames = []string{hostname}
-	}
-
-	return c
 }
 
 func GenerateX509PEMs(cert *x509.Certificate, key *ecdsa.PrivateKey) (certPem, keyPem []byte, err error) {
@@ -59,7 +52,7 @@ func GenerateX509PEMs(cert *x509.Certificate, key *ecdsa.PrivateKey) (certPem, k
 	return
 }
 
-func GenerateTLSCert(notBefore, notAfter time.Time, hostname string) (*tls.Certificate, []byte, error) {
+func GenerateTLSCert(notBefore, notAfter time.Time, IPAddresses []net.IP, DNSNames []string) (*tls.Certificate, []byte, error) {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, nil, err
@@ -70,7 +63,7 @@ func GenerateTLSCert(notBefore, notAfter time.Time, hostname string) (*tls.Certi
 		return nil, nil, err
 	}
 
-	cert := GenerateX509Cert(sn, notBefore, notAfter, hostname)
+	cert := GenerateX509Cert(sn, notBefore, notAfter, IPAddresses, DNSNames)
 	certPem, keyPem, err := GenerateX509PEMs(cert, priv)
 	if err != nil {
 		return nil, nil, err
@@ -88,7 +81,7 @@ func generateMediaTLSCert() error {
 	notBefore := time.Now()
 	notAfter := notBefore.Add(365 * 24 * time.Hour)
 
-	finalCert, certPem, err := GenerateTLSCert(notBefore, notAfter, Localhost)
+	finalCert, certPem, err := GenerateTLSCert(notBefore, notAfter, []net.IP{}, []string{Localhost})
 	if err != nil {
 		return err
 	}

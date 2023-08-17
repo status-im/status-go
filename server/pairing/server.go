@@ -5,7 +5,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/json"
-	"fmt"
 	"net"
 	"time"
 
@@ -29,8 +28,7 @@ type BaseServer struct {
 	server.Server
 	challengeGiver *ChallengeGiver
 
-	pk *ecdsa.PublicKey
-	ek []byte
+	config ServerConfig
 }
 
 // NewBaseServer returns a *BaseServer init from the given *SenderServerConfig
@@ -43,13 +41,12 @@ func NewBaseServer(logger *zap.Logger, e *PayloadEncryptor, config *ServerConfig
 	bs := &BaseServer{
 		Server: server.NewServer(
 			config.Cert,
-			config.Hostname,
+			config.ListenIP.String(),
 			nil,
 			logger,
 		),
 		challengeGiver: cg,
-		pk:             config.PK,
-		ek:             config.EK,
+		config:         *config,
 	}
 	bs.SetTimeout(config.Timeout)
 	return bs, nil
@@ -57,18 +54,7 @@ func NewBaseServer(logger *zap.Logger, e *PayloadEncryptor, config *ServerConfig
 
 // MakeConnectionParams generates a *ConnectionParams based on the Server's current state
 func (s *BaseServer) MakeConnectionParams() (*ConnectionParams, error) {
-	hostname := s.GetHostname()
-	netIP := net.ParseIP(hostname)
-	if netIP == nil {
-		return nil, fmt.Errorf("invalid ip address given '%s'", hostname)
-	}
-
-	netIP4 := netIP.To4()
-	if netIP4 != nil {
-		netIP = netIP4
-	}
-
-	return NewConnectionParams(netIP, s.MustGetPort(), s.pk, s.ek), nil
+	return NewConnectionParams(s.config.IPAddresses, s.MustGetPort(), s.config.PK, s.config.EK), nil
 }
 
 func MakeServerConfig(config *ServerConfig) error {
@@ -83,12 +69,12 @@ func MakeServerConfig(config *ServerConfig) error {
 		return err
 	}
 
-	outboundIP, err := server.GetOutboundIP()
+	ips, err := server.GetLocalAddressesForPairingServer()
 	if err != nil {
 		return err
 	}
 
-	tlsCert, _, err := GenerateCertFromKey(tlsKey, time.Now(), outboundIP.String())
+	tlsCert, _, err := GenerateCertFromKey(tlsKey, time.Now(), ips, []string{})
 	if err != nil {
 		return err
 	}
@@ -96,7 +82,9 @@ func MakeServerConfig(config *ServerConfig) error {
 	config.PK = &tlsKey.PublicKey
 	config.EK = AESKey
 	config.Cert = &tlsCert
-	config.Hostname = outboundIP.String()
+	config.IPAddresses = ips
+	config.ListenIP = net.IPv4zero
+
 	return nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -36,17 +37,37 @@ type BaseClient struct {
 
 // NewBaseClient returns a fully qualified BaseClient from the given ConnectionParams
 func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
-	u, err := c.URL()
-	if err != nil {
-		return nil, err
+
+	var url *url.URL
+	var serverCert *x509.Certificate
+	var certErrs error
+
+	for i := range c.netIPs {
+		u, err := c.URL(i)
+		if err != nil {
+			return nil, err
+		}
+
+		serverCert, err = getServerCert(u)
+		if err != nil {
+			certErrs = errors.Join(certErrs, err)
+			continue
+		}
+
+		url = u
+		break
 	}
 
-	serverCert, err := getServerCert(u)
-	if err != nil {
-		return nil, err
+	if serverCert == nil {
+		certErrs = errors.Join(errors.New("failed to connect to any of given addresses"), certErrs)
+		signal.SendLocalPairingEvent(Event{Type: EventConnectionError, Error: certErrs.Error(), Action: ActionConnect})
+		return nil, certErrs
 	}
 
-	err = verifyCert(serverCert, c.publicKey)
+	// No error on the dial out then the URL.Host is accessible
+	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionConnect})
+
+	err := verifyCert(serverCert, c.publicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +99,7 @@ func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
 		Client:         &http.Client{Transport: tr, Jar: cj},
 		serverCert:     serverCert,
 		challengeTaker: NewChallengeTaker(NewPayloadEncryptor(c.aesKey)),
-		baseAddress:    u,
+		baseAddress:    url,
 	}, nil
 }
 

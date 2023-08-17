@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	DefaultIP = net.IP{127, 0, 0, 1}
-	Localhost = "Localhost"
+	LocalHostIP = net.IP{127, 0, 0, 1}
+	Localhost   = "Localhost"
 )
 
 func GetOutboundIP() (net.IP, error) {

@@ -59,14 +59,14 @@ func (s *ServerURLSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	s.server = &MediaServer{Server: Server{
-		hostname:   DefaultIP.String(),
+		hostname:   LocalHostIP.String(),
 		portManger: newPortManager(s.Logger, nil),
 	}}
 	err = s.server.SetPort(customPortForTests)
 	s.Require().NoError(err)
 
 	s.serverNoPort = &MediaServer{Server: Server{
-		hostname:   DefaultIP.String(),
+		hostname:   LocalHostIP.String(),
 		portManger: newPortManager(s.Logger, nil),
 	}}
 	go func() {

@@ -1,8 +1,10 @@
 package pairing
 
 import (
+	"fmt"
 	"net"
 	"sort"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -11,8 +13,10 @@ import (
 	"github.com/status-im/status-go/server/servertest"
 )
 
-var (
-	connectionString = "cs2:4FHRnp:Q4:uqnnMwVUfJc2Fkcaojet8F1ufKC3hZdGEt47joyBx9yd:BbnZ7Gc66t54a9kEFCf7FW8SGQuYypwHVeNkRYeNoqV6"
+const (
+	connectionStringV1 = "cs2:4FHRnp:Q4:uqnnMwVUfJc2Fkcaojet8F1ufKC3hZdGEt47joyBx9yd:BbnZ7Gc66t54a9kEFCf7FW8SGQuYypwHVeNkRYeNoqV6"
+	connectionStringV2 = "cs3:kDDauj5:Q4:uqnnMwVUfJc2Fkcaojet8F1ufKC3hZdGEt47joyBx9yd:BbnZ7Gc66t54a9kEFCf7FW8SGQuYypwHVeNkRYeNoqV6"
+	port               = 1337
 )
 
 func TestConnectionParamsSuite(t *testing.T) {
@@ -33,17 +37,27 @@ func (s *ConnectionParamsSuite) SetupSuite() {
 	s.SetupCertComponents(s.T())
 	s.SetupLoggerComponents()
 
-	cert, _, err := GenerateCertFromKey(s.PK, s.NotBefore, server.DefaultIP.String())
+	ip := server.LocalHostIP
+	ips := []net.IP{ip}
+
+	cert, _, err := GenerateCertFromKey(s.PK, s.NotBefore, ips, []string{})
 	s.Require().NoError(err)
 
-	bs := server.NewServer(&cert, server.DefaultIP.String(), nil, s.Logger)
-	err = bs.SetPort(1337)
+	sc := ServerConfig{
+		PK:          &s.PK.PublicKey,
+		EK:          s.AES,
+		Cert:        &cert,
+		IPAddresses: ips,
+		ListenIP:    net.IPv4zero,
+	}
+
+	bs := server.NewServer(&cert, net.IPv4zero.String(), nil, s.Logger)
+	err = bs.SetPort(port)
 	s.Require().NoError(err)
 
 	s.server = &BaseServer{
 		Server: bs,
-		pk:     &s.PK.PublicKey,
-		ek:     s.AES,
+		config: sc,
 	}
 }
 
@@ -52,23 +66,38 @@ func (s *ConnectionParamsSuite) TestConnectionParams_ToString() {
 	s.Require().NoError(err)
 
 	cps := cp.ToString()
-	s.Require().Equal(connectionString, cps)
+	s.Require().Equal(connectionStringV2, cps)
 }
 
 func (s *ConnectionParamsSuite) TestConnectionParams_Generate() {
-	cp := new(ConnectionParams)
-	err := cp.FromString(connectionString)
-	s.Require().NoError(err)
 
-	u, err := cp.URL()
-	s.Require().NoError(err)
+	testCases := []struct {
+		description string
+		cs          string
+	}{
+		{description: "ConnectionString_version1", cs: connectionStringV1},
+		{description: "ConnectionString_version2", cs: connectionStringV2},
+	}
 
-	s.Require().Equal("https://127.0.0.1:1337", u.String())
-	s.Require().Equal(server.DefaultIP.String(), u.Hostname())
-	s.Require().Equal("1337", u.Port())
+	for _, tc := range testCases {
+		s.T().Run(tc.description, func(t *testing.T) {
+			cp := new(ConnectionParams)
+			err := cp.FromString(connectionStringV2)
+			s.Require().NoError(err)
 
-	s.Require().True(cp.publicKey.Equal(&s.PK.PublicKey))
-	s.Require().Equal(s.AES, cp.aesKey)
+			u, err := cp.URL(0)
+			s.Require().NoError(err)
+
+			expectedURL := fmt.Sprintf("https://%s:%d", server.LocalHostIP.String(), port)
+
+			s.Require().Equal(expectedURL, u.String())
+			s.Require().Equal(server.LocalHostIP.String(), u.Hostname())
+			s.Require().Equal(strconv.Itoa(port), u.Port())
+
+			s.Require().True(cp.publicKey.Equal(&s.PK.PublicKey))
+			s.Require().Equal(s.AES, cp.aesKey)
+		})
+	}
 }
 
 func (s *ConnectionParamsSuite) TestConnectionParams_ParseNetIps() {
