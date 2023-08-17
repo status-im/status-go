@@ -105,7 +105,9 @@ func NewService(
 	currency := currency.NewService(db, walletFeed, tokenManager, marketManager)
 	activity := activity.NewService(db, tokenManager, walletFeed, accountsDB)
 
-	openseaClient := opensea.NewClient(config.WalletConfig.OpenseaAPIKey, walletFeed)
+	openseaHTTPClient := opensea.NewHTTPClient()
+	openseaClient := opensea.NewClient(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient, walletFeed)
+	openseaV2Client := opensea.NewClientV2(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient, walletFeed)
 	infuraClient := infura.NewClient(config.WalletConfig.InfuraAPIKey, config.WalletConfig.InfuraAPIKeySecret)
 	alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKeys)
 
@@ -117,12 +119,14 @@ func NewService(
 
 	accountOwnershipProviders := []thirdparty.CollectibleAccountOwnershipProvider{
 		openseaClient,
+		openseaV2Client,
 		infuraClient,
 		alchemyClient,
 	}
 
 	collectibleDataProviders := []thirdparty.CollectibleDataProvider{
 		openseaClient,
+		openseaV2Client,
 		infuraClient,
 		alchemyClient,
 	}

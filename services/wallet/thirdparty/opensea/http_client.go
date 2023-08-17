@@ -10,15 +10,19 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+const requestTimeout = 5 * time.Second
+const getRequestRetryMaxCount = 15
+const getRequestWaitTime = 300 * time.Millisecond
+
 type HTTPClient struct {
 	client         *http.Client
 	getRequestLock sync.RWMutex
 }
 
-func newHTTPClient() *HTTPClient {
+func NewHTTPClient() *HTTPClient {
 	return &HTTPClient{
 		client: &http.Client{
-			Timeout: RequestTimeout,
+			Timeout: requestTimeout,
 		},
 	}
 }
@@ -62,9 +66,9 @@ func (o *HTTPClient) doGetRequest(url string, apiKey string) ([]byte, error) {
 			body, err := ioutil.ReadAll(resp.Body)
 			return body, err
 		case http.StatusTooManyRequests:
-			if retryCount < GetRequestRetryMaxCount {
+			if retryCount < getRequestRetryMaxCount {
 				// sleep and retry
-				time.Sleep(GetRequestWaitTime)
+				time.Sleep(getRequestWaitTime)
 				retryCount++
 				continue
 			}
@@ -74,7 +78,7 @@ func (o *HTTPClient) doGetRequest(url string, apiKey string) ([]byte, error) {
 			if tmpAPIKey == "" && apiKey != "" {
 				tmpAPIKey = apiKey
 				// sleep and retry
-				time.Sleep(GetRequestWaitTime)
+				time.Sleep(getRequestWaitTime)
 				continue
 			}
 			// break and error

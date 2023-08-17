@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
@@ -18,26 +17,20 @@ import (
 )
 
 const (
-	EventCollectibleStatusChanged walletevent.EventType = "wallet-collectible-opensea-v1-status-changed"
+	EventOpenseaV1StatusChanged walletevent.EventType = "wallet-collectible-opensea-v1-status-changed"
 )
 
 const AssetLimit = 200
 const CollectionLimit = 300
 
-const RequestTimeout = 5 * time.Second
-const GetRequestRetryMaxCount = 15
-const GetRequestWaitTime = 300 * time.Millisecond
-
 const ChainIDRequiringAPIKey = walletCommon.EthereumMainnet
-
-type urlGetter func(walletCommon.ChainID, string) (string, error)
 
 func getBaseURL(chainID walletCommon.ChainID) (string, error) {
 	// v1 Endpoints only support L1 chain
 	switch uint64(chainID) {
 	case walletCommon.EthereumMainnet:
 		return "https://api.opensea.io/api/v1", nil
-	case walletCommon.EthereumGoerli:
+	case walletCommon.EthereumSepolia:
 		return "https://testnets-api.opensea.io/api/v1", nil
 	}
 
@@ -69,12 +62,12 @@ type Client struct {
 	urlGetter        urlGetter
 }
 
-// new opensea client.
-func NewClient(apiKey string, feed *event.Feed) *Client {
+// new opensea v1 client.
+func NewClient(apiKey string, httpClient *HTTPClient, feed *event.Feed) *Client {
 	return &Client{
-		client:           newHTTPClient(),
+		client:           httpClient,
 		apiKey:           apiKey,
-		connectionStatus: connection.NewStatus(EventCollectibleStatusChanged, feed),
+		connectionStatus: connection.NewStatus(EventOpenseaV1StatusChanged, feed),
 		urlGetter:        getURL,
 	}
 }
