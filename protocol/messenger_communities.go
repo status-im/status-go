@@ -2739,7 +2739,7 @@ func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMess
 	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN:
 		fallthrough
 	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_REJECT_REQUEST_TO_JOIN:
-		if !common.IsPubKeyEqual(community.PublicKey(), signer) {
+		if !isControlNodeMsg {
 			return errors.New("accepted/requested to join sync messages can be send only by the control node")
 		}
 		requestsToJoin, err := m.communitiesManager.HandleRequestToJoinPrivilegedUserSyncMessage(&message, community.ID())
