@@ -4,6 +4,7 @@ type ConnectionParamVersion int
 
 const (
 	ConnectionParamsV1 ConnectionParamVersion = iota + 1
+	ConnectionParamsV2
 )
 
 type LocalPairingVersion int
