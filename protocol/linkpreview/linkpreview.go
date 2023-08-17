@@ -318,7 +318,7 @@ func normalizeHostname(hostname string) string {
 	return re.ReplaceAllString(hostname, "$1")
 }
 
-// isSupportedImageContentType detects whether a URL ends with one of the
+// isSupportedImageURL detects whether a URL ends with one of the
 // supported image extensions. It provides a quick way to identify whether URLs
 // should be unfurled as images without needing to retrieve the full response
 // body first.
