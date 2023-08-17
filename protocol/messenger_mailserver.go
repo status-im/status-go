@@ -445,6 +445,8 @@ func (m *Messenger) syncFiltersFrom(filters []*transport.Filter, lastRequest uin
 		m.config.messengerSignalsHandler.HistoryRequestStarted(len(batches))
 	}
 
+	m.logger.Info("<<< syncFiltersFrom")
+
 	batchKeys := make([]int, 0, len(batches))
 	for k := range batches {
 		batchKeys = append(batchKeys, k)
@@ -609,7 +611,7 @@ func processMailserverBatch(ctx context.Context, messageRequester messageRequest
 		topicStrings = append(topicStrings, t.String())
 	}
 	logger = logger.With(zap.Any("chatIDs", batch.ChatIDs), zap.String("fromString", time.Unix(int64(batch.From), 0).Format(time.RFC3339)), zap.String("toString", time.Unix(int64(batch.To), 0).Format(time.RFC3339)), zap.Any("topic", topicStrings), zap.Int64("from", int64(batch.From)), zap.Int64("to", int64(batch.To)))
-	logger.Info("syncing topic")
+	logger.Info("<<< syncing topic")
 
 	wg := sync.WaitGroup{}
 	workWg := sync.WaitGroup{}
@@ -795,10 +797,12 @@ func (m *Messenger) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
 			From:    chat.SyncedFrom - defaultSyncPeriod,
 			Topics:  topics,
 		}
+
 		if m.config.messengerSignalsHandler != nil {
 			m.config.messengerSignalsHandler.HistoryRequestStarted(1)
 		}
 
+		m.logger.Info("<<< SyncChatFromSyncedFrom")
 		err = m.processMailserverBatch(batch)
 		if err != nil {
 			return nil, err
@@ -867,6 +871,7 @@ func (m *Messenger) FillGaps(chatID string, messageIDs []string) error {
 		m.config.messengerSignalsHandler.HistoryRequestStarted(1)
 	}
 
+	m.logger.Info("<<< FillGaps")
 	err = m.processMailserverBatch(batch)
 	if err != nil {
 		return err

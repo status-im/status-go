@@ -224,7 +224,7 @@ func (msg *ReceivedMessage) Open(watcher *Filter) (result *ReceivedMessage) {
 	raw, err := payload.DecodePayload(msg.Envelope.Message(), keyInfo)
 
 	if err != nil {
-		log.Error("failed to decode message", "err", err)
+		log.Error("failed to decode message", "err", err, "envelopeHash", msg.Envelope.Hash())
 		return nil
 	}
 
@@ -238,7 +238,7 @@ func (msg *ReceivedMessage) Open(watcher *Filter) (result *ReceivedMessage) {
 
 	ct, err := ExtractTopicFromContentTopic(msg.Envelope.Message().ContentTopic)
 	if err != nil {
-		log.Error("failed to decode message", "err", err)
+		log.Error("failed to decode message", "err", err, "envelopeHash", msg.Envelope.Hash())
 		return nil
 	}
 
