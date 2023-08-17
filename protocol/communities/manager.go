@@ -1553,14 +1553,13 @@ func (m *Manager) HandleAddCommunityTokenPrivilegedUserSyncMessage(message *prot
 }
 
 func (m *Manager) handleAdditionalAdminChanges(community *Community) (*CommunityResponse, error) {
+	communityResponse := CommunityResponse{
+		RequestsToJoin: make([]*RequestToJoin, 0),
+	}
 
 	if !(community.IsControlNode() || community.HasPermissionToSendCommunityEvents()) {
 		// we're a normal user/member node, so there's nothing for us to do here
-		return nil, nil
-	}
-
-	communityResponse := CommunityResponse{
-		RequestsToJoin: make([]*RequestToJoin, 0),
+		return &communityResponse, nil
 	}
 
 	for i := range community.config.EventsData.Events {
