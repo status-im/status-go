@@ -14,7 +14,7 @@ func CalculateRequestID(publicKey string, communityID types.HexBytes) types.HexB
 	return crypto.Keccak256([]byte(idString))
 }
 
-func ExtractTokenCriteria(permissions []*protobuf.CommunityTokenPermission) (erc20TokenCriteria map[uint64]map[string]*protobuf.TokenCriteria, erc721TokenCriteria map[uint64]map[string]*protobuf.TokenCriteria, ensTokenCriteria []string) {
+func ExtractTokenCriteria(permissions []*CommunityTokenPermission) (erc20TokenCriteria map[uint64]map[string]*protobuf.TokenCriteria, erc721TokenCriteria map[uint64]map[string]*protobuf.TokenCriteria, ensTokenCriteria []string) {
 	erc20TokenCriteria = make(map[uint64]map[string]*protobuf.TokenCriteria)
 	erc721TokenCriteria = make(map[uint64]map[string]*protobuf.TokenCriteria)
 	ensTokenCriteria = make([]string, 0)

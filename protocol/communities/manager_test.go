@@ -187,11 +187,13 @@ func (s *ManagerSuite) TestRetrieveTokens() {
 		},
 	}
 
-	var permissions = []*protobuf.CommunityTokenPermission{
-		&protobuf.CommunityTokenPermission{
-			Id:            "some-id",
-			Type:          protobuf.CommunityTokenPermission_BECOME_MEMBER,
-			TokenCriteria: tokenCriteria,
+	var permissions = []*CommunityTokenPermission{
+		&CommunityTokenPermission{
+			CommunityTokenPermission: &protobuf.CommunityTokenPermission{
+				Id:            "some-id",
+				Type:          protobuf.CommunityTokenPermission_BECOME_MEMBER,
+				TokenCriteria: tokenCriteria,
+			},
 		},
 	}
 
@@ -234,11 +236,13 @@ func (s *ManagerSuite) TestRetrieveCollectibles() {
 		},
 	}
 
-	var permissions = []*protobuf.CommunityTokenPermission{
-		&protobuf.CommunityTokenPermission{
-			Id:            "some-id",
-			Type:          protobuf.CommunityTokenPermission_BECOME_MEMBER,
-			TokenCriteria: tokenCriteria,
+	var permissions = []*CommunityTokenPermission{
+		&CommunityTokenPermission{
+			CommunityTokenPermission: &protobuf.CommunityTokenPermission{
+				Id:            "some-id",
+				Type:          protobuf.CommunityTokenPermission_BECOME_MEMBER,
+				TokenCriteria: tokenCriteria,
+			},
 		},
 	}
 
@@ -905,8 +909,8 @@ func (s *ManagerSuite) TestCheckChannelPermissions_NoPermissions() {
 		},
 	}
 
-	var viewOnlyPermissions = make([]*protobuf.CommunityTokenPermission, 0)
-	var viewAndPostPermissions = make([]*protobuf.CommunityTokenPermission, 0)
+	var viewOnlyPermissions = make([]*CommunityTokenPermission, 0)
+	var viewAndPostPermissions = make([]*CommunityTokenPermission, 0)
 
 	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), 0)
 	resp, err := m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountChainIDsCombination, false)
@@ -946,16 +950,18 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewOnlyPermissions() {
 		},
 	}
 
-	var viewOnlyPermissions = []*protobuf.CommunityTokenPermission{
-		&protobuf.CommunityTokenPermission{
-			Id:            "some-id",
-			Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-			TokenCriteria: tokenCriteria,
-			ChatIds:       []string{"test-channel-id", "test-channel-id-2"},
+	var viewOnlyPermissions = []*CommunityTokenPermission{
+		&CommunityTokenPermission{
+			CommunityTokenPermission: &protobuf.CommunityTokenPermission{
+				Id:            "some-id",
+				Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+				TokenCriteria: tokenCriteria,
+				ChatIds:       []string{"test-channel-id", "test-channel-id-2"},
+			},
 		},
 	}
 
-	var viewAndPostPermissions = make([]*protobuf.CommunityTokenPermission, 0)
+	var viewAndPostPermissions = make([]*CommunityTokenPermission, 0)
 
 	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), 0)
 	resp, err := m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountChainIDsCombination, false)
@@ -1004,16 +1010,18 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewAndPostPermissions() {
 		},
 	}
 
-	var viewAndPostPermissions = []*protobuf.CommunityTokenPermission{
-		&protobuf.CommunityTokenPermission{
-			Id:            "some-id",
-			Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-			TokenCriteria: tokenCriteria,
-			ChatIds:       []string{"test-channel-id", "test-channel-id-2"},
+	var viewAndPostPermissions = []*CommunityTokenPermission{
+		&CommunityTokenPermission{
+			CommunityTokenPermission: &protobuf.CommunityTokenPermission{
+				Id:            "some-id",
+				Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+				TokenCriteria: tokenCriteria,
+				ChatIds:       []string{"test-channel-id", "test-channel-id-2"},
+			},
 		},
 	}
 
-	var viewOnlyPermissions = make([]*protobuf.CommunityTokenPermission, 0)
+	var viewOnlyPermissions = make([]*CommunityTokenPermission, 0)
 
 	tm.setResponse(chainID, accountChainIDsCombination[0].Address, gethcommon.HexToAddress(contractAddresses[chainID]), 0)
 	resp, err := m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountChainIDsCombination, false)
@@ -1063,12 +1071,14 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewAndPostPermissionsCombina
 		},
 	}
 
-	var viewOnlyPermissions = []*protobuf.CommunityTokenPermission{
-		&protobuf.CommunityTokenPermission{
-			Id:            "some-id",
-			Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-			TokenCriteria: viewOnlyTokenCriteria,
-			ChatIds:       []string{"test-channel-id", "test-channel-id-2"},
+	var viewOnlyPermissions = []*CommunityTokenPermission{
+		&CommunityTokenPermission{
+			CommunityTokenPermission: &protobuf.CommunityTokenPermission{
+				Id:            "some-id",
+				Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+				TokenCriteria: viewOnlyTokenCriteria,
+				ChatIds:       []string{"test-channel-id", "test-channel-id-2"},
+			},
 		},
 	}
 
@@ -1087,12 +1097,14 @@ func (s *ManagerSuite) TestCheckChannelPermissions_ViewAndPostPermissionsCombina
 		},
 	}
 
-	var viewAndPostPermissions = []*protobuf.CommunityTokenPermission{
-		&protobuf.CommunityTokenPermission{
-			Id:            "some-id",
-			Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
-			TokenCriteria: viewAndPostTokenCriteria,
-			ChatIds:       []string{"test-channel-id", "test-channel-id-2"},
+	var viewAndPostPermissions = []*CommunityTokenPermission{
+		&CommunityTokenPermission{
+			CommunityTokenPermission: &protobuf.CommunityTokenPermission{
+				Id:            "some-id",
+				Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+				TokenCriteria: viewAndPostTokenCriteria,
+				ChatIds:       []string{"test-channel-id", "test-channel-id-2"},
+			},
 		},
 	}
 

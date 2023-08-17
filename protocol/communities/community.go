@@ -104,26 +104,26 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		return nil, errors.New("member identity not set")
 	}
 	communityItem := struct {
-		ID                      types.HexBytes                                `json:"id"`
-		Verified                bool                                          `json:"verified"`
-		Chats                   map[string]CommunityChat                      `json:"chats"`
-		Categories              map[string]CommunityCategory                  `json:"categories"`
-		Name                    string                                        `json:"name"`
-		Description             string                                        `json:"description"`
-		IntroMessage            string                                        `json:"introMessage"`
-		OutroMessage            string                                        `json:"outroMessage"`
-		Tags                    []CommunityTag                                `json:"tags"`
-		Images                  map[string]images.IdentityImage               `json:"images"`
-		Color                   string                                        `json:"color"`
-		MembersCount            int                                           `json:"membersCount"`
-		EnsName                 string                                        `json:"ensName"`
-		Link                    string                                        `json:"link"`
-		CommunityAdminSettings  CommunityAdminSettings                        `json:"adminSettings"`
-		Encrypted               bool                                          `json:"encrypted"`
-		BanList                 []string                                      `json:"banList"`
-		TokenPermissions        map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissions"`
-		CommunityTokensMetadata []*protobuf.CommunityTokenMetadata            `json:"communityTokensMetadata"`
-		ActiveMembersCount      uint64                                        `json:"activeMembersCount"`
+		ID                      types.HexBytes                       `json:"id"`
+		Verified                bool                                 `json:"verified"`
+		Chats                   map[string]CommunityChat             `json:"chats"`
+		Categories              map[string]CommunityCategory         `json:"categories"`
+		Name                    string                               `json:"name"`
+		Description             string                               `json:"description"`
+		IntroMessage            string                               `json:"introMessage"`
+		OutroMessage            string                               `json:"outroMessage"`
+		Tags                    []CommunityTag                       `json:"tags"`
+		Images                  map[string]images.IdentityImage      `json:"images"`
+		Color                   string                               `json:"color"`
+		MembersCount            int                                  `json:"membersCount"`
+		EnsName                 string                               `json:"ensName"`
+		Link                    string                               `json:"link"`
+		CommunityAdminSettings  CommunityAdminSettings               `json:"adminSettings"`
+		Encrypted               bool                                 `json:"encrypted"`
+		BanList                 []string                             `json:"banList"`
+		TokenPermissions        map[string]*CommunityTokenPermission `json:"tokenPermissions"`
+		CommunityTokensMetadata []*protobuf.CommunityTokenMetadata   `json:"communityTokensMetadata"`
+		ActiveMembersCount      uint64                               `json:"activeMembersCount"`
 	}{
 		ID:         o.ID(),
 		Verified:   o.config.Verified,
@@ -161,7 +161,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 			communityItem.Chats[id] = chat
 		}
 
-		communityItem.TokenPermissions = o.config.CommunityDescription.TokenPermissions
+		communityItem.TokenPermissions = o.tokenPermissions()
 		communityItem.MembersCount = len(o.config.CommunityDescription.Members)
 		communityItem.Link = fmt.Sprintf("https://join.status.im/c/0x%x", o.ID())
 		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
@@ -199,38 +199,38 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		return nil, errors.New("member identity not set")
 	}
 	communityItem := struct {
-		ID                          types.HexBytes                                `json:"id"`
-		MemberRole                  protobuf.CommunityMember_Roles                `json:"memberRole"`
-		IsControlNode               bool                                          `json:"isControlNode"`
-		Verified                    bool                                          `json:"verified"`
-		Joined                      bool                                          `json:"joined"`
-		Spectated                   bool                                          `json:"spectated"`
-		RequestedAccessAt           int                                           `json:"requestedAccessAt"`
-		Name                        string                                        `json:"name"`
-		Description                 string                                        `json:"description"`
-		IntroMessage                string                                        `json:"introMessage"`
-		OutroMessage                string                                        `json:"outroMessage"`
-		Tags                        []CommunityTag                                `json:"tags"`
-		Chats                       map[string]CommunityChat                      `json:"chats"`
-		Categories                  map[string]CommunityCategory                  `json:"categories"`
-		Images                      map[string]images.IdentityImage               `json:"images"`
-		Permissions                 *protobuf.CommunityPermissions                `json:"permissions"`
-		Members                     map[string]*protobuf.CommunityMember          `json:"members"`
-		CanRequestAccess            bool                                          `json:"canRequestAccess"`
-		CanManageUsers              bool                                          `json:"canManageUsers"`              //TODO: we can remove this
-		CanDeleteMessageForEveryone bool                                          `json:"canDeleteMessageForEveryone"` //TODO: we can remove this
-		CanJoin                     bool                                          `json:"canJoin"`
-		Color                       string                                        `json:"color"`
-		RequestedToJoinAt           uint64                                        `json:"requestedToJoinAt,omitempty"`
-		IsMember                    bool                                          `json:"isMember"`
-		Muted                       bool                                          `json:"muted"`
-		MuteTill                    time.Time                                     `json:"muteTill,omitempty"`
-		CommunityAdminSettings      CommunityAdminSettings                        `json:"adminSettings"`
-		Encrypted                   bool                                          `json:"encrypted"`
-		BanList                     []string                                      `json:"banList"`
-		TokenPermissions            map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissions"`
-		CommunityTokensMetadata     []*protobuf.CommunityTokenMetadata            `json:"communityTokensMetadata"`
-		ActiveMembersCount          uint64                                        `json:"activeMembersCount"`
+		ID                          types.HexBytes                       `json:"id"`
+		MemberRole                  protobuf.CommunityMember_Roles       `json:"memberRole"`
+		IsControlNode               bool                                 `json:"isControlNode"`
+		Verified                    bool                                 `json:"verified"`
+		Joined                      bool                                 `json:"joined"`
+		Spectated                   bool                                 `json:"spectated"`
+		RequestedAccessAt           int                                  `json:"requestedAccessAt"`
+		Name                        string                               `json:"name"`
+		Description                 string                               `json:"description"`
+		IntroMessage                string                               `json:"introMessage"`
+		OutroMessage                string                               `json:"outroMessage"`
+		Tags                        []CommunityTag                       `json:"tags"`
+		Chats                       map[string]CommunityChat             `json:"chats"`
+		Categories                  map[string]CommunityCategory         `json:"categories"`
+		Images                      map[string]images.IdentityImage      `json:"images"`
+		Permissions                 *protobuf.CommunityPermissions       `json:"permissions"`
+		Members                     map[string]*protobuf.CommunityMember `json:"members"`
+		CanRequestAccess            bool                                 `json:"canRequestAccess"`
+		CanManageUsers              bool                                 `json:"canManageUsers"`              //TODO: we can remove this
+		CanDeleteMessageForEveryone bool                                 `json:"canDeleteMessageForEveryone"` //TODO: we can remove this
+		CanJoin                     bool                                 `json:"canJoin"`
+		Color                       string                               `json:"color"`
+		RequestedToJoinAt           uint64                               `json:"requestedToJoinAt,omitempty"`
+		IsMember                    bool                                 `json:"isMember"`
+		Muted                       bool                                 `json:"muted"`
+		MuteTill                    time.Time                            `json:"muteTill,omitempty"`
+		CommunityAdminSettings      CommunityAdminSettings               `json:"adminSettings"`
+		Encrypted                   bool                                 `json:"encrypted"`
+		BanList                     []string                             `json:"banList"`
+		TokenPermissions            map[string]*CommunityTokenPermission `json:"tokenPermissions"`
+		CommunityTokensMetadata     []*protobuf.CommunityTokenMetadata   `json:"communityTokensMetadata"`
+		ActiveMembersCount          uint64                               `json:"activeMembersCount"`
 	}{
 		ID:                          o.ID(),
 		MemberRole:                  o.MemberRole(o.MemberIdentity()),
@@ -280,7 +280,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 			}
 			communityItem.Chats[id] = chat
 		}
-		communityItem.TokenPermissions = o.config.CommunityDescription.TokenPermissions
+		communityItem.TokenPermissions = o.tokenPermissions()
 		communityItem.Members = o.config.CommunityDescription.Members
 		communityItem.Permissions = o.config.CommunityDescription.Permissions
 		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
@@ -949,14 +949,15 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 		return response, nil
 	}
 
-	// We only calculate changes if we joined/spectated the community or we requested access, otherwise not interested
-	if o.config.Joined || o.config.Spectated || o.config.RequestedToJoinAt > 0 {
-		response = EvaluateCommunityChanges(o.config.CommunityDescription, description)
-		response.Community = o
-	}
+	originCommunity := o.CreateDeepCopy()
 
 	o.config.CommunityDescription = description
 	o.config.CommunityDescriptionProtocolMessage = rawMessage
+
+	// We only calculate changes if we joined/spectated the community or we requested access, otherwise not interested
+	if o.config.Joined || o.config.Spectated || o.config.RequestedToJoinAt > 0 {
+		response = EvaluateCommunityChanges(originCommunity, o)
+	}
 
 	return response, nil
 }
@@ -1315,20 +1316,64 @@ func (o *Community) Categories() map[string]*protobuf.CommunityCategory {
 	return response
 }
 
-func (o *Community) TokenPermissions() map[string]*protobuf.CommunityTokenPermission {
-	return o.config.CommunityDescription.TokenPermissions
+func (o *Community) tokenPermissions() map[string]*CommunityTokenPermission {
+	result := make(map[string]*CommunityTokenPermission, len(o.config.CommunityDescription.TokenPermissions))
+	for _, tokenPermission := range o.config.CommunityDescription.TokenPermissions {
+		result[tokenPermission.Id] = NewCommunityTokenPermission(tokenPermission)
+	}
+
+	// Non-privileged members should not see pending permissions
+	if o.config.EventsData == nil || !o.IsPrivilegedMember(o.MemberIdentity()) {
+		return result
+	}
+
+	processedPermissions := make(map[string]*struct{})
+	for _, event := range o.config.EventsData.Events {
+		if event.TokenPermission == nil || processedPermissions[event.TokenPermission.Id] != nil {
+			continue
+		}
+		processedPermissions[event.TokenPermission.Id] = &struct{}{} // first permission event wins
+
+		switch event.Type {
+		case protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGE:
+			tokenPermission := result[event.TokenPermission.Id]
+			if tokenPermission != nil {
+				tokenPermission.State = TokenPermissionUpdatePending
+			} else {
+				tokenPermission := NewCommunityTokenPermission(event.TokenPermission)
+				tokenPermission.State = TokenPermissionAdditionPending
+				result[event.TokenPermission.Id] = tokenPermission
+			}
+
+		case protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETE:
+			tokenPermission := result[event.TokenPermission.Id]
+			if tokenPermission != nil {
+				tokenPermission.State = TokenPermissionRemovalPending
+			}
+		default:
+		}
+	}
+
+	return result
+}
+
+func (o *Community) TokenPermissions() map[string]*CommunityTokenPermission {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+	return o.tokenPermissions()
 }
 
 func (o *Community) HasTokenPermissions() bool {
-	return o.config.CommunityDescription.TokenPermissions != nil && len(o.config.CommunityDescription.TokenPermissions) > 0
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+	return len(o.tokenPermissions()) > 0
 }
 
 func (o *Community) ChannelHasTokenPermissions(chatID string) bool {
-	if !o.HasTokenPermissions() {
-		return false
-	}
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
 
-	for _, tokenPermission := range o.TokenPermissions() {
+	for _, tokenPermission := range o.tokenPermissions() {
 		if includes(tokenPermission.ChatIds, chatID) {
 			return true
 		}
@@ -1337,8 +1382,8 @@ func (o *Community) ChannelHasTokenPermissions(chatID string) bool {
 	return false
 }
 
-func TokenPermissionsByType(permissions map[string]*protobuf.CommunityTokenPermission, permissionType protobuf.CommunityTokenPermission_Type) []*protobuf.CommunityTokenPermission {
-	result := make([]*protobuf.CommunityTokenPermission, 0)
+func TokenPermissionsByType(permissions map[string]*CommunityTokenPermission, permissionType protobuf.CommunityTokenPermission_Type) []*CommunityTokenPermission {
+	result := make([]*CommunityTokenPermission, 0)
 	for _, tokenPermission := range permissions {
 		if tokenPermission.Type == permissionType {
 			result = append(result, tokenPermission)
@@ -1347,22 +1392,24 @@ func TokenPermissionsByType(permissions map[string]*protobuf.CommunityTokenPermi
 	return result
 }
 
-func (o *Community) tokenPermissionByID(ID string) *protobuf.CommunityTokenPermission {
-	permissions := o.config.CommunityDescription.TokenPermissions
-	if permissions == nil {
-		return nil
-	}
-
-	return permissions[ID]
+func (o *Community) tokenPermissionByID(ID string) *CommunityTokenPermission {
+	return o.tokenPermissions()[ID]
 }
 
-func (o *Community) TokenPermissionsByType(permissionType protobuf.CommunityTokenPermission_Type) []*protobuf.CommunityTokenPermission {
-	return TokenPermissionsByType(o.TokenPermissions(), permissionType)
+func (o *Community) TokenPermissionByID(ID string) *CommunityTokenPermission {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	return o.tokenPermissionByID(ID)
 }
 
-func (o *Community) ChannelTokenPermissionsByType(channelID string, permissionType protobuf.CommunityTokenPermission_Type) []*protobuf.CommunityTokenPermission {
-	permissions := make([]*protobuf.CommunityTokenPermission, 0)
-	for _, tokenPermission := range o.TokenPermissions() {
+func (o *Community) TokenPermissionsByType(permissionType protobuf.CommunityTokenPermission_Type) []*CommunityTokenPermission {
+	return TokenPermissionsByType(o.tokenPermissions(), permissionType)
+}
+
+func (o *Community) ChannelTokenPermissionsByType(channelID string, permissionType protobuf.CommunityTokenPermission_Type) []*CommunityTokenPermission {
+	permissions := make([]*CommunityTokenPermission, 0)
+	for _, tokenPermission := range o.tokenPermissions() {
 		if tokenPermission.Type == permissionType && includes(tokenPermission.ChatIds, channelID) {
 			permissions = append(permissions, tokenPermission)
 		}
@@ -1387,57 +1434,80 @@ func (o *Community) UpsertTokenPermission(tokenPermission *protobuf.CommunityTok
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	if !(o.IsControlNode() || o.hasPermissionToSendTokenPermissionCommunityEvent(protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGE, tokenPermission.Type)) {
-		return nil, ErrNotAuthorized
-	}
-
-	changes, err := o.upsertTokenPermission(tokenPermission)
-	if err != nil {
-		return nil, err
-	}
-
 	if o.IsControlNode() {
+		changes, err := o.upsertTokenPermission(tokenPermission)
+		if err != nil {
+			return nil, err
+		}
+
 		o.updateEncrypted()
 		o.increaseClock()
-	} else {
+
+		return changes, nil
+	}
+
+	if o.hasPermissionToSendTokenPermissionCommunityEvent(protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGE, tokenPermission.Type) {
+		existed := o.tokenPermissionByID(tokenPermission.Id) != nil
+
 		err := o.addNewCommunityEvent(o.ToCommunityTokenPermissionChangeCommunityEvent(tokenPermission))
 		if err != nil {
 			return nil, err
 		}
+
+		permission := NewCommunityTokenPermission(tokenPermission)
+
+		changes := o.emptyCommunityChanges()
+		if existed {
+			permission.State = TokenPermissionUpdatePending
+			changes.TokenPermissionsModified[tokenPermission.Id] = permission
+		} else {
+			permission.State = TokenPermissionAdditionPending
+			changes.TokenPermissionsAdded[tokenPermission.Id] = permission
+		}
+
+		return changes, nil
 	}
 
-	return changes, nil
+	return nil, ErrNotAuthorized
 }
 
 func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	permission, exists := o.config.CommunityDescription.TokenPermissions[permissionID]
+	tokenPermission, exists := o.config.CommunityDescription.TokenPermissions[permissionID]
 	if !exists {
 		return nil, ErrTokenPermissionNotFound
 	}
 
-	if !(o.IsControlNode() || o.hasPermissionToSendTokenPermissionCommunityEvent(protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETE, permission.Type)) {
-		return nil, ErrNotAuthorized
-	}
-
-	changes, err := o.deleteTokenPermission(permissionID)
-	if err != nil {
-		return nil, err
-	}
-
 	if o.IsControlNode() {
-		o.updateEncrypted()
-		o.increaseClock()
-	} else {
-		err := o.addNewCommunityEvent(o.ToCommunityTokenPermissionDeleteCommunityEvent(permission))
+		changes, err := o.deleteTokenPermission(permissionID)
 		if err != nil {
 			return nil, err
 		}
+
+		o.updateEncrypted()
+		o.increaseClock()
+
+		return changes, nil
 	}
 
-	return changes, nil
+	if o.hasPermissionToSendTokenPermissionCommunityEvent(protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETE, tokenPermission.Type) {
+		err := o.addNewCommunityEvent(o.ToCommunityTokenPermissionDeleteCommunityEvent(tokenPermission))
+		if err != nil {
+			return nil, err
+		}
+
+		permission := NewCommunityTokenPermission(tokenPermission)
+		permission.State = TokenPermissionRemovalPending
+
+		changes := o.emptyCommunityChanges()
+		changes.TokenPermissionsModified[permission.Id] = permission
+
+		return changes, nil
+	}
+
+	return nil, ErrNotAuthorized
 }
 
 func (o *Community) VerifyGrantSignature(data []byte) (*protobuf.Grant, error) {
@@ -1989,9 +2059,9 @@ func (o *Community) upsertTokenPermission(permission *protobuf.CommunityTokenPer
 
 	changes := o.emptyCommunityChanges()
 	if existed {
-		changes.TokenPermissionsModified[permission.Id] = permission
+		changes.TokenPermissionsModified[permission.Id] = NewCommunityTokenPermission(permission)
 	} else {
-		changes.TokenPermissionsAdded[permission.Id] = permission
+		changes.TokenPermissionsAdded[permission.Id] = NewCommunityTokenPermission(permission)
 	}
 
 	return changes, nil
@@ -2007,7 +2077,7 @@ func (o *Community) deleteTokenPermission(permissionID string) (*CommunityChange
 
 	changes := o.emptyCommunityChanges()
 
-	changes.TokenPermissionsRemoved[permissionID] = permission
+	changes.TokenPermissionsRemoved[permissionID] = NewCommunityTokenPermission(permission)
 	return changes, nil
 }
 
