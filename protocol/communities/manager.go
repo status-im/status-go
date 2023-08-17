@@ -629,7 +629,7 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 
 	tokenPermission := request.ToCommunityTokenPermission()
 
-	changes, err := community.UpdateTokenPermission(tokenPermission.Id, &tokenPermission)
+	changes, err := community.UpsertTokenPermission(&tokenPermission)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -4722,7 +4722,7 @@ func (m *Manager) createCommunityTokenPermission(request *requests.CreateCommuni
 
 	tokenPermission := request.ToCommunityTokenPermission()
 	tokenPermission.Id = uuid.New().String()
-	changes, err := community.AddTokenPermission(&tokenPermission)
+	changes, err := community.UpsertTokenPermission(&tokenPermission)
 	if err != nil {
 		return nil, nil, err
 	}

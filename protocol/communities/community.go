@@ -1347,6 +1347,15 @@ func TokenPermissionsByType(permissions map[string]*protobuf.CommunityTokenPermi
 	return result
 }
 
+func (o *Community) tokenPermissionByID(ID string) *protobuf.CommunityTokenPermission {
+	permissions := o.config.CommunityDescription.TokenPermissions
+	if permissions == nil {
+		return nil
+	}
+
+	return permissions[ID]
+}
+
 func (o *Community) TokenPermissionsByType(permissionType protobuf.CommunityTokenPermission_Type) []*protobuf.CommunityTokenPermission {
 	return TokenPermissionsByType(o.TokenPermissions(), permissionType)
 }
@@ -1374,33 +1383,7 @@ func (o *Community) updateEncrypted() {
 	o.config.CommunityDescription.Encrypted = len(o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)) > 0
 }
 
-func (o *Community) AddTokenPermission(permission *protobuf.CommunityTokenPermission) (*CommunityChanges, error) {
-	o.mutex.Lock()
-	defer o.mutex.Unlock()
-
-	if !(o.IsControlNode() || o.hasPermissionToSendTokenPermissionCommunityEvent(protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGE, permission.Type)) {
-		return nil, ErrNotAuthorized
-	}
-
-	changes, err := o.addTokenPermission(permission)
-	if err != nil {
-		return nil, err
-	}
-
-	if o.IsControlNode() {
-		o.updateEncrypted()
-		o.increaseClock()
-	} else {
-		err := o.addNewCommunityEvent(o.ToCommunityTokenPermissionChangeCommunityEvent(permission))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return changes, nil
-}
-
-func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *protobuf.CommunityTokenPermission) (*CommunityChanges, error) {
+func (o *Community) UpsertTokenPermission(tokenPermission *protobuf.CommunityTokenPermission) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -1408,7 +1391,7 @@ func (o *Community) UpdateTokenPermission(permissionID string, tokenPermission *
 		return nil, ErrNotAuthorized
 	}
 
-	changes, err := o.updateTokenPermission(tokenPermission)
+	changes, err := o.upsertTokenPermission(tokenPermission)
 	if err != nil {
 		return nil, err
 	}
@@ -1996,42 +1979,20 @@ func (o *Community) deleteChat(chatID string) *CommunityChanges {
 	return changes
 }
 
-func (o *Community) addTokenPermission(permission *protobuf.CommunityTokenPermission) (*CommunityChanges, error) {
+func (o *Community) upsertTokenPermission(permission *protobuf.CommunityTokenPermission) (*CommunityChanges, error) {
+	existed := o.tokenPermissionByID(permission.Id) != nil
+
 	if o.config.CommunityDescription.TokenPermissions == nil {
 		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
 	}
-
-	if _, exists := o.config.CommunityDescription.TokenPermissions[permission.Id]; exists {
-		return nil, ErrTokenPermissionAlreadyExists
-	}
-
 	o.config.CommunityDescription.TokenPermissions[permission.Id] = permission
 
 	changes := o.emptyCommunityChanges()
-
-	if changes.TokenPermissionsAdded == nil {
-		changes.TokenPermissionsAdded = make(map[string]*protobuf.CommunityTokenPermission)
+	if existed {
+		changes.TokenPermissionsModified[permission.Id] = permission
+	} else {
+		changes.TokenPermissionsAdded[permission.Id] = permission
 	}
-	changes.TokenPermissionsAdded[permission.Id] = permission
-
-	return changes, nil
-}
-
-func (o *Community) updateTokenPermission(permission *protobuf.CommunityTokenPermission) (*CommunityChanges, error) {
-	if o.config.CommunityDescription.TokenPermissions == nil {
-		o.config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
-	}
-	if _, ok := o.config.CommunityDescription.TokenPermissions[permission.Id]; !ok {
-		return nil, ErrTokenPermissionNotFound
-	}
-
-	changes := o.emptyCommunityChanges()
-	o.config.CommunityDescription.TokenPermissions[permission.Id] = permission
-
-	if changes.TokenPermissionsModified == nil {
-		changes.TokenPermissionsModified = make(map[string]*protobuf.CommunityTokenPermission)
-	}
-	changes.TokenPermissionsModified[permission.Id] = o.config.CommunityDescription.TokenPermissions[permission.Id]
 
 	return changes, nil
 }
