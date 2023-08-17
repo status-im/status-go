@@ -1537,9 +1537,10 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 	}
 
 	response := &MessengerResponse{}
+	dbRequest, err = m.communitiesManager.GetRequestToJoin(request.ID)
+	response.AddRequestToJoinCommunity(dbRequest)
 
 	if notification != nil {
-		dbRequest, err := m.communitiesManager.GetRequestToJoin(request.ID)
 		if err != nil {
 			return nil, err
 		}
