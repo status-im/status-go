@@ -3,16 +3,16 @@ package protocol
 import (
 	"crypto/ecdsa"
 	"encoding/json"
+	"fmt"
 
 	accountJson "github.com/status-im/status-go/account/json"
+	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/identity"
-	"github.com/status-im/status-go/protocol/identity/alias"
-	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/verification"
 )
@@ -360,16 +360,27 @@ func BuildContactFromPublicKey(publicKey *ecdsa.PublicKey) (*Contact, error) {
 	return buildContact(id, publicKey)
 }
 
+func getShortenedCompressedKey(publicKey string) string {
+	if len(publicKey) > 9 {
+		firstPart := publicKey[0:3]
+		ellipsis := "..."
+		publicKeySize := len(publicKey)
+		lastPart := publicKey[publicKeySize-6 : publicKeySize]
+		abbreviatedKey := fmt.Sprintf("%s%s%s", firstPart, ellipsis, lastPart)
+		return abbreviatedKey
+	}
+	return ""
+}
+
 func buildContact(publicKeyString string, publicKey *ecdsa.PublicKey) (*Contact, error) {
-	newIdenticon, err := identicon.GenerateBase64(publicKeyString)
+	compressedKey, err := multiformat.SerializeLegacyKey(common.PubkeyToHex(publicKey))
 	if err != nil {
 		return nil, err
 	}
 
 	contact := &Contact{
-		ID:        publicKeyString,
-		Alias:     alias.GenerateFromPublicKey(publicKey),
-		Identicon: newIdenticon,
+		ID:    publicKeyString,
+		Alias: getShortenedCompressedKey(compressedKey),
 	}
 
 	return contact, nil
