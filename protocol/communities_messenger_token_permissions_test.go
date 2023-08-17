@@ -1001,7 +1001,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 
 	s.advertiseCommunityTo(community, s.alice)
 
-	var tokenPermission *protobuf.CommunityTokenPermission
+	var tokenPermission *communities.CommunityTokenPermission
 	for _, tokenPermission = range community.TokenPermissions() {
 		break
 	}
@@ -1110,8 +1110,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 
 	s.advertiseCommunityTo(community, s.alice)
 
-	var tokenPermission *protobuf.CommunityTokenPermission
-	var tokenMemberPermission *protobuf.CommunityTokenPermission
+	var tokenPermission *communities.CommunityTokenPermission
+	var tokenMemberPermission *communities.CommunityTokenPermission
 	for _, permission := range community.TokenPermissions() {
 		if permission.Type == protobuf.CommunityTokenPermission_BECOME_MEMBER {
 			tokenMemberPermission = permission

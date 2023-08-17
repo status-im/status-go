@@ -181,43 +181,34 @@ func (o *Community) ToAddTokenMetadataCommunityEvent(tokenMetadata *protobuf.Com
 	}
 }
 
-func (o *Community) UpdateCommunityByEvents(communityEventMessage *CommunityEventsMessage) (*CommunityChanges, error) {
+func (o *Community) UpdateCommunityByEvents(communityEventMessage *CommunityEventsMessage) error {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
 	// Validate that EventsBaseCommunityDescription was signed by the control node
 	description, err := validateAndGetEventsMessageCommunityDescription(communityEventMessage.EventsBaseCommunityDescription, o.config.ID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if description.Clock != o.config.CommunityDescription.Clock {
-		return nil, ErrInvalidCommunityEventClock
+		return ErrInvalidCommunityEventClock
 	}
 
-	// Create a deep copy of current community so we can update CommunityDescription by new admin events
-	copy := o.CreateDeepCopy()
-
-	// Merge community admin events to existing community. Admin events must be stored to the db
+	// Merge community events to existing community. Community events must be stored to the db
 	// during saving the community
 	o.mergeCommunityEvents(communityEventMessage)
 
-	copy.config.CommunityDescription = description
-	copy.config.CommunityDescriptionProtocolMessage = communityEventMessage.EventsBaseCommunityDescription
-	copy.config.EventsData = o.config.EventsData
+	o.config.CommunityDescription = description
+	o.config.CommunityDescriptionProtocolMessage = communityEventMessage.EventsBaseCommunityDescription
 
 	// Update the copy of the CommunityDescription by community events
-	err = copy.updateCommunityDescriptionByEvents()
+	err = o.updateCommunityDescriptionByEvents()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// Evaluate `CommunityChanges` data by searching a difference between `CommunityDescription`
-	// from the DB and `CommunityDescription` patched by community events
-	changes := EvaluateCommunityChanges(o.config.CommunityDescription, copy.config.CommunityDescription)
-	changes.Community = copy
-
-	return changes, nil
+	return nil
 }
 
 func (o *Community) updateCommunityDescriptionByEvents() error {
@@ -246,15 +237,19 @@ func (o *Community) updateCommunityDescriptionByCommunityEvent(communityEvent Co
 		o.config.CommunityDescription.Tags = communityEvent.CommunityConfig.Tags
 
 	case protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGE:
-		_, err := o.upsertTokenPermission(communityEvent.TokenPermission)
-		if err != nil {
-			return err
+		if o.IsControlNode() {
+			_, err := o.upsertTokenPermission(communityEvent.TokenPermission)
+			if err != nil {
+				return err
+			}
 		}
 
 	case protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETE:
-		_, err := o.deleteTokenPermission(communityEvent.TokenPermission.Id)
-		if err != nil {
-			return err
+		if o.IsControlNode() {
+			_, err := o.deleteTokenPermission(communityEvent.TokenPermission.Id)
+			if err != nil {
+				return err
+			}
 		}
 
 	case protobuf.CommunityEvent_COMMUNITY_CATEGORY_CREATE:
