@@ -144,6 +144,7 @@ func TestConvertLinkPreviewsToProto(t *testing.T) {
 					Height:  200,
 					URL:     "http://localhost:9999",
 					DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+					ExternalURL: "https://github.com",
 				},
 			},
 		},

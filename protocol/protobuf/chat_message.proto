@@ -117,6 +117,7 @@ message UnfurledLink {
   bytes thumbnail_payload = 4;
   uint32 thumbnail_width = 5;
   uint32 thumbnail_height = 6;
+  string thumbnail_external_url = 7;
 }
 
 message ChatMessage {

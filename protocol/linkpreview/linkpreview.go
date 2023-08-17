@@ -93,7 +93,7 @@ func newDefaultLinkPreview(url *neturl.URL) common.LinkPreview {
 	}
 }
 
-func fetchThumbnail(logger *zap.Logger, httpClient http.Client, url string) (common.LinkPreviewThumbnail, error) {
+func fetchThumbnail(logger *zap.Logger, httpClient http.Client, url string, external bool) (common.LinkPreviewThumbnail, error) {
 	var thumbnail common.LinkPreviewThumbnail
 
 	imgBytes, err := fetchBody(logger, httpClient, url, nil)
@@ -107,12 +107,16 @@ func fetchThumbnail(logger *zap.Logger, httpClient http.Client, url string) (com
 	}
 	thumbnail.Width = width
 	thumbnail.Height = height
-
-	dataURI, err := images.GetPayloadDataURI(imgBytes)
-	if err != nil {
-		return thumbnail, fmt.Errorf("could not build data URI: %w", err)
+	
+	if external {
+		thumbnail.ExternalURL = url
+	} else {
+		dataURI, err := images.GetPayloadDataURI(imgBytes)
+		if err != nil {
+			return thumbnail, fmt.Errorf("could not build data URI: %w", err)
+		}
+		thumbnail.DataURI = dataURI
 	}
-	thumbnail.DataURI = dataURI
 
 	return thumbnail, nil
 }
@@ -125,12 +129,26 @@ type OEmbedUnfurler struct {
 	// https://www.youtube.com/oembed.
 	oembedEndpoint string
 	// url is the actual URL to be unfurled.
-	url *neturl.URL
+	url                 *neturl.URL
+	generateFakePreview bool
 }
 
-type OEmbedResponse struct {
-	Title        string `json:"title"`
-	ThumbnailURL string `json:"thumbnail_url"`
+type OEmbedBaseResponse struct {
+	Type            string `json:"type"`
+	Version         string `json:"version"`
+	Title           string `json:"title,omitempty"`
+	AuthorName      string `json:"author_name,omitempty"`
+	AuthorURL       string `json:"author_url,omitempty"`
+	ProviderName    string `json:"provider_name,omitempty"`
+	ProviderURL     string `json:"provider_url,omitempty"`
+	ThumbnailURL    string `json:"thumbnail_url,omitempty"`
+	URL             string `json:"url,omitempty"`
+	HTML            string `json:"html,omitempty"`
+	CacheAge        int    `json:"cache_age,omitempty"`
+	ThumbnailWidth  int    `json:"thumbnail_width,omitempty"`
+	ThumbnailHeight int    `json:"thumbnail_height,omitempty"`
+	Width           int    `json:"width,omitempty"`
+	Height          int    `json:"height,omitempty"`
 }
 
 func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
@@ -149,9 +167,53 @@ func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
 	return oembedURL, nil
 }
 
+func (u OEmbedUnfurler) handlePhotoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
+	if response.URL != "" {
+		t, err := fetchThumbnail(u.logger, u.httpClient, response.URL, true)
+		if err != nil {
+			u.logger.Info("failed to fetch thumbnail", zap.String("url", u.url.String()), zap.Error(err))
+		} else {
+			preview.Thumbnail = t
+		}
+	}
+	return preview
+}
+
+func (u OEmbedUnfurler) handleVideoOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
+	if response.ThumbnailURL != "" {
+		t, err := fetchThumbnail(u.logger, u.httpClient, response.ThumbnailURL, true)
+		if err != nil {
+			u.logger.Info("failed to fetch thumbnail", zap.String("url", u.url.String()), zap.Error(err))
+		} else {
+			preview.Thumbnail = t
+		}
+	}
+	return preview
+}
+
+func handleRichOembedType(preview common.LinkPreview, response OEmbedBaseResponse) common.LinkPreview {
+	preview.Thumbnail.Width = response.Width
+	preview.Thumbnail.Height = response.Height
+	preview.Thumbnail.URL = response.ThumbnailURL
+	return preview
+}
+
+func FakeGenericImageLinkPreviewData(httpClient http.Client, title string, link string) (preview common.LinkPreview, err error) {
+	_, err = neturl.Parse(link)
+	if err != nil {
+		return preview, fmt.Errorf("Failed to parse link %s", link)
+	}
+
+	preview.Title = title
+	preview.URL = link
+	return preview, nil
+}
+
 func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 	preview := newDefaultLinkPreview(u.url)
-
+	if u.generateFakePreview {
+		return FakeGenericImageLinkPreviewData(u.httpClient, "Can't get link preview for "+u.url.Hostname(), u.url.String())
+	}
 	oembedURL, err := u.newOEmbedURL()
 	if err != nil {
 		return preview, err
@@ -167,21 +229,30 @@ func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 		return preview, err
 	}
 
-	var oembedResponse OEmbedResponse
-	if err != nil {
-		return preview, err
-	}
+	var oembedResponse OEmbedBaseResponse
+
 	err = json.Unmarshal(oembedBytes, &oembedResponse)
 	if err != nil {
 		return preview, err
 	}
 
-	if oembedResponse.Title == "" {
-		return preview, fmt.Errorf("missing required title in oEmbed response")
+	if oembedResponse.Title != "" {
+		preview.Title = oembedResponse.Title
 	}
 
-	preview.Title = oembedResponse.Title
-	return preview, nil
+	switch oembedResponse.Type {
+	case "photo":
+		return u.handlePhotoOembedType(preview, oembedResponse), nil
+
+	case "video":
+		return u.handleVideoOembedType(preview, oembedResponse), nil
+
+	case "rich":
+		return handleRichOembedType(preview, oembedResponse), nil
+
+	default:
+		return preview, fmt.Errorf("unexpected oembed type: %v", oembedResponse.Type)
+	}
 }
 
 type OpenGraphMetadata struct {
@@ -226,7 +297,7 @@ func (u OpenGraphUnfurler) unfurl() (common.LinkPreview, error) {
 	}
 
 	if ogMetadata.ThumbnailURL != "" {
-		t, err := fetchThumbnail(u.logger, u.httpClient, ogMetadata.ThumbnailURL)
+		t, err := fetchThumbnail(u.logger, u.httpClient, ogMetadata.ThumbnailURL, false)
 		if err != nil {
 			// Given we want to fetch thumbnails on a best-effort basis, if an error
 			// happens we simply log it.
@@ -255,6 +326,21 @@ func newUnfurler(logger *zap.Logger, httpClient http.Client, url *neturl.URL) Un
 			url:            url,
 			logger:         logger,
 			httpClient:     httpClient,
+		}
+	case "giphy.com", "media.giphy.com":
+		return OEmbedUnfurler{
+			oembedEndpoint: "https://giphy.com/services/oembed",
+			url:            url,
+			logger:         logger,
+			httpClient:     httpClient,
+		}
+	case "tenor.com", "media.tenor.com":
+		return OEmbedUnfurler{
+			oembedEndpoint:      "https://tenor.com/oembed",
+			url:                 url,
+			logger:              logger,
+			httpClient:          httpClient,
+			generateFakePreview: true,
 		}
 	default:
 		return OpenGraphUnfurler{
