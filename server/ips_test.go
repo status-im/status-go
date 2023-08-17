@@ -20,6 +20,10 @@ type IPsTestingSuite struct {
 	servertest.TestLoggerComponents
 }
 
+func (s *IPsTestingSuite) SetupSuite() {
+	s.SetupLoggerComponents()
+}
+
 func (s *IPsTestingSuite) TestConnectionParams_GetLocalAddressesForPairingServer() {
 
 	allIps := [][]net.IP{
