@@ -53,6 +53,8 @@ const (
 	headerAcceptLanguage = "en-US,en;q=0.5"
 )
 
+var imageURLRegexp = regexp.MustCompile(`(?i)^.+(png|jpg|jpeg|webp)$`)
+
 func fetchBody(logger *zap.Logger, httpClient http.Client, url string, headers Headers) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
 	defer cancel()
@@ -323,8 +325,7 @@ func normalizeHostname(hostname string) string {
 // should be unfurled as images without needing to retrieve the full response
 // body first.
 func isSupportedImageURL(url *neturl.URL) bool {
-	re := regexp.MustCompile(`(?i)^.+(png|jpg|jpeg|webp)$`)
-	return re.MatchString(url.Path)
+	return imageURLRegexp.MatchString(url.Path)
 }
 
 // isSupportedImage returns true when payload is one of the supported image
