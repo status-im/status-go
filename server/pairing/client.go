@@ -37,7 +37,7 @@ type BaseClient struct {
 // NewBaseClient returns a fully qualified BaseClient from the given ConnectionParams
 func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
 
-	var url *url.URL
+	var baseAddress *url.URL
 	var serverCert *x509.Certificate
 	var certErrs error
 
@@ -53,7 +53,7 @@ func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
 			continue
 		}
 
-		url = u
+		baseAddress = u
 		break
 	}
 
@@ -98,7 +98,7 @@ func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
 		Client:         &http.Client{Transport: tr, Jar: cj},
 		serverCert:     serverCert,
 		challengeTaker: NewChallengeTaker(NewPayloadEncryptor(c.aesKey)),
-		baseAddress:    url,
+		baseAddress:    baseAddress,
 	}, nil
 }
 
