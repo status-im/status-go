@@ -4,7 +4,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-func (o *Community) ToSyncCommunityProtobuf(clock uint64, communitySettings *CommunitySettings) (*protobuf.SyncCommunity, error) {
+func (o *Community) ToSyncInstallationCommunityProtobuf(clock uint64, communitySettings *CommunitySettings) (*protobuf.SyncInstallationCommunity, error) {
 	wrappedCommunity, err := o.ToProtocolMessageBytes()
 	if err != nil {
 		return nil, err
@@ -26,7 +26,7 @@ func (o *Community) ToSyncCommunityProtobuf(clock uint64, communitySettings *Com
 		settings.HistoryArchiveSupportEnabled = communitySettings.HistoryArchiveSupportEnabled
 	}
 
-	return &protobuf.SyncCommunity{
+	return &protobuf.SyncInstallationCommunity{
 		Clock:          clock,
 		Id:             o.ID(),
 		Description:    wrappedCommunity,

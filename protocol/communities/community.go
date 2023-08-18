@@ -1013,7 +1013,7 @@ func (o *Community) ValidateRequestToJoin(signer *ecdsa.PublicKey, request *prot
 }
 
 // ValidateRequestToJoin validates a request, checks that the right permissions are applied
-func (o *Community) ValidateEditSharedAddresses(signer *ecdsa.PublicKey, request *protobuf.CommunityEditRevealedAccounts) error {
+func (o *Community) ValidateEditSharedAddresses(signer *ecdsa.PublicKey, request *protobuf.CommunityEditSharedAddresses) error {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 

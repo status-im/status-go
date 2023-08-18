@@ -516,7 +516,7 @@ func buildMessage(chat *protocol.Chat, count int) *common.Message {
 
 	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
 	clock += uint64(count)
-	message := &common.Message{}
+	message := common.NewMessage()
 	message.Text = fmt.Sprintf("test message %d", count)
 	message.ChatId = chat.ID
 	message.Clock = clock

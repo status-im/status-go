@@ -165,7 +165,7 @@ func (s *MessengerBackupSuite) TestBackupProfile() {
 	err = bob1.settings.AddOrReplaceSocialLinksIfNewer(profileSocialLinks, profileSocialLinksClock)
 	s.Require().NoError(err)
 
-	bob1EnsUsernameDetail, err := bob1.saveEnsUsernameDetailProto(protobuf.SyncEnsUsernameDetail{
+	bob1EnsUsernameDetail, err := bob1.saveEnsUsernameDetailProto(&protobuf.SyncEnsUsernameDetail{
 		Clock:    1,
 		Username: "bob1.eth",
 		ChainId:  1,
@@ -842,7 +842,12 @@ func (s *MessengerBackupSuite) TestBackupWatchOnlyAccounts() {
 	_, err = WaitOnMessengerResponse(
 		bob2,
 		func(r *MessengerResponse) bool {
-			return r.BackupHandled
+			c, err := bob2.settings.GetActiveWatchOnlyAccounts()
+			if err != nil {
+				return false
+			}
+			return r.BackupHandled && len(woAccounts) == len(c)
+
 		},
 		"no messages",
 	)

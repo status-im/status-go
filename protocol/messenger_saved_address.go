@@ -9,6 +9,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/services/wallet"
 )
 
@@ -33,14 +34,14 @@ func (m *Messenger) garbageCollectRemovedSavedAddresses() error {
 	return m.savedAddressesManager.DeleteSoftRemovedSavedAddresses(uint64(time.Now().AddDate(0, 0, -30).Unix()))
 }
 
-func (m *Messenger) dispatchSyncSavedAddress(ctx context.Context, syncMessage protobuf.SyncSavedAddress, rawMessageHandler RawMessageHandler) error {
+func (m *Messenger) dispatchSyncSavedAddress(ctx context.Context, syncMessage *protobuf.SyncSavedAddress, rawMessageHandler RawMessageHandler) error {
 	if !m.hasPairedDevices() {
 		return nil
 	}
 
 	clock, chat := m.getLastClockWithRelatedChat()
 
-	encodedMessage, err := proto.Marshal(&syncMessage)
+	encodedMessage, err := proto.Marshal(syncMessage)
 	if err != nil {
 		return err
 	}
@@ -62,7 +63,7 @@ func (m *Messenger) dispatchSyncSavedAddress(ctx context.Context, syncMessage pr
 }
 
 func (m *Messenger) syncNewSavedAddress(ctx context.Context, savedAddress *wallet.SavedAddress, updateClock uint64, rawMessageHandler RawMessageHandler) error {
-	return m.dispatchSyncSavedAddress(ctx, protobuf.SyncSavedAddress{
+	return m.dispatchSyncSavedAddress(ctx, &protobuf.SyncSavedAddress{
 		Address:         savedAddress.Address.Bytes(),
 		Name:            savedAddress.Name,
 		Favourite:       savedAddress.Favourite,
@@ -75,7 +76,7 @@ func (m *Messenger) syncNewSavedAddress(ctx context.Context, savedAddress *walle
 }
 
 func (m *Messenger) syncDeletedSavedAddress(ctx context.Context, address gethcommon.Address, ens string, isTest bool, updateClock uint64, rawMessageHandler RawMessageHandler) error {
-	return m.dispatchSyncSavedAddress(ctx, protobuf.SyncSavedAddress{
+	return m.dispatchSyncSavedAddress(ctx, &protobuf.SyncSavedAddress{
 		Address:     address.Bytes(),
 		UpdateClock: updateClock,
 		Removed:     true,
@@ -97,7 +98,7 @@ func (m *Messenger) syncSavedAddress(ctx context.Context, savedAddress wallet.Sa
 	return
 }
 
-func (m *Messenger) handleSyncSavedAddress(state *ReceivedMessageState, syncMessage protobuf.SyncSavedAddress) (err error) {
+func (m *Messenger) HandleSyncSavedAddress(state *ReceivedMessageState, syncMessage *protobuf.SyncSavedAddress, statusMessage *v1protocol.StatusMessage) (err error) {
 	address := gethcommon.BytesToAddress(syncMessage.Address)
 	if syncMessage.Removed {
 		_, err = m.savedAddressesManager.DeleteSavedAddress(

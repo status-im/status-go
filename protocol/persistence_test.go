@@ -178,7 +178,7 @@ func TestMessageByChatID(t *testing.T) {
 		messages = append(messages, &common.Message{
 			ID:          strconv.Itoa(i),
 			LocalChatID: chatID,
-			ChatMessage: protobuf.ChatMessage{
+			ChatMessage: &protobuf.ChatMessage{
 				Clock: uint64(i),
 			},
 			From: testPK,
@@ -189,7 +189,7 @@ func TestMessageByChatID(t *testing.T) {
 			messages = append(messages, &common.Message{
 				ID:          strconv.Itoa(count + i),
 				LocalChatID: "other-chat",
-				ChatMessage: protobuf.ChatMessage{
+				ChatMessage: &protobuf.ChatMessage{
 					Clock: uint64(i),
 				},
 
@@ -205,7 +205,7 @@ func TestMessageByChatID(t *testing.T) {
 		messages = append(messages, &common.Message{
 			ID:          strconv.Itoa(count*2 + i),
 			LocalChatID: chatID,
-			ChatMessage: protobuf.ChatMessage{
+			ChatMessage: &protobuf.ChatMessage{
 				Clock: uint64(i),
 			},
 
@@ -261,7 +261,7 @@ func TestFirstUnseenMessageIDByChatID(t *testing.T) {
 		{
 			ID:          "1",
 			LocalChatID: testPublicChatID,
-			ChatMessage: protobuf.ChatMessage{
+			ChatMessage: &protobuf.ChatMessage{
 				Clock: 1,
 				Text:  "some-text"},
 			From: testPK,
@@ -270,7 +270,7 @@ func TestFirstUnseenMessageIDByChatID(t *testing.T) {
 		{
 			ID:          "2",
 			LocalChatID: testPublicChatID,
-			ChatMessage: protobuf.ChatMessage{
+			ChatMessage: &protobuf.ChatMessage{
 				Clock: 2,
 				Text:  "some-text"},
 			From: testPK,
@@ -279,7 +279,7 @@ func TestFirstUnseenMessageIDByChatID(t *testing.T) {
 		{
 			ID:          "3",
 			LocalChatID: testPublicChatID,
-			ChatMessage: protobuf.ChatMessage{
+			ChatMessage: &protobuf.ChatMessage{
 				Clock: 3,
 				Text:  "some-text"},
 			From: testPK,
@@ -336,7 +336,7 @@ func TestOldestMessageWhisperTimestampByChatID(t *testing.T) {
 		messages = append(messages, &common.Message{
 			ID:          strconv.Itoa(i),
 			LocalChatID: chatID,
-			ChatMessage: protobuf.ChatMessage{
+			ChatMessage: &protobuf.ChatMessage{
 				Clock: uint64(i),
 			},
 			WhisperTimestamp: uint64(i + 10),
@@ -368,7 +368,7 @@ func TestPinMessageByChatID(t *testing.T) {
 		messages = append(messages, &common.Message{
 			ID:          strconv.Itoa(i),
 			LocalChatID: chatID,
-			ChatMessage: protobuf.ChatMessage{
+			ChatMessage: &protobuf.ChatMessage{
 				Clock: uint64(i),
 			},
 			From: testPK,
@@ -381,11 +381,10 @@ func TestPinMessageByChatID(t *testing.T) {
 				from = "them"
 			}
 
-			pinMessage := &common.PinMessage{
-				ID:          strconv.Itoa(i),
-				LocalChatID: chatID,
-				From:        from,
-			}
+			pinMessage := common.NewPinMessage()
+			pinMessage.ID = strconv.Itoa(i)
+			pinMessage.LocalChatID = chatID
+			pinMessage.From = from
 
 			pinMessage.MessageId = strconv.Itoa(i)
 			pinMessage.Clock = 111
@@ -395,11 +394,12 @@ func TestPinMessageByChatID(t *testing.T) {
 
 			if i%200 == 0 {
 				// unpin a message
-				unpinMessage := &common.PinMessage{
-					ID:          strconv.Itoa(i),
-					LocalChatID: chatID,
-					From:        testPK,
-				}
+				unpinMessage := common.NewPinMessage()
+
+				unpinMessage.ID = strconv.Itoa(i)
+				unpinMessage.LocalChatID = chatID
+				unpinMessage.From = testPK
+
 				pinMessage.MessageId = strconv.Itoa(i)
 				unpinMessage.Clock = 333
 				unpinMessage.Pinned = false
@@ -407,11 +407,11 @@ func TestPinMessageByChatID(t *testing.T) {
 				pinnedMessagesCount--
 
 				// pinned before the unpin
-				pinMessage2 := &common.PinMessage{
-					ID:          strconv.Itoa(i),
-					LocalChatID: chatID,
-					From:        testPK,
-				}
+				pinMessage2 := common.NewPinMessage()
+				pinMessage2.ID = strconv.Itoa(i)
+				pinMessage2.LocalChatID = chatID
+				pinMessage2.From = testPK
+
 				pinMessage2.MessageId = strconv.Itoa(i)
 				pinMessage2.Clock = 222
 				pinMessage2.Pinned = true
@@ -424,7 +424,7 @@ func TestPinMessageByChatID(t *testing.T) {
 			messages = append(messages, &common.Message{
 				ID:          strconv.Itoa(messagesCount + i),
 				LocalChatID: "chat-without-pinned-messages",
-				ChatMessage: protobuf.ChatMessage{
+				ChatMessage: &protobuf.ChatMessage{
 					Clock: uint64(i),
 				},
 
@@ -485,7 +485,7 @@ func TestMessageReplies(t *testing.T) {
 	message1 := &common.Message{
 		ID:          "id-1",
 		LocalChatID: chatID,
-		ChatMessage: protobuf.ChatMessage{
+		ChatMessage: &protobuf.ChatMessage{
 			Text:  "content-1",
 			Clock: uint64(1),
 		},
@@ -494,7 +494,7 @@ func TestMessageReplies(t *testing.T) {
 	message2 := &common.Message{
 		ID:          "id-2",
 		LocalChatID: chatID,
-		ChatMessage: protobuf.ChatMessage{
+		ChatMessage: &protobuf.ChatMessage{
 			Text:       "content-2",
 			Clock:      uint64(2),
 			ResponseTo: "id-1",
@@ -506,7 +506,7 @@ func TestMessageReplies(t *testing.T) {
 	message3 := &common.Message{
 		ID:          "id-3",
 		LocalChatID: chatID,
-		ChatMessage: protobuf.ChatMessage{
+		ChatMessage: &protobuf.ChatMessage{
 			Text:       "content-3",
 			Clock:      uint64(3),
 			ResponseTo: "non-existing",
@@ -519,7 +519,7 @@ func TestMessageReplies(t *testing.T) {
 		ID:          "id-4",
 		LocalChatID: chatID,
 		Deleted:     true,
-		ChatMessage: protobuf.ChatMessage{
+		ChatMessage: &protobuf.ChatMessage{
 			Text:  "content-4",
 			Clock: uint64(4),
 		},
@@ -530,7 +530,7 @@ func TestMessageReplies(t *testing.T) {
 	message5 := &common.Message{
 		ID:          "id-5",
 		LocalChatID: chatID,
-		ChatMessage: protobuf.ChatMessage{
+		ChatMessage: &protobuf.ChatMessage{
 			Text:       "content-4",
 			Clock:      uint64(5),
 			ResponseTo: "id-4",
@@ -576,7 +576,7 @@ func TestMessageByChatIDWithTheSameClocks(t *testing.T) {
 		messages = append(messages, &common.Message{
 			ID:          strconv.Itoa(i),
 			LocalChatID: chatID,
-			ChatMessage: protobuf.ChatMessage{
+			ChatMessage: &protobuf.ChatMessage{
 				Clock: clock,
 			},
 			From: testPK,
@@ -815,7 +815,7 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 
 	// Insert normal emoji reaction
 	require.NoError(t, p.SaveEmojiReaction(&EmojiReaction{
-		EmojiReaction: protobuf.EmojiReaction{
+		EmojiReaction: &protobuf.EmojiReaction{
 			Clock:     1,
 			MessageId: id3,
 			ChatId:    chatID,
@@ -827,7 +827,7 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 
 	// Insert retracted emoji reaction
 	require.NoError(t, p.SaveEmojiReaction(&EmojiReaction{
-		EmojiReaction: protobuf.EmojiReaction{
+		EmojiReaction: &protobuf.EmojiReaction{
 			Clock:     1,
 			MessageId: id3,
 			ChatId:    chatID,
@@ -840,7 +840,7 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 
 	// Insert retracted emoji reaction out of pagination
 	require.NoError(t, p.SaveEmojiReaction(&EmojiReaction{
-		EmojiReaction: protobuf.EmojiReaction{
+		EmojiReaction: &protobuf.EmojiReaction{
 			Clock:     1,
 			MessageId: id1,
 			ChatId:    chatID,
@@ -852,7 +852,7 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 
 	// Insert retracted emoji reaction out of pagination
 	require.NoError(t, p.SaveEmojiReaction(&EmojiReaction{
-		EmojiReaction: protobuf.EmojiReaction{
+		EmojiReaction: &protobuf.EmojiReaction{
 			Clock:     1,
 			MessageId: id1,
 			ChatId:    chatID,
@@ -864,7 +864,7 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 
 	// Wrong local chat id
 	require.NoError(t, p.SaveEmojiReaction(&EmojiReaction{
-		EmojiReaction: protobuf.EmojiReaction{
+		EmojiReaction: &protobuf.EmojiReaction{
 			Clock:     1,
 			MessageId: id1,
 			ChatId:    chatID,
@@ -902,7 +902,7 @@ func insertMinimalMessage(p *sqlitePersistence, id string) error {
 	return p.SaveMessages([]*common.Message{{
 		ID:          id,
 		LocalChatID: testPublicChatID,
-		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
+		ChatMessage: &protobuf.ChatMessage{Text: "some-text"},
 		From:        testPK,
 	}})
 }
@@ -912,7 +912,7 @@ func insertMinimalDeletedMessage(p *sqlitePersistence, id string) error {
 		ID:          id,
 		Deleted:     true,
 		LocalChatID: testPublicChatID,
-		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
+		ChatMessage: &protobuf.ChatMessage{Text: "some-text"},
 		From:        testPK,
 	}})
 }
@@ -922,7 +922,7 @@ func insertMinimalDeletedForMeMessage(p *sqlitePersistence, id string) error {
 		ID:           id,
 		DeletedForMe: true,
 		LocalChatID:  testPublicChatID,
-		ChatMessage:  protobuf.ChatMessage{Text: "some-text"},
+		ChatMessage:  &protobuf.ChatMessage{Text: "some-text"},
 		From:         testPK,
 	}})
 }
@@ -974,7 +974,7 @@ func insertMinimalDiscordMessage(p *sqlitePersistence, id string, discordMessage
 		ID:          id,
 		LocalChatID: testPublicChatID,
 		From:        testPK,
-		ChatMessage: protobuf.ChatMessage{
+		ChatMessage: &protobuf.ChatMessage{
 			Text:        "some-text",
 			ContentType: protobuf.ChatMessage_DISCORD_MESSAGE,
 			ChatId:      testPublicChatID,
@@ -1021,7 +1021,7 @@ func TestSaveChat(t *testing.T) {
 	p := newSQLitePersistence(db)
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
-	chat.LastMessage = &common.Message{}
+	chat.LastMessage = common.NewMessage()
 	err = p.SaveChat(*chat)
 	require.NoError(t, err)
 
@@ -1044,7 +1044,7 @@ func TestSaveMentions(t *testing.T) {
 	message := common.Message{
 		ID:          "1",
 		LocalChatID: chatID,
-		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
+		ChatMessage: &protobuf.ChatMessage{Text: "some-text"},
 		From:        testPK,
 		Mentions:    []string{pkString},
 	}
@@ -1179,7 +1179,7 @@ func TestSaveLinks(t *testing.T) {
 	message := common.Message{
 		ID:          "1",
 		LocalChatID: chatID,
-		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
+		ChatMessage: &protobuf.ChatMessage{Text: "some-text"},
 		From:        testPK,
 		Links:       []string{"https://github.com/status-im/status-mobile"},
 	}
@@ -1205,7 +1205,7 @@ func TestSaveWithUnfurledLinks(t *testing.T) {
 		ID:          "1",
 		LocalChatID: chatID,
 		From:        testPK,
-		ChatMessage: protobuf.ChatMessage{
+		ChatMessage: &protobuf.ChatMessage{
 			Text: "some-text",
 			UnfurledLinks: []*protobuf.UnfurledLink{
 				{
@@ -1244,7 +1244,7 @@ func TestHideMessage(t *testing.T) {
 	message := &common.Message{
 		ID:          "id-1",
 		LocalChatID: chatID,
-		ChatMessage: protobuf.ChatMessage{
+		ChatMessage: &protobuf.ChatMessage{
 			Text:  "content-1",
 			Clock: uint64(1),
 		},
@@ -1278,7 +1278,7 @@ func TestDeactivatePublicChat(t *testing.T) {
 	lastMessage := common.Message{
 		ID:          "0x01",
 		LocalChatID: publicChatID,
-		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
+		ChatMessage: &protobuf.ChatMessage{Text: "some-text"},
 		From:        testPK,
 	}
 	lastMessage.Clock = 20
@@ -1348,7 +1348,7 @@ func TestDeactivateOneToOneChat(t *testing.T) {
 	lastMessage := common.Message{
 		ID:          "0x01",
 		LocalChatID: chat.ID,
-		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
+		ChatMessage: &protobuf.ChatMessage{Text: "some-text"},
 		From:        testPK,
 	}
 	lastMessage.Clock = 20
@@ -1530,7 +1530,7 @@ func TestSaveCommunityChat(t *testing.T) {
 	}
 
 	chat := CreateCommunityChat("test-or-gid", "test-chat-id", communityChat, &testTimeSource{})
-	chat.LastMessage = &common.Message{}
+	chat.LastMessage = common.NewMessage()
 	err = p.SaveChat(*chat)
 	require.NoError(t, err)
 
@@ -1717,7 +1717,7 @@ func TestCountActiveChattersInCommunity(t *testing.T) {
 			messages = append(messages, &common.Message{
 				ID:          fmt.Sprintf("%smsg%d", chat.Name, i),
 				LocalChatID: chat.ID,
-				ChatMessage: protobuf.ChatMessage{
+				ChatMessage: &protobuf.ChatMessage{
 					Clock:     uint64(i),
 					Timestamp: uint64(i + offset),
 				},

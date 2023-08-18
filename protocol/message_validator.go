@@ -40,7 +40,10 @@ func ValidateMembershipUpdateMessage(message *protocol.MembershipUpdateMessage, 
 	return nil
 }
 
-func ValidateStatusUpdate(message protobuf.StatusUpdate) error {
+func ValidateStatusUpdate(message *protobuf.StatusUpdate) error {
+	if message == nil {
+		return errors.New("message can't be nil")
+	}
 	if message.Clock == 0 {
 		return errors.New("clock can't be 0")
 	}
@@ -57,7 +60,10 @@ func ValidateStatusUpdate(message protobuf.StatusUpdate) error {
 
 }
 
-func ValidateEditMessage(message protobuf.EditMessage) error {
+func ValidateEditMessage(message *protobuf.EditMessage) error {
+	if message == nil {
+		return errors.New("message can't be nil")
+	}
 	if message.Clock == 0 {
 		return errors.New("clock can't be 0")
 	}
@@ -75,7 +81,11 @@ func ValidateEditMessage(message protobuf.EditMessage) error {
 	return ValidateText(message.Text)
 }
 
-func ValidateDeleteMessage(message protobuf.DeleteMessage) error {
+func ValidateDeleteMessage(message *protobuf.DeleteMessage) error {
+	if message == nil {
+		return errors.New("message can't be nil")
+	}
+
 	if len(message.ChatId) == 0 {
 		return errors.New("chat-id can't be empty")
 	}
@@ -90,7 +100,11 @@ func ValidateDeleteMessage(message protobuf.DeleteMessage) error {
 	return nil
 }
 
-func ValidateDeleteForMeMessage(message protobuf.DeleteForMeMessage) error {
+func ValidateDeleteForMeMessage(message *protobuf.SyncDeleteForMeMessage) error {
+	if message == nil {
+		return errors.New("message can't be nil")
+	}
+
 	if len(message.MessageId) == 0 {
 		return errors.New("message-id can't be empty")
 	}
@@ -98,7 +112,7 @@ func ValidateDeleteForMeMessage(message protobuf.DeleteForMeMessage) error {
 	return nil
 }
 
-func ValidateReceivedPairInstallation(message *protobuf.PairInstallation, whisperTimestamp uint64) error {
+func ValidateReceivedPairInstallation(message *protobuf.SyncPairInstallation, whisperTimestamp uint64) error {
 	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
 		return err
 	}

@@ -149,7 +149,7 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 	// Send a community message
 	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, s.alice.transport)
 
-	inputMessage := &common.Message{}
+	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
 	inputMessage.Text = "some text"
 	inputMessage.CommunityID = community.IDString()
@@ -256,7 +256,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	// Send a community message
 	chat := CreateOneToOneChat(common.PubkeyToHex(&s.alice.identity.PublicKey), &s.alice.identity.PublicKey, s.bob.transport)
 
-	inputMessage := &common.Message{}
+	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
 	inputMessage.Text = "some text"
 	inputMessage.CommunityID = community.IDString()
@@ -445,7 +445,7 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	ctx := context.Background()
 
 	chatID := chat.ID
-	inputMessage := &common.Message{}
+	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chatID
 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = "some text"
@@ -1695,16 +1695,10 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
 
 	// Retrieve request to join
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.bob.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.RequestsToJoinCommunity) == 0 {
-			return errors.New("request to join community not received")
-		}
-		return nil
-	})
+	response, err = WaitOnMessengerResponse(s.bob,
+		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) == 1 },
+		"request to join community was never 1",
+	)
 	s.Require().NoError(err)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
 
@@ -3039,8 +3033,11 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 	s.Require().NoError(err)
 
 	messageState := s.admin.buildMessageState()
+	messageState.CurrentMessageState = &CurrentMessageState{}
 
-	err = s.admin.HandleCommunityRequestToJoin(messageState, &s.alice.identity.PublicKey, *requestToJoinProto)
+	messageState.CurrentMessageState.PublicKey = &s.alice.identity.PublicKey
+
+	err = s.admin.HandleCommunityRequestToJoin(messageState, requestToJoinProto, nil)
 
 	s.Require().ErrorContains(err, "can't request access")
 }

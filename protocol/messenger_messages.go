@@ -54,7 +54,7 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 
 		clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
-		editMessage := &EditMessage{}
+		editMessage := NewEditMessage()
 
 		editMessage.Text = request.Text
 		editMessage.ContentType = request.ContentType
@@ -62,7 +62,7 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 		editMessage.MessageId = message.ID
 		editMessage.Clock = clock
 
-		err = m.applyEditMessage(&editMessage.EditMessage, message)
+		err = m.applyEditMessage(editMessage.EditMessage, message)
 		if err != nil {
 			return nil, err
 		}
@@ -180,7 +180,7 @@ func (m *Messenger) DeleteMessageAndSend(ctx context.Context, messageID string) 
 
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
-	deleteMessage := &DeleteMessage{}
+	deleteMessage := NewDeleteMessage()
 	deleteMessage.ChatId = message.ChatId
 	deleteMessage.MessageId = messageID
 	deleteMessage.Clock = clock
@@ -297,7 +297,7 @@ func (m *Messenger) DeleteMessageForMeAndSync(ctx context.Context, localChatID s
 	response.AddChat(chat)
 
 	err = m.withChatClock(func(chatID string, clock uint64) error {
-		deletedForMeMessage := &protobuf.DeleteForMeMessage{
+		deletedForMeMessage := &protobuf.SyncDeleteForMeMessage{
 			MessageId: messageID,
 			Clock:     clock,
 		}
@@ -341,7 +341,7 @@ func (m *Messenger) applyEditMessage(editMessage *protobuf.EditMessage, message 
 
 	// Save original message as edit so we can retrieve history
 	if message.EditedAt == 0 {
-		originalEdit := EditMessage{}
+		originalEdit := NewEditMessage()
 		originalEdit.Clock = message.Clock
 		originalEdit.LocalChatID = message.LocalChatID
 		originalEdit.MessageId = message.ID
@@ -447,7 +447,7 @@ func (m *Messenger) SendOneToOneMessage(request *requests.SendOneToOneMessage) (
 		}
 	}
 
-	message := &common.Message{}
+	message := common.NewMessage()
 	message.Text = request.Message
 	message.ChatId = chatID
 	message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
@@ -467,7 +467,7 @@ func (m *Messenger) SendGroupChatMessage(request *requests.SendGroupChatMessage)
 		return nil, ErrChatNotFound
 	}
 
-	message := &common.Message{}
+	message := common.NewMessage()
 	message.Text = request.Message
 	message.ChatId = chatID
 	message.ContentType = protobuf.ChatMessage_TEXT_PLAIN

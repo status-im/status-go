@@ -149,7 +149,7 @@ func (m Messages) GetClock(i int) uint64 {
 // Message represents a message record in the database,
 // more specifically in user_messages table.
 type Message struct {
-	protobuf.ChatMessage
+	*protobuf.ChatMessage
 
 	// ID calculated as keccak256(compressedAuthorPubKey, data) where data is unencrypted payload.
 	ID string `json:"id"`
@@ -246,6 +246,10 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Hash string `json:"hash"`
 		Pack int32  `json:"pack"`
 		URL  string `json:"url"`
+	}
+
+	if m.ChatMessage == nil {
+		m.ChatMessage = &protobuf.ChatMessage{}
 	}
 
 	type MessageStructType struct {
@@ -672,14 +676,14 @@ func getAudioMessageMIME(i *protobuf.AudioMessage) (string, error) {
 
 // GetSigPubKey returns an ecdsa encoded public key
 // this function is required to implement the ChatEntity interface
-func (m Message) GetSigPubKey() *ecdsa.PublicKey {
+func (m *Message) GetSigPubKey() *ecdsa.PublicKey {
 	return m.SigPubKey
 }
 
 // GetProtoBuf returns the struct's embedded protobuf struct
 // this function is required to implement the ChatEntity interface
 func (m *Message) GetProtobuf() proto.Message {
-	return &m.ChatMessage
+	return m.ChatMessage
 }
 
 // SetMessageType a setter for the MessageType field
@@ -861,4 +865,10 @@ func (m *Message) SetAlbumIDAndImagesCount(albumID string, imagesCount uint32) e
 	m.Payload = &protobuf.ChatMessage_Image{Image: imageMessage}
 
 	return nil
+}
+
+func NewMessage() *Message {
+	return &Message{
+		ChatMessage: &protobuf.ChatMessage{},
+	}
 }

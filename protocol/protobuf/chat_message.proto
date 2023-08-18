@@ -63,7 +63,7 @@ message DeleteMessage {
   string deleted_by = 6;
 }
 
-message DeleteForMeMessage {
+message SyncDeleteForMeMessage {
   uint64 clock = 1;
   string message_id = 2;
 }

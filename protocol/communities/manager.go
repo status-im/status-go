@@ -2221,7 +2221,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 	return requestToJoin, nil
 }
 
-func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, request *protobuf.CommunityEditRevealedAccounts) error {
+func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, request *protobuf.CommunityEditSharedAddresses) error {
 	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityId)
 	if err != nil {
 		return err
@@ -3271,7 +3271,7 @@ func (m *Manager) IsChannelEncrypted(communityID string, chatID string) (bool, e
 	return community.ChannelHasTokenPermissions(chatID), nil
 }
 
-func (m *Manager) ShouldHandleSyncCommunity(community *protobuf.SyncCommunity) (bool, error) {
+func (m *Manager) ShouldHandleSyncCommunity(community *protobuf.SyncInstallationCommunity) (bool, error) {
 	return m.persistence.ShouldHandleSyncCommunity(community)
 }
 

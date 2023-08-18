@@ -286,7 +286,7 @@ func (m *Messenger) backupCommunities(ctx context.Context, clock uint64) ([]*pro
 				return nil, err
 			}
 
-			syncMessage, err := c.ToSyncCommunityProtobuf(clock, settings)
+			syncMessage, err := c.ToSyncInstallationCommunityProtobuf(clock, settings)
 			if err != nil {
 				return nil, err
 			}
@@ -298,7 +298,7 @@ func (m *Messenger) backupCommunities(ctx context.Context, clock uint64) ([]*pro
 			syncMessage.EncryptionKeys = encodedKeys
 
 			backupMessage := &protobuf.Backup{
-				Communities: []*protobuf.SyncCommunity{syncMessage},
+				Communities: []*protobuf.SyncInstallationCommunity{syncMessage},
 			}
 
 			backupMessages = append(backupMessages, backupMessage)

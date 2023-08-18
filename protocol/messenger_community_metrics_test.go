@@ -93,7 +93,7 @@ func (s *MessengerCommunityMetricsSuite) generateMessages(chatID string, communi
 	var messages []*common.Message
 	for i, timestamp := range timestamps {
 		message := &common.Message{
-			ChatMessage: protobuf.ChatMessage{
+			ChatMessage: &protobuf.ChatMessage{
 				ChatId:      chatID,
 				Text:        fmt.Sprintf("Test message %d", i),
 				MessageType: protobuf.MessageType_ONE_TO_ONE,

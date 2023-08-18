@@ -92,7 +92,7 @@ func TestHandleLinkPreviewThumbnail(t *testing.T) {
 
 	msg := common.Message{
 		ID: "1",
-		ChatMessage: protobuf.ChatMessage{
+		ChatMessage: &protobuf.ChatMessage{
 			UnfurledLinks: []*protobuf.UnfurledLink{
 				{
 					Type:             protobuf.UnfurledLink_LINK,

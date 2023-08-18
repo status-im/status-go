@@ -134,7 +134,7 @@ message CommunityRequestToJoin {
   repeated RevealedAccount revealed_accounts = 6;
 }
 
-message CommunityEditRevealedAccounts {
+message CommunityEditSharedAddresses {
   uint64 clock = 1;
   bytes community_id = 2;
   repeated RevealedAccount revealed_accounts = 3;
