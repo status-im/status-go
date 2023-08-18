@@ -42,6 +42,7 @@ type DrawRingParam struct {
 	ImageBytes []byte                  `json:"imageBytes"`
 	Height     int                     `json:"height"`
 	Width      int                     `json:"width"`
+	RingWidth  float64                 `json:"ringWidth"`
 }
 
 func DrawRing(param *DrawRingParam) ([]byte, error) {
@@ -62,7 +63,10 @@ func DrawRing(param *DrawRingParam) ([]byte, error) {
 	}
 	dc.DrawImage(img, 0, 0)
 
-	ringPxSize := math.Max(2.0, float64(param.Width/16.0))
+	ringPxSize := param.RingWidth
+	if param.RingWidth == 0 {
+		ringPxSize = math.Max(2.0, float64(param.Width/16.0))
+	}
 	radius := (float64(param.Height) - ringPxSize) / 2
 	arcPos := 0.0
 
