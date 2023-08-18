@@ -1,4 +1,4 @@
-package linkpreview
+package protocol
 
 import (
 	"bytes"
@@ -207,7 +207,7 @@ func Test_UnfurlURLs_YouTube(t *testing.T) {
 	transport.AddURLMatcher(thumbnailURL, readAsset(t, "1.jpg"), nil)
 	stubbedClient := http.Client{Transport: &transport}
 
-	previews, err := UnfurlURLs(nil, stubbedClient, []string{url})
+	previews, err := m.UnfurlURLs(nil, stubbedClient, []string{url})
 	require.NoError(t, err)
 	require.Len(t, previews, 1)
 	preview := previews[0]

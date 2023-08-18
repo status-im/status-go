@@ -60,7 +60,7 @@ func compressImage(imgBytes []byte) ([]byte, error) {
 	return smallest, nil
 }
 
-// isSupportedImageURL detects whether a URL ends with one of the
+// IsSupportedImageURL detects whether a URL ends with one of the
 // supported image extensions. It provides a quick way to identify whether URLs
 // should be unfurled as images without needing to retrieve the full response
 // body first.
@@ -76,7 +76,7 @@ func isSupportedImage(payload []byte) bool {
 	return images.IsJpeg(payload) || images.IsPng(payload) || images.IsWebp(payload)
 }
 
-func (u ImageUnfurler) Unfurl() (common.LinkPreview, error) {
+func (u *ImageUnfurler) Unfurl() (common.LinkPreview, error) {
 	preview := newDefaultLinkPreview(u.url)
 	preview.Type = protobuf.UnfurledLink_IMAGE
 

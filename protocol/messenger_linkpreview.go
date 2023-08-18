@@ -1,4 +1,4 @@
-package linkpreview
+package protocol
 
 import (
 	"errors"
@@ -26,11 +26,11 @@ func normalizeHostname(hostname string) string {
 	return re.ReplaceAllString(hostname, "$1")
 }
 
-func newUnfurler(logger *zap.Logger, httpClient http.Client, url *neturl.URL) unfurlers.Unfurler {
+func (m *Messenger) newUrlUnfurler(httpClient http.Client, url *neturl.URL) unfurlers.Unfurler {
 	if unfurlers.IsSupportedImageURL(url) {
 		return unfurlers.NewImageUnfurler(
 			url,
-			logger,
+			m.logger,
 			httpClient)
 	}
 
@@ -39,17 +39,17 @@ func newUnfurler(logger *zap.Logger, httpClient http.Client, url *neturl.URL) un
 		return unfurlers.NewOEmbedUnfurler(
 			"https://www.reddit.com/oembed",
 			url,
-			logger,
+			m.logger,
 			httpClient)
 	default:
 		return unfurlers.NewOpenGraphUnfurler(
 			url,
-			logger,
+			m.logger,
 			httpClient)
 	}
 }
 
-func unfurl(logger *zap.Logger, httpClient http.Client, url string) (common.LinkPreview, error) {
+func (m *Messenger) unfurlUrl(httpClient http.Client, url string) (common.LinkPreview, error) {
 	var preview common.LinkPreview
 
 	parsedURL, err := neturl.Parse(url)
@@ -57,7 +57,7 @@ func unfurl(logger *zap.Logger, httpClient http.Client, url string) (common.Link
 		return preview, err
 	}
 
-	unfurler := newUnfurler(logger, httpClient, parsedURL)
+	unfurler := m.newUrlUnfurler(httpClient, parsedURL)
 	preview, err = unfurler.Unfurl()
 	if err != nil {
 		return preview, err
@@ -131,22 +131,15 @@ func NewDefaultHTTPClient() http.Client {
 
 // UnfurlURLs assumes clients pass URLs verbatim that were validated and
 // processed by GetURLs.
-func UnfurlURLs(logger *zap.Logger, httpClient http.Client, urls []string) ([]common.LinkPreview, error) {
-	var err error
-	if logger == nil {
-		logger, err = zap.NewDevelopment()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create logger: %w", err)
-		}
-	}
-
+func (m *Messenger) UnfurlURLs(urls []string) ([]common.LinkPreview, error) {
+	httpClient := NewDefaultHTTPClient()
 	previews := make([]common.LinkPreview, 0, len(urls))
 
 	for _, url := range urls {
-		logger.Debug("unfurling", zap.String("url", url))
-		p, err := unfurl(logger, httpClient, url)
+		m.logger.Debug("unfurling", zap.String("url", url))
+		p, err := m.unfurlUrl(httpClient, url)
 		if err != nil {
-			logger.Info("failed to unfurl", zap.String("url", url), zap.Error(err))
+			m.logger.Info("failed to unfurl", zap.String("url", url), zap.Error(err))
 			continue
 		}
 		previews = append(previews, p)

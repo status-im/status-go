@@ -40,7 +40,7 @@ type OEmbedResponse struct {
 	ThumbnailURL string `json:"thumbnail_url"`
 }
 
-func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
+func (u *OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
 	oembedURL, err := neturl.Parse(u.oembedEndpoint)
 	if err != nil {
 		return nil, err
