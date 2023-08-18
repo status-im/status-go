@@ -43,7 +43,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				state.AllContacts.Store(message.PublicKey, contact)
 			}
 			currentMessageState := &CurrentMessageState{
-				Message: protobuf.ChatMessage{
+				Message: &protobuf.ChatMessage{
 					Clock: message.Clock,
 				},
 				MessageID:        " ", // make it not empty to bypass this validation: https://github.com/status-im/status-go/blob/7cd7430d3141b08f7c455d7918f4160ea8fd0559/protocol/messenger_handler.go#L325
@@ -52,7 +52,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				Contact:          contact,
 			}
 			state.CurrentMessageState = currentMessageState
-			err = m.HandleContactUpdate(state, message)
+			err = m.HandleContactUpdate(state, &message, nil)
 			if err != nil {
 				m.logger.Warn("failed to HandleContactUpdate when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -63,13 +63,10 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			addedChat := m.HandleSyncInstallationPublicChat(state, message)
-			if addedChat != nil {
-				_, err = m.createPublicChat(addedChat.ID, state.Response)
-				if err != nil {
-					m.logger.Error("error createPublicChat when HandleSyncRawMessages", zap.Error(err))
-					continue
-				}
+			err = m.HandleSyncInstallationPublicChat(state, &message, nil)
+			if err != nil {
+				m.logger.Error("error createPublicChat when HandleSyncRawMessages", zap.Error(err))
+				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_CHAT_REMOVED:
 			var message protobuf.SyncChatRemoved
@@ -77,7 +74,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncChatRemoved(state, message)
+			err = m.HandleSyncChatRemoved(state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncChatRemoved when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -88,7 +85,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncChatMessagesRead(state, message)
+			err = m.HandleSyncChatMessagesRead(state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncChatMessagesRead when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -99,29 +96,29 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.handleSyncClearHistory(state, message)
+			err = m.HandleSyncClearHistory(state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to handleSyncClearHistory when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
-		case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_CONTACT:
+		case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_CONTACT_V2:
 			var message protobuf.SyncInstallationContactV2
 			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncInstallationContact(state, message)
+			err = m.HandleSyncInstallationContactV2(state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncInstallationContact when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_COMMUNITY:
-			var message protobuf.SyncCommunity
+			var message protobuf.SyncInstallationCommunity
 			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
 			if err != nil {
 				return err
 			}
-			err = m.handleSyncCommunity(state, message)
+			err = m.handleSyncInstallationCommunity(state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to handleSyncCommunity when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -132,7 +129,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.handleSyncBookmark(state, message)
+			err = m.HandleSyncBookmark(state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to handleSyncBookmark when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -143,7 +140,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.handleSyncTrustedUser(state, message)
+			err = m.HandleSyncTrustedUser(state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to handleSyncTrustedUser when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -154,7 +151,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.handleSyncVerificationRequest(state, message)
+			err = m.HandleSyncVerificationRequest(state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to handleSyncVerificationRequest when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -165,18 +162,18 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.handleSyncSetting(state, &message)
+			err = m.HandleSyncSetting(state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to handleSyncSetting when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
-		case protobuf.ApplicationMetadataMessage_SYNC_PROFILE_PICTURE:
+		case protobuf.ApplicationMetadataMessage_SYNC_PROFILE_PICTURES:
 			var message protobuf.SyncProfilePictures
 			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncProfilePictures(state, message)
+			err = m.HandleSyncProfilePictures(state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncProfilePictures when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -187,7 +184,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncContactRequestDecision(state, message)
+			err = m.HandleSyncContactRequestDecision(state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncContactRequestDecision when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -198,7 +195,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncWatchOnlyAccount(state, message)
+			err = m.HandleSyncAccount(state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncWatchOnlyAccount when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -209,7 +206,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncKeypair(state, message, true)
+			err = m.handleSyncKeypairInternal(state, &message, true)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncKeypair when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -220,7 +217,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncAccountsPositions(state, message)
+			err = m.HandleSyncAccountsPositions(state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncAccountsPositions when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -231,7 +228,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.handleSyncSavedAddress(state, message)
+			err = m.HandleSyncSavedAddress(state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to handleSyncSavedAddress when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -242,7 +239,7 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncSocialLinks(state, message)
+			err = m.HandleSyncSocialLinks(state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleSyncSocialLinks when HandleSyncRawMessages", zap.Error(err))
 				continue
@@ -253,24 +250,24 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 			if err != nil {
 				return err
 			}
-			err = m.handleSyncEnsUsernameDetail(state, message)
+			err = m.HandleSyncEnsUsernameDetail(state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to handleSyncEnsUsernameDetail when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_DELETE_FOR_ME_MESSAGE:
-			var message protobuf.DeleteForMeMessage
+			var message protobuf.SyncDeleteForMeMessage
 			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
 			if err != nil {
 				return err
 			}
-			err = m.HandleDeleteForMeMessage(state, message)
+			err = m.HandleSyncDeleteForMeMessage(state, &message, nil)
 			if err != nil {
 				m.logger.Error("failed to HandleDeleteForMeMessage when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
-		case protobuf.ApplicationMetadataMessage_PAIR_INSTALLATION:
-			var message protobuf.PairInstallation
+		case protobuf.ApplicationMetadataMessage_SYNC_PAIR_INSTALLATION:
+			var message protobuf.SyncPairInstallation
 			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
 			if err != nil {
 				return err
@@ -289,9 +286,9 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 					},
 				}}
 			m.handleInstallations(installations)
-			// set WhisperTimestamp to pass the validation in HandlePairInstallation
+			// set WhisperTimestamp to pass the validation in HandleSyncPairInstallation
 			state.CurrentMessageState = &CurrentMessageState{WhisperTimestamp: message.Clock}
-			err = m.HandlePairInstallation(state, message)
+			err = m.HandleSyncPairInstallation(state, &message, nil)
 			if err != nil {
 				return err
 			}

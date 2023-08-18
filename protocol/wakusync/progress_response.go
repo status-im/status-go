@@ -14,10 +14,10 @@ func (sfwr *WakuBackedUpDataResponse) AddFetchingBackedUpDataDetails(section str
 		return
 	}
 	if sfwr.FetchingDataProgress == nil {
-		sfwr.FetchingDataProgress = make(map[string]protobuf.FetchingBackedUpDataDetails)
+		sfwr.FetchingDataProgress = make(map[string]*protobuf.FetchingBackedUpDataDetails)
 	}
 
-	sfwr.FetchingDataProgress[section] = *details
+	sfwr.FetchingDataProgress[section] = details
 }
 
 func (sfwr *WakuBackedUpDataResponse) FetchingBackedUpDataDetails() map[string]FetchingBackupedDataDetails {

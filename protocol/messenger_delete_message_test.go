@@ -170,8 +170,8 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageFirstThenMessage() {
 
 	inputMessage := buildTestMessage(*theirChat)
 	inputMessage.Clock = 1
-	deleteMessage := DeleteMessage{
-		DeleteMessage: protobuf.DeleteMessage{
+	deleteMessage := &DeleteMessage{
+		DeleteMessage: &protobuf.DeleteMessage{
 			Clock:       2,
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			MessageId:   messageID,
@@ -185,21 +185,20 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageFirstThenMessage() {
 	}
 
 	// Handle Delete first
-	err = s.m.HandleDeleteMessage(state, deleteMessage)
+	err = s.m.handleDeleteMessage(state, deleteMessage)
 	s.Require().NoError(err)
 
 	// // Handle chat message
 	state = &ReceivedMessageState{
 		Response: &MessengerResponse{},
 		CurrentMessageState: &CurrentMessageState{
-			Message:          inputMessage.ChatMessage,
 			MessageID:        messageID,
 			WhisperTimestamp: s.m.getTimesource().GetCurrentTime(),
 			Contact:          contact,
 			PublicKey:        &theirMessenger.identity.PublicKey,
 		},
 	}
-	err = s.m.HandleChatMessage(state)
+	err = s.m.HandleChatMessage(state, inputMessage.ChatMessage, nil)
 	s.Require().NoError(err)
 	s.Require().Len(state.Response.Messages(), 0) // Message should not be added to response
 	s.Require().Len(state.Response.RemovedMessages(), 0)
@@ -311,8 +310,8 @@ func (s *MessengerDeleteMessageSuite) TestDeleteImageMessageFirstThenMessage() {
 		album = append(album, image)
 	}
 
-	deleteMessage := DeleteMessage{
-		DeleteMessage: protobuf.DeleteMessage{
+	deleteMessage := &DeleteMessage{
+		DeleteMessage: &protobuf.DeleteMessage{
 			Clock:       2,
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			MessageId:   messageID1,
@@ -326,21 +325,20 @@ func (s *MessengerDeleteMessageSuite) TestDeleteImageMessageFirstThenMessage() {
 	}
 
 	// Handle Delete first
-	err = s.m.HandleDeleteMessage(state, deleteMessage)
+	err = s.m.handleDeleteMessage(state, deleteMessage)
 	s.Require().NoError(err)
 
 	// Handle first image message
 	state = &ReceivedMessageState{
 		Response: &MessengerResponse{},
 		CurrentMessageState: &CurrentMessageState{
-			Message:          album[0].ChatMessage,
 			MessageID:        messageID1,
 			WhisperTimestamp: s.m.getTimesource().GetCurrentTime(),
 			Contact:          contact,
 			PublicKey:        &theirMessenger.identity.PublicKey,
 		},
 	}
-	err = s.m.HandleChatMessage(state)
+	err = s.m.HandleChatMessage(state, album[0].ChatMessage, nil)
 	s.Require().NoError(err)
 	s.Require().Len(state.Response.Messages(), 0) // Message should not be added to response
 	s.Require().Len(state.Response.RemovedMessages(), 0)
@@ -350,14 +348,13 @@ func (s *MessengerDeleteMessageSuite) TestDeleteImageMessageFirstThenMessage() {
 	state = &ReceivedMessageState{
 		Response: &MessengerResponse{},
 		CurrentMessageState: &CurrentMessageState{
-			Message:          album[1].ChatMessage,
 			MessageID:        messageID2,
 			WhisperTimestamp: s.m.getTimesource().GetCurrentTime(),
 			Contact:          contact,
 			PublicKey:        &theirMessenger.identity.PublicKey,
 		},
 	}
-	err = s.m.HandleChatMessage(state)
+	err = s.m.HandleChatMessage(state, album[1].ChatMessage, nil)
 	s.Require().NoError(err)
 	s.Require().Len(state.Response.Messages(), 0) // Message should not be added to response even if we didn't delete that ID
 	s.Require().Len(state.Response.RemovedMessages(), 0)
@@ -399,8 +396,8 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageWithAMention() {
 	s.Require().Equal(int(response.Chats()[0].UnviewedMentionsCount), 1)
 	s.Require().True(response.Messages()[0].Mentioned)
 
-	deleteMessage := DeleteMessage{
-		DeleteMessage: protobuf.DeleteMessage{
+	deleteMessage := &DeleteMessage{
+		DeleteMessage: &protobuf.DeleteMessage{
 			Clock:       2,
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			MessageId:   messageID,
@@ -414,7 +411,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageWithAMention() {
 	}
 
 	// Handle Delete first
-	err = s.m.HandleDeleteMessage(state, deleteMessage)
+	err = s.m.handleDeleteMessage(state, deleteMessage)
 
 	s.Require().NoError(err)
 	s.Require().Len(response.Chats(), 1)
@@ -463,8 +460,8 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageAndChatIsAlreadyRead() {
 
 	ogMessage := sendResponse.Messages()[0]
 
-	deleteMessage := DeleteMessage{
-		DeleteMessage: protobuf.DeleteMessage{
+	deleteMessage := &DeleteMessage{
+		DeleteMessage: &protobuf.DeleteMessage{
 			Clock:       2,
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			MessageId:   ogMessage.ID,
@@ -478,7 +475,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageAndChatIsAlreadyRead() {
 	}
 
 	// Handle Delete first
-	err = s.m.HandleDeleteMessage(state, deleteMessage)
+	err = s.m.handleDeleteMessage(state, deleteMessage)
 
 	s.Require().NoError(err)
 	s.Require().Len(response.Chats(), 1)

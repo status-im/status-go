@@ -1460,12 +1460,12 @@ func testBanUnbanMember(base CommunityEventsTestsInterface, community *communiti
 func testDeleteAnyMessageInTheCommunity(base CommunityEventsTestsInterface, community *communities.Community) {
 	chatID := community.ChatIDs()[0]
 
-	inputMessage := common.Message{}
+	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chatID
 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = "control node text"
 
-	messageID := controlNodeSendMessage(base, &inputMessage)
+	messageID := controlNodeSendMessage(base, inputMessage)
 
 	deleteControlNodeMessage(base, messageID)
 }
@@ -1475,19 +1475,19 @@ func testEventSenderPinMessage(base CommunityEventsTestsInterface, community *co
 	s.Require().False(community.AllowsAllMembersToPinMessage())
 	chatID := community.ChatIDs()[0]
 
-	inputMessage := common.Message{}
+	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chatID
 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = "control node text"
 
-	messageID := controlNodeSendMessage(base, &inputMessage)
+	messageID := controlNodeSendMessage(base, inputMessage)
 
-	pinnedMessage := common.PinMessage{}
+	pinnedMessage := common.NewPinMessage()
 	pinnedMessage.MessageId = messageID
 	pinnedMessage.ChatId = chatID
 	pinnedMessage.Pinned = true
 
-	pinControlNodeMessage(base, &pinnedMessage)
+	pinControlNodeMessage(base, pinnedMessage)
 }
 
 func testMemberReceiveEventsWhenControlNodeOffline(base CommunityEventsTestsInterface, community *communities.Community) {

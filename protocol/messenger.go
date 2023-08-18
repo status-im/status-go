@@ -11,7 +11,6 @@ import (
 	"math"
 	"math/rand"
 	"os"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -55,6 +54,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/transport"
+	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
@@ -2358,7 +2358,7 @@ func (m *Messenger) ShareImageMessage(request *requests.ShareImageMessage) (*Mes
 
 	var messages []*common.Message
 	for _, pk := range request.Users {
-		message := &common.Message{}
+		message := common.NewMessage()
 		message.ChatId = pk.String()
 		message.Payload = msg.Payload
 		message.Text = "This message has been shared with you"
@@ -2431,7 +2431,7 @@ func (m *Messenger) syncProfilePictures(rawMessageHandler RawMessageHandler) err
 	rawMessage := common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_PROFILE_PICTURE,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_PROFILE_PICTURES,
 		ResendAutomatically: true,
 	}
 
@@ -2710,7 +2710,7 @@ func (m *Messenger) SendPairInstallation(ctx context.Context, rawMessageHandler 
 
 	clock, chat := m.getLastClockWithRelatedChat()
 
-	pairMessage := &protobuf.PairInstallation{
+	pairMessage := &protobuf.SyncPairInstallation{
 		Clock:          clock,
 		Name:           installation.InstallationMetadata.Name,
 		InstallationId: installation.ID,
@@ -2727,7 +2727,7 @@ func (m *Messenger) SendPairInstallation(ctx context.Context, rawMessageHandler 
 	_, err = rawMessageHandler(ctx, common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_PAIR_INSTALLATION,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_PAIR_INSTALLATION,
 		ResendAutomatically: true,
 	})
 	if err != nil {
@@ -2863,7 +2863,7 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact, rawMessag
 	rawMessage := common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_CONTACT,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_CONTACT_V2,
 		ResendAutomatically: true,
 	}
 
@@ -2891,7 +2891,7 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 		return err
 	}
 
-	syncMessage, err := community.ToSyncCommunityProtobuf(clock, communitySettings)
+	syncMessage, err := community.ToSyncInstallationCommunityProtobuf(clock, communitySettings)
 	if err != nil {
 		return err
 	}
@@ -2980,7 +2980,7 @@ func (m *Messenger) syncEnsUsernameDetails(ctx context.Context, rawMessageHandle
 	return nil
 }
 
-func (m *Messenger) saveEnsUsernameDetailProto(syncMessage protobuf.SyncEnsUsernameDetail) (*ensservice.UsernameDetail, error) {
+func (m *Messenger) saveEnsUsernameDetailProto(syncMessage *protobuf.SyncEnsUsernameDetail) (*ensservice.UsernameDetail, error) {
 	ud := &ensservice.UsernameDetail{
 		Username: syncMessage.Username,
 		Clock:    syncMessage.Clock,
@@ -2995,7 +2995,7 @@ func (m *Messenger) saveEnsUsernameDetailProto(syncMessage protobuf.SyncEnsUsern
 	return ud, nil
 }
 
-func (m *Messenger) handleSyncEnsUsernameDetail(state *ReceivedMessageState, syncMessage protobuf.SyncEnsUsernameDetail) error {
+func (m *Messenger) HandleSyncEnsUsernameDetail(state *ReceivedMessageState, syncMessage *protobuf.SyncEnsUsernameDetail, statusMessage *v1protocol.StatusMessage) error {
 	ud, err := m.saveEnsUsernameDetailProto(syncMessage)
 	if err != nil {
 		return err
@@ -3145,7 +3145,7 @@ func (m *Messenger) GetStats() types.StatsSummary {
 
 type CurrentMessageState struct {
 	// Message is the protobuf message received
-	Message protobuf.ChatMessage
+	Message *protobuf.ChatMessage
 	// MessageID is the ID of the message
 	MessageID string
 	// WhisperTimestamp is the whisper timestamp of the message
@@ -3406,15 +3406,23 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 					PublicKey:        publicKey,
 				}
 
-				if msg.ParsedMessage != nil {
+				if msg.UnwrappedPayload != nil {
 
 					logger.Debug("Handling parsed message")
 
-					switch msg.ParsedMessage.Interface().(type) {
+					switch msg.Type {
 
-					case protobuf.ChatMessage:
+					case protobuf.ApplicationMetadataMessage_CHAT_MESSAGE:
 						logger.Debug("Handling ChatMessage")
-						messageState.CurrentMessageState.Message = msg.ParsedMessage.Interface().(protobuf.ChatMessage)
+
+						protoMessage := &protobuf.ChatMessage{}
+						err := proto.Unmarshal(msg.UnwrappedPayload, protoMessage)
+						if err != nil {
+							logger.Warn("failed to unmarshal ChatMessage", zap.Error(err))
+							continue
+						}
+
+						messageState.CurrentMessageState.Message = protoMessage
 						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, messageState.CurrentMessageState.Message)
 						err = m.HandleImportedChatMessage(messageState)
 						if err != nil {
@@ -3586,950 +3594,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					PublicKey:        publicKey,
 				}
 
-				if msg.ParsedMessage != nil {
+				if msg.UnwrappedPayload != nil {
 
-					logger.Debug("Handling parsed message")
-
-					switch msg.ParsedMessage.Interface().(type) {
-					case protobuf.MembershipUpdateMessage:
-						logger.Debug("Handling MembershipUpdateMessage")
-						rawMembershipUpdate := msg.ParsedMessage.Interface().(protobuf.MembershipUpdateMessage)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, rawMembershipUpdate)
-
-						chat, _ := messageState.AllChats.Load(rawMembershipUpdate.ChatId)
-						err = m.HandleMembershipUpdate(messageState, chat, rawMembershipUpdate, m.systemMessagesTranslations)
-						if err != nil {
-							logger.Warn("failed to handle MembershipUpdate", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.ChatMessage:
-						logger.Debug("Handling ChatMessage")
-						messageState.CurrentMessageState.Message = msg.ParsedMessage.Interface().(protobuf.ChatMessage)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, messageState.CurrentMessageState.Message)
-						err = m.HandleChatMessage(messageState)
-						if err != nil {
-							logger.Warn("failed to handle ChatMessage", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.EditMessage:
-						logger.Debug("Handling EditMessage")
-						editProto := msg.ParsedMessage.Interface().(protobuf.EditMessage)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, editProto)
-						editMessage := EditMessage{
-							EditMessage: editProto,
-							From:        contact.ID,
-							ID:          messageID,
-							SigPubKey:   publicKey,
-						}
-						err = m.HandleEditMessage(messageState, editMessage)
-						if err != nil {
-							logger.Warn("failed to handle EditMessage", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.DeleteMessage:
-						logger.Debug("Handling DeleteMessage")
-						deleteProto := msg.ParsedMessage.Interface().(protobuf.DeleteMessage)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, deleteProto)
-						deleteMessage := DeleteMessage{
-							DeleteMessage: deleteProto,
-							From:          contact.ID,
-							ID:            messageID,
-							SigPubKey:     publicKey,
-						}
-
-						err = m.HandleDeleteMessage(messageState, deleteMessage)
-						if err != nil {
-							logger.Warn("failed to handle DeleteMessage", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.DeleteForMeMessage:
-						logger.Debug("Handling DeleteForMeMessage")
-						deleteForMeProto := msg.ParsedMessage.Interface().(protobuf.DeleteForMeMessage)
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, deleteForMeProto)
-
-						err = m.HandleDeleteForMeMessage(messageState, deleteForMeProto)
-						if err != nil {
-							logger.Warn("failed to handle DeleteForMeMessage", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.PinMessage:
-						pinMessage := msg.ParsedMessage.Interface().(protobuf.PinMessage)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, pinMessage)
-						err = m.HandlePinMessage(messageState, pinMessage)
-						if err != nil {
-							logger.Warn("failed to handle PinMessage", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.PairInstallation:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-						p := msg.ParsedMessage.Interface().(protobuf.PairInstallation)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						logger.Debug("Handling PairInstallation", zap.Any("message", p))
-						err = m.HandlePairInstallation(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle PairInstallation", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.StatusUpdate:
-						p := msg.ParsedMessage.Interface().(protobuf.StatusUpdate)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						logger.Debug("Handling StatusUpdate", zap.Any("message", p))
-						err = m.HandleStatusUpdate(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle StatusMessage", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.SyncInstallationContact:
-						logger.Warn("SyncInstallationContact is not supported")
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, msg.ParsedMessage.Interface().(protobuf.SyncInstallationContact))
+					err := m.dispatchToHandler(messageState, msg.UnwrappedPayload, msg, filter)
+					if err != nil {
+						allMessagesProcessed = false
+						logger.Warn("failed to process protobuf", zap.Error(err))
 						continue
-
-					case protobuf.SyncInstallationContactV2:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						p := msg.ParsedMessage.Interface().(protobuf.SyncInstallationContactV2)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						logger.Debug("Handling SyncInstallationContact", zap.Any("message", p))
-						err = m.HandleSyncInstallationContact(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle SyncInstallationContact", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.SyncProfilePictures:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						p := msg.ParsedMessage.Interface().(protobuf.SyncProfilePictures)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						logger.Debug("Handling SyncProfilePicture", zap.Any("message", p))
-						err = m.HandleSyncProfilePictures(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle SyncProfilePicture", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.SyncBookmark:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						p := msg.ParsedMessage.Interface().(protobuf.SyncBookmark)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						logger.Debug("Handling SyncBookmark", zap.Any("message", p))
-						err = m.handleSyncBookmark(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle SyncBookmark", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.SyncClearHistory:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						p := msg.ParsedMessage.Interface().(protobuf.SyncClearHistory)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						logger.Debug("Handling SyncClearHistory", zap.Any("message", p))
-						err = m.handleSyncClearHistory(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle SyncClearHistory", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-					case protobuf.SyncCommunitySettings:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-						p := msg.ParsedMessage.Interface().(protobuf.SyncCommunitySettings)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						logger.Debug("Handling SyncCommunitySettings", zap.Any("message", p))
-						err = m.handleSyncCommunitySettings(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle SyncCommunitySettings", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.SyncTrustedUser:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						p := msg.ParsedMessage.Interface().(protobuf.SyncTrustedUser)
-						logger.Debug("Handling SyncTrustedUser", zap.Any("message", p))
-						err = m.handleSyncTrustedUser(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle SyncTrustedUser", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.SyncVerificationRequest:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						p := msg.ParsedMessage.Interface().(protobuf.SyncVerificationRequest)
-						logger.Debug("Handling SyncVerificationRequest", zap.Any("message", p))
-						err = m.handleSyncVerificationRequest(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle SyncClearHistory", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.Backup:
-						if !m.processBackedupMessages {
-							continue
-						}
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						p := msg.ParsedMessage.Interface().(protobuf.Backup)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						logger.Debug("Handling Backup", zap.Any("message", p))
-						errors := m.HandleBackup(messageState, p)
-						if len(errors) > 0 {
-							for _, err := range errors {
-								logger.Warn("failed to handle Backup", zap.Error(err))
-							}
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.SyncInstallationPublicChat:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						p := msg.ParsedMessage.Interface().(protobuf.SyncInstallationPublicChat)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						logger.Debug("Handling SyncInstallationPublicChat", zap.Any("message", p))
-						addedChat := m.HandleSyncInstallationPublicChat(messageState, p)
-
-						// We join and re-register as we want to receive mentions from the newly joined public chat
-						if addedChat != nil {
-							_, err = m.createPublicChat(addedChat.ID, messageState.Response)
-							if err != nil {
-								allMessagesProcessed = false
-								logger.Error("error joining chat", zap.Error(err))
-								continue
-							}
-						}
-
-					case protobuf.SyncChatRemoved:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						p := msg.ParsedMessage.Interface().(protobuf.SyncChatRemoved)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						logger.Debug("Handling SyncChatRemoved", zap.Any("message", p))
-						err := m.HandleSyncChatRemoved(messageState, p)
-						if err != nil {
-							allMessagesProcessed = false
-							logger.Warn("failed to handle sync removing chat", zap.Error(err))
-							continue
-						}
-
-					case protobuf.SyncChatMessagesRead:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						p := msg.ParsedMessage.Interface().(protobuf.SyncChatMessagesRead)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						logger.Debug("Handling SyncChatMessagesRead", zap.Any("message", p))
-						err := m.HandleSyncChatMessagesRead(messageState, p)
-						if err != nil {
-							allMessagesProcessed = false
-							logger.Warn("failed to handle sync chat message read", zap.Error(err))
-							continue
-						}
-
-					case protobuf.SyncCommunity:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						community := msg.ParsedMessage.Interface().(protobuf.SyncCommunity)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, community)
-						logger.Debug("Handling SyncCommunity", zap.Any("message", community))
-
-						err = m.handleSyncCommunity(messageState, community)
-						if err != nil {
-							logger.Warn("failed to handle SyncCommunity", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.SyncActivityCenterRead:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterRead)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, a)
-						logger.Debug("Handling SyncActivityCenterRead", zap.Any("message", a))
-
-						err = m.handleActivityCenterRead(messageState, a)
-						if err != nil {
-							logger.Warn("failed to handle SyncActivityCenterRead", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.SyncActivityCenterAccepted:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterAccepted)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, a)
-						logger.Debug("Handling SyncActivityCenterAccepted", zap.Any("message", a))
-
-						err = m.handleActivityCenterAccepted(messageState, a)
-						if err != nil {
-							logger.Warn("failed to handle SyncActivityCenterAccepted", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.SyncActivityCenterDismissed:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterDismissed)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, a)
-						logger.Debug("Handling SyncActivityCenterDismissed", zap.Any("message", a))
-
-						err = m.handleActivityCenterDismissed(messageState, a)
-						if err != nil {
-							logger.Warn("failed to handle SyncActivityCenterDismissed", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.SyncActivityCenterNotifications:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterNotifications)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, a)
-						logger.Debug("Handling SyncActivityCenterNotification", zap.Any("message", a))
-
-						err = m.handleSyncActivityCenterNotifications(messageState, &a)
-						if err != nil {
-							logger.Warn("failed to handle SyncActivityCenterNotification", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.SyncActivityCenterNotificationState:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						a := msg.ParsedMessage.Interface().(protobuf.SyncActivityCenterNotificationState)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, a)
-						logger.Debug("Handling SyncActivityCenterNotificationState", zap.Any("message", a))
-
-						err = m.handleSyncActivityCenterNotificationState(messageState, &a)
-						if err != nil {
-							logger.Warn("failed to handle SyncActivityCenterNotificationState", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.SyncSetting:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						ss := msg.ParsedMessage.Interface().(protobuf.SyncSetting)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, ss)
-						logger.Debug("Handling SyncSetting", zap.Any("message", ss))
-
-						err := m.handleSyncSetting(messageState, &ss)
-						if err != nil {
-							logger.Warn("failed to handle SyncSetting", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.SyncAccountCustomizationColor:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-						sac := msg.ParsedMessage.Interface().(protobuf.SyncAccountCustomizationColor)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, sac)
-						logger.Debug("Handling SyncAccountCustomizationColor", zap.Any("message", sac))
-
-						err := m.handleSyncAccountCustomizationColor(messageState, sac)
-						if err != nil {
-							logger.Warn("failed to handle SyncAccountCustomizationColor", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.RequestAddressForTransaction:
-						command := msg.ParsedMessage.Interface().(protobuf.RequestAddressForTransaction)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, command)
-						logger.Debug("Handling RequestAddressForTransaction", zap.Any("message", command))
-						err = m.HandleRequestAddressForTransaction(messageState, command)
-						if err != nil {
-							logger.Warn("failed to handle RequestAddressForTransaction", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.SendTransaction:
-						command := msg.ParsedMessage.Interface().(protobuf.SendTransaction)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, command)
-						logger.Debug("Handling SendTransaction", zap.Any("message", command))
-						err = m.HandleSendTransaction(messageState, command)
-						if err != nil {
-							logger.Warn("failed to handle SendTransaction", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.AcceptRequestAddressForTransaction:
-						command := msg.ParsedMessage.Interface().(protobuf.AcceptRequestAddressForTransaction)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, command)
-						logger.Debug("Handling AcceptRequestAddressForTransaction")
-						err = m.HandleAcceptRequestAddressForTransaction(messageState, command)
-						if err != nil {
-							logger.Warn("failed to handle AcceptRequestAddressForTransaction", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.DeclineRequestAddressForTransaction:
-						command := msg.ParsedMessage.Interface().(protobuf.DeclineRequestAddressForTransaction)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, command)
-						logger.Debug("Handling DeclineRequestAddressForTransaction")
-						err = m.HandleDeclineRequestAddressForTransaction(messageState, command)
-						if err != nil {
-							logger.Warn("failed to handle DeclineRequestAddressForTransaction", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.DeclineRequestTransaction:
-						command := msg.ParsedMessage.Interface().(protobuf.DeclineRequestTransaction)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, command)
-						logger.Debug("Handling DeclineRequestTransaction")
-						err = m.HandleDeclineRequestTransaction(messageState, command)
-						if err != nil {
-							logger.Warn("failed to handle DeclineRequestTransaction", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.RequestTransaction:
-						command := msg.ParsedMessage.Interface().(protobuf.RequestTransaction)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, command)
-						logger.Debug("Handling RequestTransaction")
-						err = m.HandleRequestTransaction(messageState, command)
-						if err != nil {
-							logger.Warn("failed to handle RequestTransaction", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.ContactUpdate:
-						if common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("coming from us, ignoring")
-							continue
-						}
-
-						contactUpdate := msg.ParsedMessage.Interface().(protobuf.ContactUpdate)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, contactUpdate)
-						err = m.HandleContactUpdate(messageState, contactUpdate)
-						if err != nil {
-							logger.Warn("failed to handle ContactUpdate", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-						m.forgetContactInfoRequest(senderID)
-
-					case protobuf.AcceptContactRequest:
-						logger.Debug("Handling AcceptContactRequest")
-						message := msg.ParsedMessage.Interface().(protobuf.AcceptContactRequest)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
-						err = m.HandleAcceptContactRequest(messageState, message, senderID)
-						if err != nil {
-							logger.Warn("failed to handle AcceptContactRequest", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-					case protobuf.RetractContactRequest:
-						logger.Debug("Handling RetractContactRequest")
-						message := msg.ParsedMessage.Interface().(protobuf.RetractContactRequest)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
-						err = m.HandleRetractContactRequest(messageState, message)
-						if err != nil {
-							logger.Warn("failed to handle RetractContactRequest", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.PushNotificationQuery:
-						logger.Debug("Received PushNotificationQuery")
-						if m.pushNotificationServer == nil {
-							continue
-						}
-						message := msg.ParsedMessage.Interface().(protobuf.PushNotificationQuery)
-						logger.Debug("Handling PushNotificationQuery")
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
-						if err := m.pushNotificationServer.HandlePushNotificationQuery(publicKey, msg.ID, message); err != nil {
-							allMessagesProcessed = false
-							logger.Warn("failed to handle PushNotificationQuery", zap.Error(err))
-						}
-						// We continue in any case, no changes to messenger
-						continue
-					case protobuf.PushNotificationRegistrationResponse:
-						logger.Debug("Received PushNotificationRegistrationResponse")
-						if m.pushNotificationClient == nil {
-							continue
-						}
-						logger.Debug("Handling PushNotificationRegistrationResponse")
-						message := msg.ParsedMessage.Interface().(protobuf.PushNotificationRegistrationResponse)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
-						if err := m.pushNotificationClient.HandlePushNotificationRegistrationResponse(publicKey, message); err != nil {
-							allMessagesProcessed = false
-							logger.Warn("failed to handle PushNotificationRegistrationResponse", zap.Error(err))
-						}
-						// We continue in any case, no changes to messenger
-						continue
-					case protobuf.ContactCodeAdvertisement:
-						logger.Debug("Received ContactCodeAdvertisement")
-
-						cca := msg.ParsedMessage.Interface().(protobuf.ContactCodeAdvertisement)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, cca)
-						logger.Debug("protobuf.ContactCodeAdvertisement received", zap.Any("cca", cca))
-						if cca.ChatIdentity != nil {
-
-							logger.Debug("Received ContactCodeAdvertisement ChatIdentity")
-							err = m.HandleChatIdentity(messageState, *cca.ChatIdentity)
-							if err != nil {
-								allMessagesProcessed = false
-								logger.Warn("failed to handle ContactCodeAdvertisement ChatIdentity", zap.Error(err))
-								// No continue as Chat Identity may fail but the rest of the cca may process fine.
-							}
-						}
-
-						if m.pushNotificationClient == nil {
-							continue
-						}
-						logger.Debug("Handling ContactCodeAdvertisement")
-						if err := m.pushNotificationClient.HandleContactCodeAdvertisement(publicKey, cca); err != nil {
-							allMessagesProcessed = false
-							logger.Warn("failed to handle ContactCodeAdvertisement", zap.Error(err))
-						}
-
-						// We continue in any case, no changes to messenger
-						continue
-
-					case protobuf.PushNotificationResponse:
-						logger.Debug("Received PushNotificationResponse")
-						if m.pushNotificationClient == nil {
-							continue
-						}
-						logger.Debug("Handling PushNotificationResponse")
-						message := msg.ParsedMessage.Interface().(protobuf.PushNotificationResponse)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
-						if err := m.pushNotificationClient.HandlePushNotificationResponse(publicKey, message); err != nil {
-							allMessagesProcessed = false
-							logger.Warn("failed to handle PushNotificationResponse", zap.Error(err))
-						}
-						// We continue in any case, no changes to messenger
-						continue
-
-					case protobuf.PushNotificationQueryResponse:
-						logger.Debug("Received PushNotificationQueryResponse")
-						if m.pushNotificationClient == nil {
-							continue
-						}
-						logger.Debug("Handling PushNotificationQueryResponse")
-						message := msg.ParsedMessage.Interface().(protobuf.PushNotificationQueryResponse)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
-						if err := m.pushNotificationClient.HandlePushNotificationQueryResponse(publicKey, message); err != nil {
-							allMessagesProcessed = false
-							logger.Warn("failed to handle PushNotificationQueryResponse", zap.Error(err))
-						}
-						// We continue in any case, no changes to messenger
-						continue
-
-					case protobuf.PushNotificationRequest:
-						logger.Debug("Received PushNotificationRequest")
-						if m.pushNotificationServer == nil {
-							continue
-						}
-						logger.Debug("Handling PushNotificationRequest")
-						message := msg.ParsedMessage.Interface().(protobuf.PushNotificationRequest)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
-						if err := m.pushNotificationServer.HandlePushNotificationRequest(publicKey, msg.ID, message); err != nil {
-							allMessagesProcessed = false
-							logger.Warn("failed to handle PushNotificationRequest", zap.Error(err))
-						}
-						// We continue in any case, no changes to messenger
-						continue
-					case protobuf.EmojiReaction:
-						logger.Debug("Handling EmojiReaction")
-						message := msg.ParsedMessage.Interface().(protobuf.EmojiReaction)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
-						err = m.HandleEmojiReaction(messageState, message)
-						if err != nil {
-							logger.Warn("failed to handle EmojiReaction", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-					case protobuf.GroupChatInvitation:
-						logger.Debug("Handling GroupChatInvitation")
-						message := msg.ParsedMessage.Interface().(protobuf.GroupChatInvitation)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
-						err = m.HandleGroupChatInvitation(messageState, message)
-						if err != nil {
-							logger.Warn("failed to handle GroupChatInvitation", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-					case protobuf.ChatIdentity:
-						message := msg.ParsedMessage.Interface().(protobuf.ChatIdentity)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
-						err = m.HandleChatIdentity(messageState, message)
-						if err != nil {
-							logger.Warn("failed to handle ChatIdentity", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.CommunityDescription:
-						logger.Debug("Handling CommunityDescription")
-						message := msg.ParsedMessage.Interface().(protobuf.CommunityDescription)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
-						err = m.handleCommunityDescription(messageState, publicKey, message, msg.DecryptedPayload)
-						if err != nil {
-							logger.Warn("failed to handle CommunityDescription", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-						//if community was among requested ones, send its info and remove filter
-						for communityID := range m.requestedCommunities {
-							if _, ok := messageState.Response.communities[communityID]; ok {
-								m.passStoredCommunityInfoToSignalHandler(communityID)
-							}
-						}
-
-					case protobuf.RequestContactVerification:
-						logger.Debug("Handling RequestContactVerification")
-						err = m.HandleRequestContactVerification(messageState, msg.ParsedMessage.Interface().(protobuf.RequestContactVerification))
-						if err != nil {
-							logger.Warn("failed to handle RequestContactVerification", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.AcceptContactVerification:
-						logger.Debug("Handling AcceptContactVerification")
-						err = m.HandleAcceptContactVerification(messageState, msg.ParsedMessage.Interface().(protobuf.AcceptContactVerification))
-						if err != nil {
-							logger.Warn("failed to handle AcceptContactVerification", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.DeclineContactVerification:
-						logger.Debug("Handling DeclineContactVerification")
-						err = m.HandleDeclineContactVerification(messageState, msg.ParsedMessage.Interface().(protobuf.DeclineContactVerification))
-						if err != nil {
-							logger.Warn("failed to handle DeclineContactVerification", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.CancelContactVerification:
-						logger.Debug("Handling CancelContactVerification")
-						err = m.HandleCancelContactVerification(messageState, msg.ParsedMessage.Interface().(protobuf.CancelContactVerification))
-						if err != nil {
-							logger.Warn("failed to handle CancelContactVerification", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.CommunityRequestToJoin:
-						logger.Debug("Handling CommunityRequestToJoin")
-						request := msg.ParsedMessage.Interface().(protobuf.CommunityRequestToJoin)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, request)
-						err = m.HandleCommunityRequestToJoin(messageState, publicKey, request)
-						if err != nil {
-							logger.Warn("failed to handle CommunityRequestToJoin", zap.Error(err))
-							continue
-						}
-					case protobuf.CommunityEditRevealedAccounts:
-						logger.Debug("Handling CommunityEditRevealedAccounts")
-						request := msg.ParsedMessage.Interface().(protobuf.CommunityEditRevealedAccounts)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, request)
-						err = m.HandleCommunityEditSharedAddresses(messageState, publicKey, request)
-						if err != nil {
-							logger.Warn("failed to handle CommunityEditRevealedAccounts", zap.Error(err))
-							continue
-						}
-					case protobuf.CommunityCancelRequestToJoin:
-						logger.Debug("Handling CommunityCancelRequestToJoin")
-						request := msg.ParsedMessage.Interface().(protobuf.CommunityCancelRequestToJoin)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, request)
-						err = m.HandleCommunityCancelRequestToJoin(messageState, publicKey, request)
-						if err != nil {
-							logger.Warn("failed to handle CommunityCancelRequestToJoin", zap.Error(err))
-							continue
-						}
-					case protobuf.CommunityRequestToJoinResponse:
-						logger.Debug("Handling CommunityRequestToJoinResponse")
-						requestToJoinResponse := msg.ParsedMessage.Interface().(protobuf.CommunityRequestToJoinResponse)
-						err = m.HandleCommunityRequestToJoinResponse(messageState, publicKey, requestToJoinResponse)
-						if err != nil {
-							logger.Warn("failed to handle CommunityRequestToJoinResponse", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-					case protobuf.CommunityRequestToLeave:
-						logger.Debug("Handling CommunityRequestToLeave")
-						request := msg.ParsedMessage.Interface().(protobuf.CommunityRequestToLeave)
-						err = m.HandleCommunityRequestToLeave(messageState, publicKey, request)
-						if err != nil {
-							logger.Warn("failed to handle CommunityRequestToLeave", zap.Error(err))
-							continue
-						}
-
-					case protobuf.CommunityMessageArchiveMagnetlink:
-						logger.Debug("Handling CommunityMessageArchiveMagnetlink")
-						magnetlinkMessage := msg.ParsedMessage.Interface().(protobuf.CommunityMessageArchiveMagnetlink)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, magnetlinkMessage)
-						err = m.HandleHistoryArchiveMagnetlinkMessage(messageState, publicKey, magnetlinkMessage.MagnetUri, magnetlinkMessage.Clock)
-						if err != nil {
-							logger.Warn("failed to handle CommunityMessageArchiveMagnetlink", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.CommunityEventsMessage:
-						logger.Debug("Handling CommunityEventsMessage")
-						message := msg.ParsedMessage.Interface().(protobuf.CommunityEventsMessage)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
-						err = m.handleCommunityEventsMessage(messageState, publicKey, message)
-						if err != nil {
-							logger.Warn("failed to handle CommunityEventsMessage", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.CommunityEventsMessageRejected:
-						logger.Debug("Handling CommunityEventsMessageRejected")
-						message := msg.ParsedMessage.Interface().(protobuf.CommunityEventsMessageRejected)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
-						err = m.handleCommunityEventsMessageRejected(messageState, publicKey, message)
-						if err != nil {
-							logger.Warn("failed to handle CommunityEventsMessageRejected", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.CommunityPrivilegedUserSyncMessage:
-						logger.Debug("Handling CommunityPrivilegedUserSyncMessage")
-						message := msg.ParsedMessage.Interface().(protobuf.CommunityPrivilegedUserSyncMessage)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
-						err = m.handleCommunityPrivilegedUserSyncMessage(messageState, publicKey, message)
-						if err != nil {
-							logger.Warn("failed to handle CommunityPrivilegedUserSyncMessage", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-
-					case protobuf.AnonymousMetricBatch:
-						logger.Debug("Handling AnonymousMetricBatch")
-						if m.anonMetricsServer == nil {
-							logger.Warn("unable to handle AnonymousMetricBatch, anonMetricsServer is nil")
-							continue
-						}
-						message := msg.ParsedMessage.Interface().(protobuf.AnonymousMetricBatch)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, message)
-						ams, err := m.anonMetricsServer.StoreMetrics(message)
-						if err != nil {
-							logger.Warn("failed to store AnonymousMetricBatch", zap.Error(err))
-							continue
-						}
-						messageState.Response.AnonymousMetrics = append(messageState.Response.AnonymousMetrics, ams...)
-
-					case protobuf.SyncKeypair:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						p := msg.ParsedMessage.Interface().(protobuf.SyncKeypair)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						logger.Debug("Handling SyncKeypair", zap.Any("message", p))
-						err = m.HandleSyncKeypair(messageState, p, false)
-						if err != nil {
-							logger.Warn("failed to handle SyncKeypair", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-					case protobuf.SyncAccount:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						p := msg.ParsedMessage.Interface().(protobuf.SyncAccount)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						logger.Debug("Handling SyncAccount", zap.Any("message", p))
-						err = m.HandleSyncWatchOnlyAccount(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle SyncAccount", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-					case protobuf.SyncAccountsPositions:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						p := msg.ParsedMessage.Interface().(protobuf.SyncAccountsPositions)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						logger.Debug("Handling SyncAccountsPositions", zap.Any("message", p))
-						err = m.HandleSyncAccountsPositions(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle SyncAccountsPositions", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-					case protobuf.SyncContactRequestDecision:
-						logger.Info("SyncContactRequestDecision")
-						p := msg.ParsedMessage.Interface().(protobuf.SyncContactRequestDecision)
-						err := m.HandleSyncContactRequestDecision(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle SyncContactRequestDecision", zap.Error(err))
-							continue
-						}
-					case protobuf.SyncSavedAddress:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						p := msg.ParsedMessage.Interface().(protobuf.SyncSavedAddress)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						err = m.handleSyncSavedAddress(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle SyncSavedAddress", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-					case protobuf.SyncSocialLinks:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-
-						p := msg.ParsedMessage.Interface().(protobuf.SyncSocialLinks)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						err = m.HandleSyncSocialLinks(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle HandleSyncSocialLinks", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-					case protobuf.SyncEnsUsernameDetail:
-						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-							logger.Warn("not coming from us, ignoring")
-							continue
-						}
-						p := msg.ParsedMessage.Interface().(protobuf.SyncEnsUsernameDetail)
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.Topic, filter.ChatID, msg.Type, p)
-						err = m.handleSyncEnsUsernameDetail(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle SyncEnsName", zap.Error(err))
-							allMessagesProcessed = false
-							continue
-						}
-					default:
-						// Check if is an encrypted PushNotificationRegistration
-						if msg.Type == protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION {
-							logger.Debug("Received PushNotificationRegistration")
-							if m.pushNotificationServer == nil {
-								continue
-							}
-							logger.Debug("Handling PushNotificationRegistration")
-							if err := m.pushNotificationServer.HandlePushNotificationRegistration(publicKey, msg.ParsedMessage.Interface().([]byte)); err != nil {
-								allMessagesProcessed = false
-								logger.Warn("failed to handle PushNotificationRegistration", zap.Error(err))
-							}
-							// We continue in any case, no changes to messenger
-							continue
-						}
-
-						logger.Debug("message not handled", zap.Any("messageType", reflect.TypeOf(msg.ParsedMessage.Interface())))
-
 					}
+					logger.Debug("Handled parsed message")
+
 				} else {
 					logger.Debug("parsed message is nil")
 				}
@@ -5235,7 +4309,7 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 		return nil, errors.New("Need to be a one-to-one chat")
 	}
 
-	message := &common.Message{}
+	message := common.NewMessage()
 	err := extendMessageFromChat(message, chat, &m.identity.PublicKey, m.transport)
 	if err != nil {
 		return nil, err
@@ -5309,7 +4383,7 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 		return nil, errors.New("Need to be a one-to-one chat")
 	}
 
-	message := &common.Message{}
+	message := common.NewMessage()
 	err := extendMessageFromChat(message, chat, &m.identity.PublicKey, m.transport)
 	if err != nil {
 		return nil, err
@@ -5728,7 +4802,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 		return nil, errors.New("Need to be a one-to-one chat")
 	}
 
-	message := &common.Message{}
+	message := common.NewMessage()
 	err := extendMessageFromChat(message, chat, &m.identity.PublicKey, m.transport)
 	if err != nil {
 		return nil, err
@@ -5824,7 +4898,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		if validationResult.Message != nil {
 			message = validationResult.Message
 		} else {
-			message = &common.Message{}
+			message = common.NewMessage()
 			err := extendMessageFromChat(message, chat, &m.identity.PublicKey, m.transport)
 			if err != nil {
 				return nil, err
@@ -6148,7 +5222,7 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	emojiR := &EmojiReaction{
-		EmojiReaction: protobuf.EmojiReaction{
+		EmojiReaction: &protobuf.EmojiReaction{
 			Clock:     clock,
 			MessageId: messageID,
 			ChatId:    chatID,
@@ -6374,74 +5448,7 @@ func (m *Messenger) getEnsUsernameDetails() (result []*ensservice.UsernameDetail
 	return db.GetEnsUsernames(nil)
 }
 
-func (m *Messenger) handleSyncBookmark(state *ReceivedMessageState, message protobuf.SyncBookmark) error {
-	bookmark := &browsers.Bookmark{
-		URL:      message.Url,
-		Name:     message.Name,
-		ImageURL: message.ImageUrl,
-		Removed:  message.Removed,
-		Clock:    message.Clock,
-	}
-	state.AllBookmarks[message.Url] = bookmark
-	return nil
-}
-
-func (m *Messenger) handleSyncClearHistory(state *ReceivedMessageState, message protobuf.SyncClearHistory) error {
-	chatID := message.ChatId
-	existingChat, ok := state.AllChats.Load(chatID)
-	if !ok {
-		return ErrChatNotFound
-	}
-
-	if existingChat.DeletedAtClockValue >= message.ClearedAt {
-		return nil
-	}
-
-	err := m.persistence.ClearHistoryFromSyncMessage(existingChat, message.ClearedAt)
-	if err != nil {
-		return err
-	}
-
-	if existingChat.Public() {
-		err = m.transport.ClearProcessedMessageIDsCache()
-		if err != nil {
-			return err
-		}
-	}
-
-	state.AllChats.Store(chatID, existingChat)
-	state.Response.AddChat(existingChat)
-	state.Response.AddClearedHistory(&ClearedHistory{
-		ClearedAt: message.ClearedAt,
-		ChatID:    chatID,
-	})
-	return nil
-}
-
-func (m *Messenger) handleSyncTrustedUser(state *ReceivedMessageState, message protobuf.SyncTrustedUser) error {
-	updated, err := m.verificationDatabase.UpsertTrustStatus(message.Id, verification.TrustStatus(message.Status), message.Clock)
-	if err != nil {
-		return err
-	}
-
-	if updated {
-		state.AllTrustStatus[message.Id] = verification.TrustStatus(message.Status)
-
-		contact, ok := m.allContacts.Load(message.Id)
-		if !ok {
-			m.logger.Info("contact not found")
-			return nil
-		}
-
-		contact.TrustStatus = verification.TrustStatus(message.Status)
-		m.allContacts.Store(contact.ID, contact)
-		state.ModifiedContacts.Store(contact.ID, true)
-	}
-
-	return nil
-}
-
-func ToVerificationRequest(message protobuf.SyncVerificationRequest) *verification.Request {
+func ToVerificationRequest(message *protobuf.SyncVerificationRequest) *verification.Request {
 	return &verification.Request{
 		From:          message.From,
 		To:            message.To,
@@ -6453,7 +5460,7 @@ func ToVerificationRequest(message protobuf.SyncVerificationRequest) *verificati
 	}
 }
 
-func (m *Messenger) handleSyncVerificationRequest(state *ReceivedMessageState, message protobuf.SyncVerificationRequest) error {
+func (m *Messenger) HandleSyncVerificationRequest(state *ReceivedMessageState, message *protobuf.SyncVerificationRequest, statusMessage *v1protocol.StatusMessage) error {
 	verificationRequest := ToVerificationRequest(message)
 
 	err := m.verificationDatabase.SaveVerificationRequest(verificationRequest)
@@ -6588,8 +5595,8 @@ func (m *Messenger) syncSocialLinks(ctx context.Context, rawMessageDispatcher Ra
 	return err
 }
 
-func (m *Messenger) HandleSyncSocialLinks(state *ReceivedMessageState, message protobuf.SyncSocialLinks) error {
-	return m.handleSyncSocialLinks(&message, func(links identity.SocialLinks) {
+func (m *Messenger) HandleSyncSocialLinks(state *ReceivedMessageState, message *protobuf.SyncSocialLinks, statusMessage *v1protocol.StatusMessage) error {
+	return m.handleSyncSocialLinks(message, func(links identity.SocialLinks) {
 		state.Response.SocialLinksInfo = &identity.SocialLinksInfo{
 			Links:   links,
 			Removed: len(links) == 0,
@@ -6631,6 +5638,6 @@ func (m *Messenger) handleSyncSocialLinks(message *protobuf.SyncSocialLinks, cal
 	return nil
 }
 
-func (m *Messenger) GetDeleteForMeMessages() ([]*protobuf.DeleteForMeMessage, error) {
+func (m *Messenger) GetDeleteForMeMessages() ([]*protobuf.SyncDeleteForMeMessage, error) {
 	return m.persistence.GetDeleteForMeMessages()
 }

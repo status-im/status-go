@@ -77,7 +77,7 @@ func (s *ChatTestSuite) TestValidateChat() {
 func (s *ChatTestSuite) TestUpdateFromMessage() {
 
 	// Base case, clock is higher
-	message := &common.Message{}
+	message := common.NewMessage()
 	chat := &Chat{}
 
 	message.Clock = 1
@@ -86,7 +86,7 @@ func (s *ChatTestSuite) TestUpdateFromMessage() {
 	s.Require().Equal(uint64(1), chat.LastClockValue)
 
 	// Clock is lower and lastMessage is not nil
-	message = &common.Message{}
+	message = common.NewMessage()
 	lastMessage := message
 	chat = &Chat{LastClockValue: 2, LastMessage: lastMessage}
 
@@ -96,7 +96,7 @@ func (s *ChatTestSuite) TestUpdateFromMessage() {
 	s.Require().Equal(uint64(2), chat.LastClockValue)
 
 	// Clock is lower and lastMessage is nil
-	message = &common.Message{}
+	message = common.NewMessage()
 	chat = &Chat{LastClockValue: 2}
 
 	message.Clock = 1
@@ -105,7 +105,7 @@ func (s *ChatTestSuite) TestUpdateFromMessage() {
 	s.Require().Equal(uint64(2), chat.LastClockValue)
 
 	// Clock is higher but lastMessage has lower clock message then the receiving one
-	message = &common.Message{}
+	message = common.NewMessage()
 	chat = &Chat{LastClockValue: 2}
 
 	message.Clock = 1
@@ -114,7 +114,7 @@ func (s *ChatTestSuite) TestUpdateFromMessage() {
 	s.Require().Equal(uint64(2), chat.LastClockValue)
 
 	chat.LastClockValue = 4
-	message = &common.Message{}
+	message = common.NewMessage()
 	message.Clock = 3
 	s.Require().NoError(chat.UpdateFromMessage(message, &testTimeSource{}))
 	s.Require().Equal(chat.LastMessage, message)
@@ -124,7 +124,7 @@ func (s *ChatTestSuite) TestUpdateFromMessage() {
 
 func (s *ChatTestSuite) TestSerializeJSON() {
 
-	message := &common.Message{}
+	message := common.NewMessage()
 	chat := &Chat{}
 
 	message.From = "0x04deaafa03e3a646e54a36ec3f6968c1d3686847d88420f00c0ab6ee517ee1893398fca28aacd2af74f2654738c21d10bad3d88dc64201ebe0de5cf1e313970d3d"

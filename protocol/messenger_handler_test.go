@@ -184,7 +184,7 @@ func (s *EventToSystemMessageSuite) TestHandleMembershipUpdate() {
 		AllChats:            s.m.allChats,
 	}
 
-	err = s.m.HandleMembershipUpdate(state, nil, *rawMembershipUpdateMessage2, defaultSystemMessagesTranslations)
+	err = s.m.HandleMembershipUpdate(state, nil, rawMembershipUpdateMessage2, defaultSystemMessagesTranslations)
 	s.Require().NoError(err)
 	s.Require().Len(state.Response.Notifications(), 1)
 	s.Require().Equal(state.Response.Notifications()[0].Category, localnotifications.CategoryGroupInvite)
@@ -202,7 +202,7 @@ func (s *EventToSystemMessageSuite) TestHandleMembershipUpdate() {
 
 	// If the same response is handled, it should not show another notification & the chat should remain inactive
 	state.Response = &MessengerResponse{}
-	err = s.m.HandleMembershipUpdate(state, chat, *rawMembershipUpdateMessage2, defaultSystemMessagesTranslations)
+	err = s.m.HandleMembershipUpdate(state, chat, rawMembershipUpdateMessage2, defaultSystemMessagesTranslations)
 	s.Require().NoError(err)
 	s.Require().Len(state.Response.Notifications(), 0)
 	s.Require().Len(state.Response.Chats(), 1)

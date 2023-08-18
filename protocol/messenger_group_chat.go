@@ -213,7 +213,7 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 		logger.Info("ApproveInvitationByChatIdAndFrom", zap.String("chatID", chatID), zap.Any("member", member))
 
 		groupChatInvitation := &GroupChatInvitation{
-			GroupChatInvitation: protobuf.GroupChatInvitation{
+			GroupChatInvitation: &protobuf.GroupChatInvitation{
 				ChatId: chat.ID,
 			},
 			From: member,
@@ -433,7 +433,7 @@ func (m *Messenger) SendGroupChatInvitationRequest(ctx context.Context, chatID s
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	invitationR := &GroupChatInvitation{
-		GroupChatInvitation: protobuf.GroupChatInvitation{
+		GroupChatInvitation: &protobuf.GroupChatInvitation{
 			Clock:               clock,
 			ChatId:              chatID,
 			IntroductionMessage: message,

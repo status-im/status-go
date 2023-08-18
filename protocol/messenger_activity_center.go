@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/verification"
 
 	"github.com/golang/protobuf/proto"
@@ -120,7 +121,7 @@ func (m *Messenger) syncActivityCenterNotifications(notifications []*ActivityCen
 	}
 	return m.sendToPairedDevices(context.TODO(), common.RawMessage{
 		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_NOTIFICATION,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_NOTIFICATIONS,
 		ResendAutomatically: true,
 	})
 }
@@ -383,7 +384,7 @@ func (m *Messenger) ActivityCenterNotification(id types.HexBytes) (*ActivityCent
 	return m.persistence.GetActivityCenterNotificationByID(id)
 }
 
-func (m *Messenger) handleActivityCenterRead(state *ReceivedMessageState, message protobuf.SyncActivityCenterRead) error {
+func (m *Messenger) HandleSyncActivityCenterRead(state *ReceivedMessageState, message *protobuf.SyncActivityCenterRead, statusMessage *v1protocol.StatusMessage) error {
 	resp, err := m.MarkActivityCenterNotificationsRead(context.TODO(), toHexBytes(message.Ids), message.Clock, false)
 
 	if err != nil {
@@ -393,7 +394,7 @@ func (m *Messenger) handleActivityCenterRead(state *ReceivedMessageState, messag
 	return state.Response.Merge(resp)
 }
 
-func (m *Messenger) handleActivityCenterAccepted(state *ReceivedMessageState, message protobuf.SyncActivityCenterAccepted) error {
+func (m *Messenger) HandleSyncActivityCenterAccepted(state *ReceivedMessageState, message *protobuf.SyncActivityCenterAccepted, statusMessage *v1protocol.StatusMessage) error {
 	resp, err := m.AcceptActivityCenterNotifications(context.TODO(), toHexBytes(message.Ids), message.Clock, false)
 
 	if err != nil {
@@ -403,7 +404,7 @@ func (m *Messenger) handleActivityCenterAccepted(state *ReceivedMessageState, me
 	return state.Response.Merge(resp)
 }
 
-func (m *Messenger) handleActivityCenterDismissed(state *ReceivedMessageState, message protobuf.SyncActivityCenterDismissed) error {
+func (m *Messenger) HandleSyncActivityCenterDismissed(state *ReceivedMessageState, message *protobuf.SyncActivityCenterDismissed, statusMessage *v1protocol.StatusMessage) error {
 	resp, err := m.DismissActivityCenterNotifications(context.TODO(), toHexBytes(message.Ids), message.Clock, false)
 
 	if err != nil {
@@ -413,7 +414,7 @@ func (m *Messenger) handleActivityCenterDismissed(state *ReceivedMessageState, m
 	return state.Response.Merge(resp)
 }
 
-func (m *Messenger) handleSyncActivityCenterNotificationState(state *ReceivedMessageState, a *protobuf.SyncActivityCenterNotificationState) error {
+func (m *Messenger) HandleSyncActivityCenterNotificationState(state *ReceivedMessageState, a *protobuf.SyncActivityCenterNotificationState, statusMessage *v1protocol.StatusMessage) error {
 	s := &ActivityCenterState{
 		HasSeen:   a.HasSeen,
 		UpdatedAt: a.UpdatedAt,
@@ -428,7 +429,7 @@ func (m *Messenger) handleSyncActivityCenterNotificationState(state *ReceivedMes
 	return nil
 }
 
-func (m *Messenger) handleSyncActivityCenterNotifications(state *ReceivedMessageState, a *protobuf.SyncActivityCenterNotifications) error {
+func (m *Messenger) HandleSyncActivityCenterNotifications(state *ReceivedMessageState, a *protobuf.SyncActivityCenterNotifications, statusMessage *v1protocol.StatusMessage) error {
 	var notifications []*ActivityCenterNotification
 	for _, n := range a.ActivityCenterNotifications {
 		notification, err := convertActivityCenterNotificationFromProtobuf(n)
@@ -509,7 +510,7 @@ func convertActivityCenterNotificationFromProtobuf(proto *protobuf.SyncActivityC
 	}
 
 	if len(proto.Message) > 0 {
-		message := &common.Message{}
+		message := common.NewMessage()
 		err := json.Unmarshal(proto.Message, &message)
 		if err != nil {
 			return nil, err
@@ -517,7 +518,7 @@ func convertActivityCenterNotificationFromProtobuf(proto *protobuf.SyncActivityC
 		a.Message = message
 	}
 	if len(proto.ReplyMessage) > 0 {
-		replyMessage := &common.Message{}
+		replyMessage := common.NewMessage()
 		err := json.Unmarshal(proto.ReplyMessage, &replyMessage)
 		if err != nil {
 			return nil, err

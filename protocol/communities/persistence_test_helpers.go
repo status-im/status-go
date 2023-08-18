@@ -17,7 +17,7 @@ type RawCommunityRow struct {
 	Muted       bool
 }
 
-func fromSyncCommunityProtobuf(syncCommProto *protobuf.SyncCommunity) RawCommunityRow {
+func fromSyncCommunityProtobuf(syncCommProto *protobuf.SyncInstallationCommunity) RawCommunityRow {
 	return RawCommunityRow{
 		ID:          syncCommProto.Id,
 		Description: syncCommProto.Description,

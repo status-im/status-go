@@ -68,7 +68,7 @@ func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType
 	}
 
 	message := &common.Message{
-		ChatMessage: protobuf.ChatMessage{
+		ChatMessage: &protobuf.ChatMessage{
 			ChatId:      contactID,
 			Text:        text,
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
@@ -537,7 +537,7 @@ func (m *Messenger) generateContactRequest(clock uint64, timestamp uint64, conta
 		return nil, errors.New("contact cannot be nil")
 	}
 
-	contactRequest := &common.Message{}
+	contactRequest := common.NewMessage()
 	contactRequest.ChatId = contact.ID
 	contactRequest.WhisperTimestamp = timestamp
 	contactRequest.Seen = true

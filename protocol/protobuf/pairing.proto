@@ -20,7 +20,7 @@ message Backup {
 
 /* this is what we already had */
   repeated SyncInstallationContactV2 contacts = 3;
-  repeated SyncCommunity communities = 4;
+  repeated SyncInstallationCommunity communities = 4;
 /* newly added details to be backed up to and fetched from waku */
   FetchingBackedUpDataDetails contactsDetails = 5;
   FetchingBackedUpDataDetails communitiesDetails = 6;
@@ -83,23 +83,13 @@ message LocalPairingPeerHello {
   bytes signature = 5;
 }
 
-message PairInstallation {
+message SyncPairInstallation {
   uint64 clock = 1;
   string installation_id = 2;
   string device_type = 3;
   string name = 4;
   // following fields used for local pairing
   uint32 version = 5;
-}
-
-message SyncInstallationContact {
-  uint64 clock = 1;
-  string id = 2;
-  string profile_image = 3;
-  string ens_name = 4;
-  uint64 last_updated = 5;
-  repeated string system_tags = 6;
-  string local_nickname = 7;
 }
 
 message SyncInstallationContactV2 {
@@ -135,7 +125,7 @@ message SyncInstallationPublicChat {
   string id = 2;
 }
 
-message SyncCommunity {
+message SyncInstallationCommunity {
   uint64 clock = 1;
   bytes id = 2;
   // Don't sync private_key because we want to have only one control node
@@ -160,13 +150,6 @@ message SyncCommunityRequestsToJoin {
   bytes community_id = 6;
   uint64 state = 7;
   repeated RevealedAccount revealed_accounts = 8;
-}
-
-message SyncInstallation {
-  repeated SyncInstallationContact contacts = 1;
-  repeated SyncInstallationPublicChat public_chats = 2;
-  SyncInstallationAccount account = 3;
-  repeated SyncCommunity communities = 4;
 }
 
 message SyncChatRemoved {

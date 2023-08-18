@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/transport"
+	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
 func (m *Messenger) GetCurrentUserStatus() (*UserStatus, error) {
@@ -231,8 +232,8 @@ func (m *Messenger) SetUserStatus(ctx context.Context, newStatus int, newCustomT
 	return m.sendUserStatus(ctx, *currStatus)
 }
 
-func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, statusMessage protobuf.StatusUpdate) error {
-	if err := ValidateStatusUpdate(statusMessage); err != nil {
+func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, message *protobuf.StatusUpdate, statusMessage *v1protocol.StatusMessage) error {
+	if err := ValidateStatusUpdate(message); err != nil {
 		return err
 	}
 
@@ -243,17 +244,17 @@ func (m *Messenger) HandleStatusUpdate(state *ReceivedMessageState, statusMessag
 			return err
 		}
 
-		if currentStatus.Clock >= statusMessage.Clock {
+		if currentStatus.Clock >= message.Clock {
 			return nil // older status message, or status does not change ignoring it
 		}
-		newStatus := ToUserStatus(statusMessage)
+		newStatus := ToUserStatus(message)
 		err = m.settings.SaveSettingField(settings.CurrentUserStatus, newStatus)
 		if err != nil {
 			return err
 		}
 		state.Response.SetCurrentStatus(newStatus)
 	} else {
-		statusUpdate := ToUserStatus(statusMessage)
+		statusUpdate := ToUserStatus(message)
 		statusUpdate.PublicKey = state.CurrentMessageState.Contact.ID
 
 		err := m.persistence.InsertStatusUpdate(statusUpdate)

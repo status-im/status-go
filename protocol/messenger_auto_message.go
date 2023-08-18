@@ -42,7 +42,7 @@ func (m *Messenger) startAutoMessageLoop() error {
 				count++
 				timestamp := time.Now().Format(time.RFC3339)
 
-				msg := &common.Message{}
+				msg := common.NewMessage()
 				msg.Text = fmt.Sprintf("%d\n%s", count, timestamp)
 				msg.ChatId = autoMessageChatID
 				msg.LocalChatID = autoMessageChatID

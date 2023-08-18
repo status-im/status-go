@@ -245,7 +245,7 @@ func createCommunity(s *suite.Suite, owner *Messenger) (*communities.Community, 
 func advertiseCommunityTo(s *suite.Suite, community *communities.Community, owner *Messenger, user *Messenger) {
 	chat := CreateOneToOneChat(common.PubkeyToHex(&user.identity.PublicKey), &user.identity.PublicKey, user.transport)
 
-	inputMessage := &common.Message{}
+	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
 	inputMessage.Text = "some text"
 	inputMessage.CommunityID = community.IDString()
@@ -374,7 +374,7 @@ func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, co
 
 func sendChatMessage(s *suite.Suite, sender *Messenger, chatID string, text string) *common.Message {
 	msg := &common.Message{
-		ChatMessage: protobuf.ChatMessage{
+		ChatMessage: &protobuf.ChatMessage{
 			ChatId:      chatID,
 			ContentType: protobuf.ChatMessage_TEXT_PLAIN,
 			Text:        text,

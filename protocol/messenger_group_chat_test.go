@@ -385,8 +385,8 @@ func (s *MessengerGroupChatSuite) TestGroupChatHandleDeleteMemberMessage() {
 	s.Require().Len(response.Messages(), 1)
 	s.Require().Equal(inputMessage.Text, response.Messages()[0].Text)
 
-	deleteMessage := DeleteMessage{
-		DeleteMessage: protobuf.DeleteMessage{
+	deleteMessage := &DeleteMessage{
+		DeleteMessage: &protobuf.DeleteMessage{
 			Clock:       2,
 			MessageType: protobuf.MessageType_PRIVATE_GROUP,
 			MessageId:   inputMessage.ID,
@@ -399,7 +399,7 @@ func (s *MessengerGroupChatSuite) TestGroupChatHandleDeleteMemberMessage() {
 		Response: &MessengerResponse{},
 	}
 
-	err = member.HandleDeleteMessage(state, deleteMessage)
+	err = member.handleDeleteMessage(state, deleteMessage)
 	s.Require().NoError(err)
 
 	removedMessages := state.Response.RemovedMessages()
