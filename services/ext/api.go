@@ -533,6 +533,11 @@ func (api *PublicAPI) CreateCommunityTokenPermission(request *requests.CreateCom
 	return api.service.messenger.CreateCommunityTokenPermission(request)
 }
 
+// ReevaluateCommunityMembersPermissions reevaluates community members permissions
+func (api *PublicAPI) ReevaluateCommunityMembersPermissions(request *requests.ReevaluateCommunityMembersPermissions) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ReevaluateCommunityMembersPermissions(request)
+}
+
 func (api *PublicAPI) DeleteCommunityTokenPermission(request *requests.DeleteCommunityTokenPermission) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.DeleteCommunityTokenPermission(request)
 }

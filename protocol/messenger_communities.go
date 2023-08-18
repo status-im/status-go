@@ -1980,6 +1980,22 @@ func (m *Messenger) DeleteCommunityTokenPermission(request *requests.DeleteCommu
 	return response, nil
 }
 
+func (m *Messenger) ReevaluateCommunityMembersPermissions(request *requests.ReevaluateCommunityMembersPermissions) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	community, err := m.communitiesManager.ReevaluateCommunityMembersPermissions(request)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+
+	return response, nil
+}
+
 func (m *Messenger) EditCommunity(request *requests.EditCommunity) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
@@ -4242,6 +4258,38 @@ func (m *Messenger) AddCommunityToken(communityID string, chainID int, address s
 	community, err := m.communitiesManager.AddCommunityToken(communityToken)
 	if err != nil {
 		return err
+	}
+
+	if community.IsControlNode() && (communityToken.PrivilegesLevel == token.MasterLevel || communityToken.PrivilegesLevel == token.OwnerLevel) {
+		permissionType := protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER
+		if communityToken.PrivilegesLevel == token.MasterLevel {
+			permissionType = protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER
+		}
+
+		contractAddresses := make(map[uint64]string)
+		contractAddresses[uint64(communityToken.ChainID)] = communityToken.Address
+
+		tokenCriteria := &protobuf.TokenCriteria{
+			ContractAddresses: contractAddresses,
+			Type:              protobuf.CommunityTokenType_ERC721,
+			Symbol:            communityToken.Symbol,
+			Name:              communityToken.Name,
+			Amount:            "1",
+			Decimals:          uint64(communityToken.Decimals),
+		}
+
+		request := &requests.CreateCommunityTokenPermission{
+			CommunityID:   community.ID(),
+			Type:          permissionType,
+			TokenCriteria: []*protobuf.TokenCriteria{tokenCriteria},
+			IsPrivate:     true,
+			ChatIds:       []string{},
+		}
+
+		_, _, err := m.communitiesManager.CreateCommunityTokenPermission(request)
+		if err != nil {
+			return err
+		}
 	}
 
 	syncMsg := &protobuf.CommunityPrivilegedUserSyncMessage{
