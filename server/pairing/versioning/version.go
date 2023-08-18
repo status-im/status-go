@@ -14,6 +14,6 @@ const (
 )
 
 const (
-	LatestConnectionParamVer = ConnectionParamsV1
+	LatestConnectionParamVer = ConnectionParamsV2
 	LatestLocalPairingVer    = LocalPairingV1
 )

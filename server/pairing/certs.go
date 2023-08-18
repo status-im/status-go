@@ -9,11 +9,14 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"net"
 	"net/url"
 	"time"
 
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/signal"
 )
 
 func makeSerialNumberFromKey(pk *ecdsa.PrivateKey) *big.Int {
@@ -23,8 +26,8 @@ func makeSerialNumberFromKey(pk *ecdsa.PrivateKey) *big.Int {
 	return new(big.Int).SetBytes(h.Sum(nil))
 }
 
-func GenerateCertFromKey(pk *ecdsa.PrivateKey, from time.Time, hostname string) (tls.Certificate, []byte, error) {
-	cert := server.GenerateX509Cert(makeSerialNumberFromKey(pk), from, from.Add(time.Hour), hostname)
+func GenerateCertFromKey(pk *ecdsa.PrivateKey, from time.Time, IPAddresses []net.IP, DNSNames []string) (tls.Certificate, []byte, error) {
+	cert := server.GenerateX509Cert(makeSerialNumberFromKey(pk), from, from.Add(time.Hour), IPAddresses, DNSNames)
 	certPem, keyPem, err := server.GenerateX509PEMs(cert, pk)
 	if err != nil {
 		return tls.Certificate{}, nil, err
@@ -111,13 +114,13 @@ func getServerCert(URL *url.URL) (*x509.Certificate, error) {
 
 	conn, err := tls.Dial("tcp", URL.Host, conf)
 	if err != nil {
-		signal.SendLocalPairingEvent(Event{Type: EventConnectionError, Error: err.Error(), Action: ActionConnect})
 		return nil, err
 	}
-	defer conn.Close()
-
-	// No error on the dial out then the URL.Host is accessible
-	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionConnect})
+	defer func(conn *tls.Conn) {
+		if e := conn.Close(); e != nil {
+			logutils.ZapLogger().Warn("failed to close temporary TLS connection:", zap.Error(e))
+		}
+	}(conn)
 
 	certs := conn.ConnectionState().PeerCertificates
 	if len(certs) != 1 {

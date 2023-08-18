@@ -51,7 +51,7 @@ func (s *QROpsTestSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	s.serverNoPort = &MediaServer{Server: Server{
-		hostname:   DefaultIP.String(),
+		hostname:   LocalHostIP.String(),
 		portManger: newPortManager(s.Logger, nil),
 	}}
 	go func() {
