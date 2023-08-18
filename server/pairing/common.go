@@ -13,6 +13,7 @@ import (
 	"gopkg.in/go-playground/validator.v9"
 
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/eth-node/keystore"
 )
 
@@ -172,5 +173,84 @@ func emptyDir(dir string) error {
 			}
 		}
 	}
+	return nil
+}
+
+func validateReceivedKeystoreFiles(expectedKeys []string, keys map[string][]byte, password string) error {
+	if len(expectedKeys) != len(keys) {
+		return fmt.Errorf("one or more keystore files were not sent")
+	}
+
+	for _, searchKey := range expectedKeys {
+		found := false
+		for key := range keys {
+			if strings.Contains(key, strings.ToLower(searchKey)) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("one or more expected keystore files are not found among the sent files")
+		}
+	}
+
+	return validateKeys(keys, password)
+}
+
+func validateKeystoreFilesConfig(backend *api.GethStatusBackend, conf interface{}) error {
+	var (
+		loggedInKeyUID string
+		password       string
+		numOfKeypairs  int
+		keystorePath   string
+	)
+
+	switch c := conf.(type) {
+	case *KeystoreFilesSenderServerConfig:
+		loggedInKeyUID = c.SenderConfig.LoggedInKeyUID
+		password = c.SenderConfig.Password
+		numOfKeypairs = len(c.SenderConfig.KeypairsToExport)
+		keystorePath = c.SenderConfig.KeystorePath
+	case *KeystoreFilesReceiverClientConfig:
+		loggedInKeyUID = c.ReceiverConfig.LoggedInKeyUID
+		password = c.ReceiverConfig.Password
+		numOfKeypairs = len(c.ReceiverConfig.KeypairsToImport)
+		keystorePath = c.ReceiverConfig.KeystorePath
+	default:
+		return fmt.Errorf("unknown config type: %v", reflect.TypeOf(conf))
+	}
+
+	accountService := backend.StatusNode().AccountService()
+	if accountService == nil {
+		return fmt.Errorf("cannot resolve accounts service instance")
+	}
+
+	if !accountService.GetMessenger().HasPairedDevices() {
+		return fmt.Errorf("there are no known paired devices")
+	}
+
+	selectedAccount, err := backend.GetActiveAccount()
+	if err != nil {
+		return err
+	}
+
+	if selectedAccount.KeyUID != loggedInKeyUID {
+		return fmt.Errorf("configuration is not meant for the logged in account")
+	}
+
+	if selectedAccount.KeycardPairing == "" {
+		if !accountService.VerifyPassword(password) {
+			return fmt.Errorf("provided password is not correct")
+		}
+	}
+
+	if numOfKeypairs == 0 {
+		return fmt.Errorf("it should be at least a single keypair set a keystore files are transferred for")
+	}
+
+	if keystorePath == "" {
+		return fmt.Errorf("keyStorePath can not be empty")
+	}
+
 	return nil
 }

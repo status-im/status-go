@@ -5,12 +5,14 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
 )
@@ -345,4 +347,129 @@ func NewPayloadReceivers(logger *zap.Logger, pe *PayloadEncryptor, backend *api.
 	rmr := NewRawMessagePayloadReceiver(p, pe, backend, config)
 	imr := NewInstallationPayloadMounterReceiver(pe, backend, config.DeviceType)
 	return ar, rmr, imr, nil
+}
+
+/*
+|--------------------------------------------------------------------------
+| KeystoreFilesPayload
+|--------------------------------------------------------------------------
+*/
+
+func NewKeystoreFilesPayloadReceiver(backend *api.GethStatusBackend, e *PayloadEncryptor, config *KeystoreFilesReceiverConfig, logger *zap.Logger) (*BasePayloadReceiver, error) {
+	l := logger.Named("KeystoreFilesPayloadManager")
+	l.Debug("fired", zap.Any("config", config))
+
+	e = e.Renew()
+
+	// A new SHARED AccountPayload
+	p := new(AccountPayload)
+
+	kfps, err := NewKeystoreFilesPayloadStorer(backend, p, config)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewBasePayloadReceiver(e, NewPairingPayloadMarshaller(p, l), kfps,
+		func() {
+			data := len(p.keys)
+			signal.SendLocalPairingEvent(Event{Type: EventReceivedKeystoreFiles, Action: ActionKeystoreFilesTransfer, Data: data})
+		},
+	), nil
+}
+
+type KeystoreFilesPayloadStorer struct {
+	*AccountPayload
+
+	keystorePath                   string
+	loggedInKeyUID                 string
+	expectedKeystoreFilesToReceive []string
+}
+
+func NewKeystoreFilesPayloadStorer(backend *api.GethStatusBackend, p *AccountPayload, config *KeystoreFilesReceiverConfig) (*KeystoreFilesPayloadStorer, error) {
+	if config == nil {
+		return nil, fmt.Errorf("empty keystore files receiver config")
+	}
+
+	kfps := &KeystoreFilesPayloadStorer{
+		AccountPayload: p,
+		keystorePath:   config.KeystorePath,
+		loggedInKeyUID: config.LoggedInKeyUID,
+	}
+
+	accountService := backend.StatusNode().AccountService()
+
+	for _, keyUID := range config.KeypairsToImport {
+		kp, err := accountService.GetKeypairByKeyUID(keyUID)
+		if err != nil {
+			return nil, err
+		}
+
+		if kp.Type == accounts.KeypairTypeSeed {
+			kfps.expectedKeystoreFilesToReceive = append(kfps.expectedKeystoreFilesToReceive, kp.DerivedFrom[2:])
+		}
+
+		for _, acc := range kp.Accounts {
+			kfps.expectedKeystoreFilesToReceive = append(kfps.expectedKeystoreFilesToReceive, acc.Address.Hex()[2:])
+		}
+	}
+
+	return kfps, nil
+}
+
+func (kfps *KeystoreFilesPayloadStorer) Store() error {
+	err := validateReceivedKeystoreFiles(kfps.expectedKeystoreFilesToReceive, kfps.keys, kfps.password)
+	if err != nil {
+		return err
+	}
+
+	return kfps.storeKeys(kfps.keystorePath)
+}
+
+func (kfps *KeystoreFilesPayloadStorer) storeKeys(keyStorePath string) error {
+	if keyStorePath == "" {
+		return fmt.Errorf("keyStorePath can not be empty")
+	}
+
+	_, lastDir := filepath.Split(keyStorePath)
+
+	// If lastDir == keystoreDir we presume we need to create the rest of the keystore path
+	// else we presume the provided keystore is valid
+	if lastDir == keystoreDir {
+		keyStorePath = filepath.Join(keyStorePath, kfps.loggedInKeyUID)
+		_, err := os.Stat(keyStorePath)
+		if os.IsNotExist(err) {
+			err := os.MkdirAll(keyStorePath, 0700)
+			if err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
+		}
+	}
+
+	for name, data := range kfps.keys {
+		found := false
+		for _, key := range kfps.expectedKeystoreFilesToReceive {
+			if strings.Contains(name, strings.ToLower(key)) {
+				found = true
+			}
+		}
+		if !found {
+			continue
+		}
+
+		err := ioutil.WriteFile(filepath.Join(keyStorePath, name), data, 0600)
+		if err != nil {
+			writeErr := fmt.Errorf("failed to write key to path '%s' : %w", filepath.Join(keyStorePath, name), err)
+			// If we get an error on any of the key files attempt to revert
+			err := emptyDir(keyStorePath)
+			if err != nil {
+				// If we get an error when trying to empty the dir combine the write error and empty error
+				emptyDirErr := fmt.Errorf("failed to revert and cleanup storeKeys : %w", err)
+				return multierr.Combine(writeErr, emptyDirErr)
+			}
+			return writeErr
+		}
+	}
+	return nil
 }

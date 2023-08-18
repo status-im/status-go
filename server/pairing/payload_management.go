@@ -45,13 +45,16 @@ func NewPairingPayloadMarshaller(ap *AccountPayload, logger *zap.Logger) *Accoun
 }
 
 func (ppm *AccountPayloadMarshaller) MarshalProtobuf() ([]byte, error) {
-	return proto.Marshal(&protobuf.LocalPairingPayload{
+	lpp := &protobuf.LocalPairingPayload{
 		Keys:            ppm.accountKeysToProtobuf(),
-		Multiaccount:    ppm.multiaccount.ToProtobuf(),
 		Password:        ppm.password,
 		ChatKey:         ppm.chatKey,
 		KeycardPairings: ppm.keycardPairings,
-	})
+	}
+	if ppm.multiaccount != nil {
+		lpp.Multiaccount = ppm.multiaccount.ToProtobuf()
+	}
+	return proto.Marshal(lpp)
 }
 
 func (ppm *AccountPayloadMarshaller) accountKeysToProtobuf() []*protobuf.LocalPairingPayload_Key {
@@ -79,7 +82,9 @@ func (ppm *AccountPayloadMarshaller) UnmarshalProtobuf(data []byte) error {
 	}
 
 	ppm.accountKeysFromProtobuf(pb.Keys)
-	ppm.multiaccountFromProtobuf(pb.Multiaccount)
+	if pb.Multiaccount != nil {
+		ppm.multiaccountFromProtobuf(pb.Multiaccount)
+	}
 	ppm.password = pb.Password
 	ppm.chatKey = pb.ChatKey
 	ppm.keycardPairings = pb.KeycardPairings
