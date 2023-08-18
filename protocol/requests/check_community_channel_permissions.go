@@ -14,6 +14,7 @@ var (
 type CheckCommunityChannelPermissions struct {
 	CommunityID types.HexBytes
 	ChatID      string
+	Addresses   []string `json:"addresses"`
 }
 
 func (u *CheckCommunityChannelPermissions) Validate() error {
