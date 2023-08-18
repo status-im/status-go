@@ -21,14 +21,12 @@ import (
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
-	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/identity/ring"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 const (
 	basePath                 = "/messages"
-	identiconsPath           = basePath + "/identicons"
 	imagesPath               = basePath + "/images"
 	audioPath                = basePath + "/audio"
 	ipfsPath                 = "/ipfs"
@@ -699,47 +697,6 @@ func getTheme(params url.Values, logger *zap.Logger) ring.Theme {
 		}
 	}
 	return theme
-}
-
-func handleIdenticon(logger *zap.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
-		parsed := ParseImageParams(logger, params)
-
-		if parsed.PublicKey == "" {
-			logger.Error("no publicKey")
-			return
-		}
-
-		identiconImage, err := identicon.Generate(parsed.PublicKey)
-		if err != nil {
-			logger.Error("could not generate identicon")
-		}
-
-		if identiconImage != nil && parsed.Ring {
-			colorHash, err := colorhash.GenerateFor(parsed.PublicKey)
-			if err != nil {
-				logger.Error("could not generate color hash")
-				return
-			}
-
-			identiconImage, err = ring.DrawRing(&ring.DrawRingParam{
-				Theme: parsed.Theme, ColorHash: colorHash, ImageBytes: identiconImage, Height: identicon.Height, Width: identicon.Width,
-			})
-			if err != nil {
-				logger.Error("failed to draw ring", zap.Error(err))
-			}
-		}
-
-		w.Header().Set("Content-Type", "image/png")
-		w.Header().Set("Cache-Control", "max-age:290304000, public")
-		w.Header().Set("Expires", time.Now().AddDate(60, 0, 0).Format(http.TimeFormat))
-
-		_, err = w.Write(identiconImage)
-		if err != nil {
-			logger.Error("failed to write image", zap.Error(err))
-		}
-	}
 }
 
 func handleDiscordAuthorAvatar(db *sql.DB, logger *zap.Logger) http.HandlerFunc {

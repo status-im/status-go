@@ -63,11 +63,7 @@ func DrawRing(param *DrawRingParam) ([]byte, error) {
 	}
 	dc.DrawImage(img, 0, 0)
 
-	ringPxSize := param.RingWidth
-	if param.RingWidth == 0 {
-		ringPxSize = math.Max(2.0, float64(param.Width/16.0))
-	}
-	radius := (float64(param.Height) - ringPxSize) / 2
+	radius := (float64(param.Height) - param.RingWidth) / 2
 	arcPos := 0.0
 
 	totalRingUnits := 0
@@ -79,7 +75,7 @@ func DrawRing(param *DrawRingParam) ([]byte, error) {
 	for i := 0; i < len(param.ColorHash); i++ {
 		dc.SetHexColor(colors[param.ColorHash[i][1]])
 		dc.DrawArc(float64(param.Width/2), float64(param.Height/2), radius, arcPos, arcPos+unitRadLen*float64(param.ColorHash[i][0]))
-		dc.SetLineWidth(ringPxSize)
+		dc.SetLineWidth(param.RingWidth)
 		dc.SetLineCapButt()
 		dc.Stroke()
 		arcPos += unitRadLen * float64(param.ColorHash[i][0])
