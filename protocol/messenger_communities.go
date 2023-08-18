@@ -1308,6 +1308,19 @@ func (m *Messenger) CancelRequestToJoinCommunity(request *requests.CancelRequest
 		return nil, err
 	}
 
+	if !community.AcceptRequestToJoinAutomatically() {
+		// send cancelation to community admins also
+		rawMessage.Payload = payload
+
+		privilegedMembers := community.GetPrivilegedMembers()
+		for _, privilegedMember := range privilegedMembers {
+			_, err := m.sender.SendPrivate(context.Background(), privilegedMember, &rawMessage)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
 	response.RequestsToJoinCommunity = append(response.RequestsToJoinCommunity, requestToJoin)
@@ -1354,17 +1367,18 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 		return nil, err
 	}
 
-	pk, err := common.HexToPubkey(requestToJoin.PublicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	grant, err := community.BuildGrant(pk, "")
-	if err != nil {
-		return nil, err
-	}
-
 	if community.IsControlNode() {
+		// If we are the control node, we send the response to the user
+		pk, err := common.HexToPubkey(requestToJoin.PublicKey)
+		if err != nil {
+			return nil, err
+		}
+
+		grant, err := community.BuildGrant(pk, "")
+		if err != nil {
+			return nil, err
+		}
+
 		requestToJoinResponseProto := &protobuf.CommunityRequestToJoinResponse{
 			Clock:       community.Clock(),
 			Accepted:    true,
@@ -1437,6 +1451,7 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
+	response.AddRequestToJoinCommunity(requestToJoin)
 
 	// Activity Center notification
 	notification, err := m.persistence.GetActivityCenterNotificationByID(request.ID)
@@ -1522,9 +1537,10 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 	}
 
 	response := &MessengerResponse{}
+	dbRequest, err = m.communitiesManager.GetRequestToJoin(request.ID)
+	response.AddRequestToJoinCommunity(dbRequest)
 
 	if notification != nil {
-		dbRequest, err := m.communitiesManager.GetRequestToJoin(request.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -2159,6 +2175,26 @@ func (m *Messenger) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*com
 	return m.communitiesManager.PendingRequestsToJoinForCommunity(id)
 }
 
+func (m *Messenger) AllPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+	pendingRequests, err := m.communitiesManager.PendingRequestsToJoinForCommunity(id)
+	if err != nil {
+		return nil, err
+	}
+	acceptedPendingRequests, err := m.communitiesManager.AcceptedPendingRequestsToJoinForCommunity(id)
+	if err != nil {
+		return nil, err
+	}
+	declinedPendingRequests, err := m.communitiesManager.DeclinedPendingRequestsToJoinForCommunity(id)
+	if err != nil {
+		return nil, err
+	}
+
+	pendingRequests = append(pendingRequests, acceptedPendingRequests...)
+	pendingRequests = append(pendingRequests, declinedPendingRequests...)
+
+	return pendingRequests, nil
+}
+
 func (m *Messenger) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.DeclinedRequestsToJoinForCommunity(id)
 }
@@ -2542,6 +2578,7 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 
 	state.Response.AddCommunity(community)
 	state.Response.CommunityChanges = append(state.Response.CommunityChanges, communityResponse.Changes)
+	state.Response.AddRequestsToJoinCommunity(communityResponse.RequestsToJoin)
 
 	// If we haven't joined the org, nothing to do
 	if !community.Joined() {
@@ -2608,6 +2645,41 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 		return err
 	}
 
+	for _, requestToJoin := range communityResponse.RequestsToJoin {
+		// Activity Center notification
+		notification, err := m.persistence.GetActivityCenterNotificationByID(requestToJoin.ID)
+		if err != nil {
+			return err
+		}
+
+		if notification != nil {
+			notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
+			switch requestToJoin.State {
+			case communities.RequestToJoinStateDeclined:
+				notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
+			case communities.RequestToJoinStateAccepted:
+				notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
+			case communities.RequestToJoinStateAcceptedPending:
+				notification.MembershipStatus = ActivityCenterMembershipStatusAcceptedPending
+			case communities.RequestToJoinStateDeclinedPending:
+				notification.MembershipStatus = ActivityCenterMembershipStatusDeclinedPending
+			default:
+				notification.MembershipStatus = ActivityCenterMembershipStatusPending
+
+			}
+
+			notification.Read = true
+			notification.Accepted = true
+			notification.UpdatedAt = m.getCurrentTimeInMillis()
+
+			err = m.addActivityCenterNotification(state.Response, notification)
+			if err != nil {
+				m.logger.Error("failed to save notification", zap.Error(err))
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -2639,7 +2711,55 @@ func (m *Messenger) handleCommunityEventsMessageRejected(state *ReceivedMessageS
 }
 
 func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMessageState, signer *ecdsa.PublicKey, message protobuf.CommunityPrivilegedUserSyncMessage) error {
-	return m.communitiesManager.HandleCommunityPrivilegedUserSyncMessage(signer, &message)
+	if signer == nil {
+		return errors.New("signer can't be nil")
+	}
+
+	community, err := m.communitiesManager.GetByID(message.CommunityId)
+	if err != nil {
+		return err
+	}
+
+	if community == nil {
+		return errors.New("community not found")
+	}
+
+	if !community.IsPrivilegedMember(&m.identity.PublicKey) {
+		return errors.New("user has no permissions to process privileged sync message")
+	}
+
+	isControlNodeMsg := common.IsPubKeyEqual(community.PublicKey(), signer)
+	if !(isControlNodeMsg || community.IsPrivilegedMember(signer)) {
+		return errors.New("user has no permissions to send privileged sync message")
+	}
+
+	err = m.communitiesManager.ValidateCommunityPrivilegedUserSyncMessage(&message)
+	if err != nil {
+		return err
+	}
+
+	switch message.Type {
+	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN:
+		fallthrough
+	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_REJECT_REQUEST_TO_JOIN:
+		if !isControlNodeMsg {
+			return errors.New("accepted/requested to join sync messages can be send only by the control node")
+		}
+		requestsToJoin, err := m.communitiesManager.HandleRequestToJoinPrivilegedUserSyncMessage(&message, community.ID())
+		if err != nil {
+			return nil
+		}
+		state.Response.AddRequestsToJoinCommunity(requestsToJoin)
+
+	case protobuf.CommunityPrivilegedUserSyncMessage_ADD_COMMUNITY_TOKENS:
+		// TODO add tokens to the Response
+		err = m.communitiesManager.HandleAddCommunityTokenPrivilegedUserSyncMessage(&message, community)
+		if err != nil {
+			return nil
+		}
+	}
+
+	return nil
 }
 
 func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, syncCommunity protobuf.SyncCommunity) error {

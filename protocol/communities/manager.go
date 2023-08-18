@@ -308,8 +308,9 @@ type Subscription struct {
 }
 
 type CommunityResponse struct {
-	Community *Community        `json:"community"`
-	Changes   *CommunityChanges `json:"changes"`
+	Community      *Community        `json:"community"`
+	Changes        *CommunityChanges `json:"changes"`
+	RequestsToJoin []*RequestToJoin  `json:"requestsToJoin"`
 }
 
 type CommunityEventsMessageInvalidClockSignal struct {
@@ -1422,7 +1423,7 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		return nil, err
 	}
 
-	err = m.handleAdditionalAdminChanges(changes.Community)
+	additionalCommunityResponse, err := m.handleAdditionalAdminChanges(changes.Community)
 	if err != nil {
 		return nil, err
 	}
@@ -1449,8 +1450,9 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 	}
 
 	return &CommunityResponse{
-		Community: changes.Community,
-		Changes:   changes,
+		Community:      changes.Community,
+		Changes:        changes,
+		RequestsToJoin: additionalCommunityResponse.RequestsToJoin,
 	}, nil
 }
 
@@ -1502,107 +1504,89 @@ func (m *Manager) HandleCommunityEventsMessageRejected(signer *ecdsa.PublicKey, 
 	return reapplyEventsMessage, nil
 }
 
-func (m *Manager) HandleCommunityPrivilegedUserSyncMessage(signer *ecdsa.PublicKey, message *protobuf.CommunityPrivilegedUserSyncMessage) error {
-	if signer == nil {
-		return errors.New("signer can't be nil")
+func (m *Manager) HandleRequestToJoinPrivilegedUserSyncMessage(message *protobuf.CommunityPrivilegedUserSyncMessage, communityID types.HexBytes) ([]*RequestToJoin, error) {
+	var state RequestToJoinState
+	if message.Type == protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN {
+		state = RequestToJoinStateAccepted
+	} else {
+		state = RequestToJoinStateDeclined
 	}
 
-	community, err := m.persistence.GetByID(&m.identity.PublicKey, message.CommunityId)
-	if err != nil {
-		return err
+	requestsToJoin := make([]*RequestToJoin, 0)
+	for signer, requestToJoinProto := range message.RequestToJoin {
+		requestToJoin := &RequestToJoin{
+			PublicKey:   signer,
+			Clock:       requestToJoinProto.Clock,
+			ENSName:     requestToJoinProto.EnsName,
+			CommunityID: requestToJoinProto.CommunityId,
+			State:       state,
+		}
+		requestToJoin.CalculateID()
+
+		_, err := m.saveOrUpdateRequestToJoin(signer, communityID, requestToJoin)
+		if err != nil {
+			return nil, err
+		}
+		requestsToJoin = append(requestsToJoin, requestToJoin)
 	}
 
-	if community == nil {
-		return ErrOrgNotFound
-	}
+	return requestsToJoin, nil
+}
 
-	if !community.IsPrivilegedMember(&m.identity.PublicKey) {
-		return errors.New("user has no permissions to process privileged sync message")
-	}
-
-	err = validateCommunityPrivilegedUserSyncMessage(message)
-	if err != nil {
-		return err
-	}
-
-	switch message.Type {
-	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN:
-		fallthrough
-	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_REJECT_REQUEST_TO_JOIN:
-		if !common.IsPubKeyEqual(community.PublicKey(), signer) {
-			return errors.New("accepted/requested to join sync messages can be send only by the control node")
+func (m *Manager) HandleAddCommunityTokenPrivilegedUserSyncMessage(message *protobuf.CommunityPrivilegedUserSyncMessage, community *Community) error {
+	for _, token := range message.CommunityTokens {
+		token := community_token.FromCommunityTokenProtobuf(token)
+		if !community.MemberCanManageToken(community.MemberIdentity(), token) {
+			return ErrInvalidManageTokensPermission
 		}
 
-		var state RequestToJoinState
-		if message.Type == protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN {
-			state = RequestToJoinStateAccepted
-		} else {
-			state = RequestToJoinStateDeclined
+		exist, err := m.persistence.HasCommunityToken(token.CommunityID, token.Address, token.ChainID)
+		if err != nil {
+			return err
 		}
 
-		for signer, requestToJoinProto := range message.RequestToJoin {
-			requestToJoin := &RequestToJoin{
-				PublicKey:   signer,
-				Clock:       requestToJoinProto.Clock,
-				ENSName:     requestToJoinProto.EnsName,
-				CommunityID: requestToJoinProto.CommunityId,
-				State:       state,
-			}
-			requestToJoin.CalculateID()
-
-			_, err := m.saveOrUpdateRequestToJoin(signer, community.ID(), requestToJoin)
-			if err != nil {
-				return err
-			}
+		if !exist {
+			return m.persistence.AddCommunityToken(token)
 		}
-	case protobuf.CommunityPrivilegedUserSyncMessage_ADD_COMMUNITY_TOKENS:
-		for _, token := range message.CommunityTokens {
-			token := community_token.FromCommunityTokenProtobuf(token)
-			if !community.MemberCanManageToken(community.MemberIdentity(), token) {
-				return ErrInvalidManageTokensPermission
-			}
-
-			exist, err := m.persistence.HasCommunityToken(token.CommunityID, token.Address, token.ChainID)
-			if err != nil {
-				return err
-			}
-
-			if !exist {
-				return m.persistence.AddCommunityToken(token)
-			}
-		}
-
 	}
-
 	return nil
 }
 
-func (m *Manager) handleAdditionalAdminChanges(community *Community) error {
+func (m *Manager) handleAdditionalAdminChanges(community *Community) (*CommunityResponse, error) {
+	communityResponse := CommunityResponse{
+		RequestsToJoin: make([]*RequestToJoin, 0),
+	}
 
 	if !(community.IsControlNode() || community.HasPermissionToSendCommunityEvents()) {
 		// we're a normal user/member node, so there's nothing for us to do here
-		return nil
+		return &communityResponse, nil
 	}
 
 	for i := range community.config.EventsData.Events {
 		communityEvent := &community.config.EventsData.Events[i]
 		switch communityEvent.Type {
 		case protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_ACCEPT:
-			err := m.handleCommunityEventRequestAccepted(community, communityEvent)
+			requestsToJoin, err := m.handleCommunityEventRequestAccepted(community, communityEvent)
 			if err != nil {
-				return err
+				return nil, err
+			}
+			if requestsToJoin != nil {
+				communityResponse.RequestsToJoin = append(communityResponse.RequestsToJoin, requestsToJoin...)
 			}
 
 		case protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT:
-			err := m.handleCommunityEventRequestRejected(community, communityEvent)
+			requestsToJoin, err := m.handleCommunityEventRequestRejected(community, communityEvent)
 			if err != nil {
-				return err
+				return nil, err
+			}
+			if requestsToJoin != nil {
+				communityResponse.RequestsToJoin = append(communityResponse.RequestsToJoin, requestsToJoin...)
 			}
 
 		default:
 		}
 	}
-	return nil
+	return &communityResponse, nil
 }
 
 func (m *Manager) saveOrUpdateRequestToJoin(signer string, communityID types.HexBytes, requestToJoin *RequestToJoin) (bool, error) {
@@ -1636,8 +1620,10 @@ func (m *Manager) saveOrUpdateRequestToJoin(signer string, communityID types.Hex
 	return updated, nil
 }
 
-func (m *Manager) handleCommunityEventRequestAccepted(community *Community, communityEvent *CommunityEvent) error {
+func (m *Manager) handleCommunityEventRequestAccepted(community *Community, communityEvent *CommunityEvent) ([]*RequestToJoin, error) {
 	acceptedRequestsToJoin := make([]types.HexBytes, 0)
+
+	requestsToJoin := make([]*RequestToJoin, 0)
 
 	for signer, request := range communityEvent.AcceptedRequestsToJoin {
 		requestToJoin := &RequestToJoin{
@@ -1651,7 +1637,7 @@ func (m *Manager) handleCommunityEventRequestAccepted(community *Community, comm
 
 		existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
 		if err != nil && err != sql.ErrNoRows {
-			return err
+			return nil, err
 		}
 
 		if community.IsControlNode() {
@@ -1670,7 +1656,7 @@ func (m *Manager) handleCommunityEventRequestAccepted(community *Community, comm
 
 		requestUpdated, err := m.saveOrUpdateRequestToJoin(signer, community.ID(), requestToJoin)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if community.IsControlNode() && requestUpdated {
@@ -1680,15 +1666,19 @@ func (m *Manager) handleCommunityEventRequestAccepted(community *Community, comm
 			// admin nodes), so we don't want to trigger an `AcceptRequestToJoin` in such cases.
 			acceptedRequestsToJoin = append(acceptedRequestsToJoin, requestToJoin.ID)
 		}
+
+		requestsToJoin = append(requestsToJoin, requestToJoin)
 	}
 	if community.IsControlNode() {
 		m.publish(&Subscription{AcceptedRequestsToJoin: acceptedRequestsToJoin})
 	}
-	return nil
+	return requestsToJoin, nil
 }
 
-func (m *Manager) handleCommunityEventRequestRejected(community *Community, communityEvent *CommunityEvent) error {
+func (m *Manager) handleCommunityEventRequestRejected(community *Community, communityEvent *CommunityEvent) ([]*RequestToJoin, error) {
 	rejectedRequestsToJoin := make([]types.HexBytes, 0)
+
+	requestsToJoin := make([]*RequestToJoin, 0)
 
 	for signer, request := range communityEvent.RejectedRequestsToJoin {
 		requestToJoin := &RequestToJoin{
@@ -1702,7 +1692,7 @@ func (m *Manager) handleCommunityEventRequestRejected(community *Community, comm
 
 		existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
 		if err != nil && err != sql.ErrNoRows {
-			return err
+			return nil, err
 		}
 
 		if community.IsControlNode() {
@@ -1721,17 +1711,19 @@ func (m *Manager) handleCommunityEventRequestRejected(community *Community, comm
 
 		requestUpdated, err := m.saveOrUpdateRequestToJoin(signer, community.ID(), requestToJoin)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if community.IsControlNode() && requestUpdated {
 			rejectedRequestsToJoin = append(rejectedRequestsToJoin, requestToJoin.ID)
 		}
+
+		requestsToJoin = append(requestsToJoin, requestToJoin)
 	}
 
 	if community.IsControlNode() {
 		m.publish(&Subscription{RejectedRequestsToJoin: rejectedRequestsToJoin})
 	}
-	return nil
+	return requestsToJoin, nil
 }
 
 // markRequestToJoin marks all the pending requests to join as completed
@@ -2110,7 +2102,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		return nil, err
 	}
 
-	if existingRequestToJoin != nil {
+	if existingRequestToJoin != nil && existingRequestToJoin.State != RequestToJoinStateCanceled {
 		// request to join was already processed by an admin and waits to get
 		// confirmation for its decision
 		//
@@ -4636,7 +4628,7 @@ func (m *Manager) HandleCommunityTokensMetadata(communityID string, communityTok
 	return nil
 }
 
-func validateCommunityPrivilegedUserSyncMessage(message *protobuf.CommunityPrivilegedUserSyncMessage) error {
+func (m *Manager) ValidateCommunityPrivilegedUserSyncMessage(message *protobuf.CommunityPrivilegedUserSyncMessage) error {
 	if message == nil {
 		return errors.New("invalid CommunityPrivilegedUserSyncMessage message")
 	}
