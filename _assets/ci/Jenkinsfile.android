@@ -32,6 +32,7 @@ pipeline {
     TARGET   = 'android'
     TMPDIR   = "${WORKSPACE_TMP}"
     GOPATH   = "${WORKSPACE_TMP}/go"
+    GOCACHE  = "${WORKSPACE_TMP}/gocache"
     PATH     = "${PATH}:${GOPATH}/bin"
     REPO_SRC = "${GOPATH}/src/github.com/status-im/status-go"
     ARTIFACT = utils.pkgFilename(name: "status-go", type: "android", ext: "aar", version: null)

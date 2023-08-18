@@ -31,10 +31,11 @@ pipeline {
   }
 
   environment {
-    TARGET = "docker"
-    REPO   = "${env.WORKSPACE}/src/github.com/status-im/status-go"
-    GOPATH = "${env.WORKSPACE}"
-    PATH   = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
+    TARGET  = "docker"
+    REPO    = "${env.WORKSPACE}/src/github.com/status-im/status-go"
+    GOPATH  = "${env.WORKSPACE}"
+    GOCACHE = "${WORKSPACE_TMP}/gocache"
+    PATH    = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
     /* Makefile parameters */
     DOCKER_IMAGE_NAME = 'statusteam/status-go'
     DOCKER_IMAGE_CUSTOM_TAG = "ci-build-${utils.gitCommit()}"
