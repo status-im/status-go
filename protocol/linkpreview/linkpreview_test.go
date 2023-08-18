@@ -3,6 +3,7 @@ package linkpreview
 import (
 	"bytes"
 	"fmt"
+	"github.com/status-im/status-go/protocol/linkpreview/unfurlers"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -316,7 +317,7 @@ func Test_isSupportedImageURL(t *testing.T) {
 	for _, e := range examples {
 		parsedURL, err := url.Parse(e.url)
 		require.NoError(t, err, e)
-		require.Equal(t, e.expected, isSupportedImageURL(parsedURL), e.url)
+		require.Equal(t, e.expected, unfurlers.IsSupportedImageURL(parsedURL), e.url)
 	}
 }
 
