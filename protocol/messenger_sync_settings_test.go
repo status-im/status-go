@@ -329,11 +329,6 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {
 }
 
 func (s *MessengerSyncSettingsSuite) TestSyncSettings_PreferredName() {
-	if s.ignoreTests {
-		s.T().Skip("Currently preferred syncing has been deactivated, testing to resume after ens names also sync")
-		return
-	}
-
 	// Check alice 1 settings values
 	as, err := s.alice.settings.GetSettings()
 	s.Require().NoError(err)

@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/status-im/status-go/services/ens"
 
 	"github.com/imdario/mergo"
 
@@ -763,6 +766,12 @@ func (b *GethStatusBackend) GetSettings() (*settings.Settings, error) {
 	return &settings, nil
 }
 
+func (b *GethStatusBackend) GetEnsUsernames() ([]*ens.UsernameDetail, error) {
+	db := ens.NewEnsDatabase(b.appDB)
+	removed := false
+	return db.GetEnsUsernames(&removed)
+}
+
 func (b *GethStatusBackend) MigrateKeyStoreDir(acc multiaccounts.Account, password, oldDir, newDir string) error {
 	err := b.ensureDBsOpened(acc, password)
 	if err != nil {
@@ -812,7 +821,7 @@ func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, pass
 
 func (b *GethStatusBackend) LoggedIn(keyUID string, err error) error {
 	if err != nil {
-		signal.SendLoggedIn(nil, nil, err)
+		signal.SendLoggedIn(nil, nil, nil, err)
 		return err
 	}
 	settings, err := b.GetSettings()
@@ -824,7 +833,18 @@ func (b *GethStatusBackend) LoggedIn(keyUID string, err error) error {
 		return err
 	}
 
-	signal.SendLoggedIn(account, settings, nil)
+	ensUsernames, err := b.GetEnsUsernames()
+	if err != nil {
+		return err
+	}
+	var ensUsernamesJSON json.RawMessage
+	if ensUsernames != nil {
+		ensUsernamesJSON, err = json.Marshal(ensUsernames)
+		if err != nil {
+			return err
+		}
+	}
+	signal.SendLoggedIn(account, settings, ensUsernamesJSON, nil)
 	return nil
 }
 

@@ -3038,8 +3038,9 @@ func (m *Messenger) syncEnsUsernameDetail(ctx context.Context, usernameDetail *e
 		return err
 	}
 
+	_, chat := m.getLastClockWithRelatedChat()
 	rawMessage := common.RawMessage{
-		LocalChatID:         contactIDFromPublicKey(&m.identity.PublicKey),
+		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ENS_USERNAME_DETAIL,
 		ResendAutomatically: true,
