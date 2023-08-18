@@ -20,17 +20,16 @@ const (
 
 type ConnectionParams struct {
 	version   versioning.ConnectionParamVersion
-	netIP     net.IP
-	netIPv2   []net.IP
+	netIPs    []net.IP
 	port      int
 	publicKey *ecdsa.PublicKey
 	aesKey    []byte
 }
 
-func NewConnectionParams(netIP net.IP, port int, publicKey *ecdsa.PublicKey, aesKey []byte) *ConnectionParams {
+func NewConnectionParams(netIPs []net.IP, port int, publicKey *ecdsa.PublicKey, aesKey []byte) *ConnectionParams {
 	cp := new(ConnectionParams)
 	cp.version = versioning.LatestConnectionParamVer
-	cp.netIP = netIP
+	cp.netIPs = netIPs
 	cp.port = port
 	cp.publicKey = publicKey
 	cp.aesKey = aesKey
@@ -55,13 +54,12 @@ func NewConnectionParams(netIP net.IP, port int, publicKey *ecdsa.PublicKey, aes
 //   - AES encryption key
 func (cp *ConnectionParams) ToString() string {
 	v := base58.Encode(new(big.Int).SetInt64(int64(cp.version)).Bytes())
-	ip := base58.Encode(cp.netIP)
-	_ = base58.Encode(SerializeNetIps(cp.netIPv2))
+	ips := base58.Encode(SerializeNetIps(cp.netIPs))
 	p := base58.Encode(new(big.Int).SetInt64(int64(cp.port)).Bytes())
 	k := base58.Encode(elliptic.MarshalCompressed(cp.publicKey.Curve, cp.publicKey.X, cp.publicKey.Y))
 	ek := base58.Encode(cp.aesKey)
 
-	return fmt.Sprintf("%s%s:%s:%s:%s:%s", connectionStringID, v, ip, p, k, ek)
+	return fmt.Sprintf("%s%s:%s:%s:%s:%s", connectionStringID, v, ips, p, k, ek)
 }
 
 func SerializeNetIps(ips []net.IP) []byte {
@@ -139,13 +137,16 @@ func (cp *ConnectionParams) FromString(s string) error {
 	netIpsBytes := base58.Decode(sData[1])
 	switch cp.version {
 	case versioning.ConnectionParamsV1:
-		cp.netIP = netIpsBytes
+		if len(netIpsBytes) != net.IPv4len {
+			return fmt.Errorf("invalid IP size: '%d' bytes, expected: '%d' bytes", len(netIpsBytes), net.IPv4len)
+		}
+		cp.netIPs = []net.IP{netIpsBytes}
 	case versioning.ConnectionParamsV2:
 		netIps, err := ParseNetIps(netIpsBytes)
 		if err != nil {
 			return err
 		}
-		cp.netIPv2 = netIps
+		cp.netIPs = netIps
 	}
 
 	cp.port = int(new(big.Int).SetBytes(base58.Decode(sData[2])).Int64())
@@ -189,8 +190,10 @@ func (cp *ConnectionParams) validateVersion() error {
 }
 
 func (cp *ConnectionParams) validateNetIP() error {
-	if ok := net.ParseIP(cp.netIP.String()); ok == nil {
-		return fmt.Errorf("invalid net ip '%s'", cp.netIP)
+	for _, ip := range cp.netIPs {
+		if ok := net.ParseIP(ip.String()); ok == nil {
+			return fmt.Errorf("invalid net ip '%s'", cp.netIPs)
+		}
 	}
 	return nil
 }
@@ -223,7 +226,11 @@ func (cp *ConnectionParams) validateAESKey() error {
 	return nil
 }
 
-func (cp *ConnectionParams) URL() (*url.URL, error) {
+func (cp *ConnectionParams) URL(IPIndex int) (*url.URL, error) {
+	if IPIndex < 0 || IPIndex >= len(cp.netIPs) {
+		return nil, fmt.Errorf("invalid IP index '%d'", IPIndex)
+	}
+
 	err := cp.validate()
 	if err != nil {
 		return nil, err
@@ -231,7 +238,7 @@ func (cp *ConnectionParams) URL() (*url.URL, error) {
 
 	u := &url.URL{
 		Scheme: "https",
-		Host:   fmt.Sprintf("%s:%d", cp.netIP, cp.port),
+		Host:   fmt.Sprintf("%s:%d", cp.netIPs[IPIndex], cp.port),
 	}
 	return u, nil
 }

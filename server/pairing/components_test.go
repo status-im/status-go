@@ -18,7 +18,7 @@ import (
 type TestPairingServerComponents struct {
 	EphemeralPK  *ecdsa.PrivateKey
 	EphemeralAES []byte
-	OutboundIP   net.IP
+	IPAddresses  []net.IP
 	Cert         tls.Certificate
 	SS           *SenderServer
 	RS           *ReceiverServer
@@ -36,19 +36,20 @@ func (tpsc *TestPairingServerComponents) SetupPairingServerComponents(t *testing
 	tpsc.EphemeralAES, err = common.MakeECDHSharedKey(tpsc.EphemeralPK, &tpsc.EphemeralPK.PublicKey)
 	require.NoError(t, err)
 
-	// 3) Device outbound IP address
-	tpsc.OutboundIP, err = server.GetOutboundIP()
+	// 3) Device IP address
+	tpsc.IPAddresses, err = server.GetLocalAddressesForPairingServer()
 	require.NoError(t, err)
 
 	// Generate tls.Certificate and Server
-	tpsc.Cert, _, err = GenerateCertFromKey(tpsc.EphemeralPK, time.Now(), tpsc.OutboundIP.String())
+	tpsc.Cert, _, err = GenerateCertFromKey(tpsc.EphemeralPK, time.Now(), tpsc.IPAddresses, []string{})
 	require.NoError(t, err)
 
 	sc := &ServerConfig{
-		PK:       &tpsc.EphemeralPK.PublicKey,
-		EK:       tpsc.EphemeralAES,
-		Cert:     &tpsc.Cert,
-		Hostname: tpsc.OutboundIP.String(),
+		PK:          &tpsc.EphemeralPK.PublicKey,
+		EK:          tpsc.EphemeralAES,
+		Cert:        &tpsc.Cert,
+		IPAddresses: tpsc.IPAddresses,
+		ListenIP:    net.IPv4zero,
 	}
 
 	tpsc.SS, err = NewSenderServer(nil, &SenderServerConfig{ServerConfig: sc, SenderConfig: &SenderConfig{}})
