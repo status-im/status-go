@@ -3,11 +3,13 @@ package unfurlers
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"go.uber.org/zap"
 	"net/http"
 	neturl "net/url"
+
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type OEmbedUnfurler struct {

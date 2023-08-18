@@ -3,12 +3,14 @@ package unfurlers
 import (
 	"context"
 	"fmt"
-	"github.com/status-im/status-go/protocol/common"
-	"go.uber.org/zap"
 	"io/ioutil"
 	"net/http"
 	neturl "net/url"
 	"time"
+
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/protocol/common"
 )
 
 const (

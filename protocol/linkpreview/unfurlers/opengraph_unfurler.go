@@ -3,14 +3,16 @@ package unfurlers
 import (
 	"bytes"
 	"fmt"
-	"github.com/keighl/metabolize"
-	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/protobuf"
-	"go.uber.org/zap"
 	"io/ioutil"
 	"net/http"
 	neturl "net/url"
+
+	"github.com/keighl/metabolize"
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type OpenGraphMetadata struct {

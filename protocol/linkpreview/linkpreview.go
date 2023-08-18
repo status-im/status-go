@@ -3,13 +3,14 @@ package linkpreview
 import (
 	"errors"
 	"fmt"
-	"github.com/status-im/markdown"
-	"go.uber.org/zap"
-	"golang.org/x/net/publicsuffix"
 	"net/http"
 	neturl "net/url"
 	"regexp"
 	"strings"
+
+	"github.com/status-im/markdown"
+	"go.uber.org/zap"
+	"golang.org/x/net/publicsuffix"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/linkpreview/unfurlers"
