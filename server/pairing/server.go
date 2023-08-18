@@ -296,3 +296,84 @@ func StartUpReceiverServer(backend *api.GethStatusBackend, configJSON string) (s
 
 	return cp.ToString(), nil
 }
+
+/*
+|--------------------------------------------------------------------------
+| type KeystoreFilesSenderServer struct {
+|--------------------------------------------------------------------------
+*/
+
+type KeystoreFilesSenderServer struct {
+	*BaseServer
+	keystoreFilesMounter PayloadMounter
+}
+
+func NewKeystoreFilesSenderServer(backend *api.GethStatusBackend, config *KeystoreFilesSenderServerConfig) (*KeystoreFilesSenderServer, error) {
+	logger := logutils.ZapLogger().Named("SenderServer")
+	e := NewPayloadEncryptor(config.ServerConfig.EK)
+
+	bs, err := NewBaseServer(logger, e, config.ServerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	kfm, err := NewKeystoreFilesPayloadMounter(backend, e, config.SenderConfig, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	return &KeystoreFilesSenderServer{
+		BaseServer:           bs,
+		keystoreFilesMounter: kfm,
+	}, nil
+}
+
+func (s *KeystoreFilesSenderServer) startSendingData() error {
+	s.SetHandlers(server.HandlerPatternMap{
+		pairingChallenge:   handlePairingChallenge(s.challengeGiver),
+		pairingSendAccount: middlewareChallenge(s.challengeGiver, handleSendAccount(s.GetLogger(), s.keystoreFilesMounter)),
+	})
+	return s.Start()
+}
+
+// MakeFullSenderServer generates a fully configured and randomly seeded KeystoreFilesSenderServer
+func MakeKeystoreFilesSenderServer(backend *api.GethStatusBackend, config *KeystoreFilesSenderServerConfig) (*KeystoreFilesSenderServer, error) {
+	err := MakeServerConfig(config.ServerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewKeystoreFilesSenderServer(backend, config)
+}
+
+// StartUpKeystoreFilesSenderServer generates a KeystoreFilesSenderServer, starts the sending server
+// and returns the ConnectionParams string to allow a ReceiverClient to make a successful connection.
+func StartUpKeystoreFilesSenderServer(backend *api.GethStatusBackend, configJSON string) (string, error) {
+	conf := NewKeystoreFilesSenderServerConfig()
+	err := json.Unmarshal([]byte(configJSON), conf)
+	if err != nil {
+		return "", err
+	}
+
+	err = validateKeystoreFilesConfig(backend, conf)
+	if err != nil {
+		return "", err
+	}
+
+	ps, err := MakeKeystoreFilesSenderServer(backend, conf)
+	if err != nil {
+		return "", err
+	}
+
+	err = ps.startSendingData()
+	if err != nil {
+		return "", err
+	}
+
+	cp, err := ps.MakeConnectionParams()
+	if err != nil {
+		return "", err
+	}
+
+	return cp.ToString(), nil
+}

@@ -41,6 +41,22 @@ type ReceiverConfig struct {
 	LoggedInKeyUID string                  `json:"-"`
 }
 
+type KeystoreFilesConfig struct {
+	KeystorePath   string `json:"keystorePath" validate:"required,keystorepath"`
+	LoggedInKeyUID string `json:"loggedInKeyUid" validate:"required,keyuid"`
+	Password       string `json:"password" validate:"required"`
+}
+
+type KeystoreFilesSenderConfig struct {
+	KeystoreFilesConfig
+	KeypairsToExport []string `json:"keypairsToExport" validate:"required"`
+}
+
+type KeystoreFilesReceiverConfig struct {
+	KeystoreFilesConfig
+	KeypairsToImport []string `json:"keypairsToImport" validate:"required"`
+}
+
 type ServerConfig struct {
 	// Timeout the number of milliseconds after which the pairing server will automatically terminate
 	Timeout uint `json:"timeout" validate:"omitempty,gte=0"`
@@ -61,6 +77,11 @@ type SenderServerConfig struct {
 	ServerConfig *ServerConfig `json:"serverConfig" validate:"omitempty,dive"`
 }
 
+type KeystoreFilesSenderServerConfig struct {
+	SenderConfig *KeystoreFilesSenderConfig `json:"senderConfig" validate:"required"`
+	ServerConfig *ServerConfig              `json:"serverConfig" validate:"omitempty,dive"`
+}
+
 type SenderClientConfig struct {
 	SenderConfig *SenderConfig `json:"senderConfig" validate:"required"`
 	ClientConfig *ClientConfig `json:"clientConfig"`
@@ -69,6 +90,11 @@ type SenderClientConfig struct {
 type ReceiverClientConfig struct {
 	ReceiverConfig *ReceiverConfig `json:"receiverConfig" validate:"required"`
 	ClientConfig   *ClientConfig   `json:"clientConfig"`
+}
+
+type KeystoreFilesReceiverClientConfig struct {
+	ReceiverConfig *KeystoreFilesReceiverConfig `json:"receiverConfig" validate:"required"`
+	ClientConfig   *ClientConfig                `json:"clientConfig"`
 }
 
 type ReceiverServerConfig struct {
@@ -83,6 +109,13 @@ func NewSenderServerConfig() *SenderServerConfig {
 	}
 }
 
+func NewKeystoreFilesSenderServerConfig() *KeystoreFilesSenderServerConfig {
+	return &KeystoreFilesSenderServerConfig{
+		SenderConfig: new(KeystoreFilesSenderConfig),
+		ServerConfig: new(ServerConfig),
+	}
+}
+
 func NewSenderClientConfig() *SenderClientConfig {
 	return &SenderClientConfig{
 		SenderConfig: new(SenderConfig),
@@ -93,6 +126,13 @@ func NewSenderClientConfig() *SenderClientConfig {
 func NewReceiverClientConfig() *ReceiverClientConfig {
 	return &ReceiverClientConfig{
 		ReceiverConfig: new(ReceiverConfig),
+		ClientConfig:   new(ClientConfig),
+	}
+}
+
+func NewKeystoreFilesReceiverClientConfig() *KeystoreFilesReceiverClientConfig {
+	return &KeystoreFilesReceiverClientConfig{
+		ReceiverConfig: new(KeystoreFilesReceiverConfig),
 		ClientConfig:   new(ClientConfig),
 	}
 }

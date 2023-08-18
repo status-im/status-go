@@ -1,10 +1,14 @@
 package pairing
 
 import (
+	"fmt"
+	"strings"
+
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 )
 
 type PayloadMounter interface {
@@ -242,4 +246,94 @@ func NewPayloadMounters(logger *zap.Logger, pe *PayloadEncryptor, backend *api.G
 	rmm := NewRawMessagePayloadMounter(logger, pe, backend, config)
 	imr := NewInstallationPayloadMounterReceiver(pe, backend, config.DeviceType)
 	return am, rmm, imr, nil
+}
+
+/*
+|--------------------------------------------------------------------------
+| KeystoreFilesPayload
+|--------------------------------------------------------------------------
+*/
+
+func NewKeystoreFilesPayloadMounter(backend *api.GethStatusBackend, pe *PayloadEncryptor, config *KeystoreFilesSenderConfig, logger *zap.Logger) (*BasePayloadMounter, error) {
+	l := logger.Named("KeystoreFilesPayloadLoader")
+	l.Debug("fired", zap.Any("config", config))
+
+	pe = pe.Renew()
+
+	// A new SHARED AccountPayload
+	p := new(AccountPayload)
+	kfpl, err := NewKeystoreFilesPayloadLoader(backend, p, config)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewBasePayloadMounter(
+		kfpl,
+		NewPairingPayloadMarshaller(p, l),
+		pe,
+	), nil
+}
+
+type KeystoreFilesPayloadLoader struct {
+	*AccountPayload
+
+	keystorePath            string
+	loggedInKeyUID          string
+	keystoreFilesToTransfer []string
+}
+
+func NewKeystoreFilesPayloadLoader(backend *api.GethStatusBackend, p *AccountPayload, config *KeystoreFilesSenderConfig) (*KeystoreFilesPayloadLoader, error) {
+	if config == nil {
+		return nil, fmt.Errorf("empty keystore files sender config")
+	}
+
+	kfpl := &KeystoreFilesPayloadLoader{
+		AccountPayload: p,
+		keystorePath:   config.KeystorePath,
+		loggedInKeyUID: config.LoggedInKeyUID,
+	}
+
+	kfpl.password = config.Password
+
+	accountService := backend.StatusNode().AccountService()
+
+	for _, keyUID := range config.KeypairsToExport {
+		kp, err := accountService.GetKeypairByKeyUID(keyUID)
+		if err != nil {
+			return nil, err
+		}
+
+		if kp.Type == accounts.KeypairTypeSeed {
+			kfpl.keystoreFilesToTransfer = append(kfpl.keystoreFilesToTransfer, kp.DerivedFrom[2:])
+		}
+
+		for _, acc := range kp.Accounts {
+			kfpl.keystoreFilesToTransfer = append(kfpl.keystoreFilesToTransfer, acc.Address.Hex()[2:])
+		}
+	}
+
+	return kfpl, nil
+}
+
+func (kfpl *KeystoreFilesPayloadLoader) Load() error {
+	kfpl.keys = make(map[string][]byte)
+	err := loadKeys(kfpl.keys, kfpl.keystorePath)
+	if err != nil {
+		return err
+	}
+
+	// Create a new map to filter keys
+	filteredMap := make(map[string][]byte)
+	for _, searchKey := range kfpl.keystoreFilesToTransfer {
+		for key, value := range kfpl.keys {
+			if strings.Contains(key, strings.ToLower(searchKey)) {
+				filteredMap[key] = value
+				break
+			}
+		}
+	}
+
+	kfpl.keys = filteredMap
+
+	return validateKeys(kfpl.keys, kfpl.password)
 }

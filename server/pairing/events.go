@@ -17,9 +17,10 @@ const (
 
 	// Only Receiver side
 
-	EventReceivedAccount EventType = "received-account"
-	EventProcessSuccess  EventType = "process-success"
-	EventProcessError    EventType = "process-error"
+	EventReceivedAccount       EventType = "received-account"
+	EventProcessSuccess        EventType = "process-success"
+	EventProcessError          EventType = "process-error"
+	EventReceivedKeystoreFiles EventType = "received-keystore-files"
 )
 
 // Event is a type for transfer events.
@@ -38,6 +39,7 @@ const (
 	ActionSyncDevice
 	ActionPairingInstallation
 	ActionPeerDiscovery
+	ActionKeystoreFilesTransfer
 )
 
 type AccountData struct {

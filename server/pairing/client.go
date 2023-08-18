@@ -482,3 +482,112 @@ func StartUpReceivingClient(backend *api.GethStatusBackend, cs, configJSON strin
 	}
 	return c.sendInstallationData()
 }
+
+/*
+|--------------------------------------------------------------------------
+| ReceiverClient
+|--------------------------------------------------------------------------
+*/
+
+type KeystoreFilesReceiverClient struct {
+	*BaseClient
+
+	keystoreFilesReceiver PayloadReceiver
+}
+
+func NewKeystoreFilesReceiverClient(backend *api.GethStatusBackend, c *ConnectionParams, config *KeystoreFilesReceiverClientConfig) (*KeystoreFilesReceiverClient, error) {
+	bc, err := NewBaseClient(c)
+	if err != nil {
+		return nil, err
+	}
+
+	logger := logutils.ZapLogger().Named("ReceiverClient")
+	pe := NewPayloadEncryptor(c.aesKey)
+
+	kfrc, err := NewKeystoreFilesPayloadReceiver(backend, pe, config.ReceiverConfig, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	return &KeystoreFilesReceiverClient{
+		BaseClient:            bc,
+		keystoreFilesReceiver: kfrc,
+	}, nil
+}
+
+func (c *KeystoreFilesReceiverClient) receiveKeystoreFilesData() error {
+	c.baseAddress.Path = pairingSendAccount
+	req, err := http.NewRequest(http.MethodGet, c.baseAddress.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	err = c.challengeTaker.DoChallenge(req)
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionKeystoreFilesTransfer})
+		return err
+	}
+
+	resp, err := c.Do(req)
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionKeystoreFilesTransfer})
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("[client] status not ok when receiving account data, received '%s'", resp.Status)
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionKeystoreFilesTransfer})
+		return err
+	}
+
+	payload, err := io.ReadAll(resp.Body)
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventTransferError, Error: err.Error(), Action: ActionKeystoreFilesTransfer})
+		return err
+	}
+	signal.SendLocalPairingEvent(Event{Type: EventTransferSuccess, Action: ActionKeystoreFilesTransfer})
+
+	err = c.keystoreFilesReceiver.Receive(payload)
+	if err != nil {
+		signal.SendLocalPairingEvent(Event{Type: EventProcessError, Error: err.Error(), Action: ActionKeystoreFilesTransfer})
+		return err
+	}
+	signal.SendLocalPairingEvent(Event{Type: EventProcessSuccess, Action: ActionKeystoreFilesTransfer})
+	return nil
+}
+
+// setupKeystoreFilesReceivingClient creates a new ReceiverClient after parsing string inputs
+func setupKeystoreFilesReceivingClient(backend *api.GethStatusBackend, cs, configJSON string) (*KeystoreFilesReceiverClient, error) {
+	ccp := new(ConnectionParams)
+	err := ccp.FromString(cs)
+	if err != nil {
+		return nil, err
+	}
+
+	conf := NewKeystoreFilesReceiverClientConfig()
+	err = json.Unmarshal([]byte(configJSON), conf)
+	if err != nil {
+		return nil, err
+	}
+	err = validateKeystoreFilesConfig(backend, conf)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewKeystoreFilesReceiverClient(backend, ccp, conf)
+}
+
+// StartUpKeystoreFilesReceivingClient creates a KeystoreFilesReceiverClient and triggers all `receive` calls in sequence to the KeystoreFilesSenderServer
+func StartUpKeystoreFilesReceivingClient(backend *api.GethStatusBackend, cs, configJSON string) error {
+	c, err := setupKeystoreFilesReceivingClient(backend, cs, configJSON)
+	if err != nil {
+		return err
+	}
+
+	err = c.getChallenge()
+	if err != nil {
+		return err
+	}
+
+	return c.receiveKeystoreFilesData()
+}
