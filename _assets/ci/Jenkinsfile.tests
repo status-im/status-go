@@ -57,14 +57,13 @@ pipeline {
 
     stage('Lint') {
       steps { script {
-        nix.shell('make install-lint', pure: false)
-        nix.shell('make lint', pure: false)
+        nix.shell('make lint', pure: true)
       } }
     }
 
     stage('Canary') {
       steps { script {
-        nix.shell('make canary-test', pure: false)
+        nix.shell('make canary-test', pure: true)
       } }
     }
 
