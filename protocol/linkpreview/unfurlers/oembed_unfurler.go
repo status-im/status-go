@@ -14,7 +14,7 @@ import (
 
 type OEmbedUnfurler struct {
 	logger     *zap.Logger
-	httpClient http.Client
+	httpClient *http.Client
 	// oembedEndpoint describes where the consumer may request representations for
 	// the supported URL scheme. For example, for YouTube, it is
 	// https://www.youtube.com/oembed.
@@ -26,7 +26,7 @@ type OEmbedUnfurler struct {
 func NewOEmbedUnfurler(oembedEndpoint string,
 	url *neturl.URL,
 	logger *zap.Logger,
-	httpClient http.Client) *OEmbedUnfurler {
+	httpClient *http.Client) *OEmbedUnfurler {
 	return &OEmbedUnfurler{
 		oembedEndpoint: oembedEndpoint,
 		url:            url,

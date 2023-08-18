@@ -24,10 +24,10 @@ var imageURLRegexp = regexp.MustCompile(`(?i)^.+(png|jpg|jpeg|webp)$`)
 type ImageUnfurler struct {
 	url        *neturl.URL
 	logger     *zap.Logger
-	httpClient http.Client
+	httpClient *http.Client
 }
 
-func NewImageUnfurler(URL *neturl.URL, logger *zap.Logger, httpClient http.Client) *ImageUnfurler {
+func NewImageUnfurler(URL *neturl.URL, logger *zap.Logger, httpClient *http.Client) *ImageUnfurler {
 	return &ImageUnfurler{
 		url:        URL,
 		logger:     logger,

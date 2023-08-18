@@ -26,7 +26,7 @@ func normalizeHostname(hostname string) string {
 	return re.ReplaceAllString(hostname, "$1")
 }
 
-func (m *Messenger) newUrlUnfurler(httpClient http.Client, url *neturl.URL) unfurlers.Unfurler {
+func (m *Messenger) newUrlUnfurler(httpClient *http.Client, url *neturl.URL) unfurlers.Unfurler {
 	if unfurlers.IsSupportedImageURL(url) {
 		return unfurlers.NewImageUnfurler(
 			url,
@@ -49,7 +49,7 @@ func (m *Messenger) newUrlUnfurler(httpClient http.Client, url *neturl.URL) unfu
 	}
 }
 
-func (m *Messenger) unfurlUrl(httpClient http.Client, url string) (common.LinkPreview, error) {
+func (m *Messenger) unfurlUrl(httpClient *http.Client, url string) (common.LinkPreview, error) {
 	var preview common.LinkPreview
 
 	parsedURL, err := neturl.Parse(url)
@@ -125,14 +125,17 @@ func GetURLs(text string) []string {
 	return urls
 }
 
-func NewDefaultHTTPClient() http.Client {
-	return http.Client{Timeout: unfurlers.DefaultRequestTimeout}
+func NewDefaultHTTPClient() *http.Client {
+	return &http.Client{Timeout: unfurlers.DefaultRequestTimeout}
 }
 
 // UnfurlURLs assumes clients pass URLs verbatim that were validated and
 // processed by GetURLs.
-func (m *Messenger) UnfurlURLs(urls []string) ([]common.LinkPreview, error) {
-	httpClient := NewDefaultHTTPClient()
+func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) ([]common.LinkPreview, error) {
+	if httpClient == nil {
+		httpClient = NewDefaultHTTPClient()
+	}
+
 	previews := make([]common.LinkPreview, 0, len(urls))
 
 	for _, url := range urls {

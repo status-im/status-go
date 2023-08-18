@@ -3,6 +3,10 @@ package protocol
 import (
 	"bytes"
 	"fmt"
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/waku"
+	"github.com/stretchr/testify/suite"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -17,6 +21,29 @@ import (
 	"github.com/status-im/status-go/protocol/linkpreview/unfurlers"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
+
+func TestMessengerLinkPreivews(t *testing.T) {
+	suite.Run(t, new(MessengerLinkPreviewsTestSuite))
+}
+
+type MessengerLinkPreviewsTestSuite struct {
+	MessengerBaseTestSuite
+}
+
+func (s *MessengerLinkPreviewsTestSuite) SetupTest() {
+	s.logger = tt.MustCreateTestLogger()
+
+	c := waku.DefaultConfig
+	c.MinimumAcceptedPoW = 0
+	shh := waku.New(&c, s.logger)
+	s.shh = gethbridge.NewGethWakuWrapper(shh)
+	s.Require().NoError(shh.Start())
+
+	s.m = s.newMessenger()
+	s.privateKey = s.m.identity
+	_, err := s.m.Start()
+	s.Require().NoError(err)
+}
 
 // StubMatcher should either return an http.Response or nil in case the request
 // doesn't match.
@@ -174,7 +201,7 @@ func readAsset(t *testing.T, filename string) []byte {
 	return b
 }
 
-func Test_UnfurlURLs_YouTube(t *testing.T) {
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_YouTube(t *testing.T) {
 	url := "https://www.youtube.com/watch?v=lE4UXdJSJM4"
 	thumbnailURL := "https://i.ytimg.com/vi/lE4UXdJSJM4/maxresdefault.jpg"
 	expected := common.LinkPreview{
@@ -207,7 +234,7 @@ func Test_UnfurlURLs_YouTube(t *testing.T) {
 	transport.AddURLMatcher(thumbnailURL, readAsset(t, "1.jpg"), nil)
 	stubbedClient := http.Client{Transport: &transport}
 
-	previews, err := m.UnfurlURLs(nil, stubbedClient, []string{url})
+	previews, err := s.m.UnfurlURLs(&stubbedClient, []string{url})
 	require.NoError(t, err)
 	require.Len(t, previews, 1)
 	preview := previews[0]
@@ -223,7 +250,7 @@ func Test_UnfurlURLs_YouTube(t *testing.T) {
 	assertContainsLongString(t, expected.Thumbnail.DataURI, preview.Thumbnail.DataURI, 100)
 }
 
-func Test_UnfurlURLs_Reddit(t *testing.T) {
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Reddit(t *testing.T) {
 	url := "https://www.reddit.com/r/Bitcoin/comments/13j0tzr/the_best_bitcoin_explanation_of_all_times/?utm_source=share"
 	expected := common.LinkPreview{
 		Type:        protobuf.UnfurledLink_LINK,
@@ -251,7 +278,7 @@ func Test_UnfurlURLs_Reddit(t *testing.T) {
 	)
 	stubbedClient := http.Client{Transport: &transport}
 
-	previews, err := UnfurlURLs(nil, stubbedClient, []string{url})
+	previews, err := s.m.UnfurlURLs(&stubbedClient, []string{url})
 	require.NoError(t, err)
 	require.Len(t, previews, 1)
 	preview := previews[0]
@@ -264,14 +291,14 @@ func Test_UnfurlURLs_Reddit(t *testing.T) {
 	require.Equal(t, expected.Thumbnail, preview.Thumbnail)
 }
 
-func Test_UnfurlURLs_Timeout(t *testing.T) {
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Timeout(t *testing.T) {
 	httpClient := http.Client{Timeout: time.Nanosecond}
-	previews, err := UnfurlURLs(nil, httpClient, []string{"https://status.im"})
+	previews, err := s.m.UnfurlURLs(&httpClient, []string{"https://status.im"})
 	require.NoError(t, err)
 	require.Empty(t, previews)
 }
 
-func Test_UnfurlURLs_CommonFailures(t *testing.T) {
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_CommonFailures(t *testing.T) {
 	httpClient := http.Client{}
 
 	// Test URL that doesn't return any OpenGraph title.
@@ -282,22 +309,22 @@ func Test_UnfurlURLs_CommonFailures(t *testing.T) {
 		nil,
 	)
 	stubbedClient := http.Client{Transport: &transport}
-	previews, err := UnfurlURLs(nil, stubbedClient, []string{"https://wikipedia.org"})
+	previews, err := s.m.UnfurlURLs(&stubbedClient, []string{"https://wikipedia.org"})
 	require.NoError(t, err)
 	require.Empty(t, previews)
 
 	// Test 404.
-	previews, err = UnfurlURLs(nil, httpClient, []string{"https://github.com/status-im/i_do_not_exist"})
+	previews, err = s.m.UnfurlURLs(&httpClient, []string{"https://github.com/status-im/i_do_not_exist"})
 	require.NoError(t, err)
 	require.Empty(t, previews)
 
 	// Test no response when trying to get OpenGraph metadata.
-	previews, err = UnfurlURLs(nil, httpClient, []string{"https://wikipedia.o"})
+	previews, err = s.m.UnfurlURLs(&httpClient, []string{"https://wikipedia.o"})
 	require.NoError(t, err)
 	require.Empty(t, previews)
 }
 
-func Test_isSupportedImageURL(t *testing.T) {
+func (s *MessengerLinkPreviewsTestSuite) Test_isSupportedImageURL(t *testing.T) {
 	examples := []struct {
 		url      string
 		expected bool
@@ -321,7 +348,7 @@ func Test_isSupportedImageURL(t *testing.T) {
 	}
 }
 
-func Test_UnfurlURLs_Image(t *testing.T) {
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Image(t *testing.T) {
 	url := "https://placehold.co/600x400@3x.png"
 	expected := common.LinkPreview{
 		Type:        protobuf.UnfurledLink_IMAGE,
@@ -341,7 +368,7 @@ func Test_UnfurlURLs_Image(t *testing.T) {
 	transport.AddURLMatcher(url, readAsset(t, "IMG_1205.HEIC.jpg"), nil)
 	stubbedClient := http.Client{Transport: &transport}
 
-	previews, err := UnfurlURLs(nil, stubbedClient, []string{url})
+	previews, err := s.m.UnfurlURLs(&stubbedClient, []string{url})
 	require.NoError(t, err)
 	require.Len(t, previews, 1)
 	preview := previews[0]

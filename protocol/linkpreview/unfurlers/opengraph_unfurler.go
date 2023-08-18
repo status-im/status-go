@@ -27,10 +27,10 @@ type OpenGraphMetadata struct {
 type OpenGraphUnfurler struct {
 	url        *neturl.URL
 	logger     *zap.Logger
-	httpClient http.Client
+	httpClient *http.Client
 }
 
-func NewOpenGraphUnfurler(URL *neturl.URL, logger *zap.Logger, httpClient http.Client) *OpenGraphUnfurler {
+func NewOpenGraphUnfurler(URL *neturl.URL, logger *zap.Logger, httpClient *http.Client) *OpenGraphUnfurler {
 	return &OpenGraphUnfurler{
 		url:        URL,
 		logger:     logger,
@@ -81,7 +81,7 @@ func (u *OpenGraphUnfurler) Unfurl() (common.LinkPreview, error) {
 	return preview, nil
 }
 
-func fetchThumbnail(logger *zap.Logger, httpClient http.Client, url string) (common.LinkPreviewThumbnail, error) {
+func fetchThumbnail(logger *zap.Logger, httpClient *http.Client, url string) (common.LinkPreviewThumbnail, error) {
 	var thumbnail common.LinkPreviewThumbnail
 
 	imgBytes, err := fetchBody(logger, httpClient, url, nil)

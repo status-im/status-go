@@ -44,7 +44,7 @@ func newDefaultLinkPreview(url *neturl.URL) common.LinkPreview {
 	}
 }
 
-func fetchBody(logger *zap.Logger, httpClient http.Client, url string, headers Headers) ([]byte, error) {
+func fetchBody(logger *zap.Logger, httpClient *http.Client, url string, headers Headers) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultRequestTimeout)
 	defer cancel()
 
