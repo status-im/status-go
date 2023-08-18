@@ -84,9 +84,10 @@ func (o *ClientV2) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.
 	}
 
 	assets.PreviousCursor = cursor
+	assets.NextCursor = cursor
 
 	for {
-		assetsPage, err := o.FetchAllAssetsByOwner(chainID, owner, cursor, assetLimitV2)
+		assetsPage, err := o.FetchAllAssetsByOwner(chainID, owner, assets.NextCursor, assetLimitV2)
 		if err != nil {
 			return nil, err
 		}
