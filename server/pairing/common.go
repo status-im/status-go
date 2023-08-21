@@ -177,10 +177,6 @@ func emptyDir(dir string) error {
 }
 
 func validateReceivedKeystoreFiles(expectedKeys []string, keys map[string][]byte, password string) error {
-	if len(expectedKeys) != len(keys) {
-		return fmt.Errorf("one or more keystore files were not sent")
-	}
-
 	for _, searchKey := range expectedKeys {
 		found := false
 		for key := range keys {

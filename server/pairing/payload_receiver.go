@@ -371,7 +371,7 @@ func NewKeystoreFilesPayloadReceiver(backend *api.GethStatusBackend, e *PayloadE
 
 	return NewBasePayloadReceiver(e, NewPairingPayloadMarshaller(p, l), kfps,
 		func() {
-			data := len(p.keys)
+			data := config.KeypairsToImport
 			signal.SendLocalPairingEvent(Event{Type: EventReceivedKeystoreFiles, Action: ActionKeystoreFilesTransfer, Data: data})
 		},
 	), nil
@@ -382,7 +382,9 @@ type KeystoreFilesPayloadStorer struct {
 
 	keystorePath                   string
 	loggedInKeyUID                 string
+	expectedKeypairsToImport       []string
 	expectedKeystoreFilesToReceive []string
+	backend                        *api.GethStatusBackend
 }
 
 func NewKeystoreFilesPayloadStorer(backend *api.GethStatusBackend, p *AccountPayload, config *KeystoreFilesReceiverConfig) (*KeystoreFilesPayloadStorer, error) {
@@ -391,14 +393,16 @@ func NewKeystoreFilesPayloadStorer(backend *api.GethStatusBackend, p *AccountPay
 	}
 
 	kfps := &KeystoreFilesPayloadStorer{
-		AccountPayload: p,
-		keystorePath:   config.KeystorePath,
-		loggedInKeyUID: config.LoggedInKeyUID,
+		AccountPayload:           p,
+		keystorePath:             config.KeystorePath,
+		loggedInKeyUID:           config.LoggedInKeyUID,
+		expectedKeypairsToImport: config.KeypairsToImport,
+		backend:                  backend,
 	}
 
 	accountService := backend.StatusNode().AccountService()
 
-	for _, keyUID := range config.KeypairsToImport {
+	for _, keyUID := range kfps.expectedKeypairsToImport {
 		kp, err := accountService.GetKeypairByKeyUID(keyUID)
 		if err != nil {
 			return nil, err
@@ -426,6 +430,11 @@ func (kfps *KeystoreFilesPayloadStorer) Store() error {
 }
 
 func (kfps *KeystoreFilesPayloadStorer) storeKeys(keyStorePath string) error {
+	messenger := kfps.backend.Messenger()
+	if messenger == nil {
+		return fmt.Errorf("messenger is nil")
+	}
+
 	if keyStorePath == "" {
 		return fmt.Errorf("keyStorePath can not be empty")
 	}
@@ -471,5 +480,13 @@ func (kfps *KeystoreFilesPayloadStorer) storeKeys(keyStorePath string) error {
 			return writeErr
 		}
 	}
+
+	for _, keyUID := range kfps.expectedKeypairsToImport {
+		err := messenger.MarkKeypairFullyOperable(keyUID)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
