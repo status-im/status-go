@@ -3,10 +3,6 @@ package protocol
 import (
 	"bytes"
 	"fmt"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/waku"
-	"github.com/stretchr/testify/suite"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -15,14 +11,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/linkpreview/unfurlers"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-func TestMessengerLinkPreivews(t *testing.T) {
+func TestMessengerLinkPreviews(t *testing.T) {
 	suite.Run(t, new(MessengerLinkPreviewsTestSuite))
 }
 
@@ -30,20 +26,20 @@ type MessengerLinkPreviewsTestSuite struct {
 	MessengerBaseTestSuite
 }
 
-func (s *MessengerLinkPreviewsTestSuite) SetupTest() {
-	s.logger = tt.MustCreateTestLogger()
-
-	c := waku.DefaultConfig
-	c.MinimumAcceptedPoW = 0
-	shh := waku.New(&c, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
-
-	s.m = s.newMessenger()
-	s.privateKey = s.m.identity
-	_, err := s.m.Start()
-	s.Require().NoError(err)
-}
+//func (s *MessengerLinkPreviewsTestSuite) SetupTest() {
+//	s.logger = tt.MustCreateTestLogger()
+//
+//	c := waku.DefaultConfig
+//	c.MinimumAcceptedPoW = 0
+//	shh := waku.New(&c, s.logger)
+//	s.shh = gethbridge.NewGethWakuWrapper(shh)
+//	s.Require().NoError(shh.Start())
+//
+//	s.m = s.newMessenger()
+//	s.privateKey = s.m.identity
+//	_, err := s.m.Start()
+//	s.Require().NoError(err)
+//}
 
 // StubMatcher should either return an http.Response or nil in case the request
 // doesn't match.
@@ -120,7 +116,7 @@ func (t *StubTransport) AddURLMatcher(urlRegexp string, responseBody []byte, hea
 // correctly prints the cause of the failure. The default behavior of
 // require.Contains with long strings is to not print the formatted message
 // (varargs to require.Contains).
-func assertContainsLongString(t *testing.T, expected string, actual string, maxLength int) {
+func (s *MessengerLinkPreviewsTestSuite) assertContainsLongString(expected string, actual string, maxLength int) {
 	var safeIdx float64
 	var actualShort string
 	var expectedShort string
@@ -135,8 +131,7 @@ func assertContainsLongString(t *testing.T, expected string, actual string, maxL
 		expectedShort = expected[:int(safeIdx)]
 	}
 
-	require.Contains(
-		t,
+	s.Require().Contains(
 		actual, expected,
 		"'%s' should contain '%s'",
 		actualShort,
@@ -144,7 +139,7 @@ func assertContainsLongString(t *testing.T, expected string, actual string, maxL
 	)
 }
 
-func Test_GetLinks(t *testing.T) {
+func (s *MessengerLinkPreviewsTestSuite) Test_GetLinks() {
 	examples := []struct {
 		args     string
 		expected []string
@@ -191,22 +186,22 @@ func Test_GetLinks(t *testing.T) {
 
 	for _, ex := range examples {
 		links := GetURLs(ex.args)
-		require.Equal(t, ex.expected, links, "Failed for args: '%s'", ex.args)
+		s.Require().Equal(ex.expected, links, "Failed for args: '%s'", ex.args)
 	}
 }
 
-func readAsset(t *testing.T, filename string) []byte {
-	b, err := ioutil.ReadFile("../../_assets/tests/" + filename)
-	require.NoError(t, err)
+func (s *MessengerLinkPreviewsTestSuite) readAsset(filename string) []byte {
+	b, err := ioutil.ReadFile("../_assets/tests/" + filename)
+	s.Require().NoError(err)
 	return b
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_YouTube(t *testing.T) {
-	url := "https://www.youtube.com/watch?v=lE4UXdJSJM4"
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_YouTube() {
+	u := "https://www.youtube.com/watch?v=lE4UXdJSJM4"
 	thumbnailURL := "https://i.ytimg.com/vi/lE4UXdJSJM4/maxresdefault.jpg"
 	expected := common.LinkPreview{
 		Type:        protobuf.UnfurledLink_LINK,
-		URL:         url,
+		URL:         u,
 		Hostname:    "www.youtube.com",
 		Title:       "Interview with a GNU/Linux user - Partition 1",
 		Description: "GNU/Linux Operating SystemInterview with a GNU/Linux user with Richie Guix - aired on © The GNU Linux.Programmer humorLinux humorProgramming jokesProgramming...",
@@ -219,7 +214,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_YouTube(t *testing.T) {
 
 	transport := StubTransport{}
 	transport.AddURLMatcher(
-		url,
+		u,
 		[]byte(fmt.Sprintf(`
 			<html>
 				<head>
@@ -231,30 +226,30 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_YouTube(t *testing.T) {
 		`, expected.Title, expected.Description, thumbnailURL)),
 		nil,
 	)
-	transport.AddURLMatcher(thumbnailURL, readAsset(t, "1.jpg"), nil)
+	transport.AddURLMatcher(thumbnailURL, s.readAsset("1.jpg"), nil)
 	stubbedClient := http.Client{Transport: &transport}
 
-	previews, err := s.m.UnfurlURLs(&stubbedClient, []string{url})
-	require.NoError(t, err)
-	require.Len(t, previews, 1)
+	previews, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
+	s.Require().NoError(err)
+	s.Require().Len(previews, 1)
 	preview := previews[0]
 
-	require.Equal(t, expected.Type, preview.Type)
-	require.Equal(t, expected.URL, preview.URL)
-	require.Equal(t, expected.Hostname, preview.Hostname)
-	require.Equal(t, expected.Title, preview.Title)
-	require.Equal(t, expected.Description, preview.Description)
-	require.Equal(t, expected.Thumbnail.Width, preview.Thumbnail.Width)
-	require.Equal(t, expected.Thumbnail.Height, preview.Thumbnail.Height)
-	require.Equal(t, expected.Thumbnail.URL, preview.Thumbnail.URL)
-	assertContainsLongString(t, expected.Thumbnail.DataURI, preview.Thumbnail.DataURI, 100)
+	s.Require().Equal(expected.Type, preview.Type)
+	s.Require().Equal(expected.URL, preview.URL)
+	s.Require().Equal(expected.Hostname, preview.Hostname)
+	s.Require().Equal(expected.Title, preview.Title)
+	s.Require().Equal(expected.Description, preview.Description)
+	s.Require().Equal(expected.Thumbnail.Width, preview.Thumbnail.Width)
+	s.Require().Equal(expected.Thumbnail.Height, preview.Thumbnail.Height)
+	s.Require().Equal(expected.Thumbnail.URL, preview.Thumbnail.URL)
+	s.assertContainsLongString(expected.Thumbnail.DataURI, preview.Thumbnail.DataURI, 100)
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Reddit(t *testing.T) {
-	url := "https://www.reddit.com/r/Bitcoin/comments/13j0tzr/the_best_bitcoin_explanation_of_all_times/?utm_source=share"
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Reddit() {
+	u := "https://www.reddit.com/r/Bitcoin/comments/13j0tzr/the_best_bitcoin_explanation_of_all_times/?utm_source=share"
 	expected := common.LinkPreview{
 		Type:        protobuf.UnfurledLink_LINK,
-		URL:         url,
+		URL:         u,
 		Hostname:    "www.reddit.com",
 		Title:       "The best bitcoin explanation of all times.",
 		Description: "",
@@ -278,27 +273,27 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Reddit(t *testing.T) {
 	)
 	stubbedClient := http.Client{Transport: &transport}
 
-	previews, err := s.m.UnfurlURLs(&stubbedClient, []string{url})
-	require.NoError(t, err)
-	require.Len(t, previews, 1)
+	previews, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
+	s.Require().NoError(err)
+	s.Require().Len(previews, 1)
 	preview := previews[0]
 
-	require.Equal(t, expected.Type, preview.Type)
-	require.Equal(t, expected.URL, preview.URL)
-	require.Equal(t, expected.Hostname, preview.Hostname)
-	require.Equal(t, expected.Title, preview.Title)
-	require.Equal(t, expected.Description, preview.Description)
-	require.Equal(t, expected.Thumbnail, preview.Thumbnail)
+	s.Require().Equal(expected.Type, preview.Type)
+	s.Require().Equal(expected.URL, preview.URL)
+	s.Require().Equal(expected.Hostname, preview.Hostname)
+	s.Require().Equal(expected.Title, preview.Title)
+	s.Require().Equal(expected.Description, preview.Description)
+	s.Require().Equal(expected.Thumbnail, preview.Thumbnail)
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Timeout(t *testing.T) {
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Timeout() {
 	httpClient := http.Client{Timeout: time.Nanosecond}
 	previews, err := s.m.UnfurlURLs(&httpClient, []string{"https://status.im"})
-	require.NoError(t, err)
-	require.Empty(t, previews)
+	s.Require().NoError(err)
+	s.Require().Empty(previews)
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_CommonFailures(t *testing.T) {
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_CommonFailures() {
 	httpClient := http.Client{}
 
 	// Test URL that doesn't return any OpenGraph title.
@@ -310,21 +305,21 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_CommonFailures(t *testi
 	)
 	stubbedClient := http.Client{Transport: &transport}
 	previews, err := s.m.UnfurlURLs(&stubbedClient, []string{"https://wikipedia.org"})
-	require.NoError(t, err)
-	require.Empty(t, previews)
+	s.Require().NoError(err)
+	s.Require().Empty(previews)
 
 	// Test 404.
 	previews, err = s.m.UnfurlURLs(&httpClient, []string{"https://github.com/status-im/i_do_not_exist"})
-	require.NoError(t, err)
-	require.Empty(t, previews)
+	s.Require().NoError(err)
+	s.Require().Empty(previews)
 
 	// Test no response when trying to get OpenGraph metadata.
 	previews, err = s.m.UnfurlURLs(&httpClient, []string{"https://wikipedia.o"})
-	require.NoError(t, err)
-	require.Empty(t, previews)
+	s.Require().NoError(err)
+	s.Require().Empty(previews)
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_isSupportedImageURL(t *testing.T) {
+func (s *MessengerLinkPreviewsTestSuite) Test_isSupportedImageURL() {
 	examples := []struct {
 		url      string
 		expected bool
@@ -343,16 +338,16 @@ func (s *MessengerLinkPreviewsTestSuite) Test_isSupportedImageURL(t *testing.T) 
 
 	for _, e := range examples {
 		parsedURL, err := url.Parse(e.url)
-		require.NoError(t, err, e)
-		require.Equal(t, e.expected, unfurlers.IsSupportedImageURL(parsedURL), e.url)
+		s.Require().NoError(err, e)
+		s.Require().Equal(e.expected, unfurlers.IsSupportedImageURL(parsedURL), e.url)
 	}
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Image(t *testing.T) {
-	url := "https://placehold.co/600x400@3x.png"
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Image() {
+	u := "https://placehold.co/600x400@3x.png"
 	expected := common.LinkPreview{
 		Type:        protobuf.UnfurledLink_IMAGE,
-		URL:         url,
+		URL:         u,
 		Hostname:    "placehold.co",
 		Title:       "",
 		Description: "",
@@ -365,21 +360,21 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Image(t *testing.T) {
 
 	transport := StubTransport{}
 	// Use a larger image to verify Thumbnail.DataURI is compressed.
-	transport.AddURLMatcher(url, readAsset(t, "IMG_1205.HEIC.jpg"), nil)
+	transport.AddURLMatcher(u, s.readAsset("IMG_1205.HEIC.jpg"), nil)
 	stubbedClient := http.Client{Transport: &transport}
 
-	previews, err := s.m.UnfurlURLs(&stubbedClient, []string{url})
-	require.NoError(t, err)
-	require.Len(t, previews, 1)
+	previews, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
+	s.Require().NoError(err)
+	s.Require().Len(previews, 1)
 	preview := previews[0]
 
-	require.Equal(t, expected.Type, preview.Type)
-	require.Equal(t, expected.URL, preview.URL)
-	require.Equal(t, expected.Hostname, preview.Hostname)
-	require.Equal(t, expected.Title, preview.Title)
-	require.Equal(t, expected.Description, preview.Description)
-	require.Equal(t, expected.Thumbnail.Width, preview.Thumbnail.Width)
-	require.Equal(t, expected.Thumbnail.Height, preview.Thumbnail.Height)
-	require.Equal(t, expected.Thumbnail.URL, preview.Thumbnail.URL)
-	assertContainsLongString(t, expected.Thumbnail.DataURI, preview.Thumbnail.DataURI, 100)
+	s.Require().Equal(expected.Type, preview.Type)
+	s.Require().Equal(expected.URL, preview.URL)
+	s.Require().Equal(expected.Hostname, preview.Hostname)
+	s.Require().Equal(expected.Title, preview.Title)
+	s.Require().Equal(expected.Description, preview.Description)
+	s.Require().Equal(expected.Thumbnail.Width, preview.Thumbnail.Width)
+	s.Require().Equal(expected.Thumbnail.Height, preview.Thumbnail.Height)
+	s.Require().Equal(expected.Thumbnail.URL, preview.Thumbnail.URL)
+	s.assertContainsLongString(expected.Thumbnail.DataURI, preview.Thumbnail.DataURI, 100)
 }

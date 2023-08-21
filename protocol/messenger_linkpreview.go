@@ -26,7 +26,7 @@ func normalizeHostname(hostname string) string {
 	return re.ReplaceAllString(hostname, "$1")
 }
 
-func (m *Messenger) newUrlUnfurler(httpClient *http.Client, url *neturl.URL) unfurlers.Unfurler {
+func (m *Messenger) newURLUnfurler(httpClient *http.Client, url *neturl.URL) unfurlers.Unfurler {
 	if unfurlers.IsSupportedImageURL(url) {
 		return unfurlers.NewImageUnfurler(
 			url,
@@ -49,7 +49,7 @@ func (m *Messenger) newUrlUnfurler(httpClient *http.Client, url *neturl.URL) unf
 	}
 }
 
-func (m *Messenger) unfurlUrl(httpClient *http.Client, url string) (common.LinkPreview, error) {
+func (m *Messenger) unfurlURL(httpClient *http.Client, url string) (common.LinkPreview, error) {
 	var preview common.LinkPreview
 
 	parsedURL, err := neturl.Parse(url)
@@ -57,7 +57,7 @@ func (m *Messenger) unfurlUrl(httpClient *http.Client, url string) (common.LinkP
 		return preview, err
 	}
 
-	unfurler := m.newUrlUnfurler(httpClient, parsedURL)
+	unfurler := m.newURLUnfurler(httpClient, parsedURL)
 	preview, err = unfurler.Unfurl()
 	if err != nil {
 		return preview, err
@@ -140,7 +140,7 @@ func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) ([]common
 
 	for _, url := range urls {
 		m.logger.Debug("unfurling", zap.String("url", url))
-		p, err := m.unfurlUrl(httpClient, url)
+		p, err := m.unfurlURL(httpClient, url)
 		if err != nil {
 			m.logger.Info("failed to unfurl", zap.String("url", url), zap.Error(err))
 			continue
