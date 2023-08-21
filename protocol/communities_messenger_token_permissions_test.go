@@ -1092,22 +1092,21 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 		},
 	}
 
-	response, err = s.owner.CreateCommunityTokenPermission(createTokenMemberPermission)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().True(response.Communities()[0].HasTokenPermissions())
-
 	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
 		return len(sub.Community.TokenPermissions()) == 2
 	})
 
+	response, err = s.owner.CreateCommunityTokenPermission(createTokenMemberPermission)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	community = response.Communities()[0]
+	s.Require().True(community.HasTokenPermissions())
+	s.Require().Len(community.TokenPermissions(), 2)
+
 	err = <-waitOnCommunityPermissionCreated
 	s.Require().NoError(err)
-
-	community, err = s.owner.communitiesManager.GetByID(community.ID())
-	s.Require().NoError(err)
-	s.Require().Len(community.TokenPermissions(), 2)
 
 	s.advertiseCommunityTo(community, s.alice)
 
