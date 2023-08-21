@@ -14,6 +14,7 @@ import (
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -41,7 +42,12 @@ func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
 	var serverCert *x509.Certificate
 	var certErrs error
 
-	for i := range c.netIPs {
+	netIps, err := server.FindReachableAddressesForPairingClient(c.netIPs)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range netIps {
 		u, err := c.URL(i)
 		if err != nil {
 			return nil, err
@@ -66,7 +72,7 @@ func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
 	// No error on the dial out then the URL.Host is accessible
 	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionConnect})
 
-	err := verifyCert(serverCert, c.publicKey)
+	err = verifyCert(serverCert, c.publicKey)
 	if err != nil {
 		return nil, err
 	}
