@@ -1181,6 +1181,21 @@ func (db *Database) GetWalletAddress() (rst types.Address, err error) {
 	return
 }
 
+func (db *Database) GetProfileKeypair() (*Keypair, error) {
+	keypairs, err := db.getKeypairs(nil, "", false)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, kp := range keypairs {
+		if kp.Type == KeypairTypeProfile {
+			return kp, nil
+		}
+	}
+
+	panic("no profile keypair among known keypairs")
+}
+
 func (db *Database) GetWalletAddresses() (rst []types.Address, err error) {
 	rows, err := db.db.Query("SELECT address FROM keypairs_accounts WHERE chat = 0 AND removed = 0 ORDER BY created_at")
 	if err != nil {
@@ -1301,6 +1316,11 @@ func (db *Database) MarkKeypairFullyOperable(keyUID string, clock uint64) (err e
 	}
 
 	return db.updateKeypairClock(tx, keyUID, clock)
+}
+
+func (db *Database) MarkAccountFullyOperable(address types.Address) (err error) {
+	_, err = db.db.Exec(`UPDATE keypairs_accounts SET operable = ?	WHERE address = ?`, AccountFullyOperable, address)
+	return err
 }
 
 // This function should not update the clock, cause it marks a keypair locally.
