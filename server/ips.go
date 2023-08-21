@@ -36,10 +36,10 @@ func addrToIPNet(addr net.Addr) *net.IPNet {
 	}
 }
 
-// FilterAddressesForPairingServer filters private unicast addresses.
+// filterAddressesForPairingServer filters private unicast addresses.
 // ips is a 2-dimensional array, where each sub-array is a list of IP
 // addresses for a single network interface.
-func FilterAddressesForPairingServer(ips [][]net.IP) []net.IP {
+func filterAddressesForPairingServer(ips [][]net.IP) []net.IP {
 	var result []net.IP
 
 	for _, niIps := range ips {
@@ -70,9 +70,9 @@ func FilterAddressesForPairingServer(ips [][]net.IP) []net.IP {
 	return result
 }
 
-// GetLocalAddresses returns an array of all addresses
+// getLocalAddresses returns an array of all addresses
 // of all available network interfaces.
-func GetLocalAddresses() ([][]net.IP, error) {
+func getLocalAddresses() ([][]net.IP, error) {
 	nis, err := net.Interfaces()
 	if err != nil {
 		return nil, err
@@ -112,16 +112,16 @@ func GetLocalAddresses() ([][]net.IP, error) {
 // GetLocalAddressesForPairingServer is a high-level func
 // that returns a list of addresses to be used by local pairing server.
 func GetLocalAddressesForPairingServer() ([]net.IP, error) {
-	ips, err := GetLocalAddresses()
+	ips, err := getLocalAddresses()
 	if err != nil {
 		return nil, err
 	}
-	return FilterAddressesForPairingServer(ips), nil
+	return filterAddressesForPairingServer(ips), nil
 }
 
-// FindReachableAddresses returns a filtered remoteIps array,
+// findReachableAddresses returns a filtered remoteIps array,
 // in which each IP matches one or more of given localNets.
-func FindReachableAddresses(remoteIPs []net.IP, localNets []net.IPNet) []net.IP {
+func findReachableAddresses(remoteIPs []net.IP, localNets []net.IPNet) []net.IP {
 	var result []net.IP
 	for _, localNet := range localNets {
 		for _, remoteIP := range remoteIPs {
@@ -133,9 +133,9 @@ func FindReachableAddresses(remoteIPs []net.IP, localNets []net.IPNet) []net.IP 
 	return result
 }
 
-// GetAllAvailableNetworks collects all networks
+// getAllAvailableNetworks collects all networks
 // from available network interfaces.
-func GetAllAvailableNetworks() ([]net.IPNet, error) {
+func getAllAvailableNetworks() ([]net.IPNet, error) {
 	var localNets []net.IPNet
 
 	nis, err := net.Interfaces()
@@ -162,9 +162,9 @@ func GetAllAvailableNetworks() ([]net.IPNet, error) {
 // FindReachableAddressesForPairingClient is a high-level func
 // that returns a reachable server's address to be used by local pairing client.
 func FindReachableAddressesForPairingClient(serverIps []net.IP) ([]net.IP, error) {
-	nets, err := GetAllAvailableNetworks()
+	nets, err := getAllAvailableNetworks()
 	if err != nil {
 		return nil, err
 	}
-	return FindReachableAddresses(serverIps, nets), nil
+	return findReachableAddresses(serverIps, nets), nil
 }
