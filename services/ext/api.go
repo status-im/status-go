@@ -28,7 +28,6 @@ import (
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/linkpreview"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/requests"
@@ -1150,7 +1149,7 @@ func (api *PublicAPI) GetLinkPreviewData(link string) (previewData urls.LinkPrev
 // GetTextURLs parses text and returns a deduplicated and (somewhat) normalized
 // slice of URLs. The returned URLs can be used as cache keys by clients.
 func (api *PublicAPI) GetTextURLs(text string) []string {
-	return linkpreview.GetURLs(text)
+	return protocol.GetURLs(text)
 }
 
 // UnfurlURLs uses a best-effort approach to unfurl each URL. Failed URLs will
@@ -1158,7 +1157,7 @@ func (api *PublicAPI) GetTextURLs(text string) []string {
 //
 // This endpoint expects the client to send URLs normalized by GetTextURLs.
 func (api *PublicAPI) UnfurlURLs(urls []string) ([]common.LinkPreview, error) {
-	return api.service.messenger.UnfurlURLs(urls)
+	return api.service.messenger.UnfurlURLs(nil, urls)
 }
 
 func (api *PublicAPI) EnsVerified(pk, ensName string) error {

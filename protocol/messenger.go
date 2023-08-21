@@ -49,7 +49,6 @@ import (
 	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
-	"github.com/status-im/status-go/protocol/linkpreview"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
@@ -6137,10 +6136,6 @@ func generateAliasAndIdenticon(pk string) (string, string, error) {
 	}
 	return name, identicon, nil
 
-}
-
-func (m *Messenger) UnfurlURLs(urls []string) ([]common.LinkPreview, error) {
-	return linkpreview.UnfurlURLs(m.logger, linkpreview.NewDefaultHTTPClient(), urls)
 }
 
 func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID protobuf.EmojiReaction_Type) (*MessengerResponse, error) {
