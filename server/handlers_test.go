@@ -95,6 +95,7 @@ func TestHandleLinkPreviewThumbnail(t *testing.T) {
 		ChatMessage: protobuf.ChatMessage{
 			UnfurledLinks: []*protobuf.UnfurledLink{
 				{
+					Type:             protobuf.UnfurledLink_LINK,
 					Url:              previewURL,
 					ThumbnailWidth:   100,
 					ThumbnailHeight:  200,

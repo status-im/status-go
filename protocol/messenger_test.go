@@ -2298,6 +2298,7 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	inputMsg := buildTestMessage(*chat)
 
 	preview := common.LinkPreview{
+		Type:        protobuf.UnfurledLink_LINK,
 		URL:         "https://github.com",
 		Title:       "Build software better, together",
 		Description: "GitHub is where people build software.",
@@ -2320,6 +2321,7 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	// Test unfurled links have been saved.
 	s.Require().Len(savedMsg.UnfurledLinks, 1)
 	unfurledLink := savedMsg.UnfurledLinks[0]
+	s.Require().Equal(preview.Type, unfurledLink.Type)
 	s.Require().Equal(preview.URL, unfurledLink.Url)
 	s.Require().Equal(preview.Title, unfurledLink.Title)
 	s.Require().Equal(preview.Description, unfurledLink.Description)

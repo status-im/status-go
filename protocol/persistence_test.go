@@ -1209,12 +1209,14 @@ func TestSaveWithUnfurledLinks(t *testing.T) {
 			Text: "some-text",
 			UnfurledLinks: []*protobuf.UnfurledLink{
 				{
+					Type:             protobuf.UnfurledLink_LINK,
 					Url:              "https://github.com",
 					Title:            "Build software better, together",
 					Description:      "GitHub is where people build software.",
 					ThumbnailPayload: []byte("abc"),
 				},
 				{
+					Type:             protobuf.UnfurledLink_LINK,
 					Url:              "https://www.youtube.com/watch?v=mzOyYtfXkb0",
 					Title:            "Status Town Hall #67 - 12 October 2020",
 					Description:      "",

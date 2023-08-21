@@ -21,6 +21,7 @@ import (
 
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type LinkPreview struct {
@@ -35,6 +36,7 @@ type Headers map[string]string
 
 const (
 	defaultRequestTimeout = 15000 * time.Millisecond
+	maxImageSize          = 1024 * 350
 
 	headerAcceptJSON = "application/json; charset=utf-8"
 	headerAcceptText = "text/html; charset=utf-8"
@@ -50,6 +52,8 @@ const (
 	// to the user's language of choice.
 	headerAcceptLanguage = "en-US,en;q=0.5"
 )
+
+var imageURLRegexp = regexp.MustCompile(`(?i)^.+(png|jpg|jpeg|webp)$`)
 
 func fetchBody(logger *zap.Logger, httpClient http.Client, url string, headers Headers) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultRequestTimeout)
@@ -98,19 +102,19 @@ func fetchThumbnail(logger *zap.Logger, httpClient http.Client, url string) (com
 
 	imgBytes, err := fetchBody(logger, httpClient, url, nil)
 	if err != nil {
-		return thumbnail, fmt.Errorf("could not fetch thumbnail: %w", err)
+		return thumbnail, fmt.Errorf("could not fetch thumbnail url='%s': %w", url, err)
 	}
 
 	width, height, err := images.GetImageDimensions(imgBytes)
 	if err != nil {
-		return thumbnail, fmt.Errorf("could not get image dimensions: %w", err)
+		return thumbnail, fmt.Errorf("could not get image dimensions url='%s': %w", url, err)
 	}
 	thumbnail.Width = width
 	thumbnail.Height = height
 
 	dataURI, err := images.GetPayloadDataURI(imgBytes)
 	if err != nil {
-		return thumbnail, fmt.Errorf("could not build data URI: %w", err)
+		return thumbnail, fmt.Errorf("could not build data URI url='%s': %w", url, err)
 	}
 	thumbnail.DataURI = dataURI
 
@@ -151,6 +155,7 @@ func (u OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
 
 func (u OEmbedUnfurler) unfurl() (common.LinkPreview, error) {
 	preview := newDefaultLinkPreview(u.url)
+	preview.Type = protobuf.UnfurledLink_LINK
 
 	oembedURL, err := u.newOEmbedURL()
 	if err != nil {
@@ -201,6 +206,7 @@ type OpenGraphUnfurler struct {
 
 func (u OpenGraphUnfurler) unfurl() (common.LinkPreview, error) {
 	preview := newDefaultLinkPreview(u.url)
+	preview.Type = protobuf.UnfurledLink_LINK
 
 	headers := map[string]string{
 		"accept":          headerAcceptText,
@@ -241,13 +247,104 @@ func (u OpenGraphUnfurler) unfurl() (common.LinkPreview, error) {
 	return preview, nil
 }
 
+type ImageUnfurler struct {
+	url        *neturl.URL
+	logger     *zap.Logger
+	httpClient http.Client
+}
+
+func compressImage(imgBytes []byte) ([]byte, error) {
+	smallest := imgBytes
+
+	img, err := images.DecodeImageData(imgBytes, bytes.NewReader(imgBytes))
+	if err != nil {
+		return nil, err
+	}
+
+	compressed := bytes.NewBuffer([]byte{})
+	err = images.CompressToFileLimits(compressed, img, images.DefaultBounds)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(compressed.Bytes()) < len(smallest) {
+		smallest = compressed.Bytes()
+	}
+
+	if len(smallest) > maxImageSize {
+		return nil, errors.New("image too large")
+	}
+
+	return smallest, nil
+}
+
+func (u ImageUnfurler) unfurl() (common.LinkPreview, error) {
+	preview := newDefaultLinkPreview(u.url)
+	preview.Type = protobuf.UnfurledLink_IMAGE
+
+	headers := map[string]string{"user-agent": headerUserAgent}
+	imgBytes, err := fetchBody(u.logger, u.httpClient, u.url.String(), headers)
+	if err != nil {
+		return preview, err
+	}
+
+	if !isSupportedImage(imgBytes) {
+		return preview, fmt.Errorf("unsupported image type url='%s'", u.url.String())
+	}
+
+	compressedBytes, err := compressImage(imgBytes)
+	if err != nil {
+		return preview, fmt.Errorf("failed to compress image url='%s': %w", u.url.String(), err)
+	}
+
+	width, height, err := images.GetImageDimensions(compressedBytes)
+	if err != nil {
+		return preview, fmt.Errorf("could not get image dimensions url='%s': %w", u.url.String(), err)
+	}
+
+	dataURI, err := images.GetPayloadDataURI(compressedBytes)
+	if err != nil {
+		return preview, fmt.Errorf("could not build data URI url='%s': %w", u.url.String(), err)
+	}
+
+	preview.Thumbnail.Width = width
+	preview.Thumbnail.Height = height
+	preview.Thumbnail.DataURI = dataURI
+
+	return preview, nil
+}
+
 func normalizeHostname(hostname string) string {
 	hostname = strings.ToLower(hostname)
 	re := regexp.MustCompile(`^www\.(.*)$`)
 	return re.ReplaceAllString(hostname, "$1")
 }
 
+// isSupportedImageURL detects whether a URL ends with one of the
+// supported image extensions. It provides a quick way to identify whether URLs
+// should be unfurled as images without needing to retrieve the full response
+// body first.
+func isSupportedImageURL(url *neturl.URL) bool {
+	return imageURLRegexp.MatchString(url.Path)
+}
+
+// isSupportedImage returns true when payload is one of the supported image
+// types. In the future, we should differentiate between animated and
+// non-animated WebP because, currently, only static WebP can be processed by
+// functions in the status-go/images package.
+func isSupportedImage(payload []byte) bool {
+	return images.IsJpeg(payload) || images.IsPng(payload) || images.IsWebp(payload)
+}
+
 func newUnfurler(logger *zap.Logger, httpClient http.Client, url *neturl.URL) Unfurler {
+	if isSupportedImageURL(url) {
+		return ImageUnfurler{
+			url:        url,
+			logger:     logger,
+			httpClient: httpClient,
+		}
+	}
+
 	switch normalizeHostname(url.Hostname()) {
 	case "reddit.com":
 		return OEmbedUnfurler{

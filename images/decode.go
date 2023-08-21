@@ -30,7 +30,7 @@ func Decode(fileName string) (image.Image, error) {
 		return nil, err
 	}
 
-	return decodeImageData(fb, file)
+	return DecodeImageData(fb, file)
 }
 
 func DecodeFromURL(path string) (image.Image, error) {
@@ -57,7 +57,7 @@ func DecodeFromURL(path string) (image.Image, error) {
 		return nil, err
 	}
 
-	return decodeImageData(bodyBytes, bytes.NewReader(bodyBytes))
+	return DecodeImageData(bodyBytes, bytes.NewReader(bodyBytes))
 }
 
 func prepareFileForDecode(file *os.File) ([]byte, error) {
@@ -77,7 +77,7 @@ func prepareFileForDecode(file *os.File) ([]byte, error) {
 	return fb, nil
 }
 
-func decodeImageData(buf []byte, r io.Reader) (img image.Image, err error) {
+func DecodeImageData(buf []byte, r io.Reader) (img image.Image, err error) {
 	switch GetType(buf) {
 	case JPEG:
 		img, err = jpeg.Decode(r)
@@ -101,13 +101,13 @@ func decodeImageData(buf []byte, r io.Reader) (img image.Image, err error) {
 
 func GetType(buf []byte) ImageType {
 	switch {
-	case isJpeg(buf):
+	case IsJpeg(buf):
 		return JPEG
-	case isPng(buf):
+	case IsPng(buf):
 		return PNG
-	case isGif(buf):
+	case IsGif(buf):
 		return GIF
-	case isWebp(buf):
+	case IsWebp(buf):
 		return WEBP
 	default:
 		return UNKNOWN
@@ -116,38 +116,38 @@ func GetType(buf []byte) ImageType {
 
 func GetMimeType(buf []byte) (string, error) {
 	switch {
-	case isJpeg(buf):
+	case IsJpeg(buf):
 		return "jpeg", nil
-	case isPng(buf):
+	case IsPng(buf):
 		return "png", nil
-	case isGif(buf):
+	case IsGif(buf):
 		return "gif", nil
-	case isWebp(buf):
+	case IsWebp(buf):
 		return "webp", nil
 	default:
 		return "", errors.New("image format not supported")
 	}
 }
 
-func isJpeg(buf []byte) bool {
+func IsJpeg(buf []byte) bool {
 	return len(buf) > 2 &&
 		buf[0] == 0xFF &&
 		buf[1] == 0xD8 &&
 		buf[2] == 0xFF
 }
 
-func isPng(buf []byte) bool {
+func IsPng(buf []byte) bool {
 	return len(buf) > 3 &&
 		buf[0] == 0x89 && buf[1] == 0x50 &&
 		buf[2] == 0x4E && buf[3] == 0x47
 }
 
-func isGif(buf []byte) bool {
+func IsGif(buf []byte) bool {
 	return len(buf) > 2 &&
 		buf[0] == 0x47 && buf[1] == 0x49 && buf[2] == 0x46
 }
 
-func isWebp(buf []byte) bool {
+func IsWebp(buf []byte) bool {
 	return len(buf) > 11 &&
 		buf[8] == 0x57 && buf[9] == 0x45 &&
 		buf[10] == 0x42 && buf[11] == 0x50

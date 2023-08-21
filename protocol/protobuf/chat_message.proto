@@ -117,6 +117,12 @@ message UnfurledLink {
   bytes thumbnail_payload = 4;
   uint32 thumbnail_width = 5;
   uint32 thumbnail_height = 6;
+  LinkType type = 7;
+
+  enum LinkType {
+    LINK = 0;
+    IMAGE = 1;
+  }
 }
 
 message ChatMessage {

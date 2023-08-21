@@ -14,6 +14,8 @@ const (
 	idealTargetImageSize    = 50000
 )
 
+var DefaultBounds = FileSizeLimits{Ideal: idealTargetImageSize, Max: resizeTargetImageSize}
+
 func OpenAndAdjustImage(inputImage CroppedImage, crop bool) ([]byte, error) {
 	file, err := os.Open(inputImage.ImagePath)
 	if err != nil {
@@ -43,8 +45,7 @@ func OpenAndAdjustImage(inputImage CroppedImage, crop bool) ([]byte, error) {
 	}
 
 	bb := bytes.NewBuffer([]byte{})
-	err = CompressToFileLimits(bb, img, FileSizeLimits{Ideal: idealTargetImageSize, Max: resizeTargetImageSize})
-
+	err = CompressToFileLimits(bb, img, DefaultBounds)
 	if err != nil {
 		return nil, err
 	}

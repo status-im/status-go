@@ -135,6 +135,7 @@ func TestConvertLinkPreviewsToProto(t *testing.T) {
 	msg := Message{
 		LinkPreviews: []LinkPreview{
 			{
+				Type:        protobuf.UnfurledLink_LINK,
 				Description: "GitHub is where people build software.",
 				Hostname:    "github.com",
 				Title:       "Build software better, together",
@@ -155,6 +156,7 @@ func TestConvertLinkPreviewsToProto(t *testing.T) {
 
 	l := unfurledLinks[0]
 	validPreview := msg.LinkPreviews[0]
+	require.Equal(t, validPreview.Type, l.Type)
 	require.Equal(t, validPreview.Description, l.Description)
 	require.Equal(t, validPreview.Title, l.Title)
 	require.Equal(t, uint32(validPreview.Thumbnail.Width), l.ThumbnailWidth)
@@ -194,6 +196,7 @@ func TestConvertFromProtoToLinkPreviews(t *testing.T) {
 	l := &protobuf.UnfurledLink{
 		Description:      "GitHub is where people build software.",
 		Title:            "Build software better, together",
+		Type:             protobuf.UnfurledLink_LINK,
 		Url:              "https://github.com",
 		ThumbnailPayload: []byte(""),
 		ThumbnailWidth:   100,
@@ -213,6 +216,7 @@ func TestConvertFromProtoToLinkPreviews(t *testing.T) {
 	previews := msg.ConvertFromProtoToLinkPreviews(urlMaker)
 	require.Len(t, previews, 1)
 	p := previews[0]
+	require.Equal(t, l.Type, p.Type)
 	require.Equal(t, "github.com", p.Hostname)
 	require.Equal(t, l.Description, p.Description)
 	require.Equal(t, l.Url, p.URL)
@@ -262,6 +266,7 @@ func TestMarshalMessageJSON(t *testing.T) {
 		From: "0x04c51631b3354242d5a56f044c3b7703bcc001e8c725c4706928b3fac3c2a12ec9019e1e224d487f5c893389405bcec998bc687307f290a569d6a97d24b711bca8",
 		LinkPreviews: []LinkPreview{
 			{
+				Type:        protobuf.UnfurledLink_LINK,
 				Description: "GitHub is where people build software.",
 				Hostname:    "github.com",
 				Title:       "Build software better, together",

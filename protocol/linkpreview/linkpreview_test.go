@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"math"
 	"net/http"
+	"net/url"
 	"regexp"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 // StubMatcher should either return an http.Response or nil in case the request
@@ -58,17 +60,27 @@ func (t *StubTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // Add a matcher based on a URL regexp. If a given request URL matches the
 // regexp, then responseBody will be returned with a hardcoded 200 status code.
-func (t *StubTransport) AddURLMatcher(urlRegexp string, responseBody []byte) {
+// If headers is non-nil, use it as the value of http.Response.Header.
+func (t *StubTransport) AddURLMatcher(urlRegexp string, responseBody []byte, headers map[string]string) {
 	matcher := func(req *http.Request) *http.Response {
 		rx, err := regexp.Compile(regexp.QuoteMeta(urlRegexp))
 		if err != nil {
 			return nil
 		}
 		if rx.MatchString(req.URL.String()) {
-			return &http.Response{
+			res := &http.Response{
 				StatusCode: http.StatusOK,
 				Body:       ioutil.NopCloser(bytes.NewBuffer(responseBody)),
 			}
+
+			if headers != nil {
+				res.Header = http.Header{}
+				for k, v := range headers {
+					res.Header.Set(k, v)
+				}
+			}
+
+			return res
 		}
 		return nil
 	}
@@ -165,6 +177,7 @@ func Test_UnfurlURLs_YouTube(t *testing.T) {
 	url := "https://www.youtube.com/watch?v=lE4UXdJSJM4"
 	thumbnailURL := "https://i.ytimg.com/vi/lE4UXdJSJM4/maxresdefault.jpg"
 	expected := common.LinkPreview{
+		Type:        protobuf.UnfurledLink_LINK,
 		URL:         url,
 		Hostname:    "www.youtube.com",
 		Title:       "Interview with a GNU/Linux user - Partition 1",
@@ -188,8 +201,9 @@ func Test_UnfurlURLs_YouTube(t *testing.T) {
 				</head>
 			</html>
 		`, expected.Title, expected.Description, thumbnailURL)),
+		nil,
 	)
-	transport.AddURLMatcher(thumbnailURL, readAsset(t, "1.jpg"))
+	transport.AddURLMatcher(thumbnailURL, readAsset(t, "1.jpg"), nil)
 	stubbedClient := http.Client{Transport: &transport}
 
 	previews, err := UnfurlURLs(nil, stubbedClient, []string{url})
@@ -197,6 +211,7 @@ func Test_UnfurlURLs_YouTube(t *testing.T) {
 	require.Len(t, previews, 1)
 	preview := previews[0]
 
+	require.Equal(t, expected.Type, preview.Type)
 	require.Equal(t, expected.URL, preview.URL)
 	require.Equal(t, expected.Hostname, preview.Hostname)
 	require.Equal(t, expected.Title, preview.Title)
@@ -210,6 +225,7 @@ func Test_UnfurlURLs_YouTube(t *testing.T) {
 func Test_UnfurlURLs_Reddit(t *testing.T) {
 	url := "https://www.reddit.com/r/Bitcoin/comments/13j0tzr/the_best_bitcoin_explanation_of_all_times/?utm_source=share"
 	expected := common.LinkPreview{
+		Type:        protobuf.UnfurledLink_LINK,
 		URL:         url,
 		Hostname:    "www.reddit.com",
 		Title:       "The best bitcoin explanation of all times.",
@@ -230,6 +246,7 @@ func Test_UnfurlURLs_Reddit(t *testing.T) {
 				"author_name": "DTheDev"
 			}
 		`),
+		nil,
 	)
 	stubbedClient := http.Client{Transport: &transport}
 
@@ -238,6 +255,7 @@ func Test_UnfurlURLs_Reddit(t *testing.T) {
 	require.Len(t, previews, 1)
 	preview := previews[0]
 
+	require.Equal(t, expected.Type, preview.Type)
 	require.Equal(t, expected.URL, preview.URL)
 	require.Equal(t, expected.Hostname, preview.Hostname)
 	require.Equal(t, expected.Title, preview.Title)
@@ -260,6 +278,7 @@ func Test_UnfurlURLs_CommonFailures(t *testing.T) {
 	transport.AddURLMatcher(
 		"https://wikipedia.org",
 		[]byte("<html><head></head></html>"),
+		nil,
 	)
 	stubbedClient := http.Client{Transport: &transport}
 	previews, err := UnfurlURLs(nil, stubbedClient, []string{"https://wikipedia.org"})
@@ -275,4 +294,64 @@ func Test_UnfurlURLs_CommonFailures(t *testing.T) {
 	previews, err = UnfurlURLs(nil, httpClient, []string{"https://wikipedia.o"})
 	require.NoError(t, err)
 	require.Empty(t, previews)
+}
+
+func Test_isSupportedImageURL(t *testing.T) {
+	examples := []struct {
+		url      string
+		expected bool
+	}{
+		{url: "https://placehold.co/600x400@2x.png", expected: true},
+		{url: "https://placehold.co/600x400@2x.PNG", expected: true},
+		{url: "https://placehold.co/600x400@2x.jpg", expected: true},
+		{url: "https://placehold.co/600x400@2x.JPG", expected: true},
+		{url: "https://placehold.co/600x400@2x.jpeg", expected: true},
+		{url: "https://placehold.co/600x400@2x.Jpeg", expected: true},
+		{url: "https://placehold.co/600x400@2x.webp", expected: true},
+		{url: "https://placehold.co/600x400@2x.WebP", expected: true},
+		{url: "https://placehold.co/600x400@2x.PnGs", expected: false},
+		{url: "https://placehold.co/600x400@2x.tiff", expected: false},
+	}
+
+	for _, e := range examples {
+		parsedURL, err := url.Parse(e.url)
+		require.NoError(t, err, e)
+		require.Equal(t, e.expected, isSupportedImageURL(parsedURL), e.url)
+	}
+}
+
+func Test_UnfurlURLs_Image(t *testing.T) {
+	url := "https://placehold.co/600x400@3x.png"
+	expected := common.LinkPreview{
+		Type:        protobuf.UnfurledLink_IMAGE,
+		URL:         url,
+		Hostname:    "placehold.co",
+		Title:       "",
+		Description: "",
+		Thumbnail: common.LinkPreviewThumbnail{
+			Width:   1293,
+			Height:  1900,
+			DataURI: "data:image/jpeg;base64,/9j/2wCEABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOjM9PDkzODdASFxOQERXRTc4UG1RV19iZ",
+		},
+	}
+
+	transport := StubTransport{}
+	// Use a larger image to verify Thumbnail.DataURI is compressed.
+	transport.AddURLMatcher(url, readAsset(t, "IMG_1205.HEIC.jpg"), nil)
+	stubbedClient := http.Client{Transport: &transport}
+
+	previews, err := UnfurlURLs(nil, stubbedClient, []string{url})
+	require.NoError(t, err)
+	require.Len(t, previews, 1)
+	preview := previews[0]
+
+	require.Equal(t, expected.Type, preview.Type)
+	require.Equal(t, expected.URL, preview.URL)
+	require.Equal(t, expected.Hostname, preview.Hostname)
+	require.Equal(t, expected.Title, preview.Title)
+	require.Equal(t, expected.Description, preview.Description)
+	require.Equal(t, expected.Thumbnail.Width, preview.Thumbnail.Width)
+	require.Equal(t, expected.Thumbnail.Height, preview.Thumbnail.Height)
+	require.Equal(t, expected.Thumbnail.URL, preview.Thumbnail.URL)
+	assertContainsLongString(t, expected.Thumbnail.DataURI, preview.Thumbnail.DataURI, 100)
 }
