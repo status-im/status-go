@@ -82,7 +82,7 @@ func (s *IPsTestingSuite) TestConnectionParams_GetLocalAddressesForPairingServer
 	s.Require().False(ni4[0].IsGlobalUnicast())
 	s.Require().False(ni4[0].IsPrivate())
 
-	ips := FilterAddressesForPairingServer(allIps)
+	ips := filterAddressesForPairingServer(allIps)
 	s.Require().Len(ips, 2)
 	s.Require().NotNil(ips[0].To4())
 	s.Require().NotNil(ni1[0].To4())
@@ -104,7 +104,7 @@ func (s *IPsTestingSuite) TestConnectionParams_FindReachableAddresses() {
 	localNets = []net.IPNet{
 		{IP: net.IPv4(192, 168, 1, 43), Mask: net.IPv4Mask(255, 255, 255, 0)},
 	}
-	ips = FindReachableAddresses(remoteIps, localNets)
+	ips = findReachableAddresses(remoteIps, localNets)
 	s.Require().Len(ips, 1)
 	s.Require().Equal(ips[0], remoteIps[2])
 
@@ -119,7 +119,7 @@ func (s *IPsTestingSuite) TestConnectionParams_FindReachableAddresses() {
 		{IP: net.IPv4(172, 16, 2, 43), Mask: net.IPv4Mask(255, 255, 255, 0)},
 		{IP: net.IPv4(192, 168, 2, 43), Mask: net.IPv4Mask(255, 255, 255, 0)},
 	}
-	ips = FindReachableAddresses(remoteIps, localNets)
+	ips = findReachableAddresses(remoteIps, localNets)
 	s.Require().Len(ips, 2)
 	s.Require().Equal(ips[0], remoteIps[0])
 	s.Require().Equal(ips[1], remoteIps[1])
@@ -131,13 +131,13 @@ func (s *IPsTestingSuite) TestConnectionParams_FindReachableAddresses() {
 		net.IPv4(192, 168, 1, 42),
 	}
 	localNets = []net.IPNet{}
-	ips = FindReachableAddresses(remoteIps, localNets)
+	ips = findReachableAddresses(remoteIps, localNets)
 	s.Require().Len(ips, 0)
 
 	// Test 4
 	remoteIps = []net.IP{}
 	localNets = []net.IPNet{}
-	ips = FindReachableAddresses(remoteIps, localNets)
+	ips = findReachableAddresses(remoteIps, localNets)
 	s.Require().Len(ips, 0)
 }
 
@@ -187,7 +187,7 @@ func (s *IPsTestingSuite) TestConnectionParams_RealNetworksTest() {
 	//	Part 1:
 	//	print needed stuff. Run on both machines.
 
-	addrs, err := GetLocalAddresses()
+	addrs, err := getLocalAddresses()
 	s.Require().NoError(err)
 	s.Logger.Info("MacOS:", zap.Any("addrs", addrs))
 
@@ -195,7 +195,7 @@ func (s *IPsTestingSuite) TestConnectionParams_RealNetworksTest() {
 		printLocalAddresses(addrs)
 	}
 
-	nets, err := GetAllAvailableNetworks()
+	nets, err := getAllAvailableNetworks()
 	s.Require().NoError(err)
 	s.Logger.Info("MacOS:", zap.Any("nets", nets))
 
@@ -258,14 +258,14 @@ func (s *IPsTestingSuite) TestConnectionParams_RealNetworksTest() {
 	//	The test itself
 
 	// Windows as server, Mac as client
-	winIPs := FilterAddressesForPairingServer(winNIs)
-	winReachableIps := FindReachableAddresses(winIPs, macNets)
+	winIPs := filterAddressesForPairingServer(winNIs)
+	winReachableIps := findReachableAddresses(winIPs, macNets)
 	s.Require().Len(winReachableIps, 1)
 	s.Require().Equal(winReachableIps[0].String(), "192.168.1.33")
 
 	// Windows as server, Mac as client
-	macIPs := FilterAddressesForPairingServer(macNIs)
-	macReachableIps := FindReachableAddresses(macIPs, winNets)
+	macIPs := filterAddressesForPairingServer(macNIs)
+	macReachableIps := findReachableAddresses(macIPs, winNets)
 	s.Require().Len(macReachableIps, 1)
 	s.Require().Equal(macReachableIps[0].String(), "192.168.1.36")
 }
