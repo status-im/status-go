@@ -3,6 +3,7 @@ package pairing
 import (
 	"crypto/ecdsa"
 	"crypto/tls"
+	"net"
 
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
@@ -64,10 +65,11 @@ type ServerConfig struct {
 	// Connection fields, not json (un)marshalled
 	// Required for the server, but MUST NOT come from client
 
-	PK       *ecdsa.PublicKey `json:"-"`
-	EK       []byte           `json:"-"`
-	Cert     *tls.Certificate `json:"-"`
-	Hostname string           `json:"-"`
+	PK          *ecdsa.PublicKey `json:"-"`
+	EK          []byte           `json:"-"`
+	Cert        *tls.Certificate `json:"-"`
+	ListenIP    net.IP           `json:"-"`
+	IPAddresses []net.IP         `json:"-"`
 }
 
 type ClientConfig struct{}

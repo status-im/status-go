@@ -36,7 +36,7 @@ func preflightHandler(w http.ResponseWriter, r *http.Request) {
 func makeCert(address net.IP) (*tls.Certificate, []byte, error) {
 	notBefore := time.Now()
 	notAfter := notBefore.Add(time.Minute)
-	return server.GenerateTLSCert(notBefore, notAfter, address.String())
+	return server.GenerateTLSCert(notBefore, notAfter, []net.IP{address}, []string{})
 }
 
 func makeAndStartServer(cert *tls.Certificate, address net.IP) (string, func() error, error) {
