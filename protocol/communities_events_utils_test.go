@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/services/collectibles"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
@@ -24,6 +25,7 @@ type CommunityEventsTestsInterface interface {
 	GetEventSender() *Messenger
 	GetMember() *Messenger
 	GetSuite() *suite.Suite
+	GetCollectiblesServiceMock() *CollectiblesServiceMock
 }
 
 const commmunitiesEventsTestTokenAddress = "0x0400000000000000000000000000000000000000"
@@ -1635,8 +1637,9 @@ func testEventSenderCannotEditPrivilegedCommunityPermission(base CommunityEvents
 }
 
 func testAddAndSyncTokenFromControlNode(base CommunityEventsTestsInterface, community *communities.Community,
-	privilegesLvl token.PrivilegesLevel, expectedSync bool) {
+	privilegesLvl token.PrivilegesLevel) {
 	tokenERC721 := createCommunityToken(community.IDString(), privilegesLvl)
+	addCommunityTokenToCollectiblesService(base, tokenERC721)
 
 	s := base.GetSuite()
 
@@ -1656,6 +1659,10 @@ func testAddAndSyncTokenFromControlNode(base CommunityEventsTestsInterface, comm
 			return err
 		}
 
+		if privilegesLvl != token.CommunityLevel && len(modifiedCommmunity.TokenPermissions()) == 0 {
+			return errors.New("Token permissions was not found")
+		}
+
 		for _, tokenMetadata := range modifiedCommmunity.CommunityTokensMetadata() {
 			if tokenMetadata.Name == tokenERC721.Name {
 				return nil
@@ -1668,33 +1675,17 @@ func testAddAndSyncTokenFromControlNode(base CommunityEventsTestsInterface, comm
 	waitOnMessengerResponse(s, WaitCommunityCondition, checkTokenAdded, base.GetMember())
 	waitOnMessengerResponse(s, WaitCommunityCondition, checkTokenAdded, base.GetEventSender())
 
-	// check control node sent sync message to the event sender
-	_, err = WaitOnMessengerResponse(
-		base.GetEventSender(),
-		func(r *MessengerResponse) bool {
-			tokens, err := base.GetEventSender().communitiesManager.GetAllCommunityTokens()
-			return err == nil && len(tokens) == 1
-		},
-		"no token sync message from control node",
-	)
+	// check CommunityToken was added to the DB
+	syncTokens, err := base.GetEventSender().communitiesManager.GetAllCommunityTokens()
+	s.Require().NoError(err)
+	s.Require().Len(syncTokens, 1)
+	s.Require().Equal(syncTokens[0].PrivilegesLevel, privilegesLvl)
 
-	if expectedSync {
-		s.Require().NoError(err)
-	} else {
-		s.Require().Error(err)
-	}
+	// check CommunityToken was not added to the DB
+	syncTokens, err = base.GetMember().communitiesManager.GetAllCommunityTokens()
+	s.Require().NoError(err)
+	s.Require().Len(syncTokens, 0)
 
-	// check member did not receive sync message with the token
-	_, err = WaitOnMessengerResponse(
-		base.GetMember(),
-		func(r *MessengerResponse) bool {
-			tokens, err := base.GetMember().communitiesManager.GetAllCommunityTokens()
-			return err == nil && len(tokens) == 1
-		},
-		"no token sync message from control node",
-	)
-
-	s.Require().Error(err)
 }
 
 func testEventSenderCannotCreatePrivilegedCommunityPermission(base CommunityEventsTestsInterface, community *communities.Community, pType protobuf.CommunityTokenPermission_Type) {
@@ -1728,6 +1719,7 @@ func createCommunityToken(communityID string, privilegesLevel token.PrivilegesLe
 func testAddAndSyncTokenFromEventSenderByControlNode(base CommunityEventsTestsInterface, community *communities.Community,
 	privilegesLvl token.PrivilegesLevel) {
 	tokenERC721 := createCommunityToken(community.IDString(), privilegesLvl)
+	addCommunityTokenToCollectiblesService(base, tokenERC721)
 
 	s := base.GetSuite()
 
@@ -1785,6 +1777,7 @@ func testAddAndSyncTokenFromEventSenderByControlNode(base CommunityEventsTestsIn
 
 func testEventSenderAddTokenMasterAndOwnerToken(base CommunityEventsTestsInterface, community *communities.Community) {
 	ownerToken := createCommunityToken(community.IDString(), token.OwnerLevel)
+	addCommunityTokenToCollectiblesService(base, ownerToken)
 
 	s := base.GetSuite()
 
@@ -1803,4 +1796,15 @@ func testEventSenderAddTokenMasterAndOwnerToken(base CommunityEventsTestsInterfa
 
 	err = base.GetEventSender().AddCommunityToken(ownerToken.CommunityID, ownerToken.ChainID, ownerToken.Address)
 	s.Require().Error(err, communities.ErrInvalidManageTokensPermission)
+}
+
+func addCommunityTokenToCollectiblesService(base CommunityEventsTestsInterface, token *token.CommunityToken) {
+	data := &collectibles.CollectibleContractData{
+		TotalSupply:    token.Supply,
+		Transferable:   token.Transferable,
+		RemoteBurnable: token.RemoteSelfDestruct,
+		InfiniteSupply: token.InfiniteSupply,
+	}
+
+	base.GetCollectiblesServiceMock().SetMockCollectibleContractData(uint64(token.ChainID), token.Address, data)
 }

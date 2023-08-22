@@ -2752,13 +2752,6 @@ func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMess
 			return nil
 		}
 		state.Response.AddRequestsToJoinCommunity(requestsToJoin)
-
-	case protobuf.CommunityPrivilegedUserSyncMessage_ADD_COMMUNITY_TOKENS:
-		// TODO add tokens to the Response
-		err = m.communitiesManager.HandleAddCommunityTokenPrivilegedUserSyncMessage(message, community)
-		if err != nil {
-			return nil
-		}
 	}
 
 	return nil
@@ -2856,12 +2849,9 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 		return err
 	}
 
-	if savedCommunity.HasPermissionToSendCommunityEvents() || savedCommunity.IsControlNode() {
-		err := m.handleCommunityTokensMetadata(savedCommunity.IDString(), savedCommunity.CommunityTokensMetadata(), nil)
-		if err != nil {
-			logger.Debug("m.handleCommunityTokensMetadata", zap.Error(err))
-			return err
-		}
+	if err := m.handleCommunityTokensMetadataByPrivilegedMembers(savedCommunity); err != nil {
+		logger.Debug("m.handleCommunityTokensMetadataByPrivilegedMembers", zap.Error(err))
+		return err
 	}
 
 	// if we are not waiting for approval, join or leave the community
@@ -2919,8 +2909,8 @@ func (m *Messenger) HandleSyncCommunitySettings(messageState *ReceivedMessageSta
 	return nil
 }
 
-func (m *Messenger) handleCommunityTokensMetadata(communityID string, communityTokens []*protobuf.CommunityTokenMetadata, statusMessage *v1protocol.StatusMessage) error {
-	return m.communitiesManager.HandleCommunityTokensMetadata(communityID, communityTokens)
+func (m *Messenger) handleCommunityTokensMetadataByPrivilegedMembers(community *communities.Community) error {
+	return m.communitiesManager.HandleCommunityTokensMetadataByPrivilegedMembers(community)
 }
 
 func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community) {
@@ -4386,73 +4376,11 @@ func (m *Messenger) AddCommunityToken(communityID string, chainID int, address s
 		return err
 	}
 
-	community, err := m.communitiesManager.AddCommunityToken(communityToken)
+	_, err = m.communitiesManager.AddCommunityToken(communityToken)
 	if err != nil {
 		return err
 	}
 
-	if community.IsControlNode() && (communityToken.PrivilegesLevel == token.MasterLevel || communityToken.PrivilegesLevel == token.OwnerLevel) {
-		permissionType := protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER
-		if communityToken.PrivilegesLevel == token.MasterLevel {
-			permissionType = protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER
-		}
-
-		contractAddresses := make(map[uint64]string)
-		contractAddresses[uint64(communityToken.ChainID)] = communityToken.Address
-
-		tokenCriteria := &protobuf.TokenCriteria{
-			ContractAddresses: contractAddresses,
-			Type:              protobuf.CommunityTokenType_ERC721,
-			Symbol:            communityToken.Symbol,
-			Name:              communityToken.Name,
-			Amount:            "1",
-			Decimals:          uint64(communityToken.Decimals),
-		}
-
-		request := &requests.CreateCommunityTokenPermission{
-			CommunityID:   community.ID(),
-			Type:          permissionType,
-			TokenCriteria: []*protobuf.TokenCriteria{tokenCriteria},
-			IsPrivate:     true,
-			ChatIds:       []string{},
-		}
-
-		_, _, err := m.communitiesManager.CreateCommunityTokenPermission(request)
-		if err != nil {
-			return err
-		}
-	}
-
-	syncMsg := &protobuf.CommunityPrivilegedUserSyncMessage{
-		Type:            protobuf.CommunityPrivilegedUserSyncMessage_ADD_COMMUNITY_TOKENS,
-		CommunityId:     community.ID(),
-		CommunityTokens: []*protobuf.CommunityToken{token.ToCommunityTokenProtobuf(communityToken)},
-	}
-
-	payloadSyncMsg, err := proto.Marshal(syncMsg)
-	if err != nil {
-		return err
-	}
-
-	rawSyncMessage := &common.RawMessage{
-		Payload:           payloadSyncMsg,
-		Sender:            m.identity,
-		SkipProtocolLayer: true,
-		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE,
-	}
-
-	for _, member := range community.GetMemberPubkeys() {
-		if member.Equal(&m.identity.PublicKey) {
-			continue
-		}
-
-		if community.MemberCanManageToken(member, communityToken) {
-			_, err := m.sender.SendPrivate(context.Background(), member, rawSyncMessage)
-			if err != nil {
-				return err
-			}
-		}
-	}
 	return nil
 }
 

@@ -25,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/account"
@@ -81,7 +80,7 @@ type Manager struct {
 	torrentConfig                    *params.TorrentConfig
 	torrentClient                    *torrent.Client
 	walletConfig                     *params.WalletConfig
-	collectiblesService              *collectibles.Service
+	collectiblesService              collectibles.ServiceInterface
 	historyArchiveTasksWaitGroup     sync.WaitGroup
 	historyArchiveTasks              sync.Map // stores `chan struct{}`
 	periodicMembersReevaluationTasks sync.Map // stores `chan struct{}`
@@ -116,7 +115,7 @@ type managerOptions struct {
 	tokenManager        TokenManager
 	collectiblesManager CollectiblesManager
 	walletConfig        *params.WalletConfig
-	collectiblesService *collectibles.Service
+	collectiblesService collectibles.ServiceInterface
 }
 
 type TokenManager interface {
@@ -192,7 +191,7 @@ func WithWalletConfig(walletConfig *params.WalletConfig) ManagerOption {
 	}
 }
 
-func WithCollectiblesService(collectiblesService *collectibles.Service) ManagerOption {
+func WithCollectiblesService(collectiblesService collectibles.ServiceInterface) ManagerOption {
 	return func(opts *managerOptions) {
 		opts.collectiblesService = collectiblesService
 	}
@@ -605,13 +604,8 @@ func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommuni
 	if err != nil {
 		return nil, nil, err
 	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
-	}
 
-	tokenPermission := request.ToCommunityTokenPermission()
-	tokenPermission.Id = uuid.New().String()
-	changes, err := community.AddTokenPermission(&tokenPermission)
+	community, changes, err := m.createCommunityTokenPermission(request, community)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1278,8 +1272,12 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 }
 
 func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, description *protobuf.CommunityDescription, payload []byte) (*CommunityResponse, error) {
-	changes, err := community.UpdateCommunityDescription(description, payload, false)
+	changes, err := community.UpdateCommunityDescription(description, payload)
 	if err != nil {
+		return nil, err
+	}
+
+	if err = m.HandleCommunityTokensMetadataByPrivilegedMembers(community); err != nil {
 		return nil, err
 	}
 
@@ -1454,6 +1452,10 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		return nil, err
 	}
 
+	if err = m.HandleCommunityTokensMetadataByPrivilegedMembers(community); err != nil {
+		return nil, err
+	}
+
 	// Control node cerifies community events and publish changes
 	// all other nodes only apply changes to the community
 	if changes.Community.IsControlNode() {
@@ -1557,25 +1559,6 @@ func (m *Manager) HandleRequestToJoinPrivilegedUserSyncMessage(message *protobuf
 	}
 
 	return requestsToJoin, nil
-}
-
-func (m *Manager) HandleAddCommunityTokenPrivilegedUserSyncMessage(message *protobuf.CommunityPrivilegedUserSyncMessage, community *Community) error {
-	for _, token := range message.CommunityTokens {
-		token := community_token.FromCommunityTokenProtobuf(token)
-		if !community.MemberCanManageToken(community.MemberIdentity(), token) {
-			return ErrInvalidManageTokensPermission
-		}
-
-		exist, err := m.persistence.HasCommunityToken(token.CommunityID, token.Address, token.ChainID)
-		if err != nil {
-			return err
-		}
-
-		if !exist {
-			return m.persistence.AddCommunityToken(token)
-		}
-	}
-	return nil
 }
 
 func (m *Manager) handleAdditionalAdminChanges(community *Community) (*CommunityResponse, error) {
@@ -2801,14 +2784,17 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, err
 	}
 
-	isPrivilegedUserSigner := community.IsPrivilegedMember(signer)
 	isControlNodeSigner := common.IsPubKeyEqual(community.PublicKey(), signer)
-	if !isControlNodeSigner && !isPrivilegedUserSigner {
+	if !isControlNodeSigner {
 		return nil, ErrNotAuthorized
 	}
 
-	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg, isPrivilegedUserSigner && !isControlNodeSigner)
+	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg)
 	if err != nil {
+		return nil, err
+	}
+
+	if err = m.HandleCommunityTokensMetadataByPrivilegedMembers(community); err != nil {
 		return nil, err
 	}
 
@@ -4379,6 +4365,38 @@ func (m *Manager) AddCommunityToken(token *community_token.CommunityToken) (*Com
 		return nil, err
 	}
 
+	if community.IsControlNode() && (token.PrivilegesLevel == community_token.MasterLevel || token.PrivilegesLevel == community_token.OwnerLevel) {
+		permissionType := protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER
+		if token.PrivilegesLevel == community_token.MasterLevel {
+			permissionType = protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER
+		}
+
+		contractAddresses := make(map[uint64]string)
+		contractAddresses[uint64(token.ChainID)] = token.Address
+
+		tokenCriteria := &protobuf.TokenCriteria{
+			ContractAddresses: contractAddresses,
+			Type:              protobuf.CommunityTokenType_ERC721,
+			Symbol:            token.Symbol,
+			Name:              token.Name,
+			Amount:            "1",
+			Decimals:          uint64(token.Decimals),
+		}
+
+		request := &requests.CreateCommunityTokenPermission{
+			CommunityID:   community.ID(),
+			Type:          permissionType,
+			TokenCriteria: []*protobuf.TokenCriteria{tokenCriteria},
+			IsPrivate:     true,
+			ChatIds:       []string{},
+		}
+
+		community, _, err = m.createCommunityTokenPermission(request, community)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return community, m.saveAndPublish(community)
 }
 
@@ -4581,7 +4599,23 @@ func (m *Manager) ReevaluatePrivelegedMember(community *Community, tokenPermissi
 	return alreadyHasPrivilegedRole, nil
 }
 
-func (m *Manager) HandleCommunityTokensMetadata(communityID string, communityTokens []*protobuf.CommunityTokenMetadata) error {
+func (m *Manager) HandleCommunityTokensMetadataByPrivilegedMembers(community *Community) error {
+	if community.HasPermissionToSendCommunityEvents() || community.IsControlNode() {
+		if err := m.HandleCommunityTokensMetadata(community); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Manager) HandleCommunityTokensMetadata(community *Community) error {
+	communityID := community.IDString()
+	communityTokens := community.CommunityTokensMetadata()
+
+	if len(communityTokens) == 0 {
+		return nil
+	}
+
 	for _, tokenMetadata := range communityTokens {
 		for chainID, address := range tokenMetadata.ContractAddresses {
 			exists, err := m.persistence.HasCommunityToken(communityID, address, int(chainID))
@@ -4589,7 +4623,6 @@ func (m *Manager) HandleCommunityTokensMetadata(communityID string, communityTok
 				return err
 			}
 			if !exists {
-
 				communityToken := &community_token.CommunityToken{
 					CommunityID:        communityID,
 					Address:            address,
@@ -4605,44 +4638,29 @@ func (m *Manager) HandleCommunityTokensMetadata(communityID string, communityTok
 					Decimals:           int(tokenMetadata.Decimals),
 				}
 
-				callOpts := &bind.CallOpts{Context: context.Background(), Pending: false}
-
 				switch tokenMetadata.TokenType {
 				case protobuf.CommunityTokenType_ERC721:
-					contract, err := m.collectiblesService.API().GetCollectiblesContractInstance(chainID, address)
-					if err != nil {
-						return err
-					}
-					totalSupply, err := contract.TotalSupply(callOpts)
-					if err != nil {
-						return err
-					}
-					transferable, err := contract.Transferable(callOpts)
-					if err != nil {
-						return err
-					}
-					remoteBurnable, err := contract.RemoteBurnable(callOpts)
+					contractData, err := m.collectiblesService.GetCollectibleContractData(chainID, address)
 					if err != nil {
 						return err
 					}
 
-					communityToken.Supply = &bigint.BigInt{Int: totalSupply}
-					communityToken.Transferable = transferable
-					communityToken.RemoteSelfDestruct = remoteBurnable
-					communityToken.InfiniteSupply = collectibles.GetInfiniteSupply().Cmp(totalSupply) == 0
+					communityToken.Supply = contractData.TotalSupply
+					communityToken.Transferable = contractData.Transferable
+					communityToken.RemoteSelfDestruct = contractData.RemoteBurnable
+					communityToken.InfiniteSupply = contractData.InfiniteSupply
 
 				case protobuf.CommunityTokenType_ERC20:
-					contract, err := m.collectiblesService.API().GetAssetContractInstance(chainID, address)
+					contractData, err := m.collectiblesService.GetAssetContractData(chainID, address)
 					if err != nil {
 						return err
 					}
-					totalSupply, err := contract.TotalSupply(callOpts)
-					if err != nil {
-						return err
-					}
-					communityToken.Supply = &bigint.BigInt{Int: totalSupply}
-					communityToken.InfiniteSupply = collectibles.GetInfiniteSupply().Cmp(totalSupply) == 0
+
+					communityToken.Supply = contractData.TotalSupply
+					communityToken.InfiniteSupply = contractData.InfiniteSupply
 				}
+
+				communityToken.PrivilegesLevel = getPrivilegesLevel(chainID, address, community.TokenPermissions())
 
 				err = m.persistence.AddCommunityToken(communityToken)
 				if err != nil {
@@ -4652,6 +4670,23 @@ func (m *Manager) HandleCommunityTokensMetadata(communityID string, communityTok
 		}
 	}
 	return nil
+}
+
+func getPrivilegesLevel(chainID uint64, tokenAddress string, tokenPermissions map[string]*protobuf.CommunityTokenPermission) community_token.PrivilegesLevel {
+	for _, permission := range tokenPermissions {
+		if permission.Type == protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER || permission.Type == protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER {
+			for _, tokenCriteria := range permission.TokenCriteria {
+				value, exist := tokenCriteria.ContractAddresses[chainID]
+				if exist && value == tokenAddress {
+					if permission.Type == protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER {
+						return community_token.OwnerLevel
+					}
+					return community_token.MasterLevel
+				}
+			}
+		}
+	}
+	return community_token.CommunityLevel
 }
 
 func (m *Manager) ValidateCommunityPrivilegedUserSyncMessage(message *protobuf.CommunityPrivilegedUserSyncMessage) error {
@@ -4676,16 +4711,21 @@ func (m *Manager) ValidateCommunityPrivilegedUserSyncMessage(message *protobuf.C
 				return errors.New("no communityId in request to join in CommunityPrivilegedUserSyncMessage message")
 			}
 		}
-	case protobuf.CommunityPrivilegedUserSyncMessage_ADD_COMMUNITY_TOKENS:
-		if message.CommunityTokens == nil {
-			return errors.New("invalid add token CommunityPrivilegedUserSyncMessage message")
-		}
-		for _, token := range message.CommunityTokens {
-			if token == nil || len(token.Address) == 0 || len(token.CommunityId) == 0 ||
-				token.ChainId == 0 || len(token.Supply) == 0 {
-				return errors.New("invalid token data in CommunityPrivilegedUserSyncMessage message")
-			}
-		}
 	}
 	return nil
+}
+
+func (m *Manager) createCommunityTokenPermission(request *requests.CreateCommunityTokenPermission, community *Community) (*Community, *CommunityChanges, error) {
+	if community == nil {
+		return nil, nil, ErrOrgNotFound
+	}
+
+	tokenPermission := request.ToCommunityTokenPermission()
+	tokenPermission.Id = uuid.New().String()
+	changes, err := community.AddTokenPermission(&tokenPermission)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return community, changes, nil
 }

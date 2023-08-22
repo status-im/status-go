@@ -113,11 +113,11 @@ func (t AssetInstance) PackMethod(ctx context.Context, methodName string, args .
 // creator
 
 func NewTokenInstance(api *API, chainID uint64, contractAddress string) (TokenInstance, error) {
-	tokenType, err := api.db.GetTokenType(chainID, contractAddress)
+	tokenType, err := api.s.db.GetTokenType(chainID, contractAddress)
 	if err != nil {
 		return nil, err
 	}
-	privLevel, err := api.db.GetTokenPrivilegesLevel(chainID, contractAddress)
+	privLevel, err := api.s.db.GetTokenPrivilegesLevel(chainID, contractAddress)
 	if err != nil {
 		return nil, err
 	}
