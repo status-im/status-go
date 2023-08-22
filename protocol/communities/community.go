@@ -931,7 +931,7 @@ func (o *Community) MemberIdentity() *ecdsa.PublicKey {
 }
 
 // UpdateCommunityDescription will update the community to the new community description and return a list of changes
-func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDescription, rawMessage []byte, allowEqualClock bool) (*CommunityChanges, error) {
+func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDescription, rawMessage []byte) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -945,12 +945,7 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 
 	response := o.emptyCommunityChanges()
 
-	// allowEqualClock == true only if this was a description from the handling request to join sent by an admin
-	if allowEqualClock {
-		if description.Clock < o.config.CommunityDescription.Clock {
-			return response, nil
-		}
-	} else if description.Clock <= o.config.CommunityDescription.Clock {
+	if description.Clock <= o.config.CommunityDescription.Clock {
 		return response, nil
 	}
 

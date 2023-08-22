@@ -121,7 +121,8 @@ type MessengerCommunitiesTokenPermissionsSuite struct {
 	shh    types.Waku
 	logger *zap.Logger
 
-	mockedBalances map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big // chainID, account, token, balance
+	mockedBalances          map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big // chainID, account, token, balance
+	collectiblesServiceMock *CollectiblesServiceMock
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
@@ -158,7 +159,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string) *Messenger {
-	return newMessenger(&s.Suite, s.shh, s.logger, password, walletAddresses, &s.mockedBalances)
+	return newMessenger(&s.Suite, s.shh, s.logger, password, walletAddresses, &s.mockedBalances, s.collectiblesServiceMock)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) joinCommunity(community *communities.Community, user *Messenger, password string, addresses []string) {

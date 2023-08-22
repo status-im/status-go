@@ -29,9 +29,10 @@ type TokenMasterCommunityEventsSuite struct {
 	alice       *Messenger
 	// If one wants to send messages between different instances of Messenger,
 	// a single Waku service should be shared.
-	shh            types.Waku
-	logger         *zap.Logger
-	mockedBalances map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big // chainID, account, token, balance
+	shh                     types.Waku
+	logger                  *zap.Logger
+	mockedBalances          map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big // chainID, account, token, balance
+	collectiblesServiceMock *CollectiblesServiceMock
 }
 
 func (s *TokenMasterCommunityEventsSuite) GetControlNode() *Messenger {
@@ -50,8 +51,13 @@ func (s *TokenMasterCommunityEventsSuite) GetSuite() *suite.Suite {
 	return &s.Suite
 }
 
+func (s *TokenMasterCommunityEventsSuite) GetCollectiblesServiceMock() *CollectiblesServiceMock {
+	return s.collectiblesServiceMock
+}
+
 func (s *TokenMasterCommunityEventsSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
+	s.collectiblesServiceMock = &CollectiblesServiceMock{}
 
 	config := waku.DefaultConfig
 	config.MinimumAcceptedPoW = 0
@@ -80,7 +86,7 @@ func (s *TokenMasterCommunityEventsSuite) TearDownTest() {
 }
 
 func (s *TokenMasterCommunityEventsSuite) newMessenger(password string, walletAddresses []string) *Messenger {
-	return newMessenger(&s.Suite, s.shh, s.logger, password, walletAddresses, &s.mockedBalances)
+	return newMessenger(&s.Suite, s.shh, s.logger, password, walletAddresses, &s.mockedBalances, s.collectiblesServiceMock)
 }
 
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterEditCommunityDescription() {
@@ -240,19 +246,19 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAddTokenMasterAndOwnerT
 	testEventSenderAddTokenMasterAndOwnerToken(s, community)
 }
 
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestTokenMasterSyncOwnerTokenFromControlNode() {
+func (s *TokenMasterCommunityEventsSuite) TestTokenMasterReceiveOwnerTokenFromControlNode() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
-	testAddAndSyncTokenFromControlNode(s, community, token.OwnerLevel, false)
+	testAddAndSyncTokenFromControlNode(s, community, token.OwnerLevel)
 }
 
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestTokenMasterSyncTokenMasterTokenFromControlNode() {
+func (s *TokenMasterCommunityEventsSuite) TestTokenMasterReceiveTokenMasterTokenFromControlNode() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
-	testAddAndSyncTokenFromControlNode(s, community, token.MasterLevel, false)
+	testAddAndSyncTokenFromControlNode(s, community, token.MasterLevel)
 }
 
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestTokenMasterSyncCommunityTokenFromControlNode() {
+func (s *TokenMasterCommunityEventsSuite) TestTokenMasterReceiveCommunityTokenFromControlNode() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
-	testAddAndSyncTokenFromControlNode(s, community, token.CommunityLevel, true)
+	testAddAndSyncTokenFromControlNode(s, community, token.CommunityLevel)
 }
 
 func (s *TokenMasterCommunityEventsSuite) TestMemberReceiveTokenMasterEventsWhenControlNodeOffline() {

@@ -79,7 +79,7 @@ func (s *MessengerCommunitiesSuite) TearDownTest() {
 }
 
 func (s *MessengerCommunitiesSuite) newMessengerWithKey(privateKey *ecdsa.PrivateKey) *Messenger {
-	messenger, err := newCommunitiesTestMessenger(s.shh, privateKey, s.logger, nil, nil)
+	messenger, err := newCommunitiesTestMessenger(s.shh, privateKey, s.logger, nil, nil, nil)
 	s.Require().NoError(err)
 
 	return messenger

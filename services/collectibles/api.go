@@ -2,7 +2,6 @@ package collectibles
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"math/big"
@@ -13,37 +12,26 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts/community-tokens/assets"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/contracts/community-tokens/mastertoken"
 	"github.com/status-im/status-go/contracts/community-tokens/ownertoken"
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	wcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/transactions"
 )
 
-func NewAPI(rpcClient *rpc.Client, accountsManager *account.GethManager, pendingTracker *transactions.PendingTxTracker, config *params.NodeConfig, appDb *sql.DB) *API {
+func NewAPI(s *Service) *API {
 	return &API{
-		RPCClient:       rpcClient,
-		accountsManager: accountsManager,
-		pendingTracker:  pendingTracker,
-		config:          config,
-		db:              NewCommunityTokensDatabase(appDb),
+		s: s,
 	}
 }
 
 type API struct {
-	RPCClient       *rpc.Client
-	accountsManager *account.GethManager
-	pendingTracker  *transactions.PendingTxTracker
-	config          *params.NodeConfig
-	db              *Database
+	s *Service
 }
 
 type DeploymentDetails struct {
@@ -108,9 +96,9 @@ func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deployme
 		return DeploymentDetails{}, err
 	}
 
-	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
+	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
 
-	ethClient, err := api.RPCClient.EthClient(chainID)
+	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
 		log.Error(err.Error())
 		return DeploymentDetails{}, err
@@ -126,7 +114,7 @@ func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deployme
 		return DeploymentDetails{}, err
 	}
 
-	err = api.pendingTracker.TrackPendingTransaction(
+	err = api.s.pendingTracker.TrackPendingTransaction(
 		wcommon.ChainID(chainID),
 		tx.Hash(),
 		common.Address(txArgs.From),
@@ -152,9 +140,9 @@ func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64, ownerToken
 		return DeploymentDetails{}, err
 	}
 
-	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
+	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
 
-	ethClient, err := api.RPCClient.EthClient(chainID)
+	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
 		log.Error(err.Error())
 		return DeploymentDetails{}, err
@@ -171,7 +159,7 @@ func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64, ownerToken
 		return DeploymentDetails{}, err
 	}
 
-	err = api.pendingTracker.TrackPendingTransaction(
+	err = api.s.pendingTracker.TrackPendingTransaction(
 		wcommon.ChainID(chainID),
 		tx.Hash(),
 		common.Address(txArgs.From),
@@ -187,7 +175,7 @@ func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64, ownerToken
 }
 
 func (api *API) GetMasterTokenContractAddressFromHash(ctx context.Context, chainID uint64, txHash string) (string, error) {
-	ethClient, err := api.RPCClient.EthClient(chainID)
+	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
 		return "", err
 	}
@@ -224,9 +212,9 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 		return DeploymentDetails{}, err
 	}
 
-	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
+	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
 
-	ethClient, err := api.RPCClient.EthClient(chainID)
+	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
 		log.Error(err.Error())
 		return DeploymentDetails{}, err
@@ -239,7 +227,7 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 		return DeploymentDetails{}, err
 	}
 
-	err = api.pendingTracker.TrackPendingTransaction(
+	err = api.s.pendingTracker.TrackPendingTransaction(
 		wcommon.ChainID(chainID),
 		tx.Hash(),
 		common.Address(txArgs.From),
@@ -273,7 +261,7 @@ func (api *API) DeployOwnerTokenEstimate(ctx context.Context) (uint64, error) {
 }
 
 func (api *API) NewMasterTokenInstance(chainID uint64, contractAddress string) (*mastertoken.MasterToken, error) {
-	backend, err := api.RPCClient.EthClient(chainID)
+	backend, err := api.s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -281,19 +269,11 @@ func (api *API) NewMasterTokenInstance(chainID uint64, contractAddress string) (
 }
 
 func (api *API) NewCollectiblesInstance(chainID uint64, contractAddress string) (*collectibles.Collectibles, error) {
-	backend, err := api.RPCClient.EthClient(chainID)
-	if err != nil {
-		return nil, err
-	}
-	return collectibles.NewCollectibles(common.HexToAddress(contractAddress), backend)
+	return api.s.manager.NewCollectiblesInstance(chainID, contractAddress)
 }
 
 func (api *API) NewAssetsInstance(chainID uint64, contractAddress string) (*assets.Assets, error) {
-	backend, err := api.RPCClient.EthClient(chainID)
-	if err != nil {
-		return nil, err
-	}
-	return assets.NewAssets(common.HexToAddress(contractAddress), backend)
+	return api.s.manager.NewAssetsInstance(chainID, contractAddress)
 }
 
 // if we want to mint 2 tokens to addresses ["a", "b"] we need to mint
@@ -324,7 +304,7 @@ func (api *API) MintTokens(ctx context.Context, chainID uint64, contractAddress 
 		return "", err
 	}
 
-	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
+	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
 
 	contractInst, err := NewTokenInstance(api, chainID, contractAddress)
 	if err != nil {
@@ -336,7 +316,7 @@ func (api *API) MintTokens(ctx context.Context, chainID uint64, contractAddress 
 		return "", err
 	}
 
-	err = api.pendingTracker.TrackPendingTransaction(
+	err = api.s.pendingTracker.TrackPendingTransaction(
 		wcommon.ChainID(chainID),
 		tx.Hash(),
 		common.Address(txArgs.From),
@@ -352,7 +332,7 @@ func (api *API) MintTokens(ctx context.Context, chainID uint64, contractAddress 
 }
 
 func (api *API) EstimateMintTokens(ctx context.Context, chainID uint64, contractAddress string, fromAddress string, walletAddresses []string, amount *bigint.BigInt) (uint64, error) {
-	tokenType, err := api.db.GetTokenType(chainID, contractAddress)
+	tokenType, err := api.s.db.GetTokenType(chainID, contractAddress)
 	if err != nil {
 		return 0, err
 	}
@@ -429,7 +409,7 @@ func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress 
 		return "", err
 	}
 
-	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
+	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
 
 	var tempTokenIds []*big.Int
 	for _, v := range tokenIds {
@@ -446,7 +426,7 @@ func (api *API) RemoteBurn(ctx context.Context, chainID uint64, contractAddress 
 		return "", err
 	}
 
-	err = api.pendingTracker.TrackPendingTransaction(
+	err = api.s.pendingTracker.TrackPendingTransaction(
 		wcommon.ChainID(chainID),
 		tx.Hash(),
 		common.Address(txArgs.From),
@@ -477,23 +457,15 @@ func (api *API) EstimateRemoteBurn(ctx context.Context, chainID uint64, contract
 }
 
 func (api *API) GetCollectiblesContractInstance(chainID uint64, contractAddress string) (*collectibles.Collectibles, error) {
-	contractInst, err := api.NewCollectiblesInstance(chainID, contractAddress)
-	if err != nil {
-		return nil, err
-	}
-	return contractInst, nil
+	return api.s.manager.GetCollectiblesContractInstance(chainID, contractAddress)
 }
 
 func (api *API) GetAssetContractInstance(chainID uint64, contractAddress string) (*assets.Assets, error) {
-	contractInst, err := api.NewAssetsInstance(chainID, contractAddress)
-	if err != nil {
-		return nil, err
-	}
-	return contractInst, nil
+	return api.s.manager.GetAssetContractInstance(chainID, contractAddress)
 }
 
 func (api *API) RemainingSupply(ctx context.Context, chainID uint64, contractAddress string) (*bigint.BigInt, error) {
-	tokenType, err := api.db.GetTokenType(chainID, contractAddress)
+	tokenType, err := api.s.db.GetTokenType(chainID, contractAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -566,7 +538,7 @@ func (api *API) maxSupplyAssets(ctx context.Context, chainID uint64, contractAdd
 }
 
 func (api *API) maxSupply(ctx context.Context, chainID uint64, contractAddress string) (*big.Int, error) {
-	tokenType, err := api.db.GetTokenType(chainID, contractAddress)
+	tokenType, err := api.s.db.GetTokenType(chainID, contractAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -597,7 +569,7 @@ func (api *API) Burn(ctx context.Context, chainID uint64, contractAddress string
 		return "", err
 	}
 
-	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
+	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
 
 	newMaxSupply, err := api.prepareNewMaxSupply(ctx, chainID, contractAddress, burnAmount)
 	if err != nil {
@@ -614,7 +586,7 @@ func (api *API) Burn(ctx context.Context, chainID uint64, contractAddress string
 		return "", err
 	}
 
-	err = api.pendingTracker.TrackPendingTransaction(
+	err = api.s.pendingTracker.TrackPendingTransaction(
 		wcommon.ChainID(chainID),
 		tx.Hash(),
 		common.Address(txArgs.From),
@@ -675,7 +647,7 @@ func (api *API) validateBurnAmount(ctx context.Context, burnAmount *bigint.BigIn
 }
 
 func (api *API) estimateMethod(ctx context.Context, chainID uint64, contractAddress string, fromAddress string, methodName string, args ...interface{}) (uint64, error) {
-	ethClient, err := api.RPCClient.EthClient(chainID)
+	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
 		log.Error(err.Error())
 		return 0, err

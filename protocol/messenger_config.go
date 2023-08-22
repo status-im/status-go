@@ -87,7 +87,7 @@ type config struct {
 	torrentConfig       *params.TorrentConfig
 	walletConfig        *params.WalletConfig
 	walletService       *wallet.Service
-	collectiblesService *collectibles.Service
+	collectiblesService collectibles.ServiceInterface
 	httpServer          *server.MediaServer
 	rpcClient           *rpc.Client
 	tokenManager        communities.TokenManager
@@ -336,7 +336,7 @@ func WithWalletService(s *wallet.Service) Option {
 	}
 }
 
-func WithCollectiblesService(s *collectibles.Service) Option {
+func WithCollectiblesService(s collectibles.ServiceInterface) Option {
 	return func(c *config) error {
 		c.collectiblesService = s
 		return nil
