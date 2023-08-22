@@ -1659,6 +1659,10 @@ func testAddAndSyncTokenFromControlNode(base CommunityEventsTestsInterface, comm
 			return err
 		}
 
+		if privilegesLvl != token.CommunityLevel && len(modifiedCommmunity.TokenPermissions()) == 0 {
+			return errors.New("Token permissions was not found")
+		}
+
 		for _, tokenMetadata := range modifiedCommmunity.CommunityTokensMetadata() {
 			if tokenMetadata.Name == tokenERC721.Name {
 				return nil
@@ -1675,6 +1679,7 @@ func testAddAndSyncTokenFromControlNode(base CommunityEventsTestsInterface, comm
 	syncTokens, err := base.GetEventSender().communitiesManager.GetAllCommunityTokens()
 	s.Require().NoError(err)
 	s.Require().Len(syncTokens, 1)
+	s.Require().Equal(syncTokens[0].PrivilegesLevel, privilegesLvl)
 
 	// check CommunityToken was not added to the DB
 	syncTokens, err = base.GetMember().communitiesManager.GetAllCommunityTokens()

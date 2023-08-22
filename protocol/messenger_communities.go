@@ -4376,41 +4376,9 @@ func (m *Messenger) AddCommunityToken(communityID string, chainID int, address s
 		return err
 	}
 
-	community, err := m.communitiesManager.AddCommunityToken(communityToken)
+	_, err = m.communitiesManager.AddCommunityToken(communityToken)
 	if err != nil {
 		return err
-	}
-
-	if community.IsControlNode() && (communityToken.PrivilegesLevel == token.MasterLevel || communityToken.PrivilegesLevel == token.OwnerLevel) {
-		permissionType := protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER
-		if communityToken.PrivilegesLevel == token.MasterLevel {
-			permissionType = protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER
-		}
-
-		contractAddresses := make(map[uint64]string)
-		contractAddresses[uint64(communityToken.ChainID)] = communityToken.Address
-
-		tokenCriteria := &protobuf.TokenCriteria{
-			ContractAddresses: contractAddresses,
-			Type:              protobuf.CommunityTokenType_ERC721,
-			Symbol:            communityToken.Symbol,
-			Name:              communityToken.Name,
-			Amount:            "1",
-			Decimals:          uint64(communityToken.Decimals),
-		}
-
-		request := &requests.CreateCommunityTokenPermission{
-			CommunityID:   community.ID(),
-			Type:          permissionType,
-			TokenCriteria: []*protobuf.TokenCriteria{tokenCriteria},
-			IsPrivate:     true,
-			ChatIds:       []string{},
-		}
-
-		_, _, err := m.communitiesManager.CreateCommunityTokenPermission(request)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil

@@ -604,13 +604,8 @@ func (m *Manager) CreateCommunityTokenPermission(request *requests.CreateCommuni
 	if err != nil {
 		return nil, nil, err
 	}
-	if community == nil {
-		return nil, nil, ErrOrgNotFound
-	}
 
-	tokenPermission := request.ToCommunityTokenPermission()
-	tokenPermission.Id = uuid.New().String()
-	changes, err := community.AddTokenPermission(&tokenPermission)
+	community, changes, err := m.createCommunityTokenPermission(request, community)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -4370,6 +4365,38 @@ func (m *Manager) AddCommunityToken(token *community_token.CommunityToken) (*Com
 		return nil, err
 	}
 
+	if community.IsControlNode() && (token.PrivilegesLevel == community_token.MasterLevel || token.PrivilegesLevel == community_token.OwnerLevel) {
+		permissionType := protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER
+		if token.PrivilegesLevel == community_token.MasterLevel {
+			permissionType = protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER
+		}
+
+		contractAddresses := make(map[uint64]string)
+		contractAddresses[uint64(token.ChainID)] = token.Address
+
+		tokenCriteria := &protobuf.TokenCriteria{
+			ContractAddresses: contractAddresses,
+			Type:              protobuf.CommunityTokenType_ERC721,
+			Symbol:            token.Symbol,
+			Name:              token.Name,
+			Amount:            "1",
+			Decimals:          uint64(token.Decimals),
+		}
+
+		request := &requests.CreateCommunityTokenPermission{
+			CommunityID:   community.ID(),
+			Type:          permissionType,
+			TokenCriteria: []*protobuf.TokenCriteria{tokenCriteria},
+			IsPrivate:     true,
+			ChatIds:       []string{},
+		}
+
+		community, _, err = m.createCommunityTokenPermission(request, community)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return community, m.saveAndPublish(community)
 }
 
@@ -4574,14 +4601,21 @@ func (m *Manager) ReevaluatePrivelegedMember(community *Community, tokenPermissi
 
 func (m *Manager) HandleCommunityTokensMetadataByPrivilegedMembers(community *Community) error {
 	if community.HasPermissionToSendCommunityEvents() || community.IsControlNode() {
-		if err := m.HandleCommunityTokensMetadata(community.IDString(), community.CommunityTokensMetadata()); err != nil {
+		if err := m.HandleCommunityTokensMetadata(community); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (m *Manager) HandleCommunityTokensMetadata(communityID string, communityTokens []*protobuf.CommunityTokenMetadata) error {
+func (m *Manager) HandleCommunityTokensMetadata(community *Community) error {
+	communityID := community.IDString()
+	communityTokens := community.CommunityTokensMetadata()
+
+	if len(communityTokens) == 0 {
+		return nil
+	}
+
 	for _, tokenMetadata := range communityTokens {
 		for chainID, address := range tokenMetadata.ContractAddresses {
 			exists, err := m.persistence.HasCommunityToken(communityID, address, int(chainID))
@@ -4589,7 +4623,6 @@ func (m *Manager) HandleCommunityTokensMetadata(communityID string, communityTok
 				return err
 			}
 			if !exists {
-
 				communityToken := &community_token.CommunityToken{
 					CommunityID:        communityID,
 					Address:            address,
@@ -4627,6 +4660,8 @@ func (m *Manager) HandleCommunityTokensMetadata(communityID string, communityTok
 					communityToken.InfiniteSupply = contractData.InfiniteSupply
 				}
 
+				communityToken.PrivilegesLevel = getPrivilegesLevel(chainID, address, community.TokenPermissions())
+
 				err = m.persistence.AddCommunityToken(communityToken)
 				if err != nil {
 					return err
@@ -4635,6 +4670,23 @@ func (m *Manager) HandleCommunityTokensMetadata(communityID string, communityTok
 		}
 	}
 	return nil
+}
+
+func getPrivilegesLevel(chainID uint64, tokenAddress string, tokenPermissions map[string]*protobuf.CommunityTokenPermission) community_token.PrivilegesLevel {
+	for _, permission := range tokenPermissions {
+		if permission.Type == protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER || permission.Type == protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER {
+			for _, tokenCriteria := range permission.TokenCriteria {
+				value, exist := tokenCriteria.ContractAddresses[chainID]
+				if exist && value == tokenAddress {
+					if permission.Type == protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER {
+						return community_token.OwnerLevel
+					}
+					return community_token.MasterLevel
+				}
+			}
+		}
+	}
+	return community_token.CommunityLevel
 }
 
 func (m *Manager) ValidateCommunityPrivilegedUserSyncMessage(message *protobuf.CommunityPrivilegedUserSyncMessage) error {
@@ -4661,4 +4713,19 @@ func (m *Manager) ValidateCommunityPrivilegedUserSyncMessage(message *protobuf.C
 		}
 	}
 	return nil
+}
+
+func (m *Manager) createCommunityTokenPermission(request *requests.CreateCommunityTokenPermission, community *Community) (*Community, *CommunityChanges, error) {
+	if community == nil {
+		return nil, nil, ErrOrgNotFound
+	}
+
+	tokenPermission := request.ToCommunityTokenPermission()
+	tokenPermission.Id = uuid.New().String()
+	changes, err := community.AddTokenPermission(&tokenPermission)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return community, changes, nil
 }
