@@ -7,8 +7,10 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/waku-org/go-waku/waku/v2/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 	wenr "github.com/waku-org/go-waku/waku/v2/protocol/enr"
+	"github.com/waku-org/go-waku/waku/v2/utils"
+	"go.uber.org/zap"
 )
 
 type dnsDiscoveryParameters struct {
@@ -30,6 +32,17 @@ type DiscoveredNode struct {
 	ENR      *enode.Node
 }
 
+var metrics Metrics = nil
+
+// SetPrometheusRegisterer is used to setup a custom prometheus registerer for metrics
+func SetPrometheusRegisterer(reg prometheus.Registerer, logger *zap.Logger) {
+	metrics = newMetrics(reg)
+}
+
+func init() {
+	SetPrometheusRegisterer(prometheus.DefaultRegisterer, utils.Logger())
+}
+
 // RetrieveNodes returns a list of multiaddress given a url to a DNS discoverable ENR tree
 func RetrieveNodes(ctx context.Context, url string, opts ...DnsDiscoveryOption) ([]DiscoveredNode, error) {
 	var discoveredNodes []DiscoveredNode
@@ -45,14 +58,14 @@ func RetrieveNodes(ctx context.Context, url string, opts ...DnsDiscoveryOption) 
 
 	tree, err := client.SyncTree(url)
 	if err != nil {
-		metrics.RecordDnsDiscoveryError(ctx, "tree_sync_failure")
+		metrics.RecordError(treeSyncFailure)
 		return nil, err
 	}
 
 	for _, node := range tree.Nodes() {
 		peerID, m, err := wenr.Multiaddress(node)
 		if err != nil {
-			metrics.RecordDnsDiscoveryError(ctx, "peer_info_failure")
+			metrics.RecordError(peerInfoFailure)
 			return nil, err
 		}
 
@@ -80,6 +93,8 @@ func RetrieveNodes(ctx context.Context, url string, opts ...DnsDiscoveryOption) 
 
 		discoveredNodes = append(discoveredNodes, d)
 	}
+
+	metrics.RecordDiscoveredNodes(len(discoveredNodes))
 
 	return discoveredNodes, nil
 }

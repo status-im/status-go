@@ -6,6 +6,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
@@ -15,14 +16,15 @@ type (
 	FilterSubscribeParameters struct {
 		host         host.Host
 		selectedPeer peer.ID
-		requestId    []byte
+		pm           *peermanager.PeerManager
+		requestID    []byte
 		log          *zap.Logger
 	}
 
 	FilterUnsubscribeParameters struct {
 		unsubscribeAll bool
 		selectedPeer   peer.ID
-		requestId      []byte
+		requestID      []byte
 		log            *zap.Logger
 	}
 
@@ -54,7 +56,13 @@ func WithPeer(p peer.ID) FilterSubscribeOption {
 // supports the chosen protocol, otherwise it will chose a peer from the node peerstore
 func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) FilterSubscribeOption {
 	return func(params *FilterSubscribeParameters) {
-		p, err := utils.SelectPeer(params.host, FilterSubscribeID_v20beta1, fromThesePeers, params.log)
+		var p peer.ID
+		var err error
+		if params.pm == nil {
+			p, err = utils.SelectPeer(params.host, FilterSubscribeID_v20beta1, fromThesePeers, params.log)
+		} else {
+			p, err = params.pm.SelectPeer(FilterSubscribeID_v20beta1, fromThesePeers, params.log)
+		}
 		if err == nil {
 			params.selectedPeer = p
 		} else {
@@ -78,22 +86,26 @@ func WithFastestPeerSelection(ctx context.Context, fromThesePeers ...peer.ID) Fi
 	}
 }
 
-func WithRequestId(requestId []byte) FilterSubscribeOption {
+// WithRequestID is an option to set a specific request ID to be used when
+// creating a filter subscription
+func WithRequestID(requestID []byte) FilterSubscribeOption {
 	return func(params *FilterSubscribeParameters) {
-		params.requestId = requestId
+		params.requestID = requestID
 	}
 }
 
-func WithAutomaticRequestId() FilterSubscribeOption {
+// WithAutomaticRequestID is an option to automatically generate a request ID
+// when creating a filter subscription
+func WithAutomaticRequestID() FilterSubscribeOption {
 	return func(params *FilterSubscribeParameters) {
-		params.requestId = protocol.GenerateRequestId()
+		params.requestID = protocol.GenerateRequestId()
 	}
 }
 
 func DefaultSubscriptionOptions() []FilterSubscribeOption {
 	return []FilterSubscribeOption{
 		WithAutomaticPeerSelection(),
-		WithAutomaticRequestId(),
+		WithAutomaticRequestID(),
 	}
 }
 
@@ -109,15 +121,17 @@ func Peer(p peer.ID) FilterUnsubscribeOption {
 	}
 }
 
-func RequestID(requestId []byte) FilterUnsubscribeOption {
+// RequestID is an option to set a specific request ID to be used when
+// removing a subscription from a filter node
+func RequestID(requestID []byte) FilterUnsubscribeOption {
 	return func(params *FilterUnsubscribeParameters) {
-		params.requestId = requestId
+		params.requestID = requestID
 	}
 }
 
 func AutomaticRequestId() FilterUnsubscribeOption {
 	return func(params *FilterUnsubscribeParameters) {
-		params.requestId = protocol.GenerateRequestId()
+		params.requestID = protocol.GenerateRequestId()
 	}
 }
 

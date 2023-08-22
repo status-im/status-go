@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/waku-org/go-waku/logging"
-	"github.com/waku-org/go-waku/waku/v2/metrics"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
@@ -84,7 +83,7 @@ type criteriaFN = func(msg *wpb.WakuMessage) (bool, error)
 type HistoryRequestParameters struct {
 	selectedPeer peer.ID
 	localQuery   bool
-	requestId    []byte
+	requestID    []byte
 	cursor       *pb.Index
 	pageSize     uint64
 	asc          bool
@@ -107,7 +106,13 @@ func WithPeer(p peer.ID) HistoryRequestOption {
 // from the node peerstore
 func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) HistoryRequestOption {
 	return func(params *HistoryRequestParameters) {
-		p, err := utils.SelectPeer(params.s.h, StoreID_v20beta4, fromThesePeers, params.s.log)
+		var p peer.ID
+		var err error
+		if params.s.pm == nil {
+			p, err = utils.SelectPeer(params.s.h, StoreID_v20beta4, fromThesePeers, params.s.log)
+		} else {
+			p, err = params.s.pm.SelectPeer(StoreID_v20beta4, fromThesePeers, params.s.log)
+		}
 		if err == nil {
 			params.selectedPeer = p
 		} else {
@@ -131,15 +136,19 @@ func WithFastestPeerSelection(ctx context.Context, fromThesePeers ...peer.ID) Hi
 	}
 }
 
-func WithRequestId(requestId []byte) HistoryRequestOption {
+// WithRequestID is an option to set a specific request ID to be used when
+// creating a store request
+func WithRequestID(requestID []byte) HistoryRequestOption {
 	return func(params *HistoryRequestParameters) {
-		params.requestId = requestId
+		params.requestID = requestID
 	}
 }
 
-func WithAutomaticRequestId() HistoryRequestOption {
+// WithAutomaticRequestID is an option to automatically generate a request ID
+// when creating a store request
+func WithAutomaticRequestID() HistoryRequestOption {
 	return func(params *HistoryRequestParameters) {
-		params.requestId = protocol.GenerateRequestId()
+		params.requestID = protocol.GenerateRequestId()
 	}
 }
 
@@ -166,20 +175,20 @@ func WithLocalQuery() HistoryRequestOption {
 // Default options to be used when querying a store node for results
 func DefaultOptions() []HistoryRequestOption {
 	return []HistoryRequestOption{
-		WithAutomaticRequestId(),
+		WithAutomaticRequestID(),
 		WithAutomaticPeerSelection(),
 		WithPaging(true, MaxPageSize),
 	}
 }
 
-func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selectedPeer peer.ID, requestId []byte) (*pb.HistoryResponse, error) {
+func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selectedPeer peer.ID, requestID []byte) (*pb.HistoryResponse, error) {
 	logger := store.log.With(logging.HostID("peer", selectedPeer))
 	logger.Info("querying message history")
 
 	connOpt, err := store.h.NewStream(ctx, selectedPeer, StoreID_v20beta4)
 	if err != nil {
 		logger.Error("creating stream to peer", zap.Error(err))
-		metrics.RecordStoreError(store.ctx, "dial_failure")
+		store.metrics.RecordError(dialFailure)
 		return nil, err
 	}
 
@@ -188,7 +197,7 @@ func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selec
 		_ = connOpt.Reset()
 	}()
 
-	historyRequest := &pb.HistoryRPC{Query: q, RequestId: hex.EncodeToString(requestId)}
+	historyRequest := &pb.HistoryRPC{Query: q, RequestId: hex.EncodeToString(requestID)}
 
 	writer := pbio.NewDelimitedWriter(connOpt)
 	reader := pbio.NewDelimitedReader(connOpt, math.MaxInt32)
@@ -196,7 +205,7 @@ func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selec
 	err = writer.WriteMsg(historyRequest)
 	if err != nil {
 		logger.Error("writing request", zap.Error(err))
-		metrics.RecordStoreError(store.ctx, "write_request_failure")
+		store.metrics.RecordError(writeRequestFailure)
 		return nil, err
 	}
 
@@ -204,7 +213,7 @@ func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selec
 	err = reader.ReadMsg(historyResponseRPC)
 	if err != nil {
 		logger.Error("reading response", zap.Error(err))
-		metrics.RecordStoreError(store.ctx, "decode_rpc_failure")
+		store.metrics.RecordError(decodeRPCFailure)
 		return nil, err
 	}
 
@@ -218,7 +227,7 @@ func (store *WakuStore) queryFrom(ctx context.Context, q *pb.HistoryQuery, selec
 	return historyResponseRPC.Response, nil
 }
 
-func (store *WakuStore) localQuery(query *pb.HistoryQuery, requestId []byte) (*pb.HistoryResponse, error) {
+func (store *WakuStore) localQuery(query *pb.HistoryQuery, requestID []byte) (*pb.HistoryResponse, error) {
 	logger := store.log
 	logger.Info("querying local message history")
 
@@ -227,7 +236,7 @@ func (store *WakuStore) localQuery(query *pb.HistoryQuery, requestId []byte) (*p
 	}
 
 	historyResponseRPC := &pb.HistoryRPC{
-		RequestId: hex.EncodeToString(requestId),
+		RequestId: hex.EncodeToString(requestID),
 		Response:  store.FindMessages(query),
 	}
 
@@ -268,11 +277,11 @@ func (store *WakuStore) Query(ctx context.Context, query Query, opts ...HistoryR
 	}
 
 	if !params.localQuery && params.selectedPeer == "" {
-		metrics.RecordStoreError(ctx, "peer_not_found_failure")
+		store.metrics.RecordError(peerNotFoundFailure)
 		return nil, ErrNoPeersAvailable
 	}
 
-	if len(params.requestId) == 0 {
+	if len(params.requestID) == 0 {
 		return nil, ErrInvalidId
 	}
 
@@ -296,9 +305,9 @@ func (store *WakuStore) Query(ctx context.Context, query Query, opts ...HistoryR
 	var err error
 
 	if params.localQuery {
-		response, err = store.localQuery(q, params.requestId)
+		response, err = store.localQuery(q, params.requestID)
 	} else {
-		response, err = store.queryFrom(ctx, q, params.selectedPeer, params.requestId)
+		response, err = store.queryFrom(ctx, q, params.selectedPeer, params.requestID)
 	}
 	if err != nil {
 		return nil, err

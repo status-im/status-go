@@ -12,8 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/host/eventbus"
-	"go.opencensus.io/stats"
-	"go.opencensus.io/tag"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	proto "google.golang.org/protobuf/proto"
 
@@ -21,16 +20,18 @@ import (
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/waku-org/go-waku/logging"
 	"github.com/waku-org/go-waku/waku/v2/hash"
-	"github.com/waku-org/go-waku/waku/v2/metrics"
 	waku_proto "github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 )
 
+// WakuRelayID_v200 is the current protocol ID used for WakuRelay
 const WakuRelayID_v200 = protocol.ID("/vac/waku/relay/2.0.0")
 
+// DefaultWakuTopic is the default pubsub topic used across all Waku protocols
 var DefaultWakuTopic string = waku_proto.DefaultPubsubTopic().String()
 
+// WakuRelay is the implementation of the Waku Relay protocol
 type WakuRelay struct {
 	host                host.Host
 	opts                []pubsub.Option
@@ -40,6 +41,7 @@ type WakuRelay struct {
 	peerScoreThresholds *pubsub.PeerScoreThresholds
 	topicParams         *pubsub.TopicScoreParams
 	timesource          timesource.Timesource
+	metrics             Metrics
 
 	log *zap.Logger
 
@@ -78,7 +80,7 @@ func msgIdFn(pmsg *pubsub_pb.Message) string {
 }
 
 // NewWakuRelay returns a new instance of a WakuRelay struct
-func NewWakuRelay(bcaster Broadcaster, minPeersToPublish int, timesource timesource.Timesource, log *zap.Logger, opts ...pubsub.Option) *WakuRelay {
+func NewWakuRelay(bcaster Broadcaster, minPeersToPublish int, timesource timesource.Timesource, reg prometheus.Registerer, log *zap.Logger, opts ...pubsub.Option) *WakuRelay {
 	w := new(WakuRelay)
 	w.timesource = timesource
 	w.wakuRelayTopics = make(map[string]*pubsub.Topic)
@@ -88,6 +90,7 @@ func NewWakuRelay(bcaster Broadcaster, minPeersToPublish int, timesource timesou
 	w.wg = sync.WaitGroup{}
 	w.log = log.Named("relay")
 	w.events = eventbus.NewBus()
+	w.metrics = newMetrics(reg, w.log)
 
 	cfg := pubsub.DefaultGossipSubParams()
 	cfg.PruneBackoff = time.Minute
@@ -176,6 +179,7 @@ func NewWakuRelay(bcaster Broadcaster, minPeersToPublish int, timesource timesou
 		pubsub.WithSeenMessagesTTL(2 * time.Minute),
 		pubsub.WithPeerScore(w.peerScoreParams, w.peerScoreThresholds),
 		pubsub.WithPeerScoreInspect(w.peerScoreInspector, 6*time.Second),
+		// TODO: to improve - setup default validator only if no default validator has been set.
 		pubsub.WithDefaultValidator(func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool {
 			msg := new(pb.WakuMessage)
 			err := proto.Unmarshal(message.Data, msg)
@@ -202,11 +206,12 @@ func (w *WakuRelay) peerScoreInspector(peerScoresSnapshots map[peer.ID]*pubsub.P
 	}
 }
 
-// Sets the host to be able to mount or consume a protocol
+// SetHost sets the host to be able to mount or consume a protocol
 func (w *WakuRelay) SetHost(h host.Host) {
 	w.host = h
 }
 
+// Start initiates the WakuRelay protocol
 func (w *WakuRelay) Start(ctx context.Context) error {
 	w.wg.Wait()
 	ctx, cancel := context.WithCancel(ctx)
@@ -249,6 +254,7 @@ func (w *WakuRelay) Topics() []string {
 	return result
 }
 
+// IsSubscribed indicates whether the node is subscribed to a pubsub topic or not
 func (w *WakuRelay) IsSubscribed(topic string) bool {
 	defer w.topicsMutex.Unlock()
 	w.topicsMutex.Lock()
@@ -450,16 +456,10 @@ func (w *WakuRelay) nextMessage(ctx context.Context, sub *pubsub.Subscription) <
 func (w *WakuRelay) subscribeToTopic(pubsubTopic string, sub *pubsub.Subscription) {
 	defer w.wg.Done()
 
-	ctx, err := tag.New(w.ctx, tag.Insert(metrics.KeyType, "relay"))
-	if err != nil {
-		w.log.Error("creating tag map", zap.Error(err))
-		return
-	}
-
 	subChannel := w.nextMessage(w.ctx, sub)
 	for {
 		select {
-		case <-ctx.Done():
+		case <-w.ctx.Done():
 			return
 			// TODO: if there are no more relay subscriptions, close the pubsub subscription
 		case msg, ok := <-subChannel:
@@ -472,12 +472,9 @@ func (w *WakuRelay) subscribeToTopic(pubsubTopic string, sub *pubsub.Subscriptio
 				return
 			}
 
-			payloadSizeInBytes := len(wakuMessage.Payload)
-			payloadSizeInKb := payloadSizeInBytes / 1000
-			stats.Record(ctx, metrics.Messages.M(1), metrics.MessageSize.M(int64(payloadSizeInKb)))
-
 			envelope := waku_proto.NewEnvelope(wakuMessage, w.timesource.Now().UnixNano(), pubsubTopic)
-			w.log.Debug("waku.relay received", zap.String("pubsubTopic", pubsubTopic), logging.HexString("hash", envelope.Hash()), zap.Int64("receivedTime", envelope.Index().ReceiverTime), zap.Int("payloadSizeBytes", payloadSizeInBytes))
+
+			w.metrics.RecordMessage(envelope)
 
 			if w.bcaster != nil {
 				w.bcaster.Submit(envelope)
@@ -487,6 +484,7 @@ func (w *WakuRelay) subscribeToTopic(pubsubTopic string, sub *pubsub.Subscriptio
 
 }
 
+// Params returns the gossipsub configuration parameters used by WakuRelay
 func (w *WakuRelay) Params() pubsub.GossipSubParams {
 	return w.params
 }

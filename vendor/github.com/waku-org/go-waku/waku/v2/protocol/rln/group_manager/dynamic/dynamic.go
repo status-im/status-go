@@ -2,16 +2,18 @@ package dynamic
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/waku-org/go-waku/logging"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln/contracts"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln/keystore"
@@ -21,14 +23,15 @@ import (
 )
 
 var RLNAppInfo = keystore.AppInfo{
-	Application:   "go-waku-rln-relay",
+	Application:   "waku-rln-relay",
 	AppIdentifier: "01234567890abcdef",
 	Version:       "0.1",
 }
 
 type DynamicGroupManager struct {
-	rln *rln.RLN
-	log *zap.Logger
+	rln     *rln.RLN
+	log     *zap.Logger
+	metrics Metrics
 
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -37,24 +40,21 @@ type DynamicGroupManager struct {
 	membershipIndex    *rln.MembershipIndex
 
 	membershipContractAddress common.Address
+	membershipGroupIndex      uint
 	ethClientAddress          string
 	ethClient                 *ethclient.Client
 
-	// ethAccountPrivateKey is required for signing transactions
-	// TODO may need to erase this ethAccountPrivateKey when is not used
-	// TODO may need to make ethAccountPrivateKey mandatory
-	ethAccountPrivateKey *ecdsa.PrivateKey
+	lastBlockProcessed uint64
 
 	eventHandler RegistrationEventHandler
 
-	registrationHandler RegistrationHandler
-	chainId             *big.Int
-	rlnContract         *contracts.RLN
-	membershipFee       *big.Int
+	chainId     *big.Int
+	rlnContract *contracts.RLN
 
 	saveKeystore     bool
 	keystorePath     string
 	keystorePassword string
+	keystoreIndex    uint
 
 	rootTracker *group_manager.MerkleRootTracker
 }
@@ -62,14 +62,16 @@ type DynamicGroupManager struct {
 func handler(gm *DynamicGroupManager, events []*contracts.RLNMemberRegistered) error {
 	toRemoveTable := om.New()
 	toInsertTable := om.New()
+
+	lastBlockProcessed := gm.lastBlockProcessed
 	for _, event := range events {
 		if event.Raw.Removed {
-			var indexes []uint64
+			var indexes []uint
 			i_idx, ok := toRemoveTable.Get(event.Raw.BlockNumber)
 			if ok {
-				indexes = i_idx.([]uint64)
+				indexes = i_idx.([]uint)
 			}
-			indexes = append(indexes, event.Index.Uint64())
+			indexes = append(indexes, uint(event.Index.Uint64()))
 			toRemoveTable.Set(event.Raw.BlockNumber, indexes)
 		} else {
 			var eventsPerBlock []*contracts.RLNMemberRegistered
@@ -79,6 +81,10 @@ func handler(gm *DynamicGroupManager, events []*contracts.RLNMemberRegistered) e
 			}
 			eventsPerBlock = append(eventsPerBlock, event)
 			toInsertTable.Set(event.Raw.BlockNumber, eventsPerBlock)
+
+			if event.Raw.BlockNumber > lastBlockProcessed {
+				lastBlockProcessed = event.Raw.BlockNumber
+			}
 		}
 	}
 
@@ -92,6 +98,21 @@ func handler(gm *DynamicGroupManager, events []*contracts.RLNMemberRegistered) e
 		return err
 	}
 
+	gm.metrics.RecordRegisteredMembership(toInsertTable.Len() - toRemoveTable.Len())
+
+	gm.lastBlockProcessed = lastBlockProcessed
+	err = gm.SetMetadata(RLNMetadata{
+		LastProcessedBlock: gm.lastBlockProcessed,
+		ChainID:            gm.chainId,
+		ContractAddress:    gm.membershipContractAddress,
+	})
+	if err != nil {
+		// this is not a fatal error, hence we don't raise an exception
+		gm.log.Warn("failed to persist rln metadata", zap.Error(err))
+	} else {
+		gm.log.Debug("rln metadata persisted", zap.Uint64("lastProcessedBlock", gm.lastBlockProcessed), zap.Uint64("chainID", gm.chainId.Uint64()), logging.HexBytes("contractAddress", gm.membershipContractAddress[:]))
+	}
+
 	return nil
 }
 
@@ -99,12 +120,13 @@ type RegistrationHandler = func(tx *types.Transaction)
 
 func NewDynamicGroupManager(
 	ethClientAddr string,
-	ethAccountPrivateKey *ecdsa.PrivateKey,
 	memContractAddr common.Address,
+	membershipGroupIndex uint,
 	keystorePath string,
 	keystorePassword string,
+	keystoreIndex uint,
 	saveKeystore bool,
-	registrationHandler RegistrationHandler,
+	reg prometheus.Registerer,
 	log *zap.Logger,
 ) (*DynamicGroupManager, error) {
 	log = log.Named("rln-dynamic")
@@ -122,25 +144,20 @@ func NewDynamicGroupManager(
 	}
 
 	return &DynamicGroupManager{
+		membershipGroupIndex:      membershipGroupIndex,
 		membershipContractAddress: memContractAddr,
 		ethClientAddress:          ethClientAddr,
-		ethAccountPrivateKey:      ethAccountPrivateKey,
-		registrationHandler:       registrationHandler,
 		eventHandler:              handler,
 		saveKeystore:              saveKeystore,
 		keystorePath:              path,
 		keystorePassword:          password,
+		keystoreIndex:             keystoreIndex,
 		log:                       log,
+		metrics:                   newMetrics(reg),
 	}, nil
 }
 
 func (gm *DynamicGroupManager) getMembershipFee(ctx context.Context) (*big.Int, error) {
-	auth, err := bind.NewKeyedTransactorWithChainID(gm.ethAccountPrivateKey, gm.chainId)
-	if err != nil {
-		return nil, err
-	}
-	auth.Context = ctx
-
 	return gm.rlnContract.MEMBERSHIPDEPOSIT(&bind.CallOpts{Context: ctx})
 }
 
@@ -174,58 +191,40 @@ func (gm *DynamicGroupManager) Start(ctx context.Context, rlnInstance *rln.RLN, 
 	}
 
 	// check if the contract exists by calling a static function
-	gm.membershipFee, err = gm.getMembershipFee(ctx)
+	_, err = gm.getMembershipFee(ctx)
 	if err != nil {
 		return err
 	}
 
 	if gm.identityCredential == nil && gm.keystorePassword != "" && gm.keystorePath != "" {
+		start := time.Now()
 		credentials, err := keystore.GetMembershipCredentials(gm.log,
 			gm.keystorePath,
 			gm.keystorePassword,
 			RLNAppInfo,
 			nil,
 			[]keystore.MembershipContract{{
-				ChainId: gm.chainId.String(),
+				ChainId: fmt.Sprintf("0x%X", gm.chainId),
 				Address: gm.membershipContractAddress.Hex(),
 			}})
 		if err != nil {
 			return err
 		}
+		gm.metrics.RecordMembershipCredentialsImportDuration(time.Since(start))
 
-		// TODO: accept an index from the config
 		if len(credentials) != 0 {
-			gm.identityCredential = &credentials[0].IdentityCredential
-			gm.membershipIndex = &credentials[0].MembershipGroups[0].TreeIndex
+			if int(gm.keystoreIndex) <= len(credentials)-1 {
+				credential := credentials[gm.keystoreIndex]
+				gm.identityCredential = credential.IdentityCredential
+				if int(gm.membershipGroupIndex) <= len(credential.MembershipGroups)-1 {
+					gm.membershipIndex = &credential.MembershipGroups[gm.membershipGroupIndex].TreeIndex
+				} else {
+					return errors.New("invalid membership group index")
+				}
+			} else {
+				return errors.New("invalid keystore index")
+			}
 		}
-	}
-
-	if gm.identityCredential == nil && gm.ethAccountPrivateKey == nil {
-		return errors.New("either a credentials path or a private key must be specified")
-	}
-
-	// prepare rln membership key pair
-	if gm.identityCredential == nil && gm.ethAccountPrivateKey != nil {
-		gm.log.Info("no rln-relay key is provided, generating one")
-		identityCredential, err := rlnInstance.MembershipKeyGen()
-		if err != nil {
-			return err
-		}
-
-		gm.identityCredential = identityCredential
-
-		// register the rln-relay peer to the membership contract
-		gm.membershipIndex, err = gm.Register(ctx)
-		if err != nil {
-			return err
-		}
-
-		err = gm.persistCredentials()
-		if err != nil {
-			return err
-		}
-
-		gm.log.Info("registered peer into the membership contract")
 	}
 
 	if gm.identityCredential == nil || gm.membershipIndex == nil {
@@ -239,48 +238,33 @@ func (gm *DynamicGroupManager) Start(ctx context.Context, rlnInstance *rln.RLN, 
 	return nil
 }
 
-func (gm *DynamicGroupManager) persistCredentials() error {
-	if !gm.saveKeystore {
-		return nil
-	}
-
-	if gm.identityCredential == nil || gm.membershipIndex == nil {
-		return errors.New("no credentials to persist")
-	}
-
-	keystoreCred := keystore.MembershipCredentials{
-		IdentityCredential: *gm.identityCredential,
-		MembershipGroups: []keystore.MembershipGroup{{
-			TreeIndex: *gm.membershipIndex,
-			MembershipContract: keystore.MembershipContract{
-				ChainId: gm.chainId.String(),
-				Address: gm.membershipContractAddress.String(),
-			},
-		}},
-	}
-
-	err := keystore.AddMembershipCredentials(gm.keystorePath, []keystore.MembershipCredentials{keystoreCred}, gm.keystorePassword, RLNAppInfo, keystore.DefaultSeparator)
-	if err != nil {
-		return fmt.Errorf("failed to persist credentials: %w", err)
-	}
-
-	return nil
-}
-
 func (gm *DynamicGroupManager) InsertMembers(toInsert *om.OrderedMap) error {
 	for pair := toInsert.Oldest(); pair != nil; pair = pair.Next() {
 		events := pair.Value.([]*contracts.RLNMemberRegistered) // TODO: should these be sortered by index? we assume all members arrive in order
+		var idCommitments []rln.IDCommitment
+		var oldestIndexInBlock *big.Int
 		for _, evt := range events {
-			pubkey := rln.Bytes32(evt.Pubkey.Bytes())
-			// TODO: should we track indexes to identify missing?
-			err := gm.rln.InsertMember(pubkey)
-			if err != nil {
-				gm.log.Error("inserting member into merkletree", zap.Error(err))
-				return err
+			if oldestIndexInBlock == nil {
+				oldestIndexInBlock = evt.Index
 			}
+			idCommitments = append(idCommitments, rln.BigIntToBytes32(evt.IdCommitment))
 		}
 
-		_, err := gm.rootTracker.UpdateLatestRoot(pair.Key.(uint64))
+		if len(idCommitments) == 0 {
+			continue
+		}
+
+		// TODO: should we track indexes to identify missing?
+		startIndex := rln.MembershipIndex(uint(oldestIndexInBlock.Int64()))
+		start := time.Now()
+		err := gm.rln.InsertMembers(startIndex, idCommitments)
+		if err != nil {
+			gm.log.Error("inserting members into merkletree", zap.Error(err))
+			return err
+		}
+		gm.metrics.RecordMembershipInsertionDuration(time.Since(start))
+
+		_, err = gm.rootTracker.UpdateLatestRoot(pair.Key.(uint64))
 		if err != nil {
 			return err
 		}
@@ -290,13 +274,11 @@ func (gm *DynamicGroupManager) InsertMembers(toInsert *om.OrderedMap) error {
 
 func (gm *DynamicGroupManager) RemoveMembers(toRemove *om.OrderedMap) error {
 	for pair := toRemove.Newest(); pair != nil; pair = pair.Prev() {
-		memberIndexes := pair.Value.([]uint64)
-		for _, index := range memberIndexes {
-			err := gm.rln.DeleteMember(uint(index))
-			if err != nil {
-				gm.log.Error("deleting member", zap.Error(err))
-				return err
-			}
+		memberIndexes := pair.Value.([]uint)
+		err := gm.rln.DeleteMembers(memberIndexes)
+		if err != nil {
+			gm.log.Error("deleting members", zap.Error(err))
+			return err
 		}
 		gm.rootTracker.Backfill(pair.Key.(uint64))
 	}
@@ -312,11 +294,6 @@ func (gm *DynamicGroupManager) IdentityCredentials() (rln.IdentityCredential, er
 	return *gm.identityCredential, nil
 }
 
-func (gm *DynamicGroupManager) SetCredentials(identityCredential *rln.IdentityCredential, index *rln.MembershipIndex) {
-	gm.identityCredential = identityCredential
-	gm.membershipIndex = index
-}
-
 func (gm *DynamicGroupManager) MembershipIndex() (rln.MembershipIndex, error) {
 	if gm.membershipIndex == nil {
 		return 0, errors.New("membership index has not been setup")
@@ -325,11 +302,21 @@ func (gm *DynamicGroupManager) MembershipIndex() (rln.MembershipIndex, error) {
 	return *gm.membershipIndex, nil
 }
 
-func (gm *DynamicGroupManager) Stop() {
+// Stop stops all go-routines, eth client and closes the rln database
+func (gm *DynamicGroupManager) Stop() error {
 	if gm.cancel == nil {
-		return
+		return nil
 	}
 
 	gm.cancel()
+
+	err := gm.rln.Flush()
+	if err != nil {
+		return err
+	}
+	gm.ethClient.Close()
+
 	gm.wg.Wait()
+
+	return nil
 }

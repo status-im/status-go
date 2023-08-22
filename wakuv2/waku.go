@@ -55,7 +55,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/metrics"
 
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
-	"github.com/waku-org/go-waku/waku/v2/peers"
+	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
@@ -273,7 +273,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		node.WithHostAddress(hostAddr),
 		node.WithConnectionStatusChannel(waku.connStatusChan),
 		node.WithKeepAlive(time.Duration(cfg.KeepAliveInterval) * time.Second),
-		node.WithDiscoverParams(cfg.DiscoveryLimit),
+		node.WithMaxPeerConnections(cfg.DiscoveryLimit),
 		node.WithLogger(logger),
 	}
 
@@ -1677,7 +1677,7 @@ func (w *Waku) AddStorePeer(address string) (peer.ID, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, peers.Static, store.StoreID_v20beta4)
+	peerID, err := w.node.AddPeer(addr, wps.Static, store.StoreID_v20beta4)
 	if err != nil {
 		return "", err
 	}
@@ -1694,7 +1694,7 @@ func (w *Waku) AddRelayPeer(address string) (peer.ID, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, peers.Static, relay.WakuRelayID_v200)
+	peerID, err := w.node.AddPeer(addr, wps.Static, relay.WakuRelayID_v200)
 	if err != nil {
 		return "", err
 	}

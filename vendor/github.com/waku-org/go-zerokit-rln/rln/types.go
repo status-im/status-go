@@ -3,6 +3,7 @@ package rln
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"time"
 )
 
@@ -62,6 +63,53 @@ type RateLimitProof struct {
 	RLNIdentifier RLNIdentifier `json:"rlnIdentifier"`
 }
 
+type TreeDepth int
+
+const (
+	TreeDepth20 TreeDepth = 20
+	TreeDepth15 TreeDepth = 15
+	TreeDepth19 TreeDepth = 19
+)
+
+const DefaultTreeDepth = TreeDepth20
+
+type TreeMode string
+
+const (
+	HighThroughput TreeMode = "HighThroughput"
+	LowSpace       TreeMode = "LowSpace"
+)
+
+type TreeConfig struct {
+	CacheCapacity int
+	Mode          TreeMode
+	Compression   bool
+	FlushInterval time.Duration
+	Path          string
+}
+
+func (t TreeConfig) MarshalJSON() ([]byte, error) {
+	output := struct {
+		CacheCapacity int      `json:"cache_capacity"`
+		Mode          TreeMode `json:"mode"`
+		Compression   bool     `json:"compression"`
+		FlushInterval uint     `json:"flush_every_ms"`
+		Path          string   `json:"path"`
+	}{
+		CacheCapacity: t.CacheCapacity,
+		Mode:          t.Mode,
+		Compression:   t.Compression,
+		FlushInterval: uint(t.FlushInterval) / uint(time.Millisecond),
+		Path:          t.Path,
+	}
+	return json.Marshal(output)
+}
+
+type config struct {
+	ResourcesFolder string      `json:"resources_folder"`
+	TreeConfig      *TreeConfig `json:"tree_config,omitempty"`
+}
+
 type MembershipIndex = uint
 
 type ProofMetadata struct {
@@ -104,7 +152,7 @@ func init() {
 // STATIC_GROUP_MERKLE_ROOT is the root of the Merkle tree constructed from the STATIC_GROUP_KEYS above
 // only identity commitments are used for the Merkle tree construction
 // the root is created locally, using createMembershipList proc from waku_rln_relay_utils module, and the result is hardcoded in here
-const STATIC_GROUP_MERKLE_ROOT = "25caa6e82a7476394b0ad5bfbca174a0a842479e70eaaeee14fa8096e49072ca"
+const STATIC_GROUP_MERKLE_ROOT = "ca7290e49680fa14eeaeea709e4742a8a074a1bcbfd50a4b3976742ae8a6ca25"
 
 const EPOCH_UNIT_SECONDS = uint64(10) // the rln-relay epoch length in seconds
 

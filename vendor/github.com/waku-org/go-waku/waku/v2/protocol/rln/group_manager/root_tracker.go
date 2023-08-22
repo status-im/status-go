@@ -1,6 +1,7 @@
 package group_manager
 
 import (
+	"bytes"
 	"sync"
 
 	"github.com/waku-org/go-zerokit-rln/rln"
@@ -73,6 +74,25 @@ func (m *MerkleRootTracker) Backfill(fromBlockNumber uint64) {
 		m.validMerkleRoots = append([]RootsPerBlock{x}, m.validMerkleRoots...)
 		m.merkleRootBuffer = newRootBuffer
 	}
+}
+
+// ContainsRoot is used to check whether a merkle tree root is contained in the list of valid merkle roots or not
+func (m *MerkleRootTracker) ContainsRoot(root [32]byte) bool {
+	return m.IndexOf(root) > -1
+}
+
+// IndexOf returns the index of a root if present in the list of valid merkle roots
+func (m *MerkleRootTracker) IndexOf(root [32]byte) int {
+	m.RLock()
+	defer m.RUnlock()
+
+	for i := range m.validMerkleRoots {
+		if bytes.Equal(m.validMerkleRoots[i].root[:], root[:]) {
+			return i
+		}
+	}
+
+	return -1
 }
 
 func (m *MerkleRootTracker) UpdateLatestRoot(blockNumber uint64) (rln.MerkleNode, error) {

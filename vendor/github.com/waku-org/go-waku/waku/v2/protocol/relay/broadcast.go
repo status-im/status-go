@@ -86,6 +86,7 @@ func (b *chStore) close() {
 	b.topicToChans = nil
 }
 
+// Broadcaster is used to create a fanout for an envelope that will be received by any subscriber interested in the topic of the message
 type Broadcaster interface {
 	Start(ctx context.Context) error
 	Stop()
@@ -109,12 +110,14 @@ type broadcaster struct {
 	running atomic.Bool
 }
 
+// NewBroadcaster creates a new instance of a broadcaster
 func NewBroadcaster(bufLen int) *broadcaster {
 	return &broadcaster{
 		bufLen: bufLen,
 	}
 }
 
+// Start initiates the execution of the broadcaster
 func (b *broadcaster) Start(ctx context.Context) error {
 	if !b.running.CompareAndSwap(false, true) { // if not running then start
 		return errors.New("already started")
@@ -140,6 +143,7 @@ func (b *broadcaster) run(ctx context.Context) {
 	}
 }
 
+// Stop stops the execution of the broadcaster and closes all subscriptions
 func (b *broadcaster) Stop() {
 	if !b.running.CompareAndSwap(true, false) { // if running then stop
 		return
@@ -150,12 +154,12 @@ func (b *broadcaster) Stop() {
 	close(b.input)    // close input channel
 }
 
-// returned subscription is all speicfied topic
+// Register returns a subscription for an specific topic
 func (b *broadcaster) Register(topic string, chLen ...int) Subscription {
 	return b.chStore.getNewCh(topic, getChLen(chLen))
 }
 
-// return subscription is for all topic
+// RegisterForAll returns a subscription for all topics
 func (b *broadcaster) RegisterForAll(chLen ...int) Subscription {
 
 	return b.chStore.getNewCh("", getChLen(chLen))
@@ -169,7 +173,7 @@ func getChLen(chLen []int) int {
 	return l
 }
 
-// only accepts value when running.
+// Submit is used to broadcast messages to subscribers. It only accepts value when running.
 func (b *broadcaster) Submit(m *protocol.Envelope) {
 	if b.running.Load() {
 		b.input <- m

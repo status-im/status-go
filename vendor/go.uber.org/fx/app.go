@@ -482,7 +482,7 @@ func New(opts ...Option) *App {
 
 	// Run decorators before executing any Invokes -- including the one
 	// inside constructCustomLogger.
-	app.err = multierr.Append(app.err, app.root.decorate())
+	app.err = multierr.Append(app.err, app.root.decorateAll())
 
 	// If you are thinking about returning here after provides: do not (just yet)!
 	// If a custom logger was being used, we're still buffering messages.
@@ -574,12 +574,12 @@ func (app *App) Run() {
 	// Historically, we do not os.Exit(0) even though most applications
 	// cede control to Fx with they call app.Run. To avoid a breaking
 	// change, never os.Exit for success.
-	if code := app.run(app.Done()); code != 0 {
+	if code := app.run(app.Wait); code != 0 {
 		app.exit(code)
 	}
 }
 
-func (app *App) run(done <-chan os.Signal) (exitCode int) {
+func (app *App) run(done func() <-chan ShutdownSignal) (exitCode int) {
 	startCtx, cancel := app.clock.WithTimeout(context.Background(), app.StartTimeout())
 	defer cancel()
 
@@ -587,8 +587,9 @@ func (app *App) run(done <-chan os.Signal) (exitCode int) {
 		return 1
 	}
 
-	sig := <-done
-	app.log().LogEvent(&fxevent.Stopping{Signal: sig})
+	sig := <-done()
+	app.log().LogEvent(&fxevent.Stopping{Signal: sig.Signal})
+	exitCode = sig.ExitCode
 
 	stopCtx, cancel := app.clock.WithTimeout(context.Background(), app.StopTimeout())
 	defer cancel()
@@ -597,7 +598,7 @@ func (app *App) run(done <-chan os.Signal) (exitCode int) {
 		return 1
 	}
 
-	return 0
+	return exitCode
 }
 
 // Err returns any error encountered during New's initialization. See the
@@ -762,7 +763,7 @@ type withTimeoutParams struct {
 }
 
 // errHookCallbackExited is returned when a hook callback does not finish executing
-var errHookCallbackExited = fmt.Errorf("goroutine exited without returning")
+var errHookCallbackExited = errors.New("goroutine exited without returning")
 
 func withTimeout(ctx context.Context, param *withTimeoutParams) error {
 	c := make(chan error, 1)

@@ -5,6 +5,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 )
@@ -12,6 +13,7 @@ import (
 type PeerExchangeParameters struct {
 	host         host.Host
 	selectedPeer peer.ID
+	pm           *peermanager.PeerManager
 	log          *zap.Logger
 }
 
@@ -30,7 +32,13 @@ func WithPeer(p peer.ID) PeerExchangeOption {
 // from the node peerstore
 func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) PeerExchangeOption {
 	return func(params *PeerExchangeParameters) {
-		p, err := utils.SelectPeer(params.host, PeerExchangeID_v20alpha1, fromThesePeers, params.log)
+		var p peer.ID
+		var err error
+		if params.pm == nil {
+			p, err = utils.SelectPeer(params.host, PeerExchangeID_v20alpha1, fromThesePeers, params.log)
+		} else {
+			p, err = params.pm.SelectPeer(PeerExchangeID_v20alpha1, fromThesePeers, params.log)
+		}
 		if err == nil {
 			params.selectedPeer = p
 		} else {

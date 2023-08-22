@@ -13,12 +13,12 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waku-org/go-discover/discover"
 	"github.com/waku-org/go-waku/logging"
-	v2 "github.com/waku-org/go-waku/waku/v2"
-	"github.com/waku-org/go-waku/waku/v2/metrics"
-	"github.com/waku-org/go-waku/waku/v2/peers"
-	"github.com/waku-org/go-waku/waku/v2/protocol/enr"
+	"github.com/waku-org/go-waku/waku/v2/peermanager"
+	"github.com/waku-org/go-waku/waku/v2/peerstore"
+	wenr "github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 	"go.uber.org/zap"
 
@@ -28,20 +28,22 @@ import (
 
 var ErrNoDiscV5Listener = errors.New("no discv5 listener")
 
+// PeerConnector will subscribe to a channel containing the information for all peers found by this discovery protocol
 type PeerConnector interface {
-	Subscribe(context.Context, <-chan v2.PeerData)
+	Subscribe(context.Context, <-chan peermanager.PeerData)
 }
 
 type DiscoveryV5 struct {
-	params    *discV5Parameters
-	host      host.Host
-	config    discover.Config
-	udpAddr   *net.UDPAddr
-	listener  *discover.UDPv5
-	localnode *enode.LocalNode
+	params      *discV5Parameters
+	host        host.Host
+	config      discover.Config
+	udpAddr     *net.UDPAddr
+	listener    *discover.UDPv5
+	localnode   *enode.LocalNode
+	metrics     Metrics
+	peerChannel *peerChannel
 
 	peerConnector PeerConnector
-	peerCh        chan v2.PeerData
 	NAT           nat.Interface
 
 	log *zap.Logger
@@ -63,6 +65,10 @@ type discV5Parameters struct {
 type DiscoveryV5Option func(*discV5Parameters)
 
 var protocolID = [6]byte{'d', '5', 'w', 'a', 'k', 'u'}
+
+const peerDelay = 100 * time.Millisecond
+const bucketSize = 16
+const delayBetweenDiscoveredPeerCnt = 5 * time.Second
 
 func WithAutoUpdate(autoUpdate bool) DiscoveryV5Option {
 	return func(params *discV5Parameters) {
@@ -107,7 +113,8 @@ func DefaultOptions() []DiscoveryV5Option {
 	}
 }
 
-func NewDiscoveryV5(priv *ecdsa.PrivateKey, localnode *enode.LocalNode, peerConnector PeerConnector, log *zap.Logger, opts ...DiscoveryV5Option) (*DiscoveryV5, error) {
+// NewDiscoveryV5 returns a new instance of a DiscoveryV5 struct
+func NewDiscoveryV5(priv *ecdsa.PrivateKey, localnode *enode.LocalNode, peerConnector PeerConnector, reg prometheus.Registerer, log *zap.Logger, opts ...DiscoveryV5Option) (*DiscoveryV5, error) {
 	params := new(discV5Parameters)
 	optList := DefaultOptions()
 	optList = append(optList, opts...)
@@ -127,7 +134,9 @@ func NewDiscoveryV5(priv *ecdsa.PrivateKey, localnode *enode.LocalNode, peerConn
 		peerConnector: peerConnector,
 		NAT:           NAT,
 		wg:            &sync.WaitGroup{},
+		peerChannel:   &peerChannel{},
 		localnode:     localnode,
+		metrics:       newMetrics(reg),
 		config: discover.Config{
 			PrivateKey: priv,
 			Bootnodes:  params.bootnodes,
@@ -186,6 +195,50 @@ func (d *DiscoveryV5) SetHost(h host.Host) {
 	d.host = h
 }
 
+type peerChannel struct {
+	mutex   sync.Mutex
+	channel chan peermanager.PeerData
+	started bool
+	ctx     context.Context
+}
+
+func (p *peerChannel) Start(ctx context.Context) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	p.started = true
+	p.ctx = ctx
+	p.channel = make(chan peermanager.PeerData)
+}
+
+func (p *peerChannel) Stop() {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	if !p.started {
+		return
+	}
+	p.started = false
+	close(p.channel)
+}
+
+func (p *peerChannel) Subscribe() chan peermanager.PeerData {
+	return p.channel
+}
+
+func (p *peerChannel) Publish(peer peermanager.PeerData) bool {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	if !p.started {
+		return false
+	}
+	select {
+	case p.channel <- peer:
+	case <-p.ctx.Done():
+		return false
+
+	}
+	return true
+}
+
 // only works if the discovery v5 hasn't been started yet.
 func (d *DiscoveryV5) Start(ctx context.Context) error {
 	// compare and swap sets the discovery v5 to `started` state
@@ -197,8 +250,8 @@ func (d *DiscoveryV5) Start(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	d.cancel = cancel
 
-	d.peerCh = make(chan v2.PeerData)
-	d.peerConnector.Subscribe(ctx, d.peerCh)
+	d.peerChannel.Start(ctx)
+	d.peerConnector.Subscribe(ctx, d.peerChannel.Subscribe())
 
 	err := d.listen(ctx)
 	if err != nil {
@@ -247,7 +300,7 @@ func (d *DiscoveryV5) Stop() {
 		}
 	}()
 
-	close(d.peerCh)
+	d.peerChannel.Stop()
 }
 
 /*
@@ -268,88 +321,84 @@ func isWakuNode(node *enode.Node) bool {
 }
 */
 
-func evaluateNode(node *enode.Node) bool {
-	if node == nil {
-		return false
+func (d *DiscoveryV5) evaluateNode() func(node *enode.Node) bool {
+	return func(node *enode.Node) bool {
+		if node == nil {
+			return false
+		}
+
+		//  TODO: consider node filtering based on ENR; we do not filter based on ENR in the first waku discv5 beta stage
+		/*if !isWakuNode(node) {
+			return false
+		}*/
+
+		_, err := wenr.EnodeToPeerInfo(node)
+
+		if err != nil {
+			d.metrics.RecordError(peerInfoFailure)
+			utils.Logger().Named("discv5").Error("obtaining peer info from enode", logging.ENode("enr", node), zap.Error(err))
+			return false
+		}
+
+		return true
 	}
-
-	//  TODO: consider node filtering based on ENR; we do not filter based on ENR in the first waku discv5 beta stage
-	/*if !isWakuNode(node) {
-		return false
-	}*/
-
-	_, err := enr.EnodeToPeerInfo(node)
-
-	if err != nil {
-		metrics.RecordDiscV5Error(context.Background(), "peer_info_failure")
-		utils.Logger().Named("discv5").Error("obtaining peer info from enode", logging.ENode("enr", node), zap.Error(err))
-		return false
-	}
-
-	return true
 }
 
-// get random nodes from DHT via discv5 listender
-// used for caching enr address in peerExchange
-// used for connecting to peers in discovery_connector
-func (d *DiscoveryV5) Iterator() (enode.Iterator, error) {
+// Predicate is a function that is applied to an iterator to filter the nodes to be retrieved according to some logic
+type Predicate func(enode.Iterator) enode.Iterator
+
+// PeerIterator gets random nodes from DHT via discv5 listener.
+// Used for caching enr address in peerExchange
+// Used for connecting to peers in discovery_connector
+func (d *DiscoveryV5) PeerIterator(predicate ...Predicate) (enode.Iterator, error) {
 	if d.listener == nil {
 		return nil, ErrNoDiscV5Listener
 	}
 
-	iterator := enode.Filter(d.listener.RandomNodes(), evaluateNode)
+	iterator := enode.Filter(d.listener.RandomNodes(), d.evaluateNode())
 	if d.params.loopPredicate != nil {
-		return enode.Filter(iterator, d.params.loopPredicate), nil
-	} else {
-		return iterator, nil
-	}
-}
-
-func (d *DiscoveryV5) FindPeersWithPredicate(ctx context.Context, predicate func(*enode.Node) bool) (enode.Iterator, error) {
-	if d.listener == nil {
-		return nil, ErrNoDiscV5Listener
+		iterator = enode.Filter(iterator, d.params.loopPredicate)
 	}
 
-	iterator := enode.Filter(d.listener.RandomNodes(), evaluateNode)
-	if predicate != nil {
-		iterator = enode.Filter(iterator, predicate)
+	for _, p := range predicate {
+		iterator = p(iterator)
 	}
 
 	return iterator, nil
 }
 
-func (d *DiscoveryV5) FindPeersWithShard(ctx context.Context, cluster, index uint16) (enode.Iterator, error) {
-	if d.listener == nil {
-		return nil, ErrNoDiscV5Listener
-	}
-
-	iterator := enode.Filter(d.listener.RandomNodes(), evaluateNode)
-
-	predicate := func(node *enode.Node) bool {
-		rs, err := enr.RelaySharding(node.Record())
-		if err != nil || rs == nil {
-			return false
-		}
-		return rs.Contains(cluster, index)
-	}
-
-	return enode.Filter(iterator, predicate), nil
-}
-
 func (d *DiscoveryV5) Iterate(ctx context.Context, iterator enode.Iterator, onNode func(*enode.Node, peer.AddrInfo) error) {
 	defer iterator.Close()
 
-	for iterator.Next() { // while next exists, run for loop
-		_, addresses, err := enr.Multiaddress(iterator.Node())
+	peerCnt := 0
+	for {
+
+		if !delayedHasNext(ctx, iterator) {
+			return
+		}
+
+		peerCnt++
+		if peerCnt == bucketSize { // Delay every bucketSize peers discovered
+			peerCnt = 0
+			t := time.NewTimer(delayBetweenDiscoveredPeerCnt)
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				t.Stop()
+			}
+		}
+
+		_, addresses, err := wenr.Multiaddress(iterator.Node())
 		if err != nil {
-			metrics.RecordDiscV5Error(context.Background(), "peer_info_failure")
+			d.metrics.RecordError(peerInfoFailure)
 			d.log.Error("extracting multiaddrs from enr", zap.Error(err))
 			continue
 		}
 
 		peerAddrs, err := peer.AddrInfosFromP2pAddrs(addresses...)
 		if err != nil {
-			metrics.RecordDiscV5Error(context.Background(), "peer_info_failure")
+			d.metrics.RecordError(peerInfoFailure)
 			d.log.Error("converting multiaddrs to addrinfos", zap.Error(err))
 			continue
 		}
@@ -369,16 +418,32 @@ func (d *DiscoveryV5) Iterate(ctx context.Context, iterator enode.Iterator, onNo
 	}
 }
 
-// Iterates over the nodes found via discv5 belonging to the node's current shard, and sends them to peerConnector
-func (d *DiscoveryV5) peerLoop(ctx context.Context) error {
-	iterator, err := d.Iterator()
-	if err != nil {
-		metrics.RecordDiscV5Error(context.Background(), "iterator_failure")
-		return fmt.Errorf("obtaining iterator: %w", err)
+func delayedHasNext(ctx context.Context, iterator enode.Iterator) bool {
+	// Delay if .Next() is too fast
+	start := time.Now()
+	hasNext := iterator.Next()
+	if !hasNext {
+		return false
 	}
 
-	iterator = enode.Filter(iterator, func(n *enode.Node) bool {
-		localRS, err := enr.RelaySharding(d.localnode.Node().Record())
+	elapsed := time.Since(start)
+	if elapsed < peerDelay {
+		t := time.NewTimer(peerDelay - elapsed)
+		select {
+		case <-ctx.Done():
+			return false
+		case <-t.C:
+			t.Stop()
+		}
+	}
+
+	return true
+}
+
+// Iterates over the nodes found via discv5 belonging to the node's current shard, and sends them to peerConnector
+func (d *DiscoveryV5) peerLoop(ctx context.Context) error {
+	iterator, err := d.PeerIterator(FilterPredicate(func(n *enode.Node) bool {
+		localRS, err := wenr.RelaySharding(d.localnode.Node().Record())
 		if err != nil {
 			return false
 		}
@@ -387,7 +452,7 @@ func (d *DiscoveryV5) peerLoop(ctx context.Context) error {
 			return true
 		}
 
-		nodeRS, err := enr.RelaySharding(n.Record())
+		nodeRS, err := wenr.RelaySharding(n.Record())
 		if err != nil || nodeRS == nil {
 			return false
 		}
@@ -404,21 +469,25 @@ func (d *DiscoveryV5) peerLoop(ctx context.Context) error {
 		}
 
 		return false
-	})
+	}))
+	if err != nil {
+		d.metrics.RecordError(iteratorFailure)
+		return fmt.Errorf("obtaining iterator: %w", err)
+	}
 
 	defer iterator.Close()
 
 	d.Iterate(ctx, iterator, func(n *enode.Node, p peer.AddrInfo) error {
-		peer := v2.PeerData{
-			Origin:   peers.Discv5,
+		peer := peermanager.PeerData{
+			Origin:   peerstore.Discv5,
 			AddrInfo: p,
 			ENR:      n,
 		}
 
-		select {
-		case d.peerCh <- peer:
-		case <-ctx.Done():
-			return nil
+		if d.peerChannel.Publish(peer) {
+			d.log.Debug("published peer into peer channel", logging.HostID("peerID", peer.AddrInfo.ID))
+		} else {
+			d.log.Debug("could not publish peer into peer channel", logging.HostID("peerID", peer.AddrInfo.ID))
 		}
 
 		return nil
