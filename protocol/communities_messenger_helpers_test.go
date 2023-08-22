@@ -30,6 +30,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
+	walletToken "github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -71,6 +72,11 @@ func (m *TokenManagerMock) GetAllChainIDs() ([]uint64, error) {
 func (m *TokenManagerMock) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
 	time.Sleep(100 * time.Millisecond) // simulate response time
 	return *m.Balances, nil
+}
+
+func (m *TokenManagerMock) UpsertCustom(token walletToken.Token) error {
+	time.Sleep(100 * time.Millisecond) // simulate response time
+	return nil
 }
 
 func newMessenger(s *suite.Suite, shh types.Waku, logger *zap.Logger, password string, walletAddresses []string,

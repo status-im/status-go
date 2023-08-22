@@ -22,6 +22,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/golang/protobuf/proto"
@@ -133,6 +134,10 @@ func (m *testTokenManager) GetAllChainIDs() ([]uint64, error) {
 
 func (m *testTokenManager) GetBalancesByChain(ctx context.Context, accounts, tokenAddresses []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error) {
 	return m.response, nil
+}
+
+func (m *testTokenManager) UpsertCustom(token token.Token) error {
+	return nil
 }
 
 func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testCollectiblesManager, *testTokenManager) {

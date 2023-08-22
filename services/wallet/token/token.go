@@ -300,7 +300,12 @@ func (tm *Manager) GetTokens(chainID uint64) ([]*Token, error) {
 		res = append(res, token)
 	}
 
-	return res, nil
+	tokens, err := tm.GetCustomsByChainID(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	return append(res, tokens...), nil
 }
 
 func (tm *Manager) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*Token, error) {
