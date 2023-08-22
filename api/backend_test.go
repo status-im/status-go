@@ -1234,11 +1234,15 @@ func TestChangeDatabasePassword(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test that DBs can be opened with new password
-	appDb, err := sqlite.OpenDB(backend.getAppDBPath(account.KeyUID), newPassword, account.KDFIterations)
+	appDbPath, err := backend.getAppDBPath(account.KeyUID)
+	require.NoError(t, err)
+	appDb, err := sqlite.OpenDB(appDbPath, newPassword, account.KDFIterations)
 	require.NoError(t, err)
 	appDb.Close()
 
-	walletDb, err := sqlite.OpenDB(backend.getWalletDBPath(account.KeyUID), newPassword, account.KDFIterations)
+	walletDbPath, err := backend.getWalletDBPath(account.KeyUID)
+	require.NoError(t, err)
+	walletDb, err := sqlite.OpenDB(walletDbPath, newPassword, account.KDFIterations)
 	require.NoError(t, err)
 	walletDb.Close()
 
