@@ -121,6 +121,7 @@ type managerOptions struct {
 
 type TokenManager interface {
 	GetBalancesByChain(ctx context.Context, accounts, tokens []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error)
+	UpsertCustom(token token.Token) error
 	GetAllChainIDs() ([]uint64, error)
 }
 
@@ -159,6 +160,10 @@ func (m *DefaultTokenManager) GetBalancesByChain(ctx context.Context, accounts, 
 
 	resp, err := m.tokenManager.GetBalancesByChain(context.Background(), clients, accounts, tokenAddresses)
 	return resp, err
+}
+
+func (m *DefaultTokenManager) UpsertCustom(t token.Token) error {
+	return m.tokenManager.UpsertCustom(t)
 }
 
 type ManagerOption func(*managerOptions)
@@ -1273,6 +1278,27 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 	}
 
 	pkString := common.PubkeyToHex(&m.identity.PublicKey)
+	if description.CommunityTokensMetadata != nil && len(description.CommunityTokensMetadata) > 0 {
+		for _, tokenMetadata := range description.CommunityTokensMetadata {
+			if tokenMetadata.TokenType != protobuf.CommunityTokenType_ERC20 {
+				continue
+			}
+
+			for chainID, address := range tokenMetadata.ContractAddresses {
+				token := token.Token{
+					Address:  gethcommon.HexToAddress(address),
+					ChainID:  chainID,
+					Symbol:   tokenMetadata.Symbol,
+					Name:     tokenMetadata.Name,
+					Decimals: uint(tokenMetadata.Decimals),
+				}
+				err := m.tokenManager.UpsertCustom(token)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
 
 	// If the community require membership, we set whether we should leave/join the community after a state change
 	if community.InvitationOnly() || community.OnRequest() || community.AcceptRequestToJoinAutomatically() {
