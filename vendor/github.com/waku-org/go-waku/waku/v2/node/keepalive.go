@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
@@ -15,15 +14,10 @@ import (
 
 const maxAllowedPingFailures = 2
 
-func disconnectPeers(host host.Host, logger *zap.Logger) {
-	logger.Warn("keep alive hasnt been executed recently. Killing all connections to peers")
-	for _, p := range host.Network().Peers() {
-		err := host.Network().ClosePeer(p)
-		if err != nil {
-			logger.Warn("while disconnecting peer", zap.Error(err))
-		}
-	}
-}
+// If the difference between the last time the keep alive code was executed and now is greater
+// than sleepDectectionIntervalFactor * keepAlivePeriod, force the ping verification to disconnect
+// the peers if they don't reply back
+const sleepDetectionIntervalFactor = 3
 
 // startKeepAlive creates a go routine that periodically pings connected peers.
 // This is necessary because TCP connections are automatically closed due to inactivity,
@@ -36,15 +30,17 @@ func (w *WakuNode) startKeepAlive(ctx context.Context, t time.Duration) {
 
 	lastTimeExecuted := w.timesource.Now()
 
-	sleepDetectionInterval := int64(t) * 3
+	sleepDetectionInterval := int64(t) * sleepDetectionIntervalFactor
 
 	for {
 		select {
 		case <-ticker.C:
 			difference := w.timesource.Now().UnixNano() - lastTimeExecuted.UnixNano()
+			forceDisconnectOnPingFailure := false
 			if difference > sleepDetectionInterval {
-				disconnectPeers(w.host, w.log)
+				forceDisconnectOnPingFailure = true
 				lastTimeExecuted = w.timesource.Now()
+				w.log.Warn("keep alive hasnt been executed recently. Killing connections to peers if ping fails")
 				continue
 			}
 
@@ -55,7 +51,7 @@ func (w *WakuNode) startKeepAlive(ctx context.Context, t time.Duration) {
 			pingWg.Add(len(peersToPing))
 			for _, p := range peersToPing {
 				if p != w.host.ID() {
-					go w.pingPeer(ctx, &pingWg, p)
+					go w.pingPeer(ctx, &pingWg, p, forceDisconnectOnPingFailure)
 				}
 			}
 			pingWg.Wait()
@@ -68,41 +64,41 @@ func (w *WakuNode) startKeepAlive(ctx context.Context, t time.Duration) {
 	}
 }
 
-func (w *WakuNode) pingPeer(ctx context.Context, wg *sync.WaitGroup, peer peer.ID) {
+func (w *WakuNode) pingPeer(ctx context.Context, wg *sync.WaitGroup, peerID peer.ID, forceDisconnectOnFail bool) {
 	defer wg.Done()
 
 	ctx, cancel := context.WithTimeout(ctx, 7*time.Second)
 	defer cancel()
 
-	logger := w.log.With(logging.HostID("peer", peer))
+	logger := w.log.With(logging.HostID("peer", peerID))
 	logger.Debug("pinging")
-	pr := ping.Ping(ctx, w.host, peer)
+	pr := ping.Ping(ctx, w.host, peerID)
 	select {
 	case res := <-pr:
 		if res.Error != nil {
 			w.keepAliveMutex.Lock()
-			w.keepAliveFails[peer]++
+			w.keepAliveFails[peerID]++
 			w.keepAliveMutex.Unlock()
 			logger.Debug("could not ping", zap.Error(res.Error))
 		} else {
 			w.keepAliveMutex.Lock()
-			delete(w.keepAliveFails, peer)
+			delete(w.keepAliveFails, peerID)
 			w.keepAliveMutex.Unlock()
 		}
 	case <-ctx.Done():
 		w.keepAliveMutex.Lock()
-		w.keepAliveFails[peer]++
+		w.keepAliveFails[peerID]++
 		w.keepAliveMutex.Unlock()
 		logger.Debug("could not ping (context done)", zap.Error(ctx.Err()))
 	}
 
 	w.keepAliveMutex.Lock()
-	if w.keepAliveFails[peer] > maxAllowedPingFailures && w.host.Network().Connectedness(peer) == network.Connected {
+	if (forceDisconnectOnFail || w.keepAliveFails[peerID] > maxAllowedPingFailures) && w.host.Network().Connectedness(peerID) == network.Connected {
 		logger.Info("disconnecting peer")
-		if err := w.host.Network().ClosePeer(peer); err != nil {
+		if err := w.host.Network().ClosePeer(peerID); err != nil {
 			logger.Debug("closing conn to peer", zap.Error(err))
 		}
-		w.keepAliveFails[peer] = 0
+		w.keepAliveFails[peerID] = 0
 	}
 	w.keepAliveMutex.Unlock()
 }

@@ -27,12 +27,13 @@ func WithStaticRLNRelay(pubsubTopic string, contentTopic string, memberIndex r.M
 
 // WithDynamicRLNRelay enables the Waku V2 RLN protocol in onchain mode.
 // Requires the `gowaku_rln` build constrain (or the env variable RLN=true if building go-waku)
-func WithDynamicRLNRelay(pubsubTopic string, contentTopic string, keystorePath string, keystorePassword string, membershipContract common.Address, spamHandler rln.SpamHandler, ethClientAddress string, ethPrivateKey *ecdsa.PrivateKey, registrationHandler rln.RegistrationHandler) WakuNodeOption {
+func WithDynamicRLNRelay(pubsubTopic string, contentTopic string, keystorePath string, keystorePassword string, keystoreIndex uint, treePath string, membershipContract common.Address, membershipGroupIndex uint, spamHandler rln.SpamHandler, ethClientAddress string, ethPrivateKey *ecdsa.PrivateKey, registrationHandler rln.RegistrationHandler) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableRLN = true
 		params.rlnRelayDynamic = true
 		params.keystorePassword = keystorePassword
 		params.keystorePath = keystorePath
+		params.keystoreIndex = keystoreIndex
 		params.rlnRelayPubsubTopic = pubsubTopic
 		params.rlnRelayContentTopic = contentTopic
 		params.rlnSpamHandler = spamHandler
@@ -40,6 +41,8 @@ func WithDynamicRLNRelay(pubsubTopic string, contentTopic string, keystorePath s
 		params.rlnETHPrivateKey = ethPrivateKey
 		params.rlnMembershipContractAddress = membershipContract
 		params.rlnRegistrationHandler = registrationHandler
+		params.rlnRelayMemIndex = membershipGroupIndex
+		params.rlnTreePath = treePath
 		return nil
 	}
 }

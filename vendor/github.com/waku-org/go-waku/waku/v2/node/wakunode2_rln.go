@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager/dynamic"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager/static"
@@ -24,19 +25,6 @@ func (w *WakuNode) mountRlnRelay(ctx context.Context) error {
 	// relay protocol is the prerequisite of rln-relay
 	if w.Relay() == nil {
 		return errors.New("relay protocol is required")
-	}
-
-	// check whether the pubsub topic is supported at the relay level
-	topicFound := false
-	for _, t := range w.Relay().Topics() {
-		if t == w.opts.rlnRelayPubsubTopic {
-			topicFound = true
-			break
-		}
-	}
-
-	if !topicFound {
-		return errors.New("relay protocol does not support the configured pubsub topic")
 	}
 
 	var err error
@@ -62,8 +50,10 @@ func (w *WakuNode) mountRlnRelay(ctx context.Context) error {
 			w.opts.rlnETHClientAddress,
 			w.opts.rlnETHPrivateKey,
 			w.opts.rlnMembershipContractAddress,
+			w.opts.rlnRelayMemIndex,
 			w.opts.keystorePath,
 			w.opts.keystorePassword,
+			w.opts.keystoreIndex,
 			true,
 			w.opts.rlnRegistrationHandler,
 			w.log,
@@ -73,7 +63,7 @@ func (w *WakuNode) mountRlnRelay(ctx context.Context) error {
 		}
 	}
 
-	rlnRelay, err := rln.New(w.Relay(), groupManager, w.opts.rlnRelayPubsubTopic, w.opts.rlnRelayContentTopic, w.opts.rlnSpamHandler, w.timesource, w.log)
+	rlnRelay, err := rln.New(w.Relay(), groupManager, w.opts.rlnTreePath, w.opts.rlnRelayPubsubTopic, w.opts.rlnRelayContentTopic, w.opts.rlnSpamHandler, w.timesource, w.log)
 	if err != nil {
 		return err
 	}
@@ -110,7 +100,7 @@ func (w *WakuNode) mountRlnRelay(ctx context.Context) error {
 
 func (w *WakuNode) stopRlnRelay() error {
 	if w.rlnRelay != nil {
-		w.rlnRelay.Stop()
+		return w.rlnRelay.Stop()
 	}
 	return nil
 }

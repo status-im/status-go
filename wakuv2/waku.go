@@ -55,7 +55,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/metrics"
 
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
-	"github.com/waku-org/go-waku/waku/v2/peers"
+	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
@@ -272,7 +272,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		node.WithHostAddress(hostAddr),
 		node.WithConnectionStatusChannel(waku.connStatusChan),
 		node.WithKeepAlive(time.Duration(cfg.KeepAliveInterval) * time.Second),
-		node.WithDiscoverParams(cfg.DiscoveryLimit),
+		node.WithMaxPeerConnections(cfg.DiscoveryLimit),
 		node.WithLogger(logger),
 	}
 
@@ -1138,7 +1138,7 @@ func (w *Waku) query(ctx context.Context, peerID peer.ID, topics []common.TopicT
 
 func (w *Waku) Query(ctx context.Context, peerID peer.ID, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (cursor *storepb.Index, err error) {
 	requestID := protocol.GenerateRequestId()
-	opts = append(opts, store.WithRequestId(requestID))
+	opts = append(opts, store.WithRequestID(requestID))
 	result, err := w.query(ctx, peerID, topics, from, to, opts)
 	if err != nil {
 		w.logger.Error("error querying storenode", zap.String("requestID", hexutil.Encode(requestID)), zap.String("peerID", peerID.String()), zap.Error(err))
@@ -1573,7 +1573,7 @@ func (w *Waku) AddStorePeer(address string) (peer.ID, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, peers.Static, store.StoreID_v20beta4)
+	peerID, err := w.node.AddPeer(addr, wps.Static, store.StoreID_v20beta4)
 	if err != nil {
 		return "", err
 	}
@@ -1590,7 +1590,7 @@ func (w *Waku) AddRelayPeer(address string) (peer.ID, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, peers.Static, relay.WakuRelayID_v200)
+	peerID, err := w.node.AddPeer(addr, wps.Static, relay.WakuRelayID_v200)
 	if err != nil {
 		return "", err
 	}

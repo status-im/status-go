@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const RLN_CREDENTIALS_FILENAME = "rlnCredentials.json"
+const RLN_CREDENTIALS_FILENAME = "rlnKeystore.json"
 const RLN_CREDENTIALS_PASSWORD = "password"
 
 type MembershipContract struct {
@@ -38,10 +38,14 @@ type AppInfo struct {
 }
 
 type AppKeystore struct {
-	Application   string                `json:"application"`
-	AppIdentifier string                `json:"appIdentifier"`
-	Credentials   []keystore.CryptoJSON `json:"credentials"`
-	Version       string                `json:"version"`
+	Application   string                  `json:"application"`
+	AppIdentifier string                  `json:"appIdentifier"`
+	Credentials   []AppKeystoreCredential `json:"credentials"`
+	Version       string                  `json:"version"`
+}
+
+type AppKeystoreCredential struct {
+	Crypto keystore.CryptoJSON `json:"crypto"`
 }
 
 const DefaultSeparator = "\n"
@@ -194,7 +198,7 @@ func GetMembershipCredentials(logger *zap.Logger, credentialsPath string, passwo
 	var result []MembershipCredentials
 
 	for _, credential := range k.Credentials {
-		credentialsBytes, err := keystore.DecryptDataV3(credential, password)
+		credentialsBytes, err := keystore.DecryptDataV3(credential.Crypto, password)
 		if err != nil {
 			return nil, err
 		}
@@ -226,7 +230,7 @@ func AddMembershipCredentials(path string, credentials []MembershipCredentials, 
 		// A flag to tell us if the keystore contains a credential associated to the input identity credential, i.e. membershipCredential
 		found := -1
 		for i, existingCredentials := range k.Credentials {
-			credentialsBytes, err := keystore.DecryptDataV3(existingCredentials, password)
+			credentialsBytes, err := keystore.DecryptDataV3(existingCredentials.Crypto, password)
 			if err != nil {
 				continue
 			}
@@ -259,7 +263,7 @@ func AddMembershipCredentials(path string, credentials []MembershipCredentials, 
 				}
 
 				// we update the original credential field in keystoreCredentials
-				k.Credentials[i] = encryptedCredentials
+				k.Credentials[i] = AppKeystoreCredential{Crypto: encryptedCredentials}
 
 				found = i
 
@@ -284,7 +288,7 @@ func AddMembershipCredentials(path string, credentials []MembershipCredentials, 
 			return err
 		}
 
-		k.Credentials = append(k.Credentials, encryptedCredentials)
+		k.Credentials = append(k.Credentials, AppKeystoreCredential{Crypto: encryptedCredentials})
 	}
 
 	return save(k, path, separator)

@@ -24,15 +24,21 @@ func serialize(idKey IDSecretHash, memIndex MembershipIndex, epoch Epoch, msg []
 // this conversion is used in the proof verification proc
 // the order of serialization is based on https://github.com/kilic/rln/blob/7ac74183f8b69b399e3bc96c1ae8ab61c026dc43/src/public.rs#L205
 // [ proof<128> | root<32> | epoch<32> | share_x<32> | share_y<32> | nullifier<32> | rln_identifier<32> | signal_len<8> | signal<var> ]
-func (r RateLimitProof) serialize(data []byte) []byte {
+func (r RateLimitProof) serializeWithData(data []byte) []byte {
 	lenPrefMsg := appendLength(data)
+	proofBytes := r.serialize()
+	proofBytes = append(proofBytes, lenPrefMsg...)
+	return proofBytes
+}
+
+// serialize converts a RateLimitProof to a byte seq
+// [ proof<128> | root<32> | epoch<32> | share_x<32> | share_y<32> | nullifier<32> | rln_identifier<32>
+func (r RateLimitProof) serialize() []byte {
 	proofBytes := append(r.Proof[:], r.MerkleRoot[:]...)
 	proofBytes = append(proofBytes, r.Epoch[:]...)
 	proofBytes = append(proofBytes, r.ShareX[:]...)
 	proofBytes = append(proofBytes, r.ShareY[:]...)
 	proofBytes = append(proofBytes, r.Nullifier[:]...)
 	proofBytes = append(proofBytes, r.RLNIdentifier[:]...)
-	proofBytes = append(proofBytes, lenPrefMsg...)
-
 	return proofBytes
 }

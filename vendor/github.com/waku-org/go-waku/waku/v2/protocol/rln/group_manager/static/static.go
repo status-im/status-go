@@ -18,6 +18,7 @@ type StaticGroupManager struct {
 
 	group       []rln.IDCommitment
 	rootTracker *group_manager.MerkleRootTracker
+	nextIndex   uint64
 }
 
 func NewStaticGroupManager(
@@ -46,11 +47,10 @@ func (gm *StaticGroupManager) Start(ctx context.Context, rlnInstance *rln.RLN, r
 	gm.rootTracker = rootTracker
 
 	// add members to the Merkle tree
-	for i, member := range gm.group {
-		err := gm.insertMember(member, uint64(i+1))
-		if err != nil {
-			return err
-		}
+
+	err := gm.insertMembers(gm.group)
+	if err != nil {
+		return err
 	}
 
 	gm.group = nil // Deleting group to release memory
@@ -58,20 +58,21 @@ func (gm *StaticGroupManager) Start(ctx context.Context, rlnInstance *rln.RLN, r
 	return nil
 }
 
-func (gm *StaticGroupManager) insertMember(pubkey rln.IDCommitment, index uint64) error {
-	gm.log.Debug("a new key is added", zap.Binary("pubkey", pubkey[:]), zap.Uint64("index", index))
-
-	// assuming all the members arrive in order
-	err := gm.rln.InsertMember(pubkey)
+func (gm *StaticGroupManager) insertMembers(idCommitments []rln.IDCommitment) error {
+	err := gm.rln.InsertMembers(rln.MembershipIndex(gm.nextIndex), idCommitments)
 	if err != nil {
-		gm.log.Error("inserting member into merkletree", zap.Error(err))
+		gm.log.Error("inserting members into merkletree", zap.Error(err))
 		return err
 	}
 
-	_, err = gm.rootTracker.UpdateLatestRoot(index)
+	latestIndex := gm.nextIndex + uint64(len(idCommitments))
+
+	_, err = gm.rootTracker.UpdateLatestRoot(latestIndex)
 	if err != nil {
 		return err
 	}
+
+	gm.nextIndex = latestIndex + 1
 
 	return nil
 }
@@ -92,6 +93,8 @@ func (gm *StaticGroupManager) MembershipIndex() (rln.MembershipIndex, error) {
 	return *gm.membershipIndex, nil
 }
 
-func (gm *StaticGroupManager) Stop() {
+// Stop is a function created just to comply with the GroupManager interface (it does nothing)
+func (gm *StaticGroupManager) Stop() error {
 	// Do nothing
+	return nil
 }

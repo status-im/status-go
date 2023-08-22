@@ -15,7 +15,6 @@ import (
 
 	"github.com/waku-org/go-waku/logging"
 	"github.com/waku-org/go-waku/waku/persistence"
-	"github.com/waku-org/go-waku/waku/v2/metrics"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
@@ -149,7 +148,7 @@ func (store *WakuStore) storeMessage(env *protocol.Envelope) error {
 	err = store.msgProvider.Put(env)
 	if err != nil {
 		store.log.Error("storing message", zap.Error(err))
-		metrics.RecordStoreError(store.ctx, "store_failure")
+		store.metrics.RecordError(storeFailure)
 		return err
 	}
 
@@ -176,7 +175,7 @@ func (store *WakuStore) onRequest(s network.Stream) {
 	err := reader.ReadMsg(historyRPCRequest)
 	if err != nil {
 		logger.Error("reading request", zap.Error(err))
-		metrics.RecordStoreError(store.ctx, "decode_rpc_failure")
+		store.metrics.RecordError(decodeRPCFailure)
 		return
 	}
 
@@ -185,12 +184,12 @@ func (store *WakuStore) onRequest(s network.Stream) {
 		logger = logger.With(logging.Filters(query.GetContentFilters()))
 	} else {
 		logger.Error("reading request", zap.Error(err))
-		metrics.RecordStoreError(store.ctx, "empty_rpc_query_failure")
+		store.metrics.RecordError(emptyRPCQueryFailure)
 		return
 	}
 
 	logger.Info("received history query")
-	metrics.RecordStoreQuery(store.ctx)
+	store.metrics.RecordQuery()
 
 	historyResponseRPC := &pb.HistoryRPC{}
 	historyResponseRPC.RequestId = historyRPCRequest.RequestId
@@ -200,7 +199,7 @@ func (store *WakuStore) onRequest(s network.Stream) {
 	err = writer.WriteMsg(historyResponseRPC)
 	if err != nil {
 		logger.Error("writing response", zap.Error(err), logging.PagingInfo(historyResponseRPC.Response.PagingInfo))
-		metrics.RecordStoreError(store.ctx, "response_write_failure")
+		store.metrics.RecordError(writeResponseFailure)
 		_ = s.Reset()
 	} else {
 		logger.Info("response sent")

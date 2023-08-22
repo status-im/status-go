@@ -9,13 +9,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/waku-org/go-waku/waku/v2/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-waku/waku/v2/utils"
-	"go.opencensus.io/stats"
 	"go.uber.org/zap"
 )
 
@@ -52,6 +51,7 @@ type DBStore struct {
 	db          *sql.DB
 	migrationFn func(db *sql.DB) error
 
+	metrics    Metrics
 	timesource timesource.Timesource
 	log        *zap.Logger
 
@@ -121,9 +121,11 @@ func WithRetentionPolicy(maxMessages int, maxDuration time.Duration) DBOption {
 	}
 }
 
+type MigrationFn func(db *sql.DB) error
+
 // WithMigrations is a DBOption used to determine if migrations should
 // be executed, and what driver to use
-func WithMigrations(migrationFn func(db *sql.DB) error) DBOption {
+func WithMigrations(migrationFn MigrationFn) DBOption {
 	return func(d *DBStore) error {
 		d.enableMigrations = true
 		d.migrationFn = migrationFn
@@ -139,9 +141,10 @@ func DefaultOptions() []DBOption {
 // Creates a new DB store using the db specified via options.
 // It will create a messages table if it does not exist and
 // clean up records according to the retention policy used
-func NewDBStore(log *zap.Logger, options ...DBOption) (*DBStore, error) {
+func NewDBStore(reg prometheus.Registerer, log *zap.Logger, options ...DBOption) (*DBStore, error) {
 	result := new(DBStore)
 	result.log = log.Named("dbstore")
+	result.metrics = newMetrics(reg)
 
 	optList := DefaultOptions()
 	optList = append(optList, options...)
@@ -194,7 +197,7 @@ func (d *DBStore) updateMetrics(ctx context.Context) {
 			if err != nil {
 				d.log.Error("updating store metrics", zap.Error(err))
 			} else {
-				metrics.RecordArchiveMessage(ctx, "stored", msgCount)
+				d.metrics.RecordMessage(msgCount)
 			}
 		case <-ctx.Done():
 			return
@@ -211,7 +214,7 @@ func (d *DBStore) cleanOlderRecords(ctx context.Context) error {
 		sqlStmt := `DELETE FROM message WHERE receiverTimestamp < $1`
 		_, err := d.db.Exec(sqlStmt, utils.GetUnixEpochFrom(d.timesource.Now().Add(-d.maxDuration)))
 		if err != nil {
-			metrics.RecordArchiveError(ctx, "retpolicy_failure")
+			d.metrics.RecordError(retPolicyFailure)
 			return err
 		}
 		elapsed := time.Since(start)
@@ -224,7 +227,7 @@ func (d *DBStore) cleanOlderRecords(ctx context.Context) error {
 		sqlStmt := `DELETE FROM message WHERE id IN (SELECT id FROM message ORDER BY receiverTimestamp DESC LIMIT -1 OFFSET $1)`
 		_, err := d.db.Exec(sqlStmt, d.maxMessages)
 		if err != nil {
-			metrics.RecordArchiveError(ctx, "retpolicy_failure")
+			d.metrics.RecordError(retPolicyFailure)
 			return err
 		}
 		elapsed := time.Since(start)
@@ -288,7 +291,7 @@ func (d *DBStore) Validate(env *protocol.Envelope) error {
 func (d *DBStore) Put(env *protocol.Envelope) error {
 	stmt, err := d.db.Prepare("INSERT INTO message (id, receiverTimestamp, senderTimestamp, contentTopic, pubsubTopic, payload, version) VALUES ($1, $2, $3, $4, $5, $6, $7)")
 	if err != nil {
-		metrics.RecordArchiveError(context.TODO(), "insert_failure")
+		d.metrics.RecordError(insertFailure)
 		return err
 	}
 
@@ -300,8 +303,8 @@ func (d *DBStore) Put(env *protocol.Envelope) error {
 	if err != nil {
 		return err
 	}
-	ellapsed := time.Since(start)
-	stats.Record(context.Background(), metrics.ArchiveInsertDurationSeconds.M(int64(ellapsed.Seconds())))
+
+	d.metrics.RecordInsertDuration(time.Since(start))
 
 	err = stmt.Close()
 	if err != nil {
@@ -440,8 +443,8 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 	if err != nil {
 		return nil, nil, err
 	}
-	ellapsed := time.Since(measurementStart)
-	stats.Record(context.Background(), metrics.ArchiveQueryDurationSeconds.M(int64(ellapsed.Seconds())))
+
+	d.metrics.RecordQueryDuration(time.Since(measurementStart))
 
 	var result []StoredMessage
 	for rows.Next() {

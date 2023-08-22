@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
+	"github.com/libp2p/go-libp2p/core/event"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	wenr "github.com/waku-org/go-waku/waku/v2/protocol/enr"
@@ -305,15 +306,27 @@ func (w *WakuNode) watchTopicShards(ctx context.Context) error {
 				return
 			case <-evtRelayUnsubscribed.Out():
 			case <-evtRelaySubscribed.Out():
-				rs, err := protocol.TopicsToRelayShards(w.Relay().Topics()...)
+				topics := w.Relay().Topics()
+				rs, err := protocol.TopicsToRelayShards(topics...)
 				if err != nil {
 					w.log.Warn("could not set ENR shard info", zap.Error(err))
 					continue
 				}
 
-				if len(rs) > 1 {
-					w.log.Warn("use sharded topics within the same cluster")
-					continue
+				if len(rs) > 0 {
+					if len(rs) > 1 {
+						w.log.Warn("could not set ENR shard info", zap.String("error", "use sharded topics within the same cluster"))
+						continue
+					}
+
+					tcount := 0
+					for _, r := range rs {
+						tcount += len(r.Indices)
+					}
+					if tcount != len(topics) {
+						w.log.Warn("could not set ENR shard info", zap.String("error", "can't use a mix of static shards and named shards"))
+						continue
+					}
 				}
 
 				if len(rs) == 1 {
@@ -331,4 +344,28 @@ func (w *WakuNode) watchTopicShards(ctx context.Context) error {
 	}()
 
 	return nil
+}
+
+func (w *WakuNode) registerAndMonitorReachability(ctx context.Context) {
+	var myEventSub event.Subscription
+	var err error
+	if myEventSub, err = w.host.EventBus().Subscribe(new(event.EvtLocalReachabilityChanged)); err != nil {
+		w.log.Error("failed to register with libp2p for reachability status", zap.Error(err))
+		return
+	}
+	w.wg.Add(1)
+	go func() {
+		defer myEventSub.Close()
+		defer w.wg.Done()
+
+		for {
+			select {
+			case evt := <-myEventSub.Out():
+				reachability := evt.(event.EvtLocalReachabilityChanged).Reachability
+				w.log.Info("Node reachability changed", zap.Stringer("newReachability", reachability))
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 }
