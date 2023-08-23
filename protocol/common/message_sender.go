@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"fmt"
 	"sync"
 	"time"
 
@@ -789,7 +788,6 @@ func (s *MessageSender) handleErrDeviceNotFound(ctx context.Context, publicKey *
 }
 
 func (s *MessageSender) wrapMessageV1(rawMessage *RawMessage) ([]byte, error) {
-	fmt.Println("wrapMessageV1: pubsubTopic: ", rawMessage.PubsubTopic, " message type", rawMessage.MessageType.String())
 	wrappedMessage, err := v1protocol.WrapMessageV1(rawMessage.Payload, rawMessage.MessageType, rawMessage.Sender)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
