@@ -65,6 +65,10 @@ func (o *HTTPClient) doGetRequest(url string, apiKey string) ([]byte, error) {
 		case http.StatusOK:
 			body, err := ioutil.ReadAll(resp.Body)
 			return body, err
+		case http.StatusBadRequest:
+			// The OpenSea v2 API will return error 400 if the account holds no collectibles on
+			// the requested chain. This shouldn't be treated as an error, return an empty body.
+			return nil, nil
 		case http.StatusTooManyRequests:
 			if retryCount < getRequestRetryMaxCount {
 				// sleep and retry
