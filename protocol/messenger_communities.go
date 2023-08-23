@@ -18,7 +18,6 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/ethclient"
 
 	"go.uber.org/zap"
 
@@ -509,30 +508,8 @@ func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse,
 	// Revert code to https://github.com/status-im/status-go/blob/e6a3f63ec7f2fa691878ed35f921413dc8acfc66/protocol/messenger_communities.go#L211-L226 once the curated communities contract is deployed to mainnet
 
 	chainID := uint64(420) // Optimism Goerli
-	sDB, err := accounts.NewDB(m.database)
-	if err != nil {
-		return nil, err
-	}
-	nodeConfig, err := sDB.GetNodeConfig()
-	if err != nil {
-		return nil, err
-	}
-	var ethClient *ethclient.Client
-	for _, n := range nodeConfig.Networks {
-		if n.ChainID == chainID {
-			e, err := ethclient.Dial(n.RPCURL)
-			if err != nil {
-				return nil, err
-			}
-			ethClient = e
-		}
-	}
 
-	if ethClient == nil {
-		return nil, errors.New("failed to initialize backend before requesting curated communities")
-	}
-
-	directory, err := m.contractMaker.NewDirectoryWithBackend(chainID, ethClient)
+	directory, err := m.contractMaker.NewDirectory(chainID)
 	if err != nil {
 		return nil, err
 	}

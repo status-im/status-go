@@ -1276,6 +1276,8 @@ func (db *Database) GetPath(address types.Address) (path string, err error) {
 	return path, err
 }
 
+// NOTE: This should not be used to retrieve `Networks`.
+// NetworkManager should be used instead, otherwise RPCURL will be empty
 func (db *Database) GetNodeConfig() (*params.NodeConfig, error) {
 	return nodecfg.GetNodeConfigFromDB(db.db)
 }

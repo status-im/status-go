@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/status-im/status-go/contracts/directory"
 	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/hop"
@@ -149,18 +148,6 @@ func (c *ContractMaker) NewDirectory(chainID uint64) (*directory.Directory, erro
 	}
 
 	backend, err := c.RPCClient.EthClient(chainID)
-	if err != nil {
-		return nil, err
-	}
-
-	return directory.NewDirectory(
-		contractAddr,
-		backend,
-	)
-}
-
-func (c *ContractMaker) NewDirectoryWithBackend(chainID uint64, backend *ethclient.Client) (*directory.Directory, error) {
-	contractAddr, err := directory.ContractAddress(chainID)
 	if err != nil {
 		return nil, err
 	}
