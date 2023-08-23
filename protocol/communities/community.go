@@ -1336,14 +1336,13 @@ func (o *Community) tokenPermissions() map[string]*CommunityTokenPermission {
 
 		switch event.Type {
 		case protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGE:
-			tokenPermission := result[event.TokenPermission.Id]
-			if tokenPermission != nil {
-				tokenPermission.State = TokenPermissionUpdatePending
+			eventsTokenPermission := NewCommunityTokenPermission(event.TokenPermission)
+			if result[event.TokenPermission.Id] != nil {
+				eventsTokenPermission.State = TokenPermissionUpdatePending
 			} else {
-				tokenPermission := NewCommunityTokenPermission(event.TokenPermission)
-				tokenPermission.State = TokenPermissionAdditionPending
-				result[event.TokenPermission.Id] = tokenPermission
+				eventsTokenPermission.State = TokenPermissionAdditionPending
 			}
+			result[eventsTokenPermission.Id] = eventsTokenPermission
 
 		case protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETE:
 			tokenPermission := result[event.TokenPermission.Id]
