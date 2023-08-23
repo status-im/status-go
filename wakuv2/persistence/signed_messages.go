@@ -87,6 +87,7 @@ func (p *ProtectedTopicsStore) ProtectedTopics() ([]ProtectedTopic, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	var result []ProtectedTopic
 	for rows.Next() {

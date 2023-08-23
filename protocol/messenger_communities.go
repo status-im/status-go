@@ -670,8 +670,8 @@ func (m *Messenger) subscribeToCommunityShard(communityID []byte) error {
 	// TODO: this should probably be moved completely to transport once pubsub topic logic is implemented
 
 	pubsubTopic := transport.GetPubsubTopic(communityID)
-	var communityPubKey *ecdsa.PublicKey
-	return m.transport.SubscribeToPubsubTopic(pubsubTopic, communityPubKey)
+	// var communityPubKey *ecdsa.PublicKey
+	return m.transport.SubscribeToPubsubTopic(pubsubTopic, nil)
 }
 
 func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexBytes, forceJoin bool) (*MessengerResponse, error) {
