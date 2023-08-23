@@ -55,7 +55,11 @@ func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
 
 		serverCert, err = getServerCert(u)
 		if err != nil {
-			certErrs = fmt.Errorf("%sconnecting to '%s' failed: %s; ", certErrs.Error(), u, err.Error())
+			var certErr string
+			if certErrs != nil {
+				certErr = certErrs.Error()
+			}
+			certErrs = fmt.Errorf("%sconnecting to '%s' failed: %s; ", certErr, u, err.Error())
 			continue
 		}
 
