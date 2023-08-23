@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
 type TestServiceAPI struct{}
@@ -22,8 +24,27 @@ func (api *TestServiceAPI) SomeMethod(_ context.Context) (string, error) {
 	return "some method result", nil
 }
 
-func setupTestDB() (*sql.DB, func() error, error) {
-	return helpers.SetupTestSQLDB(appdatabase.DbInitializer{}, "tests")
+func setupTestDBs() (appDB *sql.DB, walletDB *sql.DB, closeFn func() error, err error) {
+	appDB, err = helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to setup app db: %w", err)
+	}
+
+	walletDB, err = helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to setup wallet db: %w", err)
+	}
+	return appDB, walletDB, func() error {
+		appErr := appDB.Close()
+		walletErr := walletDB.Close()
+		if appErr != nil {
+			return fmt.Errorf("failed to close app db: %w", appErr)
+		}
+		if walletErr != nil {
+			return fmt.Errorf("failed to close wallet db: %w", walletErr)
+		}
+		return nil
+	}, err
 }
 
 func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {
@@ -47,7 +68,7 @@ func setupTestMultiDB() (*multiaccounts.Database, func() error, error) {
 func createAndStartStatusNode(config *params.NodeConfig) (*StatusNode, error) {
 	statusNode := New(nil)
 
-	db, stop, err := setupTestDB()
+	appDB, walletDB, stop, err := setupTestDBs()
 	defer func() {
 		err := stop()
 		if err != nil {
@@ -57,7 +78,8 @@ func createAndStartStatusNode(config *params.NodeConfig) (*StatusNode, error) {
 	if err != nil {
 		return nil, err
 	}
-	statusNode.appDB = db
+	statusNode.appDB = appDB
+	statusNode.walletDB = walletDB
 
 	ma, stop2, err := setupTestMultiDB()
 	defer func() {
@@ -80,12 +102,13 @@ func createAndStartStatusNode(config *params.NodeConfig) (*StatusNode, error) {
 }
 
 func createStatusNode() (*StatusNode, func() error, func() error, error) {
-	db, stop1, err := setupTestDB()
+	appDB, walletDB, stop1, err := setupTestDBs()
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	statusNode := New(nil)
-	statusNode.SetAppDB(db)
+	statusNode.SetAppDB(appDB)
+	statusNode.SetWalletDB(walletDB)
 
 	ma, stop2, err := setupTestMultiDB()
 	statusNode.SetMultiaccountsDB(ma)
