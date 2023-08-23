@@ -25,9 +25,9 @@ const assetLimitV2 = 50
 func getV2BaseURL(chainID walletCommon.ChainID) (string, error) {
 	switch uint64(chainID) {
 	case walletCommon.EthereumMainnet, walletCommon.ArbitrumMainnet, walletCommon.OptimismMainnet:
-		return "https://api.opensea.io/api/v2", nil
+		return "https://api.opensea.io/v2", nil
 	case walletCommon.EthereumGoerli, walletCommon.EthereumSepolia, walletCommon.ArbitrumGoerli, walletCommon.OptimismGoerli:
-		return "https://testnets-api.opensea.io/api/v2", nil
+		return "https://testnets-api.opensea.io/v2", nil
 	}
 
 	return "", thirdparty.ErrChainIDNotSupported
@@ -155,6 +155,13 @@ func (o *ClientV2) fetchAssets(chainID walletCommon.ChainID, pathParams []string
 			return nil, err
 		}
 		o.connectionStatus.SetIsConnected(true)
+
+		// If body is empty, it means the account has no collectibles for this chain.
+		// (Workaround implemented in http_client.go)
+		if body == nil {
+			assets.NextCursor = ""
+			break
+		}
 
 		// if Json is not returned there must be an error
 		if !json.Valid(body) {
