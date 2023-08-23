@@ -15,7 +15,7 @@ func (m PinnedMessages) GetClock(i int) uint64 {
 }
 
 type PinMessage struct {
-	protobuf.PinMessage
+	*protobuf.PinMessage
 
 	// ID calculated as keccak256(compressedAuthorPubKey, data) where data is unencrypted payload.
 	ID string `json:"id"`
@@ -33,6 +33,10 @@ type PinMessage struct {
 	Alias string `json:"alias"`
 
 	Message *PinnedMessage `json:"pinnedMessage"`
+}
+
+func NewPinMessage() *PinMessage {
+	return &PinMessage{PinMessage: &protobuf.PinMessage{}}
 }
 
 type PinnedMessage struct {
@@ -59,11 +63,11 @@ func (m *PinMessage) GetGrant() []byte {
 // GetProtoBuf returns the struct's embedded protobuf struct
 // this function is required to implement the ChatEntity interface
 func (m *PinMessage) GetProtobuf() proto.Message {
-	return &m.PinMessage
+	return m.PinMessage
 }
 
 // GetSigPubKey returns an ecdsa encoded public key
 // this function is required to implement the ChatEntity interface
-func (m PinMessage) GetSigPubKey() *ecdsa.PublicKey {
+func (m *PinMessage) GetSigPubKey() *ecdsa.PublicKey {
 	return m.SigPubKey
 }

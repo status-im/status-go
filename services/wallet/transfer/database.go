@@ -170,49 +170,13 @@ func (db *Database) ProcessTransfers(chainID uint64, transfers []Transfer, remov
 	return
 }
 
-// SaveTransfersMarkBlocksLoaded
-func (db *Database) SaveTransfersMarkBlocksLoaded(chainID uint64, address common.Address, transfers []Transfer, blocks []*big.Int) (err error) {
-	err = db.SaveTransfers(chainID, address, transfers)
-	if err != nil {
-		return
-	}
-
-	var tx *sql.Tx
-	tx, err = db.client.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		_ = tx.Rollback()
-	}()
-	err = markBlocksAsLoaded(chainID, tx, address, blocks)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
-// SaveTransfers
-func (db *Database) SaveTransfers(chainID uint64, address common.Address, transfers []Transfer) (err error) {
-	var tx *sql.Tx
-	tx, err = db.client.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		_ = tx.Rollback()
-	}()
-
+func saveTransfersMarkBlocksLoaded(tx *sql.Tx, chainID uint64, address common.Address, transfers []Transfer, blocks []*big.Int) (err error) {
 	err = updateOrInsertTransfers(chainID, tx, transfers)
+	if err != nil {
+		return
+	}
+
+	err = markBlocksAsLoaded(chainID, tx, address, blocks)
 	if err != nil {
 		return
 	}

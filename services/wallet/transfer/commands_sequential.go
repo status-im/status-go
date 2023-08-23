@@ -319,7 +319,7 @@ func (c *findBlocksCommand) fastIndexErc20(ctx context.Context, fromBlockNumber 
 }
 
 func loadTransfersLoop(ctx context.Context, account common.Address, blockDAO *BlockDAO, db *Database,
-	chainClient *chain.ClientWithFallback, transactionManager *TransactionManager, pendingTxManager *transactions.TransactionManager,
+	chainClient *chain.ClientWithFallback, transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
 	tokenManager *token.Manager, feed *event.Feed, blocksLoadedCh <-chan []*DBHeader) {
 
 	log.Debug("loadTransfersLoop start", "chain", chainClient.ChainID, "account", account)
@@ -348,7 +348,7 @@ func loadTransfersLoop(ctx context.Context, account common.Address, blockDAO *Bl
 
 func newLoadBlocksAndTransfersCommand(account common.Address, db *Database,
 	blockDAO *BlockDAO, chainClient *chain.ClientWithFallback, feed *event.Feed,
-	transactionManager *TransactionManager, pendingTxManager *transactions.TransactionManager,
+	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
 	tokenManager *token.Manager) *loadBlocksAndTransfersCommand {
 
 	return &loadBlocksAndTransfersCommand{
@@ -377,7 +377,7 @@ type loadBlocksAndTransfersCommand struct {
 	errorsCount   int
 	// nonArchivalRPCNode bool // TODO Make use of it
 	transactionManager *TransactionManager
-	pendingTxManager   *transactions.TransactionManager
+	pendingTxManager   *transactions.PendingTxTracker
 	tokenManager       *token.Manager
 	blocksLoadedCh     chan []*DBHeader
 

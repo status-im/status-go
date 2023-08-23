@@ -44,8 +44,8 @@ import (
 	"github.com/status-im/status-go/server/pairing/statecontrol"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/typeddata"
+	wcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/transactions"
@@ -248,7 +248,16 @@ func (b *GethStatusBackend) DeleteMultiaccount(keyUID string, keyStoreDir string
 		return err
 	}
 
-	appDbPath := b.getAppDBPath(keyUID)
+	appDbPath, err := b.getAppDBPath(keyUID)
+	if err != nil {
+		return err
+	}
+
+	walletDbPath, err := b.getWalletDBPath(keyUID)
+	if err != nil {
+		return err
+	}
+
 	dbFiles := []string{
 		filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", keyUID)),
 		filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql-shm", keyUID)),
@@ -259,6 +268,9 @@ func (b *GethStatusBackend) DeleteMultiaccount(keyUID string, keyStoreDir string
 		appDbPath,
 		appDbPath + "-shm",
 		appDbPath + "-wal",
+		walletDbPath,
+		walletDbPath + "-shm",
+		walletDbPath + "-wal",
 	}
 	for _, path := range dbFiles {
 		if _, err := os.Stat(path); err == nil {
@@ -304,9 +316,12 @@ func (b *GethStatusBackend) runDBFileMigrations(account multiaccounts.Account, p
 	// Migrate file path to fix issue https://github.com/status-im/status-go/issues/2027
 	unsupportedPath := filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", account.KeyUID))
 	v3Path := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", account.KeyUID))
-	v4Path := b.getAppDBPath(account.KeyUID)
+	v4Path, err := b.getAppDBPath(account.KeyUID)
+	if err != nil {
+		return "", err
+	}
 
-	_, err := os.Stat(unsupportedPath)
+	_, err = os.Stat(unsupportedPath)
 	if err == nil {
 		err := os.Rename(unsupportedPath, v3Path)
 		if err != nil {
@@ -364,11 +379,37 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 
 	b.appDB, err = appdatabase.InitializeDB(dbFilePath, password, account.KDFIterations)
 	if err != nil {
-		b.log.Error("failed to initialize db", "err", err)
+		b.log.Error("failed to initialize db", "err", err.Error())
 		return err
 	}
 	b.statusNode.SetAppDB(b.appDB)
 	return nil
+}
+
+func fileExists(path string) bool {
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+
+	return true
+}
+
+func (b *GethStatusBackend) walletDBExists(keyUID string) bool {
+	path, err := b.getWalletDBPath(keyUID)
+	if err != nil {
+		return false
+	}
+
+	return fileExists(path)
+}
+
+func (b *GethStatusBackend) appDBExists(keyUID string) bool {
+	path, err := b.getAppDBPath(keyUID)
+	if err != nil {
+		return false
+	}
+
+	return fileExists(path)
 }
 
 func (b *GethStatusBackend) ensureWalletDBOpened(account multiaccounts.Account, password string) (err error) {
@@ -377,14 +418,15 @@ func (b *GethStatusBackend) ensureWalletDBOpened(account multiaccounts.Account, 
 	if b.walletDB != nil {
 		return nil
 	}
-	if len(b.rootDataDir) == 0 {
-		return errors.New("root datadir wasn't provided")
+
+	dbWalletPath, err := b.getWalletDBPath(account.KeyUID)
+	if err != nil {
+		return err
 	}
 
-	dbWalletPath := b.getWalletDBPath(account.KeyUID)
 	b.walletDB, err = walletdatabase.InitializeDB(dbWalletPath, password, account.KDFIterations)
 	if err != nil {
-		b.log.Error("failed to initialize wallet db", "err", err)
+		b.log.Error("failed to initialize wallet db", "err", err.Error())
 		return err
 	}
 	b.statusNode.SetWalletDB(b.walletDB)
@@ -815,13 +857,13 @@ func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account,
 	if b.appDB != nil {
 		return nil
 	}
-	if len(b.rootDataDir) == 0 {
-		return errors.New("root datadir wasn't provided")
+
+	path, err := b.getAppDBPath(acc.KeyUID)
+	if err != nil {
+		return err
 	}
 
-	path := b.getAppDBPath(acc.KeyUID)
-
-	err := dbsetup.EncryptDatabase(databasePath, path, password, acc.KDFIterations, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
+	err = dbsetup.EncryptDatabase(databasePath, path, password, acc.KDFIterations, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
 	if err != nil {
 		b.log.Error("failed to initialize db", "err", err)
 		return err
@@ -858,7 +900,12 @@ func (b *GethStatusBackend) ChangeDatabasePassword(keyUID string, password strin
 		return fmt.Errorf("failed to get database file name, %w", err)
 	}
 
-	isCurrentAccount := b.getAppDBPath(keyUID) == internalDbPath
+	appDBPath, err := b.getAppDBPath(keyUID)
+	if err != nil {
+		return err
+	}
+
+	isCurrentAccount := appDBPath == internalDbPath
 
 	restartNode := func() {
 		if isCurrentAccount {
@@ -913,7 +960,11 @@ func (b *GethStatusBackend) changeAppDBPassword(account *multiaccounts.Account, 
 	}
 	defer cleanup()
 
-	dbPath := b.getAppDBPath(account.KeyUID)
+	dbPath, err := b.getAppDBPath(account.KeyUID)
+	if err != nil {
+		return err
+	}
+
 	// Exporting database to a temporary file with a new password
 	err = dbsetup.ExportDB(dbPath, password, account.KDFIterations, tmpDbPath, newPassword, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
 	if err != nil {
@@ -951,7 +1002,11 @@ func (b *GethStatusBackend) changeWalletDBPassword(account *multiaccounts.Accoun
 	}
 	defer cleanup()
 
-	dbPath := b.getWalletDBPath(account.KeyUID)
+	dbPath, err := b.getWalletDBPath(account.KeyUID)
+	if err != nil {
+		return err
+	}
+
 	// Exporting database to a temporary file with a new password
 	err = dbsetup.ExportDB(dbPath, password, account.KDFIterations, tmpDbPath, newPassword, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
 	if err != nil {
@@ -1363,6 +1418,10 @@ func (b *GethStatusBackend) VerifyDatabasePassword(keyUID string, password strin
 		return err
 	}
 
+	if !b.appDBExists(keyUID) || !b.walletDBExists(keyUID) {
+		return errors.New("One or more databases not created")
+	}
+
 	err = b.ensureDBsOpened(multiaccounts.Account{KeyUID: keyUID, KDFIterations: kdfIterations}, password)
 	if err != nil {
 		return err
@@ -1730,12 +1789,17 @@ func (b *GethStatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, pa
 		return
 	}
 
-	go b.statusNode.RPCFiltersService().TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
-		Hash:    common.Hash(hash),
-		Type:    string(transactions.WalletTransfer),
-		From:    common.Address(sendArgs.From),
-		ChainID: b.transactor.NetworkID(),
-	})
+	err = b.statusNode.PendingTracker().TrackPendingTransaction(
+		wcommon.ChainID(b.transactor.NetworkID()),
+		common.Hash(hash),
+		common.Address(sendArgs.From),
+		transactions.WalletTransfer,
+		transactions.AutoDelete,
+	)
+	if err != nil {
+		log.Error("TrackPendingTransaction error", "error", err)
+		return
+	}
 
 	return
 }
@@ -1751,12 +1815,17 @@ func (b *GethStatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs 
 		return
 	}
 
-	go b.statusNode.RPCFiltersService().TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
-		Hash:    common.Hash(hash),
-		Type:    string(transactions.WalletTransfer),
-		From:    common.Address(sendArgs.From),
-		ChainID: b.transactor.NetworkID(),
-	})
+	err = b.statusNode.PendingTracker().TrackPendingTransaction(
+		wcommon.ChainID(b.transactor.NetworkID()),
+		common.Hash(hash),
+		common.Address(sendArgs.From),
+		transactions.WalletTransfer,
+		transactions.AutoDelete,
+	)
+	if err != nil {
+		log.Error("TrackPendingTransaction error", "error", err)
+		return
+	}
 
 	return
 }
@@ -1767,12 +1836,17 @@ func (b *GethStatusBackend) SendTransactionWithSignature(sendArgs transactions.S
 		return
 	}
 
-	go b.statusNode.RPCFiltersService().TriggerTransactionSentToUpstreamEvent(&rpcfilters.PendingTxInfo{
-		Hash:    common.Hash(hash),
-		Type:    string(transactions.WalletTransfer),
-		From:    common.Address(sendArgs.From),
-		ChainID: b.transactor.NetworkID(),
-	})
+	err = b.statusNode.PendingTracker().TrackPendingTransaction(
+		wcommon.ChainID(b.transactor.NetworkID()),
+		common.Hash(hash),
+		common.Address(sendArgs.From),
+		transactions.WalletTransfer,
+		transactions.AutoDelete,
+	)
+	if err != nil {
+		log.Error("TrackPendingTransaction error", "error", err)
+		return
+	}
 
 	return
 }
@@ -2268,10 +2342,18 @@ func (b *GethStatusBackend) SwitchFleet(fleet string, conf *params.NodeConfig) e
 	return nil
 }
 
-func (b *GethStatusBackend) getAppDBPath(keyUID string) string {
-	return filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db", keyUID))
+func (b *GethStatusBackend) getAppDBPath(keyUID string) (string, error) {
+	if len(b.rootDataDir) == 0 {
+		return "", errors.New("root datadir wasn't provided")
+	}
+
+	return filepath.Join(b.rootDataDir, fmt.Sprintf("%s-v4.db", keyUID)), nil
 }
 
-func (b *GethStatusBackend) getWalletDBPath(keyUID string) string {
-	return filepath.Join(b.rootDataDir, fmt.Sprintf("%s-wallet.db", keyUID))
+func (b *GethStatusBackend) getWalletDBPath(keyUID string) (string, error) {
+	if len(b.rootDataDir) == 0 {
+		return "", errors.New("root datadir wasn't provided")
+	}
+
+	return filepath.Join(b.rootDataDir, fmt.Sprintf("%s-wallet.db", keyUID)), nil
 }

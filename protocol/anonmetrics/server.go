@@ -49,7 +49,7 @@ func (s *Server) Stop() error {
 	return nil
 }
 
-func (s *Server) StoreMetrics(appMetricsBatch protobuf.AnonymousMetricBatch) (appMetrics []*appmetrics.AppMetric, err error) {
+func (s *Server) StoreMetrics(appMetricsBatch *protobuf.AnonymousMetricBatch) (appMetrics []*appmetrics.AppMetric, err error) {
 	if s.Config.Active != ActiveServerPhrase {
 		return nil, nil
 	}

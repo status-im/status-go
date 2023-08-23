@@ -714,11 +714,6 @@ func (s *MessageSender) HandleMessages(shhMessage *types.Message) ([]*v1protocol
 		if err != nil {
 			hlogger.Error("failed to handle application metadata layer message", zap.Error(err))
 		}
-
-		err = statusMessage.HandleApplication()
-		if err != nil {
-			hlogger.Error("failed to handle application layer message", zap.Error(err))
-		}
 	}
 
 	return statusMessages, acks, nil

@@ -25,6 +25,10 @@ type FeeHistory struct {
 	BaseFeePerGas []string `json:"baseFeePerGas"`
 }
 
+type ClientInterface interface {
+	BatchCallContext(ctx context.Context, b []rpc.BatchElem) error
+}
+
 type ClientWithFallback struct {
 	ChainID  uint64
 	main     *ethclient.Client
@@ -813,6 +817,15 @@ func (c *ClientWithFallback) CallContext(ctx context.Context, result interface{}
 	return c.makeCallNoReturn(
 		func() error { return c.mainRPC.CallContext(ctx, result, method, args...) },
 		func() error { return c.fallbackRPC.CallContext(ctx, result, method, args...) },
+	)
+}
+
+func (c *ClientWithFallback) BatchCallContext(ctx context.Context, b []rpc.BatchElem) error {
+	rpcstats.CountCall("eth_BatchCallContext")
+
+	return c.makeCallNoReturn(
+		func() error { return c.mainRPC.BatchCallContext(ctx, b) },
+		func() error { return c.fallbackRPC.BatchCallContext(ctx, b) },
 	)
 }
 

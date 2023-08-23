@@ -30,6 +30,8 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/services/collectibles"
+	walletToken "github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -73,8 +75,50 @@ func (m *TokenManagerMock) GetBalancesByChain(ctx context.Context, accounts, tok
 	return *m.Balances, nil
 }
 
+func (m *TokenManagerMock) UpsertCustom(token walletToken.Token) error {
+	time.Sleep(100 * time.Millisecond) // simulate response time
+	return nil
+}
+
+type CollectiblesServiceMock struct {
+	Collectibles map[uint64]map[string]*collectibles.CollectibleContractData
+	Assets       map[uint64]map[string]*collectibles.AssetContractData
+}
+
+func (c *CollectiblesServiceMock) GetCollectibleContractData(chainID uint64, contractAddress string) (*collectibles.CollectibleContractData, error) {
+	collectibleContractData, dataExists := c.Collectibles[chainID][contractAddress]
+	if dataExists {
+		return collectibleContractData, nil
+	}
+	return nil, nil
+}
+
+func (c *CollectiblesServiceMock) GetAssetContractData(chainID uint64, contractAddress string) (*collectibles.AssetContractData, error) {
+	assetsContractData, dataExists := c.Assets[chainID][contractAddress]
+	if dataExists {
+		return assetsContractData, nil
+	}
+	return nil, nil
+}
+
+func (c *CollectiblesServiceMock) SetMockCollectibleContractData(chainID uint64, contractAddress string, collectible *collectibles.CollectibleContractData) {
+	if c.Collectibles == nil {
+		c.Collectibles = make(map[uint64]map[string]*collectibles.CollectibleContractData)
+	}
+	c.Collectibles[chainID] = make(map[string]*collectibles.CollectibleContractData)
+	c.Collectibles[chainID][contractAddress] = collectible
+}
+
+func (c *CollectiblesServiceMock) SetMockAssetContractData(chainID uint64, contractAddress string, assetData *collectibles.AssetContractData) {
+	if c.Assets == nil {
+		c.Assets = make(map[uint64]map[string]*collectibles.AssetContractData)
+	}
+	c.Assets[chainID] = make(map[string]*collectibles.AssetContractData)
+	c.Assets[chainID][contractAddress] = assetData
+}
+
 func newMessenger(s *suite.Suite, shh types.Waku, logger *zap.Logger, password string, walletAddresses []string,
-	mockedBalances *map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big) *Messenger {
+	mockedBalances *map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, collectiblesService collectibles.ServiceInterface) *Messenger {
 	accountsManagerMock := &AccountManagerMock{}
 	accountsManagerMock.AccountsMap = make(map[string]string)
 	for _, walletAddress := range walletAddresses {
@@ -88,7 +132,7 @@ func newMessenger(s *suite.Suite, shh types.Waku, logger *zap.Logger, password s
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	messenger, err := newCommunitiesTestMessenger(shh, privateKey, logger, accountsManagerMock, tokenManagerMock)
+	messenger, err := newCommunitiesTestMessenger(shh, privateKey, logger, accountsManagerMock, tokenManagerMock, collectiblesService)
 	s.Require().NoError(err)
 
 	currentDistributorObj, ok := messenger.communitiesKeyDistributor.(*CommunitiesKeyDistributorImpl)
@@ -116,7 +160,8 @@ func newMessenger(s *suite.Suite, shh types.Waku, logger *zap.Logger, password s
 	return messenger
 }
 
-func newCommunitiesTestMessenger(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, accountsManager account.Manager, tokenManager communities.TokenManager) (*Messenger, error) {
+func newCommunitiesTestMessenger(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, accountsManager account.Manager,
+	tokenManager communities.TokenManager, collectiblesService collectibles.ServiceInterface) (*Messenger, error) {
 	tmpfile, err := ioutil.TempFile("", "accounts-tests-")
 	if err != nil {
 		return nil, err
@@ -147,6 +192,10 @@ func newCommunitiesTestMessenger(shh types.Waku, privateKey *ecdsa.PrivateKey, l
 		WithAccount(iai.ToMultiAccount()),
 		WithDatasync(),
 		WithTokenManager(tokenManager),
+	}
+
+	if collectiblesService != nil {
+		options = append(options, WithCollectiblesService(collectiblesService))
 	}
 
 	m, err := NewMessenger(
@@ -245,7 +294,7 @@ func createCommunity(s *suite.Suite, owner *Messenger) (*communities.Community, 
 func advertiseCommunityTo(s *suite.Suite, community *communities.Community, owner *Messenger, user *Messenger) {
 	chat := CreateOneToOneChat(common.PubkeyToHex(&user.identity.PublicKey), &user.identity.PublicKey, user.transport)
 
-	inputMessage := &common.Message{}
+	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
 	inputMessage.Text = "some text"
 	inputMessage.CommunityID = community.IDString()
@@ -374,7 +423,7 @@ func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, co
 
 func sendChatMessage(s *suite.Suite, sender *Messenger, chatID string, text string) *common.Message {
 	msg := &common.Message{
-		ChatMessage: protobuf.ChatMessage{
+		ChatMessage: &protobuf.ChatMessage{
 			ChatId:      chatID,
 			ContentType: protobuf.ChatMessage_TEXT_PLAIN,
 			Text:        text,

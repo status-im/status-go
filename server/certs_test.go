@@ -1,6 +1,7 @@
 package server
 
 import (
+	"net"
 	"testing"
 	"time"
 
@@ -42,12 +43,12 @@ func (s *CertsSuite) TestGenerateX509Cert() {
 	notBefore := time.Now()
 	notAfter := notBefore.Add(time.Hour)
 
-	c1 := GenerateX509Cert(s.SN, notBefore, notAfter, Localhost)
+	c1 := GenerateX509Cert(s.SN, notBefore, notAfter, []net.IP{}, []string{Localhost})
 	s.Require().Exactly([]string{Localhost}, c1.DNSNames)
-	s.Require().Nil(c1.IPAddresses)
+	s.Require().Empty(c1.IPAddresses)
 
-	c2 := GenerateX509Cert(s.SN, notBefore, notAfter, DefaultIP.String())
+	c2 := GenerateX509Cert(s.SN, notBefore, notAfter, []net.IP{LocalHostIP}, []string{})
 	s.Require().Len(c2.IPAddresses, 1)
-	s.Require().Equal(DefaultIP.String(), c2.IPAddresses[0].String())
-	s.Require().Nil(c2.DNSNames)
+	s.Require().Equal(LocalHostIP.String(), c2.IPAddresses[0].String())
+	s.Require().Empty(c2.DNSNames)
 }

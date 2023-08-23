@@ -11,12 +11,10 @@ message CommunityPrivilegedUserSyncMessage {
   EventType type = 2;
   bytes community_id = 3;
   map<string,CommunityRequestToJoin> request_to_join = 4;
-  repeated CommunityToken community_tokens = 5;
 
   enum EventType {
     UNKNOWN = 0;
     CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN = 1;
     CONTROL_NODE_REJECT_REQUEST_TO_JOIN = 2;
-    ADD_COMMUNITY_TOKENS = 3;
   }
 }

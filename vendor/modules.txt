@@ -945,9 +945,13 @@ github.com/status-im/zxcvbn-go/match
 github.com/status-im/zxcvbn-go/matching
 github.com/status-im/zxcvbn-go/scoring
 github.com/status-im/zxcvbn-go/utils/math
+# github.com/stretchr/objx v0.5.0
+## explicit; go 1.12
+github.com/stretchr/objx
 # github.com/stretchr/testify v1.8.4
 ## explicit; go 1.20
 github.com/stretchr/testify/assert
+github.com/stretchr/testify/mock
 github.com/stretchr/testify/require
 github.com/stretchr/testify/suite
 # github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a

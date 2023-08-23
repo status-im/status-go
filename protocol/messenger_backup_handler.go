@@ -6,6 +6,7 @@ import (
 	ensservice "github.com/status-im/status-go/services/ens"
 
 	"github.com/status-im/status-go/protocol/identity"
+	v1protocol "github.com/status-im/status-go/protocol/v1"
 
 	"go.uber.org/zap"
 
@@ -23,7 +24,22 @@ const (
 	SyncWakuSectionKeyWatchOnlyAccounts = "watchOnlyAccounts"
 )
 
-func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.Backup) []error {
+func (m *Messenger) HandleBackup(state *ReceivedMessageState, message *protobuf.Backup, statusMessage *v1protocol.StatusMessage) error {
+	if !m.processBackedupMessages {
+		return nil
+	}
+
+	errors := m.handleBackup(state, message)
+	if len(errors) > 0 {
+		for _, err := range errors {
+			m.logger.Warn("failed to handle Backup", zap.Error(err))
+		}
+		return errors[0]
+	}
+	return nil
+}
+
+func (m *Messenger) handleBackup(state *ReceivedMessageState, message *protobuf.Backup) []error {
 	var errors []error
 
 	err := m.handleBackedUpProfile(message.Profile, message.Clock)
@@ -32,14 +48,14 @@ func (m *Messenger) HandleBackup(state *ReceivedMessageState, message protobuf.B
 	}
 
 	for _, contact := range message.Contacts {
-		err = m.HandleSyncInstallationContact(state, *contact)
+		err = m.HandleSyncInstallationContactV2(state, contact, nil)
 		if err != nil {
 			errors = append(errors, err)
 		}
 	}
 
 	for _, community := range message.Communities {
-		err = m.handleSyncCommunity(state, *community)
+		err = m.handleSyncInstallationCommunity(state, community, nil)
 		if err != nil {
 			errors = append(errors, err)
 		}
@@ -154,7 +170,7 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 
 	var ensUsernameDetails []*ensservice.UsernameDetail
 	for _, d := range message.EnsUsernameDetails {
-		dd, err := m.saveEnsUsernameDetailProto(*d)
+		dd, err := m.saveEnsUsernameDetailProto(d)
 		if err != nil {
 			return err
 		}

@@ -142,7 +142,7 @@ func (s *MessengerActivityCenterMessageSuite) TestEveryoneMentionTag() {
 	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, bob.transport)
 
 	// bob sends a community message
-	inputMessage := &common.Message{}
+	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
 	inputMessage.Text = "some text"
 	inputMessage.CommunityID = community.IDString()
@@ -171,7 +171,7 @@ func (s *MessengerActivityCenterMessageSuite) TestEveryoneMentionTag() {
 	defaultCommunityChatID := response.Chats()[0].ID
 
 	// bob sends a community message
-	inputMessage = &common.Message{}
+	inputMessage = common.NewMessage()
 	inputMessage.ChatId = defaultCommunityChatID
 	inputMessage.Text = "Good news, @" + common.EveryoneMentionTag + " !"
 	inputMessage.CommunityID = community.IDString()
@@ -232,7 +232,7 @@ func (s *MessengerActivityCenterMessageSuite) TestReplyWithImage() {
 	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, bob.transport)
 
 	// bob sends a community message
-	inputMessage := &common.Message{}
+	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
 	inputMessage.Text = "some text"
 	inputMessage.CommunityID = community.IDString()
@@ -263,7 +263,7 @@ func (s *MessengerActivityCenterMessageSuite) TestReplyWithImage() {
 	defaultCommunityChatID := defaultCommunityChat.ID
 
 	// bob sends a community message
-	inputMessage = &common.Message{}
+	inputMessage = common.NewMessage()
 	inputMessage.ChatId = defaultCommunityChatID
 	inputMessage.Text = "test message"
 	inputMessage.CommunityID = community.IDString()

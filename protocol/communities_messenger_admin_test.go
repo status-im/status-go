@@ -33,9 +33,10 @@ type AdminCommunityEventsSuite struct {
 	alice *Messenger
 	// If one wants to send messages between different instances of Messenger,
 	// a single Waku service should be shared.
-	shh            types.Waku
-	logger         *zap.Logger
-	mockedBalances map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big // chainID, account, token, balance
+	shh                     types.Waku
+	logger                  *zap.Logger
+	mockedBalances          map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big // chainID, account, token, balance
+	collectiblesServiceMock *CollectiblesServiceMock
 }
 
 func (s *AdminCommunityEventsSuite) GetControlNode() *Messenger {
@@ -54,8 +55,13 @@ func (s *AdminCommunityEventsSuite) GetSuite() *suite.Suite {
 	return &s.Suite
 }
 
+func (s *AdminCommunityEventsSuite) GetCollectiblesServiceMock() *CollectiblesServiceMock {
+	return s.collectiblesServiceMock
+}
+
 func (s *AdminCommunityEventsSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
+	s.collectiblesServiceMock = &CollectiblesServiceMock{}
 
 	config := waku.DefaultConfig
 	config.MinimumAcceptedPoW = 0
@@ -84,7 +90,7 @@ func (s *AdminCommunityEventsSuite) TearDownTest() {
 }
 
 func (s *AdminCommunityEventsSuite) newMessenger(password string, walletAddresses []string) *Messenger {
-	return newMessenger(&s.Suite, s.shh, s.logger, password, walletAddresses, &s.mockedBalances)
+	return newMessenger(&s.Suite, s.shh, s.logger, password, walletAddresses, &s.mockedBalances, s.collectiblesServiceMock)
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminEditCommunityDescription() {
@@ -263,12 +269,27 @@ func (s *AdminCommunityEventsSuite) TestAdminAddCommunityToken() {
 	s.Require().Error(err)
 }
 
-func (s *TokenMasterCommunityEventsSuite) TestAdminAddTokenMasterAndOwnerToken() {
+func (s *AdminCommunityEventsSuite) TestAdminAddTokenMasterAndOwnerToken() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
 	testEventSenderAddTokenMasterAndOwnerToken(s, community)
 }
 
-func (s *AdminCommunityEventsSuite) TestMemberReceiveAdminEventsWhenOwnerOffline() {
+func (s *AdminCommunityEventsSuite) TestAdminReceiveOwnerTokenFromControlNode() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
+	testAddAndSyncTokenFromControlNode(s, community, token.OwnerLevel)
+}
+
+func (s *AdminCommunityEventsSuite) TestAdminReceiveTokenMasterTokenFromControlNode() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
+	testAddAndSyncTokenFromControlNode(s, community, token.MasterLevel)
+}
+
+func (s *AdminCommunityEventsSuite) TestAdminReceiveCommunityTokenFromControlNode() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
+	testAddAndSyncTokenFromControlNode(s, community, token.CommunityLevel)
+}
+
+func (s *AdminCommunityEventsSuite) TestMemberReceiveOwnerEventsWhenControlNodeOffline() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
 	testMemberReceiveEventsWhenControlNodeOffline(s, community)
 }

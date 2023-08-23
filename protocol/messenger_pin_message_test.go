@@ -45,9 +45,8 @@ func (s *MessengerPinMessageSuite) TestPinMessage() {
 	s.Require().NoError(err)
 	s.Require().Len(response.Chats(), 1)
 
-	pinMessage := &common.PinMessage{
-		LocalChatID: theirChat.ID,
-	}
+	pinMessage := common.NewPinMessage()
+	pinMessage.LocalChatID = theirChat.ID
 	pinMessage.MessageId = inputMessage.ID
 	pinMessage.Pinned = true
 	pinMessage.ChatId = theirChat.ID
@@ -133,7 +132,7 @@ func (s *MessengerPinMessageSuite) TestPinMessageOutOfOrder() {
 		&Contact{ID: s.m.myHexIdentity()},
 		1000,
 		handlePinMessageResponse,
-		unpinMessage,
+		&unpinMessage,
 	)
 	s.Require().NoError(err)
 
@@ -156,7 +155,7 @@ func (s *MessengerPinMessageSuite) TestPinMessageOutOfOrder() {
 		&Contact{ID: s.m.myHexIdentity()},
 		1000,
 		handlePinMessageResponse,
-		pinMessage,
+		&pinMessage,
 	)
 	s.Require().NoError(err)
 
@@ -180,7 +179,7 @@ func (s *MessengerPinMessageSuite) TestPinMessageOutOfOrder() {
 		&Contact{ID: s.m.myHexIdentity()},
 		1000,
 		handlePinMessageResponse,
-		pinMessage,
+		&pinMessage,
 	)
 	s.Require().NoError(err)
 

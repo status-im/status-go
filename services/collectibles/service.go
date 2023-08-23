@@ -8,18 +8,31 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/rpcfilters"
+	"github.com/status-im/status-go/transactions"
 )
+
+type ServiceInterface interface {
+	GetCollectibleContractData(chainID uint64, contractAddress string) (*CollectibleContractData, error)
+	GetAssetContractData(chainID uint64, contractAddress string) (*AssetContractData, error)
+}
 
 // Collectibles service
 type Service struct {
-	api *API
+	manager         *Manager
+	accountsManager *account.GethManager
+	pendingTracker  *transactions.PendingTxTracker
+	config          *params.NodeConfig
+	db              *Database
 }
 
 // Returns a new Collectibles Service.
-func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig, appDb *sql.DB) *Service {
+func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, pendingTracker *transactions.PendingTxTracker, config *params.NodeConfig, appDb *sql.DB) *Service {
 	return &Service{
-		NewAPI(rpcClient, accountsManager, rpcFiltersSrvc, config, appDb),
+		manager:         &Manager{rpcClient: rpcClient},
+		accountsManager: accountsManager,
+		pendingTracker:  pendingTracker,
+		config:          config,
+		db:              NewCommunityTokensDatabase(appDb),
 	}
 }
 
@@ -28,17 +41,13 @@ func (s *Service) Protocols() []p2p.Protocol {
 	return []p2p.Protocol{}
 }
 
-func (s *Service) API() *API {
-	return s.api
-}
-
 // APIs returns a list of new APIs.
 func (s *Service) APIs() []ethRpc.API {
 	return []ethRpc.API{
 		{
 			Namespace: "collectibles",
 			Version:   "0.1.0",
-			Service:   s.api,
+			Service:   NewAPI(s),
 			Public:    true,
 		},
 	}
@@ -52,4 +61,12 @@ func (s *Service) Start() error {
 // Stop is run when a service is stopped.
 func (s *Service) Stop() error {
 	return nil
+}
+
+func (s *Service) GetCollectibleContractData(chainID uint64, contractAddress string) (*CollectibleContractData, error) {
+	return s.manager.GetCollectibleContractData(chainID, contractAddress)
+}
+
+func (s *Service) GetAssetContractData(chainID uint64, contractAddress string) (*AssetContractData, error) {
+	return s.manager.GetAssetContractData(chainID, contractAddress)
 }

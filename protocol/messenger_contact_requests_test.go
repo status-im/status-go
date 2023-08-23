@@ -1203,13 +1203,12 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	state.CurrentMessageState = &CurrentMessageState{
 		PublicKey:        &contactKey.PublicKey,
 		MessageID:        "0xa",
-		Message:          message,
 		Contact:          contact,
 		WhisperTimestamp: 1,
 	}
 
 	response := state.Response
-	err = s.m.HandleChatMessage(state)
+	err = s.m.HandleChatMessage(state, &message, nil)
 	s.Require().NoError(err)
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
 	contacts := s.m.Contacts()
@@ -1219,7 +1218,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	retract := protobuf.RetractContactRequest{
 		Clock: 2,
 	}
-	err = s.m.HandleRetractContactRequest(state, retract)
+	err = s.m.HandleRetractContactRequest(state, &retract, nil)
 	s.Require().NoError(err)
 
 	// Nothing should have changed
@@ -1273,7 +1272,7 @@ func (s *MessengerContactRequestSuite) TestBobRestoresIncomingContactRequestFrom
 
 	// Restore alice's contact from backup
 	sync := s.syncInstallationContactV2FromContact(aliceFromBob)
-	err = bob2.HandleSyncInstallationContact(state, sync)
+	err = bob2.HandleSyncInstallationContactV2(state, &sync, nil)
 	s.Require().NoError(err)
 
 	// Accept latest CR for a contact
@@ -1353,7 +1352,7 @@ func (s *MessengerContactRequestSuite) TestAliceRestoresOutgoingContactRequestFr
 
 	// Restore alice's contact from backup
 	sync := s.syncInstallationContactV2FromContact(bobFromAlice)
-	err = alice2.HandleSyncInstallationContact(state, sync)
+	err = alice2.HandleSyncInstallationContactV2(state, &sync, nil)
 	s.Require().NoError(err)
 
 	// Accept latest CR for a contact
@@ -1455,6 +1454,7 @@ func (s *MessengerContactRequestSuite) blockContactAndSync(alice1 *Messenger, al
 	s.Require().Len(resp.ActivityCenterNotifications(), 1)
 	s.Require().Equal(resp.ActivityCenterNotifications()[0].Type, ActivityCenterNotificationTypeContactRemoved)
 
+	alice2.logger.Info("STARTING")
 	// Wait for Alice-2 to sync Bob blocked state
 	resp, err = WaitOnMessengerResponse(alice2, func(r *MessengerResponse) bool {
 		return len(r.Contacts) == 1

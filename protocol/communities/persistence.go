@@ -98,7 +98,7 @@ func (p *Persistence) ShouldHandleSyncCommunitySettings(settings *protobuf.SyncC
 	}
 }
 
-func (p *Persistence) ShouldHandleSyncCommunity(community *protobuf.SyncCommunity) (bool, error) {
+func (p *Persistence) ShouldHandleSyncCommunity(community *protobuf.SyncInstallationCommunity) (bool, error) {
 	// TODO see if there is a way to make this more elegant
 	// Keep the "*".
 	// When the test for this function fails because the table has changed we should update sync functionality

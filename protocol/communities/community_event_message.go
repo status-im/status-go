@@ -101,7 +101,7 @@ type CommunityEventsMessage struct {
 	Events                         []CommunityEvent `json:"events,omitempty"`
 }
 
-func (m *CommunityEventsMessage) ToProtobuf() protobuf.CommunityEventsMessage {
+func (m *CommunityEventsMessage) ToProtobuf() *protobuf.CommunityEventsMessage {
 	result := protobuf.CommunityEventsMessage{
 		CommunityId:                    m.CommunityID,
 		EventsBaseCommunityDescription: m.EventsBaseCommunityDescription,
@@ -116,7 +116,7 @@ func (m *CommunityEventsMessage) ToProtobuf() protobuf.CommunityEventsMessage {
 		result.SignedEvents = append(result.SignedEvents, signedEvent)
 	}
 
-	return result
+	return &result
 }
 
 func CommunityEventsMessageFromProtobuf(msg *protobuf.CommunityEventsMessage) (*CommunityEventsMessage, error) {
@@ -139,7 +139,7 @@ func CommunityEventsMessageFromProtobuf(msg *protobuf.CommunityEventsMessage) (*
 
 func (m *CommunityEventsMessage) Marshal() ([]byte, error) {
 	pb := m.ToProtobuf()
-	return proto.Marshal(&pb)
+	return proto.Marshal(pb)
 }
 
 func (c *Community) mergeCommunityEvents(communityEventMessage *CommunityEventsMessage) {

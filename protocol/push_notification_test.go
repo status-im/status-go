@@ -701,7 +701,7 @@ func (s *MessengerPushNotificationSuite) TestContactCode() {
 	s.Require().NoError(err)
 	s.Require().NotNil(contactCodeAdvertisement)
 
-	s.Require().NoError(alice.pushNotificationClient.HandleContactCodeAdvertisement(&bob1.identity.PublicKey, *contactCodeAdvertisement))
+	s.Require().NoError(alice.pushNotificationClient.HandleContactCodeAdvertisement(&bob1.identity.PublicKey, contactCodeAdvertisement))
 
 }
 
@@ -918,7 +918,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 	// Send a community message
 	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, alice.transport)
 
-	inputMessage := &common.Message{}
+	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
 	inputMessage.Text = "some text"
 	inputMessage.CommunityID = community.IDString()

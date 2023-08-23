@@ -14,6 +14,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -127,6 +128,9 @@ type StatusNode struct {
 	stickersSrvc           *stickers.Service
 	chatSrvc               *chat.Service
 	updatesSrvc            *updates.Service
+	pendingTracker         *transactions.PendingTxTracker
+
+	walletFeed event.Feed
 }
 
 // New makes new instance of StatusNode.
@@ -502,6 +506,7 @@ func (n *StatusNode) stop() error {
 	n.collectiblesSrvc = nil
 	n.stickersSrvc = nil
 	n.publicMethods = make(map[string]bool)
+	n.pendingTracker = nil
 
 	return nil
 }

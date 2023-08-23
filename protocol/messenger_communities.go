@@ -115,7 +115,7 @@ func (m *Messenger) publishCommunityEventsRejected(community *communities.Commun
 
 	communityEventsMessage := msg.ToProtobuf()
 	communityEventsMessageRejected := &protobuf.CommunityEventsMessageRejected{
-		Msg: &communityEventsMessage,
+		Msg: communityEventsMessage,
 	}
 
 	payload, err := proto.Marshal(communityEventsMessageRejected)
@@ -1105,7 +1105,7 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 
 	member := community.GetMember(m.IdentityPublicKey())
 
-	requestToEditRevealedAccountsProto := &protobuf.CommunityEditRevealedAccounts{
+	requestToEditRevealedAccountsProto := &protobuf.CommunityEditSharedAddresses{
 		Clock:            member.LastUpdateClock + 1,
 		CommunityId:      community.ID(),
 		RevealedAccounts: make([]*protobuf.RevealedAccount, 0),
@@ -2133,7 +2133,7 @@ func (m *Messenger) ShareCommunity(request *requests.ShareCommunity) (*Messenger
 
 	var messages []*common.Message
 	for _, pk := range request.Users {
-		message := &common.Message{}
+		message := common.NewMessage()
 		message.ChatId = pk.String()
 		message.CommunityID = request.CommunityID.String()
 		message.Text = fmt.Sprintf("Community %s has been shared with you", community.Name())
@@ -2564,8 +2564,8 @@ func (m *Messenger) passStoredCommunityInfoToSignalHandler(communityID string) {
 }
 
 // handleCommunityDescription handles an community description
-func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description protobuf.CommunityDescription, rawPayload []byte) error {
-	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, &description, rawPayload)
+func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawPayload []byte) error {
+	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload)
 	if err != nil {
 		return err
 	}
@@ -2683,8 +2683,9 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 	return nil
 }
 
-func (m *Messenger) handleCommunityEventsMessage(state *ReceivedMessageState, signer *ecdsa.PublicKey, message protobuf.CommunityEventsMessage) error {
-	communityResponse, err := m.communitiesManager.HandleCommunityEventsMessage(signer, &message)
+func (m *Messenger) HandleCommunityEventsMessage(state *ReceivedMessageState, message *protobuf.CommunityEventsMessage, statusMessage *v1protocol.StatusMessage) error {
+	signer := state.CurrentMessageState.PublicKey
+	communityResponse, err := m.communitiesManager.HandleCommunityEventsMessage(signer, message)
 	if err != nil {
 		return err
 	}
@@ -2693,8 +2694,9 @@ func (m *Messenger) handleCommunityEventsMessage(state *ReceivedMessageState, si
 }
 
 // Re-sends rejected events, if any.
-func (m *Messenger) handleCommunityEventsMessageRejected(state *ReceivedMessageState, signer *ecdsa.PublicKey, message protobuf.CommunityEventsMessageRejected) error {
-	reapplyEventsMessage, err := m.communitiesManager.HandleCommunityEventsMessageRejected(signer, &message)
+func (m *Messenger) HandleCommunityEventsMessageRejected(state *ReceivedMessageState, message *protobuf.CommunityEventsMessageRejected, statusMessage *v1protocol.StatusMessage) error {
+	signer := state.CurrentMessageState.PublicKey
+	reapplyEventsMessage, err := m.communitiesManager.HandleCommunityEventsMessageRejected(signer, message)
 	if err != nil {
 		return err
 	}
@@ -2710,7 +2712,7 @@ func (m *Messenger) handleCommunityEventsMessageRejected(state *ReceivedMessageS
 	return nil
 }
 
-func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMessageState, signer *ecdsa.PublicKey, message protobuf.CommunityPrivilegedUserSyncMessage) error {
+func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMessageState, signer *ecdsa.PublicKey, message *protobuf.CommunityPrivilegedUserSyncMessage) error {
 	if signer == nil {
 		return errors.New("signer can't be nil")
 	}
@@ -2733,7 +2735,7 @@ func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMess
 		return errors.New("user has no permissions to send privileged sync message")
 	}
 
-	err = m.communitiesManager.ValidateCommunityPrivilegedUserSyncMessage(&message)
+	err = m.communitiesManager.ValidateCommunityPrivilegedUserSyncMessage(message)
 	if err != nil {
 		return err
 	}
@@ -2745,28 +2747,30 @@ func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMess
 		if !isControlNodeMsg {
 			return errors.New("accepted/requested to join sync messages can be send only by the control node")
 		}
-		requestsToJoin, err := m.communitiesManager.HandleRequestToJoinPrivilegedUserSyncMessage(&message, community.ID())
+		requestsToJoin, err := m.communitiesManager.HandleRequestToJoinPrivilegedUserSyncMessage(message, community.ID())
 		if err != nil {
 			return nil
 		}
 		state.Response.AddRequestsToJoinCommunity(requestsToJoin)
-
-	case protobuf.CommunityPrivilegedUserSyncMessage_ADD_COMMUNITY_TOKENS:
-		// TODO add tokens to the Response
-		err = m.communitiesManager.HandleAddCommunityTokenPrivilegedUserSyncMessage(&message, community)
-		if err != nil {
-			return nil
-		}
 	}
 
 	return nil
 }
 
-func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, syncCommunity protobuf.SyncCommunity) error {
+func (m *Messenger) HandleCommunityPrivilegedUserSyncMessage(state *ReceivedMessageState, message *protobuf.CommunityPrivilegedUserSyncMessage, statusMessage *v1protocol.StatusMessage) error {
+	signer := state.CurrentMessageState.PublicKey
+	return m.handleCommunityPrivilegedUserSyncMessage(state, signer, message)
+}
+
+func (m *Messenger) HandleSyncInstallationCommunity(messageState *ReceivedMessageState, syncCommunity *protobuf.SyncInstallationCommunity, statusMessage *v1protocol.StatusMessage) error {
+	return m.handleSyncInstallationCommunity(messageState, syncCommunity, nil)
+}
+
+func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessageState, syncCommunity *protobuf.SyncInstallationCommunity, statusMessage *v1protocol.StatusMessage) error {
 	logger := m.logger.Named("handleSyncCommunity")
 
 	// Should handle community
-	shouldHandle, err := m.communitiesManager.ShouldHandleSyncCommunity(&syncCommunity)
+	shouldHandle, err := m.communitiesManager.ShouldHandleSyncCommunity(syncCommunity)
 	if err != nil {
 		logger.Debug("m.communitiesManager.ShouldHandleSyncCommunity error", zap.Error(err))
 		return err
@@ -2825,14 +2829,14 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		return err
 	}
 
-	err = m.handleCommunityDescription(messageState, orgPubKey, cd, syncCommunity.Description)
+	err = m.handleCommunityDescription(messageState, orgPubKey, &cd, syncCommunity.Description)
 	if err != nil {
 		logger.Debug("m.handleCommunityDescription error", zap.Error(err))
 		return err
 	}
 
 	if syncCommunity.Settings != nil {
-		err = m.handleSyncCommunitySettings(messageState, *syncCommunity.Settings)
+		err = m.HandleSyncCommunitySettings(messageState, syncCommunity.Settings, nil)
 		if err != nil {
 			logger.Debug("m.handleSyncCommunitySettings error", zap.Error(err))
 			return err
@@ -2845,12 +2849,9 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 		return err
 	}
 
-	if savedCommunity.HasPermissionToSendCommunityEvents() || savedCommunity.IsControlNode() {
-		err := m.handleCommunityTokensMetadata(savedCommunity.IDString(), savedCommunity.CommunityTokensMetadata())
-		if err != nil {
-			logger.Debug("m.handleCommunityTokensMetadata", zap.Error(err))
-			return err
-		}
+	if err := m.handleCommunityTokensMetadataByPrivilegedMembers(savedCommunity); err != nil {
+		logger.Debug("m.handleCommunityTokensMetadataByPrivilegedMembers", zap.Error(err))
+		return err
 	}
 
 	// if we are not waiting for approval, join or leave the community
@@ -2888,8 +2889,8 @@ func (m *Messenger) handleSyncCommunity(messageState *ReceivedMessageState, sync
 	return nil
 }
 
-func (m *Messenger) handleSyncCommunitySettings(messageState *ReceivedMessageState, syncCommunitySettings protobuf.SyncCommunitySettings) error {
-	shouldHandle, err := m.communitiesManager.ShouldHandleSyncCommunitySettings(&syncCommunitySettings)
+func (m *Messenger) HandleSyncCommunitySettings(messageState *ReceivedMessageState, syncCommunitySettings *protobuf.SyncCommunitySettings, statusMessage *v1protocol.StatusMessage) error {
+	shouldHandle, err := m.communitiesManager.ShouldHandleSyncCommunitySettings(syncCommunitySettings)
 	if err != nil {
 		m.logger.Debug("m.communitiesManager.ShouldHandleSyncCommunitySettings error", zap.Error(err))
 		return err
@@ -2899,7 +2900,7 @@ func (m *Messenger) handleSyncCommunitySettings(messageState *ReceivedMessageSta
 		return nil
 	}
 
-	communitySettings, err := m.communitiesManager.HandleSyncCommunitySettings(&syncCommunitySettings)
+	communitySettings, err := m.communitiesManager.HandleSyncCommunitySettings(syncCommunitySettings)
 	if err != nil {
 		return err
 	}
@@ -2908,8 +2909,8 @@ func (m *Messenger) handleSyncCommunitySettings(messageState *ReceivedMessageSta
 	return nil
 }
 
-func (m *Messenger) handleCommunityTokensMetadata(communityID string, communityTokens []*protobuf.CommunityTokenMetadata) error {
-	return m.communitiesManager.HandleCommunityTokensMetadata(communityID, communityTokens)
+func (m *Messenger) handleCommunityTokensMetadataByPrivilegedMembers(community *communities.Community) error {
+	return m.communitiesManager.HandleCommunityTokensMetadataByPrivilegedMembers(community)
 }
 
 func (m *Messenger) InitHistoryArchiveTasks(communities []*communities.Community) {
@@ -3196,7 +3197,7 @@ func (m *Messenger) dispatchMagnetlinkMessage(communityID string) error {
 		LocalChatID:          chatID,
 		Sender:               community.PrivateKey(),
 		Payload:              encodedMessage,
-		MessageType:          protobuf.ApplicationMetadataMessage_COMMUNITY_ARCHIVE_MAGNETLINK,
+		MessageType:          protobuf.ApplicationMetadataMessage_COMMUNITY_MESSAGE_ARCHIVE_MAGNETLINK,
 		SkipGroupMessageWrap: true,
 	}
 
@@ -3729,7 +3730,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 					LocalChatID:      processedChannelIds[channel.Channel.ID],
 					SigPubKey:        &communityPubKey,
 					CommunityID:      communityID,
-					ChatMessage:      chatMessage,
+					ChatMessage:      &chatMessage,
 				}
 
 				err = messageToSave.PrepareContent(common.PubkeyToHex(&m.identity.PublicKey))
@@ -3773,7 +3774,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 
 						pinMessageToSave := common.PinMessage{
 							ID:               types.EncodeHex(messageID),
-							PinMessage:       pinMessage,
+							PinMessage:       &pinMessage,
 							LocalChatID:      processedChannelIds[channel.Channel.ID],
 							From:             messageToSave.From,
 							SigPubKey:        messageToSave.SigPubKey,
@@ -4375,73 +4376,11 @@ func (m *Messenger) AddCommunityToken(communityID string, chainID int, address s
 		return err
 	}
 
-	community, err := m.communitiesManager.AddCommunityToken(communityToken)
+	_, err = m.communitiesManager.AddCommunityToken(communityToken)
 	if err != nil {
 		return err
 	}
 
-	if community.IsControlNode() && (communityToken.PrivilegesLevel == token.MasterLevel || communityToken.PrivilegesLevel == token.OwnerLevel) {
-		permissionType := protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER
-		if communityToken.PrivilegesLevel == token.MasterLevel {
-			permissionType = protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER
-		}
-
-		contractAddresses := make(map[uint64]string)
-		contractAddresses[uint64(communityToken.ChainID)] = communityToken.Address
-
-		tokenCriteria := &protobuf.TokenCriteria{
-			ContractAddresses: contractAddresses,
-			Type:              protobuf.CommunityTokenType_ERC721,
-			Symbol:            communityToken.Symbol,
-			Name:              communityToken.Name,
-			Amount:            "1",
-			Decimals:          uint64(communityToken.Decimals),
-		}
-
-		request := &requests.CreateCommunityTokenPermission{
-			CommunityID:   community.ID(),
-			Type:          permissionType,
-			TokenCriteria: []*protobuf.TokenCriteria{tokenCriteria},
-			IsPrivate:     true,
-			ChatIds:       []string{},
-		}
-
-		_, _, err := m.communitiesManager.CreateCommunityTokenPermission(request)
-		if err != nil {
-			return err
-		}
-	}
-
-	syncMsg := &protobuf.CommunityPrivilegedUserSyncMessage{
-		Type:            protobuf.CommunityPrivilegedUserSyncMessage_ADD_COMMUNITY_TOKENS,
-		CommunityId:     community.ID(),
-		CommunityTokens: []*protobuf.CommunityToken{token.ToCommunityTokenProtobuf(communityToken)},
-	}
-
-	payloadSyncMsg, err := proto.Marshal(syncMsg)
-	if err != nil {
-		return err
-	}
-
-	rawSyncMessage := &common.RawMessage{
-		Payload:           payloadSyncMsg,
-		Sender:            m.identity,
-		SkipProtocolLayer: true,
-		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE,
-	}
-
-	for _, member := range community.GetMemberPubkeys() {
-		if member.Equal(&m.identity.PublicKey) {
-			continue
-		}
-
-		if community.MemberCanManageToken(member, communityToken) {
-			_, err := m.sender.SendPrivate(context.Background(), member, rawSyncMessage)
-			if err != nil {
-				return err
-			}
-		}
-	}
 	return nil
 }
 

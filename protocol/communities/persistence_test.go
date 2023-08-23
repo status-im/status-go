@@ -77,7 +77,7 @@ func (s *PersistenceSuite) TestSaveCommunity() {
 }
 
 func (s *PersistenceSuite) TestShouldHandleSyncCommunity() {
-	sc := &protobuf.SyncCommunity{
+	sc := &protobuf.SyncInstallationCommunity{
 		Id:          []byte("0x123456"),
 		Description: []byte("this is a description"),
 		Joined:      true,
@@ -113,7 +113,7 @@ func (s *PersistenceSuite) TestShouldHandleSyncCommunity() {
 }
 
 func (s *PersistenceSuite) TestSetSyncClock() {
-	sc := &protobuf.SyncCommunity{
+	sc := &protobuf.SyncInstallationCommunity{
 		Id:          []byte("0x123456"),
 		Description: []byte("this is a description"),
 		Joined:      true,
@@ -161,7 +161,7 @@ func (s *PersistenceSuite) TestSetSyncClock() {
 }
 
 func (s *PersistenceSuite) TestSetPrivateKey() {
-	sc := &protobuf.SyncCommunity{
+	sc := &protobuf.SyncInstallationCommunity{
 		Id:          []byte("0x123456"),
 		Description: []byte("this is a description"),
 		Joined:      true,
@@ -198,8 +198,8 @@ func (s *PersistenceSuite) TestJoinedAndPendingCommunitiesWithRequests() {
 	// Add a new community that we have joined
 	com := s.makeNewCommunity(identity)
 	com.Join()
-	sc, err := com.ToSyncCommunityProtobuf(clock, nil)
-	s.NoError(err, "Community.ToSyncCommunityProtobuf shouldn't give any error")
+	sc, err := com.ToSyncInstallationCommunityProtobuf(clock, nil)
+	s.NoError(err, "Community.ToSyncInstallationCommunityProtobuf shouldn't give any error")
 	err = s.db.saveRawCommunityRow(fromSyncCommunityProtobuf(sc))
 	s.NoError(err, "saveRawCommunityRow")
 
@@ -270,7 +270,7 @@ func (s *PersistenceSuite) makeNewCommunity(identity *ecdsa.PrivateKey) *Communi
 }
 
 func (s *PersistenceSuite) TestGetSyncedRawCommunity() {
-	sc := &protobuf.SyncCommunity{
+	sc := &protobuf.SyncInstallationCommunity{
 		Id:          []byte("0x123456"),
 		Description: []byte("this is a description"),
 		Joined:      true,

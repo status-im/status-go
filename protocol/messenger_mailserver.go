@@ -563,7 +563,7 @@ func (m *Messenger) calculateGapForChat(chat *Chat, from uint32) (*common.Messag
 	timestamp := m.getTimesource().GetCurrentTime()
 
 	message := &common.Message{
-		ChatMessage: protobuf.ChatMessage{
+		ChatMessage: &protobuf.ChatMessage{
 			ChatId:      chat.ID,
 			Text:        "Gap message",
 			MessageType: protobuf.MessageType_SYSTEM_MESSAGE_GAP,

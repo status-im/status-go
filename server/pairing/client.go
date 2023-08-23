@@ -14,6 +14,7 @@ import (
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -36,15 +37,40 @@ type BaseClient struct {
 
 // NewBaseClient returns a fully qualified BaseClient from the given ConnectionParams
 func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
-	u, err := c.URL()
+
+	var baseAddress *url.URL
+	var serverCert *x509.Certificate
+	var certErrs error
+
+	netIps, err := server.FindReachableAddressesForPairingClient(c.netIPs)
 	if err != nil {
 		return nil, err
 	}
 
-	serverCert, err := getServerCert(u)
-	if err != nil {
-		return nil, err
+	for i := range netIps {
+		u, err := c.URL(i)
+		if err != nil {
+			return nil, err
+		}
+
+		serverCert, err = getServerCert(u)
+		if err != nil {
+			certErrs = fmt.Errorf("%sconnecting to '%s' failed: %s; ", certErrs.Error(), u, err.Error())
+			continue
+		}
+
+		baseAddress = u
+		break
 	}
+
+	if serverCert == nil {
+		certErrs = fmt.Errorf("failed to connect to any of given addresses. %w", certErrs)
+		signal.SendLocalPairingEvent(Event{Type: EventConnectionError, Error: certErrs.Error(), Action: ActionConnect})
+		return nil, certErrs
+	}
+
+	// No error on the dial out then the URL.Host is accessible
+	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionConnect})
 
 	err = verifyCert(serverCert, c.publicKey)
 	if err != nil {
@@ -78,7 +104,7 @@ func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
 		Client:         &http.Client{Transport: tr, Jar: cj},
 		serverCert:     serverCert,
 		challengeTaker: NewChallengeTaker(NewPayloadEncryptor(c.aesKey)),
-		baseAddress:    u,
+		baseAddress:    baseAddress,
 	}, nil
 }
 

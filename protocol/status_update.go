@@ -9,7 +9,7 @@ type UserStatus struct {
 	CustomText string `json:"text"`
 }
 
-func ToUserStatus(msg protobuf.StatusUpdate) UserStatus {
+func ToUserStatus(msg *protobuf.StatusUpdate) UserStatus {
 	return UserStatus{
 		StatusType: int(msg.StatusType),
 		Clock:      msg.Clock,

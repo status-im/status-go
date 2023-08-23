@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/transfer"
+	"github.com/status-im/status-go/transactions"
 
 	"golang.org/x/exp/constraints"
 )
@@ -301,7 +302,9 @@ const (
 
 			? AS includeAllTokenTypeAssets,
 
-			? AS includeAllNetworks
+			? AS includeAllNetworks,
+
+			? AS pendingStatus
 		),
 		filter_addresses(address) AS (
 			SELECT HEX(address) FROM %s WHERE (SELECT filterAllAddresses FROM filter_conditions) != 0
@@ -348,16 +351,16 @@ const (
 				COUNT(*) AS count,
 				network_id
 			FROM
-				pending_transactions
-			WHERE pending_transactions.multi_transaction_id != 0
+				pending_transactions, filter_conditions
+			WHERE pending_transactions.multi_transaction_id != 0 AND pending_transactions.status = pendingStatus
 			GROUP BY pending_transactions.multi_transaction_id
 		),
 		pending_network_ids AS (
 			SELECT
 				multi_transaction_id
 			FROM
-			pending_transactions
-			WHERE pending_transactions.multi_transaction_id != 0
+				pending_transactions, filter_conditions
+			WHERE pending_transactions.multi_transaction_id != 0 AND pending_transactions.status = pendingStatus
 				AND pending_transactions.network_id IN filter_networks
 			GROUP BY pending_transactions.multi_transaction_id
 		)
@@ -485,7 +488,7 @@ const (
 		filter_addresses from_join ON HEX(pending_transactions.from_address) = from_join.address
 	LEFT JOIN
 		filter_addresses to_join ON HEX(pending_transactions.to_address) = to_join.address
-	WHERE pending_transactions.multi_transaction_id = 0
+	WHERE pending_transactions.multi_transaction_id = 0 AND pending_transactions.status = pendingStatus
 		AND (filterAllActivityStatus OR filterStatusPending)
 		AND ((startFilterDisabled OR timestamp >= startTimestamp)
 			AND (endFilterDisabled OR timestamp <= endTimestamp)
@@ -678,6 +681,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		FailedAS, CompleteAS, PendingAS,
 		includeAllTokenTypeAssets,
 		includeAllNetworks,
+		transactions.Pending,
 		limit, offset)
 	if err != nil {
 		return nil, err

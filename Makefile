@@ -274,7 +274,7 @@ install-xtools: ##@install Install Miscellaneous Go Tools
 	GO111MODULE=on go install golang.org/x/tools/go/packages/...@v0.1.5
 
 generate: ##@other Regenerate assets and other auto-generated stuff
-	go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/... ./walletdatabase/...
+	go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/... ./walletdatabase/... ./_assets/generate_handlers
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)
@@ -319,7 +319,7 @@ test-unit: ##@tests Run unit and integration tests
 	for file in $(UNIT_TEST_PACKAGES); do \
 		set -e; \
 		path=$$(echo $$file | cut -d\/ -f 4-); \
-		go test -tags '$(BUILD_TAGS)' -timeout 20m -v -failfast $$file $(gotest_extraflags) | \
+		go test -tags '$(BUILD_TAGS)' -timeout 30m -v -failfast $$file $(gotest_extraflags) | \
 		  go-junit-report -iocopy -out $${path}/report.xml; \
 	done
 

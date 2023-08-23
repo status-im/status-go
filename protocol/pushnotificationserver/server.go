@@ -117,8 +117,12 @@ func (s *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 }
 
 // HandlePushNotificationQuery builds a response for the query and sends it back to the user
-func (s *Server) HandlePushNotificationQuery(publicKey *ecdsa.PublicKey, messageID []byte, query protobuf.PushNotificationQuery) error {
-	response := s.buildPushNotificationQueryResponse(&query)
+func (s *Server) HandlePushNotificationQuery(publicKey *ecdsa.PublicKey, messageID []byte, query *protobuf.PushNotificationQuery) error {
+	if query == nil {
+		return nil
+	}
+
+	response := s.buildPushNotificationQueryResponse(query)
 	if response == nil {
 		return nil
 	}
@@ -142,7 +146,7 @@ func (s *Server) HandlePushNotificationQuery(publicKey *ecdsa.PublicKey, message
 // HandlePushNotificationRequest will send a gorush notification and send a response back to the user
 func (s *Server) HandlePushNotificationRequest(publicKey *ecdsa.PublicKey,
 	messageID []byte,
-	request protobuf.PushNotificationRequest) error {
+	request *protobuf.PushNotificationRequest) error {
 	s.config.Logger.Debug("handling pn request", zap.Binary("message-id", messageID))
 
 	// This is at-most-once semantic for now
@@ -156,7 +160,7 @@ func (s *Server) HandlePushNotificationRequest(publicKey *ecdsa.PublicKey,
 		return nil
 	}
 
-	response, requestsAndRegistrations := s.buildPushNotificationRequestResponse(&request)
+	response, requestsAndRegistrations := s.buildPushNotificationRequestResponse(request)
 	//AndSendNotification(&request)
 	if response == nil {
 		return nil

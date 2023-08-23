@@ -129,7 +129,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 	s.Require().NoError(err)
 
 	editMessage := EditMessage{
-		EditMessage: protobuf.EditMessage{
+		EditMessage: &protobuf.EditMessage{
 			Clock:     editedMessage.Clock + 1,
 			Text:      "some text",
 			MessageId: editedMessage.ID,
@@ -144,7 +144,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 	}
 	state.AllChats.Store(ourChat.ID, ourChat)
 
-	err = s.m.HandleEditMessage(state, editMessage)
+	err = s.m.handleEditMessage(state, editMessage)
 	// It should error as the user can't edit this message
 	s.Require().Error(err)
 
@@ -154,7 +154,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 	s.Require().NoError(err)
 
 	editMessage = EditMessage{
-		EditMessage: protobuf.EditMessage{
+		EditMessage: &protobuf.EditMessage{
 			Clock:       editedMessage.Clock + 2,
 			Text:        "some text",
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
@@ -164,7 +164,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 		From: contact.ID,
 	}
 
-	err = s.m.HandleEditMessage(state, editMessage)
+	err = s.m.handleEditMessage(state, editMessage)
 	s.Require().NoError(err)
 	// It save the edit
 	s.Require().Len(state.Response.Messages(), 1)
@@ -176,7 +176,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 
 	// In-between edit
 	editMessage = EditMessage{
-		EditMessage: protobuf.EditMessage{
+		EditMessage: &protobuf.EditMessage{
 			Clock:       editedMessage.Clock + 1,
 			Text:        "some other text",
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
@@ -188,7 +188,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageEdgeCases() {
 
 	state.Response = &MessengerResponse{}
 
-	err = s.m.HandleEditMessage(state, editMessage)
+	err = s.m.handleEditMessage(state, editMessage)
 	// It should error as the user can't edit this message
 	s.Require().NoError(err)
 	// It discards the edit
@@ -216,7 +216,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageFirstEditsThenMessage() {
 	inputMessage := buildTestMessage(*theirChat)
 	inputMessage.Clock = 1
 	editMessage := EditMessage{
-		EditMessage: protobuf.EditMessage{
+		EditMessage: &protobuf.EditMessage{
 			Clock:       2,
 			Text:        "some text",
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
@@ -230,7 +230,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageFirstEditsThenMessage() {
 	}
 
 	// Handle edit first
-	err = s.m.HandleEditMessage(state, editMessage)
+	err = s.m.handleEditMessage(state, editMessage)
 	s.Require().NoError(err)
 
 	// Handle chat message
@@ -238,14 +238,13 @@ func (s *MessengerEditMessageSuite) TestEditMessageFirstEditsThenMessage() {
 	state = &ReceivedMessageState{
 		Response: response,
 		CurrentMessageState: &CurrentMessageState{
-			Message:          inputMessage.ChatMessage,
 			MessageID:        messageID,
 			WhisperTimestamp: s.m.getTimesource().GetCurrentTime(),
 			Contact:          contact,
 			PublicKey:        &theirMessenger.identity.PublicKey,
 		},
 	}
-	err = s.m.HandleChatMessage(state)
+	err = s.m.HandleChatMessage(state, inputMessage.ChatMessage, nil)
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
 

@@ -52,7 +52,7 @@ func TestDeleteActivityCenterNotificationsWhenEmpty(t *testing.T) {
 	p := newSQLitePersistence(db)
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
-	message := &common.Message{}
+	message := common.NewMessage()
 	message.Text = "sample text"
 	chat.LastMessage = message
 	err = p.SaveChat(*chat)
@@ -81,7 +81,7 @@ func TestDeleteActivityCenterNotificationsWithMultipleIds(t *testing.T) {
 	p := newSQLitePersistence(db)
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
-	message := &common.Message{}
+	message := common.NewMessage()
 	message.Text = "sample text"
 	chat.LastMessage = message
 	err = p.SaveChat(*chat)
@@ -120,14 +120,17 @@ func TestDeleteActivityCenterNotificationsForMessage(t *testing.T) {
 	messages := []*common.Message{
 		{
 			ID:          "0x1",
+			ChatMessage: &protobuf.ChatMessage{},
 			LocalChatID: chat.ID,
 		},
 		{
 			ID:          "0x2",
+			ChatMessage: &protobuf.ChatMessage{},
 			LocalChatID: chat.ID,
 		},
 		{
-			ID: "0x3",
+			ChatMessage: &protobuf.ChatMessage{},
+			ID:          "0x3",
 		},
 	}
 	err = p.SaveMessages(messages)
@@ -238,7 +241,7 @@ func (s *MessengerActivityCenterMessageSuite) TestMuteCommunityActivityCenterNot
 	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, bob.transport)
 
 	// bob sends a community message
-	inputMessage := &common.Message{}
+	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chat.ID
 	inputMessage.Text = "some text"
 	inputMessage.CommunityID = community.IDString()
@@ -279,7 +282,7 @@ func (s *MessengerActivityCenterMessageSuite) TestMuteCommunityActivityCenterNot
 	s.Require().True(bobCommunity.Muted())
 
 	// alice sends a community message
-	inputMessage = &common.Message{}
+	inputMessage = common.NewMessage()
 	inputMessage.ChatId = defaultCommunityChatID
 	inputMessage.Text = "Good news, @" + common.EveryoneMentionTag + " !"
 	inputMessage.CommunityID = community.IDString()
@@ -800,7 +803,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 	p := newSQLitePersistence(db)
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
-	message := &common.Message{}
+	message := common.NewMessage()
 	message.Text = "sample text"
 	chat.LastMessage = message
 	err = p.SaveChat(*chat)
@@ -949,7 +952,7 @@ func TestActivityCenterReadUnreadPagination(t *testing.T) {
 	initialOrFinalCursor := ""
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
-	message := &common.Message{}
+	message := common.NewMessage()
 	message.Text = "sample text"
 	chat.LastMessage = message
 	err = p.SaveChat(*chat)
@@ -1076,7 +1079,7 @@ func TestActivityCenterReadUnreadFilterByTypes(t *testing.T) {
 	p := newSQLitePersistence(db)
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
-	message := &common.Message{}
+	message := common.NewMessage()
 	message.Text = "sample text"
 	chat.LastMessage = message
 	err = p.SaveChat(*chat)
@@ -1204,7 +1207,7 @@ func TestActivityCenterReadUnread(t *testing.T) {
 	p := newSQLitePersistence(db)
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
-	message := &common.Message{}
+	message := common.NewMessage()
 	message.Text = "sample text"
 	chat.LastMessage = message
 	err = p.SaveChat(*chat)

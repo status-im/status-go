@@ -81,7 +81,6 @@ func TestScheduler_Enqueue_VerifyReplacementPolicyCancelOld(t *testing.T) {
 		stage1FirstTaskStarted                testStage = "First task started"
 		stage2ThirdEnqueueOverwroteSecondTask testStage = "Third Enqueue overwrote second task"
 		stage3ExitingFirstCancelledTask       testStage = "Exiting first cancelled task"
-		stage4FirstTaskCanceledResponse       testStage = "First task canceled response"
 		stage5ThirdTaskRunning                testStage = "Third task running"
 		stage6ThirdTaskResponse               testStage = "Third task response"
 	)
@@ -90,18 +89,19 @@ func TestScheduler_Enqueue_VerifyReplacementPolicyCancelOld(t *testing.T) {
 		stage1FirstTaskStarted,
 		stage2ThirdEnqueueOverwroteSecondTask,
 		stage3ExitingFirstCancelledTask,
-		stage4FirstTaskCanceledResponse,
 		stage5ThirdTaskRunning,
 		stage6ThirdTaskResponse,
 	}
 
 	callChan := make(chan testStage, len(testStages))
-	resultCallCount := 0
 	var firstRunWG, secondRunWG, thirdRunWG sync.WaitGroup
 
 	firstRunWG.Add(1)
 	secondRunWG.Add(1)
 	thirdRunWG.Add(1)
+
+	stage4AsyncFirstTaskCanceledResponse := false
+
 	testTask := TaskType{1, ReplacementPolicyCancelOld}
 	for i := 0; i < 2; i++ {
 		currentIndex := i
@@ -130,7 +130,7 @@ func TestScheduler_Enqueue_VerifyReplacementPolicyCancelOld(t *testing.T) {
 			switch currentIndex {
 			case 0:
 				// First task was cancelled by the second one Enqueue call
-				callChan <- stage4FirstTaskCanceledResponse
+				stage4AsyncFirstTaskCanceledResponse = true
 
 				require.ErrorAs(t, err, &context.Canceled)
 			case 1:
@@ -141,11 +141,6 @@ func TestScheduler_Enqueue_VerifyReplacementPolicyCancelOld(t *testing.T) {
 				thirdRunWG.Done()
 
 				require.True(t, errors.Is(err, ErrTaskOverwritten))
-			case 3:
-				// Third task was successfully executed
-				require.Equal(t, testTask, taskType)
-				require.Nil(t, res)
-				resultCallCount++
 			}
 		})
 		require.False(t, ignored)
@@ -179,6 +174,7 @@ func TestScheduler_Enqueue_VerifyReplacementPolicyCancelOld(t *testing.T) {
 			require.Fail(t, "test not completed in time", `last result: "%s" for cancel task policy`, lastRes)
 		}
 	}
+	require.True(t, stage4AsyncFirstTaskCanceledResponse)
 }
 
 func TestScheduler_Enqueue_VerifyReplacementPolicyIgnoreNew(t *testing.T) {

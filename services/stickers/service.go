@@ -11,24 +11,23 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
-	"github.com/status-im/status-go/services/rpcfilters"
+	"github.com/status-im/status-go/transactions"
 )
 
 // NewService initializes service instance.
-func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *account.GethManager, rpcFiltersSrvc *rpcfilters.Service, config *params.NodeConfig, downloader *ipfs.Downloader, httpServer *server.MediaServer) *Service {
+func NewService(acc *accounts.Database, rpcClient *rpc.Client, accountsManager *account.GethManager, config *params.NodeConfig, downloader *ipfs.Downloader, httpServer *server.MediaServer, pendingTracker *transactions.PendingTxTracker) *Service {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Service{
 		accountsDB:      acc,
 		rpcClient:       rpcClient,
 		accountsManager: accountsManager,
-		rpcFiltersSrvc:  rpcFiltersSrvc,
 		keyStoreDir:     config.KeyStoreDir,
 		downloader:      downloader,
 		httpServer:      httpServer,
 		ctx:             ctx,
 		cancel:          cancel,
-		api:             NewAPI(ctx, acc, rpcClient, accountsManager, rpcFiltersSrvc, config.KeyStoreDir, downloader, httpServer),
+		api:             NewAPI(ctx, acc, rpcClient, accountsManager, pendingTracker, config.KeyStoreDir, downloader, httpServer),
 	}
 }
 
@@ -37,7 +36,6 @@ type Service struct {
 	accountsDB      *accounts.Database
 	rpcClient       *rpc.Client
 	accountsManager *account.GethManager
-	rpcFiltersSrvc  *rpcfilters.Service
 	downloader      *ipfs.Downloader
 	keyStoreDir     string
 	httpServer      *server.MediaServer
