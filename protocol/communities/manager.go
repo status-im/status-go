@@ -262,11 +262,6 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 		manager.ensVerifier = verifier
 	}
 
-	err = manager.fixupChannelMembers()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to fixup channel members")
-	}
-
 	return manager, nil
 }
 
@@ -4513,37 +4508,6 @@ func (m *Manager) saveAndPublish(community *Community) error {
 
 		m.publish(&Subscription{CommunityEventsMessage: community.ToCommunityEventsMessage()})
 		return nil
-	}
-
-	return nil
-}
-
-// This populates the member list of channels with all community members, if required.
-// Motivation: The member lists of channels were not populated for communities that had already been created.
-//
-// Ideally, this should be executed through a migration, but it's technically unfeasible
-// because `CommunityDescription“ is stored as a signed message blob in the database.
-//
-// However, it's safe to run this migration/fixup multiple times.
-func (m *Manager) fixupChannelMembers() error {
-	controlledCommunities, err := m.ControlledCommunities()
-	if err != nil {
-		return err
-	}
-
-	for _, c := range controlledCommunities {
-		for channelID := range c.Chats() {
-			if !c.ChannelHasTokenPermissions(c.IDString() + channelID) {
-				_, err := c.PopulateChatWithAllMembers(channelID)
-				if err != nil {
-					return err
-				}
-				err = m.persistence.SaveCommunity(c)
-				if err != nil {
-					return err
-				}
-			}
-		}
 	}
 
 	return nil
