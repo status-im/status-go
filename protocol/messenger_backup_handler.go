@@ -3,16 +3,15 @@ package protocol
 import (
 	"database/sql"
 
-	ensservice "github.com/status-im/status-go/services/ens"
-
-	"github.com/status-im/status-go/protocol/identity"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
-
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/multiaccounts/errors"
+	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
+	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/protocol/wakusync"
+	ensservice "github.com/status-im/status-go/services/ens"
 )
 
 const (
@@ -106,11 +105,16 @@ func (m *Messenger) handleBackedUpProfile(message *protobuf.BackedUpProfile, bac
 	}
 
 	err := m.SaveSyncDisplayName(message.DisplayName, message.DisplayNameClock)
-	if err != nil {
+	if err != nil && err != errors.ErrNewClockOlderThanCurrent {
 		return err
 	}
 
 	response.SetDisplayName(message.DisplayName)
+
+	// if we already have a newer clock, then we don't need to update the display name
+	if err == errors.ErrNewClockOlderThanCurrent {
+		response.SetDisplayName(m.account.Name)
+	}
 
 	syncWithBackedUpImages := false
 	dbImages, err := m.multiAccounts.GetIdentityImages(message.KeyUid)
