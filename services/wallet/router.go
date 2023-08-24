@@ -23,9 +23,14 @@ import (
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/bridge"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/transactions"
 )
+
+const EstimateUsername = "RandomUsername"
+const EstimatePubKey = "0x04bb2024ce5d72e45d4a4f8589ae657ef9745855006996115a23a1af88d536cf02c0524a585fce7bfa79d6a9669af735eda6205d6c7e5b3cdc2b8ff7b2fa1f0b56"
+const ERC721TransferString = "ERC721Transfer"
 
 type SendType int
 
@@ -36,20 +41,79 @@ const (
 	ENSSetPubKey
 	StickersBuy
 	Bridge
+	ERC721Transfer
 )
-const EstimateUsername = "RandomUsername"
-const EstimatePubKey = "0x04bb2024ce5d72e45d4a4f8589ae657ef9745855006996115a23a1af88d536cf02c0524a585fce7bfa79d6a9669af735eda6205d6c7e5b3cdc2b8ff7b2fa1f0b56"
+
+func (s SendType) FetchPrices(service *Service, tokenID string) (map[string]float64, error) {
+	symbols := []string{tokenID, "ETH"}
+	if s == ERC721Transfer {
+		symbols = []string{"ETH"}
+	}
+
+	pricesMap, err := service.marketManager.FetchPrices(symbols, []string{"USD"})
+	if err != nil {
+		return nil, err
+	}
+	prices := make(map[string]float64, 0)
+	for symbol, pricePerCurrency := range pricesMap {
+		prices[symbol] = pricePerCurrency["USD"]
+	}
+	if s == ERC721Transfer {
+		prices[tokenID] = 0
+	}
+	return prices, nil
+}
+
+func (s SendType) FindToken(service *Service, account common.Address, network *params.Network, tokenID string) *token.Token {
+	if s != ERC721Transfer {
+		return service.tokenManager.FindToken(network, tokenID)
+	}
+
+	parts := strings.Split(tokenID, ":")
+	contractAddress := common.HexToAddress(parts[0])
+	collectibleTokenID, success := new(big.Int).SetString(parts[1], 10)
+	if !success {
+		return nil
+	}
+	uniqueID, err := service.collectibles.GetOwnedCollectible(walletCommon.ChainID(network.ChainID), account, contractAddress, collectibleTokenID)
+	if err != nil || uniqueID == nil {
+		return nil
+	}
+
+	return &token.Token{
+		Address:  contractAddress,
+		Symbol:   collectibleTokenID.String(),
+		Decimals: 0,
+		ChainID:  network.ChainID,
+	}
+}
 
 func (s SendType) isTransfer() bool {
-	return s == Transfer
+	return s == Transfer || s == ERC721Transfer
 }
 
 func (s SendType) isAvailableBetween(from, to *params.Network) bool {
-	if s != Bridge {
-		return true
+	if s == ERC721Transfer {
+		return from.ChainID == to.ChainID
 	}
 
-	return from.ChainID != to.ChainID
+	if s == Bridge {
+		return from.ChainID != to.ChainID
+	}
+
+	return true
+}
+
+func (s SendType) canUseBridge(b bridge.Bridge) bool {
+	if s == ERC721Transfer && b.Name() != ERC721TransferString {
+		return false
+	}
+
+	if s != ERC721Transfer && b.Name() == ERC721TransferString {
+		return false
+	}
+
+	return true
 }
 
 func (s SendType) isAvailableFor(network *params.Network) bool {
@@ -64,10 +128,9 @@ func (s SendType) isAvailableFor(network *params.Network) bool {
 	return false
 }
 
-func (s SendType) EstimateGas(service *Service, network *params.Network) uint64 {
-	from := types.Address(common.HexToAddress("0x5ffa75ce51c3a7ebe23bde37b5e3a0143dfbcee0"))
+func (s SendType) EstimateGas(service *Service, network *params.Network, from common.Address, tokenID string) uint64 {
 	tx := transactions.SendTxArgs{
-		From:  from,
+		From:  (types.Address)(from),
 		Value: (*hexutil.Big)(zero),
 	}
 	if s == ENSRegister {
@@ -96,7 +159,7 @@ func (s SendType) EstimateGas(service *Service, network *params.Network) uint64 
 
 	if s == StickersBuy {
 		packID := &bigint.BigInt{Int: big.NewInt(2)}
-		estimate, err := service.stickers.API().BuyEstimate(context.Background(), network.ChainID, from, packID)
+		estimate, err := service.stickers.API().BuyEstimate(context.Background(), network.ChainID, (types.Address)(from), packID)
 		if err != nil {
 			return 400000
 		}
@@ -343,10 +406,12 @@ func newSuggestedRoutes(
 
 func NewRouter(s *Service) *Router {
 	bridges := make(map[string]bridge.Bridge)
-	simple := bridge.NewSimpleBridge(s.transactor)
+	transfer := bridge.NewTransferBridge(s.transactor)
+	erc721Transfer := bridge.NewERC721TransferBridge(s.rpcClient, s.transactor)
 	cbridge := bridge.NewCbridge(s.rpcClient, s.transactor, s.tokenManager)
 	hop := bridge.NewHopBridge(s.rpcClient, s.transactor, s.tokenManager)
-	bridges[simple.Name()] = simple
+	bridges[transfer.Name()] = transfer
+	bridges[erc721Transfer.Name()] = erc721Transfer
 	bridges[hop.Name()] = hop
 	bridges[cbridge.Name()] = cbridge
 
@@ -369,7 +434,11 @@ type Router struct {
 	rpcClient *rpc.Client
 }
 
-func (r *Router) requireApproval(ctx context.Context, bridge bridge.Bridge, account common.Address, network *params.Network, token *token.Token, amountIn *big.Int) (bool, *big.Int, uint64, *common.Address, error) {
+func (r *Router) requireApproval(ctx context.Context, sendType SendType, bridge bridge.Bridge, account common.Address, network *params.Network, token *token.Token, amountIn *big.Int) (bool, *big.Int, uint64, *common.Address, error) {
+	if sendType == ERC721Transfer {
+		return false, nil, 0, nil, nil
+	}
+
 	if token.IsNative() {
 		return false, nil, 0, nil, nil
 	}
@@ -443,7 +512,7 @@ func (r *Router) suggestedRoutes(
 	sendType SendType,
 	account common.Address,
 	amountIn *big.Int,
-	tokenSymbol string,
+	tokenID string,
 	disabledFromChainIDs,
 	disabledToChaindIDs,
 	preferedChainIDs []uint64,
@@ -460,13 +529,9 @@ func (r *Router) suggestedRoutes(
 		return nil, err
 	}
 
-	pricesMap, err := r.s.marketManager.FetchPrices([]string{"ETH", tokenSymbol}, []string{"USD"})
+	prices, err := sendType.FetchPrices(r.s, tokenID)
 	if err != nil {
 		return nil, err
-	}
-	prices := make(map[string]float64, 0)
-	for symbol, pricePerCurrency := range pricesMap {
-		prices[symbol] = pricePerCurrency["USD"]
 	}
 
 	var (
@@ -486,7 +551,8 @@ func (r *Router) suggestedRoutes(
 		if !sendType.isAvailableFor(network) {
 			continue
 		}
-		token := r.s.tokenManager.FindToken(network, tokenSymbol)
+
+		token := sendType.FindToken(r.s, account, network, tokenID)
 		if token == nil {
 			continue
 		}
@@ -500,9 +566,13 @@ func (r *Router) suggestedRoutes(
 				return err
 			}
 
-			balance, err := r.getBalance(ctx, network, token, account)
-			if err != nil {
-				return err
+			// Default value is 1 as in case of erc721 as we built the token we are sure the account owns it
+			balance := big.NewInt(1)
+			if sendType != ERC721Transfer {
+				balance, err = r.getBalance(ctx, network, token, account)
+				if err != nil {
+					return err
+				}
 			}
 
 			maxAmountIn := (*hexutil.Big)(balance)
@@ -522,6 +592,10 @@ func (r *Router) suggestedRoutes(
 			estimatedTime := r.s.feesManager.transactionEstimatedTime(ctx, network.ChainID, maxFees)
 
 			for _, bridge := range r.bridges {
+				if !sendType.canUseBridge(bridge) {
+					continue
+				}
+
 				for _, dest := range networks {
 					if dest.IsTest != areTestNetworksEnabled {
 						continue
@@ -547,12 +621,10 @@ func (r *Router) suggestedRoutes(
 					if err != nil || !can {
 						continue
 					}
-
-					bonderFees, tokenFees, err := bridge.CalculateFees(network, dest, token, amountIn, prices["ETH"], prices[tokenSymbol], gasFees.GasPrice)
+					bonderFees, tokenFees, err := bridge.CalculateFees(network, dest, token, amountIn, prices["ETH"], prices[tokenID], gasFees.GasPrice)
 					if err != nil {
 						continue
 					}
-
 					if maxAmountIn.ToInt().Cmp(amountIn) >= 0 {
 						if bonderFees.Cmp(amountIn) >= 0 {
 							continue
@@ -562,28 +634,24 @@ func (r *Router) suggestedRoutes(
 							continue
 						}
 					}
-
 					gasLimit := uint64(0)
 					if sendType.isTransfer() {
-						gasLimit, err = bridge.EstimateGas(network, dest, token, amountIn)
+						gasLimit, err = bridge.EstimateGas(network, dest, account, token, amountIn)
 						if err != nil {
 							continue
 						}
 					} else {
-						gasLimit = sendType.EstimateGas(r.s, network)
+						gasLimit = sendType.EstimateGas(r.s, network, account, tokenID)
 					}
 					requiredNativeBalance := new(big.Int).Mul(gweiToWei(maxFees), big.NewInt(int64(gasLimit)))
-
 					// Removed the required fees from maxAMount in case of native token tx
 					if token.IsNative() {
 						maxAmountIn = (*hexutil.Big)(new(big.Int).Sub(maxAmountIn.ToInt(), requiredNativeBalance))
 					}
-
 					if nativeBalance.Cmp(requiredNativeBalance) <= 0 {
 						continue
 					}
-
-					approvalRequired, approvalAmountRequired, approvalGasLimit, approvalContractAddress, err := r.requireApproval(ctx, bridge, account, network, token, amountIn)
+					approvalRequired, approvalAmountRequired, approvalGasLimit, approvalContractAddress, err := r.requireApproval(ctx, sendType, bridge, account, network, token, amountIn)
 					if err != nil {
 						continue
 					}
@@ -606,12 +674,11 @@ func (r *Router) suggestedRoutes(
 						big.NewFloat(math.Pow(10, float64(token.Decimals))),
 					)
 					tokenCost := new(big.Float)
-					tokenCost.Mul(tokenFeesAsFloat, big.NewFloat(prices[tokenSymbol]))
+					tokenCost.Mul(tokenFeesAsFloat, big.NewFloat(prices[tokenID]))
 
 					cost := new(big.Float)
 					cost.Add(tokenCost, gasCost)
 					cost.Add(cost, approvalGasCost)
-
 					mu.Lock()
 					candidates = append(candidates, &Path{
 						BridgeName:              bridge.Name(),
@@ -641,14 +708,15 @@ func (r *Router) suggestedRoutes(
 	group.Wait()
 
 	suggestedRoutes := newSuggestedRoutes(amountIn, candidates, fromLockedAmount)
-	suggestedRoutes.TokenPrice = prices[tokenSymbol]
+	suggestedRoutes.TokenPrice = prices[tokenID]
 	suggestedRoutes.NativeChainTokenPrice = prices["ETH"]
 	for _, path := range suggestedRoutes.Best {
-		amountOut, err := r.bridges[path.BridgeName].CalculateAmountOut(path.From, path.To, (*big.Int)(path.AmountIn), tokenSymbol)
+		amountOut, err := r.bridges[path.BridgeName].CalculateAmountOut(path.From, path.To, (*big.Int)(path.AmountIn), tokenID)
 		if err != nil {
 			continue
 		}
 		path.AmountOut = (*hexutil.Big)(amountOut)
 	}
+
 	return suggestedRoutes, nil
 }

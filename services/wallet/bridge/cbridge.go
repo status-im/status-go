@@ -216,7 +216,7 @@ func (s *CBridge) CalculateFees(from, to *params.Network, token *token.Token, am
 	return big.NewInt(0), new(big.Int).Add(baseFee, percFee), nil
 }
 
-func (s *CBridge) EstimateGas(from, to *params.Network, token *token.Token, amountIn *big.Int) (uint64, error) {
+func (s *CBridge) EstimateGas(from, to *params.Network, account common.Address, token *token.Token, amountIn *big.Int) (uint64, error) {
 	// TODO: replace by estimate function
 	if token.IsNative() {
 		return 22000, nil // default gas limit for eth transaction
