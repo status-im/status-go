@@ -23,6 +23,8 @@ type TestTransaction struct {
 	Timestamp          int64
 	BlkNumber          int64
 	Success            bool
+	Nonce              uint64
+	Contract           eth_common.Address
 	MultiTransactionID MultiTransactionIDType
 }
 
@@ -69,6 +71,8 @@ func generateTestTransaction(seed int) TestTransaction {
 		Timestamp:          int64(seed),
 		BlkNumber:          int64(seed),
 		Success:            true,
+		Nonce:              uint64(seed),
+		Contract:           eth_common.HexToAddress(fmt.Sprintf("0x2%d", seed)),
 		MultiTransactionID: NoMultiTransactionID,
 	}
 }
@@ -281,7 +285,9 @@ func InsertTestTransferWithOptions(tb testing.TB, db *sql.DB, address eth_common
 		txValue:            big.NewInt(tr.Value),
 		txFrom:             txFrom,
 		txTo:               txTo,
+		txNonce:            &tr.Nonce,
 		tokenAddress:       &opt.TokenAddress,
+		contractAddress:    &tr.Contract,
 	}
 	err = updateOrInsertTransfersDBFields(tx, []transferDBFields{transfer})
 	require.NoError(tb, err)

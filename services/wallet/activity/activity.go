@@ -48,61 +48,58 @@ const (
 )
 
 type Entry struct {
-	payloadType     PayloadType
-	transaction     *transfer.TransactionIdentity
-	id              transfer.MultiTransactionIDType
-	timestamp       int64
-	activityType    Type
-	activityStatus  Status
-	amountOut       *hexutil.Big // Used for activityType SendAT, SwapAT, BridgeAT
-	amountIn        *hexutil.Big // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT
-	tokenOut        *Token       // Used for activityType SendAT, SwapAT, BridgeAT
-	tokenIn         *Token       // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT
-	sender          *eth.Address
-	recipient       *eth.Address
-	chainIDOut      *common.ChainID
-	chainIDIn       *common.ChainID
-	transferType    *TransferType
-	contractAddress *eth.Address
+	payloadType    PayloadType
+	transaction    *transfer.TransactionIdentity
+	id             transfer.MultiTransactionIDType
+	timestamp      int64
+	activityType   Type
+	activityStatus Status
+	amountOut      *hexutil.Big // Used for activityType SendAT, SwapAT, BridgeAT
+	amountIn       *hexutil.Big // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT
+	tokenOut       *Token       // Used for activityType SendAT, SwapAT, BridgeAT
+	tokenIn        *Token       // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT
+	sender         *eth.Address
+	recipient      *eth.Address
+	chainIDOut     *common.ChainID
+	chainIDIn      *common.ChainID
+	transferType   *TransferType
 }
 
 type jsonSerializationTemplate struct {
-	PayloadType     PayloadType                     `json:"payloadType"`
-	Transaction     *transfer.TransactionIdentity   `json:"transaction"`
-	ID              transfer.MultiTransactionIDType `json:"id"`
-	Timestamp       int64                           `json:"timestamp"`
-	ActivityType    Type                            `json:"activityType"`
-	ActivityStatus  Status                          `json:"activityStatus"`
-	AmountOut       *hexutil.Big                    `json:"amountOut"`
-	AmountIn        *hexutil.Big                    `json:"amountIn"`
-	TokenOut        *Token                          `json:"tokenOut,omitempty"`
-	TokenIn         *Token                          `json:"tokenIn,omitempty"`
-	Sender          *eth.Address                    `json:"sender,omitempty"`
-	Recipient       *eth.Address                    `json:"recipient,omitempty"`
-	ChainIDOut      *common.ChainID                 `json:"chainIdOut,omitempty"`
-	ChainIDIn       *common.ChainID                 `json:"chainIdIn,omitempty"`
-	TransferType    *TransferType                   `json:"transferType,omitempty"`
-	ContractAddress *eth.Address                    `json:"contractAddress,omitempty"`
+	PayloadType    PayloadType                     `json:"payloadType"`
+	Transaction    *transfer.TransactionIdentity   `json:"transaction"`
+	ID             transfer.MultiTransactionIDType `json:"id"`
+	Timestamp      int64                           `json:"timestamp"`
+	ActivityType   Type                            `json:"activityType"`
+	ActivityStatus Status                          `json:"activityStatus"`
+	AmountOut      *hexutil.Big                    `json:"amountOut"`
+	AmountIn       *hexutil.Big                    `json:"amountIn"`
+	TokenOut       *Token                          `json:"tokenOut,omitempty"`
+	TokenIn        *Token                          `json:"tokenIn,omitempty"`
+	Sender         *eth.Address                    `json:"sender,omitempty"`
+	Recipient      *eth.Address                    `json:"recipient,omitempty"`
+	ChainIDOut     *common.ChainID                 `json:"chainIdOut,omitempty"`
+	ChainIDIn      *common.ChainID                 `json:"chainIdIn,omitempty"`
+	TransferType   *TransferType                   `json:"transferType,omitempty"`
 }
 
 func (e *Entry) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonSerializationTemplate{
-		PayloadType:     e.payloadType,
-		Transaction:     e.transaction,
-		ID:              e.id,
-		Timestamp:       e.timestamp,
-		ActivityType:    e.activityType,
-		ActivityStatus:  e.activityStatus,
-		AmountOut:       e.amountOut,
-		AmountIn:        e.amountIn,
-		TokenOut:        e.tokenOut,
-		TokenIn:         e.tokenIn,
-		Sender:          e.sender,
-		Recipient:       e.recipient,
-		ChainIDOut:      e.chainIDOut,
-		ChainIDIn:       e.chainIDIn,
-		TransferType:    e.transferType,
-		ContractAddress: e.contractAddress,
+		PayloadType:    e.payloadType,
+		Transaction:    e.transaction,
+		ID:             e.id,
+		Timestamp:      e.timestamp,
+		ActivityType:   e.activityType,
+		ActivityStatus: e.activityStatus,
+		AmountOut:      e.amountOut,
+		AmountIn:       e.amountIn,
+		TokenOut:       e.tokenOut,
+		TokenIn:        e.tokenIn,
+		Sender:         e.sender,
+		Recipient:      e.recipient,
+		ChainIDOut:     e.chainIDOut,
+		ChainIDIn:      e.chainIDIn,
+		TransferType:   e.transferType,
 	})
 }
 
@@ -128,7 +125,6 @@ func (e *Entry) UnmarshalJSON(data []byte) error {
 	e.chainIDOut = aux.ChainIDOut
 	e.chainIDIn = aux.ChainIDIn
 	e.transferType = aux.TransferType
-	e.contractAddress = aux.ContractAddress
 	return nil
 }
 
@@ -847,7 +843,6 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		entry.chainIDOut = outChainID
 		entry.chainIDIn = inChainID
 		entry.transferType = transferType
-		entry.contractAddress = contractAddress
 
 		entries = append(entries, entry)
 	}
