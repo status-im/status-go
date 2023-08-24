@@ -2150,7 +2150,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 
 		// Save revealed addresses + signatures so they can later be added
 		// to the control node's local table of known revealed addresses
-		err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin)
+		err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin.ID, requestToJoin.RevealedAccounts)
 		if err != nil {
 			return nil, err
 		}
@@ -2242,7 +2242,7 @@ func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, re
 	if err != nil {
 		return err
 	}
-	err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin)
+	err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin.ID, requestToJoin.RevealedAccounts)
 	if err != nil {
 		return err
 	}
@@ -3140,12 +3140,25 @@ func (m *Manager) GetByIDString(idString string) (*Community, error) {
 	return m.GetByID(id)
 }
 
+func (m *Manager) SaveRequestToJoinRevealedAddresses(requestID types.HexBytes, revealedAccounts []*protobuf.RevealedAccount) error {
+	return m.persistence.SaveRequestToJoinRevealedAddresses(requestID, revealedAccounts)
+}
+
+func (m *Manager) RemoveRequestToJoinRevealedAddresses(requestID types.HexBytes) error {
+	return m.persistence.RemoveRequestToJoinRevealedAddresses(requestID)
+}
+
 func (m *Manager) SaveRequestToJoinAndCommunity(requestToJoin *RequestToJoin, community *Community) (*Community, *RequestToJoin, error) {
 	if err := m.persistence.SaveRequestToJoin(requestToJoin); err != nil {
 		return nil, nil, err
 	}
 	community.config.RequestedToJoinAt = uint64(time.Now().Unix())
 	community.AddRequestToJoin(requestToJoin)
+
+	// Save revealed addresses to our own table so that we can retrieve them later when editing
+	if err := m.SaveRequestToJoinRevealedAddresses(requestToJoin.ID, requestToJoin.RevealedAccounts); err != nil {
+		return nil, nil, err
+	}
 
 	return community, requestToJoin, nil
 }
