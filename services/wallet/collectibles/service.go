@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
@@ -264,4 +265,8 @@ func (s *Service) GetOwnedCollectibles(chainIDs []walletCommon.ChainID, owners [
 	}
 
 	return ids, hasMore, nil
+}
+
+func (s *Service) GetOwnedCollectible(chainID walletCommon.ChainID, owner common.Address, contractAddress common.Address, tokenID *big.Int) (*thirdparty.CollectibleUniqueID, error) {
+	return s.ownershipDB.GetOwnedCollectible(chainID, owner, contractAddress, tokenID)
 }

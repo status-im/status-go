@@ -445,7 +445,7 @@ func (api *API) GetSuggestedRoutes(
 	sendType SendType,
 	account common.Address,
 	amountIn *hexutil.Big,
-	tokenSymbol string,
+	tokenID string,
 	disabledFromChainIDs,
 	disabledToChaindIDs,
 	preferedChainIDs []uint64,
@@ -453,7 +453,7 @@ func (api *API) GetSuggestedRoutes(
 	fromLockedAmount map[uint64]*hexutil.Big,
 ) (*SuggestedRoutes, error) {
 	log.Debug("call to GetSuggestedRoutes")
-	return api.router.suggestedRoutes(ctx, sendType, account, amountIn.ToInt(), tokenSymbol, disabledFromChainIDs, disabledToChaindIDs, preferedChainIDs, gasFeeMode, fromLockedAmount)
+	return api.router.suggestedRoutes(ctx, sendType, account, amountIn.ToInt(), tokenID, disabledFromChainIDs, disabledToChaindIDs, preferedChainIDs, gasFeeMode, fromLockedAmount)
 }
 
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)

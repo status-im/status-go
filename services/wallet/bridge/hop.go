@@ -125,7 +125,7 @@ func (h *HopBridge) Can(from, to *params.Network, token *token.Token, balance *b
 	return true, nil
 }
 
-func (h *HopBridge) EstimateGas(from, to *params.Network, token *token.Token, amountIn *big.Int) (uint64, error) {
+func (h *HopBridge) EstimateGas(from, to *params.Network, account common.Address, token *token.Token, amountIn *big.Int) (uint64, error) {
 	// TODO: find why this doesn't work
 	// ethClient, err := s.contractMaker.RPCClient.EthClient(from.ChainID)
 	// if err != nil {

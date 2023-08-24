@@ -22,55 +22,64 @@ func getSigner(chainID uint64, from types.Address, verifiedAccount *account.Sele
 }
 
 type TransactionBridge struct {
-	BridgeName string
-	ChainID    uint64
-	SimpleTx   *transactions.SendTxArgs
-	HopTx      *HopTxArgs
-	CbridgeTx  *CBridgeTxArgs
+	BridgeName       string
+	ChainID          uint64
+	TransferTx       *transactions.SendTxArgs
+	HopTx            *HopTxArgs
+	CbridgeTx        *CBridgeTxArgs
+	ERC721TransferTx *ERC721TransferTxArgs
 }
 
 func (t *TransactionBridge) Value() *big.Int {
-	if t.SimpleTx != nil && t.SimpleTx.To != nil {
-		return t.SimpleTx.Value.ToInt()
+	if t.TransferTx != nil && t.TransferTx.To != nil {
+		return t.TransferTx.Value.ToInt()
 	} else if t.HopTx != nil {
 		return t.HopTx.Amount.ToInt()
 	} else if t.CbridgeTx != nil {
 		return t.CbridgeTx.Amount.ToInt()
+	} else if t.ERC721TransferTx != nil {
+		return big.NewInt(1)
 	}
 
 	return big.NewInt(0)
 }
 
 func (t *TransactionBridge) From() types.Address {
-	if t.SimpleTx != nil && t.SimpleTx.To != nil {
-		return t.SimpleTx.From
+	if t.TransferTx != nil && t.TransferTx.To != nil {
+		return t.TransferTx.From
 	} else if t.HopTx != nil {
 		return t.HopTx.From
 	} else if t.CbridgeTx != nil {
 		return t.CbridgeTx.From
+	} else if t.ERC721TransferTx != nil {
+		return t.ERC721TransferTx.From
 	}
 
 	return types.HexToAddress("0x0")
 }
 
 func (t *TransactionBridge) To() types.Address {
-	if t.SimpleTx != nil && t.SimpleTx.To != nil {
-		return *t.SimpleTx.To
+	if t.TransferTx != nil && t.TransferTx.To != nil {
+		return *t.TransferTx.To
 	} else if t.HopTx != nil {
 		return types.Address(t.HopTx.Recipient)
 	} else if t.CbridgeTx != nil {
 		return types.Address(t.HopTx.Recipient)
+	} else if t.ERC721TransferTx != nil {
+		return types.Address(t.ERC721TransferTx.Recipient)
 	}
 
 	return types.HexToAddress("0x0")
 }
 
 func (t *TransactionBridge) Data() types.HexBytes {
-	if t.SimpleTx != nil && t.SimpleTx.To != nil {
-		return t.SimpleTx.Data
+	if t.TransferTx != nil && t.TransferTx.To != nil {
+		return t.TransferTx.Data
 	} else if t.HopTx != nil {
 		return types.HexBytes("")
 	} else if t.CbridgeTx != nil {
+		return types.HexBytes("")
+	} else if t.ERC721TransferTx != nil {
 		return types.HexBytes("")
 	}
 
@@ -81,7 +90,7 @@ type Bridge interface {
 	Name() string
 	Can(from *params.Network, to *params.Network, token *token.Token, balance *big.Int) (bool, error)
 	CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int, nativeTokenPrice, tokenPrice float64, gasPrice *big.Float) (*big.Int, *big.Int, error)
-	EstimateGas(from *params.Network, to *params.Network, token *token.Token, amountIn *big.Int) (uint64, error)
+	EstimateGas(from *params.Network, to *params.Network, account common.Address, token *token.Token, amountIn *big.Int) (uint64, error)
 	CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error)
 	Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (types.Hash, error)
 	GetContractAddress(network *params.Network, token *token.Token) *common.Address

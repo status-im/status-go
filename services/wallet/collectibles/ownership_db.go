@@ -134,3 +134,32 @@ func (o *OwnershipDB) GetOwnedCollectibles(chainIDs []w_common.ChainID, ownerAdd
 
 	return rowsToCollectibles(rows)
 }
+
+func (o *OwnershipDB) GetOwnedCollectible(chainID w_common.ChainID, ownerAddresses common.Address, contractAddress common.Address, tokenID *big.Int) (*thirdparty.CollectibleUniqueID, error) {
+	query := fmt.Sprintf(`SELECT %s
+		FROM collectibles_ownership_cache
+		WHERE chain_id = ? AND owner_address = ? AND contract_address = ? AND token_id = ?`, selectOwnershipColumns)
+
+	stmt, err := o.db.Prepare(query)
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query(chainID, ownerAddresses, contractAddress, (*bigint.SQLBigIntBytes)(tokenID))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ids, err := rowsToCollectibles(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	return &ids[0], nil
+}
