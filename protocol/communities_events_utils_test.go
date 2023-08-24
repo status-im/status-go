@@ -614,6 +614,23 @@ func reorderChannel(base CommunityEventsTestsInterface, reorderRequest *requests
 }
 
 func kickMember(base CommunityEventsTestsInterface, communityID types.HexBytes, pubkey string) {
+	checkPending := func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(communityID))
+		if err != nil {
+			return err
+		}
+
+		if !modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey) {
+			return errors.New("alice should not be not kicked (yet)")
+		}
+
+		if len(modifiedCommmunity.PendingAndBannedMembers()) > 0 {
+			return errors.New("alice was kicked and should not be presented in the pending list")
+		}
+
+		return nil
+	}
+
 	checkKicked := func(response *MessengerResponse) error {
 		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(communityID))
 		if err != nil {
@@ -622,6 +639,10 @@ func kickMember(base CommunityEventsTestsInterface, communityID types.HexBytes, 
 
 		if modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey) {
 			return errors.New("alice was not kicked")
+		}
+
+		if len(modifiedCommmunity.PendingAndBannedMembers()) > 0 {
+			return errors.New("alice was kicked and should not be presented in the pending list")
 		}
 
 		return nil
@@ -634,8 +655,14 @@ func kickMember(base CommunityEventsTestsInterface, communityID types.HexBytes, 
 
 	s := base.GetSuite()
 	s.Require().NoError(err)
-	s.Require().Nil(checkKicked(response))
 
+	// 1. event sender should get pending state for kicked member
+	modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(communityID))
+	s.Require().NoError(err)
+	s.Require().True(modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey))
+	s.Require().Equal(communities.CommunityMemberKickPending, modifiedCommmunity.PendingAndBannedMembers()[pubkey])
+
+	checkClientsReceivedAdminEvent(base, checkPending)
 	checkClientsReceivedAdminEvent(base, checkKicked)
 }
 

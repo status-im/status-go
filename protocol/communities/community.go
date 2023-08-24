@@ -106,6 +106,15 @@ type CommunityTag struct {
 	Emoji string `json:"emoji"`
 }
 
+type CommunityMemberState uint8
+
+const (
+	CommunityMemberBanned CommunityMemberState = iota
+	CommunityMemberBanPending
+	CommunityMemberUnbanPending
+	CommunityMemberKickPending
+)
+
 func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 	if o.config.MemberIdentity == nil {
 		return nil, errors.New("member identity not set")
@@ -127,7 +136,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		Link                    string                               `json:"link"`
 		CommunityAdminSettings  CommunityAdminSettings               `json:"adminSettings"`
 		Encrypted               bool                                 `json:"encrypted"`
-		BanList                 []string                             `json:"banList"`
+		PendingAndBannedMembers map[string]CommunityMemberState      `json:"pendingAndBannedMembers"`
 		TokenPermissions        map[string]*CommunityTokenPermission `json:"tokenPermissions"`
 		CommunityTokensMetadata []*protobuf.CommunityTokenMetadata   `json:"communityTokensMetadata"`
 		ActiveMembersCount      uint64                               `json:"activeMembersCount"`
@@ -169,11 +178,11 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		}
 
 		communityItem.TokenPermissions = o.tokenPermissions()
+		communityItem.PendingAndBannedMembers = o.PendingAndBannedMembers()
 		communityItem.MembersCount = len(o.config.CommunityDescription.Members)
 		communityItem.Link = fmt.Sprintf("https://join.status.im/c/0x%x", o.ID())
 		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
 		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
-		communityItem.BanList = o.config.CommunityDescription.BanList
 		communityItem.CommunityTokensMetadata = o.config.CommunityDescription.CommunityTokensMetadata
 		communityItem.ActiveMembersCount = o.config.CommunityDescription.ActiveMembersCount
 
@@ -234,7 +243,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		MuteTill                    time.Time                            `json:"muteTill,omitempty"`
 		CommunityAdminSettings      CommunityAdminSettings               `json:"adminSettings"`
 		Encrypted                   bool                                 `json:"encrypted"`
-		BanList                     []string                             `json:"banList"`
+		PendingAndBannedMembers     map[string]CommunityMemberState      `json:"pendingAndBannedMembers"`
 		TokenPermissions            map[string]*CommunityTokenPermission `json:"tokenPermissions"`
 		CommunityTokensMetadata     []*protobuf.CommunityTokenMetadata   `json:"communityTokensMetadata"`
 		ActiveMembersCount          uint64                               `json:"activeMembersCount"`
@@ -288,11 +297,11 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 			communityItem.Chats[id] = chat
 		}
 		communityItem.TokenPermissions = o.tokenPermissions()
+		communityItem.PendingAndBannedMembers = o.PendingAndBannedMembers()
 		communityItem.Members = o.config.CommunityDescription.Members
 		communityItem.Permissions = o.config.CommunityDescription.Permissions
 		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
 		communityItem.OutroMessage = o.config.CommunityDescription.OutroMessage
-		communityItem.BanList = o.config.CommunityDescription.BanList
 		communityItem.CommunityTokensMetadata = o.config.CommunityDescription.CommunityTokensMetadata
 		communityItem.ActiveMembersCount = o.config.CommunityDescription.ActiveMembersCount
 
@@ -305,7 +314,6 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 					communityItem.Images = make(map[string]images.IdentityImage)
 				}
 				communityItem.Images[t] = images.IdentityImage{Name: t, Payload: i.Payload}
-
 			}
 		}
 
@@ -717,9 +725,8 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 		return nil, ErrCannotRemoveOwnerOrAdmin
 	}
 
-	o.removeMemberFromOrg(pk)
-
 	if o.IsControlNode() {
+		o.removeMemberFromOrg(pk)
 		o.increaseClock()
 	} else {
 		err := o.addNewCommunityEvent(o.ToKickCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
@@ -761,9 +768,8 @@ func (o *Community) UnbanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Commu
 		return nil, ErrNotAuthorized
 	}
 
-	o.unbanUserFromCommunity(pk)
-
 	if o.IsControlNode() {
+		o.unbanUserFromCommunity(pk)
 		o.increaseClock()
 	} else {
 		err := o.addNewCommunityEvent(o.ToUnbanCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
@@ -787,9 +793,8 @@ func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.Communi
 		return nil, ErrCannotBanOwnerOrAdmin
 	}
 
-	o.banUserFromCommunity(pk)
-
 	if o.IsControlNode() {
+		o.banUserFromCommunity(pk)
 		o.increaseClock()
 	} else {
 		err := o.addNewCommunityEvent(o.ToBanCommunityMemberCommunityEvent(common.PubkeyToHex(pk)))
@@ -1433,6 +1438,33 @@ func (o *Community) tokenPermissions() map[string]*CommunityTokenPermission {
 			if tokenPermission != nil {
 				tokenPermission.State = TokenPermissionRemovalPending
 			}
+		default:
+		}
+	}
+
+	return result
+}
+
+func (o *Community) PendingAndBannedMembers() map[string]CommunityMemberState {
+	result := make(map[string]CommunityMemberState)
+
+	// Non-privileged members should not see pending and banned members
+	if o.config.EventsData == nil || !o.IsPrivilegedMember(o.MemberIdentity()) {
+		return result
+	}
+
+	for _, bannedMemberID := range o.config.CommunityDescription.BanList {
+		result[bannedMemberID] = CommunityMemberBanned
+	}
+
+	for _, event := range o.config.EventsData.Events {
+		switch event.Type {
+		case protobuf.CommunityEvent_COMMUNITY_MEMBER_KICK:
+			result[event.MemberToAction] = CommunityMemberKickPending
+		case protobuf.CommunityEvent_COMMUNITY_MEMBER_BAN:
+			result[event.MemberToAction] = CommunityMemberBanPending
+		case protobuf.CommunityEvent_COMMUNITY_MEMBER_UNBAN:
+			result[event.MemberToAction] = CommunityMemberUnbanPending
 		default:
 		}
 	}
