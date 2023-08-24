@@ -3221,7 +3221,7 @@ func (m *Messenger) handleSyncAccountsPositions(message *protobuf.SyncAccountsPo
 	return accs, nil
 }
 
-func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPairing bool) (*accounts.Keypair, error) {
+func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPairing bool, acNofificationCallback func() error) (*accounts.Keypair, error) {
 	if message == nil {
 		return nil, errors.New("handleSyncKeypair receive a nil message")
 	}
@@ -3329,6 +3329,14 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		if err != nil {
 			return nil, err
 		}
+
+		// if keypair is coming from paired device (means not from backup) and it's not among known, active keypairs,
+		// we need to add an activity center notification
+		if !kp.Removed && dbKeypair == nil {
+			defer func() {
+				err = acNofificationCallback()
+			}()
+		}
 	}
 
 	for _, sKc := range message.Keycards {
@@ -3386,7 +3394,9 @@ func (m *Messenger) HandleSyncKeypair(state *ReceivedMessageState, message *prot
 }
 
 func (m *Messenger) handleSyncKeypairInternal(state *ReceivedMessageState, message *protobuf.SyncKeypair, fromLocalPairing bool) error {
-	kp, err := m.handleSyncKeypair(message, fromLocalPairing)
+	kp, err := m.handleSyncKeypair(message, fromLocalPairing, func() error {
+		return m.addNewKeypairAddedOnPairedDeviceACNotification(message.KeyUid, state.Response)
+	})
 	if err != nil {
 		if err == ErrTryingToStoreOldKeypair {
 			return nil
@@ -3556,4 +3566,32 @@ func (m *Messenger) HandleSyncTrustedUser(state *ReceivedMessageState, message *
 }
 func (m *Messenger) HandleCommunityMessageArchiveMagnetlink(state *ReceivedMessageState, message *protobuf.CommunityMessageArchiveMagnetlink, statusMessage *v1protocol.StatusMessage) error {
 	return m.HandleHistoryArchiveMagnetlinkMessage(state, state.CurrentMessageState.PublicKey, message.MagnetUri, message.Clock)
+}
+
+func (m *Messenger) addNewKeypairAddedOnPairedDeviceACNotification(keyUID string, response *MessengerResponse) error {
+	kp, err := m.settings.GetKeypairByKeyUID(keyUID)
+	if err != nil {
+		return err
+	}
+
+	notification := &ActivityCenterNotification{
+		ID:        types.FromHex(uuid.New().String()),
+		Type:      ActivityCenterNotificationTypeNewKeypairAddedToPairedDevice,
+		Timestamp: m.getTimesource().GetCurrentTime(),
+		Read:      false,
+		UpdatedAt: m.getCurrentTimeInMillis(),
+		Message: &common.Message{
+			ChatMessage: &protobuf.ChatMessage{
+				Text: kp.Name,
+			},
+			ID: kp.KeyUID,
+		},
+	}
+
+	err = m.addActivityCenterNotification(response, notification)
+	if err != nil {
+		m.logger.Warn("failed to create activity center notification", zap.Error(err))
+		return err
+	}
+	return nil
 }

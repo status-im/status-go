@@ -28,6 +28,7 @@ const (
 	ActivityCenterNotificationTypeCommunityKicked
 	ActivityCenterNotificationTypeContactVerification
 	ActivityCenterNotificationTypeContactRemoved
+	ActivityCenterNotificationTypeNewKeypairAddedToPairedDevice
 )
 
 type ActivityCenterMembershipStatus int
