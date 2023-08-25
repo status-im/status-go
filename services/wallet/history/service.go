@@ -40,6 +40,7 @@ const (
 type Service struct {
 	balance        *Balance
 	db             *sql.DB
+	accountsDB     *accounts.Database
 	eventFeed      *event.Feed
 	rpcClient      *statusrpc.Client
 	networkManager *network.Manager
@@ -56,10 +57,11 @@ type Service struct {
 
 type chainIdentity uint64
 
-func NewService(db *sql.DB, eventFeed *event.Feed, rpcClient *statusrpc.Client, tokenManager *token.Manager, marketManager *market.Manager) *Service {
+func NewService(db *sql.DB, accountsDB *accounts.Database, eventFeed *event.Feed, rpcClient *statusrpc.Client, tokenManager *token.Manager, marketManager *market.Manager) *Service {
 	return &Service{
 		balance:        NewBalance(NewBalanceDB(db)),
 		db:             db,
+		accountsDB:     accountsDB,
 		eventFeed:      eventFeed,
 		rpcClient:      rpcClient,
 		networkManager: rpcClient.NetworkManager,
@@ -222,8 +224,6 @@ func (s *Service) GetBalanceHistory(ctx context.Context, chainIDs []uint64, addr
 		}
 		if len(data) > 0 {
 			allData[chainIdentity(chainID)] = data
-		} else {
-			return make([]*ValuePoint, 0), nil
 		}
 	}
 
@@ -476,17 +476,13 @@ func sortTimeAsc(data map[chainIdentity][]*DataPoint, pos map[chainIdentity]int)
 //
 // expects ctx to have cancellation support and processing to be cancelled by the caller
 func (s *Service) updateBalanceHistory(ctx context.Context) error {
-	accountsDB, err := accounts.NewDB(s.db)
+
+	addresses, err := s.accountsDB.GetWalletAddresses()
 	if err != nil {
 		return err
 	}
 
-	addresses, err := accountsDB.GetWalletAddresses()
-	if err != nil {
-		return err
-	}
-
-	areTestNetworksEnabled, err := accountsDB.GetTestNetworksEnabled()
+	areTestNetworksEnabled, err := s.accountsDB.GetTestNetworksEnabled()
 	if err != nil {
 		return err
 	}

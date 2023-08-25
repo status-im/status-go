@@ -57,6 +57,30 @@ type HistoryFetcher interface {
 		limit int64, fetchMore bool) ([]Transfer, error)
 }
 
+func NewOnDemandFetchStrategy(
+	db *Database,
+	blockDAO *BlockDAO,
+	feed *event.Feed,
+	transactionManager *TransactionManager,
+	pendingTxManager *transactions.PendingTxTracker,
+	tokenManager *token.Manager,
+	chainClients map[uint64]*chain.ClientWithFallback,
+	accounts []common.Address,
+) *OnDemandFetchStrategy {
+	strategy := &OnDemandFetchStrategy{
+		db:                 db,
+		blockDAO:           blockDAO,
+		feed:               feed,
+		transactionManager: transactionManager,
+		pendingTxManager:   pendingTxManager,
+		tokenManager:       tokenManager,
+		chainClients:       chainClients,
+		accounts:           accounts,
+	}
+
+	return strategy
+}
+
 type OnDemandFetchStrategy struct {
 	db                 *Database
 	blockDAO           *BlockDAO
@@ -294,16 +318,7 @@ func (r *Reactor) createFetchStrategy(chainClients map[uint64]*chain.ClientWithF
 		)
 	}
 
-	return &OnDemandFetchStrategy{
-		db:                 r.db,
-		feed:               r.feed,
-		blockDAO:           r.blockDAO,
-		transactionManager: r.transactionManager,
-		pendingTxManager:   r.pendingTxManager,
-		tokenManager:       r.tokenManager,
-		chainClients:       chainClients,
-		accounts:           accounts,
-	}
+	return NewOnDemandFetchStrategy(r.db, r.blockDAO, r.feed, r.transactionManager, r.pendingTxManager, r.tokenManager, chainClients, accounts)
 }
 
 func (r *Reactor) getTransfersByAddress(ctx context.Context, chainID uint64, address common.Address, toBlock *big.Int,

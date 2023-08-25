@@ -66,15 +66,6 @@ type DerivedAddress struct {
 	AlreadyCreated bool           `json:"alreadyCreated"`
 }
 
-// SetInitialBlocksRange sets initial blocks range
-func (api *API) SetInitialBlocksRange(ctx context.Context) error {
-	return api.s.transferController.SetInitialBlocksRange([]uint64{api.s.rpcClient.UpstreamChainID})
-}
-
-func (api *API) SetInitialBlocksRangeForChainIDs(ctx context.Context, chainIDs []uint64) error {
-	return api.s.transferController.SetInitialBlocksRange(chainIDs)
-}
-
 func (api *API) CheckRecentHistory(ctx context.Context, addresses []common.Address) error {
 	return api.s.transferController.CheckRecentHistory([]uint64{api.s.rpcClient.UpstreamChainID}, addresses)
 }

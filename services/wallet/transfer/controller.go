@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -64,32 +63,6 @@ func (c *Controller) Stop() {
 		c.group.Wait()
 		c.group = nil
 	}
-}
-
-func (c *Controller) SetInitialBlocksRange(chainIDs []uint64) error {
-	chainClients, err := c.rpcClient.EthClients(chainIDs)
-	if err != nil {
-		return err
-	}
-
-	for chainID, chainClient := range chainClients {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-
-		toHeader, err := chainClient.HeaderByNumber(ctx, nil)
-		if err != nil {
-			return err
-		}
-
-		from := big.NewInt(0)
-
-		err = c.blockDAO.setInitialBlocksRange(chainID, from, toHeader.Number)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Address) error {

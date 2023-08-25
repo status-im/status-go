@@ -132,30 +132,6 @@ Returns avaiable transfers in a given range.
 ]
 ```
 
-### wallet_setInitialBlocksRange
-
-Sets `zero block - latest block` range as scanned for an account. It is used when a new multiaccount is generated to avoid scanning transfers history.
-
-#### Example 
-
-```json
-{"jsonrpc":"2.0","id":7,"method":"wallet_setInitialBlocksRange","params":[]}
-```
-
-### setInitialBlocksRangeForChainIDs
-
-Sets `zero block - latest block` range as scanned for an account. It is used when a new multiaccount is generated to avoid scanning transfers history.
-
-#### Parameters
-
-- `chainIDs`: `[]INT` - array of ethereum chain ID to be initialized
-
-#### Example 
-
-```json
-{"jsonrpc":"2.0","id":7,"method":"wallet_setInitialBlocksRangeForChainIDs","params":[[1, 2]]}
-```
-
 ### wallet_watchTransaction
 
 Starts watching for transaction confirmation/rejection. If transaction was not confirmed/rejected in 10 minutes the call is timed out with error.
@@ -616,7 +592,7 @@ Emitted when history scanning is started.
 
 Emitted when history scanning is ended.
 
-4. `fetching-history-error` 
+4. `fetching-history-error`
 
 Emitted when when history can't be fetched because some error. Error's decritption can be found in `message` field.
 
@@ -630,12 +606,11 @@ Emitted when the application is connected to a non-archival node.
 
 When a new multiaccount is created corresponding address will not contain any transaction. Thus no point in checking history, it will be empty.
 
-1. Call `wallet_setInitialRange` 
-2. Call `wallet_checkRecentHistory`
-3. On `recent-history-ready` request transactions via `wallet_getTransfersByAddress`
-4. Repeat `wallet_checkRecentHistory` in N minutes (currently 20 minutes in `status-mobile` for upstream RPC node. If a custom node is used interval can be arbitrary)
+1. Call `wallet_checkRecentHistory`
+2. On `recent-history-ready` request transactions via `wallet_getTransfersByAddress`
+3. Repeat `wallet_checkRecentHistory` in N minutes (currently 20 minutes in `status-mobile` for upstream RPC node. If a custom node is used interval can be arbitrary)
 
-### Logging into application 
+### Logging into application
 1. Call `wallet_checkRecentHistory`
 2. On `recent-history-ready` request transactions via `wallet_getTransfersByAddress`
 3. Repeat `wallet_checkRecentHistory` in N minutes (currently 20 minutes in `status-mobile` for upstream RPC node. If a custom node is used interval can be arbitrary)
