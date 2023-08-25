@@ -6,7 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
@@ -56,23 +55,6 @@ func (b *BlockDAO) mergeBlocksRanges(chainIDs []uint64, accounts []common.Addres
 				return err
 			}
 		}
-	}
-	return nil
-}
-
-func (b *BlockDAO) setInitialBlocksRange(chainID uint64, from *big.Int, to *big.Int) error {
-	accountsDB, err := accounts.NewDB(b.db)
-	if err != nil {
-		return err
-	}
-	watchAddress, err := accountsDB.GetWalletAddress()
-	if err != nil {
-		return err
-	}
-
-	err = b.insertRange(chainID, common.Address(watchAddress), from, to, big.NewInt(0), 0)
-	if err != nil {
-		return err
 	}
 	return nil
 }
