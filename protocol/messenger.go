@@ -434,8 +434,8 @@ func NewMessenger(
 		managerOptions = append(managerOptions, communities.WithWalletConfig(c.walletConfig))
 	}
 
-	if c.collectiblesService != nil {
-		managerOptions = append(managerOptions, communities.WithCollectiblesService(c.collectiblesService))
+	if c.communityTokensService != nil {
+		managerOptions = append(managerOptions, communities.WithCommunityTokensService(c.communityTokensService))
 	}
 
 	communitiesManager, err := communities.NewManager(identity, database, encryptionProtocol, logger, ensVerifier, transp, c.torrentConfig, managerOptions...)

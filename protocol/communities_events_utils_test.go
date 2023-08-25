@@ -16,7 +16,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
-	"github.com/status-im/status-go/services/collectibles"
+	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
@@ -1674,7 +1674,7 @@ func testEventSenderCannotEditPrivilegedCommunityPermission(base CommunityEvents
 func testAddAndSyncTokenFromControlNode(base CommunityEventsTestsInterface, community *communities.Community,
 	privilegesLvl token.PrivilegesLevel) {
 	tokenERC721 := createCommunityToken(community.IDString(), privilegesLvl)
-	addCommunityTokenToCollectiblesService(base, tokenERC721)
+	addCommunityTokenToCommunityTokensService(base, tokenERC721)
 
 	s := base.GetSuite()
 
@@ -1754,7 +1754,7 @@ func createCommunityToken(communityID string, privilegesLevel token.PrivilegesLe
 func testAddAndSyncTokenFromEventSenderByControlNode(base CommunityEventsTestsInterface, community *communities.Community,
 	privilegesLvl token.PrivilegesLevel) {
 	tokenERC721 := createCommunityToken(community.IDString(), privilegesLvl)
-	addCommunityTokenToCollectiblesService(base, tokenERC721)
+	addCommunityTokenToCommunityTokensService(base, tokenERC721)
 
 	s := base.GetSuite()
 
@@ -1812,7 +1812,7 @@ func testAddAndSyncTokenFromEventSenderByControlNode(base CommunityEventsTestsIn
 
 func testEventSenderAddTokenMasterAndOwnerToken(base CommunityEventsTestsInterface, community *communities.Community) {
 	ownerToken := createCommunityToken(community.IDString(), token.OwnerLevel)
-	addCommunityTokenToCollectiblesService(base, ownerToken)
+	addCommunityTokenToCommunityTokensService(base, ownerToken)
 
 	s := base.GetSuite()
 
@@ -1833,8 +1833,8 @@ func testEventSenderAddTokenMasterAndOwnerToken(base CommunityEventsTestsInterfa
 	s.Require().Error(err, communities.ErrInvalidManageTokensPermission)
 }
 
-func addCommunityTokenToCollectiblesService(base CommunityEventsTestsInterface, token *token.CommunityToken) {
-	data := &collectibles.CollectibleContractData{
+func addCommunityTokenToCommunityTokensService(base CommunityEventsTestsInterface, token *token.CommunityToken) {
+	data := &communitytokens.CollectibleContractData{
 		TotalSupply:    token.Supply,
 		Transferable:   token.Transferable,
 		RemoteBurnable: token.RemoteSelfDestruct,
