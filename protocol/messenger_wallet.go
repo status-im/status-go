@@ -177,7 +177,7 @@ func (m *Messenger) SaveOrUpdateAccount(acc *accounts.Account) error {
 func (m *Messenger) MarkKeypairFullyOperable(keyUID string) error {
 	clock, _ := m.getLastClockWithRelatedChat()
 
-	err := m.settings.MarkKeypairFullyOperable(keyUID, clock)
+	err := m.settings.MarkKeypairFullyOperable(keyUID, clock, true)
 	if err != nil {
 		return err
 	}
@@ -201,7 +201,7 @@ func (m *Messenger) deleteKeystoreFileForAddress(address types.Address) error {
 			return err
 		}
 
-		if len(kp.Keycards) == 0 {
+		if !kp.MigratedToKeycard() {
 			err = m.accountsManager.DeleteAccount(address)
 			var e *account.ErrCannotLocateKeyFile
 			if err != nil && !errors.As(err, &e) {
@@ -225,7 +225,7 @@ func (m *Messenger) deleteKeystoreFileForAddress(address types.Address) error {
 }
 
 func (m *Messenger) deleteKeystoreFilesForKeypair(keypair *accounts.Keypair) (err error) {
-	if keypair == nil || len(keypair.Keycards) > 0 {
+	if m.accountsManager == nil || keypair == nil || keypair.MigratedToKeycard() {
 		return
 	}
 

@@ -346,7 +346,7 @@ func (api *API) MakePartiallyOperableAccoutsFullyOperable(ctx context.Context, p
 		return
 	}
 
-	if len(profileKeypair.Keycards) == 0 && !api.VerifyPassword(password) {
+	if !profileKeypair.MigratedToKeycard() && !api.VerifyPassword(password) {
 		err = errors.New("wrong password provided")
 		return
 	}
@@ -467,11 +467,6 @@ func (api *API) SaveOrUpdateKeycard(ctx context.Context, keycard *accounts.Keyca
 		return err
 	}
 
-	relatedKeycardsByKeyUID, err := api.db.GetKeycardsWithSameKeyUID(keycard.KeyUID)
-	if err != nil {
-		return err
-	}
-
 	err = (*api.messenger).SaveOrUpdateKeycard(ctx, keycard)
 	if err != nil {
 		return err
@@ -480,9 +475,13 @@ func (api *API) SaveOrUpdateKeycard(ctx context.Context, keycard *accounts.Keyca
 	if !accountsComingFromKeycard {
 		// Once we migrate a keypair, corresponding keystore files need to be deleted
 		// if the keypair being migrated is not already migrated (in case user is creating a copy of an existing Keycard)
-		if len(relatedKeycardsByKeyUID) == 0 {
-			for _, addr := range keycard.AccountsAddresses {
-				err = api.manager.DeleteAccount(addr)
+		// and if keypair operability is different from non operable (otherwise there are not keystore files to be deleted).
+		if !kpDb.MigratedToKeycard() && kpDb.Operability() != accounts.AccountNonOperable {
+			for _, acc := range kpDb.Accounts {
+				if acc.Operable != accounts.AccountFullyOperable {
+					continue
+				}
+				err = api.manager.DeleteAccount(acc.Address)
 				if err != nil {
 					return err
 				}
@@ -492,6 +491,11 @@ func (api *API) SaveOrUpdateKeycard(ctx context.Context, keycard *accounts.Keyca
 			if err != nil {
 				return err
 			}
+		}
+
+		err = (*api.messenger).MarkKeypairFullyOperable(keycard.KeyUID)
+		if err != nil {
+			return err
 		}
 	}
 
