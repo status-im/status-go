@@ -39,7 +39,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
-	"github.com/status-im/status-go/services/collectibles"
+	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -80,7 +80,7 @@ type Manager struct {
 	torrentConfig                    *params.TorrentConfig
 	torrentClient                    *torrent.Client
 	walletConfig                     *params.WalletConfig
-	collectiblesService              collectibles.ServiceInterface
+	communityTokensService           communitytokens.ServiceInterface
 	historyArchiveTasksWaitGroup     sync.WaitGroup
 	historyArchiveTasks              sync.Map // stores `chan struct{}`
 	periodicMembersReevaluationTasks sync.Map // stores `chan struct{}`
@@ -111,11 +111,11 @@ func (t *HistoryArchiveDownloadTask) Cancel() {
 }
 
 type managerOptions struct {
-	accountsManager     account.Manager
-	tokenManager        TokenManager
-	collectiblesManager CollectiblesManager
-	walletConfig        *params.WalletConfig
-	collectiblesService collectibles.ServiceInterface
+	accountsManager        account.Manager
+	tokenManager           TokenManager
+	collectiblesManager    CollectiblesManager
+	walletConfig           *params.WalletConfig
+	communityTokensService communitytokens.ServiceInterface
 }
 
 type TokenManager interface {
@@ -191,9 +191,9 @@ func WithWalletConfig(walletConfig *params.WalletConfig) ManagerOption {
 	}
 }
 
-func WithCollectiblesService(collectiblesService collectibles.ServiceInterface) ManagerOption {
+func WithCommunityTokensService(communityTokensService communitytokens.ServiceInterface) ManagerOption {
 	return func(opts *managerOptions) {
-		opts.collectiblesService = collectiblesService
+		opts.communityTokensService = communityTokensService
 	}
 }
 
@@ -251,8 +251,8 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 		manager.walletConfig = managerConfig.walletConfig
 	}
 
-	if managerConfig.collectiblesService != nil {
-		manager.collectiblesService = managerConfig.collectiblesService
+	if managerConfig.communityTokensService != nil {
+		manager.communityTokensService = managerConfig.communityTokensService
 	}
 
 	if verifier != nil {
@@ -4607,7 +4607,7 @@ func (m *Manager) HandleCommunityTokensMetadata(community *Community) error {
 
 				switch tokenMetadata.TokenType {
 				case protobuf.CommunityTokenType_ERC721:
-					contractData, err := m.collectiblesService.GetCollectibleContractData(chainID, address)
+					contractData, err := m.communityTokensService.GetCollectibleContractData(chainID, address)
 					if err != nil {
 						return err
 					}
@@ -4618,7 +4618,7 @@ func (m *Manager) HandleCommunityTokensMetadata(community *Community) error {
 					communityToken.InfiniteSupply = contractData.InfiniteSupply
 
 				case protobuf.CommunityTokenType_ERC20:
-					contractData, err := m.collectiblesService.GetAssetContractData(chainID, address)
+					contractData, err := m.communityTokensService.GetAssetContractData(chainID, address)
 					if err != nil {
 						return err
 					}

@@ -1,4 +1,4 @@
-package collectibles
+package communitytokens
 
 import (
 	"database/sql"

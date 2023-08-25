@@ -1,4 +1,4 @@
-package collectibles
+package communitytokens
 
 import (
 	"database/sql"
@@ -45,7 +45,7 @@ func (s *Service) Protocols() []p2p.Protocol {
 func (s *Service) APIs() []ethRpc.API {
 	return []ethRpc.API{
 		{
-			Namespace: "collectibles",
+			Namespace: "communitytokens",
 			Version:   "0.1.0",
 			Service:   NewAPI(s),
 			Public:    true,

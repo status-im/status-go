@@ -7,6 +7,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/services/communitytokens"
 
 	"go.uber.org/zap"
 
@@ -24,7 +25,6 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/wakusync"
-	"github.com/status-im/status-go/services/collectibles"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
 )
@@ -76,21 +76,21 @@ type config struct {
 
 	featureFlags common.FeatureFlags
 
-	appDb               *sql.DB
-	walletDb            *sql.DB
-	afterDbCreatedHooks []Option
-	multiAccount        *multiaccounts.Database
-	mailserversDatabase *mailservers.Database
-	account             *multiaccounts.Account
-	clusterConfig       params.ClusterConfig
-	browserDatabase     *browsers.Database
-	torrentConfig       *params.TorrentConfig
-	walletConfig        *params.WalletConfig
-	walletService       *wallet.Service
-	collectiblesService collectibles.ServiceInterface
-	httpServer          *server.MediaServer
-	rpcClient           *rpc.Client
-	tokenManager        communities.TokenManager
+	appDb                  *sql.DB
+	walletDb               *sql.DB
+	afterDbCreatedHooks    []Option
+	multiAccount           *multiaccounts.Database
+	mailserversDatabase    *mailservers.Database
+	account                *multiaccounts.Account
+	clusterConfig          params.ClusterConfig
+	browserDatabase        *browsers.Database
+	torrentConfig          *params.TorrentConfig
+	walletConfig           *params.WalletConfig
+	walletService          *wallet.Service
+	communityTokensService communitytokens.ServiceInterface
+	httpServer             *server.MediaServer
+	rpcClient              *rpc.Client
+	tokenManager           communities.TokenManager
 
 	verifyTransactionClient  EthClient
 	verifyENSURL             string
@@ -336,9 +336,9 @@ func WithWalletService(s *wallet.Service) Option {
 	}
 }
 
-func WithCollectiblesService(s collectibles.ServiceInterface) Option {
+func WithCommunityTokensService(s communitytokens.ServiceInterface) Option {
 	return func(c *config) error {
-		c.collectiblesService = s
+		c.communityTokensService = s
 		return nil
 	}
 }

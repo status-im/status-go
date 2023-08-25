@@ -28,7 +28,7 @@ import (
 	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/chat"
-	"github.com/status-im/status-go/services/collectibles"
+	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/ens"
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/gif"
@@ -80,7 +80,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	services = append(services, b.statusPublicService())
 	services = append(services, b.pendingTrackerService(&b.walletFeed))
 	services = append(services, b.ensService(b.timeSourceNow()))
-	services = append(services, b.collectiblesService())
+	services = append(services, b.CommunityTokensService())
 	services = append(services, b.stickersService(accDB))
 	services = append(services, b.updatesService())
 	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accountsFeed, accDB, mediaServer))
@@ -427,11 +427,11 @@ func (b *StatusNode) pendingTrackerService(walletFeed *event.Feed) *transactions
 	return b.pendingTracker
 }
 
-func (b *StatusNode) collectiblesService() *collectibles.Service {
-	if b.collectiblesSrvc == nil {
-		b.collectiblesSrvc = collectibles.NewService(b.rpcClient, b.gethAccountManager, b.pendingTracker, b.config, b.appDB)
+func (b *StatusNode) CommunityTokensService() *communitytokens.Service {
+	if b.communityTokensSrvc == nil {
+		b.communityTokensSrvc = communitytokens.NewService(b.rpcClient, b.gethAccountManager, b.pendingTracker, b.config, b.appDB)
 	}
-	return b.collectiblesSrvc
+	return b.communityTokensSrvc
 }
 
 func (b *StatusNode) stickersService(accountDB *accounts.Database) *stickers.Service {
@@ -501,10 +501,6 @@ func (b *StatusNode) SetWalletCollectibleMetadataProvider(provider thirdparty.Co
 	if b.walletSrvc != nil {
 		b.walletSrvc.SetCollectibleMetadataProvider(provider)
 	}
-}
-
-func (b *StatusNode) CollectiblesService() *collectibles.Service {
-	return b.collectiblesSrvc
 }
 
 func (b *StatusNode) walletService(accountsDB *accounts.Database, accountsFeed *event.Feed, walletFeed *event.Feed) *wallet.Service {
