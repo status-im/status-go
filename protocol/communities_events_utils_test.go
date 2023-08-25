@@ -667,7 +667,7 @@ func unbanMember(base CommunityEventsTestsInterface, unbanRequest *requests.Unba
 	s.Require().NoError(err)
 	s.Require().Nil(checkUnbanned(response))
 
-	response, err = WaitOnMessengerResponse(
+	_, err = WaitOnMessengerResponse(
 		base.GetControlNode(),
 		func(r *MessengerResponse) bool { return checkUnbanned(r) == nil },
 		"MessengerResponse data not received",
@@ -899,7 +899,7 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
 
 	// control node receives request to join
-	response, err = WaitOnMessengerResponse(
+	_, err = WaitOnMessengerResponse(
 		base.GetControlNode(),
 		checkRequestToJoin,
 		"event sender did not receive community request to join",

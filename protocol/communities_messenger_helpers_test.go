@@ -376,17 +376,23 @@ func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, co
 	requestToJoin := response.RequestsToJoinCommunity[0]
 	s.Require().Equal(requestToJoin.PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
 
-	response, err = WaitOnMessengerResponse(
+	_, err = WaitOnMessengerResponse(
 		controlNode,
 		func(r *MessengerResponse) bool {
-			return len(r.RequestsToJoinCommunity) > 0
+			if len(r.RequestsToJoinCommunity) == 0 {
+				return false
+			}
+
+			for _, resultRequest := range r.RequestsToJoinCommunity {
+				if resultRequest.PublicKey == common.PubkeyToHex(&user.identity.PublicKey) {
+					return true
+				}
+			}
+			return false
 		},
 		"control node did not receive community request to join",
 	)
 	s.Require().NoError(err)
-
-	userRequestToJoin := response.RequestsToJoinCommunity[0]
-	s.Require().Equal(userRequestToJoin.PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
 
 	// accept join request
 	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: requestToJoin.ID}
