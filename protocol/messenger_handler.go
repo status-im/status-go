@@ -1414,8 +1414,6 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageSta
 
 // HandleCommunityRequestToJoin handles an community request to join
 func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, requestToJoinProto *protobuf.CommunityRequestToJoin, statusMessage *v1protocol.StatusMessage) error {
-	signer := state.CurrentMessageState.PublicKey
-
 	if requestToJoinProto.CommunityId == nil {
 		return ErrInvalidCommunityID
 	}
@@ -1431,7 +1429,9 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, re
 		return errors.New("request is expired")
 	}
 
-	requestToJoin, err := m.communitiesManager.HandleCommunityRequestToJoin(signer, requestToJoinProto)
+	signer := state.CurrentMessageState.PublicKey
+	receiver := statusMessage.Dst
+	requestToJoin, err := m.communitiesManager.HandleCommunityRequestToJoin(signer, receiver, requestToJoinProto)
 	if err != nil {
 		return err
 	}

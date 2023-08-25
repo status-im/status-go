@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/stretchr/testify/suite"
@@ -33,41 +34,39 @@ const commmunitiesEventsTestChainID = 1
 const commmunitiesEventsEventSenderAddress = "0x0200000000000000000000000000000000000000"
 
 type MessageResponseValidator func(*MessengerResponse) error
-type WaitResponseValidator func(*MessengerResponse) bool
-
-func WaitCommunityCondition(r *MessengerResponse) bool {
-	return len(r.Communities()) > 0
-}
 
 func WaitMessageCondition(response *MessengerResponse) bool {
 	return len(response.Messages()) > 0
 }
 
-func waitOnMessengerResponse(s *suite.Suite, fnWait WaitResponseValidator, fn MessageResponseValidator, user *Messenger) {
-	response, err := WaitOnMessengerResponse(
+func waitOnMessengerResponse(s *suite.Suite, fnWait MessageResponseValidator, user *Messenger) {
+	_, err := WaitOnMessengerResponse(
 		user,
-		fnWait,
+		func(r *MessengerResponse) bool {
+			err := fnWait(r)
+			fmt.Println("WaitOnMessengerResponse error", err)
+			return err == nil
+		},
 		"MessengerResponse data not received",
 	)
 	s.Require().NoError(err)
-	s.Require().NoError(fn(response))
 }
 
-func checkClientsReceivedAdminEvent(base CommunityEventsTestsInterface, fnWait WaitResponseValidator, fn MessageResponseValidator) {
+func checkClientsReceivedAdminEvent(base CommunityEventsTestsInterface, fn MessageResponseValidator) {
 	s := base.GetSuite()
 	// Wait and verify Member received community event
-	waitOnMessengerResponse(s, fnWait, fn, base.GetMember())
+	waitOnMessengerResponse(s, fn, base.GetMember())
 	// Wait and verify event sender received his own event
-	waitOnMessengerResponse(s, fnWait, fn, base.GetEventSender())
+	waitOnMessengerResponse(s, fn, base.GetEventSender())
 	// Wait and verify ControlNode received community event
 	// ControlNode will publish CommunityDescription update
-	waitOnMessengerResponse(s, fnWait, fn, base.GetControlNode())
+	waitOnMessengerResponse(s, fn, base.GetControlNode())
 	// Wait and verify Member received the ControlNode CommunityDescription update
-	waitOnMessengerResponse(s, fnWait, fn, base.GetMember())
+	waitOnMessengerResponse(s, fn, base.GetMember())
 	// Wait and verify event sender received the ControlNode CommunityDescription update
-	waitOnMessengerResponse(s, fnWait, fn, base.GetEventSender())
+	waitOnMessengerResponse(s, fn, base.GetEventSender())
 	// Wait and verify ControlNode received his own CommunityDescription update
-	waitOnMessengerResponse(s, fnWait, fn, base.GetControlNode())
+	waitOnMessengerResponse(s, fn, base.GetControlNode())
 }
 
 func refreshMessengerResponses(base CommunityEventsTestsInterface) {
@@ -209,7 +208,7 @@ func createCommunityChannel(base CommunityEventsTestsInterface, community *commu
 		break
 	}
 
-	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkChannelCreated)
+	checkClientsReceivedAdminEvent(base, checkChannelCreated)
 
 	return addedChatID
 }
@@ -235,7 +234,7 @@ func editCommunityChannel(base CommunityEventsTestsInterface, community *communi
 	s.Require().NoError(err)
 	s.Require().NoError(checkChannelEdited(response))
 
-	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkChannelEdited)
+	checkClientsReceivedAdminEvent(base, checkChannelEdited)
 }
 
 func deleteCommunityChannel(base CommunityEventsTestsInterface, community *communities.Community, channelID string) {
@@ -257,7 +256,7 @@ func deleteCommunityChannel(base CommunityEventsTestsInterface, community *commu
 	s.Require().NoError(err)
 	s.Require().NoError(checkChannelDeleted(response))
 
-	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkChannelDeleted)
+	checkClientsReceivedAdminEvent(base, checkChannelDeleted)
 }
 
 func createTestPermissionRequest(community *communities.Community, pType protobuf.CommunityTokenPermission_Type) *requests.CreateCommunityTokenPermission {
@@ -429,14 +428,14 @@ func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role pr
 		return checkMemberJoinedToTheCommunity(response, base.GetMember().IdentityPublicKey())
 	}
 
-	waitOnMessengerResponse(s, WaitCommunityCondition, checkMemberJoined, base.GetEventSender())
+	waitOnMessengerResponse(s, checkMemberJoined, base.GetEventSender())
 
 	// grant permissions to event sender
 	grantPermission(s, community, base.GetControlNode(), base.GetEventSender(), role)
 	checkPermissionGranted := func(response *MessengerResponse) error {
 		return checkRolePermissionInResponse(response, base.GetEventSender().IdentityPublicKey(), role)
 	}
-	waitOnMessengerResponse(s, WaitCommunityCondition, checkPermissionGranted, base.GetMember())
+	waitOnMessengerResponse(s, checkPermissionGranted, base.GetMember())
 
 	for _, eventSender := range additionalEventSenders {
 		advertiseCommunityTo(s, community, base.GetControlNode(), eventSender)
@@ -446,8 +445,8 @@ func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role pr
 		checkPermissionGranted = func(response *MessengerResponse) error {
 			return checkRolePermissionInResponse(response, eventSender.IdentityPublicKey(), role)
 		}
-		waitOnMessengerResponse(s, WaitCommunityCondition, checkPermissionGranted, base.GetMember())
-		waitOnMessengerResponse(s, WaitCommunityCondition, checkPermissionGranted, base.GetEventSender())
+		waitOnMessengerResponse(s, checkPermissionGranted, base.GetMember())
+		waitOnMessengerResponse(s, checkPermissionGranted, base.GetEventSender())
 	}
 
 	return community
@@ -482,7 +481,7 @@ func createCommunityCategory(base CommunityEventsTestsInterface, community *comm
 		break
 	}
 
-	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkCategoryCreated)
+	checkClientsReceivedAdminEvent(base, checkCategoryCreated)
 
 	return categoryID
 }
@@ -509,7 +508,7 @@ func editCommunityCategory(base CommunityEventsTestsInterface, communityID strin
 	s.Require().NoError(err)
 	s.Require().NoError(checkCategoryEdited(response))
 
-	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkCategoryEdited)
+	checkClientsReceivedAdminEvent(base, checkCategoryEdited)
 }
 
 func deleteCommunityCategory(base CommunityEventsTestsInterface, communityID string, deleteCategory *requests.DeleteCommunityCategory) {
@@ -532,7 +531,7 @@ func deleteCommunityCategory(base CommunityEventsTestsInterface, communityID str
 	s.Require().NoError(err)
 	s.Require().NoError(checkCategoryDeleted(response))
 
-	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkCategoryDeleted)
+	checkClientsReceivedAdminEvent(base, checkCategoryDeleted)
 }
 
 func reorderCategory(base CommunityEventsTestsInterface, reorderRequest *requests.ReorderCommunityCategories) {
@@ -560,7 +559,7 @@ func reorderCategory(base CommunityEventsTestsInterface, reorderRequest *request
 	s.Require().NoError(err)
 	s.Require().NoError(checkCategoryReorder(response))
 
-	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkCategoryReorder)
+	checkClientsReceivedAdminEvent(base, checkCategoryReorder)
 }
 
 func reorderChannel(base CommunityEventsTestsInterface, reorderRequest *requests.ReorderCommunityChat) {
@@ -592,7 +591,7 @@ func reorderChannel(base CommunityEventsTestsInterface, reorderRequest *requests
 	s.Require().NoError(err)
 	s.Require().NoError(checkChannelReorder(response))
 
-	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkChannelReorder)
+	checkClientsReceivedAdminEvent(base, checkChannelReorder)
 }
 
 func kickMember(base CommunityEventsTestsInterface, communityID types.HexBytes, pubkey string) {
@@ -618,7 +617,7 @@ func kickMember(base CommunityEventsTestsInterface, communityID types.HexBytes, 
 	s.Require().NoError(err)
 	s.Require().Nil(checkKicked(response))
 
-	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkKicked)
+	checkClientsReceivedAdminEvent(base, checkKicked)
 }
 
 func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserFromCommunity) {
@@ -645,7 +644,7 @@ func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserF
 	s.Require().NoError(err)
 	s.Require().Nil(checkBanned(response))
 
-	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkBanned)
+	checkClientsReceivedAdminEvent(base, checkBanned)
 }
 
 func unbanMember(base CommunityEventsTestsInterface, unbanRequest *requests.UnbanUserFromCommunity) {
@@ -670,11 +669,10 @@ func unbanMember(base CommunityEventsTestsInterface, unbanRequest *requests.Unba
 
 	response, err = WaitOnMessengerResponse(
 		base.GetControlNode(),
-		WaitCommunityCondition,
+		func(r *MessengerResponse) bool { return checkUnbanned(r) == nil },
 		"MessengerResponse data not received",
 	)
 	s.Require().NoError(err)
-	s.Require().NoError(checkUnbanned(response))
 }
 
 func controlNodeSendMessage(base CommunityEventsTestsInterface, inputMessage *common.Message) string {
@@ -715,16 +713,16 @@ func deleteControlNodeMessage(base CommunityEventsTestsInterface, messageID stri
 	s.Require().NoError(err)
 	s.Require().NoError(checkMessageDeleted(response))
 
-	waitMessageCondition := func(response *MessengerResponse) bool {
-		return len(response.RemovedMessages()) > 0
-	}
-	waitOnMessengerResponse(s, waitMessageCondition, checkMessageDeleted, base.GetMember())
-	waitOnMessengerResponse(s, waitMessageCondition, checkMessageDeleted, base.GetControlNode())
-
+	waitOnMessengerResponse(s, checkMessageDeleted, base.GetMember())
+	waitOnMessengerResponse(s, checkMessageDeleted, base.GetControlNode())
 }
 
 func pinControlNodeMessage(base CommunityEventsTestsInterface, pinnedMessage *common.PinMessage) {
 	checkPinned := func(response *MessengerResponse) error {
+		if len(response.Messages()) == 0 {
+			return errors.New("no messages in the response")
+		}
+
 		if len(response.PinMessages()) > 0 {
 			return nil
 		}
@@ -736,8 +734,8 @@ func pinControlNodeMessage(base CommunityEventsTestsInterface, pinnedMessage *co
 	s.Require().NoError(err)
 	s.Require().NoError(checkPinned(response))
 
-	waitOnMessengerResponse(s, WaitMessageCondition, checkPinned, base.GetMember())
-	waitOnMessengerResponse(s, WaitMessageCondition, checkPinned, base.GetControlNode())
+	waitOnMessengerResponse(s, checkPinned, base.GetMember())
+	waitOnMessengerResponse(s, checkPinned, base.GetControlNode())
 }
 
 func editCommunityDescription(base CommunityEventsTestsInterface, community *communities.Community) {
@@ -780,7 +778,7 @@ func editCommunityDescription(base CommunityEventsTestsInterface, community *com
 	s.Require().NoError(err)
 	s.Require().Nil(checkCommunityEdit(response))
 
-	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkCommunityEdit)
+	checkClientsReceivedAdminEvent(base, checkCommunityEdit)
 }
 
 func controlNodeCreatesCommunityPermission(base CommunityEventsTestsInterface, community *communities.Community, permissionRequest *requests.CreateCommunityTokenPermission) string {
@@ -872,7 +870,7 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	advertiseCommunityTo(s, community, base.GetControlNode(), user)
 
 	// user sends request to join
-	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	requestToJoin := &requests.RequestToJoinCommunity{CommunityID: community.ID(), ENSName: "testName"}
 	response, err := user.RequestToJoinCommunity(requestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -880,10 +878,21 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 
 	sentRequest := response.RequestsToJoinCommunity[0]
 
+	checkRequestToJoin := func(r *MessengerResponse) bool {
+		if len(r.RequestsToJoinCommunity) == 0 {
+			return false
+		}
+		for _, request := range r.RequestsToJoinCommunity {
+			if request.ENSName == requestToJoin.ENSName {
+				return true
+			}
+		}
+		return false
+	}
 	// event sender receives request to join
 	response, err = WaitOnMessengerResponse(
 		base.GetEventSender(),
-		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		checkRequestToJoin,
 		"event sender did not receive community request to join",
 	)
 	s.Require().NoError(err)
@@ -892,11 +901,10 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	// control node receives request to join
 	response, err = WaitOnMessengerResponse(
 		base.GetControlNode(),
-		func(r *MessengerResponse) bool { return len(r.RequestsToJoinCommunity) > 0 },
+		checkRequestToJoin,
 		"event sender did not receive community request to join",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
 
 	// event sender has not accepted request yet
 	eventSenderCommunity, err := base.GetEventSender().GetCommunityByID(community.ID())
@@ -1571,8 +1579,8 @@ func testMemberReceiveEventsWhenControlNodeOffline(base CommunityEventsTestsInte
 		break
 	}
 
-	waitOnMessengerResponse(s, WaitCommunityCondition, checkChannelCreated, member)
-	waitOnMessengerResponse(s, WaitCommunityCondition, checkChannelCreated, eventSender)
+	waitOnMessengerResponse(s, checkChannelCreated, member)
+	waitOnMessengerResponse(s, checkChannelCreated, eventSender)
 
 	newAdminChat.Identity.DisplayName = "modified chat from event sender"
 
@@ -1595,8 +1603,8 @@ func testMemberReceiveEventsWhenControlNodeOffline(base CommunityEventsTestsInte
 	s.Require().NoError(err)
 	s.Require().NoError(checkChannelEdited(response))
 
-	waitOnMessengerResponse(s, WaitCommunityCondition, checkChannelEdited, member)
-	waitOnMessengerResponse(s, WaitCommunityCondition, checkChannelEdited, eventSender)
+	waitOnMessengerResponse(s, checkChannelEdited, member)
+	waitOnMessengerResponse(s, checkChannelEdited, eventSender)
 
 	checkChannelDeleted := func(response *MessengerResponse) error {
 		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
@@ -1615,8 +1623,8 @@ func testMemberReceiveEventsWhenControlNodeOffline(base CommunityEventsTestsInte
 	s.Require().NoError(err)
 	s.Require().NoError(checkChannelDeleted(response))
 
-	waitOnMessengerResponse(s, WaitCommunityCondition, checkChannelDeleted, member)
-	waitOnMessengerResponse(s, WaitCommunityCondition, checkChannelDeleted, eventSender)
+	waitOnMessengerResponse(s, checkChannelDeleted, member)
+	waitOnMessengerResponse(s, checkChannelDeleted, eventSender)
 }
 
 func testEventSenderCannotDeletePrivilegedCommunityPermission(base CommunityEventsTestsInterface, community *communities.Community,
@@ -1707,8 +1715,8 @@ func testAddAndSyncTokenFromControlNode(base CommunityEventsTestsInterface, comm
 		return errors.New("Token was not found")
 	}
 
-	waitOnMessengerResponse(s, WaitCommunityCondition, checkTokenAdded, base.GetMember())
-	waitOnMessengerResponse(s, WaitCommunityCondition, checkTokenAdded, base.GetEventSender())
+	waitOnMessengerResponse(s, checkTokenAdded, base.GetMember())
+	waitOnMessengerResponse(s, checkTokenAdded, base.GetEventSender())
 
 	// check CommunityToken was added to the DB
 	syncTokens, err := base.GetEventSender().communitiesManager.GetAllCommunityTokens()
@@ -1783,7 +1791,7 @@ func testAddAndSyncTokenFromEventSenderByControlNode(base CommunityEventsTestsIn
 		return errors.New("Token was not found")
 	}
 
-	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkTokenAdded)
+	checkClientsReceivedAdminEvent(base, checkTokenAdded)
 
 	// check event sender sent sync message to the control node
 	_, err = WaitOnMessengerResponse(

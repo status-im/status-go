@@ -842,7 +842,7 @@ func (m *Manager) ReevaluateCommunityMembersPermissions(community *Community) er
 		return err
 	}
 
-	return m.shareRequestsToJoinWithMembers(community, newPrivilegedMembers)
+	return m.shareRequestsToJoinWithNewPrivilegedMembers(community, newPrivilegedMembers)
 }
 
 func (m *Manager) DeleteCommunity(id types.HexBytes) error {
@@ -1951,7 +1951,7 @@ func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, err
 
 			newPrivilegedMember := make(map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey)
 			newPrivilegedMember[memberRole] = []*ecdsa.PublicKey{pk}
-			if err = m.shareRequestsToJoinWithMembers(community, newPrivilegedMember); err != nil {
+			if err = m.shareRequestsToJoinWithNewPrivilegedMembers(community, newPrivilegedMember); err != nil {
 				return nil, err
 			}
 		}
@@ -2043,7 +2043,7 @@ func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, re
 	return requestToJoin, nil
 }
 
-func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoin) (*RequestToJoin, error) {
+func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoin) (*RequestToJoin, error) {
 	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityId)
 	if err != nil {
 		return nil, err
@@ -2055,6 +2055,12 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 	// don't process request as admin if community is configured as auto-accept
 	if !community.IsControlNode() && community.AcceptRequestToJoinAutomatically() {
 		return nil, errors.New("ignoring request to join, community is set to auto-accept")
+	}
+
+	// control node must receive requests to join only on community address
+	// ignore duplicate messages sent to control node pubKey
+	if community.IsControlNode() && receiver.Equal(m.identity) {
+		return nil, errors.New("duplicate msg sent to the owner")
 	}
 
 	isUserRejected, err := m.isUserRejectedFromCommunity(signer, community, request.Clock)
@@ -4696,7 +4702,7 @@ func (m *Manager) createCommunityTokenPermission(request *requests.CreateCommuni
 	return community, changes, nil
 }
 
-func (m *Manager) shareRequestsToJoinWithMembers(community *Community, newPrivilegedMembers map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey) error {
+func (m *Manager) shareRequestsToJoinWithNewPrivilegedMembers(community *Community, newPrivilegedMembers map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey) error {
 	requestsToJoin, err := m.persistence.GetCommunityRequestsToJoinWithRevealedAddresses(community.ID())
 	if err != nil {
 		return err
