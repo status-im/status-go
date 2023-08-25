@@ -41,10 +41,10 @@ type WakuPeerstoreImpl struct {
 // WakuPeerstore is an interface for implementing WakuPeerStore
 type WakuPeerstore interface {
 	SetOrigin(p peer.ID, origin Origin) error
-	Origin(p peer.ID, origin Origin) (Origin, error)
+	Origin(p peer.ID) (Origin, error)
 	PeersByOrigin(origin Origin) peer.IDSlice
 	SetENR(p peer.ID, enr *enode.Node) error
-	ENR(p peer.ID, origin Origin) (*enode.Node, error)
+	ENR(p peer.ID) (*enode.Node, error)
 	AddConnFailure(p peer.AddrInfo)
 	ResetConnFailures(p peer.AddrInfo)
 	ConnFailures(p peer.AddrInfo) int
@@ -69,7 +69,7 @@ func (ps *WakuPeerstoreImpl) SetOrigin(p peer.ID, origin Origin) error {
 }
 
 // Origin fetches the origin for a specific peer.
-func (ps *WakuPeerstoreImpl) Origin(p peer.ID, origin Origin) (Origin, error) {
+func (ps *WakuPeerstoreImpl) Origin(p peer.ID) (Origin, error) {
 	result, err := ps.peerStore.Get(p, peerOrigin)
 	if err != nil {
 		return Unknown, err
@@ -79,11 +79,11 @@ func (ps *WakuPeerstoreImpl) Origin(p peer.ID, origin Origin) (Origin, error) {
 }
 
 // PeersByOrigin returns the list of peers for a specific origin
-func (ps *WakuPeerstoreImpl) PeersByOrigin(origin Origin) peer.IDSlice {
+func (ps *WakuPeerstoreImpl) PeersByOrigin(expectedOrigin Origin) peer.IDSlice {
 	var result peer.IDSlice
 	for _, p := range ps.Peers() {
-		_, err := ps.Origin(p, origin)
-		if err == nil {
+		actualOrigin, err := ps.Origin(p)
+		if err == nil && actualOrigin == expectedOrigin {
 			result = append(result, p)
 		}
 	}
@@ -96,7 +96,7 @@ func (ps *WakuPeerstoreImpl) SetENR(p peer.ID, enr *enode.Node) error {
 }
 
 // ENR fetches the ENR record for a peer
-func (ps *WakuPeerstoreImpl) ENR(p peer.ID, origin Origin) (*enode.Node, error) {
+func (ps *WakuPeerstoreImpl) ENR(p peer.ID) (*enode.Node, error) {
 	result, err := ps.peerStore.Get(p, peerENR)
 	if err != nil {
 		return nil, err

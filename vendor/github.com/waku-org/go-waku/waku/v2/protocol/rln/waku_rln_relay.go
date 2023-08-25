@@ -12,8 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/waku-org/go-waku/logging"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"github.com/waku-org/go-zerokit-rln/rln"
@@ -29,16 +30,11 @@ type GroupManager interface {
 }
 
 type WakuRLNRelay struct {
-	relay      *relay.WakuRelay
 	timesource timesource.Timesource
+	metrics    Metrics
 
 	groupManager GroupManager
 	rootTracker  *group_manager.MerkleRootTracker
-
-	// pubsubTopic is the topic for which rln relay is mounted
-	pubsubTopic  string
-	contentTopic string
-	spamHandler  SpamHandler
 
 	RLN *rln.RLN
 
@@ -52,29 +48,30 @@ type WakuRLNRelay struct {
 const rlnDefaultTreePath = "./rln_tree.db"
 
 func New(
-	relay *relay.WakuRelay,
 	groupManager GroupManager,
 	treePath string,
-	pubsubTopic string,
-	contentTopic string,
-	spamHandler SpamHandler,
 	timesource timesource.Timesource,
+	reg prometheus.Registerer,
 	log *zap.Logger) (*WakuRLNRelay, error) {
 
 	if treePath == "" {
 		treePath = rlnDefaultTreePath
 	}
 
+	metrics := newMetrics(reg)
+
+	start := time.Now()
 	rlnInstance, err := rln.NewWithConfig(rln.DefaultTreeDepth, &rln.TreeConfig{
 		CacheCapacity: 15000,
 		Mode:          rln.HighThroughput,
 		Compression:   false,
-		FlushInterval: 500,
+		FlushInterval: 500 * time.Millisecond,
 		Path:          treePath,
 	})
 	if err != nil {
 		return nil, err
 	}
+	metrics.RecordInstanceCreation(time.Since(start))
 
 	rootTracker, err := group_manager.NewMerkleRootTracker(acceptableRootWindowSize, rlnInstance)
 	if err != nil {
@@ -86,10 +83,7 @@ func New(
 		RLN:          rlnInstance,
 		groupManager: groupManager,
 		rootTracker:  rootTracker,
-		pubsubTopic:  pubsubTopic,
-		contentTopic: contentTopic,
-		relay:        relay,
-		spamHandler:  spamHandler,
+		metrics:      metrics,
 		log:          log,
 		timesource:   timesource,
 		nullifierLog: make(map[rln.MerkleNode][]rln.ProofMetadata),
@@ -104,15 +98,7 @@ func (rlnRelay *WakuRLNRelay) Start(ctx context.Context) error {
 		return err
 	}
 
-	// adds a topic validator for the supplied pubsub topic at the relay protocol
-	// messages published on this pubsub topic will be relayed upon a successful validation, otherwise they will be dropped
-	// the topic validator checks for the correct non-spamming proof of the message
-	err = rlnRelay.addValidator(rlnRelay.relay, rlnRelay.pubsubTopic, rlnRelay.contentTopic, rlnRelay.spamHandler)
-	if err != nil {
-		return err
-	}
-
-	log.Info("rln relay topic validator mounted", zap.String("pubsubTopic", rlnRelay.pubsubTopic), zap.String("contentTopic", rlnRelay.contentTopic))
+	log.Info("rln relay topic validator mounted")
 
 	return nil
 }
@@ -206,12 +192,14 @@ func (rlnRelay *WakuRLNRelay) ValidateMessage(msg *pb.WakuMessage, optionalTime 
 	if msgProof == nil {
 		// message does not contain a proof
 		rlnRelay.log.Debug("invalid message: message does not contain a proof")
+		rlnRelay.metrics.RecordInvalidMessage(invalidNoProof)
 		return invalidMessage, nil
 	}
 
 	proofMD, err := rlnRelay.RLN.ExtractMetadata(*msgProof)
 	if err != nil {
 		rlnRelay.log.Debug("could not extract metadata", zap.Error(err))
+		rlnRelay.metrics.RecordError(proofMetadataExtractionErr)
 		return invalidMessage, nil
 	}
 
@@ -221,18 +209,30 @@ func (rlnRelay *WakuRLNRelay) ValidateMessage(msg *pb.WakuMessage, optionalTime 
 		// message's epoch is too old or too ahead
 		// accept messages whose epoch is within +-MAX_EPOCH_GAP from the current epoch
 		rlnRelay.log.Debug("invalid message: epoch gap exceeds a threshold", zap.Int64("gap", gap))
+		rlnRelay.metrics.RecordInvalidMessage(invalidEpoch)
+
 		return invalidMessage, nil
 	}
 
+	if !(rlnRelay.rootTracker.ContainsRoot(msgProof.MerkleRoot)) {
+		rlnRelay.log.Debug("invalid message: unexpected root", logging.HexBytes("msgRoot", msg.RateLimitProof.MerkleRoot))
+		rlnRelay.metrics.RecordInvalidMessage(invalidRoot)
+		return invalidMessage, nil
+	}
+
+	start := time.Now()
 	valid, err := rlnRelay.verifyProof(msg, msgProof)
 	if err != nil {
 		rlnRelay.log.Debug("could not verify proof", zap.Error(err))
+		rlnRelay.metrics.RecordError(proofVerificationErr)
 		return invalidMessage, nil
 	}
+	rlnRelay.metrics.RecordProofVerification(time.Since(start))
 
 	if !valid {
 		// invalid proof
 		rlnRelay.log.Debug("Invalid proof")
+		rlnRelay.metrics.RecordInvalidMessage(invalidProof)
 		return invalidMessage, nil
 	}
 
@@ -240,6 +240,7 @@ func (rlnRelay *WakuRLNRelay) ValidateMessage(msg *pb.WakuMessage, optionalTime 
 	hasDup, err := rlnRelay.HasDuplicate(proofMD)
 	if err != nil {
 		rlnRelay.log.Debug("validation error", zap.Error(err))
+		rlnRelay.metrics.RecordError(duplicateCheckErr)
 		return validationError, err
 	}
 
@@ -253,10 +254,16 @@ func (rlnRelay *WakuRLNRelay) ValidateMessage(msg *pb.WakuMessage, optionalTime 
 	// it will never error out
 	_, err = rlnRelay.updateLog(proofMD)
 	if err != nil {
+		rlnRelay.log.Debug("could not insert proof into log")
+		rlnRelay.metrics.RecordError(logInsertionErr)
 		return validationError, err
 	}
 
 	rlnRelay.log.Debug("message is valid")
+
+	rootIndex := rlnRelay.rootTracker.IndexOf(msgProof.MerkleRoot)
+	rlnRelay.metrics.RecordValidMessages(rootIndex)
+
 	return validMessage, nil
 }
 
@@ -277,36 +284,30 @@ func (rlnRelay *WakuRLNRelay) AppendRLNProof(msg *pb.WakuMessage, senderEpochTim
 
 	input := toRLNSignal(msg)
 
+	start := time.Now()
 	proof, err := rlnRelay.generateProof(input, rln.CalcEpoch(senderEpochTime))
 	if err != nil {
 		return err
 	}
+	rlnRelay.metrics.RecordProofGeneration(time.Since(start))
 
 	msg.RateLimitProof = proof
 
 	return nil
 }
 
-// this function sets a validator for the waku messages published on the supplied pubsubTopic and contentTopic
-// if contentTopic is empty, then validation takes place for All the messages published on the given pubsubTopic
-// the message validation logic is according to https://rfc.vac.dev/spec/17/
-func (rlnRelay *WakuRLNRelay) addValidator(
-	relay *relay.WakuRelay,
-	pubsubTopic string,
-	contentTopic string,
-	spamHandler SpamHandler) error {
-	validator := func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool {
+// Validator returns a validator for the waku messages.
+// The message validation logic is according to https://rfc.vac.dev/spec/17/
+func (rlnRelay *WakuRLNRelay) Validator(
+	spamHandler SpamHandler) func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool {
+	return func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool {
 		rlnRelay.log.Debug("rln-relay topic validator called")
+
+		rlnRelay.metrics.RecordMessage()
 
 		wakuMessage := &pb.WakuMessage{}
 		if err := proto.Unmarshal(message.Data, wakuMessage); err != nil {
 			rlnRelay.log.Debug("could not unmarshal message")
-			return true
-		}
-
-		// check the contentTopic
-		if (wakuMessage.ContentTopic != "") && (contentTopic != "") && (wakuMessage.ContentTopic != contentTopic) {
-			rlnRelay.log.Debug("content topic did not match", zap.String("contentTopic", contentTopic))
 			return true
 		}
 
@@ -320,21 +321,20 @@ func (rlnRelay *WakuRLNRelay) addValidator(
 		switch validationRes {
 		case validMessage:
 			rlnRelay.log.Debug("message verified",
-				zap.String("pubsubTopic", pubsubTopic),
-				zap.String("id", hex.EncodeToString(wakuMessage.Hash(pubsubTopic))),
+				zap.String("id", hex.EncodeToString([]byte(message.ID))),
 			)
 			return true
 		case invalidMessage:
 			rlnRelay.log.Debug("message could not be verified",
-				zap.String("pubsubTopic", pubsubTopic),
-				zap.String("id", hex.EncodeToString(wakuMessage.Hash(pubsubTopic))),
+				zap.String("id", hex.EncodeToString([]byte(message.ID))),
 			)
 			return false
 		case spamMessage:
 			rlnRelay.log.Debug("spam message found",
-				zap.String("pubsubTopic", pubsubTopic),
-				zap.String("id", hex.EncodeToString(wakuMessage.Hash(pubsubTopic))),
+				zap.String("id", hex.EncodeToString([]byte(message.ID))),
 			)
+
+			rlnRelay.metrics.RecordSpam(wakuMessage.ContentTopic)
 
 			if spamHandler != nil {
 				if err := spamHandler(wakuMessage); err != nil {
@@ -348,11 +348,6 @@ func (rlnRelay *WakuRLNRelay) addValidator(
 			return false
 		}
 	}
-
-	// In case there's a topic validator registered
-	_ = relay.PubSub().UnregisterTopicValidator(pubsubTopic)
-
-	return relay.PubSub().RegisterTopicValidator(pubsubTopic, validator)
 }
 
 func (rlnRelay *WakuRLNRelay) generateProof(input []byte, epoch rln.Epoch) (*pb.RateLimitProof, error) {

@@ -3,6 +3,7 @@ package rln
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"time"
 )
 
@@ -80,11 +81,28 @@ const (
 )
 
 type TreeConfig struct {
-	CacheCapacity int      `json:"cache_capacity"`
-	Mode          TreeMode `json:"mode"`
-	Compression   bool     `json:"compression"`
-	FlushInterval int      `json:"flush_interval"`
-	Path          string   `json:"path"`
+	CacheCapacity int
+	Mode          TreeMode
+	Compression   bool
+	FlushInterval time.Duration
+	Path          string
+}
+
+func (t TreeConfig) MarshalJSON() ([]byte, error) {
+	output := struct {
+		CacheCapacity int      `json:"cache_capacity"`
+		Mode          TreeMode `json:"mode"`
+		Compression   bool     `json:"compression"`
+		FlushInterval uint     `json:"flush_every_ms"`
+		Path          string   `json:"path"`
+	}{
+		CacheCapacity: t.CacheCapacity,
+		Mode:          t.Mode,
+		Compression:   t.Compression,
+		FlushInterval: uint(t.FlushInterval) / uint(time.Millisecond),
+		Path:          t.Path,
+	}
+	return json.Marshal(output)
 }
 
 type config struct {

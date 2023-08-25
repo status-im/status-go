@@ -260,7 +260,7 @@ func (pm *PeerManager) AddPeer(address ma.Multiaddr, origin wps.Origin, protocol
 	}
 
 	//Add to the peer-store
-	err = pm.addPeer(info.ID, info.Addrs, origin)
+	err = pm.addPeer(info.ID, info.Addrs, origin, protocols...)
 	if err != nil {
 		return "", err
 	}

@@ -179,6 +179,7 @@ func NewWakuRelay(bcaster Broadcaster, minPeersToPublish int, timesource timesou
 		pubsub.WithSeenMessagesTTL(2 * time.Minute),
 		pubsub.WithPeerScore(w.peerScoreParams, w.peerScoreThresholds),
 		pubsub.WithPeerScoreInspect(w.peerScoreInspector, 6*time.Second),
+		// TODO: to improve - setup default validator only if no default validator has been set.
 		pubsub.WithDefaultValidator(func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool {
 			msg := new(pb.WakuMessage)
 			err := proto.Unmarshal(message.Data, msg)
