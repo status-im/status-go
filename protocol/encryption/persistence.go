@@ -729,11 +729,13 @@ func (s *sqliteSessionStorage) Load(id []byte) (*dr.State, error) {
 }
 
 type HRCache struct {
-	GroupID []byte
-	KeyID   uint32
-	Key     []byte
-	Hash    []byte
-	SeqNo   uint32
+	GroupID   []byte
+	KeyID     uint32
+	Key       []byte
+	Hash      []byte
+	SeqNo     uint32
+	Timestamp uint64
+	HashID    []byte
 }
 
 // GetHashRatchetKeyByID retrieves a hash ratchet key by group ID and seqNo.

@@ -69,8 +69,19 @@ message HRKeys {
 }
 
 message HRKey {
+  // KeyId is intended to be a timestamp ID, however due to a bug https://github.com/status-im/status-go/issues/3675
+  // the KeyId will be an integer from 1 to 4294967296 looping roughly every 50 days
   uint32 key_id = 1;
+
+  // Key represents the bytes of a private key
   bytes key = 2;
+
+  // Timestamp represents the unix millisecond time the key was created
+  uint64 timestamp = 3;
+
+  // HashId represents the hash sum of the key bytes and timestamp big.Int bytes
+  // HashId serves as a unique (enough) ID
+  bytes hash_id = 4;
 }
 
 // Direct message value
