@@ -171,14 +171,15 @@ func (api *PublicWakuAPI) BloomFilter() []byte {
 
 // NewMessage represents a new waku message that is posted through the RPC.
 type NewMessage struct {
-	SymKeyID   string           `json:"symKeyID"`
-	PublicKey  []byte           `json:"pubKey"`
-	Sig        string           `json:"sig"`
-	Topic      common.TopicType `json:"topic"`
-	Payload    []byte           `json:"payload"`
-	Padding    []byte           `json:"padding"`
-	TargetPeer string           `json:"targetPeer"`
-	Ephemeral  bool             `json:"ephemeral"`
+	SymKeyID     string           `json:"symKeyID"`
+	PublicKey    []byte           `json:"pubKey"`
+	Sig          string           `json:"sig"`
+	PubsubTopic  string           `json:"pubsubTopic"`
+	ContentTopic common.TopicType `json:"topic"`
+	Payload      []byte           `json:"payload"`
+	Padding      []byte           `json:"padding"`
+	TargetPeer   string           `json:"targetPeer"`
+	Ephemeral    bool             `json:"ephemeral"`
 }
 
 // Post posts a message on the Waku network.
@@ -195,27 +196,22 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		return nil, ErrSymAsym
 	}
 
-	params := &common.MessageParams{
-		Payload: req.Payload,
-		Padding: req.Padding,
-		Topic:   req.Topic,
-	}
-
 	var keyInfo *payload.KeyInfo = new(payload.KeyInfo)
 
 	// Set key that is used to sign the message
 	if len(req.Sig) > 0 {
-		if params.Src, err = api.w.GetPrivateKey(req.Sig); err != nil {
+		privKey, err := api.w.GetPrivateKey(req.Sig)
+		if err != nil {
 			return nil, err
 		}
-		keyInfo.PrivKey = params.Src
+		keyInfo.PrivKey = privKey
 	}
 
 	// Set symmetric key that is used to encrypt the message
 	if symKeyGiven {
 		keyInfo.Kind = payload.Symmetric
 
-		if params.Topic == (common.TopicType{}) { // topics are mandatory with symmetric encryption
+		if req.ContentTopic == (common.TopicType{}) { // topics are mandatory with symmetric encryption
 			return nil, ErrNoTopics
 		}
 		if keyInfo.SymKey, err = api.w.GetSymKey(req.SymKeyID); err != nil {
@@ -251,13 +247,13 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 	wakuMsg := &pb.WakuMessage{
 		Payload:      payload,
 		Version:      version,
-		ContentTopic: req.Topic.ContentTopic(),
+		ContentTopic: req.ContentTopic.ContentTopic(),
 		Timestamp:    api.w.timestamp(),
 		Meta:         []byte{}, // TODO: empty for now. Once we use Waku Archive v2, we should deprecate the timestamp and use an ULID here
 		Ephemeral:    req.Ephemeral,
 	}
 
-	hash, err := api.w.Send(wakuMsg)
+	hash, err := api.w.Send(req.PubsubTopic, wakuMsg)
 
 	if err != nil {
 		return nil, err
@@ -278,10 +274,11 @@ func (api *PublicWakuAPI) Unsubscribe(ctx context.Context, id string) {
 
 // Criteria holds various filter options for inbound messages.
 type Criteria struct {
-	SymKeyID     string             `json:"symKeyID"`
-	PrivateKeyID string             `json:"privateKeyID"`
-	Sig          []byte             `json:"sig"`
-	Topics       []common.TopicType `json:"topics"`
+	SymKeyID      string             `json:"symKeyID"`
+	PrivateKeyID  string             `json:"privateKeyID"`
+	Sig           []byte             `json:"sig"`
+	PubsubTopic   string             `json:"pubsubTopic"`
+	ContentTopics []common.TopicType `json:"topics"`
 }
 
 // Messages set up a subscription that fires events when messages arrive that match
@@ -314,7 +311,9 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 		}
 	}
 
-	for _, bt := range crit.Topics {
+	filter.PubsubTopic = crit.PubsubTopic
+
+	for _, bt := range crit.ContentTopics {
 		filter.Topics = append(filter.Topics, bt[:])
 	}
 
@@ -378,23 +377,25 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 
 // Message is the RPC representation of a waku message.
 type Message struct {
-	Sig       []byte           `json:"sig,omitempty"`
-	Timestamp uint32           `json:"timestamp"`
-	Topic     common.TopicType `json:"topic"`
-	Payload   []byte           `json:"payload"`
-	Padding   []byte           `json:"padding"`
-	Hash      []byte           `json:"hash"`
-	Dst       []byte           `json:"recipientPublicKey,omitempty"`
+	Sig          []byte           `json:"sig,omitempty"`
+	Timestamp    uint32           `json:"timestamp"`
+	PubsubTopic  string           `json:"pubsubTopic"`
+	ContentTopic common.TopicType `json:"topic"`
+	Payload      []byte           `json:"payload"`
+	Padding      []byte           `json:"padding"`
+	Hash         []byte           `json:"hash"`
+	Dst          []byte           `json:"recipientPublicKey,omitempty"`
 }
 
 // ToWakuMessage converts an internal message into an API version.
 func ToWakuMessage(message *common.ReceivedMessage) *Message {
 	msg := Message{
-		Payload:   message.Data,
-		Padding:   message.Padding,
-		Timestamp: message.Sent,
-		Hash:      message.Hash().Bytes(),
-		Topic:     message.Topic,
+		Payload:      message.Data,
+		Padding:      message.Padding,
+		Timestamp:    message.Sent,
+		Hash:         message.Hash().Bytes(),
+		PubsubTopic:  message.PubsubTopic,
+		ContentTopic: message.ContentTopic,
 	}
 
 	if message.Dst != nil {
@@ -494,20 +495,21 @@ func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
 		}
 	}
 
-	if len(req.Topics) > 0 {
-		topics = make([][]byte, len(req.Topics))
-		for i, topic := range req.Topics {
+	if len(req.ContentTopics) > 0 {
+		topics = make([][]byte, len(req.ContentTopics))
+		for i, topic := range req.ContentTopics {
 			topics[i] = make([]byte, common.TopicLength)
 			copy(topics[i], topic[:])
 		}
 	}
 
 	f := &common.Filter{
-		Src:      src,
-		KeySym:   keySym,
-		KeyAsym:  keyAsym,
-		Topics:   topics,
-		Messages: common.NewMemoryMessageStore(),
+		Src:         src,
+		KeySym:      keySym,
+		KeyAsym:     keyAsym,
+		PubsubTopic: req.PubsubTopic,
+		Topics:      topics,
+		Messages:    common.NewMemoryMessageStore(),
 	}
 
 	id, err := api.w.Subscribe(f)

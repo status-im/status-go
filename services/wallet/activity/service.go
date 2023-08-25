@@ -101,6 +101,14 @@ func (s *Service) FilterActivityAsync(requestID int32, addresses []common.Addres
 	})
 }
 
+func (s *Service) GetMultiTxDetails(ctx context.Context, multiTxID int) (*EntryDetails, error) {
+	return getMultiTxDetails(ctx, s.db, multiTxID)
+}
+
+func (s *Service) GetTxDetails(ctx context.Context, id string) (*EntryDetails, error) {
+	return getTxDetails(ctx, s.db, id)
+}
+
 type GetRecipientsResponse struct {
 	Addresses []common.Address `json:"addresses"`
 	Offset    int              `json:"offset"`

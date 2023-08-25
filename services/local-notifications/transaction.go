@@ -180,7 +180,7 @@ func (s *Service) StartWalletWatcher() {
 				}
 				return
 			case event := <-events:
-				if event.Type == transfer.EventNewTransfers && len(maxKnownBlocks) > 0 {
+				if event.Type == transfer.EventNewTransfers && len(maxKnownBlocks) > 0 && event.BlockNumber != nil {
 					newBlocks := false
 					for _, address := range event.Accounts {
 						if _, ok := maxKnownBlocks[address]; !ok {

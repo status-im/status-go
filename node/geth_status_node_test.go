@@ -30,7 +30,7 @@ func TestStatusNodeStart(t *testing.T) {
 	require.Nil(t, n.RPCClient())
 	require.Equal(t, 0, n.PeerCount())
 
-	db, stop, err := setupTestDB()
+	appDB, walletDB, stop, err := setupTestDBs()
 	defer func() {
 		err := stop()
 		if err != nil {
@@ -38,8 +38,8 @@ func TestStatusNodeStart(t *testing.T) {
 		}
 	}()
 	require.NoError(t, err)
-	require.NotNil(t, db)
-	n.appDB = db
+	n.appDB = appDB
+	n.walletDB = walletDB
 
 	// start node
 	require.NoError(t, n.Start(config, nil))

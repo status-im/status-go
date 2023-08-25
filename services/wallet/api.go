@@ -547,6 +547,18 @@ func (api *API) FilterActivityAsync(requestID int32, addresses []common.Address,
 	return nil
 }
 
+func (api *API) GetMultiTxDetails(ctx context.Context, multiTxID int) (*activity.EntryDetails, error) {
+	log.Debug("wallet.api.GetMultiTxDetails", "multiTxID", multiTxID)
+
+	return api.s.activity.GetMultiTxDetails(ctx, multiTxID)
+}
+
+func (api *API) GetTxDetails(ctx context.Context, id string) (*activity.EntryDetails, error) {
+	log.Debug("wallet.api.GetTxDetails", "id", id)
+
+	return api.s.activity.GetTxDetails(ctx, id)
+}
+
 func (api *API) GetRecipientsAsync(requestID int32, offset int, limit int) (ignored bool, err error) {
 	log.Debug("wallet.api.GetRecipientsAsync", "offset", offset, "limit", limit)
 

@@ -3282,14 +3282,14 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		}
 	} else if !fromLocalPairing && dbKeypair != nil {
 		for _, dbAcc := range dbKeypair.Accounts {
-			found := false
+			removeAcc := false
 			for _, acc := range kp.Accounts {
-				if dbAcc.Address == acc.Address {
-					found = true
+				if dbAcc.Address == acc.Address && acc.Removed && !dbAcc.Removed {
+					removeAcc = true
 					break
 				}
 			}
-			if !found {
+			if removeAcc {
 				err = m.deleteKeystoreFileForAddress(dbAcc.Address)
 				if err != nil {
 					return nil, err

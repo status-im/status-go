@@ -63,6 +63,16 @@ func (w *gethWakuWrapper) AddStorePeer(address string) (peer.ID, error) {
 	return "", errors.New("not available in WakuV1")
 }
 
+// SubscribeToPubsubTopic function only added for compatibility with waku V2
+func (w *gethWakuWrapper) SubscribeToPubsubTopic(topic string, optPublicKey *ecdsa.PublicKey) error {
+	// not available in WakuV1
+	return errors.New("not available in WakuV1")
+}
+
+func (w *gethWakuWrapper) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
+	return errors.New("not available in WakuV1")
+}
+
 // AddRelayPeer function only added for compatibility with waku V2
 func (w *gethWakuWrapper) AddRelayPeer(address string) (peer.ID, error) {
 	return "", errors.New("not available in WakuV1")
@@ -231,7 +241,7 @@ func (w *gethWakuWrapper) SendMessagesRequest(peerID []byte, r types.MessagesReq
 		Limit:  r.Limit,
 		Cursor: r.Cursor,
 		Bloom:  r.Bloom,
-		Topics: r.Topics,
+		Topics: r.ContentTopics,
 	})
 }
 

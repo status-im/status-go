@@ -245,7 +245,7 @@ func (m *Messenger) handleChatMessageProtobuf(messageState *ReceivedMessageState
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleChatMessage(messageState, p, msg)
 	
@@ -263,7 +263,7 @@ func (m *Messenger) handleContactUpdateProtobuf(messageState *ReceivedMessageSta
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleContactUpdate(messageState, p, msg)
 	
@@ -281,7 +281,7 @@ func (m *Messenger) handleMembershipUpdateMessageProtobuf(messageState *Received
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleMembershipUpdateMessage(messageState, p, msg)
 	
@@ -304,7 +304,7 @@ func (m *Messenger) handleSyncPairInstallationProtobuf(messageState *ReceivedMes
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncPairInstallation(messageState, p, msg)
 	
@@ -322,7 +322,7 @@ func (m *Messenger) handleRequestAddressForTransactionProtobuf(messageState *Rec
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleRequestAddressForTransaction(messageState, p, msg)
 	
@@ -340,7 +340,7 @@ func (m *Messenger) handleAcceptRequestAddressForTransactionProtobuf(messageStat
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleAcceptRequestAddressForTransaction(messageState, p, msg)
 	
@@ -358,7 +358,7 @@ func (m *Messenger) handleDeclineRequestAddressForTransactionProtobuf(messageSta
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleDeclineRequestAddressForTransaction(messageState, p, msg)
 	
@@ -376,7 +376,7 @@ func (m *Messenger) handleRequestTransactionProtobuf(messageState *ReceivedMessa
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleRequestTransaction(messageState, p, msg)
 	
@@ -394,7 +394,7 @@ func (m *Messenger) handleSendTransactionProtobuf(messageState *ReceivedMessageS
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSendTransaction(messageState, p, msg)
 	
@@ -412,7 +412,7 @@ func (m *Messenger) handleDeclineRequestTransactionProtobuf(messageState *Receiv
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleDeclineRequestTransaction(messageState, p, msg)
 	
@@ -435,7 +435,7 @@ func (m *Messenger) handleSyncInstallationContactV2Protobuf(messageState *Receiv
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncInstallationContactV2(messageState, p, msg)
 	
@@ -458,7 +458,7 @@ func (m *Messenger) handleSyncInstallationAccountProtobuf(messageState *Received
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncInstallationAccount(messageState, p, msg)
 	
@@ -481,7 +481,7 @@ func (m *Messenger) handleSyncInstallationPublicChatProtobuf(messageState *Recei
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncInstallationPublicChat(messageState, p, msg)
 	
@@ -499,7 +499,7 @@ func (m *Messenger) handleContactCodeAdvertisementProtobuf(messageState *Receive
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleContactCodeAdvertisement(messageState, p, msg)
 	
@@ -527,7 +527,7 @@ func (m *Messenger) handlePushNotificationRegistrationResponseProtobuf(messageSt
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandlePushNotificationRegistrationResponse(messageState, p, msg)
 	
@@ -545,7 +545,7 @@ func (m *Messenger) handlePushNotificationQueryProtobuf(messageState *ReceivedMe
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandlePushNotificationQuery(messageState, p, msg)
 	
@@ -563,7 +563,7 @@ func (m *Messenger) handlePushNotificationQueryResponseProtobuf(messageState *Re
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandlePushNotificationQueryResponse(messageState, p, msg)
 	
@@ -581,7 +581,7 @@ func (m *Messenger) handlePushNotificationRequestProtobuf(messageState *Received
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandlePushNotificationRequest(messageState, p, msg)
 	
@@ -599,7 +599,7 @@ func (m *Messenger) handlePushNotificationResponseProtobuf(messageState *Receive
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandlePushNotificationResponse(messageState, p, msg)
 	
@@ -617,7 +617,7 @@ func (m *Messenger) handleEmojiReactionProtobuf(messageState *ReceivedMessageSta
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleEmojiReaction(messageState, p, msg)
 	
@@ -635,7 +635,7 @@ func (m *Messenger) handleGroupChatInvitationProtobuf(messageState *ReceivedMess
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleGroupChatInvitation(messageState, p, msg)
 	
@@ -653,7 +653,7 @@ func (m *Messenger) handleChatIdentityProtobuf(messageState *ReceivedMessageStat
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleChatIdentity(messageState, p, msg)
 	
@@ -671,7 +671,7 @@ func (m *Messenger) handleCommunityDescriptionProtobuf(messageState *ReceivedMes
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleCommunityDescription(messageState, p, msg)
 	
@@ -689,7 +689,7 @@ func (m *Messenger) handleCommunityRequestToJoinProtobuf(messageState *ReceivedM
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleCommunityRequestToJoin(messageState, p, msg)
 	
@@ -707,7 +707,7 @@ func (m *Messenger) handlePinMessageProtobuf(messageState *ReceivedMessageState,
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandlePinMessage(messageState, p, msg)
 	
@@ -725,7 +725,7 @@ func (m *Messenger) handleEditMessageProtobuf(messageState *ReceivedMessageState
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleEditMessage(messageState, p, msg)
 	
@@ -743,7 +743,7 @@ func (m *Messenger) handleStatusUpdateProtobuf(messageState *ReceivedMessageStat
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleStatusUpdate(messageState, p, msg)
 	
@@ -761,7 +761,7 @@ func (m *Messenger) handleDeleteMessageProtobuf(messageState *ReceivedMessageSta
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleDeleteMessage(messageState, p, msg)
 	
@@ -784,7 +784,7 @@ func (m *Messenger) handleSyncInstallationCommunityProtobuf(messageState *Receiv
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncInstallationCommunity(messageState, p, msg)
 	
@@ -802,7 +802,7 @@ func (m *Messenger) handleAnonymousMetricBatchProtobuf(messageState *ReceivedMes
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleAnonymousMetricBatch(messageState, p, msg)
 	
@@ -825,7 +825,7 @@ func (m *Messenger) handleSyncChatRemovedProtobuf(messageState *ReceivedMessageS
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncChatRemoved(messageState, p, msg)
 	
@@ -848,7 +848,7 @@ func (m *Messenger) handleSyncChatMessagesReadProtobuf(messageState *ReceivedMes
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncChatMessagesRead(messageState, p, msg)
 	
@@ -866,7 +866,7 @@ func (m *Messenger) handleBackupProtobuf(messageState *ReceivedMessageState, pro
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleBackup(messageState, p, msg)
 	
@@ -889,7 +889,7 @@ func (m *Messenger) handleSyncActivityCenterReadProtobuf(messageState *ReceivedM
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncActivityCenterRead(messageState, p, msg)
 	
@@ -912,7 +912,7 @@ func (m *Messenger) handleSyncActivityCenterAcceptedProtobuf(messageState *Recei
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncActivityCenterAccepted(messageState, p, msg)
 	
@@ -935,7 +935,7 @@ func (m *Messenger) handleSyncActivityCenterDismissedProtobuf(messageState *Rece
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncActivityCenterDismissed(messageState, p, msg)
 	
@@ -958,7 +958,7 @@ func (m *Messenger) handleSyncBookmarkProtobuf(messageState *ReceivedMessageStat
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncBookmark(messageState, p, msg)
 	
@@ -981,7 +981,7 @@ func (m *Messenger) handleSyncClearHistoryProtobuf(messageState *ReceivedMessage
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncClearHistory(messageState, p, msg)
 	
@@ -1004,7 +1004,7 @@ func (m *Messenger) handleSyncSettingProtobuf(messageState *ReceivedMessageState
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncSetting(messageState, p, msg)
 	
@@ -1022,7 +1022,7 @@ func (m *Messenger) handleCommunityMessageArchiveMagnetlinkProtobuf(messageState
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleCommunityMessageArchiveMagnetlink(messageState, p, msg)
 	
@@ -1045,7 +1045,7 @@ func (m *Messenger) handleSyncProfilePicturesProtobuf(messageState *ReceivedMess
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncProfilePictures(messageState, p, msg)
 	
@@ -1068,7 +1068,7 @@ func (m *Messenger) handleSyncAccountProtobuf(messageState *ReceivedMessageState
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncAccount(messageState, p, msg)
 	
@@ -1086,7 +1086,7 @@ func (m *Messenger) handleAcceptContactRequestProtobuf(messageState *ReceivedMes
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleAcceptContactRequest(messageState, p, msg)
 	
@@ -1104,7 +1104,7 @@ func (m *Messenger) handleRetractContactRequestProtobuf(messageState *ReceivedMe
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleRetractContactRequest(messageState, p, msg)
 	
@@ -1122,7 +1122,7 @@ func (m *Messenger) handleCommunityRequestToJoinResponseProtobuf(messageState *R
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleCommunityRequestToJoinResponse(messageState, p, msg)
 	
@@ -1145,7 +1145,7 @@ func (m *Messenger) handleSyncCommunitySettingsProtobuf(messageState *ReceivedMe
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncCommunitySettings(messageState, p, msg)
 	
@@ -1163,7 +1163,7 @@ func (m *Messenger) handleRequestContactVerificationProtobuf(messageState *Recei
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleRequestContactVerification(messageState, p, msg)
 	
@@ -1181,7 +1181,7 @@ func (m *Messenger) handleAcceptContactVerificationProtobuf(messageState *Receiv
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleAcceptContactVerification(messageState, p, msg)
 	
@@ -1199,7 +1199,7 @@ func (m *Messenger) handleDeclineContactVerificationProtobuf(messageState *Recei
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleDeclineContactVerification(messageState, p, msg)
 	
@@ -1222,7 +1222,7 @@ func (m *Messenger) handleSyncTrustedUserProtobuf(messageState *ReceivedMessageS
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncTrustedUser(messageState, p, msg)
 	
@@ -1245,7 +1245,7 @@ func (m *Messenger) handleSyncVerificationRequestProtobuf(messageState *Received
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncVerificationRequest(messageState, p, msg)
 	
@@ -1268,7 +1268,7 @@ func (m *Messenger) handleSyncContactRequestDecisionProtobuf(messageState *Recei
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncContactRequestDecision(messageState, p, msg)
 	
@@ -1286,7 +1286,7 @@ func (m *Messenger) handleCommunityRequestToLeaveProtobuf(messageState *Received
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleCommunityRequestToLeave(messageState, p, msg)
 	
@@ -1309,7 +1309,7 @@ func (m *Messenger) handleSyncDeleteForMeMessageProtobuf(messageState *ReceivedM
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncDeleteForMeMessage(messageState, p, msg)
 	
@@ -1332,7 +1332,7 @@ func (m *Messenger) handleSyncSavedAddressProtobuf(messageState *ReceivedMessage
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncSavedAddress(messageState, p, msg)
 	
@@ -1350,7 +1350,7 @@ func (m *Messenger) handleCommunityCancelRequestToJoinProtobuf(messageState *Rec
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleCommunityCancelRequestToJoin(messageState, p, msg)
 	
@@ -1368,7 +1368,7 @@ func (m *Messenger) handleCancelContactVerificationProtobuf(messageState *Receiv
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleCancelContactVerification(messageState, p, msg)
 	
@@ -1391,7 +1391,7 @@ func (m *Messenger) handleSyncKeypairProtobuf(messageState *ReceivedMessageState
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncKeypair(messageState, p, msg)
 	
@@ -1414,7 +1414,7 @@ func (m *Messenger) handleSyncSocialLinksProtobuf(messageState *ReceivedMessageS
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncSocialLinks(messageState, p, msg)
 	
@@ -1437,7 +1437,7 @@ func (m *Messenger) handleSyncEnsUsernameDetailProtobuf(messageState *ReceivedMe
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncEnsUsernameDetail(messageState, p, msg)
 	
@@ -1460,7 +1460,7 @@ func (m *Messenger) handleSyncActivityCenterNotificationsProtobuf(messageState *
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncActivityCenterNotifications(messageState, p, msg)
 	
@@ -1483,7 +1483,7 @@ func (m *Messenger) handleSyncActivityCenterNotificationStateProtobuf(messageSta
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncActivityCenterNotificationState(messageState, p, msg)
 	
@@ -1501,7 +1501,7 @@ func (m *Messenger) handleCommunityEventsMessageProtobuf(messageState *ReceivedM
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleCommunityEventsMessage(messageState, p, msg)
 	
@@ -1519,7 +1519,7 @@ func (m *Messenger) handleCommunityEditSharedAddressesProtobuf(messageState *Rec
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleCommunityEditSharedAddresses(messageState, p, msg)
 	
@@ -1542,7 +1542,7 @@ func (m *Messenger) handleSyncAccountCustomizationColorProtobuf(messageState *Re
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncAccountCustomizationColor(messageState, p, msg)
 	
@@ -1565,7 +1565,7 @@ func (m *Messenger) handleSyncAccountsPositionsProtobuf(messageState *ReceivedMe
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncAccountsPositions(messageState, p, msg)
 	
@@ -1583,7 +1583,7 @@ func (m *Messenger) handleCommunityEventsMessageRejectedProtobuf(messageState *R
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleCommunityEventsMessageRejected(messageState, p, msg)
 	
@@ -1601,7 +1601,7 @@ func (m *Messenger) handleCommunityPrivilegedUserSyncMessageProtobuf(messageStat
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleCommunityPrivilegedUserSyncMessage(messageState, p, msg)
 	

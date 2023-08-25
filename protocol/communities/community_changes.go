@@ -17,9 +17,9 @@ type CommunityChanges struct {
 	MembersAdded   map[string]*protobuf.CommunityMember `json:"membersAdded"`
 	MembersRemoved map[string]*protobuf.CommunityMember `json:"membersRemoved"`
 
-	TokenPermissionsAdded    map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissionsAdded"`
-	TokenPermissionsModified map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissionsModified"`
-	TokenPermissionsRemoved  map[string]*protobuf.CommunityTokenPermission `json:"tokenPermissionsRemoved"`
+	TokenPermissionsAdded    map[string]*CommunityTokenPermission `json:"tokenPermissionsAdded"`
+	TokenPermissionsModified map[string]*CommunityTokenPermission `json:"tokenPermissionsModified"`
+	TokenPermissionsRemoved  map[string]*CommunityTokenPermission `json:"tokenPermissionsRemoved"`
 
 	ChatsRemoved  map[string]*protobuf.CommunityChat `json:"chatsRemoved"`
 	ChatsAdded    map[string]*protobuf.CommunityChat `json:"chatsAdded"`
@@ -46,9 +46,9 @@ func EmptyCommunityChanges() *CommunityChanges {
 		MembersAdded:   make(map[string]*protobuf.CommunityMember),
 		MembersRemoved: make(map[string]*protobuf.CommunityMember),
 
-		TokenPermissionsAdded:    make(map[string]*protobuf.CommunityTokenPermission),
-		TokenPermissionsModified: make(map[string]*protobuf.CommunityTokenPermission),
-		TokenPermissionsRemoved:  make(map[string]*protobuf.CommunityTokenPermission),
+		TokenPermissionsAdded:    make(map[string]*CommunityTokenPermission),
+		TokenPermissionsModified: make(map[string]*CommunityTokenPermission),
+		TokenPermissionsRemoved:  make(map[string]*CommunityTokenPermission),
 
 		ChatsRemoved:  make(map[string]*protobuf.CommunityChat),
 		ChatsAdded:    make(map[string]*protobuf.CommunityChat),
@@ -79,7 +79,35 @@ func (c *CommunityChanges) HasMemberLeft(identity string) bool {
 	return ok
 }
 
-func EvaluateCommunityChanges(origin, modified *protobuf.CommunityDescription) *CommunityChanges {
+func EvaluateCommunityChanges(origin, modified *Community) *CommunityChanges {
+	changes := evaluateCommunityChangesByDescription(origin.Description(), modified.Description())
+
+	originTokenPermissions := origin.tokenPermissions()
+	modifiedTokenPermissions := modified.tokenPermissions()
+
+	// Check for modified or removed token permissions
+	for id, originPermission := range originTokenPermissions {
+		if modifiedPermission := modifiedTokenPermissions[id]; modifiedPermission != nil {
+			if !modifiedPermission.Equals(originPermission) {
+				changes.TokenPermissionsModified[id] = modifiedPermission
+			}
+		} else {
+			changes.TokenPermissionsRemoved[id] = originPermission
+		}
+	}
+
+	// Check for added token permissions
+	for id, permission := range modifiedTokenPermissions {
+		if _, ok := originTokenPermissions[id]; !ok {
+			changes.TokenPermissionsAdded[id] = permission
+		}
+	}
+
+	changes.Community = modified
+	return changes
+}
+
+func evaluateCommunityChangesByDescription(origin, modified *protobuf.CommunityDescription) *CommunityChanges {
 	changes := EmptyCommunityChanges()
 
 	// Check for new members at the org level
@@ -226,20 +254,6 @@ func EvaluateCommunityChanges(origin, modified *protobuf.CommunityDescription) *
 			}
 
 			changes.ChatsModified[chatID].CategoryModified = chat.CategoryId
-		}
-	}
-
-	// Check for removed token permissions
-	for id, permission := range origin.TokenPermissions {
-		if _, ok := modified.TokenPermissions[id]; !ok {
-			changes.TokenPermissionsRemoved[id] = permission
-		}
-	}
-
-	// Check for added token permissions
-	for id, permission := range modified.TokenPermissions {
-		if _, ok := origin.TokenPermissions[id]; !ok {
-			changes.TokenPermissionsAdded[id] = permission
 		}
 	}
 

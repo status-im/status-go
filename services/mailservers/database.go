@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	"github.com/status-im/status-go/protocol/transport"
 )
 
@@ -83,11 +84,12 @@ type MailserverRequestGap struct {
 }
 
 type MailserverTopic struct {
-	Topic       string   `json:"topic"`
-	Discovery   bool     `json:"discovery?"`
-	Negotiated  bool     `json:"negotiated?"`
-	ChatIDs     []string `json:"chat-ids"`
-	LastRequest int      `json:"last-request"` // default is 1
+	PubsubTopic  string   `json:"pubsubTopic"`
+	ContentTopic string   `json:"topic"`
+	Discovery    bool     `json:"discovery?"`
+	Negotiated   bool     `json:"negotiated?"`
+	ChatIDs      []string `json:"chat-ids"`
+	LastRequest  int      `json:"last-request"` // default is 1
 }
 
 type ChatRequestRange struct {
@@ -264,13 +266,15 @@ func (d *Database) AddTopic(topic MailserverTopic) error {
 
 	chatIDs := sqlStringSlice(topic.ChatIDs)
 	_, err := d.db.Exec(`INSERT OR REPLACE INTO mailserver_topics(
+			pubsub_topic,
 			topic,
 			chat_ids,
 			last_request,
 			discovery,
 			negotiated
-		) VALUES (?, ?, ?,?,?)`,
-		topic.Topic,
+		) VALUES (?, ?, ?, ?, ?, ?)`,
+		topic.PubsubTopic,
+		topic.ContentTopic,
 		chatIDs,
 		topic.LastRequest,
 		topic.Discovery,
@@ -296,13 +300,15 @@ func (d *Database) AddTopics(topics []MailserverTopic) (err error) {
 	for _, topic := range topics {
 		chatIDs := sqlStringSlice(topic.ChatIDs)
 		_, err = tx.Exec(`INSERT OR REPLACE INTO mailserver_topics(
+			  pubsub_topic,
 			  topic,
 			  chat_ids,
 			  last_request,
 			  discovery,
 			  negotiated
-		  ) VALUES (?, ?, ?,?,?)`,
-			topic.Topic,
+		  ) VALUES (?, ?, ?, ?, ?, ?)`,
+			topic.PubsubTopic,
+			topic.ContentTopic,
 			chatIDs,
 			topic.LastRequest,
 			topic.Discovery,
@@ -318,7 +324,7 @@ func (d *Database) AddTopics(topics []MailserverTopic) (err error) {
 func (d *Database) Topics() ([]MailserverTopic, error) {
 	var result []MailserverTopic
 
-	rows, err := d.db.Query(`SELECT topic, chat_ids, last_request,discovery,negotiated FROM mailserver_topics`)
+	rows, err := d.db.Query(`SELECT pubsub_topic, topic, chat_ids, last_request,discovery,negotiated FROM mailserver_topics`)
 	if err != nil {
 		return nil, err
 	}
@@ -330,7 +336,8 @@ func (d *Database) Topics() ([]MailserverTopic, error) {
 			chatIDs sqlStringSlice
 		)
 		if err := rows.Scan(
-			&t.Topic,
+			&t.PubsubTopic,
+			&t.ContentTopic,
 			&chatIDs,
 			&t.LastRequest,
 			&t.Discovery,
@@ -345,13 +352,13 @@ func (d *Database) Topics() ([]MailserverTopic, error) {
 	return result, nil
 }
 
-func (d *Database) ResetLastRequest(topic string) error {
-	_, err := d.db.Exec("UPDATE mailserver_topics SET last_request = 0 WHERE topic = ?", topic)
+func (d *Database) ResetLastRequest(pubsubTopic, contentTopic string) error {
+	_, err := d.db.Exec("UPDATE mailserver_topics SET last_request = 0 WHERE pubsub_topic = ? AND topic = ?", pubsubTopic, contentTopic)
 	return err
 }
 
-func (d *Database) DeleteTopic(topic string) error {
-	_, err := d.db.Exec(`DELETE FROM mailserver_topics WHERE topic = ?`, topic)
+func (d *Database) DeleteTopic(pubsubTopic, contentTopic string) error {
+	_, err := d.db.Exec(`DELETE FROM mailserver_topics WHERE pubsub_topic = ? AND topic = ?`, pubsubTopic, contentTopic)
 	return err
 }
 
@@ -375,16 +382,29 @@ func (d *Database) SetTopics(filters []*transport.Filter) (err error) {
 		return nil
 	}
 
-	topicsArgs := make([]interface{}, 0, len(filters))
+	contentTopicsPerPubsubTopic := make(map[string]map[string]struct{})
 	for _, filter := range filters {
-		topicsArgs = append(topicsArgs, filter.Topic.String())
+		contentTopics, ok := contentTopicsPerPubsubTopic[filter.PubsubTopic]
+		if !ok {
+			contentTopics = make(map[string]struct{})
+		}
+		contentTopics[filter.ContentTopic.String()] = struct{}{}
+		contentTopicsPerPubsubTopic[filter.PubsubTopic] = contentTopics
 	}
 
-	inVector := strings.Repeat("?, ", len(filters)-1) + "?"
+	for pubsubTopic, contentTopics := range contentTopicsPerPubsubTopic {
+		topicsArgs := make([]interface{}, 0, len(contentTopics)+1)
+		topicsArgs = append(topicsArgs, pubsubTopic)
+		for ct := range contentTopics {
+			topicsArgs = append(topicsArgs, ct)
+		}
 
-	// Delete topics
-	query := "DELETE FROM mailserver_topics WHERE topic NOT IN (" + inVector + ")" // nolint: gosec
-	_, err = tx.Exec(query, topicsArgs...)
+		inVector := strings.Repeat("?, ", len(contentTopics)-1) + "?"
+
+		// Delete topics
+		query := "DELETE FROM mailserver_topics WHERE pubsub_topic = ? AND topic NOT IN (" + inVector + ")" // nolint: gosec
+		_, err = tx.Exec(query, topicsArgs...)
+	}
 
 	// Default to now - 1.day
 	lastRequest := (time.Now().Add(-24 * time.Hour)).Unix()
@@ -392,12 +412,12 @@ func (d *Database) SetTopics(filters []*transport.Filter) (err error) {
 	for _, filter := range filters {
 		// fetch
 		var topic string
-		err = tx.QueryRow(`SELECT topic FROM mailserver_topics WHERE topic = ?`, filter.Topic.String()).Scan(&topic)
+		err = tx.QueryRow(`SELECT topic FROM mailserver_topics WHERE topic = ? AND pubsub_topic = ?`, filter.ContentTopic.String(), filter.PubsubTopic).Scan(&topic)
 		if err != nil && err != sql.ErrNoRows {
 			return
 		} else if err == sql.ErrNoRows {
 			// we insert the topic
-			_, err = tx.Exec(`INSERT INTO mailserver_topics(topic,last_request,discovery,negotiated) VALUES (?,?,?,?)`, filter.Topic.String(), lastRequest, filter.Discovery, filter.Negotiated)
+			_, err = tx.Exec(`INSERT INTO mailserver_topics(topic,pubsub_topic,last_request,discovery,negotiated) VALUES (?,?,?,?,?)`, filter.ContentTopic.String(), filter.PubsubTopic, lastRequest, filter.Discovery, filter.Negotiated)
 		}
 		if err != nil {
 			return

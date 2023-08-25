@@ -2,6 +2,7 @@ package ext
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -1265,6 +1266,37 @@ func (api *PublicAPI) EnableCommunityHistoryArchiveProtocol() error {
 
 func (api *PublicAPI) DisableCommunityHistoryArchiveProtocol() error {
 	return api.service.messenger.DisableCommunityHistoryArchiveProtocol()
+}
+
+func (api *PublicAPI) SubscribeToPubsubTopic(topic string, optPublicKey string) error {
+	var publicKey *ecdsa.PublicKey
+	if optPublicKey != "" {
+		keyBytes, err := hexutil.Decode(optPublicKey)
+		if err != nil {
+			return err
+		}
+
+		publicKey, err = crypto.UnmarshalPubkey(keyBytes)
+		if err != nil {
+			return err
+		}
+	}
+
+	return api.service.messenger.SubscribeToPubsubTopic(topic, publicKey)
+}
+
+func (api *PublicAPI) StorePubsubTopicKey(topic string, privKey string) error {
+	keyBytes, err := hexutil.Decode(privKey)
+	if err != nil {
+		return err
+	}
+
+	p, err := crypto.ToECDSA(keyBytes)
+	if err != nil {
+		return err
+	}
+
+	return api.service.messenger.StorePubsubTopicKey(topic, p)
 }
 
 func (api *PublicAPI) AddStorePeer(address string) (string, error) {

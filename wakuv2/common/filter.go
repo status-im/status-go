@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -30,22 +32,27 @@ import (
 
 // Filter represents a Waku message filter
 type Filter struct {
-	Src        *ecdsa.PublicKey  // Sender of the message
-	KeyAsym    *ecdsa.PrivateKey // Private Key of recipient
-	KeySym     []byte            // Key associated with the Topic
-	Topics     [][]byte          // Topics to filter messages with
-	SymKeyHash common.Hash       // The Keccak256Hash of the symmetric key, needed for optimization
-	id         string            // unique identifier
+	Src         *ecdsa.PublicKey  // Sender of the message
+	KeyAsym     *ecdsa.PrivateKey // Private Key of recipient
+	KeySym      []byte            // Key associated with the Topic
+	PubsubTopic string            // Pubsub topic used to filter messages with
+	Topics      [][]byte          // ContentTopics to filter messages with
+	SymKeyHash  common.Hash       // The Keccak256Hash of the symmetric key, needed for optimization
+	id          string            // unique identifier
 
 	Messages MessageStore
 }
+
+type FilterSet = map[*Filter]struct{}
+type ContentTopicToFilter = map[TopicType]FilterSet
+type PubsubTopicToContentTopic = map[string]ContentTopicToFilter
 
 // Filters represents a collection of filters
 type Filters struct {
 	watchers map[string]*Filter
 
-	topicMatcher     map[TopicType]map[*Filter]struct{} // map a topic to the filters that are interested in being notified when a message matches that topic
-	allTopicsMatcher map[*Filter]struct{}               // list all the filters that will be notified of a new message, no matter what its topic is
+	topicMatcher     PubsubTopicToContentTopic // map a topic to the filters that are interested in being notified when a message matches that topic
+	allTopicsMatcher map[*Filter]struct{}      // list all the filters that will be notified of a new message, no matter what its topic is
 
 	mutex sync.RWMutex
 }
@@ -54,7 +61,7 @@ type Filters struct {
 func NewFilters() *Filters {
 	return &Filters{
 		watchers:         make(map[string]*Filter),
-		topicMatcher:     make(map[TopicType]map[*Filter]struct{}),
+		topicMatcher:     make(PubsubTopicToContentTopic),
 		allTopicsMatcher: make(map[*Filter]struct{}),
 	}
 }
@@ -104,8 +111,10 @@ func (fs *Filters) AllTopics() []TopicType {
 	var topics []TopicType
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
-	for t := range fs.topicMatcher {
-		topics = append(topics, t)
+	for _, topicsPerPubsubTopic := range fs.topicMatcher {
+		for t := range topicsPerPubsubTopic {
+			topics = append(topics, t)
+		}
 	}
 
 	return topics
@@ -115,36 +124,57 @@ func (fs *Filters) AllTopics() []TopicType {
 // If the filter's Topics array is empty, it will be tried on every topic.
 // Otherwise, it will be tried on the topics specified.
 func (fs *Filters) addTopicMatcher(watcher *Filter) {
-	if len(watcher.Topics) == 0 {
+	if len(watcher.Topics) == 0 && (watcher.PubsubTopic == relay.DefaultWakuTopic || watcher.PubsubTopic == "") {
 		fs.allTopicsMatcher[watcher] = struct{}{}
 	} else {
+		filtersPerContentTopic, ok := fs.topicMatcher[watcher.PubsubTopic]
+		if !ok {
+			filtersPerContentTopic = make(ContentTopicToFilter)
+		}
+
 		for _, t := range watcher.Topics {
 			topic := BytesToTopic(t)
-			if fs.topicMatcher[topic] == nil {
-				fs.topicMatcher[topic] = make(map[*Filter]struct{})
+			if filtersPerContentTopic[topic] == nil {
+				filtersPerContentTopic[topic] = make(FilterSet)
 			}
-			fs.topicMatcher[topic][watcher] = struct{}{}
+			filtersPerContentTopic[topic][watcher] = struct{}{}
 		}
+
+		fs.topicMatcher[watcher.PubsubTopic] = filtersPerContentTopic
 	}
 }
 
 // removeFromTopicMatchers removes a filter from the topic matchers
 func (fs *Filters) removeFromTopicMatchers(watcher *Filter) {
 	delete(fs.allTopicsMatcher, watcher)
+
+	filtersPerContentTopic, ok := fs.topicMatcher[watcher.PubsubTopic]
+	if !ok {
+		return
+	}
+
 	for _, t := range watcher.Topics {
 		topic := BytesToTopic(t)
-		delete(fs.topicMatcher[topic], watcher)
+		delete(filtersPerContentTopic[topic], watcher)
 	}
+
+	fs.topicMatcher[watcher.PubsubTopic] = filtersPerContentTopic
 }
 
 // GetWatchersByTopic returns a slice containing the filters that
 // match a specific topic
-func (fs *Filters) GetWatchersByTopic(topic TopicType) []*Filter {
+func (fs *Filters) GetWatchersByTopic(pubsubTopic string, contentTopic TopicType) []*Filter {
 	res := make([]*Filter, 0, len(fs.allTopicsMatcher))
 	for watcher := range fs.allTopicsMatcher {
 		res = append(res, watcher)
 	}
-	for watcher := range fs.topicMatcher[topic] {
+
+	filtersPerContentTopic, ok := fs.topicMatcher[pubsubTopic]
+	if !ok {
+		return res
+	}
+
+	for watcher := range filtersPerContentTopic[contentTopic] {
 		res = append(res, watcher)
 	}
 	return res
@@ -166,10 +196,10 @@ func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) bool {
 	defer fs.mutex.RUnlock()
 
 	var matched bool
-	candidates := fs.GetWatchersByTopic(recvMessage.Topic)
+	candidates := fs.GetWatchersByTopic(recvMessage.PubsubTopic, recvMessage.ContentTopic)
 
 	if len(candidates) == 0 {
-		log.Debug("no filters available for this topic", "message", recvMessage.Hash().Hex(), "topic", recvMessage.Topic.String())
+		log.Debug("no filters available for this topic", "message", recvMessage.Hash().Hex(), "pubsubTopic", recvMessage.PubsubTopic, "contentTopic", recvMessage.ContentTopic.String())
 	}
 
 	for _, watcher := range candidates {

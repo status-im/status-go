@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -74,7 +75,7 @@ func NewFiltersManager(persistence KeysPersistence, service FiltersService, priv
 }
 
 func (f *FiltersManager) Init(
-	chatIDs []string,
+	filtersToInit []FiltersToInitialize,
 	publicKeys []*ecdsa.PublicKey,
 ) ([]*Filter, error) {
 
@@ -97,8 +98,8 @@ func (f *FiltersManager) Init(
 	}
 
 	// Add public, one-to-one and negotiated filters.
-	for _, chatID := range chatIDs {
-		_, err := f.LoadPublic(chatID)
+	for _, fi := range filtersToInit {
+		_, err := f.LoadPublic(fi.ChatID, fi.PubsubTopic)
 		if err != nil {
 			return nil, err
 		}
@@ -121,11 +122,16 @@ func (f *FiltersManager) Init(
 	return allFilters, nil
 }
 
-func (f *FiltersManager) InitPublicFilters(chatIDs []string) ([]*Filter, error) {
+type FiltersToInitialize struct {
+	ChatID      string
+	PubsubTopic string
+}
+
+func (f *FiltersManager) InitPublicFilters(publicFiltersToInit []FiltersToInitialize) ([]*Filter, error) {
 	var filters []*Filter
 	// Add public, one-to-one and negotiated filters.
-	for _, chatID := range chatIDs {
-		f, err := f.LoadPublic(chatID)
+	for _, pf := range publicFiltersToInit {
+		f, err := f.LoadPublic(pf.ChatID, pf.PubsubTopic) // TODO: pubsubtopic
 		if err != nil {
 			return nil, err
 		}
@@ -134,15 +140,20 @@ func (f *FiltersManager) InitPublicFilters(chatIDs []string) ([]*Filter, error) 
 	return filters, nil
 }
 
-func (f *FiltersManager) InitCommunityFilters(pks []*ecdsa.PrivateKey) ([]*Filter, error) {
+type CommunityFilterToInitialize struct {
+	CommunityID []byte
+	PrivKey     *ecdsa.PrivateKey
+}
+
+func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []CommunityFilterToInitialize) ([]*Filter, error) {
 	var filters []*Filter
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	for _, pk := range pks {
-
-		identityStr := PublicKeyToStr(&pk.PublicKey)
-		rawFilter, err := f.addAsymmetric(identityStr, pk, true)
+	for _, cf := range communityFiltersToInitialize {
+		pubsubTopic := GetPubsubTopic(cf.CommunityID)
+		identityStr := PublicKeyToStr(&cf.PrivKey.PublicKey)
+		rawFilter, err := f.addAsymmetric(identityStr, pubsubTopic, cf.PrivKey, true)
 		if err != nil {
 			f.logger.Debug("could not register community filter", zap.Error(err))
 			return nil, err
@@ -150,12 +161,13 @@ func (f *FiltersManager) InitCommunityFilters(pks []*ecdsa.PrivateKey) ([]*Filte
 		}
 		filterID := identityStr + "-admin"
 		filter := &Filter{
-			ChatID:   filterID,
-			FilterID: rawFilter.FilterID,
-			Topic:    rawFilter.Topic,
-			Identity: identityStr,
-			Listen:   true,
-			OneToOne: true,
+			ChatID:       filterID,
+			FilterID:     rawFilter.FilterID,
+			PubsubTopic:  pubsubTopic,
+			ContentTopic: rawFilter.Topic,
+			Identity:     identityStr,
+			Listen:       true,
+			OneToOne:     true,
 		}
 
 		f.filters[filterID] = filter
@@ -170,8 +182,8 @@ func (f *FiltersManager) InitCommunityFilters(pks []*ecdsa.PrivateKey) ([]*Filte
 // DEPRECATED
 func (f *FiltersManager) InitWithFilters(filters []*Filter) ([]*Filter, error) {
 	var (
-		chatIDs    []string
-		publicKeys []*ecdsa.PublicKey
+		filtersToInit []FiltersToInitialize
+		publicKeys    []*ecdsa.PublicKey
 	)
 
 	for _, filter := range filters {
@@ -182,11 +194,11 @@ func (f *FiltersManager) InitWithFilters(filters []*Filter) ([]*Filter, error) {
 			}
 			publicKeys = append(publicKeys, publicKey)
 		} else if filter.ChatID != "" {
-			chatIDs = append(chatIDs, filter.ChatID)
+			filtersToInit = append(filtersToInit, FiltersToInitialize{ChatID: filter.ChatID, PubsubTopic: filter.PubsubTopic})
 		}
 	}
 
-	return f.Init(chatIDs, publicKeys)
+	return f.Init(filtersToInit, publicKeys)
 }
 
 func (f *FiltersManager) Reset(ctx context.Context) error {
@@ -234,7 +246,7 @@ func (f *FiltersManager) FilterByTopic(topic []byte) *Filter {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 	for _, f := range f.filters {
-		if bytes.Equal(types.TopicTypeToByteArray(f.Topic), topic) {
+		if bytes.Equal(types.TopicTypeToByteArray(f.ContentTopic), topic) {
 			return f
 		}
 	}
@@ -318,6 +330,8 @@ func (f *FiltersManager) RemoveNoListenFilters() error {
 
 // Remove remove all the filters associated with a chat/identity
 func (f *FiltersManager) RemoveFilterByChatID(chatID string) (*Filter, error) {
+	// TODO: remove subscriptions from waku2 if required. Might need to be implemented in transport
+
 	f.mutex.Lock()
 	filter, ok := f.filters[chatID]
 	f.mutex.Unlock()
@@ -354,21 +368,24 @@ func (f *FiltersManager) LoadPersonal(publicKey *ecdsa.PublicKey, identity *ecds
 		return f.filters[chatID], nil
 	}
 
+	pubsubTopic := relay.DefaultWakuTopic
+
 	// We set up a filter so we can publish,
 	// but we discard envelopes if listen is false.
-	filter, err := f.addAsymmetric(chatID, identity, listen)
+	filter, err := f.addAsymmetric(chatID, pubsubTopic, identity, listen)
 	if err != nil {
 		f.logger.Debug("could not register personal topic filter", zap.Error(err))
 		return nil, err
 	}
 
 	chat := &Filter{
-		ChatID:   chatID,
-		FilterID: filter.FilterID,
-		Topic:    filter.Topic,
-		Identity: PublicKeyToStr(publicKey),
-		Listen:   listen,
-		OneToOne: true,
+		ChatID:       chatID,
+		FilterID:     filter.FilterID,
+		ContentTopic: filter.Topic,
+		PubsubTopic:  pubsubTopic,
+		Identity:     PublicKeyToStr(publicKey),
+		Listen:       listen,
+		OneToOne:     true,
 	}
 
 	f.filters[chatID] = chat
@@ -392,22 +409,25 @@ func (f *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *e
 		return f.filters[chatID], nil
 	}
 
+	pubsubTopic := relay.DefaultWakuTopic
+
 	// We set up a filter so we can publish,
 	// but we discard envelopes if listen is false.
-	filter, err := f.addAsymmetric(chatID, identity, listen)
+	filter, err := f.addAsymmetric(chatID, pubsubTopic, identity, listen)
 	if err != nil {
 		f.logger.Debug("could not register partitioned topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
 	}
 
 	chat := &Filter{
-		ChatID:    chatID,
-		FilterID:  filter.FilterID,
-		Topic:     filter.Topic,
-		Identity:  PublicKeyToStr(publicKey),
-		Listen:    listen,
-		Ephemeral: ephemeral,
-		OneToOne:  true,
+		ChatID:       chatID,
+		FilterID:     filter.FilterID,
+		ContentTopic: filter.Topic,
+		PubsubTopic:  pubsubTopic,
+		Identity:     PublicKeyToStr(publicKey),
+		Listen:       listen,
+		Ephemeral:    ephemeral,
+		OneToOne:     true,
 	}
 
 	f.filters[chatID] = chat
@@ -428,22 +448,24 @@ func (f *FiltersManager) LoadNegotiated(secret types.NegotiatedSecret) (*Filter,
 		return f.filters[chatID], nil
 	}
 
+	pubsubTopic := relay.DefaultWakuTopic
 	keyString := hex.EncodeToString(secret.Key)
-	filter, err := f.addSymmetric(keyString)
+	filter, err := f.addSymmetric(keyString, pubsubTopic)
 	if err != nil {
 		f.logger.Debug("could not register negotiated topic", zap.Error(err))
 		return nil, err
 	}
 
 	chat := &Filter{
-		ChatID:     chatID,
-		Topic:      filter.Topic,
-		SymKeyID:   filter.SymKeyID,
-		FilterID:   filter.FilterID,
-		Identity:   PublicKeyToStr(secret.PublicKey),
-		Negotiated: true,
-		Listen:     true,
-		OneToOne:   true,
+		ChatID:       chatID,
+		ContentTopic: filter.Topic,
+		PubsubTopic:  pubsubTopic,
+		SymKeyID:     filter.SymKeyID,
+		FilterID:     filter.FilterID,
+		Identity:     PublicKeyToStr(secret.PublicKey),
+		Negotiated:   true,
+		Listen:       true,
+		OneToOne:     true,
 	}
 
 	f.filters[chat.ChatID] = chat
@@ -478,25 +500,26 @@ func (f *FiltersManager) LoadDiscovery() ([]*Filter, error) {
 
 	// Load personal discovery
 	personalDiscoveryChat := &Filter{
-		ChatID:    personalDiscoveryTopic,
-		Identity:  identityStr,
-		Discovery: true,
-		Listen:    true,
-		OneToOne:  true,
+		ChatID:      personalDiscoveryTopic,
+		Identity:    identityStr,
+		PubsubTopic: relay.DefaultWakuTopic,
+		Discovery:   true,
+		Listen:      true,
+		OneToOne:    true,
 	}
 
-	discoveryResponse, err := f.addAsymmetric(personalDiscoveryChat.ChatID, f.privateKey, true)
+	discoveryResponse, err := f.addAsymmetric(personalDiscoveryChat.ChatID, personalDiscoveryChat.PubsubTopic, f.privateKey, true)
 	if err != nil {
 		f.logger.Debug("could not register discovery topic", zap.String("chatID", personalDiscoveryChat.ChatID), zap.Error(err))
 		return nil, err
 	}
 
-	personalDiscoveryChat.Topic = discoveryResponse.Topic
+	personalDiscoveryChat.ContentTopic = discoveryResponse.Topic
 	personalDiscoveryChat.FilterID = discoveryResponse.FilterID
 
 	f.filters[personalDiscoveryChat.ChatID] = personalDiscoveryChat
 
-	f.logger.Debug("registering filter for", zap.String("chatID", personalDiscoveryChat.ChatID), zap.String("type", "discovery"), zap.String("topic", personalDiscoveryChat.Topic.String()))
+	f.logger.Debug("registering filter for", zap.String("chatID", personalDiscoveryChat.ChatID), zap.String("type", "discovery"), zap.String("topic", personalDiscoveryChat.ContentTopic.String()))
 
 	return []*Filter{personalDiscoveryChat}, nil
 }
@@ -508,7 +531,7 @@ func (f *FiltersManager) PersonalTopicFilter() *Filter {
 }
 
 // LoadPublic adds a filter for a public chat.
-func (f *FiltersManager) LoadPublic(chatID string) (*Filter, error) {
+func (f *FiltersManager) LoadPublic(chatID string, pubsubTopic string) (*Filter, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
@@ -516,19 +539,20 @@ func (f *FiltersManager) LoadPublic(chatID string) (*Filter, error) {
 		return chat, nil
 	}
 
-	filterAndTopic, err := f.addSymmetric(chatID)
+	filterAndTopic, err := f.addSymmetric(chatID, pubsubTopic)
 	if err != nil {
 		f.logger.Debug("could not register public chat topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
 	}
 
 	chat := &Filter{
-		ChatID:   chatID,
-		FilterID: filterAndTopic.FilterID,
-		SymKeyID: filterAndTopic.SymKeyID,
-		Topic:    filterAndTopic.Topic,
-		Listen:   true,
-		OneToOne: false,
+		ChatID:       chatID,
+		FilterID:     filterAndTopic.FilterID,
+		SymKeyID:     filterAndTopic.SymKeyID,
+		ContentTopic: filterAndTopic.Topic,
+		PubsubTopic:  pubsubTopic,
+		Listen:       true,
+		OneToOne:     false,
 	}
 
 	f.filters[chatID] = chat
@@ -549,19 +573,22 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 		return f.filters[chatID], nil
 	}
 
-	contactCodeFilter, err := f.addSymmetric(chatID)
+	pubsubTopic := relay.DefaultWakuTopic
+
+	contactCodeFilter, err := f.addSymmetric(chatID, pubsubTopic)
 	if err != nil {
 		f.logger.Debug("could not register contact code topic", zap.String("chatID", chatID), zap.Error(err))
 		return nil, err
 	}
 
 	chat := &Filter{
-		ChatID:   chatID,
-		FilterID: contactCodeFilter.FilterID,
-		Topic:    contactCodeFilter.Topic,
-		SymKeyID: contactCodeFilter.SymKeyID,
-		Identity: PublicKeyToStr(pubKey),
-		Listen:   true,
+		ChatID:       chatID,
+		FilterID:     contactCodeFilter.FilterID,
+		ContentTopic: contactCodeFilter.Topic,
+		SymKeyID:     contactCodeFilter.SymKeyID,
+		Identity:     PublicKeyToStr(pubKey),
+		PubsubTopic:  pubsubTopic,
+		Listen:       true,
 	}
 
 	f.filters[chatID] = chat
@@ -572,7 +599,7 @@ func (f *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 }
 
 // addSymmetric adds a symmetric key filter
-func (f *FiltersManager) addSymmetric(chatID string) (*RawFilter, error) {
+func (f *FiltersManager) addSymmetric(chatID string, pubsubTopic string) (*RawFilter, error) {
 	var symKeyID string
 	var err error
 
@@ -602,9 +629,10 @@ func (f *FiltersManager) addSymmetric(chatID string) (*RawFilter, error) {
 	}
 
 	id, err := f.service.Subscribe(&types.SubscriptionOptions{
-		SymKeyID: symKeyID,
-		PoW:      minPow,
-		Topics:   topics,
+		SymKeyID:    symKeyID,
+		PoW:         minPow,
+		Topics:      topics,
+		PubsubTopic: pubsubTopic,
 	})
 	if err != nil {
 		return nil, err
@@ -619,7 +647,7 @@ func (f *FiltersManager) addSymmetric(chatID string) (*RawFilter, error) {
 
 // addAsymmetricFilter adds a filter with our private key
 // and set minPow according to the listen parameter.
-func (f *FiltersManager) addAsymmetric(chatID string, identity *ecdsa.PrivateKey, listen bool) (*RawFilter, error) {
+func (f *FiltersManager) addAsymmetric(chatID string, pubsubTopic string, identity *ecdsa.PrivateKey, listen bool) (*RawFilter, error) {
 	var (
 		err error
 		pow = 1.0 // use PoW high enough to discard all messages for the filter
@@ -641,6 +669,7 @@ func (f *FiltersManager) addAsymmetric(chatID string, identity *ecdsa.PrivateKey
 		PrivateKeyID: privateKeyID,
 		PoW:          pow,
 		Topics:       topics,
+		PubsubTopic:  pubsubTopic,
 	})
 	if err != nil {
 		return nil, err

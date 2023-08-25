@@ -41,12 +41,13 @@ func (t *mockTransport) SendMessagesRequestForTopics(
 	from, to uint32,
 	previousCursor []byte,
 	previousStoreCursor *types.StoreRequestCursor,
-	topics []types.TopicType,
+	pubsubTopic string,
+	contentTopics []types.TopicType,
 	waitForResponse bool,
 ) (cursor []byte, storeCursor *types.StoreRequestCursor, err error) {
 	var response queryResponse
 	if previousCursor == nil {
-		initialResponse := getInitialResponseKey(topics)
+		initialResponse := getInitialResponseKey(contentTopics)
 		response = t.queryResponses[initialResponse]
 	} else {
 		response = t.queryResponses[hex.EncodeToString(previousCursor)]

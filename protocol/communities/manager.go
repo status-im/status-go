@@ -262,11 +262,6 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 		manager.ensVerifier = verifier
 	}
 
-	err = manager.fixupChannelMembers()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to fixup channel members")
-	}
-
 	return manager, nil
 }
 
@@ -629,7 +624,7 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 
 	tokenPermission := request.ToCommunityTokenPermission()
 
-	changes, err := community.UpdateTokenPermission(tokenPermission.Id, &tokenPermission)
+	changes, err := community.UpsertTokenPermission(&tokenPermission)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1350,6 +1345,7 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 	if err != nil {
 		return nil, err
 	}
+	community.config.EventsData = nil
 
 	err = m.persistence.SaveCommunity(community)
 	if err != nil {
@@ -1433,9 +1429,11 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		return nil, errors.New("user has not permissions to send events")
 	}
 
+	originCommunity := community.CreateDeepCopy()
+
 	eventsMessage.Events = m.validateAndFilterEvents(community, eventsMessage.Events)
 
-	changes, err := community.UpdateCommunityByEvents(eventsMessage)
+	err = community.UpdateCommunityByEvents(eventsMessage)
 	if err != nil {
 		if err == ErrInvalidCommunityEventClock && community.IsControlNode() {
 			m.publish(&Subscription{
@@ -1447,7 +1445,7 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		return nil, err
 	}
 
-	additionalCommunityResponse, err := m.handleAdditionalAdminChanges(changes.Community)
+	additionalCommunityResponse, err := m.handleAdditionalAdminChanges(community)
 	if err != nil {
 		return nil, err
 	}
@@ -1456,30 +1454,30 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		return nil, err
 	}
 
-	// Control node cerifies community events and publish changes
-	// all other nodes only apply changes to the community
-	if changes.Community.IsControlNode() {
-		changes.Community.increaseClock()
-		err = m.persistence.SaveCommunity(changes.Community)
+	// Control node applies events and publish updated CommunityDescription
+	if community.IsControlNode() {
+		community.config.EventsData = nil // clear events, they are already applied
+		community.increaseClock()
+		err = m.persistence.SaveCommunity(community)
 		if err != nil {
 			return nil, err
 		}
 
-		m.publish(&Subscription{Community: changes.Community})
+		m.publish(&Subscription{Community: community})
 	} else {
-		err = m.persistence.SaveCommunity(changes.Community)
+		err = m.persistence.SaveCommunity(community)
 		if err != nil {
 			return nil, err
 		}
-		err := m.persistence.SaveCommunityEvents(changes.Community)
+		err := m.persistence.SaveCommunityEvents(community)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	return &CommunityResponse{
-		Community:      changes.Community,
-		Changes:        changes,
+		Community:      community,
+		Changes:        EvaluateCommunityChanges(originCommunity, community),
 		RequestsToJoin: additionalCommunityResponse.RequestsToJoin,
 	}, nil
 }
@@ -2320,7 +2318,7 @@ func calculateChainIDsSet(accountsAndChainIDs []*AccountChainIDsCombination, req
 // checkPermissions will retrieve balances and check whether the user has
 // permission to join the community, if shortcircuit is true, it will stop as soon
 // as we know the answer
-func (m *Manager) checkPermissions(permissions []*protobuf.CommunityTokenPermission, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckPermissionsResponse, error) {
+func (m *Manager) checkPermissions(permissions []*CommunityTokenPermission, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckPermissionsResponse, error) {
 
 	response := &CheckPermissionsResponse{
 		Satisfied:         false,
@@ -2661,7 +2659,7 @@ type CheckChannelViewAndPostPermissionsResult struct {
 	Permissions map[string]*PermissionTokenCriteriaResult `json:"permissions"`
 }
 
-func (m *Manager) checkChannelPermissions(viewOnlyPermissions []*protobuf.CommunityTokenPermission, viewAndPostPermissions []*protobuf.CommunityTokenPermission, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckChannelPermissionsResponse, error) {
+func (m *Manager) checkChannelPermissions(viewOnlyPermissions []*CommunityTokenPermission, viewAndPostPermissions []*CommunityTokenPermission, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckChannelPermissionsResponse, error) {
 
 	response := &CheckChannelPermissionsResponse{
 		ViewOnlyPermissions: &CheckChannelViewOnlyPermissionsResult{
@@ -3371,7 +3369,7 @@ func (m *Manager) GetCommunityChatsTopics(communityID types.HexBytes) ([]types.T
 
 	topics := []types.TopicType{}
 	for _, filter := range filters {
-		topics = append(topics, filter.Topic)
+		topics = append(topics, filter.ContentTopic)
 	}
 
 	return topics, nil
@@ -3414,7 +3412,7 @@ func (m *Manager) GetHistoryArchivePartitionStartTimestamp(communityID types.Hex
 	topics := []types.TopicType{}
 
 	for _, filter := range filters {
-		topics = append(topics, filter.Topic)
+		topics = append(topics, filter.ContentTopic)
 	}
 
 	lastArchiveEndDateTimestamp, err := m.GetLastMessageArchiveEndDate(communityID)
@@ -4477,7 +4475,7 @@ func revealedAccountsToAccountsAndChainIDsCombination(revealedAccounts []*protob
 	return accountsAndChainIDs
 }
 
-func (m *Manager) accountsHasPrivilegedPermission(privilegedPermissions []*protobuf.CommunityTokenPermission, accounts []*AccountChainIDsCombination) bool {
+func (m *Manager) accountsHasPrivilegedPermission(privilegedPermissions []*CommunityTokenPermission, accounts []*AccountChainIDsCombination) bool {
 	if len(privilegedPermissions) > 0 {
 		permissionResponse, err := m.checkPermissions(privilegedPermissions, accounts, true)
 		if err != nil {
@@ -4515,43 +4513,12 @@ func (m *Manager) saveAndPublish(community *Community) error {
 	return nil
 }
 
-// This populates the member list of channels with all community members, if required.
-// Motivation: The member lists of channels were not populated for communities that had already been created.
-//
-// Ideally, this should be executed through a migration, but it's technically unfeasible
-// because `CommunityDescription“ is stored as a signed message blob in the database.
-//
-// However, it's safe to run this migration/fixup multiple times.
-func (m *Manager) fixupChannelMembers() error {
-	controlledCommunities, err := m.ControlledCommunities()
-	if err != nil {
-		return err
-	}
-
-	for _, c := range controlledCommunities {
-		for channelID := range c.Chats() {
-			if !c.ChannelHasTokenPermissions(c.IDString() + channelID) {
-				_, err := c.PopulateChatWithAllMembers(channelID)
-				if err != nil {
-					return err
-				}
-				err = m.persistence.SaveCommunity(c)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
 func (m *Manager) GetRevealedAddresses(communityID types.HexBytes, memberPk string) ([]*protobuf.RevealedAccount, error) {
 	requestID := CalculateRequestID(memberPk, communityID)
 	return m.persistence.GetRequestToJoinRevealedAddresses(requestID)
 }
 
-func (m *Manager) ReevaluatePrivelegedMember(community *Community, tokenPermissions []*protobuf.CommunityTokenPermission,
+func (m *Manager) ReevaluatePrivelegedMember(community *Community, tokenPermissions []*CommunityTokenPermission,
 	accountsAndChainIDs []*AccountChainIDsCombination, memberPubKey *ecdsa.PublicKey,
 	privilegedRole protobuf.CommunityMember_Roles, alreadyHasPrivilegedRole bool) (bool, error) {
 
@@ -4672,7 +4639,7 @@ func (m *Manager) HandleCommunityTokensMetadata(community *Community) error {
 	return nil
 }
 
-func getPrivilegesLevel(chainID uint64, tokenAddress string, tokenPermissions map[string]*protobuf.CommunityTokenPermission) community_token.PrivilegesLevel {
+func getPrivilegesLevel(chainID uint64, tokenAddress string, tokenPermissions map[string]*CommunityTokenPermission) community_token.PrivilegesLevel {
 	for _, permission := range tokenPermissions {
 		if permission.Type == protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER || permission.Type == protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER {
 			for _, tokenCriteria := range permission.TokenCriteria {
@@ -4722,7 +4689,7 @@ func (m *Manager) createCommunityTokenPermission(request *requests.CreateCommuni
 
 	tokenPermission := request.ToCommunityTokenPermission()
 	tokenPermission.Id = uuid.New().String()
-	changes, err := community.AddTokenPermission(&tokenPermission)
+	changes, err := community.UpsertTokenPermission(&tokenPermission)
 	if err != nil {
 		return nil, nil, err
 	}

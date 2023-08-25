@@ -1115,6 +1115,46 @@ func TestGetActivityEntriesNullAddresses(t *testing.T) {
 	require.Equal(t, 3, len(activities))
 }
 
+func TestGetTxDetails(t *testing.T) {
+	deps, close := setupTestActivityDB(t)
+	defer close()
+
+	// Adds 4 extractable transactions 2 transactions (ETH/Goerli, ETH/Optimism), one MT USDC to DAI and another MT USDC to SNT
+	td, _, _ := fillTestData(t, deps.db)
+
+	_, err := getTxDetails(context.Background(), deps.db, "")
+	require.EqualError(t, err, "invalid tx id")
+
+	details, err := getTxDetails(context.Background(), deps.db, td.tr1.Hash.String())
+	require.NoError(t, err)
+
+	require.Equal(t, td.tr1.Hash.String(), details.ID)
+	require.Equal(t, 0, details.MultiTxID)
+	require.Equal(t, td.tr1.Nonce, details.Nonce)
+	require.Equal(t, td.tr1.BlkNumber, details.BlockNumber)
+	require.Equal(t, td.tr1.Contract, *details.Contract)
+}
+
+func TestGetMultiTxDetails(t *testing.T) {
+	deps, close := setupTestActivityDB(t)
+	defer close()
+
+	// Adds 4 extractable transactions 2 transactions (ETH/Goerli, ETH/Optimism), one MT USDC to DAI and another MT USDC to SNT
+	td, _, _ := fillTestData(t, deps.db)
+
+	_, err := getMultiTxDetails(context.Background(), deps.db, 0)
+	require.EqualError(t, err, "invalid tx id")
+
+	details, err := getMultiTxDetails(context.Background(), deps.db, int(td.multiTx1.MultiTransactionID))
+	require.NoError(t, err)
+
+	require.Equal(t, "", details.ID)
+	require.Equal(t, int(td.multiTx1.MultiTransactionID), details.MultiTxID)
+	require.Equal(t, td.multiTx1Tr2.Nonce, details.Nonce)
+	require.Equal(t, td.multiTx1Tr2.BlkNumber, details.BlockNumber)
+	require.Equal(t, td.multiTx1Tr1.Contract, *details.Contract)
+}
+
 func setupBenchmark(b *testing.B, inMemory bool, resultCount int) (deps FilterDependencies, close func(), accounts []eth.Address) {
 	deps, close = setupTestActivityDBStorageChoice(b, inMemory)
 

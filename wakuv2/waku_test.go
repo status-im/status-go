@@ -14,6 +14,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	waku_filter "github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 
 	"github.com/status-im/status-go/protocol/tt"
@@ -143,7 +144,7 @@ func TestBasicWakuV2(t *testing.T) {
 	msgTimestamp := w.timestamp()
 	contentTopic := common.BytesToTopic(filter.Topics[0])
 
-	_, err = w.Send(&pb.WakuMessage{
+	_, err = w.Send(relay.DefaultWakuTopic, &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
 		ContentTopic: contentTopic.ContentTopic(),
 		Version:      0,
@@ -157,7 +158,7 @@ func TestBasicWakuV2(t *testing.T) {
 	require.Len(t, messages, 1)
 
 	timestampInSeconds := msgTimestamp / int64(time.Second)
-	storeResult, err := w.query(context.Background(), storeNode.PeerID, []common.TopicType{contentTopic}, uint64(timestampInSeconds-20), uint64(timestampInSeconds+20), []store.HistoryRequestOption{})
+	storeResult, err := w.query(context.Background(), storeNode.PeerID, relay.DefaultWakuTopic, []common.TopicType{contentTopic}, uint64(timestampInSeconds-20), uint64(timestampInSeconds+20), []store.HistoryRequestOption{})
 	require.NoError(t, err)
 	require.NotZero(t, len(storeResult.Messages))
 
@@ -206,7 +207,7 @@ func TestWakuV2Filter(t *testing.T) {
 	msgTimestamp := w.timestamp()
 	contentTopic := common.BytesToTopic(filter.Topics[0])
 
-	_, err = w.Send(&pb.WakuMessage{
+	_, err = w.Send(relay.DefaultWakuTopic, &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
 		ContentTopic: contentTopic.ContentTopic(),
 		Version:      0,

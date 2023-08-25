@@ -316,11 +316,11 @@ test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
 	grep -v /t/benchmarks | \
 	grep -v /transactions/fake )
 test-unit: ##@tests Run unit and integration tests
-	for file in $(UNIT_TEST_PACKAGES); do \
+	for package in $(UNIT_TEST_PACKAGES); do \
 		set -e; \
-		path=$$(echo $$file | cut -d\/ -f 4-); \
-		go test -tags '$(BUILD_TAGS)' -timeout 30m -v -failfast $$file $(gotest_extraflags) | \
-		  go-junit-report -iocopy -out $${path}/report.xml; \
+		package_dir=$$(go list -f {{.Dir}} $${package}); \
+		go test -tags '$(BUILD_TAGS)' -timeout 30m -v -failfast $${package} $(gotest_extraflags) | \
+		  go-junit-report -iocopy -out $${package_dir}/report.xml; \
 	done
 
 test-unit-race: gotest_extraflags=-race

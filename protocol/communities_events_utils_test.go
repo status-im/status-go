@@ -277,34 +277,44 @@ func createTestPermissionRequest(community *communities.Community, pType protobu
 }
 
 func createTokenPermission(base CommunityEventsTestsInterface, community *communities.Community, request *requests.CreateCommunityTokenPermission) (string, *requests.CreateCommunityTokenPermission) {
-	checkTokenPermissionCreation := func(response *MessengerResponse) error {
-		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
-		if err != nil {
-			return err
-		}
-
-		if len(modifiedCommmunity.TokenPermissionsByType(request.Type)) == 0 {
-			return errors.New("new token permission was not found")
-		}
-
-		return nil
-	}
-
 	response, err := base.GetEventSender().CreateCommunityTokenPermission(request)
 	s := base.GetSuite()
 	s.Require().NoError(err)
-	s.Require().Nil(checkTokenPermissionCreation(response))
+	s.Require().Len(response.CommunityChanges, 1)
+	s.Require().Len(response.CommunityChanges[0].TokenPermissionsAdded, 1)
 
-	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkTokenPermissionCreation)
+	addedPermission := func() *communities.CommunityTokenPermission {
+		for _, permission := range response.CommunityChanges[0].TokenPermissionsAdded {
+			return permission
+		}
+		return nil
+	}()
+	s.Require().NotNil(addedPermission)
+	// Permission added by event must be in pending state
+	s.Require().Equal(communities.TokenPermissionAdditionPending, addedPermission.State)
 
-	var tokenPermissionID string
-	for tokenPermissionID = range response.CommunityChanges[0].TokenPermissionsAdded {
-		break
+	responseHasApprovedTokenPermission := func(r *MessengerResponse) bool {
+		if len(r.Communities()) == 0 {
+			return false
+		}
+
+		receivedPermission := r.Communities()[0].TokenPermissionByID(addedPermission.Id)
+		return receivedPermission != nil && receivedPermission.State == communities.TokenPermissionApproved
 	}
 
-	s.Require().NotEqual(tokenPermissionID, "")
+	// Control node receives community event & approves it
+	_, err = WaitOnMessengerResponse(base.GetControlNode(), responseHasApprovedTokenPermission, "community with approved permission not found")
+	s.Require().NoError(err)
 
-	return tokenPermissionID, request
+	// Member receives updated community description
+	_, err = WaitOnMessengerResponse(base.GetMember(), responseHasApprovedTokenPermission, "community with approved permission not found")
+	s.Require().NoError(err)
+
+	// EventSender receives updated community description
+	_, err = WaitOnMessengerResponse(base.GetEventSender(), responseHasApprovedTokenPermission, "community with approved permission not found")
+	s.Require().NoError(err)
+
+	return addedPermission.Id, request
 }
 
 func createTestTokenPermission(base CommunityEventsTestsInterface, community *communities.Community, pType protobuf.CommunityTokenPermission_Type) (string, *requests.CreateCommunityTokenPermission) {
@@ -314,54 +324,79 @@ func createTestTokenPermission(base CommunityEventsTestsInterface, community *co
 
 func editTokenPermission(base CommunityEventsTestsInterface, community *communities.Community, request *requests.EditCommunityTokenPermission) {
 	s := base.GetSuite()
-	checkTokenPermissionEdit := func(response *MessengerResponse) error {
-		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
-		if err != nil {
-			return err
-		}
-
-		assertCheckTokenPermissionEdited(s, modifiedCommmunity, request.CreateCommunityTokenPermission.Type)
-
-		return nil
-	}
 
 	response, err := base.GetEventSender().EditCommunityTokenPermission(request)
 	s.Require().NoError(err)
-	s.Require().Nil(checkTokenPermissionEdit(response))
+	s.Require().Len(response.CommunityChanges, 1)
+	s.Require().Len(response.CommunityChanges[0].TokenPermissionsModified, 1)
 
-	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkTokenPermissionEdit)
-}
+	editedPermission := response.CommunityChanges[0].TokenPermissionsModified[request.PermissionID]
+	s.Require().NotNil(editedPermission)
+	// Permission edited by event must be in pending state
+	s.Require().Equal(communities.TokenPermissionUpdatePending, editedPermission.State)
 
-func assertCheckTokenPermissionEdited(s *suite.Suite, community *communities.Community, pType protobuf.CommunityTokenPermission_Type) {
-	permissions := community.TokenPermissionsByType(pType)
-	s.Require().Len(permissions, 1)
-	s.Require().Len(permissions[0].TokenCriteria, 1)
-	s.Require().Equal(permissions[0].TokenCriteria[0].Type, protobuf.CommunityTokenType_ERC20)
-	s.Require().Equal(permissions[0].TokenCriteria[0].Symbol, "UPDATED")
-	s.Require().Equal(permissions[0].TokenCriteria[0].Amount, "200")
-	s.Require().Equal(permissions[0].TokenCriteria[0].Decimals, uint64(18))
+	permissionSatisfyRequest := func(p *communities.CommunityTokenPermission) bool {
+		return request.Type == p.Type &&
+			request.TokenCriteria[0].Symbol == p.TokenCriteria[0].Symbol &&
+			request.TokenCriteria[0].Amount == p.TokenCriteria[0].Amount &&
+			request.TokenCriteria[0].Decimals == p.TokenCriteria[0].Decimals
+	}
+	s.Require().True(permissionSatisfyRequest(editedPermission))
+
+	responseHasApprovedEditedTokenPermission := func(r *MessengerResponse) bool {
+		if len(r.Communities()) == 0 {
+			return false
+		}
+
+		receivedPermission := r.Communities()[0].TokenPermissionByID(editedPermission.Id)
+		return receivedPermission != nil && receivedPermission.State == communities.TokenPermissionApproved &&
+			permissionSatisfyRequest(receivedPermission)
+	}
+
+	// Control node receives community event & approves it
+	_, err = WaitOnMessengerResponse(base.GetControlNode(), responseHasApprovedEditedTokenPermission, "community with approved permission not found")
+	s.Require().NoError(err)
+
+	// Member receives updated community description
+	_, err = WaitOnMessengerResponse(base.GetMember(), responseHasApprovedEditedTokenPermission, "community with approved permission not found")
+	s.Require().NoError(err)
+
+	// EventSender receives updated community description
+	_, err = WaitOnMessengerResponse(base.GetEventSender(), responseHasApprovedEditedTokenPermission, "community with approved permission not found")
+	s.Require().NoError(err)
 }
 
 func deleteTokenPermission(base CommunityEventsTestsInterface, community *communities.Community, request *requests.DeleteCommunityTokenPermission) {
-	checkTokenPermissionDeleted := func(response *MessengerResponse) error {
-		modifiedCommmunity, err := getModifiedCommunity(response, community.IDString())
-		if err != nil {
-			return err
-		}
-
-		if modifiedCommmunity.HasTokenPermissions() {
-			return errors.New("token permission was not deleted")
-		}
-
-		return nil
-	}
-
 	response, err := base.GetEventSender().DeleteCommunityTokenPermission(request)
 	s := base.GetSuite()
 	s.Require().NoError(err)
-	s.Require().Nil(checkTokenPermissionDeleted(response))
+	s.Require().Len(response.CommunityChanges, 1)
+	s.Require().Len(response.CommunityChanges[0].TokenPermissionsModified, 1)
 
-	checkClientsReceivedAdminEvent(base, WaitCommunityCondition, checkTokenPermissionDeleted)
+	removedPermission := response.CommunityChanges[0].TokenPermissionsModified[request.PermissionID]
+	s.Require().NotNil(removedPermission)
+	// Permission removed by event must be in pending state
+	s.Require().Equal(communities.TokenPermissionRemovalPending, removedPermission.State)
+
+	responseHasNoTokenPermission := func(r *MessengerResponse) bool {
+		if len(r.Communities()) == 0 {
+			return false
+		}
+
+		return r.Communities()[0].TokenPermissionByID(removedPermission.Id) == nil
+	}
+
+	// Control node receives community event & approves it
+	_, err = WaitOnMessengerResponse(base.GetControlNode(), responseHasNoTokenPermission, "community with approved permission not found")
+	s.Require().NoError(err)
+
+	// Member receives updated community description
+	_, err = WaitOnMessengerResponse(base.GetMember(), responseHasNoTokenPermission, "community with approved permission not found")
+	s.Require().NoError(err)
+
+	// EventSender receives updated community description
+	_, err = WaitOnMessengerResponse(base.GetEventSender(), responseHasNoTokenPermission, "community with approved permission not found")
+	s.Require().NoError(err)
 }
 
 func assertCheckTokenPermissionCreated(s *suite.Suite, community *communities.Community, pType protobuf.CommunityTokenPermission_Type) {

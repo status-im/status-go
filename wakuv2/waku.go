@@ -118,8 +118,9 @@ type Waku struct {
 
 	bandwidthCounter *metrics.BandwidthCounter
 
-	sendQueue chan *protocol.Envelope
-	msgQueue  chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
+	protectedTopicStore *persistence.ProtectedTopicsStore
+	sendQueue           chan *protocol.Envelope
+	msgQueue            chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -303,6 +304,13 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 			return nil, err
 		}
 		opts = append(opts, node.WithMessageProvider(dbStore))
+	}
+
+	if appDB != nil {
+		waku.protectedTopicStore, err = persistence.NewProtectedTopicsStore(logger, appDB)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	waku.settings.Options = opts
@@ -602,34 +610,48 @@ func (w *Waku) runPeerExchangeLoop() {
 	}
 }
 
-func (w *Waku) runRelayMsgLoop() {
-	defer w.wg.Done()
-
+func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.PublicKey) error {
 	if w.settings.LightClient {
-		return
+		return errors.New("only available for full nodes")
 	}
 
-	sub, err := w.node.Relay().Subscribe(w.ctx)
-	if err != nil {
-		fmt.Println("Could not subscribe:", err)
-		return
+	if w.node.Relay().IsSubscribed(topic) {
+		return nil
 	}
 
-	for {
-		select {
-		case <-w.ctx.Done():
-			sub.Unsubscribe()
-			return
-		case env := <-sub.Ch:
-			envelopeErrors, err := w.OnNewEnvelopes(env, common.RelayedMessageType)
-			if err != nil {
-				w.logger.Error("onNewEnvelope error", zap.Error(err))
-			}
-			// TODO: should these be handled?
-			_ = envelopeErrors
-			_ = err
+	if pubkey != nil {
+		err := w.node.Relay().AddSignedTopicValidator(topic, pubkey)
+		if err != nil {
+			return err
 		}
 	}
+
+	sub, err := w.node.Relay().SubscribeToTopic(context.Background(), topic)
+	if err != nil {
+		return err
+	}
+
+	w.wg.Add(1)
+	go func() {
+		defer w.wg.Done()
+		for {
+			select {
+			case <-w.ctx.Done():
+				sub.Unsubscribe()
+				return
+			case env := <-sub.Ch:
+				envelopeErrors, err := w.OnNewEnvelopes(env, common.RelayedMessageType)
+				if err != nil {
+					w.logger.Error("onNewEnvelope error", zap.Error(err))
+				}
+				// TODO: should these be handled?
+				_ = envelopeErrors
+				_ = err
+			}
+		}
+	}()
+
+	return nil
 }
 
 func (w *Waku) runFilterSubscriptionLoop(sub *filter.SubscriptionDetails) {
@@ -680,7 +702,7 @@ func (w *Waku) runFilterMsgLoop() {
 					err := w.isFilterSubAlive(sub)
 					if err != nil {
 						// Unsubscribe on light node
-						contentFilter := w.buildContentFilter(f.Topics)
+						contentFilter := w.buildContentFilter(f.PubsubTopic, f.Topics)
 						// TODO Better return value handling for WakuFilterPushResult
 						_, err := w.node.FilterLightnode().Unsubscribe(w.ctx, contentFilter, filter.Peer(sub.PeerID))
 						if err != nil {
@@ -712,9 +734,9 @@ func (w *Waku) runFilterMsgLoop() {
 		}
 	}
 }
-func (w *Waku) buildContentFilter(topics [][]byte) filter.ContentFilter {
+func (w *Waku) buildContentFilter(pubsubTopic string, topics [][]byte) filter.ContentFilter {
 	contentFilter := filter.ContentFilter{
-		Topic: relay.DefaultWakuTopic,
+		Topic: pubsubTopic,
 	}
 	for _, topic := range topics {
 		contentFilter.ContentTopics = append(contentFilter.ContentTopics, common.BytesToTopic(topic).ContentTopic())
@@ -1008,6 +1030,9 @@ func (w *Waku) GetSymKey(id string) ([]byte, error) {
 // Subscribe installs a new message handler used for filtering, decrypting
 // and subsequent storing of incoming messages.
 func (w *Waku) Subscribe(f *common.Filter) (string, error) {
+	if f.PubsubTopic == "" {
+		f.PubsubTopic = relay.DefaultWakuTopic
+	}
 
 	s, err := w.filters.Install(f)
 	if err != nil {
@@ -1033,7 +1058,7 @@ func (w *Waku) Subscribe(f *common.Filter) (string, error) {
 func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
 	f := w.filters.Get(id)
 	if f != nil && w.settings.LightClient {
-		contentFilter := w.buildContentFilter(f.Topics)
+		contentFilter := w.buildContentFilter(f.PubsubTopic, f.Topics)
 		if _, err := w.node.FilterLightnode().Unsubscribe(ctx, contentFilter); err != nil {
 			return fmt.Errorf("failed to unsubscribe: %w", err)
 		}
@@ -1069,15 +1094,15 @@ func (w *Waku) broadcast() {
 		case envelope := <-w.sendQueue:
 			var err error
 			if w.settings.LightClient {
-				w.logger.Info("publishing message via lightpush", zap.String("envelopeHash", hexutil.Encode(envelope.Hash())))
-				_, err = w.node.Lightpush().Publish(w.ctx, envelope.Message())
+				w.logger.Info("publishing message via lightpush", zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", envelope.PubsubTopic()))
+				_, err = w.node.Lightpush().PublishToTopic(context.Background(), envelope.Message(), envelope.PubsubTopic())
 			} else {
-				w.logger.Info("publishing message via relay", zap.String("envelopeHash", hexutil.Encode(envelope.Hash())))
-				_, err = w.node.Relay().Publish(w.ctx, envelope.Message())
+				w.logger.Info("publishing message via relay", zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", envelope.PubsubTopic()))
+				_, err = w.node.Relay().PublishToTopic(context.Background(), envelope.Message(), envelope.PubsubTopic())
 			}
 
 			if err != nil {
-				w.logger.Error("could not send message", zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.Error(err))
+				w.logger.Error("could not send message", zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", envelope.PubsubTopic()), zap.Error(err))
 				w.envelopeFeed.Send(common.EnvelopeEvent{
 					Hash:  gethcommon.BytesToHash(envelope.Hash()),
 					Event: common.EventEnvelopeExpired,
@@ -1101,8 +1126,26 @@ func (w *Waku) broadcast() {
 
 // Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
-func (w *Waku) Send(msg *pb.WakuMessage) ([]byte, error) {
-	envelope := protocol.NewEnvelope(msg, msg.Timestamp, relay.DefaultWakuTopic) // TODO: once sharding is defined, use the correct pubsub topic
+func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage) ([]byte, error) {
+	if pubsubTopic == "" {
+		pubsubTopic = relay.DefaultWakuTopic
+	}
+
+	if w.protectedTopicStore != nil {
+		privKey, err := w.protectedTopicStore.FetchPrivateKey(pubsubTopic)
+		if err != nil {
+			return nil, err
+		}
+
+		if privKey != nil {
+			err = relay.SignMessage(privKey, msg, pubsubTopic)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	envelope := protocol.NewEnvelope(msg, msg.Timestamp, pubsubTopic)
 
 	w.sendQueue <- envelope
 
@@ -1118,7 +1161,7 @@ func (w *Waku) Send(msg *pb.WakuMessage) ([]byte, error) {
 	return envelope.Hash(), nil
 }
 
-func (w *Waku) query(ctx context.Context, peerID peer.ID, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (*store.Result, error) {
+func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (*store.Result, error) {
 	strTopics := make([]string, len(topics))
 	for i, t := range topics {
 		strTopics[i] = t.ContentTopic()
@@ -1130,16 +1173,16 @@ func (w *Waku) query(ctx context.Context, peerID peer.ID, topics []common.TopicT
 		StartTime:     int64(from) * int64(time.Second),
 		EndTime:       int64(to) * int64(time.Second),
 		ContentTopics: strTopics,
-		Topic:         relay.DefaultWakuTopic,
+		Topic:         pubsubTopic,
 	}
 
 	return w.node.Store().Query(ctx, query, opts...)
 }
 
-func (w *Waku) Query(ctx context.Context, peerID peer.ID, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (cursor *storepb.Index, err error) {
+func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (cursor *storepb.Index, err error) {
 	requestID := protocol.GenerateRequestId()
 	opts = append(opts, store.WithRequestID(requestID))
-	result, err := w.query(ctx, peerID, topics, from, to, opts)
+	result, err := w.query(ctx, peerID, pubsubTopic, topics, from, to, opts)
 	if err != nil {
 		w.logger.Error("error querying storenode", zap.String("requestID", hexutil.Encode(requestID)), zap.String("peerID", peerID.String()), zap.Error(err))
 		if w.onHistoricMessagesRequestFailed != nil {
@@ -1153,8 +1196,8 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, topics []common.TopicT
 		// See https://github.com/vacp2p/rfc/issues/563
 		msg.RateLimitProof = nil
 
-		envelope := protocol.NewEnvelope(msg, msg.Timestamp, relay.DefaultWakuTopic)
-		w.logger.Info("received waku2 store message", zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())))
+		envelope := protocol.NewEnvelope(msg, msg.Timestamp, pubsubTopic)
+		w.logger.Info("received waku2 store message", zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", pubsubTopic))
 		_, err = w.OnNewEnvelopes(envelope, common.StoreMessageType)
 		if err != nil {
 			return nil, err
@@ -1205,7 +1248,7 @@ func (w *Waku) Start() error {
 		}
 	}
 
-	w.wg.Add(4)
+	w.wg.Add(3)
 
 	go func() {
 		defer w.wg.Done()
@@ -1252,9 +1295,13 @@ func (w *Waku) Start() error {
 	}()
 
 	go w.telemetryBandwidthStats(w.cfg.TelemetryServerURL)
-	go w.runFilterMsgLoop()
-	go w.runRelayMsgLoop()
 	go w.runPeerExchangeLoop()
+	go w.runFilterMsgLoop()
+
+	err = w.setupRelaySubscriptions()
+	if err != nil {
+		return err
+	}
 
 	numCPU := runtime.NumCPU()
 	for i := 0; i < numCPU; i++ {
@@ -1267,12 +1314,54 @@ func (w *Waku) Start() error {
 	return nil
 }
 
+func (w *Waku) setupRelaySubscriptions() error {
+	if w.settings.LightClient {
+		return nil
+	}
+
+	if w.protectedTopicStore != nil {
+		protectedTopics, err := w.protectedTopicStore.ProtectedTopics()
+		if err != nil {
+			return err
+		}
+
+		for _, pt := range protectedTopics {
+			// Adding subscription to protected topics
+			err = w.subscribeToPubsubTopicWithWakuRelay(pt.Topic, pt.PubKey)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Default Waku Topic (TODO: remove once sharding is added)
+	err := w.subscribeToPubsubTopicWithWakuRelay(relay.DefaultWakuTopic, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Stop implements node.Service, stopping the background data propagation thread
 // of the Waku protocol.
 func (w *Waku) Stop() error {
 	w.cancel()
-	w.identifyService.Close()
+
+	err := w.identifyService.Close()
+	if err != nil {
+		return err
+	}
+
 	w.node.Stop()
+
+	if w.protectedTopicStore != nil {
+		err = w.protectedTopicStore.Close()
+		if err != nil {
+			return err
+		}
+	}
+
 	close(w.connectionChanged)
 	w.wg.Wait()
 	return nil
@@ -1293,7 +1382,6 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 	logger := w.logger.With(zap.String("hash", recvMessage.Hash().Hex()))
 
 	logger.Debug("received new envelope")
-
 	trouble := false
 
 	_, err := w.add(recvMessage)
@@ -1368,14 +1456,14 @@ func (w *Waku) processQueue() {
 
 			// If not matched we remove it
 			if !matched {
-				w.logger.Debug("filters did not match", zap.String("hash", e.Hash().String()), zap.String("contentTopic", e.Topic.ContentTopic()))
+				w.logger.Debug("filters did not match", zap.String("hash", e.Hash().String()), zap.String("contentTopic", e.ContentTopic.ContentTopic()))
 				w.storeMsgIDsMu.Lock()
 				delete(w.storeMsgIDs, e.Hash())
 				w.storeMsgIDsMu.Unlock()
 			}
 
 			w.envelopeFeed.Send(common.EnvelopeEvent{
-				Topic: e.Topic,
+				Topic: e.ContentTopic,
 				Hash:  e.Hash(),
 				Event: common.EventEnvelopeAvailable,
 			})
@@ -1427,6 +1515,20 @@ func (w *Waku) ListenAddresses() []string {
 		result = append(result, addr.String())
 	}
 	return result
+}
+
+func (w *Waku) SubscribeToPubsubTopic(topic string, pubkey *ecdsa.PublicKey) error {
+	if !w.settings.LightClient {
+		err := w.subscribeToPubsubTopicWithWakuRelay(topic, pubkey)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (w *Waku) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
+	return w.protectedTopicStore.Insert(topic, privKey, &privKey.PublicKey)
 }
 
 func (w *Waku) StartDiscV5() error {
@@ -1727,7 +1829,7 @@ func (w *Waku) subscribeToFilter(f *common.Filter) error {
 	peers := w.findFilterPeers()
 
 	if len(peers) > 0 {
-		contentFilter := w.buildContentFilter(f.Topics)
+		contentFilter := w.buildContentFilter(f.PubsubTopic, f.Topics)
 		for i := 0; i < len(peers) && i < w.settings.MinPeersForFilter; i++ {
 			subDetails, err := w.node.FilterLightnode().Subscribe(w.ctx, contentFilter, filter.WithPeer(peers[i]))
 			if err != nil {

@@ -340,6 +340,41 @@ func (api *API) MakePrivateKeyKeypairFullyOperable(ctx context.Context, privateK
 	return (*api.messenger).MarkKeypairFullyOperable(info.KeyUID)
 }
 
+func (api *API) MakePartiallyOperableAccoutsFullyOperable(ctx context.Context, password string) (addresses []types.Address, err error) {
+	profileKeypair, err := api.db.GetProfileKeypair()
+	if err != nil {
+		return
+	}
+
+	if len(profileKeypair.Keycards) == 0 && !api.VerifyPassword(password) {
+		err = errors.New("wrong password provided")
+		return
+	}
+
+	keypairs, err := api.db.GetActiveKeypairs()
+	if err != nil {
+		return
+	}
+
+	for _, kp := range keypairs {
+		for _, acc := range kp.Accounts {
+			if acc.Operable != accounts.AccountPartiallyOperable {
+				continue
+			}
+			err = api.createKeystoreFileForAccount(kp.DerivedFrom, password, acc)
+			if err != nil {
+				return
+			}
+			err = api.db.MarkAccountFullyOperable(acc.Address)
+			if err != nil {
+				return
+			}
+			addresses = append(addresses, acc.Address)
+		}
+	}
+	return
+}
+
 // Imports a new mnemonic and creates local keystore file.
 func (api *API) ImportMnemonic(ctx context.Context, mnemonic string, password string) error {
 	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")

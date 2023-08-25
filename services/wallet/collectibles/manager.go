@@ -269,7 +269,7 @@ func (o *Manager) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.Collec
 				continue
 			}
 
-			fetchedAssets, err := o.opensea.FetchAssetsByCollectibleUniqueID(idsToFetch)
+			fetchedAssets, err := provider.FetchAssetsByCollectibleUniqueID(idsToFetch)
 			if err != nil {
 				return nil, err
 			}

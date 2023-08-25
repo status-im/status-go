@@ -44,7 +44,7 @@ func EvaluateCommunityEncryptionKeyActions(origin, modified *Community) *Encrypt
 		}
 	}
 
-	changes := EvaluateCommunityChanges(origin.Description(), modified.Description())
+	changes := EvaluateCommunityChanges(origin, modified)
 
 	result := &EncryptionKeyActions{
 		CommunityKeyAction: *evaluateCommunityLevelEncryptionKeyAction(origin, modified, changes),
@@ -89,7 +89,7 @@ func evaluateChannelLevelEncryptionKeyActions(origin, modified *Community, chang
 	return &result
 }
 
-func evaluateEncryptionKeyAction(originPermissions, modifiedPermissions []*protobuf.CommunityTokenPermission, allMembers, membersAdded, membersRemoved map[string]*protobuf.CommunityMember) *EncryptionKeyAction {
+func evaluateEncryptionKeyAction(originPermissions, modifiedPermissions []*CommunityTokenPermission, allMembers, membersAdded, membersRemoved map[string]*protobuf.CommunityMember) *EncryptionKeyAction {
 	result := &EncryptionKeyAction{
 		ActionType: EncryptionKeyNone,
 		Members:    map[string]*protobuf.CommunityMember{},
