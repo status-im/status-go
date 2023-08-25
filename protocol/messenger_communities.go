@@ -137,6 +137,29 @@ func (m *Messenger) publishCommunityEventsRejected(community *communities.Commun
 	return err
 }
 
+func (m *Messenger) publishCommunityPrivilegedMemberSyncMessage(msg *communities.CommunityPrivilegedMemberSyncMessage) error {
+
+	m.logger.Debug("publishing privileged user sync message", zap.Any("event", msg))
+
+	payload, err := proto.Marshal(msg.CommunityPrivilegedUserSyncMessage)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := &common.RawMessage{
+		Payload:           payload,
+		Sender:            msg.CommunityPrivateKey, // if empty, sender private key will be used in SendPrivate
+		SkipProtocolLayer: true,
+		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE,
+	}
+
+	for _, receivers := range msg.Receivers {
+		_, err = m.sender.SendPrivate(context.Background(), receivers, rawMessage)
+	}
+
+	return err
+}
+
 func (m *Messenger) handleCommunitiesHistoryArchivesSubscription(c chan *communities.Subscription) {
 
 	go func() {
@@ -312,6 +335,12 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 						if err != nil {
 							m.logger.Warn("failed to decline request to join ", zap.Error(err))
 						}
+					}
+				}
+
+				if sub.CommunityPrivilegedMemberSyncMessage != nil {
+					if err := m.publishCommunityPrivilegedMemberSyncMessage(sub.CommunityPrivilegedMemberSyncMessage); err != nil {
+						m.logger.Warn("failed to publish community private members sync message", zap.Error(err))
 					}
 				}
 
@@ -1172,12 +1201,20 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 		return nil, err
 	}
 
-	// send edit message also to privileged members
-	privilegedMembers := community.GetPrivilegedMembers()
-	for _, privilegedMember := range privilegedMembers {
-		_, err := m.sender.SendPrivate(context.Background(), privilegedMember, &rawMessage)
-		if err != nil {
-			return nil, err
+	// send edit message also to TokenMasters and Owners
+	skipMembers := make(map[*ecdsa.PublicKey]struct{})
+	skipMembers[&m.identity.PublicKey] = struct{}{}
+
+	privilegedMembers := community.GetFilteredPrivilegedMembers(map[*ecdsa.PublicKey]struct{}{})
+	for role, members := range privilegedMembers {
+		if len(members) == 0 || (role != protobuf.CommunityMember_ROLE_TOKEN_MASTER && role != protobuf.CommunityMember_ROLE_OWNER) {
+			continue
+		}
+		for _, member := range members {
+			_, err := m.sender.SendPrivate(context.Background(), member, &rawMessage)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -1432,41 +1469,6 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 		_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
 		if err != nil {
 			return nil, err
-		}
-
-		// Notify privileged members that request to join was accepted
-		// Send request to join without revealed addresses
-		requestToJoin.RevealedAccounts = make([]*protobuf.RevealedAccount, 0)
-		acceptedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
-		acceptedRequestsToJoin[requestToJoin.PublicKey] = requestToJoin.ToCommunityRequestToJoinProtobuf()
-
-		syncMsg := &protobuf.CommunityPrivilegedUserSyncMessage{
-			Type:          protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN,
-			CommunityId:   community.ID(),
-			RequestToJoin: acceptedRequestsToJoin,
-		}
-
-		payloadSyncMsg, err := proto.Marshal(syncMsg)
-		if err != nil {
-			return nil, err
-		}
-
-		rawSyncMessage := &common.RawMessage{
-			Payload:           payloadSyncMsg,
-			Sender:            community.PrivateKey(),
-			SkipProtocolLayer: true,
-			MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE,
-		}
-
-		privilegedMembers := community.GetPrivilegedMembers()
-		for _, privilegedMember := range privilegedMembers {
-			if privilegedMember.Equal(&m.identity.PublicKey) {
-				continue
-			}
-			_, err := m.sender.SendPrivate(context.Background(), privilegedMember, rawSyncMessage)
-			if err != nil {
-				return nil, err
-			}
 		}
 	}
 
@@ -1952,8 +1954,7 @@ func (m *Messenger) CreateCommunityTokenPermission(request *requests.CreateCommu
 	if community.IsControlNode() {
 		// check existing member permission once, then check periodically
 		go func() {
-			err := m.communitiesManager.ReevaluateMembers(community)
-			if err != nil {
+			if err := m.communitiesManager.ReevaluateCommunityMembersPermissions(community); err != nil {
 				m.logger.Debug("failed to check member permissions", zap.Error(err))
 			}
 
@@ -1984,8 +1985,7 @@ func (m *Messenger) EditCommunityTokenPermission(request *requests.EditCommunity
 	// We do this in a separate routine to not block this function
 	if community.IsControlNode() {
 		go func() {
-			err := m.communitiesManager.ReevaluateMembers(community)
-			if err != nil {
+			if err := m.communitiesManager.ReevaluateCommunityMembersPermissions(community); err != nil {
 				m.logger.Debug("failed to check member permissions", zap.Error(err))
 			}
 		}()
@@ -2012,8 +2012,7 @@ func (m *Messenger) DeleteCommunityTokenPermission(request *requests.DeleteCommu
 	// We do this in a separate routine to not block this function
 	if community.IsControlNode() {
 		go func() {
-			err = m.communitiesManager.ReevaluateMembers(community)
-			if err != nil {
+			if err = m.communitiesManager.ReevaluateCommunityMembersPermissions(community); err != nil {
 				m.logger.Debug("failed to check member permissions", zap.Error(err))
 			}
 		}()
@@ -2031,8 +2030,12 @@ func (m *Messenger) ReevaluateCommunityMembersPermissions(request *requests.Reev
 		return nil, err
 	}
 
-	community, err := m.communitiesManager.ReevaluateCommunityMembersPermissions(request)
+	community, err := m.communitiesManager.GetByID(request.CommunityID)
 	if err != nil {
+		return nil, err
+	}
+
+	if err = m.communitiesManager.ReevaluateCommunityMembersPermissions(community); err != nil {
 		return nil, err
 	}
 
@@ -2771,17 +2774,16 @@ func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMess
 		return err
 	}
 
+	// Currently this type of msg coming from the control node.
+	// If it will change in the future, check that events types starting from
+	// CONTROL_NODE were sent by a control node
+	isControlNodeMsg := common.IsPubKeyEqual(community.PublicKey(), signer)
+	if !isControlNodeMsg {
+		return errors.New("accepted/requested to join sync messages can be send only by the control node")
+	}
+
 	if community == nil {
 		return errors.New("community not found")
-	}
-
-	if !community.IsPrivilegedMember(&m.identity.PublicKey) {
-		return errors.New("user has no permissions to process privileged sync message")
-	}
-
-	isControlNodeMsg := common.IsPubKeyEqual(community.PublicKey(), signer)
-	if !(isControlNodeMsg || community.IsPrivilegedMember(signer)) {
-		return errors.New("user has no permissions to send privileged sync message")
 	}
 
 	err = m.communitiesManager.ValidateCommunityPrivilegedUserSyncMessage(message)
@@ -2793,10 +2795,14 @@ func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMess
 	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN:
 		fallthrough
 	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_REJECT_REQUEST_TO_JOIN:
-		if !isControlNodeMsg {
-			return errors.New("accepted/requested to join sync messages can be send only by the control node")
-		}
 		requestsToJoin, err := m.communitiesManager.HandleRequestToJoinPrivilegedUserSyncMessage(message, community.ID())
+		if err != nil {
+			return nil
+		}
+		state.Response.AddRequestsToJoinCommunity(requestsToJoin)
+
+	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ALL_SYNC_REQUESTS_TO_JOIN:
+		requestsToJoin, err := m.communitiesManager.HandleSyncAllRequestToJoinForNewPrivilegedMember(message, community.ID())
 		if err != nil {
 			return nil
 		}

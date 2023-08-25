@@ -1059,6 +1059,29 @@ func (o *Community) GetPrivilegedMembers() []*ecdsa.PublicKey {
 	return privilegedMembers
 }
 
+func (o *Community) GetFilteredPrivilegedMembers(skipMembers map[*ecdsa.PublicKey]struct{}) map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey {
+	privilegedMembers := make(map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey)
+	privilegedMembers[protobuf.CommunityMember_ROLE_TOKEN_MASTER] = []*ecdsa.PublicKey{}
+	privilegedMembers[protobuf.CommunityMember_ROLE_ADMIN] = []*ecdsa.PublicKey{}
+	privilegedMembers[protobuf.CommunityMember_ROLE_OWNER] = []*ecdsa.PublicKey{}
+
+	members := o.GetMemberPubkeys()
+	for _, member := range members {
+
+		if _, exist := skipMembers[member]; exist {
+			continue
+		}
+
+		memberRole := o.MemberRole(member)
+		if memberRole == protobuf.CommunityMember_ROLE_OWNER || memberRole == protobuf.CommunityMember_ROLE_ADMIN ||
+			memberRole == protobuf.CommunityMember_ROLE_TOKEN_MASTER {
+
+			privilegedMembers[memberRole] = append(privilegedMembers[memberRole], member)
+		}
+	}
+	return privilegedMembers
+}
+
 func (o *Community) HasPermissionToSendCommunityEvents() bool {
 	return !o.IsControlNode() && o.hasRoles(o.config.MemberIdentity, manageCommunityRoles())
 }

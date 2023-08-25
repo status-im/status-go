@@ -1325,3 +1325,36 @@ func decodeEventsData(eventsBytes []byte, eventsDescriptionBytes []byte) (*Event
 		Events:                         events,
 	}, nil
 }
+
+func (p *Persistence) GetCommunityRequestsToJoinWithRevealedAddresses(communityID []byte) ([]*RequestToJoin, error) {
+	requests := []*RequestToJoin{}
+	rows, err := p.db.Query(`
+	SELECT id, public_key, clock, ens_name, chat_id, state
+	FROM communities_requests_to_join
+	WHERE req.community_id = ?`, communityID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		request := &RequestToJoin{}
+		err = rows.Scan(&request.ID, &request.PublicKey, &request.Clock, &request.ENSName, &request.ChatID, &request.State)
+		if err != nil {
+			return nil, err
+		}
+
+		revealedAccounts, err := p.GetRequestToJoinRevealedAddresses(request.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		request.RevealedAccounts = revealedAccounts
+
+		requests = append(requests, request)
+	}
+
+	return requests, nil
+}
