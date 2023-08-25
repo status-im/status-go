@@ -254,6 +254,27 @@ func (a *Keypair) GetChatPublicKey() types.HexBytes {
 	return nil
 }
 
+func (a *Keypair) MigratedToKeycard() bool {
+	return len(a.Keycards) > 0
+}
+
+// Returns operability of a keypair:
+// - if any of keypair's account is not operable, then a keyapir is considered as non operable
+// - if any of keypair's account is partially operable, then a keyapir is considered as partially operable
+// - if all accounts are fully operable, then a keyapir is considered as fully operable
+func (a *Keypair) Operability() AccountOperable {
+	for _, acc := range a.Accounts {
+		if acc.Operable == AccountNonOperable {
+			return AccountNonOperable
+		}
+		if acc.Operable == AccountPartiallyOperable {
+			return AccountPartiallyOperable
+		}
+	}
+
+	return AccountFullyOperable
+}
+
 // Database sql wrapper for operations with browser objects.
 type Database struct {
 	*settings.Database
@@ -1287,7 +1308,8 @@ func (db *Database) GetNodeConfig() (*params.NodeConfig, error) {
 // local pairing and then imports seed/private key for the non profile keypair on one of those two devices
 // to make that keypair fully operable. In that case we need to inform other device about the change, that
 // other device may offer other options for importing that keypair on it.
-func (db *Database) MarkKeypairFullyOperable(keyUID string, clock uint64) (err error) {
+// If the clock is set to -1, do not update it.
+func (db *Database) MarkKeypairFullyOperable(keyUID string, clock uint64, updateKeypairClock bool) (err error) {
 	tx, err := db.db.Begin()
 	if err != nil {
 		return err
@@ -1317,7 +1339,11 @@ func (db *Database) MarkKeypairFullyOperable(keyUID string, clock uint64) (err e
 		return err
 	}
 
-	return db.updateKeypairClock(tx, keyUID, clock)
+	if updateKeypairClock {
+		return db.updateKeypairClock(tx, keyUID, clock)
+	}
+
+	return nil
 }
 
 func (db *Database) MarkAccountFullyOperable(address types.Address) (err error) {

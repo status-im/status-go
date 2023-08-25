@@ -3105,6 +3105,11 @@ func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, syn
 	if accountReceivedFromLocalPairing {
 		return accounts.AccountOperable(syncAcc.Operable), nil
 	}
+
+	if syncKpMigratedToKeycard {
+		return accounts.AccountFullyOperable, nil
+	}
+
 	accountsOperability := accounts.AccountNonOperable
 	dbAccount, err := m.settings.GetAccountByAddress(types.BytesToAddress(syncAcc.Address))
 	if err != nil && err != accounts.ErrDbAccountNotFound {
@@ -3129,7 +3134,7 @@ func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, syn
 		}
 	}
 
-	if syncKpMigratedToKeycard || syncAcc.Chat || syncAcc.Wallet {
+	if syncAcc.Chat || syncAcc.Wallet {
 		accountsOperability = accounts.AccountFullyOperable
 	} else {
 		partiallyOrFullyOperable, err := m.settings.IsAnyAccountPartiallyOrFullyOperableForKeyUID(syncAcc.KeyUid)
@@ -3259,8 +3264,8 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		}
 	}
 
+	syncKpMigratedToKeycard := len(message.Keycards) > 0
 	for _, sAcc := range message.Accounts {
-		syncKpMigratedToKeycard := len(message.Keycards) > 0
 		if message.SyncedFrom == accounts.SyncedFromBackup && kp.Type == accounts.KeypairTypeProfile {
 			// if a profile keypair is coming from backup, we're handling within this block the case when a recovering
 			// was inititiated via keycard, while backed up profile keypair data refers to a regular profile
@@ -3279,25 +3284,35 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 		kp.Accounts = append(kp.Accounts, acc)
 	}
 
-	if kp.Removed {
-		// delete all keystore files
-		err = m.deleteKeystoreFilesForKeypair(dbKeypair)
-		if err != nil {
-			return nil, err
-		}
-	} else if !fromLocalPairing && dbKeypair != nil {
-		for _, dbAcc := range dbKeypair.Accounts {
-			removeAcc := false
-			for _, acc := range kp.Accounts {
-				if dbAcc.Address == acc.Address && acc.Removed && !dbAcc.Removed {
-					removeAcc = true
-					break
-				}
+	if !fromLocalPairing {
+		if kp.Removed ||
+			dbKeypair != nil && !dbKeypair.MigratedToKeycard() && syncKpMigratedToKeycard {
+			// delete all keystore files
+			err = m.deleteKeystoreFilesForKeypair(dbKeypair)
+			if err != nil {
+				return nil, err
 			}
-			if removeAcc {
-				err = m.deleteKeystoreFileForAddress(dbAcc.Address)
+
+			if syncKpMigratedToKeycard {
+				err = m.settings.MarkKeypairFullyOperable(dbKeypair.KeyUID, 0, false)
 				if err != nil {
 					return nil, err
+				}
+			}
+		} else if dbKeypair != nil {
+			for _, dbAcc := range dbKeypair.Accounts {
+				removeAcc := false
+				for _, acc := range kp.Accounts {
+					if dbAcc.Address == acc.Address && acc.Removed && !dbAcc.Removed {
+						removeAcc = true
+						break
+					}
+				}
+				if removeAcc {
+					err = m.deleteKeystoreFileForAddress(dbAcc.Address)
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
 		}
