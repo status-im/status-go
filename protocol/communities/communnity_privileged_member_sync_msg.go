@@ -44,7 +44,7 @@ func (m *Manager) HandleRequestToJoinPrivilegedUserSyncMessage(message *protobuf
 }
 
 func (m *Manager) HandleSyncAllRequestToJoinForNewPrivilegedMember(message *protobuf.CommunityPrivilegedUserSyncMessage, communityID types.HexBytes) ([]*RequestToJoin, error) {
-	requestsToJoin := make([]*RequestToJoin, 0)
+	requestsToJoin := make([]*RequestToJoin, len(message.SyncRequestsToJoin))
 	for _, syncRequestToJoin := range message.SyncRequestsToJoin {
 		requestToJoin := new(RequestToJoin)
 		requestToJoin.InitFromSyncProtobuf(syncRequestToJoin)

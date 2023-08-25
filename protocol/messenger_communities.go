@@ -1202,10 +1202,10 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 	}
 
 	// send edit message also to TokenMasters and Owners
-	skipMembers := make(map[*ecdsa.PublicKey]struct{})
-	skipMembers[&m.identity.PublicKey] = struct{}{}
+	skipMembers := make(map[string]struct{})
+	skipMembers[common.PubkeyToHex(&m.identity.PublicKey)] = struct{}{}
 
-	privilegedMembers := community.GetFilteredPrivilegedMembers(map[*ecdsa.PublicKey]struct{}{})
+	privilegedMembers := community.GetFilteredPrivilegedMembers(skipMembers)
 	for role, members := range privilegedMembers {
 		if len(members) == 0 || (role != protobuf.CommunityMember_ROLE_TOKEN_MASTER && role != protobuf.CommunityMember_ROLE_OWNER) {
 			continue

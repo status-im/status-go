@@ -1059,7 +1059,7 @@ func (o *Community) GetPrivilegedMembers() []*ecdsa.PublicKey {
 	return privilegedMembers
 }
 
-func (o *Community) GetFilteredPrivilegedMembers(skipMembers map[*ecdsa.PublicKey]struct{}) map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey {
+func (o *Community) GetFilteredPrivilegedMembers(skipMembers map[string]struct{}) map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey {
 	privilegedMembers := make(map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey)
 	privilegedMembers[protobuf.CommunityMember_ROLE_TOKEN_MASTER] = []*ecdsa.PublicKey{}
 	privilegedMembers[protobuf.CommunityMember_ROLE_ADMIN] = []*ecdsa.PublicKey{}
@@ -1067,9 +1067,11 @@ func (o *Community) GetFilteredPrivilegedMembers(skipMembers map[*ecdsa.PublicKe
 
 	members := o.GetMemberPubkeys()
 	for _, member := range members {
-
-		if _, exist := skipMembers[member]; exist {
-			continue
+		if len(skipMembers) > 0 {
+			if _, exist := skipMembers[common.PubkeyToHex(member)]; exist {
+				delete(skipMembers, common.PubkeyToHex(member))
+				continue
+			}
 		}
 
 		memberRole := o.MemberRole(member)

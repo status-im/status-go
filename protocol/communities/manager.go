@@ -645,7 +645,6 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 
 	hasMemberPermissions := len(becomeMemberPermissions) > 0
 
-	// TODO Add owners without community private keys
 	newPrivilegedRoles := make(map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey)
 	newPrivilegedRoles[protobuf.CommunityMember_ROLE_TOKEN_MASTER] = []*ecdsa.PublicKey{}
 	newPrivilegedRoles[protobuf.CommunityMember_ROLE_ADMIN] = []*ecdsa.PublicKey{}
@@ -4780,10 +4779,10 @@ func (m *Manager) shareAcceptedRequestToJoinWithPrivilegedMembers(community *Com
 		RequestToJoin: acceptedRequestsToJoinWithoutRevealedAccounts,
 	}
 
-	// do not sent to control ourself and to the accepted user
-	skipMembers := make(map[*ecdsa.PublicKey]struct{})
-	skipMembers[&m.identity.PublicKey] = struct{}{}
-	skipMembers[pk] = struct{}{}
+	// do not sent to ourself and to the accepted user
+	skipMembers := make(map[string]struct{})
+	skipMembers[common.PubkeyToHex(&m.identity.PublicKey)] = struct{}{}
+	skipMembers[common.PubkeyToHex(pk)] = struct{}{}
 
 	subscriptionMsg := &CommunityPrivilegedMemberSyncMessage{
 		CommunityPrivateKey: community.PrivateKey(),
