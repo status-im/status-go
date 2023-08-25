@@ -51,7 +51,7 @@ var DefaultConfig = Config{
 	Host:              "0.0.0.0",
 	Port:              0,
 	KeepAliveInterval: 10, // second
-	DiscoveryLimit:    40,
+	DiscoveryLimit:    20,
 	MinPeersForRelay:  1, // TODO: determine correct value with Vac team
 	MinPeersForFilter: 1, // TODO: determine correct value with Vac team and via testing
 	AutoUpdate:        false,
