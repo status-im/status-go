@@ -1230,6 +1230,8 @@ func (w *Waku) Start() error {
 		return fmt.Errorf("failed to start go-waku node: %v", err)
 	}
 
+	w.logger.Info("WakuV2 PeerID", zap.Stringer("id", w.node.Host().ID()))
+
 	idService, err := identify.NewIDService(w.node.Host())
 	if err != nil {
 		return err
@@ -1833,7 +1835,7 @@ func (w *Waku) subscribeToFilter(f *common.Filter) error {
 		for i := 0; i < len(peers) && i < w.settings.MinPeersForFilter; i++ {
 			subDetails, err := w.node.FilterLightnode().Subscribe(w.ctx, contentFilter, filter.WithPeer(peers[i]))
 			if err != nil {
-				w.logger.Warn("could not add wakuv2 filter for peer", zap.Any("peer", peers[i]))
+				w.logger.Warn("could not add wakuv2 filter for peer", zap.Stringer("peer", peers[i]))
 				continue
 			}
 
@@ -1844,6 +1846,8 @@ func (w *Waku) subscribeToFilter(f *common.Filter) error {
 			}
 			subMap[subDetails.ID] = subDetails
 			go w.runFilterSubscriptionLoop(subDetails)
+
+			w.logger.Info("wakuv2 filter subscription success", zap.Stringer("peer", peers[i]), zap.String("pubsubTopic", contentFilter.Topic), zap.Strings("contentTopics", contentFilter.ContentTopics))
 		}
 
 	} else {

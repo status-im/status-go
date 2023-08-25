@@ -673,11 +673,5 @@ func (t *Transport) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey)
 }
 
 func GetPubsubTopic(communityID []byte) string {
-	// TODO: remove hardcoded pubsub topic and use shard
-	result := "/waku/2/status-signed-test-1"
-	if communityID == nil {
-		result = relay.DefaultWakuTopic
-	}
-
-	return result
+	return relay.DefaultWakuTopic
 }
