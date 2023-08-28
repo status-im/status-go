@@ -273,6 +273,8 @@ install-release: ##@install Install Github Release Tools
 install-xtools: ##@install Install Miscellaneous Go Tools
 	GO111MODULE=on go install golang.org/x/tools/go/packages/...@v0.1.5
 
+generate-handlers:
+	go generate ./_assets/generate_handlers/
 generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/... ./walletdatabase/... ./_assets/generate_handlers
 
