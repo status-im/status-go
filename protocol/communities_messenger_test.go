@@ -3172,3 +3172,90 @@ func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 		}
 	*/
 }
+
+func (s *MessengerCommunitiesSuite) TestShareCommunityFromNonAdmin() {
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	inviteMessage := "invite to community testing message"
+
+	// Create an community chat
+	response, err := s.admin.CreateCommunity(description, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	community := response.Communities()[0]
+
+	response, err = s.admin.ShareCommunity(
+		&requests.ShareCommunity{
+			CommunityID:   community.ID(),
+			Users:         []types.HexBytes{common.PubkeyToHexBytes(&s.bob.identity.PublicKey)},
+			InviteMessage: inviteMessage,
+		},
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Messages(), 1)
+
+	// Add bob to contacts so it does not go on activity center
+	adminPk := common.PubkeyToHex(&s.admin.identity.PublicKey)
+	request := &requests.AddContact{ID: adminPk}
+	_, err = s.bob.AddContact(context.Background(), request)
+	s.Require().NoError(err)
+
+	// Pull message and make sure org is received
+	err = tt.RetryWithBackOff(func() error {
+		response, err = s.bob.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.messages) == 0 {
+			return errors.New("community link not received")
+		}
+		return nil
+	})
+
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+
+	message := response.Messages()[0]
+	s.Require().Equal(community.IDString(), message.CommunityID)
+	s.Require().Equal(inviteMessage, message.Text)
+
+	response, err = s.bob.ShareCommunity(
+		&requests.ShareCommunity{
+			CommunityID:   community.ID(),
+			Users:         []types.HexBytes{common.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
+			InviteMessage: inviteMessage,
+		},
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Messages(), 1)
+
+	alicePk := common.PubkeyToHex(&s.alice.identity.PublicKey)
+	aliceRequest := &requests.AddContact{ID: alicePk}
+	_, err = s.bob.AddContact(context.Background(), aliceRequest)
+	s.Require().NoError(err)
+
+		// Pull message and make sure org is received
+		err = tt.RetryWithBackOff(func() error {
+			response, err = s.alice.RetrieveAll()
+			if err != nil {
+				return err
+			}
+			if len(response.messages) == 0 {
+				return errors.New("community link not received")
+			}
+			return nil
+		})
+		s.Require().NoError(err)
+		fmt.Print(response.Messages()[2].ContentType, "megass")
+		s.Require().Equal("invite to community testing message", response.Messages()[2].Text)
+		s.Require().Len(response.Messages(), 3)
+}
