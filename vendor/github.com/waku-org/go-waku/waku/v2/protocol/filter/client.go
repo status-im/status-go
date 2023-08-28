@@ -379,7 +379,7 @@ func (wf *WakuFilterLightNode) Unsubscribe(ctx context.Context, contentFilter Co
 	localWg.Wait()
 	close(resultChan)
 	for _, peerID := range peersUnsubscribed {
-		if len(wf.subscriptions.items[peerID].subscriptionsPerTopic) == 0 {
+		if wf.subscriptions != nil && wf.subscriptions.items != nil && wf.subscriptions.items[peerID] != nil && len(wf.subscriptions.items[peerID].subscriptionsPerTopic) == 0 {
 			delete(wf.subscriptions.items, peerID)
 		}
 	}
