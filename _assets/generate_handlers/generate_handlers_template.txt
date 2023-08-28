@@ -48,7 +48,7 @@ func (m *Messenger) {{.MethodName}}(messageState *ReceivedMessageState, protoByt
 		return err
 	}
 
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.Handle{{.ProtobufName}}(messageState, p, msg)
 	{{ end }}
