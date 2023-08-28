@@ -2175,6 +2175,7 @@ func (m *Messenger) ShareCommunity(request *requests.ShareCommunity) (*Messenger
 		message.ChatId = pk.String()
 		message.CommunityID = request.CommunityID.String()
 		message.Text = fmt.Sprintf("Community %s has been shared with you", community.Name())
+		message.New = true
 		if request.InviteMessage != "" {
 			message.Text = request.InviteMessage
 		}
