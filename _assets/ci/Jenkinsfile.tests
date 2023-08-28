@@ -75,6 +75,7 @@ pipeline {
           '--env=POSTGRES_HOST_AUTH_METHOD=trust',
           '--publish=5432:5432',
         ].join(' ')) { c ->
+          nix.shell('make generate-handlers', pure: true)
           nix.shell('make test-unit V=1', pure: false)
         }
       } }
