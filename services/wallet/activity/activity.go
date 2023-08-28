@@ -58,6 +58,8 @@ type Entry struct {
 	amountIn       *hexutil.Big // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT
 	tokenOut       *Token       // Used for activityType SendAT, SwapAT, BridgeAT
 	tokenIn        *Token       // Used for activityType ReceiveAT, BuyAT, SwapAT, BridgeAT
+	symbolOut      *string
+	symbolIn       *string
 	sender         *eth.Address
 	recipient      *eth.Address
 	chainIDOut     *common.ChainID
@@ -76,6 +78,8 @@ type jsonSerializationTemplate struct {
 	AmountIn       *hexutil.Big                    `json:"amountIn"`
 	TokenOut       *Token                          `json:"tokenOut,omitempty"`
 	TokenIn        *Token                          `json:"tokenIn,omitempty"`
+	SymbolOut      *string                         `json:"symbolOut,omitempty"`
+	SymbolIn       *string                         `json:"symbolIn,omitempty"`
 	Sender         *eth.Address                    `json:"sender,omitempty"`
 	Recipient      *eth.Address                    `json:"recipient,omitempty"`
 	ChainIDOut     *common.ChainID                 `json:"chainIdOut,omitempty"`
@@ -95,6 +99,8 @@ func (e *Entry) MarshalJSON() ([]byte, error) {
 		AmountIn:       e.amountIn,
 		TokenOut:       e.tokenOut,
 		TokenIn:        e.tokenIn,
+		SymbolOut:      e.symbolOut,
+		SymbolIn:       e.symbolIn,
 		Sender:         e.sender,
 		Recipient:      e.recipient,
 		ChainIDOut:     e.chainIDOut,
@@ -120,12 +126,20 @@ func (e *Entry) UnmarshalJSON(data []byte) error {
 	e.amountIn = aux.AmountIn
 	e.tokenOut = aux.TokenOut
 	e.tokenIn = aux.TokenIn
+	e.symbolOut = aux.SymbolOut
+	e.symbolIn = aux.SymbolIn
 	e.sender = aux.Sender
 	e.recipient = aux.Recipient
 	e.chainIDOut = aux.ChainIDOut
 	e.chainIDIn = aux.ChainIDIn
 	e.transferType = aux.TransferType
 	return nil
+}
+
+func newAndSet[T any](v T) *T {
+	res := new(T)
+	*res = v
+	return res
 }
 
 func newActivityEntryWithPendingTransaction(transaction *transfer.TransactionIdentity, timestamp int64, activityType Type, activityStatus Status) Entry {
@@ -576,9 +590,11 @@ const (
 )
 
 type FilterDependencies struct {
-	db              *sql.DB
-	accountsDb      *accounts.Database
-	tokenSymbol     func(token Token) string
+	db         *sql.DB
+	accountsDb *accounts.Database
+	// use token.TokenType, token.ChainID and token.Address to find the available symbol
+	tokenSymbol func(token Token) string
+	// use the chainID and symbol to look up token.TokenType and token.Address. Return nil if not found
 	tokenFromSymbol func(chainID *common.ChainID, symbol string) *Token
 }
 
@@ -737,7 +753,6 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 
 		// Can be mapped directly because the values are injected into the query
 		activityStatus := Status(aggregatedStatus)
-		var tokenOut, tokenIn *Token
 		var outChainID, inChainID *common.ChainID
 		var entry Entry
 		var tokenID TokenID
@@ -761,22 +776,27 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 				involvedToken = &Token{TokenType: Native, ChainID: common.ChainID(chainID.Int64), TokenID: tokenID}
 			}
 
-			if activityType == SendAT {
-				tokenOut = involvedToken
-				outChainID = new(common.ChainID)
-				*outChainID = common.ChainID(chainID.Int64)
-			} else {
-				tokenIn = involvedToken
-				inChainID = new(common.ChainID)
-				*inChainID = common.ChainID(chainID.Int64)
-			}
-
 			entry = newActivityEntryWithSimpleTransaction(
 				&transfer.TransactionIdentity{ChainID: common.ChainID(chainID.Int64),
 					Hash:    eth.BytesToHash(transferHash),
 					Address: ownerAddress,
 				},
-				timestamp, activityType, activityStatus)
+				timestamp, activityType, activityStatus,
+			)
+
+			// Extract tokens
+			if activityType == SendAT {
+				entry.tokenOut = involvedToken
+				outChainID = new(common.ChainID)
+				*outChainID = common.ChainID(chainID.Int64)
+			} else {
+				entry.tokenIn = involvedToken
+				inChainID = new(common.ChainID)
+				*inChainID = common.ChainID(chainID.Int64)
+			}
+
+			entry.symbolOut, entry.symbolIn = lookupAndFillInTokens(deps, entry.tokenOut, entry.tokenIn)
+
 			// Complete the data
 			entry.amountOut = outAmount
 			entry.amountIn = inAmount
@@ -786,11 +806,6 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 
 			inAmount, outAmount := getTrInAndOutAmounts(activityType, dbTrAmount)
 
-			// Extract tokens
-			if tokenCode.Valid {
-				cID := common.ChainID(chainID.Int64)
-				tokenOut = deps.tokenFromSymbol(&cID, tokenCode.String)
-			}
 			outChainID = new(common.ChainID)
 			*outChainID = common.ChainID(chainID.Int64)
 
@@ -798,10 +813,20 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 				&transfer.TransactionIdentity{ChainID: common.ChainID(chainID.Int64),
 					Hash: eth.BytesToHash(pendingHash),
 				},
-				timestamp, activityType, activityStatus)
+				timestamp, activityType, activityStatus,
+			)
+
+			// Extract tokens
+			if tokenCode.Valid {
+				cID := common.ChainID(chainID.Int64)
+				entry.tokenOut = deps.tokenFromSymbol(&cID, tokenCode.String)
+			}
+			entry.symbolOut, entry.symbolIn = lookupAndFillInTokens(deps, entry.tokenOut, nil)
+
 			// Complete the data
 			entry.amountOut = outAmount
 			entry.amountIn = inAmount
+
 		} else if multiTxID.Valid {
 			mtInAmount, mtOutAmount := getMtInAndOutAmounts(dbMtFromAmount, dbMtToAmount)
 
@@ -817,25 +842,27 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 				*inChainID = common.ChainID(inChainIDDB.Int64)
 			}
 
-			// Extract tokens
-			if fromTokenCode.Valid {
-				tokenOut = deps.tokenFromSymbol(outChainID, fromTokenCode.String)
-			}
-			if toTokenCode.Valid {
-				tokenIn = deps.tokenFromSymbol(inChainID, toTokenCode.String)
-			}
-
 			entry = NewActivityEntryWithMultiTransaction(transfer.MultiTransactionIDType(multiTxID.Int64),
 				timestamp, activityType, activityStatus)
+
+			// Extract tokens
+			if fromTokenCode.Valid {
+				entry.tokenOut = deps.tokenFromSymbol(outChainID, fromTokenCode.String)
+				entry.symbolOut = newAndSet(fromTokenCode.String)
+			}
+			if toTokenCode.Valid {
+				entry.tokenIn = deps.tokenFromSymbol(inChainID, toTokenCode.String)
+				entry.symbolIn = newAndSet(toTokenCode.String)
+			}
+
 			// Complete the data
 			entry.amountOut = mtOutAmount
 			entry.amountIn = mtInAmount
 		} else {
 			return nil, errors.New("invalid row data")
 		}
+
 		// Complete common data
-		entry.tokenOut = tokenOut
-		entry.tokenIn = tokenIn
 		entry.sender = &fromAddress
 		entry.recipient = &toAddress
 		entry.sender = &fromAddress
@@ -954,4 +981,20 @@ func updateKeypairsAccountsTable(accountsDb *accounts.Database, db *sql.DB) erro
 	}
 
 	return nil
+}
+
+func lookupAndFillInTokens(deps FilterDependencies, tokenOut *Token, tokenIn *Token) (symbolOut *string, symbolIn *string) {
+	if tokenOut != nil {
+		symbol := deps.tokenSymbol(*tokenOut)
+		if len(symbol) > 0 {
+			symbolOut = newAndSet(symbol)
+		}
+	}
+	if tokenIn != nil {
+		symbol := deps.tokenSymbol(*tokenIn)
+		if len(symbol) > 0 {
+			symbolIn = newAndSet(symbol)
+		}
+	}
+	return symbolOut, symbolIn
 }
