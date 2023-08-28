@@ -3255,7 +3255,7 @@ func (s *MessengerCommunitiesSuite) TestShareCommunityFromNonAdmin() {
 			return nil
 		})
 		s.Require().NoError(err)
-		fmt.Print(response.Messages()[2].ContentType, "megass")
+
 		s.Require().Equal("invite to community testing message", response.Messages()[2].Text)
 		s.Require().Len(response.Messages(), 3)
 }

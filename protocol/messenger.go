@@ -2234,7 +2234,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		}
 		message.Payload = &protobuf.ChatMessage_Community{Community: wrappedCommunity}
 
-		message.ContentType = protobuf.ChatMessage_COMMUNITY
+		message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	} else if len(message.AudioPath) != 0 {
 		err := message.LoadAudio()
 		if err != nil {
