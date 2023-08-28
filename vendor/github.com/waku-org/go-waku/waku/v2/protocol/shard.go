@@ -6,9 +6,18 @@ import (
 	"fmt"
 	"math"
 	"strings"
+
+	"github.com/waku-org/go-waku/waku/v2/hash"
 )
 
 const MaxShardIndex = uint16(1023)
+
+// ClusterIndex is the clusterID used in sharding space.
+// For indices allocation and other magic numbers refer to RFC 51
+const ClusterIndex = 1
+
+// GenerationZeroShardsCount is number of shards supported in generation-0
+const GenerationZeroShardsCount = 8
 
 type RelayShards struct {
 	Cluster uint16
@@ -204,4 +213,19 @@ func FromBitVector(buf []byte) (RelayShards, error) {
 	}
 
 	return RelayShards{Cluster: cluster, Indices: indices}, nil
+}
+
+// GetShardFromContentTopic runs Autosharding logic and returns a pubSubTopic
+// This is based on Autosharding algorithm defined in RFC 51
+func GetShardFromContentTopic(topic ContentTopic, shardCount int) NamespacedPubsubTopic {
+	bytes := []byte(topic.ApplicationName)
+	bytes = append(bytes, []byte(fmt.Sprintf("%d", topic.ApplicationVersion))...)
+
+	hash := hash.SHA256(bytes)
+	//We only use the last 64 bits of the hash as having more shards is unlikely.
+	hashValue := binary.BigEndian.Uint64(hash[24:])
+
+	shard := hashValue % uint64(shardCount)
+
+	return NewStaticShardingPubsubTopic(ClusterIndex, uint16(shard))
 }

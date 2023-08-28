@@ -364,7 +364,7 @@ github.com/google/btree
 # github.com/google/gopacket v1.1.19
 ## explicit; go 1.12
 github.com/google/gopacket/routing
-# github.com/google/pprof v0.0.0-20230602150820-91b7bce49751
+# github.com/google/pprof v0.0.0-20230705174524-200ffdc848b8
 ## explicit; go 1.19
 github.com/google/pprof/profile
 # github.com/google/uuid v1.3.0
@@ -446,7 +446,7 @@ github.com/keighl/metabolize
 # github.com/kilic/bls12-381 v0.0.0-20200607163746-32e1441c8a9f
 ## explicit; go 1.12
 github.com/kilic/bls12-381
-# github.com/klauspost/compress v1.16.5
+# github.com/klauspost/compress v1.16.7
 ## explicit; go 1.18
 github.com/klauspost/compress
 github.com/klauspost/compress/fse
@@ -484,7 +484,7 @@ github.com/libp2p/go-cidranger/net
 # github.com/libp2p/go-flow-metrics v0.1.0
 ## explicit; go 1.17
 github.com/libp2p/go-flow-metrics
-# github.com/libp2p/go-libp2p v0.28.1
+# github.com/libp2p/go-libp2p v0.29.2
 ## explicit; go 1.19
 github.com/libp2p/go-libp2p
 github.com/libp2p/go-libp2p/config
@@ -576,7 +576,7 @@ github.com/libp2p/go-netroute
 # github.com/libp2p/go-reuseport v0.3.0
 ## explicit; go 1.19
 github.com/libp2p/go-reuseport
-# github.com/libp2p/go-yamux/v4 v4.0.0
+# github.com/libp2p/go-yamux/v4 v4.0.1
 ## explicit; go 1.18
 github.com/libp2p/go-yamux/v4
 # github.com/lucasb-eyer/go-colorful v1.0.3
@@ -609,7 +609,7 @@ github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/meirf/gopart v0.0.0-20180520194036-37e9492a85a8
 ## explicit
 github.com/meirf/gopart
-# github.com/miekg/dns v1.1.54
+# github.com/miekg/dns v1.1.55
 ## explicit; go 1.19
 github.com/miekg/dns
 # github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b
@@ -687,7 +687,7 @@ github.com/olekukonko/tablewriter
 # github.com/oliamb/cutter v0.2.2
 ## explicit
 github.com/oliamb/cutter
-# github.com/onsi/ginkgo/v2 v2.9.7
+# github.com/onsi/ginkgo/v2 v2.11.0
 ## explicit; go 1.18
 github.com/onsi/ginkgo/v2/config
 github.com/onsi/ginkgo/v2/formatter
@@ -831,13 +831,13 @@ github.com/prometheus/tsdb/fileutil
 # github.com/quic-go/qpack v0.4.0
 ## explicit; go 1.18
 github.com/quic-go/qpack
-# github.com/quic-go/qtls-go1-19 v0.3.2
+# github.com/quic-go/qtls-go1-19 v0.3.3
 ## explicit; go 1.19
 github.com/quic-go/qtls-go1-19
-# github.com/quic-go/qtls-go1-20 v0.2.2
+# github.com/quic-go/qtls-go1-20 v0.2.3
 ## explicit; go 1.20
 github.com/quic-go/qtls-go1-20
-# github.com/quic-go/quic-go v0.33.0
+# github.com/quic-go/quic-go v0.36.4
 ## explicit; go 1.19
 github.com/quic-go/quic-go
 github.com/quic-go/quic-go/http3
@@ -851,6 +851,7 @@ github.com/quic-go/quic-go/internal/qerr
 github.com/quic-go/quic-go/internal/qtls
 github.com/quic-go/quic-go/internal/utils
 github.com/quic-go/quic-go/internal/utils/linkedlist
+github.com/quic-go/quic-go/internal/utils/ringbuffer
 github.com/quic-go/quic-go/internal/wire
 github.com/quic-go/quic-go/logging
 github.com/quic-go/quic-go/qlog
@@ -1007,7 +1008,7 @@ github.com/waku-org/go-discover/discover/v5wire
 github.com/waku-org/go-libp2p-rendezvous
 github.com/waku-org/go-libp2p-rendezvous/db
 github.com/waku-org/go-libp2p-rendezvous/pb
-# github.com/waku-org/go-waku v0.7.1-0.20230821170435-5d5fe3413e00
+# github.com/waku-org/go-waku v0.7.1-0.20230828083559-67d0b77147e4
 ## explicit; go 1.19
 github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/waku/persistence
@@ -1041,7 +1042,7 @@ github.com/waku-org/go-waku/waku/v2/protocol/store/pb
 github.com/waku-org/go-waku/waku/v2/rendezvous
 github.com/waku-org/go-waku/waku/v2/timesource
 github.com/waku-org/go-waku/waku/v2/utils
-# github.com/waku-org/go-zerokit-rln v0.1.14-0.20230821163754-8167006b94e3
+# github.com/waku-org/go-zerokit-rln v0.1.14-0.20230823150836-a706089284fe
 ## explicit; go 1.18
 github.com/waku-org/go-zerokit-rln/rln
 github.com/waku-org/go-zerokit-rln/rln/link
@@ -1117,8 +1118,8 @@ go.uber.org/dig/internal/digerror
 go.uber.org/dig/internal/digreflect
 go.uber.org/dig/internal/dot
 go.uber.org/dig/internal/graph
-# go.uber.org/fx v1.19.2
-## explicit; go 1.18
+# go.uber.org/fx v1.20.0
+## explicit; go 1.19
 go.uber.org/fx
 go.uber.org/fx/fxevent
 go.uber.org/fx/internal/fxclock
@@ -1156,7 +1157,7 @@ golang.org/x/crypto/salsa20/salsa
 golang.org/x/crypto/scrypt
 golang.org/x/crypto/sha3
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df
+# golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
 ## explicit; go 1.20
 golang.org/x/exp/constraints
 golang.org/x/exp/slices

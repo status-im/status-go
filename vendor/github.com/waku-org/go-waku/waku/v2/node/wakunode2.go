@@ -10,6 +10,7 @@ import (
 	backoffv4 "github.com/cenkalti/backoff/v4"
 	golog "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -66,10 +67,14 @@ type IdentityCredential = struct {
 	IDCommitment byte32 `json:"idCommitment"`
 }
 
+type SpamHandler = func(message *pb.WakuMessage) error
+
 type RLNRelay interface {
 	IdentityCredential() (IdentityCredential, error)
 	MembershipIndex() (uint, error)
 	AppendRLNProof(msg *pb.WakuMessage, senderEpochTime time.Time) error
+	Validator(spamHandler SpamHandler) func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool
+	Start(ctx context.Context) error
 	Stop() error
 }
 
@@ -248,7 +253,6 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 
 	//Initialize peer manager.
 	w.peermanager = peermanager.NewPeerManager(w.opts.maxPeerConnections, w.log)
-	maxOutPeers := int(w.peermanager.OutRelayPeersTarget)
 
 	// Setup peer connection strategy
 	cacheSize := 600
@@ -256,11 +260,10 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	minBackoff, maxBackoff := time.Minute, time.Hour
 	bkf := backoff.NewExponentialBackoff(minBackoff, maxBackoff, backoff.FullJitter, time.Second, 5.0, 0, rand.New(rngSrc))
 
-	w.peerConnector, err = peermanager.NewPeerConnectionStrategy(cacheSize, maxOutPeers, discoveryConnectTimeout, bkf, w.log)
+	w.peerConnector, err = peermanager.NewPeerConnectionStrategy(cacheSize, w.peermanager, discoveryConnectTimeout, bkf, w.log)
 	if err != nil {
 		w.log.Error("creating peer connection strategy", zap.Error(err))
 	}
-	w.peermanager.SetPeerConnector(w.peerConnector)
 
 	if w.opts.enableDiscV5 {
 		err := w.mountDiscV5()
@@ -275,6 +278,14 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	}
 
 	w.rendezvous = rendezvous.NewRendezvous(w.opts.rendezvousDB, w.peerConnector, w.log)
+
+	if w.opts.enableRelay {
+		err = w.setupRLNRelay()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	w.relay = relay.NewWakuRelay(w.bcaster, w.opts.minRelayPeersToPublish, w.timesource, w.opts.prometheusReg, w.log, w.opts.pubsubOpts...)
 	w.legacyFilter = legacy_filter.NewWakuFilter(w.bcaster, w.opts.isLegacyFilterFullNode, w.timesource, w.opts.prometheusReg, w.log, w.opts.legacyFilterOpts...)
 	w.filterFullNode = filter.NewWakuFilterFullNode(w.timesource, w.opts.prometheusReg, w.log, w.opts.filterOpts...)
@@ -387,7 +398,6 @@ func (w *WakuNode) Start(ctx context.Context) error {
 
 	w.peerConnector.SetHost(host)
 	w.peermanager.SetHost(host)
-	w.peerConnector.SetPeerManager(w.peermanager)
 	err = w.peerConnector.Start(ctx)
 	if err != nil {
 		return err
@@ -395,6 +405,13 @@ func (w *WakuNode) Start(ctx context.Context) error {
 
 	if w.opts.enableNTP {
 		err := w.timesource.Start(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	if w.opts.enableRLN {
+		err = w.startRlnRelay(ctx)
 		if err != nil {
 			return err
 		}
@@ -474,13 +491,6 @@ func (w *WakuNode) Start(ctx context.Context) error {
 	w.rendezvous.SetHost(host)
 	if w.opts.enableRendezvousPoint {
 		err := w.rendezvous.Start(ctx)
-		if err != nil {
-			return err
-		}
-	}
-
-	if w.opts.enableRLN {
-		err = w.mountRlnRelay(ctx)
 		if err != nil {
 			return err
 		}

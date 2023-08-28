@@ -17,6 +17,8 @@ import (
 	"github.com/waku-org/go-waku/logging"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 
+	"sync/atomic"
+
 	"go.uber.org/zap"
 
 	lru "github.com/hashicorp/golang-lru"
@@ -39,14 +41,10 @@ type PeerConnectionStrategy struct {
 	pm     *PeerManager
 	cancel context.CancelFunc
 
-	paused       bool
-	workerCtx    context.Context
-	workerCancel context.CancelFunc
+	paused atomic.Bool
 
 	wg            sync.WaitGroup
-	maxOutPeers   int
 	dialTimeout   time.Duration
-	peerCh        chan PeerData
 	dialCh        chan peer.AddrInfo
 	subscriptions []<-chan PeerData
 
@@ -62,7 +60,7 @@ type PeerConnectionStrategy struct {
 // dialTimeout is how long we attempt to connect to a peer before giving up
 // minPeers is the minimum number of peers that the node should have
 // backoff describes the strategy used to decide how long to backoff after previously attempting to connect to a peer
-func NewPeerConnectionStrategy(cacheSize int, maxOutPeers int,
+func NewPeerConnectionStrategy(cacheSize int, pm *PeerManager,
 	dialTimeout time.Duration, backoff backoff.BackoffFactory,
 	logger *zap.Logger) (*PeerConnectionStrategy, error) {
 
@@ -70,15 +68,16 @@ func NewPeerConnectionStrategy(cacheSize int, maxOutPeers int,
 	if err != nil {
 		return nil, err
 	}
-
-	return &PeerConnectionStrategy{
+	pc := &PeerConnectionStrategy{
 		cache:       cache,
 		wg:          sync.WaitGroup{},
-		maxOutPeers: maxOutPeers,
 		dialTimeout: dialTimeout,
+		pm:          pm,
 		backoff:     backoff,
 		logger:      logger.Named("discovery-connector"),
-	}, nil
+	}
+	pm.SetPeerConnector(pc)
+	return pc, nil
 }
 
 type connCacheData struct {
@@ -101,28 +100,36 @@ func (c *PeerConnectionStrategy) Subscribe(ctx context.Context, ch <-chan PeerDa
 
 func (c *PeerConnectionStrategy) consumeSubscription(ctx context.Context, ch <-chan PeerData) {
 	for {
+		// for returning from the loop when peerConnector is paused.
 		select {
 		case <-ctx.Done():
 			return
-		case p := <-ch:
+		default:
+		}
+		//
+		if !c.isPaused() {
 			select {
 			case <-ctx.Done():
 				return
-			case c.peerCh <- p:
+			case p, ok := <-ch:
+				if !ok {
+					return
+				}
+				c.pm.AddDiscoveredPeer(p)
+				c.publishWork(ctx, p.AddrInfo)
+			case <-time.After(1 * time.Second):
+				// This timeout is to not lock the goroutine
+				break
 			}
+		} else {
+			time.Sleep(1 * time.Second) // sleep while the peerConnector is paused.
 		}
 	}
-
 }
 
 // SetHost sets the host to be able to mount or consume a protocol
 func (c *PeerConnectionStrategy) SetHost(h host.Host) {
 	c.host = h
-}
-
-// SetPeerManager sets the peermanager in order to utilize add peer
-func (c *PeerConnectionStrategy) SetPeerManager(pm *PeerManager) {
-	c.pm = pm
 }
 
 // Start attempts to connect to the peers passed in by peerCh.
@@ -134,12 +141,10 @@ func (c *PeerConnectionStrategy) Start(ctx context.Context) error {
 
 	ctx, cancel := context.WithCancel(ctx)
 	c.cancel = cancel
-	c.peerCh = make(chan PeerData)
 	c.dialCh = make(chan peer.AddrInfo)
 
-	c.wg.Add(3)
+	c.wg.Add(2)
 	go c.shouldDialPeers(ctx)
-	go c.workPublisher(ctx)
 	go c.dialPeers(ctx)
 
 	c.consumeSubscriptions(ctx)
@@ -154,19 +159,14 @@ func (c *PeerConnectionStrategy) Stop() {
 	}
 
 	c.cancel()
+	c.cancel = nil
 	c.wg.Wait()
 
-	close(c.peerCh)
 	close(c.dialCh)
-
-	c.subscriptions = nil
-	c.cancel = nil
 }
 
 func (c *PeerConnectionStrategy) isPaused() bool {
-	c.RLock()
-	defer c.RUnlock()
-	return c.paused
+	return c.paused.Load()
 }
 
 func (c *PeerConnectionStrategy) shouldDialPeers(ctx context.Context) {
@@ -174,38 +174,18 @@ func (c *PeerConnectionStrategy) shouldDialPeers(ctx context.Context) {
 
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
-
-	c.Lock()
-	c.workerCtx, c.workerCancel = context.WithCancel(ctx)
-	c.Unlock()
-
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			isPaused := c.isPaused()
-			_, outRelayPeers, err := c.pm.GroupPeersByDirection()
-			if err != nil {
-				c.logger.Warn("failed to get outRelayPeers from peerstore", zap.Error(err))
-				continue
-			}
-			numPeers := outRelayPeers.Len()
-			if numPeers >= c.maxOutPeers && !isPaused {
-				c.Lock()
-				c.paused = true
-				c.workerCancel()
-				c.Unlock()
-			} else if numPeers < c.maxOutPeers && isPaused {
-				c.Lock()
-				c.paused = false
-				c.workerCtx, c.workerCancel = context.WithCancel(ctx)
-				c.Unlock()
-			}
+			_, outRelayPeers := c.pm.getRelayPeers()
+			c.paused.Store(outRelayPeers.Len() >= c.pm.OutRelayPeersTarget) // pause if no of OutPeers more than or eq to target
 		}
 	}
 }
 
+// it might happen Subscribe is called before peerConnector has started so store these subscriptions in subscriptions array and custom after c.cancel is set.
 func (c *PeerConnectionStrategy) consumeSubscriptions(ctx context.Context) {
 	for _, subs := range c.subscriptions {
 		c.wg.Add(1)
@@ -214,6 +194,7 @@ func (c *PeerConnectionStrategy) consumeSubscriptions(ctx context.Context) {
 			c.consumeSubscription(ctx, s)
 		}(subs)
 	}
+	c.subscriptions = nil
 }
 
 func (c *PeerConnectionStrategy) publishWork(ctx context.Context, p peer.AddrInfo) {
@@ -224,45 +205,19 @@ func (c *PeerConnectionStrategy) publishWork(ctx context.Context, p peer.AddrInf
 	}
 }
 
-func (c *PeerConnectionStrategy) workPublisher(ctx context.Context) {
-	defer c.wg.Done()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			isPaused := c.isPaused()
-			if !isPaused {
-				select {
-				case <-ctx.Done():
-					return
-				case p := <-c.peerCh:
-					c.pm.AddDiscoveredPeer(p)
-					c.publishWork(ctx, p.AddrInfo)
-				case <-time.After(1 * time.Second):
-					// This timeout is to not lock the goroutine
-					break
-				}
-			} else {
-				// Check if paused again
-				time.Sleep(1 * time.Second)
-			}
-		}
-	}
-}
-
 const maxActiveDials = 5
 
+// c.cache is thread safe
+// only reason why mutex is used: if canDialPeer is queried twice for the same peer.
 func (c *PeerConnectionStrategy) canDialPeer(pi peer.AddrInfo) bool {
 	c.mux.Lock()
+	defer c.mux.Unlock()
 	val, ok := c.cache.Get(pi.ID)
 	var cachedPeer *connCacheData
 	if ok {
 		tv := val.(*connCacheData)
 		now := time.Now()
 		if now.Before(tv.nextTry) {
-			c.mux.Unlock()
 			return false
 		}
 
@@ -272,14 +227,13 @@ func (c *PeerConnectionStrategy) canDialPeer(pi peer.AddrInfo) bool {
 		cachedPeer.nextTry = time.Now().Add(cachedPeer.strat.Delay())
 		c.cache.Add(pi.ID, cachedPeer)
 	}
-	c.mux.Unlock()
 	return true
 }
 
 func (c *PeerConnectionStrategy) dialPeers(ctx context.Context) {
 	defer c.wg.Done()
 
-	maxGoRoutines := c.maxOutPeers
+	maxGoRoutines := c.pm.OutRelayPeersTarget
 	if maxGoRoutines > maxActiveDials {
 		maxGoRoutines = maxActiveDials
 	}
@@ -301,9 +255,7 @@ func (c *PeerConnectionStrategy) dialPeers(ctx context.Context) {
 			if c.canDialPeer(pi) {
 				sem <- struct{}{}
 				c.wg.Add(1)
-				go c.dialPeer(pi, sem)
-			} else {
-				continue
+				go c.dialPeer(ctx, pi, sem)
 			}
 		case <-ctx.Done():
 			return
@@ -311,11 +263,9 @@ func (c *PeerConnectionStrategy) dialPeers(ctx context.Context) {
 	}
 }
 
-func (c *PeerConnectionStrategy) dialPeer(pi peer.AddrInfo, sem chan struct{}) {
+func (c *PeerConnectionStrategy) dialPeer(ctx context.Context, pi peer.AddrInfo, sem chan struct{}) {
 	defer c.wg.Done()
-	c.RLock()
-	ctx, cancel := context.WithTimeout(c.workerCtx, c.dialTimeout)
-	c.RUnlock()
+	ctx, cancel := context.WithTimeout(ctx, c.dialTimeout)
 	defer cancel()
 	err := c.host.Connect(ctx, pi)
 	if err != nil && !errors.Is(err, context.Canceled) {
