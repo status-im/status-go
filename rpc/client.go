@@ -59,6 +59,15 @@ type Client struct {
 	handlers   map[string]Handler // locally registered handlers
 	log        log.Logger
 
+	nimbusProxyEnabled bool
+
+	// Default context
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+
+	db *sql.DB
+
 	walletNotifier func(chainID uint64, message string)
 }
 
@@ -70,7 +79,7 @@ var verifProxyInitFn func(c *Client)
 //
 // Client is safe for concurrent use and will automatically
 // reconnect to the server if connection is lost.
-func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.UpstreamRPCConfig, networks []params.Network, db *sql.DB) (*Client, error) {
+func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.UpstreamRPCConfig, networks []params.Network, nimbusProxyEnabled bool, db *sql.DB) (*Client, error) {
 	var err error
 
 	log := log.New("package", "status-go/rpc.Client")
@@ -80,12 +89,18 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		log.Error("Network manager failed to initialize", "error", err)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
 	c := Client{
-		local:          client,
-		NetworkManager: networkManager,
-		handlers:       make(map[string]Handler),
-		rpcClients:     make(map[uint64]chain.ClientInterface),
-		log:            log,
+		local:              client,
+		NetworkManager:     networkManager,
+		handlers:           make(map[string]Handler),
+		rpcClients:         make(map[uint64]chain.ClientInterface),
+		log:                log,
+		db:                 db,
+		nimbusProxyEnabled: nimbusProxyEnabled,
+		ctx:                ctx,
+		cancel:             cancel,
+		wg:                 sync.WaitGroup{},
 	}
 
 	if upstream.Enabled {
@@ -101,14 +116,20 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 
 	c.router = newRouter(c.upstreamEnabled)
 
-	if verifProxyInitFn != nil {
-		verifProxyInitFn(&c)
+	if c.nimbusProxyEnabled && verifProxyInitFn != nil {
+		c.wg.Add(1)
+		go verifProxyInitFn(&c)
 	}
-
 	return &c, nil
 }
 
+func (c *Client) Close() {
+	c.cancel()
+	c.wg.Wait()
+}
+
 func (c *Client) SetWalletNotifier(notifier func(chainID uint64, message string)) {
+
 	c.walletNotifier = notifier
 }
 
@@ -215,8 +236,7 @@ func (c *Client) UpdateUpstreamURL(url string) error {
 //
 // It uses custom routing scheme for calls.
 func (c *Client) Call(result interface{}, chainID uint64, method string, args ...interface{}) error {
-	ctx := context.Background()
-	return c.CallContext(ctx, result, chainID, method, args...)
+	return c.CallContext(c.ctx, result, chainID, method, args...)
 }
 
 // CallContext performs a JSON-RPC call with the given arguments. If the context is

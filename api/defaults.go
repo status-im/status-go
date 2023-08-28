@@ -288,6 +288,8 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 
 	nodeConfig.Networks = BuildDefaultNetworks(request)
 
+	nodeConfig.NimbusProxyConfig.Enabled = false
+
 	return nodeConfig, nil
 }
 

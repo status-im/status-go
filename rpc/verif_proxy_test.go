@@ -6,9 +6,6 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 	"testing"
 	"time"
 
@@ -33,7 +30,7 @@ func TestProxySuite(t *testing.T) {
 	suite.Run(t, new(ProxySuite))
 }
 
-func (s *ProxySuite) startRpcClient(infuraURL string) *Client {
+func (s *ProxySuite) startRpcClient(infuraURL string) (*Client, func()) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, `{
 			"id": 1,
@@ -47,23 +44,38 @@ func (s *ProxySuite) startRpcClient(infuraURL string) *Client {
 	require.NoError(s.T(), err)
 
 	db, close := setupTestNetworkDB(s.T())
-	defer close()
-	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: true, URL: infuraURL}, []params.Network{}, db)
+	c, err := NewClient(gethRPCClient, 1, params.UpstreamRPCConfig{Enabled: true, URL: infuraURL}, []params.Network{}, true, db)
 	require.NoError(s.T(), err)
 
-	return c
+	return c, close
 }
 
 func (s *ProxySuite) TestRun() {
 	infuraURL := "https://mainnet.infura.io/v3/800c641949d64d768a5070a1b0511938"
-	client := s.startRpcClient(infuraURL)
+	client, closeDb := s.startRpcClient(infuraURL)
 
-	// Run light client proxy
-	ctx, cancel := context.WithCancel(context.Background())
+	defer closeDb()
 
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
-	fmt.Println("Before range signals")
+	fmt.Println("Before waitForProxyHeaders")
+	ctxTimeout, _ := context.WithTimeout(context.Background(), 600*time.Second)
+	ticker := time.NewTicker(5 * time.Second)
+	for {
+		select {
+		case <-ctxTimeout.Done():
+			s.Require().Fail("Timeout reached")
+		case <-ticker.C:
+			// Let's check if handlers have been installed
+			_, found := client.handler("eth_getBalance")
+			if found {
+				fmt.Println("Proceed")
+				ticker.Stop()
+				goto proceed
+			}
+		}
+	}
+
+proceed:
+	fmt.Println("after waitForProxyHeaders")
 
 	// Invoke eth_getBalance
 	var result hexutil.Big
@@ -71,18 +83,14 @@ func (s *ProxySuite) TestRun() {
 	addr = common.HexToAddress("0x95222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5")
 	chainID := uint64(1)
 
-	time.Sleep(200 * time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 	err := client.CallContext(ctx, &result, chainID, "eth_getBalance", addr, "latest")
-	require.NoError(s.T(), err)
+	s.Require().NoError(err)
 
 	client.UnregisterHandler("eth_getBalance")
 	var resultRaw hexutil.Big
-	err = client.CallContext(ctx, &resultRaw, chainID, "eth_getBalance", addr, "latest")
+	ctx1, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	err = client.CallContext(ctx1, &resultRaw, chainID, "eth_getBalance", addr, "latest")
 	s.Require().Equal(result, resultRaw)
-	for range signals {
-		fmt.Println("Signal caught, exiting")
-		cancel()
-	}
-	fmt.Println("Exiting")
 
 }
