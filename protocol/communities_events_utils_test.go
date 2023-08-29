@@ -624,10 +624,6 @@ func kickMember(base CommunityEventsTestsInterface, communityID types.HexBytes, 
 			return errors.New("alice should not be not kicked (yet)")
 		}
 
-		if len(modifiedCommmunity.PendingAndBannedMembers()) > 0 {
-			return errors.New("alice was kicked and should not be presented in the pending list")
-		}
-
 		return nil
 	}
 
@@ -667,6 +663,21 @@ func kickMember(base CommunityEventsTestsInterface, communityID types.HexBytes, 
 }
 
 func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserFromCommunity) {
+	pubkey := common.PubkeyToHex(&base.GetMember().identity.PublicKey)
+
+	checkPending := func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(banRequest.CommunityID))
+		if err != nil {
+			return err
+		}
+
+		if !modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey) {
+			return errors.New("alice should not be not kicked (yet)")
+		}
+
+		return nil
+	}
+
 	checkBanned := func(response *MessengerResponse) error {
 		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(banRequest.CommunityID))
 		if err != nil {
@@ -681,6 +692,10 @@ func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserF
 			return errors.New("alice was not added to the banned list")
 		}
 
+		if modifiedCommmunity.PendingAndBannedMembers()[pubkey] != communities.CommunityMemberBanned {
+			return errors.New("alice should be in the pending state")
+		}
+
 		return nil
 	}
 
@@ -688,12 +703,33 @@ func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserF
 
 	s := base.GetSuite()
 	s.Require().NoError(err)
-	s.Require().Nil(checkBanned(response))
 
+	// 1. event sender should get pending state for ban member
+	modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(banRequest.CommunityID))
+	s.Require().NoError(err)
+	s.Require().True(modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey))
+	s.Require().Equal(communities.CommunityMemberBanPending, modifiedCommmunity.PendingAndBannedMembers()[pubkey])
+
+	checkClientsReceivedAdminEvent(base, checkPending)
 	checkClientsReceivedAdminEvent(base, checkBanned)
 }
 
 func unbanMember(base CommunityEventsTestsInterface, unbanRequest *requests.UnbanUserFromCommunity) {
+	pubkey := common.PubkeyToHex(&base.GetMember().identity.PublicKey)
+
+	checkPending := func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(unbanRequest.CommunityID))
+		if err != nil {
+			return err
+		}
+
+		if !modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey) {
+			return errors.New("alice should not be not kicked (yet)")
+		}
+
+		return nil
+	}
+
 	checkUnbanned := func(response *MessengerResponse) error {
 		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(unbanRequest.CommunityID))
 		if err != nil {
@@ -704,6 +740,10 @@ func unbanMember(base CommunityEventsTestsInterface, unbanRequest *requests.Unba
 			return errors.New("alice was not unbanned")
 		}
 
+		if modifiedCommmunity.PendingAndBannedMembers()[pubkey] != communities.CommunityMemberBanned {
+			return errors.New("alice should be in the pending state")
+		}
+
 		return nil
 	}
 
@@ -711,14 +751,15 @@ func unbanMember(base CommunityEventsTestsInterface, unbanRequest *requests.Unba
 
 	s := base.GetSuite()
 	s.Require().NoError(err)
-	s.Require().Nil(checkUnbanned(response))
 
-	_, err = WaitOnMessengerResponse(
-		base.GetControlNode(),
-		func(r *MessengerResponse) bool { return checkUnbanned(r) == nil },
-		"MessengerResponse data not received",
-	)
+	// 1. event sender should get pending state for unban member
+	modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(unbanRequest.CommunityID))
 	s.Require().NoError(err)
+	s.Require().True(modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey))
+	s.Require().Equal(communities.CommunityMemberUnbanPending, modifiedCommmunity.PendingAndBannedMembers()[pubkey])
+
+	checkClientsReceivedAdminEvent(base, checkPending)
+	checkClientsReceivedAdminEvent(base, checkUnbanned)
 }
 
 func controlNodeSendMessage(base CommunityEventsTestsInterface, inputMessage *common.Message) string {
