@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"math/big"
 
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -31,6 +32,7 @@ type EntryDetails struct {
 	Contract     *eth.Address   `json:"contractAddress,omitempty"`
 	MaxFeePerGas *hexutil.Big   `json:"maxFeePerGas"`
 	GasLimit     hexutil.Uint64 `json:"gasLimit"`
+	TotalFees    *hexutil.Big   `json:"totalFees,omitempty"`
 }
 
 func protocolTypeFromDBType(dbType string) (protocolType *ProtocolType) {
@@ -55,16 +57,16 @@ func getMultiTxDetails(ctx context.Context, db *sql.DB, multiTxID int) (*EntryDe
 		return nil, errors.New("invalid tx id")
 	}
 	rows, err := db.QueryContext(ctx, `
-	SELECT 
-		tx_hash, 
+	SELECT
+		tx_hash,
 		blk_number,
 		type,
 		account_nonce,
 		tx,
 		contract_address
-	FROM 
-		transfers 
-	WHERE 
+	FROM
+		transfers
+	WHERE
 		multi_transaction_id = ?;`, multiTxID)
 	if err != nil {
 		return nil, err
@@ -140,15 +142,16 @@ func getTxDetails(ctx context.Context, db *sql.DB, id string) (*EntryDetails, er
 		return nil, errors.New("invalid tx id")
 	}
 	rows, err := db.QueryContext(ctx, `
-	SELECT 
+	SELECT
 		tx_hash,
 		blk_number,
 		account_nonce,
 		tx,
-		contract_address
-	FROM 
-		transfers 
-	WHERE 
+		contract_address,
+		base_gas_fee
+	FROM
+		transfers
+	WHERE
 		hash = ?;`, eth.HexToHash(id))
 	if err != nil {
 		return nil, err
@@ -164,7 +167,8 @@ func getTxDetails(ctx context.Context, db *sql.DB, id string) (*EntryDetails, er
 	var transferHashDB, contractAddressDB sql.RawBytes
 	var blockNumber int64
 	var nonce uint64
-	err = rows.Scan(&transferHashDB, &blockNumber, &nonce, &nullableTx, &contractAddressDB)
+	var baseGasFees string
+	err = rows.Scan(&transferHashDB, &blockNumber, &nonce, &nullableTx, &contractAddressDB, &baseGasFees)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +193,34 @@ func getTxDetails(ctx context.Context, db *sql.DB, id string) (*EntryDetails, er
 		details.Input = "0x" + hex.EncodeToString(tx.Data())
 		details.MaxFeePerGas = (*hexutil.Big)(tx.GasFeeCap())
 		details.GasLimit = hexutil.Uint64(tx.Gas())
+		baseGasFees, _ := new(big.Int).SetString(baseGasFees, 0)
+		details.TotalFees = (*hexutil.Big)(getTotalFees(tx, baseGasFees))
 	}
 
 	return details, nil
+}
+
+func getTotalFees(tx *types.Transaction, baseFee *big.Int) *big.Int {
+	if tx.Type() == types.DynamicFeeTxType {
+		// EIP-1559 transaction
+		if baseFee == nil {
+			return nil
+		}
+		tip := tx.GasTipCap()
+		maxFee := tx.GasFeeCap()
+		gasUsed := big.NewInt(int64(tx.Gas()))
+
+		totalGasUsed := new(big.Int).Add(tip, baseFee)
+		if totalGasUsed.Cmp(maxFee) > 0 {
+			totalGasUsed.Set(maxFee)
+		}
+
+		return new(big.Int).Mul(totalGasUsed, gasUsed)
+	}
+
+	// Legacy transaction
+	gasPrice := tx.GasPrice()
+	gasUsed := big.NewInt(int64(tx.Gas()))
+
+	return new(big.Int).Mul(gasPrice, gasUsed)
 }
