@@ -136,7 +136,6 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		Link                    string                               `json:"link"`
 		CommunityAdminSettings  CommunityAdminSettings               `json:"adminSettings"`
 		Encrypted               bool                                 `json:"encrypted"`
-		PendingAndBannedMembers map[string]CommunityMemberState      `json:"pendingAndBannedMembers"`
 		TokenPermissions        map[string]*CommunityTokenPermission `json:"tokenPermissions"`
 		CommunityTokensMetadata []*protobuf.CommunityTokenMetadata   `json:"communityTokensMetadata"`
 		ActiveMembersCount      uint64                               `json:"activeMembersCount"`
@@ -178,7 +177,6 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		}
 
 		communityItem.TokenPermissions = o.tokenPermissions()
-		communityItem.PendingAndBannedMembers = o.PendingAndBannedMembers()
 		communityItem.MembersCount = len(o.config.CommunityDescription.Members)
 		communityItem.Link = fmt.Sprintf("https://join.status.im/c/0x%x", o.ID())
 		communityItem.IntroMessage = o.config.CommunityDescription.IntroMessage
