@@ -102,6 +102,41 @@ type LinkPreview struct {
 	Thumbnail   LinkPreviewThumbnail           `json:"thumbnail,omitempty"`
 }
 
+type StatusContactLinkPreview struct {
+	PublicKey   string               `json:"publicKey"`
+	DisplayName string               `json:"displayName"`
+	Description string               `json:"description"`
+	Icon        LinkPreviewThumbnail `json:"icon,omitempty"`
+}
+
+type StatusCommunityLinkPreview struct {
+	CommunityID  string               `json:"communityId"`
+	DisplayName  string               `json:"displayName"`
+	Description  string               `json:"description"`
+	MembersCount uint32               `json:"membersCount"`
+	Color        string               `json:"color"`
+	TagIndices   []uint32             `json:"tagIndices"`
+	Icon         LinkPreviewThumbnail `json:"icon,omitempty"`
+	Banner       LinkPreviewThumbnail `json:"banner,omitempty"`
+}
+
+type StatusCommunityChannelLinkPreview struct {
+	ChannelUUID     string               `json:"channelUuid"`
+	Emoji           string               `json:"emoji"`
+	DisplayName     string               `json:"displayName"`
+	Description     string               `json:"description"`
+	Color           string               `json:"color"`
+	CommunityIcon   LinkPreviewThumbnail `json:"communityIcon,omitempty"`
+	CommunityBanner LinkPreviewThumbnail `json:"communityBanner,omitempty"`
+}
+
+type StatusLinkPreview struct {
+	URL       string
+	Contact   *StatusContactLinkPreview          `json:"contact,omitempty"`
+	Community *StatusCommunityLinkPreview        `json:"community,omitempty"`
+	Channel   *StatusCommunityChannelLinkPreview `json:"channel,omitempty"`
+}
+
 const EveryoneMentionTag = "0x00001"
 
 type CommandParameters struct {
@@ -219,8 +254,9 @@ type Message struct {
 	Replied bool `json:"replied"`
 
 	// Links is an array of links within given message
-	Links        []string
-	LinkPreviews []LinkPreview `json:"linkPreviews"`
+	Links              []string
+	LinkPreviews       []LinkPreview       `json:"linkPreviews"`
+	StatusLinkPreviews []StatusLinkPreview `json:"statusLinkPreviews"`
 
 	// EditedAt indicates the clock value it was edited
 	EditedAt uint64 `json:"editedAt"`

@@ -1166,7 +1166,7 @@ func (api *PublicAPI) GetTextURLs(text string) []string {
 // be removed from the response.
 //
 // This endpoint expects the client to send URLs normalized by GetTextURLs.
-func (api *PublicAPI) UnfurlURLs(urls []string) ([]common.LinkPreview, error) {
+func (api *PublicAPI) UnfurlURLs(urls []string) ([]common.LinkPreview, []common.StatusLinkPreview, error) {
 	return api.service.messenger.UnfurlURLs(nil, urls)
 }
 

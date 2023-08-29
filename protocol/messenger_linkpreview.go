@@ -28,10 +28,6 @@ func normalizeHostname(hostname string) string {
 
 func (m *Messenger) newURLUnfurler(httpClient *http.Client, url *neturl.URL) Unfurler {
 
-	if m.IsStatusSharedUrl(url.String()) {
-		return NewStatusUnfurler(url, m, m.logger)
-	}
-
 	if IsSupportedImageURL(url) {
 		return NewImageUnfurler(
 			url,
@@ -136,22 +132,35 @@ func NewDefaultHTTPClient() *http.Client {
 
 // UnfurlURLs assumes clients pass URLs verbatim that were validated and
 // processed by GetURLs.
-func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) ([]common.LinkPreview, error) {
+func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) ([]common.LinkPreview, []common.StatusLinkPreview, error) {
 	if httpClient == nil {
 		httpClient = NewDefaultHTTPClient()
 	}
 
 	previews := make([]common.LinkPreview, 0, len(urls))
+	statusPreviews := make([]common.StatusLinkPreview, 0, len(urls))
 
 	for _, url := range urls {
 		m.logger.Debug("unfurling", zap.String("url", url))
+
+		if m.IsStatusSharedUrl(url) {
+			unfurler := NewStatusUnfurler(url, m, m.logger)
+			preview, err := unfurler.Unfurl()
+			if err != nil {
+				m.logger.Warn("failed to unfurl status link", zap.String("url", url), zap.Error(err))
+				continue
+			}
+			statusPreviews = append(statusPreviews, preview)
+			continue
+		}
+
 		p, err := m.unfurlURL(httpClient, url)
 		if err != nil {
-			m.logger.Info("failed to unfurl", zap.String("url", url), zap.Error(err))
+			m.logger.Warn("failed to unfurl", zap.String("url", url), zap.Error(err))
 			continue
 		}
 		previews = append(previews, p)
 	}
 
-	return previews, nil
+	return previews, statusPreviews, nil
 }
