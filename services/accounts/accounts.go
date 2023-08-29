@@ -451,6 +451,52 @@ func (api *API) VerifyPassword(password string) bool {
 	return api.VerifyKeystoreFileForAccount(address, password)
 }
 
+func (api *API) MigrateNonProfileKeycardKeypairToApp(ctx context.Context, mnemonic string, password string) error {
+	mnemonicNoExtraSpaces := strings.Join(strings.Fields(mnemonic), " ")
+
+	generatedAccountInfo, err := api.manager.AccountsGenerator().ImportMnemonic(mnemonicNoExtraSpaces, "")
+	if err != nil {
+		return err
+	}
+
+	kp, err := api.db.GetKeypairByKeyUID(generatedAccountInfo.KeyUID)
+	if err != nil {
+		return err
+	}
+
+	if kp.Type == accounts.KeypairTypeProfile {
+		return errors.New("cannot migrate profile keypair")
+	}
+
+	if !kp.MigratedToKeycard() {
+		return errors.New("keypair being migrated is not a keycard keypair")
+	}
+
+	profileKeypair, err := api.db.GetProfileKeypair()
+	if err != nil {
+		return err
+	}
+
+	if !profileKeypair.MigratedToKeycard() && !api.VerifyPassword(password) {
+		return errors.New("wrong password provided")
+	}
+
+	_, err = api.manager.AccountsGenerator().StoreAccount(generatedAccountInfo.ID, password)
+	if err != nil {
+		return err
+	}
+
+	for _, acc := range kp.Accounts {
+		err = api.createKeystoreFileForAccount(kp.DerivedFrom, password, acc)
+		if err != nil {
+			return err
+		}
+	}
+
+	// this will emit SyncKeypair message
+	return (*api.messenger).DeleteAllKeycardsWithKeyUID(ctx, generatedAccountInfo.KeyUID)
+}
+
 // If keypair is migrated from keycard to app, then `accountsComingFromKeycard` should be set to true, otherwise false.
 // If keycard is new `Position` will be determined and set by the backend and `KeycardLocked` will be set to false.
 // If keycard is already added, `Position` and `KeycardLocked` will be unchanged.
