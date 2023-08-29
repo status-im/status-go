@@ -10,7 +10,7 @@ import (
 
 type Subscriber struct {
 	peer      peer.ID
-	requestId string
+	requestID string
 	filter    *pb.FilterRequest // @TODO MAKE THIS A SEQUENCE AGAIN?
 }
 
@@ -122,14 +122,15 @@ func (sub *Subscribers) FlagAsFailure(peerID peer.ID) {
 	}
 }
 
-func (sub *Subscribers) RemoveContentFilters(peerID peer.ID, requestId string, contentFilters []*pb.FilterRequest_ContentFilter) {
+// RemoveContentFilters removes a set of content filters registered for an specific peer
+func (sub *Subscribers) RemoveContentFilters(peerID peer.ID, requestID string, contentFilters []*pb.FilterRequest_ContentFilter) {
 	sub.Lock()
 	defer sub.Unlock()
 
 	var peerIdsToRemove []peer.ID
 
 	for subIndex, subscriber := range sub.subscribers {
-		if subscriber.peer != peerID || subscriber.requestId != requestId {
+		if subscriber.peer != peerID || subscriber.requestID != requestID {
 			continue
 		}
 
@@ -156,7 +157,7 @@ func (sub *Subscribers) RemoveContentFilters(peerID peer.ID, requestId string, c
 	// if no more content filters left
 	for _, peerId := range peerIdsToRemove {
 		for i, s := range sub.subscribers {
-			if s.peer == peerId && s.requestId == requestId {
+			if s.peer == peerId && s.requestID == requestID {
 				l := len(sub.subscribers) - 1
 				sub.subscribers[i] = sub.subscribers[l]
 				sub.subscribers = sub.subscribers[:l]

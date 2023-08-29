@@ -85,15 +85,17 @@ func (fm *FilterMap) Items() <-chan FilterMapItem {
 	return c
 }
 
-func (fm *FilterMap) Notify(msg *pb.WakuMessage, requestId string) {
+// Notify is used to push a received message from a filter subscription to
+// any content filter registered on this node and to the broadcast subscribers
+func (fm *FilterMap) Notify(msg *pb.WakuMessage, requestID string) {
 	fm.RLock()
 	defer fm.RUnlock()
 
-	filter, ok := fm.items[requestId]
+	filter, ok := fm.items[requestID]
 	if !ok {
-		// We do this because the key for the filter is set to the requestId received from the filter protocol.
+		// We do this because the key for the filter is set to the requestID received from the filter protocol.
 		// This means we do not need to check the content filter explicitly as all MessagePushs already contain
-		// the requestId of the coresponding filter.
+		// the requestID of the coresponding filter.
 		return
 	}
 

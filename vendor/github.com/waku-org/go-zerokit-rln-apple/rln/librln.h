@@ -31,6 +31,7 @@ bool new_with_params(uintptr_t tree_height,
                      const struct Buffer *circom_buffer,
                      const struct Buffer *zkey_buffer,
                      const struct Buffer *vk_buffer,
+                     const struct Buffer *tree_config,
                      struct RLN **ctx);
 
 bool set_tree(struct RLN *ctx, uintptr_t tree_height);
@@ -39,11 +40,18 @@ bool delete_leaf(struct RLN *ctx, uintptr_t index);
 
 bool set_leaf(struct RLN *ctx, uintptr_t index, const struct Buffer *input_buffer);
 
+bool get_leaf(struct RLN *ctx, uintptr_t index, struct Buffer *output_buffer);
+
 bool set_next_leaf(struct RLN *ctx, const struct Buffer *input_buffer);
 
 bool set_leaves_from(struct RLN *ctx, uintptr_t index, const struct Buffer *input_buffer);
 
 bool init_tree_with_leaves(struct RLN *ctx, const struct Buffer *input_buffer);
+
+bool atomic_operation(struct RLN *ctx,
+                      uintptr_t index,
+                      const struct Buffer *leaves_buffer,
+                      const struct Buffer *indices_buffer);
 
 bool get_root(const struct RLN *ctx, struct Buffer *output_buffer);
 
@@ -82,6 +90,12 @@ bool recover_id_secret(const struct RLN *ctx,
                        const struct Buffer *input_proof_buffer_1,
                        const struct Buffer *input_proof_buffer_2,
                        struct Buffer *output_buffer);
+
+bool set_metadata(struct RLN *ctx, const struct Buffer *input_buffer);
+
+bool get_metadata(const struct RLN *ctx, struct Buffer *output_buffer);
+
+bool flush(struct RLN *ctx);
 
 bool hash(const struct Buffer *input_buffer, struct Buffer *output_buffer);
 

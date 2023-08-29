@@ -6,23 +6,23 @@ import (
 	"github.com/waku-org/go-zerokit-rln/rln"
 )
 
-type MessageValidationResult int
+type messageValidationResult int
 
 const (
-	MessageValidationResult_Unknown MessageValidationResult = iota
-	MessageValidationResult_Valid
-	MessageValidationResult_Invalid
-	MessageValidationResult_Spam
+	validationError messageValidationResult = iota
+	validMessage
+	invalidMessage
+	spamMessage
 )
 
 // the maximum clock difference between peers in seconds
-const MAX_CLOCK_GAP_SECONDS = 20
+const maxClockGapSeconds = 20
 
 // maximum allowed gap between the epochs of messages' RateLimitProofs
-const MAX_EPOCH_GAP = int64(MAX_CLOCK_GAP_SECONDS / rln.EPOCH_UNIT_SECONDS)
+const maxEpochGap = int64(maxClockGapSeconds / rln.EPOCH_UNIT_SECONDS)
 
-// Acceptable roots for merkle root validation of incoming messages
-const AcceptableRootWindowSize = 5
+// acceptable roots for merkle root validation of incoming messages
+const acceptableRootWindowSize = 5
 
 type RegistrationHandler = func(tx *types.Transaction)
 

@@ -3,11 +3,11 @@ package rln
 import "C"
 import (
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/waku-org/go-zerokit-rln/rln/link"
-	"github.com/waku-org/go-zerokit-rln/rln/resources"
 )
 
 // RLN represents the context used for rln.
@@ -15,43 +15,31 @@ type RLN struct {
 	w *link.RLNWrapper
 }
 
+func getResourcesFolder(depth TreeDepth) string {
+	return fmt.Sprintf("tree_height_%d", depth)
+}
+
 // NewRLN generates an instance of RLN. An instance supports both zkSNARKs logics
 // and Merkle tree data structure and operations. It uses a depth of 20 by default
 func NewRLN() (*RLN, error) {
-	wasm, err := resources.Asset("tree_height_20/rln.wasm")
-	if err != nil {
-		return nil, err
-	}
-
-	zkey, err := resources.Asset("tree_height_20/rln_final.zkey")
-	if err != nil {
-		return nil, err
-	}
-
-	verifKey, err := resources.Asset("tree_height_20/verification_key.json")
-	if err != nil {
-		return nil, err
-	}
-
-	r := &RLN{}
-
-	depth := 20
-
-	r.w, err = link.NewWithParams(depth, wasm, zkey, verifKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return r, nil
+	return NewWithConfig(DefaultTreeDepth, nil)
 }
 
 // NewRLNWithParams generates an instance of RLN. An instance supports both zkSNARKs logics
 // and Merkle tree data structure and operations. The parameter `depth“ indicates the depth of Merkle tree
-func NewRLNWithParams(depth int, wasm []byte, zkey []byte, verifKey []byte) (*RLN, error) {
+func NewRLNWithParams(depth int, wasm []byte, zkey []byte, verifKey []byte, treeConfig *TreeConfig) (*RLN, error) {
 	r := &RLN{}
 	var err error
 
-	r.w, err = link.NewWithParams(depth, wasm, zkey, verifKey)
+	treeConfigBytes := []byte{}
+	if treeConfig != nil {
+		treeConfigBytes, err = json.Marshal(treeConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	r.w, err = link.NewWithParams(depth, wasm, zkey, verifKey, treeConfigBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -59,15 +47,21 @@ func NewRLNWithParams(depth int, wasm []byte, zkey []byte, verifKey []byte) (*RL
 	return r, nil
 }
 
-// NewRLNWithFolder generates an instance of RLN. An instance supports both zkSNARKs logics
-// and Merkle tree data structure and operations. The parameter `deptk` indicates the depth of Merkle tree
-// The parameter “
-func NewRLNWithFolder(depth int, resourcesFolderPath string) (*RLN, error) {
+// NewWithConfig generates an instance of RLN. An instance supports both zkSNARKs logics
+// and Merkle tree data structure and operations. The parameter `depth` indicates the depth of Merkle tree
+func NewWithConfig(depth TreeDepth, treeConfig *TreeConfig) (*RLN, error) {
 	r := &RLN{}
-
 	var err error
 
-	r.w, err = link.NewWithFolder(depth, resourcesFolderPath)
+	configBytes, err := json.Marshal(config{
+		ResourcesFolder: getResourcesFolder(depth),
+		TreeConfig:      treeConfig,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	r.w, err = link.New(int(depth), configBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -75,14 +69,25 @@ func NewRLNWithFolder(depth int, resourcesFolderPath string) (*RLN, error) {
 	return r, nil
 }
 
-// MembershipKeyGen generates a IdentityCredential that can be used for the
-// registration into the rln membership contract. Returns an error if the key generation fails
-func (r *RLN) MembershipKeyGen() (*IdentityCredential, error) {
-	generatedKeys := r.w.ExtendedKeyGen()
-	if generatedKeys == nil {
-		return nil, errors.New("error in key generation")
+func (r *RLN) SetTree(treeHeight uint) error {
+	success := r.w.SetTree(treeHeight)
+	if !success {
+		return errors.New("could not set tree height")
 	}
+	return nil
+}
 
+// Initialize merkle tree with a list of IDCommitments
+func (r *RLN) InitTreeWithMembers(idComms []IDCommitment) error {
+	idCommBytes := serializeCommitments(idComms)
+	initSuccess := r.w.InitTreeWithLeaves(idCommBytes)
+	if !initSuccess {
+		return errors.New("could not init tree")
+	}
+	return nil
+}
+
+func toIdentityCredential(generatedKeys []byte) (*IdentityCredential, error) {
 	key := &IdentityCredential{
 		IDTrapdoor:   [32]byte{},
 		IDNullifier:  [32]byte{},
@@ -100,6 +105,27 @@ func (r *RLN) MembershipKeyGen() (*IdentityCredential, error) {
 	copy(key.IDCommitment[:], generatedKeys[96:128])
 
 	return key, nil
+}
+
+// MembershipKeyGen generates a IdentityCredential that can be used for the
+// registration into the rln membership contract. Returns an error if the key generation fails
+func (r *RLN) MembershipKeyGen() (*IdentityCredential, error) {
+	generatedKeys := r.w.ExtendedKeyGen()
+	if generatedKeys == nil {
+		return nil, errors.New("error in key generation")
+	}
+	return toIdentityCredential(generatedKeys)
+}
+
+// SeededMembershipKeyGen generates a deterministic IdentityCredential using a seed
+// that can be used for the registration into the rln membership contract.
+// Returns an error if the key generation fails
+func (r *RLN) SeededMembershipKeyGen(seed []byte) (*IdentityCredential, error) {
+	generatedKeys := r.w.ExtendedSeededKeyGen(seed)
+	if generatedKeys == nil {
+		return nil, errors.New("error in key generation")
+	}
+	return toIdentityCredential(generatedKeys)
 }
 
 // appendLength returns length prefixed version of the input with the following format
@@ -239,11 +265,25 @@ func serializeCommitments(commitments []IDCommitment) []byte {
 	return result
 }
 
+func serializeIndices(indices []MembershipIndex) []byte {
+	var result []byte
+
+	inputLen := make([]byte, 8)
+	binary.LittleEndian.PutUint64(inputLen, uint64(len(indices)))
+	result = append(result, inputLen...)
+
+	for _, index := range indices {
+		result = binary.LittleEndian.AppendUint64(result, uint64(index))
+	}
+
+	return result
+}
+
 // proof [ proof<128>| root<32>| epoch<32>| share_x<32>| share_y<32>| nullifier<32> | signal_len<8> | signal<var> ]
 // validRoots should contain a sequence of roots in the acceptable windows.
 // As default, it is set to an empty sequence of roots. This implies that the validity check for the proof's root is skipped
 func (r *RLN) Verify(data []byte, proof RateLimitProof, roots ...[32]byte) (bool, error) {
-	proofBytes := proof.serialize(data)
+	proofBytes := proof.serializeWithData(data)
 	rootBytes := serialize32(roots)
 
 	res, err := r.w.VerifyWithRoots(proofBytes, rootBytes)
@@ -252,6 +292,19 @@ func (r *RLN) Verify(data []byte, proof RateLimitProof, roots ...[32]byte) (bool
 	}
 
 	return bool(res), nil
+}
+
+// RecoverIDSecret returns an IDSecret having obtained before two proofs
+func (r *RLN) RecoverIDSecret(proof1 RateLimitProof, proof2 RateLimitProof) (IDSecretHash, error) {
+	proof1Bytes := proof1.serialize()
+	proof2Bytes := proof2.serialize()
+	secret, err := r.w.RecoverIDSecret(proof1Bytes, proof2Bytes)
+	if err != nil {
+		return IDSecretHash{}, err
+	}
+	var result IDSecretHash
+	copy(result[:], secret)
+	return result, nil
 }
 
 // InsertMember adds the member to the tree
@@ -267,9 +320,19 @@ func (r *RLN) InsertMember(idComm IDCommitment) error {
 // This proc is atomic, i.e., if any of the insertions fails, all the previous insertions are rolled back
 func (r *RLN) InsertMembers(index MembershipIndex, idComms []IDCommitment) error {
 	idCommBytes := serializeCommitments(idComms)
-	insertionSuccess := r.w.SetLeavesFrom(index, idCommBytes)
+	indicesBytes := serializeIndices(nil)
+	insertionSuccess := r.w.AtomicOperation(index, idCommBytes, indicesBytes)
 	if !insertionSuccess {
 		return errors.New("could not insert members")
+	}
+	return nil
+}
+
+// Insert a member in the tree at specified index
+func (r *RLN) InsertMemberAt(index MembershipIndex, idComm IDCommitment) error {
+	insertionSuccess := r.w.SetLeaf(index, idComm[:])
+	if !insertionSuccess {
+		return errors.New("could not insert member")
 	}
 	return nil
 }
@@ -281,6 +344,17 @@ func (r *RLN) DeleteMember(index MembershipIndex) error {
 	deletionSuccess := r.w.DeleteLeaf(index)
 	if !deletionSuccess {
 		return errors.New("could not delete member")
+	}
+	return nil
+}
+
+// Delete multiple members
+func (r *RLN) DeleteMembers(indices []MembershipIndex) error {
+	idCommBytes := serializeCommitments(nil)
+	indicesBytes := serializeIndices(indices)
+	insertionSuccess := r.w.AtomicOperation(0, idCommBytes, indicesBytes)
+	if !insertionSuccess {
+		return errors.New("could not insert members")
 	}
 	return nil
 }
@@ -297,6 +371,23 @@ func (r *RLN) GetMerkleRoot() (MerkleNode, error) {
 	}
 
 	var result MerkleNode
+	copy(result[:], b)
+
+	return result, nil
+}
+
+// GetLeaf reads the value stored at some index in the Merkle Tree
+func (r *RLN) GetLeaf(index MembershipIndex) (IDCommitment, error) {
+	b, err := r.w.GetLeaf(index)
+	if err != nil {
+		return IDCommitment{}, err
+	}
+
+	if len(b) != 32 {
+		return IDCommitment{}, errors.New("wrong output size")
+	}
+
+	var result IDCommitment
 	copy(result[:], b)
 
 	return result, nil
@@ -319,11 +410,8 @@ func CalcMerkleRoot(list []IDCommitment) (MerkleNode, error) {
 		return MerkleNode{}, err
 	}
 
-	// create a Merkle tree
-	for _, c := range list {
-		if err := rln.InsertMember(c); err != nil {
-			return MerkleNode{}, err
-		}
+	if err := rln.InsertMembers(0, list); err != nil {
+		return MerkleNode{}, err
 	}
 
 	return rln.GetMerkleRoot()
@@ -361,4 +449,38 @@ func CreateMembershipList(n int) ([]IdentityCredential, MerkleNode, error) {
 	}
 
 	return output, root, nil
+}
+
+// SetMetadata stores serialized data
+func (r *RLN) SetMetadata(metadata []byte) error {
+	success := r.w.SetMetadata(metadata)
+	if !success {
+		return errors.New("could not set metadata")
+	}
+	return nil
+}
+
+// GetMetadata returns the stored serialized metadata
+func (r *RLN) GetMetadata() ([]byte, error) {
+	return r.w.GetMetadata()
+}
+
+// AtomicOperation can be used to insert and remove elements into the merkle tree
+func (r *RLN) AtomicOperation(index MembershipIndex, idCommsToInsert []IDCommitment, indicesToRemove []MembershipIndex) error {
+	idCommBytes := serializeCommitments(idCommsToInsert)
+	indicesBytes := serializeIndices(indicesToRemove)
+	execSuccess := r.w.AtomicOperation(index, idCommBytes, indicesBytes)
+	if !execSuccess {
+		return errors.New("could not execute atomic_operation")
+	}
+	return nil
+}
+
+// Flush
+func (r *RLN) Flush() error {
+	success := r.w.Flush()
+	if !success {
+		return errors.New("cannot flush db")
+	}
+	return nil
 }

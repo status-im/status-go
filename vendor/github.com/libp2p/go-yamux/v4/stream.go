@@ -120,7 +120,7 @@ START:
 	n, _ = s.recvBuf.Read(b)
 
 	// Send a window update potentially
-	err = s.sendWindowUpdate()
+	err = s.sendWindowUpdate(s.readDeadline.wait())
 	return n, err
 }
 
@@ -209,7 +209,7 @@ func (s *Stream) sendFlags() uint16 {
 
 // sendWindowUpdate potentially sends a window update enabling
 // further writes to take place. Must be invoked with the lock.
-func (s *Stream) sendWindowUpdate() error {
+func (s *Stream) sendWindowUpdate(deadline <-chan struct{}) error {
 	// Determine the flags if any
 	flags := s.sendFlags()
 
@@ -238,7 +238,7 @@ func (s *Stream) sendWindowUpdate() error {
 
 	s.epochStart = now
 	hdr := encode(typeWindowUpdate, flags, s.id, delta)
-	return s.session.sendMsg(hdr, nil, nil)
+	return s.session.sendMsg(hdr, nil, deadline)
 }
 
 // sendClose is used to send a FIN

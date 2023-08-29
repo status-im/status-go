@@ -7,6 +7,8 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/host"
 	libp2pProtocol "github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"go.uber.org/zap"
@@ -49,6 +51,7 @@ type WakuStore struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
 	timesource timesource.Timesource
+	metrics    Metrics
 	MsgC       relay.Subscription
 	wg         *sync.WaitGroup
 
@@ -58,15 +61,20 @@ type WakuStore struct {
 
 	msgProvider MessageProvider
 	h           host.Host
+	pm          *peermanager.PeerManager
 }
 
 // NewWakuStore creates a WakuStore using an specific MessageProvider for storing the messages
-func NewWakuStore(p MessageProvider, timesource timesource.Timesource, log *zap.Logger) *WakuStore {
+// Takes an optional peermanager if WakuStore is being created along with WakuNode.
+// If using libp2p host, then pass peermanager as nil
+func NewWakuStore(p MessageProvider, pm *peermanager.PeerManager, timesource timesource.Timesource, reg prometheus.Registerer, log *zap.Logger) *WakuStore {
 	wakuStore := new(WakuStore)
 	wakuStore.msgProvider = p
 	wakuStore.wg = &sync.WaitGroup{}
 	wakuStore.log = log.Named("store")
 	wakuStore.timesource = timesource
+	wakuStore.pm = pm
+	wakuStore.metrics = newMetrics(reg)
 
 	return wakuStore
 }

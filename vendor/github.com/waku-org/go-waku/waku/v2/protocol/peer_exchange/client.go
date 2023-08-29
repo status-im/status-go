@@ -10,9 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-msgio/pbio"
-	v2 "github.com/waku-org/go-waku/waku/v2"
-	"github.com/waku-org/go-waku/waku/v2/metrics"
-	"github.com/waku-org/go-waku/waku/v2/peers"
+	"github.com/waku-org/go-waku/waku/v2/peermanager"
+	"github.com/waku-org/go-waku/waku/v2/peerstore"
 	wenr "github.com/waku-org/go-waku/waku/v2/protocol/enr"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange/pb"
 	"go.uber.org/zap"
@@ -22,6 +21,7 @@ func (wakuPX *WakuPeerExchange) Request(ctx context.Context, numPeers int, opts 
 	params := new(PeerExchangeParameters)
 	params.host = wakuPX.h
 	params.log = wakuPX.log
+	params.pm = wakuPX.pm
 
 	optList := DefaultOptions(wakuPX.h)
 	optList = append(optList, opts...)
@@ -30,7 +30,7 @@ func (wakuPX *WakuPeerExchange) Request(ctx context.Context, numPeers int, opts 
 	}
 
 	if params.selectedPeer == "" {
-		metrics.RecordPeerExchangeError(ctx, "dialError")
+		wakuPX.metrics.RecordError(dialFailure)
 		return ErrNoPeersAvailable
 	}
 
@@ -104,12 +104,12 @@ func (wakuPX *WakuPeerExchange) handleResponse(ctx context.Context, response *pb
 		go func() {
 			defer wakuPX.wg.Done()
 
-			peerCh := make(chan v2.PeerData)
+			peerCh := make(chan peermanager.PeerData)
 			defer close(peerCh)
 			wakuPX.peerConnector.Subscribe(ctx, peerCh)
 			for _, p := range discoveredPeers {
-				peer := v2.PeerData{
-					Origin:   peers.PeerExchange,
+				peer := peermanager.PeerData{
+					Origin:   peerstore.PeerExchange,
 					AddrInfo: p.addrInfo,
 					ENR:      p.enr,
 				}

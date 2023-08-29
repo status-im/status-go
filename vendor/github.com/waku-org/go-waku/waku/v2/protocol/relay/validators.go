@@ -20,8 +20,7 @@ import (
 	proto "google.golang.org/protobuf/proto"
 )
 
-// Application level message hash
-func MsgHash(pubSubTopic string, msg *pb.WakuMessage) []byte {
+func msgHash(pubSubTopic string, msg *pb.WakuMessage) []byte {
 	timestampBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(timestampBytes, uint64(msg.Timestamp))
 
@@ -39,7 +38,7 @@ func MsgHash(pubSubTopic string, msg *pb.WakuMessage) []byte {
 	)
 }
 
-const MessageWindowDuration = time.Minute * 5
+const messageWindowDuration = time.Minute * 5
 
 func withinTimeWindow(t timesource.Timesource, msg *pb.WakuMessage) bool {
 	if msg.Timestamp == 0 {
@@ -49,7 +48,7 @@ func withinTimeWindow(t timesource.Timesource, msg *pb.WakuMessage) bool {
 	now := t.Now()
 	msgTime := time.Unix(0, msg.Timestamp)
 
-	return now.Sub(msgTime).Abs() <= MessageWindowDuration
+	return now.Sub(msgTime).Abs() <= messageWindowDuration
 }
 
 type validatorFn = func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool
@@ -67,13 +66,14 @@ func validatorFnBuilder(t timesource.Timesource, topic string, publicKey *ecdsa.
 			return false
 		}
 
-		msgHash := MsgHash(topic, msg)
+		msgHash := msgHash(topic, msg)
 		signature := msg.Meta
 
 		return secp256k1.VerifySignature(publicKeyBytes, msgHash, signature)
 	}, nil
 }
 
+// AddSignedTopicValidator registers a gossipsub validator for a topic which will check that messages Meta field contains a valid ECDSA signature for the specified pubsub topic. This is used as a DoS prevention mechanism
 func (w *WakuRelay) AddSignedTopicValidator(topic string, publicKey *ecdsa.PublicKey) error {
 	w.log.Info("adding validator to signed topic", zap.String("topic", topic), zap.String("publicKey", hex.EncodeToString(elliptic.Marshal(publicKey.Curve, publicKey.X, publicKey.Y))))
 
@@ -94,8 +94,9 @@ func (w *WakuRelay) AddSignedTopicValidator(topic string, publicKey *ecdsa.Publi
 	return nil
 }
 
+// SignMessage adds an ECDSA signature to a WakuMessage as an opt-in mechanism for DoS prevention
 func SignMessage(privKey *ecdsa.PrivateKey, msg *pb.WakuMessage, pubsubTopic string) error {
-	msgHash := MsgHash(pubsubTopic, msg)
+	msgHash := msgHash(pubsubTopic, msg)
 	sign, err := secp256k1.Sign(msgHash, crypto.FromECDSA(privKey))
 	if err != nil {
 		return err

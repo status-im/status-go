@@ -134,11 +134,85 @@ func (e *annotationError) Error() string {
 	return e.err.Error()
 }
 
+// Unwrap the wrapped error.
+func (e *annotationError) Unwrap() error {
+	return e.err
+}
+
 type paramTagsAnnotation struct {
 	tags []string
 }
 
 var _ Annotation = paramTagsAnnotation{}
+var (
+	errTagSyntaxSpace            = errors.New(`multiple tags are not separated by space`)
+	errTagKeySyntax              = errors.New("tag key is invalid, Use group, name or optional as tag keys")
+	errTagValueSyntaxQuote       = errors.New(`tag value should start with double quote. i.e. key:"value" `)
+	errTagValueSyntaxEndingQuote = errors.New(`tag value should end in double quote. i.e. key:"value" `)
+)
+
+// Collections of key value pairs within a tag should be separated by a space.
+// Eg: `group:"some" optional:"true"`.
+func verifyTagsSpaceSeparated(tagIdx int, tag string) error {
+	if tagIdx > 0 && tag != "" && tag[0] != ' ' {
+		return errTagSyntaxSpace
+	}
+	return nil
+}
+
+// verify tag values are delimited with double quotes.
+func verifyValueQuote(value string) (string, error) {
+	// starting quote should be a double quote
+	if value[0] != '"' {
+		return "", errTagValueSyntaxQuote
+	}
+	// validate tag value is within quotes
+	i := 1
+	for i < len(value) && value[i] != '"' {
+		if value[i] == '\\' {
+			i++
+		}
+		i++
+	}
+	if i >= len(value) {
+		return "", errTagValueSyntaxEndingQuote
+	}
+	return value[i+1:], nil
+
+}
+
+// Check whether the tag follows valid struct.
+// format and returns an error if it's invalid. (i.e. not following
+// tag:"value" space-separated list )
+// Currently dig accepts only 'name', 'group', 'optional' as valid tag keys.
+func verifyAnnotateTag(tag string) error {
+	tagIdx := 0
+	validKeys := map[string]struct{}{"group": {}, "optional": {}, "name": {}}
+	for ; tag != ""; tagIdx++ {
+		if err := verifyTagsSpaceSeparated(tagIdx, tag); err != nil {
+			return err
+		}
+		i := 0
+		if strings.TrimSpace(tag) == "" {
+			return nil
+		}
+		// parsing the key i.e. till reaching colon :
+		for i < len(tag) && tag[i] != ':' {
+			i++
+		}
+		key := strings.TrimSpace(tag[:i])
+		if _, ok := validKeys[key]; !ok {
+			return errTagKeySyntax
+		}
+		value, err := verifyValueQuote(tag[i+1:])
+		if err != nil {
+			return err
+		}
+		tag = value
+	}
+	return nil
+
+}
 
 // Given func(T1, T2, T3, ..., TN), this generates a type roughly
 // equivalent to,
@@ -154,10 +228,18 @@ var _ Annotation = paramTagsAnnotation{}
 //
 // If there has already been a ParamTag that was applied, this
 // will return an error.
+//
+// If the tag is invalid and has mismatched quotation for example,
+// (`tag_name:"tag_value') , this will return an error.
 
 func (pt paramTagsAnnotation) apply(ann *annotated) error {
 	if len(ann.ParamTags) > 0 {
 		return errors.New("cannot apply more than one line of ParamTags")
+	}
+	for _, tag := range pt.tags {
+		if err := verifyAnnotateTag(tag); err != nil {
+			return err
+		}
 	}
 	ann.ParamTags = pt.tags
 	return nil
@@ -256,6 +338,9 @@ func (pt paramTagsAnnotation) parameters(ann *annotated) (
 // ParamTags is an Annotation that annotates the parameter(s) of a function.
 // When multiple tags are specified, each tag is mapped to the corresponding
 // positional parameter.
+//
+// ParamTags cannot be used in a function that takes an fx.In struct as a
+// parameter.
 func ParamTags(tags ...string) Annotation {
 	return paramTagsAnnotation{tags}
 }
@@ -280,9 +365,17 @@ var _ Annotation = resultTagsAnnotation{}
 //
 // If there has already been a ResultTag that was applied, this
 // will return an error.
+//
+// If the tag is invalid and has mismatched quotation for example,
+// (`tag_name:"tag_value') , this will return an error.
 func (rt resultTagsAnnotation) apply(ann *annotated) error {
 	if len(ann.ResultTags) > 0 {
 		return errors.New("cannot apply more than one line of ResultTags")
+	}
+	for _, tag := range rt.tags {
+		if err := verifyAnnotateTag(tag); err != nil {
+			return err
+		}
 	}
 	ann.ResultTags = rt.tags
 	return nil
@@ -430,6 +523,8 @@ func (rt resultTagsAnnotation) results(ann *annotated) (
 // ResultTags is an Annotation that annotates the result(s) of a function.
 // When multiple tags are specified, each tag is mapped to the corresponding
 // positional result.
+//
+// ResultTags cannot be used on a function that returns an fx.Out struct.
 func ResultTags(tags ...string) Annotation {
 	return resultTagsAnnotation{tags}
 }
@@ -554,7 +649,7 @@ var (
 )
 
 // buildHookInstaller returns a function that appends a hook to Lifecycle when called,
-// along with the new paramter types and a function that maps arguments to the annotated constructor
+// along with the new parameter types and a function that maps arguments to the annotated constructor
 func (la *lifecycleHookAnnotation) buildHookInstaller(ann *annotated) (
 	hookInstaller reflect.Value,
 	paramTypes []reflect.Type,
@@ -802,7 +897,7 @@ func injectLifecycle(paramTypes []reflect.Type) ([]reflect.Type, func([]reflect.
 			return args
 		}
 	}
-	// If params are tagged or there's an untagged variadic arguement,
+	// If params are tagged or there's an untagged variadic argument,
 	// add a Lifecycle field to the param struct
 	if len(paramTypes) > 0 && isIn(paramTypes[0]) {
 		taggedParam := paramTypes[0]
@@ -911,8 +1006,8 @@ func (la *lifecycleHookAnnotation) buildHook(fn func(context.Context) error) (ho
 //	}
 //
 // Only one OnStart annotation may be applied to a given function at a time,
-// however functions may be annotated with other types of lifecylce Hooks, such
-// as OnStart. The hook function passed into OnStart cannot take any arguments
+// however functions may be annotated with other types of lifecycle Hooks, such
+// as OnStop. The hook function passed into OnStart cannot take any arguments
 // outside of the annotated constructor's existing dependencies or results, except
 // a context.Context.
 func OnStart(onStart interface{}) Annotation {
@@ -975,8 +1070,8 @@ func OnStart(onStart interface{}) Annotation {
 //	}
 //
 // Only one OnStop annotation may be applied to a given function at a time,
-// however functions may be annotated with other types of lifecylce Hooks, such
-// as OnStop. The hook function passed into OnStop cannot take any arguments
+// however functions may be annotated with other types of lifecycle Hooks, such
+// as OnStart. The hook function passed into OnStop cannot take any arguments
 // outside of the annotated constructor's existing dependencies or results, except
 // a context.Context.
 func OnStop(onStop interface{}) Annotation {
@@ -1042,6 +1137,8 @@ var _ Annotation = (*asAnnotation)(nil)
 //	  w, r := a()
 //	  return w, r
 //	}
+//
+// As annotation cannot be used in a function that returns an [Out] struct as a return type.
 func As(interfaces ...interface{}) Annotation {
 	return &asAnnotation{targets: interfaces}
 }
@@ -1227,6 +1324,9 @@ var _ Annotation = (*fromAnnotation)(nil)
 //	fx.Provide(func(r1 *FooRunner, r2 *BarRunner) *RunnerWraps {
 //	  return NewRunnerWraps(r1, r2)
 //	})
+//
+// From annotation cannot be used in a function that takes an [In] struct as a
+// parameter.
 func From(interfaces ...interface{}) Annotation {
 	return &fromAnnotation{targets: interfaces}
 }
@@ -1496,8 +1596,8 @@ func (ann *annotated) cleanUpAsResults() {
 }
 
 // checks and returns a non-nil error if the target function:
-// - returns an fx.Out struct as a result.
-// - takes in an fx.In struct as a parameter.
+// - returns an fx.Out struct as a result and has either a ResultTags or an As annotation
+// - takes in an fx.In struct as a parameter and has either a ParamTags or a From annotation
 // - has an error result not as the last result.
 func (ann *annotated) typeCheckOrigFn() error {
 	ft := reflect.TypeOf(ann.Target)
@@ -1513,18 +1613,23 @@ func (ann *annotated) typeCheckOrigFn() error {
 		if ot.Kind() != reflect.Struct {
 			continue
 		}
-		if dig.IsOut(reflect.New(ft.Out(i)).Elem().Interface()) {
-			return errors.New("fx.Out structs cannot be annotated")
+		if !dig.IsOut(reflect.New(ft.Out(i)).Elem().Interface()) {
+			continue
+		}
+		if len(ann.ResultTags) > 0 || len(ann.As) > 0 {
+			return errors.New("fx.Out structs cannot be annotated with fx.ResultTags or fx.As")
 		}
 	}
-
 	for i := 0; i < ft.NumIn(); i++ {
 		it := ft.In(i)
 		if it.Kind() != reflect.Struct {
 			continue
 		}
-		if dig.IsIn(reflect.New(ft.In(i)).Elem().Interface()) {
-			return errors.New("fx.In structs cannot be annotated")
+		if !dig.IsIn(reflect.New(ft.In(i)).Elem().Interface()) {
+			continue
+		}
+		if len(ann.ParamTags) > 0 || len(ann.From) > 0 {
+			return errors.New("fx.In structs cannot be annotated with fx.ParamTags or fx.From")
 		}
 	}
 	return nil
@@ -1586,9 +1691,6 @@ func (ann *annotated) currentParamTypes() []reflect.Type {
 //	fx.Provide(func(p params) result {
 //	   return result{GW: NewGateway(p.RO, p.RW)}
 //	})
-//
-// Annotate cannot be used on functions that takes in or returns
-// [In] or [Out] structs.
 //
 // Using the same annotation multiple times is invalid.
 // For example, the following will fail with an error:

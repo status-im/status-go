@@ -116,3 +116,21 @@ func zoneless(m ma.Multiaddr) ma.Multiaddr {
 		return m
 	}
 }
+
+var nat64WellKnownPrefix net.IPNet
+
+func init() {
+	_, np, err := net.ParseCIDR("64:ff9b::/96")
+	if err != nil {
+		panic(err)
+	}
+	nat64WellKnownPrefix = *np
+}
+
+// IsNAT64IPv4ConvertedIPv6Addr returns whether addr is a well-known prefix "64:ff9b::/96" addr
+// used for NAT64 Translation. See RFC 6052
+func IsNAT64IPv4ConvertedIPv6Addr(addr ma.Multiaddr) bool {
+	c, _ := ma.SplitFirst(addr)
+	return c != nil && c.Protocol().Code == ma.P_IP6 &&
+		nat64WellKnownPrefix.Contains(net.IP(c.RawValue()))
+}

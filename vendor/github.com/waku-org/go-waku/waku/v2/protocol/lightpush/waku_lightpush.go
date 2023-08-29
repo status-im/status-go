@@ -10,8 +10,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	libp2pProtocol "github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-msgio/pbio"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waku-org/go-waku/logging"
-	"github.com/waku-org/go-waku/waku/v2/metrics"
+	"github.com/waku-org/go-waku/waku/v2/peermanager"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush/pb"
 	wpb "github.com/waku-org/go-waku/waku/v2/protocol/pb"
@@ -19,7 +20,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// LightPushID_v20beta1 is the current Waku Lightpush protocol identifier
+// LightPushID_v20beta1 is the current Waku LightPush protocol identifier
 const LightPushID_v20beta1 = libp2pProtocol.ID("/vac/waku/lightpush/2.0.0-beta1")
 
 var (
@@ -27,20 +28,26 @@ var (
 	ErrInvalidId        = errors.New("invalid request id")
 )
 
+// WakuLightPush is the implementation of the Waku LightPush protocol
 type WakuLightPush struct {
-	h      host.Host
-	relay  *relay.WakuRelay
-	cancel context.CancelFunc
+	h       host.Host
+	relay   *relay.WakuRelay
+	cancel  context.CancelFunc
+	pm      *peermanager.PeerManager
+	metrics Metrics
 
 	log *zap.Logger
 }
 
-// NewWakuRelay returns a new instance of Waku Lightpush struct
-func NewWakuLightPush(relay *relay.WakuRelay, log *zap.Logger) *WakuLightPush {
+// NewWakuLightPush returns a new instance of Waku Lightpush struct
+// Takes an optional peermanager if WakuLightPush is being created along with WakuNode.
+// If using libp2p host, then pass peermanager as nil
+func NewWakuLightPush(relay *relay.WakuRelay, pm *peermanager.PeerManager, reg prometheus.Registerer, log *zap.Logger) *WakuLightPush {
 	wakuLP := new(WakuLightPush)
 	wakuLP.relay = relay
 	wakuLP.log = log.Named("lightpush")
-
+	wakuLP.pm = pm
+	wakuLP.metrics = newMetrics(reg)
 	return wakuLP
 }
 
@@ -81,7 +88,7 @@ func (wakuLP *WakuLightPush) onRequest(ctx context.Context) func(s network.Strea
 		err := reader.ReadMsg(requestPushRPC)
 		if err != nil {
 			logger.Error("reading request", zap.Error(err))
-			metrics.RecordLightpushError(ctx, "decode_rpc_failure")
+			wakuLP.metrics.RecordError(decodeRPCFailure)
 			return
 		}
 
@@ -93,7 +100,7 @@ func (wakuLP *WakuLightPush) onRequest(ctx context.Context) func(s network.Strea
 			pubSubTopic := requestPushRPC.Query.PubsubTopic
 			message := requestPushRPC.Query.Message
 
-			metrics.RecordLightpushMessage(ctx, "PushRequest")
+			wakuLP.metrics.RecordMessage()
 
 			// TODO: Assumes success, should probably be extended to check for network, peers, etc
 			// It might make sense to use WithReadiness option here?
@@ -102,7 +109,7 @@ func (wakuLP *WakuLightPush) onRequest(ctx context.Context) func(s network.Strea
 
 			if err != nil {
 				logger.Error("publishing message", zap.Error(err))
-				metrics.RecordLightpushError(ctx, "message_push_failure")
+				wakuLP.metrics.RecordError(messagePushFailure)
 				response.Info = "Could not publish message"
 			} else {
 				response.IsSuccess = true
@@ -115,14 +122,14 @@ func (wakuLP *WakuLightPush) onRequest(ctx context.Context) func(s network.Strea
 
 			err = writer.WriteMsg(responsePushRPC)
 			if err != nil {
-				metrics.RecordLightpushError(ctx, "response_write_failure")
+				wakuLP.metrics.RecordError(writeResponseFailure)
 				logger.Error("writing response", zap.Error(err))
 				_ = s.Reset()
 			} else {
 				logger.Info("response sent")
 			}
 		} else {
-			metrics.RecordLightpushError(ctx, "empty_request_body_failure")
+			wakuLP.metrics.RecordError(emptyRequestBodyFailure)
 		}
 
 		if requestPushRPC.Response != nil {
@@ -132,15 +139,16 @@ func (wakuLP *WakuLightPush) onRequest(ctx context.Context) func(s network.Strea
 				logger.Info("request failure", zap.String("info=", requestPushRPC.Response.Info))
 			}
 		} else {
-			metrics.RecordLightpushError(ctx, "empty_response_body_failure")
+			wakuLP.metrics.RecordError(emptyResponseBodyFailure)
 		}
 	}
 }
 
-func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, opts ...LightPushOption) (*pb.PushResponse, error) {
-	params := new(LightPushParameters)
+func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, opts ...Option) (*pb.PushResponse, error) {
+	params := new(lightPushParameters)
 	params.host = wakuLP.h
 	params.log = wakuLP.log
+	params.pm = wakuLP.pm
 
 	optList := append(DefaultOptions(wakuLP.h), opts...)
 	for _, opt := range optList {
@@ -148,11 +156,11 @@ func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, o
 	}
 
 	if params.selectedPeer == "" {
-		metrics.RecordLightpushError(ctx, "peer_not_found_failure")
+		wakuLP.metrics.RecordError(peerNotFoundFailure)
 		return nil, ErrNoPeersAvailable
 	}
 
-	if len(params.requestId) == 0 {
+	if len(params.requestID) == 0 {
 		return nil, ErrInvalidId
 	}
 
@@ -161,7 +169,7 @@ func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, o
 	connOpt, err := wakuLP.h.NewStream(ctx, params.selectedPeer, LightPushID_v20beta1)
 	if err != nil {
 		logger.Error("creating stream to peer", zap.Error(err))
-		metrics.RecordLightpushError(ctx, "dial_failure")
+		wakuLP.metrics.RecordError(dialFailure)
 		return nil, err
 	}
 
@@ -169,19 +177,19 @@ func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, o
 	defer func() {
 		err := connOpt.Reset()
 		if err != nil {
-			metrics.RecordLightpushError(ctx, "dial_failure")
+			wakuLP.metrics.RecordError(dialFailure)
 			logger.Error("resetting connection", zap.Error(err))
 		}
 	}()
 
-	pushRequestRPC := &pb.PushRPC{RequestId: hex.EncodeToString(params.requestId), Query: req}
+	pushRequestRPC := &pb.PushRPC{RequestId: hex.EncodeToString(params.requestID), Query: req}
 
 	writer := pbio.NewDelimitedWriter(connOpt)
 	reader := pbio.NewDelimitedReader(connOpt, math.MaxInt32)
 
 	err = writer.WriteMsg(pushRequestRPC)
 	if err != nil {
-		metrics.RecordLightpushError(ctx, "request_write_failure")
+		wakuLP.metrics.RecordError(writeRequestFailure)
 		logger.Error("writing request", zap.Error(err))
 		return nil, err
 	}
@@ -190,7 +198,7 @@ func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, o
 	err = reader.ReadMsg(pushResponseRPC)
 	if err != nil {
 		logger.Error("reading response", zap.Error(err))
-		metrics.RecordLightpushError(ctx, "decode_rpc_failure")
+		wakuLP.metrics.RecordError(decodeRPCFailure)
 		return nil, err
 	}
 
@@ -208,7 +216,7 @@ func (wakuLP *WakuLightPush) Stop() {
 }
 
 // PublishToTopic is used to broadcast a WakuMessage to a pubsub topic via lightpush protocol
-func (wakuLP *WakuLightPush) PublishToTopic(ctx context.Context, message *wpb.WakuMessage, topic string, opts ...LightPushOption) ([]byte, error) {
+func (wakuLP *WakuLightPush) PublishToTopic(ctx context.Context, message *wpb.WakuMessage, topic string, opts ...Option) ([]byte, error) {
 	if message == nil {
 		return nil, errors.New("message can't be null")
 	}
@@ -232,6 +240,6 @@ func (wakuLP *WakuLightPush) PublishToTopic(ctx context.Context, message *wpb.Wa
 }
 
 // Publish is used to broadcast a WakuMessage to the default waku pubsub topic via lightpush protocol
-func (wakuLP *WakuLightPush) Publish(ctx context.Context, message *wpb.WakuMessage, opts ...LightPushOption) ([]byte, error) {
+func (wakuLP *WakuLightPush) Publish(ctx context.Context, message *wpb.WakuMessage, opts ...Option) ([]byte, error) {
 	return wakuLP.PublishToTopic(ctx, message, relay.DefaultWakuTopic, opts...)
 }

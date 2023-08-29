@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
 	"sync"
 	"time"
 
@@ -557,9 +556,9 @@ func readAllIDMessages(r pbio.Reader, finalMsg proto.Message) error {
 
 func (ids *idService) updateSnapshot() (updated bool) {
 	addrs := ids.Host.Addrs()
-	sort.Slice(addrs, func(i, j int) bool { return bytes.Compare(addrs[i].Bytes(), addrs[j].Bytes()) == -1 })
+	slices.SortFunc(addrs, func(a, b ma.Multiaddr) bool { return bytes.Compare(a.Bytes(), b.Bytes()) == -1 })
 	protos := ids.Host.Mux().Protocols()
-	sort.Slice(protos, func(i, j int) bool { return protos[i] < protos[j] })
+	slices.Sort(protos)
 	snapshot := identifySnapshot{
 		addrs:     addrs,
 		protocols: protos,

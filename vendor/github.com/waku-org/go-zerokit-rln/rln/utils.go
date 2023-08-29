@@ -2,6 +2,7 @@ package rln
 
 import (
 	"encoding/hex"
+	"math/big"
 )
 
 func ToIdentityCredentials(groupKeys [][]string) ([]IdentityCredential, error) {
@@ -62,9 +63,38 @@ func ToBytes32LE(hexStr string) ([32]byte, error) {
 		return [32]byte{}, err
 	}
 
-	for i := 0; i < len(b)/2; i++ {
-		b[i], b[len(b)-i-1] = b[len(b)-i-1], b[i]
+	bLen := len(b)
+	for i := 0; i < bLen/2; i++ {
+		b[i], b[bLen-i-1] = b[bLen-i-1], b[i]
 	}
 
 	return Bytes32(b), nil
+}
+
+func revert(b []byte) []byte {
+	bLen := len(b)
+	for i := 0; i < bLen/2; i++ {
+		b[i], b[bLen-i-1] = b[bLen-i-1], b[i]
+	}
+	return b
+}
+
+// BigIntToBytes32 takes a *big.Int (which uses big endian) and converts it into a little endian 32 byte array
+// Notice that is the *big.Int value contains an integer <= 2^248 - 1 (a 7 bytes value with all bits on), it will right-pad the result with 0s until
+// the result has 32 bytes, i.e.:
+// for a some bigInt whose `Bytes()` are {0x12, 0x34, 0x56, 0x78, 0x90, 0xAB, 0xCD, 0xEF}, using this function will return
+// {0xEF, 0xCD, 0xAB, 0x90, 0x78, 0x56, 0x34, 0x12, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}
+func BigIntToBytes32(value *big.Int) [32]byte {
+	b := revert(value.Bytes())
+	tmp := make([]byte, 32)
+	copy(tmp[0:len(b)], b)
+	return Bytes32(tmp)
+}
+
+// Bytes32ToBigInt takes a little endian 32 byte array and returns a *big.Int (which uses big endian)
+func Bytes32ToBigInt(value [32]byte) *big.Int {
+	b := revert(value[:])
+	result := new(big.Int)
+	result.SetBytes(b)
+	return result
 }

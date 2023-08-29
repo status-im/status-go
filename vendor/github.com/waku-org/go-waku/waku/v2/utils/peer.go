@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/waku-org/go-waku/logging"
 	"go.uber.org/zap"
 )
 
@@ -33,7 +34,42 @@ func GetPeerID(m multiaddr.Multiaddr) (peer.ID, error) {
 	return peerID, nil
 }
 
+// FilterPeersByProto filters list of peers that support specified protocols.
+// If specificPeers is nil, all peers in the host's peerStore are considered for filtering.
+func FilterPeersByProto(host host.Host, specificPeers peer.IDSlice, proto ...protocol.ID) (peer.IDSlice, error) {
+	peerSet := specificPeers
+	if len(peerSet) == 0 {
+		peerSet = host.Peerstore().Peers()
+	}
+
+	var peers peer.IDSlice
+	for _, peer := range peerSet {
+		protocols, err := host.Peerstore().SupportsProtocols(peer, proto...)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(protocols) > 0 {
+			peers = append(peers, peer)
+		}
+	}
+	return peers, nil
+}
+
+// SelectRandomPeer selects randomly a peer from the list of peers passed.
+func SelectRandomPeer(peers peer.IDSlice, log *zap.Logger) (peer.ID, error) {
+	if len(peers) >= 1 {
+		peerID := peers[rand.Intn(len(peers))]
+		// TODO: proper heuristic here that compares peer scores and selects "best" one. For now a random peer for the given protocol is returned
+		log.Info("Got random peer from peerstore", logging.HostID("peer", peerID))
+		return peerID, nil // nolint: gosec
+	}
+
+	return "", ErrNoPeersAvailable
+}
+
 // SelectPeer is used to return a random peer that supports a given protocol.
+// Note: Use this method only if WakuNode is not being initialized, otherwise use peermanager.SelectPeer.
 // If a list of specific peers is passed, the peer will be chosen from that list assuming
 // it supports the chosen protocol, otherwise it will chose a peer from the node peerstore
 func SelectPeer(host host.Host, protocolId protocol.ID, specificPeers []peer.ID, log *zap.Logger) (peer.ID, error) {
@@ -44,29 +80,12 @@ func SelectPeer(host host.Host, protocolId protocol.ID, specificPeers []peer.ID,
 	//  - latency?
 	//  - default store peer?
 
-	peerSet := specificPeers
-	if len(peerSet) == 0 {
-		peerSet = host.Peerstore().Peers()
+	peers, err := FilterPeersByProto(host, specificPeers, protocolId)
+	if err != nil {
+		return "", err
 	}
 
-	var peers peer.IDSlice
-	for _, peer := range peerSet {
-		protocols, err := host.Peerstore().SupportsProtocols(peer, protocolId)
-		if err != nil {
-			return "", err
-		}
-
-		if len(protocols) > 0 {
-			peers = append(peers, peer)
-		}
-	}
-
-	if len(peers) >= 1 {
-		// TODO: proper heuristic here that compares peer scores and selects "best" one. For now a random peer for the given protocol is returned
-		return peers[rand.Intn(len(peers))], nil // nolint: gosec
-	}
-
-	return "", ErrNoPeersAvailable
+	return SelectRandomPeer(peers, log)
 }
 
 type pingResult struct {

@@ -39,6 +39,9 @@ var (
 	// been dialed too frequently
 	ErrDialBackoff = errors.New("dial backoff")
 
+	// ErrDialRefusedBlackHole is returned when we are in a black holed environment
+	ErrDialRefusedBlackHole = errors.New("dial refused because of black hole")
+
 	// ErrDialToSelf is returned if we attempt to dial our own peer
 	ErrDialToSelf = errors.New("dial to self attempted")
 
@@ -312,7 +315,7 @@ func (s *Swarm) addrsForDial(ctx context.Context, p peer.ID) ([]ma.Multiaddr, er
 	if forceDirect, _ := network.GetForceDirectDial(ctx); forceDirect {
 		goodAddrs = ma.FilterAddrs(goodAddrs, s.nonProxyAddr)
 	}
-	goodAddrs = network.DedupAddrs(goodAddrs)
+	goodAddrs = ma.Unique(goodAddrs)
 
 	if len(goodAddrs) == 0 {
 		return nil, ErrNoGoodAddresses
@@ -434,8 +437,12 @@ func (s *Swarm) filterKnownUndialables(p peer.ID, addrs []ma.Multiaddr) []ma.Mul
 
 	// filter addresses we cannot dial
 	addrs = ma.FilterAddrs(addrs, s.canDial)
+
 	// filter low priority addresses among the addresses we can dial
 	addrs = filterLowPriorityAddresses(addrs)
+
+	// remove black holed addrs
+	addrs = s.bhd.FilterAddrs(addrs)
 
 	return ma.FilterAddrs(addrs,
 		func(addr ma.Multiaddr) bool { return !ma.Contains(ourAddrs, addr) },
@@ -484,6 +491,12 @@ func (s *Swarm) dialAddr(ctx context.Context, p peer.ID, addr ma.Multiaddr) (tra
 
 	start := time.Now()
 	connC, err := tpt.Dial(ctx, addr, p)
+
+	// We're recording any error as a failure here.
+	// Notably, this also applies to cancelations (i.e. if another dial attempt was faster).
+	// This is ok since the black hole detector uses a very low threshold (5%).
+	s.bhd.RecordResult(addr, err == nil)
+
 	if err != nil {
 		if s.metricsTracer != nil {
 			s.metricsTracer.FailedDialing(addr, err)

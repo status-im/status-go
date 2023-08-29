@@ -243,7 +243,7 @@ GET_ID:
 	s.streamLock.Unlock()
 
 	// Send the window update to create
-	if err := stream.sendWindowUpdate(); err != nil {
+	if err := stream.sendWindowUpdate(ctx.Done()); err != nil {
 		defer span.Done()
 		select {
 		case <-s.synCh:
@@ -271,7 +271,7 @@ func (s *Session) AcceptStream() (*Stream, error) {
 	for {
 		select {
 		case stream := <-s.acceptCh:
-			if err := stream.sendWindowUpdate(); err != nil {
+			if err := stream.sendWindowUpdate(nil); err != nil {
 				// don't return accept errors.
 				s.logger.Printf("[WARN] error sending window update before accepting: %s", err)
 				continue

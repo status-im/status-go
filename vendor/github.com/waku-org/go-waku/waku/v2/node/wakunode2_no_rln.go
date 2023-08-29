@@ -9,7 +9,11 @@ func (w *WakuNode) RLNRelay() RLNRelay {
 	return nil
 }
 
-func (w *WakuNode) mountRlnRelay(ctx context.Context) error {
+func (w *WakuNode) setupRLNRelay() error {
+	return nil
+}
+
+func (w *WakuNode) startRlnRelay(ctx context.Context) error {
 	return nil
 }
 

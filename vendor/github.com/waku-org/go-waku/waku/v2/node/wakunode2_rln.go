@@ -7,11 +7,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager/dynamic"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager/static"
 	r "github.com/waku-org/go-zerokit-rln/rln"
-	"go.uber.org/zap"
 )
 
 // RLNRelay is used to access any operation related to Waku RLN protocol
@@ -19,28 +20,13 @@ func (w *WakuNode) RLNRelay() RLNRelay {
 	return w.rlnRelay
 }
 
-func (w *WakuNode) mountRlnRelay(ctx context.Context) error {
-	// check whether inputs are provided
-	// relay protocol is the prerequisite of rln-relay
-	if w.Relay() == nil {
-		return errors.New("relay protocol is required")
-	}
-
-	// check whether the pubsub topic is supported at the relay level
-	topicFound := false
-	for _, t := range w.Relay().Topics() {
-		if t == w.opts.rlnRelayPubsubTopic {
-			topicFound = true
-			break
-		}
-	}
-
-	if !topicFound {
-		return errors.New("relay protocol does not support the configured pubsub topic")
-	}
-
+func (w *WakuNode) setupRLNRelay() error {
 	var err error
 	var groupManager rln.GroupManager
+
+	if !w.opts.enableRLN {
+		return nil
+	}
 
 	if !w.opts.rlnRelayDynamic {
 		w.log.Info("setting up waku-rln-relay in off-chain mode")
@@ -60,12 +46,13 @@ func (w *WakuNode) mountRlnRelay(ctx context.Context) error {
 
 		groupManager, err = dynamic.NewDynamicGroupManager(
 			w.opts.rlnETHClientAddress,
-			w.opts.rlnETHPrivateKey,
 			w.opts.rlnMembershipContractAddress,
+			w.opts.rlnRelayMemIndex,
 			w.opts.keystorePath,
 			w.opts.keystorePassword,
+			w.opts.keystoreIndex,
 			true,
-			w.opts.rlnRegistrationHandler,
+			w.opts.prometheusReg,
 			w.log,
 		)
 		if err != nil {
@@ -73,17 +60,26 @@ func (w *WakuNode) mountRlnRelay(ctx context.Context) error {
 		}
 	}
 
-	rlnRelay, err := rln.New(w.Relay(), groupManager, w.opts.rlnRelayPubsubTopic, w.opts.rlnRelayContentTopic, w.opts.rlnSpamHandler, w.timesource, w.log)
-	if err != nil {
-		return err
-	}
-
-	err = rlnRelay.Start(ctx)
+	rlnRelay, err := rln.New(groupManager, w.opts.rlnTreePath, w.timesource, w.opts.prometheusReg, w.log)
 	if err != nil {
 		return err
 	}
 
 	w.rlnRelay = rlnRelay
+
+	// Adding RLN as a default validator
+	w.opts.pubsubOpts = append(w.opts.pubsubOpts, pubsub.WithDefaultValidator(rlnRelay.Validator(w.opts.rlnSpamHandler)))
+
+	return nil
+}
+
+func (w *WakuNode) startRlnRelay(ctx context.Context) error {
+	rlnRelay := w.rlnRelay.(*rln.WakuRLNRelay)
+
+	err := rlnRelay.Start(ctx)
+	if err != nil {
+		return err
+	}
 
 	if !w.opts.rlnRelayDynamic {
 		// check the correct construction of the tree by comparing the calculated root against the expected root
@@ -103,14 +99,14 @@ func (w *WakuNode) mountRlnRelay(ctx context.Context) error {
 		}
 	}
 
-	w.log.Info("mounted waku RLN relay", zap.String("pubsubTopic", w.opts.rlnRelayPubsubTopic), zap.String("contentTopic", w.opts.rlnRelayContentTopic))
+	w.log.Info("mounted waku RLN relay")
 
 	return nil
 }
 
 func (w *WakuNode) stopRlnRelay() error {
 	if w.rlnRelay != nil {
-		w.rlnRelay.Stop()
+		return w.rlnRelay.Stop()
 	}
 	return nil
 }

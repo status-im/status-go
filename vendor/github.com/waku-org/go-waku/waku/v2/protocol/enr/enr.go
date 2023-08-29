@@ -102,11 +102,6 @@ func Multiaddress(node *enode.Node) (peer.ID, []multiaddr.Multiaddr, error) {
 		return peerID, result, nil
 	}
 
-	hostInfo, err := multiaddr.NewMultiaddr(fmt.Sprintf("/p2p/%s", peerID.Pretty()))
-	if err != nil {
-		return "", nil, err
-	}
-
 	offset := 0
 	for {
 		maSize := binary.BigEndian.Uint16(multiaddrRaw[offset : offset+2])
@@ -119,6 +114,17 @@ func Multiaddress(node *enode.Node) (peer.ID, []multiaddr.Multiaddr, error) {
 			return "", nil, fmt.Errorf("invalid multiaddress field length")
 		}
 
+		hostInfoStr := fmt.Sprintf("/p2p/%s", peerID.Pretty())
+		_, pID := peer.SplitAddr(addr)
+		if pID != "" && pID != peerID {
+			// Addresses in the ENR that contain a p2p component are circuit relay addr
+			hostInfoStr = "/p2p-circuit" + hostInfoStr
+		}
+
+		hostInfo, err := multiaddr.NewMultiaddr(hostInfoStr)
+		if err != nil {
+			return "", nil, err
+		}
 		result = append(result, addr.Encapsulate(hostInfo))
 
 		offset += 2 + int(maSize)

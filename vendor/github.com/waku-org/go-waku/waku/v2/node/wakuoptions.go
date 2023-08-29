@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p"
@@ -27,6 +26,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/legacy_filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
@@ -53,6 +53,7 @@ type WakuNodeParameters struct {
 	privKey        *ecdsa.PrivateKey
 	libP2POpts     []libp2p.Option
 	peerstore      peerstore.Peerstore
+	prometheusReg  prometheus.Registerer
 
 	enableNTP bool
 	ntpURLs   []string
@@ -68,24 +69,22 @@ type WakuNodeParameters struct {
 
 	enableRelay            bool
 	enableLegacyFilter     bool
-	isLegacyFilterFullnode bool
+	isLegacyFilterFullNode bool
 	enableFilterLightNode  bool
 	enableFilterFullNode   bool
 	legacyFilterOpts       []legacy_filter.Option
 	filterOpts             []filter.Option
-	wOpts                  []pubsub.Option
+	pubsubOpts             []pubsub.Option
 
 	minRelayPeersToPublish int
 
 	enableStore     bool
 	messageProvider store.MessageProvider
 
-	rendezvousNodes        []multiaddr.Multiaddr
-	enableRendezvousServer bool
+	enableRendezvousPoint bool
+	rendezvousDB          *rendezvous.DB
 
-	rendezvousDB *rendezvous.DB
-
-	discoveryMinPeers int
+	maxPeerConnections int
 
 	enableDiscV5     bool
 	udpPort          uint
@@ -96,16 +95,14 @@ type WakuNodeParameters struct {
 
 	enableRLN                    bool
 	rlnRelayMemIndex             uint
-	rlnRelayPubsubTopic          string
-	rlnRelayContentTopic         string
 	rlnRelayDynamic              bool
 	rlnSpamHandler               func(message *pb.WakuMessage) error
-	rlnETHPrivateKey             *ecdsa.PrivateKey
 	rlnETHClientAddress          string
 	keystorePath                 string
 	keystorePassword             string
+	keystoreIndex                uint
+	rlnTreePath                  string
 	rlnMembershipContractAddress common.Address
-	rlnRegistrationHandler       func(tx *types.Transaction)
 
 	keepAliveInterval time.Duration
 
@@ -121,7 +118,8 @@ type WakuNodeOption func(*WakuNodeParameters) error
 
 // Default options used in the libp2p node
 var DefaultWakuNodeOptions = []WakuNodeOption{
-	WithDiscoverParams(150),
+	WithPrometheusRegisterer(prometheus.NewRegistry()),
+	WithMaxPeerConnections(50),
 }
 
 // MultiAddresses return the list of multiaddresses configured in the node
@@ -158,6 +156,18 @@ func WithLogLevel(lvl zapcore.Level) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.logLevel = logging.LogLevel(lvl)
 		logging.SetAllLoggers(params.logLevel)
+		return nil
+	}
+}
+
+// WithPrometheusRegisterer configures go-waku to use reg as the Registerer for all metrics subsystems
+func WithPrometheusRegisterer(reg prometheus.Registerer) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		if reg == nil {
+			return errors.New("registerer cannot be nil")
+		}
+
+		params.prometheusReg = reg
 		return nil
 	}
 }
@@ -327,15 +337,15 @@ func WithWakuRelay(opts ...pubsub.Option) WakuNodeOption {
 func WithWakuRelayAndMinPeers(minRelayPeersToPublish int, opts ...pubsub.Option) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableRelay = true
-		params.wOpts = opts
+		params.pubsubOpts = opts
 		params.minRelayPeersToPublish = minRelayPeersToPublish
 		return nil
 	}
 }
 
-func WithDiscoverParams(minPeers int) WakuNodeOption {
+func WithMaxPeerConnections(maxPeers int) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
-		params.discoveryMinPeers = minPeers
+		params.maxPeerConnections = maxPeers
 		return nil
 	}
 }
@@ -364,7 +374,7 @@ func WithPeerExchange() WakuNodeOption {
 func WithLegacyWakuFilter(fullnode bool, filterOpts ...legacy_filter.Option) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.enableLegacyFilter = true
-		params.isLegacyFilterFullnode = fullnode
+		params.isLegacyFilterFullNode = fullnode
 		params.legacyFilterOpts = filterOpts
 		return nil
 	}
@@ -470,19 +480,11 @@ func WithWebsockets(address string, port int) WakuNodeOption {
 	}
 }
 
-// WithRendezvous is a WakuOption used to enable rendezvous as a discovery
-func WithRendezvous(rendezvousPoints []multiaddr.Multiaddr) WakuNodeOption {
-	return func(params *WakuNodeParameters) error {
-		params.rendezvousNodes = rendezvousPoints
-		return nil
-	}
-}
-
-// WithRendezvousServer is a WakuOption used to set the node as a rendezvous
+// WithRendezvous is a WakuOption used to set the node as a rendezvous
 // point, using an specific storage for the peer information
-func WithRendezvousServer(db *rendezvous.DB) WakuNodeOption {
+func WithRendezvous(db *rendezvous.DB) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
-		params.enableRendezvousServer = true
+		params.enableRendezvousPoint = true
 		params.rendezvousDB = db
 		return nil
 	}

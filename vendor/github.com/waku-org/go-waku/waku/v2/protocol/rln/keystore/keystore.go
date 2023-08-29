@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/waku-org/go-zerokit-rln/rln"
 	"go.uber.org/zap"
 )
 
-const RLN_CREDENTIALS_FILENAME = "rlnCredentials.json"
+const RLN_CREDENTIALS_FILENAME = "rlnKeystore.json"
 const RLN_CREDENTIALS_PASSWORD = "password"
 
 type MembershipContract struct {
@@ -27,8 +28,8 @@ type MembershipGroup struct {
 }
 
 type MembershipCredentials struct {
-	IdentityCredential rln.IdentityCredential `json:"identityCredential"`
-	MembershipGroups   []MembershipGroup      `json:"membershipGroups"`
+	IdentityCredential *rln.IdentityCredential `json:"identityCredential"`
+	MembershipGroups   []MembershipGroup       `json:"membershipGroups"`
 }
 
 type AppInfo struct {
@@ -38,16 +39,20 @@ type AppInfo struct {
 }
 
 type AppKeystore struct {
-	Application   string                `json:"application"`
-	AppIdentifier string                `json:"appIdentifier"`
-	Credentials   []keystore.CryptoJSON `json:"credentials"`
-	Version       string                `json:"version"`
+	Application   string                  `json:"application"`
+	AppIdentifier string                  `json:"appIdentifier"`
+	Credentials   []AppKeystoreCredential `json:"credentials"`
+	Version       string                  `json:"version"`
+}
+
+type AppKeystoreCredential struct {
+	Crypto keystore.CryptoJSON `json:"crypto"`
 }
 
 const DefaultSeparator = "\n"
 
 func (m MembershipCredentials) Equals(other MembershipCredentials) bool {
-	if !rln.IdentityCredentialEquals(m.IdentityCredential, other.IdentityCredential) {
+	if !rln.IdentityCredentialEquals(*m.IdentityCredential, *other.IdentityCredential) {
 		return false
 	}
 
@@ -194,7 +199,7 @@ func GetMembershipCredentials(logger *zap.Logger, credentialsPath string, passwo
 	var result []MembershipCredentials
 
 	for _, credential := range k.Credentials {
-		credentialsBytes, err := keystore.DecryptDataV3(credential, password)
+		credentialsBytes, err := keystore.DecryptDataV3(credential.Crypto, password)
 		if err != nil {
 			return nil, err
 		}
@@ -214,80 +219,102 @@ func GetMembershipCredentials(logger *zap.Logger, credentialsPath string, passwo
 	return result, nil
 }
 
-// Adds a sequence of membership credential to the keystore matching the application, appIdentifier and version filters.
-func AddMembershipCredentials(path string, credentials []MembershipCredentials, password string, appInfo AppInfo, separator string) error {
+// AddMembershipCredentials inserts a membership credential to the keystore matching the application, appIdentifier and version filters.
+func AddMembershipCredentials(path string, newIdentityCredential *rln.IdentityCredential, newMembershipGroup MembershipGroup, password string, appInfo AppInfo, separator string) (membershipGroupIndex uint, err error) {
 	k, err := LoadAppKeystore(path, appInfo, DefaultSeparator)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	var credentialsToAdd []MembershipCredentials
-	for _, newCredential := range credentials {
-		// A flag to tell us if the keystore contains a credential associated to the input identity credential, i.e. membershipCredential
-		found := -1
-		for i, existingCredentials := range k.Credentials {
-			credentialsBytes, err := keystore.DecryptDataV3(existingCredentials, password)
-			if err != nil {
-				continue
-			}
-
-			var credentials MembershipCredentials
-			err = json.Unmarshal(credentialsBytes, &credentials)
-			if err != nil {
-				continue
-			}
-
-			if rln.IdentityCredentialEquals(credentials.IdentityCredential, newCredential.IdentityCredential) {
-				// idCredential is present in keystore. We add the input credential membership group to the one contained in the decrypted keystore credential (we deduplicate groups using sets)
-				allMemberships := append(credentials.MembershipGroups, newCredential.MembershipGroups...)
-
-				// we define the updated credential with the updated membership sets
-				updatedCredential := MembershipCredentials{
-					IdentityCredential: newCredential.IdentityCredential,
-					MembershipGroups:   allMemberships,
-				}
-
-				// we re-encrypt creating a new keyfile
-				b, err := json.Marshal(updatedCredential)
-				if err != nil {
-					return err
-				}
-
-				encryptedCredentials, err := keystore.EncryptDataV3(b, []byte(password), keystore.StandardScryptN, keystore.StandardScryptP)
-				if err != nil {
-					return err
-				}
-
-				// we update the original credential field in keystoreCredentials
-				k.Credentials[i] = encryptedCredentials
-
-				found = i
-
-				// We stop decrypting other credentials in the keystore
-				break
-			}
-		}
-
-		if found == -1 {
-			credentialsToAdd = append(credentialsToAdd, newCredential)
-		}
-	}
-
-	for _, c := range credentialsToAdd {
-		b, err := json.Marshal(c)
+	// A flag to tell us if the keystore contains a credential associated to the input identity credential, i.e. membershipCredential
+	found := false
+	for i, existingCredentials := range k.Credentials {
+		credentialsBytes, err := keystore.DecryptDataV3(existingCredentials.Crypto, password)
 		if err != nil {
-			return err
+			continue
+		}
+
+		var credentials MembershipCredentials
+		err = json.Unmarshal(credentialsBytes, &credentials)
+		if err != nil {
+			continue
+		}
+
+		if rln.IdentityCredentialEquals(*credentials.IdentityCredential, *newIdentityCredential) {
+			// idCredential is present in keystore. We add the input credential membership group to the one contained in the decrypted keystore credential (we deduplicate groups using sets)
+			allMembershipsMap := make(map[MembershipGroup]struct{})
+			for _, m := range credentials.MembershipGroups {
+				allMembershipsMap[m] = struct{}{}
+			}
+			allMembershipsMap[newMembershipGroup] = struct{}{}
+
+			// We sort membership groups, otherwise we will not have deterministic results in tests
+			var allMemberships []MembershipGroup
+			for k := range allMembershipsMap {
+				allMemberships = append(allMemberships, k)
+			}
+			sort.Slice(allMemberships, func(i, j int) bool {
+				return allMemberships[i].MembershipContract.Address < allMemberships[j].MembershipContract.Address
+			})
+
+			// we define the updated credential with the updated membership sets
+			updatedCredential := MembershipCredentials{
+				IdentityCredential: newIdentityCredential,
+				MembershipGroups:   allMemberships,
+			}
+
+			// we re-encrypt creating a new keyfile
+			b, err := json.Marshal(updatedCredential)
+			if err != nil {
+				return 0, err
+			}
+
+			encryptedCredentials, err := keystore.EncryptDataV3(b, []byte(password), keystore.StandardScryptN, keystore.StandardScryptP)
+			if err != nil {
+				return 0, err
+			}
+
+			// we update the original credential field in keystoreCredentials
+			k.Credentials[i] = AppKeystoreCredential{Crypto: encryptedCredentials}
+
+			found = true
+
+			// We setup the return values
+			membershipGroupIndex = uint(len(allMemberships))
+			for mIdx, mg := range updatedCredential.MembershipGroups {
+				if mg.MembershipContract.Equals(newMembershipGroup.MembershipContract) {
+					membershipGroupIndex = uint(mIdx)
+					break
+				}
+			}
+
+			// We stop decrypting other credentials in the keystore
+			break
+		}
+	}
+
+	if !found { // Not found
+		newCredential := MembershipCredentials{
+			IdentityCredential: newIdentityCredential,
+			MembershipGroups:   []MembershipGroup{newMembershipGroup},
+		}
+
+		b, err := json.Marshal(newCredential)
+		if err != nil {
+			return 0, err
 		}
 
 		encryptedCredentials, err := keystore.EncryptDataV3(b, []byte(password), keystore.StandardScryptN, keystore.StandardScryptP)
 		if err != nil {
-			return err
+			return 0, err
 		}
 
-		k.Credentials = append(k.Credentials, encryptedCredentials)
+		k.Credentials = append(k.Credentials, AppKeystoreCredential{Crypto: encryptedCredentials})
+
+		membershipGroupIndex = uint(len(newCredential.MembershipGroups) - 1)
 	}
 
-	return save(k, path, separator)
+	return membershipGroupIndex, save(k, path, separator)
 }
 
 // Safely saves a Keystore's JsonNode to disk.
