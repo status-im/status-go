@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/contracts/community-tokens/assets"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/contracts/community-tokens/mastertoken"
+	"github.com/status-im/status-go/contracts/community-tokens/ownertoken"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -22,6 +23,32 @@ type TokenInstance interface {
 	Mint(*bind.TransactOpts, []string, *bigint.BigInt) (*types.Transaction, error)
 	SetMaxSupply(*bind.TransactOpts, *big.Int) (*types.Transaction, error)
 	PackMethod(ctx context.Context, methodName string, args ...interface{}) ([]byte, error)
+}
+
+// Owner Token
+type OwnerTokenInstance struct {
+	TokenInstance
+	instance *ownertoken.OwnerToken
+}
+
+func (t OwnerTokenInstance) RemoteBurn(transactOpts *bind.TransactOpts, tokenIds []*big.Int) (*types.Transaction, error) {
+	return nil, fmt.Errorf("remote destruction for owner token not implemented")
+}
+
+func (t OwnerTokenInstance) Mint(transactOpts *bind.TransactOpts, walletAddresses []string, amount *bigint.BigInt) (*types.Transaction, error) {
+	return nil, fmt.Errorf("minting for owner token not implemented")
+}
+
+func (t OwnerTokenInstance) SetMaxSupply(transactOpts *bind.TransactOpts, maxSupply *big.Int) (*types.Transaction, error) {
+	return nil, fmt.Errorf("setting max supply for owner token not implemented")
+}
+
+func (t OwnerTokenInstance) PackMethod(ctx context.Context, methodName string, args ...interface{}) ([]byte, error) {
+	ownerTokenABI, err := abi.JSON(strings.NewReader(ownertoken.OwnerTokenABI))
+	if err != nil {
+		return []byte{}, err
+	}
+	return ownerTokenABI.Pack(methodName, args...)
 }
 
 // Master Token
@@ -88,7 +115,7 @@ type AssetInstance struct {
 }
 
 func (t AssetInstance) RemoteBurn(transactOpts *bind.TransactOpts, tokenIds []*big.Int) (*types.Transaction, error) {
-	return nil, fmt.Errorf("remote burn not implemented")
+	return nil, fmt.Errorf("remote destruction for assets not implemented")
 }
 
 // The amount should be in smallest denomination of the asset (like wei) with decimal = 18, eg.
@@ -122,6 +149,12 @@ func NewTokenInstance(api *API, chainID uint64, contractAddress string) (TokenIn
 		return nil, err
 	}
 	switch {
+	case privLevel == token.OwnerLevel:
+		contractInst, err := api.NewOwnerTokenInstance(chainID, contractAddress)
+		if err != nil {
+			return nil, err
+		}
+		return &OwnerTokenInstance{instance: contractInst}, nil
 	case privLevel == token.MasterLevel:
 		contractInst, err := api.NewMasterTokenInstance(chainID, contractAddress)
 		if err != nil {

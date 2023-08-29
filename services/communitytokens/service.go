@@ -14,6 +14,7 @@ import (
 type ServiceInterface interface {
 	GetCollectibleContractData(chainID uint64, contractAddress string) (*CollectibleContractData, error)
 	GetAssetContractData(chainID uint64, contractAddress string) (*AssetContractData, error)
+	DeploymentSignatureDigest(chainID uint64, addressFrom string, communityID string) ([]byte, error)
 }
 
 // Collectibles service
@@ -69,4 +70,8 @@ func (s *Service) GetCollectibleContractData(chainID uint64, contractAddress str
 
 func (s *Service) GetAssetContractData(chainID uint64, contractAddress string) (*AssetContractData, error) {
 	return s.manager.GetAssetContractData(chainID, contractAddress)
+}
+
+func (s *Service) DeploymentSignatureDigest(chainID uint64, addressFrom string, communityID string) ([]byte, error) {
+	return s.manager.DeploymentSignatureDigest(chainID, addressFrom, communityID)
 }

@@ -14,8 +14,10 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/contracts/community-tokens/assets"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
+	communitytokendeployer "github.com/status-im/status-go/contracts/community-tokens/deployer"
 	"github.com/status-im/status-go/contracts/community-tokens/mastertoken"
 	"github.com/status-im/status-go/contracts/community-tokens/ownertoken"
+	communityownertokenregistry "github.com/status-im/status-go/contracts/community-tokens/registry"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/utils"
@@ -129,10 +131,46 @@ func (api *API) DeployCollectibles(ctx context.Context, chainID uint64, deployme
 	return DeploymentDetails{address.Hex(), tx.Hash().Hex()}, nil
 }
 
-func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64, ownerTokenParameters DeploymentParameters, masterTokenParameters DeploymentParameters, txArgs transactions.SendTxArgs, password string) (DeploymentDetails, error) {
+func decodeSignature(sig []byte) (r [32]byte, s [32]byte, v uint8, err error) {
+	if len(sig) != crypto.SignatureLength {
+		return [32]byte{}, [32]byte{}, 0, fmt.Errorf("wrong size for signature: got %d, want %d", len(sig), crypto.SignatureLength)
+	}
+	copy(r[:], sig[:32])
+	copy(s[:], sig[32:64])
+	v = sig[64] + 27
+	return r, s, v, nil
+}
+
+func prepareDeploymentSignatureStruct(signature string, communityID string, addressFrom common.Address) (communitytokendeployer.CommunityTokenDeployerDeploymentSignature, error) {
+	r, s, v, err := decodeSignature(common.FromHex(signature))
+	if err != nil {
+		return communitytokendeployer.CommunityTokenDeployerDeploymentSignature{}, err
+	}
+	communityEthAddress, err := convert33BytesPubKeyToEthAddress(communityID)
+	if err != nil {
+		return communitytokendeployer.CommunityTokenDeployerDeploymentSignature{}, err
+	}
+	communitySignature := communitytokendeployer.CommunityTokenDeployerDeploymentSignature{
+		V:        v,
+		R:        r,
+		S:        s,
+		Deployer: addressFrom,
+		Signer:   communityEthAddress,
+	}
+	return communitySignature, nil
+}
+
+func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64,
+	ownerTokenParameters DeploymentParameters, masterTokenParameters DeploymentParameters,
+	signature string, communityID string, signerPubKey string,
+	txArgs transactions.SendTxArgs, password string) (DeploymentDetails, error) {
 	err := ownerTokenParameters.Validate(false)
 	if err != nil {
 		return DeploymentDetails{}, err
+	}
+
+	if len(signerPubKey) <= 0 {
+		return DeploymentDetails{}, fmt.Errorf("signerPubKey is empty")
 	}
 
 	err = masterTokenParameters.Validate(false)
@@ -142,18 +180,32 @@ func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64, ownerToken
 
 	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
 
-	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
+	deployerContractInst, err := api.NewCommunityTokenDeployerInstance(chainID)
 	if err != nil {
-		log.Error(err.Error())
 		return DeploymentDetails{}, err
 	}
 
-	signerPubKey := []byte{}
+	ownerTokenConfig := communitytokendeployer.CommunityTokenDeployerTokenConfig{
+		Name:    ownerTokenParameters.Name,
+		Symbol:  ownerTokenParameters.Symbol,
+		BaseURI: ownerTokenParameters.TokenURI,
+	}
 
-	address, tx, _, err := ownertoken.DeployOwnerToken(transactOpts, ethClient, ownerTokenParameters.Name,
-		ownerTokenParameters.Symbol, ownerTokenParameters.TokenURI,
-		masterTokenParameters.Name, masterTokenParameters.Symbol,
-		masterTokenParameters.TokenURI, signerPubKey)
+	masterTokenConfig := communitytokendeployer.CommunityTokenDeployerTokenConfig{
+		Name:    masterTokenParameters.Name,
+		Symbol:  masterTokenParameters.Symbol,
+		BaseURI: masterTokenParameters.TokenURI,
+	}
+
+	communitySignature, err := prepareDeploymentSignatureStruct(signature, communityID, common.Address(txArgs.From))
+	if err != nil {
+		return DeploymentDetails{}, err
+	}
+
+	log.Debug("Signature:", communitySignature)
+
+	tx, err := deployerContractInst.Deploy(transactOpts, ownerTokenConfig, masterTokenConfig, communitySignature, common.FromHex(signerPubKey))
+
 	if err != nil {
 		log.Error(err.Error())
 		return DeploymentDetails{}, err
@@ -171,7 +223,7 @@ func (api *API) DeployOwnerToken(ctx context.Context, chainID uint64, ownerToken
 		return DeploymentDetails{}, err
 	}
 
-	return DeploymentDetails{address.Hex(), tx.Hash().Hex()}, nil
+	return DeploymentDetails{"", tx.Hash().Hex()}, nil
 }
 
 func (api *API) GetMasterTokenContractAddressFromHash(ctx context.Context, chainID uint64, txHash string) (string, error) {
@@ -185,24 +237,55 @@ func (api *API) GetMasterTokenContractAddressFromHash(ctx context.Context, chain
 		return "", err
 	}
 
-	logMasterTokenCreatedSig := []byte("MasterTokenCreated(address)")
+	deployerContractInst, err := api.NewCommunityTokenDeployerInstance(chainID)
+	if err != nil {
+		return "", err
+	}
+
+	logMasterTokenCreatedSig := []byte("DeployMasterToken(address)")
 	logMasterTokenCreatedSigHash := crypto.Keccak256Hash(logMasterTokenCreatedSig)
 
 	for _, vLog := range receipt.Logs {
 		if vLog.Topics[0].Hex() == logMasterTokenCreatedSigHash.Hex() {
-			ownerTokenABI, err := abi.JSON(strings.NewReader(ownertoken.OwnerTokenABI))
+			event, err := deployerContractInst.ParseDeployMasterToken(*vLog)
 			if err != nil {
 				return "", err
 			}
-			event := new(ownertoken.OwnerTokenMasterTokenCreated)
-			err = ownerTokenABI.UnpackIntoInterface(event, "MasterTokenCreated", vLog.Data)
-			if err != nil {
-				return "", err
-			}
-			return event.MasterToken.Hex(), nil
+			return event.Arg0.Hex(), nil
 		}
 	}
 	return "", fmt.Errorf("can't find master token address in transaction: %v", txHash)
+}
+
+func (api *API) GetOwnerTokenContractAddressFromHash(ctx context.Context, chainID uint64, txHash string) (string, error) {
+	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
+	if err != nil {
+		return "", err
+	}
+
+	receipt, err := ethClient.TransactionReceipt(ctx, common.HexToHash(txHash))
+	if err != nil {
+		return "", err
+	}
+
+	deployerContractInst, err := api.NewCommunityTokenDeployerInstance(chainID)
+	if err != nil {
+		return "", err
+	}
+
+	logOwnerTokenCreatedSig := []byte("DeployOwnerToken(address)")
+	logOwnerTokenCreatedSigHash := crypto.Keccak256Hash(logOwnerTokenCreatedSig)
+
+	for _, vLog := range receipt.Logs {
+		if vLog.Topics[0].Hex() == logOwnerTokenCreatedSigHash.Hex() {
+			event, err := deployerContractInst.ParseDeployOwnerToken(*vLog)
+			if err != nil {
+				return "", err
+			}
+			return event.Arg0.Hex(), nil
+		}
+	}
+	return "", fmt.Errorf("can't find owner token address in transaction: %v", txHash)
 }
 
 func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentParameters DeploymentParameters, txArgs transactions.SendTxArgs, password string) (DeploymentDetails, error) {
@@ -220,8 +303,9 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 		return DeploymentDetails{}, err
 	}
 
+	const decimals = 18
 	address, tx, _, err := assets.DeployAssets(transactOpts, ethClient, deploymentParameters.Name,
-		deploymentParameters.Symbol, deploymentParameters.GetSupply())
+		deploymentParameters.Symbol, decimals, deploymentParameters.GetSupply())
 	if err != nil {
 		log.Error(err.Error())
 		return DeploymentDetails{}, err
@@ -244,20 +328,105 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 
 // Returns gas units + 10%
 func (api *API) DeployCollectiblesEstimate(ctx context.Context) (uint64, error) {
-	gasAmount := uint64(2091605)
+	// TODO investigate why the code below does not return correct values
+	/*ethClient, err := api.s.manager.rpcClient.EthClient(420)
+	if err != nil {
+		log.Error(err.Error())
+		return 0, err
+	}
+
+	collectiblesABI, err := abi.JSON(strings.NewReader(collectibles.CollectiblesABI))
+	if err != nil {
+		return 0, err
+	}
+
+	data, err := collectiblesABI.Pack("", "name", "SYMBOL", big.NewInt(20), true, false, "tokenUriwhcih is very long asdkfjlsdkjflk",
+		common.HexToAddress("0x77b48394c650520012795a1a25696d7eb542d110"), common.HexToAddress("0x77b48394c650520012795a1a25696d7eb542d110"))
+	if err != nil {
+		return 0, err
+	}
+
+	callMsg := ethereum.CallMsg{
+		From:  common.HexToAddress("0x77b48394c650520012795a1a25696d7eb542d110"),
+		To:    nil,
+		Value: big.NewInt(0),
+		Data:  data,
+	}
+	estimate, err := ethClient.EstimateGas(ctx, callMsg)
+	if err != nil {
+		return 0, err
+	}
+	return estimate + uint64(float32(estimate)*0.1), nil*/
+
+	// TODO compute fee dynamically
+	// the code above returns too low fees, need to investigate
+	gasAmount := uint64(2500000)
 	return gasAmount + uint64(float32(gasAmount)*0.1), nil
 }
 
 // Returns gas units + 10%
 func (api *API) DeployAssetsEstimate(ctx context.Context) (uint64, error) {
-	gasAmount := uint64(957483)
+	// TODO compute fee dynamically
+	gasAmount := uint64(1500000)
 	return gasAmount + uint64(float32(gasAmount)*0.1), nil
 }
 
-// Returns gas units + 10%
-func (api *API) DeployOwnerTokenEstimate(ctx context.Context) (uint64, error) {
-	ownerGasAmount := uint64(4389457)
-	return ownerGasAmount + uint64(float32(ownerGasAmount)*0.1), nil
+func (api *API) DeployOwnerTokenEstimate(ctx context.Context, chainID uint64, fromAddress string,
+	ownerTokenParameters DeploymentParameters, masterTokenParameters DeploymentParameters,
+	signature string, communityID string, signerPubKey string) (uint64, error) {
+	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
+	if err != nil {
+		log.Error(err.Error())
+		return 0, err
+	}
+
+	deployerAddress, err := communitytokendeployer.ContractAddress(chainID)
+	if err != nil {
+		return 0, err
+	}
+
+	deployerABI, err := abi.JSON(strings.NewReader(communitytokendeployer.CommunityTokenDeployerABI))
+	if err != nil {
+		return 0, err
+	}
+
+	ownerTokenConfig := communitytokendeployer.CommunityTokenDeployerTokenConfig{
+		Name:    ownerTokenParameters.Name,
+		Symbol:  ownerTokenParameters.Symbol,
+		BaseURI: ownerTokenParameters.TokenURI,
+	}
+
+	masterTokenConfig := communitytokendeployer.CommunityTokenDeployerTokenConfig{
+		Name:    masterTokenParameters.Name,
+		Symbol:  masterTokenParameters.Symbol,
+		BaseURI: masterTokenParameters.TokenURI,
+	}
+
+	communitySignature, err := prepareDeploymentSignatureStruct(signature, communityID, common.HexToAddress(fromAddress))
+	if err != nil {
+		return 0, err
+	}
+
+	data, err := deployerABI.Pack("deploy", ownerTokenConfig, masterTokenConfig, communitySignature, common.FromHex(signerPubKey))
+
+	if err != nil {
+		return 0, err
+	}
+
+	toAddr := deployerAddress
+	fromAddr := common.HexToAddress(fromAddress)
+
+	callMsg := ethereum.CallMsg{
+		From:  fromAddr,
+		To:    &toAddr,
+		Value: big.NewInt(0),
+		Data:  data,
+	}
+	estimate, err := ethClient.EstimateGas(ctx, callMsg)
+	if err != nil {
+		return 0, err
+	}
+	return estimate + uint64(float32(estimate)*0.1), nil
 }
 
 func (api *API) NewMasterTokenInstance(chainID uint64, contractAddress string) (*mastertoken.MasterToken, error) {
@@ -266,6 +435,26 @@ func (api *API) NewMasterTokenInstance(chainID uint64, contractAddress string) (
 		return nil, err
 	}
 	return mastertoken.NewMasterToken(common.HexToAddress(contractAddress), backend)
+}
+
+func (api *API) NewOwnerTokenInstance(chainID uint64, contractAddress string) (*ownertoken.OwnerToken, error) {
+	backend, err := api.s.manager.rpcClient.EthClient(chainID)
+	if err != nil {
+		return nil, err
+	}
+	return ownertoken.NewOwnerToken(common.HexToAddress(contractAddress), backend)
+}
+
+func (api *API) NewCommunityTokenDeployerInstance(chainID uint64) (*communitytokendeployer.CommunityTokenDeployer, error) {
+	return api.s.manager.NewCommunityTokenDeployerInstance(chainID)
+}
+
+func (api *API) NewCommunityOwnerTokenRegistryInstance(chainID uint64, contractAddress string) (*communityownertokenregistry.CommunityOwnerTokenRegistry, error) {
+	backend, err := api.s.manager.rpcClient.EthClient(chainID)
+	if err != nil {
+		return nil, err
+	}
+	return communityownertokenregistry.NewCommunityOwnerTokenRegistry(common.HexToAddress(contractAddress), backend)
 }
 
 func (api *API) NewCollectiblesInstance(chainID uint64, contractAddress string) (*collectibles.Collectibles, error) {
@@ -678,4 +867,92 @@ func (api *API) estimateMethod(ctx context.Context, chainID uint64, contractAddr
 		return 0, err
 	}
 	return estimate + uint64(float32(estimate)*0.1), nil
+}
+
+// Gets signer public key from smart contract with a given chainId and address
+func (api *API) GetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string) (string, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+	contractInst, err := api.NewOwnerTokenInstance(chainID, contractAddress)
+	if err != nil {
+		return "", err
+	}
+	signerPubKey, err := contractInst.SignerPublicKey(callOpts)
+	if err != nil {
+		return "", err
+	}
+	return common.Bytes2Hex(signerPubKey), nil
+}
+
+// Gets signer public key directly from deployer contract
+func (api *API) SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error) {
+	// 1. Get Owner Token contract address from deployer contract - SafeGetOwnerTokenAddress()
+	ownerTokenAddr, err := api.SafeGetOwnerTokenAddress(ctx, chainID, communityID)
+	if err != nil {
+		return "", err
+	}
+	// 2. Get Signer from owner token contract - GetSignerPubKey()
+	return api.GetSignerPubKey(ctx, chainID, ownerTokenAddr)
+}
+
+// Gets owner token contract address from deployer contract
+func (api *API) SafeGetOwnerTokenAddress(ctx context.Context, chainID uint64, communityID string) (string, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+	deployerContractInst, err := api.NewCommunityTokenDeployerInstance(chainID)
+	if err != nil {
+		return "", err
+	}
+	registryAddr, err := deployerContractInst.DeploymentRegistry(callOpts)
+	if err != nil {
+		return "", err
+	}
+	registryContractInst, err := api.NewCommunityOwnerTokenRegistryInstance(chainID, registryAddr.Hex())
+	if err != nil {
+		return "", err
+	}
+	communityEthAddress, err := convert33BytesPubKeyToEthAddress(communityID)
+	if err != nil {
+		return "", err
+	}
+	ownerTokenAddress, err := registryContractInst.GetEntry(callOpts, communityEthAddress)
+
+	return ownerTokenAddress.Hex(), err
+}
+
+func (api *API) SetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, newSignerPubKey string) (string, error) {
+	if len(newSignerPubKey) <= 0 {
+		return "", fmt.Errorf("signerPubKey is empty")
+	}
+
+	transactOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.s.accountsManager, api.s.config.KeyStoreDir, txArgs.From, password))
+
+	contractInst, err := api.NewOwnerTokenInstance(chainID, contractAddress)
+	if err != nil {
+		return "", err
+	}
+
+	tx, err := contractInst.SetSignerPublicKey(transactOpts, common.FromHex(newSignerPubKey))
+	if err != nil {
+		return "", err
+	}
+
+	err = api.s.pendingTracker.TrackPendingTransaction(
+		wcommon.ChainID(chainID),
+		tx.Hash(),
+		common.Address(txArgs.From),
+		transactions.SetSignerPublicKey,
+		transactions.AutoDelete,
+	)
+	if err != nil {
+		log.Error("TrackPendingTransaction error", "error", err)
+		return "", err
+	}
+
+	return tx.Hash().Hex(), nil
+}
+
+func (api *API) EstimateSetSignerPubKey(ctx context.Context, chainID uint64, contractAddress string, fromAddress string, newSignerPubKey string) (uint64, error) {
+	if len(newSignerPubKey) <= 0 {
+		return 0, fmt.Errorf("signerPubKey is empty")
+	}
+	return api.estimateMethod(ctx, chainID, contractAddress, fromAddress, "setSignerPublicKey", newSignerPubKey)
 }

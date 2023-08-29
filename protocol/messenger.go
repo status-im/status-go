@@ -5077,6 +5077,10 @@ func (m *Messenger) SignMessage(message string) ([]byte, error) {
 	return crypto.Sign(hash, m.identity)
 }
 
+func (m *Messenger) CreateCommunityTokenDeploymentSignature(ctx context.Context, chainID uint64, addressFrom string, communityID string) ([]byte, error) {
+	return m.communitiesManager.CreateCommunityTokenDeploymentSignature(ctx, chainID, addressFrom, communityID)
+}
+
 func (m *Messenger) getTimesource() common.TimeSource {
 	return m.transport
 }
