@@ -385,11 +385,11 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSh
 
 	s.Require().Equal(3, community.MembersCount())
 
+	// Check owner's DB for revealed accounts
 	for pubKey := range community.Members() {
 		if pubKey != common.PubkeyToHex(&s.owner.identity.PublicKey) {
 			revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), pubKey)
 			s.Require().NoError(err)
-
 			switch pubKey {
 			case common.PubkeyToHex(&s.alice.identity.PublicKey):
 				s.Require().Len(revealedAccounts, 2)
@@ -405,6 +405,21 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSh
 			}
 		}
 	}
+
+	// Check Bob's DB for revealed accounts
+	revealedAccountsInBobsDB, err := s.bob.communitiesManager.GetRevealedAddresses(community.ID(), common.PubkeyToHex(&s.bob.identity.PublicKey))
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccountsInBobsDB, 1)
+	s.Require().Equal(revealedAccountsInBobsDB[0].Address, bobAddress)
+	s.Require().Equal(true, revealedAccountsInBobsDB[0].IsAirdropAddress)
+
+	// Check Alices's DB for revealed accounts
+	revealedAccountsInAlicesDB, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccountsInAlicesDB, 2)
+	s.Require().Equal(revealedAccountsInAlicesDB[0].Address, aliceAddress1)
+	s.Require().Equal(revealedAccountsInAlicesDB[1].Address, aliceAddress2)
+	s.Require().Equal(true, revealedAccountsInAlicesDB[0].IsAirdropAddress)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSelectedSharedAddress() {
@@ -418,21 +433,21 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersSe
 
 	s.Require().Equal(2, community.MembersCount())
 
-	for pubKey := range community.Members() {
-		if pubKey != common.PubkeyToHex(&s.owner.identity.PublicKey) {
-			revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), pubKey)
-			s.Require().NoError(err)
-			s.Require().Len(revealedAccounts, 1)
+	alicePubkey := common.PubkeyToHex(&s.alice.identity.PublicKey)
 
-			switch pubKey {
-			case common.PubkeyToHex(&s.alice.identity.PublicKey):
-				s.Require().Equal(revealedAccounts[0].Address, aliceAddress2)
-				s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
-			default:
-				s.Require().Fail("pubKey does not match expected keys")
-			}
-		}
-	}
+	// Check owner's DB for revealed accounts
+	revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccounts, 1)
+	s.Require().Equal(revealedAccounts[0].Address, aliceAddress2)
+	s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
+
+	// Check Alice's DB for revealed accounts
+	revealedAccountsInAlicesDB, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccountsInAlicesDB, 1)
+	s.Require().Equal(revealedAccountsInAlicesDB[0].Address, aliceAddress2)
+	s.Require().Equal(true, revealedAccountsInAlicesDB[0].IsAirdropAddress)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersMultipleSelectedSharedAddresses() {
@@ -446,32 +461,23 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinedCommunityMembersMu
 
 	s.Require().Equal(2, community.MembersCount())
 
-	for pubKey := range community.Members() {
-		if pubKey != common.PubkeyToHex(&s.owner.identity.PublicKey) {
-			revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), pubKey)
-			s.Require().NoError(err)
-			s.Require().Len(revealedAccounts, 2)
+	alicePubkey := common.PubkeyToHex(&s.alice.identity.PublicKey)
 
-			switch pubKey {
-			case common.PubkeyToHex(&s.alice.identity.PublicKey):
-				s.Require().Equal(revealedAccounts[0].Address, aliceAddress1)
-				s.Require().Equal(revealedAccounts[1].Address, aliceAddress2)
-				s.Require().Equal(true, revealedAccounts[1].IsAirdropAddress)
-			default:
-				s.Require().Fail("pubKey does not match expected keys")
-			}
-		}
-	}
-}
+	// Check owner's DB for revealed accounts
+	revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccounts, 2)
+	s.Require().Equal(revealedAccounts[0].Address, aliceAddress1)
+	s.Require().Equal(revealedAccounts[1].Address, aliceAddress2)
+	s.Require().Equal(true, revealedAccounts[1].IsAirdropAddress)
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) validateAddress(accounts []*protobuf.RevealedAccount, wantedAddress string) error {
-
-	for _, account := range accounts {
-		if account.Address != wantedAddress {
-			return errors.New("revealed address does not match the wanted address. Wanted " + wantedAddress + ", Found: " + account.Address)
-		}
-	}
-	return nil
+	// Check Alice's DB for revealed accounts
+	revealedAccountsInAlicesDB, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
+	s.Require().NoError(err)
+	s.Require().Len(revealedAccountsInAlicesDB, 2)
+	s.Require().Equal(revealedAccountsInAlicesDB[0].Address, aliceAddress1)
+	s.Require().Equal(revealedAccountsInAlicesDB[1].Address, aliceAddress2)
+	s.Require().Equal(true, revealedAccountsInAlicesDB[1].IsAirdropAddress)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
@@ -484,11 +490,20 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 	s.Require().NoError(err)
 	s.Require().Equal(2, community.MembersCount())
 
-	revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
+	alicePubkey := common.PubkeyToHex(&s.alice.identity.PublicKey)
+
+	revealedAccounts, err := s.owner.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
 	s.Require().NoError(err)
 
-	err = s.validateAddress(revealedAccounts, aliceAddress2)
+	s.Require().Len(revealedAccounts, 1)
+	s.Require().Equal(revealedAccounts[0].Address, aliceAddress2)
+	s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
+
+	alicesRevealedAccounts, err := s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
 	s.Require().NoError(err)
+	s.Require().Len(alicesRevealedAccounts, 1)
+	s.Require().Equal(alicesRevealedAccounts[0].Address, aliceAddress2)
+	s.Require().Equal(true, alicesRevealedAccounts[0].IsAirdropAddress)
 
 	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(alicePassword)))
 	request := &requests.EditSharedAddresses{CommunityID: community.ID(), Password: passwdHash, AddressesToReveal: []string{aliceAddress1}, AirdropAddress: aliceAddress1}
@@ -508,11 +523,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 		return nil
 	})
 	s.Require().NoError(err)
-	revealedAccounts, err = s.owner.communitiesManager.GetRevealedAddresses(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
+	revealedAccounts, err = s.owner.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
 	s.Require().NoError(err)
 
-	err = s.validateAddress(revealedAccounts, aliceAddress1)
-	s.Require().NoError(err)
+	s.Require().Len(revealedAccounts, 1)
+	s.Require().Equal(revealedAccounts[0].Address, aliceAddress1)
+	s.Require().Equal(true, revealedAccounts[0].IsAirdropAddress)
 
 	// Retrieve community description change
 	err = tt.RetryWithBackOff(func() error {
@@ -526,6 +542,12 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 		return nil
 	})
 	s.Require().NoError(err)
+
+	alicesRevealedAccounts, err = s.alice.communitiesManager.GetRevealedAddresses(community.ID(), alicePubkey)
+	s.Require().NoError(err)
+	s.Require().Len(alicesRevealedAccounts, 1)
+	s.Require().Equal(alicesRevealedAccounts[0].Address, aliceAddress1)
+	s.Require().Equal(true, alicesRevealedAccounts[0].IsAirdropAddress)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions() {

@@ -378,7 +378,7 @@ func (p *Persistence) SaveRequestToJoin(request *RequestToJoin) (err error) {
 	return err
 }
 
-func (p *Persistence) SaveRequestToJoinRevealedAddresses(request *RequestToJoin) (err error) {
+func (p *Persistence) SaveRequestToJoinRevealedAddresses(requestID types.HexBytes, revealedAccounts []*protobuf.RevealedAccount) (err error) {
 	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return
@@ -398,7 +398,7 @@ func (p *Persistence) SaveRequestToJoinRevealedAddresses(request *RequestToJoin)
 		return
 	}
 	defer stmt.Close()
-	for _, account := range request.RevealedAccounts {
+	for _, account := range revealedAccounts {
 
 		var chainIDs []string
 		for _, ID := range account.ChainIds {
@@ -406,7 +406,7 @@ func (p *Persistence) SaveRequestToJoinRevealedAddresses(request *RequestToJoin)
 		}
 
 		_, err = stmt.Exec(
-			request.ID,
+			requestID,
 			account.Address,
 			strings.Join(chainIDs, ","),
 			account.IsAirdropAddress,

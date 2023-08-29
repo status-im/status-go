@@ -1144,6 +1144,16 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 		requestToEditRevealedAccountsProto.RevealedAccounts = append(requestToEditRevealedAccountsProto.RevealedAccounts, revealedAccount)
 	}
 
+	requestID := communities.CalculateRequestID(common.PubkeyToHex(&m.identity.PublicKey), request.CommunityID)
+	err = m.communitiesManager.RemoveRequestToJoinRevealedAddresses(requestID)
+	if err != nil {
+		return nil, err
+	}
+	err = m.communitiesManager.SaveRequestToJoinRevealedAddresses(requestID, requestToEditRevealedAccountsProto.RevealedAccounts)
+	if err != nil {
+		return nil, err
+	}
+
 	payload, err := proto.Marshal(requestToEditRevealedAccountsProto)
 	if err != nil {
 		return nil, err
