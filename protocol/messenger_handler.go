@@ -3101,7 +3101,8 @@ func mapSyncAccountToAccount(message *protobuf.SyncAccount, accountOperability a
 	}
 }
 
-func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, syncKpMigratedToKeycard bool, accountReceivedFromLocalPairing bool) (accounts.AccountOperable, error) {
+func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, syncKpMigratedToKeycard bool,
+	dbKpMigratedToKeycard bool, accountReceivedFromLocalPairing bool) (accounts.AccountOperable, error) {
 	if accountReceivedFromLocalPairing {
 		return accounts.AccountOperable(syncAcc.Operable), nil
 	}
@@ -3116,6 +3117,10 @@ func (m *Messenger) resolveAccountOperability(syncAcc *protobuf.SyncAccount, syn
 		return accountsOperability, err
 	}
 	if dbAccount != nil {
+		// We're here when we receive a keypair from the paired device which has just migrated from keycard to app.
+		if !syncKpMigratedToKeycard && dbKpMigratedToKeycard {
+			return accounts.AccountNonOperable, nil
+		}
 		return dbAccount.Operable, nil
 	}
 
@@ -3275,7 +3280,8 @@ func (m *Messenger) handleSyncKeypair(message *protobuf.SyncKeypair, fromLocalPa
 			}
 			syncKpMigratedToKeycard = multiAcc != nil && multiAcc.KeycardPairing != ""
 		}
-		accountOperability, err := m.resolveAccountOperability(sAcc, syncKpMigratedToKeycard, fromLocalPairing)
+		accountOperability, err := m.resolveAccountOperability(sAcc, syncKpMigratedToKeycard,
+			dbKeypair != nil && dbKeypair.MigratedToKeycard(), fromLocalPairing)
 		if err != nil {
 			return nil, err
 		}
