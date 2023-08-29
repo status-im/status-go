@@ -994,6 +994,10 @@ func (api *PublicAPI) SignMessageWithChatKey(ctx context.Context, message string
 	return api.service.messenger.SignMessage(message)
 }
 
+func (api *PublicAPI) CreateCommunityTokenDeploymentSignature(ctx context.Context, chainID uint64, addressFrom string, communityID string) (types.HexBytes, error) {
+	return api.service.messenger.CreateCommunityTokenDeploymentSignature(ctx, chainID, addressFrom, communityID)
+}
+
 // wallet connect session apis
 func (api *PublicAPI) AddWalletConnectSession(ctx context.Context, request *requests.AddWalletConnectSession) error {
 	return api.service.messenger.AddWalletConnectSession(request)

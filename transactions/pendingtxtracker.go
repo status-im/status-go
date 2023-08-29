@@ -358,6 +358,7 @@ const (
 	RemoteDestructCollectible PendingTrxType = "RemoteDestructCollectible"
 	BurnCommunityToken        PendingTrxType = "BurnCommunityToken"
 	DeployOwnerToken          PendingTrxType = "DeployOwnerToken"
+	SetSignerPublicKey        PendingTrxType = "SetSignerPublicKey"
 )
 
 type PendingTransaction struct {

@@ -118,6 +118,10 @@ func (c *CollectiblesServiceMock) SetMockAssetContractData(chainID uint64, contr
 	c.Assets[chainID][contractAddress] = assetData
 }
 
+func (c *CollectiblesServiceMock) DeploymentSignatureDigest(chainID uint64, addressFrom string, communityID string) ([]byte, error) {
+	return gethcommon.Hex2Bytes("ccbb375343347491706cf4b43796f7b96ccc89c9e191a8b78679daeba1684ec7"), nil
+}
+
 func newMessenger(s *suite.Suite, shh types.Waku, logger *zap.Logger, password string, walletAddresses []string,
 	mockedBalances *map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, collectiblesService communitytokens.ServiceInterface) *Messenger {
 	accountsManagerMock := &AccountManagerMock{}

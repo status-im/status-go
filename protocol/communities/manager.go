@@ -4933,3 +4933,21 @@ func (m *Manager) GetCommunityRequestsToJoinWithRevealedAddresses(communityID ty
 func (m *Manager) SaveCommunity(community *Community) error {
 	return m.persistence.SaveCommunity(community)
 }
+
+func (m *Manager) CreateCommunityTokenDeploymentSignature(ctx context.Context, chainID uint64, addressFrom string, communityID string) ([]byte, error) {
+	community, err := m.GetByIDString(communityID)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+	if !community.IsControlNode() {
+		return nil, ErrNotControlNode
+	}
+	digest, err := m.communityTokensService.DeploymentSignatureDigest(chainID, addressFrom, communityID)
+	if err != nil {
+		return nil, err
+	}
+	return crypto.Sign(digest, community.PrivateKey())
+}
