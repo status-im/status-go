@@ -2462,12 +2462,12 @@ func (db sqlitePersistence) SaveEdit(editMessage *EditMessage) error {
 	if editMessage == nil {
 		return nil
 	}
-	_, err := db.db.Exec(`INSERT INTO user_messages_edits (clock, chat_id, message_id, text, source, id) VALUES(?,?,?,?,?,?)`, editMessage.Clock, editMessage.ChatId, editMessage.MessageId, editMessage.Text, editMessage.From, editMessage.ID)
+	_, err := db.db.Exec(`INSERT INTO user_messages_edits (clock, chat_id, message_id, text, source, id, unfurled_links) VALUES(?,?,?,?,?,?,?)`, editMessage.Clock, editMessage.ChatId, editMessage.MessageId, editMessage.Text, editMessage.From, editMessage.ID, editMessage.UnfurledLinks)
 	return err
 }
 
 func (db sqlitePersistence) GetEdits(messageID string, from string) ([]*EditMessage, error) {
-	rows, err := db.db.Query(`SELECT clock, chat_id, message_id, source, text, id FROM user_messages_edits WHERE message_id = ? AND source = ? ORDER BY CLOCK DESC`, messageID, from)
+	rows, err := db.db.Query(`SELECT clock, chat_id, message_id, source, text, id, unfurled_links FROM user_messages_edits WHERE message_id = ? AND source = ? ORDER BY CLOCK DESC`, messageID, from)
 	if err != nil {
 		return nil, err
 	}

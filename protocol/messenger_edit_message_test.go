@@ -445,3 +445,75 @@ func (s *MessengerEditMessageSuite) TestEditMessageWithMention() {
 	s.Require().Equal(int(response.Chats()[0].UnviewedMentionsCount), 0)
 	s.Require().False(response.Messages()[0].Mentioned)
 }
+
+func (s *MessengerEditMessageSuite) TestEditMessageWithLinkPreviews() {
+	theirMessenger := s.newMessenger()
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+	defer theirMessenger.Shutdown() // nolint: errcheck
+
+	theirChat := CreateOneToOneChat("Their 1TO1", &s.privateKey.PublicKey, s.m.transport)
+	err = theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("Our 1TO1", &theirMessenger.identity.PublicKey, s.m.transport)
+	err = s.m.SaveChat(ourChat)
+	s.Require().NoError(err)
+
+	inputMessage := buildTestMessage(*theirChat)
+
+	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+
+	ogMessage := sendResponse.Messages()[0]
+
+	messageID, err := types.DecodeHex(ogMessage.ID)
+	s.Require().NoError(err)
+
+	editedText := "edited text"
+	editedMessage := &requests.EditMessage{
+		ID:   messageID,
+		Text: editedText,
+		LinkPreviews: []common.LinkPreview{
+			{Type: protobuf.UnfurledLink_LINK,
+				Description: "GitHub is where people build software.",
+				Hostname:    "github.com",
+				Title:       "Build software better, together",
+				URL:         "https://github.com",
+				Thumbnail: common.LinkPreviewThumbnail{
+					Width:   100,
+					Height:  200,
+					URL:     "http://localhost:9999",
+					DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+				}},
+		},
+	}
+
+	sendResponse, err = theirMessenger.EditMessage(context.Background(), editedMessage)
+
+	s.Require().NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+	s.Require().NotEmpty(sendResponse.Messages()[0].LinkPreviews)
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().NotEmpty(response.Messages()[0].EditedAt)
+	s.Require().NotEmpty(response.Messages()[0].UnfurledLinks)
+	s.Require().False(response.Messages()[0].New)
+}

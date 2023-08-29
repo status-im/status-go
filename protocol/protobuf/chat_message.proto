@@ -46,6 +46,7 @@ message EditMessage {
   MessageType message_type = 6;
 
   ChatMessage.ContentType content_type = 7;
+  repeated UnfurledLink unfurled_links = 8;
 }
 
 message DeleteMessage {
