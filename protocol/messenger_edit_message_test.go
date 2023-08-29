@@ -485,7 +485,8 @@ func (s *MessengerEditMessageSuite) TestEditMessageWithLinkPreviews() {
 		ID:   messageID,
 		Text: editedText,
 		LinkPreviews: []common.LinkPreview{
-			{Type: protobuf.UnfurledLink_LINK,
+			{
+				Type:        protobuf.UnfurledLink_LINK,
 				Description: "GitHub is where people build software.",
 				Hostname:    "github.com",
 				Title:       "Build software better, together",

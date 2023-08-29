@@ -15,7 +15,7 @@ type EditMessage struct {
 	ID           types.HexBytes                   `json:"id"`
 	Text         string                           `json:"text"`
 	ContentType  protobuf.ChatMessage_ContentType `json:"content-type"`
-	LinkPreviews []common.LinkPreview             `json:"link-previews"`
+	LinkPreviews []common.LinkPreview             `json:"linkPreviews"`
 }
 
 func (e *EditMessage) Validate() error {
