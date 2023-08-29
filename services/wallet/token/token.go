@@ -568,7 +568,10 @@ func (tm *Manager) GetBalances(parent context.Context, clients map[uint64]*chain
 		response[account][token] = &sumHex
 		mu.Unlock()
 	}
-	contractMaker := contracts.ContractMaker{RPCClient: tm.RPCClient}
+	contractMaker, err := contracts.NewContractMaker(tm.RPCClient)
+	if err != nil {
+		return nil, err
+	}
 	for clientIdx := range clients {
 		client := clients[clientIdx]
 
@@ -703,7 +706,10 @@ func (tm *Manager) GetBalancesByChain(parent context.Context, clients map[uint64
 		mu.Unlock()
 	}
 
-	contractMaker := contracts.ContractMaker{RPCClient: tm.RPCClient}
+	contractMaker, err := contracts.NewContractMaker(tm.RPCClient)
+	if err != nil {
+		return nil, err
+	}
 	for clientIdx := range clients {
 		client := clients[clientIdx]
 		ethScanContract, err := contractMaker.NewEthScan(client.ChainID)

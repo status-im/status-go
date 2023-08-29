@@ -505,6 +505,11 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 }
 
 func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse, error) {
+	if m.contractMaker == nil {
+		m.logger.Warn("contract maker not initialized")
+		return nil, errors.New("contract maker not initialized")
+	}
+
 	// Revert code to https://github.com/status-im/status-go/blob/e6a3f63ec7f2fa691878ed35f921413dc8acfc66/protocol/messenger_communities.go#L211-L226 once the curated communities contract is deployed to mainnet
 
 	chainID := uint64(420) // Optimism Goerli

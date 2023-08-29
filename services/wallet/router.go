@@ -373,7 +373,10 @@ func (r *Router) requireApproval(ctx context.Context, bridge bridge.Bridge, acco
 	if token.IsNative() {
 		return false, nil, 0, nil, nil
 	}
-	contractMaker := &contracts.ContractMaker{RPCClient: r.rpcClient}
+	contractMaker, err := contracts.NewContractMaker(r.rpcClient)
+	if err != nil {
+		return false, nil, 0, nil, err
+	}
 
 	bridgeAddress := bridge.GetContractAddress(network, token)
 	if bridgeAddress == nil {

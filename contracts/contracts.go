@@ -23,6 +23,13 @@ type ContractMaker struct {
 	RPCClient *rpc.Client
 }
 
+func NewContractMaker(client *rpc.Client) (*ContractMaker, error) {
+	if client == nil {
+		return nil, errors.New("could not initialize ContractMaker with an rpc client")
+	}
+	return &ContractMaker{RPCClient: client}, nil
+}
+
 func (c *ContractMaker) NewRegistryWithAddress(chainID uint64, address common.Address) (*resolver.ENSRegistryWithFallback, error) {
 	backend, err := c.RPCClient.EthClient(chainID)
 	if err != nil {

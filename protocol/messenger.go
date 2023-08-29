@@ -518,9 +518,6 @@ func NewMessenger(
 		}{wait: make(chan struct{})},
 		browserDatabase: c.browserDatabase,
 		httpServer:      c.httpServer,
-		contractMaker: &contracts.ContractMaker{
-			RPCClient: c.rpcClient,
-		},
 		shutdownTasks: []func() error{
 			ensVerifier.Stop,
 			pushNotificationClient.Stop,
@@ -547,6 +544,15 @@ func NewMessenger(
 		logger:                logger,
 		savedAddressesManager: savedAddressesManager,
 	}
+
+	if c.rpcClient != nil {
+		contractMaker, err := contracts.NewContractMaker(c.rpcClient)
+		if err != nil {
+			return nil, err
+		}
+		messenger.contractMaker = contractMaker
+	}
+
 	messenger.mentionsManager = NewMentionManager(messenger)
 
 	if c.walletService != nil {
