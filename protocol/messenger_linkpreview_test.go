@@ -2,7 +2,10 @@ package protocol
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/protocol/requests"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -14,7 +17,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/linkpreview/unfurlers"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -25,21 +27,6 @@ func TestMessengerLinkPreviews(t *testing.T) {
 type MessengerLinkPreviewsTestSuite struct {
 	MessengerBaseTestSuite
 }
-
-//func (s *MessengerLinkPreviewsTestSuite) SetupTest() {
-//	s.logger = tt.MustCreateTestLogger()
-//
-//	c := waku.DefaultConfig
-//	c.MinimumAcceptedPoW = 0
-//	shh := waku.New(&c, s.logger)
-//	s.shh = gethbridge.NewGethWakuWrapper(shh)
-//	s.Require().NoError(shh.Start())
-//
-//	s.m = s.newMessenger()
-//	s.privateKey = s.m.identity
-//	_, err := s.m.Start()
-//	s.Require().NoError(err)
-//}
 
 // StubMatcher should either return an http.Response or nil in case the request
 // doesn't match.
@@ -339,7 +326,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_isSupportedImageURL() {
 	for _, e := range examples {
 		parsedURL, err := url.Parse(e.url)
 		s.Require().NoError(err, e)
-		s.Require().Equal(e.expected, unfurlers.IsSupportedImageURL(parsedURL), e.url)
+		s.Require().Equal(e.expected, IsSupportedImageURL(parsedURL), e.url)
 	}
 }
 
@@ -377,4 +364,33 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Image() {
 	s.Require().Equal(expected.Thumbnail.Height, preview.Thumbnail.Height)
 	s.Require().Equal(expected.Thumbnail.URL, preview.Thumbnail.URL)
 	s.assertContainsLongString(expected.Thumbnail.DataURI, preview.Thumbnail.DataURI, 100)
+}
+
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContact() {
+	identity, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	c, err := BuildContactFromPublicKey(&identity.PublicKey)
+	s.Require().NoError(err)
+	s.Require().NotNil(c)
+
+	c.DisplayName = "TestDisplayName"
+	response, err := s.m.AddContact(context.Background(), &requests.AddContact{ID: c.ID, DisplayName: c.DisplayName})
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Contacts, 1)
+
+	//u, err := s.m.ShareUserURLWithChatKey(contact.ID)
+	u, err := s.m.ShareUserURLWithData(c.ID)
+	s.Require().NoError(err)
+
+	//stubbedClient := http.Client{Transport: &StubTransport{}}
+	previews, err := s.m.UnfurlURLs(nil, []string{u})
+	s.Require().NoError(err)
+	s.Require().Len(previews, 1)
+
+	preview := previews[0]
+	s.Require().Equal(preview.Title, c.DisplayName)
+	s.Require().Equal(preview.Description, "")
+
 }

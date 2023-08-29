@@ -1,4 +1,4 @@
-package unfurlers
+package protocol
 
 import (
 	"context"

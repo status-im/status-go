@@ -14,7 +14,6 @@ import (
 	"github.com/status-im/markdown"
 
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/linkpreview/unfurlers"
 )
 
 type LinkPreview struct {
@@ -27,9 +26,14 @@ func normalizeHostname(hostname string) string {
 	return re.ReplaceAllString(hostname, "$1")
 }
 
-func (m *Messenger) newURLUnfurler(httpClient *http.Client, url *neturl.URL) unfurlers.Unfurler {
-	if unfurlers.IsSupportedImageURL(url) {
-		return unfurlers.NewImageUnfurler(
+func (m *Messenger) newURLUnfurler(httpClient *http.Client, url *neturl.URL) Unfurler {
+
+	if m.IsStatusSharedUrl(url.String()) {
+		return NewStatusUnfurler(url, m, m.logger)
+	}
+
+	if IsSupportedImageURL(url) {
+		return NewImageUnfurler(
 			url,
 			m.logger,
 			httpClient)
@@ -37,13 +41,13 @@ func (m *Messenger) newURLUnfurler(httpClient *http.Client, url *neturl.URL) unf
 
 	switch normalizeHostname(url.Hostname()) {
 	case "reddit.com":
-		return unfurlers.NewOEmbedUnfurler(
+		return NewOEmbedUnfurler(
 			"https://www.reddit.com/oembed",
 			url,
 			m.logger,
 			httpClient)
 	default:
-		return unfurlers.NewOpenGraphUnfurler(
+		return NewOpenGraphUnfurler(
 			url,
 			m.logger,
 			httpClient)
@@ -127,7 +131,7 @@ func GetURLs(text string) []string {
 }
 
 func NewDefaultHTTPClient() *http.Client {
-	return &http.Client{Timeout: unfurlers.DefaultRequestTimeout}
+	return &http.Client{Timeout: DefaultRequestTimeout}
 }
 
 // UnfurlURLs assumes clients pass URLs verbatim that were validated and

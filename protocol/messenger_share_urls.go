@@ -41,9 +41,9 @@ type ContactURLData struct {
 }
 
 type URLDataResponse struct {
-	Community CommunityURLData        `json:"community"`
-	Channel   CommunityChannelURLData `json:"channel"`
-	Contact   ContactURLData          `json:"contact"`
+	Community *CommunityURLData        `json:"community"`
+	Channel   *CommunityChannelURLData `json:"channel"`
+	Contact   *ContactURLData          `json:"contact"`
 	Shard     *common.Shard           `json:"shard,omitempty"`
 }
 
@@ -92,8 +92,8 @@ func (m *Messenger) ShareCommunityURLWithChatKey(communityID types.HexBytes) (st
 	return fmt.Sprintf("%s/c#%s", baseShareURL, shortKey), nil
 }
 
-func (m *Messenger) prepareCommunityData(community *communities.Community) CommunityURLData {
-	return CommunityURLData{
+func (m *Messenger) prepareCommunityData(community *communities.Community) *CommunityURLData {
+	return &CommunityURLData{
 		DisplayName:  community.Identity().DisplayName,
 		Description:  community.DescriptionText(),
 		MembersCount: uint32(community.MembersCount()),
@@ -203,7 +203,7 @@ func (m *Messenger) parseCommunityURLWithData(data string, chatKey string) (*URL
 	}
 
 	return &URLDataResponse{
-		Community: CommunityURLData{
+		Community: &CommunityURLData{
 			DisplayName:  communityProto.DisplayName,
 			Description:  communityProto.Description,
 			MembersCount: communityProto.MembersCount,
@@ -237,8 +237,8 @@ func (m *Messenger) ShareCommunityChannelURLWithChatKey(request *requests.Commun
 	return fmt.Sprintf("%s/cc/%s#%s", baseShareURL, request.ChannelID, shortKey), nil
 }
 
-func (m *Messenger) prepareCommunityChannelData(channel *protobuf.CommunityChat) CommunityChannelURLData {
-	return CommunityChannelURLData{
+func (m *Messenger) prepareCommunityChannelData(channel *protobuf.CommunityChat) *CommunityChannelURLData {
+	return &CommunityChannelURLData{
 		Emoji:       channel.Identity.Emoji,
 		DisplayName: channel.Identity.DisplayName,
 		Description: channel.Identity.Description,
@@ -383,7 +383,7 @@ func (m *Messenger) parseCommunityChannelURLWithData(data string, chatKey string
 	}
 
 	return &URLDataResponse{
-		Community: CommunityURLData{
+		Community: &CommunityURLData{
 			DisplayName:  channelProto.Community.DisplayName,
 			Description:  channelProto.Community.Description,
 			MembersCount: channelProto.Community.MembersCount,
@@ -391,7 +391,7 @@ func (m *Messenger) parseCommunityChannelURLWithData(data string, chatKey string
 			TagIndices:   channelProto.Community.TagIndices,
 			CommunityID:  types.EncodeHex(communityID),
 		},
-		Channel: CommunityChannelURLData{
+		Channel: &CommunityChannelURLData{
 			Emoji:       channelProto.Emoji,
 			DisplayName: channelProto.DisplayName,
 			Description: channelProto.Description,
@@ -416,8 +416,8 @@ func (m *Messenger) ShareUserURLWithChatKey(contactID string) (string, error) {
 	return fmt.Sprintf("%s/u#%s", baseShareURL, shortKey), nil
 }
 
-func (m *Messenger) prepareContactData(contact *Contact) ContactURLData {
-	return ContactURLData{
+func (m *Messenger) prepareContactData(contact *Contact) *ContactURLData {
+	return &ContactURLData{
 		DisplayName: contact.DisplayName,
 	}
 }
@@ -528,7 +528,7 @@ func (m *Messenger) parseUserURLWithData(data string, chatKey string) (*URLDataR
 	}
 
 	return &URLDataResponse{
-		Contact: ContactURLData{
+		Contact: &ContactURLData{
 			DisplayName: userProto.DisplayName,
 			Description: userProto.Description,
 			PublicKey:   chatKey,
@@ -536,8 +536,12 @@ func (m *Messenger) parseUserURLWithData(data string, chatKey string) (*URLDataR
 	}, nil
 }
 
+func (m *Messenger) IsStatusSharedUrl(url string) bool {
+	return strings.HasPrefix(url, baseShareURL)
+}
+
 func (m *Messenger) ParseSharedURL(url string) (*URLDataResponse, error) {
-	if !strings.HasPrefix(url, baseShareURL) {
+	if !m.IsStatusSharedUrl(url) {
 		return nil, fmt.Errorf("url should start with '%s'", baseShareURL)
 	}
 
