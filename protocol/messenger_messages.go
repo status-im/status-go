@@ -50,9 +50,9 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 
 	response := &MessengerResponse{}
 
-	for index, message := range messages {
+	for _, message := range messages {
 		//Add LinkPreviews only to first message
-		if len(request.LinkPreviews) > 0 && index == 0 {
+		if len(request.LinkPreviews) > 0 {
 			message.LinkPreviews = request.LinkPreviews
 		}
 
