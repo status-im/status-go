@@ -794,6 +794,7 @@ func (m *Messenger) handlePinMessage(pinner *Contact, whisperTimestamp uint64, r
 		SigPubKey:        publicKey,
 		Identicon:        pinner.Identicon,
 		Alias:            pinner.Alias,
+		DiscordMessageId: message.DiscordMessageId,
 	}
 
 	chat, err := m.matchChatEntity(pinMessage)
@@ -837,7 +838,8 @@ func (m *Messenger) handlePinMessage(pinner *Contact, whisperTimestamp uint64, r
 		if err != nil {
 			return err
 		}
-		message := &common.Message{
+
+		systemMessage := &common.Message{
 			ChatMessage: &protobuf.ChatMessage{
 				Clock:       message.Clock,
 				Timestamp:   whisperTimestamp,
@@ -850,8 +852,9 @@ func (m *Messenger) handlePinMessage(pinner *Contact, whisperTimestamp uint64, r
 			ID:               id,
 			LocalChatID:      chat.ID,
 			From:             pinner.ID,
+			Seen:             pinMessage.DiscordMessageId != "",
 		}
-		response.AddMessage(message)
+		response.AddMessage(systemMessage)
 		chat.UnviewedMessagesCount++
 	}
 

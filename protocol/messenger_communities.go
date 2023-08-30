@@ -3779,6 +3779,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 							From:             messageToSave.From,
 							SigPubKey:        messageToSave.SigPubKey,
 							WhisperTimestamp: messageToSave.WhisperTimestamp,
+							DiscordMessageId: discordMessage.Id,
 						}
 
 						pinMessagesToSave = append(pinMessagesToSave, &pinMessageToSave)

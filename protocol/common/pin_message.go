@@ -31,6 +31,8 @@ type PinMessage struct {
 	Identicon string `json:"identicon"`
 	// Random 3 words name
 	Alias string `json:"alias"`
+	// Discord message id, if message was imported from Discord
+	DiscordMessageId string `json:"discordMessageId"`
 
 	Message *PinnedMessage `json:"pinnedMessage"`
 }

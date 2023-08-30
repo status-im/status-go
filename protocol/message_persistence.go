@@ -1476,7 +1476,7 @@ func (db sqlitePersistence) buildPinMessageQueries() (*insertPinMessagesQueries,
 	queries.selectStmt = "SELECT clock_value FROM pin_messages WHERE id = ?"
 
 	// insert
-	allInsertFields := `id, message_id, whisper_timestamp, chat_id, local_chat_id, clock_value, pinned, pinned_by`
+	allInsertFields := `id, message_id, whisper_timestamp, chat_id, local_chat_id, clock_value, pinned, pinned_by, discord_message_id`
 	insertValues := strings.Repeat("?, ", strings.Count(allInsertFields, ",")) + "?"
 	insertQuery := "INSERT INTO pin_messages(" + allInsertFields + ") VALUES (" + insertValues + ")" // nolint: gosec
 	insertStmt, err := tx.Prepare(insertQuery)
@@ -1539,6 +1539,7 @@ func (db sqlitePersistence) savePinMessage(message *common.PinMessage, queries *
 			message.Clock,
 			message.Pinned,
 			message.From,
+			message.DiscordMessageId,
 		}
 		_, err = insertStmt.Exec(allValues...)
 		if err != nil {

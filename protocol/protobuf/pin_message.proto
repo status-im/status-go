@@ -12,4 +12,5 @@ message PinMessage {
   bool pinned = 4;
   // The type of message (public/one-to-one/private-group-chat)
   MessageType message_type = 5;
+  string discord_message_id = 6;
 }

@@ -1,0 +1,1 @@
+ALTER TABLE pin_messages ADD COLUMN discord_message_id TEXT DEFAULT "";
