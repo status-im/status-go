@@ -5531,7 +5531,7 @@ func (m *Messenger) GetMentionsManager() *MentionManager {
 	return m.mentionsManager
 }
 
-func (m *Messenger) getConnectedMessages(message *common.Message, chatID string) ([]*common.Message, error) {
+func (m *Messenger) getOtherMessagesInAlbum(message *common.Message, chatID string) ([]*common.Message, error) {
 	var connectedMessages []*common.Message
 	// In case of Image messages, we need to delete all the images in the album
 	if message.ContentType == protobuf.ChatMessage_IMAGE {
