@@ -422,7 +422,7 @@ func (b *StatusNode) ensService(timesource func() time.Time) *ens.Service {
 
 func (b *StatusNode) pendingTrackerService(walletFeed *event.Feed) *transactions.PendingTxTracker {
 	if b.pendingTracker == nil {
-		b.pendingTracker = transactions.NewPendingTxTracker(b.walletDB, b.rpcClient, b.rpcFiltersSrvc, walletFeed)
+		b.pendingTracker = transactions.NewPendingTxTracker(b.walletDB, b.rpcClient, b.rpcFiltersSrvc, walletFeed, transactions.PendingCheckInterval)
 	}
 	return b.pendingTracker
 }

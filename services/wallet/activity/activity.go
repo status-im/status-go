@@ -136,12 +136,6 @@ func (e *Entry) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func newAndSet[T any](v T) *T {
-	res := new(T)
-	*res = v
-	return res
-}
-
 func newActivityEntryWithPendingTransaction(transaction *transfer.TransactionIdentity, timestamp int64, activityType Type, activityStatus Status) Entry {
 	return newActivityEntryWithTransaction(true, transaction, timestamp, activityType, activityStatus)
 }
@@ -848,11 +842,11 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 			// Extract tokens
 			if fromTokenCode.Valid {
 				entry.tokenOut = deps.tokenFromSymbol(outChainID, fromTokenCode.String)
-				entry.symbolOut = newAndSet(fromTokenCode.String)
+				entry.symbolOut = common.NewAndSet(fromTokenCode.String)
 			}
 			if toTokenCode.Valid {
 				entry.tokenIn = deps.tokenFromSymbol(inChainID, toTokenCode.String)
-				entry.symbolIn = newAndSet(toTokenCode.String)
+				entry.symbolIn = common.NewAndSet(toTokenCode.String)
 			}
 
 			// Complete the data
@@ -987,13 +981,13 @@ func lookupAndFillInTokens(deps FilterDependencies, tokenOut *Token, tokenIn *To
 	if tokenOut != nil {
 		symbol := deps.tokenSymbol(*tokenOut)
 		if len(symbol) > 0 {
-			symbolOut = newAndSet(symbol)
+			symbolOut = common.NewAndSet(symbol)
 		}
 	}
 	if tokenIn != nil {
 		symbol := deps.tokenSymbol(*tokenIn)
 		if len(symbol) > 0 {
-			symbolIn = newAndSet(symbol)
+			symbolIn = common.NewAndSet(symbol)
 		}
 	}
 	return symbolOut, symbolIn
