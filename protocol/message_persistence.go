@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/lib/pq"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/lib/pq"
 )
 
 var basicMessagesSelectQuery = `
