@@ -8,9 +8,10 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/lib/pq"
+
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/lib/pq"
 )
 
 var basicMessagesSelectQuery = `
@@ -2463,6 +2464,7 @@ func (db sqlitePersistence) SaveEdit(editMessage *EditMessage) error {
 	if editMessage == nil {
 		return nil
 	}
+
 	_, err := db.db.Exec(`INSERT INTO user_messages_edits (clock, chat_id, message_id, text, source, id, unfurled_links) VALUES(?,?,?,?,?,?,?)`, editMessage.Clock, editMessage.ChatId, editMessage.MessageId, editMessage.Text, editMessage.From, editMessage.ID, pq.Array(editMessage.UnfurledLinks))
 	return err
 }
@@ -2477,7 +2479,7 @@ func (db sqlitePersistence) GetEdits(messageID string, from string) ([]*EditMess
 	var messages []*EditMessage
 	for rows.Next() {
 		e := NewEditMessage()
-		err := rows.Scan(&e.Clock, &e.ChatId, &e.MessageId, &e.From, &e.Text, &e.ID, &e.UnfurledLinks)
+		err := rows.Scan(&e.Clock, &e.ChatId, &e.MessageId, &e.From, &e.Text, &e.ID)
 		if err != nil {
 			return nil, err
 		}
