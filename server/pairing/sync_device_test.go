@@ -3,6 +3,7 @@ package pairing
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
 
 	"github.com/google/uuid"
@@ -38,19 +40,21 @@ import (
 )
 
 const (
-	pathWalletRoot     = "m/44'/60'/0'/0"
-	pathEIP1581        = "m/43'/60'/1581'"
-	pathDefaultChat    = pathEIP1581 + "/0'/0"
-	pathDefaultWallet  = pathWalletRoot + "/0"
-	currentNetwork     = "mainnet_rpc"
-	socialLinkURL      = "https://github.com/status-im"
-	ensUsername        = "bob.stateofus.eth"
-	ensChainID         = 1
-	publicChatID       = "localpairtest"
-	profileMnemonic    = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon"
-	seedPhraseMnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
-	path0              = "m/44'/60'/0'/0/0"
-	path1              = "m/44'/60'/0'/0/1"
+	pathWalletRoot          = "m/44'/60'/0'/0"
+	pathEIP1581             = "m/43'/60'/1581'"
+	pathDefaultChat         = pathEIP1581 + "/0'/0"
+	pathDefaultWallet       = pathWalletRoot + "/0"
+	currentNetwork          = "mainnet_rpc"
+	socialLinkURL           = "https://github.com/status-im"
+	ensUsername             = "bob.stateofus.eth"
+	ensChainID              = 1
+	publicChatID            = "localpairtest"
+	profileKeypairMnemonic  = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon"
+	seedKeypairMnemonic     = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+	profileKeypairMnemonic1 = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about about"
+	seedKeypairMnemonic1    = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about abandon"
+	path0                   = "m/44'/60'/0'/0/0"
+	path1                   = "m/44'/60'/0'/0/1"
 )
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
@@ -709,8 +713,8 @@ func buildTestMessage(chat *protocol.Chat) *common.Message {
 	return message
 }
 
-func (s *SyncDeviceSuite) getSeedPhraseKeypairForTest(backend *api.GethStatusBackend, server bool) *accounts.Keypair {
-	generatedAccount, err := backend.AccountManager().AccountsGenerator().ImportMnemonic(seedPhraseMnemonic, "")
+func (s *SyncDeviceSuite) getSeedPhraseKeypairForTest(backend *api.GethStatusBackend, mnemonic string, server bool) *accounts.Keypair {
+	generatedAccount, err := backend.AccountManager().AccountsGenerator().ImportMnemonic(mnemonic, "")
 	require.NoError(s.T(), err)
 	generatedDerivedAccs, err := backend.AccountManager().AccountsGenerator().DeriveAddresses(generatedAccount.ID, []string{path0, path1})
 	require.NoError(s.T(), err)
@@ -746,14 +750,28 @@ func (s *SyncDeviceSuite) getSeedPhraseKeypairForTest(backend *api.GethStatusBac
 	return seedPhraseKp
 }
 
+func containsKeystoreFile(directory, key string) bool {
+	files, err := os.ReadDir(directory)
+	if err != nil {
+		return false
+	}
+
+	for _, file := range files {
+		if strings.Contains(file.Name(), strings.ToLower(key)) {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 	ctx := context.TODO()
 
 	serverTmpDir := filepath.Join(s.clientAsReceiverTmpdir, "server")
-	serverBackend := s.prepareBackendWithAccount(profileMnemonic, serverTmpDir)
+	serverBackend := s.prepareBackendWithAccount(profileKeypairMnemonic, serverTmpDir)
 
 	clientTmpDir := filepath.Join(s.clientAsReceiverTmpdir, "client")
-	clientBackend := s.prepareBackendWithAccount(profileMnemonic, clientTmpDir)
+	clientBackend := s.prepareBackendWithAccount(profileKeypairMnemonic, clientTmpDir)
 	defer func() {
 		require.NoError(s.T(), clientBackend.Logout())
 		require.NoError(s.T(), serverBackend.Logout())
@@ -770,31 +788,17 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 
 	require.True(s.T(), serverActiveAccount.KeyUID == clientActiveAccount.KeyUID)
 
-	serverSeedPhraseKp := s.getSeedPhraseKeypairForTest(serverBackend, true)
+	serverSeedPhraseKp := s.getSeedPhraseKeypairForTest(serverBackend, seedKeypairMnemonic, true)
 	serverAccountsAPI := serverBackend.StatusNode().AccountService().APIs()[1].Service.(*accservice.API)
-	err = serverAccountsAPI.ImportMnemonic(ctx, seedPhraseMnemonic, s.password)
+	err = serverAccountsAPI.ImportMnemonic(ctx, seedKeypairMnemonic, s.password)
 	require.NoError(s.T(), err, "importing mnemonic for new keypair on server")
 	err = serverAccountsAPI.AddKeypair(ctx, s.password, serverSeedPhraseKp)
 	require.NoError(s.T(), err, "saving seed phrase keypair on server with keystore files created")
 
-	clientSeedPhraseKp := s.getSeedPhraseKeypairForTest(serverBackend, true)
+	clientSeedPhraseKp := s.getSeedPhraseKeypairForTest(serverBackend, seedKeypairMnemonic, true)
 	clientAccountsAPI := clientBackend.StatusNode().AccountService().APIs()[1].Service.(*accservice.API)
 	err = clientAccountsAPI.SaveKeypair(ctx, clientSeedPhraseKp)
 	require.NoError(s.T(), err, "saving seed phrase keypair on client without keystore files")
-
-	containsKeystoreFile := func(directory, key string) bool {
-		files, err := os.ReadDir(directory)
-		if err != nil {
-			return false
-		}
-
-		for _, file := range files {
-			if strings.Contains(file.Name(), strings.ToLower(key)) {
-				return true
-			}
-		}
-		return false
-	}
 
 	// check server - server should contain keystore files for imported seed phrase
 	serverKeystorePath := filepath.Join(serverTmpDir, keystoreDir, serverActiveAccount.KeyUID)
@@ -863,5 +867,302 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFiles() {
 		genAccInfo, err := accGenerator.LoadAccount(acc.Address.String(), s.password)
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), acc.Address.String(), genAccInfo.Address)
+	}
+}
+
+func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
+	ctx := context.TODO()
+
+	// Prepare server
+	serverTmpDir := filepath.Join(s.clientAsReceiverTmpdir, "server")
+	serverBackend := s.prepareBackendWithAccount(profileKeypairMnemonic1, serverTmpDir)
+	serverMessenger := serverBackend.Messenger()
+	serverAccountsAPI := serverBackend.StatusNode().AccountService().APIs()[1].Service.(*accservice.API)
+
+	// Prepare client
+	clientTmpDir := filepath.Join(s.clientAsReceiverTmpdir, "client")
+	clientBackend := s.prepareBackendWithAccount(profileKeypairMnemonic1, clientTmpDir)
+	clientMessenger := clientBackend.Messenger()
+	clientAccountsAPI := clientBackend.StatusNode().AccountService().APIs()[1].Service.(*accservice.API)
+
+	defer func() {
+		require.NoError(s.T(), clientBackend.Logout())
+		require.NoError(s.T(), serverBackend.Logout())
+	}()
+
+	// Pair server and client
+	im1 := &multidevice.InstallationMetadata{
+		Name:       "client-device",
+		DeviceType: "client-device-type",
+	}
+	settings, err := clientBackend.GetSettings()
+	s.Require().NoError(err)
+	err = clientMessenger.SetInstallationMetadata(settings.InstallationID, im1)
+	s.Require().NoError(err)
+	response, err := clientMessenger.SendPairInstallation(context.Background(), nil)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().False(response.Chats()[0].Active)
+
+	response, err = protocol.WaitOnMessengerResponse(
+		serverMessenger,
+		func(r *protocol.MessengerResponse) bool {
+			for _, i := range r.Installations {
+				if i.ID == settings.InstallationID {
+					return true
+				}
+			}
+			return false
+		},
+		"installation not received",
+	)
+
+	s.Require().NoError(err)
+
+	found := false
+	for _, i := range response.Installations {
+		found = i.ID == settings.InstallationID &&
+			i.InstallationMetadata != nil &&
+			i.InstallationMetadata.Name == im1.Name &&
+			i.InstallationMetadata.DeviceType == im1.DeviceType
+		if found {
+			break
+		}
+	}
+	s.Require().True(found)
+
+	err = serverMessenger.EnableInstallation(settings.InstallationID)
+	s.Require().NoError(err)
+
+	// Check if the logged in account is the same on server and client
+	serverActiveAccount, err := serverBackend.GetActiveAccount()
+	require.NoError(s.T(), err)
+	clientActiveAccount, err := clientBackend.GetActiveAccount()
+	require.NoError(s.T(), err)
+	require.True(s.T(), serverActiveAccount.KeyUID == clientActiveAccount.KeyUID)
+
+	//////////////////////////////////////////////////////////////////////////////
+	// From this point this test is trying to simulate the following scenario:
+	// - add a new seed phrase keypair on server
+	// - sync it to client
+	// - convert it to a keycard keypair on server
+	// - sync it to client
+	// - stop using keycard on server
+	// - sync it to client
+	// - try to transfer keystore files from server to client
+	//////////////////////////////////////////////////////////////////////////////
+
+	//////////////////////////////////////////////////////////////////////////////
+	// Add new seed phrase keypair to server and sync it to client
+	//////////////////////////////////////////////////////////////////////////////
+	serverSeedPhraseKp := s.getSeedPhraseKeypairForTest(serverBackend, seedKeypairMnemonic1, true)
+	err = serverAccountsAPI.ImportMnemonic(ctx, seedKeypairMnemonic1, s.password)
+	require.NoError(s.T(), err, "importing mnemonic for new keypair on server")
+	err = serverAccountsAPI.AddKeypair(ctx, s.password, serverSeedPhraseKp)
+	require.NoError(s.T(), err, "saving seed phrase keypair on server with keystore files created")
+
+	// Wait for sync messages to be received on client
+	err = tt.RetryWithBackOff(func() error {
+		response, err := clientMessenger.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		for _, kp := range response.Keypairs {
+			if kp.KeyUID == serverSeedPhraseKp.KeyUID {
+				return nil
+			}
+		}
+
+		return errors.New("no sync keypair received")
+	})
+	s.Require().NoError(err)
+
+	// Check if the keypair saved on client is the same as the one on server
+	serverKp, err := serverAccountsAPI.GetKeypairByKeyUID(ctx, serverSeedPhraseKp.KeyUID)
+	s.Require().NoError(err)
+	clientKp, err := clientAccountsAPI.GetKeypairByKeyUID(ctx, serverSeedPhraseKp.KeyUID)
+	s.Require().NoError(err)
+
+	s.Require().True(serverKp.KeyUID == clientKp.KeyUID &&
+		serverKp.Name == clientKp.Name &&
+		serverKp.Type == clientKp.Type &&
+		serverKp.DerivedFrom == clientKp.DerivedFrom &&
+		serverKp.LastUsedDerivationIndex == clientKp.LastUsedDerivationIndex &&
+		serverKp.Clock == clientKp.Clock &&
+		len(serverKp.Accounts) == len(clientKp.Accounts) &&
+		len(serverKp.Keycards) == len(clientKp.Keycards))
+
+	// Check server - server should contain keystore files for imported seed phrase
+	serverKeystorePath := filepath.Join(serverTmpDir, keystoreDir, serverActiveAccount.KeyUID)
+	require.True(s.T(), containsKeystoreFile(serverKeystorePath, serverKp.DerivedFrom[2:]))
+	for _, acc := range serverKp.Accounts {
+		require.True(s.T(), containsKeystoreFile(serverKeystorePath, acc.Address.String()[2:]))
+	}
+
+	// Check client - client should not contain keystore files for imported seed phrase
+	clientKeystorePath := filepath.Join(clientTmpDir, keystoreDir, clientActiveAccount.KeyUID)
+	require.False(s.T(), containsKeystoreFile(clientKeystorePath, clientKp.DerivedFrom[2:]))
+	for _, acc := range clientKp.Accounts {
+		require.False(s.T(), containsKeystoreFile(clientKeystorePath, acc.Address.String()[2:]))
+	}
+
+	//////////////////////////////////////////////////////////////////////////////
+	// Convert it to a keycard keypair on server and sync it to client
+	//////////////////////////////////////////////////////////////////////////////
+	err = serverAccountsAPI.SaveOrUpdateKeycard(ctx, &accounts.Keycard{
+		KeycardUID:        "1234",
+		KeycardName:       "new-keycard",
+		KeyUID:            serverKp.KeyUID,
+		AccountsAddresses: []types.Address{serverKp.Accounts[0].Address, serverKp.Accounts[1].Address},
+	}, false)
+	s.Require().NoError(err)
+
+	// Wait for sync messages to be received on client
+	err = tt.RetryWithBackOff(func() error {
+		response, err := clientMessenger.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		for _, kp := range response.Keypairs {
+			if kp.KeyUID == serverKp.KeyUID {
+				return nil
+			}
+		}
+		return errors.New("no sync keypair received")
+	})
+	s.Require().NoError(err)
+
+	// Check if the keypair saved on client is the same as the one on server
+	serverKp, err = serverAccountsAPI.GetKeypairByKeyUID(ctx, serverSeedPhraseKp.KeyUID)
+	s.Require().NoError(err)
+	clientKp, err = clientAccountsAPI.GetKeypairByKeyUID(ctx, serverSeedPhraseKp.KeyUID)
+	s.Require().NoError(err)
+
+	s.Require().True(serverKp.KeyUID == clientKp.KeyUID &&
+		serverKp.Name == clientKp.Name &&
+		serverKp.Type == clientKp.Type &&
+		serverKp.DerivedFrom == clientKp.DerivedFrom &&
+		serverKp.LastUsedDerivationIndex == clientKp.LastUsedDerivationIndex &&
+		serverKp.Clock == clientKp.Clock &&
+		len(serverKp.Accounts) == len(clientKp.Accounts) &&
+		len(serverKp.Keycards) == len(clientKp.Keycards) &&
+		len(serverKp.Keycards) == 1)
+
+	// Check server - server should not contain keystore files for imported seed phrase
+	require.False(s.T(), containsKeystoreFile(serverKeystorePath, serverKp.DerivedFrom[2:]))
+	for _, acc := range serverKp.Accounts {
+		require.False(s.T(), containsKeystoreFile(serverKeystorePath, acc.Address.String()[2:]))
+	}
+
+	// Check client - client should not contain keystore files for imported seed phrase
+	require.False(s.T(), containsKeystoreFile(clientKeystorePath, clientKp.DerivedFrom[2:]))
+	for _, acc := range clientKp.Accounts {
+		require.False(s.T(), containsKeystoreFile(clientKeystorePath, acc.Address.String()[2:]))
+	}
+
+	//////////////////////////////////////////////////////////////////////////////
+	// Stop using keycard on server and sync it to client
+	//////////////////////////////////////////////////////////////////////////////
+	err = serverAccountsAPI.MigrateNonProfileKeycardKeypairToApp(ctx, seedKeypairMnemonic1, s.password)
+	s.Require().NoError(err)
+
+	// Wait for sync messages to be received on client
+	err = tt.RetryWithBackOff(func() error {
+		response, err := clientMessenger.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		for _, kp := range response.Keypairs {
+			if kp.KeyUID == serverKp.KeyUID {
+				return nil
+			}
+		}
+		return errors.New("no sync keypair received")
+	})
+	s.Require().NoError(err)
+
+	// Check if the keypair saved on client is the same as the one on server
+	serverKp, err = serverAccountsAPI.GetKeypairByKeyUID(ctx, serverSeedPhraseKp.KeyUID)
+	s.Require().NoError(err)
+	clientKp, err = clientAccountsAPI.GetKeypairByKeyUID(ctx, serverSeedPhraseKp.KeyUID)
+	s.Require().NoError(err)
+
+	s.Require().True(serverKp.KeyUID == clientKp.KeyUID &&
+		serverKp.Name == clientKp.Name &&
+		serverKp.Type == clientKp.Type &&
+		serverKp.DerivedFrom == clientKp.DerivedFrom &&
+		serverKp.LastUsedDerivationIndex == clientKp.LastUsedDerivationIndex &&
+		serverKp.Clock == clientKp.Clock &&
+		len(serverKp.Accounts) == len(clientKp.Accounts) &&
+		len(serverKp.Keycards) == len(clientKp.Keycards) &&
+		len(serverKp.Keycards) == 0)
+
+	// Check server - server should contain keystore files for imported seed phrase
+	require.True(s.T(), containsKeystoreFile(serverKeystorePath, serverKp.DerivedFrom[2:]))
+	for _, acc := range serverKp.Accounts {
+		require.True(s.T(), containsKeystoreFile(serverKeystorePath, acc.Address.String()[2:]))
+	}
+
+	// Check client - client should not contain keystore files for imported seed phrase
+	require.False(s.T(), containsKeystoreFile(clientKeystorePath, clientKp.DerivedFrom[2:]))
+	for _, acc := range clientKp.Accounts {
+		require.False(s.T(), containsKeystoreFile(clientKeystorePath, acc.Address.String()[2:]))
+	}
+
+	//////////////////////////////////////////////////////////////////////////////
+	// Try to transfer keystore files from server to client
+	//////////////////////////////////////////////////////////////////////////////
+
+	serverMessenger.SetLocalPairing(true)
+	clientMessenger.SetLocalPairing(true)
+
+	// prepare sender
+	var config = KeystoreFilesSenderServerConfig{
+		SenderConfig: &KeystoreFilesSenderConfig{
+			KeystoreFilesConfig: KeystoreFilesConfig{
+				KeystorePath:   serverKeystorePath,
+				LoggedInKeyUID: serverActiveAccount.KeyUID,
+				Password:       s.password,
+			},
+			KeypairsToExport: []string{serverKp.KeyUID},
+		},
+		ServerConfig: new(ServerConfig),
+	}
+	configBytes, err := json.Marshal(config)
+	require.NoError(s.T(), err)
+	cs, err := StartUpKeystoreFilesSenderServer(serverBackend, string(configBytes))
+	require.NoError(s.T(), err)
+
+	// prepare receiver
+	clientPayloadSourceConfig := KeystoreFilesReceiverClientConfig{
+		ReceiverConfig: &KeystoreFilesReceiverConfig{
+			KeystoreFilesConfig: KeystoreFilesConfig{
+				KeystorePath:   clientKeystorePath,
+				LoggedInKeyUID: clientActiveAccount.KeyUID,
+				Password:       s.password,
+			},
+			KeypairsToImport: []string{clientKp.KeyUID},
+		},
+		ClientConfig: new(ClientConfig),
+	}
+	clientConfigBytes, err := json.Marshal(clientPayloadSourceConfig)
+	require.NoError(s.T(), err)
+	err = StartUpKeystoreFilesReceivingClient(clientBackend, cs, string(clientConfigBytes))
+	require.NoError(s.T(), err)
+
+	// Check server - server should contain keystore files for imported seed phrase
+	require.True(s.T(), containsKeystoreFile(serverKeystorePath, serverKp.DerivedFrom[2:]))
+	for _, acc := range serverKp.Accounts {
+		require.True(s.T(), containsKeystoreFile(serverKeystorePath, acc.Address.String()[2:]))
+	}
+
+	// Check client - client should contain keystore files for imported seed phrase
+	require.True(s.T(), containsKeystoreFile(clientKeystorePath, clientKp.DerivedFrom[2:]))
+	for _, acc := range clientKp.Accounts {
+		require.True(s.T(), containsKeystoreFile(clientKeystorePath, acc.Address.String()[2:]))
 	}
 }
