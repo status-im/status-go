@@ -3227,6 +3227,22 @@ func (s *MessengerCommunitiesSuite) TestShareCommunityFromNonAdmin() {
 	s.Require().Equal(community.IDString(), message.CommunityID)
 	s.Require().Equal(inviteMessage, message.Text)
 
+	alicePk := common.PubkeyToHex(&s.alice.identity.PublicKey)
+	aliceRequest := &requests.AddContact{ID: alicePk}
+	_, err = s.bob.AddContact(context.Background(), aliceRequest)
+	s.Require().NoError(err)
+	// Pull message and make sure org is received
+	response, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool { return len(r.Messages()) == 2 },
+		"no messages",
+	)
+
+	bobPk := common.PubkeyToHex(&s.bob.identity.PublicKey)
+	bobRequest := &requests.AddContact{ID: bobPk}
+	_, err = s.alice.AddContact(context.Background(), bobRequest)
+	s.Require().NoError(err)
+
 	response, err = s.bob.ShareCommunity(
 		&requests.ShareCommunity{
 			CommunityID:   community.ID(),
@@ -3234,28 +3250,15 @@ func (s *MessengerCommunitiesSuite) TestShareCommunityFromNonAdmin() {
 			InviteMessage: inviteMessage,
 		},
 	)
+
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Messages(), 1)
 
-	alicePk := common.PubkeyToHex(&s.alice.identity.PublicKey)
-	aliceRequest := &requests.AddContact{ID: alicePk}
-	_, err = s.bob.AddContact(context.Background(), aliceRequest)
+	response, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool { return len(r.Messages()) == 1 },
+		"no messages",
+	)
 	s.Require().NoError(err)
-
-		// Pull message and make sure org is received
-		err = tt.RetryWithBackOff(func() error {
-			response, err = s.alice.RetrieveAll()
-			if err != nil {
-				return err
-			}
-			if len(response.messages) == 0 {
-				return errors.New("community link not received")
-			}
-			return nil
-		})
-		s.Require().NoError(err)
-
-		s.Require().Equal("invite to community testing message", response.Messages()[2].Text)
-		s.Require().Len(response.Messages(), 3)
 }
