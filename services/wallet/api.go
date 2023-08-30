@@ -261,7 +261,9 @@ func (api *API) GetPendingTransactionsForIdentities(ctx context.Context, identit
 func (api *API) WatchTransactionByChainID(ctx context.Context, chainID uint64, transactionHash common.Hash) (err error) {
 	log.Debug("wallet.api.WatchTransactionByChainID", "chainID", chainID, "transactionHash", transactionHash)
 	var status *transactions.TxStatus
-	defer log.Debug("wallet.api.WatchTransactionByChainID return", "err", err, "chainID", chainID, "transactionHash", transactionHash)
+	defer func() {
+		log.Debug("wallet.api.WatchTransactionByChainID return", "err", err, "chainID", chainID, "transactionHash", transactionHash)
+	}()
 
 	// Workaround to keep the blocking call until the clients use the PendingTxTracker APIs
 	eventChan := make(chan walletevent.Event, 2)
