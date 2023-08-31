@@ -3493,6 +3493,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 		}
 
 		var chatsToSave []*Chat
+		createdChats := make(map[string]*Chat, 0)
 		processedChannelIds := make(map[string]string, 0)
 		processedCategoriesIds := make(map[string]string, 0)
 
@@ -3627,6 +3628,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				// know there was only a single such change (and it's a map)
 				for chatID, chat := range changes.ChatsAdded {
 					c := CreateCommunityChat(communityID, chatID, chat, m.getTimesource())
+					createdChats[c.ID] = c
 					chatsToSave = append(chatsToSave, c)
 					processedChannelIds[channel.Channel.ID] = c.ID
 				}
@@ -3783,6 +3785,49 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 						}
 
 						pinMessagesToSave = append(pinMessagesToSave, &pinMessageToSave)
+
+						// Generate SystemMessagePinnedMessage
+
+						//chat, err := m.matchChatEntity(&pinMessageToSave)
+						//if err != nil {
+						//	return err // matchChatEntity returns a descriptive error message
+						//}
+
+						chat, ok := createdChats[pinMessageToSave.LocalChatID]
+						if !ok {
+							err := errors.New("failed to get chat for pin message")
+							m.logger.Warn(err.Error(),
+								zap.String("PinMessageId", pinMessageToSave.ID),
+								zap.String("ChatID", pinMessageToSave.LocalChatID))
+							importProgress.AddTaskError(discord.ImportMessagesTask, discord.Warning(err.Error()))
+							progressUpdates <- importProgress
+							continue
+						}
+
+						id, err := generatePinMessageNotificationID(&m.identity.PublicKey, &pinMessageToSave, chat)
+						if err != nil {
+							m.logger.Warn("failed to generate pin message notification ID",
+								zap.String("PinMessageId", pinMessageToSave.ID))
+							importProgress.AddTaskError(discord.ImportMessagesTask, discord.Warning(err.Error()))
+							progressUpdates <- importProgress
+							continue
+						}
+						systemMessage := &common.Message{
+							ChatMessage: &protobuf.ChatMessage{
+								Clock:       pinMessageToSave.Clock,
+								Timestamp:   clockAndTimestamp,
+								ChatId:      chat.ID,
+								MessageType: pinMessageToSave.MessageType,
+								ResponseTo:  pinMessageToSave.MessageId,
+								ContentType: protobuf.ChatMessage_SYSTEM_MESSAGE_PINNED_MESSAGE,
+							},
+							WhisperTimestamp: clockAndTimestamp,
+							ID:               id,
+							LocalChatID:      chat.ID,
+							From:             messageToSave.From,
+						}
+
+						messagesToSave[systemMessage.ID] = systemMessage
 					}
 				} else {
 					messagesToSave[communityID+discordMessage.Id] = messageToSave
@@ -3811,6 +3856,10 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			chunksCount := len(discordMessageChunks)
 
 			for ii, msgs := range discordMessageChunks {
+				m.logger.Info("<<< saving chunk with discord messages",
+					zap.Int("chunk", ii),
+					zap.Int("chunksCount", chunksCount),
+					zap.Int("messagesCount", len(msgs)))
 				m.communitiesManager.LogStdout(fmt.Sprintf("saving %d/%d chunk with %d discord messages", ii+1, chunksCount, len(msgs)))
 				err = m.persistence.SaveDiscordMessages(msgs)
 				if err != nil {
