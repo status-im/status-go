@@ -1033,8 +1033,15 @@ func (db sqlitePersistence) AllMessagesFromChatsAndCommunitiesWhichMatchTerm(com
 	return getMessagesFromScanRows(db, rows, true)
 }
 
-func (db sqlitePersistence) AllChatIDsByCommunity(communityID string) ([]string, error) {
-	rows, err := db.db.Query("SELECT id FROM chats WHERE community_id = ?", communityID)
+func (db sqlitePersistence) AllChatIDsByCommunity(tx *sql.Tx, communityID string) ([]string, error) {
+	var err error
+	var rows *sql.Rows
+	query := "SELECT id FROM chats WHERE community_id = ?"
+	if tx == nil {
+		rows, err = db.db.Query(query, communityID)
+	} else {
+		rows, err = tx.Query(query, communityID)
+	}
 
 	if err != nil {
 		return nil, err

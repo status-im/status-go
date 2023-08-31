@@ -14,6 +14,8 @@ import (
 const allFieldsForTableActivityCenterNotification = `id, timestamp, notification_type, chat_id, read, dismissed, accepted, message, author, 
     reply_message, community_id, membership_status, contact_verification_status, deleted, updated_at`
 
+var emptyNotifications = make([]*ActivityCenterNotification, 0)
+
 func (db sqlitePersistence) DeleteActivityCenterNotificationByID(id []byte, updatedAt uint64) error {
 	_, err := db.db.Exec(`UPDATE activity_center_notifications SET deleted = 1, updated_at = ? WHERE id = ? AND NOT deleted`, updatedAt, id)
 	return err
@@ -594,6 +596,9 @@ func (db sqlitePersistence) HasPendingNotificationsForChat(chatID string) (bool,
 }
 
 func (db sqlitePersistence) GetActivityCenterNotificationsByID(ids []types.HexBytes) ([]*ActivityCenterNotification, error) {
+	if len(ids) == 0 {
+		return emptyNotifications, nil
+	}
 	idsArgs := make([]interface{}, 0, len(ids))
 	for _, id := range ids {
 		idsArgs = append(idsArgs, id)
@@ -699,12 +704,28 @@ func (db sqlitePersistence) DismissAllActivityCenterNotifications(updatedAt uint
 }
 
 func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromUser(userPublicKey string, updatedAt uint64) ([]*ActivityCenterNotification, error) {
+	var tx *sql.Tx
+	var err error
+
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
 	query := fmt.Sprintf(`SELECT %s FROM activity_center_notifications WHERE 
                                        author = ? AND 
                                        NOT deleted AND 
                                        NOT dismissed AND 
                                        NOT accepted`, allFieldsForTableActivityCenterNotification)
-	rows, err := db.db.Query(query, userPublicKey)
+	rows, err := tx.Query(query, userPublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -718,7 +739,7 @@ func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromUser(userPu
 		return nil, err
 	}
 
-	_, err = db.db.Exec(`
+	_, err = tx.Exec(`
 		UPDATE activity_center_notifications
 		SET read = 1, dismissed = 1, updated_at = ?
 		WHERE author = ?
@@ -727,12 +748,16 @@ func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromUser(userPu
 			AND NOT accepted
 		`,
 		updatedAt, userPublicKey)
-	return notifications, err
+	if err != nil {
+		return nil, err
+	}
+
+	return notifications, updateActivityCenterState(tx, updatedAt)
 }
 
-func (db sqlitePersistence) DeleteActivityCenterNotifications(ids []types.HexBytes, updatedAt uint64) ([]*ActivityCenterNotification, error) {
+func (db sqlitePersistence) MarkActivityCenterNotificationsDeleted(ids []types.HexBytes, updatedAt uint64) ([]*ActivityCenterNotification, error) {
 	if len(ids) == 0 {
-		return nil, nil
+		return emptyNotifications, nil
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
@@ -742,11 +767,27 @@ func (db sqlitePersistence) DeleteActivityCenterNotifications(ids []types.HexByt
 		args = append(args, id)
 	}
 
+	var tx *sql.Tx
+	var err error
+
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
 	// nolint: gosec
 	query := fmt.Sprintf(`SELECT %s FROM activity_center_notifications WHERE id IN (%s) AND NOT deleted`,
 		allFieldsForTableActivityCenterNotification,
 		inVector)
-	rows, err := db.db.Query(query, args[1:]...)
+	rows, err := tx.Query(query, args[1:]...)
 	if err != nil {
 		return nil, err
 	}
@@ -759,9 +800,12 @@ func (db sqlitePersistence) DeleteActivityCenterNotifications(ids []types.HexByt
 	}
 
 	update := "UPDATE activity_center_notifications SET deleted = 1, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted"
-	_, err = db.db.Exec(update, args...)
+	_, err = tx.Exec(update, args...)
+	if err != nil {
+		return nil, err
+	}
 
-	return notifications, err
+	return notifications, updateActivityCenterState(tx, updatedAt)
 }
 
 func (db sqlitePersistence) DismissActivityCenterNotifications(ids []types.HexBytes, updatedAt uint64) error {
@@ -776,15 +820,49 @@ func (db sqlitePersistence) DismissActivityCenterNotifications(ids []types.HexBy
 	}
 	args = append(args, updatedAt)
 
+	var tx *sql.Tx
+	var err error
+
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
 	query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1, updated_at = ? WHERE id IN (" + inVector + ") AND not deleted AND updated_at < ?" // nolint: gosec
-	_, err := db.db.Exec(query, args...)
-	return err
+	_, err = tx.Exec(query, args...)
+	if err != nil {
+		return err
+	}
+	return updateActivityCenterState(tx, updatedAt)
 }
 
 func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromCommunity(communityID string, updatedAt uint64) ([]*ActivityCenterNotification, error) {
+	var tx *sql.Tx
+	var err error
 
-	chatIDs, err := db.AllChatIDsByCommunity(communityID)
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	chatIDs, err := db.AllChatIDsByCommunity(tx, communityID)
 	if err != nil {
 		return nil, err
 	}
@@ -801,9 +879,10 @@ func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromCommunity(c
 	}
 
 	inVector := strings.Repeat("?, ", chatIDsCount-1) + "?"
+
 	// nolint: gosec
 	query := fmt.Sprintf(`SELECT %s FROM activity_center_notifications WHERE chat_id IN (%s) AND NOT deleted`, allFieldsForTableActivityCenterNotification, inVector)
-	rows, err := db.db.Query(query, args[1:]...)
+	rows, err := tx.Query(query, args[1:]...)
 	if err != nil {
 		return nil, err
 	}
@@ -817,17 +896,36 @@ func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromCommunity(c
 	}
 
 	query = "UPDATE activity_center_notifications SET read = 1, dismissed = 1, updated_at = ? WHERE chat_id IN (" + inVector + ") AND NOT deleted" // nolint: gosec
-	_, err = db.db.Exec(query, args...)
-	return notifications, err
+	_, err = tx.Exec(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	return notifications, updateActivityCenterState(tx, updatedAt)
 }
 
 func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromChatID(chatID string, updatedAt uint64) ([]*ActivityCenterNotification, error) {
+	var tx *sql.Tx
+	var err error
+
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
 	query := fmt.Sprintf(`SELECT %s FROM activity_center_notifications 
           WHERE chat_id = ? 
           AND NOT deleted 
           AND NOT accepted 
           AND notification_type != ?`, allFieldsForTableActivityCenterNotification)
-	rows, err := db.db.Query(query, chatID, ActivityCenterNotificationTypeContactRequest)
+	rows, err := tx.Query(query, chatID, ActivityCenterNotificationTypeContactRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -850,8 +948,11 @@ func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromChatID(chat
 			AND NOT accepted
 			AND notification_type != ?
 	`
-	_, err = db.db.Exec(query, updatedAt, chatID, ActivityCenterNotificationTypeContactRequest)
-	return notifications, err
+	_, err = tx.Exec(query, updatedAt, chatID, ActivityCenterNotificationTypeContactRequest)
+	if err != nil {
+		return nil, err
+	}
+	return notifications, updateActivityCenterState(tx, updatedAt)
 }
 
 func (db sqlitePersistence) AcceptAllActivityCenterNotifications(updatedAt uint64) ([]*ActivityCenterNotification, error) {
@@ -881,7 +982,9 @@ func (db sqlitePersistence) AcceptAllActivityCenterNotifications(updatedAt uint6
 }
 
 func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexBytes, updatedAt uint64) ([]*ActivityCenterNotification, error) {
-
+	if len(ids) == 0 {
+		return emptyNotifications, nil
+	}
 	var tx *sql.Tx
 	var err error
 
@@ -926,7 +1029,11 @@ func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexByt
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
 	query := "UPDATE activity_center_notifications SET read = 1, accepted = 1, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted AND updated_at < ?" // nolint: gosec
 	_, err = tx.Exec(query, args...)
-	return updateNotifications, err
+	if err != nil {
+		return nil, err
+	}
+
+	return updateNotifications, updateActivityCenterState(tx, updatedAt)
 }
 
 func (db sqlitePersistence) AcceptActivityCenterNotificationsForInvitesFromUser(userPublicKey string, updatedAt uint64) ([]*ActivityCenterNotification, error) {
@@ -980,16 +1087,34 @@ func (db sqlitePersistence) AcceptActivityCenterNotificationsForInvitesFromUser(
 		return nil, err
 	}
 
-	return notifications, nil
+	return notifications, updateActivityCenterState(tx, updatedAt)
 }
 
 func (db sqlitePersistence) MarkAllActivityCenterNotificationsRead(updatedAt uint64) error {
-	_, err := db.db.Exec(`UPDATE activity_center_notifications SET read = 1, updated_at = ? WHERE NOT read AND NOT deleted`, updatedAt)
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+	_, err = tx.Exec(`UPDATE activity_center_notifications SET read = 1, updated_at = ? WHERE NOT read AND NOT deleted`, updatedAt)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`UPDATE activity_center_states SET has_seen = 1, updated_at = ?`, updatedAt)
 	return err
 }
 
 func (db sqlitePersistence) MarkActivityCenterNotificationsRead(ids []types.HexBytes, updatedAt uint64) error {
-
+	if len(ids) == 0 {
+		return nil
+	}
 	args := make([]interface{}, 0, len(ids)+1)
 	args = append(args, updatedAt)
 	for _, id := range ids {
@@ -997,15 +1122,51 @@ func (db sqlitePersistence) MarkActivityCenterNotificationsRead(ids []types.HexB
 	}
 	args = append(args, updatedAt)
 
+	var tx *sql.Tx
+	var err error
+
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
 	query := "UPDATE activity_center_notifications SET read = 1, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted AND updated_at < ?" // nolint: gosec
-	_, err := db.db.Exec(query, args...)
-	return err
+	_, err = tx.Exec(query, args...)
+	if err != nil {
+		return err
+	}
+	return updateActivityCenterState(tx, updatedAt)
 
 }
 
-func (db sqlitePersistence) MarkActivityCenterNotificationsUnread(ids []types.HexBytes, updatedAt uint64) ([]*ActivityCenterNotification, error) {
+func updateActivityCenterState(tx *sql.Tx, updatedAt uint64) error {
+	var unreadCount int
+	err := tx.QueryRow("SELECT COUNT(1) FROM activity_center_notifications WHERE read = 0 AND deleted = 0").Scan(&unreadCount)
+	if err != nil {
+		return err
+	}
+	var hasSeen int
+	if unreadCount == 0 {
+		hasSeen = 1
+	}
 
+	_, err = tx.Exec(`UPDATE activity_center_states SET has_seen = ?, updated_at = ?`, hasSeen, updatedAt)
+	return err
+}
+
+func (db sqlitePersistence) MarkActivityCenterNotificationsUnread(ids []types.HexBytes, updatedAt uint64) ([]*ActivityCenterNotification, error) {
+	if len(ids) == 0 {
+		return emptyNotifications, nil
+	}
 	args := make([]interface{}, 0, len(ids)+1)
 	args = append(args, updatedAt)
 	for _, id := range ids {
@@ -1015,7 +1176,21 @@ func (db sqlitePersistence) MarkActivityCenterNotificationsUnread(ids []types.He
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
 	// nolint: gosec
 	query := fmt.Sprintf("SELECT %s FROM activity_center_notifications WHERE id IN (%s) AND NOT deleted", allFieldsForTableActivityCenterNotification, inVector)
-	rows, err := db.db.Query(query, args[1:]...)
+
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	rows, err := tx.Query(query, args[1:]...)
 	if err != nil {
 		return nil, err
 	}
@@ -1027,8 +1202,16 @@ func (db sqlitePersistence) MarkActivityCenterNotificationsUnread(ids []types.He
 		return nil, err
 	}
 
+	if len(notifications) == 0 {
+		return notifications, nil
+	}
+
 	query = "UPDATE activity_center_notifications SET read = 0, updated_at = ? WHERE id IN (" + inVector + ") AND NOT deleted" // nolint: gosec
-	_, err = db.db.Exec(query, args...)
+	_, err = tx.Exec(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	_, err = tx.Exec(`UPDATE activity_center_states SET has_seen = 0, updated_at = ?`, updatedAt)
 	return notifications, err
 }
 

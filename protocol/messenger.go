@@ -1568,7 +1568,7 @@ func (m *Messenger) watchPendingCommunityRequestToJoin() {
 		for {
 			select {
 			case <-time.After(time.Minute * 10):
-				_, err := m.CheckAndDeletePendingRequestToJoinCommunity(false)
+				_, err := m.CheckAndDeletePendingRequestToJoinCommunity(context.Background(), false)
 				if err != nil {
 					m.logger.Error("failed to check and delete pending request to join community", zap.Error(err))
 				}
@@ -3338,9 +3338,9 @@ func (r *ReceivedMessageState) updateExistingActivityCenterNotification(publicKe
 
 	notification.Message = message
 	notification.ReplyMessage = responseTo
-	notification.UpdatedAt = m.getCurrentTimeInMillis()
+	notification.UpdatedAt = m.GetCurrentTimeInMillis()
 
-	err = m.addActivityCenterNotification(r.Response, notification)
+	err = m.addActivityCenterNotification(r.Response, notification, nil)
 	if err != nil {
 		return err
 	}
@@ -3395,11 +3395,11 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 			ChatID:        chat.ID,
 			CommunityID:   chat.CommunityID,
 			Author:        message.From,
-			UpdatedAt:     m.getCurrentTimeInMillis(),
+			UpdatedAt:     m.GetCurrentTimeInMillis(),
 			AlbumMessages: albumMessages,
 		}
 
-		return m.addActivityCenterNotification(r.Response, notification)
+		return m.addActivityCenterNotification(r.Response, notification, nil)
 	}
 
 	return nil
@@ -4115,14 +4115,9 @@ func (m *Messenger) markAllRead(chatID string, clock uint64, shouldBeSynced bool
 	return m.persistence.SaveChats([]*Chat{chat})
 }
 
-func (m *Messenger) MarkAllRead(chatID string) error {
-	notifications, err := m.persistence.DismissAllActivityCenterNotificationsFromChatID(chatID, m.getCurrentTimeInMillis())
+func (m *Messenger) MarkAllRead(ctx context.Context, chatID string) error {
+	_, err := m.DismissAllActivityCenterNotificationsFromChatID(ctx, chatID, m.GetCurrentTimeInMillis())
 	if err != nil {
-		return err
-	}
-	err = m.syncActivityCenterNotifications(notifications)
-	if err != nil {
-		m.logger.Error("MarkAllRead, failed to sync activity center notifications", zap.Error(err))
 		return err
 	}
 
@@ -4139,13 +4134,13 @@ func (m *Messenger) MarkAllRead(chatID string) error {
 	return m.markAllRead(chatID, clock, true)
 }
 
-func (m *Messenger) MarkAllReadInCommunity(communityID string) ([]string, error) {
-	notifications, err := m.persistence.DismissAllActivityCenterNotificationsFromCommunity(communityID, m.getCurrentTimeInMillis())
+func (m *Messenger) MarkAllReadInCommunity(ctx context.Context, communityID string) ([]string, error) {
+	_, err := m.DismissAllActivityCenterNotificationsFromCommunity(ctx, communityID, m.GetCurrentTimeInMillis())
 	if err != nil {
 		return nil, err
 	}
 
-	chatIDs, err := m.persistence.AllChatIDsByCommunity(communityID)
+	chatIDs, err := m.persistence.AllChatIDsByCommunity(nil, communityID)
 	if err != nil {
 		return nil, err
 	}
@@ -4169,12 +4164,6 @@ func (m *Messenger) MarkAllReadInCommunity(communityID string) ([]string, error)
 	if err != nil {
 		return chatIDs, err
 	}
-
-	err = m.syncActivityCenterNotifications(notifications)
-	if err != nil {
-		m.logger.Error("MarkAllReadInCommunity, error syncing activity center notifications", zap.Error(err))
-	}
-
 	return chatIDs, err
 }
 
@@ -5058,7 +5047,7 @@ func (m *Messenger) getTimesource() common.TimeSource {
 	return m.transport
 }
 
-func (m *Messenger) getCurrentTimeInMillis() uint64 {
+func (m *Messenger) GetCurrentTimeInMillis() uint64 {
 	return m.getTimesource().GetCurrentTime()
 }
 

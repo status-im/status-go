@@ -247,9 +247,9 @@ func (m *Messenger) CancelVerificationRequest(ctx context.Context, id string) (*
 		message := notification.Message
 		message.ContactVerificationState = common.ContactVerificationStateCanceled
 		notification.Read = true
-		notification.UpdatedAt = m.getCurrentTimeInMillis()
+		notification.UpdatedAt = m.GetCurrentTimeInMillis()
 
-		err = m.addActivityCenterNotification(response, notification)
+		err = m.addActivityCenterNotification(response, notification, m.syncActivityCenterReadByIDs)
 		if err != nil {
 			m.logger.Error("failed to save notification", zap.Error(err))
 			return nil, err
@@ -358,9 +358,8 @@ func (m *Messenger) AcceptContactVerificationRequest(ctx context.Context, id str
 		notification.ReplyMessage = replyMessage
 		notification.Read = true
 		notification.Accepted = true
-		notification.UpdatedAt = m.getCurrentTimeInMillis()
-
-		err = m.addActivityCenterNotification(resp, notification)
+		notification.UpdatedAt = m.GetCurrentTimeInMillis()
+		err = m.addActivityCenterNotification(resp, notification, m.syncActivityCenterAcceptedByIDs)
 		if err != nil {
 			m.logger.Error("failed to save notification", zap.Error(err))
 			return nil, err
@@ -455,9 +454,9 @@ func (m *Messenger) VerifiedTrusted(ctx context.Context, request *requests.Verif
 	notification.Message.ContactVerificationState = common.ContactVerificationStateTrusted
 	notification.Read = true
 	notification.Accepted = true
-	notification.UpdatedAt = m.getCurrentTimeInMillis()
+	notification.UpdatedAt = m.GetCurrentTimeInMillis()
 
-	err = m.addActivityCenterNotification(response, notification)
+	err = m.addActivityCenterNotification(response, notification, m.syncActivityCenterAcceptedByIDs)
 	if err != nil {
 		m.logger.Error("failed to save notification", zap.Error(err))
 		return nil, err
@@ -562,9 +561,9 @@ func (m *Messenger) VerifiedUntrustworthy(ctx context.Context, request *requests
 	notification.Message.ContactVerificationState = common.ContactVerificationStateUntrustworthy
 	notification.Read = true
 	notification.Accepted = true
-	notification.UpdatedAt = m.getCurrentTimeInMillis()
+	notification.UpdatedAt = m.GetCurrentTimeInMillis()
 
-	err = m.addActivityCenterNotification(response, notification)
+	err = m.addActivityCenterNotification(response, notification, m.syncActivityCenterAcceptedByIDs)
 	if err != nil {
 		m.logger.Error("failed to save notification", zap.Error(err))
 		return nil, err
@@ -671,12 +670,12 @@ func (m *Messenger) DeclineContactVerificationRequest(ctx context.Context, id st
 		notification.ContactVerificationStatus = verification.RequestStatusDECLINED
 		notification.Read = true
 		notification.Dismissed = true
-		notification.UpdatedAt = m.getCurrentTimeInMillis()
+		notification.UpdatedAt = m.GetCurrentTimeInMillis()
 
 		message := notification.Message
 		message.ContactVerificationState = common.ContactVerificationStateDeclined
 
-		err = m.addActivityCenterNotification(response, notification)
+		err = m.addActivityCenterNotification(response, notification, m.syncActivityCenterDismissedByIDs)
 		if err != nil {
 			m.logger.Error("failed to save notification", zap.Error(err))
 			return nil, err
@@ -1049,10 +1048,10 @@ func (m *Messenger) createOrUpdateOutgoingContactVerificationNotification(contac
 		Read:                      vr.RequestStatus != verification.RequestStatusACCEPTED, // Mark as Unread Accepted notification because we are waiting for the asnwer
 		Accepted:                  vr.RequestStatus == verification.RequestStatusTRUSTED || vr.RequestStatus == verification.RequestStatusUNTRUSTWORTHY,
 		Dismissed:                 vr.RequestStatus == verification.RequestStatusDECLINED,
-		UpdatedAt:                 m.getCurrentTimeInMillis(),
+		UpdatedAt:                 m.GetCurrentTimeInMillis(),
 	}
 
-	return m.addActivityCenterNotification(response, notification)
+	return m.addActivityCenterNotification(response, notification, nil)
 }
 
 func (m *Messenger) createOrUpdateIncomingContactVerificationNotification(contact *Contact, messageState *ReceivedMessageState, vr *verification.Request, chatMessage *common.Message, replyMessage *common.Message) error {
@@ -1069,10 +1068,10 @@ func (m *Messenger) createOrUpdateIncomingContactVerificationNotification(contac
 		Read:                      vr.RequestStatus != verification.RequestStatusPENDING, // Unread only for pending incomming
 		Accepted:                  vr.RequestStatus == verification.RequestStatusACCEPTED || vr.RequestStatus == verification.RequestStatusTRUSTED || vr.RequestStatus == verification.RequestStatusUNTRUSTWORTHY,
 		Dismissed:                 vr.RequestStatus == verification.RequestStatusDECLINED,
-		UpdatedAt:                 m.getCurrentTimeInMillis(),
+		UpdatedAt:                 m.GetCurrentTimeInMillis(),
 	}
 
-	return m.addActivityCenterNotification(messageState.Response, notification)
+	return m.addActivityCenterNotification(messageState.Response, notification, nil)
 }
 
 func (m *Messenger) createContactVerificationMessage(challenge string, chat *Chat, state *ReceivedMessageState, verificationStatus common.ContactVerificationState) (*common.Message, error) {

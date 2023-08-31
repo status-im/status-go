@@ -715,7 +715,7 @@ func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserF
 		return nil
 	}
 
-	response, err := base.GetEventSender().BanUserFromCommunity(banRequest)
+	response, err := base.GetEventSender().BanUserFromCommunity(context.Background(), banRequest)
 
 	s := base.GetSuite()
 	s.Require().NoError(err)
@@ -1588,6 +1588,7 @@ func testEventSenderKickControlNode(base CommunityEventsTestsInterface, communit
 
 func testOwnerBanTheSameRole(base CommunityEventsTestsInterface, community *communities.Community) {
 	_, err := base.GetEventSender().BanUserFromCommunity(
+		context.Background(),
 		&requests.BanUserFromCommunity{
 			CommunityID: community.ID(),
 			User:        common.PubkeyToHexBytes(&base.GetEventSender().identity.PublicKey),
@@ -1601,6 +1602,7 @@ func testOwnerBanTheSameRole(base CommunityEventsTestsInterface, community *comm
 
 func testOwnerBanControlNode(base CommunityEventsTestsInterface, community *communities.Community) {
 	_, err := base.GetEventSender().BanUserFromCommunity(
+		context.Background(),
 		&requests.BanUserFromCommunity{
 			CommunityID: community.ID(),
 			User:        common.PubkeyToHexBytes(&base.GetControlNode().identity.PublicKey),
@@ -1615,6 +1617,7 @@ func testOwnerBanControlNode(base CommunityEventsTestsInterface, community *comm
 func testBanUnbanMember(base CommunityEventsTestsInterface, community *communities.Community) {
 	// verify that event sender can't ban a control node
 	_, err := base.GetEventSender().BanUserFromCommunity(
+		context.Background(),
 		&requests.BanUserFromCommunity{
 			CommunityID: community.ID(),
 			User:        common.PubkeyToHexBytes(&base.GetControlNode().identity.PublicKey),

@@ -326,16 +326,16 @@ func (api *PublicAPI) UnmuteChat(parent context.Context, chatID string) error {
 	return api.service.messenger.UnmuteChat(chatID)
 }
 
-func (api *PublicAPI) BlockContact(parent context.Context, contactID string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) BlockContact(ctx context.Context, contactID string) (*protocol.MessengerResponse, error) {
 	api.log.Info("blocking contact", "contact", contactID)
-	return api.service.messenger.BlockContact(contactID, false)
+	return api.service.messenger.BlockContact(ctx, contactID, false)
 }
 
 // This function is the same as the one above, but used only on the desktop side, since at the end it doesn't set
 // `Added` flag to `false`, but only `Blocked` to `true`
-func (api *PublicAPI) BlockContactDesktop(parent context.Context, contactID string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) BlockContactDesktop(ctx context.Context, contactID string) (*protocol.MessengerResponse, error) {
 	api.log.Info("blocking contact", "contact", contactID)
-	return api.service.messenger.BlockContactDesktop(contactID)
+	return api.service.messenger.BlockContactDesktop(ctx, contactID)
 }
 
 func (api *PublicAPI) UnblockContact(parent context.Context, contactID string) (*protocol.MessengerResponse, error) {
@@ -417,7 +417,7 @@ func (api *PublicAPI) JoinCommunity(parent context.Context, communityID types.He
 }
 
 // LeaveCommunity leaves a commuity with the given ID
-func (api *PublicAPI) LeaveCommunity(parent context.Context, communityID types.HexBytes) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) LeaveCommunity(ctx context.Context, communityID types.HexBytes) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.LeaveCommunity(communityID)
 }
 
@@ -517,8 +517,8 @@ func (api *PublicAPI) SetCommunityMuted(request *requests.MuteCommunity) error {
 }
 
 // BanUserFromCommunity removes the user with pk from the community with ID
-func (api *PublicAPI) BanUserFromCommunity(request *requests.BanUserFromCommunity) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.BanUserFromCommunity(request)
+func (api *PublicAPI) BanUserFromCommunity(ctx context.Context, request *requests.BanUserFromCommunity) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.BanUserFromCommunity(ctx, request)
 }
 
 // UnbanUserFromCommunity removes the user's pk from the community ban list
@@ -582,8 +582,8 @@ func (api *PublicAPI) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*
 }
 
 // CancelRequestToJoinCommunity accepts a pending request to join a community
-func (api *PublicAPI) CancelRequestToJoinCommunity(request *requests.CancelRequestToJoinCommunity) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.CancelRequestToJoinCommunity(request)
+func (api *PublicAPI) CancelRequestToJoinCommunity(ctx context.Context, request *requests.CancelRequestToJoinCommunity) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CancelRequestToJoinCommunity(ctx, request)
 }
 
 // AcceptRequestToJoinCommunity accepts a pending request to join a community
@@ -617,8 +617,8 @@ func (api *PublicAPI) GetRevealedAccountsForAllMembers(communityID types.HexByte
 }
 
 // CheckAndClearPendingRequestToJoinCommunity to delete pending request to join a community which are older than 7 days
-func (api *PublicAPI) CheckAndDeletePendingRequestToJoinCommunity() (*protocol.MessengerResponse, error) {
-	return api.service.messenger.CheckAndDeletePendingRequestToJoinCommunity(true)
+func (api *PublicAPI) CheckAndDeletePendingRequestToJoinCommunity(ctx context.Context) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CheckAndDeletePendingRequestToJoinCommunity(ctx, true)
 }
 
 // CreateCommunityCategory creates a category within a particular community
@@ -779,12 +779,12 @@ func (api *PublicAPI) MarkMessagesSeen(chatID string, ids []string) (*MarkMessag
 	return response, nil
 }
 
-func (api *PublicAPI) MarkAllRead(chatID string) error {
-	return api.service.messenger.MarkAllRead(chatID)
+func (api *PublicAPI) MarkAllRead(ctx context.Context, chatID string) error {
+	return api.service.messenger.MarkAllRead(ctx, chatID)
 }
 
-func (api *PublicAPI) MarkAllReadInCommunity(communityID string) ([]string, error) {
-	return api.service.messenger.MarkAllReadInCommunity(communityID)
+func (api *PublicAPI) MarkAllReadInCommunity(ctx context.Context, communityID string) ([]string, error) {
+	return api.service.messenger.MarkAllReadInCommunity(ctx, communityID)
 }
 
 func (api *PublicAPI) SendContactRequest(ctx context.Context, request *requests.SendContactRequest) (*protocol.MessengerResponse, error) {
@@ -1220,12 +1220,16 @@ func (api *PublicAPI) MarkActivityCenterNotificationsRead(ctx context.Context, i
 	return api.service.messenger.MarkActivityCenterNotificationsRead(ctx, ids, 0, true)
 }
 
-func (api *PublicAPI) MarkActivityCenterNotificationsUnread(ids []types.HexBytes) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.MarkActivityCenterNotificationsUnread(ids)
+func (api *PublicAPI) MarkActivityCenterNotificationsUnread(ctx context.Context, ids []types.HexBytes) (*protocol.MessengerResponse, error) {
+	m := api.service.messenger
+	updatedAt := m.GetCurrentTimeInMillis()
+	return m.MarkActivityCenterNotificationsUnread(ctx, ids, updatedAt, true)
 }
 
 func (api *PublicAPI) AcceptActivityCenterNotifications(ctx context.Context, ids []types.HexBytes) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.AcceptActivityCenterNotifications(ctx, ids, 0, true)
+	m := api.service.messenger
+	updatedAt := m.GetCurrentTimeInMillis()
+	return api.service.messenger.AcceptActivityCenterNotifications(ctx, ids, updatedAt, true)
 }
 
 func (api *PublicAPI) DismissActivityCenterNotifications(ctx context.Context, ids []types.HexBytes) error {
@@ -1234,7 +1238,10 @@ func (api *PublicAPI) DismissActivityCenterNotifications(ctx context.Context, id
 }
 
 func (api *PublicAPI) DeleteActivityCenterNotifications(ctx context.Context, ids []types.HexBytes) error {
-	return api.service.messenger.DeleteActivityCenterNotifications(ctx, ids, false)
+	m := api.service.messenger
+	updatedAt := m.GetCurrentTimeInMillis()
+	_, err := m.MarkActivityCenterNotificationsDeleted(ctx, ids, updatedAt, true)
+	return err
 }
 
 func (api *PublicAPI) RequestAllHistoricMessages(forceFetchingBackup bool) (*protocol.MessengerResponse, error) {

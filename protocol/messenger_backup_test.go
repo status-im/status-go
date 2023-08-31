@@ -631,7 +631,7 @@ func (s *MessengerBackupSuite) TestBackupBlockedContacts() {
 	actualContacts := bob2.AddedContacts()
 	s.Require().Equal(actualContacts[0].ID, contactID1)
 
-	_, err = bob1.BlockContact(contactID1, false)
+	_, err = bob1.BlockContact(context.Background(), contactID1, false)
 	s.Require().NoError(err)
 
 	// Backup

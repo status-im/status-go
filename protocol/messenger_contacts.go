@@ -186,9 +186,9 @@ func (m *Messenger) declineContactRequest(requestID string, fromSyncing bool) (*
 		notification.Message = contactRequest
 		notification.Read = true
 		notification.Dismissed = true
-		notification.UpdatedAt = m.getCurrentTimeInMillis()
+		notification.UpdatedAt = m.GetCurrentTimeInMillis()
 
-		err = m.addActivityCenterNotification(response, notification)
+		err = m.addActivityCenterNotification(response, notification, m.syncActivityCenterDismissedByIDs)
 		if err != nil {
 			m.logger.Error("failed to save notification", zap.Error(err))
 			return nil, err
@@ -306,9 +306,9 @@ func (m *Messenger) updateAcceptedContactRequest(response *MessengerResponse, co
 		notification.Message = contactRequest
 		notification.Read = true
 		notification.Accepted = true
-		notification.UpdatedAt = m.getCurrentTimeInMillis()
+		notification.UpdatedAt = m.GetCurrentTimeInMillis()
 
-		err = m.addActivityCenterNotification(response, notification)
+		err = m.addActivityCenterNotification(response, notification, nil)
 		if err != nil {
 			m.logger.Error("failed to save notification", zap.Error(err))
 			return nil, err
@@ -523,7 +523,7 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 		}
 
 		notification := m.generateOutgoingContactRequestNotification(contact, contactRequest)
-		err = m.addActivityCenterNotification(response, notification)
+		err = m.addActivityCenterNotification(response, notification, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -575,7 +575,7 @@ func (m *Messenger) generateOutgoingContactRequestNotification(contact *Contact,
 			contactRequest.ContactRequestState == common.ContactRequestStatePending,
 		Accepted:  contactRequest.ContactRequestState == common.ContactRequestStateAccepted,
 		Dismissed: contactRequest.ContactRequestState == common.ContactRequestStateDismissed,
-		UpdatedAt: m.getCurrentTimeInMillis(),
+		UpdatedAt: m.GetCurrentTimeInMillis(),
 	}
 }
 
@@ -802,7 +802,7 @@ func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNic
 	return response, nil
 }
 
-func (m *Messenger) blockContact(response *MessengerResponse, contactID string, isDesktopFunc bool, fromSyncing bool) error {
+func (m *Messenger) blockContact(ctx context.Context, response *MessengerResponse, contactID string, isDesktopFunc bool, fromSyncing bool) error {
 	contact, err := m.BuildContact(&requests.BuildContact{PublicKey: contactID})
 	if err != nil {
 		return err
@@ -848,14 +848,14 @@ func (m *Messenger) blockContact(response *MessengerResponse, contactID string, 
 		}
 
 		// We remove anything that's related to this contact request
-		notifications, err := m.persistence.DeleteChatContactRequestActivityCenterNotifications(contact.ID, m.getCurrentTimeInMillis())
+		updatedAt := m.GetCurrentTimeInMillis()
+		notifications, err := m.persistence.DeleteChatContactRequestActivityCenterNotifications(contact.ID, updatedAt)
 		if err != nil {
 			return err
 		}
-
-		err = m.syncActivityCenterNotifications(notifications)
+		err = m.syncActivityCenterDeleted(ctx, notifications, updatedAt)
 		if err != nil {
-			m.logger.Error("BlockContact, error syncing activity center notifications", zap.Error(err))
+			m.logger.Error("BlockContact, error syncing activity center notifications as deleted", zap.Error(err))
 			return err
 		}
 	}
@@ -869,15 +869,15 @@ func (m *Messenger) blockContact(response *MessengerResponse, contactID string, 
 	return nil
 }
 
-func (m *Messenger) BlockContact(contactID string, fromSyncing bool) (*MessengerResponse, error) {
+func (m *Messenger) BlockContact(ctx context.Context, contactID string, fromSyncing bool) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
-	err := m.blockContact(response, contactID, false, fromSyncing)
+	err := m.blockContact(ctx, response, contactID, false, fromSyncing)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err = m.DeclineAllPendingGroupInvitesFromUser(response, contactID)
+	response, err = m.DeclineAllPendingGroupInvitesFromUser(ctx, response, contactID)
 	if err != nil {
 		return nil, err
 	}
@@ -888,14 +888,9 @@ func (m *Messenger) BlockContact(contactID string, fromSyncing bool) (*Messenger
 	//		 This should be considered separately, I'm not sure if that's safe.
 	//		 https://github.com/status-im/status-go/issues/3720
 	if !fromSyncing {
-		notifications, err := m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID, m.getCurrentTimeInMillis())
+		updatedAt := m.GetCurrentTimeInMillis()
+		_, err = m.DismissAllActivityCenterNotificationsFromUser(ctx, contactID, updatedAt)
 		if err != nil {
-			return nil, err
-		}
-
-		err = m.syncActivityCenterNotifications(notifications)
-		if err != nil {
-			m.logger.Error("BlockContact, error syncing activity center notifications", zap.Error(err))
 			return nil, err
 		}
 	}
@@ -905,30 +900,24 @@ func (m *Messenger) BlockContact(contactID string, fromSyncing bool) (*Messenger
 
 // The same function as the one above.
 // Should be removed with https://github.com/status-im/status-desktop/issues/8805
-func (m *Messenger) BlockContactDesktop(contactID string) (*MessengerResponse, error) {
+func (m *Messenger) BlockContactDesktop(ctx context.Context, contactID string) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
-	err := m.blockContact(response, contactID, true, false)
+	err := m.blockContact(ctx, response, contactID, true, false)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err = m.DeclineAllPendingGroupInvitesFromUser(response, contactID)
+	response, err = m.DeclineAllPendingGroupInvitesFromUser(ctx, response, contactID)
 	if err != nil {
 		return nil, err
 	}
 
-	notifications, err := m.persistence.DismissAllActivityCenterNotificationsFromUser(contactID, m.getCurrentTimeInMillis())
+	notifications, err := m.DismissAllActivityCenterNotificationsFromUser(ctx, contactID, m.GetCurrentTimeInMillis())
 	if err != nil {
 		return nil, err
 	}
-
-	err = m.syncActivityCenterNotifications(notifications)
-	if err != nil {
-		m.logger.Error("BlockContactDesktop, error syncing activity center notifications", zap.Error(err))
-		return nil, err
-	}
-
+	response.AddActivityCenterNotifications(notifications)
 	return response, nil
 }
 
