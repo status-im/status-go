@@ -2189,7 +2189,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 		if !permissionsSatisfied {
 			requestToJoin.State = RequestToJoinStateDeclined
 		}
-		if permissionsSatisfied && existingRequestToJoin.State == RequestToJoinStateAcceptedPending {
+		if permissionsSatisfied && existingRequestToJoin != nil && existingRequestToJoin.State == RequestToJoinStateAcceptedPending {
 			err = m.markRequestToJoin(signer, community)
 			if err != nil {
 				return nil, err
