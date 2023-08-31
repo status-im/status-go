@@ -317,7 +317,6 @@ func (d *ETHDownloader) subTransactionsFromTransactionData(tx *types.Transaction
 	}
 
 	rst := make([]Transfer, 0, len(receipt.Logs))
-
 	for _, log := range receipt.Logs {
 		eventType := w_common.GetEventType(log)
 		// Only add ERC20/ERC721 transfers from/to the given account
@@ -341,7 +340,6 @@ func (d *ETHDownloader) subTransactionsFromTransactionData(tx *types.Transaction
 		case w_common.HopBridgeWithdrawalBondedEventType, w_common.HopBridgeTransferSentEventType:
 			mustAppend = true
 		}
-
 		if mustAppend {
 			transfer := Transfer{
 				Type:               w_common.EventTypeToSubtransactionType(eventType),

@@ -90,6 +90,22 @@ type Token struct {
 	BuiltOn                 string                       `json:"builtOn"`
 	MarketValuesPerCurrency map[string]TokenMarketValues `json:"marketValuesPerCurrency"`
 	PegSymbol               string                       `json:"pegSymbol"`
+	Verified                bool                         `json:"verified"`
+}
+
+func splitVerifiedTokens(tokens []*token.Token) ([]*token.Token, []*token.Token) {
+	verified := make([]*token.Token, 0)
+	unverified := make([]*token.Token, 0)
+
+	for _, t := range tokens {
+		if t.Verified {
+			verified = append(verified, t)
+		} else {
+			unverified = append(unverified, t)
+		}
+	}
+
+	return verified, unverified
 }
 
 func getTokenBySymbols(tokens []*token.Token) map[string][]*token.Token {
@@ -184,8 +200,8 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	}
 	currencies = append(currencies, currency)
 	currencies = append(currencies, getFixedCurrencies()...)
-
 	allTokens, err := r.tokenManager.GetTokensByChainIDs(chainIDs)
+
 	if err != nil {
 		return nil, err
 	}
@@ -251,68 +267,73 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	}
 	err = group.Error()
 	result := make(map[common.Address][]Token)
+	verifiedTokens, unverifiedTokens := splitVerifiedTokens(allTokens)
+
 	for _, address := range addresses {
-		for symbol, tokens := range getTokenBySymbols(allTokens) {
-			balancesPerChain := make(map[uint64]ChainBalance)
-			decimals := tokens[0].Decimals
-			anyPositiveBalance := false
-			for _, token := range tokens {
-				hexBalance := balances[token.ChainID][address][token.Address]
-				balance := big.NewFloat(0.0)
-				if hexBalance != nil {
-					balance = new(big.Float).Quo(
-						new(big.Float).SetInt(hexBalance.ToInt()),
-						big.NewFloat(math.Pow(10, float64(decimals))),
-					)
+		for _, tokenList := range [][]*token.Token{verifiedTokens, unverifiedTokens} {
+			for symbol, tokens := range getTokenBySymbols(tokenList) {
+				balancesPerChain := make(map[uint64]ChainBalance)
+				decimals := tokens[0].Decimals
+				anyPositiveBalance := false
+				for _, token := range tokens {
+					hexBalance := balances[token.ChainID][address][token.Address]
+					balance := big.NewFloat(0.0)
+					if hexBalance != nil {
+						balance = new(big.Float).Quo(
+							new(big.Float).SetInt(hexBalance.ToInt()),
+							big.NewFloat(math.Pow(10, float64(decimals))),
+						)
+					}
+					hasError := false
+					if client, ok := clients[token.ChainID]; ok {
+						hasError = err != nil || !client.IsConnected
+					}
+					if !anyPositiveBalance {
+						anyPositiveBalance = balance.Cmp(big.NewFloat(0.0)) > 0
+					}
+					balancesPerChain[token.ChainID] = ChainBalance{
+						Balance:  balance,
+						Address:  token.Address,
+						ChainID:  token.ChainID,
+						HasError: hasError,
+					}
 				}
-				hasError := false
-				if client, ok := clients[token.ChainID]; ok {
-					hasError = err != nil || !client.IsConnected
-				}
-				if !anyPositiveBalance {
-					anyPositiveBalance = balance.Cmp(big.NewFloat(0.0)) > 0
-				}
-				balancesPerChain[token.ChainID] = ChainBalance{
-					Balance:  balance,
-					Address:  token.Address,
-					ChainID:  token.ChainID,
-					HasError: hasError,
-				}
-			}
 
-			if !anyPositiveBalance && !belongsToMandatoryTokens(symbol) {
-				continue
-			}
-
-			marketValuesPerCurrency := make(map[string]TokenMarketValues)
-			for _, currency := range currencies {
-				marketValuesPerCurrency[currency] = TokenMarketValues{
-					MarketCap:       tokenMarketValues[symbol].MKTCAP,
-					HighDay:         tokenMarketValues[symbol].HIGHDAY,
-					LowDay:          tokenMarketValues[symbol].LOWDAY,
-					ChangePctHour:   tokenMarketValues[symbol].CHANGEPCTHOUR,
-					ChangePctDay:    tokenMarketValues[symbol].CHANGEPCTDAY,
-					ChangePct24hour: tokenMarketValues[symbol].CHANGEPCT24HOUR,
-					Change24hour:    tokenMarketValues[symbol].CHANGE24HOUR,
-					Price:           prices[symbol][currency],
-					HasError:        !r.marketManager.IsConnected,
+				if !anyPositiveBalance && !belongsToMandatoryTokens(symbol) {
+					continue
 				}
-			}
 
-			walletToken := Token{
-				Name:                    tokens[0].Name,
-				Color:                   tokens[0].Color,
-				Symbol:                  symbol,
-				BalancesPerChain:        balancesPerChain,
-				Decimals:                decimals,
-				Description:             tokenDetails[symbol].Description,
-				AssetWebsiteURL:         tokenDetails[symbol].AssetWebsiteURL,
-				BuiltOn:                 tokenDetails[symbol].BuiltOn,
-				MarketValuesPerCurrency: marketValuesPerCurrency,
-				PegSymbol:               token.GetTokenPegSymbol(symbol),
-			}
+				marketValuesPerCurrency := make(map[string]TokenMarketValues)
+				for _, currency := range currencies {
+					marketValuesPerCurrency[currency] = TokenMarketValues{
+						MarketCap:       tokenMarketValues[symbol].MKTCAP,
+						HighDay:         tokenMarketValues[symbol].HIGHDAY,
+						LowDay:          tokenMarketValues[symbol].LOWDAY,
+						ChangePctHour:   tokenMarketValues[symbol].CHANGEPCTHOUR,
+						ChangePctDay:    tokenMarketValues[symbol].CHANGEPCTDAY,
+						ChangePct24hour: tokenMarketValues[symbol].CHANGEPCT24HOUR,
+						Change24hour:    tokenMarketValues[symbol].CHANGE24HOUR,
+						Price:           prices[symbol][currency],
+						HasError:        !r.marketManager.IsConnected,
+					}
+				}
 
-			result[address] = append(result[address], walletToken)
+				walletToken := Token{
+					Name:                    tokens[0].Name,
+					Color:                   tokens[0].Color,
+					Symbol:                  symbol,
+					BalancesPerChain:        balancesPerChain,
+					Decimals:                decimals,
+					Description:             tokenDetails[symbol].Description,
+					AssetWebsiteURL:         tokenDetails[symbol].AssetWebsiteURL,
+					BuiltOn:                 tokenDetails[symbol].BuiltOn,
+					MarketValuesPerCurrency: marketValuesPerCurrency,
+					PegSymbol:               token.GetTokenPegSymbol(symbol),
+					Verified:                tokens[0].Verified,
+				}
+
+				result[address] = append(result[address], walletToken)
+			}
 		}
 	}
 

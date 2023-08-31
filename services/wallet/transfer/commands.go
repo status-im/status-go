@@ -404,6 +404,8 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 				return err
 			}
 
+			c.processUnknownErc20CommunityTransactions(ctx, allTransfers)
+
 			err = c.processMultiTransactions(ctx, allTransfers)
 			if err != nil {
 				log.Error("processMultiTransactions error", "error", err)
@@ -546,6 +548,15 @@ func (c *transfersCommand) checkAndProcessBridgeMultiTx(ctx context.Context, tx 
 	}
 
 	return false, nil
+}
+
+func (c *transfersCommand) processUnknownErc20CommunityTransactions(ctx context.Context, allTransfers []Transfer) {
+	for _, tx := range allTransfers {
+		if tx.Type == w_common.Erc20Transfer {
+			// Find token in db or if this is a community token, find its metadata
+			_ = c.tokenManager.FindOrCreateTokenByAddress(ctx, tx.NetworkID, *tx.Transaction.To())
+		}
+	}
 }
 
 func (c *transfersCommand) processMultiTransactions(ctx context.Context, allTransfers []Transfer) error {
