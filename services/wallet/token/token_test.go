@@ -16,7 +16,7 @@ import (
 func setupTestTokenDB(t *testing.T) (*Manager, func()) {
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
-	return &Manager{db, nil, nil, nil, nil, nil, false}, func() {
+	return &Manager{db, nil, nil, nil, nil, nil, nil, false}, func() {
 		require.NoError(t, db.Close())
 	}
 }

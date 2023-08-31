@@ -39,6 +39,8 @@ type Token struct {
 	// ISO 4217 alphabetic code. For example, an empty string means it is not
 	// pegged, while "USD" means it's pegged to the United States Dollar.
 	PegSymbol string `json:"pegSymbol"`
+
+	Verified bool `json:"verified"`
 }
 
 func (t *Token) IsNative() bool {
@@ -54,6 +56,7 @@ type ManagerInterface interface {
 type Manager struct {
 	db               *sql.DB
 	RPCClient        *rpc.Client
+	contractMaker    *contracts.ContractMaker
 	networkManager   *network.Manager
 	stores           []store
 	tokenList        []*Token
@@ -66,9 +69,18 @@ func NewTokenManager(
 	RPCClient *rpc.Client,
 	networkManager *network.Manager,
 ) *Manager {
+	maker, _ := contracts.NewContractMaker(RPCClient)
 	// Order of stores is important when merging token lists. The former prevale
-	tokenManager := &Manager{db, RPCClient, networkManager, []store{newUniswapStore(), newDefaultStore()}, nil, nil, false}
-	return tokenManager
+	return &Manager{
+		db,
+		RPCClient,
+		maker,
+		networkManager,
+		[]store{newUniswapStore(), newDefaultStore()},
+		nil,
+		nil,
+		false,
+	}
 }
 
 // overrideTokensInPlace overrides tokens in the store with the ones from the networks
@@ -135,6 +147,8 @@ func (tm *Manager) fetchTokens() {
 		tokens := store.GetTokens()
 		validTokens := make([]*Token, 0)
 		for _, token := range tokens {
+			token.Verified = true
+
 			for _, network := range networks {
 				if network.ChainID == token.ChainID {
 					validTokens = append(validTokens, token)
@@ -224,7 +238,29 @@ func (tm *Manager) FindTokenByAddress(chainID uint64, address common.Address) *T
 			return token
 		}
 	}
+
 	return nil
+}
+
+func (tm *Manager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address common.Address) *Token {
+	allTokens := tm.getFullTokenList(chainID)
+	for _, token := range allTokens {
+		if token.Address == address {
+			return token
+		}
+	}
+
+	token, err := tm.DiscoverToken(ctx, chainID, address)
+	if err != nil {
+		return nil
+	}
+
+	err = tm.UpsertCustom(*token)
+	if err != nil {
+		return nil
+	}
+
+	return token
 }
 
 func (tm *Manager) FindSNT(chainID uint64) *Token {
@@ -248,7 +284,7 @@ func (tm *Manager) GetAllTokensAndNativeCurrencies() ([]*Token, error) {
 		return nil, err
 	}
 
-	networks, err := tm.RPCClient.NetworkManager.Get(false)
+	networks, err := tm.networkManager.Get(false)
 	if err != nil {
 		return nil, err
 	}
@@ -314,11 +350,7 @@ func (tm *Manager) GetTokens(chainID uint64) ([]*Token, error) {
 }
 
 func (tm *Manager) DiscoverToken(ctx context.Context, chainID uint64, address common.Address) (*Token, error) {
-	backend, err := tm.RPCClient.EthClient(chainID)
-	if err != nil {
-		return nil, err
-	}
-	caller, err := ierc20.NewIERC20Caller(address, backend)
+	caller, err := tm.contractMaker.NewERC20(chainID, address)
 	if err != nil {
 		return nil, err
 	}
@@ -349,6 +381,7 @@ func (tm *Manager) DiscoverToken(ctx context.Context, chainID uint64, address co
 		Name:     name,
 		Symbol:   symbol,
 		Decimals: uint(decimal),
+		ChainID:  chainID,
 	}, nil
 }
 
@@ -432,6 +465,7 @@ func (tm *Manager) ToToken(network *params.Network) *Token {
 		Symbol:   network.NativeCurrencySymbol,
 		Decimals: uint(network.NativeCurrencyDecimals),
 		ChainID:  network.ChainID,
+		Verified: true,
 	}
 }
 
@@ -573,14 +607,11 @@ func (tm *Manager) GetBalances(parent context.Context, clients map[uint64]*chain
 		response[account][token] = &sumHex
 		mu.Unlock()
 	}
-	contractMaker, err := contracts.NewContractMaker(tm.RPCClient)
-	if err != nil {
-		return nil, err
-	}
+
 	for clientIdx := range clients {
 		client := clients[clientIdx]
 
-		ethScanContract, err := contractMaker.NewEthScan(client.ChainID)
+		ethScanContract, err := tm.contractMaker.NewEthScan(client.ChainID)
 
 		if err == nil {
 			fetchChainBalance := false
@@ -711,13 +742,9 @@ func (tm *Manager) GetBalancesByChain(parent context.Context, clients map[uint64
 		mu.Unlock()
 	}
 
-	contractMaker, err := contracts.NewContractMaker(tm.RPCClient)
-	if err != nil {
-		return nil, err
-	}
 	for clientIdx := range clients {
 		client := clients[clientIdx]
-		ethScanContract, err := contractMaker.NewEthScan(client.ChainID)
+		ethScanContract, err := tm.contractMaker.NewEthScan(client.ChainID)
 		if err != nil {
 			log.Error("error scanning contract", "err", err)
 			return nil, err
