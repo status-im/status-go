@@ -2479,7 +2479,7 @@ func (db sqlitePersistence) GetEdits(messageID string, from string) ([]*EditMess
 	var messages []*EditMessage
 	for rows.Next() {
 		e := NewEditMessage()
-		err := rows.Scan(&e.Clock, &e.ChatId, &e.MessageId, &e.From, &e.Text, &e.ID)
+		err := rows.Scan(&e.Clock, &e.ChatId, &e.MessageId, &e.From, &e.Text, &e.ID, pq.Array(&e.UnfurledLinks))
 		if err != nil {
 			return nil, err
 		}
