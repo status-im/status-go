@@ -3311,28 +3311,41 @@ func (r *ReceivedMessageState) addNewActivityCenterNotification(publicKey ecdsa.
 
 	// Use albumId as notificationId to prevent multiple notifications
 	// for same message with multiple images
-	var idToUse string
+	var notificationID string
 
 	image := message.GetImage()
+	var albumMessages = []*common.Message{}
 	if image != nil && image.GetAlbumId() != "" {
-		idToUse = message.GetImage().GetAlbumId()
+		notificationID = image.GetAlbumId()
+		album, err := m.persistence.albumMessages(message.LocalChatID, image.AlbumId)
+		if err != nil {
+			return err
+		}
+		if m.httpServer != nil {
+			for _, msg := range album {
+				m.prepareMessage(msg, m.httpServer)
+			}
+		}
+
+		albumMessages = album
 	} else {
-		idToUse = message.ID
+		notificationID = message.ID
 	}
 
 	isNotification, notificationType := showMentionOrReplyActivityCenterNotification(publicKey, message, chat, responseTo)
 	if isNotification {
 		notification := &ActivityCenterNotification{
-			ID:           types.FromHex(idToUse),
-			Name:         chat.Name,
-			Message:      message,
-			ReplyMessage: responseTo,
-			Type:         notificationType,
-			Timestamp:    message.WhisperTimestamp,
-			ChatID:       chat.ID,
-			CommunityID:  chat.CommunityID,
-			Author:       message.From,
-			UpdatedAt:    m.getCurrentTimeInMillis(),
+			ID:            types.FromHex(notificationID),
+			Name:          chat.Name,
+			Message:       message,
+			ReplyMessage:  responseTo,
+			Type:          notificationType,
+			Timestamp:     message.WhisperTimestamp,
+			ChatID:        chat.ID,
+			CommunityID:   chat.CommunityID,
+			Author:        message.From,
+			UpdatedAt:     m.getCurrentTimeInMillis(),
+			AlbumMessages: albumMessages,
 		}
 
 		return m.addActivityCenterNotification(r.Response, notification)

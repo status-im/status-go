@@ -46,6 +46,20 @@ func (m *Messenger) ActivityCenterNotifications(request ActivityCenterNotificati
 		for _, notification := range notifications {
 			if notification.Message != nil {
 				m.prepareMessage(notification.Message, m.httpServer)
+
+				image := notification.Message.GetImage()
+				if image != nil && image.AlbumId != "" {
+					album, err := m.persistence.albumMessages(notification.Message.LocalChatID, image.AlbumId)
+					if err != nil {
+						return nil, err
+					}
+					notification.AlbumMessages = album
+				}
+			}
+			if notification.AlbumMessages != nil {
+				for _, message := range notification.AlbumMessages {
+					m.prepareMessage(message, m.httpServer)
+				}
 			}
 		}
 	}
@@ -381,7 +395,23 @@ func (m *Messenger) DeleteActivityCenterNotifications(ctx context.Context, ids [
 }
 
 func (m *Messenger) ActivityCenterNotification(id types.HexBytes) (*ActivityCenterNotification, error) {
-	return m.persistence.GetActivityCenterNotificationByID(id)
+	notification, err := m.persistence.GetActivityCenterNotificationByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	if notification.Message != nil {
+		image := notification.Message.GetImage()
+		if image != nil && image.AlbumId != "" {
+			album, err := m.persistence.albumMessages(notification.Message.LocalChatID, image.AlbumId)
+			if err != nil {
+				return nil, err
+			}
+			notification.AlbumMessages = album
+		}
+	}
+
+	return notification, nil
 }
 
 func (m *Messenger) HandleSyncActivityCenterRead(state *ReceivedMessageState, message *protobuf.SyncActivityCenterRead, statusMessage *v1protocol.StatusMessage) error {
