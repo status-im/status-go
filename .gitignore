@@ -82,3 +82,6 @@ package-lock.json
 
 # junit reports for Jenkins integration
 report.xml
+
+# go test logs
+test.log

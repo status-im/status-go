@@ -35,7 +35,6 @@ GIT_COMMIT = $(shell git rev-parse --short HEAD)
 AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 ENABLE_METRICS ?= true
-BUILD_TAGS ?= 
 BUILD_FLAGS ?= $(shell echo "-ldflags='\
 	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
@@ -48,7 +47,6 @@ BUILD_FLAGS_MOBILE ?= $(shell echo "-ldflags='\
 	-X github.com/status-im/status-go/params.IpfsGatewayURL=$(IPFS_GATEWAY_URL)'")
 
 networkid ?= StatusChain
-gotest_extraflags =
 
 DOCKER_IMAGE_NAME ?= statusteam/status-go
 BOOTNODE_IMAGE_NAME ?= statusteam/bootnode
@@ -311,28 +309,23 @@ docker-test: ##@tests Run tests in a docker container with golang.
 
 test: test-unit ##@tests Run basic, short tests during development
 
-test-unit: SHELL := /bin/bash -o pipefail
-test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
+test-unit: export BUILD_TAGS ?=
+test-unit: export UNIT_TEST_PACKAGES ?= $(shell go list ./... | \
 	grep -v /vendor | \
 	grep -v /t/e2e | \
 	grep -v /t/benchmarks | \
 	grep -v /transactions/fake )
 test-unit: ##@tests Run unit and integration tests
-	for package in $(UNIT_TEST_PACKAGES); do \
-		set -e; \
-		package_dir=$$(go list -f {{.Dir}} $${package}); \
-		go test -tags '$(BUILD_TAGS)' -timeout 30m -v -failfast $${package} $(gotest_extraflags) | \
-		  go-junit-report -iocopy -out $${package_dir}/report.xml; \
-	done
+	./_assets/scripts/run_unit_tests.sh
 
-test-unit-race: gotest_extraflags=-race
+test-unit-race: export GOTEST_EXTRAFLAGS=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag
 
 test-e2e: ##@tests Run e2e tests
 	# order: reliability then alphabetical
 	# TODO(tiabc): make a single command out of them adding `-p 1` flag.
 
-test-e2e-race: gotest_extraflags=-race
+test-e2e-race: export GOTEST_EXTRAFLAGS=-race
 test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
 
 canary-test: node-canary
