@@ -2,6 +2,7 @@ package server
 
 import (
 	"net"
+	"runtime"
 
 	"go.uber.org/zap"
 
@@ -70,9 +71,25 @@ func filterAddressesForPairingServer(ips [][]net.IP) []net.IP {
 	return result
 }
 
+// getAndroidLocalIP uses the net dial default ip as the standard Android IP address
+// patches https://github.com/status-im/status-mobile/issues/17156
+// more work required for a more robust implementation, see https://github.com/wlynxg/anet
+func getAndroidLocalIP() ([][]net.IP, error) {
+	ip, err := GetOutboundIP()
+	if err != nil {
+		return nil, err
+	}
+
+	return [][]net.IP{{ip}}, nil
+}
+
 // getLocalAddresses returns an array of all addresses
 // of all available network interfaces.
 func getLocalAddresses() ([][]net.IP, error) {
+	if runtime.GOOS == "android" {
+		return getAndroidLocalIP()
+	}
+
 	nis, err := net.Interfaces()
 	if err != nil {
 		return nil, err
