@@ -26,6 +26,8 @@ type CollectibleHeader struct {
 	AnimationMediaType string                         `json:"animation_media_type"`
 	BackgroundColor    string                         `json:"background_color"`
 	CollectionName     string                         `json:"collection_name"`
+	CollectionSlug     string                         `json:"collection_slug"`
+	CollectionImageURL string                         `json:"collection_image_url"`
 }
 
 func fullCollectibleDataToHeader(c thirdparty.FullCollectibleData) CollectibleHeader {
@@ -39,6 +41,8 @@ func fullCollectibleDataToHeader(c thirdparty.FullCollectibleData) CollectibleHe
 	}
 	if c.CollectionData != nil {
 		ret.CollectionName = c.CollectionData.Name
+		ret.CollectionSlug = c.CollectionData.Slug
+		ret.CollectionImageURL = c.CollectionData.ImageURL
 	}
 	return ret
 }
