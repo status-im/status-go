@@ -96,15 +96,6 @@ func (s *ServerURLSuite) TestServer_MakeImageServerURL() {
 	s.testNoPort(baseURLWithDefaultPort+"/messages/", s.serverNoPort.MakeImageServerURL())
 }
 
-func (s *ServerURLSuite) TestServer_MakeIdenticonURL() {
-	s.Require().Equal(
-		baseURLWithCustomPort+"/messages/identicons?publicKey=0xdaff0d11decade",
-		s.server.MakeIdenticonURL("0xdaff0d11decade"))
-	s.testNoPort(
-		baseURLWithDefaultPort+"/messages/identicons?publicKey=0xdaff0d11decade",
-		s.serverNoPort.MakeIdenticonURL("0xdaff0d11decade"))
-}
-
 func (s *ServerURLSuite) TestServer_MakeImageURL() {
 	s.Require().Equal(
 		baseURLWithCustomPort+"/messages/images?messageId=0x10aded70ffee",

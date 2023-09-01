@@ -44,7 +44,6 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 		discordAttachmentsPath:   handleDiscordAttachment(s.db, s.logger),
 		discordAuthorsPath:       handleDiscordAuthorAvatar(s.db, s.logger),
 		generateQRCode:           handleQRCodeGeneration(s.multiaccountsDB, s.logger),
-		identiconsPath:           handleIdenticon(s.logger),
 		imagesPath:               handleImage(s.db, s.logger),
 		ipfsPath:                 handleIPFS(s.downloader, s.logger),
 		LinkPreviewThumbnailPath: handleLinkPreviewThumbnail(s.db, s.logger),
@@ -56,14 +55,6 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 func (s *MediaServer) MakeImageServerURL() string {
 	u := s.MakeBaseURL()
 	u.Path = basePath + "/"
-	return u.String()
-}
-
-func (s *MediaServer) MakeIdenticonURL(from string) string {
-	u := s.MakeBaseURL()
-	u.Path = identiconsPath
-	u.RawQuery = url.Values{"publicKey": {from}}.Encode()
-
 	return u.String()
 }
 

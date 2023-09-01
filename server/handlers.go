@@ -21,14 +21,12 @@ import (
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/identity/colorhash"
-	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/identity/ring"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 const (
 	basePath                 = "/messages"
-	identiconsPath           = basePath + "/identicons"
 	imagesPath               = basePath + "/images"
 	audioPath                = basePath + "/audio"
 	ipfsPath                 = "/ipfs"
@@ -72,6 +70,7 @@ type ImageParams struct {
 	UppercaseRatio  float64
 	Theme           ring.Theme
 	Ring            bool
+	RingWidth       float64
 	IndicatorSize   float64
 	IndicatorBorder float64
 	IndicatorColor  color.Color
@@ -228,6 +227,16 @@ func ParseImageParams(logger *zap.Logger, params url.Values) ImageParams {
 		parsed.IndicatorBorder = indicatorBorder
 	}
 
+	ringWidthStrs := params["ringWidth"]
+	if len(ringWidthStrs) != 0 {
+		ringWidth, err := strconv.ParseFloat(ringWidthStrs[0], 64)
+		if err != nil {
+			logger.Error("ParseParams: invalid indicatorSize", zap.String("ringWidth", ringWidthStrs[0]))
+			ringWidth = 0
+		}
+		parsed.RingWidth = ringWidth
+	}
+
 	parsed.Theme = getTheme(params, logger)
 	parsed.Ring = ringEnabled(params)
 
@@ -278,6 +287,12 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 		logger.Error("handleAccountImagesImpl: failed to load image.", zap.String("keyUid", parsed.KeyUID), zap.String("imageName", parsed.ImageName), zap.Error(err))
 		return
 	}
+
+	if parsed.Ring && parsed.RingWidth == 0 {
+		logger.Error("handleAccountImagesImpl: no ringWidth.")
+		return
+	}
+
 	if parsed.BgSize == 0 {
 		parsed.BgSize = identityImage.Width
 	}
@@ -287,6 +302,8 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 		logger.Error("handleAccountImagesImpl: failed to crop image.", zap.String("keyUid", parsed.KeyUID), zap.String("imageName", parsed.ImageName), zap.Error(err))
 		return
 	}
+
+	enlargeRatio := float64(identityImage.Width) / float64(parsed.BgSize)
 
 	if parsed.Ring {
 		account, err := multiaccountsDB.GetAccount(parsed.KeyUID)
@@ -311,7 +328,7 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 		}
 
 		payload, err = ring.DrawRing(&ring.DrawRingParam{
-			Theme: parsed.Theme, ColorHash: accColorHash, ImageBytes: payload, Height: identityImage.Height, Width: identityImage.Width,
+			Theme: parsed.Theme, ColorHash: accColorHash, ImageBytes: payload, Height: identityImage.Height, Width: identityImage.Width, RingWidth: parsed.RingWidth * enlargeRatio,
 		})
 		if err != nil {
 			logger.Error("handleAccountImagesImpl: failed to draw ring for account identity", zap.Error(err))
@@ -322,8 +339,7 @@ func handleAccountImagesImpl(multiaccountsDB *multiaccounts.Database, logger *za
 	if parsed.IndicatorSize != 0 {
 		// enlarge indicator size based on identity image size / desired size
 		// or we get a bad quality identity image
-		enlargeIndicatorRatio := float64(identityImage.Width / parsed.BgSize)
-		payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize*enlargeIndicatorRatio, parsed.IndicatorBorder*enlargeIndicatorRatio)
+		payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize*enlargeRatio, parsed.IndicatorBorder*enlargeRatio)
 		if err != nil {
 			logger.Error("handleAccountImagesImpl: failed to draw status-indicator for initials", zap.Error(err))
 			return
@@ -418,6 +434,11 @@ func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *
 	var accColorHash multiaccounts.ColorHash
 	var account *multiaccounts.Account
 
+	if parsed.Ring && parsed.RingWidth == 0 {
+		logger.Error("handleAccountInitialsImpl: no ringWidth.")
+		return
+	}
+
 	if parsed.KeyUID != "" {
 		account, err := multiaccountsDB.GetAccount(parsed.KeyUID)
 
@@ -453,7 +474,7 @@ func handleAccountInitialsImpl(multiaccountsDB *multiaccounts.Database, logger *
 		}
 
 		payload, err = ring.DrawRing(&ring.DrawRingParam{
-			Theme: parsed.Theme, ColorHash: accColorHash, ImageBytes: payload, Height: parsed.BgSize, Width: parsed.BgSize,
+			Theme: parsed.Theme, ColorHash: accColorHash, ImageBytes: payload, Height: parsed.BgSize, Width: parsed.BgSize, RingWidth: parsed.RingWidth,
 		})
 
 		if err != nil {
@@ -584,6 +605,11 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 			return
 		}
 
+		if parsed.Ring && parsed.RingWidth == 0 {
+			logger.Error("handleAccountImagesImpl: no ringWidth.")
+			return
+		}
+
 		var payload []byte
 		err := db.QueryRow(`SELECT payload FROM chat_identity_contacts WHERE contact_id = ? and image_type = ?`, parsed.PublicKey, parsed.ImageName).Scan(&payload)
 		if err != nil {
@@ -608,6 +634,8 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 			return
 		}
 
+		enlargeRatio := float64(width) / float64(parsed.BgSize)
+
 		if parsed.Ring {
 			colorHash, err := colorhash.GenerateFor(parsed.PublicKey)
 			if err != nil {
@@ -616,7 +644,7 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 			}
 
 			payload, err = ring.DrawRing(&ring.DrawRingParam{
-				Theme: parsed.Theme, ColorHash: colorHash, ImageBytes: payload, Height: width, Width: width,
+				Theme: parsed.Theme, ColorHash: colorHash, ImageBytes: payload, Height: width, Width: width, RingWidth: parsed.RingWidth * enlargeRatio,
 			})
 
 			if err != nil {
@@ -626,8 +654,7 @@ func handleContactImages(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
 		}
 
 		if parsed.IndicatorSize != 0 {
-			enlargeIndicatorRatio := float64(width / parsed.BgSize)
-			payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize*enlargeIndicatorRatio, parsed.IndicatorBorder*enlargeIndicatorRatio)
+			payload, err = images.AddStatusIndicatorToImage(payload, parsed.IndicatorColor, parsed.IndicatorSize*enlargeRatio, parsed.IndicatorBorder*enlargeRatio)
 			if err != nil {
 				logger.Error("handleAccountImagesImpl: failed to draw status-indicator for initials", zap.Error(err))
 				return
@@ -670,47 +697,6 @@ func getTheme(params url.Values, logger *zap.Logger) ring.Theme {
 		}
 	}
 	return theme
-}
-
-func handleIdenticon(logger *zap.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		params := r.URL.Query()
-		parsed := ParseImageParams(logger, params)
-
-		if parsed.PublicKey == "" {
-			logger.Error("no publicKey")
-			return
-		}
-
-		identiconImage, err := identicon.Generate(parsed.PublicKey)
-		if err != nil {
-			logger.Error("could not generate identicon")
-		}
-
-		if identiconImage != nil && parsed.Ring {
-			colorHash, err := colorhash.GenerateFor(parsed.PublicKey)
-			if err != nil {
-				logger.Error("could not generate color hash")
-				return
-			}
-
-			identiconImage, err = ring.DrawRing(&ring.DrawRingParam{
-				Theme: parsed.Theme, ColorHash: colorHash, ImageBytes: identiconImage, Height: identicon.Height, Width: identicon.Width,
-			})
-			if err != nil {
-				logger.Error("failed to draw ring", zap.Error(err))
-			}
-		}
-
-		w.Header().Set("Content-Type", "image/png")
-		w.Header().Set("Cache-Control", "max-age:290304000, public")
-		w.Header().Set("Expires", time.Now().AddDate(60, 0, 0).Format(http.TimeFormat))
-
-		_, err = w.Write(identiconImage)
-		if err != nil {
-			logger.Error("failed to write image", zap.Error(err))
-		}
-	}
 }
 
 func handleDiscordAuthorAvatar(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
