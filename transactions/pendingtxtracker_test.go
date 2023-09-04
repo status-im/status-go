@@ -265,17 +265,29 @@ func TestPendingTxTracker_MultipleClients(t *testing.T) {
 		(*res)["blockNumber"] = transactionSuccessStatus
 	})
 
-	for i := range txs {
-		err := m.TrackPendingTransaction(txs[i].ChainID, txs[i].Hash, txs[i].From, txs[i].Type, true)
-		require.NoError(t, err)
-	}
+	// If we call TrackPendingTransaction immediately, there is a chance that some events
+	// will be emitted before we reach select, so occasionally select fails on timeout.
+	go func() {
+		for i := range txs {
+			err := m.TrackPendingTransaction(txs[i].ChainID, txs[i].Hash, txs[i].From, txs[i].Type, true)
+			require.NoError(t, err)
+		}
+	}()
 
 	eventChan := make(chan walletevent.Event)
 	sub := eventFeed.Subscribe(eventChan)
 
-	err := m.Start()
-	require.NoError(t, err)
+	// events caused by addPending
+	for i := 0; i < 2; i++ {
+		select {
+		case we := <-eventChan:
+			require.Equal(t, EventPendingTransactionUpdate, we.Type)
+		case <-time.After(1 * time.Second):
+			t.Fatal("timeout waiting for event")
+		}
+	}
 
+	// events caused by tx deletion on fetch
 	for i := 0; i < 2; i++ {
 		for j := 0; j < 2; j++ {
 			select {
@@ -295,7 +307,7 @@ func TestPendingTxTracker_MultipleClients(t *testing.T) {
 		}
 	}
 
-	err = m.Stop()
+	err := m.Stop()
 	require.NoError(t, err)
 
 	res, err := m.GetAllPending()
