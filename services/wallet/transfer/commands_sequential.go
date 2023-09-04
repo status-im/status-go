@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
@@ -69,7 +70,7 @@ type findBlocksCommand struct {
 	db                 *Database
 	blockRangeDAO      *BlockRangeSequentialDAO
 	chainClient        *chain.ClientWithFallback
-	balanceCache       *balanceCache
+	balanceCacher      balance.Cacher
 	feed               *event.Feed
 	noLimit            bool
 	transactionManager *TransactionManager
@@ -112,8 +113,8 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 
 		if len(headers) > 0 {
 			log.Debug("findBlocksCommand saving headers", "len", len(headers), "lastBlockNumber", to,
-				"balance", c.balanceCache.ReadCachedBalance(c.account, to),
-				"nonce", c.balanceCache.ReadCachedNonce(c.account, to))
+				"balance", c.balanceCacher.Cache().GetBalance(c.account, to),
+				"nonce", c.balanceCacher.Cache().GetNonce(c.account, to))
 
 			err = c.db.SaveBlocks(c.chainClient.ChainID, c.account, headers)
 			if err != nil {
@@ -145,7 +146,7 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 }
 
 func (c *findBlocksCommand) blocksFound(headers []*DBHeader) {
-	c.blocksLoadedCh <- headers
+	c.blocksLoadedCh <- headers // TODO Use notifyOfNewBlocksLoaded instead ??
 }
 
 func (c *findBlocksCommand) upsertBlockRange(blockRange *BlockRange) error {
@@ -167,7 +168,7 @@ func (c *findBlocksCommand) checkRange(parent context.Context, from *big.Int, to
 
 	fromBlock := &Block{Number: from}
 
-	newFromBlock, ethHeaders, startBlock, err := c.fastIndex(parent, c.balanceCache, fromBlock, to)
+	newFromBlock, ethHeaders, startBlock, err := c.fastIndex(parent, c.balanceCacher, fromBlock, to)
 	if err != nil {
 		log.Error("findBlocksCommand checkRange fastIndex", "err", err, "account", c.account,
 			"chain", c.chainClient.ChainID)
@@ -247,7 +248,7 @@ func areAllHistoryBlocksLoadedForAddress(blockRangeDAO *BlockRangeSequentialDAO,
 
 // run fast indexing for every accont up to canonical chain head minus safety depth.
 // every account will run it from last synced header.
-func (c *findBlocksCommand) fastIndex(ctx context.Context, bCache *balanceCache,
+func (c *findBlocksCommand) fastIndex(ctx context.Context, bCacher balance.Cacher,
 	fromBlock *Block, toBlockNumber *big.Int) (resultingFrom *Block, headers []*DBHeader,
 	startBlock *big.Int, err error) {
 
@@ -258,14 +259,14 @@ func (c *findBlocksCommand) fastIndex(ctx context.Context, bCache *balanceCache,
 	group := async.NewGroup(ctx)
 
 	command := &ethHistoricalCommand{
-		chainClient:  c.chainClient,
-		balanceCache: bCache,
-		address:      c.account,
-		feed:         c.feed,
-		from:         fromBlock,
-		to:           toBlockNumber,
-		noLimit:      c.noLimit,
-		threadLimit:  SequentialThreadLimit,
+		chainClient:   c.chainClient,
+		balanceCacher: bCacher,
+		address:       c.account,
+		feed:          c.feed,
+		from:          fromBlock,
+		to:            toBlockNumber,
+		noLimit:       c.noLimit,
+		threadLimit:   SequentialThreadLimit,
 	}
 	group.Add(command.Command())
 
@@ -349,7 +350,7 @@ func loadTransfersLoop(ctx context.Context, account common.Address, blockDAO *Bl
 func newLoadBlocksAndTransfersCommand(account common.Address, db *Database,
 	blockDAO *BlockDAO, chainClient *chain.ClientWithFallback, feed *event.Feed,
 	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
-	tokenManager *token.Manager) *loadBlocksAndTransfersCommand {
+	tokenManager *token.Manager, balanceCacher balance.Cacher) *loadBlocksAndTransfersCommand {
 
 	return &loadBlocksAndTransfersCommand{
 		account:            account,
@@ -358,6 +359,7 @@ func newLoadBlocksAndTransfersCommand(account common.Address, db *Database,
 		blockDAO:           blockDAO,
 		chainClient:        chainClient,
 		feed:               feed,
+		balanceCacher:      balanceCacher,
 		errorsCount:        0,
 		transactionManager: transactionManager,
 		pendingTxManager:   pendingTxManager,
@@ -373,7 +375,7 @@ type loadBlocksAndTransfersCommand struct {
 	blockDAO      *BlockDAO
 	chainClient   *chain.ClientWithFallback
 	feed          *event.Feed
-	balanceCache  *balanceCache
+	balanceCacher balance.Cacher
 	errorsCount   int
 	// nonArchivalRPCNode bool // TODO Make use of it
 	transactionManager *TransactionManager
@@ -389,11 +391,6 @@ func (c *loadBlocksAndTransfersCommand) Run(parent context.Context) error {
 	log.Debug("start load all transfers command", "chain", c.chainClient.ChainID, "account", c.account)
 
 	ctx := parent
-
-	if c.balanceCache == nil {
-		c.balanceCache = newBalanceCache() // TODO - need to keep balanceCache in memory??? What about sharing it with other packages?
-	}
-
 	group := async.NewGroup(ctx)
 
 	err := c.fetchTransfersForLoadedBlocks(group)
@@ -414,7 +411,7 @@ func (c *loadBlocksAndTransfersCommand) Run(parent context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		c.balanceCache.Clear()
+		c.balanceCacher.Clear()
 		return ctx.Err()
 	case <-group.WaitAsync():
 		log.Debug("end loadBlocksAndTransfers command", "chain", c.chainClient.ChainID, "account", c.account)
@@ -462,7 +459,7 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocks(ctx context.Context, 
 			db:                 c.db,
 			blockRangeDAO:      c.blockRangeDAO,
 			chainClient:        c.chainClient,
-			balanceCache:       c.balanceCache,
+			balanceCacher:      c.balanceCacher,
 			feed:               c.feed,
 			noLimit:            false,
 			fromBlockNumber:    big.NewInt(0),
@@ -500,7 +497,7 @@ func (c *loadBlocksAndTransfersCommand) startFetchingNewBlocks(group *async.Grou
 			db:                 c.db,
 			blockRangeDAO:      c.blockRangeDAO,
 			chainClient:        c.chainClient,
-			balanceCache:       c.balanceCache,
+			balanceCacher:      c.balanceCacher,
 			feed:               c.feed,
 			noLimit:            false,
 			transactionManager: c.transactionManager,

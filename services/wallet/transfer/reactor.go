@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
@@ -40,14 +41,6 @@ type HeaderReader interface {
 	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
 }
 
-// BalanceReader interface for reading balance at a specifeid address.
-type BalanceReader interface {
-	BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error)
-	NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error)
-	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
-	FullTransactionByBlockNumberAndIndex(ctx context.Context, blockNumber *big.Int, index uint) (*chain.FullTransaction, error)
-}
-
 type HistoryFetcher interface {
 	start() error
 	stop()
@@ -66,11 +59,13 @@ func NewOnDemandFetchStrategy(
 	tokenManager *token.Manager,
 	chainClients map[uint64]*chain.ClientWithFallback,
 	accounts []common.Address,
+	balanceCacher balance.Cacher,
 ) *OnDemandFetchStrategy {
 	strategy := &OnDemandFetchStrategy{
 		db:                 db,
 		blockDAO:           blockDAO,
 		feed:               feed,
+		balanceCacher:      balanceCacher,
 		transactionManager: transactionManager,
 		pendingTxManager:   pendingTxManager,
 		tokenManager:       tokenManager,
@@ -87,7 +82,7 @@ type OnDemandFetchStrategy struct {
 	feed               *event.Feed
 	mu                 sync.Mutex
 	group              *async.Group
-	balanceCache       *balanceCache
+	balanceCacher      balance.Cacher
 	transactionManager *TransactionManager
 	pendingTxManager   *transactions.PendingTxTracker
 	tokenManager       *token.Manager
@@ -114,6 +109,7 @@ func (s *OnDemandFetchStrategy) newControlCommand(chainClient *chain.ClientWithF
 		transactionManager: s.transactionManager,
 		pendingTxManager:   s.pendingTxManager,
 		tokenManager:       s.tokenManager,
+		balanceCacher:      s.balanceCacher,
 	}
 
 	return ctl
@@ -207,14 +203,11 @@ func (s *OnDemandFetchStrategy) getTransfersByAddress(ctx context.Context, chain
 		}}
 		toByAddress := map[common.Address]*big.Int{address: block}
 
-		if s.balanceCache == nil {
-			s.balanceCache = newBalanceCache()
-		}
 		blocksCommand := &findAndCheckBlockRangeCommand{
 			accounts:      []common.Address{address},
 			db:            s.db,
 			chainClient:   chainClient,
-			balanceCache:  s.balanceCache,
+			balanceCacher: s.balanceCacher,
 			feed:          s.feed,
 			fromByAddress: fromByAddress,
 			toByAddress:   toByAddress,
@@ -223,7 +216,7 @@ func (s *OnDemandFetchStrategy) getTransfersByAddress(ctx context.Context, chain
 		if err = blocksCommand.Command()(ctx); err != nil {
 			return nil, err
 		}
-		s.balanceCache.Clear()
+		s.balanceCacher.Clear()
 
 		blocks, err := s.blockDAO.GetBlocksToLoadByAddress(chainID, address, numberOfBlocksCheckedPerIteration)
 		if err != nil {
@@ -266,10 +259,12 @@ type Reactor struct {
 	pendingTxManager   *transactions.PendingTxTracker
 	tokenManager       *token.Manager
 	strategy           HistoryFetcher
+	balanceCacher      balance.Cacher
 }
 
 func NewReactor(db *Database, blockDAO *BlockDAO, feed *event.Feed, tm *TransactionManager,
-	pendingTxManager *transactions.PendingTxTracker, tokenManager *token.Manager) *Reactor {
+	pendingTxManager *transactions.PendingTxTracker, tokenManager *token.Manager,
+	balanceCacher balance.Cacher) *Reactor {
 	return &Reactor{
 		db:                 db,
 		blockDAO:           blockDAO,
@@ -277,6 +272,7 @@ func NewReactor(db *Database, blockDAO *BlockDAO, feed *event.Feed, tm *Transact
 		transactionManager: tm,
 		pendingTxManager:   pendingTxManager,
 		tokenManager:       tokenManager,
+		balanceCacher:      balanceCacher,
 	}
 }
 
@@ -315,10 +311,11 @@ func (r *Reactor) createFetchStrategy(chainClients map[uint64]*chain.ClientWithF
 			r.tokenManager,
 			chainClients,
 			accounts,
+			r.balanceCacher,
 		)
 	}
 
-	return NewOnDemandFetchStrategy(r.db, r.blockDAO, r.feed, r.transactionManager, r.pendingTxManager, r.tokenManager, chainClients, accounts)
+	return NewOnDemandFetchStrategy(r.db, r.blockDAO, r.feed, r.transactionManager, r.pendingTxManager, r.tokenManager, chainClients, accounts, r.balanceCacher)
 }
 
 func (r *Reactor) getTransfersByAddress(ctx context.Context, chainID uint64, address common.Address, toBlock *big.Int,
