@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/balance"
 )
 
 const (
@@ -93,7 +94,7 @@ type Downloader interface {
 
 // Returns new block ranges that contain transfers and found block headers that contain transfers, and a block where
 // beginning of trasfers history detected
-func checkRangesWithStartBlock(parent context.Context, client BalanceReader, cache BalanceCache,
+func checkRangesWithStartBlock(parent context.Context, client balance.Reader, cache balance.Cacher,
 	account common.Address, ranges [][]*big.Int, threadLimit uint32, startBlock *big.Int) (
 	resRanges [][]*big.Int, headers []*DBHeader, newStartBlock *big.Int, err error) {
 
@@ -214,7 +215,7 @@ func checkRangesWithStartBlock(parent context.Context, client BalanceReader, cac
 	return c.GetRanges(), c.GetHeaders(), newStartBlock, nil
 }
 
-func findBlocksWithEthTransfers(parent context.Context, client BalanceReader, cache BalanceCache,
+func findBlocksWithEthTransfers(parent context.Context, client balance.Reader, cache balance.Cacher,
 	account common.Address, low, high *big.Int, noLimit bool, threadLimit uint32) (
 	from *big.Int, headers []*DBHeader, resStartBlock *big.Int, err error) {
 

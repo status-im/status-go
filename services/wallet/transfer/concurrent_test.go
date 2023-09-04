@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/services/wallet/balance"
 
 	"github.com/stretchr/testify/require"
 
@@ -142,7 +143,7 @@ func TestConcurrentEthDownloader(t *testing.T) {
 			defer cancel()
 			concurrent := NewConcurrentDownloader(ctx, 0)
 			_, headers, _, _ := findBlocksWithEthTransfers(
-				ctx, tc.options.balances, newBalanceCache(),
+				ctx, tc.options.balances, balance.NewCache(),
 				common.Address{}, zero, tc.options.last, false, NoThreadLimit)
 			concurrent.Wait()
 			require.NoError(t, concurrent.Error())

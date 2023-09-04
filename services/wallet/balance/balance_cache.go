@@ -1,4 +1,4 @@
-package transfer
+package balance
 
 import (
 	"context"
@@ -7,6 +7,8 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/status-im/status-go/rpc/chain"
 )
 
 type nonceRange struct {
@@ -15,13 +17,32 @@ type nonceRange struct {
 	min   *big.Int
 }
 
-type BalanceCache interface {
-	BalanceAt(ctx context.Context, client BalanceReader, account common.Address, blockNumber *big.Int) (*big.Int, error)
-	NonceAt(ctx context.Context, client BalanceReader, account common.Address, blockNumber *big.Int) (*int64, error)
+// Reader interface for reading balance at a specified address.
+type Reader interface {
+	BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error)
+	NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error)
+	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
+	FullTransactionByBlockNumberAndIndex(ctx context.Context, blockNumber *big.Int, index uint) (*chain.FullTransaction, error)
+}
+
+// Cacher interface for caching balance to BalanceCache. Requires BalanceReader to fetch balance.
+type Cacher interface {
+	BalanceAt(ctx context.Context, client Reader, account common.Address, blockNumber *big.Int) (*big.Int, error)
+	NonceAt(ctx context.Context, client Reader, account common.Address, blockNumber *big.Int) (*int64, error)
+	Clear()
+	Cache() CacheIface
+}
+
+// Interface for cache of balances.
+type CacheIface interface {
+	GetBalance(account common.Address, blockNumber *big.Int) *big.Int
+	GetNonce(account common.Address, blockNumber *big.Int) *int64
+	AddBalance(account common.Address, blockNumber *big.Int, balance *big.Int)
+	AddNonce(account common.Address, blockNumber *big.Int, nonce *int64)
 	Clear()
 }
 
-type balanceCache struct {
+type Cache struct {
 	// balances maps an address to a map of a block number and the balance of this particular address
 	balances     map[common.Address]map[uint64]*big.Int // we don't care about block number overflow as we use cache only for comparing balances when fetching, not for UI
 	nonces       map[common.Address]map[uint64]*int64   // we don't care about block number overflow as we use cache only for comparing balances when fetching, not for UI
@@ -30,8 +51,8 @@ type balanceCache struct {
 	rw           sync.RWMutex
 }
 
-func newBalanceCache() *balanceCache {
-	return &balanceCache{
+func NewCache() *Cache {
+	return &Cache{
 		balances:     make(map[common.Address]map[uint64]*big.Int),
 		nonces:       make(map[common.Address]map[uint64]*int64),
 		nonceRanges:  make(map[common.Address]map[int64]nonceRange),
@@ -39,7 +60,10 @@ func newBalanceCache() *balanceCache {
 	}
 }
 
-func (b *balanceCache) Clear() {
+func (b *Cache) Clear() {
+	b.rw.Lock()
+	defer b.rw.Unlock()
+
 	for address, cache := range b.balances {
 		if len(cache) == 0 {
 			continue
@@ -84,14 +108,14 @@ func (b *balanceCache) Clear() {
 	b.sortedRanges = make(map[common.Address][]nonceRange)
 }
 
-func (b *balanceCache) ReadCachedBalance(account common.Address, blockNumber *big.Int) *big.Int {
+func (b *Cache) GetBalance(account common.Address, blockNumber *big.Int) *big.Int {
 	b.rw.RLock()
 	defer b.rw.RUnlock()
 
 	return b.balances[account][blockNumber.Uint64()]
 }
 
-func (b *balanceCache) addBalanceToCache(account common.Address, blockNumber *big.Int, balance *big.Int) {
+func (b *Cache) AddBalance(account common.Address, blockNumber *big.Int, balance *big.Int) {
 	b.rw.Lock()
 	defer b.rw.Unlock()
 
@@ -102,8 +126,8 @@ func (b *balanceCache) addBalanceToCache(account common.Address, blockNumber *bi
 	b.balances[account][blockNumber.Uint64()] = balance
 }
 
-func (b *balanceCache) BalanceAt(ctx context.Context, client BalanceReader, account common.Address, blockNumber *big.Int) (*big.Int, error) {
-	cachedBalance := b.ReadCachedBalance(account, blockNumber)
+func (b *Cache) BalanceAt(ctx context.Context, client Reader, account common.Address, blockNumber *big.Int) (*big.Int, error) {
+	cachedBalance := b.GetBalance(account, blockNumber)
 	if cachedBalance != nil {
 		return cachedBalance, nil
 	}
@@ -111,19 +135,23 @@ func (b *balanceCache) BalanceAt(ctx context.Context, client BalanceReader, acco
 	if err != nil {
 		return nil, err
 	}
-	b.addBalanceToCache(account, blockNumber, balance)
+	b.AddBalance(account, blockNumber, balance)
 
 	return balance, nil
 }
 
-func (b *balanceCache) ReadCachedNonce(account common.Address, blockNumber *big.Int) *int64 {
+func (b *Cache) GetNonce(account common.Address, blockNumber *big.Int) *int64 {
 	b.rw.RLock()
 	defer b.rw.RUnlock()
 
 	return b.nonces[account][blockNumber.Uint64()]
 }
 
-func (b *balanceCache) sortRanges(account common.Address) {
+func (b *Cache) Cache() CacheIface {
+	return b
+}
+
+func (b *Cache) sortRanges(account common.Address) {
 	keys := make([]int, 0, len(b.nonceRanges[account]))
 	for k := range b.nonceRanges[account] {
 		keys = append(keys, int(k))
@@ -140,7 +168,7 @@ func (b *balanceCache) sortRanges(account common.Address) {
 	b.sortedRanges[account] = ranges
 }
 
-func (b *balanceCache) findNonceInRange(account common.Address, block *big.Int) *int64 {
+func (b *Cache) findNonceInRange(account common.Address, block *big.Int) *int64 {
 	b.rw.RLock()
 	defer b.rw.RUnlock()
 
@@ -162,7 +190,7 @@ func (b *balanceCache) findNonceInRange(account common.Address, block *big.Int) 
 	return nil
 }
 
-func (b *balanceCache) updateNonceRange(account common.Address, blockNumber *big.Int, nonce *int64) {
+func (b *Cache) updateNonceRange(account common.Address, blockNumber *big.Int, nonce *int64) {
 	_, exists := b.nonceRanges[account]
 	if !exists {
 		b.nonceRanges[account] = make(map[int64]nonceRange)
@@ -189,7 +217,7 @@ func (b *balanceCache) updateNonceRange(account common.Address, blockNumber *big
 	}
 }
 
-func (b *balanceCache) addNonceToCache(account common.Address, blockNumber *big.Int, nonce *int64) {
+func (b *Cache) AddNonce(account common.Address, blockNumber *big.Int, nonce *int64) {
 	b.rw.Lock()
 	defer b.rw.Unlock()
 
@@ -201,8 +229,8 @@ func (b *balanceCache) addNonceToCache(account common.Address, blockNumber *big.
 	b.updateNonceRange(account, blockNumber, nonce)
 }
 
-func (b *balanceCache) NonceAt(ctx context.Context, client BalanceReader, account common.Address, blockNumber *big.Int) (*int64, error) {
-	cachedNonce := b.ReadCachedNonce(account, blockNumber)
+func (b *Cache) NonceAt(ctx context.Context, client Reader, account common.Address, blockNumber *big.Int) (*int64, error) {
+	cachedNonce := b.GetNonce(account, blockNumber)
 	if cachedNonce != nil {
 		return cachedNonce, nil
 	}
@@ -216,7 +244,7 @@ func (b *balanceCache) NonceAt(ctx context.Context, client BalanceReader, accoun
 		return nil, err
 	}
 	int64Nonce := int64(nonce)
-	b.addNonceToCache(account, blockNumber, &int64Nonce)
+	b.AddNonce(account, blockNumber, &int64Nonce)
 
 	return &int64Nonce, nil
 }

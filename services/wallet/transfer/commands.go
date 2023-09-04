@@ -14,6 +14,7 @@ import (
 
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
+	"github.com/status-im/status-go/services/wallet/balance"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -53,13 +54,13 @@ var (
 )
 
 type ethHistoricalCommand struct {
-	address      common.Address
-	chainClient  *chain.ClientWithFallback
-	balanceCache *balanceCache
-	feed         *event.Feed
-	foundHeaders []*DBHeader
-	error        error
-	noLimit      bool
+	address       common.Address
+	chainClient   *chain.ClientWithFallback
+	balanceCacher balance.Cacher
+	feed          *event.Feed
+	foundHeaders  []*DBHeader
+	error         error
+	noLimit       bool
 
 	from                          *Block
 	to, resultingFrom, startBlock *big.Int
@@ -81,13 +82,13 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 
 	start := time.Now()
 	if c.from.Number != nil && c.from.Balance != nil {
-		c.balanceCache.addBalanceToCache(c.address, c.from.Number, c.from.Balance)
+		c.balanceCacher.Cache().AddBalance(c.address, c.from.Number, c.from.Balance)
 	}
 	if c.from.Number != nil && c.from.Nonce != nil {
-		c.balanceCache.addNonceToCache(c.address, c.from.Number, c.from.Nonce)
+		c.balanceCacher.Cache().AddNonce(c.address, c.from.Number, c.from.Nonce)
 	}
 	from, headers, startBlock, err := findBlocksWithEthTransfers(ctx, c.chainClient,
-		c.balanceCache, c.address, c.from.Number, c.to, c.noLimit, c.threadLimit)
+		c.balanceCacher, c.address, c.from.Number, c.to, c.noLimit, c.threadLimit)
 
 	if err != nil {
 		c.error = err
@@ -189,6 +190,7 @@ type controlCommand struct {
 	transactionManager *TransactionManager
 	pendingTxManager   *transactions.PendingTxTracker
 	tokenManager       *token.Manager
+	balanceCacher      balance.Cacher
 }
 
 func (c *controlCommand) LoadTransfers(ctx context.Context, limit int) error {
@@ -258,13 +260,12 @@ func (c *controlCommand) Run(parent context.Context) error {
 		toByAddress[address] = target
 	}
 
-	bCache := newBalanceCache()
 	cmnd := &findAndCheckBlockRangeCommand{
 		accounts:      c.accounts,
 		db:            c.db,
 		blockDAO:      c.blockDAO,
 		chainClient:   c.chainClient,
-		balanceCache:  bCache,
+		balanceCacher: c.balanceCacher,
 		feed:          c.feed,
 		fromByAddress: fromByAddress,
 		toByAddress:   toByAddress,
@@ -285,7 +286,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 		return cmnd.error
 	}
 
-	bCache.Clear()
+	c.balanceCacher.Clear()
 	err = c.LoadTransfers(parent, numberOfBlocksCheckedPerIteration)
 	if err != nil {
 		if c.NewError(err) {
@@ -618,7 +619,7 @@ type findAndCheckBlockRangeCommand struct {
 	db            *Database
 	blockDAO      *BlockDAO
 	chainClient   *chain.ClientWithFallback
-	balanceCache  *balanceCache
+	balanceCacher balance.Cacher
 	feed          *event.Feed
 	fromByAddress map[common.Address]*Block
 	toByAddress   map[common.Address]*big.Int
@@ -637,7 +638,7 @@ func (c *findAndCheckBlockRangeCommand) Command() async.Command {
 func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) error {
 	log.Debug("start findAndCHeckBlockRangeCommand")
 
-	newFromByAddress, ethHeadersByAddress, err := c.fastIndex(parent, c.balanceCache, c.fromByAddress, c.toByAddress)
+	newFromByAddress, ethHeadersByAddress, err := c.fastIndex(parent, c.balanceCacher, c.fromByAddress, c.toByAddress)
 	if err != nil {
 		c.error = err
 		// return err // In case c.noLimit is true, hystrix "max concurrency" may be reached and we will not be able to index ETH transfers. But if we return error, we will get stuck in inifinite loop.
@@ -679,12 +680,12 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) error {
 
 		lastBlockNumber := c.toByAddress[address]
 		log.Debug("saving headers", "len", len(uniqHeaders), "lastBlockNumber", lastBlockNumber,
-			"balance", c.balanceCache.ReadCachedBalance(address, lastBlockNumber), "nonce", c.balanceCache.ReadCachedNonce(address, lastBlockNumber))
+			"balance", c.balanceCacher.Cache().GetBalance(address, lastBlockNumber), "nonce", c.balanceCacher.Cache().GetNonce(address, lastBlockNumber))
 
 		to := &Block{
 			Number:  lastBlockNumber,
-			Balance: c.balanceCache.ReadCachedBalance(address, lastBlockNumber),
-			Nonce:   c.balanceCache.ReadCachedNonce(address, lastBlockNumber),
+			Balance: c.balanceCacher.Cache().GetBalance(address, lastBlockNumber),
+			Nonce:   c.balanceCacher.Cache().GetNonce(address, lastBlockNumber),
 		}
 		log.Debug("uniqHeaders found for account", "address", address, "uniqHeaders.len", len(uniqHeaders))
 		err = c.db.ProcessBlocks(c.chainClient.ChainID, address, newFromByAddress[address], to, uniqHeaders)
@@ -701,7 +702,7 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) error {
 
 // run fast indexing for every accont up to canonical chain head minus safety depth.
 // every account will run it from last synced header.
-func (c *findAndCheckBlockRangeCommand) fastIndex(ctx context.Context, bCache *balanceCache,
+func (c *findAndCheckBlockRangeCommand) fastIndex(ctx context.Context, bCacher balance.Cacher,
 	fromByAddress map[common.Address]*Block, toByAddress map[common.Address]*big.Int) (map[common.Address]*big.Int,
 	map[common.Address][]*DBHeader, error) {
 
@@ -713,14 +714,14 @@ func (c *findAndCheckBlockRangeCommand) fastIndex(ctx context.Context, bCache *b
 	commands := make([]*ethHistoricalCommand, len(c.accounts))
 	for i, address := range c.accounts {
 		eth := &ethHistoricalCommand{
-			chainClient:  c.chainClient,
-			balanceCache: bCache,
-			address:      address,
-			feed:         c.feed,
-			from:         fromByAddress[address],
-			to:           toByAddress[address],
-			noLimit:      c.noLimit,
-			threadLimit:  NoThreadLimit,
+			chainClient:   c.chainClient,
+			balanceCacher: bCacher,
+			address:       address,
+			feed:          c.feed,
+			from:          fromByAddress[address],
+			to:            toByAddress[address],
+			noLimit:       c.noLimit,
+			threadLimit:   NoThreadLimit,
 		}
 		commands[i] = eth
 		group.Add(eth.Command())
