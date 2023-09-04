@@ -10,6 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+
+	w_common "github.com/status-im/status-go/services/wallet/common"
 )
 
 type Balance struct {
@@ -17,17 +19,8 @@ type Balance struct {
 }
 
 const (
-	defaultChains = uint64(0)
-	aDay          = time.Duration(24) * time.Hour
+	aDay = time.Duration(24) * time.Hour
 )
-
-var averageBlockDurationForChain = map[uint64]time.Duration{
-	defaultChains: time.Duration(12000) * time.Millisecond,
-	10:            time.Duration(400) * time.Millisecond,  // Optimism
-	420:           time.Duration(2000) * time.Millisecond, // Optimism Testnet
-	42161:         time.Duration(300) * time.Millisecond,  // Arbitrum
-	421611:        time.Duration(1500) * time.Millisecond, // Arbitrum Testnet
-}
 
 // Must have a common divisor to share common blocks and increase the cache hit
 const (
@@ -78,9 +71,9 @@ var timeIntervalToStrideDuration = map[TimeInterval]time.Duration{
 }
 
 func strideBlockCount(timeInterval TimeInterval, chainID uint64) int {
-	blockDuration, found := averageBlockDurationForChain[chainID]
+	blockDuration, found := w_common.AverageBlockDurationForChain[w_common.ChainID(chainID)]
 	if !found {
-		blockDuration = averageBlockDurationForChain[defaultChains]
+		blockDuration = w_common.AverageBlockDurationForChain[w_common.ChainID(w_common.UnknownChainID)]
 	}
 
 	return int(timeIntervalToStrideDuration[timeInterval] / blockDuration)

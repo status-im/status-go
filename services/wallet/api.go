@@ -406,6 +406,11 @@ func (api *API) GetSuggestedFees(ctx context.Context, chainID uint64) (*Suggeste
 	return api.s.feesManager.suggestedFees(ctx, chainID)
 }
 
+func (api *API) GetEstimatedLatestBlockNumber(ctx context.Context, chainID uint64) (uint64, error) {
+	log.Debug("call to GetEstimatedLatestBlockNumber, chainID:", chainID)
+	return api.s.blockChainState.GetEstimatedLatestBlockNumber(ctx, chainID)
+}
+
 func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Float) (TransactionEstimation, error) {
 	log.Debug("call to getTransactionEstimatedTime")
 	return api.s.feesManager.transactionEstimatedTime(ctx, chainID, maxFeePerGas), nil

@@ -102,6 +102,7 @@ func NewService(
 	reader := NewReader(rpcClient, tokenManager, marketManager, accountsDB, NewPersistence(db), feed)
 	history := history.NewService(db, accountsDB, feed, rpcClient, tokenManager, marketManager)
 	currency := currency.NewService(db, feed, tokenManager, marketManager)
+	blockChainState := NewBlockChainState(rpcClient, accountsDB)
 
 	openseaHTTPClient := opensea.NewHTTPClient()
 	openseaClient := opensea.NewClient(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient, feed)
@@ -165,6 +166,7 @@ func NewService(
 		currency:              currency,
 		activity:              activity,
 		decoder:               NewDecoder(),
+		blockChainState:       blockChainState,
 	}
 }
 
@@ -195,6 +197,7 @@ type Service struct {
 	currency              *currency.Service
 	activity              *activity.Service
 	decoder               *Decoder
+	blockChainState       *BlockChainState
 }
 
 // Start signals transmitter.
@@ -204,6 +207,7 @@ func (s *Service) Start() error {
 	err := s.signals.Start()
 	s.history.Start()
 	s.collectibles.Start()
+	s.blockChainState.Start()
 	s.started = true
 	return err
 }
@@ -223,6 +227,7 @@ func (s *Service) Stop() error {
 	s.history.Stop()
 	s.activity.Stop()
 	s.collectibles.Stop()
+	s.blockChainState.Stop()
 	s.started = false
 	log.Info("wallet stopped")
 	return nil
