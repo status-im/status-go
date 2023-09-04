@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/status-im/status-go/logutils"
+	"go.uber.org/zap"
 	"sort"
 	"strings"
 
@@ -2099,6 +2101,7 @@ func (db sqlitePersistence) SaveDiscordMessages(messages []*protobuf.DiscordMess
 	defer stmt.Close()
 
 	for _, msg := range messages {
+		logutils.ZapLogger().Info("<<< inserting message", zap.String("messageId", msg.Id))
 		_, err = stmt.Exec(
 			msg.GetId(),
 			msg.Author.GetId(),

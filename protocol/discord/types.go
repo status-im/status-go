@@ -3,6 +3,8 @@ package discord
 import (
 	"errors"
 	"fmt"
+	"github.com/status-im/status-go/logutils"
+	"go.uber.org/zap"
 	"sync"
 
 	"github.com/status-im/status-go/images"
@@ -243,6 +245,10 @@ func (progress *ImportProgress) UpdateTaskProgress(task ImportTask, value float3
 	}
 	// Update total progress now that sub progress has changed
 	progress.Progress = sum / float32(len(progress.Tasks))
+	logutils.ZapLogger().Info("<<< discord import progress",
+		zap.Any("totalProgress", progress.Progress),
+		zap.Any("task", task),
+		zap.Any("taskProgress", value))
 }
 
 func (progress *ImportProgress) UpdateTaskState(task ImportTask, state ImportTaskState) {

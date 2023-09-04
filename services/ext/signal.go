@@ -2,11 +2,13 @@ package ext
 
 import (
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/discord"
 	"github.com/status-im/status-go/protocol/wakusync"
 	"github.com/status-im/status-go/signal"
+	"go.uber.org/zap"
 )
 
 // EnvelopeSignalHandler sends signals when envelope is sent or expired.
@@ -138,6 +140,7 @@ func (m *MessengerSignalsHandler) DiscordCommunityImportProgress(importProgress 
 }
 
 func (m *MessengerSignalsHandler) DiscordCommunityImportFinished(id string) {
+	logutils.ZapLogger().Info("<<< DiscordCommunityImportFinished", zap.String("id", id))
 	signal.SendDiscordCommunityImportFinished(id)
 }
 
