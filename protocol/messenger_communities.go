@@ -3746,11 +3746,13 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				// Handle pin messages
 				if discordMessage.Type == string(discord.MessageTypeChannelPinned) && discordMessage.Reference != nil {
 
-					_, exists := messagesToSave[communityID+discordMessage.Reference.MessageId]
+					responseToMessageId := communityID + discordMessage.Reference.MessageId
+
+					_, exists := messagesToSave[responseToMessageId]
 					if exists {
 						pinMessage := protobuf.PinMessage{
 							Clock:       messageToSave.WhisperTimestamp,
-							MessageId:   communityID + discordMessage.Reference.MessageId,
+							MessageId:   responseToMessageId,
 							ChatId:      messageToSave.LocalChatID,
 							MessageType: protobuf.MessageType_COMMUNITY_CHAT,
 							Pinned:      true,
@@ -3788,11 +3790,6 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 
 						// Generate SystemMessagePinnedMessage
 
-						//chat, err := m.matchChatEntity(&pinMessageToSave)
-						//if err != nil {
-						//	return err // matchChatEntity returns a descriptive error message
-						//}
-
 						chat, ok := createdChats[pinMessageToSave.LocalChatID]
 						if !ok {
 							err := errors.New("failed to get chat for pin message")
@@ -3818,13 +3815,18 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 								Timestamp:   clockAndTimestamp,
 								ChatId:      chat.ID,
 								MessageType: pinMessageToSave.MessageType,
-								ResponseTo:  pinMessageToSave.MessageId,
+								ResponseTo:  responseToMessageId, // FIXME
 								ContentType: protobuf.ChatMessage_SYSTEM_MESSAGE_PINNED_MESSAGE,
+								//Payload: &protobuf.ChatMessage_DiscordMessage{
+								//	DiscordMessage: discordMessage,
+								//},
 							},
 							WhisperTimestamp: clockAndTimestamp,
 							ID:               id,
 							LocalChatID:      chat.ID,
 							From:             messageToSave.From,
+							Seen:             true,
+							//DiscordMessageId: discordMessage.Id, // FIXME:
 						}
 
 						messagesToSave[systemMessage.ID] = systemMessage
@@ -3847,7 +3849,9 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 
 			var discordMessages []*protobuf.DiscordMessage
 			for _, msg := range messagesToSave {
-				discordMessages = append(discordMessages, msg.GetDiscordMessage())
+				if msg.ContentType == protobuf.ChatMessage_DISCORD_MESSAGE {
+					discordMessages = append(discordMessages, msg.GetDiscordMessage())
+				}
 			}
 
 			// We save these messages in chunks so we don't block the database
@@ -3961,7 +3965,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				go func(id string, author *protobuf.DiscordMessageAuthor) {
 					defer wg.Done()
 
-					m.communitiesManager.LogStdout(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
+					m.communitiesManager.LogStdout(fmt.Sprintf("downloading avatar asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
 					imagePayload, err := discord.DownloadAvatarAsset(author.AvatarUrl)
 					if err != nil {
 						errmsg := fmt.Sprintf("Couldn't download profile avatar '%s': %s", author.AvatarUrl, err.Error())
@@ -4013,7 +4017,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 					defer wg.Done()
 					for ii, attachment := range attachments {
 
-						m.communitiesManager.LogStdout(fmt.Sprintf("downloading asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
+						m.communitiesManager.LogStdout(fmt.Sprintf("downloading attachment asset %d/%d", assetCounter.Value()+1, totalAssetsCount))
 
 						assetPayload, contentType, err := discord.DownloadAsset(attachment.Url)
 						if err != nil {
@@ -4355,12 +4359,13 @@ func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, 
 
 		hash := crypto.Keccak256Hash(append([]byte(c.IDString()), wrappedPayload...))
 		wakuMessage := &types.Message{
-			Sig:       crypto.FromECDSAPub(&c.PrivateKey().PublicKey),
-			Timestamp: uint32(msg.WhisperTimestamp / 1000),
-			Topic:     filter.Topic,
-			Payload:   wrappedPayload,
-			Padding:   []byte{1},
-			Hash:      hash[:],
+			Sig:          crypto.FromECDSAPub(&c.PrivateKey().PublicKey),
+			Timestamp:    uint32(msg.WhisperTimestamp / 1000),
+			Topic:        filter.Topic,
+			Payload:      wrappedPayload,
+			Padding:      []byte{1},
+			Hash:         hash[:],
+			ThirdPartyID: c.IDString() + msg.GetDiscordMessage().Id,
 		}
 		wakuMessages = append(wakuMessages, wakuMessage)
 	}
