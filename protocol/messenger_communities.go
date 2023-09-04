@@ -2225,12 +2225,12 @@ func (m *Messenger) RemovePrivateKey(id types.HexBytes) (*MessengerResponse, err
 	return response, nil
 }
 
-func (m *Messenger) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error) {
+func (m *Messenger) ExportCommunity(id types.HexBytes) (*communities.CommunityImportInfo, error) {
 	return m.communitiesManager.ExportCommunity(id)
 }
 
-func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) (*MessengerResponse, error) {
-	community, err := m.communitiesManager.ImportCommunity(key)
+func (m *Messenger) ImportCommunity(ctx context.Context, importInfo *communities.CommunityImportInfo) (*MessengerResponse, error) {
+	community, err := m.communitiesManager.ImportCommunity(importInfo)
 	if err != nil {
 		return nil, err
 	}

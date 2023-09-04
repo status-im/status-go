@@ -980,7 +980,13 @@ func (m *Manager) RemovePrivateKey(id types.HexBytes) (*Community, error) {
 	return community, nil
 }
 
-func (m *Manager) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error) {
+type CommunityImportInfo struct {
+	Shard        *common.Shard   `json:"shard"`
+	TopicKey     *types.HexBytes `json:"topicKey,omitempty"`
+	CommunityKey types.HexBytes  `json:"communityKey"`
+}
+
+func (m *Manager) ExportCommunity(id types.HexBytes) (*CommunityImportInfo, error) {
 	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
@@ -990,11 +996,39 @@ func (m *Manager) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error) 
 		return nil, ErrNotControlNode
 	}
 
-	return community.config.PrivateKey, nil
+	topicKey, err := m.transport.RetrievePubsubTopicKey(community.PubsubTopic())
+	if err != nil {
+		return nil, err
+	}
+
+	var topicKeyBytes *types.HexBytes
+	if topicKey != nil {
+		k := types.HexBytes(crypto.FromECDSA(topicKey))
+		topicKeyBytes = &k
+	}
+
+	return &CommunityImportInfo{
+		CommunityKey: crypto.FromECDSA(community.config.PrivateKey),
+		Shard:        community.Shard(),
+		TopicKey:     topicKeyBytes,
+	}, nil
 }
 
-func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey) (*Community, error) {
-	communityID := crypto.CompressPubkey(&key.PublicKey)
+func (m *Manager) ImportCommunity(importData *CommunityImportInfo) (*Community, error) {
+	communityKey, err := crypto.ToECDSA(importData.CommunityKey)
+	if err != nil {
+		return nil, err
+	}
+
+	var protectedTopicKey *ecdsa.PrivateKey
+	if importData.TopicKey != nil {
+		protectedTopicKey, err = crypto.ToECDSA(*importData.TopicKey)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	communityID := crypto.CompressPubkey(&communityKey.PublicKey)
 
 	community, err := m.persistence.GetByID(&m.identity.PublicKey, communityID)
 	if err != nil {
@@ -1007,19 +1041,28 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey) (*Community, error) {
 		}
 
 		config := Config{
-			ID:                   &key.PublicKey,
-			PrivateKey:           key,
+			ID:                   &communityKey.PublicKey,
+			PrivateKey:           communityKey,
 			Logger:               m.logger,
 			Joined:               true,
 			MemberIdentity:       &m.identity.PublicKey,
 			CommunityDescription: description,
+			Shard:                importData.Shard,
 		}
 		community, err = New(config)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		community.config.PrivateKey = key
+		community.config.PrivateKey = communityKey
+		community.config.Shard = importData.Shard
+	}
+
+	if protectedTopicKey != nil {
+		err = m.transport.StorePubsubTopicKey(community.PubsubTopic(), protectedTopicKey)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	community.Join()
