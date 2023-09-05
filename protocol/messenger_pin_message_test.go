@@ -133,6 +133,7 @@ func (s *MessengerPinMessageSuite) TestPinMessageOutOfOrder() {
 		1000,
 		handlePinMessageResponse,
 		&unpinMessage,
+		false,
 	)
 	s.Require().NoError(err)
 
@@ -156,6 +157,7 @@ func (s *MessengerPinMessageSuite) TestPinMessageOutOfOrder() {
 		1000,
 		handlePinMessageResponse,
 		&pinMessage,
+		false,
 	)
 	s.Require().NoError(err)
 
@@ -180,6 +182,7 @@ func (s *MessengerPinMessageSuite) TestPinMessageOutOfOrder() {
 		1000,
 		handlePinMessageResponse,
 		&pinMessage,
+		false,
 	)
 	s.Require().NoError(err)
 
