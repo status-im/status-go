@@ -7,6 +7,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/common"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/server/pairing/peers"
@@ -44,7 +45,7 @@ func (p *PeerNotifier) handler(hello *peers.LocalPairingPeerHello) {
 
 func (p *PeerNotifier) Search() error {
 	// TODO until we can resolve Android errors when calling net.Interfaces() just noop. Sorry Android
-	if runtime.GOOS == server.AndroidPlatform {
+	if runtime.GOOS == common.AndroidPlatform {
 		return nil
 	}
 
