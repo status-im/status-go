@@ -244,7 +244,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageFirstEditsThenMessage() {
 			PublicKey:        &theirMessenger.identity.PublicKey,
 		},
 	}
-	err = s.m.HandleChatMessage(state, inputMessage.ChatMessage, nil)
+	err = s.m.HandleChatMessage(state, inputMessage.ChatMessage, nil, false)
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 1)
 
