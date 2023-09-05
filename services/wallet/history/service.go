@@ -6,58 +6,59 @@ import (
 	"errors"
 	"math"
 	"math/big"
+	"reflect"
 	"sort"
-	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
 	statustypes "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/params"
 	statusrpc "github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/network"
 
-	"github.com/status-im/status-go/rpc/chain"
+	"github.com/status-im/status-go/services/wallet/balance"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
+
+const minPointsForGraph = 14 // for minimal time frame - 7 days, twice a day
 
 // EventBalanceHistoryUpdateStarted and EventBalanceHistoryUpdateDone are used to notify the UI that balance history is being updated
 const (
 	EventBalanceHistoryUpdateStarted           walletevent.EventType = "wallet-balance-history-update-started"
 	EventBalanceHistoryUpdateFinished          walletevent.EventType = "wallet-balance-history-update-finished"
 	EventBalanceHistoryUpdateFinishedWithError walletevent.EventType = "wallet-balance-history-update-finished-with-error"
-
-	balanceHistoryUpdateInterval = 12 * time.Hour
 )
 
-type Service struct {
-	balance        *Balance
-	db             *sql.DB
-	accountsDB     *accounts.Database
-	eventFeed      *event.Feed
-	rpcClient      *statusrpc.Client
-	networkManager *network.Manager
-	tokenManager   *token.Manager
-	serviceContext context.Context
-	cancelFn       context.CancelFunc
-
-	exchange *Exchange
-
-	timer                    *time.Timer
-	visibleTokenSymbols      []string
-	visibleTokenSymbolsMutex sync.Mutex
+type ValuePoint struct {
+	Value     float64 `json:"value"`
+	Timestamp uint64  `json:"time"`
 }
 
-type chainIdentity uint64
+type Service struct {
+	balance         *Balance
+	db              *sql.DB
+	accountsDB      *accounts.Database
+	eventFeed       *event.Feed
+	rpcClient       *statusrpc.Client
+	networkManager  *network.Manager
+	tokenManager    *token.Manager
+	serviceContext  context.Context
+	cancelFn        context.CancelFunc
+	transferWatcher *Watcher
+	exchange        *Exchange
+	balanceCache    balance.CacheIface
+}
 
-func NewService(db *sql.DB, accountsDB *accounts.Database, eventFeed *event.Feed, rpcClient *statusrpc.Client, tokenManager *token.Manager, marketManager *market.Manager) *Service {
+func NewService(db *sql.DB, accountsDB *accounts.Database, eventFeed *event.Feed, rpcClient *statusrpc.Client, tokenManager *token.Manager, marketManager *market.Manager, balanceCache balance.CacheIface) *Service {
 	return &Service{
 		balance:        NewBalance(NewBalanceDB(db)),
 		db:             db,
@@ -67,6 +68,7 @@ func NewService(db *sql.DB, accountsDB *accounts.Database, eventFeed *event.Feed
 		networkManager: rpcClient.NetworkManager,
 		tokenManager:   tokenManager,
 		exchange:       NewExchange(marketManager),
+		balanceCache:   balanceCache,
 	}
 }
 
@@ -74,6 +76,8 @@ func (s *Service) Stop() {
 	if s.cancelFn != nil {
 		s.cancelFn()
 	}
+
+	s.stopTransfersWatcher()
 }
 
 func (s *Service) triggerEvent(eventType walletevent.EventType, account statustypes.Address, message string) {
@@ -87,150 +91,155 @@ func (s *Service) triggerEvent(eventType walletevent.EventType, account statusty
 }
 
 func (s *Service) Start() {
+	log.Debug("Starting balance history service")
+
+	s.startTransfersWatcher()
+
 	go func() {
 		s.serviceContext, s.cancelFn = context.WithCancel(context.Background())
-		s.timer = time.NewTimer(balanceHistoryUpdateInterval)
 
-		update := func() (exit bool) {
-			err := s.updateBalanceHistory(s.serviceContext)
-			if s.serviceContext.Err() != nil {
-				s.triggerEvent(EventBalanceHistoryUpdateFinished, statustypes.Address{}, "Service canceled")
-				s.timer.Stop()
-				return true
-			}
-			if err != nil {
-				s.triggerEvent(EventBalanceHistoryUpdateFinishedWithError, statustypes.Address{}, err.Error())
-			}
-			return false
+		err := s.updateBalanceHistory(s.serviceContext)
+		if s.serviceContext.Err() != nil {
+			s.triggerEvent(EventBalanceHistoryUpdateFinished, statustypes.Address{}, "Service canceled")
 		}
-
-		if update() {
-			return
-		}
-
-		for range s.timer.C {
-			s.resetTimer(balanceHistoryUpdateInterval)
-
-			if update() {
-				return
-			}
+		if err != nil {
+			s.triggerEvent(EventBalanceHistoryUpdateFinishedWithError, statustypes.Address{}, err.Error())
 		}
 	}()
 }
 
-func (s *Service) resetTimer(interval time.Duration) {
-	if s.timer != nil {
-		s.timer.Stop()
-		s.timer.Reset(interval)
-	}
-}
+func (s *Service) mergeChainsBalances(chainIDs []uint64, address common.Address, tokenSymbol string, fromTimestamp uint64, data map[uint64][]*entry) ([]*DataPoint, error) {
+	log.Debug("Merging balances", "address", address, "tokenSymbol", tokenSymbol, "fromTimestamp", fromTimestamp, "len(data)", len(data))
 
-func (s *Service) UpdateVisibleTokens(symbols []string) {
-	s.visibleTokenSymbolsMutex.Lock()
-	defer s.visibleTokenSymbolsMutex.Unlock()
+	toTimestamp := uint64(time.Now().UTC().Unix())
+	allData := make([]*entry, 0)
 
-	startUpdate := len(s.visibleTokenSymbols) == 0 && len(symbols) > 0
-	s.visibleTokenSymbols = symbols
-	if startUpdate {
-		s.resetTimer(0)
-	}
-}
-
-func (s *Service) isTokenVisible(tokenSymbol string) bool {
-	s.visibleTokenSymbolsMutex.Lock()
-	defer s.visibleTokenSymbolsMutex.Unlock()
-
-	for _, visibleSymbol := range s.visibleTokenSymbols {
-		if visibleSymbol == tokenSymbol {
-			return true
-		}
-	}
-	return false
-}
-
-// Native token implementation of DataSource interface
-type chainClientSource struct {
-	chainClient chain.ClientInterface
-	currency    string
-}
-
-func (src *chainClientSource) HeaderByNumber(ctx context.Context, blockNo *big.Int) (*types.Header, error) {
-	return src.chainClient.HeaderByNumber(ctx, blockNo)
-}
-
-func (src *chainClientSource) BalanceAt(ctx context.Context, account common.Address, blockNo *big.Int) (*big.Int, error) {
-	return src.chainClient.BalanceAt(ctx, account, blockNo)
-}
-
-func (src *chainClientSource) ChainID() uint64 {
-	return src.chainClient.NetworkID()
-}
-
-func (src *chainClientSource) Currency() string {
-	return src.currency
-}
-
-func (src *chainClientSource) TimeNow() int64 {
-	return time.Now().UTC().Unix()
-}
-
-// ERC20 token implementation of DataSource interface
-type tokenChainClientSource struct {
-	chainClientSource
-	TokenManager   *token.Manager
-	NetworkManager *network.Manager
-
-	firstUnavailableBlockNo *big.Int
-}
-
-func (src *tokenChainClientSource) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
-	network := src.NetworkManager.Find(src.chainClient.NetworkID())
-	if network == nil {
-		return nil, errors.New("network not found")
-	}
-	token := src.TokenManager.FindToken(network, src.currency)
-	if token == nil {
-		return nil, errors.New("token not found")
-	}
-	if src.firstUnavailableBlockNo != nil && blockNumber.Cmp(src.firstUnavailableBlockNo) < 0 {
-		return big.NewInt(0), nil
-	}
-	balance, err := src.TokenManager.GetTokenBalanceAt(ctx, src.chainClient, account, token.Address, blockNumber)
-	if err != nil {
-		if err == bind.ErrNoCode {
-			// Ignore requests before contract deployment and mark this state for future requests
-			src.firstUnavailableBlockNo = new(big.Int).Set(blockNumber)
-			return big.NewInt(0), nil
-		}
-		return nil, err
-	}
-	return balance, err
-}
-
-type ValuePoint struct {
-	Value       float64      `json:"value"`
-	Timestamp   uint64       `json:"time"`
-	BlockNumber *hexutil.Big `json:"blockNumber"`
-}
-
-// GetBalanceHistory returns token count balance
-func (s *Service) GetBalanceHistory(ctx context.Context, chainIDs []uint64, address common.Address, tokenSymbol string, currencySymbol string, endTimestamp int64, timeInterval TimeInterval) ([]*ValuePoint, error) {
-	// Retrieve cached data for all chains
-	allData := make(map[chainIdentity][]*DataPoint)
+	// Add edge points per chain
+	// Iterate over chainIDs param, not data keys, because data may not contain all the chains, but we need edge points for all of them
 	for _, chainID := range chainIDs {
-		data, err := s.balance.get(ctx, chainID, tokenSymbol, address, endTimestamp, timeInterval)
+		// edge points are needed to properly calculate total balance, as they contain the balance for the first and last timestamp
+		chainData, err := s.balance.addEdgePoints(chainID, tokenSymbol, address, fromTimestamp, toTimestamp, data[chainID])
 		if err != nil {
 			return nil, err
 		}
-		if len(data) > 0 {
-			allData[chainIdentity(chainID)] = data
+		allData = append(allData, chainData...)
+	}
+
+	// Sort by timestamp
+	sort.Slice(allData, func(i, j int) bool {
+		return allData[i].timestamp < allData[j].timestamp
+	})
+
+	log.Debug("Sorted balances", "len", len(allData))
+	for _, entry := range allData {
+		log.Debug("Sorted balances", "entry", entry)
+	}
+
+	// Add padding points to make chart look nice
+	if len(allData) < minPointsForGraph {
+		allData, _ = addPaddingPoints(tokenSymbol, address, toTimestamp, allData, minPointsForGraph)
+	}
+
+	return entriesToDataPoints(chainIDs, allData)
+}
+
+// Expects sorted data
+func entriesToDataPoints(chainIDs []uint64, data []*entry) ([]*DataPoint, error) {
+	var resSlice []*DataPoint
+	var groupedEntries []*entry // Entries with the same timestamp
+
+	sumBalances := func(entries []*entry) *big.Int {
+		sum := big.NewInt(0)
+		for _, entry := range entries {
+			sum.Add(sum, entry.balance)
+		}
+		return sum
+	}
+
+	// calculate balance for entries with the same timestam and add a single point for them
+	for _, entry := range data {
+		if len(groupedEntries) > 0 {
+			if entry.timestamp == groupedEntries[0].timestamp {
+				groupedEntries = append(groupedEntries, entry)
+				continue
+			} else {
+				// Calculate balance for the grouped entries
+				cumulativeBalance := sumBalances(groupedEntries)
+				// Points in slice contain balances for all chains
+				resSlice = appendPointToSlice(resSlice, &DataPoint{
+					Timestamp: uint64(groupedEntries[0].timestamp),
+					Balance:   (*hexutil.Big)(cumulativeBalance),
+				})
+
+				// Reset grouped entries
+				groupedEntries = nil
+				groupedEntries = append(groupedEntries, entry)
+			}
+		} else {
+			groupedEntries = append(groupedEntries, entry)
 		}
 	}
 
-	data, err := mergeDataPoints(allData, timeIntervalToStrideDuration[timeInterval])
+	// If only edge points are present, groupedEntries will be non-empty
+	if len(groupedEntries) > 0 {
+		cumulativeBalance := sumBalances(groupedEntries)
+		resSlice = appendPointToSlice(resSlice, &DataPoint{
+			Timestamp: uint64(groupedEntries[0].timestamp),
+			Balance:   (*hexutil.Big)(cumulativeBalance),
+		})
+	}
+
+	return resSlice, nil
+}
+
+func appendPointToSlice(slice []*DataPoint, point *DataPoint) []*DataPoint {
+	// Replace the last point in slice if it has the same timestamp or add a new one if different
+	if len(slice) > 0 {
+		if slice[len(slice)-1].Timestamp != point.Timestamp {
+			// Timestamps are different, appending to slice
+			slice = append(slice, point)
+		} else {
+			// Replace last item in slice because timestamps are the same
+			slice[len(slice)-1] = point
+		}
+	} else {
+		slice = append(slice, point)
+	}
+
+	return slice
+}
+
+// GetBalanceHistory returns token count balance
+func (s *Service) GetBalanceHistory(ctx context.Context, chainIDs []uint64, address common.Address, tokenSymbol string, currencySymbol string, fromTimestamp uint64) ([]*ValuePoint, error) {
+	log.Debug("GetBalanceHistory", "chainIDs", chainIDs, "address", address.String(), "tokenSymbol", tokenSymbol, "currencySymbol", currencySymbol, "fromTimestamp", fromTimestamp)
+
+	chainDataMap := make(map[uint64][]*entry)
+	for _, chainID := range chainIDs {
+		chainData, err := s.balance.get(ctx, chainID, tokenSymbol, address, fromTimestamp) // TODO Make chainID a slice?
+		if err != nil {
+			return nil, err
+		}
+
+		if len(chainData) == 0 {
+			continue
+		}
+
+		chainDataMap[chainID] = chainData
+	}
+
+	// Need to get balance for all the chains for the first timestamp, otherwise total values will be incorrect
+	data, err := s.mergeChainsBalances(chainIDs, address, tokenSymbol, fromTimestamp, chainDataMap)
 	if err != nil {
 		return nil, err
 	} else if len(data) == 0 {
+		return make([]*ValuePoint, 0), nil
+	}
+
+	return s.dataPointsToValuePoints(chainIDs, tokenSymbol, currencySymbol, data)
+}
+
+func (s *Service) dataPointsToValuePoints(chainIDs []uint64, tokenSymbol string, currencySymbol string, data []*DataPoint) ([]*ValuePoint, error) {
+	if len(data) == 0 {
 		return make([]*ValuePoint, 0), nil
 	}
 
@@ -243,10 +252,17 @@ func (s *Service) GetBalanceHistory(ctx context.Context, chainIDs []uint64, addr
 		lastDayTime = lastDayTime.AddDate(0, 0, -1)
 	}
 
-	_, err = s.exchange.GetExchangeRateForDay(tokenSymbol, currencySymbol, lastDayTime)
+	lastDayValue, err := s.exchange.GetExchangeRateForDay(tokenSymbol, currencySymbol, lastDayTime)
 	if err != nil {
 		err := s.exchange.FetchAndCacheMissingRates(tokenSymbol, currencySymbol)
 		if err != nil {
+			log.Error("Error fetching exchange rates", "tokenSymbol", tokenSymbol, "currencySymbol", currencySymbol, "err", err)
+			return nil, err
+		}
+
+		lastDayValue, err = s.exchange.GetExchangeRateForDay(tokenSymbol, currencySymbol, lastDayTime)
+		if err != nil {
+			log.Error("Exchange rate missing for", "tokenSymbol", tokenSymbol, "currencySymbol", currencySymbol, "lastDayTime", lastDayTime, "err", err)
 			return nil, err
 		}
 	}
@@ -259,24 +275,31 @@ func (s *Service) GetBalanceHistory(ctx context.Context, chainIDs []uint64, addr
 
 	var res []*ValuePoint
 	for _, d := range data {
+		var dayValue float32
 		dayTime := time.Unix(int64(d.Timestamp), 0).UTC()
 		if dayTime.After(currentDayStart) {
 			// No chance to have today, use the previous day value for the last data point
-			dayTime = lastDayTime
-		}
-		dayValue, err := s.exchange.GetExchangeRateForDay(tokenSymbol, currencySymbol, dayTime)
-		if err != nil {
-			log.Warn("Echange rate missing for", dayTime, "- err", err)
-			continue
+			if lastDayValue > 0 {
+				dayValue = lastDayValue
+			} else {
+				log.Warn("Exchange rate missing for", "dayTime", dayTime, "err", err)
+				continue
+			}
+		} else {
+			dayValue, err = s.exchange.GetExchangeRateForDay(tokenSymbol, currencySymbol, dayTime)
+			if err != nil {
+				log.Warn("Exchange rate missing for", "dayTime", dayTime, "err", err)
+				continue
+			}
 		}
 
 		// The big.Int values are discarded, hence copy the original values
 		res = append(res, &ValuePoint{
-			Timestamp:   d.Timestamp,
-			Value:       tokenToValue((*big.Int)(d.Balance), dayValue, weisInOneMain),
-			BlockNumber: d.BlockNumber,
+			Timestamp: d.Timestamp,
+			Value:     tokenToValue((*big.Int)(d.Balance), dayValue, weisInOneMain),
 		})
 	}
+
 	return res, nil
 }
 
@@ -306,176 +329,12 @@ func tokenToValue(tokenCount *big.Int, mainDenominationValue float32, weisInOneM
 	return res
 }
 
-// mergeDataPoints merges close in time block numbers. Drops the ones that are not in a stride duration
-// this should improve merging balance data from different chains which are incompatible due to different timelines
-// and block length
-func mergeDataPoints(data map[chainIdentity][]*DataPoint, stride time.Duration) ([]*DataPoint, error) {
-	// Special cases
-	if len(data) == 0 {
-		return make([]*DataPoint, 0), nil
-	} else if len(data) == 1 {
-		for k := range data {
-			return data[k], nil
-		}
-	}
-
-	res := make([]*DataPoint, 0)
-	strideStart, pos := findFirstStrideWindow(data, stride)
-	for {
-		strideEnd := strideStart + int64(stride.Seconds())
-
-		// - Gather all points in the stride window starting with current pos
-		var strideIdentities map[chainIdentity][]timeIdentity
-		strideIdentities, pos = dataInStrideWindowAndNextPos(data, pos, strideEnd)
-
-		// Check if all chains have data
-		strideComplete := true
-		for k := range data {
-			_, strideComplete = strideIdentities[k]
-			if !strideComplete {
-				break
-			}
-		}
-		if strideComplete {
-			chainMaxBalance := make(map[chainIdentity]*DataPoint)
-			for chainID, identities := range strideIdentities {
-				for _, identity := range identities {
-					_, exists := chainMaxBalance[chainID]
-					if exists && (*big.Int)(identity.dataPoint(data).Balance).Cmp((*big.Int)(chainMaxBalance[chainID].Balance)) <= 0 {
-						continue
-					}
-					chainMaxBalance[chainID] = identity.dataPoint(data)
-				}
-			}
-			balance := big.NewInt(0)
-			for _, chainBalance := range chainMaxBalance {
-				balance.Add(balance, (*big.Int)(chainBalance.Balance))
-			}
-
-			// if last stride, the timestamp might be in the future
-			if strideEnd > time.Now().UTC().Unix() {
-				strideEnd = time.Now().UTC().Unix()
-			}
-
-			res = append(res, &DataPoint{
-				Timestamp:   uint64(strideEnd),
-				Balance:     (*hexutil.Big)(balance),
-				BlockNumber: (*hexutil.Big)(getBlockID(chainMaxBalance)),
-			})
-		}
-
-		if allPastEnd(data, pos) {
-			return res, nil
-		}
-
-		strideStart = strideEnd
-	}
-}
-
-func getBlockID(chainBalance map[chainIdentity]*DataPoint) *big.Int {
-	var res *big.Int
-	for _, balance := range chainBalance {
-		if res == nil {
-			res = new(big.Int).Set(balance.BlockNumber.ToInt())
-		} else if res.Cmp(balance.BlockNumber.ToInt()) != 0 {
-			return nil
-		}
-	}
-
-	return res
-}
-
-type timeIdentity struct {
-	chain chainIdentity
-	index int
-}
-
-func (i timeIdentity) dataPoint(data map[chainIdentity][]*DataPoint) *DataPoint {
-	return data[i.chain][i.index]
-}
-
-func (i timeIdentity) atEnd(data map[chainIdentity][]*DataPoint) bool {
-	return (i.index + 1) == len(data[i.chain])
-}
-
-func (i timeIdentity) pastEnd(data map[chainIdentity][]*DataPoint) bool {
-	return i.index >= len(data[i.chain])
-}
-
-func allPastEnd(data map[chainIdentity][]*DataPoint, pos map[chainIdentity]int) bool {
-	for chainID := range pos {
-		if !(timeIdentity{chainID, pos[chainID]}).pastEnd(data) {
-			return false
-		}
-	}
-	return true
-}
-
-// findFirstStrideWindow returns the start of the first stride window (timestamp and all positions)
-//
-// Note: tried to implement finding an optimal stride window but it was becoming too complicated and not worth it given that it will potentially save the first and last stride but it is not guaranteed. Current implementation should give good results as long as the the DataPoints are regular enough
-func findFirstStrideWindow(data map[chainIdentity][]*DataPoint, stride time.Duration) (firstTimestamp int64, pos map[chainIdentity]int) {
-	pos = make(map[chainIdentity]int)
-	for k := range data {
-		pos[k] = 0
-	}
-
-	cur := sortTimeAsc(data, pos)
-	return int64(cur[0].dataPoint(data).Timestamp), pos
-}
-
-func copyMap[K comparable, V any](original map[K]V) map[K]V {
-	copy := make(map[K]V, len(original))
-	for key, value := range original {
-		copy[key] = value
-	}
-	return copy
-}
-
-// startPos might have indexes past the end of the data for a chain
-func dataInStrideWindowAndNextPos(data map[chainIdentity][]*DataPoint, startPos map[chainIdentity]int, endT int64) (identities map[chainIdentity][]timeIdentity, nextPos map[chainIdentity]int) {
-	pos := copyMap(startPos)
-	identities = make(map[chainIdentity][]timeIdentity)
-
-	// Identify the current oldest and newest block
-	lastLen := int(-1)
-	for lastLen < len(identities) {
-		lastLen = len(identities)
-		sorted := sortTimeAsc(data, pos)
-		for _, identity := range sorted {
-			if identity.dataPoint(data).Timestamp < uint64(endT) {
-				identities[identity.chain] = append(identities[identity.chain], identity)
-				pos[identity.chain]++
-			}
-		}
-	}
-	return identities, pos
-}
-
-// sortTimeAsc expect indexes in pos past the end of the data for a chain
-func sortTimeAsc(data map[chainIdentity][]*DataPoint, pos map[chainIdentity]int) []timeIdentity {
-	res := make([]timeIdentity, 0, len(data))
-	for k := range data {
-		identity := timeIdentity{
-			chain: k,
-			index: pos[k],
-		}
-		if !identity.pastEnd(data) {
-			res = append(res, identity)
-		}
-	}
-
-	sort.Slice(res, func(i, j int) bool {
-		return res[i].dataPoint(data).Timestamp < res[j].dataPoint(data).Timestamp
-	})
-	return res
-}
-
 // updateBalanceHistory iterates over all networks depending on test/prod for the s.visibleTokenSymbol
 // and updates the balance history for the given address
 //
 // expects ctx to have cancellation support and processing to be cancelled by the caller
 func (s *Service) updateBalanceHistory(ctx context.Context) error {
+	log.Debug("updateBalanceHistory started")
 
 	addresses, err := s.accountsDB.GetWalletAddresses()
 	if err != nil {
@@ -487,7 +346,8 @@ func (s *Service) updateBalanceHistory(ctx context.Context) error {
 		return err
 	}
 
-	networks, err := s.networkManager.Get(false)
+	onlyEnabledNetworks := false
+	networks, err := s.networkManager.Get(onlyEnabledNetworks)
 	if err != nil {
 		return err
 	}
@@ -499,49 +359,177 @@ func (s *Service) updateBalanceHistory(ctx context.Context) error {
 			if network.IsTest != areTestNetworksEnabled {
 				continue
 			}
-			tokensForChain, err := s.tokenManager.GetTokens(network.ChainID)
+
+			entries, err := s.balance.db.GetEntriesWithoutBalances(network.ChainID, common.Address(address))
 			if err != nil {
-				tokensForChain = make([]*token.Token, 0)
+				log.Error("Error getting blocks without balances", "chainID", network.ChainID, "address", address.String(), "err", err)
+				return err
 			}
-			tokensForChain = append(tokensForChain, s.tokenManager.ToToken(network))
 
-			for _, token := range tokensForChain {
-				if !s.isTokenVisible(token.Symbol) {
-					continue
-				}
+			log.Debug("Blocks without balances", "chainID", network.ChainID, "address", address.String(), "entries", entries)
 
-				var dataSource DataSource
-				chainClient, err := s.rpcClient.EthClient(network.ChainID)
-				if err != nil {
-					return err
-				}
-				if token.IsNative() {
-					dataSource = &chainClientSource{chainClient, token.Symbol}
-				} else {
-					dataSource = &tokenChainClientSource{
-						chainClientSource: chainClientSource{
-							chainClient: chainClient,
-							currency:    token.Symbol,
-						},
-						TokenManager:   s.tokenManager,
-						NetworkManager: s.networkManager,
-					}
-				}
+			client, err := s.rpcClient.EthClient(network.ChainID)
+			if err != nil {
+				log.Error("Error getting client", "chainID", network.ChainID, "address", address.String(), "err", err)
+				return err
+			}
 
-				for currentInterval := int(BalanceHistoryAllTime); currentInterval >= int(BalanceHistory7Days); currentInterval-- {
-					select {
-					case <-ctx.Done():
-						return errors.New("context cancelled")
-					default:
-					}
-					err = s.balance.update(ctx, dataSource, common.Address(address), TimeInterval(currentInterval))
-					if err != nil {
-						log.Warn("Error updating balance history", "chainID", dataSource.ChainID(), "currency", dataSource.Currency(), "address", address.String(), "interval", currentInterval, "err", err)
-					}
-				}
+			err = s.addEntriesToDB(ctx, client, network, address, entries)
+			if err != nil {
+				return err
 			}
 		}
 		s.triggerEvent(EventBalanceHistoryUpdateFinished, address, "")
 	}
+
+	log.Debug("updateBalanceHistory finished")
 	return nil
+}
+
+func (s *Service) addEntriesToDB(ctx context.Context, client chain.ClientInterface, network *params.Network, address statustypes.Address, entries []*entry) (err error) {
+	for _, entry := range entries {
+		var balance *big.Int
+		// tokenAddess is zero for native currency
+		if (entry.tokenAddress == common.Address{}) {
+			// Check in cache
+			balance = s.balanceCache.GetBalance(common.Address(address), network.ChainID, entry.block)
+			log.Debug("Balance from cache", "chainID", network.ChainID, "address", address.String(), "block", entry.block, "balance", balance)
+
+			if balance == nil {
+				balance, err = client.BalanceAt(ctx, common.Address(address), entry.block)
+				if balance == nil {
+					log.Error("Error getting balance", "chainID", network.ChainID, "address", address.String(), "err", err, "unwrapped", errors.Unwrap(err))
+					return err
+				}
+				time.Sleep(50 * time.Millisecond) // TODO Remove this sleep after fixing exceeding rate limit
+			}
+			entry.tokenSymbol = network.NativeCurrencySymbol
+		} else {
+			// Check token first if it is supported
+			token := s.tokenManager.FindTokenByAddress(network.ChainID, entry.tokenAddress)
+			if token == nil {
+				log.Warn("Token not found", "chainID", network.ChainID, "address", address.String(), "tokenAddress", entry.tokenAddress.String())
+				// TODO Add "supported=false" flag to such tokens to avoid checking them again and again
+				continue // Skip token that we don't have symbol for. For example we don't have tokens in store for goerli optimism
+			} else {
+				entry.tokenSymbol = token.Symbol
+			}
+
+			// Check balance for token
+			balance, err = s.tokenManager.GetTokenBalanceAt(ctx, client, common.Address(address), entry.tokenAddress, entry.block)
+			log.Debug("Balance from token manager", "chainID", network.ChainID, "address", address.String(), "block", entry.block, "balance", balance)
+
+			if err != nil {
+				log.Error("Error getting token balance", "chainID", network.ChainID, "address", address.String(), "tokenAddress", entry.tokenAddress.String(), "err", err)
+				return err
+			}
+		}
+
+		entry.balance = balance
+		err = s.balance.db.add(entry)
+		if err != nil {
+			log.Error("Error adding balance", "chainID", network.ChainID, "address", address.String(), "err", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *Service) startTransfersWatcher() {
+	if s.transferWatcher != nil {
+		return
+	}
+
+	transferLoadedCb := func(chainID uint64, addresses []common.Address, block *big.Int) {
+		log.Debug("Balance history watcher: transfer loaded:", "chainID", chainID, "addresses", addresses, "block", block.Uint64())
+
+		client, err := s.rpcClient.EthClient(chainID)
+		if err != nil {
+			log.Error("Error getting client", "chainID", chainID, "err", err)
+			return
+		}
+
+		transferDB := transfer.NewDB(s.db)
+
+		for _, address := range addresses {
+			network := s.networkManager.Find(chainID)
+
+			transfers, err := transferDB.GetTransfersByAddressAndBlock(chainID, address, block, 1500) // 1500 is quite arbitrary and far from real, but should be enough to cover all transfers in a block
+			if err != nil {
+				log.Error("Error getting transfers", "chainID", chainID, "address", address.String(), "err", err)
+				continue
+			}
+
+			if len(transfers) == 0 {
+				log.Debug("No transfers found", "chainID", chainID, "address", address.String(), "block", block.Uint64())
+				continue
+			}
+
+			entries := transfersToEntries(address, block, transfers) // TODO Remove address and block after testing that they match
+			unique := removeDuplicates(entries)
+			log.Debug("Entries after filtering", "entries", entries, "unique", unique)
+
+			err = s.addEntriesToDB(s.serviceContext, client, network, statustypes.Address(address), unique)
+			if err != nil {
+				log.Error("Error adding entries to DB", "chainID", chainID, "address", address.String(), "err", err)
+				continue
+			}
+
+			// No event triggering here, because noone cares about balance history updates yet
+		}
+	}
+
+	s.transferWatcher = NewWatcher(s.eventFeed, transferLoadedCb)
+	s.transferWatcher.Start()
+}
+
+func removeDuplicates(entries []*entry) []*entry {
+	unique := make([]*entry, 0, len(entries))
+	for _, entry := range entries {
+		found := false
+		for _, u := range unique {
+			if reflect.DeepEqual(entry, u) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			unique = append(unique, entry)
+		}
+	}
+
+	return unique
+}
+
+func transfersToEntries(address common.Address, block *big.Int, transfers []transfer.Transfer) []*entry {
+	entries := make([]*entry, 0)
+
+	for _, transfer := range transfers {
+		if transfer.Address != address {
+			panic("Address mismatch") // coding error
+		}
+
+		if transfer.BlockNumber.Cmp(block) != 0 {
+			panic("Block number mismatch") // coding error
+		}
+		entry := &entry{
+			chainID:      transfer.NetworkID,
+			address:      transfer.Address,
+			tokenAddress: transfer.Receipt.ContractAddress,
+			block:        transfer.BlockNumber,
+			timestamp:    (int64)(transfer.Timestamp),
+		}
+
+		entries = append(entries, entry)
+	}
+
+	return entries
+}
+
+func (s *Service) stopTransfersWatcher() {
+	if s.transferWatcher != nil {
+		s.transferWatcher.Stop()
+		s.transferWatcher = nil
+	}
 }

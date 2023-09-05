@@ -98,7 +98,7 @@ func checkRangesWithStartBlock(parent context.Context, client balance.Reader, ca
 	account common.Address, ranges [][]*big.Int, threadLimit uint32, startBlock *big.Int) (
 	resRanges [][]*big.Int, headers []*DBHeader, newStartBlock *big.Int, err error) {
 
-	log.Debug("start checkRanges", "account", account.Hex(), "ranges len", len(ranges))
+	log.Debug("start checkRanges", "account", account.Hex(), "ranges len", len(ranges), "startBlock", startBlock)
 
 	ctx, cancel := context.WithTimeout(parent, 30*time.Second)
 	defer cancel()
@@ -111,6 +111,8 @@ func checkRangesWithStartBlock(parent context.Context, client balance.Reader, ca
 		from := blocksRange[0]
 		to := blocksRange[1]
 
+		log.Debug("check block range", "from", from, "to", to)
+
 		if startBlock != nil {
 			if to.Cmp(newStartBlock) <= 0 {
 				log.Debug("'to' block is less than 'start' block", "to", to, "startBlock", startBlock)
@@ -120,6 +122,7 @@ func checkRangesWithStartBlock(parent context.Context, client balance.Reader, ca
 
 		c.Add(func(ctx context.Context) error {
 			if from.Cmp(to) >= 0 {
+				log.Debug("'from' block is greater than or equal to 'to' block", "from", from, "to", to)
 				return nil
 			}
 			log.Debug("eth transfers comparing blocks", "from", from, "to", to)

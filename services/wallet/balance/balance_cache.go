@@ -2,21 +2,15 @@ package balance
 
 import (
 	"context"
-	"math"
 	"math/big"
-	"sort"
+	"reflect"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/status-im/status-go/rpc/chain"
 )
-
-type nonceRange struct {
-	nonce int64
-	max   *big.Int
-	min   *big.Int
-}
 
 // Reader interface for reading balance at a specified address.
 type Reader interface {
@@ -41,245 +35,171 @@ type CacheIface interface {
 	GetNonce(account common.Address, chainID uint64, blockNumber *big.Int) *int64
 	AddBalance(account common.Address, chainID uint64, blockNumber *big.Int, balance *big.Int)
 	AddNonce(account common.Address, chainID uint64, blockNumber *big.Int, nonce *int64)
+	BalanceSize(account common.Address, chainID uint64) int
+	NonceSize(account common.Address, chainID uint64) int
 	Clear()
 }
 
-type balanceCacheType map[common.Address]map[uint64]map[uint64]*big.Int      // address->chainID->blockNumber->balance
-type nonceCacheType map[common.Address]map[uint64]map[uint64]*int64          // address->chainID->blockNumber->nonce
-type nonceRangesCacheType map[common.Address]map[uint64]map[int64]nonceRange // address->chainID->blockNumber->nonceRange
-type sortedNonceRangesCacheType map[common.Address]map[uint64][]nonceRange   // address->chainID->[]nonceRange
+type addressChainMap[T any] map[common.Address]map[uint64]T // address->chainID
 
-type Cache struct {
-	// balances maps an address to a map of a block number and the balance of this particular address
-	balances     balanceCacheType
-	nonces       nonceCacheType
-	nonceRanges  nonceRangesCacheType
-	sortedRanges sortedNonceRangesCacheType
-	rw           sync.RWMutex
+type cacheIface[K comparable, V any] interface {
+	get(K) V
+	set(K, V)
+	len() int
+	keys() []K
+	clear()
+	init()
 }
 
-func NewCache() *Cache {
-	return &Cache{
-		balances:     make(balanceCacheType),
-		nonces:       make(nonceCacheType),
-		nonceRanges:  make(nonceRangesCacheType),
-		sortedRanges: make(sortedNonceRangesCacheType),
-	}
+// genericCache is a generic implementation of CacheIface
+type genericCache[B cacheIface[uint64, *big.Int], N cacheIface[uint64, *int64], NR cacheIface[int64, nonceRange]] struct {
+	nonceRangeCache[NR]
+
+	// balances maps an address and chain to a cache of a block number and the balance of this particular address on the chain
+	balances addressChainMap[B]
+	nonces   addressChainMap[N]
+	rw       sync.RWMutex
 }
 
-func (b *Cache) Clear() {
-	b.rw.Lock()
-	defer b.rw.Unlock()
-
-	for address, chainCache := range b.balances {
-		if len(chainCache) == 0 {
-			continue
-		}
-
-		for chainID, cache := range chainCache {
-			if len(cache) == 0 {
-				continue
-			}
-
-			var maxBlock uint64 = 0
-			var minBlock uint64 = math.MaxUint64
-			for key := range cache {
-				if key > maxBlock {
-					maxBlock = key
-				}
-				if key < minBlock {
-					minBlock = key
-				}
-			}
-			newCache := make(map[uint64]*big.Int)
-			newCache[maxBlock] = cache[maxBlock]
-			newCache[minBlock] = cache[minBlock]
-			b.balances[address][chainID] = newCache
-		}
-	}
-	for address, chainCache := range b.nonces {
-		if len(chainCache) == 0 {
-			continue
-		}
-
-		for chainID, cache := range chainCache {
-			var maxBlock uint64 = 0
-			var minBlock uint64 = math.MaxUint64
-			for key := range cache {
-				if key > maxBlock {
-					maxBlock = key
-				}
-				if key < minBlock {
-					minBlock = key
-				}
-			}
-			newCache := make(map[uint64]*int64)
-			newCache[maxBlock] = cache[maxBlock]
-			newCache[minBlock] = cache[minBlock]
-			b.nonces[address][chainID] = newCache
-		}
-	}
-	b.nonceRanges = make(nonceRangesCacheType)
-	b.sortedRanges = make(sortedNonceRangesCacheType)
-}
-
-func (b *Cache) GetBalance(account common.Address, chainID uint64, blockNumber *big.Int) *big.Int {
+func (b *genericCache[_, _, _]) GetBalance(account common.Address, chainID uint64, blockNumber *big.Int) *big.Int {
 	b.rw.RLock()
 	defer b.rw.RUnlock()
 
-	if b.balances[account] == nil || b.balances[account][chainID] == nil {
+	_, exists := b.balances[account]
+	if !exists {
 		return nil
 	}
 
-	return b.balances[account][chainID][blockNumber.Uint64()]
+	_, exists = b.balances[account][chainID]
+	if !exists {
+		return nil
+	}
+
+	return b.balances[account][chainID].get(blockNumber.Uint64())
 }
 
-func (b *Cache) AddBalance(account common.Address, chainID uint64, blockNumber *big.Int, balance *big.Int) {
+func (b *genericCache[B, _, _]) AddBalance(account common.Address, chainID uint64, blockNumber *big.Int, balance *big.Int) {
 	b.rw.Lock()
 	defer b.rw.Unlock()
 
 	_, exists := b.balances[account]
 	if !exists {
-		b.balances[account] = make(map[uint64]map[uint64]*big.Int)
+		b.balances[account] = make(map[uint64]B)
 	}
 
 	_, exists = b.balances[account][chainID]
 	if !exists {
-		b.balances[account][chainID] = make(map[uint64]*big.Int)
+		b.balances[account][chainID] = reflect.New(reflect.TypeOf(b.balances[account][chainID]).Elem()).Interface().(B)
+		b.balances[account][chainID].init()
 	}
 
-	b.balances[account][chainID][blockNumber.Uint64()] = balance
+	b.balances[account][chainID].set(blockNumber.Uint64(), balance)
 }
 
-func (b *Cache) BalanceAt(ctx context.Context, client Reader, account common.Address, blockNumber *big.Int) (*big.Int, error) {
-	cachedBalance := b.GetBalance(account, client.NetworkID(), blockNumber)
-	if cachedBalance != nil {
-		return cachedBalance, nil
-	}
-	balance, err := client.BalanceAt(ctx, account, blockNumber)
-	if err != nil {
-		return nil, err
-	}
-	b.AddBalance(account, client.NetworkID(), blockNumber, balance)
-
-	return balance, nil
-}
-
-func (b *Cache) GetNonce(account common.Address, chainID uint64, blockNumber *big.Int) *int64 {
+func (b *genericCache[_, _, _]) GetNonce(account common.Address, chainID uint64, blockNumber *big.Int) *int64 {
 	b.rw.RLock()
 	defer b.rw.RUnlock()
 
-	if b.nonces[account] == nil || b.nonces[account][chainID] == nil {
+	_, exists := b.nonces[account]
+	if !exists {
 		return nil
 	}
-	return b.nonces[account][chainID][blockNumber.Uint64()]
-}
 
-func (b *Cache) Cache() CacheIface {
-	return b
-}
-
-func (b *Cache) sortRanges(account common.Address, chainID uint64) {
-	keys := make([]int, 0, len(b.nonceRanges[account][chainID]))
-	for k := range b.nonceRanges[account][chainID] {
-		keys = append(keys, int(k))
-	}
-
-	sort.Ints(keys) // This will not work for keys > 2^31
-
-	ranges := []nonceRange{}
-	for _, k := range keys {
-		r := b.nonceRanges[account][chainID][int64(k)]
-		ranges = append(ranges, r)
-	}
-
-	_, exists := b.sortedRanges[account]
+	_, exists = b.nonces[account][chainID]
 	if !exists {
-		b.sortedRanges[account] = make(map[uint64][]nonceRange)
+		return nil
 	}
 
-	b.sortedRanges[account][chainID] = ranges
+	nonce := b.nonces[account][chainID].get(blockNumber.Uint64())
+	if nonce != nil {
+		return nonce
+	}
+
+	return b.findNonceInRange(account, chainID, blockNumber)
 }
 
-func (b *Cache) findNonceInRange(account common.Address, chainID uint64, block *big.Int) *int64 {
-	b.rw.RLock()
-	defer b.rw.RUnlock()
-
-	for k := range b.sortedRanges[account][chainID] {
-		nr := b.sortedRanges[account][chainID][k]
-		cmpMin := nr.min.Cmp(block)
-		if cmpMin == 1 {
-			return nil
-		} else if cmpMin == 0 {
-			return &nr.nonce
-		} else {
-			cmpMax := nr.max.Cmp(block)
-			if cmpMax >= 0 {
-				return &nr.nonce
-			}
-		}
-	}
-
-	return nil
-}
-
-func (b *Cache) updateNonceRange(account common.Address, chainID uint64, blockNumber *big.Int, nonce *int64) {
-	_, exists := b.nonceRanges[account]
-	if !exists {
-		b.nonceRanges[account] = make(map[uint64]map[int64]nonceRange)
-	}
-	_, exists = b.nonceRanges[account][chainID]
-	if !exists {
-		b.nonceRanges[account][chainID] = make(map[int64]nonceRange)
-	}
-
-	nr, exists := b.nonceRanges[account][chainID][*nonce]
-	if !exists {
-		r := nonceRange{
-			max:   big.NewInt(0).Set(blockNumber),
-			min:   big.NewInt(0).Set(blockNumber),
-			nonce: *nonce,
-		}
-		b.nonceRanges[account][chainID][*nonce] = r
-	} else {
-		if nr.max.Cmp(blockNumber) == -1 {
-			nr.max.Set(blockNumber)
-		}
-
-		if nr.min.Cmp(blockNumber) == 1 {
-			nr.min.Set(blockNumber)
-		}
-
-		b.nonceRanges[account][chainID][*nonce] = nr
-		b.sortRanges(account, chainID)
-	}
-}
-
-func (b *Cache) AddNonce(account common.Address, chainID uint64, blockNumber *big.Int, nonce *int64) {
+func (b *genericCache[_, N, _]) AddNonce(account common.Address, chainID uint64, blockNumber *big.Int, nonce *int64) {
 	b.rw.Lock()
 	defer b.rw.Unlock()
 
 	_, exists := b.nonces[account]
 	if !exists {
-		b.nonces[account] = make(map[uint64]map[uint64]*int64)
+		b.nonces[account] = make(map[uint64]N)
 	}
 
 	_, exists = b.nonces[account][chainID]
 	if !exists {
-		b.nonces[account][chainID] = make(map[uint64]*int64)
+		b.nonces[account][chainID] = reflect.New(reflect.TypeOf(b.nonces[account][chainID]).Elem()).Interface().(N)
+		b.nonces[account][chainID].init()
 	}
-	b.nonces[account][chainID][blockNumber.Uint64()] = nonce
+
+	b.nonces[account][chainID].set(blockNumber.Uint64(), nonce)
 	b.updateNonceRange(account, chainID, blockNumber, nonce)
 }
 
-func (b *Cache) NonceAt(ctx context.Context, client Reader, account common.Address, blockNumber *big.Int) (*int64, error) {
-	cachedNonce := b.GetNonce(account, client.NetworkID(), blockNumber)
+func (b *genericCache[_, _, _]) BalanceSize(account common.Address, chainID uint64) int {
+	b.rw.RLock()
+	defer b.rw.RUnlock()
+
+	_, exists := b.balances[account]
+	if !exists {
+		return 0
+	}
+
+	_, exists = b.balances[account][chainID]
+	if !exists {
+		return 0
+	}
+
+	return b.balances[account][chainID].len()
+}
+
+func (b *genericCache[_, N, _]) NonceSize(account common.Address, chainID uint64) int {
+	b.rw.RLock()
+	defer b.rw.RUnlock()
+
+	_, exists := b.nonces[account]
+	if !exists {
+		return 0
+	}
+
+	_, exists = b.nonces[account][chainID]
+	if !exists {
+		return 0
+	}
+
+	return b.nonces[account][chainID].len()
+}
+
+// implements Cacher interface that caches balance and nonce in memory.
+type cacherImpl struct {
+	cache CacheIface
+}
+
+func newCacherImpl(cache CacheIface) *cacherImpl {
+	return &cacherImpl{
+		cache: cache,
+	}
+}
+
+func (b *cacherImpl) BalanceAt(ctx context.Context, client Reader, account common.Address, blockNumber *big.Int) (*big.Int, error) {
+	cachedBalance := b.cache.GetBalance(account, client.NetworkID(), blockNumber)
+	if cachedBalance != nil {
+		return cachedBalance, nil
+	}
+
+	balance, err := client.BalanceAt(ctx, account, blockNumber)
+	if err != nil {
+		return nil, err
+	}
+	b.cache.AddBalance(account, client.NetworkID(), blockNumber, balance)
+	return balance, nil
+}
+
+func (b *cacherImpl) NonceAt(ctx context.Context, client Reader, account common.Address, blockNumber *big.Int) (*int64, error) {
+	cachedNonce := b.cache.GetNonce(account, client.NetworkID(), blockNumber)
 	if cachedNonce != nil {
 		return cachedNonce, nil
-	}
-	rangeNonce := b.findNonceInRange(account, client.NetworkID(), blockNumber)
-	if rangeNonce != nil {
-		return rangeNonce, nil
 	}
 
 	nonce, err := client.NonceAt(ctx, account, blockNumber)
@@ -287,7 +207,15 @@ func (b *Cache) NonceAt(ctx context.Context, client Reader, account common.Addre
 		return nil, err
 	}
 	int64Nonce := int64(nonce)
-	b.AddNonce(account, client.NetworkID(), blockNumber, &int64Nonce)
+	b.cache.AddNonce(account, client.NetworkID(), blockNumber, &int64Nonce)
 
 	return &int64Nonce, nil
+}
+
+func (b *cacherImpl) Clear() {
+	b.cache.Clear()
+}
+
+func (b *cacherImpl) Cache() CacheIface {
+	return b.cache
 }

@@ -286,7 +286,6 @@ func (c *controlCommand) Run(parent context.Context) error {
 		return cmnd.error
 	}
 
-	c.balanceCacher.Clear()
 	err = c.LoadTransfers(parent, numberOfBlocksCheckedPerIteration)
 	if err != nil {
 		if c.NewError(err) {
@@ -432,7 +431,7 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 
 			c.fetchedTransfers = append(c.fetchedTransfers, allTransfers...)
 
-			c.notifyOfNewTransfers(allTransfers)
+			c.notifyOfNewTransfers(blockNum, allTransfers)
 
 			log.Debug("transfersCommand block end", "chain", c.chainClient.NetworkID(), "address", c.address,
 				"block", blockNum, "tranfers.len", len(allTransfers), "fetchedTransfers.len", len(c.fetchedTransfers))
@@ -609,13 +608,14 @@ func (c *transfersCommand) processMultiTransactions(ctx context.Context, allTran
 	return nil
 }
 
-func (c *transfersCommand) notifyOfNewTransfers(transfers []Transfer) {
+func (c *transfersCommand) notifyOfNewTransfers(blockNum *big.Int, transfers []Transfer) {
 	if c.feed != nil {
 		if len(transfers) > 0 {
 			c.feed.Send(walletevent.Event{
-				Type:     EventNewTransfers,
-				Accounts: []common.Address{c.address},
-				ChainID:  c.chainClient.NetworkID(),
+				Type:        EventNewTransfers,
+				Accounts:    []common.Address{c.address},
+				ChainID:     c.chainClient.NetworkID(),
+				BlockNumber: blockNum,
 			})
 		}
 	}

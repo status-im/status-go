@@ -279,7 +279,7 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 }
 
 func (c *findBlocksCommand) blocksFound(headers []*DBHeader) {
-	c.blocksLoadedCh <- headers // TODO Use notifyOfNewBlocksLoaded instead ??
+	c.blocksLoadedCh <- headers
 }
 
 func (c *findBlocksCommand) upsertBlockRange(blockRange *BlockRange) error {
@@ -543,7 +543,6 @@ func (c *loadBlocksAndTransfersCommand) Run(parent context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		c.balanceCacher.Clear()
 		return ctx.Err()
 	case <-group.WaitAsync():
 		log.Debug("end loadBlocksAndTransfers command", "chain", c.chainClient.NetworkID(), "account", c.account)

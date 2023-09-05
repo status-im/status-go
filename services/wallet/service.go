@@ -93,18 +93,17 @@ func NewService(
 		})
 	})
 
-	balanceCache := balance.NewCache()
-
+	balanceCacher := balance.NewCacherWithTTL(5 * time.Minute)
 	tokenManager := token.NewTokenManager(db, rpcClient, rpcClient.NetworkManager)
 	savedAddressesManager := &SavedAddressesManager{db: db}
 	transactionManager := transfer.NewTransactionManager(db, gethManager, transactor, config, accountsDB, pendingTxManager, feed)
 	transferController := transfer.NewTransferController(db, rpcClient, accountFeed, feed, transactionManager, pendingTxManager,
-		tokenManager, balanceCache, config.WalletConfig.LoadAllTransfers)
+		tokenManager, balanceCacher, config.WalletConfig.LoadAllTransfers)
 	cryptoCompare := cryptocompare.NewClient()
 	coingecko := coingecko.NewClient()
 	marketManager := market.NewManager(cryptoCompare, coingecko, feed)
 	reader := NewReader(rpcClient, tokenManager, marketManager, accountsDB, NewPersistence(db), feed)
-	history := history.NewService(db, accountsDB, feed, rpcClient, tokenManager, marketManager)
+	history := history.NewService(db, accountsDB, feed, rpcClient, tokenManager, marketManager, balanceCacher.Cache())
 	currency := currency.NewService(db, feed, tokenManager, marketManager)
 	blockChainState := NewBlockChainState(rpcClient, accountsDB)
 

@@ -182,3 +182,27 @@ func TestGetNewRanges(t *testing.T) {
 	require.Equal(t, int64(50), newRange.to.Int64())
 	require.Equal(t, 4, len(d))
 }
+
+func TestInsertZeroBalance(t *testing.T) {
+	db, _, err := helpers.SetupTestSQLDB(walletdatabase.DbInitializer{}, "zero-balance")
+	require.NoError(t, err)
+
+	b := &BlockDAO{db}
+	r := &BlocksRange{
+		from: big.NewInt(0),
+		to:   big.NewInt(10),
+	}
+	nonce := uint64(199)
+	balance := big.NewInt(0)
+	account := common.Address{2}
+
+	err = b.insertRange(777, account, r.from, r.to, balance, nonce)
+	require.NoError(t, err)
+
+	block, err := b.GetLastKnownBlockByAddress(777, account)
+	require.NoError(t, err)
+
+	require.Equal(t, 0, block.Number.Cmp(r.to))
+	require.Equal(t, big.NewInt(0).Int64(), block.Balance.Int64())
+	require.Equal(t, nonce, uint64(*block.Nonce))
+}
