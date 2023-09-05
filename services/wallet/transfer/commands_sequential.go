@@ -45,14 +45,14 @@ func (c *findNewBlocksCommand) Run(parent context.Context) (err error) {
 	}
 
 	if blockRange != nil {
-		c.fromBlockNumber = new(big.Int).Add(blockRange.LastKnown, big.NewInt(1))
+		c.fromBlockNumber = blockRange.LastKnown
 
 		log.Debug("Launching new blocks command", "chainID", c.chainClient.ChainID, "account", c.account,
 			"from", c.fromBlockNumber, "headNum", headNum)
 
 		// In case interval between checks is set smaller than block mining time,
 		// we might need to wait for the next block to be mined
-		if c.fromBlockNumber.Cmp(headNum) > 0 {
+		if c.fromBlockNumber.Cmp(headNum) >= 0 {
 			return
 		}
 
