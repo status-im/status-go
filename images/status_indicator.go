@@ -10,7 +10,7 @@ import (
 	"github.com/fogleman/gg"
 )
 
-func AddStatusIndicatorToImage(inputImage []byte, innerColor color.Color, indicatorSize, indicatorBorder float64) ([]byte, error) {
+func AddStatusIndicatorToImage(inputImage []byte, innerColor color.Color, indicatorSize, indicatorBorder, indicatorCenterToEdge float64) ([]byte, error) {
 	// decode the input image
 	img, _, err := image.Decode(bytes.NewReader(inputImage))
 	if err != nil {
@@ -21,11 +21,11 @@ func AddStatusIndicatorToImage(inputImage []byte, innerColor color.Color, indica
 	width := img.Bounds().Max.X
 	height := img.Bounds().Max.Y
 
-	indicatorRadius := indicatorSize / 2
+	indicatorOuterRadius := (indicatorSize / 2) + indicatorBorder
 
 	// calculate the center point
-	x := float64(width) - indicatorRadius
-	y := float64(height) - indicatorRadius
+	x := float64(width) - indicatorCenterToEdge
+	y := float64(height) - indicatorCenterToEdge
 
 	// create a new gg.Context instance
 	dc := gg.NewContext(width, height)
@@ -33,16 +33,16 @@ func AddStatusIndicatorToImage(inputImage []byte, innerColor color.Color, indica
 
 	// Loop through each pixel in the hole and set it to transparent
 	dc.SetColor(color.Transparent)
-	for i := x - indicatorRadius; i <= x+indicatorRadius; i++ {
-		for j := y - indicatorRadius; j <= y+indicatorRadius; j++ {
-			if math.Pow(i-x, 2)+math.Pow(j-y, 2) <= math.Pow(indicatorRadius, 2) {
+	for i := x - indicatorOuterRadius; i <= x+indicatorOuterRadius; i++ {
+		for j := y - indicatorOuterRadius; j <= y+indicatorOuterRadius; j++ {
+			if math.Pow(i-x, 2)+math.Pow(j-y, 2) <= math.Pow(indicatorOuterRadius, 2) {
 				dc.SetPixel(int(i), int(j))
 			}
 		}
 	}
 
 	// draw inner circle
-	dc.DrawCircle(x, y, indicatorRadius-indicatorBorder)
+	dc.DrawCircle(x, y, indicatorOuterRadius-indicatorBorder)
 	dc.SetColor(innerColor)
 	dc.Fill()
 
