@@ -16,11 +16,11 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
-func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
+func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter, fromArchive bool) error {
 	switch msg.Type {
 	
            case protobuf.ApplicationMetadataMessage_CHAT_MESSAGE:
-		return m.handleChatMessageProtobuf(messageState, protoBytes, msg, filter)
+		return m.handleChatMessageProtobuf(messageState, protoBytes, msg, filter, fromArchive)
         
            case protobuf.ApplicationMetadataMessage_CONTACT_UPDATE:
 		return m.handleContactUpdateProtobuf(messageState, protoBytes, msg, filter)
@@ -95,7 +95,7 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
 		return m.handleCommunityRequestToJoinProtobuf(messageState, protoBytes, msg, filter)
         
            case protobuf.ApplicationMetadataMessage_PIN_MESSAGE:
-		return m.handlePinMessageProtobuf(messageState, protoBytes, msg, filter)
+		return m.handlePinMessageProtobuf(messageState, protoBytes, msg, filter, fromArchive)
         
            case protobuf.ApplicationMetadataMessage_EDIT_MESSAGE:
 		return m.handleEditMessageProtobuf(messageState, protoBytes, msg, filter)
@@ -234,7 +234,7 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
 }
 
 
-func (m *Messenger) handleChatMessageProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
+func (m *Messenger) handleChatMessageProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter, fromArchive bool) error {
 	m.logger.Info("handling ChatMessage")
 	
 
@@ -247,7 +247,7 @@ func (m *Messenger) handleChatMessageProtobuf(messageState *ReceivedMessageState
 
 	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
 
-	return m.HandleChatMessage(messageState, p, msg)
+	return m.HandleChatMessage(messageState, p, msg, fromArchive )
 	
 }
 
@@ -696,7 +696,7 @@ func (m *Messenger) handleCommunityRequestToJoinProtobuf(messageState *ReceivedM
 }
 
 
-func (m *Messenger) handlePinMessageProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
+func (m *Messenger) handlePinMessageProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter, fromArchive bool) error {
 	m.logger.Info("handling PinMessage")
 	
 
@@ -709,7 +709,7 @@ func (m *Messenger) handlePinMessageProtobuf(messageState *ReceivedMessageState,
 
 	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.Topic, filter.ChatID, msg.Type, p)
 
-	return m.HandlePinMessage(messageState, p, msg)
+	return m.HandlePinMessage(messageState, p, msg, fromArchive )
 	
 }
 
