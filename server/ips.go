@@ -15,7 +15,7 @@ var (
 )
 
 const (
-	androidPlatform = "android"
+	AndroidPlatform = "android"
 )
 
 func GetOutboundIP() (net.IP, error) {
@@ -90,7 +90,9 @@ func getAndroidLocalIP() ([][]net.IP, error) {
 // getLocalAddresses returns an array of all addresses
 // of all available network interfaces.
 func getLocalAddresses() ([][]net.IP, error) {
-	if runtime.GOOS == androidPlatform {
+	// TODO until we can resolve Android errors when calling net.Interfaces() just return the outbound local address.
+	//  Sorry Android
+	if runtime.GOOS == AndroidPlatform {
 		return getAndroidLocalIP()
 	}
 
@@ -183,12 +185,9 @@ func getAllAvailableNetworks() ([]net.IPNet, error) {
 // FindReachableAddressesForPairingClient is a high-level func
 // that returns a reachable server's address to be used by local pairing client.
 func FindReachableAddressesForPairingClient(serverIps []net.IP) ([]net.IP, error) {
-	if runtime.GOOS == androidPlatform {
-		ips, err := getAndroidLocalIP()
-		if err != nil {
-			return nil, err
-		}
-		return filterAddressesForPairingServer(ips), nil
+	// TODO until we can resolve Android errors when calling net.Interfaces() just noop. Sorry Android
+	if runtime.GOOS == AndroidPlatform {
+		return serverIps, nil
 	}
 
 	nets, err := getAllAvailableNetworks()
