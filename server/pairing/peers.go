@@ -43,6 +43,11 @@ func (p *PeerNotifier) handler(hello *peers.LocalPairingPeerHello) {
 }
 
 func (p *PeerNotifier) Search() error {
+	// TODO until we can resolve Android errors when calling net.Interfaces() just noop. Sorry Android
+	if runtime.GOOS == server.AndroidPlatform {
+		return nil
+	}
+
 	dn, err := server.GetDeviceName()
 	if err != nil {
 		return err
