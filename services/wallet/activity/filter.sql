@@ -27,6 +27,7 @@ WITH filter_conditions AS (
 		? AS filterActivityTypeReceive,
 		? AS filterActivityTypeContractDeployment,
 		? AS filterActivityTypeMint,
+		? AS mTTypeSend,
 		? AS fromTrType,
 		? AS toTrType,
 		? AS filterAllAddresses,
@@ -184,7 +185,7 @@ SELECT
 FROM
 	transfers,
 	filter_conditions
-	LEFT JOIN filter_addresses from_join ON HEX(transfers.tx_from_address) = from_join.address
+	LEFT JOIN filter_addresses from_join ON HEX(transfers.address) = from_join.address
 	LEFT JOIN filter_addresses to_join ON HEX(transfers.tx_to_address) = to_join.address
 WHERE
 	transfers.loaded == 1
@@ -206,10 +207,17 @@ WHERE
 			filterActivityTypeSend
 			AND (
 				filterAllAddresses
-				OR (HEX(transfers.tx_from_address) IN filter_addresses)
+				OR (
+					HEX(transfers.tx_from_address) IN filter_addresses
+				)
 			)
-			AND NOT (tr_type = fromTrType and transfers.tx_to_address IS NULL AND transfers.type = "eth" 
-			AND transfers.contract_address IS NOT NULL AND HEX(transfers.contract_address) != zeroAddress)
+			AND NOT (
+				tr_type = fromTrType
+				and transfers.tx_to_address IS NULL
+				AND transfers.type = "eth"
+				AND transfers.contract_address IS NOT NULL
+				AND HEX(transfers.contract_address) != zeroAddress
+			)
 		)
 		OR (
 			filterActivityTypeReceive
@@ -217,14 +225,22 @@ WHERE
 				filterAllAddresses
 				OR (HEX(transfers.tx_to_address) IN filter_addresses)
 			)
-			AND NOT (tr_type = toTrType AND transfers.type = "erc721" AND (
-				transfers.tx_from_address IS NULL 
-				OR HEX(transfers.tx_from_address) = zeroAddress))
+			AND NOT (
+				tr_type = toTrType
+				AND transfers.type = "erc721"
+				AND (
+					transfers.tx_from_address IS NULL
+					OR HEX(transfers.tx_from_address) = zeroAddress
+				)
+			)
 		)
 		OR (
 			filterActivityTypeContractDeployment
-			AND tr_type = fromTrType AND transfers.tx_to_address IS NULL AND transfers.type = "eth" 
-			AND transfers.contract_address IS NOT NULL AND HEX(transfers.contract_address) != zeroAddress
+			AND tr_type = fromTrType
+			AND transfers.tx_to_address IS NULL
+			AND transfers.type = "eth"
+			AND transfers.contract_address IS NOT NULL
+			AND HEX(transfers.contract_address) != zeroAddress
 			AND (
 				filterAllAddresses
 				OR (HEX(transfers.address) IN filter_addresses)
@@ -232,10 +248,13 @@ WHERE
 		)
 		OR (
 			filterActivityTypeMint
-			AND tr_type = toTrType AND transfers.type = "erc721" AND (
-				transfers.tx_from_address IS NULL 
+			AND tr_type = toTrType
+			AND transfers.type = "erc721"
+			AND (
+				transfers.tx_from_address IS NULL
 				OR HEX(transfers.tx_from_address) = zeroAddress
-			) AND (
+			)
+			AND (
 				filterAllAddresses
 				OR (HEX(transfers.address) IN filter_addresses)
 			)
@@ -243,10 +262,7 @@ WHERE
 	)
 	AND (
 		filterAllAddresses
-		OR (
-			HEX(transfers.tx_from_address) IN filter_addresses
-		)
-		OR (HEX(transfers.tx_to_address) IN filter_addresses)
+		OR (HEX(owner_address) IN filter_addresses)
 	)
 	AND (
 		filterAllToAddresses
@@ -391,7 +407,7 @@ SELECT
 	NULL as tr_type,
 	multi_transactions.from_address AS from_address,
 	multi_transactions.to_address AS to_address,
-	NULL AS owner_address,
+	multi_transactions.from_address AS owner_address,
 	NULL AS tr_amount,
 	multi_transactions.from_amount AS mt_from_amount,
 	multi_transactions.to_amount AS mt_to_amount,
@@ -434,10 +450,16 @@ WHERE
 	AND (
 		filterAllAddresses
 		OR (
-			HEX(multi_transactions.from_address) IN filter_addresses
+			-- Send multi-transaction types are exclusively for outbound transfers. The receiving end will have a corresponding entry as "owner_address" in the transfers table.
+			mt_type = mTTypeSend
+			AND HEX(owner_address) IN filter_addresses
 		)
 		OR (
-			HEX(multi_transactions.to_address) IN filter_addresses
+			mt_type != mTTypeSend
+			AND (
+				HEX(multi_transactions.from_address) IN filter_addresses
+				OR HEX(multi_transactions.to_address) IN filter_addresses
+			)
 		)
 	)
 	AND (
