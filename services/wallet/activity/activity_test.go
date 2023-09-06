@@ -219,18 +219,18 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		transaction:    &transfer.TransactionIdentity{ChainID: td.tr1.ChainID, Hash: td.tr1.Hash, Address: td.tr1.To},
 		id:             td.tr1.MultiTransactionID,
 		timestamp:      td.tr1.Timestamp,
-		activityType:   SendAT,
+		activityType:   ReceiveAT,
 		activityStatus: CompleteAS,
-		amountOut:      (*hexutil.Big)(big.NewInt(td.tr1.Value)),
-		amountIn:       (*hexutil.Big)(big.NewInt(0)),
-		tokenOut:       TTrToToken(t, &td.tr1.TestTransaction),
-		tokenIn:        nil,
-		symbolOut:      common.NewAndSet("ETH"),
-		symbolIn:       nil,
+		amountOut:      (*hexutil.Big)(big.NewInt(0)),
+		amountIn:       (*hexutil.Big)(big.NewInt(td.tr1.Value)),
+		tokenOut:       nil,
+		tokenIn:        TTrToToken(t, &td.tr1.TestTransaction),
+		symbolOut:      nil,
+		symbolIn:       common.NewAndSet("ETH"),
 		sender:         &td.tr1.From,
 		recipient:      &td.tr1.To,
-		chainIDOut:     &td.tr1.ChainID,
-		chainIDIn:      nil,
+		chainIDOut:     nil,
+		chainIDIn:      &td.tr1.ChainID,
 		transferType:   expectedTokenType(td.tr1.Token.Address),
 	}, entries[3])
 	require.Equal(t, Entry{
@@ -286,8 +286,10 @@ func TestGetActivityEntriesAll(t *testing.T) {
 	}, entries[0])
 }
 
-// TestGetActivityEntriesWithSenderFilter covers the issue with returning the same transaction
-// twice when the sender and receiver have entries in the transfers table
+// TestGetActivityEntriesWithSenderFilter covers the corner-case of having both sender and receiver in the filter.
+// In this specific case we expect that there will be two transactions (one probably backed by a multi-transaction)
+// In case of both sender and receiver are included we validate we receive both entries otherwise only the "owned"
+// transactions should be retrieved by the filter
 func TestGetActivityEntriesWithSameTransactionForSenderAndReceiverInDB(t *testing.T) {
 	deps, close := setupTestActivityDB(t)
 	defer close()
@@ -297,39 +299,28 @@ func TestGetActivityEntriesWithSameTransactionForSenderAndReceiverInDB(t *testin
 
 	mockTestAccountsWithAddresses(t, deps.accountsDb, append(fromAddresses, toAddresses...))
 
-	// Add another transaction with sender and receiver reversed
-	receiverTr := td.tr1
-	prevTo := receiverTr.To
-	receiverTr.To = td.tr1.From
-	receiverTr.From = prevTo
-
-	// TODO: test also when there is a transaction in the other direction
-
-	// Ensure they are the oldest transactions (last in the list) and we have a consistent order
-	receiverTr.Timestamp--
-	transfer.InsertTestTransfer(t, deps.db, receiverTr.To, &receiverTr)
+	// Add another transaction with owner reversed
+	senderTr := td.tr1
+	// Ensure we have a consistent order
+	senderTr.Timestamp++
+	// add sender as owner, fillTestData adds receiver as owner
+	transfer.InsertTestTransfer(t, deps.db, senderTr.From, &senderTr)
 
 	var filter Filter
-	entries, err := getActivityEntries(context.Background(), deps, []eth.Address{td.tr1.From, receiverTr.From}, []common.ChainID{}, filter, 0, 10)
+	entries, err := getActivityEntries(context.Background(), deps, []eth.Address{td.tr1.To, senderTr.From}, []common.ChainID{}, filter, 0, 10)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(entries))
 
 	// Check that the transaction are labeled alternatively as send and receive
-	require.Equal(t, ReceiveAT, entries[1].activityType)
-	require.NotEqual(t, eth.Address{}, entries[1].transaction.Address)
-	require.Equal(t, receiverTr.To, entries[1].transaction.Address)
-
 	require.Equal(t, SendAT, entries[0].activityType)
-	require.NotEqual(t, eth.Address{}, entries[0].transaction.Address)
-	require.Equal(t, td.tr1.To, *entries[0].recipient)
+	require.Equal(t, senderTr.From, entries[0].transaction.Address)
+	require.Equal(t, senderTr.From, *entries[0].sender)
+	require.Equal(t, senderTr.To, *entries[0].recipient)
 
-	entries, err = getActivityEntries(context.Background(), deps, []eth.Address{}, []common.ChainID{}, filter, 0, 10)
-	require.NoError(t, err)
-	require.Equal(t, 5, len(entries))
-
-	// Check that the transaction are labeled alternatively as send and receive
-	require.Equal(t, ReceiveAT, entries[4].activityType)
-	require.Equal(t, SendAT, entries[3].activityType)
+	require.Equal(t, ReceiveAT, entries[1].activityType)
+	require.Equal(t, td.tr1.To, *entries[1].recipient)
+	require.Equal(t, td.tr1.From, *entries[1].sender)
+	require.Equal(t, td.tr1.To, *entries[1].recipient)
 }
 
 func TestGetActivityEntriesFilterByTime(t *testing.T) {
@@ -360,18 +351,18 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		transaction:    &transfer.TransactionIdentity{ChainID: trs[5].ChainID, Hash: trs[5].Hash, Address: trs[5].To},
 		id:             0,
 		timestamp:      trs[5].Timestamp,
-		activityType:   SendAT,
+		activityType:   ReceiveAT,
 		activityStatus: CompleteAS,
-		amountOut:      (*hexutil.Big)(big.NewInt(trs[5].Value)),
-		amountIn:       (*hexutil.Big)(big.NewInt(0)),
-		tokenOut:       TTrToToken(t, &trs[5].TestTransaction),
-		tokenIn:        nil,
-		symbolOut:      common.NewAndSet("USDC"),
-		symbolIn:       nil,
+		amountOut:      (*hexutil.Big)(big.NewInt(0)),
+		amountIn:       (*hexutil.Big)(big.NewInt(trs[5].Value)),
+		tokenOut:       nil,
+		tokenIn:        TTrToToken(t, &trs[5].TestTransaction),
+		symbolOut:      nil,
+		symbolIn:       common.NewAndSet("USDC"),
 		sender:         &trs[5].From,
 		recipient:      &trs[5].To,
-		chainIDOut:     &trs[5].ChainID,
-		chainIDIn:      nil,
+		chainIDOut:     nil,
+		chainIDIn:      &trs[5].ChainID,
 		transferType:   expectedTokenType(trs[5].Token.Address),
 	}, entries[0])
 	require.Equal(t, Entry{
@@ -406,18 +397,18 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		transaction:    &transfer.TransactionIdentity{ChainID: trs[2].ChainID, Hash: trs[2].Hash, Address: trs[2].To},
 		id:             0,
 		timestamp:      trs[2].Timestamp,
-		activityType:   SendAT,
+		activityType:   ReceiveAT,
 		activityStatus: CompleteAS,
-		amountOut:      (*hexutil.Big)(big.NewInt(trs[2].Value)),
-		amountIn:       (*hexutil.Big)(big.NewInt(0)),
-		tokenOut:       TTrToToken(t, &trs[2].TestTransaction),
-		tokenIn:        nil,
-		symbolOut:      common.NewAndSet("ETH"),
-		symbolIn:       nil,
+		amountOut:      (*hexutil.Big)(big.NewInt(0)),
+		amountIn:       (*hexutil.Big)(big.NewInt(trs[2].Value)),
+		tokenOut:       nil,
+		tokenIn:        TTrToToken(t, &trs[2].TestTransaction),
+		symbolOut:      nil,
+		symbolIn:       common.NewAndSet("ETH"),
 		sender:         &trs[2].From,
 		recipient:      &trs[2].To,
-		chainIDOut:     &trs[2].ChainID,
-		chainIDIn:      nil,
+		chainIDOut:     nil,
+		chainIDIn:      &trs[2].ChainID,
 		transferType:   expectedTokenType(trs[2].Token.Address),
 	}, entries[0])
 	require.Equal(t, Entry{
@@ -451,18 +442,18 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		transaction:    &transfer.TransactionIdentity{ChainID: trs[2].ChainID, Hash: trs[2].Hash, Address: trs[2].To},
 		id:             0,
 		timestamp:      trs[2].Timestamp,
-		activityType:   SendAT,
+		activityType:   ReceiveAT,
 		activityStatus: CompleteAS,
-		amountOut:      (*hexutil.Big)(big.NewInt(trs[2].Value)),
-		amountIn:       (*hexutil.Big)(big.NewInt(0)),
-		tokenOut:       TTrToToken(t, &trs[2].TestTransaction),
-		tokenIn:        nil,
-		symbolOut:      common.NewAndSet("ETH"),
-		symbolIn:       nil,
+		amountOut:      (*hexutil.Big)(big.NewInt(0)),
+		amountIn:       (*hexutil.Big)(big.NewInt(trs[2].Value)),
+		tokenOut:       nil,
+		tokenIn:        TTrToToken(t, &trs[2].TestTransaction),
+		symbolOut:      nil,
+		symbolIn:       common.NewAndSet("ETH"),
 		sender:         &trs[2].From,
 		recipient:      &trs[2].To,
-		chainIDOut:     &trs[2].ChainID,
-		chainIDIn:      nil,
+		chainIDOut:     nil,
+		chainIDIn:      &trs[2].ChainID,
 		transferType:   expectedTokenType(trs[2].Token.Address),
 	}, entries[0])
 	require.Equal(t, Entry{
@@ -470,18 +461,18 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		transaction:    &transfer.TransactionIdentity{ChainID: td.tr1.ChainID, Hash: td.tr1.Hash, Address: td.tr1.To},
 		id:             0,
 		timestamp:      td.tr1.Timestamp,
-		activityType:   SendAT,
+		activityType:   ReceiveAT,
 		activityStatus: CompleteAS,
-		amountOut:      (*hexutil.Big)(big.NewInt(td.tr1.Value)),
-		amountIn:       (*hexutil.Big)(big.NewInt(0)),
-		tokenOut:       TTrToToken(t, &td.tr1.TestTransaction),
-		tokenIn:        nil,
-		symbolOut:      common.NewAndSet("ETH"),
-		symbolIn:       nil,
+		amountOut:      (*hexutil.Big)(big.NewInt(0)),
+		amountIn:       (*hexutil.Big)(big.NewInt(td.tr1.Value)),
+		tokenOut:       nil,
+		tokenIn:        TTrToToken(t, &td.tr1.TestTransaction),
+		symbolOut:      nil,
+		symbolIn:       common.NewAndSet("ETH"),
 		sender:         &td.tr1.From,
 		recipient:      &td.tr1.To,
-		chainIDOut:     &td.tr1.ChainID,
-		chainIDIn:      nil,
+		chainIDOut:     nil,
+		chainIDIn:      &td.tr1.ChainID,
 		transferType:   expectedTokenType(td.tr1.Token.Address),
 	}, entries[6])
 }
@@ -516,18 +507,18 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		transaction:    &transfer.TransactionIdentity{ChainID: trs[8].ChainID, Hash: trs[8].Hash, Address: trs[8].To},
 		id:             0,
 		timestamp:      trs[8].Timestamp,
-		activityType:   SendAT,
+		activityType:   ReceiveAT,
 		activityStatus: CompleteAS,
-		amountOut:      (*hexutil.Big)(big.NewInt(trs[8].Value)),
-		amountIn:       (*hexutil.Big)(big.NewInt(0)),
-		tokenOut:       TTrToToken(t, &trs[8].TestTransaction),
-		tokenIn:        nil,
-		symbolOut:      common.NewAndSet("ETH"),
-		symbolIn:       nil,
+		amountOut:      (*hexutil.Big)(big.NewInt(0)),
+		amountIn:       (*hexutil.Big)(big.NewInt(trs[8].Value)),
+		tokenOut:       nil,
+		tokenIn:        TTrToToken(t, &trs[8].TestTransaction),
+		symbolOut:      nil,
+		symbolIn:       common.NewAndSet("ETH"),
 		sender:         &trs[8].From,
 		recipient:      &trs[8].To,
-		chainIDOut:     &trs[8].ChainID,
-		chainIDIn:      nil,
+		chainIDOut:     nil,
+		chainIDIn:      &trs[8].ChainID,
 		transferType:   expectedTokenType(trs[8].Token.Address),
 	}, entries[0])
 	require.Equal(t, Entry{
@@ -535,18 +526,18 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		transaction:    &transfer.TransactionIdentity{ChainID: trs[6].ChainID, Hash: trs[6].Hash, Address: trs[6].To},
 		id:             0,
 		timestamp:      trs[6].Timestamp,
-		activityType:   SendAT,
+		activityType:   ReceiveAT,
 		activityStatus: CompleteAS,
-		amountOut:      (*hexutil.Big)(big.NewInt(trs[6].Value)),
-		amountIn:       (*hexutil.Big)(big.NewInt(0)),
-		tokenOut:       TTrToToken(t, &trs[6].TestTransaction),
-		tokenIn:        nil,
-		symbolOut:      common.NewAndSet("DAI"),
-		symbolIn:       nil,
+		amountOut:      (*hexutil.Big)(big.NewInt(0)),
+		amountIn:       (*hexutil.Big)(big.NewInt(trs[6].Value)),
+		tokenOut:       nil,
+		tokenIn:        TTrToToken(t, &trs[6].TestTransaction),
+		symbolOut:      nil,
+		symbolIn:       common.NewAndSet("DAI"),
 		sender:         &trs[6].From,
 		recipient:      &trs[6].To,
-		chainIDOut:     &trs[6].ChainID,
-		chainIDIn:      nil,
+		chainIDOut:     nil,
+		chainIDIn:      &trs[6].ChainID,
 		transferType:   expectedTokenType(trs[6].Token.Address),
 	}, entries[2])
 
@@ -560,18 +551,18 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		transaction:    &transfer.TransactionIdentity{ChainID: trs[6].ChainID, Hash: trs[6].Hash, Address: trs[6].To},
 		id:             0,
 		timestamp:      trs[6].Timestamp,
-		activityType:   SendAT,
+		activityType:   ReceiveAT,
 		activityStatus: CompleteAS,
-		amountOut:      (*hexutil.Big)(big.NewInt(trs[6].Value)),
-		amountIn:       (*hexutil.Big)(big.NewInt(0)),
-		tokenOut:       TTrToToken(t, &trs[6].TestTransaction),
-		tokenIn:        nil,
-		symbolOut:      common.NewAndSet("DAI"),
-		symbolIn:       nil,
+		amountOut:      (*hexutil.Big)(big.NewInt(0)),
+		amountIn:       (*hexutil.Big)(big.NewInt(trs[6].Value)),
+		tokenOut:       nil,
+		tokenIn:        TTrToToken(t, &trs[6].TestTransaction),
+		symbolOut:      nil,
+		symbolIn:       common.NewAndSet("DAI"),
 		sender:         &trs[6].From,
 		recipient:      &trs[6].To,
-		chainIDOut:     &trs[6].ChainID,
-		chainIDIn:      nil,
+		chainIDOut:     nil,
+		chainIDIn:      &trs[6].ChainID,
 		transferType:   expectedTokenType(trs[6].Token.Address),
 	}, entries[0])
 	require.Equal(t, Entry{
@@ -579,18 +570,18 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		transaction:    &transfer.TransactionIdentity{ChainID: trs[4].ChainID, Hash: trs[4].Hash, Address: trs[4].To},
 		id:             0,
 		timestamp:      trs[4].Timestamp,
-		activityType:   SendAT,
+		activityType:   ReceiveAT,
 		activityStatus: CompleteAS,
-		amountOut:      (*hexutil.Big)(big.NewInt(trs[4].Value)),
-		amountIn:       (*hexutil.Big)(big.NewInt(0)),
-		tokenOut:       TTrToToken(t, &trs[4].TestTransaction),
-		tokenIn:        nil,
-		symbolOut:      common.NewAndSet("USDC"),
-		symbolIn:       nil,
+		amountOut:      (*hexutil.Big)(big.NewInt(0)),
+		amountIn:       (*hexutil.Big)(big.NewInt(trs[4].Value)),
+		tokenOut:       nil,
+		tokenIn:        TTrToToken(t, &trs[4].TestTransaction),
+		symbolOut:      nil,
+		symbolIn:       common.NewAndSet("USDC"),
 		sender:         &trs[4].From,
 		recipient:      &trs[4].To,
-		chainIDOut:     &trs[4].ChainID,
-		chainIDIn:      nil,
+		chainIDOut:     nil,
+		chainIDIn:      &trs[4].ChainID,
 		transferType:   expectedTokenType(trs[4].Token.Address),
 	}, entries[2])
 
@@ -604,18 +595,18 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		transaction:    &transfer.TransactionIdentity{ChainID: trs[2].ChainID, Hash: trs[2].Hash, Address: trs[2].To},
 		id:             0,
 		timestamp:      trs[2].Timestamp,
-		activityType:   SendAT,
+		activityType:   ReceiveAT,
 		activityStatus: CompleteAS,
-		amountOut:      (*hexutil.Big)(big.NewInt(trs[2].Value)),
-		amountIn:       (*hexutil.Big)(big.NewInt(0)),
-		tokenOut:       TTrToToken(t, &trs[2].TestTransaction),
-		tokenIn:        nil,
-		symbolOut:      common.NewAndSet("USDC"),
-		symbolIn:       nil,
+		amountOut:      (*hexutil.Big)(big.NewInt(0)),
+		amountIn:       (*hexutil.Big)(big.NewInt(trs[2].Value)),
+		tokenOut:       nil,
+		tokenIn:        TTrToToken(t, &trs[2].TestTransaction),
+		symbolOut:      nil,
+		symbolIn:       common.NewAndSet("USDC"),
 		sender:         &trs[2].From,
 		recipient:      &trs[2].To,
-		chainIDOut:     &trs[2].ChainID,
-		chainIDIn:      nil,
+		chainIDOut:     nil,
+		chainIDIn:      &trs[2].ChainID,
 		transferType:   expectedTokenType(trs[2].Token.Address),
 	}, entries[0])
 }
@@ -753,7 +744,7 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 	td, fromTds, toTds := fillTestData(t, deps.db)
 	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 6)
 	for i := range trs {
-		transfer.InsertTestTransfer(t, deps.db, trs[i].To, &trs[i])
+		transfer.InsertTestTransfer(t, deps.db, trs[i].From, &trs[i])
 	}
 
 	mockTestAccountsWithAddresses(t, deps.accountsDb, append(append(append(fromTds, toTds...), fromTrs...), toTrs...))
@@ -765,32 +756,33 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 10, len(entries))
 
-	addressesFilter = []eth.Address{td.multiTx2.ToAddress, trs[1].From, trs[4].To}
+	addressesFilter = []eth.Address{td.multiTx1.ToAddress, td.multiTx2.FromAddress, trs[1].From, trs[4].From, trs[3].To}
+	// The td.multiTx1.ToAddress and trs[3].To are missing not having them as owner address
 	entries, err = getActivityEntries(context.Background(), deps, addressesFilter, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(entries))
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: trs[4].ChainID, Hash: trs[4].Hash, Address: trs[4].To},
+		transaction:    &transfer.TransactionIdentity{ChainID: trs[4].ChainID, Hash: trs[4].Hash, Address: trs[4].From},
 		id:             0,
 		timestamp:      trs[4].Timestamp,
-		activityType:   ReceiveAT,
+		activityType:   SendAT,
 		activityStatus: CompleteAS,
-		amountOut:      (*hexutil.Big)(big.NewInt(0)),
-		amountIn:       (*hexutil.Big)(big.NewInt(trs[4].Value)),
-		tokenOut:       nil,
-		tokenIn:        TTrToToken(t, &trs[4].TestTransaction),
-		symbolOut:      nil,
-		symbolIn:       common.NewAndSet("USDC"),
+		amountOut:      (*hexutil.Big)(big.NewInt(trs[4].Value)),
+		amountIn:       (*hexutil.Big)(big.NewInt(0)),
+		tokenOut:       TTrToToken(t, &trs[4].TestTransaction),
+		tokenIn:        nil,
+		symbolOut:      common.NewAndSet("USDC"),
+		symbolIn:       nil,
 		sender:         &trs[4].From,
 		recipient:      &trs[4].To,
-		chainIDOut:     nil,
-		chainIDIn:      &trs[4].ChainID,
+		chainIDOut:     &trs[4].ChainID,
+		chainIDIn:      nil,
 		transferType:   expectedTokenType(trs[4].Token.Address),
 	}, entries[0])
 	require.Equal(t, Entry{
 		payloadType:    SimpleTransactionPT,
-		transaction:    &transfer.TransactionIdentity{ChainID: trs[1].ChainID, Hash: trs[1].Hash, Address: trs[1].To},
+		transaction:    &transfer.TransactionIdentity{ChainID: trs[1].ChainID, Hash: trs[1].Hash, Address: trs[1].From},
 		id:             0,
 		timestamp:      trs[1].Timestamp,
 		activityType:   SendAT,
@@ -937,9 +929,9 @@ func TestGetActivityEntriesFilterByTokenType(t *testing.T) {
 	require.NoError(t, err)
 	// Two MT for which ChainID is ignored and one transfer on the main net and the Goerli is ignored
 	require.Equal(t, 3, len(entries))
-	require.Equal(t, Erc20, entries[0].tokenOut.TokenType)
-	require.Equal(t, transfer.UsdcMainnet.Address, entries[0].tokenOut.Address)
-	require.Nil(t, entries[0].tokenIn)
+	require.Equal(t, Erc20, entries[0].tokenIn.TokenType)
+	require.Equal(t, transfer.UsdcMainnet.Address, entries[0].tokenIn.Address)
+	require.Nil(t, entries[0].tokenOut)
 	// MT has only symbol, the first token is lookup by symbol for both entries
 	require.Equal(t, Erc20, entries[1].tokenOut.TokenType)
 	require.Equal(t, transfer.UsdcMainnet.Address, entries[1].tokenOut.Address)
@@ -963,9 +955,9 @@ func TestGetActivityEntriesFilterByTokenType(t *testing.T) {
 	require.NoError(t, err)
 	// Two MT for which ChainID is ignored and two transfers on the main net and Goerli
 	require.Equal(t, 4, len(entries))
-	require.Equal(t, Erc20, entries[0].tokenOut.TokenType)
-	require.Equal(t, transfer.UsdcGoerli.Address, entries[0].tokenOut.Address)
-	require.Nil(t, entries[0].tokenIn)
+	require.Equal(t, Erc20, entries[0].tokenIn.TokenType)
+	require.Equal(t, transfer.UsdcGoerli.Address, entries[0].tokenIn.Address)
+	require.Nil(t, entries[0].tokenOut)
 }
 
 func TestGetActivityEntriesFilterByToAddresses(t *testing.T) {
@@ -1138,19 +1130,19 @@ func TestGetActivityEntriesCheckToAndFrom(t *testing.T) {
 	transfer.InsertTestTransfer(t, deps.db, trs[0].To, &trs[0])
 	transfer.InsertTestPendingTransaction(t, deps.db, &trs[1])
 
-	addresses := []eth.Address{td.tr1.From, td.pendingTr.From,
-		td.multiTx1.FromAddress, td.multiTx2.ToAddress, trs[0].To, trs[1].To}
+	addresses := []eth.Address{td.tr1.To, td.pendingTr.To,
+		td.multiTx1.FromAddress, td.multiTx2.FromAddress, trs[0].To, trs[1].To}
 
 	var filter Filter
 	entries, err := getActivityEntries(context.Background(), deps, addresses, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 6, len(entries))
 
-	require.Equal(t, SendAT, entries[5].activityType)                  // td.tr1
+	require.Equal(t, ReceiveAT, entries[5].activityType)               // td.tr1
 	require.NotEqual(t, eth.Address{}, entries[5].transaction.Address) // td.tr1
 	require.Equal(t, td.tr1.To, *entries[5].recipient)                 // td.tr1
 
-	require.Equal(t, SendAT, entries[4].activityType) // td.pendingTr
+	require.Equal(t, ReceiveAT, entries[4].activityType) // td.pendingTr
 
 	// Multi-transactions are always considered as SendAT
 	require.Equal(t, SendAT, entries[3].activityType) // td.multiTx1
@@ -1161,9 +1153,6 @@ func TestGetActivityEntriesCheckToAndFrom(t *testing.T) {
 	require.Equal(t, trs[0].To, entries[1].transaction.Address)        // trs[0]
 
 	require.Equal(t, ReceiveAT, entries[0].activityType) // trs[1] (pending)
-
-	// TODO: add accounts to DB for proper detection of sender/receiver
-	// TODO: Test with all addresses
 }
 
 func TestGetActivityEntriesCheckContextCancellation(t *testing.T) {

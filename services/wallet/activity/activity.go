@@ -421,6 +421,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		startFilterDisabled, filter.Period.StartTimestamp, endFilterDisabled, filter.Period.EndTimestamp,
 		filterActivityTypeAll, sliceContains(filter.Types, SendAT), sliceContains(filter.Types, ReceiveAT),
 		sliceContains(filter.Types, ContractDeploymentAT), sliceContains(filter.Types, MintAT),
+		transfer.MultiTransactionSend,
 		fromTrType, toTrType,
 		filterAllAddresses, filterAllToAddresses,
 		includeAllStatuses, filterStatusCompleted, filterStatusFailed, filterStatusFinalized, filterStatusPending,

@@ -2,7 +2,7 @@ package transfer
 
 import (
 	"context"
-	"fmt"
+	"database/sql"
 	"math/big"
 	"strings"
 	"time"
@@ -452,24 +452,63 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 	return nil
 }
 
+// saveAndConfirmPending ensures only the transaction that has owner (Address) as a sender is matched to the
+// corresponding multi-transaction (by multi-transaction ID). This way we ensure that if receiver is in the list
+// of accounts filter will discard the proper one
 func (c *transfersCommand) saveAndConfirmPending(allTransfers []Transfer, blockNum *big.Int) error {
-	tx, err := c.db.client.Begin()
-	if err != nil {
-		return err
+	tx, resErr := c.db.client.Begin()
+	if resErr != nil {
+		return resErr
 	}
-
 	notifyFunctions := make([]func(), 0)
-	// Confirm all pending transactions that are included in this block
-	for i, transfer := range allTransfers {
-		txType, MTID, err := transactions.GetTransferData(tx, w_common.ChainID(transfer.NetworkID), transfer.Receipt.TxHash)
-		if err != nil {
-			log.Error("GetTransferData error", "error", err)
+	defer func() {
+		if resErr == nil {
+			commitErr := tx.Commit()
+			if commitErr != nil {
+				log.Error("failed to commit", "error", commitErr)
+			}
+			for _, notify := range notifyFunctions {
+				notify()
+			}
+		} else {
+			rollbackErr := tx.Rollback()
+			if rollbackErr != nil {
+				log.Error("failed to rollback", "error", rollbackErr)
+			}
 		}
-		if MTID != nil {
-			allTransfers[i].MultiTransactionID = MultiTransactionIDType(*MTID)
+	}()
+
+	// Confirm all pending transactions that are included in this block
+	for i, tr := range allTransfers {
+		chainID := w_common.ChainID(tr.NetworkID)
+		txHash := tr.Receipt.TxHash
+		txType, mTID, err := transactions.GetOwnedPendingStatus(tx, chainID, txHash, tr.Address)
+		if err == sql.ErrNoRows {
+			if tr.MultiTransactionID > 0 {
+				continue
+			} else {
+				// Outside transaction, already confirmed by another duplicate or not yet downloaded
+				existingMTID, err := GetOwnedMultiTransactionID(tx, chainID, tr.ID, tr.Address)
+				if err == sql.ErrNoRows || existingMTID == 0 {
+					// Outside transaction, ignore it
+					continue
+				} else if err != nil {
+					log.Warn("GetOwnedMultiTransactionID", "error", err)
+					continue
+				}
+				mTID = w_common.NewAndSet(existingMTID)
+
+			}
+		} else if err != nil {
+			log.Warn("GetOwnedPendingStatus", "error", err)
+			continue
+		}
+
+		if mTID != nil {
+			allTransfers[i].MultiTransactionID = MultiTransactionIDType(*mTID)
 		}
 		if txType != nil && *txType == transactions.WalletTransfer {
-			notify, err := c.pendingTxManager.DeleteBySQLTx(tx, w_common.ChainID(transfer.NetworkID), transfer.Receipt.TxHash)
+			notify, err := c.pendingTxManager.DeleteBySQLTx(tx, chainID, txHash)
 			if err != nil && err != transactions.ErrStillPending {
 				log.Error("DeleteBySqlTx error", "error", err)
 			}
@@ -477,27 +516,12 @@ func (c *transfersCommand) saveAndConfirmPending(allTransfers []Transfer, blockN
 		}
 	}
 
-	err = saveTransfersMarkBlocksLoaded(tx, c.chainClient.ChainID, c.address, allTransfers, []*big.Int{blockNum})
-	if err != nil {
-		log.Error("SaveTransfers error", "error", err)
-		return err
+	resErr = saveTransfersMarkBlocksLoaded(tx, c.chainClient.ChainID, c.address, allTransfers, []*big.Int{blockNum})
+	if resErr != nil {
+		log.Error("SaveTransfers error", "error", resErr)
 	}
 
-	if err == nil {
-		err = tx.Commit()
-		if err != nil {
-			return err
-		}
-		for _, notify := range notifyFunctions {
-			notify()
-		}
-	} else {
-		err = tx.Rollback()
-		if err != nil {
-			return fmt.Errorf("failed to rollback: %w", err)
-		}
-	}
-	return nil
+	return resErr
 }
 
 // Mark all subTxs of a given Tx with the same multiTxID

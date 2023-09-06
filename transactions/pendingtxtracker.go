@@ -561,15 +561,16 @@ func (tm *PendingTxTracker) DeleteBySQLTx(tx *sql.Tx, chainID common.ChainID, ha
 	}, err
 }
 
-func GetTransferData(tx *sql.Tx, chainID common.ChainID, hash eth.Hash) (txType *PendingTrxType, MTID *int64, err error) {
-	row := tx.QueryRow(`SELECT type, multi_transaction_id FROM pending_transactions WHERE network_id = ? AND hash = ?`, chainID, hash, txType)
+// GetOwnedPendingStatus returns sql.ErrNoRows if no pending transaction is found for the given identity
+func GetOwnedPendingStatus(tx *sql.Tx, chainID common.ChainID, hash eth.Hash, ownerAddress eth.Address) (txType *PendingTrxType, mTID *int64, err error) {
+	row := tx.QueryRow(`SELECT type, multi_transaction_id FROM pending_transactions WHERE network_id = ? AND hash = ? AND from_address = ?`, chainID, hash, ownerAddress)
 	txType = new(PendingTrxType)
-	MTID = new(int64)
-	err = row.Scan(txType, MTID)
+	mTID = new(int64)
+	err = row.Scan(txType, mTID)
 	if err != nil {
 		return nil, nil, err
 	}
-	return txType, MTID, nil
+	return txType, mTID, nil
 }
 
 // Watch returns sql.ErrNoRows if no pending transaction is found for the given identity
