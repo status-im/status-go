@@ -1304,6 +1304,14 @@ func decodeWrappedCommunityDescription(wrappedDescriptionBytes []byte) (*protobu
 		return nil, err
 	}
 
+	// TODO: Since there has been a change in compatibility between old and new communities,
+	// we need a more reliable way to determine if a community is old or not.
+	for _, chat := range description.Chats {
+		if len(chat.Members) == 0 {
+			chat.Members = description.Members
+		}
+	}
+
 	return description, nil
 }
 
