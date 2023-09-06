@@ -82,10 +82,10 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 
 	start := time.Now()
 	if c.from.Number != nil && c.from.Balance != nil {
-		c.balanceCacher.Cache().AddBalance(c.address, c.from.Number, c.from.Balance)
+		c.balanceCacher.Cache().AddBalance(c.address, c.chainClient.ChainID, c.from.Number, c.from.Balance)
 	}
 	if c.from.Number != nil && c.from.Nonce != nil {
-		c.balanceCacher.Cache().AddNonce(c.address, c.from.Number, c.from.Nonce)
+		c.balanceCacher.Cache().AddNonce(c.address, c.chainClient.ChainID, c.from.Number, c.from.Nonce)
 	}
 	from, headers, startBlock, err := findBlocksWithEthTransfers(ctx, c.chainClient,
 		c.balanceCacher, c.address, c.from.Number, c.to, c.noLimit, c.threadLimit)
@@ -301,6 +301,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 			event := walletevent.Event{
 				Type:     EventNewTransfers,
 				Accounts: []common.Address{address},
+				ChainID:  c.chainClient.ChainID,
 			}
 			for _, header := range cmnd.foundHeaders[address] {
 				if event.BlockNumber == nil || header.Number.Cmp(event.BlockNumber) == 1 {
@@ -590,6 +591,7 @@ func (c *transfersCommand) notifyOfNewTransfers(transfers []Transfer) {
 			c.feed.Send(walletevent.Event{
 				Type:     EventNewTransfers,
 				Accounts: []common.Address{c.address},
+				ChainID:  c.chainClient.ChainID,
 			})
 		}
 	}
@@ -691,12 +693,13 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) error {
 
 		lastBlockNumber := c.toByAddress[address]
 		log.Debug("saving headers", "len", len(uniqHeaders), "lastBlockNumber", lastBlockNumber,
-			"balance", c.balanceCacher.Cache().GetBalance(address, lastBlockNumber), "nonce", c.balanceCacher.Cache().GetNonce(address, lastBlockNumber))
+			"balance", c.balanceCacher.Cache().GetBalance(address, c.chainClient.ChainID, lastBlockNumber),
+			"nonce", c.balanceCacher.Cache().GetNonce(address, c.chainClient.ChainID, lastBlockNumber))
 
 		to := &Block{
 			Number:  lastBlockNumber,
-			Balance: c.balanceCacher.Cache().GetBalance(address, lastBlockNumber),
-			Nonce:   c.balanceCacher.Cache().GetNonce(address, lastBlockNumber),
+			Balance: c.balanceCacher.Cache().GetBalance(address, c.chainClient.ChainID, lastBlockNumber),
+			Nonce:   c.balanceCacher.Cache().GetNonce(address, c.chainClient.ChainID, lastBlockNumber),
 		}
 		log.Debug("uniqHeaders found for account", "address", address, "uniqHeaders.len", len(uniqHeaders))
 		err = c.db.ProcessBlocks(c.chainClient.ChainID, address, newFromByAddress[address], to, uniqHeaders)

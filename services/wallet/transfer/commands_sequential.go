@@ -113,8 +113,8 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 
 		if len(headers) > 0 {
 			log.Debug("findBlocksCommand saving headers", "len", len(headers), "lastBlockNumber", to,
-				"balance", c.balanceCacher.Cache().GetBalance(c.account, to),
-				"nonce", c.balanceCacher.Cache().GetNonce(c.account, to))
+				"balance", c.balanceCacher.Cache().GetBalance(c.account, c.chainClient.ChainID, to),
+				"nonce", c.balanceCacher.Cache().GetNonce(c.account, c.chainClient.ChainID, to))
 
 			err = c.db.SaveBlocks(c.chainClient.ChainID, c.account, headers)
 			if err != nil {
@@ -542,6 +542,7 @@ func (c *loadBlocksAndTransfersCommand) notifyHistoryReady() {
 		c.feed.Send(walletevent.Event{
 			Type:     EventRecentHistoryReady,
 			Accounts: []common.Address{c.account},
+			ChainID:  c.chainClient.ChainID,
 		})
 	}
 }
