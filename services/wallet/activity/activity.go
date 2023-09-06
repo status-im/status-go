@@ -30,7 +30,7 @@ import (
 
 type PayloadType = int
 
-// Beware: pleas update multiTransactionTypeToActivityType if changing this enum
+// Beware: please update multiTransactionTypeToActivityType if changing this enum
 const (
 	MultiTransactionPT PayloadType = iota + 1
 	SimpleTransactionPT

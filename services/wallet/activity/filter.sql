@@ -43,7 +43,7 @@ filter_addresses(address) AS (
 	SELECT
 		HEX(address)
 	FROM
-		% s
+		%s
 	WHERE
 		(
 			SELECT
@@ -58,7 +58,7 @@ filter_addresses(address) AS (
 	FROM
 		(
 			VALUES
-				% s
+				%s
 		)
 	WHERE
 		(
@@ -70,19 +70,19 @@ filter_addresses(address) AS (
 ),
 filter_to_addresses(address) AS (
 	VALUES
-		% s
+		%s
 ),
 assets_token_codes(token_code) AS (
 	VALUES
-		% s
+		%s
 ),
 assets_erc20(chain_id, token_address) AS (
 	VALUES
-		% s
+		%s
 ),
 filter_networks(network_id) AS (
 	VALUES
-		% s
+		%s
 ),
 tr_status AS (
 	SELECT
@@ -401,7 +401,7 @@ WHERE
 	)
 	AND (
 		filterActivityTypeAll
-		OR (multi_transactions.type IN (% s))
+		OR (multi_transactions.type IN (%s))
 	)
 	AND (
 		filterAllAddresses
@@ -460,8 +460,8 @@ WHERE
 			multi_transactions.to_network_id IN filter_networks
 		)
 		OR (
-			multi_transactions.from_network_id IS NULL
-			AND multi_transactions.to_network_id IS NULL
+			COALESCE(multi_transactions.from_network_id, 0) = 0
+			AND COALESCE(multi_transactions.to_network_id, 0) = 0
 			AND (
 				EXISTS (
 					SELECT

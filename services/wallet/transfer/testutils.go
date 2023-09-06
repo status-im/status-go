@@ -45,6 +45,8 @@ type TestMultiTransaction struct {
 	FromAmount           int64
 	ToAmount             int64
 	Timestamp            int64
+	FromNetworkID        *uint64
+	ToNetworkID          *uint64
 }
 
 func SeedToToken(seed int) *token.Token {
@@ -321,9 +323,9 @@ func InsertTestMultiTransaction(tb testing.TB, db *sql.DB, tr *TestMultiTransact
 	toAmount := (*hexutil.Big)(big.NewInt(tr.ToAmount))
 
 	result, err := db.Exec(`
-		INSERT INTO multi_transactions (from_address, from_asset, from_amount, to_address, to_asset, to_amount, type, timestamp
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		tr.FromAddress, fromTokenType, fromAmount.String(), tr.ToAddress, toTokenType, toAmount.String(), tr.MultiTransactionType, tr.Timestamp)
+		INSERT INTO multi_transactions (from_address, from_asset, from_amount, to_address, to_asset, to_amount, type, timestamp, from_network_id, to_network_id
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		tr.FromAddress, fromTokenType, fromAmount.String(), tr.ToAddress, toTokenType, toAmount.String(), tr.MultiTransactionType, tr.Timestamp, tr.FromNetworkID, tr.ToNetworkID)
 	require.NoError(tb, err)
 	rowID, err := result.LastInsertId()
 	require.NoError(tb, err)

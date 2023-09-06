@@ -1039,6 +1039,9 @@ func TestGetActivityEntriesFilterByNetworksOfSubTransactions(t *testing.T) {
 
 	trs[3].ChainID = 1234
 	mt2 := transfer.GenerateTestSwapMultiTransaction(trs[3], testutils.SntSymbol, 100)
+	// insertMultiTransaction will insert 0 instead of NULL
+	mt2.FromNetworkID = common.NewAndSet(uint64(0))
+	mt2.ToNetworkID = common.NewAndSet(uint64(0))
 	trs[3].MultiTransactionID = transfer.InsertTestMultiTransaction(t, deps.db, &mt2)
 
 	for i := range trs {
@@ -1055,19 +1058,24 @@ func TestGetActivityEntriesFilterByNetworksOfSubTransactions(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 3, len(entries))
 
-	// Extract sub-transactions by pending
 	chainIDs = []common.ChainID{trs[0].ChainID, trs[1].ChainID}
 	entries, err = getActivityEntries(context.Background(), deps, toTrs, chainIDs, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(entries))
 	require.Equal(t, entries[0].id, mt1.MultiTransactionID)
 
-	// Extract sub-transactions by
+	// Filter by pending_transactions sub-transacitons
 	chainIDs = []common.ChainID{trs[2].ChainID}
 	entries, err = getActivityEntries(context.Background(), deps, toTrs, chainIDs, filter, 0, 15)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(entries))
 	require.Equal(t, entries[0].id, mt1.MultiTransactionID)
+
+	chainIDs = []common.ChainID{trs[3].ChainID}
+	entries, err = getActivityEntries(context.Background(), deps, toTrs, chainIDs, filter, 0, 15)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(entries))
+	require.Equal(t, entries[0].id, mt2.MultiTransactionID)
 }
 
 func TestGetActivityEntriesCheckToAndFrom(t *testing.T) {
