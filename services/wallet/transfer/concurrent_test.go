@@ -79,6 +79,10 @@ func (f balancesFixture) HeaderByHash(ctx context.Context, hash common.Hash) (*t
 	}, nil
 }
 
+func (f balancesFixture) NetworkID() uint64 {
+	return 0
+}
+
 func (f balancesFixture) FullTransactionByBlockNumberAndIndex(ctx context.Context, blockNumber *big.Int, index uint) (*chain.FullTransaction, error) {
 	blockHash := common.HexToHash("0x0")
 	return &chain.FullTransaction{

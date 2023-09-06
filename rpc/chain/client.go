@@ -498,20 +498,8 @@ func (c *ClientWithFallback) SubscribeNewHead(ctx context.Context, ch chan<- *ty
 	return sub.(ethereum.Subscription), nil
 }
 
-func (c *ClientWithFallback) NetworkID(ctx context.Context) (*big.Int, error) {
-	rpcstats.CountCall("eth_NetworkID")
-
-	networkID, err := c.makeCallSingleReturn(
-		func() (any, error) { return c.main.NetworkID(ctx) },
-		func() (any, error) { return c.fallback.NetworkID(ctx) },
-		true,
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return networkID.(*big.Int), nil
+func (c *ClientWithFallback) NetworkID() uint64 {
+	return c.ChainID
 }
 
 func (c *ClientWithFallback) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
