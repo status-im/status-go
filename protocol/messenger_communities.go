@@ -3768,9 +3768,9 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 
 				// Handle message replies
 				if discordMessage.Type == string(discord.MessageTypeReply) && discordMessage.Reference != nil {
-					repliedMessageId := communityID + discordMessage.Reference.MessageId
-					if _, exists := messagesToSave[repliedMessageId]; exists {
-						chatMessage.ResponseTo = repliedMessageId
+					repliedMessageID := communityID + discordMessage.Reference.MessageId
+					if _, exists := messagesToSave[repliedMessageID]; exists {
+						chatMessage.ResponseTo = repliedMessageID
 					}
 				}
 
@@ -3796,12 +3796,12 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 				// Handle pin messages
 				if discordMessage.Type == string(discord.MessageTypeChannelPinned) && discordMessage.Reference != nil {
 
-					pinnedMessageId := communityID + discordMessage.Reference.MessageId
-					_, exists := messagesToSave[pinnedMessageId]
+					pinnedMessageID := communityID + discordMessage.Reference.MessageId
+					_, exists := messagesToSave[pinnedMessageID]
 					if exists {
 						pinMessage := protobuf.PinMessage{
 							Clock:       messageToSave.WhisperTimestamp,
-							MessageId:   pinnedMessageId,
+							MessageId:   pinnedMessageID,
 							ChatId:      messageToSave.LocalChatID,
 							MessageType: protobuf.MessageType_COMMUNITY_CHAT,
 							Pinned:      true,
@@ -4407,12 +4407,12 @@ func (m *Messenger) pinMessagesToWakuMessages(pinMessages []*common.PinMessage, 
 
 		hash := crypto.Keccak256Hash(append([]byte(c.IDString()), wrappedPayload...))
 		wakuMessage := &types.Message{
-			Sig:       crypto.FromECDSAPub(&c.PrivateKey().PublicKey),
-			Timestamp: uint32(msg.WhisperTimestamp / 1000),
-			Topic:     filter.ContentTopic,
-			Payload:   wrappedPayload,
-			Padding:   []byte{1},
-			Hash:      hash[:],
+			Sig:          crypto.FromECDSAPub(&c.PrivateKey().PublicKey),
+			Timestamp:    uint32(msg.WhisperTimestamp / 1000),
+			Topic:        filter.ContentTopic,
+			Payload:      wrappedPayload,
+			Padding:      []byte{1},
+			Hash:         hash[:],
 			ThirdPartyID: msg.ID, // CommunityID + DiscordMessageID
 		}
 		wakuMessages = append(wakuMessages, wakuMessage)
