@@ -245,7 +245,7 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 	}
 
 	if message.Message != nil {
-		return m.HandleChatMessage(messageState, message.Message, nil)
+		return m.HandleChatMessage(messageState, message.Message, nil, false)
 	} else if message.EmojiReaction != nil {
 		return m.HandleEmojiReaction(messageState, message.EmojiReaction, nil)
 	}
@@ -781,7 +781,7 @@ func (m *Messenger) HandleSyncChatMessagesRead(state *ReceivedMessageState, mess
 	return nil
 }
 
-func (m *Messenger) handlePinMessage(pinner *Contact, whisperTimestamp uint64, response *MessengerResponse, message *protobuf.PinMessage) error {
+func (m *Messenger) handlePinMessage(pinner *Contact, whisperTimestamp uint64, response *MessengerResponse, message *protobuf.PinMessage, forceSeen bool) error {
 	logger := m.logger.With(zap.String("site", "HandlePinMessage"))
 
 	logger.Info("Handling pin message")
@@ -816,9 +816,6 @@ func (m *Messenger) handlePinMessage(pinner *Contact, whisperTimestamp uint64, r
 		return nil
 	}
 
-	// Set the LocalChatID for the message
-	pinMessage.LocalChatID = chat.ID
-
 	if c, ok := m.allChats.Load(chat.ID); ok {
 		chat = c
 	}
@@ -842,7 +839,7 @@ func (m *Messenger) handlePinMessage(pinner *Contact, whisperTimestamp uint64, r
 		if err != nil {
 			return err
 		}
-		message := &common.Message{
+		systemMessage := &common.Message{
 			ChatMessage: &protobuf.ChatMessage{
 				Clock:       message.Clock,
 				Timestamp:   whisperTimestamp,
@@ -856,7 +853,12 @@ func (m *Messenger) handlePinMessage(pinner *Contact, whisperTimestamp uint64, r
 			LocalChatID:      chat.ID,
 			From:             pinner.ID,
 		}
-		response.AddMessage(message)
+
+		if forceSeen {
+			systemMessage.Seen = true
+		}
+
+		response.AddMessage(systemMessage)
 		chat.UnviewedMessagesCount++
 	}
 
@@ -872,8 +874,8 @@ func (m *Messenger) handlePinMessage(pinner *Contact, whisperTimestamp uint64, r
 	return nil
 }
 
-func (m *Messenger) HandlePinMessage(state *ReceivedMessageState, message *protobuf.PinMessage, statusMessage *v1protocol.StatusMessage) error {
-	return m.handlePinMessage(state.CurrentMessageState.Contact, state.CurrentMessageState.WhisperTimestamp, state.Response, message)
+func (m *Messenger) HandlePinMessage(state *ReceivedMessageState, message *protobuf.PinMessage, statusMessage *v1protocol.StatusMessage, fromArchive bool) error {
+	return m.handlePinMessage(state.CurrentMessageState.Contact, state.CurrentMessageState.WhisperTimestamp, state.Response, message, fromArchive)
 }
 
 func (m *Messenger) handleAcceptContactRequest(
@@ -1353,7 +1355,7 @@ func (m *Messenger) handleArchiveMessages(archiveMessages []*protobuf.WakuMessag
 		return nil, err
 	}
 
-	response, err := m.handleRetrievedMessages(otherMessages, false)
+	response, err := m.handleRetrievedMessages(otherMessages, false, true)
 	if err != nil {
 		m.communitiesManager.LogStdout("failed to write history archive messages to database", zap.Error(err))
 		return nil, err
@@ -2267,13 +2269,9 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 	return nil
 }
 
-func (m *Messenger) HandleChatMessage(state *ReceivedMessageState, message *protobuf.ChatMessage, statusMessage *v1protocol.StatusMessage) error {
+func (m *Messenger) HandleChatMessage(state *ReceivedMessageState, message *protobuf.ChatMessage, statusMessage *v1protocol.StatusMessage, fromArchive bool) error {
 	state.CurrentMessageState.Message = message
-	return m.handleChatMessage(state, false)
-}
-
-func (m *Messenger) HandleImportedChatMessage(state *ReceivedMessageState) error {
-	return m.handleChatMessage(state, true)
+	return m.handleChatMessage(state, fromArchive)
 }
 
 func (m *Messenger) addActivityCenterNotification(response *MessengerResponse, notification *ActivityCenterNotification) error {

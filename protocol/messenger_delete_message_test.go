@@ -198,7 +198,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteMessageFirstThenMessage() {
 			PublicKey:        &theirMessenger.identity.PublicKey,
 		},
 	}
-	err = s.m.HandleChatMessage(state, inputMessage.ChatMessage, nil)
+	err = s.m.HandleChatMessage(state, inputMessage.ChatMessage, nil, false)
 	s.Require().NoError(err)
 	s.Require().Len(state.Response.Messages(), 0) // Message should not be added to response
 	s.Require().Len(state.Response.RemovedMessages(), 0)
@@ -338,7 +338,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteImageMessageFirstThenMessage() {
 			PublicKey:        &theirMessenger.identity.PublicKey,
 		},
 	}
-	err = s.m.HandleChatMessage(state, album[0].ChatMessage, nil)
+	err = s.m.HandleChatMessage(state, album[0].ChatMessage, nil, false)
 	s.Require().NoError(err)
 	s.Require().Len(state.Response.Messages(), 0) // Message should not be added to response
 	s.Require().Len(state.Response.RemovedMessages(), 0)
@@ -354,7 +354,7 @@ func (s *MessengerDeleteMessageSuite) TestDeleteImageMessageFirstThenMessage() {
 			PublicKey:        &theirMessenger.identity.PublicKey,
 		},
 	}
-	err = s.m.HandleChatMessage(state, album[1].ChatMessage, nil)
+	err = s.m.HandleChatMessage(state, album[1].ChatMessage, nil, false)
 	s.Require().NoError(err)
 	s.Require().Len(state.Response.Messages(), 0) // Message should not be added to response even if we didn't delete that ID
 	s.Require().Len(state.Response.RemovedMessages(), 0)

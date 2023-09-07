@@ -19,11 +19,12 @@ type EnumType struct {
 
 // MethodInfo holds information about a method
 type MethodInfo struct {
-	ProtobufName string
-	MethodName   string
-	EnumValue    string
-	ProcessRaw   bool
-	SyncMessage  bool
+	ProtobufName   string
+	MethodName     string
+	EnumValue      string
+	ProcessRaw     bool
+	SyncMessage    bool
+	FromArchiveArg bool
 }
 
 func main() {
@@ -66,6 +67,8 @@ func main() {
 		if protobufName == "PushNotificationRegistration" {
 			info.ProcessRaw = true
 		}
+
+		info.FromArchiveArg = protobufName == "ChatMessage" || protobufName == "PinMessage"
 
 		methodInfos = append(methodInfos, info)
 	}

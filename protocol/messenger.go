@@ -3158,7 +3158,7 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	return m.handleRetrievedMessages(chatWithMessages, true)
+	return m.handleRetrievedMessages(chatWithMessages, true, false)
 }
 
 func (m *Messenger) GetStats() types.StatsSummary {
@@ -3435,21 +3435,16 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 					switch msg.Type {
 
 					case protobuf.ApplicationMetadataMessage_CHAT_MESSAGE:
-						logger.Debug("Handling ChatMessage")
-
-						protoMessage := &protobuf.ChatMessage{}
-						err := proto.Unmarshal(msg.UnwrappedPayload, protoMessage)
-						if err != nil {
-							logger.Warn("failed to unmarshal ChatMessage", zap.Error(err))
-							continue
-						}
-
-						messageState.CurrentMessageState.Message = protoMessage
-						m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, senderID, filter.ContentTopic, filter.ChatID, msg.Type, messageState.CurrentMessageState.Message)
-						err = m.HandleImportedChatMessage(messageState)
+						err = m.handleChatMessageProtobuf(messageState, msg.UnwrappedPayload, msg, filter, true)
 						if err != nil {
 							logger.Warn("failed to handle ChatMessage", zap.Error(err))
 							continue
+						}
+
+					case protobuf.ApplicationMetadataMessage_PIN_MESSAGE:
+						err = m.handlePinMessageProtobuf(messageState, msg.UnwrappedPayload, msg, filter, true)
+						if err != nil {
+							logger.Warn("failed to handle PinMessage", zap.Error(err))
 						}
 					}
 				}
@@ -3513,7 +3508,7 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 	return nil
 }
 
-func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message, storeWakuMessages bool) (*MessengerResponse, error) {
+func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message, storeWakuMessages bool, fromArchive bool) (*MessengerResponse, error) {
 
 	m.handleMessagesMutex.Lock()
 	defer m.handleMessagesMutex.Unlock()
@@ -3618,7 +3613,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 				if msg.UnwrappedPayload != nil {
 
-					err := m.dispatchToHandler(messageState, msg.UnwrappedPayload, msg, filter)
+					err := m.dispatchToHandler(messageState, msg.UnwrappedPayload, msg, filter, fromArchive)
 					if err != nil {
 						allMessagesProcessed = false
 						logger.Warn("failed to process protobuf", zap.Error(err))
