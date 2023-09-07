@@ -10,4 +10,5 @@ var (
 	ErrNotImplemented   = errors.New("not implemented")
 	ErrContactNotFound  = errors.New("contact not found")
 	ErrCommunityIDEmpty = errors.New("community ID is empty")
+	ErrUserNotMember    = errors.New("user not a member")
 )
