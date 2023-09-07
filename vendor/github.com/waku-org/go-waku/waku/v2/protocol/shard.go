@@ -20,8 +20,8 @@ const ClusterIndex = 1
 const GenerationZeroShardsCount = 8
 
 type RelayShards struct {
-	Cluster uint16
-	Indices []uint16
+	Cluster uint16   `json:"cluster"`
+	Indices []uint16 `json:"indices"`
 }
 
 func NewRelayShards(cluster uint16, indices ...uint16) (RelayShards, error) {
@@ -217,7 +217,7 @@ func FromBitVector(buf []byte) (RelayShards, error) {
 
 // GetShardFromContentTopic runs Autosharding logic and returns a pubSubTopic
 // This is based on Autosharding algorithm defined in RFC 51
-func GetShardFromContentTopic(topic ContentTopic, shardCount int) NamespacedPubsubTopic {
+func GetShardFromContentTopic(topic ContentTopic, shardCount int) StaticShardingPubsubTopic {
 	bytes := []byte(topic.ApplicationName)
 	bytes = append(bytes, []byte(fmt.Sprintf("%d", topic.ApplicationVersion))...)
 

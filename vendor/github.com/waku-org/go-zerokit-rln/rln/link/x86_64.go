@@ -95,6 +95,10 @@ func (i RLNWrapper) AtomicOperation(index uint, leaves []byte, indices []byte) b
 	return i.ffi.AtomicOperation(index, leaves, indices)
 }
 
+func (i RLNWrapper) SeqAtomicOperation(leaves []byte, indices []byte) bool {
+	return i.ffi.SeqAtomicOperation(leaves, indices)
+}
+
 func (i RLNWrapper) RecoverIDSecret(proof1 []byte, proof2 []byte) ([]byte, error) {
 	return i.ffi.RecoverIDSecret(proof1, proof2)
 }

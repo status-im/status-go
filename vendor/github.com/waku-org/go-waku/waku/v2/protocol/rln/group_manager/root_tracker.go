@@ -7,11 +7,14 @@ import (
 	"github.com/waku-org/go-zerokit-rln/rln"
 )
 
+// RootsPerBlock stores the merkle root generated at N block number
 type RootsPerBlock struct {
-	root        rln.MerkleNode
-	blockNumber uint64
+	Root        rln.MerkleNode
+	BlockNumber uint64
 }
 
+// MerkleRootTracker keeps track of the latest N merkle roots considered
+// valid for RLN proofs.
 type MerkleRootTracker struct {
 	sync.RWMutex
 
@@ -23,6 +26,7 @@ type MerkleRootTracker struct {
 
 const maxBufferSize = 20
 
+// NewMerkleRootTracker creates an instance of MerkleRootTracker
 func NewMerkleRootTracker(acceptableRootWindowSize int, rlnInstance *rln.RLN) (*MerkleRootTracker, error) {
 	result := &MerkleRootTracker{
 		acceptableRootWindowSize: acceptableRootWindowSize,
@@ -37,13 +41,14 @@ func NewMerkleRootTracker(acceptableRootWindowSize int, rlnInstance *rln.RLN) (*
 	return result, nil
 }
 
+// Backfill is used to pop merkle roots when there is a chain fork
 func (m *MerkleRootTracker) Backfill(fromBlockNumber uint64) {
 	m.Lock()
 	defer m.Unlock()
 
 	numBlocks := 0
 	for i := len(m.validMerkleRoots) - 1; i >= 0; i-- {
-		if m.validMerkleRoots[i].blockNumber >= fromBlockNumber {
+		if m.validMerkleRoots[i].BlockNumber >= fromBlockNumber {
 			numBlocks++
 		}
 	}
@@ -87,7 +92,7 @@ func (m *MerkleRootTracker) IndexOf(root [32]byte) int {
 	defer m.RUnlock()
 
 	for i := range m.validMerkleRoots {
-		if bytes.Equal(m.validMerkleRoots[i].root[:], root[:]) {
+		if bytes.Equal(m.validMerkleRoots[i].Root[:], root[:]) {
 			return i
 		}
 	}
@@ -95,6 +100,8 @@ func (m *MerkleRootTracker) IndexOf(root [32]byte) int {
 	return -1
 }
 
+// UpdateLatestRoot should be called when a block containing a new
+// IDCommitment is received so we can keep track of the merkle root change
 func (m *MerkleRootTracker) UpdateLatestRoot(blockNumber uint64) (rln.MerkleNode, error) {
 	m.Lock()
 	defer m.Unlock()
@@ -111,8 +118,8 @@ func (m *MerkleRootTracker) UpdateLatestRoot(blockNumber uint64) (rln.MerkleNode
 
 func (m *MerkleRootTracker) pushRoot(blockNumber uint64, root [32]byte) {
 	m.validMerkleRoots = append(m.validMerkleRoots, RootsPerBlock{
-		root:        root,
-		blockNumber: blockNumber,
+		Root:        root,
+		BlockNumber: blockNumber,
 	})
 
 	// Maintain valid merkle root window
@@ -125,29 +132,50 @@ func (m *MerkleRootTracker) pushRoot(blockNumber uint64, root [32]byte) {
 	if len(m.merkleRootBuffer) > maxBufferSize {
 		m.merkleRootBuffer = m.merkleRootBuffer[1:]
 	}
-
 }
 
+// Roots return the list of valid merkle roots
 func (m *MerkleRootTracker) Roots() []rln.MerkleNode {
 	m.RLock()
 	defer m.RUnlock()
 
 	result := make([]rln.MerkleNode, len(m.validMerkleRoots))
 	for i := range m.validMerkleRoots {
-		result[i] = m.validMerkleRoots[i].root
+		result[i] = m.validMerkleRoots[i].Root
 	}
 
 	return result
 }
 
+// Buffer is used as a repository of older merkle roots that although
+// they were valid once, they have left the acceptable window of
+// merkle roots. We keep track of them in case a chain fork occurs
+// and we need to restore the valid merkle roots to a previous point
+// of time
 func (m *MerkleRootTracker) Buffer() []rln.MerkleNode {
 	m.RLock()
 	defer m.RUnlock()
 
 	result := make([]rln.MerkleNode, len(m.merkleRootBuffer))
 	for i := range m.merkleRootBuffer {
-		result[i] = m.merkleRootBuffer[i].root
+		result[i] = m.merkleRootBuffer[i].Root
 	}
 
 	return result
+}
+
+// ValidRootsPerBlock returns the current valid merkle roots and block numbers
+func (m *MerkleRootTracker) ValidRootsPerBlock() []RootsPerBlock {
+	m.RLock()
+	defer m.RUnlock()
+
+	return m.validMerkleRoots
+}
+
+// SetValidRootsPerBlock is used to overwrite the valid merkle roots
+func (m *MerkleRootTracker) SetValidRootsPerBlock(roots []RootsPerBlock) {
+	m.Lock()
+	defer m.Unlock()
+
+	m.validMerkleRoots = roots
 }

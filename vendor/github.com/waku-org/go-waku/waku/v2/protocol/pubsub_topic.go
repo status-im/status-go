@@ -94,7 +94,7 @@ type StaticShardingPubsubTopic struct {
 }
 
 // NewStaticShardingPubsubTopic creates a new pubSub topic
-func NewStaticShardingPubsubTopic(cluster uint16, shard uint16) NamespacedPubsubTopic {
+func NewStaticShardingPubsubTopic(cluster uint16, shard uint16) StaticShardingPubsubTopic {
 	return StaticShardingPubsubTopic{
 		kind:    StaticSharding,
 		cluster: cluster,

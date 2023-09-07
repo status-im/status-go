@@ -2,6 +2,7 @@ package filter
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
@@ -26,6 +27,7 @@ type (
 		selectedPeer   peer.ID
 		requestID      []byte
 		log            *zap.Logger
+		wg             *sync.WaitGroup
 	}
 
 	FilterParameters struct {
@@ -135,9 +137,26 @@ func AutomaticRequestId() FilterUnsubscribeOption {
 	}
 }
 
+// WithWaitGroup allos specigying a waitgroup to wait until all
+// unsubscribe requests are complete before the function is complete
+func WithWaitGroup(wg *sync.WaitGroup) FilterUnsubscribeOption {
+	return func(params *FilterUnsubscribeParameters) {
+		params.wg = wg
+	}
+}
+
+// DontWait is used to fire and forget an unsubscription, and don't
+// care about the results of it
+func DontWait() FilterUnsubscribeOption {
+	return func(params *FilterUnsubscribeParameters) {
+		params.wg = nil
+	}
+}
+
 func DefaultUnsubscribeOptions() []FilterUnsubscribeOption {
 	return []FilterUnsubscribeOption{
 		AutomaticRequestId(),
+		WithWaitGroup(&sync.WaitGroup{}),
 	}
 }
 

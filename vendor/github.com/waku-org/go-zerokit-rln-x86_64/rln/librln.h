@@ -53,6 +53,10 @@ bool atomic_operation(struct RLN *ctx,
                       const struct Buffer *leaves_buffer,
                       const struct Buffer *indices_buffer);
 
+bool seq_atomic_operation(struct RLN *ctx,
+                          const struct Buffer *leaves_buffer,
+                          const struct Buffer *indices_buffer);
+
 bool get_root(const struct RLN *ctx, struct Buffer *output_buffer);
 
 bool get_proof(const struct RLN *ctx, uintptr_t index, struct Buffer *output_buffer);

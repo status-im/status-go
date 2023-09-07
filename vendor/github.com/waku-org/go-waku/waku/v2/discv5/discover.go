@@ -453,8 +453,15 @@ func (d *DiscoveryV5) peerLoop(ctx context.Context) error {
 		}
 
 		nodeRS, err := wenr.RelaySharding(n.Record())
-		if err != nil || nodeRS == nil {
+		if err != nil {
 			return false
+		}
+
+		if nodeRS == nil {
+			// TODO: Node has no shard registered.
+			// Since for now, status-go uses both mixed static and named shards, we assume the node is valid
+			// Once status-go uses only static shards, we can't return true anymore.
+			return true
 		}
 
 		if nodeRS.Cluster != localRS.Cluster {

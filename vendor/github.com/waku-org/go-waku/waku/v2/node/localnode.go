@@ -315,22 +315,17 @@ func (w *WakuNode) watchTopicShards(ctx context.Context) error {
 
 				if len(rs) > 0 {
 					if len(rs) > 1 {
-						w.log.Warn("could not set ENR shard info", zap.String("error", "use sharded topics within the same cluster"))
-						continue
-					}
-
-					tcount := 0
-					for _, r := range rs {
-						tcount += len(r.Indices)
-					}
-					if tcount != len(topics) {
-						w.log.Warn("could not set ENR shard info", zap.String("error", "can't use a mix of static shards and named shards"))
+						w.log.Warn("could not set ENR shard info", zap.String("error", "multiple clusters found, use sharded topics within the same cluster"))
 						continue
 					}
 				}
 
 				if len(rs) == 1 {
 					w.log.Info("updating advertised relay shards in ENR")
+					if len(rs[0].Indices) != len(topics) {
+						w.log.Warn("A mix of named and static shards found. ENR shard will contain only the following shards", zap.Any("shards", rs[0]))
+					}
+
 					err = wenr.Update(w.localNode, wenr.WithWakuRelaySharding(rs[0]))
 					if err != nil {
 						w.log.Warn("could not set ENR shard info", zap.Error(err))

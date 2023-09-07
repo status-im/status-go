@@ -100,7 +100,6 @@ type WakuNodeParameters struct {
 	rlnETHClientAddress          string
 	keystorePath                 string
 	keystorePassword             string
-	keystoreIndex                uint
 	rlnTreePath                  string
 	rlnMembershipContractAddress common.Address
 

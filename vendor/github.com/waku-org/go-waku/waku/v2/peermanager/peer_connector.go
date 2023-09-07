@@ -5,6 +5,7 @@ package peermanager
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -53,27 +54,34 @@ type PeerConnectionStrategy struct {
 	logger  *zap.Logger
 }
 
+// backoff describes the strategy used to decide how long to backoff after previously attempting to connect to a peer
+func getBackOff() backoff.BackoffFactory {
+	rngSrc := rand.NewSource(rand.Int63())
+	minBackoff, maxBackoff := time.Minute, time.Hour
+	bkf := backoff.NewExponentialBackoff(minBackoff, maxBackoff, backoff.FullJitter, time.Second, 5.0, 0, rand.New(rngSrc))
+	return bkf
+}
+
 // NewPeerConnectionStrategy creates a utility to connect to peers,
 // but only if we have not recently tried connecting to them already.
 //
-// cacheSize is the size of a TwoQueueCache
 // dialTimeout is how long we attempt to connect to a peer before giving up
 // minPeers is the minimum number of peers that the node should have
-// backoff describes the strategy used to decide how long to backoff after previously attempting to connect to a peer
-func NewPeerConnectionStrategy(cacheSize int, pm *PeerManager,
-	dialTimeout time.Duration, backoff backoff.BackoffFactory,
-	logger *zap.Logger) (*PeerConnectionStrategy, error) {
-
+func NewPeerConnectionStrategy(pm *PeerManager,
+	dialTimeout time.Duration, logger *zap.Logger) (*PeerConnectionStrategy, error) {
+	// cacheSize is the size of a TwoQueueCache
+	cacheSize := 600
 	cache, err := lru.New2Q(cacheSize)
 	if err != nil {
 		return nil, err
 	}
+	//
 	pc := &PeerConnectionStrategy{
 		cache:       cache,
 		wg:          sync.WaitGroup{},
 		dialTimeout: dialTimeout,
 		pm:          pm,
-		backoff:     backoff,
+		backoff:     getBackOff(),
 		logger:      logger.Named("discovery-connector"),
 	}
 	pm.SetPeerConnector(pc)

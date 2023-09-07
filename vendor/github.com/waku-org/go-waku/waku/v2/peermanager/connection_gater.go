@@ -82,6 +82,7 @@ func (c *ConnectionGater) InterceptUpgraded(_ network.Conn) (allow bool, reason 
 	return true, 0
 }
 
+// NotifyDisconnect is called when a connection disconnects.
 func (c *ConnectionGater) NotifyDisconnect(addr multiaddr.Multiaddr) {
 	ip, err := manet.ToIP(addr)
 	if err != nil {
@@ -111,16 +112,10 @@ func (c *ConnectionGater) validateInboundConn(addr multiaddr.Multiaddr) bool {
 	c.Lock()
 	defer c.Unlock()
 
-	currConnections, ok := c.limiter[ip.String()]
-	if !ok {
-		c.limiter[ip.String()] = 1
-		return true
-	} else {
-		if currConnections+1 > maxConnsPerIP {
-			return false
-		}
-
-		c.limiter[ip.String()]++
+	if currConnections := c.limiter[ip.String()]; currConnections+1 > maxConnsPerIP {
+		return false
 	}
+
+	c.limiter[ip.String()]++
 	return true
 }

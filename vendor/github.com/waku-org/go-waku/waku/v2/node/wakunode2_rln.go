@@ -12,6 +12,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager/dynamic"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager/static"
+	"github.com/waku-org/go-waku/waku/v2/protocol/rln/keystore"
 	r "github.com/waku-org/go-zerokit-rln/rln"
 )
 
@@ -44,14 +45,17 @@ func (w *WakuNode) setupRLNRelay() error {
 	} else {
 		w.log.Info("setting up waku-rln-relay in on-chain mode")
 
+		appKeystore, err := keystore.New(w.opts.keystorePath, dynamic.RLNAppInfo, w.log)
+		if err != nil {
+			return err
+		}
+
 		groupManager, err = dynamic.NewDynamicGroupManager(
 			w.opts.rlnETHClientAddress,
 			w.opts.rlnMembershipContractAddress,
 			w.opts.rlnRelayMemIndex,
-			w.opts.keystorePath,
+			appKeystore,
 			w.opts.keystorePassword,
-			w.opts.keystoreIndex,
-			true,
 			w.opts.prometheusReg,
 			w.log,
 		)
