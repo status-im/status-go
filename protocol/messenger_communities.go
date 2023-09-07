@@ -2626,8 +2626,8 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 	state.Response.CommunityChanges = append(state.Response.CommunityChanges, communityResponse.Changes)
 	state.Response.AddRequestsToJoinCommunity(communityResponse.RequestsToJoin)
 
-	// If we haven't joined the org, nothing to do
-	if !community.Joined() {
+	// If we haven't joined/spectated the org, nothing to do
+	if !community.Joined() && !community.Spectated() {
 		return nil
 	}
 

@@ -1208,7 +1208,7 @@ func (s *MessengerContactRequestSuite) TestReceiveAcceptAndRetractContactRequest
 	}
 
 	response := state.Response
-	err = s.m.HandleChatMessage(state, &message, nil)
+	err = s.m.HandleChatMessage(state, &message, nil, false)
 	s.Require().NoError(err)
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
 	contacts := s.m.Contacts()
