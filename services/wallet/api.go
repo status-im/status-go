@@ -66,10 +66,12 @@ type DerivedAddress struct {
 	AlreadyCreated bool           `json:"alreadyCreated"`
 }
 
+// @deprecated
 func (api *API) CheckRecentHistory(ctx context.Context, addresses []common.Address) error {
 	return api.s.transferController.CheckRecentHistory([]uint64{api.s.rpcClient.UpstreamChainID}, addresses)
 }
 
+// @deprecated
 func (api *API) CheckRecentHistoryForChainIDs(ctx context.Context, chainIDs []uint64, addresses []common.Address) error {
 	return api.s.transferController.CheckRecentHistory(chainIDs, addresses)
 }
@@ -82,6 +84,7 @@ func hexBigToBN(hexBig *hexutil.Big) *big.Int {
 	return bN
 }
 
+// @deprecated
 // GetTransfersByAddress returns transfers for a single address
 func (api *API) GetTransfersByAddress(ctx context.Context, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]transfer.View, error) {
 	log.Debug("[WalletAPI:: GetTransfersByAddress] get transfers for an address", "address", address)
@@ -92,6 +95,7 @@ func (api *API) GetTransfersByAddress(ctx context.Context, address common.Addres
 	return api.s.transferController.GetTransfersByAddress(ctx, api.s.rpcClient.UpstreamChainID, address, hexBigToBN(toBlock), intLimit, fetchMore)
 }
 
+// @deprecated
 // LoadTransferByHash loads transfer to the database
 // Only used by status-mobile
 func (api *API) LoadTransferByHash(ctx context.Context, address common.Address, hash common.Hash) error {
@@ -99,11 +103,13 @@ func (api *API) LoadTransferByHash(ctx context.Context, address common.Address, 
 	return api.s.transferController.LoadTransferByHash(ctx, api.s.rpcClient, address, hash)
 }
 
+// @deprecated
 func (api *API) GetTransfersByAddressAndChainID(ctx context.Context, chainID uint64, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]transfer.View, error) {
 	log.Debug("[WalletAPI:: GetTransfersByAddressAndChainIDs] get transfers for an address", "address", address)
 	return api.s.transferController.GetTransfersByAddress(ctx, chainID, address, hexBigToBN(toBlock), limit.ToInt().Int64(), fetchMore)
 }
 
+// @deprecated
 func (api *API) GetTransfersForIdentities(ctx context.Context, identities []transfer.TransactionIdentity) ([]transfer.View, error) {
 	log.Debug("wallet.api.GetTransfersForIdentities", "identities.len", len(identities))
 
@@ -116,6 +122,7 @@ func (api *API) FetchDecodedTxData(ctx context.Context, data string) (*thirdpart
 	return api.s.decoder.Decode(data)
 }
 
+// @deprecated
 // GetTokensBalances return mapping of token balances for every account.
 func (api *API) GetTokensBalances(ctx context.Context, accounts, addresses []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	chainClients, err := api.s.rpcClient.EthClients([]uint64{api.s.rpcClient.UpstreamChainID})
@@ -125,6 +132,7 @@ func (api *API) GetTokensBalances(ctx context.Context, accounts, addresses []com
 	return api.s.tokenManager.GetBalances(ctx, chainClients, accounts, addresses)
 }
 
+// @deprecated
 func (api *API) GetTokensBalancesForChainIDs(ctx context.Context, chainIDs []uint64, accounts, addresses []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	clients, err := api.s.rpcClient.EthClients(chainIDs)
 	if err != nil {
@@ -164,6 +172,7 @@ func (api *API) DiscoverToken(ctx context.Context, chainID uint64, address commo
 	return token, err
 }
 
+// @deprecated
 func (api *API) GetVisibleTokens(chainIDs []uint64) (map[uint64][]*token.Token, error) {
 	log.Debug("call to get visible tokens")
 	rst, err := api.s.tokenManager.GetVisible(chainIDs)
@@ -171,6 +180,7 @@ func (api *API) GetVisibleTokens(chainIDs []uint64) (map[uint64][]*token.Token, 
 	return rst, err
 }
 
+// @deprecated
 func (api *API) ToggleVisibleToken(ctx context.Context, chainID uint64, address common.Address) (bool, error) {
 	log.Debug("call to toggle visible tokens")
 	err := api.s.tokenManager.Toggle(chainID, address)
@@ -190,6 +200,7 @@ func (api *API) AddCustomToken(ctx context.Context, token token.Token) error {
 	return err
 }
 
+// @deprecated
 func (api *API) DeleteCustomToken(ctx context.Context, address common.Address) error {
 	log.Debug("call to remove custom token")
 	err := api.s.tokenManager.DeleteCustom(api.s.rpcClient.UpstreamChainID, address)
@@ -225,6 +236,7 @@ func (api *API) DeleteSavedAddress(ctx context.Context, address common.Address, 
 	return err
 }
 
+// @deprecated
 func (api *API) GetPendingTransactions(ctx context.Context) ([]*transactions.PendingTransaction, error) {
 	log.Debug("wallet.api.GetPendingTransactions")
 	rst, err := api.s.pendingTxManager.GetAllPending()
@@ -248,6 +260,7 @@ func (api *API) GetPendingTransactionsForIdentities(ctx context.Context, identit
 	return
 }
 
+// @deprecated
 // TODO - #11861: Remove this and replace with EventPendingTransactionStatusChanged event and Delete to confirm the transaction where it is needed
 func (api *API) WatchTransactionByChainID(ctx context.Context, chainID uint64, transactionHash common.Hash) (err error) {
 	log.Debug("wallet.api.WatchTransactionByChainID", "chainID", chainID, "transactionHash", transactionHash)
@@ -313,17 +326,20 @@ func (api *API) GetCollectiblesDetailsAsync(requestID int32, uniqueIDs []thirdpa
 	return nil
 }
 
+// @deprecated
 // Old Collectibles API - To be deprecated
 func (api *API) GetOpenseaCollectionsByOwner(ctx context.Context, chainID wcommon.ChainID, owner common.Address) ([]opensea.OwnedCollection, error) {
 	log.Debug("call to GetOpenseaCollectionsByOwner")
 	return api.s.collectiblesManager.FetchAllCollectionsByOwner(chainID, owner)
 }
 
+// @deprecated
 func (api *API) GetOpenseaAssetsByOwnerAndCollectionWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, collectionSlug string, cursor string, limit int) (*opensea.AssetContainer, error) {
 	log.Debug("call to GetOpenseaAssetsByOwnerAndCollectionWithCursor")
 	return api.s.collectiblesManager.FetchAllOpenseaAssetsByOwnerAndCollection(chainID, owner, collectionSlug, cursor, limit)
 }
 
+// @deprecated
 func (api *API) GetOpenseaAssetsByOwnerAndCollection(ctx context.Context, chainID wcommon.ChainID, owner common.Address, collectionSlug string, limit int) ([]opensea.Asset, error) {
 	container, err := api.GetOpenseaAssetsByOwnerAndCollectionWithCursor(ctx, chainID, owner, collectionSlug, "", limit)
 	if err != nil {
@@ -332,21 +348,25 @@ func (api *API) GetOpenseaAssetsByOwnerAndCollection(ctx context.Context, chainI
 	return container.Assets, nil
 }
 
+// @deprecated
 func (api *API) GetCollectiblesByOwnerAndCollectionWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, collectionSlug string, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
 	log.Debug("call to GetCollectiblesByOwnerAndCollectionWithCursor")
 	return api.s.collectiblesManager.FetchAllAssetsByOwnerAndCollection(chainID, owner, collectionSlug, cursor, limit)
 }
 
+// @deprecated
 func (api *API) GetCollectiblesByOwnerWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
 	log.Debug("call to GetCollectiblesByOwnerWithCursor")
 	return api.s.collectiblesManager.FetchAllAssetsByOwner(chainID, owner, cursor, limit)
 }
 
+// @deprecated
 func (api *API) GetCollectiblesByOwnerAndContractAddressWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
 	log.Debug("call to GetCollectiblesByOwnerAndContractAddressWithCursor")
 	return api.s.collectiblesManager.FetchAllAssetsByOwnerAndContractAddress(chainID, owner, contractAddresses, cursor, limit)
 }
 
+// @deprecated
 func (api *API) GetCollectiblesByUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
 	log.Debug("call to GetCollectiblesByUniqueID")
 	return api.s.collectiblesManager.FetchAssetsByCollectibleUniqueID(uniqueIDs)
@@ -376,11 +396,13 @@ func (api *API) GetEthereumChains(ctx context.Context) ([]*network.CombinedNetwo
 	return api.s.rpcClient.NetworkManager.GetCombinedNetworks()
 }
 
+// @deprecated
 func (api *API) FetchPrices(ctx context.Context, symbols []string, currencies []string) (map[string]map[string]float64, error) {
 	log.Debug("call to FetchPrices")
 	return api.s.marketManager.FetchPrices(symbols, currencies)
 }
 
+// @deprecated
 func (api *API) FetchMarketValues(ctx context.Context, symbols []string, currency string) (map[string]thirdparty.TokenMarketValues, error) {
 	log.Debug("call to FetchMarketValues")
 	return api.s.marketManager.FetchTokenMarketValues(symbols, currency)
@@ -396,6 +418,7 @@ func (api *API) GetDailyMarketValues(ctx context.Context, symbol string, currenc
 	return api.s.marketManager.FetchHistoricalDailyPrices(symbol, currency, limit, allData, aggregate)
 }
 
+// @deprecated
 func (api *API) FetchTokenDetails(ctx context.Context, symbols []string) (map[string]thirdparty.TokenDetails, error) {
 	log.Debug("call to FetchTokenDetails")
 	return api.s.marketManager.FetchTokenDetails(symbols)
@@ -411,6 +434,7 @@ func (api *API) GetEstimatedLatestBlockNumber(ctx context.Context, chainID uint6
 	return api.s.blockChainState.GetEstimatedLatestBlockNumber(ctx, chainID)
 }
 
+// @deprecated
 func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64, maxFeePerGas *big.Float) (TransactionEstimation, error) {
 	log.Debug("call to getTransactionEstimatedTime")
 	return api.s.feesManager.transactionEstimatedTime(ctx, chainID, maxFeePerGas), nil
