@@ -213,6 +213,12 @@ func (r *RLN) AtomicOperation(index uint, leaves []byte, indices []byte) bool {
 	return bool(C.atomic_operation(r.ptr, C.uintptr_t(index), leavesBuffer, indicesBuffer))
 }
 
+func (r *RLN) SeqAtomicOperation(leaves []byte, indices []byte) bool {
+	leavesBuffer := toCBufferPtr(leaves)
+	indicesBuffer := toCBufferPtr(indices)
+	return bool(C.seq_atomic_operation(r.ptr, leavesBuffer, indicesBuffer))
+}
+
 func (r *RLN) DeleteLeaf(index uint) bool {
 	return bool(C.delete_leaf(r.ptr, C.uintptr_t(index)))
 }

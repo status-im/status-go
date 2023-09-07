@@ -225,7 +225,7 @@ func iterateSubscriptionSet(logger *zap.Logger, subscriptions SubscriptionSet, e
 			defer subscription.RUnlock()
 
 			_, ok := subscription.ContentTopics[envelope.Message().ContentTopic]
-			if !ok && len(subscription.ContentTopics) != 0 {
+			if !ok { // only send the msg to subscriptions that have matching contentTopic
 				return
 			}
 

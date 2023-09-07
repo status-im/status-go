@@ -22,7 +22,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	"github.com/libp2p/go-libp2p/p2p/host/autorelay"
 	"github.com/libp2p/go-libp2p/p2p/host/peerstore/pstoremem"
 	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/proto"
@@ -71,7 +70,7 @@ type SpamHandler = func(message *pb.WakuMessage) error
 
 type RLNRelay interface {
 	IdentityCredential() (IdentityCredential, error)
-	MembershipIndex() (uint, error)
+	MembershipIndex() uint
 	AppendRLNProof(msg *pb.WakuMessage, senderEpochTime time.Time) error
 	Validator(spamHandler SpamHandler) func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool
 	Start(ctx context.Context) error
@@ -254,13 +253,7 @@ func New(opts ...WakuNodeOption) (*WakuNode, error) {
 	//Initialize peer manager.
 	w.peermanager = peermanager.NewPeerManager(w.opts.maxPeerConnections, w.log)
 
-	// Setup peer connection strategy
-	cacheSize := 600
-	rngSrc := rand.NewSource(rand.Int63())
-	minBackoff, maxBackoff := time.Minute, time.Hour
-	bkf := backoff.NewExponentialBackoff(minBackoff, maxBackoff, backoff.FullJitter, time.Second, 5.0, 0, rand.New(rngSrc))
-
-	w.peerConnector, err = peermanager.NewPeerConnectionStrategy(cacheSize, w.peermanager, discoveryConnectTimeout, bkf, w.log)
+	w.peerConnector, err = peermanager.NewPeerConnectionStrategy(w.peermanager, discoveryConnectTimeout, w.log)
 	if err != nil {
 		w.log.Error("creating peer connection strategy", zap.Error(err))
 	}
@@ -745,6 +738,20 @@ func (w *WakuNode) connect(ctx context.Context, info peer.AddrInfo) error {
 	if err != nil {
 		w.host.Peerstore().(wps.WakuPeerstore).AddConnFailure(info)
 		return err
+	}
+
+	for _, addr := range info.Addrs {
+		// TODO: this is a temporary fix
+		// host.Connect adds the addresses with a TempAddressTTL
+		// however, identify will filter out all non IP addresses
+		// and expire all temporary addrs. So in the meantime, let's
+		// store dns4 addresses with a connectedAddressTTL, otherwise
+		// it will have trouble with the status fleet circuit relay addresses
+		// See https://github.com/libp2p/go-libp2p/issues/2550
+		_, err := addr.ValueForProtocol(ma.P_DNS4)
+		if err == nil {
+			w.host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
+		}
 	}
 
 	w.host.Peerstore().(wps.WakuPeerstore).ResetConnFailures(info)

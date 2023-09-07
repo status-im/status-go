@@ -3,6 +3,7 @@
 ### Requirements:
 - Node.js
 - Go 
+- jq
 - [solcjs 0.8.15](https://github.com/ethereum/solc-js)
 - [abigen](https://github.com/ethereum/go-ethereum/tree/master/cmd/abigen) 
 

@@ -25,7 +25,7 @@ import (
 type GroupManager interface {
 	Start(ctx context.Context, rln *rln.RLN, rootTracker *group_manager.MerkleRootTracker) error
 	IdentityCredentials() (rln.IdentityCredential, error)
-	MembershipIndex() (rln.MembershipIndex, error)
+	MembershipIndex() rln.MembershipIndex
 	Stop() error
 }
 
@@ -356,10 +356,7 @@ func (rlnRelay *WakuRLNRelay) generateProof(input []byte, epoch rln.Epoch) (*pb.
 		return nil, err
 	}
 
-	membershipIndex, err := rlnRelay.groupManager.MembershipIndex()
-	if err != nil {
-		return nil, err
-	}
+	membershipIndex := rlnRelay.groupManager.MembershipIndex()
 
 	proof, err := rlnRelay.RLN.GenerateProof(input, identityCredentials, membershipIndex, epoch)
 	if err != nil {
@@ -381,6 +378,6 @@ func (rlnRelay *WakuRLNRelay) IdentityCredential() (rln.IdentityCredential, erro
 	return rlnRelay.groupManager.IdentityCredentials()
 }
 
-func (rlnRelay *WakuRLNRelay) MembershipIndex() (uint, error) {
+func (rlnRelay *WakuRLNRelay) MembershipIndex() uint {
 	return rlnRelay.groupManager.MembershipIndex()
 }

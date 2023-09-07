@@ -14,7 +14,7 @@ type StaticGroupManager struct {
 	log *zap.Logger
 
 	identityCredential *rln.IdentityCredential
-	membershipIndex    *rln.MembershipIndex
+	membershipIndex    rln.MembershipIndex
 
 	group       []rln.IDCommitment
 	rootTracker *group_manager.MerkleRootTracker
@@ -36,7 +36,7 @@ func NewStaticGroupManager(
 		log:                log.Named("rln-static"),
 		group:              group,
 		identityCredential: &identityCredential,
-		membershipIndex:    &index,
+		membershipIndex:    index,
 	}, nil
 }
 
@@ -85,12 +85,8 @@ func (gm *StaticGroupManager) IdentityCredentials() (rln.IdentityCredential, err
 	return *gm.identityCredential, nil
 }
 
-func (gm *StaticGroupManager) MembershipIndex() (rln.MembershipIndex, error) {
-	if gm.membershipIndex == nil {
-		return 0, errors.New("membership index has not been setup")
-	}
-
-	return *gm.membershipIndex, nil
+func (gm *StaticGroupManager) MembershipIndex() rln.MembershipIndex {
+	return gm.membershipIndex
 }
 
 // Stop is a function created just to comply with the GroupManager interface (it does nothing)

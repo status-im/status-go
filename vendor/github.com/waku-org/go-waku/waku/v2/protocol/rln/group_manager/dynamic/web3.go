@@ -21,16 +21,16 @@ type RegistrationEventHandler = func(*DynamicGroupManager, []*contracts.RLNMembe
 // It connects to the eth client, subscribes to the `MemberRegistered` event emitted from the `MembershipContract`
 // and collects all the events, for every received event, it calls the `handler`
 func (gm *DynamicGroupManager) HandleGroupUpdates(ctx context.Context, handler RegistrationEventHandler) error {
-	fromBlock := uint64(0)
+	fromBlock := gm.web3Config.RLNContract.DeployedBlockNumber
 	metadata, err := gm.GetMetadata()
 	if err != nil {
-		gm.log.Warn("could not load last processed block from metadata. Starting onchain sync from scratch", zap.Error(err))
+		gm.log.Warn("could not load last processed block from metadata. Starting onchain sync from deployment block", zap.Error(err), zap.Uint64("deploymentBlock", gm.web3Config.RLNContract.DeployedBlockNumber))
 	} else {
-		if gm.chainId.Uint64() != metadata.ChainID.Uint64() {
+		if gm.web3Config.ChainID.Cmp(metadata.ChainID) != 0 {
 			return errors.New("persisted data: chain id mismatch")
 		}
 
-		if !bytes.Equal(gm.membershipContractAddress[:], metadata.ContractAddress[:]) {
+		if !bytes.Equal(gm.web3Config.RegistryContract.Address.Bytes(), metadata.ContractAddress.Bytes()) {
 			return errors.New("persisted data: contract address mismatch")
 		}
 
@@ -38,7 +38,9 @@ func (gm *DynamicGroupManager) HandleGroupUpdates(ctx context.Context, handler R
 		gm.log.Info("resuming onchain sync", zap.Uint64("fromBlock", fromBlock))
 	}
 
-	err = gm.loadOldEvents(ctx, gm.rlnContract, fromBlock, handler)
+	gm.rootTracker.SetValidRootsPerBlock(metadata.ValidRootsPerBlock)
+
+	err = gm.loadOldEvents(ctx, fromBlock, handler)
 	if err != nil {
 		return err
 	}
@@ -46,11 +48,11 @@ func (gm *DynamicGroupManager) HandleGroupUpdates(ctx context.Context, handler R
 	errCh := make(chan error)
 
 	gm.wg.Add(1)
-	go gm.watchNewEvents(ctx, gm.rlnContract, handler, gm.log, errCh)
+	go gm.watchNewEvents(ctx, handler, gm.log, errCh)
 	return <-errCh
 }
 
-func (gm *DynamicGroupManager) loadOldEvents(ctx context.Context, rlnContract *contracts.RLN, fromBlock uint64, handler RegistrationEventHandler) error {
+func (gm *DynamicGroupManager) loadOldEvents(ctx context.Context, fromBlock uint64, handler RegistrationEventHandler) error {
 	events, err := gm.getEvents(ctx, fromBlock, nil)
 	if err != nil {
 		return err
@@ -58,14 +60,14 @@ func (gm *DynamicGroupManager) loadOldEvents(ctx context.Context, rlnContract *c
 	return handler(gm, events)
 }
 
-func (gm *DynamicGroupManager) watchNewEvents(ctx context.Context, rlnContract *contracts.RLN, handler RegistrationEventHandler, log *zap.Logger, errCh chan<- error) {
+func (gm *DynamicGroupManager) watchNewEvents(ctx context.Context, handler RegistrationEventHandler, log *zap.Logger, errCh chan<- error) {
 	defer gm.wg.Done()
 
 	// Watch for new events
 	firstErr := true
 	headerCh := make(chan *types.Header)
 	subs := event.Resubscribe(2*time.Second, func(ctx context.Context) (event.Subscription, error) {
-		s, err := gm.ethClient.SubscribeNewHead(ctx, headerCh)
+		s, err := gm.web3Config.ETHClient.SubscribeNewHead(ctx, headerCh)
 		if err != nil {
 			if err == rpc.ErrNotificationsUnsupported {
 				err = errors.New("notifications not supported. The node must support websockets")
@@ -123,7 +125,7 @@ func (gm *DynamicGroupManager) getEvents(ctx context.Context, from uint64, to *u
 
 	toBlock := to
 	if to == nil {
-		block, err := gm.ethClient.BlockByNumber(ctx, nil)
+		block, err := gm.web3Config.ETHClient.BlockByNumber(ctx, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -148,6 +150,8 @@ func (gm *DynamicGroupManager) getEvents(ctx context.Context, from uint64, to *u
 			end = *toBlock
 		}
 
+		gm.log.Info("loading events...", zap.Uint64("fromBlock", start), zap.Uint64("toBlock", end))
+
 		evts, err := gm.fetchEvents(ctx, start, &end)
 		if err != nil {
 			if tooMuchDataRequestedError(err) {
@@ -157,6 +161,9 @@ func (gm *DynamicGroupManager) getEvents(ctx context.Context, from uint64, to *u
 
 				// multiplicative decrease
 				batchSize = batchSize / multiplicativeDecreaseDivisor
+
+				gm.log.Warn("too many logs requested!, retrying with a smaller chunk size", zap.Uint64("batchSize", batchSize))
+
 				continue
 			}
 			return nil, err
@@ -179,7 +186,7 @@ func (gm *DynamicGroupManager) getEvents(ctx context.Context, from uint64, to *u
 }
 
 func (gm *DynamicGroupManager) fetchEvents(ctx context.Context, from uint64, to *uint64) ([]*contracts.RLNMemberRegistered, error) {
-	logIterator, err := gm.rlnContract.FilterMemberRegistered(&bind.FilterOpts{Start: from, End: to, Context: ctx})
+	logIterator, err := gm.web3Config.RLNContract.FilterMemberRegistered(&bind.FilterOpts{Start: from, End: to, Context: ctx})
 	if err != nil {
 		return nil, err
 	}
