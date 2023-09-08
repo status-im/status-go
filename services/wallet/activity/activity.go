@@ -420,6 +420,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 	rows, err := deps.db.QueryContext(ctx, queryString,
 		startFilterDisabled, filter.Period.StartTimestamp, endFilterDisabled, filter.Period.EndTimestamp,
 		filterActivityTypeAll, sliceContains(filter.Types, SendAT), sliceContains(filter.Types, ReceiveAT),
+		sliceContains(filter.Types, ContractDeploymentAT), sliceContains(filter.Types, MintAT),
 		fromTrType, toTrType,
 		filterAllAddresses, filterAllToAddresses,
 		includeAllStatuses, filterStatusCompleted, filterStatusFailed, filterStatusFinalized, filterStatusPending,
@@ -519,7 +520,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 			)
 
 			// Extract tokens
-			if activityType == SendAT {
+			if activityType == SendAT || activityType == ContractDeploymentAT {
 				entry.tokenOut = involvedToken
 				outChainID = new(common.ChainID)
 				*outChainID = common.ChainID(chainID.Int64)
@@ -624,10 +625,14 @@ func getTrInAndOutAmounts(activityType Type, trAmount sql.NullString) (inAmount 
 		amount, ok := new(big.Int).SetString(trAmount.String, 16)
 		if ok {
 			switch activityType {
+			case ContractDeploymentAT:
+				fallthrough
 			case SendAT:
 				inAmount = (*hexutil.Big)(big.NewInt(0))
 				outAmount = (*hexutil.Big)(amount)
 				return
+			case MintAT:
+				fallthrough
 			case ReceiveAT:
 				inAmount = (*hexutil.Big)(amount)
 				outAmount = (*hexutil.Big)(big.NewInt(0))

@@ -380,6 +380,9 @@ func isMetadataEmpty(asset thirdparty.CollectibleData) bool {
 }
 
 func (o *Manager) fetchTokenURI(id thirdparty.CollectibleUniqueID) (string, error) {
+	if id.TokenID == nil {
+		return "", errors.New("empty token ID")
+	}
 	backend, err := o.rpcClient.EthClient(uint64(id.ContractID.ChainID))
 	if err != nil {
 		return "", err

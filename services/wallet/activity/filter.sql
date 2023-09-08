@@ -10,6 +10,8 @@
 --
 -- Only status FailedAS, PendingAS and CompleteAS are returned. FinalizedAS requires correlation with blockchain current state. As an optimization we approximate it by using timestamp information; see startTimestamp and endTimestamp
 --
+-- ContractDeploymentAT is subtype of SendAT and MintAT is subtype of ReceiveAT. It means query must prevent returning MintAT when filtering by ReceiveAT or ContractDeploymentAT when filtering by SendAT. That required duplicated code in filter by type query, to maintain perforamnce.
+--
 -- Token filtering has two parts
 -- 1. Filtering by symbol (multi_transactions and pending_transactions tables) where the chain ID is ignored, basically the filter_networks will account for that
 -- 2. Filtering by token identity (chain and address for transfers table) where the symbol is ignored and all the token identities must be provided
@@ -23,6 +25,8 @@ WITH filter_conditions AS (
 		? AS filterActivityTypeAll,
 		? AS filterActivityTypeSend,
 		? AS filterActivityTypeReceive,
+		? AS filterActivityTypeContractDeployment,
+		? AS filterActivityTypeMint,
 		? AS fromTrType,
 		? AS toTrType,
 		? AS filterAllAddresses,
@@ -37,7 +41,8 @@ WITH filter_conditions AS (
 		? AS statusPending,
 		? AS includeAllTokenTypeAssets,
 		? AS includeAllNetworks,
-		? AS pendingStatus
+		? AS pendingStatus,
+		"0000000000000000000000000000000000000000" AS zeroAddress
 ),
 filter_addresses(address) AS (
 	SELECT
@@ -195,21 +200,44 @@ WHERE
 		)
 	)
 	AND (
+		-- Check description at the top of the file why code below is duplicated
 		filterActivityTypeAll
 		OR (
 			filterActivityTypeSend
 			AND (
 				filterAllAddresses
-				OR (
-					HEX(transfers.tx_from_address) IN filter_addresses
-				)
+				OR (HEX(transfers.tx_from_address) IN filter_addresses)
 			)
+			AND NOT (tr_type = fromTrType and transfers.tx_to_address IS NULL AND transfers.type = "eth" 
+			AND transfers.contract_address IS NOT NULL AND HEX(transfers.contract_address) != zeroAddress)
 		)
 		OR (
 			filterActivityTypeReceive
 			AND (
 				filterAllAddresses
 				OR (HEX(transfers.tx_to_address) IN filter_addresses)
+			)
+			AND NOT (tr_type = toTrType AND transfers.type = "erc721" AND (
+				transfers.tx_from_address IS NULL 
+				OR HEX(transfers.tx_from_address) = zeroAddress))
+		)
+		OR (
+			filterActivityTypeContractDeployment
+			AND tr_type = fromTrType AND transfers.tx_to_address IS NULL AND transfers.type = "eth" 
+			AND transfers.contract_address IS NOT NULL AND HEX(transfers.contract_address) != zeroAddress
+			AND (
+				filterAllAddresses
+				OR (HEX(transfers.address) IN filter_addresses)
+			)
+		)
+		OR (
+			filterActivityTypeMint
+			AND tr_type = toTrType AND transfers.type = "erc721" AND (
+				transfers.tx_from_address IS NULL 
+				OR HEX(transfers.tx_from_address) = zeroAddress
+			) AND (
+				filterAllAddresses
+				OR (HEX(transfers.address) IN filter_addresses)
 			)
 		)
 	)
