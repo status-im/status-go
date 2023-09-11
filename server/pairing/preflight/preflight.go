@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/status-im/status-go/server/pairing"
+
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/logutils"
@@ -34,8 +36,9 @@ func preflightHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func makeCert(address net.IP) (*tls.Certificate, []byte, error) {
-	notBefore := time.Now()
-	notAfter := notBefore.Add(time.Minute)
+	now := time.Now()
+	notBefore := now.Add(-pairing.CertificateMaxClockDrift)
+	notAfter := now.Add(pairing.CertificateMaxClockDrift)
 	return server.GenerateTLSCert(notBefore, notAfter, []net.IP{address}, []string{})
 }
 

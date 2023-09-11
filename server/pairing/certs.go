@@ -19,6 +19,8 @@ import (
 	"github.com/status-im/status-go/server"
 )
 
+const CertificateMaxClockDrift = time.Minute
+
 func makeSerialNumberFromKey(pk *ecdsa.PrivateKey) *big.Int {
 	h := sha256.New()
 	h.Write(append(pk.D.Bytes(), append(pk.Y.Bytes(), pk.X.Bytes()...)...))
@@ -27,7 +29,7 @@ func makeSerialNumberFromKey(pk *ecdsa.PrivateKey) *big.Int {
 }
 
 func GenerateCertFromKey(pk *ecdsa.PrivateKey, from time.Time, IPAddresses []net.IP, DNSNames []string) (tls.Certificate, []byte, error) {
-	cert := server.GenerateX509Cert(makeSerialNumberFromKey(pk), from, from.Add(time.Hour), IPAddresses, DNSNames)
+	cert := server.GenerateX509Cert(makeSerialNumberFromKey(pk), from.Add(-CertificateMaxClockDrift), from.Add(time.Hour), IPAddresses, DNSNames)
 	certPem, keyPem, err := server.GenerateX509PEMs(cert, pk)
 	if err != nil {
 		return tls.Certificate{}, nil, err
