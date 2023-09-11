@@ -734,6 +734,12 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 	require.Equal(t, 0, mintCount)
 	require.Equal(t, 0, swapCount)
 	require.Equal(t, 0, bridgeCount)
+
+	// Filter with all addresses regression
+	filter.Types = []Type{SendAT}
+	entries, err = getActivityEntries(context.Background(), deps, allAddressesFilter(), []common.ChainID{}, filter, 0, 15)
+	require.NoError(t, err)
+	require.Equal(t, 5, len(entries))
 }
 
 func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
