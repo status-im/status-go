@@ -136,7 +136,7 @@ func (m *testTokenManager) GetBalancesByChain(ctx context.Context, accounts, tok
 	return m.response, nil
 }
 
-func (m *testTokenManager) UpsertCustom(token token.Token) error {
+func (m *testTokenManager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *token.Token {
 	return nil
 }
 

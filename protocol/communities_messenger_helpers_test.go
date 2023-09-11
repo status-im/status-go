@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
+
 	"io/ioutil"
 	"sync"
 	"time"
@@ -75,7 +76,7 @@ func (m *TokenManagerMock) GetBalancesByChain(ctx context.Context, accounts, tok
 	return *m.Balances, nil
 }
 
-func (m *TokenManagerMock) UpsertCustom(token walletToken.Token) error {
+func (m *TokenManagerMock) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *walletToken.Token {
 	time.Sleep(100 * time.Millisecond) // simulate response time
 	return nil
 }
