@@ -16,9 +16,19 @@ import (
 func setupTestTokenDB(t *testing.T) (*Manager, func()) {
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
-	return &Manager{db, nil, nil, nil, nil, nil, nil, false}, func() {
-		require.NoError(t, db.Close())
-	}
+
+	return &Manager{
+			db:               db,
+			RPCClient:        nil,
+			contractMaker:    nil,
+			networkManager:   nil,
+			stores:           nil,
+			tokenList:        nil,
+			tokenMap:         nil,
+			areTokensFetched: false,
+		}, func() {
+			require.NoError(t, db.Close())
+		}
 }
 
 func TestCustoms(t *testing.T) {
