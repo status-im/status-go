@@ -10,7 +10,7 @@
 --
 -- Only status FailedAS, PendingAS and CompleteAS are returned. FinalizedAS requires correlation with blockchain current state. As an optimization we approximate it by using timestamp information; see startTimestamp and endTimestamp
 --
--- ContractDeploymentAT is subtype of SendAT and MintAT is subtype of ReceiveAT. It means query must prevent returning MintAT when filtering by ReceiveAT or ContractDeploymentAT when filtering by SendAT. That required duplicated code in filter by type query, to maintain perforamnce.
+-- ContractDeploymentAT is subtype of SendAT and MintAT is subtype of ReceiveAT. It means query must prevent returning MintAT when filtering by ReceiveAT or ContractDeploymentAT when filtering by SendAT. That required duplicated code in filter by type query, to maintain performance.
 --
 -- Token filtering has two parts
 -- 1. Filtering by symbol (multi_transactions and pending_transactions tables) where the chain ID is ignored, basically the filter_networks will account for that
@@ -157,7 +157,7 @@ SELECT
 		AND from_join.address IS NULL THEN toTrType
 		WHEN from_join.address IS NOT NULL
 		AND to_join.address IS NOT NULL THEN CASE
-			WHEN from_join.address < to_join.address THEN fromTrType
+			WHEN transfers.address = transfers.tx_from_address THEN fromTrType
 			ELSE toTrType
 		END
 		ELSE NULL
@@ -205,12 +205,7 @@ WHERE
 		filterActivityTypeAll
 		OR (
 			filterActivityTypeSend
-			AND (
-				filterAllAddresses
-				OR (
-					HEX(transfers.tx_from_address) IN filter_addresses
-				)
-			)
+			AND tr_type = fromTrType
 			AND NOT (
 				tr_type = fromTrType
 				and transfers.tx_to_address IS NULL
@@ -221,10 +216,7 @@ WHERE
 		)
 		OR (
 			filterActivityTypeReceive
-			AND (
-				filterAllAddresses
-				OR (HEX(transfers.tx_to_address) IN filter_addresses)
-			)
+			AND tr_type = toTrType
 			AND NOT (
 				tr_type = toTrType
 				AND transfers.type = "erc721"
