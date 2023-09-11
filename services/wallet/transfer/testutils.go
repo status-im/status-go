@@ -242,7 +242,7 @@ func InsertTestTransferWithOptions(tb testing.TB, db *sql.DB, address eth_common
 
 	block := blockDBFields{
 		chainID:     uint64(tr.ChainID),
-		account:     tr.To,
+		account:     address,
 		blockNumber: big.NewInt(tr.BlkNumber),
 		blockHash:   blkHash,
 	}

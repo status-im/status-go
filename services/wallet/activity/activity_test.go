@@ -620,7 +620,7 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 	}, entries[0])
 }
 
-func countTypes(entries []Entry) (sendCount, receiveCount, swapCount, buyCount, bridgeCount int) {
+func countTypes(entries []Entry) (sendCount, receiveCount, contractCount, mintCount, swapCount, buyCount, bridgeCount int) {
 	for _, entry := range entries {
 		switch entry.activityType {
 		case SendAT:
@@ -633,6 +633,10 @@ func countTypes(entries []Entry) (sendCount, receiveCount, swapCount, buyCount, 
 			buyCount++
 		case BridgeAT:
 			bridgeCount++
+		case ContractDeploymentAT:
+			contractCount++
+		case MintAT:
+			mintCount++
 		}
 	}
 	return
@@ -662,15 +666,29 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 		transfer.InsertTestTransfer(t, deps.db, trs[i].To, &trs[i])
 	}
 
+	trsSpecial, _, _ := transfer.GenerateTestTransfers(t, deps.db, 100, 2)
+	// Insert MintAT
+	trsSpecial[0].From = eth.HexToAddress("0x0")
+	transfer.InsertTestTransferWithOptions(t, deps.db, trsSpecial[0].To, &trsSpecial[0], &transfer.TestTransferOptions{
+		TokenAddress: eth.HexToAddress("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"),
+		TokenID:      (big.NewInt(1318)),
+	})
+
+	// Insert ContractDeploymentAt
+	trsSpecial[1].To = eth.HexToAddress("0x0")
+	transfer.InsertTestTransferWithOptions(t, deps.db, trsSpecial[1].From, &trsSpecial[1], &transfer.TestTransferOptions{
+		NullifyAddresses: []eth.Address{trsSpecial[1].To},
+	})
+
 	// Test filtering out without address involved
 	var filter Filter
 
 	filter.Types = allActivityTypesFilter()
 	// Set tr1 to Receive and pendingTr to Send; rest of two MT remain default Send
-	addresses := []eth.Address{td.tr1.To, td.pendingTr.From, td.multiTx1.FromAddress, td.multiTx2.FromAddress, trs[0].From, trs[2].From, trs[4].From, trs[6].From, trs[8].From}
+	addresses := []eth.Address{td.tr1.To, td.pendingTr.From, td.multiTx1.FromAddress, td.multiTx2.FromAddress, trs[0].From, trs[2].From, trs[4].From, trs[6].From, trs[8].From, trsSpecial[0].To, trsSpecial[1].From}
 	entries, err := getActivityEntries(context.Background(), deps, addresses, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
-	require.Equal(t, 9, len(entries))
+	require.Equal(t, 11, len(entries))
 
 	filter.Types = []Type{SendAT, SwapAT}
 	entries, err = getActivityEntries(context.Background(), deps, addresses, []common.ChainID{}, filter, 0, 15)
@@ -678,10 +696,12 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 	// 3 from td Send + 2 trs MT Send + 1 (swap)
 	require.Equal(t, 6, len(entries))
 
-	sendCount, receiveCount, swapCount, _, bridgeCount := countTypes(entries)
+	sendCount, receiveCount, contractCount, mintCount, swapCount, _, bridgeCount := countTypes(entries)
 
 	require.Equal(t, 5, sendCount)
 	require.Equal(t, 0, receiveCount)
+	require.Equal(t, 0, contractCount)
+	require.Equal(t, 0, mintCount)
 	require.Equal(t, 1, swapCount)
 	require.Equal(t, 0, bridgeCount)
 
@@ -690,11 +710,39 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 3, len(entries))
 
-	sendCount, receiveCount, swapCount, _, bridgeCount = countTypes(entries)
+	sendCount, receiveCount, contractCount, mintCount, swapCount, _, bridgeCount = countTypes(entries)
 	require.Equal(t, 0, sendCount)
 	require.Equal(t, 1, receiveCount)
+	require.Equal(t, 0, contractCount)
+	require.Equal(t, 0, mintCount)
 	require.Equal(t, 0, swapCount)
 	require.Equal(t, 2, bridgeCount)
+
+	filter.Types = []Type{MintAT}
+	entries, err = getActivityEntries(context.Background(), deps, addresses, []common.ChainID{}, filter, 0, 15)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(entries))
+
+	sendCount, receiveCount, contractCount, mintCount, swapCount, _, bridgeCount = countTypes(entries)
+	require.Equal(t, 0, sendCount)
+	require.Equal(t, 0, receiveCount)
+	require.Equal(t, 0, contractCount)
+	require.Equal(t, 1, mintCount)
+	require.Equal(t, 0, swapCount)
+	require.Equal(t, 0, bridgeCount)
+
+	filter.Types = []Type{ContractDeploymentAT}
+	entries, err = getActivityEntries(context.Background(), deps, addresses, []common.ChainID{}, filter, 0, 15)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(entries))
+
+	sendCount, receiveCount, contractCount, mintCount, swapCount, _, bridgeCount = countTypes(entries)
+	require.Equal(t, 0, sendCount)
+	require.Equal(t, 0, receiveCount)
+	require.Equal(t, 1, contractCount)
+	require.Equal(t, 0, mintCount)
+	require.Equal(t, 0, swapCount)
+	require.Equal(t, 0, bridgeCount)
 }
 
 func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
