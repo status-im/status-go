@@ -120,7 +120,7 @@ type managerOptions struct {
 
 type TokenManager interface {
 	GetBalancesByChain(ctx context.Context, accounts, tokens []gethcommon.Address, chainIDs []uint64) (map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, error)
-	UpsertCustom(token token.Token) error
+	FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *token.Token
 	GetAllChainIDs() ([]uint64, error)
 }
 
@@ -161,8 +161,8 @@ func (m *DefaultTokenManager) GetBalancesByChain(ctx context.Context, accounts, 
 	return resp, err
 }
 
-func (m *DefaultTokenManager) UpsertCustom(t token.Token) error {
-	return m.tokenManager.UpsertCustom(t)
+func (m *DefaultTokenManager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint64, address gethcommon.Address) *token.Token {
+	return m.tokenManager.FindOrCreateTokenByAddress(ctx, chainID, address)
 }
 
 type ManagerOption func(*managerOptions)
@@ -1308,17 +1308,7 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 			}
 
 			for chainID, address := range tokenMetadata.ContractAddresses {
-				token := token.Token{
-					Address:  gethcommon.HexToAddress(address),
-					ChainID:  chainID,
-					Symbol:   tokenMetadata.Symbol,
-					Name:     tokenMetadata.Name,
-					Decimals: uint(tokenMetadata.Decimals),
-				}
-				err := m.tokenManager.UpsertCustom(token)
-				if err != nil {
-					return nil, err
-				}
+				_ = m.tokenManager.FindOrCreateTokenByAddress(context.Background(), chainID, gethcommon.HexToAddress(address))
 			}
 		}
 	}
