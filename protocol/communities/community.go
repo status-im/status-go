@@ -672,6 +672,8 @@ func (o *Community) RemoveUserFromChat(pk *ecdsa.PublicKey, chatID string) (*pro
 		o.increaseClock()
 	}
 
+	fmt.Println("------> RemoveUserFromChat::", chat.Identity.DisplayName, ", members: ", len(chat.Members))
+
 	return o.config.CommunityDescription, nil
 }
 
@@ -1767,6 +1769,8 @@ func (o *Community) AddMemberToChat(chatID string, publicKey *ecdsa.PublicKey, r
 		},
 	}
 
+	fmt.Println("------> AddMemberToChat::", chat.Identity.DisplayName, ", members: ", len(chat.Members))
+
 	if o.IsControlNode() {
 		o.increaseClock()
 	}
@@ -1805,6 +1809,8 @@ func (o *Community) populateChatWithAllMembers(chatID string) (*CommunityChanges
 
 	chat.Members = o.Members()
 	o.increaseClock()
+
+	fmt.Println("------> populateChatWithAllMembers::", chat.Identity.DisplayName, ", members: ", len(chat.Members))
 
 	return result, nil
 }
@@ -1972,6 +1978,7 @@ func (o *Community) createChat(chatID string, chat *protobuf.CommunityChat) erro
 	}
 
 	chat.Members = o.config.CommunityDescription.Members
+	fmt.Println("------> createChat::", chat.Identity.DisplayName, ", members: ", len(chat.Members))
 
 	o.config.CommunityDescription.Chats[chatID] = chat
 

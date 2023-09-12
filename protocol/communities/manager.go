@@ -721,6 +721,8 @@ func (m *Manager) ReevaluateMembers(community *Community) error {
 			}
 		}
 
+		fmt.Println("------> ReevaluateMembers for community: ", community.Identity().DisplayName)
+
 		// Validate channel permissions
 		for channelID := range community.Chats() {
 			chatID := community.IDString() + channelID
@@ -4529,6 +4531,7 @@ func (m *Manager) fixupChannelMembers() error {
 	}
 
 	for _, c := range controlledCommunities {
+		fmt.Println("------> fixupChannelMembers for community: ", c.Identity().DisplayName)
 		for channelID := range c.Chats() {
 			if !c.ChannelHasTokenPermissions(c.IDString() + channelID) {
 				_, err := c.PopulateChatWithAllMembers(channelID)
