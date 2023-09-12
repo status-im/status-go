@@ -112,7 +112,6 @@ func NewAccountPayloadLoader(p *AccountPayload, config *SenderConfig) (*AccountP
 	ppr.keyUID = config.KeyUID
 	ppr.password = config.Password
 	ppr.chatKey = config.ChatKey
-	ppr.keycardPairings = config.KeycardPairings
 	ppr.keystorePath = config.KeystorePath
 	return ppr, nil
 }

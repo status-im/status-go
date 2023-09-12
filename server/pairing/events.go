@@ -43,8 +43,7 @@ const (
 )
 
 type AccountData struct {
-	Account         *multiaccounts.Account `json:"account,omitempty"`
-	Password        string                 `json:"password,omitempty"`
-	ChatKey         string                 `json:"chatKey,omitempty"`
-	KeycardPairings string                 `json:"keycardPairings,omitempty"`
+	Account  *multiaccounts.Account `json:"account,omitempty"`
+	Password string                 `json:"password,omitempty"`
+	ChatKey  string                 `json:"chatKey,omitempty"`
 }

@@ -25,11 +25,10 @@ var (
 
 // AccountPayload represents the payload structure a Server handles
 type AccountPayload struct {
-	keys            map[string][]byte // nolint: structcheck
-	multiaccount    *multiaccounts.Account
-	password        string
-	chatKey         string
-	keycardPairings string
+	keys         map[string][]byte // nolint: structcheck
+	multiaccount *multiaccounts.Account
+	password     string
+	chatKey      string
 	//flag if account already exist before sync account
 	exist bool
 }
@@ -46,10 +45,9 @@ func NewPairingPayloadMarshaller(ap *AccountPayload, logger *zap.Logger) *Accoun
 
 func (ppm *AccountPayloadMarshaller) MarshalProtobuf() ([]byte, error) {
 	lpp := &protobuf.LocalPairingPayload{
-		Keys:            ppm.accountKeysToProtobuf(),
-		Password:        ppm.password,
-		ChatKey:         ppm.chatKey,
-		KeycardPairings: ppm.keycardPairings,
+		Keys:     ppm.accountKeysToProtobuf(),
+		Password: ppm.password,
+		ChatKey:  ppm.chatKey,
 	}
 	if ppm.multiaccount != nil {
 		lpp.Multiaccount = ppm.multiaccount.ToProtobuf()
@@ -87,7 +85,7 @@ func (ppm *AccountPayloadMarshaller) UnmarshalProtobuf(data []byte) error {
 	}
 	ppm.password = pb.Password
 	ppm.chatKey = pb.ChatKey
-	ppm.keycardPairings = pb.KeycardPairings
+
 	return nil
 }
 

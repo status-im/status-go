@@ -15,10 +15,9 @@ type SenderConfig struct {
 	// DeviceType SendPairInstallation need this information
 	DeviceType string `json:"deviceType" validate:"required"`
 
-	KeyUID          string `json:"keyUID" validate:"required,keyuid"`
-	Password        string `json:"password" validate:"required"`
-	ChatKey         string `json:"chatKey"` // set only in case of a Keycard user, otherwise empty
-	KeycardPairings string `json:"keycardPairings"`
+	KeyUID   string `json:"keyUID" validate:"required,keyuid"`
+	Password string `json:"password" validate:"required"`
+	ChatKey  string `json:"chatKey"` // set only in case of a Keycard user, otherwise empty
 
 	DB *multiaccounts.Database `json:"-"`
 }
