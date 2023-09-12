@@ -117,7 +117,7 @@ func (s SendType) canUseBridge(b bridge.Bridge) bool {
 }
 
 func (s SendType) isAvailableFor(network *params.Network) bool {
-	if s == Transfer || s == Bridge {
+	if s == Transfer || s == Bridge || s == ERC721Transfer {
 		return true
 	}
 
@@ -544,6 +544,7 @@ func (r *Router) suggestedRoutes(
 		if network.IsTest != areTestNetworksEnabled {
 			continue
 		}
+
 		if containsNetworkChainID(network, disabledFromChainIDs) {
 			continue
 		}
@@ -556,10 +557,12 @@ func (r *Router) suggestedRoutes(
 		if token == nil {
 			continue
 		}
+
 		nativeToken := r.s.tokenManager.FindToken(network, network.NativeCurrencySymbol)
 		if nativeToken == nil {
 			continue
 		}
+
 		group.Add(func(c context.Context) error {
 			gasFees, err := r.s.feesManager.suggestedFees(ctx, network.ChainID)
 			if err != nil {
@@ -590,7 +593,6 @@ func (r *Router) suggestedRoutes(
 			maxFees := gasFees.feeFor(gasFeeMode)
 
 			estimatedTime := r.s.feesManager.transactionEstimatedTime(ctx, network.ChainID, maxFees)
-
 			for _, bridge := range r.bridges {
 				if !sendType.canUseBridge(bridge) {
 					continue
