@@ -77,10 +77,21 @@ type NFT struct {
 	MetadataURL   string         `json:"metadata_url"`
 }
 
+type DetailedNFTContainer struct {
+	NFT DetailedNFT `json:"nft"`
+}
+
 type DetailedNFT struct {
-	NFT
-	Owners []OwnerV2 `json:"owners"`
-	Traits []TraitV2 `json:"traits"`
+	TokenID       *bigint.BigInt `json:"identifier"`
+	Collection    string         `json:"collection"`
+	Contract      common.Address `json:"contract"`
+	TokenStandard string         `json:"token_standard"`
+	Name          string         `json:"name"`
+	Description   string         `json:"description"`
+	ImageURL      string         `json:"image_url"`
+	MetadataURL   string         `json:"metadata_url"`
+	Owners        []OwnerV2      `json:"owners"`
+	Traits        []TraitV2      `json:"traits"`
 }
 
 type OwnerV2 struct {
@@ -107,22 +118,6 @@ func (c *NFT) id(chainID walletCommon.ChainID) thirdparty.CollectibleUniqueID {
 	}
 }
 
-func openseaV2ToCollectibleTraits(traits []TraitV2) []thirdparty.CollectibleTrait {
-	ret := make([]thirdparty.CollectibleTrait, 0, len(traits))
-	caser := cases.Title(language.Und, cases.NoLower)
-	for _, orig := range traits {
-		dest := thirdparty.CollectibleTrait{
-			TraitType:   strings.Replace(orig.TraitType, "_", " ", 1),
-			Value:       caser.String(string(orig.Value)),
-			DisplayType: orig.DisplayType,
-			MaxValue:    orig.MaxValue,
-		}
-
-		ret = append(ret, dest)
-	}
-	return ret
-}
-
 func (c *NFT) toCollectiblesData(chainID walletCommon.ChainID) thirdparty.CollectibleData {
 	return thirdparty.CollectibleData{
 		ID:           c.id(chainID),
@@ -143,10 +138,46 @@ func (c *NFT) toCommon(chainID walletCommon.ChainID) thirdparty.FullCollectibleD
 	}
 }
 
-func (c *DetailedNFT) toCommon(chainID walletCommon.ChainID) thirdparty.FullCollectibleData {
-	fullData := c.NFT.toCommon(chainID)
-	fullData.CollectibleData.Traits = openseaV2ToCollectibleTraits(c.Traits)
+func openseaV2ToCollectibleTraits(traits []TraitV2) []thirdparty.CollectibleTrait {
+	ret := make([]thirdparty.CollectibleTrait, 0, len(traits))
+	caser := cases.Title(language.Und, cases.NoLower)
+	for _, orig := range traits {
+		dest := thirdparty.CollectibleTrait{
+			TraitType:   strings.Replace(orig.TraitType, "_", " ", 1),
+			Value:       caser.String(string(orig.Value)),
+			DisplayType: orig.DisplayType,
+			MaxValue:    orig.MaxValue,
+		}
 
+		ret = append(ret, dest)
+	}
+	return ret
+}
+
+func (c *DetailedNFT) id(chainID walletCommon.ChainID) thirdparty.CollectibleUniqueID {
+	return thirdparty.CollectibleUniqueID{
+		ContractID: thirdparty.ContractID{
+			ChainID: chainID,
+			Address: c.Contract,
+		},
+		TokenID: c.TokenID,
+	}
+}
+
+func (c *DetailedNFT) toCollectiblesData(chainID walletCommon.ChainID) thirdparty.CollectibleData {
+	return thirdparty.CollectibleData{
+		ID:           c.id(chainID),
+		Provider:     OpenseaV2ID,
+		Name:         c.Name,
+		Description:  c.Description,
+		ImageURL:     c.ImageURL,
+		AnimationURL: c.ImageURL,
+		Traits:       openseaV2ToCollectibleTraits(c.Traits),
+		TokenURI:     c.MetadataURL,
+	}
+}
+
+func (c *DetailedNFT) toCommon(chainID walletCommon.ChainID) thirdparty.FullCollectibleData {
 	return thirdparty.FullCollectibleData{
 		CollectibleData: c.toCollectiblesData(chainID),
 		CollectionData:  nil,
