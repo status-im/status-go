@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -122,15 +121,6 @@ func getTokenBySymbols(tokens []*token.Token) map[string][]*token.Token {
 	return res
 }
 
-func getTokenSymbols(tokens []*token.Token) []string {
-	tokensBySymbols := getTokenBySymbols(tokens)
-	res := make([]string, 0)
-	for symbol := range tokensBySymbols {
-		res = append(res, symbol)
-	}
-	return res
-}
-
 func getTokenAddresses(tokens []*token.Token) []common.Address {
 	set := make(map[common.Address]bool)
 	for _, token := range tokens {
@@ -209,65 +199,25 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 		allTokens = append(allTokens, r.tokenManager.ToToken(network))
 	}
 
-	tokenSymbols := getTokenSymbols(allTokens)
 	tokenAddresses := getTokenAddresses(allTokens)
-
-	var (
-		group             = async.NewAtomicGroup(ctx)
-		prices            = map[string]map[string]float64{}
-		tokenDetails      = map[string]thirdparty.TokenDetails{}
-		tokenMarketValues = map[string]thirdparty.TokenMarketValues{}
-		balances          = map[uint64]map[common.Address]map[common.Address]*hexutil.Big{}
-	)
-
-	group.Add(func(parent context.Context) error {
-		prices, err = r.marketManager.FetchPrices(tokenSymbols, currencies)
-		if err != nil {
-			log.Info("marketManager.FetchPrices err", err)
-		}
-		return nil
-	})
-
-	group.Add(func(parent context.Context) error {
-		tokenDetails, err = r.marketManager.FetchTokenDetails(tokenSymbols)
-		if err != nil {
-			log.Info("marketManager.FetchTokenDetails err", err)
-		}
-		return nil
-	})
-
-	group.Add(func(parent context.Context) error {
-		tokenMarketValues, err = r.marketManager.FetchTokenMarketValues(tokenSymbols, currency)
-		if err != nil {
-			log.Info("marketManager.FetchTokenMarketValues err", err)
-		}
-		return nil
-	})
 
 	clients, err := r.rpcClient.EthClients(chainIDs)
 	if err != nil {
 		return nil, err
 	}
-	group.Add(func(parent context.Context) error {
-		balances, err = r.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokenAddresses)
-		if err != nil {
-			for _, client := range clients {
-				client.SetIsConnected(false)
-			}
-			log.Info("tokenManager.GetBalancesByChain error", "err", err)
-			return err
-		}
-		return nil
-	})
 
-	select {
-	case <-group.WaitAsync():
-	case <-ctx.Done():
-		return nil, ctx.Err()
+	balances, err := r.tokenManager.GetBalancesByChain(ctx, clients, addresses, tokenAddresses)
+	if err != nil {
+		for _, client := range clients {
+			client.SetIsConnected(false)
+		}
+		log.Info("tokenManager.GetBalancesByChain error", "err", err)
+		return nil, err
 	}
-	err = group.Error()
-	result := make(map[common.Address][]Token)
+
 	verifiedTokens, unverifiedTokens := splitVerifiedTokens(allTokens)
+	tokenSymbols := make([]string, 0)
+	result := make(map[common.Address][]Token)
 
 	for _, address := range addresses {
 		for _, tokenList := range [][]*token.Token{verifiedTokens, unverifiedTokens} {
@@ -303,37 +253,91 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 					continue
 				}
 
-				marketValuesPerCurrency := make(map[string]TokenMarketValues)
-				for _, currency := range currencies {
-					marketValuesPerCurrency[currency] = TokenMarketValues{
-						MarketCap:       tokenMarketValues[symbol].MKTCAP,
-						HighDay:         tokenMarketValues[symbol].HIGHDAY,
-						LowDay:          tokenMarketValues[symbol].LOWDAY,
-						ChangePctHour:   tokenMarketValues[symbol].CHANGEPCTHOUR,
-						ChangePctDay:    tokenMarketValues[symbol].CHANGEPCTDAY,
-						ChangePct24hour: tokenMarketValues[symbol].CHANGEPCT24HOUR,
-						Change24hour:    tokenMarketValues[symbol].CHANGE24HOUR,
-						Price:           prices[symbol][currency],
-						HasError:        !r.marketManager.IsConnected,
-					}
-				}
-
 				walletToken := Token{
-					Name:                    tokens[0].Name,
-					Color:                   tokens[0].Color,
-					Symbol:                  symbol,
-					BalancesPerChain:        balancesPerChain,
-					Decimals:                decimals,
-					Description:             tokenDetails[symbol].Description,
-					AssetWebsiteURL:         tokenDetails[symbol].AssetWebsiteURL,
-					BuiltOn:                 tokenDetails[symbol].BuiltOn,
-					MarketValuesPerCurrency: marketValuesPerCurrency,
-					PegSymbol:               token.GetTokenPegSymbol(symbol),
-					Verified:                tokens[0].Verified,
+					Name:             tokens[0].Name,
+					Color:            tokens[0].Color,
+					Symbol:           symbol,
+					BalancesPerChain: balancesPerChain,
+					Decimals:         decimals,
+					PegSymbol:        token.GetTokenPegSymbol(symbol),
+					Verified:         tokens[0].Verified,
 				}
 
+				tokenSymbols = append(tokenSymbols, symbol)
 				result[address] = append(result[address], walletToken)
 			}
+		}
+	}
+
+	var (
+		group             = async.NewAtomicGroup(ctx)
+		prices            = map[string]map[string]float64{}
+		tokenDetails      = map[string]thirdparty.TokenDetails{}
+		tokenMarketValues = map[string]thirdparty.TokenMarketValues{}
+	)
+
+	group.Add(func(parent context.Context) error {
+		prices, err = r.marketManager.FetchPrices(tokenSymbols, currencies)
+		if err != nil {
+			log.Info("marketManager.FetchPrices err", err)
+		}
+		return nil
+	})
+
+	group.Add(func(parent context.Context) error {
+		tokenDetails, err = r.marketManager.FetchTokenDetails(tokenSymbols)
+		if err != nil {
+			log.Info("marketManager.FetchTokenDetails err", err)
+		}
+		return nil
+	})
+
+	group.Add(func(parent context.Context) error {
+		tokenMarketValues, err = r.marketManager.FetchTokenMarketValues(tokenSymbols, currency)
+		if err != nil {
+			log.Info("marketManager.FetchTokenMarketValues err", err)
+		}
+		return nil
+	})
+
+	select {
+	case <-group.WaitAsync():
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	err = group.Error()
+	if err != nil {
+		return nil, err
+	}
+
+	for address, tokens := range result {
+		for index, token := range tokens {
+			marketValuesPerCurrency := make(map[string]TokenMarketValues)
+			for _, currency := range currencies {
+				if _, ok := tokenMarketValues[token.Symbol]; !ok {
+					continue
+				}
+				marketValuesPerCurrency[currency] = TokenMarketValues{
+					MarketCap:       tokenMarketValues[token.Symbol].MKTCAP,
+					HighDay:         tokenMarketValues[token.Symbol].HIGHDAY,
+					LowDay:          tokenMarketValues[token.Symbol].LOWDAY,
+					ChangePctHour:   tokenMarketValues[token.Symbol].CHANGEPCTHOUR,
+					ChangePctDay:    tokenMarketValues[token.Symbol].CHANGEPCTDAY,
+					ChangePct24hour: tokenMarketValues[token.Symbol].CHANGEPCT24HOUR,
+					Change24hour:    tokenMarketValues[token.Symbol].CHANGE24HOUR,
+					Price:           prices[token.Symbol][currency],
+					HasError:        !r.marketManager.IsConnected,
+				}
+			}
+
+			if _, ok := tokenDetails[token.Symbol]; !ok {
+				continue
+			}
+
+			result[address][index].Description = tokenDetails[token.Symbol].Description
+			result[address][index].AssetWebsiteURL = tokenDetails[token.Symbol].AssetWebsiteURL
+			result[address][index].BuiltOn = tokenDetails[token.Symbol].BuiltOn
+			result[address][index].MarketValuesPerCurrency = marketValuesPerCurrency
 		}
 	}
 
