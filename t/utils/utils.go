@@ -238,6 +238,7 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 		"NetworkId": ` + strconv.Itoa(networkID) + `,
 		"DataDir": "` + testDir + `",
 		"KeyStoreDir": "` + path.Join(testDir, "keystore") + `",
+		"KeycardPairingDataFile": "` + path.Join(testDir, "keycard/pairings.json") + `",
 		"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 		"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
 		"LogLevel": "` + errorLevel + `",

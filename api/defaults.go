@@ -96,6 +96,7 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 	nodeConfig.LogDir = request.LogFilePath
 	nodeConfig.LogLevel = "ERROR"
 	nodeConfig.DataDir = "/ethereum/mainnet_rpc"
+	nodeConfig.KeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
 
 	if request.LogLevel != nil {
 		nodeConfig.LogLevel = *request.LogLevel

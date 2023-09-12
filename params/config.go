@@ -318,6 +318,9 @@ type NodeConfig struct {
 	// KeyStoreDir is the file system folder that contains private keys.
 	KeyStoreDir string `validate:"required"`
 
+	// KeycardPairingDataFile is the file where we keep keycard pairings data.
+	KeycardPairingDataFile string `validate:"required"`
+
 	// NodeKey is the hex-encoded node ID (private key). Should be a valid secp256k1 private key that will be used for both
 	// remote peer identification as well as network traffic encryption.
 	NodeKey string
@@ -827,31 +830,34 @@ func (c *NodeConfig) updatePeerLimits() {
 // NewNodeConfig creates new node configuration object with bare-minimum defaults.
 // Important: the returned config is not validated.
 func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
-	var keyStoreDir, wakuDir, wakuV2Dir string
+	var keyStoreDir, keycardPairingDataFile, wakuDir, wakuV2Dir string
 
 	if dataDir != "" {
 		keyStoreDir = filepath.Join(dataDir, "keystore")
+		keycardPairingDataFile = filepath.Join(dataDir, "keycard", "pairings.json")
+
 		wakuDir = filepath.Join(dataDir, "waku")
 		wakuV2Dir = filepath.Join(dataDir, "wakuv2")
 	}
 
 	config := &NodeConfig{
-		NetworkID:        networkID,
-		DataDir:          dataDir,
-		KeyStoreDir:      keyStoreDir,
-		Version:          Version,
-		HTTPHost:         "localhost",
-		HTTPPort:         8545,
-		HTTPVirtualHosts: []string{"localhost"},
-		ListenAddr:       ":0",
-		APIModules:       "eth,net,web3,peer,wallet",
-		MaxPeers:         25,
-		MaxPendingPeers:  0,
-		IPCFile:          "geth.ipc",
-		log:              log.New("package", "status-go/params.NodeConfig"),
-		LogFile:          "",
-		LogLevel:         "ERROR",
-		NoDiscovery:      true,
+		NetworkID:              networkID,
+		DataDir:                dataDir,
+		KeyStoreDir:            keyStoreDir,
+		KeycardPairingDataFile: keycardPairingDataFile,
+		Version:                Version,
+		HTTPHost:               "localhost",
+		HTTPPort:               8545,
+		HTTPVirtualHosts:       []string{"localhost"},
+		ListenAddr:             ":0",
+		APIModules:             "eth,net,web3,peer,wallet",
+		MaxPeers:               25,
+		MaxPendingPeers:        0,
+		IPCFile:                "geth.ipc",
+		log:                    log.New("package", "status-go/params.NodeConfig"),
+		LogFile:                "",
+		LogLevel:               "ERROR",
+		NoDiscovery:            true,
 		UpstreamConfig: UpstreamRPCConfig{
 			URL: getUpstreamURL(networkID),
 		},

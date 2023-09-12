@@ -298,6 +298,7 @@ message SyncKeypair {
   repeated SyncAccount accounts = 8;
   repeated SyncKeycard keycards = 9;
   bool removed = 10;
+  bytes keycard_pairings = 11;
 }
 
 // this message is used for syncing accounts positions only, for syncing any other info consider
