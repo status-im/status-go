@@ -215,13 +215,13 @@ func (o *ClientV2) fetchDetailedAssets(uniqueIDs []thirdparty.CollectibleUniqueI
 			return nil, fmt.Errorf("invalid json: %s", string(body))
 		}
 
-		nft := DetailedNFT{}
-		err = json.Unmarshal(body, &nft)
+		nftContainer := DetailedNFTContainer{}
+		err = json.Unmarshal(body, &nftContainer)
 		if err != nil {
 			return nil, err
 		}
 
-		assets = append(assets, nft.toCommon(id.ContractID.ChainID))
+		assets = append(assets, nftContainer.NFT.toCommon(id.ContractID.ChainID))
 	}
 
 	return assets, nil
