@@ -63,7 +63,7 @@ func setupTestService(tb testing.TB) (service *Service, eventFeed *event.Feed, t
 	eventFeed = new(event.Feed)
 	tokenMock = &mockTokenManager{}
 	collectiblesMock = &mockCollectiblesManager{}
-	service = NewService(db, tokenMock, collectiblesMock, eventFeed, nil)
+	service = NewService(db, tokenMock, collectiblesMock, eventFeed)
 
 	return service, eventFeed, tokenMock, collectiblesMock, func() {
 		require.NoError(tb, db.Close())
@@ -79,8 +79,8 @@ type arg struct {
 }
 
 // insertStubTransfersWithCollectibles will insert nil if tokenIDStr is empty
-func insertStubTransfersWithCollectibles(t *testing.T, db *sql.DB, args []arg) {
-	trs, _, _ := transfer.GenerateTestTransfers(t, db, 0, len(args))
+func insertStubTransfersWithCollectibles(t *testing.T, db *sql.DB, args []arg) (fromAddresses, toAddresses []eth.Address) {
+	trs, fromAddresses, toAddresses := transfer.GenerateTestTransfers(t, db, 0, len(args))
 	for i := range args {
 		trs[i].ChainID = args[i].chainID
 		if args[i].tokenIDStr == "" {
@@ -96,6 +96,7 @@ func insertStubTransfersWithCollectibles(t *testing.T, db *sql.DB, args []arg) {
 			TokenID:      args[i].tokenID,
 		})
 	}
+	return fromAddresses, toAddresses
 }
 
 func TestService_UpdateCollectibleInfo(t *testing.T) {
@@ -108,7 +109,7 @@ func TestService_UpdateCollectibleInfo(t *testing.T) {
 		{5, "0x3d6afaa395c31fcd391fe3d562e75fe9e8ec7e6a", "", nil, nil},
 		{5, "0xA2838FDA19EB6EED3F8B9EFF411D4CD7D2DE0313", "0x0F", nil, nil},
 	}
-	insertStubTransfersWithCollectibles(t, s.db, args)
+	fromAddresses, toAddresses := insertStubTransfersWithCollectibles(t, s.db, args)
 
 	ch := make(chan walletevent.Event)
 	sub := e.Subscribe(ch)
@@ -147,7 +148,7 @@ func TestService_UpdateCollectibleInfo(t *testing.T) {
 		},
 	}, nil).Once()
 
-	s.FilterActivityAsync(0, allAddressesFilter(), allNetworksFilter(), Filter{}, 0, 3)
+	s.FilterActivityAsync(0, append(fromAddresses, toAddresses...), true, allNetworksFilter(), Filter{}, 0, 3)
 
 	filterResponseCount := 0
 	var updates []EntryData
@@ -190,43 +191,36 @@ func TestService_UpdateCollectibleInfo_Error(t *testing.T) {
 		{5, "0xA2838FDA19EB6EED3F8B9EFF411D4CD7D2DE0313", "0x762AD3E4934E687F8701F24C7274E5209213FD6208FF952ACEB325D028866949", nil, nil},
 		{5, "0xA2838FDA19EB6EED3F8B9EFF411D4CD7D2DE0313", "0x0D", nil, nil},
 	}
-	insertStubTransfersWithCollectibles(t, s.db, args)
 
-	ch := make(chan walletevent.Event)
+	ch := make(chan walletevent.Event, 4)
 	sub := e.Subscribe(ch)
+
+	fromAddresses, toAddresses := insertStubTransfersWithCollectibles(t, s.db, args)
 
 	c.On("FetchAssetsByCollectibleUniqueID", mock.Anything).Return(nil, thirdparty.ErrChainIDNotSupported).Once()
 
-	s.FilterActivityAsync(0, allAddressesFilter(), allNetworksFilter(), Filter{}, 0, 5)
+	s.FilterActivityAsync(0, append(fromAddresses, toAddresses...), true, allNetworksFilter(), Filter{}, 0, 5)
 
 	filterResponseCount := 0
 	updatesCount := 0
 
-	select {
-	case res := <-ch:
-		switch res.Type {
-		case EventActivityFilteringDone:
-			var payload FilterResponse
-			err := json.Unmarshal([]byte(res.Message), &payload)
-			require.NoError(t, err)
-			require.Equal(t, ErrorCodeSuccess, payload.ErrorCode)
-			require.Equal(t, 2, len(payload.Activities))
-			filterResponseCount++
-		case EventActivityFilteringUpdate:
-			updatesCount++
+	for i := 0; i < 2; i++ {
+		select {
+		case res := <-ch:
+			switch res.Type {
+			case EventActivityFilteringDone:
+				var payload FilterResponse
+				err := json.Unmarshal([]byte(res.Message), &payload)
+				require.NoError(t, err)
+				require.Equal(t, ErrorCodeSuccess, payload.ErrorCode)
+				require.Equal(t, 2, len(payload.Activities))
+				filterResponseCount++
+			case EventActivityFilteringUpdate:
+				updatesCount++
+			}
+		case <-time.NewTimer(20 * time.Millisecond).C:
+			// We wait to ensure the EventActivityFilteringUpdate is never sent
 		}
-	case <-time.NewTimer(100 * time.Millisecond).C:
-	}
-
-	select {
-	case res := <-ch:
-		switch res.Type {
-		case EventActivityFilteringDone:
-			filterResponseCount++
-		case EventActivityFilteringUpdate:
-			updatesCount++
-		}
-	case <-time.NewTimer(100 * time.Microsecond).C:
 	}
 
 	require.Equal(t, 1, filterResponseCount)

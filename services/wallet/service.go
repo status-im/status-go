@@ -143,7 +143,7 @@ func NewService(
 	collectiblesManager := collectibles.NewManager(db, rpcClient, contractOwnershipProviders, accountOwnershipProviders, collectibleDataProviders, collectionDataProviders, openseaClient)
 	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, rpcClient.NetworkManager, collectiblesManager)
 
-	activity := activity.NewService(db, tokenManager, collectiblesManager, feed, accountsDB)
+	activity := activity.NewService(db, tokenManager, collectiblesManager, feed)
 
 	return &Service{
 		db:                    db,

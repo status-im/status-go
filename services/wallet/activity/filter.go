@@ -68,10 +68,6 @@ func allTokensFilter() []Token {
 	return []Token{}
 }
 
-func allAddressesFilter() []eth.Address {
-	return []eth.Address{}
-}
-
 func allNetworksFilter() []common.ChainID {
 	return []common.ChainID{}
 }
