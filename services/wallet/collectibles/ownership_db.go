@@ -11,9 +11,12 @@ import (
 
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
+	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/sqlite"
 )
+
+const InvalidTimestamp = int64(-1)
 
 type OwnershipDB struct {
 	db *sql.DB
@@ -27,6 +30,9 @@ func NewOwnershipDB(sqlDb *sql.DB) *OwnershipDB {
 
 const ownershipColumns = "chain_id, contract_address, token_id, owner_address"
 const selectOwnershipColumns = "chain_id, contract_address, token_id"
+
+const ownershipTimestampColumns = "owner_address, chain_id, timestamp"
+const selectOwnershipTimestampColumns = "timestamp"
 
 func removeAddressOwnership(creator sqlite.StatementCreator, chainID w_common.ChainID, ownerAddress common.Address) error {
 	deleteOwnership, err := creator.Prepare("DELETE FROM collectibles_ownership_cache WHERE chain_id = ? AND owner_address = ?")
@@ -59,7 +65,19 @@ func insertAddressOwnership(creator sqlite.StatementCreator, ownerAddress common
 	return nil
 }
 
-func (o *OwnershipDB) Update(chainID w_common.ChainID, ownerAddress common.Address, collectibles []thirdparty.CollectibleUniqueID) (err error) {
+func updateAddressOwnershipTimestamp(creator sqlite.StatementCreator, ownerAddress common.Address, chainID w_common.ChainID, timestamp int64) error {
+	updateTimestamp, err := creator.Prepare(fmt.Sprintf(`INSERT OR REPLACE INTO collectibles_ownership_update_timestamps (%s) 
+																				VALUES (?, ?, ?)`, ownershipTimestampColumns))
+	if err != nil {
+		return err
+	}
+
+	_, err = updateTimestamp.Exec(ownerAddress, chainID, timestamp)
+
+	return err
+}
+
+func (o *OwnershipDB) Update(chainID w_common.ChainID, ownerAddress common.Address, collectibles []thirdparty.CollectibleUniqueID, timestamp int64) (err error) {
 	var (
 		tx *sql.Tx
 	)
@@ -86,6 +104,9 @@ func (o *OwnershipDB) Update(chainID w_common.ChainID, ownerAddress common.Addre
 	if err != nil {
 		return err
 	}
+
+	// Update timestamp
+	err = updateAddressOwnershipTimestamp(tx, ownerAddress, chainID, timestamp)
 
 	return
 }
@@ -162,4 +183,30 @@ func (o *OwnershipDB) GetOwnedCollectible(chainID w_common.ChainID, ownerAddress
 	}
 
 	return &ids[0], nil
+}
+
+func (o *OwnershipDB) GetOwnershipUpdateTimestamp(owner common.Address, chainID walletCommon.ChainID) (int64, error) {
+	query := fmt.Sprintf(`SELECT %s
+		FROM collectibles_ownership_update_timestamps
+		WHERE owner_address = ? AND chain_id = ?`, selectOwnershipTimestampColumns)
+
+	stmt, err := o.db.Prepare(query)
+	if err != nil {
+		return InvalidTimestamp, err
+	}
+	defer stmt.Close()
+
+	row := stmt.QueryRow(owner, chainID)
+
+	var timestamp int64
+
+	err = row.Scan(&timestamp)
+
+	if err == sql.ErrNoRows {
+		return InvalidTimestamp, nil
+	} else if err != nil {
+		return InvalidTimestamp, err
+	}
+
+	return timestamp, nil
 }
