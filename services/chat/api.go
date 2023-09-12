@@ -3,6 +3,7 @@ package chat
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -385,6 +386,8 @@ func (api *API) toAPIChat(protocolChat *protocol.Chat, community *communities.Co
 		return nil, err
 	}
 	chat.Members = chatMembers
+
+	fmt.Println("------> toAPIChat::", chat.Name, ", members: ", len(chat.Members))
 
 	return chat, nil
 }

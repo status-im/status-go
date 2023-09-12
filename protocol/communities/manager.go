@@ -716,6 +716,8 @@ func (m *Manager) ReevaluateMembers(community *Community) error {
 			}
 		}
 
+		fmt.Println("------> ReevaluateMembers for community: ", community.Identity().DisplayName)
+
 		// Validate channel permissions
 		for channelID := range community.Chats() {
 			chatID := community.IDString() + channelID
