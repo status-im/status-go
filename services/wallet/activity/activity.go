@@ -18,7 +18,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -36,8 +35,6 @@ const (
 	SimpleTransactionPT
 	PendingTransactionPT
 )
-
-const keypairAccountsTable = "keypairs_accounts"
 
 var (
 	ZeroAddress = eth.Address{}
@@ -322,8 +319,7 @@ const (
 var queryFormatString string
 
 type FilterDependencies struct {
-	db         *sql.DB
-	accountsDb *accounts.Database
+	db *sql.DB
 	// use token.TokenType, token.ChainID and token.Address to find the available symbol
 	tokenSymbol func(token Token) string
 	// use the chainID and symbol to look up token.TokenType and token.Address. Return nil if not found
@@ -333,10 +329,18 @@ type FilterDependencies struct {
 // getActivityEntries queries the transfers, pending_transactions, and multi_transactions tables based on filter parameters and arguments
 // it returns metadata for all entries ordered by timestamp column
 //
+// addresses are mandatory and used to detect activity types SendAT and ReceiveAT for transfers entries
+//
+// allAddresses optimization indicates if the passed addresses include all the owners in the wallet DB
+//
 // Adding a no-limit option was never considered or required.
 //
 // TODO: optimization: consider implementing nullable []byte instead of using strings for addresses or insert binary (X'...' syntax) directly into the query
-func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses []eth.Address, chainIDs []common.ChainID, filter Filter, offset int, limit int) ([]Entry, error) {
+func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses []eth.Address, allAddresses bool, chainIDs []common.ChainID, filter Filter, offset int, limit int) ([]Entry, error) {
+	if len(addresses) == 0 {
+		return nil, errors.New("no addresses provided")
+	}
+
 	includeAllTokenTypeAssets := len(filter.Assets) == 0 && !filter.FilterOutAssets
 
 	// Used for symbol bearing tables multi_transactions and pending_transactions
@@ -378,7 +382,6 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 	startFilterDisabled := !(filter.Period.StartTimestamp > 0)
 	endFilterDisabled := !(filter.Period.EndTimestamp > 0)
 	filterActivityTypeAll := len(filter.Types) == 0
-	filterAllAddresses := len(addresses) == 0
 	filterAllToAddresses := len(filter.CounterpartyAddresses) == 0
 	includeAllStatuses := len(filter.Statuses) == 0
 
@@ -393,10 +396,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		filterStatusFinalized = sliceContains(filter.Statuses, FinalizedAS)
 	}
 
-	involvedAddresses := noEntriesInTmpTableSQLValues
-	if !filterAllAddresses {
-		involvedAddresses = joinAddresses(addresses)
-	}
+	involvedAddresses := joinAddresses(addresses)
 	toAddresses := noEntriesInTmpTableSQLValues
 	if !filterAllToAddresses {
 		toAddresses = joinAddresses(filter.CounterpartyAddresses)
@@ -407,15 +407,16 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		return strconv.Itoa(int(t))
 	})
 
-	// Since the filter query needs addresses which are in a different database, we need to update the
-	// keypairs_accounts table in the current database with the latest addresses from the accounts database
-	err := updateKeypairsAccountsTable(deps.accountsDb, deps.db)
+	queryString := fmt.Sprintf(queryFormatString, involvedAddresses, toAddresses, assetsTokenCodes, assetsERC20, networks,
+		joinedMTTypes)
+
+	// The duplicated temporary table UNION with CTE acts as an optimization
+	// As soon as we use filter_addresses CTE or filter_addresses_table temp table
+	// or switch them alternatively for JOIN or IN clauses the performance drops significantly
+	_, err := deps.db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS filter_addresses_table; CREATE TEMP TABLE filter_addresses_table (address VARCHAR PRIMARY KEY); INSERT OR IGNORE INTO filter_addresses_table (address) VALUES %s;\n", involvedAddresses))
 	if err != nil {
 		return nil, err
 	}
-
-	queryString := fmt.Sprintf(queryFormatString, keypairAccountsTable, involvedAddresses, toAddresses, assetsTokenCodes, assetsERC20, networks,
-		joinedMTTypes)
 
 	rows, err := deps.db.QueryContext(ctx, queryString,
 		startFilterDisabled, filter.Period.StartTimestamp, endFilterDisabled, filter.Period.EndTimestamp,
@@ -423,7 +424,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		sliceContains(filter.Types, ContractDeploymentAT), sliceContains(filter.Types, MintAT),
 		transfer.MultiTransactionSend,
 		fromTrType, toTrType,
-		filterAllAddresses, filterAllToAddresses,
+		allAddresses, filterAllToAddresses,
 		includeAllStatuses, filterStatusCompleted, filterStatusFailed, filterStatusFinalized, filterStatusPending,
 		FailedAS, CompleteAS, PendingAS,
 		includeAllTokenTypeAssets,
@@ -687,48 +688,6 @@ func contractTypeFromDBType(dbType string) (transferType *TransferType) {
 		return nil
 	}
 	return transferType
-}
-
-func updateKeypairsAccountsTable(accountsDb *accounts.Database, db *sql.DB) error {
-	_, err := db.Exec(fmt.Sprintf("CREATE TEMP TABLE IF NOT EXISTS %s (address VARCHAR PRIMARY KEY)",
-		keypairAccountsTable))
-	if err != nil {
-		log.Error("failed to create 'keypairs_accounts' table", "err", err)
-		return err
-	}
-
-	// TODO: remove dependency on accounts table by removing"all accounts filter" optimization; see #11980
-	if accountsDb == nil {
-		return nil
-	}
-	addresses, err := accountsDb.GetWalletAddresses()
-	if err != nil {
-		log.Error("failed to get wallet addresses", "err", err)
-		return err
-	}
-
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		_ = tx.Rollback()
-	}()
-
-	for _, address := range addresses {
-		_, err = tx.Exec(fmt.Sprintf("INSERT OR IGNORE INTO %s (address) VALUES (?)", keypairAccountsTable), address)
-		if err != nil {
-			log.Error("failed to insert wallet addresses", "err", err)
-			return err
-		}
-	}
-
-	return nil
 }
 
 // lookupAndFillInTokens ignores NFTs

@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	w_common "github.com/status-im/status-go/services/wallet/common"
@@ -43,9 +42,9 @@ var (
 	}
 )
 
+// Service provides an async interface, ensuring only one filter request, of each type, is running at a time. It also provides lazy load of NFT info and token mapping
 type Service struct {
 	db           *sql.DB
-	accountsDB   *accounts.Database
 	tokenManager token.ManagerInterface
 	collectibles collectibles.ManagerInterface
 	eventFeed    *event.Feed
@@ -53,10 +52,9 @@ type Service struct {
 	scheduler *async.MultiClientScheduler
 }
 
-func NewService(db *sql.DB, tokenManager token.ManagerInterface, collectibles collectibles.ManagerInterface, eventFeed *event.Feed, accountsDb *accounts.Database) *Service {
+func NewService(db *sql.DB, tokenManager token.ManagerInterface, collectibles collectibles.ManagerInterface, eventFeed *event.Feed) *Service {
 	return &Service{
 		db:           db,
-		accountsDB:   accountsDb,
 		tokenManager: tokenManager,
 		collectibles: collectibles,
 		eventFeed:    eventFeed,
@@ -82,11 +80,13 @@ type FilterResponse struct {
 }
 
 // FilterActivityAsync allows only one filter task to run at a time
-// and it cancels the current one if a new one is started
+// it cancels the current one if a new one is started
+// and should not expect other owners to have data in one of the queried tables
+//
 // All calls will trigger an EventActivityFilteringDone event with the result of the filtering
-func (s *Service) FilterActivityAsync(requestID int32, addresses []common.Address, chainIDs []w_common.ChainID, filter Filter, offset int, limit int) {
+func (s *Service) FilterActivityAsync(requestID int32, addresses []common.Address, allAddresses bool, chainIDs []w_common.ChainID, filter Filter, offset int, limit int) {
 	s.scheduler.Enqueue(requestID, filterTask, func(ctx context.Context) (interface{}, error) {
-		activities, err := getActivityEntries(ctx, s.getDeps(), addresses, chainIDs, filter, offset, limit)
+		activities, err := getActivityEntries(ctx, s.getDeps(), addresses, allAddresses, chainIDs, filter, offset, limit)
 		return activities, err
 	}, func(result interface{}, taskType async.TaskType, err error) {
 		res := FilterResponse{
@@ -241,8 +241,7 @@ func (s *Service) Stop() {
 
 func (s *Service) getDeps() FilterDependencies {
 	return FilterDependencies{
-		db:         s.db,
-		accountsDb: s.accountsDB,
+		db: s.db,
 		tokenSymbol: func(t Token) string {
 			info := s.tokenManager.LookupTokenIdentity(uint64(t.ChainID), t.Address, t.TokenType == Native)
 			if info == nil {

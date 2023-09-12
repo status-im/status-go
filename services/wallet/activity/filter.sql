@@ -1,9 +1,5 @@
 -- Query includes duplicates, will return multiple rows for the same transaction if both to and from addresses are in the address list.
 --
--- The addresses list will have priority in deciding the source of the duplicate transaction; see filter_addresses temp table
--- TODO: #11980
--- However, if the addresses list is empty, and all addresses should be included, the accounts table will be used
---
 -- The switch for tr_type is used to de-conflict the source for the two entries for the same transaction
 --
 -- UNION ALL is used to avoid the overhead of DISTINCT given that we don't expect to have duplicate entries outside the sender and receiver addresses being in the list which is handled separately
@@ -43,13 +39,14 @@ WITH filter_conditions AS (
 		? AS includeAllTokenTypeAssets,
 		? AS includeAllNetworks,
 		? AS pendingStatus,
-		"0000000000000000000000000000000000000000" AS zeroAddress
+		'0000000000000000000000000000000000000000' AS zeroAddress
 ),
+-- This UNION between CTE and TEMP TABLE acts as an optimization. As soon as we drop one or use them interchangeably the performance drops significantly.
 filter_addresses(address) AS (
 	SELECT
-		HEX(address)
+		address
 	FROM
-		%s
+		filter_addresses_table
 	WHERE
 		(
 			SELECT
@@ -209,7 +206,7 @@ WHERE
 			AND NOT (
 				tr_type = fromTrType
 				and transfers.tx_to_address IS NULL
-				AND transfers.type = "eth"
+				AND transfers.type = 'eth'
 				AND transfers.contract_address IS NOT NULL
 				AND HEX(transfers.contract_address) != zeroAddress
 			)
@@ -219,7 +216,7 @@ WHERE
 			AND tr_type = toTrType
 			AND NOT (
 				tr_type = toTrType
-				AND transfers.type = "erc721"
+				AND transfers.type = 'erc721'
 				AND (
 					transfers.tx_from_address IS NULL
 					OR HEX(transfers.tx_from_address) = zeroAddress
@@ -230,7 +227,7 @@ WHERE
 			filterActivityTypeContractDeployment
 			AND tr_type = fromTrType
 			AND transfers.tx_to_address IS NULL
-			AND transfers.type = "eth"
+			AND transfers.type = 'eth'
 			AND transfers.contract_address IS NOT NULL
 			AND HEX(transfers.contract_address) != zeroAddress
 			AND (
@@ -241,7 +238,7 @@ WHERE
 		OR (
 			filterActivityTypeMint
 			AND tr_type = toTrType
-			AND transfers.type = "erc721"
+			AND transfers.type = 'erc721'
 			AND (
 				transfers.tx_from_address IS NULL
 				OR HEX(transfers.tx_from_address) = zeroAddress
@@ -265,11 +262,11 @@ WHERE
 	AND (
 		includeAllTokenTypeAssets
 		OR (
-			transfers.type = "eth"
-			AND ("ETH" IN assets_token_codes)
+			transfers.type = 'eth'
+			AND ('ETH' IN assets_token_codes)
 		)
 		OR (
-			transfers.type = "erc20"
+			transfers.type = 'erc20'
 			AND (
 				(
 					transfers.network_id,
