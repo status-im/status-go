@@ -407,6 +407,13 @@ func (m *Messenger) prepareSyncKeypairMessage(kp *accounts.Keypair) (*protobuf.S
 	}
 	message.Keycards = syncKcMsgs
 
+	if m.walletAPI != nil {
+		message.KeycardPairings, err = m.walletAPI.GetPairingsJSONFileContent()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return message, nil
 }
 

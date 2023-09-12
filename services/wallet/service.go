@@ -171,6 +171,7 @@ func NewService(
 		activity:              activity,
 		decoder:               NewDecoder(),
 		blockChainState:       blockChainState,
+		keycardPairings:       NewKeycardPairings(),
 	}
 }
 
@@ -202,6 +203,7 @@ type Service struct {
 	activity              *activity.Service
 	decoder               *Decoder
 	blockChainState       *BlockChainState
+	keycardPairings       *KeycardPairings
 }
 
 // Start signals transmitter.
@@ -256,4 +258,8 @@ func (s *Service) Protocols() []p2p.Protocol {
 
 func (s *Service) IsStarted() bool {
 	return s.started
+}
+
+func (s *Service) KeycardPairings() *KeycardPairings {
+	return s.keycardPairings
 }

@@ -646,6 +646,7 @@ func defaultNodeConfig(installationID, keyUID string) (*params.NodeConfig, error
 	nodeConfig.LogLevel = "ERROR"
 	nodeConfig.DataDir = filepath.Join("ethereum/mainnet_rpc")
 	nodeConfig.KeyStoreDir = filepath.Join(keystoreDir, keyUID)
+	nodeConfig.KeycardPairingDataFile = filepath.Join("keycard", "pairings.json")
 	nodeConfig.UpstreamConfig = params.UpstreamRPCConfig{
 		Enabled: true,
 		URL:     "https://mainnet.infura.io/v3/800c641949d64d768a5070a1b0511938",

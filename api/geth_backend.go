@@ -1731,6 +1731,10 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 		return err
 	}
 
+	if b.statusNode.WalletService() != nil {
+		b.statusNode.WalletService().KeycardPairings().SetKeycardPairingsFile(config.KeycardPairingDataFile)
+	}
+
 	signal.SendNodeReady()
 
 	if err := b.statusNode.StartDiscovery(); err != nil {

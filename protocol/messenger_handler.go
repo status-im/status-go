@@ -3452,6 +3452,17 @@ func (m *Messenger) HandleSyncKeypair(state *ReceivedMessageState, message *prot
 }
 
 func (m *Messenger) handleSyncKeypairInternal(state *ReceivedMessageState, message *protobuf.SyncKeypair, fromLocalPairing bool) error {
+	if message == nil {
+		return errors.New("handleSyncKeypairInternal receive a nil message")
+	}
+
+	if m.walletAPI != nil {
+		err := m.walletAPI.SetPairingsJSONFileContent(message.KeycardPairings)
+		if err != nil {
+			return err
+		}
+	}
+
 	// check for the profile keypair migration first on paired device
 	handled, err := m.handleProfileKeypairMigration(state, fromLocalPairing, message)
 	if err != nil {

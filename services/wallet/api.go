@@ -50,6 +50,14 @@ func (api *API) StopWallet(ctx context.Context) error {
 	return api.s.Stop()
 }
 
+func (api *API) GetPairingsJSONFileContent() ([]byte, error) {
+	return api.s.keycardPairings.GetPairingsJSONFileContent()
+}
+
+func (api *API) SetPairingsJSONFileContent(content []byte) error {
+	return api.s.keycardPairings.SetPairingsJSONFileContent(content)
+}
+
 func (api *API) GetWalletToken(ctx context.Context, addresses []common.Address) (map[common.Address][]Token, error) {
 	return api.reader.GetWalletToken(ctx, addresses)
 }
