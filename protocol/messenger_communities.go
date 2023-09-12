@@ -2614,6 +2614,10 @@ func (m *Messenger) passStoredCommunityInfoToSignalHandler(communityID string) {
 
 // handleCommunityDescription handles an community description
 func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawPayload []byte) error {
+	for _, chat := range description.Chats {
+		fmt.Println("------> handleCommunityDescription::", chat.Identity.DisplayName, ", members: ", len(chat.Members))
+	}
+
 	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload)
 	if err != nil {
 		return err
