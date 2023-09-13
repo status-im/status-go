@@ -1030,7 +1030,19 @@ func (b *GethStatusBackend) createTempDBFile(pattern string) (tmpDbPath string, 
 		err = errors.New("root datadir wasn't provided")
 		return
 	}
-	file, err := os.CreateTemp(filepath.Dir(b.rootDataDir), "*-"+pattern)
+	rootDataDir := b.rootDataDir
+	//On iOS, the rootDataDir value does not contain a trailing slash.
+	//This is causing an incorrectly formatted temporary file path to be generated, leading to an "operation not permitted" error.
+	//e.g. value of rootDataDir is `/var/mobile/.../12906D5A-E831-49E9-BBE7-5FFE8E805D8A/Library`,
+	//the file path generated is something like `/var/mobile/.../12906D5A-E831-49E9-BBE7-5FFE8E805D8A/123-v4.db`
+	//which removed `Library` from the path.
+	if !strings.HasSuffix(rootDataDir, "/") {
+		rootDataDir += "/"
+	}
+	file, err := os.CreateTemp(filepath.Dir(rootDataDir), "*-"+pattern)
+	if err != nil {
+		return
+	}
 	tmpDbPath = file.Name()
 	cleanup = func() {
 		filePath := file.Name()
