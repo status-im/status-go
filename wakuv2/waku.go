@@ -1820,10 +1820,6 @@ func formatConnStatus(wakuNode *node.WakuNode, c node.ConnStatus) types.ConnStat
 	}
 }
 
-func (w *Waku) filterDebug(msg string, fields ...zap.Field) {
-	w.logger.Info("FilterDebug "+msg, fields...)
-}
-
 // Find suitable peer(s). For this we use a peerDisconnectMap, it works so that
 // peers that have been recently disconnected from have lower priority
 func (w *Waku) findFilterPeers() []peer.ID {
