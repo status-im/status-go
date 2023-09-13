@@ -166,6 +166,77 @@ func TestBasicWakuV2(t *testing.T) {
 	require.NoError(t, w.Stop())
 }
 
+func TestBasicWakuV2RendezvousDiscovery(t *testing.T) {
+	enrTreeAddress := testENRBootstrap
+	envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")
+	if envEnrTreeAddress != "" {
+		enrTreeAddress = envEnrTreeAddress
+	}
+
+	config := &Config{}
+	config.Port = 0
+	config.EnableDiscV5 = true
+	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
+	config.DiscoveryLimit = 20
+	config.UDPPort = 9001
+	config.WakuNodes = []string{enrTreeAddress}
+	w, err := New("", "", config, nil, nil, nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, w.Start())
+
+	// DNSDiscovery
+	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
+	defer cancel()
+
+	discoveredNodes, err := dnsdisc.RetrieveNodes(ctx, enrTreeAddress)
+	require.NoError(t, err)
+
+	// Peer used for retrieving history
+	r, err := rand.Int(rand.Reader, big.NewInt(int64(len(discoveredNodes))))
+	require.NoError(t, err)
+
+	storeNode := discoveredNodes[int(r.Int64())]
+
+	// Wait for some peers to be discovered
+	time.Sleep(3 * time.Second)
+
+	// At least 3 peers should have been discovered
+	require.Greater(t, w.PeerCount(), 3)
+
+	filter := &common.Filter{
+		Messages: common.NewMemoryMessageStore(),
+		Topics: [][]byte{
+			{1, 2, 3, 4},
+		},
+	}
+
+	_, err = w.Subscribe(filter)
+	require.NoError(t, err)
+
+	msgTimestamp := w.timestamp()
+	contentTopic := common.BytesToTopic(filter.Topics[0])
+
+	_, err = w.Send(relay.DefaultWakuTopic, &pb.WakuMessage{
+		Payload:      []byte{1, 2, 3, 4, 5},
+		ContentTopic: contentTopic.ContentTopic(),
+		Version:      0,
+		Timestamp:    msgTimestamp,
+	})
+	require.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+
+	messages := filter.Retrieve()
+	require.Len(t, messages, 1)
+
+	timestampInSeconds := msgTimestamp / int64(time.Second)
+	storeResult, err := w.query(context.Background(), storeNode.PeerID, relay.DefaultWakuTopic, []common.TopicType{contentTopic}, uint64(timestampInSeconds-20), uint64(timestampInSeconds+20), []store.HistoryRequestOption{})
+	require.NoError(t, err)
+	require.NotZero(t, len(storeResult.Messages))
+
+	require.NoError(t, w.Stop())
+}
+
 func TestWakuV2Filter(t *testing.T) {
 	enrTreeAddress := testENRBootstrap
 	envEnrTreeAddress := os.Getenv("ENRTREE_ADDRESS")

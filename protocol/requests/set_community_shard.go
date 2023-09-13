@@ -2,9 +2,12 @@ package requests
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+
+	"github.com/waku-org/go-waku/waku/v2/protocol"
 )
 
 type SetCommunityShard struct {
@@ -22,8 +25,8 @@ func (s *SetCommunityShard) Validate() error {
 		if s.Shard.Cluster != common.MainStatusShard {
 			return errors.New("invalid shard cluster")
 		}
-		if s.Shard.Index > 1023 {
-			return errors.New("invalid shard index. Only 0-1023 is allowed")
+		if s.Shard.Index > protocol.MaxShardIndex {
+			return fmt.Errorf("invalid shard index. Max index is '%d'", protocol.MaxShardIndex)
 		}
 	}
 	return nil

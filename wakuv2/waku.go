@@ -53,6 +53,7 @@ import (
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/metrics"
+	// libp2pprotocol "github.com/libp2p/go-libp2p/core/protocol"
 
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
@@ -60,9 +61,11 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+	wrendezvous "github.com/waku-org/go-waku/waku/v2/rendezvous"
 
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
+	protocolcommon "github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/wakuv2/common"
 	"github.com/status-im/status-go/wakuv2/persistence"
@@ -1212,6 +1215,180 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 	return
 }
 
+func (w *Waku) discoverPeers() {
+	// should happen as soon as the user logins
+	//   - for communities that are not assigned to a shard
+	//   - join a community flow
+	//   - ask about peers I can connect to in a status cluster
+
+	// * Find rendezvous points
+	peerStore := w.node.Host().Peerstore().(*wps.WakuPeerstoreImpl)
+	// this will only retrieve peers discovered by rendezvous
+	// every few seconds we should check for new rendezvous peers
+	rendezvousPeerIDs := peerStore.PeersByOrigin(wps.Rendezvous)
+
+	// * Grab peers that support waku relay.
+	var peerIDs []peer.ID
+	for _, peerID := range rendezvousPeerIDs {
+		// Should we check if filter.FilterSubscribeID_v20beta1 is supported?
+		supportedProtocols, err := peerStore.SupportsProtocols(peerID, relay.WakuRelayID_v200)
+		if err != nil {
+			continue
+		}
+		if len(supportedProtocols) == 1 {
+			peerIDs = append(peerIDs, peerID)
+		}
+	}
+
+	// initial list to discover other peers come from a specific hardcoded enrtree.
+	// identifyandconnect set a list and reuse here as a the initial list
+	// cfg.WakuNodes
+
+	// the list of peers could be static (?)
+	var rendezvousPoints []multiaddr.Multiaddr
+	for _, peerID := range peerIDs {
+		peerInfo := peerStore.PeerInfo(peerID)
+		// peers by origin rendezvous is not
+		rendezvousPoints = append(rendezvousPoints, peerInfo.Addrs...)
+	}
+
+	// Do something if no rendezvous points could be found.
+	//
+	// Try again every X seconds? Give up after a few attempts?
+	if len(rendezvousPoints) <= 0 {
+		// ...
+	}
+
+	// we have 3 nodes in the fleet supporting rendezvous
+
+	// Depending how long it takes to find the minimum amount of peers, new peers
+	// may arrive or disappear. Would it be wise to re-create the rendezvous
+	// iterator with a more up-to-date address list (rendezvous points)?
+	rendezvousIter := wrendezvous.NewRendezvousPointIterator(rendezvousPoints)
+
+	// we need to react to pubsub changes for new shards or shards we're not part of.
+
+	// * Get all Status' shards.
+	var shards []protocolcommon.Shard
+	for _, peerID := range peerIDs {
+		// Newest version of go-waku has peerstore.PubsubTopics() this is incorrect,
+		// we should use the pubsub topics I'm already subscribed to.
+		result, err := peerStore.Get(peerID, "pubSubTopics")
+		if err != nil {
+			continue
+		}
+		pubsubTopics := result.([]string)
+
+		relayShards, err := protocol.TopicsToRelayShards(pubsubTopics...)
+		if err != nil {
+			continue
+		}
+
+		for _, rs := range relayShards {
+			if rs.Cluster == 16 {
+				for _, idx := range rs.Indices {
+					shards = append(shards, protocolcommon.Shard{Cluster: rs.Cluster, Index: idx})
+				}
+			}
+		}
+	}
+
+	// what does subscribing to a topic means?
+	// w.subscribeToPubsubTopicWithWakuRelay(nodeTopic.String())
+
+	var waitGroup sync.WaitGroup
+
+	for _, shard := range shards {
+		shard := shard
+
+		// Register shards. One register query per shard/topic.
+		waitGroup.Add(1)
+		nodeTopic := protocol.NewStaticShardingPubsubTopic(shard.Cluster, shard.Index).String()
+
+		go func(nodeTopic string) {
+			defer waitGroup.Done()
+
+			// This takes too long to repeat? Shouldn't we just try a few times with
+			// shorter delay and give up just give up sooner?
+			t := time.NewTicker(wrendezvous.RegisterDefaultTTL)
+			defer t.Stop()
+
+			for {
+				select {
+				case <-w.ctx.Done():
+					return
+				case <-t.C:
+					w.node.Rendezvous().RegisterShard(w.ctx, shard.Cluster, shard.Index, rendezvousIter.RendezvousPoints())
+				}
+			}
+		}(nodeTopic)
+
+		waitGroup.Add(1)
+		// https://rfc.vac.dev/spec/51/#static-sharding
+		go func(formattedNodeTopic string) {
+			defer waitGroup.Done()
+
+			// gossip subparams
+			// Should we use Dlo instead?
+			// https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md#parameters
+			desiredOutDegree := w.node.Relay().Params().D
+			t := time.NewTicker(7 * time.Second)
+			defer t.Stop()
+			for {
+				select {
+				case <-w.ctx.Done():
+					return
+				case <-t.C:
+					peerCount := len(w.node.Relay().PubSub().ListPeers(formattedNodeTopic))
+					peersToFind := desiredOutDegree - peerCount
+					if peersToFind <= 0 {
+						continue
+					}
+
+					rendezvousPoint := <-rendezvousIter.Next(w.ctx)
+					if rendezvousPoint == nil {
+						continue
+					}
+					ctx, cancel := context.WithTimeout(w.ctx, 7*time.Second)
+					// only populates the peerstore, but doesn't connect
+					// we need to dial peers, because discover doesn't connect
+					// if dialing doesn't work, try again, backoff, log when giving up.
+					w.node.Rendezvous().DiscoverShard(ctx, rendezvousPoint, shard.Cluster, shard.Index, peersToFind)
+					cancel()
+				}
+			}
+		}(nodeTopic)
+	}
+
+	waitGroup.Wait()
+
+	// When to unsubscribe? Should we unsubscribe from the rendezvous point?
+	// w.node.Relay().Unsubscribe(w.ctx, nodeTopic)
+
+	// DiscoverWithNamespace  causes the rendezvous point to subscribe to a namespace.
+	// rendezvous.DiscoverWithNamespace
+
+	// ---------------------------------------------------------
+	// Using DialPeerByID
+	timeoutCtx, cancelTimeoutCtx := context.WithTimeout(w.ctx, 5*time.Second)
+	defer cancelTimeoutCtx()
+
+	// how many peers do we need? minimum 6?
+	// see wakuv2/config#DefaultConfig
+
+	visiblePeerIDs := make([]peer.ID, len(rendezvousPeerIDs))
+	for _, peerID := range rendezvousPeerIDs {
+		err := w.node.DialPeerByID(timeoutCtx, peerID)
+		if err != nil {
+			visiblePeerIDs = append(visiblePeerIDs, peerID)
+		}
+	}
+
+	if len(visiblePeerIDs) > 0 {
+		fmt.Println(visiblePeerIDs)
+	}
+}
+
 // Start implements node.Service, starting the background data propagation thread
 // of the Waku protocol.
 func (w *Waku) Start() error {
@@ -1242,6 +1419,10 @@ func (w *Waku) Start() error {
 
 	if err = w.addWakuV2Peers(ctx, w.cfg); err != nil {
 		return fmt.Errorf("failed to add wakuv2 peers: %v", err)
+	}
+
+	if w.cfg.Rendezvous {
+		w.discoverPeers()
 	}
 
 	if w.cfg.EnableDiscV5 {
