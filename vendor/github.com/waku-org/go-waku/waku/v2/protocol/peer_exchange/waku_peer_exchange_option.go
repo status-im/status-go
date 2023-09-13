@@ -37,7 +37,7 @@ func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) PeerExchangeOption {
 		if params.pm == nil {
 			p, err = utils.SelectPeer(params.host, PeerExchangeID_v20alpha1, fromThesePeers, params.log)
 		} else {
-			p, err = params.pm.SelectPeer(PeerExchangeID_v20alpha1, fromThesePeers, params.log)
+			p, err = params.pm.SelectPeer(PeerExchangeID_v20alpha1, "", fromThesePeers...)
 		}
 		if err == nil {
 			params.selectedPeer = p

@@ -484,3 +484,8 @@ func (r *RLN) Flush() error {
 	}
 	return nil
 }
+
+// LeavesSet indicates how many elements have been inserted in the merkle tree
+func (r *RLN) LeavesSet() uint {
+	return r.w.LeavesSet()
+}

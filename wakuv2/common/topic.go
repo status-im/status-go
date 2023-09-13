@@ -30,6 +30,24 @@ import (
 // SHA3 hash of some arbitrary data given by the original author of the message.
 type TopicType [TopicLength]byte
 
+type TopicSet map[TopicType]struct{}
+
+func NewTopicSet(topics []TopicType) TopicSet {
+	s := make(TopicSet, len(topics))
+	for _, t := range topics {
+		s[t] = struct{}{}
+	}
+	return s
+}
+
+func NewTopicSetFromBytes(byteArrays [][]byte) TopicSet {
+	topics := make([]TopicType, len(byteArrays))
+	for i, byteArr := range byteArrays {
+		topics[i] = BytesToTopic(byteArr)
+	}
+	return NewTopicSet(topics)
+}
+
 // BytesToTopic converts from the byte array representation of a topic
 // into the TopicType type.
 func BytesToTopic(b []byte) (t TopicType) {

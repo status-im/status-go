@@ -243,7 +243,7 @@ func (store *WakuStore) queryLoop(ctx context.Context, query *pb.HistoryQuery, c
 	for _, peer := range candidateList {
 		func() {
 			defer queryWg.Done()
-			result, err := store.queryFrom(ctx, query, peer, protocol.GenerateRequestId())
+			result, err := store.queryFrom(ctx, query, peer, protocol.GenerateRequestID())
 			if err == nil {
 				resultChan <- result
 				return
@@ -298,7 +298,7 @@ func (store *WakuStore) Resume(ctx context.Context, pubsubTopic string, peerList
 		return 0, err
 	}
 
-	var offset int64 = int64(20 * time.Nanosecond)
+	offset := int64(20 * time.Nanosecond)
 	currentTime := store.timesource.Now().UnixNano() + offset
 	lastSeenTime = max(lastSeenTime-offset, 0)
 

@@ -18,9 +18,9 @@ var brHmacDrbgPool = sync.Pool{New: func() interface{} {
 	return hmacdrbg.NewHmacDrbg(256, seed, nil)
 }}
 
-// GenerateRequestId generates a random 32 byte slice that can be used for
+// GenerateRequestID generates a random 32 byte slice that can be used for
 // creating requests inf the filter, store and lightpush protocols
-func GenerateRequestId() []byte {
+func GenerateRequestID() []byte {
 	rng := brHmacDrbgPool.Get().(*hmacdrbg.HmacDrbg)
 	defer brHmacDrbgPool.Put(rng)
 

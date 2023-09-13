@@ -162,11 +162,11 @@ func (w *gethWakuV2Wrapper) UnsubscribeMany(ids []string) error {
 
 func (w *gethWakuV2Wrapper) createFilterWrapper(id string, keyAsym *ecdsa.PrivateKey, keySym []byte, pow float64, pubsubTopic string, topics [][]byte) (types.Filter, error) {
 	return NewWakuV2FilterWrapper(&wakucommon.Filter{
-		KeyAsym:     keyAsym,
-		KeySym:      keySym,
-		Topics:      topics,
-		PubsubTopic: pubsubTopic,
-		Messages:    wakucommon.NewMemoryMessageStore(),
+		KeyAsym:       keyAsym,
+		KeySym:        keySym,
+		ContentTopics: wakucommon.NewTopicSetFromBytes(topics),
+		PubsubTopic:   pubsubTopic,
+		Messages:      wakucommon.NewMemoryMessageStore(),
 	}, id), nil
 }
 

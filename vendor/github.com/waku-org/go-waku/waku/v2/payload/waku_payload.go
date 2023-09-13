@@ -72,16 +72,15 @@ func (payload Payload) Encode(version uint32) ([]byte, error) {
 			encoded, err := encryptSymmetric(data, payload.Key.SymKey)
 			if err != nil {
 				return nil, fmt.Errorf("couldn't encrypt using symmetric key: %w", err)
-			} else {
-				return encoded, nil
 			}
+
+			return encoded, nil
 		case Asymmetric:
 			encoded, err := encryptAsymmetric(data, &payload.Key.PubKey)
 			if err != nil {
 				return nil, fmt.Errorf("couldn't encrypt using asymmetric key: %w", err)
-			} else {
-				return encoded, nil
 			}
+			return encoded, nil
 		case None:
 			return nil, errors.New("non supported KeyKind")
 		}

@@ -2,27 +2,27 @@
   "language": "Solidity",
   "sources": {
     "WakuRln.sol": {
-      "urls": ["./waku-rln-contract/contracts/WakuRln.sol"]
+      "urls": ["../../../../../libs/waku-rln-contract/contracts/WakuRln.sol"]
     },
     "WakuRlnRegistry.sol": {
-      "urls": ["./waku-rln-contract/contracts/WakuRlnRegistry.sol"]
+      "urls": ["../../../../../libs/waku-rln-contract/contracts/WakuRlnRegistry.sol"]
     },
     "rln-contract/PoseidonHasher.sol": {
       "urls": [
-        "./waku-rln-contract/lib/rln-contract/contracts/PoseidonHasher.sol"
+        "../../../../../libs/waku-rln-contract/lib/rln-contract/contracts/PoseidonHasher.sol"
       ]
     },
     "rln-contract/RlnBase.sol": {
-      "urls": ["./waku-rln-contract/lib/rln-contract/contracts/RlnBase.sol"]
+      "urls": ["../../../../../libs/waku-rln-contract/lib/rln-contract/contracts/RlnBase.sol"]
     },
     "rln-contract/IVerifier.sol": {
-        "urls": ["./waku-rln-contract/lib/rln-contract/contracts/IVerifier.sol"]
+        "urls": ["../../../../../libs/waku-rln-contract/lib/rln-contract/contracts/IVerifier.sol"]
       },
     "openzeppelin-contracts/contracts/access/Ownable.sol": {
-        "urls": ["./waku-rln-contract/lib/openzeppelin-contracts/contracts/access/Ownable.sol"]
+        "urls": ["../../../../../libs/waku-rln-contract/lib/openzeppelin-contracts/contracts/access/Ownable.sol"]
       },
       "openzeppelin-contracts/contracts/utils/Context.sol": {
-        "urls": ["./waku-rln-contract/lib/openzeppelin-contracts/contracts/utils/Context.sol"]
+        "urls": ["../../../../../libs/waku-rln-contract/lib/openzeppelin-contracts/contracts/utils/Context.sol"]
       }
   },
   "settings": {
