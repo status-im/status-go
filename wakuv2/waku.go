@@ -1826,8 +1826,8 @@ func (w *Waku) findFilterPeers() []peer.ID {
 
 	allPeers := w.node.Host().Peerstore().Peers()
 	networkPeers := w.node.Host().Network().Peers()
-	w.filterDebug("Peerstore peers", zap.Any("cnt", len(allPeers)))
-	w.filterDebug("Network peers", zap.Any("cnt", len(networkPeers)))
+	w.filterDebug("Peerstore peers", zap.Stringers("peers", allPeers))
+	w.filterDebug("Network peers", zap.Stringers("peers", networkPeers))
 	var peers peer.IDSlice
 	for _, peer := range allPeers {
 		protocols, err := w.node.Host().Peerstore().SupportsProtocols(peer, filter.FilterSubscribeID_v20beta1, relay.WakuRelayID_v200)
@@ -1840,7 +1840,7 @@ func (w *Waku) findFilterPeers() []peer.ID {
 		}
 	}
 
-	w.filterDebug("Filtered peers", zap.Any("cnt", len(peers)))
+	w.filterDebug("Filtered peers", zap.Stringers("peers", peers))
 	if len(peers) > 0 {
 		sort.Slice(peers, func(i, j int) bool {
 			// If element not found in map, [] operator will return 0
@@ -1849,7 +1849,7 @@ func (w *Waku) findFilterPeers() []peer.ID {
 	}
 
 	var peerLen = len(peers)
-	w.filterDebug("Sliced peers", zap.Any("cnt", len(peers)))
+	w.filterDebug("Sliced peers", zap.Stringers("peers", peers))
 	if w.settings.MinPeersForFilter < peerLen {
 		peerLen = w.settings.MinPeersForFilter
 	}
