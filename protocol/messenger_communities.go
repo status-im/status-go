@@ -81,7 +81,9 @@ func (m *Messenger) publishOrg(org *communities.Community) error {
 		SkipProtocolLayer: true,
 		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION,
 	}
-	_, err = m.sender.SendPublic(context.Background(), org.IDString(), rawMessage)
+
+	ctx := context.WithValue(context.Background(), "messageType", rawMessage.MessageType.String())
+	_, err = m.sender.SendPublic(ctx, org.IDString(), rawMessage)
 	return err
 }
 
@@ -103,7 +105,8 @@ func (m *Messenger) publishCommunityEvents(msg *communities.CommunityEventsMessa
 	}
 
 	// TODO: resend in case of failure?
-	_, err = m.sender.SendPublic(context.Background(), types.EncodeHex(msg.CommunityID), rawMessage)
+	ctx := context.WithValue(context.Background(), "messageType", rawMessage.MessageType.String())
+	_, err = m.sender.SendPublic(ctx, types.EncodeHex(msg.CommunityID), rawMessage)
 	return err
 }
 
