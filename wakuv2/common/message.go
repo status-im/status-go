@@ -11,6 +11,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -156,7 +157,7 @@ type MemoryMessageStore struct {
 func NewReceivedMessage(env *protocol.Envelope, msgType MessageType) *ReceivedMessage {
 	ct, err := ExtractTopicFromContentTopic(env.Message().ContentTopic)
 	if err != nil {
-		log.Debug("failed to extract content topic from message", "topic", env.Message().ContentTopic, "err", err)
+		log.Debug("failed to extract content topic from message", "hash", hexutil.Encode(env.Hash()), "pubsubTopic", env.PubsubTopic(), "contentTopic", env.Message().ContentTopic, "err", err)
 		return nil
 	}
 
