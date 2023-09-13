@@ -1824,10 +1824,10 @@ func (w *Waku) filterDebug(msg string, fields ...zap.Field) {
 // peers that have been recently disconnected from have lower priority
 func (w *Waku) findFilterPeers() []peer.ID {
 
-	allPeers := w.node.Host().Peerstore().Peers()
-	networkPeers := w.node.Host().Network().Peers()
-	w.filterDebug("Peerstore peers", zap.Stringers("peers", allPeers))
-	w.filterDebug("Network peers", zap.Stringers("peers", networkPeers))
+	peerstorePeers := w.node.Host().Peerstore().Peers()
+	allPeers := w.node.Host().Network().Peers()
+	w.filterDebug("Peerstore peers", zap.Stringers("peers", peerstorePeers))
+	w.filterDebug("Network peers", zap.Stringers("peers", allPeers))
 	var peers peer.IDSlice
 	for _, peer := range allPeers {
 		protocols, err := w.node.Host().Peerstore().SupportsProtocols(peer, filter.FilterSubscribeID_v20beta1, relay.WakuRelayID_v200)
