@@ -11,6 +11,9 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
@@ -35,22 +38,18 @@ type BaseClient struct {
 	challengeTaker *ChallengeTaker
 }
 
-// NewBaseClient returns a fully qualified BaseClient from the given ConnectionParams
-func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
-
+func findServerCert(c *ConnectionParams) (*url.URL, *x509.Certificate, error) {
+	netIps, err := server.FindReachableAddressesForPairingClient(c.netIPs)
+	if err != nil {
+		return nil, nil, err
+	}
 	var baseAddress *url.URL
 	var serverCert *x509.Certificate
 	var certErrs error
-
-	netIps, err := server.FindReachableAddressesForPairingClient(c.netIPs)
-	if err != nil {
-		return nil, err
-	}
-
 	for i := range netIps {
 		u, err := c.URL(i)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		serverCert, err = getServerCert(u)
@@ -62,6 +61,26 @@ func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
 		baseAddress = u
 		break
 	}
+	return baseAddress, serverCert, certErrs
+}
+
+// NewBaseClient returns a fully qualified BaseClient from the given ConnectionParams
+func NewBaseClient(c *ConnectionParams, logger *zap.Logger) (*BaseClient, error) {
+	var baseAddress *url.URL
+	var serverCert *x509.Certificate
+	var certErrs error
+
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		baseAddress, serverCert, certErrs = findServerCert(c)
+		if serverCert == nil {
+			certErrs = fmt.Errorf("failed to connect to any of given addresses. %w", certErrs)
+			time.Sleep(1 * time.Second)
+			logger.Warn("failed to connect to any of given addresses. Retrying...", zap.Error(certErrs))
+		} else {
+			break
+		}
+	}
 
 	if serverCert == nil {
 		certErrs = fmt.Errorf("failed to connect to any of given addresses. %w", certErrs)
@@ -72,7 +91,7 @@ func NewBaseClient(c *ConnectionParams) (*BaseClient, error) {
 	// No error on the dial out then the URL.Host is accessible
 	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionConnect})
 
-	err = verifyCert(serverCert, c.publicKey)
+	err := verifyCert(serverCert, c.publicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +164,7 @@ func NewSenderClient(backend *api.GethStatusBackend, c *ConnectionParams, config
 	logger := logutils.ZapLogger().Named("SenderClient")
 	pe := NewPayloadEncryptor(c.aesKey)
 
-	bc, err := NewBaseClient(c)
+	bc, err := NewBaseClient(c, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -316,12 +335,13 @@ type ReceiverClient struct {
 
 // NewReceiverClient returns a fully qualified ReceiverClient created with the incoming parameters
 func NewReceiverClient(backend *api.GethStatusBackend, c *ConnectionParams, config *ReceiverClientConfig) (*ReceiverClient, error) {
-	bc, err := NewBaseClient(c)
+	logger := logutils.ZapLogger().Named("ReceiverClient")
+
+	bc, err := NewBaseClient(c, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	logger := logutils.ZapLogger().Named("ReceiverClient")
 	pe := NewPayloadEncryptor(c.aesKey)
 
 	ar, rmr, imr, err := NewPayloadReceivers(logger, pe, backend, config.ReceiverConfig)
@@ -522,12 +542,11 @@ type KeystoreFilesReceiverClient struct {
 }
 
 func NewKeystoreFilesReceiverClient(backend *api.GethStatusBackend, c *ConnectionParams, config *KeystoreFilesReceiverClientConfig) (*KeystoreFilesReceiverClient, error) {
-	bc, err := NewBaseClient(c)
+	logger := logutils.ZapLogger().Named("ReceiverClient")
+	bc, err := NewBaseClient(c, logger)
 	if err != nil {
 		return nil, err
 	}
-
-	logger := logutils.ZapLogger().Named("ReceiverClient")
 	pe := NewPayloadEncryptor(c.aesKey)
 
 	kfrc, err := NewKeystoreFilesPayloadReceiver(backend, pe, config.ReceiverConfig, logger)
