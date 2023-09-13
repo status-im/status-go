@@ -7,15 +7,23 @@ import (
 	"strings"
 )
 
+// Waku2PubsubTopicPrefix is the expected prefix to be used for pubsub topics
 const Waku2PubsubTopicPrefix = "/waku/2"
+
+// StaticShardingPubsubTopicPrefix is the expected prefix to be used for static sharding pubsub topics
 const StaticShardingPubsubTopicPrefix = Waku2PubsubTopicPrefix + "/rs"
 
+// ErrInvalidStructure indicates that the pubsub topic is malformed
 var ErrInvalidStructure = errors.New("invalid topic structure")
+
+// ErrInvalidTopicPrefix indicates that the pubsub topic is missing the prefix /waku/2
 var ErrInvalidTopicPrefix = errors.New("must start with " + Waku2PubsubTopicPrefix)
 var ErrMissingTopicName = errors.New("missing topic-name")
 var ErrInvalidShardedTopicPrefix = errors.New("must start with " + StaticShardingPubsubTopicPrefix)
 var ErrMissingClusterIndex = errors.New("missing shard_cluster_index")
 var ErrMissingShardNumber = errors.New("missing shard_number")
+
+// ErrInvalidNumberFormat indicates that a number exceeds the allowed range
 var ErrInvalidNumberFormat = errors.New("only 2^16 numbers are allowed")
 
 // NamespacedPubsubTopicKind used to represent kind of NamespacedPubsubTopicKind
@@ -107,7 +115,7 @@ func (s StaticShardingPubsubTopic) Cluster() uint16 {
 	return s.cluster
 }
 
-// Cluster returns the shard number
+// Shard returns the shard number
 func (s StaticShardingPubsubTopic) Shard() uint16 {
 	return s.shard
 }
@@ -174,14 +182,14 @@ func ToShardedPubsubTopic(topic string) (NamespacedPubsubTopic, error) {
 			return nil, err
 		}
 		return s, nil
-	} else {
-		s := NamedShardingPubsubTopic{}
-		err := s.Parse(topic)
-		if err != nil {
-			return nil, err
-		}
-		return s, nil
 	}
+
+	s := NamedShardingPubsubTopic{}
+	err := s.Parse(topic)
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 // DefaultPubsubTopic is the default pubSub topic used in waku

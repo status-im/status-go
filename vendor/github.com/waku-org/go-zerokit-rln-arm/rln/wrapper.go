@@ -244,3 +244,7 @@ func (r *RLN) GetLeaf(index uint) ([]byte, error) {
 
 	return C.GoBytes(unsafe.Pointer(out.ptr), C.int(out.len)), nil
 }
+
+func (r *RLN) LeavesSet() uint {
+	return uint(C.leaves_set(r.ptr))
+}

@@ -37,9 +37,9 @@ func WithWakuRelaySharding(rs protocol.RelayShards) ENROption {
 	return func(localnode *enode.LocalNode) error {
 		if len(rs.Indices) >= 64 {
 			return WithWakuRelayShardingBitVector(rs)(localnode)
-		} else {
-			return WithWakuRelayShardingIndicesList(rs)(localnode)
 		}
+
+		return WithWakuRelayShardingIndicesList(rs)(localnode)
 	}
 }
 

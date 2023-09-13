@@ -32,8 +32,8 @@ var (
 	// that could be used to retrieve message history
 	ErrNoPeersAvailable = errors.New("no suitable remote peers")
 
-	// ErrInvalidId is returned when no RequestID is given
-	ErrInvalidId = errors.New("invalid request id")
+	// ErrInvalidID is returned when no RequestID is given
+	ErrInvalidID = errors.New("invalid request id")
 
 	// ErrFailedToResumeHistory is returned when the node attempted to retrieve historic
 	// messages to fill its own message history but for some reason it failed

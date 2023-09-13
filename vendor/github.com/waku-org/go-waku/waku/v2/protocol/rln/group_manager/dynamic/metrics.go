@@ -7,8 +7,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var numberRegisteredMemberships = prometheus.NewCounter(
-	prometheus.CounterOpts{
+var numberRegisteredMemberships = prometheus.NewGauge(
+	prometheus.GaugeOpts{
 		Name: "waku_rln_number_registered_memberships",
 		Help: "number of registered and active rln memberships",
 	})
@@ -33,7 +33,7 @@ var collectors = []prometheus.Collector{
 
 // Metrics exposes the functions required to update prometheus metrics for lightpush protocol
 type Metrics interface {
-	RecordRegisteredMembership(num int)
+	RecordRegisteredMembership(num uint)
 	RecordMembershipInsertionDuration(duration time.Duration)
 	RecordMembershipCredentialsImportDuration(duration time.Duration)
 }
@@ -60,10 +60,6 @@ func (m *metricsImpl) RecordMembershipCredentialsImportDuration(duration time.Du
 }
 
 // RecordRegisteredMembership records the number of registered memberships
-func (m *metricsImpl) RecordRegisteredMembership(num int) {
-	if num < 0 {
-		return
-	}
-
-	numberRegisteredMemberships.Add(float64(num))
+func (m *metricsImpl) RecordRegisteredMembership(num uint) {
+	numberRegisteredMemberships.Set(float64(num))
 }

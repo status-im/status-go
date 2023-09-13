@@ -19,7 +19,7 @@ func FilterPredicate(predicate func(*enode.Node) bool) Predicate {
 }
 
 // FilterShard creates a Predicate that filters nodes that belong to a specific shard
-func FilterShard(iterator enode.Iterator, cluster, index uint16) Predicate {
+func FilterShard(cluster, index uint16) Predicate {
 	return func(iterator enode.Iterator) enode.Iterator {
 		predicate := func(node *enode.Node) bool {
 			rs, err := wenr.RelaySharding(node.Record())
@@ -33,7 +33,7 @@ func FilterShard(iterator enode.Iterator, cluster, index uint16) Predicate {
 }
 
 // FilterCapabilities creates a Predicate to filter nodes that support specific protocols
-func FilterCapabilities(iterator enode.Iterator, flags wenr.WakuEnrBitfield) Predicate {
+func FilterCapabilities(flags wenr.WakuEnrBitfield) Predicate {
 	return func(iterator enode.Iterator) enode.Iterator {
 		predicate := func(node *enode.Node) bool {
 			enrField := new(wenr.WakuEnrBitfield)

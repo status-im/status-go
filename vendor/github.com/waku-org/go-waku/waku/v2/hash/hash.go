@@ -10,6 +10,7 @@ var sha256Pool = sync.Pool{New: func() interface{} {
 	return sha256.New()
 }}
 
+// SHA256 generates the SHA256 hash from the input data
 func SHA256(data ...[]byte) []byte {
 	h, ok := sha256Pool.Get().(hash.Hash)
 	if !ok {

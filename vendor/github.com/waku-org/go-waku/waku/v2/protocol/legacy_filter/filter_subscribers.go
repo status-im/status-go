@@ -155,9 +155,9 @@ func (sub *Subscribers) RemoveContentFilters(peerID peer.ID, requestID string, c
 
 	// make sure we delete the subscriber
 	// if no more content filters left
-	for _, peerId := range peerIdsToRemove {
+	for _, peerID := range peerIdsToRemove {
 		for i, s := range sub.subscribers {
-			if s.peer == peerId && s.requestID == requestID {
+			if s.peer == peerID && s.requestID == requestID {
 				l := len(sub.subscribers) - 1
 				sub.subscribers[i] = sub.subscribers[l]
 				sub.subscribers = sub.subscribers[:l]

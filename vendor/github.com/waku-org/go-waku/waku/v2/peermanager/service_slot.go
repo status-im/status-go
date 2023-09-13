@@ -5,6 +5,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/utils"
 )
 
@@ -57,7 +58,7 @@ func NewServiceSlot() *ServiceSlots {
 // getPeers for getting all the peers for a given protocol
 // since peerMap is only used in peerManager that's why it is unexported
 func (slots *ServiceSlots) getPeers(proto protocol.ID) *peerMap {
-	if proto == WakuRelayIDv200 {
+	if proto == relay.WakuRelayID_v200 {
 		return nil
 	}
 	slots.mu.Lock()

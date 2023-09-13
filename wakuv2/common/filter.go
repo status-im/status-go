@@ -23,7 +23,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -32,15 +34,16 @@ import (
 
 // Filter represents a Waku message filter
 type Filter struct {
-	Src         *ecdsa.PublicKey  // Sender of the message
-	KeyAsym     *ecdsa.PrivateKey // Private Key of recipient
-	KeySym      []byte            // Key associated with the Topic
-	PubsubTopic string            // Pubsub topic used to filter messages with
-	Topics      [][]byte          // ContentTopics to filter messages with
-	SymKeyHash  common.Hash       // The Keccak256Hash of the symmetric key, needed for optimization
-	id          string            // unique identifier
+	Src           *ecdsa.PublicKey  // Sender of the message
+	KeyAsym       *ecdsa.PrivateKey // Private Key of recipient
+	KeySym        []byte            // Key associated with the Topic
+	PubsubTopic   string            // Pubsub topic used to filter messages with
+	ContentTopics TopicSet          // ContentTopics to filter messages with
+	SymKeyHash    common.Hash       // The Keccak256Hash of the symmetric key, needed for optimization
+	id            string            // unique identifier
 
-	Messages MessageStore
+	Subscriptions filter.SubscriptionSet
+	Messages      MessageStore
 }
 
 type FilterSet = map[*Filter]struct{}
@@ -49,20 +52,26 @@ type PubsubTopicToContentTopic = map[string]ContentTopicToFilter
 
 // Filters represents a collection of filters
 type Filters struct {
+	// Map of random ID to Filter
 	watchers map[string]*Filter
 
-	topicMatcher     PubsubTopicToContentTopic // map a topic to the filters that are interested in being notified when a message matches that topic
-	allTopicsMatcher map[*Filter]struct{}      // list all the filters that will be notified of a new message, no matter what its topic is
+	// map a topic to the filters that are interested in being notified when a message matches that topic
+	topicMatcher PubsubTopicToContentTopic
 
-	mutex sync.RWMutex
+	// list all the filters that will be notified of a new message, no matter what its topic is
+	allTopicsMatcher map[*Filter]struct{}
+
+	logger *zap.Logger
+	mutex  sync.RWMutex
 }
 
 // NewFilters returns a newly created filter collection
-func NewFilters() *Filters {
+func NewFilters(logger *zap.Logger) *Filters {
 	return &Filters{
 		watchers:         make(map[string]*Filter),
 		topicMatcher:     make(PubsubTopicToContentTopic),
 		allTopicsMatcher: make(map[*Filter]struct{}),
+		logger:           logger,
 	}
 }
 
@@ -89,8 +98,13 @@ func (fs *Filters) Install(watcher *Filter) (string, error) {
 	}
 
 	watcher.id = id
+
+	// Initialize subscriptions
+	watcher.Subscriptions = make(filter.SubscriptionSet)
 	fs.watchers[id] = watcher
 	fs.addTopicMatcher(watcher)
+
+	fs.logger.Info("Filters.Install()", zap.String("id", id))
 	return id, err
 }
 
@@ -99,9 +113,12 @@ func (fs *Filters) Install(watcher *Filter) (string, error) {
 func (fs *Filters) Uninstall(id string) bool {
 	fs.mutex.Lock()
 	defer fs.mutex.Unlock()
-	if fs.watchers[id] != nil {
+	watcher := fs.watchers[id]
+	if watcher != nil {
 		fs.removeFromTopicMatchers(fs.watchers[id])
 		delete(fs.watchers, id)
+
+		fs.logger.Info("Filters.Uninstall()", zap.String("id", id))
 		return true
 	}
 	return false
@@ -124,7 +141,7 @@ func (fs *Filters) AllTopics() []TopicType {
 // If the filter's Topics array is empty, it will be tried on every topic.
 // Otherwise, it will be tried on the topics specified.
 func (fs *Filters) addTopicMatcher(watcher *Filter) {
-	if len(watcher.Topics) == 0 && (watcher.PubsubTopic == relay.DefaultWakuTopic || watcher.PubsubTopic == "") {
+	if len(watcher.ContentTopics) == 0 && (watcher.PubsubTopic == relay.DefaultWakuTopic || watcher.PubsubTopic == "") {
 		fs.allTopicsMatcher[watcher] = struct{}{}
 	} else {
 		filtersPerContentTopic, ok := fs.topicMatcher[watcher.PubsubTopic]
@@ -132,8 +149,7 @@ func (fs *Filters) addTopicMatcher(watcher *Filter) {
 			filtersPerContentTopic = make(ContentTopicToFilter)
 		}
 
-		for _, t := range watcher.Topics {
-			topic := BytesToTopic(t)
+		for topic := range watcher.ContentTopics {
 			if filtersPerContentTopic[topic] == nil {
 				filtersPerContentTopic[topic] = make(FilterSet)
 			}
@@ -153,8 +169,7 @@ func (fs *Filters) removeFromTopicMatchers(watcher *Filter) {
 		return
 	}
 
-	for _, t := range watcher.Topics {
-		topic := BytesToTopic(t)
+	for topic := range watcher.ContentTopics {
 		delete(filtersPerContentTopic[topic], watcher)
 	}
 
@@ -185,6 +200,15 @@ func (fs *Filters) Get(id string) *Filter {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
 	return fs.watchers[id]
+}
+
+func (fs *Filters) IterateFilters(fn func(id string)) {
+	fs.mutex.RLock()
+	defer fs.mutex.RUnlock()
+
+	for _, f := range fs.watchers {
+		fn(f.id)
+	}
 }
 
 // NotifyWatchers notifies any filter that has declared interest

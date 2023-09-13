@@ -28,7 +28,7 @@ type WakuEnrBitfield = uint8
 
 // NewWakuEnrBitfield creates a WakuEnrBitField whose value will depend on which protocols are enabled in the node
 func NewWakuEnrBitfield(lightpush, filter, store, relay bool) WakuEnrBitfield {
-	var v uint8 = 0
+	var v uint8
 
 	if lightpush {
 		v |= (1 << 3)
@@ -91,10 +91,9 @@ func Multiaddress(node *enode.Node) (peer.ID, []multiaddr.Multiaddr, error) {
 	if err := node.Record().Load(enr.WithEntry(MultiaddrENRField, &multiaddrRaw)); err != nil {
 		if !enr.IsNotFound(err) {
 			return "", nil, err
-		} else {
-			// No multiaddr entry on enr
-			return peerID, result, nil
 		}
+		// No multiaddr entry on enr
+		return peerID, result, nil
 	}
 
 	if len(multiaddrRaw) < 2 {

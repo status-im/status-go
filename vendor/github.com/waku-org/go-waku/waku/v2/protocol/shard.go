@@ -194,6 +194,7 @@ func (rs RelayShards) BitVector() []byte {
 	return append(result, vec...)
 }
 
+// Generate a RelayShards from a byte slice
 func FromBitVector(buf []byte) (RelayShards, error) {
 	if len(buf) != 130 {
 		return RelayShards{}, errors.New("invalid data: expected 130 bytes")
