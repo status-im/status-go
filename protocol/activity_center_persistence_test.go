@@ -104,6 +104,92 @@ func TestDeleteActivityCenterNotificationsWithMultipleIds(t *testing.T) {
 	require.Equal(t, uint64(1), count)
 }
 
+func TestDeleteActivityCenterNotificationsForLastMessage(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	chat := CreatePublicChat("test-chat", &testTimeSource{})
+	err = p.SaveChat(*chat)
+	require.NoError(t, err)
+
+	chat2 := CreatePublicChat("test-chat", &testTimeSource{})
+	err = p.SaveChat(*chat2)
+	require.NoError(t, err)
+
+	messages := []*common.Message{
+		{
+			ID:          "0x1",
+			ChatMessage: &protobuf.ChatMessage{},
+			LocalChatID: chat.ID,
+		},
+		{
+			ID:          "0x2",
+			ChatMessage: &protobuf.ChatMessage{},
+			LocalChatID: chat.ID,
+		},
+		{
+			ChatMessage: &protobuf.ChatMessage{},
+			ID:          "0x3",
+			LocalChatID: chat.ID,
+		},
+	}
+	err = p.SaveMessages(messages)
+	require.NoError(t, err)
+
+	chat.LastMessage = messages[1]
+	err = p.SaveChat(*chat)
+	require.NoError(t, err)
+
+	chatMessages, _, err := p.MessageByChatID(chat.ID, "", 2)
+	require.NoError(t, err)
+	require.Len(t, chatMessages, 2)
+
+	nID1 := types.HexBytes("1")
+	nID2 := types.HexBytes("2")
+	nID3 := types.HexBytes("3")
+
+	createNotifications(t, p, []*ActivityCenterNotification{
+		{
+			ID:      nID1,
+			ChatID:  chat.ID,
+			Type:    ActivityCenterNotificationTypeMention,
+			Message: messages[0],
+		},
+		{
+			ID:      nID2,
+			ChatID:  chat.ID,
+			Type:    ActivityCenterNotificationTypeMention,
+			Message: messages[1],
+		},
+		{
+			ID:      nID3,
+			ChatID:  chat.ID,
+			Type:    ActivityCenterNotificationTypeMention,
+			Message: messages[2],
+		},
+	})
+
+	// Test: soft delete only the notifications that have Message.ID == messages[0].ID.
+	_, err = p.DeleteActivityCenterNotificationForMessage(chat.ID, messages[2].ID, currentMilliseconds())
+	require.NoError(t, err)
+
+	notif, err := p.GetActivityCenterNotificationByID(nID3)
+	require.NoError(t, err)
+	require.True(t, notif.Deleted)
+	require.True(t, notif.Dismissed)
+	require.True(t, notif.Read)
+
+	// Other notifications are not affected.
+	for _, id := range []types.HexBytes{nID1, nID2} {
+		notif, err = p.GetActivityCenterNotificationByID(id)
+		require.NoError(t, err)
+		require.False(t, notif.Deleted, notif.ID)
+		require.False(t, notif.Dismissed, notif.ID)
+		require.False(t, notif.Read, notif.ID)
+	}
+}
+
 func TestDeleteActivityCenterNotificationsForMessage(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
