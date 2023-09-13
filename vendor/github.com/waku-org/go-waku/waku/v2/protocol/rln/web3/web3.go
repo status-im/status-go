@@ -5,8 +5,10 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln/contracts"
 )
@@ -26,12 +28,22 @@ type RLNContract struct {
 	DeployedBlockNumber uint64
 }
 
+// EthClient is an interface for the ethclient.Client, so that we can pass mock client for testing
+type EthClient interface {
+	bind.ContractBackend
+	SyncProgress(ctx context.Context) (*ethereum.SyncProgress, error)
+	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
+	BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error)
+	SubscribeNewHead(ctx context.Context, ch chan<- *types.Header) (ethereum.Subscription, error)
+	Close()
+}
+
 // Config is a helper struct that contains attributes for interaction with RLN smart contracts
 type Config struct {
 	configured bool
 
 	ETHClientAddress string
-	ETHClient        *ethclient.Client
+	ETHClient        EthClient
 	ChainID          *big.Int
 	RegistryContract RegistryContract
 	RLNContract      RLNContract

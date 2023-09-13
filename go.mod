@@ -84,7 +84,7 @@ require (
 	github.com/mutecomm/go-sqlcipher/v4 v4.4.2
 	github.com/schollz/peerdiscovery v1.7.0
 	github.com/siphiuel/lc-proxy-wrapper v0.0.0-20230516150924-246507cee8c7
-	github.com/waku-org/go-waku v0.7.1-0.20230907093131-092811658ea3
+	github.com/waku-org/go-waku v0.8.1-0.20230926162729-d324234c8153
 	github.com/wk8/go-ordered-map/v2 v2.1.7
 	github.com/yeqown/go-qrcode/v2 v2.2.1
 	github.com/yeqown/go-qrcode/writer/standard v1.2.1
@@ -257,10 +257,10 @@ require (
 	github.com/urfave/cli/v2 v2.24.4 // indirect
 	github.com/waku-org/go-discover v0.0.0-20221209174356-61c833f34d98 // indirect
 	github.com/waku-org/go-libp2p-rendezvous v0.0.0-20230628220917-7b4e5ae4c0e7 // indirect
-	github.com/waku-org/go-zerokit-rln v0.1.14-0.20230905214645-ca686a02e816 // indirect
-	github.com/waku-org/go-zerokit-rln-apple v0.0.0-20230905213302-1d6d18a03e7c // indirect
-	github.com/waku-org/go-zerokit-rln-arm v0.0.0-20230905183322-05f4cda61468 // indirect
-	github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230905182930-2b11e72ef866 // indirect
+	github.com/waku-org/go-zerokit-rln v0.1.14-0.20230916173259-d284a3d8f2fd // indirect
+	github.com/waku-org/go-zerokit-rln-apple v0.0.0-20230916172309-ee0ee61dde2b // indirect
+	github.com/waku-org/go-zerokit-rln-arm v0.0.0-20230916171929-1dd9494ff065 // indirect
+	github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1 // indirect
 	github.com/wk8/go-ordered-map v1.0.0 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect

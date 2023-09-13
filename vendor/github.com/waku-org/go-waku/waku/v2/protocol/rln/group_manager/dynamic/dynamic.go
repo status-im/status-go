@@ -3,6 +3,7 @@ package dynamic
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -28,28 +29,26 @@ var RLNAppInfo = keystore.AppInfo{
 }
 
 type DynamicGroupManager struct {
-	rln     *rln.RLN
-	log     *zap.Logger
+	MembershipFetcher
 	metrics Metrics
 
 	cancel context.CancelFunc
-	wg     sync.WaitGroup
 
 	identityCredential *rln.IdentityCredential
 	membershipIndex    rln.MembershipIndex
 
-	web3Config         *web3.Config
-	lastBlockProcessed uint64
+	lastBlockProcessedMutex sync.RWMutex
+	lastBlockProcessed      uint64
 
-	eventHandler RegistrationEventHandler
-
-	appKeystore      *keystore.AppKeystore
-	keystorePassword string
-
-	rootTracker *group_manager.MerkleRootTracker
+	appKeystore           *keystore.AppKeystore
+	keystorePassword      string
+	membershipIndexToLoad *uint
 }
 
-func handler(gm *DynamicGroupManager, events []*contracts.RLNMemberRegistered) error {
+func (gm *DynamicGroupManager) handler(events []*contracts.RLNMemberRegistered) error {
+	gm.lastBlockProcessedMutex.Lock()
+	defer gm.lastBlockProcessedMutex.Unlock()
+
 	toRemoveTable := om.New()
 	toInsertTable := om.New()
 
@@ -57,17 +56,17 @@ func handler(gm *DynamicGroupManager, events []*contracts.RLNMemberRegistered) e
 	for _, event := range events {
 		if event.Raw.Removed {
 			var indexes []uint
-			i_idx, ok := toRemoveTable.Get(event.Raw.BlockNumber)
+			iIdx, ok := toRemoveTable.Get(event.Raw.BlockNumber)
 			if ok {
-				indexes = i_idx.([]uint)
+				indexes = iIdx.([]uint)
 			}
 			indexes = append(indexes, uint(event.Index.Uint64()))
 			toRemoveTable.Set(event.Raw.BlockNumber, indexes)
 		} else {
 			var eventsPerBlock []*contracts.RLNMemberRegistered
-			i_evt, ok := toInsertTable.Get(event.Raw.BlockNumber)
+			iEvt, ok := toInsertTable.Get(event.Raw.BlockNumber)
 			if ok {
-				eventsPerBlock = i_evt.([]*contracts.RLNMemberRegistered)
+				eventsPerBlock = iEvt.([]*contracts.RLNMemberRegistered)
 			}
 			eventsPerBlock = append(eventsPerBlock, event)
 			toInsertTable.Set(event.Raw.BlockNumber, eventsPerBlock)
@@ -88,8 +87,6 @@ func handler(gm *DynamicGroupManager, events []*contracts.RLNMemberRegistered) e
 		return err
 	}
 
-	gm.metrics.RecordRegisteredMembership(toInsertTable.Len() - toRemoveTable.Len())
-
 	gm.lastBlockProcessed = lastBlockProcessed
 	err = gm.SetMetadata(RLNMetadata{
 		LastProcessedBlock: gm.lastBlockProcessed,
@@ -101,7 +98,7 @@ func handler(gm *DynamicGroupManager, events []*contracts.RLNMemberRegistered) e
 		// this is not a fatal error, hence we don't raise an exception
 		gm.log.Warn("failed to persist rln metadata", zap.Error(err))
 	} else {
-		gm.log.Debug("rln metadata persisted", zap.Uint64("lastProcessedBlock", gm.lastBlockProcessed), zap.Uint64("chainID", gm.web3Config.ChainID.Uint64()), logging.HexBytes("contractAddress", gm.web3Config.RegistryContract.Address.Bytes()))
+		gm.log.Debug("rln metadata persisted", zap.Uint64("lastBlockProcessed", gm.lastBlockProcessed), zap.Uint64("chainID", gm.web3Config.ChainID.Uint64()), logging.HexBytes("contractAddress", gm.web3Config.RegistryContract.Address.Bytes()))
 	}
 
 	return nil
@@ -112,34 +109,43 @@ type RegistrationHandler = func(tx *types.Transaction)
 func NewDynamicGroupManager(
 	ethClientAddr string,
 	memContractAddr common.Address,
-	membershipIndex uint,
+	membershipIndexToLoad *uint,
 	appKeystore *keystore.AppKeystore,
 	keystorePassword string,
 	reg prometheus.Registerer,
+	rlnInstance *rln.RLN,
+	rootTracker *group_manager.MerkleRootTracker,
 	log *zap.Logger,
 ) (*DynamicGroupManager, error) {
 	log = log.Named("rln-dynamic")
 
+	web3Config := web3.NewConfig(ethClientAddr, memContractAddr)
 	return &DynamicGroupManager{
-		membershipIndex:  membershipIndex,
-		web3Config:       web3.NewConfig(ethClientAddr, memContractAddr),
-		eventHandler:     handler,
-		appKeystore:      appKeystore,
-		keystorePassword: keystorePassword,
-		log:              log,
-		metrics:          newMetrics(reg),
+		membershipIndexToLoad: membershipIndexToLoad,
+		appKeystore:           appKeystore,
+		keystorePassword:      keystorePassword,
+		MembershipFetcher:     NewMembershipFetcher(web3Config, rlnInstance, rootTracker, log),
+		metrics:               newMetrics(reg),
 	}, nil
 }
 
 func (gm *DynamicGroupManager) getMembershipFee(ctx context.Context) (*big.Int, error) {
-	return gm.web3Config.RLNContract.MEMBERSHIPDEPOSIT(&bind.CallOpts{Context: ctx})
+	fee, err := gm.web3Config.RLNContract.MEMBERSHIPDEPOSIT(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, fmt.Errorf("could not check if credential exits in contract: %w", err)
+	}
+	return fee, nil
 }
 
 func (gm *DynamicGroupManager) memberExists(ctx context.Context, idCommitment rln.IDCommitment) (bool, error) {
-	return gm.web3Config.RLNContract.MemberExists(&bind.CallOpts{Context: ctx}, rln.Bytes32ToBigInt(idCommitment))
+	exists, err := gm.web3Config.RLNContract.MemberExists(&bind.CallOpts{Context: ctx}, rln.Bytes32ToBigInt(idCommitment))
+	if err != nil {
+		return false, fmt.Errorf("could not check if credential exits in contract: %w", err)
+	}
+	return exists, nil
 }
 
-func (gm *DynamicGroupManager) Start(ctx context.Context, rlnInstance *rln.RLN, rootTracker *group_manager.MerkleRootTracker) error {
+func (gm *DynamicGroupManager) Start(ctx context.Context) error {
 	if gm.cancel != nil {
 		return errors.New("already started")
 	}
@@ -154,9 +160,6 @@ func (gm *DynamicGroupManager) Start(ctx context.Context, rlnInstance *rln.RLN, 
 		return err
 	}
 
-	gm.rln = rlnInstance
-	gm.rootTracker = rootTracker
-
 	// check if the contract exists by calling a static function
 	_, err = gm.getMembershipFee(ctx)
 	if err != nil {
@@ -168,19 +171,26 @@ func (gm *DynamicGroupManager) Start(ctx context.Context, rlnInstance *rln.RLN, 
 		return err
 	}
 
-	if err = gm.HandleGroupUpdates(ctx, gm.eventHandler); err != nil {
+	err = gm.MembershipFetcher.HandleGroupUpdates(ctx, gm.handler)
+	if err != nil {
 		return err
 	}
+
+	gm.metrics.RecordRegisteredMembership(gm.rln.LeavesSet())
 
 	return nil
 }
 
 func (gm *DynamicGroupManager) loadCredential(ctx context.Context) error {
+	if gm.appKeystore == nil {
+		gm.log.Warn("no credentials were loaded. Node will only validate messages, but wont be able to generate proofs and attach them to messages")
+		return nil
+	}
 	start := time.Now()
 
 	credentials, err := gm.appKeystore.GetMembershipCredentials(
 		gm.keystorePassword,
-		gm.membershipIndex,
+		gm.membershipIndexToLoad,
 		keystore.NewMembershipContractInfo(gm.web3Config.ChainID, gm.web3Config.RegistryContract.Address))
 	if err != nil {
 		return err
@@ -201,6 +211,7 @@ func (gm *DynamicGroupManager) loadCredential(ctx context.Context) error {
 	}
 
 	gm.identityCredential = credentials.IdentityCredential
+	gm.membershipIndex = credentials.TreeIndex
 
 	return nil
 }
@@ -230,6 +241,8 @@ func (gm *DynamicGroupManager) InsertMembers(toInsert *om.OrderedMap) error {
 			return err
 		}
 		gm.metrics.RecordMembershipInsertionDuration(time.Since(start))
+
+		gm.metrics.RecordRegisteredMembership(gm.rln.LeavesSet())
 
 		_, err = gm.rootTracker.UpdateLatestRoot(pair.Key.(uint64))
 		if err != nil {
@@ -278,9 +291,29 @@ func (gm *DynamicGroupManager) Stop() error {
 		return err
 	}
 
-	gm.web3Config.ETHClient.Close()
-
-	gm.wg.Wait()
+	gm.MembershipFetcher.Stop()
 
 	return nil
+}
+
+func (gm *DynamicGroupManager) IsReady(ctx context.Context) (bool, error) {
+	latestBlockNumber, err := gm.latestBlockNumber(ctx)
+	if err != nil {
+		return false, fmt.Errorf("could not retrieve latest block: %w", err)
+	}
+
+	gm.lastBlockProcessedMutex.RLock()
+	allBlocksProcessed := gm.lastBlockProcessed >= latestBlockNumber
+	gm.lastBlockProcessedMutex.RUnlock()
+
+	if !allBlocksProcessed {
+		return false, nil
+	}
+
+	syncProgress, err := gm.web3Config.ETHClient.SyncProgress(ctx)
+	if err != nil {
+		return false, fmt.Errorf("could not retrieve sync state: %w", err)
+	}
+
+	return syncProgress == nil, nil // syncProgress only has a value while node is syncing
 }

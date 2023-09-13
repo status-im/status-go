@@ -16,6 +16,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
+	"golang.org/x/exp/maps"
 
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/wakuv2/common"
@@ -132,17 +133,15 @@ func TestBasicWakuV2(t *testing.T) {
 	require.Greater(t, w.PeerCount(), 3)
 
 	filter := &common.Filter{
-		Messages: common.NewMemoryMessageStore(),
-		Topics: [][]byte{
-			{1, 2, 3, 4},
-		},
+		Messages:      common.NewMemoryMessageStore(),
+		ContentTopics: common.NewTopicSetFromBytes([][]byte{[]byte{1, 2, 3, 4}}),
 	}
 
 	_, err = w.Subscribe(filter)
 	require.NoError(t, err)
 
 	msgTimestamp := w.timestamp()
-	contentTopic := common.BytesToTopic(filter.Topics[0])
+	contentTopic := maps.Keys(filter.ContentTopics)[0]
 
 	_, err = w.Send(relay.DefaultWakuTopic, &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
@@ -195,17 +194,15 @@ func TestWakuV2Filter(t *testing.T) {
 	require.Greater(t, w.PeerCount(), 3)
 
 	filter := &common.Filter{
-		Messages: common.NewMemoryMessageStore(),
-		Topics: [][]byte{
-			{1, 2, 3, 4},
-		},
+		Messages:      common.NewMemoryMessageStore(),
+		ContentTopics: common.NewTopicSetFromBytes([][]byte{[]byte{1, 2, 3, 4}}),
 	}
 
-	_, err = w.Subscribe(filter)
+	filterId, err := w.Subscribe(filter)
 	require.NoError(t, err)
 
 	msgTimestamp := w.timestamp()
-	contentTopic := common.BytesToTopic(filter.Topics[0])
+	contentTopic := maps.Keys(filter.ContentTopics)[0]
 
 	_, err = w.Send(relay.DefaultWakuTopic, &pb.WakuMessage{
 		Payload:      []byte{1, 2, 3, 4, 5},
@@ -217,35 +214,39 @@ func TestWakuV2Filter(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
 
-	// Ensure there is 1 active filter subscription
-	require.Len(t, w.filterSubscriptions, 1)
-	subMap := w.filterSubscriptions[filter]
+	// Ensure there is at least 1 active filter subscription
+	subscriptions := w.node.FilterLightnode().Subscriptions()
+	require.Greater(t, len(subscriptions), 0)
+
 	// Ensure there are some active peers for this filter subscription
-	require.Greater(t, len(subMap), 0)
+	stats := w.getFilterStats()
+	require.Greater(t, len(stats[filterId]), 0)
 
 	messages := filter.Retrieve()
-	//require.Len(t, messages, 1)
 	require.Len(t, messages, 1)
 
 	// Mock peers going down
-	isFilterSubAliveBak := w.isFilterSubAlive
+	isFilterSubAliveBak := w.filterManager.isFilterSubAlive
 	w.settings.MinPeersForFilter = 0
-	w.isFilterSubAlive = func(sub *waku_filter.SubscriptionDetails) error {
+	w.filterManager.isFilterSubAlive = func(sub *waku_filter.SubscriptionDetails) error {
 		return errors.New("peer down")
 	}
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// Ensure there are 0 active peers now
-	require.Len(t, subMap, 0)
+
+	stats = w.getFilterStats()
+	require.Len(t, stats[filterId], 0)
 
 	// Reconnect
 	w.settings.MinPeersForFilter = 2
-	w.isFilterSubAlive = isFilterSubAliveBak
+	w.filterManager.isFilterSubAlive = isFilterSubAliveBak
 	time.Sleep(10 * time.Second)
 
 	// Ensure there are some active peers now
-	require.Greater(t, len(subMap), 0)
+	stats = w.getFilterStats()
+	require.Greater(t, len(stats[filterId]), 0)
 
 	require.NoError(t, w.Stop())
 }

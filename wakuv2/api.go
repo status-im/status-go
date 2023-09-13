@@ -312,14 +312,11 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 	}
 
 	filter.PubsubTopic = crit.PubsubTopic
-
-	for _, bt := range crit.ContentTopics {
-		filter.Topics = append(filter.Topics, bt[:])
-	}
+	filter.ContentTopics = common.NewTopicSet(crit.ContentTopics)
 
 	// listen for message that are encrypted with the given symmetric key
 	if symKeyGiven {
-		if len(filter.Topics) == 0 {
+		if len(filter.ContentTopics) == 0 {
 			return nil, ErrNoTopics
 		}
 		key, err := api.w.GetSymKey(crit.SymKeyID)
@@ -461,7 +458,6 @@ func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
 		src     *ecdsa.PublicKey
 		keySym  []byte
 		keyAsym *ecdsa.PrivateKey
-		topics  [][]byte
 
 		symKeyGiven  = len(req.SymKeyID) > 0
 		asymKeyGiven = len(req.PrivateKeyID) > 0
@@ -495,21 +491,13 @@ func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
 		}
 	}
 
-	if len(req.ContentTopics) > 0 {
-		topics = make([][]byte, len(req.ContentTopics))
-		for i, topic := range req.ContentTopics {
-			topics[i] = make([]byte, common.TopicLength)
-			copy(topics[i], topic[:])
-		}
-	}
-
 	f := &common.Filter{
-		Src:         src,
-		KeySym:      keySym,
-		KeyAsym:     keyAsym,
-		PubsubTopic: req.PubsubTopic,
-		Topics:      topics,
-		Messages:    common.NewMemoryMessageStore(),
+		Src:           src,
+		KeySym:        keySym,
+		KeyAsym:       keyAsym,
+		PubsubTopic:   req.PubsubTopic,
+		ContentTopics: common.NewTopicSet(req.ContentTopics),
+		Messages:      common.NewMemoryMessageStore(),
 	}
 
 	id, err := api.w.Subscribe(f)

@@ -35,15 +35,14 @@ func WithMultiaddress(multiaddrs ...multiaddr.Multiaddr) ENROption {
 		failedOnceWritingENR := false
 		couldWriteENRatLeastOnce := false
 		successIdx := -1
-		for i := len(multiaddrs) - 1; i >= 0; i-- {
+		for i := len(multiaddrs); i > 0; i-- {
 			err = writeMultiaddressField(localnode, multiaddrs[0:i])
 			if err == nil {
 				couldWriteENRatLeastOnce = true
 				successIdx = i
 				break
-			} else {
-				failedOnceWritingENR = true
 			}
+			failedOnceWritingENR = true
 		}
 
 		if failedOnceWritingENR && couldWriteENRatLeastOnce {

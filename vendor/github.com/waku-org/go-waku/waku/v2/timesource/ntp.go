@@ -113,6 +113,7 @@ func computeOffset(timeQuery ntpQuery, servers []string, allowedFailures int) (t
 	return offsets[mid], nil
 }
 
+// NewNTPTimesource creates a timesource that uses NTP
 func NewNTPTimesource(ntpServers []string, log *zap.Logger) *NTPTimeSource {
 	return &NTPTimeSource{
 		servers:           ntpServers,

@@ -79,13 +79,3 @@ func (gm *DynamicGroupManager) SetMetadata(meta RLNMetadata) error {
 	b := meta.Serialize()
 	return gm.rln.SetMetadata(b)
 }
-
-// GetMetadata retrieves metadata from the zerokit's RLN database
-func (gm *DynamicGroupManager) GetMetadata() (RLNMetadata, error) {
-	b, err := gm.rln.GetMetadata()
-	if err != nil {
-		return RLNMetadata{}, err
-	}
-
-	return DeserializeMetadata(b)
-}

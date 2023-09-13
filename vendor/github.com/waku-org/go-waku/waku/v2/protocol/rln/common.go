@@ -26,7 +26,7 @@ const acceptableRootWindowSize = 5
 
 type RegistrationHandler = func(tx *types.Transaction)
 
-type SpamHandler = func(message *pb.WakuMessage) error
+type SpamHandler = func(msg *pb.WakuMessage, topic string) error
 
 func toRLNSignal(wakuMessage *pb.WakuMessage) []byte {
 	if wakuMessage == nil {

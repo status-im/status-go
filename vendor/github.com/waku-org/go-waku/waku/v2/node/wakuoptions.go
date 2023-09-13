@@ -55,6 +55,9 @@ type WakuNodeParameters struct {
 	peerstore      peerstore.Peerstore
 	prometheusReg  prometheus.Registerer
 
+	circuitRelayMinInterval time.Duration
+	circuitRelayBootDelay   time.Duration
+
 	enableNTP bool
 	ntpURLs   []string
 
@@ -94,9 +97,9 @@ type WakuNodeParameters struct {
 	enablePeerExchange bool
 
 	enableRLN                    bool
-	rlnRelayMemIndex             uint
+	rlnRelayMemIndex             *uint
 	rlnRelayDynamic              bool
-	rlnSpamHandler               func(message *pb.WakuMessage) error
+	rlnSpamHandler               func(message *pb.WakuMessage, topic string) error
 	rlnETHClientAddress          string
 	keystorePath                 string
 	keystorePassword             string
@@ -119,6 +122,7 @@ type WakuNodeOption func(*WakuNodeParameters) error
 var DefaultWakuNodeOptions = []WakuNodeOption{
 	WithPrometheusRegisterer(prometheus.NewRegistry()),
 	WithMaxPeerConnections(50),
+	WithCircuitRelayParams(2*time.Second, 3*time.Minute),
 }
 
 // MultiAddresses return the list of multiaddresses configured in the node
@@ -171,8 +175,8 @@ func WithPrometheusRegisterer(reg prometheus.Registerer) WakuNodeOption {
 	}
 }
 
-// WithDns4Domain is a WakuNodeOption that adds a custom domain name to listen
-func WithDns4Domain(dns4Domain string) WakuNodeOption {
+// WithDNS4Domain is a WakuNodeOption that adds a custom domain name to listen
+func WithDNS4Domain(dns4Domain string) WakuNodeOption {
 	return func(params *WakuNodeParameters) error {
 		params.dns4Domain = dns4Domain
 		previousAddrFactory := params.addressFactory
@@ -190,8 +194,11 @@ func WithDns4Domain(dns4Domain string) WakuNodeOption {
 
 			if params.enableWS || params.enableWSS {
 				if params.enableWSS {
+					// WSS is deprecated in https://github.com/multiformats/multiaddr/pull/109
 					wss, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/tcp/%d/wss", params.wssPort))
 					addresses = append(addresses, hostAddrMA.Encapsulate(wss))
+					tlsws, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/tcp/%d/tls/ws", params.wssPort))
+					addresses = append(addresses, hostAddrMA.Encapsulate(tlsws))
 				} else {
 					ws, _ := multiaddr.NewMultiaddr(fmt.Sprintf("/tcp/%d/ws", params.wsPort))
 					addresses = append(addresses, hostAddrMA.Encapsulate(ws))
@@ -200,9 +207,9 @@ func WithDns4Domain(dns4Domain string) WakuNodeOption {
 
 			if previousAddrFactory != nil {
 				return previousAddrFactory(addresses)
-			} else {
-				return addresses
 			}
+
+			return addresses
 		}
 
 		return nil
@@ -510,6 +517,14 @@ func WithSecureWebsockets(address string, port int, certPath string, keyPath str
 			MinVersion:   tls.VersionTLS12,
 		}
 
+		return nil
+	}
+}
+
+func WithCircuitRelayParams(minInterval time.Duration, bootDelay time.Duration) WakuNodeOption {
+	return func(params *WakuNodeParameters) error {
+		params.circuitRelayBootDelay = bootDelay
+		params.circuitRelayMinInterval = minInterval
 		return nil
 	}
 }

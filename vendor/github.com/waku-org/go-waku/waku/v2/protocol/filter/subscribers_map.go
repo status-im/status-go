@@ -14,6 +14,14 @@ var ErrNotFound = errors.New("not found")
 
 type ContentTopicSet map[string]struct{}
 
+func NewContentTopicSet(contentTopics ...string) ContentTopicSet {
+	s := make(ContentTopicSet, len(contentTopics))
+	for _, ct := range contentTopics {
+		s[ct] = struct{}{}
+	}
+	return s
+}
+
 type PeerSet map[peer.ID]struct{}
 
 type PubsubTopics map[string]ContentTopicSet // pubsubTopic => contentTopics

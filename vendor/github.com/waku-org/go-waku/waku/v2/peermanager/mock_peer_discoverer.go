@@ -25,10 +25,15 @@ func NewTestPeerDiscoverer() *TestPeerDiscoverer {
 // Subscribe is for subscribing to peer discoverer
 func (t *TestPeerDiscoverer) Subscribe(ctx context.Context, ch <-chan PeerData) {
 	go func() {
-		for p := range ch {
-			t.Lock()
-			t.peerMap[p.AddrInfo.ID] = struct{}{}
-			t.Unlock()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case p := <-ch:
+				t.Lock()
+				t.peerMap[p.AddrInfo.ID] = struct{}{}
+				t.Unlock()
+			}
 		}
 	}()
 }

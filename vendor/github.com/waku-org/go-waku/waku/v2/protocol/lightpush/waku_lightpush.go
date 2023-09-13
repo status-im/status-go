@@ -25,7 +25,7 @@ const LightPushID_v20beta1 = libp2pProtocol.ID("/vac/waku/lightpush/2.0.0-beta1"
 
 var (
 	ErrNoPeersAvailable = errors.New("no suitable remote peers")
-	ErrInvalidId        = errors.New("invalid request id")
+	ErrInvalidID        = errors.New("invalid request id")
 )
 
 // WakuLightPush is the implementation of the Waku LightPush protocol
@@ -72,8 +72,8 @@ func (wakuLP *WakuLightPush) Start(ctx context.Context) error {
 }
 
 // relayIsNotAvailable determines if this node supports relaying messages for other lightpush clients
-func (wakuLp *WakuLightPush) relayIsNotAvailable() bool {
-	return wakuLp.relay == nil
+func (wakuLP *WakuLightPush) relayIsNotAvailable() bool {
+	return wakuLP.relay == nil
 }
 
 func (wakuLP *WakuLightPush) onRequest(ctx context.Context) func(s network.Stream) {
@@ -161,7 +161,7 @@ func (wakuLP *WakuLightPush) request(ctx context.Context, req *pb.PushRequest, o
 	}
 
 	if len(params.requestID) == 0 {
-		return nil, ErrInvalidId
+		return nil, ErrInvalidID
 	}
 
 	logger := wakuLP.log.With(logging.HostID("peer", params.selectedPeer))
@@ -234,9 +234,9 @@ func (wakuLP *WakuLightPush) PublishToTopic(ctx context.Context, message *wpb.Wa
 		hash := message.Hash(topic)
 		wakuLP.log.Info("waku.lightpush published", logging.HexString("hash", hash))
 		return hash, nil
-	} else {
-		return nil, errors.New(response.Info)
 	}
+
+	return nil, errors.New(response.Info)
 }
 
 // Publish is used to broadcast a WakuMessage to the default waku pubsub topic via lightpush protocol

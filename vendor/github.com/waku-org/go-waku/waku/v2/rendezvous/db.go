@@ -36,7 +36,7 @@ type DB struct {
 	cancel func()
 }
 
-func NewDB(ctx context.Context, db *sql.DB, logger *zap.Logger) *DB {
+func NewDB(db *sql.DB, logger *zap.Logger) *DB {
 	rdb := &DB{
 		db:     db,
 		logger: logger.Named("rendezvous/db"),

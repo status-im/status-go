@@ -28,7 +28,6 @@ import (
 	"math"
 	"net"
 	"runtime"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -57,7 +56,6 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
-	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
@@ -75,6 +73,7 @@ import (
 
 const messageQueueLimit = 1024
 const requestTimeout = 30 * time.Second
+const pingTimeout = 5 * time.Second
 const bootnodesQueryBackoffMs = 200
 const bootnodesMaxRetries = 7
 
@@ -102,11 +101,8 @@ type Waku struct {
 	dnsAddressCacheLock *sync.RWMutex                       // lock to handle access to the map
 
 	// Filter-related
-	filters             *common.Filters                                           // Message filters installed with Subscribe function
-	filterSubscriptions map[*common.Filter]map[string]*filter.SubscriptionDetails // wakuv2 filter subscription details
-
-	filterPeerDisconnectMap map[peer.ID]int64
-	isFilterSubAlive        func(sub *filter.SubscriptionDetails) error
+	filters       *common.Filters // Message filters installed with Subscribe function
+	filterManager *FilterManager
 
 	privateKeys map[string]*ecdsa.PrivateKey // Private key storage
 	symKeys     map[string][]byte            // Symmetric key storage
@@ -196,7 +192,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		}
 	}
 
-	logger.Debug("starting wakuv2 with config", zap.Any("config", cfg))
+	logger.Info("starting wakuv2 with config", zap.Any("config", cfg))
 
 	waku := &Waku{
 		appDB:                           appDB,
@@ -213,19 +209,12 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		dnsAddressCache:                 make(map[string][]dnsdisc.DiscoveredNode),
 		dnsAddressCacheLock:             &sync.RWMutex{},
 		storeMsgIDs:                     make(map[gethcommon.Hash]bool),
-		filterPeerDisconnectMap:         make(map[peer.ID]int64),
-		filterSubscriptions:             make(map[*common.Filter]map[string]*filter.SubscriptionDetails),
 		timesource:                      ts,
 		storeMsgIDsMu:                   sync.RWMutex{},
 		logger:                          logger,
 		discV5BootstrapNodes:            cfg.DiscV5BootstrapNodes,
 		onHistoricMessagesRequestFailed: onHistoricMessagesRequestFailed,
 		onPeerStats:                     onPeerStats,
-	}
-
-	// This fn is being mocked in test
-	waku.isFilterSubAlive = func(sub *filter.SubscriptionDetails) error {
-		return waku.node.FilterLightnode().IsSubscriptionAlive(waku.ctx, sub)
 	}
 
 	waku.settings = settings{
@@ -239,7 +228,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		EnableDiscV5:      cfg.EnableDiscV5,
 	}
 
-	waku.filters = common.NewFilters()
+	waku.filters = common.NewFilters(waku.logger)
 	waku.bandwidthCounter = metrics.NewBandwidthCounter()
 
 	var privateKey *ecdsa.PrivateKey
@@ -385,7 +374,7 @@ func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnA
 		nameserver := w.settings.Nameserver
 		w.settingsMu.RUnlock()
 
-		var opts []dnsdisc.DnsDiscoveryOption
+		var opts []dnsdisc.DNSDiscoveryOption
 		if nameserver != "" {
 			opts = append(opts, dnsdisc.WithNameserver(nameserver))
 		}
@@ -475,21 +464,21 @@ func (w *Waku) identifyAndConnect(ctx context.Context, isLightClient bool, ma mu
 	if isLightClient {
 		err = w.node.Host().Network().ClosePeer(peerInfo.ID)
 		if err != nil {
-			w.logger.Error("could not close connections to peer", zap.Any("peer", peerInfo.ID), zap.Error(err))
+			w.logger.Error("could not close connections to peer", zap.Stringer("peer", peerInfo.ID), zap.Error(err))
 		}
 		return
 	}
 
 	supportedProtocols, err := w.node.Host().Peerstore().SupportsProtocols(peerInfo.ID, relay.WakuRelayID_v200)
 	if err != nil {
-		w.logger.Error("could not obtain protocols", zap.Any("peer", peerInfo.ID), zap.Error(err))
+		w.logger.Error("could not obtain protocols", zap.Stringer("peer", peerInfo.ID), zap.Error(err))
 		return
 	}
 
 	if len(supportedProtocols) == 0 {
 		err = w.node.Host().Network().ClosePeer(peerInfo.ID)
 		if err != nil {
-			w.logger.Error("could not close connections to peer", zap.Any("peer", peerInfo.ID), zap.Error(err))
+			w.logger.Error("could not close connections to peer", zap.Stringer("peer", peerInfo.ID), zap.Error(err))
 		}
 	}
 }
@@ -549,7 +538,7 @@ func (w *Waku) runPeerExchangeLoop() {
 		case <-w.ctx.Done():
 			return
 		case <-ticker.C:
-			w.logger.Debug("Running peer exchange loop")
+			w.logger.Info("Running peer exchange loop")
 
 			connectedPeers := w.node.Host().Network().Peers()
 			peersWithRelay := 0
@@ -640,109 +629,15 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 				sub.Unsubscribe()
 				return
 			case env := <-sub.Ch:
-				envelopeErrors, err := w.OnNewEnvelopes(env, common.RelayedMessageType)
+				err := w.OnNewEnvelopes(env, common.RelayedMessageType)
 				if err != nil {
-					w.logger.Error("onNewEnvelope error", zap.Error(err))
+					w.logger.Error("OnNewEnvelopes error", zap.Error(err))
 				}
-				// TODO: should these be handled?
-				_ = envelopeErrors
-				_ = err
 			}
 		}
 	}()
 
 	return nil
-}
-
-func (w *Waku) runFilterSubscriptionLoop(sub *filter.SubscriptionDetails) {
-	for {
-		select {
-		case <-w.ctx.Done():
-			return
-		case env, ok := <-sub.C:
-			if ok {
-				envelopeErrors, err := w.OnNewEnvelopes(env, common.RelayedMessageType)
-				// TODO: should these be handled?
-				_ = envelopeErrors
-				_ = err
-			} else {
-				return
-			}
-		}
-	}
-}
-
-func (w *Waku) runFilterMsgLoop() {
-	defer w.wg.Done()
-
-	if !w.settings.LightClient {
-		return
-	}
-
-	// Use it to ping filter peer(s) periodically
-	ticker := time.NewTicker(time.Duration(w.cfg.KeepAliveInterval) * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-w.ctx.Done():
-			return
-		case <-ticker.C:
-			for f, subMap := range w.filterSubscriptions {
-				if len(subMap) == 0 {
-					// All peers have disconnected on previous iteration,
-					// attempt full reconnect
-					err := w.subscribeToFilter(f)
-					if err != nil {
-						w.logger.Error("Failed to subscribe to filter")
-					}
-					break
-				}
-				for id, sub := range subMap {
-					err := w.isFilterSubAlive(sub)
-					if err != nil {
-						// Unsubscribe on light node
-						contentFilter := w.buildContentFilter(f.PubsubTopic, f.Topics)
-						// TODO Better return value handling for WakuFilterPushResult
-						_, err := w.node.FilterLightnode().Unsubscribe(w.ctx, contentFilter, filter.Peer(sub.PeerID))
-						if err != nil {
-							w.logger.Warn("could not unsubscribe wakuv2 filter for peer", zap.Any("peer", sub.PeerID))
-							continue
-						}
-
-						// Remove entry from maps
-						w.filterPeerDisconnectMap[sub.PeerID] = time.Now().Unix()
-						delete(subMap, id)
-
-						// Re-subscribe
-						peers := w.findFilterPeers()
-						if len(peers) > 0 && len(subMap) < w.settings.MinPeersForFilter {
-							subDetails, err := w.node.FilterLightnode().Subscribe(w.ctx, contentFilter, filter.WithPeer(peers[0]))
-							if err != nil {
-								w.logger.Warn("could not add wakuv2 filter for peer", zap.Any("peer", peers[0]))
-								break
-							}
-
-							subMap[subDetails.ID] = subDetails
-							go w.runFilterSubscriptionLoop(subDetails)
-
-							break
-						}
-					}
-				}
-			}
-		}
-	}
-}
-func (w *Waku) buildContentFilter(pubsubTopic string, topics [][]byte) filter.ContentFilter {
-	contentFilter := filter.ContentFilter{
-		Topic: pubsubTopic,
-	}
-	for _, topic := range topics {
-		contentFilter.ContentTopics = append(contentFilter.ContentTopics, common.BytesToTopic(topic).ContentTopic())
-	}
-
-	return contentFilter
 }
 
 // MaxMessageSize returns the maximum accepted message size.
@@ -1034,41 +929,41 @@ func (w *Waku) Subscribe(f *common.Filter) (string, error) {
 		f.PubsubTopic = relay.DefaultWakuTopic
 	}
 
-	s, err := w.filters.Install(f)
+	id, err := w.filters.Install(f)
 	if err != nil {
-		return s, err
+		return id, err
 	}
 
 	if w.settings.LightClient {
-		go func() {
-			ticker := time.NewTicker(1 * time.Second)
-			for range ticker.C {
-				err := w.subscribeToFilter(f)
-				if err == nil {
-					break
-				}
-			}
-		}()
+		w.filterManager.eventChan <- FilterEvent{eventType: FilterEvent_ADDED, filterId: id}
 	}
 
-	return s, nil
+	return id, nil
 }
 
 // Unsubscribe removes an installed message handler.
 func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
-	f := w.filters.Get(id)
-	if f != nil && w.settings.LightClient {
-		contentFilter := w.buildContentFilter(f.PubsubTopic, f.Topics)
-		if _, err := w.node.FilterLightnode().Unsubscribe(ctx, contentFilter); err != nil {
-			return fmt.Errorf("failed to unsubscribe: %w", err)
-		}
-	}
-
 	ok := w.filters.Uninstall(id)
 	if !ok {
 		return fmt.Errorf("failed to unsubscribe: invalid ID '%s'", id)
 	}
+
+	if w.settings.LightClient {
+		w.filterManager.eventChan <- FilterEvent{eventType: FilterEvent_REMOVED, filterId: id}
+	}
+
 	return nil
+}
+
+// Used for testing
+func (w *Waku) getFilterStats() FilterSubs {
+	ch := make(chan FilterSubs)
+	w.logger.Info("### getFilterStats")
+	w.filterManager.eventChan <- FilterEvent{eventType: FilterEvent_GET_STATS, ch: ch}
+	w.logger.Info("### getFilterStats after send")
+	stats := <-ch
+
+	return stats
 }
 
 // GetFilter returns the filter by id.
@@ -1079,7 +974,7 @@ func (w *Waku) GetFilter(id string) *common.Filter {
 // Unsubscribe removes an installed message handler.
 func (w *Waku) UnsubscribeMany(ids []string) error {
 	for _, id := range ids {
-		w.logger.Debug("cleaning up filter", zap.String("id", id))
+		w.logger.Info("cleaning up filter", zap.String("id", id))
 		ok := w.filters.Uninstall(id)
 		if !ok {
 			w.logger.Warn("could not remove filter with id", zap.String("id", id))
@@ -1180,7 +1075,7 @@ func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 }
 
 func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (cursor *storepb.Index, err error) {
-	requestID := protocol.GenerateRequestId()
+	requestID := protocol.GenerateRequestID()
 	opts = append(opts, store.WithRequestID(requestID))
 	result, err := w.query(ctx, peerID, pubsubTopic, topics, from, to, opts)
 	if err != nil {
@@ -1198,7 +1093,7 @@ func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 
 		envelope := protocol.NewEnvelope(msg, msg.Timestamp, pubsubTopic)
 		w.logger.Info("received waku2 store message", zap.Any("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", pubsubTopic))
-		_, err = w.OnNewEnvelopes(envelope, common.StoreMessageType)
+		err = w.OnNewEnvelopes(envelope, common.StoreMessageType)
 		if err != nil {
 			return nil, err
 		}
@@ -1263,6 +1158,7 @@ func (w *Waku) Start() error {
 			case c := <-w.connStatusChan:
 				w.connStatusMu.Lock()
 				latestConnStatus := formatConnStatus(w.node, c)
+				w.logger.Info("PeerStats", zap.Any("stats", latestConnStatus))
 				for k, subs := range w.connStatusSubscriptions {
 					if subs.Active() {
 						subs.C <- latestConnStatus
@@ -1278,13 +1174,13 @@ func (w *Waku) Start() error {
 				if w.cfg.EnableDiscV5 {
 					// Restarting DiscV5
 					if !latestConnStatus.IsOnline && isConnected {
-						w.logger.Debug("Restarting DiscV5: offline and is connected")
+						w.logger.Info("Restarting DiscV5: offline and is connected")
 						isConnected = false
 						w.node.DiscV5().Stop()
 					} else if latestConnStatus.IsOnline && !isConnected {
-						w.logger.Debug("Restarting DiscV5: online and is not connected")
+						w.logger.Info("Restarting DiscV5: online and is not connected")
 						isConnected = true
-						if !w.node.DiscV5().IsStarted() {
+						if w.node.DiscV5().ErrOnNotRunning() != nil {
 							err := w.node.DiscV5().Start(ctx)
 							if err != nil {
 								w.logger.Error("Could not start DiscV5", zap.Error(err))
@@ -1298,7 +1194,16 @@ func (w *Waku) Start() error {
 
 	go w.telemetryBandwidthStats(w.cfg.TelemetryServerURL)
 	go w.runPeerExchangeLoop()
-	go w.runFilterMsgLoop()
+
+	if w.settings.LightClient {
+		w.filterManager = newFilterManager(w.ctx, w.logger,
+			func(id string) *common.Filter { return w.GetFilter(id) },
+			w.settings,
+			func(env *protocol.Envelope) error { return w.OnNewEnvelopes(env, common.RelayedMessageType) },
+			w.node)
+
+		go w.filterManager.runFilterLoop(&w.wg)
+	}
 
 	err = w.setupRelaySubscriptions()
 	if err != nil {
@@ -1369,21 +1274,19 @@ func (w *Waku) Stop() error {
 	return nil
 }
 
-func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.MessageType) ([]common.EnvelopeError, error) {
+func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.MessageType) error {
 	if envelope == nil {
-		return nil, nil
+		return nil
 	}
 
 	recvMessage := common.NewReceivedMessage(envelope, msgType)
 	if recvMessage == nil {
-		return nil, nil
+		return nil
 	}
-
-	envelopeErrors := make([]common.EnvelopeError, 0)
 
 	logger := w.logger.With(zap.String("hash", recvMessage.Hash().Hex()))
 
-	logger.Debug("received new envelope")
+	logger.Info("received new envelope")
 	trouble := false
 
 	_, err := w.add(recvMessage)
@@ -1395,10 +1298,10 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 	common.EnvelopesValidatedCounter.Inc()
 
 	if trouble {
-		return envelopeErrors, errors.New("received invalid envelope")
+		return errors.New("received invalid envelope")
 	}
 
-	return envelopeErrors, nil
+	return nil
 }
 
 // addEnvelope adds an envelope to the envelope map, used for sending
@@ -1423,10 +1326,10 @@ func (w *Waku) add(recvMessage *common.ReceivedMessage) (bool, error) {
 	}
 
 	if alreadyCached {
-		w.logger.Debug("w envelope already cached", zap.String("envelopeHash", recvMessage.Hash().Hex()))
+		w.logger.Info("w envelope already cached", zap.String("envelopeHash", recvMessage.Hash().Hex()))
 		common.EnvelopesCachedCounter.WithLabelValues("hit").Inc()
 	} else {
-		w.logger.Debug("cached w envelope", zap.String("envelopeHash", recvMessage.Hash().Hex()))
+		w.logger.Info("cached w envelope", zap.String("envelopeHash", recvMessage.Hash().Hex()))
 		common.EnvelopesCachedCounter.WithLabelValues("miss").Inc()
 		common.EnvelopesSizeMeter.Observe(float64(len(recvMessage.Envelope.Message().Payload)))
 		w.postEvent(recvMessage) // notify the local node about the new message
@@ -1458,7 +1361,7 @@ func (w *Waku) processQueue() {
 
 			// If not matched we remove it
 			if !matched {
-				w.logger.Debug("filters did not match", zap.String("hash", e.Hash().String()), zap.String("contentTopic", e.ContentTopic.ContentTopic()))
+				w.logger.Info("filters did not match", zap.String("hash", e.Hash().String()), zap.String("contentTopic", e.ContentTopic.ContentTopic()))
 				w.storeMsgIDsMu.Lock()
 				delete(w.storeMsgIDs, e.Hash())
 				w.storeMsgIDsMu.Unlock()
@@ -1645,7 +1548,7 @@ func (w *Waku) restartDiscV5() error {
 		return errors.New("failed to fetch bootnodes")
 	}
 
-	if !w.node.DiscV5().IsStarted() {
+	if w.node.DiscV5().ErrOnNotRunning() != nil {
 		w.logger.Info("is not started restarting")
 		err := w.node.DiscV5().Start(ctx)
 		if err != nil {
@@ -1677,7 +1580,7 @@ func (w *Waku) AddStorePeer(address string) (peer.ID, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, wps.Static, store.StoreID_v20beta4)
+	peerID, err := w.node.AddPeer(addr, wps.Static, []string{}, store.StoreID_v20beta4)
 	if err != nil {
 		return "", err
 	}
@@ -1694,7 +1597,7 @@ func (w *Waku) AddRelayPeer(address string) (peer.ID, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, wps.Static, relay.WakuRelayID_v200)
+	peerID, err := w.node.AddPeer(addr, wps.Static, []string{}, relay.WakuRelayID_v200)
 	if err != nil {
 		return "", err
 	}
@@ -1793,66 +1696,4 @@ func formatConnStatus(wakuNode *node.WakuNode, c node.ConnStatus) types.ConnStat
 		HasHistory: c.HasHistory,
 		Peers:      FormatPeerStats(wakuNode, c.Peers),
 	}
-}
-
-// Find suitable peer(s). For this we use a peerDisconnectMap, it works so that
-// peers that have been recently disconnected from have lower priority
-func (w *Waku) findFilterPeers() []peer.ID {
-
-	allPeers := w.node.Host().Peerstore().Peers()
-	var peers peer.IDSlice
-	for _, peer := range allPeers {
-		protocols, err := w.node.Host().Peerstore().SupportsProtocols(peer, filter.FilterSubscribeID_v20beta1, relay.WakuRelayID_v200)
-		if err != nil {
-			continue
-		}
-
-		if len(protocols) == 2 {
-			peers = append(peers, peer)
-		}
-	}
-
-	if len(peers) > 0 {
-		sort.Slice(peers, func(i, j int) bool {
-			// If element not found in map, [] operator will return 0
-			return w.filterPeerDisconnectMap[peers[i]] < w.filterPeerDisconnectMap[peers[j]]
-		})
-	}
-
-	var peerLen = len(peers)
-	if w.settings.MinPeersForFilter < peerLen {
-		peerLen = w.settings.MinPeersForFilter
-	}
-	peers = peers[0:peerLen]
-	return peers
-}
-
-func (w *Waku) subscribeToFilter(f *common.Filter) error {
-	peers := w.findFilterPeers()
-
-	if len(peers) > 0 {
-		contentFilter := w.buildContentFilter(f.PubsubTopic, f.Topics)
-		for i := 0; i < len(peers) && i < w.settings.MinPeersForFilter; i++ {
-			subDetails, err := w.node.FilterLightnode().Subscribe(w.ctx, contentFilter, filter.WithPeer(peers[i]))
-			if err != nil {
-				w.logger.Warn("could not add wakuv2 filter for peer", zap.Stringer("peer", peers[i]))
-				continue
-			}
-
-			subMap := w.filterSubscriptions[f]
-			if subMap == nil {
-				subMap = make(map[string]*filter.SubscriptionDetails)
-				w.filterSubscriptions[f] = subMap
-			}
-			subMap[subDetails.ID] = subDetails
-			go w.runFilterSubscriptionLoop(subDetails)
-
-			w.logger.Info("wakuv2 filter subscription success", zap.Stringer("peer", peers[i]), zap.String("pubsubTopic", contentFilter.Topic), zap.Strings("contentTopics", contentFilter.ContentTopics))
-		}
-
-	} else {
-		return errors.New("could not select a suitable peer for filter")
-	}
-
-	return nil
 }

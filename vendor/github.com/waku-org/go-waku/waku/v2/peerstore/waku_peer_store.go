@@ -1,6 +1,7 @@
 package peerstore
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -18,13 +19,15 @@ const (
 	Discv5
 	Static
 	PeerExchange
-	DnsDiscovery
+	DNSDiscovery
 	Rendezvous
+	PeerManager
 )
 
 const peerOrigin = "origin"
 const peerENR = "enr"
 const peerDirection = "direction"
+const peerPubSubTopics = "pubSubTopics"
 
 // ConnectionFailures contains connection failure information towards all peers
 type ConnectionFailures struct {
@@ -51,6 +54,12 @@ type WakuPeerstore interface {
 
 	SetDirection(p peer.ID, direction network.Direction) error
 	Direction(p peer.ID) (network.Direction, error)
+
+	AddPubSubTopic(p peer.ID, topic string) error
+	RemovePubSubTopic(p peer.ID, topic string) error
+	PubSubTopics(p peer.ID) ([]string, error)
+	SetPubSubTopics(p peer.ID, topics []string) error
+	PeersByPubSubTopic(pubSubTopic string) peer.IDSlice
 }
 
 // NewWakuPeerstore creates a new WakuPeerStore object
@@ -138,4 +147,78 @@ func (ps *WakuPeerstoreImpl) Direction(p peer.ID) (network.Direction, error) {
 	}
 
 	return result.(network.Direction), nil
+}
+
+// AddPubSubTopic adds a new pubSubTopic for a peer
+func (ps *WakuPeerstoreImpl) AddPubSubTopic(p peer.ID, topic string) error {
+	existingTopics, err := ps.PubSubTopics(p)
+	if err != nil {
+		return err
+	}
+	for _, t := range existingTopics {
+		if t == topic {
+			return nil
+		}
+	}
+	existingTopics = append(existingTopics, topic)
+	return ps.peerStore.Put(p, peerPubSubTopics, existingTopics)
+}
+
+// RemovePubSubTopic removes a pubSubTopic from the peer
+func (ps *WakuPeerstoreImpl) RemovePubSubTopic(p peer.ID, topic string) error {
+	existingTopics, err := ps.PubSubTopics(p)
+	if err != nil {
+		return err
+	}
+
+	if len(existingTopics) == 0 {
+		return nil
+	}
+
+	for i := range existingTopics {
+		if existingTopics[i] == topic {
+			existingTopics = append(existingTopics[:i], existingTopics[i+1:]...)
+			break
+		}
+	}
+
+	err = ps.SetPubSubTopics(p, existingTopics)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// SetPubSubTopics sets pubSubTopics for a peer, it also overrides existing ones that were set previously..
+func (ps *WakuPeerstoreImpl) SetPubSubTopics(p peer.ID, topics []string) error {
+	return ps.peerStore.Put(p, peerPubSubTopics, topics)
+}
+
+// PubSubTopics fetches list of pubSubTopics for a peer
+func (ps *WakuPeerstoreImpl) PubSubTopics(p peer.ID) ([]string, error) {
+	result, err := ps.peerStore.Get(p, peerPubSubTopics)
+	if err != nil {
+		if errors.Is(err, peerstore.ErrNotFound) {
+			return nil, nil
+		} else {
+			return nil, err
+		}
+	}
+	return result.([]string), nil
+}
+
+// PeersByPubSubTopic Returns list of peers by pubSubTopic
+func (ps *WakuPeerstoreImpl) PeersByPubSubTopic(pubSubTopic string) peer.IDSlice {
+	var result peer.IDSlice
+	for _, p := range ps.Peers() {
+		topics, err := ps.PubSubTopics(p)
+		if err == nil {
+			for _, topic := range topics {
+				if topic == pubSubTopic {
+					result = append(result, p)
+				}
+			}
+		} //Note: skipping a peer in case of an error as there would be others available.
+	}
+	return result
 }

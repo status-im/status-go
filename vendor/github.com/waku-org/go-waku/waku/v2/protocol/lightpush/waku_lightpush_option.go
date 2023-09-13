@@ -40,7 +40,7 @@ func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) Option {
 		if params.pm == nil {
 			p, err = utils.SelectPeer(params.host, LightPushID_v20beta1, fromThesePeers, params.log)
 		} else {
-			p, err = params.pm.SelectPeer(LightPushID_v20beta1, fromThesePeers, params.log)
+			p, err = params.pm.SelectPeer(LightPushID_v20beta1, fromThesePeers)
 		}
 		if err == nil {
 			params.selectedPeer = p
@@ -77,7 +77,7 @@ func WithRequestID(requestID []byte) Option {
 // when publishing a message
 func WithAutomaticRequestID() Option {
 	return func(params *lightPushParameters) {
-		params.requestID = protocol.GenerateRequestId()
+		params.requestID = protocol.GenerateRequestID()
 	}
 }
 

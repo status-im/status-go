@@ -100,9 +100,9 @@ func (wakuPX *WakuPeerExchange) handleResponse(ctx context.Context, response *pb
 
 	if len(discoveredPeers) != 0 {
 		wakuPX.log.Info("connecting to newly discovered peers", zap.Int("count", len(discoveredPeers)))
-		wakuPX.wg.Add(1)
+		wakuPX.WaitGroup().Add(1)
 		go func() {
-			defer wakuPX.wg.Done()
+			defer wakuPX.WaitGroup().Done()
 
 			peerCh := make(chan peermanager.PeerData)
 			defer close(peerCh)
