@@ -10,14 +10,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
-
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
+	proto "google.golang.org/protobuf/proto"
+
 	"github.com/waku-org/go-waku/waku/v2/hash"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/timesource"
 	"go.uber.org/zap"
-	proto "google.golang.org/protobuf/proto"
 )
 
 func msgHash(pubSubTopic string, msg *pb.WakuMessage) []byte {
@@ -38,6 +38,68 @@ func msgHash(pubSubTopic string, msg *pb.WakuMessage) []byte {
 	)
 }
 
+type validatorFn = func(ctx context.Context, msg *pb.WakuMessage, topic string) bool
+
+func (w *WakuRelay) RegisterDefaultValidator(fn validatorFn) {
+	w.topicValidatorMutex.Lock()
+	defer w.topicValidatorMutex.Unlock()
+	w.defaultTopicValidators = append(w.defaultTopicValidators, fn)
+}
+
+func (w *WakuRelay) RegisterTopicValidator(topic string, fn validatorFn) {
+	w.topicValidatorMutex.Lock()
+	defer w.topicValidatorMutex.Unlock()
+
+	w.topicValidators[topic] = append(w.topicValidators[topic], fn)
+}
+
+func (w *WakuRelay) RemoveTopicValidator(topic string) {
+	w.topicValidatorMutex.Lock()
+	defer w.topicValidatorMutex.Unlock()
+
+	delete(w.topicValidators, topic)
+}
+
+func (w *WakuRelay) topicValidator(topic string) func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool {
+	return func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool {
+		msg := new(pb.WakuMessage)
+		err := proto.Unmarshal(message.Data, msg)
+		if err != nil {
+			return false
+		}
+
+		w.topicValidatorMutex.RLock()
+		validators, exists := w.topicValidators[topic]
+		validators = append(validators, w.defaultTopicValidators...)
+		w.topicValidatorMutex.RUnlock()
+
+		if exists {
+			for _, v := range validators {
+				if !v(ctx, msg, topic) {
+					return false
+				}
+			}
+		}
+
+		return true
+	}
+}
+
+// AddSignedTopicValidator registers a gossipsub validator for a topic which will check that messages Meta field contains a valid ECDSA signature for the specified pubsub topic. This is used as a DoS prevention mechanism
+func (w *WakuRelay) AddSignedTopicValidator(topic string, publicKey *ecdsa.PublicKey) error {
+	w.log.Info("adding validator to signed topic", zap.String("topic", topic), zap.String("publicKey", hex.EncodeToString(elliptic.Marshal(publicKey.Curve, publicKey.X, publicKey.Y))))
+
+	fn := signedTopicBuilder(w.timesource, publicKey)
+
+	w.RegisterTopicValidator(topic, fn)
+
+	if !w.IsSubscribed(topic) {
+		w.log.Warn("relay is not subscribed to signed topic", zap.String("topic", topic))
+	}
+
+	return nil
+}
+
 const messageWindowDuration = time.Minute * 5
 
 func withinTimeWindow(t timesource.Timesource, msg *pb.WakuMessage) bool {
@@ -51,17 +113,9 @@ func withinTimeWindow(t timesource.Timesource, msg *pb.WakuMessage) bool {
 	return now.Sub(msgTime).Abs() <= messageWindowDuration
 }
 
-type validatorFn = func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool
-
-func validatorFnBuilder(t timesource.Timesource, topic string, publicKey *ecdsa.PublicKey) (validatorFn, error) {
+func signedTopicBuilder(t timesource.Timesource, publicKey *ecdsa.PublicKey) validatorFn {
 	publicKeyBytes := crypto.FromECDSAPub(publicKey)
-	return func(ctx context.Context, peerID peer.ID, message *pubsub.Message) bool {
-		msg := new(pb.WakuMessage)
-		err := proto.Unmarshal(message.Data, msg)
-		if err != nil {
-			return false
-		}
-
+	return func(ctx context.Context, msg *pb.WakuMessage, topic string) bool {
 		if !withinTimeWindow(t, msg) {
 			return false
 		}
@@ -70,28 +124,7 @@ func validatorFnBuilder(t timesource.Timesource, topic string, publicKey *ecdsa.
 		signature := msg.Meta
 
 		return secp256k1.VerifySignature(publicKeyBytes, msgHash, signature)
-	}, nil
-}
-
-// AddSignedTopicValidator registers a gossipsub validator for a topic which will check that messages Meta field contains a valid ECDSA signature for the specified pubsub topic. This is used as a DoS prevention mechanism
-func (w *WakuRelay) AddSignedTopicValidator(topic string, publicKey *ecdsa.PublicKey) error {
-	w.log.Info("adding validator to signed topic", zap.String("topic", topic), zap.String("publicKey", hex.EncodeToString(elliptic.Marshal(publicKey.Curve, publicKey.X, publicKey.Y))))
-
-	fn, err := validatorFnBuilder(w.timesource, topic, publicKey)
-	if err != nil {
-		return err
 	}
-
-	err = w.pubsub.RegisterTopicValidator(topic, fn)
-	if err != nil {
-		return err
-	}
-
-	if !w.IsSubscribed(topic) {
-		w.log.Warn("relay is not subscribed to signed topic", zap.String("topic", topic))
-	}
-
-	return nil
 }
 
 // SignMessage adds an ECDSA signature to a WakuMessage as an opt-in mechanism for DoS prevention

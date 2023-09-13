@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var log *zap.Logger = nil
+var log *zap.Logger
 
 // Logger creates a zap.Logger with some reasonable defaults
 func Logger() *zap.Logger {

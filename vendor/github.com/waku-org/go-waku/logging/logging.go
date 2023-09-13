@@ -68,7 +68,7 @@ func HostID(key string, id peer.ID) zapcore.Field {
 	return zap.Stringer(key, hostID(id))
 }
 
-func (id hostID) String() string { return peer.Encode(peer.ID(id)) }
+func (id hostID) String() string { return peer.ID(id).String() }
 
 // Time - Waku uses Nanosecond Unix Time
 type timestamp int64

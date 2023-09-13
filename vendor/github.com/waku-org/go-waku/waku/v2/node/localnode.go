@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.Multiaddr, ipAddr *net.TCPAddr, udpPort uint, wakuFlags wenr.WakuEnrBitfield, advertiseAddr []ma.Multiaddr, shouldAutoUpdate bool, log *zap.Logger) error {
+func (w *WakuNode) updateLocalNode(localnode *enode.LocalNode, multiaddrs []ma.Multiaddr, ipAddr *net.TCPAddr, udpPort uint, wakuFlags wenr.WakuEnrBitfield, advertiseAddr []ma.Multiaddr, shouldAutoUpdate bool) error {
 	var options []wenr.ENROption
 	options = append(options, wenr.WithUDPPort(udpPort))
 	options = append(options, wenr.WithWakuBitfield(wakuFlags))
@@ -268,7 +268,7 @@ func (w *WakuNode) setupENR(ctx context.Context, addrs []ma.Multiaddr) error {
 		return err
 	}
 
-	err = w.updateLocalNode(w.localNode, multiaddresses, ipAddr, w.opts.udpPort, w.wakuFlag, w.opts.advertiseAddrs, w.opts.discV5autoUpdate, w.log)
+	err = w.updateLocalNode(w.localNode, multiaddresses, ipAddr, w.opts.udpPort, w.wakuFlag, w.opts.advertiseAddrs, w.opts.discV5autoUpdate)
 	if err != nil {
 		w.log.Error("updating localnode ENR record", zap.Error(err))
 		return err
@@ -280,6 +280,8 @@ func (w *WakuNode) setupENR(ctx context.Context, addrs []ma.Multiaddr) error {
 			return err
 		}
 	}
+
+	w.enrChangeCh <- struct{}{}
 
 	return nil
 

@@ -31,7 +31,7 @@ type Result struct {
 	store    Store
 	query    *pb.HistoryQuery
 	cursor   *pb.Index
-	peerId   peer.ID
+	peerID   peer.ID
 }
 
 func (r *Result) Cursor() *pb.Index {
@@ -43,7 +43,7 @@ func (r *Result) IsComplete() bool {
 }
 
 func (r *Result) PeerID() peer.ID {
-	return r.peerId
+	return r.peerID
 }
 
 func (r *Result) Query() *pb.HistoryQuery {
@@ -111,7 +111,7 @@ func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) HistoryRequestOption 
 		if params.s.pm == nil {
 			p, err = utils.SelectPeer(params.s.h, StoreID_v20beta4, fromThesePeers, params.s.log)
 		} else {
-			p, err = params.s.pm.SelectPeer(StoreID_v20beta4, fromThesePeers, params.s.log)
+			p, err = params.s.pm.SelectPeer(StoreID_v20beta4, "", fromThesePeers...)
 		}
 		if err == nil {
 			params.selectedPeer = p
@@ -148,7 +148,7 @@ func WithRequestID(requestID []byte) HistoryRequestOption {
 // when creating a store request
 func WithAutomaticRequestID() HistoryRequestOption {
 	return func(params *HistoryRequestParameters) {
-		params.requestID = protocol.GenerateRequestId()
+		params.requestID = protocol.GenerateRequestID()
 	}
 }
 
@@ -282,7 +282,7 @@ func (store *WakuStore) Query(ctx context.Context, query Query, opts ...HistoryR
 	}
 
 	if len(params.requestID) == 0 {
-		return nil, ErrInvalidId
+		return nil, ErrInvalidID
 	}
 
 	if params.cursor != nil {
@@ -321,7 +321,7 @@ func (store *WakuStore) Query(ctx context.Context, query Query, opts ...HistoryR
 		store:    store,
 		Messages: response.Messages,
 		query:    q,
-		peerId:   params.selectedPeer,
+		peerID:   params.selectedPeer,
 	}
 
 	if response.PagingInfo != nil {
@@ -379,7 +379,7 @@ func (store *WakuStore) Next(ctx context.Context, r *Result) (*Result, error) {
 			Messages: []*wpb.WakuMessage{},
 			cursor:   nil,
 			query:    r.query,
-			peerId:   r.PeerID(),
+			peerID:   r.PeerID(),
 		}, nil
 	}
 
@@ -400,7 +400,7 @@ func (store *WakuStore) Next(ctx context.Context, r *Result) (*Result, error) {
 		},
 	}
 
-	response, err := store.queryFrom(ctx, q, r.PeerID(), protocol.GenerateRequestId())
+	response, err := store.queryFrom(ctx, q, r.PeerID(), protocol.GenerateRequestID())
 	if err != nil {
 		return nil, err
 	}
@@ -414,7 +414,7 @@ func (store *WakuStore) Next(ctx context.Context, r *Result) (*Result, error) {
 		store:    store,
 		Messages: response.Messages,
 		query:    q,
-		peerId:   r.PeerID(),
+		peerID:   r.PeerID(),
 	}
 
 	if response.PagingInfo != nil {

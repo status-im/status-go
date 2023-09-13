@@ -194,6 +194,7 @@ func (rs RelayShards) BitVector() []byte {
 	return append(result, vec...)
 }
 
+// Generate a RelayShards from a byte slice
 func FromBitVector(buf []byte) (RelayShards, error) {
 	if len(buf) != 130 {
 		return RelayShards{}, errors.New("invalid data: expected 130 bytes")
@@ -228,4 +229,14 @@ func GetShardFromContentTopic(topic ContentTopic, shardCount int) StaticSharding
 	shard := hashValue % uint64(shardCount)
 
 	return NewStaticShardingPubsubTopic(ClusterIndex, uint16(shard))
+}
+
+func GetPubSubTopicFromContentTopic(cTopicString string) (string, error) {
+	cTopic, err := StringToContentTopic(cTopicString)
+	if err != nil {
+		return "", fmt.Errorf("%s : %s", err.Error(), cTopicString)
+	}
+	pTopic := GetShardFromContentTopic(cTopic, GenerationZeroShardsCount)
+
+	return pTopic.String(), nil
 }

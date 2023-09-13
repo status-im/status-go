@@ -1,5 +1,5 @@
-//go:build gowaku_rln
-// +build gowaku_rln
+//go:build !gowaku_no_rln
+// +build !gowaku_no_rln
 
 package node
 
@@ -8,8 +8,8 @@ import (
 	"context"
 	"errors"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln"
+	"github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager/dynamic"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln/group_manager/static"
 	"github.com/waku-org/go-waku/waku/v2/protocol/rln/keystore"
@@ -23,31 +23,48 @@ func (w *WakuNode) RLNRelay() RLNRelay {
 
 func (w *WakuNode) setupRLNRelay() error {
 	var err error
-	var groupManager rln.GroupManager
 
 	if !w.opts.enableRLN {
 		return nil
 	}
 
+	if !w.opts.enableRelay {
+		return errors.New("rln requires relay")
+	}
+
+	var groupManager group_manager.GroupManager
+
+	rlnInstance, rootTracker, err := rln.GetRLNInstanceAndRootTracker(w.opts.rlnTreePath)
+	if err != nil {
+		return err
+	}
 	if !w.opts.rlnRelayDynamic {
 		w.log.Info("setting up waku-rln-relay in off-chain mode")
 
+		index := uint(0)
+		if w.opts.rlnRelayMemIndex != nil {
+			index = *w.opts.rlnRelayMemIndex
+		}
+
 		// set up rln relay inputs
-		groupKeys, idCredential, err := static.Setup(w.opts.rlnRelayMemIndex)
+		groupKeys, idCredential, err := static.Setup(index)
 		if err != nil {
 			return err
 		}
 
-		groupManager, err = static.NewStaticGroupManager(groupKeys, idCredential, w.opts.rlnRelayMemIndex, w.log)
+		groupManager, err = static.NewStaticGroupManager(groupKeys, idCredential, index, rlnInstance, rootTracker, w.log)
 		if err != nil {
 			return err
 		}
 	} else {
 		w.log.Info("setting up waku-rln-relay in on-chain mode")
 
-		appKeystore, err := keystore.New(w.opts.keystorePath, dynamic.RLNAppInfo, w.log)
-		if err != nil {
-			return err
+		var appKeystore *keystore.AppKeystore
+		if w.opts.keystorePath != "" {
+			appKeystore, err = keystore.New(w.opts.keystorePath, dynamic.RLNAppInfo, w.log)
+			if err != nil {
+				return err
+			}
 		}
 
 		groupManager, err = dynamic.NewDynamicGroupManager(
@@ -57,6 +74,8 @@ func (w *WakuNode) setupRLNRelay() error {
 			appKeystore,
 			w.opts.keystorePassword,
 			w.opts.prometheusReg,
+			rlnInstance,
+			rootTracker,
 			w.log,
 		)
 		if err != nil {
@@ -64,15 +83,15 @@ func (w *WakuNode) setupRLNRelay() error {
 		}
 	}
 
-	rlnRelay, err := rln.New(groupManager, w.opts.rlnTreePath, w.timesource, w.opts.prometheusReg, w.log)
-	if err != nil {
-		return err
-	}
+	rlnRelay := rln.New(group_manager.Details{
+		GroupManager: groupManager,
+		RootTracker:  rootTracker,
+		RLN:          rlnInstance,
+	}, w.timesource, w.opts.prometheusReg, w.log)
 
 	w.rlnRelay = rlnRelay
 
-	// Adding RLN as a default validator
-	w.opts.pubsubOpts = append(w.opts.pubsubOpts, pubsub.WithDefaultValidator(rlnRelay.Validator(w.opts.rlnSpamHandler)))
+	w.Relay().RegisterDefaultValidator(w.rlnRelay.Validator(w.opts.rlnSpamHandler))
 
 	return nil
 }

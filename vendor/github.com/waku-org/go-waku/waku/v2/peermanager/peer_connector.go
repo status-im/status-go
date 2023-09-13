@@ -7,9 +7,9 @@ import (
 	"errors"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -17,40 +17,27 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	"github.com/waku-org/go-waku/logging"
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
-
-	"sync/atomic"
+	waku_proto "github.com/waku-org/go-waku/waku/v2/protocol"
 
 	"go.uber.org/zap"
 
 	lru "github.com/hashicorp/golang-lru"
 )
 
-// PeerData contains information about a peer useful in establishing connections with it.
-type PeerData struct {
-	Origin   wps.Origin
-	AddrInfo peer.AddrInfo
-	ENR      *enode.Node
-}
-
 // PeerConnectionStrategy is a utility to connect to peers,
 // but only if we have not recently tried connecting to them already
 type PeerConnectionStrategy struct {
-	sync.RWMutex
+	mux   sync.Mutex
+	cache *lru.TwoQueueCache
+	host  host.Host
+	pm    *PeerManager
 
-	cache  *lru.TwoQueueCache
-	host   host.Host
-	pm     *PeerManager
-	cancel context.CancelFunc
-
-	paused atomic.Bool
-
-	wg            sync.WaitGroup
-	dialTimeout   time.Duration
-	dialCh        chan peer.AddrInfo
+	paused      atomic.Bool
+	dialTimeout time.Duration
+	*CommonDiscoveryService
 	subscriptions []<-chan PeerData
 
 	backoff backoff.BackoffFactory
-	mux     sync.Mutex
 	logger  *zap.Logger
 }
 
@@ -77,12 +64,12 @@ func NewPeerConnectionStrategy(pm *PeerManager,
 	}
 	//
 	pc := &PeerConnectionStrategy{
-		cache:       cache,
-		wg:          sync.WaitGroup{},
-		dialTimeout: dialTimeout,
-		pm:          pm,
-		backoff:     getBackOff(),
-		logger:      logger.Named("discovery-connector"),
+		cache:                  cache,
+		dialTimeout:            dialTimeout,
+		CommonDiscoveryService: NewCommonDiscoveryService(),
+		pm:                     pm,
+		backoff:                getBackOff(),
+		logger:                 logger.Named("discovery-connector"),
 	}
 	pm.SetPeerConnector(pc)
 	return pc, nil
@@ -95,36 +82,46 @@ type connCacheData struct {
 
 // Subscribe receives channels on which discovered peers should be pushed
 func (c *PeerConnectionStrategy) Subscribe(ctx context.Context, ch <-chan PeerData) {
-	if c.cancel != nil {
-		c.wg.Add(1)
-		go func() {
-			defer c.wg.Done()
-			c.consumeSubscription(ctx, ch)
-		}()
-	} else {
+	// if not running yet, store the subscription and return
+	if err := c.ErrOnNotRunning(); err != nil {
+		c.mux.Lock()
 		c.subscriptions = append(c.subscriptions, ch)
+		c.mux.Unlock()
+		return
 	}
+	// if running start a goroutine to consume the subscription
+	c.WaitGroup().Add(1)
+	go func() {
+		defer c.WaitGroup().Done()
+		c.consumeSubscription(ch)
+	}()
 }
 
-func (c *PeerConnectionStrategy) consumeSubscription(ctx context.Context, ch <-chan PeerData) {
+func (c *PeerConnectionStrategy) consumeSubscription(ch <-chan PeerData) {
 	for {
 		// for returning from the loop when peerConnector is paused.
 		select {
-		case <-ctx.Done():
+		case <-c.Context().Done():
 			return
 		default:
 		}
 		//
 		if !c.isPaused() {
 			select {
-			case <-ctx.Done():
+			case <-c.Context().Done():
 				return
 			case p, ok := <-ch:
 				if !ok {
 					return
 				}
-				c.pm.AddDiscoveredPeer(p)
-				c.publishWork(ctx, p.AddrInfo)
+				triggerImmediateConnection := false
+				//Not connecting to peer as soon as it is discovered,
+				// rather expecting this to be pushed from PeerManager based on the need.
+				if len(c.host.Network().Peers()) < waku_proto.GossipSubOptimalFullMeshSize {
+					triggerImmediateConnection = true
+				}
+				c.pm.AddDiscoveredPeer(p, triggerImmediateConnection)
+
 			case <-time.After(1 * time.Second):
 				// This timeout is to not lock the goroutine
 				break
@@ -143,74 +140,38 @@ func (c *PeerConnectionStrategy) SetHost(h host.Host) {
 // Start attempts to connect to the peers passed in by peerCh.
 // Will not connect to peers if they are within the backoff period.
 func (c *PeerConnectionStrategy) Start(ctx context.Context) error {
-	if c.cancel != nil {
-		return errors.New("already started")
-	}
+	return c.CommonDiscoveryService.Start(ctx, c.start)
 
-	ctx, cancel := context.WithCancel(ctx)
-	c.cancel = cancel
-	c.dialCh = make(chan peer.AddrInfo)
+}
+func (c *PeerConnectionStrategy) start() error {
+	c.WaitGroup().Add(1)
 
-	c.wg.Add(2)
-	go c.shouldDialPeers(ctx)
-	go c.dialPeers(ctx)
+	go c.dialPeers()
 
-	c.consumeSubscriptions(ctx)
+	c.consumeSubscriptions()
 
 	return nil
 }
 
 // Stop terminates the peer-connector
 func (c *PeerConnectionStrategy) Stop() {
-	if c.cancel == nil {
-		return
-	}
-
-	c.cancel()
-	c.cancel = nil
-	c.wg.Wait()
-
-	close(c.dialCh)
+	c.CommonDiscoveryService.Stop(func() {})
 }
 
 func (c *PeerConnectionStrategy) isPaused() bool {
 	return c.paused.Load()
 }
 
-func (c *PeerConnectionStrategy) shouldDialPeers(ctx context.Context) {
-	defer c.wg.Done()
-
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			_, outRelayPeers := c.pm.getRelayPeers()
-			c.paused.Store(outRelayPeers.Len() >= c.pm.OutRelayPeersTarget) // pause if no of OutPeers more than or eq to target
-		}
-	}
-}
-
 // it might happen Subscribe is called before peerConnector has started so store these subscriptions in subscriptions array and custom after c.cancel is set.
-func (c *PeerConnectionStrategy) consumeSubscriptions(ctx context.Context) {
+func (c *PeerConnectionStrategy) consumeSubscriptions() {
 	for _, subs := range c.subscriptions {
-		c.wg.Add(1)
+		c.WaitGroup().Add(1)
 		go func(s <-chan PeerData) {
-			defer c.wg.Done()
-			c.consumeSubscription(ctx, s)
+			defer c.WaitGroup().Done()
+			c.consumeSubscription(s)
 		}(subs)
 	}
 	c.subscriptions = nil
-}
-
-func (c *PeerConnectionStrategy) publishWork(ctx context.Context, p peer.AddrInfo) {
-	select {
-	case c.dialCh <- p:
-	case <-ctx.Done():
-		return
-	}
 }
 
 const maxActiveDials = 5
@@ -238,8 +199,8 @@ func (c *PeerConnectionStrategy) canDialPeer(pi peer.AddrInfo) bool {
 	return true
 }
 
-func (c *PeerConnectionStrategy) dialPeers(ctx context.Context) {
-	defer c.wg.Done()
+func (c *PeerConnectionStrategy) dialPeers() {
+	defer c.WaitGroup().Done()
 
 	maxGoRoutines := c.pm.OutRelayPeersTarget
 	if maxGoRoutines > maxActiveDials {
@@ -250,30 +211,31 @@ func (c *PeerConnectionStrategy) dialPeers(ctx context.Context) {
 
 	for {
 		select {
-		case pi, ok := <-c.dialCh:
+		case pd, ok := <-c.GetListeningChan():
 			if !ok {
 				return
 			}
+			addrInfo := pd.AddrInfo
 
-			if pi.ID == c.host.ID() || pi.ID == "" ||
-				c.host.Network().Connectedness(pi.ID) == network.Connected {
+			if addrInfo.ID == c.host.ID() || addrInfo.ID == "" ||
+				c.host.Network().Connectedness(addrInfo.ID) == network.Connected {
 				continue
 			}
 
-			if c.canDialPeer(pi) {
+			if c.canDialPeer(addrInfo) {
 				sem <- struct{}{}
-				c.wg.Add(1)
-				go c.dialPeer(ctx, pi, sem)
+				c.WaitGroup().Add(1)
+				go c.dialPeer(addrInfo, sem)
 			}
-		case <-ctx.Done():
+		case <-c.Context().Done():
 			return
 		}
 	}
 }
 
-func (c *PeerConnectionStrategy) dialPeer(ctx context.Context, pi peer.AddrInfo, sem chan struct{}) {
-	defer c.wg.Done()
-	ctx, cancel := context.WithTimeout(ctx, c.dialTimeout)
+func (c *PeerConnectionStrategy) dialPeer(pi peer.AddrInfo, sem chan struct{}) {
+	defer c.WaitGroup().Done()
+	ctx, cancel := context.WithTimeout(c.Context(), c.dialTimeout)
 	defer cancel()
 	err := c.host.Connect(ctx, pi)
 	if err != nil && !errors.Is(err, context.Canceled) {

@@ -6,6 +6,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 )
 
+const GossipSubOptimalFullMeshSize = 6
+
 // FulltextMatch is the default matching function used for checking if a peer
 // supports a protocol or not
 func FulltextMatch(expectedProtocol string) func(string) bool {

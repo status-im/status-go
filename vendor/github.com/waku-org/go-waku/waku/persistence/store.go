@@ -410,6 +410,10 @@ func (d *DBStore) prepareQuerySQL(query *pb.HistoryQuery) (string, []interface{}
 	paramCnt++
 
 	sqlQuery += fmt.Sprintf("LIMIT $%d", paramCnt)
+	// Always search for _max page size_ + 1. If the extra row does not exist, do not return pagination info.
+	pageSize := query.PagingInfo.PageSize + 1
+	parameters = append(parameters, pageSize)
+
 	sqlQuery = fmt.Sprintf(sqlQuery, conditionStr, orderDirection, orderDirection, orderDirection, orderDirection)
 	d.log.Info(fmt.Sprintf("sqlQuery: %s", sqlQuery))
 
@@ -434,10 +438,7 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 		return nil, nil, err
 	}
 	defer stmt.Close()
-	pageSize := query.PagingInfo.PageSize + 1
-
-	parameters = append(parameters, pageSize)
-
+	//
 	measurementStart := time.Now()
 	rows, err := stmt.Query(parameters...)
 	if err != nil {
@@ -458,6 +459,7 @@ func (d *DBStore) Query(query *pb.HistoryQuery) (*pb.Index, []StoredMessage, err
 
 	var cursor *pb.Index
 	if len(result) != 0 {
+		// since there are more rows than pagingInfo.PageSize, we need to return a cursor, for pagination
 		if len(result) > int(query.PagingInfo.PageSize) {
 			result = result[0:query.PagingInfo.PageSize]
 			lastMsgIdx := len(result) - 1

@@ -17,10 +17,10 @@ type dnsDiscoveryParameters struct {
 	nameserver string
 }
 
-type DnsDiscoveryOption func(*dnsDiscoveryParameters)
+type DNSDiscoveryOption func(*dnsDiscoveryParameters)
 
 // WithNameserver is a DnsDiscoveryOption that configures the nameserver to use
-func WithNameserver(nameserver string) DnsDiscoveryOption {
+func WithNameserver(nameserver string) DNSDiscoveryOption {
 	return func(params *dnsDiscoveryParameters) {
 		params.nameserver = nameserver
 	}
@@ -32,7 +32,7 @@ type DiscoveredNode struct {
 	ENR      *enode.Node
 }
 
-var metrics Metrics = nil
+var metrics Metrics
 
 // SetPrometheusRegisterer is used to setup a custom prometheus registerer for metrics
 func SetPrometheusRegisterer(reg prometheus.Registerer, logger *zap.Logger) {
@@ -44,7 +44,7 @@ func init() {
 }
 
 // RetrieveNodes returns a list of multiaddress given a url to a DNS discoverable ENR tree
-func RetrieveNodes(ctx context.Context, url string, opts ...DnsDiscoveryOption) ([]DiscoveredNode, error) {
+func RetrieveNodes(ctx context.Context, url string, opts ...DNSDiscoveryOption) ([]DiscoveredNode, error) {
 	var discoveredNodes []DiscoveredNode
 
 	params := new(dnsDiscoveryParameters)

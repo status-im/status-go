@@ -54,7 +54,7 @@ var DefaultConfig = Config{
 	KeepAliveInterval: 10, // second
 	DiscoveryLimit:    20,
 	MinPeersForRelay:  1, // TODO: determine correct value with Vac team
-	MinPeersForFilter: 1, // TODO: determine correct value with Vac team and via testing
+	MinPeersForFilter: 2, // TODO: determine correct value with Vac team and via testing
 	AutoUpdate:        false,
 }
 
