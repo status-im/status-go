@@ -27,7 +27,9 @@ import (
 	"time"
 
 	"github.com/waku-org/go-waku/waku/v2/payload"
+	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/wakuv2/common"
 
@@ -252,6 +254,17 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		Meta:         []byte{}, // TODO: empty for now. Once we use Waku Archive v2, we should deprecate the timestamp and use an ULID here
 		Ephemeral:    req.Ephemeral,
 	}
+
+	env := protocol.NewEnvelope(wakuMsg, time.Now().UnixNano(), req.PubsubTopic)
+	messageType := ""
+	ctxMessageType := ctx.Value("messageType")
+	if ctxMessageType == nil {
+		messageType = "?"
+	} else {
+		messageType = ctxMessageType.(string)
+	}
+
+	api.w.logger.Info("Building message", zap.String("hash", hexutil.Encode(env.Hash())), zap.String("messageType", messageType))
 
 	hash, err := api.w.Send(req.PubsubTopic, wakuMsg)
 
