@@ -708,10 +708,10 @@ func (w *Waku) runFilterMsgLoop() {
 					break
 				}
 				for id, sub := range subMap {
-					w.filterDebug("Check sub aliveness", zap.String("peerId", string(sub.PeerID)))
+					w.filterDebug("Check sub aliveness", zap.Stringer("peerId", sub.PeerID))
 					err := w.isFilterSubAlive(sub)
 					if err != nil {
-						w.filterDebug("Sub not alive", zap.String("peerId", string(sub.PeerID)), zap.Error(err))
+						w.filterDebug("Sub not alive", zap.Stringer("peerId", sub.PeerID), zap.Error(err))
 
 						contentFilter := w.buildContentFilter(f.PubsubTopic, f.Topics)
 						// Unsubscribe on light node
@@ -729,7 +729,7 @@ func (w *Waku) runFilterMsgLoop() {
 						// Re-subscribe
 						peers := w.findFilterPeers()
 						if len(peers) > 0 && len(subMap) < w.settings.MinPeersForFilter {
-							w.filterDebug("New subscribe to peer", zap.String("peerId", string(peers[0])))
+							w.filterDebug("New subscribe to peer", zap.Stringer("peerId", peers[0]))
 							subDetails, err := w.node.FilterLightnode().Subscribe(w.ctx, contentFilter, filter.WithPeer(peers[0]))
 							if err != nil {
 								w.logger.Warn("could not add wakuv2 filter for peer", zap.Any("peer", peers[0]), zap.Error(err))
