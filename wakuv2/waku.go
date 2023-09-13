@@ -671,9 +671,11 @@ func (w *Waku) runFilterSubscriptionLoop(sub *filter.SubscriptionDetails) {
 	}
 }
 func (w *Waku) logFilterPeers() {
-	w.filterDebug("logFilterPeers")
-	peers := w.findFilterPeers()
-	w.filterDebug("Filter peers count", zap.Any("cnt", len(peers)))
+	if len(w.filterSubscriptions) > 0 {
+		w.logger.Info("logFilterPeers")
+		peers := w.findFilterPeers()
+		w.logger.Info("Filter peers count", zap.Any("cnt", len(peers)))
+	}
 }
 
 func (w *Waku) runFilterMsgLoop() {
@@ -692,58 +694,60 @@ func (w *Waku) runFilterMsgLoop() {
 		case <-w.ctx.Done():
 			return
 		case <-ticker.C:
-			w.filterSubsLock.Lock()
-			defer w.filterSubsLock.Unlock()
-			w.logFilterPeers()
-			for f, subMap := range w.filterSubscriptions {
-				w.filterDebug("Checking content topic subs", zap.Strings("topics", w.buildContentTopics(f.Topics)))
-				if len(subMap) == 0 {
-					// All peers have disconnected on previous iteration,
-					// attempt full reconnect
-					w.filterDebug("Attempt full reconnect")
-					err := w.subscribeToFilter(f)
-					if err != nil {
-						w.logger.Error("Failed to subscribe to filter")
+			go func() {
+				w.filterSubsLock.Lock()
+				defer w.filterSubsLock.Unlock()
+				w.logFilterPeers()
+				for f, subMap := range w.filterSubscriptions {
+					w.logger.Info("Checking content topic subs", zap.Strings("topics", w.buildContentTopics(f.Topics)))
+					if len(subMap) == 0 {
+						// All peers have disconnected on previous iteration,
+						// attempt full reconnect
+						w.logger.Info("Attempt full reconnect")
+						err := w.subscribeToFilter(f)
+						if err != nil {
+							w.logger.Error("Failed to subscribe to filter")
+						}
+						break
 					}
-					break
-				}
-				for id, sub := range subMap {
-					w.filterDebug("Check sub aliveness", zap.Stringer("peerId", sub.PeerID))
-					err := w.isFilterSubAlive(sub)
-					if err != nil {
-						w.filterDebug("Sub not alive", zap.Stringer("peerId", sub.PeerID), zap.Error(err))
+					for id, sub := range subMap {
+						w.logger.Info("Check sub aliveness", zap.Stringer("peerId", sub.PeerID))
+						err := w.isFilterSubAlive(sub)
+						if err != nil {
+							w.logger.Info("Sub not alive", zap.Stringer("peerId", sub.PeerID), zap.Error(err))
 
-						contentFilter := w.buildContentFilter(f.PubsubTopic, f.Topics)
-						// Unsubscribe on light node
-						// Do not unsubscribe from disconnected peer, as Unsubscribe will fail anyway
-						// _, err := w.node.FilterLightnode().Unsubscribe(w.ctx, contentFilter, filter.Peer(sub.PeerID))
-						// if err != nil {
-						// 	w.logger.Warn("could not unsubscribe wakuv2 filter for peer", zap.Any("peer", sub.PeerID))
-						// 	continue
-						// }
+							contentFilter := w.buildContentFilter(f.PubsubTopic, f.Topics)
+							// Unsubscribe on light node
+							// Do not unsubscribe from disconnected peer, as Unsubscribe will fail anyway
+							// _, err := w.node.FilterLightnode().Unsubscribe(w.ctx, contentFilter, filter.Peer(sub.PeerID))
+							// if err != nil {
+							// 	w.logger.Warn("could not unsubscribe wakuv2 filter for peer", zap.Any("peer", sub.PeerID))
+							// 	continue
+							// }
 
-						// Remove entry from maps
-						w.filterPeerDisconnectMap[sub.PeerID] = time.Now().Unix()
-						delete(subMap, id)
+							// Remove entry from maps
+							w.filterPeerDisconnectMap[sub.PeerID] = time.Now().Unix()
+							delete(subMap, id)
 
-						// Re-subscribe
-						peers := w.findFilterPeers()
-						if len(peers) > 0 && len(subMap) < w.settings.MinPeersForFilter {
-							w.filterDebug("New subscribe to peer", zap.Stringer("peerId", peers[0]))
-							subDetails, err := w.node.FilterLightnode().Subscribe(w.ctx, contentFilter, filter.WithPeer(peers[0]))
-							if err != nil {
-								w.logger.Warn("could not add wakuv2 filter for peer", zap.Any("peer", peers[0]), zap.Error(err))
+							// Re-subscribe
+							peers := w.findFilterPeers()
+							if len(peers) > 0 && len(subMap) < w.settings.MinPeersForFilter {
+								w.logger.Info("New subscribe to peer", zap.Stringer("peerId", peers[0]))
+								subDetails, err := w.node.FilterLightnode().Subscribe(w.ctx, contentFilter, filter.WithPeer(peers[0]))
+								if err != nil {
+									w.logger.Warn("could not add wakuv2 filter for peer", zap.Any("peer", peers[0]), zap.Error(err))
+									break
+								}
+
+								subMap[subDetails.ID] = subDetails
+								go w.runFilterSubscriptionLoop(subDetails)
+
 								break
 							}
-
-							subMap[subDetails.ID] = subDetails
-							go w.runFilterSubscriptionLoop(subDetails)
-
-							break
 						}
 					}
 				}
-			}
+			}()
 		}
 	}
 }
@@ -1067,7 +1071,7 @@ func (w *Waku) Subscribe(f *common.Filter) (string, error) {
 				if err == nil {
 					break
 				} else {
-					w.filterDebug("Error when performing initial subscribe", zap.Error(err))
+					w.logger.Info("Error when performing initial subscribe", zap.Error(err))
 				}
 			}
 		}()
@@ -1826,12 +1830,13 @@ func (w *Waku) findFilterPeers() []peer.ID {
 
 	peerstorePeers := w.node.Host().Peerstore().Peers()
 	allPeers := w.node.Host().Network().Peers()
-	w.filterDebug("Peerstore peers", zap.Stringers("peers", peerstorePeers))
-	w.filterDebug("Network peers", zap.Stringers("peers", allPeers))
+	w.logger.Info("Peerstore peers", zap.Stringers("peers", peerstorePeers))
+	w.logger.Info("Network peers", zap.Stringers("peers", allPeers))
 	var peers peer.IDSlice
 	for _, peer := range allPeers {
 		protocols, err := w.node.Host().Peerstore().SupportsProtocols(peer, filter.FilterSubscribeID_v20beta1, relay.WakuRelayID_v200)
 		if err != nil {
+			w.logger.Info("SupportsProtocols error", zap.Error(err))
 			continue
 		}
 
@@ -1840,7 +1845,7 @@ func (w *Waku) findFilterPeers() []peer.ID {
 		}
 	}
 
-	w.filterDebug("Filtered peers", zap.Stringers("peers", peers))
+	w.logger.Info("Filtered peers", zap.Stringers("peers", peers))
 	if len(peers) > 0 {
 		sort.Slice(peers, func(i, j int) bool {
 			// If element not found in map, [] operator will return 0
@@ -1849,7 +1854,7 @@ func (w *Waku) findFilterPeers() []peer.ID {
 	}
 
 	var peerLen = len(peers)
-	w.filterDebug("Sliced peers", zap.Stringers("peers", peers))
+	w.logger.Info("Sliced peers", zap.Stringers("peers", peers), zap.Int("peerLen", peerLen))
 	if w.settings.MinPeersForFilter < peerLen {
 		peerLen = w.settings.MinPeersForFilter
 	}
@@ -1866,6 +1871,7 @@ func (w *Waku) subscribeToFilter(f *common.Filter) error {
 		w.filterSubsLock.Lock()
 		defer w.filterSubsLock.Unlock()
 		for i := 0; i < len(peers) && i < w.settings.MinPeersForFilter; i++ {
+			w.logger.Info("Subscribe to filter node", zap.Stringer("peerId", peers[i]))
 			subDetails, err := w.node.FilterLightnode().Subscribe(w.ctx, contentFilter, filter.WithPeer(peers[i]))
 			if err != nil {
 				w.logger.Warn("could not add wakuv2 filter for peer", zap.Stringer("peer", peers[i]), zap.Error(err))
