@@ -68,14 +68,15 @@ func TestTrToToken(t *testing.T, tt *TestTransaction) (token *token.Token, isNat
 func generateTestTransaction(seed int) TestTransaction {
 	token := SeedToToken(seed)
 	return TestTransaction{
-		Hash:               eth_common.HexToHash(fmt.Sprintf("0x1%d", seed)),
-		ChainID:            common.ChainID(token.ChainID),
-		From:               eth_common.HexToAddress(fmt.Sprintf("0x2%d", seed)),
-		Timestamp:          int64(seed),
-		BlkNumber:          int64(seed),
-		Success:            true,
-		Nonce:              uint64(seed),
-		Contract:           eth_common.HexToAddress(fmt.Sprintf("0x2%d", seed)),
+		Hash:      eth_common.HexToHash(fmt.Sprintf("0x1%d", seed)),
+		ChainID:   common.ChainID(token.ChainID),
+		From:      eth_common.HexToAddress(fmt.Sprintf("0x2%d", seed)),
+		Timestamp: int64(seed),
+		BlkNumber: int64(seed),
+		Success:   true,
+		Nonce:     uint64(seed),
+		// In practice this is last20Bytes(Keccak256(RLP(From, nonce)))
+		Contract:           eth_common.HexToAddress(fmt.Sprintf("0x4%d", seed)),
 		MultiTransactionID: NoMultiTransactionID,
 	}
 }

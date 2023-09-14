@@ -638,8 +638,6 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 	multiTxs[3] = transfer.GenerateTestBridgeMultiTransaction(trs[6], trs[7])
 	multiTxs[4] = transfer.GenerateTestSendMultiTransaction(trs[8]) // trs[9]
 
-	allAddresses := append(append(append(tdFromAdds, tdToAddrs...), fromAddrs...), toAddrs...)
-
 	var lastMT transfer.MultiTransactionIDType
 	for i := range trs {
 		if i%2 == 0 {
@@ -649,7 +647,11 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 		transfer.InsertTestTransfer(t, deps.db, trs[i].To, &trs[i])
 	}
 
-	trsSpecial, _, _ := transfer.GenerateTestTransfers(t, deps.db, 100, 2)
+	trsSpecial, fromSpecial, toSpecial := transfer.GenerateTestTransfers(t, deps.db, 100, 2)
+
+	// Here not to include the modified To and From addresses
+	allAddresses := append(append(append(append(append(tdFromAdds, tdToAddrs...), fromAddrs...), toAddrs...), fromSpecial...), toSpecial...)
+
 	// Insert MintAT
 	trsSpecial[0].From = eth.HexToAddress("0x0")
 	transfer.InsertTestTransferWithOptions(t, deps.db, trsSpecial[0].To, &trsSpecial[0], &transfer.TestTransferOptions{
@@ -731,6 +733,7 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 	filter.Types = []Type{SendAT}
 	entries, err = getActivityEntries(context.Background(), deps, allAddresses, true, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
+	// We have 6 but one is not matched because is a receive, having owner the to address
 	require.Equal(t, 5, len(entries))
 }
 
@@ -1293,152 +1296,4 @@ func TestGetMultiTxDetails(t *testing.T) {
 	require.Equal(t, td.multiTx1Tr2.Nonce, details.Nonce)
 	require.Equal(t, td.multiTx1Tr2.BlkNumber, details.BlockNumber)
 	require.Equal(t, td.multiTx1Tr1.Contract, *details.Contract)
-}
-
-func setupBenchmark(b *testing.B, inMemory bool, resultCount int) (deps FilterDependencies, close func(), accounts []eth.Address) {
-	deps, close = setupTestActivityDBStorageChoice(b, inMemory)
-
-	const transactionCount = 100000
-	const mtSendRatio = 0.2   // 20%
-	const mtSwapRatio = 0.1   // 10%
-	const mtBridgeRatio = 0.1 // 10%
-	const pendingCount = 10
-	const mtSendCount = int(float64(transactionCount) * mtSendRatio)
-	const mtSwapCount = int(float64(transactionCount) * mtSwapRatio)
-	// Bridge requires two transactions
-	const mtBridgeCount = int(float64(transactionCount) * (mtBridgeRatio / 2))
-
-	trs, _, _ := transfer.GenerateTestTransfers(b, deps.db, 0, transactionCount)
-
-	accounts = []eth.Address{trs[0].From, trs[1].From, trs[2].From, trs[3].To, trs[4].To, trs[5].To}
-
-	i := 0
-	multiTxs := make([]transfer.TestMultiTransaction, mtSendCount+mtSwapCount+mtBridgeCount)
-	for ; i < mtSendCount; i++ {
-		multiTxs[i] = transfer.GenerateTestSendMultiTransaction(trs[i])
-		trs[i].From = accounts[i%len(accounts)]
-		multiTxs[i].FromAddress = trs[i].From
-
-		multiTxs[i].MultiTransactionID = transfer.InsertTestMultiTransaction(b, deps.db, &multiTxs[i])
-		trs[i].MultiTransactionID = multiTxs[i].MultiTransactionID
-	}
-
-	for j := 0; j < mtSwapCount; i, j = i+1, j+1 {
-		multiTxs[i] = transfer.GenerateTestSwapMultiTransaction(trs[i], testutils.SntSymbol, int64(i))
-		trs[i].From = accounts[i%len(accounts)]
-		multiTxs[i].FromAddress = trs[i].From
-
-		multiTxs[i].MultiTransactionID = transfer.InsertTestMultiTransaction(b, deps.db, &multiTxs[i])
-		trs[i].MultiTransactionID = multiTxs[i].MultiTransactionID
-	}
-
-	for mtIdx := 0; mtIdx < mtBridgeCount; i, mtIdx = i+2, mtIdx+1 {
-		firstTrIdx := i
-		secondTrIdx := i + 1
-		multiTxs[mtIdx] = transfer.GenerateTestBridgeMultiTransaction(trs[firstTrIdx], trs[secondTrIdx])
-		trs[firstTrIdx].From = accounts[i%len(accounts)]
-		trs[secondTrIdx].To = accounts[(i+3)%len(accounts)]
-		multiTxs[mtIdx].FromAddress = trs[firstTrIdx].From
-		multiTxs[mtIdx].ToAddress = trs[secondTrIdx].To
-		multiTxs[mtIdx].FromAddress = trs[i].From
-
-		multiTxs[mtIdx].MultiTransactionID = transfer.InsertTestMultiTransaction(b, deps.db, &multiTxs[mtIdx])
-		trs[firstTrIdx].MultiTransactionID = multiTxs[mtIdx].MultiTransactionID
-		trs[secondTrIdx].MultiTransactionID = multiTxs[mtIdx].MultiTransactionID
-	}
-
-	for i = 0; i < transactionCount-pendingCount; i++ {
-		trs[i].From = accounts[i%len(accounts)]
-		transfer.InsertTestTransfer(b, deps.db, trs[i].From, &trs[i])
-	}
-
-	for ; i < transactionCount; i++ {
-		trs[i].From = accounts[i%len(accounts)]
-		transfer.InsertTestPendingTransaction(b, deps.db, &trs[i])
-	}
-
-	return
-}
-
-func BenchmarkGetActivityEntries(bArg *testing.B) {
-	type params struct {
-		inMemory               bool
-		resultCount            int
-		generateTestParameters func([]eth.Address) (addresses []eth.Address, allAddresses bool, filter *Filter, startIndex int)
-	}
-	testCases := []struct {
-		name   string
-		params params
-	}{
-		{
-			"RAM_NoFilter",
-			params{
-				true,
-				10,
-				func(addresses []eth.Address) ([]eth.Address, bool, *Filter, int) {
-					return addresses, true, &Filter{}, 0
-				},
-			},
-		},
-		{
-			"SSD_NoFilter",
-			params{
-				false,
-				10,
-				func(addresses []eth.Address) ([]eth.Address, bool, *Filter, int) {
-					return addresses, true, &Filter{}, 0
-				},
-			},
-		},
-		{
-			"SSD_MovingWindow",
-			params{
-				false,
-				10,
-				func(addresses []eth.Address) ([]eth.Address, bool, *Filter, int) {
-					return addresses, true, &Filter{}, 200
-				},
-			},
-		},
-		{
-			"SSD_AllAddresses_AllTos",
-			params{
-				false,
-				10,
-				func(addresses []eth.Address) ([]eth.Address, bool, *Filter, int) {
-					return addresses, true, &Filter{CounterpartyAddresses: addresses[3:]}, 0
-				},
-			},
-		},
-		{
-			"SSD_OneAddress",
-			params{
-				false,
-				10,
-				func(addresses []eth.Address) ([]eth.Address, bool, *Filter, int) {
-					return addresses[0:1], false, &Filter{}, 0
-				},
-			},
-		},
-	}
-
-	deps, closeFn, accounts := setupBenchmark(bArg, true, 10)
-	defer closeFn()
-
-	const resultCount = 10
-	for _, tc := range testCases {
-		addresses, allAddresses, filter, startIndex := tc.params.generateTestParameters(accounts)
-		bArg.Run(tc.name, func(b *testing.B) {
-			// Reset timer after setup
-			b.ResetTimer()
-
-			// Run benchmark
-			for i := 0; i < b.N; i++ {
-				res, err := getActivityEntries(context.Background(), deps, addresses, allAddresses, allNetworksFilter(), *filter, startIndex, resultCount)
-				if err != nil || len(res) != resultCount {
-					b.Error(err)
-				}
-			}
-		})
-	}
 }

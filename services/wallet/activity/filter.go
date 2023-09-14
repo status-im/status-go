@@ -166,7 +166,7 @@ func GetOldestTimestamp(ctx context.Context, db *sql.DB, addresses []eth.Address
 			transfers.timestamp AS timestamp
 		FROM transfers, filter_conditions
 		WHERE transfers.multi_transaction_id = 0
-			AND (filterAllAddresses OR HEX(from_address) IN filter_addresses OR HEX(to_address) IN filter_addresses)
+			AND (filterAllAddresses OR from_address IN filter_addresses OR to_address IN filter_addresses)
 
 		UNION ALL
 
@@ -176,7 +176,7 @@ func GetOldestTimestamp(ctx context.Context, db *sql.DB, addresses []eth.Address
 			pending_transactions.timestamp AS timestamp
 		FROM pending_transactions, filter_conditions
 		WHERE pending_transactions.multi_transaction_id = 0
-			AND (filterAllAddresses OR HEX(from_address) IN filter_addresses OR HEX(to_address) IN filter_addresses)
+			AND (filterAllAddresses OR from_address IN filter_addresses OR to_address IN filter_addresses)
 
 		UNION ALL
 
@@ -185,7 +185,7 @@ func GetOldestTimestamp(ctx context.Context, db *sql.DB, addresses []eth.Address
 			multi_transactions.to_address AS to_address,
 			multi_transactions.timestamp AS timestamp
 		FROM multi_transactions, filter_conditions
-		WHERE filterAllAddresses OR HEX(from_address) IN filter_addresses OR HEX(to_address) IN filter_addresses
+		WHERE filterAllAddresses OR from_address IN filter_addresses OR to_address IN filter_addresses
 		ORDER BY timestamp ASC
 		LIMIT 1`
 
