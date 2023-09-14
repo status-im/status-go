@@ -44,7 +44,7 @@ WITH filter_conditions AS (
 		? AS nowTimestamp,
 		? AS layer2FinalisationDuration,
 		? AS layer1FinalisationDuration,
-		'0000000000000000000000000000000000000000' AS zeroAddress
+		X'0000000000000000000000000000000000000000' AS zeroAddress
 ),
 -- This UNION between CTE and TEMP TABLE acts as an optimization. As soon as we drop one or use them interchangeably the performance drops significantly.
 filter_addresses(address) AS (
@@ -150,7 +150,8 @@ pending_network_ids AS (
 		pending_transactions.multi_transaction_id
 ),
 layer2_networks(network_id) AS (
-	VALUES %s
+	VALUES
+		%s
 )
 SELECT
 	transfers.hash AS transfer_hash,
@@ -178,16 +179,16 @@ SELECT
 	NULL AS mt_from_amount,
 	NULL AS mt_to_amount,
 	CASE
-		WHEN transfers.status IS 1 THEN 
-			CASE
-				WHEN transfers.timestamp > 0 AND filter_conditions.nowTimestamp >= transfers.timestamp + 
-					(CASE
-						WHEN transfers.network_id in layer2_networks THEN layer2FinalisationDuration
-						ELSE layer1FinalisationDuration
-					END) 
-				THEN statusFinalized
-				ELSE statusCompleted
-			END
+		WHEN transfers.status IS 1 THEN CASE
+			WHEN transfers.timestamp > 0
+			AND filter_conditions.nowTimestamp >= transfers.timestamp + (
+				CASE
+					WHEN transfers.network_id in layer2_networks THEN layer2FinalisationDuration
+					ELSE layer1FinalisationDuration
+				END
+			) THEN statusFinalized
+			ELSE statusCompleted
+		END
 		ELSE statusFailed
 	END AS agg_status,
 	1 AS agg_count,
@@ -201,10 +202,12 @@ SELECT
 	transfers.type AS type,
 	transfers.contract_address AS contract_address
 FROM
-	transfers,
-	filter_conditions
-	LEFT JOIN filter_addresses from_join ON HEX(transfers.address) = from_join.address
-	LEFT JOIN filter_addresses to_join ON HEX(transfers.tx_to_address) = to_join.address
+	transfers
+	CROSS JOIN filter_conditions
+	INNER JOIN filter_to_addresses receiver_join ON filterAllToAddresses != 0
+	OR transfers.tx_to_address = receiver_join.address
+	LEFT JOIN filter_addresses from_join ON transfers.tx_from_address = from_join.address
+	LEFT JOIN filter_addresses to_join ON transfers.tx_to_address = to_join.address
 WHERE
 	transfers.loaded == 1
 	AND transfers.multi_transaction_id = 0
@@ -223,24 +226,22 @@ WHERE
 		filterActivityTypeAll
 		OR (
 			filterActivityTypeSend
-			AND tr_type = fromTrType
+			AND tr_type = fromTrType -- Check NOT ContractDeploymentAT
 			AND NOT (
-				tr_type = fromTrType
-				and transfers.tx_to_address IS NULL
+				transfers.tx_to_address IS NULL
 				AND transfers.type = 'eth'
 				AND transfers.contract_address IS NOT NULL
-				AND HEX(transfers.contract_address) != zeroAddress
+				AND transfers.contract_address != zeroAddress
 			)
 		)
 		OR (
 			filterActivityTypeReceive
-			AND tr_type = toTrType
+			AND tr_type = toTrType -- Check NOT MintAT
 			AND NOT (
-				tr_type = toTrType
-				AND transfers.type = 'erc721'
+				transfers.type = 'erc721'
 				AND (
 					transfers.tx_from_address IS NULL
-					OR HEX(transfers.tx_from_address) = zeroAddress
+					OR transfers.tx_from_address = zeroAddress
 				)
 			)
 		)
@@ -250,11 +251,7 @@ WHERE
 			AND transfers.tx_to_address IS NULL
 			AND transfers.type = 'eth'
 			AND transfers.contract_address IS NOT NULL
-			AND HEX(transfers.contract_address) != zeroAddress
-			AND (
-				filterAllAddresses
-				OR (HEX(transfers.address) IN filter_addresses)
-			)
+			AND transfers.contract_address != zeroAddress
 		)
 		OR (
 			filterActivityTypeMint
@@ -262,23 +259,13 @@ WHERE
 			AND transfers.type = 'erc721'
 			AND (
 				transfers.tx_from_address IS NULL
-				OR HEX(transfers.tx_from_address) = zeroAddress
-			)
-			AND (
-				filterAllAddresses
-				OR (HEX(transfers.address) IN filter_addresses)
+				OR transfers.tx_from_address = zeroAddress
 			)
 		)
 	)
 	AND (
-		filterAllAddresses
-		OR (HEX(owner_address) IN filter_addresses)
-	)
-	AND (
-		filterAllToAddresses
-		OR (
-			HEX(transfers.tx_to_address) IN filter_to_addresses
-		)
+		filterAllAddresses -- Every account address has an "owned" entry either as to or from
+		OR (owner_address IN filter_addresses)
 	)
 	AND (
 		includeAllTokenTypeAssets
@@ -291,7 +278,7 @@ WHERE
 			AND (
 				(
 					transfers.network_id,
-					HEX(transfers.token_address)
+					transfers.token_address
 				) IN assets_erc20
 			)
 		)
@@ -303,8 +290,8 @@ WHERE
 			AND (
 				(
 					transfers.network_id,
-					HEX(transfers.token_id),
-					HEX(transfers.token_address)
+					transfers.token_id,
+					transfers.token_address
 				) IN assets_erc721
 			)
 		)
@@ -320,7 +307,7 @@ WHERE
 			AND agg_status = statusCompleted
 		)
 		OR (
-			filterStatusFinalized 
+			filterStatusFinalized
 			AND agg_status = statusFinalized
 		)
 		OR (
@@ -367,10 +354,12 @@ SELECT
 	pending_transactions.type AS type,
 	NULL as contract_address
 FROM
-	pending_transactions,
-	filter_conditions
-	LEFT JOIN filter_addresses from_join ON HEX(pending_transactions.from_address) = from_join.address
-	LEFT JOIN filter_addresses to_join ON HEX(pending_transactions.to_address) = to_join.address
+	pending_transactions
+	CROSS JOIN filter_conditions
+	INNER JOIN filter_to_addresses receiver_join ON filterAllToAddresses != 0
+	OR pending_transactions.to_address = receiver_join.address
+	LEFT JOIN filter_addresses from_join ON pending_transactions.from_address = from_join.address
+	LEFT JOIN filter_addresses to_join ON pending_transactions.to_address = to_join.address
 WHERE
 	pending_transactions.multi_transaction_id = 0
 	AND pending_transactions.status = pendingStatus
@@ -395,18 +384,7 @@ WHERE
 	)
 	AND (
 		filterAllAddresses
-		OR (
-			HEX(pending_transactions.from_address) IN filter_addresses
-		)
-		OR (
-			HEX(pending_transactions.to_address) IN filter_addresses
-		)
-	)
-	AND (
-		filterAllToAddresses
-		OR (
-			HEX(pending_transactions.to_address) IN filter_to_addresses
-		)
+		OR tr_type NOT NULL
 	)
 	AND (
 		includeAllTokenTypeAssets
@@ -437,15 +415,16 @@ SELECT
 	multi_transactions.from_amount AS mt_from_amount,
 	multi_transactions.to_amount AS mt_to_amount,
 	CASE
-	WHEN tr_status.min_status = 1 AND COALESCE(pending_status.count, 0) = 0 THEN 
-		CASE
-			WHEN multi_transactions.timestamp > 0 AND filter_conditions.nowTimestamp >= multi_transactions.timestamp + 
-				(CASE
-					WHEN multi_transactions.from_network_id in layer2_networks 
-							OR multi_transactions.to_network_id in layer2_networks THEN layer2FinalisationDuration
+		WHEN tr_status.min_status = 1
+		AND COALESCE(pending_status.count, 0) = 0 THEN CASE
+			WHEN multi_transactions.timestamp > 0
+			AND filter_conditions.nowTimestamp >= multi_transactions.timestamp + (
+				CASE
+					WHEN multi_transactions.from_network_id in layer2_networks
+					OR multi_transactions.to_network_id in layer2_networks THEN layer2FinalisationDuration
 					ELSE layer1FinalisationDuration
-				END)
-			THEN statusFinalized
+				END
+			) THEN statusFinalized
 			ELSE statusCompleted
 		END
 		WHEN tr_status.min_status = 0 THEN statusFailed
@@ -462,8 +441,10 @@ SELECT
 	NULL AS type,
 	NULL as contract_address
 FROM
-	multi_transactions,
-	filter_conditions
+	multi_transactions
+	CROSS JOIN filter_conditions
+	INNER JOIN filter_to_addresses receiver_join ON filterAllToAddresses != 0
+	OR multi_transactions.to_address = receiver_join.address
 	LEFT JOIN tr_status ON multi_transactions.ROWID = tr_status.multi_transaction_id
 	LEFT JOIN pending_status ON multi_transactions.ROWID = pending_status.multi_transaction_id
 WHERE
@@ -487,20 +468,14 @@ WHERE
 		OR (
 			-- Send multi-transaction types are exclusively for outbound transfers. The receiving end will have a corresponding entry as "owner_address" in the transfers table.
 			mt_type = mTTypeSend
-			AND HEX(owner_address) IN filter_addresses
+			AND owner_address IN filter_addresses
 		)
 		OR (
 			mt_type != mTTypeSend
 			AND (
-				HEX(multi_transactions.from_address) IN filter_addresses
-				OR HEX(multi_transactions.to_address) IN filter_addresses
+				multi_transactions.from_address IN filter_addresses
+				OR multi_transactions.to_address IN filter_addresses
 			)
-		)
-	)
-	AND (
-		filterAllToAddresses
-		OR (
-			HEX(multi_transactions.to_address) IN filter_to_addresses
 		)
 	)
 	AND (
@@ -521,11 +496,11 @@ WHERE
 	AND (
 		filterAllActivityStatus
 		OR (
-			filterStatusCompleted 
-			AND agg_status = statusCompleted 
+			filterStatusCompleted
+			AND agg_status = statusCompleted
 		)
 		OR (
-			filterStatusFinalized 
+			filterStatusFinalized
 			AND agg_status = statusFinalized
 		)
 		OR (

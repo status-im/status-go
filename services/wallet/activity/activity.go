@@ -285,7 +285,7 @@ func joinItems[T interface{}](items []T, itemConversion func(T) string) string {
 
 func joinAddresses(addresses []eth.Address) string {
 	return joinItems(addresses, func(a eth.Address) string {
-		return fmt.Sprintf("'%s'", strings.ToUpper(hex.EncodeToString(a[:])))
+		return fmt.Sprintf("X'%s'", hex.EncodeToString(a[:]))
 	})
 }
 
@@ -337,8 +337,6 @@ type FilterDependencies struct {
 // allAddresses optimization indicates if the passed addresses include all the owners in the wallet DB
 //
 // Adding a no-limit option was never considered or required.
-//
-// TODO: optimization: consider implementing nullable []byte instead of using strings for addresses or insert binary (X'...' syntax) directly into the query
 func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses []eth.Address, allAddresses bool, chainIDs []common.ChainID, filter Filter, offset int, limit int) ([]Entry, error) {
 	if len(addresses) == 0 {
 		return nil, errors.New("no addresses provided")
@@ -367,8 +365,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		if sliceChecksCondition(filter.Assets, func(item *Token) bool { return item.TokenType == Erc20 }) {
 			assetsERC20 = joinItems(filter.Assets, func(item Token) string {
 				if item.TokenType == Erc20 {
-					// SQL HEX() (Blob->Hex) conversion returns uppercase digits with no 0x prefix
-					return fmt.Sprintf("%d, '%s'", item.ChainID, strings.ToUpper(item.Address.Hex()[2:]))
+					return fmt.Sprintf("%d, X'%s'", item.ChainID, item.Address.Hex()[2:])
 				}
 				return ""
 			})
@@ -379,14 +376,13 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 	assetsERC721 := noEntriesInThreeColumnsTmpTableSQLValues
 	if !includeAllCollectibles && !filter.FilterOutCollectibles {
 		assetsERC721 = joinItems(filter.Collectibles, func(item Token) string {
-			// SQL HEX() (Blob->Hex) conversion returns uppercase digits with no 0x prefix
-			tokenID := strings.ToUpper(item.TokenID.String()[2:])
-			address := strings.ToUpper(item.Address.Hex()[2:])
+			tokenID := item.TokenID.String()[2:]
+			address := item.Address.Hex()[2:]
+			// SQLite mandates that byte length is an even number which hexutil.EncodeBig doesn't guarantee
 			if len(tokenID)%2 == 1 {
-				// Hex length must be divisable by 2, otherwise append '0' at the beginning
 				tokenID = "0" + tokenID
 			}
-			return fmt.Sprintf("%d, '%s', '%s'", item.ChainID, tokenID, address)
+			return fmt.Sprintf("%d, X'%s', X'%s'", item.ChainID, tokenID, address)
 		})
 	}
 
@@ -436,7 +432,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 	// The duplicated temporary table UNION with CTE acts as an optimization
 	// As soon as we use filter_addresses CTE or filter_addresses_table temp table
 	// or switch them alternatively for JOIN or IN clauses the performance drops significantly
-	_, err := deps.db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS filter_addresses_table; CREATE TEMP TABLE filter_addresses_table (address VARCHAR PRIMARY KEY); INSERT OR IGNORE INTO filter_addresses_table (address) VALUES %s;\n", involvedAddresses))
+	_, err := deps.db.Exec(fmt.Sprintf("DROP TABLE IF EXISTS filter_addresses_table; CREATE TEMP TABLE filter_addresses_table (address VARCHAR PRIMARY KEY); INSERT INTO filter_addresses_table (address) VALUES %s;\n", involvedAddresses))
 	if err != nil {
 		return nil, err
 	}
