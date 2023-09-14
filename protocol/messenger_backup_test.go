@@ -280,6 +280,7 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 		bob1Bio                       = "bio"
 		bob1Mnemonic                  = ""
 		bob1MnemonicRemoved           = true
+		bob1PreferredName             = "talent"
 	)
 
 	// Create bob1 and set fields which are supposed to be backed up to/fetched from waku
@@ -297,6 +298,8 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	err = bob1.settings.SaveSettingField(settings.Bio, bob1Bio)
 	s.Require().NoError(err)
 	err = bob1.settings.SaveSettingField(settings.Mnemonic, bob1Mnemonic)
+	s.Require().NoError(err)
+	err = bob1.settings.SaveSettingField(settings.PreferredName, bob1PreferredName)
 	s.Require().NoError(err)
 
 	// Create bob2
@@ -331,6 +334,9 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	storedMnemonicRemoved, err := bob1.settings.MnemonicRemoved()
 	s.Require().NoError(err)
 	s.Require().Equal(bob1MnemonicRemoved, storedMnemonicRemoved)
+	storedPreferredName, err := bob1.settings.GetPreferredUsername()
+	s.NoError(err)
+	s.Equal(bob1PreferredName, storedPreferredName)
 
 	// Check bob2
 	storedBob2DisplayName, err := bob2.settings.DisplayName()
@@ -354,6 +360,9 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	storedBob2MnemonicRemoved, err := bob2.settings.MnemonicRemoved()
 	s.Require().NoError(err)
 	s.Require().Equal(false, storedBob2MnemonicRemoved)
+	storedBob2PreferredName, err := bob2.settings.GetPreferredUsername()
+	s.NoError(err)
+	s.Equal("", storedBob2PreferredName)
 
 	// Backup
 	clock, err := bob1.BackupData(context.Background())
@@ -391,6 +400,10 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	storedBob2MnemonicRemoved, err = bob2.settings.MnemonicRemoved()
 	s.Require().NoError(err)
 	s.Require().Equal(bob1MnemonicRemoved, storedBob2MnemonicRemoved)
+	storedBob2PreferredName, err = bob2.settings.GetPreferredUsername()
+	s.NoError(err)
+	s.Equal(bob1PreferredName, storedBob2PreferredName)
+	s.Equal(bob1PreferredName, bob2.account.Name)
 
 	lastBackup, err := bob1.lastBackup()
 	s.Require().NoError(err)
