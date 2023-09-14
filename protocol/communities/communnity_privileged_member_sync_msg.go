@@ -58,7 +58,7 @@ func (m *Manager) HandleSyncAllRequestToJoinForNewPrivilegedMember(message *prot
 				return nil, err
 			}
 
-			if err := m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin); err != nil {
+			if err := m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin.ID, requestToJoin.RevealedAccounts); err != nil {
 				return nil, err
 			}
 		}

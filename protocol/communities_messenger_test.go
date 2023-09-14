@@ -3037,7 +3037,10 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 
 	messageState.CurrentMessageState.PublicKey = &s.alice.identity.PublicKey
 
-	err = s.admin.HandleCommunityRequestToJoin(messageState, requestToJoinProto, nil)
+	statusMessage := v1protocol.StatusMessage{
+		Dst: community.PublicKey(),
+	}
+	err = s.admin.HandleCommunityRequestToJoin(messageState, requestToJoinProto, &statusMessage)
 
 	s.Require().ErrorContains(err, "can't request access")
 }
