@@ -16,8 +16,9 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 )
 
-type LinkPreview struct {
-	common.LinkPreview
+type UnfurlURLsResponse struct {
+	LinkPreviews       []common.LinkPreview       `json:"linkPreviews,omitempty"`
+	StatusLinkPreviews []common.StatusLinkPreview `json:"statusLinkPreviews,omitempty"`
 }
 
 func normalizeHostname(hostname string) string {
@@ -132,13 +133,15 @@ func NewDefaultHTTPClient() *http.Client {
 
 // UnfurlURLs assumes clients pass URLs verbatim that were validated and
 // processed by GetURLs.
-func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) ([]common.LinkPreview, []common.StatusLinkPreview, error) {
+func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (UnfurlURLsResponse, error) {
 	if httpClient == nil {
 		httpClient = NewDefaultHTTPClient()
 	}
 
-	previews := make([]common.LinkPreview, 0, len(urls))
-	statusPreviews := make([]common.StatusLinkPreview, 0, len(urls))
+	r := UnfurlURLsResponse{
+		LinkPreviews:       make([]common.LinkPreview, 0, len(urls)),
+		StatusLinkPreviews: make([]common.StatusLinkPreview, 0, len(urls)),
+	}
 
 	for _, url := range urls {
 		m.logger.Debug("unfurling", zap.String("url", url))
@@ -150,7 +153,7 @@ func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) ([]common
 				m.logger.Warn("failed to unfurl status link", zap.String("url", url), zap.Error(err))
 				continue
 			}
-			statusPreviews = append(statusPreviews, preview)
+			r.StatusLinkPreviews = append(r.StatusLinkPreviews, preview)
 			continue
 		}
 
@@ -159,8 +162,8 @@ func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) ([]common
 			m.logger.Warn("failed to unfurl", zap.String("url", url), zap.Error(err))
 			continue
 		}
-		previews = append(previews, p)
+		r.LinkPreviews = append(r.LinkPreviews, p)
 	}
 
-	return previews, statusPreviews, nil
+	return r, nil
 }

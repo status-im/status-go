@@ -216,11 +216,11 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_YouTube() {
 	transport.AddURLMatcher(thumbnailURL, s.readAsset("1.jpg"), nil)
 	stubbedClient := http.Client{Transport: &transport}
 
-	previews, sPreviews, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
+	response, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
 	s.Require().NoError(err)
-	s.Require().Len(sPreviews, 0)
-	s.Require().Len(previews, 1)
-	preview := previews[0]
+	s.Require().Len(response.StatusLinkPreviews, 0)
+	s.Require().Len(response.LinkPreviews, 1)
+	preview := response.LinkPreviews[0]
 
 	s.Require().Equal(expected.Type, preview.Type)
 	s.Require().Equal(expected.URL, preview.URL)
@@ -261,11 +261,11 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Reddit() {
 	)
 	stubbedClient := http.Client{Transport: &transport}
 
-	previews, sPreviews, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
+	response, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
 	s.Require().NoError(err)
-	s.Require().Len(sPreviews, 0)
-	s.Require().Len(previews, 1)
-	preview := previews[0]
+	s.Require().Len(response.StatusLinkPreviews, 0)
+	s.Require().Len(response.LinkPreviews, 1)
+	preview := response.LinkPreviews[0]
 
 	s.Require().Equal(expected.Type, preview.Type)
 	s.Require().Equal(expected.URL, preview.URL)
@@ -277,10 +277,10 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Reddit() {
 
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Timeout() {
 	httpClient := http.Client{Timeout: time.Nanosecond}
-	previews, sPreviews, err := s.m.UnfurlURLs(&httpClient, []string{"https://status.im"})
+	response, err := s.m.UnfurlURLs(&httpClient, []string{"https://status.im"})
 	s.Require().NoError(err)
-	s.Require().Len(sPreviews, 0)
-	s.Require().Empty(previews)
+	s.Require().Len(response.StatusLinkPreviews, 0)
+	s.Require().Empty(response.LinkPreviews)
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_CommonFailures() {
@@ -294,22 +294,22 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_CommonFailures() {
 		nil,
 	)
 	stubbedClient := http.Client{Transport: &transport}
-	previews, sPreviews, err := s.m.UnfurlURLs(&stubbedClient, []string{"https://wikipedia.org"})
+	response, err := s.m.UnfurlURLs(&stubbedClient, []string{"https://wikipedia.org"})
 	s.Require().NoError(err)
-	s.Require().Len(sPreviews, 0)
-	s.Require().Empty(previews)
+	s.Require().Len(response.StatusLinkPreviews, 0)
+	s.Require().Empty(response.LinkPreviews)
 
 	// Test 404.
-	previews, sPreviews, err = s.m.UnfurlURLs(&httpClient, []string{"https://github.com/status-im/i_do_not_exist"})
+	response, err = s.m.UnfurlURLs(&httpClient, []string{"https://github.com/status-im/i_do_not_exist"})
 	s.Require().NoError(err)
-	s.Require().Len(sPreviews, 0)
-	s.Require().Empty(previews)
+	s.Require().Len(response.StatusLinkPreviews, 0)
+	s.Require().Empty(response.LinkPreviews)
 
 	// Test no response when trying to get OpenGraph metadata.
-	previews, sPreviews, err = s.m.UnfurlURLs(&httpClient, []string{"https://wikipedia.o"})
+	response, err = s.m.UnfurlURLs(&httpClient, []string{"https://wikipedia.o"})
 	s.Require().NoError(err)
-	s.Require().Len(sPreviews, 0)
-	s.Require().Empty(previews)
+	s.Require().Len(response.StatusLinkPreviews, 0)
+	s.Require().Empty(response.LinkPreviews)
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_isSupportedImageURL() {
@@ -356,11 +356,11 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Image() {
 	transport.AddURLMatcher(u, s.readAsset("IMG_1205.HEIC.jpg"), nil)
 	stubbedClient := http.Client{Transport: &transport}
 
-	previews, sPreviews, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
+	response, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
 	s.Require().NoError(err)
-	s.Require().Len(sPreviews, 0)
-	s.Require().Len(previews, 1)
-	preview := previews[0]
+	s.Require().Len(response.StatusLinkPreviews, 0)
+	s.Require().Len(response.LinkPreviews, 1)
+	preview := response.LinkPreviews[0]
 
 	s.Require().Equal(expected.Type, preview.Type)
 	s.Require().Equal(expected.URL, preview.URL)
@@ -392,12 +392,12 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContact() {
 	s.Require().NoError(err)
 
 	//stubbedClient := http.Client{Transport: &StubTransport{}}
-	previews, sPreviews, err := s.m.UnfurlURLs(nil, []string{u})
+	r, err := s.m.UnfurlURLs(nil, []string{u})
 	s.Require().NoError(err)
-	s.Require().Len(sPreviews, 1)
-	s.Require().Len(previews, 0)
+	s.Require().Len(r.StatusLinkPreviews, 1)
+	s.Require().Len(r.LinkPreviews, 0)
 
-	preview := sPreviews[0]
+	preview := r.StatusLinkPreviews[0]
 	s.Require().NotNil(preview.Contact)
 	s.Require().Equal(preview.Contact.DisplayName, c.DisplayName)
 	s.Require().Equal(preview.Contact.Description, "")
