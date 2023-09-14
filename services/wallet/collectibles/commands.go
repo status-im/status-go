@@ -8,8 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/wallet/async"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -21,74 +19,56 @@ const (
 	accountOwnershipUpdateInterval = 30 * time.Minute
 )
 
-// Fetches owned collectibles for all chainIDs and wallet addresses
-type refreshOwnedCollectiblesCommand struct {
-	manager        *Manager
-	ownershipDB    *OwnershipDB
-	accountsDB     *accounts.Database
-	walletFeed     *event.Feed
-	networkManager *network.Manager
+type periodicRefreshOwnedCollectiblesCommand struct {
+	chainID     walletCommon.ChainID
+	account     common.Address
+	manager     *Manager
+	ownershipDB *OwnershipDB
+	walletFeed  *event.Feed
+
+	group *async.Group
 }
 
-func newRefreshOwnedCollectiblesCommand(manager *Manager, ownershipDB *OwnershipDB, accountsDB *accounts.Database, walletFeed *event.Feed, networkManager *network.Manager) *refreshOwnedCollectiblesCommand {
-	return &refreshOwnedCollectiblesCommand{
-		manager:        manager,
-		ownershipDB:    ownershipDB,
-		accountsDB:     accountsDB,
-		walletFeed:     walletFeed,
-		networkManager: networkManager,
+func newPeriodicRefreshOwnedCollectiblesCommand(manager *Manager, ownershipDB *OwnershipDB, walletFeed *event.Feed, chainID walletCommon.ChainID, account common.Address) *periodicRefreshOwnedCollectiblesCommand {
+	return &periodicRefreshOwnedCollectiblesCommand{
+		manager:     manager,
+		ownershipDB: ownershipDB,
+		walletFeed:  walletFeed,
+		chainID:     chainID,
+		account:     account,
 	}
 }
 
-func (c *refreshOwnedCollectiblesCommand) Command() async.Command {
+func (c *periodicRefreshOwnedCollectiblesCommand) Command() async.Command {
 	return async.InfiniteCommand{
 		Interval: accountOwnershipUpdateInterval,
 		Runable:  c.Run,
 	}.Run
 }
 
-func (c *refreshOwnedCollectiblesCommand) Run(ctx context.Context) (err error) {
-	return c.updateOwnershipForAllAccounts(ctx)
+func (c *periodicRefreshOwnedCollectiblesCommand) Run(ctx context.Context) (err error) {
+	return c.loadOwnedCollectibles(ctx)
 }
 
-func (c *refreshOwnedCollectiblesCommand) updateOwnershipForAllAccounts(ctx context.Context) error {
-	networks, err := c.networkManager.Get(false)
-	if err != nil {
-		return err
+func (c *periodicRefreshOwnedCollectiblesCommand) Stop() {
+	if c.group != nil {
+		c.group.Stop()
+		c.group.Wait()
+		c.group = nil
 	}
+}
 
-	addresses, err := c.accountsDB.GetWalletAddresses()
-	if err != nil {
-		return err
-	}
+func (c *periodicRefreshOwnedCollectiblesCommand) loadOwnedCollectibles(ctx context.Context) error {
+	c.group = async.NewGroup(ctx)
 
-	areTestNetworksEnabled, err := c.accountsDB.GetTestNetworksEnabled()
-	if err != nil {
-		return err
-	}
-
-	start := time.Now()
-	group := async.NewGroup(ctx)
-
-	log.Debug("refreshOwnedCollectiblesCommand started")
-
-	for _, network := range networks {
-		if network.IsTest != areTestNetworksEnabled {
-			continue
-		}
-		for _, address := range addresses {
-			command := newLoadOwnedCollectiblesCommand(c.manager, c.ownershipDB, c.walletFeed, walletCommon.ChainID(network.ChainID), common.Address(address))
-			group.Add(command.Command())
-		}
-	}
+	command := newLoadOwnedCollectiblesCommand(c.manager, c.ownershipDB, c.walletFeed, c.chainID, c.account)
+	c.group.Add(command.Command())
 
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-group.WaitAsync():
+	case <-c.group.WaitAsync():
 	}
-
-	log.Debug("refreshOwnedCollectiblesCommand finished", "in", time.Since(start))
 
 	return nil
 }
@@ -140,35 +120,54 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 	start := time.Now()
 
 	c.triggerEvent(EventCollectiblesOwnershipUpdateStarted, c.chainID, c.account, "")
-	// Fetch collectibles in chunks
-	for {
-		if shouldCancel(parent) {
-			c.err = errors.New("context cancelled")
-			break
-		}
 
-		partialOwnership, err := c.manager.FetchCollectibleOwnershipByOwner(c.chainID, c.account, cursor, fetchLimit)
-
-		if err != nil {
-			log.Error("failed loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "page", pageNr, "error", err)
-			c.err = err
-			break
-		}
-
-		log.Debug("partial loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "page", pageNr, "found", len(partialOwnership.Items), "collectibles")
-
-		c.partialOwnership = append(c.partialOwnership, partialOwnership.Items...)
-
-		pageNr++
-		cursor = partialOwnership.NextCursor
-
-		if cursor == thirdparty.FetchFromStartCursor {
-			err = c.ownershipDB.Update(c.chainID, c.account, c.partialOwnership, start.Unix())
-			if err != nil {
-				log.Error("failed updating ownershipDB in loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "error", err)
-				c.err = err
+	lastFetchTimestamp, err := c.ownershipDB.GetOwnershipUpdateTimestamp(c.account, c.chainID)
+	if err != nil {
+		c.err = err
+	} else {
+		initialFetch := lastFetchTimestamp == InvalidTimestamp
+		// Fetch collectibles in chunks
+		for {
+			if shouldCancel(parent) {
+				c.err = errors.New("context cancelled")
+				break
 			}
-			break
+
+			pageStart := time.Now()
+			log.Debug("start loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "page", pageNr)
+
+			partialOwnership, err := c.manager.FetchCollectibleOwnershipByOwner(c.chainID, c.account, cursor, fetchLimit)
+
+			if err != nil {
+				log.Error("failed loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "page", pageNr, "error", err)
+				c.err = err
+				break
+			}
+
+			log.Debug("partial loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "page", pageNr, "in", time.Since(pageStart), "found", len(partialOwnership.Items), "collectibles")
+
+			c.partialOwnership = append(c.partialOwnership, partialOwnership.Items...)
+
+			pageNr++
+			cursor = partialOwnership.NextCursor
+
+			finished := cursor == thirdparty.FetchFromStartCursor
+
+			// Normally, update the DB once we've finished fetching
+			// If this is the first fetch, make partial updates to the client to get a better UX
+			if initialFetch || finished {
+				err = c.ownershipDB.Update(c.chainID, c.account, c.partialOwnership, start.Unix())
+				if err != nil {
+					log.Error("failed updating ownershipDB in loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "error", err)
+					c.err = err
+				}
+			}
+
+			if finished || c.err != nil {
+				break
+			} else if initialFetch {
+				c.triggerEvent(EventCollectiblesOwnershipUpdatePartial, c.chainID, c.account, "")
+			}
 		}
 	}
 
@@ -178,7 +177,7 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 		c.triggerEvent(EventCollectiblesOwnershipUpdateFinished, c.chainID, c.account, "")
 	}
 
-	log.Debug("end loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account)
+	log.Debug("end loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "in", time.Since(start))
 	return nil
 }
 
