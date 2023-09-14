@@ -84,13 +84,30 @@ const (
 	ErrorCodeFailed
 )
 
+type OwnershipState = int
+
+const (
+	OwnershipStateIdle OwnershipState = iota + 1
+	OwnershipStateUpdating
+	OwnershipStateError
+)
+
+type OwnershipStatus struct {
+	State     OwnershipState `json:"state"`
+	Timestamp int64          `json:"timestamp"`
+}
+
+type OwnershipStatusPerChainID = map[walletCommon.ChainID]OwnershipStatus
+type OwnershipStatusPerAddressAndChainID = map[common.Address]OwnershipStatusPerChainID
+
 type FilterOwnedCollectiblesResponse struct {
 	Collectibles []CollectibleHeader `json:"collectibles"`
 	Offset       int                 `json:"offset"`
 	// Used to indicate that there might be more collectibles that were not returned
 	// based on a simple heuristic
-	HasMore   bool      `json:"hasMore"`
-	ErrorCode ErrorCode `json:"errorCode"`
+	HasMore         bool                                `json:"hasMore"`
+	OwnershipStatus OwnershipStatusPerAddressAndChainID `json:"ownershipStatus"`
+	ErrorCode       ErrorCode                           `json:"errorCode"`
 }
 
 type GetCollectiblesDetailsResponse struct {
@@ -99,8 +116,9 @@ type GetCollectiblesDetailsResponse struct {
 }
 
 type filterOwnedCollectiblesTaskReturnType struct {
-	collectibles []CollectibleHeader
-	hasMore      bool
+	collectibles    []CollectibleHeader
+	hasMore         bool
+	ownershipStatus OwnershipStatusPerAddressAndChainID
 }
 
 // FilterOwnedCollectiblesResponse allows only one filter task to run at a time
@@ -116,10 +134,15 @@ func (s *Service) FilterOwnedCollectiblesAsync(requestID int32, chainIDs []walle
 		if err != nil {
 			return nil, err
 		}
+		ownershipStatus, err := s.GetOwnershipStatus(chainIDs, addresses)
+		if err != nil {
+			return nil, err
+		}
 
 		return filterOwnedCollectiblesTaskReturnType{
-			collectibles: fullCollectiblesDataToHeaders(data),
-			hasMore:      hasMore,
+			collectibles:    fullCollectiblesDataToHeaders(data),
+			hasMore:         hasMore,
+			ownershipStatus: ownershipStatus,
 		}, err
 	}, func(result interface{}, taskType async.TaskType, err error) {
 		res := FilterOwnedCollectiblesResponse{
@@ -133,6 +156,7 @@ func (s *Service) FilterOwnedCollectiblesAsync(requestID int32, chainIDs []walle
 			res.Collectibles = fnRet.collectibles
 			res.Offset = offset
 			res.HasMore = fnRet.hasMore
+			res.OwnershipStatus = fnRet.ownershipStatus
 			res.ErrorCode = ErrorCodeSuccess
 		}
 
@@ -354,4 +378,27 @@ func (s *Service) GetOwnedCollectibles(chainIDs []walletCommon.ChainID, owners [
 
 func (s *Service) GetOwnedCollectible(chainID walletCommon.ChainID, owner common.Address, contractAddress common.Address, tokenID *big.Int) (*thirdparty.CollectibleUniqueID, error) {
 	return s.ownershipDB.GetOwnedCollectible(chainID, owner, contractAddress, tokenID)
+}
+
+func (s *Service) GetOwnershipStatus(chainIDs []walletCommon.ChainID, owners []common.Address) (OwnershipStatusPerAddressAndChainID, error) {
+	ret := make(OwnershipStatusPerAddressAndChainID)
+	for _, address := range owners {
+		ret[address] = make(OwnershipStatusPerChainID)
+		for _, chainID := range chainIDs {
+			timestamp, err := s.ownershipDB.GetOwnershipUpdateTimestamp(address, chainID)
+			if err != nil {
+				return nil, err
+			}
+			state := OwnershipStateIdle
+			if s.commands[address] != nil && s.commands[address][chainID] != nil {
+				state = s.commands[address][chainID].GetState()
+			}
+			ret[address][chainID] = OwnershipStatus{
+				State:     state,
+				Timestamp: timestamp,
+			}
+		}
+	}
+
+	return ret, nil
 }

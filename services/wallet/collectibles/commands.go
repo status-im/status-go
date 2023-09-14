@@ -3,6 +3,7 @@ package collectibles
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -27,16 +28,19 @@ type periodicRefreshOwnedCollectiblesCommand struct {
 	walletFeed  *event.Feed
 
 	group *async.Group
+	state atomic.Value
 }
 
 func newPeriodicRefreshOwnedCollectiblesCommand(manager *Manager, ownershipDB *OwnershipDB, walletFeed *event.Feed, chainID walletCommon.ChainID, account common.Address) *periodicRefreshOwnedCollectiblesCommand {
-	return &periodicRefreshOwnedCollectiblesCommand{
+	ret := &periodicRefreshOwnedCollectiblesCommand{
 		manager:     manager,
 		ownershipDB: ownershipDB,
 		walletFeed:  walletFeed,
 		chainID:     chainID,
 		account:     account,
 	}
+	ret.state.Store(OwnershipStateIdle)
+	return ret
 }
 
 func (c *periodicRefreshOwnedCollectiblesCommand) Command() async.Command {
@@ -50,6 +54,10 @@ func (c *periodicRefreshOwnedCollectiblesCommand) Run(ctx context.Context) (err 
 	return c.loadOwnedCollectibles(ctx)
 }
 
+func (c *periodicRefreshOwnedCollectiblesCommand) GetState() OwnershipState {
+	return c.state.Load().(OwnershipState)
+}
+
 func (c *periodicRefreshOwnedCollectiblesCommand) Stop() {
 	if c.group != nil {
 		c.group.Stop()
@@ -60,8 +68,17 @@ func (c *periodicRefreshOwnedCollectiblesCommand) Stop() {
 
 func (c *periodicRefreshOwnedCollectiblesCommand) loadOwnedCollectibles(ctx context.Context) error {
 	c.group = async.NewGroup(ctx)
-
 	command := newLoadOwnedCollectiblesCommand(c.manager, c.ownershipDB, c.walletFeed, c.chainID, c.account)
+
+	c.state.Store(OwnershipStateUpdating)
+	defer func() {
+		if command.err != nil {
+			c.state.Store(OwnershipStateError)
+		} else {
+			c.state.Store(OwnershipStateIdle)
+		}
+	}()
+
 	c.group.Add(command.Command())
 
 	select {
