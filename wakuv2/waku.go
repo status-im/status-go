@@ -36,6 +36,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
 	"github.com/multiformats/go-multiaddr"
+	"google.golang.org/protobuf/proto"
 
 	"go.uber.org/zap"
 
@@ -1093,11 +1094,18 @@ func (w *Waku) broadcast() {
 		select {
 		case envelope := <-w.sendQueue:
 			var err error
+			var bytes []byte
 			if w.settings.LightClient {
 				w.logger.Info("publishing message via lightpush", zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", envelope.PubsubTopic()), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().Timestamp))
 				_, err = w.node.Lightpush().PublishToTopic(context.Background(), envelope.Message(), envelope.PubsubTopic())
 			} else {
-				w.logger.Info("publishing message via relay", zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", envelope.PubsubTopic()), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().Timestamp))
+				bytes, err = proto.Marshal(envelope.Message())
+				if err != nil {
+					w.logger.Error("could not marshal msg")
+				}
+				messageSize := len(bytes)
+
+				w.logger.Info("publishing message via relay", zap.Int("messageSizeInBytes", messageSize), zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", envelope.PubsubTopic()), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().Timestamp))
 				_, err = w.node.Relay().PublishToTopic(context.Background(), envelope.Message(), envelope.PubsubTopic())
 			}
 

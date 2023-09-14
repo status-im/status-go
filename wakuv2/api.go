@@ -29,6 +29,7 @@ import (
 	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/wakuv2/common"
@@ -255,7 +256,12 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		Ephemeral:    req.Ephemeral,
 	}
 
-	env := protocol.NewEnvelope(wakuMsg, time.Now().UnixNano(), req.PubsubTopic)
+	pubsubTopic := req.PubsubTopic
+	if pubsubTopic == "" {
+		pubsubTopic = relay.DefaultWakuTopic
+	}
+
+	env := protocol.NewEnvelope(wakuMsg, time.Now().UnixNano(), pubsubTopic)
 	messageType := ""
 	ctxMessageType := ctx.Value("messageType")
 	if ctxMessageType == nil {
