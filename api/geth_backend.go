@@ -617,7 +617,11 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		return err
 	}
 
-	err = b.loadNodeConfig(nil)
+	defaultCfg := &params.NodeConfig{
+		// why we need this? relate PR: https://github.com/status-im/status-go/pull/4014
+		KeycardPairingDataFile: defaultKeycardPairingDataFile,
+	}
+	err = b.loadNodeConfig(defaultCfg)
 	if err != nil {
 		return err
 	}

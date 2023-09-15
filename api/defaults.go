@@ -22,6 +22,7 @@ const pathDefaultWallet = pathWalletRoot + "/0"
 const defaultMnemonicLength = 12
 const walletAccountDefaultName = "Ethereum account"
 const keystoreRelativePath = "keystore"
+const defaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
 
@@ -96,7 +97,7 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 	nodeConfig.LogDir = request.LogFilePath
 	nodeConfig.LogLevel = "ERROR"
 	nodeConfig.DataDir = "/ethereum/mainnet_rpc"
-	nodeConfig.KeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.json"
+	nodeConfig.KeycardPairingDataFile = defaultKeycardPairingDataFile
 
 	if request.LogLevel != nil {
 		nodeConfig.LogLevel = *request.LogLevel
