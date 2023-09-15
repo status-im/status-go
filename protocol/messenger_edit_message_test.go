@@ -367,10 +367,10 @@ func (s *MessengerEditMessageSuite) TestEditMessageWithMention() {
 	s.Require().NoError(err)
 	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages(), 1)
-	// Make sure there is no mention at first
-	s.Require().Equal(int(response.Chats()[0].UnviewedMessagesCount), 1)
-	s.Require().Equal(int(response.Chats()[0].UnviewedMentionsCount), 0)
+	// Make sure the message is not marked as Mentioned (chat still counts it because it's 1-1)
 	s.Require().False(response.Messages()[0].Mentioned)
+	s.Require().Equal(int(response.Chats()[0].UnviewedMessagesCount), 1)
+	s.Require().Equal(int(response.Chats()[0].UnviewedMentionsCount), 1)
 
 	ogMessage := sendResponse.Messages()[0]
 
@@ -407,9 +407,9 @@ func (s *MessengerEditMessageSuite) TestEditMessageWithMention() {
 	s.Require().NotEmpty(response.Messages()[0].EditedAt)
 	s.Require().False(response.Messages()[0].New)
 	// Receiver (us) is now mentioned
+	s.Require().True(response.Messages()[0].Mentioned)
 	s.Require().Equal(int(response.Chats()[0].UnviewedMessagesCount), 1)
 	s.Require().Equal(int(response.Chats()[0].UnviewedMentionsCount), 1)
-	s.Require().True(response.Messages()[0].Mentioned)
 
 	// Edit the message again but remove the mention
 	editedText = "edited text no mention"
@@ -441,9 +441,9 @@ func (s *MessengerEditMessageSuite) TestEditMessageWithMention() {
 	s.Require().NotEmpty(response.Messages()[0].EditedAt)
 	s.Require().False(response.Messages()[0].New)
 	// Receiver (us) is no longer mentioned
-	s.Require().Equal(int(response.Chats()[0].UnviewedMessagesCount), 1) // We still have an unread message though
-	s.Require().Equal(int(response.Chats()[0].UnviewedMentionsCount), 0)
 	s.Require().False(response.Messages()[0].Mentioned)
+	s.Require().Equal(int(response.Chats()[0].UnviewedMessagesCount), 1) // We still have an unread message though
+	s.Require().Equal(int(response.Chats()[0].UnviewedMentionsCount), 1)
 }
 
 func (s *MessengerEditMessageSuite) TestEditMessageWithLinkPreviews() {
