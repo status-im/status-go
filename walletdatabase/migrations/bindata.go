@@ -3,6 +3,7 @@
 // 1691753758_initial.up.sql (5.738kB)
 // 1692701329_add_collectibles_and_collections_data_cache.up.sql (1.808kB)
 // 1692701339_add_scope_to_pending.up.sql (576B)
+// 1694540071_add_collectibles_ownership_update_timestamp.up.sql (349B)
 // doc.go (74B)
 
 package migrations
@@ -132,6 +133,26 @@ func _1692701339_add_scope_to_pendingUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1694540071_add_collectibles_ownership_update_timestampUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x9c\xcf\x41\x4b\x80\x30\x18\xc6\xf1\xfb\x3e\xc5\x7b\x4c\xf0\x1b\x78\x9a\xba\x6c\x20\xaf\xa4\x5b\x78\x1b\xcb\xbd\xe1\x40\xa7\xb8\x45\xf8\xed\x03\x09\xa1\xa0\x43\xdd\xff\x3c\x3c\xbf\xaa\x17\x5c\x09\x50\xbc\x6c\x05\xc8\x47\xc0\x4e\x81\x18\xe5\xa0\x06\x98\xb6\x65\xa1\x29\xf9\xd7\x85\xa2\xd9\x3e\x02\x1d\x71\xf6\xbb\x79\xdf\x9d\x4d\x64\x92\x5f\x29\x26\xbb\xee\x11\x1e\x18\x00\xc0\x55\x18\xeb\xdc\x41\x31\xc2\x0b\xef\xab\x27\xde\x5f\x7b\xa8\xdb\x36\xbf\x9a\x69\xb6\x3e\x18\xef\x40\xe3\x20\x1b\x14\x35\x94\xb2\x91\xa8\x7e\x64\xf7\xf6\xaf\x1d\xcb\x0a\xc6\xbe\xbe\x6b\x94\xcf\x5a\x80\xc4\x5a\x8c\xff\x24\x18\xef\x28\x24\xff\x76\x1a\x0a\xe9\x38\xa1\xc3\x3f\xe8\xbf\xc1\xf3\xdb\x98\x15\xec\x33\x00\x00\xff\xff\x02\x64\xbc\xba\x5d\x01\x00\x00")
+
+func _1694540071_add_collectibles_ownership_update_timestampUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1694540071_add_collectibles_ownership_update_timestampUpSql,
+		"1694540071_add_collectibles_ownership_update_timestamp.up.sql",
+	)
+}
+
+func _1694540071_add_collectibles_ownership_update_timestampUpSql() (*asset, error) {
+	bytes, err := _1694540071_add_collectibles_ownership_update_timestampUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1694540071_add_collectibles_ownership_update_timestamp.up.sql", size: 349, mode: os.FileMode(0644), modTime: time.Unix(1694818708, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7f, 0x45, 0xc7, 0xce, 0x79, 0x63, 0xbc, 0x6f, 0x83, 0x5f, 0xe2, 0x3, 0x56, 0xcc, 0x5, 0x2f, 0x85, 0xda, 0x7e, 0xea, 0xf5, 0xd2, 0xac, 0x19, 0xd4, 0xd8, 0x5e, 0xdd, 0xed, 0xe2, 0xa9, 0x97}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xc9\xb1\x0d\xc4\x20\x0c\x05\xd0\x9e\x29\xfe\x02\xd8\xfd\x6d\xe3\x4b\xac\x2f\x44\x82\x09\x78\x7f\xa5\x49\xfd\xa6\x1d\xdd\xe8\xd8\xcf\x55\x8a\x2a\xe3\x47\x1f\xbe\x2c\x1d\x8c\xfa\x6f\xe3\xb4\x34\xd4\xd9\x89\xbb\x71\x59\xb6\x18\x1b\x35\x20\xa2\x9f\x0a\x03\xa2\xe5\x0d\x00\x00\xff\xff\x60\xcd\x06\xbe\x4a\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -249,6 +270,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1692701339_add_scope_to_pending.up.sql": _1692701339_add_scope_to_pendingUpSql,
 
+	"1694540071_add_collectibles_ownership_update_timestamp.up.sql": _1694540071_add_collectibles_ownership_update_timestampUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -296,7 +319,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1691753758_initial.up.sql":                                     &bintree{_1691753758_initialUpSql, map[string]*bintree{}},
 	"1692701329_add_collectibles_and_collections_data_cache.up.sql": &bintree{_1692701329_add_collectibles_and_collections_data_cacheUpSql, map[string]*bintree{}},
 	"1692701339_add_scope_to_pending.up.sql":                        &bintree{_1692701339_add_scope_to_pendingUpSql, map[string]*bintree{}},
-	"doc.go":                                                        &bintree{docGo, map[string]*bintree{}},
+	"1694540071_add_collectibles_ownership_update_timestamp.up.sql": &bintree{_1694540071_add_collectibles_ownership_update_timestampUpSql, map[string]*bintree{}},
+	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
