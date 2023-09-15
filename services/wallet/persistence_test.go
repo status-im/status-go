@@ -6,12 +6,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/protocol/sqlite"
 )
 
 func TestSaveTokens(t *testing.T) {
-	db, err := sqlite.Open(sqlite.InMemoryPath, "", 1)
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+
 	require.NoError(t, err)
 	require.NotNil(t, db)
 
@@ -39,15 +42,17 @@ func TestSaveTokens(t *testing.T) {
 	}
 
 	token1.BalancesPerChain[chain1] = ChainBalance{
-		Balance: big.NewFloat(0.1),
-		Address: tokenAddress1,
-		ChainID: chain1,
+		RawBalance: "1",
+		Balance:    big.NewFloat(0.1),
+		Address:    tokenAddress1,
+		ChainID:    chain1,
 	}
 
 	token1.BalancesPerChain[chain2] = ChainBalance{
-		Balance: big.NewFloat(0.2),
-		Address: tokenAddress2,
-		ChainID: chain2,
+		RawBalance: "2",
+		Balance:    big.NewFloat(0.2),
+		Address:    tokenAddress2,
+		ChainID:    chain2,
 	}
 
 	token2 := Token{
@@ -61,9 +66,10 @@ func TestSaveTokens(t *testing.T) {
 	}
 
 	token2.BalancesPerChain[chain1] = ChainBalance{
-		Balance: big.NewFloat(0.3),
-		Address: tokenAddress1,
-		ChainID: chain1,
+		RawBalance: "3",
+		Balance:    big.NewFloat(0.3),
+		Address:    tokenAddress1,
+		ChainID:    chain1,
 	}
 
 	token3 := Token{
@@ -77,9 +83,10 @@ func TestSaveTokens(t *testing.T) {
 	}
 
 	token3.BalancesPerChain[chain1] = ChainBalance{
-		Balance: big.NewFloat(0.4),
-		Address: tokenAddress1,
-		ChainID: chain1,
+		RawBalance: "4",
+		Balance:    big.NewFloat(0.4),
+		Address:    tokenAddress1,
+		ChainID:    chain1,
 	}
 
 	tokens[address1] = []Token{token1, token2}
@@ -116,11 +123,13 @@ func TestSaveTokens(t *testing.T) {
 	require.Equal(t, actualToken1.Description, token1.Description)
 	require.Equal(t, actualToken1.AssetWebsiteURL, token1.AssetWebsiteURL)
 
+	require.Equal(t, actualToken1.BalancesPerChain[chain1].RawBalance, "1")
 	require.NotNil(t, actualToken1.BalancesPerChain[chain1].Balance)
 	require.Equal(t, actualToken1.BalancesPerChain[chain1].Balance.String(), "0.1")
 	require.Equal(t, actualToken1.BalancesPerChain[chain1].Address, tokenAddress1)
 	require.Equal(t, actualToken1.BalancesPerChain[chain1].ChainID, chain1)
 
+	require.Equal(t, actualToken1.BalancesPerChain[chain2].RawBalance, "2")
 	require.NotNil(t, actualToken1.BalancesPerChain[chain2].Balance)
 	require.Equal(t, actualToken1.BalancesPerChain[chain2].Balance.String(), "0.2")
 	require.Equal(t, actualToken1.BalancesPerChain[chain2].Address, tokenAddress2)
@@ -133,6 +142,7 @@ func TestSaveTokens(t *testing.T) {
 	require.Equal(t, actualToken2.Description, token2.Description)
 	require.Equal(t, actualToken2.AssetWebsiteURL, token2.AssetWebsiteURL)
 
+	require.Equal(t, actualToken2.BalancesPerChain[chain1].RawBalance, "3")
 	require.NotNil(t, actualToken2.BalancesPerChain[chain1].Balance)
 	require.Equal(t, actualToken2.BalancesPerChain[chain1].Balance.String(), "0.3")
 	require.Equal(t, actualToken2.BalancesPerChain[chain1].Address, tokenAddress1)
@@ -145,6 +155,7 @@ func TestSaveTokens(t *testing.T) {
 	require.Equal(t, actualToken3.Description, token3.Description)
 	require.Equal(t, actualToken3.AssetWebsiteURL, token3.AssetWebsiteURL)
 
+	require.Equal(t, actualToken3.BalancesPerChain[chain1].RawBalance, "4")
 	require.NotNil(t, actualToken3.BalancesPerChain[chain1].Balance)
 	require.Equal(t, actualToken3.BalancesPerChain[chain1].Balance.String(), "0.4")
 	require.Equal(t, actualToken3.BalancesPerChain[chain1].Address, tokenAddress1)

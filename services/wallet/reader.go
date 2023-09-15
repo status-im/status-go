@@ -72,10 +72,11 @@ type TokenMarketValues struct {
 }
 
 type ChainBalance struct {
-	Balance  *big.Float     `json:"balance"`
-	Address  common.Address `json:"address"`
-	ChainID  uint64         `json:"chainId"`
-	HasError bool           `json:"hasError"`
+	RawBalance string         `json:"rawBalance"`
+	Balance    *big.Float     `json:"balance"`
+	Address    common.Address `json:"address"`
+	ChainID    uint64         `json:"chainId"`
+	HasError   bool           `json:"hasError"`
 }
 
 type Token struct {
@@ -242,10 +243,11 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 						anyPositiveBalance = balance.Cmp(big.NewFloat(0.0)) > 0
 					}
 					balancesPerChain[token.ChainID] = ChainBalance{
-						Balance:  balance,
-						Address:  token.Address,
-						ChainID:  token.ChainID,
-						HasError: hasError,
+						RawBalance: hexBalance.ToInt().String(),
+						Balance:    balance,
+						Address:    token.Address,
+						ChainID:    token.ChainID,
+						HasError:   hasError,
 					}
 				}
 

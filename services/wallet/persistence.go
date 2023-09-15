@@ -36,7 +36,7 @@ func (p *Persistence) SaveTokens(tokens map[common.Address][]Token) (err error) 
 				if b.HasError || b.Balance.Cmp(big.NewFloat(0)) == 0 {
 					continue
 				}
-				_, err = tx.Exec(`INSERT INTO token_balances(user_address,token_name,token_symbol,token_address,token_color,token_decimals,token_description,token_url,balance,chain_id) VALUES (?,?,?,?,?,?,?,?,?,?)`, address.Hex(), t.Name, t.Symbol, b.Address.Hex(), t.Color, t.Decimals, t.Description, t.AssetWebsiteURL, b.Balance.String(), chainID)
+				_, err = tx.Exec(`INSERT INTO token_balances(user_address,token_name,token_symbol,token_address,token_color,token_decimals,token_description,token_url,balance,raw_balance,chain_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)`, address.Hex(), t.Name, t.Symbol, b.Address.Hex(), t.Color, t.Decimals, t.Description, t.AssetWebsiteURL, b.Balance.String(), b.RawBalance, chainID)
 				if err != nil {
 					return err
 				}
@@ -49,7 +49,7 @@ func (p *Persistence) SaveTokens(tokens map[common.Address][]Token) (err error) 
 }
 
 func (p *Persistence) GetTokens() (map[common.Address][]Token, error) {
-	rows, err := p.db.Query(`SELECT user_address, token_name, token_symbol, token_address, token_color, token_decimals, token_description, token_url, balance, chain_id FROM token_balances `)
+	rows, err := p.db.Query(`SELECT user_address, token_name, token_symbol, token_address, token_color, token_decimals, token_description, token_url, balance, raw_balance, chain_id FROM token_balances `)
 	if err != nil {
 		return nil, err
 	}
@@ -59,11 +59,11 @@ func (p *Persistence) GetTokens() (map[common.Address][]Token, error) {
 	acc := make(map[common.Address]map[string]Token)
 
 	for rows.Next() {
-		var addressStr, balance, tokenAddress string
+		var addressStr, balance, rawBalance, tokenAddress string
 		token := Token{}
 		var chainID uint64
 
-		err := rows.Scan(&addressStr, &token.Name, &token.Symbol, &tokenAddress, &token.Color, &token.Decimals, &token.Description, &token.AssetWebsiteURL, &balance, &chainID)
+		err := rows.Scan(&addressStr, &token.Name, &token.Symbol, &tokenAddress, &token.Color, &token.Decimals, &token.Description, &token.AssetWebsiteURL, &balance, &rawBalance, &chainID)
 		if err != nil {
 			return nil, err
 		}
@@ -88,9 +88,10 @@ func (p *Persistence) GetTokens() (map[common.Address][]Token, error) {
 		}
 
 		tokenAcc.BalancesPerChain[chainID] = ChainBalance{
-			Balance: balanceFloat,
-			Address: common.HexToAddress(tokenAddress),
-			ChainID: chainID,
+			RawBalance: rawBalance,
+			Balance:    balanceFloat,
+			Address:    common.HexToAddress(tokenAddress),
+			ChainID:    chainID,
 		}
 	}
 
