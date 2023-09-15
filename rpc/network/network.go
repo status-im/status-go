@@ -13,7 +13,7 @@ type CombinedNetwork struct {
 	Test *params.Network
 }
 
-const baseQuery = "SELECT chain_id, chain_name, rpc_url, fallback_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name, related_chain_id FROM networks"
+const baseQuery = "SELECT chain_id, chain_name, rpc_url, original_rpc_url, fallback_url, original_fallback_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name, related_chain_id FROM networks"
 
 func newNetworksQuery() *networksQuery {
 	buf := bytes.NewBuffer(nil)
@@ -51,7 +51,7 @@ func (nq *networksQuery) filterChainID(chainID uint64) *networksQuery {
 	return nq
 }
 
-func (nq *networksQuery) exec(db *sql.DB, configuredNetworks []params.Network) ([]*params.Network, error) {
+func (nq *networksQuery) exec(db *sql.DB) ([]*params.Network, error) {
 	rows, err := db.Query(nq.buf.String(), nq.args...)
 	if err != nil {
 		return nil, err
@@ -61,8 +61,8 @@ func (nq *networksQuery) exec(db *sql.DB, configuredNetworks []params.Network) (
 	for rows.Next() {
 		network := params.Network{}
 		err := rows.Scan(
-			&network.ChainID, &network.ChainName, &network.RPCURL, &network.FallbackURL, &network.BlockExplorerURL, &network.IconURL,
-			&network.NativeCurrencyName, &network.NativeCurrencySymbol,
+			&network.ChainID, &network.ChainName, &network.RPCURL, &network.OriginalRPCURL, &network.FallbackURL, &network.OriginalFallbackURL,
+			&network.BlockExplorerURL, &network.IconURL, &network.NativeCurrencyName, &network.NativeCurrencySymbol,
 			&network.NativeCurrencyDecimals, &network.IsTest, &network.Layer, &network.Enabled, &network.ChainColor, &network.ShortName,
 			&network.RelatedChainID,
 		)
@@ -70,25 +70,6 @@ func (nq *networksQuery) exec(db *sql.DB, configuredNetworks []params.Network) (
 			return nil, err
 		}
 
-		for _, configuredNetwork := range configuredNetworks {
-			if configuredNetwork.ChainID == network.ChainID {
-				if network.RPCURL == "" {
-					network.RPCURL = configuredNetwork.RPCURL
-				}
-				network.OriginalRPCURL = configuredNetwork.RPCURL
-				break
-			}
-		}
-
-		for _, configuredNetwork := range configuredNetworks {
-			if configuredNetwork.ChainID == network.ChainID {
-				if network.FallbackURL == "" {
-					network.FallbackURL = configuredNetwork.FallbackURL
-				}
-				network.OriginalFallbackURL = configuredNetwork.FallbackURL
-				break
-			}
-		}
 		res = append(res, &network)
 	}
 
@@ -147,6 +128,10 @@ func (nm *Manager) Init(networks []params.Network) error {
 						errors += fmt.Sprintf("error updating network fallback_url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
 					}
 				}
+				err := nm.UpdateOriginalURL(currentNetworks[j].ChainID, networks[i].RPCURL, networks[i].FallbackURL)
+				if err != nil {
+					errors += fmt.Sprintf("error updating network original url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
+				}
 				break
 			}
 		}
@@ -168,22 +153,9 @@ func (nm *Manager) Init(networks []params.Network) error {
 }
 
 func (nm *Manager) Upsert(network *params.Network) error {
-	rpcURL := network.RPCURL
-	fallbackURL := network.FallbackURL
-	for _, n := range nm.configuredNetworks {
-		if n.ChainID == network.ChainID {
-			if rpcURL == n.RPCURL {
-				rpcURL = ""
-			}
-			if fallbackURL == n.FallbackURL {
-				fallbackURL = ""
-			}
-			break
-		}
-	}
 	_, err := nm.db.Exec(
-		"INSERT OR REPLACE INTO networks (chain_id, chain_name, rpc_url, fallback_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name, related_chain_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		network.ChainID, network.ChainName, rpcURL, fallbackURL, network.BlockExplorerURL, network.IconURL,
+		"INSERT OR REPLACE INTO networks (chain_id, chain_name, rpc_url, original_rpc_url, fallback_url, original_fallback_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name, related_chain_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		network.ChainID, network.ChainName, network.RPCURL, network.OriginalRPCURL, network.FallbackURL, network.OriginalFallbackURL, network.BlockExplorerURL, network.IconURL,
 		network.NativeCurrencyName, network.NativeCurrencySymbol, network.NativeCurrencyDecimals,
 		network.IsTest, network.Layer, network.Enabled, network.ChainColor, network.ShortName,
 		network.RelatedChainID,
@@ -201,8 +173,13 @@ func (nm *Manager) UpdateRelatedChainID(chainID uint64, relatedChainID uint64) e
 	return err
 }
 
+func (nm *Manager) UpdateOriginalURL(chainID uint64, originalRPCURL, OriginalFallbackURL string) error {
+	_, err := nm.db.Exec(`UPDATE networks SET original_rpc_url = ?, original_fallback_url = ?  WHERE chain_id = ?`, originalRPCURL, OriginalFallbackURL, chainID)
+	return err
+}
+
 func (nm *Manager) Find(chainID uint64) *params.Network {
-	networks, err := newNetworksQuery().filterChainID(chainID).exec(nm.db, nm.configuredNetworks)
+	networks, err := newNetworksQuery().filterChainID(chainID).exec(nm.db)
 	if len(networks) != 1 || err != nil {
 		return nil
 	}
@@ -215,12 +192,12 @@ func (nm *Manager) Get(onlyEnabled bool) ([]*params.Network, error) {
 		query.filterEnabled(true)
 	}
 
-	return query.exec(nm.db, nm.configuredNetworks)
+	return query.exec(nm.db)
 }
 
 func (nm *Manager) GetCombinedNetworks() ([]*CombinedNetwork, error) {
 	query := newNetworksQuery()
-	networks, err := query.exec(nm.db, nm.configuredNetworks)
+	networks, err := query.exec(nm.db)
 	if err != nil {
 		return nil, err
 	}
