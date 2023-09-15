@@ -591,32 +591,21 @@ func (p *Persistence) GetRequestToJoinRevealedAddresses(requestID []byte) ([]*pr
 	defer rows.Close()
 
 	for rows.Next() {
-		address := ""
-		chainIDsStr := ""
+		var address sql.NullString
+		var chainIDsStr sql.NullString
 		var isAirdropAddress sql.NullBool
 		err := rows.Scan(&address, &chainIDsStr, &isAirdropAddress)
 		if err != nil {
 			return nil, err
 		}
 
-		chainIDs := make([]uint64, 0)
-		for _, chainIDstr := range strings.Split(chainIDsStr, ",") {
-			if chainIDstr != "" {
-				chainID, err := strconv.Atoi(chainIDstr)
-				if err != nil {
-					return nil, err
-				}
-				chainIDs = append(chainIDs, uint64(chainID))
-			}
+		revealedAccount, err := toRevealedAccount(address, chainIDsStr, isAirdropAddress)
+		if err != nil {
+			return nil, err
 		}
 
-		revealedAccount := &protobuf.RevealedAccount{
-			Address:          address,
-			ChainIds:         chainIDs,
-			IsAirdropAddress: false,
-		}
-		if isAirdropAddress.Valid {
-			revealedAccount.IsAirdropAddress = isAirdropAddress.Bool
+		if revealedAccount == nil {
+			return nil, errors.New("invalid RequestToJoin RevealedAddresses data")
 		}
 		revealedAccounts = append(revealedAccounts, revealedAccount)
 	}
@@ -1329,9 +1318,10 @@ func decodeEventsData(eventsBytes []byte, eventsDescriptionBytes []byte) (*Event
 func (p *Persistence) GetCommunityRequestsToJoinWithRevealedAddresses(communityID []byte) ([]*RequestToJoin, error) {
 	requests := []*RequestToJoin{}
 	rows, err := p.db.Query(`
-	SELECT id, public_key, clock, ens_name, chat_id, state
-	FROM communities_requests_to_join
-	WHERE req.community_id = ?`, communityID)
+	SELECT r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.state, r.community_id, a.address, a.chain_ids, a.is_airdrop_address
+	FROM communities_requests_to_join r
+	LEFT JOIN communities_requests_to_join_revealed_addresses a ON r.id = a.request_id
+	WHERE community_id = ?`, communityID)
 
 	if err != nil {
 		return nil, err
@@ -1339,22 +1329,75 @@ func (p *Persistence) GetCommunityRequestsToJoinWithRevealedAddresses(communityI
 
 	defer rows.Close()
 
+	prevRequest := &RequestToJoin{}
 	for rows.Next() {
 		request := &RequestToJoin{}
-		err = rows.Scan(&request.ID, &request.PublicKey, &request.Clock, &request.ENSName, &request.ChatID, &request.State)
+		var address sql.NullString
+		var chainIDsStr sql.NullString
+		var isAirdropAddress sql.NullBool
+
+		err = rows.Scan(&request.ID, &request.PublicKey, &request.Clock, &request.ENSName, &request.ChatID, &request.State, &request.CommunityID,
+			&address, &chainIDsStr, &isAirdropAddress)
 		if err != nil {
 			return nil, err
 		}
 
-		revealedAccounts, err := p.GetRequestToJoinRevealedAddresses(request.ID)
+		revealedAccount, err := toRevealedAccount(address, chainIDsStr, isAirdropAddress)
 		if err != nil {
 			return nil, err
 		}
 
-		request.RevealedAccounts = revealedAccounts
-
-		requests = append(requests, request)
+		if types.EncodeHex(prevRequest.ID) == types.EncodeHex(request.ID) {
+			if revealedAccount != nil {
+				prevRequest.RevealedAccounts = append(prevRequest.RevealedAccounts, revealedAccount)
+			}
+		} else {
+			if revealedAccount != nil {
+				request.RevealedAccounts = []*protobuf.RevealedAccount{
+					revealedAccount,
+				}
+			}
+			requests = append(requests, request)
+			prevRequest = request
+		}
 	}
 
 	return requests, nil
+}
+
+func toRevealedAccount(rawAddress sql.NullString, rawChainIDsStr sql.NullString, isAirdropAddress sql.NullBool) (*protobuf.RevealedAccount, error) {
+	if !rawAddress.Valid {
+		return nil, nil
+	}
+
+	address := rawAddress.String
+	if address == "" {
+		return nil, nil
+	}
+
+	chainIDsStr := ""
+	if rawChainIDsStr.Valid {
+		chainIDsStr = rawChainIDsStr.String
+	}
+
+	chainIDs := make([]uint64, 0)
+	for _, chainIDstr := range strings.Split(chainIDsStr, ",") {
+		if chainIDstr != "" {
+			chainID, err := strconv.Atoi(chainIDstr)
+			if err != nil {
+				return nil, err
+			}
+			chainIDs = append(chainIDs, uint64(chainID))
+		}
+	}
+
+	revealedAccount := &protobuf.RevealedAccount{
+		Address:          address,
+		ChainIds:         chainIDs,
+		IsAirdropAddress: false,
+	}
+	if isAirdropAddress.Valid {
+		revealedAccount.IsAirdropAddress = isAirdropAddress.Bool
+	}
+	return revealedAccount, nil
 }

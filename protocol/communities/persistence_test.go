@@ -509,3 +509,121 @@ func (s *PersistenceSuite) TestSaveCheckChannelPermissionResponse() {
 	s.Require().Equal(responses[chatID].ViewAndPostPermissions.Permissions["one"].Criteria, []bool{true, true, true, true})
 	s.Require().Equal(responses[chatID].ViewAndPostPermissions.Permissions["two"].Criteria, []bool{false})
 }
+
+func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses() {
+	identity, err := crypto.GenerateKey()
+	s.NoError(err, "crypto.GenerateKey shouldn't give any error")
+
+	clock := uint64(time.Now().Unix())
+	communityID := types.HexBytes{7, 7, 7, 7, 7, 7, 7, 7}
+	revealedAddresses := []string{"address1", "address2", "address3"}
+	chainIds := []uint64{1, 2}
+
+	// No data in database
+	rtjResult, err := s.db.GetCommunityRequestsToJoinWithRevealedAddresses(communityID)
+	s.NoError(err, "GetCommunityRequestsToJoinWithRevealedAddresses shouldn't give any error")
+	s.Require().Len(rtjResult, 0)
+
+	// RTJ with 2 revealed Addresses
+	expectedRtj1 := &RequestToJoin{
+		ID:          types.HexBytes{1, 2, 3, 4, 5, 6, 7, 8},
+		PublicKey:   common.PubkeyToHex(&identity.PublicKey),
+		Clock:       clock,
+		CommunityID: communityID,
+		State:       RequestToJoinStateAccepted,
+		RevealedAccounts: []*protobuf.RevealedAccount{
+			{
+				Address: revealedAddresses[0],
+			},
+			{
+				Address: revealedAddresses[1],
+			},
+		},
+	}
+	err = s.db.SaveRequestToJoin(expectedRtj1)
+	s.NoError(err, "SaveRequestToJoin shouldn't give any error")
+
+	err = s.db.SaveRequestToJoinRevealedAddresses(expectedRtj1.ID, expectedRtj1.RevealedAccounts)
+	s.NoError(err, "SaveRequestToJoinRevealedAddresses shouldn't give any error")
+
+	rtjResult, err = s.db.GetCommunityRequestsToJoinWithRevealedAddresses(communityID)
+	s.NoError(err, "GetCommunityRequestsToJoinWithRevealedAddresses shouldn't give any error")
+	s.Require().Len(rtjResult, 1)
+	s.Require().Equal(expectedRtj1.ID, rtjResult[0].ID)
+	s.Require().Equal(expectedRtj1.PublicKey, rtjResult[0].PublicKey)
+	s.Require().Equal(expectedRtj1.Clock, rtjResult[0].Clock)
+	s.Require().Equal(expectedRtj1.CommunityID, rtjResult[0].CommunityID)
+	s.Require().Len(rtjResult[0].RevealedAccounts, 2)
+
+	for index, account := range rtjResult[0].RevealedAccounts {
+		s.Require().Equal(revealedAddresses[index], account.Address)
+	}
+
+	// RTJ with 1 revealed Address, ChainIds and IsAirdropAddress
+	expectedRtj2 := &RequestToJoin{
+		ID:          types.HexBytes{8, 7, 6, 5, 4, 3, 2, 1},
+		PublicKey:   common.PubkeyToHex(&identity.PublicKey),
+		Clock:       clock,
+		CommunityID: communityID,
+		State:       RequestToJoinStateAccepted,
+		RevealedAccounts: []*protobuf.RevealedAccount{
+			{
+				Address:          revealedAddresses[2],
+				ChainIds:         chainIds,
+				IsAirdropAddress: true,
+			},
+		},
+	}
+	err = s.db.SaveRequestToJoin(expectedRtj2)
+	s.NoError(err, "SaveRequestToJoin shouldn't give any error")
+
+	err = s.db.SaveRequestToJoinRevealedAddresses(expectedRtj2.ID, expectedRtj2.RevealedAccounts)
+	s.NoError(err, "SaveRequestToJoinRevealedAddresses shouldn't give any error")
+
+	rtjResult, err = s.db.GetCommunityRequestsToJoinWithRevealedAddresses(communityID)
+	s.NoError(err, "GetCommunityRequestsToJoinWithRevealedAddresses shouldn't give any error")
+	s.Require().Len(rtjResult, 2)
+
+	s.Require().Len(rtjResult[1].RevealedAccounts, 1)
+	s.Require().Equal(revealedAddresses[2], rtjResult[1].RevealedAccounts[0].Address)
+	s.Require().Equal(chainIds, rtjResult[1].RevealedAccounts[0].ChainIds)
+	s.Require().Equal(true, rtjResult[1].RevealedAccounts[0].IsAirdropAddress)
+
+	// RTJ without RevealedAccounts
+	expectedRtjWithoutRevealedAccounts := &RequestToJoin{
+		ID:          types.HexBytes{1, 6, 6, 6, 6, 6, 6, 6},
+		PublicKey:   common.PubkeyToHex(&identity.PublicKey),
+		Clock:       clock,
+		CommunityID: communityID,
+		State:       RequestToJoinStateAccepted,
+	}
+	err = s.db.SaveRequestToJoin(expectedRtjWithoutRevealedAccounts)
+	s.NoError(err, "SaveRequestToJoin shouldn't give any error")
+
+	rtjResult, err = s.db.GetCommunityRequestsToJoinWithRevealedAddresses(communityID)
+	s.NoError(err, "GetCommunityRequestsToJoinWithRevealedAddresses shouldn't give any error")
+	s.Require().Len(rtjResult, 3)
+
+	s.Require().Len(rtjResult[2].RevealedAccounts, 0)
+
+	// RTJ with RevealedAccount but with empty Address
+	expectedRtjWithEmptyAddress := &RequestToJoin{
+		ID:          types.HexBytes{2, 6, 6, 6, 6, 6, 6, 6},
+		PublicKey:   common.PubkeyToHex(&identity.PublicKey),
+		Clock:       clock,
+		CommunityID: communityID,
+		State:       RequestToJoinStateAccepted,
+		RevealedAccounts: []*protobuf.RevealedAccount{
+			{
+				Address: "",
+			},
+		},
+	}
+	err = s.db.SaveRequestToJoin(expectedRtjWithEmptyAddress)
+	s.NoError(err, "SaveRequestToJoin shouldn't give any error")
+
+	rtjResult, err = s.db.GetCommunityRequestsToJoinWithRevealedAddresses(communityID)
+	s.NoError(err, "GetCommunityRequestsToJoinWithRevealedAddresses shouldn't give any error")
+	s.Require().Len(rtjResult, 4)
+	s.Require().Len(rtjResult[3].RevealedAccounts, 0)
+}
