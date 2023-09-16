@@ -31,7 +31,7 @@ message SyncSetting {
     DISPLAY_NAME = 13;
     BIO = 14;
     MNEMONIC_REMOVED = 15;
-    ENS_USERNAMES = 16;
+    reserved 16; //do not use this value anymore as it was removed
     INCLUDE_WATCHONLY_ACCOUNT = 17;
   }
 }

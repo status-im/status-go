@@ -255,9 +255,7 @@ var (
 	PreferredName = SettingField{
 		reactFieldName: "preferred-name",
 		dBColumnName:   "preferred_name",
-		// TODO resolve issue 9 https://github.com/status-im/status-mobile/pull/13053#issuecomment-1075336559
 		syncProtobufFactory: &SyncProtobufFactory{
-			inactive:          true, // Remove after issue is resolved
 			fromInterface:     preferredNameProtobufFactory,
 			fromStruct:        preferredNameProtobufFactoryStruct,
 			valueFromProtobuf: StringFromSyncProtobuf,
@@ -399,17 +397,6 @@ var (
 		dBColumnName:   "use_mailservers",
 		valueHandler:   BoolHandler,
 	}
-	Usernames = SettingField{
-		reactFieldName: "usernames",
-		dBColumnName:   "usernames",
-		valueHandler:   JSONBlobHandler,
-		syncProtobufFactory: &SyncProtobufFactory{
-			fromInterface:     usernamesProtobufFactory,
-			fromStruct:        usernamesProtobufFactoryStruct,
-			valueFromProtobuf: BytesFromSyncProtobuf,
-			protobufType:      protobuf.SyncSetting_ENS_USERNAMES,
-		},
-	}
 	WakuBloomFilterMode = SettingField{
 		reactFieldName: "waku-bloom-filter-mode",
 		dBColumnName:   "waku_bloom_filter_mode",
@@ -519,7 +506,6 @@ var (
 		TelemetryServerURL,
 		TestNetworksEnabled,
 		UseMailservers,
-		Usernames,
 		WakuBloomFilterMode,
 		WalletRootAddress,
 		WalletSetUpPassed,

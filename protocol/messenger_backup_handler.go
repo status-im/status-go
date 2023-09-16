@@ -205,12 +205,22 @@ func (m *Messenger) handleBackedUpSettings(message *protobuf.SyncSetting) error 
 		return nil
 	}
 
-	if settingField != nil && m.config.messengerSignalsHandler != nil {
-		response := wakusync.WakuBackedUpDataResponse{
-			Setting: settingField,
+	if settingField != nil {
+		if message.GetType() == protobuf.SyncSetting_PREFERRED_NAME && message.GetValueString() != "" {
+			m.account.Name = message.GetValueString()
+			err = m.multiAccounts.SaveAccount(*m.account)
+			if err != nil {
+				m.logger.Warn("[handleBackedUpSettings] failed to save account", zap.Error(err))
+				return nil
+			}
 		}
 
-		m.config.messengerSignalsHandler.SendWakuBackedUpSettings(&response)
+		if m.config.messengerSignalsHandler != nil {
+			response := wakusync.WakuBackedUpDataResponse{
+				Setting: settingField,
+			}
+			m.config.messengerSignalsHandler.SendWakuBackedUpSettings(&response)
+		}
 	}
 
 	return nil

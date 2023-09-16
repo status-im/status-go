@@ -280,9 +280,7 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 		bob1Bio                       = "bio"
 		bob1Mnemonic                  = ""
 		bob1MnemonicRemoved           = true
-	)
-	var (
-		bob1Usernames = json.RawMessage(`["username1","username2"]`)
+		bob1PreferredName             = "talent"
 	)
 
 	// Create bob1 and set fields which are supposed to be backed up to/fetched from waku
@@ -301,7 +299,7 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	s.Require().NoError(err)
 	err = bob1.settings.SaveSettingField(settings.Mnemonic, bob1Mnemonic)
 	s.Require().NoError(err)
-	err = bob1.settings.SaveSettingField(settings.Usernames, bob1Usernames)
+	err = bob1.settings.SaveSettingField(settings.PreferredName, bob1PreferredName)
 	s.Require().NoError(err)
 
 	// Create bob2
@@ -336,9 +334,9 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	storedMnemonicRemoved, err := bob1.settings.MnemonicRemoved()
 	s.Require().NoError(err)
 	s.Require().Equal(bob1MnemonicRemoved, storedMnemonicRemoved)
-	storedBob1Usernames, err := bob1.settings.Usernames()
-	s.Require().NoError(err)
-	s.Require().Equal(bob1Usernames, *storedBob1Usernames)
+	storedPreferredName, err := bob1.settings.GetPreferredUsername()
+	s.NoError(err)
+	s.Equal(bob1PreferredName, storedPreferredName)
 
 	// Check bob2
 	storedBob2DisplayName, err := bob2.settings.DisplayName()
@@ -362,9 +360,9 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	storedBob2MnemonicRemoved, err := bob2.settings.MnemonicRemoved()
 	s.Require().NoError(err)
 	s.Require().Equal(false, storedBob2MnemonicRemoved)
-	storedBob2Usernames, err := bob2.settings.Usernames()
-	s.Require().NoError(err)
-	s.Require().Nil(storedBob2Usernames)
+	storedBob2PreferredName, err := bob2.settings.GetPreferredUsername()
+	s.NoError(err)
+	s.Equal("", storedBob2PreferredName)
 
 	// Backup
 	clock, err := bob1.BackupData(context.Background())
@@ -402,9 +400,10 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	storedBob2MnemonicRemoved, err = bob2.settings.MnemonicRemoved()
 	s.Require().NoError(err)
 	s.Require().Equal(bob1MnemonicRemoved, storedBob2MnemonicRemoved)
-	storedBob2Usernames, err = bob2.settings.Usernames()
-	s.Require().NoError(err)
-	s.Require().Equal(bob1Usernames, *storedBob2Usernames)
+	storedBob2PreferredName, err = bob2.settings.GetPreferredUsername()
+	s.NoError(err)
+	s.Equal(bob1PreferredName, storedBob2PreferredName)
+	s.Equal(bob1PreferredName, bob2.account.Name)
 
 	lastBackup, err := bob1.lastBackup()
 	s.Require().NoError(err)

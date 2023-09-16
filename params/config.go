@@ -319,6 +319,7 @@ type NodeConfig struct {
 	KeyStoreDir string `validate:"required"`
 
 	// KeycardPairingDataFile is the file where we keep keycard pairings data.
+	// note: this field won't be saved into db, it's local to the device.
 	KeycardPairingDataFile string `validate:"required"`
 
 	// NodeKey is the hex-encoded node ID (private key). Should be a valid secp256k1 private key that will be used for both
