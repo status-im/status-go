@@ -2263,12 +2263,20 @@ func (o *Community) ValidateEvent(event *CommunityEvent, signer *ecdsa.PublicKey
 		return err
 	}
 
-	member := o.getMember(signer)
-	if member == nil {
+	eventSender := o.getMember(signer)
+
+	pk, err := common.HexToPubkey(event.MemberToAction)
+	if err != nil {
+		return err
+	}
+
+	member := o.getMember(pk)
+
+	if eventSender == nil || member == nil {
 		return ErrMemberNotFound
 	}
 
-	if !RolesAuthorizedToPerformEvent(member.Roles, event) {
+	if !RolesAuthorizedToPerformEvent(eventSender.Roles, member.Roles, event) {
 		return ErrNotAuthorized
 	}
 
