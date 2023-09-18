@@ -441,23 +441,40 @@ func (api *PublicAPI) SetCommunityShard(request *requests.SetCommunityShard) (*p
 	return api.service.messenger.SetCommunityShard(request)
 }
 
-// ExportCommunity exports the private key of the community with given ID
+// ExportCommunity exports the private key of the community with given ID.
+// WARNING: this does not include the shard info
+// DEPRECATED
 func (api *PublicAPI) ExportCommunity(id types.HexBytes) (types.HexBytes, error) {
-	key, err := api.service.messenger.ExportCommunity(id)
+	communityInfo, err := api.service.messenger.ExportCommunity(id)
 	if err != nil {
 		return nil, err
 	}
-	return crypto.FromECDSA(key), nil
+
+	return communityInfo.CommunityKey, nil
+}
+
+// ExportCommunity exports the private key of the community, topic and shard with given ID
+func (api *PublicAPI) ExportCommunityWithShard(id types.HexBytes) (*communities.CommunityImportInfo, error) {
+	return api.service.messenger.ExportCommunity(id)
 }
 
 // ImportCommunity imports a community with the given private key in hex
+// WARNING: this does not include shard information
+// DEPRECATED
 func (api *PublicAPI) ImportCommunity(ctx context.Context, hexPrivateKey string) (*protocol.MessengerResponse, error) {
 	// Strip the 0x from the beginning
 	privateKey, err := crypto.HexToECDSA(hexPrivateKey[2:])
 	if err != nil {
 		return nil, err
 	}
-	return api.service.messenger.ImportCommunity(ctx, privateKey)
+	return api.service.messenger.ImportCommunity(ctx, &communities.CommunityImportInfo{
+		CommunityKey: types.HexBytes(crypto.FromECDSA(privateKey)),
+	})
+}
+
+// ImportCommunity imports a community with the given community key, topic and shard information
+func (api *PublicAPI) ImportCommunityWithShard(ctx context.Context, importData *communities.CommunityImportInfo) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ImportCommunity(ctx, importData)
 }
 
 // GetCommunityPublicKeyFromPrivateKey gets the community's public key from its private key
