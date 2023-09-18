@@ -46,11 +46,8 @@ func findServerCert(c *ConnectionParams) (*url.URL, *x509.Certificate, error) {
 	var baseAddress *url.URL
 	var serverCert *x509.Certificate
 	var certErrs error
-	for i := range netIps {
-		u, err := c.URL(i)
-		if err != nil {
-			return nil, nil, err
-		}
+	for _, ip := range netIps {
+		u := c.BuildURL(ip)
 
 		serverCert, err = getServerCert(u)
 		if err != nil {
