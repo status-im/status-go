@@ -1231,7 +1231,16 @@ func (o *Community) Description() *protobuf.CommunityDescription {
 }
 
 func (o *Community) marshaledDescription() ([]byte, error) {
-	return proto.Marshal(o.config.CommunityDescription)
+	// Clear members list for each channel what don't have permissions
+	// TMP: should be fixed in https://github.com/status-im/status-desktop/issues/12188
+	clonedDescritpion := proto.Clone(o.config.CommunityDescription).(*protobuf.CommunityDescription)
+	for chatID, chat := range clonedDescritpion.Chats {
+		if !CheckIfChannelHasAnyPermissions(chatID, clonedDescritpion) {
+			chat.Members = map[string]*protobuf.CommunityMember{}
+		}
+	}
+
+	return proto.Marshal(clonedDescritpion)
 }
 
 func (o *Community) MarshaledDescription() ([]byte, error) {
