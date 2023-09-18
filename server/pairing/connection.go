@@ -236,11 +236,14 @@ func (cp *ConnectionParams) URL(IPIndex int) (*url.URL, error) {
 		return nil, err
 	}
 
-	u := &url.URL{
+	return cp.BuildURL(cp.netIPs[IPIndex]), nil
+}
+
+func (cp *ConnectionParams) BuildURL(ip net.IP) *url.URL {
+	return &url.URL{
 		Scheme: "https",
-		Host:   fmt.Sprintf("%s:%d", cp.netIPs[IPIndex], cp.port),
+		Host:   fmt.Sprintf("%s:%d", ip, cp.port),
 	}
-	return u, nil
 }
 
 func ValidateConnectionString(cs string) error {
