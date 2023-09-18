@@ -3090,6 +3090,21 @@ func (m *Messenger) enableHistoryArchivesImportAfterDelay() {
 	}()
 }
 
+func (m *Messenger) checkIfIMemberOfCommunity(communityID types.HexBytes) error {
+	community, err := m.communitiesManager.GetByID(communityID)
+	if err != nil {
+		m.communitiesManager.LogStdout("couldn't get community to import archives", zap.Error(err))
+		return err
+	}
+
+	if !community.HasMember(&m.identity.PublicKey) {
+		m.communitiesManager.LogStdout("can't import archives when user not a member of community")
+		return ErrUserNotMember
+	}
+
+	return nil
+}
+
 func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) error {
 	archiveIDsToImport, err := m.communitiesManager.GetMessageArchiveIDsToImport(communityID)
 	if err != nil {
@@ -3098,6 +3113,11 @@ func (m *Messenger) resumeHistoryArchivesImport(communityID types.HexBytes) erro
 
 	if len(archiveIDsToImport) == 0 {
 		return nil
+	}
+
+	err = m.checkIfIMemberOfCommunity(communityID)
+	if err != nil {
+		return err
 	}
 
 	currentTask := m.communitiesManager.GetHistoryArchiveDownloadTask(communityID.String())
@@ -3161,7 +3181,10 @@ importMessageArchivesLoop:
 			m.communitiesManager.LogStdout("interrupted importing history archive messages")
 			return nil
 		case <-importTicker.C:
-
+			err := m.checkIfIMemberOfCommunity(communityID)
+			if err != nil {
+				break importMessageArchivesLoop
+			}
 			archiveIDsToImport, err := m.communitiesManager.GetMessageArchiveIDsToImport(communityID)
 			if err != nil {
 				m.communitiesManager.LogStdout("couldn't get message archive IDs to import", zap.Error(err))

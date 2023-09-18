@@ -1306,6 +1306,11 @@ func (m *Messenger) downloadAndImportHistoryArchives(id types.HexBytes, magnetli
 		m.communitiesManager.LogStdout("couldn't update last seen magnetlink", zap.Error(err))
 	}
 
+	err = m.checkIfIMemberOfCommunity(id)
+	if err != nil {
+		return
+	}
+
 	err = m.importHistoryArchives(id, cancel)
 	if err != nil {
 		m.communitiesManager.LogStdout("failed to import history archives", zap.Error(err))
