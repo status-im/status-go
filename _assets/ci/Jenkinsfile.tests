@@ -25,7 +25,8 @@ pipeline {
 
   environment {
     TARGET   = 'tests'
-    DB_CONT  = 'status-go-test-db'
+    DB_CONT  = "status-go-test-db-${env.EXECUTOR_NUMBER.toInteger() + 1}"
+    DB_PORT  = "${5432 + env.EXECUTOR_NUMBER.toInteger()}"
     TMPDIR   = "${WORKSPACE_TMP}"
     GOPATH   = "${WORKSPACE_TMP}/go"
     GOCACHE  = "${WORKSPACE_TMP}/gocache"
@@ -69,12 +70,15 @@ pipeline {
     }
 
     stage('Unit Tests') {
+      environment {
+        TEST_POSTGRES_PORT = "${env.DB_PORT}"
+      }
       steps { script {
         db = docker.image('postgres:9.6-alpine').withRun([
           "--name=${DB_CONT}",
-          '--env=POSTGRES_HOST_AUTH_METHOD=trust',
-          '--publish=5432:5432',
-        ].join(' ')) { c ->
+          "--env=POSTGRES_HOST_AUTH_METHOD=trust",
+          "--publish=${DB_PORT}:${DB_PORT}",
+        ].join(' '), "-p ${DB_PORT}") { c ->
           nix.shell('make generate-handlers', pure: true)
           nix.shell('make test-unit V=1', pure: false)
         }
