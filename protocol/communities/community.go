@@ -1455,9 +1455,9 @@ func (o *Community) PendingAndBannedMembers() map[string]CommunityMemberState {
 		result[bannedMemberID] = CommunityMemberBanned
 	}
 
-	processedEvents := make(map[protobuf.CommunityEvent_EventType]bool)
+	processedEvents := make(map[string]bool)
 	for _, event := range o.config.EventsData.Events {
-		if processedEvents[event.Type] {
+		if processedEvents[event.MemberToAction] {
 			continue
 		}
 
@@ -1471,7 +1471,7 @@ func (o *Community) PendingAndBannedMembers() map[string]CommunityMemberState {
 		default:
 			continue
 		}
-		processedEvents[event.Type] = true
+		processedEvents[event.MemberToAction] = true
 	}
 
 	return result
@@ -2277,13 +2277,13 @@ func (o *Community) ValidateEvent(event *CommunityEvent, signer *ecdsa.PublicKey
 		return err
 	}
 
-	member := o.getMember(pk)
+	eventTarget := o.getMember(pk)
 
-	if eventSender == nil || member == nil {
+	if eventSender == nil || eventTarget == nil {
 		return ErrMemberNotFound
 	}
 
-	if !RolesAuthorizedToPerformEvent(eventSender.Roles, member.Roles, event) {
+	if !RolesAuthorizedToPerformEvent(eventSender.Roles, eventTarget.Roles, event) {
 		return ErrNotAuthorized
 	}
 
