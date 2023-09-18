@@ -1455,7 +1455,12 @@ func (o *Community) PendingAndBannedMembers() map[string]CommunityMemberState {
 		result[bannedMemberID] = CommunityMemberBanned
 	}
 
+	processedEvents := make(map[protobuf.CommunityEvent_EventType]bool)
 	for _, event := range o.config.EventsData.Events {
+		if processedEvents[event.Type] {
+			continue
+		}
+
 		switch event.Type {
 		case protobuf.CommunityEvent_COMMUNITY_MEMBER_KICK:
 			result[event.MemberToAction] = CommunityMemberKickPending
@@ -1464,7 +1469,9 @@ func (o *Community) PendingAndBannedMembers() map[string]CommunityMemberState {
 		case protobuf.CommunityEvent_COMMUNITY_MEMBER_UNBAN:
 			result[event.MemberToAction] = CommunityMemberUnbanPending
 		default:
+			continue
 		}
+		processedEvents[event.Type] = true
 	}
 
 	return result
