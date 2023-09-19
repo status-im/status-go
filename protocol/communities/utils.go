@@ -7,6 +7,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"golang.org/x/exp/slices"
 )
 
 func CalculateRequestID(publicKey string, communityID types.HexBytes) types.HexBytes {
@@ -56,4 +57,13 @@ func ExtractTokenCriteria(permissions []*CommunityTokenPermission) (erc20TokenCr
 		}
 	}
 	return
+}
+
+func CheckIfChannelHasAnyPermissions(chatID string, description *protobuf.CommunityDescription) bool {
+	for _, permission := range description.TokenPermissions {
+		if slices.Contains(permission.ChatIds, chatID) {
+			return true
+		}
+	}
+	return false
 }

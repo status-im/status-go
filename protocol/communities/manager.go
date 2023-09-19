@@ -1272,6 +1272,14 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 }
 
 func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, description *protobuf.CommunityDescription, payload []byte) (*CommunityResponse, error) {
+	// For each channel that doesn't have permissions, we use community members list instead
+	// TMP: should be fixed in https://github.com/status-im/status-desktop/issues/12188
+	for chatID, chat := range description.Chats {
+		if !CheckIfChannelHasAnyPermissions(chatID, description) {
+			chat.Members = description.Members
+		}
+	}
+
 	changes, err := community.UpdateCommunityDescription(description, payload)
 	if err != nil {
 		return nil, err
