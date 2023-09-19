@@ -70,8 +70,8 @@ func (s *AdminCommunityEventsSuite) SetupTest() {
 	s.Require().NoError(shh.Start())
 
 	s.owner = s.newMessenger("", []string{})
-	s.admin = s.newMessenger("qwerty", []string{commmunitiesEventsEventSenderAddress})
-	s.alice = s.newMessenger("", []string{})
+	s.admin = s.newMessenger(accountPassword, []string{eventsSenderAccountAddress})
+	s.alice = s.newMessenger(accountPassword, []string{aliceAccountAddress})
 	_, err := s.owner.Start()
 	s.Require().NoError(err)
 	_, err = s.admin.Start()
@@ -144,7 +144,7 @@ func (s *AdminCommunityEventsSuite) TestAdminCannotDeleteBecomeTokenMasterPermis
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders() {
-	additionalAdmin := s.newMessenger("qwerty", []string{commmunitiesEventsEventSenderAddress})
+	additionalAdmin := s.newMessenger("qwerty", []string{eventsSenderAccountAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{additionalAdmin})
 	// set up additional user that will send request to join
 	user := s.newMessenger("", []string{})
@@ -160,7 +160,7 @@ func (s *AdminCommunityEventsSuite) TestAdminAcceptMemberRequestToJoin() {
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminRejectMemberRequestToJoinResponseSharedWithOtherEventSenders() {
-	additionalAdmin := s.newMessenger("qwerty", []string{commmunitiesEventsEventSenderAddress})
+	additionalAdmin := s.newMessenger("qwerty", []string{eventsSenderAccountAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{additionalAdmin})
 	// set up additional user that will send request to join
 	user := s.newMessenger("", []string{})
@@ -176,7 +176,7 @@ func (s *AdminCommunityEventsSuite) TestAdminRejectMemberRequestToJoin() {
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminRequestToJoinStateCannotBeOverridden() {
-	additionalAdmin := s.newMessenger("qwerty", []string{commmunitiesEventsEventSenderAddress})
+	additionalAdmin := s.newMessenger("qwerty", []string{eventsSenderAccountAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{additionalAdmin})
 
 	// set up additional user that will send request to join
@@ -185,7 +185,7 @@ func (s *AdminCommunityEventsSuite) TestAdminRequestToJoinStateCannotBeOverridde
 }
 
 func (s *AdminCommunityEventsSuite) TestAdminControlNodeHandlesMultipleEventSenderRequestToJoinDecisions() {
-	additionalAdmin := s.newMessenger("qwerty", []string{commmunitiesEventsEventSenderAddress})
+	additionalAdmin := s.newMessenger("qwerty", []string{eventsSenderAccountAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{additionalAdmin})
 
 	// set up additional user that will send request to join
@@ -362,4 +362,22 @@ func (s *AdminCommunityEventsSuite) TestAdminResendRejectedEvents() {
 	}, "no communities in response")
 	s.Require().NoError(err)
 	s.Require().Equal(adminEditRequest.Description, response.Communities()[0].DescriptionText())
+}
+
+func (s *AdminCommunityEventsSuite) TestJoinedAdminReceiveRequestsToJoinWithoutRevealedAccounts() {
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{})
+
+	// set up additional user (bob) that will send request to join
+	bob := s.newMessenger(accountPassword, []string{bobAccountAddress})
+
+	// set up additional user that will join to the community as TokenMaster
+	newPrivilegedUser := s.newMessenger(accountPassword, []string{eventsSenderAccountAddress})
+
+	testJoinedPrivilegedMemberReceiveRequestsToJoin(s, community, bob, newPrivilegedUser, protobuf.CommunityTokenPermission_BECOME_ADMIN)
+}
+
+func (s *AdminCommunityEventsSuite) TestReceiveRequestsToJoinWithRevealedAccountsAfterGettingAdminRole() {
+	// set up additional user (bob) that will send request to join
+	bob := s.newMessenger(accountPassword, []string{bobAccountAddress})
+	testMemberReceiveRequestsToJoinAfterGettingNewRole(s, bob, protobuf.CommunityTokenPermission_BECOME_ADMIN)
 }

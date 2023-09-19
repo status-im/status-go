@@ -66,8 +66,8 @@ func (s *TokenMasterCommunityEventsSuite) SetupTest() {
 	s.Require().NoError(shh.Start())
 
 	s.controlNode = s.newMessenger("", []string{})
-	s.tokenMaster = s.newMessenger("qwerty", []string{commmunitiesEventsEventSenderAddress})
-	s.alice = s.newMessenger("", []string{})
+	s.tokenMaster = s.newMessenger(accountPassword, []string{eventsSenderAccountAddress})
+	s.alice = s.newMessenger(accountPassword, []string{aliceAccountAddress})
 	_, err := s.controlNode.Start()
 	s.Require().NoError(err)
 	_, err = s.tokenMaster.Start()
@@ -146,7 +146,7 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAcceptMemberRequestToJo
 }
 
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAcceptMemberRequestToJoinResponseSharedWithOtherEventSenders() {
-	additionalTokenMaster := s.newMessenger("qwerty", []string{commmunitiesEventsEventSenderAddress})
+	additionalTokenMaster := s.newMessenger("qwerty", []string{eventsSenderAccountAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{additionalTokenMaster})
 	// set up additional user that will send request to join
 	user := s.newMessenger("", []string{})
@@ -154,7 +154,7 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterAcceptMemberRequestToJo
 }
 
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterRejectMemberRequestToJoinResponseSharedWithOtherEventSenders() {
-	additionalTokenMaster := s.newMessenger("qwerty", []string{commmunitiesEventsEventSenderAddress})
+	additionalTokenMaster := s.newMessenger("qwerty", []string{eventsSenderAccountAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{additionalTokenMaster})
 	// set up additional user that will send request to join
 	user := s.newMessenger("", []string{})
@@ -178,7 +178,7 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterRequestToJoinStateCanno
 }
 
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterControlNodeHandlesMultipleEventSenderRequestToJoinDecisions() {
-	additionalTokenMaster := s.newMessenger("qwerty", []string{commmunitiesEventsEventSenderAddress})
+	additionalTokenMaster := s.newMessenger("qwerty", []string{eventsSenderAccountAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{additionalTokenMaster})
 
 	// set up additional user that will send request to join
@@ -264,4 +264,22 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterReceiveCommunityTokenFr
 func (s *TokenMasterCommunityEventsSuite) TestMemberReceiveTokenMasterEventsWhenControlNodeOffline() {
 	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER)
 	testMemberReceiveEventsWhenControlNodeOffline(s, community)
+}
+
+func (s *TokenMasterCommunityEventsSuite) TestJoinedTokenMasterReceiveRequestsToJoinWithRevealedAccounts() {
+	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{})
+
+	// set up additional user (bob) that will send request to join
+	bob := s.newMessenger(accountPassword, []string{bobAccountAddress})
+
+	// set up additional user that will join to the community as TokenMaster
+	newPrivilegedUser := s.newMessenger(accountPassword, []string{eventsSenderAccountAddress})
+
+	testJoinedPrivilegedMemberReceiveRequestsToJoin(s, community, bob, newPrivilegedUser, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
+}
+
+func (s *TokenMasterCommunityEventsSuite) TestReceiveRequestsToJoinWithRevealedAccountsAfterGettingTokenMasterRole() {
+	// set up additional user (bob) that will send request to join
+	bob := s.newMessenger(accountPassword, []string{bobAccountAddress})
+	testMemberReceiveRequestsToJoinAfterGettingNewRole(s, bob, protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
 }

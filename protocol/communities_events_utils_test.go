@@ -29,9 +29,12 @@ type CommunityEventsTestsInterface interface {
 	GetCollectiblesServiceMock() *CollectiblesServiceMock
 }
 
-const commmunitiesEventsTestTokenAddress = "0x0400000000000000000000000000000000000000"
-const commmunitiesEventsTestChainID = 1
-const commmunitiesEventsEventSenderAddress = "0x0200000000000000000000000000000000000000"
+const communitiesEventsTestTokenAddress = "0x0400000000000000000000000000000000000000"
+const aliceAccountAddress = "0x0777100000000000000000000000000000000000"
+const bobAccountAddress = "0x0330000000000000000000000000000000000000"
+const communitiesEventsTestChainID = 1
+const eventsSenderAccountAddress = "0x0200000000000000000000000000000000000000"
+const accountPassword = "qwerty"
 
 type MessageResponseValidator func(*MessengerResponse) error
 
@@ -87,20 +90,20 @@ func refreshMessengerResponses(base CommunityEventsTestsInterface) {
 }
 
 func createMockedWalletBalance(s *suite.Suite) map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big {
-	eventSenderAddress := gethcommon.HexToAddress(commmunitiesEventsEventSenderAddress)
+	eventSenderAddress := gethcommon.HexToAddress(eventsSenderAccountAddress)
 
 	mockedBalances := make(map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
 	mockedBalances[testChainID1] = make(map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big)
 	mockedBalances[testChainID1][eventSenderAddress] = make(map[gethcommon.Address]*hexutil.Big)
 
-	// event sender will have token with `commmunitiesEventsTestTokenAddress``
-	contractAddress := gethcommon.HexToAddress(commmunitiesEventsTestTokenAddress)
+	// event sender will have token with `communitiesEventsTestTokenAddress``
+	contractAddress := gethcommon.HexToAddress(communitiesEventsTestTokenAddress)
 	balance, ok := new(big.Int).SetString("200", 10)
 	s.Require().True(ok)
 	decimalsFactor := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(18)), nil)
 	balance.Mul(balance, decimalsFactor)
 
-	mockedBalances[commmunitiesEventsTestChainID][eventSenderAddress][contractAddress] = (*hexutil.Big)(balance)
+	mockedBalances[communitiesEventsTestChainID][eventSenderAddress][contractAddress] = (*hexutil.Big)(balance)
 	return mockedBalances
 }
 
@@ -120,18 +123,18 @@ func setUpCommunityAndRoles(base CommunityEventsTestsInterface, role protobuf.Co
 
 	request := &requests.RequestToJoinCommunity{
 		CommunityID:       community.ID(),
-		AddressesToReveal: []string{commmunitiesEventsEventSenderAddress},
-		Password:          "qwerty1",
-		AirdropAddress:    commmunitiesEventsEventSenderAddress,
+		AddressesToReveal: []string{eventsSenderAccountAddress},
+		Password:          accountPassword,
+		AirdropAddress:    eventsSenderAccountAddress,
 	}
 	joinCommunity(suite, community, base.GetControlNode(), base.GetEventSender(), request)
 	refreshMessengerResponses(base)
 
 	request = &requests.RequestToJoinCommunity{
 		CommunityID:       community.ID(),
-		AddressesToReveal: []string{"0x0300000000000000000000000000000000000000"},
-		Password:          "qwerty2",
-		AirdropAddress:    "0x0300000000000000000000000000000000000000",
+		AddressesToReveal: []string{aliceAccountAddress},
+		Password:          accountPassword,
+		AirdropAddress:    aliceAccountAddress,
 	}
 	joinCommunity(suite, community, base.GetControlNode(), base.GetMember(), request)
 	refreshMessengerResponses(base)
@@ -266,7 +269,7 @@ func createTestPermissionRequest(community *communities.Community, pType protobu
 		TokenCriteria: []*protobuf.TokenCriteria{
 			{
 				Type:              protobuf.CommunityTokenType_ERC20,
-				ContractAddresses: map[uint64]string{uint64(commmunitiesEventsTestChainID): commmunitiesEventsTestTokenAddress},
+				ContractAddresses: map[uint64]string{uint64(communitiesEventsTestChainID): communitiesEventsTestTokenAddress},
 				Symbol:            "TEST",
 				Amount:            "100",
 				Decimals:          uint64(18),
@@ -421,8 +424,24 @@ func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role pr
 	advertiseCommunityTo(s, community, base.GetControlNode(), base.GetEventSender())
 	advertiseCommunityTo(s, community, base.GetControlNode(), base.GetMember())
 
-	joinOnRequestCommunity(s, community, base.GetControlNode(), base.GetEventSender())
-	joinOnRequestCommunity(s, community, base.GetControlNode(), base.GetMember())
+	requestEventSender := &requests.RequestToJoinCommunity{
+		CommunityID:       community.ID(),
+		AddressesToReveal: []string{eventsSenderAccountAddress},
+		ENSName:           "eventSender",
+		Password:          accountPassword,
+		AirdropAddress:    eventsSenderAccountAddress,
+	}
+
+	joinOnRequestCommunity(s, community, base.GetControlNode(), base.GetEventSender(), requestEventSender)
+
+	requestMember := &requests.RequestToJoinCommunity{
+		CommunityID:       community.ID(),
+		AddressesToReveal: []string{aliceAccountAddress},
+		ENSName:           "alice",
+		Password:          accountPassword,
+		AirdropAddress:    aliceAccountAddress,
+	}
+	joinOnRequestCommunity(s, community, base.GetControlNode(), base.GetMember(), requestMember)
 
 	checkMemberJoined := func(response *MessengerResponse) error {
 		return checkMemberJoinedToTheCommunity(response, base.GetMember().IdentityPublicKey())
@@ -439,7 +458,7 @@ func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role pr
 
 	for _, eventSender := range additionalEventSenders {
 		advertiseCommunityTo(s, community, base.GetControlNode(), eventSender)
-		joinOnRequestCommunity(s, community, base.GetControlNode(), eventSender)
+		joinOnRequestCommunity(s, community, base.GetControlNode(), eventSender, requestEventSender)
 
 		grantPermission(s, community, base.GetControlNode(), eventSender, role)
 		checkPermissionGranted = func(response *MessengerResponse) error {
@@ -798,15 +817,17 @@ func controlNodeCreatesCommunityPermission(base CommunityEventsTestsInterface, c
 	assertCheckTokenPermissionCreated(s, ownerCommunity, permissionRequest.Type)
 
 	// then, ensure event sender receives updated community
-	_, err = WaitOnMessengerResponse(
+	resp, err := WaitOnMessengerResponse(
 		base.GetEventSender(),
 		func(r *MessengerResponse) bool {
 			return len(r.Communities()) > 0 &&
-				len(r.Communities()[0].TokenPermissionsByType(permissionRequest.Type)) > 0
+				len(r.Communities()[0].TokenPermissionsByType(permissionRequest.Type)) > 0 &&
+				r.Communities()[0].HasPermissionToSendCommunityEvents()
 		},
 		"event sender did not receive community token permission",
 	)
 	s.Require().NoError(err)
+	s.Require().NotNil(resp)
 	eventSenderCommunity, err := base.GetEventSender().communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
 	assertCheckTokenPermissionCreated(s, eventSenderCommunity, permissionRequest.Type)
@@ -1850,4 +1871,172 @@ func addCommunityTokenToCommunityTokensService(base CommunityEventsTestsInterfac
 	}
 
 	base.GetCollectiblesServiceMock().SetMockCollectibleContractData(uint64(token.ChainID), token.Address, data)
+}
+
+func testJoinedPrivilegedMemberReceiveRequestsToJoin(base CommunityEventsTestsInterface, community *communities.Community,
+	bob *Messenger, newPrivilegedUser *Messenger, tokenPermissionType protobuf.CommunityTokenPermission_Type) {
+
+	// create community permission
+	rolePermission := createTestPermissionRequest(community, tokenPermissionType)
+	controlNodeCreatesCommunityPermission(base, community, rolePermission)
+
+	s := base.GetSuite()
+
+	advertiseCommunityTo(s, community, base.GetControlNode(), bob)
+	advertiseCommunityTo(s, community, base.GetControlNode(), newPrivilegedUser)
+
+	requestMember := &requests.RequestToJoinCommunity{
+		CommunityID:       community.ID(),
+		AddressesToReveal: []string{bobAccountAddress},
+		ENSName:           "bob",
+		Password:          accountPassword,
+		AirdropAddress:    bobAccountAddress,
+	}
+
+	requestToJoinCommunity(s, base.GetControlNode(), bob, requestMember)
+
+	requestNewPrivilegedUser := &requests.RequestToJoinCommunity{
+		CommunityID:       community.ID(),
+		AddressesToReveal: []string{eventsSenderAccountAddress},
+		ENSName:           "newPrivilegedUser",
+		Password:          accountPassword,
+		AirdropAddress:    eventsSenderAccountAddress,
+	}
+
+	requestToJoinID := requestToJoinCommunity(s, base.GetControlNode(), newPrivilegedUser, requestNewPrivilegedUser)
+
+	// accept join request
+	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: requestToJoinID}
+	response, err := base.GetControlNode().AcceptRequestToJoinCommunity(acceptRequestToJoin)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	updatedCommunity := response.Communities()[0]
+	s.Require().NotNil(updatedCommunity)
+	s.Require().True(updatedCommunity.HasMember(&newPrivilegedUser.identity.PublicKey))
+
+	// receive request to join msg
+	_, err = WaitOnMessengerResponse(
+		newPrivilegedUser,
+		func(r *MessengerResponse) bool {
+			return len(r.RequestsToJoinCommunity) > 3
+		},
+		"newPrivilegedUser did not receive all requests to join from the control node",
+	)
+	s.Require().NoError(err)
+
+	checkRevealedAddresses := func(user *Messenger) {
+		requestsToJoin, err := newPrivilegedUser.communitiesManager.GetCommunityRequestsToJoinWithRevealedAddresses(community.ID())
+		s.Require().NoError(err)
+		// event sender, member, bob and newPrivilegedUser requests
+		s.Require().Len(requestsToJoin, 4)
+
+		// check if revealed addresses are present based on the role
+		for _, request := range requestsToJoin {
+			if tokenPermissionType == protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER {
+				s.Require().Len(request.RevealedAccounts, 1)
+			} else {
+				s.Require().Len(request.RevealedAccounts, 0)
+			}
+		}
+	}
+
+	checkRevealedAddresses(bob)
+
+	_, err = WaitOnMessengerResponse(
+		base.GetEventSender(),
+		func(r *MessengerResponse) bool {
+			return len(r.RequestsToJoinCommunity) > 1
+		},
+		"EventSender did not receive new requests to join from the control node",
+	)
+	s.Require().NoError(err)
+
+	checkRevealedAddresses(base.GetEventSender())
+}
+
+func testMemberReceiveRequestsToJoinAfterGettingNewRole(base CommunityEventsTestsInterface, bob *Messenger, tokenPermissionType protobuf.CommunityTokenPermission_Type) {
+	tcs2, err := base.GetControlNode().communitiesManager.All()
+	s := base.GetSuite()
+	s.Require().NoError(err, "eventSender.communitiesManager.All")
+	s.Len(tcs2, 1, "Must have 1 community")
+
+	// control node creates a community and chat
+	community := createTestCommunity(base, protobuf.CommunityPermissions_ON_REQUEST)
+	refreshMessengerResponses(base)
+
+	advertiseCommunityTo(s, community, base.GetControlNode(), base.GetEventSender())
+	advertiseCommunityTo(s, community, base.GetControlNode(), base.GetMember())
+	advertiseCommunityTo(s, community, base.GetControlNode(), bob)
+
+	requestAlice := &requests.RequestToJoinCommunity{
+		CommunityID:       community.ID(),
+		AddressesToReveal: []string{aliceAccountAddress},
+		ENSName:           "alice",
+		Password:          accountPassword,
+		AirdropAddress:    aliceAccountAddress,
+	}
+
+	requestToJoinCommunity(s, base.GetControlNode(), base.GetMember(), requestAlice)
+
+	requestBob := &requests.RequestToJoinCommunity{
+		CommunityID:       community.ID(),
+		AddressesToReveal: []string{bobAccountAddress},
+		ENSName:           "bob",
+		Password:          accountPassword,
+		AirdropAddress:    bobAccountAddress,
+	}
+
+	requestToJoinCommunity(s, base.GetControlNode(), bob, requestBob)
+
+	requestEventSender := &requests.RequestToJoinCommunity{
+		CommunityID:       community.ID(),
+		AddressesToReveal: []string{eventsSenderAccountAddress},
+		ENSName:           "eventSender",
+		Password:          accountPassword,
+		AirdropAddress:    eventsSenderAccountAddress,
+	}
+
+	// event sender joins as simple user
+	joinOnRequestCommunity(s, community, base.GetControlNode(), base.GetEventSender(), requestEventSender)
+
+	// create community permission
+	rolePermission := createTestPermissionRequest(community, tokenPermissionType)
+
+	response, err := base.GetControlNode().CreateCommunityTokenPermission(rolePermission)
+	s.Require().NoError(err)
+
+	var tokenPermissionID string
+	for id := range response.CommunityChanges[0].TokenPermissionsAdded {
+		tokenPermissionID = id
+	}
+	s.Require().NotEqual(tokenPermissionID, "")
+
+	ownerCommunity, err := base.GetControlNode().communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	assertCheckTokenPermissionCreated(s, ownerCommunity, rolePermission.Type)
+
+	// receive request to join msg
+	_, err = WaitOnMessengerResponse(
+		base.GetEventSender(),
+		func(r *MessengerResponse) bool {
+			return len(r.RequestsToJoinCommunity) > 2
+		},
+		"Event sender did not receive all requests to join from the control node",
+	)
+	s.Require().NoError(err)
+
+	requestsToJoin, err := base.GetEventSender().communitiesManager.GetCommunityRequestsToJoinWithRevealedAddresses(community.ID())
+	s.Require().NoError(err)
+	// event sender, bob and alice requests
+	s.Require().Len(requestsToJoin, 3)
+
+	// check if revealed addresses are present based on the role
+	for _, request := range requestsToJoin {
+		if tokenPermissionType == protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER {
+			s.Require().Len(request.RevealedAccounts, 1)
+		} else {
+			s.Require().Len(request.RevealedAccounts, 0)
+		}
+	}
 }

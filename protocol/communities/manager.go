@@ -1938,7 +1938,6 @@ func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, err
 	}
 
 	if community.IsControlNode() {
-		// share accepted request to join with other privileged members
 		if err = m.shareAcceptedRequestToJoinWithPrivilegedMembers(community, dbRequest); err != nil {
 			return nil, err
 		}
@@ -4702,7 +4701,7 @@ func (m *Manager) createCommunityTokenPermission(request *requests.CreateCommuni
 }
 
 func (m *Manager) shareRequestsToJoinWithNewPrivilegedMembers(community *Community, newPrivilegedMembers map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey) error {
-	requestsToJoin, err := m.persistence.GetCommunityRequestsToJoinWithRevealedAddresses(community.ID())
+	requestsToJoin, err := m.GetCommunityRequestsToJoinWithRevealedAddresses(community.ID())
 	if err != nil {
 		return err
 	}
@@ -4710,10 +4709,10 @@ func (m *Manager) shareRequestsToJoinWithNewPrivilegedMembers(community *Communi
 	var syncRequestsWithoutRevealedAccounts []*protobuf.SyncCommunityRequestsToJoin
 	var syncRequestsWithRevealedAccounts []*protobuf.SyncCommunityRequestsToJoin
 	for _, request := range requestsToJoin {
-		requestProto := request.ToSyncProtobuf()
-		syncRequestsWithRevealedAccounts = append(syncRequestsWithRevealedAccounts, requestProto)
-		requestProto.RevealedAccounts = []*protobuf.RevealedAccount{}
-		syncRequestsWithoutRevealedAccounts = append(syncRequestsWithoutRevealedAccounts, requestProto)
+		syncRequestsWithRevealedAccounts = append(syncRequestsWithRevealedAccounts, request.ToSyncProtobuf())
+		requestProtoWithoutAccounts := request.ToSyncProtobuf()
+		requestProtoWithoutAccounts.RevealedAccounts = []*protobuf.RevealedAccount{}
+		syncRequestsWithoutRevealedAccounts = append(syncRequestsWithoutRevealedAccounts, requestProtoWithoutAccounts)
 	}
 
 	syncMsgWithoutRevealedAccounts := &protobuf.CommunityPrivilegedUserSyncMessage{
@@ -4809,4 +4808,8 @@ func (m *Manager) shareAcceptedRequestToJoinWithPrivilegedMembers(community *Com
 	}
 
 	return nil
+}
+
+func (m *Manager) GetCommunityRequestsToJoinWithRevealedAddresses(communityID types.HexBytes) ([]*RequestToJoin, error) {
+	return m.persistence.GetCommunityRequestsToJoinWithRevealedAddresses(communityID)
 }

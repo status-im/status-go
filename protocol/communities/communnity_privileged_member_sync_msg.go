@@ -44,7 +44,7 @@ func (m *Manager) HandleRequestToJoinPrivilegedUserSyncMessage(message *protobuf
 }
 
 func (m *Manager) HandleSyncAllRequestToJoinForNewPrivilegedMember(message *protobuf.CommunityPrivilegedUserSyncMessage, communityID types.HexBytes) ([]*RequestToJoin, error) {
-	requestsToJoin := make([]*RequestToJoin, len(message.SyncRequestsToJoin))
+	requestsToJoin := []*RequestToJoin{}
 	for _, syncRequestToJoin := range message.SyncRequestsToJoin {
 		requestToJoin := new(RequestToJoin)
 		requestToJoin.InitFromSyncProtobuf(syncRequestToJoin)
@@ -53,11 +53,11 @@ func (m *Manager) HandleSyncAllRequestToJoinForNewPrivilegedMember(message *prot
 			return nil, err
 		}
 
-		if requestToJoin.RevealedAccounts != nil && len(requestToJoin.RevealedAccounts) > 0 {
-			if err := m.persistence.RemoveRequestToJoinRevealedAddresses(requestToJoin.ID); err != nil {
-				return nil, err
-			}
+		if err := m.persistence.RemoveRequestToJoinRevealedAddresses(requestToJoin.ID); err != nil {
+			return nil, err
+		}
 
+		if requestToJoin.RevealedAccounts != nil && len(requestToJoin.RevealedAccounts) > 0 {
 			if err := m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin.ID, requestToJoin.RevealedAccounts); err != nil {
 				return nil, err
 			}

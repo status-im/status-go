@@ -365,9 +365,7 @@ func joinCommunity(s *suite.Suite, community *communities.Community, owner *Mess
 	s.Require().NoError(err)
 }
 
-func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, controlNode *Messenger, user *Messenger) {
-	// Request to join the community
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+func requestToJoinCommunity(s *suite.Suite, controlNode *Messenger, user *Messenger, request *requests.RequestToJoinCommunity) types.HexBytes {
 	response, err := user.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -394,9 +392,16 @@ func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, co
 	)
 	s.Require().NoError(err)
 
+	return requestToJoin.ID
+}
+
+func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, controlNode *Messenger, user *Messenger, request *requests.RequestToJoinCommunity) {
+	// Request to join the community
+	requestToJoinID := requestToJoinCommunity(s, controlNode, user, request)
+
 	// accept join request
-	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: requestToJoin.ID}
-	response, err = controlNode.AcceptRequestToJoinCommunity(acceptRequestToJoin)
+	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: requestToJoinID}
+	response, err := controlNode.AcceptRequestToJoinCommunity(acceptRequestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 
