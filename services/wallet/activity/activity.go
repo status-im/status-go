@@ -200,7 +200,6 @@ func (e *Entry) isNFT() bool {
 	return tt != nil && (*tt == TransferTypeErc721 || *tt == TransferTypeErc1155) && ((e.tokenIn != nil && e.tokenIn.TokenID != nil) || (e.tokenOut != nil && e.tokenOut.TokenID != nil))
 }
 
-// TODO - #11952: use only one of (big.Int, bigint.BigInt and hexutil.Big)
 func tokenIDToWalletBigInt(tokenID *hexutil.Big) *bigint.BigInt {
 	if tokenID == nil {
 		return nil

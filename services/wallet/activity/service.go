@@ -236,6 +236,15 @@ func (s *Service) GetOldestTimestampAsync(requestID int32, addresses []common.Ad
 	})
 }
 
+func (s *Service) CancelFilterTask(requestID int32) {
+	s.scheduler.Enqueue(requestID, filterTask, func(ctx context.Context) (interface{}, error) {
+		// No-op
+		return nil, nil
+	}, func(result interface{}, taskType async.TaskType, err error) {
+		// Ignore result
+	})
+}
+
 func (s *Service) Stop() {
 	s.scheduler.Stop()
 }
