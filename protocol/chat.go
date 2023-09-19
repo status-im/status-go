@@ -19,12 +19,28 @@ import (
 )
 
 var chatColors = []string{
-	"#fa6565", // red
-	"#887af9", // blue
-	"#FE8F59", // orange
-	"#7cda00", // green
-	"#51d0f0", // light-blue
-	"#d37ef4", // purple
+	"#2A4AF5", // blue
+
+	"#F6B03C", // yellow
+
+	"#2A799B", // turquoise
+
+	"#CB6256", // copper
+
+	"#1992D7", // sky
+
+	"#C78F67", // camel
+
+	"#FF7D46", // orange
+
+	"#216266", // army
+
+	"#F66F8F", // pink
+
+	"#7140FD", // purple
+
+	"#EC266C", // magenta
+
 }
 
 type ChatType int
