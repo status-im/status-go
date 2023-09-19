@@ -549,7 +549,7 @@ func (s *SyncDeviceSuite) TestPairingThreeDevices() {
 	alice2Backend := s.prepareBackendWithoutAccount(alice2TmpDir)
 
 	alice3TmpDir := filepath.Join(s.pairThreeDevicesTmpdir, "alice3")
-	alice3Backend := s.prepareBackendWithAccount("", alice3TmpDir)
+	alice3Backend := s.prepareBackendWithoutAccount(alice3TmpDir)
 
 	defer func() {
 		require.NoError(s.T(), bobBackend.Logout())
@@ -583,8 +583,6 @@ func (s *SyncDeviceSuite) TestPairingThreeDevices() {
 
 	// Pair Alice-2 <-> ALice-3
 	s.logger.Info("pairing Alice-2 and Alice-3")
-	// don't allow 2 different account logged in and doing pairing, so we logout alice-3
-	s.NoError(alice3Backend.Logout())
 	s.pairAccounts(alice2Backend, alice2TmpDir, alice3Backend, alice3TmpDir)
 
 	s.checkMutualContact(alice3Backend, bobPublicKey)
