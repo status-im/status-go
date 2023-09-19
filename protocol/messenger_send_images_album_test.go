@@ -318,3 +318,59 @@ func (s *MessengerSendImagesAlbumSuite) TestAlbumImageEditText() {
 		s.Require().Equal(message.Text, editedText)
 	}
 }
+
+// This test makes sure that if you get a mention with an album of images in a community, it sends it correctly and has correct AC notif with album
+func (s *MessengerSendImagesAlbumSuite) TestAlbumImagesMessageWithMentionInCommunitySend() {
+	theirMessenger := s.newMessenger()
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+	defer theirMessenger.Shutdown() // nolint: errcheck
+
+	community, chat := createCommunity(&s.Suite, s.m)
+
+	s.advertiseCommunityTo(community, theirMessenger)
+
+	s.joinCommunity(community, theirMessenger)
+
+	const messageCount = 3
+	var album []*common.Message
+
+	for i := 0; i < messageCount; i++ {
+		outgoingMessage, err := buildImageWithoutAlbumIDMessage(*chat)
+		s.NoError(err)
+		outgoingMessage.Mentioned = true
+		outgoingMessage.Text = "hey @" + common.PubkeyToHex(&theirMessenger.identity.PublicKey)
+		album = append(album, outgoingMessage)
+	}
+
+	err = s.m.SaveChat(chat)
+	s.NoError(err)
+	response, err := s.m.SendChatMessages(context.Background(), album)
+	s.NoError(err)
+	s.Require().Equal(messageCount, len(response.Messages()), "it returns the messages")
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), messageCount)
+
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.messages) == messageCount },
+		"no messages",
+	)
+
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), messageCount)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+
+	for _, notif := range response.ActivityCenterNotifications() {
+		s.Require().Equal(messageCount, len(notif.AlbumMessages), "AC notification should have AlbumMessages")
+	}
+
+	for _, message := range response.Messages() {
+		image := message.GetImage()
+		s.Require().NotNil(image, "Message.ID=%s", message.ID)
+		s.Require().NotEmpty(image.AlbumId)
+	}
+
+	s.Require().Equal(uint(1), response.Chats()[0].UnviewedMessagesCount, "Just one unread message")
+}
