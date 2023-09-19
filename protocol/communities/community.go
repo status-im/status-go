@@ -2271,19 +2271,20 @@ func (o *Community) ValidateEvent(event *CommunityEvent, signer *ecdsa.PublicKey
 	}
 
 	eventSender := o.getMember(signer)
-
-	pk, err := common.HexToPubkey(event.MemberToAction)
-	if err != nil {
-		return err
-	}
-
-	eventTarget := o.getMember(pk)
-
-	if eventSender == nil || eventTarget == nil {
+	if eventSender == nil {
 		return ErrMemberNotFound
 	}
 
-	if !RolesAuthorizedToPerformEvent(eventSender.Roles, eventTarget.Roles, event) {
+	eventTargetRoles := []protobuf.CommunityMember_Roles{}
+	eventTargetPk, err := common.HexToPubkey(event.MemberToAction)
+	if err == nil {
+		eventTarget := o.getMember(eventTargetPk)
+		if eventTarget != nil {
+			eventTargetRoles = eventTarget.Roles
+		}
+	}
+
+	if !RolesAuthorizedToPerformEvent(eventSender.Roles, eventTargetRoles, event) {
 		return ErrNotAuthorized
 	}
 

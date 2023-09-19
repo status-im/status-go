@@ -77,18 +77,27 @@ func canRolesModifyPermission(roles []protobuf.CommunityMember_Roles, permission
 }
 
 func canRolesKickOrBanMember(senderRoles []protobuf.CommunityMember_Roles, memberRoles []protobuf.CommunityMember_Roles) bool {
+	// Owner can kick everyone
 	if slices.Contains(senderRoles, protobuf.CommunityMember_ROLE_OWNER) {
 		return true
 	}
 
-	if (slices.Contains(senderRoles, protobuf.CommunityMember_ROLE_ADMIN) ||
-		slices.Contains(senderRoles, protobuf.CommunityMember_ROLE_TOKEN_MASTER)) &&
+	// TokenMaster can kick normal members and admins
+	if (slices.Contains(senderRoles, protobuf.CommunityMember_ROLE_TOKEN_MASTER)) &&
+		!(slices.Contains(memberRoles, protobuf.CommunityMember_ROLE_TOKEN_MASTER) ||
+			slices.Contains(memberRoles, protobuf.CommunityMember_ROLE_OWNER)) {
+		return true
+	}
+
+	// Admins can kick normal members
+	if (slices.Contains(senderRoles, protobuf.CommunityMember_ROLE_ADMIN)) &&
 		!(slices.Contains(memberRoles, protobuf.CommunityMember_ROLE_ADMIN) ||
 			slices.Contains(memberRoles, protobuf.CommunityMember_ROLE_TOKEN_MASTER) ||
 			slices.Contains(memberRoles, protobuf.CommunityMember_ROLE_OWNER)) {
 		return true
 	}
 
+	// Normal members can't kick anyone
 	return false
 }
 
