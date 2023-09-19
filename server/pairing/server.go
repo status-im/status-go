@@ -245,6 +245,7 @@ func MakeFullReceiverServer(backend *api.GethStatusBackend, config *ReceiverServ
 		return nil, err
 	}
 
+	// ignore err because we don't care if there is no active account
 	activeAccount, _ := backend.GetActiveAccount()
 	if activeAccount != nil {
 		config.ReceiverConfig.LoggedInKeyUID = activeAccount.KeyUID
