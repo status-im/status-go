@@ -25,8 +25,23 @@ type FeeHistory struct {
 	BaseFeePerGas []string `json:"baseFeePerGas"`
 }
 
+type BatchCallClient interface {
+	BatchCallContext(ctx context.Context, b []rpc.BatchElem) error
+}
+
 type ClientInterface interface {
 	BatchCallContext(ctx context.Context, b []rpc.BatchElem) error
+	HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error)
+	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
+	BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error)
+	NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error)
+	FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]types.Log, error)
+	BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error)
+	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
+	FullTransactionByBlockNumberAndIndex(ctx context.Context, blockNumber *big.Int, index uint) (*FullTransaction, error)
+	GetBaseFeeFromBlock(blockNumber *big.Int) (string, error)
+	NetworkID() uint64
+	ToBigInt() *big.Int
 }
 
 type ClientWithFallback struct {

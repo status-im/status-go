@@ -55,7 +55,7 @@ var (
 
 type ethHistoricalCommand struct {
 	address       common.Address
-	chainClient   *chain.ClientWithFallback
+	chainClient   chain.ClientInterface
 	balanceCacher balance.Cacher
 	feed          *event.Feed
 	foundHeaders  []*DBHeader
@@ -77,22 +77,22 @@ func (c *ethHistoricalCommand) Command() async.Command {
 }
 
 func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
-	log.Info("eth historical downloader start", "chainID", c.chainClient.ChainID, "address", c.address,
+	log.Info("eth historical downloader start", "chainID", c.chainClient.NetworkID(), "address", c.address,
 		"from", c.from.Number, "to", c.to, "noLimit", c.noLimit)
 
 	start := time.Now()
 	if c.from.Number != nil && c.from.Balance != nil {
-		c.balanceCacher.Cache().AddBalance(c.address, c.chainClient.ChainID, c.from.Number, c.from.Balance)
+		c.balanceCacher.Cache().AddBalance(c.address, c.chainClient.NetworkID(), c.from.Number, c.from.Balance)
 	}
 	if c.from.Number != nil && c.from.Nonce != nil {
-		c.balanceCacher.Cache().AddNonce(c.address, c.chainClient.ChainID, c.from.Number, c.from.Nonce)
+		c.balanceCacher.Cache().AddNonce(c.address, c.chainClient.NetworkID(), c.from.Number, c.from.Nonce)
 	}
 	from, headers, startBlock, err := findBlocksWithEthTransfers(ctx, c.chainClient,
 		c.balanceCacher, c.address, c.from.Number, c.to, c.noLimit, c.threadLimit)
 
 	if err != nil {
 		c.error = err
-		log.Error("failed to find blocks with transfers", "error", err, "chainID", c.chainClient.ChainID,
+		log.Error("failed to find blocks with transfers", "error", err, "chainID", c.chainClient.NetworkID(),
 			"address", c.address, "from", c.from.Number, "to", c.to)
 		return nil
 	}
@@ -101,7 +101,7 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 	c.resultingFrom = from
 	c.startBlock = startBlock
 
-	log.Info("eth historical downloader finished successfully", "chain", c.chainClient.ChainID,
+	log.Info("eth historical downloader finished successfully", "chain", c.chainClient.NetworkID(),
 		"address", c.address, "from", from, "to", c.to, "total blocks", len(headers), "time", time.Since(start))
 
 	return nil
@@ -110,7 +110,7 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 type erc20HistoricalCommand struct {
 	erc20       BatchDownloader
 	address     common.Address
-	chainClient *chain.ClientWithFallback
+	chainClient chain.ClientInterface
 	feed        *event.Feed
 
 	iterator     *IterativeDownloader
@@ -147,14 +147,14 @@ func getErc20BatchSize(chainID uint64) *big.Int {
 }
 
 func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
-	log.Info("wallet historical downloader for erc20 transfers start", "chainID", c.chainClient.ChainID, "address", c.address,
+	log.Info("wallet historical downloader for erc20 transfers start", "chainID", c.chainClient.NetworkID(), "address", c.address,
 		"from", c.from, "to", c.to)
 
 	start := time.Now()
 	if c.iterator == nil {
 		c.iterator, err = SetupIterativeDownloader(
 			c.chainClient, c.address,
-			c.erc20, getErc20BatchSize(c.chainClient.ChainID), c.to, c.from)
+			c.erc20, getErc20BatchSize(c.chainClient.NetworkID()), c.to, c.from)
 		if err != nil {
 			log.Error("failed to setup historical downloader for erc20")
 			return err
@@ -168,7 +168,7 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 		}
 		c.foundHeaders = append(c.foundHeaders, headers...)
 	}
-	log.Info("wallet historical downloader for erc20 transfers finished", "chainID", c.chainClient.ChainID, "address", c.address,
+	log.Info("wallet historical downloader for erc20 transfers finished", "chainID", c.chainClient.NetworkID(), "address", c.address,
 		"from", c.from, "to", c.to, "time", time.Since(start), "headers", len(c.foundHeaders))
 	return nil
 }
@@ -220,7 +220,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 	log.Info("current head is", "block number", head.Number)
 
 	// Get last known block for each account
-	lastKnownEthBlocks, accountsWithoutHistory, err := c.blockDAO.GetLastKnownBlockByAddresses(c.chainClient.ChainID, c.accounts)
+	lastKnownEthBlocks, accountsWithoutHistory, err := c.blockDAO.GetLastKnownBlockByAddresses(c.chainClient.NetworkID(), c.accounts)
 	if err != nil {
 		log.Error("failed to load last head from database", "error", err)
 		if c.NewError(err) {
@@ -301,7 +301,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 			event := walletevent.Event{
 				Type:     EventNewTransfers,
 				Accounts: []common.Address{address},
-				ChainID:  c.chainClient.ChainID,
+				ChainID:  c.chainClient.NetworkID(),
 			}
 			for _, header := range cmnd.foundHeaders[address] {
 				if event.BlockNumber == nil || header.Number.Cmp(event.BlockNumber) == 1 {
@@ -334,9 +334,9 @@ func nonArchivalNodeError(err error) bool {
 
 func (c *controlCommand) NewError(err error) bool {
 	c.errorsCount++
-	log.Error("controlCommand error", "chainID", c.chainClient.ChainID, "error", err, "counter", c.errorsCount)
+	log.Error("controlCommand error", "chainID", c.chainClient.NetworkID(), "error", err, "counter", c.errorsCount)
 	if nonArchivalNodeError(err) {
-		log.Info("Non archival node detected", "chainID", c.chainClient.ChainID)
+		log.Info("Non archival node detected", "chainID", c.chainClient.NetworkID())
 		c.nonArchivalRPCNode = true
 		c.feed.Send(walletevent.Event{
 			Type: EventNonArchivalNodeDetected,
@@ -387,17 +387,17 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 	// Take blocks from cache if available and disrespect the limit
 	// If no blocks are available in cache, take blocks from DB respecting the limit
 	// If no limit is set, take all blocks from DB
-	log.Info("start transfersCommand", "chain", c.chainClient.ChainID, "address", c.address, "blockNums", c.blockNums)
+	log.Info("start transfersCommand", "chain", c.chainClient.NetworkID(), "address", c.address, "blockNums", c.blockNums)
 	startTs := time.Now()
 
 	for {
 		blocks := c.blockNums
 		if blocks == nil {
-			blocks, _ = c.blockDAO.GetBlocksToLoadByAddress(c.chainClient.ChainID, c.address, numberOfBlocksCheckedPerIteration)
+			blocks, _ = c.blockDAO.GetBlocksToLoadByAddress(c.chainClient.NetworkID(), c.address, numberOfBlocksCheckedPerIteration)
 		}
 
 		for _, blockNum := range blocks {
-			log.Debug("transfersCommand block start", "chain", c.chainClient.ChainID, "address", c.address, "block", blockNum)
+			log.Debug("transfersCommand block start", "chain", c.chainClient.NetworkID(), "address", c.address, "block", blockNum)
 
 			allTransfers, err := c.eth.GetTransfersByNumber(ctx, blockNum)
 			if err != nil {
@@ -421,9 +421,9 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 				}
 			} else {
 				// If no transfers found, that is suspecting, because downloader returned this block as containing transfers
-				log.Error("no transfers found in block", "chain", c.chainClient.ChainID, "address", c.address, "block", blockNum)
+				log.Error("no transfers found in block", "chain", c.chainClient.NetworkID(), "address", c.address, "block", blockNum)
 
-				err = markBlocksAsLoaded(c.chainClient.ChainID, c.db.client, c.address, []*big.Int{blockNum})
+				err = markBlocksAsLoaded(c.chainClient.NetworkID(), c.db.client, c.address, []*big.Int{blockNum})
 				if err != nil {
 					log.Error("Mark blocks loaded error", "error", err)
 					return err
@@ -434,19 +434,19 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 
 			c.notifyOfNewTransfers(allTransfers)
 
-			log.Debug("transfersCommand block end", "chain", c.chainClient.ChainID, "address", c.address,
+			log.Debug("transfersCommand block end", "chain", c.chainClient.NetworkID(), "address", c.address,
 				"block", blockNum, "tranfers.len", len(allTransfers), "fetchedTransfers.len", len(c.fetchedTransfers))
 		}
 
 		if c.blockNums != nil || len(blocks) == 0 ||
 			(c.blocksLimit > noBlockLimit && len(blocks) >= c.blocksLimit) {
-			log.Debug("loadTransfers breaking loop on block limits reached or 0 blocks", "chain", c.chainClient.ChainID,
+			log.Debug("loadTransfers breaking loop on block limits reached or 0 blocks", "chain", c.chainClient.NetworkID(),
 				"address", c.address, "limit", c.blocksLimit, "blocks", len(blocks))
 			break
 		}
 	}
 
-	log.Info("end transfersCommand", "chain", c.chainClient.ChainID, "address", c.address,
+	log.Info("end transfersCommand", "chain", c.chainClient.NetworkID(), "address", c.address,
 		"blocks.len", len(c.blockNums), "transfers.len", len(c.fetchedTransfers), "in", time.Since(startTs))
 
 	return nil
@@ -516,7 +516,7 @@ func (c *transfersCommand) saveAndConfirmPending(allTransfers []Transfer, blockN
 		}
 	}
 
-	resErr = saveTransfersMarkBlocksLoaded(tx, c.chainClient.ChainID, c.address, allTransfers, []*big.Int{blockNum})
+	resErr = saveTransfersMarkBlocksLoaded(tx, c.chainClient.NetworkID(), c.address, allTransfers, []*big.Int{blockNum})
 	if resErr != nil {
 		log.Error("SaveTransfers error", "error", resErr)
 	}
@@ -615,7 +615,7 @@ func (c *transfersCommand) notifyOfNewTransfers(transfers []Transfer) {
 			c.feed.Send(walletevent.Event{
 				Type:     EventNewTransfers,
 				Accounts: []common.Address{c.address},
-				ChainID:  c.chainClient.ChainID,
+				ChainID:  c.chainClient.NetworkID(),
 			})
 		}
 	}
@@ -717,16 +717,16 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) error {
 
 		lastBlockNumber := c.toByAddress[address]
 		log.Debug("saving headers", "len", len(uniqHeaders), "lastBlockNumber", lastBlockNumber,
-			"balance", c.balanceCacher.Cache().GetBalance(address, c.chainClient.ChainID, lastBlockNumber),
-			"nonce", c.balanceCacher.Cache().GetNonce(address, c.chainClient.ChainID, lastBlockNumber))
+			"balance", c.balanceCacher.Cache().GetBalance(address, c.chainClient.NetworkID(), lastBlockNumber),
+			"nonce", c.balanceCacher.Cache().GetNonce(address, c.chainClient.NetworkID(), lastBlockNumber))
 
 		to := &Block{
 			Number:  lastBlockNumber,
-			Balance: c.balanceCacher.Cache().GetBalance(address, c.chainClient.ChainID, lastBlockNumber),
-			Nonce:   c.balanceCacher.Cache().GetNonce(address, c.chainClient.ChainID, lastBlockNumber),
+			Balance: c.balanceCacher.Cache().GetBalance(address, c.chainClient.NetworkID(), lastBlockNumber),
+			Nonce:   c.balanceCacher.Cache().GetNonce(address, c.chainClient.NetworkID(), lastBlockNumber),
 		}
 		log.Debug("uniqHeaders found for account", "address", address, "uniqHeaders.len", len(uniqHeaders))
-		err = c.db.ProcessBlocks(c.chainClient.ChainID, address, newFromByAddress[address], to, uniqHeaders)
+		err = c.db.ProcessBlocks(c.chainClient.NetworkID(), address, newFromByAddress[address], to, uniqHeaders)
 		if err != nil {
 			return err
 		}

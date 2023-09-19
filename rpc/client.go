@@ -34,7 +34,7 @@ var (
 type Handler func(context.Context, uint64, ...interface{}) (interface{}, error)
 
 type ClientInterface interface {
-	AbstractEthClient(chainID common.ChainID) (chain.ClientInterface, error)
+	AbstractEthClient(chainID common.ChainID) (chain.BatchCallClient, error)
 }
 
 // Client represents RPC client with custom routing
@@ -160,7 +160,7 @@ func (c *Client) EthClient(chainID uint64) (*chain.ClientWithFallback, error) {
 }
 
 // AbstractEthClient returns a partial abstraction used by new components for testing purposes
-func (c *Client) AbstractEthClient(chainID common.ChainID) (chain.ClientInterface, error) {
+func (c *Client) AbstractEthClient(chainID common.ChainID) (chain.BatchCallClient, error) {
 	client, err := c.getClientUsingCache(uint64(chainID))
 	if err != nil {
 		return nil, err

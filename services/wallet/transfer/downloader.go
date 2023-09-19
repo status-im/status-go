@@ -236,7 +236,7 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 }
 
 // NewERC20TransfersDownloader returns new instance.
-func NewERC20TransfersDownloader(client *chain.ClientWithFallback, accounts []common.Address, signer types.Signer) *ERC20TransfersDownloader {
+func NewERC20TransfersDownloader(client chain.ClientInterface, accounts []common.Address, signer types.Signer) *ERC20TransfersDownloader {
 	signature := w_common.GetEventSignatureHash(w_common.Erc20_721TransferEventSignature)
 
 	return &ERC20TransfersDownloader{
@@ -253,7 +253,7 @@ func NewERC20TransfersDownloader(client *chain.ClientWithFallback, accounts []co
 // database gets implemented, differentiation between erc20 and erc721 will handled
 // in the controller.
 type ERC20TransfersDownloader struct {
-	client   *chain.ClientWithFallback
+	client   chain.ClientInterface
 	accounts []common.Address
 
 	// hash of the Transfer event signature
@@ -414,7 +414,7 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 // time to get logs for 100000 blocks = 1.144686979s. with 249 events in the result set.
 func (d *ERC20TransfersDownloader) GetHeadersInRange(parent context.Context, from, to *big.Int) ([]*DBHeader, error) {
 	start := time.Now()
-	log.Debug("get erc20 transfers in range start", "chainID", d.client.ChainID, "from", from, "to", to)
+	log.Debug("get erc20 transfers in range start", "chainID", d.client.NetworkID(), "from", from, "to", to)
 	headers := []*DBHeader{}
 	ctx := context.Background()
 	for _, address := range d.accounts {
@@ -444,15 +444,15 @@ func (d *ERC20TransfersDownloader) GetHeadersInRange(parent context.Context, fro
 			return nil, err
 		}
 		if len(rst) == 0 {
-			log.Warn("no headers found in logs for account", "chainID", d.client.ChainID, "address", address, "from", from, "to", to)
+			log.Warn("no headers found in logs for account", "chainID", d.client.NetworkID(), "address", address, "from", from, "to", to)
 			continue
 		} else {
 			headers = append(headers, rst...)
-			log.Debug("found erc20 transfers for account", "chainID", d.client.ChainID, "address", address,
+			log.Debug("found erc20 transfers for account", "chainID", d.client.NetworkID(), "address", address,
 				"from", from, "to", to, "headers", len(headers))
 		}
 	}
-	log.Debug("get erc20 transfers in range end", "chainID", d.client.ChainID,
+	log.Debug("get erc20 transfers in range end", "chainID", d.client.NetworkID(),
 		"from", from, "to", to, "headers", len(headers), "took", time.Since(start))
 	return headers, nil
 }

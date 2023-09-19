@@ -55,7 +55,7 @@ func (m *MockChainClient) setAvailableClients(chainIDs []common.ChainID) *MockCh
 	return m
 }
 
-func (m *MockChainClient) AbstractEthClient(chainID common.ChainID) (chain.ClientInterface, error) {
+func (m *MockChainClient) AbstractEthClient(chainID common.ChainID) (chain.BatchCallClient, error) {
 	if _, ok := m.clients[chainID]; !ok {
 		panic(fmt.Sprintf("no mock client for chainID %d", chainID))
 	}
