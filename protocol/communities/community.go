@@ -1231,7 +1231,7 @@ func (o *Community) Description() *protobuf.CommunityDescription {
 }
 
 func (o *Community) marshaledDescription() ([]byte, error) {
-	// Clear members list for each channel what don't have permissions
+	// Clear members list for channels that don't have permissions
 	// TMP: should be fixed in https://github.com/status-im/status-desktop/issues/12188
 	clonedDescritpion := proto.Clone(o.config.CommunityDescription).(*protobuf.CommunityDescription)
 	for chatID, chat := range clonedDescritpion.Chats {
