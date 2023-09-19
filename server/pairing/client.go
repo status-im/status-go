@@ -493,7 +493,7 @@ func setupReceivingClient(backend *api.GethStatusBackend, cs, configJSON string)
 		return nil, err
 	}
 
-	// ignore err because we don't care if there is no active account
+	// ignore err because we allow no active account here
 	activeAccount, _ := backend.GetActiveAccount()
 	if activeAccount != nil {
 		conf.ReceiverConfig.LoggedInKeyUID = activeAccount.KeyUID

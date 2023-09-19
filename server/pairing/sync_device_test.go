@@ -55,6 +55,7 @@ const (
 	seedKeypairMnemonic1    = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about abandon"
 	path0                   = "m/44'/60'/0'/0/0"
 	path1                   = "m/44'/60'/0'/0/1"
+	expectedKDFIterations   = 1024
 )
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
@@ -192,7 +193,6 @@ func (s *SyncDeviceSuite) pairAccounts(serverBackend *api.GethStatusBackend, ser
 	clientNodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
 	require.NoError(s.T(), err)
 
-	expectedKDFIterations := 2048
 	clientKeystoreDir := filepath.Join(clientDir, keystoreDir)
 	clientPayloadSourceConfig := ReceiverClientConfig{
 		ReceiverConfig: &ReceiverConfig{
@@ -295,7 +295,6 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.NoError(s.T(), err)
 	serverNodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
 	require.NoError(s.T(), err)
-	expectedKDFIterations := 1024
 	serverKeystoreDir := filepath.Join(serverTmpDir, keystoreDir)
 	serverPayloadSourceConfig := &ReceiverServerConfig{
 		ReceiverConfig: &ReceiverConfig{
@@ -463,7 +462,6 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.NoError(s.T(), err)
 	clientNodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
 	require.NoError(s.T(), err)
-	expectedKDFIterations := 2048
 	clientKeystoreDir := filepath.Join(clientTmpDir, keystoreDir)
 	clientPayloadSourceConfig := ReceiverClientConfig{
 		ReceiverConfig: &ReceiverConfig{
@@ -1195,7 +1193,6 @@ func (s *SyncDeviceSuite) TestPreventLoggedInAccountLocalPairingClientAsReceiver
 	cs, err := StartUpSenderServer(serverBackend, string(configBytes))
 	s.NoError(err)
 
-	expectedKDFIterations := 2048
 	clientKeystoreDir := filepath.Join(clientTmpDir, keystoreDir)
 	clientNodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
 	s.NoError(err)
@@ -1228,7 +1225,6 @@ func (s *SyncDeviceSuite) TestPreventLoggedInAccountLocalPairingClientAsSender()
 
 	serverNodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
 	s.NoError(err)
-	expectedKDFIterations := 1024
 	serverKeystoreDir := filepath.Join(serverTmpDir, keystoreDir)
 	serverPayloadSourceConfig := &ReceiverServerConfig{
 		ReceiverConfig: &ReceiverConfig{
