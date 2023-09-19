@@ -3,6 +3,7 @@ package communities
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1240,7 +1241,14 @@ func (o *Community) marshaledDescription() ([]byte, error) {
 		}
 	}
 
-	return proto.Marshal(clonedDescritpion)
+	rawDescritpionData, err := proto.Marshal(clonedDescritpion)
+	if err != nil {
+		return []byte{}, nil
+	}
+
+	fmt.Println("-------------------> Raw CommunityDescritpion size: ", binary.Size(rawDescritpionData))
+
+	return rawDescritpionData, nil
 }
 
 func (o *Community) MarshaledDescription() ([]byte, error) {
