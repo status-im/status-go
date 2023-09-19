@@ -583,6 +583,8 @@ func (s *SyncDeviceSuite) TestPairingThreeDevices() {
 
 	// Pair Alice-2 <-> ALice-3
 	s.logger.Info("pairing Alice-2 and Alice-3")
+	// don't allow 2 different account logged in and doing pairing, so we logout alice-3
+	s.NoError(alice3Backend.Logout())
 	s.pairAccounts(alice2Backend, alice2TmpDir, alice3Backend, alice3TmpDir)
 
 	s.checkMutualContact(alice3Backend, bobPublicKey)
