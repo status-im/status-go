@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/testutils"
@@ -17,6 +18,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+var mockupTime = time.Unix(946724400, 0) // 2000-01-01 12:00:00
 
 func tokenFromSymbol(chainID *common.ChainID, symbol string) *Token {
 	for i, t := range transfer.TestTokens {
@@ -70,6 +73,9 @@ func setupTestActivityDBStorageChoice(tb testing.TB, inMemory bool) (deps Filter
 		},
 		// tokenFromSymbol nil chainID accepts first symbol found
 		tokenFromSymbol: tokenFromSymbol,
+		currentTimestamp: func() int64 {
+			return mockupTime.Unix()
+		},
 	}
 
 	return deps, func() {
@@ -197,7 +203,7 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		id:             td.tr1.MultiTransactionID,
 		timestamp:      td.tr1.Timestamp,
 		activityType:   ReceiveAT,
-		activityStatus: CompleteAS,
+		activityStatus: FinalizedAS,
 		amountOut:      (*hexutil.Big)(big.NewInt(0)),
 		amountIn:       (*hexutil.Big)(big.NewInt(td.tr1.Value)),
 		tokenOut:       nil,
@@ -235,7 +241,7 @@ func TestGetActivityEntriesAll(t *testing.T) {
 		id:             td.multiTx1ID,
 		timestamp:      td.multiTx1.Timestamp,
 		activityType:   SendAT,
-		activityStatus: CompleteAS,
+		activityStatus: FinalizedAS,
 		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx1.FromAmount)),
 		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx1.ToAmount)),
 		tokenOut:       tokenFromSymbol(nil, td.multiTx1.FromToken),
@@ -327,7 +333,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		id:             0,
 		timestamp:      trs[5].Timestamp,
 		activityType:   ReceiveAT,
-		activityStatus: CompleteAS,
+		activityStatus: FinalizedAS,
 		amountOut:      (*hexutil.Big)(big.NewInt(0)),
 		amountIn:       (*hexutil.Big)(big.NewInt(trs[5].Value)),
 		tokenOut:       nil,
@@ -346,7 +352,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		id:             td.multiTx1ID,
 		timestamp:      td.multiTx1.Timestamp,
 		activityType:   SendAT,
-		activityStatus: CompleteAS,
+		activityStatus: FinalizedAS,
 		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx1.FromAmount)),
 		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx1.ToAmount)),
 		tokenOut:       tokenFromSymbol(nil, td.multiTx1.FromToken),
@@ -373,7 +379,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		id:             0,
 		timestamp:      trs[2].Timestamp,
 		activityType:   ReceiveAT,
-		activityStatus: CompleteAS,
+		activityStatus: FinalizedAS,
 		amountOut:      (*hexutil.Big)(big.NewInt(0)),
 		amountIn:       (*hexutil.Big)(big.NewInt(trs[2].Value)),
 		tokenOut:       nil,
@@ -392,7 +398,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		id:             td.multiTx1ID,
 		timestamp:      td.multiTx1.Timestamp,
 		activityType:   SendAT,
-		activityStatus: CompleteAS,
+		activityStatus: FinalizedAS,
 		amountOut:      (*hexutil.Big)(big.NewInt(td.multiTx1.FromAmount)),
 		amountIn:       (*hexutil.Big)(big.NewInt(td.multiTx1.ToAmount)),
 		tokenOut:       tokenFromSymbol(nil, td.multiTx1.FromToken),
@@ -418,7 +424,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		id:             0,
 		timestamp:      trs[2].Timestamp,
 		activityType:   ReceiveAT,
-		activityStatus: CompleteAS,
+		activityStatus: FinalizedAS,
 		amountOut:      (*hexutil.Big)(big.NewInt(0)),
 		amountIn:       (*hexutil.Big)(big.NewInt(trs[2].Value)),
 		tokenOut:       nil,
@@ -437,7 +443,7 @@ func TestGetActivityEntriesFilterByTime(t *testing.T) {
 		id:             0,
 		timestamp:      td.tr1.Timestamp,
 		activityType:   ReceiveAT,
-		activityStatus: CompleteAS,
+		activityStatus: FinalizedAS,
 		amountOut:      (*hexutil.Big)(big.NewInt(0)),
 		amountIn:       (*hexutil.Big)(big.NewInt(td.tr1.Value)),
 		tokenOut:       nil,
@@ -483,7 +489,7 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		id:             0,
 		timestamp:      trs[8].Timestamp,
 		activityType:   ReceiveAT,
-		activityStatus: CompleteAS,
+		activityStatus: FinalizedAS,
 		amountOut:      (*hexutil.Big)(big.NewInt(0)),
 		amountIn:       (*hexutil.Big)(big.NewInt(trs[8].Value)),
 		tokenOut:       nil,
@@ -502,7 +508,7 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		id:             0,
 		timestamp:      trs[6].Timestamp,
 		activityType:   ReceiveAT,
-		activityStatus: CompleteAS,
+		activityStatus: FinalizedAS,
 		amountOut:      (*hexutil.Big)(big.NewInt(0)),
 		amountIn:       (*hexutil.Big)(big.NewInt(trs[6].Value)),
 		tokenOut:       nil,
@@ -527,7 +533,7 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		id:             0,
 		timestamp:      trs[6].Timestamp,
 		activityType:   ReceiveAT,
-		activityStatus: CompleteAS,
+		activityStatus: FinalizedAS,
 		amountOut:      (*hexutil.Big)(big.NewInt(0)),
 		amountIn:       (*hexutil.Big)(big.NewInt(trs[6].Value)),
 		tokenOut:       nil,
@@ -546,7 +552,7 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		id:             0,
 		timestamp:      trs[4].Timestamp,
 		activityType:   ReceiveAT,
-		activityStatus: CompleteAS,
+		activityStatus: FinalizedAS,
 		amountOut:      (*hexutil.Big)(big.NewInt(0)),
 		amountIn:       (*hexutil.Big)(big.NewInt(trs[4].Value)),
 		tokenOut:       nil,
@@ -571,7 +577,7 @@ func TestGetActivityEntriesCheckOffsetAndLimit(t *testing.T) {
 		id:             0,
 		timestamp:      trs[2].Timestamp,
 		activityType:   ReceiveAT,
-		activityStatus: CompleteAS,
+		activityStatus: FinalizedAS,
 		amountOut:      (*hexutil.Big)(big.NewInt(0)),
 		amountIn:       (*hexutil.Big)(big.NewInt(trs[2].Value)),
 		tokenOut:       nil,
@@ -749,7 +755,7 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 		id:             0,
 		timestamp:      trs[4].Timestamp,
 		activityType:   SendAT,
-		activityStatus: CompleteAS,
+		activityStatus: FinalizedAS,
 		amountOut:      (*hexutil.Big)(big.NewInt(trs[4].Value)),
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 		tokenOut:       TTrToToken(t, &trs[4].TestTransaction),
@@ -768,7 +774,7 @@ func TestGetActivityEntriesFilterByAddresses(t *testing.T) {
 		id:             0,
 		timestamp:      trs[1].Timestamp,
 		activityType:   SendAT,
-		activityStatus: CompleteAS,
+		activityStatus: FinalizedAS,
 		amountOut:      (*hexutil.Big)(big.NewInt(trs[1].Value)),
 		amountIn:       (*hexutil.Big)(big.NewInt(0)),
 		tokenOut:       TTrToToken(t, &trs[1].TestTransaction),
@@ -805,9 +811,9 @@ func TestGetActivityEntriesFilterByStatus(t *testing.T) {
 	deps, close := setupTestActivityDB(t)
 	defer close()
 
-	// Adds 4 extractable transactions: 1 T, 1 T pending, 1 MT pending, 1 MT with 2xT success
+	// Adds 4 extractable transactions: 1 T, 1 T pending, 1 MT pending, 1 MT with 2xT finalized
 	td, fromTds, toTds := fillTestData(t, deps.db)
-	// Add 7 extractable transactions: 1 pending, 1 Tr failed, 1 MT failed, 4 success
+	// Add 7 extractable transactions: 1 pending, 1 Tr failed, 1 MT failed, 4 finalized
 	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 7)
 	multiTx := transfer.GenerateTestSendMultiTransaction(trs[6])
 	failedMTID := transfer.InsertTestMultiTransaction(t, deps.db, &multiTx)
@@ -817,6 +823,10 @@ func TestGetActivityEntriesFilterByStatus(t *testing.T) {
 			transfer.InsertTestPendingTransaction(t, deps.db, &trs[i])
 		} else {
 			trs[i].Success = i != 3 && i != 6
+			if trs[i].Success && (i == 2 || i == 5) {
+				// Finalize status depends on timestamp
+				trs[i].Timestamp = mockupTime.Unix() - 10
+			}
 			transfer.InsertTestTransfer(t, deps.db, trs[i].To, &trs[i])
 		}
 	}
@@ -845,13 +855,12 @@ func TestGetActivityEntriesFilterByStatus(t *testing.T) {
 	filter.Statuses = []Status{CompleteAS}
 	entries, err = getActivityEntries(context.Background(), deps, allAddresses, true, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
-	require.Equal(t, 6, len(entries))
+	require.Equal(t, 2, len(entries))
 
-	// Finalized is treated as Complete, would need dynamic blockchain status to track the Finalized level
 	filter.Statuses = []Status{FinalizedAS}
 	entries, err = getActivityEntries(context.Background(), deps, allAddresses, true, []common.ChainID{}, filter, 0, 15)
 	require.NoError(t, err)
-	require.Equal(t, 6, len(entries))
+	require.Equal(t, 4, len(entries))
 
 	// Combined filter
 	filter.Statuses = []Status{FailedAS, PendingAS}
