@@ -161,15 +161,14 @@ SELECT
 	transfers.timestamp AS timestamp,
 	NULL AS mt_type,
 	CASE
-		WHEN from_join.address IS NOT NULL
-		AND to_join.address IS NULL THEN fromTrType
-		WHEN to_join.address IS NOT NULL
-		AND from_join.address IS NULL THEN toTrType
-		WHEN from_join.address IS NOT NULL
-		AND to_join.address IS NOT NULL THEN CASE
-			WHEN transfers.address = transfers.tx_from_address THEN fromTrType
-			ELSE toTrType
-		END
+		WHEN from_join.address IS NOT NULL AND to_join.address IS NULL THEN fromTrType
+		WHEN to_join.address IS NOT NULL AND from_join.address IS NULL THEN toTrType
+		WHEN from_join.address IS NOT NULL AND to_join.address IS NOT NULL THEN
+			CASE
+				WHEN transfers.address = transfers.tx_from_address THEN fromTrType
+				WHEN transfers.address = transfers.tx_to_address THEN toTrType
+				ELSE NULL
+			END
 		ELSE NULL
 	END as tr_type,
 	transfers.tx_from_address AS from_address,
@@ -204,8 +203,6 @@ SELECT
 FROM
 	transfers
 	CROSS JOIN filter_conditions
-	INNER JOIN filter_to_addresses receiver_join ON filterAllToAddresses != 0
-	OR transfers.tx_to_address = receiver_join.address
 	LEFT JOIN filter_addresses from_join ON transfers.tx_from_address = from_join.address
 	LEFT JOIN filter_addresses to_join ON transfers.tx_to_address = to_join.address
 WHERE
@@ -268,6 +265,10 @@ WHERE
 		OR (owner_address IN filter_addresses)
 	)
 	AND (
+		filterAllToAddresses
+		OR (transfers.tx_to_address IN filter_to_addresses)
+	)
+	AND (
 		includeAllTokenTypeAssets
 		OR (
 			transfers.type = 'eth'
@@ -325,15 +326,13 @@ SELECT
 	pending_transactions.timestamp AS timestamp,
 	NULL AS mt_type,
 	CASE
-		WHEN from_join.address IS NOT NULL
-		AND to_join.address IS NULL THEN fromTrType
-		WHEN to_join.address IS NOT NULL
-		AND from_join.address IS NULL THEN toTrType
-		WHEN from_join.address IS NOT NULL
-		AND to_join.address IS NOT NULL THEN CASE
-			WHEN from_join.address < to_join.address THEN fromTrType
-			ELSE toTrType
-		END
+		WHEN from_join.address IS NOT NULL AND to_join.address IS NULL THEN fromTrType
+		WHEN to_join.address IS NOT NULL AND from_join.address IS NULL THEN toTrType
+		WHEN from_join.address IS NOT NULL AND to_join.address IS NOT NULL THEN
+			CASE
+				WHEN from_join.address < to_join.address THEN fromTrType
+				ELSE toTrType
+			END
 		ELSE NULL
 	END as tr_type,
 	pending_transactions.from_address AS from_address,
@@ -356,8 +355,6 @@ SELECT
 FROM
 	pending_transactions
 	CROSS JOIN filter_conditions
-	INNER JOIN filter_to_addresses receiver_join ON filterAllToAddresses != 0
-	OR pending_transactions.to_address = receiver_join.address
 	LEFT JOIN filter_addresses from_join ON pending_transactions.from_address = from_join.address
 	LEFT JOIN filter_addresses to_join ON pending_transactions.to_address = to_join.address
 WHERE
@@ -385,6 +382,10 @@ WHERE
 	AND (
 		filterAllAddresses
 		OR tr_type NOT NULL
+	)
+	AND (
+		filterAllToAddresses
+		OR (pending_transactions.to_address IN filter_to_addresses)
 	)
 	AND (
 		includeAllTokenTypeAssets
@@ -443,8 +444,6 @@ SELECT
 FROM
 	multi_transactions
 	CROSS JOIN filter_conditions
-	INNER JOIN filter_to_addresses receiver_join ON filterAllToAddresses != 0
-	OR multi_transactions.to_address = receiver_join.address
 	LEFT JOIN tr_status ON multi_transactions.ROWID = tr_status.multi_transaction_id
 	LEFT JOIN pending_status ON multi_transactions.ROWID = pending_status.multi_transaction_id
 WHERE
@@ -477,6 +476,10 @@ WHERE
 				OR multi_transactions.to_address IN filter_addresses
 			)
 		)
+	)
+	AND (
+		filterAllToAddresses
+		OR (multi_transactions.to_address IN filter_to_addresses)
 	)
 	AND (
 		includeAllTokenTypeAssets

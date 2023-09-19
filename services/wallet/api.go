@@ -577,6 +577,13 @@ func (api *API) FilterActivityAsync(requestID int32, addresses []common.Address,
 	return nil
 }
 
+func (api *API) CancelActivityFilterTask(requestID int32) error {
+	log.Debug("wallet.api.CancelActivityFilterTask", "requestID", requestID)
+
+	api.s.activity.CancelFilterTask(requestID)
+	return nil
+}
+
 func (api *API) GetMultiTxDetails(ctx context.Context, multiTxID int) (*activity.EntryDetails, error) {
 	log.Debug("wallet.api.GetMultiTxDetails", "multiTxID", multiTxID)
 
