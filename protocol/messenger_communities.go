@@ -16,6 +16,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
@@ -1057,7 +1059,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		CommunityID:       community.ID(),
 		SkipProtocolLayer: true,
 		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
-		PubsubTopic:       community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+		PubsubTopic:       relay.DefaultWakuTopic, // TODO: this should be sent on a non protected pubsub topic.
 	}
 
 	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
@@ -1375,7 +1377,7 @@ func (m *Messenger) CancelRequestToJoinCommunity(request *requests.CancelRequest
 		CommunityID:       community.ID(),
 		SkipProtocolLayer: true,
 		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN,
-		PubsubTopic:       community.PubsubTopic(), // TODO: confirm if it should be send in community pubsub topic
+		PubsubTopic:       relay.DefaultWakuTopic, // TODO: this should be sent on a non protected pubsub topic.
 	}
 	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
 

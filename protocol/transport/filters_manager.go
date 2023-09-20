@@ -137,7 +137,7 @@ func (f *FiltersManager) InitPublicFilters(publicFiltersToInit []FiltersToInitia
 	var filters []*Filter
 	// Add public, one-to-one and negotiated filters.
 	for _, pf := range publicFiltersToInit {
-		f, err := f.LoadPublic(pf.ChatID, pf.PubsubTopic) // TODO: pubsubtopic
+		f, err := f.LoadPublic(pf.ChatID, pf.PubsubTopic)
 		if err != nil {
 			return nil, err
 		}
@@ -161,30 +161,33 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 			continue
 		}
 
-		pubsubTopic := GetPubsubTopic(cf.Shard)
-		identityStr := PublicKeyToStr(&cf.PrivKey.PublicKey)
-		rawFilter, err := f.addAsymmetric(identityStr, pubsubTopic, cf.PrivKey, true)
-		if err != nil {
-			f.logger.Debug("could not register community filter", zap.Error(err))
-			return nil, err
+		// TODO: requests to join / cancels are currently being sent into the default waku topic.
+		// They must be sent into an specific non protected shard
+		for _, pubsubTopic := range []string{GetPubsubTopic(cf.Shard), relay.DefaultWakuTopic} {
+			identityStr := PublicKeyToStr(&cf.PrivKey.PublicKey)
+			rawFilter, err := f.addAsymmetric(identityStr, pubsubTopic, cf.PrivKey, true)
+			if err != nil {
+				f.logger.Debug("could not register community filter", zap.Error(err))
+				return nil, err
 
+			}
+			filterID := identityStr + "-admin"
+			filter := &Filter{
+				ChatID:       filterID,
+				FilterID:     rawFilter.FilterID,
+				PubsubTopic:  pubsubTopic,
+				ContentTopic: rawFilter.Topic,
+				Identity:     identityStr,
+				Listen:       true,
+				OneToOne:     true,
+			}
+
+			f.filters[filterID] = filter
+
+			f.logger.Debug("registering filter for", zap.String("chatID", filterID), zap.String("type", "community"), zap.String("topic", rawFilter.Topic.String()))
+
+			filters = append(filters, filter)
 		}
-		filterID := identityStr + "-admin"
-		filter := &Filter{
-			ChatID:       filterID,
-			FilterID:     rawFilter.FilterID,
-			PubsubTopic:  pubsubTopic,
-			ContentTopic: rawFilter.Topic,
-			Identity:     identityStr,
-			Listen:       true,
-			OneToOne:     true,
-		}
-
-		f.filters[filterID] = filter
-
-		f.logger.Debug("registering filter for", zap.String("chatID", filterID), zap.String("type", "community"), zap.String("topic", rawFilter.Topic.String()))
-
-		filters = append(filters, filter)
 	}
 	return filters, nil
 }
