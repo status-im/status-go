@@ -1267,7 +1267,8 @@ func (o *Community) DefaultFilters() []transport.FiltersToInitialize {
 	communityPubsubTopic := o.PubsubTopic()
 
 	return []transport.FiltersToInitialize{
-		{ChatID: cID, PubsubTopic: relay.DefaultWakuTopic}, // TODO: verify if this goes into default topic
+		{ChatID: cID, PubsubTopic: communityPubsubTopic},
+		{ChatID: uncompressedPubKey, PubsubTopic: relay.DefaultWakuTopic}, // TODO: messages that are not protected are sent in default pubsub topic for now
 		{ChatID: uncompressedPubKey, PubsubTopic: communityPubsubTopic},
 		{ChatID: updatesChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: mlChannelID, PubsubTopic: communityPubsubTopic},

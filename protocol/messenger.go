@@ -2272,7 +2272,19 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		if err != nil {
 			return nil, err
 		}
-		message.Payload = &protobuf.ChatMessage_Community{Community: wrappedCommunity}
+
+		shardCluster := int32(common.UndefinedShardValue)
+		shardIndex := int32(common.UndefinedShardValue)
+		if community.Shard() != nil {
+			shardCluster = int32(community.Shard().Cluster)
+			shardIndex = int32(community.Shard().Index)
+		}
+
+		message.Payload = &protobuf.ChatMessage_CommunityShard{CommunityShard: &protobuf.CommunityShard{
+			Community:    wrappedCommunity,
+			ShardCluster: shardCluster,
+			ShardIndex:   shardIndex,
+		}}
 
 		message.ContentType = protobuf.ChatMessage_COMMUNITY
 	} else if len(message.AudioPath) != 0 {

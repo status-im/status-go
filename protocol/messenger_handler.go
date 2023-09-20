@@ -1674,8 +1674,8 @@ func (m *Messenger) HandleCommunityRequestToLeave(state *ReceivedMessageState, r
 }
 
 // handleWrappedCommunityDescriptionMessage handles a wrapped community description
-func (m *Messenger) handleWrappedCommunityDescriptionMessage(payload []byte) (*communities.CommunityResponse, error) {
-	return m.communitiesManager.HandleWrappedCommunityDescriptionMessage(payload)
+func (m *Messenger) handleWrappedCommunityDescriptionMessage(payload []byte, shard *common.Shard) (*communities.CommunityResponse, error) {
+	return m.communitiesManager.HandleWrappedCommunityDescriptionMessage(payload, shard)
 }
 
 func (m *Messenger) handleEditMessage(state *ReceivedMessageState, editMessage EditMessage) error {
@@ -2275,7 +2275,23 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 	if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
 		m.logger.Debug("Handling community content type")
 
-		communityResponse, err := m.handleWrappedCommunityDescriptionMessage(receivedMessage.GetCommunity())
+		var descriptionPayload []byte
+		var shard *common.Shard
+		communityShard := receivedMessage.GetCommunityShard()
+		if communityShard != nil {
+			descriptionPayload = communityShard.Community
+			if communityShard.ShardCluster != common.UndefinedShardValue && communityShard.ShardIndex != common.UndefinedShardValue {
+				shard = &common.Shard{
+					Cluster: uint16(communityShard.ShardCluster),
+					Index:   uint16(communityShard.ShardIndex),
+				}
+			}
+		} else {
+			// Handling deprecated message
+			descriptionPayload = receivedMessage.GetCommunityNoShard()
+		}
+
+		communityResponse, err := m.handleWrappedCommunityDescriptionMessage(descriptionPayload, shard)
 		if err != nil {
 			return err
 		}
