@@ -84,10 +84,21 @@ func (s *IPsTestingSuite) TestConnectionParams_GetLocalAddressesForPairingServer
 
 	ips := filterAddressesForPairingServer(allIps)
 	s.Require().Len(ips, 2)
-	s.Require().NotNil(ips[0].To4())
+
+	var ip1, ip2 net.IP
+
+	if ips[0].To4() != nil {
+		ip1 = ips[0]
+		ip2 = ips[1]
+	} else {
+		ip1 = ips[1]
+		ip2 = ips[0]
+	}
+
+	s.Require().NotNil(ip1.To4())
 	s.Require().NotNil(ni1[0].To4())
-	s.Require().Equal(ips[0].To4(), ni1[0].To4())
-	s.Require().Equal(ips[1], ni3[0])
+	s.Require().Equal(ip1.To4(), ni1[0].To4())
+	s.Require().Equal(ip2, ni3[0])
 }
 
 func (s *IPsTestingSuite) TestConnectionParams_FindReachableAddresses() {

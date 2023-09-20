@@ -42,7 +42,7 @@ func addrToIPNet(addr net.Addr) *net.IPNet {
 // ips is a 2-dimensional array, where each sub-array is a list of IP
 // addresses for a single network interface.
 func filterAddressesForPairingServer(ips [][]net.IP) []net.IP {
-	var result []net.IP
+	var result = map[string]net.IP{}
 
 	for _, niIps := range ips {
 		var ipv4, ipv6 []net.IP
@@ -63,13 +63,22 @@ func filterAddressesForPairingServer(ips [][]net.IP) []net.IP {
 
 		// Prefer IPv4 over IPv6 for shorter connection string
 		if len(ipv4) == 0 {
-			result = append(result, ipv6...)
+			for _, ip := range ipv6 {
+				result[ip.String()] = ip
+			}
 		} else {
-			result = append(result, ipv4...)
+			for _, ip := range ipv4 {
+				result[ip.String()] = ip
+			}
 		}
 	}
 
-	return result
+	var out []net.IP
+	for _, v := range result {
+		out = append(out, v)
+	}
+
+	return out
 }
 
 // getAndroidLocalIP uses the net dial default ip as the standard Android IP address
