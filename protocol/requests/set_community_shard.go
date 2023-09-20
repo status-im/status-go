@@ -19,7 +19,7 @@ func (s *SetCommunityShard) Validate() error {
 	}
 	if s.Shard != nil {
 		// TODO: for now only MainStatusShard(16) is accepted
-		if s.Shard.Cluster != common.MainStatusShard {
+		if s.Shard.Cluster != common.MainStatusShardCluster {
 			return errors.New("invalid shard cluster")
 		}
 		if s.Shard.Index > 1023 {
