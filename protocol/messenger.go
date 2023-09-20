@@ -3615,8 +3615,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						continue
 					}
 					contact = c
-					messageState.AllContacts.Store(senderID, contact)
-					m.forgetContactInfoRequest(senderID)
+					if msg.Type != protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY {
+						messageState.AllContacts.Store(senderID, contact)
+						m.forgetContactInfoRequest(senderID)
+					}
 				}
 				messageState.CurrentMessageState = &CurrentMessageState{
 					MessageID:        messageID,
