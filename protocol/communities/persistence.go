@@ -40,7 +40,7 @@ const communitiesBaseQuery = `
 func (p *Persistence) SaveCommunity(community *Community) error {
 	id := community.ID()
 	privateKey := community.PrivateKey()
-	wrappedCommunity, err := community.ToProtocolMessageBytes()
+	wrappedCommunity, err := community.ToProtocolMessageBytes(false)
 	if err != nil {
 		return err
 	}

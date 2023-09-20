@@ -1230,13 +1230,15 @@ func (o *Community) Description() *protobuf.CommunityDescription {
 	return o.config.CommunityDescription
 }
 
-func (o *Community) marshaledDescription() ([]byte, error) {
+func (o *Community) marshaledDescription(trimChatMembers bool) ([]byte, error) {
 	// Clear members list for channels that don't have permissions
 	// TMP: should be fixed in https://github.com/status-im/status-desktop/issues/12188
 	clonedDescritpion := proto.Clone(o.config.CommunityDescription).(*protobuf.CommunityDescription)
-	for chatID, chat := range clonedDescritpion.Chats {
-		if !CheckIfChannelHasAnyPermissions(chatID, clonedDescritpion) {
-			chat.Members = map[string]*protobuf.CommunityMember{}
+	if trimChatMembers {
+		for chatID, chat := range clonedDescritpion.Chats {
+			if !CheckIfChannelHasAnyPermissions(chatID, clonedDescritpion) {
+				chat.Members = map[string]*protobuf.CommunityMember{}
+			}
 		}
 	}
 
@@ -1246,10 +1248,10 @@ func (o *Community) marshaledDescription() ([]byte, error) {
 func (o *Community) MarshaledDescription() ([]byte, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
-	return o.marshaledDescription()
+	return o.marshaledDescription(true)
 }
 
-func (o *Community) toProtocolMessageBytes() ([]byte, error) {
+func (o *Community) toProtocolMessageBytes(trimChatMembers bool) ([]byte, error) {
 	// This should not happen, as we can only serialize on our side if we
 	// created the community
 	if !o.IsControlNode() && len(o.config.CommunityDescriptionProtocolMessage) == 0 {
@@ -1262,7 +1264,7 @@ func (o *Community) toProtocolMessageBytes() ([]byte, error) {
 	}
 
 	// serialize and sign
-	payload, err := o.marshaledDescription()
+	payload, err := o.marshaledDescription(trimChatMembers)
 	if err != nil {
 		return nil, err
 	}
@@ -1271,10 +1273,10 @@ func (o *Community) toProtocolMessageBytes() ([]byte, error) {
 }
 
 // ToProtocolMessageBytes returns the community in a wrapped & signed protocol message
-func (o *Community) ToProtocolMessageBytes() ([]byte, error) {
+func (o *Community) ToProtocolMessageBytes(trimChatMembers bool) ([]byte, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
-	return o.toProtocolMessageBytes()
+	return o.toProtocolMessageBytes(trimChatMembers)
 }
 
 func (o *Community) Chats() map[string]*protobuf.CommunityChat {
