@@ -38,6 +38,15 @@ func tokenFromSymbol(chainID *common.ChainID, symbol string) *Token {
 	return nil
 }
 
+func tokenFromCollectible(c *transfer.TestCollectible) Token {
+	return Token{
+		TokenType: Erc721,
+		ChainID:   c.ChainID,
+		Address:   c.TokenAddress,
+		TokenID:   (*hexutil.Big)(c.TokenID),
+	}
+}
+
 func setupTestActivityDBStorageChoice(tb testing.TB, inMemory bool) (deps FilterDependencies, close func()) {
 	var db *sql.DB
 	var err error
@@ -949,6 +958,60 @@ func TestGetActivityEntriesFilterByTokenType(t *testing.T) {
 	require.Equal(t, Erc20, entries[0].tokenIn.TokenType)
 	require.Equal(t, transfer.UsdcGoerli.Address, entries[0].tokenIn.Address)
 	require.Nil(t, entries[0].tokenOut)
+}
+
+func TestGetActivityEntriesFilterByCollectibles(t *testing.T) {
+	deps, close := setupTestActivityDB(t)
+	defer close()
+
+	// Adds 4 extractable transactions 2 transactions (ETH/Goerli, ETH/Optimism), one MT USDC to DAI and another MT USDC to SNT
+	td, fromTds, toTds := fillTestData(t, deps.db)
+	// Add 4 transactions with collectibles
+	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 4)
+	for i := range trs {
+		collectibleData := transfer.TestCollectibles[i]
+		trs[i].ChainID = collectibleData.ChainID
+		transfer.InsertTestTransferWithOptions(t, deps.db, trs[i].To, &trs[i], &transfer.TestTransferOptions{
+			TokenAddress: collectibleData.TokenAddress,
+			TokenID:      collectibleData.TokenID,
+		})
+	}
+
+	allAddresses := append(append(append(fromTds, toTds...), fromTrs...), toTrs...)
+
+	var filter Filter
+	filter.FilterOutCollectibles = true
+	entries, err := getActivityEntries(context.Background(), deps, allAddresses, true, []common.ChainID{}, filter, 0, 15)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(entries))
+
+	filter.FilterOutCollectibles = false
+	filter.Collectibles = allTokensFilter()
+	entries, err = getActivityEntries(context.Background(), deps, allAddresses, true, []common.ChainID{}, filter, 0, 15)
+	require.NoError(t, err)
+	require.Equal(t, 8, len(entries))
+
+	// Search for a specific collectible
+	filter.Collectibles = []Token{tokenFromCollectible(&transfer.TestCollectibles[0])}
+	entries, err = getActivityEntries(context.Background(), deps, allAddresses, true, []common.ChainID{}, filter, 0, 15)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(entries))
+	require.Equal(t, entries[0].tokenIn.Address, transfer.TestCollectibles[0].TokenAddress)
+	require.Equal(t, entries[0].tokenIn.TokenID, (*hexutil.Big)(transfer.TestCollectibles[0].TokenID))
+
+	// Search for a specific collectible
+	filter.Collectibles = []Token{tokenFromCollectible(&transfer.TestCollectibles[3])}
+	entries, err = getActivityEntries(context.Background(), deps, allAddresses, true, []common.ChainID{}, filter, 0, 15)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(entries))
+	require.Equal(t, entries[0].tokenIn.Address, transfer.TestCollectibles[3].TokenAddress)
+	require.Equal(t, entries[0].tokenIn.TokenID, (*hexutil.Big)(transfer.TestCollectibles[3].TokenID))
+
+	// Search for a multiple collectibles
+	filter.Collectibles = []Token{tokenFromCollectible(&transfer.TestCollectibles[1]), tokenFromCollectible(&transfer.TestCollectibles[2])}
+	entries, err = getActivityEntries(context.Background(), deps, allAddresses, true, []common.ChainID{}, filter, 0, 15)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(entries))
 }
 
 func TestGetActivityEntriesFilterByToAddresses(t *testing.T) {

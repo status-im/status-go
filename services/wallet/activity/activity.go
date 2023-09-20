@@ -311,8 +311,9 @@ const (
 	fromTrType = byte(1)
 	toTrType   = byte(2)
 
-	noEntriesInTmpTableSQLValues           = "(NULL)"
-	noEntriesInTwoColumnsTmpTableSQLValues = "(NULL, NULL)"
+	noEntriesInTmpTableSQLValues             = "(NULL)"
+	noEntriesInTwoColumnsTmpTableSQLValues   = "(NULL, NULL)"
+	noEntriesInThreeColumnsTmpTableSQLValues = "(NULL, NULL, NULL)"
 )
 
 //go:embed filter.sql
@@ -374,6 +375,21 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		}
 	}
 
+	includeAllCollectibles := len(filter.Collectibles) == 0 && !filter.FilterOutCollectibles
+	assetsERC721 := noEntriesInThreeColumnsTmpTableSQLValues
+	if !includeAllCollectibles && !filter.FilterOutCollectibles {
+		assetsERC721 = joinItems(filter.Collectibles, func(item Token) string {
+			// SQL HEX() (Blob->Hex) conversion returns uppercase digits with no 0x prefix
+			tokenID := strings.ToUpper(item.TokenID.String()[2:])
+			address := strings.ToUpper(item.Address.Hex()[2:])
+			if len(tokenID)%2 == 1 {
+				// Hex length must be divisable by 2, otherwise append '0' at the beginning
+				tokenID = "0" + tokenID
+			}
+			return fmt.Sprintf("%d, '%s', '%s'", item.ChainID, tokenID, address)
+		})
+	}
+
 	// construct chain IDs
 	includeAllNetworks := len(chainIDs) == 0
 	networks := noEntriesInTmpTableSQLValues
@@ -414,7 +430,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		return strconv.Itoa(int(t))
 	})
 
-	queryString := fmt.Sprintf(queryFormatString, involvedAddresses, toAddresses, assetsTokenCodes, assetsERC20, networks,
+	queryString := fmt.Sprintf(queryFormatString, involvedAddresses, toAddresses, assetsTokenCodes, assetsERC20, assetsERC721, networks,
 		layer2Networks, joinedMTTypes)
 
 	// The duplicated temporary table UNION with CTE acts as an optimization
@@ -435,6 +451,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		includeAllStatuses, filterStatusCompleted, filterStatusFailed, filterStatusFinalized, filterStatusPending,
 		FailedAS, CompleteAS, FinalizedAS, PendingAS,
 		includeAllTokenTypeAssets,
+		includeAllCollectibles,
 		includeAllNetworks,
 		transactions.Pending,
 		deps.currentTimestamp(),
