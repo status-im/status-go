@@ -34,11 +34,15 @@ WITH filter_conditions AS (
 		? AS filterStatusFinalized,
 		? AS filterStatusPending,
 		? AS statusFailed,
-		? AS statusSuccess,
+		? AS statusCompleted,
+		? AS statusFinalized,
 		? AS statusPending,
 		? AS includeAllTokenTypeAssets,
 		? AS includeAllNetworks,
 		? AS pendingStatus,
+		? AS nowTimestamp,
+		? AS layer2FinalisationDuration,
+		? AS layer1FinalisationDuration,
 		'0000000000000000000000000000000000000000' AS zeroAddress
 ),
 -- This UNION between CTE and TEMP TABLE acts as an optimization. As soon as we drop one or use them interchangeably the performance drops significantly.
@@ -139,6 +143,9 @@ pending_network_ids AS (
 		AND pending_transactions.network_id IN filter_networks
 	GROUP BY
 		pending_transactions.multi_transaction_id
+),
+layer2_networks(network_id) AS (
+	VALUES %s
 )
 SELECT
 	transfers.hash AS transfer_hash,
@@ -166,7 +173,16 @@ SELECT
 	NULL AS mt_from_amount,
 	NULL AS mt_to_amount,
 	CASE
-		WHEN transfers.status IS 1 THEN statusSuccess
+		WHEN transfers.status IS 1 THEN 
+			CASE
+				WHEN transfers.timestamp > 0 AND filter_conditions.nowTimestamp >= transfers.timestamp + 
+					(CASE
+						WHEN transfers.network_id in layer2_networks THEN layer2FinalisationDuration
+						ELSE layer1FinalisationDuration
+					END) 
+				THEN statusFinalized
+				ELSE statusCompleted
+			END
 		ELSE statusFailed
 	END AS agg_status,
 	1 AS agg_count,
@@ -282,15 +298,16 @@ WHERE
 	AND (
 		filterAllActivityStatus
 		OR (
-			(
-				filterStatusCompleted
-				OR filterStatusFinalized
-			)
-			AND transfers.status = 1
+			filterStatusCompleted
+			AND agg_status = statusCompleted
+		)
+		OR (
+			filterStatusFinalized 
+			AND agg_status = statusFinalized
 		)
 		OR (
 			filterStatusFailed
-			AND transfers.status = 0
+			AND agg_status = statusFailed
 		)
 	)
 UNION
@@ -401,8 +418,17 @@ SELECT
 	multi_transactions.from_amount AS mt_from_amount,
 	multi_transactions.to_amount AS mt_to_amount,
 	CASE
-		WHEN tr_status.min_status = 1
-		AND COALESCE(pending_status.count, 0) = 0 THEN statusSuccess
+	WHEN tr_status.min_status = 1 AND COALESCE(pending_status.count, 0) = 0 THEN 
+		CASE
+			WHEN multi_transactions.timestamp > 0 AND filter_conditions.nowTimestamp >= multi_transactions.timestamp + 
+				(CASE
+					WHEN multi_transactions.from_network_id in layer2_networks 
+							OR multi_transactions.to_network_id in layer2_networks THEN layer2FinalisationDuration
+					ELSE layer1FinalisationDuration
+				END)
+			THEN statusFinalized
+			ELSE statusCompleted
+		END
 		WHEN tr_status.min_status = 0 THEN statusFailed
 		ELSE statusPending
 	END AS agg_status,
@@ -475,11 +501,12 @@ WHERE
 	AND (
 		filterAllActivityStatus
 		OR (
-			(
-				filterStatusCompleted
-				OR filterStatusFinalized
-			)
-			AND agg_status = statusSuccess
+			filterStatusCompleted 
+			AND agg_status = statusCompleted 
+		)
+		OR (
+			filterStatusFinalized 
+			AND agg_status = statusFinalized
 		)
 		OR (
 			filterStatusFailed

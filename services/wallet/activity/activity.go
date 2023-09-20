@@ -324,6 +324,8 @@ type FilterDependencies struct {
 	tokenSymbol func(token Token) string
 	// use the chainID and symbol to look up token.TokenType and token.Address. Return nil if not found
 	tokenFromSymbol func(chainID *common.ChainID, symbol string) *Token
+	// use to get current timestamp
+	currentTimestamp func() int64
 }
 
 // getActivityEntries queries the transfers, pending_transactions, and multi_transactions tables based on filter parameters and arguments
@@ -379,6 +381,11 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		networks = joinItems(chainIDs, nil)
 	}
 
+	layer2Chains := []uint64{common.OptimismMainnet, common.OptimismGoerli, common.ArbitrumMainnet, common.ArbitrumGoerli}
+	layer2Networks := joinItems(layer2Chains, func(chainID uint64) string {
+		return fmt.Sprintf("%d", chainID)
+	})
+
 	startFilterDisabled := !(filter.Period.StartTimestamp > 0)
 	endFilterDisabled := !(filter.Period.EndTimestamp > 0)
 	filterActivityTypeAll := len(filter.Types) == 0
@@ -408,7 +415,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 	})
 
 	queryString := fmt.Sprintf(queryFormatString, involvedAddresses, toAddresses, assetsTokenCodes, assetsERC20, networks,
-		joinedMTTypes)
+		layer2Networks, joinedMTTypes)
 
 	// The duplicated temporary table UNION with CTE acts as an optimization
 	// As soon as we use filter_addresses CTE or filter_addresses_table temp table
@@ -426,10 +433,13 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		fromTrType, toTrType,
 		allAddresses, filterAllToAddresses,
 		includeAllStatuses, filterStatusCompleted, filterStatusFailed, filterStatusFinalized, filterStatusPending,
-		FailedAS, CompleteAS, PendingAS,
+		FailedAS, CompleteAS, FinalizedAS, PendingAS,
 		includeAllTokenTypeAssets,
 		includeAllNetworks,
 		transactions.Pending,
+		deps.currentTimestamp(),
+		648000, // 7.5 days in seconds for layer 2 finalization. 0.5 day is buffer to not create false positive.
+		960,    // A block on layer 1 is every 12s, finalization require 64 blocks. A buffer of 16 blocks is added to not create false positives.
 		limit, offset)
 	if err != nil {
 		return nil, err

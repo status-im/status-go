@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
@@ -268,6 +269,9 @@ func (s *Service) getDeps() FilterDependencies {
 				ChainID:   w_common.ChainID(t.ChainID),
 				Address:   t.Address,
 			}
+		},
+		currentTimestamp: func() int64 {
+			return time.Now().Unix()
 		},
 	}
 }
