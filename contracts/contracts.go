@@ -165,29 +165,36 @@ func (c *ContractMaker) NewDirectory(chainID uint64) (*directory.Directory, erro
 	)
 }
 
-func (c *ContractMaker) NewEthScan(chainID uint64) (*ethscan.BalanceScanner, error) {
+func (c *ContractMaker) NewEthScan(chainID uint64) (*ethscan.BalanceScanner, uint, error) {
 	contractAddr, err := ethscan.ContractAddress(chainID)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
+	}
+
+	contractCreatedAt, err := ethscan.ContractCreatedAt(chainID)
+	if err != nil {
+		return nil, 0, err
 	}
 
 	backend, err := c.RPCClient.EthClient(chainID)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	bytecode, err := backend.CodeAt(context.Background(), contractAddr, nil)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	if len(bytecode) == 0 {
-		return nil, errors.New("is not a contract")
+		return nil, 0, errors.New("is not a contract")
 	}
 
-	return ethscan.NewBalanceScanner(
+	scanner, err := ethscan.NewBalanceScanner(
 		contractAddr,
 		backend,
 	)
+
+	return scanner, contractCreatedAt, err
 }
 
 func (c *ContractMaker) NewHopL2SaddlSwap(chainID uint64, symbol string) (*hopSwap.HopSwap, error) {

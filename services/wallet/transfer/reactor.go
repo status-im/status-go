@@ -57,7 +57,7 @@ func NewOnDemandFetchStrategy(
 	transactionManager *TransactionManager,
 	pendingTxManager *transactions.PendingTxTracker,
 	tokenManager *token.Manager,
-	chainClients map[uint64]*chain.ClientWithFallback,
+	chainClients map[uint64]chain.ClientInterface,
 	accounts []common.Address,
 	balanceCacher balance.Cacher,
 ) *OnDemandFetchStrategy {
@@ -86,11 +86,11 @@ type OnDemandFetchStrategy struct {
 	transactionManager *TransactionManager
 	pendingTxManager   *transactions.PendingTxTracker
 	tokenManager       *token.Manager
-	chainClients       map[uint64]*chain.ClientWithFallback
+	chainClients       map[uint64]chain.ClientInterface
 	accounts           []common.Address
 }
 
-func (s *OnDemandFetchStrategy) newControlCommand(chainClient *chain.ClientWithFallback, accounts []common.Address) *controlCommand {
+func (s *OnDemandFetchStrategy) newControlCommand(chainClient chain.ClientInterface, accounts []common.Address) *controlCommand {
 	signer := types.LatestSignerForChainID(chainClient.ToBigInt())
 	ctl := &controlCommand{
 		db:          s.db,
@@ -277,7 +277,7 @@ func NewReactor(db *Database, blockDAO *BlockDAO, feed *event.Feed, tm *Transact
 }
 
 // Start runs reactor loop in background.
-func (r *Reactor) start(chainClients map[uint64]*chain.ClientWithFallback, accounts []common.Address,
+func (r *Reactor) start(chainClients map[uint64]chain.ClientInterface, accounts []common.Address,
 	loadAllTransfers bool) error {
 
 	r.strategy = r.createFetchStrategy(chainClients, accounts, loadAllTransfers)
@@ -291,14 +291,14 @@ func (r *Reactor) stop() {
 	}
 }
 
-func (r *Reactor) restart(chainClients map[uint64]*chain.ClientWithFallback, accounts []common.Address,
+func (r *Reactor) restart(chainClients map[uint64]chain.ClientInterface, accounts []common.Address,
 	loadAllTransfers bool) error {
 
 	r.stop()
 	return r.start(chainClients, accounts, loadAllTransfers)
 }
 
-func (r *Reactor) createFetchStrategy(chainClients map[uint64]*chain.ClientWithFallback,
+func (r *Reactor) createFetchStrategy(chainClients map[uint64]chain.ClientInterface,
 	accounts []common.Address, loadAllTransfers bool) HistoryFetcher {
 
 	if loadAllTransfers {
@@ -328,9 +328,9 @@ func (r *Reactor) getTransfersByAddress(ctx context.Context, chainID uint64, add
 	return nil, errors.New(ReactorNotStarted)
 }
 
-func getChainClientByID(clients map[uint64]*chain.ClientWithFallback, id uint64) (*chain.ClientWithFallback, error) {
+func getChainClientByID(clients map[uint64]chain.ClientInterface, id uint64) (chain.ClientInterface, error) {
 	for _, client := range clients {
-		if client.ChainID == id {
+		if client.NetworkID() == id {
 			return client, nil
 		}
 	}

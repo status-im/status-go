@@ -42,6 +42,19 @@ type ClientInterface interface {
 	GetBaseFeeFromBlock(blockNumber *big.Int) (string, error)
 	NetworkID() uint64
 	ToBigInt() *big.Int
+	CodeAt(ctx context.Context, contract common.Address, blockNumber *big.Int) ([]byte, error)
+	CallContract(ctx context.Context, call ethereum.CallMsg, blockNumber *big.Int) ([]byte, error)
+	CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error
+	GetWalletNotifier() func(chainId uint64, message string)
+	SetWalletNotifier(notifier func(chainId uint64, message string))
+	TransactionByHash(ctx context.Context, hash common.Hash) (*types.Transaction, bool, error)
+	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
+	BlockNumber(ctx context.Context) (uint64, error)
+	SetIsConnected(value bool)
+	GetIsConnected() bool
+	bind.ContractCaller
+	bind.ContractTransactor
+	bind.ContractFilterer
 }
 
 type ClientWithFallback struct {
@@ -167,6 +180,12 @@ func (c *ClientWithFallback) SetIsConnected(value bool) {
 			}
 		}
 	}
+}
+
+func (c *ClientWithFallback) GetIsConnected() bool {
+	c.IsConnectedLock.RLock()
+	defer c.IsConnectedLock.RUnlock()
+	return c.IsConnected
 }
 
 func (c *ClientWithFallback) makeCallNoReturn(main func() error, fallback func() error) error {
@@ -876,4 +895,12 @@ func (c *ClientWithFallback) FullTransactionByBlockNumberAndIndex(ctx context.Co
 	}
 
 	return tx.(*FullTransaction), nil
+}
+
+func (c *ClientWithFallback) GetWalletNotifier() func(chainId uint64, message string) {
+	return c.WalletNotifier
+}
+
+func (c *ClientWithFallback) SetWalletNotifier(notifier func(chainId uint64, message string)) {
+	c.WalletNotifier = notifier
 }

@@ -48,9 +48,9 @@ type Client struct {
 	UpstreamChainID uint64
 
 	local           *gethrpc.Client
-	upstream        *chain.ClientWithFallback
+	upstream        chain.ClientInterface
 	rpcClientsMutex sync.RWMutex
-	rpcClients      map[uint64]*chain.ClientWithFallback
+	rpcClients      map[uint64]chain.ClientInterface
 
 	router         *router
 	NetworkManager *network.Manager
@@ -84,7 +84,7 @@ func NewClient(client *gethrpc.Client, upstreamChainID uint64, upstream params.U
 		local:          client,
 		NetworkManager: networkManager,
 		handlers:       make(map[string]Handler),
-		rpcClients:     make(map[uint64]*chain.ClientWithFallback),
+		rpcClients:     make(map[uint64]chain.ClientInterface),
 		log:            log,
 	}
 
@@ -112,12 +112,12 @@ func (c *Client) SetWalletNotifier(notifier func(chainID uint64, message string)
 	c.walletNotifier = notifier
 }
 
-func (c *Client) getClientUsingCache(chainID uint64) (*chain.ClientWithFallback, error) {
+func (c *Client) getClientUsingCache(chainID uint64) (chain.ClientInterface, error) {
 	c.rpcClientsMutex.Lock()
 	defer c.rpcClientsMutex.Unlock()
 	if rpcClient, ok := c.rpcClients[chainID]; ok {
-		if rpcClient.WalletNotifier == nil {
-			rpcClient.WalletNotifier = c.walletNotifier
+		if rpcClient.GetWalletNotifier() == nil {
+			rpcClient.SetWalletNotifier(c.walletNotifier)
 		}
 		return rpcClient, nil
 	}
@@ -150,7 +150,7 @@ func (c *Client) getClientUsingCache(chainID uint64) (*chain.ClientWithFallback,
 }
 
 // Ethclient returns ethclient.Client per chain
-func (c *Client) EthClient(chainID uint64) (*chain.ClientWithFallback, error) {
+func (c *Client) EthClient(chainID uint64) (chain.ClientInterface, error) {
 	client, err := c.getClientUsingCache(chainID)
 	if err != nil {
 		return nil, err
@@ -169,8 +169,8 @@ func (c *Client) AbstractEthClient(chainID common.ChainID) (chain.BatchCallClien
 	return client, nil
 }
 
-func (c *Client) EthClients(chainIDs []uint64) (map[uint64]*chain.ClientWithFallback, error) {
-	clients := make(map[uint64]*chain.ClientWithFallback, 0)
+func (c *Client) EthClients(chainIDs []uint64) (map[uint64]chain.ClientInterface, error) {
+	clients := make(map[uint64]chain.ClientInterface, 0)
 	for _, chainID := range chainIDs {
 		client, err := c.getClientUsingCache(chainID)
 		if err != nil {
@@ -180,6 +180,13 @@ func (c *Client) EthClients(chainIDs []uint64) (map[uint64]*chain.ClientWithFall
 	}
 
 	return clients, nil
+}
+
+// SetClient strictly for testing purposes
+func (c *Client) SetClient(chainID uint64, client chain.ClientInterface) {
+	c.rpcClientsMutex.Lock()
+	defer c.rpcClientsMutex.Unlock()
+	c.rpcClients[chainID] = client
 }
 
 // UpdateUpstreamURL changes the upstream RPC client URL, if the upstream is enabled.

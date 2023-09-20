@@ -131,7 +131,7 @@ func upsertHopBridgeDestinationTx(ctx context.Context, transactionManager *Trans
 	return multiTx, nil
 }
 
-func buildHopBridgeMultitransaction(ctx context.Context, client *chain.ClientWithFallback, transactionManager *TransactionManager, tokenManager *token.Manager, subTx *Transfer) (*MultiTransaction, error) {
+func buildHopBridgeMultitransaction(ctx context.Context, client chain.ClientInterface, transactionManager *TransactionManager, tokenManager *token.Manager, subTx *Transfer) (*MultiTransaction, error) {
 	// Identify if it's from/to transaction
 	switch w_common.GetEventType(subTx.Log) {
 	case w_common.HopBridgeTransferSentToL2EventType:

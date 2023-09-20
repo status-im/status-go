@@ -19,7 +19,7 @@ import (
 func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, feed *event.Feed,
 	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
 	tokenManager *token.Manager,
-	chainClients map[uint64]*chain.ClientWithFallback,
+	chainClients map[uint64]chain.ClientInterface,
 	accounts []common.Address,
 	balanceCacher balance.Cacher,
 ) *SequentialFetchStrategy {
@@ -46,12 +46,12 @@ type SequentialFetchStrategy struct {
 	transactionManager *TransactionManager
 	pendingTxManager   *transactions.PendingTxTracker
 	tokenManager       *token.Manager
-	chainClients       map[uint64]*chain.ClientWithFallback
+	chainClients       map[uint64]chain.ClientInterface
 	accounts           []common.Address
 	balanceCacher      balance.Cacher
 }
 
-func (s *SequentialFetchStrategy) newCommand(chainClient *chain.ClientWithFallback,
+func (s *SequentialFetchStrategy) newCommand(chainClient chain.ClientInterface,
 	account common.Address) async.Commander {
 
 	return newLoadBlocksAndTransfersCommand(account, s.db, s.blockDAO, chainClient, s.feed,

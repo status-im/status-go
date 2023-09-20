@@ -18,7 +18,7 @@ func SetupIterativeDownloader(
 		return nil, errors.New("to or from cannot be nil")
 	}
 
-	log.Info("iterative downloader", "address", address, "from", from, "to", to, "size", size)
+	log.Debug("iterative downloader", "address", address, "from", from, "to", to, "size", size)
 	d := &IterativeDownloader{
 		client:     client,
 		batchSize:  size,
@@ -65,7 +65,7 @@ func (d *IterativeDownloader) Next(parent context.Context) ([]*DBHeader, *big.In
 		from = d.from
 	}
 	headers, err := d.downloader.GetHeadersInRange(parent, from, to)
-	log.Info("load erc20 transfers in range", "from", from, "to", to, "batchSize", d.batchSize)
+	log.Debug("load erc20 transfers in range", "from", from, "to", to, "batchSize", d.batchSize)
 	if err != nil {
 		log.Error("failed to get transfer in between two blocks", "from", from, "to", to, "error", err)
 		return nil, nil, nil, err

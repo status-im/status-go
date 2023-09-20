@@ -66,22 +66,25 @@ func (c *findNewBlocksCommand) Run(parent context.Context) (err error) {
 
 // TODO NewFindBlocksCommand
 type findBlocksCommand struct {
-	account            common.Address
-	db                 *Database
-	blockRangeDAO      *BlockRangeSequentialDAO
-	chainClient        chain.ClientInterface
-	balanceCacher      balance.Cacher
-	feed               *event.Feed
-	noLimit            bool
-	transactionManager *TransactionManager
-	fromBlockNumber    *big.Int
-	toBlockNumber      *big.Int
-	blocksLoadedCh     chan<- []*DBHeader
+	account                   common.Address
+	db                        *Database
+	blockRangeDAO             *BlockRangeSequentialDAO
+	chainClient               chain.ClientInterface
+	balanceCacher             balance.Cacher
+	feed                      *event.Feed
+	noLimit                   bool
+	transactionManager        *TransactionManager
+	tokenManager              *token.Manager
+	fromBlockNumber           *big.Int
+	toBlockNumber             *big.Int
+	blocksLoadedCh            chan<- []*DBHeader
+	defaultNodeBlockChunkSize int
 
 	// Not to be set by the caller
-	resFromBlock     *Block
-	startBlockNumber *big.Int
-	error            error
+	resFromBlock           *Block
+	startBlockNumber       *big.Int
+	reachedETHHistoryStart bool
+	error                  error
 }
 
 func (c *findBlocksCommand) Command() async.Command {
@@ -91,10 +94,114 @@ func (c *findBlocksCommand) Command() async.Command {
 	}.Run
 }
 
-func (c *findBlocksCommand) Run(parent context.Context) (err error) {
-	log.Debug("start findBlocksCommand", "account", c.account, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit)
+func (c *findBlocksCommand) ERC20ScanByBalance(parent context.Context, fromBlock, toBlock *big.Int, token common.Address) ([]*DBHeader, error) {
+	var err error
+	batchSize := getErc20BatchSize(c.chainClient.NetworkID())
+	ranges := [][]*big.Int{{fromBlock, toBlock}}
+	foundHeaders := []*DBHeader{}
+	cache := map[int64]*big.Int{}
+	for {
+		nextRanges := [][]*big.Int{}
+		for _, blockRange := range ranges {
+			from, to := blockRange[0], blockRange[1]
+			fromBalance, ok := cache[from.Int64()]
+			if !ok {
+				fromBalance, err = c.tokenManager.GetTokenBalanceAt(parent, c.chainClient, c.account, token, from)
+				if err != nil {
+					return nil, err
+				}
 
-	rangeSize := big.NewInt(DefaultNodeBlockChunkSize)
+				if fromBalance == nil {
+					fromBalance = big.NewInt(0)
+				}
+				cache[from.Int64()] = fromBalance
+			}
+
+			toBalance, ok := cache[to.Int64()]
+			if !ok {
+				toBalance, err = c.tokenManager.GetTokenBalanceAt(parent, c.chainClient, c.account, token, to)
+				if err != nil {
+					return nil, err
+				}
+				if toBalance == nil {
+					toBalance = big.NewInt(0)
+				}
+				cache[to.Int64()] = toBalance
+			}
+
+			if fromBalance.Cmp(toBalance) != 0 {
+				diff := new(big.Int).Sub(to, from)
+				if diff.Cmp(batchSize) <= 0 {
+					headers, err := c.fastIndexErc20(parent, from, to)
+					if err != nil {
+						return nil, err
+					}
+					foundHeaders = append(foundHeaders, headers...)
+
+					continue
+				}
+
+				halfOfDiff := new(big.Int).Div(diff, big.NewInt(2))
+				mid := new(big.Int).Add(from, halfOfDiff)
+
+				nextRanges = append(nextRanges, []*big.Int{from, mid})
+				nextRanges = append(nextRanges, []*big.Int{mid, to})
+			}
+		}
+
+		if len(nextRanges) == 0 {
+			break
+		}
+
+		ranges = nextRanges
+	}
+
+	return foundHeaders, nil
+}
+
+func (c *findBlocksCommand) checkERC20Tail(parent context.Context) ([]*DBHeader, error) {
+	log.Debug("checkERC20Tail", "account", c.account, "to block", c.startBlockNumber, "from", c.resFromBlock.Number)
+	tokens, err := c.tokenManager.GetTokens(c.chainClient.NetworkID())
+	if err != nil {
+		return nil, err
+	}
+	addresses := make([]common.Address, len(tokens))
+	for i, token := range tokens {
+		addresses[i] = token.Address
+	}
+
+	from := new(big.Int).Sub(c.resFromBlock.Number, big.NewInt(1))
+
+	clients := make(map[uint64]chain.ClientInterface, 1)
+	clients[c.chainClient.NetworkID()] = c.chainClient
+	atBlocks := make(map[uint64]*big.Int, 1)
+	atBlocks[c.chainClient.NetworkID()] = from
+	balances, err := c.tokenManager.GetBalancesAtByChain(parent, clients, []common.Address{c.account}, addresses, atBlocks)
+	if err != nil {
+		return nil, err
+	}
+
+	headers := []*DBHeader{}
+	for token, balance := range balances[c.chainClient.NetworkID()][c.account] {
+		bigintBalance := big.NewInt(balance.ToInt().Int64())
+		if bigintBalance.Cmp(big.NewInt(0)) <= 0 {
+			continue
+		}
+		result, err := c.ERC20ScanByBalance(parent, big.NewInt(0), from, token)
+		if err != nil {
+			return nil, err
+		}
+
+		headers = append(headers, result...)
+	}
+
+	return headers, nil
+}
+
+func (c *findBlocksCommand) Run(parent context.Context) (err error) {
+	log.Debug("start findBlocksCommand", "account", c.account, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit, "from", c.fromBlockNumber, "to", c.toBlockNumber)
+
+	rangeSize := big.NewInt(int64(c.defaultNodeBlockChunkSize))
 
 	from, to := new(big.Int).Set(c.fromBlockNumber), new(big.Int).Set(c.toBlockNumber)
 
@@ -104,7 +211,18 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 	}
 
 	for {
-		headers, _ := c.checkRange(parent, from, to)
+		var headers []*DBHeader
+		if c.reachedETHHistoryStart {
+			if c.fromBlockNumber.Cmp(zero) == 0 && c.startBlockNumber != nil && c.startBlockNumber.Cmp(zero) == 1 {
+				headers, err = c.checkERC20Tail(parent)
+				if err != nil {
+					c.error = err
+				}
+			}
+		} else {
+			headers, _ = c.checkRange(parent, from, to)
+		}
+
 		if c.error != nil {
 			log.Error("findBlocksCommand checkRange", "error", c.error, "account", c.account,
 				"chain", c.chainClient.NetworkID(), "from", from, "to", to)
@@ -126,17 +244,32 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 			c.blocksFound(headers)
 		}
 
+		if c.reachedETHHistoryStart {
+			break
+		}
+
 		err = c.upsertBlockRange(&BlockRange{c.startBlockNumber, c.resFromBlock.Number, to})
 		if err != nil {
 			break
 		}
 
-		from, to = nextRange(c.resFromBlock.Number, c.fromBlockNumber)
+		if from.Cmp(to) == 0 {
+			break
+		}
+
+		nextFrom, nextTo := nextRange(c.defaultNodeBlockChunkSize, c.resFromBlock.Number, c.fromBlockNumber)
+
+		if nextFrom.Cmp(from) == 0 && nextTo.Cmp(to) == 0 {
+			break
+		}
+
+		from = nextFrom
+		to = nextTo
 
 		if to.Cmp(c.fromBlockNumber) <= 0 || (c.startBlockNumber != nil &&
 			c.startBlockNumber.Cmp(big.NewInt(0)) > 0 && to.Cmp(c.startBlockNumber) <= 0) {
 			log.Debug("Checked all ranges, stop execution", "startBlock", c.startBlockNumber, "from", from, "to", to)
-			break
+			c.reachedETHHistoryStart = true
 		}
 	}
 
@@ -319,18 +452,18 @@ func (c *findBlocksCommand) fastIndexErc20(ctx context.Context, fromBlockNumber 
 }
 
 func loadTransfersLoop(ctx context.Context, account common.Address, blockDAO *BlockDAO, db *Database,
-	chainClient *chain.ClientWithFallback, transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
+	chainClient chain.ClientInterface, transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
 	tokenManager *token.Manager, feed *event.Feed, blocksLoadedCh <-chan []*DBHeader) {
 
-	log.Debug("loadTransfersLoop start", "chain", chainClient.ChainID, "account", account)
+	log.Debug("loadTransfersLoop start", "chain", chainClient.NetworkID(), "account", account)
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Info("loadTransfersLoop error", "chain", chainClient.ChainID, "account", account, "error", ctx.Err())
+			log.Info("loadTransfersLoop error", "chain", chainClient.NetworkID(), "account", account, "error", ctx.Err())
 			return
 		case dbHeaders := <-blocksLoadedCh:
-			log.Debug("loadTransfersOnDemand transfers received", "chain", chainClient.ChainID, "account", account, "headers", len(dbHeaders))
+			log.Debug("loadTransfersOnDemand transfers received", "chain", chainClient.NetworkID(), "account", account, "headers", len(dbHeaders))
 
 			blockNums := make([]*big.Int, len(dbHeaders))
 			for i, dbHeader := range dbHeaders {
@@ -347,7 +480,7 @@ func loadTransfersLoop(ctx context.Context, account common.Address, blockDAO *Bl
 }
 
 func newLoadBlocksAndTransfersCommand(account common.Address, db *Database,
-	blockDAO *BlockDAO, chainClient *chain.ClientWithFallback, feed *event.Feed,
+	blockDAO *BlockDAO, chainClient chain.ClientInterface, feed *event.Feed,
 	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
 	tokenManager *token.Manager, balanceCacher balance.Cacher) *loadBlocksAndTransfersCommand {
 
@@ -372,7 +505,7 @@ type loadBlocksAndTransfersCommand struct {
 	db            *Database
 	blockRangeDAO *BlockRangeSequentialDAO
 	blockDAO      *BlockDAO
-	chainClient   *chain.ClientWithFallback
+	chainClient   chain.ClientInterface
 	feed          *event.Feed
 	balanceCacher balance.Cacher
 	errorsCount   int
@@ -455,17 +588,19 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocks(ctx context.Context, 
 
 	if !allHistoryLoaded {
 		fbc := &findBlocksCommand{
-			account:            c.account,
-			db:                 c.db,
-			blockRangeDAO:      c.blockRangeDAO,
-			chainClient:        c.chainClient,
-			balanceCacher:      c.balanceCacher,
-			feed:               c.feed,
-			noLimit:            false,
-			fromBlockNumber:    big.NewInt(0),
-			toBlockNumber:      to,
-			transactionManager: c.transactionManager,
-			blocksLoadedCh:     blocksLoadedCh,
+			account:                   c.account,
+			db:                        c.db,
+			blockRangeDAO:             c.blockRangeDAO,
+			chainClient:               c.chainClient,
+			balanceCacher:             c.balanceCacher,
+			feed:                      c.feed,
+			noLimit:                   false,
+			fromBlockNumber:           big.NewInt(0),
+			toBlockNumber:             to,
+			transactionManager:        c.transactionManager,
+			tokenManager:              c.tokenManager,
+			blocksLoadedCh:            blocksLoadedCh,
+			defaultNodeBlockChunkSize: DefaultNodeBlockChunkSize,
 		}
 		group.Add(fbc.Command())
 	} else {
@@ -501,6 +636,7 @@ func (c *loadBlocksAndTransfersCommand) startFetchingNewBlocks(group *async.Grou
 			feed:               c.feed,
 			noLimit:            false,
 			transactionManager: c.transactionManager,
+			tokenManager:       c.tokenManager,
 			blocksLoadedCh:     blocksLoadedCh,
 		},
 	}
@@ -583,15 +719,14 @@ func getHeadBlockNumber(parent context.Context, chainClient chain.ClientInterfac
 	return head.Number, err
 }
 
-func nextRange(from *big.Int, zeroBlockNumber *big.Int) (*big.Int, *big.Int) {
-	log.Debug("next range start", "from", from, "zeroBlockNumber", zeroBlockNumber)
+func nextRange(maxRangeSize int, prevFrom, zeroBlockNumber *big.Int) (*big.Int, *big.Int) {
+	log.Debug("next range start", "from", prevFrom, "zeroBlockNumber", zeroBlockNumber)
 
-	rangeSize := big.NewInt(DefaultNodeBlockChunkSize)
+	rangeSize := big.NewInt(int64(maxRangeSize))
 
-	to := new(big.Int).Sub(from, big.NewInt(1)) // it won't hit the cache, but we wont load the transfers twice
-	if to.Cmp(rangeSize) > 0 {
-		from.Sub(to, rangeSize)
-	} else {
+	to := big.NewInt(0).Set(prevFrom)
+	from := big.NewInt(0).Sub(to, rangeSize)
+	if from.Cmp(zeroBlockNumber) < 0 {
 		from = new(big.Int).Set(zeroBlockNumber)
 	}
 

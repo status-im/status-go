@@ -77,7 +77,7 @@ func (c *ethHistoricalCommand) Command() async.Command {
 }
 
 func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
-	log.Info("eth historical downloader start", "chainID", c.chainClient.NetworkID(), "address", c.address,
+	log.Debug("eth historical downloader start", "chainID", c.chainClient.NetworkID(), "address", c.address,
 		"from", c.from.Number, "to", c.to, "noLimit", c.noLimit)
 
 	start := time.Now()
@@ -101,7 +101,7 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 	c.resultingFrom = from
 	c.startBlock = startBlock
 
-	log.Info("eth historical downloader finished successfully", "chain", c.chainClient.NetworkID(),
+	log.Debug("eth historical downloader finished successfully", "chain", c.chainClient.NetworkID(),
 		"address", c.address, "from", from, "to", c.to, "total blocks", len(headers), "time", time.Since(start))
 
 	return nil
@@ -147,7 +147,7 @@ func getErc20BatchSize(chainID uint64) *big.Int {
 }
 
 func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
-	log.Info("wallet historical downloader for erc20 transfers start", "chainID", c.chainClient.NetworkID(), "address", c.address,
+	log.Debug("wallet historical downloader for erc20 transfers start", "chainID", c.chainClient.NetworkID(), "address", c.address,
 		"from", c.from, "to", c.to)
 
 	start := time.Now()
@@ -168,7 +168,7 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 		}
 		c.foundHeaders = append(c.foundHeaders, headers...)
 	}
-	log.Info("wallet historical downloader for erc20 transfers finished", "chainID", c.chainClient.NetworkID(), "address", c.address,
+	log.Debug("wallet historical downloader for erc20 transfers finished", "chainID", c.chainClient.NetworkID(), "address", c.address,
 		"from", c.from, "to", c.to, "time", time.Since(start), "headers", len(c.foundHeaders))
 	return nil
 }
@@ -183,7 +183,7 @@ type controlCommand struct {
 	blockDAO           *BlockDAO
 	eth                *ETHDownloader
 	erc20              *ERC20TransfersDownloader
-	chainClient        *chain.ClientWithFallback
+	chainClient        chain.ClientInterface
 	feed               *event.Feed
 	errorsCount        int
 	nonArchivalRPCNode bool
@@ -365,7 +365,7 @@ type transfersCommand struct {
 	eth                *ETHDownloader
 	blockNums          []*big.Int
 	address            common.Address
-	chainClient        *chain.ClientWithFallback
+	chainClient        chain.ClientInterface
 	blocksLimit        int
 	transactionManager *TransactionManager
 	pendingTxManager   *transactions.PendingTxTracker
@@ -625,7 +625,7 @@ type loadTransfersCommand struct {
 	accounts           []common.Address
 	db                 *Database
 	blockDAO           *BlockDAO
-	chainClient        *chain.ClientWithFallback
+	chainClient        chain.ClientInterface
 	blocksByAddress    map[common.Address][]*big.Int
 	transactionManager *TransactionManager
 	pendingTxManager   *transactions.PendingTxTracker
@@ -655,7 +655,7 @@ type findAndCheckBlockRangeCommand struct {
 	accounts      []common.Address
 	db            *Database
 	blockDAO      *BlockDAO
-	chainClient   *chain.ClientWithFallback
+	chainClient   chain.ClientInterface
 	balanceCacher balance.Cacher
 	feed          *event.Feed
 	fromByAddress map[common.Address]*Block
@@ -818,11 +818,11 @@ func (c *findAndCheckBlockRangeCommand) fastIndexErc20(ctx context.Context, from
 }
 
 func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *BlockDAO, db *Database,
-	chainClient *chain.ClientWithFallback, blocksLimitPerAccount int, blocksByAddress map[common.Address][]*big.Int,
+	chainClient chain.ClientInterface, blocksLimitPerAccount int, blocksByAddress map[common.Address][]*big.Int,
 	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
 	tokenManager *token.Manager, feed *event.Feed) error {
 
-	log.Info("loadTransfers start", "accounts", accounts, "chain", chainClient.ChainID, "limit", blocksLimitPerAccount)
+	log.Info("loadTransfers start", "accounts", accounts, "chain", chainClient.NetworkID(), "limit", blocksLimitPerAccount)
 
 	start := time.Now()
 	group := async.NewGroup(ctx)
@@ -852,7 +852,7 @@ func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *Blo
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-group.WaitAsync():
-		log.Info("loadTransfers finished for account", "in", time.Since(start), "chain", chainClient.ChainID)
+		log.Info("loadTransfers finished for account", "in", time.Since(start), "chain", chainClient.NetworkID())
 		return nil
 	}
 }
@@ -871,10 +871,10 @@ func getLowestFrom(chainID uint64, to *big.Int) *big.Int {
 }
 
 // Finds the latest range up to initialTo where the number of transactions is between 20 and 25
-func findFirstRange(c context.Context, account common.Address, initialTo *big.Int, client *chain.ClientWithFallback) (*big.Int, error) {
+func findFirstRange(c context.Context, account common.Address, initialTo *big.Int, client chain.ClientInterface) (*big.Int, error) {
 	log.Info("findFirstRange", "account", account, "initialTo", initialTo, "client", client)
 
-	from := getLowestFrom(client.ChainID, initialTo)
+	from := getLowestFrom(client.NetworkID(), initialTo)
 	to := initialTo
 	goal := uint64(20)
 
@@ -930,7 +930,7 @@ func findFirstRange(c context.Context, account common.Address, initialTo *big.In
 }
 
 // Finds the latest ranges up to initialTo where the number of transactions is between 20 and 25
-func findFirstRanges(c context.Context, accounts []common.Address, initialTo *big.Int, client *chain.ClientWithFallback) (map[common.Address]*big.Int, error) {
+func findFirstRanges(c context.Context, accounts []common.Address, initialTo *big.Int, client chain.ClientInterface) (map[common.Address]*big.Int, error) {
 	res := map[common.Address]*big.Int{}
 
 	for _, address := range accounts {

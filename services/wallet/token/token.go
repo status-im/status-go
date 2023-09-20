@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/contracts"
+	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
@@ -153,7 +154,7 @@ func (tm *Manager) getAddressTokenMap(chainID uint64) (addressTokenMap, bool) {
 	return tokenMap, chainPresent
 }
 
-func (tm *Manager) setTokens(tokens []*Token) {
+func (tm *Manager) SetTokens(tokens []*Token) {
 	tm.tokenLock.Lock()
 	defer tm.tokenLock.Unlock()
 
@@ -187,7 +188,7 @@ func (tm *Manager) fetchTokens() {
 		tokenList = mergeTokenLists([][]*Token{tokenList, validTokens})
 	}
 
-	tm.setTokens(tokenList)
+	tm.SetTokens(tokenList)
 }
 
 func (tm *Manager) getFullTokenList(chainID uint64) []*Token {
@@ -577,7 +578,7 @@ func (tm *Manager) DeleteCustom(chainID uint64, address common.Address) error {
 	return err
 }
 
-func (tm *Manager) GetTokenBalance(ctx context.Context, client *chain.ClientWithFallback, account common.Address, token common.Address) (*big.Int, error) {
+func (tm *Manager) GetTokenBalance(ctx context.Context, client chain.ClientInterface, account common.Address, token common.Address) (*big.Int, error) {
 	caller, err := ierc20.NewIERC20Caller(token, client)
 	if err != nil {
 		return nil, err
@@ -588,23 +589,32 @@ func (tm *Manager) GetTokenBalance(ctx context.Context, client *chain.ClientWith
 	}, account)
 }
 
-func (tm *Manager) GetTokenBalanceAt(ctx context.Context, client *chain.ClientWithFallback, account common.Address, token common.Address, blockNumber *big.Int) (*big.Int, error) {
+func (tm *Manager) GetTokenBalanceAt(ctx context.Context, client chain.ClientInterface, account common.Address, token common.Address, blockNumber *big.Int) (*big.Int, error) {
 	caller, err := ierc20.NewIERC20Caller(token, client)
 	if err != nil {
 		return nil, err
 	}
 
-	return caller.BalanceOf(&bind.CallOpts{
+	balance, err := caller.BalanceOf(&bind.CallOpts{
 		Context:     ctx,
 		BlockNumber: blockNumber,
 	}, account)
+
+	if err != nil {
+		if err != bind.ErrNoCode {
+			return nil, err
+		}
+		balance = big.NewInt(0)
+	}
+
+	return balance, nil
 }
 
-func (tm *Manager) GetChainBalance(ctx context.Context, client *chain.ClientWithFallback, account common.Address) (*big.Int, error) {
+func (tm *Manager) GetChainBalance(ctx context.Context, client chain.ClientInterface, account common.Address) (*big.Int, error) {
 	return client.BalanceAt(ctx, account, nil)
 }
 
-func (tm *Manager) GetBalance(ctx context.Context, client *chain.ClientWithFallback, account common.Address, token common.Address) (*big.Int, error) {
+func (tm *Manager) GetBalance(ctx context.Context, client chain.ClientInterface, account common.Address, token common.Address) (*big.Int, error) {
 	if token == nativeChainAddress {
 		return tm.GetChainBalance(ctx, client, account)
 	}
@@ -612,7 +622,7 @@ func (tm *Manager) GetBalance(ctx context.Context, client *chain.ClientWithFallb
 	return tm.GetTokenBalance(ctx, client, account, token)
 }
 
-func (tm *Manager) GetBalances(parent context.Context, clients map[uint64]*chain.ClientWithFallback, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
+func (tm *Manager) GetBalances(parent context.Context, clients map[uint64]chain.ClientInterface, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	var (
 		group    = async.NewAtomicGroup(parent)
 		mu       sync.Mutex
@@ -638,7 +648,7 @@ func (tm *Manager) GetBalances(parent context.Context, clients map[uint64]*chain
 	for clientIdx := range clients {
 		client := clients[clientIdx]
 
-		ethScanContract, err := tm.contractMaker.NewEthScan(client.ChainID)
+		ethScanContract, _, err := tm.contractMaker.NewEthScan(client.NetworkID())
 
 		if err == nil {
 			fetchChainBalance := false
@@ -666,7 +676,7 @@ func (tm *Manager) GetBalances(parent context.Context, clients map[uint64]*chain
 						Context: ctx,
 					}, accounts)
 					if err != nil {
-						log.Error("can't fetch chain balance", err)
+						log.Error("can't fetch chain balance 2", err)
 						return nil
 					}
 					for idx, account := range accounts {
@@ -690,7 +700,7 @@ func (tm *Manager) GetBalances(parent context.Context, clients map[uint64]*chain
 							Context: ctx,
 						}, account, chunk)
 						if err != nil {
-							log.Error("can't fetch erc20 token balance", "account", account, "error", err)
+							log.Error("can't fetch erc20 token balance 3", "account", account, "error", err)
 							return nil
 						}
 
@@ -713,7 +723,7 @@ func (tm *Manager) GetBalances(parent context.Context, clients map[uint64]*chain
 					account := accounts[accountIdx]
 					token := tokens[tokenIdx]
 					client := clients[clientIdx]
-					if !tm.inStore(token, client.ChainID) {
+					if !tm.inStore(token, client.NetworkID()) {
 						continue
 					}
 					group.Add(func(parent context.Context) error {
@@ -722,7 +732,7 @@ func (tm *Manager) GetBalances(parent context.Context, clients map[uint64]*chain
 						balance, err := tm.GetBalance(ctx, client, account, token)
 
 						if err != nil {
-							log.Error("can't fetch erc20 token balance", "account", account, "token", token, "error", err)
+							log.Error("can't fetch erc20 token balance 4", "account", account, "token", token, "error", err)
 
 							return nil
 						}
@@ -742,7 +752,11 @@ func (tm *Manager) GetBalances(parent context.Context, clients map[uint64]*chain
 	return response, group.Error()
 }
 
-func (tm *Manager) GetBalancesByChain(parent context.Context, clients map[uint64]*chain.ClientWithFallback, accounts, tokens []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
+func (tm *Manager) GetBalancesByChain(parent context.Context, clients map[uint64]chain.ClientInterface, accounts, tokens []common.Address) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
+	return tm.GetBalancesAtByChain(parent, clients, accounts, tokens, nil)
+}
+
+func (tm *Manager) GetBalancesAtByChain(parent context.Context, clients map[uint64]chain.ClientInterface, accounts, tokens []common.Address, atBlocks map[uint64]*big.Int) (map[uint64]map[common.Address]map[common.Address]*hexutil.Big, error) {
 	var (
 		group    = async.NewAtomicGroup(parent)
 		mu       sync.Mutex
@@ -769,13 +783,14 @@ func (tm *Manager) GetBalancesByChain(parent context.Context, clients map[uint64
 		mu.Unlock()
 	}
 
-	for clientIdx := range clients {
-		client := clients[clientIdx]
-		ethScanContract, err := tm.contractMaker.NewEthScan(client.ChainID)
+	for _, client := range clients {
+		ethScanContract, availableAtBlock, err := tm.contractMaker.NewEthScan(client.NetworkID())
 		if err != nil {
 			log.Error("error scanning contract", "err", err)
 			return nil, err
 		}
+
+		atBlock := atBlocks[client.NetworkID()]
 
 		fetchChainBalance := false
 		var tokenChunks [][]common.Address
@@ -799,16 +814,17 @@ func (tm *Manager) GetBalancesByChain(parent context.Context, clients map[uint64
 				ctx, cancel := context.WithTimeout(parent, requestTimeout)
 				defer cancel()
 				res, err := ethScanContract.EtherBalances(&bind.CallOpts{
-					Context: ctx,
+					Context:     ctx,
+					BlockNumber: atBlock,
 				}, accounts)
 				if err != nil {
-					log.Error("can't fetch chain balance", err)
+					log.Error("can't fetch chain balance 5", err)
 					return nil
 				}
 				for idx, account := range accounts {
 					balance := new(big.Int)
 					balance.SetBytes(res[idx].Data)
-					updateBalance(client.ChainID, account, common.HexToAddress("0x"), balance)
+					updateBalance(client.NetworkID(), account, common.HexToAddress("0x"), balance)
 				}
 
 				return nil
@@ -822,28 +838,46 @@ func (tm *Manager) GetBalancesByChain(parent context.Context, clients map[uint64
 				group.Add(func(parent context.Context) error {
 					ctx, cancel := context.WithTimeout(parent, requestTimeout)
 					defer cancel()
-					res, err := ethScanContract.TokensBalance(&bind.CallOpts{
-						Context: ctx,
-					}, account, chunk)
-					if err != nil {
-						log.Error("can't fetch erc20 token balance", "account", account, "error", err)
-						return nil
-					}
-
-					if len(res) != len(chunk) {
-						log.Error("can't fetch erc20 token balance", "account", account, "error response not complete")
-						return nil
-					}
-
-					for idx, token := range chunk {
-
-						if !res[idx].Success {
-							continue
+					var res []ethscan.BalanceScannerResult
+					if atBlock == nil || big.NewInt(int64(availableAtBlock)).Cmp(atBlock) < 0 {
+						res, err = ethScanContract.TokensBalance(&bind.CallOpts{
+							Context:     ctx,
+							BlockNumber: atBlock,
+						}, account, chunk)
+						if err != nil {
+							log.Error("can't fetch erc20 token balance 6", "account", account, "error", err)
+							return nil
 						}
-						balance := new(big.Int)
-						balance.SetBytes(res[idx].Data)
-						updateBalance(client.ChainID, account, token, balance)
+
+						if len(res) != len(chunk) {
+							log.Error("can't fetch erc20 token balance 7", "account", account, "error response not complete")
+							return nil
+						}
+
+						for idx, token := range chunk {
+
+							if !res[idx].Success {
+								continue
+							}
+							balance := new(big.Int)
+							balance.SetBytes(res[idx].Data)
+							updateBalance(client.NetworkID(), account, token, balance)
+						}
+						return nil
 					}
+
+					for _, token := range chunk {
+						balance, err := tm.GetTokenBalanceAt(ctx, client, account, token, atBlock)
+						if err != nil {
+							if err != bind.ErrNoCode {
+								log.Error("can't fetch erc20 token balance 8", "account", account, "token", token, "error on fetching token balance")
+
+								return nil
+							}
+						}
+						updateBalance(client.NetworkID(), account, token, balance)
+					}
+
 					return nil
 				})
 			}

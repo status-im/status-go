@@ -237,7 +237,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 					}
 					hasError := false
 					if client, ok := clients[token.ChainID]; ok {
-						hasError = err != nil || !client.IsConnected
+						hasError = err != nil || !client.GetIsConnected()
 					}
 					if !anyPositiveBalance {
 						anyPositiveBalance = balance.Cmp(big.NewFloat(0.0)) > 0

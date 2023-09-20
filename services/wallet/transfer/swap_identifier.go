@@ -20,7 +20,7 @@ import (
 const ETHSymbol string = "ETH"
 const WETHSymbol string = "WETH"
 
-func fetchUniswapV2PairInfo(ctx context.Context, client *chain.ClientWithFallback, pairAddress common.Address) (*common.Address, *common.Address, error) {
+func fetchUniswapV2PairInfo(ctx context.Context, client chain.ClientInterface, pairAddress common.Address) (*common.Address, *common.Address, error) {
 	caller, err := uniswapv2.NewUniswapv2Caller(pairAddress, client)
 	if err != nil {
 		return nil, nil, err
@@ -43,7 +43,7 @@ func fetchUniswapV2PairInfo(ctx context.Context, client *chain.ClientWithFallbac
 	return &token0Address, &token1Address, nil
 }
 
-func fetchUniswapV3PoolInfo(ctx context.Context, client *chain.ClientWithFallback, poolAddress common.Address) (*common.Address, *common.Address, error) {
+func fetchUniswapV3PoolInfo(ctx context.Context, client chain.ClientInterface, poolAddress common.Address) (*common.Address, *common.Address, error) {
 	caller, err := uniswapv3.NewUniswapv3Caller(poolAddress, client)
 	if err != nil {
 		return nil, nil, err
@@ -90,7 +90,7 @@ func identifyUniswapV2Asset(tokenManager *token.Manager, chainID uint64, amount0
 	return
 }
 
-func fetchUniswapV2Info(ctx context.Context, client *chain.ClientWithFallback, tokenManager *token.Manager, log *types.Log) (fromAsset string, fromAmount *hexutil.Big, toAsset string, toAmount *hexutil.Big, err error) {
+func fetchUniswapV2Info(ctx context.Context, client chain.ClientInterface, tokenManager *token.Manager, log *types.Log) (fromAsset string, fromAmount *hexutil.Big, toAsset string, toAmount *hexutil.Big, err error) {
 	pairAddress, _, _, amount0In, amount1In, amount0Out, amount1Out, err := w_common.ParseUniswapV2Log(log)
 	if err != nil {
 		return
@@ -101,7 +101,7 @@ func fetchUniswapV2Info(ctx context.Context, client *chain.ClientWithFallback, t
 		return
 	}
 
-	fromToken, fromAmountInt, err := identifyUniswapV2Asset(tokenManager, client.ChainID, amount0In, *token0ContractAddress, amount1In, *token1ContractAddress)
+	fromToken, fromAmountInt, err := identifyUniswapV2Asset(tokenManager, client.NetworkID(), amount0In, *token0ContractAddress, amount1In, *token1ContractAddress)
 	if err != nil {
 		// "Soft" error, allow to continue with unknown asset
 		fromAsset = ""
@@ -111,7 +111,7 @@ func fetchUniswapV2Info(ctx context.Context, client *chain.ClientWithFallback, t
 		fromAmount = (*hexutil.Big)(fromAmountInt)
 	}
 
-	toToken, toAmountInt, err := identifyUniswapV2Asset(tokenManager, client.ChainID, amount0Out, *token0ContractAddress, amount1Out, *token1ContractAddress)
+	toToken, toAmountInt, err := identifyUniswapV2Asset(tokenManager, client.NetworkID(), amount0Out, *token0ContractAddress, amount1Out, *token1ContractAddress)
 	if err != nil {
 		// "Soft" error, allow to continue with unknown asset
 		toAsset = ""
@@ -159,7 +159,7 @@ func identifyUniswapV3Assets(tokenManager *token.Manager, chainID uint64, amount
 	return
 }
 
-func fetchUniswapV3Info(ctx context.Context, client *chain.ClientWithFallback, tokenManager *token.Manager, log *types.Log) (fromAsset string, fromAmount *hexutil.Big, toAsset string, toAmount *hexutil.Big, err error) {
+func fetchUniswapV3Info(ctx context.Context, client chain.ClientInterface, tokenManager *token.Manager, log *types.Log) (fromAsset string, fromAmount *hexutil.Big, toAsset string, toAmount *hexutil.Big, err error) {
 	poolAddress, _, _, amount0, amount1, err := w_common.ParseUniswapV3Log(log)
 	if err != nil {
 		return
@@ -170,7 +170,7 @@ func fetchUniswapV3Info(ctx context.Context, client *chain.ClientWithFallback, t
 		return
 	}
 
-	fromToken, fromAmountInt, toToken, toAmountInt, err := identifyUniswapV3Assets(tokenManager, client.ChainID, amount0, *token0ContractAddress, amount1, *token1ContractAddress)
+	fromToken, fromAmountInt, toToken, toAmountInt, err := identifyUniswapV3Assets(tokenManager, client.NetworkID(), amount0, *token0ContractAddress, amount1, *token1ContractAddress)
 	if err != nil {
 		// "Soft" error, allow to continue with unknown asset
 		err = nil
@@ -188,7 +188,7 @@ func fetchUniswapV3Info(ctx context.Context, client *chain.ClientWithFallback, t
 	return
 }
 
-func fetchUniswapInfo(ctx context.Context, client *chain.ClientWithFallback, tokenManager *token.Manager, log *types.Log, logType w_common.EventType) (fromAsset string, fromAmount *hexutil.Big, toAsset string, toAmount *hexutil.Big, err error) {
+func fetchUniswapInfo(ctx context.Context, client chain.ClientInterface, tokenManager *token.Manager, log *types.Log, logType w_common.EventType) (fromAsset string, fromAmount *hexutil.Big, toAsset string, toAmount *hexutil.Big, err error) {
 	switch logType {
 	case w_common.UniswapV2SwapEventType:
 		return fetchUniswapV2Info(ctx, client, tokenManager, log)
@@ -201,7 +201,7 @@ func fetchUniswapInfo(ctx context.Context, client *chain.ClientWithFallback, tok
 
 // Build a Swap multitransaction from a list containing one or several uniswapV2/uniswapV3 subTxs
 // We only care about the first and last swap to identify the input/output token and amounts
-func buildUniswapSwapMultitransaction(ctx context.Context, client *chain.ClientWithFallback, tokenManager *token.Manager, transfer *Transfer) (*MultiTransaction, error) {
+func buildUniswapSwapMultitransaction(ctx context.Context, client chain.ClientInterface, tokenManager *token.Manager, transfer *Transfer) (*MultiTransaction, error) {
 	multiTransaction := MultiTransaction{
 		Type:          MultiTransactionSwap,
 		FromNetworkID: transfer.NetworkID,

@@ -150,7 +150,7 @@ func (s *Service) isTokenVisible(tokenSymbol string) bool {
 
 // Native token implementation of DataSource interface
 type chainClientSource struct {
-	chainClient *chain.ClientWithFallback
+	chainClient chain.ClientInterface
 	currency    string
 }
 
@@ -163,7 +163,7 @@ func (src *chainClientSource) BalanceAt(ctx context.Context, account common.Addr
 }
 
 func (src *chainClientSource) ChainID() uint64 {
-	return src.chainClient.ChainID
+	return src.chainClient.NetworkID()
 }
 
 func (src *chainClientSource) Currency() string {
@@ -184,7 +184,7 @@ type tokenChainClientSource struct {
 }
 
 func (src *tokenChainClientSource) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
-	network := src.NetworkManager.Find(src.chainClient.ChainID)
+	network := src.NetworkManager.Find(src.chainClient.NetworkID())
 	if network == nil {
 		return nil, errors.New("network not found")
 	}

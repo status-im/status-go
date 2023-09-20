@@ -74,7 +74,7 @@ type Transfer struct {
 
 // ETHDownloader downloads regular eth transfers.
 type ETHDownloader struct {
-	chainClient *chain.ClientWithFallback
+	chainClient chain.ClientInterface
 	accounts    []common.Address
 	signer      types.Signer
 	db          *Database
@@ -95,7 +95,7 @@ func (d *ETHDownloader) GetTransfersByNumber(ctx context.Context, number *big.In
 }
 
 // Only used by status-mobile
-func getTransferByHash(ctx context.Context, client *chain.ClientWithFallback, signer types.Signer, address common.Address, hash common.Hash) (*Transfer, error) {
+func getTransferByHash(ctx context.Context, client chain.ClientInterface, signer types.Signer, address common.Address, hash common.Hash) (*Transfer, error) {
 	transaction, _, err := client.TransactionByHash(ctx, hash)
 	if err != nil {
 		return nil, err
@@ -143,7 +143,7 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 	for _, address := range accounts {
 		// During block discovery, we should have populated the DB with 1 item per Transaction containing
 		// erc20/erc721 transfers
-		transactionsToLoad, err := d.db.GetTransactionsToLoad(d.chainClient.ChainID, address, blk.Number())
+		transactionsToLoad, err := d.db.GetTransactionsToLoad(d.chainClient.NetworkID(), address, blk.Number())
 		if err != nil {
 			return nil, err
 		}
@@ -162,7 +162,7 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 
 		for _, tx := range blk.Transactions() {
 			if tx.ChainId().Cmp(big.NewInt(0)) != 0 && tx.ChainId().Cmp(d.chainClient.ToBigInt()) != 0 {
-				log.Info("chain id mismatch", "tx hash", tx.Hash(), "tx chain id", tx.ChainId(), "expected chain id", d.chainClient.ChainID)
+				log.Info("chain id mismatch", "tx hash", tx.Hash(), "tx chain id", tx.ChainId(), "expected chain id", d.chainClient.NetworkID())
 				continue
 			}
 			from, err := types.Sender(d.signer, tx)
