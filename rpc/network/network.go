@@ -142,6 +142,11 @@ func (nm *Manager) Init(networks []params.Network) error {
 			if err != nil {
 				errors += fmt.Sprintf("error inserting network with ChainID: %d, %s", networks[i].ChainID, err.Error())
 			}
+
+			err = nm.UpdateOriginalURL(networks[i].ChainID, networks[i].RPCURL, networks[i].FallbackURL)
+			if err != nil {
+				errors += fmt.Sprintf("error updating network original url for ChainID: %d, %s", networks[i].ChainID, err.Error())
+			}
 		}
 	}
 
