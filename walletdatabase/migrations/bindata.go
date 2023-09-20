@@ -4,6 +4,7 @@
 // 1692701329_add_collectibles_and_collections_data_cache.up.sql (1.808kB)
 // 1692701339_add_scope_to_pending.up.sql (576B)
 // 1694540071_add_collectibles_ownership_update_timestamp.up.sql (349B)
+// 1694692748_add_raw_balance_to_token_balances.up.sql (165B)
 // doc.go (74B)
 
 package migrations
@@ -88,7 +89,7 @@ func _1691753758_initialUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1691753758_initial.up.sql", size: 5738, mode: os.FileMode(0644), modTime: time.Unix(1694703777, 0)}
+	info := bindataFileInfo{name: "1691753758_initial.up.sql", size: 5738, mode: os.FileMode(0664), modTime: time.Unix(1694793410, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6b, 0x25, 0x31, 0xc8, 0x27, 0x3, 0x6b, 0x9f, 0x15, 0x42, 0x2f, 0x85, 0xfb, 0xe3, 0x6, 0xea, 0xf7, 0x97, 0x12, 0x56, 0x3c, 0x9a, 0x5b, 0x1a, 0xca, 0xb1, 0x23, 0xfa, 0xcd, 0x57, 0x25, 0x5c}}
 	return a, nil
 }
@@ -108,7 +109,7 @@ func _1692701329_add_collectibles_and_collections_data_cacheUpSql() (*asset, err
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1692701329_add_collectibles_and_collections_data_cache.up.sql", size: 1808, mode: os.FileMode(0644), modTime: time.Unix(1694703777, 0)}
+	info := bindataFileInfo{name: "1692701329_add_collectibles_and_collections_data_cache.up.sql", size: 1808, mode: os.FileMode(0664), modTime: time.Unix(1694793410, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1, 0x51, 0xf4, 0x2b, 0x92, 0xde, 0x59, 0x65, 0xd8, 0x9b, 0x57, 0xe0, 0xfd, 0x7b, 0x12, 0xb, 0x29, 0x6e, 0x9d, 0xb5, 0x90, 0xe, 0xfa, 0x12, 0x97, 0xd, 0x61, 0x60, 0x7f, 0x32, 0x1d, 0xc3}}
 	return a, nil
 }
@@ -128,7 +129,7 @@ func _1692701339_add_scope_to_pendingUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1692701339_add_scope_to_pending.up.sql", size: 576, mode: os.FileMode(0644), modTime: time.Unix(1694703777, 0)}
+	info := bindataFileInfo{name: "1692701339_add_scope_to_pending.up.sql", size: 576, mode: os.FileMode(0664), modTime: time.Unix(1694793410, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x36, 0x8a, 0x5e, 0xe2, 0x63, 0x15, 0x37, 0xba, 0x55, 0x18, 0xf3, 0xcc, 0xe0, 0x5, 0x84, 0xe1, 0x5b, 0xe8, 0x1, 0x32, 0x6b, 0x9f, 0x7d, 0x9f, 0xd9, 0x23, 0x6c, 0xa9, 0xb5, 0xdc, 0xf4, 0x93}}
 	return a, nil
 }
@@ -148,8 +149,28 @@ func _1694540071_add_collectibles_ownership_update_timestampUpSql() (*asset, err
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1694540071_add_collectibles_ownership_update_timestamp.up.sql", size: 349, mode: os.FileMode(0644), modTime: time.Unix(1695071106, 0)}
+	info := bindataFileInfo{name: "1694540071_add_collectibles_ownership_update_timestamp.up.sql", size: 349, mode: os.FileMode(0664), modTime: time.Unix(1695198641, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7f, 0x45, 0xc7, 0xce, 0x79, 0x63, 0xbc, 0x6f, 0x83, 0x5f, 0xe2, 0x3, 0x56, 0xcc, 0x5, 0x2f, 0x85, 0xda, 0x7e, 0xea, 0xf5, 0xd2, 0xac, 0x19, 0xd4, 0xd8, 0x5e, 0xdd, 0xed, 0xe2, 0xa9, 0x97}}
+	return a, nil
+}
+
+var __1694692748_add_raw_balance_to_token_balancesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x34\xcd\xc1\x0a\x82\x40\x10\x87\xf1\xbb\x4f\xf1\xc7\xbb\xd0\x2b\x4c\x6a\x74\xd8\x14\x64\xed\x1a\xab\x3b\xc9\x92\xce\xc6\xce\x4a\x3d\x7e\x04\x75\xfd\x0e\xdf\xaf\xaa\x40\xde\x63\x8e\xeb\xbe\x09\xee\x31\x41\x73\x4c\x41\x16\x24\xf7\xc2\xe4\x56\x27\x33\x83\xdf\xcf\xc4\xaa\xec\x11\x04\x93\x53\xc6\x2e\x41\xb2\xc2\x29\xa6\xb0\x20\x48\xe6\x85\x13\x3c\xcf\x61\x73\x6b\x41\xc6\xb6\x03\x2c\x1d\x4d\x8b\x1c\x1f\x2c\xb7\xdf\x49\x41\x4d\x83\xba\x37\xe3\xa5\xfb\x0a\xff\x8e\x2b\x0d\xf5\x99\x06\x74\xbd\x45\x37\x1a\x83\xa6\x3d\xd1\x68\x2c\xca\x43\x59\x7c\x02\x00\x00\xff\xff\x88\x21\xef\xa1\xa5\x00\x00\x00")
+
+func _1694692748_add_raw_balance_to_token_balancesUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1694692748_add_raw_balance_to_token_balancesUpSql,
+		"1694692748_add_raw_balance_to_token_balances.up.sql",
+	)
+}
+
+func _1694692748_add_raw_balance_to_token_balancesUpSql() (*asset, error) {
+	bytes, err := _1694692748_add_raw_balance_to_token_balancesUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1694692748_add_raw_balance_to_token_balances.up.sql", size: 165, mode: os.FileMode(0664), modTime: time.Unix(1695203924, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd4, 0xe0, 0x5b, 0x42, 0xf0, 0x96, 0xa5, 0xf5, 0xed, 0xc0, 0x97, 0x88, 0xb0, 0x6d, 0xfe, 0x7d, 0x97, 0x2e, 0x17, 0xd2, 0x16, 0xbc, 0x2a, 0xf2, 0xcc, 0x67, 0x9e, 0xc5, 0x47, 0xf6, 0x69, 0x1}}
 	return a, nil
 }
 
@@ -168,7 +189,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 74, mode: os.FileMode(0644), modTime: time.Unix(1694703777, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 74, mode: os.FileMode(0664), modTime: time.Unix(1694793410, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xde, 0x7c, 0x28, 0xcd, 0x47, 0xf2, 0xfa, 0x7c, 0x51, 0x2d, 0xd8, 0x38, 0xb, 0xb0, 0x34, 0x9d, 0x4c, 0x62, 0xa, 0x9e, 0x28, 0xc3, 0x31, 0x23, 0xd9, 0xbb, 0x89, 0x9f, 0xa0, 0x89, 0x1f, 0xe8}}
 	return a, nil
 }
@@ -272,6 +293,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1694540071_add_collectibles_ownership_update_timestamp.up.sql": _1694540071_add_collectibles_ownership_update_timestampUpSql,
 
+	"1694692748_add_raw_balance_to_token_balances.up.sql": _1694692748_add_raw_balance_to_token_balancesUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -320,6 +343,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1692701329_add_collectibles_and_collections_data_cache.up.sql": &bintree{_1692701329_add_collectibles_and_collections_data_cacheUpSql, map[string]*bintree{}},
 	"1692701339_add_scope_to_pending.up.sql":                        &bintree{_1692701339_add_scope_to_pendingUpSql, map[string]*bintree{}},
 	"1694540071_add_collectibles_ownership_update_timestamp.up.sql": &bintree{_1694540071_add_collectibles_ownership_update_timestampUpSql, map[string]*bintree{}},
+	"1694692748_add_raw_balance_to_token_balances.up.sql":           &bintree{_1694692748_add_raw_balance_to_token_balancesUpSql, map[string]*bintree{}},
 	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 
