@@ -500,10 +500,11 @@ type CommunityShard struct {
 }
 
 type KnownCommunitiesResponse struct {
-	ContractCommunities         []CommunityShard      `json:"contractCommunities"`
-	ContractFeaturedCommunities []CommunityShard      `json:"contractFeaturedCommunities"`
+	ContractCommunities         []string              `json:"contractCommunities"`         // TODO: use CommunityShard
+	ContractFeaturedCommunities []string              `json:"contractFeaturedCommunities"` // TODO: use CommunityShard
 	Descriptions                map[string]*Community `json:"communities"`
-	UnknownCommunities          []CommunityShard      `json:"unknownCommunities"`
+	UnknownCommunities          []string              `json:"unknownCommunities"` // TODO: use CommunityShard
+
 }
 
 func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []types.HexBytes) (response *KnownCommunitiesResponse, err error) {
@@ -519,18 +520,20 @@ func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []types.HexByt
 			return
 		}
 
-		response.ContractCommunities = append(response.ContractCommunities, CommunityShard{
-			CommunityID: communityID,
-			Shard:       community.Shard(),
-		})
+		// TODO: use CommunityShard instead of appending the communityID
+
+		response.ContractCommunities = append(response.ContractCommunities, communityID) // , CommunityShard{
+		// CommunityID: communityID,
+		// Shard:       community.Shard(),
+		// }
 
 		if community != nil {
 			response.Descriptions[community.IDString()] = community
 		} else {
-			response.UnknownCommunities = append(response.UnknownCommunities, CommunityShard{
-				CommunityID: communityID,
-				Shard:       community.Shard(),
-			})
+			response.UnknownCommunities = append(response.UnknownCommunities, communityID) // CommunityShard{
+			//	CommunityID: communityID,
+			//	Shard:       community.Shard(),
+			// })
 		}
 	}
 
@@ -1273,7 +1276,7 @@ func (m *Manager) DeleteCategory(request *requests.DeleteCommunityCategory) (*Co
 	return changes.Community, changes, nil
 }
 
-func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte) (*CommunityResponse, error) {
+func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte, shard *common.Shard) (*CommunityResponse, error) {
 	if signer == nil {
 		return nil, errors.New("signer can't be nil")
 	}
@@ -1292,6 +1295,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 			CommunityDescriptionProtocolMessage: payload,
 			MemberIdentity:                      &m.identity.PublicKey,
 			ID:                                  signer,
+			Shard:                               shard,
 		}
 
 		community, err = New(config)
@@ -2876,7 +2880,7 @@ func (m *Manager) HandleCommunityRequestToLeave(signer *ecdsa.PublicKey, proto *
 	return nil
 }
 
-func (m *Manager) HandleWrappedCommunityDescriptionMessage(payload []byte) (*CommunityResponse, error) {
+func (m *Manager) HandleWrappedCommunityDescriptionMessage(payload []byte, shard *common.Shard) (*CommunityResponse, error) {
 	m.logger.Debug("Handling wrapped community description message")
 
 	applicationMetadataMessage := &protobuf.ApplicationMetadataMessage{}
@@ -2899,7 +2903,7 @@ func (m *Manager) HandleWrappedCommunityDescriptionMessage(payload []byte) (*Com
 		return nil, err
 	}
 
-	return m.HandleCommunityDescriptionMessage(signer, description, payload)
+	return m.HandleCommunityDescriptionMessage(signer, description, payload, shard)
 }
 
 func (m *Manager) JoinCommunity(id types.HexBytes, forceJoin bool) (*Community, error) {

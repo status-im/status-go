@@ -16,6 +16,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
@@ -576,13 +578,26 @@ func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse,
 	// TODO: The curated communities smart contract should also store the community shard cluster and index
 
 	for _, c := range featuredCommunities {
-		response.ContractFeaturedCommunities = append(response.ContractFeaturedCommunities, communities.CommunityShard{
+		response.ContractFeaturedCommunities = append(response.ContractFeaturedCommunities, types.HexBytes(c).String())
+		// TODO: use CommunityShard instead of communityID
+		/*response.ContractFeaturedCommunities = append(response.ContractFeaturedCommunities, communities.CommunityShard{
 			CommunityID: types.HexBytes(c).String(),
 			// Shard:     c.Shard, // TODO: obtain this value
+		})*/
+	}
+
+	// TODO: this loop is added just to not revert the change from requestCommunitiesFromMailserver
+	// Once support for shards is added in the contract, just pass the `response.UnknownCommunities` directly to
+	// the function
+
+	var unknownCommunities []communities.CommunityShard
+	for _, u := range response.UnknownCommunities {
+		unknownCommunities = append(unknownCommunities, communities.CommunityShard{
+			CommunityID: u,
 		})
 	}
 
-	go m.requestCommunitiesFromMailserver(response.UnknownCommunities)
+	go m.requestCommunitiesFromMailserver(unknownCommunities)
 
 	return response, nil
 }
@@ -1059,7 +1074,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		CommunityID:       community.ID(),
 		SkipProtocolLayer: true,
 		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
-		PubsubTopic:       community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+		PubsubTopic:       relay.DefaultWakuTopic, // TODO: this should be sent on a non protected pubsub topic.
 	}
 
 	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
@@ -1377,7 +1392,7 @@ func (m *Messenger) CancelRequestToJoinCommunity(request *requests.CancelRequest
 		CommunityID:       community.ID(),
 		SkipProtocolLayer: true,
 		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN,
-		PubsubTopic:       community.PubsubTopic(), // TODO: confirm if it should be send in community pubsub topic
+		PubsubTopic:       relay.DefaultWakuTopic, // TODO: this should be sent on a non protected pubsub topic.
 	}
 	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
 
@@ -2784,7 +2799,7 @@ func (m *Messenger) passStoredCommunityInfoToSignalHandler(communityID string) {
 
 // handleCommunityDescription handles an community description
 func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawPayload []byte) error {
-	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload)
+	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload, nil)
 	if err != nil {
 		return err
 	}
