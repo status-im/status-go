@@ -304,6 +304,7 @@ type Subscription struct {
 	CommunityEventsMessageInvalidClock       *CommunityEventsMessageInvalidClockSignal
 	AcceptedRequestsToJoin                   []types.HexBytes
 	RejectedRequestsToJoin                   []types.HexBytes
+	CommunityPrivilegedMemberSyncMessage     *CommunityPrivilegedMemberSyncMessage
 }
 
 type CommunityResponse struct {
@@ -637,65 +638,77 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 	return community, changes, nil
 }
 
-func (m *Manager) ReevaluateMembers(community *Community) error {
+func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 	becomeTokenMasterPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
 
 	hasMemberPermissions := len(becomeMemberPermissions) > 0
 
+	newPrivilegedRoles := make(map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey)
+	newPrivilegedRoles[protobuf.CommunityMember_ROLE_TOKEN_MASTER] = []*ecdsa.PublicKey{}
+	newPrivilegedRoles[protobuf.CommunityMember_ROLE_ADMIN] = []*ecdsa.PublicKey{}
+
 	for memberKey := range community.Members() {
 		memberPubKey, err := common.HexToPubkey(memberKey)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if memberKey == common.PubkeyToHex(&m.identity.PublicKey) || community.IsMemberOwner(memberPubKey) {
 			continue
 		}
 
-		isTokenMaster := community.IsMemberTokenMaster(memberPubKey)
-		isAdmin := community.IsMemberAdmin(memberPubKey)
+		isCurrentRoleTokenMaster := community.IsMemberTokenMaster(memberPubKey)
+		isCurrentRoleAdmin := community.IsMemberAdmin(memberPubKey)
 		requestID := CalculateRequestID(memberKey, community.ID())
 		revealedAccounts, err := m.persistence.GetRequestToJoinRevealedAddresses(requestID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		memberHasWallet := len(revealedAccounts) > 0
 
 		// Check if user has privilege role without sharing the account to controlNode
 		// or user treated as a member without wallet in closed community
-		if !memberHasWallet && (hasMemberPermissions || isAdmin || isTokenMaster) {
+		if !memberHasWallet && (hasMemberPermissions || isCurrentRoleTokenMaster || isCurrentRoleAdmin) {
 			_, err = community.RemoveUserFromOrg(memberPubKey)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			continue
 		}
 
 		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(revealedAccounts)
 
-		isTokenMaster, err = m.ReevaluatePrivelegedMember(community, becomeTokenMasterPermissions, accountsAndChainIDs, memberPubKey,
-			protobuf.CommunityMember_ROLE_TOKEN_MASTER, isTokenMaster)
+		isNewRoleTokenMaster, err := m.ReevaluatePrivilegedMember(community, becomeTokenMasterPermissions, accountsAndChainIDs, memberPubKey,
+			protobuf.CommunityMember_ROLE_TOKEN_MASTER, isCurrentRoleTokenMaster)
 
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		if isTokenMaster {
+		if isNewRoleTokenMaster {
+			if !isCurrentRoleTokenMaster {
+				newPrivilegedRoles[protobuf.CommunityMember_ROLE_TOKEN_MASTER] =
+					append(newPrivilegedRoles[protobuf.CommunityMember_ROLE_TOKEN_MASTER], memberPubKey)
+			}
 			// Skip further validation if user has TokenMaster permissions
 			continue
 		}
 
-		isAdmin, err = m.ReevaluatePrivelegedMember(community, becomeAdminPermissions, accountsAndChainIDs, memberPubKey,
-			protobuf.CommunityMember_ROLE_ADMIN, isAdmin)
+		isNewRoleAdmin, err := m.ReevaluatePrivilegedMember(community, becomeAdminPermissions, accountsAndChainIDs, memberPubKey,
+			protobuf.CommunityMember_ROLE_ADMIN, isCurrentRoleAdmin)
 
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		if isAdmin {
+		if isNewRoleAdmin {
+			if !isCurrentRoleAdmin {
+				newPrivilegedRoles[protobuf.CommunityMember_ROLE_ADMIN] =
+					append(newPrivilegedRoles[protobuf.CommunityMember_ROLE_TOKEN_MASTER], memberPubKey)
+			}
 			// Skip further validation if user has Admin permissions
 			continue
 		}
@@ -703,13 +716,13 @@ func (m *Manager) ReevaluateMembers(community *Community) error {
 		if hasMemberPermissions {
 			permissionResponse, err := m.checkPermissions(becomeMemberPermissions, accountsAndChainIDs, true)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			if !permissionResponse.Satisfied {
 				_, err = community.RemoveUserFromOrg(memberPubKey)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				// Skip channels validation if user has been removed
 				continue
@@ -727,14 +740,14 @@ func (m *Manager) ReevaluateMembers(community *Community) error {
 				// ensure all members are added back if channel permissions were removed
 				_, err = community.PopulateChatWithAllMembers(channelID)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				continue
 			}
 
 			response, err := m.checkChannelPermissions(viewOnlyPermissions, viewAndPostPermissions, accountsAndChainIDs, true)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			isMemberAlreadyInChannel := community.IsMemberInChat(memberPubKey, channelID)
@@ -743,24 +756,19 @@ func (m *Manager) ReevaluateMembers(community *Community) error {
 				if !isMemberAlreadyInChannel {
 					_, err := community.AddMemberToChat(channelID, memberPubKey, []protobuf.CommunityMember_Roles{})
 					if err != nil {
-						return err
+						return nil, err
 					}
 				}
 			} else if isMemberAlreadyInChannel {
 				_, err := community.RemoveUserFromChat(memberPubKey, channelID)
 				if err != nil {
-					return err
+					return nil, err
 				}
 			}
 		}
 	}
 
-	err := m.saveAndPublish(community)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return newPrivilegedRoles, m.saveAndPublish(community)
 }
 
 func (m *Manager) ReevaluateMembersPeriodically(communityID types.HexBytes) {
@@ -783,10 +791,11 @@ func (m *Manager) ReevaluateMembersPeriodically(communityID types.HexBytes) {
 				m.periodicMembersReevaluationTasks.Delete(communityID.String())
 			}
 
-			err = m.ReevaluateMembers(community)
-			if err != nil {
+			if err = m.ReevaluateCommunityMembersPermissions(community); err != nil {
 				m.logger.Debug("failed to check member permissions", zap.Error(err))
+				continue
 			}
+
 		case <-cancel:
 			m.periodicMembersReevaluationTasks.Delete(communityID.String())
 			return
@@ -816,33 +825,23 @@ func (m *Manager) DeleteCommunityTokenPermission(request *requests.DeleteCommuni
 	return community, changes, nil
 }
 
-func (m *Manager) ReevaluateCommunityMembersPermissions(request *requests.ReevaluateCommunityMembersPermissions) (*Community, error) {
-	community, err := m.GetByID(request.CommunityID)
-	if err != nil {
-		return nil, err
-	}
-
+func (m *Manager) ReevaluateCommunityMembersPermissions(community *Community) error {
 	if community == nil {
-		return nil, ErrOrgNotFound
+		return ErrOrgNotFound
 	}
 
 	// TODO: Control node needs to be notified to do a permission check if TokenMasters did airdrop
 	// of the token which is using in a community permissions
 	if !community.IsControlNode() {
-		return nil, ErrNotEnoughPermissions
+		return ErrNotEnoughPermissions
 	}
 
-	err = m.ReevaluateMembers(community)
+	newPrivilegedMembers, err := m.ReevaluateMembers(community)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = m.saveAndPublish(community)
-	if err != nil {
-		return nil, err
-	}
-
-	return community, nil
+	return m.shareRequestsToJoinWithNewPrivilegedMembers(community, newPrivilegedMembers)
 }
 
 func (m *Manager) DeleteCommunity(id types.HexBytes) error {
@@ -1520,35 +1519,6 @@ func (m *Manager) HandleCommunityEventsMessageRejected(signer *ecdsa.PublicKey, 
 	return reapplyEventsMessage, nil
 }
 
-func (m *Manager) HandleRequestToJoinPrivilegedUserSyncMessage(message *protobuf.CommunityPrivilegedUserSyncMessage, communityID types.HexBytes) ([]*RequestToJoin, error) {
-	var state RequestToJoinState
-	if message.Type == protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN {
-		state = RequestToJoinStateAccepted
-	} else {
-		state = RequestToJoinStateDeclined
-	}
-
-	requestsToJoin := make([]*RequestToJoin, 0)
-	for signer, requestToJoinProto := range message.RequestToJoin {
-		requestToJoin := &RequestToJoin{
-			PublicKey:   signer,
-			Clock:       requestToJoinProto.Clock,
-			ENSName:     requestToJoinProto.EnsName,
-			CommunityID: requestToJoinProto.CommunityId,
-			State:       state,
-		}
-		requestToJoin.CalculateID()
-
-		_, err := m.saveOrUpdateRequestToJoin(signer, communityID, requestToJoin)
-		if err != nil {
-			return nil, err
-		}
-		requestsToJoin = append(requestsToJoin, requestToJoin)
-	}
-
-	return requestsToJoin, nil
-}
-
 func (m *Manager) handleAdditionalAdminChanges(community *Community) (*CommunityResponse, error) {
 	communityResponse := CommunityResponse{
 		RequestsToJoin: make([]*RequestToJoin, 0),
@@ -1586,7 +1556,7 @@ func (m *Manager) handleAdditionalAdminChanges(community *Community) (*Community
 	return &communityResponse, nil
 }
 
-func (m *Manager) saveOrUpdateRequestToJoin(signer string, communityID types.HexBytes, requestToJoin *RequestToJoin) (bool, error) {
+func (m *Manager) saveOrUpdateRequestToJoin(communityID types.HexBytes, requestToJoin *RequestToJoin) (bool, error) {
 	updated := false
 
 	existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
@@ -1614,6 +1584,7 @@ func (m *Manager) saveOrUpdateRequestToJoin(signer string, communityID types.Hex
 			return updated, err
 		}
 	}
+
 	return updated, nil
 }
 
@@ -1651,7 +1622,7 @@ func (m *Manager) handleCommunityEventRequestAccepted(community *Community, comm
 			continue
 		}
 
-		requestUpdated, err := m.saveOrUpdateRequestToJoin(signer, community.ID(), requestToJoin)
+		requestUpdated, err := m.saveOrUpdateRequestToJoin(community.ID(), requestToJoin)
 		if err != nil {
 			return nil, err
 		}
@@ -1706,7 +1677,7 @@ func (m *Manager) handleCommunityEventRequestRejected(community *Community, comm
 			continue
 		}
 
-		requestUpdated, err := m.saveOrUpdateRequestToJoin(signer, community.ID(), requestToJoin)
+		requestUpdated, err := m.saveOrUpdateRequestToJoin(community.ID(), requestToJoin)
 		if err != nil {
 			return nil, err
 		}
@@ -1966,6 +1937,24 @@ func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, err
 		return nil, err
 	}
 
+	if community.IsControlNode() {
+		if err = m.shareAcceptedRequestToJoinWithPrivilegedMembers(community, dbRequest); err != nil {
+			return nil, err
+		}
+
+		// if accepted member has a privilege role, share with him requests to join
+		memberRole := community.MemberRole(pk)
+		if memberRole == protobuf.CommunityMember_ROLE_OWNER || memberRole == protobuf.CommunityMember_ROLE_ADMIN ||
+			memberRole == protobuf.CommunityMember_ROLE_TOKEN_MASTER {
+
+			newPrivilegedMember := make(map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey)
+			newPrivilegedMember[memberRole] = []*ecdsa.PublicKey{pk}
+			if err = m.shareRequestsToJoinWithNewPrivilegedMembers(community, newPrivilegedMember); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	return community, nil
 }
 
@@ -2052,7 +2041,7 @@ func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, re
 	return requestToJoin, nil
 }
 
-func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoin) (*RequestToJoin, error) {
+func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoin) (*RequestToJoin, error) {
 	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityId)
 	if err != nil {
 		return nil, err
@@ -2064,6 +2053,12 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 	// don't process request as admin if community is configured as auto-accept
 	if !community.IsControlNode() && community.AcceptRequestToJoinAutomatically() {
 		return nil, errors.New("ignoring request to join, community is set to auto-accept")
+	}
+
+	// control node must receive requests to join only on community address
+	// ignore duplicate messages sent to control node pubKey
+	if community.IsControlNode() && receiver.Equal(m.identity) {
+		return nil, errors.New("duplicate msg sent to the owner")
 	}
 
 	isUserRejected, err := m.isUserRejectedFromCommunity(signer, community, request.Clock)
@@ -4521,7 +4516,7 @@ func (m *Manager) GetRevealedAddresses(communityID types.HexBytes, memberPk stri
 	return m.persistence.GetRequestToJoinRevealedAddresses(requestID)
 }
 
-func (m *Manager) ReevaluatePrivelegedMember(community *Community, tokenPermissions []*CommunityTokenPermission,
+func (m *Manager) ReevaluatePrivilegedMember(community *Community, tokenPermissions []*CommunityTokenPermission,
 	accountsAndChainIDs []*AccountChainIDsCombination, memberPubKey *ecdsa.PublicKey,
 	privilegedRole protobuf.CommunityMember_Roles, alreadyHasPrivilegedRole bool) (bool, error) {
 
@@ -4681,7 +4676,12 @@ func (m *Manager) ValidateCommunityPrivilegedUserSyncMessage(message *protobuf.C
 				return errors.New("no communityId in request to join in CommunityPrivilegedUserSyncMessage message")
 			}
 		}
+	case protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ALL_SYNC_REQUESTS_TO_JOIN:
+		if message.SyncRequestsToJoin == nil || len(message.SyncRequestsToJoin) == 0 {
+			return errors.New("invalid sync requests to join in CommunityPrivilegedUserSyncMessage message")
+		}
 	}
+
 	return nil
 }
 
@@ -4698,4 +4698,118 @@ func (m *Manager) createCommunityTokenPermission(request *requests.CreateCommuni
 	}
 
 	return community, changes, nil
+}
+
+func (m *Manager) shareRequestsToJoinWithNewPrivilegedMembers(community *Community, newPrivilegedMembers map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey) error {
+	requestsToJoin, err := m.GetCommunityRequestsToJoinWithRevealedAddresses(community.ID())
+	if err != nil {
+		return err
+	}
+
+	var syncRequestsWithoutRevealedAccounts []*protobuf.SyncCommunityRequestsToJoin
+	var syncRequestsWithRevealedAccounts []*protobuf.SyncCommunityRequestsToJoin
+	for _, request := range requestsToJoin {
+		syncRequestsWithRevealedAccounts = append(syncRequestsWithRevealedAccounts, request.ToSyncProtobuf())
+		requestProtoWithoutAccounts := request.ToSyncProtobuf()
+		requestProtoWithoutAccounts.RevealedAccounts = []*protobuf.RevealedAccount{}
+		syncRequestsWithoutRevealedAccounts = append(syncRequestsWithoutRevealedAccounts, requestProtoWithoutAccounts)
+	}
+
+	syncMsgWithoutRevealedAccounts := &protobuf.CommunityPrivilegedUserSyncMessage{
+		Type:               protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ALL_SYNC_REQUESTS_TO_JOIN,
+		CommunityId:        community.ID(),
+		SyncRequestsToJoin: syncRequestsWithoutRevealedAccounts,
+	}
+
+	syncMsgWitRevealedAccounts := &protobuf.CommunityPrivilegedUserSyncMessage{
+		Type:               protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ALL_SYNC_REQUESTS_TO_JOIN,
+		CommunityId:        community.ID(),
+		SyncRequestsToJoin: syncRequestsWithRevealedAccounts,
+	}
+
+	subscriptionMsg := &CommunityPrivilegedMemberSyncMessage{
+		CommunityPrivateKey: community.PrivateKey(),
+	}
+
+	for role, members := range newPrivilegedMembers {
+		if len(members) == 0 {
+			continue
+		}
+
+		subscriptionMsg.Receivers = members
+
+		switch role {
+		case protobuf.CommunityMember_ROLE_ADMIN:
+			subscriptionMsg.CommunityPrivilegedUserSyncMessage = syncMsgWithoutRevealedAccounts
+		case protobuf.CommunityMember_ROLE_OWNER:
+			fallthrough
+		case protobuf.CommunityMember_ROLE_TOKEN_MASTER:
+			subscriptionMsg.CommunityPrivilegedUserSyncMessage = syncMsgWitRevealedAccounts
+		}
+
+		m.publish(&Subscription{CommunityPrivilegedMemberSyncMessage: subscriptionMsg})
+	}
+
+	return nil
+}
+
+func (m *Manager) shareAcceptedRequestToJoinWithPrivilegedMembers(community *Community, requestsToJoin *RequestToJoin) error {
+	pk, err := common.HexToPubkey(requestsToJoin.PublicKey)
+	if err != nil {
+		return err
+	}
+
+	acceptedRequestsToJoinWithoutRevealedAccounts := make(map[string]*protobuf.CommunityRequestToJoin)
+	acceptedRequestsToJoinWithRevealedAccounts := make(map[string]*protobuf.CommunityRequestToJoin)
+
+	acceptedRequestsToJoinWithRevealedAccounts[requestsToJoin.PublicKey] = requestsToJoin.ToCommunityRequestToJoinProtobuf()
+	requestsToJoin.RevealedAccounts = make([]*protobuf.RevealedAccount, 0)
+	acceptedRequestsToJoinWithoutRevealedAccounts[requestsToJoin.PublicKey] = requestsToJoin.ToCommunityRequestToJoinProtobuf()
+
+	msgWithRevealedAccounts := &protobuf.CommunityPrivilegedUserSyncMessage{
+		Type:          protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN,
+		CommunityId:   community.ID(),
+		RequestToJoin: acceptedRequestsToJoinWithRevealedAccounts,
+	}
+
+	msgWithoutRevealedAccounts := &protobuf.CommunityPrivilegedUserSyncMessage{
+		Type:          protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_ACCEPT_REQUEST_TO_JOIN,
+		CommunityId:   community.ID(),
+		RequestToJoin: acceptedRequestsToJoinWithoutRevealedAccounts,
+	}
+
+	// do not sent to ourself and to the accepted user
+	skipMembers := make(map[string]struct{})
+	skipMembers[common.PubkeyToHex(&m.identity.PublicKey)] = struct{}{}
+	skipMembers[common.PubkeyToHex(pk)] = struct{}{}
+
+	subscriptionMsg := &CommunityPrivilegedMemberSyncMessage{
+		CommunityPrivateKey: community.PrivateKey(),
+	}
+
+	fileredPrivilegedMembers := community.GetFilteredPrivilegedMembers(skipMembers)
+	for role, members := range fileredPrivilegedMembers {
+		if len(members) == 0 {
+			continue
+		}
+
+		subscriptionMsg.Receivers = members
+
+		switch role {
+		case protobuf.CommunityMember_ROLE_ADMIN:
+			subscriptionMsg.CommunityPrivilegedUserSyncMessage = msgWithoutRevealedAccounts
+		case protobuf.CommunityMember_ROLE_OWNER:
+			fallthrough
+		case protobuf.CommunityMember_ROLE_TOKEN_MASTER:
+			subscriptionMsg.CommunityPrivilegedUserSyncMessage = msgWithRevealedAccounts
+		}
+
+		m.publish(&Subscription{CommunityPrivilegedMemberSyncMessage: subscriptionMsg})
+	}
+
+	return nil
+}
+
+func (m *Manager) GetCommunityRequestsToJoinWithRevealedAddresses(communityID types.HexBytes) ([]*RequestToJoin, error) {
+	return m.persistence.GetCommunityRequestsToJoinWithRevealedAddresses(communityID)
 }

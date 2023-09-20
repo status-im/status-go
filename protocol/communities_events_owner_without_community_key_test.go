@@ -66,7 +66,7 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) SetupTest() {
 	s.Require().NoError(shh.Start())
 
 	s.controlNode = s.newMessenger("", []string{})
-	s.ownerWithoutCommunityKey = s.newMessenger("qwerty", []string{commmunitiesEventsEventSenderAddress})
+	s.ownerWithoutCommunityKey = s.newMessenger("qwerty", []string{eventsSenderAccountAddress})
 	s.alice = s.newMessenger("", []string{})
 	_, err := s.controlNode.Start()
 	s.Require().NoError(err)

@@ -948,7 +948,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestViewChannelPermissions()
 	// in production it will happen automatically, by periodic check
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
-	err = s.owner.communitiesManager.ReevaluateMembers(community)
+	_, err = s.owner.communitiesManager.ReevaluateMembers(community)
 	s.Require().NoError(err)
 
 	err = <-waitOnChannelKeyToBeDistributedToBob
@@ -1038,7 +1038,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().True(checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, community))
 
 	// the control node re-evaluates the roles of the participants, checking that the privileged user has not lost his role
-	err = s.owner.communitiesManager.ReevaluateMembers(community)
+	_, err = s.owner.communitiesManager.ReevaluateMembers(community)
 	s.Require().NoError(err)
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
@@ -1060,7 +1060,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().NoError(err)
 	s.Require().False(community.HasTokenPermissions())
 
-	err = s.owner.communitiesManager.ReevaluateMembers(community)
+	_, err = s.owner.communitiesManager.ReevaluateMembers(community)
 	s.Require().NoError(err)
 
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
@@ -1153,7 +1153,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().True(checkRoleBasedOnThePermissionType(permissionType, &s.alice.identity.PublicKey, community))
 
 	// the control node reevaluates the roles of the participants, checking that the privileged user has not lost his role
-	err = s.owner.communitiesManager.ReevaluateMembers(community)
+	_, err = s.owner.communitiesManager.ReevaluateMembers(community)
 	s.Require().NoError(err)
 
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
@@ -1176,7 +1176,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities()[0].TokenPermissions(), 1)
 
-	err = s.owner.communitiesManager.ReevaluateMembers(community)
+	_, err = s.owner.communitiesManager.ReevaluateMembers(community)
 	s.Require().NoError(err)
 
 	community, err = s.owner.communitiesManager.GetByID(community.ID())
@@ -1200,7 +1200,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) testReevaluateMemberPrivileg
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities()[0].TokenPermissions(), 0)
 
-	err = s.owner.communitiesManager.ReevaluateMembers(community)
+	_, err = s.owner.communitiesManager.ReevaluateMembers(community)
 	s.Require().NoError(err)
 
 	community, err = s.owner.communitiesManager.GetByID(community.ID())

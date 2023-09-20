@@ -1,9 +1,6 @@
 package token
 
 import (
-	"fmt"
-	"math/big"
-
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
@@ -41,55 +38,4 @@ type CommunityToken struct {
 	Decimals           int                         `json:"decimals"`
 	Deployer           string                      `json:"deployer"`
 	PrivilegesLevel    PrivilegesLevel             `json:"privilegesLevel"`
-}
-
-func ToCommunityTokenProtobuf(token *CommunityToken) *protobuf.CommunityToken {
-	return &protobuf.CommunityToken{
-		TokenType:          token.TokenType,
-		CommunityId:        token.CommunityID,
-		Address:            token.Address,
-		Name:               token.Name,
-		Symbol:             token.Symbol,
-		Description:        token.Description,
-		Supply:             token.Supply.String(),
-		InfiniteSupply:     token.InfiniteSupply,
-		Transferable:       token.Transferable,
-		RemoteSelfDestruct: token.RemoteSelfDestruct,
-		ChainId:            int32(token.ChainID),
-		DeployState:        protobuf.CommunityToken_DeployState(token.DeployState),
-		Base64Image:        token.Base64Image,
-		Decimals:           int32(token.Decimals),
-		Deployer:           token.Deployer,
-		PrivilegesLevel:    protobuf.CommunityToken_PrivilegesLevel(token.PrivilegesLevel),
-	}
-}
-
-func FromCommunityTokenProtobuf(pToken *protobuf.CommunityToken) *CommunityToken {
-	token := &CommunityToken{
-		TokenType:          pToken.TokenType,
-		CommunityID:        pToken.CommunityId,
-		Address:            pToken.Address,
-		Name:               pToken.Name,
-		Symbol:             pToken.Symbol,
-		Description:        pToken.Description,
-		InfiniteSupply:     pToken.InfiniteSupply,
-		Transferable:       pToken.Transferable,
-		RemoteSelfDestruct: pToken.RemoteSelfDestruct,
-		ChainID:            int(pToken.ChainId),
-		DeployState:        DeployState(pToken.DeployState),
-		Base64Image:        pToken.Base64Image,
-		Decimals:           int(pToken.Decimals),
-		Deployer:           pToken.Deployer,
-		PrivilegesLevel:    PrivilegesLevel(pToken.PrivilegesLevel),
-	}
-
-	supplyBigInt, ok := new(big.Int).SetString(pToken.Supply, 10)
-	if ok {
-		token.Supply = &bigint.BigInt{Int: supplyBigInt}
-	} else {
-		token.Supply = &bigint.BigInt{Int: big.NewInt(0)}
-		fmt.Println("can't create supply bigInt from string")
-	}
-
-	return token
 }

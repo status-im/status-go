@@ -365,9 +365,7 @@ func joinCommunity(s *suite.Suite, community *communities.Community, owner *Mess
 	s.Require().NoError(err)
 }
 
-func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, controlNode *Messenger, user *Messenger) {
-	// Request to join the community
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+func requestToJoinCommunity(s *suite.Suite, controlNode *Messenger, user *Messenger, request *requests.RequestToJoinCommunity) types.HexBytes {
 	response, err := user.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -376,21 +374,34 @@ func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, co
 	requestToJoin := response.RequestsToJoinCommunity[0]
 	s.Require().Equal(requestToJoin.PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
 
-	response, err = WaitOnMessengerResponse(
+	_, err = WaitOnMessengerResponse(
 		controlNode,
 		func(r *MessengerResponse) bool {
-			return len(r.RequestsToJoinCommunity) > 0
+			if len(r.RequestsToJoinCommunity) == 0 {
+				return false
+			}
+
+			for _, resultRequest := range r.RequestsToJoinCommunity {
+				if resultRequest.PublicKey == common.PubkeyToHex(&user.identity.PublicKey) {
+					return true
+				}
+			}
+			return false
 		},
 		"control node did not receive community request to join",
 	)
 	s.Require().NoError(err)
 
-	userRequestToJoin := response.RequestsToJoinCommunity[0]
-	s.Require().Equal(userRequestToJoin.PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
+	return requestToJoin.ID
+}
+
+func joinOnRequestCommunity(s *suite.Suite, community *communities.Community, controlNode *Messenger, user *Messenger, request *requests.RequestToJoinCommunity) {
+	// Request to join the community
+	requestToJoinID := requestToJoinCommunity(s, controlNode, user, request)
 
 	// accept join request
-	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: requestToJoin.ID}
-	response, err = controlNode.AcceptRequestToJoinCommunity(acceptRequestToJoin)
+	acceptRequestToJoin := &requests.AcceptRequestToJoinCommunity{ID: requestToJoinID}
+	response, err := controlNode.AcceptRequestToJoinCommunity(acceptRequestToJoin)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 
