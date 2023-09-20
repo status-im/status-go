@@ -1617,6 +1617,12 @@ func (m *Messenger) Init() error {
 
 	logger := m.logger.With(zap.String("site", "Init"))
 
+	// Community requests will arrive in this pubsub topic
+	err := m.SubscribeToPubsubTopic(common.DefaultNonProtectedPubsubTopic(nil), nil)
+	if err != nil {
+		return err
+	}
+
 	var (
 		filtersToInit []transport.FiltersToInitialize
 		publicKeys    []*ecdsa.PublicKey

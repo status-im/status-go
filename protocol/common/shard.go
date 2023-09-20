@@ -3,7 +3,12 @@ package common
 import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/transport"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 )
+
+const MainStatusShardCluster = 16
+const NonProtectedIndex = 128
+const UndefinedShardValue = 0
 
 type Shard struct {
 	Cluster uint16 `json:"cluster"`
@@ -43,5 +48,15 @@ func (s *Shard) Protobuffer() *protobuf.Shard {
 	}
 }
 
-const MainStatusShard = 16
-const UndefinedShardValue = 0
+func DefaultNonProtectedPubsubTopic(shard *Shard) string {
+	// TODO: remove the condition once DefaultWakuTopic usage
+	// is removed
+	if shard != nil {
+		return transport.GetPubsubTopic(&transport.Shard{
+			Cluster: MainStatusShardCluster,
+			Index:   NonProtectedIndex,
+		})
+	} else {
+		return relay.DefaultWakuTopic
+	}
+}
