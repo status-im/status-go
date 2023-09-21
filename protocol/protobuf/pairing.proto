@@ -136,6 +136,7 @@ message SyncInstallationCommunity {
   bool encrypted = 10;
   bool spectated = 11;
   bytes encryption_keys = 12;
+  SyncCommunityControlNode control_node = 13;
 }
 
 message SyncCommunityRequestsToJoin {
@@ -147,6 +148,15 @@ message SyncCommunityRequestsToJoin {
   bytes community_id = 6;
   uint64 state = 7;
   repeated RevealedAccount revealed_accounts = 8;
+}
+
+message SyncCommunityControlNode {
+  // Lamport timestamp of control node change
+  uint64 clock = 1;
+
+  // The device id of the control node
+  // Empty if there is no control node
+  string installation_id = 2;
 }
 
 message SyncChat {

@@ -4,7 +4,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-func (o *Community) ToSyncInstallationCommunityProtobuf(clock uint64, communitySettings *CommunitySettings) (*protobuf.SyncInstallationCommunity, error) {
+func (o *Community) ToSyncInstallationCommunityProtobuf(clock uint64, communitySettings *CommunitySettings, syncControlNode *protobuf.SyncCommunityControlNode) (*protobuf.SyncInstallationCommunity, error) {
 	wrappedCommunity, err := o.ToProtocolMessageBytes()
 	if err != nil {
 		return nil, err
@@ -35,5 +35,6 @@ func (o *Community) ToSyncInstallationCommunityProtobuf(clock uint64, communityS
 		Muted:          o.Muted(),
 		RequestsToJoin: rtjs,
 		Settings:       settings,
+		ControlNode:    syncControlNode,
 	}, nil
 }

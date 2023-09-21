@@ -39,7 +39,7 @@ func TestMessengerCommunitiesSuite(t *testing.T) {
 
 type MessengerCommunitiesSuite struct {
 	suite.Suite
-	admin *Messenger
+	owner *Messenger
 	bob   *Messenger
 	alice *Messenger
 	// If one wants to send messages between different instances of Messenger,
@@ -57,13 +57,13 @@ func (s *MessengerCommunitiesSuite) SetupTest() {
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start())
 
-	s.admin = s.newMessenger()
+	s.owner = s.newMessenger()
 	s.bob = s.newMessenger()
 	s.alice = s.newMessenger()
 
-	s.admin.communitiesManager.RekeyInterval = 50 * time.Millisecond
+	s.owner.communitiesManager.RekeyInterval = 50 * time.Millisecond
 
-	_, err := s.admin.Start()
+	_, err := s.owner.Start()
 	s.Require().NoError(err)
 	_, err = s.bob.Start()
 	s.Require().NoError(err)
@@ -72,7 +72,7 @@ func (s *MessengerCommunitiesSuite) SetupTest() {
 }
 
 func (s *MessengerCommunitiesSuite) TearDownTest() {
-	s.Require().NoError(s.admin.Shutdown())
+	s.Require().NoError(s.owner.Shutdown())
 	s.Require().NoError(s.bob.Shutdown())
 	s.Require().NoError(s.alice.Shutdown())
 	_ = s.logger.Sync()
@@ -381,16 +381,16 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 }
 
 func (s *MessengerCommunitiesSuite) createCommunity() (*communities.Community, *Chat) {
-	return createCommunity(&s.Suite, s.admin)
+	return createCommunity(&s.Suite, s.owner)
 }
 
 func (s *MessengerCommunitiesSuite) advertiseCommunityTo(community *communities.Community, user *Messenger) {
-	advertiseCommunityTo(&s.Suite, community, s.admin, user)
+	advertiseCommunityTo(&s.Suite, community, s.owner, user)
 }
 
 func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Community, user *Messenger) {
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-	joinCommunity(&s.Suite, community, s.admin, user, request)
+	joinCommunity(&s.Suite, community, s.owner, user, request)
 }
 
 func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
@@ -456,7 +456,7 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	var response *MessengerResponse
 	// Pull message and make sure org is received
 	err = tt.RetryWithBackOff(func() error {
-		response, err = s.admin.RetrieveAll()
+		response, err = s.owner.RetrieveAll()
 		if err != nil {
 			return err
 		}
@@ -495,35 +495,35 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 		ChatIDs:      []string{},
 	}
 
-	response, err := s.admin.CreateCommunityCategory(category)
+	response, err := s.owner.CreateCommunityCategory(category)
 	s.Require().NoError(err)
 	community = response.Communities()[0]
 
-	privateKey, err := s.admin.ExportCommunity(community.ID())
+	s.advertiseCommunityTo(community, s.bob)
+	s.joinCommunity(community, s.bob)
+
+	privateKey, err := s.owner.ExportCommunity(community.ID())
 	s.Require().NoError(err)
 
 	_, err = s.alice.ImportCommunity(ctx, privateKey)
 	s.Require().NoError(err)
 
-	// Invite user on admin side
-	s.advertiseCommunityTo(community, s.bob)
-	s.joinCommunity(community, s.bob)
-
-	// Pull message and make sure org is received
-	err = tt.RetryWithBackOff(func() error {
-		response, err = s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-		if !response.Communities()[0].IsControlNode() {
-			return errors.New("isn't admin despite import")
-		}
-		return nil
+	newDescription := "new description set post import"
+	_, err = s.alice.EditCommunity(&requests.EditCommunity{
+		CommunityID: community.ID(),
+		CreateCommunity: requests.CreateCommunity{
+			Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+			Name:        community.Name(),
+			Color:       community.Color(),
+			Description: newDescription,
+		},
 	})
+	s.Require().NoError(err)
 
+	// bob receives new description
+	_, err = WaitOnMessengerResponse(s.bob, func(r *MessengerResponse) bool {
+		return len(r.Communities()) > 0 && r.Communities()[0].DescriptionText() == newDescription
+	}, "new description not received")
 	s.Require().NoError(err)
 }
 
@@ -550,7 +550,7 @@ func (s *MessengerCommunitiesSuite) TestRemovePrivateKey() {
 	s.Require().Len(response.Communities(), 1)
 
 	community = response.Communities()[0]
-	s.Require().True(community.IsOwnerWithoutCommunityKey())
+	s.Require().True(community.IsOwner())
 	s.Require().False(community.IsControlNode())
 }
 
@@ -1932,7 +1932,7 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 	s.joinCommunity(community, s.alice)
 	s.joinCommunity(community, s.bob)
 
-	joinedCommunities, err := s.admin.communitiesManager.Joined()
+	joinedCommunities, err := s.owner.communitiesManager.Joined()
 	s.Require().NoError(err)
 	s.Require().Equal(3, joinedCommunities[0].MembersCount())
 
@@ -1959,7 +1959,7 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 
 		if response.Communities()[0].MembersCount() != 2 {
 			communityMembersError = fmt.Errorf("invalid number of members: %d", response.Communities()[0].MembersCount())
-		} else if !response.Communities()[0].HasMember(&s.admin.identity.PublicKey) {
+		} else if !response.Communities()[0].HasMember(&s.owner.identity.PublicKey) {
 			communityMembersError = errors.New("admin removed from community")
 		} else if !response.Communities()[0].HasMember(&s.bob.identity.PublicKey) {
 			communityMembersError = errors.New("bob removed from community")
@@ -1970,7 +1970,7 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 		return communityMembersError
 	}
 	err = tt.RetryWithBackOff(func() error {
-		return verifyCommunityMembers(s.admin)
+		return verifyCommunityMembers(s.owner)
 	})
 	s.Require().NoError(err)
 	err = tt.RetryWithBackOff(func() error {
@@ -1978,7 +1978,7 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 	})
 	s.Require().NoError(err)
 
-	joinedCommunities, err = s.admin.communitiesManager.Joined()
+	joinedCommunities, err = s.owner.communitiesManager.Joined()
 	s.Require().NoError(err)
 	s.Require().Equal(2, joinedCommunities[0].MembersCount())
 
@@ -1995,7 +1995,7 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 	// alice can rejoin
 	s.joinCommunity(community, s.alice)
 
-	joinedCommunities, err = s.admin.communitiesManager.Joined()
+	joinedCommunities, err = s.owner.communitiesManager.Joined()
 	s.Require().NoError(err)
 	s.Require().Equal(3, joinedCommunities[0].MembersCount())
 
@@ -2174,7 +2174,7 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 	s.advertiseCommunityTo(community, s.alice)
 	s.joinCommunity(community, s.alice)
 
-	response, err := s.admin.BanUserFromCommunity(
+	response, err := s.owner.BanUserFromCommunity(
 		context.Background(),
 		&requests.BanUserFromCommunity{
 			CommunityID: community.ID(),
@@ -2189,7 +2189,7 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
 	s.Require().True(community.IsBanned(&s.alice.identity.PublicKey))
 
-	response, err = s.admin.UnbanUserFromCommunity(
+	response, err = s.owner.UnbanUserFromCommunity(
 		&requests.UnbanUserFromCommunity{
 			CommunityID: community.ID(),
 			User:        common.PubkeyToHexBytes(&s.alice.identity.PublicKey),
@@ -2439,9 +2439,12 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	s.Equal(newCommunity.InvitationOnly(), tnc.InvitationOnly())
 
 	s.True(newCommunity.IsControlNode())
-	s.False(newCommunity.IsOwnerWithoutCommunityKey())
-	s.True(tnc.IsOwnerWithoutCommunityKey())
+	s.True(newCommunity.IsOwner())
+
+	// Even though synced device have the private key, it is not the control node
+	// There can be only one control node
 	s.False(tnc.IsControlNode())
+	s.True(tnc.IsOwner())
 }
 
 // TestSyncCommunity_RequestToJoin tests more complex pairing and syncing scenario where one paired device
@@ -2764,6 +2767,39 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 
 	aoCom := mr.Communities()[0]
 	s.Equal(aCom, aoCom)
+}
+
+func (s *MessengerCommunitiesSuite) TestSyncCommunity_ImportCommunity() {
+	// Owner creates community
+	community, _ := s.createCommunity()
+	s.Require().True(community.IsControlNode())
+
+	// New device is created & paired
+	ownersOtherDevice := s.createOtherDevice(s.owner)
+	PairDevices(&s.Suite, ownersOtherDevice, s.owner)
+	PairDevices(&s.Suite, s.owner, ownersOtherDevice)
+
+	privateKey, err := s.owner.ExportCommunity(community.ID())
+	s.Require().NoError(err)
+
+	// New device imports the community (before it is received via sync message)
+	ctx := context.Background()
+	response, err := ownersOtherDevice.ImportCommunity(ctx, privateKey)
+	s.Require().NoError(err)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Equal(community.IDString(), response.Communities()[0].IDString())
+	// New device becomes the control node
+	s.Require().True(response.Communities()[0].IsControlNode())
+
+	// Old device is no longer the control node
+	_, err = WaitOnMessengerResponse(s.owner, func(response *MessengerResponse) bool {
+		if len(response.Communities()) != 1 {
+			return false
+		}
+		c := response.Communities()[0]
+		return c.IDString() == community.IDString() && !c.IsControlNode()
+	}, "community not synced")
+	s.Require().NoError(err)
 }
 
 func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
@@ -3096,7 +3132,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 	s.advertiseCommunityTo(community, s.alice)
 	s.joinCommunity(community, s.alice)
 
-	response, err := s.admin.BanUserFromCommunity(
+	response, err := s.owner.BanUserFromCommunity(
 		context.Background(),
 		&requests.BanUserFromCommunity{
 			CommunityID: community.ID(),
@@ -3139,7 +3175,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 
 	s.Require().NoError(err)
 
-	messageState := s.admin.buildMessageState()
+	messageState := s.owner.buildMessageState()
 	messageState.CurrentMessageState = &CurrentMessageState{}
 
 	messageState.CurrentMessageState.PublicKey = &s.alice.identity.PublicKey
@@ -3147,7 +3183,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 	statusMessage := v1protocol.StatusMessage{
 		Dst: community.PublicKey(),
 	}
-	err = s.admin.HandleCommunityRequestToJoin(messageState, requestToJoinProto, &statusMessage)
+	err = s.owner.HandleCommunityRequestToJoin(messageState, requestToJoinProto, &statusMessage)
 
 	s.Require().ErrorContains(err, "can't request access")
 }
@@ -3178,12 +3214,12 @@ func (s *MessengerCommunitiesSuite) TestHandleImport() {
 	wrappedPayload, err := v1protocol.WrapMessageV1(
 		encodedPayload,
 		protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
-		s.admin.identity,
+		s.owner.identity,
 	)
 	s.Require().NoError(err)
 
 	message := &types.Message{}
-	message.Sig = crypto.FromECDSAPub(&s.admin.identity.PublicKey)
+	message.Sig = crypto.FromECDSAPub(&s.owner.identity.PublicKey)
 	message.Payload = wrappedPayload
 
 	filter := s.alice.transport.FilterByChatID(chat.ID)
@@ -3217,7 +3253,7 @@ func (s *MessengerCommunitiesSuite) TestGetCommunityIdFromKey() {
 
 func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 	// Create a new community
-	response, err := s.admin.CreateCommunity(
+	response, err := s.owner.CreateCommunity(
 		&requests.CreateCommunity{
 			Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
 			Name:        "status",
@@ -3231,7 +3267,7 @@ func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 	s.Require().Len(response.Communities(), 1)
 
 	// Check community is present in the DB and has default values we care about
-	c, err := s.admin.GetCommunityByID(response.Communities()[0].ID())
+	c, err := s.owner.GetCommunityByID(response.Communities()[0].ID())
 	s.Require().NoError(err)
 	s.Require().False(c.Encrypted())
 	// TODO some check that there are no keys for the community. Alt for s.Require().Zero(c.RekeyedAt().Unix())

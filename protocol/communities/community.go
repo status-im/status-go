@@ -30,6 +30,7 @@ const signatureLength = 65
 type Config struct {
 	PrivateKey                          *ecdsa.PrivateKey
 	ControlNode                         *ecdsa.PublicKey
+	ControlDevice                       bool // whether this device is control node
 	CommunityDescription                *protobuf.CommunityDescription
 	CommunityDescriptionProtocolMessage []byte // community in a wrapped & signed (by owner) protocol message
 	ID                                  *ecdsa.PublicKey
@@ -1086,11 +1087,11 @@ func (o *Community) ValidateEditSharedAddresses(signer *ecdsa.PublicKey, request
 
 // We treat control node as an owner with community key
 func (o *Community) IsControlNode() bool {
-	return o.config.PrivateKey != nil && o.config.PrivateKey.PublicKey.Equal(o.ControlNode())
+	return o.config.PrivateKey != nil && o.config.PrivateKey.PublicKey.Equal(o.ControlNode()) && o.config.ControlDevice
 }
 
-func (o *Community) IsOwnerWithoutCommunityKey() bool {
-	return o.config.PrivateKey == nil && o.IsMemberOwner(o.config.MemberIdentity)
+func (o *Community) IsOwner() bool {
+	return o.IsMemberOwner(o.config.MemberIdentity)
 }
 
 func (o *Community) IsTokenMaster() bool {
@@ -2077,6 +2078,7 @@ func (o *Community) CreateDeepCopy() *Community {
 		config: &Config{
 			PrivateKey:                          o.config.PrivateKey,
 			ControlNode:                         o.config.ControlNode,
+			ControlDevice:                       o.config.ControlDevice,
 			CommunityDescription:                proto.Clone(o.config.CommunityDescription).(*protobuf.CommunityDescription),
 			CommunityDescriptionProtocolMessage: o.config.CommunityDescriptionProtocolMessage,
 			ID:                                  o.config.ID,

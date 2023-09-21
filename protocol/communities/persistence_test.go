@@ -47,7 +47,7 @@ func (s *PersistenceSuite) TestSaveCommunity() {
 	s.Require().NoError(err)
 
 	// there is one community inserted by default
-	communities, err := s.db.AllCommunities(&id.PublicKey)
+	communities, err := s.db.AllCommunities(&id.PublicKey, "")
 	s.Require().NoError(err)
 	s.Require().Len(communities, 1)
 
@@ -55,6 +55,7 @@ func (s *PersistenceSuite) TestSaveCommunity() {
 		config: &Config{
 			PrivateKey:           id,
 			ControlNode:          &id.PublicKey,
+			ControlDevice:        true,
 			ID:                   &id.PublicKey,
 			Joined:               true,
 			Spectated:            true,
@@ -66,7 +67,7 @@ func (s *PersistenceSuite) TestSaveCommunity() {
 	}
 	s.Require().NoError(s.db.SaveCommunity(&community))
 
-	communities, err = s.db.AllCommunities(&id.PublicKey)
+	communities, err = s.db.AllCommunities(&id.PublicKey, "")
 	s.Require().NoError(err)
 	s.Require().Len(communities, 2)
 	s.Equal(types.HexBytes(crypto.CompressPubkey(&id.PublicKey)), communities[1].ID())
@@ -199,7 +200,7 @@ func (s *PersistenceSuite) TestJoinedAndPendingCommunitiesWithRequests() {
 	// Add a new community that we have joined
 	com := s.makeNewCommunity(identity)
 	com.Join()
-	sc, err := com.ToSyncInstallationCommunityProtobuf(clock, nil)
+	sc, err := com.ToSyncInstallationCommunityProtobuf(clock, nil, nil)
 	s.Require().NoError(err, "Community.ToSyncInstallationCommunityProtobuf shouldn't give any error")
 	err = s.db.saveRawCommunityRow(fromSyncCommunityProtobuf(sc))
 	s.Require().NoError(err, "saveRawCommunityRow")
@@ -219,7 +220,7 @@ func (s *PersistenceSuite) TestJoinedAndPendingCommunitiesWithRequests() {
 	err = s.db.SaveRequestToJoin(rtj)
 	s.Require().NoError(err, "SaveRequestToJoin shouldn't give any error")
 
-	comms, err := s.db.JoinedAndPendingCommunitiesWithRequests(&identity.PublicKey)
+	comms, err := s.db.JoinedAndPendingCommunitiesWithRequests(&identity.PublicKey, "")
 	s.Require().NoError(err, "JoinedAndPendingCommunitiesWithRequests shouldn't give any error")
 	s.Len(comms, 2, "Should have 2 communities")
 
@@ -260,6 +261,7 @@ func (s *PersistenceSuite) makeNewCommunity(identity *ecdsa.PrivateKey) *Communi
 		MemberIdentity: &identity.PublicKey,
 		PrivateKey:     comPrivKey,
 		ControlNode:    &comPrivKey.PublicKey,
+		ControlDevice:  true,
 		ID:             &comPrivKey.PublicKey,
 	}, &TimeSourceStub{})
 	s.NoError(err, "New shouldn't give any error")

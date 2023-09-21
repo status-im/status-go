@@ -2287,7 +2287,9 @@ func (m *Messenger) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error
 }
 
 func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) (*MessengerResponse, error) {
-	community, err := m.communitiesManager.ImportCommunity(key)
+	clock, _ := m.getLastClockWithRelatedChat()
+
+	community, err := m.communitiesManager.ImportCommunity(key, clock)
 	if err != nil {
 		return nil, err
 	}
@@ -2320,6 +2322,12 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 	}
 
 	response, err := m.JoinCommunity(ctx, community.ID(), true)
+	if err != nil {
+		return nil, err
+	}
+
+	// Notify other clients we are the control node now
+	err = m.syncCommunity(context.Background(), community, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -3157,8 +3165,15 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 		}
 	}
 
-	id := crypto.CompressPubkey(orgPubKey)
-	savedCommunity, err := m.communitiesManager.GetByID(id)
+	if syncCommunity.ControlNode != nil {
+		err = m.communitiesManager.SetSyncControlNode(syncCommunity.Id, syncCommunity.ControlNode)
+		if err != nil {
+			logger.Debug("m.SetSyncControlNode", zap.Error(err))
+			return err
+		}
+	}
+
+	savedCommunity, err := m.communitiesManager.GetByID(syncCommunity.Id)
 	if err != nil {
 		return err
 	}
@@ -4771,7 +4786,13 @@ func (m *Messenger) AddCommunityToken(communityID string, chainID int, address s
 		return err
 	}
 
-	_, err = m.communitiesManager.AddCommunityToken(communityToken)
+	clock, _ := m.getLastClockWithRelatedChat()
+	community, err := m.communitiesManager.AddCommunityToken(communityToken, clock)
+	if err != nil {
+		return err
+	}
+
+	err = m.syncCommunity(context.Background(), community, m.dispatchMessage)
 	if err != nil {
 		return err
 	}
@@ -5105,15 +5126,22 @@ func (m *Messenger) SetCommunitySignerPubKey(ctx context.Context, communityID []
 	if m.communityTokensService == nil {
 		return "", errors.New("tokens service not initialized")
 	}
-	transactionHash, err := m.communityTokensService.SetSignerPubKey(ctx, chainID, contractAddress, txArgs, password, newSignerPubKey)
+
+	return m.communityTokensService.SetSignerPubKey(ctx, chainID, contractAddress, txArgs, password, newSignerPubKey)
+}
+
+func (m *Messenger) PromoteSelfToControlNode(communityID types.HexBytes) (*communities.Community, error) {
+	clock, _ := m.getLastClockWithRelatedChat()
+
+	community, err := m.communitiesManager.PromoteSelfToControlNode(communityID, clock)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	_, err = m.communitiesManager.PromoteSelfToControlNode(communityID)
+	err = m.syncCommunity(context.Background(), community, m.dispatchMessage)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return transactionHash, nil
+	return community, nil
 }

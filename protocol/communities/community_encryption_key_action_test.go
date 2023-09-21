@@ -28,6 +28,7 @@ func createTestCommunity(identity *ecdsa.PrivateKey) (*Community, error) {
 		},
 		ID:             &identity.PublicKey,
 		ControlNode:    &identity.PublicKey,
+		ControlDevice:  true,
 		Joined:         true,
 		MemberIdentity: &identity.PublicKey,
 	}
