@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -56,4 +58,13 @@ func ExtractTokenCriteria(permissions []*CommunityTokenPermission) (erc20TokenCr
 		}
 	}
 	return
+}
+
+func CheckIfChannelHasAnyPermissions(chatID string, description *protobuf.CommunityDescription) bool {
+	for _, permission := range description.TokenPermissions {
+		if slices.Contains(permission.ChatIds, chatID) {
+			return true
+		}
+	}
+	return false
 }

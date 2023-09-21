@@ -155,7 +155,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 				Emoji:       c.Identity.Emoji,
 				Description: c.Identity.Description,
 				Permissions: c.Permissions,
-				Members:     c.Members,
+				Members:     o.getChatMembers(id),
 				CanPost:     canPost,
 				CategoryID:  c.CategoryId,
 				Position:    int(c.Position),
@@ -275,7 +275,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 				Color:       c.Identity.Color,
 				Description: c.Identity.Description,
 				Permissions: c.Permissions,
-				Members:     c.Members,
+				Members:     o.getChatMembers(id),
 				CanPost:     canPost,
 				CategoryID:  c.CategoryId,
 				Position:    int(c.Position),
@@ -570,22 +570,32 @@ func (o *Community) GetMember(pk *ecdsa.PublicKey) *protobuf.CommunityMember {
 	return o.getMember(pk)
 }
 
+func (o *Community) getChatMembers(chatID string) map[string]*protobuf.CommunityMember {
+	chat, ok := o.config.CommunityDescription.Chats[chatID]
+	if !ok {
+		return map[string]*protobuf.CommunityMember{}
+	}
+
+	if CheckIfChannelHasAnyPermissions(chatID, o.config.CommunityDescription) {
+		return chat.Members
+	}
+	return o.Members()
+}
+
+func (o *Community) GetChatMembers(chatID string) map[string]*protobuf.CommunityMember {
+	return o.getChatMembers(chatID)
+}
+
 func (o *Community) getChatMember(pk *ecdsa.PublicKey, chatID string) *protobuf.CommunityMember {
 	if !o.hasMember(pk) {
 		return nil
 	}
 
-	chat, ok := o.config.CommunityDescription.Chats[chatID]
-	if !ok {
-		return nil
-	}
-
 	key := common.PubkeyToHex(pk)
-	return chat.Members[key]
+	return o.getChatMembers(chatID)[key]
 }
 
 func (o *Community) hasMember(pk *ecdsa.PublicKey) bool {
-
 	member := o.getMember(pk)
 	return member != nil
 }
@@ -658,7 +668,7 @@ func (o *Community) RemoveUserFromChat(pk *ecdsa.PublicKey, chatID string) (*pro
 	if !o.IsControlNode() {
 		return nil, ErrNotControlNode
 	}
-	if !o.hasMember(pk) {
+	if !o.hasMember(pk) || !CheckIfChannelHasAnyPermissions(chatID, o.config.CommunityDescription) {
 		return o.config.CommunityDescription, nil
 	}
 
@@ -1256,7 +1266,16 @@ func (o *Community) Description() *protobuf.CommunityDescription {
 }
 
 func (o *Community) marshaledDescription() ([]byte, error) {
-	return proto.Marshal(o.config.CommunityDescription)
+	// Clear members list for channels that don't have permissions
+	// TMP: should be fixed in https://github.com/status-im/status-desktop/issues/12188
+	clonedDescritpion := proto.Clone(o.config.CommunityDescription).(*protobuf.CommunityDescription)
+	for chatID, chat := range clonedDescritpion.Chats {
+		if !CheckIfChannelHasAnyPermissions(chatID, clonedDescritpion) {
+			chat.Members = map[string]*protobuf.CommunityMember{}
+		}
+	}
+
+	return proto.Marshal(clonedDescritpion)
 }
 
 func (o *Community) MarshaledDescription() ([]byte, error) {
@@ -1846,6 +1865,10 @@ func (o *Community) AddMemberToChat(chatID string, publicKey *ecdsa.PublicKey, r
 		return nil, ErrChatNotFound
 	}
 
+	if !CheckIfChannelHasAnyPermissions(chatID, o.config.CommunityDescription) {
+		return changes, nil
+	}
+
 	if chat.Members == nil {
 		chat.Members = make(map[string]*protobuf.CommunityMember)
 	}
@@ -1874,7 +1897,10 @@ func (o *Community) PopulateChatWithAllMembers(chatID string) (*CommunityChanges
 		return o.emptyCommunityChanges(), ErrNotControlNode
 	}
 
-	return o.populateChatWithAllMembers(chatID)
+	if CheckIfChannelHasAnyPermissions(chatID, o.config.CommunityDescription) {
+		return o.populateChatWithAllMembers(chatID)
+	}
+	return o.emptyCommunityChanges(), nil
 }
 
 func (o *Community) populateChatWithAllMembers(chatID string) (*CommunityChanges, error) {
@@ -2062,8 +2088,6 @@ func (o *Community) createChat(chatID string, chat *protobuf.CommunityChat) erro
 			chat.Position++
 		}
 	}
-
-	chat.Members = o.config.CommunityDescription.Members
 
 	o.config.CommunityDescription.Chats[chatID] = chat
 
