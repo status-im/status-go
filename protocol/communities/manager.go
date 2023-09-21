@@ -262,6 +262,11 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 		manager.ensVerifier = verifier
 	}
 
+	err = manager.clearChannelMembers()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to clear channel members")
+	}
+
 	return manager, nil
 }
 
@@ -730,18 +735,15 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 		}
 
 		// Validate channel permissions
-		for channelID := range community.Chats() {
+		for channelID, chat := range community.Chats() {
 			chatID := community.IDString() + channelID
 
 			viewOnlyPermissions := community.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
 			viewAndPostPermissions := community.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
 
 			if len(viewOnlyPermissions) == 0 && len(viewAndPostPermissions) == 0 {
-				// ensure all members are added back if channel permissions were removed
-				_, err = community.PopulateChatWithAllMembers(channelID)
-				if err != nil {
-					return nil, err
-				}
+				// clear members list for channel without permissions
+				chat.Members = map[string]*protobuf.CommunityMember{}
 				continue
 			}
 
@@ -4812,4 +4814,32 @@ func (m *Manager) shareAcceptedRequestToJoinWithPrivilegedMembers(community *Com
 
 func (m *Manager) GetCommunityRequestsToJoinWithRevealedAddresses(communityID types.HexBytes) ([]*RequestToJoin, error) {
 	return m.persistence.GetCommunityRequestsToJoinWithRevealedAddresses(communityID)
+}
+
+// Clear members list for channels that don't have permissions
+// TMP: should be fixed in https://github.com/status-im/status-desktop/issues/12188
+func (m *Manager) clearChannelMembers() error {
+	controlledCommunities, err := m.ControlledCommunities()
+	if err != nil {
+		return err
+	}
+
+	for _, c := range controlledCommunities {
+		hasChanges := false
+		for channelID, chat := range c.Chats() {
+			if !c.ChannelHasTokenPermissions(c.IDString() + channelID) {
+				chat.Members = map[string]*protobuf.CommunityMember{}
+				hasChanges = true
+			}
+		}
+
+		if hasChanges {
+			err = m.persistence.SaveCommunity(c)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
