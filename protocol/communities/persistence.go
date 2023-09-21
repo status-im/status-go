@@ -332,6 +332,14 @@ func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, p
 		return nil, err
 	}
 
+	// For each channel that doesn't have permissions, we use community members list instead
+	// TMP: should be fixed in https://github.com/status-im/status-desktop/issues/12188
+	for chatID, chat := range community.config.CommunityDescription.Chats {
+		if !CheckIfChannelHasAnyPermissions(chatID, description) {
+			chat.Members = description.Members
+		}
+	}
+
 	return community, nil
 }
 

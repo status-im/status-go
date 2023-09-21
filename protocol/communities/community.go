@@ -940,6 +940,14 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 	// This is done in case tags are updated and a client sends unknown tags
 	description.Tags = requests.RemoveUnknownAndDeduplicateTags(description.Tags)
 
+	// For each channel that doesn't have permissions, we use community members list instead
+	// TMP: should be fixed in https://github.com/status-im/status-desktop/issues/12188
+	for chatID, chat := range description.Chats {
+		if !CheckIfChannelHasAnyPermissions(chatID, description) {
+			chat.Members = description.Members
+		}
+	}
+
 	err := ValidateCommunityDescription(description)
 	if err != nil {
 		return nil, err
