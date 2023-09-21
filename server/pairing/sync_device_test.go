@@ -55,6 +55,7 @@ const (
 	seedKeypairMnemonic1    = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about abandon"
 	path0                   = "m/44'/60'/0'/0/0"
 	path1                   = "m/44'/60'/0'/0/1"
+	expectedKDFIterations   = 1024
 )
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
@@ -192,7 +193,6 @@ func (s *SyncDeviceSuite) pairAccounts(serverBackend *api.GethStatusBackend, ser
 	clientNodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
 	require.NoError(s.T(), err)
 
-	expectedKDFIterations := 2048
 	clientKeystoreDir := filepath.Join(clientDir, keystoreDir)
 	clientPayloadSourceConfig := ReceiverClientConfig{
 		ReceiverConfig: &ReceiverConfig{
@@ -295,7 +295,6 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsSender() {
 	require.NoError(s.T(), err)
 	serverNodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
 	require.NoError(s.T(), err)
-	expectedKDFIterations := 1024
 	serverKeystoreDir := filepath.Join(serverTmpDir, keystoreDir)
 	serverPayloadSourceConfig := &ReceiverServerConfig{
 		ReceiverConfig: &ReceiverConfig{
@@ -463,7 +462,6 @@ func (s *SyncDeviceSuite) TestPairingSyncDeviceClientAsReceiver() {
 	require.NoError(s.T(), err)
 	clientNodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
 	require.NoError(s.T(), err)
-	expectedKDFIterations := 2048
 	clientKeystoreDir := filepath.Join(clientTmpDir, keystoreDir)
 	clientPayloadSourceConfig := ReceiverClientConfig{
 		ReceiverConfig: &ReceiverConfig{
@@ -551,7 +549,7 @@ func (s *SyncDeviceSuite) TestPairingThreeDevices() {
 	alice2Backend := s.prepareBackendWithoutAccount(alice2TmpDir)
 
 	alice3TmpDir := filepath.Join(s.pairThreeDevicesTmpdir, "alice3")
-	alice3Backend := s.prepareBackendWithAccount("", alice3TmpDir)
+	alice3Backend := s.prepareBackendWithoutAccount(alice3TmpDir)
 
 	defer func() {
 		require.NoError(s.T(), bobBackend.Logout())
@@ -1166,4 +1164,98 @@ func (s *SyncDeviceSuite) TestTransferringKeystoreFilesAfterStopUisngKeycard() {
 	for _, acc := range clientKp.Accounts {
 		require.True(s.T(), containsKeystoreFile(clientKeystorePath, acc.Address.String()[2:]))
 	}
+}
+
+func (s *SyncDeviceSuite) TestPreventLoggedInAccountLocalPairingClientAsReceiver() {
+	clientTmpDir := filepath.Join(s.clientAsSenderTmpdir, "client")
+	clientBackend := s.prepareBackendWithAccount("", clientTmpDir)
+	serverTmpDir := filepath.Join(s.clientAsSenderTmpdir, "server")
+	serverBackend := s.prepareBackendWithAccount("", serverTmpDir)
+	defer func() {
+		s.NoError(serverBackend.Logout())
+		s.NoError(clientBackend.Logout())
+	}()
+
+	serverActiveAccount, err := serverBackend.GetActiveAccount()
+	s.NoError(err)
+	serverKeystorePath := filepath.Join(serverTmpDir, keystoreDir, serverActiveAccount.KeyUID)
+	var config = &SenderServerConfig{
+		SenderConfig: &SenderConfig{
+			KeystorePath: serverKeystorePath,
+			DeviceType:   "desktop",
+			KeyUID:       serverActiveAccount.KeyUID,
+			Password:     s.password,
+		},
+		ServerConfig: new(ServerConfig),
+	}
+	configBytes, err := json.Marshal(config)
+	s.NoError(err)
+	cs, err := StartUpSenderServer(serverBackend, string(configBytes))
+	s.NoError(err)
+
+	clientKeystoreDir := filepath.Join(clientTmpDir, keystoreDir)
+	clientNodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
+	s.NoError(err)
+	clientPayloadSourceConfig := ReceiverClientConfig{
+		ReceiverConfig: &ReceiverConfig{
+			KeystorePath:          clientKeystoreDir,
+			DeviceType:            "iphone",
+			KDFIterations:         expectedKDFIterations,
+			NodeConfig:            clientNodeConfig,
+			SettingCurrentNetwork: currentNetwork,
+		},
+		ClientConfig: new(ClientConfig),
+	}
+	clientNodeConfig.RootDataDir = clientTmpDir
+	clientConfigBytes, err := json.Marshal(clientPayloadSourceConfig)
+	s.NoError(err)
+	err = StartUpReceivingClient(clientBackend, cs, string(clientConfigBytes))
+	s.ErrorIs(err, ErrLoggedInKeyUIDConflict)
+}
+
+func (s *SyncDeviceSuite) TestPreventLoggedInAccountLocalPairingClientAsSender() {
+	clientTmpDir := filepath.Join(s.clientAsSenderTmpdir, "client")
+	clientBackend := s.prepareBackendWithAccount("", clientTmpDir)
+	serverTmpDir := filepath.Join(s.clientAsSenderTmpdir, "server")
+	serverBackend := s.prepareBackendWithAccount("", serverTmpDir)
+	defer func() {
+		s.NoError(serverBackend.Logout())
+		s.NoError(clientBackend.Logout())
+	}()
+
+	serverNodeConfig, err := defaultNodeConfig(uuid.New().String(), "")
+	s.NoError(err)
+	serverKeystoreDir := filepath.Join(serverTmpDir, keystoreDir)
+	serverPayloadSourceConfig := &ReceiverServerConfig{
+		ReceiverConfig: &ReceiverConfig{
+			NodeConfig:            serverNodeConfig,
+			KeystorePath:          serverKeystoreDir,
+			DeviceType:            "desktop",
+			KDFIterations:         expectedKDFIterations,
+			SettingCurrentNetwork: currentNetwork,
+		},
+		ServerConfig: new(ServerConfig),
+	}
+	serverNodeConfig.RootDataDir = serverTmpDir
+	serverConfigBytes, err := json.Marshal(serverPayloadSourceConfig)
+	s.NoError(err)
+	cs, err := StartUpReceiverServer(serverBackend, string(serverConfigBytes))
+	s.NoError(err)
+
+	clientActiveAccount, err := clientBackend.GetActiveAccount()
+	s.NoError(err)
+	clientKeystorePath := filepath.Join(clientTmpDir, keystoreDir, clientActiveAccount.KeyUID)
+	clientPayloadSourceConfig := SenderClientConfig{
+		SenderConfig: &SenderConfig{
+			KeystorePath: clientKeystorePath,
+			DeviceType:   "android",
+			KeyUID:       clientActiveAccount.KeyUID,
+			Password:     s.password,
+		},
+		ClientConfig: new(ClientConfig),
+	}
+	clientConfigBytes, err := json.Marshal(clientPayloadSourceConfig)
+	s.NoError(err)
+	err = StartUpSendingClient(clientBackend, cs, string(clientConfigBytes))
+	s.ErrorContains(err, "[client] status not ok when sending account data, received '500 Internal Server Error'")
 }
