@@ -8,6 +8,7 @@ import (
 
 	eth_common "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/services/wallet/common"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/testutils"
@@ -139,6 +140,35 @@ func GenerateTestTransfers(tb testing.TB, db *sql.DB, firstStartIndex int, count
 		result = append(result, tr)
 	}
 	return
+}
+
+type TestCollectible struct {
+	TokenAddress eth_common.Address
+	TokenID      *big.Int
+	ChainID      common.ChainID
+}
+
+var TestCollectibles = []TestCollectible{
+	TestCollectible{
+		TokenAddress: eth_common.HexToAddress("0x97a04fda4d97c6e3547d66b572e29f4a4ff40392"),
+		TokenID:      big.NewInt(1),
+		ChainID:      1,
+	},
+	TestCollectible{ // Same token ID as above but different address
+		TokenAddress: eth_common.HexToAddress("0x2cec8879915cdbd80c88d8b1416aa9413a24ddfa"),
+		TokenID:      big.NewInt(1),
+		ChainID:      1,
+	},
+	TestCollectible{
+		TokenAddress: eth_common.HexToAddress("0x1dea7a3e04849840c0eb15fd26a55f6c40c4a69b"),
+		TokenID:      big.NewInt(11),
+		ChainID:      5,
+	},
+	TestCollectible{ // Same address as above but different token ID
+		TokenAddress: eth_common.HexToAddress("0x1dea7a3e04849840c0eb15fd26a55f6c40c4a69b"),
+		TokenID:      big.NewInt(12),
+		ChainID:      5,
+	},
 }
 
 var EthMainnet = token.Token{

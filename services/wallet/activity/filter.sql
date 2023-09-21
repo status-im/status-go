@@ -38,6 +38,7 @@ WITH filter_conditions AS (
 		? AS statusFinalized,
 		? AS statusPending,
 		? AS includeAllTokenTypeAssets,
+		? AS includeAllCollectibles,
 		? AS includeAllNetworks,
 		? AS pendingStatus,
 		? AS nowTimestamp,
@@ -84,6 +85,10 @@ assets_token_codes(token_code) AS (
 		%s
 ),
 assets_erc20(chain_id, token_address) AS (
+	VALUES
+		%s
+),
+assets_erc721(chain_id, token_id, token_address) AS (
 	VALUES
 		%s
 ),
@@ -292,6 +297,19 @@ WHERE
 		)
 	)
 	AND (
+		includeAllCollectibles
+		OR (
+			transfers.type = "erc721"
+			AND (
+				(
+					transfers.network_id,
+					HEX(transfers.token_id),
+					HEX(transfers.token_address)
+				) IN assets_erc721
+			)
+		)
+	)
+	AND (
 		includeAllNetworks
 		OR (transfers.network_id IN filter_networks)
 	)
@@ -360,6 +378,7 @@ WHERE
 		filterAllActivityStatus
 		OR filterStatusPending
 	)
+	AND includeAllCollectibles
 	AND (
 		(
 			startFilterDisabled
@@ -458,6 +477,7 @@ WHERE
 			OR multi_transactions.timestamp <= endTimestamp
 		)
 	)
+	AND includeAllCollectibles
 	AND (
 		filterActivityTypeAll
 		OR (multi_transactions.type IN (%s))
