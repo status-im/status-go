@@ -320,6 +320,13 @@ func (api *API) FetchBalancesByOwnerAndContractAddress(chainID wcommon.ChainID, 
 	return api.s.collectiblesManager.FetchBalancesByOwnerAndContractAddress(chainID, ownerAddress, contractAddresses)
 }
 
+func (api *API) RefetchOwnedCollectibles() error {
+	log.Debug("wallet.api.RefetchOwnedCollectibles")
+
+	api.s.collectibles.RefetchOwnedCollectibles()
+	return nil
+}
+
 func (api *API) FilterOwnedCollectiblesAsync(requestID int32, chainIDs []wcommon.ChainID, addresses []common.Address, offset int, limit int) error {
 	log.Debug("wallet.api.FilterOwnedCollectiblesAsync", "chainIDs.count", len(chainIDs), "addr.count", len(addresses), "offset", offset, "limit", limit)
 

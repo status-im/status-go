@@ -188,6 +188,11 @@ func (s *Service) GetCollectiblesDetailsAsync(requestID int32, uniqueIDs []third
 	})
 }
 
+func (s *Service) RefetchOwnedCollectibles() {
+	s.stopPeriodicalOwnershipFetch()
+	_ = s.startPeriodicalOwnershipFetch()
+}
+
 // Starts periodical fetching for the all wallet addresses and all chains
 func (s *Service) startPeriodicalOwnershipFetch() error {
 	if s.group != nil {
