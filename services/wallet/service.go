@@ -223,6 +223,11 @@ func (s *Service) SetCollectibleMetadataProvider(provider thirdparty.Collectible
 	s.collectiblesManager.SetMetadataProvider(provider)
 }
 
+// Set external Collectibles community info provider
+func (s *Service) SetCollectibleCommunityInfoProvider(provider thirdparty.CollectibleCommunityInfoProvider) {
+	s.collectiblesManager.SetCommunityInfoProvider(provider)
+}
+
 // Stop reactor and close db.
 func (s *Service) Stop() error {
 	log.Info("wallet will be stopped")

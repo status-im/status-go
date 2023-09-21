@@ -116,7 +116,7 @@ type GetCollectiblesDetailsResponse struct {
 }
 
 type filterOwnedCollectiblesTaskReturnType struct {
-	collectibles    []CollectibleHeader
+	headers         []CollectibleHeader
 	hasMore         bool
 	ownershipStatus OwnershipStatusPerAddressAndChainID
 }
@@ -138,9 +138,10 @@ func (s *Service) FilterOwnedCollectiblesAsync(requestID int32, chainIDs []walle
 		if err != nil {
 			return nil, err
 		}
+		headers, err := s.fullCollectiblesDataToHeaders(data)
 
 		return filterOwnedCollectiblesTaskReturnType{
-			collectibles:    fullCollectiblesDataToHeaders(data),
+			headers:         headers,
 			hasMore:         hasMore,
 			ownershipStatus: ownershipStatus,
 		}, err
@@ -153,7 +154,7 @@ func (s *Service) FilterOwnedCollectiblesAsync(requestID int32, chainIDs []walle
 			res.ErrorCode = ErrorCodeTaskCanceled
 		} else if err == nil {
 			fnRet := result.(filterOwnedCollectiblesTaskReturnType)
-			res.Collectibles = fnRet.collectibles
+			res.Collectibles = fnRet.headers
 			res.Offset = offset
 			res.HasMore = fnRet.hasMore
 			res.OwnershipStatus = fnRet.ownershipStatus
@@ -167,7 +168,10 @@ func (s *Service) FilterOwnedCollectiblesAsync(requestID int32, chainIDs []walle
 func (s *Service) GetCollectiblesDetailsAsync(requestID int32, uniqueIDs []thirdparty.CollectibleUniqueID) {
 	s.scheduler.Enqueue(requestID, getCollectiblesDataTask, func(ctx context.Context) (interface{}, error) {
 		collectibles, err := s.manager.FetchAssetsByCollectibleUniqueID(uniqueIDs)
-		return collectibles, err
+		if err != nil {
+			return nil, err
+		}
+		return s.fullCollectiblesDataToDetails(collectibles)
 	}, func(result interface{}, taskType async.TaskType, err error) {
 		res := GetCollectiblesDetailsResponse{
 			ErrorCode: ErrorCodeFailed,
@@ -176,8 +180,7 @@ func (s *Service) GetCollectiblesDetailsAsync(requestID int32, uniqueIDs []third
 		if errors.Is(err, context.Canceled) || errors.Is(err, async.ErrTaskOverwritten) {
 			res.ErrorCode = ErrorCodeTaskCanceled
 		} else if err == nil {
-			collectibles := result.([]thirdparty.FullCollectibleData)
-			res.Collectibles = fullCollectiblesDataToDetails(collectibles)
+			res.Collectibles = result.([]CollectibleDetails)
 			res.ErrorCode = ErrorCodeSuccess
 		}
 
@@ -401,4 +404,57 @@ func (s *Service) GetOwnershipStatus(chainIDs []walletCommon.ChainID, owners []c
 	}
 
 	return ret, nil
+}
+
+func (s *Service) fullCollectiblesDataToHeaders(data []thirdparty.FullCollectibleData) ([]CollectibleHeader, error) {
+	res := make([]CollectibleHeader, 0, len(data))
+
+	for _, c := range data {
+		header := fullCollectibleDataToHeader(c)
+
+		if c.CollectibleData.CommunityID != "" {
+			communityInfo, err := s.manager.FetchCollectibleCommunityInfo(c.CollectibleData.CommunityID, c.CollectibleData.ID)
+			if err != nil {
+				return nil, err
+			}
+
+			header.CommunityHeader = &CommunityHeader{
+				CommunityID:     communityInfo.CommunityID,
+				CommunityName:   communityInfo.CommunityName,
+				CommunityColor:  communityInfo.CommunityColor,
+				PrivilegesLevel: communityInfo.PrivilegesLevel,
+			}
+		}
+
+		res = append(res, header)
+	}
+
+	return res, nil
+}
+
+func (s *Service) fullCollectiblesDataToDetails(data []thirdparty.FullCollectibleData) ([]CollectibleDetails, error) {
+	res := make([]CollectibleDetails, 0, len(data))
+
+	for _, c := range data {
+		details := fullCollectibleDataToDetails(c)
+
+		if c.CollectibleData.CommunityID != "" {
+			traits, err := s.manager.FetchCollectibleCommunityTraits(c.CollectibleData.CommunityID, c.CollectibleData.ID)
+			if err != nil {
+				return nil, err
+			}
+			details.Traits = traits
+
+			communityInfo, err := s.manager.FetchCollectibleCommunityInfo(c.CollectibleData.CommunityID, c.CollectibleData.ID)
+			if err != nil {
+				return nil, err
+			}
+
+			details.CommunityInfo = communityInfo
+		}
+
+		res = append(res, details)
+	}
+
+	return res, nil
 }

@@ -7,16 +7,17 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
 
 	"github.com/stretchr/testify/require"
 )
 
 func setupCollectibleDataDBTest(t *testing.T) (*CollectibleDataDB, func()) {
-	db, err := appdatabase.InitializeDB(":memory:", "wallet-collectibles-data-db-tests", 1)
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	return NewCollectibleDataDB(db), func() {
 		require.NoError(t, db.Close())
@@ -64,6 +65,7 @@ func generateTestCollectiblesData(count int) (result []thirdparty.CollectibleDat
 			},
 			BackgroundColor: fmt.Sprintf("backgroundcolor-%d", i),
 			TokenURI:        fmt.Sprintf("tokenuri-%d", i),
+			CommunityID:     fmt.Sprintf("communityid-%d", i),
 		}
 		result = append(result, newCollectible)
 	}

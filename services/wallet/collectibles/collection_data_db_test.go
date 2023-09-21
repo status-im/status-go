@@ -7,15 +7,16 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/appdatabase"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
 
 	"github.com/stretchr/testify/require"
 )
 
 func setupCollectionDataDBTest(t *testing.T) (*CollectionDataDB, func()) {
-	db, err := appdatabase.InitializeDB(":memory:", "wallet-collections-data-db-tests", 1)
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	return NewCollectionDataDB(db), func() {
 		require.NoError(t, db.Close())
@@ -39,11 +40,12 @@ func generateTestCollectionsData(count int) (result []thirdparty.CollectionData)
 				ChainID: w_common.ChainID(i),
 				Address: common.BigToAddress(bigI),
 			},
-			Provider: fmt.Sprintf("provider-%d", i),
-			Name:     fmt.Sprintf("name-%d", i),
-			Slug:     fmt.Sprintf("slug-%d", i),
-			ImageURL: fmt.Sprintf("imageurl-%d", i),
-			Traits:   traits,
+			Provider:    fmt.Sprintf("provider-%d", i),
+			Name:        fmt.Sprintf("name-%d", i),
+			Slug:        fmt.Sprintf("slug-%d", i),
+			ImageURL:    fmt.Sprintf("imageurl-%d", i),
+			Traits:      traits,
+			CommunityID: fmt.Sprintf("community-%d", i),
 		}
 		result = append(result, newCollection)
 	}

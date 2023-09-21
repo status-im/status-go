@@ -122,6 +122,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 		services = append(services, wakuext)
 
 		b.SetWalletCollectibleMetadataProvider(wakuext)
+		b.SetWalletCollectibleCommunityInfoProvider(wakuext)
 	}
 
 	if config.WakuV2Config.Enabled {
@@ -149,6 +150,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 		services = append(services, wakuext)
 
 		b.SetWalletCollectibleMetadataProvider(wakuext)
+		b.SetWalletCollectibleCommunityInfoProvider(wakuext)
 	}
 
 	// We ignore for now local notifications flag as users who are upgrading have no mean to enable it
@@ -500,6 +502,12 @@ func (b *StatusNode) WalletService() *wallet.Service {
 func (b *StatusNode) SetWalletCollectibleMetadataProvider(provider thirdparty.CollectibleMetadataProvider) {
 	if b.walletSrvc != nil {
 		b.walletSrvc.SetCollectibleMetadataProvider(provider)
+	}
+}
+
+func (b *StatusNode) SetWalletCollectibleCommunityInfoProvider(provider thirdparty.CollectibleCommunityInfoProvider) {
+	if b.walletSrvc != nil {
+		b.walletSrvc.SetCollectibleCommunityInfoProvider(provider)
 	}
 }
 

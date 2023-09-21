@@ -4490,6 +4490,10 @@ func (m *Messenger) chatMessagesToWakuMessages(chatMessages []*common.Message, c
 	return wakuMessages, nil
 }
 
+func (m *Messenger) GetCommunityToken(communityID string, chainID int, address string) (*token.CommunityToken, error) {
+	return m.communitiesManager.GetCommunityToken(communityID, chainID, address)
+}
+
 func (m *Messenger) GetCommunityTokens(communityID string) ([]*token.CommunityToken, error) {
 	return m.communitiesManager.GetCommunityTokens(communityID)
 }

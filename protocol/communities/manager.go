@@ -4588,53 +4588,62 @@ func (m *Manager) HandleCommunityTokensMetadata(community *Community) error {
 				return err
 			}
 			if !exists {
-				communityToken := &community_token.CommunityToken{
-					CommunityID:        communityID,
-					Address:            address,
-					TokenType:          tokenMetadata.TokenType,
-					Name:               tokenMetadata.Name,
-					Symbol:             tokenMetadata.Symbol,
-					Description:        tokenMetadata.Description,
-					Transferable:       true,
-					RemoteSelfDestruct: false,
-					ChainID:            int(chainID),
-					DeployState:        community_token.Deployed,
-					Base64Image:        tokenMetadata.Image,
-					Decimals:           int(tokenMetadata.Decimals),
-				}
-
-				switch tokenMetadata.TokenType {
-				case protobuf.CommunityTokenType_ERC721:
-					contractData, err := m.communityTokensService.GetCollectibleContractData(chainID, address)
-					if err != nil {
-						return err
-					}
-
-					communityToken.Supply = contractData.TotalSupply
-					communityToken.Transferable = contractData.Transferable
-					communityToken.RemoteSelfDestruct = contractData.RemoteBurnable
-					communityToken.InfiniteSupply = contractData.InfiniteSupply
-
-				case protobuf.CommunityTokenType_ERC20:
-					contractData, err := m.communityTokensService.GetAssetContractData(chainID, address)
-					if err != nil {
-						return err
-					}
-
-					communityToken.Supply = contractData.TotalSupply
-					communityToken.InfiniteSupply = contractData.InfiniteSupply
-				}
-
-				communityToken.PrivilegesLevel = getPrivilegesLevel(chainID, address, community.TokenPermissions())
-
-				err = m.persistence.AddCommunityToken(communityToken)
+				// Fetch community token to make sure it's stored in the DB, discard result
+				communityToken, err := m.FetchCommunityToken(community, tokenMetadata, chainID, address)
 				if err != nil {
 					return err
 				}
+
+				return m.persistence.AddCommunityToken(communityToken)
 			}
 		}
 	}
 	return nil
+}
+
+func (m *Manager) FetchCommunityToken(community *Community, tokenMetadata *protobuf.CommunityTokenMetadata, chainID uint64, contractAddress string) (*community_token.CommunityToken, error) {
+	communityID := community.IDString()
+
+	communityToken := &community_token.CommunityToken{
+		CommunityID:        communityID,
+		Address:            contractAddress,
+		TokenType:          tokenMetadata.TokenType,
+		Name:               tokenMetadata.Name,
+		Symbol:             tokenMetadata.Symbol,
+		Description:        tokenMetadata.Description,
+		Transferable:       true,
+		RemoteSelfDestruct: false,
+		ChainID:            int(chainID),
+		DeployState:        community_token.Deployed,
+		Base64Image:        tokenMetadata.Image,
+		Decimals:           int(tokenMetadata.Decimals),
+	}
+
+	switch tokenMetadata.TokenType {
+	case protobuf.CommunityTokenType_ERC721:
+		contractData, err := m.communityTokensService.GetCollectibleContractData(chainID, contractAddress)
+		if err != nil {
+			return nil, err
+		}
+
+		communityToken.Supply = contractData.TotalSupply
+		communityToken.Transferable = contractData.Transferable
+		communityToken.RemoteSelfDestruct = contractData.RemoteBurnable
+		communityToken.InfiniteSupply = contractData.InfiniteSupply
+
+	case protobuf.CommunityTokenType_ERC20:
+		contractData, err := m.communityTokensService.GetAssetContractData(chainID, contractAddress)
+		if err != nil {
+			return nil, err
+		}
+
+		communityToken.Supply = contractData.TotalSupply
+		communityToken.InfiniteSupply = contractData.InfiniteSupply
+	}
+
+	communityToken.PrivilegesLevel = getPrivilegesLevel(chainID, contractAddress, community.TokenPermissions())
+
+	return communityToken, nil
 }
 
 func getPrivilegesLevel(chainID uint64, tokenAddress string, tokenPermissions map[string]*CommunityTokenPermission) community_token.PrivilegesLevel {
