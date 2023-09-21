@@ -614,19 +614,6 @@ func reorderChannel(base CommunityEventsTestsInterface, reorderRequest *requests
 }
 
 func kickMember(base CommunityEventsTestsInterface, communityID types.HexBytes, pubkey string) {
-	checkPending := func(response *MessengerResponse) error {
-		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(communityID))
-		if err != nil {
-			return err
-		}
-
-		if !modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey) {
-			return errors.New("alice should not be not kicked (yet)")
-		}
-
-		return nil
-	}
-
 	checkKicked := func(response *MessengerResponse) error {
 		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(communityID))
 		if err != nil {
@@ -658,15 +645,9 @@ func kickMember(base CommunityEventsTestsInterface, communityID types.HexBytes, 
 	s.Require().True(modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey))
 	s.Require().Equal(communities.CommunityMemberKickPending, modifiedCommmunity.PendingAndBannedMembers()[pubkey])
 
-	checkClientsReceivedAdminEvent(base, checkPending)
-	checkClientsReceivedAdminEvent(base, checkKicked)
-}
-
-func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserFromCommunity) {
-	pubkey := common.PubkeyToHex(&base.GetMember().identity.PublicKey)
-
-	checkPending := func(response *MessengerResponse) error {
-		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(banRequest.CommunityID))
+	// 2. wait for event as a sender
+	waitOnMessengerResponse(s, func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(communityID))
 		if err != nil {
 			return err
 		}
@@ -675,8 +656,43 @@ func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserF
 			return errors.New("alice should not be not kicked (yet)")
 		}
 
+		if modifiedCommmunity.PendingAndBannedMembers()[pubkey] != communities.CommunityMemberKickPending {
+			return errors.New("alice should be in the pending state")
+		}
+
 		return nil
-	}
+	}, base.GetEventSender())
+
+	// 3. wait for event as the community member and check we are still until control node gets it
+	waitOnMessengerResponse(s, func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(communityID))
+		if err != nil {
+			return err
+		}
+
+		if !modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey) {
+			return errors.New("alice should not be not kicked (yet)")
+		}
+
+		if len(modifiedCommmunity.PendingAndBannedMembers()) > 0 {
+			return errors.New("alice should not know about banned and pending members")
+		}
+
+		return nil
+	}, base.GetMember())
+
+	// 4. control node should handle event and actually kick member
+	waitOnMessengerResponse(s, checkKicked, base.GetControlNode())
+
+	// 5. event sender get removed member
+	waitOnMessengerResponse(s, checkKicked, base.GetEventSender())
+
+	// 6. member should be notified about actual removal
+	waitOnMessengerResponse(s, checkKicked, base.GetMember())
+}
+
+func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserFromCommunity) {
+	pubkey := common.PubkeyToHex(&base.GetMember().identity.PublicKey)
 
 	checkBanned := func(response *MessengerResponse) error {
 		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(banRequest.CommunityID))
@@ -710,25 +726,54 @@ func banMember(base CommunityEventsTestsInterface, banRequest *requests.BanUserF
 	s.Require().True(modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey))
 	s.Require().Equal(communities.CommunityMemberBanPending, modifiedCommmunity.PendingAndBannedMembers()[pubkey])
 
-	checkClientsReceivedAdminEvent(base, checkPending)
-	checkClientsReceivedAdminEvent(base, checkBanned)
-}
-
-func unbanMember(base CommunityEventsTestsInterface, unbanRequest *requests.UnbanUserFromCommunity) {
-	pubkey := common.PubkeyToHex(&base.GetMember().identity.PublicKey)
-
-	checkPending := func(response *MessengerResponse) error {
-		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(unbanRequest.CommunityID))
+	// 2. wait for event as a sender
+	waitOnMessengerResponse(s, func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(banRequest.CommunityID))
 		if err != nil {
 			return err
 		}
 
 		if !modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey) {
-			return errors.New("alice should not be not kicked (yet)")
+			return errors.New("alice should not be not banned (yet)")
+		}
+
+		if modifiedCommmunity.PendingAndBannedMembers()[pubkey] != communities.CommunityMemberBanPending {
+			return errors.New("alice should be in the pending state")
 		}
 
 		return nil
-	}
+	}, base.GetEventSender())
+
+	// 3. wait for event as the community member and check we are still until control node gets it
+	waitOnMessengerResponse(s, func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(banRequest.CommunityID))
+		if err != nil {
+			return err
+		}
+
+		if !modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey) {
+			return errors.New("alice should not be not banned (yet)")
+		}
+
+		if len(modifiedCommmunity.PendingAndBannedMembers()) > 0 {
+			return errors.New("alice should not know about banned and pending members")
+		}
+
+		return nil
+	}, base.GetMember())
+
+	// 4. control node should handle event and actually ban member
+	waitOnMessengerResponse(s, checkBanned, base.GetControlNode())
+
+	// 5. event sender get banned member
+	waitOnMessengerResponse(s, checkBanned, base.GetEventSender())
+
+	// 6. member should be notified about actual removal
+	waitOnMessengerResponse(s, checkBanned, base.GetMember())
+}
+
+func unbanMember(base CommunityEventsTestsInterface, unbanRequest *requests.UnbanUserFromCommunity) {
+	pubkey := common.PubkeyToHex(&base.GetMember().identity.PublicKey)
 
 	checkUnbanned := func(response *MessengerResponse) error {
 		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(unbanRequest.CommunityID))
@@ -755,11 +800,44 @@ func unbanMember(base CommunityEventsTestsInterface, unbanRequest *requests.Unba
 	// 1. event sender should get pending state for unban member
 	modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(unbanRequest.CommunityID))
 	s.Require().NoError(err)
-	s.Require().True(modifiedCommmunity.HasMember(&base.GetMember().identity.PublicKey))
 	s.Require().Equal(communities.CommunityMemberUnbanPending, modifiedCommmunity.PendingAndBannedMembers()[pubkey])
 
-	checkClientsReceivedAdminEvent(base, checkPending)
-	checkClientsReceivedAdminEvent(base, checkUnbanned)
+	// 2. wait for event as a sender
+	waitOnMessengerResponse(s, func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(unbanRequest.CommunityID))
+		if err != nil {
+			return err
+		}
+
+		if modifiedCommmunity.PendingAndBannedMembers()[pubkey] != communities.CommunityMemberUnbanPending {
+			return errors.New("alice should be in the pending state")
+		}
+
+		return nil
+	}, base.GetEventSender())
+
+	// 3. wait for event as the community member and check we are still until control node gets it
+	waitOnMessengerResponse(s, func(response *MessengerResponse) error {
+		modifiedCommmunity, err := getModifiedCommunity(response, types.EncodeHex(unbanRequest.CommunityID))
+		if err != nil {
+			return err
+		}
+
+		if len(modifiedCommmunity.PendingAndBannedMembers()) > 0 {
+			return errors.New("alice should not know about banned and pending members")
+		}
+
+		return nil
+	}, base.GetMember())
+
+	// 4. control node should handle event and actually unban member
+	waitOnMessengerResponse(s, checkUnbanned, base.GetControlNode())
+
+	// 5. event sender get removed member
+	waitOnMessengerResponse(s, checkUnbanned, base.GetEventSender())
+
+	// 6. member should be notified about actual removal
+	waitOnMessengerResponse(s, checkUnbanned, base.GetMember())
 }
 
 func controlNodeSendMessage(base CommunityEventsTestsInterface, inputMessage *common.Message) string {
