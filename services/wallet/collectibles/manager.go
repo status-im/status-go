@@ -49,13 +49,21 @@ type Manager struct {
 	collectibleDataProviders   []thirdparty.CollectibleDataProvider
 	collectionDataProviders    []thirdparty.CollectionDataProvider
 	metadataProvider           thirdparty.CollectibleMetadataProvider
+	communityInfoProvider      thirdparty.CollectibleCommunityInfoProvider
 	opensea                    *opensea.Client
 	httpClient                 *http.Client
 	collectiblesDataDB         *CollectibleDataDB
 	collectionsDataDB          *CollectionDataDB
 }
 
-func NewManager(db *sql.DB, rpcClient *rpc.Client, contractOwnershipProviders []thirdparty.CollectibleContractOwnershipProvider, accountOwnershipProviders []thirdparty.CollectibleAccountOwnershipProvider, collectibleDataProviders []thirdparty.CollectibleDataProvider, collectionDataProviders []thirdparty.CollectionDataProvider, opensea *opensea.Client) *Manager {
+func NewManager(
+	db *sql.DB,
+	rpcClient *rpc.Client,
+	contractOwnershipProviders []thirdparty.CollectibleContractOwnershipProvider,
+	accountOwnershipProviders []thirdparty.CollectibleAccountOwnershipProvider,
+	collectibleDataProviders []thirdparty.CollectibleDataProvider,
+	collectionDataProviders []thirdparty.CollectionDataProvider,
+	opensea *opensea.Client) *Manager {
 	hystrix.ConfigureCommand(hystrixContractOwnershipClientName, hystrix.CommandConfig{
 		Timeout:               10000,
 		MaxConcurrentRequests: 100,
@@ -137,6 +145,10 @@ func (o *Manager) doContentTypeRequest(url string) (string, error) {
 // Used to break circular dependency, call once as soon as possible after initialization
 func (o *Manager) SetMetadataProvider(metadataProvider thirdparty.CollectibleMetadataProvider) {
 	o.metadataProvider = metadataProvider
+}
+
+func (o *Manager) SetCommunityInfoProvider(communityInfoProvider thirdparty.CollectibleCommunityInfoProvider) {
+	o.communityInfoProvider = communityInfoProvider
 }
 
 func (o *Manager) FetchAllCollectionsByOwner(chainID walletCommon.ChainID, owner common.Address) ([]opensea.OwnedCollection, error) {
@@ -375,8 +387,7 @@ func (o *Manager) FetchCollectibleOwnersByContractAddress(chainID walletCommon.C
 func isMetadataEmpty(asset thirdparty.CollectibleData) bool {
 	return asset.Name == "" &&
 		asset.Description == "" &&
-		asset.ImageURL == "" &&
-		asset.TokenURI == ""
+		asset.ImageURL == ""
 }
 
 func (o *Manager) fetchTokenURI(id thirdparty.CollectibleUniqueID) (string, error) {
@@ -426,13 +437,19 @@ func (o *Manager) processFullCollectibleData(assets []thirdparty.FullCollectible
 			if o.metadataProvider == nil {
 				return fmt.Errorf("CollectibleMetadataProvider not available")
 			}
-			tokenURI, err := o.fetchTokenURI(id)
 
-			if err != nil {
-				return err
+			tokenURI := asset.CollectibleData.TokenURI
+			var err error
+
+			if tokenURI == "" {
+				tokenURI, err = o.fetchTokenURI(id)
+
+				if err != nil {
+					return err
+				}
+
+				asset.CollectibleData.TokenURI = tokenURI
 			}
-
-			asset.CollectibleData.TokenURI = tokenURI
 
 			canProvide, err := o.metadataProvider.CanProvideCollectibleMetadata(id, tokenURI)
 
@@ -537,4 +554,41 @@ func (o *Manager) getCacheFullCollectibleData(uniqueIDs []thirdparty.Collectible
 	}
 
 	return ret, nil
+}
+
+func (o *Manager) FetchCollectibleCommunityInfo(communityID string, id thirdparty.CollectibleUniqueID) (*thirdparty.CollectiblesCommunityInfo, error) {
+	if o.communityInfoProvider == nil {
+		return nil, fmt.Errorf("CollectibleCommunityInfoProvider not available")
+	}
+
+	return o.communityInfoProvider.FetchCollectibleCommunityInfo(communityID, id)
+}
+
+func (o *Manager) FetchCollectibleCommunityTraits(communityID string, id thirdparty.CollectibleUniqueID) ([]thirdparty.CollectibleTrait, error) {
+	if o.communityInfoProvider == nil {
+		return nil, fmt.Errorf("CollectibleCommunityInfoProvider not available")
+	}
+
+	traits, err := o.communityInfoProvider.FetchCollectibleCommunityTraits(communityID, id)
+	if err != nil {
+		return nil, err
+	}
+
+	collectibleIDs := []thirdparty.CollectibleUniqueID{id}
+
+	collectiblesData, err := o.collectiblesDataDB.GetData(collectibleIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	if collectible, ok := collectiblesData[id.HashKey()]; ok {
+		collectible.Traits = traits
+		collectiblesData[id.HashKey()] = collectible
+		err = o.collectiblesDataDB.SetData(mapToList(collectiblesData))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return traits, nil
 }

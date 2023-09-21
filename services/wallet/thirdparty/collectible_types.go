@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 )
@@ -76,12 +77,13 @@ type CollectionTrait struct {
 
 // Collection info
 type CollectionData struct {
-	ID       ContractID                 `json:"id"`
-	Provider string                     `json:"provider"`
-	Name     string                     `json:"name"`
-	Slug     string                     `json:"slug"`
-	ImageURL string                     `json:"image_url"`
-	Traits   map[string]CollectionTrait `json:"traits"`
+	ID          ContractID                 `json:"id"`
+	CommunityID string                     `json:"community_id"`
+	Provider    string                     `json:"provider"`
+	Name        string                     `json:"name"`
+	Slug        string                     `json:"slug"`
+	ImageURL    string                     `json:"image_url"`
+	Traits      map[string]CollectionTrait `json:"traits"`
 }
 
 type CollectibleTrait struct {
@@ -94,6 +96,7 @@ type CollectibleTrait struct {
 // Collectible info
 type CollectibleData struct {
 	ID                 CollectibleUniqueID `json:"id"`
+	CommunityID        string              `json:"community_id"`
 	Provider           string              `json:"provider"`
 	Name               string              `json:"name"`
 	Description        string              `json:"description"`
@@ -141,9 +144,26 @@ func (c *FullCollectibleDataContainer) ToOwnershipContainer() CollectibleOwnersh
 	}
 }
 
+// Community-related info. Present only for collectibles minted in a community.
+// This info is directly fetched every time upon request since a change in community
+// settings could affect it.
+
+type CollectiblesCommunityInfo struct {
+	CommunityID     string                `json:"community_id"`
+	CommunityName   string                `json:"community_name"`
+	CommunityColor  string                `json:"community_color"`
+	CommunityImage  string                `json:"community_image"`
+	PrivilegesLevel token.PrivilegesLevel `json:"privileges_level"`
+}
+
 type CollectibleMetadataProvider interface {
 	CanProvideCollectibleMetadata(id CollectibleUniqueID, tokenURI string) (bool, error)
 	FetchCollectibleMetadata(id CollectibleUniqueID, tokenURI string) (*FullCollectibleData, error)
+}
+
+type CollectibleCommunityInfoProvider interface {
+	FetchCollectibleCommunityInfo(communityID string, id CollectibleUniqueID) (*CollectiblesCommunityInfo, error)
+	FetchCollectibleCommunityTraits(communityID string, id CollectibleUniqueID) ([]CollectibleTrait, error)
 }
 
 type TokenBalance struct {

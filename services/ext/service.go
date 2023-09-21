@@ -32,12 +32,16 @@ import (
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/communities/token"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/transport"
@@ -53,6 +57,8 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
+const infinityString = "∞"
+
 // EnvelopeEventsHandler used for two different event types.
 type EnvelopeEventsHandler interface {
 	EnvelopeSent([][]byte)
@@ -63,7 +69,6 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional API to whisper-based protocols like Whisper or Waku.
 type Service struct {
-	thirdparty.CollectibleMetadataProvider
 	messenger       *protocol.Messenger
 	identity        *ecdsa.PrivateKey
 	cancelMessenger chan struct{}
@@ -556,14 +561,112 @@ func (s *Service) CanProvideCollectibleMetadata(id thirdparty.CollectibleUniqueI
 }
 
 func (s *Service) FetchCollectibleMetadata(id thirdparty.CollectibleUniqueID, tokenURI string) (*thirdparty.FullCollectibleData, error) {
-	if s.messenger == nil {
-		return nil, fmt.Errorf("messenger not ready")
-	}
-
 	communityID := tokenURIToCommunityID(tokenURI)
 
 	if communityID == "" {
 		return nil, fmt.Errorf("invalid tokenURI")
+	}
+
+	community, err := s.fetchCommunity(communityID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if community == nil {
+		return nil, nil
+	}
+
+	tokenMetadata, err := s.fetchCommunityCollectibleMetadata(community, id.ContractID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if tokenMetadata == nil {
+		return nil, nil
+	}
+
+	token, err := s.fetchCommunityToken(communityID, id.ContractID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &thirdparty.FullCollectibleData{
+		CollectibleData: thirdparty.CollectibleData{
+			ID:          id,
+			CommunityID: communityID,
+			Name:        tokenMetadata.GetName(),
+			Description: tokenMetadata.GetDescription(),
+			ImageURL:    tokenMetadata.GetImage(),
+			TokenURI:    tokenURI,
+			Traits:      getCollectibleCommunityTraits(token),
+		},
+		CollectionData: &thirdparty.CollectionData{
+			ID:          id.ContractID,
+			CommunityID: communityID,
+			Name:        tokenMetadata.GetName(),
+			ImageURL:    tokenMetadata.GetImage(),
+		},
+	}, nil
+}
+
+func permissionTypeToPrivilegesLevel(permissionType protobuf.CommunityTokenPermission_Type) token.PrivilegesLevel {
+	switch permissionType {
+	case protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER:
+		return token.OwnerLevel
+	case protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER:
+		return token.MasterLevel
+	default:
+		return token.CommunityLevel
+	}
+}
+
+func (s *Service) FetchCollectibleCommunityInfo(communityID string, id thirdparty.CollectibleUniqueID) (*thirdparty.CollectiblesCommunityInfo, error) {
+	community, err := s.fetchCommunity(communityID)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, nil
+	}
+
+	metadata, err := s.fetchCommunityCollectibleMetadata(community, id.ContractID)
+	if err != nil {
+		return nil, err
+	}
+	if metadata == nil {
+		return nil, nil
+	}
+
+	permission := fetchCommunityCollectiblePermission(community, id)
+
+	privilegesLevel := token.CommunityLevel
+	if permission != nil {
+		privilegesLevel = permissionTypeToPrivilegesLevel(permission.GetType())
+	}
+
+	return &thirdparty.CollectiblesCommunityInfo{
+		CommunityID:     communityID,
+		CommunityName:   community.Name(),
+		CommunityColor:  community.Color(),
+		CommunityImage:  fetchCommunityImage(community),
+		PrivilegesLevel: privilegesLevel,
+	}, nil
+}
+
+func (s *Service) FetchCollectibleCommunityTraits(communityID string, id thirdparty.CollectibleUniqueID) ([]thirdparty.CollectibleTrait, error) {
+	token, err := s.fetchCommunityToken(communityID, id.ContractID)
+	if err != nil {
+		return nil, err
+	}
+
+	return getCollectibleCommunityTraits(token), nil
+}
+
+func (s *Service) fetchCommunity(communityID string) (*communities.Community, error) {
+	if s.messenger == nil {
+		return nil, fmt.Errorf("messenger not ready")
 	}
 
 	// Try to fetch metadata from Messenger communities
@@ -573,29 +676,155 @@ func (s *Service) FetchCollectibleMetadata(id thirdparty.CollectibleUniqueID, to
 		return nil, err
 	}
 
-	if community != nil {
-		tokensMetadata := community.CommunityTokensMetadata()
+	return community, nil
+}
 
-		for _, tokenMetadata := range tokensMetadata {
-			contractAddresses := tokenMetadata.GetContractAddresses()
-			if contractAddresses[uint64(id.ContractID.ChainID)] == id.ContractID.Address.Hex() {
-				return &thirdparty.FullCollectibleData{
-					CollectibleData: thirdparty.CollectibleData{
-						ID:          id,
-						Name:        tokenMetadata.GetName(),
-						Description: tokenMetadata.GetDescription(),
-						ImageURL:    tokenMetadata.GetImage(),
-						TokenURI:    tokenURI,
-					},
-					CollectionData: &thirdparty.CollectionData{
-						ID:       id.ContractID,
-						Name:     tokenMetadata.GetName(),
-						ImageURL: tokenMetadata.GetImage(),
-					},
-				}, nil
-			}
+func (s *Service) fetchCommunityToken(communityID string, contractID thirdparty.ContractID) (*token.CommunityToken, error) {
+	if s.messenger == nil {
+		return nil, fmt.Errorf("messenger not ready")
+	}
+
+	return s.messenger.GetCommunityToken(communityID, int(contractID.ChainID), contractID.Address.String())
+}
+
+func (s *Service) fetchCommunityCollectibleMetadata(community *communities.Community, contractID thirdparty.ContractID) (*protobuf.CommunityTokenMetadata, error) {
+	tokensMetadata := community.CommunityTokensMetadata()
+
+	for _, tokenMetadata := range tokensMetadata {
+		contractAddresses := tokenMetadata.GetContractAddresses()
+		if contractAddresses[uint64(contractID.ChainID)] == contractID.Address.Hex() {
+			return tokenMetadata, nil
 		}
 	}
 
 	return nil, nil
+}
+
+func tokenCriterionContainsCollectible(tokenCriterion *protobuf.TokenCriteria, id thirdparty.CollectibleUniqueID) bool {
+	// Check if token type matches
+	if tokenCriterion.Type != protobuf.CommunityTokenType_ERC721 {
+		return false
+	}
+
+	for chainID, contractAddressStr := range tokenCriterion.ContractAddresses {
+		if chainID != uint64(id.ContractID.ChainID) {
+			continue
+		}
+
+		contractAddress := commongethtypes.HexToAddress(contractAddressStr)
+		if contractAddress != id.ContractID.Address {
+			continue
+		}
+
+		if len(tokenCriterion.TokenIds) == 0 {
+			return true
+		}
+
+		for _, tokenID := range tokenCriterion.TokenIds {
+			tokenIDBigInt := new(big.Int).SetUint64(tokenID)
+			if id.TokenID.Cmp(tokenIDBigInt) == 0 {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func permissionContainsCollectible(permission *communities.CommunityTokenPermission, id thirdparty.CollectibleUniqueID) bool {
+	// See if any token criterion contains the collectible we're looking for
+	for _, tokenCriterion := range permission.TokenCriteria {
+		if tokenCriterionContainsCollectible(tokenCriterion, id) {
+			return true
+		}
+	}
+	return false
+}
+
+func fetchCommunityCollectiblePermission(community *communities.Community, id thirdparty.CollectibleUniqueID) *communities.CommunityTokenPermission {
+	// Permnission types of interest
+	permissionTypes := []protobuf.CommunityTokenPermission_Type{
+		protobuf.CommunityTokenPermission_BECOME_TOKEN_OWNER,
+		protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER,
+	}
+
+	for _, permissionType := range permissionTypes {
+		permissions := community.TokenPermissionsByType(permissionType)
+		// See if any community permission matches the type we're looking for
+		for _, permission := range permissions {
+			if permissionContainsCollectible(permission, id) {
+				return permission
+			}
+		}
+	}
+
+	return nil
+}
+
+func fetchCommunityImage(community *communities.Community) string {
+	imageTypes := []string{
+		images.LargeDimName,
+		images.SmallDimName,
+	}
+
+	communityImages := community.Images()
+
+	for _, imageType := range imageTypes {
+		if pbImage, ok := communityImages[imageType]; ok {
+			imageBase64, err := images.GetPayloadDataURI(pbImage.Payload)
+			if err == nil {
+				return imageBase64
+			}
+		}
+	}
+
+	return ""
+}
+
+func boolToString(value bool) string {
+	if value {
+		return "Yes"
+	}
+	return "No"
+}
+
+func getCollectibleCommunityTraits(token *token.CommunityToken) []thirdparty.CollectibleTrait {
+	if token == nil {
+		return make([]thirdparty.CollectibleTrait, 0)
+	}
+
+	totalStr := infinityString
+	availableStr := infinityString
+	if !token.InfiniteSupply {
+		totalStr = token.Supply.String()
+		// TODO: calculate available supply. See services/communitytokens/api.go
+		availableStr = totalStr
+	}
+
+	transferableStr := boolToString(token.Transferable)
+
+	destructibleStr := boolToString(token.RemoteSelfDestruct)
+
+	return []thirdparty.CollectibleTrait{
+		{
+			TraitType: "Symbol",
+			Value:     token.Symbol,
+		},
+		{
+			TraitType: "Total",
+			Value:     totalStr,
+		},
+		{
+			TraitType: "Available",
+			Value:     availableStr,
+		},
+		{
+			TraitType: "Transferable",
+			Value:     transferableStr,
+		},
+		{
+			TraitType: "Destructible",
+			Value:     destructibleStr,
+		},
+	}
 }
