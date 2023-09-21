@@ -126,6 +126,12 @@ message UnfurledLink {
   }
 }
 
+message CommunityShard {
+  bytes community = 1;
+  int32 shard_cluster = 2;
+  int32 shard_index = 3;
+}
+
 message ChatMessage {
   // Lamport timestamp of the chat message
   uint64 clock = 1;
@@ -154,7 +160,8 @@ message ChatMessage {
     StickerMessage sticker = 9;
     ImageMessage image = 10;
     AudioMessage audio = 11;
-    bytes community = 12;
+    bytes communityNoShard = 12 [deprecated=true];
+    CommunityShard communityShard = 17;
     DiscordMessage discord_message = 99;
   }
 

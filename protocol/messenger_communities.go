@@ -576,13 +576,26 @@ func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse,
 	// TODO: The curated communities smart contract should also store the community shard cluster and index
 
 	for _, c := range featuredCommunities {
-		response.ContractFeaturedCommunities = append(response.ContractFeaturedCommunities, communities.CommunityShard{
+		response.ContractFeaturedCommunities = append(response.ContractFeaturedCommunities, types.HexBytes(c).String())
+		// TODO: use CommunityShard instead of communityID
+		/*response.ContractFeaturedCommunities = append(response.ContractFeaturedCommunities, communities.CommunityShard{
 			CommunityID: types.HexBytes(c).String(),
 			// Shard:     c.Shard, // TODO: obtain this value
+		})*/
+	}
+
+	// TODO: this loop is added just to not revert the change from requestCommunitiesFromMailserver
+	// Once support for shards is added in the contract, just pass the `response.UnknownCommunities` directly to
+	// the function
+
+	var unknownCommunities []communities.CommunityShard
+	for _, u := range response.UnknownCommunities {
+		unknownCommunities = append(unknownCommunities, communities.CommunityShard{
+			CommunityID: u,
 		})
 	}
 
-	go m.requestCommunitiesFromMailserver(response.UnknownCommunities)
+	go m.requestCommunitiesFromMailserver(unknownCommunities)
 
 	return response, nil
 }
@@ -973,6 +986,7 @@ func (m *Messenger) getAccountsToShare(addressesToReveal []string, airdropAddres
 func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommunity) (*MessengerResponse, error) {
 	logger := m.logger.Named("RequestToJoinCommunity")
 	if err := request.Validate(); err != nil {
+		m.logger.Info("!!!!!!!!!!!!!!! invalid request", zap.Error(err))
 		logger.Debug("request failed to validate", zap.Error(err), zap.Any("request", request))
 		return nil, err
 	}
@@ -980,6 +994,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	if request.Password != "" {
 		walletAccounts, err := m.settings.GetActiveAccounts()
 		if err != nil {
+			m.logger.Info("!!!!!!!!!!!!!!! no wallet accounts", zap.Error(err))
 			return nil, err
 		}
 		if len(walletAccounts) > 0 {
@@ -992,6 +1007,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 
 	displayName, err := m.settings.DisplayName()
 	if err != nil {
+		m.logger.Info("!!!!!!!!!!!!!!! no display name", zap.Error(err))
 		return nil, err
 	}
 
@@ -1063,6 +1079,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	}
 
 	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
+	m.logger.Info("!!!!!!!!!!!!!!! REQUEST TO JOIN SENT?", zap.Error(err))
 	if err != nil {
 		return nil, err
 	}
@@ -2784,7 +2801,7 @@ func (m *Messenger) passStoredCommunityInfoToSignalHandler(communityID string) {
 
 // handleCommunityDescription handles an community description
 func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawPayload []byte) error {
-	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload)
+	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload, nil)
 	if err != nil {
 		return err
 	}
