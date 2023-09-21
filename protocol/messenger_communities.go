@@ -984,6 +984,8 @@ func (m *Messenger) getAccountsToShare(addressesToReveal []string, airdropAddres
 }
 
 func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommunity) (*MessengerResponse, error) {
+	m.logger.Info("!!!!!!!!!!!!! REQUESTING TO JOIN COMMUNITY =========================")
+
 	logger := m.logger.Named("RequestToJoinCommunity")
 	if err := request.Validate(); err != nil {
 		m.logger.Info("!!!!!!!!!!!!!!! invalid request", zap.Error(err))
