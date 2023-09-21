@@ -3,7 +3,6 @@ package communities
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1232,23 +1231,7 @@ func (o *Community) Description() *protobuf.CommunityDescription {
 }
 
 func (o *Community) marshaledDescription() ([]byte, error) {
-	// Clear members list for channels that don't have permissions
-	// TMP: should be fixed in https://github.com/status-im/status-desktop/issues/12188
-	clonedDescritpion := proto.Clone(o.config.CommunityDescription).(*protobuf.CommunityDescription)
-	for chatID, chat := range clonedDescritpion.Chats {
-		if !CheckIfChannelHasAnyPermissions(chatID, clonedDescritpion) {
-			chat.Members = map[string]*protobuf.CommunityMember{}
-		}
-	}
-
-	rawDescritpionData, err := proto.Marshal(clonedDescritpion)
-	if err != nil {
-		return []byte{}, nil
-	}
-
-	fmt.Println("-------------------> Raw CommunityDescritpion size: ", binary.Size(rawDescritpionData))
-
-	return rawDescritpionData, nil
+	return proto.Marshal(o.config.CommunityDescription)
 }
 
 func (o *Community) MarshaledDescription() ([]byte, error) {
