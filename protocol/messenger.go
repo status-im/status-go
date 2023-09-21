@@ -465,7 +465,7 @@ func NewMessenger(
 		managerOptions = append(managerOptions, communities.WithCommunityTokensService(c.communityTokensService))
 	}
 
-	communitiesManager, err := communities.NewManager(identity, database, encryptionProtocol, logger, ensVerifier, c.communityTokensService, transp, transp, c.torrentConfig, managerOptions...)
+	communitiesManager, err := communities.NewManager(identity, installationID, database, encryptionProtocol, logger, ensVerifier, c.communityTokensService, transp, transp, c.torrentConfig, managerOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -2963,7 +2963,12 @@ func (m *Messenger) syncCommunity(ctx context.Context, community *communities.Co
 		return err
 	}
 
-	syncMessage, err := community.ToSyncInstallationCommunityProtobuf(clock, communitySettings)
+	syncControlNode, err := m.communitiesManager.GetSyncControlNode(community.ID())
+	if err != nil {
+		return err
+	}
+
+	syncMessage, err := community.ToSyncInstallationCommunityProtobuf(clock, communitySettings, syncControlNode)
 	if err != nil {
 		return err
 	}

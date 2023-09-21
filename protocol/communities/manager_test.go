@@ -55,7 +55,7 @@ func (s *ManagerSuite) buildManager(ownerVerifier OwnerVerifier) *Manager {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	s.Require().NoError(err)
-	m, err := NewManager(key, db, nil, nil, nil, ownerVerifier, nil, &TimeSourceStub{}, nil)
+	m, err := NewManager(key, "", db, nil, nil, nil, ownerVerifier, nil, &TimeSourceStub{}, nil)
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 	return m
@@ -169,7 +169,7 @@ func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testCollect
 		WithTokenManager(tm),
 	}
 
-	m, err := NewManager(key, db, nil, nil, nil, nil, nil, &TimeSourceStub{}, nil, options...)
+	m, err := NewManager(key, "", db, nil, nil, nil, nil, nil, &TimeSourceStub{}, nil, options...)
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
@@ -279,7 +279,6 @@ func (s *ManagerSuite) TestRetrieveCollectibles() {
 }
 
 func (s *ManagerSuite) TestCreateCommunity() {
-
 	request := &requests.CreateCommunity{
 		Name:        "status",
 		Description: "token membership description",
@@ -302,6 +301,7 @@ func (s *ManagerSuite) TestCreateCommunity() {
 
 	s.Require().Equal(community.ID(), actualCommunity.ID())
 	s.Require().Equal(community.PrivateKey(), actualCommunity.PrivateKey())
+	s.Require().True(community.IsControlNode())
 	s.Require().True(proto.Equal(community.config.CommunityDescription, actualCommunity.config.CommunityDescription))
 }
 

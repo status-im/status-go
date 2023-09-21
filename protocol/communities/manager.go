@@ -79,6 +79,7 @@ type Manager struct {
 	ensVerifier                      *ens.Verifier
 	ownerVerifier                    OwnerVerifier
 	identity                         *ecdsa.PrivateKey
+	installationID                   string
 	accountsManager                  account.Manager
 	tokenManager                     TokenManager
 	collectiblesManager              CollectiblesManager
@@ -211,7 +212,7 @@ type OwnerVerifier interface {
 	SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error)
 }
 
-func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Protocol, logger *zap.Logger, ensverifier *ens.Verifier, ownerVerifier OwnerVerifier, transport *transport.Transport, timesource common.TimeSource, torrentConfig *params.TorrentConfig, opts ...ManagerOption) (*Manager, error) {
+func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, encryptor *encryption.Protocol, logger *zap.Logger, ensverifier *ens.Verifier, ownerVerifier OwnerVerifier, transport *transport.Transport, timesource common.TimeSource, torrentConfig *params.TorrentConfig, opts ...ManagerOption) (*Manager, error) {
 	if identity == nil {
 		return nil, errors.New("empty identity")
 	}
@@ -242,6 +243,7 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 		stdoutLogger:                stdoutLogger,
 		encryptor:                   encryptor,
 		identity:                    identity,
+		installationID:              installationID,
 		ownerVerifier:               ownerVerifier,
 		quit:                        make(chan struct{}),
 		transport:                   transport,
@@ -596,7 +598,7 @@ func (m *Manager) publish(subscription *Subscription) {
 }
 
 func (m *Manager) All() ([]*Community, error) {
-	communities, err := m.persistence.AllCommunities(&m.identity.PublicKey)
+	communities, err := m.persistence.AllCommunities(&m.identity.PublicKey, m.installationID)
 	if err != nil {
 		return nil, err
 	}
@@ -658,7 +660,7 @@ func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []types.HexByt
 }
 
 func (m *Manager) Joined() ([]*Community, error) {
-	communities, err := m.persistence.JoinedCommunities(&m.identity.PublicKey)
+	communities, err := m.persistence.JoinedCommunities(&m.identity.PublicKey, m.installationID)
 	if err != nil {
 		return nil, err
 	}
@@ -674,7 +676,7 @@ func (m *Manager) Joined() ([]*Community, error) {
 }
 
 func (m *Manager) Spectated() ([]*Community, error) {
-	communities, err := m.persistence.SpectatedCommunities(&m.identity.PublicKey)
+	communities, err := m.persistence.SpectatedCommunities(&m.identity.PublicKey, m.installationID)
 	if err != nil {
 		return nil, err
 	}
@@ -690,7 +692,7 @@ func (m *Manager) Spectated() ([]*Community, error) {
 }
 
 func (m *Manager) JoinedAndPendingCommunitiesWithRequests() ([]*Community, error) {
-	communities, err := m.persistence.JoinedAndPendingCommunitiesWithRequests(&m.identity.PublicKey)
+	communities, err := m.persistence.JoinedAndPendingCommunitiesWithRequests(&m.identity.PublicKey, m.installationID)
 	if err != nil {
 		return nil, err
 	}
@@ -706,7 +708,7 @@ func (m *Manager) JoinedAndPendingCommunitiesWithRequests() ([]*Community, error
 }
 
 func (m *Manager) DeletedCommunities() ([]*Community, error) {
-	communities, err := m.persistence.DeletedCommunities(&m.identity.PublicKey)
+	communities, err := m.persistence.DeletedCommunities(&m.identity.PublicKey, m.installationID)
 	if err != nil {
 		return nil, err
 	}
@@ -722,7 +724,7 @@ func (m *Manager) DeletedCommunities() ([]*Community, error) {
 }
 
 func (m *Manager) ControlledCommunities() ([]*Community, error) {
-	communities, err := m.persistence.CommunitiesWithPrivateKey(&m.identity.PublicKey)
+	communities, err := m.persistence.CommunitiesWithPrivateKey(&m.identity.PublicKey, m.installationID)
 	if err != nil {
 		return nil, err
 	}
@@ -738,7 +740,7 @@ func (m *Manager) ControlledCommunities() ([]*Community, error) {
 }
 
 func (m *Manager) Owned() ([]*Community, error) {
-	communities, err := m.persistence.CommunitiesWithPrivateKey(&m.identity.PublicKey)
+	communities, err := m.persistence.CommunitiesWithPrivateKey(&m.identity.PublicKey, m.installationID)
 	if err != nil {
 		return nil, err
 	}
@@ -783,6 +785,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 		ID:                   &key.PublicKey,
 		PrivateKey:           key,
 		ControlNode:          &key.PublicKey,
+		ControlDevice:        true,
 		Logger:               m.logger,
 		Joined:               true,
 		MemberIdentity:       &m.identity.PublicKey,
@@ -798,6 +801,16 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 	community.Join()
 
 	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	// Mark this device as the control node
+	syncControlNode := &protobuf.SyncCommunityControlNode{
+		Clock:          1,
+		InstallationId: m.installationID,
+	}
+	err = m.SaveSyncControlNode(community.ID(), syncControlNode)
 	if err != nil {
 		return nil, err
 	}
@@ -1192,7 +1205,7 @@ func (m *Manager) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error) 
 	return community.config.PrivateKey, nil
 }
 
-func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey) (*Community, error) {
+func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Community, error) {
 	communityID := crypto.CompressPubkey(&key.PublicKey)
 
 	community, err := m.GetByID(communityID)
@@ -1201,14 +1214,29 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey) (*Community, error) {
 	}
 
 	if community == nil {
-		description := &protobuf.CommunityDescription{
-			Permissions: &protobuf.CommunityPermissions{},
+		createCommunityRequest := requests.CreateCommunity{
+			Membership: protobuf.CommunityPermissions_ON_REQUEST,
+			Name:       "unknown imported",
 		}
+
+		description, err := createCommunityRequest.ToCommunityDescription()
+		if err != nil {
+			return nil, err
+		}
+
+		err = ValidateCommunityDescription(description)
+		if err != nil {
+			return nil, err
+		}
+
+		description.Clock = 1
+		description.ID = types.EncodeHex(communityID)
 
 		config := Config{
 			ID:                   &key.PublicKey,
 			PrivateKey:           key,
 			ControlNode:          &key.PublicKey,
+			ControlDevice:        true,
 			Logger:               m.logger,
 			Joined:               true,
 			MemberIdentity:       &m.identity.PublicKey,
@@ -1221,10 +1249,21 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey) (*Community, error) {
 
 	} else {
 		community.config.PrivateKey = key
+		community.config.ControlDevice = true
 	}
 
 	community.Join()
 	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	// Mark this device as the control node
+	syncControlNode := &protobuf.SyncCommunityControlNode{
+		Clock:          clock,
+		InstallationId: m.installationID,
+	}
+	err = m.SaveSyncControlNode(community.ID(), syncControlNode)
 	if err != nil {
 		return nil, err
 	}
@@ -2352,7 +2391,7 @@ func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, re
 }
 
 func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoin) (*Community, *RequestToJoin, error) {
-	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityId)
+	community, err := m.GetByID(request.CommunityId)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -3394,7 +3433,7 @@ func initializeCommunity(community *Community) error {
 }
 
 func (m *Manager) GetByID(id []byte) (*Community, error) {
-	community, err := m.persistence.GetByID(&m.identity.PublicKey, id)
+	community, err := m.persistence.GetByID(&m.identity.PublicKey, m.installationID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -4640,7 +4679,7 @@ func (m *Manager) SaveCommunityToken(token *community_token.CommunityToken, crop
 	return token, m.persistence.AddCommunityToken(token)
 }
 
-func (m *Manager) AddCommunityToken(token *community_token.CommunityToken) (*Community, error) {
+func (m *Manager) AddCommunityToken(token *community_token.CommunityToken, clock uint64) (*Community, error) {
 	if token == nil {
 		return nil, errors.New("Token is absent in database")
 	}
@@ -4703,7 +4742,10 @@ func (m *Manager) AddCommunityToken(token *community_token.CommunityToken) (*Com
 		}
 
 		if token.PrivilegesLevel == community_token.OwnerLevel {
-			m.promoteSelfToControlNode(community)
+			err = m.promoteSelfToControlNode(community, clock)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -5026,7 +5068,7 @@ func (m *Manager) createCommunityTokenPermission(request *requests.CreateCommuni
 
 }
 
-func (m *Manager) PromoteSelfToControlNode(communityID types.HexBytes) (*Community, error) {
+func (m *Manager) PromoteSelfToControlNode(communityID types.HexBytes, clock uint64) (*Community, error) {
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
@@ -5036,16 +5078,34 @@ func (m *Manager) PromoteSelfToControlNode(communityID types.HexBytes) (*Communi
 		return nil, ErrOrgNotFound
 	}
 
-	m.promoteSelfToControlNode(community)
+	err = m.promoteSelfToControlNode(community, clock)
+	if err != nil {
+		return nil, err
+	}
 
 	return community, m.saveAndPublish(community)
 }
 
-func (m *Manager) promoteSelfToControlNode(community *Community) {
+func (m *Manager) promoteSelfToControlNode(community *Community, clock uint64) error {
 	community.setPrivateKey(m.identity)
 	if !community.ControlNode().Equal(&m.identity.PublicKey) {
 		community.setControlNode(&m.identity.PublicKey)
 	}
+
+	// Mark this device as the control node
+	syncControlNode := &protobuf.SyncCommunityControlNode{
+		Clock:          clock,
+		InstallationId: m.installationID,
+	}
+	err := m.SaveSyncControlNode(community.ID(), syncControlNode)
+	if err != nil {
+		return err
+	}
+	community.config.ControlDevice = true
+
+	community.increaseClock()
+
+	return nil
 }
 
 func (m *Manager) shareRequestsToJoinWithNewPrivilegedMembers(community *Community, newPrivilegedMembers map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey) error {
@@ -5182,4 +5242,25 @@ func (m *Manager) CreateCommunityTokenDeploymentSignature(ctx context.Context, c
 		return nil, err
 	}
 	return crypto.Sign(digest, community.PrivateKey())
+}
+
+func (m *Manager) GetSyncControlNode(id types.HexBytes) (*protobuf.SyncCommunityControlNode, error) {
+	return m.persistence.GetSyncControlNode(id)
+}
+
+func (m *Manager) SaveSyncControlNode(id types.HexBytes, syncControlNode *protobuf.SyncCommunityControlNode) error {
+	return m.persistence.SaveSyncControlNode(id, syncControlNode.Clock, syncControlNode.InstallationId)
+}
+
+func (m *Manager) SetSyncControlNode(id types.HexBytes, syncControlNode *protobuf.SyncCommunityControlNode) error {
+	existingSyncControlNode, err := m.GetSyncControlNode(id)
+	if err != nil {
+		return err
+	}
+
+	if existingSyncControlNode == nil || existingSyncControlNode.Clock < syncControlNode.Clock {
+		return m.SaveSyncControlNode(id, syncControlNode)
+	}
+
+	return nil
 }

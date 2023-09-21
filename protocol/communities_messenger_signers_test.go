@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"testing"
 	"time"
@@ -20,7 +19,6 @@ import (
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/wallet/bigint"
-	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/waku"
 )
 
@@ -105,7 +103,6 @@ func (s *MessengerCommunitiesSignersSuite) joinCommunity(controlNode *Messenger,
 // Both John and Bob accepts the changes
 
 func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
-
 	// Create a community
 	// Transfer ownership
 	// Process message
@@ -117,60 +114,12 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	s.joinCommunity(s.john, community, s.bob)
 	s.joinCommunity(s.john, community, s.alice)
 
-	// john as control node publishes community update
-	johnDescr := "john's description"
-	response, err := s.john.EditCommunity(&requests.EditCommunity{
-		CommunityID: community.ID(),
-		CreateCommunity: requests.CreateCommunity{
-			Name:        community.Name(),
-			Description: johnDescr,
-			Color:       community.Color(),
-			Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		},
-	})
-	s.Require().NoError(err)
-	s.Require().Equal(johnDescr, response.Communities()[0].Description().Identity.Description)
-
-	// bob accepts community update
-	_, err = WaitOnMessengerResponse(
-		s.bob,
-		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0 && r.Communities()[0].Description().Identity.Description == johnDescr
-		},
-		"no communities",
-	)
-	s.Require().NoError(err)
-
-	// alice accepts community update
-	_, err = WaitOnMessengerResponse(
-		s.alice,
-		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0 && r.Communities()[0].Description().Identity.Description == johnDescr
-		},
-		"no communities",
-	)
-	s.Require().NoError(err)
-
-	// Alice will be transferred the ownership token, and alice will let others know
-
+	// john mints owner token
 	var chainID uint64 = 1
-	communityAddress := "community-address"
 	tokenAddress := "token-address"
 	tokenName := "tokenName"
 	tokenSymbol := "TSM"
-
-	// Update mock
-	// The signer for the community returned by the contracts should be alice
-	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
-	s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
-		&communitytokens.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
-
-	community, err = s.alice.communitiesManager.PromoteSelfToControlNode(community.ID())
-	s.Require().NoError(err)
-	s.Require().True(community.IsControlNode())
-
-	// Create community token
-	_, err = s.alice.SaveCommunityToken(&token.CommunityToken{
+	_, err := s.john.SaveCommunityToken(&token.CommunityToken{
 		TokenType:       protobuf.CommunityTokenType_ERC721,
 		CommunityID:     community.IDString(),
 		Address:         tokenAddress,
@@ -182,15 +131,46 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	}, nil)
 	s.Require().NoError(err)
 
-	err = s.alice.AddCommunityToken(community.IDString(), int(chainID), tokenAddress)
+	// john adds minted owner token to community
+	err = s.john.AddCommunityToken(community.IDString(), int(chainID), tokenAddress)
 	s.Require().NoError(err)
 
-	// make alice the control node
-	transaction := transactions.SendTxArgs{}
-	_, err = s.alice.SetCommunitySignerPubKey(context.Background(), community.ID(), chainID, communityAddress, transaction, "password", common.PubkeyToHex(&s.alice.identity.PublicKey))
+	// update mock - the signer for the community returned by the contracts should be john
+	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.john.identity.PublicKey))
+	s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
+		&communitytokens.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
+
+	// bob accepts community update
+	_, err = WaitOnSignaledMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0 && len(r.Communities()[0].CommunityTokensMetadata()) == 1
+		},
+		"no communities",
+	)
 	s.Require().NoError(err)
 
-	// john accepts community update
+	// alice accepts community update
+	_, err = WaitOnSignaledMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0 && len(r.Communities()[0].CommunityTokensMetadata()) == 1
+		},
+		"no communities",
+	)
+	s.Require().NoError(err)
+
+	// Alice will be transferred the ownership token, and alice will let others know
+	// update mock - the signer for the community returned by the contracts should be alice
+	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
+	s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
+		&communitytokens.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
+
+	community, err = s.alice.PromoteSelfToControlNode(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(community.IsControlNode())
+
+	// john accepts community update from alice (new control node)
 	_, err = WaitOnSignaledMessengerResponse(
 		s.john,
 		func(r *MessengerResponse) bool {
@@ -207,12 +187,11 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	s.Require().True(common.IsPubKeyEqual(johnCommunity.ControlNode(), &s.alice.identity.PublicKey))
 	s.Require().False(johnCommunity.IsControlNode())
 
-	// We check the control node is correctly set on bob
+	// bob accepts community update from alice (new control node)
 	_, err = WaitOnSignaledMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
 			return len(r.Communities()) > 0 && r.Communities()[0].IDString() == community.IDString()
-
 		},
 		"no communities",
 	)

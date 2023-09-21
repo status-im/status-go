@@ -838,6 +838,7 @@ func (s *CommunitySuite) newConfig(identity *ecdsa.PrivateKey, description *prot
 		CommunityDescription: description,
 		PrivateKey:           identity,
 		ControlNode:          &identity.PublicKey,
+		ControlDevice:        true,
 	}
 }
 

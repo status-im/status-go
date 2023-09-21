@@ -434,36 +434,15 @@ func joinCommunity(s *suite.Suite, community *communities.Community, owner *Mess
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
 
 	// Retrieve and accept join request
-	err = tt.RetryWithBackOff(func() error {
-		response, err := owner.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("no communities in response (accept join request)")
-		}
-		if !response.Communities()[0].HasMember(&user.identity.PublicKey) {
-			return errors.New("user not accepted")
-		}
-		return nil
-	})
+	_, err = WaitOnMessengerResponse(owner, func(r *MessengerResponse) bool {
+		return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&user.identity.PublicKey)
+	}, "user not accepted")
 	s.Require().NoError(err)
 
 	// Retrieve join request response
-	err = tt.RetryWithBackOff(func() error {
-		response, err := user.RetrieveAll()
-
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("no communities in response (join request response)")
-		}
-		if !response.Communities()[0].HasMember(&user.identity.PublicKey) {
-			return errors.New("user not a member")
-		}
-		return nil
-	})
+	_, err = WaitOnMessengerResponse(user, func(r *MessengerResponse) bool {
+		return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&user.identity.PublicKey)
+	}, "user not accepted")
 	s.Require().NoError(err)
 }
 

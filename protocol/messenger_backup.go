@@ -305,7 +305,12 @@ func (m *Messenger) backupCommunities(ctx context.Context, clock uint64) ([]*pro
 				return nil, err
 			}
 
-			syncMessage, err := c.ToSyncInstallationCommunityProtobuf(clock, settings)
+			syncControlNode, err := m.communitiesManager.GetSyncControlNode(c.ID())
+			if err != nil {
+				return nil, err
+			}
+
+			syncMessage, err := c.ToSyncInstallationCommunityProtobuf(clock, settings, syncControlNode)
 			if err != nil {
 				return nil, err
 			}
