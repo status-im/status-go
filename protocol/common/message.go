@@ -131,7 +131,7 @@ type StatusCommunityChannelLinkPreview struct {
 }
 
 type StatusLinkPreview struct {
-	URL       string
+	URL       string                             `json:"url,omitempty"`
 	Contact   *StatusContactLinkPreview          `json:"contact,omitempty"`
 	Community *StatusCommunityLinkPreview        `json:"community,omitempty"`
 	Channel   *StatusCommunityChannelLinkPreview `json:"channel,omitempty"`

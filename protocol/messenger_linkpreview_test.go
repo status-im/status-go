@@ -398,8 +398,10 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContact() {
 	s.Require().Len(r.LinkPreviews, 0)
 
 	preview := r.StatusLinkPreviews[0]
+	s.Require().Equal(u, preview.URL)
 	s.Require().NotNil(preview.Contact)
 	s.Require().Equal(preview.Contact.DisplayName, c.DisplayName)
 	s.Require().Equal(preview.Contact.Description, "")
-
+	s.Require().Nil(preview.Community)
+	s.Require().Nil(preview.Channel)
 }

@@ -51,6 +51,7 @@ func (u *StatusUnfurler) createContactData(contactData *ContactURLData) *common.
 func (u *StatusUnfurler) Unfurl() (common.StatusLinkPreview, error) {
 
 	var preview common.StatusLinkPreview
+	preview.URL = u.url
 
 	resp, err := u.m.ParseSharedURL(u.url)
 	if err != nil {
