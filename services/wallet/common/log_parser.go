@@ -20,20 +20,24 @@ type EventType string
 
 const (
 	// Transaction types
-	EthTransfer        Type = "eth"
-	Erc20Transfer      Type = "erc20"
-	Erc721Transfer     Type = "erc721"
-	UniswapV2Swap      Type = "uniswapV2Swap"
-	UniswapV3Swap      Type = "uniswapV3Swap"
-	HopBridgeFrom      Type = "HopBridgeFrom"
-	HopBridgeTo        Type = "HopBridgeTo"
-	unknownTransaction Type = "unknown"
+	EthTransfer           Type = "eth"
+	Erc20Transfer         Type = "erc20"
+	Erc721Transfer        Type = "erc721"
+	Erc1155SingleTransfer Type = "erc1155"
+	Erc1155BatchTransfer  Type = "erc1155"
+	UniswapV2Swap         Type = "uniswapV2Swap"
+	UniswapV3Swap         Type = "uniswapV3Swap"
+	HopBridgeFrom         Type = "HopBridgeFrom"
+	HopBridgeTo           Type = "HopBridgeTo"
+	unknownTransaction    Type = "unknown"
 
 	// Event types
 	WETHDepositEventType                      EventType = "wethDepositEvent"
 	WETHWithdrawalEventType                   EventType = "wethWithdrawalEvent"
 	Erc20TransferEventType                    EventType = "erc20Event"
 	Erc721TransferEventType                   EventType = "erc721Event"
+	Erc1155TransferSingleEventType            EventType = "erc1155SingleEvent"
+	Erc1155TransferBatchEventType             EventType = "erc1155BatchEvent"
 	UniswapV2SwapEventType                    EventType = "uniswapV2SwapEvent"
 	UniswapV3SwapEventType                    EventType = "uniswapV3SwapEvent"
 	HopBridgeTransferSentToL2EventType        EventType = "hopBridgeTransferSentToL2Event"
@@ -49,10 +53,13 @@ const (
 
 	// Transfer (index_topic_1 address from, index_topic_2 address to, uint256 value)
 	// Transfer (index_topic_1 address from, index_topic_2 address to, index_topic_3 uint256 tokenId)
-	Erc20_721TransferEventSignature = "Transfer(address,address,uint256)"
+	Erc20_721TransferEventSignature     = "Transfer(address,address,uint256)"
+	Erc1155TransferSingleEventSignature = "TransferSingle(address,address,address,uint256,uint256)"    // operator, from, to, id, value
+	Erc1155TransferBatchEventSignature  = "TransferBatch(address,address,address,uint256[],uint256[])" // operator, from, to, ids, values
 
-	erc20TransferEventIndexedParameters  = 3 // signature, from, to
-	erc721TransferEventIndexedParameters = 4 // signature, from, to, tokenId
+	erc20TransferEventIndexedParameters   = 3 // signature, from, to
+	erc721TransferEventIndexedParameters  = 4 // signature, from, to, tokenId
+	erc1155TransferEventIndexedParameters = 4 // signature, operator, from, to (id, value are not indexed)
 
 	// Swap (index_topic_1 address sender, uint256 amount0In, uint256 amount1In, uint256 amount0Out, uint256 amount1Out, index_topic_2 address to)
 	uniswapV2SwapEventSignature = "Swap(address,uint256,uint256,uint256,uint256,address)" // also used by SushiSwap
@@ -79,6 +86,8 @@ func GetEventType(log *types.Log) EventType {
 	wethDepositEventSignatureHash := GetEventSignatureHash(wethDepositEventSignature)
 	wethWithdrawalEventSignatureHash := GetEventSignatureHash(wethWithdrawalEventSignature)
 	erc20_721TransferEventSignatureHash := GetEventSignatureHash(Erc20_721TransferEventSignature)
+	erc1155TransferSingleEventSignatureHash := GetEventSignatureHash(Erc1155TransferSingleEventSignature)
+	erc1155TransferBatchEventSignatureHash := GetEventSignatureHash(Erc1155TransferBatchEventSignature)
 	uniswapV2SwapEventSignatureHash := GetEventSignatureHash(uniswapV2SwapEventSignature)
 	uniswapV3SwapEventSignatureHash := GetEventSignatureHash(uniswapV3SwapEventSignature)
 	hopBridgeTransferSentToL2EventSignatureHash := GetEventSignatureHash(hopBridgeTransferSentToL2EventSignature)
@@ -99,6 +108,10 @@ func GetEventType(log *types.Log) EventType {
 			case erc721TransferEventIndexedParameters:
 				return Erc721TransferEventType
 			}
+		case erc1155TransferSingleEventSignatureHash:
+			return Erc1155TransferSingleEventType
+		case erc1155TransferBatchEventSignatureHash:
+			return Erc1155TransferBatchEventType
 		case uniswapV2SwapEventSignatureHash:
 			return UniswapV2SwapEventType
 		case uniswapV3SwapEventSignatureHash:
@@ -123,6 +136,10 @@ func EventTypeToSubtransactionType(eventType EventType) Type {
 		return Erc20Transfer
 	case Erc721TransferEventType:
 		return Erc721Transfer
+	case Erc1155TransferSingleEventType:
+		return Erc1155SingleTransfer
+	case Erc1155TransferBatchEventType:
+		return Erc1155BatchTransfer
 	case UniswapV2SwapEventType:
 		return UniswapV2Swap
 	case UniswapV3SwapEventType:
@@ -149,7 +166,12 @@ func GetFirstEvent(logs []*types.Log) (EventType, *types.Log) {
 
 func IsTokenTransfer(logs []*types.Log) bool {
 	eventType, _ := GetFirstEvent(logs)
-	return eventType == Erc20TransferEventType
+	switch eventType {
+	case Erc20TransferEventType, Erc721TransferEventType, Erc1155TransferSingleEventType, Erc1155TransferBatchEventType:
+		return true
+	}
+
+	return false
 }
 
 func ParseWETHDepositLog(ethlog *types.Log) (src common.Address, amount *big.Int) {
@@ -200,7 +222,7 @@ func ParseWETHWithdrawLog(ethlog *types.Log) (dst common.Address, amount *big.In
 
 func ParseErc20TransferLog(ethlog *types.Log) (from, to common.Address, amount *big.Int) {
 	amount = new(big.Int)
-	if len(ethlog.Topics) < 3 {
+	if len(ethlog.Topics) < erc20TransferEventIndexedParameters {
 		log.Warn("not enough topics for erc20 transfer", "topics", ethlog.Topics)
 		return
 	}
@@ -225,7 +247,7 @@ func ParseErc20TransferLog(ethlog *types.Log) (from, to common.Address, amount *
 
 func ParseErc721TransferLog(ethlog *types.Log) (from, to common.Address, tokenID *big.Int) {
 	tokenID = new(big.Int)
-	if len(ethlog.Topics) < 4 {
+	if len(ethlog.Topics) < erc721TransferEventIndexedParameters {
 		log.Warn("not enough topics for erc721 transfer", "topics", ethlog.Topics)
 		return
 	}
@@ -244,6 +266,37 @@ func ParseErc721TransferLog(ethlog *types.Log) (from, to common.Address, tokenID
 	copy(from[:], ethlog.Topics[1][12:])
 	copy(to[:], ethlog.Topics[2][12:])
 	tokenID.SetBytes(ethlog.Topics[3][:])
+
+	return
+}
+
+func ParseErc1155TransferSingleLog(ethlog *types.Log) (operator, from, to common.Address, id, amount *big.Int) {
+	if len(ethlog.Topics) < erc1155TransferEventIndexedParameters {
+		log.Warn("not enough topics for erc1155 transfer single", "topics", ethlog.Topics)
+		return
+	}
+
+	amount = new(big.Int)
+	id = new(big.Int)
+
+	for i := 1; i < erc1155TransferEventIndexedParameters; i++ {
+		if len(ethlog.Topics[i]) != common.HashLength {
+			log.Warn(fmt.Sprintf("topic %d is not padded to %d byte address, topic=%s", i, common.HashLength, ethlog.Topics[1]))
+			return
+		}
+	}
+	addressIdx := common.HashLength - common.AddressLength
+	copy(operator[:], ethlog.Topics[1][addressIdx:])
+	copy(from[:], ethlog.Topics[2][addressIdx:])
+	copy(to[:], ethlog.Topics[3][addressIdx:])
+
+	if len(ethlog.Data) != common.HashLength*2 {
+		log.Warn("data is not padded to 64 bytes", "data", ethlog.Data)
+		return
+	}
+
+	id.SetBytes(ethlog.Data[:common.HashLength])
+	amount.SetBytes(ethlog.Data[common.HashLength:])
 
 	return
 }
@@ -502,6 +555,14 @@ func ExtractTokenIdentity(dbEntryType Type, log *types.Log, tx *types.Transactio
 		txTokenID = tokenID
 		txFrom = &from
 		txTo = &to
+	case Erc1155SingleTransfer:
+		tokenAddress = new(common.Address)
+		*tokenAddress = log.Address
+		_, from, to, tokenID, value := ParseErc1155TransferSingleLog(log)
+		txTokenID = tokenID
+		txFrom = &from
+		txTo = &to
+		txValue = value
 	}
 
 	return

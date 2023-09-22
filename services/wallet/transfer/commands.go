@@ -116,9 +116,10 @@ type erc20HistoricalCommand struct {
 	chainClient chain.ClientInterface
 	feed        *event.Feed
 
-	iterator     *IterativeDownloader
-	to           *big.Int
-	from         *big.Int
+	iterator *IterativeDownloader
+	to       *big.Int
+	from     *big.Int
+
 	foundHeaders []*DBHeader
 }
 
@@ -166,7 +167,7 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 	for !c.iterator.Finished() {
 		headers, _, _, err := c.iterator.Next(ctx)
 		if err != nil {
-			log.Error("failed to get next batch", "error", err)
+			log.Error("failed to get next batch", "error", err, "chainID", c.chainClient.NetworkID()) // TODO: stop inifinite command in case of an error that we can't fix like missing trie node
 			return err
 		}
 		c.foundHeaders = append(c.foundHeaders, headers...)

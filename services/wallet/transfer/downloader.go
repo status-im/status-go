@@ -240,11 +240,13 @@ func NewERC20TransfersDownloader(client chain.ClientInterface, accounts []common
 	signature := w_common.GetEventSignatureHash(w_common.Erc20_721TransferEventSignature)
 
 	return &ERC20TransfersDownloader{
-		client:       client,
-		accounts:     accounts,
-		incomingOnly: incomingOnly,
-		signature:    signature,
-		signer:       signer,
+		client:                 client,
+		accounts:               accounts,
+		signature:              signature,
+		incomingOnly:           incomingOnly,
+		signatureErc1155Single: w_common.GetEventSignatureHash(w_common.Erc1155TransferSingleEventSignature),
+		signatureErc1155Batch:  w_common.GetEventSignatureHash(w_common.Erc1155TransferBatchEventSignature),
+		signer:                 signer,
 	}
 }
 
@@ -259,7 +261,9 @@ type ERC20TransfersDownloader struct {
 	incomingOnly bool
 
 	// hash of the Transfer event signature
-	signature common.Hash
+	signature              common.Hash
+	signatureErc1155Single common.Hash
+	signatureErc1155Batch  common.Hash
 
 	// signer is used to derive tx sender from tx signature
 	signer types.Signer
@@ -277,6 +281,14 @@ func (d *ERC20TransfersDownloader) inboundTopics(address common.Address) [][]com
 
 func (d *ERC20TransfersDownloader) outboundTopics(address common.Address) [][]common.Hash {
 	return [][]common.Hash{{d.signature}, {d.paddedAddress(address)}, {}}
+}
+
+func (d *ERC20TransfersDownloader) inboundERC20OutboundERC1155Topics(address common.Address) [][]common.Hash {
+	return [][]common.Hash{{d.signature, d.signatureErc1155Single}, {}, {d.paddedAddress(address)}}
+}
+
+func (d *ERC20TransfersDownloader) inboundTopicsERC1155Single(address common.Address) [][]common.Hash {
+	return [][]common.Hash{{d.signatureErc1155Single}, {}, {}, {d.paddedAddress(address)}}
 }
 
 func (d *ETHDownloader) subTransactionsFromTransactionHash(parent context.Context, txHash common.Hash, address common.Address) ([]Transfer, error) {
@@ -321,7 +333,7 @@ func (d *ETHDownloader) subTransactionsFromTransactionData(tx *types.Transaction
 	rst := make([]Transfer, 0, len(receipt.Logs))
 	for _, log := range receipt.Logs {
 		eventType := w_common.GetEventType(log)
-		// Only add ERC20/ERC721 transfers from/to the given account
+		// Only add ERC20/ERC721/ERC1155 transfers from/to the given account
 		// Other types of events get always added
 		mustAppend := false
 		switch eventType {
@@ -332,6 +344,11 @@ func (d *ETHDownloader) subTransactionsFromTransactionData(tx *types.Transaction
 			}
 		case w_common.Erc721TransferEventType:
 			trFrom, trTo, _ := w_common.ParseErc721TransferLog(log)
+			if trFrom == address || trTo == address {
+				mustAppend = true
+			}
+		case w_common.Erc1155TransferSingleEventType:
+			_, trFrom, trTo, _, _ := w_common.ParseErc1155TransferSingleLog(log)
 			if trFrom == address || trTo == address {
 				mustAppend = true
 			}
@@ -382,6 +399,13 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 			return nil, err
 		}
 
+		logType := w_common.EventTypeToSubtransactionType(w_common.GetEventType(&l))
+		log.Debug("block from logs", "block", l.BlockNumber, "log", l, "logType", logType, "address", address, "id", id)
+
+		if logType != w_common.Erc1155SingleTransfer && logType != w_common.Erc1155BatchTransfer {
+			logType = w_common.Erc20Transfer
+		}
+
 		header := &DBHeader{
 			Number: big.NewInt(int64(l.BlockNumber)),
 			Hash:   l.BlockHash,
@@ -392,7 +416,7 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 				ID:          id,
 				From:        address,
 				Loaded:      false,
-				Type:        w_common.Erc20Transfer,
+				Type:        logType,
 				Log:         &l,
 				BaseGasFees: baseGasFee,
 			}},
@@ -422,6 +446,7 @@ func (d *ERC20TransfersDownloader) GetHeadersInRange(parent context.Context, fro
 	var err error
 	for _, address := range d.accounts {
 		outbound := []types.Log{}
+		var inboundOrMixed []types.Log // inbound ERC20 or outbound ERC1155 share the same signature for our purposes
 		if !d.incomingOnly {
 			outbound, err = d.client.FilterLogs(ctx, ethereum.FilterQuery{
 				FromBlock: from,
@@ -431,17 +456,38 @@ func (d *ERC20TransfersDownloader) GetHeadersInRange(parent context.Context, fro
 			if err != nil {
 				return nil, err
 			}
+			inboundOrMixed, err = d.client.FilterLogs(ctx, ethereum.FilterQuery{
+				FromBlock: from,
+				ToBlock:   to,
+				Topics:    d.inboundERC20OutboundERC1155Topics(address),
+			})
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			inboundOrMixed, err = d.client.FilterLogs(ctx, ethereum.FilterQuery{
+				FromBlock: from,
+				ToBlock:   to,
+				Topics:    d.inboundTopics(address),
+			})
+			if err != nil {
+				return nil, err
+			}
 		}
-		inbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
+
+		inbound1155, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
 			FromBlock: from,
 			ToBlock:   to,
-			Topics:    d.inboundTopics(address),
+			Topics:    d.inboundTopicsERC1155Single(address),
 		})
 		if err != nil {
 			return nil, err
 		}
-		logs := append(outbound, inbound...)
+
+		logs := concatLogs(outbound, inboundOrMixed, inbound1155)
+
 		if len(logs) == 0 {
+			log.Debug("no logs found for account")
 			continue
 		}
 
@@ -458,7 +504,22 @@ func (d *ERC20TransfersDownloader) GetHeadersInRange(parent context.Context, fro
 				"from", from, "to", to, "headers", len(headers))
 		}
 	}
+
 	log.Debug("get erc20 transfers in range end", "chainID", d.client.NetworkID(),
 		"from", from, "to", to, "headers", len(headers), "took", time.Since(start))
 	return headers, nil
+}
+
+func concatLogs(slices ...[]types.Log) []types.Log {
+	var totalLen int
+	for _, s := range slices {
+		totalLen += len(s)
+	}
+	tmp := make([]types.Log, totalLen)
+	var i int
+	for _, s := range slices {
+		i += copy(tmp[i:], s)
+	}
+
+	return tmp
 }
