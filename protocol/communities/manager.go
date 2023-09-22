@@ -1425,6 +1425,8 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 	err = community.UpdateCommunityByEvents(eventsMessage)
 	if err != nil {
 		if err == ErrInvalidCommunityEventClock && community.IsControlNode() {
+			// send updated CommunityDescription to the event sender on top of which he must apply his changes
+			eventsMessage.EventsBaseCommunityDescription = community.config.CommunityDescriptionProtocolMessage
 			m.publish(&Subscription{
 				CommunityEventsMessageInvalidClock: &CommunityEventsMessageInvalidClockSignal{
 					Community:              community,
@@ -1491,6 +1493,17 @@ func (m *Manager) HandleCommunityEventsMessageRejected(signer *ecdsa.PublicKey, 
 	if err != nil {
 		return nil, err
 	}
+
+	communityDescription, err := validateAndGetEventsMessageCommunityDescription(eventsMessage.EventsBaseCommunityDescription, signer)
+	if err != nil {
+		return nil, err
+	}
+	// the privileged member did not receive updated CommunityDescription so his events
+	// will be send on top of outdated CommunityDescription
+	if communityDescription.Clock != community.Clock() {
+		return nil, errors.New("resend rejected community events aborted, client node has outdated community description")
+	}
+
 	eventsMessage.Events = m.validateAndFilterEvents(community, eventsMessage.Events)
 
 	myRejectedEvents := make([]CommunityEvent, 0)
@@ -4812,4 +4825,8 @@ func (m *Manager) shareAcceptedRequestToJoinWithPrivilegedMembers(community *Com
 
 func (m *Manager) GetCommunityRequestsToJoinWithRevealedAddresses(communityID types.HexBytes) ([]*RequestToJoin, error) {
 	return m.persistence.GetCommunityRequestsToJoinWithRevealedAddresses(communityID)
+}
+
+func (m *Manager) SaveCommunity(community *Community) error {
+	return m.persistence.SaveCommunity(community)
 }
