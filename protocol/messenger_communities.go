@@ -499,7 +499,9 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 
 	const errorTimeout = 10 * time.Second
 	const successTimeout = 120 * time.Second
-	const unknownCommunitiesFoundTimeout = 3 * time.Second
+	// TODO lower this back again once the real curated community contract is up
+	// The current contract contains communities that are no longer accessible on waku
+	const unknownCommunitiesFoundTimeout = 60 * time.Second
 
 	go func() {
 		for {
