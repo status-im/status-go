@@ -40,6 +40,13 @@ const (
 	requestAddressForTransactionDeclinedMessage = "Request address for transaction declined"
 )
 
+const (
+	// IncreaseUnviewedMessagesCountTimeout
+	// this timeout indicates how long the time between received messages should be
+	// for a new message to increase the unviewed messages counter
+	IncreaseUnviewedMessagesCountTimeout = 1000 * 60 * 2
+)
+
 var (
 	ErrMessageNotAllowed                     = errors.New("message from a non-contact")
 	ErrMessageForWrongChatType               = errors.New("message for the wrong chat type")
@@ -413,7 +420,7 @@ func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *c
 
 	// Increase unviewed count
 	if !common.IsPubKeyEqual(message.SigPubKey, &m.identity.PublicKey) {
-		m.updateUnviewedCounts(chat, message.Mentioned || message.Replied)
+		m.updateUnviewedCounts(chat, message)
 		message.OutgoingStatus = ""
 	} else {
 		// Our own message, mark as sent
@@ -2120,7 +2127,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 			}
 		}
 		if !skipUpdateUnviewedCountForAlbums {
-			m.updateUnviewedCounts(chat, receivedMessage.Mentioned || receivedMessage.Replied)
+			m.updateUnviewedCounts(chat, receivedMessage)
 		}
 	}
 
@@ -3075,9 +3082,17 @@ func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, er
 	return contact.added(), nil
 }
 
-func (m *Messenger) updateUnviewedCounts(chat *Chat, mentionedOrReplied bool) {
-	chat.UnviewedMessagesCount++
-	if mentionedOrReplied {
+func (m *Messenger) updateUnviewedCounts(chat *Chat, message *common.Message) {
+	if chat == nil {
+		return
+	}
+	if chat.LastMessage == nil ||
+		chat.LastMessage.IsSystemMessage() ||
+		!chat.LastMessage.New ||
+		message.Timestamp > chat.LastMessage.Timestamp+IncreaseUnviewedMessagesCountTimeout {
+		chat.UnviewedMessagesCount++
+	}
+	if message.Mentioned || message.Replied {
 		chat.UnviewedMentionsCount++
 	}
 }

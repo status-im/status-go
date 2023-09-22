@@ -632,6 +632,17 @@ func (m *Message) PrepareContent(identity string) error {
 	return m.parseAudio()
 }
 
+func (m *Message) IsSystemMessage() bool {
+	return m.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP ||
+		m.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_GAP ||
+		m.ContentType == protobuf.ChatMessage_CONTACT_REQUEST ||
+		m.ContentType == protobuf.ChatMessage_IDENTITY_VERIFICATION ||
+		m.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_PINNED_MESSAGE ||
+		m.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT ||
+		m.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED ||
+		m.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_REMOVED
+}
+
 // GetSimplifiedText returns a the text stripped of all the markdown and with mentions
 // replaced by canonical names
 func (m *Message) GetSimplifiedText(identity string, canonicalNames map[string]string) (string, error) {
