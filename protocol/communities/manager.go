@@ -262,11 +262,6 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 		manager.ensVerifier = verifier
 	}
 
-	err = manager.fixupChannelMembers()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to fixup channel members")
-	}
-
 	return manager, nil
 }
 
@@ -722,18 +717,17 @@ func (m *Manager) ReevaluateMembers(community *Community) error {
 		}
 
 		// Validate channel permissions
-		for channelID := range community.Chats() {
+		for channelID, channel := range community.Chats() {
 			chatID := community.IDString() + channelID
 
 			viewOnlyPermissions := community.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
 			viewAndPostPermissions := community.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
 
 			if len(viewOnlyPermissions) == 0 && len(viewAndPostPermissions) == 0 {
-				// ensure all members are added back if channel permissions were removed
-				_, err = community.PopulateChatWithAllMembers(channelID)
-				if err != nil {
-					return err
-				}
+				// CommunityDescription space optimization:
+				// clear members list for channel without permissions
+				// empty channel members list mean all community members
+				channel.Members = map[string]*protobuf.CommunityMember{}
 				continue
 			}
 
@@ -4516,38 +4510,6 @@ func (m *Manager) saveAndPublish(community *Community) error {
 
 		m.publish(&Subscription{CommunityEventsMessage: community.ToCommunityEventsMessage()})
 		return nil
-	}
-
-	return nil
-}
-
-// This populates the member list of channels with all community members, if required.
-// Motivation: The member lists of channels were not populated for communities that had already been created.
-//
-// Ideally, this should be executed through a migration, but it's technically unfeasible
-// because `CommunityDescription“ is stored as a signed message blob in the database.
-//
-// However, it's safe to run this migration/fixup multiple times.
-func (m *Manager) fixupChannelMembers() error {
-	controlledCommunities, err := m.ControlledCommunities()
-	if err != nil {
-		return err
-	}
-
-	for _, c := range controlledCommunities {
-		fmt.Println("------> fixupChannelMembers for community: ", c.Identity().DisplayName)
-		for channelID := range c.Chats() {
-			if !c.ChannelHasTokenPermissions(c.IDString() + channelID) {
-				_, err := c.PopulateChatWithAllMembers(channelID)
-				if err != nil {
-					return err
-				}
-				err = m.persistence.SaveCommunity(c)
-				if err != nil {
-					return err
-				}
-			}
-		}
 	}
 
 	return nil

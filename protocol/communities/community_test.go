@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -920,6 +921,7 @@ func (s *CommunitySuite) buildCommunityDescription() *protobuf.CommunityDescript
 		DisplayName: "display-name",
 		Description: "description",
 	}
+
 	return desc
 }
 
@@ -957,6 +959,18 @@ func (s *CommunitySuite) buildCommunity(owner *ecdsa.PublicKey) *Community {
 	config := s.config()
 	config.ID = owner
 	config.CommunityDescription = s.buildCommunityDescription()
+
+	// Only channels with token permissions can have non-empty members list
+	prefixed := func(channelID string) string {
+		return types.EncodeHex(crypto.CompressPubkey(config.ID)) + channelID
+	}
+	config.CommunityDescription.TokenPermissions = make(map[string]*protobuf.CommunityTokenPermission)
+	config.CommunityDescription.TokenPermissions["id1"] = &protobuf.CommunityTokenPermission{
+		Id:            "id1",
+		TokenCriteria: []*protobuf.TokenCriteria{},
+		ChatIds:       []string{prefixed(testChatID1), prefixed(testChatID2)},
+		IsPrivate:     false,
+	}
 
 	org, err := New(config)
 	s.Require().NoError(err)

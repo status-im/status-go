@@ -155,7 +155,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 				Emoji:       c.Identity.Emoji,
 				Description: c.Identity.Description,
 				Permissions: c.Permissions,
-				Members:     c.Members,
+				Members:     o.GetChatMembers(id),
 				CanPost:     canPost,
 				CategoryID:  c.CategoryId,
 				Position:    int(c.Position),
@@ -275,7 +275,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 				Color:       c.Identity.Color,
 				Description: c.Identity.Description,
 				Permissions: c.Permissions,
-				Members:     c.Members,
+				Members:     o.GetChatMembers(id),
 				CanPost:     canPost,
 				CategoryID:  c.CategoryId,
 				Position:    int(c.Position),
@@ -570,18 +570,32 @@ func (o *Community) GetMember(pk *ecdsa.PublicKey) *protobuf.CommunityMember {
 	return o.getMember(pk)
 }
 
+func (o *Community) getChatMembers(chatID string) map[string]*protobuf.CommunityMember {
+	chat, ok := o.config.CommunityDescription.Chats[chatID]
+	if !ok {
+		return map[string]*protobuf.CommunityMember{}
+	}
+
+	if o.channelHasTokenPermissions(o.IDString() + chatID) {
+		return chat.Members
+	}
+
+	return o.Members()
+}
+
+func (o *Community) GetChatMembers(chatID string) map[string]*protobuf.CommunityMember {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	return o.getChatMembers(chatID)
+}
+
 func (o *Community) getChatMember(pk *ecdsa.PublicKey, chatID string) *protobuf.CommunityMember {
 	if !o.hasMember(pk) {
 		return nil
 	}
 
-	chat, ok := o.config.CommunityDescription.Chats[chatID]
-	if !ok {
-		return nil
-	}
-
-	key := common.PubkeyToHex(pk)
-	return chat.Members[key]
+	return o.getChatMembers(chatID)[common.PubkeyToHex(pk)]
 }
 
 func (o *Community) hasMember(pk *ecdsa.PublicKey) bool {
@@ -1383,10 +1397,7 @@ func (o *Community) HasTokenPermissions() bool {
 	return len(o.tokenPermissions()) > 0
 }
 
-func (o *Community) ChannelHasTokenPermissions(chatID string) bool {
-	o.mutex.Lock()
-	defer o.mutex.Unlock()
-
+func (o *Community) channelHasTokenPermissions(chatID string) bool {
 	for _, tokenPermission := range o.tokenPermissions() {
 		if includes(tokenPermission.ChatIds, chatID) {
 			return true
@@ -1394,6 +1405,13 @@ func (o *Community) ChannelHasTokenPermissions(chatID string) bool {
 	}
 
 	return false
+}
+
+func (o *Community) ChannelHasTokenPermissions(chatID string) bool {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	return o.channelHasTokenPermissions(chatID)
 }
 
 func TokenPermissionsByType(permissions map[string]*CommunityTokenPermission, permissionType protobuf.CommunityTokenPermission_Type) []*CommunityTokenPermission {
@@ -1841,41 +1859,6 @@ func (o *Community) AddMemberToChat(chatID string, publicKey *ecdsa.PublicKey, r
 	return changes, nil
 }
 
-func (o *Community) PopulateChatWithAllMembers(chatID string) (*CommunityChanges, error) {
-	o.mutex.Lock()
-	defer o.mutex.Unlock()
-
-	if !o.IsControlNode() {
-		return o.emptyCommunityChanges(), ErrNotControlNode
-	}
-
-	return o.populateChatWithAllMembers(chatID)
-}
-
-func (o *Community) populateChatWithAllMembers(chatID string) (*CommunityChanges, error) {
-	result := o.emptyCommunityChanges()
-
-	chat, exists := o.chats()[chatID]
-	if !exists {
-		return result, ErrChatNotFound
-	}
-
-	membersAdded := make(map[string]*protobuf.CommunityMember)
-	for pubKey, member := range o.Members() {
-		if chat.Members[pubKey] == nil {
-			membersAdded[pubKey] = member
-		}
-	}
-	result.ChatsModified[chatID] = &CommunityChatChanges{
-		MembersAdded: membersAdded,
-	}
-
-	chat.Members = o.Members()
-	o.increaseClock()
-
-	return result, nil
-}
-
 func (o *Community) ChatIDs() (chatIDs []string) {
 	for id := range o.config.CommunityDescription.Chats {
 		chatIDs = append(chatIDs, o.IDString()+id)
@@ -2037,8 +2020,6 @@ func (o *Community) createChat(chatID string, chat *protobuf.CommunityChat) erro
 			chat.Position++
 		}
 	}
-
-	chat.Members = o.config.CommunityDescription.Members
 
 	o.config.CommunityDescription.Chats[chatID] = chat
 

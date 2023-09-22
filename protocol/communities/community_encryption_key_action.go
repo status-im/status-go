@@ -83,7 +83,7 @@ func evaluateChannelLevelEncryptionKeyActions(origin, modified *Community, chang
 			membersRemoved = chatChanges.MembersRemoved
 		}
 
-		result[channelID] = *evaluateEncryptionKeyAction(originChannelPermissions, modifiedChannelPermissions, modified.config.CommunityDescription.Chats[channelID].Members, membersAdded, membersRemoved)
+		result[channelID] = *evaluateEncryptionKeyAction(originChannelPermissions, modifiedChannelPermissions, modified.getChatMembers(channelID), membersAdded, membersRemoved)
 	}
 
 	return &result

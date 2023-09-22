@@ -80,7 +80,158 @@ func (c *CommunityChanges) HasMemberLeft(identity string) bool {
 }
 
 func EvaluateCommunityChanges(origin, modified *Community) *CommunityChanges {
-	changes := evaluateCommunityChangesByDescription(origin.Description(), modified.Description())
+	changes := EmptyCommunityChanges()
+	changes.Community = modified
+
+	originDescription := origin.Description()
+	modifiedDescription := modified.Description()
+
+	// Check for new members at the org level
+	for pk, member := range modifiedDescription.Members {
+		if _, ok := originDescription.Members[pk]; !ok {
+			if changes.MembersAdded == nil {
+				changes.MembersAdded = make(map[string]*protobuf.CommunityMember)
+			}
+			changes.MembersAdded[pk] = member
+		}
+	}
+
+	// Check for removed members at the org level
+	for pk, member := range originDescription.Members {
+		if _, ok := modifiedDescription.Members[pk]; !ok {
+			if changes.MembersRemoved == nil {
+				changes.MembersRemoved = make(map[string]*protobuf.CommunityMember)
+			}
+			changes.MembersRemoved[pk] = member
+		}
+	}
+
+	// check for removed chats
+	for chatID, chat := range originDescription.Chats {
+		if modifiedDescription.Chats == nil {
+			modifiedDescription.Chats = make(map[string]*protobuf.CommunityChat)
+		}
+		if _, ok := modifiedDescription.Chats[chatID]; !ok {
+			if changes.ChatsRemoved == nil {
+				changes.ChatsRemoved = make(map[string]*protobuf.CommunityChat)
+			}
+
+			changes.ChatsRemoved[chatID] = chat
+		}
+	}
+
+	for chatID, chat := range modifiedDescription.Chats {
+		if originDescription.Chats == nil {
+			originDescription.Chats = make(map[string]*protobuf.CommunityChat)
+		}
+
+		if _, ok := originDescription.Chats[chatID]; !ok {
+			if changes.ChatsAdded == nil {
+				changes.ChatsAdded = make(map[string]*protobuf.CommunityChat)
+			}
+
+			changes.ChatsAdded[chatID] = chat
+		} else {
+			// Check for members added
+			for pk, member := range modified.getChatMembers(chatID) {
+				if _, ok := origin.getChatMembers(chatID)[pk]; !ok {
+					if changes.ChatsModified[chatID] == nil {
+						changes.ChatsModified[chatID] = &CommunityChatChanges{
+							MembersAdded:   make(map[string]*protobuf.CommunityMember),
+							MembersRemoved: make(map[string]*protobuf.CommunityMember),
+						}
+					}
+
+					changes.ChatsModified[chatID].MembersAdded[pk] = member
+				}
+			}
+
+			// check for members removed
+			for pk, member := range origin.getChatMembers(chatID) {
+				if _, ok := modified.getChatMembers(chatID)[pk]; !ok {
+					if changes.ChatsModified[chatID] == nil {
+						changes.ChatsModified[chatID] = &CommunityChatChanges{
+							MembersAdded:   make(map[string]*protobuf.CommunityMember),
+							MembersRemoved: make(map[string]*protobuf.CommunityMember),
+						}
+					}
+
+					changes.ChatsModified[chatID].MembersRemoved[pk] = member
+				}
+			}
+
+			// check if first message timestamp was modified
+			if originDescription.Chats[chatID].Identity.FirstMessageTimestamp !=
+				modifiedDescription.Chats[chatID].Identity.FirstMessageTimestamp {
+				if changes.ChatsModified[chatID] == nil {
+					changes.ChatsModified[chatID] = &CommunityChatChanges{
+						MembersAdded:   make(map[string]*protobuf.CommunityMember),
+						MembersRemoved: make(map[string]*protobuf.CommunityMember),
+					}
+				}
+				changes.ChatsModified[chatID].FirstMessageTimestampModified = modifiedDescription.Chats[chatID].Identity.FirstMessageTimestamp
+			}
+		}
+	}
+
+	// Check for categories that were removed
+	for categoryID := range originDescription.Categories {
+		if modifiedDescription.Categories == nil {
+			modifiedDescription.Categories = make(map[string]*protobuf.CommunityCategory)
+		}
+
+		if modifiedDescription.Chats == nil {
+			modifiedDescription.Chats = make(map[string]*protobuf.CommunityChat)
+		}
+
+		if _, ok := modifiedDescription.Categories[categoryID]; !ok {
+			changes.CategoriesRemoved = append(changes.CategoriesRemoved, categoryID)
+		}
+
+		if originDescription.Chats == nil {
+			originDescription.Chats = make(map[string]*protobuf.CommunityChat)
+		}
+	}
+
+	// Check for categories that were added
+	for categoryID, category := range modifiedDescription.Categories {
+		if originDescription.Categories == nil {
+			originDescription.Categories = make(map[string]*protobuf.CommunityCategory)
+		}
+		if _, ok := originDescription.Categories[categoryID]; !ok {
+			if changes.CategoriesAdded == nil {
+				changes.CategoriesAdded = make(map[string]*protobuf.CommunityCategory)
+			}
+
+			changes.CategoriesAdded[categoryID] = category
+		} else {
+			if originDescription.Categories[categoryID].Name != category.Name || originDescription.Categories[categoryID].Position != category.Position {
+				changes.CategoriesModified[categoryID] = category
+			}
+		}
+	}
+
+	// Check for chat categories that were modified
+	for chatID, chat := range modifiedDescription.Chats {
+		if originDescription.Chats == nil {
+			originDescription.Chats = make(map[string]*protobuf.CommunityChat)
+		}
+
+		if _, ok := originDescription.Chats[chatID]; !ok {
+			continue // It's a new chat
+		}
+
+		if originDescription.Chats[chatID].CategoryId != chat.CategoryId {
+			if changes.ChatsModified[chatID] == nil {
+				changes.ChatsModified[chatID] = &CommunityChatChanges{
+					MembersAdded:   make(map[string]*protobuf.CommunityMember),
+					MembersRemoved: make(map[string]*protobuf.CommunityMember),
+				}
+			}
+
+			changes.ChatsModified[chatID].CategoryModified = chat.CategoryId
+		}
+	}
 
 	originTokenPermissions := origin.tokenPermissions()
 	modifiedTokenPermissions := modified.tokenPermissions()
@@ -100,160 +251,6 @@ func EvaluateCommunityChanges(origin, modified *Community) *CommunityChanges {
 	for id, permission := range modifiedTokenPermissions {
 		if _, ok := originTokenPermissions[id]; !ok {
 			changes.TokenPermissionsAdded[id] = permission
-		}
-	}
-
-	changes.Community = modified
-	return changes
-}
-
-func evaluateCommunityChangesByDescription(origin, modified *protobuf.CommunityDescription) *CommunityChanges {
-	changes := EmptyCommunityChanges()
-
-	// Check for new members at the org level
-	for pk, member := range modified.Members {
-		if _, ok := origin.Members[pk]; !ok {
-			if changes.MembersAdded == nil {
-				changes.MembersAdded = make(map[string]*protobuf.CommunityMember)
-			}
-			changes.MembersAdded[pk] = member
-		}
-	}
-
-	// Check for removed members at the org level
-	for pk, member := range origin.Members {
-		if _, ok := modified.Members[pk]; !ok {
-			if changes.MembersRemoved == nil {
-				changes.MembersRemoved = make(map[string]*protobuf.CommunityMember)
-			}
-			changes.MembersRemoved[pk] = member
-		}
-	}
-
-	// check for removed chats
-	for chatID, chat := range origin.Chats {
-		if modified.Chats == nil {
-			modified.Chats = make(map[string]*protobuf.CommunityChat)
-		}
-		if _, ok := modified.Chats[chatID]; !ok {
-			if changes.ChatsRemoved == nil {
-				changes.ChatsRemoved = make(map[string]*protobuf.CommunityChat)
-			}
-
-			changes.ChatsRemoved[chatID] = chat
-		}
-	}
-
-	for chatID, chat := range modified.Chats {
-		if origin.Chats == nil {
-			origin.Chats = make(map[string]*protobuf.CommunityChat)
-		}
-
-		if _, ok := origin.Chats[chatID]; !ok {
-			if changes.ChatsAdded == nil {
-				changes.ChatsAdded = make(map[string]*protobuf.CommunityChat)
-			}
-
-			changes.ChatsAdded[chatID] = chat
-		} else {
-			// Check for members added
-			for pk, member := range modified.Chats[chatID].Members {
-				if _, ok := origin.Chats[chatID].Members[pk]; !ok {
-					if changes.ChatsModified[chatID] == nil {
-						changes.ChatsModified[chatID] = &CommunityChatChanges{
-							MembersAdded:   make(map[string]*protobuf.CommunityMember),
-							MembersRemoved: make(map[string]*protobuf.CommunityMember),
-						}
-					}
-
-					changes.ChatsModified[chatID].MembersAdded[pk] = member
-				}
-			}
-
-			// check for members removed
-			for pk, member := range origin.Chats[chatID].Members {
-				if _, ok := modified.Chats[chatID].Members[pk]; !ok {
-					if changes.ChatsModified[chatID] == nil {
-						changes.ChatsModified[chatID] = &CommunityChatChanges{
-							MembersAdded:   make(map[string]*protobuf.CommunityMember),
-							MembersRemoved: make(map[string]*protobuf.CommunityMember),
-						}
-					}
-
-					changes.ChatsModified[chatID].MembersRemoved[pk] = member
-				}
-			}
-
-			// check if first message timestamp was modified
-			if origin.Chats[chatID].Identity.FirstMessageTimestamp !=
-				modified.Chats[chatID].Identity.FirstMessageTimestamp {
-				if changes.ChatsModified[chatID] == nil {
-					changes.ChatsModified[chatID] = &CommunityChatChanges{
-						MembersAdded:   make(map[string]*protobuf.CommunityMember),
-						MembersRemoved: make(map[string]*protobuf.CommunityMember),
-					}
-				}
-				changes.ChatsModified[chatID].FirstMessageTimestampModified = modified.Chats[chatID].Identity.FirstMessageTimestamp
-			}
-		}
-	}
-
-	// Check for categories that were removed
-	for categoryID := range origin.Categories {
-		if modified.Categories == nil {
-			modified.Categories = make(map[string]*protobuf.CommunityCategory)
-		}
-
-		if modified.Chats == nil {
-			modified.Chats = make(map[string]*protobuf.CommunityChat)
-		}
-
-		if _, ok := modified.Categories[categoryID]; !ok {
-			changes.CategoriesRemoved = append(changes.CategoriesRemoved, categoryID)
-		}
-
-		if origin.Chats == nil {
-			origin.Chats = make(map[string]*protobuf.CommunityChat)
-		}
-	}
-
-	// Check for categories that were added
-	for categoryID, category := range modified.Categories {
-		if origin.Categories == nil {
-			origin.Categories = make(map[string]*protobuf.CommunityCategory)
-		}
-		if _, ok := origin.Categories[categoryID]; !ok {
-			if changes.CategoriesAdded == nil {
-				changes.CategoriesAdded = make(map[string]*protobuf.CommunityCategory)
-			}
-
-			changes.CategoriesAdded[categoryID] = category
-		} else {
-			if origin.Categories[categoryID].Name != category.Name || origin.Categories[categoryID].Position != category.Position {
-				changes.CategoriesModified[categoryID] = category
-			}
-		}
-	}
-
-	// Check for chat categories that were modified
-	for chatID, chat := range modified.Chats {
-		if origin.Chats == nil {
-			origin.Chats = make(map[string]*protobuf.CommunityChat)
-		}
-
-		if _, ok := origin.Chats[chatID]; !ok {
-			continue // It's a new chat
-		}
-
-		if origin.Chats[chatID].CategoryId != chat.CategoryId {
-			if changes.ChatsModified[chatID] == nil {
-				changes.ChatsModified[chatID] = &CommunityChatChanges{
-					MembersAdded:   make(map[string]*protobuf.CommunityMember),
-					MembersRemoved: make(map[string]*protobuf.CommunityMember),
-				}
-			}
-
-			changes.ChatsModified[chatID].CategoryModified = chat.CategoryId
 		}
 	}
 
