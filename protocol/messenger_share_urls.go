@@ -138,11 +138,11 @@ func (m *Messenger) prepareEncodedCommunityData(community *communities.Community
 		return "", "", err
 	}
 
-	shardCluster := int32(common.UndefinedShardValue)
-	shardIndex := int32(common.UndefinedShardValue)
+	shardCluster := uint32(common.UndefinedShardValue)
+	shardIndex := uint32(common.UndefinedShardValue)
 	if community.Shard() != nil {
-		shardCluster = int32(community.Shard().Cluster)
-		shardIndex = int32(community.Shard().Index)
+		shardCluster = uint32(community.Shard().Cluster)
+		shardIndex = uint32(community.Shard().Index)
 	}
 
 	urlDataProto := &protobuf.URLData{
@@ -321,11 +321,11 @@ func (m *Messenger) prepareEncodedCommunityChannelData(community *communities.Co
 		return "", "", err
 	}
 
-	shardCluster := int32(common.UndefinedShardValue)
-	shardIndex := int32(common.UndefinedShardValue)
+	shardCluster := uint32(common.UndefinedShardValue)
+	shardIndex := uint32(common.UndefinedShardValue)
 	if community.Shard() != nil {
-		shardCluster = int32(community.Shard().Cluster)
-		shardIndex = int32(community.Shard().Index)
+		shardCluster = uint32(community.Shard().Cluster)
+		shardIndex = uint32(community.Shard().Index)
 
 	}
 

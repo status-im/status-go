@@ -1489,8 +1489,8 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 		}
 
 		if community.Shard() != nil {
-			requestToJoinResponseProto.ShardIndex = int32(community.Shard().Index)
-			requestToJoinResponseProto.ShardCluster = int32(community.Shard().Cluster)
+			requestToJoinResponseProto.ShardIndex = uint32(community.Shard().Index)
+			requestToJoinResponseProto.ShardCluster = uint32(community.Shard().Cluster)
 		} else {
 			requestToJoinResponseProto.ShardIndex = common.UndefinedShardValue
 			requestToJoinResponseProto.ShardCluster = common.UndefinedShardValue
@@ -2435,8 +2435,8 @@ func (m *Messenger) SendCommunityShardKey(community *communities.Community, pubk
 	}
 
 	if community.Shard() != nil {
-		communityShardKey.ShardIndex = int32(community.Shard().Index)
-		communityShardKey.ShardCluster = int32(community.Shard().Cluster)
+		communityShardKey.ShardIndex = uint32(community.Shard().Index)
+		communityShardKey.ShardCluster = uint32(community.Shard().Cluster)
 	} else {
 		communityShardKey.ShardIndex = common.UndefinedShardValue
 		communityShardKey.ShardCluster = common.UndefinedShardValue
@@ -2983,7 +2983,7 @@ func (m *Messenger) HandleCommunityShardKey(state *ReceivedMessageState, message
 	return m.handleCommunityShardAndFiltersFromProto(community, message.ShardCluster, message.ShardIndex, message.PrivateKey)
 }
 
-func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communities.Community, shardCluster int32, shardIndex int32, privateKeyBytes []byte) error {
+func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communities.Community, shardCluster uint32, shardIndex uint32, privateKeyBytes []byte) error {
 	var shard *common.Shard
 	if shardCluster != common.UndefinedShardValue && shardIndex != common.UndefinedShardValue {
 		shard = &common.Shard{

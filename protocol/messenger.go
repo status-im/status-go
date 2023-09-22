@@ -2250,11 +2250,11 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 			return nil, err
 		}
 
-		shardCluster := int32(common.UndefinedShardValue)
-		shardIndex := int32(common.UndefinedShardValue)
+		shardCluster := uint32(common.UndefinedShardValue)
+		shardIndex := uint32(common.UndefinedShardValue)
 		if community.Shard() != nil {
-			shardCluster = int32(community.Shard().Cluster)
-			shardIndex = int32(community.Shard().Index)
+			shardCluster = uint32(community.Shard().Cluster)
+			shardIndex = uint32(community.Shard().Index)
 		}
 
 		message.Payload = &protobuf.ChatMessage_CommunityShard{CommunityShard: &protobuf.CommunityShard{

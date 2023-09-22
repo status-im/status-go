@@ -156,8 +156,8 @@ message CommunityRequestToJoinResponse {
   bytes community_id = 5;
   string magnet_uri = 6;
   bytes protected_topic_private_key = 7;
-  int32 shard_cluster = 8;
-  int32 shard_index = 9;
+  uint32 shard_cluster = 8;
+  uint32 shard_index = 9;
 }
 
 message CommunityRequestToLeave {
