@@ -7,11 +7,11 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/connection"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
@@ -48,6 +48,10 @@ func (o *Client) IsChainSupported(chainID walletCommon.ChainID) bool {
 	return err == nil
 }
 
+func (o *Client) IsConnected() bool {
+	return o.connectionStatus.IsConnected()
+}
+
 func getAPIKeySubpath(apiKey string) string {
 	if apiKey == "" {
 		return "demo"
@@ -67,16 +71,16 @@ func getNFTBaseURL(chainID walletCommon.ChainID, apiKey string) (string, error) 
 
 type Client struct {
 	thirdparty.CollectibleContractOwnershipProvider
-	client          *http.Client
-	apiKeys         map[uint64]string
-	IsConnected     bool
-	IsConnectedLock sync.RWMutex
+	client           *http.Client
+	apiKeys          map[uint64]string
+	connectionStatus *connection.Status
 }
 
 func NewClient(apiKeys map[uint64]string) *Client {
 	return &Client{
-		client:  &http.Client{Timeout: time.Minute},
-		apiKeys: apiKeys,
+		client:           &http.Client{Timeout: time.Minute},
+		apiKeys:          apiKeys,
+		connectionStatus: connection.NewStatus(),
 	}
 }
 
@@ -136,10 +140,11 @@ func (o *Client) FetchCollectibleOwnersByContractAddress(chainID walletCommon.Ch
 		url := fmt.Sprintf("%s/getOwnersForContract?%s", baseURL, queryParams.Encode())
 
 		resp, err := o.doQuery(url)
-
 		if err != nil {
+			o.connectionStatus.SetIsConnected(false)
 			return nil, err
 		}
+		o.connectionStatus.SetIsConnected(true)
 
 		defer resp.Body.Close()
 
@@ -204,8 +209,10 @@ func (o *Client) fetchOwnedAssets(chainID walletCommon.ChainID, owner common.Add
 
 		resp, err := o.doQuery(url)
 		if err != nil {
+			o.connectionStatus.SetIsConnected(false)
 			return nil, err
 		}
+		o.connectionStatus.SetIsConnected(true)
 
 		defer resp.Body.Close()
 

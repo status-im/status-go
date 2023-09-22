@@ -28,7 +28,7 @@ func initTestClient(srv *httptest.Server) *Client {
 		return srv.URL, nil
 	}
 
-	status := connection.NewStatus("", nil)
+	status := connection.NewStatus()
 
 	client := &HTTPClient{
 		client: srv.Client(),

@@ -23,9 +23,9 @@ func setupOwnershipDBTest(t *testing.T) (*OwnershipDB, func()) {
 	}
 }
 
-func generateTestCollectibles(chainID w_common.ChainID, count int) (result []thirdparty.CollectibleUniqueID) {
+func generateTestCollectibles(chainID w_common.ChainID, offset int, count int) (result []thirdparty.CollectibleUniqueID) {
 	result = make([]thirdparty.CollectibleUniqueID, 0, count)
-	for i := 0; i < count; i++ {
+	for i := offset; i < offset+count; i++ {
 		bigI := big.NewInt(int64(i))
 		newCollectible := thirdparty.CollectibleUniqueID{
 			ContractID: thirdparty.ContractID{
@@ -43,26 +43,38 @@ func TestUpdateOwnership(t *testing.T) {
 	oDB, cleanDB := setupOwnershipDBTest(t)
 	defer cleanDB()
 
-	ownerAddress1 := common.HexToAddress("0x1234")
 	chainID0 := w_common.ChainID(0)
-	ownedListChain0 := generateTestCollectibles(chainID0, 10)
-	timestampChain0 := int64(1234567890)
 	chainID1 := w_common.ChainID(1)
-	ownedListChain1 := generateTestCollectibles(chainID1, 15)
+	chainID2 := w_common.ChainID(2)
+
+	ownerAddress1 := common.HexToAddress("0x1234")
+	ownedListChain0 := generateTestCollectibles(chainID0, 0, 10)
+	timestampChain0 := int64(1234567890)
+	ownedListChain1 := generateTestCollectibles(chainID1, 0, 15)
 	timestampChain1 := int64(1234567891)
 
 	ownedList1 := append(ownedListChain0, ownedListChain1...)
 
 	ownerAddress2 := common.HexToAddress("0x5678")
-	chainID2 := w_common.ChainID(2)
-	ownedListChain2 := generateTestCollectibles(chainID2, 20)
+	ownedListChain2 := generateTestCollectibles(chainID2, 0, 20)
 	timestampChain2 := int64(1234567892)
 
 	ownedList2 := ownedListChain2
 
-	fullList := append(ownedList1, ownedList2...)
+	ownerAddress3 := common.HexToAddress("0xABCD")
+	ownedListChain1b := generateTestCollectibles(chainID1, len(ownedListChain1), 5)
+	timestampChain1b := timestampChain1 - 100
+	ownedListChain2b := generateTestCollectibles(chainID2, len(ownedListChain2), 20)
+	timestampChain2b := timestampChain2 + 100
 
-	randomAddress := common.HexToAddress("0xABCD")
+	ownedList3 := append(ownedListChain1b, ownedListChain2b...)
+
+	allChains := []w_common.ChainID{chainID0, chainID1, chainID2}
+	allOwnerAddresses := []common.Address{ownerAddress1, ownerAddress2, ownerAddress3}
+	allCollectibles := append(ownedList1, ownedList2...)
+	allCollectibles = append(allCollectibles, ownedList3...)
+
+	randomAddress := common.HexToAddress("0xFFFF")
 
 	var err error
 
@@ -73,11 +85,23 @@ func TestUpdateOwnership(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, InvalidTimestamp, loadedTimestamp)
 
+	loadedTimestamp, err = oDB.GetLatestOwnershipUpdateTimestamp(chainID0)
+	require.NoError(t, err)
+	require.Equal(t, InvalidTimestamp, loadedTimestamp)
+
 	loadedTimestamp, err = oDB.GetOwnershipUpdateTimestamp(ownerAddress1, chainID1)
 	require.NoError(t, err)
 	require.Equal(t, InvalidTimestamp, loadedTimestamp)
 
+	loadedTimestamp, err = oDB.GetLatestOwnershipUpdateTimestamp(chainID1)
+	require.NoError(t, err)
+	require.Equal(t, InvalidTimestamp, loadedTimestamp)
+
 	loadedTimestamp, err = oDB.GetOwnershipUpdateTimestamp(ownerAddress2, chainID2)
+	require.NoError(t, err)
+	require.Equal(t, InvalidTimestamp, loadedTimestamp)
+
+	loadedTimestamp, err = oDB.GetLatestOwnershipUpdateTimestamp(chainID2)
 	require.NoError(t, err)
 	require.Equal(t, InvalidTimestamp, loadedTimestamp)
 
@@ -88,11 +112,23 @@ func TestUpdateOwnership(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, timestampChain0, loadedTimestamp)
 
+	loadedTimestamp, err = oDB.GetLatestOwnershipUpdateTimestamp(chainID0)
+	require.NoError(t, err)
+	require.Equal(t, timestampChain0, loadedTimestamp)
+
 	loadedTimestamp, err = oDB.GetOwnershipUpdateTimestamp(ownerAddress1, chainID1)
 	require.NoError(t, err)
 	require.Equal(t, InvalidTimestamp, loadedTimestamp)
 
+	loadedTimestamp, err = oDB.GetLatestOwnershipUpdateTimestamp(chainID1)
+	require.NoError(t, err)
+	require.Equal(t, InvalidTimestamp, loadedTimestamp)
+
 	loadedTimestamp, err = oDB.GetOwnershipUpdateTimestamp(ownerAddress2, chainID2)
+	require.NoError(t, err)
+	require.Equal(t, InvalidTimestamp, loadedTimestamp)
+
+	loadedTimestamp, err = oDB.GetLatestOwnershipUpdateTimestamp(chainID2)
 	require.NoError(t, err)
 	require.Equal(t, InvalidTimestamp, loadedTimestamp)
 
@@ -102,7 +138,17 @@ func TestUpdateOwnership(t *testing.T) {
 	err = oDB.Update(chainID2, ownerAddress2, ownedListChain2, timestampChain2)
 	require.NoError(t, err)
 
+	err = oDB.Update(chainID1, ownerAddress3, ownedListChain1b, timestampChain1b)
+	require.NoError(t, err)
+
+	err = oDB.Update(chainID2, ownerAddress3, ownedListChain2b, timestampChain2b)
+	require.NoError(t, err)
+
 	loadedTimestamp, err = oDB.GetOwnershipUpdateTimestamp(ownerAddress1, chainID0)
+	require.NoError(t, err)
+	require.Equal(t, timestampChain0, loadedTimestamp)
+
+	loadedTimestamp, err = oDB.GetLatestOwnershipUpdateTimestamp(chainID0)
 	require.NoError(t, err)
 	require.Equal(t, timestampChain0, loadedTimestamp)
 
@@ -110,27 +156,43 @@ func TestUpdateOwnership(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, timestampChain1, loadedTimestamp)
 
+	loadedTimestamp, err = oDB.GetOwnershipUpdateTimestamp(ownerAddress3, chainID1)
+	require.NoError(t, err)
+	require.Equal(t, timestampChain1b, loadedTimestamp)
+
+	loadedTimestamp, err = oDB.GetLatestOwnershipUpdateTimestamp(chainID1)
+	require.NoError(t, err)
+	require.Equal(t, timestampChain1, loadedTimestamp)
+
 	loadedTimestamp, err = oDB.GetOwnershipUpdateTimestamp(ownerAddress2, chainID2)
 	require.NoError(t, err)
 	require.Equal(t, timestampChain2, loadedTimestamp)
 
-	loadedList, err = oDB.GetOwnedCollectibles([]w_common.ChainID{chainID0}, []common.Address{ownerAddress1}, 0, len(fullList))
+	loadedTimestamp, err = oDB.GetOwnershipUpdateTimestamp(ownerAddress3, chainID2)
+	require.NoError(t, err)
+	require.Equal(t, timestampChain2b, loadedTimestamp)
+
+	loadedTimestamp, err = oDB.GetLatestOwnershipUpdateTimestamp(chainID2)
+	require.NoError(t, err)
+	require.Equal(t, timestampChain2b, loadedTimestamp)
+
+	loadedList, err = oDB.GetOwnedCollectibles([]w_common.ChainID{chainID0}, []common.Address{ownerAddress1}, 0, len(allCollectibles))
 	require.NoError(t, err)
 	require.Equal(t, ownedListChain0, loadedList)
 
-	loadedList, err = oDB.GetOwnedCollectibles([]w_common.ChainID{chainID0, chainID1}, []common.Address{ownerAddress1, randomAddress}, 0, len(fullList))
+	loadedList, err = oDB.GetOwnedCollectibles([]w_common.ChainID{chainID0, chainID1}, []common.Address{ownerAddress1, randomAddress}, 0, len(allCollectibles))
 	require.NoError(t, err)
 	require.Equal(t, ownedList1, loadedList)
 
-	loadedList, err = oDB.GetOwnedCollectibles([]w_common.ChainID{chainID2}, []common.Address{ownerAddress2}, 0, len(fullList))
+	loadedList, err = oDB.GetOwnedCollectibles([]w_common.ChainID{chainID2}, []common.Address{ownerAddress2}, 0, len(allCollectibles))
 	require.NoError(t, err)
 	require.Equal(t, ownedList2, loadedList)
 
-	loadedList, err = oDB.GetOwnedCollectibles([]w_common.ChainID{chainID0, chainID1, chainID2}, []common.Address{ownerAddress1, ownerAddress2}, 0, len(fullList))
+	loadedList, err = oDB.GetOwnedCollectibles(allChains, allOwnerAddresses, 0, len(allCollectibles))
 	require.NoError(t, err)
-	require.Equal(t, fullList, loadedList)
+	require.Equal(t, len(allCollectibles), len(loadedList))
 
-	loadedList, err = oDB.GetOwnedCollectibles([]w_common.ChainID{chainID0}, []common.Address{randomAddress}, 0, len(fullList))
+	loadedList, err = oDB.GetOwnedCollectibles([]w_common.ChainID{chainID0}, []common.Address{randomAddress}, 0, len(allCollectibles))
 	require.NoError(t, err)
 	require.Empty(t, loadedList)
 }

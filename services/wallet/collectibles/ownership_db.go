@@ -210,3 +210,30 @@ func (o *OwnershipDB) GetOwnershipUpdateTimestamp(owner common.Address, chainID 
 
 	return timestamp, nil
 }
+
+func (o *OwnershipDB) GetLatestOwnershipUpdateTimestamp(chainID walletCommon.ChainID) (int64, error) {
+	query := `SELECT MAX(timestamp)
+		FROM collectibles_ownership_update_timestamps
+		WHERE chain_id = ?`
+
+	stmt, err := o.db.Prepare(query)
+	if err != nil {
+		return InvalidTimestamp, err
+	}
+	defer stmt.Close()
+
+	row := stmt.QueryRow(chainID)
+
+	var timestamp sql.NullInt64
+
+	err = row.Scan(&timestamp)
+
+	if err != nil {
+		return InvalidTimestamp, err
+	}
+	if timestamp.Valid {
+		return timestamp.Int64, nil
+	}
+
+	return InvalidTimestamp, nil
+}

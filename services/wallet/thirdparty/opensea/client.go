@@ -8,16 +8,10 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/event"
 
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/connection"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/walletevent"
-)
-
-const (
-	EventOpenseaV1StatusChanged walletevent.EventType = "wallet-collectible-opensea-v1-status-changed"
 )
 
 const AssetLimit = 200
@@ -46,6 +40,10 @@ func (o *Client) IsChainSupported(chainID walletCommon.ChainID) bool {
 	return err == nil
 }
 
+func (o *Client) IsConnected() bool {
+	return o.connectionStatus.IsConnected()
+}
+
 func getURL(chainID walletCommon.ChainID, path string) (string, error) {
 	baseURL, err := getBaseURL(chainID)
 	if err != nil {
@@ -63,11 +61,11 @@ type Client struct {
 }
 
 // new opensea v1 client.
-func NewClient(apiKey string, httpClient *HTTPClient, feed *event.Feed) *Client {
+func NewClient(apiKey string, httpClient *HTTPClient) *Client {
 	return &Client{
 		client:           httpClient,
 		apiKey:           apiKey,
-		connectionStatus: connection.NewStatus(EventOpenseaV1StatusChanged, feed),
+		connectionStatus: connection.NewStatus(),
 		urlGetter:        getURL,
 	}
 }

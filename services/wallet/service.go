@@ -109,8 +109,8 @@ func NewService(
 	blockChainState := NewBlockChainState(rpcClient, accountsDB)
 
 	openseaHTTPClient := opensea.NewHTTPClient()
-	openseaClient := opensea.NewClient(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient, feed)
-	openseaV2Client := opensea.NewClientV2(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient, feed)
+	openseaClient := opensea.NewClient(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient)
+	openseaV2Client := opensea.NewClientV2(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient)
 	infuraClient := infura.NewClient(config.WalletConfig.InfuraAPIKey, config.WalletConfig.InfuraAPIKeySecret)
 	alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKeys)
 
@@ -140,7 +140,7 @@ func NewService(
 		alchemyClient,
 	}
 
-	collectiblesManager := collectibles.NewManager(db, rpcClient, contractOwnershipProviders, accountOwnershipProviders, collectibleDataProviders, collectionDataProviders, openseaClient)
+	collectiblesManager := collectibles.NewManager(db, rpcClient, contractOwnershipProviders, accountOwnershipProviders, collectibleDataProviders, collectionDataProviders, openseaClient, feed)
 	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, rpcClient.NetworkManager, collectiblesManager)
 
 	activity := activity.NewService(db, tokenManager, collectiblesManager, feed)

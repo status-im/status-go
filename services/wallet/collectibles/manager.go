@@ -14,18 +14,23 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/connection"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
+	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
 const requestTimeout = 5 * time.Second
 
 const hystrixContractOwnershipClientName = "contractOwnershipClient"
+
+const EventCollectiblesConnectionStatusChanged walletevent.EventType = "wallet-collectible-status-changed"
 
 // ERC721 does not support function "TokenURI" if call
 // returns error starting with one of these strings
@@ -35,6 +40,7 @@ var noTokenURIErrorPrefixes = []string{
 }
 
 var (
+	ErrAllProvidersFailedForChainID   = errors.New("all providers failed for chainID")
 	ErrNoProvidersAvailableForChainID = errors.New("no providers available for chainID")
 )
 
@@ -48,12 +54,18 @@ type Manager struct {
 	accountOwnershipProviders  []thirdparty.CollectibleAccountOwnershipProvider
 	collectibleDataProviders   []thirdparty.CollectibleDataProvider
 	collectionDataProviders    []thirdparty.CollectionDataProvider
+	collectibleProviders       []thirdparty.CollectibleProvider
 	metadataProvider           thirdparty.CollectibleMetadataProvider
 	communityInfoProvider      thirdparty.CollectibleCommunityInfoProvider
-	opensea                    *opensea.Client
-	httpClient                 *http.Client
-	collectiblesDataDB         *CollectibleDataDB
-	collectionsDataDB          *CollectionDataDB
+
+	opensea    *opensea.Client
+	httpClient *http.Client
+
+	collectiblesDataDB *CollectibleDataDB
+	collectionsDataDB  *CollectionDataDB
+
+	statuses       map[string]*connection.Status
+	statusNotifier *connection.StatusNotifier
 }
 
 func NewManager(
@@ -63,7 +75,8 @@ func NewManager(
 	accountOwnershipProviders []thirdparty.CollectibleAccountOwnershipProvider,
 	collectibleDataProviders []thirdparty.CollectibleDataProvider,
 	collectionDataProviders []thirdparty.CollectionDataProvider,
-	opensea *opensea.Client) *Manager {
+	opensea *opensea.Client,
+	feed *event.Feed) *Manager {
 	hystrix.ConfigureCommand(hystrixContractOwnershipClientName, hystrix.CommandConfig{
 		Timeout:               10000,
 		MaxConcurrentRequests: 100,
@@ -71,18 +84,62 @@ func NewManager(
 		ErrorPercentThreshold: 25,
 	})
 
+	ownershipDB := NewOwnershipDB(db)
+
+	statuses := make(map[string]*connection.Status)
+
+	allChainIDs := walletCommon.AllChainIDs()
+	for _, chainID := range allChainIDs {
+		status := connection.NewStatus()
+		state := status.GetState()
+		latestUpdateTimestamp, err := ownershipDB.GetLatestOwnershipUpdateTimestamp(chainID)
+		if err == nil {
+			state.LastSuccessAt = latestUpdateTimestamp
+			status.SetState(state)
+		}
+		statuses[chainID.String()] = status
+	}
+
+	statusNotifier := connection.NewStatusNotifier(
+		statuses,
+		EventCollectiblesConnectionStatusChanged,
+		feed,
+	)
+
+	// Get list of all providers
+	collectibleProvidersMap := make(map[string]thirdparty.CollectibleProvider)
+	collectibleProviders := make([]thirdparty.CollectibleProvider, 0)
+	for _, provider := range contractOwnershipProviders {
+		collectibleProvidersMap[provider.ID()] = provider
+	}
+	for _, provider := range accountOwnershipProviders {
+		collectibleProvidersMap[provider.ID()] = provider
+	}
+	for _, provider := range collectibleDataProviders {
+		collectibleProvidersMap[provider.ID()] = provider
+	}
+	for _, provider := range collectionDataProviders {
+		collectibleProvidersMap[provider.ID()] = provider
+	}
+	for _, provider := range collectibleProvidersMap {
+		collectibleProviders = append(collectibleProviders, provider)
+	}
+
 	return &Manager{
 		rpcClient:                  rpcClient,
 		contractOwnershipProviders: contractOwnershipProviders,
 		accountOwnershipProviders:  accountOwnershipProviders,
 		collectibleDataProviders:   collectibleDataProviders,
 		collectionDataProviders:    collectionDataProviders,
+		collectibleProviders:       collectibleProviders,
 		opensea:                    opensea,
 		httpClient: &http.Client{
 			Timeout: requestTimeout,
 		},
 		collectiblesDataDB: NewCollectibleDataDB(db),
 		collectionsDataDB:  NewCollectionDataDB(db),
+		statuses:           statuses,
+		statusNotifier:     statusNotifier,
 	}
 }
 
@@ -216,14 +273,19 @@ func (o *Manager) FetchBalancesByOwnerAndContractAddress(chainID walletCommon.Ch
 }
 
 func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
+	defer o.checkConnectionStatus(chainID)
+
+	anyProviderAvailable := false
 	for _, provider := range o.accountOwnershipProviders {
 		if !provider.IsChainSupported(chainID) {
 			continue
 		}
+		anyProviderAvailable = true
 
 		assetContainer, err := provider.FetchAllAssetsByOwnerAndContractAddress(chainID, owner, contractAddresses, cursor, limit)
 		if err != nil {
-			return nil, err
+			log.Error("FetchAllAssetsByOwnerAndContractAddress failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
+			continue
 		}
 
 		err = o.processFullCollectibleData(assetContainer.Items)
@@ -234,10 +296,16 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.C
 		return assetContainer, nil
 	}
 
+	if anyProviderAvailable {
+		return nil, ErrAllProvidersFailedForChainID
+	}
 	return nil, ErrNoProvidersAvailableForChainID
 }
 
 func (o *Manager) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
+	defer o.checkConnectionStatus(chainID)
+
+	anyProviderAvailable := false
 	for _, provider := range o.accountOwnershipProviders {
 		if !provider.IsChainSupported(chainID) {
 			continue
@@ -245,7 +313,8 @@ func (o *Manager) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner comm
 
 		assetContainer, err := provider.FetchAllAssetsByOwner(chainID, owner, cursor, limit)
 		if err != nil {
-			return nil, err
+			log.Error("FetchAllAssetsByOwner failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
+			continue
 		}
 
 		err = o.processFullCollectibleData(assetContainer.Items)
@@ -256,6 +325,9 @@ func (o *Manager) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner comm
 		return assetContainer, nil
 	}
 
+	if anyProviderAvailable {
+		return nil, ErrAllProvidersFailedForChainID
+	}
 	return nil, ErrNoProvidersAvailableForChainID
 }
 
@@ -280,6 +352,8 @@ func (o *Manager) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.Collec
 	missingIDsPerChainID := thirdparty.GroupCollectibleUIDsByChainID(missingIDs)
 
 	for chainID, idsToFetch := range missingIDsPerChainID {
+		defer o.checkConnectionStatus(chainID)
+
 		for _, provider := range o.collectibleDataProviders {
 			if !provider.IsChainSupported(chainID) {
 				continue
@@ -287,7 +361,8 @@ func (o *Manager) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.Collec
 
 			fetchedAssets, err := provider.FetchAssetsByCollectibleUniqueID(idsToFetch)
 			if err != nil {
-				return nil, err
+				log.Error("FetchAssetsByCollectibleUniqueID failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
+				continue
 			}
 
 			err = o.processFullCollectibleData(fetchedAssets)
@@ -311,6 +386,8 @@ func (o *Manager) FetchCollectionsDataByContractID(ids []thirdparty.ContractID) 
 	missingIDsPerChainID := thirdparty.GroupContractIDsByChainID(missingIDs)
 
 	for chainID, idsToFetch := range missingIDsPerChainID {
+		defer o.checkConnectionStatus(chainID)
+
 		for _, provider := range o.collectionDataProviders {
 			if !provider.IsChainSupported(chainID) {
 				continue
@@ -318,7 +395,8 @@ func (o *Manager) FetchCollectionsDataByContractID(ids []thirdparty.ContractID) 
 
 			fetchedCollections, err := provider.FetchCollectionsDataByContractID(idsToFetch)
 			if err != nil {
-				return nil, err
+				log.Error("FetchCollectionsDataByContractID failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
+				continue
 			}
 
 			err = o.processCollectionData(fetchedCollections)
@@ -362,11 +440,17 @@ func getCollectibleOwnersByContractAddressFunc(chainID walletCommon.ChainID, con
 		return nil
 	}
 	return func() (any, error) {
-		return provider.FetchCollectibleOwnersByContractAddress(chainID, contractAddress)
+		res, err := provider.FetchCollectibleOwnersByContractAddress(chainID, contractAddress)
+		if err != nil {
+			log.Error("FetchCollectibleOwnersByContractAddress failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
+		}
+		return res, err
 	}
 }
 
 func (o *Manager) FetchCollectibleOwnersByContractAddress(chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
+	defer o.checkConnectionStatus(chainID)
+
 	mainProvider, fallbackProvider := o.getContractOwnershipProviders(chainID)
 	if mainProvider == nil {
 		return nil, ErrNoProvidersAvailableForChainID
@@ -381,7 +465,6 @@ func (o *Manager) FetchCollectibleOwnersByContractAddress(chainID walletCommon.C
 	}
 
 	return owners.(*thirdparty.CollectibleContractOwnership), nil
-
 }
 
 func isMetadataEmpty(asset thirdparty.CollectibleData) bool {
@@ -591,4 +674,22 @@ func (o *Manager) FetchCollectibleCommunityTraits(communityID string, id thirdpa
 	}
 
 	return traits, nil
+}
+
+// Reset connection status to trigger notifications
+// on the next status update
+func (o *Manager) ResetConnectionStatus() {
+	for _, status := range o.statuses {
+		status.ResetStateValue()
+	}
+}
+
+func (o *Manager) checkConnectionStatus(chainID walletCommon.ChainID) {
+	for _, provider := range o.collectibleProviders {
+		if provider.IsChainSupported(chainID) && provider.IsConnected() {
+			o.statuses[chainID.String()].SetIsConnected(true)
+			return
+		}
+	}
+	o.statuses[chainID.String()].SetIsConnected(false)
 }

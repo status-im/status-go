@@ -190,6 +190,7 @@ func (s *Service) GetCollectiblesDetailsAsync(requestID int32, uniqueIDs []third
 
 func (s *Service) RefetchOwnedCollectibles() {
 	s.stopPeriodicalOwnershipFetch()
+	s.manager.ResetConnectionStatus()
 	_ = s.startPeriodicalOwnershipFetch()
 }
 
