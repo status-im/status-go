@@ -1,6 +1,9 @@
 package common
 
-import "time"
+import (
+	"strconv"
+	"time"
+)
 
 type ChainID uint64
 
@@ -14,6 +17,22 @@ const (
 	ArbitrumMainnet uint64 = 42161
 	ArbitrumGoerli  uint64 = 421613
 )
+
+func (c ChainID) String() string {
+	return strconv.Itoa(int(c))
+}
+
+func AllChainIDs() []ChainID {
+	return []ChainID{
+		ChainID(EthereumMainnet),
+		ChainID(EthereumGoerli),
+		ChainID(EthereumSepolia),
+		ChainID(OptimismMainnet),
+		ChainID(OptimismGoerli),
+		ChainID(ArbitrumMainnet),
+		ChainID(ArbitrumGoerli),
+	}
+}
 
 var AverageBlockDurationForChain = map[ChainID]time.Duration{
 	ChainID(UnknownChainID):  time.Duration(12000) * time.Millisecond,

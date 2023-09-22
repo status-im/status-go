@@ -20,6 +20,7 @@ const FetchFromStartCursor = ""
 type CollectibleProvider interface {
 	ID() string
 	IsChainSupported(chainID w_common.ChainID) bool
+	IsConnected() bool
 }
 
 type ContractID struct {

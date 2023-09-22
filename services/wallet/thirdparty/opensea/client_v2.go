@@ -8,16 +8,10 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/event"
 
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/connection"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/walletevent"
-)
-
-const (
-	EventOpenseaV2StatusChanged walletevent.EventType = "wallet-collectible-opensea-v2-status-changed"
 )
 
 const assetLimitV2 = 50
@@ -42,6 +36,10 @@ func (o *ClientV2) IsChainSupported(chainID walletCommon.ChainID) bool {
 	return err == nil
 }
 
+func (o *ClientV2) IsConnected() bool {
+	return o.connectionStatus.IsConnected()
+}
+
 func getV2URL(chainID walletCommon.ChainID, path string) (string, error) {
 	baseURL, err := getV2BaseURL(chainID)
 	if err != nil {
@@ -59,11 +57,11 @@ type ClientV2 struct {
 }
 
 // new opensea v2 client.
-func NewClientV2(apiKey string, httpClient *HTTPClient, feed *event.Feed) *ClientV2 {
+func NewClientV2(apiKey string, httpClient *HTTPClient) *ClientV2 {
 	return &ClientV2{
 		client:           httpClient,
 		apiKey:           apiKey,
-		connectionStatus: connection.NewStatus(EventOpenseaV2StatusChanged, feed),
+		connectionStatus: connection.NewStatus(),
 		urlGetter:        getV2URL,
 	}
 }

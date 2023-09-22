@@ -3,54 +3,71 @@ package connection
 import (
 	"sync"
 	"time"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
+type StateChangeCb func(State)
+
 type Status struct {
-	eventType       walletevent.EventType
-	feed            *event.Feed
-	isConnected     bool
-	lastCheckedAt   int64
-	isConnectedLock sync.RWMutex
+	stateChangeCb StateChangeCb
+	state         State
+	stateLock     sync.RWMutex
 }
 
-func NewStatus(eventType walletevent.EventType, feed *event.Feed) *Status {
+func NewStatus() *Status {
 	return &Status{
-		eventType:     eventType,
-		feed:          feed,
-		isConnected:   true,
-		lastCheckedAt: time.Now().Unix(),
+		state: NewState(),
 	}
+}
+
+func (c *Status) SetStateChangeCb(stateChangeCb StateChangeCb) {
+	c.stateChangeCb = stateChangeCb
 }
 
 func (c *Status) SetIsConnected(value bool) {
-	c.isConnectedLock.Lock()
-	defer c.isConnectedLock.Unlock()
+	now := time.Now().Unix()
 
-	c.lastCheckedAt = time.Now().Unix()
-	if value != c.isConnected {
-		message := "down"
-		if value {
-			message = "up"
-		}
-		if c.feed != nil {
-			c.feed.Send(walletevent.Event{
-				Type:     c.eventType,
-				Accounts: []common.Address{},
-				Message:  message,
-				At:       time.Now().Unix(),
-			})
-		}
+	state := c.GetState()
+	state.LastCheckedAt = now
+	if value {
+		state.LastSuccessAt = now
 	}
-	c.isConnected = value
+	if value {
+		state.Value = StateValueConnected
+	} else {
+		state.Value = StateValueDisconnected
+	}
+
+	c.SetState(state)
+}
+
+func (c *Status) ResetStateValue() {
+	state := c.GetState()
+	state.Value = StateValueUnknown
+	c.SetState(state)
+}
+
+func (c *Status) GetState() State {
+	c.stateLock.RLock()
+	defer c.stateLock.RUnlock()
+
+	return c.state
+}
+
+func (c *Status) SetState(state State) {
+	c.stateLock.Lock()
+	isStateChange := c.state.Value != state.Value
+	c.state = state
+	c.stateLock.Unlock()
+
+	if isStateChange && c.stateChangeCb != nil {
+		c.stateChangeCb(state)
+	}
+}
+
+func (c *Status) GetStateValue() StateValue {
+	return c.GetState().Value
 }
 
 func (c *Status) IsConnected() bool {
-	c.isConnectedLock.RLock()
-	defer c.isConnectedLock.RUnlock()
-
-	return c.isConnected
+	return c.GetStateValue() == StateValueConnected
 }

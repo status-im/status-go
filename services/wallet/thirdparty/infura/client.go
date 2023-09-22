@@ -6,11 +6,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/connection"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 )
 
@@ -18,17 +18,17 @@ const baseURL = "https://nft.api.infura.io"
 
 type Client struct {
 	thirdparty.CollectibleContractOwnershipProvider
-	client          *http.Client
-	apiKey          string
-	apiKeySecret    string
-	IsConnected     bool
-	IsConnectedLock sync.RWMutex
+	client           *http.Client
+	apiKey           string
+	apiKeySecret     string
+	connectionStatus *connection.Status
 }
 
 func NewClient(apiKey string, apiKeySecret string) *Client {
 	return &Client{
-		client: &http.Client{Timeout: time.Minute},
-		apiKey: apiKey,
+		client:           &http.Client{Timeout: time.Minute},
+		apiKey:           apiKey,
+		connectionStatus: connection.NewStatus(),
 	}
 }
 
@@ -62,6 +62,10 @@ func (o *Client) IsChainSupported(chainID walletCommon.ChainID) bool {
 	return false
 }
 
+func (o *Client) IsConnected() bool {
+	return o.connectionStatus.IsConnected()
+}
+
 func (o *Client) FetchCollectibleOwnersByContractAddress(chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
 	cursor := ""
 	ownersMap := make(map[common.Address][]CollectibleOwner)
@@ -75,8 +79,10 @@ func (o *Client) FetchCollectibleOwnersByContractAddress(chainID walletCommon.Ch
 
 		resp, err := o.doQuery(url)
 		if err != nil {
+			o.connectionStatus.SetIsConnected(false)
 			return nil, err
 		}
+		o.connectionStatus.SetIsConnected(true)
 
 		defer resp.Body.Close()
 
@@ -141,8 +147,10 @@ func (o *Client) fetchOwnedAssets(chainID walletCommon.ChainID, owner common.Add
 
 		resp, err := o.doQuery(url)
 		if err != nil {
+			o.connectionStatus.SetIsConnected(false)
 			return nil, err
 		}
+		o.connectionStatus.SetIsConnected(true)
 
 		defer resp.Body.Close()
 
@@ -187,8 +195,10 @@ func (o *Client) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.Collect
 
 		resp, err := o.doQuery(url)
 		if err != nil {
+			o.connectionStatus.SetIsConnected(false)
 			return nil, err
 		}
+		o.connectionStatus.SetIsConnected(true)
 
 		defer resp.Body.Close()
 
@@ -224,8 +234,10 @@ func (o *Client) FetchCollectionsDataByContractID(contractIDs []thirdparty.Contr
 
 		resp, err := o.doQuery(url)
 		if err != nil {
+			o.connectionStatus.SetIsConnected(false)
 			return nil, err
 		}
+		o.connectionStatus.SetIsConnected(true)
 
 		defer resp.Body.Close()
 

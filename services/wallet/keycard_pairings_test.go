@@ -8,10 +8,15 @@ import (
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/walletdatabase"
 )
 
 func TestKeycardPairingsFile(t *testing.T) {
-	service := NewService(nil, nil, &rpc.Client{}, nil, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil)
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	service := NewService(db, nil, &rpc.Client{}, nil, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil)
 
 	data, err := service.KeycardPairings().GetPairingsJSONFileContent()
 	require.NoError(t, err)
