@@ -381,3 +381,62 @@ func (s *AdminCommunityEventsSuite) TestReceiveRequestsToJoinWithRevealedAccount
 	bob := s.newMessenger(accountPassword, []string{bobAccountAddress})
 	testMemberReceiveRequestsToJoinAfterGettingNewRole(s, bob, protobuf.CommunityTokenPermission_BECOME_ADMIN)
 }
+
+func (s *AdminCommunityEventsSuite) TestAdminDoesNotHaveRejectedEventsLoop() {
+	community := setUpCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN)
+
+	// admin modifies community description
+	adminEditRequest := &requests.EditCommunity{
+		CommunityID: community.ID(),
+		CreateCommunity: requests.CreateCommunity{
+			Name:        "admin name",
+			Description: "admin description",
+			Color:       "#FFFFFF",
+			Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		},
+	}
+	_, err := s.admin.EditCommunity(adminEditRequest)
+	s.Require().NoError(err)
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+
+	// Update community clock without publishing new CommunityDescription
+	err = community.DeclineRequestToJoin(nil)
+	s.Require().NoError(err)
+
+	err = s.owner.communitiesManager.SaveCommunity(community)
+	s.Require().NoError(err)
+
+	waitOnAdminEventsRejection := waitOnCommunitiesEvent(s.owner, func(s *communities.Subscription) bool {
+		return s.CommunityEventsMessageInvalidClock != nil
+	})
+
+	// control node receives admin event and rejects it
+	_, err = WaitOnMessengerResponse(s.owner, func(response *MessengerResponse) bool {
+		select {
+		case err := <-waitOnAdminEventsRejection:
+			s.Require().NoError(err)
+			return true
+		default:
+			return false
+		}
+	}, "")
+	s.Require().NoError(err)
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotEqual(adminEditRequest.Description, community.DescriptionText())
+
+	// admin receives rejected events and re-applies them
+	// there is no signal whatsoever, we just wait for admin to process all incoming messages
+	_, _ = WaitOnMessengerResponse(s.admin, func(response *MessengerResponse) bool {
+		return false
+	}, "")
+
+	// control node does not receives admin event
+	_, err = WaitOnMessengerResponse(s.owner, func(response *MessengerResponse) bool {
+		return len(response.Communities()) > 0
+	}, "no communities in response")
+	s.Require().Error(err)
+}
