@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/mock"
+	"golang.org/x/exp/slices" // since 1.21, this is in the standard library
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum"
@@ -25,6 +27,7 @@ import (
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/wallet/async"
 	"github.com/status-im/status-go/services/wallet/balance"
+	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/status-im/status-go/params"
@@ -39,17 +42,19 @@ import (
 type TestClient struct {
 	t *testing.T
 	// [][block, newBalance, nonceDiff]
-	balances               [][]int
-	outgoingERC20Transfers []testERC20Transfer
-	incomingERC20Transfers []testERC20Transfer
-	balanceHistory         map[uint64]*big.Int
-	tokenBalanceHistory    map[common.Address]map[uint64]*big.Int
-	nonceHistory           map[uint64]uint64
-	traceAPICalls          bool
-	printPreparedData      bool
-	rw                     sync.RWMutex
-	callsCounter           map[string]int
-	currentBlock           uint64
+	balances                       [][]int
+	outgoingERC20Transfers         []testERC20Transfer
+	incomingERC20Transfers         []testERC20Transfer
+	outgoingERC1155SingleTransfers []testERC20Transfer
+	incomingERC1155SingleTransfers []testERC20Transfer
+	balanceHistory                 map[uint64]*big.Int
+	tokenBalanceHistory            map[common.Address]map[uint64]*big.Int
+	nonceHistory                   map[uint64]uint64
+	traceAPICalls                  bool
+	printPreparedData              bool
+	rw                             sync.RWMutex
+	callsCounter                   map[string]int
+	currentBlock                   uint64
 }
 
 func (tc *TestClient) incCounter(method string) {
@@ -126,11 +131,36 @@ func (tc *TestClient) FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([
 	if tc.traceAPICalls {
 		tc.t.Log("FilterLogs")
 	}
-	//checking only ERC20 for now
-	incomingAddress := q.Topics[len(q.Topics)-1]
-	allTransfers := tc.incomingERC20Transfers
-	if len(incomingAddress) == 0 {
-		allTransfers = tc.outgoingERC20Transfers
+
+	// We do not verify addresses for now
+	allTransfers := []testERC20Transfer{}
+	signatures := q.Topics[0]
+	erc20TransferSignature := w_common.GetEventSignatureHash(w_common.Erc20_721TransferEventSignature)
+	erc1155TransferSingleSignature := w_common.GetEventSignatureHash(w_common.Erc1155TransferSingleEventSignature)
+	if slices.Contains(signatures, erc1155TransferSingleSignature) {
+		from := q.Topics[2]
+		var to []common.Hash
+		if len(q.Topics) > 3 {
+			to = q.Topics[3]
+		}
+
+		if len(to) > 0 {
+			allTransfers = append(allTransfers, tc.incomingERC1155SingleTransfers...)
+		}
+		if len(from) > 0 {
+			allTransfers = append(allTransfers, tc.outgoingERC1155SingleTransfers...)
+		}
+	}
+
+	if slices.Contains(signatures, erc20TransferSignature) {
+		from := q.Topics[1]
+		to := q.Topics[2]
+		if len(to) > 0 {
+			allTransfers = append(allTransfers, tc.incomingERC20Transfers...)
+		}
+		if len(from) > 0 {
+			allTransfers = append(allTransfers, tc.outgoingERC20Transfers...)
+		}
 	}
 
 	logs := []types.Log{}
@@ -341,6 +371,15 @@ func (tc *TestClient) prepareTokenBalanceHistory(toBlock int) {
 		transfersPerToken[transfer.address] = append(transfersPerToken[transfer.address], transfer)
 	}
 
+	for _, transfer := range tc.outgoingERC1155SingleTransfers {
+		transfer.amount = new(big.Int).Neg(transfer.amount)
+		transfersPerToken[transfer.address] = append(transfersPerToken[transfer.address], transfer)
+	}
+
+	for _, transfer := range tc.incomingERC1155SingleTransfers {
+		transfersPerToken[transfer.address] = append(transfersPerToken[transfer.address], transfer)
+	}
+
 	tc.tokenBalanceHistory = map[common.Address]map[uint64]*big.Int{}
 
 	for token, transfers := range transfersPerToken {
@@ -539,16 +578,18 @@ type testERC20Transfer struct {
 }
 
 type findBlockCase struct {
-	balanceChanges         [][]int
-	ERC20BalanceChanges    [][]int
-	fromBlock              int64
-	toBlock                int64
-	rangeSize              int
-	expectedBlocksFound    int
-	outgoingERC20Transfers []testERC20Transfer
-	incomingERC20Transfers []testERC20Transfer
-	label                  string
-	expectedCalls          map[string]int
+	balanceChanges                 [][]int
+	ERC20BalanceChanges            [][]int
+	fromBlock                      int64
+	toBlock                        int64
+	rangeSize                      int
+	expectedBlocksFound            int
+	outgoingERC20Transfers         []testERC20Transfer
+	incomingERC20Transfers         []testERC20Transfer
+	outgoingERC1155SingleTransfers []testERC20Transfer
+	incomingERC1155SingleTransfers []testERC20Transfer
+	label                          string
+	expectedCalls                  map[string]int
 }
 
 func transferInEachBlock() [][]int {
@@ -577,11 +618,7 @@ func getCases() []findBlockCase {
 		toBlock:             100,
 		expectedBlocksFound: 6,
 		expectedCalls: map[string]int{
-			"BalanceAt": 27,
-			//TODO(rasom) NonceAt is flaky, sometimes it's called 18 times, sometimes 17
-			//to be investigated
-			//"NonceAt":        18,
-			"FilterLogs":     10,
+			"FilterLogs":     15,
 			"HeaderByNumber": 5,
 		},
 	}
@@ -593,7 +630,7 @@ func getCases() []findBlockCase {
 		expectedCalls: map[string]int{
 			"BalanceAt":      101,
 			"NonceAt":        0,
-			"FilterLogs":     10,
+			"FilterLogs":     15,
 			"HeaderByNumber": 100,
 		},
 	}
@@ -660,7 +697,7 @@ func getCases() []findBlockCase {
 			{big.NewInt(6), tokenTXXAddress, big.NewInt(1)},
 		},
 		expectedCalls: map[string]int{
-			"FilterLogs":   3,
+			"FilterLogs":   5,
 			"CallContract": 3,
 		},
 	}
@@ -677,8 +714,7 @@ func getCases() []findBlockCase {
 			{big.NewInt(6), tokenTXXAddress, big.NewInt(1)},
 		},
 		expectedCalls: map[string]int{
-			"FilterLogs":   3,
-			"CallContract": 5,
+			"FilterLogs": 5,
 		},
 	}
 
@@ -690,10 +726,113 @@ func getCases() []findBlockCase {
 		label:               "single block range, no transactions",
 		expectedCalls: map[string]int{
 			// only two requests to check the range for incoming ERC20
-			"FilterLogs": 2,
+			"FilterLogs": 3,
 			// no contract calls as ERC20 is not checked
 			"CallContract": 0,
 		},
+	}
+
+	case11IncomingERC1155SingleTransfers := findBlockCase{
+		balanceChanges: [][]int{},
+		toBlock:        100,
+		rangeSize:      20,
+		// we expect only a single eth_getLogs to be executed here for both erc20 transfers,
+		// thus only 2 blocks found
+		expectedBlocksFound: 2,
+		incomingERC1155SingleTransfers: []testERC20Transfer{
+			{big.NewInt(7), tokenTXYAddress, big.NewInt(1)},
+			{big.NewInt(6), tokenTXXAddress, big.NewInt(1)},
+		},
+		expectedCalls: map[string]int{
+			"FilterLogs":   5,
+			"CallContract": 5,
+		},
+	}
+
+	case12OutgoingERC1155SingleTransfers := findBlockCase{
+		balanceChanges: [][]int{
+			{6, 1, 0},
+		},
+		toBlock:             100,
+		rangeSize:           20,
+		expectedBlocksFound: 3,
+		outgoingERC1155SingleTransfers: []testERC20Transfer{
+			{big.NewInt(80), tokenTXYAddress, big.NewInt(1)},
+			{big.NewInt(6), tokenTXXAddress, big.NewInt(1)},
+		},
+		expectedCalls: map[string]int{
+			"FilterLogs": 15, // 3 for each range
+		},
+	}
+
+	case13outgoingERC20ERC1155SingleTransfers := findBlockCase{
+		balanceChanges: [][]int{
+			{63, 1, 0},
+		},
+		toBlock:             100,
+		rangeSize:           20,
+		expectedBlocksFound: 3,
+		outgoingERC1155SingleTransfers: []testERC20Transfer{
+			{big.NewInt(80), tokenTXYAddress, big.NewInt(1)},
+		},
+		outgoingERC20Transfers: []testERC20Transfer{
+			{big.NewInt(63), tokenTXYAddress, big.NewInt(1)},
+		},
+		expectedCalls: map[string]int{
+			"FilterLogs": 6, // 3 for each range, 0 for tail check becauseERC20ScanByBalance  returns no ranges
+		},
+	}
+
+	case14outgoingERC20ERC1155SingleTransfersMoreFilterLogs := findBlockCase{
+		balanceChanges: [][]int{
+			{61, 1, 0},
+		},
+		toBlock:             100,
+		rangeSize:           20,
+		expectedBlocksFound: 3,
+		outgoingERC1155SingleTransfers: []testERC20Transfer{
+			{big.NewInt(80), tokenTXYAddress, big.NewInt(1)},
+		},
+		outgoingERC20Transfers: []testERC20Transfer{
+			{big.NewInt(61), tokenTXYAddress, big.NewInt(1)},
+		},
+		expectedCalls: map[string]int{
+			"FilterLogs": 9, // 3 for each range of [40-100], 0 for tail check because ERC20ScanByBalance returns no ranges
+		},
+		label: "outgoing ERC20 and ERC1155 transfers but more FilterLogs calls because startFromBlock is not detected at range [60-80] as it is in the first subrange",
+	}
+
+	case15incomingERC20outgoingERC1155SingleTransfers := findBlockCase{
+		balanceChanges: [][]int{
+			{85, 1, 0},
+		},
+		toBlock:             100,
+		rangeSize:           20,
+		expectedBlocksFound: 2,
+		outgoingERC1155SingleTransfers: []testERC20Transfer{
+			{big.NewInt(85), tokenTXYAddress, big.NewInt(1)},
+		},
+		incomingERC20Transfers: []testERC20Transfer{
+			{big.NewInt(88), tokenTXYAddress, big.NewInt(1)},
+		},
+		expectedCalls: map[string]int{
+			"FilterLogs": 3, // 3 for each range of [40-100], 0 for tail check because ERC20ScanByBalance returns no ranges
+		},
+		label: "incoming ERC20 and outgoing ERC1155 transfers are fetched with same topic",
+	}
+
+	case16 := findBlockCase{
+		balanceChanges: [][]int{
+			{75, 0, 1},
+		},
+		outgoingERC20Transfers: []testERC20Transfer{
+			{big.NewInt(80), tokenTXXAddress, big.NewInt(4)},
+		},
+		toBlock:             100,
+		rangeSize:           20,
+		expectedBlocksFound: 3, // ideally we should find 2 blocks, but we will find 3 and this test shows that we are ok with that
+		label: `duplicate blocks detected but we wont fix it because we want to save requests on the edges of the ranges,
+		 taking balance and nonce from cache while ETH and tokens ranges searching are tightly coupled`,
 	}
 
 	cases = append(cases, case1)
@@ -707,6 +846,12 @@ func getCases() []findBlockCase {
 	cases = append(cases, case8emptyHistoryWithERC20Transfers)
 	cases = append(cases, case9emptyHistoryWithERC20Transfers)
 	cases = append(cases, case10)
+	cases = append(cases, case11IncomingERC1155SingleTransfers)
+	cases = append(cases, case12OutgoingERC1155SingleTransfers)
+	cases = append(cases, case13outgoingERC20ERC1155SingleTransfers)
+	cases = append(cases, case14outgoingERC20ERC1155SingleTransfersMoreFilterLogs)
+	cases = append(cases, case15incomingERC20outgoingERC1155SingleTransfers)
+	cases = append(cases, case16)
 
 	//cases = append([]findBlockCase{}, case10)
 
@@ -718,7 +863,7 @@ var tokenTXYAddress = common.HexToAddress("0x73211")
 
 func TestFindBlocksCommand(t *testing.T) {
 	for idx, testCase := range getCases() {
-		t.Log("case #", idx)
+		t.Log("case #", idx+1)
 		ctx := context.Background()
 		group := async.NewGroup(ctx)
 
@@ -728,11 +873,13 @@ func TestFindBlocksCommand(t *testing.T) {
 
 		wdb := NewDB(db)
 		tc := &TestClient{
-			t:                      t,
-			balances:               testCase.balanceChanges,
-			outgoingERC20Transfers: testCase.outgoingERC20Transfers,
-			incomingERC20Transfers: testCase.incomingERC20Transfers,
-			callsCounter:           map[string]int{},
+			t:                              t,
+			balances:                       testCase.balanceChanges,
+			outgoingERC20Transfers:         testCase.outgoingERC20Transfers,
+			incomingERC20Transfers:         testCase.incomingERC20Transfers,
+			outgoingERC1155SingleTransfers: testCase.outgoingERC1155SingleTransfers,
+			incomingERC1155SingleTransfers: testCase.incomingERC1155SingleTransfers,
+			callsCounter:                   map[string]int{},
 		}
 		//tc.traceAPICalls = true
 		//tc.printPreparedData = true

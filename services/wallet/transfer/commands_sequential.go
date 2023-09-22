@@ -281,6 +281,7 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 			break
 		}
 
+		// if we have found first ETH block and we have not reached the start of ETH history yet
 		if c.startBlockNumber != nil && c.fromBlockNumber.Cmp(from) == -1 {
 			log.Debug("ERC20 tail should be checked", "initial from", c.fromBlockNumber, "actual from", from, "first ETH block", c.startBlockNumber)
 			c.reachedETHHistoryStart = true
