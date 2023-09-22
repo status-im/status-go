@@ -19,4 +19,4 @@ func (s *Shard) TransportShard() *transport.Shard {
 }
 
 const MainStatusShard = 16
-const UndefinedShardValue = -1
+const UndefinedShardValue = 0

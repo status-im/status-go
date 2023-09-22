@@ -1151,8 +1151,8 @@ type CommunityRequestToJoinResponse struct {
 	CommunityId              []byte                `protobuf:"bytes,5,opt,name=community_id,json=communityId,proto3" json:"community_id,omitempty"`
 	MagnetUri                string                `protobuf:"bytes,6,opt,name=magnet_uri,json=magnetUri,proto3" json:"magnet_uri,omitempty"`
 	ProtectedTopicPrivateKey []byte                `protobuf:"bytes,7,opt,name=protected_topic_private_key,json=protectedTopicPrivateKey,proto3" json:"protected_topic_private_key,omitempty"`
-	ShardCluster             int32                 `protobuf:"varint,8,opt,name=shard_cluster,json=shardCluster,proto3" json:"shard_cluster,omitempty"`
-	ShardIndex               int32                 `protobuf:"varint,9,opt,name=shard_index,json=shardIndex,proto3" json:"shard_index,omitempty"`
+	ShardCluster             uint32                `protobuf:"varint,8,opt,name=shard_cluster,json=shardCluster,proto3" json:"shard_cluster,omitempty"`
+	ShardIndex               uint32                `protobuf:"varint,9,opt,name=shard_index,json=shardIndex,proto3" json:"shard_index,omitempty"`
 	XXX_NoUnkeyedLiteral     struct{}              `json:"-"`
 	XXX_unrecognized         []byte                `json:"-"`
 	XXX_sizecache            int32                 `json:"-"`
@@ -1232,14 +1232,14 @@ func (m *CommunityRequestToJoinResponse) GetProtectedTopicPrivateKey() []byte {
 	return nil
 }
 
-func (m *CommunityRequestToJoinResponse) GetShardCluster() int32 {
+func (m *CommunityRequestToJoinResponse) GetShardCluster() uint32 {
 	if m != nil {
 		return m.ShardCluster
 	}
 	return 0
 }
 
-func (m *CommunityRequestToJoinResponse) GetShardIndex() int32 {
+func (m *CommunityRequestToJoinResponse) GetShardIndex() uint32 {
 	if m != nil {
 		return m.ShardIndex
 	}
