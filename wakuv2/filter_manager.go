@@ -13,13 +13,14 @@ import (
 
 	"github.com/status-im/status-go/wakuv2/common"
 
+	"go.uber.org/zap"
+	"golang.org/x/exp/maps"
+
 	node "github.com/waku-org/go-waku/waku/v2/node"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/subscription"
-	"go.uber.org/zap"
-	"golang.org/x/exp/maps"
 )
 
 const (

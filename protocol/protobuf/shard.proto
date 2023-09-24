@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+option go_package = "./;protobuf";
+package protobuf;
+
+message Shard {
+    int32 cluster = 1;
+    int32 index = 2;
+}
+  

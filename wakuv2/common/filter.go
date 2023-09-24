@@ -23,9 +23,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
+
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"

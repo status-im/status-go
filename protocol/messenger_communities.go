@@ -1509,14 +1509,7 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 			Community:                community.Description(),
 			Grant:                    grant,
 			ProtectedTopicPrivateKey: crypto.FromECDSA(key),
-		}
-
-		if community.Shard() != nil {
-			requestToJoinResponseProto.ShardIndex = uint32(community.Shard().Index)
-			requestToJoinResponseProto.ShardCluster = uint32(community.Shard().Cluster)
-		} else {
-			requestToJoinResponseProto.ShardIndex = common.UndefinedShardValue
-			requestToJoinResponseProto.ShardCluster = common.UndefinedShardValue
+			Shard:                    community.Shard().Protobuffer(),
 		}
 
 		if m.torrentClientReady() && m.communitiesManager.TorrentFileExists(community.IDString()) {
@@ -2455,14 +2448,7 @@ func (m *Messenger) SendCommunityShardKey(community *communities.Community, pubk
 		Clock:       m.getTimesource().GetCurrentTime(),
 		CommunityId: community.ID(),
 		PrivateKey:  crypto.FromECDSA(key),
-	}
-
-	if community.Shard() != nil {
-		communityShardKey.ShardIndex = uint32(community.Shard().Index)
-		communityShardKey.ShardCluster = uint32(community.Shard().Cluster)
-	} else {
-		communityShardKey.ShardIndex = common.UndefinedShardValue
-		communityShardKey.ShardCluster = common.UndefinedShardValue
+		Shard:       community.Shard().Protobuffer(),
 	}
 
 	encodedMessage, err := proto.Marshal(communityShardKey)
@@ -2986,18 +2972,10 @@ func (m *Messenger) HandleCommunityShardKey(state *ReceivedMessageState, message
 		return communities.ErrNotAuthorized
 	}
 
-	return m.handleCommunityShardAndFiltersFromProto(community, message.ShardCluster, message.ShardIndex, message.PrivateKey)
+	return m.handleCommunityShardAndFiltersFromProto(community, common.ShardFromProtobuff(message.Shard), message.PrivateKey)
 }
 
-func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communities.Community, shardCluster uint32, shardIndex uint32, privateKeyBytes []byte) error {
-	var shard *common.Shard
-	if shardCluster != common.UndefinedShardValue && shardIndex != common.UndefinedShardValue {
-		shard = &common.Shard{
-			Cluster: uint16(shardCluster),
-			Index:   uint16(shardIndex),
-		}
-	}
-
+func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communities.Community, shard *common.Shard, privateKeyBytes []byte) error {
 	err := m.communitiesManager.UpdateShard(community, shard)
 	if err != nil {
 		return err

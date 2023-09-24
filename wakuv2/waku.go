@@ -1439,10 +1439,18 @@ func (w *Waku) SubscribeToPubsubTopic(topic string, pubkey *ecdsa.PublicKey) err
 }
 
 func (w *Waku) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
+	if w.protectedTopicStore == nil {
+		return nil, nil
+	}
+
 	return w.protectedTopicStore.FetchPrivateKey(topic)
 }
 
 func (w *Waku) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
+	if w.protectedTopicStore == nil {
+		return nil
+	}
+
 	return w.protectedTopicStore.Insert(topic, privKey, &privKey.PublicKey)
 }
 

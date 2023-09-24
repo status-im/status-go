@@ -1575,7 +1575,7 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 			return err
 		}
 
-		err = m.handleCommunityShardAndFiltersFromProto(community, requestToJoinResponseProto.ShardCluster, requestToJoinResponseProto.ShardIndex, requestToJoinResponseProto.ProtectedTopicPrivateKey)
+		err = m.handleCommunityShardAndFiltersFromProto(community, common.ShardFromProtobuff(requestToJoinResponseProto.Shard), requestToJoinResponseProto.ProtectedTopicPrivateKey)
 		if err != nil {
 			return err
 		}
@@ -2275,23 +2275,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 	if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
 		m.logger.Debug("Handling community content type")
 
-		var descriptionPayload []byte
-		var shard *common.Shard
-		communityShard := receivedMessage.GetCommunityShard()
-		if communityShard != nil {
-			descriptionPayload = communityShard.Community
-			if communityShard.ShardCluster != common.UndefinedShardValue && communityShard.ShardIndex != common.UndefinedShardValue {
-				shard = &common.Shard{
-					Cluster: uint16(communityShard.ShardCluster),
-					Index:   uint16(communityShard.ShardIndex),
-				}
-			}
-		} else {
-			// Handling deprecated message
-			descriptionPayload = receivedMessage.GetCommunityNoShard()
-		}
-
-		communityResponse, err := m.handleWrappedCommunityDescriptionMessage(descriptionPayload, shard)
+		communityResponse, err := m.handleWrappedCommunityDescriptionMessage(receivedMessage.GetCommunity(), common.ShardFromProtobuff(receivedMessage.Shard))
 		if err != nil {
 			return err
 		}
