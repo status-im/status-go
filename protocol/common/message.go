@@ -328,6 +328,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Replied                  bool                             `json:"replied,omitempty"`
 		Links                    []string                         `json:"links,omitempty"`
 		LinkPreviews             []LinkPreview                    `json:"linkPreviews,omitempty"`
+		StatusLinkPreviews       []StatusLinkPreview              `json:"statusLinkPreviews,omitempty"`
 		EditedAt                 uint64                           `json:"editedAt,omitempty"`
 		Deleted                  bool                             `json:"deleted,omitempty"`
 		DeletedBy                string                           `json:"deletedBy,omitempty"`
@@ -367,6 +368,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Replied:                  m.Replied,
 		Links:                    m.Links,
 		LinkPreviews:             m.LinkPreviews,
+		StatusLinkPreviews:       m.StatusLinkPreviews,
 		MessageType:              m.MessageType,
 		CommandParameters:        m.CommandParameters,
 		GapParameters:            m.GapParameters,
@@ -813,6 +815,39 @@ func isValidLinkPreviewForProto(preview LinkPreview) bool {
 	}
 }
 
+func (preview StatusLinkPreview) isValidForProto() bool {
+	if preview.URL == "" {
+		return false
+	}
+
+	// At least and only one of Contact/Community/Channel can be present in the preview
+	if preview.Contact != nil && preview.Community != nil ||
+		preview.Community != nil && preview.Channel != nil ||
+		preview.Channel != nil && preview.Contact != nil ||
+		preview.Contact == nil && preview.Community == nil && preview.Channel == nil {
+		return false
+	}
+
+	if preview.Contact != nil {
+		return preview.Contact.PublicKey != "" &&
+			isValidLinkPreviewThumbnail(preview.Contact.Icon)
+	}
+
+	if preview.Community != nil {
+		return preview.Community.CommunityID != "" &&
+			isValidLinkPreviewThumbnail(preview.Community.Icon) &&
+			isValidLinkPreviewThumbnail(preview.Community.Banner)
+	}
+
+	if preview.Channel != nil {
+		return preview.Channel.ChannelUUID != "" &&
+			isValidLinkPreviewThumbnail(preview.Channel.CommunityIcon) &&
+			isValidLinkPreviewThumbnail(preview.Channel.CommunityBanner)
+	}
+
+	return false
+}
+
 // ConvertLinkPreviewsToProto expects previews to be correctly sent by the
 // client because we can't attempt to re-unfurl URLs at this point (it's
 // actually undesirable). We run a basic validation as an additional safety net.
@@ -880,11 +915,179 @@ func (m *Message) ConvertFromProtoToLinkPreviews(makeMediaServerURL func(msgID s
 			Type:        link.Type,
 			URL:         link.Url,
 		}
-		if payload := link.GetThumbnailPayload(); payload != nil {
+		if link.GetThumbnailPayload() != nil {
 			lp.Thumbnail.Width = int(link.ThumbnailWidth)
 			lp.Thumbnail.Height = int(link.ThumbnailHeight)
 			lp.Thumbnail.URL = makeMediaServerURL(m.ID, link.Url)
 		}
+		previews = append(previews, lp)
+	}
+
+	return previews
+}
+
+func (preview *LinkPreviewThumbnail) ConvertToProto() (*protobuf.UnfurledLinkThumbnail, error) {
+	var payload []byte
+	var err error
+	if preview.DataURI != "" {
+		payload, err = images.GetPayloadFromURI(preview.DataURI)
+		if err != nil {
+			return nil, fmt.Errorf("could not get data URI payload, url='%s': %w", preview.URL, err)
+		}
+	}
+
+	return &protobuf.UnfurledLinkThumbnail{
+		Width:   uint32(preview.Width),
+		Height:  uint32(preview.Height),
+		Payload: payload,
+	}, nil
+}
+
+func (m *Message) ConvertStatusLinkPreviewsToProto() ([]*protobuf.UnfurledStatusLink, error) {
+	if len(m.StatusLinkPreviews) == 0 {
+		return nil, nil
+	}
+
+	unfurledLinks := make([]*protobuf.UnfurledStatusLink, 0, len(m.StatusLinkPreviews))
+
+	for _, preview := range m.StatusLinkPreviews {
+		// We do expect all previews to be valid at this stage
+		if !preview.isValidForProto() {
+			return nil, fmt.Errorf("invalid status link preview, url='%s'", preview.URL)
+		}
+
+		ul := &protobuf.UnfurledStatusLink{
+			Url: preview.URL,
+		}
+
+		if preview.Contact != nil {
+			icon, err := preview.Contact.Icon.ConvertToProto()
+			if err != nil {
+				return nil, err
+			}
+			ul.Payload = &protobuf.UnfurledStatusLink_Contact{
+				Contact: &protobuf.UnfurledStatusContactLink{
+					PublicKey:   preview.Contact.PublicKey,
+					DisplayName: preview.Contact.DisplayName,
+					Description: preview.Contact.Description,
+					Icon:        icon,
+				},
+			}
+		}
+
+		if preview.Community != nil {
+			icon, err := preview.Community.Icon.ConvertToProto()
+			if err != nil {
+				return nil, err
+			}
+			banner, err := preview.Community.Banner.ConvertToProto()
+			if err != nil {
+				return nil, err
+			}
+			ul.Payload = &protobuf.UnfurledStatusLink_Community{
+				Community: &protobuf.UnfurledStatusCommunityLink{
+					CommunityId:  preview.Community.CommunityID,
+					DisplayName:  preview.Community.DisplayName,
+					Description:  preview.Community.Description,
+					MembersCount: preview.Community.MembersCount,
+					Color:        preview.Community.Color,
+					TagIndices:   preview.Community.TagIndices,
+					Icon:         icon,
+					Banner:       banner,
+				},
+			}
+		}
+
+		if preview.Channel != nil {
+			icon, err := preview.Channel.CommunityIcon.ConvertToProto()
+			if err != nil {
+				return nil, err
+			}
+			banner, err := preview.Channel.CommunityBanner.ConvertToProto()
+			if err != nil {
+				return nil, err
+			}
+			ul.Payload = &protobuf.UnfurledStatusLink_Channel{
+				Channel: &protobuf.UnfurledStatusChannelLink{
+					ChannelUuid:     preview.Channel.ChannelUUID,
+					Emoji:           preview.Channel.Emoji,
+					DisplayName:     preview.Channel.DisplayName,
+					Description:     preview.Channel.Description,
+					Color:           preview.Channel.Color,
+					CommunityIcon:   icon,
+					CommunityBanner: banner,
+				},
+			}
+		}
+
+		unfurledLinks = append(unfurledLinks, ul)
+	}
+
+	return unfurledLinks, nil
+}
+
+func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(msgID string, previewURL string) string) []StatusLinkPreview {
+	var links []*protobuf.UnfurledStatusLink
+
+	if links = m.GetUnfurledStatusLinks(); links == nil {
+		return nil
+	}
+
+	createThumbnail := func(thumbnail *protobuf.UnfurledLinkThumbnail, URL string) LinkPreviewThumbnail {
+		return LinkPreviewThumbnail{
+			Width:  int(thumbnail.Width),
+			Height: int(thumbnail.Height),
+			URL:    makeMediaServerURL(m.ID, URL),
+		}
+	}
+
+	previews := make([]StatusLinkPreview, 0, len(links))
+	for _, link := range links {
+		lp := StatusLinkPreview{
+			URL: link.Url,
+		}
+
+		if c := link.GetContact(); c != nil {
+			lp.Contact = &StatusContactLinkPreview{
+				PublicKey:   c.PublicKey,
+				DisplayName: c.DisplayName,
+				Description: c.Description,
+			}
+			if icon := c.GetIcon(); icon != nil {
+				lp.Contact.Icon = createThumbnail(icon, link.Url)
+			}
+		}
+
+		if c := link.GetCommunity(); c != nil {
+			lp.Community = &StatusCommunityLinkPreview{
+				CommunityID:  c.CommunityId,
+				DisplayName:  c.DisplayName,
+				Description:  c.Description,
+				MembersCount: c.MembersCount,
+				Color:        c.Color,
+				TagIndices:   c.TagIndices,
+			}
+			if icon := c.GetIcon(); icon != nil {
+				lp.Community.Icon = createThumbnail(icon, link.Url)
+			}
+			if banner := c.GetBanner(); banner != nil {
+				lp.Community.Banner = createThumbnail(banner, link.Url)
+			}
+		}
+
+		if c := link.GetChannel(); c != nil {
+			lp.Channel = &StatusCommunityChannelLinkPreview{
+				ChannelUUID: c.ChannelUuid,
+				Emoji:       c.Emoji,
+				DisplayName: c.DisplayName,
+				Description: c.Description,
+				Color:       c.Color,
+			}
+			if icon := c.GetCommunityIcon(); icon != nil {
+				lp.Channel.CommunityIcon = createThumbnail(icon, link.Url)
+			}
+		}
+
 		previews = append(previews, lp)
 	}
 

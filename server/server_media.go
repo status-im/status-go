@@ -37,16 +37,17 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 		multiaccountsDB: multiaccountsDB,
 	}
 	s.SetHandlers(HandlerPatternMap{
-		accountImagesPath:        handleAccountImages(s.multiaccountsDB, s.logger),
-		accountInitialsPath:      handleAccountInitials(s.multiaccountsDB, s.logger),
-		audioPath:                handleAudio(s.db, s.logger),
-		contactImagesPath:        handleContactImages(s.db, s.logger),
-		discordAttachmentsPath:   handleDiscordAttachment(s.db, s.logger),
-		discordAuthorsPath:       handleDiscordAuthorAvatar(s.db, s.logger),
-		generateQRCode:           handleQRCodeGeneration(s.multiaccountsDB, s.logger),
-		imagesPath:               handleImage(s.db, s.logger),
-		ipfsPath:                 handleIPFS(s.downloader, s.logger),
-		LinkPreviewThumbnailPath: handleLinkPreviewThumbnail(s.db, s.logger),
+		accountImagesPath:              handleAccountImages(s.multiaccountsDB, s.logger),
+		accountInitialsPath:            handleAccountInitials(s.multiaccountsDB, s.logger),
+		audioPath:                      handleAudio(s.db, s.logger),
+		contactImagesPath:              handleContactImages(s.db, s.logger),
+		discordAttachmentsPath:         handleDiscordAttachment(s.db, s.logger),
+		discordAuthorsPath:             handleDiscordAuthorAvatar(s.db, s.logger),
+		generateQRCode:                 handleQRCodeGeneration(s.multiaccountsDB, s.logger),
+		imagesPath:                     handleImage(s.db, s.logger),
+		ipfsPath:                       handleIPFS(s.downloader, s.logger),
+		LinkPreviewThumbnailPath:       handleLinkPreviewThumbnail(s.db, s.logger),
+		StatusLinkPreviewThumbnailPath: handleLinkPreviewThumbnail(s.db, s.logger), // FIXME: Use a separate function
 	})
 
 	return s, nil
@@ -69,6 +70,13 @@ func (s *MediaServer) MakeImageURL(id string) string {
 func (s *MediaServer) MakeLinkPreviewThumbnailURL(msgID string, previewURL string) string {
 	u := s.MakeBaseURL()
 	u.Path = LinkPreviewThumbnailPath
+	u.RawQuery = url.Values{"message-id": {msgID}, "url": {previewURL}}.Encode()
+	return u.String()
+}
+
+func (s *MediaServer) MakeStatusLinkPreviewThumbnailURL(msgID string, previewURL string) string {
+	u := s.MakeBaseURL()
+	u.Path = StatusLinkPreviewThumbnailPath
 	u.RawQuery = url.Values{"message-id": {msgID}, "url": {previewURL}}.Encode()
 	return u.String()
 }

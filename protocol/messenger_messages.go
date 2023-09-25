@@ -71,6 +71,12 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 		}
 		editMessage.UnfurledLinks = unfurledLinks
 
+		unfurledStatusLinks, err := message.ConvertStatusLinkPreviewsToProto()
+		if err != nil {
+			return nil, err
+		}
+		editMessage.UnfurledStatusLinks = unfurledStatusLinks
+
 		err = m.applyEditMessage(editMessage.EditMessage, message)
 		if err != nil {
 			return nil, err

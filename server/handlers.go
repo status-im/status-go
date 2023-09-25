@@ -26,13 +26,18 @@ import (
 )
 
 const (
-	basePath                 = "/messages"
-	imagesPath               = basePath + "/images"
-	audioPath                = basePath + "/audio"
-	ipfsPath                 = "/ipfs"
-	discordAuthorsPath       = "/discord/authors"
-	discordAttachmentsPath   = basePath + "/discord/attachments"
-	LinkPreviewThumbnailPath = "/link-preview/thumbnail"
+	basePath                       = "/messages"
+	imagesPath                     = basePath + "/images"
+	audioPath                      = basePath + "/audio"
+	ipfsPath                       = "/ipfs"
+	discordAuthorsPath             = "/discord/authors"
+	discordAttachmentsPath         = basePath + "/discord/attachments"
+	LinkPreviewThumbnailPath       = "/link-preview/thumbnail"
+	StatusLinkPreviewThumbnailPath = "/status-link-preview/contact/icon"
+	//StatusLinkPreviewThumbnailPath = "/status-link-preview/community/icon"
+	//StatusLinkPreviewThumbnailPath = "/status-link-preview/community/banner"
+	//StatusLinkPreviewThumbnailPath = "/status-link-preview/channel/community-icon"
+	//StatusLinkPreviewThumbnailPath = "/status-link-preview/channel/community-banner"
 
 	// Handler routes for pairing
 	accountImagesPath   = "/accountImages"

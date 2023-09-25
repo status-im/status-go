@@ -48,6 +48,7 @@ message EditMessage {
 
   ChatMessage.ContentType content_type = 7;
   repeated UnfurledLink unfurled_links = 8;
+  repeated UnfurledStatusLink unfurled_status_links = 9;
 }
 
 message DeleteMessage {
@@ -108,6 +109,12 @@ message DiscordMessageAttachment {
   string localUrl = 8;
 }
 
+message UnfurledLinkThumbnail {
+  bytes payload = 1;
+  uint32 width = 2;
+  uint32 height = 3;
+}
+
 message UnfurledLink {
   // A valid URL which uniquely identifies this link.
   string url = 1;
@@ -124,6 +131,43 @@ message UnfurledLink {
   enum LinkType {
     LINK = 0;
     IMAGE = 1;
+  }
+}
+
+message UnfurledStatusContactLink {
+  string public_key = 1;
+  string display_name = 2;
+  string description = 3;
+  UnfurledLinkThumbnail icon = 4;
+}
+
+message UnfurledStatusCommunityLink {
+  string community_id = 1;
+  string display_name = 2;
+  string description = 3;
+  uint32 members_count = 4;
+  string color = 5;
+  repeated uint32 tag_indices = 6;
+  UnfurledLinkThumbnail icon = 7;
+  UnfurledLinkThumbnail banner = 8;
+}
+
+message UnfurledStatusChannelLink {
+  string channel_uuid = 1;
+  string emoji = 2;
+  string display_name = 3;
+  string description = 4;
+  string color = 5;
+  UnfurledLinkThumbnail community_icon = 6;
+  UnfurledLinkThumbnail community_banner = 7;
+}
+
+message UnfurledStatusLink {
+  string url = 1;
+  oneof payload {
+    UnfurledStatusContactLink contact = 2;
+    UnfurledStatusCommunityLink community = 3;
+    UnfurledStatusChannelLink channel = 4;
   }
 }
 
@@ -170,6 +214,8 @@ message ChatMessage {
   repeated UnfurledLink unfurled_links = 16;
 
   Shard shard = 17;
+
+  repeated UnfurledStatusLink unfurled_status_links = 18;
 
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;

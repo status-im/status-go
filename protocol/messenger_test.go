@@ -2312,6 +2312,21 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	}
 	inputMsg.LinkPreviews = []common.LinkPreview{preview}
 
+	statusPreview := common.StatusLinkPreview{
+		URL: "https://status.app/u/TestUrl",
+		Contact: &common.StatusContactLinkPreview{
+			PublicKey:   "TestPublicKey",
+			DisplayName: "TestDisplayName",
+			Description: "Test description",
+			Icon: common.LinkPreviewThumbnail{
+				Width:   100,
+				Height:  200,
+				DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+			},
+		},
+	}
+	inputMsg.StatusLinkPreviews = []common.StatusLinkPreview{statusPreview}
+
 	_, err = s.m.SendChatMessage(context.Background(), inputMsg)
 	s.NoError(err)
 
@@ -2337,6 +2352,13 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 		httpServer.MakeLinkPreviewThumbnailURL(inputMsg.ID, preview.URL),
 		savedMsg.LinkPreviews[0].Thumbnail.URL,
 	)
+
+	// Test unfurled status links have been saved
+	s.Require().Len(savedMsg.StatusLinkPreviews, 1)
+	unfurledStatusLink := savedMsg.StatusLinkPreviews[0]
+	s.Require().Equal(statusPreview.URL, unfurledStatusLink.URL)
+	s.Require().NotNil(statusPreview.Contact)
+	s.Require().Equal(statusPreview.Contact.PublicKey, unfurledStatusLink.Contact.PublicKey)
 }
 
 func (s *MessengerSuite) TestMessageSent() {

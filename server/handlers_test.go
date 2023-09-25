@@ -52,12 +52,16 @@ func createUserMessage(t *testing.T, db *sql.DB, msg *common.Message) {
 			local_chat_id,
 			response_to,
 			clock_value,
-			unfurled_links
-		) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+			unfurled_links,
+		    unfurled_status_links
+		) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
 	`)
 	require.NoError(t, err)
 
 	links, err := json.Marshal(msg.UnfurledLinks)
+	require.NoError(t, err)
+
+	statusLinks, err := json.Marshal(msg.UnfurledStatusLinks)
 	require.NoError(t, err)
 
 	_, err = stmt.Exec(
@@ -72,6 +76,7 @@ func createUserMessage(t *testing.T, db *sql.DB, msg *common.Message) {
 		responseTo,
 		clockValue,
 		links,
+		statusLinks,
 	)
 	require.NoError(t, err)
 }
