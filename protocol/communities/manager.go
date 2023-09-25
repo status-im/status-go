@@ -493,7 +493,19 @@ func (m *Manager) publish(subscription *Subscription) {
 }
 
 func (m *Manager) All() ([]*Community, error) {
-	return m.persistence.AllCommunities(&m.identity.PublicKey)
+	communities, err := m.persistence.AllCommunities(&m.identity.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range communities {
+		err = initializeCommunity(c)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return communities, nil
 }
 
 type KnownCommunitiesResponse struct {
@@ -529,23 +541,83 @@ func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []types.HexByt
 }
 
 func (m *Manager) Joined() ([]*Community, error) {
-	return m.persistence.JoinedCommunities(&m.identity.PublicKey)
+	communities, err := m.persistence.JoinedCommunities(&m.identity.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range communities {
+		err = initializeCommunity(c)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return communities, nil
 }
 
 func (m *Manager) Spectated() ([]*Community, error) {
-	return m.persistence.SpectatedCommunities(&m.identity.PublicKey)
+	communities, err := m.persistence.SpectatedCommunities(&m.identity.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range communities {
+		err = initializeCommunity(c)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return communities, nil
 }
 
 func (m *Manager) JoinedAndPendingCommunitiesWithRequests() ([]*Community, error) {
-	return m.persistence.JoinedAndPendingCommunitiesWithRequests(&m.identity.PublicKey)
+	communities, err := m.persistence.JoinedAndPendingCommunitiesWithRequests(&m.identity.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range communities {
+		err = initializeCommunity(c)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return communities, nil
 }
 
 func (m *Manager) DeletedCommunities() ([]*Community, error) {
-	return m.persistence.DeletedCommunities(&m.identity.PublicKey)
+	communities, err := m.persistence.DeletedCommunities(&m.identity.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range communities {
+		err = initializeCommunity(c)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return communities, nil
 }
 
 func (m *Manager) ControlledCommunities() ([]*Community, error) {
-	return m.persistence.CommunitiesWithPrivateKey(&m.identity.PublicKey)
+	communities, err := m.persistence.CommunitiesWithPrivateKey(&m.identity.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range communities {
+		err = initializeCommunity(c)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return communities, nil
 }
 
 // CreateCommunity takes a description, generates an ID for it, saves it and return it
@@ -959,7 +1031,7 @@ func (m *Manager) ExportCommunity(id types.HexBytes) (*ecdsa.PrivateKey, error) 
 func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey) (*Community, error) {
 	communityID := crypto.CompressPubkey(&key.PublicKey)
 
-	community, err := m.persistence.GetByID(&m.identity.PublicKey, communityID)
+	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
 	}
@@ -1244,10 +1316,13 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 
 	id := crypto.CompressPubkey(signer)
 
-	community, err := m.persistence.GetByID(&m.identity.PublicKey, id)
+	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
 	}
+
+	// Workaround for https://github.com/status-im/status-desktop/issues/12188
+	HydrateChannelsMembers(types.EncodeHex(id), description)
 
 	if community == nil {
 		config := Config{
@@ -1411,7 +1486,7 @@ func (m *Manager) HandleCommunityEventsMessage(signer *ecdsa.PublicKey, message 
 		return nil, err
 	}
 
-	community, err := m.persistence.GetByID(&m.identity.PublicKey, eventsMessage.CommunityID)
+	community, err := m.GetByID(eventsMessage.CommunityID)
 	if err != nil {
 		return nil, err
 	}
@@ -1485,7 +1560,7 @@ func (m *Manager) HandleCommunityEventsMessageRejected(signer *ecdsa.PublicKey, 
 	}
 
 	id := crypto.CompressPubkey(signer)
-	community, err := m.persistence.GetByID(&m.identity.PublicKey, id)
+	community, err := m.GetByID(id)
 	if err != nil {
 		return nil, err
 	}
@@ -2028,7 +2103,7 @@ func (m *Manager) isUserRejectedFromCommunity(signer *ecdsa.PublicKey, community
 }
 
 func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, request *protobuf.CommunityCancelRequestToJoin) (*RequestToJoin, error) {
-	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityId)
+	community, err := m.GetByID(request.CommunityId)
 	if err != nil {
 		return nil, err
 	}
@@ -2058,7 +2133,7 @@ func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, re
 }
 
 func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoin) (*RequestToJoin, error) {
-	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityId)
+	community, err := m.GetByID(request.CommunityId)
 	if err != nil {
 		return nil, err
 	}
@@ -2198,7 +2273,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, request 
 }
 
 func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, request *protobuf.CommunityEditSharedAddresses) error {
-	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityId)
+	community, err := m.GetByID(request.CommunityId)
 	if err != nil {
 		return err
 	}
@@ -2749,7 +2824,7 @@ type CheckAllChannelsPermissionsResponse struct {
 func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoinResponse) (*RequestToJoin, error) {
 	pkString := common.PubkeyToHex(&m.identity.PublicKey)
 
-	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityId)
+	community, err := m.GetByID(request.CommunityId)
 	if err != nil {
 		return nil, err
 	}
@@ -3110,6 +3185,19 @@ func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (
 	return community, nil
 }
 
+// Apply events to raw community
+func initializeCommunity(community *Community) error {
+	err := community.updateCommunityDescriptionByEvents()
+	if err != nil {
+		return err
+	}
+
+	// Workaround for https://github.com/status-im/status-desktop/issues/12188
+	HydrateChannelsMembers(community.IDString(), community.config.CommunityDescription)
+
+	return nil
+}
+
 func (m *Manager) GetByID(id []byte) (*Community, error) {
 	community, err := m.persistence.GetByID(&m.identity.PublicKey, id)
 	if err != nil {
@@ -3119,7 +3207,7 @@ func (m *Manager) GetByID(id []byte) (*Community, error) {
 		return nil, nil
 	}
 
-	err = community.updateCommunityDescriptionByEvents()
+	err = initializeCommunity(community)
 	if err != nil {
 		return nil, err
 	}
@@ -3159,7 +3247,7 @@ func (m *Manager) SaveRequestToJoinAndCommunity(requestToJoin *RequestToJoin, co
 }
 
 func (m *Manager) CreateRequestToJoin(requester *ecdsa.PublicKey, request *requests.RequestToJoinCommunity) (*Community, *RequestToJoin, error) {
-	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityID)
+	community, err := m.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, nil, err
 	}
