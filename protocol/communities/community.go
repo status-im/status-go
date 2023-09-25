@@ -1290,7 +1290,46 @@ func (o *Community) toProtocolMessageBytes() ([]byte, error) {
 func (o *Community) ToProtocolMessageBytes() ([]byte, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
+
+	// This is only workaround to lower the size of the message that goes over the wire,
+	// see https://github.com/status-im/status-desktop/issues/12188
+	if o.IsControlNode() {
+		clone := o.CreateDeepCopy()
+		clone.DehydrateChannelsMembers()
+		return clone.toProtocolMessageBytes()
+	}
+
 	return o.toProtocolMessageBytes()
+}
+
+func (o *Community) DehydrateChannelsMembers() {
+	// To save space, we don't attach members for channels without permissions,
+	// otherwise the message will hit waku msg size limit.
+	for channelID, channel := range o.chats() {
+		if !o.ChannelHasTokenPermissions(o.IDString() + channelID) {
+			channel.Members = map[string]*protobuf.CommunityMember{} // clean members
+		}
+	}
+}
+
+func HydrateChannelsMembers(communityID string, description *protobuf.CommunityDescription) {
+	channelHasTokenPermissions := func(channelID string) bool {
+		for _, tokenPermission := range description.TokenPermissions {
+			if includes(tokenPermission.ChatIds, communityID+channelID) {
+				return true
+			}
+		}
+		return false
+	}
+
+	for channelID, channel := range description.Chats {
+		if !channelHasTokenPermissions(channelID) {
+			channel.Members = make(map[string]*protobuf.CommunityMember)
+			for pubKey, member := range description.Members {
+				channel.Members[pubKey] = member
+			}
+		}
+	}
 }
 
 func (o *Community) Chats() map[string]*protobuf.CommunityChat {
