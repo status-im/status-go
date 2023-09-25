@@ -27,6 +27,13 @@ var chatColors = []string{
 	"#d37ef4", // purple
 }
 
+const (
+	// IncreaseUnviewedMessagesCountTimeoutMs
+	// this timeout indicates how long the time between received messages should be
+	// for a new message to increase the unviewed messages counter
+	IncreaseUnviewedMessagesCountTimeoutMs = 1000 * 60 * 2
+)
+
 type ChatType int
 
 const (
@@ -389,6 +396,14 @@ func (c *Chat) UpdateFromMessage(message *common.Message, timesource common.Time
 		c.LastClockValue = message.Clock
 	}
 	return nil
+}
+
+func (c *Chat) ShouldIncreaseMessageCount(message *common.Message) bool {
+	return c.LastMessage == nil ||
+		c.LastMessage.IsSystemMessage() ||
+		!c.LastMessage.New ||
+		c.LastMessage.Seen ||
+		message.Timestamp > c.LastMessage.Timestamp+IncreaseUnviewedMessagesCountTimeoutMs
 }
 
 func (c *Chat) UpdateFirstMessageTimestamp(timestamp uint32) bool {

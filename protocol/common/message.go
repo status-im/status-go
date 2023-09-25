@@ -635,8 +635,6 @@ func (m *Message) PrepareContent(identity string) error {
 func (m *Message) IsSystemMessage() bool {
 	return m.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP ||
 		m.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_GAP ||
-		m.ContentType == protobuf.ChatMessage_CONTACT_REQUEST ||
-		m.ContentType == protobuf.ChatMessage_IDENTITY_VERIFICATION ||
 		m.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_PINNED_MESSAGE ||
 		m.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_SENT ||
 		m.ContentType == protobuf.ChatMessage_SYSTEM_MESSAGE_MUTUAL_EVENT_ACCEPTED ||

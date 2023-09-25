@@ -4108,6 +4108,10 @@ func (m *Messenger) markAllRead(chatID string, clock uint64, shouldBeSynced bool
 	chat.UnviewedMessagesCount = 0
 	chat.UnviewedMentionsCount = 0
 
+	if chat.LastMessage != nil {
+		chat.LastMessage.Seen = true
+	}
+
 	// TODO(samyoul) remove storing of an updated reference pointer?
 	m.allChats.Store(chat.ID, chat)
 	return m.persistence.SaveChats([]*Chat{chat})

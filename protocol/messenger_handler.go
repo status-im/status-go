@@ -40,13 +40,6 @@ const (
 	requestAddressForTransactionDeclinedMessage = "Request address for transaction declined"
 )
 
-const (
-	// IncreaseUnviewedMessagesCountTimeout
-	// this timeout indicates how long the time between received messages should be
-	// for a new message to increase the unviewed messages counter
-	IncreaseUnviewedMessagesCountTimeout = 1000 * 60 * 2
-)
-
 var (
 	ErrMessageNotAllowed                     = errors.New("message from a non-contact")
 	ErrMessageForWrongChatType               = errors.New("message for the wrong chat type")
@@ -1728,15 +1721,19 @@ func (m *Messenger) handleEditMessage(state *ReceivedMessageState, editMessage E
 
 	editedMessageHasMentions := editedMessage.Mentioned
 
-	if editedMessageHasMentions && !originalMessageMentioned && !editedMessage.Seen {
-		// Increase unviewed count when the edited message has a mention and didn't have one before
-		chat.UnviewedMentionsCount++
-		needToSaveChat = true
-	} else if !editedMessageHasMentions && originalMessageMentioned && !editedMessage.Seen {
-		// Opposite of above, the message had a mention, but no longer does, so we reduce the count
-		chat.UnviewedMentionsCount--
-		needToSaveChat = true
+	// Messages in OneToOne chats increase the UnviewedMentionsCount whether or not they include a Mention
+	if !chat.OneToOne() {
+		if editedMessageHasMentions && !originalMessageMentioned && !editedMessage.Seen {
+			// Increase unviewed count when the edited message has a mention and didn't have one before
+			chat.UnviewedMentionsCount++
+			needToSaveChat = true
+		} else if !editedMessageHasMentions && originalMessageMentioned && !editedMessage.Seen {
+			// Opposite of above, the message had a mention, but no longer does, so we reduce the count
+			chat.UnviewedMentionsCount--
+			needToSaveChat = true
+		}
 	}
+
 	if needToSaveChat {
 		err := m.saveChat(chat)
 		if err != nil {
@@ -3083,17 +3080,11 @@ func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, er
 }
 
 func (m *Messenger) updateUnviewedCounts(chat *Chat, message *common.Message) {
-	if chat == nil {
-		return
-	}
-	if chat.LastMessage == nil ||
-		chat.LastMessage.IsSystemMessage() ||
-		!chat.LastMessage.New ||
-		message.Timestamp > chat.LastMessage.Timestamp+IncreaseUnviewedMessagesCountTimeout {
+	if chat.ShouldIncreaseMessageCount(message) {
 		chat.UnviewedMessagesCount++
-	}
-	if message.Mentioned || message.Replied {
-		chat.UnviewedMentionsCount++
+		if message.Mentioned || message.Replied || chat.OneToOne() {
+			chat.UnviewedMentionsCount++
+		}
 	}
 }
 
