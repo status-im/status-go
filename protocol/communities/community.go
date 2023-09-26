@@ -1264,7 +1264,11 @@ func (o *Community) Description() *protobuf.CommunityDescription {
 }
 
 func (o *Community) marshaledDescription() ([]byte, error) {
-	return proto.Marshal(o.config.CommunityDescription)
+	// This is only workaround to lower the size of the message that goes over the wire,
+	// see https://github.com/status-im/status-desktop/issues/12188
+	clone := o.CreateDeepCopy()
+	clone.DehydrateChannelsMembers()
+	return proto.Marshal(clone.config.CommunityDescription)
 }
 
 func (o *Community) MarshaledDescription() ([]byte, error) {
@@ -1274,14 +1278,14 @@ func (o *Community) MarshaledDescription() ([]byte, error) {
 }
 
 func (o *Community) toProtocolMessageBytes() ([]byte, error) {
-	// This should not happen, as we can only serialize on our side if we
-	// created the community
-	if !o.IsControlNode() && len(o.config.CommunityDescriptionProtocolMessage) == 0 {
-		return nil, ErrNotControlNode
-	}
-
 	// If we are not a control node, use the received serialized version
 	if !o.IsControlNode() {
+		// This should not happen, as we can only serialize on our side if we
+		// created the community
+		if len(o.config.CommunityDescriptionProtocolMessage) == 0 {
+			return nil, ErrNotControlNode
+		}
+
 		return o.config.CommunityDescriptionProtocolMessage, nil
 	}
 
@@ -1298,15 +1302,6 @@ func (o *Community) toProtocolMessageBytes() ([]byte, error) {
 func (o *Community) ToProtocolMessageBytes() ([]byte, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
-
-	// This is only workaround to lower the size of the message that goes over the wire,
-	// see https://github.com/status-im/status-desktop/issues/12188
-	if o.IsControlNode() {
-		clone := o.CreateDeepCopy()
-		clone.DehydrateChannelsMembers()
-		return clone.toProtocolMessageBytes()
-	}
-
 	return o.toProtocolMessageBytes()
 }
 
