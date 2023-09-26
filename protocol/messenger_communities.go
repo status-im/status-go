@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -503,16 +504,38 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 	// The current contract contains communities that are no longer accessible on waku
 	const unknownCommunitiesFoundTimeout = 60 * time.Second
 
+	type curatedCommunities struct {
+		ContractCommunities         []string
+		ContractFeaturedCommunities []string
+		UnknownCommunities          []string
+	}
+
+	var mu = sync.RWMutex{}
+	var c = curatedCommunities{}
+
 	go func() {
 		for {
 			var timeTillNextUpdate time.Duration
 
 			response, err := m.CuratedCommunities()
+
 			if err != nil {
 				timeTillNextUpdate = errorTimeout
 			} else {
+				mu.Lock()
+				// Check if it's the same values we had
+				if !reflect.DeepEqual(c.ContractCommunities, response.ContractCommunities) ||
+					!reflect.DeepEqual(c.ContractFeaturedCommunities, response.ContractFeaturedCommunities) ||
+					!reflect.DeepEqual(c.UnknownCommunities, response.UnknownCommunities) {
+					// One of the communities is different, send the updated response
+					m.config.messengerSignalsHandler.SendCuratedCommunitiesUpdate(response)
 
-				m.config.messengerSignalsHandler.SendCuratedCommunitiesUpdate(response)
+					// Update the values
+					c.ContractCommunities = response.ContractCommunities
+					c.ContractFeaturedCommunities = response.ContractFeaturedCommunities
+					c.UnknownCommunities = response.UnknownCommunities
+				}
+				mu.Unlock()
 
 				if len(response.UnknownCommunities) == 0 {
 					//next update shouldn't happen soon
