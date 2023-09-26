@@ -48,7 +48,7 @@ message EditMessage {
 
   ChatMessage.ContentType content_type = 7;
   repeated UnfurledLink unfurled_links = 8;
-  repeated UnfurledStatusLink unfurled_status_links = 9;
+  UnfurledStatusLinks unfurled_status_links = 9;
 }
 
 message DeleteMessage {
@@ -171,6 +171,11 @@ message UnfurledStatusLink {
   }
 }
 
+// Create a wrapper around repeated property for proper unmarshalling
+message UnfurledStatusLinks {
+  repeated UnfurledStatusLink unfurled_status_links = 1;
+}
+
 message ChatMessage {
   // Lamport timestamp of the chat message
   uint64 clock = 1;
@@ -215,7 +220,7 @@ message ChatMessage {
 
   Shard shard = 17;
 
-  repeated UnfurledStatusLink unfurled_status_links = 18;
+  UnfurledStatusLinks unfurled_status_links = 18;
 
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;

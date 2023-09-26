@@ -17,10 +17,6 @@ import (
 const expectedJPEG = "data:image/jpeg;base64,/9j/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/yQALCAABAAEBAREA/8wABgAQEAX/2gAIAQEAAD8A0s8g/9k="
 const expectedAAC = "data:audio/aac;base64,//FQgBw//NoATGF2YzUyLjcwLjAAQniptokphEFCg5qs1v9fn48+qz1rfWNhwvz+CqB5dipmq3T2PlT1Ld6sPj+19fUt1C3NKV0KowiqohZVCrdf19WMatvV3YbIvAuy/q2RafA8UiZPmZY7DdmHZtP9ri25kedWSiMKQRt79ttlod55LkuX7/f7/f7/f7/YGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYHNqo8g5qs1v9fn48+qz1rfWNhwvz+CqAAAAAAAAAAAAAAAAAAAAAAABw//FQgCNf/CFXbUZfDKFRgsYlKDegtXJH9eLkT54uRM1ckDYDcXRzZGF6Kz5Yps5fTeLY6w7gclwly+0PJL3udY3PyekTFI65bdniF3OjvHeafzZfWTs0qRMSkdll1sbb4SNT5e8vX98ytot6jEZ0NhJi2pBVP/tKV2JMyo36n9uxR2tKR+FoLCsP4SVi49kmvaSCWm5bQD96OmVQA9Q40bqnOa7rT8j9N0TlK991XdcenGTLbyS6eUnN2U1ckf14uRPni5EzVyQAAAAAAAAAAx6Q1flBp+KH2LhgH2Xx+14QB2/jcizm6ngck4vB9DoH9/Vcb7E8Dy+D/1ii1pSPwsUUUXCSsXHsk17SBfKwn2uHr6QAAAAAAAHA//FQgBt//CF3VO1KFCFWcd/r04m+O0758/tXHUlvaqEK9lvhUZXEZMXKMV/LQ6B3/mOl/Mrfs6jpD2b7f+n4yt+tm2x5ZmnpD++dZo/V9VgblI3OW/s1b8qt0h1RBiIRIIYIYQIBeCM8yy7etkwt1JAajRSoZGwwNZ07TTFTyMR1mTUVVUTW97vaDaHU5DV1snBf0mN4fraa+rf/vpdZ8FxqatGjNxPh35UuVfpNqc48W4nZ6rOO/16cTfHad8+f2rjqS3tVAAAAAAAAAAAAAAAAAAAAAAAAAAAO//FQgBm//CEXVPU+GiFsPr7x6+N6v+m+q511I4SgtYVyoyWjcMWMxkaxxDGSx1qVcarjDESt8zLQehx/lkil/GrHBy/NfJcHek0XtfanZJLHNXO2rUnFklPAlQSBS4l0pIoXIfORcXx0UYj1nTsSe1/0wXDkkFCfxWHtqRayOmWm3oS6JGdnZdtjesjByefiS8dLW1tVVVC58ijoxN3gmGFYj07+YJ6eth9fePXxvV/031XOupHCUAAAAAAAAAAAAAAAAAAAAAAAAAAA4P/xUIAcf/whN1T9NsMOEK5rxxxxXnid+f0/Ia195vi6oGH1ZVr6kjqScdSF9lt3qXH+Lxf0fo/Oe53r99IUPzybv/YWGZ7Vgk31MGw+DMp05+3y9fPERUTHlt1c9sUyoqCaD5bdXVz2wkG0hnpDmFy8r0fr3VBn/C7Rmg+L0/45EWfdocGq3HQ1uRro0GJK+vsvo837NR82s01l/n97rsWn7RYNBM3WRcDY3cJKosqMJhgdHtj9yflthd65rxxxxXnid+f0/Ia195vi6oAAAAAAAAAAAAAAAAAAAAAAAAAAAABw"
 
-func linkPreviewUrlMaker(msgID string, linkURL string) string {
-	return "https://localhost:6666/" + msgID + "-" + linkURL
-}
-
 func TestPrepareContentImage(t *testing.T) {
 	file, err := os.Open("../../_assets/tests/test.jpg")
 	require.NoError(t, err)
@@ -213,7 +209,11 @@ func TestConvertFromProtoToLinkPreviews(t *testing.T) {
 		},
 	}
 
-	previews := msg.ConvertFromProtoToLinkPreviews(linkPreviewUrlMaker)
+	urlMaker := func(msgID string, linkURL string) string {
+		return "https://localhost:6666/" + msgID + "-" + linkURL
+	}
+
+	previews := msg.ConvertFromProtoToLinkPreviews(urlMaker)
 	require.Len(t, previews, 1)
 	p := previews[0]
 	require.Equal(t, l.Type, p.Type)
@@ -230,7 +230,7 @@ func TestConvertFromProtoToLinkPreviews(t *testing.T) {
 	// Test when the URL is not parseable by url.Parse.
 	l.Url = "postgres://user:abc{DEf1=ghi@example.com:5432/db?sslmode=require"
 	msg.ChatMessage.UnfurledLinks = []*protobuf.UnfurledLink{l}
-	previews = msg.ConvertFromProtoToLinkPreviews(linkPreviewUrlMaker)
+	previews = msg.ConvertFromProtoToLinkPreviews(urlMaker)
 	require.Len(t, previews, 1)
 	p = previews[0]
 	require.Equal(t, l.Url, p.Hostname)
@@ -242,7 +242,7 @@ func TestConvertFromProtoToLinkPreviews(t *testing.T) {
 		Url:         "https://github.com",
 	}
 	msg.ChatMessage.UnfurledLinks = []*protobuf.UnfurledLink{l}
-	previews = msg.ConvertFromProtoToLinkPreviews(linkPreviewUrlMaker)
+	previews = msg.ConvertFromProtoToLinkPreviews(urlMaker)
 	require.Len(t, previews, 1)
 	p = previews[0]
 	require.Equal(t, 0, p.Thumbnail.Height)
@@ -256,16 +256,15 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 		PublicKey:   "1",
 		DisplayName: "2",
 		Description: "3",
-
-		//Icon: "4",
-
-		//ThumbnailPayload: []byte(""),
-		//ThumbnailWidth:   100,
-		//ThumbnailHeight:  200,
+		Icon: &protobuf.UnfurledLinkThumbnail{
+			Width:   100,
+			Height:  200,
+			Payload: []byte(""),
+		},
 	}
 
 	l := &protobuf.UnfurledStatusLink{
-		Url: "https://status.app/",
+		Url: "https://status.app",
 		Payload: &protobuf.UnfurledStatusLink_Contact{
 			Contact: contact,
 		},
@@ -274,23 +273,37 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 	msg := Message{
 		ID: "42",
 		ChatMessage: &protobuf.ChatMessage{
-			UnfurledStatusLinks: []*protobuf.UnfurledStatusLink{l},
+			UnfurledStatusLinks: &protobuf.UnfurledStatusLinks{
+				UnfurledStatusLinks: []*protobuf.UnfurledStatusLink{l},
+			},
 		},
 	}
 
-	previews := msg.ConvertFromProtoToStatusLinkPreviews(linkPreviewUrlMaker)
+	urlMaker := func(msgID string, linkURL string, imageID string) string {
+		return "https://localhost:6666/" + msgID + "-" + linkURL + "-" + imageID
+	}
+
+	previews := msg.ConvertFromProtoToStatusLinkPreviews(urlMaker)
 	require.Len(t, previews, 1)
 
 	p := previews[0]
 	require.Equal(t, l.Url, p.URL)
 
-	c := l.GetContact()
+	require.Nil(t, p.Community)
+	require.Nil(t, p.Channel)
+
+	c := p.Contact
 	require.NotNil(t, c)
 	require.Equal(t, "1", c.PublicKey)
-	require.Equal(t, contact.PublicKey, c.GetPublicKey())
-	require.Equal(t, contact.DisplayName, c.GetDisplayName())
-	require.Equal(t, contact.Description, c.GetDescription())
-	require.Nil(t, contact.Icon)
+	require.Equal(t, contact.PublicKey, c.PublicKey)
+	require.Equal(t, contact.DisplayName, c.DisplayName)
+	require.Equal(t, contact.Description, c.Description)
+	icon := c.Icon
+	require.NotNil(t, icon)
+	require.Equal(t, int(contact.Icon.Width), icon.Width)
+	require.Equal(t, int(contact.Icon.Height), icon.Height)
+	require.Equal(t, "", icon.DataURI)
+	require.Equal(t, "https://localhost:6666/42-https://status.app-contact-icon", icon.URL)
 }
 
 func assertMarshalAndUnmarshalJSON[T any](t *testing.T, obj *T, msgAndArgs ...any) {

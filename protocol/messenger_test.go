@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -13,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/protobuf/proto"
 	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -2287,6 +2287,13 @@ func (s *MessengerSuite) TestShouldResendEmoji() {
 	s.True(ok)
 }
 
+func (s *MessengerSuite) TestMarshalUnfurledStatusLink() {
+	const marshalled = "[{\"url\":\"https://status.app/u/TestUrl\",\"Payload\":{\"Contact\":{\"public_key\":\"TestPublicKey\",\"display_name\":\"TestDisplayName\",\"description\":\"Test description\",\"icon\":{\"payload\":\"iVBORw0KGgoAAAANSUg=\",\"width\":100,\"height\":200}}}}]"
+	var unmarshalled protobuf.UnfurledStatusLinks
+	err := proto.Unmarshal([]byte(marshalled), &unmarshalled)
+	s.Require().NoError(err)
+}
+
 func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	httpServer, err := server.NewMediaServer(s.m.database, nil, nil)
 	s.Require().NoError(err)
@@ -2312,7 +2319,7 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	}
 	inputMsg.LinkPreviews = []common.LinkPreview{preview}
 
-	statusPreview := common.StatusLinkPreview{
+	inputStatusPreview := common.StatusLinkPreview{
 		URL: "https://status.app/u/TestUrl",
 		Contact: &common.StatusContactLinkPreview{
 			PublicKey:   "TestPublicKey",
@@ -2325,7 +2332,7 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 			},
 		},
 	}
-	inputMsg.StatusLinkPreviews = []common.StatusLinkPreview{statusPreview}
+	inputMsg.StatusLinkPreviews = []common.StatusLinkPreview{inputStatusPreview}
 
 	_, err = s.m.SendChatMessage(context.Background(), inputMsg)
 	s.NoError(err)
@@ -2337,14 +2344,14 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 
 	// Test unfurled links have been saved.
 	s.Require().Len(savedMsg.UnfurledLinks, 1)
-	unfurledLink := savedMsg.UnfurledLinks[0]
-	s.Require().Equal(preview.Type, unfurledLink.Type)
-	s.Require().Equal(preview.URL, unfurledLink.Url)
-	s.Require().Equal(preview.Title, unfurledLink.Title)
-	s.Require().Equal(preview.Description, unfurledLink.Description)
+	savedLinkProto := savedMsg.UnfurledLinks[0]
+	s.Require().Equal(preview.Type, savedLinkProto.Type)
+	s.Require().Equal(preview.URL, savedLinkProto.Url)
+	s.Require().Equal(preview.Title, savedLinkProto.Title)
+	s.Require().Equal(preview.Description, savedLinkProto.Description)
 
 	// Test the saved link thumbnail can be encoded as a data URI.
-	expectedDataURI, err := images.GetPayloadDataURI(unfurledLink.ThumbnailPayload)
+	expectedDataURI, err := images.GetPayloadDataURI(savedLinkProto.ThumbnailPayload)
 	s.Require().NoError(err)
 	s.Require().Equal(preview.Thumbnail.DataURI, expectedDataURI)
 
@@ -2353,12 +2360,42 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 		savedMsg.LinkPreviews[0].Thumbnail.URL,
 	)
 
-	// Test unfurled status links have been saved
+	// Check saved message protobuf fields
+	s.Require().NotNil(savedMsg.UnfurledStatusLinks)
+	s.Require().Len(savedMsg.UnfurledStatusLinks.UnfurledStatusLinks, 1)
+	savedStatusLinkProto := savedMsg.UnfurledStatusLinks.UnfurledStatusLinks[0]
+	s.Require().Equal(inputStatusPreview.URL, savedStatusLinkProto.Url)
+	s.Require().NotNil(savedStatusLinkProto.GetContact())
+	s.Require().Nil(savedStatusLinkProto.GetCommunity())
+	s.Require().Nil(savedStatusLinkProto.GetChannel())
+
+	savedContactProto := savedStatusLinkProto.GetContact()
+	s.Require().Equal(inputStatusPreview.Contact.PublicKey, savedContactProto.PublicKey)
+	s.Require().Equal(inputStatusPreview.Contact.DisplayName, savedContactProto.DisplayName)
+	s.Require().Equal(inputStatusPreview.Contact.Description, savedContactProto.Description)
+	s.Require().NotNil(savedContactProto.Icon)
+	s.Require().Equal(inputStatusPreview.Contact.Icon.Width, int(savedContactProto.Icon.Width))
+	s.Require().Equal(inputStatusPreview.Contact.Icon.Height, int(savedContactProto.Icon.Height))
+
+	iconDataURI, err := images.GetPayloadDataURI(savedContactProto.Icon.Payload)
+	s.Require().NoError(err)
+	s.Require().Equal(inputStatusPreview.Contact.Icon.DataURI, iconDataURI)
+
+	// Check message `StatusLinkPreviews` properties
 	s.Require().Len(savedMsg.StatusLinkPreviews, 1)
-	unfurledStatusLink := savedMsg.StatusLinkPreviews[0]
-	s.Require().Equal(statusPreview.URL, unfurledStatusLink.URL)
-	s.Require().NotNil(statusPreview.Contact)
-	s.Require().Equal(statusPreview.Contact.PublicKey, unfurledStatusLink.Contact.PublicKey)
+	savedStatusLinkPreview := savedMsg.StatusLinkPreviews[0]
+	s.Require().Equal(inputStatusPreview.URL, savedStatusLinkPreview.URL)
+	s.Require().NotNil(savedStatusLinkPreview.Contact)
+
+	savedContact := savedStatusLinkPreview.Contact
+	s.Require().Equal(inputStatusPreview.Contact.PublicKey, savedContact.PublicKey)
+	s.Require().Equal(inputStatusPreview.Contact.DisplayName, savedContact.DisplayName)
+	s.Require().Equal(inputStatusPreview.Contact.Description, savedContact.Description)
+	s.Require().NotNil(savedContact.Icon)
+	s.Require().Equal(inputStatusPreview.Contact.Icon.Width, savedContact.Icon.Width)
+	s.Require().Equal(inputStatusPreview.Contact.Icon.Height, savedContact.Icon.Height)
+	expectedIconUrl := httpServer.MakeStatusLinkPreviewThumbnailURL(inputMsg.ID, inputStatusPreview.URL, "contact-icon")
+	s.Require().Equal(expectedIconUrl, savedContact.Icon.URL)
 }
 
 func (s *MessengerSuite) TestMessageSent() {

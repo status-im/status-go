@@ -362,7 +362,7 @@ func (s *MessengerShareUrlsSuite) TestParseUserURLWithChatKey() {
 
 	s.Require().NotNil(urlData.Contact)
 	s.Require().Equal(contact.DisplayName, urlData.Contact.DisplayName)
-	s.Require().Equal(contact.Bio, urlData.Contact.DisplayName)
+	s.Require().Equal(contact.Bio, urlData.Contact.Description)
 }
 
 func (s *MessengerShareUrlsSuite) TestShareUserURLWithENS() {

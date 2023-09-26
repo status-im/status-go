@@ -471,6 +471,7 @@ func (m *Messenger) prepareEncodedUserData(contact *Contact) (string, string, er
 
 	userProto := &protobuf.User{
 		DisplayName: contact.DisplayName,
+		Description: contact.Bio,
 	}
 
 	userData, err := proto.Marshal(userProto)

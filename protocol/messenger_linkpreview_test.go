@@ -2,10 +2,9 @@ package protocol
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/images"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -373,7 +372,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Image() {
 	s.assertContainsLongString(expected.Thumbnail.DataURI, preview.Thumbnail.DataURI, 100)
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContact() {
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	identity, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
@@ -381,17 +380,30 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContact() {
 	s.Require().NoError(err)
 	s.Require().NotNil(c)
 
-	c.DisplayName = "TestDisplayName"
-	response, err := s.m.AddContact(context.Background(), &requests.AddContact{ID: c.ID, DisplayName: c.DisplayName})
+	pubkey, err := c.PublicKey()
 	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Contacts, 1)
 
-	//u, err := s.m.ShareUserURLWithChatKey(contact.ID)
+	shortKey, err := s.m.SerializePublicKey(crypto.CompressPubkey(pubkey))
+	s.Require().NoError(err)
+
+	payload, err := images.GetPayloadFromURI("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAAiklEQVR4nOzWwQmFQAwG4ffEXmzLIizDImzLarQBhSwSGH7mO+9hh0DI9AthCI0hNIbQGEJjCI0hNIbQxITM1YfHfl69X3m2bsu/8i5mIobQGEJjCI0hNIbQlG+tUW83UtfNFjMRQ2gMofm8tUa3U9c2i5mIITSGqEnMRAyhMYTGEBpDaO4AAAD//5POEGncqtj1AAAAAElFTkSuQmCC")
+	s.Require().NoError(err)
+
+	icon := images.IdentityImage{
+		Width:   50,
+		Height:  50,
+		Payload: payload,
+	}
+
+	c.Bio = "TestBio"
+	c.DisplayName = "TestDisplayName"
+	c.Images = map[string]images.IdentityImage{}
+	c.Images[images.SmallDimName] = icon
+	s.m.allContacts.Store(c.ID, c)
+
 	u, err := s.m.ShareUserURLWithData(c.ID)
 	s.Require().NoError(err)
 
-	//stubbedClient := http.Client{Transport: &StubTransport{}}
 	r, err := s.m.UnfurlURLs(nil, []string{u})
 	s.Require().NoError(err)
 	s.Require().Len(r.StatusLinkPreviews, 1)
@@ -399,9 +411,39 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContact() {
 
 	preview := r.StatusLinkPreviews[0]
 	s.Require().Equal(u, preview.URL)
-	s.Require().NotNil(preview.Contact)
-	s.Require().Equal(preview.Contact.DisplayName, c.DisplayName)
-	s.Require().Equal(preview.Contact.Description, "")
 	s.Require().Nil(preview.Community)
 	s.Require().Nil(preview.Channel)
+	s.Require().NotNil(preview.Contact)
+	s.Require().Equal(shortKey, preview.Contact.PublicKey)
+	s.Require().Equal(c.DisplayName, preview.Contact.DisplayName)
+	s.Require().Equal(c.Bio, preview.Contact.Description)
+	s.Require().Equal(icon.Width, preview.Contact.Icon.Width)
+	s.Require().Equal(icon.Height, preview.Contact.Icon.Height)
+	s.Require().Equal("", preview.Contact.Icon.URL)
+
+	expectedDataURI, err := images.GetPayloadDataURI(icon.Payload)
+	s.Require().NoError(err)
+	s.Require().Equal(expectedDataURI, preview.Contact.Icon.DataURI)
+}
+
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactUnknown() {
+	const u = "https://status.app/u/G10A4B0JdgwyRww90WXtnP1oNH1ZLQNM0yX0Ja9YyAMjrqSZIYINOHCbFhrnKRAcPGStPxCMJDSZlGCKzmZrJcimHY8BbcXlORrElv_BbQEegnMDPx1g9C5VVNl0fE4y#zQ3shwQPhRuDJSjVGVBnTjCdgXy5i9WQaeVPdGJD6yTarJQSj"
+
+	r, err := s.m.UnfurlURLs(nil, []string{u})
+	s.Require().NoError(err)
+	s.Require().Len(r.StatusLinkPreviews, 1)
+	s.Require().Len(r.LinkPreviews, 0)
+
+	preview := r.StatusLinkPreviews[0]
+	s.Require().Equal(u, preview.URL)
+	s.Require().Nil(preview.Community)
+	s.Require().Nil(preview.Channel)
+	s.Require().NotNil(preview.Contact)
+	s.Require().Equal("zQ3shwQPhRuDJSjVGVBnTjCdgXy5i9WQaeVPdGJD6yTarJQSj", preview.Contact.PublicKey)
+	s.Require().Equal("Mark Cole", preview.Contact.DisplayName)
+	s.Require().Equal("Visual designer @Status, cat lover, pizza enthusiast, yoga afficionada", preview.Contact.Description)
+	s.Require().Equal(0, preview.Contact.Icon.Width)
+	s.Require().Equal(0, preview.Contact.Icon.Height)
+	s.Require().Equal("", preview.Contact.Icon.URL)
+	s.Require().Equal("", preview.Contact.Icon.DataURI)
 }

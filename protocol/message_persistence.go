@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/golang/protobuf/proto"
 	"sort"
 	"strings"
 
@@ -419,10 +420,13 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	}
 
 	if serializedUnfurledStatusLinks != nil {
-		err = json.Unmarshal(serializedUnfurledStatusLinks, &message.UnfurledStatusLinks)
+		// use proto.Marshal, because json.Marshal doesn't support `oneof` fields
+		var links protobuf.UnfurledStatusLinks
+		err = proto.Unmarshal(serializedUnfurledStatusLinks, &links)
 		if err != nil {
 			return err
 		}
+		message.UnfurledStatusLinks = &links
 	}
 
 	if attachment.Id != "" {
@@ -515,7 +519,8 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 
 	var serializedUnfurledStatusLinks []byte
 	if links := message.GetUnfurledStatusLinks(); links != nil {
-		serializedUnfurledStatusLinks, err = json.Marshal(links)
+		// use proto.Marshal, because json.Marshal doesn't support `oneof` fields
+		serializedUnfurledStatusLinks, err = proto.Marshal(links)
 		if err != nil {
 			return nil, err
 		}

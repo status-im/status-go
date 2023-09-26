@@ -47,7 +47,7 @@ func NewMediaServer(db *sql.DB, downloader *ipfs.Downloader, multiaccountsDB *mu
 		imagesPath:                     handleImage(s.db, s.logger),
 		ipfsPath:                       handleIPFS(s.downloader, s.logger),
 		LinkPreviewThumbnailPath:       handleLinkPreviewThumbnail(s.db, s.logger),
-		StatusLinkPreviewThumbnailPath: handleLinkPreviewThumbnail(s.db, s.logger), // FIXME: Use a separate function
+		StatusLinkPreviewThumbnailPath: handleStatusLinkPreviewThumbnail(s.db, s.logger),
 	})
 
 	return s, nil
@@ -74,10 +74,10 @@ func (s *MediaServer) MakeLinkPreviewThumbnailURL(msgID string, previewURL strin
 	return u.String()
 }
 
-func (s *MediaServer) MakeStatusLinkPreviewThumbnailURL(msgID string, previewURL string) string {
+func (s *MediaServer) MakeStatusLinkPreviewThumbnailURL(msgID string, previewURL string, imageID string) string {
 	u := s.MakeBaseURL()
 	u.Path = StatusLinkPreviewThumbnailPath
-	u.RawQuery = url.Values{"message-id": {msgID}, "url": {previewURL}}.Encode()
+	u.RawQuery = url.Values{"message-id": {msgID}, "url": {previewURL}, "image-id": {string(imageID)}}.Encode()
 	return u.String()
 }
 

@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/images"
@@ -33,17 +34,21 @@ const (
 	discordAuthorsPath             = "/discord/authors"
 	discordAttachmentsPath         = basePath + "/discord/attachments"
 	LinkPreviewThumbnailPath       = "/link-preview/thumbnail"
-	StatusLinkPreviewThumbnailPath = "/status-link-preview/contact/icon"
-	//StatusLinkPreviewThumbnailPath = "/status-link-preview/community/icon"
-	//StatusLinkPreviewThumbnailPath = "/status-link-preview/community/banner"
-	//StatusLinkPreviewThumbnailPath = "/status-link-preview/channel/community-icon"
-	//StatusLinkPreviewThumbnailPath = "/status-link-preview/channel/community-banner"
+	StatusLinkPreviewThumbnailPath = "/status-link-preview/thumbnail"
 
 	// Handler routes for pairing
 	accountImagesPath   = "/accountImages"
 	accountInitialsPath = "/accountInitials"
 	contactImagesPath   = "/contactImages"
 	generateQRCode      = "/GenerateQRCode"
+)
+
+const (
+	ContactIcon            = "contact-icon"
+	CommunityIcon          = "community-icon"
+	CommunityBanner        = "community-banner"
+	ChannelCommunityIcon   = "channel-community-icon"
+	ChannelCommunityBanner = "channel-community-banner"
 )
 
 type HandlerPatternMap map[string]http.HandlerFunc
@@ -85,6 +90,7 @@ type ImageParams struct {
 	URL          string
 	MessageID    string
 	AttachmentID string
+	ImageID      string
 
 	Hash     string
 	Download bool
@@ -269,6 +275,10 @@ func ParseImageParams(logger *zap.Logger, params url.Values) ImageParams {
 	authorIds := params["authorId"]
 	if len(authorIds) != 0 {
 		parsed.AuthorID = authorIds[0]
+	}
+
+	if imageIds := params["image-id"]; len(imageIds) != 0 {
+		parsed.ImageID = imageIds[0]
 	}
 
 	urls := params["url"]
@@ -964,6 +974,127 @@ func handleLinkPreviewThumbnail(db *sql.DB, logger *zap.Logger) http.HandlerFunc
 		}
 
 		thumbnail, err := getThumbnailPayload(db, logger, parsed.MessageID, parsed.URL)
+		if err != nil {
+			logger.Error("failed to get thumbnail", zap.String("msgID", parsed.MessageID))
+			http.Error(w, "failed to get thumbnail", http.StatusInternalServerError)
+			return
+		}
+
+		mimeType, err := images.GetMimeType(thumbnail)
+		if err != nil {
+			http.Error(w, "mime type not supported", http.StatusNotImplemented)
+			return
+		}
+
+		w.Header().Set("Content-Type", "image/"+mimeType)
+		w.Header().Set("Cache-Control", "no-store")
+
+		_, err = w.Write(thumbnail)
+		if err != nil {
+			logger.Error("failed to write response", zap.Error(err))
+		}
+	}
+}
+
+func getStatusLinkThumbnailPayload(db *sql.DB, logger *zap.Logger, msgID string, URL string, imageId string) ([]byte, error) {
+
+	var result []byte
+	err := db.QueryRow(`SELECT unfurled_status_links FROM user_messages WHERE id = ?`, msgID).Scan(&result)
+	if err != nil {
+		return nil, fmt.Errorf("could not find message with message-id '%s': %w", msgID, err)
+	}
+
+	var links protobuf.UnfurledStatusLinks
+	err = proto.Unmarshal(result, &links)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal protobuf.UrlPreview: %w", err)
+	}
+
+	for _, p := range links.UnfurledStatusLinks {
+		if p.Url != URL {
+			continue
+		}
+
+		switch imageId {
+		case ContactIcon:
+			contact := p.GetContact()
+			if contact == nil {
+				return nil, fmt.Errorf("this is not a contact link")
+			}
+			if contact.Icon == nil {
+				return nil, fmt.Errorf("contact icon is empty")
+			}
+			return contact.Icon.Payload, nil
+		case CommunityIcon:
+			community := p.GetCommunity()
+			if community == nil {
+				return nil, fmt.Errorf("this is not a community link")
+			}
+			if community.Icon == nil {
+				return nil, fmt.Errorf("community icon is empty")
+			}
+			return community.Icon.Payload, nil
+
+		case CommunityBanner:
+			community := p.GetCommunity()
+			if community == nil {
+				return nil, fmt.Errorf("this is not a community link")
+			}
+			if community.Banner == nil {
+				return nil, fmt.Errorf("community banner is empty")
+			}
+			return community.Banner.Payload, nil
+
+		case ChannelCommunityIcon:
+			channel := p.GetChannel()
+			if channel == nil {
+				return nil, fmt.Errorf("this is not a channel link")
+			}
+			if channel.CommunityIcon == nil {
+				return nil, fmt.Errorf("channel community icon is empty")
+			}
+			return channel.CommunityIcon.Payload, nil
+
+		case ChannelCommunityBanner:
+			channel := p.GetChannel()
+			if channel == nil {
+				return nil, fmt.Errorf("this is not a channel link")
+			}
+			if channel.CommunityBanner == nil {
+				return nil, fmt.Errorf("channel community banner is empty")
+			}
+			return channel.CommunityBanner.Payload, nil
+		}
+	}
+
+	return nil, fmt.Errorf("invalid query parameter 'image-id' value")
+}
+
+func handleStatusLinkPreviewThumbnail(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
+
+	//StatusLinkPreviewImageURLs
+	//StatusLinkPreviewImageID
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		params := r.URL.Query()
+		parsed := ParseImageParams(logger, params)
+
+		if parsed.MessageID == "" {
+			http.Error(w, "missing query parameter 'message-id'", http.StatusBadRequest)
+			return
+		}
+
+		if parsed.URL == "" {
+			http.Error(w, "missing query parameter 'url'", http.StatusBadRequest)
+			return
+		}
+
+		if parsed.ImageID == "" {
+			http.Error(w, "missing query parameter 'image-id'", http.StatusBadRequest)
+			return
+		}
+
+		thumbnail, err := getStatusLinkThumbnailPayload(db, logger, parsed.MessageID, parsed.URL, parsed.ImageID)
 		if err != nil {
 			logger.Error("failed to get thumbnail", zap.String("msgID", parsed.MessageID))
 			http.Error(w, "failed to get thumbnail", http.StatusInternalServerError)

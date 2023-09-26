@@ -943,7 +943,7 @@ func (preview *LinkPreviewThumbnail) ConvertToProto() (*protobuf.UnfurledLinkThu
 	}, nil
 }
 
-func (m *Message) ConvertStatusLinkPreviewsToProto() ([]*protobuf.UnfurledStatusLink, error) {
+func (m *Message) ConvertStatusLinkPreviewsToProto() (*protobuf.UnfurledStatusLinks, error) {
 	if len(m.StatusLinkPreviews) == 0 {
 		return nil, nil
 	}
@@ -1023,21 +1023,26 @@ func (m *Message) ConvertStatusLinkPreviewsToProto() ([]*protobuf.UnfurledStatus
 		unfurledLinks = append(unfurledLinks, ul)
 	}
 
-	return unfurledLinks, nil
+	return &protobuf.UnfurledStatusLinks{UnfurledStatusLinks: unfurledLinks}, nil
 }
 
-func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(msgID string, previewURL string) string) []StatusLinkPreview {
-	var links []*protobuf.UnfurledStatusLink
+func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(msgID string, previewURL string, imageId string) string) []StatusLinkPreview {
 
-	if links = m.GetUnfurledStatusLinks(); links == nil {
+	if m.GetUnfurledStatusLinks() == nil {
 		return nil
 	}
 
-	createThumbnail := func(thumbnail *protobuf.UnfurledLinkThumbnail, URL string) LinkPreviewThumbnail {
+	links := m.UnfurledStatusLinks.GetUnfurledStatusLinks()
+
+	if links == nil {
+		return nil
+	}
+
+	createThumbnail := func(thumbnail *protobuf.UnfurledLinkThumbnail, URL string, imageId string) LinkPreviewThumbnail {
 		return LinkPreviewThumbnail{
 			Width:  int(thumbnail.Width),
 			Height: int(thumbnail.Height),
-			URL:    makeMediaServerURL(m.ID, URL),
+			URL:    makeMediaServerURL(m.ID, URL, imageId),
 		}
 	}
 
@@ -1054,7 +1059,7 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 				Description: c.Description,
 			}
 			if icon := c.GetIcon(); icon != nil {
-				lp.Contact.Icon = createThumbnail(icon, link.Url)
+				lp.Contact.Icon = createThumbnail(icon, link.Url, "contact-icon")
 			}
 		}
 
@@ -1068,10 +1073,10 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 				TagIndices:   c.TagIndices,
 			}
 			if icon := c.GetIcon(); icon != nil {
-				lp.Community.Icon = createThumbnail(icon, link.Url)
+				lp.Community.Icon = createThumbnail(icon, link.Url, "community-icon")
 			}
 			if banner := c.GetBanner(); banner != nil {
-				lp.Community.Banner = createThumbnail(banner, link.Url)
+				lp.Community.Banner = createThumbnail(banner, link.Url, "community-banner")
 			}
 		}
 
@@ -1084,7 +1089,10 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 				Color:       c.Color,
 			}
 			if icon := c.GetCommunityIcon(); icon != nil {
-				lp.Channel.CommunityIcon = createThumbnail(icon, link.Url)
+				lp.Channel.CommunityIcon = createThumbnail(icon, link.Url, "channel-community-icon")
+			}
+			if banner := c.GetCommunityBanner(); banner != nil {
+				lp.Channel.CommunityBanner = createThumbnail(banner, link.Url, "channel-community-banner")
 			}
 		}
 

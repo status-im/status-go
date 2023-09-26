@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"fmt"
+	"github.com/status-im/status-go/api/multiformat"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/images"
@@ -21,31 +23,59 @@ func NewStatusUnfurler(URL string, messenger *Messenger, logger *zap.Logger) *St
 	}
 }
 
-func (u *StatusUnfurler) createContactData(contactData *ContactURLData) *common.StatusContactLinkPreview {
+func buildThumbnail(image *images.IdentityImage, thumbnail *common.LinkPreviewThumbnail) error {
+	if image.IsEmpty() {
+		return nil
+	}
+
+	var err error
+
+	thumbnail.Width, thumbnail.Height, err = images.GetImageDimensions(image.Payload)
+	if err != nil {
+		return fmt.Errorf("failed to get image dimensions: %w", err)
+	}
+
+	thumbnail.DataURI, err = image.GetDataURI()
+	if err != nil {
+		return fmt.Errorf("failed to get data uri: %w", err)
+	}
+
+	return nil
+}
+
+func (u *StatusUnfurler) buildContactData(contactData *ContactURLData) (*common.StatusContactLinkPreview, error) {
 	c := new(common.StatusContactLinkPreview)
 	c.PublicKey = contactData.PublicKey
 	c.DisplayName = contactData.DisplayName
 	c.Description = contactData.Description
 
-	var err error
-	contact := u.m.GetContactByID(contactData.PublicKey)
+	contactID, err := multiformat.DeserializeCompressedKey(contactData.PublicKey)
+
+	if err != nil {
+		return nil, err
+	}
+
+	contact := u.m.GetContactByID(contactID)
+
+	// TODO: Should we do this?
+	//if contact == nil {
+	//	if contact, err = u.m.RequestContactInfoFromMailserver(contactData.PublicKey, true); err != nil {
+	//		u.logger.Warn("StatusUnfurler: failed to request contact info from mailserver")
+	//		return c, err
+	//	}
+	//}
 
 	if contact == nil {
-		if contact, err = u.m.RequestContactInfoFromMailserver(contactData.PublicKey, true); err != nil {
-			u.logger.Warn("StatusUnfurler: failed to request contact info from mailserver")
-			return c
+		return c, nil
+	}
+
+	if image, ok := contact.Images[images.SmallDimName]; ok {
+		if err = buildThumbnail(&image, &c.Icon); err != nil {
+			u.logger.Warn("unfurling status link: failed to set thumbnail", zap.Error(err))
 		}
 	}
 
-	if thumbImage, ok := contact.Images[images.SmallDimName]; ok {
-		if imageBase64, err := thumbImage.GetDataURI(); err == nil {
-			c.Icon.Width = thumbImage.Width
-			c.Icon.Height = thumbImage.Height
-			c.Icon.DataURI = imageBase64
-		}
-	}
-
-	return c
+	return c, nil
 }
 
 func (u *StatusUnfurler) Unfurl() (common.StatusLinkPreview, error) {
@@ -59,20 +89,27 @@ func (u *StatusUnfurler) Unfurl() (common.StatusLinkPreview, error) {
 	}
 
 	if resp.Contact != nil {
-		preview.Contact = u.createContactData(resp.Contact)
+		preview.Contact, err = u.buildContactData(resp.Contact)
 	}
 
 	if resp.Community != nil {
+		// TODO: move to a separate func, finish
 		preview.Community = new(common.StatusCommunityLinkPreview)
 		preview.Community.DisplayName = resp.Community.DisplayName
 		preview.Community.Description = resp.Community.Description
 	}
 
 	if resp.Channel != nil {
+		// TODO: move to a separate func, finish
 		preview.Channel = new(common.StatusCommunityChannelLinkPreview)
 		preview.Channel.DisplayName = resp.Channel.DisplayName
 		preview.Channel.Description = resp.Channel.Description
 	}
+
+	u.logger.Info("<<< StatusUnfurler::Unfurl",
+		zap.Any("contact", preview.Contact),
+		zap.Any("community", preview.Community),
+		zap.Any("channel", preview.Channel))
 
 	return preview, nil
 }

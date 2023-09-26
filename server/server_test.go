@@ -116,6 +116,16 @@ func (s *ServerURLSuite) TestServer_MakeLinkPreviewThumbnailURL() {
 		s.serverNoPort.MakeLinkPreviewThumbnailURL("99", "https://github.com"))
 }
 
+func (s *ServerURLSuite) TestServer_MakeStatusLinkPreviewThumbnailURL() {
+	s.Require().Equal(
+		baseURLWithCustomPort+"/status-link-preview/thumbnail?message-id=99&url=https%3A%2F%2Fstatus.app",
+		s.server.MakeStatusLinkPreviewThumbnailURL("99", "https://status.app"))
+
+	s.testNoPort(
+		baseURLWithDefaultPort+"/status-link-preview/thumbnail?message-id=99&url=https%3A%2F%2Fstatus.app",
+		s.serverNoPort.MakeStatusLinkPreviewThumbnailURL("99", "https://status.app"))
+}
+
 func (s *ServerURLSuite) TestServer_MakeAudioURL() {
 	s.Require().Equal(
 		baseURLWithCustomPort+"/messages/audio?messageId=0xde1e7ebee71e",

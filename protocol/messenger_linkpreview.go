@@ -165,5 +165,7 @@ func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (UnfurlUR
 		r.LinkPreviews = append(r.LinkPreviews, p)
 	}
 
+	m.logger.Info("<<< UnfurlURLs", zap.Any("response", r))
+
 	return r, nil
 }
