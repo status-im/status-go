@@ -493,6 +493,53 @@ func (m *Messenger) HandleSyncInstallationAccount(state *ReceivedMessageState, m
 	return nil
 }
 
+func (m *Messenger) handleSyncChats(messageState *ReceivedMessageState, chats []*protobuf.SyncChat) error {
+	for _, syncChat := range chats {
+		chat := &Chat{
+			ID:                       syncChat.Id,
+			Name:                     syncChat.Name,
+			Timestamp:                time.Now().Unix(),
+			ReadMessagesAtClockValue: 0,
+			Active:                   true,
+			Joined:                   time.Now().Unix(),
+			ChatType:                 ChatType(syncChat.ChatType),
+			Highlight:                false,
+		}
+		if chat.OneToOne() {
+			chat.Name = "" // Emptying since it contains non useful data
+		}
+		if chat.PrivateGroupChat() {
+			chat.MembershipUpdates = make([]v1protocol.MembershipUpdateEvent, len(syncChat.MembershipUpdateEvents))
+			for i, membershipUpdate := range syncChat.MembershipUpdateEvents {
+				chat.MembershipUpdates[i] = v1protocol.MembershipUpdateEvent{
+					ClockValue: membershipUpdate.Clock,
+					Type:       protobuf.MembershipUpdateEvent_EventType(membershipUpdate.Type),
+					Members:    membershipUpdate.Members,
+					Name:       membershipUpdate.Name,
+					Signature:  membershipUpdate.Signature,
+					ChatID:     membershipUpdate.ChatId,
+					From:       membershipUpdate.From,
+					RawPayload: membershipUpdate.RawPayload,
+					Color:      membershipUpdate.Color,
+				}
+			}
+			group, err := newProtocolGroupFromChat(chat)
+			if err != nil {
+				return err
+			}
+			chat.updateChatFromGroupMembershipChanges(group)
+		}
+
+		err := m.saveChat(chat)
+		if err != nil {
+			return err
+		}
+		messageState.Response.AddChat(chat)
+	}
+
+	return nil
+}
+
 func (m *Messenger) HandleSyncInstallationContactV2(state *ReceivedMessageState, message *protobuf.SyncInstallationContactV2, statusMessage *v1protocol.StatusMessage) error {
 	// Ignore own contact installation
 

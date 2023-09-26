@@ -53,6 +53,11 @@ func (m *Messenger) handleBackup(state *ReceivedMessageState, message *protobuf.
 		}
 	}
 
+	err = m.handleSyncChats(state, message.Chats)
+	if err != nil {
+		errors = append(errors, err)
+	}
+
 	for _, community := range message.Communities {
 		err = m.handleSyncInstallationCommunity(state, community, nil)
 		if err != nil {

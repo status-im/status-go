@@ -86,6 +86,10 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
+	chatsToBackup := m.backupChats(ctx, clock)
+	if err != nil {
+		return 0, err
+	}
 	profileToBackup, err := m.backupProfile(ctx, clock)
 	if err != nil {
 		return 0, err
@@ -109,6 +113,10 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 	backupDetailsOnly := func() *protobuf.Backup {
 		return &protobuf.Backup{
 			Clock: clock,
+			ChatsDetails: &protobuf.FetchingBackedUpDataDetails{
+				DataNumber:  uint32(0),
+				TotalNumber: uint32(len(chatsToBackup)),
+			},
 			ContactsDetails: &protobuf.FetchingBackedUpDataDetails{
 				DataNumber:  uint32(0),
 				TotalNumber: uint32(len(contactsToBackup)),
@@ -163,6 +171,17 @@ func (m *Messenger) BackupData(ctx context.Context) (uint64, error) {
 		pb := backupDetailsOnly()
 		pb.ProfileDetails.DataNumber = uint32(i + 1)
 		pb.Profile = d.Profile
+		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	// Update chats encode and dispatch
+	for i, d := range chatsToBackup {
+		pb := backupDetailsOnly()
+		pb.ChatsDetails.DataNumber = uint32(i + 1)
+		pb.Chats = d.Chats
 		err = m.encodeAndDispatchBackupMessage(ctx, pb, chat.ID)
 		if err != nil {
 			return 0, err
@@ -306,6 +325,46 @@ func (m *Messenger) backupCommunities(ctx context.Context, clock uint64) ([]*pro
 	}
 
 	return backupMessages, nil
+}
+
+func (m *Messenger) backupChats(ctx context.Context, clock uint64) []*protobuf.Backup {
+	var oneToOneAndGroupChats []*protobuf.SyncChat
+	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool) {
+		if !chat.Active || (!chat.OneToOne() && !chat.PrivateGroupChat()) {
+			return true
+		}
+		syncChat := protobuf.SyncChat{
+			Id:       chatID,
+			ChatType: uint32(chat.ChatType),
+		}
+		if chat.PrivateGroupChat() {
+			syncChat.Name = chat.Name // The Name is only useful in the case of a group chat
+
+			syncChat.MembershipUpdateEvents = make([]*protobuf.MembershipUpdateEvents, len(chat.MembershipUpdates))
+			for i, membershipUpdate := range chat.MembershipUpdates {
+				syncChat.MembershipUpdateEvents[i] = &protobuf.MembershipUpdateEvents{
+					Clock:      membershipUpdate.ClockValue,
+					Type:       uint32(membershipUpdate.Type),
+					Members:    membershipUpdate.Members,
+					Name:       membershipUpdate.Name,
+					Signature:  membershipUpdate.Signature,
+					ChatId:     membershipUpdate.ChatID,
+					From:       membershipUpdate.From,
+					RawPayload: membershipUpdate.RawPayload,
+					Color:      membershipUpdate.Color,
+				}
+			}
+		}
+		oneToOneAndGroupChats = append(oneToOneAndGroupChats, &syncChat)
+		return true
+	})
+
+	var backupMessages []*protobuf.Backup
+	backupMessage := &protobuf.Backup{
+		Chats: oneToOneAndGroupChats,
+	}
+	backupMessages = append(backupMessages, backupMessage)
+	return backupMessages
 }
 
 func (m *Messenger) buildSyncContactMessage(contact *Contact) *protobuf.SyncInstallationContactV2 {
