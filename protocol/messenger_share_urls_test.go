@@ -205,6 +205,7 @@ func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithData() {
 	s.Require().NotNil(urlData)
 
 	s.Require().NotNil(urlData.Community)
+	s.Require().Equal("0x02a3d2fdb9ac335917bf9d46b38d7496c00bbfadbaf832e8aa61d13ac2b4452084", urlData.Community.CommunityID)
 	s.Require().Equal("Doodles", urlData.Community.DisplayName)
 	s.Require().Equal("Coloring the world with joy • ᴗ •", urlData.Community.Description)
 	s.Require().Equal(uint32(446744), urlData.Community.MembersCount)

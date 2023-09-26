@@ -3,6 +3,8 @@ package protocol
 import (
 	"fmt"
 	"github.com/status-im/status-go/api/multiformat"
+	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/communities"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/images"
@@ -50,14 +52,16 @@ func (u *StatusUnfurler) buildContactData(contactData *ContactURLData) (*common.
 	c.Description = contactData.Description
 
 	contactID, err := multiformat.DeserializeCompressedKey(contactData.PublicKey)
-
 	if err != nil {
 		return nil, err
 	}
 
 	contact := u.m.GetContactByID(contactID)
+	if contact == nil {
+		return c, nil
+	}
 
-	// TODO: Should we do this?
+	// TODO: Should we try to fetch from waku?
 	//if contact == nil {
 	//	if contact, err = u.m.RequestContactInfoFromMailserver(contactData.PublicKey, true); err != nil {
 	//		u.logger.Warn("StatusUnfurler: failed to request contact info from mailserver")
@@ -65,15 +69,69 @@ func (u *StatusUnfurler) buildContactData(contactData *ContactURLData) (*common.
 	//	}
 	//}
 
-	if contact == nil {
+	if image, ok := contact.Images[images.SmallDimName]; ok {
+		if err = buildThumbnail(&image, &c.Icon); err != nil {
+			return c, fmt.Errorf("failed to set thumbnail: %w", err)
+		}
+	}
+
+	return c, nil
+}
+
+func (u *StatusUnfurler) fillCommunityImages(community *communities.Community, icon *common.LinkPreviewThumbnail, banner *common.LinkPreviewThumbnail) error {
+	if image, ok := community.Images()[images.SmallDimName]; ok {
+		if err := buildThumbnail(&images.IdentityImage{Payload: image.Payload}, icon); err != nil {
+			u.logger.Warn("unfurling status link: failed to set community thumbnail", zap.Error(err))
+		}
+	}
+
+	if image, ok := community.Images()[images.BannerIdentityName]; ok {
+		if err := buildThumbnail(&images.IdentityImage{Payload: image.Payload}, banner); err != nil {
+			u.logger.Warn("unfurling status link: failed to set community banner", zap.Error(err))
+		}
+	}
+
+	return nil
+}
+
+func (u *StatusUnfurler) buildCommunityData(data *CommunityURLData) (*common.StatusCommunityLinkPreview, error) {
+	c := new(common.StatusCommunityLinkPreview)
+
+	// First, fill the output with the data from URL
+	c.CommunityID = data.CommunityID
+	c.DisplayName = data.DisplayName
+	c.Description = data.Description
+	c.MembersCount = data.MembersCount
+	c.Color = data.Color
+	c.TagIndices = data.TagIndices
+
+	// Now check if there's newer information in the database
+	communityID, err := types.DecodeHex(data.CommunityID)
+	if err != nil {
+		return c, fmt.Errorf("failed to decode community id: %w", err)
+	}
+
+	community, err := u.m.GetCommunityByID(communityID)
+	if err != nil {
 		return c, nil
 	}
 
-	if image, ok := contact.Images[images.SmallDimName]; ok {
-		if err = buildThumbnail(&image, &c.Icon); err != nil {
-			u.logger.Warn("unfurling status link: failed to set thumbnail", zap.Error(err))
-		}
+	err = u.fillCommunityImages(community, &c.Icon, &c.Banner)
+	if err != nil {
+		return c, err
 	}
+
+	return c, nil
+}
+
+func (u *StatusUnfurler) buildChannelData(data *CommunityChannelURLData) (*common.StatusCommunityChannelLinkPreview, error) {
+	c := new(common.StatusCommunityChannelLinkPreview)
+
+	c.ChannelUUID = data.ChannelUUID
+	c.Emoji = data.Emoji
+	c.DisplayName = data.DisplayName
+	c.Description = data.Description
+	c.Color = data.Color
 
 	return c, nil
 }
@@ -88,22 +146,34 @@ func (u *StatusUnfurler) Unfurl() (common.StatusLinkPreview, error) {
 		return preview, err
 	}
 
+	// If a URL has been successfully parsed,
+	// any further errors should not be returned, only logged.
+
 	if resp.Contact != nil {
 		preview.Contact, err = u.buildContactData(resp.Contact)
+		u.logger.Warn("error when building contact data: ", zap.Error(err))
+		return preview, nil
 	}
 
+	// NOTE: Currently channel data comes together with community data,
+	//		 both `Community` and `Channel` fields will be present.
+
 	if resp.Community != nil {
-		// TODO: move to a separate func, finish
-		preview.Community = new(common.StatusCommunityLinkPreview)
-		preview.Community.DisplayName = resp.Community.DisplayName
-		preview.Community.Description = resp.Community.Description
+		preview.Community, err = u.buildCommunityData(resp.Community)
+		if err != nil {
+			u.logger.Warn("error when building community data: ", zap.Error(err))
+		}
 	}
 
 	if resp.Channel != nil {
-		// TODO: move to a separate func, finish
-		preview.Channel = new(common.StatusCommunityChannelLinkPreview)
-		preview.Channel.DisplayName = resp.Channel.DisplayName
-		preview.Channel.Description = resp.Channel.Description
+		preview.Channel, err = u.buildChannelData(resp.Channel)
+		if err != nil {
+			u.logger.Warn("error when building channel data: ", zap.Error(err))
+		}
+		//preview.Channel.Community, err = u.buildCommunityData(resp.Community)
+		//if err != nil {
+		//	u.logger.Warn("error when building channel community data: ", zap.Error(err))
+		//}
 	}
 
 	u.logger.Info("<<< StatusUnfurler::Unfurl",

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/protocol/requests"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -426,9 +427,56 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	s.Require().Equal(expectedDataURI, preview.Contact.Icon.DataURI)
 }
 
-func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactUnknown() {
-	const u = "https://status.app/u/G10A4B0JdgwyRww90WXtnP1oNH1ZLQNM0yX0Ja9YyAMjrqSZIYINOHCbFhrnKRAcPGStPxCMJDSZlGCKzmZrJcimHY8BbcXlORrElv_BbQEegnMDPx1g9C5VVNl0fE4y#zQ3shwQPhRuDJSjVGVBnTjCdgXy5i9WQaeVPdGJD6yTarJQSj"
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined() {
 
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:        "status",
+		Description: "status community description",
+		Color:       "#123456",
+		Image:       "../_assets/tests/status.png", // 256*256 px
+		ImageAx:     0,
+		ImageAy:     0,
+		ImageBx:     256,
+		ImageBy:     256,
+		Banner: images.CroppedImage{
+			ImagePath: "../_assets/tests/IMG_1205.HEIC.jpg", // 2282*3352 px
+			X:         0,
+			Y:         0,
+			Width:     160,
+			Height:    90,
+		},
+	}
+
+	response, err := s.m.CreateCommunity(description, false)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	community := response.Communities()[0]
+	communityImages := community.Images()
+	s.Require().Len(communityImages, 3)
+
+	// Get icon data
+	icon, ok := communityImages[images.SmallDimName]
+	s.Require().True(ok)
+	iconWidth, iconHeight, err := images.GetImageDimensions(icon.Payload)
+	s.Require().NoError(err)
+	iconDataURI, err := images.GetPayloadDataURI(icon.Payload)
+	s.Require().NoError(err)
+
+	// Get banner data
+	banner, ok := communityImages[images.BannerIdentityName]
+	s.Require().True(ok)
+	bannerWidth, bannerHeight, err := images.GetImageDimensions(banner.Payload)
+	s.Require().NoError(err)
+	bannerDataURI, err := images.GetPayloadDataURI(banner.Payload)
+	s.Require().NoError(err)
+
+	// Create shared URL
+	u, err := s.m.ShareCommunityURLWithData(community.ID())
+	s.Require().NoError(err)
+
+	// Unfurl community shared URL
 	r, err := s.m.UnfurlURLs(nil, []string{u})
 	s.Require().NoError(err)
 	s.Require().Len(r.StatusLinkPreviews, 1)
@@ -436,14 +484,51 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactUnknown() 
 
 	preview := r.StatusLinkPreviews[0]
 	s.Require().Equal(u, preview.URL)
+	s.Require().NotNil(preview.Community)
+	s.Require().Nil(preview.Channel)
+	s.Require().Nil(preview.Contact)
+
+	s.Require().Equal(community.IDString(), preview.Community.CommunityID)
+	s.Require().Equal(community.Name(), preview.Community.DisplayName)
+	s.Require().Equal(community.Identity().Description, preview.Community.Description)
+	s.Require().Equal(iconWidth, preview.Community.Icon.Width)
+	s.Require().Equal(iconHeight, preview.Community.Icon.Height)
+	s.Require().Equal(iconDataURI, preview.Community.Icon.DataURI)
+	s.Require().Equal(bannerWidth, preview.Community.Banner.Width)
+	s.Require().Equal(bannerHeight, preview.Community.Banner.Height)
+	s.Require().Equal(bannerDataURI, preview.Community.Banner.DataURI)
+}
+
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusSharedURL() {
+	const contactSharedURL = "https://status.app/u/G10A4B0JdgwyRww90WXtnP1oNH1ZLQNM0yX0Ja9YyAMjrqSZIYINOHCbFhrnKRAcPGStPxCMJDSZlGCKzmZrJcimHY8BbcXlORrElv_BbQEegnMDPx1g9C5VVNl0fE4y#zQ3shwQPhRuDJSjVGVBnTjCdgXy5i9WQaeVPdGJD6yTarJQSj"
+	const communitySharedURL = "https://status.app/c/iyKACkQKB0Rvb2RsZXMSJ0NvbG9yaW5nIHRoZSB3b3JsZCB3aXRoIGpveSDigKIg4bSXIOKAohiYohsiByMxMzFEMkYqAwEhMwM=#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
+
+	r, err := s.m.UnfurlURLs(nil, []string{contactSharedURL, communitySharedURL})
+	s.Require().NoError(err)
+	s.Require().Len(r.StatusLinkPreviews, 2)
+	s.Require().Len(r.LinkPreviews, 0)
+
+	preview := r.StatusLinkPreviews[0]
+	s.Require().Equal(contactSharedURL, preview.URL)
+	s.Require().NotNil(preview.Contact)
 	s.Require().Nil(preview.Community)
 	s.Require().Nil(preview.Channel)
-	s.Require().NotNil(preview.Contact)
 	s.Require().Equal("zQ3shwQPhRuDJSjVGVBnTjCdgXy5i9WQaeVPdGJD6yTarJQSj", preview.Contact.PublicKey)
 	s.Require().Equal("Mark Cole", preview.Contact.DisplayName)
 	s.Require().Equal("Visual designer @Status, cat lover, pizza enthusiast, yoga afficionada", preview.Contact.Description)
-	s.Require().Equal(0, preview.Contact.Icon.Width)
-	s.Require().Equal(0, preview.Contact.Icon.Height)
-	s.Require().Equal("", preview.Contact.Icon.URL)
-	s.Require().Equal("", preview.Contact.Icon.DataURI)
+	s.Require().True(preview.Contact.Icon.IsEmpty())
+
+	preview = r.StatusLinkPreviews[1]
+	s.Require().Equal(communitySharedURL, preview.URL)
+	s.Require().NotNil(preview.Community)
+	s.Require().Nil(preview.Contact)
+	s.Require().Nil(preview.Channel)
+	s.Require().Equal("0x02a3d2fdb9ac335917bf9d46b38d7496c00bbfadbaf832e8aa61d13ac2b4452084", preview.Community.CommunityID)
+	s.Require().Equal("Doodles", preview.Community.DisplayName)
+	s.Require().Equal("Coloring the world with joy • ᴗ •", preview.Community.Description)
+	s.Require().Equal(uint32(446744), preview.Community.MembersCount)
+	s.Require().Equal("#131D2F", preview.Community.Color)
+	s.Require().Equal([]uint32{1, 33, 51}, preview.Community.TagIndices)
+	s.Require().True(preview.Community.Icon.IsEmpty())
+	s.Require().True(preview.Community.Banner.IsEmpty())
 }
