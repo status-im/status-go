@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,6 +33,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/typeddata"
+	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
@@ -744,6 +746,47 @@ func TestLoginWithKey(t *testing.T) {
 	activeAccount, err := b.GetActiveAccount()
 	require.NoError(t, err)
 	require.NotNil(t, activeAccount.ColorHash)
+}
+
+func TestLoginAccount(t *testing.T) {
+	utils.Init()
+	password := "some-password"
+	tmpdir := t.TempDir()
+
+	b := NewGethStatusBackend()
+	createAccountRequest := &requests.CreateAccount{
+		DisplayName:           "some-display-name",
+		CustomizationColor:    "#ffffff",
+		Password:              password,
+		BackupDisabledDataDir: tmpdir,
+		NetworkID:             1,
+		LogFilePath:           tmpdir + "/log",
+	}
+	c := make(chan interface{}, 10)
+	signal.SetMobileSignalHandler(func(data []byte) {
+		if strings.Contains(string(data), "node.login") {
+			c <- struct{}{}
+		}
+	})
+	require.NoError(t, b.CreateAccountAndLogin(createAccountRequest))
+	require.NoError(t, b.Logout())
+	require.NoError(t, b.StopNode())
+
+	accounts, err := b.GetAccounts()
+	require.NoError(t, err)
+	require.Len(t, accounts, 1)
+
+	loginAccountRequest := &requests.Login{
+		KeyUID:   accounts[0].KeyUID,
+		Password: password,
+	}
+	require.NoError(t, b.LoginAccount(loginAccountRequest))
+	select {
+	case <-c:
+		break
+	case <-time.After(5 * time.Second):
+		t.FailNow()
+	}
 }
 
 func TestVerifyDatabasePassword(t *testing.T) {

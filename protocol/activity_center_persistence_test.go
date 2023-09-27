@@ -717,6 +717,7 @@ func TestActiveContactRequestNotification(t *testing.T) {
 
 	notif, err = p.ActiveContactRequestNotification(contactID)
 	require.NoError(t, err)
+	require.NotNil(t, notif)
 	require.Equal(t, ActivityCenterNotificationTypeContactRequest, notif.Type)
 
 	// Test: In case there's more than one notification, return the most recent
