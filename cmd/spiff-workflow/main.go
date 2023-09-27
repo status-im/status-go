@@ -293,9 +293,10 @@ func defaultNodeConfig(installationID string) (*params.NodeConfig, error) {
 	nodeConfig.BrowsersConfig = params.BrowsersConfig{Enabled: true}
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
 	nodeConfig.MailserversConfig = params.MailserversConfig{Enabled: true}
-	nodes := []string{"enrtree://AOGECG2SPND25EEFMAJ5WF3KSGJNSGV356DSTL2YVLLZWIV6SAYBM@prod.nodes.status.im"}
-	nodeConfig.ClusterConfig.WakuNodes = nodes
-	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = nodes
+	err = api.SetDefaultFleet(nodeConfig)
+	if err != nil {
+		return nil, err
+	}
 
 	nodeConfig.WakuV2Config = params.WakuV2Config{
 		Enabled:        true,

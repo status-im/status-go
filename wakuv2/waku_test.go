@@ -22,7 +22,7 @@ import (
 	"github.com/status-im/status-go/wakuv2/common"
 )
 
-var testENRBootstrap = "enrtree://AOGECG2SPND25EEFMAJ5WF3KSGJNSGV356DSTL2YVLLZWIV6SAYBM@prod.nodes.status.im"
+var testENRBootstrap = "enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"
 
 func TestDiscoveryV5(t *testing.T) {
 	config := &Config{}

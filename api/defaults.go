@@ -26,6 +26,20 @@ const defaultKeycardPairingDataFile = "/ethereum/mainnet_rpc/keycard/pairings.js
 
 var paths = []string{pathWalletRoot, pathEIP1581, pathDefaultChat, pathDefaultWallet}
 
+const (
+	statusProdFleet = "status.prod"
+	statusTestFleet = "status.test"
+	wakuv2ProdFleet = "wakuv2.prod"
+	wakuv2TestFleet = "wakuv2.test"
+)
+
+var defaultWakuNodes = map[string][]string{
+	statusProdFleet: []string{"enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"},
+	statusTestFleet: []string{"enrtree://AIO6LUM3IVWCU2KCPBBI6FEH2W42IGK3ASCZHZGG5TIXUR56OGQUO@test.status.nodes.status.im"},
+	wakuv2ProdFleet: []string{"enrtree://ANEDLO25QVUGJOUTQFRYKWX6P4Z4GKVESBMHML7DZ6YK4LGS5FC5O@prod.wakuv2.nodes.status.im"},
+	wakuv2TestFleet: []string{"enrtree://AO47IDOLBKH72HIZZOXQP6NMRESAN7CHYWIBNXDXWRJRZWLODKII6@test.wakuv2.nodes.status.im"},
+}
+
 func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {
 	chatKeyString := derivedAddresses[pathDefaultChat].PublicKey
 
@@ -88,6 +102,19 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	return s, nil
 }
 
+func SetDefaultFleet(nodeConfig *params.NodeConfig) error {
+	clusterConfig, err := params.LoadClusterConfigFromFleet(statusProdFleet)
+	if err != nil {
+		return err
+	}
+	nodeConfig.ClusterConfig = *clusterConfig
+
+	nodeConfig.ClusterConfig.WakuNodes = defaultWakuNodes[statusProdFleet]
+	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = defaultWakuNodes[statusProdFleet]
+
+	return nil
+}
+
 func defaultNodeConfig(installationID string, request *requests.CreateAccount) (*params.NodeConfig, error) {
 	// Set mainnet
 	nodeConfig := &params.NodeConfig{}
@@ -112,11 +139,6 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 
 	nodeConfig.Name = "StatusIM"
 	nodeConfig.Rendezvous = false
-	clusterConfig, err := params.LoadClusterConfigFromFleet("status.prod")
-	if err != nil {
-		return nil, err
-	}
-	nodeConfig.ClusterConfig = *clusterConfig
 	nodeConfig.NoDiscovery = true
 	nodeConfig.MaxPeers = 20
 	nodeConfig.MaxPendingPeers = 20
@@ -162,9 +184,11 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 	nodeConfig.PermissionsConfig = params.PermissionsConfig{Enabled: true}
 	nodeConfig.MailserversConfig = params.MailserversConfig{Enabled: true}
 
-	nodes := []string{"enrtree://AOGECG2SPND25EEFMAJ5WF3KSGJNSGV356DSTL2YVLLZWIV6SAYBM@prod.nodes.status.im"}
-	nodeConfig.ClusterConfig.WakuNodes = nodes
-	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = nodes
+	err := SetDefaultFleet(nodeConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	nodeConfig.ListenAddr = ":0"
 
 	nodeConfig.WakuV2Config = params.WakuV2Config{

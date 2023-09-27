@@ -621,6 +621,12 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		// why we need this? relate PR: https://github.com/status-im/status-go/pull/4014
 		KeycardPairingDataFile: defaultKeycardPairingDataFile,
 	}
+
+	err = SetDefaultFleet(defaultCfg)
+	if err != nil {
+		return err
+	}
+
 	err = b.loadNodeConfig(defaultCfg)
 	if err != nil {
 		return err
