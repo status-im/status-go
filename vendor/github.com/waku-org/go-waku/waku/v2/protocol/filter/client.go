@@ -316,7 +316,7 @@ func (wf *WakuFilterLightNode) Ping(ctx context.Context, peerID peer.ID) error {
 
 	return wf.request(
 		ctx,
-		&FilterSubscribeParameters{selectedPeer: peerID},
+		&FilterSubscribeParameters{selectedPeer: peerID, requestID: protocol.GenerateRequestId()},
 		pb.FilterSubscribeRequest_SUBSCRIBER_PING,
 		ContentFilter{})
 }

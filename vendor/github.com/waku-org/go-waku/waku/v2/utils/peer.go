@@ -12,7 +12,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/waku-org/go-waku/logging"
 	"go.uber.org/zap"
 )
 
@@ -61,7 +60,6 @@ func SelectRandomPeer(peers peer.IDSlice, log *zap.Logger) (peer.ID, error) {
 	if len(peers) >= 1 {
 		peerID := peers[rand.Intn(len(peers))]
 		// TODO: proper heuristic here that compares peer scores and selects "best" one. For now a random peer for the given protocol is returned
-		log.Info("Got random peer from peerstore", logging.HostID("peer", peerID))
 		return peerID, nil // nolint: gosec
 	}
 
