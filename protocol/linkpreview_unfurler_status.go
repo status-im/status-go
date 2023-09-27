@@ -124,7 +124,7 @@ func (u *StatusUnfurler) buildCommunityData(data *CommunityURLData) (*common.Sta
 	return c, nil
 }
 
-func (u *StatusUnfurler) buildChannelData(data *CommunityChannelURLData) (*common.StatusCommunityChannelLinkPreview, error) {
+func (u *StatusUnfurler) buildChannelData(data *CommunityChannelURLData, communityData *CommunityURLData) (*common.StatusCommunityChannelLinkPreview, error) {
 	c := new(common.StatusCommunityChannelLinkPreview)
 
 	c.ChannelUUID = data.ChannelUUID
@@ -132,6 +132,17 @@ func (u *StatusUnfurler) buildChannelData(data *CommunityChannelURLData) (*commo
 	c.DisplayName = data.DisplayName
 	c.Description = data.Description
 	c.Color = data.Color
+
+	if communityData == nil {
+		return nil, fmt.Errorf("channel communtiy can't be empty")
+	}
+
+	community, err := u.buildCommunityData(communityData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build channel community data: %w", err)
+	}
+
+	c.Community = community
 
 	return c, nil
 }
@@ -157,23 +168,22 @@ func (u *StatusUnfurler) Unfurl() (common.StatusLinkPreview, error) {
 
 	// NOTE: Currently channel data comes together with community data,
 	//		 both `Community` and `Channel` fields will be present.
+	//		 So we check for Channel first, then Community.
+
+	if resp.Channel != nil {
+		preview.Channel, err = u.buildChannelData(resp.Channel, resp.Community)
+		if err != nil {
+			u.logger.Warn("error when building channel data: ", zap.Error(err))
+		}
+		return preview, nil
+	}
 
 	if resp.Community != nil {
 		preview.Community, err = u.buildCommunityData(resp.Community)
 		if err != nil {
 			u.logger.Warn("error when building community data: ", zap.Error(err))
 		}
-	}
-
-	if resp.Channel != nil {
-		preview.Channel, err = u.buildChannelData(resp.Channel)
-		if err != nil {
-			u.logger.Warn("error when building channel data: ", zap.Error(err))
-		}
-		//preview.Channel.Community, err = u.buildCommunityData(resp.Community)
-		//if err != nil {
-		//	u.logger.Warn("error when building channel community data: ", zap.Error(err))
-		//}
+		return preview, nil
 	}
 
 	u.logger.Info("<<< StatusUnfurler::Unfurl",

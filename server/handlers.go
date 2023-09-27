@@ -1050,20 +1050,26 @@ func getStatusLinkThumbnailPayload(db *sql.DB, logger *zap.Logger, msgID string,
 			if channel == nil {
 				return nil, fmt.Errorf("this is not a channel link")
 			}
-			if channel.CommunityIcon == nil {
+			if channel.Community == nil {
+				return nil, fmt.Errorf("channel community is empty")
+			}
+			if channel.Community.Icon == nil {
 				return nil, fmt.Errorf("channel community icon is empty")
 			}
-			return channel.CommunityIcon.Payload, nil
+			return channel.Community.Icon.Payload, nil
 
 		case ChannelCommunityBanner:
 			channel := p.GetChannel()
 			if channel == nil {
 				return nil, fmt.Errorf("this is not a channel link")
 			}
-			if channel.CommunityBanner == nil {
+			if channel.Community == nil {
+				return nil, fmt.Errorf("channel community is empty")
+			}
+			if channel.Community.Banner == nil {
 				return nil, fmt.Errorf("channel community banner is empty")
 			}
-			return channel.CommunityBanner.Payload, nil
+			return channel.Community.Banner.Payload, nil
 		}
 	}
 

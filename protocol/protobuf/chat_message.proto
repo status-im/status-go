@@ -158,8 +158,7 @@ message UnfurledStatusChannelLink {
   string display_name = 3;
   string description = 4;
   string color = 5;
-  UnfurledLinkThumbnail community_icon = 6;
-  UnfurledLinkThumbnail community_banner = 7;
+  UnfurledStatusCommunityLink community = 6;
 }
 
 message UnfurledStatusLink {

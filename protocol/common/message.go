@@ -121,13 +121,12 @@ type StatusCommunityLinkPreview struct {
 }
 
 type StatusCommunityChannelLinkPreview struct {
-	ChannelUUID     string               `json:"channelUuid"`
-	Emoji           string               `json:"emoji"`
-	DisplayName     string               `json:"displayName"`
-	Description     string               `json:"description"`
-	Color           string               `json:"color"`
-	CommunityIcon   LinkPreviewThumbnail `json:"communityIcon,omitempty"`
-	CommunityBanner LinkPreviewThumbnail `json:"communityBanner,omitempty"`
+	ChannelUUID string                      `json:"channelUuid"`
+	Emoji       string                      `json:"emoji"`
+	DisplayName string                      `json:"displayName"`
+	Description string                      `json:"description"`
+	Color       string                      `json:"color"`
+	Community   *StatusCommunityLinkPreview `json:"community"`
 }
 
 type StatusLinkPreview struct {
@@ -815,6 +814,12 @@ func isValidLinkPreviewForProto(preview LinkPreview) bool {
 	}
 }
 
+func (preview *StatusCommunityLinkPreview) isValidForProto() bool {
+	return preview.CommunityID != "" &&
+		isValidLinkPreviewThumbnail(preview.Icon) &&
+		isValidLinkPreviewThumbnail(preview.Banner)
+}
+
 func (preview StatusLinkPreview) isValidForProto() bool {
 	if preview.URL == "" {
 		return false
@@ -834,15 +839,13 @@ func (preview StatusLinkPreview) isValidForProto() bool {
 	}
 
 	if preview.Community != nil {
-		return preview.Community.CommunityID != "" &&
-			isValidLinkPreviewThumbnail(preview.Community.Icon) &&
-			isValidLinkPreviewThumbnail(preview.Community.Banner)
+		return preview.Community.isValidForProto()
 	}
 
 	if preview.Channel != nil {
 		return preview.Channel.ChannelUUID != "" &&
-			isValidLinkPreviewThumbnail(preview.Channel.CommunityIcon) &&
-			isValidLinkPreviewThumbnail(preview.Channel.CommunityBanner)
+			preview.Community != nil &&
+			preview.Community.isValidForProto()
 	}
 
 	return false
@@ -926,6 +929,13 @@ func (m *Message) ConvertFromProtoToLinkPreviews(makeMediaServerURL func(msgID s
 	return previews
 }
 
+func (preview *LinkPreviewThumbnail) IsEmpty() bool {
+	return preview.Width == 0 &&
+		preview.Height == 0 &&
+		preview.URL == "" &&
+		preview.DataURI == ""
+}
+
 func (preview *LinkPreviewThumbnail) ConvertToProto() (*protobuf.UnfurledLinkThumbnail, error) {
 	var payload []byte
 	var err error
@@ -941,6 +951,35 @@ func (preview *LinkPreviewThumbnail) ConvertToProto() (*protobuf.UnfurledLinkThu
 		Height:  uint32(preview.Height),
 		Payload: payload,
 	}, nil
+}
+
+func (preview *StatusCommunityLinkPreview) ConvertToProto() (*protobuf.UnfurledStatusCommunityLink, error) {
+	if preview == nil {
+		return nil, nil
+	}
+
+	icon, err := preview.Icon.ConvertToProto()
+	if err != nil {
+		return nil, err
+	}
+
+	banner, err := preview.Banner.ConvertToProto()
+	if err != nil {
+		return nil, err
+	}
+
+	community := &protobuf.UnfurledStatusCommunityLink{
+		CommunityId:  preview.CommunityID,
+		DisplayName:  preview.DisplayName,
+		Description:  preview.Description,
+		MembersCount: preview.MembersCount,
+		Color:        preview.Color,
+		TagIndices:   preview.TagIndices,
+		Icon:         icon,
+		Banner:       banner,
+	}
+
+	return community, nil
 }
 
 func (m *Message) ConvertStatusLinkPreviewsToProto() (*protobuf.UnfurledStatusLinks, error) {
@@ -976,48 +1015,32 @@ func (m *Message) ConvertStatusLinkPreviewsToProto() (*protobuf.UnfurledStatusLi
 		}
 
 		if preview.Community != nil {
-			icon, err := preview.Community.Icon.ConvertToProto()
-			if err != nil {
-				return nil, err
-			}
-			banner, err := preview.Community.Banner.ConvertToProto()
+			communityPreview, err := preview.Community.ConvertToProto()
 			if err != nil {
 				return nil, err
 			}
 			ul.Payload = &protobuf.UnfurledStatusLink_Community{
-				Community: &protobuf.UnfurledStatusCommunityLink{
-					CommunityId:  preview.Community.CommunityID,
-					DisplayName:  preview.Community.DisplayName,
-					Description:  preview.Community.Description,
-					MembersCount: preview.Community.MembersCount,
-					Color:        preview.Community.Color,
-					TagIndices:   preview.Community.TagIndices,
-					Icon:         icon,
-					Banner:       banner,
-				},
+				Community: communityPreview,
 			}
 		}
 
 		if preview.Channel != nil {
-			icon, err := preview.Channel.CommunityIcon.ConvertToProto()
+			communityPreview, err := preview.Community.ConvertToProto()
 			if err != nil {
 				return nil, err
 			}
-			banner, err := preview.Channel.CommunityBanner.ConvertToProto()
-			if err != nil {
-				return nil, err
-			}
+
 			ul.Payload = &protobuf.UnfurledStatusLink_Channel{
 				Channel: &protobuf.UnfurledStatusChannelLink{
-					ChannelUuid:     preview.Channel.ChannelUUID,
-					Emoji:           preview.Channel.Emoji,
-					DisplayName:     preview.Channel.DisplayName,
-					Description:     preview.Channel.Description,
-					Color:           preview.Channel.Color,
-					CommunityIcon:   icon,
-					CommunityBanner: banner,
+					ChannelUuid: preview.Channel.ChannelUUID,
+					Emoji:       preview.Channel.Emoji,
+					DisplayName: preview.Channel.DisplayName,
+					Description: preview.Channel.Description,
+					Color:       preview.Channel.Color,
+					Community:   communityPreview,
 				},
 			}
+
 		}
 
 		unfurledLinks = append(unfurledLinks, ul)
@@ -1046,6 +1069,28 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 		}
 	}
 
+	convertCommunityFromProto := func(c *protobuf.UnfurledStatusCommunityLink, URL string) *StatusCommunityLinkPreview {
+		if c == nil {
+			return nil
+		}
+
+		out := &StatusCommunityLinkPreview{
+			CommunityID:  c.CommunityId,
+			DisplayName:  c.DisplayName,
+			Description:  c.Description,
+			MembersCount: c.MembersCount,
+			Color:        c.Color,
+			TagIndices:   c.TagIndices,
+		}
+		if icon := c.GetIcon(); icon != nil {
+			out.Icon = createThumbnail(icon, URL, "community-icon")
+		}
+		if banner := c.GetBanner(); banner != nil {
+			out.Banner = createThumbnail(banner, URL, "community-banner")
+		}
+		return out
+	}
+
 	previews := make([]StatusLinkPreview, 0, len(links))
 	for _, link := range links {
 		lp := StatusLinkPreview{
@@ -1064,20 +1109,7 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 		}
 
 		if c := link.GetCommunity(); c != nil {
-			lp.Community = &StatusCommunityLinkPreview{
-				CommunityID:  c.CommunityId,
-				DisplayName:  c.DisplayName,
-				Description:  c.Description,
-				MembersCount: c.MembersCount,
-				Color:        c.Color,
-				TagIndices:   c.TagIndices,
-			}
-			if icon := c.GetIcon(); icon != nil {
-				lp.Community.Icon = createThumbnail(icon, link.Url, "community-icon")
-			}
-			if banner := c.GetBanner(); banner != nil {
-				lp.Community.Banner = createThumbnail(banner, link.Url, "community-banner")
-			}
+			lp.Community = convertCommunityFromProto(c, link.Url)
 		}
 
 		if c := link.GetChannel(); c != nil {
@@ -1088,12 +1120,7 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 				Description: c.Description,
 				Color:       c.Color,
 			}
-			if icon := c.GetCommunityIcon(); icon != nil {
-				lp.Channel.CommunityIcon = createThumbnail(icon, link.Url, "channel-community-icon")
-			}
-			if banner := c.GetCommunityBanner(); banner != nil {
-				lp.Channel.CommunityBanner = createThumbnail(banner, link.Url, "channel-community-banner")
-			}
+			lp.Channel.Community = convertCommunityFromProto(c.Community, link.Url)
 		}
 
 		previews = append(previews, lp)
