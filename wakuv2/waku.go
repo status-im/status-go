@@ -306,6 +306,10 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		opts = append(opts, node.WithMessageProvider(dbStore))
 	}
 
+	if cfg.EnableFilterFullNode {
+		opts = append(opts, node.WithWakuFilterFullNode())
+	}
+
 	if appDB != nil {
 		waku.protectedTopicStore, err = persistence.NewProtectedTopicsStore(logger, appDB)
 		if err != nil {

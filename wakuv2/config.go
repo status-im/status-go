@@ -44,6 +44,7 @@ type Config struct {
 	StoreCapacity        int      `toml:",omitempty"`
 	StoreSeconds         int      `toml:",omitempty"`
 	TelemetryServerURL   string   `toml:",omitempty"`
+	EnableFilterFullNode bool     `toml:",omitempty"`
 }
 
 var DefaultConfig = Config{
