@@ -3,6 +3,7 @@ package communities
 import (
 	"crypto/ecdsa"
 	"testing"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 
@@ -21,6 +22,13 @@ const testChatID1 = "chat-id-1"
 const testCategoryID1 = "category-id-1"
 const testCategoryName1 = "category-name-1"
 const testChatID2 = "chat-id-2"
+
+type TimeSourceStub struct {
+}
+
+func (t *TimeSourceStub) GetCurrentTime() uint64 {
+	return uint64(time.Now().Unix())
+}
 
 type CommunitySuite struct {
 	suite.Suite
@@ -219,6 +227,7 @@ func (s *CommunitySuite) TestDeleteChat() {
 
 	_, err := org.DeleteChat(testChatID1)
 	s.Require().Equal(ErrNotAuthorized, err)
+	change1Clock := org.Clock()
 
 	org.config.PrivateKey = s.identity
 	org.config.ID = &s.identity.PublicKey
@@ -226,10 +235,11 @@ func (s *CommunitySuite) TestDeleteChat() {
 	changes, err := org.DeleteChat(testChatID1)
 	s.Require().NoError(err)
 	s.Require().NotNil(changes)
+	change2Clock := org.Clock()
 
 	s.Require().Nil(org.Chats()[testChatID1])
 	s.Require().Len(changes.ChatsRemoved, 1)
-	s.Require().Equal(uint64(2), org.Clock())
+	s.Require().Greater(change2Clock, change1Clock)
 }
 
 func (s *CommunitySuite) TestRemoveUserFromChat() {
@@ -465,7 +475,7 @@ func (s *CommunitySuite) TestValidateRequestToJoin() {
 
 	for _, tc := range testCases {
 		s.Run(tc.name, func() {
-			org, err := New(tc.config)
+			org, err := New(tc.config, &TimeSourceStub{})
 			s.Require().NoError(err)
 			err = org.ValidateRequestToJoin(tc.signer, tc.request)
 			s.Require().Equal(tc.err, err)
@@ -563,7 +573,7 @@ func (s *CommunitySuite) TestCanPost() {
 		s.Run(tc.name, func() {
 			var grant []byte
 			var err error
-			org, err := New(tc.config)
+			org, err := New(tc.config, &TimeSourceStub{})
 			s.Require().NoError(err)
 
 			if tc.grant == validGrant {
@@ -958,7 +968,7 @@ func (s *CommunitySuite) buildCommunity(owner *ecdsa.PublicKey) *Community {
 	config.ID = owner
 	config.CommunityDescription = s.buildCommunityDescription()
 
-	org, err := New(config)
+	org, err := New(config, &TimeSourceStub{})
 	s.Require().NoError(err)
 	return org
 }

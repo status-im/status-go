@@ -2635,7 +2635,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 
 	// Check that the joined community has the correct values
 	s.Equal(community.ID(), aCom.ID())
-	s.Equal(uint64(0x2), aCom.Clock())
+	s.Equal(community.Clock(), aCom.Clock())
 	s.Equal(community.PublicKey(), aCom.PublicKey())
 
 	// Check alicesOtherDevice receives the sync join message

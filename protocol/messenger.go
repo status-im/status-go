@@ -461,7 +461,7 @@ func NewMessenger(
 		managerOptions = append(managerOptions, communities.WithCommunityTokensService(c.communityTokensService))
 	}
 
-	communitiesManager, err := communities.NewManager(identity, database, encryptionProtocol, logger, ensVerifier, transp, c.torrentConfig, managerOptions...)
+	communitiesManager, err := communities.NewManager(identity, database, encryptionProtocol, logger, ensVerifier, transp, transp, c.torrentConfig, managerOptions...)
 	if err != nil {
 		return nil, err
 	}

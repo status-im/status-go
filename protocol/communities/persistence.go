@@ -23,8 +23,9 @@ import (
 )
 
 type Persistence struct {
-	db     *sql.DB
-	logger *zap.Logger
+	db         *sql.DB
+	logger     *zap.Logger
+	timesource common.TimeSource
 }
 
 var ErrOldRequestToJoin = errors.New("old request to join")
@@ -148,7 +149,7 @@ func (p *Persistence) queryCommunities(memberIdentity *ecdsa.PublicKey, query st
 			return nil, err
 		}
 
-		org, err := unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(requestedToJoinAt.Int64), eventsBytes, eventsDescriptionBytes, p.logger)
+		org, err := p.unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(requestedToJoinAt.Int64), eventsBytes, eventsDescriptionBytes, p.logger)
 		if err != nil {
 			return nil, err
 		}
@@ -207,7 +208,7 @@ func (p *Persistence) rowsToCommunities(memberIdentity *ecdsa.PublicKey, rows *s
 			return nil, err
 		}
 
-		comm, err = unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(rtjClock.Int64), eventsBytes, eventsDescriptionBytes, p.logger)
+		comm, err = p.unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(rtjClock.Int64), eventsBytes, eventsDescriptionBytes, p.logger)
 		if err != nil {
 			return nil, err
 		}
@@ -280,10 +281,10 @@ func (p *Persistence) GetByID(memberIdentity *ecdsa.PublicKey, id []byte) (*Comm
 		return nil, err
 	}
 
-	return unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(requestedToJoinAt.Int64), eventsBytes, eventsDescriptionBytes, p.logger)
+	return p.unmarshalCommunityFromDB(memberIdentity, publicKeyBytes, privateKeyBytes, descriptionBytes, joined, spectated, verified, muted, muteTill.Time, uint64(requestedToJoinAt.Int64), eventsBytes, eventsDescriptionBytes, p.logger)
 }
 
-func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, privateKeyBytes, wrappedCommunity []byte, joined,
+func (p *Persistence) unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, privateKeyBytes, wrappedCommunity []byte, joined,
 	spectated, verified, muted bool, muteTill time.Time, requestedToJoinAt uint64, eventsBytes []byte,
 	eventsDescriptionBytes []byte, logger *zap.Logger) (*Community, error) {
 
@@ -327,7 +328,7 @@ func unmarshalCommunityFromDB(memberIdentity *ecdsa.PublicKey, publicKeyBytes, p
 		Spectated:                           spectated,
 		EventsData:                          eventsData,
 	}
-	community, err := New(config)
+	community, err := New(config, p.timesource)
 	if err != nil {
 		return nil, err
 	}

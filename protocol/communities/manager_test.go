@@ -53,7 +53,7 @@ func (s *ManagerSuite) SetupTest() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	s.Require().NoError(err)
-	m, err := NewManager(key, db, nil, nil, nil, nil, nil)
+	m, err := NewManager(key, db, nil, nil, nil, nil, &TimeSourceStub{}, nil)
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 	s.manager = m
@@ -161,7 +161,7 @@ func (s *ManagerSuite) setupManagerForTokenPermissions() (*Manager, *testCollect
 		WithTokenManager(tm),
 	}
 
-	m, err := NewManager(key, db, nil, nil, nil, nil, nil, options...)
+	m, err := NewManager(key, db, nil, nil, nil, nil, &TimeSourceStub{}, nil, options...)
 	s.Require().NoError(err)
 	s.Require().NoError(m.Start())
 
