@@ -2319,7 +2319,7 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	}
 	inputMsg.LinkPreviews = []common.LinkPreview{preview}
 
-	inputStatusPreview := common.StatusLinkPreview{
+	sentContactPreview := common.StatusLinkPreview{
 		URL: "https://status.app/u/TestUrl",
 		Contact: &common.StatusContactLinkPreview{
 			PublicKey:   "TestPublicKey",
@@ -2332,7 +2332,7 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 			},
 		},
 	}
-	inputMsg.StatusLinkPreviews = []common.StatusLinkPreview{inputStatusPreview}
+	inputMsg.StatusLinkPreviews = []common.StatusLinkPreview{sentContactPreview}
 
 	_, err = s.m.SendChatMessage(context.Background(), inputMsg)
 	s.NoError(err)
@@ -2364,37 +2364,37 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	s.Require().NotNil(savedMsg.UnfurledStatusLinks)
 	s.Require().Len(savedMsg.UnfurledStatusLinks.UnfurledStatusLinks, 1)
 	savedStatusLinkProto := savedMsg.UnfurledStatusLinks.UnfurledStatusLinks[0]
-	s.Require().Equal(inputStatusPreview.URL, savedStatusLinkProto.Url)
+	s.Require().Equal(sentContactPreview.URL, savedStatusLinkProto.Url)
 	s.Require().NotNil(savedStatusLinkProto.GetContact())
 	s.Require().Nil(savedStatusLinkProto.GetCommunity())
 	s.Require().Nil(savedStatusLinkProto.GetChannel())
 
 	savedContactProto := savedStatusLinkProto.GetContact()
-	s.Require().Equal(inputStatusPreview.Contact.PublicKey, savedContactProto.PublicKey)
-	s.Require().Equal(inputStatusPreview.Contact.DisplayName, savedContactProto.DisplayName)
-	s.Require().Equal(inputStatusPreview.Contact.Description, savedContactProto.Description)
+	s.Require().Equal(sentContactPreview.Contact.PublicKey, savedContactProto.PublicKey)
+	s.Require().Equal(sentContactPreview.Contact.DisplayName, savedContactProto.DisplayName)
+	s.Require().Equal(sentContactPreview.Contact.Description, savedContactProto.Description)
 	s.Require().NotNil(savedContactProto.Icon)
-	s.Require().Equal(inputStatusPreview.Contact.Icon.Width, int(savedContactProto.Icon.Width))
-	s.Require().Equal(inputStatusPreview.Contact.Icon.Height, int(savedContactProto.Icon.Height))
+	s.Require().Equal(sentContactPreview.Contact.Icon.Width, int(savedContactProto.Icon.Width))
+	s.Require().Equal(sentContactPreview.Contact.Icon.Height, int(savedContactProto.Icon.Height))
 
 	iconDataURI, err := images.GetPayloadDataURI(savedContactProto.Icon.Payload)
 	s.Require().NoError(err)
-	s.Require().Equal(inputStatusPreview.Contact.Icon.DataURI, iconDataURI)
+	s.Require().Equal(sentContactPreview.Contact.Icon.DataURI, iconDataURI)
 
 	// Check message `StatusLinkPreviews` properties
 	s.Require().Len(savedMsg.StatusLinkPreviews, 1)
 	savedStatusLinkPreview := savedMsg.StatusLinkPreviews[0]
-	s.Require().Equal(inputStatusPreview.URL, savedStatusLinkPreview.URL)
+	s.Require().Equal(sentContactPreview.URL, savedStatusLinkPreview.URL)
 	s.Require().NotNil(savedStatusLinkPreview.Contact)
 
 	savedContact := savedStatusLinkPreview.Contact
-	s.Require().Equal(inputStatusPreview.Contact.PublicKey, savedContact.PublicKey)
-	s.Require().Equal(inputStatusPreview.Contact.DisplayName, savedContact.DisplayName)
-	s.Require().Equal(inputStatusPreview.Contact.Description, savedContact.Description)
+	s.Require().Equal(sentContactPreview.Contact.PublicKey, savedContact.PublicKey)
+	s.Require().Equal(sentContactPreview.Contact.DisplayName, savedContact.DisplayName)
+	s.Require().Equal(sentContactPreview.Contact.Description, savedContact.Description)
 	s.Require().NotNil(savedContact.Icon)
-	s.Require().Equal(inputStatusPreview.Contact.Icon.Width, savedContact.Icon.Width)
-	s.Require().Equal(inputStatusPreview.Contact.Icon.Height, savedContact.Icon.Height)
-	expectedIconUrl := httpServer.MakeStatusLinkPreviewThumbnailURL(inputMsg.ID, inputStatusPreview.URL, "contact-icon")
+	s.Require().Equal(sentContactPreview.Contact.Icon.Width, savedContact.Icon.Width)
+	s.Require().Equal(sentContactPreview.Contact.Icon.Height, savedContact.Icon.Height)
+	expectedIconUrl := httpServer.MakeStatusLinkPreviewThumbnailURL(inputMsg.ID, sentContactPreview.URL, "contact-icon")
 	s.Require().Equal(expectedIconUrl, savedContact.Icon.URL)
 }
 

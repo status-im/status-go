@@ -250,6 +250,166 @@ func TestConvertFromProtoToLinkPreviews(t *testing.T) {
 	require.Equal(t, "", p.Thumbnail.URL)
 }
 
+func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
+	contact := &StatusContactLinkPreview{
+		PublicKey:   "1",
+		DisplayName: "2",
+		Description: "3",
+		Icon: LinkPreviewThumbnail{
+			Width:   10,
+			Height:  20,
+			DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+		},
+	}
+
+	community := &StatusCommunityLinkPreview{
+		CommunityID:  "4",
+		DisplayName:  "5",
+		Description:  "6",
+		MembersCount: 7,
+		Color:        "8",
+		TagIndices:   []uint32{9, 10},
+		Icon: LinkPreviewThumbnail{
+			Width:   30,
+			Height:  40,
+			DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+		},
+		Banner: LinkPreviewThumbnail{
+			Width:   50,
+			Height:  60,
+			DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+		},
+	}
+
+	channel := &StatusCommunityChannelLinkPreview{
+		ChannelUUID: "11",
+		Emoji:       "12",
+		DisplayName: "13",
+		Description: "14",
+		Color:       "15",
+		Community: &StatusCommunityLinkPreview{
+			CommunityID:  "16",
+			DisplayName:  "17",
+			Description:  "18",
+			MembersCount: 19,
+			Color:        "20",
+			TagIndices:   []uint32{21, 22},
+			Icon: LinkPreviewThumbnail{
+				Width:   70,
+				Height:  80,
+				DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+			},
+			Banner: LinkPreviewThumbnail{
+				Width:   90,
+				Height:  100,
+				DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+			},
+		},
+	}
+
+	message := Message{
+		StatusLinkPreviews: []StatusLinkPreview{
+			{
+				URL:     "https://status.app/u/",
+				Contact: contact,
+			},
+			{
+				URL:       "https://status.app/c/",
+				Community: community,
+			},
+			{
+				URL:     "https://status.app/cc/",
+				Channel: channel,
+			},
+		},
+	}
+
+	expectedThumbnailPayload, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUg=")
+	require.NoError(t, err)
+
+	unfurledLinks, err := message.ConvertStatusLinkPreviewsToProto()
+	require.NoError(t, err)
+	require.Len(t, unfurledLinks.UnfurledStatusLinks, 3)
+
+	// Contact link
+
+	l1 := unfurledLinks.UnfurledStatusLinks[0]
+	require.Equal(t, "https://status.app/u/", l1.Url)
+	require.NotNil(t, l1.GetContact())
+	require.Nil(t, l1.GetCommunity())
+	require.Nil(t, l1.GetChannel())
+	c1 := l1.GetContact()
+	require.Equal(t, contact.PublicKey, c1.PublicKey)
+	require.Equal(t, contact.DisplayName, c1.DisplayName)
+	require.Equal(t, contact.Description, c1.Description)
+	require.NotNil(t, c1.Icon)
+	require.Equal(t, uint32(contact.Icon.Width), c1.Icon.Width)
+	require.Equal(t, uint32(contact.Icon.Height), c1.Icon.Height)
+	require.Equal(t, expectedThumbnailPayload, c1.Icon.Payload)
+
+	// Community link
+
+	l2 := unfurledLinks.UnfurledStatusLinks[1]
+	require.Equal(t, "https://status.app/c/", l2.Url)
+	require.NotNil(t, l2.GetCommunity())
+	require.Nil(t, l2.GetContact())
+	require.Nil(t, l2.GetChannel())
+	c2 := l2.GetCommunity()
+	require.Equal(t, community.CommunityID, c2.CommunityId)
+	require.Equal(t, community.DisplayName, c2.DisplayName)
+	require.Equal(t, community.Description, c2.Description)
+	require.Equal(t, community.MembersCount, c2.MembersCount)
+	require.Equal(t, community.Color, c2.Color)
+	require.Equal(t, community.TagIndices, c2.TagIndices)
+	require.NotNil(t, c2.Icon)
+	require.Equal(t, uint32(community.Icon.Width), c2.Icon.Width)
+	require.Equal(t, uint32(community.Icon.Height), c2.Icon.Height)
+	require.Equal(t, expectedThumbnailPayload, c2.Icon.Payload)
+	require.NotNil(t, c2.Banner)
+	require.Equal(t, uint32(community.Banner.Width), c2.Banner.Width)
+	require.Equal(t, uint32(community.Banner.Height), c2.Banner.Height)
+	require.Equal(t, expectedThumbnailPayload, c2.Banner.Payload)
+
+	// Channel link
+
+	l3 := unfurledLinks.UnfurledStatusLinks[2]
+	require.Equal(t, "https://status.app/cc/", l3.Url)
+	require.NotNil(t, l3.GetChannel())
+	require.Nil(t, l3.GetContact())
+	require.Nil(t, l3.GetCommunity())
+
+	c3 := l3.GetChannel()
+	require.Equal(t, channel.ChannelUUID, c3.ChannelUuid)
+	require.Equal(t, channel.Emoji, c3.Emoji)
+	require.Equal(t, channel.DisplayName, c3.DisplayName)
+	require.Equal(t, channel.Description, c3.Description)
+	require.Equal(t, channel.Color, c3.Color)
+
+	require.NotNil(t, c3.Community)
+	require.Equal(t, channel.Community.CommunityID, c3.Community.CommunityId)
+	require.Equal(t, channel.Community.DisplayName, c3.Community.DisplayName)
+	require.Equal(t, channel.Community.Color, c3.Community.Color)
+	require.Equal(t, channel.Community.Description, c3.Community.Description)
+	require.Equal(t, channel.Community.MembersCount, c3.Community.MembersCount)
+	require.NotNil(t, c3.Community.Icon)
+	require.Equal(t, uint32(channel.Community.Icon.Width), c3.Community.Icon.Width)
+	require.Equal(t, uint32(channel.Community.Icon.Height), c3.Community.Icon.Height)
+	require.Equal(t, expectedThumbnailPayload, c3.Community.Icon.Payload)
+	require.NotNil(t, c3.Community.Banner)
+	require.Equal(t, uint32(channel.Community.Banner.Width), c3.Community.Banner.Width)
+	require.Equal(t, uint32(channel.Community.Banner.Height), c3.Community.Banner.Height)
+	require.Equal(t, expectedThumbnailPayload, c3.Community.Banner.Payload)
+
+	// Test any invalid link preview causes an early return.
+	invalidContactPreview := contact
+	invalidContactPreview.PublicKey = ""
+	invalidPreview := message.StatusLinkPreviews[0]
+	invalidPreview.Contact = invalidContactPreview
+	message.StatusLinkPreviews = []StatusLinkPreview{invalidPreview}
+	_, err = message.ConvertStatusLinkPreviewsToProto()
+	require.ErrorContains(t, err, "invalid status link preview, url='https://status.app/u/'")
+}
+
 func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 
 	contact := &protobuf.UnfurledStatusContactLink{
@@ -257,16 +417,54 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 		DisplayName: "2",
 		Description: "3",
 		Icon: &protobuf.UnfurledLinkThumbnail{
-			Width:   100,
-			Height:  200,
+			Width:   10,
+			Height:  20,
 			Payload: []byte(""),
 		},
 	}
 
-	l := &protobuf.UnfurledStatusLink{
-		Url: "https://status.app",
-		Payload: &protobuf.UnfurledStatusLink_Contact{
-			Contact: contact,
+	community := &protobuf.UnfurledStatusCommunityLink{
+		CommunityId:  "4",
+		DisplayName:  "5",
+		Description:  "6",
+		MembersCount: 7,
+		Color:        "8",
+		TagIndices:   []uint32{9, 10},
+		Icon: &protobuf.UnfurledLinkThumbnail{
+			Width:   30,
+			Height:  40,
+			Payload: []byte(""),
+		},
+		Banner: &protobuf.UnfurledLinkThumbnail{
+			Width:   50,
+			Height:  60,
+			Payload: []byte(""),
+		},
+	}
+
+	channel := &protobuf.UnfurledStatusChannelLink{
+		ChannelUuid: "11",
+		Emoji:       "12",
+		DisplayName: "13",
+		Description: "14",
+		Color:       "15",
+		Community: &protobuf.UnfurledStatusCommunityLink{
+			CommunityId:  "16",
+			DisplayName:  "17",
+			Description:  "18",
+			MembersCount: 19,
+			Color:        "20",
+			TagIndices:   []uint32{21, 22},
+			Icon: &protobuf.UnfurledLinkThumbnail{
+				Width:   70,
+				Height:  80,
+				Payload: []byte(""),
+			},
+			Banner: &protobuf.UnfurledLinkThumbnail{
+				Width:   90,
+				Height:  100,
+				Payload: []byte(""),
+			},
 		},
 	}
 
@@ -274,7 +472,26 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 		ID: "42",
 		ChatMessage: &protobuf.ChatMessage{
 			UnfurledStatusLinks: &protobuf.UnfurledStatusLinks{
-				UnfurledStatusLinks: []*protobuf.UnfurledStatusLink{l},
+				UnfurledStatusLinks: []*protobuf.UnfurledStatusLink{
+					{
+						Url: "https://status.app/u/",
+						Payload: &protobuf.UnfurledStatusLink_Contact{
+							Contact: contact,
+						},
+					},
+					{
+						Url: "https://status.app/c/",
+						Payload: &protobuf.UnfurledStatusLink_Community{
+							Community: community,
+						},
+					},
+					{
+						Url: "https://status.app/cc/",
+						Payload: &protobuf.UnfurledStatusLink_Channel{
+							Channel: channel,
+						},
+					},
+				},
 			},
 		},
 	}
@@ -284,26 +501,86 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 	}
 
 	previews := msg.ConvertFromProtoToStatusLinkPreviews(urlMaker)
-	require.Len(t, previews, 1)
+	require.Len(t, previews, 3)
 
-	p := previews[0]
-	require.Equal(t, l.Url, p.URL)
+	// Contact preview
 
-	require.Nil(t, p.Community)
-	require.Nil(t, p.Channel)
+	p1 := previews[0]
+	require.Equal(t, "https://status.app/u/", p1.URL)
+	require.NotNil(t, p1.Contact)
+	require.Nil(t, p1.Community)
+	require.Nil(t, p1.Channel)
 
-	c := p.Contact
-	require.NotNil(t, c)
-	require.Equal(t, "1", c.PublicKey)
-	require.Equal(t, contact.PublicKey, c.PublicKey)
-	require.Equal(t, contact.DisplayName, c.DisplayName)
-	require.Equal(t, contact.Description, c.Description)
-	icon := c.Icon
-	require.NotNil(t, icon)
-	require.Equal(t, int(contact.Icon.Width), icon.Width)
-	require.Equal(t, int(contact.Icon.Height), icon.Height)
-	require.Equal(t, "", icon.DataURI)
-	require.Equal(t, "https://localhost:6666/42-https://status.app-contact-icon", icon.URL)
+	c1 := p1.Contact
+	require.NotNil(t, c1)
+	require.Equal(t, "1", c1.PublicKey)
+	require.Equal(t, contact.PublicKey, c1.PublicKey)
+	require.Equal(t, contact.DisplayName, c1.DisplayName)
+	require.Equal(t, contact.Description, c1.Description)
+	require.NotNil(t, c1.Icon)
+	require.Equal(t, int(contact.Icon.Width), c1.Icon.Width)
+	require.Equal(t, int(contact.Icon.Height), c1.Icon.Height)
+	require.Equal(t, "", c1.Icon.DataURI)
+	require.Equal(t, "https://localhost:6666/42-https://status.app/u/-contact-icon", c1.Icon.URL)
+
+	// Community preview
+
+	p2 := previews[1]
+	require.Equal(t, "https://status.app/c/", p2.URL)
+	require.NotNil(t, p2.Community)
+	require.Nil(t, p2.Contact)
+	require.Nil(t, p2.Channel)
+
+	c2 := p2.Community
+	require.Equal(t, community.CommunityId, c2.CommunityID)
+	require.Equal(t, community.DisplayName, c2.DisplayName)
+	require.Equal(t, community.Description, c2.Description)
+	require.Equal(t, community.MembersCount, c2.MembersCount)
+	require.Equal(t, community.Color, c2.Color)
+	require.Equal(t, community.TagIndices, c2.TagIndices)
+	require.NotNil(t, c2.Icon)
+	require.Equal(t, int(community.Icon.Width), c2.Icon.Width)
+	require.Equal(t, int(community.Icon.Height), c2.Icon.Height)
+	require.Equal(t, "", c2.Icon.DataURI)
+	require.Equal(t, "https://localhost:6666/42-https://status.app/c/-community-icon", c2.Icon.URL)
+	require.NotNil(t, c2.Banner)
+	require.Equal(t, int(community.Banner.Width), c2.Banner.Width)
+	require.Equal(t, int(community.Banner.Height), c2.Banner.Height)
+	require.Equal(t, "", c2.Banner.DataURI)
+	require.Equal(t, "https://localhost:6666/42-https://status.app/c/-community-banner", c2.Banner.URL)
+
+	// Channel preview
+
+	p3 := previews[2]
+	require.Equal(t, "https://status.app/cc/", p3.URL)
+	require.NotNil(t, p3.Channel)
+	require.Nil(t, p3.Contact)
+	require.Nil(t, p3.Community)
+
+	c3 := previews[2].Channel
+	require.Equal(t, channel.ChannelUuid, c3.ChannelUUID)
+	require.Equal(t, channel.Emoji, c3.Emoji)
+	require.Equal(t, channel.DisplayName, c3.DisplayName)
+	require.Equal(t, channel.Description, c3.Description)
+	require.Equal(t, channel.Color, c3.Color)
+
+	require.NotNil(t, p3.Channel.Community)
+	require.Equal(t, channel.Community.CommunityId, c3.Community.CommunityID)
+	require.Equal(t, channel.Community.DisplayName, c3.Community.DisplayName)
+	require.Equal(t, channel.Community.Color, c3.Community.Color)
+	require.Equal(t, channel.Community.Description, c3.Community.Description)
+	require.Equal(t, channel.Community.MembersCount, c3.Community.MembersCount)
+	require.NotNil(t, c3.Community.Icon)
+	require.Equal(t, int(channel.Community.Icon.Width), c3.Community.Icon.Width)
+	require.Equal(t, int(channel.Community.Icon.Height), c3.Community.Icon.Height)
+	require.Equal(t, "", c3.Community.Icon.DataURI)
+	require.Equal(t, "https://localhost:6666/42-https://status.app/cc/-channel-community-icon", c3.Community.Icon.URL)
+	require.NotNil(t, c3.Community.Banner)
+	require.Equal(t, int(channel.Community.Banner.Width), c3.Community.Banner.Width)
+	require.Equal(t, int(channel.Community.Banner.Height), c3.Community.Banner.Height)
+	require.Equal(t, "", c3.Community.Banner.DataURI)
+	require.Equal(t, "https://localhost:6666/42-https://status.app/cc/-channel-community-banner", c3.Community.Banner.URL)
+
 }
 
 func assertMarshalAndUnmarshalJSON[T any](t *testing.T, obj *T, msgAndArgs ...any) {

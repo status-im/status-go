@@ -1025,6 +1025,7 @@ func getStatusLinkThumbnailPayload(db *sql.DB, logger *zap.Logger, msgID string,
 				return nil, fmt.Errorf("contact icon is empty")
 			}
 			return contact.Icon.Payload, nil
+
 		case CommunityIcon:
 			community := p.GetCommunity()
 			if community == nil {
@@ -1077,10 +1078,6 @@ func getStatusLinkThumbnailPayload(db *sql.DB, logger *zap.Logger, msgID string,
 }
 
 func handleStatusLinkPreviewThumbnail(db *sql.DB, logger *zap.Logger) http.HandlerFunc {
-
-	//StatusLinkPreviewImageURLs
-	//StatusLinkPreviewImageID
-
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := r.URL.Query()
 		parsed := ParseImageParams(logger, params)
