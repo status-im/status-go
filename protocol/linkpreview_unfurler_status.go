@@ -163,6 +163,7 @@ func (u *StatusUnfurler) Unfurl() (common.StatusLinkPreview, error) {
 	if resp.Contact != nil {
 		preview.Contact, err = u.buildContactData(resp.Contact)
 		u.logger.Warn("error when building contact data: ", zap.Error(err))
+		u.logger.Info("<<< StatusUnfurler::Unfurl", zap.Any("contact", preview.Contact))
 		return preview, nil
 	}
 
@@ -175,6 +176,7 @@ func (u *StatusUnfurler) Unfurl() (common.StatusLinkPreview, error) {
 		if err != nil {
 			u.logger.Warn("error when building channel data: ", zap.Error(err))
 		}
+		u.logger.Info("<<< StatusUnfurler::Unfurl", zap.Any("channel", preview.Channel))
 		return preview, nil
 	}
 
@@ -183,13 +185,9 @@ func (u *StatusUnfurler) Unfurl() (common.StatusLinkPreview, error) {
 		if err != nil {
 			u.logger.Warn("error when building community data: ", zap.Error(err))
 		}
+		u.logger.Info("<<< StatusUnfurler::Unfurl", zap.Any("community", preview.Community))
 		return preview, nil
 	}
-
-	u.logger.Info("<<< StatusUnfurler::Unfurl",
-		zap.Any("contact", preview.Contact),
-		zap.Any("community", preview.Community),
-		zap.Any("channel", preview.Channel))
 
 	return preview, nil
 }

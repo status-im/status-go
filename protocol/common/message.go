@@ -918,10 +918,14 @@ func (m *Message) ConvertFromProtoToLinkPreviews(makeMediaServerURL func(msgID s
 			Type:        link.Type,
 			URL:         link.Url,
 		}
+		mediaUrl := ""
+		if len(link.ThumbnailPayload) > 0 {
+			mediaUrl = makeMediaServerURL(m.ID, link.Url)
+		}
 		if link.GetThumbnailPayload() != nil {
 			lp.Thumbnail.Width = int(link.ThumbnailWidth)
 			lp.Thumbnail.Height = int(link.ThumbnailHeight)
-			lp.Thumbnail.URL = makeMediaServerURL(m.ID, link.Url)
+			lp.Thumbnail.URL = mediaUrl
 		}
 		previews = append(previews, lp)
 	}
@@ -1062,10 +1066,14 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 	}
 
 	createThumbnail := func(thumbnail *protobuf.UnfurledLinkThumbnail, URL string, imageId string) LinkPreviewThumbnail {
+		mediaUrl := ""
+		if len(thumbnail.Payload) > 0 {
+			mediaUrl = makeMediaServerURL(m.ID, URL, imageId)
+		}
 		return LinkPreviewThumbnail{
 			Width:  int(thumbnail.Width),
 			Height: int(thumbnail.Height),
-			URL:    makeMediaServerURL(m.ID, URL, imageId),
+			URL:    mediaUrl,
 		}
 	}
 
