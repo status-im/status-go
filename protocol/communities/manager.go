@@ -76,6 +76,7 @@ type Manager struct {
 	logger                           *zap.Logger
 	stdoutLogger                     *zap.Logger
 	transport                        *transport.Transport
+	timesource                       common.TimeSource
 	quit                             chan struct{}
 	torrentConfig                    *params.TorrentConfig
 	torrentClient                    *torrent.Client
@@ -197,9 +198,13 @@ func WithCommunityTokensService(communityTokensService communitytokens.ServiceIn
 	}
 }
 
-func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Protocol, logger *zap.Logger, verifier *ens.Verifier, transport *transport.Transport, torrentConfig *params.TorrentConfig, opts ...ManagerOption) (*Manager, error) {
+func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Protocol, logger *zap.Logger, verifier *ens.Verifier, transport *transport.Transport, timesource common.TimeSource, torrentConfig *params.TorrentConfig, opts ...ManagerOption) (*Manager, error) {
 	if identity == nil {
 		return nil, errors.New("empty identity")
+	}
+
+	if timesource == nil {
+		return nil, errors.New("no timesource")
 	}
 
 	var err error
@@ -226,12 +231,14 @@ func NewManager(identity *ecdsa.PrivateKey, db *sql.DB, encryptor *encryption.Pr
 		identity:                    identity,
 		quit:                        make(chan struct{}),
 		transport:                   transport,
+		timesource:                  timesource,
 		torrentConfig:               torrentConfig,
 		torrentTasks:                make(map[string]metainfo.Hash),
 		historyArchiveDownloadTasks: make(map[string]*HistoryArchiveDownloadTask),
 		persistence: &Persistence{
-			logger: logger,
-			db:     db,
+			logger:     logger,
+			db:         db,
+			timesource: timesource,
 		},
 	}
 
@@ -647,7 +654,7 @@ func (m *Manager) CreateCommunity(request *requests.CreateCommunity, publish boo
 		MemberIdentity:       &m.identity.PublicKey,
 		CommunityDescription: description,
 	}
-	community, err := New(config)
+	community, err := New(config, m.timesource)
 	if err != nil {
 		return nil, err
 	}
@@ -1043,7 +1050,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey) (*Community, error) {
 			MemberIdentity:       &m.identity.PublicKey,
 			CommunityDescription: description,
 		}
-		community, err = New(config)
+		community, err = New(config, m.timesource)
 		if err != nil {
 			return nil, err
 		}
@@ -1326,8 +1333,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 			MemberIdentity:                      &m.identity.PublicKey,
 			ID:                                  signer,
 		}
-
-		community, err = New(config)
+		community, err = New(config, m.timesource)
 		if err != nil {
 			return nil, err
 		}

@@ -2,7 +2,6 @@ package communities
 
 import (
 	"crypto/ecdsa"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -13,27 +12,26 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-func createTestCommunity(identity *ecdsa.PrivateKey) *Community {
-	return &Community{
-		config: &Config{
-			PrivateKey: identity,
-			CommunityDescription: &protobuf.CommunityDescription{
-				Members:                 map[string]*protobuf.CommunityMember{},
-				Permissions:             &protobuf.CommunityPermissions{},
-				Identity:                &protobuf.ChatIdentity{},
-				Chats:                   map[string]*protobuf.CommunityChat{},
-				BanList:                 []string{},
-				Categories:              map[string]*protobuf.CommunityCategory{},
-				Encrypted:               false,
-				TokenPermissions:        map[string]*protobuf.CommunityTokenPermission{},
-				CommunityTokensMetadata: []*protobuf.CommunityTokenMetadata{},
-			},
-			ID:             &identity.PublicKey,
-			Joined:         true,
-			MemberIdentity: &identity.PublicKey,
+func createTestCommunity(identity *ecdsa.PrivateKey) (*Community, error) {
+	config := Config{
+		PrivateKey: identity,
+		CommunityDescription: &protobuf.CommunityDescription{
+			Members:                 map[string]*protobuf.CommunityMember{},
+			Permissions:             &protobuf.CommunityPermissions{},
+			Identity:                &protobuf.ChatIdentity{},
+			Chats:                   map[string]*protobuf.CommunityChat{},
+			BanList:                 []string{},
+			Categories:              map[string]*protobuf.CommunityCategory{},
+			Encrypted:               false,
+			TokenPermissions:        map[string]*protobuf.CommunityTokenPermission{},
+			CommunityTokensMetadata: []*protobuf.CommunityTokenMetadata{},
 		},
-		mutex: sync.Mutex{},
+		ID:             &identity.PublicKey,
+		Joined:         true,
+		MemberIdentity: &identity.PublicKey,
 	}
+
+	return New(config, &TimeSourceStub{})
 }
 
 func TestCommunityEncryptionKeyActionSuite(t *testing.T) {
@@ -79,7 +77,8 @@ func (s *CommunityEncryptionKeyActionSuite) SetupTest() {
 }
 
 func (s *CommunityEncryptionKeyActionSuite) TestEncryptionKeyNone() {
-	origin := createTestCommunity(s.identity)
+	origin, err := createTestCommunity(s.identity)
+	s.Require().NoError(err)
 
 	// if there are no changes there should be no actions
 	actions := EvaluateCommunityEncryptionKeyActions(origin, origin)
@@ -365,7 +364,8 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Permiss
 
 	for _, tc := range testCases {
 		s.Run(tc.name, func() {
-			origin := createTestCommunity(s.identity)
+			origin, err := createTestCommunity(s.identity)
+			s.Require().NoError(err)
 			modified := origin.CreateDeepCopy()
 
 			for _, permission := range tc.originPermissions {
@@ -494,7 +494,9 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Members
 
 	for _, tc := range testCases {
 		s.Run(tc.name, func() {
-			origin := createTestCommunity(s.identity)
+			origin, err := createTestCommunity(s.identity)
+			s.Require().NoError(err)
+
 			for _, permission := range tc.permissions {
 				_, err := origin.UpsertTokenPermission(permission)
 				s.Require().NoError(err)
@@ -595,7 +597,8 @@ func (s *CommunityEncryptionKeyActionSuite) TestCommunityLevelKeyActions_Permiss
 
 	for _, tc := range testCases {
 		s.Run(tc.name, func() {
-			origin := createTestCommunity(s.identity)
+			origin, err := createTestCommunity(s.identity)
+			s.Require().NoError(err)
 			modified := origin.CreateDeepCopy()
 
 			for _, permission := range tc.originPermissions {
@@ -737,8 +740,10 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 
 	for _, tc := range testCases {
 		s.Run(tc.name, func() {
-			origin := createTestCommunity(s.identity)
-			_, err := origin.CreateChat(channelID, &protobuf.CommunityChat{
+			origin, err := createTestCommunity(s.identity)
+			s.Require().NoError(err)
+
+			_, err = origin.CreateChat(channelID, &protobuf.CommunityChat{
 				Members:     map[string]*protobuf.CommunityMember{},
 				Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_NO_MEMBERSHIP},
 				Identity:    &protobuf.ChatIdentity{},
@@ -783,12 +788,13 @@ func (s *CommunityEncryptionKeyActionSuite) TestChannelLevelKeyActions() {
 }
 
 func (s *CommunityEncryptionKeyActionSuite) TestNilOrigin() {
-	newCommunity := createTestCommunity(s.identity)
+	newCommunity, err := createTestCommunity(s.identity)
+	s.Require().NoError(err)
 
 	channelID := "0x1234"
 	chatID := types.EncodeHex(crypto.CompressPubkey(&s.identity.PublicKey)) + channelID
 
-	_, err := newCommunity.CreateChat(channelID, &protobuf.CommunityChat{
+	_, err = newCommunity.CreateChat(channelID, &protobuf.CommunityChat{
 		Members:     map[string]*protobuf.CommunityMember{},
 		Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_NO_MEMBERSHIP},
 		Identity:    &protobuf.ChatIdentity{},

@@ -39,7 +39,7 @@ func (s *PersistenceSuite) SetupTest() {
 	err = sqlite.Migrate(db)
 	s.NoError(err, "protocol migrate")
 
-	s.db = &Persistence{db: db}
+	s.db = &Persistence{db: db, timesource: &TimeSourceStub{}}
 }
 
 func (s *PersistenceSuite) TestSaveCommunity() {
@@ -259,7 +259,7 @@ func (s *PersistenceSuite) makeNewCommunity(identity *ecdsa.PrivateKey) *Communi
 		MemberIdentity: &identity.PublicKey,
 		PrivateKey:     comPrivKey,
 		ID:             &comPrivKey.PublicKey,
-	})
+	}, &TimeSourceStub{})
 	s.NoError(err, "New shouldn't give any error")
 
 	md, err := com.MarshaledDescription()

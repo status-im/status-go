@@ -51,13 +51,18 @@ type EventsData struct {
 }
 
 type Community struct {
-	config *Config
-	mutex  sync.Mutex
+	config     *Config
+	mutex      sync.Mutex
+	timesource common.TimeSource
 }
 
-func New(config Config) (*Community, error) {
+func New(config Config, timesource common.TimeSource) (*Community, error) {
 	if config.MemberIdentity == nil {
 		return nil, errors.New("no member identity")
+	}
+
+	if timesource == nil {
+		return nil, errors.New("no timesource")
 	}
 
 	if config.Logger == nil {
@@ -68,7 +73,7 @@ func New(config Config) (*Community, error) {
 		config.Logger = logger
 	}
 
-	community := &Community{config: &config}
+	community := &Community{config: &config, timesource: timesource}
 	community.initialize()
 	return community, nil
 }
@@ -1820,7 +1825,16 @@ func (o *Community) RequestedToJoinAt() uint64 {
 }
 
 func (o *Community) nextClock() uint64 {
-	return o.config.CommunityDescription.Clock + 1
+	// lamport timestamp
+	clock := o.config.CommunityDescription.Clock
+	timestamp := o.timesource.GetCurrentTime()
+	if clock == 0 || clock < timestamp {
+		clock = timestamp
+	} else {
+		clock = clock + 1
+	}
+
+	return clock
 }
 
 func (o *Community) CanManageUsersPublicKeys() ([]*ecdsa.PublicKey, error) {
@@ -1985,6 +1999,7 @@ func (o *Community) CreateDeepCopy() *Community {
 			SyncedAt:                            o.config.SyncedAt,
 			EventsData:                          o.config.EventsData,
 		},
+		timesource: o.timesource,
 	}
 }
 
