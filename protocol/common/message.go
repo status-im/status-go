@@ -800,42 +800,85 @@ func (m *Message) LoadImage() error {
 	return nil
 }
 
-func isValidLinkPreviewThumbnail(thumbnail LinkPreviewThumbnail) bool {
-	return (thumbnail.DataURI == "" && thumbnail.Width == 0 && thumbnail.Height == 0) ||
-		(thumbnail.DataURI != "" && thumbnail.Width > 0 && thumbnail.Height > 0)
+func isValidLinkPreviewThumbnail(thumbnail LinkPreviewThumbnail) error {
+	if thumbnail.DataURI == "" {
+		if thumbnail.Width == 0 && thumbnail.Height == 0 {
+			return nil
+		}
+		return fmt.Errorf("dataUri is empty, but width/height are not zero")
+	}
+
+	if thumbnail.Width == 0 || thumbnail.Height == 0 {
+		return fmt.Errorf("dataUri is not empty, but width/heigth are zero")
+	}
+
+	return nil
 }
 
-func isValidLinkPreviewForProto(preview LinkPreview) bool {
+func isValidLinkPreviewForProto(preview LinkPreview) error {
 	switch preview.Type {
 	case protobuf.UnfurledLink_IMAGE:
-		return preview.URL != "" && isValidLinkPreviewThumbnail(preview.Thumbnail)
+		if preview.URL == "" {
+			return fmt.Errorf("empty url")
+		}
+		if err := isValidLinkPreviewThumbnail(preview.Thumbnail); err != nil {
+			return fmt.Errorf("thumbnail is not valid for proto: %w", err)
+		}
+		return nil
 	default: // Validate as a link type by default.
-		return preview.Title != "" && preview.URL != "" && isValidLinkPreviewThumbnail(preview.Thumbnail)
+		if preview.Title == "" {
+			return fmt.Errorf("title is empty")
+		}
+		if preview.URL == "" {
+			return fmt.Errorf("url is empty")
+		}
+		if err := isValidLinkPreviewThumbnail(preview.Thumbnail); err != nil {
+			return fmt.Errorf("thumbnail is not valid for proto: %w", err)
+		}
 	}
+	return fmt.Errorf("uncaught link preview type")
 }
 
-func (preview *StatusCommunityLinkPreview) isValidForProto() bool {
-	return preview.CommunityID != "" &&
-		isValidLinkPreviewThumbnail(preview.Icon) &&
-		isValidLinkPreviewThumbnail(preview.Banner)
+func (preview *StatusCommunityLinkPreview) isValidForProto() error {
+	if preview == nil {
+		return fmt.Errorf("community preview is empty")
+	}
+	if preview.CommunityID == "" {
+		return fmt.Errorf("communityId is empty")
+	}
+	if err := isValidLinkPreviewThumbnail(preview.Icon); err != nil {
+		return fmt.Errorf("community icon is invalid: %w", err)
+	}
+	if err := isValidLinkPreviewThumbnail(preview.Banner); err != nil {
+		return fmt.Errorf("community banner is invalid: %w", err)
+	}
+	return nil
 }
 
-func (preview StatusLinkPreview) isValidForProto() bool {
+func (preview StatusLinkPreview) isValidForProto() error {
 	if preview.URL == "" {
-		return false
+		return fmt.Errorf("url can't be empty")
 	}
 
 	// At least and only one of Contact/Community/Channel can be present in the preview
 	if preview.Contact != nil && preview.Community != nil ||
 		preview.Community != nil && preview.Channel != nil ||
-		preview.Channel != nil && preview.Contact != nil ||
-		preview.Contact == nil && preview.Community == nil && preview.Channel == nil {
-		return false
+		preview.Channel != nil && preview.Contact != nil {
+		return fmt.Errorf("several of contact/community/channel are set at the same time")
+	}
+
+	if preview.Contact == nil && preview.Community == nil && preview.Channel == nil {
+		return fmt.Errorf("none of contact/community/channel are set")
 	}
 
 	if preview.Contact != nil {
-		return preview.Contact.PublicKey != "" &&
-			isValidLinkPreviewThumbnail(preview.Contact.Icon)
+		if preview.Contact.PublicKey == "" {
+			return fmt.Errorf("contact publicKey is empty")
+		}
+		if err := isValidLinkPreviewThumbnail(preview.Contact.Icon); err != nil {
+			return fmt.Errorf("contact icon invalid: %w", err)
+		}
+		return nil
 	}
 
 	if preview.Community != nil {
@@ -843,12 +886,18 @@ func (preview StatusLinkPreview) isValidForProto() bool {
 	}
 
 	if preview.Channel != nil {
-		return preview.Channel.ChannelUUID != "" &&
-			preview.Community != nil &&
-			preview.Community.isValidForProto()
+		if preview.Channel.ChannelUUID == "" {
+			return fmt.Errorf("channelUuid is empty")
+		}
+		if preview.Channel.Community == nil {
+			return fmt.Errorf("channel community is nil")
+		}
+		if err := preview.Channel.Community.isValidForProto(); err != nil {
+			return fmt.Errorf("channel community is not valid: %w", err)
+		}
+		return nil
 	}
-
-	return false
+	return nil
 }
 
 // ConvertLinkPreviewsToProto expects previews to be correctly sent by the
@@ -864,8 +913,8 @@ func (m *Message) ConvertLinkPreviewsToProto() ([]*protobuf.UnfurledLink, error)
 	for _, preview := range m.LinkPreviews {
 		// Do not process subsequent previews because we do expect all previews to
 		// be valid at this stage.
-		if !isValidLinkPreviewForProto(preview) {
-			return nil, fmt.Errorf("invalid link preview, url='%s'", preview.URL)
+		if err := isValidLinkPreviewForProto(preview); err != nil {
+			return nil, fmt.Errorf("invalid link preview, url='%s': %w", preview.URL, err)
 		}
 
 		var payload []byte
@@ -994,9 +1043,9 @@ func (m *Message) ConvertStatusLinkPreviewsToProto() (*protobuf.UnfurledStatusLi
 	unfurledLinks := make([]*protobuf.UnfurledStatusLink, 0, len(m.StatusLinkPreviews))
 
 	for _, preview := range m.StatusLinkPreviews {
-		// We do expect all previews to be valid at this stage
-		if !preview.isValidForProto() {
-			return nil, fmt.Errorf("invalid status link preview, url='%s'", preview.URL)
+		// We expect all previews to be valid at this stage
+		if err := preview.isValidForProto(); err != nil {
+			return nil, fmt.Errorf("invalid status link preview, url='%s': %w", preview.URL, err)
 		}
 
 		ul := &protobuf.UnfurledStatusLink{
@@ -1029,7 +1078,7 @@ func (m *Message) ConvertStatusLinkPreviewsToProto() (*protobuf.UnfurledStatusLi
 		}
 
 		if preview.Channel != nil {
-			communityPreview, err := preview.Community.ConvertToProto()
+			communityPreview, err := preview.Channel.Community.ConvertToProto()
 			if err != nil {
 				return nil, err
 			}
