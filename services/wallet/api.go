@@ -553,6 +553,11 @@ func (api *API) CreateMultiTransaction(ctx context.Context, multiTransactionComm
 	return api.s.transactionManager.CreateMultiTransactionFromCommand(ctx, multiTransactionCommand, data, api.router.bridges, password)
 }
 
+func (api *API) ProceedWithTransactionsSignatures(ctx context.Context, signatures map[string]transfer.SignatureDetails) (*transfer.MultiTransactionCommandResult, error) {
+	log.Debug("[WalletAPI:: ProceedWithTransactionsSignatures] sign with signatures and send multi transaction")
+	return api.s.transactionManager.ProceedWithTransactionsSignatures(ctx, signatures)
+}
+
 func (api *API) GetMultiTransactions(ctx context.Context, transactionIDs []transfer.MultiTransactionIDType) ([]*transfer.MultiTransaction, error) {
 	log.Debug("wallet.api.GetMultiTransactions", "IDs.len", len(transactionIDs))
 	return api.s.transactionManager.GetMultiTransactions(ctx, transactionIDs)

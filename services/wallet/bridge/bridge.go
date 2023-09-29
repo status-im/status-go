@@ -94,4 +94,5 @@ type Bridge interface {
 	CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error)
 	Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (types.Hash, error)
 	GetContractAddress(network *params.Network, token *token.Token) *common.Address
+	BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error)
 }

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
@@ -244,56 +245,63 @@ func (s *CBridge) GetContractAddress(network *params.Network, token *token.Token
 	return nil
 }
 
-func (s *CBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (types.Hash, error) {
+func (s *CBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerFn) (*ethTypes.Transaction, error) {
 	fromNetwork := s.rpcClient.NetworkManager.Find(sendArgs.ChainID)
 	if fromNetwork == nil {
-		return types.HexToHash(""), errors.New("network not found")
+		return nil, errors.New("network not found")
 	}
 	tk := s.tokenManager.FindToken(fromNetwork, sendArgs.CbridgeTx.Symbol)
 	if tk == nil {
-		return types.HexToHash(""), errors.New("token not found")
+		return nil, errors.New("token not found")
 	}
 	addrs := s.GetContractAddress(fromNetwork, nil)
 	if addrs == nil {
-		return types.HexToHash(""), errors.New("contract not found")
+		return nil, errors.New("contract not found")
 	}
 
 	backend, err := s.rpcClient.EthClient(sendArgs.ChainID)
 	if err != nil {
-		return types.HexToHash(""), err
+		return nil, err
 	}
 	contract, err := celer.NewCeler(*addrs, backend)
 	if err != nil {
-		return types.HexToHash(""), err
+		return nil, err
 	}
 
-	txOpts := sendArgs.CbridgeTx.ToTransactOpts(getSigner(sendArgs.ChainID, sendArgs.CbridgeTx.From, verifiedAccount))
-	var tx *ethTypes.Transaction
+	txOpts := sendArgs.CbridgeTx.ToTransactOpts(signerFn)
 	if tk.IsNative() {
-		tx, err = contract.SendNative(
+		return contract.SendNative(
 			txOpts,
 			sendArgs.CbridgeTx.Recipient,
-			(*big.Int)(sendArgs.CbridgeTx.Amount),
-			sendArgs.CbridgeTx.ChainID,
-			uint64(time.Now().UnixMilli()),
-			500,
-		)
-	} else {
-		tx, err = contract.Send(
-			txOpts,
-			sendArgs.CbridgeTx.Recipient,
-			tk.Address,
 			(*big.Int)(sendArgs.CbridgeTx.Amount),
 			sendArgs.CbridgeTx.ChainID,
 			uint64(time.Now().UnixMilli()),
 			500,
 		)
 	}
+
+	return contract.Send(
+		txOpts,
+		sendArgs.CbridgeTx.Recipient,
+		tk.Address,
+		(*big.Int)(sendArgs.CbridgeTx.Amount),
+		sendArgs.CbridgeTx.ChainID,
+		uint64(time.Now().UnixMilli()),
+		500,
+	)
+}
+
+func (s *CBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (types.Hash, error) {
+	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.CbridgeTx.From, verifiedAccount))
 	if err != nil {
 		return types.HexToHash(""), err
 	}
 
 	return types.Hash(tx.Hash()), nil
+}
+
+func (s *CBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error) {
+	return s.sendOrBuild(sendArgs, nil)
 }
 
 func (s *CBridge) CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error) {

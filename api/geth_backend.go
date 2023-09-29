@@ -1897,7 +1897,7 @@ func (b *GethStatusBackend) SendTransactionWithChainID(chainID uint64, sendArgs 
 }
 
 func (b *GethStatusBackend) SendTransactionWithSignature(sendArgs transactions.SendTxArgs, sig []byte) (hash types.Hash, err error) {
-	hash, err = b.transactor.SendTransactionWithSignature(sendArgs, sig)
+	hash, err = b.transactor.SendTransactionWithSignature(b.transactor.NetworkID(), sendArgs, sig)
 	if err != nil {
 		return
 	}

@@ -17,7 +17,7 @@ import (
 func setupTestTransactionDB(t *testing.T) (*TransactionManager, func()) {
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
-	return &TransactionManager{db, nil, nil, nil, nil, nil, nil}, func() {
+	return &TransactionManager{db, nil, nil, nil, nil, nil, nil, nil, nil, nil}, func() {
 		require.NoError(t, db.Close())
 	}
 }
