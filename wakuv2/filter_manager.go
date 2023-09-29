@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"math/big"
-	"sort"
 	"sync"
 	"time"
 
@@ -30,6 +29,8 @@ const (
 	FilterEventGetStats          int = 5
 )
 
+const pingTimeout = 5 * time.Second
+
 type FilterSubs map[string]filter.SubscriptionSet
 
 type FilterEvent struct {
@@ -48,7 +49,6 @@ type FilterManager struct {
 	isFilterSubAlive func(sub *filter.SubscriptionDetails) error
 	getFilter        func(string) *common.Filter
 	onNewEnvelopes   func(env *protocol.Envelope) error
-	disconnectMap    map[peer.ID]int64
 	peers            []peer.ID
 	logger           *zap.Logger
 	settings         settings
@@ -64,7 +64,6 @@ func newFilterManager(ctx context.Context, logger *zap.Logger, getFilterFn func(
 	mgr.onNewEnvelopes = onNewEnvelopes
 	mgr.filterSubs = make(FilterSubs)
 	mgr.eventChan = make(chan FilterEvent)
-	mgr.disconnectMap = make(map[peer.ID]int64)
 	mgr.peers = make([]peer.ID, 0)
 	mgr.settings = settings
 	mgr.node = node
@@ -80,7 +79,7 @@ func newFilterManager(ctx context.Context, logger *zap.Logger, getFilterFn func(
 func (mgr *FilterManager) runFilterLoop(wg *sync.WaitGroup) {
 	defer wg.Done()
 	// Use it to ping filter peer(s) periodically
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(pingTimeout)
 	defer ticker.Stop()
 
 	// Populate filter peers initially
@@ -92,25 +91,14 @@ func (mgr *FilterManager) runFilterLoop(wg *sync.WaitGroup) {
 			return
 		case <-ticker.C:
 			mgr.peers = mgr.findFilterPeers()
-			mgr.checkFilterHealth()
-			mgr.resubscribe("")
+			mgr.pingPeers()
+			mgr.resubscribe()
 		case ev := <-mgr.eventChan:
 			switch ev.eventType {
 
 			case FilterEventAdded:
-				f := mgr.getFilter(ev.filterID)
-				if f == nil {
-					mgr.logger.Error("FILTER event ADDED: No filter found", zap.String("id", ev.filterID))
-					break
-				}
 				mgr.filterSubs[ev.filterID] = make(filter.SubscriptionSet)
-				peer, err := mgr.findPeerCandidate()
-				if err == nil {
-					mgr.logger.Info("FILTER selecting peer", zap.Any("peer", peer))
-					go mgr.subscribeToFilter(ev.filterID, peer)
-				} else {
-					mgr.logger.Error("FILTER subscribe error", zap.Error(err))
-				}
+				mgr.resubscribe()
 
 			case FilterEventRemoved:
 				for _, sub := range mgr.filterSubs[ev.filterID] {
@@ -120,11 +108,26 @@ func (mgr *FilterManager) runFilterLoop(wg *sync.WaitGroup) {
 
 			case FilterEventPingResult:
 				if ev.result {
-					delete(mgr.disconnectMap, ev.peerID)
 					break
 				}
-				mgr.disconnectMap[ev.peerID] = time.Now().Unix()
-				mgr.resubscribe(ev.peerID)
+				// Remove peer from list
+				for i, p := range mgr.peers {
+					if ev.peerID == p {
+						mgr.peers = append(mgr.peers[:i], mgr.peers[i+1:]...)
+						break
+					}
+				}
+				// Delete subs for removed peer
+				for filterID, subs := range mgr.filterSubs {
+					for _, sub := range subs {
+						if sub.PeerID == ev.peerID {
+							mgr.logger.Info("FILTER sub is inactive", zap.String("filterId", filterID), zap.String("subID", sub.ID))
+							delete(subs, sub.ID)
+							go mgr.unsubscribeFromFilter(filterID, sub)
+						}
+					}
+				}
+				//mgr.resubscribe()
 
 			case FilterEventSubscribeResult:
 				mgr.filterSubs[ev.filterID][ev.sub.ID] = ev.sub
@@ -190,7 +193,7 @@ func (mgr *FilterManager) unsubscribeFromFilter(filterID string, sub *filter.Sub
 
 // Check whether each of the installed filters
 // has enough alive subscriptions to peers
-func (mgr *FilterManager) checkFilterHealth() {
+func (mgr *FilterManager) pingPeers() {
 
 	distinctPeers := make(map[peer.ID]struct{})
 	for _, subs := range mgr.filterSubs {
@@ -228,8 +231,7 @@ func (mgr *FilterManager) buildContentFilter(pubsubTopic string, contentTopicSet
 	}
 }
 
-// Find suitable peer(s). For this we use a peerDisconnectMap, it works so that
-// peers that have been recently disconnected from have lower priority
+// Find suitable peer(s)
 func (mgr *FilterManager) findFilterPeers() []peer.ID {
 	allPeers := mgr.node.Host().Peerstore().Peers()
 	//mgr.logger.Info("Peerstore peers", zap.Stringers("peers", allPeers))
@@ -252,15 +254,6 @@ func (mgr *FilterManager) findFilterPeers() []peer.ID {
 }
 
 func (mgr *FilterManager) findPeerCandidate() (peer.ID, error) {
-	if len(mgr.peers) > 0 {
-		sort.Slice(mgr.peers, func(i, j int) bool {
-			// If element not found in map, [] operator will return 0
-			return mgr.disconnectMap[mgr.peers[i]] < mgr.disconnectMap[mgr.peers[j]]
-		})
-	}
-
-	//mgr.logger.Info("Sorted peers", zap.Stringers("peers", peers), zap.Int("peerLen", len(peers)))
-
 	if len(mgr.peers) == 0 {
 		return "", errors.New("FILTER could not select a suitable peer")
 	}
@@ -268,16 +261,8 @@ func (mgr *FilterManager) findPeerCandidate() (peer.ID, error) {
 	return mgr.peers[n.Int64()], nil
 }
 
-func (mgr *FilterManager) resubscribe(peerToDrop peer.ID) {
+func (mgr *FilterManager) resubscribe() {
 	for filterID, subs := range mgr.filterSubs {
-		for _, sub := range subs {
-			if len(peerToDrop) > 0 && sub.PeerID == peerToDrop {
-				mgr.logger.Info("FILTER sub is inactive", zap.String("filterId", filterID), zap.String("subID", sub.ID))
-
-				delete(subs, sub.ID)
-				go mgr.unsubscribeFromFilter(filterID, sub)
-			}
-		}
 		mgr.logger.Info("FILTER active subscriptions count:", zap.String("filterId", filterID), zap.Int("len", len(subs)))
 		for i := len(subs); i < mgr.settings.MinPeersForFilter; i++ {
 			mgr.logger.Info("FILTER check not passed, try subscribing to peers", zap.String("filterId", filterID))
@@ -285,6 +270,8 @@ func (mgr *FilterManager) resubscribe(peerToDrop peer.ID) {
 
 			if err == nil {
 				go mgr.subscribeToFilter(filterID, peer)
+			} else {
+				mgr.logger.Error("FILTER resubscribe findPeer error", zap.Error(err))
 			}
 		}
 	}

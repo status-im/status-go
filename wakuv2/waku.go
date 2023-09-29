@@ -73,7 +73,6 @@ import (
 
 const messageQueueLimit = 1024
 const requestTimeout = 30 * time.Second
-const pingTimeout = 5 * time.Second
 const bootnodesQueryBackoffMs = 200
 const bootnodesMaxRetries = 7
 
