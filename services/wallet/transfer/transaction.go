@@ -3,17 +3,21 @@ package transfer
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
 	"strings"
 	"time"
 
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -21,6 +25,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/bridge"
 	wallet_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/walletevent"
+	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
 
@@ -33,6 +38,18 @@ const (
 	EventMTTransactionUpdate walletevent.EventType = "multi-transaction-update"
 )
 
+type SignatureDetails struct {
+	R string `json:"r"`
+	S string `json:"s"`
+	V string `json:"v"`
+}
+
+type TransactionDescription struct {
+	chainID   uint64
+	builtTx   *ethTypes.Transaction
+	signature []byte
+}
+
 type TransactionManager struct {
 	db             *sql.DB
 	gethManager    *account.GethManager
@@ -41,6 +58,10 @@ type TransactionManager struct {
 	accountsDB     *accounts.Database
 	pendingTracker *transactions.PendingTxTracker
 	eventFeed      *event.Feed
+
+	multiTransactionForKeycardSigning *MultiTransaction
+	transactionsBridgeData            []*bridge.TransactionBridge
+	transactionsForKeycardSingning    map[common.Hash]*TransactionDescription
 }
 
 func NewTransactionManager(
@@ -271,6 +292,7 @@ func (tm *TransactionManager) UpdateMultiTransaction(multiTransaction *MultiTran
 	return updateMultiTransaction(tm.db, multiTransaction)
 }
 
+// In case of keycard account, password should be empty
 func (tm *TransactionManager) CreateMultiTransactionFromCommand(ctx context.Context, command *MultiTransactionCommand,
 	data []*bridge.TransactionBridge, bridges map[string]bridge.Bridge, password string) (*MultiTransactionCommandResult, error) {
 
@@ -286,6 +308,33 @@ func (tm *TransactionManager) CreateMultiTransactionFromCommand(ctx context.Cont
 	}
 
 	multiTransaction.ID = uint(multiTransactionID)
+	if password == "" {
+		acc, err := tm.accountsDB.GetAccountByAddress(types.Address(multiTransaction.FromAddress))
+		if err != nil {
+			return nil, err
+		}
+
+		kp, err := tm.accountsDB.GetKeypairByKeyUID(acc.KeyUID)
+		if err != nil {
+			return nil, err
+		}
+
+		if !kp.MigratedToKeycard() {
+			return nil, fmt.Errorf("account being used is not migrated to a keycard, password is required")
+		}
+
+		tm.multiTransactionForKeycardSigning = multiTransaction
+		tm.transactionsBridgeData = data
+		hashes, err := tm.buildTransactions(bridges)
+		if err != nil {
+			return nil, err
+		}
+
+		signal.SendTransactionsForSigningEvent(hashes)
+
+		return nil, nil
+	}
+
 	hashes, err := tm.sendTransactions(multiTransaction, data, bridges, password)
 	if err != nil {
 		return nil, err
@@ -298,6 +347,61 @@ func (tm *TransactionManager) CreateMultiTransactionFromCommand(ctx context.Cont
 
 	return &MultiTransactionCommandResult{
 		ID:     int64(multiTransactionID),
+		Hashes: hashes,
+	}, nil
+}
+
+func (tm *TransactionManager) ProceedWithTransactionsSignatures(ctx context.Context, signatures map[string]SignatureDetails) (*MultiTransactionCommandResult, error) {
+	if tm.multiTransactionForKeycardSigning == nil {
+		return nil, errors.New("no multi transaction to proceed with")
+	}
+	if len(tm.transactionsBridgeData) == 0 {
+		return nil, errors.New("no transactions bridge data to proceed with")
+	}
+	if len(tm.transactionsForKeycardSingning) == 0 {
+		return nil, errors.New("no transactions to proceed with")
+	}
+	if len(signatures) != len(tm.transactionsForKeycardSingning) {
+		return nil, errors.New("not all transactions have been signed")
+	}
+
+	// check if all transactions have been signed
+	for hash, desc := range tm.transactionsForKeycardSingning {
+		sigDetails, ok := signatures[hash.String()]
+		if !ok {
+			return nil, fmt.Errorf("missing signature for transaction %s", hash)
+		}
+
+		rBytes, _ := hex.DecodeString(sigDetails.R)
+		sBytes, _ := hex.DecodeString(sigDetails.S)
+		vByte := byte(0)
+		if sigDetails.V == "1" {
+			vByte = 1
+		}
+
+		desc.signature = make([]byte, crypto.SignatureLength)
+		copy(desc.signature[32-len(rBytes):32], rBytes)
+		copy(desc.signature[64-len(rBytes):64], sBytes)
+		desc.signature[64] = vByte
+	}
+
+	// send transactions
+	hashes := make(map[uint64][]types.Hash)
+	for _, desc := range tm.transactionsForKeycardSingning {
+		hash, err := tm.transactor.SendBuiltTransactionWithSignature(desc.chainID, desc.builtTx, desc.signature)
+		if err != nil {
+			return nil, err
+		}
+		hashes[desc.chainID] = append(hashes[desc.chainID], hash)
+	}
+
+	err := tm.storePendingTransactions(tm.multiTransactionForKeycardSigning, hashes, tm.transactionsBridgeData)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MultiTransactionCommandResult{
+		ID:     int64(tm.multiTransactionForKeycardSigning.ID),
 		Hashes: hashes,
 	}, nil
 }
@@ -357,6 +461,29 @@ func multiTransactionFromCommand(command *MultiTransactionCommand) *MultiTransac
 	}
 
 	return multiTransaction
+}
+
+func (tm *TransactionManager) buildTransactions(bridges map[string]bridge.Bridge) ([]string, error) {
+	tm.transactionsForKeycardSingning = make(map[common.Hash]*TransactionDescription)
+	var hashes []string
+	for _, bridgeTx := range tm.transactionsBridgeData {
+		builtTx, err := bridges[bridgeTx.BridgeName].BuildTransaction(bridgeTx)
+		if err != nil {
+			return hashes, err
+		}
+
+		signer := ethTypes.NewLondonSigner(big.NewInt(int64(bridgeTx.ChainID)))
+		txHash := signer.Hash(builtTx)
+
+		tm.transactionsForKeycardSingning[txHash] = &TransactionDescription{
+			chainID: bridgeTx.ChainID,
+			builtTx: builtTx,
+		}
+
+		hashes = append(hashes, txHash.String())
+	}
+
+	return hashes, nil
 }
 
 func (tm *TransactionManager) sendTransactions(multiTransaction *MultiTransaction,

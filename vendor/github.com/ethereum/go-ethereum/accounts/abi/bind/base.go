@@ -61,6 +61,7 @@ type TransactOpts struct {
 
 	Context context.Context // Network context to support cancellation and timeouts (nil = no timeout)
 
+	NoSign bool // Do all transact steps but do not sign or send the transaction
 	NoSend bool // Do all transact steps but do not send the transaction
 }
 
@@ -386,6 +387,9 @@ func (c *BoundContract) transact(opts *TransactOpts, contract *common.Address, i
 	}
 	if err != nil {
 		return nil, err
+	}
+	if opts.NoSign {
+		return rawTx, nil
 	}
 	// Sign the transaction and schedule it for execution
 	if opts.Signer == nil {

@@ -3,8 +3,10 @@ package bridge
 import (
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts/community-tokens/collectibles"
 	"github.com/status-im/status-go/eth-node/types"
@@ -74,30 +76,41 @@ func (s *ERC721TransferBridge) EstimateGas(from, to *params.Network, account com
 	return 80000, nil
 }
 
-func (s *ERC721TransferBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
+func (s *ERC721TransferBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
 	ethClient, err := s.rpcClient.EthClient(sendArgs.ChainID)
 	if err != nil {
-		return hash, err
+		return tx, err
 	}
+
 	contract, err := collectibles.NewCollectibles(common.Address(*sendArgs.ERC721TransferTx.To), ethClient)
 	if err != nil {
-		return hash, err
+		return tx, err
 	}
+
 	nonce, unlock, err := s.transactor.NextNonce(s.rpcClient, sendArgs.ChainID, sendArgs.ERC721TransferTx.From)
 	if err != nil {
-		return hash, err
+		return tx, err
 	}
 	defer func() {
 		unlock(err == nil, nonce)
 	}()
 	argNonce := hexutil.Uint64(nonce)
 	sendArgs.ERC721TransferTx.Nonce = &argNonce
-	txOpts := sendArgs.ERC721TransferTx.ToTransactOpts(getSigner(sendArgs.ChainID, sendArgs.ERC721TransferTx.From, verifiedAccount))
-	tx, err := contract.SafeTransferFrom(txOpts, common.Address(sendArgs.ERC721TransferTx.From), sendArgs.ERC721TransferTx.Recipient, sendArgs.ERC721TransferTx.TokenID.ToInt())
+	txOpts := sendArgs.ERC721TransferTx.ToTransactOpts(signerFn)
+	return contract.SafeTransferFrom(txOpts, common.Address(sendArgs.ERC721TransferTx.From), sendArgs.ERC721TransferTx.Recipient,
+		sendArgs.ERC721TransferTx.TokenID.ToInt())
+}
+
+func (s *ERC721TransferBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
+	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.ERC721TransferTx.From, verifiedAccount))
 	if err != nil {
 		return hash, err
 	}
 	return types.Hash(tx.Hash()), nil
+}
+
+func (s *ERC721TransferBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error) {
+	return s.sendOrBuild(sendArgs, nil)
 }
 
 func (s *ERC721TransferBridge) CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error) {

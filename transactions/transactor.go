@@ -26,7 +26,7 @@ const (
 
 	defaultGas = 90000
 
-	validSignatureSize = 65
+	ValidSignatureSize = 65
 )
 
 // ErrInvalidSignatureSize is returned if a signature is not 65 bytes to avoid panic from go-ethereum
@@ -93,23 +93,50 @@ func (t *Transactor) SendTransactionWithChainID(chainID uint64, sendArgs SendTxA
 	return
 }
 
+func (t *Transactor) ValidateAndBuildTransaction(chainID uint64, sendArgs SendTxArgs) (tx *gethtypes.Transaction, err error) {
+	wrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
+	tx, err = t.validateAndBuildTransaction(wrapper, sendArgs)
+	return
+}
+
+func (t *Transactor) SendBuiltTransactionWithSignature(chainID uint64, tx *gethtypes.Transaction, sig []byte) (hash types.Hash, err error) {
+	if len(sig) != ValidSignatureSize {
+		return hash, ErrInvalidSignatureSize
+	}
+
+	rpcWrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
+	chID := big.NewInt(int64(rpcWrapper.chainID))
+
+	signer := gethtypes.NewLondonSigner(chID)
+	signedTx, err := tx.WithSignature(signer, sig)
+	if err != nil {
+		return hash, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
+	defer cancel()
+
+	if err := rpcWrapper.SendTransaction(ctx, signedTx); err != nil {
+		return hash, err
+	}
+	return types.Hash(signedTx.Hash()), nil
+}
+
 // SendTransactionWithSignature receive a transaction and a signature, serialize them together and propage it to the network.
 // It's different from eth_sendRawTransaction because it receives a signature and not a serialized transaction with signature.
 // Since the transactions is already signed, we assume it was validated and used the right nonce.
-func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (hash types.Hash, err error) {
+func (t *Transactor) SendTransactionWithSignature(chainID uint64, args SendTxArgs, sig []byte) (hash types.Hash, err error) {
 	if !args.Valid() {
 		return hash, ErrInvalidSendTxArgs
 	}
 
-	if len(sig) != validSignatureSize {
+	if len(sig) != ValidSignatureSize {
 		return hash, ErrInvalidSignatureSize
 	}
 
-	chainID := big.NewInt(int64(t.networkID))
-	signer := gethtypes.NewLondonSigner(chainID)
-
 	tx := t.buildTransaction(args)
-	expectedNonce, unlock, err := t.nonce.Next(t.rpcWrapper, args.From)
+	rpcWrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
+	expectedNonce, unlock, err := t.nonce.Next(rpcWrapper, args.From)
 	if err != nil {
 		return hash, err
 	}
@@ -121,18 +148,7 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 		return hash, &ErrBadNonce{tx.Nonce(), expectedNonce}
 	}
 
-	signedTx, err := tx.WithSignature(signer, sig)
-	if err != nil {
-		return hash, err
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
-	defer cancel()
-
-	if err := t.rpcWrapper.SendTransaction(ctx, signedTx); err != nil {
-		return hash, err
-	}
-	return types.Hash(signedTx.Hash()), nil
+	return t.SendBuiltTransactionWithSignature(chainID, tx, sig)
 }
 
 func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs, hash types.Hash, err error) {
@@ -235,18 +251,14 @@ func (t *Transactor) validateAccount(args SendTxArgs, selectedAccount *account.S
 	return nil
 }
 
-func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccount *account.SelectedExtKey, args SendTxArgs) (hash types.Hash, err error) {
-	if err = t.validateAccount(args, selectedAccount); err != nil {
-		return hash, err
-	}
-
+func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args SendTxArgs) (tx *gethtypes.Transaction, err error) {
 	if !args.Valid() {
-		return hash, ErrInvalidSendTxArgs
+		return tx, ErrInvalidSendTxArgs
 	}
 
 	nonce, unlock, err := t.nonce.Next(rpcWrapper, args.From)
 	if err != nil {
-		return hash, err
+		return tx, err
 	}
 	if args.Nonce != nil {
 		nonce = uint64(*args.Nonce)
@@ -261,10 +273,10 @@ func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccoun
 	if !args.IsDynamicFeeTx() && args.GasPrice == nil {
 		gasPrice, err = rpcWrapper.SuggestGasPrice(ctx)
 		if err != nil {
-			return hash, err
+			return tx, err
 		}
 	}
-	chainID := big.NewInt(int64(rpcWrapper.chainID))
+
 	value := (*big.Int)(args.Value)
 	var gas uint64
 	if args.Gas != nil {
@@ -289,20 +301,34 @@ func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccoun
 			Data:     args.GetInput(),
 		})
 		if err != nil {
-			return hash, err
+			return tx, err
 		}
 		if gas < defaultGas {
 			t.log.Info("default gas will be used because estimated is lower", "estimated", gas, "default", defaultGas)
 			gas = defaultGas
 		}
 	}
-	tx := t.buildTransactionWithOverrides(nonce, value, gas, gasPrice, args)
+	tx = t.buildTransactionWithOverrides(nonce, value, gas, gasPrice, args)
+	return tx, nil
+}
+
+func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccount *account.SelectedExtKey, args SendTxArgs) (hash types.Hash, err error) {
+	if err = t.validateAccount(args, selectedAccount); err != nil {
+		return hash, err
+	}
+
+	tx, err := t.validateAndBuildTransaction(rpcWrapper, args)
+	if err != nil {
+		return hash, err
+	}
+
+	chainID := big.NewInt(int64(rpcWrapper.chainID))
 	signedTx, err := gethtypes.SignTx(tx, gethtypes.NewLondonSigner(chainID), selectedAccount.AccountKey.PrivateKey)
 	if err != nil {
 		return hash, err
 	}
-	// ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
-	// defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
+	defer cancel()
 
 	if err := rpcWrapper.SendTransaction(ctx, signedTx); err != nil {
 		return hash, err

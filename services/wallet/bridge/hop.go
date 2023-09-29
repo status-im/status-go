@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/hop"
@@ -173,15 +174,15 @@ func (h *HopBridge) GetContractAddress(network *params.Network, token *token.Tok
 	return &address
 }
 
-func (h *HopBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
+func (h *HopBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
 	fromNetwork := h.contractMaker.RPCClient.NetworkManager.Find(sendArgs.ChainID)
 	if fromNetwork == nil {
-		return hash, err
+		return tx, err
 	}
 
 	nonce, unlock, err := h.transactor.NextNonce(h.contractMaker.RPCClient, sendArgs.ChainID, sendArgs.HopTx.From)
 	if err != nil {
-		return hash, err
+		return tx, err
 	}
 	defer func() {
 		unlock(err == nil, nonce)
@@ -191,25 +192,37 @@ func (h *HopBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.S
 
 	token := h.tokenManager.FindToken(fromNetwork, sendArgs.HopTx.Symbol)
 	if fromNetwork.Layer == 1 {
-		hash, err = h.sendToL2(sendArgs.ChainID, sendArgs.HopTx, verifiedAccount, token)
-		return hash, err
+		tx, err = h.sendToL2(sendArgs.ChainID, sendArgs.HopTx, signerFn, token)
+		return tx, err
 	}
-	hash, err = h.swapAndSend(sendArgs.ChainID, sendArgs.HopTx, verifiedAccount, token)
-	return hash, err
+	tx, err = h.swapAndSend(sendArgs.ChainID, sendArgs.HopTx, signerFn, token)
+	return tx, err
 }
 
-func (h *HopBridge) sendToL2(chainID uint64, hopArgs *HopTxArgs, verifiedAccount *account.SelectedExtKey, token *token.Token) (hash types.Hash, err error) {
+func (h *HopBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
+	tx, err := h.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.HopTx.From, verifiedAccount))
+	if err != nil {
+		return types.Hash{}, err
+	}
+	return types.Hash(tx.Hash()), nil
+}
+
+func (h *HopBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error) {
+	return h.sendOrBuild(sendArgs, nil)
+}
+
+func (h *HopBridge) sendToL2(chainID uint64, hopArgs *HopTxArgs, signerFn bind.SignerFn, token *token.Token) (tx *ethTypes.Transaction, err error) {
 	bridge, err := h.contractMaker.NewHopL1Bridge(chainID, hopArgs.Symbol)
 	if err != nil {
-		return hash, err
+		return tx, err
 	}
-	txOpts := hopArgs.ToTransactOpts(getSigner(chainID, hopArgs.From, verifiedAccount))
+	txOpts := hopArgs.ToTransactOpts(signerFn)
 	if token.IsNative() {
 		txOpts.Value = (*big.Int)(hopArgs.Amount)
 	}
 	now := time.Now()
 	deadline := big.NewInt(now.Unix() + 604800)
-	tx, err := bridge.SendToL2(
+	tx, err = bridge.SendToL2(
 		txOpts,
 		big.NewInt(int64(hopArgs.ChainID)),
 		hopArgs.Recipient,
@@ -220,25 +233,22 @@ func (h *HopBridge) sendToL2(chainID uint64, hopArgs *HopTxArgs, verifiedAccount
 		big.NewInt(0),
 	)
 
-	if err != nil {
-		return hash, err
-	}
-	return types.Hash(tx.Hash()), nil
+	return tx, err
 }
 
-func (h *HopBridge) swapAndSend(chainID uint64, hopArgs *HopTxArgs, verifiedAccount *account.SelectedExtKey, token *token.Token) (hash types.Hash, err error) {
+func (h *HopBridge) swapAndSend(chainID uint64, hopArgs *HopTxArgs, signerFn bind.SignerFn, token *token.Token) (tx *ethTypes.Transaction, err error) {
 	ammWrapper, err := h.contractMaker.NewHopL2AmmWrapper(chainID, hopArgs.Symbol)
 	if err != nil {
-		return hash, err
+		return tx, err
 	}
 
-	txOpts := hopArgs.ToTransactOpts(getSigner(chainID, hopArgs.From, verifiedAccount))
+	txOpts := hopArgs.ToTransactOpts(signerFn)
 	if token.IsNative() {
 		txOpts.Value = (*big.Int)(hopArgs.Amount)
 	}
 	now := time.Now()
 	deadline := big.NewInt(now.Unix() + 604800)
-	tx, err := ammWrapper.SwapAndSend(
+	tx, err = ammWrapper.SwapAndSend(
 		txOpts,
 		big.NewInt(int64(hopArgs.ChainID)),
 		hopArgs.Recipient,
@@ -250,11 +260,7 @@ func (h *HopBridge) swapAndSend(chainID uint64, hopArgs *HopTxArgs, verifiedAcco
 		deadline,
 	)
 
-	if err != nil {
-		return hash, err
-	}
-
-	return types.Hash(tx.Hash()), nil
+	return tx, err
 }
 
 // CalculateBonderFees logics come from: https://docs.hop.exchange/fee-calculation

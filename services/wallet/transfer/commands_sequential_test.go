@@ -715,7 +715,7 @@ func TestFindBlocksCommand(t *testing.T) {
 
 		db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 		require.NoError(t, err)
-		tm := &TransactionManager{db, nil, nil, nil, nil, nil, nil}
+		tm := &TransactionManager{db, nil, nil, nil, nil, nil, nil, nil, nil, nil}
 
 		wdb := NewDB(db)
 		tc := &TestClient{

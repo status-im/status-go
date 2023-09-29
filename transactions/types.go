@@ -106,6 +106,11 @@ func (args SendTxArgs) ToTransactOpts(signerFn bind.SignerFn) *bind.TransactOpts
 		gasLimit = uint64(*args.Gas)
 	}
 
+	var noSign = false
+	if signerFn == nil {
+		noSign = true
+	}
+
 	return &bind.TransactOpts{
 		From:      common.Address(args.From),
 		Signer:    signerFn,
@@ -114,6 +119,7 @@ func (args SendTxArgs) ToTransactOpts(signerFn bind.SignerFn) *bind.TransactOpts
 		GasFeeCap: gasFeeCap,
 		GasTipCap: gasTipCap,
 		Nonce:     nonce,
+		NoSign:    noSign,
 	}
 }
 
