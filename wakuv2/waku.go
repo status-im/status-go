@@ -935,7 +935,7 @@ func (w *Waku) Subscribe(f *common.Filter) (string, error) {
 	}
 
 	if w.settings.LightClient {
-		w.filterManager.eventChan <- FilterEvent{eventType: FilterEvent_ADDED, filterId: id}
+		w.filterManager.eventChan <- FilterEvent{eventType: FilterEventAdded, filterID: id}
 	}
 
 	return id, nil
@@ -949,7 +949,7 @@ func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
 	}
 
 	if w.settings.LightClient {
-		w.filterManager.eventChan <- FilterEvent{eventType: FilterEvent_REMOVED, filterId: id}
+		w.filterManager.eventChan <- FilterEvent{eventType: FilterEventRemoved, filterID: id}
 	}
 
 	return nil
@@ -959,7 +959,7 @@ func (w *Waku) Unsubscribe(ctx context.Context, id string) error {
 func (w *Waku) getFilterStats() FilterSubs {
 	ch := make(chan FilterSubs)
 	w.logger.Info("### getFilterStats")
-	w.filterManager.eventChan <- FilterEvent{eventType: FilterEvent_GET_STATS, ch: ch}
+	w.filterManager.eventChan <- FilterEvent{eventType: FilterEventGetStats, ch: ch}
 	w.logger.Info("### getFilterStats after send")
 	stats := <-ch
 

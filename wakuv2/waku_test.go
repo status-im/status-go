@@ -198,7 +198,7 @@ func TestWakuV2Filter(t *testing.T) {
 		ContentTopics: common.NewTopicSetFromBytes([][]byte{[]byte{1, 2, 3, 4}}),
 	}
 
-	filterId, err := w.Subscribe(filter)
+	filterID, err := w.Subscribe(filter)
 	require.NoError(t, err)
 
 	msgTimestamp := w.timestamp()
@@ -220,7 +220,7 @@ func TestWakuV2Filter(t *testing.T) {
 
 	// Ensure there are some active peers for this filter subscription
 	stats := w.getFilterStats()
-	require.Greater(t, len(stats[filterId]), 0)
+	require.Greater(t, len(stats[filterID]), 0)
 
 	messages := filter.Retrieve()
 	require.Len(t, messages, 1)
@@ -237,7 +237,7 @@ func TestWakuV2Filter(t *testing.T) {
 	// Ensure there are 0 active peers now
 
 	stats = w.getFilterStats()
-	require.Len(t, stats[filterId], 0)
+	require.Len(t, stats[filterID], 0)
 
 	// Reconnect
 	w.settings.MinPeersForFilter = 2
@@ -246,7 +246,7 @@ func TestWakuV2Filter(t *testing.T) {
 
 	// Ensure there are some active peers now
 	stats = w.getFilterStats()
-	require.Greater(t, len(stats[filterId]), 0)
+	require.Greater(t, len(stats[filterID]), 0)
 
 	require.NoError(t, w.Stop())
 }

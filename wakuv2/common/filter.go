@@ -45,10 +45,6 @@ type Filter struct {
 	Messages MessageStore
 }
 
-func (f *Filter) Id() string {
-	return f.id
-}
-
 type FilterSet = map[*Filter]struct{}
 type ContentTopicToFilter = map[TopicType]FilterSet
 type PubsubTopicToContentTopic = map[string]ContentTopicToFilter
