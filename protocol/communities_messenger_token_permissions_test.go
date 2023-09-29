@@ -748,6 +748,13 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWit
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
 
+	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		return sub.Community.HasTokenPermissions()
+	})
+
+	err = <-waitOnCommunityPermissionCreated
+	s.Require().NoError(err)
+
 	// setup become admin permission
 	permissionRequestAdmin := requests.CreateCommunityTokenPermission{
 		CommunityID: community.ID(),
@@ -766,10 +773,17 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWit
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
 
+	waitOnCommunityPermissionCreated = waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		return len(sub.Community.TokenPermissions()) == 2
+	})
+
+	err = <-waitOnCommunityPermissionCreated
+	s.Require().NoError(err)
+
 	// make bob satisfy the member criteria
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, permissionRequestMember.TokenCriteria[0])
 
-	s.advertiseCommunityTo(community, s.bob)
+	s.advertiseCommunityTo(response.Communities()[0], s.bob)
 
 	// Bob should still be able to join even though he doesn't satisfy the admin requirement
 	// because he satisfies the member one
@@ -803,6 +817,13 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsAdminWith
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
 
+	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		return sub.Community.HasTokenPermissions()
+	})
+
+	err = <-waitOnCommunityPermissionCreated
+	s.Require().NoError(err)
+
 	// setup become admin permission
 	permissionRequestAdmin := requests.CreateCommunityTokenPermission{
 		CommunityID: community.ID(),
@@ -820,11 +841,24 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsAdminWith
 	response, err = s.owner.CreateCommunityTokenPermission(&permissionRequestAdmin)
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Communities()[0].TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN), 1)
+	s.Require().Len(response.Communities()[0].TokenPermissions(), 2)
+
+	waitOnCommunityPermissionCreated = waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		return len(sub.Community.TokenPermissions()) == 2
+	})
+
+	err = <-waitOnCommunityPermissionCreated
+	s.Require().NoError(err)
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(community.TokenPermissions(), 2)
+
+	s.advertiseCommunityTo(community, s.bob)
 
 	// make bob satisfy the admin criteria
 	s.makeAddressSatisfyTheCriteria(testChainID1, bobAddress, permissionRequestAdmin.TokenCriteria[0])
-
-	s.advertiseCommunityTo(community, s.bob)
 
 	// Bob should still be able to join even though he doesn't satisfy the member requirement
 	// because he satisfies the admin one
