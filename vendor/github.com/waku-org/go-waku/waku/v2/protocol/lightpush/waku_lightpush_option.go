@@ -17,6 +17,7 @@ type lightPushParameters struct {
 	requestID    []byte
 	pm           *peermanager.PeerManager
 	log          *zap.Logger
+	pubsubTopic  string
 }
 
 // Option is the type of options accepted when performing LightPush protocol requests
@@ -40,13 +41,19 @@ func WithAutomaticPeerSelection(fromThesePeers ...peer.ID) Option {
 		if params.pm == nil {
 			p, err = utils.SelectPeer(params.host, LightPushID_v20beta1, fromThesePeers, params.log)
 		} else {
-			p, err = params.pm.SelectPeer(LightPushID_v20beta1, fromThesePeers, params.log)
+			p, err = params.pm.SelectPeer(LightPushID_v20beta1, "", fromThesePeers...)
 		}
 		if err == nil {
 			params.selectedPeer = p
 		} else {
 			params.log.Info("selecting peer", zap.Error(err))
 		}
+	}
+}
+
+func WithPubSubTopic(pubsubTopic string) Option {
+	return func(params *lightPushParameters) {
+		params.pubsubTopic = pubsubTopic
 	}
 }
 
@@ -77,7 +84,7 @@ func WithRequestID(requestID []byte) Option {
 // when publishing a message
 func WithAutomaticRequestID() Option {
 	return func(params *lightPushParameters) {
-		params.requestID = protocol.GenerateRequestId()
+		params.requestID = protocol.GenerateRequestID()
 	}
 }
 

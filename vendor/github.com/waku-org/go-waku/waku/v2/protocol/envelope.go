@@ -20,12 +20,12 @@ type Envelope struct {
 // as well as generating a hash based on the bytes that compose the message
 func NewEnvelope(msg *wpb.WakuMessage, receiverTime int64, pubSubTopic string) *Envelope {
 	messageHash := msg.Hash(pubSubTopic)
-	hash := hash.SHA256([]byte(msg.ContentTopic), msg.Payload)
+	digest := hash.SHA256([]byte(msg.ContentTopic), msg.Payload)
 	return &Envelope{
 		msg:  msg,
 		hash: messageHash,
 		index: &pb.Index{
-			Digest:       hash[:],
+			Digest:       digest[:],
 			ReceiverTime: receiverTime,
 			SenderTime:   msg.Timestamp,
 			PubsubTopic:  pubSubTopic,
@@ -48,6 +48,6 @@ func (e *Envelope) Hash() []byte {
 	return e.hash
 }
 
-func (env *Envelope) Index() *pb.Index {
-	return env.index
+func (e *Envelope) Index() *pb.Index {
+	return e.index
 }

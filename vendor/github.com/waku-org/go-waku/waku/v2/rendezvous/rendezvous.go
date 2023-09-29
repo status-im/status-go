@@ -2,10 +2,8 @@ package rendezvous
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
-	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
@@ -32,9 +30,8 @@ type Rendezvous struct {
 
 	peerConnector PeerConnector
 
-	log    *zap.Logger
-	wg     sync.WaitGroup
-	cancel context.CancelFunc
+	log *zap.Logger
+	*peermanager.CommonDiscoveryService
 }
 
 // PeerConnector will subscribe to a channel containing the information for all peers found by this discovery protocol
@@ -46,9 +43,10 @@ type PeerConnector interface {
 func NewRendezvous(db *DB, peerConnector PeerConnector, log *zap.Logger) *Rendezvous {
 	logger := log.Named("rendezvous")
 	return &Rendezvous{
-		db:            db,
-		peerConnector: peerConnector,
-		log:           logger,
+		db:                     db,
+		peerConnector:          peerConnector,
+		log:                    logger,
+		CommonDiscoveryService: peermanager.NewCommonDiscoveryService(),
 	}
 }
 
@@ -58,17 +56,17 @@ func (r *Rendezvous) SetHost(h host.Host) {
 }
 
 func (r *Rendezvous) Start(ctx context.Context) error {
-	if r.cancel != nil {
-		return errors.New("already started")
+	return r.CommonDiscoveryService.Start(ctx, r.start)
+}
+
+func (r *Rendezvous) start() error {
+	if r.db != nil {
+		if err := r.db.Start(r.Context()); err != nil {
+			return err
+		}
 	}
-
-	ctx, cancel := context.WithCancel(ctx)
-	r.cancel = cancel
-
-	err := r.db.Start(ctx)
-	if err != nil {
-		cancel()
-		return err
+	if r.peerConnector != nil {
+		r.peerConnector.Subscribe(r.Context(), r.GetListeningChan())
 	}
 
 	r.rendezvousSvc = rvs.NewRendezvousService(r.host, r.db)
@@ -105,18 +103,15 @@ func (r *Rendezvous) DiscoverWithNamespace(ctx context.Context, namespace string
 	if len(addrInfo) != 0 {
 		rp.SetSuccess(cookie)
 
-		peerCh := make(chan peermanager.PeerData)
-		defer close(peerCh)
-		r.peerConnector.Subscribe(ctx, peerCh)
 		for _, p := range addrInfo {
 			peer := peermanager.PeerData{
-				Origin:   peerstore.Rendezvous,
-				AddrInfo: p,
+				Origin:       peerstore.Rendezvous,
+				AddrInfo:     p,
+				PubSubTopics: []string{namespace},
 			}
-			select {
-			case <-ctx.Done():
+			if !r.PushToChan(peer) {
+				r.log.Error("could push to closed channel/context completed")
 				return
-			case peerCh <- peer:
 			}
 		}
 	} else {
@@ -161,9 +156,9 @@ func (r *Rendezvous) RegisterRelayShards(ctx context.Context, rs protocol.RelayS
 // RegisterWithNamespace registers the node in the rendezvous point by using an specific namespace (usually a pubsub topic)
 func (r *Rendezvous) RegisterWithNamespace(ctx context.Context, namespace string, rendezvousPoints []*RendezvousPoint) {
 	for _, m := range rendezvousPoints {
-		r.wg.Add(1)
+		r.WaitGroup().Add(1)
 		go func(m *RendezvousPoint) {
-			r.wg.Done()
+			r.WaitGroup().Done()
 
 			rendezvousClient := rvs.NewRendezvousClient(r.host, m.id)
 			retries := 0
@@ -186,14 +181,10 @@ func (r *Rendezvous) RegisterWithNamespace(ctx context.Context, namespace string
 }
 
 func (r *Rendezvous) Stop() {
-	if r.cancel == nil {
-		return
-	}
-
-	r.cancel()
-	r.wg.Wait()
-	r.host.RemoveStreamHandler(rvs.RendezvousProto)
-	r.rendezvousSvc = nil
+	r.CommonDiscoveryService.Stop(func() {
+		r.host.RemoveStreamHandler(rvs.RendezvousProto)
+		r.rendezvousSvc = nil
+	})
 }
 
 // ShardToNamespace translates a cluster and shard index into a rendezvous namespace

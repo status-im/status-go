@@ -58,8 +58,10 @@ import (
 	wps "github.com/waku-org/go-waku/waku/v2/peerstore"
 	"github.com/waku-org/go-waku/waku/v2/protocol"
 	"github.com/waku-org/go-waku/waku/v2/protocol/filter"
+	"github.com/waku-org/go-waku/waku/v2/protocol/lightpush"
 	"github.com/waku-org/go-waku/waku/v2/protocol/peer_exchange"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+	"github.com/waku-org/go-waku/waku/v2/protocol/subscription"
 
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/types"
@@ -102,11 +104,11 @@ type Waku struct {
 	dnsAddressCacheLock *sync.RWMutex                       // lock to handle access to the map
 
 	// Filter-related
-	filters             *common.Filters                                           // Message filters installed with Subscribe function
-	filterSubscriptions map[*common.Filter]map[string]*filter.SubscriptionDetails // wakuv2 filter subscription details
+	filters             *common.Filters                                                 // Message filters installed with Subscribe function
+	filterSubscriptions map[*common.Filter]map[string]*subscription.SubscriptionDetails // wakuv2 filter subscription details
 
 	filterPeerDisconnectMap map[peer.ID]int64
-	isFilterSubAlive        func(sub *filter.SubscriptionDetails) error
+	isFilterSubAlive        func(sub *subscription.SubscriptionDetails) error
 
 	privateKeys map[string]*ecdsa.PrivateKey // Private key storage
 	symKeys     map[string][]byte            // Symmetric key storage
@@ -214,7 +216,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		dnsAddressCacheLock:             &sync.RWMutex{},
 		storeMsgIDs:                     make(map[gethcommon.Hash]bool),
 		filterPeerDisconnectMap:         make(map[peer.ID]int64),
-		filterSubscriptions:             make(map[*common.Filter]map[string]*filter.SubscriptionDetails),
+		filterSubscriptions:             make(map[*common.Filter]map[string]*subscription.SubscriptionDetails),
 		timesource:                      ts,
 		storeMsgIDsMu:                   sync.RWMutex{},
 		logger:                          logger,
@@ -224,7 +226,7 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 	}
 
 	// This fn is being mocked in test
-	waku.isFilterSubAlive = func(sub *filter.SubscriptionDetails) error {
+	waku.isFilterSubAlive = func(sub *subscription.SubscriptionDetails) error {
 		return waku.node.FilterLightnode().IsSubscriptionAlive(waku.ctx, sub)
 	}
 
@@ -389,7 +391,7 @@ func (w *Waku) dnsDiscover(ctx context.Context, enrtreeAddress string, apply fnA
 		nameserver := w.settings.Nameserver
 		w.settingsMu.RUnlock()
 
-		var opts []dnsdisc.DnsDiscoveryOption
+		var opts []dnsdisc.DNSDiscoveryOption
 		if nameserver != "" {
 			opts = append(opts, dnsdisc.WithNameserver(nameserver))
 		}
@@ -658,7 +660,7 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 	return nil
 }
 
-func (w *Waku) runFilterSubscriptionLoop(sub *filter.SubscriptionDetails) {
+func (w *Waku) runFilterSubscriptionLoop(sub *subscription.SubscriptionDetails) {
 	for {
 		select {
 		case <-w.ctx.Done():
@@ -708,7 +710,7 @@ func (w *Waku) runFilterMsgLoop() {
 						// Unsubscribe on light node
 						contentFilter := w.buildContentFilter(f.PubsubTopic, f.Topics)
 						// TODO Better return value handling for WakuFilterPushResult
-						_, err := w.node.FilterLightnode().Unsubscribe(w.ctx, contentFilter, filter.Peer(sub.PeerID))
+						_, err := w.node.FilterLightnode().Unsubscribe(w.ctx, contentFilter, filter.WithPeer(sub.PeerID))
 						if err != nil {
 							w.logger.Warn("could not unsubscribe wakuv2 filter for peer", zap.Any("peer", sub.PeerID))
 							continue
@@ -727,8 +729,8 @@ func (w *Waku) runFilterMsgLoop() {
 								break
 							}
 
-							subMap[subDetails.ID] = subDetails
-							go w.runFilterSubscriptionLoop(subDetails)
+							subMap[subDetails[0].ID] = subDetails[0]
+							go w.runFilterSubscriptionLoop(subDetails[0])
 
 							break
 						}
@@ -738,12 +740,13 @@ func (w *Waku) runFilterMsgLoop() {
 		}
 	}
 }
-func (w *Waku) buildContentFilter(pubsubTopic string, topics [][]byte) filter.ContentFilter {
-	contentFilter := filter.ContentFilter{
-		Topic: pubsubTopic,
+func (w *Waku) buildContentFilter(pubsubTopic string, topics [][]byte) protocol.ContentFilter {
+	contentFilter := protocol.ContentFilter{
+		PubsubTopic: pubsubTopic,
 	}
+	contentFilter.ContentTopics = make(protocol.ContentTopicSet)
 	for _, topic := range topics {
-		contentFilter.ContentTopics = append(contentFilter.ContentTopics, common.BytesToTopic(topic).ContentTopic())
+		contentFilter.ContentTopics[common.BytesToTopic(topic).ContentTopic()] = struct{}{}
 	}
 
 	return contentFilter
@@ -1099,7 +1102,7 @@ func (w *Waku) broadcast() {
 			var err error
 			if w.settings.LightClient {
 				w.logger.Info("publishing message via lightpush", zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", envelope.PubsubTopic()))
-				_, err = w.node.Lightpush().PublishToTopic(context.Background(), envelope.Message(), envelope.PubsubTopic())
+				_, err = w.node.Lightpush().PublishToTopic(context.Background(), envelope.Message(), lightpush.WithPubSubTopic(envelope.PubsubTopic()))
 			} else {
 				w.logger.Info("publishing message via relay", zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", envelope.PubsubTopic()))
 				_, err = w.node.Relay().PublishToTopic(context.Background(), envelope.Message(), envelope.PubsubTopic())
@@ -1184,7 +1187,7 @@ func (w *Waku) query(ctx context.Context, peerID peer.ID, pubsubTopic string, to
 }
 
 func (w *Waku) Query(ctx context.Context, peerID peer.ID, pubsubTopic string, topics []common.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) (cursor *storepb.Index, err error) {
-	requestID := protocol.GenerateRequestId()
+	requestID := protocol.GenerateRequestID()
 	opts = append(opts, store.WithRequestID(requestID))
 	result, err := w.query(ctx, peerID, pubsubTopic, topics, from, to, opts)
 	if err != nil {
@@ -1288,7 +1291,7 @@ func (w *Waku) Start() error {
 					} else if latestConnStatus.IsOnline && !isConnected {
 						w.logger.Debug("Restarting DiscV5: online and is not connected")
 						isConnected = true
-						if !w.node.DiscV5().IsStarted() {
+						if w.node.DiscV5().ErrOnNotRunning() != nil {
 							err := w.node.DiscV5().Start(ctx)
 							if err != nil {
 								w.logger.Error("Could not start DiscV5", zap.Error(err))
@@ -1649,7 +1652,7 @@ func (w *Waku) restartDiscV5() error {
 		return errors.New("failed to fetch bootnodes")
 	}
 
-	if !w.node.DiscV5().IsStarted() {
+	if w.node.DiscV5().ErrOnNotRunning() != nil {
 		w.logger.Info("is not started restarting")
 		err := w.node.DiscV5().Start(ctx)
 		if err != nil {
@@ -1681,7 +1684,7 @@ func (w *Waku) AddStorePeer(address string) (peer.ID, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, wps.Static, store.StoreID_v20beta4)
+	peerID, err := w.node.AddPeer(addr, wps.Static, []string{}, store.StoreID_v20beta4)
 	if err != nil {
 		return "", err
 	}
@@ -1698,7 +1701,7 @@ func (w *Waku) AddRelayPeer(address string) (peer.ID, error) {
 		return "", err
 	}
 
-	peerID, err := w.node.AddPeer(addr, wps.Static, relay.WakuRelayID_v200)
+	peerID, err := w.node.AddPeer(addr, wps.Static, []string{}, relay.WakuRelayID_v200)
 	if err != nil {
 		return "", err
 	}
@@ -1845,13 +1848,13 @@ func (w *Waku) subscribeToFilter(f *common.Filter) error {
 
 			subMap := w.filterSubscriptions[f]
 			if subMap == nil {
-				subMap = make(map[string]*filter.SubscriptionDetails)
+				subMap = make(map[string]*subscription.SubscriptionDetails)
 				w.filterSubscriptions[f] = subMap
 			}
-			subMap[subDetails.ID] = subDetails
-			go w.runFilterSubscriptionLoop(subDetails)
+			subMap[subDetails[0].ID] = subDetails[0]
+			go w.runFilterSubscriptionLoop(subDetails[0])
 
-			w.logger.Info("wakuv2 filter subscription success", zap.Stringer("peer", peers[i]), zap.String("pubsubTopic", contentFilter.Topic), zap.Strings("contentTopics", contentFilter.ContentTopics))
+			w.logger.Info("wakuv2 filter subscription success", zap.Stringer("peer", peers[i]), zap.String("pubsubTopic", contentFilter.PubsubTopic), zap.Strings("contentTopics", contentFilter.ContentTopicsList()))
 		}
 
 	} else {

@@ -75,15 +75,15 @@ func (s *chStore) broadcast(ctx context.Context, m *protocol.Envelope) {
 	}
 }
 
-func (b *chStore) close() {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	for _, chans := range b.topicToChans {
+func (s *chStore) close() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, chans := range s.topicToChans {
 		for _, ch := range chans {
 			close(ch)
 		}
 	}
-	b.topicToChans = nil
+	s.topicToChans = nil
 }
 
 // Broadcaster is used to create a fanout for an envelope that will be received by any subscriber interested in the topic of the message

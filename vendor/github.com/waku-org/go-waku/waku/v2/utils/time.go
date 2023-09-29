@@ -19,7 +19,7 @@ type Timesource interface {
 func GetUnixEpoch(timesource ...Timesource) int64 {
 	if len(timesource) != 0 {
 		return GetUnixEpochFrom(timesource[0].Now())
-	} else {
-		return GetUnixEpochFrom(time.Now())
 	}
+
+	return GetUnixEpochFrom(time.Now())
 }

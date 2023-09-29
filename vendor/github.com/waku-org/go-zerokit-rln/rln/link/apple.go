@@ -114,3 +114,7 @@ func (i RLNWrapper) GetMetadata() ([]byte, error) {
 func (i RLNWrapper) Flush() bool {
 	return i.ffi.Flush()
 }
+
+func (i RLNWrapper) LeavesSet() uint {
+	return i.ffi.LeavesSet()
+}

@@ -42,6 +42,8 @@ bool set_leaf(struct RLN *ctx, uintptr_t index, const struct Buffer *input_buffe
 
 bool get_leaf(struct RLN *ctx, uintptr_t index, struct Buffer *output_buffer);
 
+uintptr_t leaves_set(struct RLN *ctx);
+
 bool set_next_leaf(struct RLN *ctx, const struct Buffer *input_buffer);
 
 bool set_leaves_from(struct RLN *ctx, uintptr_t index, const struct Buffer *input_buffer);

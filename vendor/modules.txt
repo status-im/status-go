@@ -1008,7 +1008,7 @@ github.com/waku-org/go-discover/discover/v5wire
 github.com/waku-org/go-libp2p-rendezvous
 github.com/waku-org/go-libp2p-rendezvous/db
 github.com/waku-org/go-libp2p-rendezvous/pb
-# github.com/waku-org/go-waku v0.7.1-0.20230907093131-092811658ea3
+# github.com/waku-org/go-waku v0.8.1-0.20230929051325-47c961dcbbf3
 ## explicit; go 1.19
 github.com/waku-org/go-waku/logging
 github.com/waku-org/go-waku/waku/persistence
@@ -1040,21 +1040,34 @@ github.com/waku-org/go-waku/waku/v2/protocol/rln/keystore
 github.com/waku-org/go-waku/waku/v2/protocol/rln/web3
 github.com/waku-org/go-waku/waku/v2/protocol/store
 github.com/waku-org/go-waku/waku/v2/protocol/store/pb
+github.com/waku-org/go-waku/waku/v2/protocol/subscription
 github.com/waku-org/go-waku/waku/v2/rendezvous
 github.com/waku-org/go-waku/waku/v2/timesource
 github.com/waku-org/go-waku/waku/v2/utils
-# github.com/waku-org/go-zerokit-rln v0.1.14-0.20230905214645-ca686a02e816
+# github.com/waku-org/go-zerokit-rln v0.1.14-0.20230916173259-d284a3d8f2fd
 ## explicit; go 1.18
 github.com/waku-org/go-zerokit-rln/rln
 github.com/waku-org/go-zerokit-rln/rln/link
-# github.com/waku-org/go-zerokit-rln-apple v0.0.0-20230905213302-1d6d18a03e7c
+# github.com/waku-org/go-zerokit-rln-apple v0.0.0-20230916172309-ee0ee61dde2b
 ## explicit; go 1.19
+github.com/waku-org/go-zerokit-rln-apple/libs/aarch64-apple-darwin
+github.com/waku-org/go-zerokit-rln-apple/libs/x86_64-apple-darwin
 github.com/waku-org/go-zerokit-rln-apple/rln
-# github.com/waku-org/go-zerokit-rln-arm v0.0.0-20230905183322-05f4cda61468
+# github.com/waku-org/go-zerokit-rln-arm v0.0.0-20230916171929-1dd9494ff065
 ## explicit; go 1.19
+github.com/waku-org/go-zerokit-rln-arm/libs/aarch64-linux-android
+github.com/waku-org/go-zerokit-rln-arm/libs/aarch64-unknown-linux-gnu
+github.com/waku-org/go-zerokit-rln-arm/libs/arm-linux-androideabi
+github.com/waku-org/go-zerokit-rln-arm/libs/arm-unknown-linux-gnueabi
+github.com/waku-org/go-zerokit-rln-arm/libs/arm-unknown-linux-gnueabihf
+github.com/waku-org/go-zerokit-rln-arm/libs/armv7-linux-androideabi
+github.com/waku-org/go-zerokit-rln-arm/libs/armv7a-linux-androideabi
 github.com/waku-org/go-zerokit-rln-arm/rln
-# github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230905182930-2b11e72ef866
+# github.com/waku-org/go-zerokit-rln-x86_64 v0.0.0-20230916171518-2a77c3734dd1
 ## explicit; go 1.19
+github.com/waku-org/go-zerokit-rln-x86_64/libs/x86_64-pc-windows-gnu
+github.com/waku-org/go-zerokit-rln-x86_64/libs/x86_64-unknown-linux-gnu
+github.com/waku-org/go-zerokit-rln-x86_64/libs/x86_64-unknown-linux-musl
 github.com/waku-org/go-zerokit-rln-x86_64/rln
 # github.com/wealdtech/go-ens/v3 v3.5.0
 ## explicit; go 1.12
@@ -1161,6 +1174,7 @@ golang.org/x/crypto/ssh/terminal
 # golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
 ## explicit; go 1.20
 golang.org/x/exp/constraints
+golang.org/x/exp/maps
 golang.org/x/exp/slices
 # golang.org/x/image v0.0.0-20210220032944-ac19c3e999fb
 ## explicit; go 1.12

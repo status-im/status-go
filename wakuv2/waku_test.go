@@ -12,10 +12,10 @@ import (
 	"github.com/cenkalti/backoff/v3"
 	"github.com/stretchr/testify/require"
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
-	waku_filter "github.com/waku-org/go-waku/waku/v2/protocol/filter"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
+	"github.com/waku-org/go-waku/waku/v2/protocol/subscription"
 
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/wakuv2/common"
@@ -230,7 +230,7 @@ func TestWakuV2Filter(t *testing.T) {
 	// Mock peers going down
 	isFilterSubAliveBak := w.isFilterSubAlive
 	w.settings.MinPeersForFilter = 0
-	w.isFilterSubAlive = func(sub *waku_filter.SubscriptionDetails) error {
+	w.isFilterSubAlive = func(sub *subscription.SubscriptionDetails) error {
 		return errors.New("peer down")
 	}
 

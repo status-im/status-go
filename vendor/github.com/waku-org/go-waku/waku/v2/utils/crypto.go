@@ -16,7 +16,7 @@ func EcdsaPubKeyToSecp256k1PublicKey(pubKey *ecdsa.PublicKey) *crypto.Secp256k1P
 	return (*crypto.Secp256k1PublicKey)(btcec.NewPublicKey(xFieldVal, yFieldVal))
 }
 
-// EcdsaPubKeyToSecp256k1PublicKey converts an `ecdsa.PrivateKey` into a libp2p `crypto.Secp256k1PrivateKey“
+// EcdsaPrivKeyToSecp256k1PrivKey converts an `ecdsa.PrivateKey` into a libp2p `crypto.Secp256k1PrivateKey“
 func EcdsaPrivKeyToSecp256k1PrivKey(privKey *ecdsa.PrivateKey) *crypto.Secp256k1PrivateKey {
 	privK, _ := btcec.PrivKeyFromBytes(privKey.D.Bytes())
 	return (*crypto.Secp256k1PrivateKey)(privK)
