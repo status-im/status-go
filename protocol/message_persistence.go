@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/golang/protobuf/proto"
 	"sort"
 	"strings"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/lib/pq"
 
 	"github.com/status-im/status-go/protocol/common"

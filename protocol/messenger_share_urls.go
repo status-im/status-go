@@ -537,12 +537,12 @@ func (m *Messenger) parseUserURLWithData(data string, chatKey string) (*URLDataR
 	}, nil
 }
 
-func (m *Messenger) IsStatusSharedUrl(url string) bool {
+func (m *Messenger) IsStatusSharedURL(url string) bool {
 	return strings.HasPrefix(url, baseShareURL)
 }
 
 func (m *Messenger) ParseSharedURL(url string) (*URLDataResponse, error) {
-	if !m.IsStatusSharedUrl(url) {
+	if !m.IsStatusSharedURL(url) {
 		return nil, fmt.Errorf("url should start with '%s'", baseShareURL)
 	}
 

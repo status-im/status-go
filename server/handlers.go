@@ -996,7 +996,7 @@ func handleLinkPreviewThumbnail(db *sql.DB, logger *zap.Logger) http.HandlerFunc
 	}
 }
 
-func getStatusLinkThumbnailPayload(db *sql.DB, logger *zap.Logger, msgID string, URL string, imageId string) ([]byte, error) {
+func getStatusLinkThumbnailPayload(db *sql.DB, logger *zap.Logger, msgID string, URL string, imageID string) ([]byte, error) {
 
 	var result []byte
 	err := db.QueryRow(`SELECT unfurled_status_links FROM user_messages WHERE id = ?`, msgID).Scan(&result)
@@ -1015,7 +1015,7 @@ func getStatusLinkThumbnailPayload(db *sql.DB, logger *zap.Logger, msgID string,
 			continue
 		}
 
-		switch imageId {
+		switch imageID {
 		case ContactIcon:
 			contact := p.GetContact()
 			if contact == nil {

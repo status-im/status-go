@@ -77,7 +77,7 @@ func (s *MediaServer) MakeLinkPreviewThumbnailURL(msgID string, previewURL strin
 func (s *MediaServer) MakeStatusLinkPreviewThumbnailURL(msgID string, previewURL string, imageID string) string {
 	u := s.MakeBaseURL()
 	u.Path = StatusLinkPreviewThumbnailPath
-	u.RawQuery = url.Values{"message-id": {msgID}, "url": {previewURL}, "image-id": {string(imageID)}}.Encode()
+	u.RawQuery = url.Values{"message-id": {msgID}, "url": {previewURL}, "image-id": {imageID}}.Encode()
 	return u.String()
 }
 

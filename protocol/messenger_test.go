@@ -2394,8 +2394,8 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	s.Require().NotNil(savedContact.Icon)
 	s.Require().Equal(sentContactPreview.Contact.Icon.Width, savedContact.Icon.Width)
 	s.Require().Equal(sentContactPreview.Contact.Icon.Height, savedContact.Icon.Height)
-	expectedIconUrl := httpServer.MakeStatusLinkPreviewThumbnailURL(inputMsg.ID, sentContactPreview.URL, "contact-icon")
-	s.Require().Equal(expectedIconUrl, savedContact.Icon.URL)
+	expectedIconURL := httpServer.MakeStatusLinkPreviewThumbnailURL(inputMsg.ID, sentContactPreview.URL, "contact-icon")
+	s.Require().Equal(expectedIconURL, savedContact.Icon.URL)
 }
 
 func (s *MessengerSuite) TestMessageSent() {
