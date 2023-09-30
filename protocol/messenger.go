@@ -204,6 +204,29 @@ type EnvelopeEventsInterceptor struct {
 	Messenger             *Messenger
 }
 
+func (m *Messenger) GetOwnPrimaryName() (string, error) {
+	ensName, err := m.settings.ENSName()
+	if err != nil {
+		return ensName, nil
+	}
+	return m.settings.DisplayName()
+}
+
+func (m *Messenger) ResolvePrimaryName(mentionID string) (string, error) {
+	if mentionID == m.myHexIdentity() {
+		return m.GetOwnPrimaryName()
+	}
+	contact, ok := m.allContacts.Load(mentionID)
+	if !ok {
+		var err error
+		contact, err = buildContactFromPkString(mentionID)
+		if err != nil {
+			return mentionID, err
+		}
+	}
+	return contact.PrimaryName(), nil
+}
+
 // EnvelopeSent triggered when envelope delivered at least to 1 peer.
 func (interceptor EnvelopeEventsInterceptor) EnvelopeSent(identifiers [][]byte) {
 	if interceptor.Messenger != nil {
@@ -3200,7 +3223,8 @@ type ReceivedMessageState struct {
 	// GroupChatInvitations is a list of invitation requests or rejections
 	GroupChatInvitations map[string]*GroupChatInvitation
 	// Response to the client
-	Response *MessengerResponse
+	Response           *MessengerResponse
+	ResolvePrimaryName func(string) (string, error)
 	// Timesource is a time source for clock values/timestamps.
 	Timesource              common.TimeSource
 	AllBookmarks            map[string]*browsers.Bookmark
@@ -3263,7 +3287,7 @@ func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicK
 
 	if !chat.Muted {
 		if showMessageNotification(publicKey, m, chat, responseTo) {
-			notification, err := NewMessageNotification(m.ID, m, chat, contact, r.AllContacts, profilePicturesVisibility)
+			notification, err := NewMessageNotification(m.ID, m, chat, contact, r.ResolvePrimaryName, profilePicturesVisibility)
 			if err != nil {
 				return err
 			}
@@ -3366,6 +3390,7 @@ func (m *Messenger) buildMessageState() *ReceivedMessageState {
 		GroupChatInvitations:  make(map[string]*GroupChatInvitation),
 		Response:              &MessengerResponse{},
 		Timesource:            m.getTimesource(),
+		ResolvePrimaryName:    m.ResolvePrimaryName,
 		AllBookmarks:          make(map[string]*browsers.Bookmark),
 		AllTrustStatus:        make(map[string]verification.TrustStatus),
 	}
@@ -5013,7 +5038,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		}
 
 		if notificationsEnabled {
-			notification, err := NewMessageNotification(message.ID, message, chat, contact, m.allContacts, profilePicturesVisibility)
+			notification, err := NewMessageNotification(message.ID, message, chat, contact, m.ResolvePrimaryName, profilePicturesVisibility)
 			if err != nil {
 				return nil, err
 			}

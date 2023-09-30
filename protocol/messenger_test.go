@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -22,6 +23,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -2446,4 +2448,36 @@ type testTimeSource struct{}
 
 func (t *testTimeSource) GetCurrentTime() uint64 {
 	return uint64(time.Now().Unix())
+}
+
+func (s *MessengerSuite) TestSendMessageMention() {
+	// Initialize Alice and Bob's messengers
+	alice, bob := s.m, s.newMessenger()
+	_, err := bob.Start()
+	s.Require().NoError(err)
+	defer bob.Shutdown() // nolint: errcheck
+
+	// Set display names for Bob and Alice
+	s.Require().NoError(bob.settings.SaveSettingField(settings.DisplayName, "bobby"))
+	s.Require().NoError(alice.settings.SaveSettingField(settings.DisplayName, "Alice"))
+	s.Require().NoError(alice.settings.SaveSettingField(settings.NotificationsEnabled, true))
+
+	// Create one-to-one chats
+	chat, chat2 := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, bob.transport),
+		CreateOneToOneChat(common.PubkeyToHex(&bob.identity.PublicKey), &bob.identity.PublicKey, alice.transport)
+	s.Require().NoError(bob.SaveChat(chat))
+	s.Require().NoError(alice.SaveChat(chat2))
+
+	// Prepare the message and Send the message from Bob to Alice
+	inputMessage := common.NewMessage()
+	inputMessage.ChatId = chat.ID
+	inputMessage.Text = fmt.Sprintf("@%s talk to @%s", alice.myHexIdentity(), bob.myHexIdentity())
+	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	_, err = bob.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
+
+	// Wait for Alice to receive the message and make sure it's properly formatted
+	response, err := WaitOnMessengerResponse(alice, func(r *MessengerResponse) bool { return len(r.Notifications()) >= 1 }, "no messages")
+	s.Require().NoError(err)
+	s.Require().Equal("Alice talk to bobby", response.Notifications()[0].Message)
 }

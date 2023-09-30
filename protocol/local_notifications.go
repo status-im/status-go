@@ -45,14 +45,14 @@ func (n NotificationBody) MarshalJSON() ([]byte, error) {
 	return json.Marshal(item)
 }
 
-func NewMessageNotification(id string, message *common.Message, chat *Chat, contact *Contact, contacts *contactMap, profilePicturesVisibility int) (*localnotifications.Notification, error) {
+func NewMessageNotification(id string, message *common.Message, chat *Chat, contact *Contact, resolvePrimaryName func(string) (string, error), profilePicturesVisibility int) (*localnotifications.Notification, error) {
 	body := &NotificationBody{
 		Message: message,
 		Chat:    chat,
 		Contact: contact,
 	}
 
-	return body.toMessageNotification(id, contacts, profilePicturesVisibility)
+	return body.toMessageNotification(id, resolvePrimaryName, profilePicturesVisibility)
 }
 
 func DeletedMessageNotification(id string, chat *Chat) *localnotifications.Notification {
@@ -84,7 +84,7 @@ func NewPrivateGroupInviteNotification(id string, chat *Chat, contact *Contact, 
 	return body.toPrivateGroupInviteNotification(id, profilePicturesVisibility)
 }
 
-func (n NotificationBody) toMessageNotification(id string, contacts *contactMap, profilePicturesVisibility int) (*localnotifications.Notification, error) {
+func (n NotificationBody) toMessageNotification(id string, resolvePrimaryName func(string) (string, error), profilePicturesVisibility int) (*localnotifications.Notification, error) {
 	var title string
 	if n.Chat.PrivateGroupChat() || n.Chat.Public() || n.Chat.CommunityChat() {
 		title = n.Chat.Name
@@ -95,15 +95,12 @@ func (n NotificationBody) toMessageNotification(id string, contacts *contactMap,
 
 	canonicalNames := make(map[string]string)
 	for _, mentionID := range n.Message.Mentions {
-		contact, ok := contacts.Load(mentionID)
-		if !ok {
-			var err error
-			contact, err = buildContactFromPkString(mentionID)
-			if err != nil {
-				return nil, err
-			}
+		name, err := resolvePrimaryName(mentionID)
+		if err != nil {
+			canonicalNames[mentionID] = mentionID
+		} else {
+			canonicalNames[mentionID] = name
 		}
-		canonicalNames[mentionID] = contact.PrimaryName()
 	}
 
 	// We don't pass idenity as only interested in the simplified text
