@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/status-im/status-go/wakuv2/common"
@@ -38,6 +39,7 @@ type FilterEvent struct {
 	filterID  string
 	result    bool
 	peerID    peer.ID
+	tempID    string
 	sub       *filter.SubscriptionDetails
 	ch        chan FilterSubs
 }
@@ -92,22 +94,31 @@ func (mgr *FilterManager) runFilterLoop(wg *sync.WaitGroup) {
 		case <-ticker.C:
 			mgr.peers = mgr.findFilterPeers()
 			mgr.pingPeers()
-			mgr.resubscribe()
 		case ev := <-mgr.eventChan:
 			switch ev.eventType {
 
 			case FilterEventAdded:
 				mgr.filterSubs[ev.filterID] = make(filter.SubscriptionSet)
-				mgr.resubscribe()
+				mgr.resubscribe(ev.filterID)
 
 			case FilterEventRemoved:
 				for _, sub := range mgr.filterSubs[ev.filterID] {
+					if sub == nil {
+						// Skip temp subs
+						continue
+					}
 					go mgr.unsubscribeFromFilter(ev.filterID, sub)
 				}
 				delete(mgr.filterSubs, ev.filterID)
 
 			case FilterEventPingResult:
 				if ev.result {
+					break
+				}
+				if ev.filterID != "" {
+					// Full resubscribe, filter has no peers
+					mgr.logger.Info("filter has no subs", zap.String("filterId", ev.filterID))
+					mgr.resubscribe(ev.filterID)
 					break
 				}
 				// Remove peer from list
@@ -120,18 +131,26 @@ func (mgr *FilterManager) runFilterLoop(wg *sync.WaitGroup) {
 				// Delete subs for removed peer
 				for filterID, subs := range mgr.filterSubs {
 					for _, sub := range subs {
+						if sub == nil {
+							// Skip temp subs
+							continue
+						}
 						if sub.PeerID == ev.peerID {
 							mgr.logger.Info("FILTER sub is inactive", zap.String("filterId", filterID), zap.String("subID", sub.ID))
 							delete(subs, sub.ID)
 							go mgr.unsubscribeFromFilter(filterID, sub)
 						}
 					}
+					mgr.resubscribe(filterID)
 				}
-				//mgr.resubscribe()
 
 			case FilterEventSubscribeResult:
-				mgr.filterSubs[ev.filterID][ev.sub.ID] = ev.sub
-				go mgr.runFilterSubscriptionLoop(ev.sub)
+				if ev.result {
+					mgr.filterSubs[ev.filterID][ev.sub.ID] = ev.sub
+					go mgr.runFilterSubscriptionLoop(ev.sub)
+				}
+				// Delete temp subscription record
+				delete(mgr.filterSubs[ev.filterID], ev.tempID)
 
 			case FilterEventUnsubscribeResult:
 				//if ev.Result { // possible 404 - NOT_FOUND: peer has no subscriptions
@@ -146,7 +165,15 @@ func (mgr *FilterManager) runFilterLoop(wg *sync.WaitGroup) {
 				mgr.logger.Info("### getstats")
 				stats := make(FilterSubs)
 				for id, subs := range mgr.filterSubs {
-					stats[id] = maps.Clone(subs)
+					stats[id] = make(filter.SubscriptionSet)
+					for subID, sub := range subs {
+						if sub == nil {
+							// Skip temp subs
+							continue
+						}
+
+						stats[id][subID] = sub
+					}
 				}
 				ev.ch <- stats
 			}
@@ -154,7 +181,7 @@ func (mgr *FilterManager) runFilterLoop(wg *sync.WaitGroup) {
 	}
 }
 
-func (mgr *FilterManager) subscribeToFilter(filterID string, peer peer.ID) {
+func (mgr *FilterManager) subscribeToFilter(filterID string, peer peer.ID, tempID string) {
 
 	f := mgr.getFilter(filterID)
 	if f == nil {
@@ -167,13 +194,15 @@ func (mgr *FilterManager) subscribeToFilter(filterID string, peer peer.ID) {
 	defer cancel()
 
 	subDetails, err := mgr.node.FilterLightnode().Subscribe(ctx, contentFilter, filter.WithPeer(peer))
+	success := err == nil
 	if err != nil {
 		mgr.logger.Warn("FILTER could not add wakuv2 filter for peer", zap.Stringer("peer", peer), zap.Error(err))
 	} else {
 		mgr.logger.Info("FILTER subscription success", zap.Stringer("peer", peer), zap.String("pubsubTopic", contentFilter.PubsubTopic), zap.Strings("contentTopics", contentFilter.ContentTopicsList()))
 
-		mgr.eventChan <- FilterEvent{eventType: FilterEventSubscribeResult, filterID: filterID, sub: subDetails[0]}
 	}
+
+	mgr.eventChan <- FilterEvent{eventType: FilterEventSubscribeResult, filterID: filterID, tempID: tempID, sub: subDetails[0], result: success}
 }
 
 func (mgr *FilterManager) unsubscribeFromFilter(filterID string, sub *filter.SubscriptionDetails) {
@@ -196,8 +225,19 @@ func (mgr *FilterManager) unsubscribeFromFilter(filterID string, sub *filter.Sub
 func (mgr *FilterManager) pingPeers() {
 
 	distinctPeers := make(map[peer.ID]struct{})
-	for _, subs := range mgr.filterSubs {
+	for filterID, subs := range mgr.filterSubs {
+		if len(subs) == 0 {
+			// No subs found, trigger full resubscribe
+			go func() {
+				mgr.eventChan <- FilterEvent{eventType: FilterEventPingResult, filterID: filterID, result: false}
+			}()
+			continue
+		}
 		for _, sub := range subs {
+			if sub == nil {
+				// Skip temp subs
+				continue
+			}
 			_, found := distinctPeers[sub.PeerID]
 			if found {
 				continue
@@ -261,18 +301,24 @@ func (mgr *FilterManager) findPeerCandidate() (peer.ID, error) {
 	return mgr.peers[n.Int64()], nil
 }
 
-func (mgr *FilterManager) resubscribe() {
-	for filterID, subs := range mgr.filterSubs {
-		mgr.logger.Info("FILTER active subscriptions count:", zap.String("filterId", filterID), zap.Int("len", len(subs)))
-		for i := len(subs); i < mgr.settings.MinPeersForFilter; i++ {
-			mgr.logger.Info("FILTER check not passed, try subscribing to peers", zap.String("filterId", filterID))
-			peer, err := mgr.findPeerCandidate()
+func (mgr *FilterManager) resubscribe(filterID string) {
+	subs, found := mgr.filterSubs[filterID]
+	if !found {
+		mgr.logger.Error("resubscribe filter not found", zap.String("filterId", filterID))
+		return
+	}
+	mgr.logger.Info("FILTER active subscriptions count:", zap.String("filterId", filterID), zap.Int("len", len(subs)))
+	for i := len(subs); i < mgr.settings.MinPeersForFilter; i++ {
+		mgr.logger.Info("FILTER check not passed, try subscribing to peers", zap.String("filterId", filterID))
+		peer, err := mgr.findPeerCandidate()
 
-			if err == nil {
-				go mgr.subscribeToFilter(filterID, peer)
-			} else {
-				mgr.logger.Error("FILTER resubscribe findPeer error", zap.Error(err))
-			}
+		// Create sub placeholder in order to avoid potentially too many subs
+		tempID := uuid.NewString()
+		subs[tempID] = nil
+		if err == nil {
+			go mgr.subscribeToFilter(filterID, peer, tempID)
+		} else {
+			mgr.logger.Error("FILTER resubscribe findPeer error", zap.Error(err))
 		}
 	}
 }
