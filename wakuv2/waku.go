@@ -1194,13 +1194,16 @@ func (w *Waku) Start() error {
 	go w.telemetryBandwidthStats(w.cfg.TelemetryServerURL)
 	go w.runPeerExchangeLoop()
 
+	w.logger.Info("### before newfiltermanager")
 	if w.settings.LightClient {
+		w.logger.Info("### before newfiltermanager 1")
 		w.filterManager = newFilterManager(w.ctx, w.logger,
 			func(id string) *common.Filter { return w.GetFilter(id) },
 			w.settings,
 			func(env *protocol.Envelope) error { return w.OnNewEnvelopes(env, common.RelayedMessageType) },
 			w.node)
 
+		w.logger.Info("### before newfiltermanager 2")
 		go w.filterManager.runFilterLoop(&w.wg)
 	}
 
