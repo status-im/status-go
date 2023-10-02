@@ -603,10 +603,10 @@ func (api *API) GetTxDetails(ctx context.Context, id string) (*activity.EntryDet
 	return api.s.activity.GetTxDetails(ctx, id)
 }
 
-func (api *API) GetRecipientsAsync(requestID int32, offset int, limit int) (ignored bool, err error) {
-	log.Debug("wallet.api.GetRecipientsAsync", "offset", offset, "limit", limit)
+func (api *API) GetRecipientsAsync(requestID int32, chainIDs []wcommon.ChainID, addresses []common.Address, offset int, limit int) (ignored bool, err error) {
+	log.Debug("wallet.api.GetRecipientsAsync", "addresses.len", len(addresses), "chainIDs.len", len(chainIDs), "offset", offset, "limit", limit)
 
-	ignored = api.s.activity.GetRecipientsAsync(requestID, offset, limit)
+	ignored = api.s.activity.GetRecipientsAsync(requestID, chainIDs, addresses, offset, limit)
 	return ignored, err
 }
 

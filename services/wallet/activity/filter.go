@@ -5,12 +5,22 @@ import (
 	"database/sql"
 	"fmt"
 
+	// used for embedding the sql query in the binary
+	_ "embed"
+
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/transactions"
 )
 
 const NoLimitTimestampForPeriod = 0
+
+//go:embed oldest_timestamp.sql
+var oldestTimestampQueryFormatString string
+
+//go:embed recipients.sql
+var recipientsQueryFormatString string
 
 type Period struct {
 	StartTimestamp int64 `json:"startTimestamp"`
@@ -85,49 +95,22 @@ type Filter struct {
 	FilterOutCollectibles bool    `json:"filterOutCollectibles"`
 }
 
-func GetRecipients(ctx context.Context, db *sql.DB, offset int, limit int) (addresses []eth.Address, hasMore bool, err error) {
-	rows, err := db.QueryContext(ctx, `
-		SELECT
-			to_address,
-			MIN(timestamp) AS min_timestamp
-		FROM (
-			SELECT
-				transfers.tx_to_address as to_address,
-				MIN(transfers.timestamp) AS timestamp
-			FROM
-				transfers
-			WHERE
-				transfers.multi_transaction_id = 0 AND transfers.tx_to_address NOT NULL
-			GROUP BY
-				transfers.tx_to_address
+func GetRecipients(ctx context.Context, db *sql.DB, chainIDs []common.ChainID, addresses []eth.Address, offset int, limit int) (recipients []eth.Address, hasMore bool, err error) {
+	filterAllAddresses := len(addresses) == 0
+	involvedAddresses := noEntriesInTmpTableSQLValues
+	if !filterAllAddresses {
+		involvedAddresses = joinAddresses(addresses)
+	}
 
-			UNION
+	includeAllNetworks := len(chainIDs) == 0
+	networks := noEntriesInTmpTableSQLValues
+	if !includeAllNetworks {
+		networks = joinItems(chainIDs, nil)
+	}
 
-			SELECT
-				pending_transactions.to_address AS to_address,
-				MIN(pending_transactions.timestamp) AS timestamp
-			FROM
-				pending_transactions
-			WHERE
-				pending_transactions.multi_transaction_id = 0 AND pending_transactions.to_address NOT NULL
-			GROUP BY
-				pending_transactions.to_address
+	queryString := fmt.Sprintf(recipientsQueryFormatString, involvedAddresses, networks)
 
-			UNION
-
-			SELECT
-				multi_transactions.to_address AS to_address,
-				MIN(multi_transactions.timestamp) AS timestamp
-			FROM
-				multi_transactions
-			GROUP BY
-				multi_transactions.to_address
-		) AS combined_result
-		GROUP BY
-			to_address
-		ORDER BY
-			min_timestamp DESC
-		LIMIT ? OFFSET ?;`, limit, offset)
+	rows, err := db.QueryContext(ctx, queryString, filterAllAddresses, includeAllNetworks, transactions.Pending, limit, offset)
 	if err != nil {
 		return nil, false, err
 	}
@@ -154,47 +137,13 @@ func GetRecipients(ctx context.Context, db *sql.DB, offset int, limit int) (addr
 }
 
 func GetOldestTimestamp(ctx context.Context, db *sql.DB, addresses []eth.Address) (timestamp int64, err error) {
-	queryFormatString := `
-		WITH filter_conditions AS (SELECT ? AS filterAllAddresses),
-			filter_addresses(address) AS (
-				SELECT * FROM (VALUES %s) WHERE (SELECT filterAllAddresses FROM filter_conditions) = 0
-			)
-
-		SELECT
-			transfers.tx_from_address AS from_address,
-			transfers.tx_to_address AS to_address,
-			transfers.timestamp AS timestamp
-		FROM transfers, filter_conditions
-		WHERE transfers.multi_transaction_id = 0
-			AND (filterAllAddresses OR from_address IN filter_addresses OR to_address IN filter_addresses)
-
-		UNION ALL
-
-		SELECT
-			pending_transactions.from_address AS from_address,
-			pending_transactions.to_address AS to_address,
-			pending_transactions.timestamp AS timestamp
-		FROM pending_transactions, filter_conditions
-		WHERE pending_transactions.multi_transaction_id = 0
-			AND (filterAllAddresses OR from_address IN filter_addresses OR to_address IN filter_addresses)
-
-		UNION ALL
-
-		SELECT
-			multi_transactions.from_address AS from_address,
-			multi_transactions.to_address AS to_address,
-			multi_transactions.timestamp AS timestamp
-		FROM multi_transactions, filter_conditions
-		WHERE filterAllAddresses OR from_address IN filter_addresses OR to_address IN filter_addresses
-		ORDER BY timestamp ASC
-		LIMIT 1`
-
 	filterAllAddresses := len(addresses) == 0
 	involvedAddresses := noEntriesInTmpTableSQLValues
 	if !filterAllAddresses {
 		involvedAddresses = joinAddresses(addresses)
 	}
-	queryString := fmt.Sprintf(queryFormatString, involvedAddresses)
+
+	queryString := fmt.Sprintf(oldestTimestampQueryFormatString, involvedAddresses)
 
 	row := db.QueryRowContext(ctx, queryString, filterAllAddresses)
 	var fromAddress, toAddress sql.NullString

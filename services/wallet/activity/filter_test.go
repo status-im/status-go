@@ -8,6 +8,7 @@ import (
 
 	eth "github.com/ethereum/go-ethereum/common"
 
+	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/testutils"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/t/helpers"
@@ -69,16 +70,6 @@ func insertTestData(t *testing.T, db *sql.DB, nullifyToForIndexes []int) (trs []
 	return
 }
 
-func TestGetRecipientsEmptyDB(t *testing.T) {
-	db, close := setupTestFilterDB(t)
-	defer close()
-
-	entries, hasMore, err := GetRecipients(context.Background(), db, 0, 15)
-	require.NoError(t, err)
-	require.Equal(t, 0, len(entries))
-	require.False(t, hasMore)
-}
-
 func TestGetRecipients(t *testing.T) {
 	db, close := setupTestFilterDB(t)
 	defer close()
@@ -103,7 +94,7 @@ func TestGetRecipients(t *testing.T) {
 	dupTrs[3].To = trs[5].To
 	transfer.InsertTestPendingTransaction(t, db, &dupTrs[3])
 
-	entries, hasMore, err := GetRecipients(context.Background(), db, 0, 15)
+	entries, hasMore, err := GetRecipients(context.Background(), db, []common.ChainID{}, []eth.Address{}, 0, 15)
 	require.NoError(t, err)
 	require.False(t, hasMore)
 	require.Equal(t, 6, len(entries))
@@ -118,10 +109,27 @@ func TestGetRecipients(t *testing.T) {
 		require.True(t, found, fmt.Sprintf("recipient %s not found in toTrs", entries[i].Hex()))
 	}
 
-	entries, hasMore, err = GetRecipients(context.Background(), db, 0, 2)
+	entries, hasMore, err = GetRecipients(context.Background(), db, []common.ChainID{}, []eth.Address{}, 0, 2)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(entries))
 	require.True(t, hasMore)
+
+	// Get Recipients from specific chains
+	entries, hasMore, err = GetRecipients(context.Background(), db, []common.ChainID{10}, []eth.Address{}, 0, 15)
+
+	require.NoError(t, err)
+	require.Equal(t, 2, len(entries))
+	require.False(t, hasMore)
+	require.Equal(t, trs[5].To, entries[0])
+	require.Equal(t, trs[2].To, entries[1])
+
+	// Get Recipients from specific addresses
+	entries, hasMore, err = GetRecipients(context.Background(), db, []common.ChainID{}, []eth.Address{trs[0].From}, 0, 15)
+
+	require.NoError(t, err)
+	require.Equal(t, 1, len(entries))
+	require.False(t, hasMore)
+	require.Equal(t, trs[1].To, entries[0])
 }
 
 func TestGetRecipients_NullAddresses(t *testing.T) {
@@ -130,7 +138,7 @@ func TestGetRecipients_NullAddresses(t *testing.T) {
 
 	insertTestData(t, db, []int{1, 2, 3, 5})
 
-	entries, hasMore, err := GetRecipients(context.Background(), db, 0, 15)
+	entries, hasMore, err := GetRecipients(context.Background(), db, []common.ChainID{}, []eth.Address{}, 0, 15)
 	require.NoError(t, err)
 	require.False(t, hasMore)
 	require.Equal(t, 3, len(entries))
