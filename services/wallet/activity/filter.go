@@ -11,10 +11,14 @@ import (
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/transactions"
 )
 
 const NoLimitTimestampForPeriod = 0
+
+//go:embed get_collectibles.sql
+var getCollectiblesQueryFormatString string
 
 //go:embed oldest_timestamp.sql
 var oldestTimestampQueryFormatString string
@@ -157,4 +161,28 @@ func GetOldestTimestamp(ctx context.Context, db *sql.DB, addresses []eth.Address
 	}
 
 	return timestamp, nil
+}
+
+func GetActivityCollectibles(ctx context.Context, db *sql.DB, chainIDs []common.ChainID, owners []eth.Address, offset int, limit int) ([]thirdparty.CollectibleUniqueID, error) {
+	filterAllAddresses := len(owners) == 0
+	involvedAddresses := noEntriesInTmpTableSQLValues
+	if !filterAllAddresses {
+		involvedAddresses = joinAddresses(owners)
+	}
+
+	includeAllNetworks := len(chainIDs) == 0
+	networks := noEntriesInTmpTableSQLValues
+	if !includeAllNetworks {
+		networks = joinItems(chainIDs, nil)
+	}
+
+	queryString := fmt.Sprintf(getCollectiblesQueryFormatString, involvedAddresses, networks)
+
+	rows, err := db.QueryContext(ctx, queryString, filterAllAddresses, includeAllNetworks, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return thirdparty.RowsToCollectibles(rows)
 }

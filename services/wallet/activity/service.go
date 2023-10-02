@@ -26,6 +26,7 @@ const (
 	EventActivityFilteringUpdate        walletevent.EventType = "wallet-activity-filtering-entries-updated"
 	EventActivityGetRecipientsDone      walletevent.EventType = "wallet-activity-get-recipients-result"
 	EventActivityGetOldestTimestampDone walletevent.EventType = "wallet-activity-get-oldest-timestamp-result"
+	EventActivityGetCollectibles        walletevent.EventType = "wallet-activity-get-collectibles"
 )
 
 var (
@@ -39,6 +40,10 @@ var (
 	}
 	getOldestTimestampTask = async.TaskType{
 		ID:     3,
+		Policy: async.ReplacementPolicyCancelOld,
+	}
+	getCollectiblesTask = async.TaskType{
+		ID:     4,
 		Policy: async.ReplacementPolicyCancelOld,
 	}
 )
@@ -110,6 +115,64 @@ func (s *Service) FilterActivityAsync(requestID int32, addresses []common.Addres
 		if res.Activities != nil {
 			go s.lazyLoadDetails(requestID, res.Activities)
 		}
+	})
+}
+
+type CollectibleHeader struct {
+	ID       thirdparty.CollectibleUniqueID `json:"id"`
+	Name     string                         `json:"name"`
+	ImageURL string                         `json:"image_url"`
+}
+
+type GetollectiblesResponse struct {
+	Collectibles []CollectibleHeader `json:"collectibles"`
+	Offset       int                 `json:"offset"`
+	// Used to indicate that there might be more collectibles that were not returned
+	// based on a simple heuristic
+	HasMore   bool      `json:"hasMore"`
+	ErrorCode ErrorCode `json:"errorCode"`
+}
+
+func (s *Service) GetActivityCollectiblesAsync(requestID int32, chainIDs []w_common.ChainID, addresses []common.Address, offset int, limit int) {
+	s.scheduler.Enqueue(requestID, getCollectiblesTask, func(ctx context.Context) (interface{}, error) {
+		collectibles, err := GetActivityCollectibles(ctx, s.db, chainIDs, addresses, offset, limit)
+
+		if err != nil {
+			return nil, err
+		}
+
+		data, err := s.collectibles.FetchAssetsByCollectibleUniqueID(collectibles)
+		if err != nil {
+			return nil, err
+		}
+
+		res := make([]CollectibleHeader, 0, len(data))
+
+		for _, c := range data {
+			res = append(res, CollectibleHeader{
+				ID:       c.CollectibleData.ID,
+				Name:     c.CollectibleData.Name,
+				ImageURL: c.CollectibleData.ImageURL,
+			})
+		}
+
+		return res, err
+	}, func(result interface{}, taskType async.TaskType, err error) {
+		res := GetollectiblesResponse{
+			ErrorCode: ErrorCodeFailed,
+		}
+
+		if errors.Is(err, context.Canceled) || errors.Is(err, async.ErrTaskOverwritten) {
+			res.ErrorCode = ErrorCodeTaskCanceled
+		} else if err == nil {
+			collectibles := result.([]CollectibleHeader)
+			res.Collectibles = collectibles
+			res.Offset = offset
+			res.HasMore = len(collectibles) == limit
+			res.ErrorCode = ErrorCodeSuccess
+		}
+
+		s.sendResponseEvent(&requestID, EventActivityGetCollectibles, res, err)
 	})
 }
 

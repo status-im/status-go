@@ -8,8 +8,10 @@ import (
 
 	eth "github.com/ethereum/go-ethereum/common"
 
+	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/testutils"
+	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
@@ -29,7 +31,7 @@ func setupTestFilterDB(t *testing.T) (db *sql.DB, close func()) {
 // insertTestData inserts 6 extractable activity entries: 2 transfers, 2 pending transactions and 2 multi transactions
 func insertTestData(t *testing.T, db *sql.DB, nullifyToForIndexes []int) (trs []transfer.TestTransfer, toTrs []eth.Address, multiTxs []transfer.TestMultiTransaction) {
 	// Add 6 extractable transactions
-	trs, _, toTrs = transfer.GenerateTestTransfers(t, db, 0, 7)
+	trs, _, toTrs = transfer.GenerateTestTransfers(t, db, 0, 10)
 	multiTxs = []transfer.TestMultiTransaction{
 		transfer.GenerateTestBridgeMultiTransaction(trs[0], trs[1]),
 		transfer.GenerateTestSwapMultiTransaction(trs[2], testutils.SntSymbol, 100),
@@ -57,6 +59,13 @@ func insertTestData(t *testing.T, db *sql.DB, nullifyToForIndexes []int) (trs []
 			}
 			transfer.InsertTestTransferWithOptions(t, db, trs[i].To, &trs[i], &transfer.TestTransferOptions{
 				NullifyAddresses: nullifyAddresses,
+			})
+		} else if i >= 7 && i < 10 {
+			ci := i - 7
+			trs[i].ChainID = transfer.TestCollectibles[ci].ChainID
+			transfer.InsertTestTransferWithOptions(t, db, trs[i].To, &trs[i], &transfer.TestTransferOptions{
+				TokenID:      transfer.TestCollectibles[ci].TokenID,
+				TokenAddress: transfer.TestCollectibles[ci].TokenAddress,
 			})
 		} else {
 			for j := range nullifyToForIndexes {
@@ -97,7 +106,7 @@ func TestGetRecipients(t *testing.T) {
 	entries, hasMore, err := GetRecipients(context.Background(), db, []common.ChainID{}, []eth.Address{}, 0, 15)
 	require.NoError(t, err)
 	require.False(t, hasMore)
-	require.Equal(t, 6, len(entries))
+	require.Equal(t, 9, len(entries))
 	for i := range entries {
 		found := false
 		for j := range toTrs {
@@ -141,7 +150,7 @@ func TestGetRecipients_NullAddresses(t *testing.T) {
 	entries, hasMore, err := GetRecipients(context.Background(), db, []common.ChainID{}, []eth.Address{}, 0, 15)
 	require.NoError(t, err)
 	require.False(t, hasMore)
-	require.Equal(t, 3, len(entries))
+	require.Equal(t, 6, len(entries))
 }
 
 func TestGetOldestTimestampEmptyDB(t *testing.T) {
@@ -225,4 +234,68 @@ func TestGetOldestTimestamp_NullAddresses(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, int64(0), timestamp)
+}
+
+func TestGetActivityCollectiblesEmptyDB(t *testing.T) {
+	db, close := setupTestFilterDB(t)
+	defer close()
+
+	collectibles, err := GetActivityCollectibles(context.Background(), db, []common.ChainID{}, []eth.Address{}, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(collectibles))
+}
+
+func TestGetActivityCollectibles(t *testing.T) {
+	db, close := setupTestFilterDB(t)
+	defer close()
+
+	trs, _, _ := insertTestData(t, db, nil)
+
+	// Extract all collectibles
+	collectibles, err := GetActivityCollectibles(context.Background(), db, []common.ChainID{}, []eth.Address{}, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(collectibles))
+
+	// Extract collectibles for a specific chain
+	collectibles, err = GetActivityCollectibles(context.Background(), db, []common.ChainID{1}, []eth.Address{}, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(collectibles))
+	require.Equal(t, thirdparty.CollectibleUniqueID{
+		TokenID: &bigint.BigInt{Int: transfer.TestCollectibles[0].TokenID},
+		ContractID: thirdparty.ContractID{
+			ChainID: transfer.TestCollectibles[1].ChainID,
+			Address: transfer.TestCollectibles[1].TokenAddress,
+		},
+	}, collectibles[0])
+	require.Equal(t, thirdparty.CollectibleUniqueID{
+		TokenID: &bigint.BigInt{Int: transfer.TestCollectibles[1].TokenID},
+		ContractID: thirdparty.ContractID{
+			ChainID: transfer.TestCollectibles[0].ChainID,
+			Address: transfer.TestCollectibles[0].TokenAddress,
+		},
+	}, collectibles[1])
+
+	// Extract collectibles for a specific sender addresses
+	collectibles, err = GetActivityCollectibles(context.Background(), db, []common.ChainID{}, []eth.Address{trs[8].From}, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(collectibles))
+	require.Equal(t, thirdparty.CollectibleUniqueID{
+		TokenID: &bigint.BigInt{Int: transfer.TestCollectibles[1].TokenID},
+		ContractID: thirdparty.ContractID{
+			ChainID: transfer.TestCollectibles[1].ChainID,
+			Address: transfer.TestCollectibles[1].TokenAddress,
+		},
+	}, collectibles[0])
+
+	// Extract collectibles for a specific recipient addresses
+	collectibles, err = GetActivityCollectibles(context.Background(), db, []common.ChainID{}, []eth.Address{trs[7].To}, 0, 10)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(collectibles))
+	require.Equal(t, thirdparty.CollectibleUniqueID{
+		TokenID: &bigint.BigInt{Int: transfer.TestCollectibles[0].TokenID},
+		ContractID: thirdparty.ContractID{
+			ChainID: transfer.TestCollectibles[0].ChainID,
+			Address: transfer.TestCollectibles[0].TokenAddress,
+		},
+	}, collectibles[0])
 }
