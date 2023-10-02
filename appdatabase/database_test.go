@@ -100,7 +100,7 @@ const (
 
 func TestMigrateWalletJsonBlobs(t *testing.T) {
 	openDB := func() (*sql.DB, error) {
-		return sqlite.OpenDB(sqlite.InMemoryPath, "1234567890", sqlite.ReducedKDFIterationsNumber)
+		return sqlite.OpenDB(sqlite.InMemoryPath, "1234567890", dbsetup.ReducedKDFIterationsNumber)
 	}
 	db, err := openDB()
 	require.NoError(t, err)

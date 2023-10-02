@@ -1,17 +1,17 @@
 package sharedsecret
 
 import (
-	"io/ioutil"
-	"os"
 	"testing"
 
+	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/protocol/sqlite"
 )
 
 func TestServiceTestSuite(t *testing.T) {
@@ -21,25 +21,21 @@ func TestServiceTestSuite(t *testing.T) {
 type SharedSecretTestSuite struct {
 	suite.Suite
 	service *SharedSecret
-	path    string
 	logger  *zap.Logger
 }
 
 func (s *SharedSecretTestSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	dbFile, err := ioutil.TempFile(os.TempDir(), "sharedsecret")
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err)
-	s.path = dbFile.Name()
-
-	db, err := sqlite.Open(s.path, "", sqlite.ReducedKDFIterationsNumber)
+	err = sqlite.Migrate(db)
 	s.Require().NoError(err)
 
 	s.service = New(db, s.logger)
 }
 
 func (s *SharedSecretTestSuite) TearDownTest() {
-	os.Remove(s.path)
 	_ = s.logger.Sync()
 }
 

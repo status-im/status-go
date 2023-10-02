@@ -3,7 +3,6 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -12,17 +11,18 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func setupTest(t *testing.T) (*sql.DB, *zap.Logger) {
-	dbPath, err := ioutil.TempFile("", "status-go-test-db-")
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
-
-	db, err := sqlite.Open(dbPath.Name(), "", sqlite.ReducedKDFIterationsNumber)
+	err = sqlite.Migrate(db)
 	require.NoError(t, err)
 
 	logger := logutils.ZapLogger()

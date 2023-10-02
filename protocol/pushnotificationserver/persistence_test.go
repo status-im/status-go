@@ -1,17 +1,17 @@
 package pushnotificationserver
 
 import (
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestSQLitePersistenceSuite(t *testing.T) {
@@ -20,22 +20,16 @@ func TestSQLitePersistenceSuite(t *testing.T) {
 
 type SQLitePersistenceSuite struct {
 	suite.Suite
-	tmpFile     *os.File
 	persistence Persistence
 }
 
 func (s *SQLitePersistenceSuite) SetupTest() {
-	tmpFile, err := ioutil.TempFile("", "")
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err)
-	s.tmpFile = tmpFile
-
-	database, err := sqlite.Open(s.tmpFile.Name(), "", sqlite.ReducedKDFIterationsNumber)
+	err = sqlite.Migrate(db)
 	s.Require().NoError(err)
-	s.persistence = NewSQLitePersistence(database)
-}
 
-func (s *SQLitePersistenceSuite) TearDownTest() {
-	_ = os.Remove(s.tmpFile.Name())
+	s.persistence = NewSQLitePersistence(db)
 }
 
 func (s *SQLitePersistenceSuite) TestSaveAndRetrieve() {

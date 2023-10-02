@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/protocol/sqlite"
 
 	"github.com/stretchr/testify/require"
 
@@ -28,7 +28,7 @@ func setupTestDB(t *testing.T) (*Database, func()) {
 func TestAccounts(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	expected := Account{Name: "string", KeyUID: "string", CustomizationColor: common.CustomizationColorBlue, ColorHash: ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: sqlite.ReducedKDFIterationsNumber}
+	expected := Account{Name: "string", KeyUID: "string", CustomizationColor: common.CustomizationColorBlue, ColorHash: ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: dbsetup.ReducedKDFIterationsNumber}
 	require.NoError(t, db.SaveAccount(expected))
 	accounts, err := db.GetAccounts()
 	require.NoError(t, err)
@@ -39,7 +39,7 @@ func TestAccounts(t *testing.T) {
 func TestAccountsUpdate(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	expected := Account{KeyUID: "string", CustomizationColor: common.CustomizationColorBlue, ColorHash: ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: sqlite.ReducedKDFIterationsNumber}
+	expected := Account{KeyUID: "string", CustomizationColor: common.CustomizationColorBlue, ColorHash: ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: dbsetup.ReducedKDFIterationsNumber}
 	require.NoError(t, db.SaveAccount(expected))
 	expected.Name = "chars"
 	expected.CustomizationColor = common.CustomizationColorMagenta
@@ -54,7 +54,7 @@ func TestLoginUpdate(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	accounts := []Account{{Name: "first", KeyUID: "0x1", KDFIterations: sqlite.ReducedKDFIterationsNumber}, {Name: "second", KeyUID: "0x2", KDFIterations: sqlite.ReducedKDFIterationsNumber}}
+	accounts := []Account{{Name: "first", KeyUID: "0x1", KDFIterations: dbsetup.ReducedKDFIterationsNumber}, {Name: "second", KeyUID: "0x2", KDFIterations: dbsetup.ReducedKDFIterationsNumber}}
 	for _, acc := range accounts {
 		require.NoError(t, db.SaveAccount(acc))
 	}
@@ -185,7 +185,7 @@ func TestDatabase_GetAccount(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	expected := Account{Name: "string", KeyUID: keyUID, ColorHash: ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: sqlite.ReducedKDFIterationsNumber}
+	expected := Account{Name: "string", KeyUID: keyUID, ColorHash: ColorHash{{4, 3}, {4, 0}, {4, 3}, {4, 0}}, ColorID: 10, KDFIterations: dbsetup.ReducedKDFIterationsNumber}
 	require.NoError(t, db.SaveAccount(expected))
 
 	account, err := db.GetAccount(expected.KeyUID)

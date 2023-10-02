@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/migrations"
@@ -300,7 +301,7 @@ func (db *Database) SaveAccount(account Account) error {
 	}
 
 	if account.KDFIterations <= 0 {
-		account.KDFIterations = sqlite.ReducedKDFIterationsNumber
+		account.KDFIterations = dbsetup.ReducedKDFIterationsNumber
 	}
 
 	_, err = db.db.Exec("INSERT OR REPLACE INTO accounts (name, identicon, colorHash, colorId, customizationColor, customizationColorClock, keycardPairing, keyUid, kdfIterations) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", account.Name, account.Identicon, colorHash, account.ColorID, account.CustomizationColor, account.CustomizationColorClock, account.KeycardPairing, account.KeyUID, account.KDFIterations)
@@ -322,7 +323,7 @@ func (db *Database) UpdateAccount(account Account) error {
 	}
 
 	if account.KDFIterations <= 0 {
-		account.KDFIterations = sqlite.ReducedKDFIterationsNumber
+		account.KDFIterations = dbsetup.ReducedKDFIterationsNumber
 	}
 
 	_, err = db.db.Exec("UPDATE accounts SET name = ?, identicon = ?, colorHash = ?, colorId = ?, customizationColor = ?, customizationColorClock = ?, keycardPairing = ?, kdfIterations = ? WHERE keyUid = ?", account.Name, account.Identicon, colorHash, account.ColorID, account.CustomizationColor, account.CustomizationColorClock, account.KeycardPairing, account.KDFIterations, account.KeyUID)

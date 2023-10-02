@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/services/ens"
+	"github.com/status-im/status-go/sqlite"
 
 	"github.com/imdario/mergo"
 
@@ -50,7 +51,6 @@ import (
 	"github.com/status-im/status-go/services/typeddata"
 	wcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/walletdatabase"
 )
@@ -609,7 +609,7 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 	}
 
 	if acc.KDFIterations == 0 {
-		acc.KDFIterations = sqlite.ReducedKDFIterationsNumber
+		acc.KDFIterations = dbsetup.ReducedKDFIterationsNumber
 	}
 
 	err := b.ensureDBsOpened(acc, password)
@@ -867,7 +867,7 @@ func (b *GethStatusBackend) ExportUnencryptedDatabase(acc multiaccounts.Account,
 		return err
 	}
 
-	err = dbsetup.DecryptDatabase(dbPath, directory, password, acc.KDFIterations)
+	err = sqlite.DecryptDB(dbPath, directory, password, acc.KDFIterations)
 	if err != nil {
 		b.log.Error("failed to initialize db", "err", err)
 		return err
@@ -887,7 +887,7 @@ func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account,
 		return err
 	}
 
-	err = dbsetup.EncryptDatabase(databasePath, path, password, acc.KDFIterations, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
+	err = sqlite.EncryptDB(databasePath, path, password, acc.KDFIterations, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
 	if err != nil {
 		b.log.Error("failed to initialize db", "err", err)
 		return err
@@ -990,7 +990,7 @@ func (b *GethStatusBackend) changeAppDBPassword(account *multiaccounts.Account, 
 	}
 
 	// Exporting database to a temporary file with a new password
-	err = dbsetup.ExportDB(dbPath, password, account.KDFIterations, tmpDbPath, newPassword, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
+	err = sqlite.ExportDB(dbPath, password, account.KDFIterations, tmpDbPath, newPassword, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
 	if err != nil {
 		return err
 	}
@@ -1032,7 +1032,7 @@ func (b *GethStatusBackend) changeWalletDBPassword(account *multiaccounts.Accoun
 	}
 
 	// Exporting database to a temporary file with a new password
-	err = dbsetup.ExportDB(dbPath, password, account.KDFIterations, tmpDbPath, newPassword, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
+	err = sqlite.ExportDB(dbPath, password, account.KDFIterations, tmpDbPath, newPassword, signal.SendReEncryptionStarted, signal.SendReEncryptionFinished)
 	if err != nil {
 		return err
 	}
@@ -1300,7 +1300,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		Name:                    request.DisplayName,
 		CustomizationColor:      multiacccommon.CustomizationColor(request.CustomizationColor),
 		CustomizationColorClock: customizationColorClock,
-		KDFIterations:           sqlite.ReducedKDFIterationsNumber,
+		KDFIterations:           dbsetup.ReducedKDFIterationsNumber,
 	}
 	if request.ImagePath != "" {
 		iis, err := images.GenerateIdentityImages(request.ImagePath, 0, 0, 1000, 1000)

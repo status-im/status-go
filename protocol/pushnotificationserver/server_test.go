@@ -3,18 +3,18 @@ package pushnotificationserver
 import (
 	"crypto/ecdsa"
 	"crypto/rand"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestServerSuite(t *testing.T) {
@@ -27,7 +27,6 @@ func TestServerSuite(t *testing.T) {
 
 type ServerSuite struct {
 	suite.Suite
-	tmpFile        *os.File
 	persistence    Persistence
 	accessToken    string
 	installationID string
@@ -39,13 +38,12 @@ type ServerSuite struct {
 }
 
 func (s *ServerSuite) SetupTest() {
-	tmpFile, err := ioutil.TempFile("", "")
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err)
-	s.tmpFile = tmpFile
+	err = sqlite.Migrate(db)
+	s.Require().NoError(err)
 
-	database, err := sqlite.Open(s.tmpFile.Name(), "", sqlite.ReducedKDFIterationsNumber)
-	s.Require().NoError(err)
-	s.persistence = NewSQLitePersistence(database)
+	s.persistence = NewSQLitePersistence(db)
 
 	identity, err := crypto.GenerateKey()
 	s.Require().NoError(err)

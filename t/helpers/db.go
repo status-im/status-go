@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/status-im/status-go/common/dbsetup"
-	"github.com/status-im/status-go/protocol/sqlite"
 )
 
 const kdfIterationsNumberForTests = 1
@@ -33,7 +32,7 @@ func SetupTestSQLDB(dbInit dbsetup.DatabaseInitializer, prefix string) (*sql.DB,
 }
 
 func SetupTestMemorySQLDB(dbInit dbsetup.DatabaseInitializer) (*sql.DB, error) {
-	db, err := dbInit.Initialize(sqlite.InMemoryPath, "password", kdfIterationsNumberForTests)
+	db, err := dbInit.Initialize(dbsetup.InMemoryPath, "password", kdfIterationsNumberForTests)
 	if err != nil {
 		return nil, err
 	}

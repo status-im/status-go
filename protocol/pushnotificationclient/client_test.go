@@ -3,14 +3,13 @@ package pushnotificationclient
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"io/ioutil"
 	"math/rand"
-	"os"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
 	"github.com/status-im/status-go/eth-node/types"
@@ -18,13 +17,13 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 const testDeviceToken = "test-token"
 
 type ClientSuite struct {
 	suite.Suite
-	tmpFile        *os.File
 	persistence    *Persistence
 	identity       *ecdsa.PrivateKey
 	installationID string
@@ -39,13 +38,12 @@ func TestClientSuite(t *testing.T) {
 }
 
 func (s *ClientSuite) SetupTest() {
-	tmpFile, err := ioutil.TempFile("", "")
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err)
-	s.tmpFile = tmpFile
+	err = sqlite.Migrate(db)
+	s.Require().NoError(err)
 
-	database, err := sqlite.Open(s.tmpFile.Name(), "", sqlite.ReducedKDFIterationsNumber)
-	s.Require().NoError(err)
-	s.persistence = NewPersistence(database)
+	s.persistence = NewPersistence(db)
 
 	identity, err := crypto.GenerateKey()
 	s.Require().NoError(err)

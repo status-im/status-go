@@ -1,11 +1,11 @@
 package transport
 
 import (
-	"io/ioutil"
-	"os"
 	"testing"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/stretchr/testify/require"
 
@@ -13,10 +13,11 @@ import (
 )
 
 func TestNewTransport(t *testing.T) {
-	dbPath, err := ioutil.TempFile("", "transport.sql")
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
-	defer os.Remove(dbPath.Name())
-	db, err := sqlite.Open(dbPath.Name(), "some-key", sqlite.ReducedKDFIterationsNumber)
+	err = sqlite.Migrate(db)
+	require.NoError(t, err)
+
 	require.NoError(t, err)
 
 	logger := tt.MustCreateTestLogger()
