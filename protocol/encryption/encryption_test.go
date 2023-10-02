@@ -3,12 +3,12 @@ package encryption
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -27,23 +27,17 @@ func TestEncryptionServiceTestSuite(t *testing.T) {
 
 type EncryptionServiceTestSuite struct {
 	suite.Suite
-	logger      *zap.Logger
-	alice       *Protocol
-	bob         *Protocol
-	aliceDBPath *os.File
-	bobDBPath   *os.File
+	logger *zap.Logger
+	alice  *Protocol
+	bob    *Protocol
 }
 
 func (s *EncryptionServiceTestSuite) initDatabases(config encryptorConfig) {
 	var err error
 
-	s.aliceDBPath, err = ioutil.TempFile("", "alice.db.sql")
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err)
-
-	s.bobDBPath, err = ioutil.TempFile("", "bob.db.sql")
-	s.Require().NoError(err)
-
-	db, err := sqlite.Open(s.aliceDBPath.Name(), "alice-key", sqlite.ReducedKDFIterationsNumber)
+	err = sqlite.Migrate(db)
 	s.Require().NoError(err)
 	config.InstallationID = aliceInstallationID
 	s.alice = NewWithEncryptorConfig(
@@ -53,7 +47,9 @@ func (s *EncryptionServiceTestSuite) initDatabases(config encryptorConfig) {
 		s.logger.With(zap.String("user", "alice")),
 	)
 
-	db, err = sqlite.Open(s.bobDBPath.Name(), "bob-key", sqlite.ReducedKDFIterationsNumber)
+	db, err = helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	s.Require().NoError(err)
+	err = sqlite.Migrate(db)
 	s.Require().NoError(err)
 	config.InstallationID = bobInstallationID
 	s.bob = NewWithEncryptorConfig(
@@ -70,8 +66,6 @@ func (s *EncryptionServiceTestSuite) SetupTest() {
 }
 
 func (s *EncryptionServiceTestSuite) TearDownTest() {
-	os.Remove(s.aliceDBPath.Name())
-	os.Remove(s.bobDBPath.Name())
 	_ = s.logger.Sync()
 }
 

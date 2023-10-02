@@ -1,17 +1,13 @@
 package multidevice
 
 import (
-	"database/sql"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/protocol/sqlite"
-)
-
-const (
-	dbPath = "/tmp/status-key-store.db"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestSQLLitePersistenceTestSuite(t *testing.T) {
@@ -20,15 +16,13 @@ func TestSQLLitePersistenceTestSuite(t *testing.T) {
 
 type SQLLitePersistenceTestSuite struct {
 	suite.Suite
-	// nolint: structcheck, megacheck
-	db      *sql.DB
 	service *sqlitePersistence
 }
 
 func (s *SQLLitePersistenceTestSuite) SetupTest() {
-	os.Remove(dbPath)
-
-	db, err := sqlite.Open(dbPath, "test-key", sqlite.ReducedKDFIterationsNumber)
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	s.Require().NoError(err)
+	err = sqlite.Migrate(db)
 	s.Require().NoError(err)
 
 	s.service = newSQLitePersistence(db)

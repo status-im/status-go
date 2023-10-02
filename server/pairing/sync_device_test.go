@@ -13,6 +13,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
@@ -36,7 +37,6 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	accservice "github.com/status-im/status-go/services/accounts"
 	"github.com/status-im/status-go/services/browsers"
-	"github.com/status-im/status-go/sqlite"
 )
 
 const (
@@ -102,7 +102,7 @@ func (s *SyncDeviceSuite) prepareBackendWithAccount(mnemonic, tmpdir string) *ap
 	}
 	account := multiaccounts.Account{
 		KeyUID:        generatedAccountInfo.KeyUID,
-		KDFIterations: sqlite.ReducedKDFIterationsNumber,
+		KDFIterations: dbsetup.ReducedKDFIterationsNumber,
 	}
 	err = accountManager.InitKeystore(filepath.Join(tmpdir, keystoreDir, account.KeyUID))
 	require.NoError(s.T(), err)

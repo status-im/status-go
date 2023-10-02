@@ -22,7 +22,6 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/static"
 	wakucommon "github.com/status-im/status-go/waku/common"
 	wakuv2common "github.com/status-im/status-go/wakuv2/common"
@@ -489,7 +488,7 @@ type NodeConfig struct {
 	MailServerRegistryAddress string
 
 	// PushNotificationServerConfig is the config for the push notification server
-	PushNotificationServerConfig pushnotificationserver.Config `json:"PushNotificationServerConfig"`
+	PushNotificationServerConfig PushNotificationServerConfig `json:"PushNotificationServerConfig"`
 
 	OutputMessageCSVEnabled bool
 
@@ -585,6 +584,12 @@ func (p *PushNotificationServer) UnmarshalText(data []byte) error {
 
 	p.PublicKey = pk
 	return nil
+}
+
+type PushNotificationServerConfig struct {
+	Enabled   bool
+	Identity  *ecdsa.PrivateKey
+	GorushURL string
 }
 
 // ShhextConfig defines options used by shhext service.

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"sort"
 	"strconv"
@@ -14,11 +13,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestTableUserMessagesAllFieldsCount(t *testing.T) {
@@ -891,11 +892,12 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 }
 
 func openTestDB() (*sql.DB, error) {
-	dbPath, err := ioutil.TempFile("", "status-go-test-db-")
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	if err != nil {
 		return nil, err
 	}
-	return sqlite.Open(dbPath.Name(), "", sqlite.ReducedKDFIterationsNumber)
+
+	return db, sqlite.Migrate(db)
 }
 
 func insertMinimalMessage(p *sqlitePersistence, id string) error {

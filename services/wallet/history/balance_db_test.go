@@ -9,13 +9,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
 func setupBalanceDBTest(t *testing.T) (*BalanceDB, func()) {
-	db, err := walletdatabase.InitializeDB(sqlite.InMemoryPath, "wallet-history-balance_db-tests", 1)
+	db, err := walletdatabase.InitializeDB(dbsetup.InMemoryPath, "wallet-history-balance_db-tests", 1)
 	require.NoError(t, err)
 	return NewBalanceDB(db), func() {
 		require.NoError(t, db.Close())

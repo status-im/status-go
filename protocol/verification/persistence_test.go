@@ -1,13 +1,14 @@
 package verification
 
 import (
-	"io/ioutil"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestPersistenceSuite(t *testing.T) {
@@ -21,13 +22,10 @@ type PersistenceSuite struct {
 }
 
 func (s *PersistenceSuite) SetupTest() {
-	s.db = nil
-
-	dbPath, err := ioutil.TempFile("", "")
-	s.NoError(err, "creating temp file for db")
-
-	db, err := sqlite.Open(dbPath.Name(), "", sqlite.ReducedKDFIterationsNumber)
-	s.NoError(err, "creating sqlite db instance")
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	s.Require().NoError(err)
+	err = sqlite.Migrate(db)
+	s.Require().NoError(err)
 
 	s.db = &Persistence{db: db}
 }

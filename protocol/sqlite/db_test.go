@@ -1,34 +1,13 @@
 package sqlite
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/t/helpers"
 )
-
-func TestOpen(t *testing.T) {
-	dir := t.TempDir()
-
-	dbPath := filepath.Join(dir, "db.sql")
-
-	// Open the db for the first time.
-	db, err := openAndMigrate(dbPath, "some-key", ReducedKDFIterationsNumber)
-	require.NoError(t, err)
-
-	// Insert some data.
-	_, err = db.Exec("CREATE TABLE test(name TEXT)")
-	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO test (name) VALUES ("abc")`)
-	require.NoError(t, err)
-	db.Close()
-
-	// Open again with different key should fail
-	// because the file already exists and it should not
-	// be recreated.
-	_, err = openAndMigrate(dbPath, "different-key", ReducedKDFIterationsNumber)
-	require.Error(t, err)
-}
 
 // TestCommunitiesMigrationDirty tests the communities migration when
 // dirty flag has been set to true.
@@ -36,7 +15,7 @@ func TestOpen(t *testing.T) {
 // then execute again, and we should be all migrated.
 func TestCommunitiesMigrationDirty(t *testing.T) {
 	// Open the db for the first time.
-	db, err := open(InMemoryPath, "some-key", ReducedKDFIterationsNumber)
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	// Create a communities table, so that migration will fail
@@ -84,7 +63,7 @@ func TestCommunitiesMigrationDirty(t *testing.T) {
 // dirty to false and then execute again, and we should be all migrated.
 func TestCommunitiesMigrationNotDirty(t *testing.T) {
 	// Open the db for the first time.
-	db, err := open(InMemoryPath, "some-key", ReducedKDFIterationsNumber)
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	require.NoError(t, err)
 
 	// Create a communities table, so that migration will fail

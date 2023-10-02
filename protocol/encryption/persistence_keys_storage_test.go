@@ -1,13 +1,14 @@
 package encryption
 
 import (
-	"path/filepath"
 	"testing"
 
 	dr "github.com/status-im/doubleratchet"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 var (
@@ -30,10 +31,9 @@ type SQLLitePersistenceKeysStorageTestSuite struct {
 }
 
 func (s *SQLLitePersistenceKeysStorageTestSuite) SetupTest() {
-	dir := s.T().TempDir()
-	key := "blahblahblah"
-
-	db, err := sqlite.Open(filepath.Join(dir, "db.sql"), key, sqlite.ReducedKDFIterationsNumber)
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	s.Require().NoError(err)
+	err = sqlite.Migrate(db)
 	s.Require().NoError(err)
 
 	p := newSQLitePersistence(db)

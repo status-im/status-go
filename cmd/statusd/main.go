@@ -22,6 +22,7 @@ import (
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/common/dbsetup"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/logutils"
@@ -31,7 +32,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/sqlite"
+	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -208,21 +209,24 @@ func main() {
 			return
 		}
 
-		walletDB, err := walletdatabase.InitializeDB(config.DataDir+"/"+installationID.String()+"-wallet.db", "", sqlite.ReducedKDFIterationsNumber)
+		walletDB, err := walletdatabase.InitializeDB(config.DataDir+"/"+installationID.String()+"-wallet.db", "", dbsetup.ReducedKDFIterationsNumber)
 		if err != nil {
 			logger.Error("failed to initialize app db", "error", err)
 			return
 		}
 
-		appDB, err := appdatabase.InitializeDB(config.DataDir+"/"+installationID.String()+".db", "", sqlite.ReducedKDFIterationsNumber)
+		appDB, err := appdatabase.InitializeDB(config.DataDir+"/"+installationID.String()+".db", "", dbsetup.ReducedKDFIterationsNumber)
 		if err != nil {
 			logger.Error("failed to initialize app db", "error", err)
 			return
 		}
-
 		options := []protocol.Option{
 			protocol.WithPushNotifications(),
-			protocol.WithPushNotificationServerConfig(&config.PushNotificationServerConfig),
+			protocol.WithPushNotificationServerConfig(&pushnotificationserver.Config{
+				Enabled:   config.PushNotificationServerConfig.Enabled,
+				Identity:  config.PushNotificationServerConfig.Identity,
+				GorushURL: config.PushNotificationServerConfig.GorushURL,
+			}),
 			protocol.WithDatabase(appDB),
 			protocol.WithWalletDatabase(walletDB),
 			protocol.WithTorrentConfig(&config.TorrentConfig),

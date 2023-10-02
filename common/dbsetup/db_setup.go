@@ -5,31 +5,18 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/sqlite"
 )
+
+const InMemoryPath = ":memory:"
+
+// The reduced number of kdf iterations (for performance reasons) which is
+// currently used for derivation of the database key
+// https://github.com/status-im/status-go/pull/1343
+// https://notes.status.im/i8Y_l7ccTiOYq09HVgoFwA
+const ReducedKDFIterationsNumber = 3200
 
 type DatabaseInitializer interface {
 	Initialize(path, password string, kdfIterationsNumber int) (*sql.DB, error)
-}
-
-// DecryptDatabase creates an unencrypted copy of the database and copies it
-// over to the given directory
-func DecryptDatabase(oldPath, newPath, password string, kdfIterationsNumber int) error {
-	return sqlite.DecryptDB(oldPath, newPath, password, kdfIterationsNumber)
-}
-
-// EncryptDatabase creates an encrypted copy of the database and copies it to the
-// user path
-func EncryptDatabase(oldPath, newPath, password string, kdfIterationsNumber int, onStart func(), onEnd func()) error {
-	return sqlite.EncryptDB(oldPath, newPath, password, kdfIterationsNumber, onStart, onEnd)
-}
-
-func ExportDB(path string, password string, kdfIterationsNumber int, newDbPath string, newPassword string, onStart func(), onEnd func()) error {
-	return sqlite.ExportDB(path, password, kdfIterationsNumber, newDbPath, newPassword, onStart, onEnd)
-}
-
-func ChangeDatabasePassword(path string, password string, kdfIterationsNumber int, newPassword string, onStart func(), onEnd func()) error {
-	return sqlite.ChangeEncryptionKey(path, password, kdfIterationsNumber, newPassword, onStart, onEnd)
 }
 
 // GetDBFilename takes an instance of sql.DB and returns the filename of the "main" database

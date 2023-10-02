@@ -2,18 +2,18 @@ package pushnotificationclient
 
 import (
 	"crypto/ecdsa"
-	"io/ioutil"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 const (
@@ -29,22 +29,16 @@ func TestSQLitePersistenceSuite(t *testing.T) {
 
 type SQLitePersistenceSuite struct {
 	suite.Suite
-	tmpFile     *os.File
 	persistence *Persistence
 }
 
 func (s *SQLitePersistenceSuite) SetupTest() {
-	tmpFile, err := ioutil.TempFile("", "")
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err)
-	s.tmpFile = tmpFile
-
-	database, err := sqlite.Open(s.tmpFile.Name(), "", sqlite.ReducedKDFIterationsNumber)
+	err = sqlite.Migrate(db)
 	s.Require().NoError(err)
-	s.persistence = NewPersistence(database)
-}
 
-func (s *SQLitePersistenceSuite) TearDownTest() {
-	_ = os.Remove(s.tmpFile.Name())
+	s.persistence = NewPersistence(db)
 }
 
 func (s *SQLitePersistenceSuite) TestSaveAndRetrieveServer() {

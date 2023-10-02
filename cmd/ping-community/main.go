@@ -19,11 +19,11 @@ import (
 
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
-	"github.com/status-im/status-go/sqlite"
 
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
@@ -396,7 +396,7 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 
 	account := multiaccounts.Account{
 		KeyUID:        generatedAccountInfo.KeyUID,
-		KDFIterations: sqlite.ReducedKDFIterationsNumber,
+		KDFIterations: dbsetup.ReducedKDFIterationsNumber,
 	}
 	settings, err := defaultSettings(generatedAccountInfo, derivedAddresses, &seedPhrase)
 	if err != nil {

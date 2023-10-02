@@ -17,7 +17,6 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/nodecfg"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/t/helpers"
 )
 
@@ -205,7 +204,7 @@ func randomNodeConfig() *params.NodeConfig {
 		},
 		RegisterTopics: randomTopicSlice(),
 		RequireTopics:  randomTopicLimits(),
-		PushNotificationServerConfig: pushnotificationserver.Config{
+		PushNotificationServerConfig: params.PushNotificationServerConfig{
 			Enabled:   randomBool(),
 			GorushURL: randomString(),
 			Identity:  privK,

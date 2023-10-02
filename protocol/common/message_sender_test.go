@@ -1,10 +1,10 @@
 package common
 
 import (
-	"path/filepath"
 	"testing"
 
 	transport2 "github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/status-im/status-go/waku"
 
@@ -22,6 +22,8 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+
+	"github.com/status-im/status-go/appdatabase"
 )
 
 func TestMessageSenderSuite(t *testing.T) {
@@ -32,7 +34,6 @@ type MessageSenderSuite struct {
 	suite.Suite
 
 	sender      *MessageSender
-	tmpDir      string
 	testMessage protobuf.ChatMessage
 	logger      *zap.Logger
 }
@@ -52,12 +53,12 @@ func (s *MessageSenderSuite) SetupTest() {
 	s.logger, err = zap.NewDevelopment()
 	s.Require().NoError(err)
 
-	s.tmpDir = s.T().TempDir()
-
 	identity, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	database, err := sqlite.Open(filepath.Join(s.tmpDir, "sender-test.sql"), "some-key", sqlite.ReducedKDFIterationsNumber)
+	database, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	s.Require().NoError(err)
+	err = sqlite.Migrate(database)
 	s.Require().NoError(err)
 
 	encryptionProtocol := encryption.New(
@@ -188,8 +189,11 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	s.Require().NoError(err)
 
 	// Create sender encryption protocol.
-	senderDatabase, err := sqlite.Open(filepath.Join(s.tmpDir, "sender.db.sql"), "", sqlite.ReducedKDFIterationsNumber)
+	senderDatabase, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err)
+	err = sqlite.Migrate(senderDatabase)
+	s.Require().NoError(err)
+
 	senderEncryptionProtocol := encryption.New(
 		senderDatabase,
 		"installation-2",

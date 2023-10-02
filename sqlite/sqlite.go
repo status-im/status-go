@@ -12,7 +12,7 @@ import (
 
 	sqlcipher "github.com/mutecomm/go-sqlcipher/v4" // We require go sqlcipher that overrides default implementation
 
-	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/common/dbsetup"
 )
 
 const (
@@ -80,7 +80,7 @@ func attachDatabaseWithDefaultSettings(db *sql.DB, attachedDbPath string, attach
 	}
 
 	if kdfIterationsNumber <= 0 {
-		kdfIterationsNumber = sqlite.ReducedKDFIterationsNumber
+		kdfIterationsNumber = dbsetup.ReducedKDFIterationsNumber
 	}
 
 	if _, err := db.Exec(fmt.Sprintf(`PRAGMA %s.busy_timeout = 60000`, attachedDbName)); err != nil {
@@ -177,7 +177,7 @@ func openDB(path string, key string, kdfIterationsNumber int, cipherPageSize int
 			}
 
 			if kdfIterationsNumber <= 0 {
-				kdfIterationsNumber = sqlite.ReducedKDFIterationsNumber
+				kdfIterationsNumber = dbsetup.ReducedKDFIterationsNumber
 			}
 
 			if _, err := conn.Exec(fmt.Sprintf("PRAGMA cipher_page_size = %d", cipherPageSize), nil); err != nil {
@@ -289,7 +289,7 @@ func ChangeEncryptionKey(path string, key string, kdfIterationsNumber int, newKe
 	}
 
 	if kdfIterationsNumber <= 0 {
-		kdfIterationsNumber = sqlite.ReducedKDFIterationsNumber
+		kdfIterationsNumber = dbsetup.ReducedKDFIterationsNumber
 	}
 
 	db, err := openDB(path, key, kdfIterationsNumber, V4CipherPageSize)

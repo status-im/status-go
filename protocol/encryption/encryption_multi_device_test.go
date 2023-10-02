@@ -3,12 +3,12 @@ package encryption
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"io/ioutil"
 	"testing"
 
-	"github.com/status-im/status-go/protocol/tt"
-
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -51,12 +51,12 @@ func setupUser(user string, s *EncryptionServiceMultiDeviceSuite, n int) error {
 
 	for i := 0; i < n; i++ {
 		installationID := fmt.Sprintf("%s%d", user, i+1)
-		dbFileName := fmt.Sprintf("sqlite-persistence-test-%s.sql", installationID)
-		dbPath, err := ioutil.TempFile("", dbFileName)
+
+		db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 		if err != nil {
 			return err
 		}
-		db, err := sqlite.Open(dbPath.Name(), "some-key", sqlite.ReducedKDFIterationsNumber)
+		err = sqlite.Migrate(db)
 		if err != nil {
 			return err
 		}

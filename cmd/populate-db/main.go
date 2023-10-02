@@ -20,6 +20,7 @@ import (
 
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
@@ -33,7 +34,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	wakuextn "github.com/status-im/status-go/services/wakuext"
-	"github.com/status-im/status-go/sqlite"
 )
 
 type testTimeSource struct{}
@@ -461,7 +461,7 @@ func ImportAccount(seedPhrase string, backend *api.GethStatusBackend) error {
 
 	account := multiaccounts.Account{
 		KeyUID:        generatedAccountInfo.KeyUID,
-		KDFIterations: sqlite.ReducedKDFIterationsNumber,
+		KDFIterations: dbsetup.ReducedKDFIterationsNumber,
 	}
 	settings, err := defaultSettings(generatedAccountInfo, derivedAddresses, &seedPhrase)
 	if err != nil {

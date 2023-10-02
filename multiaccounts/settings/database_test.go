@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 )
 
@@ -71,7 +71,7 @@ func TestClosingsqlDB(t *testing.T) {
 	password := "settings-tests"
 
 	// Make connection with sql.DB
-	db, err := appdatabase.InitializeDB(testFileName, password, sqlite.ReducedKDFIterationsNumber)
+	db, err := appdatabase.InitializeDB(testFileName, password, dbsetup.ReducedKDFIterationsNumber)
 
 	// handle removing the test file on any exit
 	defer func() {
@@ -96,7 +96,7 @@ func TestClosingsqlDB(t *testing.T) {
 	require.NoError(t, err)
 
 	// Make another connection with sql.DB
-	db2, err := appdatabase.InitializeDB(testFileName, password, sqlite.ReducedKDFIterationsNumber)
+	db2, err := appdatabase.InitializeDB(testFileName, password, dbsetup.ReducedKDFIterationsNumber)
 	require.NoError(t, err)
 
 	// Init settings.Database struct using second connection

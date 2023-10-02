@@ -1,13 +1,13 @@
 package encryption
 
 import (
-	"database/sql"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/t/helpers"
 
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/sqlite"
@@ -19,15 +19,13 @@ func TestSQLLitePersistenceTestSuite(t *testing.T) {
 
 type SQLLitePersistenceTestSuite struct {
 	suite.Suite
-	// nolint: structcheck, megacheck
-	db      *sql.DB
 	service *sqlitePersistence
 }
 
 func (s *SQLLitePersistenceTestSuite) SetupTest() {
-	dir := s.T().TempDir()
-
-	db, err := sqlite.Open(filepath.Join(dir, "db.sql"), "test-key", sqlite.ReducedKDFIterationsNumber)
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	s.Require().NoError(err)
+	err = sqlite.Migrate(db)
 	s.Require().NoError(err)
 
 	s.service = newSQLitePersistence(db)
