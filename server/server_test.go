@@ -118,11 +118,11 @@ func (s *ServerURLSuite) TestServer_MakeLinkPreviewThumbnailURL() {
 
 func (s *ServerURLSuite) TestServer_MakeStatusLinkPreviewThumbnailURL() {
 	s.Require().Equal(
-		baseURLWithCustomPort+"/status-link-preview/thumbnail?message-id=99&url=https%3A%2F%2Fstatus.app",
+		baseURLWithCustomPort+"/status-link-preview/thumbnail?image-id=contact-icon&message-id=99&url=https%3A%2F%2Fstatus.app",
 		s.server.MakeStatusLinkPreviewThumbnailURL("99", "https://status.app", "contact-icon"))
 
 	s.testNoPort(
-		baseURLWithDefaultPort+"/status-link-preview/thumbnail?message-id=99&url=https%3A%2F%2Fstatus.app",
+		baseURLWithDefaultPort+"/status-link-preview/thumbnail?image-id=contact-icon&message-id=99&url=https%3A%2F%2Fstatus.app",
 		s.serverNoPort.MakeStatusLinkPreviewThumbnailURL("99", "https://status.app", "contact-icon"))
 }
 
