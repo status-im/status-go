@@ -193,12 +193,16 @@ func TestConvertLinkPreviewsToProto(t *testing.T) {
 }
 
 func TestConvertFromProtoToLinkPreviews(t *testing.T) {
+
+	thumbnailPayload, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUg=")
+	require.NoError(t, err)
+
 	l := &protobuf.UnfurledLink{
 		Description:      "GitHub is where people build software.",
 		Title:            "Build software better, together",
 		Type:             protobuf.UnfurledLink_LINK,
 		Url:              "https://github.com",
-		ThumbnailPayload: []byte(""),
+		ThumbnailPayload: thumbnailPayload,
 		ThumbnailWidth:   100,
 		ThumbnailHeight:  200,
 	}
