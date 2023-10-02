@@ -190,14 +190,14 @@ type GetRecipientsResponse struct {
 // GetRecipientsAsync returns true if a task is already running or scheduled due to a previous call; meaning that
 // this call won't receive an answer but client should rely on the answer from the previous call.
 // If no task is already scheduled false will be returned
-func (s *Service) GetRecipientsAsync(requestID int32, offset int, limit int) bool {
+func (s *Service) GetRecipientsAsync(requestID int32, chainIDs []w_common.ChainID, addresses []common.Address, offset int, limit int) bool {
 	return s.scheduler.Enqueue(requestID, getRecipientsTask, func(ctx context.Context) (interface{}, error) {
 		var err error
 		result := &GetRecipientsResponse{
 			Offset:    offset,
 			ErrorCode: ErrorCodeSuccess,
 		}
-		result.Addresses, result.HasMore, err = GetRecipients(ctx, s.db, offset, limit)
+		result.Addresses, result.HasMore, err = GetRecipients(ctx, s.db, chainIDs, addresses, offset, limit)
 		return result, err
 	}, func(result interface{}, taskType async.TaskType, err error) {
 		res := result.(*GetRecipientsResponse)
