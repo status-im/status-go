@@ -47,15 +47,16 @@ func buildThumbnail(image *images.IdentityImage, thumbnail *common.LinkPreviewTh
 }
 
 func (u *StatusUnfurler) buildContactData(contactData *ContactURLData) (*common.StatusContactLinkPreview, error) {
-	c := new(common.StatusContactLinkPreview)
-	c.PublicKey = contactData.PublicKey
-	c.DisplayName = contactData.DisplayName
-	c.Description = contactData.Description
 
 	contactID, err := multiformat.DeserializeCompressedKey(contactData.PublicKey)
 	if err != nil {
 		return nil, err
 	}
+
+	c := new(common.StatusContactLinkPreview)
+	c.PublicKey = contactData.PublicKey
+	c.DisplayName = contactData.DisplayName
+	c.Description = contactData.Description
 
 	contact := u.m.GetContactByID(contactID)
 	if contact == nil {
@@ -109,7 +110,7 @@ func (u *StatusUnfurler) buildCommunityData(data *CommunityURLData) (*common.Sta
 	// Now check if there's newer information in the database
 	communityID, err := types.DecodeHex(data.CommunityID)
 	if err != nil {
-		return c, fmt.Errorf("failed to decode community id: %w", err)
+		return nil, fmt.Errorf("failed to decode community id: %w", err)
 	}
 
 	community, err := u.m.GetCommunityByID(communityID)

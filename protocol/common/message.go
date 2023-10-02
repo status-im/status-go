@@ -835,8 +835,8 @@ func isValidLinkPreviewForProto(preview LinkPreview) error {
 		if err := isValidLinkPreviewThumbnail(preview.Thumbnail); err != nil {
 			return fmt.Errorf("thumbnail is not valid for proto: %w", err)
 		}
+		return nil
 	}
-	return fmt.Errorf("uncaught link preview type")
 }
 
 func (preview *StatusCommunityLinkPreview) isValidForProto() error {

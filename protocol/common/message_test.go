@@ -252,9 +252,9 @@ func TestConvertFromProtoToLinkPreviews(t *testing.T) {
 
 func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
 	contact := &StatusContactLinkPreview{
-		PublicKey:   "1",
-		DisplayName: "2",
-		Description: "3",
+		PublicKey:   "PublicKey_1",
+		DisplayName: "DisplayName_2",
+		Description: "Description_3",
 		Icon: LinkPreviewThumbnail{
 			Width:   10,
 			Height:  20,
@@ -263,11 +263,11 @@ func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
 	}
 
 	community := &StatusCommunityLinkPreview{
-		CommunityID:  "4",
-		DisplayName:  "5",
-		Description:  "6",
+		CommunityID:  "CommunityID_4",
+		DisplayName:  "DisplayName_5",
+		Description:  "Description_6",
 		MembersCount: 7,
-		Color:        "8",
+		Color:        "Color_8",
 		TagIndices:   []uint32{9, 10},
 		Icon: LinkPreviewThumbnail{
 			Width:   30,
@@ -282,17 +282,17 @@ func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
 	}
 
 	channel := &StatusCommunityChannelLinkPreview{
-		ChannelUUID: "11",
-		Emoji:       "12",
-		DisplayName: "13",
-		Description: "14",
-		Color:       "15",
+		ChannelUUID: "ChannelUUID_11",
+		Emoji:       "Emoji_12",
+		DisplayName: "DisplayName_13",
+		Description: "Description_14",
+		Color:       "Color_15",
 		Community: &StatusCommunityLinkPreview{
-			CommunityID:  "16",
-			DisplayName:  "17",
-			Description:  "18",
+			CommunityID:  "CommunityID_16",
+			DisplayName:  "DisplayName_17",
+			Description:  "Description_18",
 			MembersCount: 19,
-			Color:        "20",
+			Color:        "Color_20",
 			TagIndices:   []uint32{21, 22},
 			Icon: LinkPreviewThumbnail{
 				Width:   70,
@@ -413,9 +413,9 @@ func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
 func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 
 	contact := &protobuf.UnfurledStatusContactLink{
-		PublicKey:   "1",
-		DisplayName: "2",
-		Description: "3",
+		PublicKey:   "PublicKey_1",
+		DisplayName: "DisplayName_2",
+		Description: "Description_3",
 		Icon: &protobuf.UnfurledLinkThumbnail{
 			Width:   10,
 			Height:  20,
@@ -424,11 +424,11 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 	}
 
 	community := &protobuf.UnfurledStatusCommunityLink{
-		CommunityId:  "4",
-		DisplayName:  "5",
-		Description:  "6",
+		CommunityId:  "CommunityId_4",
+		DisplayName:  "DisplayName_5",
+		Description:  "Description_6",
 		MembersCount: 7,
-		Color:        "8",
+		Color:        "Color_8",
 		TagIndices:   []uint32{9, 10},
 		Icon: &protobuf.UnfurledLinkThumbnail{
 			Width:   30,
@@ -443,17 +443,17 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 	}
 
 	channel := &protobuf.UnfurledStatusChannelLink{
-		ChannelUuid: "11",
-		Emoji:       "12",
-		DisplayName: "13",
-		Description: "14",
-		Color:       "15",
+		ChannelUuid: "ChannelUuid_11",
+		Emoji:       "Emoji_12",
+		DisplayName: "DisplayName_13",
+		Description: "Description_14",
+		Color:       "Color_15",
 		Community: &protobuf.UnfurledStatusCommunityLink{
-			CommunityId:  "16",
-			DisplayName:  "17",
-			Description:  "18",
+			CommunityId:  "CommunityId_16",
+			DisplayName:  "DisplayName_17",
+			Description:  "Description_18",
 			MembersCount: 19,
-			Color:        "20",
+			Color:        "Color_20",
 			TagIndices:   []uint32{21, 22},
 			Icon: &protobuf.UnfurledLinkThumbnail{
 				Width:   70,
@@ -513,7 +513,6 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 
 	c1 := p1.Contact
 	require.NotNil(t, c1)
-	require.Equal(t, "1", c1.PublicKey)
 	require.Equal(t, contact.PublicKey, c1.PublicKey)
 	require.Equal(t, contact.DisplayName, c1.DisplayName)
 	require.Equal(t, contact.Description, c1.Description)
