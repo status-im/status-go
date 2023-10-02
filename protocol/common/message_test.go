@@ -416,6 +416,9 @@ func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
 
 func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 
+	thumbnailPayload, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUg=")
+	require.NoError(t, err)
+
 	contact := &protobuf.UnfurledStatusContactLink{
 		PublicKey:   "PublicKey_1",
 		DisplayName: "DisplayName_2",
@@ -423,7 +426,7 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 		Icon: &protobuf.UnfurledLinkThumbnail{
 			Width:   10,
 			Height:  20,
-			Payload: []byte(""),
+			Payload: thumbnailPayload,
 		},
 	}
 
@@ -437,12 +440,12 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 		Icon: &protobuf.UnfurledLinkThumbnail{
 			Width:   30,
 			Height:  40,
-			Payload: []byte(""),
+			Payload: thumbnailPayload,
 		},
 		Banner: &protobuf.UnfurledLinkThumbnail{
 			Width:   50,
 			Height:  60,
-			Payload: []byte(""),
+			Payload: thumbnailPayload,
 		},
 	}
 
@@ -462,12 +465,12 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 			Icon: &protobuf.UnfurledLinkThumbnail{
 				Width:   70,
 				Height:  80,
-				Payload: []byte(""),
+				Payload: thumbnailPayload,
 			},
 			Banner: &protobuf.UnfurledLinkThumbnail{
 				Width:   90,
 				Height:  100,
-				Payload: []byte(""),
+				Payload: thumbnailPayload,
 			},
 		},
 	}
@@ -577,12 +580,12 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 	require.Equal(t, int(channel.Community.Icon.Width), c3.Community.Icon.Width)
 	require.Equal(t, int(channel.Community.Icon.Height), c3.Community.Icon.Height)
 	require.Equal(t, "", c3.Community.Icon.DataURI)
-	require.Equal(t, "https://localhost:6666/42-https://status.app/cc/-channel-community-icon", c3.Community.Icon.URL)
+	require.Equal(t, "https://localhost:6666/42-https://status.app/cc/-community-channel-icon", c3.Community.Icon.URL)
 	require.NotNil(t, c3.Community.Banner)
 	require.Equal(t, int(channel.Community.Banner.Width), c3.Community.Banner.Width)
 	require.Equal(t, int(channel.Community.Banner.Height), c3.Community.Banner.Height)
 	require.Equal(t, "", c3.Community.Banner.DataURI)
-	require.Equal(t, "https://localhost:6666/42-https://status.app/cc/-channel-community-banner", c3.Community.Banner.URL)
+	require.Equal(t, "https://localhost:6666/42-https://status.app/cc/-community-channel-banner", c3.Community.Banner.URL)
 
 }
 

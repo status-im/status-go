@@ -1126,7 +1126,7 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 		}
 	}
 
-	convertCommunityFromProto := func(c *protobuf.UnfurledStatusCommunityLink, URL string) *StatusCommunityLinkPreview {
+	convertCommunityFromProto := func(c *protobuf.UnfurledStatusCommunityLink, URL string, thumbnailPrefix string) *StatusCommunityLinkPreview {
 		if c == nil {
 			return nil
 		}
@@ -1140,10 +1140,10 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 			TagIndices:   c.TagIndices,
 		}
 		if icon := c.GetIcon(); icon != nil {
-			out.Icon = createThumbnail(icon, URL, "community-icon")
+			out.Icon = createThumbnail(icon, URL, thumbnailPrefix+"icon")
 		}
 		if banner := c.GetBanner(); banner != nil {
-			out.Banner = createThumbnail(banner, URL, "community-banner")
+			out.Banner = createThumbnail(banner, URL, thumbnailPrefix+"banner")
 		}
 		return out
 	}
@@ -1166,7 +1166,7 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 		}
 
 		if c := link.GetCommunity(); c != nil {
-			lp.Community = convertCommunityFromProto(c, link.Url)
+			lp.Community = convertCommunityFromProto(c, link.Url, "community-")
 		}
 
 		if c := link.GetChannel(); c != nil {
@@ -1177,7 +1177,7 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 				Description: c.Description,
 				Color:       c.Color,
 			}
-			lp.Channel.Community = convertCommunityFromProto(c.Community, link.Url)
+			lp.Channel.Community = convertCommunityFromProto(c.Community, link.Url, "community-channel-")
 		}
 
 		previews = append(previews, lp)

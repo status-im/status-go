@@ -47,8 +47,8 @@ const (
 	ContactIcon            = "contact-icon"
 	CommunityIcon          = "community-icon"
 	CommunityBanner        = "community-banner"
-	ChannelCommunityIcon   = "channel-community-icon"
-	ChannelCommunityBanner = "channel-community-banner"
+	ChannelCommunityIcon   = "community-channel-icon"
+	ChannelCommunityBanner = "community-channel-banner"
 )
 
 type HandlerPatternMap map[string]http.HandlerFunc
