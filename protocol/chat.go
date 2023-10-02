@@ -399,7 +399,8 @@ func (c *Chat) UpdateFromMessage(message *common.Message, timesource common.Time
 }
 
 func (c *Chat) ShouldIncreaseMessageCount(message *common.Message) bool {
-	return c.LastMessage == nil ||
+	return c.ChatType != ChatTypeOneToOne ||
+		c.LastMessage == nil ||
 		c.LastMessage.IsSystemMessage() ||
 		!c.LastMessage.New ||
 		c.LastMessage.Seen ||
