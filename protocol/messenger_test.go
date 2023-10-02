@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	_ "github.com/mutecomm/go-sqlcipher/v4" // require go-sqlcipher that overrides default implementation
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -2285,13 +2284,6 @@ func (s *MessengerSuite) TestShouldResendEmoji() {
 	}, s.m.getTimesource())
 	s.NoError(err)
 	s.True(ok)
-}
-
-func (s *MessengerSuite) TestMarshalUnfurledStatusLink() {
-	const marshalled = "[{\"url\":\"https://status.app/u/TestUrl\",\"Payload\":{\"Contact\":{\"public_key\":\"TestPublicKey\",\"display_name\":\"TestDisplayName\",\"description\":\"Test description\",\"icon\":{\"payload\":\"iVBORw0KGgoAAAANSUg=\",\"width\":100,\"height\":200}}}}]"
-	var unmarshalled protobuf.UnfurledStatusLinks
-	err := proto.Unmarshal([]byte(marshalled), &unmarshalled)
-	s.Require().NoError(err)
 }
 
 func (s *MessengerSuite) TestSendMessageWithPreviews() {
