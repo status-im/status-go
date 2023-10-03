@@ -63,14 +63,6 @@ func (u *StatusUnfurler) buildContactData(contactData *ContactURLData) (*common.
 		return c, nil
 	}
 
-	// TODO: Should we try to fetch from waku?
-	//if contact == nil {
-	//	if contact, err = u.m.RequestContactInfoFromMailserver(contactData.PublicKey, true); err != nil {
-	//		u.logger.Warn("StatusUnfurler: failed to request contact info from mailserver")
-	//		return c, err
-	//	}
-	//}
-
 	if image, ok := contact.Images[images.SmallDimName]; ok {
 		if err = buildThumbnail(&image, &c.Icon); err != nil {
 			return c, fmt.Errorf("failed to set thumbnail: %w", err)
@@ -165,7 +157,6 @@ func (u *StatusUnfurler) Unfurl() (common.StatusLinkPreview, error) {
 	if resp.Contact != nil {
 		preview.Contact, err = u.buildContactData(resp.Contact)
 		u.logger.Warn("error when building contact data: ", zap.Error(err))
-		u.logger.Info("<<< StatusUnfurler::Unfurl", zap.Any("contact", preview.Contact))
 		return preview, nil
 	}
 
@@ -178,7 +169,6 @@ func (u *StatusUnfurler) Unfurl() (common.StatusLinkPreview, error) {
 		if err != nil {
 			u.logger.Warn("error when building channel data: ", zap.Error(err))
 		}
-		u.logger.Info("<<< StatusUnfurler::Unfurl", zap.Any("channel", preview.Channel))
 		return preview, nil
 	}
 
@@ -187,7 +177,6 @@ func (u *StatusUnfurler) Unfurl() (common.StatusLinkPreview, error) {
 		if err != nil {
 			u.logger.Warn("error when building community data: ", zap.Error(err))
 		}
-		u.logger.Info("<<< StatusUnfurler::Unfurl", zap.Any("community", preview.Community))
 		return preview, nil
 	}
 

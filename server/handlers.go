@@ -43,12 +43,31 @@ const (
 	generateQRCode      = "/GenerateQRCode"
 )
 
+type LinkPreviewImageIDPrefix string
+type LinkPreviewImageIDPostfix string
+type LinkPreviewImageID string
+
+func CreateImageID(prefix LinkPreviewImageIDPrefix, postfix LinkPreviewImageIDPostfix) LinkPreviewImageID {
+	return LinkPreviewImageID(string(prefix) + string(postfix))
+}
+
 const (
-	ContactIcon            = "contact-icon"
-	CommunityIcon          = "community-icon"
-	CommunityBanner        = "community-banner"
-	ChannelCommunityIcon   = "community-channel-icon"
-	ChannelCommunityBanner = "community-channel-banner"
+	IconPostfix   LinkPreviewImageIDPostfix = "icon"
+	BannerPostfix LinkPreviewImageIDPostfix = "banner"
+)
+
+const (
+	ContactPrefix          LinkPreviewImageIDPrefix = "contact-"
+	CommunityPrefix        LinkPreviewImageIDPrefix = "community-"
+	ChannelCommunityPrefix LinkPreviewImageIDPrefix = "community-channel-"
+)
+
+const (
+	ContactIcon            = LinkPreviewImageID(string(ContactPrefix) + string(IconPostfix))
+	CommunityIcon          = LinkPreviewImageID(string(CommunityPrefix) + string(IconPostfix))
+	CommunityBanner        = LinkPreviewImageID(string(CommunityPrefix) + string(BannerPostfix))
+	ChannelCommunityIcon   = LinkPreviewImageID(string(ChannelCommunityPrefix) + string(IconPostfix))
+	ChannelCommunityBanner = LinkPreviewImageID(string(ChannelCommunityPrefix) + string(BannerPostfix))
 )
 
 type HandlerPatternMap map[string]http.HandlerFunc
