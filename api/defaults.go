@@ -138,6 +138,12 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 		nodeConfig.WalletConfig.InfuraAPIKeySecret = request.InfuraSecret
 	}
 
+	if request.AlchemyEthereumMainnetToken != "" {
+		nodeConfig.WalletConfig.AlchemyAPIKeys[mainnetChainID] = request.AlchemyEthereumMainnetToken
+	}
+	if request.AlchemyEthereumGoerliToken != "" {
+		nodeConfig.WalletConfig.AlchemyAPIKeys[goerliChainID] = request.AlchemyEthereumGoerliToken
+	}
 	if request.AlchemyArbitrumMainnetToken != "" {
 		nodeConfig.WalletConfig.AlchemyAPIKeys[arbitrumChainID] = request.AlchemyArbitrumMainnetToken
 	}
