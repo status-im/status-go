@@ -1671,6 +1671,14 @@ func newDefaultStore() *DefaultStore {
 				Decimals: 6,
 				ChainID:  421613,
 			},
+			&Token{
+				Address:  common.HexToAddress("0x3e622317f8c93f7328350cf0b56d9ed4c620c5d6"),
+				Name:     "Dai Stablecoin",
+				Symbol:   "DAI",
+				Color:    "#f8f8f8",
+				Decimals: 18,
+				ChainID:  11155111,
+			},
 		},
 	}
 }

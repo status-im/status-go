@@ -5,8 +5,14 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 )
+
+const SepoliaChainID = 11155111
+
+// GoerliChainIDs Uncomment next chain when we move more chain to sepolia
+var GoerliChainIDs = []uint64{5} //, 420, 421613}
 
 type CombinedNetwork struct {
 	Prod *params.Network
@@ -79,11 +85,17 @@ func (nq *networksQuery) exec(db *sql.DB) ([]*params.Network, error) {
 type Manager struct {
 	db                 *sql.DB
 	configuredNetworks []params.Network
+	accountsDB         *accounts.Database
 }
 
 func NewManager(db *sql.DB) *Manager {
+	accountsDB, err := accounts.NewDB(db)
+	if err != nil {
+		return nil
+	}
 	return &Manager{
-		db: db,
+		db:         db,
+		accountsDB: accountsDB,
 	}
 }
 
@@ -191,18 +203,54 @@ func (nm *Manager) Find(chainID uint64) *params.Network {
 	return networks[0]
 }
 
+func (nm *Manager) GetAll() ([]*params.Network, error) {
+	query := newNetworksQuery()
+	return query.exec(nm.db)
+}
+
 func (nm *Manager) Get(onlyEnabled bool) ([]*params.Network, error) {
+	isSepoliaEnabled, err := nm.accountsDB.GetIsSepoliaEnabled()
+	if err != nil {
+		return nil, err
+	}
+
 	query := newNetworksQuery()
 	if onlyEnabled {
 		query.filterEnabled(true)
 	}
 
-	return query.exec(nm.db)
+	networks, err := query.exec(nm.db)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []*params.Network
+	for _, network := range networks {
+		if !isSepoliaEnabled && network.ChainID == SepoliaChainID {
+			continue
+		}
+
+		if isSepoliaEnabled {
+			found := false
+
+			for _, chainID := range GoerliChainIDs {
+				if network.ChainID == chainID {
+					found = true
+					break
+				}
+			}
+			if found {
+				continue
+			}
+		}
+		results = append(results, network)
+	}
+
+	return results, nil
 }
 
 func (nm *Manager) GetCombinedNetworks() ([]*CombinedNetwork, error) {
-	query := newNetworksQuery()
-	networks, err := query.exec(nm.db)
+	networks, err := nm.Get(false)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +258,7 @@ func (nm *Manager) GetCombinedNetworks() ([]*CombinedNetwork, error) {
 	for _, network := range networks {
 		found := false
 		for _, n := range combinedNetworks {
-			if (n.Test != nil && network.ChainID == n.Test.RelatedChainID) || (n.Prod != nil && network.ChainID == n.Prod.RelatedChainID) {
+			if (n.Test != nil && (network.ChainID == n.Test.RelatedChainID || n.Test.ChainID == network.RelatedChainID)) || (n.Prod != nil && (network.ChainID == n.Prod.RelatedChainID || n.Prod.ChainID == network.RelatedChainID)) {
 				found = true
 				if network.IsTest {
 					n.Test = network
