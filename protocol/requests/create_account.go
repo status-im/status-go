@@ -50,6 +50,8 @@ type WalletSecretsConfig struct {
 
 	// Testing
 	GanacheURL                  string `json:"ganacheURL"`
+	AlchemyEthereumMainnetToken string `json:"alchemyEthereumMainnetToken"`
+	AlchemyEthereumGoerliToken  string `json:"alchemyEthereumGoerliToken"`
 	AlchemyArbitrumMainnetToken string `json:"alchemyArbitrumMainnetToken"`
 	AlchemyArbitrumGoerliToken  string `json:"alchemyArbitrumGoerliToken"`
 	AlchemyOptimismMainnetToken string `json:"alchemyOptimismMainnetToken"`
