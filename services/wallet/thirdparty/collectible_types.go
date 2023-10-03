@@ -1,8 +1,10 @@
 package thirdparty
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/protocol/communities/token"
@@ -43,6 +45,27 @@ func (k *CollectibleUniqueID) HashKey() string {
 
 func (k *CollectibleUniqueID) Same(other *CollectibleUniqueID) bool {
 	return k.ContractID.ChainID == other.ContractID.ChainID && k.ContractID.Address == other.ContractID.Address && k.TokenID.Cmp(other.TokenID.Int) == 0
+}
+
+func RowsToCollectibles(rows *sql.Rows) ([]CollectibleUniqueID, error) {
+	var ids []CollectibleUniqueID
+	for rows.Next() {
+		id := CollectibleUniqueID{
+			TokenID: &bigint.BigInt{Int: big.NewInt(0)},
+		}
+		err := rows.Scan(
+			&id.ContractID.ChainID,
+			&id.ContractID.Address,
+			(*bigint.SQLBigIntBytes)(id.TokenID.Int),
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		ids = append(ids, id)
+	}
+
+	return ids, nil
 }
 
 func GroupCollectibleUIDsByChainID(uids []CollectibleUniqueID) map[w_common.ChainID][]CollectibleUniqueID {

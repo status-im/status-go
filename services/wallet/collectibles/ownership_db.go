@@ -111,27 +111,6 @@ func (o *OwnershipDB) Update(chainID w_common.ChainID, ownerAddress common.Addre
 	return
 }
 
-func rowsToCollectibles(rows *sql.Rows) ([]thirdparty.CollectibleUniqueID, error) {
-	var ids []thirdparty.CollectibleUniqueID
-	for rows.Next() {
-		id := thirdparty.CollectibleUniqueID{
-			TokenID: &bigint.BigInt{Int: big.NewInt(0)},
-		}
-		err := rows.Scan(
-			&id.ContractID.ChainID,
-			&id.ContractID.Address,
-			(*bigint.SQLBigIntBytes)(id.TokenID.Int),
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		ids = append(ids, id)
-	}
-
-	return ids, nil
-}
-
 func (o *OwnershipDB) GetOwnedCollectibles(chainIDs []w_common.ChainID, ownerAddresses []common.Address, offset int, limit int) ([]thirdparty.CollectibleUniqueID, error) {
 	query, args, err := sqlx.In(fmt.Sprintf(`SELECT %s
 		FROM collectibles_ownership_cache
@@ -153,7 +132,7 @@ func (o *OwnershipDB) GetOwnedCollectibles(chainIDs []w_common.ChainID, ownerAdd
 	}
 	defer rows.Close()
 
-	return rowsToCollectibles(rows)
+	return thirdparty.RowsToCollectibles(rows)
 }
 
 func (o *OwnershipDB) GetOwnedCollectible(chainID w_common.ChainID, ownerAddresses common.Address, contractAddress common.Address, tokenID *big.Int) (*thirdparty.CollectibleUniqueID, error) {
@@ -173,7 +152,7 @@ func (o *OwnershipDB) GetOwnedCollectible(chainID w_common.ChainID, ownerAddress
 	}
 	defer rows.Close()
 
-	ids, err := rowsToCollectibles(rows)
+	ids, err := thirdparty.RowsToCollectibles(rows)
 	if err != nil {
 		return nil, err
 	}

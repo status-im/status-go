@@ -617,6 +617,14 @@ func (api *API) GetOldestActivityTimestampAsync(requestID int32, addresses []com
 	return nil
 }
 
+func (api *API) GetActivityCollectiblesAsync(requestID int32, chainIDs []wcommon.ChainID, addresses []common.Address, offset int, limit int) error {
+	log.Debug("wallet.api.GetActivityCollectiblesAsync", "addresses.len", len(addresses), "chainIDs.len", len(chainIDs), "offset", offset, "limit", limit)
+
+	api.s.activity.GetActivityCollectiblesAsync(requestID, chainIDs, addresses, offset, limit)
+
+	return nil
+}
+
 func (api *API) FetchChainIDForURL(ctx context.Context, rpcURL string) (*big.Int, error) {
 	log.Debug("wallet.api.VerifyURL", rpcURL)
 
