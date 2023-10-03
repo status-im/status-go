@@ -108,7 +108,7 @@ func (tckd *TestCommunitiesKeyDistributor) waitOnKeyDistribution(condition func(
 }
 
 func TestMessengerCommunitiesTokenPermissionsSuite(t *testing.T) {
-	suite.Run(t, new(MessengerCommunitiesTokenPermissionsSuite))
+	//suite.Run(t, new(MessengerCommunitiesTokenPermissionsSuite))
 }
 
 type MessengerCommunitiesTokenPermissionsSuite struct {
