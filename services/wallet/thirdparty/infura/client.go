@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/connection"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -25,6 +26,13 @@ type Client struct {
 }
 
 func NewClient(apiKey string, apiKeySecret string) *Client {
+	if apiKey == "" {
+		log.Warn("Infura API key not available")
+	}
+	if apiKeySecret == "" {
+		log.Warn("Infura API key secret not available")
+	}
+
 	return &Client{
 		client:           &http.Client{Timeout: time.Minute},
 		apiKey:           apiKey,

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/connection"
@@ -62,6 +63,10 @@ type Client struct {
 
 // new opensea v1 client.
 func NewClient(apiKey string, httpClient *HTTPClient) *Client {
+	if apiKey == "" {
+		log.Warn("OpenseaV1 API key not available")
+	}
+
 	return &Client{
 		client:           httpClient,
 		apiKey:           apiKey,
