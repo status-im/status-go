@@ -392,6 +392,11 @@ var (
 		dBColumnName:   "test_networks_enabled",
 		valueHandler:   BoolHandler,
 	}
+	IsSepoliaEnabled = SettingField{
+		reactFieldName: "is-sepolia-enabled?",
+		dBColumnName:   "is_sepolia_enabled",
+		valueHandler:   BoolHandler,
+	}
 	UseMailservers = SettingField{
 		reactFieldName: "use-mailservers?",
 		dBColumnName:   "use_mailservers",
@@ -513,6 +518,7 @@ var (
 		WebviewAllowPermissionRequests,
 		IncludeWatchOnlyAccount,
 		ProfileMigrationNeeded,
+		IsSepoliaEnabled,
 	}
 )
 

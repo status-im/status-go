@@ -66,7 +66,7 @@ func TestInitNetwork(t *testing.T) {
 	db, stop := setupTestNetworkDB(t)
 	defer stop()
 
-	nm := &Manager{db: db}
+	nm := NewManager(db)
 	err := nm.Init(initNetworks)
 	require.NoError(t, err)
 
@@ -79,7 +79,7 @@ func TestGet(t *testing.T) {
 	db, stop := setupTestNetworkDB(t)
 	defer stop()
 
-	nm := &Manager{db: db}
+	nm := NewManager(db)
 	err := nm.Init(initNetworks)
 	require.NoError(t, err)
 
@@ -92,7 +92,7 @@ func TestGetCombinedNetworks(t *testing.T) {
 	db, stop := setupTestNetworkDB(t)
 	defer stop()
 
-	nm := &Manager{db: db}
+	nm := NewManager(db)
 	err := nm.Init(initNetworks)
 	require.NoError(t, err)
 
@@ -109,7 +109,7 @@ func TestDelete(t *testing.T) {
 	db, stop := setupTestNetworkDB(t)
 	defer stop()
 
-	nm := &Manager{db: db}
+	nm := NewManager(db)
 	err := nm.Init(initNetworks)
 	require.NoError(t, err)
 
@@ -124,7 +124,7 @@ func TestUpsert(t *testing.T) {
 	db, stop := setupTestNetworkDB(t)
 	defer stop()
 
-	nm := &Manager{db: db}
+	nm := NewManager(db)
 	err := nm.Init(initNetworks)
 	require.NoError(t, err)
 

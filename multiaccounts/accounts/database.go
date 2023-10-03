@@ -109,8 +109,9 @@ const (
 	AccountPartiallyOperable AccountOperable = "partially" // an account is partially operable if it is not a keycard account and there is created keystore file for the address it is derived from
 	AccountFullyOperable     AccountOperable = "fully"     // an account is fully operable if it is not a keycard account and there is a keystore file for it
 
-	ProdPreferredChainIDsDefault = "1:10:42161"
-	TestPreferredChainIDsDefault = "5:420:421613"
+	ProdPreferredChainIDsDefault        = "1:10:42161"
+	TestPreferredChainIDsDefault        = "5:420:421613"
+	TestSepoliaPreferredChainIDsDefault = "11155111:420:421613"
 )
 
 // IsOwnAccount returns true if this is an account we have the private key for
@@ -947,7 +948,7 @@ func (db *Database) updateKeypairClock(tx *sql.Tx, keyUID string, clock uint64) 
 	return err
 }
 
-func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, updateKeypairClock bool) (err error) {
+func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, updateKeypairClock, isSepoliaEnabled bool) (err error) {
 	if tx == nil {
 		return errDbTransactionIsNil
 	}
@@ -978,8 +979,13 @@ func (db *Database) saveOrUpdateAccounts(tx *sql.Tx, accounts []*Account, update
 			if acc.ProdPreferredChainIDs == "" {
 				acc.ProdPreferredChainIDs = ProdPreferredChainIDsDefault
 			}
+
 			if acc.TestPreferredChainIDs == "" {
-				acc.TestPreferredChainIDs = TestPreferredChainIDsDefault
+				if isSepoliaEnabled {
+					acc.TestPreferredChainIDs = TestSepoliaPreferredChainIDsDefault
+				} else {
+					acc.TestPreferredChainIDs = TestPreferredChainIDsDefault
+				}
 			}
 		}
 
@@ -1071,6 +1077,10 @@ func (db *Database) SaveOrUpdateAccounts(accounts []*Account, updateKeypairClock
 	if len(accounts) == 0 {
 		return errors.New("no provided accounts to save/update")
 	}
+	isSepoliaEnabled, err := db.GetIsSepoliaEnabled()
+	if err != nil {
+		return err
+	}
 
 	tx, err := db.db.Begin()
 	if err != nil {
@@ -1083,7 +1093,7 @@ func (db *Database) SaveOrUpdateAccounts(accounts []*Account, updateKeypairClock
 		}
 		_ = tx.Rollback()
 	}()
-	err = db.saveOrUpdateAccounts(tx, accounts, updateKeypairClock)
+	err = db.saveOrUpdateAccounts(tx, accounts, updateKeypairClock, isSepoliaEnabled)
 	return err
 }
 
@@ -1094,6 +1104,11 @@ func (db *Database) SaveOrUpdateAccounts(accounts []*Account, updateKeypairClock
 func (db *Database) SaveOrUpdateKeypair(keypair *Keypair) error {
 	if keypair == nil {
 		return errDbPassedParameterIsNil
+	}
+
+	isSepoliaEnabled, err := db.GetIsSepoliaEnabled()
+	if err != nil {
+		return err
 	}
 
 	tx, err := db.db.Begin()
@@ -1145,7 +1160,7 @@ func (db *Database) SaveOrUpdateKeypair(keypair *Keypair) error {
 	if err != nil {
 		return err
 	}
-	return db.saveOrUpdateAccounts(tx, keypair.Accounts, false)
+	return db.saveOrUpdateAccounts(tx, keypair.Accounts, false, isSepoliaEnabled)
 }
 
 func (db *Database) UpdateKeypairName(keyUID string, name string, clock uint64, updateChatAccountName bool) error {

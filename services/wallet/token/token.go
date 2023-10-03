@@ -166,7 +166,7 @@ func (tm *Manager) SetTokens(tokens []*Token) {
 func (tm *Manager) fetchTokens() {
 	tokenList := make([]*Token, 0)
 
-	networks, err := tm.networkManager.Get(false)
+	networks, err := tm.networkManager.GetAll()
 	if err != nil {
 		return
 	}
