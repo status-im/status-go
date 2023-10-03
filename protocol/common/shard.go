@@ -7,7 +7,7 @@ import (
 )
 
 const MainStatusShardCluster = 16
-const NonProtectedIndex = 128
+const NonProtectedShardIndex = 64
 const UndefinedShardValue = 0
 
 type Shard struct {
@@ -54,7 +54,7 @@ func DefaultNonProtectedPubsubTopic(shard *Shard) string {
 	if shard != nil {
 		return transport.GetPubsubTopic(&transport.Shard{
 			Cluster: MainStatusShardCluster,
-			Index:   NonProtectedIndex,
+			Index:   NonProtectedShardIndex,
 		})
 	} else {
 		return relay.DefaultWakuTopic
