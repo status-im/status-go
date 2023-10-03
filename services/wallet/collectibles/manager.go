@@ -543,7 +543,10 @@ func (o *Manager) processFullCollectibleData(assets []thirdparty.FullCollectible
 			if canProvide {
 				metadata, err := o.metadataProvider.FetchCollectibleMetadata(id, tokenURI)
 				if err != nil {
-					return err
+					// Metadata is available but fetching failed.
+					// Ideally we would retry, but for now we just skip it.
+					log.Error("Failed to fetch collectible metadata", "err", err)
+					continue
 				}
 
 				if metadata != nil {

@@ -82,7 +82,19 @@ type RawMetadata struct {
 }
 
 type Raw struct {
-	RawMetadata RawMetadata `json:"metadata"`
+	RawMetadata interface{} `json:"metadata"`
+}
+
+func (r *Raw) UnmarshalJSON(b []byte) error {
+	metadata := RawMetadata{
+		Attributes: make([]Attribute, 0),
+	}
+
+	// Field structure is not known in advance
+	_ = json.Unmarshal(b, &metadata)
+
+	r.RawMetadata = metadata
+	return nil
 }
 
 type OpenSeaMetadata struct {
@@ -166,14 +178,16 @@ func (c *Contract) toCollectionData(id thirdparty.ContractID) thirdparty.Collect
 }
 
 func (c *Asset) toCollectiblesData(id thirdparty.CollectibleUniqueID) thirdparty.CollectibleData {
+	rawMetadata := c.Raw.RawMetadata.(RawMetadata)
+
 	return thirdparty.CollectibleData{
 		ID:           id,
 		Provider:     AlchemyID,
 		Name:         c.Name,
 		Description:  c.Description,
 		ImageURL:     c.Image.ImageURL,
-		AnimationURL: c.Image.OriginalAnimationURL,
-		Traits:       alchemyToCollectibleTraits(c.Raw.RawMetadata.Attributes),
+		AnimationURL: c.Image.CachedAnimationURL,
+		Traits:       alchemyToCollectibleTraits(rawMetadata.Attributes),
 	}
 }
 
