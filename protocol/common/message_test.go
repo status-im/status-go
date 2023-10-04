@@ -503,8 +503,8 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 		},
 	}
 
-	urlMaker := func(msgID string, linkURL string, imageID string) string {
-		return "https://localhost:6666/" + msgID + "-" + linkURL + "-" + imageID
+	urlMaker := func(msgID string, linkURL string, imageID MediaServerImageID) string {
+		return "https://localhost:6666/" + msgID + "-" + linkURL + "-" + string(imageID)
 	}
 
 	previews := msg.ConvertFromProtoToStatusLinkPreviews(urlMaker)

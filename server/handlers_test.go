@@ -3,20 +3,21 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
-	"github.com/status-im/status-go/protocol/tt"
-	"github.com/stretchr/testify/suite"
-	"io/ioutil"
+	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/t/helpers"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 
+	"github.com/golang/protobuf/proto"
+	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
-	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/protocol/tt"
 )
 
 func TestHandlersSuite(t *testing.T) {
@@ -30,17 +31,17 @@ type HandlersSuite struct {
 }
 
 func (s *HandlersSuite) SetupTest() {
-	dbPath, err := ioutil.TempFile("", "status-go-test-db-")
+	db, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
 	s.Require().NoError(err)
 
-	db, err := sqlite.Open(dbPath.Name(), "", sqlite.ReducedKDFIterationsNumber)
+	err = sqlite.Migrate(db)
 	s.Require().NoError(err)
 
 	s.logger = tt.MustCreateTestLogger()
 	s.db = db
 }
 
-func (s *HandlersSuite) createUserMessage(msg *common.Message) {
+func (s *HandlersSuite) saveUserMessage(msg *common.Message) {
 	whisperTimestamp := 0
 	source := ""
 	text := ""
@@ -73,7 +74,7 @@ func (s *HandlersSuite) createUserMessage(msg *common.Message) {
 	links, err := json.Marshal(msg.UnfurledLinks)
 	s.Require().NoError(err)
 
-	statusLinks, err := json.Marshal(msg.UnfurledStatusLinks)
+	statusLinks, err := proto.Marshal(msg.UnfurledStatusLinks)
 	s.Require().NoError(err)
 
 	_, err = stmt.Exec(
@@ -103,67 +104,116 @@ func (s *HandlersSuite) httpGetReqRecorder(handler http.HandlerFunc, reqURL stri
 	return rr
 }
 
+func (s *HandlersSuite) verifyHTTPResponseThumbnail(rr *httptest.ResponseRecorder, expectedPayload []byte) {
+	s.Require().Equal(expectedPayload, rr.Body.Bytes())
+	s.Require().Equal("image/jpeg", rr.HeaderMap.Get("Content-Type"))
+	s.Require().Equal("no-store", rr.HeaderMap.Get("Cache-Control"))
+}
+
 func (s *HandlersSuite) TestHandleLinkPreviewThumbnail() {
 	previewURL := "https://github.com"
+	defaultPayload := []byte{0xff, 0xd8, 0xff, 0xdb, 0x0, 0x84, 0x0, 0x50, 0x37, 0x3c, 0x46, 0x3c, 0x32, 0x50}
+
 	msg := common.Message{
 		ID: "1",
 		ChatMessage: &protobuf.ChatMessage{
 			UnfurledLinks: []*protobuf.UnfurledLink{
 				{
-					Type:             protobuf.UnfurledLink_LINK,
-					Url:              previewURL,
-					ThumbnailWidth:   100,
-					ThumbnailHeight:  200,
-					ThumbnailPayload: []byte{0xff, 0xd8, 0xff, 0xdb, 0x0, 0x84, 0x0, 0x50, 0x37, 0x3c, 0x46, 0x3c, 0x32, 0x50},
+					Type:            protobuf.UnfurledLink_LINK,
+					Url:             previewURL,
+					ThumbnailWidth:  100,
+					ThumbnailHeight: 200,
 				},
 			},
 		},
 	}
-	s.createUserMessage(&msg)
+	s.saveUserMessage(&msg)
 
-	// Test happy path.
-	reqURL := "/dummy?" + url.Values{"message-id": {msg.ID}, "url": {previewURL}}.Encode()
-	rr := s.httpGetReqRecorder(handleLinkPreviewThumbnail(s.db, s.logger), reqURL)
-	s.Require().Equal(http.StatusOK, rr.Code)
-	s.Require().Equal(msg.UnfurledLinks[0].ThumbnailPayload, rr.Body.Bytes())
-	s.Require().Equal("image/jpeg", rr.HeaderMap.Get("Content-Type"))
-	s.Require().Equal("no-store", rr.HeaderMap.Get("Cache-Control"))
+	testCases := []struct {
+		Name                   string
+		ExpectedHTTPStatusCode int
+		ThumbnailPayload       []byte
+		Parameters             url.Values
+		CheckFunc              func(s *HandlersSuite, rr *httptest.ResponseRecorder)
+	}{
+		{
+			Name:                   "Test happy path",
+			ExpectedHTTPStatusCode: http.StatusOK,
+			ThumbnailPayload:       defaultPayload,
+			Parameters: url.Values{
+				"message-id": {msg.ID},
+				"url":        {previewURL},
+			},
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.verifyHTTPResponseThumbnail(rr, msg.UnfurledLinks[0].ThumbnailPayload)
+			},
+		},
+		{
+			Name:                   "Test request with missing 'url' parameter",
+			ThumbnailPayload:       defaultPayload,
+			ExpectedHTTPStatusCode: http.StatusBadRequest,
+			Parameters: url.Values{
+				"message-id": {msg.ID},
+			},
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.Require().Equal("missing query parameter 'url'\n", rr.Body.String())
+			},
+		},
+		{
+			Name:                   "Test request with missing 'message-id' parameter",
+			ThumbnailPayload:       defaultPayload,
+			ExpectedHTTPStatusCode: http.StatusBadRequest,
+			Parameters: url.Values{
+				"url": {previewURL},
+			},
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.Require().Equal("missing query parameter 'message-id'\n", rr.Body.String())
+			},
+		},
+		{
+			Name:                   "Test mime type not supported",
+			ThumbnailPayload:       []byte("unsupported image"),
+			ExpectedHTTPStatusCode: http.StatusNotImplemented,
+			Parameters: url.Values{
+				"message-id": {msg.ID},
+				"url":        {previewURL},
+			},
+		},
+	}
 
-	// Test bad requests.
-	reqURL = "/dummy?" + url.Values{"message-id": {msg.ID}}.Encode()
-	rr = s.httpGetReqRecorder(handleLinkPreviewThumbnail(s.db, s.logger), reqURL)
-	s.Require().Equal(http.StatusBadRequest, rr.Code)
-	s.Require().Equal("missing query parameter 'url'\n", rr.Body.String())
+	handler := handleLinkPreviewThumbnail(s.db, s.logger)
 
-	reqURL = "/dummy?" + url.Values{"url": {previewURL}}.Encode()
-	rr = s.httpGetReqRecorder(handleLinkPreviewThumbnail(s.db, s.logger), reqURL)
-	s.Require().Equal(http.StatusBadRequest, rr.Code)
-	s.Require().Equal("missing query parameter 'message-id'\n", rr.Body.String())
+	for _, tc := range testCases {
+		s.Run(tc.Name, func() {
+			msg.UnfurledLinks[0].ThumbnailPayload = tc.ThumbnailPayload
+			s.saveUserMessage(&msg)
 
-	// Test mime type not supported.
-	msg.UnfurledLinks[0].ThumbnailPayload = []byte("unsupported image")
-	s.createUserMessage(&msg)
-	reqURL = "/dummy?" + url.Values{"message-id": {msg.ID}, "url": {previewURL}}.Encode()
-	rr = s.httpGetReqRecorder(handleLinkPreviewThumbnail(s.db, s.logger), reqURL)
-	s.Require().Equal(http.StatusNotImplemented, rr.Code)
+			requestURL := "/dummy?" + tc.Parameters.Encode()
+			rr := s.httpGetReqRecorder(handler, requestURL)
+			s.Require().Equal(tc.ExpectedHTTPStatusCode, rr.Code)
+			if tc.CheckFunc != nil {
+				tc.CheckFunc(s, rr)
+			}
+		})
+	}
 }
 
 func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
-	thumbnailPayload := []byte{0xff, 0xd8, 0xff, 0xdb, 0x0, 0x84, 0x0, 0x50, 0x37, 0x3c, 0x46, 0x3c, 0x32, 0x50}
-
 	contact := &protobuf.UnfurledStatusContactLink{
 		PublicKey: "PublicKey_1",
 		Icon: &protobuf.UnfurledLinkThumbnail{
 			Width:   10,
 			Height:  20,
-			Payload: thumbnailPayload,
+			Payload: []byte{0xff, 0xd8, 0xff, 0xdb, 0x0, 0x84, 0x0, 0x50, 0x37, 0x3c, 0x46, 0x3c, 0x32, 0x50},
 		},
 	}
 
-	unfurledContact := &protobuf.UnfurledStatusLink{
-		Url: "https://status.app/u/",
-		Payload: &protobuf.UnfurledStatusLink_Contact{
-			Contact: contact,
+	contactWithUnsupportedImage := &protobuf.UnfurledStatusContactLink{
+		PublicKey: "PublicKey_2",
+		Icon: &protobuf.UnfurledLinkThumbnail{
+			Width:   10,
+			Height:  20,
+			Payload: []byte("unsupported image"),
 		},
 	}
 
@@ -172,19 +222,12 @@ func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 		Icon: &protobuf.UnfurledLinkThumbnail{
 			Width:   30,
 			Height:  40,
-			Payload: thumbnailPayload,
+			Payload: []byte{0xff, 0xd8, 0xff, 0xdb, 0x0, 0x84, 0x0, 0x50, 0x37, 0x3c, 0x46, 0x3c, 0x32, 0x51},
 		},
 		Banner: &protobuf.UnfurledLinkThumbnail{
 			Width:   50,
 			Height:  60,
-			Payload: thumbnailPayload,
-		},
-	}
-
-	unfurledCommunity := &protobuf.UnfurledStatusLink{
-		Url: "https://status.app/c/",
-		Payload: &protobuf.UnfurledStatusLink_Community{
-			Community: community,
+			Payload: []byte{0xff, 0xd8, 0xff, 0xdb, 0x0, 0x84, 0x0, 0x50, 0x37, 0x3c, 0x46, 0x3c, 0x32, 0x52},
 		},
 	}
 
@@ -195,13 +238,34 @@ func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 			Icon: &protobuf.UnfurledLinkThumbnail{
 				Width:   70,
 				Height:  80,
-				Payload: thumbnailPayload,
+				Payload: []byte{0xff, 0xd8, 0xff, 0xdb, 0x0, 0x84, 0x0, 0x50, 0x37, 0x3c, 0x46, 0x3c, 0x32, 0x53},
 			},
 			Banner: &protobuf.UnfurledLinkThumbnail{
 				Width:   90,
 				Height:  100,
-				Payload: thumbnailPayload,
+				Payload: []byte{0xff, 0xd8, 0xff, 0xdb, 0x0, 0x84, 0x0, 0x50, 0x37, 0x3c, 0x46, 0x3c, 0x32, 0x54},
 			},
+		},
+	}
+
+	unfurledContact := &protobuf.UnfurledStatusLink{
+		Url: "https://status.app/u/",
+		Payload: &protobuf.UnfurledStatusLink_Contact{
+			Contact: contact,
+		},
+	}
+
+	unfurledContactWithUnsupportedImage := &protobuf.UnfurledStatusLink{
+		Url: "https://status.app/u/",
+		Payload: &protobuf.UnfurledStatusLink_Contact{
+			Contact: contactWithUnsupportedImage,
+		},
+	}
+
+	unfurledCommunity := &protobuf.UnfurledStatusLink{
+		Url: "https://status.app/c/",
+		Payload: &protobuf.UnfurledStatusLink_Community{
+			Community: community,
 		},
 	}
 
@@ -212,8 +276,49 @@ func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 		},
 	}
 
-	msg := common.Message{
-		ID: "1",
+	const (
+		messageIDContactOnly      = "1"
+		messageIDCommunityOnly    = "2"
+		messageIDChannelOnly      = "3"
+		messageIDAllLinks         = "4"
+		messageIDUnsupportedImage = "5"
+	)
+
+	s.saveUserMessage(&common.Message{
+		ID: messageIDContactOnly,
+		ChatMessage: &protobuf.ChatMessage{
+			UnfurledStatusLinks: &protobuf.UnfurledStatusLinks{
+				UnfurledStatusLinks: []*protobuf.UnfurledStatusLink{
+					unfurledContact,
+				},
+			},
+		},
+	})
+
+	s.saveUserMessage(&common.Message{
+		ID: messageIDCommunityOnly,
+		ChatMessage: &protobuf.ChatMessage{
+			UnfurledStatusLinks: &protobuf.UnfurledStatusLinks{
+				UnfurledStatusLinks: []*protobuf.UnfurledStatusLink{
+					unfurledCommunity,
+				},
+			},
+		},
+	})
+
+	s.saveUserMessage(&common.Message{
+		ID: messageIDChannelOnly,
+		ChatMessage: &protobuf.ChatMessage{
+			UnfurledStatusLinks: &protobuf.UnfurledStatusLinks{
+				UnfurledStatusLinks: []*protobuf.UnfurledStatusLink{
+					unfurledChannel,
+				},
+			},
+		},
+	})
+
+	s.saveUserMessage(&common.Message{
+		ID: messageIDAllLinks,
 		ChatMessage: &protobuf.ChatMessage{
 			UnfurledStatusLinks: &protobuf.UnfurledStatusLinks{
 				UnfurledStatusLinks: []*protobuf.UnfurledStatusLink{
@@ -223,7 +328,213 @@ func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 				},
 			},
 		},
+	})
+
+	s.saveUserMessage(&common.Message{
+		ID: messageIDUnsupportedImage,
+		ChatMessage: &protobuf.ChatMessage{
+			UnfurledStatusLinks: &protobuf.UnfurledStatusLinks{
+				UnfurledStatusLinks: []*protobuf.UnfurledStatusLink{
+					unfurledContactWithUnsupportedImage,
+				},
+			},
+		},
+	})
+
+	testCases := []struct {
+		Name                   string
+		ExpectedHTTPStatusCode int
+		Parameters             url.Values
+		CheckFunc              func(s *HandlersSuite, rr *httptest.ResponseRecorder)
+	}{
+		{
+			Name: "Test valid contact icon link",
+			Parameters: url.Values{
+				"message-id": {messageIDContactOnly},
+				"url":        {unfurledContact.Url},
+				"image-id":   {string(common.MediaServerContactIcon)},
+			},
+			ExpectedHTTPStatusCode: http.StatusOK,
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.verifyHTTPResponseThumbnail(rr, unfurledContact.GetContact().Icon.Payload)
+			},
+		},
+		{
+			Name: "Test invalid request for community icon in a contact link",
+			Parameters: url.Values{
+				"message-id": {messageIDContactOnly},
+				"url":        {unfurledContact.Url},
+				"image-id":   {string(common.MediaServerCommunityIcon)},
+			},
+			ExpectedHTTPStatusCode: http.StatusBadRequest,
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.Require().Equal("invalid query parameter 'image-id' value: this is not a community link\n", rr.Body.String())
+			},
+		},
+		{
+			Name: "Test invalid request for cahnnel community banner in a contact link",
+			Parameters: url.Values{
+				"message-id": {messageIDContactOnly},
+				"url":        {unfurledContact.Url},
+				"image-id":   {string(common.MediaServerChannelCommunityBanner)},
+			},
+			ExpectedHTTPStatusCode: http.StatusBadRequest,
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.Require().Equal("invalid query parameter 'image-id' value: this is not a community channel link\n", rr.Body.String())
+			},
+		},
+		{
+			Name: "Test invalid request for channel community banner in a contact link",
+			Parameters: url.Values{
+				"message-id": {messageIDContactOnly},
+				"url":        {unfurledContact.Url},
+				"image-id":   {"contact-banner"},
+			},
+			ExpectedHTTPStatusCode: http.StatusBadRequest,
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.Require().Equal("invalid query parameter 'image-id' value: value not supported\n", rr.Body.String())
+			},
+		},
+		{
+			Name: "Test valid community icon link",
+			Parameters: url.Values{
+				"message-id": {messageIDCommunityOnly},
+				"url":        {unfurledCommunity.Url},
+				"image-id":   {string(common.MediaServerCommunityIcon)},
+			},
+			ExpectedHTTPStatusCode: http.StatusOK,
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.verifyHTTPResponseThumbnail(rr, unfurledCommunity.GetCommunity().Icon.Payload)
+			},
+		},
+		{
+			Name: "Test valid community banner link",
+			Parameters: url.Values{
+				"message-id": {messageIDCommunityOnly},
+				"url":        {unfurledCommunity.Url},
+				"image-id":   {string(common.MediaServerCommunityBanner)},
+			},
+			ExpectedHTTPStatusCode: http.StatusOK,
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.verifyHTTPResponseThumbnail(rr, unfurledCommunity.GetCommunity().Banner.Payload)
+			},
+		},
+		{
+			Name: "Test valid channel community icon link",
+			Parameters: url.Values{
+				"message-id": {messageIDChannelOnly},
+				"url":        {unfurledChannel.Url},
+				"image-id":   {string(common.MediaServerChannelCommunityIcon)},
+			},
+			ExpectedHTTPStatusCode: http.StatusOK,
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.verifyHTTPResponseThumbnail(rr, unfurledChannel.GetChannel().GetCommunity().Icon.Payload)
+			},
+		},
+		{
+			Name: "Test valid channel community banner link",
+			Parameters: url.Values{
+				"message-id": {messageIDChannelOnly},
+				"url":        {unfurledChannel.Url},
+				"image-id":   {string(common.MediaServerChannelCommunityBanner)},
+			},
+			ExpectedHTTPStatusCode: http.StatusOK,
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.verifyHTTPResponseThumbnail(rr, unfurledChannel.GetChannel().GetCommunity().Banner.Payload)
+			},
+		},
+		{
+			Name: "Test valid contact icon link in a diverse message",
+			Parameters: url.Values{
+				"message-id": {messageIDAllLinks},
+				"url":        {unfurledContact.Url},
+				"image-id":   {string(common.MediaServerContactIcon)},
+			},
+			ExpectedHTTPStatusCode: http.StatusOK,
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.verifyHTTPResponseThumbnail(rr, unfurledContact.GetContact().Icon.Payload)
+			},
+		},
+		{
+			Name: "Test valid community icon link in a diverse message",
+			Parameters: url.Values{
+				"message-id": {messageIDAllLinks},
+				"url":        {unfurledCommunity.Url},
+				"image-id":   {string(common.MediaServerCommunityIcon)},
+			},
+			ExpectedHTTPStatusCode: http.StatusOK,
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.verifyHTTPResponseThumbnail(rr, unfurledCommunity.GetCommunity().Icon.Payload)
+			},
+		},
+		{
+			Name: "Test valid channel community icon link in a diverse message",
+			Parameters: url.Values{
+				"message-id": {messageIDAllLinks},
+				"url":        {unfurledChannel.Url},
+				"image-id":   {string(common.MediaServerChannelCommunityIcon)},
+			},
+			ExpectedHTTPStatusCode: http.StatusOK,
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.verifyHTTPResponseThumbnail(rr, unfurledChannel.GetChannel().GetCommunity().Icon.Payload)
+			},
+		},
+		{
+			Name: "Test mime type not supported",
+			Parameters: url.Values{
+				"message-id": {messageIDUnsupportedImage},
+				"url":        {unfurledContactWithUnsupportedImage.Url},
+				"image-id":   {string(common.MediaServerContactIcon)},
+			},
+			ExpectedHTTPStatusCode: http.StatusNotImplemented,
+		},
+		{
+			Name: "Test request with missing 'message-id' parameter",
+			Parameters: url.Values{
+				"url":      {unfurledCommunity.Url},
+				"image-id": {string(common.MediaServerCommunityIcon)},
+			},
+			ExpectedHTTPStatusCode: http.StatusBadRequest,
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.Require().Equal("missing query parameter 'message-id'\n", rr.Body.String())
+			},
+		},
+		{
+			Name: "Test request with missing 'url' parameter",
+			Parameters: url.Values{
+				"message-id": {messageIDCommunityOnly},
+				"image-id":   {string(common.MediaServerCommunityIcon)},
+			},
+			ExpectedHTTPStatusCode: http.StatusBadRequest,
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.Require().Equal("missing query parameter 'url'\n", rr.Body.String())
+			},
+		},
+		{
+			Name: "Test request with missing 'image-id' parameter",
+			Parameters: url.Values{
+				"message-id": {messageIDCommunityOnly},
+				"url":        {unfurledCommunity.Url},
+			},
+			ExpectedHTTPStatusCode: http.StatusBadRequest,
+			CheckFunc: func(s *HandlersSuite, rr *httptest.ResponseRecorder) {
+				s.Require().Equal("missing query parameter 'image-id'\n", rr.Body.String())
+			},
+		},
 	}
 
-	s.Require().NotNil(msg)
+	handler := handleStatusLinkPreviewThumbnail(s.db, s.logger)
+
+	for _, tc := range testCases {
+		s.Run(tc.Name, func() {
+			requestURL := "/dummy?" + tc.Parameters.Encode()
+
+			rr := s.httpGetReqRecorder(handler, requestURL)
+			s.Require().Equal(tc.ExpectedHTTPStatusCode, rr.Code)
+
+			if tc.CheckFunc != nil {
+				tc.CheckFunc(s, rr)
+			}
+		})
+	}
 }

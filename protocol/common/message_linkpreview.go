@@ -2,14 +2,14 @@ package common
 
 import (
 	"fmt"
+	"net/url"
+
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/server"
-	"net/url"
 )
 
-type MakeMediaServerURLType func(msgID string, previewURL string, imageID server.LinkPreviewImageID) string
-type MakeMediaServerURLMessageWrapperType func(previewURL string, imageID server.LinkPreviewImageID) string
+type MakeMediaServerURLType func(msgID string, previewURL string, imageID MediaServerImageID) string
+type MakeMediaServerURLMessageWrapperType func(previewURL string, imageID MediaServerImageID) string
 
 type LinkPreviewThumbnail struct {
 	Width  int `json:"width"`
@@ -114,7 +114,7 @@ func (thumbnail *LinkPreviewThumbnail) convertToProto() (*protobuf.UnfurledLinkT
 func (thumbnail *LinkPreviewThumbnail) loadFromProto(
 	input *protobuf.UnfurledLinkThumbnail,
 	URL string,
-	imageId server.LinkPreviewImageID,
+	imageID MediaServerImageID,
 	makeMediaServerURL MakeMediaServerURLMessageWrapperType) {
 
 	thumbnail.clear()
@@ -122,7 +122,7 @@ func (thumbnail *LinkPreviewThumbnail) loadFromProto(
 	thumbnail.Height = int(input.Height)
 
 	if len(input.Payload) > 0 {
-		thumbnail.URL = makeMediaServerURL(URL, imageId)
+		thumbnail.URL = makeMediaServerURL(URL, imageID)
 	}
 }
 
@@ -241,7 +241,7 @@ func (preview *StatusCommunityLinkPreview) convertToProto() (*protobuf.UnfurledS
 }
 
 func (preview *StatusCommunityLinkPreview) loadFromProto(c *protobuf.UnfurledStatusCommunityLink,
-	URL string, thumbnailPrefix server.LinkPreviewImageIDPrefix,
+	URL string, thumbnailPrefix MediaServerImageIDPrefix,
 	makeMediaServerURL MakeMediaServerURLMessageWrapperType) {
 
 	preview.CommunityID = c.CommunityId
@@ -254,10 +254,10 @@ func (preview *StatusCommunityLinkPreview) loadFromProto(c *protobuf.UnfurledSta
 	preview.Banner.clear()
 
 	if icon := c.GetIcon(); icon != nil {
-		preview.Icon.loadFromProto(icon, URL, server.CreateImageID(thumbnailPrefix, server.IconPostfix), makeMediaServerURL)
+		preview.Icon.loadFromProto(icon, URL, CreateImageID(thumbnailPrefix, MediaServerIconPostfix), makeMediaServerURL)
 	}
 	if banner := c.GetBanner(); banner != nil {
-		preview.Banner.loadFromProto(banner, URL, server.CreateImageID(thumbnailPrefix, server.BannerPostfix), makeMediaServerURL)
+		preview.Banner.loadFromProto(banner, URL, CreateImageID(thumbnailPrefix, MediaServerBannerPostfix), makeMediaServerURL)
 	}
 }
 
@@ -410,7 +410,7 @@ func (m *Message) ConvertStatusLinkPreviewsToProto() (*protobuf.UnfurledStatusLi
 	return &protobuf.UnfurledStatusLinks{UnfurledStatusLinks: unfurledLinks}, nil
 }
 
-func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(msgID string, previewURL string, imageID server.LinkPreviewImageID) string) []StatusLinkPreview {
+func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(msgID string, previewURL string, imageID MediaServerImageID) string) []StatusLinkPreview {
 	if m.GetUnfurledStatusLinks() == nil {
 		return nil
 	}
@@ -422,7 +422,7 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 	}
 
 	// This wrapper adds the messageID to the callback
-	makeMediaServerURLMessageWrapper := func(previewURL string, imageID server.LinkPreviewImageID) string {
+	makeMediaServerURLMessageWrapper := func(previewURL string, imageID MediaServerImageID) string {
 		return makeMediaServerURL(m.ID, previewURL, imageID)
 	}
 
@@ -440,13 +440,13 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 				Description: c.Description,
 			}
 			if icon := c.GetIcon(); icon != nil {
-				lp.Contact.Icon.loadFromProto(icon, link.Url, server.ContactIcon, makeMediaServerURLMessageWrapper)
+				lp.Contact.Icon.loadFromProto(icon, link.Url, MediaServerContactIcon, makeMediaServerURLMessageWrapper)
 			}
 		}
 
 		if c := link.GetCommunity(); c != nil {
 			lp.Community = new(StatusCommunityLinkPreview)
-			lp.Community.loadFromProto(c, link.Url, server.CommunityPrefix, makeMediaServerURLMessageWrapper)
+			lp.Community.loadFromProto(c, link.Url, MediaServerCommunityPrefix, makeMediaServerURLMessageWrapper)
 		}
 
 		if c := link.GetChannel(); c != nil {
@@ -459,7 +459,7 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 			}
 			if c.Community != nil {
 				lp.Channel.Community = new(StatusCommunityLinkPreview)
-				lp.Channel.Community.loadFromProto(c.Community, link.Url, server.ChannelCommunityPrefix, makeMediaServerURLMessageWrapper)
+				lp.Channel.Community.loadFromProto(c.Community, link.Url, MediaServerChannelCommunityPrefix, makeMediaServerURLMessageWrapper)
 			}
 		}
 

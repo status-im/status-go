@@ -7,6 +7,7 @@ import (
 	"github.com/status-im/status-go/ipfs"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -74,7 +75,7 @@ func (s *MediaServer) MakeLinkPreviewThumbnailURL(msgID string, previewURL strin
 	return u.String()
 }
 
-func (s *MediaServer) MakeStatusLinkPreviewThumbnailURL(msgID string, previewURL string, imageID LinkPreviewImageID) string {
+func (s *MediaServer) MakeStatusLinkPreviewThumbnailURL(msgID string, previewURL string, imageID common.MediaServerImageID) string {
 	u := s.MakeBaseURL()
 	u.Path = StatusLinkPreviewThumbnailPath
 	u.RawQuery = url.Values{"message-id": {msgID}, "url": {previewURL}, "image-id": {string(imageID)}}.Encode()
