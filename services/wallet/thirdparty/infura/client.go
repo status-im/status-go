@@ -149,6 +149,7 @@ func (o *Client) fetchOwnedAssets(chainID walletCommon.ChainID, owner common.Add
 	if len(queryParams["cursor"]) > 0 {
 		assets.PreviousCursor = queryParams["cursor"][0]
 	}
+	assets.Provider = o.ID()
 
 	for {
 		url := fmt.Sprintf("%s/networks/%d/accounts/%s/assets/nfts?%s", baseURL, chainID, owner.String(), queryParams.Encode())

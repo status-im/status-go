@@ -18,6 +18,7 @@ var (
 
 const FetchNoLimit = 0
 const FetchFromStartCursor = ""
+const FetchFromAnyProvider = ""
 
 type CollectibleProvider interface {
 	ID() string
@@ -144,6 +145,7 @@ type CollectiblesContainer[T any] struct {
 	Items          []T
 	NextCursor     string
 	PreviousCursor string
+	Provider       string
 }
 
 type CollectibleOwnershipContainer CollectiblesContainer[CollectibleUniqueID]
@@ -165,6 +167,7 @@ func (c *FullCollectibleDataContainer) ToOwnershipContainer() CollectibleOwnersh
 		Items:          collectibleItemsToIDs(c.Items),
 		NextCursor:     c.NextCursor,
 		PreviousCursor: c.PreviousCursor,
+		Provider:       c.Provider,
 	}
 }
 
