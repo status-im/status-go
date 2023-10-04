@@ -4712,7 +4712,6 @@ func (m *Manager) HandleCommunityTokensMetadata(community *Community) error {
 	if len(communityTokens) == 0 {
 		return nil
 	}
-
 	for _, tokenMetadata := range communityTokens {
 		for chainID, address := range tokenMetadata.ContractAddresses {
 			exists, err := m.persistence.HasCommunityToken(communityID, address, int(chainID))
@@ -4726,7 +4725,10 @@ func (m *Manager) HandleCommunityTokensMetadata(community *Community) error {
 					return err
 				}
 
-				return m.persistence.AddCommunityToken(communityToken)
+				err = m.persistence.AddCommunityToken(communityToken)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
