@@ -3084,11 +3084,9 @@ func (m *Messenger) isMessageAllowedFrom(publicKey string, chat *Chat) (bool, er
 }
 
 func (m *Messenger) updateUnviewedCounts(chat *Chat, message *common.Message) {
-	if chat.ShouldIncreaseMessageCount(message) {
-		chat.UnviewedMessagesCount++
-		if message.Mentioned || message.Replied || chat.OneToOne() {
-			chat.UnviewedMentionsCount++
-		}
+	chat.UnviewedMessagesCount++
+	if message.Mentioned || message.Replied || chat.OneToOne() {
+		chat.UnviewedMentionsCount++
 	}
 }
 
