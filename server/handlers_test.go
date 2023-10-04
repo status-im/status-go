@@ -3,8 +3,6 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/status-im/status-go/t/helpers"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -14,10 +12,12 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/t/helpers"
 )
 
 func TestHandlersSuite(t *testing.T) {
