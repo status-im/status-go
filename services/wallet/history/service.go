@@ -360,7 +360,7 @@ func (s *Service) updateBalanceHistory(ctx context.Context) error {
 				continue
 			}
 
-			entries, err := s.balance.db.GetEntriesWithoutBalances(network.ChainID, common.Address(address))
+			entries, err := s.balance.db.getEntriesWithoutBalances(network.ChainID, common.Address(address))
 			if err != nil {
 				log.Error("Error getting blocks without balances", "chainID", network.ChainID, "address", address.String(), "err", err)
 				return err

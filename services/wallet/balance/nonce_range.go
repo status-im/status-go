@@ -96,7 +96,7 @@ func (b *nonceRangeCache[T]) sortRanges(account common.Address, chainID uint64) 
 
 	ranges := []nonceRange{}
 	for _, k := range keys {
-		r := b.nonceRanges[account][chainID].get(int64(k))
+		r := b.nonceRanges[account][chainID].get(k)
 		ranges = append(ranges, r)
 	}
 

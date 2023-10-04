@@ -23,6 +23,7 @@ type ttlCache[K comparable, V any] struct {
 	cache *ttlcache.Cache[K, V]
 }
 
+//nolint:golint,unused // linter does not detect using it via reflect
 func (c *ttlCache[K, V]) get(key K) V {
 	item := c.cache.Get(key)
 	if item == nil {
@@ -32,18 +33,22 @@ func (c *ttlCache[K, V]) get(key K) V {
 	return item.Value()
 }
 
+//nolint:golint,unused // linter does not detect using it via reflect
 func (c *ttlCache[K, V]) set(key K, value V) {
 	_ = c.cache.Set(key, value, ttlcache.DefaultTTL)
 }
 
+//nolint:golint,unused // linter does not detect using it via reflect
 func (c *ttlCache[K, V]) len() int {
 	return c.cache.Len()
 }
 
+//nolint:golint,unused // linter does not detect using it via reflect
 func (c *ttlCache[K, V]) keys() []K {
 	return c.cache.Keys()
 }
 
+//nolint:golint,unused // linter does not detect using it via reflect
 func (c *ttlCache[K, V]) init() {
 	c.cache = ttlcache.New[K, V](
 		ttlcache.WithTTL[K, V](defaultTTLValue),
@@ -54,6 +59,7 @@ func (c *ttlCache[K, V]) init() {
 	go c.cache.Start() // starts automatic expired item deletion
 }
 
+//nolint:golint,unused // linter does not detect using it via reflect
 func (c *ttlCache[K, V]) clear() {
 	c.cache.DeleteAll()
 }
