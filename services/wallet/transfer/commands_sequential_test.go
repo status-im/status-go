@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -632,11 +633,11 @@ func TestFindBlocksCommand(t *testing.T) {
 			},
 		})
 		fbc := &findBlocksCommand{
-			account:                   common.HexToAddress("0x12345"),
+			account:                   common.HexToAddress("0x1234"),
 			db:                        wdb,
 			blockRangeDAO:             &BlockRangeSequentialDAO{wdb.client},
 			chainClient:               tc,
-			balanceCacher:             balance.NewCache(),
+			balanceCacher:             balance.NewCacherWithTTL(5 * time.Minute),
 			feed:                      &event.Feed{},
 			noLimit:                   false,
 			fromBlockNumber:           big.NewInt(testCase.fromBlock),

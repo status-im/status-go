@@ -149,15 +149,35 @@ func (api *API) GetTokensBalancesForChainIDs(ctx context.Context, chainIDs []uin
 	return api.s.tokenManager.GetBalances(ctx, clients, accounts, addresses)
 }
 
-func (api *API) UpdateVisibleTokens(ctx context.Context, symbols []string) error {
-	api.s.history.UpdateVisibleTokens(symbols)
-	return nil
-}
-
 // GetBalanceHistory retrieves token balance history for token identity on multiple chains
 func (api *API) GetBalanceHistory(ctx context.Context, chainIDs []uint64, address common.Address, tokenSymbol string, currencySymbol string, timeInterval history.TimeInterval) ([]*history.ValuePoint, error) {
-	endTimestamp := time.Now().UTC().Unix()
-	return api.s.history.GetBalanceHistory(ctx, chainIDs, address, tokenSymbol, currencySymbol, endTimestamp, timeInterval)
+	log.Debug("wallet.api.GetBalanceHistory", "chainIDs", chainIDs, "address", address, "tokenSymbol", tokenSymbol, "currencySymbol", currencySymbol, "timeInterval", timeInterval)
+
+	var fromTimestamp uint64
+	now := uint64(time.Now().UTC().Unix())
+	switch timeInterval {
+	case history.BalanceHistoryAllTime:
+		fromTimestamp = 0
+	case history.BalanceHistory1Year:
+		fallthrough
+	case history.BalanceHistory6Months:
+		fallthrough
+	case history.BalanceHistory1Month:
+		fallthrough
+	case history.BalanceHistory7Days:
+		fromTimestamp = now - history.TimeIntervalDurationSecs(timeInterval)
+	default:
+		return nil, fmt.Errorf("unknown time interval: %v", timeInterval)
+	}
+
+	return api.GetBalanceHistoryRange(ctx, chainIDs, address, tokenSymbol, currencySymbol, fromTimestamp, now)
+}
+
+// GetBalanceHistoryRange retrieves token balance history for token identity on multiple chains for a time range
+// 'toTimestamp' is ignored for now, but will be used in the future to limit the range of the history
+func (api *API) GetBalanceHistoryRange(ctx context.Context, chainIDs []uint64, address common.Address, tokenSymbol string, currencySymbol string, fromTimestamp uint64, _ uint64) ([]*history.ValuePoint, error) {
+	log.Debug("wallet.api.GetBalanceHistoryRange", "chainIDs", chainIDs, "address", address, "tokenSymbol", tokenSymbol, "currencySymbol", currencySymbol, "fromTimestamp", fromTimestamp)
+	return api.s.history.GetBalanceHistory(ctx, chainIDs, address, tokenSymbol, currencySymbol, fromTimestamp)
 }
 
 func (api *API) GetTokens(ctx context.Context, chainID uint64) ([]*token.Token, error) {
