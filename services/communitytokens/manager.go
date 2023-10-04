@@ -78,7 +78,7 @@ func (m *Manager) GetCollectibleContractData(chainID uint64, contractAddress str
 	if err != nil {
 		return nil, err
 	}
-	totalSupply, err := contract.TotalSupply(callOpts)
+	totalSupply, err := contract.MaxSupply(callOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (m *Manager) GetAssetContractData(chainID uint64, contractAddress string) (
 	if err != nil {
 		return nil, err
 	}
-	totalSupply, err := contract.TotalSupply(callOpts)
+	totalSupply, err := contract.MaxSupply(callOpts)
 	if err != nil {
 		return nil, err
 	}
