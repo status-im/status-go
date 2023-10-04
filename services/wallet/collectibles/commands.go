@@ -134,6 +134,7 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 
 	pageNr := 0
 	cursor := thirdparty.FetchFromStartCursor
+	providerID := thirdparty.FetchFromAnyProvider
 	start := time.Now()
 
 	c.triggerEvent(EventCollectiblesOwnershipUpdateStarted, c.chainID, c.account, "")
@@ -153,7 +154,7 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 			pageStart := time.Now()
 			log.Debug("start loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "page", pageNr)
 
-			partialOwnership, err := c.manager.FetchCollectibleOwnershipByOwner(c.chainID, c.account, cursor, fetchLimit)
+			partialOwnership, err := c.manager.FetchCollectibleOwnershipByOwner(c.chainID, c.account, cursor, fetchLimit, providerID)
 
 			if err != nil {
 				log.Error("failed loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "page", pageNr, "error", err)
@@ -167,6 +168,7 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 
 			pageNr++
 			cursor = partialOwnership.NextCursor
+			providerID = partialOwnership.Provider
 
 			finished := cursor == thirdparty.FetchFromStartCursor
 

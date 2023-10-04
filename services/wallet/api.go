@@ -392,13 +392,13 @@ func (api *API) GetCollectiblesByOwnerAndCollectionWithCursor(ctx context.Contex
 // @deprecated
 func (api *API) GetCollectiblesByOwnerWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
 	log.Debug("call to GetCollectiblesByOwnerWithCursor")
-	return api.s.collectiblesManager.FetchAllAssetsByOwner(chainID, owner, cursor, limit)
+	return api.s.collectiblesManager.FetchAllAssetsByOwner(chainID, owner, cursor, limit, thirdparty.FetchFromAnyProvider)
 }
 
 // @deprecated
 func (api *API) GetCollectiblesByOwnerAndContractAddressWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
 	log.Debug("call to GetCollectiblesByOwnerAndContractAddressWithCursor")
-	return api.s.collectiblesManager.FetchAllAssetsByOwnerAndContractAddress(chainID, owner, contractAddresses, cursor, limit)
+	return api.s.collectiblesManager.FetchAllAssetsByOwnerAndContractAddress(chainID, owner, contractAddresses, cursor, limit, thirdparty.FetchFromAnyProvider)
 }
 
 // @deprecated

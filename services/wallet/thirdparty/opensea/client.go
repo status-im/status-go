@@ -217,6 +217,7 @@ func (o *Client) fetchAssets(chainID walletCommon.ChainID, queryParams url.Value
 	if len(queryParams["cursor"]) > 0 {
 		assets.PreviousCursor = queryParams["cursor"][0]
 	}
+	assets.Provider = o.ID()
 
 	tmpLimit := AssetLimit
 	if limit > thirdparty.FetchNoLimit && limit < tmpLimit {

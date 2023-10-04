@@ -88,6 +88,7 @@ func (o *ClientV2) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.
 
 	assets.PreviousCursor = cursor
 	assets.NextCursor = cursor
+	assets.Provider = o.ID()
 
 	for {
 		assetsPage, err := o.FetchAllAssetsByOwner(chainID, owner, assets.NextCursor, assetLimitV2)
@@ -144,6 +145,7 @@ func (o *ClientV2) fetchAssets(chainID walletCommon.ChainID, pathParams []string
 	if cursor != "" {
 		queryParams["next"] = []string{cursor}
 	}
+	assets.Provider = o.ID()
 
 	for {
 		path := fmt.Sprintf("%s?%s", strings.Join(pathParams, "/"), queryParams.Encode())

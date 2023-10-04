@@ -239,7 +239,7 @@ func (o *Manager) FetchBalancesByOwnerAndContractAddress(chainID walletCommon.Ch
 	}
 
 	// Try with account ownership providers first
-	assetsContainer, err := o.FetchAllAssetsByOwnerAndContractAddress(chainID, ownerAddress, contractAddresses, thirdparty.FetchFromStartCursor, thirdparty.FetchNoLimit)
+	assetsContainer, err := o.FetchAllAssetsByOwnerAndContractAddress(chainID, ownerAddress, contractAddresses, thirdparty.FetchFromStartCursor, thirdparty.FetchNoLimit, thirdparty.FetchFromAnyProvider)
 	if err == ErrNoProvidersAvailableForChainID {
 		// Use contract ownership providers
 		for _, contractAddress := range contractAddresses {
@@ -272,7 +272,7 @@ func (o *Manager) FetchBalancesByOwnerAndContractAddress(chainID walletCommon.Ch
 	return ret, nil
 }
 
-func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
+func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int, providerID string) (*thirdparty.FullCollectibleDataContainer, error) {
 	defer o.checkConnectionStatus(chainID)
 
 	anyProviderAvailable := false
@@ -281,6 +281,9 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.C
 			continue
 		}
 		anyProviderAvailable = true
+		if providerID != thirdparty.FetchFromAnyProvider && providerID != provider.ID() {
+			continue
+		}
 
 		assetContainer, err := provider.FetchAllAssetsByOwnerAndContractAddress(chainID, owner, contractAddresses, cursor, limit)
 		if err != nil {
@@ -302,12 +305,16 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.C
 	return nil, ErrNoProvidersAvailableForChainID
 }
 
-func (o *Manager) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
+func (o *Manager) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner common.Address, cursor string, limit int, providerID string) (*thirdparty.FullCollectibleDataContainer, error) {
 	defer o.checkConnectionStatus(chainID)
 
 	anyProviderAvailable := false
 	for _, provider := range o.accountOwnershipProviders {
 		if !provider.IsChainSupported(chainID) {
+			continue
+		}
+		anyProviderAvailable = true
+		if providerID != thirdparty.FetchFromAnyProvider && providerID != provider.ID() {
 			continue
 		}
 
@@ -331,10 +338,10 @@ func (o *Manager) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner comm
 	return nil, ErrNoProvidersAvailableForChainID
 }
 
-func (o *Manager) FetchCollectibleOwnershipByOwner(chainID walletCommon.ChainID, owner common.Address, cursor string, limit int) (*thirdparty.CollectibleOwnershipContainer, error) {
+func (o *Manager) FetchCollectibleOwnershipByOwner(chainID walletCommon.ChainID, owner common.Address, cursor string, limit int, providerID string) (*thirdparty.CollectibleOwnershipContainer, error) {
 	// We don't yet have an API that will return only Ownership data
 	// Use the full Ownership + Metadata endpoint and use the data we need
-	assetContainer, err := o.FetchAllAssetsByOwner(chainID, owner, cursor, limit)
+	assetContainer, err := o.FetchAllAssetsByOwner(chainID, owner, cursor, limit, providerID)
 	if err != nil {
 		return nil, err
 	}

@@ -204,6 +204,7 @@ func (o *Client) fetchOwnedAssets(chainID walletCommon.ChainID, owner common.Add
 		queryParams["pageKey"] = []string{cursor}
 		assets.PreviousCursor = cursor
 	}
+	assets.Provider = o.ID()
 
 	baseURL, err := getNFTBaseURL(chainID, o.apiKeys[uint64(chainID)])
 
