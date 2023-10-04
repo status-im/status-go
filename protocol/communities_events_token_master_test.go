@@ -168,15 +168,6 @@ func (s *TokenMasterCommunityEventsSuite) TestTokenMasterRejectMemberRequestToJo
 	testRejectMemberRequestToJoin(s, community, user)
 }
 
-func (s *TokenMasterCommunityEventsSuite) TestTokenMasterRequestToJoinStateCannotBeOverridden() {
-	additionalTokenMaster := s.newMessenger("", []string{})
-	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{additionalTokenMaster})
-
-	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
-	testEventSenderCannotOverrideRequestToJoinState(s, community, user, additionalTokenMaster)
-}
-
 func (s *TokenMasterCommunityEventsSuite) TestTokenMasterControlNodeHandlesMultipleEventSenderRequestToJoinDecisions() {
 	additionalTokenMaster := s.newMessenger("qwerty", []string{eventsSenderAccountAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_TOKEN_MASTER, []*Messenger{additionalTokenMaster})
