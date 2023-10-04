@@ -1,6 +1,10 @@
 package communities
 
-import "github.com/status-im/status-go/protocol/protobuf"
+import (
+	"golang.org/x/exp/slices"
+
+	"github.com/status-im/status-go/protocol/protobuf"
+)
 
 var adminAuthorizedEventTypes = []protobuf.CommunityEvent_EventType{
 	protobuf.CommunityEvent_COMMUNITY_EDIT,
@@ -56,11 +60,8 @@ var rolesToAuthorizedPermissionTypes = map[protobuf.CommunityMember_Roles][]prot
 
 func canRolesPerformEvent(roles []protobuf.CommunityMember_Roles, eventType protobuf.CommunityEvent_EventType) bool {
 	for _, role := range roles {
-		authorizedEventTypes := rolesToAuthorizedEventTypes[role]
-		for _, authorizedEventType := range authorizedEventTypes {
-			if authorizedEventType == eventType {
-				return true
-			}
+		if slices.Contains(rolesToAuthorizedEventTypes[role], eventType) {
+			return true
 		}
 	}
 	return false
@@ -68,24 +69,51 @@ func canRolesPerformEvent(roles []protobuf.CommunityMember_Roles, eventType prot
 
 func canRolesModifyPermission(roles []protobuf.CommunityMember_Roles, permissionType protobuf.CommunityTokenPermission_Type) bool {
 	for _, role := range roles {
-		authorizedPermissionTypes := rolesToAuthorizedPermissionTypes[role]
-		for _, authorizedPermissionType := range authorizedPermissionTypes {
-			if authorizedPermissionType == permissionType {
-				return true
-			}
+		if slices.Contains(rolesToAuthorizedPermissionTypes[role], permissionType) {
+			return true
 		}
 	}
 	return false
 }
 
-func RolesAuthorizedToPerformEvent(roles []protobuf.CommunityMember_Roles, event *CommunityEvent) bool {
-	if !canRolesPerformEvent(roles, event.Type) {
+func canRolesKickOrBanMember(senderRoles []protobuf.CommunityMember_Roles, memberRoles []protobuf.CommunityMember_Roles) bool {
+	// Owner can kick everyone
+	if slices.Contains(senderRoles, protobuf.CommunityMember_ROLE_OWNER) {
+		return true
+	}
+
+	// TokenMaster can kick normal members and admins
+	if (slices.Contains(senderRoles, protobuf.CommunityMember_ROLE_TOKEN_MASTER)) &&
+		!(slices.Contains(memberRoles, protobuf.CommunityMember_ROLE_TOKEN_MASTER) ||
+			slices.Contains(memberRoles, protobuf.CommunityMember_ROLE_OWNER)) {
+		return true
+	}
+
+	// Admins can kick normal members
+	if (slices.Contains(senderRoles, protobuf.CommunityMember_ROLE_ADMIN)) &&
+		!(slices.Contains(memberRoles, protobuf.CommunityMember_ROLE_ADMIN) ||
+			slices.Contains(memberRoles, protobuf.CommunityMember_ROLE_TOKEN_MASTER) ||
+			slices.Contains(memberRoles, protobuf.CommunityMember_ROLE_OWNER)) {
+		return true
+	}
+
+	// Normal members can't kick anyone
+	return false
+}
+
+func RolesAuthorizedToPerformEvent(senderRoles []protobuf.CommunityMember_Roles, memberRoles []protobuf.CommunityMember_Roles, event *CommunityEvent) bool {
+	if !canRolesPerformEvent(senderRoles, event.Type) {
 		return false
 	}
 
 	if event.Type == protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_CHANGE ||
 		event.Type == protobuf.CommunityEvent_COMMUNITY_MEMBER_TOKEN_PERMISSION_DELETE {
-		return canRolesModifyPermission(roles, event.TokenPermission.Type)
+		return canRolesModifyPermission(senderRoles, event.TokenPermission.Type)
+	}
+
+	if event.Type == protobuf.CommunityEvent_COMMUNITY_MEMBER_BAN ||
+		event.Type == protobuf.CommunityEvent_COMMUNITY_MEMBER_KICK {
+		return canRolesKickOrBanMember(senderRoles, memberRoles)
 	}
 
 	return true

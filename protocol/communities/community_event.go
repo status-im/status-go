@@ -298,35 +298,29 @@ func (o *Community) updateCommunityDescriptionByCommunityEvent(communityEvent Co
 		}
 
 	case protobuf.CommunityEvent_COMMUNITY_MEMBER_KICK:
-		pk, err := common.HexToPubkey(communityEvent.MemberToAction)
-		if err != nil {
-			return err
+		if o.IsControlNode() {
+			pk, err := common.HexToPubkey(communityEvent.MemberToAction)
+			if err != nil {
+				return err
+			}
+			o.removeMemberFromOrg(pk)
 		}
-
-		if !o.IsControlNode() && o.IsPrivilegedMember(pk) {
-			return errors.New("attempt to kick an control node or privileged user from non-control node side")
-		}
-
-		o.removeMemberFromOrg(pk)
-
 	case protobuf.CommunityEvent_COMMUNITY_MEMBER_BAN:
-		pk, err := common.HexToPubkey(communityEvent.MemberToAction)
-		if err != nil {
-			return err
+		if o.IsControlNode() {
+			pk, err := common.HexToPubkey(communityEvent.MemberToAction)
+			if err != nil {
+				return err
+			}
+			o.banUserFromCommunity(pk)
 		}
-
-		if !o.IsControlNode() && o.IsPrivilegedMember(pk) {
-			return errors.New("attempt to ban an control node or privileged user from non-control node side")
-		}
-		o.banUserFromCommunity(pk)
-
 	case protobuf.CommunityEvent_COMMUNITY_MEMBER_UNBAN:
-		pk, err := common.HexToPubkey(communityEvent.MemberToAction)
-		if err != nil {
-			return err
+		if o.IsControlNode() {
+			pk, err := common.HexToPubkey(communityEvent.MemberToAction)
+			if err != nil {
+				return err
+			}
+			o.unbanUserFromCommunity(pk)
 		}
-		o.unbanUserFromCommunity(pk)
-
 	case protobuf.CommunityEvent_COMMUNITY_TOKEN_ADD:
 		o.config.CommunityDescription.CommunityTokensMetadata = append(o.config.CommunityDescription.CommunityTokensMetadata, communityEvent.TokenMetadata)
 	}
