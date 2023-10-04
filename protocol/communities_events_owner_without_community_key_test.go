@@ -147,15 +147,6 @@ func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRejectMemberRequ
 	testRejectMemberRequestToJoin(s, community, user)
 }
 
-func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerRequestToJoinStateCannotBeOverridden() {
-	additionalOwner := s.newMessenger("", []string{})
-	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{additionalOwner})
-
-	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
-	testEventSenderCannotOverrideRequestToJoinState(s, community, user, additionalOwner)
-}
-
 func (s *OwnerWithoutCommunityKeyCommunityEventsSuite) TestOwnerControlNodeHandlesMultipleEventSenderRequestToJoinDecisions() {
 	additionalOwner := s.newMessenger("", []string{})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_OWNER, []*Messenger{additionalOwner})

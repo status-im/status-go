@@ -1435,8 +1435,12 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, re
 	if err != nil {
 		return err
 	}
+	// not interested, stop further processing
+	if requestToJoin == nil {
+		return nil
+	}
 
-	if requestToJoin.State == communities.RequestToJoinStateAccepted || requestToJoin.State == communities.RequestToJoinStateAcceptedPending {
+	if requestToJoin.State == communities.RequestToJoinStateAccepted {
 		accept := &requests.AcceptRequestToJoinCommunity{
 			ID: requestToJoin.ID,
 		}
@@ -1452,7 +1456,7 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, re
 		}
 	}
 
-	if requestToJoin.State == communities.RequestToJoinStateDeclined || requestToJoin.State == communities.RequestToJoinStateDeclinedPending {
+	if requestToJoin.State == communities.RequestToJoinStateDeclined {
 		cancel := &requests.DeclineRequestToJoinCommunity{
 			ID: requestToJoin.ID,
 		}

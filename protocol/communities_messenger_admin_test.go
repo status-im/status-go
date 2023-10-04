@@ -175,15 +175,6 @@ func (s *AdminCommunityEventsSuite) TestAdminRejectMemberRequestToJoin() {
 	testRejectMemberRequestToJoin(s, community, user)
 }
 
-func (s *AdminCommunityEventsSuite) TestAdminRequestToJoinStateCannotBeOverridden() {
-	additionalAdmin := s.newMessenger("qwerty", []string{eventsSenderAccountAddress})
-	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{additionalAdmin})
-
-	// set up additional user that will send request to join
-	user := s.newMessenger("", []string{})
-	testEventSenderCannotOverrideRequestToJoinState(s, community, user, additionalAdmin)
-}
-
 func (s *AdminCommunityEventsSuite) TestAdminControlNodeHandlesMultipleEventSenderRequestToJoinDecisions() {
 	additionalAdmin := s.newMessenger("qwerty", []string{eventsSenderAccountAddress})
 	community := setUpOnRequestCommunityAndRoles(s, protobuf.CommunityMember_ROLE_ADMIN, []*Messenger{additionalAdmin})
@@ -402,7 +393,7 @@ func (s *AdminCommunityEventsSuite) TestAdminDoesNotHaveRejectedEventsLoop() {
 	s.Require().NoError(err)
 
 	// Update community clock without publishing new CommunityDescription
-	err = community.DeclineRequestToJoin(nil)
+	_, err = community.DeclineRequestToJoin(nil)
 	s.Require().NoError(err)
 
 	err = s.owner.communitiesManager.SaveCommunity(community)

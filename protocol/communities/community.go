@@ -2178,12 +2178,12 @@ func (o *Community) addMemberWithRevealedAccounts(memberKey string, roles []prot
 	return changes
 }
 
-func (o *Community) DeclineRequestToJoin(dbRequest *RequestToJoin) error {
+func (o *Community) DeclineRequestToJoin(dbRequest *RequestToJoin) (adminEventCreated bool, err error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
 	if !(o.IsControlNode() || o.hasPermissionToSendCommunityEvent(protobuf.CommunityEvent_COMMUNITY_REQUEST_TO_JOIN_REJECT)) {
-		return ErrNotAuthorized
+		return adminEventCreated, ErrNotAuthorized
 	}
 
 	if o.IsControlNode() {
@@ -2200,13 +2200,15 @@ func (o *Community) DeclineRequestToJoin(dbRequest *RequestToJoin) error {
 			CommunityChanges:       o.emptyCommunityChanges(),
 			RejectedRequestsToJoin: rejectedRequestsToJoin,
 		}
-		err := o.addNewCommunityEvent(o.ToCommunityRequestToJoinRejectCommunityEvent(adminChanges))
+		err = o.addNewCommunityEvent(o.ToCommunityRequestToJoinRejectCommunityEvent(adminChanges))
 		if err != nil {
-			return err
+			return adminEventCreated, err
 		}
+
+		adminEventCreated = true
 	}
 
-	return nil
+	return adminEventCreated, err
 }
 
 func (o *Community) ValidateEvent(event *CommunityEvent, signer *ecdsa.PublicKey) error {
