@@ -94,11 +94,16 @@ func (c *findBlocksCommand) Command() async.Command {
 	}.Run
 }
 
-func (c *findBlocksCommand) ERC20ScanByBalance(parent context.Context, fromBlock, toBlock *big.Int, token common.Address) ([]*DBHeader, error) {
+type ERC20BlockRange struct {
+	from *big.Int
+	to   *big.Int
+}
+
+func (c *findBlocksCommand) ERC20ScanByBalance(parent context.Context, fromBlock, toBlock *big.Int, token common.Address) ([]ERC20BlockRange, error) {
 	var err error
 	batchSize := getErc20BatchSize(c.chainClient.NetworkID())
 	ranges := [][]*big.Int{{fromBlock, toBlock}}
-	foundHeaders := []*DBHeader{}
+	foundRanges := []ERC20BlockRange{}
 	cache := map[int64]*big.Int{}
 	for {
 		nextRanges := [][]*big.Int{}
@@ -132,12 +137,7 @@ func (c *findBlocksCommand) ERC20ScanByBalance(parent context.Context, fromBlock
 			if fromBalance.Cmp(toBalance) != 0 {
 				diff := new(big.Int).Sub(to, from)
 				if diff.Cmp(batchSize) <= 0 {
-					headers, err := c.fastIndexErc20(parent, from, to, true)
-					if err != nil {
-						return nil, err
-					}
-					foundHeaders = append(foundHeaders, headers...)
-
+					foundRanges = append(foundRanges, ERC20BlockRange{from, to})
 					continue
 				}
 
@@ -156,7 +156,7 @@ func (c *findBlocksCommand) ERC20ScanByBalance(parent context.Context, fromBlock
 		ranges = nextRanges
 	}
 
-	return foundHeaders, nil
+	return foundRanges, nil
 }
 
 func (c *findBlocksCommand) checkERC20Tail(parent context.Context) ([]*DBHeader, error) {
@@ -181,7 +181,7 @@ func (c *findBlocksCommand) checkERC20Tail(parent context.Context) ([]*DBHeader,
 		return nil, err
 	}
 
-	headers := []*DBHeader{}
+	foundRanges := []ERC20BlockRange{}
 	for token, balance := range balances[c.chainClient.NetworkID()][c.account] {
 		bigintBalance := big.NewInt(balance.ToInt().Int64())
 		if bigintBalance.Cmp(big.NewInt(0)) <= 0 {
@@ -192,10 +192,29 @@ func (c *findBlocksCommand) checkERC20Tail(parent context.Context) ([]*DBHeader,
 			return nil, err
 		}
 
-		headers = append(headers, result...)
+		foundRanges = append(foundRanges, result...)
 	}
 
-	return headers, nil
+	uniqRanges := []ERC20BlockRange{}
+	rangesMap := map[string]bool{}
+	for _, rangeItem := range foundRanges {
+		key := rangeItem.from.String() + "-" + rangeItem.to.String()
+		if _, ok := rangesMap[key]; !ok {
+			rangesMap[key] = true
+			uniqRanges = append(uniqRanges, rangeItem)
+		}
+	}
+
+	foundHeaders := []*DBHeader{}
+	for _, rangeItem := range uniqRanges {
+		headers, err := c.fastIndexErc20(parent, rangeItem.from, rangeItem.to, true)
+		if err != nil {
+			return nil, err
+		}
+		foundHeaders = append(foundHeaders, headers...)
+	}
+
+	return foundHeaders, nil
 }
 
 func (c *findBlocksCommand) Run(parent context.Context) (err error) {

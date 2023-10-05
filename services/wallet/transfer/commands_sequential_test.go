@@ -153,6 +153,9 @@ func (tc *TestClient) BalanceAt(ctx context.Context, account common.Address, blo
 
 func (tc *TestClient) tokenBalanceAt(token common.Address, blockNumber *big.Int) *big.Int {
 	balance := tc.tokenBalanceHistory[token][blockNumber.Uint64()]
+	if balance == nil {
+		balance = big.NewInt(0)
+	}
 
 	if tc.traceAPICalls {
 		tc.t.Log("tokenBalanceAt", token, blockNumber, "result:", balance)
@@ -266,7 +269,7 @@ func (tc *TestClient) CallContract(ctx context.Context, call ethereum.CallMsg, b
 		return output, nil
 	}
 
-	if *call.To == tokenTXXAddress || *call.To == tokenTXZAddress {
+	if *call.To == tokenTXXAddress || *call.To == tokenTXYAddress {
 		balance := tc.tokenBalanceAt(*call.To, blockNumber)
 
 		parsed, err := abi.JSON(strings.NewReader(ierc20.IERC20ABI))
@@ -653,6 +656,23 @@ func getCases() []findBlockCase {
 		},
 	}
 
+	case9emptyHistoryWithERC20Transfers := findBlockCase{
+		balanceChanges: [][]int{},
+		toBlock:        100,
+		rangeSize:      20,
+		// we expect only a single eth_getLogs to be executed here for both erc20 transfers,
+		// thus only 2 blocks found
+		expectedBlocksFound: 2,
+		incomingERC20Transfers: []testERC20Transfer{
+			{big.NewInt(7), tokenTXYAddress, big.NewInt(1)},
+			{big.NewInt(6), tokenTXXAddress, big.NewInt(1)},
+		},
+		expectedCalls: map[string]int{
+			"FilterLogs":   3,
+			"CallContract": 5,
+		},
+	}
+
 	cases = append(cases, case1)
 	cases = append(cases, case100transfers)
 	cases = append(cases, case3)
@@ -662,14 +682,15 @@ func getCases() []findBlockCase {
 	cases = append(cases, case6)
 	cases = append(cases, case7emptyHistoryWithOneERC20Transfer)
 	cases = append(cases, case8emptyHistoryWithERC20Transfers)
+	cases = append(cases, case9emptyHistoryWithERC20Transfers)
 
-	//cases = append([]findBlockCase{}, case1)
+	//cases = append([]findBlockCase{}, case9emptyHistoryWithERC20Transfers)
 
 	return cases
 }
 
 var tokenTXXAddress = common.HexToAddress("0x53211")
-var tokenTXZAddress = common.HexToAddress("0x73211")
+var tokenTXYAddress = common.HexToAddress("0x73211")
 
 func TestFindBlocksCommand(t *testing.T) {
 	for idx, testCase := range getCases() {
@@ -708,6 +729,14 @@ func TestFindBlocksCommand(t *testing.T) {
 				Decimals: 18,
 				ChainID:  tc.NetworkID(),
 				Name:     "Test Token 1",
+				Verified: true,
+			},
+			{
+				Address:  tokenTXYAddress,
+				Symbol:   "TXY",
+				Decimals: 18,
+				ChainID:  tc.NetworkID(),
+				Name:     "Test Token 2",
 				Verified: true,
 			},
 		})
