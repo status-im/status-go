@@ -28,6 +28,10 @@ func (kp *KeycardPairings) GetPairingsJSONFileContent() ([]byte, error) {
 }
 
 func (kp *KeycardPairings) SetPairingsJSONFileContent(content []byte) error {
+	if len(content) == 0 {
+		// Nothing to write
+		return nil
+	}
 	_, err := os.Stat(kp.pairingsFile)
 	if os.IsNotExist(err) {
 		dir, _ := filepath.Split(kp.pairingsFile)
