@@ -34,11 +34,11 @@ const (
 type Headers map[string]string
 
 type Unfurler interface {
-	Unfurl() (common.LinkPreview, error)
+	Unfurl() (*common.LinkPreview, error)
 }
 
-func newDefaultLinkPreview(url *neturl.URL) common.LinkPreview {
-	return common.LinkPreview{
+func newDefaultLinkPreview(url *neturl.URL) *common.LinkPreview {
+	return &common.LinkPreview{
 		URL:      url.String(),
 		Hostname: url.Hostname(),
 	}

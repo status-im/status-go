@@ -17,8 +17,8 @@ import (
 )
 
 type UnfurlURLsResponse struct {
-	LinkPreviews       []common.LinkPreview       `json:"linkPreviews,omitempty"`
-	StatusLinkPreviews []common.StatusLinkPreview `json:"statusLinkPreviews,omitempty"`
+	LinkPreviews       []*common.LinkPreview       `json:"linkPreviews,omitempty"`
+	StatusLinkPreviews []*common.StatusLinkPreview `json:"statusLinkPreviews,omitempty"`
 }
 
 func normalizeHostname(hostname string) string {
@@ -51,8 +51,8 @@ func (m *Messenger) newURLUnfurler(httpClient *http.Client, url *neturl.URL) Unf
 	}
 }
 
-func (m *Messenger) unfurlURL(httpClient *http.Client, url string) (common.LinkPreview, error) {
-	var preview common.LinkPreview
+func (m *Messenger) unfurlURL(httpClient *http.Client, url string) (*common.LinkPreview, error) {
+	preview := new(common.LinkPreview)
 
 	parsedURL, err := neturl.Parse(url)
 	if err != nil {
@@ -139,8 +139,8 @@ func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (UnfurlUR
 	}
 
 	r := UnfurlURLsResponse{
-		LinkPreviews:       make([]common.LinkPreview, 0, len(urls)),
-		StatusLinkPreviews: make([]common.StatusLinkPreview, 0, len(urls)),
+		LinkPreviews:       make([]*common.LinkPreview, 0, len(urls)),
+		StatusLinkPreviews: make([]*common.StatusLinkPreview, 0, len(urls)),
 	}
 
 	for _, url := range urls {

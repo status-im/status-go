@@ -38,7 +38,7 @@ func NewOpenGraphUnfurler(URL *neturl.URL, logger *zap.Logger, httpClient *http.
 	}
 }
 
-func (u *OpenGraphUnfurler) Unfurl() (common.LinkPreview, error) {
+func (u *OpenGraphUnfurler) Unfurl() (*common.LinkPreview, error) {
 	preview := newDefaultLinkPreview(u.url)
 	preview.Type = protobuf.UnfurledLink_LINK
 

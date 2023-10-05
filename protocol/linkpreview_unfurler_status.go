@@ -6,7 +6,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/api/multiformat"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -46,26 +45,29 @@ func buildThumbnail(image *images.IdentityImage, thumbnail *common.LinkPreviewTh
 	return nil
 }
 
-func (u *StatusUnfurler) buildContactData(contactData *ContactURLData) (*common.StatusContactLinkPreview, error) {
-
-	contactID, err := multiformat.DeserializeCompressedKey(contactData.PublicKey)
+func (u *StatusUnfurler) buildContactData(publicKey string) (*common.StatusContactLinkPreview, error) {
+	contactID, err := multiformat.DeserializeCompressedKey(publicKey)
 	if err != nil {
 		return nil, err
 	}
 
-	c := new(common.StatusContactLinkPreview)
-	c.PublicKey = contactData.PublicKey
-	c.DisplayName = contactData.DisplayName
-	c.Description = contactData.Description
-
 	contact := u.m.GetContactByID(contactID)
+
+	// If no contact found locally, fetch it from waku
 	if contact == nil {
-		return c, nil
+		if contact, err = u.m.RequestContactInfoFromMailserver(contactID, true); err != nil {
+			return nil, fmt.Errorf("failed to request contact info from mailserver for public key '%s': %w", publicKey, err)
+		}
 	}
+
+	c := new(common.StatusContactLinkPreview)
+	c.PublicKey = publicKey
+	c.DisplayName = contact.DisplayName
+	c.Description = contact.Bio
 
 	if image, ok := contact.Images[images.SmallDimName]; ok {
 		if err = buildThumbnail(&image, &c.Icon); err != nil {
-			return c, fmt.Errorf("failed to set thumbnail: %w", err)
+			return nil, fmt.Errorf("failed to set thumbnail: %w", err)
 		}
 	}
 
@@ -88,75 +90,73 @@ func (u *StatusUnfurler) fillCommunityImages(community *communities.Community, i
 	return nil
 }
 
-func (u *StatusUnfurler) buildCommunityData(data *CommunityURLData) (*common.StatusCommunityLinkPreview, error) {
-	c := new(common.StatusCommunityLinkPreview)
+func (u *StatusUnfurler) buildCommunityData(communityID string) (*communities.Community, *common.StatusCommunityLinkPreview, error) {
+	// This automatically checks the database
+	community, err := u.m.RequestCommunityInfoFromMailserver(communityID, true)
 
-	// First, fill the output with the data from URL
-	c.CommunityID = data.CommunityID
-	c.DisplayName = data.DisplayName
-	c.Description = data.Description
-	c.MembersCount = data.MembersCount
-	c.Color = data.Color
-	c.TagIndices = data.TagIndices
-
-	// Now check if there's newer information in the database
-	communityID, err := types.DecodeHex(data.CommunityID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode community id: %w", err)
+		return nil, nil, fmt.Errorf("failed to get community info for communityID '%s': %w", communityID, err)
 	}
 
-	community, err := u.m.GetCommunityByID(communityID)
-	if err != nil {
-		return c, nil
+	if community == nil {
+		return community, nil, fmt.Errorf("community info fetched, but it is empty")
+	}
+
+	c := &common.StatusCommunityLinkPreview{
+		CommunityID:  community.IDString(),
+		DisplayName:  community.Name(),
+		Description:  community.DescriptionText(),
+		MembersCount: uint32(community.MembersCount()),
+		Color:        community.Color(),
+		TagIndices:   community.TagsIndices(),
 	}
 
 	err = u.fillCommunityImages(community, &c.Icon, &c.Banner)
 	if err != nil {
-		return c, err
+		return community, c, err
 	}
 
-	return c, nil
+	return community, c, nil
 }
 
-func (u *StatusUnfurler) buildChannelData(data *CommunityChannelURLData, communityData *CommunityURLData) (*common.StatusCommunityChannelLinkPreview, error) {
-	c := new(common.StatusCommunityChannelLinkPreview)
-
-	c.ChannelUUID = data.ChannelUUID
-	c.Emoji = data.Emoji
-	c.DisplayName = data.DisplayName
-	c.Description = data.Description
-	c.Color = data.Color
-
-	if communityData == nil {
-		return nil, fmt.Errorf("channel communtiy can't be empty")
-	}
-
-	community, err := u.buildCommunityData(communityData)
+func (u *StatusUnfurler) buildChannelData(channelUUID string, communityID string) (*common.StatusCommunityChannelLinkPreview, error) {
+	community, communityData, err := u.buildCommunityData(communityID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build channel community data: %w", err)
 	}
 
-	c.Community = community
+	channel, ok := community.Chats()[channelUUID]
+	if !ok {
+		return nil, fmt.Errorf("channel with channelID '%s' not found in community '%s'", channelUUID, communityID)
+	}
 
-	return c, nil
+	return &common.StatusCommunityChannelLinkPreview{
+		ChannelUUID: channelUUID,
+		Emoji:       channel.Identity.Emoji,
+		DisplayName: channel.Identity.DisplayName,
+		Description: channel.Identity.Description,
+		Color:       channel.Identity.Color,
+		Community:   communityData,
+	}, nil
 }
 
-func (u *StatusUnfurler) Unfurl() (common.StatusLinkPreview, error) {
-
-	var preview common.StatusLinkPreview
+func (u *StatusUnfurler) Unfurl() (*common.StatusLinkPreview, error) {
+	preview := new(common.StatusLinkPreview)
 	preview.URL = u.url
 
 	resp, err := u.m.ParseSharedURL(u.url)
 	if err != nil {
-		return preview, err
+		return nil, fmt.Errorf("failed to parse shared url: %w", err)
 	}
 
 	// If a URL has been successfully parsed,
 	// any further errors should not be returned, only logged.
 
 	if resp.Contact != nil {
-		preview.Contact, err = u.buildContactData(resp.Contact)
-		u.logger.Warn("error when building contact data: ", zap.Error(err))
+		preview.Contact, err = u.buildContactData(resp.Contact.PublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("error when building contact data: %w", err)
+		}
 		return preview, nil
 	}
 
@@ -165,20 +165,23 @@ func (u *StatusUnfurler) Unfurl() (common.StatusLinkPreview, error) {
 	//		 So we check for Channel first, then Community.
 
 	if resp.Channel != nil {
-		preview.Channel, err = u.buildChannelData(resp.Channel, resp.Community)
+		if resp.Community == nil {
+			return preview, fmt.Errorf("channel community can't be empty")
+		}
+		preview.Channel, err = u.buildChannelData(resp.Channel.ChannelUUID, resp.Community.CommunityID)
 		if err != nil {
-			u.logger.Warn("error when building channel data: ", zap.Error(err))
+			return nil, fmt.Errorf("error when building channel data: %w", err)
 		}
 		return preview, nil
 	}
 
 	if resp.Community != nil {
-		preview.Community, err = u.buildCommunityData(resp.Community)
+		_, preview.Community, err = u.buildCommunityData(resp.Community.CommunityID)
 		if err != nil {
-			u.logger.Warn("error when building community data: ", zap.Error(err))
+			return nil, fmt.Errorf("error when building community data: %w", err)
 		}
 		return preview, nil
 	}
 
-	return preview, nil
+	return nil, fmt.Errorf("shared url does not contain contact, community or channel data")
 }

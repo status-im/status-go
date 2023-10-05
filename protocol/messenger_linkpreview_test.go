@@ -398,14 +398,21 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 		Payload: payload,
 	}
 
-	c.Bio = "TestBio"
-	c.DisplayName = "TestDisplayName"
+	c.Bio = "TestBio_1"
+	c.DisplayName = "TestDisplayName_2"
 	c.Images = map[string]images.IdentityImage{}
 	c.Images[images.SmallDimName] = icon
 	s.m.allContacts.Store(c.ID, c)
 
+	// Generate a shared URL
 	u, err := s.m.ShareUserURLWithData(c.ID)
 	s.Require().NoError(err)
+
+	// Update contact info locally after creating the shared URL
+	// This is required to test that URL-decoded data is not used in the preview.
+	c.Bio = "TestBio_2"
+	c.DisplayName = "TestDisplayName_2"
+	s.m.allContacts.Store(c.ID, c)
 
 	r, err := s.m.UnfurlURLs(nil, []string{u})
 	s.Require().NoError(err)
@@ -499,66 +506,4 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined()
 	s.Require().Equal(bannerWidth, preview.Community.Banner.Width)
 	s.Require().Equal(bannerHeight, preview.Community.Banner.Height)
 	s.Require().Equal(bannerDataURI, preview.Community.Banner.DataURI)
-}
-
-func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusSharedURL() {
-	const contactSharedURL = "https://status.app/u/G10A4B0JdgwyRww90WXtnP1oNH1ZLQNM0yX0Ja9YyAMjrqSZIYINOHCbFhrnKRAcPGStPxCMJDSZlGCKzmZrJcimHY8BbcXlORrElv_BbQEegnMDPx1g9C5VVNl0fE4y#zQ3shwQPhRuDJSjVGVBnTjCdgXy5i9WQaeVPdGJD6yTarJQSj"
-	const communitySharedURL = "https://status.app/c/iyKACkQKB0Rvb2RsZXMSJ0NvbG9yaW5nIHRoZSB3b3JsZCB3aXRoIGpveSDigKIg4bSXIOKAohiYohsiByMxMzFEMkYqAwEhMwM=#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
-	const channelSharedURL = "https://status.app/cc/G54AAKwObLdpiGjXnckYzRcOSq0QQAS_CURGfqVU42ceGHCObstUIknTTZDOKF3E8y2MSicncpO7fTskXnoACiPKeejvjtLTGWNxUhlT7fyQS7Jrr33UVHluxv_PLjV2ePGw5GQ33innzeK34pInIgUGs5RjdQifMVmURalxxQKwiuoY5zwIjixWWRHqjHM=#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
-
-	r, err := s.m.UnfurlURLs(nil, []string{contactSharedURL, communitySharedURL, channelSharedURL})
-	s.Require().NoError(err)
-	s.Require().Len(r.StatusLinkPreviews, 3)
-	s.Require().Len(r.LinkPreviews, 0)
-
-	preview := r.StatusLinkPreviews[0]
-	s.Require().Equal(contactSharedURL, preview.URL)
-	s.Require().NotNil(preview.Contact)
-	s.Require().Nil(preview.Community)
-	s.Require().Nil(preview.Channel)
-
-	contact := preview.Contact
-	s.Require().Equal("zQ3shwQPhRuDJSjVGVBnTjCdgXy5i9WQaeVPdGJD6yTarJQSj", contact.PublicKey)
-	s.Require().Equal("Mark Cole", contact.DisplayName)
-	s.Require().Equal("Visual designer @Status, cat lover, pizza enthusiast, yoga afficionada", contact.Description)
-	s.Require().True(contact.Icon.IsEmpty())
-
-	preview = r.StatusLinkPreviews[1]
-	s.Require().Equal(communitySharedURL, preview.URL)
-	s.Require().NotNil(preview.Community)
-	s.Require().Nil(preview.Contact)
-	s.Require().Nil(preview.Channel)
-
-	community := preview.Community
-	s.Require().Equal("0x02a3d2fdb9ac335917bf9d46b38d7496c00bbfadbaf832e8aa61d13ac2b4452084", community.CommunityID)
-	s.Require().Equal("Doodles", community.DisplayName)
-	s.Require().Equal("Coloring the world with joy • ᴗ •", community.Description)
-	s.Require().Equal(uint32(446744), community.MembersCount)
-	s.Require().Equal("#131D2F", community.Color)
-	s.Require().Equal([]uint32{1, 33, 51}, community.TagIndices)
-	s.Require().True(community.Icon.IsEmpty())
-	s.Require().True(community.Banner.IsEmpty())
-
-	preview = r.StatusLinkPreviews[2]
-	s.Require().Equal(channelSharedURL, preview.URL)
-	s.Require().NotNil(preview.Channel)
-	s.Require().Nil(preview.Community)
-	s.Require().Nil(preview.Contact)
-
-	channel := preview.Channel
-	s.Require().Equal("003cdcd5-e065-48f9-b166-b1a94ac75a11", channel.ChannelUUID)
-	s.Require().Equal("🍿", channel.Emoji)
-	s.Require().Equal("design", channel.DisplayName)
-	s.Require().Equal("The quick brown fox jumped over the lazy dog because it was too lazy to go around.", channel.Description)
-	s.Require().Equal("#131D2F", channel.Color)
-
-	s.Require().NotNil(channel.Community)
-	s.Require().Equal("0x02a3d2fdb9ac335917bf9d46b38d7496c00bbfadbaf832e8aa61d13ac2b4452084", channel.Community.CommunityID)
-	s.Require().Equal("Doodles", channel.Community.DisplayName)
-	s.Require().Equal("", channel.Community.Color)
-	s.Require().Equal("", channel.Community.Description)
-	s.Require().Equal(uint32(0), channel.Community.MembersCount)
-	s.Require().True(channel.Community.Icon.IsEmpty())
-	s.Require().True(channel.Community.Banner.IsEmpty())
-	s.Require().Nil(channel.Community.TagIndices)
 }
