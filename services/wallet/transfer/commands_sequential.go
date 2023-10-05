@@ -627,16 +627,17 @@ func (c *loadBlocksAndTransfersCommand) startFetchingNewBlocks(group *async.Grou
 
 	newBlocksCmd := &findNewBlocksCommand{
 		findBlocksCommand: &findBlocksCommand{
-			account:            address,
-			db:                 c.db,
-			blockRangeDAO:      c.blockRangeDAO,
-			chainClient:        c.chainClient,
-			balanceCacher:      c.balanceCacher,
-			feed:               c.feed,
-			noLimit:            false,
-			transactionManager: c.transactionManager,
-			tokenManager:       c.tokenManager,
-			blocksLoadedCh:     blocksLoadedCh,
+			account:                   address,
+			db:                        c.db,
+			blockRangeDAO:             c.blockRangeDAO,
+			chainClient:               c.chainClient,
+			balanceCacher:             c.balanceCacher,
+			feed:                      c.feed,
+			noLimit:                   false,
+			transactionManager:        c.transactionManager,
+			tokenManager:              c.tokenManager,
+			blocksLoadedCh:            blocksLoadedCh,
+			defaultNodeBlockChunkSize: DefaultNodeBlockChunkSize,
 		},
 	}
 	group.Add(newBlocksCmd.Command())
