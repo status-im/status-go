@@ -132,7 +132,7 @@ func (c *findBlocksCommand) ERC20ScanByBalance(parent context.Context, fromBlock
 			if fromBalance.Cmp(toBalance) != 0 {
 				diff := new(big.Int).Sub(to, from)
 				if diff.Cmp(batchSize) <= 0 {
-					headers, err := c.fastIndexErc20(parent, from, to)
+					headers, err := c.fastIndexErc20(parent, from, to, true)
 					if err != nil {
 						return nil, err
 					}
@@ -314,7 +314,7 @@ func (c *findBlocksCommand) checkRange(parent context.Context, from *big.Int, to
 
 	// There could be incoming ERC20 transfers which don't change the balance
 	// and nonce of ETH account, so we keep looking for them
-	erc20Headers, err := c.fastIndexErc20(parent, newFromBlock.Number, to)
+	erc20Headers, err := c.fastIndexErc20(parent, newFromBlock.Number, to, false)
 	if err != nil {
 		log.Error("findBlocksCommand checkRange fastIndexErc20", "err", err, "account", c.account, "chain", c.chainClient.NetworkID())
 		c.error = err
@@ -424,13 +424,13 @@ func (c *findBlocksCommand) fastIndex(ctx context.Context, bCacher balance.Cache
 // run fast indexing for every accont up to canonical chain head minus safety depth.
 // every account will run it from last synced header.
 func (c *findBlocksCommand) fastIndexErc20(ctx context.Context, fromBlockNumber *big.Int,
-	toBlockNumber *big.Int) ([]*DBHeader, error) {
+	toBlockNumber *big.Int, incomingOnly bool) ([]*DBHeader, error) {
 
 	start := time.Now()
 	group := async.NewGroup(ctx)
 
 	erc20 := &erc20HistoricalCommand{
-		erc20:        NewERC20TransfersDownloader(c.chainClient, []common.Address{c.account}, types.LatestSignerForChainID(c.chainClient.ToBigInt())),
+		erc20:        NewERC20TransfersDownloader(c.chainClient, []common.Address{c.account}, types.LatestSignerForChainID(c.chainClient.ToBigInt()), incomingOnly),
 		chainClient:  c.chainClient,
 		feed:         c.feed,
 		address:      c.account,

@@ -103,7 +103,7 @@ func (s *OnDemandFetchStrategy) newControlCommand(chainClient chain.ClientInterf
 			signer:      signer,
 			db:          s.db,
 		},
-		erc20:              NewERC20TransfersDownloader(chainClient, accounts, signer),
+		erc20:              NewERC20TransfersDownloader(chainClient, accounts, signer, false),
 		feed:               s.feed,
 		errorsCount:        0,
 		transactionManager: s.transactionManager,

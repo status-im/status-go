@@ -236,14 +236,15 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 }
 
 // NewERC20TransfersDownloader returns new instance.
-func NewERC20TransfersDownloader(client chain.ClientInterface, accounts []common.Address, signer types.Signer) *ERC20TransfersDownloader {
+func NewERC20TransfersDownloader(client chain.ClientInterface, accounts []common.Address, signer types.Signer, incomingOnly bool) *ERC20TransfersDownloader {
 	signature := w_common.GetEventSignatureHash(w_common.Erc20_721TransferEventSignature)
 
 	return &ERC20TransfersDownloader{
-		client:    client,
-		accounts:  accounts,
-		signature: signature,
-		signer:    signer,
+		client:       client,
+		accounts:     accounts,
+		incomingOnly: incomingOnly,
+		signature:    signature,
+		signer:       signer,
 	}
 }
 
@@ -253,8 +254,9 @@ func NewERC20TransfersDownloader(client chain.ClientInterface, accounts []common
 // database gets implemented, differentiation between erc20 and erc721 will handled
 // in the controller.
 type ERC20TransfersDownloader struct {
-	client   chain.ClientInterface
-	accounts []common.Address
+	client       chain.ClientInterface
+	accounts     []common.Address
+	incomingOnly bool
 
 	// hash of the Transfer event signature
 	signature common.Hash
@@ -417,14 +419,18 @@ func (d *ERC20TransfersDownloader) GetHeadersInRange(parent context.Context, fro
 	log.Debug("get erc20 transfers in range start", "chainID", d.client.NetworkID(), "from", from, "to", to)
 	headers := []*DBHeader{}
 	ctx := context.Background()
+	var err error
 	for _, address := range d.accounts {
-		outbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
-			FromBlock: from,
-			ToBlock:   to,
-			Topics:    d.outboundTopics(address),
-		})
-		if err != nil {
-			return nil, err
+		outbound := []types.Log{}
+		if !d.incomingOnly {
+			outbound, err = d.client.FilterLogs(ctx, ethereum.FilterQuery{
+				FromBlock: from,
+				ToBlock:   to,
+				Topics:    d.outboundTopics(address),
+			})
+			if err != nil {
+				return nil, err
+			}
 		}
 		inbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
 			FromBlock: from,

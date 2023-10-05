@@ -793,7 +793,7 @@ func (c *findAndCheckBlockRangeCommand) fastIndexErc20(ctx context.Context, from
 	commands := make([]*erc20HistoricalCommand, len(c.accounts))
 	for i, address := range c.accounts {
 		erc20 := &erc20HistoricalCommand{
-			erc20:        NewERC20TransfersDownloader(c.chainClient, []common.Address{address}, types.LatestSignerForChainID(c.chainClient.ToBigInt())),
+			erc20:        NewERC20TransfersDownloader(c.chainClient, []common.Address{address}, types.LatestSignerForChainID(c.chainClient.ToBigInt()), false),
 			chainClient:  c.chainClient,
 			feed:         c.feed,
 			address:      address,
