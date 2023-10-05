@@ -71,11 +71,18 @@ func (s *HandlersSuite) saveUserMessage(msg *common.Message) {
 
 	s.Require().NoError(err)
 
-	links, err := json.Marshal(msg.UnfurledLinks)
-	s.Require().NoError(err)
+	links := []byte{}
+	statusLinks := []byte{}
 
-	statusLinks, err := proto.Marshal(msg.UnfurledStatusLinks)
-	s.Require().NoError(err)
+	if msg.UnfurledLinks != nil {
+		links, err = json.Marshal(msg.UnfurledLinks)
+		s.Require().NoError(err)
+	}
+
+	if msg.UnfurledStatusLinks != nil {
+		statusLinks, err = proto.Marshal(msg.UnfurledStatusLinks)
+		s.Require().NoError(err)
+	}
 
 	_, err = stmt.Exec(
 		msg.ID,
