@@ -1221,32 +1221,25 @@ func (m *Messenger) RequestContactInfoFromMailserver(pubkey string, waitForRespo
 		return nil, nil
 	}
 
-	ctx := context.Background()
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 
-	var contact *Contact
-	fetching := true
+	defer func() {
+		cancel()
+		m.forgetContactInfoRequest(pubkey)
+	}()
 
-	for fetching {
+	for {
 		select {
 		case <-time.After(200 * time.Millisecond):
-			var ok bool
-			contact, ok = m.allContacts.Load(pubkey)
-
+			contact, ok := m.allContacts.Load(pubkey)
 			if ok && contact != nil && contact.DisplayName != "" {
-				fetching = false
-				m.logger.Info("contact info received", zap.String("pubkey", contact.ID))
+				return contact, nil
 			}
 
 		case <-ctx.Done():
-			fetching = false
+			return nil, fmt.Errorf("failed to request contact info from mailserver: %w", ctx.Err())
 		}
 	}
-
-	m.forgetContactInfoRequest(pubkey)
-
-	return contact, nil
 }
 
 func (m *Messenger) requestContactInfoFromMailserver(pubkey string) error {
