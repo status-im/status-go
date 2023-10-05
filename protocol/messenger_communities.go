@@ -295,6 +295,12 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 		return result
 	}()
 
+	notifyClient := func(response *MessengerResponse) {
+		if m.config.messengerSignalsHandler != nil {
+			m.config.messengerSignalsHandler.MessengerResponse(response)
+		}
+	}
+
 	publishOrgAndDistributeEncryptionKeys := func(community *communities.Community) {
 		err := m.publishOrg(community)
 		if err != nil {
@@ -305,13 +311,11 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 
 		recentlyPublishedOrg := recentlyPublishedOrgs[community.IDString()]
 
-		// signal client with published community
-		if m.config.messengerSignalsHandler != nil {
-			if recentlyPublishedOrg == nil || community.Clock() > recentlyPublishedOrg.Clock() {
-				response := &MessengerResponse{}
-				response.AddCommunity(community)
-				m.config.messengerSignalsHandler.MessengerResponse(response)
-			}
+		// notify client with published community
+		if recentlyPublishedOrg == nil || community.Clock() > recentlyPublishedOrg.Clock() {
+			response := &MessengerResponse{}
+			response.AddCommunity(community)
+			notifyClient(response)
 		}
 
 		// evaluate and distribute encryption keys (if any)
@@ -355,10 +359,11 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 						accept := &requests.AcceptRequestToJoinCommunity{
 							ID: requestID,
 						}
-						_, err := m.AcceptRequestToJoinCommunity(accept)
+						response, err := m.AcceptRequestToJoinCommunity(accept)
 						if err != nil {
 							m.logger.Warn("failed to accept request to join ", zap.Error(err))
 						}
+						notifyClient(response)
 					}
 				}
 
@@ -367,10 +372,11 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 						reject := &requests.DeclineRequestToJoinCommunity{
 							ID: requestID,
 						}
-						_, err := m.DeclineRequestToJoinCommunity(reject)
+						response, err := m.DeclineRequestToJoinCommunity(reject)
 						if err != nil {
 							m.logger.Warn("failed to decline request to join ", zap.Error(err))
 						}
+						notifyClient(response)
 					}
 				}
 
@@ -3287,7 +3293,8 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 	}
 
 	err = m.handleCommunityDescription(messageState, orgPubKey, &cd, syncCommunity.Description)
-	if err != nil {
+	// Even if the Description is outdated we should proceed in order to sync settings and joined state
+	if err != nil && err != communities.ErrInvalidCommunityDescriptionClockOutdated {
 		logger.Debug("m.handleCommunityDescription error", zap.Error(err))
 		return err
 	}

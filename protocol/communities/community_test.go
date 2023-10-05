@@ -560,8 +560,8 @@ func (s *CommunitySuite) TestHandleCommunityDescription() {
 			name:        "updated version but lower clock",
 			description: s.oldCommunityDescription,
 			signer:      signer,
-			changes:     buildChanges,
-			err:         nil,
+			changes:     func(c *Community) *CommunityChanges { return nil },
+			err:         ErrInvalidCommunityDescriptionClockOutdated,
 		},
 		{
 			name:        "removed member from org",

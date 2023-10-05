@@ -2693,7 +2693,6 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 		return nil
 	})
 	s.Require().NoError(err)
-	s.Len(response.Communities(), 1)
 
 	// Get the pending requests to join for the new community on alicesOtherDevice
 	requestsToJoin, err = alicesOtherDevice.PendingRequestsToJoinForCommunity(community.ID())

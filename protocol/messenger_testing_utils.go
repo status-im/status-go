@@ -56,6 +56,53 @@ func WaitOnSignaledMessengerResponse(m *Messenger, condition func(*MessengerResp
 	interval := 500 * time.Millisecond
 	timeoutChan := time.After(10 * time.Second)
 
+	responseChan := make(chan *MessengerResponse, 1)
+	m.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{
+		responseChan: responseChan,
+	}
+
+	for {
+		_, err := m.RetrieveAll()
+		if err != nil {
+			return nil, err
+		}
+
+		select {
+		case r := <-responseChan:
+			if condition(r) {
+				return r, nil
+			}
+			return nil, errors.New(errorMessage)
+
+		case <-timeoutChan:
+			return nil, errors.New("timed out: " + errorMessage)
+
+		default: // No immediate response, rest & loop back to retrieve again
+			time.Sleep(interval)
+		}
+	}
+}
+
+type MessengerSignalsHandlerMock struct {
+	MessengerSignalsHandler
+
+	responseChan chan *MessengerResponse
+}
+
+func (m *MessengerSignalsHandlerMock) MessengerResponse(response *MessengerResponse) {
+	// Non-blocking send
+	select {
+	case m.responseChan <- response:
+	default:
+	}
+}
+
+func (m *MessengerSignalsHandlerMock) MessageDelivered(chatID string, messageID string) {}
+
+func WaitOnSignaledMessengerResponse(m *Messenger, condition func(*MessengerResponse) bool, errorMessage string) (*MessengerResponse, error) {
+	interval := 500 * time.Millisecond
+	timeoutChan := time.After(10 * time.Second)
+
 	if m.config.messengerSignalsHandler != nil {
 		return nil, errors.New("messengerSignalsHandler already provided/mocked")
 	}

@@ -66,8 +66,6 @@ func checkClientsReceivedAdminEvent(base CommunityEventsTestsInterface, fn Messa
 	waitOnMessengerResponse(s, fn, base.GetMember())
 	// Wait and verify event sender received the ControlNode CommunityDescription update
 	waitOnMessengerResponse(s, fn, base.GetEventSender())
-	// Wait and verify ControlNode received his own CommunityDescription update
-	waitOnMessengerResponse(s, fn, base.GetControlNode())
 }
 
 func refreshMessengerResponses(base CommunityEventsTestsInterface) {
@@ -415,7 +413,6 @@ func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role pr
 
 	// control node creates a community and chat
 	community := createTestCommunity(base, protobuf.CommunityPermissions_MANUAL_ACCEPT)
-	refreshMessengerResponses(base)
 
 	advertiseCommunityTo(s, community, base.GetControlNode(), base.GetEventSender())
 	advertiseCommunityTo(s, community, base.GetControlNode(), base.GetMember())
@@ -426,7 +423,6 @@ func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role pr
 		ENSName:           "eventSender",
 		AirdropAddress:    eventsSenderAccountAddress,
 	}
-
 	joinOnRequestCommunity(s, community, base.GetControlNode(), base.GetEventSender(), requestEventSender)
 
 	requestMember := &requests.RequestToJoinCommunity{
@@ -436,12 +432,6 @@ func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role pr
 		AirdropAddress:    aliceAccountAddress,
 	}
 	joinOnRequestCommunity(s, community, base.GetControlNode(), base.GetMember(), requestMember)
-
-	checkMemberJoined := func(response *MessengerResponse) error {
-		return checkMemberJoinedToTheCommunity(response, base.GetMember().IdentityPublicKey())
-	}
-
-	waitOnMessengerResponse(s, checkMemberJoined, base.GetEventSender())
 
 	// grant permissions to event sender
 	grantPermission(s, community, base.GetControlNode(), base.GetEventSender(), role)
@@ -1095,22 +1085,19 @@ func testAcceptMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	)
 	s.Require().Error(err)
 
-	// control node receives community event with accepted membership request
+	// control node receives community event and accepts membership request
 	_, err = WaitOnMessengerResponse(
 		base.GetControlNode(),
 		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&user.identity.PublicKey)
+			acceptedRequests, err := base.GetControlNode().AcceptedRequestsToJoinForCommunity(community.ID())
+			if err != nil {
+				return false
+			}
+			return len(acceptedRequests) == 3
 		},
 		"control node did not receive community request to join response",
 	)
 	s.Require().NoError(err)
-
-	// at this point, the request to join is marked as accepted by control node
-	acceptedRequests, err := base.GetControlNode().AcceptedRequestsToJoinForCommunity(community.ID())
-	s.Require().NoError(err)
-	// we expect 3 here (1 event senders, 1 member + 1 from user)
-	s.Require().Len(acceptedRequests, 3)
-	s.Require().Equal(acceptedRequests[2].PublicKey, common.PubkeyToHex(&user.identity.PublicKey))
 
 	// user receives updated community
 	_, err = WaitOnMessengerResponse(
@@ -1405,11 +1392,15 @@ func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community
 }
 
 func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base CommunityEventsTestsInterface, community *communities.Community, user *Messenger, additionalEventSender *Messenger) {
-	_, err := user.Start()
-
 	s := base.GetSuite()
+
+	_, err := user.Start()
 	s.Require().NoError(err)
 	defer user.Shutdown() // nolint: errcheck
+
+	_, err = additionalEventSender.Start()
+	s.Require().NoError(err)
+	defer additionalEventSender.Shutdown() // nolint: errcheck
 
 	advertiseCommunityTo(s, community, base.GetControlNode(), user)
 
@@ -1456,7 +1447,7 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 	s.Require().NotNil(rejectedPendingRequests)
 	s.Require().Len(rejectedPendingRequests, 1)
 
-	// control node receives event sender 1's and 2's decision
+	// control node receives event sender 1's decision
 	_, err = WaitOnMessengerResponse(
 		base.GetControlNode(),
 		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
@@ -1479,10 +1470,20 @@ func testControlNodeHandlesMultipleEventSenderRequestToJoinDecisions(base Commun
 	s.Require().NotNil(acceptedPendingRequests)
 	s.Require().Len(acceptedPendingRequests, 1)
 
-	// control node now receives event sender 2's decision
+	// control node rejects event sender 2's decision due to outdated admin event clock
+	waitOnAdminEventsRejection := waitOnCommunitiesEvent(base.GetControlNode(), func(sub *communities.Subscription) bool {
+		return sub.CommunityEventsMessageInvalidClock != nil
+	})
 	_, err = WaitOnMessengerResponse(
 		base.GetControlNode(),
-		func(r *MessengerResponse) bool { return len(r.Communities()) > 0 },
+		func(r *MessengerResponse) bool {
+			select {
+			case err := <-waitOnAdminEventsRejection:
+				return err == nil
+			default:
+				return false
+			}
+		},
 		"control node did not receive event senders decision",
 	)
 	s.Require().NoError(err)

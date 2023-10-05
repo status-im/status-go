@@ -1007,18 +1007,16 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
+	if description.Clock <= o.config.CommunityDescription.Clock {
+		return nil, ErrInvalidCommunityDescriptionClockOutdated
+	}
+
 	// This is done in case tags are updated and a client sends unknown tags
 	description.Tags = requests.RemoveUnknownAndDeduplicateTags(description.Tags)
 
 	err := ValidateCommunityDescription(description)
 	if err != nil {
 		return nil, err
-	}
-
-	response := o.emptyCommunityChanges()
-
-	if description.Clock <= o.config.CommunityDescription.Clock {
-		return response, nil
 	}
 
 	originCommunity := o.CreateDeepCopy()
@@ -1032,10 +1030,10 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 
 	// We only calculate changes if we joined/spectated the community or we requested access, otherwise not interested
 	if o.config.Joined || o.config.Spectated || o.config.RequestedToJoinAt > 0 {
-		response = EvaluateCommunityChanges(originCommunity, o)
+		return EvaluateCommunityChanges(originCommunity, o), nil
 	}
 
-	return response, nil
+	return o.emptyCommunityChanges(), nil
 }
 
 func (o *Community) UpdateChatFirstMessageTimestamp(chatID string, timestamp uint32) (*CommunityChanges, error) {
