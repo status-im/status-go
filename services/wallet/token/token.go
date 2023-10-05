@@ -783,7 +783,10 @@ func (tm *Manager) GetBalancesAtByChain(parent context.Context, clients map[uint
 		mu.Unlock()
 	}
 
-	for _, client := range clients {
+	for clientIdx := range clients {
+		// Keep the reference to the client. DO NOT USE A LOOP, the client will be overridden in the coroutine
+		client := clients[clientIdx]
+
 		ethScanContract, availableAtBlock, err := tm.contractMaker.NewEthScan(client.NetworkID())
 		if err != nil {
 			log.Error("error scanning contract", "err", err)
@@ -832,9 +835,12 @@ func (tm *Manager) GetBalancesAtByChain(parent context.Context, clients map[uint
 		}
 
 		for accountIdx := range accounts {
+			// Keep the reference to the account. DO NOT USE A LOOP, the account will be overridden in the coroutine
 			account := accounts[accountIdx]
 			for idx := range tokenChunks {
+				// Keep the reference to the chunk. DO NOT USE A LOOP, the chunk will be overridden in the coroutine
 				chunk := tokenChunks[idx]
+
 				group.Add(func(parent context.Context) error {
 					ctx, cancel := context.WithTimeout(parent, requestTimeout)
 					defer cancel()
@@ -855,7 +861,6 @@ func (tm *Manager) GetBalancesAtByChain(parent context.Context, clients map[uint
 						}
 
 						for idx, token := range chunk {
-
 							if !res[idx].Success {
 								continue
 							}
