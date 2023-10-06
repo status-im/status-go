@@ -28,7 +28,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/alchemy"
 	"github.com/status-im/status-go/services/wallet/thirdparty/coingecko"
 	"github.com/status-im/status-go/services/wallet/thirdparty/cryptocompare"
-	"github.com/status-im/status-go/services/wallet/thirdparty/infura"
 	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
@@ -110,32 +109,27 @@ func NewService(
 	openseaHTTPClient := opensea.NewHTTPClient()
 	openseaClient := opensea.NewClient(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient)
 	openseaV2Client := opensea.NewClientV2(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient)
-	infuraClient := infura.NewClient(config.WalletConfig.InfuraAPIKey, config.WalletConfig.InfuraAPIKeySecret)
 	alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKeys)
 
 	// Try OpenSea, Infura, Alchemy in that order
 	contractOwnershipProviders := []thirdparty.CollectibleContractOwnershipProvider{
-		infuraClient,
 		alchemyClient,
 	}
 
 	accountOwnershipProviders := []thirdparty.CollectibleAccountOwnershipProvider{
 		openseaClient,
 		openseaV2Client,
-		infuraClient,
 		alchemyClient,
 	}
 
 	collectibleDataProviders := []thirdparty.CollectibleDataProvider{
 		openseaClient,
 		openseaV2Client,
-		infuraClient,
 		alchemyClient,
 	}
 
 	collectionDataProviders := []thirdparty.CollectionDataProvider{
 		openseaClient,
-		infuraClient,
 		alchemyClient,
 	}
 
