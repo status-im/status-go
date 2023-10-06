@@ -1,6 +1,8 @@
 package opensea
 
 import (
+	"encoding/json"
+	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -23,24 +25,7 @@ const (
 	optimismGoerliString  = "optimism_goerli"
 )
 
-func chainStringToChainID(chainString string) walletCommon.ChainID {
-	chainID := walletCommon.UnknownChainID
-	switch chainString {
-	case ethereumMainnetString:
-		chainID = walletCommon.EthereumMainnet
-	case arbitrumMainnetString:
-		chainID = walletCommon.ArbitrumMainnet
-	case optimismMainnetString:
-		chainID = walletCommon.OptimismMainnet
-	case ethereumGoerliString:
-		chainID = walletCommon.EthereumGoerli
-	case arbitrumGoerliString:
-		chainID = walletCommon.ArbitrumGoerli
-	case optimismGoerliString:
-		chainID = walletCommon.OptimismGoerli
-	}
-	return walletCommon.ChainID(chainID)
-}
+type urlGetter func(walletCommon.ChainID, string) (string, error)
 
 func chainIDToChainString(chainID walletCommon.ChainID) string {
 	chainString := ""
@@ -97,6 +82,26 @@ type DetailedNFT struct {
 type OwnerV2 struct {
 	Address  common.Address `json:"address"`
 	Quantity *bigint.BigInt `json:"quantity"`
+}
+
+type TraitValue string
+
+func (st *TraitValue) UnmarshalJSON(b []byte) error {
+	var item interface{}
+	if err := json.Unmarshal(b, &item); err != nil {
+		return err
+	}
+
+	switch v := item.(type) {
+	case float64:
+		*st = TraitValue(strconv.FormatFloat(v, 'f', 2, 64))
+	case int:
+		*st = TraitValue(strconv.Itoa(v))
+	case string:
+		*st = TraitValue(v)
+
+	}
+	return nil
 }
 
 type TraitV2 struct {

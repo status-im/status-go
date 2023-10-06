@@ -107,7 +107,6 @@ func NewService(
 	blockChainState := NewBlockChainState(rpcClient, accountsDB)
 
 	openseaHTTPClient := opensea.NewHTTPClient()
-	openseaClient := opensea.NewClient(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient)
 	openseaV2Client := opensea.NewClientV2(config.WalletConfig.OpenseaAPIKey, openseaHTTPClient)
 	alchemyClient := alchemy.NewClient(config.WalletConfig.AlchemyAPIKeys)
 
@@ -117,23 +116,20 @@ func NewService(
 	}
 
 	accountOwnershipProviders := []thirdparty.CollectibleAccountOwnershipProvider{
-		openseaClient,
 		openseaV2Client,
 		alchemyClient,
 	}
 
 	collectibleDataProviders := []thirdparty.CollectibleDataProvider{
-		openseaClient,
 		openseaV2Client,
 		alchemyClient,
 	}
 
 	collectionDataProviders := []thirdparty.CollectionDataProvider{
-		openseaClient,
 		alchemyClient,
 	}
 
-	collectiblesManager := collectibles.NewManager(db, rpcClient, contractOwnershipProviders, accountOwnershipProviders, collectibleDataProviders, collectionDataProviders, openseaClient, feed)
+	collectiblesManager := collectibles.NewManager(db, rpcClient, contractOwnershipProviders, accountOwnershipProviders, collectibleDataProviders, collectionDataProviders, feed)
 	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, rpcClient.NetworkManager, collectiblesManager)
 
 	activity := activity.NewService(db, tokenManager, collectiblesManager, feed)

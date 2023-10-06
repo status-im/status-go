@@ -23,7 +23,6 @@ import (
 	"github.com/status-im/status-go/services/wallet/currency"
 	"github.com/status-im/status-go/services/wallet/history"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
@@ -359,34 +358,6 @@ func (api *API) GetCollectiblesDetailsAsync(requestID int32, uniqueIDs []thirdpa
 
 	api.s.collectibles.GetCollectiblesDetailsAsync(requestID, uniqueIDs)
 	return nil
-}
-
-// @deprecated
-// Old Collectibles API - To be deprecated
-func (api *API) GetOpenseaCollectionsByOwner(ctx context.Context, chainID wcommon.ChainID, owner common.Address) ([]opensea.OwnedCollection, error) {
-	log.Debug("call to GetOpenseaCollectionsByOwner")
-	return api.s.collectiblesManager.FetchAllCollectionsByOwner(chainID, owner)
-}
-
-// @deprecated
-func (api *API) GetOpenseaAssetsByOwnerAndCollectionWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, collectionSlug string, cursor string, limit int) (*opensea.AssetContainer, error) {
-	log.Debug("call to GetOpenseaAssetsByOwnerAndCollectionWithCursor")
-	return api.s.collectiblesManager.FetchAllOpenseaAssetsByOwnerAndCollection(chainID, owner, collectionSlug, cursor, limit)
-}
-
-// @deprecated
-func (api *API) GetOpenseaAssetsByOwnerAndCollection(ctx context.Context, chainID wcommon.ChainID, owner common.Address, collectionSlug string, limit int) ([]opensea.Asset, error) {
-	container, err := api.GetOpenseaAssetsByOwnerAndCollectionWithCursor(ctx, chainID, owner, collectionSlug, "", limit)
-	if err != nil {
-		return nil, err
-	}
-	return container.Assets, nil
-}
-
-// @deprecated
-func (api *API) GetCollectiblesByOwnerAndCollectionWithCursor(ctx context.Context, chainID wcommon.ChainID, owner common.Address, collectionSlug string, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
-	log.Debug("call to GetCollectiblesByOwnerAndCollectionWithCursor")
-	return api.s.collectiblesManager.FetchAllAssetsByOwnerAndCollection(chainID, owner, collectionSlug, cursor, limit)
 }
 
 // @deprecated
