@@ -9,8 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/connection"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -92,13 +95,12 @@ func NewClient(apiKeys map[uint64]string) *Client {
 }
 
 func (o *Client) doQuery(url string) (*http.Response, error) {
-	resp, err := o.client.Get(url)
-
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return resp, nil
+	return o.doWithRetries(req)
 }
 
 func (o *Client) doPostWithJSON(url string, payload any) (*http.Response, error) {
@@ -118,12 +120,38 @@ func (o *Client) doPostWithJSON(url string, payload any) (*http.Response, error)
 	req.Header.Add("accept", "application/json")
 	req.Header.Add("content-type", "application/json")
 
-	resp, err := o.client.Do(req)
-	if err != nil {
-		return nil, err
+	return o.doWithRetries(req)
+}
+
+func (o *Client) doWithRetries(req *http.Request) (*http.Response, error) {
+	b := backoff.ExponentialBackOff{
+		InitialInterval:     time.Millisecond * 1000,
+		RandomizationFactor: 0.1,
+		Multiplier:          1.5,
+		MaxInterval:         time.Second * 32,
+		MaxElapsedTime:      time.Second * 128,
+		Clock:               backoff.SystemClock,
+	}
+	b.Reset()
+
+	op := func() (*http.Response, error) {
+		resp, err := o.client.Do(req)
+		if err != nil {
+			return nil, backoff.Permanent(err)
+		}
+
+		if resp.StatusCode == http.StatusOK {
+			return resp, nil
+		}
+
+		err = fmt.Errorf("unsuccessful request: %d %s", resp.StatusCode, http.StatusText(resp.StatusCode))
+		if resp.StatusCode == http.StatusTooManyRequests {
+			return nil, err
+		}
+		return nil, backoff.Permanent(err)
 	}
 
-	return resp, nil
+	return backoff.RetryWithData(op, &b)
 }
 
 func (o *Client) FetchCollectibleOwnersByContractAddress(chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
