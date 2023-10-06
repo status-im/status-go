@@ -108,7 +108,6 @@ func (u *StatusUnfurler) buildCommunityData(communityID string) (*communities.Co
 		Description:  community.DescriptionText(),
 		MembersCount: uint32(community.MembersCount()),
 		Color:        community.Color(),
-		TagIndices:   community.TagsIndices(),
 	}
 
 	err = u.fillCommunityImages(community, &c.Icon, &c.Banner)

@@ -147,7 +147,6 @@ message UnfurledStatusCommunityLink {
   string description = 3;
   uint32 members_count = 4;
   string color = 5;
-  repeated uint32 tag_indices = 6;
   UnfurledLinkThumbnail icon = 7;
   UnfurledLinkThumbnail banner = 8;
 }

@@ -44,7 +44,6 @@ type StatusCommunityLinkPreview struct {
 	Description  string               `json:"description"`
 	MembersCount uint32               `json:"membersCount"`
 	Color        string               `json:"color"`
-	TagIndices   []uint32             `json:"tagIndices"`
 	Icon         LinkPreviewThumbnail `json:"icon,omitempty"`
 	Banner       LinkPreviewThumbnail `json:"banner,omitempty"`
 }
@@ -232,7 +231,6 @@ func (preview *StatusCommunityLinkPreview) convertToProto() (*protobuf.UnfurledS
 		Description:  preview.Description,
 		MembersCount: preview.MembersCount,
 		Color:        preview.Color,
-		TagIndices:   preview.TagIndices,
 		Icon:         icon,
 		Banner:       banner,
 	}
@@ -249,7 +247,6 @@ func (preview *StatusCommunityLinkPreview) loadFromProto(c *protobuf.UnfurledSta
 	preview.Description = c.Description
 	preview.MembersCount = c.MembersCount
 	preview.Color = c.Color
-	preview.TagIndices = c.TagIndices
 	preview.Icon.clear()
 	preview.Banner.clear()
 

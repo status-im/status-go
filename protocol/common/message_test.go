@@ -272,7 +272,6 @@ func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
 		Description:  "Description_6",
 		MembersCount: 7,
 		Color:        "Color_8",
-		TagIndices:   []uint32{9, 10},
 		Icon: LinkPreviewThumbnail{
 			Width:   30,
 			Height:  40,
@@ -297,7 +296,6 @@ func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
 			Description:  "Description_18",
 			MembersCount: 19,
 			Color:        "Color_20",
-			TagIndices:   []uint32{21, 22},
 			Icon: LinkPreviewThumbnail{
 				Width:   70,
 				Height:  80,
@@ -364,7 +362,6 @@ func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
 	require.Equal(t, community.Description, c2.Description)
 	require.Equal(t, community.MembersCount, c2.MembersCount)
 	require.Equal(t, community.Color, c2.Color)
-	require.Equal(t, community.TagIndices, c2.TagIndices)
 	require.NotNil(t, c2.Icon)
 	require.Equal(t, uint32(community.Icon.Width), c2.Icon.Width)
 	require.Equal(t, uint32(community.Icon.Height), c2.Icon.Height)
@@ -436,7 +433,6 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 		Description:  "Description_6",
 		MembersCount: 7,
 		Color:        "Color_8",
-		TagIndices:   []uint32{9, 10},
 		Icon: &protobuf.UnfurledLinkThumbnail{
 			Width:   30,
 			Height:  40,
@@ -461,7 +457,6 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 			Description:  "Description_18",
 			MembersCount: 19,
 			Color:        "Color_20",
-			TagIndices:   []uint32{21, 22},
 			Icon: &protobuf.UnfurledLinkThumbnail{
 				Width:   70,
 				Height:  80,
@@ -543,7 +538,6 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 	require.Equal(t, community.Description, c2.Description)
 	require.Equal(t, community.MembersCount, c2.MembersCount)
 	require.Equal(t, community.Color, c2.Color)
-	require.Equal(t, community.TagIndices, c2.TagIndices)
 	require.NotNil(t, c2.Icon)
 	require.Equal(t, int(community.Icon.Width), c2.Icon.Width)
 	require.Equal(t, int(community.Icon.Height), c2.Icon.Height)
