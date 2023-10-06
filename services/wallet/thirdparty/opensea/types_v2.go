@@ -21,6 +21,7 @@ const (
 	arbitrumMainnetString = "arbitrum"
 	optimismMainnetString = "optimism"
 	ethereumGoerliString  = "goerli"
+	ethereumSepoliaString = "sepolia"
 	arbitrumGoerliString  = "arbitrum_goerli"
 	optimismGoerliString  = "optimism_goerli"
 )
@@ -38,6 +39,8 @@ func chainIDToChainString(chainID walletCommon.ChainID) string {
 		chainString = optimismMainnetString
 	case walletCommon.EthereumGoerli:
 		chainString = ethereumGoerliString
+	case walletCommon.EthereumSepolia:
+		chainString = ethereumSepoliaString
 	case walletCommon.ArbitrumGoerli:
 		chainString = arbitrumGoerliString
 	case walletCommon.OptimismGoerli:
@@ -74,6 +77,7 @@ type DetailedNFT struct {
 	Name          string         `json:"name"`
 	Description   string         `json:"description"`
 	ImageURL      string         `json:"image_url"`
+	AnimationURL  string         `json:"animation_url"`
 	MetadataURL   string         `json:"metadata_url"`
 	Owners        []OwnerV2      `json:"owners"`
 	Traits        []TraitV2      `json:"traits"`
@@ -111,6 +115,28 @@ type TraitV2 struct {
 	TraitCount  int        `json:"trait_count"`
 	Order       string     `json:"order"`
 	Value       TraitValue `json:"value"`
+}
+
+type ContractData struct {
+	Address          common.Address `json:"address"`
+	Chain            string         `json:"chain"`
+	Collection       string         `json:"collection"`
+	ContractStandard string         `json:"contract_standard"`
+	Name             string         `json:"name"`
+}
+
+type ContractID struct {
+	Address common.Address `json:"address"`
+	Chain   string         `json:"chain"`
+}
+
+type CollectionData struct {
+	Collection  string         `json:"collection"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Owner       common.Address `json:"owner"`
+	ImageURL    string         `json:"image_url"`
+	Contracts   []ContractID   `json:"contracts"`
 }
 
 func (c *NFT) id(chainID walletCommon.ChainID) thirdparty.CollectibleUniqueID {
@@ -176,7 +202,7 @@ func (c *DetailedNFT) toCollectiblesData(chainID walletCommon.ChainID) thirdpart
 		Name:         c.Name,
 		Description:  c.Description,
 		ImageURL:     c.ImageURL,
-		AnimationURL: c.ImageURL,
+		AnimationURL: c.AnimationURL,
 		Traits:       openseaV2ToCollectibleTraits(c.Traits),
 		TokenURI:     c.MetadataURL,
 	}
@@ -187,4 +213,15 @@ func (c *DetailedNFT) toCommon(chainID walletCommon.ChainID) thirdparty.FullColl
 		CollectibleData: c.toCollectiblesData(chainID),
 		CollectionData:  nil,
 	}
+}
+
+func (c *CollectionData) toCommon(id thirdparty.ContractID) thirdparty.CollectionData {
+	ret := thirdparty.CollectionData{
+		ID:       id,
+		Provider: OpenseaV2ID,
+		Name:     c.Name,
+		Slug:     c.Collection,
+		ImageURL: c.ImageURL,
+	}
+	return ret
 }
