@@ -18,10 +18,11 @@ func TestActivityCenterPersistence(t *testing.T) {
 
 type ActivityCenterPersistenceTestSuite struct {
 	suite.Suite
+	idCounter int
 }
 
 func (s *ActivityCenterPersistenceTestSuite) SetupTest() {
-
+	s.idCounter = 0
 }
 
 func currentMilliseconds() uint64 {
@@ -36,7 +37,8 @@ func (s *ActivityCenterPersistenceTestSuite) createNotifications(p *sqlitePersis
 			notif.Timestamp = now
 		}
 		if len(notif.ID) == 0 {
-			notif.ID = types.HexBytes(strconv.Itoa(index))
+			s.idCounter++
+			notif.ID = types.HexBytes(strconv.Itoa(s.idCounter + index))
 		}
 		if notif.UpdatedAt == 0 {
 			notif.UpdatedAt = now
@@ -635,6 +637,7 @@ func (s *ActivityCenterPersistenceTestSuite) Test_ActiveContactRequestNotificati
 
 	notif, err = p.ActiveContactRequestNotification(contactID)
 	s.Require().NoError(err)
+	s.Require().NotNil(notif)
 	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, notif.Type)
 
 	// Test: In case there's more than one notification, return the most recent
