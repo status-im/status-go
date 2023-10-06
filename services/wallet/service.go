@@ -126,6 +126,7 @@ func NewService(
 	}
 
 	collectionDataProviders := []thirdparty.CollectionDataProvider{
+		openseaV2Client,
 		alchemyClient,
 	}
 

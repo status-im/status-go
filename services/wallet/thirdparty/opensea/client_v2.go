@@ -231,3 +231,79 @@ func (o *ClientV2) fetchDetailedAssets(uniqueIDs []thirdparty.CollectibleUniqueI
 
 	return assets, nil
 }
+
+func (o *ClientV2) fetchContractDataByContractID(id thirdparty.ContractID) (*ContractData, error) {
+	path := fmt.Sprintf("chain/%s/contract/%s", chainIDToChainString(id.ChainID), id.Address.String())
+	url, err := o.urlGetter(id.ChainID, path)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := o.client.doGetRequest(url, o.apiKey)
+	if err != nil {
+		o.connectionStatus.SetIsConnected(false)
+		return nil, err
+	}
+	o.connectionStatus.SetIsConnected(true)
+
+	// if Json is not returned there must be an error
+	if !json.Valid(body) {
+		return nil, fmt.Errorf("invalid json: %s", string(body))
+	}
+
+	contract := ContractData{}
+	err = json.Unmarshal(body, &contract)
+	if err != nil {
+		return nil, err
+	}
+
+	return &contract, nil
+}
+
+func (o *ClientV2) fetchCollectionDataBySlug(chainID walletCommon.ChainID, slug string) (*CollectionData, error) {
+	path := fmt.Sprintf("collections/%s", slug)
+	url, err := o.urlGetter(chainID, path)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := o.client.doGetRequest(url, o.apiKey)
+	if err != nil {
+		o.connectionStatus.SetIsConnected(false)
+		return nil, err
+	}
+	o.connectionStatus.SetIsConnected(true)
+
+	// if Json is not returned there must be an error
+	if !json.Valid(body) {
+		return nil, fmt.Errorf("invalid json: %s", string(body))
+	}
+
+	collection := CollectionData{}
+	err = json.Unmarshal(body, &collection)
+	if err != nil {
+		return nil, err
+	}
+
+	return &collection, nil
+}
+
+func (o *ClientV2) FetchCollectionsDataByContractID(contractIDs []thirdparty.ContractID) ([]thirdparty.CollectionData, error) {
+	ret := make([]thirdparty.CollectionData, 0, len(contractIDs))
+
+	for _, id := range contractIDs {
+		contractData, err := o.fetchContractDataByContractID(id)
+		if err != nil {
+			return nil, err
+		}
+
+		collectionData, err := o.fetchCollectionDataBySlug(id.ChainID, contractData.Collection)
+		if err != nil {
+			return nil, err
+		}
+
+		ret = append(ret, collectionData.toCommon(id))
+	}
+
+	return ret, nil
+}
