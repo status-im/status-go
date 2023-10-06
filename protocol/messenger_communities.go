@@ -2443,11 +2443,12 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, waitF
 		m.requestedCommunities[communityID] = nil
 	}
 
+	defer m.forgetCommunityRequest(communityID)
+
 	to := uint32(m.transport.GetCurrentTime() / 1000)
 	from := to - oneMonthInSeconds
 
 	_, err = m.performMailserverRequest(func() (*MessengerResponse, error) {
-
 		batch := MailserverBatch{From: from, To: to, Topics: []types.TopicType{filter.ContentTopic}}
 		m.logger.Info("Requesting historic")
 		err := m.processMailserverBatch(batch)
@@ -2461,43 +2462,25 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, waitF
 		return nil, nil
 	}
 
-	ctx := context.Background()
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	var community *communities.Community
 
-	fetching := true
-
-	for fetching {
+	for {
 		select {
 		case <-time.After(200 * time.Millisecond):
 			//send signal to client that message status updated
-			community, err = m.communitiesManager.GetByIDString(communityID)
+			community, err := m.communitiesManager.GetByIDString(communityID)
 			if err != nil {
 				return nil, err
 			}
-
 			if community != nil && community.Name() != "" && community.DescriptionText() != "" {
-				fetching = false
+				return community, nil
 			}
 
 		case <-ctx.Done():
-			fetching = false
+			return nil, fmt.Errorf("failed to request community info for id '%s' from mailserver: %w", communityID, ctx.Err())
 		}
 	}
-
-	if community == nil {
-		return nil, nil
-	}
-
-	//if there is no info helpful for client, we don't post it
-	if community.Name() == "" && community.DescriptionText() == "" {
-		return nil, nil
-	}
-
-	m.forgetCommunityRequest(communityID)
-
-	return community, nil
 }
 
 // RequestCommunityInfoFromMailserver installs filter for community and requests its details
