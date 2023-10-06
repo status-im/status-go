@@ -22,7 +22,6 @@ import (
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/connection"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
-	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
 
@@ -58,7 +57,6 @@ type Manager struct {
 	metadataProvider           thirdparty.CollectibleMetadataProvider
 	communityInfoProvider      thirdparty.CollectibleCommunityInfoProvider
 
-	opensea    *opensea.Client
 	httpClient *http.Client
 
 	collectiblesDataDB *CollectibleDataDB
@@ -75,7 +73,6 @@ func NewManager(
 	accountOwnershipProviders []thirdparty.CollectibleAccountOwnershipProvider,
 	collectibleDataProviders []thirdparty.CollectibleDataProvider,
 	collectionDataProviders []thirdparty.CollectionDataProvider,
-	opensea *opensea.Client,
 	feed *event.Feed) *Manager {
 	hystrix.ConfigureCommand(hystrixContractOwnershipClientName, hystrix.CommandConfig{
 		Timeout:               10000,
@@ -132,7 +129,6 @@ func NewManager(
 		collectibleDataProviders:   collectibleDataProviders,
 		collectionDataProviders:    collectionDataProviders,
 		collectibleProviders:       collectibleProviders,
-		opensea:                    opensea,
 		httpClient: &http.Client{
 			Timeout: requestTimeout,
 		},
@@ -206,28 +202,6 @@ func (o *Manager) SetMetadataProvider(metadataProvider thirdparty.CollectibleMet
 
 func (o *Manager) SetCommunityInfoProvider(communityInfoProvider thirdparty.CollectibleCommunityInfoProvider) {
 	o.communityInfoProvider = communityInfoProvider
-}
-
-func (o *Manager) FetchAllCollectionsByOwner(chainID walletCommon.ChainID, owner common.Address) ([]opensea.OwnedCollection, error) {
-	return o.opensea.FetchAllCollectionsByOwner(chainID, owner)
-}
-
-func (o *Manager) FetchAllOpenseaAssetsByOwnerAndCollection(chainID walletCommon.ChainID, owner common.Address, collectionSlug string, cursor string, limit int) (*opensea.AssetContainer, error) {
-	return o.opensea.FetchAllOpenseaAssetsByOwnerAndCollection(chainID, owner, collectionSlug, cursor, limit)
-}
-
-func (o *Manager) FetchAllAssetsByOwnerAndCollection(chainID walletCommon.ChainID, owner common.Address, collectionSlug string, cursor string, limit int) (*thirdparty.FullCollectibleDataContainer, error) {
-	assetContainer, err := o.opensea.FetchAllAssetsByOwnerAndCollection(chainID, owner, collectionSlug, cursor, limit)
-	if err != nil {
-		return nil, err
-	}
-
-	err = o.processFullCollectibleData(assetContainer.Items)
-	if err != nil {
-		return nil, err
-	}
-
-	return assetContainer, nil
 }
 
 // Need to combine different providers to support all needed ChainIDs

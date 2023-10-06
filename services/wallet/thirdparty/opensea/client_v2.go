@@ -135,7 +135,7 @@ func (o *ClientV2) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.Colle
 func (o *ClientV2) fetchAssets(chainID walletCommon.ChainID, pathParams []string, queryParams url.Values, limit int, cursor string) (*thirdparty.FullCollectibleDataContainer, error) {
 	assets := new(thirdparty.FullCollectibleDataContainer)
 
-	tmpLimit := AssetLimit
+	tmpLimit := assetLimitV2
 	if limit > thirdparty.FetchNoLimit && limit < tmpLimit {
 		tmpLimit = limit
 	}
