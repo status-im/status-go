@@ -1417,6 +1417,11 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 	}
 	community.config.EventsData = nil
 
+	// Set Joined if we are part of the member list
+	if !community.Joined() && community.hasMember(&m.identity.PublicKey) {
+		changes.ShouldMemberJoin = true
+	}
+
 	err = m.persistence.SaveCommunity(community)
 	if err != nil {
 		return nil, err
