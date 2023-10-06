@@ -25,7 +25,7 @@ func NewStatusUnfurler(URL string, messenger *Messenger, logger *zap.Logger) *St
 	}
 }
 
-func buildThumbnail(image *images.IdentityImage, thumbnail *common.LinkPreviewThumbnail) error {
+func updateThumbnail(image *images.IdentityImage, thumbnail *common.LinkPreviewThumbnail) error {
 	if image.IsEmpty() {
 		return nil
 	}
@@ -66,7 +66,7 @@ func (u *StatusUnfurler) buildContactData(publicKey string) (*common.StatusConta
 	c.Description = contact.Bio
 
 	if image, ok := contact.Images[images.SmallDimName]; ok {
-		if err = buildThumbnail(&image, &c.Icon); err != nil {
+		if err = updateThumbnail(&image, &c.Icon); err != nil {
 			return nil, fmt.Errorf("failed to set thumbnail: %w", err)
 		}
 	}
@@ -76,13 +76,13 @@ func (u *StatusUnfurler) buildContactData(publicKey string) (*common.StatusConta
 
 func (u *StatusUnfurler) fillCommunityImages(community *communities.Community, icon *common.LinkPreviewThumbnail, banner *common.LinkPreviewThumbnail) error {
 	if image, ok := community.Images()[images.SmallDimName]; ok {
-		if err := buildThumbnail(&images.IdentityImage{Payload: image.Payload}, icon); err != nil {
+		if err := updateThumbnail(&images.IdentityImage{Payload: image.Payload}, icon); err != nil {
 			u.logger.Warn("unfurling status link: failed to set community thumbnail", zap.Error(err))
 		}
 	}
 
 	if image, ok := community.Images()[images.BannerIdentityName]; ok {
-		if err := buildThumbnail(&images.IdentityImage{Payload: image.Payload}, banner); err != nil {
+		if err := updateThumbnail(&images.IdentityImage{Payload: image.Payload}, banner); err != nil {
 			u.logger.Warn("unfurling status link: failed to set community banner", zap.Error(err))
 		}
 	}
