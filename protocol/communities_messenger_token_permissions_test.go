@@ -22,11 +22,11 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/waku"
 )
 
 const testChainID1 = 1
 
+const testENRBootstrap = "enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"
 const ownerPassword = "123456"
 const alicePassword = "qwerty"
 const bobPassword = "bob123"
@@ -108,7 +108,7 @@ func (tckd *TestCommunitiesKeyDistributor) waitOnKeyDistribution(condition func(
 }
 
 func TestMessengerCommunitiesTokenPermissionsSuite(t *testing.T) {
-	//suite.Run(t, new(MessengerCommunitiesTokenPermissionsSuite))
+	suite.Run(t, new(MessengerCommunitiesTokenPermissionsSuite))
 }
 
 type MessengerCommunitiesTokenPermissionsSuite struct {
@@ -116,9 +116,11 @@ type MessengerCommunitiesTokenPermissionsSuite struct {
 	owner *Messenger
 	bob   *Messenger
 	alice *Messenger
-	// If one wants to send messages between different instances of Messenger,
-	// a single Waku service should be shared.
-	shh    types.Waku
+
+	ownerWaku types.Waku
+	bobWaku   types.Waku
+	aliceWaku types.Waku
+
 	logger *zap.Logger
 
 	mockedBalances          map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big // chainID, account, token, balance
@@ -128,15 +130,20 @@ type MessengerCommunitiesTokenPermissionsSuite struct {
 func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	config := waku.DefaultConfig
-	config.MinimumAcceptedPoW = 0
-	shh := waku.New(&config, s.logger)
-	s.shh = gethbridge.NewGethWakuWrapper(shh)
-	s.Require().NoError(shh.Start())
+	wakuNodes := createWakuNetwork(&s.Suite, s.logger, []string{"owner", "bob", "alice"})
 
-	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress})
-	s.bob = s.newMessenger(bobPassword, []string{bobAddress})
-	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2})
+	ownerLogger := s.logger.With(zap.String("name", "owner"))
+	s.ownerWaku = wakuNodes[0]
+	s.owner = s.newMessenger(ownerPassword, []string{ownerAddress}, s.ownerWaku, ownerLogger)
+
+	bobLogger := s.logger.With(zap.String("name", "bob"))
+	s.bobWaku = wakuNodes[1]
+	s.bob = s.newMessenger(bobPassword, []string{bobAddress}, s.bobWaku, bobLogger)
+
+	aliceLogger := s.logger.With(zap.String("name", "alice"))
+	s.aliceWaku = wakuNodes[2]
+	s.alice = s.newMessenger(alicePassword, []string{aliceAddress1, aliceAddress2}, s.aliceWaku, aliceLogger)
+
 	_, err := s.owner.Start()
 	s.Require().NoError(err)
 	_, err = s.bob.Start()
@@ -149,17 +156,34 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 	s.mockedBalances[testChainID1][gethcommon.HexToAddress(aliceAddress1)] = make(map[gethcommon.Address]*hexutil.Big)
 	s.mockedBalances[testChainID1][gethcommon.HexToAddress(aliceAddress2)] = make(map[gethcommon.Address]*hexutil.Big)
 	s.mockedBalances[testChainID1][gethcommon.HexToAddress(bobAddress)] = make(map[gethcommon.Address]*hexutil.Big)
+
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TearDownTest() {
-	s.Require().NoError(s.owner.Shutdown())
-	s.Require().NoError(s.bob.Shutdown())
-	s.Require().NoError(s.alice.Shutdown())
+	if s.owner != nil {
+		s.Require().NoError(s.owner.Shutdown())
+	}
+	if s.ownerWaku != nil {
+		s.Require().NoError(gethbridge.GetGethWakuV2From(s.ownerWaku).Stop())
+	}
+
+	if s.bob != nil {
+		s.Require().NoError(s.bob.Shutdown())
+	}
+	if s.bobWaku != nil {
+		s.Require().NoError(gethbridge.GetGethWakuV2From(s.bobWaku).Stop())
+	}
+	if s.alice != nil {
+		s.Require().NoError(s.alice.Shutdown())
+	}
+	if s.aliceWaku != nil {
+		s.Require().NoError(gethbridge.GetGethWakuV2From(s.aliceWaku).Stop())
+	}
 	_ = s.logger.Sync()
 }
 
-func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string) *Messenger {
-	return newMessenger(&s.Suite, s.shh, s.logger, password, walletAddresses, &s.mockedBalances, s.collectiblesServiceMock)
+func (s *MessengerCommunitiesTokenPermissionsSuite) newMessenger(password string, walletAddresses []string, waku types.Waku, logger *zap.Logger) *Messenger {
+	return newMessenger(&s.Suite, waku, logger, password, walletAddresses, &s.mockedBalances, s.collectiblesServiceMock)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) joinCommunity(community *communities.Community, user *Messenger, password string, addresses []string) {
