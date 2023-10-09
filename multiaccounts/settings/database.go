@@ -16,6 +16,8 @@ import (
 	"github.com/status-im/status-go/sqlite"
 )
 
+type Notifier func(SettingField, interface{})
+
 var (
 	// dbInstances holds a map of singleton instances of Database
 	dbInstances map[string]*Database
@@ -28,6 +30,7 @@ var (
 type Database struct {
 	db        *sql.DB
 	SyncQueue chan SyncSettingField
+	notifier  Notifier
 }
 
 // MakeNewDB ensures that a singleton instance of Database is returned per sqlite db file
@@ -68,6 +71,11 @@ func MakeNewDB(db *sql.DB) (*Database, error) {
 	}
 
 	return dbInstances[filename], nil
+}
+
+// Set a notifier for setting changes
+func (db *Database) SetSettingsNotifier(n Notifier) {
+	db.notifier = n
 }
 
 // TODO remove photoPath from settings
@@ -196,7 +204,16 @@ func (db *Database) saveSetting(setting SettingField, value interface{}) error {
 	}
 
 	_, err = update.Exec(value)
-	return err
+
+	if err != nil {
+		return err
+	}
+
+	if db.notifier != nil {
+		db.notifier(setting, value)
+	}
+
+	return nil
 }
 
 func (db *Database) parseSaveAndSyncSetting(sf SettingField, value interface{}) (err error) {

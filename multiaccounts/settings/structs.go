@@ -109,6 +109,10 @@ func (s SettingField) CanSync(source SyncSource) bool {
 	}
 }
 
+func (s SettingField) Equals(other SettingField) bool {
+	return s.reactFieldName == other.reactFieldName
+}
+
 // Settings represents the entire setting row stored in the application db
 type Settings struct {
 	// required

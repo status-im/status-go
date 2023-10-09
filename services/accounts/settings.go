@@ -29,7 +29,12 @@ func (api *SettingsAPI) SaveSetting(ctx context.Context, typ string, val interfa
 		return nil
 	}
 
-	return api.db.SaveSetting(typ, val)
+	err := api.db.SaveSetting(typ, val)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (api *SettingsAPI) GetSettings(ctx context.Context) (settings.Settings, error) {
