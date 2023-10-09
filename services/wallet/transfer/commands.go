@@ -33,6 +33,9 @@ const (
 	// EventNonArchivalNodeDetected emitted when a connection to a non archival node is detected
 	EventNonArchivalNodeDetected walletevent.EventType = "non-archival-node-detected"
 
+	// EventInternalERC721TransferDetected emitted when ERC721 transfer is detected
+	EventInternalERC721TransferDetected walletevent.EventType = walletevent.InternalEventTypePrefix + "erc721-transfer-detected"
+
 	numberOfBlocksCheckedPerIteration = 40
 	noBlockLimit                      = 0
 )
@@ -432,6 +435,7 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 			c.fetchedTransfers = append(c.fetchedTransfers, allTransfers...)
 
 			c.notifyOfNewTransfers(blockNum, allTransfers)
+			c.notifyOfNewERC721Transfers(allTransfers)
 
 			log.Debug("transfersCommand block end", "chain", c.chainClient.NetworkID(), "address", c.address,
 				"block", blockNum, "tranfers.len", len(allTransfers), "fetchedTransfers.len", len(c.fetchedTransfers))
@@ -616,6 +620,28 @@ func (c *transfersCommand) notifyOfNewTransfers(blockNum *big.Int, transfers []T
 				Accounts:    []common.Address{c.address},
 				ChainID:     c.chainClient.NetworkID(),
 				BlockNumber: blockNum,
+			})
+		}
+	}
+}
+
+func (c *transfersCommand) notifyOfNewERC721Transfers(transfers []Transfer) {
+	if c.feed != nil {
+		// Internal event for ERC721 transfers
+		latestERC721TransferTimestamp := uint64(0)
+		for _, transfer := range transfers {
+			if transfer.Type == w_common.Erc721Transfer {
+				if transfer.Timestamp > latestERC721TransferTimestamp {
+					latestERC721TransferTimestamp = transfer.Timestamp
+				}
+			}
+		}
+		if latestERC721TransferTimestamp > 0 {
+			c.feed.Send(walletevent.Event{
+				Type:     EventInternalERC721TransferDetected,
+				Accounts: []common.Address{c.address},
+				ChainID:  c.chainClient.NetworkID(),
+				At:       int64(latestERC721TransferTimestamp),
 			})
 		}
 	}

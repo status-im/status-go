@@ -16,8 +16,18 @@ import (
 )
 
 const (
-	fetchLimit                     = 50 // Limit number of collectibles we fetch per provider call
-	accountOwnershipUpdateInterval = 30 * time.Minute
+	fetchLimit                          = 50 // Limit number of collectibles we fetch per provider call
+	accountOwnershipUpdateInterval      = 30 * time.Minute
+	accountOwnershipUpdateDelayInterval = 30 * time.Second
+)
+
+type OwnershipState = int
+
+const (
+	OwnershipStateIdle OwnershipState = iota + 1
+	OwnershipStateDelayed
+	OwnershipStateUpdating
+	OwnershipStateError
 )
 
 type periodicRefreshOwnedCollectiblesCommand struct {
@@ -41,6 +51,17 @@ func newPeriodicRefreshOwnedCollectiblesCommand(manager *Manager, ownershipDB *O
 	}
 	ret.state.Store(OwnershipStateIdle)
 	return ret
+}
+
+func (c *periodicRefreshOwnedCollectiblesCommand) DelayedCommand() async.Command {
+	return async.SingleShotCommand{
+		Interval: accountOwnershipUpdateDelayInterval,
+		Init: func(ctx context.Context) (err error) {
+			c.state.Store(OwnershipStateDelayed)
+			return nil
+		},
+		Runable: c.Command(),
+	}.Run
 }
 
 func (c *periodicRefreshOwnedCollectiblesCommand) Command() async.Command {
