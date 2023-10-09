@@ -1,4 +1,4 @@
-package walletaccounts
+package accountsevent
 
 import (
 	"context"
@@ -7,11 +7,10 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/services/accounts/accountsevent"
 	"github.com/status-im/status-go/services/wallet/async"
 )
 
-type AccountsChangeCb func(changedAddresses []common.Address, eventType accountsevent.EventType, currentAddresses []common.Address)
+type AccountsChangeCb func(changedAddresses []common.Address, eventType EventType, currentAddresses []common.Address)
 
 // Watcher executes a given callback whenever an account gets added/removed
 type Watcher struct {
@@ -48,7 +47,7 @@ func (w *Watcher) Stop() {
 	}
 }
 
-func onAccountsChange(accountsDB *accounts.Database, callback AccountsChangeCb, changedAddresses []common.Address, eventType accountsevent.EventType) {
+func onAccountsChange(accountsDB *accounts.Database, callback AccountsChangeCb, changedAddresses []common.Address, eventType EventType) {
 	currentEthAddresses, err := accountsDB.GetWalletAddresses()
 
 	if err != nil {
@@ -67,7 +66,7 @@ func onAccountsChange(accountsDB *accounts.Database, callback AccountsChangeCb, 
 }
 
 func watch(ctx context.Context, accountsDB *accounts.Database, accountFeed *event.Feed, callback AccountsChangeCb) error {
-	ch := make(chan accountsevent.Event, 1)
+	ch := make(chan Event, 1)
 	sub := accountFeed.Subscribe(ch)
 	defer sub.Unsubscribe()
 

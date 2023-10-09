@@ -13,7 +13,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
-	walletAccounts "github.com/status-im/status-go/services/wallet/accounts"
 	"github.com/status-im/status-go/services/wallet/async"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/transfer"
@@ -43,13 +42,19 @@ type Controller struct {
 	commands            commandPerAddressAndChainID
 	timers              timerPerAddressAndChainID
 	group               *async.Group
-	accountsWatcher     *walletAccounts.Watcher
+	accountsWatcher     *accountsevent.Watcher
 	walletEventsWatcher *walletevent.Watcher
 
 	commandsLock sync.RWMutex
 }
 
-func NewController(db *sql.DB, walletFeed *event.Feed, accountsDB *accounts.Database, accountsFeed *event.Feed, networkManager *network.Manager, manager *Manager) *Controller {
+func NewController(
+	db *sql.DB,
+	walletFeed *event.Feed,
+	accountsDB *accounts.Database,
+	accountsFeed *event.Feed,
+	networkManager *network.Manager,
+	manager *Manager) *Controller {
 	return &Controller{
 		manager:        manager,
 		ownershipDB:    NewOwnershipDB(db),
@@ -285,7 +290,7 @@ func (c *Controller) startAccountsWatcher() {
 		}
 	}
 
-	c.accountsWatcher = walletAccounts.NewWatcher(c.accountsDB, c.accountsFeed, accountChangeCb)
+	c.accountsWatcher = accountsevent.NewWatcher(c.accountsDB, c.accountsFeed, accountChangeCb)
 
 	c.accountsWatcher.Start()
 }
