@@ -23,11 +23,11 @@ const (
 	ProfilePicturesShowToNone
 )
 
-type UrlUnfurlingModeType int
+type URLUnfurlingModeType int
 
 const (
-	UrlUnfurlingAlwaysAsk UrlUnfurlingModeType = iota + 1
-	UrlUnfurlingEnableAll
-	UrlUnfurlingDisableAll
-	UrlUnfurlingSpecifyForSite // TODO: post-mvp
+	URLUnfurlingAlwaysAsk URLUnfurlingModeType = iota + 1
+	URLUnfurlingEnableAll
+	URLUnfurlingDisableAll
+	URLUnfurlingSpecifyForSite // TODO: post-mvp
 )

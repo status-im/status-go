@@ -437,7 +437,7 @@ var (
 		dBColumnName:   "profile_migration_needed",
 		valueHandler:   BoolHandler,
 	}
-	UrlUnfurlingMode = SettingField{
+	URLUnfurlingMode = SettingField{
 		reactFieldName: "url-unfurling-mode",
 		dBColumnName:   "url_unfurling_mode",
 		syncProtobufFactory: &SyncProtobufFactory{
@@ -517,7 +517,7 @@ var (
 		WebviewAllowPermissionRequests,
 		ProfileMigrationNeeded,
 		IsSepoliaEnabled,
-		UrlUnfurlingMode,
+		URLUnfurlingMode,
 	}
 )
 

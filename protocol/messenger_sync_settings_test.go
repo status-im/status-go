@@ -149,7 +149,7 @@ func (s *MessengerSyncSettingsSuite) newMessengerWithOptions(shh types.Waku, pri
 		LinkPreviewRequestEnabled: true,
 		SendStatusUpdates:         true,
 		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900"),
-		UrlUnfurlingMode:          settings.UrlUnfurlingAlwaysAsk,
+		URLUnfurlingMode:          settings.URLUnfurlingAlwaysAsk,
 	}
 
 	err = m.settings.CreateSettings(setting, config)
@@ -238,14 +238,14 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 	s.Require().NoError(err)
 	s.Require().Exactly(settings.ProfilePicturesShowToContactsOnly, as.ProfilePicturesShowTo)
 	s.Require().Exactly(settings.ProfilePicturesVisibilityContactsOnly, as.ProfilePicturesVisibility)
-	s.Require().Exactly(settings.UrlUnfurlingAlwaysAsk, as.UrlUnfurlingMode)
+	s.Require().Exactly(settings.URLUnfurlingAlwaysAsk, as.URLUnfurlingMode)
 
 	// Check alice 2 settings values
 	aos, err := s.alice2.settings.GetSettings()
 	s.Require().NoError(err)
 	s.Require().Exactly(settings.ProfilePicturesShowToContactsOnly, aos.ProfilePicturesShowTo)
 	s.Require().Exactly(settings.ProfilePicturesVisibilityContactsOnly, aos.ProfilePicturesVisibility)
-	s.Require().Exactly(settings.UrlUnfurlingAlwaysAsk, as.UrlUnfurlingMode)
+	s.Require().Exactly(settings.URLUnfurlingAlwaysAsk, as.URLUnfurlingMode)
 
 	aos = s.syncSettingAndCheck(s.alice, s.alice2, settings.ProfilePicturesVisibility, settings.ProfilePicturesVisibilityEveryone)
 	s.Require().Equal(settings.ProfilePicturesVisibilityEveryone, aos.ProfilePicturesVisibility)
@@ -253,8 +253,8 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 	as = s.syncSettingAndCheck(s.alice2, s.alice, settings.ProfilePicturesShowTo, settings.ProfilePicturesShowToEveryone)
 	s.Require().Exactly(settings.ProfilePicturesShowToEveryone, as.ProfilePicturesShowTo)
 
-	aos = s.syncSettingAndCheck(s.alice, s.alice2, settings.UrlUnfurlingMode, settings.UrlUnfurlingDisableAll)
-	s.Require().Exactly(settings.UrlUnfurlingDisableAll, aos.UrlUnfurlingMode)
+	aos = s.syncSettingAndCheck(s.alice, s.alice2, settings.URLUnfurlingMode, settings.URLUnfurlingDisableAll)
+	s.Require().Exactly(settings.URLUnfurlingDisableAll, aos.URLUnfurlingMode)
 }
 
 func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {

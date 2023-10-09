@@ -53,7 +53,7 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 	s.KeyUID = generatedAccountInfo.KeyUID
 	s.Address = types.HexToAddress(generatedAccountInfo.Address)
 	s.WalletRootAddress = types.HexToAddress(derivedAddresses[pathWalletRoot].Address)
-	s.UrlUnfurlingMode = settings.UrlUnfurlingAlwaysAsk
+	s.URLUnfurlingMode = settings.URLUnfurlingAlwaysAsk
 
 	// Set chat key & name
 	name, err := alias.GenerateFromPublicKeyString(chatKeyString)

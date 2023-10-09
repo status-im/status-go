@@ -8,13 +8,13 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/status-im/markdown"
 	"github.com/status-im/status-go/multiaccounts/settings"
 
 	"go.uber.org/zap"
 	"golang.org/x/net/publicsuffix"
 
-	"github.com/status-im/markdown"
-
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 )
 
@@ -146,19 +146,19 @@ func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (*UnfurlU
 	}
 
 	// We use switch case, though there's most cases are empty for code clarity.
-	switch s.UrlUnfurlingMode {
-	case settings.UrlUnfurlingDisableAll:
-		return nil, fmt.Errorf("url unfurling is disabled") // WARNING: Is this an error?
-	case settings.UrlUnfurlingEnableAll:
+	switch s.URLUnfurlingMode {
+	case settings.URLUnfurlingDisableAll:
+		return nil, fmt.Errorf("url unfurling is disabled")
+	case settings.URLUnfurlingEnableAll:
 		break
-	case settings.UrlUnfurlingAlwaysAsk:
+	case settings.URLUnfurlingAlwaysAsk:
 		// This mode should be handled on the app side
-		// and is considered as equal to UrlUnfurlingEnableAll in status-go.
+		// and is considered as equal to URLUnfurlingEnableAll in status-go.
 		break
-	case settings.UrlUnfurlingSpecifyForSite:
+	case settings.URLUnfurlingSpecifyForSite:
 		// TODO: implement filtering post-mvp
 	default:
-		return nil, fmt.Errorf("invalid url unfurling mode setting: %d", s.UrlUnfurlingMode)
+		return nil, fmt.Errorf("invalid url unfurling mode setting: %d", s.URLUnfurlingMode)
 	}
 
 	// Unfurl in a loop

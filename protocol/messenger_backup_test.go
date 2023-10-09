@@ -281,7 +281,7 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 		bob1Mnemonic                  = ""
 		bob1MnemonicRemoved           = true
 		bob1PreferredName             = "talent"
-		bob1UrlUnfUnfurlingMode       = settings.UrlUnfurlingEnableAll
+		bob1UrlUnfUnfurlingMode       = settings.URLUnfurlingEnableAll
 	)
 
 	// Create bob1 and set fields which are supposed to be backed up to/fetched from waku
@@ -302,7 +302,7 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	s.Require().NoError(err)
 	err = bob1.settings.SaveSettingField(settings.PreferredName, bob1PreferredName)
 	s.Require().NoError(err)
-	err = bob1.settings.SaveSettingField(settings.UrlUnfurlingMode, bob1UrlUnfUnfurlingMode)
+	err = bob1.settings.SaveSettingField(settings.URLUnfurlingMode, bob1UrlUnfUnfurlingMode)
 	s.Require().NoError(err)
 
 	// Create bob2
@@ -340,7 +340,7 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	storedPreferredName, err := bob1.settings.GetPreferredUsername()
 	s.NoError(err)
 	s.Require().Equal(bob1PreferredName, storedPreferredName)
-	storedBob1UrlUnfurlingMode, err := bob1.settings.UrlUnfurlingMode()
+	storedBob1UrlUnfurlingMode, err := bob1.settings.URLUnfurlingMode()
 	s.NoError(err)
 	s.Require().Equal(int64(bob1UrlUnfUnfurlingMode), storedBob1UrlUnfurlingMode)
 
@@ -369,9 +369,9 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	storedBob2PreferredName, err := bob2.settings.GetPreferredUsername()
 	s.NoError(err)
 	s.Require().Equal("", storedBob2PreferredName)
-	storedBob2UrlUnfurlingMode, err := bob2.settings.UrlUnfurlingMode()
+	storedBob2UrlUnfurlingMode, err := bob2.settings.URLUnfurlingMode()
 	s.NoError(err)
-	s.Require().Equal(int64(settings.UrlUnfurlingAlwaysAsk), storedBob2UrlUnfurlingMode)
+	s.Require().Equal(int64(settings.URLUnfurlingAlwaysAsk), storedBob2UrlUnfurlingMode)
 
 	// Backup
 	clock, err := bob1.BackupData(context.Background())
@@ -413,7 +413,7 @@ func (s *MessengerBackupSuite) TestBackupSettings() {
 	s.NoError(err)
 	s.Require().Equal(bob1PreferredName, storedBob2PreferredName)
 	s.Require().Equal(bob1PreferredName, bob2.account.Name)
-	storedBob2UrlUnfurlingMode, err = bob2.settings.UrlUnfurlingMode()
+	storedBob2UrlUnfurlingMode, err = bob2.settings.URLUnfurlingMode()
 	s.NoError(err)
 	s.Require().Equal(storedBob1UrlUnfurlingMode, storedBob2UrlUnfurlingMode)
 

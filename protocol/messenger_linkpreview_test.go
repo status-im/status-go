@@ -537,7 +537,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
 	// NOTE: on status-go side `AlwaysAsk` == `EnableAll`, "asking" should be processed by the app
 
 	requestsCount = 0
-	err := s.m.settings.SaveSettingField(settings.UrlUnfurlingMode, settings.UrlUnfurlingAlwaysAsk)
+	err := s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingAlwaysAsk)
 	s.Require().NoError(err)
 
 	linkPreviews, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
@@ -547,7 +547,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
 
 	// Test `EnableAll`
 	requestsCount = 0
-	err = s.m.settings.SaveSettingField(settings.UrlUnfurlingMode, settings.UrlUnfurlingEnableAll)
+	err = s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingEnableAll)
 	s.Require().NoError(err)
 
 	linkPreviews, err = s.m.UnfurlURLs(&stubbedClient, []string{u})
@@ -556,7 +556,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
 
 	// Test `DisableAll`
 	requestsCount = 0
-	err = s.m.settings.SaveSettingField(settings.UrlUnfurlingMode, settings.UrlUnfurlingDisableAll)
+	err = s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingDisableAll)
 	s.Require().NoError(err)
 
 	linkPreviews, err = s.m.UnfurlURLs(&stubbedClient, []string{u})

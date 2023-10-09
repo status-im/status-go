@@ -151,7 +151,7 @@ INSERT INTO settings (
 		s.CurrentUserStatus,
 		s.ProfilePicturesShowTo,
 		s.ProfilePicturesVisibility,
-		s.UrlUnfurlingMode,
+		s.URLUnfurlingMode,
 	)
 	if err != nil {
 		return err
@@ -411,7 +411,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.MutualContactEnabled,
 		&s.ProfileMigrationNeeded,
 		&s.IsSepoliaEnabled,
-		&s.UrlUnfurlingMode,
+		&s.URLUnfurlingMode,
 	)
 
 	return s, err
@@ -701,8 +701,8 @@ func (db *Database) ProfileMigrationNeeded() (result bool, err error) {
 	return result, err
 }
 
-func (db *Database) UrlUnfurlingMode() (result int64, err error) {
-	err = db.makeSelectRow(UrlUnfurlingMode).Scan(&result)
+func (db *Database) URLUnfurlingMode() (result int64, err error) {
+	err = db.makeSelectRow(URLUnfurlingMode).Scan(&result)
 	if err == sql.ErrNoRows {
 		return result, nil
 	}
