@@ -154,13 +154,16 @@ func (preview *StatusLinkPreview) validateForProto() error {
 		return fmt.Errorf("url can't be empty")
 	}
 
-	// At least and only one of Contact/Community/Channel can be present in the preview
-	if preview.Contact != nil && preview.Community != nil ||
-		preview.Community != nil && preview.Channel != nil ||
-		preview.Channel != nil && preview.Contact != nil {
-		return fmt.Errorf("several of contact/community/channel are set at the same time")
+	// At least and only one of Contact/Community/Channel should be present in the preview
+	if preview.Contact != nil && preview.Community != nil {
+		return fmt.Errorf("both contact and community are set at the same time")
 	}
-
+	if preview.Community != nil && preview.Channel != nil {
+		return fmt.Errorf("both community and channel are set at the same time")
+	}
+	if preview.Channel != nil && preview.Contact != nil {
+		return fmt.Errorf("both contact and channel are set at the same time")
+	}
 	if preview.Contact == nil && preview.Community == nil && preview.Channel == nil {
 		return fmt.Errorf("none of contact/community/channel are set")
 	}
