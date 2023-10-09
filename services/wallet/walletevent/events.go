@@ -2,12 +2,22 @@ package walletevent
 
 import (
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 )
 
 // EventType type for event types.
 type EventType string
+
+// EventType prefix to be used for internal events.
+// These events are not forwarded to the client, they are only used
+// within status-go.
+const InternalEventTypePrefix = "INT-"
+
+func (t EventType) IsInternal() bool {
+	return strings.HasPrefix(string(t), InternalEventTypePrefix)
+}
 
 // Event is a type for transfer events.
 type Event struct {

@@ -12,6 +12,31 @@ type Commander interface {
 	Command() Command
 }
 
+// SingleShotCommand runs once.
+type SingleShotCommand struct {
+	Interval time.Duration
+	Init     func(context.Context) error
+	Runable  func(context.Context) error
+}
+
+func (c SingleShotCommand) Run(ctx context.Context) error {
+	timer := time.NewTimer(c.Interval)
+	if c.Init != nil {
+		err := c.Init(ctx)
+		if err != nil {
+			return err
+		}
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+			_ = c.Runable(ctx)
+		}
+	}
+}
+
 // FiniteCommand terminates when error is nil.
 type FiniteCommand struct {
 	Interval time.Duration

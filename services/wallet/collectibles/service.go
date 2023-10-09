@@ -14,8 +14,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/rpc/network"
 
-	"github.com/status-im/status-go/services/accounts/accountsevent"
-	walletaccounts "github.com/status-im/status-go/services/wallet/accounts"
 	"github.com/status-im/status-go/services/wallet/async"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -44,35 +42,21 @@ var (
 	}
 )
 
-type commandPerChainID = map[walletCommon.ChainID]*periodicRefreshOwnedCollectiblesCommand
-type commandPerAddressAndChainID = map[common.Address]commandPerChainID
-
 type Service struct {
-	manager      *Manager
-	ownershipDB  *OwnershipDB
-	walletFeed   *event.Feed
-	accountsDB   *accounts.Database
-	accountsFeed *event.Feed
-
-	networkManager *network.Manager
-	cancelFn       context.CancelFunc
-
-	commands        commandPerAddressAndChainID
-	group           *async.Group
-	scheduler       *async.MultiClientScheduler
-	accountsWatcher *walletaccounts.Watcher
+	manager     *Manager
+	controller  *Controller
+	ownershipDB *OwnershipDB
+	walletFeed  *event.Feed
+	scheduler   *async.MultiClientScheduler
 }
 
 func NewService(db *sql.DB, walletFeed *event.Feed, accountsDB *accounts.Database, accountsFeed *event.Feed, networkManager *network.Manager, manager *Manager) *Service {
 	return &Service{
-		manager:        manager,
-		ownershipDB:    NewOwnershipDB(db),
-		walletFeed:     walletFeed,
-		accountsDB:     accountsDB,
-		accountsFeed:   accountsFeed,
-		networkManager: networkManager,
-		commands:       make(commandPerAddressAndChainID),
-		scheduler:      async.NewMultiClientScheduler(),
+		manager:     manager,
+		controller:  NewController(db, walletFeed, accountsDB, accountsFeed, networkManager, manager),
+		ownershipDB: NewOwnershipDB(db),
+		walletFeed:  walletFeed,
+		scheduler:   async.NewMultiClientScheduler(),
 	}
 }
 
@@ -82,14 +66,6 @@ const (
 	ErrorCodeSuccess ErrorCode = iota + 1
 	ErrorCodeTaskCanceled
 	ErrorCodeFailed
-)
-
-type OwnershipState = int
-
-const (
-	OwnershipStateIdle OwnershipState = iota + 1
-	OwnershipStateUpdating
-	OwnershipStateError
 )
 
 type OwnershipStatus struct {
@@ -189,160 +165,15 @@ func (s *Service) GetCollectiblesDetailsAsync(requestID int32, uniqueIDs []third
 }
 
 func (s *Service) RefetchOwnedCollectibles() {
-	s.stopPeriodicalOwnershipFetch()
-	s.manager.ResetConnectionStatus()
-	_ = s.startPeriodicalOwnershipFetch()
-}
-
-// Starts periodical fetching for the all wallet addresses and all chains
-func (s *Service) startPeriodicalOwnershipFetch() error {
-	if s.group != nil {
-		return nil
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	s.cancelFn = cancel
-
-	s.group = async.NewGroup(ctx)
-
-	addresses, err := s.accountsDB.GetWalletAddresses()
-	if err != nil {
-		return err
-	}
-
-	for _, addr := range addresses {
-		err := s.startPeriodicalOwnershipFetchForAccount(common.Address(addr))
-		if err != nil {
-			log.Error("Error starting periodical collectibles fetch for accpunt", "address", addr, "error", err)
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (s *Service) stopPeriodicalOwnershipFetch() {
-	if s.cancelFn != nil {
-		s.cancelFn()
-		s.cancelFn = nil
-	}
-	if s.group != nil {
-		s.group.Stop()
-		s.group.Wait()
-		s.group = nil
-		s.commands = make(commandPerAddressAndChainID)
-	}
-}
-
-// Starts (or restarts) periodical fetching for the given account address for all chains
-func (s *Service) startPeriodicalOwnershipFetchForAccount(address common.Address) error {
-	if s.group == nil {
-		return errors.New("periodical fetch group not initialized")
-	}
-
-	networks, err := s.networkManager.Get(false)
-	if err != nil {
-		return err
-	}
-
-	areTestNetworksEnabled, err := s.accountsDB.GetTestNetworksEnabled()
-	if err != nil {
-		return err
-	}
-
-	if _, ok := s.commands[address]; ok {
-		for chainID, command := range s.commands[address] {
-			command.Stop()
-			delete(s.commands[address], chainID)
-		}
-	}
-
-	s.commands[address] = make(commandPerChainID)
-
-	for _, network := range networks {
-		if network.IsTest != areTestNetworksEnabled {
-			continue
-		}
-		chainID := walletCommon.ChainID(network.ChainID)
-
-		command := newPeriodicRefreshOwnedCollectiblesCommand(
-			s.manager,
-			s.ownershipDB,
-			s.walletFeed,
-			chainID,
-			address,
-		)
-
-		s.commands[address][chainID] = command
-		s.group.Add(command.Command())
-	}
-
-	return nil
-}
-
-// Stop periodical fetching for the given account address for all chains
-func (s *Service) stopPeriodicalOwnershipFetchForAccount(address common.Address) error {
-	if s.group == nil {
-		return errors.New("periodical fetch group not initialized")
-	}
-
-	if _, ok := s.commands[address]; ok {
-		for _, command := range s.commands[address] {
-			command.Stop()
-		}
-		delete(s.commands, address)
-	}
-
-	return nil
-}
-
-func (s *Service) startAccountsWatcher() {
-	if s.accountsWatcher != nil {
-		return
-	}
-
-	accountChangeCb := func(changedAddresses []common.Address, eventType accountsevent.EventType, currentAddresses []common.Address) {
-		// Whenever an account gets added, start fetching
-		if eventType == accountsevent.EventTypeAdded {
-			for _, address := range changedAddresses {
-				err := s.startPeriodicalOwnershipFetchForAccount(address)
-				if err != nil {
-					log.Error("Error starting periodical collectibles fetch", "address", address, "error", err)
-				}
-			}
-		} else if eventType == accountsevent.EventTypeRemoved {
-			for _, address := range changedAddresses {
-				err := s.stopPeriodicalOwnershipFetchForAccount(address)
-				if err != nil {
-					log.Error("Error starting periodical collectibles fetch", "address", address, "error", err)
-				}
-			}
-		}
-	}
-
-	s.accountsWatcher = walletaccounts.NewWatcher(s.accountsDB, s.accountsFeed, accountChangeCb)
-
-	s.accountsWatcher.Start()
-}
-
-func (s *Service) stopAccountsWatcher() {
-	if s.accountsWatcher != nil {
-		s.accountsWatcher.Stop()
-		s.accountsWatcher = nil
-	}
+	s.controller.RefetchOwnedCollectibles()
 }
 
 func (s *Service) Start() {
-	// Setup periodical collectibles refresh
-	_ = s.startPeriodicalOwnershipFetch()
-
-	// Setup collectibles fetch when a new account gets added
-	s.startAccountsWatcher()
+	s.controller.Start()
 }
 
 func (s *Service) Stop() {
-	s.stopAccountsWatcher()
-
-	s.stopPeriodicalOwnershipFetch()
+	s.controller.Stop()
 
 	s.scheduler.Stop()
 }
@@ -398,12 +229,8 @@ func (s *Service) GetOwnershipStatus(chainIDs []walletCommon.ChainID, owners []c
 			if err != nil {
 				return nil, err
 			}
-			state := OwnershipStateIdle
-			if s.commands[address] != nil && s.commands[address][chainID] != nil {
-				state = s.commands[address][chainID].GetState()
-			}
 			ret[address][chainID] = OwnershipStatus{
-				State:     state,
+				State:     s.controller.GetCommandState(chainID, address),
 				Timestamp: timestamp,
 			}
 		}
