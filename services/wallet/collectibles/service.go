@@ -50,7 +50,13 @@ type Service struct {
 	scheduler   *async.MultiClientScheduler
 }
 
-func NewService(db *sql.DB, walletFeed *event.Feed, accountsDB *accounts.Database, accountsFeed *event.Feed, networkManager *network.Manager, manager *Manager) *Service {
+func NewService(
+	db *sql.DB,
+	walletFeed *event.Feed,
+	accountsDB *accounts.Database,
+	accountsFeed *event.Feed,
+	networkManager *network.Manager,
+	manager *Manager) *Service {
 	return &Service{
 		manager:     manager,
 		controller:  NewController(db, walletFeed, accountsDB, accountsFeed, networkManager, manager),
