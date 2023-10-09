@@ -22,9 +22,11 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	accountssvc "github.com/status-im/status-go/services/accounts"
+	"github.com/status-im/status-go/services/accounts/settingsevent"
 	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/chat"
@@ -65,10 +67,12 @@ var (
 
 func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server.MediaServer) error {
 	accountsFeed := &event.Feed{}
+	settingsFeed := &event.Feed{}
 	accDB, err := accounts.NewDB(b.appDB)
 	if err != nil {
 		return err
 	}
+	setSettingsNotifier(accDB, settingsFeed)
 
 	services := []common.StatusService{}
 	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
@@ -340,6 +344,16 @@ func (b *StatusNode) wakuV2Service(nodeConfig *params.NodeConfig, telemetryServe
 	}
 
 	return b.wakuV2Srvc, nil
+}
+
+func setSettingsNotifier(db *accounts.Database, feed *event.Feed) {
+	db.SetSettingsNotifier(func(setting settings.SettingField, val interface{}) {
+		feed.Send(settingsevent.Event{
+			Type:    settingsevent.EventTypeChanged,
+			Setting: setting,
+			Value:   val,
+		})
+	})
 }
 
 func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) *wakucommon.PeerRateLimiter {
