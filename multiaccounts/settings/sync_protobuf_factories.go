@@ -410,6 +410,8 @@ func parseNumberToInt64(value interface{}) (int64, error) {
 		return int64(v), nil
 	case ProfilePicturesVisibilityType:
 		return int64(v), nil
+	case UrlUnfurlingModeType:
+		return int64(v), nil
 	default:
 		return 0, errors.Wrapf(ErrTypeAssertionFailed, "expected a numeric type, received %T", value)
 	}
@@ -513,4 +515,29 @@ func mnemonicRemovedProtobufFactory(value interface{}, clock uint64, chatID stri
 
 func mnemonicRemovedProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
 	return buildRawMnemonicRemovedSyncMessage(s.MnemonicRemoved, clock, chatID)
+}
+
+// UrlUnfurlingMode
+
+func buildRawUrlUnfurlingModeSyncMessage(v int64, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	pb := &protobuf.SyncSetting{
+		Type:  protobuf.SyncSetting_URL_UNFURLING_MODE,
+		Value: &protobuf.SyncSetting_ValueInt64{ValueInt64: v},
+		Clock: clock,
+	}
+	rm, err := buildRawSyncSettingMessage(pb, chatID)
+	return rm, pb, err
+}
+
+func urlUnfurlingModeProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	v, err := parseNumberToInt64(value)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return buildRawUrlUnfurlingModeSyncMessage(v, clock, chatID)
+}
+
+func urlUnfurlingModeProtobufFactoryStruct(s Settings, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+	return buildRawUrlUnfurlingModeSyncMessage(int64(s.UrlUnfurlingMode), clock, chatID)
 }

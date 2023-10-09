@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/status-im/status-go/multiaccounts/settings"
+
 	"go.uber.org/zap"
 	"golang.org/x/net/publicsuffix"
 
@@ -133,10 +135,33 @@ func NewDefaultHTTPClient() *http.Client {
 
 // UnfurlURLs assumes clients pass URLs verbatim that were validated and
 // processed by GetURLs.
-func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (UnfurlURLsResponse, error) {
+func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (*UnfurlURLsResponse, error) {
 	if httpClient == nil {
 		httpClient = NewDefaultHTTPClient()
 	}
+
+	s, err := m.getSettings()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get settigs: %w", err)
+	}
+
+	// We use switch case, though there's most cases are empty for code clarity.
+	switch s.UrlUnfurlingMode {
+	case settings.UrlUnfurlingDisableAll:
+		return nil, fmt.Errorf("url unfurling is disabled") // WARNING: Is this an error?
+	case settings.UrlUnfurlingEnableAll:
+		break
+	case settings.UrlUnfurlingAlwaysAsk:
+		// This mode should be handled on the app side
+		// and is considered as equal to UrlUnfurlingEnableAll in status-go.
+		break
+	case settings.UrlUnfurlingSpecifyForSite:
+		// TODO: implement filtering post-mvp
+	default:
+		return nil, fmt.Errorf("invalid url unfurling mode setting: %d", s.UrlUnfurlingMode)
+	}
+
+	// Unfurl in a loop
 
 	r := UnfurlURLsResponse{
 		LinkPreviews:       make([]*common.LinkPreview, 0, len(urls)),
@@ -165,5 +190,5 @@ func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (UnfurlUR
 		r.LinkPreviews = append(r.LinkPreviews, p)
 	}
 
-	return r, nil
+	return &r, nil
 }

@@ -148,7 +148,9 @@ func (s *MessengerSyncSettingsSuite) newMessengerWithOptions(shh types.Waku, pri
 		UseMailservers:            true,
 		LinkPreviewRequestEnabled: true,
 		SendStatusUpdates:         true,
-		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900")}
+		WalletRootAddress:         types.HexToAddress("0x1122334455667788990011223344556677889900"),
+		UrlUnfurlingMode:          settings.UrlUnfurlingAlwaysAsk,
+	}
 
 	err = m.settings.CreateSettings(setting, config)
 	s.Require().NoError(err)
@@ -203,6 +205,29 @@ func prepAliceMessengersForPairing(s *suite.Suite, alice1, alice2 *Messenger) {
 	s.Require().NoError(err)
 }
 
+func (s *MessengerSyncSettingsSuite) syncSettingAndCheck(m1 *Messenger, m2 *Messenger, settingField settings.SettingField, settingValue interface{}) settings.Settings {
+	err := m1.settings.SaveSettingField(settingField, settingValue)
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		mr, err := m2.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(mr.Settings) == 0 {
+			return errors.New("sync settings not in MessengerResponse")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+
+	// Check settings values
+	m2s, err := m2.settings.GetSettings()
+	s.Require().NoError(err)
+	return m2s
+}
+
 func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 	// Pair alice's two devices
 	PairDevices(&s.Suite, s.alice2, s.alice)
@@ -213,60 +238,23 @@ func (s *MessengerSyncSettingsSuite) TestSyncSettings() {
 	s.Require().NoError(err)
 	s.Require().Exactly(settings.ProfilePicturesShowToContactsOnly, as.ProfilePicturesShowTo)
 	s.Require().Exactly(settings.ProfilePicturesVisibilityContactsOnly, as.ProfilePicturesVisibility)
+	s.Require().Exactly(settings.UrlUnfurlingAlwaysAsk, as.UrlUnfurlingMode)
 
 	// Check alice 2 settings values
 	aos, err := s.alice2.settings.GetSettings()
 	s.Require().NoError(err)
 	s.Require().Exactly(settings.ProfilePicturesShowToContactsOnly, aos.ProfilePicturesShowTo)
 	s.Require().Exactly(settings.ProfilePicturesVisibilityContactsOnly, aos.ProfilePicturesVisibility)
+	s.Require().Exactly(settings.UrlUnfurlingAlwaysAsk, as.UrlUnfurlingMode)
 
-	// Update alice ProfilePicturesVisibility setting
-	err = s.alice.settings.SaveSettingField(settings.ProfilePicturesVisibility, settings.ProfilePicturesVisibilityEveryone)
-	s.Require().NoError(err)
-
-	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		mr, err := s.alice2.RetrieveAll()
-		if err != nil {
-			return err
-		}
-
-		if len(mr.Settings) == 0 {
-			return errors.New("sync settings not in MessengerResponse")
-		}
-
-		return nil
-	})
-	s.Require().NoError(err)
-
-	// Check alice 2 settings values
-	aos, err = s.alice2.settings.GetSettings()
-	s.Require().NoError(err)
+	aos = s.syncSettingAndCheck(s.alice, s.alice2, settings.ProfilePicturesVisibility, settings.ProfilePicturesVisibilityEveryone)
 	s.Require().Equal(settings.ProfilePicturesVisibilityEveryone, aos.ProfilePicturesVisibility)
 
-	// Alice 2 updated a setting which triggers the sync functionality
-	err = s.alice2.settings.SaveSettingField(settings.ProfilePicturesShowTo, settings.ProfilePicturesShowToEveryone)
-	s.Require().NoError(err)
-
-	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		mr, err := s.alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-
-		if len(mr.Settings) == 0 {
-			return errors.New("sync settings not in MessengerResponse")
-		}
-
-		return nil
-	})
-	s.Require().NoError(err)
-
-	// Check alice 1 settings values
-	as, err = s.alice.settings.GetSettings()
-	s.Require().NoError(err)
+	as = s.syncSettingAndCheck(s.alice2, s.alice, settings.ProfilePicturesShowTo, settings.ProfilePicturesShowToEveryone)
 	s.Require().Exactly(settings.ProfilePicturesShowToEveryone, as.ProfilePicturesShowTo)
+
+	aos = s.syncSettingAndCheck(s.alice, s.alice2, settings.UrlUnfurlingMode, settings.UrlUnfurlingDisableAll)
+	s.Require().Exactly(settings.UrlUnfurlingDisableAll, aos.UrlUnfurlingMode)
 }
 
 func (s *MessengerSyncSettingsSuite) TestSyncSettings_StickerPacks() {

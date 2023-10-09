@@ -196,6 +196,7 @@ type Settings struct {
 	TestNetworksEnabled            bool                          `json:"test-networks-enabled?,omitempty"`
 	ProfileMigrationNeeded         bool                          `json:"profile-migration-needed,omitempty"`
 	IsSepoliaEnabled               bool                          `json:"is-sepolia-enabled?,omitempty"`
+	UrlUnfurlingMode               UrlUnfurlingModeType          `json:"url-unfurling-mode"`
 }
 
 func (s Settings) MarshalJSON() ([]byte, error) {

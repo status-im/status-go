@@ -103,6 +103,7 @@ func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *z
 			DisplayName:               DefaultProfileDisplayName,
 			ProfilePicturesShowTo:     1,
 			ProfilePicturesVisibility: 1,
+			UrlUnfurlingMode:          settings.UrlUnfurlingAlwaysAsk,
 		}, params.NodeConfig{}),
 		WithBrowserDatabase(nil),
 	}
