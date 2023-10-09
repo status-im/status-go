@@ -305,7 +305,9 @@ func (api *API) DeployAssets(ctx context.Context, chainID uint64, deploymentPara
 
 	const decimals = 18
 	address, tx, _, err := assets.DeployAssets(transactOpts, ethClient, deploymentParameters.Name,
-		deploymentParameters.Symbol, decimals, deploymentParameters.GetSupply())
+		deploymentParameters.Symbol, decimals, deploymentParameters.GetSupply(),
+		common.HexToAddress(deploymentParameters.OwnerTokenAddress),
+		common.HexToAddress(deploymentParameters.MasterTokenAddress))
 	if err != nil {
 		log.Error(err.Error())
 		return DeploymentDetails{}, err
