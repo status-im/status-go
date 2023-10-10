@@ -109,7 +109,6 @@ func TestBasicWakuV2(t *testing.T) {
 	config.EnableDiscV5 = true
 	config.DiscV5BootstrapNodes = []string{enrTreeAddress}
 	config.DiscoveryLimit = 20
-	config.UDPPort = 9001
 	config.WakuNodes = []string{enrTreeAddress}
 	w, err := New("", "", config, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
