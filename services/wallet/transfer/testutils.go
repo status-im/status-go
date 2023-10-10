@@ -8,6 +8,7 @@ import (
 
 	eth_common "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/status-im/status-go/services/wallet/common"
 	w_common "github.com/status-im/status-go/services/wallet/common"
@@ -253,6 +254,13 @@ type TestTransferOptions struct {
 	TokenAddress     eth_common.Address
 	TokenID          *big.Int
 	NullifyAddresses []eth_common.Address
+	Tx               *types.Transaction
+}
+
+func GenerateTxField(data []byte) *types.Transaction {
+	return types.NewTx(&types.DynamicFeeTx{
+		Data: data,
+	})
 }
 
 func InsertTestTransferWithOptions(tb testing.TB, db *sql.DB, address eth_common.Address, tr *TestTransfer, opt *TestTransferOptions) {
@@ -327,6 +335,7 @@ func InsertTestTransferWithOptions(tb testing.TB, db *sql.DB, address eth_common
 		tokenAddress:       &opt.TokenAddress,
 		contractAddress:    &tr.Contract,
 		tokenID:            opt.TokenID,
+		transaction:        opt.Tx,
 	}
 	err = updateOrInsertTransfersDBFields(tx, []transferDBFields{transfer})
 	require.NoError(tb, err)

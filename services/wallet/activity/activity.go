@@ -317,6 +317,7 @@ const (
 
 //go:embed filter.sql
 var queryFormatString string
+var mintATQuery = "SELECT hash FROM input_data WHERE method IN ('mint', 'mintToken')"
 
 type FilterDependencies struct {
 	db *sql.DB
@@ -425,8 +426,26 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		return strconv.Itoa(int(t))
 	})
 
+	inputDataMethods := make([]string, 0)
+
+	if includeAllStatuses || sliceContains(filter.Types, MintAT) || sliceContains(filter.Types, ReceiveAT) {
+		inputDataRows, err := deps.db.QueryContext(ctx, mintATQuery)
+
+		if err != nil {
+			return nil, err
+		}
+
+		for inputDataRows.Next() {
+			var inputData sql.NullString
+			err := inputDataRows.Scan(&inputData)
+			if err == nil && inputData.Valid {
+				inputDataMethods = append(inputDataMethods, inputData.String)
+			}
+		}
+	}
+
 	queryString := fmt.Sprintf(queryFormatString, involvedAddresses, toAddresses, assetsTokenCodes, assetsERC20, assetsERC721, networks,
-		layer2Networks, joinedMTTypes)
+		layer2Networks, mintATQuery, joinedMTTypes)
 
 	// The duplicated temporary table UNION with CTE acts as an optimization
 	// As soon as we use filter_addresses CTE or filter_addresses_table temp table
@@ -471,10 +490,12 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		var dbTrAmount sql.NullString
 		var dbMtFromAmount, dbMtToAmount, contractType sql.NullString
 		var tokenCode, fromTokenCode, toTokenCode sql.NullString
+		var methodHash sql.NullString
 		var transferType *TransferType
 		err := rows.Scan(&transferHash, &pendingHash, &chainID, &multiTxID, &timestamp, &dbMtType, &dbTrType, &fromAddress,
 			&toAddressDB, &ownerAddressDB, &dbTrAmount, &dbMtFromAmount, &dbMtToAmount, &aggregatedStatus, &aggregatedCount,
-			&tokenAddress, &dbTokenID, &tokenCode, &fromTokenCode, &toTokenCode, &outChainIDDB, &inChainIDDB, &contractType, &contractAddressDB)
+			&tokenAddress, &dbTokenID, &tokenCode, &fromTokenCode, &toTokenCode, &outChainIDDB, &inChainIDDB, &contractType,
+			&contractAddressDB, &methodHash)
 		if err != nil {
 			return nil, err
 		}
@@ -486,6 +507,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		if contractType.Valid {
 			transferType = contractTypeFromDBType(contractType.String)
 		}
+
 		if len(contractAddressDB) > 0 {
 			contractAddress = new(eth.Address)
 			*contractAddress = eth.BytesToAddress(contractAddressDB)
@@ -499,10 +521,13 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 					}
 					return SendAT, fromAddress
 				} else if trType.Byte == toTrType {
-					if fromAddress == ZeroAddress && transferType != nil && *transferType == TransferTypeErc721 {
-						return MintAT, toAddress
+					at := ReceiveAT
+					if fromAddress == ZeroAddress && transferType != nil {
+						if *transferType == TransferTypeErc721 || (*transferType == TransferTypeErc20 && methodHash.Valid && sliceContains(inputDataMethods, methodHash.String)) {
+							at = MintAT
+						}
 					}
-					return ReceiveAT, toAddress
+					return at, toAddress
 				}
 			}
 			log.Warn(fmt.Sprintf("unexpected activity type. Missing from [%s] or to [%s] in addresses?", fromAddress, toAddress))
@@ -626,7 +651,6 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		}
 
 		// Complete common data
-		entry.sender = &fromAddress
 		entry.recipient = &toAddress
 		entry.sender = &fromAddress
 		entry.recipient = &toAddress

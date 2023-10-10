@@ -152,6 +152,9 @@ pending_network_ids AS (
 layer2_networks(network_id) AS (
 	VALUES
 		%s
+),
+mint_methods(method_hash) AS (
+	%s
 )
 SELECT
 	transfers.hash AS transfer_hash,
@@ -199,7 +202,11 @@ SELECT
 	NULL AS out_network_id,
 	NULL AS in_network_id,
 	transfers.type AS type,
-	transfers.contract_address AS contract_address
+	transfers.contract_address AS contract_address,
+	CASE
+		WHEN transfers.tx_from_address = zeroAddress AND transfers.type = "erc20" THEN substr(json_extract(tx, '$.input'), 1, 10)
+		ELSE NULL
+	END AS method_hash
 FROM
 	transfers
 	CROSS JOIN filter_conditions
@@ -235,10 +242,17 @@ WHERE
 			filterActivityTypeReceive
 			AND tr_type = toTrType -- Check NOT MintAT
 			AND NOT (
-				transfers.type = 'erc721'
-				AND (
+				(
 					transfers.tx_from_address IS NULL
 					OR transfers.tx_from_address = zeroAddress
+				)
+				AND (
+					transfers.type = 'erc721'
+					OR (
+						transfers.type = 'erc20' 
+						AND method_hash IS NOT NULL 
+						AND method_hash IN mint_methods
+					)
 				)
 			)
 		)
@@ -253,10 +267,17 @@ WHERE
 		OR (
 			filterActivityTypeMint
 			AND tr_type = toTrType
-			AND transfers.type = 'erc721'
 			AND (
 				transfers.tx_from_address IS NULL
 				OR transfers.tx_from_address = zeroAddress
+			)
+			AND (
+				transfers.type = 'erc721'
+				OR (
+					transfers.type = 'erc20' 
+					AND method_hash IS NOT NULL 
+					AND method_hash IN mint_methods
+				)
 			)
 		)
 	)
@@ -351,7 +372,8 @@ SELECT
 	NULL AS out_network_id,
 	NULL AS in_network_id,
 	pending_transactions.type AS type,
-	NULL as contract_address
+	NULL as contract_address,
+	NULL AS method_hash
 FROM
 	pending_transactions
 	CROSS JOIN filter_conditions
@@ -440,7 +462,8 @@ SELECT
 	multi_transactions.from_network_id AS out_network_id,
 	multi_transactions.to_network_id AS in_network_id,
 	NULL AS type,
-	NULL as contract_address
+	NULL as contract_address,
+	NULL AS method_hash
 FROM
 	multi_transactions
 	CROSS JOIN filter_conditions
