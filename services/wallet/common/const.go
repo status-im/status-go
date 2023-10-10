@@ -16,6 +16,7 @@ const (
 	OptimismGoerli  uint64 = 420
 	ArbitrumMainnet uint64 = 42161
 	ArbitrumGoerli  uint64 = 421613
+	ArbitrumSepolia uint64 = 421614
 )
 
 func (c ChainID) String() string {
@@ -31,6 +32,7 @@ func AllChainIDs() []ChainID {
 		ChainID(OptimismGoerli),
 		ChainID(ArbitrumMainnet),
 		ChainID(ArbitrumGoerli),
+		ChainID(ArbitrumSepolia),
 	}
 }
 
