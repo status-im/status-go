@@ -111,7 +111,7 @@ const (
 
 	ProdPreferredChainIDsDefault        = "1:10:42161"
 	TestPreferredChainIDsDefault        = "5:420:421613"
-	TestSepoliaPreferredChainIDsDefault = "11155111:420:421613"
+	TestSepoliaPreferredChainIDsDefault = "11155111:420:421614"
 )
 
 // IsOwnAccount returns true if this is an account we have the private key for

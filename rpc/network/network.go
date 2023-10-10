@@ -9,10 +9,10 @@ import (
 	"github.com/status-im/status-go/params"
 )
 
-const SepoliaChainID = 11155111
+var SepoliaChainIDs = []uint64{11155111, 421614}
 
 // GoerliChainIDs Uncomment next chain when we move more chain to sepolia
-var GoerliChainIDs = []uint64{5} //, 420, 421613}
+var GoerliChainIDs = []uint64{5, 421613} //, 420, }
 
 type CombinedNetwork struct {
 	Prod *params.Network
@@ -226,8 +226,17 @@ func (nm *Manager) Get(onlyEnabled bool) ([]*params.Network, error) {
 
 	var results []*params.Network
 	for _, network := range networks {
-		if !isSepoliaEnabled && network.ChainID == SepoliaChainID {
-			continue
+		if !isSepoliaEnabled {
+			found := false
+			for _, chainID := range SepoliaChainIDs {
+				if network.ChainID == chainID {
+					found = true
+					break
+				}
+			}
+			if found {
+				continue
+			}
 		}
 
 		if isSepoliaEnabled {
