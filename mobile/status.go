@@ -279,7 +279,7 @@ func CreateAccountAndLogin(requestJSON string) string {
 
 	api.RunAsync(func() error {
 		log.Debug("starting a node and creating config")
-		err := statusBackend.CreateAccountAndLogin(&request)
+		_, err := statusBackend.CreateAccountAndLogin(&request)
 		if err != nil {
 			log.Error("failed to create account", "error", err)
 			return err
@@ -328,7 +328,7 @@ func RestoreAccountAndLogin(requestJSON string) string {
 
 	api.RunAsync(func() error {
 		log.Debug("starting a node and restoring account")
-		err := statusBackend.RestoreAccountAndLogin(&request)
+		_, err := statusBackend.RestoreAccountAndLogin(&request)
 		if err != nil {
 			log.Error("failed to restore account", "error", err)
 			return err

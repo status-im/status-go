@@ -1236,10 +1236,10 @@ func (b *GethStatusBackend) ConvertToKeycardAccount(account multiaccounts.Accoun
 	return nil
 }
 
-func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAccount) error {
+func (b *GethStatusBackend) RestoreAccountAndLogin(request *requests.RestoreAccount) (*multiaccounts.Account, error) {
 
 	if err := request.Validate(); err != nil {
-		return err
+		return nil, err
 	}
 
 	return b.generateOrImportAccount(request.Mnemonic, 0, &request.CreateAccount)
@@ -1256,14 +1256,14 @@ func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error)
 	return info.KeyUID, nil
 }
 
-func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizationColorClock uint64, request *requests.CreateAccount) error {
+func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizationColorClock uint64, request *requests.CreateAccount) (*multiaccounts.Account, error) {
 	keystoreDir := keystoreRelativePath
 
 	b.UpdateRootDataDir(request.BackupDisabledDataDir)
 	err := b.OpenAccounts()
 	if err != nil {
 		b.log.Error("failed open accounts", err)
-		return err
+		return nil, err
 	}
 
 	accountGenerator := b.accountManager.AccountsGenerator()
@@ -1275,30 +1275,35 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		info = generatedAccountInfos[0]
 
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else {
 
 		info, err = accountGenerator.ImportMnemonic(mnemonic, "")
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	derivedAddresses, err := accountGenerator.DeriveAddresses(info.ID, paths)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	userKeyStoreDir := filepath.Join(keystoreDir, info.KeyUID)
 	// Initialize keystore dir with account
 	if err := b.accountManager.InitKeystore(filepath.Join(b.rootDataDir, userKeyStoreDir)); err != nil {
-		return err
+		return nil, err
+	}
+
+	_, err = accountGenerator.StoreAccount(info.ID, request.Password)
+	if err != nil {
+		return nil, err
 	}
 
 	_, err = accountGenerator.StoreDerivedAccounts(info.ID, request.Password, paths)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	account := multiaccounts.Account{
@@ -1311,14 +1316,14 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 	if request.ImagePath != "" {
 		iis, err := images.GenerateIdentityImages(request.ImagePath, 0, 0, 1000, 1000)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		account.Images = iis
 	}
 
 	settings, err := defaultSettings(info, derivedAddresses, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	settings.DeviceName = request.DeviceName
@@ -1334,7 +1339,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 
 	nodeConfig, err := defaultNodeConfig(settings.InstallationID, request)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if mnemonic != "" {
 		nodeConfig.ProcessBackedupMessages = true
@@ -1369,17 +1374,16 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 	err = b.StartNodeWithAccountAndInitialConfig(account, request.Password, *settings, nodeConfig, subAccounts)
 	if err != nil {
 		b.log.Error("start node", err)
-		return err
+		return nil, err
 	}
 
-	return nil
-
+	return &account, nil
 }
 
-func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccount) error {
+func (b *GethStatusBackend) CreateAccountAndLogin(request *requests.CreateAccount) (*multiaccounts.Account, error) {
 
 	if err := request.Validate(); err != nil {
-		return err
+		return nil, err
 	}
 	return b.generateOrImportAccount("", 1, request)
 }

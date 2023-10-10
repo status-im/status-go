@@ -55,7 +55,7 @@ func (s *Service) APIs() []rpc.API {
 		{
 			Namespace: "accounts",
 			Version:   "0.1.0",
-			Service:   NewAccountsAPI(s.manager, s.config, s.db, s.feed, &s.messenger),
+			Service:   s.AccountsAPI(),
 		},
 		{
 			Namespace: "multiaccounts",
@@ -63,6 +63,10 @@ func (s *Service) APIs() []rpc.API {
 			Service:   NewMultiAccountsAPI(s.mdb, s.mediaServer),
 		},
 	}
+}
+
+func (s *Service) AccountsAPI() *API {
+	return NewAccountsAPI(s.manager, s.config, s.db, s.feed, &s.messenger)
 }
 
 // Protocols returns list of p2p protocols.

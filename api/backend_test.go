@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -33,6 +34,7 @@ import (
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/typeddata"
+	walletservice "github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
@@ -768,7 +770,8 @@ func TestLoginAccount(t *testing.T) {
 			c <- struct{}{}
 		}
 	})
-	require.NoError(t, b.CreateAccountAndLogin(createAccountRequest))
+	_, err := b.CreateAccountAndLogin(createAccountRequest)
+	require.NoError(t, err)
 	require.NoError(t, b.Logout())
 	require.NoError(t, b.StopNode())
 
@@ -1289,4 +1292,69 @@ func TestChangeDatabasePassword(t *testing.T) {
 	require.NotNil(t, acc)
 	require.NotNil(t, key)
 	require.Equal(t, acc.Address, key.Address)
+}
+
+func TestCreateWallet(t *testing.T) {
+	utils.Init()
+	password := "some-password2"
+	tmpdir := t.TempDir()
+
+	b := NewGethStatusBackend()
+	createAccountRequest := &requests.CreateAccount{
+		DisplayName:           "some-display-name",
+		CustomizationColor:    "#ffffff",
+		Password:              password,
+		BackupDisabledDataDir: tmpdir,
+		NetworkID:             1,
+		LogFilePath:           tmpdir + "/log",
+	}
+	c := make(chan interface{}, 10)
+	signal.SetMobileSignalHandler(func(data []byte) {
+		if strings.Contains(string(data), "node.login") {
+			c <- struct{}{}
+		}
+	})
+
+	account, err := b.CreateAccountAndLogin(createAccountRequest)
+	require.NoError(t, err)
+	statusNode := b.statusNode
+	require.NotNil(t, statusNode)
+
+	walletService := statusNode.WalletService()
+	require.NotNil(t, walletService)
+	walletAPI := walletservice.NewAPI(walletService)
+
+	paths := []string{"m/44'/60'/0'/0/1"}
+
+	db, err := accounts.NewDB(b.appDB)
+	require.NoError(t, err)
+	walletRootAddress, err := db.GetWalletRootAddress()
+	require.NoError(t, err)
+
+	masterRootAddress, err := db.GetMasterAddress()
+	require.NoError(t, err)
+
+	fmt.Println("WALLET ROOT", walletRootAddress.String())
+	fmt.Println("MASTER ROOT", masterRootAddress.String())
+
+	derivedAddress, err := walletAPI.GetDerivedAddresses(context.Background(), password, walletRootAddress.String(), paths)
+	require.NoError(t, err)
+	require.Len(t, derivedAddress, 1)
+
+	fmt.Println("DERVIED", derivedAddress)
+	accountsService := statusNode.AccountService()
+	require.NotNil(t, accountsService)
+	accountsAPI := accountsService.AccountsAPI()
+
+	err = accountsAPI.AddAccount(context.Background(), password, &accounts.Account{
+		KeyUID:    account.KeyUID,
+		Type:      accounts.AccountTypeGenerated,
+		PublicKey: derivedAddress[0].PublicKey,
+		Emoji:     "some",
+		ColorID:   "so",
+		Name:      "some name",
+		Path:      derivedAddress[0].Path,
+	})
+	require.NoError(t, err)
+
 }
