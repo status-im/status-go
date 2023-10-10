@@ -136,8 +136,8 @@ func (mgr *FilterManager) processEvents(ev *FilterEvent) {
 		// filterID field is only set when there are no subs to check for this filter,
 		// therefore no particular peers that could be unreachable.
 		if ev.filterID != "" {
-			// Trigger full resubscribe, filter has no peers
-			mgr.logger.Debug("filter has no subs", zap.String("filterId", ev.filterID))
+			// Trigger full resubscribe, filter has too few peers
+			mgr.logger.Debug("filter has too few subs", zap.String("filterId", ev.filterID))
 			mgr.resubscribe(ev.filterID)
 			break
 		}
@@ -156,7 +156,7 @@ func (mgr *FilterManager) processEvents(ev *FilterEvent) {
 					continue
 				}
 				if sub.PeerID == ev.peerID {
-					mgr.logger.Debug("filter sub is inactive", zap.String("filterId", filterID), zap.String("subID", sub.ID))
+					mgr.logger.Debug("filter sub is inactive", zap.String("filterId", filterID), zap.Stringer("peerId", sub.PeerID), zap.String("subID", sub.ID))
 					delete(subs, sub.ID)
 					go mgr.unsubscribeFromFilter(filterID, sub)
 				}
@@ -181,7 +181,7 @@ func (mgr *FilterManager) processEvents(ev *FilterEvent) {
 		}
 
 	case FilterEventUnsubscribeResult:
-		mgr.logger.Debug("filter event unsubscribe_result", zap.String("filterId", ev.filterID), zap.Stringer("peerID", ev.sub.PeerID))
+		mgr.logger.Debug("filter event unsubscribe result", zap.String("filterId", ev.filterID), zap.Stringer("peerID", ev.sub.PeerID))
 
 	case FilterEventGetStats:
 		stats := make(FilterSubs)
@@ -202,23 +202,24 @@ func (mgr *FilterManager) processEvents(ev *FilterEvent) {
 
 func (mgr *FilterManager) subscribeToFilter(filterID string, peer peer.ID, tempID string) {
 
+	logger := mgr.logger.With(zap.String("filterId", filterID))
 	f := mgr.getFilter(filterID)
 	if f == nil {
-		mgr.logger.Error("filter subscribeToFilter: No filter found", zap.String("id", filterID))
+		logger.Error("filter subscribeToFilter: No filter found")
 		mgr.eventChan <- FilterEvent{eventType: FilterEventSubscribeResult, filterID: filterID, tempID: tempID, success: false}
 		return
 	}
 	contentFilter := mgr.buildContentFilter(f.PubsubTopic, f.ContentTopics)
-	mgr.logger.Debug("filter subscribe to filter node", zap.Stringer("peer", peer), zap.String("pubsubTopic", contentFilter.PubsubTopic), zap.Strings("contentTopics", contentFilter.ContentTopicsList()))
+	logger.Debug("filter subscribe to filter node", zap.Stringer("peer", peer), zap.String("pubsubTopic", contentFilter.PubsubTopic), zap.Strings("contentTopics", contentFilter.ContentTopicsList()))
 	ctx, cancel := context.WithTimeout(mgr.ctx, requestTimeout)
 	defer cancel()
 
 	subDetails, err := mgr.node.FilterLightnode().Subscribe(ctx, contentFilter, filter.WithPeer(peer))
 	var sub *subscription.SubscriptionDetails
 	if err != nil {
-		mgr.logger.Warn("filter could not add wakuv2 filter for peer", zap.String("filterId", filterID), zap.Stringer("peer", peer), zap.Error(err))
+		logger.Warn("filter could not add wakuv2 filter for peer", zap.Stringer("peer", peer), zap.Error(err))
 	} else {
-		mgr.logger.Debug("filter subscription success", zap.String("filterId", filterID), zap.Stringer("peer", peer), zap.String("pubsubTopic", contentFilter.PubsubTopic), zap.Strings("contentTopics", contentFilter.ContentTopicsList()))
+		logger.Debug("filter subscription success", zap.Stringer("peer", peer), zap.String("pubsubTopic", contentFilter.PubsubTopic), zap.Strings("contentTopics", contentFilter.ContentTopicsList()))
 		sub = subDetails[0]
 	}
 
@@ -248,13 +249,20 @@ func (mgr *FilterManager) pingPeers() {
 
 	distinctPeers := make(map[peer.ID]struct{})
 	for filterID, subs := range mgr.filterSubs {
-		if len(subs) == 0 {
-			// No subs found, trigger full resubscribe
-			mgr.logger.Debug("filter ping peer no subs", zap.String("filterId", filterID))
-			go func() {
+		logger := mgr.logger.With(zap.String("filterId", filterID))
+		nilSubsCnt := 0
+		for _, s := range subs {
+			if s == nil {
+				nilSubsCnt++
+			}
+		}
+		logger.Debug("filter ping peers", zap.Int("len", len(subs)), zap.Int("len(nilSubs)", nilSubsCnt))
+		if len(subs) < mgr.settings.MinPeersForFilter {
+			// Trigger full resubscribe
+			logger.Debug("filter ping peers not enough subs")
+			go func(filterID string) {
 				mgr.eventChan <- FilterEvent{eventType: FilterEventPingResult, filterID: filterID, success: false}
-			}()
-			continue
+			}(filterID)
 		}
 		for _, sub := range subs {
 			if sub == nil {
@@ -266,15 +274,15 @@ func (mgr *FilterManager) pingPeers() {
 				continue
 			}
 			distinctPeers[sub.PeerID] = struct{}{}
-			mgr.logger.Debug("filter ping peer", zap.Stringer("peerId", sub.PeerID))
+			logger.Debug("filter ping peer", zap.Stringer("peerId", sub.PeerID))
 			go func(sub *subscription.SubscriptionDetails) {
 				err := mgr.isFilterSubAlive(sub)
 				alive := err == nil
 
 				if alive {
-					mgr.logger.Debug("filter aliveness check succeeded", zap.Stringer("peerId", sub.PeerID))
+					logger.Debug("filter aliveness check succeeded", zap.Stringer("peerId", sub.PeerID))
 				} else {
-					mgr.logger.Debug("filter aliveness check failed", zap.Stringer("peerId", sub.PeerID), zap.Error(err))
+					logger.Debug("filter aliveness check failed", zap.Stringer("peerId", sub.PeerID), zap.Error(err))
 				}
 				mgr.eventChan <- FilterEvent{eventType: FilterEventPingResult, peerID: sub.PeerID, success: alive}
 			}(sub)
@@ -329,7 +337,14 @@ func (mgr *FilterManager) resubscribe(filterID string) {
 		mgr.logger.Error("resubscribe filter not found", zap.String("filterId", filterID))
 		return
 	}
-	mgr.logger.Debug("filter active subscriptions count:", zap.String("filterId", filterID), zap.Int("len", len(subs)))
+	if len(subs) > mgr.settings.MinPeersForFilter {
+		mgr.logger.Error("filter resubscribe too many subs", zap.String("filterId", filterID), zap.Int("len", len(subs)))
+	}
+	if len(subs) == mgr.settings.MinPeersForFilter {
+		// do nothing
+		return
+	}
+	mgr.logger.Debug("filter resubscribe subs count:", zap.String("filterId", filterID), zap.Int("len", len(subs)))
 	for i := len(subs); i < mgr.settings.MinPeersForFilter; i++ {
 		mgr.logger.Debug("filter check not passed, try subscribing to peers", zap.String("filterId", filterID))
 		peer, err := mgr.findPeerCandidate()
