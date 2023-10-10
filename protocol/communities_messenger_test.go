@@ -2018,7 +2018,7 @@ func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 
 	inviteMessage := "invite to community testing message"
 
-	// Create an community chat
+	// Create an community
 	response, err := s.bob.CreateCommunity(description, true)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -2061,6 +2061,109 @@ func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 	message := response.Messages()[0]
 	s.Require().Equal(community.IDString(), message.CommunityID)
 	s.Require().Equal(inviteMessage, message.Text)
+}
+
+func (s *MessengerCommunitiesSuite) TestShareCommunityWithPreviousMember() {
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	inviteMessage := "invite to community testing message"
+
+	// Create an community chat
+	response, err := s.bob.CreateCommunity(description, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	community := response.Communities()[0]
+
+	orgChat := &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "status-core",
+			Emoji:       "😎",
+			Description: "status-core community chat",
+		},
+	}
+	response, err = s.bob.CreateCommunityChat(community.ID(), orgChat)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Chats(), 1)
+
+	community = response.Communities()[0]
+	communityChat := response.Chats()[0]
+
+	// Add Alice to the community before sharing it
+	_, err = community.AddMember(&s.alice.identity.PublicKey, []protobuf.CommunityMember_Roles{})
+	s.Require().NoError(err)
+
+	err = s.bob.communitiesManager.SaveCommunity(community)
+	s.Require().NoError(err)
+
+	response, err = s.bob.ShareCommunity(
+		&requests.ShareCommunity{
+			CommunityID:   community.ID(),
+			Users:         []types.HexBytes{common.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
+			InviteMessage: inviteMessage,
+		},
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Messages(), 1)
+
+	// Add bob to contacts so it does not go on activity center
+	bobPk := common.PubkeyToHex(&s.bob.identity.PublicKey)
+	request := &requests.AddContact{ID: bobPk}
+	_, err = s.alice.AddContact(context.Background(), request)
+	s.Require().NoError(err)
+
+	// Pull message and make sure org is received
+	err = tt.RetryWithBackOff(func() error {
+		response, err = s.alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.messages) == 0 {
+			return errors.New("community link not received")
+		}
+		return nil
+	})
+
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 1)
+
+	message := response.Messages()[0]
+	s.Require().Equal(community.IDString(), message.CommunityID)
+	s.Require().Equal(inviteMessage, message.Text)
+
+	// Alice should have the Joined status for the community
+	communityInResponse := response.Communities()[0]
+	s.Require().Equal(community.ID(), communityInResponse.ID())
+	s.Require().True(communityInResponse.Joined())
+
+	// Alice is able to receive messages in the community
+	inputMessage := buildTestMessage(*communityChat)
+	sendResponse, err := s.bob.SendChatMessage(context.Background(), inputMessage)
+	messageID := sendResponse.Messages()[0].ID
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+
+	response, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool { return len(r.messages) > 0 },
+		"no messages",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.Messages(), 1)
+	s.Require().Equal(messageID, response.Messages()[0].ID)
 }
 
 func (s *MessengerCommunitiesSuite) TestBanUser() {
