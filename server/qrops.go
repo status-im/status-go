@@ -21,6 +21,13 @@ type WriterCloserByteBuffer struct {
 	*bytes.Buffer
 }
 
+type LogoShape string
+
+const (
+	LogoShapeCircle    LogoShape = "circle"
+	LogoShapeRectangle LogoShape = "rectangle"
+)
+
 func (wc WriterCloserByteBuffer) Close() error {
 	return nil
 }
@@ -32,9 +39,14 @@ func NewWriterCloserByteBuffer() *WriterCloserByteBuffer {
 type QRConfig struct {
 	DecodedQRURL    string
 	WithLogo        bool
+	LogoShape       LogoShape
+	WithEmoji       bool
+	WithMask        bool
 	CorrectionLevel qrcode.EncodeOption
 	KeyUID          string
 	ImageName       string
+	MaskHex         string
+	EmojiValue      string
 	Size            int
 	Params          url.Values
 }
@@ -50,6 +62,15 @@ func NewQRConfig(params url.Values, logger *zap.Logger) (*QRConfig, error) {
 	}
 
 	config.setAllowProfileImage()
+	config.setAllowMask()
+
+	if config.WithMask {
+		// we only want to set mask hex when withMask was passed as true
+		err := config.setMaskHex()
+		logger.Error(err.Error())
+		return nil, err
+	}
+
 	config.setErrorCorrectionLevel()
 	err = config.setSize()
 
@@ -67,6 +88,7 @@ func NewQRConfig(params url.Values, logger *zap.Logger) (*QRConfig, error) {
 		}
 
 		config.setImageName()
+		config.setLogoShape()
 	}
 
 	return config, nil
@@ -109,6 +131,29 @@ func (q *QRConfig) setAllowProfileImage() {
 
 	// if we reach here its most probably true
 	q.WithLogo = LogoOnImage
+}
+
+func (q *QRConfig) setAllowMask() {
+	allowMask, ok := q.Params["allowMask"]
+
+	if !ok || len(allowMask) == 0 {
+		// we default to false when this flag was not provided
+		// so someone does not want to add a mask on their QR Image
+		// fine then :)
+		q.WithMask = false
+	}
+
+	LogoOnMask, err := strconv.ParseBool(allowMask[0])
+
+	if err != nil {
+		// maybe for fun someone tries to send non-boolean values to this flag
+		// we also default to false in that case
+		q.WithMask = false
+	}
+
+	// if we reach here its most probably true
+	q.WithMask = LogoOnMask
+
 }
 
 func (q *QRConfig) setErrorCorrectionLevel() {
@@ -173,6 +218,28 @@ func (q *QRConfig) setKeyUID() error {
 	return nil
 }
 
+func (q *QRConfig) setLogoShape() error {
+	shape, ok := q.Params["LogoShape"]
+	acceptedShapes := LogoShape(shape[0])
+
+	// the LogoShape was not passed, we default to LogoShapeCircle
+	if !ok || len(acceptedShapes) == 0 {
+		q.LogoShape = LogoShapeCircle
+	}
+	return nil
+}
+
+func (q *QRConfig) setMaskHex() error {
+	maskHex, ok := q.Params["maskHex"]
+
+	if !ok || len(maskHex) == 0 {
+		return errors.New("[qrops-error] A maskHex is required to put customisation color on variant and it was not passed in the parameters")
+	}
+
+	q.MaskHex = maskHex[0]
+	return nil
+}
+
 func (q *QRConfig) setImageName() {
 	imageName, ok := q.Params["imageName"]
 	//if the imageName was not passed, we default to const images.LargeDimName
@@ -183,7 +250,7 @@ func (q *QRConfig) setImageName() {
 	q.ImageName = imageName[0]
 }
 
-func ToLogoImageFromBytes(imageBytes []byte, padding int) ([]byte, error) {
+func ToLogoImageWithPadding(imageBytes []byte, padding int) ([]byte, error) {
 	img, _, err := image.Decode(bytes.NewReader(imageBytes))
 	if err != nil {
 		return nil, fmt.Errorf("decoding image failed: %v", err)
@@ -217,23 +284,12 @@ func GetLogoImage(multiaccountsDB *multiaccounts.Database, keyUID string, imageN
 	padding = 10
 
 	if identityImageObjectFromDB == nil {
-		LogoBytes, err = ToLogoImageFromBytes(staticImageData, padding)
+		LogoBytes, err = ToLogoImageWithPadding(staticImageData, padding)
 	} else {
-		LogoBytes, err = ToLogoImageFromBytes(identityImageObjectFromDB.Payload, padding)
+		LogoBytes, err = ToLogoImageWithPadding(identityImageObjectFromDB.Payload, padding)
 	}
 
 	return LogoBytes, err
-}
-
-func GetPadding(imgBytes []byte) int {
-	const (
-		defaultPadding = 20
-	)
-	size, _, err := images.GetImageDimensions(imgBytes)
-	if err != nil {
-		return defaultPadding
-	}
-	return size / 5
 }
 
 func generateQRBytes(params url.Values, logger *zap.Logger, multiaccountsDB *multiaccounts.Database) []byte {
@@ -288,7 +344,21 @@ func generateQRBytes(params url.Values, logger *zap.Logger, multiaccountsDB *mul
 			return nil
 		}
 
-		payload = images.SuperimposeLogoOnQRImage(payload, logo)
+		if qrGenerationConfig.WithMask {
+			mask, err := images.GenerateMask(qrGenerationConfig.MaskHex, qrGenerationConfig.LogoShape)
+
+			if err != nil {
+				logger.Error("could not generate mask ", zap.Error(err))
+				return nil
+			}
+			payloadWithMask := images.SuperimposeLogoOnQRImage(payload, mask)
+
+			payload = images.SuperimposeLogoOnQRImage(payloadWithMask, logo)
+
+		} else {
+			payload = images.SuperimposeLogoOnQRImage(payload, logo)
+		}
+
 	}
 
 	if qrGenerationConfig.Size > 0 {

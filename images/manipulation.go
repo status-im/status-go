@@ -3,6 +3,7 @@ package images
 import (
 	"bytes"
 	"fmt"
+	"github.com/status-im/status-go/server"
 	"image"
 	"image/color"
 	"image/draw"
@@ -164,15 +165,6 @@ func ImageToBytesAndImage(imagePath string) ([]byte, image.Image, error) {
 	return imgBuffer.Bytes(), img, nil
 }
 
-func AddPadding(img image.Image, padding int) *image.RGBA {
-	bounds := img.Bounds()
-	newBounds := image.Rect(bounds.Min.X-padding, bounds.Min.Y-padding, bounds.Max.X+padding, bounds.Max.Y+padding)
-	paddedImg := image.NewRGBA(newBounds)
-	draw.Draw(paddedImg, newBounds, &image.Uniform{C: color.White}, image.ZP, draw.Src)
-
-	return paddedImg
-}
-
 func EncodePNG(img *image.RGBA) ([]byte, error) {
 	resultImg := &bytes.Buffer{}
 	err := png.Encode(resultImg, img)
@@ -234,14 +226,6 @@ func RoundCrop(inputImage []byte) ([]byte, error) {
 	return outputImage.Bytes(), nil
 }
 
-func PlaceCircleInCenter(paddedImg, circle *image.RGBA) *image.RGBA {
-	bounds := circle.Bounds()
-	centerX := (paddedImg.Bounds().Min.X + paddedImg.Bounds().Max.X) / 2
-	centerY := (paddedImg.Bounds().Min.Y + paddedImg.Bounds().Max.Y) / 2
-	draw.Draw(paddedImg, bounds.Add(image.Pt(centerX-bounds.Dx()/2, centerY-bounds.Dy()/2)), circle, image.ZP, draw.Over)
-	return paddedImg
-}
-
 func ResizeImage(imgBytes []byte, width, height int) ([]byte, error) {
 	// Decode image bytes
 	img, _, err := image.Decode(bytes.NewReader(imgBytes))
@@ -295,4 +279,43 @@ func SuperimposeLogoOnQRImage(imageBytes []byte, qrFilepath []byte) []byte {
 	}
 
 	return b.Bytes()
+}
+
+func GenerateMask(maskHex string, shapeType server.LogoShape) ([]byte, error) {
+
+	maskColor, err := ParseColor(maskHex)
+	var dummyMask *Circle
+
+	if err != nil {
+		return nil, err
+	}
+
+	// todo : figure out how to get rid of this redundant code
+	dummyImageBytes := []byte{0xff, 0xd8, 0xff, 0xdb, 0x00, 0x84, 0x00, 0x50, 0x37, 0x3c, 0x46, 0x3c, 0x32, 0x50}
+	dummyImage, _, err := image.Decode(bytes.NewReader(dummyImageBytes))
+	dummyRadius := 5
+
+	if err != nil {
+		return nil, err
+	}
+
+	dummyCircularImage := image.NewRGBA(dummyImage.Bounds())
+
+	//so it seems like to generate a mask we need the following
+	// x, y, radius of the object
+	if shapeType == server.LogoShapeCircle {
+		dummyMask = &Circle{
+			X: dummyRadius,
+			Y: dummyRadius,
+			R: dummyRadius,
+		}
+	}
+
+	//then the following draw command would generate the mask
+	draw.DrawMask(dummyCircularImage, dummyCircularImage.Bounds(), image.NewUniform(maskColor), image.ZP, dummyMask, image.ZP, draw.Src)
+
+	var b bytes.Buffer
+	err = png.Encode(&b, dummyCircularImage)
+
+	return b.Bytes(), nil
 }

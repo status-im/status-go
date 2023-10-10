@@ -103,10 +103,24 @@ func (s *QROpsTestSuite) TestQROpsCodeWithSuperImposingLogo() {
 	params.Set("level", "2")
 	params.Set("size", "200")
 	params.Set("keyUid", keyUID)
+	params.Set("allowMask", "true")
+	params.Set("maskHex", "#eeeeee")
 	params.Set("imageName", "large")
 
 	payload := generateQRBytes(params, s.Logger, db)
 	s.Require().NotEmpty(payload)
+
+	f, err := os.Create("TestQROpsCodeWithSuperImposingLogo.png")
+	if err != nil {
+		s.Require().NoError(err)
+
+	}
+	defer f.Close()
+	_, err = f.Write(payload)
+
+	if err != nil {
+		s.Require().NoError(err)
+	}
 
 	expectedPayload, err := images.Asset("_assets/tests/qr/QRWithLogo.png")
 	require.Equal(s.T(), payload, expectedPayload)
