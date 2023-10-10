@@ -55,11 +55,12 @@ func NewService(
 	walletFeed *event.Feed,
 	accountsDB *accounts.Database,
 	accountsFeed *event.Feed,
+	settingsFeed *event.Feed,
 	networkManager *network.Manager,
 	manager *Manager) *Service {
 	return &Service{
 		manager:     manager,
-		controller:  NewController(db, walletFeed, accountsDB, accountsFeed, networkManager, manager),
+		controller:  NewController(db, walletFeed, accountsDB, accountsFeed, settingsFeed, networkManager, manager),
 		ownershipDB: NewOwnershipDB(db),
 		walletFeed:  walletFeed,
 		scheduler:   async.NewMultiClientScheduler(),

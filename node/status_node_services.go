@@ -98,7 +98,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	// Wallet Service is used by wakuExtSrvc/wakuV2ExtSrvc
 	// Keep this initialization before the other two
 	if config.WalletConfig.Enabled {
-		walletService := b.walletService(accDB, accountsFeed, &b.walletFeed)
+		walletService := b.walletService(accDB, accountsFeed, settingsFeed, &b.walletFeed)
 		services = append(services, walletService)
 	}
 
@@ -526,10 +526,10 @@ func (b *StatusNode) SetWalletCollectibleCommunityInfoProvider(provider thirdpar
 	}
 }
 
-func (b *StatusNode) walletService(accountsDB *accounts.Database, accountsFeed *event.Feed, walletFeed *event.Feed) *wallet.Service {
+func (b *StatusNode) walletService(accountsDB *accounts.Database, accountsFeed *event.Feed, settingsFeed *event.Feed, walletFeed *event.Feed) *wallet.Service {
 	if b.walletSrvc == nil {
 		b.walletSrvc = wallet.NewService(
-			b.walletDB, accountsDB, b.rpcClient, accountsFeed, b.gethAccountManager, b.transactor, b.config,
+			b.walletDB, accountsDB, b.rpcClient, accountsFeed, settingsFeed, b.gethAccountManager, b.transactor, b.config,
 			b.ensService(b.timeSourceNow()),
 			b.stickersService(accountsDB),
 			b.pendingTracker,

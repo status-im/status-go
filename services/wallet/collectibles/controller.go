@@ -11,8 +11,10 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
+	"github.com/status-im/status-go/services/accounts/settingsevent"
 	"github.com/status-im/status-go/services/wallet/async"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/transfer"
@@ -35,6 +37,7 @@ type Controller struct {
 	walletFeed   *event.Feed
 	accountsDB   *accounts.Database
 	accountsFeed *event.Feed
+	settingsFeed *event.Feed
 
 	networkManager *network.Manager
 	cancelFn       context.CancelFunc
@@ -44,6 +47,7 @@ type Controller struct {
 	group               *async.Group
 	accountsWatcher     *accountsevent.Watcher
 	walletEventsWatcher *walletevent.Watcher
+	settingsWatcher     *settingsevent.Watcher
 
 	commandsLock sync.RWMutex
 }
@@ -53,6 +57,7 @@ func NewController(
 	walletFeed *event.Feed,
 	accountsDB *accounts.Database,
 	accountsFeed *event.Feed,
+	settingsFeed *event.Feed,
 	networkManager *network.Manager,
 	manager *Manager) *Controller {
 	return &Controller{
@@ -61,6 +66,7 @@ func NewController(
 		walletFeed:     walletFeed,
 		accountsDB:     accountsDB,
 		accountsFeed:   accountsFeed,
+		settingsFeed:   settingsFeed,
 		networkManager: networkManager,
 		commands:       make(commandPerAddressAndChainID),
 		timers:         make(timerPerAddressAndChainID),
@@ -76,9 +82,14 @@ func (c *Controller) Start() {
 
 	// Setup collectibles fetch when relevant activity is detected
 	c.startWalletEventsWatcher()
+
+	// Setup collectibles fetch when chain-related settings change
+	c.startSettingsWatcher()
 }
 
 func (c *Controller) Stop() {
+	c.stopSettingsWatcher()
+
 	c.stopWalletEventsWatcher()
 
 	c.stopAccountsWatcher()
@@ -353,5 +364,32 @@ func (c *Controller) stopWalletEventsWatcher() {
 	if c.walletEventsWatcher != nil {
 		c.walletEventsWatcher.Stop()
 		c.walletEventsWatcher = nil
+	}
+}
+
+func (c *Controller) startSettingsWatcher() {
+	if c.settingsWatcher != nil {
+		return
+	}
+
+	settingChangeCb := func(setting settings.SettingField, value interface{}) {
+		if setting.Equals(settings.TestNetworksEnabled) || setting.Equals(settings.IsSepoliaEnabled) {
+			c.stopPeriodicalOwnershipFetch()
+			err := c.startPeriodicalOwnershipFetch()
+			if err != nil {
+				log.Error("Error starting periodical collectibles fetch", "error", err)
+			}
+		}
+	}
+
+	c.settingsWatcher = settingsevent.NewWatcher(c.settingsFeed, settingChangeCb)
+
+	c.settingsWatcher.Start()
+}
+
+func (c *Controller) stopSettingsWatcher() {
+	if c.settingsWatcher != nil {
+		c.settingsWatcher.Stop()
+		c.settingsWatcher = nil
 	}
 }
