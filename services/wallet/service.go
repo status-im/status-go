@@ -45,6 +45,7 @@ func NewService(
 	accountsDB *accounts.Database,
 	rpcClient *rpc.Client,
 	accountFeed *event.Feed,
+	settingsFeed *event.Feed,
 	gethManager *account.GethManager,
 	transactor *transactions.Transactor,
 	config *params.NodeConfig,
@@ -131,7 +132,7 @@ func NewService(
 	}
 
 	collectiblesManager := collectibles.NewManager(db, rpcClient, contractOwnershipProviders, accountOwnershipProviders, collectibleDataProviders, collectionDataProviders, feed)
-	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, rpcClient.NetworkManager, collectiblesManager)
+	collectibles := collectibles.NewService(db, feed, accountsDB, accountFeed, settingsFeed, rpcClient.NetworkManager, collectiblesManager)
 
 	activity := activity.NewService(db, tokenManager, collectiblesManager, feed)
 
