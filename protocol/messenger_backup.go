@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -333,10 +334,12 @@ func (m *Messenger) backupChats(ctx context.Context, clock uint64) []*protobuf.B
 		if !chat.OneToOne() && !chat.PrivateGroupChat() {
 			return true
 		}
+		fmt.Println("Sync chat ples", chat.Name, chat.ChatType, chat.Active)
 		syncChat := protobuf.SyncChat{
 			Id:       chatID,
 			ChatType: uint32(chat.ChatType),
 			Active:   chat.Active,
+			Clock:    uint64(time.Now().Unix()),
 		}
 		if chat.PrivateGroupChat() {
 			syncChat.Name = chat.Name // The Name is only useful in the case of a group chat

@@ -495,18 +495,22 @@ func (m *Messenger) HandleSyncInstallationAccount(state *ReceivedMessageState, m
 
 func (m *Messenger) handleSyncChats(messageState *ReceivedMessageState, chats []*protobuf.SyncChat) error {
 	for _, syncChat := range chats {
+		oldChat, ok := m.allChats.Load(syncChat.Id)
+		clock := int64(syncChat.Clock)
+		if ok && oldChat.Timestamp > clock {
+			// We already know this chat and its timestamp is newer than the syncChat
+			fmt.Println("skip old one", syncChat.Name, syncChat.ChatType)
+			continue
+		}
 		chat := &Chat{
 			ID:                       syncChat.Id,
 			Name:                     syncChat.Name,
-			Timestamp:                time.Now().Unix(),
+			Timestamp:                clock,
 			ReadMessagesAtClockValue: 0,
 			Active:                   syncChat.Active,
-			Joined:                   time.Now().Unix(),
+			Joined:                   clock,
 			ChatType:                 ChatType(syncChat.ChatType),
 			Highlight:                false,
-		}
-		if chat.OneToOne() {
-			chat.Name = "" // Emptying since it contains non useful data
 		}
 		if chat.PrivateGroupChat() {
 			chat.MembershipUpdates = make([]v1protocol.MembershipUpdateEvent, len(syncChat.MembershipUpdateEvents))
@@ -530,6 +534,7 @@ func (m *Messenger) handleSyncChats(messageState *ReceivedMessageState, chats []
 			chat.updateChatFromGroupMembershipChanges(group)
 		}
 
+		fmt.Println("Save chat", chat.Name, chat.ChatType, chat.Active)
 		err := m.saveChat(chat)
 		if err != nil {
 			return err

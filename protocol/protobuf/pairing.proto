@@ -160,6 +160,7 @@ message SyncChat {
   string name = 3;
   repeated MembershipUpdateEvents membershipUpdateEvents = 4;
   bool active = 5;
+  uint64 clock = 6;
 }
 
 message MembershipUpdateEvents {
