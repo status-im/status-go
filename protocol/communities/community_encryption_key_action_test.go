@@ -22,7 +22,6 @@ func createTestCommunity(identity *ecdsa.PrivateKey) (*Community, error) {
 			Chats:                   map[string]*protobuf.CommunityChat{},
 			BanList:                 []string{},
 			Categories:              map[string]*protobuf.CommunityCategory{},
-			Encrypted:               false,
 			TokenPermissions:        map[string]*protobuf.CommunityTokenPermission{},
 			CommunityTokensMetadata: []*protobuf.CommunityTokenMetadata{},
 		},
