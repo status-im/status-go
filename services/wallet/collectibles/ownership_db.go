@@ -77,6 +77,42 @@ func updateAddressOwnershipTimestamp(creator sqlite.StatementCreator, ownerAddre
 	return err
 }
 
+// Returns the list of new IDs when comparing the given list of IDs with the ones in the DB.
+// Call before Update for the result to be useful.
+func (o *OwnershipDB) GetIDsNotInDB(
+	chainID w_common.ChainID,
+	ownerAddress common.Address,
+	newIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.CollectibleUniqueID, error) {
+	ret := make([]thirdparty.CollectibleUniqueID, 0, len(newIDs))
+
+	exists, err := o.db.Prepare(`SELECT EXISTS (
+			SELECT 1 FROM collectibles_ownership_cache
+			WHERE chain_id=? AND contract_address=? AND token_id=? AND owner_address=?
+		)`)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, id := range newIDs {
+		row := exists.QueryRow(
+			id.ContractID.ChainID,
+			id.ContractID.Address,
+			(*bigint.SQLBigIntBytes)(id.TokenID.Int),
+			ownerAddress,
+		)
+		var exists bool
+		err = row.Scan(&exists)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			ret = append(ret, id)
+		}
+	}
+
+	return ret, nil
+}
+
 func (o *OwnershipDB) Update(chainID w_common.ChainID, ownerAddress common.Address, collectibles []thirdparty.CollectibleUniqueID, timestamp int64) (err error) {
 	var (
 		tx *sql.Tx

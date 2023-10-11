@@ -42,6 +42,12 @@ type CommunityHeader struct {
 	PrivilegesLevel token.PrivilegesLevel `json:"privileges_level"`
 }
 
+type CommunityCollectibleHeader struct {
+	ID              thirdparty.CollectibleUniqueID `json:"id"`
+	Name            string                         `json:"name"`
+	CommunityHeader CommunityHeader                `json:"community_header"`
+}
+
 func fullCollectibleDataToHeader(c thirdparty.FullCollectibleData) CollectibleHeader {
 	ret := CollectibleHeader{
 		ID:                 c.CollectibleData.ID,
@@ -76,4 +82,13 @@ func fullCollectibleDataToDetails(c thirdparty.FullCollectibleData) CollectibleD
 		ret.CollectionImageURL = c.CollectionData.ImageURL
 	}
 	return ret
+}
+
+func communityInfoToHeader(c thirdparty.CollectiblesCommunityInfo) CommunityHeader {
+	return CommunityHeader{
+		CommunityID:     c.CommunityID,
+		CommunityName:   c.CommunityName,
+		CommunityColor:  c.CommunityColor,
+		PrivilegesLevel: c.PrivilegesLevel,
+	}
 }

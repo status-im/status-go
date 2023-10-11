@@ -26,6 +26,7 @@ const (
 	EventCollectiblesOwnershipUpdatePartial           walletevent.EventType = "wallet-collectibles-ownership-update-partial"
 	EventCollectiblesOwnershipUpdateFinished          walletevent.EventType = "wallet-collectibles-ownership-update-finished"
 	EventCollectiblesOwnershipUpdateFinishedWithError walletevent.EventType = "wallet-collectibles-ownership-update-finished-with-error"
+	EventCommunityCollectiblesReceived                walletevent.EventType = "wallet-collectibles-community-collectibles-received"
 
 	EventOwnedCollectiblesFilteringDone walletevent.EventType = "wallet-owned-collectibles-filtering-done"
 	EventGetCollectiblesDetailsDone     walletevent.EventType = "wallet-get-collectibles-details-done"
@@ -258,12 +259,8 @@ func (s *Service) fullCollectiblesDataToHeaders(data []thirdparty.FullCollectibl
 				return nil, err
 			}
 
-			header.CommunityHeader = &CommunityHeader{
-				CommunityID:     communityInfo.CommunityID,
-				CommunityName:   communityInfo.CommunityName,
-				CommunityColor:  communityInfo.CommunityColor,
-				PrivilegesLevel: communityInfo.PrivilegesLevel,
-			}
+			communityHeader := communityInfoToHeader(*communityInfo)
+			header.CommunityHeader = &communityHeader
 		}
 
 		res = append(res, header)
