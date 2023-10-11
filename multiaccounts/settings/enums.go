@@ -29,5 +29,4 @@ const (
 	URLUnfurlingAlwaysAsk URLUnfurlingModeType = iota + 1
 	URLUnfurlingEnableAll
 	URLUnfurlingDisableAll
-	URLUnfurlingSpecifyForSite // TODO: post-mvp
 )

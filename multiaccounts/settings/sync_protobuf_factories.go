@@ -529,7 +529,7 @@ func buildRawURLUnfurlingModeSyncMessage(v int64, clock uint64, chatID string) (
 	return rm, pb, err
 }
 
-func urlUnfurlingModeProtobufFactory(value interface{}, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
+func urlUnfurlingModeProtobufFactory(value any, clock uint64, chatID string) (*common.RawMessage, *protobuf.SyncSetting, error) {
 	v, err := parseNumberToInt64(value)
 	if err != nil {
 		return nil, nil, err

@@ -155,8 +155,6 @@ func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (*UnfurlU
 		// This mode should be handled on the app side
 		// and is considered as equal to URLUnfurlingEnableAll in status-go.
 		break
-	case settings.URLUnfurlingSpecifyForSite:
-		// TODO: implement filtering post-mvp
 	default:
 		return nil, fmt.Errorf("invalid url unfurling mode setting: %d", s.URLUnfurlingMode)
 	}

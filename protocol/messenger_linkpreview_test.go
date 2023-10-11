@@ -553,6 +553,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
 	linkPreviews, err = s.m.UnfurlURLs(&stubbedClient, []string{u})
 	s.Require().NoError(err)
 	s.Require().Len(linkPreviews, 1)
+	s.Require().Equal(requestsCount, 1)
 
 	// Test `DisableAll`
 	requestsCount = 0
@@ -562,5 +563,6 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
 	linkPreviews, err = s.m.UnfurlURLs(&stubbedClient, []string{u})
 	s.Require().Error(err)
 	s.Require().Len(linkPreviews, 0)
+	s.Require().Equal(requestsCount, 0)
 
 }
