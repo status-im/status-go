@@ -161,6 +161,7 @@ message SyncChat {
   repeated MembershipUpdateEvents membershipUpdateEvents = 4;
   bool active = 5;
   uint64 clock = 6;
+  bool muted = 7;
 }
 
 message MembershipUpdateEvents {

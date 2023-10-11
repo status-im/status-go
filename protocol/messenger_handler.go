@@ -499,7 +499,6 @@ func (m *Messenger) handleSyncChats(messageState *ReceivedMessageState, chats []
 		clock := int64(syncChat.Clock)
 		if ok && oldChat.Timestamp > clock {
 			// We already know this chat and its timestamp is newer than the syncChat
-			fmt.Println("skip old one", syncChat.Name, syncChat.ChatType)
 			continue
 		}
 		chat := &Chat{
@@ -508,6 +507,7 @@ func (m *Messenger) handleSyncChats(messageState *ReceivedMessageState, chats []
 			Timestamp:                clock,
 			ReadMessagesAtClockValue: 0,
 			Active:                   syncChat.Active,
+			Muted:                    syncChat.Muted,
 			Joined:                   clock,
 			ChatType:                 ChatType(syncChat.ChatType),
 			Highlight:                false,
