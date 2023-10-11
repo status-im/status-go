@@ -329,13 +329,14 @@ func (m *Messenger) backupCommunities(ctx context.Context, clock uint64) ([]*pro
 
 func (m *Messenger) backupChats(ctx context.Context, clock uint64) []*protobuf.Backup {
 	var oneToOneAndGroupChats []*protobuf.SyncChat
-	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool) {
-		if !chat.Active || (!chat.OneToOne() && !chat.PrivateGroupChat()) {
+	m.allChats.Range(func(chatID string, chat *Chat) bool {
+		if !chat.OneToOne() && !chat.PrivateGroupChat() {
 			return true
 		}
 		syncChat := protobuf.SyncChat{
 			Id:       chatID,
 			ChatType: uint32(chat.ChatType),
+			Active:   chat.Active,
 		}
 		if chat.PrivateGroupChat() {
 			syncChat.Name = chat.Name // The Name is only useful in the case of a group chat

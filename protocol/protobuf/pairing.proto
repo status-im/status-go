@@ -159,6 +159,7 @@ message SyncChat {
   uint32 chat_type = 2;
   string name = 3;
   repeated MembershipUpdateEvents membershipUpdateEvents = 4;
+  bool active = 5;
 }
 
 message MembershipUpdateEvents {

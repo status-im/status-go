@@ -500,7 +500,7 @@ func (m *Messenger) handleSyncChats(messageState *ReceivedMessageState, chats []
 			Name:                     syncChat.Name,
 			Timestamp:                time.Now().Unix(),
 			ReadMessagesAtClockValue: 0,
-			Active:                   true,
+			Active:                   syncChat.Active,
 			Joined:                   time.Now().Unix(),
 			ChatType:                 ChatType(syncChat.ChatType),
 			Highlight:                false,
