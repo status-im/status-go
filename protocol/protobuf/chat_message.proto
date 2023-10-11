@@ -135,14 +135,14 @@ message UnfurledLink {
 }
 
 message UnfurledStatusContactLink {
-  string public_key = 1;
+  bytes public_key = 1;
   string display_name = 2;
   string description = 3;
   UnfurledLinkThumbnail icon = 4;
 }
 
 message UnfurledStatusCommunityLink {
-  string community_id = 1;
+  bytes community_id = 1;
   string display_name = 2;
   string description = 3;
   uint32 members_count = 4;
@@ -152,7 +152,7 @@ message UnfurledStatusCommunityLink {
 }
 
 message UnfurledStatusChannelLink {
-  string channel_uuid = 1;
+  bytes channel_uuid = 1;
   string emoji = 2;
   string display_name = 3;
   string description = 4;

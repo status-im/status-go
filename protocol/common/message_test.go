@@ -341,7 +341,7 @@ func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
 	require.Nil(t, l1.GetCommunity())
 	require.Nil(t, l1.GetChannel())
 	c1 := l1.GetContact()
-	require.Equal(t, contact.PublicKey, c1.PublicKey)
+	require.Equal(t, contact.PublicKey, string(c1.PublicKey))
 	require.Equal(t, contact.DisplayName, c1.DisplayName)
 	require.Equal(t, contact.Description, c1.Description)
 	require.NotNil(t, c1.Icon)
@@ -357,7 +357,7 @@ func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
 	require.Nil(t, l2.GetContact())
 	require.Nil(t, l2.GetChannel())
 	c2 := l2.GetCommunity()
-	require.Equal(t, community.CommunityID, c2.CommunityId)
+	require.Equal(t, community.CommunityID, string(c2.CommunityId))
 	require.Equal(t, community.DisplayName, c2.DisplayName)
 	require.Equal(t, community.Description, c2.Description)
 	require.Equal(t, community.MembersCount, c2.MembersCount)
@@ -380,14 +380,14 @@ func TestConvertStatusLinkPreviewsToProto(t *testing.T) {
 	require.Nil(t, l3.GetCommunity())
 
 	c3 := l3.GetChannel()
-	require.Equal(t, channel.ChannelUUID, c3.ChannelUuid)
+	require.Equal(t, channel.ChannelUUID, string(c3.ChannelUuid))
 	require.Equal(t, channel.Emoji, c3.Emoji)
 	require.Equal(t, channel.DisplayName, c3.DisplayName)
 	require.Equal(t, channel.Description, c3.Description)
 	require.Equal(t, channel.Color, c3.Color)
 
 	require.NotNil(t, c3.Community)
-	require.Equal(t, channel.Community.CommunityID, c3.Community.CommunityId)
+	require.Equal(t, channel.Community.CommunityID, string(c3.Community.CommunityId))
 	require.Equal(t, channel.Community.DisplayName, c3.Community.DisplayName)
 	require.Equal(t, channel.Community.Color, c3.Community.Color)
 	require.Equal(t, channel.Community.Description, c3.Community.Description)
@@ -417,7 +417,7 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 	require.NoError(t, err)
 
 	contact := &protobuf.UnfurledStatusContactLink{
-		PublicKey:   "PublicKey_1",
+		PublicKey:   []byte("PublicKey_1"),
 		DisplayName: "DisplayName_2",
 		Description: "Description_3",
 		Icon: &protobuf.UnfurledLinkThumbnail{
@@ -428,7 +428,7 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 	}
 
 	community := &protobuf.UnfurledStatusCommunityLink{
-		CommunityId:  "CommunityId_4",
+		CommunityId:  []byte("CommunityId_4"),
 		DisplayName:  "DisplayName_5",
 		Description:  "Description_6",
 		MembersCount: 7,
@@ -446,13 +446,13 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 	}
 
 	channel := &protobuf.UnfurledStatusChannelLink{
-		ChannelUuid: "ChannelUuid_11",
+		ChannelUuid: []byte("ChannelUuid_11"),
 		Emoji:       "Emoji_12",
 		DisplayName: "DisplayName_13",
 		Description: "Description_14",
 		Color:       "Color_15",
 		Community: &protobuf.UnfurledStatusCommunityLink{
-			CommunityId:  "CommunityId_16",
+			CommunityId:  []byte("CommunityId_16"),
 			DisplayName:  "DisplayName_17",
 			Description:  "Description_18",
 			MembersCount: 19,
@@ -515,7 +515,7 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 
 	c1 := p1.Contact
 	require.NotNil(t, c1)
-	require.Equal(t, contact.PublicKey, c1.PublicKey)
+	require.Equal(t, contact.PublicKey, []byte(c1.PublicKey))
 	require.Equal(t, contact.DisplayName, c1.DisplayName)
 	require.Equal(t, contact.Description, c1.Description)
 	require.NotNil(t, c1.Icon)
@@ -533,7 +533,7 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 	require.Nil(t, p2.Channel)
 
 	c2 := p2.Community
-	require.Equal(t, community.CommunityId, c2.CommunityID)
+	require.Equal(t, community.CommunityId, []byte(c2.CommunityID))
 	require.Equal(t, community.DisplayName, c2.DisplayName)
 	require.Equal(t, community.Description, c2.Description)
 	require.Equal(t, community.MembersCount, c2.MembersCount)
@@ -558,14 +558,14 @@ func TestConvertFromProtoToStatusLinkPreviews(t *testing.T) {
 	require.Nil(t, p3.Community)
 
 	c3 := previews[2].Channel
-	require.Equal(t, channel.ChannelUuid, c3.ChannelUUID)
+	require.Equal(t, channel.ChannelUuid, []byte(c3.ChannelUUID))
 	require.Equal(t, channel.Emoji, c3.Emoji)
 	require.Equal(t, channel.DisplayName, c3.DisplayName)
 	require.Equal(t, channel.Description, c3.Description)
 	require.Equal(t, channel.Color, c3.Color)
 
 	require.NotNil(t, p3.Channel.Community)
-	require.Equal(t, channel.Community.CommunityId, c3.Community.CommunityID)
+	require.Equal(t, channel.Community.CommunityId, []byte(c3.Community.CommunityID))
 	require.Equal(t, channel.Community.DisplayName, c3.Community.DisplayName)
 	require.Equal(t, channel.Community.Color, c3.Community.Color)
 	require.Equal(t, channel.Community.Description, c3.Community.Description)
