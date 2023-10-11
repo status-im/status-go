@@ -3,6 +3,7 @@ package collectibles
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"sync"
 	"time"
@@ -221,6 +222,7 @@ func (c *Controller) startPeriodicalOwnershipFetchForAccountAndChainID(address c
 		c.walletFeed,
 		chainID,
 		address,
+		c.notifyCommunityCollectiblesReceived,
 	)
 
 	c.commands[address][chainID] = command
@@ -392,4 +394,54 @@ func (c *Controller) stopSettingsWatcher() {
 		c.settingsWatcher.Stop()
 		c.settingsWatcher = nil
 	}
+}
+
+func (c *Controller) notifyCommunityCollectiblesReceived(ownedCollectibles OwnedCollectibles) {
+	collectiblesData, err := c.manager.FetchAssetsByCollectibleUniqueID(ownedCollectibles.ids)
+	if err != nil {
+		log.Error("Error fetching collectibles data", "error", err)
+		return
+	}
+
+	communityCollectibles := make([]CommunityCollectibleHeader, 0, len(collectiblesData))
+	for _, collectibleData := range collectiblesData {
+		collectibleID := collectibleData.CollectibleData.ID
+		communityID := collectibleData.CollectibleData.CommunityID
+
+		if communityID == "" {
+			continue
+		}
+
+		communityInfo, err := c.manager.FetchCollectibleCommunityInfo(communityID, collectibleID)
+		if err != nil {
+			log.Error("Error fetching community info", "error", err)
+			continue
+		}
+
+		header := CommunityCollectibleHeader{
+			ID:              collectibleID,
+			Name:            collectibleData.CollectibleData.Name,
+			CommunityHeader: communityInfoToHeader(*communityInfo),
+		}
+
+		communityCollectibles = append(communityCollectibles, header)
+	}
+
+	if len(communityCollectibles) == 0 {
+		return
+	}
+
+	encodedMessage, err := json.Marshal(communityCollectibles)
+	if err != nil {
+		return
+	}
+
+	c.walletFeed.Send(walletevent.Event{
+		Type:    EventCommunityCollectiblesReceived,
+		ChainID: uint64(ownedCollectibles.chainID),
+		Accounts: []common.Address{
+			ownedCollectibles.account,
+		},
+		Message: string(encodedMessage),
+	})
 }

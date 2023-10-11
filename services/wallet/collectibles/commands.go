@@ -23,6 +23,14 @@ const (
 
 type OwnershipState = int
 
+type OwnedCollectibles struct {
+	chainID walletCommon.ChainID
+	account common.Address
+	ids     []thirdparty.CollectibleUniqueID
+}
+
+type OwnedCollectiblesCb func(OwnedCollectibles)
+
 const (
 	OwnershipStateIdle OwnershipState = iota + 1
 	OwnershipStateDelayed
@@ -31,23 +39,31 @@ const (
 )
 
 type periodicRefreshOwnedCollectiblesCommand struct {
-	chainID     walletCommon.ChainID
-	account     common.Address
-	manager     *Manager
-	ownershipDB *OwnershipDB
-	walletFeed  *event.Feed
+	chainID                walletCommon.ChainID
+	account                common.Address
+	manager                *Manager
+	ownershipDB            *OwnershipDB
+	walletFeed             *event.Feed
+	receivedCollectiblesCb OwnedCollectiblesCb
 
 	group *async.Group
 	state atomic.Value
 }
 
-func newPeriodicRefreshOwnedCollectiblesCommand(manager *Manager, ownershipDB *OwnershipDB, walletFeed *event.Feed, chainID walletCommon.ChainID, account common.Address) *periodicRefreshOwnedCollectiblesCommand {
+func newPeriodicRefreshOwnedCollectiblesCommand(
+	manager *Manager,
+	ownershipDB *OwnershipDB,
+	walletFeed *event.Feed,
+	chainID walletCommon.ChainID,
+	account common.Address,
+	receivedCollectiblesCb OwnedCollectiblesCb) *periodicRefreshOwnedCollectiblesCommand {
 	ret := &periodicRefreshOwnedCollectiblesCommand{
-		manager:     manager,
-		ownershipDB: ownershipDB,
-		walletFeed:  walletFeed,
-		chainID:     chainID,
-		account:     account,
+		manager:                manager,
+		ownershipDB:            ownershipDB,
+		walletFeed:             walletFeed,
+		chainID:                chainID,
+		account:                account,
+		receivedCollectiblesCb: receivedCollectiblesCb,
 	}
 	ret.state.Store(OwnershipStateIdle)
 	return ret
@@ -89,7 +105,9 @@ func (c *periodicRefreshOwnedCollectiblesCommand) Stop() {
 
 func (c *periodicRefreshOwnedCollectiblesCommand) loadOwnedCollectibles(ctx context.Context) error {
 	c.group = async.NewGroup(ctx)
-	command := newLoadOwnedCollectiblesCommand(c.manager, c.ownershipDB, c.walletFeed, c.chainID, c.account)
+
+	receivedCollectiblesCh := make(chan OwnedCollectibles)
+	command := newLoadOwnedCollectiblesCommand(c.manager, c.ownershipDB, c.walletFeed, c.chainID, c.account, receivedCollectiblesCh)
 
 	c.state.Store(OwnershipStateUpdating)
 	defer func() {
@@ -103,9 +121,14 @@ func (c *periodicRefreshOwnedCollectiblesCommand) loadOwnedCollectibles(ctx cont
 	c.group.Add(command.Command())
 
 	select {
+	case ownedCollectibles := <-receivedCollectiblesCh:
+		if c.receivedCollectiblesCb != nil {
+			c.receivedCollectiblesCb(ownedCollectibles)
+		}
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-c.group.WaitAsync():
+		return nil
 	}
 
 	return nil
@@ -114,24 +137,32 @@ func (c *periodicRefreshOwnedCollectiblesCommand) loadOwnedCollectibles(ctx cont
 // Fetches owned collectibles for a ChainID+OwnerAddress combination in chunks
 // and updates the ownershipDB when all chunks are loaded
 type loadOwnedCollectiblesCommand struct {
-	chainID     walletCommon.ChainID
-	account     common.Address
-	manager     *Manager
-	ownershipDB *OwnershipDB
-	walletFeed  *event.Feed
+	chainID                walletCommon.ChainID
+	account                common.Address
+	manager                *Manager
+	ownershipDB            *OwnershipDB
+	walletFeed             *event.Feed
+	receivedCollectiblesCh chan<- OwnedCollectibles
 
 	// Not to be set by the caller
 	partialOwnership []thirdparty.CollectibleUniqueID
 	err              error
 }
 
-func newLoadOwnedCollectiblesCommand(manager *Manager, ownershipDB *OwnershipDB, walletFeed *event.Feed, chainID walletCommon.ChainID, account common.Address) *loadOwnedCollectiblesCommand {
+func newLoadOwnedCollectiblesCommand(
+	manager *Manager,
+	ownershipDB *OwnershipDB,
+	walletFeed *event.Feed,
+	chainID walletCommon.ChainID,
+	account common.Address,
+	receivedCollectiblesCh chan<- OwnedCollectibles) *loadOwnedCollectiblesCommand {
 	return &loadOwnedCollectiblesCommand{
-		manager:     manager,
-		ownershipDB: ownershipDB,
-		walletFeed:  walletFeed,
-		chainID:     chainID,
-		account:     account,
+		manager:                manager,
+		ownershipDB:            ownershipDB,
+		walletFeed:             walletFeed,
+		chainID:                chainID,
+		account:                account,
+		receivedCollectiblesCh: receivedCollectiblesCh,
 	}
 }
 
@@ -196,10 +227,22 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 			// Normally, update the DB once we've finished fetching
 			// If this is the first fetch, make partial updates to the client to get a better UX
 			if initialFetch || finished {
+				receivedIDs, err := c.ownershipDB.GetIDsNotInDB(c.chainID, c.account, c.partialOwnership)
+				if err != nil {
+					log.Error("failed GetIDsNotInDB in processOwnedIDs", "chain", c.chainID, "account", c.account, "error", err)
+					return err
+				}
+
 				err = c.ownershipDB.Update(c.chainID, c.account, c.partialOwnership, start.Unix())
 				if err != nil {
 					log.Error("failed updating ownershipDB in loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "error", err)
 					c.err = err
+				}
+
+				c.receivedCollectiblesCh <- OwnedCollectibles{
+					chainID: c.chainID,
+					account: c.account,
+					ids:     receivedIDs,
 				}
 			}
 
