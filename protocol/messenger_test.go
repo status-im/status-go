@@ -2363,7 +2363,7 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	s.Require().Nil(savedStatusLinkProto.GetChannel())
 
 	savedContactProto := savedStatusLinkProto.GetContact()
-	s.Require().Equal(sentContactPreview.Contact.PublicKey, savedContactProto.PublicKey)
+	s.Require().Equal(sentContactPreview.Contact.PublicKey, string(savedContactProto.PublicKey))
 	s.Require().Equal(sentContactPreview.Contact.DisplayName, savedContactProto.DisplayName)
 	s.Require().Equal(sentContactPreview.Contact.Description, savedContactProto.Description)
 	s.Require().NotNil(savedContactProto.Icon)
