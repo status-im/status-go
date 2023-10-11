@@ -93,7 +93,7 @@ message CommunityDescription {
   CommunityAdminSettings admin_settings = 10;
   string intro_message = 11;
   string outro_message = 12;
-  bool encrypted = 13;
+  bool encrypted = 13 [deprecated=true];
   repeated string tags = 14;
   map<string, CommunityTokenPermission> token_permissions = 15;
   repeated CommunityTokenMetadata community_tokens_metadata = 16;
