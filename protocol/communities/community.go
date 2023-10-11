@@ -141,7 +141,7 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 				Position: int(c.Position),
 			}
 			communityItem.Categories[id] = category
-			communityItem.Encrypted = o.config.CommunityDescription.Encrypted
+			communityItem.Encrypted = o.Encrypted()
 		}
 		for id, c := range o.config.CommunityDescription.Chats {
 			canPost, err := o.CanPost(o.config.MemberIdentity, id, nil)
@@ -260,7 +260,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 				Name:     c.Name,
 				Position: int(c.Position),
 			}
-			communityItem.Encrypted = o.config.CommunityDescription.Encrypted
+			communityItem.Encrypted = o.Encrypted()
 			communityItem.Categories[id] = category
 		}
 		for id, c := range o.config.CommunityDescription.Chats {
@@ -905,7 +905,7 @@ func (o *Community) Spectate() {
 }
 
 func (o *Community) Encrypted() bool {
-	return o.config.CommunityDescription.Encrypted
+	return len(o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)) > 0
 }
 
 func (o *Community) Joined() bool {
@@ -1474,10 +1474,6 @@ func includes(channelIDs []string, channelID string) bool {
 	return false
 }
 
-func (o *Community) updateEncrypted() {
-	o.config.CommunityDescription.Encrypted = len(o.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)) > 0
-}
-
 func (o *Community) UpsertTokenPermission(tokenPermission *protobuf.CommunityTokenPermission) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
@@ -1488,7 +1484,6 @@ func (o *Community) UpsertTokenPermission(tokenPermission *protobuf.CommunityTok
 			return nil, err
 		}
 
-		o.updateEncrypted()
 		o.increaseClock()
 
 		return changes, nil
@@ -1534,7 +1529,6 @@ func (o *Community) DeleteTokenPermission(permissionID string) (*CommunityChange
 			return nil, err
 		}
 
-		o.updateEncrypted()
 		o.increaseClock()
 
 		return changes, nil

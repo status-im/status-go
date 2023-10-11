@@ -128,7 +128,6 @@ func (c *CreateCommunity) ToCommunityDescription() (*protobuf.CommunityDescripti
 		},
 		IntroMessage: c.IntroMessage,
 		OutroMessage: c.OutroMessage,
-		Encrypted:    false,
 		Tags:         c.Tags,
 	}
 	return description, nil
