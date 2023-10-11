@@ -2024,11 +2024,18 @@ func addCommunityTokenToCommunityTokensService(base CommunityEventsTestsInterfac
 
 func testJoinedPrivilegedMemberReceiveRequestsToJoin(base CommunityEventsTestsInterface, community *communities.Community,
 	bob *Messenger, newPrivilegedUser *Messenger, tokenPermissionType protobuf.CommunityTokenPermission_Type) {
+	s := base.GetSuite()
+
+	_, err := bob.Start()
+	s.Require().NoError(err)
+	defer bob.Shutdown() // nolint: errcheck
+
+	_, err = newPrivilegedUser.Start()
+	s.Require().NoError(err)
+	defer newPrivilegedUser.Shutdown() // nolint: errcheck
 	// create community permission
 	rolePermission := createTestPermissionRequest(community, tokenPermissionType)
 	controlNodeCreatesCommunityPermission(base, community, rolePermission)
-
-	s := base.GetSuite()
 
 	advertiseCommunityTo(s, community, base.GetControlNode(), bob)
 	advertiseCommunityTo(s, community, base.GetControlNode(), newPrivilegedUser)
