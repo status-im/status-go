@@ -207,7 +207,7 @@ func (s *HandlersSuite) TestHandleLinkPreviewThumbnail() {
 
 func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 	contact := &protobuf.UnfurledStatusContactLink{
-		PublicKey: "PublicKey_1",
+		PublicKey: []byte("PublicKey_1"),
 		Icon: &protobuf.UnfurledLinkThumbnail{
 			Width:   10,
 			Height:  20,
@@ -216,7 +216,7 @@ func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 	}
 
 	contactWithUnsupportedImage := &protobuf.UnfurledStatusContactLink{
-		PublicKey: "PublicKey_2",
+		PublicKey: []byte("PublicKey_2"),
 		Icon: &protobuf.UnfurledLinkThumbnail{
 			Width:   10,
 			Height:  20,
@@ -225,7 +225,7 @@ func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 	}
 
 	community := &protobuf.UnfurledStatusCommunityLink{
-		CommunityId: "CommunityId_1",
+		CommunityId: []byte("CommunityId_1"),
 		Icon: &protobuf.UnfurledLinkThumbnail{
 			Width:   30,
 			Height:  40,
@@ -239,9 +239,9 @@ func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 	}
 
 	channel := &protobuf.UnfurledStatusChannelLink{
-		ChannelUuid: "ChannelUuid_1",
+		ChannelUuid: []byte("ChannelUuid_1"),
 		Community: &protobuf.UnfurledStatusCommunityLink{
-			CommunityId: "CommunityId_2",
+			CommunityId: []byte("CommunityId_2"),
 			Icon: &protobuf.UnfurledLinkThumbnail{
 				Width:   70,
 				Height:  80,
