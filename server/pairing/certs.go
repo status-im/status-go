@@ -114,7 +114,8 @@ func getServerCert(URL *url.URL) (*x509.Certificate, error) {
 		InsecureSkipVerify: true, // nolint: gosec // Only skip verify to get the server's TLS cert. DO NOT skip for any other reason.
 	}
 
-	conn, err := tls.Dial("tcp", URL.Host, conf)
+	// one second should be enough to get the server's TLS cert in LAN?
+	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: time.Second}, "tcp", URL.Host, conf)
 	if err != nil {
 		return nil, err
 	}

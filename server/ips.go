@@ -3,6 +3,7 @@ package server
 import (
 	"net"
 	"runtime"
+	"strings"
 
 	"go.uber.org/zap"
 
@@ -98,7 +99,7 @@ func getAndroidLocalIP() ([][]net.IP, error) {
 func getLocalAddresses() ([][]net.IP, error) {
 	// TODO until we can resolve Android errors when calling net.Interfaces() just return the outbound local address.
 	//  Sorry Android
-	if runtime.GOOS == common.AndroidPlatform {
+	if strings.HasPrefix(runtime.GOOS, common.AndroidPlatform) {
 		return getAndroidLocalIP()
 	}
 
@@ -192,7 +193,7 @@ func getAllAvailableNetworks() ([]net.IPNet, error) {
 // that returns a reachable server's address to be used by local pairing client.
 func FindReachableAddressesForPairingClient(serverIps []net.IP) ([]net.IP, error) {
 	// TODO until we can resolve Android errors when calling net.Interfaces() just noop. Sorry Android
-	if runtime.GOOS == common.AndroidPlatform {
+	if strings.HasPrefix(runtime.GOOS, common.AndroidPlatform) {
 		return serverIps, nil
 	}
 

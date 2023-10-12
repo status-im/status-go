@@ -2,6 +2,7 @@ package pairing
 
 import (
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,7 +46,7 @@ func (p *PeerNotifier) handler(hello *peers.LocalPairingPeerHello) {
 
 func (p *PeerNotifier) Search() error {
 	// TODO until we can resolve Android errors when calling net.Interfaces() just noop. Sorry Android
-	if runtime.GOOS == common.AndroidPlatform {
+	if strings.HasPrefix(runtime.GOOS, common.AndroidPlatform) {
 		return nil
 	}
 
