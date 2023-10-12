@@ -6,12 +6,9 @@ import (
 	"database/sql"
 	"fmt"
 	"io/ioutil"
-	"math"
-	"math/big"
 	"net"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -99,6 +96,7 @@ type Manager struct {
 	historyArchiveDownloadTasks      map[string]*HistoryArchiveDownloadTask
 	stopped                          bool
 	RekeyInterval                    time.Duration
+	PermissionChecker                PermissionChecker
 }
 
 type HistoryArchiveDownloadTask struct {
@@ -127,6 +125,7 @@ type managerOptions struct {
 	collectiblesManager    CollectiblesManager
 	walletConfig           *params.WalletConfig
 	communityTokensService communitytokens.ServiceInterface
+	permissionChecker      PermissionChecker
 }
 
 type TokenManager interface {
@@ -181,6 +180,12 @@ type ManagerOption func(*managerOptions)
 func WithAccountManager(accountsManager account.Manager) ManagerOption {
 	return func(opts *managerOptions) {
 		opts.accountsManager = accountsManager
+	}
+}
+
+func WithPermissionChecker(permissionChecker PermissionChecker) ManagerOption {
+	return func(opts *managerOptions) {
+		opts.permissionChecker = permissionChecker
 	}
 }
 
@@ -283,6 +288,17 @@ func NewManager(identity *ecdsa.PrivateKey, installationID string, db *sql.DB, e
 		sub := ensverifier.Subscribe()
 		manager.ensSubscription = sub
 		manager.ensVerifier = ensverifier
+	}
+
+	if managerConfig.permissionChecker != nil {
+		manager.PermissionChecker = managerConfig.permissionChecker
+	} else {
+		manager.PermissionChecker = &DefaultPermissionChecker{
+			tokenManager:        manager.tokenManager,
+			collectiblesManager: manager.collectiblesManager,
+			logger:              logger,
+			ensVerifier:         ensverifier,
+		}
 	}
 
 	return manager, nil
@@ -929,7 +945,7 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 		}
 
 		if hasMemberPermissions {
-			permissionResponse, err := m.checkPermissions(becomeMemberPermissions, accountsAndChainIDs, true)
+			permissionResponse, err := m.PermissionChecker.CheckPermissions(becomeMemberPermissions, accountsAndChainIDs, true)
 			if err != nil {
 				return nil, err
 			}
@@ -2123,31 +2139,7 @@ func (m *Manager) CheckPermissionToJoin(id []byte, addresses []gethcommon.Addres
 		return nil, err
 	}
 
-	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
-	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
-	becomeTokenMasterPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
-
-	permissionsToJoin := append(becomeAdminPermissions, becomeMemberPermissions...)
-	permissionsToJoin = append(permissionsToJoin, becomeTokenMasterPermissions...)
-
-	allChainIDs, err := m.tokenManager.GetAllChainIDs()
-	if err != nil {
-		return nil, err
-	}
-
-	accountsAndChainIDs := combineAddressesAndChainIDs(addresses, allChainIDs)
-
-	if len(becomeMemberPermissions) == 0 || len(permissionsToJoin) == 0 {
-		// There are no permissions to join on this community at the moment,
-		// so we reveal all accounts + all chain IDs
-		response := &CheckPermissionsResponse{
-			Satisfied:         true,
-			Permissions:       make(map[string]*PermissionTokenCriteriaResult),
-			ValidCombinations: accountsAndChainIDs,
-		}
-		return response, nil
-	}
-	return m.checkPermissions(permissionsToJoin, accountsAndChainIDs, false)
+	return m.PermissionChecker.CheckPermissionToJoin(community, addresses)
 
 }
 
@@ -2165,7 +2157,7 @@ func (m *Manager) accountsSatisfyPermissionsToJoin(community *Community, account
 	}
 
 	if len(becomeMemberPermissions) > 0 {
-		permissionResponse, err := m.checkPermissions(becomeMemberPermissions, accountsAndChainIDs, true)
+		permissionResponse, err := m.PermissionChecker.CheckPermissions(becomeMemberPermissions, accountsAndChainIDs, true)
 		if err != nil {
 			return false, protobuf.CommunityMember_ROLE_NONE, err
 		}
@@ -2187,7 +2179,7 @@ func (m *Manager) accountsSatisfyPermissionsToJoinChannels(community *Community,
 		channelPermissions := append(channelViewOnlyPermissions, channelViewAndPostPermissions...)
 
 		if len(channelPermissions) > 0 {
-			permissionResponse, err := m.checkPermissions(channelPermissions, accountsAndChainIDs, true)
+			permissionResponse, err := m.PermissionChecker.CheckPermissions(channelPermissions, accountsAndChainIDs, true)
 			if err != nil {
 				return nil, err
 			}
@@ -2598,243 +2590,6 @@ func calculateChainIDsSet(accountsAndChainIDs []*AccountChainIDsCombination, req
 	return revealedAccountsChainIDs
 }
 
-// checkPermissions will retrieve balances and check whether the user has
-// permission to join the community, if shortcircuit is true, it will stop as soon
-// as we know the answer
-func (m *Manager) checkPermissions(permissions []*CommunityTokenPermission, accountsAndChainIDs []*AccountChainIDsCombination, shortcircuit bool) (*CheckPermissionsResponse, error) {
-
-	response := &CheckPermissionsResponse{
-		Satisfied:         false,
-		Permissions:       make(map[string]*PermissionTokenCriteriaResult),
-		ValidCombinations: make([]*AccountChainIDsCombination, 0),
-	}
-
-	erc20TokenRequirements, erc721TokenRequirements, _ := ExtractTokenCriteria(permissions)
-
-	erc20ChainIDsMap := make(map[uint64]bool)
-	erc721ChainIDsMap := make(map[uint64]bool)
-
-	erc20TokenAddresses := make([]gethcommon.Address, 0)
-	accounts := make([]gethcommon.Address, 0)
-
-	for _, accountAndChainIDs := range accountsAndChainIDs {
-		accounts = append(accounts, accountAndChainIDs.Address)
-	}
-
-	// figure out chain IDs we're interested in
-	for chainID, tokens := range erc20TokenRequirements {
-		erc20ChainIDsMap[chainID] = true
-		for contractAddress := range tokens {
-			erc20TokenAddresses = append(erc20TokenAddresses, gethcommon.HexToAddress(contractAddress))
-		}
-	}
-
-	for chainID := range erc721TokenRequirements {
-		erc721ChainIDsMap[chainID] = true
-	}
-
-	chainIDsForERC20 := calculateChainIDsSet(accountsAndChainIDs, erc20ChainIDsMap)
-	chainIDsForERC721 := calculateChainIDsSet(accountsAndChainIDs, erc721ChainIDsMap)
-
-	// if there are no chain IDs that match token criteria chain IDs
-	// we aren't able to check balances on selected networks
-	if len(erc20ChainIDsMap) > 0 && len(chainIDsForERC20) == 0 {
-		return response, nil
-	}
-
-	ownedERC20TokenBalances := make(map[uint64]map[gethcommon.Address]map[gethcommon.Address]*hexutil.Big, 0)
-	if len(chainIDsForERC20) > 0 {
-		// this only returns balances for the networks we're actually interested in
-		balances, err := m.tokenManager.GetBalancesByChain(context.Background(), accounts, erc20TokenAddresses, chainIDsForERC20)
-		if err != nil {
-			return nil, err
-		}
-		ownedERC20TokenBalances = balances
-	}
-
-	ownedERC721Tokens := make(CollectiblesByChain)
-	if len(chainIDsForERC721) > 0 {
-		collectibles, err := m.GetOwnedERC721Tokens(accounts, erc721TokenRequirements, chainIDsForERC721)
-		if err != nil {
-			return nil, err
-		}
-		ownedERC721Tokens = collectibles
-	}
-
-	accountsChainIDsCombinations := make(map[gethcommon.Address]map[uint64]bool)
-
-	for _, tokenPermission := range permissions {
-
-		permissionRequirementsMet := true
-		response.Permissions[tokenPermission.Id] = &PermissionTokenCriteriaResult{}
-
-		// There can be multiple token requirements per permission.
-		// If only one is not met, the entire permission is marked
-		// as not fulfilled
-		for _, tokenRequirement := range tokenPermission.TokenCriteria {
-
-			tokenRequirementMet := false
-
-			if tokenRequirement.Type == protobuf.CommunityTokenType_ERC721 {
-				if len(ownedERC721Tokens) == 0 {
-					response.Permissions[tokenPermission.Id].Criteria = append(response.Permissions[tokenPermission.Id].Criteria, false)
-					continue
-				}
-
-			chainIDLoopERC721:
-				for chainID, addressStr := range tokenRequirement.ContractAddresses {
-					contractAddress := gethcommon.HexToAddress(addressStr)
-					if _, exists := ownedERC721Tokens[chainID]; !exists || len(ownedERC721Tokens[chainID]) == 0 {
-						continue chainIDLoopERC721
-					}
-
-					for account := range ownedERC721Tokens[chainID] {
-						if _, exists := ownedERC721Tokens[chainID][account]; !exists {
-							continue
-						}
-
-						tokenBalances := ownedERC721Tokens[chainID][account][contractAddress]
-						if len(tokenBalances) > 0 {
-							// 'account' owns some TokenID owned from contract 'address'
-							if _, exists := accountsChainIDsCombinations[account]; !exists {
-								accountsChainIDsCombinations[account] = make(map[uint64]bool)
-							}
-
-							if len(tokenRequirement.TokenIds) == 0 {
-								// no specific tokenId of this collection is needed
-								tokenRequirementMet = true
-								accountsChainIDsCombinations[account][chainID] = true
-								break chainIDLoopERC721
-							}
-
-						tokenIDsLoop:
-							for _, tokenID := range tokenRequirement.TokenIds {
-								tokenIDBigInt := new(big.Int).SetUint64(tokenID)
-
-								for _, asset := range tokenBalances {
-									if asset.TokenID.Cmp(tokenIDBigInt) == 0 && asset.Balance.Sign() > 0 {
-										tokenRequirementMet = true
-										accountsChainIDsCombinations[account][chainID] = true
-										break tokenIDsLoop
-									}
-								}
-							}
-						}
-					}
-				}
-			} else if tokenRequirement.Type == protobuf.CommunityTokenType_ERC20 {
-				if len(ownedERC20TokenBalances) == 0 {
-					response.Permissions[tokenPermission.Id].Criteria = append(response.Permissions[tokenPermission.Id].Criteria, false)
-					continue
-				}
-
-				accumulatedBalance := new(big.Float)
-
-			chainIDLoopERC20:
-				for chainID, address := range tokenRequirement.ContractAddresses {
-					if _, exists := ownedERC20TokenBalances[chainID]; !exists || len(ownedERC20TokenBalances[chainID]) == 0 {
-						continue chainIDLoopERC20
-					}
-					contractAddress := gethcommon.HexToAddress(address)
-					for account := range ownedERC20TokenBalances[chainID] {
-						if _, exists := ownedERC20TokenBalances[chainID][account][contractAddress]; !exists {
-							continue
-						}
-
-						value := ownedERC20TokenBalances[chainID][account][contractAddress]
-
-						accountChainBalance := new(big.Float).Quo(
-							new(big.Float).SetInt(value.ToInt()),
-							big.NewFloat(math.Pow(10, float64(tokenRequirement.Decimals))),
-						)
-
-						if _, exists := accountsChainIDsCombinations[account]; !exists {
-							accountsChainIDsCombinations[account] = make(map[uint64]bool)
-						}
-
-						if accountChainBalance.Cmp(big.NewFloat(0)) > 0 {
-							// account has balance > 0 on this chain for this token, so let's add it the chain IDs
-							accountsChainIDsCombinations[account][chainID] = true
-						}
-
-						// check if adding current chain account balance to accumulated balance
-						// satisfies required amount
-						prevBalance := accumulatedBalance
-						accumulatedBalance.Add(prevBalance, accountChainBalance)
-
-						requiredAmount, err := strconv.ParseFloat(tokenRequirement.Amount, 32)
-						if err != nil {
-							return nil, err
-						}
-
-						if accumulatedBalance.Cmp(big.NewFloat(requiredAmount)) != -1 {
-							tokenRequirementMet = true
-							if shortcircuit {
-								break chainIDLoopERC20
-							}
-						}
-					}
-				}
-
-			} else if tokenRequirement.Type == protobuf.CommunityTokenType_ENS {
-
-				for _, account := range accounts {
-					ownedENSNames, err := m.getOwnedENS([]gethcommon.Address{account})
-					if err != nil {
-						return nil, err
-					}
-
-					if _, exists := accountsChainIDsCombinations[account]; !exists {
-						accountsChainIDsCombinations[account] = make(map[uint64]bool)
-					}
-
-					if !strings.HasPrefix(tokenRequirement.EnsPattern, "*.") {
-						for _, ownedENS := range ownedENSNames {
-							if ownedENS == tokenRequirement.EnsPattern {
-								tokenRequirementMet = true
-								accountsChainIDsCombinations[account][walletcommon.EthereumMainnet] = true
-							}
-						}
-					} else {
-						parentName := tokenRequirement.EnsPattern[2:]
-						for _, ownedENS := range ownedENSNames {
-							if strings.HasSuffix(ownedENS, parentName) {
-								tokenRequirementMet = true
-								accountsChainIDsCombinations[account][walletcommon.EthereumMainnet] = true
-							}
-						}
-					}
-				}
-			}
-			if !tokenRequirementMet {
-				permissionRequirementsMet = false
-			}
-			response.Permissions[tokenPermission.Id].Criteria = append(response.Permissions[tokenPermission.Id].Criteria, tokenRequirementMet)
-		}
-		// multiple permissions are treated as logical OR, meaning
-		// if only one of them is fulfilled, the user gets permission
-		// to join and we can stop early
-		if shortcircuit && permissionRequirementsMet {
-			break
-		}
-	}
-
-	// attach valid account and chainID combinations to response
-	for account, chainIDs := range accountsChainIDsCombinations {
-		combination := &AccountChainIDsCombination{
-			Address: account,
-		}
-		for chainID := range chainIDs {
-			combination.ChainIDs = append(combination.ChainIDs, chainID)
-		}
-		response.ValidCombinations = append(response.ValidCombinations, combination)
-	}
-
-	response.calculateSatisfied()
-
-	return response, nil
-}
-
 type CollectiblesByChain = map[uint64]map[gethcommon.Address]thirdparty.TokenBalancesPerContractAddress
 
 func (m *Manager) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tokenRequirements map[uint64]map[string]*protobuf.TokenCriteria, chainIDs []uint64) (CollectiblesByChain, error) {
@@ -2876,24 +2631,6 @@ func (m *Manager) GetOwnedERC721Tokens(walletAddresses []gethcommon.Address, tok
 		}
 	}
 	return ownedERC721Tokens, nil
-}
-
-func (m *Manager) getOwnedENS(addresses []gethcommon.Address) ([]string, error) {
-	ownedENS := make([]string, 0)
-	if m.ensVerifier == nil {
-		m.logger.Warn("no ensVerifier configured for communities manager")
-		return ownedENS, nil
-	}
-	for _, address := range addresses {
-		name, err := m.ensVerifier.ReverseResolve(address)
-		if err != nil && err.Error() != "not a resolver" {
-			return ownedENS, err
-		}
-		if name != "" {
-			ownedENS = append(ownedENS, name)
-		}
-	}
-	return ownedENS, nil
 }
 
 func (m *Manager) CheckChannelPermissions(communityID types.HexBytes, chatID string, addresses []gethcommon.Address) (*CheckChannelPermissionsResponse, error) {
@@ -2955,12 +2692,12 @@ func (m *Manager) checkChannelPermissions(viewOnlyPermissions []*CommunityTokenP
 		},
 	}
 
-	viewOnlyPermissionsResponse, err := m.checkPermissions(viewOnlyPermissions, accountsAndChainIDs, shortcircuit)
+	viewOnlyPermissionsResponse, err := m.PermissionChecker.CheckPermissions(viewOnlyPermissions, accountsAndChainIDs, shortcircuit)
 	if err != nil {
 		return nil, err
 	}
 
-	viewAndPostPermissionsResponse, err := m.checkPermissions(viewAndPostPermissions, accountsAndChainIDs, shortcircuit)
+	viewAndPostPermissionsResponse, err := m.PermissionChecker.CheckPermissions(viewAndPostPermissions, accountsAndChainIDs, shortcircuit)
 	if err != nil {
 		return nil, err
 	}
@@ -4819,7 +4556,7 @@ func revealedAccountsToAccountsAndChainIDsCombination(revealedAccounts []*protob
 
 func (m *Manager) accountsHasPrivilegedPermission(privilegedPermissions []*CommunityTokenPermission, accounts []*AccountChainIDsCombination) bool {
 	if len(privilegedPermissions) > 0 {
-		permissionResponse, err := m.checkPermissions(privilegedPermissions, accounts, true)
+		permissionResponse, err := m.PermissionChecker.CheckPermissions(privilegedPermissions, accounts, true)
 		if err != nil {
 			m.logger.Warn("check privileged permission failed: %v", zap.Error(err))
 			return false
@@ -4868,7 +4605,7 @@ func (m *Manager) ReevaluatePrivilegedMember(community *Community, tokenPermissi
 	removeCurrentRole := false
 
 	if hasPrivilegedRolePermissions {
-		permissionResponse, err := m.checkPermissions(tokenPermissions, accountsAndChainIDs, true)
+		permissionResponse, err := m.PermissionChecker.CheckPermissions(tokenPermissions, accountsAndChainIDs, true)
 		if err != nil {
 			return alreadyHasPrivilegedRole, err
 		} else if permissionResponse.Satisfied && !alreadyHasPrivilegedRole {

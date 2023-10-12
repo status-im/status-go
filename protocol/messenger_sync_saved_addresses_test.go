@@ -3,7 +3,6 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -152,7 +151,6 @@ func (s *MessengerSyncSavedAddressesSuite) TestSyncExistingSavedAddresses() {
 	_, err = WaitOnMessengerResponse(
 		s.other,
 		func(r *MessengerResponse) bool {
-			fmt.Println("LENG", len(r.SavedAddresses()))
 			if len(r.SavedAddresses()) == 2 {
 				sas := r.SavedAddresses()
 				s.Require().True(haveSameElements([]wallet.SavedAddress{sa1, sa2}, []wallet.SavedAddress{*sas[0], *sas[1]}, savedAddressDataIsEqual))

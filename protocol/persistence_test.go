@@ -1660,7 +1660,7 @@ func TestSaveHashRatchetMessage(t *testing.T) {
 
 	groupID1 := []byte("group-id-1")
 	groupID2 := []byte("group-id-2")
-	var keyID uint32 = 3
+	keyID := []byte("key-id")
 
 	message1 := &types.Message{
 		Hash:      []byte{1},
@@ -1685,11 +1685,10 @@ func TestSaveHashRatchetMessage(t *testing.T) {
 
 	require.NoError(t, p.SaveHashRatchetMessage(groupID2, keyID, message2))
 
-	fetchedMessages, err := p.GetHashRatchetMessages(groupID1, keyID)
+	fetchedMessages, err := p.GetHashRatchetMessages(keyID)
 	require.NoError(t, err)
 	require.NotNil(t, fetchedMessages)
-	require.Len(t, fetchedMessages, 1)
-	require.Equal(t, fetchedMessages[0], message1)
+	require.Len(t, fetchedMessages, 2)
 }
 
 func TestCountActiveChattersInCommunity(t *testing.T) {

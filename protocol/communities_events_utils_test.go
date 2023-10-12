@@ -3,7 +3,6 @@ package protocol
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/stretchr/testify/suite"
@@ -47,7 +46,6 @@ func waitOnMessengerResponse(s *suite.Suite, fnWait MessageResponseValidator, us
 		user,
 		func(r *MessengerResponse) bool {
 			err := fnWait(r)
-			fmt.Println("WaitOnMessengerResponse error", err)
 			return err == nil
 		},
 		"MessengerResponse data not received",

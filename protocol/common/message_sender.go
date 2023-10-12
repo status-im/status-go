@@ -38,6 +38,10 @@ const (
 	whisperPoWTime   = 5
 )
 
+// RekeyCompatibility indicates whether we should be sending
+// keys in 1-to-1 messages as well as in the newer format
+var RekeyCompatibility = true
+
 // SentMessage reprent a message that has been passed to the transport layer
 type SentMessage struct {
 	PublicKey  *ecdsa.PublicKey
@@ -320,17 +324,71 @@ func (s *MessageSender) sendCommunity(
 	// Check if it's a key exchange message. In this case we send it
 	// to all the recipients
 	if rawMessage.CommunityKeyExMsgType != KeyExMsgNone {
-		keyExMessageSpecs, err := s.protocol.GetKeyExMessageSpecs(rawMessage.HashRatchetGroupID, s.identity, rawMessage.Recipients, rawMessage.CommunityKeyExMsgType == KeyExMsgRekey)
-		if err != nil {
-			return nil, err
-		}
-
-		for i, spec := range keyExMessageSpecs {
-			recipient := rawMessage.Recipients[i]
-			_, _, err = s.sendMessageSpec(ctx, recipient, spec, messageIDs)
+		forceRekey := rawMessage.CommunityKeyExMsgType == KeyExMsgRekey
+		// If rekeycompatibility is on, we always
+		// want to execute below, otherwise we execute
+		// only when we want to fill up old keys to a given user
+		if RekeyCompatibility || !forceRekey {
+			keyExMessageSpecs, err := s.protocol.GetKeyExMessageSpecs(rawMessage.HashRatchetGroupID, s.identity, rawMessage.Recipients, forceRekey)
 			if err != nil {
 				return nil, err
 			}
+
+			for i, spec := range keyExMessageSpecs {
+				recipient := rawMessage.Recipients[i]
+				_, _, err = s.sendMessageSpec(ctx, recipient, spec, messageIDs)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		if forceRekey {
+
+			var ratchet *encryption.HashRatchetKeyCompatibility
+			// We have just rekeyed, pull the latest
+			if RekeyCompatibility {
+				ratchet, err = s.protocol.GetCurrentKeyForGroup(rawMessage.HashRatchetGroupID)
+				if err != nil {
+					return nil, err
+				}
+
+			}
+			// We send the message over the community topic
+			messages, err := s.protocol.BuildHashRatchetReKeyGroupMessage(s.identity, rawMessage.Recipients, rawMessage.HashRatchetGroupID, ratchet)
+			if err != nil {
+				return nil, err
+			}
+			for _, m := range messages {
+				payload, err := proto.Marshal(m.Message)
+				if err != nil {
+					return nil, err
+				}
+
+				rawMessage.Payload = payload
+				newMessage = &types.NewMessage{
+					TTL:       whisperTTL,
+					Payload:   payload,
+					PowTarget: calculatePoW(payload),
+					PowTime:   whisperPoWTime,
+				}
+
+				newMessage.Ephemeral = rawMessage.Ephemeral
+				newMessage.PubsubTopic = rawMessage.PubsubTopic
+
+				messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, payload)
+				rawMessage.ID = types.EncodeHex(messageID)
+
+				// notify before dispatching
+				s.notifyOnScheduledMessage(nil, rawMessage)
+
+				_, err = s.transport.SendPublic(ctx, newMessage, types.EncodeHex(rawMessage.CommunityID))
+				if err != nil {
+					return nil, err
+				}
+
+			}
+
 		}
 		return nil, nil
 	}
@@ -712,7 +770,7 @@ func (s *MessageSender) HandleMessages(shhMessage *types.Message) ([]*v1protocol
 
 	// Check if there are undecrypted message
 	for _, hashRatchetInfo := range statusMessage.HashRatchetInfo {
-		messages, err := s.persistence.GetHashRatchetMessages(hashRatchetInfo.GroupID, hashRatchetInfo.KeyID)
+		messages, err := s.persistence.GetHashRatchetMessages(hashRatchetInfo.KeyID)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1078,11 +1136,11 @@ func (s *MessageSender) StartDatasync() {
 }
 
 // GetCurrentKeyForGroup returns the latest key timestampID belonging to a key group
-func (s *MessageSender) GetCurrentKeyForGroup(groupID []byte) (uint32, error) {
+func (s *MessageSender) GetCurrentKeyForGroup(groupID []byte) (*encryption.HashRatchetKeyCompatibility, error) {
 	return s.protocol.GetCurrentKeyForGroup(groupID)
 }
 
 // GetKeyIDsForGroup returns a slice of key IDs belonging to a given group ID
-func (s *MessageSender) GetKeyIDsForGroup(groupID []byte) ([]uint32, error) {
-	return s.protocol.GetKeyIDsForGroup(groupID)
+func (s *MessageSender) GetKeysForGroup(groupID []byte) ([]*encryption.HashRatchetKeyCompatibility, error) {
+	return s.protocol.GetKeysForGroup(groupID)
 }
