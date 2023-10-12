@@ -229,37 +229,34 @@ func (p *Protocol) BuildEncryptedMessage(myIdentityKey *ecdsa.PrivateKey, public
 	return spec, nil
 }
 
-func (p *Protocol) GenerateHashRatchetKey(groupID []byte) (uint32, error) {
+func (p *Protocol) GenerateHashRatchetKey(groupID []byte) (*HashRatchetKeyCompatibility, error) {
 	return p.encryptor.GenerateHashRatchetKey(groupID)
 }
 
 func (p *Protocol) GetAllHREncodedKeys(groupID []byte) ([]byte, error) {
-	keyIDs, err := p.encryptor.persistence.GetKeyIDsForGroup(groupID)
+	keys, err := p.encryptor.persistence.GetKeysForGroup(groupID)
 	if err != nil {
 		return nil, err
 	}
-	if len(keyIDs) == 0 {
+	if len(keys) == 0 {
 		return nil, nil
 	}
 
-	return p.GetHREncodedKeys(groupID, keyIDs)
+	return p.GetHREncodedKeys(groupID, keys)
 }
 
 // GetKeyIDsForGroup returns a slice of key IDs belonging to a given group ID
-func (p *Protocol) GetKeyIDsForGroup(groupID []byte) ([]uint32, error) {
-	return p.encryptor.persistence.GetKeyIDsForGroup(groupID)
+func (p *Protocol) GetKeysForGroup(groupID []byte) ([]*HashRatchetKeyCompatibility, error) {
+	return p.encryptor.persistence.GetKeysForGroup(groupID)
 }
 
-func (p *Protocol) GetHREncodedKeys(groupID []byte, keyIDs []uint32) ([]byte, error) {
+func (p *Protocol) GetHREncodedKeys(groupID []byte, ratchets []*HashRatchetKeyCompatibility) ([]byte, error) {
 	keys := &HRKeys{}
-	for _, keyID := range keyIDs {
-		keyData, err := p.encryptor.persistence.GetHashRatchetKeyByID(groupID, keyID, 0)
-		if err != nil {
-			return nil, err
-		}
+	for _, ratchet := range ratchets {
 		key := &HRKey{
-			KeyId: keyID,
-			Key:   keyData.Key,
+			DeprecatedKeyId: ratchet.DeprecatedKeyID(),
+			Key:             ratchet.Key,
+			Timestamp:       ratchet.Timestamp,
 		}
 		keys.Keys = append(keys.Keys, key)
 	}
@@ -269,9 +266,9 @@ func (p *Protocol) GetHREncodedKeys(groupID []byte, keyIDs []uint32) ([]byte, er
 
 // BuildHashRatchetKeyExchangeMessage builds a 1:1 message
 // containing newly generated hash ratchet key
-func (p *Protocol) BuildHashRatchetKeyExchangeMessage(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, groupID []byte, keyIDs []uint32) (*ProtocolMessageSpec, error) {
+func (p *Protocol) BuildHashRatchetKeyExchangeMessage(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, groupID []byte, ratchets []*HashRatchetKeyCompatibility) (*ProtocolMessageSpec, error) {
 
-	encodedKeys, err := p.GetHREncodedKeys(groupID, keyIDs)
+	encodedKeys, err := p.GetHREncodedKeys(groupID, ratchets)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +292,7 @@ func (p *Protocol) BuildHashRatchetKeyExchangeMessage(myIdentityKey *ecdsa.Priva
 	return response, err
 }
 
-func (p *Protocol) GetCurrentKeyForGroup(groupID []byte) (uint32, error) {
+func (p *Protocol) GetCurrentKeyForGroup(groupID []byte) (*HashRatchetKeyCompatibility, error) {
 	return p.encryptor.persistence.GetCurrentKeyForGroup(groupID)
 
 }
@@ -303,13 +300,13 @@ func (p *Protocol) GetCurrentKeyForGroup(groupID []byte) (uint32, error) {
 // BuildHashRatchetMessage returns a hash ratchet chat message
 func (p *Protocol) BuildHashRatchetMessage(groupID []byte, payload []byte) (*ProtocolMessageSpec, error) {
 
-	keyID, err := p.encryptor.persistence.GetCurrentKeyForGroup(groupID)
+	ratchet, err := p.encryptor.persistence.GetCurrentKeyForGroup(groupID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Encrypt payload
-	encryptedMessagesByInstalls, err := p.encryptor.EncryptHashRatchetPayload(groupID, keyID, payload)
+	encryptedMessagesByInstalls, err := p.encryptor.EncryptHashRatchetPayload(ratchet, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -326,25 +323,25 @@ func (p *Protocol) BuildHashRatchetMessage(groupID []byte, payload []byte) (*Pro
 	return spec, nil
 }
 
-func (p *Protocol) GetKeyExMessageSpecs(communityID []byte, identity *ecdsa.PrivateKey, recipients []*ecdsa.PublicKey, forceRekey bool) ([]*ProtocolMessageSpec, error) {
-	var communityKeyIDs []uint32
+func (p *Protocol) GetKeyExMessageSpecs(groupID []byte, identity *ecdsa.PrivateKey, recipients []*ecdsa.PublicKey, forceRekey bool) ([]*ProtocolMessageSpec, error) {
+	var ratchets []*HashRatchetKeyCompatibility
 	var err error
 	if !forceRekey {
-		communityKeyIDs, err = p.encryptor.persistence.GetKeyIDsForGroup(communityID)
+		ratchets, err = p.encryptor.persistence.GetKeysForGroup(groupID)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if len(communityKeyIDs) == 0 || forceRekey {
-		communityKeyID, err := p.GenerateHashRatchetKey(communityID)
+	if len(ratchets) == 0 || forceRekey {
+		ratchet, err := p.GenerateHashRatchetKey(groupID)
 		if err != nil {
 			return nil, err
 		}
-		communityKeyIDs = []uint32{communityKeyID}
+		ratchets = []*HashRatchetKeyCompatibility{ratchet}
 	}
 	specs := make([]*ProtocolMessageSpec, len(recipients))
 	for i, recipient := range recipients {
-		keyExMsg, err := p.BuildHashRatchetKeyExchangeMessage(identity, recipient, communityID, communityKeyIDs)
+		keyExMsg, err := p.BuildHashRatchetKeyExchangeMessage(identity, recipient, groupID, ratchets)
 		if err != nil {
 			return nil, err
 		}
@@ -499,7 +496,7 @@ func (p *Protocol) ConfirmMessageProcessed(messageID []byte) error {
 
 type HashRatchetInfo struct {
 	GroupID []byte
-	KeyID   uint32
+	KeyID   []byte
 }
 type DecryptMessageResponse struct {
 	DecryptedMessage []byte
@@ -517,12 +514,27 @@ func (p *Protocol) HandleHashRatchetKeys(groupID, encodedKeys []byte) ([]*HashRa
 		return nil, err
 	}
 	for _, key := range keys.Keys {
-		// Payload contains hash ratchet key
-		err = p.encryptor.persistence.SaveHashRatchetKey(groupID, key.KeyId, key.Key)
+		ratchet := &HashRatchetKeyCompatibility{
+			GroupID:   groupID,
+			Timestamp: key.Timestamp,
+			Key:       key.Key,
+		}
+
+		// If there's no timestamp, is coming from an older client
+		if key.Timestamp == 0 {
+			ratchet.Timestamp = uint64(key.DeprecatedKeyId)
+		}
+		keyID, err := ratchet.GetKeyID()
 		if err != nil {
 			return nil, err
 		}
-		info = append(info, &HashRatchetInfo{GroupID: groupID, KeyID: key.KeyId})
+
+		// Payload contains hash ratchet key
+		err = p.encryptor.persistence.SaveHashRatchetKey(ratchet)
+		if err != nil {
+			return nil, err
+		}
+		info = append(info, &HashRatchetInfo{GroupID: groupID, KeyID: keyID})
 	}
 
 	return info, nil

@@ -337,7 +337,18 @@ func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentit
 	// Try Hash Ratchet
 	if header := msg.GetHRHeader(); header != nil {
 
-		decryptedPayload, err := s.decryptWithHR(header.GroupId, header.KeyId, header.SeqNo, payload)
+		ratchet := &HashRatchetKeyCompatibility{
+			GroupID: header.GroupId,
+			// NOTE: this would be nil in the old format
+			keyID: header.KeyId,
+		}
+
+		// Old key format
+		if header.DeprecatedKeyId != 0 {
+			ratchet.Timestamp = uint64(header.DeprecatedKeyId)
+		}
+
+		decryptedPayload, err := s.decryptWithHR(ratchet, header.SeqNo, payload)
 
 		return decryptedPayload, err
 	}
@@ -609,51 +620,37 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 	return response, targetedInstallations, nil
 }
 
-func (s *encryptor) getNextHashRatchetKeyID(groupID []byte) (uint32, error) {
-	latestKeyID, err := s.persistence.GetCurrentKeyForGroup(groupID)
+func (s *encryptor) getNextHashRatchet(groupID []byte) (*HashRatchetKeyCompatibility, error) {
+	latestKey, err := s.persistence.GetCurrentKeyForGroup(groupID)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	currentTime := GetCurrentTime()
-	if latestKeyID < currentTime {
-		return bumpKeyID(currentTime), nil
-	}
-
-	return latestKeyID + 1, nil
+	return latestKey.GenerateNext()
 }
 
 // GenerateHashRatchetKey Generates and stores a hash ratchet key given a group ID
-func (s *encryptor) GenerateHashRatchetKey(groupID []byte) (uint32, error) {
+func (s *encryptor) GenerateHashRatchetKey(groupID []byte) (*HashRatchetKeyCompatibility, error) {
 
-	// Randomly generate a hash ratchet key
-	hrKey, err := crypto.GenerateKey()
+	key, err := s.getNextHashRatchet(groupID)
 	if err != nil {
-		return 0, err
-	}
-	hrKeyBytes := crypto.FromECDSA(hrKey)
-
-	keyID, err := s.getNextHashRatchetKeyID(groupID)
-	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	err = s.persistence.SaveHashRatchetKey(groupID, keyID, hrKeyBytes)
-
-	return keyID, err
+	return key, s.persistence.SaveHashRatchetKey(key)
 }
 
 // EncryptHashRatchetPayload returns a new EncryptedMessageProtocol with a given payload encrypted, given a group's key
-func (s *encryptor) EncryptHashRatchetPayload(groupID []byte, keyID uint32, payload []byte) (map[string]*EncryptedMessageProtocol, error) {
+func (s *encryptor) EncryptHashRatchetPayload(ratchet *HashRatchetKeyCompatibility, payload []byte) (map[string]*EncryptedMessageProtocol, error) {
 	logger := s.logger.With(
 		zap.String("site", "EncryptHashRatchetPayload"),
-		zap.Any("group-id", groupID),
-		zap.Any("key-id", keyID))
+		zap.Any("group-id", ratchet.GroupID),
+		zap.Any("key-id", ratchet.keyID))
 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	logger.Debug("encrypting hash ratchet message")
-	dmp, err := s.encryptWithHR(groupID, keyID, payload)
+	dmp, err := s.encryptWithHR(ratchet, payload)
 	response := make(map[string]*EncryptedMessageProtocol)
 	response[noInstallationID] = dmp
 	return response, err
@@ -663,8 +660,8 @@ func samePublicKeys(pubKey1, pubKey2 ecdsa.PublicKey) bool {
 	return pubKey1.X.Cmp(pubKey2.X) == 0 && pubKey1.Y.Cmp(pubKey2.Y) == 0
 }
 
-func (s *encryptor) encryptWithHR(groupID []byte, keyID uint32, payload []byte) (*EncryptedMessageProtocol, error) {
-	hrCache, err := s.persistence.GetHashRatchetKeyByID(groupID, keyID, 0) // Get latest seqNo
+func (s *encryptor) encryptWithHR(ratchet *HashRatchetKeyCompatibility, payload []byte) (*EncryptedMessageProtocol, error) {
+	hrCache, err := s.persistence.GetHashRatchetKeyByID(ratchet, 0) // Get latest seqNo
 
 	if err != nil {
 		return nil, err
@@ -686,23 +683,29 @@ func (s *encryptor) encryptWithHR(groupID []byte, keyID uint32, payload []byte) 
 		return nil, err
 	}
 	newSeqNo := hrCache.SeqNo + 1
-	err = s.persistence.SaveHashRatchetKeyHash(groupID, keyID, hash.Bytes(), newSeqNo)
+	err = s.persistence.SaveHashRatchetKeyHash(ratchet, hash.Bytes(), newSeqNo)
 	if err != nil {
 		return nil, err
 	}
+	keyID, err := ratchet.GetKeyID()
+	if err != nil {
+		return nil, err
+	}
+
 	dmp := &EncryptedMessageProtocol{
 		HRHeader: &HRHeader{
-			GroupId: groupID,
-			KeyId:   keyID,
-			SeqNo:   newSeqNo,
+			DeprecatedKeyId: ratchet.DeprecatedKeyID(),
+			GroupId:         ratchet.GroupID,
+			KeyId:           keyID,
+			SeqNo:           newSeqNo,
 		},
 		Payload: encryptedPayload,
 	}
 	return dmp, nil
 }
 
-func (s *encryptor) decryptWithHR(groupID []byte, keyID uint32, seqNo uint32, payload []byte) ([]byte, error) {
-	hrCache, err := s.persistence.GetHashRatchetKeyByID(groupID, keyID, seqNo)
+func (s *encryptor) decryptWithHR(ratchet *HashRatchetKeyCompatibility, seqNo uint32, payload []byte) ([]byte, error) {
+	hrCache, err := s.persistence.GetHashRatchetKeyByID(ratchet, seqNo)
 	if err != nil {
 		return nil, err
 	}
@@ -731,7 +734,7 @@ func (s *encryptor) decryptWithHR(groupID []byte, keyID uint32, seqNo uint32, pa
 		}
 		for i := hrCache.SeqNo; i < seqNo; i++ {
 			hash = crypto.Keccak256Hash(hash).Bytes()
-			err := s.persistence.SaveHashRatchetKeyHash(groupID, keyID, hash, i+1)
+			err := s.persistence.SaveHashRatchetKeyHash(ratchet, hash, i+1)
 			if err != nil {
 				return nil, err
 			}

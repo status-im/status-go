@@ -712,7 +712,7 @@ func (s *MessageSender) HandleMessages(shhMessage *types.Message) ([]*v1protocol
 
 	// Check if there are undecrypted message
 	for _, hashRatchetInfo := range statusMessage.HashRatchetInfo {
-		messages, err := s.persistence.GetHashRatchetMessages(hashRatchetInfo.GroupID, hashRatchetInfo.KeyID)
+		messages, err := s.persistence.GetHashRatchetMessages(hashRatchetInfo.KeyID)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1078,11 +1078,11 @@ func (s *MessageSender) StartDatasync() {
 }
 
 // GetCurrentKeyForGroup returns the latest key timestampID belonging to a key group
-func (s *MessageSender) GetCurrentKeyForGroup(groupID []byte) (uint32, error) {
+func (s *MessageSender) GetCurrentKeyForGroup(groupID []byte) (*encryption.HashRatchetKeyCompatibility, error) {
 	return s.protocol.GetCurrentKeyForGroup(groupID)
 }
 
 // GetKeyIDsForGroup returns a slice of key IDs belonging to a given group ID
-func (s *MessageSender) GetKeyIDsForGroup(groupID []byte) ([]uint32, error) {
-	return s.protocol.GetKeyIDsForGroup(groupID)
+func (s *MessageSender) GetKeysForGroup(groupID []byte) ([]*encryption.HashRatchetKeyCompatibility, error) {
+	return s.protocol.GetKeysForGroup(groupID)
 }

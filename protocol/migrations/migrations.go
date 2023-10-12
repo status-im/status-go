@@ -104,6 +104,7 @@
 // 1693311981_community_shard.up.sql (156B)
 // 1695331492_add_status_link_previews.up.sql (136B)
 // 1695918296_add_validated_at.up.sql (377B)
+// 1697038980_add_timestamp_hash_ratchet.up.sql (730B)
 // README.md (554B)
 // doc.go (850B)
 
@@ -2248,8 +2249,28 @@ func _1695918296_add_validated_atUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1695918296_add_validated_at.up.sql", size: 377, mode: os.FileMode(0644), modTime: time.Unix(1697561195, 0)}
+	info := bindataFileInfo{name: "1695918296_add_validated_at.up.sql", size: 377, mode: os.FileMode(0644), modTime: time.Unix(1697609054, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1d, 0x48, 0xa7, 0xd5, 0xb, 0xbb, 0x23, 0xfd, 0x40, 0x49, 0x33, 0x1b, 0x5c, 0xb3, 0x5b, 0x7a, 0xd8, 0xed, 0x5, 0xd, 0xb4, 0x91, 0xa3, 0x37, 0xaf, 0xaf, 0xc6, 0xa1, 0x13, 0xeb, 0x56, 0x1d}}
+	return a, nil
+}
+
+var __1697038980_add_timestamp_hash_ratchetUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x8c\x52\x4d\x6b\x83\x40\x10\xbd\xcf\xaf\x98\x63\x02\x39\xf5\x2a\x3d\x6c\xcc\xa4\x48\xd7\x5d\x59\x37\x87\x9c\x16\xb1\x4b\x95\xe2\x47\x75\x5b\x10\xf2\xe3\xcb\x8a\x06\x9a\xc6\xd4\x93\xf0\x7c\x3b\xf3\xde\xbc\x07\xa1\x22\xa6\x09\x35\xdb\x73\xc2\x22\xeb\x0b\xd3\x65\x2e\x2f\xac\x33\xb6\xce\xbb\xa1\x75\x65\x53\x9b\xef\x27\xdc\x00\xe2\x7b\xd7\x7c\xb5\xa6\x7c\xc3\x3d\x97\x7b\x14\x52\xa3\x38\x71\xbe\x03\xc4\x0f\x3b\x78\x3c\x12\xfa\x16\xbe\xcf\x75\x65\x65\x7b\x97\x55\xed\xf8\xdb\xa3\xe3\xea\x7b\xa3\x13\x15\xc5\x4c\x9d\xf1\x95\xce\x9b\x89\xb4\x45\x29\x30\x94\xe2\xc8\xa3\x50\xa3\xa2\x84\xb3\x90\x60\x1b\x00\x44\x22\x25\xa5\xbd\x0e\xf9\xc0\xcc\x66\x36\xb2\x9b\x84\x8f\xdf\x1d\x5e\xc7\xa7\xc4\x29\xd4\xb8\x40\xbb\x9e\xe1\x72\x99\x8d\x1f\x95\x8c\x97\x16\x06\x00\x07\x25\x93\xc7\x27\x0e\x00\x18\xd7\xa4\xfe\x0f\x42\x91\x60\x31\xe1\xb2\xc1\x00\x00\x4e\xc9\xc1\xa7\xba\xc0\xc0\x94\xf4\x4d\x0c\xcf\x93\x93\x55\x62\x4d\x9e\xe5\x85\x0d\x60\x5d\x79\x46\xf2\xba\xfe\x94\xb5\xfb\x05\xf7\xf6\xd3\xd4\x8d\x8f\x93\x5e\x48\xcd\x35\xf9\xfb\xbc\x1f\x2a\xbf\xd1\xcc\x7d\xf3\x5d\xf8\x09\x00\x00\xff\xff\x22\xbd\x0c\x4f\xda\x02\x00\x00")
+
+func _1697038980_add_timestamp_hash_ratchetUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1697038980_add_timestamp_hash_ratchetUpSql,
+		"1697038980_add_timestamp_hash_ratchet.up.sql",
+	)
+}
+
+func _1697038980_add_timestamp_hash_ratchetUpSql() (*asset, error) {
+	bytes, err := _1697038980_add_timestamp_hash_ratchetUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1697038980_add_timestamp_hash_ratchet.up.sql", size: 730, mode: os.FileMode(0644), modTime: time.Unix(1697609054, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x23, 0x2a, 0xba, 0x83, 0x77, 0x41, 0x55, 0xf0, 0x61, 0xf0, 0xb7, 0x47, 0x80, 0x25, 0x66, 0xb2, 0xc9, 0x38, 0xaa, 0x6f, 0x68, 0x5d, 0xdd, 0x7, 0x98, 0xd, 0x57, 0x70, 0x9, 0xf9, 0x15, 0x74}}
 	return a, nil
 }
 
@@ -2488,8 +2509,9 @@ var _bindata = map[string]func() (*asset, error){
 	"1693311981_community_shard.up.sql":                                           _1693311981_community_shardUpSql,
 	"1695331492_add_status_link_previews.up.sql":                                  _1695331492_add_status_link_previewsUpSql,
 	"1695918296_add_validated_at.up.sql":                                          _1695918296_add_validated_atUpSql,
-	"README.md":                                                                   readmeMd,
-	"doc.go":                                                                      docGo,
+	"1697038980_add_timestamp_hash_ratchet.up.sql":                                _1697038980_add_timestamp_hash_ratchetUpSql,
+	"README.md": readmeMd,
+	"doc.go":    docGo,
 }
 
 // AssetDebug is true if the assets were built with the debug flag enabled.
@@ -2642,8 +2664,9 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1693311981_community_shard.up.sql":                                           {_1693311981_community_shardUpSql, map[string]*bintree{}},
 	"1695331492_add_status_link_previews.up.sql":                                  {_1695331492_add_status_link_previewsUpSql, map[string]*bintree{}},
 	"1695918296_add_validated_at.up.sql":                                          {_1695918296_add_validated_atUpSql, map[string]*bintree{}},
-	"README.md":                                                                   {readmeMd, map[string]*bintree{}},
-	"doc.go":                                                                      {docGo, map[string]*bintree{}},
+	"1697038980_add_timestamp_hash_ratchet.up.sql":                                {_1697038980_add_timestamp_hash_ratchetUpSql, map[string]*bintree{}},
+	"README.md": {readmeMd, map[string]*bintree{}},
+	"doc.go":    {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
