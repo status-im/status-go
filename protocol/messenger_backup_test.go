@@ -857,3 +857,67 @@ func (s *MessengerBackupSuite) TestBackupWatchOnlyAccounts() {
 	s.Require().Equal(len(woAccounts), len(dbWoAccounts2))
 	s.Require().True(haveSameElements(woAccounts, dbWoAccounts2, accounts.SameAccounts))
 }
+
+func (s *MessengerBackupSuite) TestBackupChats() {
+	// Create bob1
+	bob1 := s.m
+
+	response, err := bob1.CreateGroupChatWithMembers(context.Background(), "group", []string{})
+	s.NoError(err)
+	s.Require().Len(response.Chats(), 1)
+
+	ourGroupChat := response.Chats()[0]
+
+	err = bob1.SaveChat(ourGroupChat)
+	s.NoError(err)
+
+	alice := s.newMessenger()
+	_, err = alice.Start()
+	s.Require().NoError(err)
+	defer alice.Shutdown() // nolint: errcheck
+
+	ourOneOneChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.transport)
+	err = bob1.SaveChat(ourOneOneChat)
+	s.Require().NoError(err)
+
+	// Create bob2
+	bob2, err := newMessengerWithKey(s.shh, bob1.identity, s.logger, nil)
+	s.Require().NoError(err)
+	_, err = bob2.Start()
+	s.Require().NoError(err)
+	defer bob2.Shutdown() // nolint: errcheck
+
+	// Backup
+	_, err = bob1.BackupData(context.Background())
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	response, err = WaitOnMessengerResponse(
+		bob2,
+		func(r *MessengerResponse) bool {
+			return r.BackupHandled
+		},
+		"no messages",
+	)
+	s.Require().NoError(err)
+
+	// -- Group chat
+	// Check response
+	chat, ok := response.chats[ourGroupChat.ID]
+	s.Require().True(ok)
+	s.Require().Equal(ourGroupChat.Name, chat.Name)
+	// Check stored chats
+	chat, ok = bob2.allChats.Load(ourGroupChat.ID)
+	s.Require().True(ok)
+	s.Require().Equal(ourGroupChat.Name, chat.Name)
+
+	// -- One to One chat
+	// Check response
+	chat, ok = response.chats[ourOneOneChat.ID]
+	s.Require().True(ok)
+	s.Require().Equal("", chat.Name) // We set 1-1 chat names to "" because the name is not good
+	// Check stored chats
+	chat, ok = bob2.allChats.Load(ourOneOneChat.ID)
+	s.Require().True(ok)
+	s.Require().Equal("", chat.Name)
+}

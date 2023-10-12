@@ -32,6 +32,8 @@ message Backup {
   FetchingBackedUpDataDetails keypairDetails = 12;
   SyncAccount watchOnlyAccount = 13;
   FetchingBackedUpDataDetails watchOnlyAccountDetails = 14;
+  repeated SyncChat chats = 15;
+  FetchingBackedUpDataDetails chatsDetails = 16;
 }
 
 message MultiAccount {
@@ -150,6 +152,28 @@ message SyncCommunityRequestsToJoin {
   bytes community_id = 6;
   uint64 state = 7;
   repeated RevealedAccount revealed_accounts = 8;
+}
+
+message SyncChat {
+  string id = 1;
+  uint32 chat_type = 2;
+  string name = 3;
+  repeated MembershipUpdateEvents membershipUpdateEvents = 4;
+  bool active = 5;
+  uint64 clock = 6;
+  bool muted = 7;
+}
+
+message MembershipUpdateEvents {
+  uint64 clock = 1;
+  uint32 type = 2;
+  repeated string members = 3;
+  string name = 4;
+  bytes signature = 5;
+  string chat_id = 6;
+  string from = 7;
+  bytes raw_payload = 8;
+  string color = 9;
 }
 
 message SyncChatRemoved {
