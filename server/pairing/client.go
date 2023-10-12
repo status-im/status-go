@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -42,6 +43,7 @@ type BaseClient struct {
 func findServerCert(c *ConnectionParams, reachableIPs []net.IP) (*url.URL, *x509.Certificate, error) {
 	var baseAddress *url.URL
 	var serverCert *x509.Certificate
+	var once sync.Once
 	errCh := make(chan struct {
 		ip  net.IP
 		err error
@@ -64,7 +66,7 @@ func findServerCert(c *ConnectionParams, reachableIPs []net.IP) (*url.URL, *x509
 			// If no error, send the results to their respective channels
 			urlCh <- u
 			certCh <- cert
-			close(done) // signal success and close the done channel
+			once.Do(func() { close(done) }) // signal success and close the done channel
 		}(ip)
 	}
 
