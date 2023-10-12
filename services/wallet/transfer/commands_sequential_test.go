@@ -673,6 +673,20 @@ func getCases() []findBlockCase {
 		},
 	}
 
+	case10 := findBlockCase{
+		balanceChanges:      [][]int{},
+		toBlock:             100,
+		fromBlock:           99,
+		expectedBlocksFound: 0,
+		label:               "single block range, no transactions",
+		expectedCalls: map[string]int{
+			// only two requests to check the range for incoming ERC20
+			"FilterLogs": 2,
+			// no contract calls as ERC20 is not checked
+			"CallContract": 0,
+		},
+	}
+
 	cases = append(cases, case1)
 	cases = append(cases, case100transfers)
 	cases = append(cases, case3)
@@ -683,8 +697,9 @@ func getCases() []findBlockCase {
 	cases = append(cases, case7emptyHistoryWithOneERC20Transfer)
 	cases = append(cases, case8emptyHistoryWithERC20Transfers)
 	cases = append(cases, case9emptyHistoryWithERC20Transfers)
+	cases = append(cases, case10)
 
-	//cases = append([]findBlockCase{}, case9emptyHistoryWithERC20Transfers)
+	//cases = append([]findBlockCase{}, case10)
 
 	return cases
 }

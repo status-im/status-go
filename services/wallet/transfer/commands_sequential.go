@@ -230,6 +230,11 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 	}
 
 	for {
+		if from.Cmp(to) == 0 {
+			log.Debug("findBlocksCommand empty range", "from", from, "to", to)
+			break
+		}
+
 		var headers []*DBHeader
 		if c.reachedETHHistoryStart {
 			if c.fromBlockNumber.Cmp(zero) == 0 && c.startBlockNumber != nil && c.startBlockNumber.Cmp(zero) == 1 {
@@ -264,6 +269,7 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 		}
 
 		if c.reachedETHHistoryStart {
+			log.Debug("findBlocksCommand reached first ETH transfer and checked erc20 tail", "chain", c.chainClient.NetworkID(), "account", c.account)
 			break
 		}
 
@@ -272,24 +278,26 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 			break
 		}
 
-		if from.Cmp(to) == 0 {
+		if c.startBlockNumber != nil && c.fromBlockNumber.Cmp(from) == -1 {
+			log.Debug("ERC20 tail should be checked", "initial from", c.fromBlockNumber, "actual from", from, "first ETH block", c.startBlockNumber)
+			c.reachedETHHistoryStart = true
+			continue
+		}
+
+		if c.startBlockNumber != nil && c.startBlockNumber.Cmp(from) >= 0 {
+			log.Debug("Checked all ranges, stop execution", "startBlock", c.startBlockNumber, "from", from, "to", to)
 			break
 		}
 
 		nextFrom, nextTo := nextRange(c.defaultNodeBlockChunkSize, c.resFromBlock.Number, c.fromBlockNumber)
 
 		if nextFrom.Cmp(from) == 0 && nextTo.Cmp(to) == 0 {
+			log.Debug("findBlocksCommand empty next range", "from", from, "to", to)
 			break
 		}
 
 		from = nextFrom
 		to = nextTo
-
-		if to.Cmp(c.fromBlockNumber) <= 0 || (c.startBlockNumber != nil &&
-			c.startBlockNumber.Cmp(big.NewInt(0)) > 0 && to.Cmp(c.startBlockNumber) <= 0) {
-			log.Debug("Checked all ranges, stop execution", "startBlock", c.startBlockNumber, "from", from, "to", to)
-			c.reachedETHHistoryStart = true
-		}
 	}
 
 	log.Debug("end findBlocksCommand", "account", c.account, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit)
