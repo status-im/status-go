@@ -44,7 +44,8 @@ WITH filter_conditions AS (
 		? AS nowTimestamp,
 		? AS layer2FinalisationDuration,
 		? AS layer1FinalisationDuration,
-		X'0000000000000000000000000000000000000000' AS zeroAddress
+		X'0000000000000000000000000000000000000000' AS zeroAddress,
+		'0x28c427b0611d99da5c4f7368abe57e86b045b483c4689ae93e90745802335b87' as statusMintEvent
 ),
 -- This UNION between CTE and TEMP TABLE acts as an optimization. As soon as we drop one or use them interchangeably the performance drops significantly.
 filter_addresses(address) AS (
@@ -250,8 +251,14 @@ WHERE
 					transfers.type = 'erc721'
 					OR (
 						transfers.type = 'erc20' 
-						AND method_hash IS NOT NULL 
-						AND method_hash IN mint_methods
+						AND (
+							(method_hash IS NOT NULL AND method_hash IN mint_methods)
+							OR (
+								(SELECT 1
+								FROM json_each(transfers.receipt, '$.logs' )
+								WHERE json_extract( value, '$.topics[0]' ) = statusMintEvent) IS NOT NULL
+							)
+						) 
 					)
 				)
 			)
@@ -275,8 +282,14 @@ WHERE
 				transfers.type = 'erc721'
 				OR (
 					transfers.type = 'erc20' 
-					AND method_hash IS NOT NULL 
-					AND method_hash IN mint_methods
+					AND (
+						(method_hash IS NOT NULL AND method_hash IN mint_methods)
+						OR (
+							(SELECT 1
+							FROM json_each(transfers.receipt, '$.logs' )
+							WHERE json_extract( value, '$.topics[0]' ) = statusMintEvent) IS NOT NULL
+						)
+					) 
 				)
 			)
 		)
