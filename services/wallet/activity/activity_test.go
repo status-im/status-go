@@ -16,6 +16,7 @@ import (
 
 	eth "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/stretchr/testify/require"
 )
@@ -746,6 +747,65 @@ func TestGetActivityEntriesFilterByType(t *testing.T) {
 	require.NoError(t, err)
 	// We have 6 but one is not matched because is a receive, having owner the to address
 	require.Equal(t, 5, len(entries))
+}
+
+func TestStatusMintCustomEvent(t *testing.T) {
+	deps, close := setupTestActivityDB(t)
+	defer close()
+
+	td, fromTds, toTds := fillTestData(t, deps.db)
+	trs, fromTrs, toTrs := transfer.GenerateTestTransfers(t, deps.db, td.nextIndex, 3)
+
+	allAddresses := append(append(append(fromTds, toTds...), fromTrs...), toTrs...)
+
+	trs[0].From = eth.HexToAddress("0x0")
+	transfer.InsertTestTransferWithOptions(t, deps.db, trs[0].To, &trs[0], &transfer.TestTransferOptions{
+		TokenAddress: eth.HexToAddress("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"),
+		Receipt: &types.Receipt{
+			Logs: []*types.Log{
+				{Topics: []eth.Hash{eth.HexToHash("0xea667487ed28493de38fd2808b00affaee21d875a9e95aa01ef8352151292297")}},
+				{Topics: []eth.Hash{eth.HexToHash("0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925")}},
+			},
+		},
+	})
+	// StatusMint - 0x28c427b0611d99da5c4f7368abe57e86b045b483c4689ae93e90745802335b87
+	trs[1].From = eth.HexToAddress("0x0")
+	transfer.InsertTestTransferWithOptions(t, deps.db, trs[1].To, &trs[1], &transfer.TestTransferOptions{
+		TokenAddress: eth.HexToAddress("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb49"),
+		Receipt: &types.Receipt{
+			Logs: []*types.Log{
+				{Topics: []eth.Hash{eth.HexToHash("0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925")}},
+				{Topics: []eth.Hash{eth.HexToHash("0x28c427b0611d99da5c4f7368abe57e86b045b483c4689ae93e90745802335b87")}},
+			},
+		},
+	})
+
+	// Log order should not matter
+	trs[2].From = eth.HexToAddress("0x0")
+	transfer.InsertTestTransferWithOptions(t, deps.db, trs[2].To, &trs[2], &transfer.TestTransferOptions{
+		TokenAddress: eth.HexToAddress("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb49"),
+		Receipt: &types.Receipt{
+			Logs: []*types.Log{
+				{Topics: []eth.Hash{eth.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")}},
+				{Topics: []eth.Hash{eth.HexToHash("0x28c427b0611d99da5c4f7368abe57e86b045b483c4689ae93e90745802335b87")}},
+				{Topics: []eth.Hash{eth.HexToHash("0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925")}},
+			},
+		},
+	})
+
+	var filter Filter
+
+	entries, err := getActivityEntries(context.Background(), deps, allAddresses, true, []common.ChainID{}, filter, 0, 15)
+	require.NoError(t, err)
+	require.Equal(t, 7, len(entries))
+
+	filter.Types = []Type{MintAT}
+
+	entries, err = getActivityEntries(context.Background(), deps, allAddresses, true, []common.ChainID{}, filter, 0, 15)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(entries))
+	require.Equal(t, trs[2].Hash, entries[0].transaction.Hash)
+	require.Equal(t, trs[1].Hash, entries[1].transaction.Hash)
 }
 
 func TestGetActivityEntriesFilterByAddresses(t *testing.T) {

@@ -255,6 +255,7 @@ type TestTransferOptions struct {
 	TokenID          *big.Int
 	NullifyAddresses []eth_common.Address
 	Tx               *types.Transaction
+	Receipt          *types.Receipt
 }
 
 func GenerateTxField(data []byte) *types.Transaction {
@@ -336,6 +337,7 @@ func InsertTestTransferWithOptions(tb testing.TB, db *sql.DB, address eth_common
 		contractAddress:    &tr.Contract,
 		tokenID:            opt.TokenID,
 		transaction:        opt.Tx,
+		receipt:            opt.Receipt,
 	}
 	err = updateOrInsertTransfersDBFields(tx, []transferDBFields{transfer})
 	require.NoError(tb, err)
