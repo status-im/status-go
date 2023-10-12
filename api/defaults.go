@@ -158,6 +158,14 @@ func defaultNodeConfig(installationID string, request *requests.CreateAccount) (
 		nodeConfig.WalletConfig.OpenseaAPIKey = request.OpenseaAPIKey
 	}
 
+	if request.RaribleMainnetAPIKey != "" {
+		nodeConfig.WalletConfig.RaribleMainnetAPIKey = request.RaribleMainnetAPIKey
+	}
+
+	if request.RaribleTestnetAPIKey != "" {
+		nodeConfig.WalletConfig.RaribleTestnetAPIKey = request.RaribleTestnetAPIKey
+	}
+
 	if request.InfuraToken != "" {
 		nodeConfig.WalletConfig.InfuraAPIKey = request.InfuraToken
 	}

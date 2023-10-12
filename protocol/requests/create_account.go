@@ -43,10 +43,12 @@ type CreateAccount struct {
 }
 
 type WalletSecretsConfig struct {
-	PoktToken     string `json:"poktToken"`
-	InfuraToken   string `json:"infuraToken"`
-	InfuraSecret  string `json:"infuraSecret"`
-	OpenseaAPIKey string `json:"openseaApiKey"`
+	PoktToken            string `json:"poktToken"`
+	InfuraToken          string `json:"infuraToken"`
+	InfuraSecret         string `json:"infuraSecret"`
+	OpenseaAPIKey        string `json:"openseaApiKey"`
+	RaribleMainnetAPIKey string `json:"raribleMainnetApiKey"`
+	RaribleTestnetAPIKey string `json:"raribleTestnetApiKey"`
 
 	// Testing
 	GanacheURL                  string `json:"ganacheURL"`
