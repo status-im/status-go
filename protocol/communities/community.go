@@ -1021,12 +1021,19 @@ func (o *Community) ValidateRequestToJoin(signer *ecdsa.PublicKey, request *prot
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
-	// If we are not admin, fuggetaboutit
-	if !o.IsControlNode() && !o.HasPermissionToSendCommunityEvents() {
+	if o.IsControlNode() {
+		// TODO: Enable this once mobile supports revealed addresses.
+		// if len(request.RevealedAccounts) == 0 {
+		// 	return errors.New("no addresses revealed")
+		// }
+	} else if o.HasPermissionToSendCommunityEvents() {
+		if o.AcceptRequestToJoinAutomatically() {
+			return errors.New("auto-accept community requests can only be processed by the control node")
+		}
+	} else {
 		return ErrNotAdmin
 	}
 
-	// If the org is ens name only, then reject if not present
 	if o.config.CommunityDescription.Permissions.EnsOnly && len(request.EnsName) == 0 {
 		return ErrCantRequestAccess
 	}
@@ -1038,6 +1045,19 @@ func (o *Community) ValidateRequestToJoin(signer *ecdsa.PublicKey, request *prot
 	err := o.validateRequestToJoinWithoutChatID(request)
 	if err != nil {
 		return err
+	}
+
+	if o.isBanned(signer) {
+		return ErrCantRequestAccess
+	}
+
+	timeNow := uint64(time.Now().Unix())
+	requestTimeOutClock, err := AddTimeoutToRequestToJoinClock(request.Clock)
+	if err != nil {
+		return err
+	}
+	if timeNow >= requestTimeOutClock {
+		return errors.New("request is expired")
 	}
 
 	return nil

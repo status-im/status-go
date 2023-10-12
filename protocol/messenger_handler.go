@@ -1465,76 +1465,22 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageSta
 
 // HandleCommunityRequestToJoin handles an community request to join
 func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, requestToJoinProto *protobuf.CommunityRequestToJoin, statusMessage *v1protocol.StatusMessage) error {
-	if requestToJoinProto.CommunityId == nil {
-		return ErrInvalidCommunityID
-	}
-
-	timeNow := uint64(time.Now().Unix())
-
-	requestTimeOutClock, err := communities.AddTimeoutToRequestToJoinClock(requestToJoinProto.Clock)
-	if err != nil {
-		return err
-	}
-
-	if timeNow >= requestTimeOutClock {
-		return errors.New("request is expired")
-	}
-
 	signer := state.CurrentMessageState.PublicKey
-	receiver := statusMessage.Dst
-	requestToJoin, err := m.communitiesManager.HandleCommunityRequestToJoin(signer, receiver, requestToJoinProto)
-	if err != nil {
-		return err
-	}
-	// not interested, stop further processing
-	if requestToJoin == nil {
-		return nil
-	}
-
-	if requestToJoin.State == communities.RequestToJoinStateAccepted {
-		accept := &requests.AcceptRequestToJoinCommunity{
-			ID: requestToJoin.ID,
-		}
-		_, err = m.AcceptRequestToJoinCommunity(accept)
-		if err != nil {
-			if err == communities.ErrNoPermissionToJoin {
-				// only control node will end up here as it's the only one that
-				// performed token permission checks
-				requestToJoin.State = communities.RequestToJoinStateDeclined
-			} else {
-				return err
-			}
-		}
-	}
-
-	if requestToJoin.State == communities.RequestToJoinStateDeclined {
-		cancel := &requests.DeclineRequestToJoinCommunity{
-			ID: requestToJoin.ID,
-		}
-		_, err = m.DeclineRequestToJoinCommunity(cancel)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-
-	community, err := m.communitiesManager.GetByID(requestToJoinProto.CommunityId)
+	community, requestToJoin, err := m.communitiesManager.HandleCommunityRequestToJoin(signer, statusMessage.Dst, requestToJoinProto)
 	if err != nil {
 		return err
 	}
 
-	contactID := contactIDFromPublicKey(signer)
+	switch requestToJoin.State {
+	case communities.RequestToJoinStatePending:
+		contact, _ := state.AllContacts.Load(contactIDFromPublicKey(signer))
+		if len(requestToJoinProto.DisplayName) != 0 {
+			contact.DisplayName = requestToJoinProto.DisplayName
+			state.ModifiedContacts.Store(contact.ID, true)
+			state.AllContacts.Store(contact.ID, contact)
+			state.ModifiedContacts.Store(contact.ID, true)
+		}
 
-	contact, _ := state.AllContacts.Load(contactID)
-
-	if len(requestToJoinProto.DisplayName) != 0 {
-		contact.DisplayName = requestToJoinProto.DisplayName
-		state.ModifiedContacts.Store(contact.ID, true)
-		state.AllContacts.Store(contact.ID, contact)
-		state.ModifiedContacts.Store(contact.ID, true)
-	}
-
-	if requestToJoin.State == communities.RequestToJoinStatePending {
 		if state.Response.RequestsToJoinCommunity == nil {
 			state.Response.RequestsToJoinCommunity = make([]*communities.RequestToJoin, 0)
 		}
@@ -1553,32 +1499,52 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, re
 			Deleted:          false,
 			UpdatedAt:        m.getCurrentTimeInMillis(),
 		}
-
 		err = m.addActivityCenterNotification(state.Response, notification)
 		if err != nil {
 			m.logger.Error("failed to save notification", zap.Error(err))
 			return err
 		}
-	} else {
-		// Activity Center notification, updating existing for accepted/declined
-		notification, err := m.persistence.GetActivityCenterNotificationByID(requestToJoin.ID)
-		if err != nil {
+
+	case communities.RequestToJoinStateDeclined:
+		response, err := m.declineRequestToJoinCommunity(requestToJoin)
+		if err == nil {
+			err := state.Response.Merge(response)
+			if err != nil {
+				return err
+			}
+		} else {
 			return err
 		}
 
-		if notification != nil {
-			if requestToJoin.State == communities.RequestToJoinStateAccepted {
-				notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
-			} else {
-				notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
-			}
-			notification.UpdatedAt = m.getCurrentTimeInMillis()
-			err = m.addActivityCenterNotification(state.Response, notification)
+	case communities.RequestToJoinStateAccepted:
+		response, err := m.acceptRequestToJoinCommunity(requestToJoin)
+		if err == nil {
+			err := state.Response.Merge(response) // new member has been added
 			if err != nil {
-				m.logger.Error("failed to save notification", zap.Error(err))
 				return err
 			}
+		} else if err == communities.ErrNoPermissionToJoin {
+			// only control node will end up here as it's the only one that
+			// performed token permission checks
+			response, err = m.declineRequestToJoinCommunity(requestToJoin)
+			if err == nil {
+				err := state.Response.Merge(response)
+				if err != nil {
+					return err
+				}
+			} else {
+				return err
+			}
+		} else {
+			return err
 		}
+
+	case communities.RequestToJoinStateCanceled:
+		// cancellation is handled by separate message
+		fallthrough
+	case communities.RequestToJoinStateAcceptedPending, communities.RequestToJoinStateDeclinedPending:
+		// request can be marked as pending only manually
+		return errors.New("invalid request state")
 	}
 
 	return nil

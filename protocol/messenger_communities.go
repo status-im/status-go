@@ -1500,16 +1500,7 @@ func (m *Messenger) CancelRequestToJoinCommunity(request *requests.CancelRequest
 	return response, nil
 }
 
-func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequestToJoinCommunity) (*MessengerResponse, error) {
-	if err := request.Validate(); err != nil {
-		return nil, err
-	}
-
-	requestToJoin, err := m.communitiesManager.GetRequestToJoin(request.ID)
-	if err != nil {
-		return nil, err
-	}
-
+func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.RequestToJoin) (*MessengerResponse, error) {
 	community, err := m.communitiesManager.AcceptRequestToJoin(requestToJoin)
 	if err != nil {
 		return nil, err
@@ -1577,12 +1568,11 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 	response.AddCommunity(community)
 	response.AddRequestToJoinCommunity(requestToJoin)
 
-	// Activity Center notification
-	notification, err := m.persistence.GetActivityCenterNotificationByID(request.ID)
+	// Update existing notification
+	notification, err := m.persistence.GetActivityCenterNotificationByID(requestToJoin.ID)
 	if err != nil {
 		return nil, err
 	}
-
 	if notification != nil {
 		notification.MembershipStatus = ActivityCenterMembershipStatusAccepted
 		if community.HasPermissionToSendCommunityEvents() {
@@ -1602,17 +1592,21 @@ func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequest
 	return response, nil
 }
 
-func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineRequestToJoinCommunity) (*MessengerResponse, error) {
+func (m *Messenger) AcceptRequestToJoinCommunity(request *requests.AcceptRequestToJoinCommunity) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
 
-	dbRequest, err := m.communitiesManager.GetRequestToJoin(request.ID)
+	requestToJoin, err := m.communitiesManager.GetRequestToJoin(request.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	community, err := m.communitiesManager.DeclineRequestToJoin(dbRequest)
+	return m.acceptRequestToJoinCommunity(requestToJoin)
+}
+
+func (m *Messenger) declineRequestToJoinCommunity(requestToJoin *communities.RequestToJoin) (*MessengerResponse, error) {
+	community, err := m.communitiesManager.DeclineRequestToJoin(requestToJoin)
 	if err != nil {
 		return nil, err
 	}
@@ -1620,9 +1614,9 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 	if community.IsControlNode() {
 		// Notify privileged members that request to join was rejected
 		// Send request to join without revealed addresses
-		dbRequest.RevealedAccounts = make([]*protobuf.RevealedAccount, 0)
+		requestToJoin.RevealedAccounts = make([]*protobuf.RevealedAccount, 0)
 		declinedRequestsToJoin := make(map[string]*protobuf.CommunityRequestToJoin)
-		declinedRequestsToJoin[dbRequest.PublicKey] = dbRequest.ToCommunityRequestToJoinProtobuf()
+		declinedRequestsToJoin[requestToJoin.PublicKey] = requestToJoin.ToCommunityRequestToJoinProtobuf()
 
 		syncMsg := &protobuf.CommunityPrivilegedUserSyncMessage{
 			Type:          protobuf.CommunityPrivilegedUserSyncMessage_CONTROL_NODE_REJECT_REQUEST_TO_JOIN,
@@ -1654,25 +1648,16 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 		}
 	}
 
-	// Activity Center notification
-	notification, err := m.persistence.GetActivityCenterNotificationByID(request.ID)
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+	response.AddRequestToJoinCommunity(requestToJoin)
+
+	// Update existing notification
+	notification, err := m.persistence.GetActivityCenterNotificationByID(requestToJoin.ID)
 	if err != nil {
 		return nil, err
 	}
-
-	response := &MessengerResponse{}
-	dbRequest, err = m.communitiesManager.GetRequestToJoin(request.ID)
-	response.AddRequestToJoinCommunity(dbRequest)
-
 	if notification != nil {
-		if err != nil {
-			return nil, err
-		}
-		community, err := m.communitiesManager.GetByID(dbRequest.CommunityID)
-		if err != nil {
-			return nil, err
-		}
-
 		notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
 		if community.HasPermissionToSendCommunityEvents() {
 			notification.MembershipStatus = ActivityCenterMembershipStatusDeclinedPending
@@ -1689,6 +1674,19 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 	}
 
 	return response, nil
+}
+
+func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineRequestToJoinCommunity) (*MessengerResponse, error) {
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+
+	requestToJoin, err := m.communitiesManager.GetRequestToJoin(request.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.declineRequestToJoinCommunity(requestToJoin)
 }
 
 func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
