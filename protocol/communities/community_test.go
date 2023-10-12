@@ -338,21 +338,25 @@ func (s *CommunitySuite) TestValidateRequestToJoin() {
 	request := &protobuf.CommunityRequestToJoin{
 		EnsName:     "donvanvliet.stateofus.eth",
 		CommunityId: s.communityID,
+		Clock:       uint64(time.Now().Unix()),
 	}
 
 	requestWithChatID := &protobuf.CommunityRequestToJoin{
 		EnsName:     "donvanvliet.stateofus.eth",
 		CommunityId: s.communityID,
 		ChatId:      testChatID1,
+		Clock:       uint64(time.Now().Unix()),
 	}
 
 	requestWithoutENS := &protobuf.CommunityRequestToJoin{
 		CommunityId: s.communityID,
+		Clock:       uint64(time.Now().Unix()),
 	}
 
 	requestWithChatWithoutENS := &protobuf.CommunityRequestToJoin{
 		CommunityId: s.communityID,
 		ChatId:      testChatID1,
+		Clock:       uint64(time.Now().Unix()),
 	}
 
 	// MATRIX

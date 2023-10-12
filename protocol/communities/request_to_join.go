@@ -74,6 +74,19 @@ func (r *RequestToJoin) Empty() bool {
 	return len(r.ID)+len(r.PublicKey)+int(r.Clock)+len(r.ENSName)+len(r.ChatID)+len(r.CommunityID)+int(r.State) == 0
 }
 
+func (r *RequestToJoin) ShouldRetainDeclined(clock uint64) (bool, error) {
+	if r.State != RequestToJoinStateDeclined {
+		return false, nil
+	}
+
+	declineExpiryClock, err := AddTimeoutToRequestToJoinClock(r.Clock)
+	if err != nil {
+		return false, err
+	}
+
+	return clock < declineExpiryClock, nil
+}
+
 func AddTimeoutToRequestToJoinClock(clock uint64) (uint64, error) {
 	requestToJoinClock, err := strconv.ParseInt(fmt.Sprint(clock), 10, 64)
 	if err != nil {

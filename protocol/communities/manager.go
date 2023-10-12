@@ -2119,25 +2119,17 @@ func (m *Manager) DeclineRequestToJoin(dbRequest *RequestToJoin) (*Community, er
 	return community, nil
 }
 
-func (m *Manager) isUserRejectedFromCommunity(signer *ecdsa.PublicKey, community *Community, requestClock uint64) (bool, error) {
-	declinedRequestsToJoin, err := m.persistence.DeclinedRequestsToJoinForCommunity(community.ID())
+func (m *Manager) shouldUserRetainDeclined(signer *ecdsa.PublicKey, community *Community, requestClock uint64) (bool, error) {
+	requestID := CalculateRequestID(common.PubkeyToHex(signer), types.HexBytes(community.IDString()))
+	request, err := m.persistence.GetRequestToJoin(requestID)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
 		return false, err
 	}
 
-	for _, req := range declinedRequestsToJoin {
-		if req.PublicKey == common.PubkeyToHex(signer) {
-			dbRequestTimeOutClock, err := AddTimeoutToRequestToJoinClock(req.Clock)
-			if err != nil {
-				return false, err
-			}
-
-			if requestClock < dbRequestTimeOutClock {
-				return true, nil
-			}
-		}
-	}
-	return false, nil
+	return request.ShouldRetainDeclined(requestClock)
 }
 
 func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, request *protobuf.CommunityCancelRequestToJoin) (*RequestToJoin, error) {
@@ -2149,11 +2141,11 @@ func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, re
 		return nil, ErrOrgNotFound
 	}
 
-	isUserRejected, err := m.isUserRejectedFromCommunity(signer, community, request.Clock)
+	retainDeclined, err := m.shouldUserRetainDeclined(signer, community, request.Clock)
 	if err != nil {
 		return nil, err
 	}
-	if isUserRejected {
+	if retainDeclined {
 		return nil, ErrCommunityRequestAlreadyRejected
 	}
 
@@ -2170,41 +2162,18 @@ func (m *Manager) HandleCommunityCancelRequestToJoin(signer *ecdsa.PublicKey, re
 	return requestToJoin, nil
 }
 
-func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoin) (*RequestToJoin, error) {
+func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoin) (*Community, *RequestToJoin, error) {
 	community, err := m.persistence.GetByID(&m.identity.PublicKey, request.CommunityId)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if community == nil {
-		return nil, ErrOrgNotFound
+		return nil, nil, ErrOrgNotFound
 	}
 
-	// don't process request as admin if community is configured as auto-accept
-	if !community.IsControlNode() && community.AcceptRequestToJoinAutomatically() {
-		return nil, nil
-	}
-
-	// control node must receive requests to join only on community address
-	// ignore duplicate messages sent to control node pubKey
-	if community.IsControlNode() && receiver.Equal(m.identity) {
-		return nil, errors.New("duplicate msg sent to the owner")
-	}
-
-	isUserRejected, err := m.isUserRejectedFromCommunity(signer, community, request.Clock)
+	err = community.ValidateRequestToJoin(signer, request)
 	if err != nil {
-		return nil, err
-	}
-	if isUserRejected {
-		return nil, ErrCommunityRequestAlreadyRejected
-	}
-
-	// Banned member can't request to join community
-	if community.isBanned(signer) {
-		return nil, ErrCantRequestAccess
-	}
-
-	if err := community.ValidateRequestToJoin(signer, request); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	requestToJoin := &RequestToJoin{
@@ -2215,57 +2184,73 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 		State:            RequestToJoinStatePending,
 		RevealedAccounts: request.RevealedAccounts,
 	}
-
 	requestToJoin.CalculateID()
 
 	existingRequestToJoin, err := m.persistence.GetRequestToJoin(requestToJoin.ID)
 	if err != nil && err != sql.ErrNoRows {
-		return nil, err
+		return nil, nil, err
 	}
 
-	if existingRequestToJoin == nil || existingRequestToJoin.State == RequestToJoinStateCanceled {
-		if err := m.persistence.SaveRequestToJoin(requestToJoin); err != nil {
-			return nil, err
+	if existingRequestToJoin == nil {
+		err = m.SaveRequestToJoin(requestToJoin)
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
+		retainDeclined, err := existingRequestToJoin.ShouldRetainDeclined(request.Clock)
+		if err != nil {
+			return nil, nil, err
+		}
+		if retainDeclined {
+			return nil, nil, ErrCommunityRequestAlreadyRejected
+		}
+
+		switch existingRequestToJoin.State {
+		case RequestToJoinStatePending, RequestToJoinStateDeclined, RequestToJoinStateCanceled:
+			// Another request have been received, save request back to pending state
+			err = m.SaveRequestToJoin(requestToJoin)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 	}
 
 	if community.IsControlNode() {
-		// request to join was already processed by an admin and waits to get
-		// confirmation for its decision
-		//
-		// we're only interested in immediately declining any declined/pending
-		// requests here, because if it's accepted/pending, we still need to perform
-		// some checks
-		if existingRequestToJoin != nil && existingRequestToJoin.State == RequestToJoinStateDeclinedPending {
-			requestToJoin.State = RequestToJoinStateDeclined
-			return requestToJoin, nil
-		}
-
-		if len(request.RevealedAccounts) > 0 {
-			// verify if revealed addresses indeed belong to requester
-			for _, revealedAccount := range request.RevealedAccounts {
-				recoverParams := account.RecoverParams{
-					Message:   types.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID(), requestToJoin.ID)),
-					Signature: types.EncodeHex(revealedAccount.Signature),
-				}
-
-				matching, err := m.accountsManager.CanRecover(recoverParams, types.HexToAddress(revealedAccount.Address))
-				if err != nil {
-					return nil, err
-				}
-				if !matching {
-					// if ownership of only one wallet address cannot be verified,
-					// we mark the request as cancelled and stop
-					requestToJoin.State = RequestToJoinStateDeclined
-					return requestToJoin, nil
-				}
+		// verify if revealed addresses indeed belong to requester
+		for _, revealedAccount := range request.RevealedAccounts {
+			recoverParams := account.RecoverParams{
+				Message:   types.EncodeHex(crypto.Keccak256(crypto.CompressPubkey(signer), community.ID(), requestToJoin.ID)),
+				Signature: types.EncodeHex(revealedAccount.Signature),
 			}
 
-			// Save revealed addresses + signatures so they can later be added
-			// to the control node's local table of known revealed addresses
-			err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin.ID, requestToJoin.RevealedAccounts)
+			matching, err := m.accountsManager.CanRecover(recoverParams, types.HexToAddress(revealedAccount.Address))
 			if err != nil {
-				return nil, err
+				return nil, nil, err
+			}
+			if !matching {
+				// if ownership of only one wallet address cannot be verified,
+				// we mark the request as cancelled and stop
+				requestToJoin.State = RequestToJoinStateDeclined
+				return community, requestToJoin, nil
+			}
+		}
+
+		// Save revealed addresses + signatures so they can later be added
+		// to the control node's local table of known revealed addresses
+		err = m.persistence.SaveRequestToJoinRevealedAddresses(requestToJoin.ID, requestToJoin.RevealedAccounts)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if existingRequestToJoin != nil {
+			// request to join was already processed by privileged user
+			// and waits to get confirmation for its decision
+			if existingRequestToJoin.State == RequestToJoinStateDeclinedPending {
+				requestToJoin.State = RequestToJoinStateDeclined
+				return community, requestToJoin, nil
+			} else if existingRequestToJoin.State == RequestToJoinStateAcceptedPending {
+				requestToJoin.State = RequestToJoinStateAccepted
+				return community, requestToJoin, nil
 			}
 		}
 
@@ -2273,23 +2258,15 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 		// It may happen when member removes itself from community and then tries to rejoin
 		// More specifically, CommunityRequestToLeave may be delivered later than CommunityRequestToJoin, or not delivered at all
 		acceptAutomatically := community.AcceptRequestToJoinAutomatically() || community.HasMember(signer)
-		// If the request to join was already accepted by another admin,
-		// we mark it as accepted so it won't be in pending state, even if the community
-		// is not set to auto-accept
-		acceptedByAdmin := existingRequestToJoin != nil && existingRequestToJoin.State == RequestToJoinStateAcceptedPending
-		if acceptAutomatically || acceptedByAdmin {
-			err = m.markRequestToJoinAsAccepted(signer, community)
-			if err != nil {
-				return nil, err
-			}
+		if acceptAutomatically {
 			// Don't check permissions here,
 			// it will be done further in the processing pipeline.
 			requestToJoin.State = RequestToJoinStateAccepted
-			return requestToJoin, nil
+			return community, requestToJoin, nil
 		}
 	}
 
-	return requestToJoin, nil
+	return community, requestToJoin, nil
 }
 
 func (m *Manager) HandleCommunityEditSharedAddresses(signer *ecdsa.PublicKey, request *protobuf.CommunityEditSharedAddresses) error {
