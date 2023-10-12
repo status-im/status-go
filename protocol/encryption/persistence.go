@@ -3,6 +3,7 @@ package encryption
 import (
 	"crypto/ecdsa"
 	"database/sql"
+	"errors"
 	"strings"
 
 	dr "github.com/status-im/doubleratchet"
@@ -729,34 +730,34 @@ func (s *sqliteSessionStorage) Load(id []byte) (*dr.State, error) {
 }
 
 type HRCache struct {
-	GroupID []byte
-	KeyID   uint32
-	Key     []byte
-	Hash    []byte
-	SeqNo   uint32
+	GroupID         []byte
+	KeyID           []byte
+	DeprecatedKeyID uint32
+	Key             []byte
+	Hash            []byte
+	SeqNo           uint32
 }
 
 // GetHashRatchetKeyByID retrieves a hash ratchet key by group ID and seqNo.
 // If cache data with given seqNo (e.g. 0) is not found,
 // then the query will return the cache data with the latest seqNo
-func (s *sqlitePersistence) GetHashRatchetKeyByID(groupID []byte, keyID uint32, seqNo uint32) (*HRCache, error) {
-	stmt, err := s.DB.Prepare(
-		`WITH input AS (
-       select ? AS group_id, ? AS key_id, ? as seq_no
+func (s *sqlitePersistence) GetHashRatchetKeyByID(ratchet *HashRatchetKeyCompatibility, seqNo uint32) (*HRCache, error) {
+	stmt, err := s.DB.Prepare(`WITH input AS (
+       select ? AS group_id, ? AS key_id, ? as seq_no, ? AS old_key_id
      ),
      cec AS (
        SELECT e.key, c.seq_no, c.hash FROM hash_ratchet_encryption e, input i
-			 LEFT JOIN hash_ratchet_encryption_cache c ON e.group_id=c.group_id AND e.key_id=c.key_id
-       WHERE e.key_id=i.key_id AND e.group_id=i.group_id),
+			 LEFT JOIN hash_ratchet_encryption_cache c ON e.group_id=c.group_id AND (e.hash_id=c.key_id OR e.key_id=c.key_id)
+       WHERE (e.hash_id=i.key_id OR e.key_id=i.old_key_id) AND e.group_id=i.group_id),
     seq_nos AS (
-    select CASE 
-		  	WHEN EXISTS (SELECT c.seq_no from cec c, input i where c.seq_no=i.seq_no) 
-				THEN i.seq_no 
-			  ELSE (select max(seq_no) from cec) 
+    select CASE
+		  	WHEN EXISTS (SELECT c.seq_no from cec c, input i where c.seq_no=i.seq_no)
+				THEN i.seq_no
+			  ELSE (select max(seq_no) from cec)
 			END as seq_no from input i
     )
 		 SELECT c.key, c.seq_no, c.hash FROM cec c, input i, seq_nos s
-    where case when not exists(select seq_no from seq_nos where seq_no is not null) 
+    where case when not exists(select seq_no from seq_nos where seq_no is not null)
     then 1 else c.seq_no = s.seq_no end`)
 	if err != nil {
 		return nil, err
@@ -766,7 +767,22 @@ func (s *sqlitePersistence) GetHashRatchetKeyByID(groupID []byte, keyID uint32, 
 	var key, hash []byte
 	var seqNoPtr *uint32
 
-	err = stmt.QueryRow(groupID, keyID, seqNo).Scan(&key, &seqNoPtr, &hash)
+	oldFormat := ratchet.IsOldFormat()
+	if oldFormat {
+		// Query using the deprecated format
+		err = stmt.QueryRow(ratchet.GroupID, nil, seqNo, ratchet.DeprecatedKeyID()).Scan(&key, &seqNoPtr, &hash)
+
+	} else {
+		keyID, err := ratchet.GetKeyID()
+		if err != nil {
+			return nil, err
+		}
+
+		err = stmt.QueryRow(ratchet.GroupID, keyID, seqNo, ratchet.DeprecatedKeyID()).Scan(&key, &seqNoPtr, &hash)
+		if err != nil {
+			return nil, err
+		}
+	}
 	var seqNoResult uint32
 	if seqNoPtr == nil {
 		seqNoResult = 0
@@ -774,55 +790,134 @@ func (s *sqlitePersistence) GetHashRatchetKeyByID(groupID []byte, keyID uint32, 
 		seqNoResult = *seqNoPtr
 	}
 
-	res := &HRCache{
-		KeyID: keyID,
-		Key:   key,
-		Hash:  hash,
-		SeqNo: seqNoResult,
-	}
 	switch err {
 	case sql.ErrNoRows:
 		return nil, nil
 	case nil:
+		ratchet.Key = key
+		keyID, err := ratchet.GetKeyID()
+
+		if err != nil {
+			return nil, err
+		}
+
+		res := &HRCache{
+			KeyID: keyID,
+			Key:   key,
+			Hash:  hash,
+			SeqNo: seqNoResult,
+		}
+
 		return res, nil
 	default:
 		return nil, err
 	}
 }
 
+type HashRatchetKeyCompatibility struct {
+	GroupID   []byte
+	keyID     []byte
+	Timestamp uint64
+	Key       []byte
+}
+
+func (h *HashRatchetKeyCompatibility) DeprecatedKeyID() uint32 {
+	return uint32(h.Timestamp)
+}
+
+func (h *HashRatchetKeyCompatibility) IsOldFormat() bool {
+	return len(h.keyID) == 0 && len(h.Key) == 0
+}
+
+func (h *HashRatchetKeyCompatibility) GetKeyID() ([]byte, error) {
+	if len(h.keyID) != 0 {
+		return h.keyID, nil
+	}
+
+	if len(h.GroupID) == 0 || h.Timestamp == 0 || len(h.Key) == 0 {
+		return nil, errors.New("could not create key")
+	}
+
+	return generateHashRatchetKeyID(h.GroupID, h.Timestamp, h.Key), nil
+}
+
+func (h *HashRatchetKeyCompatibility) GenerateNext() (*HashRatchetKeyCompatibility, error) {
+
+	ratchet := &HashRatchetKeyCompatibility{
+		GroupID: h.GroupID,
+	}
+
+	// Randomly generate a hash ratchet key
+	hrKey, err := crypto.GenerateKey()
+	if err != nil {
+		return nil, err
+	}
+	hrKeyBytes := crypto.FromECDSA(hrKey)
+
+	if err != nil {
+		return nil, err
+	}
+
+	currentTime := GetCurrentTime()
+	if h.Timestamp < currentTime {
+		ratchet.Timestamp = bumpKeyID(currentTime)
+	} else {
+		ratchet.Timestamp = h.Timestamp + 1
+	}
+
+	ratchet.Key = hrKeyBytes
+
+	_, err = ratchet.GetKeyID()
+	if err != nil {
+		return nil, err
+	}
+
+	return ratchet, nil
+}
+
 // GetCurrentKeyForGroup retrieves a key ID for given group ID
 // (with an assumption that key ids are shared in the group, and
 // at any given time there is a single key used)
-func (s *sqlitePersistence) GetCurrentKeyForGroup(groupID []byte) (uint32, error) {
+func (s *sqlitePersistence) GetCurrentKeyForGroup(groupID []byte) (*HashRatchetKeyCompatibility, error) {
+	ratchet := &HashRatchetKeyCompatibility{
+		GroupID: groupID,
+	}
 
-	stmt, err := s.DB.Prepare(`SELECT key_id
+	stmt, err := s.DB.Prepare(`SELECT hash_id, key_timestamp, key
 				   FROM hash_ratchet_encryption
-				     WHERE group_id = ? order by key_id desc limit 1`)
+				     WHERE group_id = ? order by key_timestamp desc limit 1`)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	defer stmt.Close()
 
-	var keyID uint32
-	err = stmt.QueryRow(groupID).Scan(&keyID)
+	var keyID, key []byte
+	var timestamp uint64
+	err = stmt.QueryRow(groupID).Scan(&keyID, &timestamp, &key)
 
 	switch err {
 	case sql.ErrNoRows:
-		return 0, nil
+		return ratchet, nil
 	case nil:
-		return keyID, nil
+		ratchet.Key = key
+		ratchet.Timestamp = timestamp
+		_, err = ratchet.GetKeyID()
+		if err != nil {
+			return nil, err
+		}
+		return ratchet, nil
 	default:
-		return 0, err
+		return nil, err
 	}
 }
 
-// GetKeyIDsForGroup retrieves all key IDs for given group ID
-func (s *sqlitePersistence) GetKeyIDsForGroup(groupID []byte) ([]uint32, error) {
+// GetKeysForGroup retrieves all key IDs for given group ID
+func (s *sqlitePersistence) GetKeysForGroup(groupID []byte) ([]*HashRatchetKeyCompatibility, error) {
 
-	var keyIDs []uint32
-	stmt, err := s.DB.Prepare(`SELECT key_id
+	var ratchets []*HashRatchetKeyCompatibility
+	stmt, err := s.DB.Prepare(`SELECT hash_id, key_timestamp, key
 				   FROM hash_ratchet_encryption
-				     WHERE group_id = ? order by key_id desc`)
+				     WHERE group_id = ? order by key_timestamp desc`)
 	if err != nil {
 		return nil, err
 	}
@@ -834,84 +929,56 @@ func (s *sqlitePersistence) GetKeyIDsForGroup(groupID []byte) ([]uint32, error) 
 	}
 
 	for rows.Next() {
-		var keyID uint32
-		err := rows.Scan(&keyID)
+		ratchet := &HashRatchetKeyCompatibility{GroupID: groupID}
+		err := rows.Scan(&ratchet.keyID, &ratchet.Timestamp, &ratchet.Key)
 		if err != nil {
 			return nil, err
 		}
-		keyIDs = append(keyIDs, keyID)
+		ratchets = append(ratchets, ratchet)
 	}
 
-	return keyIDs, nil
+	return ratchets, nil
 }
 
 // SaveHashRatchetKeyHash saves a hash ratchet key cache data
 func (s *sqlitePersistence) SaveHashRatchetKeyHash(
-	groupID []byte,
-	keyID uint32,
+	ratchet *HashRatchetKeyCompatibility,
 	hash []byte,
 	seqNo uint32,
 ) error {
 
-	stmt, err := s.DB.Prepare(`INSERT INTO hash_ratchet_encryption_cache(group_id,key_id,hash,seq_no)
+	stmt, err := s.DB.Prepare(`INSERT INTO hash_ratchet_encryption_cache(group_id, key_id, hash, seq_no)
            VALUES(?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(groupID, keyID, hash, seqNo)
+	keyID, err := ratchet.GetKeyID()
+	if err != nil {
+		return err
+	}
+
+	_, err = stmt.Exec(ratchet.GroupID, keyID, hash, seqNo)
 
 	return err
 }
 
 // SaveHashRatchetKey saves a hash ratchet key
-func (s *sqlitePersistence) SaveHashRatchetKey(
-	groupID []byte,
-	keyID uint32,
-	key []byte,
-) error {
-	tx, err := s.DB.Begin()
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		// don't shadow original error
-		_ = tx.Rollback()
-	}()
-
-	var result uint64
-	stmt, err := tx.Prepare(`SELECT 1
-        FROM hash_ratchet_encryption
-        WHERE group_id = ? AND key_id = ?
-        LIMIT 1`)
-	if err != nil {
-		return err
-	}
-
-	defer stmt.Close()
-
-	err = stmt.QueryRow(groupID, keyID).Scan(&result)
-	if err != nil && err != sql.ErrNoRows {
-		return err
-	} else if err == nil {
-		// already in the database, nothing to do
-		return nil
-	}
-
-	stmt, err = tx.Prepare(`INSERT INTO hash_ratchet_encryption(group_id, key_id, key)
-           VALUES(?,?,?)`)
+func (s *sqlitePersistence) SaveHashRatchetKey(ratchet *HashRatchetKeyCompatibility) error {
+	stmt, err := s.DB.Prepare(`INSERT INTO hash_ratchet_encryption(group_id, hash_id, key_timestamp, key_id, key)
+           VALUES(?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(groupID, keyID, key)
+	keyID, err := ratchet.GetKeyID()
+	if err != nil {
+		return err
+	}
+
+	_, err = stmt.Exec(ratchet.GroupID, keyID, ratchet.Timestamp, ratchet.DeprecatedKeyID(), ratchet.Key)
 
 	return err
 }

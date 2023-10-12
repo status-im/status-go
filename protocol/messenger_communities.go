@@ -36,6 +36,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/discord"
+	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
@@ -4934,7 +4935,7 @@ func chunkAttachmentsByByteSize(slice []*protobuf.DiscordMessageAttachment, maxF
 }
 
 // GetCurrentKeyForGroup returns the latest key timestampID belonging to a key group
-func (m *Messenger) GetCurrentKeyForGroup(groupID []byte) (uint32, error) {
+func (m *Messenger) GetCurrentKeyForGroup(groupID []byte) (*encryption.HashRatchetKeyCompatibility, error) {
 	return m.sender.GetCurrentKeyForGroup(groupID)
 }
 
