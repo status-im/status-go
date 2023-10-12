@@ -106,6 +106,7 @@
 // 1695918296_add_validated_at.up.sql (377B)
 // 1697699419_community_control_node_sync.up.sql (435B)
 // 1698137561_add_profile_showcase_tables.up.sql (440B)
+// 1698137562_fix_encryption_key_id.up.sql (759B)
 // README.md (554B)
 // doc.go (850B)
 
@@ -117,7 +118,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -127,7 +127,7 @@ import (
 func bindataRead(data []byte, name string) ([]byte, error) {
 	gz, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %w", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -135,7 +135,7 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	clErr := gz.Close()
 
 	if err != nil {
-		return nil, fmt.Errorf("read %q: %v", name, err)
+		return nil, fmt.Errorf("read %q: %w", name, err)
 	}
 	if clErr != nil {
 		return nil, err
@@ -191,7 +191,7 @@ func _000001_initDownDbSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "000001_init.down.db.sql", size: 65, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "000001_init.down.db.sql", size: 65, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x5e, 0xbb, 0x3f, 0x1, 0x75, 0x19, 0x70, 0x86, 0xa7, 0x34, 0x40, 0x17, 0x34, 0x3e, 0x18, 0x51, 0x79, 0xd4, 0x22, 0xad, 0x8f, 0x80, 0xcc, 0xa6, 0xcc, 0x6, 0x2b, 0x62, 0x2, 0x47, 0xba, 0xf9}}
 	return a, nil
 }
@@ -211,7 +211,7 @@ func _000001_initUpDbSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "000001_init.up.db.sql", size: 2719, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "000001_init.up.db.sql", size: 2719, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x60, 0xdc, 0xeb, 0xe, 0xc2, 0x4f, 0x75, 0xa, 0xf6, 0x3e, 0xc7, 0xc4, 0x4, 0xe2, 0xe1, 0xa4, 0x73, 0x2f, 0x4a, 0xad, 0x1a, 0x0, 0xc3, 0x93, 0x9d, 0x77, 0x3e, 0x31, 0x91, 0x77, 0x2e, 0xc8}}
 	return a, nil
 }
@@ -231,7 +231,7 @@ func _000002_add_last_ens_clock_valueUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "000002_add_last_ens_clock_value.up.sql", size: 77, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "000002_add_last_ens_clock_value.up.sql", size: 77, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x4d, 0x3, 0x8f, 0xd5, 0x85, 0x83, 0x47, 0xbe, 0xf9, 0x82, 0x7e, 0x81, 0xa4, 0xbd, 0xaa, 0xd5, 0x98, 0x18, 0x5, 0x2d, 0x82, 0x42, 0x3b, 0x3, 0x50, 0xc3, 0x1e, 0x84, 0x35, 0xf, 0xb6, 0x2b}}
 	return a, nil
 }
@@ -251,7 +251,7 @@ func _1586358095_add_replaceUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1586358095_add_replace.up.sql", size: 224, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1586358095_add_replace.up.sql", size: 224, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd2, 0xb3, 0xa9, 0xc7, 0x7f, 0x9d, 0x8f, 0x43, 0x8c, 0x9e, 0x58, 0x8d, 0x44, 0xbc, 0xfa, 0x6b, 0x5f, 0x3f, 0x5a, 0xbe, 0xe8, 0xb1, 0x16, 0xf, 0x91, 0x2a, 0xa0, 0x71, 0xbb, 0x8d, 0x6b, 0xcb}}
 	return a, nil
 }
@@ -271,7 +271,7 @@ func _1588665364_add_image_dataUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1588665364_add_image_data.up.sql", size: 186, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1588665364_add_image_data.up.sql", size: 186, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd6, 0xc6, 0x35, 0xb4, 0x4c, 0x39, 0x96, 0x29, 0x30, 0xda, 0xf4, 0x8f, 0xcb, 0xf1, 0x9f, 0x84, 0xdc, 0x88, 0xd4, 0xd5, 0xbc, 0xb6, 0x5b, 0x46, 0x78, 0x67, 0x76, 0x1a, 0x5, 0x36, 0xdc, 0xe5}}
 	return a, nil
 }
@@ -291,7 +291,7 @@ func _1589365189_add_pow_targetUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1589365189_add_pow_target.up.sql", size: 66, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1589365189_add_pow_target.up.sql", size: 66, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x4e, 0x3a, 0xe2, 0x2e, 0x7d, 0xaf, 0xbb, 0xcc, 0x21, 0xa1, 0x7a, 0x41, 0x9a, 0xd0, 0xbb, 0xa9, 0xc8, 0x35, 0xf9, 0x32, 0x34, 0x46, 0x44, 0x9a, 0x86, 0x40, 0x7c, 0xb9, 0x23, 0xc7, 0x3, 0x3f}}
 	return a, nil
 }
@@ -311,7 +311,7 @@ func _1591277220_add_index_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1591277220_add_index_messages.up.sql", size: 240, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1591277220_add_index_messages.up.sql", size: 240, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9c, 0xfe, 0xbe, 0xd5, 0xb8, 0x8f, 0xdd, 0xef, 0xbb, 0xa8, 0xad, 0x7f, 0xed, 0x5b, 0x5b, 0x2f, 0xe6, 0x82, 0x27, 0x78, 0x1f, 0xb9, 0x57, 0xdc, 0x8, 0xc2, 0xb2, 0xa9, 0x9a, 0x4, 0xe1, 0x7a}}
 	return a, nil
 }
@@ -331,7 +331,7 @@ func _1593087212_add_mute_chat_and_raw_message_fieldsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1593087212_add_mute_chat_and_raw_message_fields.up.sql", size: 215, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1593087212_add_mute_chat_and_raw_message_fields.up.sql", size: 215, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x73, 0x99, 0x61, 0xd1, 0xaa, 0xb4, 0xbf, 0xaf, 0xd7, 0x20, 0x17, 0x40, 0xf9, 0x2, 0xfb, 0xcc, 0x40, 0x2a, 0xd, 0x86, 0x36, 0x30, 0x88, 0x89, 0x25, 0x80, 0x42, 0xb0, 0x5b, 0xe9, 0x73, 0x78}}
 	return a, nil
 }
@@ -351,7 +351,7 @@ func _1595862781_add_audio_dataUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1595862781_add_audio_data.up.sql", size: 246, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1595862781_add_audio_data.up.sql", size: 246, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xae, 0xd2, 0xee, 0x55, 0xfb, 0x36, 0xa4, 0x92, 0x66, 0xe, 0x81, 0x62, 0x1e, 0x7a, 0x69, 0xa, 0xd5, 0x4b, 0xa5, 0x6a, 0x8d, 0x1d, 0xce, 0xf3, 0x3e, 0xc0, 0x5f, 0x9c, 0x66, 0x1b, 0xb4, 0xed}}
 	return a, nil
 }
@@ -371,7 +371,7 @@ func _1595865249_create_emoji_reactions_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1595865249_create_emoji_reactions_table.up.sql", size: 300, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1595865249_create_emoji_reactions_table.up.sql", size: 300, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3e, 0xc5, 0x43, 0x5c, 0x3d, 0x53, 0x43, 0x2c, 0x1a, 0xa5, 0xb6, 0xbf, 0x7, 0x4, 0x5a, 0x3e, 0x40, 0x8b, 0xa4, 0x57, 0x12, 0x58, 0xbc, 0x42, 0xe2, 0xc3, 0xde, 0x76, 0x98, 0x80, 0xe2, 0xbe}}
 	return a, nil
 }
@@ -391,7 +391,7 @@ func _1596805115_create_group_chat_invitations_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1596805115_create_group_chat_invitations_table.up.sql", size: 231, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1596805115_create_group_chat_invitations_table.up.sql", size: 231, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6d, 0xb1, 0x14, 0x6d, 0x54, 0x28, 0x67, 0xc3, 0x23, 0x6a, 0xfc, 0x80, 0xdf, 0x9e, 0x4c, 0x35, 0x36, 0xf, 0xf8, 0xf3, 0x5f, 0xae, 0xad, 0xb, 0xc1, 0x51, 0x8e, 0x17, 0x7, 0xe5, 0x7f, 0x91}}
 	return a, nil
 }
@@ -411,7 +411,7 @@ func _1597322655_add_invitation_admin_chat_fieldUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1597322655_add_invitation_admin_chat_field.up.sql", size: 54, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1597322655_add_invitation_admin_chat_field.up.sql", size: 54, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa9, 0x7a, 0xa0, 0xf2, 0xdb, 0x13, 0x91, 0x91, 0xa8, 0x34, 0x1a, 0xa1, 0x49, 0x68, 0xd5, 0xae, 0x2c, 0xd8, 0xd5, 0xea, 0x8f, 0x8c, 0xc7, 0x2, 0x4e, 0x58, 0x2c, 0x3a, 0x14, 0xd4, 0x4f, 0x2c}}
 	return a, nil
 }
@@ -431,7 +431,7 @@ func _1597757544_add_nicknameUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1597757544_add_nickname.up.sql", size: 52, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1597757544_add_nickname.up.sql", size: 52, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf4, 0xa2, 0x64, 0x50, 0xc5, 0x4, 0xb9, 0x8b, 0xd1, 0x18, 0x9b, 0xc3, 0x91, 0x36, 0x2a, 0x1f, 0xc3, 0x6c, 0x2d, 0x92, 0xf8, 0x5e, 0xff, 0xb1, 0x59, 0x61, 0x2, 0x1c, 0xe1, 0x85, 0x90, 0xa4}}
 	return a, nil
 }
@@ -451,7 +451,7 @@ func _1598955122_add_mentionsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1598955122_add_mentions.up.sql", size: 52, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1598955122_add_mentions.up.sql", size: 52, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x8d, 0x22, 0x17, 0x92, 0xd2, 0x11, 0x4e, 0x7, 0x93, 0x9a, 0x55, 0xfd, 0xb, 0x97, 0xc4, 0x63, 0x6a, 0x81, 0x97, 0xcd, 0xb2, 0xf8, 0x4b, 0x5f, 0x3c, 0xfa, 0x3a, 0x38, 0x53, 0x10, 0xed, 0x9d}}
 	return a, nil
 }
@@ -471,7 +471,7 @@ func _1599641390_add_emoji_reactions_indexUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1599641390_add_emoji_reactions_index.up.sql", size: 126, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1599641390_add_emoji_reactions_index.up.sql", size: 126, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf9, 0xd8, 0xdc, 0xa7, 0xb, 0x92, 0x7a, 0x61, 0x37, 0x24, 0x1c, 0x77, 0x5e, 0xe, 0x7e, 0xfc, 0x9f, 0x98, 0x7b, 0x65, 0xe7, 0xf9, 0x71, 0x57, 0x89, 0x2d, 0x90, 0x1b, 0xf6, 0x5e, 0x37, 0xe8}}
 	return a, nil
 }
@@ -491,7 +491,7 @@ func _1599720851_add_seen_index_remove_long_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1599720851_add_seen_index_remove_long_messages.up.sql", size: 150, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1599720851_add_seen_index_remove_long_messages.up.sql", size: 150, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x24, 0x1c, 0xc4, 0x78, 0x91, 0xc7, 0xeb, 0xfe, 0xc8, 0xa0, 0xd8, 0x13, 0x27, 0x97, 0xc8, 0x96, 0x56, 0x97, 0x33, 0x2c, 0x1e, 0x16, 0x8a, 0xd3, 0x49, 0x99, 0x3, 0xe9, 0xbb, 0xc4, 0x5, 0x3c}}
 	return a, nil
 }
@@ -511,7 +511,7 @@ func _1603198582_add_profile_chat_fieldUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1603198582_add_profile_chat_field.up.sql", size: 45, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1603198582_add_profile_chat_field.up.sql", size: 45, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xaa, 0xca, 0xe, 0x46, 0xa0, 0x9, 0x9d, 0x47, 0x57, 0xe9, 0xfb, 0x17, 0xeb, 0x9c, 0xf6, 0xb8, 0x1d, 0xe9, 0xd, 0x0, 0xd5, 0xe5, 0xd8, 0x9e, 0x60, 0xa, 0xbf, 0x32, 0x2c, 0x52, 0x7f, 0x6a}}
 	return a, nil
 }
@@ -531,7 +531,7 @@ func _1603816533_add_linksUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1603816533_add_links.up.sql", size: 48, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1603816533_add_links.up.sql", size: 48, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc9, 0x24, 0xd6, 0x1d, 0xa, 0x83, 0x1e, 0x4d, 0xf, 0xae, 0x4d, 0x8c, 0x51, 0x32, 0xa8, 0x37, 0xb0, 0x14, 0xfb, 0x32, 0x34, 0xc8, 0xc, 0x4e, 0x5b, 0xc5, 0x15, 0x65, 0x73, 0x0, 0x0, 0x1d}}
 	return a, nil
 }
@@ -551,7 +551,7 @@ func _1603888149_create_chat_identity_last_published_tableUpSql() (*asset, error
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1603888149_create_chat_identity_last_published_table.up.sql", size: 407, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1603888149_create_chat_identity_last_published_table.up.sql", size: 407, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7f, 0x9, 0xf, 0xfb, 0xdb, 0x3c, 0x86, 0x70, 0x82, 0xda, 0x10, 0x25, 0xe2, 0x4e, 0x40, 0x45, 0xab, 0x8b, 0x1c, 0x91, 0x7c, 0xf1, 0x70, 0x2e, 0x81, 0xf3, 0x71, 0x45, 0xda, 0xe2, 0xa4, 0x57}}
 	return a, nil
 }
@@ -571,7 +571,7 @@ func _1605075346_add_communitiesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1605075346_add_communities.up.sql", size: 6971, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1605075346_add_communities.up.sql", size: 6971, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1f, 0x64, 0xea, 0xb4, 0xae, 0x9e, 0xdb, 0x9, 0x58, 0xb6, 0x5c, 0x7a, 0x50, 0xc5, 0xfe, 0x93, 0x5d, 0x36, 0x85, 0x5d, 0x6a, 0xba, 0xc9, 0x7e, 0x84, 0xd7, 0xbf, 0x2a, 0x53, 0xf3, 0x97, 0xf1}}
 	return a, nil
 }
@@ -591,7 +591,7 @@ func _1610117927_add_message_cacheUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1610117927_add_message_cache.up.sql", size: 142, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1610117927_add_message_cache.up.sql", size: 142, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x34, 0xf1, 0xf0, 0x82, 0x79, 0x28, 0x19, 0xc2, 0x39, 0x6a, 0xa5, 0x96, 0x59, 0x23, 0xa0, 0xed, 0x60, 0x58, 0x86, 0x9, 0xb9, 0xad, 0xfb, 0xa, 0xe3, 0x47, 0x6e, 0xa1, 0x18, 0xe8, 0x39, 0x2c}}
 	return a, nil
 }
@@ -611,7 +611,7 @@ func _1610959908_add_dont_wrap_to_raw_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1610959908_add_dont_wrap_to_raw_messages.up.sql", size: 83, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1610959908_add_dont_wrap_to_raw_messages.up.sql", size: 83, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x71, 0x2, 0x9a, 0xca, 0xd4, 0x38, 0x44, 0x30, 0x2b, 0xa8, 0x27, 0x32, 0x63, 0x53, 0x22, 0x60, 0x59, 0x84, 0x23, 0x96, 0x77, 0xf0, 0x56, 0xd7, 0x94, 0xe0, 0x95, 0x28, 0x6, 0x1d, 0x4e, 0xb1}}
 	return a, nil
 }
@@ -631,7 +631,7 @@ func _1610960912_add_send_on_personal_topicUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1610960912_add_send_on_personal_topic.up.sql", size: 82, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1610960912_add_send_on_personal_topic.up.sql", size: 82, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x77, 0xac, 0x2f, 0xc4, 0xd, 0xa7, 0x1b, 0x37, 0x30, 0xc2, 0x68, 0xee, 0xde, 0x54, 0x5e, 0xbf, 0x3f, 0xa0, 0xd6, 0xc6, 0x9f, 0xd4, 0x34, 0x12, 0x76, 0x1e, 0x66, 0x4a, 0xfc, 0xf, 0xee, 0xc9}}
 	return a, nil
 }
@@ -651,7 +651,7 @@ func _1612870480_add_datasync_idUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1612870480_add_datasync_id.up.sql", size: 111, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1612870480_add_datasync_id.up.sql", size: 111, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x34, 0x9a, 0xbc, 0xfa, 0xaa, 0x8c, 0x9c, 0x37, 0x67, 0x15, 0x9c, 0x7e, 0x78, 0x75, 0x66, 0x82, 0x18, 0x72, 0x10, 0xbc, 0xd4, 0xab, 0x44, 0xfe, 0x57, 0x85, 0x6d, 0x19, 0xf5, 0x96, 0x8a, 0xbe}}
 	return a, nil
 }
@@ -671,7 +671,7 @@ func _1614152139_add_communities_request_to_joinUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1614152139_add_communities_request_to_join.up.sql", size: 831, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1614152139_add_communities_request_to_join.up.sql", size: 831, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x11, 0x3, 0x26, 0xf9, 0x29, 0x50, 0x4f, 0xcd, 0x46, 0xe5, 0xb1, 0x6b, 0xb9, 0x2, 0x40, 0xb1, 0xdf, 0x4a, 0x4c, 0x7a, 0xda, 0x3, 0x35, 0xcd, 0x2d, 0xcc, 0x80, 0x7d, 0x57, 0x5f, 0x3, 0x5c}}
 	return a, nil
 }
@@ -691,7 +691,7 @@ func _1615374373_add_confirmationsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1615374373_add_confirmations.up.sql", size: 227, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1615374373_add_confirmations.up.sql", size: 227, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xdd, 0xa6, 0x65, 0xc5, 0x1d, 0xb2, 0x77, 0x36, 0xe3, 0x79, 0xda, 0xe8, 0x7a, 0xa4, 0xdf, 0x45, 0xae, 0xd8, 0xb4, 0xba, 0x90, 0xfd, 0x74, 0x71, 0x14, 0x75, 0x73, 0x72, 0xb9, 0x9e, 0x1, 0x81}}
 	return a, nil
 }
@@ -711,7 +711,7 @@ func _1617694931_add_notification_centerUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1617694931_add_notification_center.up.sql", size: 572, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1617694931_add_notification_center.up.sql", size: 572, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x10, 0x45, 0xc6, 0xc9, 0x73, 0xbb, 0x1f, 0xda, 0xa3, 0x4d, 0x19, 0x98, 0x85, 0x2d, 0xca, 0xda, 0xcc, 0x3b, 0x32, 0xff, 0xc7, 0x7b, 0xe3, 0x9f, 0x9b, 0x2a, 0x93, 0xf5, 0xdf, 0x65, 0x38, 0x91}}
 	return a, nil
 }
@@ -731,7 +731,7 @@ func _1618923660_create_pin_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1618923660_create_pin_messages.up.sql", size: 265, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1618923660_create_pin_messages.up.sql", size: 265, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x61, 0x44, 0x3a, 0xbe, 0x30, 0xd2, 0x7e, 0xc0, 0xe2, 0x8e, 0x65, 0x53, 0x54, 0xbb, 0x7a, 0x1c, 0xb3, 0x5d, 0xd2, 0xa6, 0xa9, 0x28, 0xb7, 0xa4, 0x5f, 0x8b, 0x9, 0x5f, 0x17, 0xc1, 0x85, 0x21}}
 	return a, nil
 }
@@ -751,7 +751,7 @@ func _1619094007_add_joined_chat_fieldUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1619094007_add_joined_chat_field.up.sql", size: 101, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1619094007_add_joined_chat_field.up.sql", size: 101, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xfa, 0x30, 0x81, 0x3a, 0x2f, 0x9f, 0xb3, 0x0, 0x55, 0x8e, 0x1d, 0xa8, 0xb0, 0x68, 0xf0, 0x40, 0x1a, 0x6c, 0xaa, 0xfc, 0x33, 0xd1, 0xd1, 0x55, 0x3f, 0xf2, 0xbd, 0x54, 0xa1, 0x2b, 0x40, 0x95}}
 	return a, nil
 }
@@ -771,7 +771,7 @@ func _1619099821_add_last_synced_fieldUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1619099821_add_last_synced_field.up.sql", size: 226, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1619099821_add_last_synced_field.up.sql", size: 226, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf, 0x52, 0x22, 0xe, 0x2f, 0xd7, 0x93, 0x5f, 0x42, 0xc2, 0x93, 0x4, 0x35, 0x6f, 0xc9, 0x19, 0xed, 0x6b, 0x52, 0x6f, 0xae, 0x99, 0xe2, 0x68, 0x3d, 0x4f, 0x40, 0xe, 0xe1, 0xa, 0x47, 0x21}}
 	return a, nil
 }
@@ -791,7 +791,7 @@ func _1621933219_add_mentionedUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1621933219_add_mentioned.up.sql", size: 70, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1621933219_add_mentioned.up.sql", size: 70, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x36, 0x76, 0x8a, 0xc9, 0x7, 0x8f, 0xa5, 0xcb, 0x12, 0x21, 0x4e, 0xfe, 0x96, 0x77, 0xcf, 0x7f, 0x76, 0x75, 0x36, 0x2c, 0xf8, 0x1d, 0x13, 0xcb, 0xcd, 0x6e, 0x70, 0xbf, 0xf5, 0x93, 0x67, 0xd1}}
 	return a, nil
 }
@@ -811,7 +811,7 @@ func _1622010048_add_unviewed_mentions_countUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1622010048_add_unviewed_mentions_count.up.sql", size: 114, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1622010048_add_unviewed_mentions_count.up.sql", size: 114, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7c, 0x16, 0x85, 0xa6, 0x5b, 0xe1, 0x66, 0xb9, 0x84, 0xbe, 0x7f, 0xa, 0x77, 0x23, 0xb9, 0xef, 0x8e, 0x2, 0x8, 0xfc, 0x61, 0xb2, 0x43, 0xa9, 0x63, 0xae, 0xb4, 0xdf, 0x30, 0xb1, 0x61, 0x4b}}
 	return a, nil
 }
@@ -831,7 +831,7 @@ func _1622061278_add_message_activity_center_notification_fieldUpSql() (*asset, 
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1622061278_add_message_activity_center_notification_field.up.sql", size: 80, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1622061278_add_message_activity_center_notification_field.up.sql", size: 80, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x8, 0xc, 0xa6, 0x1f, 0xa5, 0xc6, 0x7c, 0x6f, 0xab, 0x2c, 0x2d, 0xb5, 0xa4, 0xdd, 0xc1, 0xd6, 0x44, 0x83, 0xf9, 0xb1, 0xa5, 0xce, 0x34, 0x3d, 0x2, 0xa9, 0x35, 0xcf, 0xc6, 0xb2, 0x43, 0x37}}
 	return a, nil
 }
@@ -851,7 +851,7 @@ func _1622464518_set_synced_to_fromUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1622464518_set_synced_to_from.up.sql", size: 105, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1622464518_set_synced_to_from.up.sql", size: 105, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x33, 0x3e, 0x2b, 0xa, 0x1e, 0xc7, 0x6d, 0x6f, 0xd1, 0x1d, 0xe8, 0x4b, 0xdd, 0x92, 0x76, 0xea, 0xf2, 0x3e, 0x15, 0x85, 0xc4, 0xc3, 0x31, 0xf1, 0xc0, 0xa2, 0xd7, 0x47, 0xde, 0x4e, 0xfd, 0xc6}}
 	return a, nil
 }
@@ -871,7 +871,7 @@ func _1622464519_add_chat_descriptionUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1622464519_add_chat_description.up.sql", size: 93, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1622464519_add_chat_description.up.sql", size: 93, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x36, 0x2e, 0x89, 0x31, 0xec, 0xef, 0xeb, 0x43, 0xf5, 0x96, 0x6d, 0xce, 0x91, 0x8a, 0x37, 0x2a, 0x11, 0x7a, 0x3f, 0xd9, 0x10, 0xbb, 0xa1, 0xbc, 0x7, 0xe0, 0x3b, 0xa5, 0xf4, 0xa6, 0xf4, 0xa1}}
 	return a, nil
 }
@@ -891,7 +891,7 @@ func _1622622253_add_pinned_by_to_pin_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1622622253_add_pinned_by_to_pin_messages.up.sql", size: 52, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1622622253_add_pinned_by_to_pin_messages.up.sql", size: 52, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9b, 0x94, 0xa3, 0x45, 0x91, 0x1e, 0x66, 0xd1, 0x96, 0x5a, 0xaf, 0xfa, 0x29, 0x39, 0xa8, 0x3a, 0x97, 0x4c, 0x65, 0x6, 0x96, 0x90, 0x4c, 0xfe, 0xce, 0x7d, 0x5d, 0xd4, 0xb3, 0x8, 0x6d, 0x5f}}
 	return a, nil
 }
@@ -911,7 +911,7 @@ func _1623938329_add_author_activity_center_notification_fieldUpSql() (*asset, e
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1623938329_add_author_activity_center_notification_field.up.sql", size: 66, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1623938329_add_author_activity_center_notification_field.up.sql", size: 66, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x36, 0xe6, 0xa7, 0xd5, 0x26, 0xff, 0xab, 0x92, 0x88, 0xf0, 0xd3, 0x34, 0xd9, 0x2f, 0xe7, 0x18, 0x1a, 0x40, 0xf9, 0xbe, 0x8e, 0xfc, 0xd0, 0x4f, 0x1f, 0x4a, 0xb9, 0x83, 0x3f, 0xa9, 0xde, 0xb}}
 	return a, nil
 }
@@ -931,7 +931,7 @@ func _1623938330_add_edit_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1623938330_add_edit_messages.up.sql", size: 369, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1623938330_add_edit_messages.up.sql", size: 369, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7e, 0xd2, 0xce, 0xe, 0x5c, 0x19, 0xbe, 0x5e, 0x29, 0xbe, 0x9b, 0x31, 0x53, 0x76, 0xb2, 0xc8, 0x56, 0xf0, 0x82, 0xfe, 0x7d, 0x6c, 0xe8, 0x5c, 0xe9, 0x7a, 0x5d, 0x5, 0xc4, 0x92, 0x38, 0xe3}}
 	return a, nil
 }
@@ -951,7 +951,7 @@ func _1624978434_add_muted_communityUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1624978434_add_muted_community.up.sql", size: 82, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1624978434_add_muted_community.up.sql", size: 82, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6, 0xdc, 0x6e, 0x6f, 0x97, 0xc7, 0x3d, 0x50, 0xab, 0x80, 0x87, 0x44, 0x43, 0x38, 0xe6, 0xc5, 0xc1, 0x91, 0x26, 0xf, 0x16, 0xe, 0xd9, 0x32, 0x37, 0x25, 0x96, 0x25, 0x6, 0xc8, 0xb5, 0x4a}}
 	return a, nil
 }
@@ -971,7 +971,7 @@ func _1625018910_add_repply_message_activity_center_notification_fieldUpSql() (*
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1625018910_add_repply_message_activity_center_notification_field.up.sql", size: 86, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1625018910_add_repply_message_activity_center_notification_field.up.sql", size: 86, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf2, 0x52, 0x12, 0x40, 0xd8, 0x6f, 0x71, 0x97, 0x46, 0x39, 0xaa, 0x74, 0x41, 0xcd, 0x45, 0x4c, 0xe8, 0xd9, 0xe2, 0x56, 0x8e, 0x78, 0x18, 0x62, 0xf6, 0xa8, 0x36, 0xe9, 0x9a, 0x1f, 0xc, 0xb1}}
 	return a, nil
 }
@@ -991,7 +991,7 @@ func _1625762506_add_deleted_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1625762506_add_deleted_messages.up.sql", size: 357, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1625762506_add_deleted_messages.up.sql", size: 357, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd5, 0x61, 0x42, 0xb6, 0x8c, 0x7f, 0x2d, 0xec, 0xa9, 0x6d, 0x3d, 0x0, 0xa3, 0x32, 0xd8, 0x4a, 0x38, 0x5c, 0x97, 0xfc, 0x68, 0xde, 0xa9, 0xb7, 0xd8, 0xde, 0xb, 0x29, 0x93, 0xdc, 0x81, 0xf8}}
 	return a, nil
 }
@@ -1011,7 +1011,7 @@ func _1627388946_add_communities_synced_atUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1627388946_add_communities_synced_at.up.sql", size: 87, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1627388946_add_communities_synced_at.up.sql", size: 87, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc1, 0xbd, 0x9b, 0x6a, 0xc9, 0x1a, 0x7a, 0x34, 0xcf, 0x5f, 0x80, 0x9e, 0x8c, 0x1c, 0xc0, 0xec, 0x4e, 0x78, 0xb0, 0x2d, 0x15, 0x77, 0x38, 0x4a, 0x6a, 0x5, 0x84, 0xf5, 0x8d, 0x8b, 0xbe, 0x9}}
 	return a, nil
 }
@@ -1031,7 +1031,7 @@ func _1628280060_createUsermessagesIndexSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1628280060_create-usermessages-index.sql", size: 80, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1628280060_create-usermessages-index.sql", size: 80, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x10, 0x6f, 0x70, 0x47, 0x40, 0xab, 0xa8, 0x60, 0xe0, 0xf9, 0x8, 0x7e, 0x19, 0x9d, 0xba, 0x33, 0x16, 0xfc, 0x3c, 0xdc, 0xa8, 0xa6, 0x53, 0x61, 0x39, 0x82, 0x91, 0xcf, 0x69, 0xd8, 0xf2, 0xcf}}
 	return a, nil
 }
@@ -1051,7 +1051,7 @@ func _1632303896_modify_contacts_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1632303896_modify_contacts_table.up.sql", size: 1574, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1632303896_modify_contacts_table.up.sql", size: 1574, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x81, 0x1e, 0x6c, 0x3c, 0xd, 0xd7, 0x7d, 0xbb, 0x19, 0xbc, 0xe4, 0x7, 0xfd, 0xf8, 0x66, 0x6d, 0x78, 0xf6, 0x4, 0xe6, 0x51, 0xe4, 0xe6, 0xdc, 0xe, 0x5a, 0x2e, 0xac, 0xe6, 0xe7, 0x24, 0x69}}
 	return a, nil
 }
@@ -1071,7 +1071,7 @@ func _1633349838_add_emoji_column_in_chatsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1633349838_add_emoji_column_in_chats.up.sql", size: 52, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1633349838_add_emoji_column_in_chats.up.sql", size: 52, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xcb, 0x33, 0xcb, 0x3b, 0xa9, 0x99, 0x77, 0x6a, 0xea, 0xc4, 0x39, 0xd7, 0xa1, 0x49, 0xa7, 0xdf, 0xff, 0x72, 0xda, 0x34, 0x21, 0x67, 0x66, 0xca, 0x65, 0x46, 0x1, 0xa6, 0x4e, 0xf9, 0x38, 0x86}}
 	return a, nil
 }
@@ -1091,7 +1091,7 @@ func _1634831235_add_highlight_column_in_chatsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1634831235_add_highlight_column_in_chats.up.sql", size: 62, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1634831235_add_highlight_column_in_chats.up.sql", size: 62, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xaa, 0x63, 0x5c, 0x73, 0x19, 0x83, 0xbd, 0x35, 0x80, 0x9f, 0x66, 0xec, 0x4c, 0xbc, 0x9d, 0x2d, 0x52, 0x91, 0x6d, 0xb3, 0x2b, 0x87, 0xde, 0x24, 0x46, 0x5c, 0xd, 0xfd, 0x78, 0xf5, 0xe3, 0xe9}}
 	return a, nil
 }
@@ -1111,7 +1111,7 @@ func _1634896007_add_last_updated_locally_and_removedUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1634896007_add_last_updated_locally_and_removed.up.sql", size: 131, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1634896007_add_last_updated_locally_and_removed.up.sql", size: 131, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x2e, 0xa8, 0x34, 0xe2, 0xc0, 0x62, 0xc8, 0xd6, 0x5a, 0x87, 0xe3, 0x70, 0xe1, 0xc4, 0x16, 0x9c, 0x60, 0x2e, 0x98, 0xf0, 0x91, 0x84, 0xbe, 0xe0, 0xdf, 0x3e, 0x4d, 0x24, 0xc4, 0x6c, 0x40, 0x17}}
 	return a, nil
 }
@@ -1131,7 +1131,7 @@ func _1635840039_add_clock_read_at_column_in_chatsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1635840039_add_clock_read_at_column_in_chats.up.sql", size: 245, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1635840039_add_clock_read_at_column_in_chats.up.sql", size: 245, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6c, 0xba, 0x3f, 0xba, 0x1a, 0x71, 0xa8, 0x9, 0x19, 0xbe, 0x1e, 0x38, 0x50, 0x30, 0x3a, 0x52, 0x15, 0x29, 0xee, 0x49, 0x19, 0x6f, 0x53, 0xc2, 0xc6, 0x6c, 0xd9, 0x80, 0x7e, 0xb9, 0x58, 0x7a}}
 	return a, nil
 }
@@ -1151,7 +1151,7 @@ func _1637852321_add_received_invitation_admin_column_in_chatsUpSql() (*asset, e
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1637852321_add_received_invitation_admin_column_in_chats.up.sql", size: 72, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1637852321_add_received_invitation_admin_column_in_chats.up.sql", size: 72, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x70, 0x8b, 0x92, 0x56, 0x83, 0x70, 0x7f, 0x6, 0xb2, 0xd, 0x1c, 0x2f, 0xcc, 0x93, 0xc3, 0x85, 0x8c, 0xc2, 0x38, 0x94, 0x7e, 0x88, 0x3f, 0x39, 0x34, 0xf8, 0x90, 0xcf, 0x83, 0x68, 0x3d, 0xe5}}
 	return a, nil
 }
@@ -1171,7 +1171,7 @@ func _1645034601_display_nameUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1645034601_display_name.up.sql", size: 110, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1645034601_display_name.up.sql", size: 110, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x15, 0xfc, 0xda, 0x70, 0x53, 0x19, 0x90, 0x20, 0x4, 0x1c, 0x99, 0x42, 0x53, 0x1a, 0xd6, 0xb8, 0xbb, 0x8a, 0xe8, 0xbe, 0xcc, 0xb7, 0xc, 0x7f, 0x73, 0x50, 0x18, 0xf1, 0x8b, 0x18, 0x54, 0x64}}
 	return a, nil
 }
@@ -1191,7 +1191,7 @@ func _1645034602_add_mutual_contact_requestUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1645034602_add_mutual_contact_request.up.sql", size: 454, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1645034602_add_mutual_contact_request.up.sql", size: 454, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1a, 0xe0, 0x5d, 0x68, 0xb8, 0x50, 0xa4, 0xbb, 0x3e, 0x4f, 0x2, 0x87, 0xad, 0x87, 0x6e, 0x38, 0xdf, 0xc8, 0x4c, 0xe2, 0x5f, 0xd1, 0x6, 0xdc, 0xe7, 0xbd, 0x4a, 0x9c, 0xf3, 0x91, 0xa1, 0x51}}
 	return a, nil
 }
@@ -1211,7 +1211,7 @@ func _1650373957_add_contact_request_stateUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1650373957_add_contact_request_state.up.sql", size: 59, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1650373957_add_contact_request_state.up.sql", size: 59, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x5e, 0xc1, 0x3f, 0x29, 0xe, 0x19, 0x86, 0x1a, 0x4c, 0x6c, 0x2a, 0x90, 0x9d, 0xdf, 0xb1, 0xb, 0x72, 0x25, 0xcd, 0x6c, 0x5f, 0xd, 0x51, 0x9e, 0x85, 0xc0, 0x9, 0xb7, 0xbc, 0x87, 0x23, 0xec}}
 	return a, nil
 }
@@ -1231,7 +1231,7 @@ func _1656958989_contact_verificationUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1656958989_contact_verification.up.sql", size: 624, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1656958989_contact_verification.up.sql", size: 624, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3a, 0x3f, 0x28, 0x38, 0x33, 0xdb, 0xe9, 0x4d, 0xc0, 0x54, 0x8c, 0x2a, 0x73, 0xc4, 0xdd, 0x5c, 0xc5, 0x1a, 0x93, 0x4b, 0x6, 0x13, 0xbe, 0x42, 0xd2, 0x7f, 0xd4, 0xc, 0xc5, 0x4e, 0x6d, 0xce}}
 	return a, nil
 }
@@ -1251,7 +1251,7 @@ func _1658236268_add_discord_message_authors_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1658236268_add_discord_message_authors_table.up.sql", size: 191, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1658236268_add_discord_message_authors_table.up.sql", size: 191, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3d, 0xb7, 0xdb, 0x79, 0x1, 0x15, 0xe7, 0x76, 0x5d, 0x22, 0x54, 0x82, 0x9a, 0xbe, 0x24, 0xc1, 0x82, 0xcf, 0x67, 0x91, 0x53, 0xcc, 0xac, 0x74, 0x18, 0x61, 0x69, 0x68, 0x19, 0xca, 0x2b, 0xa8}}
 	return a, nil
 }
@@ -1271,7 +1271,7 @@ func _1659619997_add_discord_messages_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1659619997_add_discord_messages_table.up.sql", size: 371, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1659619997_add_discord_messages_table.up.sql", size: 371, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xde, 0x12, 0x9c, 0x96, 0xe2, 0x42, 0x3f, 0x94, 0x62, 0xc2, 0x76, 0xab, 0x3b, 0x4c, 0x85, 0x36, 0x48, 0xcc, 0x73, 0x60, 0x93, 0x5a, 0xd6, 0x7, 0xd6, 0x0, 0xee, 0x1b, 0x1e, 0x34, 0x58, 0x99}}
 	return a, nil
 }
@@ -1291,7 +1291,7 @@ func _1660226788_create_chat_identity_social_linksUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1660226788_create_chat_identity_social_links.up.sql", size: 318, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1660226788_create_chat_identity_social_links.up.sql", size: 318, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3c, 0x76, 0x40, 0xe9, 0x85, 0xc4, 0x38, 0xf8, 0xe5, 0x5d, 0xe8, 0x13, 0x46, 0x1b, 0xc, 0x1, 0xe9, 0x2f, 0x74, 0xd1, 0x79, 0x59, 0xa4, 0xdb, 0x4a, 0x4a, 0xf4, 0x98, 0x58, 0x3c, 0x57, 0xd3}}
 	return a, nil
 }
@@ -1311,7 +1311,7 @@ func _1660226789_add_walletconnectsessions_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1660226789_add_walletconnectsessions_table.up.sql", size: 215, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1660226789_add_walletconnectsessions_table.up.sql", size: 215, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf8, 0x5c, 0x72, 0x2, 0xed, 0x36, 0x19, 0x91, 0x4d, 0x1a, 0xc1, 0xab, 0x84, 0xfa, 0x41, 0xb1, 0x46, 0xa5, 0xdb, 0x3f, 0x76, 0x47, 0xd3, 0x75, 0x3c, 0x6a, 0x8e, 0x78, 0xe6, 0x41, 0xdc, 0x7f}}
 	return a, nil
 }
@@ -1331,7 +1331,7 @@ func _1661242854_add_communities_requests_to_leaveUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1661242854_add_communities_requests_to_leave.up.sql", size: 204, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1661242854_add_communities_requests_to_leave.up.sql", size: 204, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x49, 0x2e, 0x7d, 0x14, 0xef, 0x6e, 0x95, 0x4b, 0x6, 0x70, 0x2e, 0xd1, 0xf6, 0x59, 0xf9, 0xe, 0x56, 0xa, 0x9c, 0x80, 0x18, 0xca, 0xb9, 0x49, 0x19, 0xf, 0x89, 0x94, 0x36, 0x6d, 0x93, 0x9a}}
 	return a, nil
 }
@@ -1351,7 +1351,7 @@ func _1662044232_add_chat_imageUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1662044232_add_chat_image.up.sql", size: 49, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1662044232_add_chat_image.up.sql", size: 49, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb3, 0x74, 0xdf, 0x50, 0x79, 0x73, 0x9e, 0xd0, 0xff, 0xa4, 0xd3, 0x87, 0xc3, 0x48, 0x31, 0x6c, 0xdf, 0xa6, 0x20, 0x85, 0xe6, 0x4e, 0x19, 0x9d, 0xef, 0xcc, 0x84, 0x2b, 0x5d, 0x44, 0x34, 0x6}}
 	return a, nil
 }
@@ -1371,7 +1371,7 @@ func _1662106895_add_chat_first_message_timestampUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1662106895_add_chat_first_message_timestamp.up.sql", size: 113, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1662106895_add_chat_first_message_timestamp.up.sql", size: 113, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x8b, 0x55, 0x74, 0xfa, 0xf5, 0x51, 0x85, 0x19, 0xfd, 0xfb, 0x6, 0x79, 0x4d, 0x1d, 0xd, 0x3, 0x46, 0x66, 0x34, 0x1e, 0xce, 0x91, 0x21, 0x29, 0xf6, 0x71, 0xe7, 0x31, 0x39, 0x8f, 0x9d, 0x5}}
 	return a, nil
 }
@@ -1391,7 +1391,7 @@ func _1662723928_add_discord_author_image_fieldsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1662723928_add_discord_author_image_fields.up.sql", size: 75, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1662723928_add_discord_author_image_fields.up.sql", size: 75, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1e, 0x5b, 0x48, 0x57, 0x98, 0x55, 0x9a, 0xf1, 0x75, 0xf7, 0xb5, 0x41, 0x5e, 0x96, 0xc5, 0xce, 0xfc, 0x30, 0x5c, 0x15, 0x35, 0x9e, 0x4e, 0x4a, 0x3b, 0x38, 0x42, 0xc4, 0x27, 0x3c, 0x87, 0xbf}}
 	return a, nil
 }
@@ -1411,7 +1411,7 @@ func _1664195977_add_deleted_for_mesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1664195977_add_deleted_for_mes.up.sql", size: 352, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1664195977_add_deleted_for_mes.up.sql", size: 352, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7d, 0x9d, 0x13, 0x9, 0xaa, 0x44, 0x14, 0x93, 0xe2, 0xf5, 0x53, 0xb7, 0x79, 0xa8, 0x18, 0xf0, 0x6c, 0xa4, 0x9c, 0x73, 0xc1, 0xaa, 0xc5, 0x2e, 0xc5, 0x41, 0xd7, 0x24, 0xb0, 0xd7, 0xb8, 0xdf}}
 	return a, nil
 }
@@ -1431,7 +1431,7 @@ func _1664367420_add_discord_attachments_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1664367420_add_discord_attachments_table.up.sql", size: 350, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1664367420_add_discord_attachments_table.up.sql", size: 350, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x48, 0xe1, 0xb6, 0x4f, 0x6f, 0x92, 0x0, 0xb4, 0xf, 0x55, 0x12, 0x1c, 0x98, 0x6d, 0xbc, 0x1e, 0xfd, 0xae, 0x1c, 0xce, 0xd1, 0x3d, 0x2, 0x21, 0x2e, 0xc0, 0x13, 0xa, 0xb2, 0xec, 0x81, 0x13}}
 	return a, nil
 }
@@ -1451,7 +1451,7 @@ func _1665079662_add_spectated_column_in_communitiesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1665079662_add_spectated_column_in_communities.up.sql", size: 86, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1665079662_add_spectated_column_in_communities.up.sql", size: 86, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa0, 0x5d, 0xfe, 0xe2, 0xbe, 0xdf, 0xba, 0x45, 0xe9, 0xfc, 0xa7, 0x5f, 0xda, 0x19, 0xdb, 0x40, 0x96, 0x59, 0x78, 0xa, 0xd7, 0x4a, 0xca, 0x1a, 0x93, 0xfb, 0xae, 0x6d, 0x74, 0x7, 0x36, 0xdd}}
 	return a, nil
 }
@@ -1471,7 +1471,7 @@ func _1665479047_add_community_id_in_notificationsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1665479047_add_community_id_in_notifications.up.sql", size: 169, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1665479047_add_community_id_in_notifications.up.sql", size: 169, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd9, 0x8f, 0x8b, 0x1c, 0xaa, 0x6a, 0x56, 0xd6, 0xa5, 0x88, 0x57, 0x13, 0x8f, 0xea, 0xb9, 0x23, 0x82, 0x50, 0xb7, 0x65, 0x1f, 0xab, 0xfa, 0x23, 0x6f, 0x0, 0x7, 0xb6, 0x6e, 0xb5, 0x85, 0x44}}
 	return a, nil
 }
@@ -1491,7 +1491,7 @@ func _1665484435_add_encrypted_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1665484435_add_encrypted_messages.up.sql", size: 402, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1665484435_add_encrypted_messages.up.sql", size: 402, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x8f, 0x5c, 0x1e, 0x1c, 0x7f, 0xae, 0x5f, 0xeb, 0x3c, 0x6c, 0xcd, 0xc2, 0x99, 0x48, 0x5c, 0x83, 0xa0, 0xa2, 0x97, 0x5, 0x39, 0x82, 0x71, 0x90, 0x47, 0x21, 0x84, 0x29, 0x19, 0xa4, 0x7a, 0x90}}
 	return a, nil
 }
@@ -1511,7 +1511,7 @@ func _1665560200_add_contact_verification_individualUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1665560200_add_contact_verification_individual.up.sql", size: 509, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1665560200_add_contact_verification_individual.up.sql", size: 509, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc5, 0xbb, 0x61, 0xfd, 0xbf, 0x33, 0x1d, 0x4e, 0x5f, 0xbd, 0x86, 0x42, 0xb0, 0x6c, 0xf7, 0x39, 0x19, 0x6e, 0x72, 0x35, 0xfd, 0x1b, 0xd6, 0xbd, 0xf6, 0x81, 0x21, 0xc4, 0xaa, 0x6, 0x62, 0x40}}
 	return a, nil
 }
@@ -1531,7 +1531,7 @@ func _1670921937_add_album_idUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1670921937_add_album_id.up.sql", size: 55, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1670921937_add_album_id.up.sql", size: 55, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7e, 0xae, 0x83, 0x58, 0xb7, 0x77, 0x5, 0xca, 0xe3, 0xda, 0x32, 0x8f, 0x7b, 0xa4, 0x2f, 0x4c, 0xaf, 0x5f, 0xfa, 0x94, 0x36, 0xe4, 0xf9, 0x7, 0xc6, 0xd6, 0xb7, 0x90, 0xf3, 0xe5, 0xb5, 0x3}}
 	return a, nil
 }
@@ -1551,7 +1551,7 @@ func _1673373000_add_repliedUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1673373000_add_replied.up.sql", size: 67, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1673373000_add_replied.up.sql", size: 67, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd5, 0x1c, 0xae, 0xf2, 0xf, 0xb4, 0xc2, 0xba, 0x3c, 0xfe, 0x7b, 0xb0, 0xf, 0xf, 0xd5, 0xbc, 0xe2, 0xa7, 0xad, 0x50, 0xd9, 0x5a, 0xe8, 0x96, 0x22, 0x65, 0x89, 0xcf, 0x4a, 0x9a, 0x1b, 0x94}}
 	return a, nil
 }
@@ -1571,7 +1571,7 @@ func _1673428910_add_image_width_heightUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1673428910_add_image_width_height.up.sql", size: 117, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1673428910_add_image_width_height.up.sql", size: 117, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x74, 0xda, 0x93, 0x2a, 0x9b, 0x6b, 0xb7, 0x96, 0xcd, 0xac, 0xf, 0xaf, 0x54, 0x89, 0x9e, 0x91, 0x5b, 0xd0, 0x4a, 0xa, 0x8d, 0x9e, 0x80, 0x66, 0x26, 0x9e, 0xb5, 0xa9, 0x8, 0xec, 0x2d, 0x6c}}
 	return a, nil
 }
@@ -1591,7 +1591,7 @@ func _1674210659_add_contact_request_local_clockUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1674210659_add_contact_request_local_clock.up.sql", size: 691, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1674210659_add_contact_request_local_clock.up.sql", size: 691, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x92, 0x72, 0x39, 0xfe, 0x72, 0x98, 0xfc, 0x91, 0x20, 0x10, 0xe8, 0xf5, 0xac, 0x79, 0xa8, 0x1c, 0xca, 0x7b, 0x35, 0xa, 0xc1, 0x56, 0x49, 0x9a, 0xfc, 0xbd, 0x64, 0x9d, 0xdf, 0xd2, 0x60, 0x70}}
 	return a, nil
 }
@@ -1611,7 +1611,7 @@ func _1675212323_add_deleted_byUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1675212323_add_deleted_by.up.sql", size: 57, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1675212323_add_deleted_by.up.sql", size: 57, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x85, 0x37, 0x29, 0x2f, 0xd, 0x5a, 0xb6, 0xdb, 0xa7, 0x8, 0x86, 0xfc, 0x7a, 0x70, 0xd8, 0x4d, 0xe6, 0xf0, 0x57, 0xe7, 0xd1, 0x95, 0xd5, 0x4, 0x40, 0x2f, 0x7a, 0x5, 0x4f, 0xc2, 0x97, 0xbc}}
 	return a, nil
 }
@@ -1631,7 +1631,7 @@ func _1675247084_add_activity_center_statesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1675247084_add_activity_center_states.up.sql", size: 136, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1675247084_add_activity_center_states.up.sql", size: 136, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xba, 0x90, 0x7d, 0x55, 0xc7, 0x40, 0x29, 0x26, 0x97, 0x45, 0x5c, 0xdf, 0xba, 0x61, 0xb, 0xfc, 0x3d, 0x7a, 0x6c, 0x42, 0xe4, 0x95, 0x78, 0xb0, 0xc5, 0x1f, 0x73, 0xe9, 0x33, 0x51, 0xc8, 0x81}}
 	return a, nil
 }
@@ -1651,7 +1651,7 @@ func _1675272329_fix_protocol_migrationUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1675272329_fix_protocol_migration.up.sql", size: 183, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1675272329_fix_protocol_migration.up.sql", size: 183, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb6, 0xe0, 0x11, 0x4c, 0x66, 0x55, 0x72, 0xd3, 0xe6, 0x98, 0xa4, 0xe7, 0x44, 0xf9, 0x3b, 0x3a, 0x3f, 0xd9, 0x91, 0x1e, 0x4f, 0xfc, 0x56, 0x63, 0xe5, 0xa4, 0x83, 0xfc, 0x7c, 0xcf, 0x18, 0x99}}
 	return a, nil
 }
@@ -1671,7 +1671,7 @@ func _1676998418_fix_activity_center_migrationUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1676998418_fix_activity_center_migration.up.sql", size: 178, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1676998418_fix_activity_center_migration.up.sql", size: 178, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x8a, 0xdc, 0x64, 0xb1, 0x47, 0x67, 0xda, 0x2c, 0x26, 0x29, 0x6b, 0x6f, 0xb, 0xfa, 0x45, 0xf3, 0xad, 0x8b, 0x1a, 0x5f, 0x1c, 0xed, 0xd7, 0xea, 0x54, 0xf5, 0x3f, 0xb8, 0xf6, 0xf9, 0x44, 0x53}}
 	return a, nil
 }
@@ -1691,7 +1691,7 @@ func _1677278861_add_deleted_column_to_activity_center_notifications_tableUpSql(
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1677278861_add_deleted_column_to_activity_center_notifications_table.up.sql", size: 381, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1677278861_add_deleted_column_to_activity_center_notifications_table.up.sql", size: 381, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x38, 0x3a, 0x95, 0xaf, 0x81, 0xb0, 0x85, 0x8d, 0x73, 0xda, 0x7b, 0x2a, 0x35, 0xa6, 0xaa, 0xcc, 0x4c, 0x35, 0xa3, 0xa8, 0xbd, 0xd1, 0x37, 0xe8, 0x5d, 0x83, 0xa4, 0x33, 0x1f, 0x10, 0xe4, 0xe6}}
 	return a, nil
 }
@@ -1711,7 +1711,7 @@ func _1677486338_add_community_tokens_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1677486338_add_community_tokens_table.up.sql", size: 527, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1677486338_add_community_tokens_table.up.sql", size: 527, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xfb, 0x7b, 0x3d, 0x7e, 0x79, 0xc4, 0x3a, 0xf1, 0xda, 0x4b, 0xc6, 0xd1, 0xd, 0xfb, 0xb2, 0xb9, 0x7f, 0x81, 0x29, 0xab, 0xd8, 0x1, 0x20, 0xd7, 0xe1, 0xaf, 0x3e, 0x67, 0x1b, 0xdb, 0xf9, 0xd5}}
 	return a, nil
 }
@@ -1731,7 +1731,7 @@ func _1678292329_add_collapsed_categoriesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1678292329_add_collapsed_categories.up.sql", size: 170, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1678292329_add_collapsed_categories.up.sql", size: 170, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x46, 0x63, 0x86, 0xd5, 0x7, 0xe2, 0x25, 0x15, 0x1b, 0xfe, 0xf3, 0xe, 0x50, 0x48, 0x11, 0x3c, 0x7c, 0xc6, 0xe5, 0xab, 0x8d, 0x1f, 0xe8, 0x3c, 0xcb, 0xf0, 0x8d, 0xa7, 0x49, 0x4c, 0x16, 0x4f}}
 	return a, nil
 }
@@ -1751,7 +1751,7 @@ func _1678800760_add_index_to_raw_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1678800760_add_index_to_raw_messages.up.sql", size: 88, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1678800760_add_index_to_raw_messages.up.sql", size: 88, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9d, 0xd9, 0x8d, 0x22, 0x46, 0xae, 0x7b, 0x53, 0x3e, 0x51, 0x39, 0xad, 0xad, 0x38, 0x50, 0x6, 0xfa, 0xb9, 0xc4, 0x9f, 0x8d, 0xd2, 0x67, 0x0, 0xef, 0x58, 0x13, 0xab, 0x6a, 0x67, 0xf3, 0x7e}}
 	return a, nil
 }
@@ -1771,7 +1771,7 @@ func _1678877478_add_communities_requests_to_join_revealed_addresses_tableUpSql(
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1678877478_add_communities_requests_to_join_revealed_addresses_table.up.sql", size: 168, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1678877478_add_communities_requests_to_join_revealed_addresses_table.up.sql", size: 168, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x82, 0x1, 0xb4, 0xb2, 0x94, 0x25, 0xd5, 0x2e, 0x45, 0xc3, 0xb1, 0x2c, 0xeb, 0x1a, 0x52, 0xe0, 0x4b, 0x9b, 0x46, 0xf4, 0xc, 0xac, 0x1, 0x1e, 0x90, 0xbc, 0x64, 0x38, 0x10, 0xf1, 0xaf, 0xac}}
 	return a, nil
 }
@@ -1791,7 +1791,7 @@ func _1679326850_add_community_token_ownersUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1679326850_add_community_token_owners.up.sql", size: 206, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1679326850_add_community_token_owners.up.sql", size: 206, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe9, 0xe6, 0x25, 0x67, 0xd1, 0xd6, 0x54, 0x88, 0xb1, 0x80, 0x1e, 0x2d, 0x9c, 0xfa, 0x1c, 0xc7, 0x63, 0x6e, 0xf9, 0x66, 0xb1, 0x68, 0xc6, 0xf8, 0x51, 0xb6, 0xd5, 0x4e, 0x93, 0x39, 0x5e, 0xc0}}
 	return a, nil
 }
@@ -1811,7 +1811,7 @@ func _1680011500_add_album_images_countUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1680011500_add_album_images_count.up.sql", size: 71, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1680011500_add_album_images_count.up.sql", size: 71, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x2e, 0x55, 0x99, 0x31, 0xcc, 0x80, 0x78, 0xc3, 0x51, 0x13, 0x63, 0x6f, 0x1a, 0xfd, 0x53, 0xd2, 0xf4, 0x13, 0x4b, 0xb2, 0x4f, 0x99, 0xb8, 0x7b, 0x7, 0x99, 0xb6, 0xab, 0x88, 0x2e, 0x7, 0x8}}
 	return a, nil
 }
@@ -1831,7 +1831,7 @@ func _1680114896_add_index_on_album_idUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1680114896_add_index_on_album_id.up.sql", size: 83, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1680114896_add_index_on_album_id.up.sql", size: 83, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb3, 0x7e, 0xd5, 0xcd, 0x2d, 0xab, 0xd4, 0x32, 0x26, 0x50, 0x3a, 0x5b, 0x8e, 0x1c, 0xcc, 0x35, 0xf8, 0xa1, 0x2a, 0xc1, 0x23, 0xf6, 0x90, 0xfe, 0x84, 0x3, 0xde, 0x5a, 0xee, 0xc6, 0xfc, 0x2a}}
 	return a, nil
 }
@@ -1851,7 +1851,7 @@ func _1681655289_add_mute_tillUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1681655289_add_mute_till.up.sql", size: 51, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1681655289_add_mute_till.up.sql", size: 51, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd1, 0xbe, 0xce, 0xb8, 0xe1, 0x30, 0xe7, 0xa7, 0xe0, 0x7d, 0x97, 0xf4, 0x26, 0xb8, 0x57, 0x1d, 0x2a, 0xed, 0x18, 0xf2, 0xa, 0xe3, 0x77, 0x29, 0x18, 0x55, 0x9, 0x74, 0x2c, 0x24, 0x5a, 0x19}}
 	return a, nil
 }
@@ -1871,7 +1871,7 @@ func _1681934966_add_index_response_toUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1681934966_add_index_response_to.up.sql", size: 70, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1681934966_add_index_response_to.up.sql", size: 70, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3b, 0xed, 0xa6, 0x7e, 0x51, 0xf2, 0xa1, 0x3c, 0x78, 0x9a, 0xa7, 0x7a, 0x51, 0x25, 0x7d, 0xdd, 0x4b, 0xf3, 0x45, 0xeb, 0x3f, 0xad, 0x23, 0x3e, 0xac, 0x16, 0x28, 0x62, 0x7, 0x8c, 0xe0, 0xa0}}
 	return a, nil
 }
@@ -1891,7 +1891,7 @@ func _1682528339_add_index_user_messages_unseenUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1682528339_add_index_user_messages_unseen.up.sql", size: 104, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1682528339_add_index_user_messages_unseen.up.sql", size: 104, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x35, 0xfa, 0x98, 0xdd, 0x74, 0x5e, 0x21, 0x1f, 0xf2, 0x56, 0x17, 0x96, 0xfe, 0xbb, 0x44, 0x4c, 0xa1, 0xd8, 0x9f, 0x2e, 0x6, 0x2f, 0xd8, 0x23, 0xec, 0x94, 0x8c, 0x53, 0xf3, 0xf0, 0x40, 0xe7}}
 	return a, nil
 }
@@ -1911,7 +1911,7 @@ func _1683707289_recreate_deleted_for_mesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1683707289_recreate_deleted_for_mes.up.sql", size: 408, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1683707289_recreate_deleted_for_mes.up.sql", size: 408, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x5b, 0x9d, 0xd6, 0x45, 0x41, 0x29, 0x44, 0xf6, 0x14, 0x38, 0xeb, 0xdf, 0x6b, 0x5d, 0x9c, 0x45, 0x4b, 0xc3, 0xa8, 0xbd, 0x38, 0x14, 0xd9, 0x73, 0xf1, 0x51, 0xbb, 0x9f, 0x14, 0x36, 0xf2, 0x11}}
 	return a, nil
 }
@@ -1931,7 +1931,7 @@ func _1683725607_mark_discord_messages_as_seenUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1683725607_mark_discord_messages_as_seen.up.sql", size: 108, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1683725607_mark_discord_messages_as_seen.up.sql", size: 108, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd7, 0x2a, 0xc3, 0x43, 0xea, 0x5e, 0x3, 0x2e, 0xce, 0x79, 0xea, 0xa5, 0x67, 0x61, 0x8c, 0xe4, 0xb9, 0xb7, 0x4d, 0xd5, 0xd5, 0xb0, 0x35, 0xc8, 0x2b, 0xa0, 0x3f, 0xd8, 0xde, 0xea, 0x4e, 0x16}}
 	return a, nil
 }
@@ -1951,7 +1951,7 @@ func _1684174617_add_url_previews_to_user_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1684174617_add_url_previews_to_user_messages.up.sql", size: 58, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1684174617_add_url_previews_to_user_messages.up.sql", size: 58, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xdc, 0xb0, 0x72, 0xe3, 0xe4, 0xa9, 0x63, 0x82, 0xea, 0x52, 0x70, 0xb6, 0xa0, 0x73, 0x55, 0x7a, 0x78, 0xa8, 0xd2, 0xb0, 0xf4, 0x78, 0x8a, 0xd, 0x5a, 0xa2, 0x9d, 0x92, 0xdc, 0xce, 0x1c, 0x71}}
 	return a, nil
 }
@@ -1971,7 +1971,7 @@ func _1684175608_add_token_balancesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1684175608_add_token_balances.up.sql", size: 467, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1684175608_add_token_balances.up.sql", size: 467, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1b, 0x4e, 0xe0, 0x48, 0x34, 0x1, 0x4d, 0x88, 0x11, 0x54, 0x20, 0x52, 0x5c, 0x57, 0x14, 0xa9, 0xa9, 0x36, 0xa4, 0x28, 0x59, 0x48, 0xa8, 0xa, 0x76, 0xec, 0x37, 0xee, 0x9e, 0xd2, 0x20, 0xaa}}
 	return a, nil
 }
@@ -1991,7 +1991,7 @@ func _1684979808_sync_activity_center_notificationsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1684979808_sync_activity_center_notifications.up.sql", size: 169, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1684979808_sync_activity_center_notifications.up.sql", size: 169, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd8, 0xf5, 0xf7, 0x94, 0xa9, 0xa1, 0x60, 0x26, 0x9d, 0xca, 0x31, 0xf, 0x14, 0xd, 0x70, 0xf8, 0xab, 0x40, 0x29, 0x73, 0x61, 0xbd, 0x1b, 0xb6, 0xc4, 0x31, 0x77, 0x9e, 0x32, 0xa8, 0xce, 0x6d}}
 	return a, nil
 }
@@ -2011,7 +2011,7 @@ func _1685383829_add_communities_mute_tillUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1685383829_add_communities_mute_till.up.sql", size: 69, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1685383829_add_communities_mute_till.up.sql", size: 69, mode: os.FileMode(0644), modTime: time.Unix(1689667416, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xbf, 0x58, 0x96, 0xe5, 0x66, 0xcb, 0xde, 0xed, 0x76, 0xb8, 0x5a, 0x86, 0x81, 0x9a, 0x60, 0x51, 0x12, 0x37, 0x54, 0x9a, 0x36, 0x3e, 0xd1, 0x4a, 0xbe, 0x9a, 0xab, 0x20, 0x7f, 0x1d, 0xf4, 0x73}}
 	return a, nil
 }
@@ -2031,7 +2031,7 @@ func _1685964183_add_chainids_to_revealed_addressesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1685964183_add_chainids_to_revealed_addresses.up.sql", size: 88, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1685964183_add_chainids_to_revealed_addresses.up.sql", size: 88, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc, 0xb5, 0xa8, 0xd7, 0xad, 0x9c, 0x54, 0xa5, 0xe9, 0xdb, 0x42, 0x2d, 0xd0, 0xd7, 0x22, 0x1, 0x93, 0xf3, 0x4f, 0x53, 0xf7, 0x1e, 0xbe, 0x4b, 0xac, 0xc7, 0x63, 0x15, 0xdf, 0xe0, 0x6, 0xf8}}
 	return a, nil
 }
@@ -2051,7 +2051,7 @@ func _1687370421_add_communities_muted_till_newUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1687370421_add_communities_muted_till_new.up.sql", size: 635, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1687370421_add_communities_muted_till_new.up.sql", size: 635, mode: os.FileMode(0644), modTime: time.Unix(1689667416, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x65, 0x73, 0x96, 0x1d, 0xc8, 0x3e, 0xca, 0xf5, 0xdc, 0xe3, 0xac, 0x3f, 0x9c, 0xc3, 0x67, 0x12, 0x9c, 0x19, 0x1, 0x4, 0x2b, 0xea, 0x6b, 0xe1, 0x59, 0x59, 0x89, 0x3d, 0xef, 0x4a, 0x6e, 0xbe}}
 	return a, nil
 }
@@ -2071,7 +2071,7 @@ func _1687416607_add_communities_check_channel_permission_responses_tableUpSql()
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1687416607_add_communities_check_channel_permission_responses_table.up.sql", size: 739, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1687416607_add_communities_check_channel_permission_responses_table.up.sql", size: 739, mode: os.FileMode(0644), modTime: time.Unix(1689667416, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc2, 0x6, 0x3, 0x1a, 0xde, 0x9d, 0xbc, 0x50, 0x9d, 0xf1, 0x6d, 0x5a, 0x1c, 0x28, 0x92, 0x19, 0x89, 0x76, 0x4e, 0x8b, 0x60, 0xa9, 0xf, 0xe9, 0x76, 0xf1, 0xee, 0x75, 0x92, 0xbd, 0xda, 0x72}}
 	return a, nil
 }
@@ -2091,7 +2091,7 @@ func _1687856939_add_community_tokens_decimalsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1687856939_add_community_tokens_decimals.up.sql", size: 65, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1687856939_add_community_tokens_decimals.up.sql", size: 65, mode: os.FileMode(0644), modTime: time.Unix(1689667416, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x59, 0x76, 0x42, 0x70, 0xc9, 0x7b, 0x16, 0xf6, 0xfe, 0x7, 0x1c, 0x99, 0xe5, 0x38, 0xfd, 0xa0, 0x3b, 0x93, 0x40, 0xbc, 0x66, 0xc2, 0xd1, 0xdd, 0xe9, 0xc7, 0xbf, 0xae, 0x36, 0xcc, 0x46, 0x57}}
 	return a, nil
 }
@@ -2111,7 +2111,7 @@ func _1687959987_modify_community_tokens_supply_as_stringUpSql() (*asset, error)
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1687959987_modify_community_tokens_supply_as_string.up.sql", size: 77, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1687959987_modify_community_tokens_supply_as_string.up.sql", size: 77, mode: os.FileMode(0644), modTime: time.Unix(1694623803, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x57, 0x89, 0xbf, 0x9b, 0xed, 0x9b, 0x18, 0x3f, 0x84, 0xb5, 0x3c, 0x78, 0x40, 0x60, 0xea, 0x33, 0x26, 0x50, 0x3, 0xda, 0x28, 0x92, 0xd3, 0xb6, 0xff, 0x40, 0xa7, 0x19, 0x2, 0xa7, 0x17, 0xf9}}
 	return a, nil
 }
@@ -2131,7 +2131,7 @@ func _1689258900_add_airdrop_address_to_revealed_addressesUpSql() (*asset, error
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1689258900_add_airdrop_address_to_revealed_addresses.up.sql", size: 99, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1689258900_add_airdrop_address_to_revealed_addresses.up.sql", size: 99, mode: os.FileMode(0644), modTime: time.Unix(1694623803, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xea, 0x7e, 0xaf, 0x5c, 0xd, 0xe5, 0x1e, 0x67, 0x1a, 0x6d, 0xd, 0x28, 0x20, 0x7a, 0x1a, 0x45, 0x6e, 0xba, 0x80, 0x91, 0xb0, 0xd6, 0xfd, 0xc2, 0xb9, 0x42, 0x5c, 0x8d, 0x6e, 0x3e, 0x6e, 0xb2}}
 	return a, nil
 }
@@ -2151,7 +2151,7 @@ func _1689266326_create_communities_events_tableUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1689266326_create_communities_events_table.up.sql", size: 164, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1689266326_create_communities_events_table.up.sql", size: 164, mode: os.FileMode(0644), modTime: time.Unix(1694623803, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf5, 0x4e, 0xe, 0xba, 0x29, 0x16, 0x46, 0x38, 0x19, 0xa4, 0x5, 0x40, 0x46, 0xaf, 0x9a, 0x6, 0x89, 0xe0, 0x9c, 0xcc, 0xec, 0x8a, 0xb, 0x40, 0x85, 0x6f, 0xcc, 0x5, 0x24, 0x2a, 0x33, 0xfa}}
 	return a, nil
 }
@@ -2171,7 +2171,7 @@ func _1689931300_add_community_tokens_deployer_and_priv_levelUpSql() (*asset, er
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1689931300_add_community_tokens_deployer_and_priv_level.up.sql", size: 156, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1689931300_add_community_tokens_deployer_and_priv_level.up.sql", size: 156, mode: os.FileMode(0644), modTime: time.Unix(1694623803, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3f, 0x24, 0xd9, 0x4d, 0xe, 0x4b, 0xe3, 0x4c, 0xd1, 0xc, 0x72, 0xd4, 0x99, 0xe4, 0xb9, 0xb8, 0xe9, 0x38, 0x9e, 0x11, 0x48, 0xea, 0xe3, 0x5d, 0xd9, 0xd0, 0xef, 0x96, 0x38, 0x5a, 0xd4, 0xa5}}
 	return a, nil
 }
@@ -2191,7 +2191,7 @@ func _1693311881_add_unfurled_links_to_message_editsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1693311881_add_unfurled_links_to_message_edits.up.sql", size: 64, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1693311881_add_unfurled_links_to_message_edits.up.sql", size: 64, mode: os.FileMode(0644), modTime: time.Unix(1694623803, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6b, 0xc7, 0x7c, 0xe4, 0x80, 0x6f, 0xf8, 0x96, 0xb, 0x37, 0xff, 0xa2, 0xab, 0x1c, 0xbd, 0x25, 0x8d, 0x1e, 0x9a, 0x65, 0xe9, 0x45, 0xaf, 0x7f, 0x77, 0x84, 0x1b, 0x10, 0x1b, 0x1a, 0x5, 0xcc}}
 	return a, nil
 }
@@ -2211,7 +2211,7 @@ func _1693311981_community_shardUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1693311981_community_shard.up.sql", size: 156, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1693311981_community_shard.up.sql", size: 156, mode: os.FileMode(0644), modTime: time.Unix(1697795010, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc9, 0x12, 0xf9, 0xde, 0x49, 0x9f, 0x95, 0xaa, 0x22, 0x5e, 0x54, 0x5a, 0x1, 0xd, 0xc6, 0x1f, 0x42, 0x93, 0xe8, 0x69, 0x30, 0x11, 0x69, 0x41, 0x7f, 0x87, 0x57, 0x56, 0x2a, 0x32, 0xb9, 0x3e}}
 	return a, nil
 }
@@ -2231,7 +2231,7 @@ func _1695331492_add_status_link_previewsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1695331492_add_status_link_previews.up.sql", size: 136, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1695331492_add_status_link_previews.up.sql", size: 136, mode: os.FileMode(0644), modTime: time.Unix(1697795010, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb6, 0x7d, 0x6e, 0x86, 0xf0, 0xf8, 0x23, 0x4b, 0x16, 0x3d, 0xca, 0x8f, 0xfc, 0x8, 0x22, 0xd5, 0x70, 0x14, 0xbb, 0xdd, 0xa9, 0xb8, 0x3e, 0xc6, 0x20, 0xfb, 0x0, 0x26, 0x73, 0xcb, 0x92, 0xb2}}
 	return a, nil
 }
@@ -2251,7 +2251,7 @@ func _1695918296_add_validated_atUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1695918296_add_validated_at.up.sql", size: 377, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "1695918296_add_validated_at.up.sql", size: 377, mode: os.FileMode(0644), modTime: time.Unix(1697795010, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1d, 0x48, 0xa7, 0xd5, 0xb, 0xbb, 0x23, 0xfd, 0x40, 0x49, 0x33, 0x1b, 0x5c, 0xb3, 0x5b, 0x7a, 0xd8, 0xed, 0x5, 0xd, 0xb4, 0x91, 0xa3, 0x37, 0xaf, 0xaf, 0xc6, 0xa1, 0x13, 0xeb, 0x56, 0x1d}}
 	return a, nil
 }
@@ -2271,7 +2271,7 @@ func _1697699419_community_control_node_syncUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1697699419_community_control_node_sync.up.sql", size: 435, mode: os.FileMode(0644), modTime: time.Unix(1698072538, 0)}
+	info := bindataFileInfo{name: "1697699419_community_control_node_sync.up.sql", size: 435, mode: os.FileMode(0644), modTime: time.Unix(1698161299, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x11, 0xd6, 0x63, 0x10, 0x1b, 0x16, 0x35, 0x57, 0xf1, 0x4a, 0x4, 0x51, 0xe0, 0x1, 0xe1, 0xfc, 0x12, 0x3a, 0x10, 0x4f, 0xb1, 0x96, 0x53, 0x2, 0xf5, 0x66, 0x7b, 0xe0, 0x8a, 0xdf, 0x78, 0x53}}
 	return a, nil
 }
@@ -2291,8 +2291,28 @@ func _1698137561_add_profile_showcase_tablesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1698137561_add_profile_showcase_tables.up.sql", size: 440, mode: os.FileMode(0644), modTime: time.Unix(1698136910, 0)}
+	info := bindataFileInfo{name: "1698137561_add_profile_showcase_tables.up.sql", size: 440, mode: os.FileMode(0644), modTime: time.Unix(1698161299, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7c, 0xef, 0x89, 0x68, 0x42, 0xbf, 0xff, 0xb9, 0x8f, 0x8f, 0x19, 0x91, 0xd2, 0x6a, 0x85, 0xda, 0x2c, 0x63, 0x5f, 0x3c, 0x84, 0x4, 0x93, 0x16, 0x10, 0xf0, 0xe0, 0xd9, 0x9b, 0xbe, 0x8d, 0x62}}
+	return a, nil
+}
+
+var __1698137562_fix_encryption_key_idUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x8c\x52\x3d\x6f\xb3\x30\x10\xde\xef\x57\xdc\x98\x48\x4c\xef\x8a\xde\xc1\x21\x97\x0a\xd5\xb1\x91\xe3\x0c\x99\x2c\x04\x56\x41\x11\x1f\x05\xb7\x12\x52\x7e\x7c\xe5\xb4\xb4\xa2\x94\x24\xab\xfd\x9c\x9e\xcf\x48\x11\xd3\x84\x9a\x6d\x38\x61\x91\xf6\x85\xe9\x52\x97\x15\xd6\x19\x5b\x67\xdd\xd0\xba\xb2\xa9\xcd\xfb\x3f\x5c\x01\xe2\x4b\xd7\xbc\xb5\xa6\xcc\x71\xc3\xe5\x06\x85\xd4\x28\x8e\x9c\x07\x80\x98\xdb\xb6\xb3\x59\xea\x6c\x6e\xce\x76\xf0\x90\x58\xe8\x09\xe2\x6c\x87\xf9\x99\xc7\xba\xb2\xb2\xbd\x4b\xab\xf6\xfa\x3d\xbe\xfe\x45\x92\xa8\x78\xcf\xd4\x09\x9f\xe9\xb4\xfa\xc4\xac\x51\x0a\x8c\xa4\xd8\xf1\x38\xd2\xa8\x28\xe1\x2c\x22\x58\x87\x00\xb1\x38\x90\xd2\x5e\x85\xbc\xe1\x6a\x35\x3a\x0a\xe6\x0e\x02\xaf\x23\xc0\x91\xe8\x40\x9c\x22\x8d\x3f\x07\x13\xd4\x77\x32\x97\xcb\x28\x7f\xa7\xe4\x7e\x89\x3a\x04\xd8\x2a\x99\xdc\x4e\x3d\x04\x60\x5c\x93\xba\xdf\x8d\x22\xc1\xf6\x84\xcb\x56\x43\x00\x38\x26\x5b\x5f\xf4\x02\x02\x0f\xa4\x7f\xd5\xf1\x7f\x9e\xc9\x43\xba\x4d\x96\x66\x85\x0d\x01\x1e\x9a\xd6\x15\x7c\x67\x5d\x5f\x89\x96\xb5\x9b\x3c\xf7\xf6\xd5\xd4\x8d\xef\x98\x9e\x48\xf9\x17\x4f\x32\x3f\xef\x87\xca\x33\x9a\x71\x82\x7e\x20\x1f\x01\x00\x00\xff\xff\x81\xfe\x72\x41\xf7\x02\x00\x00")
+
+func _1698137562_fix_encryption_key_idUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1698137562_fix_encryption_key_idUpSql,
+		"1698137562_fix_encryption_key_id.up.sql",
+	)
+}
+
+func _1698137562_fix_encryption_key_idUpSql() (*asset, error) {
+	bytes, err := _1698137562_fix_encryption_key_idUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1698137562_fix_encryption_key_id.up.sql", size: 759, mode: os.FileMode(0644), modTime: time.Unix(1698161790, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb6, 0x4d, 0x54, 0x8c, 0xd4, 0x6d, 0xfa, 0x76, 0x2f, 0x8a, 0xde, 0x4a, 0xc0, 0x53, 0xc, 0xb7, 0xf1, 0x0, 0x45, 0xd3, 0xa0, 0x5, 0xe3, 0x4a, 0xe5, 0x87, 0xb4, 0x50, 0x46, 0xd0, 0xa0, 0xd9}}
 	return a, nil
 }
 
@@ -2311,7 +2331,7 @@ func readmeMd() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "README.md", size: 554, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "README.md", size: 554, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1c, 0x6e, 0xfb, 0xcc, 0x81, 0x94, 0x4d, 0x8c, 0xa0, 0x3b, 0x5, 0xb0, 0x18, 0xd6, 0xbb, 0xb3, 0x79, 0xc8, 0x8f, 0xff, 0xc1, 0x10, 0xf9, 0xf, 0x20, 0x1b, 0x4a, 0x74, 0x96, 0x42, 0xd7, 0xa8}}
 	return a, nil
 }
@@ -2331,7 +2351,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 850, mode: os.FileMode(0644), modTime: time.Unix(1697629170, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 850, mode: os.FileMode(0644), modTime: time.Unix(1687889856, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa0, 0xcc, 0x41, 0xe1, 0x61, 0x12, 0x97, 0xe, 0x36, 0x8c, 0xa7, 0x9e, 0xe0, 0x6e, 0x59, 0x9e, 0xee, 0xd5, 0x4a, 0xcf, 0x1e, 0x60, 0xd6, 0xc3, 0x3a, 0xc9, 0x6c, 0xf2, 0x86, 0x5a, 0xb4, 0x1e}}
 	return a, nil
 }
@@ -2427,232 +2447,131 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"000001_init.down.db.sql": _000001_initDownDbSql,
-
-	"000001_init.up.db.sql": _000001_initUpDbSql,
-
-	"000002_add_last_ens_clock_value.up.sql": _000002_add_last_ens_clock_valueUpSql,
-
-	"1586358095_add_replace.up.sql": _1586358095_add_replaceUpSql,
-
-	"1588665364_add_image_data.up.sql": _1588665364_add_image_dataUpSql,
-
-	"1589365189_add_pow_target.up.sql": _1589365189_add_pow_targetUpSql,
-
-	"1591277220_add_index_messages.up.sql": _1591277220_add_index_messagesUpSql,
-
-	"1593087212_add_mute_chat_and_raw_message_fields.up.sql": _1593087212_add_mute_chat_and_raw_message_fieldsUpSql,
-
-	"1595862781_add_audio_data.up.sql": _1595862781_add_audio_dataUpSql,
-
-	"1595865249_create_emoji_reactions_table.up.sql": _1595865249_create_emoji_reactions_tableUpSql,
-
-	"1596805115_create_group_chat_invitations_table.up.sql": _1596805115_create_group_chat_invitations_tableUpSql,
-
-	"1597322655_add_invitation_admin_chat_field.up.sql": _1597322655_add_invitation_admin_chat_fieldUpSql,
-
-	"1597757544_add_nickname.up.sql": _1597757544_add_nicknameUpSql,
-
-	"1598955122_add_mentions.up.sql": _1598955122_add_mentionsUpSql,
-
-	"1599641390_add_emoji_reactions_index.up.sql": _1599641390_add_emoji_reactions_indexUpSql,
-
-	"1599720851_add_seen_index_remove_long_messages.up.sql": _1599720851_add_seen_index_remove_long_messagesUpSql,
-
-	"1603198582_add_profile_chat_field.up.sql": _1603198582_add_profile_chat_fieldUpSql,
-
-	"1603816533_add_links.up.sql": _1603816533_add_linksUpSql,
-
-	"1603888149_create_chat_identity_last_published_table.up.sql": _1603888149_create_chat_identity_last_published_tableUpSql,
-
-	"1605075346_add_communities.up.sql": _1605075346_add_communitiesUpSql,
-
-	"1610117927_add_message_cache.up.sql": _1610117927_add_message_cacheUpSql,
-
-	"1610959908_add_dont_wrap_to_raw_messages.up.sql": _1610959908_add_dont_wrap_to_raw_messagesUpSql,
-
-	"1610960912_add_send_on_personal_topic.up.sql": _1610960912_add_send_on_personal_topicUpSql,
-
-	"1612870480_add_datasync_id.up.sql": _1612870480_add_datasync_idUpSql,
-
-	"1614152139_add_communities_request_to_join.up.sql": _1614152139_add_communities_request_to_joinUpSql,
-
-	"1615374373_add_confirmations.up.sql": _1615374373_add_confirmationsUpSql,
-
-	"1617694931_add_notification_center.up.sql": _1617694931_add_notification_centerUpSql,
-
-	"1618923660_create_pin_messages.up.sql": _1618923660_create_pin_messagesUpSql,
-
-	"1619094007_add_joined_chat_field.up.sql": _1619094007_add_joined_chat_fieldUpSql,
-
-	"1619099821_add_last_synced_field.up.sql": _1619099821_add_last_synced_fieldUpSql,
-
-	"1621933219_add_mentioned.up.sql": _1621933219_add_mentionedUpSql,
-
-	"1622010048_add_unviewed_mentions_count.up.sql": _1622010048_add_unviewed_mentions_countUpSql,
-
-	"1622061278_add_message_activity_center_notification_field.up.sql": _1622061278_add_message_activity_center_notification_fieldUpSql,
-
-	"1622464518_set_synced_to_from.up.sql": _1622464518_set_synced_to_fromUpSql,
-
-	"1622464519_add_chat_description.up.sql": _1622464519_add_chat_descriptionUpSql,
-
-	"1622622253_add_pinned_by_to_pin_messages.up.sql": _1622622253_add_pinned_by_to_pin_messagesUpSql,
-
-	"1623938329_add_author_activity_center_notification_field.up.sql": _1623938329_add_author_activity_center_notification_fieldUpSql,
-
-	"1623938330_add_edit_messages.up.sql": _1623938330_add_edit_messagesUpSql,
-
-	"1624978434_add_muted_community.up.sql": _1624978434_add_muted_communityUpSql,
-
-	"1625018910_add_repply_message_activity_center_notification_field.up.sql": _1625018910_add_repply_message_activity_center_notification_fieldUpSql,
-
-	"1625762506_add_deleted_messages.up.sql": _1625762506_add_deleted_messagesUpSql,
-
-	"1627388946_add_communities_synced_at.up.sql": _1627388946_add_communities_synced_atUpSql,
-
-	"1628280060_create-usermessages-index.sql": _1628280060_createUsermessagesIndexSql,
-
-	"1632303896_modify_contacts_table.up.sql": _1632303896_modify_contacts_tableUpSql,
-
-	"1633349838_add_emoji_column_in_chats.up.sql": _1633349838_add_emoji_column_in_chatsUpSql,
-
-	"1634831235_add_highlight_column_in_chats.up.sql": _1634831235_add_highlight_column_in_chatsUpSql,
-
-	"1634896007_add_last_updated_locally_and_removed.up.sql": _1634896007_add_last_updated_locally_and_removedUpSql,
-
-	"1635840039_add_clock_read_at_column_in_chats.up.sql": _1635840039_add_clock_read_at_column_in_chatsUpSql,
-
-	"1637852321_add_received_invitation_admin_column_in_chats.up.sql": _1637852321_add_received_invitation_admin_column_in_chatsUpSql,
-
-	"1645034601_display_name.up.sql": _1645034601_display_nameUpSql,
-
-	"1645034602_add_mutual_contact_request.up.sql": _1645034602_add_mutual_contact_requestUpSql,
-
-	"1650373957_add_contact_request_state.up.sql": _1650373957_add_contact_request_stateUpSql,
-
-	"1656958989_contact_verification.up.sql": _1656958989_contact_verificationUpSql,
-
-	"1658236268_add_discord_message_authors_table.up.sql": _1658236268_add_discord_message_authors_tableUpSql,
-
-	"1659619997_add_discord_messages_table.up.sql": _1659619997_add_discord_messages_tableUpSql,
-
-	"1660226788_create_chat_identity_social_links.up.sql": _1660226788_create_chat_identity_social_linksUpSql,
-
-	"1660226789_add_walletconnectsessions_table.up.sql": _1660226789_add_walletconnectsessions_tableUpSql,
-
-	"1661242854_add_communities_requests_to_leave.up.sql": _1661242854_add_communities_requests_to_leaveUpSql,
-
-	"1662044232_add_chat_image.up.sql": _1662044232_add_chat_imageUpSql,
-
-	"1662106895_add_chat_first_message_timestamp.up.sql": _1662106895_add_chat_first_message_timestampUpSql,
-
-	"1662723928_add_discord_author_image_fields.up.sql": _1662723928_add_discord_author_image_fieldsUpSql,
-
-	"1664195977_add_deleted_for_mes.up.sql": _1664195977_add_deleted_for_mesUpSql,
-
-	"1664367420_add_discord_attachments_table.up.sql": _1664367420_add_discord_attachments_tableUpSql,
-
-	"1665079662_add_spectated_column_in_communities.up.sql": _1665079662_add_spectated_column_in_communitiesUpSql,
-
-	"1665479047_add_community_id_in_notifications.up.sql": _1665479047_add_community_id_in_notificationsUpSql,
-
-	"1665484435_add_encrypted_messages.up.sql": _1665484435_add_encrypted_messagesUpSql,
-
-	"1665560200_add_contact_verification_individual.up.sql": _1665560200_add_contact_verification_individualUpSql,
-
-	"1670921937_add_album_id.up.sql": _1670921937_add_album_idUpSql,
-
-	"1673373000_add_replied.up.sql": _1673373000_add_repliedUpSql,
-
-	"1673428910_add_image_width_height.up.sql": _1673428910_add_image_width_heightUpSql,
-
-	"1674210659_add_contact_request_local_clock.up.sql": _1674210659_add_contact_request_local_clockUpSql,
-
-	"1675212323_add_deleted_by.up.sql": _1675212323_add_deleted_byUpSql,
-
-	"1675247084_add_activity_center_states.up.sql": _1675247084_add_activity_center_statesUpSql,
-
-	"1675272329_fix_protocol_migration.up.sql": _1675272329_fix_protocol_migrationUpSql,
-
-	"1676998418_fix_activity_center_migration.up.sql": _1676998418_fix_activity_center_migrationUpSql,
-
+	"000001_init.down.db.sql":                                                     _000001_initDownDbSql,
+	"000001_init.up.db.sql":                                                       _000001_initUpDbSql,
+	"000002_add_last_ens_clock_value.up.sql":                                      _000002_add_last_ens_clock_valueUpSql,
+	"1586358095_add_replace.up.sql":                                               _1586358095_add_replaceUpSql,
+	"1588665364_add_image_data.up.sql":                                            _1588665364_add_image_dataUpSql,
+	"1589365189_add_pow_target.up.sql":                                            _1589365189_add_pow_targetUpSql,
+	"1591277220_add_index_messages.up.sql":                                        _1591277220_add_index_messagesUpSql,
+	"1593087212_add_mute_chat_and_raw_message_fields.up.sql":                      _1593087212_add_mute_chat_and_raw_message_fieldsUpSql,
+	"1595862781_add_audio_data.up.sql":                                            _1595862781_add_audio_dataUpSql,
+	"1595865249_create_emoji_reactions_table.up.sql":                              _1595865249_create_emoji_reactions_tableUpSql,
+	"1596805115_create_group_chat_invitations_table.up.sql":                       _1596805115_create_group_chat_invitations_tableUpSql,
+	"1597322655_add_invitation_admin_chat_field.up.sql":                           _1597322655_add_invitation_admin_chat_fieldUpSql,
+	"1597757544_add_nickname.up.sql":                                              _1597757544_add_nicknameUpSql,
+	"1598955122_add_mentions.up.sql":                                              _1598955122_add_mentionsUpSql,
+	"1599641390_add_emoji_reactions_index.up.sql":                                 _1599641390_add_emoji_reactions_indexUpSql,
+	"1599720851_add_seen_index_remove_long_messages.up.sql":                       _1599720851_add_seen_index_remove_long_messagesUpSql,
+	"1603198582_add_profile_chat_field.up.sql":                                    _1603198582_add_profile_chat_fieldUpSql,
+	"1603816533_add_links.up.sql":                                                 _1603816533_add_linksUpSql,
+	"1603888149_create_chat_identity_last_published_table.up.sql":                 _1603888149_create_chat_identity_last_published_tableUpSql,
+	"1605075346_add_communities.up.sql":                                           _1605075346_add_communitiesUpSql,
+	"1610117927_add_message_cache.up.sql":                                         _1610117927_add_message_cacheUpSql,
+	"1610959908_add_dont_wrap_to_raw_messages.up.sql":                             _1610959908_add_dont_wrap_to_raw_messagesUpSql,
+	"1610960912_add_send_on_personal_topic.up.sql":                                _1610960912_add_send_on_personal_topicUpSql,
+	"1612870480_add_datasync_id.up.sql":                                           _1612870480_add_datasync_idUpSql,
+	"1614152139_add_communities_request_to_join.up.sql":                           _1614152139_add_communities_request_to_joinUpSql,
+	"1615374373_add_confirmations.up.sql":                                         _1615374373_add_confirmationsUpSql,
+	"1617694931_add_notification_center.up.sql":                                   _1617694931_add_notification_centerUpSql,
+	"1618923660_create_pin_messages.up.sql":                                       _1618923660_create_pin_messagesUpSql,
+	"1619094007_add_joined_chat_field.up.sql":                                     _1619094007_add_joined_chat_fieldUpSql,
+	"1619099821_add_last_synced_field.up.sql":                                     _1619099821_add_last_synced_fieldUpSql,
+	"1621933219_add_mentioned.up.sql":                                             _1621933219_add_mentionedUpSql,
+	"1622010048_add_unviewed_mentions_count.up.sql":                               _1622010048_add_unviewed_mentions_countUpSql,
+	"1622061278_add_message_activity_center_notification_field.up.sql":            _1622061278_add_message_activity_center_notification_fieldUpSql,
+	"1622464518_set_synced_to_from.up.sql":                                        _1622464518_set_synced_to_fromUpSql,
+	"1622464519_add_chat_description.up.sql":                                      _1622464519_add_chat_descriptionUpSql,
+	"1622622253_add_pinned_by_to_pin_messages.up.sql":                             _1622622253_add_pinned_by_to_pin_messagesUpSql,
+	"1623938329_add_author_activity_center_notification_field.up.sql":             _1623938329_add_author_activity_center_notification_fieldUpSql,
+	"1623938330_add_edit_messages.up.sql":                                         _1623938330_add_edit_messagesUpSql,
+	"1624978434_add_muted_community.up.sql":                                       _1624978434_add_muted_communityUpSql,
+	"1625018910_add_repply_message_activity_center_notification_field.up.sql":     _1625018910_add_repply_message_activity_center_notification_fieldUpSql,
+	"1625762506_add_deleted_messages.up.sql":                                      _1625762506_add_deleted_messagesUpSql,
+	"1627388946_add_communities_synced_at.up.sql":                                 _1627388946_add_communities_synced_atUpSql,
+	"1628280060_create-usermessages-index.sql":                                    _1628280060_createUsermessagesIndexSql,
+	"1632303896_modify_contacts_table.up.sql":                                     _1632303896_modify_contacts_tableUpSql,
+	"1633349838_add_emoji_column_in_chats.up.sql":                                 _1633349838_add_emoji_column_in_chatsUpSql,
+	"1634831235_add_highlight_column_in_chats.up.sql":                             _1634831235_add_highlight_column_in_chatsUpSql,
+	"1634896007_add_last_updated_locally_and_removed.up.sql":                      _1634896007_add_last_updated_locally_and_removedUpSql,
+	"1635840039_add_clock_read_at_column_in_chats.up.sql":                         _1635840039_add_clock_read_at_column_in_chatsUpSql,
+	"1637852321_add_received_invitation_admin_column_in_chats.up.sql":             _1637852321_add_received_invitation_admin_column_in_chatsUpSql,
+	"1645034601_display_name.up.sql":                                              _1645034601_display_nameUpSql,
+	"1645034602_add_mutual_contact_request.up.sql":                                _1645034602_add_mutual_contact_requestUpSql,
+	"1650373957_add_contact_request_state.up.sql":                                 _1650373957_add_contact_request_stateUpSql,
+	"1656958989_contact_verification.up.sql":                                      _1656958989_contact_verificationUpSql,
+	"1658236268_add_discord_message_authors_table.up.sql":                         _1658236268_add_discord_message_authors_tableUpSql,
+	"1659619997_add_discord_messages_table.up.sql":                                _1659619997_add_discord_messages_tableUpSql,
+	"1660226788_create_chat_identity_social_links.up.sql":                         _1660226788_create_chat_identity_social_linksUpSql,
+	"1660226789_add_walletconnectsessions_table.up.sql":                           _1660226789_add_walletconnectsessions_tableUpSql,
+	"1661242854_add_communities_requests_to_leave.up.sql":                         _1661242854_add_communities_requests_to_leaveUpSql,
+	"1662044232_add_chat_image.up.sql":                                            _1662044232_add_chat_imageUpSql,
+	"1662106895_add_chat_first_message_timestamp.up.sql":                          _1662106895_add_chat_first_message_timestampUpSql,
+	"1662723928_add_discord_author_image_fields.up.sql":                           _1662723928_add_discord_author_image_fieldsUpSql,
+	"1664195977_add_deleted_for_mes.up.sql":                                       _1664195977_add_deleted_for_mesUpSql,
+	"1664367420_add_discord_attachments_table.up.sql":                             _1664367420_add_discord_attachments_tableUpSql,
+	"1665079662_add_spectated_column_in_communities.up.sql":                       _1665079662_add_spectated_column_in_communitiesUpSql,
+	"1665479047_add_community_id_in_notifications.up.sql":                         _1665479047_add_community_id_in_notificationsUpSql,
+	"1665484435_add_encrypted_messages.up.sql":                                    _1665484435_add_encrypted_messagesUpSql,
+	"1665560200_add_contact_verification_individual.up.sql":                       _1665560200_add_contact_verification_individualUpSql,
+	"1670921937_add_album_id.up.sql":                                              _1670921937_add_album_idUpSql,
+	"1673373000_add_replied.up.sql":                                               _1673373000_add_repliedUpSql,
+	"1673428910_add_image_width_height.up.sql":                                    _1673428910_add_image_width_heightUpSql,
+	"1674210659_add_contact_request_local_clock.up.sql":                           _1674210659_add_contact_request_local_clockUpSql,
+	"1675212323_add_deleted_by.up.sql":                                            _1675212323_add_deleted_byUpSql,
+	"1675247084_add_activity_center_states.up.sql":                                _1675247084_add_activity_center_statesUpSql,
+	"1675272329_fix_protocol_migration.up.sql":                                    _1675272329_fix_protocol_migrationUpSql,
+	"1676998418_fix_activity_center_migration.up.sql":                             _1676998418_fix_activity_center_migrationUpSql,
 	"1677278861_add_deleted_column_to_activity_center_notifications_table.up.sql": _1677278861_add_deleted_column_to_activity_center_notifications_tableUpSql,
-
-	"1677486338_add_community_tokens_table.up.sql": _1677486338_add_community_tokens_tableUpSql,
-
-	"1678292329_add_collapsed_categories.up.sql": _1678292329_add_collapsed_categoriesUpSql,
-
-	"1678800760_add_index_to_raw_messages.up.sql": _1678800760_add_index_to_raw_messagesUpSql,
-
+	"1677486338_add_community_tokens_table.up.sql":                                _1677486338_add_community_tokens_tableUpSql,
+	"1678292329_add_collapsed_categories.up.sql":                                  _1678292329_add_collapsed_categoriesUpSql,
+	"1678800760_add_index_to_raw_messages.up.sql":                                 _1678800760_add_index_to_raw_messagesUpSql,
 	"1678877478_add_communities_requests_to_join_revealed_addresses_table.up.sql": _1678877478_add_communities_requests_to_join_revealed_addresses_tableUpSql,
-
-	"1679326850_add_community_token_owners.up.sql": _1679326850_add_community_token_ownersUpSql,
-
-	"1680011500_add_album_images_count.up.sql": _1680011500_add_album_images_countUpSql,
-
-	"1680114896_add_index_on_album_id.up.sql": _1680114896_add_index_on_album_idUpSql,
-
-	"1681655289_add_mute_till.up.sql": _1681655289_add_mute_tillUpSql,
-
-	"1681934966_add_index_response_to.up.sql": _1681934966_add_index_response_toUpSql,
-
-	"1682528339_add_index_user_messages_unseen.up.sql": _1682528339_add_index_user_messages_unseenUpSql,
-
-	"1683707289_recreate_deleted_for_mes.up.sql": _1683707289_recreate_deleted_for_mesUpSql,
-
-	"1683725607_mark_discord_messages_as_seen.up.sql": _1683725607_mark_discord_messages_as_seenUpSql,
-
-	"1684174617_add_url_previews_to_user_messages.up.sql": _1684174617_add_url_previews_to_user_messagesUpSql,
-
-	"1684175608_add_token_balances.up.sql": _1684175608_add_token_balancesUpSql,
-
-	"1684979808_sync_activity_center_notifications.up.sql": _1684979808_sync_activity_center_notificationsUpSql,
-
-	"1685383829_add_communities_mute_till.up.sql": _1685383829_add_communities_mute_tillUpSql,
-
-	"1685964183_add_chainids_to_revealed_addresses.up.sql": _1685964183_add_chainids_to_revealed_addressesUpSql,
-
-	"1687370421_add_communities_muted_till_new.up.sql": _1687370421_add_communities_muted_till_newUpSql,
-
-	"1687416607_add_communities_check_channel_permission_responses_table.up.sql": _1687416607_add_communities_check_channel_permission_responses_tableUpSql,
-
-	"1687856939_add_community_tokens_decimals.up.sql": _1687856939_add_community_tokens_decimalsUpSql,
-
-	"1687959987_modify_community_tokens_supply_as_string.up.sql": _1687959987_modify_community_tokens_supply_as_stringUpSql,
-
-	"1689258900_add_airdrop_address_to_revealed_addresses.up.sql": _1689258900_add_airdrop_address_to_revealed_addressesUpSql,
-
-	"1689266326_create_communities_events_table.up.sql": _1689266326_create_communities_events_tableUpSql,
-
-	"1689931300_add_community_tokens_deployer_and_priv_level.up.sql": _1689931300_add_community_tokens_deployer_and_priv_levelUpSql,
-
-	"1693311881_add_unfurled_links_to_message_edits.up.sql": _1693311881_add_unfurled_links_to_message_editsUpSql,
-
-	"1693311981_community_shard.up.sql": _1693311981_community_shardUpSql,
-
-	"1695331492_add_status_link_previews.up.sql": _1695331492_add_status_link_previewsUpSql,
-
-	"1695918296_add_validated_at.up.sql": _1695918296_add_validated_atUpSql,
-
-	"1697699419_community_control_node_sync.up.sql": _1697699419_community_control_node_syncUpSql,
-
-	"1698137561_add_profile_showcase_tables.up.sql": _1698137561_add_profile_showcase_tablesUpSql,
-
+	"1679326850_add_community_token_owners.up.sql":                                _1679326850_add_community_token_ownersUpSql,
+	"1680011500_add_album_images_count.up.sql":                                    _1680011500_add_album_images_countUpSql,
+	"1680114896_add_index_on_album_id.up.sql":                                     _1680114896_add_index_on_album_idUpSql,
+	"1681655289_add_mute_till.up.sql":                                             _1681655289_add_mute_tillUpSql,
+	"1681934966_add_index_response_to.up.sql":                                     _1681934966_add_index_response_toUpSql,
+	"1682528339_add_index_user_messages_unseen.up.sql":                            _1682528339_add_index_user_messages_unseenUpSql,
+	"1683707289_recreate_deleted_for_mes.up.sql":                                  _1683707289_recreate_deleted_for_mesUpSql,
+	"1683725607_mark_discord_messages_as_seen.up.sql":                             _1683725607_mark_discord_messages_as_seenUpSql,
+	"1684174617_add_url_previews_to_user_messages.up.sql":                         _1684174617_add_url_previews_to_user_messagesUpSql,
+	"1684175608_add_token_balances.up.sql":                                        _1684175608_add_token_balancesUpSql,
+	"1684979808_sync_activity_center_notifications.up.sql":                        _1684979808_sync_activity_center_notificationsUpSql,
+	"1685383829_add_communities_mute_till.up.sql":                                 _1685383829_add_communities_mute_tillUpSql,
+	"1685964183_add_chainids_to_revealed_addresses.up.sql":                        _1685964183_add_chainids_to_revealed_addressesUpSql,
+	"1687370421_add_communities_muted_till_new.up.sql":                            _1687370421_add_communities_muted_till_newUpSql,
+	"1687416607_add_communities_check_channel_permission_responses_table.up.sql":  _1687416607_add_communities_check_channel_permission_responses_tableUpSql,
+	"1687856939_add_community_tokens_decimals.up.sql":                             _1687856939_add_community_tokens_decimalsUpSql,
+	"1687959987_modify_community_tokens_supply_as_string.up.sql":                  _1687959987_modify_community_tokens_supply_as_stringUpSql,
+	"1689258900_add_airdrop_address_to_revealed_addresses.up.sql":                 _1689258900_add_airdrop_address_to_revealed_addressesUpSql,
+	"1689266326_create_communities_events_table.up.sql":                           _1689266326_create_communities_events_tableUpSql,
+	"1689931300_add_community_tokens_deployer_and_priv_level.up.sql":              _1689931300_add_community_tokens_deployer_and_priv_levelUpSql,
+	"1693311881_add_unfurled_links_to_message_edits.up.sql":                       _1693311881_add_unfurled_links_to_message_editsUpSql,
+	"1693311981_community_shard.up.sql":                                           _1693311981_community_shardUpSql,
+	"1695331492_add_status_link_previews.up.sql":                                  _1695331492_add_status_link_previewsUpSql,
+	"1695918296_add_validated_at.up.sql":                                          _1695918296_add_validated_atUpSql,
+	"1697699419_community_control_node_sync.up.sql":                               _1697699419_community_control_node_syncUpSql,
+	"1698137561_add_profile_showcase_tables.up.sql":                               _1698137561_add_profile_showcase_tablesUpSql,
+	"1698137562_fix_encryption_key_id.up.sql":                                     _1698137562_fix_encryption_key_idUpSql,
 	"README.md": readmeMd,
-
-	"doc.go": docGo,
+	"doc.go":    docGo,
 }
+
+// AssetDebug is true if the assets were built with the debug flag enabled.
+const AssetDebug = false
 
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
 // For example if you run go-bindata on data/... and data contains the
 // following hierarchy:
-//     data/
-//       foo.txt
-//       img/
-//         a.png
-//         b.png
+//
+//	data/
+//	  foo.txt
+//	  img/
+//	    a.png
+//	    b.png
+//
 // then AssetDir("data") would return []string{"foo.txt", "img"},
 // AssetDir("data/img") would return []string{"a.png", "b.png"},
 // AssetDir("foo.txt") and AssetDir("notexist") would return an error, and
@@ -2685,114 +2604,115 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"000001_init.down.db.sql":                                                     &bintree{_000001_initDownDbSql, map[string]*bintree{}},
-	"000001_init.up.db.sql":                                                       &bintree{_000001_initUpDbSql, map[string]*bintree{}},
-	"000002_add_last_ens_clock_value.up.sql":                                      &bintree{_000002_add_last_ens_clock_valueUpSql, map[string]*bintree{}},
-	"1586358095_add_replace.up.sql":                                               &bintree{_1586358095_add_replaceUpSql, map[string]*bintree{}},
-	"1588665364_add_image_data.up.sql":                                            &bintree{_1588665364_add_image_dataUpSql, map[string]*bintree{}},
-	"1589365189_add_pow_target.up.sql":                                            &bintree{_1589365189_add_pow_targetUpSql, map[string]*bintree{}},
-	"1591277220_add_index_messages.up.sql":                                        &bintree{_1591277220_add_index_messagesUpSql, map[string]*bintree{}},
-	"1593087212_add_mute_chat_and_raw_message_fields.up.sql":                      &bintree{_1593087212_add_mute_chat_and_raw_message_fieldsUpSql, map[string]*bintree{}},
-	"1595862781_add_audio_data.up.sql":                                            &bintree{_1595862781_add_audio_dataUpSql, map[string]*bintree{}},
-	"1595865249_create_emoji_reactions_table.up.sql":                              &bintree{_1595865249_create_emoji_reactions_tableUpSql, map[string]*bintree{}},
-	"1596805115_create_group_chat_invitations_table.up.sql":                       &bintree{_1596805115_create_group_chat_invitations_tableUpSql, map[string]*bintree{}},
-	"1597322655_add_invitation_admin_chat_field.up.sql":                           &bintree{_1597322655_add_invitation_admin_chat_fieldUpSql, map[string]*bintree{}},
-	"1597757544_add_nickname.up.sql":                                              &bintree{_1597757544_add_nicknameUpSql, map[string]*bintree{}},
-	"1598955122_add_mentions.up.sql":                                              &bintree{_1598955122_add_mentionsUpSql, map[string]*bintree{}},
-	"1599641390_add_emoji_reactions_index.up.sql":                                 &bintree{_1599641390_add_emoji_reactions_indexUpSql, map[string]*bintree{}},
-	"1599720851_add_seen_index_remove_long_messages.up.sql":                       &bintree{_1599720851_add_seen_index_remove_long_messagesUpSql, map[string]*bintree{}},
-	"1603198582_add_profile_chat_field.up.sql":                                    &bintree{_1603198582_add_profile_chat_fieldUpSql, map[string]*bintree{}},
-	"1603816533_add_links.up.sql":                                                 &bintree{_1603816533_add_linksUpSql, map[string]*bintree{}},
-	"1603888149_create_chat_identity_last_published_table.up.sql":                 &bintree{_1603888149_create_chat_identity_last_published_tableUpSql, map[string]*bintree{}},
-	"1605075346_add_communities.up.sql":                                           &bintree{_1605075346_add_communitiesUpSql, map[string]*bintree{}},
-	"1610117927_add_message_cache.up.sql":                                         &bintree{_1610117927_add_message_cacheUpSql, map[string]*bintree{}},
-	"1610959908_add_dont_wrap_to_raw_messages.up.sql":                             &bintree{_1610959908_add_dont_wrap_to_raw_messagesUpSql, map[string]*bintree{}},
-	"1610960912_add_send_on_personal_topic.up.sql":                                &bintree{_1610960912_add_send_on_personal_topicUpSql, map[string]*bintree{}},
-	"1612870480_add_datasync_id.up.sql":                                           &bintree{_1612870480_add_datasync_idUpSql, map[string]*bintree{}},
-	"1614152139_add_communities_request_to_join.up.sql":                           &bintree{_1614152139_add_communities_request_to_joinUpSql, map[string]*bintree{}},
-	"1615374373_add_confirmations.up.sql":                                         &bintree{_1615374373_add_confirmationsUpSql, map[string]*bintree{}},
-	"1617694931_add_notification_center.up.sql":                                   &bintree{_1617694931_add_notification_centerUpSql, map[string]*bintree{}},
-	"1618923660_create_pin_messages.up.sql":                                       &bintree{_1618923660_create_pin_messagesUpSql, map[string]*bintree{}},
-	"1619094007_add_joined_chat_field.up.sql":                                     &bintree{_1619094007_add_joined_chat_fieldUpSql, map[string]*bintree{}},
-	"1619099821_add_last_synced_field.up.sql":                                     &bintree{_1619099821_add_last_synced_fieldUpSql, map[string]*bintree{}},
-	"1621933219_add_mentioned.up.sql":                                             &bintree{_1621933219_add_mentionedUpSql, map[string]*bintree{}},
-	"1622010048_add_unviewed_mentions_count.up.sql":                               &bintree{_1622010048_add_unviewed_mentions_countUpSql, map[string]*bintree{}},
-	"1622061278_add_message_activity_center_notification_field.up.sql":            &bintree{_1622061278_add_message_activity_center_notification_fieldUpSql, map[string]*bintree{}},
-	"1622464518_set_synced_to_from.up.sql":                                        &bintree{_1622464518_set_synced_to_fromUpSql, map[string]*bintree{}},
-	"1622464519_add_chat_description.up.sql":                                      &bintree{_1622464519_add_chat_descriptionUpSql, map[string]*bintree{}},
-	"1622622253_add_pinned_by_to_pin_messages.up.sql":                             &bintree{_1622622253_add_pinned_by_to_pin_messagesUpSql, map[string]*bintree{}},
-	"1623938329_add_author_activity_center_notification_field.up.sql":             &bintree{_1623938329_add_author_activity_center_notification_fieldUpSql, map[string]*bintree{}},
-	"1623938330_add_edit_messages.up.sql":                                         &bintree{_1623938330_add_edit_messagesUpSql, map[string]*bintree{}},
-	"1624978434_add_muted_community.up.sql":                                       &bintree{_1624978434_add_muted_communityUpSql, map[string]*bintree{}},
-	"1625018910_add_repply_message_activity_center_notification_field.up.sql":     &bintree{_1625018910_add_repply_message_activity_center_notification_fieldUpSql, map[string]*bintree{}},
-	"1625762506_add_deleted_messages.up.sql":                                      &bintree{_1625762506_add_deleted_messagesUpSql, map[string]*bintree{}},
-	"1627388946_add_communities_synced_at.up.sql":                                 &bintree{_1627388946_add_communities_synced_atUpSql, map[string]*bintree{}},
-	"1628280060_create-usermessages-index.sql":                                    &bintree{_1628280060_createUsermessagesIndexSql, map[string]*bintree{}},
-	"1632303896_modify_contacts_table.up.sql":                                     &bintree{_1632303896_modify_contacts_tableUpSql, map[string]*bintree{}},
-	"1633349838_add_emoji_column_in_chats.up.sql":                                 &bintree{_1633349838_add_emoji_column_in_chatsUpSql, map[string]*bintree{}},
-	"1634831235_add_highlight_column_in_chats.up.sql":                             &bintree{_1634831235_add_highlight_column_in_chatsUpSql, map[string]*bintree{}},
-	"1634896007_add_last_updated_locally_and_removed.up.sql":                      &bintree{_1634896007_add_last_updated_locally_and_removedUpSql, map[string]*bintree{}},
-	"1635840039_add_clock_read_at_column_in_chats.up.sql":                         &bintree{_1635840039_add_clock_read_at_column_in_chatsUpSql, map[string]*bintree{}},
-	"1637852321_add_received_invitation_admin_column_in_chats.up.sql":             &bintree{_1637852321_add_received_invitation_admin_column_in_chatsUpSql, map[string]*bintree{}},
-	"1645034601_display_name.up.sql":                                              &bintree{_1645034601_display_nameUpSql, map[string]*bintree{}},
-	"1645034602_add_mutual_contact_request.up.sql":                                &bintree{_1645034602_add_mutual_contact_requestUpSql, map[string]*bintree{}},
-	"1650373957_add_contact_request_state.up.sql":                                 &bintree{_1650373957_add_contact_request_stateUpSql, map[string]*bintree{}},
-	"1656958989_contact_verification.up.sql":                                      &bintree{_1656958989_contact_verificationUpSql, map[string]*bintree{}},
-	"1658236268_add_discord_message_authors_table.up.sql":                         &bintree{_1658236268_add_discord_message_authors_tableUpSql, map[string]*bintree{}},
-	"1659619997_add_discord_messages_table.up.sql":                                &bintree{_1659619997_add_discord_messages_tableUpSql, map[string]*bintree{}},
-	"1660226788_create_chat_identity_social_links.up.sql":                         &bintree{_1660226788_create_chat_identity_social_linksUpSql, map[string]*bintree{}},
-	"1660226789_add_walletconnectsessions_table.up.sql":                           &bintree{_1660226789_add_walletconnectsessions_tableUpSql, map[string]*bintree{}},
-	"1661242854_add_communities_requests_to_leave.up.sql":                         &bintree{_1661242854_add_communities_requests_to_leaveUpSql, map[string]*bintree{}},
-	"1662044232_add_chat_image.up.sql":                                            &bintree{_1662044232_add_chat_imageUpSql, map[string]*bintree{}},
-	"1662106895_add_chat_first_message_timestamp.up.sql":                          &bintree{_1662106895_add_chat_first_message_timestampUpSql, map[string]*bintree{}},
-	"1662723928_add_discord_author_image_fields.up.sql":                           &bintree{_1662723928_add_discord_author_image_fieldsUpSql, map[string]*bintree{}},
-	"1664195977_add_deleted_for_mes.up.sql":                                       &bintree{_1664195977_add_deleted_for_mesUpSql, map[string]*bintree{}},
-	"1664367420_add_discord_attachments_table.up.sql":                             &bintree{_1664367420_add_discord_attachments_tableUpSql, map[string]*bintree{}},
-	"1665079662_add_spectated_column_in_communities.up.sql":                       &bintree{_1665079662_add_spectated_column_in_communitiesUpSql, map[string]*bintree{}},
-	"1665479047_add_community_id_in_notifications.up.sql":                         &bintree{_1665479047_add_community_id_in_notificationsUpSql, map[string]*bintree{}},
-	"1665484435_add_encrypted_messages.up.sql":                                    &bintree{_1665484435_add_encrypted_messagesUpSql, map[string]*bintree{}},
-	"1665560200_add_contact_verification_individual.up.sql":                       &bintree{_1665560200_add_contact_verification_individualUpSql, map[string]*bintree{}},
-	"1670921937_add_album_id.up.sql":                                              &bintree{_1670921937_add_album_idUpSql, map[string]*bintree{}},
-	"1673373000_add_replied.up.sql":                                               &bintree{_1673373000_add_repliedUpSql, map[string]*bintree{}},
-	"1673428910_add_image_width_height.up.sql":                                    &bintree{_1673428910_add_image_width_heightUpSql, map[string]*bintree{}},
-	"1674210659_add_contact_request_local_clock.up.sql":                           &bintree{_1674210659_add_contact_request_local_clockUpSql, map[string]*bintree{}},
-	"1675212323_add_deleted_by.up.sql":                                            &bintree{_1675212323_add_deleted_byUpSql, map[string]*bintree{}},
-	"1675247084_add_activity_center_states.up.sql":                                &bintree{_1675247084_add_activity_center_statesUpSql, map[string]*bintree{}},
-	"1675272329_fix_protocol_migration.up.sql":                                    &bintree{_1675272329_fix_protocol_migrationUpSql, map[string]*bintree{}},
-	"1676998418_fix_activity_center_migration.up.sql":                             &bintree{_1676998418_fix_activity_center_migrationUpSql, map[string]*bintree{}},
-	"1677278861_add_deleted_column_to_activity_center_notifications_table.up.sql": &bintree{_1677278861_add_deleted_column_to_activity_center_notifications_tableUpSql, map[string]*bintree{}},
-	"1677486338_add_community_tokens_table.up.sql":                                &bintree{_1677486338_add_community_tokens_tableUpSql, map[string]*bintree{}},
-	"1678292329_add_collapsed_categories.up.sql":                                  &bintree{_1678292329_add_collapsed_categoriesUpSql, map[string]*bintree{}},
-	"1678800760_add_index_to_raw_messages.up.sql":                                 &bintree{_1678800760_add_index_to_raw_messagesUpSql, map[string]*bintree{}},
-	"1678877478_add_communities_requests_to_join_revealed_addresses_table.up.sql": &bintree{_1678877478_add_communities_requests_to_join_revealed_addresses_tableUpSql, map[string]*bintree{}},
-	"1679326850_add_community_token_owners.up.sql":                                &bintree{_1679326850_add_community_token_ownersUpSql, map[string]*bintree{}},
-	"1680011500_add_album_images_count.up.sql":                                    &bintree{_1680011500_add_album_images_countUpSql, map[string]*bintree{}},
-	"1680114896_add_index_on_album_id.up.sql":                                     &bintree{_1680114896_add_index_on_album_idUpSql, map[string]*bintree{}},
-	"1681655289_add_mute_till.up.sql":                                             &bintree{_1681655289_add_mute_tillUpSql, map[string]*bintree{}},
-	"1681934966_add_index_response_to.up.sql":                                     &bintree{_1681934966_add_index_response_toUpSql, map[string]*bintree{}},
-	"1682528339_add_index_user_messages_unseen.up.sql":                            &bintree{_1682528339_add_index_user_messages_unseenUpSql, map[string]*bintree{}},
-	"1683707289_recreate_deleted_for_mes.up.sql":                                  &bintree{_1683707289_recreate_deleted_for_mesUpSql, map[string]*bintree{}},
-	"1683725607_mark_discord_messages_as_seen.up.sql":                             &bintree{_1683725607_mark_discord_messages_as_seenUpSql, map[string]*bintree{}},
-	"1684174617_add_url_previews_to_user_messages.up.sql":                         &bintree{_1684174617_add_url_previews_to_user_messagesUpSql, map[string]*bintree{}},
-	"1684175608_add_token_balances.up.sql":                                        &bintree{_1684175608_add_token_balancesUpSql, map[string]*bintree{}},
-	"1684979808_sync_activity_center_notifications.up.sql":                        &bintree{_1684979808_sync_activity_center_notificationsUpSql, map[string]*bintree{}},
-	"1685383829_add_communities_mute_till.up.sql":                                 &bintree{_1685383829_add_communities_mute_tillUpSql, map[string]*bintree{}},
-	"1685964183_add_chainids_to_revealed_addresses.up.sql":                        &bintree{_1685964183_add_chainids_to_revealed_addressesUpSql, map[string]*bintree{}},
-	"1687370421_add_communities_muted_till_new.up.sql":                            &bintree{_1687370421_add_communities_muted_till_newUpSql, map[string]*bintree{}},
-	"1687416607_add_communities_check_channel_permission_responses_table.up.sql":  &bintree{_1687416607_add_communities_check_channel_permission_responses_tableUpSql, map[string]*bintree{}},
-	"1687856939_add_community_tokens_decimals.up.sql":                             &bintree{_1687856939_add_community_tokens_decimalsUpSql, map[string]*bintree{}},
-	"1687959987_modify_community_tokens_supply_as_string.up.sql":                  &bintree{_1687959987_modify_community_tokens_supply_as_stringUpSql, map[string]*bintree{}},
-	"1689258900_add_airdrop_address_to_revealed_addresses.up.sql":                 &bintree{_1689258900_add_airdrop_address_to_revealed_addressesUpSql, map[string]*bintree{}},
-	"1689266326_create_communities_events_table.up.sql":                           &bintree{_1689266326_create_communities_events_tableUpSql, map[string]*bintree{}},
-	"1689931300_add_community_tokens_deployer_and_priv_level.up.sql":              &bintree{_1689931300_add_community_tokens_deployer_and_priv_levelUpSql, map[string]*bintree{}},
-	"1693311881_add_unfurled_links_to_message_edits.up.sql":                       &bintree{_1693311881_add_unfurled_links_to_message_editsUpSql, map[string]*bintree{}},
-	"1693311981_community_shard.up.sql":                                           &bintree{_1693311981_community_shardUpSql, map[string]*bintree{}},
-	"1695331492_add_status_link_previews.up.sql":                                  &bintree{_1695331492_add_status_link_previewsUpSql, map[string]*bintree{}},
-	"1695918296_add_validated_at.up.sql":                                          &bintree{_1695918296_add_validated_atUpSql, map[string]*bintree{}},
-	"1697699419_community_control_node_sync.up.sql":                               &bintree{_1697699419_community_control_node_syncUpSql, map[string]*bintree{}},
-	"1698137561_add_profile_showcase_tables.up.sql":                               &bintree{_1698137561_add_profile_showcase_tablesUpSql, map[string]*bintree{}},
-	"README.md": &bintree{readmeMd, map[string]*bintree{}},
-	"doc.go":    &bintree{docGo, map[string]*bintree{}},
+	"000001_init.down.db.sql":                                                     {_000001_initDownDbSql, map[string]*bintree{}},
+	"000001_init.up.db.sql":                                                       {_000001_initUpDbSql, map[string]*bintree{}},
+	"000002_add_last_ens_clock_value.up.sql":                                      {_000002_add_last_ens_clock_valueUpSql, map[string]*bintree{}},
+	"1586358095_add_replace.up.sql":                                               {_1586358095_add_replaceUpSql, map[string]*bintree{}},
+	"1588665364_add_image_data.up.sql":                                            {_1588665364_add_image_dataUpSql, map[string]*bintree{}},
+	"1589365189_add_pow_target.up.sql":                                            {_1589365189_add_pow_targetUpSql, map[string]*bintree{}},
+	"1591277220_add_index_messages.up.sql":                                        {_1591277220_add_index_messagesUpSql, map[string]*bintree{}},
+	"1593087212_add_mute_chat_and_raw_message_fields.up.sql":                      {_1593087212_add_mute_chat_and_raw_message_fieldsUpSql, map[string]*bintree{}},
+	"1595862781_add_audio_data.up.sql":                                            {_1595862781_add_audio_dataUpSql, map[string]*bintree{}},
+	"1595865249_create_emoji_reactions_table.up.sql":                              {_1595865249_create_emoji_reactions_tableUpSql, map[string]*bintree{}},
+	"1596805115_create_group_chat_invitations_table.up.sql":                       {_1596805115_create_group_chat_invitations_tableUpSql, map[string]*bintree{}},
+	"1597322655_add_invitation_admin_chat_field.up.sql":                           {_1597322655_add_invitation_admin_chat_fieldUpSql, map[string]*bintree{}},
+	"1597757544_add_nickname.up.sql":                                              {_1597757544_add_nicknameUpSql, map[string]*bintree{}},
+	"1598955122_add_mentions.up.sql":                                              {_1598955122_add_mentionsUpSql, map[string]*bintree{}},
+	"1599641390_add_emoji_reactions_index.up.sql":                                 {_1599641390_add_emoji_reactions_indexUpSql, map[string]*bintree{}},
+	"1599720851_add_seen_index_remove_long_messages.up.sql":                       {_1599720851_add_seen_index_remove_long_messagesUpSql, map[string]*bintree{}},
+	"1603198582_add_profile_chat_field.up.sql":                                    {_1603198582_add_profile_chat_fieldUpSql, map[string]*bintree{}},
+	"1603816533_add_links.up.sql":                                                 {_1603816533_add_linksUpSql, map[string]*bintree{}},
+	"1603888149_create_chat_identity_last_published_table.up.sql":                 {_1603888149_create_chat_identity_last_published_tableUpSql, map[string]*bintree{}},
+	"1605075346_add_communities.up.sql":                                           {_1605075346_add_communitiesUpSql, map[string]*bintree{}},
+	"1610117927_add_message_cache.up.sql":                                         {_1610117927_add_message_cacheUpSql, map[string]*bintree{}},
+	"1610959908_add_dont_wrap_to_raw_messages.up.sql":                             {_1610959908_add_dont_wrap_to_raw_messagesUpSql, map[string]*bintree{}},
+	"1610960912_add_send_on_personal_topic.up.sql":                                {_1610960912_add_send_on_personal_topicUpSql, map[string]*bintree{}},
+	"1612870480_add_datasync_id.up.sql":                                           {_1612870480_add_datasync_idUpSql, map[string]*bintree{}},
+	"1614152139_add_communities_request_to_join.up.sql":                           {_1614152139_add_communities_request_to_joinUpSql, map[string]*bintree{}},
+	"1615374373_add_confirmations.up.sql":                                         {_1615374373_add_confirmationsUpSql, map[string]*bintree{}},
+	"1617694931_add_notification_center.up.sql":                                   {_1617694931_add_notification_centerUpSql, map[string]*bintree{}},
+	"1618923660_create_pin_messages.up.sql":                                       {_1618923660_create_pin_messagesUpSql, map[string]*bintree{}},
+	"1619094007_add_joined_chat_field.up.sql":                                     {_1619094007_add_joined_chat_fieldUpSql, map[string]*bintree{}},
+	"1619099821_add_last_synced_field.up.sql":                                     {_1619099821_add_last_synced_fieldUpSql, map[string]*bintree{}},
+	"1621933219_add_mentioned.up.sql":                                             {_1621933219_add_mentionedUpSql, map[string]*bintree{}},
+	"1622010048_add_unviewed_mentions_count.up.sql":                               {_1622010048_add_unviewed_mentions_countUpSql, map[string]*bintree{}},
+	"1622061278_add_message_activity_center_notification_field.up.sql":            {_1622061278_add_message_activity_center_notification_fieldUpSql, map[string]*bintree{}},
+	"1622464518_set_synced_to_from.up.sql":                                        {_1622464518_set_synced_to_fromUpSql, map[string]*bintree{}},
+	"1622464519_add_chat_description.up.sql":                                      {_1622464519_add_chat_descriptionUpSql, map[string]*bintree{}},
+	"1622622253_add_pinned_by_to_pin_messages.up.sql":                             {_1622622253_add_pinned_by_to_pin_messagesUpSql, map[string]*bintree{}},
+	"1623938329_add_author_activity_center_notification_field.up.sql":             {_1623938329_add_author_activity_center_notification_fieldUpSql, map[string]*bintree{}},
+	"1623938330_add_edit_messages.up.sql":                                         {_1623938330_add_edit_messagesUpSql, map[string]*bintree{}},
+	"1624978434_add_muted_community.up.sql":                                       {_1624978434_add_muted_communityUpSql, map[string]*bintree{}},
+	"1625018910_add_repply_message_activity_center_notification_field.up.sql":     {_1625018910_add_repply_message_activity_center_notification_fieldUpSql, map[string]*bintree{}},
+	"1625762506_add_deleted_messages.up.sql":                                      {_1625762506_add_deleted_messagesUpSql, map[string]*bintree{}},
+	"1627388946_add_communities_synced_at.up.sql":                                 {_1627388946_add_communities_synced_atUpSql, map[string]*bintree{}},
+	"1628280060_create-usermessages-index.sql":                                    {_1628280060_createUsermessagesIndexSql, map[string]*bintree{}},
+	"1632303896_modify_contacts_table.up.sql":                                     {_1632303896_modify_contacts_tableUpSql, map[string]*bintree{}},
+	"1633349838_add_emoji_column_in_chats.up.sql":                                 {_1633349838_add_emoji_column_in_chatsUpSql, map[string]*bintree{}},
+	"1634831235_add_highlight_column_in_chats.up.sql":                             {_1634831235_add_highlight_column_in_chatsUpSql, map[string]*bintree{}},
+	"1634896007_add_last_updated_locally_and_removed.up.sql":                      {_1634896007_add_last_updated_locally_and_removedUpSql, map[string]*bintree{}},
+	"1635840039_add_clock_read_at_column_in_chats.up.sql":                         {_1635840039_add_clock_read_at_column_in_chatsUpSql, map[string]*bintree{}},
+	"1637852321_add_received_invitation_admin_column_in_chats.up.sql":             {_1637852321_add_received_invitation_admin_column_in_chatsUpSql, map[string]*bintree{}},
+	"1645034601_display_name.up.sql":                                              {_1645034601_display_nameUpSql, map[string]*bintree{}},
+	"1645034602_add_mutual_contact_request.up.sql":                                {_1645034602_add_mutual_contact_requestUpSql, map[string]*bintree{}},
+	"1650373957_add_contact_request_state.up.sql":                                 {_1650373957_add_contact_request_stateUpSql, map[string]*bintree{}},
+	"1656958989_contact_verification.up.sql":                                      {_1656958989_contact_verificationUpSql, map[string]*bintree{}},
+	"1658236268_add_discord_message_authors_table.up.sql":                         {_1658236268_add_discord_message_authors_tableUpSql, map[string]*bintree{}},
+	"1659619997_add_discord_messages_table.up.sql":                                {_1659619997_add_discord_messages_tableUpSql, map[string]*bintree{}},
+	"1660226788_create_chat_identity_social_links.up.sql":                         {_1660226788_create_chat_identity_social_linksUpSql, map[string]*bintree{}},
+	"1660226789_add_walletconnectsessions_table.up.sql":                           {_1660226789_add_walletconnectsessions_tableUpSql, map[string]*bintree{}},
+	"1661242854_add_communities_requests_to_leave.up.sql":                         {_1661242854_add_communities_requests_to_leaveUpSql, map[string]*bintree{}},
+	"1662044232_add_chat_image.up.sql":                                            {_1662044232_add_chat_imageUpSql, map[string]*bintree{}},
+	"1662106895_add_chat_first_message_timestamp.up.sql":                          {_1662106895_add_chat_first_message_timestampUpSql, map[string]*bintree{}},
+	"1662723928_add_discord_author_image_fields.up.sql":                           {_1662723928_add_discord_author_image_fieldsUpSql, map[string]*bintree{}},
+	"1664195977_add_deleted_for_mes.up.sql":                                       {_1664195977_add_deleted_for_mesUpSql, map[string]*bintree{}},
+	"1664367420_add_discord_attachments_table.up.sql":                             {_1664367420_add_discord_attachments_tableUpSql, map[string]*bintree{}},
+	"1665079662_add_spectated_column_in_communities.up.sql":                       {_1665079662_add_spectated_column_in_communitiesUpSql, map[string]*bintree{}},
+	"1665479047_add_community_id_in_notifications.up.sql":                         {_1665479047_add_community_id_in_notificationsUpSql, map[string]*bintree{}},
+	"1665484435_add_encrypted_messages.up.sql":                                    {_1665484435_add_encrypted_messagesUpSql, map[string]*bintree{}},
+	"1665560200_add_contact_verification_individual.up.sql":                       {_1665560200_add_contact_verification_individualUpSql, map[string]*bintree{}},
+	"1670921937_add_album_id.up.sql":                                              {_1670921937_add_album_idUpSql, map[string]*bintree{}},
+	"1673373000_add_replied.up.sql":                                               {_1673373000_add_repliedUpSql, map[string]*bintree{}},
+	"1673428910_add_image_width_height.up.sql":                                    {_1673428910_add_image_width_heightUpSql, map[string]*bintree{}},
+	"1674210659_add_contact_request_local_clock.up.sql":                           {_1674210659_add_contact_request_local_clockUpSql, map[string]*bintree{}},
+	"1675212323_add_deleted_by.up.sql":                                            {_1675212323_add_deleted_byUpSql, map[string]*bintree{}},
+	"1675247084_add_activity_center_states.up.sql":                                {_1675247084_add_activity_center_statesUpSql, map[string]*bintree{}},
+	"1675272329_fix_protocol_migration.up.sql":                                    {_1675272329_fix_protocol_migrationUpSql, map[string]*bintree{}},
+	"1676998418_fix_activity_center_migration.up.sql":                             {_1676998418_fix_activity_center_migrationUpSql, map[string]*bintree{}},
+	"1677278861_add_deleted_column_to_activity_center_notifications_table.up.sql": {_1677278861_add_deleted_column_to_activity_center_notifications_tableUpSql, map[string]*bintree{}},
+	"1677486338_add_community_tokens_table.up.sql":                                {_1677486338_add_community_tokens_tableUpSql, map[string]*bintree{}},
+	"1678292329_add_collapsed_categories.up.sql":                                  {_1678292329_add_collapsed_categoriesUpSql, map[string]*bintree{}},
+	"1678800760_add_index_to_raw_messages.up.sql":                                 {_1678800760_add_index_to_raw_messagesUpSql, map[string]*bintree{}},
+	"1678877478_add_communities_requests_to_join_revealed_addresses_table.up.sql": {_1678877478_add_communities_requests_to_join_revealed_addresses_tableUpSql, map[string]*bintree{}},
+	"1679326850_add_community_token_owners.up.sql":                                {_1679326850_add_community_token_ownersUpSql, map[string]*bintree{}},
+	"1680011500_add_album_images_count.up.sql":                                    {_1680011500_add_album_images_countUpSql, map[string]*bintree{}},
+	"1680114896_add_index_on_album_id.up.sql":                                     {_1680114896_add_index_on_album_idUpSql, map[string]*bintree{}},
+	"1681655289_add_mute_till.up.sql":                                             {_1681655289_add_mute_tillUpSql, map[string]*bintree{}},
+	"1681934966_add_index_response_to.up.sql":                                     {_1681934966_add_index_response_toUpSql, map[string]*bintree{}},
+	"1682528339_add_index_user_messages_unseen.up.sql":                            {_1682528339_add_index_user_messages_unseenUpSql, map[string]*bintree{}},
+	"1683707289_recreate_deleted_for_mes.up.sql":                                  {_1683707289_recreate_deleted_for_mesUpSql, map[string]*bintree{}},
+	"1683725607_mark_discord_messages_as_seen.up.sql":                             {_1683725607_mark_discord_messages_as_seenUpSql, map[string]*bintree{}},
+	"1684174617_add_url_previews_to_user_messages.up.sql":                         {_1684174617_add_url_previews_to_user_messagesUpSql, map[string]*bintree{}},
+	"1684175608_add_token_balances.up.sql":                                        {_1684175608_add_token_balancesUpSql, map[string]*bintree{}},
+	"1684979808_sync_activity_center_notifications.up.sql":                        {_1684979808_sync_activity_center_notificationsUpSql, map[string]*bintree{}},
+	"1685383829_add_communities_mute_till.up.sql":                                 {_1685383829_add_communities_mute_tillUpSql, map[string]*bintree{}},
+	"1685964183_add_chainids_to_revealed_addresses.up.sql":                        {_1685964183_add_chainids_to_revealed_addressesUpSql, map[string]*bintree{}},
+	"1687370421_add_communities_muted_till_new.up.sql":                            {_1687370421_add_communities_muted_till_newUpSql, map[string]*bintree{}},
+	"1687416607_add_communities_check_channel_permission_responses_table.up.sql":  {_1687416607_add_communities_check_channel_permission_responses_tableUpSql, map[string]*bintree{}},
+	"1687856939_add_community_tokens_decimals.up.sql":                             {_1687856939_add_community_tokens_decimalsUpSql, map[string]*bintree{}},
+	"1687959987_modify_community_tokens_supply_as_string.up.sql":                  {_1687959987_modify_community_tokens_supply_as_stringUpSql, map[string]*bintree{}},
+	"1689258900_add_airdrop_address_to_revealed_addresses.up.sql":                 {_1689258900_add_airdrop_address_to_revealed_addressesUpSql, map[string]*bintree{}},
+	"1689266326_create_communities_events_table.up.sql":                           {_1689266326_create_communities_events_tableUpSql, map[string]*bintree{}},
+	"1689931300_add_community_tokens_deployer_and_priv_level.up.sql":              {_1689931300_add_community_tokens_deployer_and_priv_levelUpSql, map[string]*bintree{}},
+	"1693311881_add_unfurled_links_to_message_edits.up.sql":                       {_1693311881_add_unfurled_links_to_message_editsUpSql, map[string]*bintree{}},
+	"1693311981_community_shard.up.sql":                                           {_1693311981_community_shardUpSql, map[string]*bintree{}},
+	"1695331492_add_status_link_previews.up.sql":                                  {_1695331492_add_status_link_previewsUpSql, map[string]*bintree{}},
+	"1695918296_add_validated_at.up.sql":                                          {_1695918296_add_validated_atUpSql, map[string]*bintree{}},
+	"1697699419_community_control_node_sync.up.sql":                               {_1697699419_community_control_node_syncUpSql, map[string]*bintree{}},
+	"1698137561_add_profile_showcase_tables.up.sql":                               {_1698137561_add_profile_showcase_tablesUpSql, map[string]*bintree{}},
+	"1698137562_fix_encryption_key_id.up.sql":                                     {_1698137562_fix_encryption_key_idUpSql, map[string]*bintree{}},
+	"README.md": {readmeMd, map[string]*bintree{}},
+	"doc.go":    {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
@@ -2809,7 +2729,7 @@ func RestoreAsset(dir, name string) error {
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(_filePath(dir, name), data, info.Mode())
+	err = os.WriteFile(_filePath(dir, name), data, info.Mode())
 	if err != nil {
 		return err
 	}

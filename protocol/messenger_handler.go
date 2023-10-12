@@ -529,7 +529,6 @@ func (m *Messenger) handleSyncChats(messageState *ReceivedMessageState, chats []
 			chat.updateChatFromGroupMembershipChanges(group)
 		}
 
-		fmt.Println("Save chat", chat.Name, chat.ChatType, chat.Active)
 		err := m.saveChat(chat)
 		if err != nil {
 			return err

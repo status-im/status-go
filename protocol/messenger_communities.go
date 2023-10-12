@@ -36,6 +36,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/discord"
+	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
@@ -3104,7 +3105,8 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 
 	// Handle community keys
 	if len(syncCommunity.EncryptionKeys) != 0 {
-		_, err := m.encryptor.HandleHashRatchetKeys(syncCommunity.Id, syncCommunity.EncryptionKeys)
+		//  We pass nil,nil as private key/public key as they won't be encrypted
+		_, err := m.encryptor.HandleHashRatchetKeys(syncCommunity.Id, syncCommunity.EncryptionKeys, nil, nil)
 		if err != nil {
 			return err
 		}
@@ -4934,7 +4936,7 @@ func chunkAttachmentsByByteSize(slice []*protobuf.DiscordMessageAttachment, maxF
 }
 
 // GetCurrentKeyForGroup returns the latest key timestampID belonging to a key group
-func (m *Messenger) GetCurrentKeyForGroup(groupID []byte) (uint32, error) {
+func (m *Messenger) GetCurrentKeyForGroup(groupID []byte) (*encryption.HashRatchetKeyCompatibility, error) {
 	return m.sender.GetCurrentKeyForGroup(groupID)
 }
 
@@ -4950,16 +4952,17 @@ func (m *Messenger) RekeyCommunity(cID types.HexBytes) error {
 	return m.communitiesKeyDistributor.Rekey(c)
 }
 
-var rekeyCommunities = false
+// NOTE: disabling rekey loop as it rekeys too aggressively
+
+var enableRekeyLoop = false
 
 // startCommunityRekeyLoop creates a 5-minute ticker and starts a routine that attempts to rekey every community every tick
 func (m *Messenger) startCommunityRekeyLoop() {
-	logger := m.logger.Named("CommunityRekeyLoop")
-	// TODO reactivate once resolved the issue with key_id see rekeyAllCommunities() for details
-	if !rekeyCommunities { // Always return
+	if !enableRekeyLoop {
 		return
 	}
 
+	logger := m.logger.Named("CommunityRekeyLoop")
 	var d time.Duration
 	if m.communitiesManager.RekeyInterval != 0 {
 		if m.communitiesManager.RekeyInterval < 10 {
@@ -4976,9 +4979,7 @@ func (m *Messenger) startCommunityRekeyLoop() {
 		for {
 			select {
 			case <-ticker.C:
-				logger.Debug("rekeyAllCommunities ticker fired")
 				m.rekeyAllCommunities(logger)
-				logger.Debug("rekeyAllCommunities ticker loop ended")
 			case <-m.quit:
 				ticker.Stop()
 				logger.Debug("CommunityRekeyLoop stopped")
@@ -4997,12 +4998,13 @@ func (m *Messenger) rekeyAllCommunities(logger *zap.Logger) {
 	// Determine the rekey interval, if the value is not set as a property of m.communitiesManager
 	// default to one hour
 	// TODO in future have a community level rki rather than a global rki
-	var rki time.Duration
-	if m.communitiesManager.RekeyInterval == 0 {
-		rki = time.Hour
-	} else {
-		rki = m.communitiesManager.RekeyInterval
-	}
+	/*
+		var rki time.Duration
+		if m.communitiesManager.RekeyInterval == 0 {
+			rki = time.Hour
+		} else {
+			rki = m.communitiesManager.RekeyInterval
+		}*/
 
 	// Get and loop over all communities in persistence
 	cs, err := m.Communities()
@@ -5011,7 +5013,6 @@ func (m *Messenger) rekeyAllCommunities(logger *zap.Logger) {
 		return
 	}
 	for _, c := range cs {
-		keyTimestampID, err := m.GetCurrentKeyForGroup(c.ID())
 		if err != nil {
 			logger.Error("error getting current keyTimestampID for community", zap.Error(err), zap.Binary("community ID", c.ID()))
 			continue
@@ -5021,7 +5022,6 @@ func (m *Messenger) rekeyAllCommunities(logger *zap.Logger) {
 		//  c.RekeyedAt().Add(rki).Before(time.Now())
 		//  keyTimestampID + rki < time.Now()
 		//  Just using the vars that will be used later
-		fmt.Printf("%d, %d", rki, keyTimestampID)
 
 		if c.IsControlNode() && c.Encrypted() { // && c.RekeyedAt().Add(rki).Before(time.Now())
 			err := m.RekeyCommunity(c.ID())
