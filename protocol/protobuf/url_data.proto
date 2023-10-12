@@ -3,6 +3,8 @@ syntax = "proto3";
 option go_package = "./;protobuf";
 package protobuf;
 
+import "shard.proto";
+
 message Community {
  string display_name = 1;
  string description = 2;
@@ -29,4 +31,5 @@ message User {
 message URLData {
  // Community, Channel, or User
  bytes content = 1;
+ Shard shard = 2;
 }

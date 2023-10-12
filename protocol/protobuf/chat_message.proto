@@ -5,6 +5,7 @@ package protobuf;
 
 import "enums.proto";
 import "contact.proto";
+import "shard.proto";
 
 message StickerMessage {
   string hash = 1;
@@ -167,6 +168,8 @@ message ChatMessage {
   ContactRequestPropagatedState contact_request_propagated_state = 15;
 
   repeated UnfurledLink unfurled_links = 16;
+
+  Shard shard = 17;
 
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;

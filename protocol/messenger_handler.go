@@ -1570,6 +1570,16 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 	}
 
 	if requestToJoinResponseProto.Accepted {
+		community, err := m.communitiesManager.GetByID(requestToJoinResponseProto.CommunityId)
+		if err != nil {
+			return err
+		}
+
+		err = m.handleCommunityShardAndFiltersFromProto(community, common.ShardFromProtobuff(requestToJoinResponseProto.Shard), requestToJoinResponseProto.ProtectedTopicPrivateKey)
+		if err != nil {
+			return err
+		}
+
 		response, err := m.JoinCommunity(context.Background(), requestToJoinResponseProto.CommunityId, false)
 		if err != nil {
 			return err
@@ -1664,8 +1674,8 @@ func (m *Messenger) HandleCommunityRequestToLeave(state *ReceivedMessageState, r
 }
 
 // handleWrappedCommunityDescriptionMessage handles a wrapped community description
-func (m *Messenger) handleWrappedCommunityDescriptionMessage(payload []byte) (*communities.CommunityResponse, error) {
-	return m.communitiesManager.HandleWrappedCommunityDescriptionMessage(payload)
+func (m *Messenger) handleWrappedCommunityDescriptionMessage(payload []byte, shard *common.Shard) (*communities.CommunityResponse, error) {
+	return m.communitiesManager.HandleWrappedCommunityDescriptionMessage(payload, shard)
 }
 
 func (m *Messenger) handleEditMessage(state *ReceivedMessageState, editMessage EditMessage) error {
@@ -2265,7 +2275,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 	if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
 		m.logger.Debug("Handling community content type")
 
-		communityResponse, err := m.handleWrappedCommunityDescriptionMessage(receivedMessage.GetCommunity())
+		communityResponse, err := m.handleWrappedCommunityDescriptionMessage(receivedMessage.GetCommunity(), common.ShardFromProtobuff(receivedMessage.Shard))
 		if err != nil {
 			return err
 		}

@@ -44,6 +44,7 @@ type URLDataResponse struct {
 	Community CommunityURLData        `json:"community"`
 	Channel   CommunityChannelURLData `json:"channel"`
 	Contact   ContactURLData          `json:"contact"`
+	Shard     *common.Shard           `json:"shard,omitempty"`
 }
 
 const baseShareURL = "https://status.app"
@@ -119,6 +120,7 @@ func (m *Messenger) parseCommunityURLWithChatKey(urlData string) (*URLDataRespon
 
 	return &URLDataResponse{
 		Community: m.prepareCommunityData(community),
+		Shard:     community.Shard(),
 	}, nil
 }
 
@@ -138,6 +140,7 @@ func (m *Messenger) prepareEncodedCommunityData(community *communities.Community
 
 	urlDataProto := &protobuf.URLData{
 		Content: communityData,
+		Shard:   community.Shard().Protobuffer(),
 	}
 
 	urlData, err := proto.Marshal(urlDataProto)
@@ -208,6 +211,7 @@ func (m *Messenger) parseCommunityURLWithData(data string, chatKey string) (*URL
 			TagIndices:   communityProto.TagIndices,
 			CommunityID:  types.EncodeHex(communityID),
 		},
+		Shard: common.ShardFromProtobuff(urlDataProto.Shard),
 	}, nil
 }
 
@@ -274,6 +278,7 @@ func (m *Messenger) parseCommunityChannelURLWithChatKey(channelID string, public
 	return &URLDataResponse{
 		Community: m.prepareCommunityData(community),
 		Channel:   m.prepareCommunityChannelData(channel),
+		Shard:     community.Shard(),
 	}, nil
 }
 
@@ -302,6 +307,7 @@ func (m *Messenger) prepareEncodedCommunityChannelData(community *communities.Co
 
 	urlDataProto := &protobuf.URLData{
 		Content: channelData,
+		Shard:   community.Shard().Protobuffer(),
 	}
 
 	urlData, err := proto.Marshal(urlDataProto)
@@ -392,6 +398,7 @@ func (m *Messenger) parseCommunityChannelURLWithData(data string, chatKey string
 			Color:       channelProto.Color,
 			ChannelUUID: channelProto.Uuid,
 		},
+		Shard: common.ShardFromProtobuff(urlDataProto.Shard),
 	}, nil
 }
 

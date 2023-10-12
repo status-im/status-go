@@ -69,7 +69,13 @@ func (w *gethWakuWrapper) SubscribeToPubsubTopic(topic string, optPublicKey *ecd
 	return errors.New("not available in WakuV1")
 }
 
+func (w *gethWakuWrapper) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
+	// not available in WakuV1
+	return nil, errors.New("not available in WakuV1")
+}
+
 func (w *gethWakuWrapper) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
+	// not available in WakuV1
 	return errors.New("not available in WakuV1")
 }
 

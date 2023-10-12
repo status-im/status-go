@@ -22,8 +22,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"golang.org/x/exp/maps"
+
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/wakuv2/common"
 )

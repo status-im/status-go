@@ -3,6 +3,7 @@ syntax = "proto3";
 option go_package = "./;protobuf";
 import "chat_identity.proto";
 import "enums.proto";
+import "shard.proto";
 
 package protobuf;
 
@@ -155,6 +156,8 @@ message CommunityRequestToJoinResponse {
   bytes grant = 4;
   bytes community_id = 5;
   string magnet_uri = 6;
+  bytes protected_topic_private_key = 7;
+  Shard shard = 8;
 }
 
 message CommunityRequestToLeave {

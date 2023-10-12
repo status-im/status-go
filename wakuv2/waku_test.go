@@ -11,12 +11,14 @@ import (
 
 	"github.com/cenkalti/backoff/v3"
 	"github.com/stretchr/testify/require"
+
+	"golang.org/x/exp/maps"
+
 	"github.com/waku-org/go-waku/waku/v2/dnsdisc"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"github.com/waku-org/go-waku/waku/v2/protocol/store"
 	"github.com/waku-org/go-waku/waku/v2/protocol/subscription"
-	"golang.org/x/exp/maps"
 
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/wakuv2/common"

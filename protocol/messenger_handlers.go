@@ -226,6 +226,9 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
            case protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE:
 		return m.handleCommunityPrivilegedUserSyncMessageProtobuf(messageState, protoBytes, msg, filter)
         
+           case protobuf.ApplicationMetadataMessage_COMMUNITY_SHARD_KEY:
+		return m.handleCommunityShardKeyProtobuf(messageState, protoBytes, msg, filter)
+        
 	default:
 		m.logger.Info("protobuf type not found", zap.String("type", string(msg.Type)))
                 return errors.New("protobuf type not found")
@@ -1604,6 +1607,24 @@ func (m *Messenger) handleCommunityPrivilegedUserSyncMessageProtobuf(messageStat
 	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleCommunityPrivilegedUserSyncMessage(messageState, p, msg)
+	
+}
+
+
+func (m *Messenger) handleCommunityShardKeyProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
+	m.logger.Info("handling CommunityShardKey")
+	
+
+	
+	p := &protobuf.CommunityShardKey{}
+	err := proto.Unmarshal(protoBytes, p)
+	if err != nil {
+		return err
+	}
+
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
+
+	return m.HandleCommunityShardKey(messageState, p, msg)
 	
 }
 

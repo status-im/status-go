@@ -8,8 +8,9 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 	"go.uber.org/zap"
+
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 
 	"github.com/status-im/status-go/eth-node/types"
 )
@@ -17,6 +18,11 @@ import (
 const (
 	minPow = 0.0
 )
+
+type Shard struct {
+	Cluster uint16
+	Index   uint16
+}
 
 type RawFilter struct {
 	FilterID string
@@ -131,7 +137,7 @@ func (f *FiltersManager) InitPublicFilters(publicFiltersToInit []FiltersToInitia
 	var filters []*Filter
 	// Add public, one-to-one and negotiated filters.
 	for _, pf := range publicFiltersToInit {
-		f, err := f.LoadPublic(pf.ChatID, pf.PubsubTopic) // TODO: pubsubtopic
+		f, err := f.LoadPublic(pf.ChatID, pf.PubsubTopic)
 		if err != nil {
 			return nil, err
 		}
@@ -141,8 +147,8 @@ func (f *FiltersManager) InitPublicFilters(publicFiltersToInit []FiltersToInitia
 }
 
 type CommunityFilterToInitialize struct {
-	CommunityID []byte
-	PrivKey     *ecdsa.PrivateKey
+	Shard   *Shard
+	PrivKey *ecdsa.PrivateKey
 }
 
 func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []CommunityFilterToInitialize) ([]*Filter, error) {
@@ -151,30 +157,43 @@ func (f *FiltersManager) InitCommunityFilters(communityFiltersToInitialize []Com
 	defer f.mutex.Unlock()
 
 	for _, cf := range communityFiltersToInitialize {
-		pubsubTopic := GetPubsubTopic(cf.CommunityID)
-		identityStr := PublicKeyToStr(&cf.PrivKey.PublicKey)
-		rawFilter, err := f.addAsymmetric(identityStr, pubsubTopic, cf.PrivKey, true)
-		if err != nil {
-			f.logger.Debug("could not register community filter", zap.Error(err))
-			return nil, err
-
-		}
-		filterID := identityStr + "-admin"
-		filter := &Filter{
-			ChatID:       filterID,
-			FilterID:     rawFilter.FilterID,
-			PubsubTopic:  pubsubTopic,
-			ContentTopic: rawFilter.Topic,
-			Identity:     identityStr,
-			Listen:       true,
-			OneToOne:     true,
+		if cf.PrivKey == nil {
+			continue
 		}
 
-		f.filters[filterID] = filter
+		communityPubsubTopic := GetPubsubTopic(cf.Shard)
+		topics := []string{communityPubsubTopic}
+		if communityPubsubTopic != relay.DefaultWakuTopic {
+			topics = append(topics, relay.DefaultWakuTopic)
+		}
 
-		f.logger.Debug("registering filter for", zap.String("chatID", filterID), zap.String("type", "community"), zap.String("topic", rawFilter.Topic.String()))
+		// TODO: requests to join / cancels are currently being sent into the default waku topic.
+		// They must be sent into an specific non protected shard
+		for _, pubsubTopic := range topics {
+			identityStr := PublicKeyToStr(&cf.PrivKey.PublicKey)
+			rawFilter, err := f.addAsymmetric(identityStr, pubsubTopic, cf.PrivKey, true)
+			if err != nil {
+				f.logger.Debug("could not register community filter", zap.Error(err))
+				return nil, err
 
-		filters = append(filters, filter)
+			}
+			filterID := identityStr + "-admin"
+			filter := &Filter{
+				ChatID:       filterID,
+				FilterID:     rawFilter.FilterID,
+				PubsubTopic:  pubsubTopic,
+				ContentTopic: rawFilter.Topic,
+				Identity:     identityStr,
+				Listen:       true,
+				OneToOne:     true,
+			}
+
+			f.filters[filterID] = filter
+
+			f.logger.Debug("registering filter for", zap.String("chatID", filterID), zap.String("type", "community"), zap.String("topic", rawFilter.Topic.String()))
+
+			filters = append(filters, filter)
+		}
 	}
 	return filters, nil
 }

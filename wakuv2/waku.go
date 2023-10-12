@@ -990,16 +990,17 @@ func (w *Waku) broadcast() {
 		select {
 		case envelope := <-w.sendQueue:
 			var err error
+			logger := w.logger.With(zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", envelope.PubsubTopic()), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().Timestamp))
 			if w.settings.LightClient {
-				w.logger.Info("publishing message via lightpush", zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", envelope.PubsubTopic()))
+				w.logger.Info("publishing message via lightpush")
 				_, err = w.node.Lightpush().PublishToTopic(context.Background(), envelope.Message(), lightpush.WithPubSubTopic(envelope.PubsubTopic()))
 			} else {
-				w.logger.Info("publishing message via relay", zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", envelope.PubsubTopic()))
+				logger.Info("publishing message via relay")
 				_, err = w.node.Relay().PublishToTopic(context.Background(), envelope.Message(), envelope.PubsubTopic())
 			}
 
 			if err != nil {
-				w.logger.Error("could not send message", zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", envelope.PubsubTopic()), zap.Error(err))
+				logger.Error("could not send message", zap.Error(err))
 				w.envelopeFeed.Send(common.EnvelopeEvent{
 					Hash:  gethcommon.BytesToHash(envelope.Hash()),
 					Event: common.EventEnvelopeExpired,
@@ -1437,7 +1438,19 @@ func (w *Waku) SubscribeToPubsubTopic(topic string, pubkey *ecdsa.PublicKey) err
 	return nil
 }
 
+func (w *Waku) RetrievePubsubTopicKey(topic string) (*ecdsa.PrivateKey, error) {
+	if w.protectedTopicStore == nil {
+		return nil, nil
+	}
+
+	return w.protectedTopicStore.FetchPrivateKey(topic)
+}
+
 func (w *Waku) StorePubsubTopicKey(topic string, privKey *ecdsa.PrivateKey) error {
+	if w.protectedTopicStore == nil {
+		return nil
+	}
+
 	return w.protectedTopicStore.Insert(topic, privKey, &privKey.PublicKey)
 }
 
