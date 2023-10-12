@@ -1989,6 +1989,7 @@ func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, err
 			return nil, err
 		}
 
+		dbRequest.State = RequestToJoinStateAcceptedPending
 		if err := m.markRequestToJoinAsAcceptedPending(pk, community); err != nil {
 			return nil, err
 		}
@@ -2031,6 +2032,7 @@ func (m *Manager) AcceptRequestToJoin(dbRequest *RequestToJoin) (*Community, err
 			}
 		}
 
+		dbRequest.State = RequestToJoinStateAccepted
 		if err := m.markRequestToJoin(pk, community); err != nil {
 			return nil, err
 		}
@@ -2058,6 +2060,8 @@ func (m *Manager) DeclineRequestToJoin(dbRequest *RequestToJoin) (*Community, er
 	if community.HasPermissionToSendCommunityEvents() {
 		requestToJoinState = RequestToJoinStateDeclinedPending
 	}
+
+	dbRequest.State = requestToJoinState
 	err = m.persistence.SetRequestToJoinState(dbRequest.PublicKey, dbRequest.CommunityID, requestToJoinState)
 	if err != nil {
 		return nil, err
