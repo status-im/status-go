@@ -2208,7 +2208,7 @@ func _1693311981_community_shardUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1693311981_community_shard.up.sql", size: 156, mode: os.FileMode(0644), modTime: time.Unix(1697196255, 0)}
+	info := bindataFileInfo{name: "1693311981_community_shard.up.sql", size: 156, mode: os.FileMode(0644), modTime: time.Unix(1697200175, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc9, 0x12, 0xf9, 0xde, 0x49, 0x9f, 0x95, 0xaa, 0x22, 0x5e, 0x54, 0x5a, 0x1, 0xd, 0xc6, 0x1f, 0x42, 0x93, 0xe8, 0x69, 0x30, 0x11, 0x69, 0x41, 0x7f, 0x87, 0x57, 0x56, 0x2a, 0x32, 0xb9, 0x3e}}
 	return a, nil
 }
@@ -2228,7 +2228,7 @@ func _1695331492_add_status_link_previewsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1695331492_add_status_link_previews.up.sql", size: 136, mode: os.FileMode(0644), modTime: time.Unix(1697196265, 0)}
+	info := bindataFileInfo{name: "1695331492_add_status_link_previews.up.sql", size: 136, mode: os.FileMode(0644), modTime: time.Unix(1697200175, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb6, 0x7d, 0x6e, 0x86, 0xf0, 0xf8, 0x23, 0x4b, 0x16, 0x3d, 0xca, 0x8f, 0xfc, 0x8, 0x22, 0xd5, 0x70, 0x14, 0xbb, 0xdd, 0xa9, 0xb8, 0x3e, 0xc6, 0x20, 0xfb, 0x0, 0x26, 0x73, 0xcb, 0x92, 0xb2}}
 	return a, nil
 }

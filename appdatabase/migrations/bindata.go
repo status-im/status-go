@@ -90,6 +90,7 @@
 // 1693900971_add_profile_migration_needed_column_to_settings_table.up.sql (88B)
 // 1694764094_add_original_to_networks.up.sql (120B)
 // 1695974515_add_is_sepolia_enabled_to_settings.up.sql (82B)
+// 1696259336_settings_add_url_unfurling_mode.up.sql (160B)
 // 1697123140_drop_include_watch_only_accounts.up.sql (61B)
 // 1697123233_drop_include_watch_only_account_to_settings_sync_clock.up.sql (72B)
 // doc.go (74B)
@@ -1961,6 +1962,26 @@ func _1695974515_add_is_sepolia_enabled_to_settingsUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1696259336_settings_add_url_unfurling_modeUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x4e\x2d\x29\xc9\xcc\x4b\x2f\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x28\x2d\xca\x89\x2f\xcd\x4b\x2b\x2d\xca\xc9\xcc\x4b\x8f\xcf\xcd\x4f\x49\x55\xf0\xf4\x0b\x51\xf0\xf3\x0f\x51\xf0\x0b\xf5\xf1\x51\x70\x71\x75\x73\x0c\xf5\x09\x51\x30\xb4\xe6\xc2\x66\x54\x7c\x71\x65\x5e\x72\x7c\x72\x4e\x7e\x72\x36\x39\xa6\x1a\x58\x03\x02\x00\x00\xff\xff\xad\xc8\x55\x02\xa0\x00\x00\x00")
+
+func _1696259336_settings_add_url_unfurling_modeUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1696259336_settings_add_url_unfurling_modeUpSql,
+		"1696259336_settings_add_url_unfurling_mode.up.sql",
+	)
+}
+
+func _1696259336_settings_add_url_unfurling_modeUpSql() (*asset, error) {
+	bytes, err := _1696259336_settings_add_url_unfurling_modeUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1696259336_settings_add_url_unfurling_mode.up.sql", size: 160, mode: os.FileMode(0644), modTime: time.Unix(1697201656, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xde, 0x62, 0xf4, 0x5, 0x31, 0x4e, 0x35, 0xb5, 0xcd, 0x1a, 0xad, 0xdc, 0xcb, 0x4, 0x94, 0x16, 0x67, 0xc4, 0x8d, 0x6f, 0x63, 0xa6, 0x8f, 0xbf, 0xa5, 0x6, 0xfd, 0xbe, 0xb1, 0x7c, 0xe8, 0xa7}}
+	return a, nil
+}
+
 var __1697123140_drop_include_watch_only_accountsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x4e\x2d\x29\xc9\xcc\x4b\x2f\x56\x70\x09\xf2\x0f\x50\x70\xf6\xf7\x09\xf5\xf5\x53\xc8\xcc\x4b\xce\x29\x4d\x49\x8d\x2f\x4f\x2c\x49\xce\x88\xcf\xcf\xcb\xa9\x8c\x4f\x4c\x4e\xce\x2f\xcd\x2b\xb1\xe6\x02\x04\x00\x00\xff\xff\xb4\xff\x34\xe0\x3d\x00\x00\x00")
 
 func _1697123140_drop_include_watch_only_accountsUpSqlBytes() ([]byte, error) {
@@ -1976,7 +1997,7 @@ func _1697123140_drop_include_watch_only_accountsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1697123140_drop_include_watch_only_accounts.up.sql", size: 61, mode: os.FileMode(0644), modTime: time.Unix(1697196255, 0)}
+	info := bindataFileInfo{name: "1697123140_drop_include_watch_only_accounts.up.sql", size: 61, mode: os.FileMode(0644), modTime: time.Unix(1697200175, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x77, 0xc9, 0xc7, 0xaf, 0x7b, 0xe4, 0x83, 0x5, 0xe1, 0xde, 0x83, 0xd9, 0xdd, 0xbe, 0xb6, 0x1d, 0x24, 0x5c, 0x19, 0x88, 0xad, 0xc1, 0x5c, 0xd1, 0x26, 0x84, 0x61, 0xce, 0x3a, 0x74, 0x3c, 0x8c}}
 	return a, nil
 }
@@ -1996,7 +2017,7 @@ func _1697123233_drop_include_watch_only_account_to_settings_sync_clockUpSql() (
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1697123233_drop_include_watch_only_account_to_settings_sync_clock.up.sql", size: 72, mode: os.FileMode(0644), modTime: time.Unix(1697196255, 0)}
+	info := bindataFileInfo{name: "1697123233_drop_include_watch_only_account_to_settings_sync_clock.up.sql", size: 72, mode: os.FileMode(0644), modTime: time.Unix(1697200175, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xcd, 0xe9, 0x5b, 0xc9, 0xd2, 0x96, 0x18, 0x8e, 0x97, 0x13, 0x3b, 0x72, 0x2d, 0x8a, 0xa9, 0xa3, 0x32, 0x6, 0x17, 0xb, 0xd1, 0xd8, 0x44, 0x13, 0xde, 0xb6, 0xa3, 0xbf, 0xef, 0xf4, 0xf9, 0xff}}
 	return a, nil
 }
@@ -2292,6 +2313,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1695974515_add_is_sepolia_enabled_to_settings.up.sql": _1695974515_add_is_sepolia_enabled_to_settingsUpSql,
 
+	"1696259336_settings_add_url_unfurling_mode.up.sql": _1696259336_settings_add_url_unfurling_modeUpSql,
+
 	"1697123140_drop_include_watch_only_accounts.up.sql": _1697123140_drop_include_watch_only_accountsUpSql,
 
 	"1697123233_drop_include_watch_only_account_to_settings_sync_clock.up.sql": _1697123233_drop_include_watch_only_account_to_settings_sync_clockUpSql,
@@ -2430,6 +2453,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1693900971_add_profile_migration_needed_column_to_settings_table.up.sql":  &bintree{_1693900971_add_profile_migration_needed_column_to_settings_tableUpSql, map[string]*bintree{}},
 	"1694764094_add_original_to_networks.up.sql":                               &bintree{_1694764094_add_original_to_networksUpSql, map[string]*bintree{}},
 	"1695974515_add_is_sepolia_enabled_to_settings.up.sql":                     &bintree{_1695974515_add_is_sepolia_enabled_to_settingsUpSql, map[string]*bintree{}},
+	"1696259336_settings_add_url_unfurling_mode.up.sql":                        &bintree{_1696259336_settings_add_url_unfurling_modeUpSql, map[string]*bintree{}},
 	"1697123140_drop_include_watch_only_accounts.up.sql":                       &bintree{_1697123140_drop_include_watch_only_accountsUpSql, map[string]*bintree{}},
 	"1697123233_drop_include_watch_only_account_to_settings_sync_clock.up.sql": &bintree{_1697123233_drop_include_watch_only_account_to_settings_sync_clockUpSql, map[string]*bintree{}},
 	"doc.go": &bintree{docGo, map[string]*bintree{}},
