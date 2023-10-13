@@ -22,3 +22,11 @@ const (
 	ProfilePicturesShowToEveryone
 	ProfilePicturesShowToNone
 )
+
+type URLUnfurlingModeType int
+
+const (
+	URLUnfurlingAlwaysAsk URLUnfurlingModeType = iota + 1
+	URLUnfurlingEnableAll
+	URLUnfurlingDisableAll
+)

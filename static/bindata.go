@@ -224,7 +224,7 @@ func ConfigCliFleetShardsTestJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-shards.test.json", size: 1954, mode: os.FileMode(0644), modTime: time.Unix(1697196255, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-shards.test.json", size: 1954, mode: os.FileMode(0644), modTime: time.Unix(1697200175, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xcf, 0xeb, 0x33, 0xd4, 0x3, 0x54, 0xff, 0xda, 0x1f, 0xc4, 0xc, 0x91, 0x88, 0x1e, 0x53, 0xbf, 0x49, 0xa, 0x6c, 0x45, 0xf9, 0x19, 0x91, 0xec, 0xe, 0x1a, 0xfc, 0x14, 0x86, 0x8d, 0xa3, 0x5a}}
 	return a, nil
 }

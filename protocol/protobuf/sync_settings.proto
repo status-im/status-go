@@ -31,7 +31,11 @@ message SyncSetting {
     DISPLAY_NAME = 13;
     BIO = 14;
     MNEMONIC_REMOVED = 15;
-    reserved 16; //do not use this value anymore as it was removed
+    reserved 16;
+    reserved "ENS_USERNAMES";
+    reserved 17;
+    reserved "INCLUDE_WATCHONLY_ACCOUNT";
+    URL_UNFURLING_MODE = 18;
   }
 }
 

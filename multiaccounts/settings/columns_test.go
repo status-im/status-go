@@ -64,8 +64,6 @@ func TestGetFieldFromProtobufType(t *testing.T) {
 			require.Error(t, err, "do not have a SettingField for the unknown type")
 			continue
 		}
-		if err != nil {
-			require.NoError(t, err)
-		}
+		require.NoError(t, err)
 	}
 }

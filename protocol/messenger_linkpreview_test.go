@@ -15,6 +15,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
@@ -69,34 +70,40 @@ func (t *StubTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return nil, fmt.Errorf("no HTTP matcher found")
 }
 
-// Add a matcher based on a URL regexp. If a given request URL matches the
-// regexp, then responseBody will be returned with a hardcoded 200 status code.
-// If headers is non-nil, use it as the value of http.Response.Header.
-func (t *StubTransport) AddURLMatcher(urlRegexp string, responseBody []byte, headers map[string]string) {
+func (t *StubTransport) AddURLMatcherRoundTrip(urlRegexp string, roundTrip func(r *http.Request) *http.Response) {
 	matcher := func(req *http.Request) *http.Response {
 		rx, err := regexp.Compile(regexp.QuoteMeta(urlRegexp))
 		if err != nil {
 			return nil
 		}
-		if rx.MatchString(req.URL.String()) {
-			res := &http.Response{
-				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(bytes.NewBuffer(responseBody)),
-			}
-
-			if headers != nil {
-				res.Header = http.Header{}
-				for k, v := range headers {
-					res.Header.Set(k, v)
-				}
-			}
-
-			return res
+		if !rx.MatchString(req.URL.String()) {
+			return nil
 		}
-		return nil
+		return roundTrip(req)
 	}
-
 	t.matchers = append(t.matchers, matcher)
+}
+
+// Add a matcher based on a URL regexp. If a given request URL matches the
+// regexp, then responseBody will be returned with a hardcoded 200 status code.
+// If headers is non-nil, use it as the value of http.Response.Header.
+func (t *StubTransport) AddURLMatcher(urlRegexp string, responseBody []byte, headers map[string]string) {
+	matcher := func(req *http.Request) *http.Response {
+		res := &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       ioutil.NopCloser(bytes.NewBuffer(responseBody)),
+		}
+
+		if headers != nil {
+			res.Header = http.Header{}
+			for k, v := range headers {
+				res.Header.Set(k, v)
+			}
+		}
+
+		return res
+	}
+	t.AddURLMatcherRoundTrip(urlRegexp, matcher)
 }
 
 // assertContainsLongString verifies if actual contains a slice of expected and
@@ -506,4 +513,56 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined()
 	s.Require().Equal(bannerWidth, preview.Community.Banner.Width)
 	s.Require().Equal(bannerHeight, preview.Community.Banner.Height)
 	s.Require().Equal(bannerDataURI, preview.Community.Banner.DataURI)
+}
+
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
+	u := "https://github.com"
+	requestsCount := 0
+
+	transport := StubTransport{}
+	transport.AddURLMatcherRoundTrip(
+		u,
+		func(req *http.Request) *http.Response {
+			requestsCount++
+			responseBody := []byte(`<html><head><meta property="og:title" content="TestTitle"></head></html>`)
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       ioutil.NopCloser(bytes.NewBuffer(responseBody)),
+			}
+		},
+	)
+	stubbedClient := http.Client{Transport: &transport}
+
+	// Test `AlwaysAsk`
+	// NOTE: on status-go side `AlwaysAsk` == `EnableAll`, "asking" should be processed by the app
+
+	requestsCount = 0
+	err := s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingAlwaysAsk)
+	s.Require().NoError(err)
+
+	linkPreviews, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
+	s.Require().NoError(err)
+	s.Require().Len(linkPreviews.LinkPreviews, 1)
+	s.Require().Equal(requestsCount, 1)
+
+	// Test `EnableAll`
+	requestsCount = 0
+	err = s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingEnableAll)
+	s.Require().NoError(err)
+
+	linkPreviews, err = s.m.UnfurlURLs(&stubbedClient, []string{u})
+	s.Require().NoError(err)
+	s.Require().Len(linkPreviews.LinkPreviews, 1)
+	s.Require().Equal(requestsCount, 1)
+
+	// Test `DisableAll`
+	requestsCount = 0
+	err = s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingDisableAll)
+	s.Require().NoError(err)
+
+	linkPreviews, err = s.m.UnfurlURLs(&stubbedClient, []string{u})
+	s.Require().Error(err)
+	s.Require().Len(linkPreviews.LinkPreviews, 0)
+	s.Require().Equal(requestsCount, 0)
+
 }

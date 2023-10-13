@@ -8,11 +8,11 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/status-im/markdown"
 	"go.uber.org/zap"
 	"golang.org/x/net/publicsuffix"
 
-	"github.com/status-im/markdown"
-
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 )
 
@@ -134,13 +134,34 @@ func NewDefaultHTTPClient() *http.Client {
 // UnfurlURLs assumes clients pass URLs verbatim that were validated and
 // processed by GetURLs.
 func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (UnfurlURLsResponse, error) {
-	if httpClient == nil {
-		httpClient = NewDefaultHTTPClient()
+	response := UnfurlURLsResponse{}
+
+	s, err := m.getSettings()
+	if err != nil {
+		return response, fmt.Errorf("failed to get settigs: %w", err)
 	}
 
-	r := UnfurlURLsResponse{
-		LinkPreviews:       make([]*common.LinkPreview, 0, len(urls)),
-		StatusLinkPreviews: make([]*common.StatusLinkPreview, 0, len(urls)),
+	// We use switch case, though there's most cases are empty for code clarity.
+	switch s.URLUnfurlingMode {
+	case settings.URLUnfurlingDisableAll:
+		return response, fmt.Errorf("url unfurling is disabled")
+	case settings.URLUnfurlingEnableAll:
+		break
+	case settings.URLUnfurlingAlwaysAsk:
+		// This mode should be handled on the app side
+		// and is considered as equal to URLUnfurlingEnableAll in status-go.
+		break
+	default:
+		return response, fmt.Errorf("invalid url unfurling mode setting: %d", s.URLUnfurlingMode)
+	}
+
+	// Unfurl in a loop
+
+	response.LinkPreviews = make([]*common.LinkPreview, 0, len(urls))
+	response.StatusLinkPreviews = make([]*common.StatusLinkPreview, 0, len(urls))
+
+	if httpClient == nil {
+		httpClient = NewDefaultHTTPClient()
 	}
 
 	for _, url := range urls {
@@ -153,7 +174,7 @@ func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (UnfurlUR
 				m.logger.Warn("failed to unfurl status link", zap.String("url", url), zap.Error(err))
 				continue
 			}
-			r.StatusLinkPreviews = append(r.StatusLinkPreviews, preview)
+			response.StatusLinkPreviews = append(response.StatusLinkPreviews, preview)
 			continue
 		}
 
@@ -162,8 +183,8 @@ func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (UnfurlUR
 			m.logger.Warn("failed to unfurl", zap.String("url", url), zap.Error(err))
 			continue
 		}
-		r.LinkPreviews = append(r.LinkPreviews, p)
+		response.LinkPreviews = append(response.LinkPreviews, p)
 	}
 
-	return r, nil
+	return response, nil
 }

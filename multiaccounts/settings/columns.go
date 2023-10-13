@@ -437,6 +437,16 @@ var (
 		dBColumnName:   "profile_migration_needed",
 		valueHandler:   BoolHandler,
 	}
+	URLUnfurlingMode = SettingField{
+		reactFieldName: "url-unfurling-mode",
+		dBColumnName:   "url_unfurling_mode",
+		syncProtobufFactory: &SyncProtobufFactory{
+			fromInterface:     urlUnfurlingModeProtobufFactory,
+			fromStruct:        urlUnfurlingModeProtobufFactoryStruct,
+			valueFromProtobuf: Int64FromSyncProtobuf,
+			protobufType:      protobuf.SyncSetting_URL_UNFURLING_MODE,
+		},
+	}
 
 	SettingFieldRegister = []SettingField{
 		AnonMetricsShouldSend,
@@ -507,6 +517,7 @@ var (
 		WebviewAllowPermissionRequests,
 		ProfileMigrationNeeded,
 		IsSepoliaEnabled,
+		URLUnfurlingMode,
 	}
 )
 
