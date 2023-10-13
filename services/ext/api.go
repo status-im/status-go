@@ -1539,6 +1539,30 @@ func (api *PublicAPI) CreateTokenGatedCommunity() (*protocol.MessengerResponse, 
 	return api.service.messenger.CreateTokenGatedCommunity()
 }
 
+// Returns response with AC notification when owner token is received
+func (api *PublicAPI) RegisterOwnerTokenReceivedNotification(communityID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RegisterOwnerTokenReceivedNotification(communityID)
+}
+
+// Returns response with AC notification when setting signer is successfull
+func (api *PublicAPI) RegisterSetSignerSuccessNotification(communityID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RegisterSetSignerSuccessNotification(communityID)
+}
+
+// Returns response with AC notification when setting signer is failed
+func (api *PublicAPI) RegisterSetSignerFailedNotification(communityID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RegisterSetSignerFailedNotification(communityID)
+}
+
+// Returns response with AC notification when setting signer is declined
+func (api *PublicAPI) RegisterSetSignerDeclinedNotification(communityID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RegisterSetSignerDeclinedNotification(communityID)
+}
+
+func (api *PublicAPI) PromoteSelfToControlMode(ctx Context, communityID string) error {
+	return api.service.messenger.PromoteSelfToControlNode(ctx, []byte(communityID))
+}
+
 // -----
 // HELPER
 // -----

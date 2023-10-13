@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	ethRpc "github.com/ethereum/go-ethereum/rpc"
@@ -35,16 +36,18 @@ type Service struct {
 	pendingTracker  *transactions.PendingTxTracker
 	config          *params.NodeConfig
 	db              *Database
+	walletFeed      *event.Feed
 }
 
 // Returns a new Collectibles Service.
-func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, pendingTracker *transactions.PendingTxTracker, config *params.NodeConfig, appDb *sql.DB) *Service {
+func NewService(rpcClient *rpc.Client, accountsManager *account.GethManager, pendingTracker *transactions.PendingTxTracker, config *params.NodeConfig, appDb *sql.DB, walletFeed *event.Feed) *Service {
 	return &Service{
 		manager:         &Manager{rpcClient: rpcClient},
 		accountsManager: accountsManager,
 		pendingTracker:  pendingTracker,
 		config:          config,
 		db:              NewCommunityTokensDatabase(appDb),
+		walletFeed:      walletFeed,
 	}
 }
 

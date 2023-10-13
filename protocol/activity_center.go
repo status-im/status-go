@@ -29,6 +29,10 @@ const (
 	ActivityCenterNotificationTypeContactVerification
 	ActivityCenterNotificationTypeContactRemoved
 	ActivityCenterNotificationTypeNewKeypairAddedToPairedDevice
+	ActivityCenterNotificationTypeOwnerTokenReceived
+	ActivityCenterNotificationTypeSetSignerSuccess
+	ActivityCenterNotificationTypeSetSignerFailed
+	ActivityCenterNotificationTypeSetSignerDeclined
 )
 
 type ActivityCenterMembershipStatus int

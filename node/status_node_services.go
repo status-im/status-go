@@ -446,7 +446,7 @@ func (b *StatusNode) pendingTrackerService(walletFeed *event.Feed) *transactions
 
 func (b *StatusNode) CommunityTokensService() *communitytokens.Service {
 	if b.communityTokensSrvc == nil {
-		b.communityTokensSrvc = communitytokens.NewService(b.rpcClient, b.gethAccountManager, b.pendingTracker, b.config, b.appDB)
+		b.communityTokensSrvc = communitytokens.NewService(b.rpcClient, b.gethAccountManager, b.pendingTracker, b.config, b.appDB, &b.walletFeed)
 	}
 	return b.communityTokensSrvc
 }

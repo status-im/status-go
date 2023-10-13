@@ -5111,6 +5111,12 @@ func (m *Messenger) processCommunityChanges(messageState *ReceivedMessageState) 
 	messageState.Response.CommunityChanges = nil
 }
 
+// TODO
+func (m *Messenger) PromoteSelfToControlNode(ctx context.Context, communityID []byte) error {
+	_, err := m.communitiesManager.PromoteSelfToControlNode(communityID)
+	return err
+}
+
 func (m *Messenger) SetCommunitySignerPubKey(ctx context.Context, communityID []byte, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, newSignerPubKey string) (string, error) {
 	if m.communityTokensService == nil {
 		return "", errors.New("tokens service not initialized")
@@ -5126,4 +5132,43 @@ func (m *Messenger) SetCommunitySignerPubKey(ctx context.Context, communityID []
 	}
 
 	return transactionHash, nil
+}
+
+func (m *Messenger) createResponseWithACNotification(communityID string, acType ActivityCenterType) (*MessengerResponse, error) {
+	// Activity center notification
+	notification := &ActivityCenterNotification{
+		ID:          types.FromHex(uuid.New().String()),
+		Type:        acType,
+		Timestamp:   m.getTimesource().GetCurrentTime(),
+		CommunityID: communityID,
+		Read:        false,
+		Deleted:     false,
+		UpdatedAt:   m.getCurrentTimeInMillis(),
+	}
+
+	response := &MessengerResponse{}
+
+	err := m.addActivityCenterNotification(response, notification)
+	if err != nil {
+		m.logger.Error("failed to save notification", zap.Error(err))
+		return response, err
+	}
+
+	return response, nil
+}
+
+func (m *Messenger) RegisterOwnerTokenReceivedNotification(communityID string) (*MessengerResponse, error) {
+	return m.createResponseWithACNotification(communityID, ActivityCenterNotificationTypeOwnerTokenReceived)
+}
+
+func (m *Messenger) RegisterSetSignerSuccessNotification(communityID string) (*MessengerResponse, error) {
+	return m.createResponseWithACNotification(communityID, ActivityCenterNotificationTypeSetSignerSuccess)
+}
+
+func (m *Messenger) RegisterSetSignerFailedNotification(communityID string) (*MessengerResponse, error) {
+	return m.createResponseWithACNotification(communityID, ActivityCenterNotificationTypeSetSignerFailed)
+}
+
+func (m *Messenger) RegisterSetSignerDeclinedNotification(communityID string) (*MessengerResponse, error) {
+	return m.createResponseWithACNotification(communityID, ActivityCenterNotificationTypeSetSignerDeclined)
 }
