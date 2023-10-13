@@ -1,4 +1,4 @@
-package unfurlers
+package protocol
 
 import (
 	"bytes"
@@ -76,7 +76,7 @@ func isSupportedImage(payload []byte) bool {
 	return images.IsJpeg(payload) || images.IsPng(payload) || images.IsWebp(payload)
 }
 
-func (u *ImageUnfurler) Unfurl() (common.LinkPreview, error) {
+func (u *ImageUnfurler) Unfurl() (*common.LinkPreview, error) {
 	preview := newDefaultLinkPreview(u.url)
 	preview.Type = protobuf.UnfurledLink_IMAGE
 

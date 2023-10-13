@@ -13,9 +13,11 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/linkpreview/unfurlers"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 )
 
 func TestMessengerLinkPreviews(t *testing.T) {
@@ -25,21 +27,6 @@ func TestMessengerLinkPreviews(t *testing.T) {
 type MessengerLinkPreviewsTestSuite struct {
 	MessengerBaseTestSuite
 }
-
-//func (s *MessengerLinkPreviewsTestSuite) SetupTest() {
-//	s.logger = tt.MustCreateTestLogger()
-//
-//	c := waku.DefaultConfig
-//	c.MinimumAcceptedPoW = 0
-//	shh := waku.New(&c, s.logger)
-//	s.shh = gethbridge.NewGethWakuWrapper(shh)
-//	s.Require().NoError(shh.Start())
-//
-//	s.m = s.newMessenger()
-//	s.privateKey = s.m.identity
-//	_, err := s.m.Start()
-//	s.Require().NoError(err)
-//}
 
 // StubMatcher should either return an http.Response or nil in case the request
 // doesn't match.
@@ -229,10 +216,11 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_YouTube() {
 	transport.AddURLMatcher(thumbnailURL, s.readAsset("1.jpg"), nil)
 	stubbedClient := http.Client{Transport: &transport}
 
-	previews, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
+	response, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
 	s.Require().NoError(err)
-	s.Require().Len(previews, 1)
-	preview := previews[0]
+	s.Require().Len(response.StatusLinkPreviews, 0)
+	s.Require().Len(response.LinkPreviews, 1)
+	preview := response.LinkPreviews[0]
 
 	s.Require().Equal(expected.Type, preview.Type)
 	s.Require().Equal(expected.URL, preview.URL)
@@ -273,10 +261,11 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Reddit() {
 	)
 	stubbedClient := http.Client{Transport: &transport}
 
-	previews, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
+	response, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
 	s.Require().NoError(err)
-	s.Require().Len(previews, 1)
-	preview := previews[0]
+	s.Require().Len(response.StatusLinkPreviews, 0)
+	s.Require().Len(response.LinkPreviews, 1)
+	preview := response.LinkPreviews[0]
 
 	s.Require().Equal(expected.Type, preview.Type)
 	s.Require().Equal(expected.URL, preview.URL)
@@ -288,9 +277,10 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Reddit() {
 
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Timeout() {
 	httpClient := http.Client{Timeout: time.Nanosecond}
-	previews, err := s.m.UnfurlURLs(&httpClient, []string{"https://status.im"})
+	response, err := s.m.UnfurlURLs(&httpClient, []string{"https://status.im"})
 	s.Require().NoError(err)
-	s.Require().Empty(previews)
+	s.Require().Len(response.StatusLinkPreviews, 0)
+	s.Require().Empty(response.LinkPreviews)
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_CommonFailures() {
@@ -304,19 +294,22 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_CommonFailures() {
 		nil,
 	)
 	stubbedClient := http.Client{Transport: &transport}
-	previews, err := s.m.UnfurlURLs(&stubbedClient, []string{"https://wikipedia.org"})
+	response, err := s.m.UnfurlURLs(&stubbedClient, []string{"https://wikipedia.org"})
 	s.Require().NoError(err)
-	s.Require().Empty(previews)
+	s.Require().Len(response.StatusLinkPreviews, 0)
+	s.Require().Empty(response.LinkPreviews)
 
 	// Test 404.
-	previews, err = s.m.UnfurlURLs(&httpClient, []string{"https://github.com/status-im/i_do_not_exist"})
+	response, err = s.m.UnfurlURLs(&httpClient, []string{"https://github.com/status-im/i_do_not_exist"})
 	s.Require().NoError(err)
-	s.Require().Empty(previews)
+	s.Require().Len(response.StatusLinkPreviews, 0)
+	s.Require().Empty(response.LinkPreviews)
 
 	// Test no response when trying to get OpenGraph metadata.
-	previews, err = s.m.UnfurlURLs(&httpClient, []string{"https://wikipedia.o"})
+	response, err = s.m.UnfurlURLs(&httpClient, []string{"https://wikipedia.o"})
 	s.Require().NoError(err)
-	s.Require().Empty(previews)
+	s.Require().Len(response.StatusLinkPreviews, 0)
+	s.Require().Empty(response.LinkPreviews)
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_isSupportedImageURL() {
@@ -339,7 +332,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_isSupportedImageURL() {
 	for _, e := range examples {
 		parsedURL, err := url.Parse(e.url)
 		s.Require().NoError(err, e)
-		s.Require().Equal(e.expected, unfurlers.IsSupportedImageURL(parsedURL), e.url)
+		s.Require().Equal(e.expected, IsSupportedImageURL(parsedURL), e.url)
 	}
 }
 
@@ -363,10 +356,11 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Image() {
 	transport.AddURLMatcher(u, s.readAsset("IMG_1205.HEIC.jpg"), nil)
 	stubbedClient := http.Client{Transport: &transport}
 
-	previews, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
+	response, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
 	s.Require().NoError(err)
-	s.Require().Len(previews, 1)
-	preview := previews[0]
+	s.Require().Len(response.StatusLinkPreviews, 0)
+	s.Require().Len(response.LinkPreviews, 1)
+	preview := response.LinkPreviews[0]
 
 	s.Require().Equal(expected.Type, preview.Type)
 	s.Require().Equal(expected.URL, preview.URL)
@@ -377,4 +371,139 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Image() {
 	s.Require().Equal(expected.Thumbnail.Height, preview.Thumbnail.Height)
 	s.Require().Equal(expected.Thumbnail.URL, preview.Thumbnail.URL)
 	s.assertContainsLongString(expected.Thumbnail.DataURI, preview.Thumbnail.DataURI, 100)
+}
+
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
+	identity, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	c, err := BuildContactFromPublicKey(&identity.PublicKey)
+	s.Require().NoError(err)
+	s.Require().NotNil(c)
+
+	pubkey, err := c.PublicKey()
+	s.Require().NoError(err)
+
+	shortKey, err := s.m.SerializePublicKey(crypto.CompressPubkey(pubkey))
+	s.Require().NoError(err)
+
+	payload, err := images.GetPayloadFromURI("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixA" +
+		"AAAiklEQVR4nOzWwQmFQAwG4ffEXmzLIizDImzLarQBhSwSGH7mO+9hh0DI9AthCI0hNIbQGEJjCI0hNIbQxITM1YfHfl69X3m2bsu/8i5mI" +
+		"obQGEJjCI0hNIbQlG+tUW83UtfNFjMRQ2gMofm8tUa3U9c2i5mIITSGqEnMRAyhMYTGEBpDaO4AAAD//5POEGncqtj1AAAAAElFTkSuQmCC")
+	s.Require().NoError(err)
+
+	icon := images.IdentityImage{
+		Width:   50,
+		Height:  50,
+		Payload: payload,
+	}
+
+	c.Bio = "TestBio_1"
+	c.DisplayName = "TestDisplayName_2"
+	c.Images = map[string]images.IdentityImage{}
+	c.Images[images.SmallDimName] = icon
+	s.m.allContacts.Store(c.ID, c)
+
+	// Generate a shared URL
+	u, err := s.m.ShareUserURLWithData(c.ID)
+	s.Require().NoError(err)
+
+	// Update contact info locally after creating the shared URL
+	// This is required to test that URL-decoded data is not used in the preview.
+	c.Bio = "TestBio_2"
+	c.DisplayName = "TestDisplayName_2"
+	s.m.allContacts.Store(c.ID, c)
+
+	r, err := s.m.UnfurlURLs(nil, []string{u})
+	s.Require().NoError(err)
+	s.Require().Len(r.StatusLinkPreviews, 1)
+	s.Require().Len(r.LinkPreviews, 0)
+
+	preview := r.StatusLinkPreviews[0]
+	s.Require().Equal(u, preview.URL)
+	s.Require().Nil(preview.Community)
+	s.Require().Nil(preview.Channel)
+	s.Require().NotNil(preview.Contact)
+	s.Require().Equal(shortKey, preview.Contact.PublicKey)
+	s.Require().Equal(c.DisplayName, preview.Contact.DisplayName)
+	s.Require().Equal(c.Bio, preview.Contact.Description)
+	s.Require().Equal(icon.Width, preview.Contact.Icon.Width)
+	s.Require().Equal(icon.Height, preview.Contact.Icon.Height)
+	s.Require().Equal("", preview.Contact.Icon.URL)
+
+	expectedDataURI, err := images.GetPayloadDataURI(icon.Payload)
+	s.Require().NoError(err)
+	s.Require().Equal(expectedDataURI, preview.Contact.Icon.DataURI)
+}
+
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined() {
+
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:        "status",
+		Description: "status community description",
+		Color:       "#123456",
+		Image:       "../_assets/tests/status.png", // 256*256 px
+		ImageAx:     0,
+		ImageAy:     0,
+		ImageBx:     256,
+		ImageBy:     256,
+		Banner: images.CroppedImage{
+			ImagePath: "../_assets/tests/IMG_1205.HEIC.jpg", // 2282*3352 px
+			X:         0,
+			Y:         0,
+			Width:     160,
+			Height:    90,
+		},
+	}
+
+	response, err := s.m.CreateCommunity(description, false)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	community := response.Communities()[0]
+	communityImages := community.Images()
+	s.Require().Len(communityImages, 3)
+
+	// Get icon data
+	icon, ok := communityImages[images.SmallDimName]
+	s.Require().True(ok)
+	iconWidth, iconHeight, err := images.GetImageDimensions(icon.Payload)
+	s.Require().NoError(err)
+	iconDataURI, err := images.GetPayloadDataURI(icon.Payload)
+	s.Require().NoError(err)
+
+	// Get banner data
+	banner, ok := communityImages[images.BannerIdentityName]
+	s.Require().True(ok)
+	bannerWidth, bannerHeight, err := images.GetImageDimensions(banner.Payload)
+	s.Require().NoError(err)
+	bannerDataURI, err := images.GetPayloadDataURI(banner.Payload)
+	s.Require().NoError(err)
+
+	// Create shared URL
+	u, err := s.m.ShareCommunityURLWithData(community.ID())
+	s.Require().NoError(err)
+
+	// Unfurl community shared URL
+	r, err := s.m.UnfurlURLs(nil, []string{u})
+	s.Require().NoError(err)
+	s.Require().Len(r.StatusLinkPreviews, 1)
+	s.Require().Len(r.LinkPreviews, 0)
+
+	preview := r.StatusLinkPreviews[0]
+	s.Require().Equal(u, preview.URL)
+	s.Require().NotNil(preview.Community)
+	s.Require().Nil(preview.Channel)
+	s.Require().Nil(preview.Contact)
+
+	s.Require().Equal(community.IDString(), preview.Community.CommunityID)
+	s.Require().Equal(community.Name(), preview.Community.DisplayName)
+	s.Require().Equal(community.Identity().Description, preview.Community.Description)
+	s.Require().Equal(iconWidth, preview.Community.Icon.Width)
+	s.Require().Equal(iconHeight, preview.Community.Icon.Height)
+	s.Require().Equal(iconDataURI, preview.Community.Icon.DataURI)
+	s.Require().Equal(bannerWidth, preview.Community.Banner.Width)
+	s.Require().Equal(bannerHeight, preview.Community.Banner.Height)
+	s.Require().Equal(bannerDataURI, preview.Community.Banner.DataURI)
 }

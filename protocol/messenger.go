@@ -2299,6 +2299,13 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		message.UnfurledLinks = unfurledLinks
 	}
 
+	unfurledStatusLinks, err := message.ConvertStatusLinkPreviewsToProto()
+	if err != nil {
+		m.logger.Error("failed to convert status link previews", zap.Error(err))
+	} else {
+		message.UnfurledStatusLinks = unfurledStatusLinks
+	}
+
 	var response MessengerResponse
 
 	// A valid added chat is required.
@@ -4057,6 +4064,7 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 	}
 
 	msg.LinkPreviews = msg.ConvertFromProtoToLinkPreviews(s.MakeLinkPreviewThumbnailURL)
+	msg.StatusLinkPreviews = msg.ConvertFromProtoToStatusLinkPreviews(s.MakeStatusLinkPreviewThumbnailURL)
 }
 
 func (m *Messenger) AllMessageByChatIDWhichMatchTerm(chatID string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {

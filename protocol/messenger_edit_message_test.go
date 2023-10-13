@@ -498,13 +498,30 @@ func (s *MessengerEditMessageSuite) TestEditMessageWithLinkPreviews() {
 					DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
 				}},
 		},
+		StatusLinkPreviews: []common.StatusLinkPreview{
+			{
+				URL: "https://status.app/u/TestUrl",
+				Contact: &common.StatusContactLinkPreview{
+					PublicKey:   "TestPublicKey",
+					DisplayName: "TestDisplayName",
+					Description: "Test description",
+					Icon: common.LinkPreviewThumbnail{
+						Width:   100,
+						Height:  200,
+						DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+					},
+				},
+			},
+		},
 	}
 
 	sendResponse, err = theirMessenger.EditMessage(context.Background(), editedMessage)
 
 	s.Require().NoError(err)
 	s.Require().Len(sendResponse.Messages(), 1)
-	s.Require().NotEmpty(sendResponse.Messages()[0].LinkPreviews)
+	s.Require().Len(sendResponse.Messages()[0].LinkPreviews, 1)
+	s.Require().NotNil(sendResponse.Messages()[0].UnfurledStatusLinks)
+	s.Require().Len(sendResponse.Messages()[0].UnfurledStatusLinks.UnfurledStatusLinks, 1)
 	response, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool { return len(r.messages) == 1 },
@@ -514,7 +531,11 @@ func (s *MessengerEditMessageSuite) TestEditMessageWithLinkPreviews() {
 
 	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages(), 1)
-	s.Require().NotEmpty(response.Messages()[0].EditedAt)
-	s.Require().NotEmpty(response.Messages()[0].UnfurledLinks)
-	s.Require().False(response.Messages()[0].New)
+
+	responseMessage := response.Messages()[0]
+	s.Require().NotEmpty(responseMessage.EditedAt)
+	s.Require().Len(responseMessage.UnfurledLinks, 1)
+	s.Require().NotNil(responseMessage.UnfurledStatusLinks)
+	s.Require().Len(responseMessage.UnfurledStatusLinks.UnfurledStatusLinks, 1)
+	s.Require().False(responseMessage.New)
 }

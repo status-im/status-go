@@ -55,6 +55,9 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 		if len(request.LinkPreviews) > 0 {
 			message.LinkPreviews = request.LinkPreviews
 		}
+		if len(request.StatusLinkPreviews) > 0 {
+			message.StatusLinkPreviews = request.StatusLinkPreviews
+		}
 
 		clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
@@ -65,11 +68,18 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 		editMessage.ChatId = message.ChatId
 		editMessage.MessageId = message.ID
 		editMessage.Clock = clock
+
 		unfurledLinks, err := message.ConvertLinkPreviewsToProto()
 		if err != nil {
 			return nil, err
 		}
 		editMessage.UnfurledLinks = unfurledLinks
+
+		unfurledStatusLinks, err := message.ConvertStatusLinkPreviewsToProto()
+		if err != nil {
+			return nil, err
+		}
+		editMessage.UnfurledStatusLinks = unfurledStatusLinks
 
 		err = m.applyEditMessage(editMessage.EditMessage, message)
 		if err != nil {
@@ -346,6 +356,7 @@ func (m *Messenger) applyEditMessage(editMessage *protobuf.EditMessage, message 
 	message.Text = editMessage.Text
 	message.EditedAt = editMessage.Clock
 	message.UnfurledLinks = editMessage.UnfurledLinks
+	message.UnfurledStatusLinks = editMessage.UnfurledStatusLinks
 	if editMessage.ContentType != protobuf.ChatMessage_UNKNOWN_CONTENT_TYPE {
 		message.ContentType = editMessage.ContentType
 	}
@@ -360,6 +371,7 @@ func (m *Messenger) applyEditMessage(editMessage *protobuf.EditMessage, message 
 		originalEdit.ContentType = message.ContentType
 		originalEdit.From = message.From
 		originalEdit.UnfurledLinks = message.UnfurledLinks
+		originalEdit.UnfurledStatusLinks = message.UnfurledStatusLinks
 		err := m.persistence.SaveEdit(originalEdit)
 		if err != nil {
 			return err

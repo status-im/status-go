@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/lib/pq"
 
 	"github.com/status-im/status-go/protocol/common"
@@ -83,6 +84,7 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		mentions,
 		links,
 		unfurled_links,
+		unfurled_status_links,
 		command_id,
 		command_value,
 		command_from,
@@ -136,6 +138,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.mentions,
 		m1.links,
 		m1.unfurled_links,
+		m1.unfurled_status_links,
 		m1.command_id,
 		m1.command_value,
 		m1.command_from,
@@ -215,6 +218,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var serializedMentions []byte
 	var serializedLinks []byte
 	var serializedUnfurledLinks []byte
+	var serializedUnfurledStatusLinks []byte
 	var alias sql.NullString
 	var identicon sql.NullString
 	var communityID sql.NullString
@@ -271,6 +275,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&serializedMentions,
 		&serializedLinks,
 		&serializedUnfurledLinks,
+		&serializedUnfurledStatusLinks,
 		&command.ID,
 		&command.Value,
 		&command.From,
@@ -414,6 +419,16 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		}
 	}
 
+	if serializedUnfurledStatusLinks != nil {
+		// use proto.Marshal, because json.Marshal doesn't support `oneof` fields
+		var links protobuf.UnfurledStatusLinks
+		err = proto.Unmarshal(serializedUnfurledStatusLinks, &links)
+		if err != nil {
+			return err
+		}
+		message.UnfurledStatusLinks = &links
+	}
+
 	if attachment.Id != "" {
 		discordMessage.Attachments = append(discordMessage.Attachments, attachment)
 	}
@@ -502,6 +517,15 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		}
 	}
 
+	var serializedUnfurledStatusLinks []byte
+	if links := message.GetUnfurledStatusLinks(); links != nil {
+		// use proto.Marshal, because json.Marshal doesn't support `oneof` fields
+		serializedUnfurledStatusLinks, err = proto.Marshal(links)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return []interface{}{
 		message.ID,
 		message.WhisperTimestamp,
@@ -534,6 +558,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		serializedMentions,
 		serializedLinks,
 		serializedUnfurledLinks,
+		serializedUnfurledStatusLinks,
 		command.ID,
 		command.Value,
 		command.From,
@@ -2465,12 +2490,12 @@ func (db sqlitePersistence) SaveEdit(editMessage *EditMessage) error {
 		return nil
 	}
 
-	_, err := db.db.Exec(`INSERT INTO user_messages_edits (clock, chat_id, message_id, text, source, id, unfurled_links) VALUES(?,?,?,?,?,?,?)`, editMessage.Clock, editMessage.ChatId, editMessage.MessageId, editMessage.Text, editMessage.From, editMessage.ID, pq.Array(editMessage.UnfurledLinks))
+	_, err := db.db.Exec(`INSERT INTO user_messages_edits (clock, chat_id, message_id, text, source, id, unfurled_links, unfurled_status_links) VALUES(?,?,?,?,?,?,?,?)`, editMessage.Clock, editMessage.ChatId, editMessage.MessageId, editMessage.Text, editMessage.From, editMessage.ID, pq.Array(editMessage.UnfurledLinks), editMessage.UnfurledStatusLinks)
 	return err
 }
 
 func (db sqlitePersistence) GetEdits(messageID string, from string) ([]*EditMessage, error) {
-	rows, err := db.db.Query(`SELECT clock, chat_id, message_id, source, text, id, unfurled_links FROM user_messages_edits WHERE message_id = ? AND source = ? ORDER BY CLOCK DESC`, messageID, from)
+	rows, err := db.db.Query(`SELECT clock, chat_id, message_id, source, text, id, unfurled_links, unfurled_status_links FROM user_messages_edits WHERE message_id = ? AND source = ? ORDER BY CLOCK DESC`, messageID, from)
 	if err != nil {
 		return nil, err
 	}
@@ -2479,7 +2504,7 @@ func (db sqlitePersistence) GetEdits(messageID string, from string) ([]*EditMess
 	var messages []*EditMessage
 	for rows.Next() {
 		e := NewEditMessage()
-		err := rows.Scan(&e.Clock, &e.ChatId, &e.MessageId, &e.From, &e.Text, &e.ID, pq.Array(&e.UnfurledLinks))
+		err := rows.Scan(&e.Clock, &e.ChatId, &e.MessageId, &e.From, &e.Text, &e.ID, pq.Array(&e.UnfurledLinks), &e.UnfurledStatusLinks)
 		if err != nil {
 			return nil, err
 		}

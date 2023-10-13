@@ -1,4 +1,4 @@
-package unfurlers
+package protocol
 
 import (
 	"encoding/json"
@@ -56,7 +56,7 @@ func (u *OEmbedUnfurler) newOEmbedURL() (*neturl.URL, error) {
 	return oembedURL, nil
 }
 
-func (u OEmbedUnfurler) Unfurl() (common.LinkPreview, error) {
+func (u OEmbedUnfurler) Unfurl() (*common.LinkPreview, error) {
 	preview := newDefaultLinkPreview(u.url)
 	preview.Type = protobuf.UnfurledLink_LINK
 

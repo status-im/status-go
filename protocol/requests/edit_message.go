@@ -12,10 +12,11 @@ var ErrEditMessageInvalidID = errors.New("edit-message: invalid id")
 var ErrEditMessageInvalidText = errors.New("edit-message: invalid text")
 
 type EditMessage struct {
-	ID           types.HexBytes                   `json:"id"`
-	Text         string                           `json:"text"`
-	ContentType  protobuf.ChatMessage_ContentType `json:"content-type"`
-	LinkPreviews []common.LinkPreview             `json:"linkPreviews"`
+	ID                 types.HexBytes                   `json:"id"`
+	Text               string                           `json:"text"`
+	ContentType        protobuf.ChatMessage_ContentType `json:"content-type"`
+	LinkPreviews       []common.LinkPreview             `json:"linkPreviews"`
+	StatusLinkPreviews []common.StatusLinkPreview       `json:"statusLinkPreviews"`
 }
 
 func (e *EditMessage) Validate() error {

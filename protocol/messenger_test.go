@@ -2312,6 +2312,21 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	}
 	inputMsg.LinkPreviews = []common.LinkPreview{preview}
 
+	sentContactPreview := common.StatusLinkPreview{
+		URL: "https://status.app/u/TestUrl",
+		Contact: &common.StatusContactLinkPreview{
+			PublicKey:   "TestPublicKey",
+			DisplayName: "TestDisplayName",
+			Description: "Test description",
+			Icon: common.LinkPreviewThumbnail{
+				Width:   100,
+				Height:  200,
+				DataURI: "data:image/png;base64,iVBORw0KGgoAAAANSUg=",
+			},
+		},
+	}
+	inputMsg.StatusLinkPreviews = []common.StatusLinkPreview{sentContactPreview}
+
 	_, err = s.m.SendChatMessage(context.Background(), inputMsg)
 	s.NoError(err)
 
@@ -2322,14 +2337,14 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 
 	// Test unfurled links have been saved.
 	s.Require().Len(savedMsg.UnfurledLinks, 1)
-	unfurledLink := savedMsg.UnfurledLinks[0]
-	s.Require().Equal(preview.Type, unfurledLink.Type)
-	s.Require().Equal(preview.URL, unfurledLink.Url)
-	s.Require().Equal(preview.Title, unfurledLink.Title)
-	s.Require().Equal(preview.Description, unfurledLink.Description)
+	savedLinkProto := savedMsg.UnfurledLinks[0]
+	s.Require().Equal(preview.Type, savedLinkProto.Type)
+	s.Require().Equal(preview.URL, savedLinkProto.Url)
+	s.Require().Equal(preview.Title, savedLinkProto.Title)
+	s.Require().Equal(preview.Description, savedLinkProto.Description)
 
 	// Test the saved link thumbnail can be encoded as a data URI.
-	expectedDataURI, err := images.GetPayloadDataURI(unfurledLink.ThumbnailPayload)
+	expectedDataURI, err := images.GetPayloadDataURI(savedLinkProto.ThumbnailPayload)
 	s.Require().NoError(err)
 	s.Require().Equal(preview.Thumbnail.DataURI, expectedDataURI)
 
@@ -2337,6 +2352,43 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 		httpServer.MakeLinkPreviewThumbnailURL(inputMsg.ID, preview.URL),
 		savedMsg.LinkPreviews[0].Thumbnail.URL,
 	)
+
+	// Check saved message protobuf fields
+	s.Require().NotNil(savedMsg.UnfurledStatusLinks)
+	s.Require().Len(savedMsg.UnfurledStatusLinks.UnfurledStatusLinks, 1)
+	savedStatusLinkProto := savedMsg.UnfurledStatusLinks.UnfurledStatusLinks[0]
+	s.Require().Equal(sentContactPreview.URL, savedStatusLinkProto.Url)
+	s.Require().NotNil(savedStatusLinkProto.GetContact())
+	s.Require().Nil(savedStatusLinkProto.GetCommunity())
+	s.Require().Nil(savedStatusLinkProto.GetChannel())
+
+	savedContactProto := savedStatusLinkProto.GetContact()
+	s.Require().Equal(sentContactPreview.Contact.PublicKey, string(savedContactProto.PublicKey))
+	s.Require().Equal(sentContactPreview.Contact.DisplayName, savedContactProto.DisplayName)
+	s.Require().Equal(sentContactPreview.Contact.Description, savedContactProto.Description)
+	s.Require().NotNil(savedContactProto.Icon)
+	s.Require().Equal(sentContactPreview.Contact.Icon.Width, int(savedContactProto.Icon.Width))
+	s.Require().Equal(sentContactPreview.Contact.Icon.Height, int(savedContactProto.Icon.Height))
+
+	iconDataURI, err := images.GetPayloadDataURI(savedContactProto.Icon.Payload)
+	s.Require().NoError(err)
+	s.Require().Equal(sentContactPreview.Contact.Icon.DataURI, iconDataURI)
+
+	// Check message `StatusLinkPreviews` properties
+	s.Require().Len(savedMsg.StatusLinkPreviews, 1)
+	savedStatusLinkPreview := savedMsg.StatusLinkPreviews[0]
+	s.Require().Equal(sentContactPreview.URL, savedStatusLinkPreview.URL)
+	s.Require().NotNil(savedStatusLinkPreview.Contact)
+
+	savedContact := savedStatusLinkPreview.Contact
+	s.Require().Equal(sentContactPreview.Contact.PublicKey, savedContact.PublicKey)
+	s.Require().Equal(sentContactPreview.Contact.DisplayName, savedContact.DisplayName)
+	s.Require().Equal(sentContactPreview.Contact.Description, savedContact.Description)
+	s.Require().NotNil(savedContact.Icon)
+	s.Require().Equal(sentContactPreview.Contact.Icon.Width, savedContact.Icon.Width)
+	s.Require().Equal(sentContactPreview.Contact.Icon.Height, savedContact.Icon.Height)
+	expectedIconURL := httpServer.MakeStatusLinkPreviewThumbnailURL(inputMsg.ID, sentContactPreview.URL, "contact-icon")
+	s.Require().Equal(expectedIconURL, savedContact.Icon.URL)
 }
 
 func (s *MessengerSuite) TestMessageSent() {

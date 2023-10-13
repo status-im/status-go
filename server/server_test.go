@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/server/servertest"
 )
 
@@ -114,6 +115,16 @@ func (s *ServerURLSuite) TestServer_MakeLinkPreviewThumbnailURL() {
 	s.testNoPort(
 		baseURLWithDefaultPort+"/link-preview/thumbnail?message-id=99&url=https%3A%2F%2Fgithub.com",
 		s.serverNoPort.MakeLinkPreviewThumbnailURL("99", "https://github.com"))
+}
+
+func (s *ServerURLSuite) TestServer_MakeStatusLinkPreviewThumbnailURL() {
+	s.Require().Equal(
+		baseURLWithCustomPort+"/status-link-preview/thumbnail?image-id=contact-icon&message-id=99&url=https%3A%2F%2Fstatus.app",
+		s.server.MakeStatusLinkPreviewThumbnailURL("99", "https://status.app", common.MediaServerContactIcon))
+
+	s.testNoPort(
+		baseURLWithDefaultPort+"/status-link-preview/thumbnail?image-id=contact-icon&message-id=99&url=https%3A%2F%2Fstatus.app",
+		s.serverNoPort.MakeStatusLinkPreviewThumbnailURL("99", "https://status.app", common.MediaServerContactIcon))
 }
 
 func (s *ServerURLSuite) TestServer_MakeAudioURL() {
