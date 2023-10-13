@@ -830,19 +830,14 @@ func (api *API) validateBurnAmount(ctx context.Context, burnAmount *bigint.BigIn
 	return nil
 }
 
-func (api *API) estimateMethod(ctx context.Context, chainID uint64, contractAddress string, fromAddress string, methodName string, args ...interface{}) (uint64, error) {
+func (api *API) estimateMethodForTokenInstance(ctx context.Context, contractInstance TokenInstance, chainID uint64, contractAddress string, fromAddress string, methodName string, args ...interface{}) (uint64, error) {
 	ethClient, err := api.s.manager.rpcClient.EthClient(chainID)
 	if err != nil {
 		log.Error(err.Error())
 		return 0, err
 	}
 
-	contractInst, err := NewTokenInstance(api, chainID, contractAddress)
-	if err != nil {
-		return 0, err
-	}
-
-	data, err := contractInst.PackMethod(ctx, methodName, args...)
+	data, err := contractInstance.PackMethod(ctx, methodName, args...)
 
 	if err != nil {
 		return 0, err
@@ -862,6 +857,14 @@ func (api *API) estimateMethod(ctx context.Context, chainID uint64, contractAddr
 		return 0, err
 	}
 	return estimate + uint64(float32(estimate)*0.1), nil
+}
+
+func (api *API) estimateMethod(ctx context.Context, chainID uint64, contractAddress string, fromAddress string, methodName string, args ...interface{}) (uint64, error) {
+	contractInst, err := NewTokenInstance(api, chainID, contractAddress)
+	if err != nil {
+		return 0, err
+	}
+	return api.estimateMethodForTokenInstance(ctx, contractInst, chainID, contractAddress, fromAddress, methodName, args...)
 }
 
 // Gets signer public key from smart contract with a given chainId and address
@@ -887,5 +890,25 @@ func (api *API) EstimateSetSignerPubKey(ctx context.Context, chainID uint64, con
 	if len(newSignerPubKey) <= 0 {
 		return 0, fmt.Errorf("signerPubKey is empty")
 	}
-	return api.estimateMethod(ctx, chainID, contractAddress, fromAddress, "setSignerPublicKey", newSignerPubKey)
+
+	contractInst, err := api.NewOwnerTokenInstance(chainID, contractAddress)
+	if err != nil {
+		return 0, err
+	}
+	ownerTokenInstance := &OwnerTokenInstance{instance: contractInst}
+
+	return api.estimateMethodForTokenInstance(ctx, ownerTokenInstance, chainID, contractAddress, fromAddress, "setSignerPublicKey", common.FromHex(newSignerPubKey))
+}
+
+func (api *API) OwnerTokenOwnerAddress(ctx context.Context, chainID uint64, contractAddress string) (string, error) {
+	callOpts := &bind.CallOpts{Context: ctx, Pending: false}
+	contractInst, err := api.NewOwnerTokenInstance(chainID, contractAddress)
+	if err != nil {
+		return "", err
+	}
+	ownerAddress, err := contractInst.OwnerOf(callOpts, big.NewInt(0))
+	if err != nil {
+		return "", err
+	}
+	return ownerAddress.Hex(), nil
 }

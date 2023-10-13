@@ -1631,6 +1631,36 @@ func (api *PublicAPI) GetProfileShowcasePreferences() (*protocol.ProfileShowcase
 	return api.service.messenger.GetProfileShowcasePreferences()
 }
 
+// Returns response with AC notification when owner token is received
+func (api *PublicAPI) RegisterOwnerTokenReceivedNotification(communityID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeOwnerTokenReceived, false)
+}
+
+// Returns response with AC notification when setting signer is successful
+func (api *PublicAPI) RegisterReceivedOwnershipNotification(communityID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeOwnershipReceived, false)
+}
+
+// Returns response with AC notification when setting signer is failed
+func (api *PublicAPI) RegisterSetSignerFailedNotification(communityID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeSetSignerFailed, false)
+}
+
+// Returns response with AC notification when setting signer is declined
+func (api *PublicAPI) RegisterSetSignerDeclinedNotification(communityID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeSetSignerDeclined, true)
+}
+
+// Returns response with AC notification when ownership is lost
+func (api *PublicAPI) RegisterLostOwnershipNotification(communityID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeOwnershipLost, false)
+}
+
+func (api *PublicAPI) PromoteSelfToControlMode(communityID string) error {
+	_, err := api.service.messenger.PromoteSelfToControlNode([]byte(communityID))
+	return err
+}
+
 // -----
 // HELPER
 // -----
