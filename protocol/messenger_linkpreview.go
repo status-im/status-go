@@ -9,8 +9,6 @@ import (
 	"strings"
 
 	"github.com/status-im/markdown"
-	"github.com/status-im/status-go/multiaccounts/settings"
-
 	"go.uber.org/zap"
 	"golang.org/x/net/publicsuffix"
 

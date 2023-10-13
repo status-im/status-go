@@ -32,7 +32,7 @@ message SyncSetting {
     BIO = 14;
     MNEMONIC_REMOVED = 15;
     reserved 16;
-    reserved "ENS_USERNAMES"
+    reserved "ENS_USERNAMES";
     reserved 17;
     reserved "INCLUDE_WATCHONLY_ACCOUNT";
     URL_UNFURLING_MODE = 18;
