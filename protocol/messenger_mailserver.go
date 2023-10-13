@@ -75,7 +75,7 @@ func (m *Messenger) scheduleSyncChat(chat *Chat) (bool, error) {
 
 	go func() {
 		_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
-			response, err := m.syncChat(chat.ID)
+			response, err := m.syncChatWithFilters(chat.ID)
 
 			if err != nil {
 				m.logger.Error("failed to sync chat", zap.Error(err))
@@ -234,8 +234,7 @@ func (m *Messenger) topicsForChat(chatID string) (string, []types.TopicType, err
 	return filters[0].PubsubTopic, contentTopics, nil
 }
 
-// Assume is a public chat for now
-func (m *Messenger) syncChat(chatID string) (*MessengerResponse, error) {
+func (m *Messenger) syncChatWithFilters(chatID string) (*MessengerResponse, error) {
 	filters, err := m.filtersForChat(chatID)
 	if err != nil {
 		return nil, err

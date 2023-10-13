@@ -55,9 +55,6 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
            case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_ACCOUNT:
 		return m.handleSyncInstallationAccountProtobuf(messageState, protoBytes, msg, filter)
         
-           case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_PUBLIC_CHAT:
-		return m.handleSyncInstallationPublicChatProtobuf(messageState, protoBytes, msg, filter)
-        
            case protobuf.ApplicationMetadataMessage_CONTACT_CODE_ADVERTISEMENT:
 		return m.handleContactCodeAdvertisementProtobuf(messageState, protoBytes, msg, filter)
         
@@ -228,6 +225,9 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
         
            case protobuf.ApplicationMetadataMessage_COMMUNITY_SHARD_KEY:
 		return m.handleCommunityShardKeyProtobuf(messageState, protoBytes, msg, filter)
+        
+           case protobuf.ApplicationMetadataMessage_SYNC_CHAT:
+		return m.handleSyncChatProtobuf(messageState, protoBytes, msg, filter)
         
 	default:
 		m.logger.Info("protobuf type not found", zap.String("type", string(msg.Type)))
@@ -464,29 +464,6 @@ func (m *Messenger) handleSyncInstallationAccountProtobuf(messageState *Received
 	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncInstallationAccount(messageState, p, msg)
-	
-}
-
-
-func (m *Messenger) handleSyncInstallationPublicChatProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
-	m.logger.Info("handling SyncInstallationPublicChat")
-	
-	if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-		m.logger.Warn("not coming from us, ignoring")
-		return nil
-	}
-	
-
-	
-	p := &protobuf.SyncInstallationPublicChat{}
-	err := proto.Unmarshal(protoBytes, p)
-	if err != nil {
-		return err
-	}
-
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
-
-	return m.HandleSyncInstallationPublicChat(messageState, p, msg)
 	
 }
 
@@ -1625,6 +1602,29 @@ func (m *Messenger) handleCommunityShardKeyProtobuf(messageState *ReceivedMessag
 	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleCommunityShardKey(messageState, p, msg)
+	
+}
+
+
+func (m *Messenger) handleSyncChatProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
+	m.logger.Info("handling SyncChat")
+	
+	if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+		m.logger.Warn("not coming from us, ignoring")
+		return nil
+	}
+	
+
+	
+	p := &protobuf.SyncChat{}
+	err := proto.Unmarshal(protoBytes, p)
+	if err != nil {
+		return err
+	}
+
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
+
+	return m.HandleSyncChat(messageState, p, msg)
 	
 }
 

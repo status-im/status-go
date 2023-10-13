@@ -275,6 +275,11 @@ func (c *Chat) IsActivePersonalChat() bool {
 	return c.Active && (c.OneToOne() || c.PrivateGroupChat() || c.Public()) && c.CommunityID == ""
 }
 
+func (c *Chat) shouldBeSynced() bool {
+	isPublicChat := !c.Timeline() && !c.ProfileUpdates() && c.Public()
+	return isPublicChat || c.OneToOne() || c.PrivateGroupChat()
+}
+
 func (c *Chat) CommunityChatID() string {
 	if c.ChatType != ChatTypeCommunityChat {
 		return c.ID

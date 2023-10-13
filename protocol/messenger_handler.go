@@ -525,6 +525,7 @@ func (m *Messenger) handleSyncChats(messageState *ReceivedMessageState, chats []
 					From:       membershipUpdate.From,
 					RawPayload: membershipUpdate.RawPayload,
 					Color:      membershipUpdate.Color,
+					Image:      membershipUpdate.Image,
 				}
 			}
 			group, err := newProtocolGroupFromChat(chat)
@@ -762,7 +763,7 @@ func (m *Messenger) HandleSyncProfilePictures(state *ReceivedMessageState, messa
 	return err
 }
 
-func (m *Messenger) HandleSyncInstallationPublicChat(state *ReceivedMessageState, message *protobuf.SyncInstallationPublicChat, statusMessage *v1protocol.StatusMessage) error {
+func (m *Messenger) HandleSyncChat(state *ReceivedMessageState, message *protobuf.SyncChat, statusMessage *v1protocol.StatusMessage) error {
 	chatID := message.Id
 	existingChat, ok := state.AllChats.Load(chatID)
 	if ok && (existingChat.Active || uint32(message.GetClock()/1000) < existingChat.SyncedTo) {
@@ -771,18 +772,16 @@ func (m *Messenger) HandleSyncInstallationPublicChat(state *ReceivedMessageState
 
 	chat := existingChat
 	if !ok {
-		chat = CreatePublicChat(chatID, state.Timesource)
-		chat.Joined = int64(message.Clock)
-	} else {
-		existingChat.Joined = int64(message.Clock)
+		chats := make([]*protobuf.SyncChat, 1)
+		chats[0] = message
+		return m.handleSyncChats(state, chats)
 	}
-
+	existingChat.Joined = int64(message.Clock)
 	state.AllChats.Store(chat.ID, chat)
 
 	state.Response.AddChat(chat)
-	// We join and re-register as we want to receive mentions from the newly joined public chat
-	_, err := m.createPublicChat(chat.ID, state.Response)
-	return err
+
+	return nil
 }
 
 func (m *Messenger) HandleSyncChatRemoved(state *ReceivedMessageState, message *protobuf.SyncChatRemoved, statusMessage *v1protocol.StatusMessage) error {

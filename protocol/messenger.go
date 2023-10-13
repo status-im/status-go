@@ -2533,50 +2533,19 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		return err
 	}
 
-	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool) {
-		isPublicChat := !chat.Timeline() && !chat.ProfileUpdates() && chat.Public()
-		if isPublicChat && chat.Active {
-			err = m.syncPublicChat(ctx, chat, rawMessageHandler)
-			if err != nil {
-				return false
-			}
+	m.allChats.Range(func(chatID string, chat *Chat) bool {
+		if !chat.shouldBeSynced() {
+			return true
+
 		}
-
-		if (isPublicChat || chat.OneToOne() || chat.PrivateGroupChat()) && !chat.Active && chat.DeletedAtClockValue > 0 {
-			pending, err := m.persistence.HasPendingNotificationsForChat(chat.ID)
-			if err != nil {
-				return false
-			}
-
-			if !pending {
-				err = m.syncChatRemoving(ctx, chatID, rawMessageHandler)
-				if err != nil {
-					return false
-				}
-			}
-		}
-
-		if (isPublicChat || chat.OneToOne() || chat.PrivateGroupChat() || chat.CommunityChat()) && chat.Active {
-			err := m.syncChatMessagesRead(ctx, chatID, chat.ReadMessagesAtClockValue, rawMessageHandler)
-			if err != nil {
-				return false
-			}
-		}
-
-		if isPublicChat && chat.Active && chat.DeletedAtClockValue > 0 {
-			err = m.syncClearHistory(ctx, chat, rawMessageHandler)
-			if err != nil {
-				return false
-			}
-		}
-
-		return true
+		err = m.syncChat(ctx, chat, rawMessageHandler)
+		return err == nil
 	})
 	if err != nil {
 		return err
 	}
 
-	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
+	m.allContacts.Range(func(contactID string, contact *Contact) bool {
 		if contact.ID != myID &&
 			(contact.LocalNickname != "" || contact.added() || contact.Blocked) {
 			if err = m.syncContact(ctx, contact, rawMessageHandler); err != nil {
@@ -2815,17 +2784,45 @@ func (m *Messenger) SendPairInstallation(ctx context.Context, rawMessageHandler 
 	return &response, nil
 }
 
-// syncPublicChat sync a public chat with paired devices
-func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat, rawMessageHandler RawMessageHandler) error {
+// syncChat sync a chat with paired devices
+func (m *Messenger) syncChat(ctx context.Context, chatToSync *Chat, rawMessageHandler RawMessageHandler) error {
 	var err error
 	if !m.hasPairedDevices() {
 		return nil
 	}
 	clock, chat := m.getLastClockWithRelatedChat()
 
-	syncMessage := &protobuf.SyncInstallationPublicChat{
-		Clock: clock,
-		Id:    publicChat.ID,
+	syncMessage := &protobuf.SyncChat{
+		Clock:    clock,
+		Id:       chatToSync.ID,
+		Name:     chatToSync.Name,
+		ChatType: uint32(chatToSync.ChatType),
+		Active:   chatToSync.Active,
+	}
+	chatMuteTill, _ := time.Parse(time.RFC3339, chatToSync.MuteTill.Format(time.RFC3339))
+	if chatToSync.Muted && chatMuteTill.Equal(time.Time{}) {
+		// Only set Muted if it is "permanently" muted
+		syncMessage.Muted = true
+	}
+	if chatToSync.OneToOne() {
+		syncMessage.Name = "" // The Name is useless in 1-1 chats
+	}
+	if chatToSync.PrivateGroupChat() {
+		syncMessage.MembershipUpdateEvents = make([]*protobuf.MembershipUpdateEvents, len(chatToSync.MembershipUpdates))
+		for i, membershipUpdate := range chatToSync.MembershipUpdates {
+			syncMessage.MembershipUpdateEvents[i] = &protobuf.MembershipUpdateEvents{
+				Clock:      membershipUpdate.ClockValue,
+				Type:       uint32(membershipUpdate.Type),
+				Members:    membershipUpdate.Members,
+				Name:       membershipUpdate.Name,
+				Signature:  membershipUpdate.Signature,
+				ChatId:     membershipUpdate.ChatID,
+				From:       membershipUpdate.From,
+				RawPayload: membershipUpdate.RawPayload,
+				Color:      membershipUpdate.Color,
+				Image:      membershipUpdate.Image,
+			}
+		}
 	}
 	encodedMessage, err := proto.Marshal(syncMessage)
 	if err != nil {
@@ -2835,7 +2832,7 @@ func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat, rawMes
 	rawMessage := common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_PUBLIC_CHAT,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_CHAT,
 		ResendAutomatically: true,
 	}
 

@@ -122,11 +122,6 @@ message SyncInstallationAccount {
   uint64 last_updated = 3;
 }
 
-message SyncInstallationPublicChat {
-  uint64 clock = 1;
-  string id = 2;
-}
-
 message SyncInstallationCommunity {
   uint64 clock = 1;
   bytes id = 2;
@@ -174,6 +169,7 @@ message MembershipUpdateEvents {
   string from = 7;
   bytes raw_payload = 8;
   string color = 9;
+  bytes image = 10;
 }
 
 message SyncChatRemoved {
