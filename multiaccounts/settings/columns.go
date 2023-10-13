@@ -432,17 +432,6 @@ var (
 		dBColumnName:   "address",
 		valueHandler:   AddressHandler,
 	}
-	IncludeWatchOnlyAccount = SettingField{
-		reactFieldName: "include-watch-only-account?",
-		dBColumnName:   "include_watch_only_account",
-		valueHandler:   BoolHandler,
-		syncProtobufFactory: &SyncProtobufFactory{
-			fromInterface:     includeWatchOnlyAccountProtobufFactory,
-			fromStruct:        includeWatchOnlyAccountProtobufFactoryStruct,
-			valueFromProtobuf: BoolFromSyncProtobuf,
-			protobufType:      protobuf.SyncSetting_INCLUDE_WATCHONLY_ACCOUNT,
-		},
-	}
 	ProfileMigrationNeeded = SettingField{
 		reactFieldName: "profile-migration-needed",
 		dBColumnName:   "profile_migration_needed",
@@ -516,7 +505,6 @@ var (
 		WalletSetUpPassed,
 		WalletVisibleTokens,
 		WebviewAllowPermissionRequests,
-		IncludeWatchOnlyAccount,
 		ProfileMigrationNeeded,
 		IsSepoliaEnabled,
 	}

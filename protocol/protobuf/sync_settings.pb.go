@@ -59,7 +59,6 @@ var SyncSetting_Type_name = map[int32]string{
 	13: "DISPLAY_NAME",
 	14: "BIO",
 	15: "MNEMONIC_REMOVED",
-	17: "INCLUDE_WATCHONLY_ACCOUNT",
 }
 
 var SyncSetting_Type_value = map[string]int32{
@@ -79,7 +78,6 @@ var SyncSetting_Type_value = map[string]int32{
 	"DISPLAY_NAME":                13,
 	"BIO":                         14,
 	"MNEMONIC_REMOVED":            15,
-	"INCLUDE_WATCHONLY_ACCOUNT":   17,
 }
 
 func (x SyncSetting_Type) String() string {

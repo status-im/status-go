@@ -44,7 +44,6 @@ var (
 		UseMailservers:            true,
 		LinkPreviewRequestEnabled: true,
 		SendStatusUpdates:         true,
-		IncludeWatchOnlyAccount:   true,
 		WalletRootAddress:         types.HexToAddress("0x3B591fd819F86D0A6a2EF2Bcb94f77807a7De1a6")}
 )
 
