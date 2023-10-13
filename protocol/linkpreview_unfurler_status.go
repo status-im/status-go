@@ -92,7 +92,7 @@ func (u *StatusUnfurler) fillCommunityImages(community *communities.Community, i
 
 func (u *StatusUnfurler) buildCommunityData(communityID string) (*communities.Community, *common.StatusCommunityLinkPreview, error) {
 	// This automatically checks the database
-	community, err := u.m.RequestCommunityInfoFromMailserver(communityID, true)
+	community, err := u.m.RequestCommunityInfoFromMailserver(communityID, nil, true)
 
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get community info for communityID '%s': %w", communityID, err)

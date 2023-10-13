@@ -44,7 +44,7 @@ type URLDataResponse struct {
 	Community *CommunityURLData        `json:"community"`
 	Channel   *CommunityChannelURLData `json:"channel"`
 	Contact   *ContactURLData          `json:"contact"`
-	Shard     *common.Shard           `json:"shard,omitempty"`
+	Shard     *common.Shard            `json:"shard,omitempty"`
 }
 
 const baseShareURL = "https://status.app"
