@@ -6086,3 +6086,26 @@ func (m *Messenger) PromoteSelfToControlNode(communityID types.HexBytes) (*Messe
 
 	return &response, nil
 }
+
+func (m *Messenger) CreateResponseWithACNotification(communityID string, acType ActivityCenterType, isRead bool) (*MessengerResponse, error) {
+	// Activity center notification
+	notification := &ActivityCenterNotification{
+		ID:          types.FromHex(uuid.New().String()),
+		Type:        acType,
+		Timestamp:   m.getTimesource().GetCurrentTime(),
+		CommunityID: communityID,
+		Read:        isRead,
+		Deleted:     false,
+		UpdatedAt:   m.GetCurrentTimeInMillis(),
+	}
+
+	response := &MessengerResponse{}
+
+	err := m.addActivityCenterNotification(response, notification, nil)
+	if err != nil {
+		m.logger.Error("failed to save notification", zap.Error(err))
+		return response, err
+	}
+
+	return response, nil
+}
