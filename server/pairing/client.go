@@ -13,7 +13,6 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"sync"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -107,7 +106,6 @@ func NewBaseClient(c *ConnectionParams, logger *zap.Logger) (*BaseClient, error)
 		baseAddress, serverCert, certErrs = findServerCert(c, netIPs)
 		if serverCert == nil {
 			certErrs = fmt.Errorf("failed to connect to any of given addresses. %w", certErrs)
-			time.Sleep(1 * time.Second)
 			logger.Warn("failed to connect to any of given addresses. Retrying...", zap.Error(certErrs), zap.Any("netIPs", netIPs), zap.Int("retry", i+1))
 		} else {
 			break
