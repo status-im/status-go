@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"sync"
 
 	"go.uber.org/zap"
 
@@ -42,30 +41,29 @@ type BaseClient struct {
 func findServerCert(c *ConnectionParams, reachableIPs []net.IP) (*url.URL, *x509.Certificate, error) {
 	var baseAddress *url.URL
 	var serverCert *x509.Certificate
-	var once sync.Once
-	errCh := make(chan struct {
+
+	type connectionError struct {
 		ip  net.IP
 		err error
-	}, len(reachableIPs))
-	certCh := make(chan *x509.Certificate, len(reachableIPs))
-	urlCh := make(chan *url.URL, len(reachableIPs))
-	done := make(chan bool)
+	}
+	errCh := make(chan connectionError, len(reachableIPs))
+
+	type result struct {
+		u    *url.URL
+		cert *x509.Certificate
+	}
+	successCh := make(chan result, 1) // as we close on the first success
 
 	for _, ip := range reachableIPs {
 		go func(ip net.IP) {
 			u := c.BuildURL(ip)
 			cert, err := getServerCert(u)
 			if err != nil {
-				errCh <- struct {
-					ip  net.IP
-					err error
-				}{ip: ip, err: fmt.Errorf("connecting to '%s' failed: %s", u, err.Error())}
+				errCh <- connectionError{ip: ip, err: fmt.Errorf("connecting to '%s' failed: %s", u, err.Error())}
 				return
 			}
-			// If no error, send the results to their respective channels
-			urlCh <- u
-			certCh <- cert
-			once.Do(func() { close(done) }) // signal success and close the done channel
+			// If no error, send the results to the success channel
+			successCh <- result{u: u, cert: cert}
 		}(ip)
 	}
 
@@ -74,9 +72,9 @@ func findServerCert(c *ConnectionParams, reachableIPs []net.IP) (*url.URL, *x509
 	var combinedErrors string
 	for {
 		select {
-		case <-done:
-			baseAddress = <-urlCh
-			serverCert = <-certCh
+		case success := <-successCh:
+			baseAddress = success.u
+			serverCert = success.cert
 			return baseAddress, serverCert, nil
 		case ipErr := <-errCh:
 			errorCount++
