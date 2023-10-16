@@ -154,6 +154,8 @@ type ImportTasks map[ImportTask]*ImportTaskProgress
 type ImportProgress struct {
 	CommunityID     string                          `json:"communityId,omitempty"`
 	CommunityName   string                          `json:"communityName"`
+	ChannelID       string                          `json:"channelId"`
+	ChannelName     string                          `json:"channelName"`
 	CommunityImages map[string]images.IdentityImage `json:"communityImages"`
 	Tasks           []*ImportTaskProgress           `json:"tasks"`
 	Progress        float32                         `json:"progress"`

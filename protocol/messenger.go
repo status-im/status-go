@@ -147,6 +147,7 @@ type Messenger struct {
 	cancel context.CancelFunc
 
 	importingCommunities map[string]bool
+	importingChannels    map[string]bool
 	importRateLimiter    *rate.Limiter
 	importDelayer        struct {
 		wait chan struct{}
@@ -540,6 +541,7 @@ func NewMessenger(
 		requestedContactsLock:    sync.RWMutex{},
 		requestedContacts:        make(map[string]*transport.Filter),
 		importingCommunities:     make(map[string]bool),
+		importingChannels:        make(map[string]bool),
 		importRateLimiter:        rate.NewLimiter(rate.Every(importSlowRate), 1),
 		importDelayer: struct {
 			wait chan struct{}
