@@ -12,11 +12,12 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/status-im/status-go/common"
 
 	_ "github.com/stretchr/testify/suite" // required to register testify flags
 
@@ -222,7 +223,7 @@ func WaitClosed(c <-chan struct{}, d time.Duration) error {
 func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 	testDir := filepath.Join(TestDataDir, TestNetworkNames[networkID])
 
-	if runtime.GOOS == "windows" {
+	if common.OperatingSystemIs(common.WindowsPlatform) {
 		testDir = filepath.ToSlash(testDir)
 	}
 
