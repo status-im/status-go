@@ -49,14 +49,14 @@ func (m *metricsImpl) RecordMessage() {
 type metricsErrCategory string
 
 var (
-	decodeRPCFailure         metricsErrCategory = "decode_rpc_failure"
-	writeRequestFailure      metricsErrCategory = "write_request_failure"
-	writeResponseFailure     metricsErrCategory = "write_response_failure"
-	dialFailure              metricsErrCategory = "dial_failure"
-	messagePushFailure       metricsErrCategory = "message_push_failure"
-	emptyRequestBodyFailure  metricsErrCategory = "empty_request_body_failure"
-	emptyResponseBodyFailure metricsErrCategory = "empty_response_body_failure"
-	peerNotFoundFailure      metricsErrCategory = "peer_not_found_failure"
+	decodeRPCFailure     metricsErrCategory = "decode_rpc_failure"
+	writeRequestFailure  metricsErrCategory = "write_request_failure"
+	writeResponseFailure metricsErrCategory = "write_response_failure"
+	dialFailure          metricsErrCategory = "dial_failure"
+	messagePushFailure   metricsErrCategory = "message_push_failure"
+	requestBodyFailure   metricsErrCategory = "request_failure"
+	responseBodyFailure  metricsErrCategory = "response_body_failure"
+	peerNotFoundFailure  metricsErrCategory = "peer_not_found_failure"
 )
 
 // RecordError increases the counter for different error types

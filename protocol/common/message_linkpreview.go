@@ -4,13 +4,10 @@ import (
 	"fmt"
 	"net/url"
 
-	"go.uber.org/zap"
-
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
-	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -462,7 +459,6 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 		if c := link.GetContact(); c != nil {
 			publicKey, err := crypto.DecompressPubkey(c.PublicKey)
 			if err != nil {
-				logutils.Logger().Warn("ConvertFromProtoToStatusLinkPreviews: failed to decompress contact public key", zap.Error(err))
 				continue
 			}
 

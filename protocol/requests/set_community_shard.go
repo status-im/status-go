@@ -5,6 +5,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/transport"
 )
 
 type SetCommunityShard struct {
@@ -19,7 +20,7 @@ func (s *SetCommunityShard) Validate() error {
 	}
 	if s.Shard != nil {
 		// TODO: for now only MainStatusShard(16) is accepted
-		if s.Shard.Cluster != common.MainStatusShardCluster {
+		if s.Shard.Cluster != transport.MainStatusShardCluster {
 			return errors.New("invalid shard cluster")
 		}
 		if s.Shard.Index > 1023 {

@@ -13,57 +13,64 @@ import (
 const MaxShardIndex = uint16(1023)
 
 // ClusterIndex is the clusterID used in sharding space.
-// For indices allocation and other magic numbers refer to RFC 51
+// For shardIDs allocation and other magic numbers refer to RFC 51
 const ClusterIndex = 1
 
 // GenerationZeroShardsCount is number of shards supported in generation-0
 const GenerationZeroShardsCount = 8
 
+var (
+	ErrTooManyShards     = errors.New("too many shards")
+	ErrInvalidShard      = errors.New("invalid shard")
+	ErrInvalidShardCount = errors.New("invalid shard count")
+	ErrExpected130Bytes  = errors.New("invalid data: expected 130 bytes")
+)
+
 type RelayShards struct {
-	Cluster uint16   `json:"cluster"`
-	Indices []uint16 `json:"indices"`
+	ClusterID uint16   `json:"clusterID"`
+	ShardIDs  []uint16 `json:"shardIDs"`
 }
 
-func NewRelayShards(cluster uint16, indices ...uint16) (RelayShards, error) {
-	if len(indices) > math.MaxUint8 {
-		return RelayShards{}, errors.New("too many indices")
+func NewRelayShards(clusterID uint16, shardIDs ...uint16) (RelayShards, error) {
+	if len(shardIDs) > math.MaxUint8 {
+		return RelayShards{}, ErrTooManyShards
 	}
 
-	indiceSet := make(map[uint16]struct{})
-	for _, index := range indices {
+	shardIDSet := make(map[uint16]struct{})
+	for _, index := range shardIDs {
 		if index > MaxShardIndex {
-			return RelayShards{}, errors.New("invalid index")
+			return RelayShards{}, ErrInvalidShard
 		}
-		indiceSet[index] = struct{}{} // dedup
+		shardIDSet[index] = struct{}{} // dedup
 	}
 
-	if len(indiceSet) == 0 {
-		return RelayShards{}, errors.New("invalid index count")
+	if len(shardIDSet) == 0 {
+		return RelayShards{}, ErrInvalidShardCount
 	}
 
-	indices = []uint16{}
-	for index := range indiceSet {
-		indices = append(indices, index)
+	shardIDs = []uint16{}
+	for index := range shardIDSet {
+		shardIDs = append(shardIDs, index)
 	}
 
-	return RelayShards{Cluster: cluster, Indices: indices}, nil
+	return RelayShards{ClusterID: clusterID, ShardIDs: shardIDs}, nil
 }
 
-func (rs RelayShards) Topics() []NamespacedPubsubTopic {
-	var result []NamespacedPubsubTopic
-	for _, i := range rs.Indices {
-		result = append(result, NewStaticShardingPubsubTopic(rs.Cluster, i))
+func (rs RelayShards) Topics() []WakuPubSubTopic {
+	var result []WakuPubSubTopic
+	for _, i := range rs.ShardIDs {
+		result = append(result, NewStaticShardingPubsubTopic(rs.ClusterID, i))
 	}
 	return result
 }
 
 func (rs RelayShards) Contains(cluster uint16, index uint16) bool {
-	if rs.Cluster != cluster {
+	if rs.ClusterID != cluster {
 		return false
 	}
 
 	found := false
-	for _, idx := range rs.Indices {
+	for _, idx := range rs.ShardIDs {
 		if idx == index {
 			found = true
 		}
@@ -72,14 +79,12 @@ func (rs RelayShards) Contains(cluster uint16, index uint16) bool {
 	return found
 }
 
-func (rs RelayShards) ContainsNamespacedTopic(topic NamespacedPubsubTopic) bool {
-	if topic.Kind() != StaticSharding {
+func (rs RelayShards) ContainsShardPubsubTopic(topic WakuPubSubTopic) bool {
+	if shardedTopic, err := ToShardPubsubTopic(topic); err != nil {
 		return false
+	} else {
+		return rs.Contains(shardedTopic.Cluster(), shardedTopic.Shard())
 	}
-
-	shardedTopic := topic.(StaticShardingPubsubTopic)
-
-	return rs.Contains(shardedTopic.Cluster(), shardedTopic.Shard())
 }
 
 func TopicsToRelayShards(topic ...string) ([]RelayShards, error) {
@@ -96,22 +101,22 @@ func TopicsToRelayShards(topic ...string) ([]RelayShards, error) {
 			return nil, err
 		}
 
-		indices, ok := dict[ps.cluster]
+		shardIDs, ok := dict[ps.clusterID]
 		if !ok {
-			indices = make(map[uint16]struct{})
+			shardIDs = make(map[uint16]struct{})
 		}
 
-		indices[ps.shard] = struct{}{}
-		dict[ps.cluster] = indices
+		shardIDs[ps.shardID] = struct{}{}
+		dict[ps.clusterID] = shardIDs
 	}
 
-	for cluster, indices := range dict {
-		idx := make([]uint16, 0, len(indices))
-		for index := range indices {
-			idx = append(idx, index)
+	for clusterID, shardIDs := range dict {
+		idx := make([]uint16, 0, len(shardIDs))
+		for shardID := range shardIDs {
+			idx = append(idx, shardID)
 		}
 
-		rs, err := NewRelayShards(cluster, idx...)
+		rs, err := NewRelayShards(clusterID, idx...)
 		if err != nil {
 			return nil, err
 		}
@@ -123,30 +128,30 @@ func TopicsToRelayShards(topic ...string) ([]RelayShards, error) {
 }
 
 func (rs RelayShards) ContainsTopic(topic string) bool {
-	nsTopic, err := ToShardedPubsubTopic(topic)
+	wTopic, err := ToWakuPubsubTopic(topic)
 	if err != nil {
 		return false
 	}
-	return rs.ContainsNamespacedTopic(nsTopic)
+	return rs.ContainsShardPubsubTopic(wTopic)
 }
 
-func (rs RelayShards) IndicesList() ([]byte, error) {
-	if len(rs.Indices) > math.MaxUint8 {
-		return nil, errors.New("indices list too long")
+func (rs RelayShards) ShardList() ([]byte, error) {
+	if len(rs.ShardIDs) > math.MaxUint8 {
+		return nil, ErrTooManyShards
 	}
 
 	var result []byte
 
-	result = binary.BigEndian.AppendUint16(result, rs.Cluster)
-	result = append(result, uint8(len(rs.Indices)))
-	for _, index := range rs.Indices {
+	result = binary.BigEndian.AppendUint16(result, rs.ClusterID)
+	result = append(result, uint8(len(rs.ShardIDs)))
+	for _, index := range rs.ShardIDs {
 		result = binary.BigEndian.AppendUint16(result, index)
 	}
 
 	return result, nil
 }
 
-func FromIndicesList(buf []byte) (RelayShards, error) {
+func FromShardList(buf []byte) (RelayShards, error) {
 	if len(buf) < 3 {
 		return RelayShards{}, fmt.Errorf("insufficient data: expected at least 3 bytes, got %d bytes", len(buf))
 	}
@@ -158,12 +163,12 @@ func FromIndicesList(buf []byte) (RelayShards, error) {
 		return RelayShards{}, fmt.Errorf("invalid data: `length` field is %d but %d bytes were provided", length, len(buf))
 	}
 
-	var indices []uint16
+	shardIDs := make([]uint16, length)
 	for i := 0; i < length; i++ {
-		indices = append(indices, binary.BigEndian.Uint16(buf[3+2*i:5+2*i]))
+		shardIDs[i] = binary.BigEndian.Uint16(buf[3+2*i : 5+2*i])
 	}
 
-	return NewRelayShards(cluster, indices...)
+	return NewRelayShards(cluster, shardIDs...)
 }
 
 func setBit(n byte, pos uint) byte {
@@ -183,10 +188,10 @@ func (rs RelayShards) BitVector() []byte {
 	// of. The right-most bit in the bit vector represents shard 0, the left-most
 	// bit represents shard 1023.
 	var result []byte
-	result = binary.BigEndian.AppendUint16(result, rs.Cluster)
+	result = binary.BigEndian.AppendUint16(result, rs.ClusterID)
 
 	vec := make([]byte, 128)
-	for _, index := range rs.Indices {
+	for _, index := range rs.ShardIDs {
 		n := vec[index/8]
 		vec[index/8] = byte(setBit(n, uint(index%8)))
 	}
@@ -197,11 +202,11 @@ func (rs RelayShards) BitVector() []byte {
 // Generate a RelayShards from a byte slice
 func FromBitVector(buf []byte) (RelayShards, error) {
 	if len(buf) != 130 {
-		return RelayShards{}, errors.New("invalid data: expected 130 bytes")
+		return RelayShards{}, ErrExpected130Bytes
 	}
 
 	cluster := binary.BigEndian.Uint16(buf[0:2])
-	var indices []uint16
+	var shardIDs []uint16
 
 	for i := uint16(0); i < 128; i++ {
 		for j := uint(0); j < 8; j++ {
@@ -209,11 +214,11 @@ func FromBitVector(buf []byte) (RelayShards, error) {
 				continue
 			}
 
-			indices = append(indices, uint16(j)+8*i)
+			shardIDs = append(shardIDs, uint16(j)+8*i)
 		}
 	}
 
-	return RelayShards{Cluster: cluster, Indices: indices}, nil
+	return RelayShards{ClusterID: cluster, ShardIDs: shardIDs}, nil
 }
 
 // GetShardFromContentTopic runs Autosharding logic and returns a pubSubTopic

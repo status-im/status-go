@@ -87,16 +87,18 @@ func (wakuPX *WakuPeerExchange) start() error {
 	return nil
 }
 
-func (wakuPX *WakuPeerExchange) onRequest() func(s network.Stream) {
-	return func(s network.Stream) {
-		defer s.Close()
-		logger := wakuPX.log.With(logging.HostID("peer", s.Conn().RemotePeer()))
+func (wakuPX *WakuPeerExchange) onRequest() func(network.Stream) {
+	return func(stream network.Stream) {
+		logger := wakuPX.log.With(logging.HostID("peer", stream.Conn().RemotePeer()))
 		requestRPC := &pb.PeerExchangeRPC{}
-		reader := pbio.NewDelimitedReader(s, math.MaxInt32)
+		reader := pbio.NewDelimitedReader(stream, math.MaxInt32)
 		err := reader.ReadMsg(requestRPC)
 		if err != nil {
 			logger.Error("reading request", zap.Error(err))
 			wakuPX.metrics.RecordError(decodeRPCFailure)
+			if err := stream.Reset(); err != nil {
+				wakuPX.log.Error("resetting connection", zap.Error(err))
+			}
 			return
 		}
 
@@ -114,14 +116,19 @@ func (wakuPX *WakuPeerExchange) onRequest() func(s network.Stream) {
 			responseRPC.Response = new(pb.PeerExchangeResponse)
 			responseRPC.Response.PeerInfos = records
 
-			writer := pbio.NewDelimitedWriter(s)
+			writer := pbio.NewDelimitedWriter(stream)
 			err = writer.WriteMsg(responseRPC)
 			if err != nil {
 				logger.Error("writing response", zap.Error(err))
 				wakuPX.metrics.RecordError(pxFailure)
+				if err := stream.Reset(); err != nil {
+					wakuPX.log.Error("resetting connection", zap.Error(err))
+				}
 				return
 			}
 		}
+
+		stream.Close()
 	}
 }
 
