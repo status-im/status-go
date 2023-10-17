@@ -334,10 +334,10 @@ func (m *Messenger) backupChats(ctx context.Context, clock uint64) []*protobuf.B
 			return true
 		}
 		syncChat := protobuf.SyncChat{
+			Clock:    clock,
 			Id:       chatID,
 			ChatType: uint32(chat.ChatType),
 			Active:   chat.Active,
-			Clock:    uint64(time.Now().Unix()),
 		}
 		chatMuteTill, _ := time.Parse(time.RFC3339, chat.MuteTill.Format(time.RFC3339))
 		if chat.Muted && chatMuteTill.Equal(time.Time{}) {

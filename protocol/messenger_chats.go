@@ -168,12 +168,9 @@ func (m *Messenger) initChatSyncFields(chat *Chat) error {
 
 func (m *Messenger) createPublicChat(chatID string, response *MessengerResponse) (*MessengerResponse, error) {
 	chat, ok := m.allChats.Load(chatID)
-	wasActive := false
 	if !ok {
 		chat = CreatePublicChat(chatID, m.getTimesource())
 
-	} else {
-		wasActive = chat.Active
 	}
 	chat.Active = true
 	chat.DeletedAtClockValue = 0
@@ -202,13 +199,6 @@ func (m *Messenger) createPublicChat(chatID string, response *MessengerResponse)
 	err = m.saveChat(chat)
 	if err != nil {
 		return nil, err
-	}
-
-	// Sync if it was created
-	if !ok || !wasActive {
-		if err := m.syncPublicChat(context.Background(), chat, m.dispatchMessage); err != nil {
-			return nil, err
-		}
 	}
 
 	err = m.reregisterForPushNotifications()
@@ -487,10 +477,9 @@ func (m *Messenger) saveChat(chat *Chat) error {
 		chat.Identicon = identicon
 	}
 
-	// Sync chat if it's a new active public chat, but not a timeline chat
-	if !ok && chat.Active && chat.Public() && !chat.ProfileUpdates() && !chat.Timeline() {
-
-		if err := m.syncPublicChat(context.Background(), chat, m.dispatchMessage); err != nil {
+	// Sync chat if it's a new public, 1-1 or group chat, but not a timeline chat
+	if !ok && chat.shouldBeSynced() {
+		if err := m.syncChat(context.Background(), chat, m.dispatchMessage); err != nil {
 			return err
 		}
 	}

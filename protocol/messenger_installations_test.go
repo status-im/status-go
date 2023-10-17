@@ -3,8 +3,12 @@ package protocol
 import (
 	"context"
 	"errors"
+	"image"
+	"image/png"
+	"os"
 	"testing"
 
+	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/services/browsers"
 
 	"github.com/stretchr/testify/suite"
@@ -157,6 +161,65 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
+	// Create group chat
+	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "group", []string{})
+	s.NoError(err)
+	s.Require().Len(response.Chats(), 1)
+
+	ourGroupChat := response.Chats()[0]
+
+	err = s.m.SaveChat(ourGroupChat)
+	s.NoError(err)
+
+	// Generate test image bigger than BannerDim
+	testImage := image.NewRGBA(image.Rect(0, 0, 20, 10))
+
+	tmpTestFilePath := s.T().TempDir() + "/test.png"
+	file, err := os.Create(tmpTestFilePath)
+	s.NoError(err)
+	defer file.Close()
+
+	err = png.Encode(file, testImage)
+	s.Require().NoError(err)
+
+	groupImg := userimage.CroppedImage{
+		ImagePath: tmpTestFilePath,
+		X:         1,
+		Y:         1,
+		Width:     10,
+		Height:    5,
+	}
+
+	// Add image to chat
+	response, err = s.m.EditGroupChat(context.Background(), ourGroupChat.ID, "test_admin_group", "#FF00FF", groupImg)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Equal("test_admin_group", response.Chats()[0].Name)
+	s.Require().Equal("#FF00FF", response.Chats()[0].Color)
+	ourGroupChat = response.Chats()[0]
+
+	// Create second group chat and deactivate it
+	response, err = s.m.CreateGroupChatWithMembers(context.Background(), "deactivated-group", []string{})
+	s.NoError(err)
+	s.Require().Len(response.Chats(), 1)
+
+	ourDeactivatedGroupChat := response.Chats()[0]
+	err = s.m.SaveChat(ourDeactivatedGroupChat)
+	s.NoError(err)
+	_, err = s.m.deactivateChat(ourDeactivatedGroupChat.ID, 0, true, true)
+	s.NoError(err)
+
+	// Create Alice for the 1-1 chat
+	alice := s.newMessenger()
+	_, err = alice.Start()
+	s.Require().NoError(err)
+	defer alice.Shutdown() // nolint: errcheck
+
+	// Create 1-1 chat
+	ourOneOneChat := CreateOneToOneChat("Our 1TO1", &alice.identity.PublicKey, alice.transport)
+	err = s.m.SaveChat(ourOneOneChat)
+	s.Require().NoError(err)
+
 	// add and deactivate chat
 	chat2 := CreatePublicChat(removedChatID, s.m.transport)
 	chat2.DeletedAtClockValue = 1
@@ -176,7 +239,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 		DeviceType: "their-device-type",
 	})
 	s.Require().NoError(err)
-	response, err := theirMessenger.SendPairInstallation(context.Background(), nil)
+	response, err = theirMessenger.SendPairInstallation(context.Background(), nil)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats(), 1)
@@ -220,7 +283,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 		}
 		bookmarks = append(bookmarks, response.GetBookmarks()...)
 
-		if len(allChats) >= 2 && actualContact != nil && len(bookmarks) >= 1 {
+		if len(allChats) >= 5 && actualContact != nil && len(bookmarks) >= 1 {
 			return nil
 		}
 
@@ -231,10 +294,22 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().NoError(err)
 
 	var statusChat *Chat
+	var groupChat *Chat
+	var removedGroupChat *Chat
+	var oneToOneChat *Chat
 	var removedChat *Chat
 	for _, c := range allChats {
 		if c.ID == statusChatID {
 			statusChat = c
+		}
+		if c.ID == ourGroupChat.ID {
+			groupChat = c
+		}
+		if c.ID == ourDeactivatedGroupChat.ID {
+			removedGroupChat = c
+		}
+		if c.ID == ourOneOneChat.ID {
+			oneToOneChat = c
 		}
 		if c.ID == removedChatID {
 			removedChat = c
@@ -242,6 +317,18 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	}
 
 	s.Require().NotNil(statusChat)
+	s.Require().NotNil(groupChat)
+	s.Require().NotNil(removedGroupChat)
+	s.Require().NotNil(oneToOneChat)
+
+	s.Require().Equal(ourGroupChat.Name, groupChat.Name)
+	s.Require().True(ourGroupChat.Active)
+
+	s.Require().Equal(ourDeactivatedGroupChat.Name, removedGroupChat.Name)
+	s.Require().False(removedGroupChat.Active)
+
+	s.Require().Equal("", oneToOneChat.Name) // We set 1-1 chat names to "" because the name is not good
+	s.Require().True(oneToOneChat.Active)
 
 	s.Require().True(actualContact.added())
 	s.Require().Equal("Test Nickname", actualContact.LocalNickname)

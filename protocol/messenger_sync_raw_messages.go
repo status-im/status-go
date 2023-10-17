@@ -57,15 +57,15 @@ func (m *Messenger) HandleSyncRawMessages(rawMessages []*protobuf.RawMessage) er
 				m.logger.Warn("failed to HandleContactUpdate when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
-		case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_PUBLIC_CHAT:
-			var message protobuf.SyncInstallationPublicChat
+		case protobuf.ApplicationMetadataMessage_SYNC_CHAT:
+			var message protobuf.SyncChat
 			err := proto.Unmarshal(rawMessage.GetPayload(), &message)
 			if err != nil {
 				return err
 			}
-			err = m.HandleSyncInstallationPublicChat(state, &message, nil)
+			err = m.HandleSyncChat(state, &message, nil)
 			if err != nil {
-				m.logger.Error("error createPublicChat when HandleSyncRawMessages", zap.Error(err))
+				m.logger.Error("error createChat when HandleSyncRawMessages", zap.Error(err))
 				continue
 			}
 		case protobuf.ApplicationMetadataMessage_SYNC_CHAT_REMOVED:
