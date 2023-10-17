@@ -22,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/ierc20"
 	"github.com/status-im/status-go/rpc/chain"
@@ -867,6 +868,9 @@ func TestFindBlocksCommand(t *testing.T) {
 		ctx := context.Background()
 		group := async.NewGroup(ctx)
 
+		appdb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+		require.NoError(t, err)
+
 		db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 		require.NoError(t, err)
 		tm := &TransactionManager{db, nil, nil, nil, nil, nil, nil, nil, nil, nil}
@@ -892,7 +896,7 @@ func TestFindBlocksCommand(t *testing.T) {
 		}
 		client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 		client.SetClient(tc.NetworkID(), tc)
-		tokenManager := token.NewTokenManager(db, client, network.NewManager(db))
+		tokenManager := token.NewTokenManager(db, client, network.NewManager(appdb))
 		tokenManager.SetTokens([]*token.Token{
 			{
 				Address:  tokenTXXAddress,
@@ -990,6 +994,9 @@ func (m *MockChainClient) AbstractEthClient(chainID walletcommon.ChainID) (chain
 }
 
 func TestFetchTransfersForLoadedBlocks(t *testing.T) {
+	appdb, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	require.NoError(t, err)
+
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 	tm := &TransactionManager{db, nil, nil, nil, nil, nil, nil, nil, nil, nil}
@@ -1008,7 +1015,7 @@ func TestFetchTransfersForLoadedBlocks(t *testing.T) {
 
 	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
 	client.SetClient(tc.NetworkID(), tc)
-	tokenManager := token.NewTokenManager(db, client, network.NewManager(db))
+	tokenManager := token.NewTokenManager(db, client, network.NewManager(appdb))
 
 	tokenManager.SetTokens([]*token.Token{
 		{

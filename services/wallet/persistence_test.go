@@ -34,7 +34,6 @@ func TestSaveTokens(t *testing.T) {
 	token1 := Token{
 		Name:             "token-1",
 		Symbol:           "TT1",
-		Color:            "color-1",
 		Decimals:         10,
 		BalancesPerChain: make(map[uint64]ChainBalance),
 		Description:      "description-1",
@@ -58,7 +57,6 @@ func TestSaveTokens(t *testing.T) {
 	token2 := Token{
 		Name:             "token-2",
 		Symbol:           "TT2",
-		Color:            "color-2",
 		Decimals:         11,
 		BalancesPerChain: make(map[uint64]ChainBalance),
 		Description:      "description-2",
@@ -75,7 +73,6 @@ func TestSaveTokens(t *testing.T) {
 	token3 := Token{
 		Name:             "token-3",
 		Symbol:           "TT3",
-		Color:            "color-3",
 		Decimals:         11,
 		BalancesPerChain: make(map[uint64]ChainBalance),
 		Description:      "description-3",
@@ -118,7 +115,6 @@ func TestSaveTokens(t *testing.T) {
 
 	require.Equal(t, actualToken1.Name, token1.Name)
 	require.Equal(t, actualToken1.Symbol, token1.Symbol)
-	require.Equal(t, actualToken1.Color, token1.Color)
 	require.Equal(t, actualToken1.Decimals, token1.Decimals)
 	require.Equal(t, actualToken1.Description, token1.Description)
 	require.Equal(t, actualToken1.AssetWebsiteURL, token1.AssetWebsiteURL)
@@ -137,7 +133,6 @@ func TestSaveTokens(t *testing.T) {
 
 	require.Equal(t, actualToken2.Name, token2.Name)
 	require.Equal(t, actualToken2.Symbol, token2.Symbol)
-	require.Equal(t, actualToken2.Color, token2.Color)
 	require.Equal(t, actualToken2.Decimals, token2.Decimals)
 	require.Equal(t, actualToken2.Description, token2.Description)
 	require.Equal(t, actualToken2.AssetWebsiteURL, token2.AssetWebsiteURL)
@@ -150,7 +145,6 @@ func TestSaveTokens(t *testing.T) {
 
 	require.Equal(t, actualToken3.Name, token3.Name)
 	require.Equal(t, actualToken3.Symbol, token3.Symbol)
-	require.Equal(t, actualToken3.Color, token3.Color)
 	require.Equal(t, actualToken3.Decimals, token3.Decimals)
 	require.Equal(t, actualToken3.Description, token3.Description)
 	require.Equal(t, actualToken3.AssetWebsiteURL, token3.AssetWebsiteURL)

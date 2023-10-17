@@ -131,26 +131,6 @@ func (api *API) FetchDecodedTxData(ctx context.Context, data string) (*thirdpart
 	return api.s.decoder.Decode(data)
 }
 
-// @deprecated
-// GetTokensBalances return mapping of token balances for every account.
-func (api *API) GetTokensBalances(ctx context.Context, accounts, addresses []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
-	chainClients, err := api.s.rpcClient.EthClients([]uint64{api.s.rpcClient.UpstreamChainID})
-	if err != nil {
-		return nil, err
-	}
-	return api.s.tokenManager.GetBalances(ctx, chainClients, accounts, addresses)
-}
-
-// @deprecated
-func (api *API) GetTokensBalancesForChainIDs(ctx context.Context, chainIDs []uint64, accounts, addresses []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
-	log.Debug("wallet.api.GetTokensBalances", "accounts", accounts, "addresses", addresses)
-	clients, err := api.s.rpcClient.EthClients(chainIDs)
-	if err != nil {
-		return nil, err
-	}
-	return api.s.tokenManager.GetBalances(ctx, clients, accounts, addresses)
-}
-
 // GetBalanceHistory retrieves token balance history for token identity on multiple chains
 func (api *API) GetBalanceHistory(ctx context.Context, chainIDs []uint64, address common.Address, tokenSymbol string, currencySymbol string, timeInterval history.TimeInterval) ([]*history.ValuePoint, error) {
 	log.Debug("wallet.api.GetBalanceHistory", "chainIDs", chainIDs, "address", address, "tokenSymbol", tokenSymbol, "currencySymbol", currencySymbol, "timeInterval", timeInterval)
@@ -182,16 +162,25 @@ func (api *API) GetBalanceHistoryRange(ctx context.Context, chainIDs []uint64, a
 	return api.s.history.GetBalanceHistory(ctx, chainIDs, address, tokenSymbol, currencySymbol, fromTimestamp)
 }
 
+func (api *API) GetTokenList(ctx context.Context) ([]*token.List, error) {
+	log.Debug("call to get token list")
+	rst := api.s.tokenManager.GetList()
+	log.Debug("result from token list", "len", len(rst))
+	return rst, nil
+}
+
+// @deprecated
 func (api *API) GetTokens(ctx context.Context, chainID uint64) ([]*token.Token, error) {
 	log.Debug("call to get tokens")
-	rst, err := api.s.tokenManager.GetTokens(chainID, true)
+	rst, err := api.s.tokenManager.GetTokens(chainID)
 	log.Debug("result from token store", "len", len(rst))
 	return rst, err
 }
 
+// @deprecated
 func (api *API) GetCustomTokens(ctx context.Context) ([]*token.Token, error) {
 	log.Debug("call to get custom tokens")
-	rst, err := api.s.tokenManager.GetCustoms()
+	rst, err := api.s.tokenManager.GetCustoms(true)
 	log.Debug("result from database for custom tokens", "len", len(rst))
 	return rst, err
 }
@@ -200,24 +189,6 @@ func (api *API) DiscoverToken(ctx context.Context, chainID uint64, address commo
 	log.Debug("call to get discover token")
 	token, err := api.s.tokenManager.DiscoverToken(ctx, chainID, address)
 	return token, err
-}
-
-// @deprecated
-func (api *API) GetVisibleTokens(chainIDs []uint64) (map[uint64][]*token.Token, error) {
-	log.Debug("call to get visible tokens")
-	rst, err := api.s.tokenManager.GetVisible(chainIDs)
-	log.Debug("result from database for visible tokens", "len", len(rst))
-	return rst, err
-}
-
-// @deprecated
-func (api *API) ToggleVisibleToken(ctx context.Context, chainID uint64, address common.Address) (bool, error) {
-	log.Debug("call to toggle visible tokens")
-	err := api.s.tokenManager.Toggle(chainID, address)
-	if err != nil {
-		return false, err
-	}
-	return true, nil
 }
 
 func (api *API) AddCustomToken(ctx context.Context, token token.Token) error {

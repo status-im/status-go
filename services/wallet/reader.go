@@ -82,7 +82,6 @@ type ChainBalance struct {
 type Token struct {
 	Name                    string                       `json:"name"`
 	Symbol                  string                       `json:"symbol"`
-	Color                   string                       `json:"color"`
 	Decimals                uint                         `json:"decimals"`
 	BalancesPerChain        map[uint64]ChainBalance      `json:"balancesPerChain"`
 	Description             string                       `json:"description"`
@@ -192,7 +191,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	}
 	currencies = append(currencies, currency)
 	currencies = append(currencies, getFixedCurrencies()...)
-	allTokens, err := r.tokenManager.GetTokensByChainIDs(chainIDs, true)
+	allTokens, err := r.tokenManager.GetTokensByChainIDs(chainIDs)
 
 	if err != nil {
 		return nil, err
@@ -263,7 +262,6 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 
 				walletToken := Token{
 					Name:             tokens[0].Name,
-					Color:            tokens[0].Color,
 					Symbol:           symbol,
 					BalancesPerChain: balancesPerChain,
 					Decimals:         decimals,

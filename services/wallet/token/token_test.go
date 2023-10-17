@@ -1,7 +1,6 @@
 package token
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,14 +17,11 @@ func setupTestTokenDB(t *testing.T) (*Manager, func()) {
 	require.NoError(t, err)
 
 	return &Manager{
-			db:               db,
-			RPCClient:        nil,
-			contractMaker:    nil,
-			networkManager:   nil,
-			stores:           nil,
-			tokenList:        nil,
-			tokenMap:         nil,
-			areTokensFetched: false,
+			db:             db,
+			RPCClient:      nil,
+			contractMaker:  nil,
+			networkManager: nil,
+			stores:         nil,
 		}, func() {
 			require.NoError(t, db.Close())
 		}
@@ -35,7 +31,7 @@ func TestCustoms(t *testing.T) {
 	manager, stop := setupTestTokenDB(t)
 	defer stop()
 
-	rst, err := manager.GetCustoms()
+	rst, err := manager.GetCustoms(false)
 	require.NoError(t, err)
 	require.Nil(t, rst)
 
@@ -44,14 +40,13 @@ func TestCustoms(t *testing.T) {
 		Name:     "Zilliqa",
 		Symbol:   "ZIL",
 		Decimals: 12,
-		Color:    "#fa6565",
 		ChainID:  777,
 	}
 
 	err = manager.UpsertCustom(token)
 	require.NoError(t, err)
 
-	rst, err = manager.GetCustoms()
+	rst, err = manager.GetCustoms(false)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(rst))
 	require.Equal(t, token, *rst[0])
@@ -59,9 +54,25 @@ func TestCustoms(t *testing.T) {
 	err = manager.DeleteCustom(777, token.Address)
 	require.NoError(t, err)
 
-	rst, err = manager.GetCustoms()
+	rst, err = manager.GetCustoms(false)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(rst))
+}
+
+func toTokenMap(tokens []*Token) storeMap {
+	tokenMap := storeMap{}
+
+	for _, token := range tokens {
+		addTokMap := tokenMap[token.ChainID]
+		if addTokMap == nil {
+			addTokMap = make(addressTokenMap)
+		}
+
+		addTokMap[token.Address] = token
+		tokenMap[token.ChainID] = addTokMap
+	}
+
+	return tokenMap
 }
 
 func TestTokenOverride(t *testing.T) {
@@ -113,7 +124,7 @@ func TestTokenOverride(t *testing.T) {
 		tokenList,
 	}
 
-	overrideTokensInPlace(networks, testStore.tokenList)
+	overrideTokensInPlace(networks, tokenList)
 	tokens := testStore.GetTokens()
 	tokenMap := toTokenMap(tokens)
 	_, found := tokenMap[1][common.Address{1}]
@@ -124,63 +135,4 @@ func TestTokenOverride(t *testing.T) {
 	require.False(t, found)
 	require.Equal(t, common.Address{33}, tokenMap[2][common.Address{33}].Address)
 	require.Equal(t, common.Address{4}, tokenMap[2][common.Address{4}].Address)
-}
-
-func TestMergeTokenLists(t *testing.T) {
-	tokenList1 := []*Token{
-		&Token{
-			Address: common.Address{1},
-			Symbol:  "SNT",
-			ChainID: 1,
-		},
-	}
-	tokenList1Copy := []*Token{
-		&Token{
-			Address: common.Address{1},
-			Symbol:  "SNT",
-			ChainID: 1,
-		},
-	}
-	tokenList2 := []*Token{
-		&Token{
-			Address: common.Address{3},
-			Symbol:  "STT",
-			ChainID: 2,
-		},
-		&Token{
-			Address: common.Address{4},
-			Symbol:  "TTT",
-			ChainID: 2,
-		},
-	}
-	tokenList1Plus2 := []*Token{
-		&Token{
-			Address: common.Address{1},
-			Symbol:  "SNT",
-			ChainID: 1,
-		},
-		&Token{
-			Address: common.Address{3},
-			Symbol:  "STT",
-			ChainID: 2,
-		},
-		&Token{
-			Address: common.Address{4},
-			Symbol:  "TTT",
-			ChainID: 2,
-		},
-	}
-	tokenListEmpty := []*Token{}
-
-	mergedList := mergeTokenLists([][]*Token{tokenListEmpty, tokenListEmpty})
-	require.Equal(t, 0, len(mergedList))
-
-	mergedList = mergeTokenLists([][]*Token{tokenListEmpty, tokenList1})
-	require.True(t, reflect.DeepEqual(mergedList, tokenList1))
-
-	mergedList = mergeTokenLists([][]*Token{tokenList1, tokenList1Copy})
-	require.True(t, reflect.DeepEqual(mergedList, tokenList1))
-
-	mergedList = mergeTokenLists([][]*Token{tokenList1, tokenList2})
-	require.True(t, reflect.DeepEqual(mergedList, tokenList1Plus2))
 }
