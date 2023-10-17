@@ -1,1 +1,0 @@
-# reed solomon encoding lib

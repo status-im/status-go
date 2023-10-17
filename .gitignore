@@ -72,8 +72,8 @@ Session.vim
 # created for running container
 _assets/compose/bootnode/keys
 
-# do not vendor nested vendor/ dirs
-vendor/**/vendor
+# do not store vendor at all
+vendor
 
 # nodejs package
 
@@ -85,8 +85,3 @@ report.xml
 
 # go test logs
 test.log
-
-# Waku libs
-vendor/github.com/waku-org/go-zerokit-rln-x86_64/
-vendor/github.com/waku-org/go-zerokit-rln-apple/
-vendor/github.com/waku-org/go-zerokit-rln-arm/

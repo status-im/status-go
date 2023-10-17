@@ -1,1 +1,0 @@
-echo $(git rev-parse --short HEAD)$(git diff --quiet || echo -dirty)
