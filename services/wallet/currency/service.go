@@ -94,7 +94,7 @@ func (s *Service) getAllFiatCurrencyFormats() (FormatPerSymbol, error) {
 }
 
 func (s *Service) fetchAllTokenCurrencyFormats() (FormatPerSymbol, error) {
-	tokens, err := s.tokenManager.GetAllTokensAndNativeCurrencies()
+	tokens, err := s.tokenManager.GetAllTokens()
 	if err != nil {
 		return nil, err
 	}

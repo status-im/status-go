@@ -6,17 +6,26 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/rpc/network"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
 func TestKeycardPairingsFile(t *testing.T) {
+	appDB, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	require.NoError(t, err)
+
+	accountsDb, err := accounts.NewDB(appDB)
+	require.NoError(t, err)
+
 	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
 	require.NoError(t, err)
 
-	service := NewService(db, nil, &rpc.Client{}, nil, nil, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil)
+	service := NewService(db, accountsDb, &rpc.Client{NetworkManager: network.NewManager(db)}, nil, nil, nil, nil, &params.NodeConfig{}, nil, nil, nil, nil)
 
 	data, err := service.KeycardPairings().GetPairingsJSONFileContent()
 	require.NoError(t, err)

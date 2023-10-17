@@ -31,7 +31,6 @@ var uniswapTokens = []*Token{
 		Address:   common.HexToAddress("{{ $token.Address }}"),
 		Name:      "{{ $token.Name }}",
 		Symbol:    "{{ $token.Symbol }}",
-		Color:     "{{ $token.Color }}",
 		Decimals:  {{ $token.Decimals }},
 		ChainID:   {{ $token.ChainID }},
 		PegSymbol: "{{ $token.PegSymbol }}",

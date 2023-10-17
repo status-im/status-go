@@ -36,7 +36,7 @@ func (p *Persistence) SaveTokens(tokens map[common.Address][]Token) (err error) 
 				if b.HasError || b.Balance.Cmp(big.NewFloat(0)) == 0 {
 					continue
 				}
-				_, err = tx.Exec(`INSERT INTO token_balances(user_address,token_name,token_symbol,token_address,token_color,token_decimals,token_description,token_url,balance,raw_balance,chain_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)`, address.Hex(), t.Name, t.Symbol, b.Address.Hex(), t.Color, t.Decimals, t.Description, t.AssetWebsiteURL, b.Balance.String(), b.RawBalance, chainID)
+				_, err = tx.Exec(`INSERT INTO token_balances(user_address,token_name,token_symbol,token_address,token_decimals,token_description,token_url,balance,raw_balance,chain_id) VALUES (?,?,?,?,?,?,?,?,?,?)`, address.Hex(), t.Name, t.Symbol, b.Address.Hex(), t.Decimals, t.Description, t.AssetWebsiteURL, b.Balance.String(), b.RawBalance, chainID)
 				if err != nil {
 					return err
 				}
@@ -49,7 +49,7 @@ func (p *Persistence) SaveTokens(tokens map[common.Address][]Token) (err error) 
 }
 
 func (p *Persistence) GetTokens() (map[common.Address][]Token, error) {
-	rows, err := p.db.Query(`SELECT user_address, token_name, token_symbol, token_address, token_color, token_decimals, token_description, token_url, balance, raw_balance, chain_id FROM token_balances `)
+	rows, err := p.db.Query(`SELECT user_address, token_name, token_symbol, token_address, token_decimals, token_description, token_url, balance, raw_balance, chain_id FROM token_balances `)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func (p *Persistence) GetTokens() (map[common.Address][]Token, error) {
 		token := Token{}
 		var chainID uint64
 
-		err := rows.Scan(&addressStr, &token.Name, &token.Symbol, &tokenAddress, &token.Color, &token.Decimals, &token.Description, &token.AssetWebsiteURL, &balance, &rawBalance, &chainID)
+		err := rows.Scan(&addressStr, &token.Name, &token.Symbol, &tokenAddress, &token.Decimals, &token.Description, &token.AssetWebsiteURL, &balance, &rawBalance, &chainID)
 		if err != nil {
 			return nil, err
 		}
