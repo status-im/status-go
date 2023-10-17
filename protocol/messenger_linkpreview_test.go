@@ -516,12 +516,14 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined()
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
-	u := "https://github.com"
+
+	// Create website stub
+	ogLink := "https://github.com"
 	requestsCount := 0
 
 	transport := StubTransport{}
 	transport.AddURLMatcherRoundTrip(
-		u,
+		ogLink,
 		func(req *http.Request) *http.Response {
 			requestsCount++
 			responseBody := []byte(`<html><head><meta property="og:title" content="TestTitle"></head></html>`)
@@ -533,16 +535,33 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
 	)
 	stubbedClient := http.Client{Transport: &transport}
 
+	// Add contact
+	identity, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	c, err := BuildContactFromPublicKey(&identity.PublicKey)
+	s.Require().NoError(err)
+	s.Require().NotNil(c)
+
+	c.Bio = "TestBio_1"
+	c.DisplayName = "TestDisplayName_2"
+	s.m.allContacts.Store(c.ID, c)
+	statusUserLink, err := s.m.ShareUserURLWithData(c.ID)
+	s.Require().NoError(err)
+
+	linksToUnfurl := []string{ogLink, statusUserLink}
+
 	// Test `AlwaysAsk`
 	// NOTE: on status-go side `AlwaysAsk` == `EnableAll`, "asking" should be processed by the app
 
 	requestsCount = 0
-	err := s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingAlwaysAsk)
+	err = s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingAlwaysAsk)
 	s.Require().NoError(err)
 
-	linkPreviews, err := s.m.UnfurlURLs(&stubbedClient, []string{u})
+	linkPreviews, err := s.m.UnfurlURLs(&stubbedClient, linksToUnfurl)
 	s.Require().NoError(err)
 	s.Require().Len(linkPreviews.LinkPreviews, 1)
+	s.Require().Len(linkPreviews.StatusLinkPreviews, 1)
 	s.Require().Equal(requestsCount, 1)
 
 	// Test `EnableAll`
@@ -550,9 +569,10 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
 	err = s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingEnableAll)
 	s.Require().NoError(err)
 
-	linkPreviews, err = s.m.UnfurlURLs(&stubbedClient, []string{u})
+	linkPreviews, err = s.m.UnfurlURLs(&stubbedClient, linksToUnfurl)
 	s.Require().NoError(err)
 	s.Require().Len(linkPreviews.LinkPreviews, 1)
+	s.Require().Len(linkPreviews.StatusLinkPreviews, 1)
 	s.Require().Equal(requestsCount, 1)
 
 	// Test `DisableAll`
@@ -560,9 +580,10 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
 	err = s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingDisableAll)
 	s.Require().NoError(err)
 
-	linkPreviews, err = s.m.UnfurlURLs(&stubbedClient, []string{u})
-	s.Require().Error(err)
+	linkPreviews, err = s.m.UnfurlURLs(&stubbedClient, linksToUnfurl)
+	s.Require().NoError(err)
 	s.Require().Len(linkPreviews.LinkPreviews, 0)
+	s.Require().Len(linkPreviews.StatusLinkPreviews, 1) // Status links are always unfurled
 	s.Require().Equal(requestsCount, 0)
 
 }

@@ -141,20 +141,6 @@ func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (UnfurlUR
 		return response, fmt.Errorf("failed to get settigs: %w", err)
 	}
 
-	// We use switch case, though there's most cases are empty for code clarity.
-	switch s.URLUnfurlingMode {
-	case settings.URLUnfurlingDisableAll:
-		return response, fmt.Errorf("url unfurling is disabled")
-	case settings.URLUnfurlingEnableAll:
-		break
-	case settings.URLUnfurlingAlwaysAsk:
-		// This mode should be handled on the app side
-		// and is considered as equal to URLUnfurlingEnableAll in status-go.
-		break
-	default:
-		return response, fmt.Errorf("invalid url unfurling mode setting: %d", s.URLUnfurlingMode)
-	}
-
 	// Unfurl in a loop
 
 	response.LinkPreviews = make([]*common.LinkPreview, 0, len(urls))
@@ -175,6 +161,12 @@ func (m *Messenger) UnfurlURLs(httpClient *http.Client, urls []string) (UnfurlUR
 				continue
 			}
 			response.StatusLinkPreviews = append(response.StatusLinkPreviews, preview)
+			continue
+		}
+
+		// `AlwaysAsk` mode should be handled on the app side
+		// and is considered as equal to `EnableAll` in status-go.
+		if s.URLUnfurlingMode == settings.URLUnfurlingDisableAll {
 			continue
 		}
 
