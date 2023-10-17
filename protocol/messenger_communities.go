@@ -1124,19 +1124,33 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		return nil, err
 	}
 
+	// send request to join to privileged members
 	if !community.AcceptRequestToJoinAutomatically() {
-		// send request to join also to community admins but without revealed addresses
+		privilegedMembers := community.GetFilteredPrivilegedMembers(map[string]struct{}{})
+
+		for _, member := range privilegedMembers[protobuf.CommunityMember_ROLE_OWNER] {
+			_, err := m.sender.SendPrivate(context.Background(), member, &rawMessage)
+			if err != nil {
+				return nil, err
+			}
+		}
+		for _, member := range privilegedMembers[protobuf.CommunityMember_ROLE_TOKEN_MASTER] {
+			_, err := m.sender.SendPrivate(context.Background(), member, &rawMessage)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// don't send revealed addresses to admins
 		requestToJoinProto.RevealedAccounts = make([]*protobuf.RevealedAccount, 0)
 		payload, err = proto.Marshal(requestToJoinProto)
 		if err != nil {
 			return nil, err
 		}
-
 		rawMessage.Payload = payload
 
-		privilegedMembers := community.GetPrivilegedMembers()
-		for _, privilegedMember := range privilegedMembers {
-			_, err := m.sender.SendPrivate(context.Background(), privilegedMember, &rawMessage)
+		for _, member := range privilegedMembers[protobuf.CommunityMember_ROLE_ADMIN] {
+			_, err := m.sender.SendPrivate(context.Background(), member, &rawMessage)
 			if err != nil {
 				return nil, err
 			}
