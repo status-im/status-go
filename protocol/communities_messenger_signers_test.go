@@ -168,7 +168,7 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
 		&communitytokens.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
 
-	community, err = s.alice.communitiesManager.UpdatePrivateKeyAndControlNode(community.ID(), s.alice.identity)
+	community, err = s.alice.communitiesManager.PromoteSelfToControlNode(community.ID())
 	s.Require().NoError(err)
 	s.Require().True(community.IsControlNode())
 

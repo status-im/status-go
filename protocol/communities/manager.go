@@ -1208,11 +1208,11 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey) (*Community, error) {
 		config := Config{
 			ID:                   &key.PublicKey,
 			PrivateKey:           key,
+			ControlNode:          &key.PublicKey,
 			Logger:               m.logger,
 			Joined:               true,
 			MemberIdentity:       &m.identity.PublicKey,
 			CommunityDescription: description,
-			ControlNode:          &m.identity.PublicKey,
 		}
 		community, err = New(config, m.timesource)
 		if err != nil {
@@ -5022,7 +5022,7 @@ func (m *Manager) createCommunityTokenPermission(request *requests.CreateCommuni
 
 }
 
-func (m *Manager) UpdateControlNode(communityID types.HexBytes, pubKey *ecdsa.PublicKey) (*Community, error) {
+func (m *Manager) PromoteSelfToControlNode(communityID types.HexBytes) (*Community, error) {
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
@@ -5031,47 +5031,12 @@ func (m *Manager) UpdateControlNode(communityID types.HexBytes, pubKey *ecdsa.Pu
 		return nil, ErrOrgNotFound
 	}
 
-	if community.ControlNode().Equal(pubKey) {
-		return community, nil
+	community.setPrivateKey(m.identity)
+	if !community.ControlNode().Equal(&m.identity.PublicKey) {
+		community.setControlNode(&m.identity.PublicKey)
 	}
 
-	community.setControlNode(pubKey)
-	err = m.persistence.SaveCommunity(community)
-	if err != nil {
-		return nil, err
-	}
-
-	return community, nil
-}
-
-func (m *Manager) UpdatePrivateKeyAndControlNode(communityID types.HexBytes, pk *ecdsa.PrivateKey) (*Community, error) {
-	_, err := m.UpdatePrivateKey(communityID, pk)
-	if err != nil {
-		return nil, err
-	}
-
-	community, err := m.UpdateControlNode(communityID, &pk.PublicKey)
-
-	if err != nil {
-		return nil, err
-	}
-
-	m.publish(&Subscription{Community: community})
-	return community, nil
-}
-
-func (m *Manager) UpdatePrivateKey(communityID types.HexBytes, pk *ecdsa.PrivateKey) (*Community, error) {
-	community, err := m.GetByID(communityID)
-	if err != nil {
-		return nil, err
-	}
-	if community == nil {
-		return nil, ErrOrgNotFound
-	}
-
-	community.setPrivateKey(pk)
-
-	err = m.persistence.SaveCommunity(community)
+	err = m.saveAndPublish(community)
 	if err != nil {
 		return nil, err
 	}

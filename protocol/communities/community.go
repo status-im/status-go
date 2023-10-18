@@ -1086,7 +1086,7 @@ func (o *Community) ValidateEditSharedAddresses(signer *ecdsa.PublicKey, request
 
 // We treat control node as an owner with community key
 func (o *Community) IsControlNode() bool {
-	return o.config.PrivateKey != nil
+	return o.config.PrivateKey != nil && o.config.PrivateKey.PublicKey.Equal(o.config.ControlNode)
 }
 
 func (o *Community) IsOwnerWithoutCommunityKey() bool {
@@ -2073,6 +2073,7 @@ func (o *Community) CreateDeepCopy() *Community {
 	return &Community{
 		config: &Config{
 			PrivateKey:                          o.config.PrivateKey,
+			ControlNode:                         o.config.ControlNode,
 			CommunityDescription:                proto.Clone(o.config.CommunityDescription).(*protobuf.CommunityDescription),
 			CommunityDescriptionProtocolMessage: o.config.CommunityDescriptionProtocolMessage,
 			ID:                                  o.config.ID,
