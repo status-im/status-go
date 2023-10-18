@@ -1,9 +1,10 @@
 package common
 
 import (
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
+
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/transport"
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 )
 
 const MainStatusShardCluster = 16

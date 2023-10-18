@@ -8,10 +8,10 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"time"
 
 	"go.uber.org/zap"
 
@@ -38,31 +38,52 @@ type BaseClient struct {
 	challengeTaker *ChallengeTaker
 }
 
-func findServerCert(c *ConnectionParams) (*url.URL, *x509.Certificate, error) {
-	netIps, err := server.FindReachableAddressesForPairingClient(c.netIPs)
-	if err != nil {
-		return nil, nil, err
-	}
+func findServerCert(c *ConnectionParams, reachableIPs []net.IP) (*url.URL, *x509.Certificate, error) {
 	var baseAddress *url.URL
 	var serverCert *x509.Certificate
-	var certErrs error
-	for _, ip := range netIps {
-		u := c.BuildURL(ip)
 
-		serverCert, err = getServerCert(u)
-		if err != nil {
-			var certErr string
-			if certErrs != nil {
-				certErr = certErrs.Error()
-			}
-			certErrs = fmt.Errorf("%sconnecting to '%s' failed: %s; ", certErr, u, err.Error())
-			continue
-		}
-
-		baseAddress = u
-		break
+	type connectionError struct {
+		ip  net.IP
+		err error
 	}
-	return baseAddress, serverCert, certErrs
+	errCh := make(chan connectionError, len(reachableIPs))
+
+	type result struct {
+		u    *url.URL
+		cert *x509.Certificate
+	}
+	successCh := make(chan result, 1) // as we close on the first success
+
+	for _, ip := range reachableIPs {
+		go func(ip net.IP) {
+			u := c.BuildURL(ip)
+			cert, err := getServerCert(u)
+			if err != nil {
+				errCh <- connectionError{ip: ip, err: fmt.Errorf("connecting to '%s' failed: %s", u, err.Error())}
+				return
+			}
+			// If no error, send the results to the success channel
+			successCh <- result{u: u, cert: cert}
+		}(ip)
+	}
+
+	// Keep track of error counts
+	errorCount := 0
+	var combinedErrors string
+	for {
+		select {
+		case success := <-successCh:
+			baseAddress = success.u
+			serverCert = success.cert
+			return baseAddress, serverCert, nil
+		case ipErr := <-errCh:
+			errorCount++
+			combinedErrors += fmt.Sprintf("IP %s: %s; ", ipErr.ip, ipErr.err)
+			if errorCount == len(reachableIPs) {
+				return nil, nil, fmt.Errorf(combinedErrors)
+			}
+		}
+	}
 }
 
 // NewBaseClient returns a fully qualified BaseClient from the given ConnectionParams
@@ -71,13 +92,19 @@ func NewBaseClient(c *ConnectionParams, logger *zap.Logger) (*BaseClient, error)
 	var serverCert *x509.Certificate
 	var certErrs error
 
+	netIPs, err := server.FindReachableAddressesForPairingClient(c.netIPs)
+	if err != nil {
+		logger.Error("[local pair client] failed to find reachable addresses", zap.Error(err), zap.Any("netIPs", netIPs))
+		signal.SendLocalPairingEvent(Event{Type: EventConnectionError, Error: err.Error(), Action: ActionConnect})
+		return nil, err
+	}
+
 	maxRetries := 3
 	for i := 0; i < maxRetries; i++ {
-		baseAddress, serverCert, certErrs = findServerCert(c)
+		baseAddress, serverCert, certErrs = findServerCert(c, netIPs)
 		if serverCert == nil {
 			certErrs = fmt.Errorf("failed to connect to any of given addresses. %w", certErrs)
-			time.Sleep(1 * time.Second)
-			logger.Warn("failed to connect to any of given addresses. Retrying...", zap.Error(certErrs))
+			logger.Warn("failed to connect to any of given addresses. Retrying...", zap.Error(certErrs), zap.Any("netIPs", netIPs), zap.Int("retry", i+1))
 		} else {
 			break
 		}
@@ -92,7 +119,7 @@ func NewBaseClient(c *ConnectionParams, logger *zap.Logger) (*BaseClient, error)
 	// No error on the dial out then the URL.Host is accessible
 	signal.SendLocalPairingEvent(Event{Type: EventConnectionSuccess, Action: ActionConnect})
 
-	err := verifyCert(serverCert, c.publicKey)
+	err = verifyCert(serverCert, c.publicKey)
 	if err != nil {
 		return nil, err
 	}
