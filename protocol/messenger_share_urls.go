@@ -435,8 +435,8 @@ func (m *Messenger) parseUserURLWithChatKey(urlData string) (*URLDataResponse, e
 
 	contactID := common.PubkeyToHex(pubKey)
 
-	contact, ok := m.allContacts.Load(contactID)
-	if !ok {
+	contact := m.GetContactByID(contactID)
+	if contact == nil {
 		return nil, ErrContactNotFound
 	}
 
@@ -446,8 +446,8 @@ func (m *Messenger) parseUserURLWithChatKey(urlData string) (*URLDataResponse, e
 }
 
 func (m *Messenger) ShareUserURLWithENS(contactID string) (string, error) {
-	contact, ok := m.allContacts.Load(contactID)
-	if !ok {
+	contact := m.GetContactByID(contactID)
+	if contact == nil {
 		return "", ErrContactNotFound
 	}
 	return fmt.Sprintf("%s/u#%s", baseShareURL, contact.EnsName), nil
@@ -497,8 +497,8 @@ func (m *Messenger) prepareEncodedUserData(contact *Contact) (string, string, er
 }
 
 func (m *Messenger) ShareUserURLWithData(contactID string) (string, error) {
-	contact, ok := m.allContacts.Load(contactID)
-	if !ok {
+	contact := m.GetContactByID(contactID)
+	if contact == nil {
 		return "", ErrContactNotFound
 	}
 

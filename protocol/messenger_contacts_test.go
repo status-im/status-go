@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"sync"
 	"testing"
 	"time"
 
@@ -22,6 +21,8 @@ type MessengerContactsTestSuite struct {
 }
 
 func (s *MessengerContactsTestSuite) Test_SelfContact() {
+	const timeout = 1 * time.Second
+
 	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
 	profileKp.KeyUID = s.m.account.KeyUID
 	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
@@ -43,73 +44,35 @@ func (s *MessengerContactsTestSuite) Test_SelfContact() {
 		identityImagesMap[img.Name] = img
 	}
 
-	// Create change subscriptions
+	// Set values stored in settings
 
-	const timeout = 100 * time.Second
-	var wg sync.WaitGroup
-	displayNameChanged := false
-	preferredNameChanged := false
-	bioChanged := false
-	identityImageChanged := false
+	settingsList := []string{settings.DisplayName.GetReactName(), settings.PreferredName.GetReactName(), settings.Bio.GetReactName()}
+	setSettingsValues := func() {
+		err := s.m.SetDisplayName(displayName)
+		s.Require().NoError(err)
 
-	wg.Add(1)
-	go func() {
-		channel := s.m.settings.SubscribeToChanges()
-		defer func() {
-			wg.Done()
-		}()
-		for !displayNameChanged || !preferredNameChanged || !bioChanged {
-			select {
-			case setting := <-channel:
-				switch setting.GetReactName() {
-				case settings.DisplayName.GetReactName():
-					displayNameChanged = true
-				case settings.PreferredName.GetReactName():
-					preferredNameChanged = true
-				case settings.Bio.GetReactName():
-					bioChanged = true
-				}
-			case <-time.After(timeout):
-				return
-			}
-		}
-	}()
+		err = s.m.SetBio(bio)
+		s.Require().NoError(err)
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		select {
-		case <-s.m.multiAccounts.SubscribeToIdentityImageChanges():
-			identityImageChanged = true
-		case <-time.After(timeout):
-			return
-		}
-	}()
+		err = s.m.settings.SaveSettingField(settings.PreferredName, ensName)
+		s.Require().NoError(err)
+	}
 
-	// Set settings
+	SetSettingsAndWaitForChange(&s.Suite, s.m, settingsList, timeout, setSettingsValues)
 
-	err = s.m.SetDisplayName(displayName)
-	s.Require().NoError(err)
+	// Set values stored in multiaccounts
 
-	err = s.m.SetBio(bio)
-	s.Require().NoError(err)
+	setIdentityImages := func() {
+		err := s.m.multiAccounts.StoreIdentityImages(s.m.account.KeyUID, identityImages, false)
+		s.Require().NoError(err)
+	}
 
-	err = s.m.settings.SaveSettingField(settings.PreferredName, ensName)
-	s.Require().NoError(err)
+	SetIdentityImagesAndWaitForChange(&s.Suite, s.m.multiAccounts, timeout, setIdentityImages)
+
+	// Set social links. They are applied immediately, no need to wait.
 
 	err = s.m.AddOrReplaceSocialLinks(socialLinks)
 	s.Require().NoError(err)
-
-	err = s.m.multiAccounts.StoreIdentityImages(s.m.account.KeyUID, identityImages, false)
-	s.Require().NoError(err)
-
-	// Wait for changes
-
-	wg.Wait()
-	s.Require().True(displayNameChanged)
-	s.Require().True(preferredNameChanged)
-	s.Require().True(bioChanged)
-	s.Require().True(identityImageChanged)
 
 	// Check values
 

@@ -3,7 +3,6 @@ package protocol
 import (
 	"context"
 	"encoding/json"
-
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/multiaccounts/errors"

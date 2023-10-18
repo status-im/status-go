@@ -3,10 +3,12 @@ package protocol
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
@@ -131,4 +133,61 @@ func PairDevices(s *suite.Suite, device1, device2 *Messenger) {
 	// Ensure installation is enabled
 	err = device2.EnableInstallation(device1.installationID)
 	s.Require().NoError(err)
+}
+
+func SetSettingsAndWaitForChange(s *suite.Suite, messenger *Messenger, settingsReactNames []string, timeout time.Duration, actionCallback func()) {
+	changedSettings := map[string]struct{}{}
+	wg := sync.WaitGroup{}
+
+	for _, reactName := range settingsReactNames {
+		wg.Add(1)
+		settingReactName := reactName // Loop variables captured by 'func' literals in 'go' statements might have unexpected values
+		channel := messenger.settings.SubscribeToChanges()
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case setting := <-channel:
+					if setting.GetReactName() == settingReactName {
+						changedSettings[settingReactName] = struct{}{}
+						return
+					}
+				case <-time.After(timeout):
+					return
+				}
+			}
+		}()
+	}
+
+	actionCallback()
+
+	wg.Wait()
+	s.Require().Len(changedSettings, len(settingsReactNames))
+
+	for _, reactName := range settingsReactNames {
+		_, ok := changedSettings[reactName]
+		s.Require().True(ok)
+	}
+}
+
+func SetIdentityImagesAndWaitForChange(s *suite.Suite, multiAccounts *multiaccounts.Database, timeout time.Duration, actionCallback func()) {
+	channel := multiAccounts.SubscribeToIdentityImageChanges()
+	ok := false
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		select {
+		case <-channel:
+			ok = true
+		case <-time.After(timeout):
+			return
+		}
+	}()
+
+	actionCallback()
+
+	wg.Wait()
+	s.Require().True(ok)
 }

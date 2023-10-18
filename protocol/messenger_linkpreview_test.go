@@ -3,7 +3,6 @@ package protocol
 import (
 	"bytes"
 	"fmt"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -16,10 +15,17 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+)
+
+const (
+	exampleIdenticonURI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixA" +
+		"AAAiklEQVR4nOzWwQmFQAwG4ffEXmzLIizDImzLarQBhSwSGH7mO+9hh0DI9AthCI0hNIbQGEJjCI0hNIbQxITM1YfHfl69X3m2bsu/8i5mI" +
+		"obQGEJjCI0hNIbQlG+tUW83UtfNFjMRQ2gMofm8tUa3U9c2i5mIITSGqEnMRAyhMYTGEBpDaO4AAAD//5POEGncqtj1AAAAAElFTkSuQmCC"
 )
 
 func TestMessengerLinkPreviews(t *testing.T) {
@@ -395,9 +401,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	shortKey, err := s.m.SerializePublicKey(crypto.CompressPubkey(pubkey))
 	s.Require().NoError(err)
 
-	payload, err := images.GetPayloadFromURI("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixA" +
-		"AAAiklEQVR4nOzWwQmFQAwG4ffEXmzLIizDImzLarQBhSwSGH7mO+9hh0DI9AthCI0hNIbQGEJjCI0hNIbQxITM1YfHfl69X3m2bsu/8i5mI" +
-		"obQGEJjCI0hNIbQlG+tUW83UtfNFjMRQ2gMofm8tUa3U9c2i5mIITSGqEnMRAyhMYTGEBpDaO4AAAD//5POEGncqtj1AAAAAElFTkSuQmCC")
+	payload, err := images.GetPayloadFromURI(exampleIdenticonURI)
 	s.Require().NoError(err)
 
 	icon := images.IdentityImage{
@@ -442,7 +446,27 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	expectedDataURI, err := images.GetPayloadDataURI(icon.Payload)
 	s.Require().NoError(err)
 	s.Require().Equal(expectedDataURI, preview.Contact.Icon.DataURI)
+}
 
+func (s *MessengerLinkPreviewsTestSuite) setProfileParameters(messenger *Messenger, displayName string, bio string, identityImages []images.IdentityImage) {
+	const timeout = 1 * time.Second
+
+	settingsList := []string{
+		settings.DisplayName.GetReactName(),
+		settings.Bio.GetReactName(),
+	}
+
+	SetSettingsAndWaitForChange(&s.Suite, messenger, settingsList, timeout, func() {
+		err := messenger.SetDisplayName(displayName)
+		s.Require().NoError(err)
+		err = messenger.SetBio(bio)
+		s.Require().NoError(err)
+	})
+
+	SetIdentityImagesAndWaitForChange(&s.Suite, messenger.multiAccounts, timeout, func() {
+		err := messenger.multiAccounts.StoreIdentityImages(messenger.account.KeyUID, identityImages, false)
+		s.Require().NoError(err)
+	})
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_SelfLink() {
@@ -456,11 +480,9 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_SelfLink() {
 	err = s.m.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err)
 
-	err = s.m.SetDisplayName("TestDisplayName_3")
-	s.Require().NoError(err)
-
-	err = s.m.SetBio("TestBio_3")
-	s.Require().NoError(err)
+	// Set initial profile parameters
+	identityImages := images.SampleIdentityImages()
+	s.setProfileParameters(s.m, "TestDisplayName_3", "TestBio_3", identityImages)
 
 	// Generate a shared URL
 	u, err := s.m.ShareUserURLWithData(s.m.IdentityPublicKeyString())
@@ -468,11 +490,15 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_SelfLink() {
 
 	// Update contact info locally after creating the shared URL
 	// This is required to test that URL-decoded data is not used in the preview.
-	err = s.m.SetDisplayName("TestDisplayName_4")
+	iconPayload, err := images.GetPayloadFromURI(exampleIdenticonURI)
 	s.Require().NoError(err)
-
-	err = s.m.SetBio("TestBio_4")
-	s.Require().NoError(err)
+	icon := images.IdentityImage{
+		Name:    images.SmallDimName,
+		Width:   50,
+		Height:  50,
+		Payload: iconPayload,
+	}
+	s.setProfileParameters(s.m, "TestDisplayName_4", "TestBio_4", []images.IdentityImage{icon})
 
 	r, err := s.m.UnfurlURLs(nil, []string{u})
 	s.Require().NoError(err)
@@ -490,6 +516,14 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_SelfLink() {
 	s.Require().Equal(shortKey, preview.Contact.PublicKey)
 	s.Require().Equal(userSettings.DisplayName, preview.Contact.DisplayName)
 	s.Require().Equal(userSettings.Bio, preview.Contact.Description)
+
+	s.Require().Equal(icon.Width, preview.Contact.Icon.Width)
+	s.Require().Equal(icon.Height, preview.Contact.Icon.Height)
+	s.Require().Equal("", preview.Contact.Icon.URL)
+
+	expectedDataURI, err := images.GetPayloadDataURI(icon.Payload)
+	s.Require().NoError(err)
+	s.Require().Equal(expectedDataURI, preview.Contact.Icon.DataURI)
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined() {
