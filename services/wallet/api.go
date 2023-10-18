@@ -141,6 +141,7 @@ func (api *API) GetTokensBalances(ctx context.Context, accounts, addresses []com
 
 // @deprecated
 func (api *API) GetTokensBalancesForChainIDs(ctx context.Context, chainIDs []uint64, accounts, addresses []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
+	log.Debug("wallet.api.GetTokensBalances", "accounts", accounts, "addresses", addresses)
 	clients, err := api.s.rpcClient.EthClients(chainIDs)
 	if err != nil {
 		return nil, err

@@ -1329,6 +1329,7 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 	// If restoring an account, we don't set the mnemonic
 	if mnemonic == "" {
 		settings.Mnemonic = &info.Mnemonic
+		settings.OmitTransfersHistoryScan = true
 	}
 
 	nodeConfig, err := defaultNodeConfig(settings.InstallationID, request)

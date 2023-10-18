@@ -259,11 +259,12 @@ type Reactor struct {
 	tokenManager       *token.Manager
 	strategy           HistoryFetcher
 	balanceCacher      balance.Cacher
+	omitHistory        bool
 }
 
 func NewReactor(db *Database, blockDAO *BlockDAO, feed *event.Feed, tm *TransactionManager,
 	pendingTxManager *transactions.PendingTxTracker, tokenManager *token.Manager,
-	balanceCacher balance.Cacher) *Reactor {
+	balanceCacher balance.Cacher, omitHistory bool) *Reactor {
 	return &Reactor{
 		db:                 db,
 		blockDAO:           blockDAO,
@@ -272,6 +273,7 @@ func NewReactor(db *Database, blockDAO *BlockDAO, feed *event.Feed, tm *Transact
 		pendingTxManager:   pendingTxManager,
 		tokenManager:       tokenManager,
 		balanceCacher:      balanceCacher,
+		omitHistory:        omitHistory,
 	}
 }
 
@@ -311,6 +313,7 @@ func (r *Reactor) createFetchStrategy(chainClients map[uint64]chain.ClientInterf
 			chainClients,
 			accounts,
 			r.balanceCacher,
+			r.omitHistory,
 		)
 	}
 

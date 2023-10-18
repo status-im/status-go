@@ -447,6 +447,11 @@ var (
 			protobufType:      protobuf.SyncSetting_URL_UNFURLING_MODE,
 		},
 	}
+	OmitTransfersHistoryScan = SettingField{
+		reactFieldName: "omit-transfers-history-scan",
+		dBColumnName:   "omit_transfers_history_scan",
+		valueHandler:   BoolHandler,
+	}
 
 	SettingFieldRegister = []SettingField{
 		AnonMetricsShouldSend,

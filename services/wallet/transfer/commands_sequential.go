@@ -509,7 +509,7 @@ func loadTransfersLoop(ctx context.Context, account common.Address, blockDAO *Bl
 func newLoadBlocksAndTransfersCommand(account common.Address, db *Database,
 	blockDAO *BlockDAO, chainClient chain.ClientInterface, feed *event.Feed,
 	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
-	tokenManager *token.Manager, balanceCacher balance.Cacher) *loadBlocksAndTransfersCommand {
+	tokenManager *token.Manager, balanceCacher balance.Cacher, omitHistory bool) *loadBlocksAndTransfersCommand {
 
 	return &loadBlocksAndTransfersCommand{
 		account:            account,
@@ -524,6 +524,7 @@ func newLoadBlocksAndTransfersCommand(account common.Address, db *Database,
 		pendingTxManager:   pendingTxManager,
 		tokenManager:       tokenManager,
 		blocksLoadedCh:     make(chan []*DBHeader, 100),
+		omitHistory:        omitHistory,
 	}
 }
 
@@ -541,6 +542,7 @@ type loadBlocksAndTransfersCommand struct {
 	pendingTxManager   *transactions.PendingTxTracker
 	tokenManager       *token.Manager
 	blocksLoadedCh     chan []*DBHeader
+	omitHistory        bool
 
 	// Not to be set by the caller
 	transfersLoaded bool // For event RecentHistoryReady to be sent only once per account during app lifetime
@@ -591,12 +593,19 @@ func (c *loadBlocksAndTransfersCommand) startTransfersLoop(ctx context.Context) 
 
 func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocks(ctx context.Context, group *async.Group, blocksLoadedCh chan []*DBHeader) error {
 
-	log.Debug("fetchHistoryBlocks start", "chainID", c.chainClient.NetworkID(), "account", c.account)
+	log.Debug("fetchHistoryBlocks start", "chainID", c.chainClient.NetworkID(), "account", c.account, "omit", c.omitHistory)
 
 	headNum, err := getHeadBlockNumber(ctx, c.chainClient)
 	if err != nil {
 		// c.error = err
 		return err // Might need to retry a couple of times
+	}
+
+	if c.omitHistory {
+		blockRange := &BlockRange{nil, big.NewInt(0), headNum}
+		err := c.blockRangeDAO.upsertRange(c.chainClient.NetworkID(), c.account, blockRange)
+		log.Debug("fetchHistoryBlocks omit history", "chainID", c.chainClient.NetworkID(), "account", c.account, "headNum", headNum, "err", err)
+		return err
 	}
 
 	blockRange, err := loadBlockRangeInfo(c.chainClient.NetworkID(), c.account, c.blockRangeDAO)

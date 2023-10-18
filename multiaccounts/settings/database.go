@@ -122,10 +122,11 @@ INSERT INTO settings (
   current_user_status,
   profile_pictures_show_to,
   profile_pictures_visibility,
-  url_unfurling_mode
+  url_unfurling_mode,
+  omit_transfers_history_scan
 ) VALUES (
 ?,?,?,?,?,?,?,?,?,?,?,?,?,
-?,?,?,?,?,?,?,?,?,'id',?,?,?,?)`,
+?,?,?,?,?,?,?,?,?,'id',?,?,?,?,?)`,
 		s.Address,
 		s.Currency,
 		s.CurrentNetwork,
@@ -152,6 +153,7 @@ INSERT INTO settings (
 		s.ProfilePicturesShowTo,
 		s.ProfilePicturesVisibility,
 		s.URLUnfurlingMode,
+		s.OmitTransfersHistoryScan,
 	)
 	if err != nil {
 		return err
@@ -336,7 +338,8 @@ func (db *Database) GetSettings() (Settings, error) {
 		profile_pictures_show_to, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens,
 		waku_bloom_filter_mode, webview_allow_permission_requests, current_user_status, send_status_updates, gif_recents,
 		gif_favorites, opensea_enabled, last_backup, backup_enabled, telemetry_server_url, auto_message_enabled, gif_api_key,
-		test_networks_enabled, mutual_contact_enabled, profile_migration_needed, is_sepolia_enabled, url_unfurling_mode
+		test_networks_enabled, mutual_contact_enabled, profile_migration_needed, is_sepolia_enabled, url_unfurling_mode,
+                omit_transfers_history_scan
 	FROM
 		settings
 	WHERE
@@ -412,6 +415,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.ProfileMigrationNeeded,
 		&s.IsSepoliaEnabled,
 		&s.URLUnfurlingMode,
+		&s.OmitTransfersHistoryScan,
 	)
 
 	return s, err

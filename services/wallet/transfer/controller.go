@@ -10,6 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	statusaccounts "github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/services/accounts/accountsevent"
@@ -21,6 +23,7 @@ import (
 
 type Controller struct {
 	db                 *Database
+	accountsDB         *statusaccounts.Database
 	rpcClient          *rpc.Client
 	blockDAO           *BlockDAO
 	reactor            *Reactor
@@ -34,13 +37,14 @@ type Controller struct {
 	loadAllTransfers   bool
 }
 
-func NewTransferController(db *sql.DB, rpcClient *rpc.Client, accountFeed *event.Feed, transferFeed *event.Feed,
+func NewTransferController(db *sql.DB, accountsDB *statusaccounts.Database, rpcClient *rpc.Client, accountFeed *event.Feed, transferFeed *event.Feed,
 	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker, tokenManager *token.Manager,
 	balanceCacher balance.Cacher, loadAllTransfers bool) *Controller {
 
 	blockDAO := &BlockDAO{db}
 	return &Controller{
 		db:                 NewDB(db),
+		accountsDB:         accountsDB,
 		blockDAO:           blockDAO,
 		rpcClient:          rpcClient,
 		accountFeed:        accountFeed,
@@ -71,12 +75,10 @@ func (c *Controller) Stop() {
 
 func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Address) error {
 	if len(accounts) == 0 {
-		log.Info("no accounts provided")
 		return nil
 	}
 
 	if len(chainIDs) == 0 {
-		log.Info("no chain provided")
 		return nil
 	}
 
@@ -96,8 +98,21 @@ func (c *Controller) CheckRecentHistory(chainIDs []uint64, accounts []common.Add
 			return err
 		}
 	} else {
+		multiaccSettings, err := c.accountsDB.GetSettings()
+		if err != nil {
+			return err
+		}
+
+		omitHistory := multiaccSettings.OmitTransfersHistoryScan
+		if omitHistory {
+			err := c.accountsDB.SaveSettingField(settings.OmitTransfersHistoryScan, false)
+			if err != nil {
+				return err
+			}
+		}
+
 		c.reactor = NewReactor(c.db, c.blockDAO, c.TransferFeed, c.transactionManager,
-			c.pendingTxManager, c.tokenManager, c.balanceCacher)
+			c.pendingTxManager, c.tokenManager, c.balanceCacher, omitHistory)
 
 		err = c.reactor.start(chainClients, accounts, c.loadAllTransfers)
 		if err != nil {

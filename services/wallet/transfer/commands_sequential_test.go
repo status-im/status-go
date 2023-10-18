@@ -2,6 +2,7 @@ package transfer
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"sort"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum"
@@ -28,7 +30,9 @@ import (
 	"github.com/status-im/status-go/params"
 	statusRpc "github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/network"
+	walletcommon "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/token"
+	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/walletdatabase"
 )
 
@@ -45,6 +49,7 @@ type TestClient struct {
 	printPreparedData      bool
 	rw                     sync.RWMutex
 	callsCounter           map[string]int
+	currentBlock           uint64
 }
 
 func (tc *TestClient) incCounter(method string) {
@@ -165,6 +170,10 @@ func (tc *TestClient) tokenBalanceAt(token common.Address, blockNumber *big.Int)
 
 func (tc *TestClient) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
 	tc.incCounter("HeaderByNumber")
+	if number == nil {
+		number = big.NewInt(int64(tc.currentBlock))
+	}
+
 	if tc.traceAPICalls {
 		tc.t.Log("HeaderByNumber", number)
 	}
@@ -802,5 +811,108 @@ func TestFindBlocksCommand(t *testing.T) {
 			sort.Slice(numbers, func(i, j int) bool { return numbers[i] < numbers[j] })
 			require.Equal(t, testCase.expectedBlocksFound, len(foundBlocks), testCase.label, "found blocks", numbers)
 		}
+	}
+}
+
+type MockETHClient struct {
+	mock.Mock
+}
+
+func (m *MockETHClient) BatchCallContext(ctx context.Context, b []rpc.BatchElem) error {
+	args := m.Called(ctx, b)
+	return args.Error(0)
+}
+
+type MockChainClient struct {
+	mock.Mock
+
+	clients map[walletcommon.ChainID]*MockETHClient
+}
+
+func newMockChainClient() *MockChainClient {
+	return &MockChainClient{
+		clients: make(map[walletcommon.ChainID]*MockETHClient),
+	}
+}
+
+func (m *MockChainClient) AbstractEthClient(chainID walletcommon.ChainID) (chain.BatchCallClient, error) {
+	if _, ok := m.clients[chainID]; !ok {
+		panic(fmt.Sprintf("no mock client for chainID %d", chainID))
+	}
+	return m.clients[chainID], nil
+}
+
+func TestFetchTransfersForLoadedBlocks(t *testing.T) {
+	db, err := helpers.SetupTestMemorySQLDB(walletdatabase.DbInitializer{})
+	require.NoError(t, err)
+	tm := &TransactionManager{db, nil, nil, nil, nil, nil, nil, nil, nil, nil}
+
+	wdb := NewDB(db)
+	blockChannel := make(chan []*DBHeader, 100)
+
+	tc := &TestClient{
+		t:                      t,
+		balances:               [][]int{},
+		outgoingERC20Transfers: []testERC20Transfer{},
+		incomingERC20Transfers: []testERC20Transfer{},
+		callsCounter:           map[string]int{},
+		currentBlock:           100,
+	}
+
+	client, _ := statusRpc.NewClient(nil, 1, params.UpstreamRPCConfig{Enabled: false, URL: ""}, []params.Network{}, db)
+	client.SetClient(tc.NetworkID(), tc)
+	tokenManager := token.NewTokenManager(db, client, network.NewManager(db))
+
+	tokenManager.SetTokens([]*token.Token{
+		{
+			Address:  tokenTXXAddress,
+			Symbol:   "TXX",
+			Decimals: 18,
+			ChainID:  tc.NetworkID(),
+			Name:     "Test Token 1",
+			Verified: true,
+		},
+		{
+			Address:  tokenTXYAddress,
+			Symbol:   "TXY",
+			Decimals: 18,
+			ChainID:  tc.NetworkID(),
+			Name:     "Test Token 2",
+			Verified: true,
+		},
+	})
+
+	chainClient := newMockChainClient()
+	tracker := transactions.NewPendingTxTracker(db, chainClient, nil, &event.Feed{}, transactions.PendingCheckInterval)
+	cmd := &loadBlocksAndTransfersCommand{
+		account:            common.HexToAddress("0x1234"),
+		db:                 wdb,
+		blockRangeDAO:      &BlockRangeSequentialDAO{wdb.client},
+		blockDAO:           &BlockDAO{db},
+		chainClient:        tc,
+		feed:               &event.Feed{},
+		balanceCacher:      balance.NewCacherWithTTL(5 * time.Minute),
+		errorsCount:        0,
+		transactionManager: tm,
+		pendingTxManager:   tracker,
+		tokenManager:       tokenManager,
+		blocksLoadedCh:     blockChannel,
+		omitHistory:        true,
+	}
+
+	tc.prepareBalanceHistory(int(tc.currentBlock))
+	tc.prepareTokenBalanceHistory(int(tc.currentBlock))
+	tc.traceAPICalls = true
+
+	ctx := context.Background()
+	group := async.NewGroup(ctx)
+	err = cmd.fetchHistoryBlocks(ctx, group, blockChannel)
+	require.NoError(t, err)
+
+	select {
+	case <-ctx.Done():
+		t.Log("ERROR")
+	case <-group.WaitAsync():
+		require.Equal(t, 1, tc.getCounter())
 	}
 }

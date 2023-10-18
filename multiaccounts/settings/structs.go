@@ -143,6 +143,7 @@ type Settings struct {
 	MessagesFromContactsOnly  bool             `json:"messages-from-contacts-only"`
 	Mnemonic                  *string          `json:"mnemonic,omitempty"`
 	MnemonicRemoved           bool             `json:"mnemonic-removed?,omitempty"`
+	OmitTransfersHistoryScan  bool             `json:"omit-transfers-history-scan?,omitempty"`
 	MutualContactEnabled      bool             `json:"mutual-contact-enabled?"`
 	Name                      string           `json:"name,omitempty"`
 	Networks                  *json.RawMessage `json:"networks/networks"`

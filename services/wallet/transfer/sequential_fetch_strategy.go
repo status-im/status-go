@@ -22,6 +22,7 @@ func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, feed *event.Fe
 	chainClients map[uint64]chain.ClientInterface,
 	accounts []common.Address,
 	balanceCacher balance.Cacher,
+	omitHistory bool,
 ) *SequentialFetchStrategy {
 
 	return &SequentialFetchStrategy{
@@ -34,6 +35,7 @@ func NewSequentialFetchStrategy(db *Database, blockDAO *BlockDAO, feed *event.Fe
 		chainClients:       chainClients,
 		accounts:           accounts,
 		balanceCacher:      balanceCacher,
+		omitHistory:        omitHistory,
 	}
 }
 
@@ -49,13 +51,14 @@ type SequentialFetchStrategy struct {
 	chainClients       map[uint64]chain.ClientInterface
 	accounts           []common.Address
 	balanceCacher      balance.Cacher
+	omitHistory        bool
 }
 
 func (s *SequentialFetchStrategy) newCommand(chainClient chain.ClientInterface,
 	account common.Address) async.Commander {
 
 	return newLoadBlocksAndTransfersCommand(account, s.db, s.blockDAO, chainClient, s.feed,
-		s.transactionManager, s.pendingTxManager, s.tokenManager, s.balanceCacher)
+		s.transactionManager, s.pendingTxManager, s.tokenManager, s.balanceCacher, s.omitHistory)
 }
 
 func (s *SequentialFetchStrategy) start() error {
