@@ -4701,6 +4701,10 @@ func (m *Manager) AddCommunityToken(token *community_token.CommunityToken) (*Com
 		if err != nil {
 			return nil, err
 		}
+
+		if token.PrivilegesLevel == community_token.OwnerLevel {
+			m.promoteSelfToControlNode(community)
+		}
 	}
 
 	return community, m.saveAndPublish(community)
@@ -5027,21 +5031,21 @@ func (m *Manager) PromoteSelfToControlNode(communityID types.HexBytes) (*Communi
 	if err != nil {
 		return nil, err
 	}
+
 	if community == nil {
 		return nil, ErrOrgNotFound
 	}
 
+	m.promoteSelfToControlNode(community)
+
+	return community, m.saveAndPublish(community)
+}
+
+func (m *Manager) promoteSelfToControlNode(community *Community) {
 	community.setPrivateKey(m.identity)
 	if !community.ControlNode().Equal(&m.identity.PublicKey) {
 		community.setControlNode(&m.identity.PublicKey)
 	}
-
-	err = m.saveAndPublish(community)
-	if err != nil {
-		return nil, err
-	}
-
-	return community, nil
 }
 
 func (m *Manager) shareRequestsToJoinWithNewPrivilegedMembers(community *Community, newPrivilegedMembers map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey) error {
