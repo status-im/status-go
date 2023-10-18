@@ -54,6 +54,7 @@ func (s *PersistenceSuite) TestSaveCommunity() {
 	community := Community{
 		config: &Config{
 			PrivateKey:           id,
+			ControlNode:          &id.PublicKey,
 			ID:                   &id.PublicKey,
 			Joined:               true,
 			Spectated:            true,
@@ -258,6 +259,7 @@ func (s *PersistenceSuite) makeNewCommunity(identity *ecdsa.PrivateKey) *Communi
 	com, err := New(Config{
 		MemberIdentity: &identity.PublicKey,
 		PrivateKey:     comPrivKey,
+		ControlNode:    &comPrivKey.PublicKey,
 		ID:             &comPrivKey.PublicKey,
 	}, &TimeSourceStub{})
 	s.NoError(err, "New shouldn't give any error")

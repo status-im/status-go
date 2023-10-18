@@ -5120,7 +5120,7 @@ func (m *Messenger) SetCommunitySignerPubKey(ctx context.Context, communityID []
 		return "", err
 	}
 
-	_, err = m.communitiesManager.UpdatePrivateKeyAndControlNode(communityID, m.identity)
+	_, err = m.communitiesManager.PromoteSelfToControlNode(communityID)
 	if err != nil {
 		return "", err
 	}
