@@ -27,11 +27,14 @@ contract CommunityERC20 is Context, Ownable, ERC20, CommunityOwnable {
 
     uint8 private immutable customDecimals;
 
+    string public baseTokenURI;
+
     constructor(
         string memory _name,
         string memory _symbol,
         uint8 _decimals,
         uint256 _maxSupply,
+        string memory _baseTokenURI,
         address _ownerToken,
         address _masterToken
     )
@@ -40,6 +43,7 @@ contract CommunityERC20 is Context, Ownable, ERC20, CommunityOwnable {
     {
         maxSupply = _maxSupply;
         customDecimals = _decimals;
+        baseTokenURI = _baseTokenURI;
     }
 
     // Events
