@@ -2,6 +2,7 @@ package communities
 
 import (
 	"crypto/ecdsa"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -26,6 +27,7 @@ func createTestCommunity(identity *ecdsa.PrivateKey) (*Community, error) {
 			CommunityTokensMetadata: []*protobuf.CommunityTokenMetadata{},
 		},
 		ID:             &identity.PublicKey,
+		ControlNode:    &identity.PublicKey,
 		Joined:         true,
 		MemberIdentity: &identity.PublicKey,
 	}
@@ -824,4 +826,161 @@ func (s *CommunityEncryptionKeyActionSuite) TestNilOrigin() {
 	s.Require().Len(actions.ChannelKeysActions, 1)
 	s.Require().NotNil(actions.ChannelKeysActions[channelID])
 	s.Require().Equal(actions.ChannelKeysActions[channelID].ActionType, EncryptionKeyAdd)
+}
+
+func (s *CommunityEncryptionKeyActionSuite) TestControlNodeChange() {
+	channelID := "1234"
+	chatID := types.EncodeHex(crypto.CompressPubkey(&s.identity.PublicKey)) + channelID
+
+	testCases := []struct {
+		name            string
+		permissions     []*protobuf.CommunityTokenPermission
+		members         []*ecdsa.PublicKey
+		channelMembers  []*ecdsa.PublicKey
+		expectedActions EncryptionKeyActions
+	}{
+		{
+			name:           "change control node in open community",
+			permissions:    []*protobuf.CommunityTokenPermission{},
+			members:        []*ecdsa.PublicKey{&s.member1.PublicKey, &s.member2.PublicKey},
+			channelMembers: []*ecdsa.PublicKey{&s.member1.PublicKey},
+			expectedActions: EncryptionKeyActions{
+				CommunityKeyAction: EncryptionKeyAction{
+					ActionType: EncryptionKeyNone,
+					Members:    map[string]*protobuf.CommunityMember{},
+				},
+				ChannelKeysActions: map[string]EncryptionKeyAction{
+					channelID: EncryptionKeyAction{
+						ActionType: EncryptionKeyNone,
+						Members:    map[string]*protobuf.CommunityMember{},
+					},
+				},
+			},
+		},
+		{
+			name: "change control node in token-gated community",
+			permissions: []*protobuf.CommunityTokenPermission{
+				&protobuf.CommunityTokenPermission{
+					Id:            "some-id",
+					Type:          protobuf.CommunityTokenPermission_BECOME_MEMBER,
+					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					ChatIds:       []string{},
+				},
+			},
+			members:        []*ecdsa.PublicKey{&s.member1.PublicKey, &s.member2.PublicKey},
+			channelMembers: []*ecdsa.PublicKey{&s.member1.PublicKey},
+			expectedActions: EncryptionKeyActions{
+				CommunityKeyAction: EncryptionKeyAction{
+					ActionType: EncryptionKeyRekey,
+					Members: map[string]*protobuf.CommunityMember{
+						s.member1Key: &protobuf.CommunityMember{},
+						s.member2Key: &protobuf.CommunityMember{},
+					},
+				},
+				ChannelKeysActions: map[string]EncryptionKeyAction{
+					channelID: EncryptionKeyAction{
+						ActionType: EncryptionKeyNone,
+						Members:    map[string]*protobuf.CommunityMember{},
+					},
+				},
+			},
+		},
+		{
+			name: "change control node in open community with token-gated channel",
+			permissions: []*protobuf.CommunityTokenPermission{
+				&protobuf.CommunityTokenPermission{
+					Id:            "some-id",
+					Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					ChatIds:       []string{chatID},
+				},
+			},
+			members:        []*ecdsa.PublicKey{&s.member1.PublicKey, &s.member2.PublicKey},
+			channelMembers: []*ecdsa.PublicKey{&s.member1.PublicKey},
+			expectedActions: EncryptionKeyActions{
+				CommunityKeyAction: EncryptionKeyAction{
+					ActionType: EncryptionKeyNone,
+					Members:    map[string]*protobuf.CommunityMember{},
+				},
+				ChannelKeysActions: map[string]EncryptionKeyAction{
+					channelID: EncryptionKeyAction{
+						ActionType: EncryptionKeyRekey,
+						Members: map[string]*protobuf.CommunityMember{
+							s.member1Key: &protobuf.CommunityMember{},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "change control node in token-gated community with token-gated channel",
+			permissions: []*protobuf.CommunityTokenPermission{
+				&protobuf.CommunityTokenPermission{
+					Id:            "some-id-1",
+					Type:          protobuf.CommunityTokenPermission_BECOME_MEMBER,
+					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					ChatIds:       []string{},
+				},
+				&protobuf.CommunityTokenPermission{
+					Id:            "some-id-2",
+					Type:          protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+					TokenCriteria: make([]*protobuf.TokenCriteria, 0),
+					ChatIds:       []string{chatID},
+				},
+			},
+			members:        []*ecdsa.PublicKey{&s.member1.PublicKey, &s.member2.PublicKey},
+			channelMembers: []*ecdsa.PublicKey{&s.member1.PublicKey},
+			expectedActions: EncryptionKeyActions{
+				CommunityKeyAction: EncryptionKeyAction{
+					ActionType: EncryptionKeyRekey,
+					Members: map[string]*protobuf.CommunityMember{
+						s.member1Key: &protobuf.CommunityMember{},
+						s.member2Key: &protobuf.CommunityMember{},
+					},
+				},
+				ChannelKeysActions: map[string]EncryptionKeyAction{
+					channelID: EncryptionKeyAction{
+						ActionType: EncryptionKeyRekey,
+						Members: map[string]*protobuf.CommunityMember{
+							s.member1Key: &protobuf.CommunityMember{},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.name, func() {
+			origin, err := createTestCommunity(s.identity)
+			s.Require().NoError(err)
+
+			_, err = origin.CreateChat(channelID, &protobuf.CommunityChat{
+				Members:     map[string]*protobuf.CommunityMember{},
+				Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_NO_MEMBERSHIP},
+				Identity:    &protobuf.ChatIdentity{},
+			})
+			s.Require().NoError(err)
+
+			for _, permission := range tc.permissions {
+				_, err := origin.UpsertTokenPermission(permission)
+				s.Require().NoError(err)
+			}
+			for _, member := range tc.members {
+				_, err := origin.AddMember(member, []protobuf.CommunityMember_Roles{})
+				s.Require().NoError(err)
+			}
+			for _, member := range tc.channelMembers {
+				_, err = origin.AddMemberToChat(channelID, member, []protobuf.CommunityMember_Roles{})
+				s.Require().NoError(err)
+			}
+
+			// change control node to arbitrary member
+			modified := origin.CreateDeepCopy()
+			modified.setControlNode(&s.member1.PublicKey)
+
+			actions := EvaluateCommunityEncryptionKeyActions(origin, modified)
+			s.Require().True(reflect.DeepEqual(tc.expectedActions, *actions))
+		})
+	}
 }

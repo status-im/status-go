@@ -1,6 +1,10 @@
 package communities
 
-import "github.com/status-im/status-go/protocol/protobuf"
+import (
+	"crypto/ecdsa"
+
+	"github.com/status-im/status-go/protocol/protobuf"
+)
 
 type CommunityChatChanges struct {
 	ChatModified                  *protobuf.CommunityChat
@@ -13,6 +17,8 @@ type CommunityChatChanges struct {
 
 type CommunityChanges struct {
 	Community *Community `json:"community"`
+
+	ControlNodeChanged *ecdsa.PublicKey `json:"controlNodeChanged"`
 
 	MembersAdded   map[string]*protobuf.CommunityMember `json:"membersAdded"`
 	MembersRemoved map[string]*protobuf.CommunityMember `json:"membersRemoved"`
@@ -81,6 +87,10 @@ func (c *CommunityChanges) HasMemberLeft(identity string) bool {
 
 func EvaluateCommunityChanges(origin, modified *Community) *CommunityChanges {
 	changes := evaluateCommunityChangesByDescription(origin.Description(), modified.Description())
+
+	if origin.ControlNode() != nil && !modified.ControlNode().Equal(origin.ControlNode()) {
+		changes.ControlNodeChanged = modified.ControlNode()
+	}
 
 	originTokenPermissions := origin.tokenPermissions()
 	modifiedTokenPermissions := modified.tokenPermissions()

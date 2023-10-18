@@ -57,7 +57,14 @@ func evaluateCommunityLevelEncryptionKeyAction(origin, modified *Community, chan
 	originBecomeMemberPermissions := origin.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 	modifiedBecomeMemberPermissions := modified.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 
-	return evaluateEncryptionKeyAction(originBecomeMemberPermissions, modifiedBecomeMemberPermissions, modified.config.CommunityDescription.Members, changes.MembersAdded, changes.MembersRemoved)
+	return evaluateEncryptionKeyAction(
+		originBecomeMemberPermissions,
+		modifiedBecomeMemberPermissions,
+		modified.config.CommunityDescription.Members,
+		changes.MembersAdded,
+		changes.MembersRemoved,
+		changes.ControlNodeChanged != nil,
+	)
 }
 
 func evaluateChannelLevelEncryptionKeyActions(origin, modified *Community, changes *CommunityChanges) *map[string]EncryptionKeyAction {
@@ -83,13 +90,20 @@ func evaluateChannelLevelEncryptionKeyActions(origin, modified *Community, chang
 			membersRemoved = chatChanges.MembersRemoved
 		}
 
-		result[channelID] = *evaluateEncryptionKeyAction(originChannelPermissions, modifiedChannelPermissions, modified.config.CommunityDescription.Chats[channelID].Members, membersAdded, membersRemoved)
+		result[channelID] = *evaluateEncryptionKeyAction(
+			originChannelPermissions,
+			modifiedChannelPermissions,
+			modified.config.CommunityDescription.Chats[channelID].Members,
+			membersAdded, membersRemoved,
+			changes.ControlNodeChanged != nil,
+		)
 	}
 
 	return &result
 }
 
-func evaluateEncryptionKeyAction(originPermissions, modifiedPermissions []*CommunityTokenPermission, allMembers, membersAdded, membersRemoved map[string]*protobuf.CommunityMember) *EncryptionKeyAction {
+func evaluateEncryptionKeyAction(originPermissions, modifiedPermissions []*CommunityTokenPermission,
+	allMembers, membersAdded, membersRemoved map[string]*protobuf.CommunityMember, controlNodeChanged bool) *EncryptionKeyAction {
 	result := &EncryptionKeyAction{
 		ActionType: EncryptionKeyNone,
 		Members:    map[string]*protobuf.CommunityMember{},
@@ -101,6 +115,13 @@ func evaluateEncryptionKeyAction(originPermissions, modifiedPermissions []*Commu
 			to[pubKey] = member
 		}
 		return to
+	}
+
+	// control node changed on closed community/channel
+	if controlNodeChanged && len(modifiedPermissions) > 0 {
+		result.ActionType = EncryptionKeyRekey
+		result.Members = copyMap(allMembers)
+		return result
 	}
 
 	// permission was just added

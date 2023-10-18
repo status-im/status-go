@@ -2207,7 +2207,10 @@ func (o *Community) createChat(chatID string, chat *protobuf.CommunityChat) erro
 		}
 	}
 
-	chat.Members = o.config.CommunityDescription.Members
+	chat.Members = make(map[string]*protobuf.CommunityMember)
+	for pubKey, member := range o.config.CommunityDescription.Members {
+		chat.Members[pubKey] = member
+	}
 
 	o.config.CommunityDescription.Chats[chatID] = chat
 
