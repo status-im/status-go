@@ -3,6 +3,7 @@ package protocol
 import (
 	"bytes"
 	"fmt"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -406,7 +407,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	}
 
 	c.Bio = "TestBio_1"
-	c.DisplayName = "TestDisplayName_2"
+	c.DisplayName = "TestDisplayName_1"
 	c.Images = map[string]images.IdentityImage{}
 	c.Images[images.SmallDimName] = icon
 	s.m.allContacts.Store(c.ID, c)
@@ -441,6 +442,54 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	expectedDataURI, err := images.GetPayloadDataURI(icon.Payload)
 	s.Require().NoError(err)
 	s.Require().Equal(expectedDataURI, preview.Contact.Icon.DataURI)
+
+}
+
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_SelfLink() {
+	shortKey, err := s.m.SerializePublicKey(crypto.CompressPubkey(s.m.IdentityPublicKey()))
+	s.Require().NoError(err)
+
+	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp.KeyUID = s.m.account.KeyUID
+	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
+
+	err = s.m.settings.SaveOrUpdateKeypair(profileKp)
+	s.Require().NoError(err)
+
+	err = s.m.SetDisplayName("TestDisplayName_3")
+	s.Require().NoError(err)
+
+	err = s.m.SetBio("TestBio_3")
+	s.Require().NoError(err)
+
+	// Generate a shared URL
+	u, err := s.m.ShareUserURLWithData(s.m.IdentityPublicKeyString())
+	s.Require().NoError(err)
+
+	// Update contact info locally after creating the shared URL
+	// This is required to test that URL-decoded data is not used in the preview.
+	err = s.m.SetDisplayName("TestDisplayName_4")
+	s.Require().NoError(err)
+
+	err = s.m.SetBio("TestBio_4")
+	s.Require().NoError(err)
+
+	r, err := s.m.UnfurlURLs(nil, []string{u})
+	s.Require().NoError(err)
+	s.Require().Len(r.StatusLinkPreviews, 1)
+	s.Require().Len(r.LinkPreviews, 0)
+
+	userSettings, err := s.m.getSettings()
+	s.Require().NoError(err)
+
+	preview := r.StatusLinkPreviews[0]
+	s.Require().Equal(u, preview.URL)
+	s.Require().Nil(preview.Community)
+	s.Require().Nil(preview.Channel)
+	s.Require().NotNil(preview.Contact)
+	s.Require().Equal(shortKey, preview.Contact.PublicKey)
+	s.Require().Equal(userSettings.DisplayName, preview.Contact.DisplayName)
+	s.Require().Equal(userSettings.Bio, preview.Contact.Description)
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined() {

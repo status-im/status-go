@@ -756,8 +756,14 @@ func (m *Messenger) BlockedContacts() []*Contact {
 	return contacts
 }
 
-// GetContactByID assumes pubKey includes 0x prefix
+// GetContactByID returns a Contact for given pubKey, if it's known.
+// This function automatically checks if pubKey is self identity key and returns a Contact
+// filled with self information.
+// pubKey is assumed to include `0x` prefix
 func (m *Messenger) GetContactByID(pubKey string) *Contact {
+	if pubKey == m.IdentityPublicKeyString() {
+		return m.selfContact
+	}
 	contact, _ := m.allContacts.Load(pubKey)
 	return contact
 }
@@ -1287,3 +1293,46 @@ func (m *Messenger) forgetContactInfoRequest(publicKey string) {
 
 	delete(m.requestedContacts, publicKey)
 }
+
+func (m *Messenger) buildSelfContact() (*Contact, error) {
+	return buildSelfContact(m.identity, m.settings, m.multiAccounts, m.account)
+}
+
+//func (m *Messenger) updateSelfContact() error {
+//	displayName, err := m.settings.DisplayName()
+//	if err != nil {
+//		return err
+//	}
+//
+//	bio, err := m.settings.Bio()
+//	if err != nil {
+//		return err
+//	}
+//
+//	ensName, err := m.settings.ENSName()
+//	if err != nil {
+//		return err
+//	}
+//
+//	socialLinks, err := m.settings.GetSocialLinks()
+//	if err != nil {
+//		return err
+//	}
+//
+//	imgs, err := m.multiAccounts.GetIdentityImages(m.account.KeyUID)
+//	if err != nil {
+//		return err
+//	}
+//
+//	imagesMap := make(map[string]images.IdentityImage)
+//	for _, img := range imgs {
+//		imagesMap[img.Name] = *img
+//	}
+//
+//	m.selfContact.DisplayName = displayName
+//	m.selfContact.Bio = bio
+//	m.selfContact.EnsName = ensName
+//	m.selfContact.SocialLinks = socialLinks
+//	m.selfContact.Images = imagesMap
+//	return nil
+//}

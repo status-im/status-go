@@ -5,6 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/status-im/status-go/multiaccounts/accounts"
+
+	"github.com/status-im/status-go/multiaccounts"
+
 	accountJson "github.com/status-im/status-go/account/json"
 	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -384,6 +388,51 @@ func buildContact(publicKeyString string, publicKey *ecdsa.PublicKey) (*Contact,
 	}
 
 	return contact, nil
+}
+
+func buildSelfContact(identity *ecdsa.PrivateKey, settings *accounts.Database, multiAccounts *multiaccounts.Database, account *multiaccounts.Account) (*Contact, error) {
+	myPublicKeyString := types.EncodeHex(crypto.FromECDSAPub(&identity.PublicKey))
+	c, err := buildContact(myPublicKeyString, &identity.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build contact: %w", err)
+	}
+
+	displayName, err := settings.DisplayName()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get display name: %w", err)
+	}
+
+	bio, err := settings.Bio()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bio: %w", err)
+	}
+
+	ensName, err := settings.ENSName()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ens name: %w", err)
+	}
+
+	socialLinks, err := settings.GetSocialLinks()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get social links: %w", err)
+	}
+
+	identityImages, err := multiAccounts.GetIdentityImages(account.KeyUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get identity images: %w", err)
+	}
+
+	imagesMap := make(map[string]images.IdentityImage)
+	for _, img := range identityImages {
+		imagesMap[img.Name] = *img
+	}
+
+	c.DisplayName = displayName
+	c.Bio = bio
+	c.EnsName = ensName
+	c.SocialLinks = socialLinks
+	c.Images = imagesMap
+	return c, nil
 }
 
 func contactIDFromPublicKey(key *ecdsa.PublicKey) string {
