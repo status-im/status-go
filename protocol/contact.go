@@ -397,19 +397,9 @@ func buildSelfContact(identity *ecdsa.PrivateKey, settings *accounts.Database, m
 		return nil, fmt.Errorf("failed to build contact: %w", err)
 	}
 
-	displayName, err := settings.DisplayName()
+	s, err := settings.GetSettings()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get display name: %w", err)
-	}
-
-	bio, err := settings.Bio()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get bio: %w", err)
-	}
-
-	ensName, err := settings.ENSName()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get ens name: %w", err)
+		return nil, fmt.Errorf("failed to get settings: %w", err)
 	}
 
 	socialLinks, err := settings.GetSocialLinks()
@@ -427,11 +417,14 @@ func buildSelfContact(identity *ecdsa.PrivateKey, settings *accounts.Database, m
 		imagesMap[img.Name] = *img
 	}
 
-	c.DisplayName = displayName
-	c.Bio = bio
-	c.EnsName = ensName
+	c.DisplayName = s.DisplayName
+	c.Bio = s.Bio
 	c.SocialLinks = socialLinks
 	c.Images = imagesMap
+	if s.PreferredName != nil {
+		c.EnsName = *s.PreferredName
+	}
+
 	return c, nil
 }
 

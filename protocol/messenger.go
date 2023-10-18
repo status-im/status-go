@@ -817,6 +817,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 	m.startSyncSettingsLoop()
+	m.startSettingsChangesLoop()
 	m.startCommunityRekeyLoop()
 	m.startCuratedCommunitiesUpdateLoop()
 
@@ -1548,25 +1549,28 @@ func (m *Messenger) watchIdentityImageChanges() {
 	go func() {
 		for {
 			select {
-			case <-channel:
+			case change := <-channel:
 				identityImages, err := m.multiAccounts.GetIdentityImages(m.account.KeyUID)
 				if err != nil {
 					m.logger.Error("failed to get profile pictures to save self contact", zap.Error(err))
-				} else {
-					identityImagesMap := make(map[string]images.IdentityImage)
-					for _, img := range identityImages {
-						identityImagesMap[img.Name] = *img
-					}
-					m.selfContact.Images = identityImagesMap
+					break
 				}
 
-				err = m.syncProfilePictures(m.dispatchMessage, identityImages)
-				if err != nil {
-					m.logger.Error("failed to sync profile pictures to paired devices", zap.Error(err))
+				identityImagesMap := make(map[string]images.IdentityImage)
+				for _, img := range identityImages {
+					identityImagesMap[img.Name] = *img
 				}
-				err = m.PublishIdentityImage()
-				if err != nil {
-					m.logger.Error("failed to publish identity image", zap.Error(err))
+				m.selfContact.Images = identityImagesMap
+
+				if change.PublishExpected {
+					err = m.syncProfilePictures(m.dispatchMessage, identityImages)
+					if err != nil {
+						m.logger.Error("failed to sync profile pictures to paired devices", zap.Error(err))
+					}
+					err = m.PublishIdentityImage()
+					if err != nil {
+						m.logger.Error("failed to publish identity image", zap.Error(err))
+					}
 				}
 			case <-m.quit:
 				return

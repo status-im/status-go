@@ -95,9 +95,13 @@ type MultiAccountMarshaller interface {
 	ToMultiAccount() *Account
 }
 
+type IdentityImageSubscriptionChange struct {
+	PublishExpected bool
+}
+
 type Database struct {
 	db                         *sql.DB
-	identityImageSubscriptions []chan struct{}
+	identityImageSubscriptions []chan *IdentityImageSubscriptionChange
 }
 
 // InitializeDB creates db file at a given path and applies migrations.
@@ -422,24 +426,24 @@ func (db *Database) StoreIdentityImages(keyUID string, iis []images.IdentityImag
 		}
 	}
 
-	if publish {
-		db.publishOnIdentityImageSubscriptions()
-	}
+	db.publishOnIdentityImageSubscriptions(&IdentityImageSubscriptionChange{
+		PublishExpected: publish,
+	})
 
 	return nil
 }
 
-func (db *Database) SubscribeToIdentityImageChanges() chan struct{} {
-	s := make(chan struct{}, 100)
+func (db *Database) SubscribeToIdentityImageChanges() chan *IdentityImageSubscriptionChange {
+	s := make(chan *IdentityImageSubscriptionChange, 100)
 	db.identityImageSubscriptions = append(db.identityImageSubscriptions, s)
 	return s
 }
 
-func (db *Database) publishOnIdentityImageSubscriptions() {
+func (db *Database) publishOnIdentityImageSubscriptions(change *IdentityImageSubscriptionChange) {
 	// Publish on channels, drop if buffer is full
 	for _, s := range db.identityImageSubscriptions {
 		select {
-		case s <- struct{}{}:
+		case s <- change:
 		default:
 			log.Warn("subscription channel full, dropping message")
 		}

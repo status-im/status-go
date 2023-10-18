@@ -77,8 +77,6 @@ func (m *Messenger) SetDisplayName(displayName string) error {
 		return err
 	}
 
-	m.selfContact.DisplayName = displayName
-
 	err = m.UpdateKeypairName(m.account.KeyUID, displayName)
 	if err != nil {
 		return err
@@ -133,7 +131,6 @@ func (m *Messenger) SetBio(bio string) error {
 	if err = m.settings.SaveSettingField(settings.Bio, bio); err != nil {
 		return err
 	}
-	m.selfContact.Bio = bio
 
 	if err = m.resetLastPublishedTimeForChatIdentity(); err != nil {
 		return err
