@@ -20,7 +20,7 @@ type StatusUnfurler struct {
 func NewStatusUnfurler(URL string, messenger *Messenger, logger *zap.Logger) *StatusUnfurler {
 	return &StatusUnfurler{
 		m:      messenger,
-		logger: logger,
+		logger: logger.With(zap.String("url", URL)),
 		url:    URL,
 	}
 }
@@ -30,17 +30,19 @@ func updateThumbnail(image *images.IdentityImage, thumbnail *common.LinkPreviewT
 		return nil
 	}
 
-	var err error
-
-	thumbnail.Width, thumbnail.Height, err = images.GetImageDimensions(image.Payload)
+	width, height, err := images.GetImageDimensions(image.Payload)
 	if err != nil {
 		return fmt.Errorf("failed to get image dimensions: %w", err)
 	}
 
-	thumbnail.DataURI, err = image.GetDataURI()
+	dataURI, err := image.GetDataURI()
 	if err != nil {
 		return fmt.Errorf("failed to get data uri: %w", err)
 	}
+
+	thumbnail.Width = width
+	thumbnail.Height = height
+	thumbnail.DataURI = dataURI
 
 	return nil
 }
@@ -67,7 +69,7 @@ func (u *StatusUnfurler) buildContactData(publicKey string) (*common.StatusConta
 
 	if image, ok := contact.Images[images.SmallDimName]; ok {
 		if err = updateThumbnail(&image, &c.Icon); err != nil {
-			return nil, fmt.Errorf("failed to set thumbnail: %w", err)
+			u.logger.Warn("unfurling status link: failed to set contact thumbnail", zap.Error(err))
 		}
 	}
 
