@@ -1547,12 +1547,12 @@ func (api *PublicAPI) CreateTokenGatedCommunity() (*protocol.MessengerResponse, 
 }
 
 // Set profile showcase preference for current user
-func (api *PublicAPI) SetProfileShowcasePreference(entry *protocol.ProfileShowcaseEntry) error {
-	return api.service.messenger.SetProfileShowcasePreference(entry)
+func (api *PublicAPI) SetProfileShowcasePreferences(preferences protocol.ProfileShowcasePreferences) error {
+	return api.service.messenger.SetProfileShowcasePreferences(preferences)
 }
 
 // Get all profile showcase preferences for current user
-func (api *PublicAPI) GetProfileShowcasePreferences() (*protocol.ProfileShowcaseResponse, error) {
+func (api *PublicAPI) GetProfileShowcasePreferences() (*protocol.ProfileShowcasePreferences, error) {
 	return api.service.messenger.GetProfileShowcasePreferences()
 }
 

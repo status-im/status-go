@@ -15,52 +15,62 @@ type MessengerProfileShowcaseSuite struct {
 }
 
 func (s *MessengerProfileShowcaseSuite) TestSetAndGetProfileShowcasePreferences() {
-	communityEntry := &ProfileShowcaseEntry{
-		ID:         "0x01312357798976434",
-		Type:       ProfileShowcaseEntryTypeCommunity,
-		Visibility: ProfileShowcaseVisibilityContacts,
-		Order:      10,
+	communityEntry1 := &ProfileShowcaseEntry{
+		ID:                 "0x01312357798976434",
+		EntryType:          ProfileShowcaseEntryTypeCommunity,
+		ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+		Order:              10,
 	}
-	err := s.m.SetProfileShowcasePreference(communityEntry)
-	s.Require().NoError(err)
+
+	communityEntry2 := &ProfileShowcaseEntry{
+		ID:                 "0x01312357798976535",
+		EntryType:          ProfileShowcaseEntryTypeCommunity,
+		ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+		Order:              11,
+	}
 
 	accountEntry := &ProfileShowcaseEntry{
-		ID:         "0cx34662234",
-		Type:       ProfileShowcaseEntryTypeAccount,
-		Visibility: ProfileShowcaseVisibilityEveryone,
-		Order:      17,
+		ID:                 "0cx34662234",
+		EntryType:          ProfileShowcaseEntryTypeAccount,
+		ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+		Order:              17,
 	}
-	err = s.m.SetProfileShowcasePreference(accountEntry)
-	s.Require().NoError(err)
 
 	collectibleEntry := &ProfileShowcaseEntry{
-		ID:         "0x12378534257568678487683576",
-		Type:       ProfileShowcaseEntryTypeCollectible,
-		Visibility: ProfileShowcaseVisibilityIDVerifiedContacts,
-		Order:      17,
+		ID:                 "0x12378534257568678487683576",
+		EntryType:          ProfileShowcaseEntryTypeCollectible,
+		ShowcaseVisibility: ProfileShowcaseVisibilityIDVerifiedContacts,
+		Order:              17,
 	}
-	err = s.m.SetProfileShowcasePreference(collectibleEntry)
-	s.Require().NoError(err)
 
 	assetEntry := &ProfileShowcaseEntry{
-		ID:         "0x139ii4uu423",
-		Type:       ProfileShowcaseEntryTypeAsset,
-		Visibility: ProfileShowcaseVisibilityNoOne,
-		Order:      17,
+		ID:                 "0x139ii4uu423",
+		EntryType:          ProfileShowcaseEntryTypeAsset,
+		ShowcaseVisibility: ProfileShowcaseVisibilityNoOne,
+		Order:              17,
 	}
-	err = s.m.SetProfileShowcasePreference(assetEntry)
+
+	request := ProfileShowcasePreferences{
+		Communities:  []*ProfileShowcaseEntry{communityEntry1, communityEntry2},
+		Accounts:     []*ProfileShowcaseEntry{accountEntry},
+		Collectibles: []*ProfileShowcaseEntry{collectibleEntry},
+		Assets:       []*ProfileShowcaseEntry{assetEntry},
+	}
+
+	err := s.m.SetProfileShowcasePreferences(request)
 	s.Require().NoError(err)
 
 	response, err := s.m.GetProfileShowcasePreferences()
 	s.Require().NoError(err)
 
-	s.Require().Len(response.Communities, 1)
-	s.Require().Equal(response.Communities[0], communityEntry)
+	s.Require().Len(response.Communities, 2)
+	s.Require().Equal(response.Communities[0], communityEntry1)
+	s.Require().Equal(response.Communities[1], communityEntry2)
 
-	s.Require().Len(response.Communities, 1)
+	s.Require().Len(response.Accounts, 1)
 	s.Require().Equal(response.Accounts[0], accountEntry)
 
-	s.Require().Len(response.Communities, 1)
+	s.Require().Len(response.Collectibles, 1)
 	s.Require().Equal(response.Collectibles[0], collectibleEntry)
 
 	s.Require().Len(response.Assets, 1)

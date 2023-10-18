@@ -1,6 +1,9 @@
 package protocol
 
-import "database/sql"
+import (
+	"context"
+	"database/sql"
+)
 
 type ProfileShowcaseEntryType int
 
@@ -25,22 +28,52 @@ const selectAllProfilePreferencesQuery = "SELECT id, entry_type, visibility, sor
 const selectProfilePreferencesByTypeQuery = "SELECT id, entry_type, visibility, sort_order FROM profile_showcase_preferences WHERE entry_type = ?"
 
 type ProfileShowcaseEntry struct {
-	ID         string                    `json:"id"`
-	Type       ProfileShowcaseEntryType  `json:"type"`
-	Visibility ProfileShowcaseVisibility `json:"visiblity"`
-	Order      int                       `json:"order"`
+	ID                 string                    `json:"id"`
+	EntryType          ProfileShowcaseEntryType  `json:"entryType"`
+	ShowcaseVisibility ProfileShowcaseVisibility `json:"showcaseVisibility"`
+	Order              int                       `json:"order"`
 }
 
 func (db sqlitePersistence) InsertOrUpdateProfileShowcasePreference(entry *ProfileShowcaseEntry) error {
 	_, err := db.db.Exec(insertOrUpdateProfilePreferencesQuery,
 		entry.ID,
-		entry.Type,
-		entry.Visibility,
+		entry.EntryType,
+		entry.ShowcaseVisibility,
 		entry.Order,
 	)
 
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (db sqlitePersistence) SaveProfileShowcasePreferences(entries []*ProfileShowcaseEntry) error {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	for _, entry := range entries {
+		_, err = tx.Exec(insertOrUpdateProfilePreferencesQuery,
+			entry.ID,
+			entry.EntryType,
+			entry.ShowcaseVisibility,
+			entry.Order,
+		)
+
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -54,8 +87,8 @@ func (db sqlitePersistence) parseProfileShowcasePreferencesRows(rows *sql.Rows) 
 
 		err := rows.Scan(
 			&entry.ID,
-			&entry.Type,
-			&entry.Visibility,
+			&entry.EntryType,
+			&entry.ShowcaseVisibility,
 			&entry.Order,
 		)
 

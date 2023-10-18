@@ -1,6 +1,6 @@
 package protocol
 
-type ProfileShowcaseResponse struct {
+type ProfileShowcasePreferences struct {
 	Communities  []*ProfileShowcaseEntry `json:"communities"`
 	Accounts     []*ProfileShowcaseEntry `json:"accounts"`
 	Collectibles []*ProfileShowcaseEntry `json:"collectibles"`
@@ -11,7 +11,20 @@ func (m *Messenger) SetProfileShowcasePreference(entry *ProfileShowcaseEntry) er
 	return m.persistence.InsertOrUpdateProfileShowcasePreference(entry)
 }
 
-func (m *Messenger) GetProfileShowcasePreferences() (*ProfileShowcaseResponse, error) {
+func (m *Messenger) SetProfileShowcasePreferences(preferences ProfileShowcasePreferences) error {
+	allPreferences := []*ProfileShowcaseEntry{}
+
+	allPreferences = append(allPreferences, preferences.Communities...)
+	allPreferences = append(allPreferences, preferences.Accounts...)
+	allPreferences = append(allPreferences, preferences.Collectibles...)
+	allPreferences = append(allPreferences, preferences.Assets...)
+
+	return m.persistence.SaveProfileShowcasePreferences(allPreferences)
+}
+
+func (m *Messenger) GetProfileShowcasePreferences() (*ProfileShowcasePreferences, error) {
+	// NOTE: in the future default profile preferences should be filled in for each group according to special rules,
+	// that's why they should be grouped here
 	communities, err := m.persistence.GetProfileShowcasePreferencesByType(ProfileShowcaseEntryTypeCommunity)
 	if err != nil {
 		return nil, err
@@ -32,7 +45,7 @@ func (m *Messenger) GetProfileShowcasePreferences() (*ProfileShowcaseResponse, e
 		return nil, err
 	}
 
-	return &ProfileShowcaseResponse{
+	return &ProfileShowcasePreferences{
 		Communities:  communities,
 		Accounts:     accounts,
 		Collectibles: collectibles,
