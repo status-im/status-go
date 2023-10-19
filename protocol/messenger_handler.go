@@ -2296,6 +2296,11 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 		if err != nil {
 			return err
 		}
+
+		if communityResponse == nil {
+			return nil
+		}
+
 		community := communityResponse.Community
 		receivedMessage.CommunityID = community.IDString()
 
