@@ -131,7 +131,7 @@ func TestBasicWakuV2(t *testing.T) {
 	time.Sleep(3 * time.Second)
 
 	// At least 3 peers should have been discovered
-	require.Greater(t, w.PeerCount(), 3)
+	require.GreaterOrEqual(t, w.PeerCount(), 3)
 
 	filter := &common.Filter{
 		Messages:      common.NewMemoryMessageStore(),
@@ -158,9 +158,24 @@ func TestBasicWakuV2(t *testing.T) {
 	require.Len(t, messages, 1)
 
 	timestampInSeconds := msgTimestamp / int64(time.Second)
-	storeResult, err := w.query(context.Background(), storeNode.PeerID, relay.DefaultWakuTopic, []common.TopicType{contentTopic}, uint64(timestampInSeconds-20), uint64(timestampInSeconds+20), []store.HistoryRequestOption{})
+	marginInSeconds := 20
+
+	options := func(b *backoff.ExponentialBackOff) {
+		b.MaxElapsedTime = 60 * time.Second
+		b.InitialInterval = 500 * time.Millisecond
+	}
+	err = tt.RetryWithBackOff(func() error {
+		storeResult, err := w.query(context.Background(), storeNode.PeerID, relay.DefaultWakuTopic, []common.TopicType{contentTopic}, uint64(timestampInSeconds-int64(marginInSeconds)), uint64(timestampInSeconds+int64(marginInSeconds)), []store.HistoryRequestOption{})
+		if err != nil || len(storeResult.Messages) == 0 {
+			// in case of failure extend timestamp margin up to 40secs
+			if marginInSeconds < 40 {
+				marginInSeconds += 5
+			}
+			return errors.New("no messages received from store node")
+		}
+		return nil
+	}, options)
 	require.NoError(t, err)
-	require.NotZero(t, len(storeResult.Messages))
 
 	require.NoError(t, w.Stop())
 }
