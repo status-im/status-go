@@ -1086,7 +1086,7 @@ func (o *Community) ValidateEditSharedAddresses(signer *ecdsa.PublicKey, request
 
 // We treat control node as an owner with community key
 func (o *Community) IsControlNode() bool {
-	return o.config.PrivateKey != nil && o.config.PrivateKey.PublicKey.Equal(o.config.ControlNode)
+	return o.config.PrivateKey != nil && o.config.PrivateKey.PublicKey.Equal(o.ControlNode())
 }
 
 func (o *Community) IsOwnerWithoutCommunityKey() bool {
