@@ -835,20 +835,22 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	if m.torrentClientReady() {
-		controlledCommunities, err := m.communitiesManager.Controlled()
-		if err == nil && len(controlledCommunities) > 0 {
-			available := m.SubscribeMailserverAvailable()
-			go func() {
-				<-available
-				m.InitHistoryArchiveTasks(controlledCommunities)
-			}()
+	controlledCommunities, err := m.communitiesManager.Controlled()
+	if err != nil {
+		return nil, err
+	}
 
-			for _, c := range controlledCommunities {
-				if c.Joined() && c.HasTokenPermissions() {
-					go m.communitiesManager.ReevaluateMembersPeriodically(c.ID())
-				}
-			}
+	if m.torrentClientReady() {
+		available := m.SubscribeMailserverAvailable()
+		go func() {
+			<-available
+			m.InitHistoryArchiveTasks(controlledCommunities)
+		}()
+	}
+
+	for _, c := range controlledCommunities {
+		if c.Joined() && c.HasTokenPermissions() {
+			go m.communitiesManager.ReevaluateMembersPeriodically(c.ID())
 		}
 	}
 
