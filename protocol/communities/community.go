@@ -1308,6 +1308,9 @@ func (o *Community) setPrivateKey(pk *ecdsa.PrivateKey) {
 }
 
 func (o *Community) ControlNode() *ecdsa.PublicKey {
+	if o.config.ControlNode == nil {
+		return o.config.ID
+	}
 	return o.config.ControlNode
 }
 
