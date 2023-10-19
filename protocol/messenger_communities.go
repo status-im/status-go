@@ -251,7 +251,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 	recentlyPublishedOrgs := func() map[string]*communities.Community {
 		result := make(map[string]*communities.Community)
 
-		controlledCommunities, err := m.communitiesManager.ControlledCommunities()
+		controlledCommunities, err := m.communitiesManager.Controlled()
 		if err != nil {
 			m.logger.Warn("failed to retrieve orgs", zap.Error(err))
 			return result
@@ -379,7 +379,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					continue
 				}
 
-				controlledCommunities, err := m.communitiesManager.Owned()
+				controlledCommunities, err := m.communitiesManager.Controlled()
 				if err != nil {
 					m.logger.Warn("failed to retrieve orgs", zap.Error(err))
 				}
@@ -413,7 +413,7 @@ func (m *Messenger) updateCommunitiesActiveMembersPeriodically() {
 		for {
 			select {
 			case <-ticker.C:
-				controlledCommunities, err := m.communitiesManager.Owned()
+				controlledCommunities, err := m.communitiesManager.Controlled()
 				if err != nil {
 					m.logger.Error("failed to update community active members count", zap.Error(err))
 				}
@@ -3589,7 +3589,7 @@ func (m *Messenger) EnableCommunityHistoryArchiveProtocol() error {
 		return err
 	}
 
-	controlledCommunities, err := m.communitiesManager.Owned()
+	controlledCommunities, err := m.communitiesManager.Controlled()
 	if err != nil {
 		return err
 	}
