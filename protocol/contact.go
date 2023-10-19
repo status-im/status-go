@@ -390,30 +390,34 @@ func buildContact(publicKeyString string, publicKey *ecdsa.PublicKey) (*Contact,
 
 func buildSelfContact(identity *ecdsa.PrivateKey, settings *accounts.Database, multiAccounts *multiaccounts.Database, account *multiaccounts.Account) (*Contact, error) {
 	myPublicKeyString := types.EncodeHex(crypto.FromECDSAPub(&identity.PublicKey))
+
 	c, err := buildContact(myPublicKeyString, &identity.PublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build contact: %w", err)
 	}
 
-	if s, err := settings.GetSettings(); err == nil {
-		c.DisplayName = s.DisplayName
-		c.Bio = s.Bio
-		if s.PreferredName != nil {
-			c.EnsName = *s.PreferredName
+	if settings != nil {
+		if s, err := settings.GetSettings(); err == nil {
+			c.DisplayName = s.DisplayName
+			c.Bio = s.Bio
+			if s.PreferredName != nil {
+				c.EnsName = *s.PreferredName
+			}
+		}
+		if socialLinks, err := settings.GetSocialLinks(); err != nil {
+			c.SocialLinks = socialLinks
 		}
 	}
 
-	if socialLinks, err := settings.GetSocialLinks(); err != nil {
-		c.SocialLinks = socialLinks
-	}
+	if multiAccounts != nil && account != nil {
+		if identityImages, err := multiAccounts.GetIdentityImages(account.KeyUID); err != nil {
+			imagesMap := make(map[string]images.IdentityImage)
+			for _, img := range identityImages {
+				imagesMap[img.Name] = *img
+			}
 
-	if identityImages, err := multiAccounts.GetIdentityImages(account.KeyUID); err != nil {
-		imagesMap := make(map[string]images.IdentityImage)
-		for _, img := range identityImages {
-			imagesMap[img.Name] = *img
+			c.Images = imagesMap
 		}
-
-		c.Images = imagesMap
 	}
 
 	return c, nil
