@@ -395,32 +395,25 @@ func buildSelfContact(identity *ecdsa.PrivateKey, settings *accounts.Database, m
 		return nil, fmt.Errorf("failed to build contact: %w", err)
 	}
 
-	s, err := settings.GetSettings()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get settings: %w", err)
+	if s, err := settings.GetSettings(); err == nil {
+		c.DisplayName = s.DisplayName
+		c.Bio = s.Bio
+		if s.PreferredName != nil {
+			c.EnsName = *s.PreferredName
+		}
 	}
 
-	socialLinks, err := settings.GetSocialLinks()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get social links: %w", err)
+	if socialLinks, err := settings.GetSocialLinks(); err != nil {
+		c.SocialLinks = socialLinks
 	}
 
-	identityImages, err := multiAccounts.GetIdentityImages(account.KeyUID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get identity images: %w", err)
-	}
+	if identityImages, err := multiAccounts.GetIdentityImages(account.KeyUID); err != nil {
+		imagesMap := make(map[string]images.IdentityImage)
+		for _, img := range identityImages {
+			imagesMap[img.Name] = *img
+		}
 
-	imagesMap := make(map[string]images.IdentityImage)
-	for _, img := range identityImages {
-		imagesMap[img.Name] = *img
-	}
-
-	c.DisplayName = s.DisplayName
-	c.Bio = s.Bio
-	c.SocialLinks = socialLinks
-	c.Images = imagesMap
-	if s.PreferredName != nil {
-		c.EnsName = *s.PreferredName
+		c.Images = imagesMap
 	}
 
 	return c, nil
