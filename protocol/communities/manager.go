@@ -723,37 +723,25 @@ func (m *Manager) DeletedCommunities() ([]*Community, error) {
 	return communities, nil
 }
 
-func (m *Manager) ControlledCommunities() ([]*Community, error) {
+func (m *Manager) Controlled() ([]*Community, error) {
 	communities, err := m.persistence.CommunitiesWithPrivateKey(&m.identity.PublicKey, m.installationID)
 	if err != nil {
 		return nil, err
 	}
+
+	controlled := make([]*Community, 0, len(communities))
 
 	for _, c := range communities {
-		err = initializeCommunity(c)
-		if err != nil {
-			return nil, err
+		if c.IsControlNode() {
+			err = initializeCommunity(c)
+			if err != nil {
+				return nil, err
+			}
+			controlled = append(controlled, c)
 		}
 	}
 
-	return communities, nil
-}
-
-func (m *Manager) Owned() ([]*Community, error) {
-	communities, err := m.persistence.CommunitiesWithPrivateKey(&m.identity.PublicKey, m.installationID)
-	if err != nil {
-		return nil, err
-	}
-
-	var ownedCommunities []*Community
-
-	for _, community := range communities {
-		if community.IsControlNode() {
-			ownedCommunities = append(ownedCommunities, community)
-		}
-	}
-
-	return ownedCommunities, nil
+	return controlled, nil
 }
 
 // CreateCommunity takes a description, generates an ID for it, saves it and return it
@@ -3676,7 +3664,7 @@ func (m *Manager) UpdateCommunitySettings(settings CommunitySettings) error {
 }
 
 func (m *Manager) GetOwnedCommunitiesChatIDs() (map[string]bool, error) {
-	ownedCommunities, err := m.Owned()
+	ownedCommunities, err := m.Controlled()
 	if err != nil {
 		return nil, err
 	}

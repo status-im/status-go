@@ -836,7 +836,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	}
 
 	if m.torrentClientReady() {
-		controlledCommunities, err := m.communitiesManager.ControlledCommunities()
+		controlledCommunities, err := m.communitiesManager.Controlled()
 		if err == nil && len(controlledCommunities) > 0 {
 			available := m.SubscribeMailserverAvailable()
 			go func() {
@@ -1691,7 +1691,7 @@ func (m *Messenger) Init() error {
 
 	// Init filters for the communities we control
 	var communityFiltersToInitialize []transport.CommunityFilterToInitialize
-	controlledCommunities, err := m.communitiesManager.ControlledCommunities()
+	controlledCommunities, err := m.communitiesManager.Controlled()
 	if err != nil {
 		return err
 	}
