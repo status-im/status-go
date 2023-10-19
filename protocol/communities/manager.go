@@ -1545,36 +1545,36 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 		}
 
 		// A new community, we need to check if we need to validate async.
-		// That would be the case if it has a contract. We queue everything and process separately
-
+		// That would be the case if it has a contract. We queue everything and process separately.
 		if shouldQueue {
 			return nil, m.Queue(signer, community, description.Clock, payload)
 		}
-
 	} else {
-		// we only queue if the clock is greater
-		if shouldQueue && community.config.CommunityDescription.Clock < description.Clock {
+		// only queue if already known control node is different than the signer
+		// and if the clock is greater
+		shouldQueue = shouldQueue && !common.IsPubKeyEqual(community.ControlNode(), signer) &&
+			community.config.CommunityDescription.Clock < description.Clock
+		if shouldQueue {
 			return nil, m.Queue(signer, community, description.Clock, payload)
 		}
 	}
 
-	// Override verified owner
-	if verifiedOwner != nil {
-		m.logger.Info("updating verified owner", zap.String("communityID", community.IDString()), zap.String("owner", common.PubkeyToHex(verifiedOwner)))
+	if hasTokenOwnership {
+		// Override verified owner
+		if verifiedOwner != nil {
+			m.logger.Info("updating verified owner", zap.String("communityID", community.IDString()), zap.String("owner", common.PubkeyToHex(verifiedOwner)))
 
-		// If we are not the verified owner anymore, drop the private key
-		if !common.IsPubKeyEqual(verifiedOwner, &m.identity.PublicKey) {
-			community.config.PrivateKey = nil
+			// If we are not the verified owner anymore, drop the private key
+			if !common.IsPubKeyEqual(verifiedOwner, &m.identity.PublicKey) {
+				community.config.PrivateKey = nil
+			}
+
+			community.setControlNode(verifiedOwner)
 		}
-
-		community.setControlNode(verifiedOwner)
-	}
-
-	// If it has token ownership, we check the control node
-	// otherwise we check the public key
-	if hasTokenOwnership && !common.IsPubKeyEqual(community.ControlNode(), signer) {
-		return nil, ErrNotAuthorized
-	} else if !hasTokenOwnership && !common.IsPubKeyEqual(community.PublicKey(), signer) {
+		if !common.IsPubKeyEqual(community.ControlNode(), signer) {
+			return nil, ErrNotAuthorized
+		}
+	} else if !common.IsPubKeyEqual(community.PublicKey(), signer) {
 		return nil, ErrNotAuthorized
 	}
 
