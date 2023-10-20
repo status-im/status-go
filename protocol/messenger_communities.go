@@ -982,16 +982,14 @@ func (m *Messenger) SetMutePropertyOnChatsByCategory(request *requests.MuteCateg
 	return nil
 }
 
-// getAccountsToShare is used to get the wallet accounts to share either when requesting to join a community or when editing
-// requestToJoinID can be empty when editing
-func (m *Messenger) getAccountsToShare(addressesToReveal []string, airdropAddress string, communityID types.HexBytes, password string, requestToJoinID []byte) (map[gethcommon.Address]*protobuf.RevealedAccount, []gethcommon.Address, error) {
+// Generates a single hash for each address that needs to be revealed to a community.
+// Each hash needs to be signed.
+// The order of retuned hashes corresponds to the order of addresses in addressesToReveal.
+func (m *Messenger) generateCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string, isEdit bool) ([]account.SignParams, error) {
 	walletAccounts, err := m.settings.GetActiveAccounts()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-
-	revealedAccounts := make(map[gethcommon.Address]*protobuf.RevealedAccount)
-	revealedAddresses := make([]gethcommon.Address, 0)
 
 	containsAddress := func(addresses []string, targetAddress string) bool {
 		for _, address := range addresses {
@@ -1002,7 +1000,8 @@ func (m *Messenger) getAccountsToShare(addressesToReveal []string, airdropAddres
 		return false
 	}
 
-	for i, walletAccount := range walletAccounts {
+	msgsToSign := make([]account.SignParams, 0)
+	for _, walletAccount := range walletAccounts {
 		if walletAccount.Chat || walletAccount.Type == accounts.AccountTypeWatch {
 			continue
 		}
@@ -1011,65 +1010,114 @@ func (m *Messenger) getAccountsToShare(addressesToReveal []string, airdropAddres
 			continue
 		}
 
-		verifiedAccount, err := m.accountsManager.GetVerifiedWalletAccount(m.settings, walletAccount.Address.Hex(), password)
-		if err != nil {
-			return nil, nil, err
+		requestID := []byte{}
+		if !isEdit {
+			requestID = communities.CalculateRequestID(memberPubKey, communityID)
 		}
-
-		messageToSign := types.EncodeHex(crypto.Keccak256(m.IdentityPublicKeyCompressed(), communityID, requestToJoinID))
-		signParams := account.SignParams{
-			Data:     messageToSign,
-			Address:  verifiedAccount.Address.Hex(),
-			Password: password,
-		}
-		signatureBytes, err := m.accountsManager.Sign(signParams, verifiedAccount)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		revealedAddress := gethcommon.HexToAddress(verifiedAccount.Address.Hex())
-		revealedAddresses = append(revealedAddresses, revealedAddress)
-		address := verifiedAccount.Address.Hex()
-		isAirdropAddress := types.HexToAddress(address) == types.HexToAddress(airdropAddress)
-		if airdropAddress == "" {
-			isAirdropAddress = i == 0
-		}
-		revealedAccounts[revealedAddress] = &protobuf.RevealedAccount{
-			Address:          address,
-			IsAirdropAddress: isAirdropAddress,
-			Signature:        signatureBytes,
-			ChainIds:         make([]uint64, 0),
-		}
+		msgsToSign = append(msgsToSign, account.SignParams{
+			Data:    types.EncodeHex(crypto.Keccak256(m.IdentityPublicKeyCompressed(), communityID, requestID)),
+			Address: walletAccount.Address.Hex(),
+		})
 	}
-	return revealedAccounts, revealedAddresses, nil
+
+	return msgsToSign, nil
+}
+
+func (m *Messenger) GenerateJoiningCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]account.SignParams, error) {
+	if len(communityID) == 0 {
+		return nil, errors.New("communityID has to be provided")
+	}
+	return m.generateCommunityRequestsForSigning(memberPubKey, communityID, addressesToReveal, false)
+}
+
+func (m *Messenger) GenerateEditCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]account.SignParams, error) {
+	return m.generateCommunityRequestsForSigning(memberPubKey, communityID, addressesToReveal, true)
+}
+
+// Signs the provided messages with the provided accounts and password.
+// Provided accounts must not belong to a keypair that is migrated to a keycard.
+// Otherwise, the signing will fail, cause such accounts should be signed with a keycard.
+func (m *Messenger) SignData(signParams []account.SignParams) ([]string, error) {
+	signatures := make([]string, len(signParams))
+	for i, param := range signParams {
+		if err := param.Validate(true); err != nil {
+			return nil, err
+		}
+
+		account, err := m.settings.GetAccountByAddress(types.HexToAddress(param.Address))
+		if err != nil {
+			return nil, err
+		}
+
+		if account.Chat || account.Type == accounts.AccountTypeWatch {
+			return nil, errors.New("cannot join a community using profile chat or watch-only account")
+		}
+
+		keypair, err := m.settings.GetKeypairByKeyUID(account.KeyUID)
+		if err != nil {
+			return nil, err
+		}
+
+		if keypair.MigratedToKeycard() {
+			return nil, errors.New("signing a joining community request for accounts migrated to keycard must be done with a keycard")
+		}
+
+		verifiedAccount, err := m.accountsManager.GetVerifiedWalletAccount(m.settings, param.Address, param.Password)
+		if err != nil {
+			return nil, err
+		}
+
+		signature, err := m.accountsManager.Sign(param, verifiedAccount)
+		if err != nil {
+			return nil, err
+		}
+
+		signatures[i] = types.EncodeHex(signature)
+	}
+
+	return signatures, nil
 }
 
 func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommunity) (*MessengerResponse, error) {
+	// TODO: Because of changes that need to be done in tests, calling this function and providing `request` without `AddressesToReveal`
+	//       is not an error, but it should be.
 	logger := m.logger.Named("RequestToJoinCommunity")
-	if err := request.Validate(); err != nil {
+	if err := request.Validate(len(request.AddressesToReveal) > 0); err != nil {
 		logger.Debug("request failed to validate", zap.Error(err), zap.Any("request", request))
 		return nil, err
 	}
 
-	if request.Password != "" {
-		walletAccounts, err := m.settings.GetActiveAccounts()
+	requestToJoin := m.communitiesManager.CreateRequestToJoin(request)
+
+	if len(request.AddressesToReveal) > 0 {
+		revealedAddresses := make([]gethcommon.Address, 0)
+		for _, addr := range request.AddressesToReveal {
+			revealedAddresses = append(revealedAddresses, gethcommon.HexToAddress(addr))
+		}
+
+		permissions, err := m.communitiesManager.CheckPermissionToJoin(request.CommunityID, revealedAddresses)
 		if err != nil {
 			return nil, err
 		}
-		if len(walletAccounts) > 0 {
-			_, err := m.accountsManager.GetVerifiedWalletAccount(m.settings, walletAccounts[0].Address.Hex(), request.Password)
-			if err != nil {
-				return nil, err
+		if !permissions.Satisfied {
+			return nil, errors.New("permission to join not satisfied")
+		}
+
+		for _, accountAndChainIDs := range permissions.ValidCombinations {
+			for i := range requestToJoin.RevealedAccounts {
+				if gethcommon.HexToAddress(requestToJoin.RevealedAccounts[i].Address) == accountAndChainIDs.Address {
+					requestToJoin.RevealedAccounts[i].ChainIds = accountAndChainIDs.ChainIDs
+				}
 			}
 		}
 	}
 
-	displayName, err := m.settings.DisplayName()
+	community, err := m.communitiesManager.CheckCommunityForJoining(request.CommunityID)
 	if err != nil {
 		return nil, err
 	}
 
-	community, requestToJoin, err := m.communitiesManager.CreateRequestToJoin(&m.identity.PublicKey, request)
+	displayName, err := m.settings.DisplayName()
 	if err != nil {
 		return nil, err
 	}
@@ -1078,40 +1126,8 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 		Clock:            requestToJoin.Clock,
 		EnsName:          requestToJoin.ENSName,
 		DisplayName:      displayName,
-		CommunityId:      community.ID(),
-		RevealedAccounts: make([]*protobuf.RevealedAccount, 0),
-	}
-
-	// find wallet accounts and attach wallet addresses and
-	// signatures to request
-	if request.Password != "" {
-		revealedAccounts, revealedAddresses, err := m.getAccountsToShare(
-			request.AddressesToReveal,
-			request.AirdropAddress,
-			request.CommunityID,
-			request.Password,
-			requestToJoin.ID,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		response, err := m.communitiesManager.CheckPermissionToJoin(community.ID(), revealedAddresses)
-		if err != nil {
-			return nil, err
-		}
-		if !response.Satisfied {
-			return nil, errors.New("permission to join not satisfied")
-		}
-
-		for _, accountAndChainIDs := range response.ValidCombinations {
-			revealedAccounts[accountAndChainIDs.Address].ChainIds = accountAndChainIDs.ChainIDs
-		}
-
-		for _, revealedAccount := range revealedAccounts {
-			requestToJoinProto.RevealedAccounts = append(requestToJoinProto.RevealedAccounts, revealedAccount)
-			requestToJoin.RevealedAccounts = append(requestToJoinProto.RevealedAccounts, revealedAccount)
-		}
+		CommunityId:      request.CommunityID,
+		RevealedAccounts: requestToJoin.RevealedAccounts,
 	}
 
 	community, _, err = m.communitiesManager.SaveRequestToJoinAndCommunity(requestToJoin, community)
@@ -1223,29 +1239,24 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 		logger.Debug("request failed to validate", zap.Error(err), zap.Any("request", request))
 		return nil, err
 	}
-	// verify wallet password is there
-	if request.Password == "" {
-		return nil, errors.New("password is necessary to use this function")
-	}
 
 	community, err := m.communitiesManager.GetByID(request.CommunityID)
 	if err != nil {
 		return nil, err
 	}
 
-	walletAccounts, err := m.settings.GetActiveAccounts()
-	if err != nil {
-		return nil, err
-	}
-	if len(walletAccounts) > 0 {
-		_, err := m.accountsManager.GetVerifiedWalletAccount(m.settings, walletAccounts[0].Address.Hex(), request.Password)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	if !community.HasMember(m.IdentityPublicKey()) {
 		return nil, errors.New("not part of the community")
+	}
+
+	revealedAddresses := make([]gethcommon.Address, 0)
+	for _, addr := range request.AddressesToReveal {
+		revealedAddresses = append(revealedAddresses, gethcommon.HexToAddress(addr))
+	}
+
+	checkPermissionResponse, err := m.communitiesManager.CheckPermissionToJoin(community.ID(), revealedAddresses)
+	if err != nil {
+		return nil, err
 	}
 
 	member := community.GetMember(m.IdentityPublicKey())
@@ -1255,30 +1266,22 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 		CommunityId:      community.ID(),
 		RevealedAccounts: make([]*protobuf.RevealedAccount, 0),
 	}
-	// find wallet accounts and attach wallet addresses and
-	// signatures to request
-	revealedAccounts, revealedAddresses, err := m.getAccountsToShare(
-		request.AddressesToReveal,
-		request.AirdropAddress,
-		request.CommunityID,
-		request.Password,
-		[]byte{},
-	)
-	if err != nil {
-		return nil, err
-	}
 
-	checkPermissionResponse, err := m.communitiesManager.CheckPermissionToJoin(community.ID(), revealedAddresses)
-	if err != nil {
-		return nil, err
-	}
+	for i := range request.AddressesToReveal {
+		revealedAcc := &protobuf.RevealedAccount{
+			Address:          request.AddressesToReveal[i],
+			IsAirdropAddress: types.HexToAddress(request.AddressesToReveal[i]) == types.HexToAddress(request.AirdropAddress),
+			Signature:        request.Signatures[i],
+		}
 
-	for _, accountAndChainIDs := range checkPermissionResponse.ValidCombinations {
-		revealedAccounts[accountAndChainIDs.Address].ChainIds = accountAndChainIDs.ChainIDs
-	}
+		for _, accountAndChainIDs := range checkPermissionResponse.ValidCombinations {
+			if accountAndChainIDs.Address == gethcommon.HexToAddress(request.AddressesToReveal[i]) {
+				revealedAcc.ChainIds = accountAndChainIDs.ChainIDs
+				break
+			}
+		}
 
-	for _, revealedAccount := range revealedAccounts {
-		requestToEditRevealedAccountsProto.RevealedAccounts = append(requestToEditRevealedAccountsProto.RevealedAccounts, revealedAccount)
+		requestToEditRevealedAccountsProto.RevealedAccounts = append(requestToEditRevealedAccountsProto.RevealedAccounts, revealedAcc)
 	}
 
 	requestID := communities.CalculateRequestID(common.PubkeyToHex(&m.identity.PublicKey), request.CommunityID)

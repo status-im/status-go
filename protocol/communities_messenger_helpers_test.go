@@ -429,7 +429,30 @@ func advertiseCommunityTo(s *suite.Suite, community *communities.Community, owne
 	s.Require().NoError(err)
 }
 
-func joinCommunity(s *suite.Suite, community *communities.Community, owner *Messenger, user *Messenger, request *requests.RequestToJoinCommunity) {
+func joinCommunity(s *suite.Suite, community *communities.Community, owner *Messenger, user *Messenger, request *requests.RequestToJoinCommunity, password string) {
+	if password != "" {
+		signingParams, err := user.GenerateJoiningCommunityRequestsForSigning(common.PubkeyToHex(&user.identity.PublicKey), community.ID(), request.AddressesToReveal)
+		s.Require().NoError(err)
+
+		for i := range signingParams {
+			signingParams[i].Password = password
+		}
+		signatures, err := user.SignData(signingParams)
+		s.Require().NoError(err)
+
+		updateAddresses := len(request.AddressesToReveal) == 0
+		if updateAddresses {
+			request.AddressesToReveal = make([]string, len(signingParams))
+		}
+		for i := range signingParams {
+			request.AddressesToReveal[i] = signingParams[i].Address
+			request.Signatures = append(request.Signatures, types.FromHex(signatures[i]))
+		}
+		if updateAddresses {
+			request.AirdropAddress = request.AddressesToReveal[0]
+		}
+	}
+
 	response, err := user.RequestToJoinCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)

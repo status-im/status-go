@@ -54,7 +54,23 @@ var zeroAddress = types.Address{}
 type SignParams struct {
 	Data     interface{} `json:"data"`
 	Address  string      `json:"account"`
-	Password string      `json:"password"`
+	Password string      `json:"password,omitempty"`
+}
+
+func (sp *SignParams) Validate(checkPassword bool) error {
+	if len(sp.Address) != 2*types.AddressLength+2 {
+		return errors.New("address has to be provided")
+	}
+
+	if sp.Data == "" {
+		return errors.New("data has to be provided")
+	}
+
+	if checkPassword && sp.Password == "" {
+		return errors.New("password has to be provided")
+	}
+
+	return nil
 }
 
 type RecoverParams struct {

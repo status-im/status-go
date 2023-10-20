@@ -122,19 +122,17 @@ func setUpCommunityAndRoles(base CommunityEventsTestsInterface, role protobuf.Co
 	request := &requests.RequestToJoinCommunity{
 		CommunityID:       community.ID(),
 		AddressesToReveal: []string{eventsSenderAccountAddress},
-		Password:          accountPassword,
 		AirdropAddress:    eventsSenderAccountAddress,
 	}
-	joinCommunity(suite, community, base.GetControlNode(), base.GetEventSender(), request)
+	joinCommunity(suite, community, base.GetControlNode(), base.GetEventSender(), request, accountPassword)
 	refreshMessengerResponses(base)
 
 	request = &requests.RequestToJoinCommunity{
 		CommunityID:       community.ID(),
 		AddressesToReveal: []string{aliceAccountAddress},
-		Password:          accountPassword,
 		AirdropAddress:    aliceAccountAddress,
 	}
-	joinCommunity(suite, community, base.GetControlNode(), base.GetMember(), request)
+	joinCommunity(suite, community, base.GetControlNode(), base.GetMember(), request, accountPassword)
 	refreshMessengerResponses(base)
 
 	// grant permissions to the event sender
@@ -426,7 +424,6 @@ func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role pr
 		CommunityID:       community.ID(),
 		AddressesToReveal: []string{eventsSenderAccountAddress},
 		ENSName:           "eventSender",
-		Password:          accountPassword,
 		AirdropAddress:    eventsSenderAccountAddress,
 	}
 
@@ -436,7 +433,6 @@ func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role pr
 		CommunityID:       community.ID(),
 		AddressesToReveal: []string{aliceAccountAddress},
 		ENSName:           "alice",
-		Password:          accountPassword,
 		AirdropAddress:    aliceAccountAddress,
 	}
 	joinOnRequestCommunity(s, community, base.GetControlNode(), base.GetMember(), requestMember)
@@ -2040,7 +2036,6 @@ func testJoinedPrivilegedMemberReceiveRequestsToJoin(base CommunityEventsTestsIn
 		CommunityID:       community.ID(),
 		AddressesToReveal: []string{bobAccountAddress},
 		ENSName:           "bob",
-		Password:          accountPassword,
 		AirdropAddress:    bobAccountAddress,
 	}
 
@@ -2050,7 +2045,6 @@ func testJoinedPrivilegedMemberReceiveRequestsToJoin(base CommunityEventsTestsIn
 		CommunityID:       community.ID(),
 		AddressesToReveal: []string{eventsSenderAccountAddress},
 		ENSName:           "newPrivilegedUser",
-		Password:          accountPassword,
 		AirdropAddress:    eventsSenderAccountAddress,
 	}
 
@@ -2118,7 +2112,6 @@ func testMemberReceiveRequestsToJoinAfterGettingNewRole(base CommunityEventsTest
 		CommunityID:       community.ID(),
 		AddressesToReveal: []string{aliceAccountAddress},
 		ENSName:           "alice",
-		Password:          accountPassword,
 		AirdropAddress:    aliceAccountAddress,
 	}
 
@@ -2128,7 +2121,6 @@ func testMemberReceiveRequestsToJoinAfterGettingNewRole(base CommunityEventsTest
 		CommunityID:       community.ID(),
 		AddressesToReveal: []string{bobAccountAddress},
 		ENSName:           "bob",
-		Password:          accountPassword,
 		AirdropAddress:    bobAccountAddress,
 	}
 
@@ -2138,7 +2130,6 @@ func testMemberReceiveRequestsToJoinAfterGettingNewRole(base CommunityEventsTest
 		CommunityID:       community.ID(),
 		AddressesToReveal: []string{eventsSenderAccountAddress},
 		ENSName:           "eventSender",
-		Password:          accountPassword,
 		AirdropAddress:    eventsSenderAccountAddress,
 	}
 
