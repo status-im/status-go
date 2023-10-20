@@ -3,8 +3,6 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/json"
-	"strings"
 	"testing"
 	"time"
 
@@ -22,7 +20,6 @@ import (
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/services/communitytokens"
 	"github.com/status-im/status-go/services/wallet/bigint"
-	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 	"github.com/status-im/status-go/waku"
 )
@@ -193,25 +190,11 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	_, err = s.alice.SetCommunitySignerPubKey(context.Background(), community.ID(), chainID, communityAddress, transaction, "password", common.PubkeyToHex(&s.alice.identity.PublicKey))
 	s.Require().NoError(err)
 
-	var published bool
-
-	// We check the updated description is published as a signal
-	signal.SetMobileSignalHandler(func(data []byte) {
-		response := &MessengerResponse{}
-		err := json.Unmarshal(data, response)
-		if err != nil {
-			s.john.logger.Error("failed to unmarshal json", zap.Error(err))
-			return
-		}
-
-		published = strings.Contains(string(data), community.IDString())
-	})
-
 	// john accepts community update
-	_, err = WaitOnMessengerResponse(
+	_, err = WaitOnSignaledMessengerResponse(
 		s.john,
 		func(r *MessengerResponse) bool {
-			return published
+			return len(r.Communities()) > 0 && r.Communities()[0].IDString() == community.IDString()
 		},
 		"no communities",
 	)
@@ -224,13 +207,11 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	s.Require().True(common.IsPubKeyEqual(johnCommunity.ControlNode(), &s.alice.identity.PublicKey))
 	s.Require().False(johnCommunity.IsControlNode())
 
-	published = false
-
 	// We check the control node is correctly set on bob
-	_, err = WaitOnMessengerResponse(
+	_, err = WaitOnSignaledMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
-			return published
+			return len(r.Communities()) > 0 && r.Communities()[0].IDString() == community.IDString()
 
 		},
 		"no communities",
