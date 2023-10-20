@@ -1511,7 +1511,7 @@ func (p *Persistence) getCommunitiesToValidate() (map[string][]communityToValida
 
 }
 
-func (p *Persistence) DeleteCommunitiesToValidateByCommunityID(communityID []byte) error {
-	_, err := p.db.Exec(`DELETE FROM communities_validate_signer WHERE id = ?`, communityID)
+func (p *Persistence) DeleteCommunitiesToValidate(communityToRemove communityToValidate) error {
+	_, err := p.db.Exec(`DELETE FROM communities_validate_signer WHERE id = ? AND clock <= ?`, communityToRemove.id, communityToRemove.clock)
 	return err
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 
@@ -1821,12 +1822,17 @@ func testAddAndSyncTokenFromControlNode(base CommunityEventsTestsInterface, comm
 	addCommunityTokenToCommunityTokensService(base, tokenERC721)
 
 	s := base.GetSuite()
+	communities.SetValidateInterval(1000 * time.Millisecond)
 
 	_, err := base.GetControlNode().SaveCommunityToken(tokenERC721, nil)
 	s.Require().NoError(err)
 
 	err = base.GetControlNode().AddCommunityToken(tokenERC721.CommunityID, tokenERC721.ChainID, tokenERC721.Address)
 	s.Require().NoError(err)
+
+	ownerCommunity, err := base.GetControlNode().communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(ownerCommunity.TokenPermissions(), 1)
 
 	tokens, err := base.GetEventSender().communitiesManager.GetAllCommunityTokens()
 	s.Require().NoError(err)

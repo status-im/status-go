@@ -2297,6 +2297,7 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 			return err
 		}
 
+		// If response is nil, but not error, it will be processed async
 		if communityResponse == nil {
 			return nil
 		}

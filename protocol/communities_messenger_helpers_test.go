@@ -407,17 +407,11 @@ func advertiseCommunityTo(s *suite.Suite, community *communities.Community, owne
 	_, err = owner.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
 
+	waitOnSignal := communities.HasTokenOwnership(community.Description())
 	// Ensure community is received
-	err = tt.RetryWithBackOff(func() error {
-		response, err := user.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		if len(response.Communities()) == 0 {
-			return errors.New("community not received")
-		}
-		return nil
-	})
+	err = WaitOnResponseAndValidate(user,
+		func(response *MessengerResponse) bool { return response != nil && len(response.Communities()) > 0 },
+		"user did not receive advertised closed community", waitOnSignal)
 	s.Require().NoError(err)
 }
 
@@ -635,4 +629,69 @@ func waitOnCommunitiesEvent(user *Messenger, condition func(*communities.Subscri
 	}()
 
 	return errCh
+}
+
+type MessengerSignalsHandlerMock struct {
+	MessengerSignalsHandler
+
+	responseChan chan *MessengerResponse
+}
+
+func (m *MessengerSignalsHandlerMock) MessengerResponse(response *MessengerResponse) {
+	// Non-blocking send
+	select {
+	case m.responseChan <- response:
+	default:
+	}
+}
+
+func (m *MessengerSignalsHandlerMock) MessageDelivered(chatID string, messageID string) {}
+
+func WaitOnSignaledMessengerResponse(m *Messenger, condition func(*MessengerResponse) bool, errorMessage string) (*MessengerResponse, error) {
+	interval := 500 * time.Millisecond
+	timeoutChan := time.After(10 * time.Second)
+
+	responseChan := make(chan *MessengerResponse, 1)
+	m.config.messengerSignalsHandler = &MessengerSignalsHandlerMock{
+		responseChan: responseChan,
+	}
+
+	defer func() { m.config.messengerSignalsHandler = nil }()
+
+	for {
+		_, err := m.RetrieveAll()
+		if err != nil {
+			return nil, err
+		}
+
+		select {
+		case r := <-responseChan:
+			if condition(r) {
+				m.config.messengerSignalsHandler = nil
+				return r, nil
+			}
+
+			return nil, errors.New(errorMessage)
+
+		case <-timeoutChan:
+			return nil, errors.New("timed out: " + errorMessage)
+
+		default: // No immediate response, rest & loop back to retrieve again
+			time.Sleep(interval)
+		}
+	}
+}
+
+func WaitOnResponseAndValidate(messenger *Messenger, condition func(*MessengerResponse) bool, errorMsg string, waitOnSignal bool) error {
+	var err error
+	if waitOnSignal {
+		_, err = WaitOnSignaledMessengerResponse(messenger, condition, "wait on signaled response: "+errorMsg)
+	} else {
+		_, err = WaitOnMessengerResponse(
+			messenger,
+			condition,
+			"wait on response: "+errorMsg,
+		)
+	}
+	return err
 }

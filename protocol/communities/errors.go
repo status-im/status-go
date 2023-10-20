@@ -41,3 +41,4 @@ var ErrNotEnoughPermissions = errors.New("not enough permissions for this commun
 var ErrCannotRemoveOwnerOrAdmin = errors.New("not allowed to remove admin or owner")
 var ErrCannotBanOwnerOrAdmin = errors.New("not allowed to ban admin or owner")
 var ErrInvalidManageTokensPermission = errors.New("no privileges to manage tokens")
+var ErrNoPermissionsForReevaluate = errors.New("no permissions to reevaluate members")

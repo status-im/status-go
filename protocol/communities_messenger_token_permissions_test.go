@@ -19,9 +19,11 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
+	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
 const testChainID1 = 1
@@ -129,6 +131,8 @@ type MessengerCommunitiesTokenPermissionsSuite struct {
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
+	s.collectiblesServiceMock = &CollectiblesServiceMock{}
+	communities.SetValidateInterval(100 * time.Millisecond)
 
 	wakuNodes := createWakuNetwork(&s.Suite, s.logger, []string{"owner", "bob", "alice"})
 
@@ -1285,4 +1289,65 @@ func checkRoleBasedOnThePermissionType(permissionType protobuf.CommunityTokenPer
 	default:
 		panic("Unknown permission, please, update the test")
 	}
+}
+
+func (s *MessengerCommunitiesTokenPermissionsSuite) TestReevaluateOwnerRoleInCommunityWithMintedOwnerToken() {
+	community, _ := s.createCommunity()
+
+	ownerToken := &token.CommunityToken{
+		CommunityID:        community.IDString(),
+		TokenType:          protobuf.CommunityTokenType_ERC20,
+		Address:            "0x123",
+		Name:               "StatusToken",
+		Symbol:             "STT",
+		Description:        "desc",
+		Supply:             &bigint.BigInt{Int: big.NewInt(123)},
+		InfiniteSupply:     false,
+		Transferable:       true,
+		RemoteSelfDestruct: true,
+		ChainID:            1,
+		DeployState:        token.Deployed,
+		Base64Image:        "ABCD",
+		PrivilegesLevel:    token.OwnerLevel,
+	}
+
+	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.owner.identity.PublicKey))
+
+	_, err := s.owner.SaveCommunityToken(ownerToken, nil)
+	s.Require().NoError(err)
+
+	err = s.owner.AddCommunityToken(ownerToken.CommunityID, ownerToken.ChainID, ownerToken.Address)
+	s.Require().NoError(err)
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(community.TokenPermissions(), 1)
+	s.Require().Equal(community.PrivateKey(), s.owner.identity)
+	s.Require().Equal(community.ControlNode(), &s.owner.identity.PublicKey)
+
+	s.advertiseCommunityTo(community, s.alice)
+
+	s.joinCommunity(community, s.alice, alicePassword, []string{aliceAddress1})
+
+	community, err = s.owner.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().Len(community.TokenPermissions(), 1)
+	s.Require().Len(community.Members(), 2)
+
+	// the contract owner reevaluates the roles of the members
+	_, err = s.owner.communitiesManager.ReevaluateMembers(community)
+	s.Require().NoError(err)
+	s.Require().True(community.IsMemberOwner(&s.owner.identity.PublicKey))
+
+	// alice became the contract owner, previous owner should not have permissions to reevaluate member permissions
+	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
+	_, err = s.owner.communitiesManager.ReevaluateMembers(community)
+	s.Require().Error(err, communities.ErrNoPermissionsForReevaluate)
+
+	// alice (new contract owner) reevaluate members permissions
+	_, err = s.alice.communitiesManager.ReevaluateMembers(community)
+	s.Require().NoError(err)
+	s.Require().Len(community.Members(), 2)
+	s.Require().True(community.IsMemberOwner(&s.alice.identity.PublicKey))
+	s.Require().False(community.IsMemberOwner(&s.owner.identity.PublicKey))
 }

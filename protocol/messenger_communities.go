@@ -363,8 +363,9 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 						m.logger.Error("failed to save data and prepare response")
 					}
 
-					signal.SendNewMessages(response)
-
+					if m.config.messengerSignalsHandler != nil {
+						m.config.messengerSignalsHandler.MessengerResponse(response)
+					}
 				}
 
 			case <-ticker.C:

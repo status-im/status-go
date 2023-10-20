@@ -449,13 +449,14 @@ func (m *Manager) runOwnerVerificationLoop() {
 							m.logger.Error("failed to handle community", zap.Error(err))
 							continue
 						}
+
 						if response != nil {
 
 							m.logger.Info("community validated", zap.String("id", types.EncodeHex(communityToValidate.id)), zap.String("signer", common.PubkeyToHex(signer)))
 							m.publish(&Subscription{TokenCommunityValidated: response})
-							err := m.persistence.DeleteCommunitiesToValidateByCommunityID(communityToValidate.id)
+							err := m.persistence.DeleteCommunitiesToValidate(communityToValidate)
 							if err != nil {
-								m.logger.Error("failed to delete community to validate", zap.Error(err))
+								m.logger.Error("failed to delete communities to validate", zap.Error(err))
 							}
 							break
 						}
@@ -853,6 +854,24 @@ func (m *Manager) EditCommunityTokenPermission(request *requests.EditCommunityTo
 }
 
 func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey, error) {
+	var contractOwner string
+	var err error
+	chainID := CommunityDescriptionTokenOwnerChainID(community.Description())
+	hasTokenOwnership := chainID > 0
+	if hasTokenOwnership {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+		defer cancel()
+
+		contractOwner, err = m.ownerVerifier.SafeGetSignerPubKey(ctx, chainID, community.IDString())
+		if err != nil {
+			return nil, err
+		}
+
+		if contractOwner != common.PubkeyToHex(&m.identity.PublicKey) {
+			return nil, ErrNoPermissionsForReevaluate
+		}
+	}
+
 	becomeMemberPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
 	becomeAdminPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_ADMIN)
 	becomeTokenMasterPermissions := community.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_TOKEN_MASTER)
@@ -869,7 +888,15 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 			return nil, err
 		}
 
-		if memberKey == common.PubkeyToHex(&m.identity.PublicKey) || community.IsMemberOwner(memberPubKey) {
+		if hasTokenOwnership && contractOwner == memberKey {
+			if !community.IsMemberOwner(memberPubKey) {
+				_, err = community.AddRoleToMember(memberPubKey, protobuf.CommunityMember_ROLE_OWNER)
+				if err != nil {
+					return nil, err
+				}
+			}
+			continue
+		} else if !hasTokenOwnership && memberKey == common.PubkeyToHex(&m.identity.PublicKey) {
 			continue
 		}
 
@@ -891,6 +918,14 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 				return nil, err
 			}
 			continue
+		}
+
+		// member has role owner but he's not a contract owner, remove the role
+		if community.IsMemberOwner(memberPubKey) {
+			_, err := community.RemoveRoleFromMember(memberPubKey, protobuf.CommunityMember_ROLE_OWNER)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		accountsAndChainIDs := revealedAccountsToAccountsAndChainIDsCombination(revealedAccounts)
@@ -3038,7 +3073,14 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, err
 	}
 
-	isControlNodeSigner := common.IsPubKeyEqual(community.PublicKey(), signer)
+	var isControlNodeSigner bool
+	chainID := CommunityDescriptionTokenOwnerChainID(community.Description())
+	if chainID == 0 {
+		isControlNodeSigner = common.IsPubKeyEqual(community.PublicKey(), signer)
+	} else {
+		isControlNodeSigner = common.IsPubKeyEqual(community.ControlNode(), signer)
+	}
+
 	if !isControlNodeSigner {
 		return nil, ErrNotAuthorized
 	}
