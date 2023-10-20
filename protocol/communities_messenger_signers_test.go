@@ -95,7 +95,7 @@ func (s *MessengerCommunitiesSignersSuite) advertiseCommunityTo(controlNode *Mes
 
 func (s *MessengerCommunitiesSignersSuite) joinCommunity(controlNode *Messenger, community *communities.Community, user *Messenger) {
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-	joinCommunity(&s.Suite, community, controlNode, user, request)
+	joinCommunity(&s.Suite, community, controlNode, user, request, "")
 }
 
 func (s *MessengerCommunitiesSignersSuite) joinOnRequestCommunity(controlNode *Messenger, community *communities.Community, user *Messenger) {

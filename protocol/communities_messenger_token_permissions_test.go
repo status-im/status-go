@@ -196,8 +196,8 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) joinCommunityWithAirdropAddr
 		airdropAddress = addresses[0]
 	}
 
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), Password: passwdHash, AddressesToReveal: addresses, AirdropAddress: airdropAddress}
-	joinCommunity(&s.Suite, community, s.owner, user, request)
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), AddressesToReveal: addresses, AirdropAddress: airdropAddress}
+	joinCommunity(&s.Suite, community, s.owner, user, request, passwdHash)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) advertiseCommunityTo(community *communities.Community, user *Messenger) {
@@ -529,8 +529,30 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestEditSharedAddresses() {
 	s.Require().Equal(alicesRevealedAccounts[0].Address, aliceAddress2)
 	s.Require().Equal(true, alicesRevealedAccounts[0].IsAirdropAddress)
 
+	request := &requests.EditSharedAddresses{CommunityID: community.ID(), AddressesToReveal: []string{aliceAddress1}, AirdropAddress: aliceAddress1}
+
+	signingParams, err := s.alice.GenerateJoiningCommunityRequestsForSigning(common.PubkeyToHex(&s.alice.identity.PublicKey), community.ID(), request.AddressesToReveal)
+	s.Require().NoError(err)
+
 	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(alicePassword)))
-	request := &requests.EditSharedAddresses{CommunityID: community.ID(), Password: passwdHash, AddressesToReveal: []string{aliceAddress1}, AirdropAddress: aliceAddress1}
+	for i := range signingParams {
+		signingParams[i].Password = passwdHash
+	}
+	signatures, err := s.alice.SignData(signingParams)
+	s.Require().NoError(err)
+
+	updateAddresses := len(request.AddressesToReveal) == 0
+	if updateAddresses {
+		request.AddressesToReveal = make([]string, len(signingParams))
+	}
+	for i := range signingParams {
+		request.AddressesToReveal[i] = signingParams[i].Address
+		request.Signatures = append(request.Signatures, types.FromHex(signatures[i]))
+	}
+	if updateAddresses {
+		request.AirdropAddress = request.AddressesToReveal[0]
+	}
+
 	response, err := s.alice.EditSharedAddressesForCommunity(request)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
@@ -670,8 +692,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	s.Require().ErrorContains(err, "no messages")
 
 	// bob tries to join, but he doesn't satisfy so the request isn't sent
-	passwdHash := types.EncodeHex(crypto.Keccak256([]byte(bobPassword)))
-	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), Password: passwdHash, AddressesToReveal: []string{bobAddress}, AirdropAddress: bobAddress}
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID(), AddressesToReveal: []string{bobAddress}, AirdropAddress: bobAddress}
 	_, err = s.bob.RequestToJoinCommunity(request)
 	s.Require().Error(err)
 	s.Require().ErrorContains(err, "permission to join not satisfied")

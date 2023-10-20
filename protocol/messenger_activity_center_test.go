@@ -34,7 +34,7 @@ func (s *MessengerActivityCenterMessageSuite) advertiseCommunityTo(community *co
 
 func (s *MessengerActivityCenterMessageSuite) joinCommunity(community *communities.Community, owner *Messenger, user *Messenger) {
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-	joinCommunity(&s.Suite, community, owner, user, request)
+	joinCommunity(&s.Suite, community, owner, user, request, "")
 }
 
 type MessengerActivityCenterMessageSuite struct {

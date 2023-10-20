@@ -392,7 +392,7 @@ func (s *MessengerCommunitiesSuite) advertiseCommunityTo(community *communities.
 
 func (s *MessengerCommunitiesSuite) joinCommunity(community *communities.Community, owner *Messenger, user *Messenger) {
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-	joinCommunity(&s.Suite, community, owner, user, request)
+	joinCommunity(&s.Suite, community, owner, user, request, "")
 }
 
 func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
@@ -3246,7 +3246,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
 	// We try to join the org
-	_, rtj, err := s.alice.communitiesManager.CreateRequestToJoin(&s.alice.identity.PublicKey, request)
+	rtj := s.alice.communitiesManager.CreateRequestToJoin(request)
 
 	s.Require().NoError(err)
 

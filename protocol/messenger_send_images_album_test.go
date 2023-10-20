@@ -69,7 +69,7 @@ func (s *MessengerSendImagesAlbumSuite) advertiseCommunityTo(community *communit
 
 func (s *MessengerSendImagesAlbumSuite) joinCommunity(community *communities.Community, user *Messenger) {
 	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
-	joinCommunity(&s.Suite, community, s.m, user, request)
+	joinCommunity(&s.Suite, community, s.m, user, request, "")
 }
 
 func (s *MessengerSendImagesAlbumSuite) TestAlbumImageMessagesSend() {

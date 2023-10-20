@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/services/wallet/bigint"
@@ -584,6 +585,27 @@ func (api *PublicAPI) DeclinedRequestsToJoinForCommunity(id types.HexBytes) ([]*
 // CanceledRequestsToJoinForCommunity returns the declined requests to join for a given community
 func (api *PublicAPI) CanceledRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.CanceledRequestsToJoinForCommunity(id)
+}
+
+// Generates a single hash for each address that needs to be revealed to a community.
+// Each hash needs to be signed.
+// The order of retuned hashes corresponds to the order of addresses in addressesToReveal.
+func (api *PublicAPI) GenerateJoiningCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]account.SignParams, error) {
+	return api.service.messenger.GenerateJoiningCommunityRequestsForSigning(memberPubKey, communityID, addressesToReveal)
+}
+
+// Generates a single hash for each address that needs to be revealed to a community.
+// Each hash needs to be signed.
+// The order of retuned hashes corresponds to the order of addresses in addressesToReveal.
+func (api *PublicAPI) GenerateEditCommunityRequestsForSigning(memberPubKey string, communityID types.HexBytes, addressesToReveal []string) ([]account.SignParams, error) {
+	return api.service.messenger.GenerateEditCommunityRequestsForSigning(memberPubKey, communityID, addressesToReveal)
+}
+
+// Signs the provided messages with the provided accounts and password.
+// Provided accounts must not belong to a keypair that is migrated to a keycard.
+// Otherwise, the signing will fail, cause such accounts should be signed with a keycard.
+func (api *PublicAPI) SignData(signParams []account.SignParams) ([]string, error) {
+	return api.service.messenger.SignData(signParams)
 }
 
 // CancelRequestToJoinCommunity accepts a pending request to join a community

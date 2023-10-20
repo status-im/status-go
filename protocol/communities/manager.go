@@ -3248,25 +3248,32 @@ func (m *Manager) SaveRequestToJoinAndCommunity(requestToJoin *RequestToJoin, co
 	return community, requestToJoin, nil
 }
 
-func (m *Manager) CreateRequestToJoin(requester *ecdsa.PublicKey, request *requests.RequestToJoinCommunity) (*Community, *RequestToJoin, error) {
-	community, err := m.GetByID(request.CommunityID)
+func (m *Manager) CheckCommunityForJoining(communityID types.HexBytes) (*Community, error) {
+	community, err := m.GetByID(communityID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-
-	err = community.updateCommunityDescriptionByEvents()
-	if err != nil {
-		return nil, nil, err
+	if community == nil {
+		return nil, ErrOrgNotFound
 	}
 
 	// We don't allow requesting access if already joined
 	if community.Joined() {
-		return nil, nil, ErrAlreadyJoined
+		return nil, ErrAlreadyJoined
 	}
 
+	err = community.updateCommunityDescriptionByEvents()
+	if err != nil {
+		return nil, err
+	}
+
+	return community, nil
+}
+
+func (m *Manager) CreateRequestToJoin(request *requests.RequestToJoinCommunity) *RequestToJoin {
 	clock := uint64(time.Now().Unix())
 	requestToJoin := &RequestToJoin{
-		PublicKey:        common.PubkeyToHex(requester),
+		PublicKey:        common.PubkeyToHex(&m.identity.PublicKey),
 		Clock:            clock,
 		ENSName:          request.ENSName,
 		CommunityID:      request.CommunityID,
@@ -3277,7 +3284,21 @@ func (m *Manager) CreateRequestToJoin(requester *ecdsa.PublicKey, request *reque
 
 	requestToJoin.CalculateID()
 
-	return community, requestToJoin, nil
+	addSignature := len(request.Signatures) == len(request.AddressesToReveal)
+	for i := range request.AddressesToReveal {
+		revealedAcc := &protobuf.RevealedAccount{
+			Address:          request.AddressesToReveal[i],
+			IsAirdropAddress: types.HexToAddress(request.AddressesToReveal[i]) == types.HexToAddress(request.AirdropAddress),
+		}
+
+		if addSignature {
+			revealedAcc.Signature = request.Signatures[i]
+		}
+
+		requestToJoin.RevealedAccounts = append(requestToJoin.RevealedAccounts, revealedAcc)
+	}
+
+	return requestToJoin
 }
 
 func (m *Manager) SaveRequestToJoin(request *RequestToJoin) error {
