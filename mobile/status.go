@@ -277,7 +277,7 @@ func CreateAccountAndLogin(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	api.RunAsync(func() error {
+	responseChan := api.RunAsync(func() error {
 		log.Debug("starting a node and creating config")
 		err := statusBackend.CreateAccountAndLogin(&request)
 		if err != nil {
@@ -287,7 +287,7 @@ func CreateAccountAndLogin(requestJSON string) string {
 		log.Debug("started a node, and created account")
 		return nil
 	})
-	return makeJSONResponse(nil)
+	return makeJSONResponse(<-responseChan)
 }
 
 func LoginAccount(requestJSON string) string {
