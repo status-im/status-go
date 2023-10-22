@@ -277,17 +277,27 @@ func CreateAccountAndLogin(requestJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	responseChan := api.RunAsync(func() error {
-		log.Debug("starting a node and creating config")
-		err := statusBackend.CreateAccountAndLogin(&request)
-		if err != nil {
-			log.Error("failed to create account", "error", err)
-			return err
-		}
-		log.Debug("started a node, and created account")
-		return nil
-	})
-	return makeJSONResponse(<-responseChan)
+	log.Debug("starting a node and creating config")
+	err = statusBackend.CreateAccountAndLogin(&request)
+	if err != nil {
+		log.Error("failed to create account", "error", err)
+		return makeJSONResponse(err)
+	}
+
+	return makeJSONResponse(nil)
+
+	// don't do this async to debug crash on x86_64 devices
+	//responseChan := api.RunAsync(func() error {
+	//	log.Debug("starting a node and creating config")
+	//	err := statusBackend.CreateAccountAndLogin(&request)
+	//	if err != nil {
+	//		log.Error("failed to create account", "error", err)
+	//		return err
+	//	}
+	//	log.Debug("started a node, and created account")
+	//	return nil
+	//})
+	//return makeJSONResponse(<-responseChan)
 }
 
 func LoginAccount(requestJSON string) string {
