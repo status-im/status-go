@@ -253,16 +253,40 @@ func OpenDB(path string, key string, kdfIterationsNumber int) (*sql.DB, error) {
 
 // OpenUnecryptedDB opens database with setting PRAGMA key.
 func OpenUnecryptedDB(path string) (*sql.DB, error) {
+
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("database path does not exist: %s", path)
+		}
+		return nil, fmt.Errorf("error checking database path: %v", err)
+	}
+
+	// Check for permissions: readable and writable
+	perm := info.Mode().Perm()
+	if perm&0400 == 0 || perm&0200 == 0 {
+		// File lacks read or write permissions
+		fmt.Println("Modifying database file permissions to read/write...")
+
+		if err := os.Chmod(path, 0600); err != nil {
+			return nil, fmt.Errorf("failed to set database file permissions: %v", err)
+		}
+	}
+
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error opening sqlite3 db: %v", err)
+	}
+
+	if db == nil {
+		return nil, fmt.Errorf("received nil database connection from sql.Open")
 	}
 
 	// Disable concurrent access as not supported by the driver
 	db.SetMaxOpenConns(1)
 
 	if _, err = db.Exec("PRAGMA foreign_keys=ON"); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error while setting foreign keys: %w", err)
 	}
 	// readers do not block writers and faster i/o operations
 	// https://www.sqlite.org/draft/wal.html
