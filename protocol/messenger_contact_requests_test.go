@@ -252,15 +252,14 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(
 	s.Require().NoError(err)
 	s.Require().NotNil(resp)
 
-	// WARNING: Uncomment these checks when bug fixed https://github.com/status-im/status-go/issues/3801
 	// Check activity center notification is of the right type
-	//s.Require().Len(resp.ActivityCenterNotifications(), 1)
-	//s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
-	//s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
-	//s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, true)
-	//s.Require().Equal(resp.ActivityCenterNotifications()[0].Accepted, true)
-	//s.Require().Equal(resp.ActivityCenterNotifications()[0].Dismissed, false)
-	//s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
+	s.Require().Len(resp.ActivityCenterNotifications(), 1)
+	s.Require().Equal(ActivityCenterNotificationTypeContactRequest, resp.ActivityCenterNotifications()[0].Type)
+	s.Require().Equal(common.ContactRequestStateAccepted, resp.ActivityCenterNotifications()[0].Message.ContactRequestState)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Read, true)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Accepted, true)
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Dismissed, false)
+	s.Require().NotNil(resp.ActivityCenterNotifications()[0].Message)
 
 	// Make sure the message is updated, sender side
 	s.Require().Len(resp.Messages(), 2)
@@ -288,9 +287,8 @@ func (s *MessengerContactRequestSuite) acceptContactRequest(
 	contact := resp.Contacts[0]
 	s.Require().True(contact.mutual())
 
-	// WARNING: Uncomment these checks when bug fixed https://github.com/status-im/status-go/issues/3801
 	// Check contact's primary name matches notification's name
-	//s.Require().Equal(resp.ActivityCenterNotifications()[0].Name, contact.PrimaryName())
+	s.Require().Equal(resp.ActivityCenterNotifications()[0].Name, contact.PrimaryName())
 
 	// Sender's side chat should be active after the accepting the CR
 	chat, ok := s.m.allChats.Load(contact.ID)
@@ -1425,7 +1423,7 @@ func (s *MessengerContactRequestSuite) blockContactAndSync(alice1 *Messenger, al
 	s.Require().NoError(err)
 
 	// Alice-1 blocks Bob
-	_, err = alice1.BlockContact(bobPublicKey, false)
+	_, err = alice1.BlockContact(context.Background(), bobPublicKey, false)
 	s.Require().NoError(err)
 	s.Require().Len(alice1.BlockedContacts(), 1)
 	s.Require().Equal(bobPublicKey, alice1.BlockedContacts()[0].ID)

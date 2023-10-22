@@ -80,7 +80,7 @@ func (s *ActivityCenterPersistenceTestSuite) Test_DeleteActivityCenterNotificati
 	count, _ = p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)
 	s.Require().Equal(uint64(1), count)
 
-	_, err = p.DeleteActivityCenterNotifications([]types.HexBytes{}, currentMilliseconds())
+	_, err = p.MarkActivityCenterNotificationsDeleted([]types.HexBytes{}, currentMilliseconds())
 	s.Require().NoError(err)
 
 	count, _ = p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)
@@ -109,7 +109,7 @@ func (s *ActivityCenterPersistenceTestSuite) Test_DeleteActivityCenterNotificati
 	count, _ = p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)
 	s.Require().Equal(uint64(3), count)
 
-	_, err = p.DeleteActivityCenterNotifications([]types.HexBytes{notifications[1].ID, notifications[2].ID}, currentMilliseconds())
+	_, err = p.MarkActivityCenterNotificationsDeleted([]types.HexBytes{notifications[1].ID, notifications[2].ID}, currentMilliseconds())
 	s.Require().NoError(err)
 
 	count, _ = p.ActivityCenterNotificationsCount([]ActivityCenterType{}, ActivityCenterQueryParamsReadUnread, false)

@@ -199,9 +199,6 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
            case protobuf.ApplicationMetadataMessage_SYNC_ENS_USERNAME_DETAIL:
 		return m.handleSyncEnsUsernameDetailProtobuf(messageState, protoBytes, msg, filter)
         
-           case protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_NOTIFICATIONS:
-		return m.handleSyncActivityCenterNotificationsProtobuf(messageState, protoBytes, msg, filter)
-        
            case protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_NOTIFICATION_STATE:
 		return m.handleSyncActivityCenterNotificationStateProtobuf(messageState, protoBytes, msg, filter)
         
@@ -228,6 +225,12 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
         
            case protobuf.ApplicationMetadataMessage_SYNC_CHAT:
 		return m.handleSyncChatProtobuf(messageState, protoBytes, msg, filter)
+        
+           case protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_DELETED:
+		return m.handleSyncActivityCenterDeletedProtobuf(messageState, protoBytes, msg, filter)
+        
+           case protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_UNREAD:
+		return m.handleSyncActivityCenterUnreadProtobuf(messageState, protoBytes, msg, filter)
         
 	default:
 		m.logger.Info("protobuf type not found", zap.String("type", string(msg.Type)))
@@ -1424,29 +1427,6 @@ func (m *Messenger) handleSyncEnsUsernameDetailProtobuf(messageState *ReceivedMe
 }
 
 
-func (m *Messenger) handleSyncActivityCenterNotificationsProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
-	m.logger.Info("handling SyncActivityCenterNotifications")
-	
-	if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-		m.logger.Warn("not coming from us, ignoring")
-		return nil
-	}
-	
-
-	
-	p := &protobuf.SyncActivityCenterNotifications{}
-	err := proto.Unmarshal(protoBytes, p)
-	if err != nil {
-		return err
-	}
-
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
-
-	return m.HandleSyncActivityCenterNotifications(messageState, p, msg)
-	
-}
-
-
 func (m *Messenger) handleSyncActivityCenterNotificationStateProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
 	m.logger.Info("handling SyncActivityCenterNotificationState")
 	
@@ -1625,6 +1605,52 @@ func (m *Messenger) handleSyncChatProtobuf(messageState *ReceivedMessageState, p
 	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncChat(messageState, p, msg)
+	
+}
+
+
+func (m *Messenger) handleSyncActivityCenterDeletedProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
+	m.logger.Info("handling SyncActivityCenterDeleted")
+	
+	if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+		m.logger.Warn("not coming from us, ignoring")
+		return nil
+	}
+	
+
+	
+	p := &protobuf.SyncActivityCenterDeleted{}
+	err := proto.Unmarshal(protoBytes, p)
+	if err != nil {
+		return err
+	}
+
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
+
+	return m.HandleSyncActivityCenterDeleted(messageState, p, msg)
+	
+}
+
+
+func (m *Messenger) handleSyncActivityCenterUnreadProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
+	m.logger.Info("handling SyncActivityCenterUnread")
+	
+	if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+		m.logger.Warn("not coming from us, ignoring")
+		return nil
+	}
+	
+
+	
+	p := &protobuf.SyncActivityCenterUnread{}
+	err := proto.Unmarshal(protoBytes, p)
+	if err != nil {
+		return err
+	}
+
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
+
+	return m.HandleSyncActivityCenterUnread(messageState, p, msg)
 	
 }
 

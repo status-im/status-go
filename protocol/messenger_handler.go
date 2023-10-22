@@ -280,10 +280,10 @@ func (m *Messenger) createMessageNotification(chat *Chat, messageState *Received
 		Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
 		ChatID:      chat.ID,
 		CommunityID: chat.CommunityID,
-		UpdatedAt:   m.getCurrentTimeInMillis(),
+		UpdatedAt:   m.GetCurrentTimeInMillis(),
 	}
 
-	err := m.addActivityCenterNotification(messageState.Response, notification)
+	err := m.addActivityCenterNotification(messageState.Response, notification, nil)
 	if err != nil {
 		m.logger.Warn("failed to create activity center notification", zap.Error(err))
 	}
@@ -333,19 +333,13 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 			notification.Read = true
 			notification.Accepted = true
 			notification.Dismissed = false
-			notification.UpdatedAt = m.getCurrentTimeInMillis()
+			notification.UpdatedAt = m.GetCurrentTimeInMillis()
 			_, err = m.persistence.SaveActivityCenterNotification(notification, true)
 			if err != nil {
 				return err
 			}
 			messageState.Response.AddMessage(contactRequest)
 			messageState.Response.AddActivityCenterNotification(notification)
-
-			err = m.syncActivityCenterNotifications([]*ActivityCenterNotification{notification})
-			if err != nil {
-				m.logger.Error("createIncomingContactRequestNotification, failed to sync activity center notifications", zap.Error(err))
-				return err
-			}
 		}
 		return nil
 	}
@@ -365,10 +359,10 @@ func (m *Messenger) createIncomingContactRequestNotification(contact *Contact, m
 		Read:      contactRequest.ContactRequestState == common.ContactRequestStateAccepted || contactRequest.ContactRequestState == common.ContactRequestStateDismissed,
 		Accepted:  contactRequest.ContactRequestState == common.ContactRequestStateAccepted,
 		Dismissed: contactRequest.ContactRequestState == common.ContactRequestStateDismissed,
-		UpdatedAt: m.getCurrentTimeInMillis(),
+		UpdatedAt: m.GetCurrentTimeInMillis(),
 	}
 
-	return m.addActivityCenterNotification(messageState.Response, notification)
+	return m.addActivityCenterNotification(messageState.Response, notification, nil)
 }
 
 func (m *Messenger) handleCommandMessage(state *ReceivedMessageState, message *common.Message) error {
@@ -474,7 +468,7 @@ func (m *Messenger) syncContactRequestForInstallationContact(contact *Contact, s
 
 	if outgoing {
 		notification := m.generateOutgoingContactRequestNotification(contact, contactRequest)
-		err = m.addActivityCenterNotification(state.Response, notification)
+		err = m.addActivityCenterNotification(state.Response, notification, nil)
 		if err != nil {
 			return err
 		}
@@ -684,7 +678,7 @@ func (m *Messenger) HandleSyncInstallationContactV2(state *ReceivedMessageState,
 		if message.Blocked != contact.Blocked {
 			if message.Blocked {
 				state.AllContacts.Store(contact.ID, contact)
-				response, err := m.BlockContact(contact.ID, true)
+				response, err := m.BlockContact(context.TODO(), contact.ID, true)
 				if err != nil {
 					return err
 				}
@@ -1027,7 +1021,7 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 	if request != nil {
 		if isOutgoing {
 			notification := m.generateOutgoingContactRequestNotification(contact, request)
-			err = m.addActivityCenterNotification(state.Response, notification)
+			err = m.addActivityCenterNotification(state.Response, notification, nil)
 			if err != nil {
 				return err
 			}
@@ -1036,9 +1030,18 @@ func (m *Messenger) handleAcceptContactRequestMessage(state *ReceivedMessageStat
 			if err != nil {
 				return err
 			}
-		}
-		if err != nil {
-			m.logger.Warn("could not create contact request notification", zap.Error(err))
+
+			// With devices 1 and 2 paired, and userA logged in on both, while userB is on device 3:
+			// When userA on device 1 sends a contact request to userB, userB accepts it on device 3.
+			// The confirmation is sent to devices 1 and 2.
+			// However, the contactRequestID in `AcceptContactRequestMessage` uses keccak256(...) instead of defaultContactRequestID(contact.ID).
+			// Device 1 processes this, but device 2 doesn't due to an error `ErrRecordNotFound` from `m.persistence.MessageByID(contactRequestID)`.
+			// The correct notification ID on device 2 should be defaultContactRequestID(contact.ID).
+			// Thus, we must sync the accepted decision to device 2.
+			err = m.syncActivityCenterAcceptedByIDs(context.TODO(), []types.HexBytes{types.FromHex(defaultContactRequestID(contact.ID))}, m.GetCurrentTimeInMillis())
+			if err != nil {
+				m.logger.Warn("could not sync activity center notification as accepted", zap.Error(err))
+			}
 		}
 	}
 
@@ -1103,10 +1106,10 @@ func (m *Messenger) handleRetractContactRequest(state *ReceivedMessageState, con
 		Timestamp: m.getTimesource().GetCurrentTime(),
 		ChatID:    contact.ID,
 		Read:      false,
-		UpdatedAt: m.getCurrentTimeInMillis(),
+		UpdatedAt: m.GetCurrentTimeInMillis(),
 	}
 
-	err = m.addActivityCenterNotification(state.Response, notification)
+	err = m.addActivityCenterNotification(state.Response, notification, nil)
 	if err != nil {
 		m.logger.Warn("failed to create activity center notification", zap.Error(err))
 		return err
@@ -1440,8 +1443,11 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageSta
 	}
 
 	if notification != nil {
-		notification.UpdatedAt = m.getCurrentTimeInMillis()
-		err = m.persistence.DeleteActivityCenterNotificationByID(types.FromHex(requestToJoin.ID.String()), notification.UpdatedAt)
+		updatedAt := m.GetCurrentTimeInMillis()
+		notification.UpdatedAt = updatedAt
+		// we shouldn't sync deleted notification here,
+		// as the same user on different devices will receive the same message(CommunityCancelRequestToJoin) ?
+		err = m.persistence.DeleteActivityCenterNotificationByID(types.FromHex(requestToJoin.ID.String()), updatedAt)
 		if err != nil {
 			m.logger.Error("failed to delete notification from Activity Center", zap.Error(err))
 			return err
@@ -1449,12 +1455,6 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageSta
 
 		// sending signal to client to remove the activity center notification from UI
 		response := &MessengerResponse{}
-		notification.Deleted = true
-		err = m.syncActivityCenterNotifications([]*ActivityCenterNotification{notification})
-		if err != nil {
-			m.logger.Error("HandleCommunityCancelRequestToJoin, failed to sync activity center notifications", zap.Error(err))
-			return err
-		}
 		response.AddActivityCenterNotification(notification)
 
 		signal.SendNewMessages(response)
@@ -1497,9 +1497,9 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, re
 			CommunityID:      community.IDString(),
 			MembershipStatus: ActivityCenterMembershipStatusPending,
 			Deleted:          false,
-			UpdatedAt:        m.getCurrentTimeInMillis(),
+			UpdatedAt:        m.GetCurrentTimeInMillis(),
 		}
-		err = m.addActivityCenterNotification(state.Response, notification)
+		err = m.addActivityCenterNotification(state.Response, notification, nil)
 		if err != nil {
 			m.logger.Error("failed to save notification", zap.Error(err))
 			return err
@@ -1656,8 +1656,8 @@ func (m *Messenger) HandleCommunityRequestToJoinResponse(state *ReceivedMessageS
 		} else {
 			notification.MembershipStatus = ActivityCenterMembershipStatusDeclined
 		}
-		notification.UpdatedAt = m.getCurrentTimeInMillis()
-		err = m.addActivityCenterNotification(state.Response, notification)
+		notification.UpdatedAt = m.GetCurrentTimeInMillis()
+		err = m.addActivityCenterNotification(state.Response, notification, nil)
 		if err != nil {
 			m.logger.Warn("failed to update notification", zap.Error(err))
 			return err
@@ -1863,8 +1863,10 @@ func (m *Messenger) handleDeleteMessage(state *ReceivedMessageState, deleteMessa
 			return err
 		}
 
+		// we shouldn't sync deleted notification here,
+		// as the same user on different devices will receive the same message(DeleteMessage) ?
 		m.logger.Debug("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", messageToDelete.ID))
-		notifications, err := m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, messageToDelete.ID, m.getCurrentTimeInMillis())
+		_, err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, messageToDelete.ID, m.GetCurrentTimeInMillis())
 
 		if err != nil {
 			m.logger.Warn("failed to delete notifications for deleted message", zap.Error(err))
@@ -1884,12 +1886,6 @@ func (m *Messenger) handleDeleteMessage(state *ReceivedMessageState, deleteMessa
 			if err != nil {
 				return err
 			}
-		}
-
-		err = m.syncActivityCenterNotifications(notifications)
-		if err != nil {
-			m.logger.Error("HandleDeleteMessage, failed to sync activity center notifications", zap.Error(err))
-			return err
 		}
 
 		state.Response.AddRemovedMessage(&RemovedMessage{MessageID: messageToDelete.ID, ChatID: chat.ID, DeletedBy: deleteMessage.DeleteMessage.DeletedBy})
@@ -1983,9 +1979,10 @@ func (m *Messenger) HandleSyncDeleteForMeMessage(state *ReceivedMessageState, de
 			return err
 		}
 
+		// we shouldn't sync deleted notification here,
+		// as the same user on different devices will receive the same message(DeleteForMeMessage) ?
 		m.logger.Debug("deleting activity center notification for message", zap.String("chatID", chat.ID), zap.String("messageID", messageToDelete.ID))
-
-		notifications, err := m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, messageToDelete.ID, m.getCurrentTimeInMillis())
+		_, err = m.persistence.DeleteActivityCenterNotificationForMessage(chat.ID, messageToDelete.ID, m.GetCurrentTimeInMillis())
 		if err != nil {
 			m.logger.Warn("failed to delete notifications for deleted message", zap.Error(err))
 			return err
@@ -1997,12 +1994,6 @@ func (m *Messenger) HandleSyncDeleteForMeMessage(state *ReceivedMessageState, de
 			if err != nil {
 				return nil
 			}
-		}
-
-		err = m.syncActivityCenterNotifications(notifications)
-		if err != nil {
-			m.logger.Error("HandleDeleteForMeMessage, failed to sync activity center notifications", zap.Error(err))
-			return err
 		}
 
 		state.Response.AddMessage(messageToDelete)
@@ -2317,33 +2308,6 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 func (m *Messenger) HandleChatMessage(state *ReceivedMessageState, message *protobuf.ChatMessage, statusMessage *v1protocol.StatusMessage, fromArchive bool) error {
 	state.CurrentMessageState.Message = message
 	return m.handleChatMessage(state, fromArchive)
-}
-
-func (m *Messenger) addActivityCenterNotification(response *MessengerResponse, notification *ActivityCenterNotification) error {
-	_, err := m.persistence.SaveActivityCenterNotification(notification, true)
-	if err != nil {
-		m.logger.Error("failed to save notification", zap.Error(err))
-		return err
-	}
-
-	err = m.syncActivityCenterNotifications([]*ActivityCenterNotification{notification})
-	if err != nil {
-		m.logger.Error("addActivityCenterNotification, failed to sync activity center notifications", zap.Error(err))
-		return err
-	}
-
-	state, err := m.persistence.GetActivityCenterState()
-	if err != nil {
-		m.logger.Error("failed to obtain activity center state", zap.Error(err))
-		return err
-	}
-	response.AddActivityCenterNotification(notification)
-	response.SetActivityCenterState(state)
-
-	if !notification.Read {
-		return m.syncActivityCenterNotificationState(state)
-	}
-	return nil
 }
 
 func (m *Messenger) HandleRequestAddressForTransaction(messageState *ReceivedMessageState, command *protobuf.RequestAddressForTransaction, statusMessage *v1protocol.StatusMessage) error {
@@ -3703,7 +3667,7 @@ func (m *Messenger) addNewKeypairAddedOnPairedDeviceACNotification(keyUID string
 		Type:      ActivityCenterNotificationTypeNewKeypairAddedToPairedDevice,
 		Timestamp: m.getTimesource().GetCurrentTime(),
 		Read:      false,
-		UpdatedAt: m.getCurrentTimeInMillis(),
+		UpdatedAt: m.GetCurrentTimeInMillis(),
 		Message: &common.Message{
 			ChatMessage: &protobuf.ChatMessage{
 				Text: kp.Name,
@@ -3712,7 +3676,7 @@ func (m *Messenger) addNewKeypairAddedOnPairedDeviceACNotification(keyUID string
 		},
 	}
 
-	err = m.addActivityCenterNotification(response, notification)
+	err = m.addActivityCenterNotification(response, notification, nil)
 	if err != nil {
 		m.logger.Warn("failed to create activity center notification", zap.Error(err))
 		return err

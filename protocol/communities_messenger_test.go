@@ -933,7 +933,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusPending)
 
 	// Delete pending request to join
-	response, err = s.alice.CheckAndDeletePendingRequestToJoinCommunity(true)
+	response, err = s.alice.CheckAndDeletePendingRequestToJoinCommunity(ctx, true)
 	s.Require().NoError(err)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
@@ -945,7 +945,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	s.Require().Equal(notification.Type, ActivityCenterNotificationTypeCommunityRequest)
 	s.Require().Equal(notification.MembershipStatus, ActivityCenterMembershipStatusIdle)
 
-	response, err = s.bob.CheckAndDeletePendingRequestToJoinCommunity(true)
+	response, err = s.bob.CheckAndDeletePendingRequestToJoinCommunity(ctx, true)
 	s.Require().NoError(err)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
@@ -1067,7 +1067,8 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	s.Require().Equal(response.Communities()[0].RequestedToJoinAt(), requestToJoin.Clock)
 
 	// Alice deletes activity center notification
-	err = s.alice.DeleteActivityCenterNotifications(ctx, []types.HexBytes{notification.ID}, false)
+	var updatedAt uint64 = 99
+	_, err = s.alice.MarkActivityCenterNotificationsDeleted(ctx, []types.HexBytes{notification.ID}, updatedAt, true)
 	s.Require().NoError(err)
 
 	// Check activity center notification for Bob after deleting
@@ -1180,7 +1181,8 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	s.Require().Len(requestsToJoin, 1)
 
 	// Bob deletes activity center notification
-	err = s.bob.DeleteActivityCenterNotifications(ctx, []types.HexBytes{notification.ID}, false)
+	updatedAt++
+	_, err = s.bob.MarkActivityCenterNotificationsDeleted(ctx, []types.HexBytes{notification.ID}, updatedAt, true)
 	s.Require().NoError(err)
 
 	// Check activity center notification for Bob after deleting
@@ -1189,7 +1191,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	s.Require().Len(notifications.Notifications, 0)
 
 	// Delete pending request to join
-	response, err = s.alice.CheckAndDeletePendingRequestToJoinCommunity(true)
+	response, err = s.alice.CheckAndDeletePendingRequestToJoinCommunity(ctx, true)
 	s.Require().NoError(err)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
 
@@ -1371,7 +1373,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	requestToJoin := requestsToJoin[0]
 
 	requestToCancel := &requests.CancelRequestToJoinCommunity{ID: requestToJoin.ID}
-	response, err = s.alice.CancelRequestToJoinCommunity(requestToCancel)
+	response, err = s.alice.CancelRequestToJoinCommunity(ctx, requestToCancel)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
@@ -2173,6 +2175,7 @@ func (s *MessengerCommunitiesSuite) TestBanUser() {
 	s.joinCommunity(community, s.alice)
 
 	response, err := s.admin.BanUserFromCommunity(
+		context.Background(),
 		&requests.BanUserFromCommunity{
 			CommunityID: community.ID(),
 			User:        common.PubkeyToHexBytes(&s.alice.identity.PublicKey),
@@ -3094,6 +3097,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityBanUserRequestToJoin() {
 	s.joinCommunity(community, s.alice)
 
 	response, err := s.admin.BanUserFromCommunity(
+		context.Background(),
 		&requests.BanUserFromCommunity{
 			CommunityID: community.ID(),
 			User:        common.PubkeyToHexBytes(&s.alice.identity.PublicKey),

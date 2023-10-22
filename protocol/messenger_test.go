@@ -305,7 +305,7 @@ func (s *MessengerSuite) TestMarkAllRead() {
 	err = s.m.SaveMessages([]*common.Message{inputMessage1, inputMessage2})
 	s.Require().NoError(err)
 
-	err = s.m.MarkAllRead(chat.ID)
+	err = s.m.MarkAllRead(context.Background(), chat.ID)
 	s.Require().NoError(err)
 
 	chats := s.m.Chats()
@@ -651,7 +651,7 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 	}
 
 	// Block contact
-	_, err = s.m.BlockContact(blockedContact.ID, false)
+	_, err = s.m.BlockContact(context.Background(), blockedContact.ID, false)
 	s.Require().NoError(err)
 
 	// Blocked contact sends message, we should not receive it
@@ -1399,7 +1399,7 @@ func (s *MessengerSuite) TestBlockContact() {
 	err = s.m.SaveMessages(messages)
 	s.Require().NoError(err)
 
-	response, err := s.m.BlockContact(contact.ID, false)
+	response, err := s.m.BlockContact(context.Background(), contact.ID, false)
 	s.Require().NoError(err)
 
 	blockedContacts := s.m.BlockedContacts()
