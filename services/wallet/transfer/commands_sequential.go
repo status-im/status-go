@@ -218,7 +218,7 @@ func (c *findBlocksCommand) checkERC20Tail(parent context.Context) ([]*DBHeader,
 }
 
 func (c *findBlocksCommand) Run(parent context.Context) (err error) {
-	log.Debug("start findBlocksCommand", "account", c.account, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit, "from", c.fromBlockNumber, "to", c.toBlockNumber)
+	log.Info("TSCAN start findBlocksCommand", "account", c.account, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit, "from", c.fromBlockNumber, "to", c.toBlockNumber)
 
 	rangeSize := big.NewInt(int64(c.defaultNodeBlockChunkSize))
 
@@ -254,7 +254,7 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 		}
 
 		if len(headers) > 0 {
-			log.Debug("findBlocksCommand saving headers", "len", len(headers), "lastBlockNumber", to,
+			log.Info("TSCAN findBlocksCommand saving headers", "len", len(headers), "lastBlockNumber", to,
 				"balance", c.balanceCacher.Cache().GetBalance(c.account, c.chainClient.NetworkID(), to),
 				"nonce", c.balanceCacher.Cache().GetNonce(c.account, c.chainClient.NetworkID(), to))
 
@@ -300,7 +300,7 @@ func (c *findBlocksCommand) Run(parent context.Context) (err error) {
 		to = nextTo
 	}
 
-	log.Debug("end findBlocksCommand", "account", c.account, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit)
+	log.Info("TSCAN end findBlocksCommand", "account", c.account, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit)
 
 	return nil
 }

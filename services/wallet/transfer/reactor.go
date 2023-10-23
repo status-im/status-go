@@ -302,7 +302,7 @@ func (r *Reactor) restart(chainClients map[uint64]chain.ClientInterface, account
 func (r *Reactor) createFetchStrategy(chainClients map[uint64]chain.ClientInterface,
 	accounts []common.Address, loadAllTransfers bool) HistoryFetcher {
 
-	if loadAllTransfers {
+	if /*loadAllTransfers*/ true {
 		return NewSequentialFetchStrategy(
 			r.db,
 			r.blockDAO,
