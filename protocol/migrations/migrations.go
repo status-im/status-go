@@ -104,8 +104,8 @@
 // 1693311981_community_shard.up.sql (156B)
 // 1695331492_add_status_link_previews.up.sql (136B)
 // 1695918296_add_validated_at.up.sql (377B)
-// 1696595054_add_profile_showcase_tables.up.sql (440B)
 // 1697699419_community_control_node_sync.up.sql (435B)
+// 1698137561_add_profile_showcase_tables.up.sql (440B)
 // README.md (554B)
 // doc.go (850B)
 
@@ -2256,26 +2256,6 @@ func _1695918296_add_validated_atUpSql() (*asset, error) {
 	return a, nil
 }
 
-var __1696595054_add_profile_showcase_tablesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x9c\xcf\xc1\x4a\x03\x31\x10\xc6\xf1\xfb\x3e\xc5\x77\x54\xf0\xe0\xdd\x53\x8c\xb3\x10\x8c\xd9\x92\x4e\xa1\x3d\x85\x9a\x4e\x31\x50\x36\x4b\x12\x94\x7d\x7b\xa1\x75\x8f\x2a\xed\x71\xe0\x3f\xcc\xfc\xb4\x27\xc5\x04\x56\xcf\x96\x60\x7a\xb8\x81\x41\x5b\xb3\xe6\x35\xa6\x92\x8f\xe9\x24\xa1\x7e\xe4\xaf\xb8\xaf\x12\xa6\x22\x47\x29\x32\x46\xa9\xb8\xeb\x00\x20\x1d\xc0\xb4\x65\xac\xbc\x79\x53\x7e\x87\x57\xda\x61\x70\xd0\x83\xeb\xad\xd1\x0c\x4f\x2b\xab\x34\x3d\x9c\x63\x19\x5b\x99\x43\x9b\x27\x81\x71\x7c\xbe\xe4\x36\xd6\xe2\x85\x7a\xb5\xb1\x8c\xc7\x4b\xf6\x99\x6a\x7a\x4f\xa7\xd4\xe6\x3f\xb3\x9a\x4b\x0b\xb9\x1c\xa4\xfc\x92\x75\xf7\x4f\x5d\x77\x0d\x2f\xe6\xb1\xed\x63\x5b\x6c\x3f\x63\xb8\xc1\xb8\xac\x2c\x4f\x5d\xe5\xbf\x64\xff\xc9\xbe\x03\x00\x00\xff\xff\x7a\x85\xf6\x6b\xb8\x01\x00\x00")
-
-func _1696595054_add_profile_showcase_tablesUpSqlBytes() ([]byte, error) {
-	return bindataRead(
-		__1696595054_add_profile_showcase_tablesUpSql,
-		"1696595054_add_profile_showcase_tables.up.sql",
-	)
-}
-
-func _1696595054_add_profile_showcase_tablesUpSql() (*asset, error) {
-	bytes, err := _1696595054_add_profile_showcase_tablesUpSqlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "1696595054_add_profile_showcase_tables.up.sql", size: 440, mode: os.FileMode(0644), modTime: time.Unix(1698072538, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7c, 0xef, 0x89, 0x68, 0x42, 0xbf, 0xff, 0xb9, 0x8f, 0x8f, 0x19, 0x91, 0xd2, 0x6a, 0x85, 0xda, 0x2c, 0x63, 0x5f, 0x3c, 0x84, 0x4, 0x93, 0x16, 0x10, 0xf0, 0xe0, 0xd9, 0x9b, 0xbe, 0x8d, 0x62}}
-	return a, nil
-}
-
 var __1697699419_community_control_node_syncUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x6c\x8f\x4d\x4f\xc3\x20\x18\xc7\xef\x7c\x8a\xc7\xd3\x5c\xd2\x2c\xf1\xbc\x78\xa0\xf8\x2c\x43\x19\x2c\x14\x35\x3b\x35\x4d\x5b\x1d\x59\x57\xcc\x40\xe3\xbe\xbd\xa1\x2c\x55\xab\x37\xe0\xff\xf6\x83\x69\xa4\x06\xc1\xd0\x5c\x20\xd4\xee\x78\x7c\xef\x6d\xb0\xad\x2f\x6b\xd7\x87\x93\xeb\xca\xde\x35\x2d\x5c\x13\x00\x18\xe5\x73\x69\x1b\xc8\x85\xca\x41\x2a\x03\xf2\x51\x08\xd8\x6a\xbe\xa1\x7a\x07\x0f\xb8\x03\x25\x81\x29\xb9\x12\x9c\x19\xd0\xb8\x15\x94\x61\x96\xf2\x9d\xab\x0f\xc0\xa5\x19\x73\xe9\xdd\xf6\x3e\x54\x5d\x57\x05\xeb\xfa\x58\xfd\x44\x35\x5b\x53\x3d\xba\xc8\x7c\x49\x08\x97\x05\x6a\x13\xd3\xea\x17\xcc\x5f\xd6\x9f\x98\x59\x1a\xcd\xa6\x1b\x73\x52\xa0\x40\x66\x52\xd5\xc2\x36\x89\xe4\x06\x68\x71\x49\x0c\x77\xbf\x98\xe4\xc8\x4a\xab\xcd\x3f\xfb\xe3\x79\x28\x18\x0c\xf7\x8a\x4b\xf0\xfb\x7d\xfb\x19\x22\xe0\x8b\x7d\x8d\x9a\x27\xcf\x6b\xd4\x78\xd9\x7d\x3b\xd9\x8f\x2a\xb4\xe5\xa1\x3d\x03\x2f\xbe\x3f\x1c\x55\x2a\xef\x26\x8e\xab\x5b\x98\xcd\x96\xe4\x2b\x00\x00\xff\xff\x61\xbb\x8c\x2b\xb3\x01\x00\x00")
 
 func _1697699419_community_control_node_syncUpSqlBytes() ([]byte, error) {
@@ -2293,6 +2273,26 @@ func _1697699419_community_control_node_syncUpSql() (*asset, error) {
 
 	info := bindataFileInfo{name: "1697699419_community_control_node_sync.up.sql", size: 435, mode: os.FileMode(0644), modTime: time.Unix(1698072538, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x11, 0xd6, 0x63, 0x10, 0x1b, 0x16, 0x35, 0x57, 0xf1, 0x4a, 0x4, 0x51, 0xe0, 0x1, 0xe1, 0xfc, 0x12, 0x3a, 0x10, 0x4f, 0xb1, 0x96, 0x53, 0x2, 0xf5, 0x66, 0x7b, 0xe0, 0x8a, 0xdf, 0x78, 0x53}}
+	return a, nil
+}
+
+var __1698137561_add_profile_showcase_tablesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x9c\xcf\xc1\x4a\x03\x31\x10\xc6\xf1\xfb\x3e\xc5\x77\x54\xf0\xe0\xdd\x53\x8c\xb3\x10\x8c\xd9\x92\x4e\xa1\x3d\x85\x9a\x4e\x31\x50\x36\x4b\x12\x94\x7d\x7b\xa1\x75\x8f\x2a\xed\x71\xe0\x3f\xcc\xfc\xb4\x27\xc5\x04\x56\xcf\x96\x60\x7a\xb8\x81\x41\x5b\xb3\xe6\x35\xa6\x92\x8f\xe9\x24\xa1\x7e\xe4\xaf\xb8\xaf\x12\xa6\x22\x47\x29\x32\x46\xa9\xb8\xeb\x00\x20\x1d\xc0\xb4\x65\xac\xbc\x79\x53\x7e\x87\x57\xda\x61\x70\xd0\x83\xeb\xad\xd1\x0c\x4f\x2b\xab\x34\x3d\x9c\x63\x19\x5b\x99\x43\x9b\x27\x81\x71\x7c\xbe\xe4\x36\xd6\xe2\x85\x7a\xb5\xb1\x8c\xc7\x4b\xf6\x99\x6a\x7a\x4f\xa7\xd4\xe6\x3f\xb3\x9a\x4b\x0b\xb9\x1c\xa4\xfc\x92\x75\xf7\x4f\x5d\x77\x0d\x2f\xe6\xb1\xed\x63\x5b\x6c\x3f\x63\xb8\xc1\xb8\xac\x2c\x4f\x5d\xe5\xbf\x64\xff\xc9\xbe\x03\x00\x00\xff\xff\x7a\x85\xf6\x6b\xb8\x01\x00\x00")
+
+func _1698137561_add_profile_showcase_tablesUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1698137561_add_profile_showcase_tablesUpSql,
+		"1698137561_add_profile_showcase_tables.up.sql",
+	)
+}
+
+func _1698137561_add_profile_showcase_tablesUpSql() (*asset, error) {
+	bytes, err := _1698137561_add_profile_showcase_tablesUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1698137561_add_profile_showcase_tables.up.sql", size: 440, mode: os.FileMode(0644), modTime: time.Unix(1698136910, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7c, 0xef, 0x89, 0x68, 0x42, 0xbf, 0xff, 0xb9, 0x8f, 0x8f, 0x19, 0x91, 0xd2, 0x6a, 0x85, 0xda, 0x2c, 0x63, 0x5f, 0x3c, 0x84, 0x4, 0x93, 0x16, 0x10, 0xf0, 0xe0, 0xd9, 0x9b, 0xbe, 0x8d, 0x62}}
 	return a, nil
 }
 
@@ -2635,9 +2635,9 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1695918296_add_validated_at.up.sql": _1695918296_add_validated_atUpSql,
 
-	"1696595054_add_profile_showcase_tables.up.sql": _1696595054_add_profile_showcase_tablesUpSql,
-
 	"1697699419_community_control_node_sync.up.sql": _1697699419_community_control_node_syncUpSql,
+
+	"1698137561_add_profile_showcase_tables.up.sql": _1698137561_add_profile_showcase_tablesUpSql,
 
 	"README.md": readmeMd,
 
@@ -2789,8 +2789,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1693311981_community_shard.up.sql":                                           &bintree{_1693311981_community_shardUpSql, map[string]*bintree{}},
 	"1695331492_add_status_link_previews.up.sql":                                  &bintree{_1695331492_add_status_link_previewsUpSql, map[string]*bintree{}},
 	"1695918296_add_validated_at.up.sql":                                          &bintree{_1695918296_add_validated_atUpSql, map[string]*bintree{}},
-	"1696595054_add_profile_showcase_tables.up.sql":                               &bintree{_1696595054_add_profile_showcase_tablesUpSql, map[string]*bintree{}},
 	"1697699419_community_control_node_sync.up.sql":                               &bintree{_1697699419_community_control_node_syncUpSql, map[string]*bintree{}},
+	"1698137561_add_profile_showcase_tables.up.sql":                               &bintree{_1698137561_add_profile_showcase_tablesUpSql, map[string]*bintree{}},
 	"README.md": &bintree{readmeMd, map[string]*bintree{}},
 	"doc.go":    &bintree{docGo, map[string]*bintree{}},
 }}

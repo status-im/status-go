@@ -1,5 +1,7 @@
 package protocol
 
+import "fmt"
+
 type ProfileShowcasePreferences struct {
 	Communities  []*ProfileShowcaseEntry `json:"communities"`
 	Accounts     []*ProfileShowcaseEntry `json:"accounts"`
@@ -7,11 +9,43 @@ type ProfileShowcasePreferences struct {
 	Assets       []*ProfileShowcaseEntry `json:"assets"`
 }
 
+func (p *ProfileShowcasePreferences) Validate() error {
+	for _, community := range p.Communities {
+		if community.EntryType != ProfileShowcaseEntryTypeCommunity {
+			return fmt.Errorf("communities must contain only entriers of type ProfileShowcaseEntryTypeCommunity")
+		}
+	}
+
+	for _, community := range p.Accounts {
+		if community.EntryType != ProfileShowcaseEntryTypeAccount {
+			return fmt.Errorf("accounts must contain only entriers of type ProfileShowcaseEntryTypeAccount")
+		}
+	}
+
+	for _, community := range p.Collectibles {
+		if community.EntryType != ProfileShowcaseEntryTypeCollectible {
+			return fmt.Errorf("collectibles must contain only entriers of type ProfileShowcaseEntryTypeCollectible")
+		}
+	}
+
+	for _, community := range p.Assets {
+		if community.EntryType != ProfileShowcaseEntryTypeAsset {
+			return fmt.Errorf("assets must contain only entriers of type ProfileShowcaseEntryTypeAsset")
+		}
+	}
+	return nil
+}
+
 func (m *Messenger) SetProfileShowcasePreference(entry *ProfileShowcaseEntry) error {
 	return m.persistence.InsertOrUpdateProfileShowcasePreference(entry)
 }
 
 func (m *Messenger) SetProfileShowcasePreferences(preferences ProfileShowcasePreferences) error {
+	err := preferences.Validate()
+	if err != nil {
+		return err
+	}
+
 	allPreferences := []*ProfileShowcaseEntry{}
 
 	allPreferences = append(allPreferences, preferences.Communities...)
