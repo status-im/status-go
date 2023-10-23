@@ -7,8 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/status-im/status-go/account/generator"
-	"github.com/status-im/status-go/images"
-	multiacccommon "github.com/status-im/status-go/multiaccounts/common"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -1285,7 +1283,8 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		}
 	}
 
-	derivedAddresses, err := accountGenerator.DeriveAddresses(info.ID, paths)
+	//derivedAddresses, err := accountGenerator.DeriveAddresses(info.ID, paths)
+	_, err = accountGenerator.DeriveAddresses(info.ID, paths)
 	if err != nil {
 		return err
 	}
@@ -1296,35 +1295,35 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		return err
 	}
 
-	_, err = accountGenerator.StoreDerivedAccounts(info.ID, request.Password, paths)
-	if err != nil {
-		return err
-	}
-
-	account := multiaccounts.Account{
-		KeyUID:                  info.KeyUID,
-		Name:                    request.DisplayName,
-		CustomizationColor:      multiacccommon.CustomizationColor(request.CustomizationColor),
-		CustomizationColorClock: customizationColorClock,
-		KDFIterations:           dbsetup.ReducedKDFIterationsNumber,
-	}
-	if request.ImagePath != "" {
-		iis, err := images.GenerateIdentityImages(request.ImagePath, 0, 0, 1000, 1000)
-		if err != nil {
-			return err
-		}
-		account.Images = iis
-	}
-
-	settings, err := defaultSettings(info, derivedAddresses, nil)
-	if err != nil {
-		return err
-	}
-
-	settings.DeviceName = request.DeviceName
-	settings.DisplayName = request.DisplayName
-	settings.PreviewPrivacy = request.PreviewPrivacy
-	settings.CurrentNetwork = request.CurrentNetwork
+	//_, err = accountGenerator.StoreDerivedAccounts(info.ID, request.Password, paths)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//account := multiaccounts.Account{
+	//	KeyUID:                  info.KeyUID,
+	//	Name:                    request.DisplayName,
+	//	CustomizationColor:      multiacccommon.CustomizationColor(request.CustomizationColor),
+	//	CustomizationColorClock: customizationColorClock,
+	//	KDFIterations:           dbsetup.ReducedKDFIterationsNumber,
+	//}
+	//if request.ImagePath != "" {
+	//	iis, err := images.GenerateIdentityImages(request.ImagePath, 0, 0, 1000, 1000)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	account.Images = iis
+	//}
+	//
+	//settings, err := defaultSettings(info, derivedAddresses, nil)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//settings.DeviceName = request.DeviceName
+	//settings.DisplayName = request.DisplayName
+	//settings.PreviewPrivacy = request.PreviewPrivacy
+	//settings.CurrentNetwork = request.CurrentNetwork
 
 	//// If restoring an account, we don't set the mnemonic
 	//if mnemonic == "" {
