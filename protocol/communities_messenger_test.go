@@ -498,6 +498,82 @@ func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	s.Require().True(found)
 }
 
+func (s *MessengerCommunitiesSuite) TestPinMessageInCommunityChat() {
+	ctx := context.Background()
+
+	// Create a community
+	description := &requests.CreateCommunity{
+		Membership:                  protobuf.CommunityPermissions_AUTO_ACCEPT,
+		Name:                        "status",
+		Color:                       "#ffffff",
+		Description:                 "status community description",
+		PinMessageAllMembersEnabled: true,
+	}
+
+	response, err := s.owner.CreateCommunity(description, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	community := response.Communities()[0]
+	s.Require().NotNil(community)
+	s.Require().Equal(community.AllowsAllMembersToPinMessage(), true)
+
+	// Create a community chat
+	orgChat := &protobuf.CommunityChat{
+		Permissions: &protobuf.CommunityPermissions{
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
+		},
+		Identity: &protobuf.ChatIdentity{
+			DisplayName: "status-core",
+			Emoji:       "😎",
+			Description: "status-core community chat",
+		},
+	}
+	response, err = s.owner.CreateCommunityChat(community.ID(), orgChat)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	s.Require().Len(response.Chats(), 1)
+	chat := response.Chats()[0]
+	s.Require().NotNil(chat)
+
+	s.advertiseCommunityTo(community, s.owner, s.bob)
+	s.joinCommunity(community, s.owner, s.bob)
+
+	inputMessage := common.NewMessage()
+	inputMessage.ChatId = chat.ID
+	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	inputMessage.Text = "message to be pinned"
+
+	sendResponse, err := s.bob.SendChatMessage(ctx, inputMessage)
+	s.Require().NoError(err)
+	s.Require().Len(sendResponse.Messages(), 1)
+
+	// bob should be able to pin the message
+	pinMessage := common.NewPinMessage()
+	pinMessage.ChatId = chat.ID
+	pinMessage.MessageId = inputMessage.ID
+	pinMessage.Pinned = true
+	sendResponse, err = s.bob.SendPinMessage(ctx, pinMessage)
+	s.Require().NoError(err)
+	s.Require().Len(sendResponse.PinMessages(), 1)
+
+	// alice does not fully join the community,
+	// so she should not be able to send the pin message
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+	response, err = s.alice.SpectateCommunity(community.ID())
+	s.Require().NotNil(response)
+	s.Require().NoError(err)
+	failedPinMessage := common.NewPinMessage()
+	failedPinMessage.ChatId = chat.ID
+	failedPinMessage.MessageId = inputMessage.ID
+	failedPinMessage.Pinned = true
+	sendResponse, err = s.alice.SendPinMessage(ctx, failedPinMessage)
+	s.Require().Nil(sendResponse)
+	s.Require().Error(err, "can't pin message")
+}
+
 func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 	ctx := context.Background()
 
