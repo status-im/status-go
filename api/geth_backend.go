@@ -25,17 +25,14 @@ import (
 	signercore "github.com/ethereum/go-ethereum/signer/core/apitypes"
 
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	multiacccommon "github.com/status-im/status-go/multiaccounts/common"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/nodecfg"
@@ -1257,7 +1254,7 @@ func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error)
 }
 
 func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizationColorClock uint64, request *requests.CreateAccount) error {
-	keystoreDir := keystoreRelativePath
+	//keystoreDir := keystoreRelativePath
 
 	b.UpdateRootDataDir(request.BackupDisabledDataDir)
 	err := b.OpenAccounts()
@@ -1266,111 +1263,111 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		return err
 	}
 
-	accountGenerator := b.accountManager.AccountsGenerator()
-
-	var info generator.GeneratedAccountInfo
-	if mnemonic == "" {
-		// generate 1(n) account with default mnemonic length and no passphrase
-		generatedAccountInfos, err := accountGenerator.Generate(defaultMnemonicLength, 1, "")
-		info = generatedAccountInfos[0]
-
-		if err != nil {
-			return err
-		}
-	} else {
-
-		info, err = accountGenerator.ImportMnemonic(mnemonic, "")
-		if err != nil {
-			return err
-		}
-	}
-
-	derivedAddresses, err := accountGenerator.DeriveAddresses(info.ID, paths)
-	if err != nil {
-		return err
-	}
-
-	userKeyStoreDir := filepath.Join(keystoreDir, info.KeyUID)
-	// Initialize keystore dir with account
-	if err := b.accountManager.InitKeystore(filepath.Join(b.rootDataDir, userKeyStoreDir)); err != nil {
-		return err
-	}
-
-	_, err = accountGenerator.StoreDerivedAccounts(info.ID, request.Password, paths)
-	if err != nil {
-		return err
-	}
-
-	account := multiaccounts.Account{
-		KeyUID:                  info.KeyUID,
-		Name:                    request.DisplayName,
-		CustomizationColor:      multiacccommon.CustomizationColor(request.CustomizationColor),
-		CustomizationColorClock: customizationColorClock,
-		KDFIterations:           dbsetup.ReducedKDFIterationsNumber,
-	}
-	if request.ImagePath != "" {
-		iis, err := images.GenerateIdentityImages(request.ImagePath, 0, 0, 1000, 1000)
-		if err != nil {
-			return err
-		}
-		account.Images = iis
-	}
-
-	settings, err := defaultSettings(info, derivedAddresses, nil)
-	if err != nil {
-		return err
-	}
-
-	settings.DeviceName = request.DeviceName
-	settings.DisplayName = request.DisplayName
-	settings.PreviewPrivacy = request.PreviewPrivacy
-	settings.CurrentNetwork = request.CurrentNetwork
-
-	// If restoring an account, we don't set the mnemonic
-	if mnemonic == "" {
-		settings.Mnemonic = &info.Mnemonic
-		settings.OmitTransfersHistoryScan = true
-	}
-
-	nodeConfig, err := defaultNodeConfig(settings.InstallationID, request)
-	if err != nil {
-		return err
-	}
-	if mnemonic != "" {
-		nodeConfig.ProcessBackedupMessages = true
-	}
-
-	// when we set nodeConfig.KeyStoreDir, value of nodeConfig.KeyStoreDir should not contain the rootDataDir
-	// loadNodeConfig will add rootDataDir to nodeConfig.KeyStoreDir
-	nodeConfig.KeyStoreDir = userKeyStoreDir
-
-	walletDerivedAccount := derivedAddresses[pathDefaultWallet]
-	walletAccount := &accounts.Account{
-		PublicKey: types.Hex2Bytes(walletDerivedAccount.PublicKey),
-		KeyUID:    info.KeyUID,
-		Address:   types.HexToAddress(walletDerivedAccount.Address),
-		ColorID:   "",
-		Wallet:    true,
-		Path:      pathDefaultWallet,
-		Name:      walletAccountDefaultName,
-	}
-
-	chatDerivedAccount := derivedAddresses[pathDefaultChat]
-	chatAccount := &accounts.Account{
-		PublicKey: types.Hex2Bytes(chatDerivedAccount.PublicKey),
-		KeyUID:    info.KeyUID,
-		Address:   types.HexToAddress(chatDerivedAccount.Address),
-		Name:      request.DisplayName,
-		Chat:      true,
-		Path:      pathDefaultChat,
-	}
-
-	subAccounts := []*accounts.Account{walletAccount, chatAccount}
-	err = b.StartNodeWithAccountAndInitialConfig(account, request.Password, *settings, nodeConfig, subAccounts)
-	if err != nil {
-		b.log.Error("start node", err)
-		return err
-	}
+	//accountGenerator := b.accountManager.AccountsGenerator()
+	//
+	//var info generator.GeneratedAccountInfo
+	//if mnemonic == "" {
+	//	// generate 1(n) account with default mnemonic length and no passphrase
+	//	generatedAccountInfos, err := accountGenerator.Generate(defaultMnemonicLength, 1, "")
+	//	info = generatedAccountInfos[0]
+	//
+	//	if err != nil {
+	//		return err
+	//	}
+	//} else {
+	//
+	//	info, err = accountGenerator.ImportMnemonic(mnemonic, "")
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
+	//
+	//derivedAddresses, err := accountGenerator.DeriveAddresses(info.ID, paths)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//userKeyStoreDir := filepath.Join(keystoreDir, info.KeyUID)
+	//// Initialize keystore dir with account
+	//if err := b.accountManager.InitKeystore(filepath.Join(b.rootDataDir, userKeyStoreDir)); err != nil {
+	//	return err
+	//}
+	//
+	//_, err = accountGenerator.StoreDerivedAccounts(info.ID, request.Password, paths)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//account := multiaccounts.Account{
+	//	KeyUID:                  info.KeyUID,
+	//	Name:                    request.DisplayName,
+	//	CustomizationColor:      multiacccommon.CustomizationColor(request.CustomizationColor),
+	//	CustomizationColorClock: customizationColorClock,
+	//	KDFIterations:           dbsetup.ReducedKDFIterationsNumber,
+	//}
+	//if request.ImagePath != "" {
+	//	iis, err := images.GenerateIdentityImages(request.ImagePath, 0, 0, 1000, 1000)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	account.Images = iis
+	//}
+	//
+	//settings, err := defaultSettings(info, derivedAddresses, nil)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//settings.DeviceName = request.DeviceName
+	//settings.DisplayName = request.DisplayName
+	//settings.PreviewPrivacy = request.PreviewPrivacy
+	//settings.CurrentNetwork = request.CurrentNetwork
+	//
+	//// If restoring an account, we don't set the mnemonic
+	//if mnemonic == "" {
+	//	settings.Mnemonic = &info.Mnemonic
+	//	settings.OmitTransfersHistoryScan = true
+	//}
+	//
+	//nodeConfig, err := defaultNodeConfig(settings.InstallationID, request)
+	//if err != nil {
+	//	return err
+	//}
+	//if mnemonic != "" {
+	//	nodeConfig.ProcessBackedupMessages = true
+	//}
+	//
+	//// when we set nodeConfig.KeyStoreDir, value of nodeConfig.KeyStoreDir should not contain the rootDataDir
+	//// loadNodeConfig will add rootDataDir to nodeConfig.KeyStoreDir
+	//nodeConfig.KeyStoreDir = userKeyStoreDir
+	//
+	//walletDerivedAccount := derivedAddresses[pathDefaultWallet]
+	//walletAccount := &accounts.Account{
+	//	PublicKey: types.Hex2Bytes(walletDerivedAccount.PublicKey),
+	//	KeyUID:    info.KeyUID,
+	//	Address:   types.HexToAddress(walletDerivedAccount.Address),
+	//	ColorID:   "",
+	//	Wallet:    true,
+	//	Path:      pathDefaultWallet,
+	//	Name:      walletAccountDefaultName,
+	//}
+	//
+	//chatDerivedAccount := derivedAddresses[pathDefaultChat]
+	//chatAccount := &accounts.Account{
+	//	PublicKey: types.Hex2Bytes(chatDerivedAccount.PublicKey),
+	//	KeyUID:    info.KeyUID,
+	//	Address:   types.HexToAddress(chatDerivedAccount.Address),
+	//	Name:      request.DisplayName,
+	//	Chat:      true,
+	//	Path:      pathDefaultChat,
+	//}
+	//
+	//subAccounts := []*accounts.Account{walletAccount, chatAccount}
+	//err = b.StartNodeWithAccountAndInitialConfig(account, request.Password, *settings, nodeConfig, subAccounts)
+	//if err != nil {
+	//	b.log.Error("start node", err)
+	//	return err
+	//}
 
 	return nil
 
