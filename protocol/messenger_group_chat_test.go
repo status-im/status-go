@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	userimage "github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -453,4 +454,49 @@ func (s *MessengerGroupChatSuite) TestGroupChatMembersRemovalOutOfOrder() {
 	s.Require().Len(messageState.Response.Chats()[0].Members, 1)
 	defer s.NoError(admin.Shutdown())
 	defer s.NoError(memberA.Shutdown())
+}
+
+func (s *MessengerGroupChatSuite) TestGroupChatMembersInfoSync() {
+	admin, memberA, memberB := s.startNewMessenger(), s.startNewMessenger(), s.startNewMessenger()
+	s.Require().NoError(admin.settings.SaveSettingField(settings.DisplayName, "admin"))
+	s.Require().NoError(memberA.settings.SaveSettingField(settings.DisplayName, "memberA"))
+	s.Require().NoError(memberB.settings.SaveSettingField(settings.DisplayName, "memberB"))
+
+	members := []string{common.PubkeyToHex(&memberA.identity.PublicKey), common.PubkeyToHex(&memberB.identity.PublicKey)}
+
+	s.makeMutualContacts(admin, memberA)
+	s.makeMutualContacts(admin, memberB)
+
+	s.createGroupChat(admin, "test_group_chat", members)
+	s.verifyGroupChatCreated(memberA, true)
+	s.verifyGroupChatCreated(memberB, true)
+
+	response, err := WaitOnMessengerResponse(
+		memberA,
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
+		"chat invitation not received",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().True(response.Chats()[0].Active)
+	s.Require().Len(response.Chats()[0].Members, 3)
+
+	_, err = WaitOnMessengerResponse(
+		memberA,
+		func(r *MessengerResponse) bool {
+			// we republish as we don't have store nodes in tests
+			err := memberB.publishContactCode()
+			if err != nil {
+				return false
+			}
+			contact, ok := memberA.allContacts.Load(common.PubkeyToHex(&memberB.identity.PublicKey))
+			return ok && contact.DisplayName == "memberB"
+		},
+		"DisplayName is not the same",
+	)
+	s.Require().NoError(err)
+
+	s.NoError(admin.Shutdown())
+	s.NoError(memberA.Shutdown())
+	s.NoError(memberB.Shutdown())
 }

@@ -164,6 +164,19 @@ func (m *Messenger) HandleMembershipUpdate(messageState *ReceivedMessageState, c
 			return errors.Wrap(err, "failed to get group creator")
 		}
 
+		publicKeys, err := group.MemberPublicKeys()
+		if err != nil {
+			return errors.Wrap(err, "failed to get group members")
+		}
+		filters, err := m.transport.JoinGroup(publicKeys)
+		if err != nil {
+			return errors.Wrap(err, "failed to join group")
+		}
+		ok, err := m.scheduleSyncFilters(filters)
+		if err != nil {
+			return errors.Wrap(err, "failed to schedule sync filter")
+		}
+		m.logger.Debug("result of schedule sync filter", zap.Bool("ok", ok))
 	} else {
 		existingGroup, err := newProtocolGroupFromChat(chat)
 		if err != nil {

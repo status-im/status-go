@@ -448,6 +448,26 @@ func (g Group) Members() []string {
 	return g.members.List()
 }
 
+func (g Group) MemberPublicKeys() ([]*ecdsa.PublicKey, error) {
+	var publicKeys = make([]*ecdsa.PublicKey, 0, len(g.Members()))
+	for _, memberPublicKey := range g.Members() {
+		publicKey, err := hexToPubkey(memberPublicKey)
+		if err != nil {
+			return nil, err
+		}
+		publicKeys = append(publicKeys, publicKey)
+	}
+	return publicKeys, nil
+}
+
+func hexToPubkey(pk string) (*ecdsa.PublicKey, error) {
+	bytes, err := types.DecodeHex(pk)
+	if err != nil {
+		return nil, err
+	}
+	return crypto.UnmarshalPubkey(bytes)
+}
+
 func (g Group) Admins() []string {
 	return g.admins.List()
 }
