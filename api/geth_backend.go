@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/images"
+	multiacccommon "github.com/status-im/status-go/multiaccounts/common"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -1255,7 +1257,7 @@ func (b *GethStatusBackend) GetKeyUIDByMnemonic(mnemonic string) (string, error)
 }
 
 func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizationColorClock uint64, request *requests.CreateAccount) error {
-	//keystoreDir := keystoreRelativePath
+	keystoreDir := keystoreRelativePath
 
 	b.UpdateRootDataDir(request.BackupDisabledDataDir)
 	err := b.OpenAccounts()
@@ -1283,48 +1285,47 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		}
 	}
 
-	//derivedAddresses, err := accountGenerator.DeriveAddresses(info.ID, paths)
-	_, err = accountGenerator.DeriveAddresses(info.ID, paths)
+	derivedAddresses, err := accountGenerator.DeriveAddresses(info.ID, paths)
 	if err != nil {
 		return err
 	}
 
-	//userKeyStoreDir := filepath.Join(keystoreDir, info.KeyUID)
-	//// Initialize keystore dir with account
-	//if err := b.accountManager.InitKeystore(filepath.Join(b.rootDataDir, userKeyStoreDir)); err != nil {
-	//	return err
-	//}
-	//
-	//_, err = accountGenerator.StoreDerivedAccounts(info.ID, request.Password, paths)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//account := multiaccounts.Account{
-	//	KeyUID:                  info.KeyUID,
-	//	Name:                    request.DisplayName,
-	//	CustomizationColor:      multiacccommon.CustomizationColor(request.CustomizationColor),
-	//	CustomizationColorClock: customizationColorClock,
-	//	KDFIterations:           dbsetup.ReducedKDFIterationsNumber,
-	//}
-	//if request.ImagePath != "" {
-	//	iis, err := images.GenerateIdentityImages(request.ImagePath, 0, 0, 1000, 1000)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	account.Images = iis
-	//}
-	//
-	//settings, err := defaultSettings(info, derivedAddresses, nil)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//settings.DeviceName = request.DeviceName
-	//settings.DisplayName = request.DisplayName
-	//settings.PreviewPrivacy = request.PreviewPrivacy
-	//settings.CurrentNetwork = request.CurrentNetwork
-	//
+	userKeyStoreDir := filepath.Join(keystoreDir, info.KeyUID)
+	// Initialize keystore dir with account
+	if err := b.accountManager.InitKeystore(filepath.Join(b.rootDataDir, userKeyStoreDir)); err != nil {
+		return err
+	}
+
+	_, err = accountGenerator.StoreDerivedAccounts(info.ID, request.Password, paths)
+	if err != nil {
+		return err
+	}
+
+	account := multiaccounts.Account{
+		KeyUID:                  info.KeyUID,
+		Name:                    request.DisplayName,
+		CustomizationColor:      multiacccommon.CustomizationColor(request.CustomizationColor),
+		CustomizationColorClock: customizationColorClock,
+		KDFIterations:           dbsetup.ReducedKDFIterationsNumber,
+	}
+	if request.ImagePath != "" {
+		iis, err := images.GenerateIdentityImages(request.ImagePath, 0, 0, 1000, 1000)
+		if err != nil {
+			return err
+		}
+		account.Images = iis
+	}
+
+	settings, err := defaultSettings(info, derivedAddresses, nil)
+	if err != nil {
+		return err
+	}
+
+	settings.DeviceName = request.DeviceName
+	settings.DisplayName = request.DisplayName
+	settings.PreviewPrivacy = request.PreviewPrivacy
+	settings.CurrentNetwork = request.CurrentNetwork
+
 	//// If restoring an account, we don't set the mnemonic
 	//if mnemonic == "" {
 	//	settings.Mnemonic = &info.Mnemonic
