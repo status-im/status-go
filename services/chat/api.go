@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -106,12 +108,14 @@ type ChannelGroup struct {
 
 func NewAPI(service *Service) *API {
 	return &API{
-		s: service,
+		s:   service,
+		log: log.New("package", "status-go/services/chat.API"),
 	}
 }
 
 type API struct {
-	s *Service
+	s   *Service
+	log log.Logger
 }
 
 func unique(communities []*communities.Community) (result []*communities.Community) {
@@ -246,6 +250,12 @@ func (api *API) getChannelGroups(ctx context.Context, channelGroupID string) (ma
 
 		for _, chat := range channels {
 			if chat.CommunityID == community.IDString() && chat.Active {
+				_, exists := community.Chats()[chat.CommunityChatID()]
+				if !exists {
+					api.log.Warn("Chat not found in the community", "chat.ID", chat.ID)
+					continue
+				}
+
 				c, err := api.toAPIChat(chat, community, pubKey, true)
 				if err != nil {
 					return nil, err
@@ -421,7 +431,8 @@ func getChatMembers(sourceChat *protocol.Chat, community *communities.Community,
 	if community != nil {
 		channel, exists := community.Chats()[sourceChat.CommunityChatID()]
 		if !exists {
-			return result, communities.ErrChatNotFound
+			// Skip unknown community chats. They might be channels that were deleted. We shouldn't get here
+			return result, nil
 		}
 		for member := range channel.Members {
 			pubKey, err := common.HexToPubkey(member)
