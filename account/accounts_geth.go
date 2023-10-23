@@ -34,11 +34,11 @@ func (m *GethManager) InitKeystore(keydir string) error {
 	defer m.mu.Unlock()
 
 	var err error
-	//m.gethAccManager, err = makeAccountManager(keydir)
-	//if err != nil {
-	//	return err
-	//}
-	//
+	m.gethAccManager, err = makeAccountManager(keydir)
+	if err != nil {
+		return err
+	}
+
 	//m.keystore, err = makeKeyStore(m.gethAccManager)
 	m.Keydir = keydir
 	return err
