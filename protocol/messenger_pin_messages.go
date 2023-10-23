@@ -36,11 +36,16 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 		if err != nil {
 			return nil, err
 		}
+
 		hasPermission := community.IsPrivilegedMember(&m.identity.PublicKey)
 		pinMessageAllowed := community.AllowsAllMembersToPinMessage()
+		canPost, err := community.CanPost(&m.identity.PublicKey, chat.CommunityChatID(), nil)
+		if err != nil {
+			return nil, err
+		}
 
-		if !pinMessageAllowed && !hasPermission {
-			return nil, errors.New("member can't pin message")
+		if !canPost && !pinMessageAllowed && !hasPermission {
+			return nil, errors.New("can't pin message")
 		}
 	}
 
