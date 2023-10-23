@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/status-im/status-go/account/generator"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -1263,30 +1264,31 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		return err
 	}
 
-	//accountGenerator := b.accountManager.AccountsGenerator()
-	//
-	//var info generator.GeneratedAccountInfo
-	//if mnemonic == "" {
-	//	// generate 1(n) account with default mnemonic length and no passphrase
-	//	generatedAccountInfos, err := accountGenerator.Generate(defaultMnemonicLength, 1, "")
-	//	info = generatedAccountInfos[0]
-	//
-	//	if err != nil {
-	//		return err
-	//	}
-	//} else {
-	//
-	//	info, err = accountGenerator.ImportMnemonic(mnemonic, "")
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
-	//
+	accountGenerator := b.accountManager.AccountsGenerator()
+
+	var info generator.GeneratedAccountInfo
+	if mnemonic == "" {
+		// generate 1(n) account with default mnemonic length and no passphrase
+		generatedAccountInfos, err := accountGenerator.Generate(defaultMnemonicLength, 1, "")
+		info = generatedAccountInfos[0]
+
+		if err != nil {
+			return err
+		}
+	} else {
+
+		info, err = accountGenerator.ImportMnemonic(mnemonic, "")
+		if err != nil {
+			return err
+		}
+	}
+
 	//derivedAddresses, err := accountGenerator.DeriveAddresses(info.ID, paths)
-	//if err != nil {
-	//	return err
-	//}
-	//
+	_, err = accountGenerator.DeriveAddresses(info.ID, paths)
+	if err != nil {
+		return err
+	}
+
 	//userKeyStoreDir := filepath.Join(keystoreDir, info.KeyUID)
 	//// Initialize keystore dir with account
 	//if err := b.accountManager.InitKeystore(filepath.Join(b.rootDataDir, userKeyStoreDir)); err != nil {
