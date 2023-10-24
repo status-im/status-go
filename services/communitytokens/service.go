@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts/community-tokens/ownertoken"
 	communityownertokenregistry "github.com/status-im/status-go/contracts/community-tokens/registry"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/utils"
@@ -104,7 +105,8 @@ func (s *Service) GetSignerPubKey(ctx context.Context, chainID uint64, contractA
 	if err != nil {
 		return "", err
 	}
-	return common.Bytes2Hex(signerPubKey), nil
+
+	return types.ToHex(signerPubKey), nil
 }
 
 func (s *Service) SafeGetSignerPubKey(ctx context.Context, chainID uint64, communityID string) (string, error) {
