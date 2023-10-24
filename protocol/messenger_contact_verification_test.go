@@ -332,7 +332,6 @@ func (s *MessengerVerificationRequests) TestTrustedVerificationRequests() {
 
 	s.Require().NoError(err)
 
-	s.Require().NoError(err)
 	s.Require().Len(resp.VerificationRequests(), 1)
 	s.Require().Equal(resp.VerificationRequests()[0].ID, verificationRequestID)
 	s.Require().Equal(resp.VerificationRequests()[0].RequestStatus, verification.RequestStatusACCEPTED)

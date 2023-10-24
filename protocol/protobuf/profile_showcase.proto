@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+option go_package = "./;protobuf";
+package protobuf;
+
+message ProfileShowcaseEntry {
+  string entry_id = 1;
+  uint32 order = 2;
+}
+
+message ProfileShowcaseEntries {
+  repeated ProfileShowcaseEntry communities = 1;
+  repeated ProfileShowcaseEntry accounts = 2;
+  repeated ProfileShowcaseEntry collectibles = 3;
+  repeated ProfileShowcaseEntry assets = 4;
+}
+
+message ProfileShowcaseEntriesEncrypted {
+  bytes encrypted_entries = 1;
+  repeated bytes encryption_keys = 2;
+}
+
+
+message ProfileShowcase {
+  ProfileShowcaseEntries for_everyone = 1;
+  ProfileShowcaseEntriesEncrypted for_contacts = 2;
+  ProfileShowcaseEntriesEncrypted for_id_verified_contacts = 3;
+}
