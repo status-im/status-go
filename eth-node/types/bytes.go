@@ -39,3 +39,8 @@ func Hex2Bytes(str string) []byte {
 	h, _ := hex.DecodeString(str)
 	return h
 }
+
+// ToHex returns the hex string representation of bytes with 0x prefix.
+func ToHex(bytes []byte) string {
+	return "0x" + Bytes2Hex(bytes)
+}
