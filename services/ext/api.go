@@ -1546,6 +1546,16 @@ func (api *PublicAPI) CreateTokenGatedCommunity() (*protocol.MessengerResponse, 
 	return api.service.messenger.CreateTokenGatedCommunity()
 }
 
+// Set profile showcase preference for current user
+func (api *PublicAPI) SetProfileShowcasePreferences(preferences protocol.ProfileShowcasePreferences) error {
+	return api.service.messenger.SetProfileShowcasePreferences(preferences)
+}
+
+// Get all profile showcase preferences for current user
+func (api *PublicAPI) GetProfileShowcasePreferences() (*protocol.ProfileShowcasePreferences, error) {
+	return api.service.messenger.GetProfileShowcasePreferences()
+}
+
 // -----
 // HELPER
 // -----
