@@ -2618,6 +2618,9 @@ func (m *Messenger) RequestCommunityInfoFromMailserverAsync(privateOrPublicKey s
 // RequestCommunityInfoFromMailserver installs filter for community and requests its details
 // from mailserver. When response received it will be passed through signals handler
 func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, shard *common.Shard, waitForResponse bool) (*communities.Community, error) {
+
+	m.logger.Info("requesting community info", zap.String("communityID", communityID), zap.Any("shard", shard))
+
 	m.requestedCommunitiesLock.Lock()
 	defer m.requestedCommunitiesLock.Unlock()
 
@@ -2652,11 +2655,17 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, shard
 	from := to - oneMonthInSeconds
 
 	_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
-		batch := MailserverBatch{From: from, To: to, Topics: []types.TopicType{filter.ContentTopic}}
-		m.logger.Info("Requesting historic")
+		batch := MailserverBatch{
+			From:        from,
+			To:          to,
+			Topics:      []types.TopicType{filter.ContentTopic},
+			PubsubTopic: filter.PubsubTopic,
+		}
+		m.logger.Info("requesting historic", zap.Any("batch", batch))
 		err := m.processMailserverBatch(batch)
 		return nil, err
 	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -2681,6 +2690,7 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, shard
 			}
 
 		case <-ctx.Done():
+			m.logger.Error("failed to request community info", zap.String("communityID", communityID), zap.Error(ctx.Err()))
 			return nil, fmt.Errorf("failed to request community info for id '%s' from mailserver: %w", communityID, ctx.Err())
 		}
 	}
@@ -2692,7 +2702,9 @@ func (m *Messenger) requestCommunitiesFromMailserver(communities []communities.C
 	m.requestedCommunitiesLock.Lock()
 	defer m.requestedCommunitiesLock.Unlock()
 
-	var topics []types.TopicType
+	// we group topics by PubsubTopic
+	groupedTopics := map[string][]types.TopicType{}
+
 	for _, c := range communities {
 		if _, ok := m.requestedCommunities[c.CommunityID]; ok {
 			continue
@@ -2720,23 +2732,43 @@ func (m *Messenger) requestCommunitiesFromMailserver(communities []communities.C
 			//we don't remember filter id associated with community because it was already installed
 			m.requestedCommunities[c.CommunityID] = nil
 		}
-		topics = append(topics, filter.ContentTopic)
+
+		groupedTopics[filter.PubsubTopic] = append(groupedTopics[filter.PubsubTopic], filter.ContentTopic)
 	}
+
+	defer func() {
+		for _, c := range communities {
+			m.forgetCommunityRequest(c.CommunityID)
+		}
+	}()
 
 	to := uint32(m.transport.GetCurrentTime() / 1000)
 	from := to - oneMonthInSeconds
 
-	_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
-		batch := MailserverBatch{From: from, To: to, Topics: topics}
-		m.logger.Info("Requesting historic")
-		err := m.processMailserverBatch(batch)
-		return nil, err
-	})
+	wg := sync.WaitGroup{}
 
-	if err != nil {
-		m.logger.Error("Err performing mailserver request", zap.Error(err))
-		return
+	for pubsubTopic, contentTopics := range groupedTopics {
+		wg.Add(1)
+		go func(pubsubTopic string, contentTopics []types.TopicType) {
+			_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
+				batch := MailserverBatch{
+					From:        from,
+					To:          to,
+					Topics:      contentTopics,
+					PubsubTopic: pubsubTopic,
+				}
+				m.logger.Info("requesting historic", zap.Any("batch", batch))
+				err := m.processMailserverBatch(batch)
+				return nil, err
+			})
+			if err != nil {
+				m.logger.Error("error performing mailserver request", zap.Error(err))
+			}
+			wg.Done()
+		}(pubsubTopic, contentTopics)
 	}
+
+	wg.Wait()
 
 	ctx := context.Background()
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
@@ -2769,14 +2801,12 @@ func (m *Messenger) requestCommunitiesFromMailserver(communities []communities.C
 		}
 	}
 
-	for _, c := range communities {
-		m.forgetCommunityRequest(c.CommunityID)
-	}
-
 }
 
 // forgetCommunityRequest removes community from requested ones and removes filter
 func (m *Messenger) forgetCommunityRequest(communityID string) {
+	m.logger.Info("forgetting community request", zap.String("communityID", communityID))
+
 	filter, ok := m.requestedCommunities[communityID]
 	if !ok {
 		return
