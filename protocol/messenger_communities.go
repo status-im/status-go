@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	"golang.org/x/time/rate"
 
@@ -2703,7 +2704,7 @@ func (m *Messenger) requestCommunitiesFromMailserver(communities []communities.C
 	defer m.requestedCommunitiesLock.Unlock()
 
 	// we group topics by PubsubTopic
-	groupedTopics := map[string][]types.TopicType{}
+	groupedTopics := map[string]map[types.TopicType]struct{}{}
 
 	for _, c := range communities {
 		if _, ok := m.requestedCommunities[c.CommunityID]; ok {
@@ -2733,7 +2734,11 @@ func (m *Messenger) requestCommunitiesFromMailserver(communities []communities.C
 			m.requestedCommunities[c.CommunityID] = nil
 		}
 
-		groupedTopics[filter.PubsubTopic] = append(groupedTopics[filter.PubsubTopic], filter.ContentTopic)
+		if _, ok := groupedTopics[filter.PubsubTopic]; !ok {
+			groupedTopics[filter.PubsubTopic] = map[types.TopicType]struct{}{}
+		}
+
+		groupedTopics[filter.PubsubTopic][filter.ContentTopic] = struct{}{}
 	}
 
 	defer func() {
@@ -2749,20 +2754,20 @@ func (m *Messenger) requestCommunitiesFromMailserver(communities []communities.C
 
 	for pubsubTopic, contentTopics := range groupedTopics {
 		wg.Add(1)
-		go func(pubsubTopic string, contentTopics []types.TopicType) {
+		go func(pubsubTopic string, contentTopics map[types.TopicType]struct{}) {
+			batch := MailserverBatch{
+				From:        from,
+				To:          to,
+				Topics:      maps.Keys(contentTopics),
+				PubsubTopic: pubsubTopic,
+			}
 			_, err := m.performMailserverRequest(func() (*MessengerResponse, error) {
-				batch := MailserverBatch{
-					From:        from,
-					To:          to,
-					Topics:      contentTopics,
-					PubsubTopic: pubsubTopic,
-				}
 				m.logger.Info("requesting historic", zap.Any("batch", batch))
 				err := m.processMailserverBatch(batch)
 				return nil, err
 			})
 			if err != nil {
-				m.logger.Error("error performing mailserver request", zap.Error(err))
+				m.logger.Error("error performing mailserver request", zap.Any("batch", batch), zap.Error(err))
 			}
 			wg.Done()
 		}(pubsubTopic, contentTopics)
