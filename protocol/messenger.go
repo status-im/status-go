@@ -127,6 +127,7 @@ type Messenger struct {
 	shouldPublishContactCode   bool
 	systemMessagesTranslations *systemMessageTranslationsMap
 	allChats                   *chatMap
+	selfContact                *Contact
 	allContacts                *contactMap
 	allInstallations           *installationMap
 	modifiedInstallations      *stringBoolMap
@@ -479,10 +480,9 @@ func NewMessenger(
 
 	savedAddressesManager := wallet.NewSavedAddressesManager(c.walletDb)
 
-	myPublicKeyString := types.EncodeHex(crypto.FromECDSAPub(&identity.PublicKey))
-	myContact, err := buildContact(myPublicKeyString, &identity.PublicKey)
+	selfContact, err := buildSelfContact(identity, settings, c.multiAccount, c.account)
 	if err != nil {
-		return nil, errors.New("failed to build contact of ourself: " + err.Error())
+		return nil, fmt.Errorf("failed to build contact of ourself: %w", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -511,9 +511,10 @@ func NewMessenger(
 		featureFlags:               c.featureFlags,
 		systemMessagesTranslations: c.systemMessagesTranslations,
 		allChats:                   new(chatMap),
+		selfContact:                selfContact,
 		allContacts: &contactMap{
 			logger: logger,
-			me:     myContact,
+			me:     selfContact,
 		},
 		allInstallations:        new(installationMap),
 		installationID:          installationID,
@@ -816,6 +817,7 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		return nil, err
 	}
 	m.startSyncSettingsLoop()
+	m.startSettingsChangesLoop()
 	m.startCommunityRekeyLoop()
 	m.startCuratedCommunitiesUpdateLoop()
 
@@ -1547,14 +1549,28 @@ func (m *Messenger) watchIdentityImageChanges() {
 	go func() {
 		for {
 			select {
-			case <-channel:
-				err := m.syncProfilePictures(m.dispatchMessage)
+			case change := <-channel:
+				identityImages, err := m.multiAccounts.GetIdentityImages(m.account.KeyUID)
 				if err != nil {
-					m.logger.Error("failed to sync profile pictures to paired devices", zap.Error(err))
+					m.logger.Error("failed to get profile pictures to save self contact", zap.Error(err))
+					break
 				}
-				err = m.PublishIdentityImage()
-				if err != nil {
-					m.logger.Error("failed to publish identity image", zap.Error(err))
+
+				identityImagesMap := make(map[string]images.IdentityImage)
+				for _, img := range identityImages {
+					identityImagesMap[img.Name] = *img
+				}
+				m.selfContact.Images = identityImagesMap
+
+				if change.PublishExpected {
+					err = m.syncProfilePictures(m.dispatchMessage, identityImages)
+					if err != nil {
+						m.logger.Error("failed to sync profile pictures to paired devices", zap.Error(err))
+					}
+					err = m.PublishIdentityImage()
+					if err != nil {
+						m.logger.Error("failed to publish identity image", zap.Error(err))
+					}
 				}
 			case <-m.quit:
 				return
@@ -2464,23 +2480,26 @@ func (m *Messenger) ShareImageMessage(request *requests.ShareImageMessage) (*Mes
 	return response, nil
 }
 
-func (m *Messenger) syncProfilePictures(rawMessageHandler RawMessageHandler) error {
-	if !m.hasPairedDevices() {
-		return nil
-	}
-
+func (m *Messenger) syncProfilePicturesFromDatabase(rawMessageHandler RawMessageHandler) error {
 	keyUID := m.account.KeyUID
-	images, err := m.multiAccounts.GetIdentityImages(keyUID)
+	identityImages, err := m.multiAccounts.GetIdentityImages(keyUID)
 	if err != nil {
 		return err
+	}
+	return m.syncProfilePictures(rawMessageHandler, identityImages)
+}
+
+func (m *Messenger) syncProfilePictures(rawMessageHandler RawMessageHandler, identityImages []*images.IdentityImage) error {
+	if !m.hasPairedDevices() {
+		return nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	pictures := make([]*protobuf.SyncProfilePicture, len(images))
+	pictures := make([]*protobuf.SyncProfilePicture, len(identityImages))
 	clock, chat := m.getLastClockWithRelatedChat()
-	for i, image := range images {
+	for i, image := range identityImages {
 		p := &protobuf.SyncProfilePicture{}
 		p.Name = image.Name
 		p.Payload = image.Payload
@@ -2497,7 +2516,7 @@ func (m *Messenger) syncProfilePictures(rawMessageHandler RawMessageHandler) err
 	}
 
 	message := &protobuf.SyncProfilePictures{}
-	message.KeyUid = keyUID
+	message.KeyUid = m.account.KeyUID
 	message.Pictures = pictures
 
 	encodedMessage, err := proto.Marshal(message)
@@ -2606,7 +2625,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string, 
 		return err
 	}
 
-	err = m.syncProfilePictures(rawMessageHandler)
+	err = m.syncProfilePicturesFromDatabase(rawMessageHandler)
 	if err != nil {
 		return err
 	}

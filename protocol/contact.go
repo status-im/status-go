@@ -10,6 +10,8 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/identity"
@@ -384,6 +386,41 @@ func buildContact(publicKeyString string, publicKey *ecdsa.PublicKey) (*Contact,
 	}
 
 	return contact, nil
+}
+
+func buildSelfContact(identity *ecdsa.PrivateKey, settings *accounts.Database, multiAccounts *multiaccounts.Database, account *multiaccounts.Account) (*Contact, error) {
+	myPublicKeyString := types.EncodeHex(crypto.FromECDSAPub(&identity.PublicKey))
+
+	c, err := buildContact(myPublicKeyString, &identity.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build contact: %w", err)
+	}
+
+	if settings != nil {
+		if s, err := settings.GetSettings(); err == nil {
+			c.DisplayName = s.DisplayName
+			c.Bio = s.Bio
+			if s.PreferredName != nil {
+				c.EnsName = *s.PreferredName
+			}
+		}
+		if socialLinks, err := settings.GetSocialLinks(); err != nil {
+			c.SocialLinks = socialLinks
+		}
+	}
+
+	if multiAccounts != nil && account != nil {
+		if identityImages, err := multiAccounts.GetIdentityImages(account.KeyUID); err != nil {
+			imagesMap := make(map[string]images.IdentityImage)
+			for _, img := range identityImages {
+				imagesMap[img.Name] = *img
+			}
+
+			c.Images = imagesMap
+		}
+	}
+
+	return c, nil
 }
 
 func contactIDFromPublicKey(key *ecdsa.PublicKey) string {

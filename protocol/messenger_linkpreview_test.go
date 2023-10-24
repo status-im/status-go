@@ -15,10 +15,17 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+)
+
+const (
+	exampleIdenticonURI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixA" +
+		"AAAiklEQVR4nOzWwQmFQAwG4ffEXmzLIizDImzLarQBhSwSGH7mO+9hh0DI9AthCI0hNIbQGEJjCI0hNIbQxITM1YfHfl69X3m2bsu/8i5mI" +
+		"obQGEJjCI0hNIbQlG+tUW83UtfNFjMRQ2gMofm8tUa3U9c2i5mIITSGqEnMRAyhMYTGEBpDaO4AAAD//5POEGncqtj1AAAAAElFTkSuQmCC"
 )
 
 func TestMessengerLinkPreviews(t *testing.T) {
@@ -394,9 +401,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	shortKey, err := s.m.SerializePublicKey(crypto.CompressPubkey(pubkey))
 	s.Require().NoError(err)
 
-	payload, err := images.GetPayloadFromURI("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixA" +
-		"AAAiklEQVR4nOzWwQmFQAwG4ffEXmzLIizDImzLarQBhSwSGH7mO+9hh0DI9AthCI0hNIbQGEJjCI0hNIbQxITM1YfHfl69X3m2bsu/8i5mI" +
-		"obQGEJjCI0hNIbQlG+tUW83UtfNFjMRQ2gMofm8tUa3U9c2i5mIITSGqEnMRAyhMYTGEBpDaO4AAAD//5POEGncqtj1AAAAAElFTkSuQmCC")
+	payload, err := images.GetPayloadFromURI(exampleIdenticonURI)
 	s.Require().NoError(err)
 
 	icon := images.IdentityImage{
@@ -406,7 +411,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	}
 
 	c.Bio = "TestBio_1"
-	c.DisplayName = "TestDisplayName_2"
+	c.DisplayName = "TestDisplayName_1"
 	c.Images = map[string]images.IdentityImage{}
 	c.Images[images.SmallDimName] = icon
 	s.m.allContacts.Store(c.ID, c)
@@ -434,6 +439,84 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	s.Require().Equal(shortKey, preview.Contact.PublicKey)
 	s.Require().Equal(c.DisplayName, preview.Contact.DisplayName)
 	s.Require().Equal(c.Bio, preview.Contact.Description)
+	s.Require().Equal(icon.Width, preview.Contact.Icon.Width)
+	s.Require().Equal(icon.Height, preview.Contact.Icon.Height)
+	s.Require().Equal("", preview.Contact.Icon.URL)
+
+	expectedDataURI, err := images.GetPayloadDataURI(icon.Payload)
+	s.Require().NoError(err)
+	s.Require().Equal(expectedDataURI, preview.Contact.Icon.DataURI)
+}
+
+func (s *MessengerLinkPreviewsTestSuite) setProfileParameters(messenger *Messenger, displayName string, bio string, identityImages []images.IdentityImage) {
+	const timeout = 1 * time.Second
+
+	settingsList := []string{
+		settings.DisplayName.GetReactName(),
+		settings.Bio.GetReactName(),
+	}
+
+	SetSettingsAndWaitForChange(&s.Suite, messenger, settingsList, timeout, func() {
+		err := messenger.SetDisplayName(displayName)
+		s.Require().NoError(err)
+		err = messenger.SetBio(bio)
+		s.Require().NoError(err)
+	})
+
+	SetIdentityImagesAndWaitForChange(&s.Suite, messenger.multiAccounts, timeout, func() {
+		err := messenger.multiAccounts.StoreIdentityImages(messenger.account.KeyUID, identityImages, false)
+		s.Require().NoError(err)
+	})
+}
+
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_SelfLink() {
+	shortKey, err := s.m.SerializePublicKey(crypto.CompressPubkey(s.m.IdentityPublicKey()))
+	s.Require().NoError(err)
+
+	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
+	profileKp.KeyUID = s.m.account.KeyUID
+	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
+
+	err = s.m.settings.SaveOrUpdateKeypair(profileKp)
+	s.Require().NoError(err)
+
+	// Set initial profile parameters
+	identityImages := images.SampleIdentityImages()
+	s.setProfileParameters(s.m, "TestDisplayName_3", "TestBio_3", identityImages)
+
+	// Generate a shared URL
+	u, err := s.m.ShareUserURLWithData(s.m.IdentityPublicKeyString())
+	s.Require().NoError(err)
+
+	// Update contact info locally after creating the shared URL
+	// This is required to test that URL-decoded data is not used in the preview.
+	iconPayload, err := images.GetPayloadFromURI(exampleIdenticonURI)
+	s.Require().NoError(err)
+	icon := images.IdentityImage{
+		Name:    images.SmallDimName,
+		Width:   50,
+		Height:  50,
+		Payload: iconPayload,
+	}
+	s.setProfileParameters(s.m, "TestDisplayName_4", "TestBio_4", []images.IdentityImage{icon})
+
+	r, err := s.m.UnfurlURLs(nil, []string{u})
+	s.Require().NoError(err)
+	s.Require().Len(r.StatusLinkPreviews, 1)
+	s.Require().Len(r.LinkPreviews, 0)
+
+	userSettings, err := s.m.getSettings()
+	s.Require().NoError(err)
+
+	preview := r.StatusLinkPreviews[0]
+	s.Require().Equal(u, preview.URL)
+	s.Require().Nil(preview.Community)
+	s.Require().Nil(preview.Channel)
+	s.Require().NotNil(preview.Contact)
+	s.Require().Equal(shortKey, preview.Contact.PublicKey)
+	s.Require().Equal(userSettings.DisplayName, preview.Contact.DisplayName)
+	s.Require().Equal(userSettings.Bio, preview.Contact.Description)
+
 	s.Require().Equal(icon.Width, preview.Contact.Icon.Width)
 	s.Require().Equal(icon.Height, preview.Contact.Icon.Height)
 	s.Require().Equal("", preview.Contact.Icon.URL)

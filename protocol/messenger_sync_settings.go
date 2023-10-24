@@ -159,3 +159,24 @@ func (m *Messenger) startSyncSettingsLoop() {
 		}
 	}()
 }
+
+func (m *Messenger) startSettingsChangesLoop() {
+	channel := m.settings.SubscribeToChanges()
+	go func() {
+		for {
+			select {
+			case s := <-channel:
+				switch s.GetReactName() {
+				case settings.DisplayName.GetReactName():
+					m.selfContact.DisplayName = s.Value.(string)
+				case settings.PreferredName.GetReactName():
+					m.selfContact.EnsName = s.Value.(string)
+				case settings.Bio.GetReactName():
+					m.selfContact.Bio = s.Value.(string)
+				}
+			case <-m.quit:
+				return
+			}
+		}
+	}()
+}

@@ -180,6 +180,7 @@ func (m *Messenger) AddOrReplaceSocialLinks(socialLinks identity.SocialLinks) er
 		if err != nil {
 			return err
 		}
+		m.selfContact.SocialLinks = socialLinks
 
 		err = m.syncSocialLinks(context.Background(), m.dispatchMessage)
 		return err

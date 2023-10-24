@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/status-im/status-go/common/dbsetup"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/errors"
@@ -28,9 +30,10 @@ var (
 
 // Database sql wrapper for operations with browser objects.
 type Database struct {
-	db        *sql.DB
-	SyncQueue chan SyncSettingField
-	notifier  Notifier
+	db                   *sql.DB
+	SyncQueue            chan SyncSettingField
+	changesSubscriptions []chan *SyncSettingField
+	notifier             Notifier
 }
 
 // MakeNewDB ensures that a singleton instance of Database is returned per sqlite db file
@@ -254,6 +257,9 @@ func (db *Database) parseSaveAndSyncSetting(sf SettingField, value interface{}) 
 	if sf.CanSync(FromInterface) {
 		db.SyncQueue <- SyncSettingField{sf, value}
 	}
+
+	db.postChangesToSubscribers(&SyncSettingField{sf, value})
+
 	return nil
 }
 
@@ -280,7 +286,8 @@ func (db *Database) DeleteMnemonic() error {
 }
 
 // SaveSyncSetting stores setting data from a sync protobuf source, note it does not call SettingField.ValueHandler()
-// nor does this function attempt to write to the Database.SyncQueue
+// nor does this function attempt to write to the Database.SyncQueue,
+// yet it still writes to Database.changesSubscriptions.
 func (db *Database) SaveSyncSetting(setting SettingField, value interface{}, clock uint64) error {
 	ls, err := db.GetSettingLastSynced(setting)
 	if err != nil {
@@ -295,7 +302,13 @@ func (db *Database) SaveSyncSetting(setting SettingField, value interface{}, clo
 		return err
 	}
 
-	return db.saveSetting(setting, value)
+	err = db.saveSetting(setting, value)
+	if err != nil {
+		return err
+	}
+
+	db.postChangesToSubscribers(&SyncSettingField{setting, value})
+	return nil
 }
 
 func (db *Database) GetSettingLastSynced(setting SettingField) (result uint64, err error) {
@@ -711,4 +724,21 @@ func (db *Database) URLUnfurlingMode() (result int64, err error) {
 		return result, nil
 	}
 	return result, err
+}
+
+func (db *Database) SubscribeToChanges() chan *SyncSettingField {
+	s := make(chan *SyncSettingField, 100)
+	db.changesSubscriptions = append(db.changesSubscriptions, s)
+	return s
+}
+
+func (db *Database) postChangesToSubscribers(change *SyncSettingField) {
+	// Publish on channels, drop if buffer is full
+	for _, s := range db.changesSubscriptions {
+		select {
+		case s <- change:
+		default:
+			log.Warn("settings changes subscription channel full, dropping message")
+		}
+	}
 }

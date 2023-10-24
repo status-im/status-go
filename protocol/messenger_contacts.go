@@ -756,8 +756,14 @@ func (m *Messenger) BlockedContacts() []*Contact {
 	return contacts
 }
 
-// GetContactByID assumes pubKey includes 0x prefix
+// GetContactByID returns a Contact for given pubKey, if it's known.
+// This function automatically checks if pubKey is self identity key and returns a Contact
+// filled with self information.
+// pubKey is assumed to include `0x` prefix
 func (m *Messenger) GetContactByID(pubKey string) *Contact {
+	if pubKey == m.IdentityPublicKeyString() {
+		return m.selfContact
+	}
 	contact, _ := m.allContacts.Load(pubKey)
 	return contact
 }
