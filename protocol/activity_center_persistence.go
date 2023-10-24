@@ -1328,3 +1328,18 @@ func (db sqlitePersistence) GetActivityCenterState() (*ActivityCenterState, erro
 	}
 	return state, nil
 }
+
+func (db sqlitePersistence) UpdateActivityCenterState(updatedAt uint64) (*ActivityCenterState, error) {
+	var unreadCount int
+	err := db.db.QueryRow("SELECT COUNT(1) FROM activity_center_notifications WHERE read = 0 AND deleted = 0").Scan(&unreadCount)
+	if err != nil {
+		return nil, err
+	}
+	var hasSeen int
+	if unreadCount == 0 {
+		hasSeen = 1
+	}
+
+	_, err = db.db.Exec(`UPDATE activity_center_states SET has_seen = ?, updated_at = ?`, hasSeen, updatedAt)
+	return &ActivityCenterState{HasSeen: hasSeen == 1, UpdatedAt: updatedAt}, err
+}

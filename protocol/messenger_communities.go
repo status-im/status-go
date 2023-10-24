@@ -1586,7 +1586,7 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 		notification.Accepted = true
 		notification.UpdatedAt = m.GetCurrentTimeInMillis()
 
-		err = m.addActivityCenterNotification(response, notification, m.syncActivityCenterAcceptedByIDs)
+		err = m.addActivityCenterNotification(response, notification, m.syncActivityCenterCommunityRequestDecisionAdapter)
 		if err != nil {
 			m.logger.Error("failed to save notification", zap.Error(err))
 			return nil, err
@@ -1670,7 +1670,7 @@ func (m *Messenger) declineRequestToJoinCommunity(requestToJoin *communities.Req
 		notification.Dismissed = true
 		notification.UpdatedAt = m.GetCurrentTimeInMillis()
 
-		err = m.addActivityCenterNotification(response, notification, m.syncActivityCenterDismissedByIDs)
+		err = m.addActivityCenterNotification(response, notification, m.syncActivityCenterCommunityRequestDecisionAdapter)
 		if err != nil {
 			m.logger.Error("failed to save notification", zap.Error(err))
 			return nil, err

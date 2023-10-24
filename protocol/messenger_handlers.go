@@ -232,6 +232,9 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
            case protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_UNREAD:
 		return m.handleSyncActivityCenterUnreadProtobuf(messageState, protoBytes, msg, filter)
         
+           case protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_COMMUNITY_REQUEST_DECISION:
+		return m.handleSyncActivityCenterCommunityRequestDecisionProtobuf(messageState, protoBytes, msg, filter)
+        
 	default:
 		m.logger.Info("protobuf type not found", zap.String("type", string(msg.Type)))
                 return errors.New("protobuf type not found")
@@ -1651,6 +1654,29 @@ func (m *Messenger) handleSyncActivityCenterUnreadProtobuf(messageState *Receive
 	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncActivityCenterUnread(messageState, p, msg)
+	
+}
+
+
+func (m *Messenger) handleSyncActivityCenterCommunityRequestDecisionProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
+	m.logger.Info("handling SyncActivityCenterCommunityRequestDecision")
+	
+	if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+		m.logger.Warn("not coming from us, ignoring")
+		return nil
+	}
+	
+
+	
+	p := &protobuf.SyncActivityCenterCommunityRequestDecision{}
+	err := proto.Unmarshal(protoBytes, p)
+	if err != nil {
+		return err
+	}
+
+	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
+
+	return m.HandleSyncActivityCenterCommunityRequestDecision(messageState, p, msg)
 	
 }
 
