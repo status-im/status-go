@@ -294,6 +294,7 @@ lint-fix:
 		-and -not -name '*.pb.go' \
 		-and -not -name 'bindata*' \
 		-and -not -name 'migrations.go' \
+		-and -not -name 'messenger_handlers.go' \
 		-and -not -wholename '*/vendor/*' \
 		-exec goimports \
 		-local 'github.com/ethereum/go-ethereum,github.com/status-im/status-go,github.com/status-im/markdown' \

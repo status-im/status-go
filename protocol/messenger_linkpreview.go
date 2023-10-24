@@ -8,9 +8,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/status-im/markdown"
 	"go.uber.org/zap"
 	"golang.org/x/net/publicsuffix"
+
+	"github.com/status-im/markdown"
 
 	"github.com/status-im/status-go/multiaccounts/settings"
 	"github.com/status-im/status-go/protocol/common"
