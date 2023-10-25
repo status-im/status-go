@@ -1028,7 +1028,7 @@ func (o *Community) ValidateRequestToJoin(signer *ecdsa.PublicKey, request *prot
 		// 	return errors.New("no addresses revealed")
 		// }
 	} else if o.HasPermissionToSendCommunityEvents() {
-		if o.AcceptRequestToJoinAutomatically() {
+		if o.AutoAccept() {
 			return errors.New("auto-accept community requests can only be processed by the control node")
 		}
 	} else {
@@ -1225,7 +1225,7 @@ func (o *Community) validateRequestToJoinWithChatID(request *protobuf.CommunityR
 	return nil
 }
 
-func (o *Community) OnRequest() bool {
+func (o *Community) ManualAccept() bool {
 	return o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_MANUAL_ACCEPT
 }
 
@@ -1233,7 +1233,7 @@ func (o *Community) InvitationOnly() bool {
 	return o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_INVITATION_ONLY
 }
 
-func (o *Community) AcceptRequestToJoinAutomatically() bool {
+func (o *Community) AutoAccept() bool {
 	// We no longer have the notion of "no membership", but for historical reasons
 	// we use `NO_MEMBERSHIP` to determine wether requests to join should be automatically
 	// accepted or not.
