@@ -351,8 +351,9 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 				}
 				if sub.TokenCommunityValidated != nil {
 					state := m.buildMessageState()
+					communityResponse := sub.TokenCommunityValidated
 
-					err := m.handleCommunityResponse(state, sub.TokenCommunityValidated)
+					err := m.handleCommunityResponse(state, communityResponse)
 					if err != nil {
 						m.logger.Error("failed to handle community response", zap.Error(err))
 					}
@@ -362,6 +363,17 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					response, err := m.saveDataAndPrepareResponse(state)
 					if err != nil {
 						m.logger.Error("failed to save data and prepare response")
+					}
+
+					// if control node changed, the client will be kicked from the community
+					// if owner token will be mint, the client will stay the member of the community
+					if communityResponse.Changes.ShouldMemberLeave {
+						requestToJoin, err := m.sendSharedAddressToControlNode(communityResponse.Community.ControlNode(), communityResponse.Community)
+						if err != nil {
+							m.logger.Error("failed to save data and prepare response")
+						} else {
+							state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, requestToJoin)
+						}
 					}
 
 					if m.config.messengerSignalsHandler != nil {
@@ -2416,6 +2428,7 @@ func (m *Messenger) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*com
 }
 
 func (m *Messenger) AllPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+	// TODO: optimize and extract via one query
 	pendingRequests, err := m.communitiesManager.PendingRequestsToJoinForCommunity(id)
 	if err != nil {
 		return nil, err
@@ -2429,8 +2442,14 @@ func (m *Messenger) AllPendingRequestsToJoinForCommunity(id types.HexBytes) ([]*
 		return nil, err
 	}
 
+	ownershipChangedRequests, err := m.communitiesManager.RequestsToJoinForCommunityAwaitingAddresses(id)
+	if err != nil {
+		return nil, err
+	}
+
 	pendingRequests = append(pendingRequests, acceptedPendingRequests...)
 	pendingRequests = append(pendingRequests, declinedPendingRequests...)
+	pendingRequests = append(pendingRequests, ownershipChangedRequests...)
 
 	return pendingRequests, nil
 }
@@ -2976,6 +2995,8 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 				notification.MembershipStatus = ActivityCenterMembershipStatusAcceptedPending
 			case communities.RequestToJoinStateDeclinedPending:
 				notification.MembershipStatus = ActivityCenterMembershipStatusDeclinedPending
+			case communities.RequestToJoinStateAwaitingAddresses:
+				notification.MembershipStatus = ActivityCenterMembershipOwnershipChanged
 			default:
 				notification.MembershipStatus = ActivityCenterMembershipStatusPending
 
@@ -3132,6 +3153,47 @@ func (m *Messenger) handleCommunityPrivilegedUserSyncMessage(state *ReceivedMess
 func (m *Messenger) HandleCommunityPrivilegedUserSyncMessage(state *ReceivedMessageState, message *protobuf.CommunityPrivilegedUserSyncMessage, statusMessage *v1protocol.StatusMessage) error {
 	signer := state.CurrentMessageState.PublicKey
 	return m.handleCommunityPrivilegedUserSyncMessage(state, signer, message)
+}
+
+func (m *Messenger) sendSharedAddressToControlNode(receiver *ecdsa.PublicKey, community *communities.Community) (*communities.RequestToJoin, error) {
+	if receiver == nil {
+		return nil, errors.New("receiver can't be nil")
+	}
+
+	if community == nil {
+		return nil, communities.ErrOrgNotFound
+	}
+
+	m.logger.Info("share address to the new owner ", zap.String("community id", community.IDString()))
+
+	pk := common.PubkeyToHex(&m.identity.PublicKey)
+
+	requestToJoin, err := m.communitiesManager.GetCommunityRequestToJoinWithRevealedAddresses(pk, community.ID())
+	if err != nil {
+		return nil, err
+	}
+
+	requestToJoin.Clock = uint64(time.Now().Unix())
+	requestToJoin.State = communities.RequestToJoinStateAwaitingAddresses
+	payload, err := proto.Marshal(requestToJoin.ToCommunityRequestToJoinProtobuf())
+	if err != nil {
+		return nil, err
+	}
+
+	rawMessage := common.RawMessage{
+		Payload:           payload,
+		CommunityID:       community.ID(),
+		SkipProtocolLayer: true,
+		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
+		PubsubTopic:       community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+	}
+
+	if err = m.communitiesManager.SaveRequestToJoin(requestToJoin); err != nil {
+		return nil, err
+	}
+
+	_, err = m.sender.SendPrivate(context.Background(), receiver, &rawMessage)
+	return requestToJoin, err
 }
 
 func (m *Messenger) HandleSyncInstallationCommunity(messageState *ReceivedMessageState, syncCommunity *protobuf.SyncInstallationCommunity, statusMessage *v1protocol.StatusMessage) error {
@@ -5926,18 +5988,28 @@ func (m *Messenger) SetCommunitySignerPubKey(ctx context.Context, communityID []
 	return m.communityTokensService.SetSignerPubKey(ctx, chainID, contractAddress, txArgs, password, newSignerPubKey)
 }
 
-func (m *Messenger) PromoteSelfToControlNode(communityID types.HexBytes) (*communities.Community, error) {
+func (m *Messenger) PromoteSelfToControlNode(communityID types.HexBytes) (*MessengerResponse, error) {
 	clock, _ := m.getLastClockWithRelatedChat()
-
-	community, err := m.communitiesManager.PromoteSelfToControlNode(communityID, clock)
+	changes, err := m.communitiesManager.PromoteSelfToControlNode(communityID, clock)
 	if err != nil {
 		return nil, err
 	}
 
-	err = m.syncCommunity(context.Background(), community, m.dispatchMessage)
+	err = m.syncCommunity(context.Background(), changes.Community, m.dispatchMessage)
 	if err != nil {
 		return nil, err
 	}
 
-	return community, nil
+	if len(changes.MembersRemoved) > 0 {
+		err = m.communitiesManager.GenerateRequestsToJoinForAutoApprovalOnNewOwnership(changes.Community.ID(), changes.MembersRemoved)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var response MessengerResponse
+	response.AddCommunity(changes.Community)
+	response.CommunityChanges = []*communities.CommunityChanges{changes}
+
+	return &response, nil
 }

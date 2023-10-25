@@ -646,6 +646,10 @@ func (api *PublicAPI) DeleteCommunityCategory(request *requests.DeleteCommunityC
 	return api.service.messenger.DeleteCommunityCategory(request)
 }
 
+func (api *PublicAPI) PromoteSelfToControlNode(communityID types.HexBytes) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.PromoteSelfToControlNode(communityID)
+}
+
 type ApplicationMessagesResponse struct {
 	Messages []*common.Message `json:"messages"`
 	Cursor   string            `json:"cursor"`

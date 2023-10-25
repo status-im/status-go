@@ -18,6 +18,7 @@ const (
 	RequestToJoinStateCanceled
 	RequestToJoinStateAcceptedPending
 	RequestToJoinStateDeclinedPending
+	RequestToJoinStateAwaitingAddresses
 )
 
 type RequestToJoin struct {

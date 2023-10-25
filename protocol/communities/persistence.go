@@ -828,6 +828,10 @@ func (p *Persistence) DeclinedPendingRequestsToJoinForCommunity(id []byte) ([]*R
 	return p.RequestsToJoinForCommunityWithState(id, RequestToJoinStateDeclinedPending)
 }
 
+func (p *Persistence) RequestsToJoinForCommunityAwaitingAddresses(id []byte) ([]*RequestToJoin, error) {
+	return p.RequestsToJoinForCommunityWithState(id, RequestToJoinStateAwaitingAddresses)
+}
+
 func (p *Persistence) SetRequestToJoinState(pk string, communityID []byte, state RequestToJoinState) error {
 	_, err := p.db.Exec(`UPDATE communities_requests_to_join SET state = ? WHERE community_id = ? AND public_key = ?`, state, communityID, pk)
 	return err
@@ -1397,7 +1401,7 @@ func (p *Persistence) GetCommunityRequestsToJoinWithRevealedAddresses(communityI
 	SELECT r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.state, r.community_id, a.address, a.chain_ids, a.is_airdrop_address
 	FROM communities_requests_to_join r
 	LEFT JOIN communities_requests_to_join_revealed_addresses a ON r.id = a.request_id
-	WHERE community_id = ?`, communityID)
+	WHERE r.community_id = ? AND r.state != ?`, communityID, RequestToJoinStateAwaitingAddresses)
 
 	if err != nil {
 		return nil, err
@@ -1528,6 +1532,11 @@ func (p *Persistence) DeleteCommunitiesToValidateByCommunityID(communityID []byt
 	return err
 }
 
+func (p *Persistence) DeleteCommunityToValidate(communityID []byte, clock uint64) error {
+	_, err := p.db.Exec(`DELETE FROM communities_validate_signer WHERE id = ? AND clock = ?`, communityID, clock)
+	return err
+}
+
 func (p *Persistence) GetSyncControlNode(communityID types.HexBytes) (*protobuf.SyncCommunityControlNode, error) {
 	result := &protobuf.SyncCommunityControlNode{}
 
@@ -1558,5 +1567,63 @@ func (p *Persistence) SaveSyncControlNode(communityID types.HexBytes, clock uint
 		clock,
 		installationID,
 	)
+	return err
+}
+
+func (p *Persistence) GetCommunityRequestToJoinWithRevealedAddresses(pubKey string, communityID []byte) (*RequestToJoin, error) {
+	requestToJoin, err := p.GetRequestToJoinByPkAndCommunityID(pubKey, communityID)
+	if err != nil {
+		return nil, err
+	}
+
+	revealedAccounts, err := p.GetRequestToJoinRevealedAddresses(requestToJoin.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	requestToJoin.RevealedAccounts = revealedAccounts
+
+	return requestToJoin, nil
+}
+
+func (p *Persistence) SaveRequestsToJoin(requests []*RequestToJoin) (err error) {
+	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			// Rollback the transaction on error
+			_ = tx.Rollback()
+		}
+	}()
+
+	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO communities_requests_to_join(id,public_key,clock,ens_name,chat_id,community_id,state) 
+		VALUES (?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, request := range requests {
+		var clock uint64
+		// Fetch any existing request to join
+		err = tx.QueryRow(`SELECT clock FROM communities_requests_to_join WHERE public_key = ? AND community_id = ?`, request.PublicKey, request.CommunityID).Scan(&clock)
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+
+		if clock >= request.Clock {
+			return ErrOldRequestToJoin
+		}
+
+		_, err = stmt.Exec(request.ID, request.PublicKey, request.Clock, request.ENSName, request.ChatID, request.CommunityID, request.State)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = tx.Commit()
 	return err
 }

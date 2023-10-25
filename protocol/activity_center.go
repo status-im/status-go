@@ -40,6 +40,7 @@ const (
 	ActivityCenterMembershipStatusDeclined
 	ActivityCenterMembershipStatusAcceptedPending
 	ActivityCenterMembershipStatusDeclinedPending
+	ActivityCenterMembershipOwnershipChanged
 )
 
 type ActivityCenterQueryParamsRead uint

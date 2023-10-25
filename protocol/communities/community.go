@@ -760,6 +760,37 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 	return o.config.CommunityDescription, nil
 }
 
+func (o *Community) RemoveAllUsersFromOrg() *CommunityChanges {
+	o.increaseClock()
+
+	myPublicKey := common.PubkeyToHex(o.config.MemberIdentity)
+	member := o.config.CommunityDescription.Members[myPublicKey]
+
+	membersToRemove := o.config.CommunityDescription.Members
+	delete(membersToRemove, myPublicKey)
+
+	changes := o.emptyCommunityChanges()
+	changes.MembersRemoved = membersToRemove
+
+	o.config.CommunityDescription.Members = make(map[string]*protobuf.CommunityMember)
+	o.config.CommunityDescription.Members[myPublicKey] = member
+
+	for chatID, chat := range o.config.CommunityDescription.Chats {
+		chatMembersToRemove := chat.Members
+		delete(chatMembersToRemove, myPublicKey)
+
+		chat.Members = make(map[string]*protobuf.CommunityMember)
+		chat.Members[myPublicKey] = member
+
+		changes.ChatsModified[chatID] = &CommunityChatChanges{
+			ChatModified:   chat,
+			MembersRemoved: chatMembersToRemove,
+		}
+	}
+
+	return changes
+}
+
 func (o *Community) AddCommunityTokensMetadata(token *protobuf.CommunityTokenMetadata) (*protobuf.CommunityDescription, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
