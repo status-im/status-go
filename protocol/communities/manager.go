@@ -1672,7 +1672,7 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 	}
 
 	// If the community require membership, we set whether we should leave/join the community after a state change
-	if community.InvitationOnly() || community.ManualAccept() || community.AutoAccept() {
+	if community.ManualAccept() || community.AutoAccept() {
 		if changes.HasNewMember(pkString) {
 			hasPendingRequest, err := m.persistence.HasPendingRequestsToJoinForUserAndCommunity(pkString, changes.Community.ID())
 			if err != nil {

@@ -1229,10 +1229,6 @@ func (o *Community) ManualAccept() bool {
 	return o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_MANUAL_ACCEPT
 }
 
-func (o *Community) InvitationOnly() bool {
-	return o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_INVITATION_ONLY
-}
-
 func (o *Community) AutoAccept() bool {
 	// We no longer have the notion of "no membership", but for historical reasons
 	// we use `NO_MEMBERSHIP` to determine wether requests to join should be automatically

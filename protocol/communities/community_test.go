@@ -392,13 +392,6 @@ func (s *CommunitySuite) TestValidateRequestToJoin() {
 			err:     ErrNotAdmin,
 		},
 		{
-			name:    "invitation-only",
-			config:  s.configInvitationOnly(),
-			signer:  signer,
-			request: request,
-			err:     ErrCantRequestAccess,
-		},
-		{
 			name:    "ens-only org and missing ens",
 			config:  s.configENSOnly(),
 			signer:  signer,
@@ -429,44 +422,12 @@ func (s *CommunitySuite) TestValidateRequestToJoin() {
 			request: requestWithChatID,
 			err:     ErrCantRequestAccess,
 		},
-		// NO_MEMBERSHIP-INVITATION_ONLY = error as it's invitation only
-		{
-			name:    "no-membership org with no-membeship chat",
-			config:  s.configNoMembershipOrgInvitationOnlyChat(),
-			signer:  signer,
-			request: requestWithChatID,
-			err:     ErrCantRequestAccess,
-		},
 		// NO_MEMBERSHIP-ON_REQUEST = this is a valid case
 		{
 			name:    "no-membership org with on-request chat",
 			config:  s.configNoMembershipOrgOnRequestChat(),
 			signer:  signer,
 			request: requestWithChatID,
-		},
-		// INVITATION_ONLY-INVITATION_ONLY error as it's invitation only
-		{
-			name:    "invitation-only org with invitation-only chat",
-			config:  s.configInvitationOnlyOrgInvitationOnlyChat(),
-			signer:  signer,
-			request: requestWithChatID,
-			err:     ErrCantRequestAccess,
-		},
-		// ON_REQUEST-INVITATION_ONLY error as it's invitation only
-		{
-			name:    "on-request org with invitation-only chat",
-			config:  s.configOnRequestOrgInvitationOnlyChat(),
-			signer:  signer,
-			request: requestWithChatID,
-			err:     ErrCantRequestAccess,
-		},
-		// ON_REQUEST-INVITATION_ONLY error as it's invitation only
-		{
-			name:    "on-request org with invitation-only chat",
-			config:  s.configOnRequestOrgInvitationOnlyChat(),
-			signer:  signer,
-			request: requestWithChatID,
-			err:     ErrCantRequestAccess,
 		},
 		// ON_REQUEST-ON_REQUEST success
 		{
@@ -512,32 +473,6 @@ func (s *CommunitySuite) TestCanPost() {
 			config:  s.configNoMembershipOrgNoMembershipChat(),
 			member:  notMember,
 			canPost: false,
-		},
-		{
-			name:    "no-membership org with invitation only chat-not-a-member",
-			config:  s.configNoMembershipOrgInvitationOnlyChat(),
-			member:  notMember,
-			canPost: false,
-		},
-		{
-			name:    "no-membership org with invitation only chat member",
-			config:  s.configNoMembershipOrgInvitationOnlyChat(),
-			member:  member,
-			canPost: true,
-		},
-		{
-			name:    "no-membership org with invitation only chat-not-a-member valid grant",
-			config:  s.configNoMembershipOrgInvitationOnlyChat(),
-			member:  notMember,
-			canPost: false,
-			grant:   validGrant,
-		},
-		{
-			name:    "no-membership org with invitation only chat-not-a-member invalid grant",
-			config:  s.configNoMembershipOrgInvitationOnlyChat(),
-			member:  notMember,
-			canPost: false,
-			grant:   invalidGrant,
 		},
 		{
 			name:    "membership org with no-membership chat-not-a-member",
@@ -671,7 +606,7 @@ func (s *CommunitySuite) TestHandleCommunityDescription() {
 				changes.MembersAdded[s.member3Key] = &protobuf.CommunityMember{}
 				changes.ChatsAdded[testChatID2] = &protobuf.CommunityChat{
 					Identity:    &protobuf.ChatIdentity{DisplayName: "added-chat", Description: "description"},
-					Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_INVITATION_ONLY},
+					Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_MANUAL_ACCEPT},
 					Members:     make(map[string]*protobuf.CommunityMember)}
 				changes.ChatsAdded[testChatID2].Members[s.member3Key] = &protobuf.CommunityMember{}
 
@@ -848,30 +783,10 @@ func (s *CommunitySuite) configOnRequest() Config {
 	return s.newConfig(s.identity, description)
 }
 
-func (s *CommunitySuite) configInvitationOnly() Config {
-	description := s.emptyCommunityDescription()
-	description.Permissions.Access = protobuf.CommunityPermissions_INVITATION_ONLY
-	return s.newConfig(s.identity, description)
-}
-
 func (s *CommunitySuite) configNoMembershipOrgNoMembershipChat() Config {
 	description := s.emptyCommunityDescriptionWithChat()
 	description.Permissions.Access = protobuf.CommunityPermissions_AUTO_ACCEPT
 	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_AUTO_ACCEPT
-	return s.newConfig(s.identity, description)
-}
-
-func (s *CommunitySuite) configNoMembershipOrgInvitationOnlyChat() Config {
-	description := s.emptyCommunityDescriptionWithChat()
-	description.Permissions.Access = protobuf.CommunityPermissions_AUTO_ACCEPT
-	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_INVITATION_ONLY
-	return s.newConfig(s.identity, description)
-}
-
-func (s *CommunitySuite) configInvitationOnlyOrgInvitationOnlyChat() Config {
-	description := s.emptyCommunityDescriptionWithChat()
-	description.Permissions.Access = protobuf.CommunityPermissions_INVITATION_ONLY
-	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_INVITATION_ONLY
 	return s.newConfig(s.identity, description)
 }
 
@@ -886,13 +801,6 @@ func (s *CommunitySuite) configOnRequestOrgOnRequestChat() Config {
 	description := s.emptyCommunityDescriptionWithChat()
 	description.Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
 	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
-	return s.newConfig(s.identity, description)
-}
-
-func (s *CommunitySuite) configOnRequestOrgInvitationOnlyChat() Config {
-	description := s.emptyCommunityDescriptionWithChat()
-	description.Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
-	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_INVITATION_ONLY
 	return s.newConfig(s.identity, description)
 }
 
@@ -919,12 +827,12 @@ func (s *CommunitySuite) configENSOnly() Config {
 }
 
 func (s *CommunitySuite) config() Config {
-	config := s.configOnRequestOrgInvitationOnlyChat()
+	config := s.configOnRequestOrgOnRequestChat()
 	return config
 }
 
 func (s *CommunitySuite) buildCommunityDescription() *protobuf.CommunityDescription {
-	config := s.configOnRequestOrgInvitationOnlyChat()
+	config := s.configOnRequestOrgOnRequestChat()
 	desc := config.CommunityDescription
 	desc.Clock = 1
 	desc.Members = make(map[string]*protobuf.CommunityMember)
@@ -1016,7 +924,7 @@ func (s *CommunitySuite) addedChatCommunityDescription(org *Community) *protobuf
 	description.Members[s.member3Key] = &protobuf.CommunityMember{}
 	description.Chats[testChatID2] = &protobuf.CommunityChat{
 		Identity:    &protobuf.ChatIdentity{DisplayName: "added-chat", Description: "description"},
-		Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_INVITATION_ONLY},
+		Permissions: &protobuf.CommunityPermissions{Access: protobuf.CommunityPermissions_MANUAL_ACCEPT},
 		Members:     make(map[string]*protobuf.CommunityMember)}
 	description.Chats[testChatID2].Members[s.member3Key] = &protobuf.CommunityMember{}
 
