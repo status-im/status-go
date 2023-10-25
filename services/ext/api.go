@@ -1388,12 +1388,20 @@ func (api *PublicAPI) ExtractDiscordChannelsAndCategories(filesToImport []string
 	return api.service.messenger.ExtractDiscordChannelsAndCategories(filesToImport)
 }
 
+func (api *PublicAPI) RequestImportDiscordChannel(request *requests.ImportDiscordChannel) {
+	api.service.messenger.RequestImportDiscordChannel(request)
+}
+
 func (api *PublicAPI) RequestImportDiscordCommunity(request *requests.ImportDiscordCommunity) {
 	api.service.messenger.RequestImportDiscordCommunity(request)
 }
 
 func (api *PublicAPI) RequestCancelDiscordCommunityImport(id string) {
 	api.service.messenger.MarkDiscordCommunityImportAsCancelled(id)
+}
+
+func (api *PublicAPI) RequestCancelDiscordChannelImport(discordChannelID string) {
+	api.service.messenger.MarkDiscordChannelImportAsCancelled(discordChannelID)
 }
 
 func (api *PublicAPI) BuildContact(request *requests.BuildContact) (*protocol.Contact, error) {
