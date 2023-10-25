@@ -4157,7 +4157,7 @@ func (m *Messenger) RequestImportDiscordChannel(request *requests.ImportDiscordC
 
 				communityChat := &protobuf.CommunityChat{
 					Permissions: &protobuf.CommunityPermissions{
-						Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+						Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 					},
 					Identity: &protobuf.ChatIdentity{
 						DisplayName: request.Name,
