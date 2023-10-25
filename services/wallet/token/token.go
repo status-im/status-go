@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math/big"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,12 +15,15 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/contracts"
+	"github.com/status-im/status-go/contracts/community-tokens/assets"
 	"github.com/status-im/status-go/contracts/ethscan"
 	"github.com/status-im/status-go/contracts/ierc20"
+	eth_node_types "github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/rpc/chain"
 	"github.com/status-im/status-go/rpc/network"
+	"github.com/status-im/status-go/services/utils"
 	"github.com/status-im/status-go/services/wallet/async"
 )
 
@@ -41,7 +45,8 @@ type Token struct {
 	// pegged, while "USD" means it's pegged to the United States Dollar.
 	PegSymbol string `json:"pegSymbol"`
 
-	Verified bool `json:"verified"`
+	Verified    bool    `json:"verified"`
+	CommunityID *string `json:"communityId,omitempty"`
 }
 
 func (t *Token) IsNative() bool {
@@ -274,6 +279,7 @@ func (tm *Manager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint6
 	allTokens := tm.getFullTokenList(chainID)
 	for _, token := range allTokens {
 		if token.Address == address {
+			tm.discoverTokenCommunityID(context.Background(), token, address)
 			return token
 		}
 	}
@@ -288,7 +294,56 @@ func (tm *Manager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint6
 		return nil
 	}
 
+	tm.discoverTokenCommunityID(context.Background(), token, address)
 	return token
+}
+
+func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *Token, address common.Address) {
+	if token != nil && token.CommunityID == nil {
+		// Token is invalid or is alrady discovered. Nothing to do here.
+		return
+	}
+	backend, err := tm.RPCClient.EthClient(token.ChainID)
+	if err != nil {
+		return
+	}
+	caller, err := assets.NewAssetsCaller(address, backend)
+	if err != nil {
+		return
+	}
+	uri, err := caller.BaseTokenURI(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return
+	}
+
+	update, err := tm.db.Prepare("UPDATE tokens SET community_id=? WHERE network_id=? AND address=?")
+	if err != nil {
+		log.Error("Cannot prepare token update query", err)
+		return
+	}
+
+	if uri == "" {
+		// Update token community ID to prevent further checks
+		_, err := update.Exec("", token.ChainID, token.Address)
+		if err != nil {
+			log.Error("Cannot update community id", err)
+		}
+		return
+	}
+
+	uri = strings.TrimSuffix(uri, "/")
+	communityIDHex, err := utils.DeserializePublicKey(uri)
+	if err != nil {
+		return
+	}
+	communityID := eth_node_types.EncodeHex(communityIDHex)
+
+	_, err = update.Exec(communityID, token.ChainID, token.Address)
+	if err != nil {
+		log.Error("Cannot update community id", err)
+	}
 }
 
 func (tm *Manager) FindSNT(chainID uint64) *Token {
@@ -413,8 +468,8 @@ func (tm *Manager) DiscoverToken(ctx context.Context, chainID uint64, address co
 	}, nil
 }
 
-func (tm *Manager) GetCustoms() ([]*Token, error) {
-	rows, err := tm.db.Query("SELECT address, name, symbol, decimals, color, network_id FROM tokens")
+func (tm *Manager) getTokens(query string, args ...any) ([]*Token, error) {
+	rows, err := tm.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -423,9 +478,14 @@ func (tm *Manager) GetCustoms() ([]*Token, error) {
 	var rst []*Token
 	for rows.Next() {
 		token := &Token{}
-		err := rows.Scan(&token.Address, &token.Name, &token.Symbol, &token.Decimals, &token.Color, &token.ChainID)
+		var communityIDDB sql.NullString
+		err := rows.Scan(&token.Address, &token.Name, &token.Symbol, &token.Decimals, &token.Color, &token.ChainID, &communityIDDB)
 		if err != nil {
 			return nil, err
+		}
+
+		if communityIDDB.Valid {
+			token.CommunityID = &communityIDDB.String
 		}
 
 		rst = append(rst, token)
@@ -434,25 +494,12 @@ func (tm *Manager) GetCustoms() ([]*Token, error) {
 	return rst, nil
 }
 
+func (tm *Manager) GetCustoms() ([]*Token, error) {
+	return tm.getTokens("SELECT address, name, symbol, decimals, color, network_id, community_id FROM tokens")
+}
+
 func (tm *Manager) GetCustomsByChainID(chainID uint64) ([]*Token, error) {
-	rows, err := tm.db.Query("SELECT address, name, symbol, decimals, color, network_id FROM tokens where network_id=?", chainID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var rst []*Token
-	for rows.Next() {
-		token := &Token{}
-		err := rows.Scan(&token.Address, &token.Name, &token.Symbol, &token.Decimals, &token.Color, &token.ChainID)
-		if err != nil {
-			return nil, err
-		}
-
-		rst = append(rst, token)
-	}
-
-	return rst, nil
+	return tm.getTokens("SELECT address, name, symbol, decimals, color, network_id, community_id FROM tokens where network_id=?", chainID)
 }
 
 func (tm *Manager) IsTokenVisible(chainID uint64, address common.Address) (bool, error) {

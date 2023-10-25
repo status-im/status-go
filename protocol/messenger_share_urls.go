@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/urls"
+	"github.com/status-im/status-go/services/utils"
 )
 
 type CommunityURLData struct {
@@ -68,20 +69,7 @@ func (m *Messenger) SerializePublicKey(compressedKey types.HexBytes) (string, er
 }
 
 func (m *Messenger) DeserializePublicKey(compressedKey string) (types.HexBytes, error) {
-	rawKey, err := multiformat.DeserializePublicKey(compressedKey, "f")
-	if err != nil {
-		return nil, err
-	}
-
-	secp256k1Code := "fe701"
-	pubKeyBytes := "0x" + strings.TrimPrefix(rawKey, secp256k1Code)
-
-	pubKey, err := common.HexToPubkey(pubKeyBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return crypto.CompressPubkey(pubKey), nil
+	return utils.DeserializePublicKey(compressedKey)
 }
 
 func (m *Messenger) ShareCommunityURLWithChatKey(communityID types.HexBytes) (string, error) {
