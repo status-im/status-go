@@ -23,7 +23,10 @@ type findNewBlocksCommand struct {
 
 func (c *findNewBlocksCommand) Command() async.Command {
 	return async.InfiniteCommand{
-		Interval: 13 * time.Second, // TODO - make it configurable based on chain block mining time
+		// TODO - make it configurable based on chain block mining time
+		// NOTE(rasom): ^ it is unclear why each block has to be checked,
+		// that is rather undesirable, as it causes a lot of RPC requests
+		Interval: 2 * time.Minute,
 		Runable:  c.Run,
 	}.Run
 }
