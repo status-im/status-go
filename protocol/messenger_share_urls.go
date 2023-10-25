@@ -7,7 +7,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
@@ -52,20 +51,7 @@ const baseShareURL = "https://status.app"
 const channelUUIDRegExp = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$"
 
 func (m *Messenger) SerializePublicKey(compressedKey types.HexBytes) (string, error) {
-	rawKey, err := crypto.DecompressPubkey(compressedKey)
-	if err != nil {
-		return "", err
-	}
-	pubKey := types.EncodeHex(crypto.FromECDSAPub(rawKey))
-
-	secp256k1Code := "0xe701"
-	base58btc := "z"
-	multiCodecKey := secp256k1Code + strings.TrimPrefix(pubKey, "0x")
-	cpk, err := multiformat.SerializePublicKey(multiCodecKey, base58btc)
-	if err != nil {
-		return "", err
-	}
-	return cpk, nil
+	return utils.SerializePublicKey(compressedKey)
 }
 
 func (m *Messenger) DeserializePublicKey(compressedKey string) (types.HexBytes, error) {

@@ -18,7 +18,7 @@ import (
 type transactionState string
 
 const (
-	walletDeeplinkPrefix = "status-im://wallet/"
+	walletDeeplinkPrefix = "status-app://wallet/"
 
 	failed   transactionState = "failed"
 	inbound  transactionState = "inbound"

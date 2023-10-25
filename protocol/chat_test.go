@@ -162,3 +162,13 @@ func (s *ChatTestSuite) TestUpdateFirstMessageTimestamp() {
 	setAndCheck(FirstMessageTimestampNoMessage, false, 200)
 	setAndCheck(100, true, 100)
 }
+
+func (s *ChatTestSuite) TestDeepLink() {
+	chat := &Chat{
+		CommunityID: "0x02b1188c997e666cd5505ffd5c4b5fdbe3084b78a486d8e709da3b32ad3708a89e",
+		ID:          "0x02b1188c997e666cd5505ffd5c4b5fdbe3084b78a486d8e709da3b32ad3708a89ec432709e-fc73-440d-bb67-cb3a0929dfda",
+		ChatType:    ChatTypeCommunityChat,
+	}
+
+	s.Require().Equal(chat.DeepLink(), "status-app://cc/c432709e-fc73-440d-bb67-cb3a0929dfda#zQ3shZL6dXiFCbDyxnXxwQa9v8QFC2q19subFtyxd7kVszMVo")
+}
