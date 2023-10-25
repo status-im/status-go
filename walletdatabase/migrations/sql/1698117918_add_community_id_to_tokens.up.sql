@@ -1,0 +1,1 @@
+ALTER TABLE tokens ADD COLUMN community_id TEXT DEFAULT NULL;
