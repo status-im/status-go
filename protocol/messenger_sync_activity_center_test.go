@@ -129,7 +129,7 @@ func (s *MessengerSyncActivityCenterSuite) testSyncCommunityRequestDecision(acti
 
 	requestToJoinID := s.waitForRequestToJoin(s.m)
 
-	s.waitForRequestToJoinOnDevice2(s.m2)
+	s.waitForRequestToJoinOnDevice2()
 
 	switch action {
 	case actionAccept:
@@ -142,7 +142,7 @@ func (s *MessengerSyncActivityCenterSuite) testSyncCommunityRequestDecision(acti
 		s.T().Fatal("Unknown action")
 	}
 
-	s.waitForDecisionOnDevice2(s.m2, requestToJoinID, action)
+	s.waitForDecisionOnDevice2(requestToJoinID, action)
 }
 
 func (s *MessengerSyncActivityCenterSuite) createUserB() *Messenger {
@@ -161,6 +161,7 @@ func (s *MessengerSyncActivityCenterSuite) createClosedCommunity() types.HexByte
 	response, err = WaitOnMessengerResponse(s.m2, func(r *MessengerResponse) bool {
 		return len(r.Communities()) > 0
 	}, "community not received on device 2")
+	s.Require().NoError(err)
 	return response.Communities()[0].ID()
 }
 
@@ -207,6 +208,7 @@ func (s *MessengerSyncActivityCenterSuite) addContactAndShareCommunity(userB *Me
 		}
 		return false
 	}, "contact request not accepted on device 2")
+	s.Require().NoError(err)
 
 	_, err = s.m.ShareCommunity(&requests.ShareCommunity{
 		CommunityID:   communityID,
@@ -240,8 +242,8 @@ func (s *MessengerSyncActivityCenterSuite) waitForRequestToJoin(messenger *Messe
 	return requestToJoinID
 }
 
-func (s *MessengerSyncActivityCenterSuite) waitForRequestToJoinOnDevice2(messenger *Messenger) {
-	_, err := WaitOnMessengerResponse(messenger, func(r *MessengerResponse) bool {
+func (s *MessengerSyncActivityCenterSuite) waitForRequestToJoinOnDevice2() {
+	_, err := WaitOnMessengerResponse(s.m2, func(r *MessengerResponse) bool {
 		for _, n := range r.ActivityCenterNotifications() {
 			if n.Type == ActivityCenterNotificationTypeCommunityMembershipRequest {
 				return true
@@ -252,7 +254,7 @@ func (s *MessengerSyncActivityCenterSuite) waitForRequestToJoinOnDevice2(messeng
 	s.Require().NoError(err)
 }
 
-func (s *MessengerSyncActivityCenterSuite) waitForDecisionOnDevice2(messenger *Messenger, requestToJoinID types.HexBytes, action string) {
+func (s *MessengerSyncActivityCenterSuite) waitForDecisionOnDevice2(requestToJoinID types.HexBytes, action string) {
 	requestToJoinIDString := hex.Dump(requestToJoinID)
 	conditionFunc := func(r *MessengerResponse) bool {
 		for _, n := range r.ActivityCenterNotifications() {
@@ -266,6 +268,6 @@ func (s *MessengerSyncActivityCenterSuite) waitForDecisionOnDevice2(messenger *M
 		}
 		return false
 	}
-	_, err := WaitOnMessengerResponse(messenger, conditionFunc, "community request decision not received on device 2")
+	_, err := WaitOnMessengerResponse(s.m2, conditionFunc, "community request decision not received on device 2")
 	s.Require().NoError(err)
 }
