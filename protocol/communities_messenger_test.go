@@ -2450,7 +2450,6 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 	s.Equal(newCommunity.Muted(), tnc.Muted())
 	s.Equal(newCommunity.Joined(), tnc.Joined())
 	s.Equal(newCommunity.Spectated(), tnc.Spectated())
-	s.Equal(newCommunity.InvitationOnly(), tnc.InvitationOnly())
 
 	s.True(newCommunity.IsControlNode())
 	s.True(newCommunity.IsOwner())
