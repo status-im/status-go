@@ -112,8 +112,8 @@ func (m *Messenger) connectToNewMailserverAndWait() error {
 
 func (m *Messenger) performMailserverRequest(fn func() (*MessengerResponse, error)) (*MessengerResponse, error) {
 
-	m.mailserverCycle.Lock()
-	defer m.mailserverCycle.Unlock()
+	m.mailserverCycle.RLock()
+	defer m.mailserverCycle.RUnlock()
 	var tries uint = 0
 	for tries < mailserverMaxTries {
 		if !m.isActiveMailserverAvailable() {
@@ -134,6 +134,12 @@ func (m *Messenger) performMailserverRequest(fn func() (*MessengerResponse, erro
 			activeMailserver.FailedRequests = 0
 			return response, nil
 		}
+
+		m.logger.Error("failed to perform mailserver request",
+			zap.String("mailserverID", activeMailserver.ID),
+			zap.Uint("tries", tries),
+			zap.Error(err),
+		)
 
 		tries++
 		// Increment failed requests
