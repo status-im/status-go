@@ -661,7 +661,7 @@ func (s *MessengerBackupSuite) TestBackupCommunities() {
 	// Create a communitie
 
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",

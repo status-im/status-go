@@ -112,7 +112,7 @@ func setUpCommunityAndRoles(base CommunityEventsTestsInterface, role protobuf.Co
 	suite.Len(tcs2, 1, "Must have 1 community")
 
 	// ControlNode creates a community and chat
-	community := createTestCommunity(base, protobuf.CommunityPermissions_NO_MEMBERSHIP)
+	community := createTestCommunity(base, protobuf.CommunityPermissions_AUTO_ACCEPT)
 	refreshMessengerResponses(base)
 
 	// add events sender and member to the community
@@ -416,7 +416,7 @@ func setUpOnRequestCommunityAndRoles(base CommunityEventsTestsInterface, role pr
 	s.Len(tcs2, 1, "Must have 1 community")
 
 	// control node creates a community and chat
-	community := createTestCommunity(base, protobuf.CommunityPermissions_ON_REQUEST)
+	community := createTestCommunity(base, protobuf.CommunityPermissions_MANUAL_ACCEPT)
 	refreshMessengerResponses(base)
 
 	advertiseCommunityTo(s, community, base.GetControlNode(), base.GetEventSender())
@@ -909,7 +909,7 @@ func editCommunityDescription(base CommunityEventsTestsInterface, community *com
 	response, err := base.GetEventSender().EditCommunity(&requests.EditCommunity{
 		CommunityID: community.ID(),
 		CreateCommunity: requests.CreateCommunity{
-			Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+			Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 			Name:        expectedName,
 			Color:       expectedColor,
 			Description: expectedDescr,
@@ -983,7 +983,7 @@ func controlNodeCreatesCommunityPermission(base CommunityEventsTestsInterface, c
 func testCreateEditDeleteChannels(base CommunityEventsTestsInterface, community *communities.Community) {
 	newChat := &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "chat from the event sender",
@@ -1531,7 +1531,7 @@ func testReorderChannelsAndCategories(base CommunityEventsTestsInterface, commun
 
 	chat := &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "chat from event-sender",
@@ -1682,7 +1682,7 @@ func testMemberReceiveEventsWhenControlNodeOffline(base CommunityEventsTestsInte
 
 	newAdminChat := &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "chat from event sender",
@@ -2105,7 +2105,7 @@ func testMemberReceiveRequestsToJoinAfterGettingNewRole(base CommunityEventsTest
 	s.Len(tcs2, 1, "Must have 1 community")
 
 	// control node creates a community and chat
-	community := createTestCommunity(base, protobuf.CommunityPermissions_ON_REQUEST)
+	community := createTestCommunity(base, protobuf.CommunityPermissions_MANUAL_ACCEPT)
 	refreshMessengerResponses(base)
 
 	advertiseCommunityTo(s, community, base.GetControlNode(), base.GetEventSender())

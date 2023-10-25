@@ -41,9 +41,9 @@ message CommunityTokenMetadata {
 message CommunityPermissions {
   enum Access {
     UNKNOWN_ACCESS = 0;
-    NO_MEMBERSHIP = 1;
-    INVITATION_ONLY = 2;
-    ON_REQUEST = 3;
+    AUTO_ACCEPT = 1;
+    INVITATION_ONLY = 2 [deprecated = true];
+    MANUAL_ACCEPT = 3;
   }
 
   bool ens_only = 1;

@@ -10,7 +10,7 @@ import (
 func (m *Messenger) createCommunityChat(communityID types.HexBytes, name string) (*MessengerResponse, error) {
 	return m.CreateCommunityChat(communityID, &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: name,
@@ -25,7 +25,7 @@ func (m *Messenger) CreateClosedCommunity() (*MessengerResponse, error) {
 		Description:                  "closed community to check membership requests",
 		Color:                        "#887af9",
 		HistoryArchiveSupportEnabled: true,
-		Membership:                   protobuf.CommunityPermissions_ON_REQUEST,
+		Membership:                   protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		PinMessageAllMembersEnabled:  true,
 	}, true)
 	if err != nil {
@@ -96,7 +96,7 @@ func (m *Messenger) CreateOpenCommunity() (*MessengerResponse, error) {
 		Description:                  "open community to join with no requests",
 		Color:                        "#26a69a",
 		HistoryArchiveSupportEnabled: true,
-		Membership:                   protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:                   protobuf.CommunityPermissions_AUTO_ACCEPT,
 		PinMessageAllMembersEnabled:  false,
 	}, true)
 	return response, err
@@ -108,7 +108,7 @@ func (m *Messenger) CreateTokenGatedCommunity() (*MessengerResponse, error) {
 		Description:                  "require 10 SNT Goerli to use",
 		Color:                        "#eab700",
 		HistoryArchiveSupportEnabled: true,
-		Membership:                   protobuf.CommunityPermissions_ON_REQUEST,
+		Membership:                   protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		PinMessageAllMembersEnabled:  false,
 	}, true)
 	if err != nil {

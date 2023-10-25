@@ -1214,7 +1214,7 @@ func (o *Community) validateRequestToJoinWithChatID(request *protobuf.CommunityR
 	}
 
 	// If chat is no permissions, access should not have been requested
-	if chat.Permissions.Access != protobuf.CommunityPermissions_ON_REQUEST {
+	if chat.Permissions.Access != protobuf.CommunityPermissions_MANUAL_ACCEPT {
 		return ErrCantRequestAccess
 	}
 
@@ -1226,7 +1226,7 @@ func (o *Community) validateRequestToJoinWithChatID(request *protobuf.CommunityR
 }
 
 func (o *Community) OnRequest() bool {
-	return o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_ON_REQUEST
+	return o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_MANUAL_ACCEPT
 }
 
 func (o *Community) InvitationOnly() bool {
@@ -1237,7 +1237,7 @@ func (o *Community) AcceptRequestToJoinAutomatically() bool {
 	// We no longer have the notion of "no membership", but for historical reasons
 	// we use `NO_MEMBERSHIP` to determine wether requests to join should be automatically
 	// accepted or not.
-	return o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_NO_MEMBERSHIP
+	return o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_AUTO_ACCEPT
 }
 
 func (o *Community) validateRequestToJoinWithoutChatID(request *protobuf.CommunityRequestToJoin) error {
@@ -1248,7 +1248,7 @@ func (o *Community) validateRequestToJoinWithoutChatID(request *protobuf.Communi
 	//
 	// Hence, not only do we check whether the community permissions are ON_REQUEST but
 	// also NO_MEMBERSHIP.
-	if o.config.CommunityDescription.Permissions.Access != protobuf.CommunityPermissions_ON_REQUEST && o.config.CommunityDescription.Permissions.Access != protobuf.CommunityPermissions_NO_MEMBERSHIP {
+	if o.config.CommunityDescription.Permissions.Access != protobuf.CommunityPermissions_MANUAL_ACCEPT && o.config.CommunityDescription.Permissions.Access != protobuf.CommunityPermissions_AUTO_ACCEPT {
 		return ErrCantRequestAccess
 	}
 
@@ -1853,7 +1853,7 @@ func (o *Community) CanRequestAccess(pk *ecdsa.PublicKey) bool {
 		return false
 	}
 
-	return o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_ON_REQUEST
+	return o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_MANUAL_ACCEPT
 }
 
 func (o *Community) CanManageUsers(pk *ecdsa.PublicKey) bool {
@@ -1888,7 +1888,7 @@ func (o *Community) canJoin() bool {
 		return true
 	}
 
-	if o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_NO_MEMBERSHIP {
+	if o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_AUTO_ACCEPT {
 		return true
 	}
 

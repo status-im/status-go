@@ -2011,7 +2011,7 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity, createDef
 				FirstMessageTimestamp: FirstMessageTimestampNoMessage,
 			},
 			Permissions: &protobuf.CommunityPermissions{
-				Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+				Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 			},
 		})
 		if err != nil {
@@ -3986,7 +3986,7 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			if !exists {
 				communityChat := &protobuf.CommunityChat{
 					Permissions: &protobuf.CommunityPermissions{
-						Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+						Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 					},
 					Identity: &protobuf.ChatIdentity{
 						DisplayName: channel.Channel.Name,

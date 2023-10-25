@@ -27,7 +27,7 @@ type MessengerShareUrlsSuite struct {
 
 func (s *MessengerShareUrlsSuite) createCommunity() *communities.Community {
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
@@ -67,7 +67,7 @@ func (s *MessengerShareUrlsSuite) createCommunityWithChannel() (*communities.Com
 
 	chat := &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core",

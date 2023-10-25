@@ -119,7 +119,7 @@ func (s *CommunitySuite) TestCreateChat() {
 		Description: "new-chat-description",
 	}
 	permissions := &protobuf.CommunityPermissions{
-		Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 	}
 
 	_, err := org.CreateChat(newChatID, &protobuf.CommunityChat{
@@ -171,7 +171,7 @@ func (s *CommunitySuite) TestEditChat() {
 		Color:       "#000000",
 	}
 	permissions := &protobuf.CommunityPermissions{
-		Access:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Access:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Private: false,
 	}
 
@@ -190,7 +190,7 @@ func (s *CommunitySuite) TestEditChat() {
 		Color:       "#FFFFFF",
 	}
 	editedPermissions := &protobuf.CommunityPermissions{
-		Access:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Access:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Private: true,
 	}
 	_, err = org.EditChat(newChatID, &protobuf.CommunityChat{
@@ -844,7 +844,7 @@ func (s *CommunitySuite) newConfig(identity *ecdsa.PrivateKey, description *prot
 
 func (s *CommunitySuite) configOnRequest() Config {
 	description := s.emptyCommunityDescription()
-	description.Permissions.Access = protobuf.CommunityPermissions_ON_REQUEST
+	description.Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
 	return s.newConfig(s.identity, description)
 }
 
@@ -856,14 +856,14 @@ func (s *CommunitySuite) configInvitationOnly() Config {
 
 func (s *CommunitySuite) configNoMembershipOrgNoMembershipChat() Config {
 	description := s.emptyCommunityDescriptionWithChat()
-	description.Permissions.Access = protobuf.CommunityPermissions_NO_MEMBERSHIP
-	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_NO_MEMBERSHIP
+	description.Permissions.Access = protobuf.CommunityPermissions_AUTO_ACCEPT
+	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_AUTO_ACCEPT
 	return s.newConfig(s.identity, description)
 }
 
 func (s *CommunitySuite) configNoMembershipOrgInvitationOnlyChat() Config {
 	description := s.emptyCommunityDescriptionWithChat()
-	description.Permissions.Access = protobuf.CommunityPermissions_NO_MEMBERSHIP
+	description.Permissions.Access = protobuf.CommunityPermissions_AUTO_ACCEPT
 	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_INVITATION_ONLY
 	return s.newConfig(s.identity, description)
 }
@@ -877,43 +877,43 @@ func (s *CommunitySuite) configInvitationOnlyOrgInvitationOnlyChat() Config {
 
 func (s *CommunitySuite) configNoMembershipOrgOnRequestChat() Config {
 	description := s.emptyCommunityDescriptionWithChat()
-	description.Permissions.Access = protobuf.CommunityPermissions_NO_MEMBERSHIP
-	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_ON_REQUEST
+	description.Permissions.Access = protobuf.CommunityPermissions_AUTO_ACCEPT
+	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
 	return s.newConfig(s.identity, description)
 }
 
 func (s *CommunitySuite) configOnRequestOrgOnRequestChat() Config {
 	description := s.emptyCommunityDescriptionWithChat()
-	description.Permissions.Access = protobuf.CommunityPermissions_ON_REQUEST
-	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_ON_REQUEST
+	description.Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
+	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
 	return s.newConfig(s.identity, description)
 }
 
 func (s *CommunitySuite) configOnRequestOrgInvitationOnlyChat() Config {
 	description := s.emptyCommunityDescriptionWithChat()
-	description.Permissions.Access = protobuf.CommunityPermissions_ON_REQUEST
+	description.Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
 	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_INVITATION_ONLY
 	return s.newConfig(s.identity, description)
 }
 
 func (s *CommunitySuite) configOnRequestOrgNoMembershipChat() Config {
 	description := s.emptyCommunityDescriptionWithChat()
-	description.Permissions.Access = protobuf.CommunityPermissions_ON_REQUEST
-	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_NO_MEMBERSHIP
+	description.Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
+	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_AUTO_ACCEPT
 	return s.newConfig(s.identity, description)
 }
 
 func (s *CommunitySuite) configChatENSOnly() Config {
 	description := s.emptyCommunityDescriptionWithChat()
-	description.Permissions.Access = protobuf.CommunityPermissions_ON_REQUEST
-	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_ON_REQUEST
+	description.Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
+	description.Chats[testChatID1].Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
 	description.Chats[testChatID1].Permissions.EnsOnly = true
 	return s.newConfig(s.identity, description)
 }
 
 func (s *CommunitySuite) configENSOnly() Config {
 	description := s.emptyCommunityDescription()
-	description.Permissions.Access = protobuf.CommunityPermissions_ON_REQUEST
+	description.Permissions.Access = protobuf.CommunityPermissions_MANUAL_ACCEPT
 	description.Permissions.EnsOnly = true
 	return s.newConfig(s.identity, description)
 }

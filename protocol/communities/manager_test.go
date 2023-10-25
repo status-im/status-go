@@ -282,7 +282,7 @@ func (s *ManagerSuite) TestCreateCommunity() {
 	request := &requests.CreateCommunity{
 		Name:        "status",
 		Description: "token membership description",
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 	}
 
 	community, err := s.manager.CreateCommunity(request, true)
@@ -320,7 +320,7 @@ func (s *ManagerSuite) TestCreateCommunity_WithBanner() {
 	request := &requests.CreateCommunity{
 		Name:        "with_banner",
 		Description: "community with banner ",
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Banner: userimages.CroppedImage{
 			ImagePath: tmpTestFilePath,
 			X:         1,
@@ -349,7 +349,7 @@ func (s *ManagerSuite) TestEditCommunity() {
 	createRequest := &requests.CreateCommunity{
 		Name:        "status",
 		Description: "status community description",
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 	}
 
 	community, err := s.manager.CreateCommunity(createRequest, true)
@@ -1138,7 +1138,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions_EmptyPermissions() {
 	createRequest := &requests.CreateCommunity{
 		Name:        "channel permission community",
 		Description: "some description",
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 	}
 	community, err := m.CreateCommunity(createRequest, true)
 	s.Require().NoError(err)
@@ -1150,7 +1150,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions_EmptyPermissions() {
 			Description: "description",
 		},
 		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Members: make(map[string]*protobuf.CommunityMember),
 	}
@@ -1189,7 +1189,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 	createRequest := &requests.CreateCommunity{
 		Name:        "channel permission community",
 		Description: "some description",
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 	}
 	community, err := m.CreateCommunity(createRequest, true)
 	s.Require().NoError(err)
@@ -1201,7 +1201,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 			Description: "description",
 		},
 		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Members: make(map[string]*protobuf.CommunityMember),
 	}
@@ -1220,7 +1220,7 @@ func (s *ManagerSuite) TestCheckAllChannelsPermissions() {
 			Description: "description",
 		},
 		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Members: make(map[string]*protobuf.CommunityMember),
 	}
@@ -1519,7 +1519,7 @@ func (s *ManagerSuite) buildCommunityWithChat() (*Community, string, error) {
 	createRequest := &requests.CreateCommunity{
 		Name:        "status",
 		Description: "status community description",
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 	}
 	community, err := s.manager.CreateCommunity(createRequest, true)
 	if err != nil {
@@ -1531,7 +1531,7 @@ func (s *ManagerSuite) buildCommunityWithChat() (*Community, string, error) {
 			Description: "description",
 		},
 		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Members: make(map[string]*protobuf.CommunityMember),
 	}
@@ -1569,7 +1569,7 @@ func (s *ManagerSuite) TestCommunityQueue() {
 	createRequest := &requests.CreateCommunity{
 		Name:        "status",
 		Description: "status community description",
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 	}
 	community, err := s.manager.CreateCommunity(createRequest, true)
 	s.Require().NoError(err)
@@ -1660,7 +1660,7 @@ func (s *ManagerSuite) TestCommunityQueueMultipleDifferentSigners() {
 	createRequest := &requests.CreateCommunity{
 		Name:        "status",
 		Description: "status community description",
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 	}
 	community, err := s.manager.CreateCommunity(createRequest, true)
 	s.Require().NoError(err)
@@ -1789,7 +1789,7 @@ func (s *ManagerSuite) TestCommunityQueueMultipleDifferentSignersIgnoreIfNotRetu
 	createRequest := &requests.CreateCommunity{
 		Name:        "status",
 		Description: "status community description",
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 	}
 	community, err := s.manager.CreateCommunity(createRequest, true)
 	s.Require().NoError(err)
