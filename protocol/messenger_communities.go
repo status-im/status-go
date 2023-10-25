@@ -1128,7 +1128,7 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	}
 
 	// send request to join to privileged members
-	if !community.AcceptRequestToJoinAutomatically() {
+	if !community.AutoAccept() {
 		privilegedMembers := community.GetFilteredPrivilegedMembers(map[string]struct{}{})
 
 		for _, member := range privilegedMembers[protobuf.CommunityMember_ROLE_OWNER] {
@@ -1459,7 +1459,7 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 		return nil, err
 	}
 
-	if !community.AcceptRequestToJoinAutomatically() {
+	if !community.AutoAccept() {
 		// send cancelation to community admins also
 		rawMessage.Payload = payload
 

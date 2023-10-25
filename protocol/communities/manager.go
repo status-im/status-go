@@ -1672,7 +1672,7 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 	}
 
 	// If the community require membership, we set whether we should leave/join the community after a state change
-	if community.InvitationOnly() || community.OnRequest() || community.AcceptRequestToJoinAutomatically() {
+	if community.InvitationOnly() || community.ManualAccept() || community.AutoAccept() {
 		if changes.HasNewMember(pkString) {
 			hasPendingRequest, err := m.persistence.HasPendingRequestsToJoinForUserAndCommunity(pkString, changes.Community.ID())
 			if err != nil {
@@ -2465,7 +2465,7 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 		// If user is already a member, then accept request automatically
 		// It may happen when member removes itself from community and then tries to rejoin
 		// More specifically, CommunityRequestToLeave may be delivered later than CommunityRequestToJoin, or not delivered at all
-		acceptAutomatically := community.AcceptRequestToJoinAutomatically() || community.HasMember(signer)
+		acceptAutomatically := community.AutoAccept() || community.HasMember(signer)
 		if acceptAutomatically {
 			// Don't check permissions here,
 			// it will be done further in the processing pipeline.
