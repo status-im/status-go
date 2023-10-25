@@ -442,18 +442,29 @@ func (s *MessengerCommunitiesSuite) TestCommunityContactCodeAdvertisement() {
 func (s *MessengerCommunitiesSuite) TestPostToCommunityChat() {
 	community, chat := s.createCommunity()
 
-	s.advertiseCommunityTo(community, s.owner, s.alice)
-	s.joinCommunity(community, s.owner, s.alice)
-
-	ctx := context.Background()
-
 	chatID := chat.ID
 	inputMessage := common.NewMessage()
 	inputMessage.ChatId = chatID
 	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = "some text"
 
+	ctx := context.Background()
+
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+
+	// Send message without even spectating fails
 	_, err := s.alice.SendChatMessage(ctx, inputMessage)
+	s.Require().Error(err)
+
+	// Sending a message without joining fails
+	_, err = s.alice.SpectateCommunity(community.ID())
+	s.Require().NoError(err)
+	_, err = s.alice.SendChatMessage(ctx, inputMessage)
+	s.Require().Error(err)
+
+	// Sending should work now
+	s.joinCommunity(community, s.owner, s.alice)
+	_, err = s.alice.SendChatMessage(ctx, inputMessage)
 	s.Require().NoError(err)
 
 	var response *MessengerResponse

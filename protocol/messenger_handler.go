@@ -2625,31 +2625,27 @@ func (m *Messenger) matchChatEntity(chatEntity common.ChatEntity) (*Chat, error)
 			return nil, errors.New("not an community chat")
 		}
 
-		var emojiReaction bool
-		var pinMessage bool
-		// We allow emoji reactions from anyone
-		switch chatEntity.(type) {
-		case *EmojiReaction:
-			emojiReaction = true
-		case *common.PinMessage:
-			pinMessage = true
-		}
-
 		canPost, err := m.communitiesManager.CanPost(chatEntity.GetSigPubKey(), chat.CommunityID, chat.CommunityChatID(), chatEntity.GetGrant())
 		if err != nil {
 			return nil, err
 		}
 
-		community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
-		if err != nil {
-			return nil, err
+		if !canPost {
+			return nil, errors.New("user can't post in community")
 		}
 
-		hasPermission := community.IsPrivilegedMember(chatEntity.GetSigPubKey())
-		pinMessageAllowed := community.AllowsAllMembersToPinMessage()
+		_, isPinMessage := chatEntity.(*common.PinMessage)
+		if isPinMessage {
+			community, err := m.communitiesManager.GetByIDString(chat.CommunityID)
+			if err != nil {
+				return nil, err
+			}
 
-		if (pinMessage && !hasPermission && !pinMessageAllowed) || (!emojiReaction && !canPost) {
-			return nil, errors.New("user can't post")
+			hasPermission := community.IsPrivilegedMember(chatEntity.GetSigPubKey())
+			pinMessageAllowed := community.AllowsAllMembersToPinMessage()
+			if !hasPermission && !pinMessageAllowed {
+				return nil, errors.New("user can't pin message")
+			}
 		}
 
 		return chat, nil
