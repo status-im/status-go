@@ -1523,7 +1523,7 @@ func TestSaveCommunityChat(t *testing.T) {
 		FirstMessageTimestamp: 1,
 	}
 	permissions := &protobuf.CommunityPermissions{
-		Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 	}
 
 	communityChat := &protobuf.CommunityChat{

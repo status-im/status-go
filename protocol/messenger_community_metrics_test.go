@@ -24,7 +24,7 @@ type MessengerCommunityMetricsSuite struct {
 
 func (s *MessengerCommunityMetricsSuite) prepareCommunityAndChatIDs() (*communities.Community, []string) {
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
@@ -42,7 +42,7 @@ func (s *MessengerCommunityMetricsSuite) prepareCommunityAndChatIDs() (*communit
 	// Create another chat
 	chat := &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status",

@@ -56,7 +56,7 @@ func (s *CommunitySuite) TestCreateCategory() {
 		Description: "new-chat-description",
 	}
 	permissions := &protobuf.CommunityPermissions{
-		Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 	}
 
 	_, err = org.CreateChat(newChatID, &protobuf.CommunityChat{
@@ -122,7 +122,7 @@ func (s *CommunitySuite) TestEditCategory() {
 		Description: "new-chat-description",
 	}
 	permissions := &protobuf.CommunityPermissions{
-		Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 	}
 
 	testChatID2 := "test-chat-id-2"
@@ -171,7 +171,7 @@ func (s *CommunitySuite) TestDeleteCategory() {
 	org := s.buildCommunity(&s.identity.PublicKey)
 	org.config.PrivateKey = s.identity
 	permissions := &protobuf.CommunityPermissions{
-		Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 	}
 
 	testChatID2 := "test-chat-id-2"
@@ -238,7 +238,7 @@ func (s *CommunitySuite) TestDeleteChatOrder() {
 	org := s.buildCommunity(&s.identity.PublicKey)
 	org.config.PrivateKey = s.identity
 	permissions := &protobuf.CommunityPermissions{
-		Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 	}
 
 	testChatID2 := "test-chat-id-2"

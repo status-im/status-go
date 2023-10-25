@@ -529,7 +529,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_SelfLink() {
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusCommunityJoined() {
 
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "status",
 		Description: "status community description",
 		Color:       "#123456",

@@ -903,7 +903,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityReq
 	s.Require().NoError(err)
 
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",

@@ -297,7 +297,7 @@ func (s *AdminCommunityEventsSuite) TestAdminResendRejectedEvents() {
 			Name:        "admin name",
 			Description: "admin description",
 			Color:       "#FFFFFF",
-			Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+			Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		},
 	}
 	_, err := s.admin.EditCommunity(adminEditRequest)
@@ -310,7 +310,7 @@ func (s *AdminCommunityEventsSuite) TestAdminResendRejectedEvents() {
 			Name:        "control node name",
 			Description: "control node description",
 			Color:       "#FFFFFF",
-			Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+			Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		},
 	}
 	_, err = s.owner.EditCommunity(ownerEditRequest)
@@ -385,7 +385,7 @@ func (s *AdminCommunityEventsSuite) TestAdminDoesNotHaveRejectedEventsLoop() {
 			Name:        "admin name",
 			Description: "admin description",
 			Color:       "#FFFFFF",
-			Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+			Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		},
 	}
 	_, err := s.admin.EditCommunity(adminEditRequest)

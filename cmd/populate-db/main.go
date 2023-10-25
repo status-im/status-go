@@ -224,7 +224,7 @@ func main() {
 			Name:        randomString(10),
 			Description: randomString(30),
 			Color:       "#ffffff",
-			Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+			Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		}
 		_, err = wakuext.CreateCommunity(&request)
 		if err != nil {

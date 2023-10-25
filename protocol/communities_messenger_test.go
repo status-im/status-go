@@ -97,7 +97,7 @@ func (s *MessengerCommunitiesSuite) newMessenger() *Messenger {
 
 func (s *MessengerCommunitiesSuite) TestCreateCommunity() {
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
@@ -113,7 +113,7 @@ func (s *MessengerCommunitiesSuite) TestCreateCommunity() {
 func (s *MessengerCommunitiesSuite) TestCreateCommunity_WithoutDefaultChannel() {
 
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
@@ -130,7 +130,7 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 	alice := s.newMessenger()
 
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
@@ -187,7 +187,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	ctx := context.Background()
 
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
@@ -208,7 +208,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 
 	orgChat := &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core",
@@ -325,7 +325,7 @@ func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
 	// Create another org chat
 	orgChat = &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core-ui",
@@ -526,7 +526,7 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 	_, err = s.alice.EditCommunity(&requests.EditCommunity{
 		CommunityID: community.ID(),
 		CreateCommunity: requests.CreateCommunity{
-			Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+			Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 			Name:        community.Name(),
 			Color:       community.Color(),
 			Description: newDescription,
@@ -543,7 +543,7 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 
 func (s *MessengerCommunitiesSuite) TestRemovePrivateKey() {
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
@@ -572,7 +572,7 @@ func (s *MessengerCommunitiesSuite) TestRolesAfterImportCommunity() {
 	ctx := context.Background()
 
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
@@ -617,7 +617,7 @@ func (s *MessengerCommunitiesSuite) TestRequestAccess() {
 	ctx := context.Background()
 
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
@@ -824,7 +824,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	ctx := context.Background()
 
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
@@ -1014,7 +1014,7 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccessWithDeclinedSt
 	ctx := context.Background()
 
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
@@ -1266,7 +1266,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 	ctx := context.Background()
 
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
@@ -1441,7 +1441,7 @@ func (s *MessengerCommunitiesSuite) TestCancelRequestAccess() {
 
 func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
@@ -1735,7 +1735,7 @@ func (s *MessengerCommunitiesSuite) TestDeclineAccess() {
 	ctx := context.Background()
 
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
@@ -2026,7 +2026,7 @@ func (s *MessengerCommunitiesSuite) TestLeaveAndRejoinCommunity() {
 
 func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
@@ -2081,7 +2081,7 @@ func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 
 func (s *MessengerCommunitiesSuite) TestShareCommunityWithPreviousMember() {
 	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "status",
 		Color:       "#ffffff",
 		Description: "status community description",
@@ -2099,7 +2099,7 @@ func (s *MessengerCommunitiesSuite) TestShareCommunityWithPreviousMember() {
 
 	orgChat := &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core",
@@ -2245,7 +2245,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings() {
 
 	// Create a community
 	createCommunityReq := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		Name:        "new community",
 		Color:       "#000000",
 		Description: "new community description",
@@ -2297,7 +2297,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunitySettings_EditCommunity() {
 
 	// Create a community
 	createCommunityReq := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		Name:        "new community",
 		Color:       "#000000",
 		Description: "new community description",
@@ -2386,7 +2386,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity() {
 
 	// Create a community
 	createCommunityReq := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		Name:        "new community",
 		Color:       "#000000",
 		Description: "new community description",
@@ -2486,7 +2486,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_RequestToJoin() {
 
 	// Bob the admin creates a community
 	createCommunityReq := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		Name:        "new community",
 		Color:       "#000000",
 		Description: "new community description",
@@ -2691,7 +2691,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Leave() {
 
 	// Bob the admin creates a community
 	createCommunityReq := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "new community",
 		Color:       "#000000",
 		Description: "new community description",
@@ -2819,7 +2819,7 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_ImportCommunity() {
 func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
 	// Create a community
 	createCommunityReq := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		Name:        "new community",
 		Color:       "#000000",
 		Description: "new community description",
@@ -2837,7 +2837,7 @@ func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
 
 	orgChat1 := &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core",
@@ -2848,7 +2848,7 @@ func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
 
 	orgChat2 := &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core2",
@@ -2918,7 +2918,7 @@ func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
 func (s *MessengerCommunitiesSuite) TestCheckCommunitiesToUnmute() {
 	// Create a community
 	createCommunityReq := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		Name:        "new community",
 		Color:       "#000000",
 		Description: "new community description",
@@ -2962,7 +2962,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityNotInDB() {
 func (s *MessengerCommunitiesSuite) TestMuteAllCommunityChats() {
 	// Create a community
 	createCommunityReq := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Membership:  protobuf.CommunityPermissions_MANUAL_ACCEPT,
 		Name:        "new community",
 		Color:       "#000000",
 		Description: "new community description",
@@ -2980,7 +2980,7 @@ func (s *MessengerCommunitiesSuite) TestMuteAllCommunityChats() {
 
 	orgChat1 := &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core",
@@ -2991,7 +2991,7 @@ func (s *MessengerCommunitiesSuite) TestMuteAllCommunityChats() {
 
 	orgChat2 := &protobuf.CommunityChat{
 		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 		},
 		Identity: &protobuf.ChatIdentity{
 			DisplayName: "status-core2",
@@ -3280,7 +3280,7 @@ func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 	// Create a new community
 	response, err := s.owner.CreateCommunity(
 		&requests.CreateCommunity{
-			Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 			Name:        "status",
 			Color:       "#57a7e5",
 			Description: "status community description",
@@ -3356,7 +3356,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBan() {
 	// Create a new community
 	response, err := owner.CreateCommunity(
 		&requests.CreateCommunity{
-			Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 			Name:        "status",
 			Color:       "#57a7e5",
 			Description: "status community description",
@@ -3466,7 +3466,7 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibili
 	// Create a new community
 	response, err := owner.CreateCommunity(
 		&requests.CreateCommunity{
-			Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 			Name:        "status",
 			Color:       "#57a7e5",
 			Description: "status community description",

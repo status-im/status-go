@@ -1219,7 +1219,7 @@ func (m *Manager) ImportCommunity(key *ecdsa.PrivateKey, clock uint64) (*Communi
 
 	if community == nil {
 		createCommunityRequest := requests.CreateCommunity{
-			Membership: protobuf.CommunityPermissions_ON_REQUEST,
+			Membership: protobuf.CommunityPermissions_MANUAL_ACCEPT,
 			Name:       "unknown imported",
 		}
 
