@@ -1689,11 +1689,6 @@ func (m *Messenger) HandleCommunityRequestToLeave(state *ReceivedMessageState, r
 	return nil
 }
 
-// handleWrappedCommunityDescriptionMessage handles a wrapped community description
-func (m *Messenger) handleWrappedCommunityDescriptionMessage(payload []byte, shard *common.Shard) (*communities.CommunityResponse, error) {
-	return m.communitiesManager.HandleWrappedCommunityDescriptionMessage(payload, shard)
-}
-
 func (m *Messenger) handleEditMessage(state *ReceivedMessageState, editMessage EditMessage) error {
 	if err := ValidateEditMessage(editMessage.EditMessage); err != nil {
 		return err
@@ -2282,20 +2277,22 @@ func (m *Messenger) handleChatMessage(state *ReceivedMessageState, forceSeen boo
 	if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
 		m.logger.Debug("Handling community content type")
 
-		communityResponse, err := m.handleWrappedCommunityDescriptionMessage(receivedMessage.GetCommunity(), common.ShardFromProtobuff(receivedMessage.Shard))
+		signer, description, err := communities.UnwrapCommunityDescriptionMessage(receivedMessage.GetCommunity())
 		if err != nil {
 			return err
 		}
 
-		if communityResponse == nil {
-			return nil
+		err = m.handleCommunityDescription(state, signer, description, receivedMessage.GetCommunity())
+		if err != nil {
+			return err
 		}
 
-		community := communityResponse.Community
-		receivedMessage.CommunityID = community.IDString()
-
-		state.Response.AddCommunity(community)
-		state.Response.CommunityChanges = append(state.Response.CommunityChanges, communityResponse.Changes)
+		if len(description.ID) != 0 {
+			receivedMessage.CommunityID = description.ID
+		} else {
+			// Backward compatibility
+			receivedMessage.CommunityID = types.EncodeHex(crypto.CompressPubkey(signer))
+		}
 	}
 
 	receivedMessage.New = true

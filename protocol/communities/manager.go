@@ -431,7 +431,7 @@ func (m *Manager) runOwnerVerificationLoop() {
 					m.logger.Info("validating communities", zap.String("id", id), zap.Int("count", len(communities)))
 
 					for _, communityToValidate := range communities {
-						signer, description, err := m.unwrapCommunityDescriptionMessage(communityToValidate.payload)
+						signer, description, err := UnwrapCommunityDescriptionMessage(communityToValidate.payload)
 						if err != nil {
 							m.logger.Error("failed to unwrap community", zap.Error(err))
 							continue
@@ -2856,7 +2856,7 @@ func (m *Manager) HandleCommunityRequestToLeave(signer *ecdsa.PublicKey, proto *
 	return nil
 }
 
-func (m *Manager) unwrapCommunityDescriptionMessage(payload []byte) (*ecdsa.PublicKey, *protobuf.CommunityDescription, error) {
+func UnwrapCommunityDescriptionMessage(payload []byte) (*ecdsa.PublicKey, *protobuf.CommunityDescription, error) {
 
 	applicationMetadataMessage := &protobuf.ApplicationMetadataMessage{}
 	err := proto.Unmarshal(payload, applicationMetadataMessage)
@@ -2879,16 +2879,6 @@ func (m *Manager) unwrapCommunityDescriptionMessage(payload []byte) (*ecdsa.Publ
 	}
 
 	return signer, description, nil
-}
-
-func (m *Manager) HandleWrappedCommunityDescriptionMessage(payload []byte, shard *common.Shard) (*CommunityResponse, error) {
-	m.logger.Debug("Handling wrapped community description message")
-	signer, description, err := m.unwrapCommunityDescriptionMessage(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	return m.HandleCommunityDescriptionMessage(signer, description, payload, shard, nil)
 }
 
 func (m *Manager) JoinCommunity(id types.HexBytes, forceJoin bool) (*Community, error) {
