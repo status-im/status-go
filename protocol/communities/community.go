@@ -1722,72 +1722,54 @@ func (o *Community) VerifyGrantSignature(data []byte) (*protobuf.Grant, error) {
 
 func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, grantBytes []byte) (bool, error) {
 	if o.config.CommunityDescription.Chats == nil {
-		o.config.Logger.Debug("canPost, no-chats")
+		o.config.Logger.Debug("Community.CanPost: no-chats")
 		return false, nil
 	}
 
 	chat, ok := o.config.CommunityDescription.Chats[chatID]
 	if !ok {
-		o.config.Logger.Debug("canPost, no chat with id", zap.String("chat-id", chatID))
+		o.config.Logger.Debug("Community.CanPost: no chat with id", zap.String("chat-id", chatID))
 		return false, nil
 	}
 
-	// creator can always post
+	// community creator can always post, return immediately
 	if common.IsPubKeyEqual(pk, o.config.ID) {
 		return true, nil
 	}
 
-	// if banned cannot post
 	if o.isBanned(pk) {
+		o.config.Logger.Debug("Community.CanPost: user is banned", zap.String("chat-id", chatID))
 		return false, nil
 	}
 
-	// If both the chat & the org have no permissions, the user is allowed to post
-	if o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_NO_MEMBERSHIP && chat.Permissions.Access == protobuf.CommunityPermissions_NO_MEMBERSHIP {
-		return true, nil
+	if o.config.CommunityDescription.Members == nil {
+		o.config.Logger.Debug("Community.CanPost: no members in org", zap.String("chat-id", chatID))
+		return false, nil
 	}
 
-	if chat.Permissions.Access != protobuf.CommunityPermissions_NO_MEMBERSHIP {
-		if chat.Members == nil {
-			o.config.Logger.Debug("canPost, no members in chat", zap.String("chat-id", chatID))
+	// If community member, also check chat membership next
+	_, ok = o.config.CommunityDescription.Members[common.PubkeyToHex(pk)]
+	if !ok {
+		o.config.Logger.Debug("Community.CanPost: not a community member", zap.String("chat-id", chatID))
+		return false, nil
+	}
+
+	if chat.Members == nil {
+		o.config.Logger.Debug("Community.CanPost: no members in chat", zap.String("chat-id", chatID))
+		return false, nil
+	}
+
+	// Need to also be a chat member to post
+	if !o.IsMemberInChat(pk, chatID) {
+		if grantBytes == nil {
+			o.config.Logger.Debug("Community.CanPost: not a chat member:", zap.String("chat-id", chatID))
 			return false, nil
 		}
-
-		_, ok := chat.Members[common.PubkeyToHex(pk)]
-		// If member, we stop here
-		if ok {
-			return true, nil
-		}
-
-		// If not a member, and not grant, we return
-		if !ok && grantBytes == nil {
-			o.config.Logger.Debug("canPost, not a member in chat", zap.String("chat-id", chatID))
-			return false, nil
-		}
-
-		// Otherwise we verify the grant
 		return o.canPostWithGrant(pk, chatID, grantBytes)
 	}
 
-	// Chat has no membership, check org permissions
-	if o.config.CommunityDescription.Members == nil {
-		o.config.Logger.Debug("canPost, no members in org", zap.String("chat-id", chatID))
-		return false, nil
-	}
-
-	// If member, they can post
-	_, ok = o.config.CommunityDescription.Members[common.PubkeyToHex(pk)]
-	if ok {
-		return true, nil
-	}
-
-	// Not a member and no grant, can't post
-	if !ok && grantBytes == nil {
-		o.config.Logger.Debug("canPost, not a member in org", zap.String("chat-id", chatID), zap.String("pubkey", common.PubkeyToHex(pk)))
-		return false, nil
-	}
-
-	return o.canPostWithGrant(pk, chatID, grantBytes)
+	// all conditions satisfied, user can post after all
+	return true, nil
 }
 
 func (o *Community) canPostWithGrant(pk *ecdsa.PublicKey, chatID string, grantBytes []byte) (bool, error) {

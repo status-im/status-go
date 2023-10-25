@@ -511,7 +511,7 @@ func (s *CommunitySuite) TestCanPost() {
 			name:    "no-membership org with no-membeship chat",
 			config:  s.configNoMembershipOrgNoMembershipChat(),
 			member:  notMember,
-			canPost: true,
+			canPost: false,
 		},
 		{
 			name:    "no-membership org with invitation only chat-not-a-member",
@@ -529,7 +529,7 @@ func (s *CommunitySuite) TestCanPost() {
 			name:    "no-membership org with invitation only chat-not-a-member valid grant",
 			config:  s.configNoMembershipOrgInvitationOnlyChat(),
 			member:  notMember,
-			canPost: true,
+			canPost: false,
 			grant:   validGrant,
 		},
 		{
@@ -555,7 +555,7 @@ func (s *CommunitySuite) TestCanPost() {
 			name:    "membership org with no-membership chat  not-a-member valid grant",
 			config:  s.configOnRequestOrgNoMembershipChat(),
 			member:  notMember,
-			canPost: true,
+			canPost: false,
 			grant:   validGrant,
 		},
 		{

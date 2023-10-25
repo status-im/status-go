@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
@@ -21,6 +22,19 @@ import (
 
 func TestMessengerActivityCenterMessageSuite(t *testing.T) {
 	suite.Run(t, new(MessengerActivityCenterMessageSuite))
+}
+
+func (s *MessengerActivityCenterMessageSuite) createCommunity(owner *Messenger) (*communities.Community, *Chat) {
+	return createCommunity(&s.Suite, owner)
+}
+
+func (s *MessengerActivityCenterMessageSuite) advertiseCommunityTo(community *communities.Community, owner *Messenger, user *Messenger) {
+	advertiseCommunityTo(&s.Suite, community, owner, user)
+}
+
+func (s *MessengerActivityCenterMessageSuite) joinCommunity(community *communities.Community, owner *Messenger, user *Messenger) {
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	joinCommunity(&s.Suite, community, owner, user, request)
 }
 
 type MessengerActivityCenterMessageSuite struct {
@@ -117,75 +131,35 @@ func (s *MessengerActivityCenterMessageSuite) TestDeleteOneToOneChat() {
 }
 
 func (s *MessengerActivityCenterMessageSuite) TestEveryoneMentionTag() {
-
-	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		Name:        "status",
-		Color:       "#ffffff",
-		Description: "status community description",
-	}
-
 	alice := s.m
 	bob := s.newMessenger()
 	_, err := bob.Start()
 	s.Require().NoError(err)
 	defer bob.Shutdown() // nolint: errcheck
 
-	// Create an community chat
-	response, err := bob.CreateCommunity(description, true)
-	s.Require().NoError(err)
-	s.Require().Len(response.Communities(), 1)
-
-	community := response.Communities()[0]
+	// Create a community
+	community, chat := s.createCommunity(bob)
 	s.Require().NotNil(community)
-
-	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, bob.transport)
-
-	// bob sends a community message
-	inputMessage := common.NewMessage()
-	inputMessage.ChatId = chat.ID
-	inputMessage.Text = "some text"
-	inputMessage.CommunityID = community.IDString()
-
-	err = bob.SaveChat(chat)
-	s.Require().NoError(err)
-	_, err = bob.SendChatMessage(context.Background(), inputMessage)
-	s.Require().NoError(err)
-
-	_, err = WaitOnMessengerResponse(
-		alice,
-		func(r *MessengerResponse) bool { return len(r.Communities()) == 1 },
-		"no messages",
-	)
-
-	s.Require().NoError(err)
+	s.Require().NotNil(chat)
 
 	// Alice joins the community
-	response, err = alice.JoinCommunity(context.Background(), community.ID(), false)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().True(response.Communities()[0].Joined())
-	s.Require().Len(response.Chats(), 1)
+	s.advertiseCommunityTo(community, bob, alice)
+	s.joinCommunity(community, bob, alice)
 
-	defaultCommunityChatID := response.Chats()[0].ID
-
-	// bob sends a community message
-	inputMessage = common.NewMessage()
-	inputMessage.ChatId = defaultCommunityChatID
+	// alice sends a community message
+	inputMessage := common.NewMessage()
+	inputMessage.ChatId = chat.ID
+	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = "Good news, @" + common.EveryoneMentionTag + " !"
-	inputMessage.CommunityID = community.IDString()
 
-	response, err = alice.SendChatMessage(context.Background(), inputMessage)
+	response, err := alice.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
-
 	s.Require().Len(response.Messages(), 1)
-
 	s.Require().True(response.Messages()[0].Mentioned)
 
 	response, err = WaitOnMessengerResponse(
 		bob,
-		func(r *MessengerResponse) bool { return len(r.Messages()) == 1 },
+		func(r *MessengerResponse) bool { return len(r.Messages()) >= 1 },
 		"no messages",
 	)
 
@@ -199,14 +173,6 @@ func (s *MessengerActivityCenterMessageSuite) TestEveryoneMentionTag() {
 }
 
 func (s *MessengerActivityCenterMessageSuite) TestReplyWithImage() {
-
-	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		Name:        "status",
-		Color:       "#ffffff",
-		Description: "status community description",
-	}
-
 	alice := s.m
 	bob := s.newMessenger()
 	_, err := bob.Start()
@@ -218,73 +184,36 @@ func (s *MessengerActivityCenterMessageSuite) TestReplyWithImage() {
 	s.Require().NoError(err)
 	s.Require().NotNil(mediaServer)
 	s.Require().NoError(mediaServer.Start())
-
 	alice.httpServer = mediaServer
 
-	// Create an community chat
-	response, err := bob.CreateCommunity(description, true)
-	s.Require().NoError(err)
-	s.Require().Len(response.Communities(), 1)
-
-	community := response.Communities()[0]
+	// Create a community
+	community, chat := s.createCommunity(bob)
 	s.Require().NotNil(community)
-
-	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, bob.transport)
-
-	// bob sends a community message
-	inputMessage := common.NewMessage()
-	inputMessage.ChatId = chat.ID
-	inputMessage.Text = "some text"
-	inputMessage.CommunityID = community.IDString()
-
-	err = bob.SaveChat(chat)
-	s.Require().NoError(err)
-	_, err = bob.SendChatMessage(context.Background(), inputMessage)
-	s.Require().NoError(err)
-
-	_, err = WaitOnMessengerResponse(
-		alice,
-		func(r *MessengerResponse) bool { return len(r.Communities()) == 1 },
-		"no messages",
-	)
-
-	s.Require().NoError(err)
+	s.Require().NotNil(chat)
 
 	// Alice joins the community
-	response, err = alice.JoinCommunity(context.Background(), community.ID(), false)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().True(response.Communities()[0].Joined())
-	s.Require().Len(response.Chats(), 1)
+	s.advertiseCommunityTo(community, bob, alice)
+	s.joinCommunity(community, bob, alice)
 
-	defaultCommunityChat := response.Chats()[0]
-
-	defaultCommunityChatID := defaultCommunityChat.ID
-
-	// bob sends a community message
-	inputMessage = common.NewMessage()
-	inputMessage.ChatId = defaultCommunityChatID
+	// Alice sends a community message
+	inputMessage := common.NewMessage()
+	inputMessage.ChatId = chat.ID
+	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = "test message"
-	inputMessage.CommunityID = community.IDString()
 
-	response, err = alice.SendChatMessage(context.Background(), inputMessage)
+	response, err := alice.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
-
 	s.Require().Len(response.Messages(), 1)
-
 	response, err = WaitOnMessengerResponse(
 		bob,
 		func(r *MessengerResponse) bool { return len(r.Messages()) == 1 },
 		"no messages",
 	)
-
 	s.Require().NoError(err)
-
 	s.Require().Len(response.Messages(), 1)
 
-	// bob sends a community message
-	inputMessage, err = buildImageWithAlbumIDMessage(*defaultCommunityChat, "0x34")
+	// bob sends a reply with an image
+	inputMessage, err = buildImageWithAlbumIDMessage(*chat, "0x34")
 	s.Require().NoError(err)
 
 	inputMessage.Text = "test message reply"
@@ -292,25 +221,22 @@ func (s *MessengerActivityCenterMessageSuite) TestReplyWithImage() {
 
 	response, err = bob.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
-
 	s.Require().Len(response.Messages(), 2)
-
 	response, err = WaitOnMessengerResponse(
 		alice,
 		func(r *MessengerResponse) bool { return len(r.Messages()) == 2 },
 		"no messages",
 	)
-
 	s.Require().NoError(err)
 	s.Require().Len(response.ActivityCenterNotifications(), 1)
 
+	// verify the new message
 	var newMessage *common.Message
 	for _, m := range response.Messages() {
 		if m.Text == "test message reply" {
 			newMessage = m
 		}
 	}
-
 	s.Require().NotNil(newMessage)
 	s.Require().Equal(protobuf.ChatMessage_IMAGE, newMessage.ContentType)
 	s.Require().NotEmpty(newMessage.ImageLocalURL)
@@ -331,57 +257,19 @@ func (s *MessengerActivityCenterMessageSuite) TestReplyWithImage() {
 }
 
 func (s *MessengerActivityCenterMessageSuite) TestMuteCommunityActivityCenterNotifications() {
-
-	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		Name:        "status",
-		Color:       "#ffffff",
-		Description: "status community description",
-	}
-
 	alice := s.m
 	bob := s.newMessenger()
 	_, err := bob.Start()
 	s.Require().NoError(err)
 
-	// Create an community chat
-	response, err := bob.CreateCommunity(description, true)
-	s.Require().NoError(err)
-	s.Require().Len(response.Communities(), 1)
-
-	community := response.Communities()[0]
+	// Create a community
+	community, chat := s.createCommunity(bob)
 	s.Require().NotNil(community)
-
-	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, bob.transport)
-
-	// bob sends a community message
-	inputMessage := common.NewMessage()
-	inputMessage.ChatId = chat.ID
-	inputMessage.Text = "some text"
-	inputMessage.CommunityID = community.IDString()
-
-	err = bob.SaveChat(chat)
-	s.Require().NoError(err)
-	_, err = bob.SendChatMessage(context.Background(), inputMessage)
-	s.Require().NoError(err)
-
-	_, err = WaitOnMessengerResponse(
-		alice,
-		func(r *MessengerResponse) bool { return len(r.Communities()) == 1 },
-		"no messages",
-	)
-
-	s.Require().NoError(err)
+	s.Require().NotNil(chat)
 
 	// Alice joins the community
-	response, err = alice.JoinCommunity(context.Background(), community.ID(), true)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	s.Require().True(response.Communities()[0].Joined())
-	s.Require().Len(response.Chats(), 1)
-
-	defaultCommunityChatID := response.Chats()[0].ID
+	s.advertiseCommunityTo(community, bob, alice)
+	s.joinCommunity(community, bob, alice)
 
 	// Bob mutes the community
 	time, err := bob.MuteAllCommunityChats(&requests.MuteCommunity{
@@ -396,16 +284,14 @@ func (s *MessengerActivityCenterMessageSuite) TestMuteCommunityActivityCenterNot
 	s.Require().True(bobCommunity.Muted())
 
 	// alice sends a community message
-	inputMessage = common.NewMessage()
-	inputMessage.ChatId = defaultCommunityChatID
+	inputMessage := common.NewMessage()
+	inputMessage.ChatId = chat.ID
+	inputMessage.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	inputMessage.Text = "Good news, @" + common.EveryoneMentionTag + " !"
-	inputMessage.CommunityID = community.IDString()
 
-	response, err = alice.SendChatMessage(context.Background(), inputMessage)
+	response, err := alice.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
-
 	s.Require().Len(response.Messages(), 1)
-
 	s.Require().True(response.Messages()[0].Mentioned)
 
 	response, err = WaitOnMessengerResponse(
@@ -414,10 +300,9 @@ func (s *MessengerActivityCenterMessageSuite) TestMuteCommunityActivityCenterNot
 		"no messages",
 	)
 
+	// Bob still receives it, but no AC notif
 	s.Require().NoError(err)
-
 	s.Require().Len(response.Messages(), 1)
-
 	s.Require().True(response.Messages()[0].Mentioned)
 	s.Require().Len(response.ActivityCenterNotifications(), 0)
 }
