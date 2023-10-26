@@ -63,7 +63,6 @@ func (s *MessengerCommunitiesSuite) SetupTest() {
 	s.bob = s.newMessenger()
 	s.alice = s.newMessenger()
 
-	enableRekeyLoop = true
 	s.owner.communitiesManager.RekeyInterval = 50 * time.Millisecond
 
 	_, err := s.owner.Start()
@@ -3352,28 +3351,12 @@ func (t *testPermissionChecker) CheckPermissions(permissions []*communities.Comm
 }
 
 func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
-	// Create a new community
-	response, err := s.owner.CreateCommunity(
-		&requests.CreateCommunity{
-			Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
-			Name:        "status",
-			Color:       "#57a7e5",
-			Description: "status community description",
-		},
-		true,
-	)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
+	community, chat := s.createCommunity()
+	s.Require().False(community.Encrypted())
 
-	// Check community is present in the DB and has default values we care about
-	c, err := s.owner.GetCommunityByID(response.Communities()[0].ID())
-	s.Require().NoError(err)
-	s.Require().False(c.Encrypted())
-	// TODO some check that there are no keys for the community. Alt for s.Require().Zero(c.RekeyedAt().Unix())
-
-	_, err = s.owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
-		CommunityID: c.ID(),
+	// Add community permission
+	_, err := s.owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
 		Type:        protobuf.CommunityTokenPermission_BECOME_MEMBER,
 		TokenCriteria: []*protobuf.TokenCriteria{{
 			ContractAddresses: map[uint64]string{3: "0x933"},
@@ -3386,37 +3369,57 @@ func (s *MessengerCommunitiesSuite) TestStartCommunityRekeyLoop() {
 	})
 	s.Require().NoError(err)
 
-	c, err = s.owner.GetCommunityByID(c.ID())
+	// Add channel permission
+	response, err := s.owner.CreateCommunityTokenPermission(&requests.CreateCommunityTokenPermission{
+		CommunityID: community.ID(),
+		Type:        protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL,
+		TokenCriteria: []*protobuf.TokenCriteria{
+			&protobuf.TokenCriteria{
+				ContractAddresses: map[uint64]string{3: "0x933"},
+				Type:              protobuf.CommunityTokenType_ERC20,
+				Symbol:            "STT",
+				Name:              "Status Test Token",
+				Amount:            "10",
+				Decimals:          18,
+			},
+		},
+		ChatIds: []string{chat.ID},
+	})
 	s.Require().NoError(err)
-	s.Require().True(c.Encrypted())
-
-	s.advertiseCommunityTo(c, s.owner, s.bob)
-	s.advertiseCommunityTo(c, s.owner, s.alice)
+	s.Require().Len(response.Communities(), 1)
+	community = response.Communities()[0]
+	s.Require().True(community.Encrypted())
+	s.Require().True(community.ChannelEncrypted(chat.CommunityChatID()))
 
 	s.owner.communitiesManager.PermissionChecker = &testPermissionChecker{}
 
-	s.joinCommunity(c, s.owner, s.bob)
-	s.joinCommunity(c, s.owner, s.alice)
+	s.advertiseCommunityTo(community, s.owner, s.bob)
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.joinCommunity(community, s.owner, s.bob)
+	s.joinCommunity(community, s.owner, s.alice)
 
-	// Check the Alice and Bob are members of the community
-	c, err = s.owner.GetCommunityByID(c.ID())
+	// Check keys in the database
+	communityKeys, err := s.owner.sender.GetKeysForGroup(community.ID())
 	s.Require().NoError(err)
-	s.Require().True(c.HasMember(&s.alice.identity.PublicKey))
-	s.Require().True(c.HasMember(&s.bob.identity.PublicKey))
+	communityKeyCount := len(communityKeys)
 
-	// Check the keys in the database
-	keys, err := s.owner.sender.GetKeysForGroup(c.ID())
+	channelKeys, err := s.owner.sender.GetKeysForGroup([]byte(chat.ID))
 	s.Require().NoError(err)
-	keyCount := len(keys)
+	channelKeyCount := len(channelKeys)
 
 	// Check that rekeying is occurring by counting the number of keyIDs in the encryptor's DB
 	// This test could be flaky, as the rekey function may not be finished before RekeyInterval * 2 has passed
 	for i := 0; i < 5; i++ {
 		time.Sleep(s.owner.communitiesManager.RekeyInterval * 2)
-		keys, err = s.owner.sender.GetKeysForGroup(c.ID())
+		communityKeys, err = s.owner.sender.GetKeysForGroup(community.ID())
 		s.Require().NoError(err)
-		s.Require().Greater(len(keys), keyCount)
-		keyCount = len(keys)
+		s.Require().Greater(len(communityKeys), communityKeyCount)
+		communityKeyCount = len(communityKeys)
+
+		channelKeys, err = s.owner.sender.GetKeysForGroup([]byte(chat.ID))
+		s.Require().NoError(err)
+		s.Require().Greater(len(channelKeys), channelKeyCount)
+		channelKeyCount = len(channelKeys)
 	}
 }
 

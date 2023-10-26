@@ -1547,6 +1547,10 @@ func (o *Community) HasTokenPermissions() bool {
 	return len(o.tokenPermissions()) > 0
 }
 
+func (o *Community) ChannelEncrypted(channelID string) bool {
+	return o.ChannelHasTokenPermissions(o.IDString() + channelID)
+}
+
 func (o *Community) ChannelHasTokenPermissions(chatID string) bool {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()

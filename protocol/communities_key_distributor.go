@@ -12,7 +12,6 @@ import (
 
 type CommunitiesKeyDistributor interface {
 	Distribute(community *communities.Community, keyActions *communities.EncryptionKeyActions) error
-	Rekey(community *communities.Community) error
 }
 
 type CommunitiesKeyDistributorImpl struct {
@@ -41,32 +40,6 @@ func (ckd *CommunitiesKeyDistributorImpl) Distribute(community *communities.Comm
 	return nil
 }
 
-func (ckd *CommunitiesKeyDistributorImpl) Rekey(community *communities.Community) error {
-	if !community.IsControlNode() {
-		return communities.ErrNotControlNode
-	}
-
-	err := ckd.distributeKey(community, community.ID(), &communities.EncryptionKeyAction{
-		ActionType: communities.EncryptionKeyRekey,
-		Members:    community.Members(),
-	})
-	if err != nil {
-		return err
-	}
-
-	for channelID, channel := range community.Chats() {
-		err := ckd.distributeKey(community, []byte(community.IDString()+channelID), &communities.EncryptionKeyAction{
-			ActionType: communities.EncryptionKeyRekey,
-			Members:    channel.Members,
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (ckd *CommunitiesKeyDistributorImpl) distributeKey(community *communities.Community, hashRatchetGroupID []byte, keyAction *communities.EncryptionKeyAction) error {
 	pubkeys := make([]*ecdsa.PublicKey, len(keyAction.Members))
 	i := 0
@@ -77,15 +50,7 @@ func (ckd *CommunitiesKeyDistributorImpl) distributeKey(community *communities.C
 
 	switch keyAction.ActionType {
 	case communities.EncryptionKeyAdd:
-		_, err := ckd.encryptor.GenerateHashRatchetKey(hashRatchetGroupID)
-		if err != nil {
-			return err
-		}
-
-		err = ckd.sendKeyExchangeMessage(community, hashRatchetGroupID, pubkeys, common.KeyExMsgReuse)
-		if err != nil {
-			return err
-		}
+		fallthrough
 
 	case communities.EncryptionKeyRekey:
 		err := ckd.sendKeyExchangeMessage(community, hashRatchetGroupID, pubkeys, common.KeyExMsgRekey)
