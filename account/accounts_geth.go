@@ -39,7 +39,7 @@ func (m *GethManager) InitKeystore(keydir string) error {
 		return err
 	}
 
-	//m.keystore, err = makeKeyStore(m.gethAccManager)
+	m.keystore, err = makeKeyStore(m.gethAccManager)
 	m.Keydir = keydir
 	return err
 }
