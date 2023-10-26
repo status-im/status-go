@@ -45,7 +45,7 @@ WITH filter_conditions AS (
 		? AS layer2FinalisationDuration,
 		? AS layer1FinalisationDuration,
 		X'0000000000000000000000000000000000000000' AS zeroAddress,
-		'0x28c427b0611d99da5c4f7368abe57e86b045b483c4689ae93e90745802335b87' as statusMintEvent
+		'0x28c427b0611d99da5c4f7368abe57e86b045b483c4689ae93e90745802335b87' as communityMintEvent
 ),
 -- This UNION between CTE and TEMP TABLE acts as an optimization. As soon as we drop one or use them interchangeably the performance drops significantly.
 filter_addresses(address) AS (
@@ -207,7 +207,11 @@ SELECT
 	CASE
 		WHEN transfers.tx_from_address = zeroAddress AND transfers.type = "erc20" THEN substr(json_extract(tx, '$.input'), 1, 10)
 		ELSE NULL
-	END AS method_hash
+	END AS method_hash,
+	CASE 
+		WHEN transfers.tx_from_address = zeroAddress AND transfers.type = "erc20" THEN (SELECT 1 FROM json_each(transfers.receipt, '$.logs' ) WHERE json_extract( value, '$.topics[0]' ) = communityMintEvent)
+		ELSE NULL
+	END AS community_mint_event
 FROM
 	transfers
 	CROSS JOIN filter_conditions
@@ -253,11 +257,7 @@ WHERE
 						transfers.type = 'erc20' 
 						AND (
 							(method_hash IS NOT NULL AND method_hash IN mint_methods)
-							OR (
-								(SELECT 1
-								FROM json_each(transfers.receipt, '$.logs' )
-								WHERE json_extract( value, '$.topics[0]' ) = statusMintEvent) IS NOT NULL
-							)
+							OR community_mint_event IS NOT NULL
 						) 
 					)
 				)
@@ -284,11 +284,7 @@ WHERE
 					transfers.type = 'erc20' 
 					AND (
 						(method_hash IS NOT NULL AND method_hash IN mint_methods)
-						OR (
-							(SELECT 1
-							FROM json_each(transfers.receipt, '$.logs' )
-							WHERE json_extract( value, '$.topics[0]' ) = statusMintEvent) IS NOT NULL
-						)
+						OR community_mint_event IS NOT NULL
 					) 
 				)
 			)
@@ -386,7 +382,8 @@ SELECT
 	NULL AS in_network_id,
 	pending_transactions.type AS type,
 	NULL as contract_address,
-	NULL AS method_hash
+	NULL AS method_hash,
+	NULL AS community_mint_event
 FROM
 	pending_transactions
 	CROSS JOIN filter_conditions
@@ -476,7 +473,8 @@ SELECT
 	multi_transactions.to_network_id AS in_network_id,
 	NULL AS type,
 	NULL as contract_address,
-	NULL AS method_hash
+	NULL AS method_hash,
+	NULL AS community_mint_event
 FROM
 	multi_transactions
 	CROSS JOIN filter_conditions

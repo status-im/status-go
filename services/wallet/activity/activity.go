@@ -492,10 +492,12 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 		var tokenCode, fromTokenCode, toTokenCode sql.NullString
 		var methodHash sql.NullString
 		var transferType *TransferType
+		var communityMintEventDB sql.NullBool
+		var communityMintEvent bool
 		err := rows.Scan(&transferHash, &pendingHash, &chainID, &multiTxID, &timestamp, &dbMtType, &dbTrType, &fromAddress,
 			&toAddressDB, &ownerAddressDB, &dbTrAmount, &dbMtFromAmount, &dbMtToAmount, &aggregatedStatus, &aggregatedCount,
 			&tokenAddress, &dbTokenID, &tokenCode, &fromTokenCode, &toTokenCode, &outChainIDDB, &inChainIDDB, &contractType,
-			&contractAddressDB, &methodHash)
+			&contractAddressDB, &methodHash, &communityMintEventDB)
 		if err != nil {
 			return nil, err
 		}
@@ -506,6 +508,10 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 
 		if contractType.Valid {
 			transferType = contractTypeFromDBType(contractType.String)
+		}
+
+		if communityMintEventDB.Valid {
+			communityMintEvent = communityMintEventDB.Bool
 		}
 
 		if len(contractAddressDB) > 0 {
@@ -523,7 +529,7 @@ func getActivityEntries(ctx context.Context, deps FilterDependencies, addresses 
 				} else if trType.Byte == toTrType {
 					at := ReceiveAT
 					if fromAddress == ZeroAddress && transferType != nil {
-						if *transferType == TransferTypeErc721 || (*transferType == TransferTypeErc20 && methodHash.Valid && sliceContains(inputDataMethods, methodHash.String)) {
+						if *transferType == TransferTypeErc721 || (*transferType == TransferTypeErc20 && methodHash.Valid && (communityMintEvent || sliceContains(inputDataMethods, methodHash.String))) {
 							at = MintAT
 						}
 					}
