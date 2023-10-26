@@ -49,9 +49,13 @@ func makeAccountManager(keydir string) (manager *accounts.Manager, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(keydir, 0700); err != nil {
-		return nil, err
-	}
+	// we don't need to do this for android apps now
+	// because at this stage we're already creating the keystoredir
+	// on the client side
+	// TODO: pass a parameter to not do this only for the android client
+	//if err := os.MkdirAll(keydir, 0700); err != nil {
+	//	return nil, err
+	//}
 	config := accounts.Config{InsecureUnlockAllowed: false}
 	return accounts.NewManager(&config, keystore.NewKeyStore(keydir, keystore.LightScryptN, keystore.LightScryptP)), nil
 }
