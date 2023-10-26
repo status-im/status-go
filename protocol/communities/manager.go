@@ -3311,7 +3311,8 @@ func (m *Manager) IsChannelEncrypted(communityID string, chatID string) (bool, e
 		return false, err
 	}
 
-	return community.ChannelHasTokenPermissions(chatID), nil
+	channelID := strings.TrimPrefix(chatID, communityID)
+	return community.ChannelEncrypted(channelID), nil
 }
 
 func (m *Manager) ShouldHandleSyncCommunity(community *protobuf.SyncInstallationCommunity) (bool, error) {
