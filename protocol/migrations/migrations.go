@@ -2292,7 +2292,7 @@ func _1698137561_add_profile_showcase_tablesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1698137561_add_profile_showcase_tables.up.sql", size: 440, mode: os.FileMode(0644), modTime: time.Unix(1698150010, 0)}
+	info := bindataFileInfo{name: "1698137561_add_profile_showcase_tables.up.sql", size: 440, mode: os.FileMode(0644), modTime: time.Unix(1698289441, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7c, 0xef, 0x89, 0x68, 0x42, 0xbf, 0xff, 0xb9, 0x8f, 0x8f, 0x19, 0x91, 0xd2, 0x6a, 0x85, 0xda, 0x2c, 0x63, 0x5f, 0x3c, 0x84, 0x4, 0x93, 0x16, 0x10, 0xf0, 0xe0, 0xd9, 0x9b, 0xbe, 0x8d, 0x62}}
 	return a, nil
 }
@@ -2312,7 +2312,7 @@ func _1698137562_fix_encryption_key_idUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1698137562_fix_encryption_key_id.up.sql", size: 759, mode: os.FileMode(0644), modTime: time.Unix(1698211939, 0)}
+	info := bindataFileInfo{name: "1698137562_fix_encryption_key_id.up.sql", size: 759, mode: os.FileMode(0644), modTime: time.Unix(1698289441, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb6, 0x4d, 0x54, 0x8c, 0xd4, 0x6d, 0xfa, 0x76, 0x2f, 0x8a, 0xde, 0x4a, 0xc0, 0x53, 0xc, 0xb7, 0xf1, 0x0, 0x45, 0xd3, 0xa0, 0x5, 0xe3, 0x4a, 0xe5, 0x87, 0xb4, 0x50, 0x46, 0xd0, 0xa0, 0xd9}}
 	return a, nil
 }
