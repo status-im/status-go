@@ -1295,10 +1295,10 @@ func (b *GethStatusBackend) generateOrImportAccount(mnemonic string, customizati
 		return err
 	}
 
-	//_, err = accountGenerator.StoreDerivedAccounts(info.ID, request.Password, paths)
-	//if err != nil {
-	//	return err
-	//}
+	_, err = accountGenerator.StoreDerivedAccounts(info.ID, request.Password, paths)
+	if err != nil {
+		return err
+	}
 	//
 	//account := multiaccounts.Account{
 	//	KeyUID:                  info.KeyUID,

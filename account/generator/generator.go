@@ -224,21 +224,23 @@ func (g *Generator) StoreDerivedAccounts(accountID string, password string, path
 		return nil, err
 	}
 
-	pathAccounts, err := g.deriveChildAccounts(acc, pathStrings)
+	//pathAccounts, err := g.deriveChildAccounts(acc, pathStrings)
+	_, err = g.deriveChildAccounts(acc, pathStrings)
 	if err != nil {
 		return nil, err
 	}
 
 	pathAccountsInfo := make(map[string]AccountInfo)
 
-	for pathString, childAccount := range pathAccounts {
-		info, err := g.store(childAccount, password)
-		if err != nil {
-			return nil, err
-		}
-
-		pathAccountsInfo[pathString] = info
-	}
+	// I now suspect that this is causing the crash!
+	//for pathString, childAccount := range pathAccounts {
+	//	info, err := g.store(childAccount, password)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//
+	//	pathAccountsInfo[pathString] = info
+	//}
 
 	return pathAccountsInfo, nil
 }
