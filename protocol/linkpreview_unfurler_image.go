@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	neturl "net/url"
+	"path"
 	"regexp"
 
 	"go.uber.org/zap"
@@ -105,6 +106,7 @@ func (u *ImageUnfurler) Unfurl() (*common.LinkPreview, error) {
 		return preview, fmt.Errorf("could not build data URI url='%s': %w", u.url.String(), err)
 	}
 
+	preview.Title = path.Base(u.url.Path)
 	preview.Thumbnail.Width = width
 	preview.Thumbnail.Height = height
 	preview.Thumbnail.DataURI = dataURI
