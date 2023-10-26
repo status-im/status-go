@@ -333,7 +333,7 @@ func (g *Generator) store(acc *Account, password string) (AccountInfo, error) {
 	}
 
 	log.Println("store: converting account to account info")
-	return acc.ToAccountInfo(), fmt.Errorf("store: there were no errors but we return something just to see on client for now")
+	return acc.ToAccountInfo(), nil
 }
 
 func (g *Generator) addAccount(acc *Account) string {
