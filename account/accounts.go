@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	systemlog "log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -334,25 +335,37 @@ func (m *DefaultManager) ImportAccount(privateKey *ecdsa.PrivateKey, password st
 // ImportExtendedKey is used in older version of Status where PrivateKey is set to be the BIP44 key at index 0,
 // and ExtendedKey is the extended key of the BIP44 key at index 1.
 func (m *DefaultManager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
+	if extKey == nil {
+		systemlog.Printf("ImportSingleExtendedKey: extended key is nil")
+		return "", "", fmt.Errorf("extended key cannot be nil")
+	}
+
 	if m.keystore == nil {
+		systemlog.Printf("ImportSingleExtendedKey: keystore is missing")
 		return "", "", ErrAccountKeyStoreMissing
 	}
 
 	// imports extended key, create key file (if necessary)
+	systemlog.Printf("ImportSingleExtendedKey: importing single extended key to keystore")
 	account, err := m.keystore.ImportSingleExtendedKey(extKey, password)
 	if err != nil {
+		systemlog.Printf("ImportSingleExtendedKey: error while importing extended key to keystore. Error: %v\n", err)
 		return "", "", err
 	}
 
 	address = account.Address.Hex()
+	systemlog.Printf("ImportSingleExtendedKey: address obtained from account: %s\n", address)
 
 	// obtain public key to return
+	systemlog.Printf("ImportSingleExtendedKey: attempting to decrypt account key")
 	account, key, err := m.keystore.AccountDecryptedKey(account, password)
 	if err != nil {
+		systemlog.Printf("ImportSingleExtendedKey: error while decrypting account key. Error: %v\n", err)
 		return address, "", err
 	}
 
 	pubKey = types.EncodeHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
+	systemlog.Printf("ImportSingleExtendedKey: public key obtained: %s\n", pubKey)
 
 	return
 }
