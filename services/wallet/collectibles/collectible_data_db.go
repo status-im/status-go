@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/sqlite"
@@ -21,6 +22,7 @@ func NewCollectibleDataDB(sqlDb *sql.DB) *CollectibleDataDB {
 }
 
 const collectibleDataColumns = "chain_id, contract_address, token_id, provider, name, description, permalink, image_url, animation_url, animation_media_type, background_color, token_uri, community_id"
+const collectibleCommunityDataColumns = "community_privileges_level"
 const collectibleTraitsColumns = "chain_id, contract_address, token_id, trait_type, trait_value, display_type, max_value"
 const selectCollectibleTraitsColumns = "trait_type, trait_value, display_type, max_value"
 
@@ -251,4 +253,71 @@ func (o *CollectibleDataDB) GetData(ids []thirdparty.CollectibleUniqueID) (map[s
 		}
 	}
 	return ret, nil
+}
+
+func (o *CollectibleDataDB) SetCommunityInfo(id thirdparty.CollectibleUniqueID, communityInfo thirdparty.CollectibleCommunityInfo) (err error) {
+	tx, err := o.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	update, err := tx.Prepare(`UPDATE collectible_data_cache 
+		SET community_privileges_level=?
+		WHERE chain_id=? AND contract_address=? AND token_id=?`)
+	if err != nil {
+		return err
+	}
+
+	_, err = update.Exec(
+		communityInfo.PrivilegesLevel,
+		id.ContractID.ChainID,
+		id.ContractID.Address,
+		(*bigint.SQLBigIntBytes)(id.TokenID.Int),
+	)
+
+	return err
+}
+
+func (o *CollectibleDataDB) GetCommunityInfo(id thirdparty.CollectibleUniqueID) (*thirdparty.CollectibleCommunityInfo, error) {
+	ret := thirdparty.CollectibleCommunityInfo{
+		PrivilegesLevel: token.CommunityLevel,
+	}
+
+	getData, err := o.db.Prepare(fmt.Sprintf(`SELECT %s
+		FROM collectible_data_cache
+		WHERE chain_id=? AND contract_address=? AND token_id=?`, collectibleCommunityDataColumns))
+	if err != nil {
+		return nil, err
+	}
+
+	row := getData.QueryRow(
+		id.ContractID.ChainID,
+		id.ContractID.Address,
+		(*bigint.SQLBigIntBytes)(id.TokenID.Int),
+	)
+
+	var dbPrivilegesLevel sql.NullByte
+
+	err = row.Scan(
+		&dbPrivilegesLevel,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	if dbPrivilegesLevel.Valid {
+		ret.PrivilegesLevel = token.PrivilegesLevel(dbPrivilegesLevel.Byte)
+	}
+
+	return &ret, nil
 }

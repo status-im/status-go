@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/services/accounts/settingsevent"
 	"github.com/status-im/status-go/services/wallet/async"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/transfer"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -35,6 +36,7 @@ type timerPerAddressAndChainID = map[common.Address]timerPerChainID
 type Controller struct {
 	manager      *Manager
 	ownershipDB  *OwnershipDB
+	communityDB  *community.DataDB
 	walletFeed   *event.Feed
 	accountsDB   *accounts.Database
 	accountsFeed *event.Feed
@@ -64,6 +66,7 @@ func NewController(
 	return &Controller{
 		manager:        manager,
 		ownershipDB:    NewOwnershipDB(db),
+		communityDB:    community.NewDataDB(db),
 		walletFeed:     walletFeed,
 		accountsDB:     accountsDB,
 		accountsFeed:   accountsFeed,
@@ -412,7 +415,8 @@ func (c *Controller) notifyCommunityCollectiblesReceived(ownedCollectibles Owned
 			continue
 		}
 
-		communityInfo, err := c.manager.FetchCollectibleCommunityInfo(communityID, collectibleID)
+		communityInfo, err := c.communityDB.GetCommunityInfo(communityID)
+
 		if err != nil {
 			log.Error("Error fetching community info", "error", err)
 			continue
@@ -421,7 +425,7 @@ func (c *Controller) notifyCommunityCollectiblesReceived(ownedCollectibles Owned
 		header := CommunityCollectibleHeader{
 			ID:              collectibleID,
 			Name:            collectibleData.CollectibleData.Name,
-			CommunityHeader: communityInfoToHeader(*communityInfo),
+			CommunityHeader: communityInfoToHeader(communityID, communityInfo, collectibleData.CommunityInfo),
 		}
 
 		communityCollectibles = append(communityCollectibles, header)

@@ -209,11 +209,6 @@ func (s *Service) Start() error {
 	return err
 }
 
-// Set external Collectibles metadata provider
-func (s *Service) SetCollectibleMetadataProvider(provider thirdparty.CollectibleMetadataProvider) {
-	s.collectiblesManager.SetMetadataProvider(provider)
-}
-
 // Set external Collectibles community info provider
 func (s *Service) SetCollectibleCommunityInfoProvider(provider thirdparty.CollectibleCommunityInfoProvider) {
 	s.collectiblesManager.SetCommunityInfoProvider(provider)

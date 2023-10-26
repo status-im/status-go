@@ -7,18 +7,18 @@ import (
 
 // Combined Collection+Collectible info, used to display a detailed view of a collectible
 type CollectibleDetails struct {
-	ID                 thirdparty.CollectibleUniqueID        `json:"id"`
-	Name               string                                `json:"name"`
-	Description        string                                `json:"description"`
-	ImageURL           string                                `json:"image_url"`
-	AnimationURL       string                                `json:"animation_url"`
-	AnimationMediaType string                                `json:"animation_media_type"`
-	Traits             []thirdparty.CollectibleTrait         `json:"traits"`
-	BackgroundColor    string                                `json:"background_color"`
-	CollectionName     string                                `json:"collection_name"`
-	CollectionSlug     string                                `json:"collection_slug"`
-	CollectionImageURL string                                `json:"collection_image_url"`
-	CommunityInfo      *thirdparty.CollectiblesCommunityInfo `json:"community_info,omitempty"`
+	ID                 thirdparty.CollectibleUniqueID `json:"id"`
+	Name               string                         `json:"name"`
+	Description        string                         `json:"description"`
+	ImageURL           string                         `json:"image_url"`
+	AnimationURL       string                         `json:"animation_url"`
+	AnimationMediaType string                         `json:"animation_media_type"`
+	Traits             []thirdparty.CollectibleTrait  `json:"traits"`
+	BackgroundColor    string                         `json:"background_color"`
+	CollectionName     string                         `json:"collection_name"`
+	CollectionSlug     string                         `json:"collection_slug"`
+	CollectionImageURL string                         `json:"collection_image_url"`
+	CommunityInfo      *CommunityDetails              `json:"community_info,omitempty"`
 }
 
 // Combined Collection+Collectible info, used to display a basic view of a collectible in a list
@@ -33,6 +33,14 @@ type CollectibleHeader struct {
 	CollectionSlug     string                         `json:"collection_slug"`
 	CollectionImageURL string                         `json:"collection_image_url"`
 	CommunityHeader    *CommunityHeader               `json:"community_header,omitempty"`
+}
+
+type CommunityDetails struct {
+	CommunityID     string                `json:"community_id"`
+	CommunityName   string                `json:"community_name"`
+	CommunityColor  string                `json:"community_color"`
+	CommunityImage  string                `json:"community_image"`
+	PrivilegesLevel token.PrivilegesLevel `json:"privileges_level"`
 }
 
 type CommunityHeader struct {
@@ -84,11 +92,37 @@ func fullCollectibleDataToDetails(c thirdparty.FullCollectibleData) CollectibleD
 	return ret
 }
 
-func communityInfoToHeader(c thirdparty.CollectiblesCommunityInfo) CommunityHeader {
-	return CommunityHeader{
-		CommunityID:     c.CommunityID,
-		CommunityName:   c.CommunityName,
-		CommunityColor:  c.CommunityColor,
-		PrivilegesLevel: c.PrivilegesLevel,
+func communityInfoToHeader(communityID string, community *thirdparty.CommunityInfo, communityCollectible *thirdparty.CollectibleCommunityInfo) CommunityHeader {
+	ret := CommunityHeader{
+		CommunityID: communityID,
 	}
+
+	if community != nil {
+		ret.CommunityName = community.CommunityName
+		ret.CommunityColor = community.CommunityColor
+	}
+
+	if communityCollectible != nil {
+		ret.PrivilegesLevel = communityCollectible.PrivilegesLevel
+	}
+
+	return ret
+}
+
+func communityInfoToDetails(communityID string, community *thirdparty.CommunityInfo, communityCollectible *thirdparty.CollectibleCommunityInfo) CommunityDetails {
+	ret := CommunityDetails{
+		CommunityID: communityID,
+	}
+
+	if community != nil {
+		ret.CommunityName = community.CommunityName
+		ret.CommunityColor = community.CommunityColor
+		ret.CommunityImage = community.CommunityImage
+	}
+
+	if communityCollectible != nil {
+		ret.PrivilegesLevel = communityCollectible.PrivilegesLevel
+	}
+
+	return ret
 }

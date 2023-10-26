@@ -214,7 +214,7 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 				break
 			}
 
-			log.Debug("partial loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "page", pageNr, "in", time.Since(pageStart), "found", len(partialOwnership.Items), "collectibles")
+			log.Debug("partial loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "page", pageNr, "in", time.Since(pageStart), "found", len(partialOwnership.Items))
 
 			c.partialOwnership = append(c.partialOwnership, partialOwnership.Items...)
 

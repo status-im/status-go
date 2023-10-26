@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/status-im/status-go/protocol/communities/token"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
@@ -68,6 +69,17 @@ func generateTestCollectiblesData(count int) (result []thirdparty.CollectibleDat
 			CommunityID:     fmt.Sprintf("communityid-%d", i),
 		}
 		result = append(result, newCollectible)
+	}
+	return result
+}
+
+func generateTestCommunityData(count int) []thirdparty.CollectibleCommunityInfo {
+	result := make([]thirdparty.CollectibleCommunityInfo, 0, count)
+	for i := 0; i < count; i++ {
+		newCommunityInfo := thirdparty.CollectibleCommunityInfo{
+			PrivilegesLevel: token.PrivilegesLevel(i),
+		}
+		result = append(result, newCommunityInfo)
 	}
 	return result
 }
@@ -145,4 +157,29 @@ func TestUpdateCollectiblesData(t *testing.T) {
 
 	require.Equal(t, c0, loadedMap[c0.ID.HashKey()])
 	require.Equal(t, c1, loadedMap[c1.ID.HashKey()])
+}
+
+func TestUpdateCommunityData(t *testing.T) {
+	db, cleanDB := setupCollectibleDataDBTest(t)
+	defer cleanDB()
+
+	const nData = 50
+	data := generateTestCollectiblesData(nData)
+	communityData := generateTestCommunityData(nData)
+
+	var err error
+
+	err = db.SetData(data)
+	require.NoError(t, err)
+
+	for i := 0; i < nData; i++ {
+		err = db.SetCommunityInfo(data[i].ID, communityData[i])
+		require.NoError(t, err)
+	}
+
+	for i := 0; i < nData; i++ {
+		loadedCommunityData, err := db.GetCommunityInfo(data[i].ID)
+		require.NoError(t, err)
+		require.Equal(t, communityData[i], *loadedCommunityData)
+	}
 }
