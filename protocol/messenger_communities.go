@@ -370,7 +370,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					if communityResponse.Changes.ShouldMemberLeave {
 						requestToJoin, err := m.sendSharedAddressToControlNode(communityResponse.Community.ControlNode(), communityResponse.Community)
 						if err != nil {
-							m.logger.Error("failed to save data and prepare response")
+							m.logger.Error("share address to control node failed", zap.String("id", types.EncodeHex(communityResponse.Community.ID())), zap.Error(err))
 						} else {
 							state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, requestToJoin)
 						}
@@ -2421,6 +2421,10 @@ func (m *Messenger) MyCanceledRequestsToJoin() ([]*communities.RequestToJoin, er
 
 func (m *Messenger) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, error) {
 	return m.communitiesManager.PendingRequestsToJoinForUser(&m.identity.PublicKey)
+}
+
+func (m *Messenger) MyAwaitingRequestsToJoin() ([]*communities.RequestToJoin, error) {
+	return m.communitiesManager.AwaitingRequestsToJoinForUser(&m.identity.PublicKey)
 }
 
 func (m *Messenger) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {

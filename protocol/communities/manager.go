@@ -3291,7 +3291,11 @@ func (m *Manager) PendingRequestsToJoin() ([]*RequestToJoin, error) {
 }
 
 func (m *Manager) PendingRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
-	return m.persistence.PendingRequestsToJoinForUser(common.PubkeyToHex(pk))
+	return m.persistence.RequestsToJoinForUserByState(common.PubkeyToHex(pk), RequestToJoinStatePending)
+}
+
+func (m *Manager) AwaitingRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
+	return m.persistence.RequestsToJoinForUserByState(common.PubkeyToHex(pk), RequestToJoinStateAwaitingAddresses)
 }
 
 func (m *Manager) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {

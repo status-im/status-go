@@ -264,7 +264,7 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	response, err = s.alice.EditCommunity(&requests.EditCommunity{
 		CommunityID: community.ID(),
 		CreateCommunity: requests.CreateCommunity{
-			Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+			Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 			Name:        expectedName,
 			Color:       "#000000",
 			Description: "edited community description",

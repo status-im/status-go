@@ -468,7 +468,7 @@ func (p *Persistence) SaveRequestToJoinRevealedAddresses(requestID types.HexByte
 		_ = tx.Rollback()
 	}()
 
-	query := `INSERT OR REPLACE INTO communities_requests_to_join_revealed_addresses (request_id, address, chain_ids, is_airdrop_address) VALUES (?, ?, ?, ?)`
+	query := `INSERT OR REPLACE INTO communities_requests_to_join_revealed_addresses (request_id, address, chain_ids, is_airdrop_address, signature) VALUES (?, ?, ?, ?, ?)`
 	stmt, err := tx.Prepare(query)
 	if err != nil {
 		return
@@ -486,6 +486,7 @@ func (p *Persistence) SaveRequestToJoinRevealedAddresses(requestID types.HexByte
 			account.Address,
 			strings.Join(chainIDs, ","),
 			account.IsAirdropAddress,
+			account.Signature,
 		)
 		if err != nil {
 			return
@@ -660,7 +661,7 @@ func (p *Persistence) RemoveRequestToJoinRevealedAddresses(requestID []byte) err
 
 func (p *Persistence) GetRequestToJoinRevealedAddresses(requestID []byte) ([]*protobuf.RevealedAccount, error) {
 	revealedAccounts := make([]*protobuf.RevealedAccount, 0)
-	rows, err := p.db.Query(`SELECT address, chain_ids, is_airdrop_address FROM communities_requests_to_join_revealed_addresses WHERE request_id = ?`, requestID)
+	rows, err := p.db.Query(`SELECT address, chain_ids, is_airdrop_address, signature FROM communities_requests_to_join_revealed_addresses WHERE request_id = ?`, requestID)
 	if err != nil {
 		return nil, err
 	}
@@ -670,12 +671,13 @@ func (p *Persistence) GetRequestToJoinRevealedAddresses(requestID []byte) ([]*pr
 		var address sql.NullString
 		var chainIDsStr sql.NullString
 		var isAirdropAddress sql.NullBool
-		err := rows.Scan(&address, &chainIDsStr, &isAirdropAddress)
+		var signature sql.RawBytes
+		err := rows.Scan(&address, &chainIDsStr, &isAirdropAddress, &signature)
 		if err != nil {
 			return nil, err
 		}
 
-		revealedAccount, err := toRevealedAccount(address, chainIDsStr, isAirdropAddress)
+		revealedAccount, err := toRevealedAccount(address, chainIDsStr, isAirdropAddress, signature)
 		if err != nil {
 			return nil, err
 		}
@@ -738,9 +740,9 @@ func (p *Persistence) CanceledRequestsToJoinForUser(pk string) ([]*RequestToJoin
 	return requests, nil
 }
 
-func (p *Persistence) PendingRequestsToJoinForUser(pk string) ([]*RequestToJoin, error) {
+func (p *Persistence) RequestsToJoinForUserByState(pk string, state RequestToJoinState) ([]*RequestToJoin, error) {
 	var requests []*RequestToJoin
-	rows, err := p.db.Query(`SELECT id,public_key,clock,ens_name,chat_id,community_id,state FROM communities_requests_to_join WHERE state = ? AND public_key = ?`, RequestToJoinStatePending, pk)
+	rows, err := p.db.Query(`SELECT id,public_key,clock,ens_name,chat_id,community_id,state FROM communities_requests_to_join WHERE state = ? AND public_key = ?`, state, pk)
 	if err != nil {
 		return nil, err
 	}
@@ -1398,7 +1400,8 @@ func decodeEventsData(eventsBytes []byte, eventsDescriptionBytes []byte) (*Event
 func (p *Persistence) GetCommunityRequestsToJoinWithRevealedAddresses(communityID []byte) ([]*RequestToJoin, error) {
 	requests := []*RequestToJoin{}
 	rows, err := p.db.Query(`
-	SELECT r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.state, r.community_id, a.address, a.chain_ids, a.is_airdrop_address
+	SELECT r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.state, r.community_id, 
+		a.address, a.chain_ids, a.is_airdrop_address, a.signature
 	FROM communities_requests_to_join r
 	LEFT JOIN communities_requests_to_join_revealed_addresses a ON r.id = a.request_id
 	WHERE r.community_id = ? AND r.state != ?`, communityID, RequestToJoinStateAwaitingAddresses)
@@ -1415,14 +1418,15 @@ func (p *Persistence) GetCommunityRequestsToJoinWithRevealedAddresses(communityI
 		var address sql.NullString
 		var chainIDsStr sql.NullString
 		var isAirdropAddress sql.NullBool
+		var signature sql.RawBytes
 
 		err = rows.Scan(&request.ID, &request.PublicKey, &request.Clock, &request.ENSName, &request.ChatID, &request.State, &request.CommunityID,
-			&address, &chainIDsStr, &isAirdropAddress)
+			&address, &chainIDsStr, &isAirdropAddress, &signature)
 		if err != nil {
 			return nil, err
 		}
 
-		revealedAccount, err := toRevealedAccount(address, chainIDsStr, isAirdropAddress)
+		revealedAccount, err := toRevealedAccount(address, chainIDsStr, isAirdropAddress, signature)
 		if err != nil {
 			return nil, err
 		}
@@ -1445,7 +1449,7 @@ func (p *Persistence) GetCommunityRequestsToJoinWithRevealedAddresses(communityI
 	return requests, nil
 }
 
-func toRevealedAccount(rawAddress sql.NullString, rawChainIDsStr sql.NullString, isAirdropAddress sql.NullBool) (*protobuf.RevealedAccount, error) {
+func toRevealedAccount(rawAddress sql.NullString, rawChainIDsStr sql.NullString, isAirdropAddress sql.NullBool, rawSignature sql.RawBytes) (*protobuf.RevealedAccount, error) {
 	if !rawAddress.Valid {
 		return nil, nil
 	}
@@ -1475,6 +1479,7 @@ func toRevealedAccount(rawAddress sql.NullString, rawChainIDsStr sql.NullString,
 		Address:          address,
 		ChainIds:         chainIDs,
 		IsAirdropAddress: false,
+		Signature:        rawSignature,
 	}
 	if isAirdropAddress.Valid {
 		revealedAccount.IsAirdropAddress = isAirdropAddress.Bool
