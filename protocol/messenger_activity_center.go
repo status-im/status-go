@@ -14,6 +14,8 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
+var errOnlyOneNotificationID = errors.New("only one notification id is supported")
+
 func toHexBytes(b [][]byte) []types.HexBytes {
 	hb := make([]types.HexBytes, len(b))
 
@@ -274,7 +276,7 @@ func (m *Messenger) addActivityCenterNotification(response *MessengerResponse, n
 			return err
 		}
 	}
-	return m.syncActivityCenterNotificationState(state)
+	return nil
 }
 
 func (m *Messenger) syncActivityCenterReadByIDs(ctx context.Context, ids []types.HexBytes, clock uint64) error {
@@ -428,6 +430,48 @@ func (m *Messenger) syncActivityCenterAcceptedByIDs(ctx context.Context, ids []t
 	return m.sendToPairedDevices(ctx, common.RawMessage{
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_ACCEPTED,
+		ResendAutomatically: true,
+	})
+}
+
+func (m *Messenger) syncActivityCenterCommunityRequestDecisionAdapter(ctx context.Context, ids []types.HexBytes, _ uint64) error {
+	if len(ids) != 1 {
+		return errOnlyOneNotificationID
+	}
+	id := ids[0]
+	notification, err := m.persistence.GetActivityCenterNotificationByID(id)
+	if err != nil {
+		return err
+	}
+
+	return m.syncActivityCenterCommunityRequestDecision(ctx, notification)
+}
+
+func (m *Messenger) syncActivityCenterCommunityRequestDecision(ctx context.Context, notification *ActivityCenterNotification) error {
+	var decision protobuf.SyncActivityCenterCommunityRequestDecisionCommunityRequestDecision
+	if notification.Accepted {
+		decision = protobuf.SyncActivityCenterCommunityRequestDecision_ACCEPTED
+	} else if notification.Dismissed {
+		decision = protobuf.SyncActivityCenterCommunityRequestDecision_DECLINED
+	} else {
+		return errors.New("[syncActivityCenterCommunityRequestDecision] notification is not accepted or dismissed")
+	}
+
+	syncMessage := &protobuf.SyncActivityCenterCommunityRequestDecision{
+		Clock:            notification.UpdatedAt,
+		Id:               notification.ID,
+		MembershipStatus: uint32(notification.MembershipStatus),
+		Decision:         decision,
+	}
+
+	encodedMessage, err := proto.Marshal(syncMessage)
+	if err != nil {
+		return err
+	}
+
+	return m.sendToPairedDevices(ctx, common.RawMessage{
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_COMMUNITY_REQUEST_DECISION,
 		ResendAutomatically: true,
 	})
 }
@@ -664,5 +708,39 @@ func (m *Messenger) HandleSyncActivityCenterNotificationState(state *ReceivedMes
 	if n > 0 {
 		state.Response.SetActivityCenterState(s)
 	}
+	return nil
+}
+
+func (m *Messenger) HandleSyncActivityCenterCommunityRequestDecision(state *ReceivedMessageState, a *protobuf.SyncActivityCenterCommunityRequestDecision, statusMessage *v1protocol.StatusMessage) error {
+	notification, err := m.persistence.GetActivityCenterNotificationByID(a.Id)
+	if err != nil {
+		return err
+	}
+	if notification == nil {
+		return errors.New("[HandleSyncActivityCenterCommunityRequestDecision] notification not found")
+	}
+
+	notification.MembershipStatus = ActivityCenterMembershipStatus(a.MembershipStatus)
+	notification.UpdatedAt = a.Clock
+	if a.Decision == protobuf.SyncActivityCenterCommunityRequestDecision_DECLINED {
+		notification.Dismissed = true
+	} else if a.Decision == protobuf.SyncActivityCenterCommunityRequestDecision_ACCEPTED {
+		notification.Accepted = true
+	} else {
+		return errors.New("[HandleSyncActivityCenterCommunityRequestDecision] invalid decision")
+	}
+	_, err = m.persistence.SaveActivityCenterNotification(notification, false)
+	if err != nil {
+		return err
+	}
+
+	resp := state.Response
+	resp.AddActivityCenterNotification(notification)
+
+	s, err := m.persistence.UpdateActivityCenterState(notification.UpdatedAt)
+	if err != nil {
+		return err
+	}
+	resp.SetActivityCenterState(s)
 	return nil
 }

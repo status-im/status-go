@@ -222,6 +222,17 @@ message SyncActivityCenterNotificationState {
   bool has_seen = 2;
 }
 
+message SyncActivityCenterCommunityRequestDecision {
+  uint64 clock = 1;
+  bytes id = 2;
+  uint32 membership_status = 3;
+  enum community_request_decision {
+    ACCEPTED = 0;
+    DECLINED = 1;
+  }
+  community_request_decision decision = 4;
+}
+
 message SyncBookmark {
   uint64 clock = 1;
   string url = 2;
