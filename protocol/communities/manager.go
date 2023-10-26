@@ -1684,8 +1684,8 @@ func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, 
 		}
 
 		if changes.HasMemberLeft(pkString) {
-			// If we joined previously the community, we should leave it
-			changes.ShouldMemberLeave = community.Joined()
+			// If we joined previously the community, that means we have been kicked
+			changes.MemberKicked = community.Joined()
 		}
 	}
 
@@ -2956,6 +2956,27 @@ func (m *Manager) LeaveCommunity(id types.HexBytes) (*Community, error) {
 
 	community.RemoveOurselvesFromOrg(&m.identity.PublicKey)
 	community.Leave()
+
+	if err = m.persistence.SaveCommunity(community); err != nil {
+		return nil, err
+	}
+
+	return community, nil
+}
+
+// Same as LeaveCommunity, but we want to stay spectating
+func (m *Manager) KickedOutOfCommunity(id types.HexBytes) (*Community, error) {
+	community, err := m.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	community.RemoveOurselvesFromOrg(&m.identity.PublicKey)
+	community.Leave()
+	community.Spectate()
 
 	if err = m.persistence.SaveCommunity(community); err != nil {
 		return nil, err

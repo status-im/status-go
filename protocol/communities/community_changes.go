@@ -42,9 +42,8 @@ type CommunityChanges struct {
 	// automatically
 	ShouldMemberJoin bool `json:"memberAdded"`
 
-	// ShouldMemberJoin indicates whether the user should leave this community
-	// automatically
-	ShouldMemberLeave bool `json:"memberRemoved"`
+	// MemberKicked indicates whether the user has been kicked out
+	MemberKicked bool `json:"memberRemoved"`
 }
 
 func EmptyCommunityChanges() *CommunityChanges {
