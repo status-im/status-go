@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 
@@ -224,8 +225,7 @@ func (g *Generator) StoreDerivedAccounts(accountID string, password string, path
 		return nil, err
 	}
 
-	//pathAccounts, err := g.deriveChildAccounts(acc, pathStrings)
-	_, err = g.deriveChildAccounts(acc, pathStrings)
+	pathAccounts, err := g.deriveChildAccounts(acc, pathStrings)
 	if err != nil {
 		return nil, err
 	}
@@ -233,14 +233,14 @@ func (g *Generator) StoreDerivedAccounts(accountID string, password string, path
 	pathAccountsInfo := make(map[string]AccountInfo)
 
 	// I now suspect that this is causing the crash!
-	//for pathString, childAccount := range pathAccounts {
-	//	info, err := g.store(childAccount, password)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//
-	//	pathAccountsInfo[pathString] = info
-	//}
+	for pathString, childAccount := range pathAccounts {
+		info, err := g.store(childAccount, password)
+		if err != nil {
+			return nil, err
+		}
+
+		pathAccountsInfo[pathString] = info
+	}
 
 	return pathAccountsInfo, nil
 }
@@ -310,17 +310,30 @@ func (g *Generator) deriveChildAccount(acc *Account, pathString string) (*Accoun
 }
 
 func (g *Generator) store(acc *Account, password string) (AccountInfo, error) {
-	if acc.extendedKey != nil {
-		if _, _, err := g.am.ImportSingleExtendedKey(acc.extendedKey, password); err != nil {
-			return AccountInfo{}, err
-		}
-	} else {
-		if _, err := g.am.ImportAccount(acc.privateKey, password); err != nil {
-			return AccountInfo{}, err
-		}
+
+	if acc == nil {
+		log.Println("store: account is nil")
+		return AccountInfo{}, fmt.Errorf("account cannot be nil")
 	}
 
-	return acc.ToAccountInfo(), nil
+	if acc.extendedKey != nil {
+		log.Println("store: importing extended key")
+		if _, _, err := g.am.ImportSingleExtendedKey(acc.extendedKey, password); err != nil {
+			log.Printf("store: failed to import extended key. Error: %v\n", err)
+			return AccountInfo{}, err
+		}
+		log.Println("store: extended key imported successfully")
+	} else {
+		log.Println("store: importing private key")
+		if _, err := g.am.ImportAccount(acc.privateKey, password); err != nil {
+			log.Printf("store: failed to import private key. Error: %v\n", err)
+			return AccountInfo{}, err
+		}
+		log.Println("store: private key imported successfully")
+	}
+
+	log.Println("store: converting account to account info")
+	return acc.ToAccountInfo(), fmt.Errorf("store: there were no errors but we return something just to see on client for now")
 }
 
 func (g *Generator) addAccount(acc *Account) string {
