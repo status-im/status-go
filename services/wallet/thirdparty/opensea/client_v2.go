@@ -297,6 +297,10 @@ func (o *ClientV2) FetchCollectionsDataByContractID(contractIDs []thirdparty.Con
 			return nil, err
 		}
 
+		if contractData == nil || contractData.Collection == "" {
+			continue
+		}
+
 		collectionData, err := o.fetchCollectionDataBySlug(id.ChainID, contractData.Collection)
 		if err != nil {
 			return nil, err
