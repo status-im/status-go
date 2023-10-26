@@ -30,6 +30,7 @@ func EvaluateCommunityEncryptionKeyActions(origin, modified *Community) *Encrypt
 		// `modified` is a new community, create empty `origin` community
 		origin = &Community{
 			config: &Config{
+				ID: modified.config.ID,
 				CommunityDescription: &protobuf.CommunityDescription{
 					Members:                 map[string]*protobuf.CommunityMember{},
 					Permissions:             &protobuf.CommunityPermissions{},
@@ -54,16 +55,13 @@ func EvaluateCommunityEncryptionKeyActions(origin, modified *Community) *Encrypt
 }
 
 func evaluateCommunityLevelEncryptionKeyAction(origin, modified *Community, changes *CommunityChanges) *EncryptionKeyAction {
-	originBecomeMemberPermissions := origin.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
-	modifiedBecomeMemberPermissions := modified.TokenPermissionsByType(protobuf.CommunityTokenPermission_BECOME_MEMBER)
-
 	return evaluateEncryptionKeyAction(
-		originBecomeMemberPermissions,
-		modifiedBecomeMemberPermissions,
+		origin.Encrypted(),
+		modified.Encrypted(),
+		changes.ControlNodeChanged != nil,
 		modified.config.CommunityDescription.Members,
 		changes.MembersAdded,
 		changes.MembersRemoved,
-		changes.ControlNodeChanged != nil,
 	)
 }
 
@@ -71,16 +69,6 @@ func evaluateChannelLevelEncryptionKeyActions(origin, modified *Community, chang
 	result := make(map[string]EncryptionKeyAction)
 
 	for channelID := range modified.config.CommunityDescription.Chats {
-		chatID := modified.IDString() + channelID
-
-		originChannelViewOnlyPermissions := origin.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
-		originChannelViewAndPostPermissions := origin.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
-		originChannelPermissions := append(originChannelViewOnlyPermissions, originChannelViewAndPostPermissions...)
-
-		modifiedChannelViewOnlyPermissions := modified.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
-		modifiedChannelViewAndPostPermissions := modified.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
-		modifiedChannelPermissions := append(modifiedChannelViewOnlyPermissions, modifiedChannelViewAndPostPermissions...)
-
 		membersAdded := make(map[string]*protobuf.CommunityMember)
 		membersRemoved := make(map[string]*protobuf.CommunityMember)
 
@@ -91,19 +79,20 @@ func evaluateChannelLevelEncryptionKeyActions(origin, modified *Community, chang
 		}
 
 		result[channelID] = *evaluateEncryptionKeyAction(
-			originChannelPermissions,
-			modifiedChannelPermissions,
-			modified.config.CommunityDescription.Chats[channelID].Members,
-			membersAdded, membersRemoved,
+			origin.ChannelEncrypted(channelID),
+			modified.ChannelEncrypted(channelID),
 			changes.ControlNodeChanged != nil,
+			modified.config.CommunityDescription.Chats[channelID].Members,
+			membersAdded,
+			membersRemoved,
 		)
 	}
 
 	return &result
 }
 
-func evaluateEncryptionKeyAction(originPermissions, modifiedPermissions []*CommunityTokenPermission,
-	allMembers, membersAdded, membersRemoved map[string]*protobuf.CommunityMember, controlNodeChanged bool) *EncryptionKeyAction {
+func evaluateEncryptionKeyAction(originEncrypted, modifiedEncrypted, controlNodeChanged bool,
+	allMembers, membersAdded, membersRemoved map[string]*protobuf.CommunityMember) *EncryptionKeyAction {
 	result := &EncryptionKeyAction{
 		ActionType: EncryptionKeyNone,
 		Members:    map[string]*protobuf.CommunityMember{},
@@ -118,28 +107,28 @@ func evaluateEncryptionKeyAction(originPermissions, modifiedPermissions []*Commu
 	}
 
 	// control node changed on closed community/channel
-	if controlNodeChanged && len(modifiedPermissions) > 0 {
+	if controlNodeChanged && modifiedEncrypted {
 		result.ActionType = EncryptionKeyRekey
 		result.Members = copyMap(allMembers)
 		return result
 	}
 
-	// permission was just added
-	if len(modifiedPermissions) > 0 && len(originPermissions) == 0 {
+	// encryption was just added
+	if modifiedEncrypted && !originEncrypted {
 		result.ActionType = EncryptionKeyAdd
 		result.Members = copyMap(allMembers)
 		return result
 	}
 
-	// permission was just removed
-	if len(modifiedPermissions) == 0 && len(originPermissions) > 0 {
+	// encryption was just removed
+	if !modifiedEncrypted && originEncrypted {
 		result.ActionType = EncryptionKeyRemove
 		result.Members = copyMap(allMembers)
 		return result
 	}
 
 	// open community/channel does not require any actions
-	if len(modifiedPermissions) == 0 {
+	if !modifiedEncrypted {
 		return result
 	}
 
