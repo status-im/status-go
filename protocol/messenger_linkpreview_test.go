@@ -356,7 +356,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Image() {
 		Type:        protobuf.UnfurledLink_IMAGE,
 		URL:         u,
 		Hostname:    "placehold.co",
-		Title:       "",
+		Title:       "600x400@3x.png",
 		Description: "",
 		Thumbnail: common.LinkPreviewThumbnail{
 			Width:   1293,
