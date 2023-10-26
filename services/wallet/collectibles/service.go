@@ -16,6 +16,7 @@ import (
 
 	"github.com/status-im/status-go/services/wallet/async"
 	walletCommon "github.com/status-im/status-go/services/wallet/common"
+	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 )
@@ -47,6 +48,7 @@ type Service struct {
 	manager     *Manager
 	controller  *Controller
 	ownershipDB *OwnershipDB
+	communityDB *community.DataDB
 	walletFeed  *event.Feed
 	scheduler   *async.MultiClientScheduler
 }
@@ -63,6 +65,7 @@ func NewService(
 		manager:     manager,
 		controller:  NewController(db, walletFeed, accountsDB, accountsFeed, settingsFeed, networkManager, manager),
 		ownershipDB: NewOwnershipDB(db),
+		communityDB: community.NewDataDB(db),
 		walletFeed:  walletFeed,
 		scheduler:   async.NewMultiClientScheduler(),
 	}
@@ -254,12 +257,12 @@ func (s *Service) fullCollectiblesDataToHeaders(data []thirdparty.FullCollectibl
 		header := fullCollectibleDataToHeader(c)
 
 		if c.CollectibleData.CommunityID != "" {
-			communityInfo, err := s.manager.FetchCollectibleCommunityInfo(c.CollectibleData.CommunityID, c.CollectibleData.ID)
+			communityInfo, err := s.communityDB.GetCommunityInfo(c.CollectibleData.CommunityID)
 			if err != nil {
 				return nil, err
 			}
 
-			communityHeader := communityInfoToHeader(*communityInfo)
+			communityHeader := communityInfoToHeader(c.CollectibleData.CommunityID, communityInfo, c.CommunityInfo)
 			header.CommunityHeader = &communityHeader
 		}
 
@@ -276,18 +279,13 @@ func (s *Service) fullCollectiblesDataToDetails(data []thirdparty.FullCollectibl
 		details := fullCollectibleDataToDetails(c)
 
 		if c.CollectibleData.CommunityID != "" {
-			traits, err := s.manager.FetchCollectibleCommunityTraits(c.CollectibleData.CommunityID, c.CollectibleData.ID)
-			if err != nil {
-				return nil, err
-			}
-			details.Traits = traits
-
-			communityInfo, err := s.manager.FetchCollectibleCommunityInfo(c.CollectibleData.CommunityID, c.CollectibleData.ID)
+			communityInfo, err := s.communityDB.GetCommunityInfo(c.CollectibleData.CommunityID)
 			if err != nil {
 				return nil, err
 			}
 
-			details.CommunityInfo = communityInfo
+			communityDetails := communityInfoToDetails(c.CollectibleData.CommunityID, communityInfo, c.CommunityInfo)
+			details.CommunityInfo = &communityDetails
 		}
 
 		res = append(res, details)

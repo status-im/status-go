@@ -555,64 +555,80 @@ func tokenURIToCommunityID(tokenURI string) string {
 	return communityID
 }
 
-func (s *Service) CanProvideCollectibleMetadata(id thirdparty.CollectibleUniqueID, tokenURI string) (bool, error) {
-	ret := tokenURI != "" && tokenURIToCommunityID(tokenURI) != ""
-	return ret, nil
+func (s *Service) GetCommunityID(tokenURI string) string {
+	if tokenURI != "" {
+		return tokenURIToCommunityID(tokenURI)
+	}
+	return ""
 }
 
-func (s *Service) FetchCollectibleMetadata(id thirdparty.CollectibleUniqueID, tokenURI string) (*thirdparty.FullCollectibleData, error) {
+func (s *Service) FillCollectibleMetadata(collectible *thirdparty.FullCollectibleData) error {
 	if s.messenger == nil {
-		return nil, fmt.Errorf("messenger not ready")
+		return fmt.Errorf("messenger not ready")
 	}
 
-	communityID := tokenURIToCommunityID(tokenURI)
+	if collectible == nil {
+		return fmt.Errorf("empty collectible")
+	}
+
+	id := collectible.CollectibleData.ID
+	communityID := collectible.CollectibleData.CommunityID
 
 	if communityID == "" {
-		return nil, fmt.Errorf("invalid tokenURI")
+		return fmt.Errorf("invalid communityID")
 	}
 
 	community, err := s.fetchCommunity(communityID)
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if community == nil {
-		return nil, nil
+		return nil
 	}
 
 	tokenMetadata, err := s.fetchCommunityCollectibleMetadata(community, id.ContractID)
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if tokenMetadata == nil {
-		return nil, nil
+		return nil
 	}
 
-	token, err := s.fetchCommunityToken(communityID, id.ContractID)
+	communityToken, err := s.fetchCommunityToken(communityID, id.ContractID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &thirdparty.FullCollectibleData{
-		CollectibleData: thirdparty.CollectibleData{
-			ID:          id,
-			CommunityID: communityID,
-			Name:        tokenMetadata.GetName(),
-			Description: tokenMetadata.GetDescription(),
-			ImageURL:    tokenMetadata.GetImage(),
-			TokenURI:    tokenURI,
-			Traits:      getCollectibleCommunityTraits(token),
-		},
-		CollectionData: &thirdparty.CollectionData{
+	permission := fetchCommunityCollectiblePermission(community, id)
+
+	privilegesLevel := token.CommunityLevel
+	if permission != nil {
+		privilegesLevel = permissionTypeToPrivilegesLevel(permission.GetType())
+	}
+
+	collectible.CollectibleData.Name = tokenMetadata.GetName()
+	collectible.CollectibleData.Description = tokenMetadata.GetDescription()
+	collectible.CollectibleData.ImageURL = tokenMetadata.GetImage()
+	collectible.CollectibleData.Traits = getCollectibleCommunityTraits(communityToken)
+
+	if collectible.CollectionData == nil {
+		collectible.CollectionData = &thirdparty.CollectionData{
 			ID:          id.ContractID,
 			CommunityID: communityID,
-			Name:        tokenMetadata.GetName(),
-			ImageURL:    tokenMetadata.GetImage(),
-		},
-	}, nil
+		}
+	}
+	collectible.CollectionData.Name = tokenMetadata.GetName()
+	collectible.CollectionData.ImageURL = tokenMetadata.GetImage()
+
+	collectible.CommunityInfo = &thirdparty.CollectibleCommunityInfo{
+		PrivilegesLevel: privilegesLevel,
+	}
+
+	return nil
 }
 
 func permissionTypeToPrivilegesLevel(permissionType protobuf.CommunityTokenPermission_Type) token.PrivilegesLevel {
@@ -626,7 +642,7 @@ func permissionTypeToPrivilegesLevel(permissionType protobuf.CommunityTokenPermi
 	}
 }
 
-func (s *Service) FetchCollectibleCommunityInfo(communityID string, id thirdparty.CollectibleUniqueID) (*thirdparty.CollectiblesCommunityInfo, error) {
+func (s *Service) FetchCommunityInfo(communityID string) (*thirdparty.CommunityInfo, error) {
 	community, err := s.fetchCommunity(communityID)
 	if err != nil {
 		return nil, err
@@ -635,37 +651,13 @@ func (s *Service) FetchCollectibleCommunityInfo(communityID string, id thirdpart
 		return nil, nil
 	}
 
-	metadata, err := s.fetchCommunityCollectibleMetadata(community, id.ContractID)
-	if err != nil {
-		return nil, err
-	}
-	if metadata == nil {
-		return nil, nil
+	communityInfo := &thirdparty.CommunityInfo{
+		CommunityName:  community.Name(),
+		CommunityColor: community.Color(),
+		CommunityImage: fetchCommunityImage(community),
 	}
 
-	permission := fetchCommunityCollectiblePermission(community, id)
-
-	privilegesLevel := token.CommunityLevel
-	if permission != nil {
-		privilegesLevel = permissionTypeToPrivilegesLevel(permission.GetType())
-	}
-
-	return &thirdparty.CollectiblesCommunityInfo{
-		CommunityID:     communityID,
-		CommunityName:   community.Name(),
-		CommunityColor:  community.Color(),
-		CommunityImage:  fetchCommunityImage(community),
-		PrivilegesLevel: privilegesLevel,
-	}, nil
-}
-
-func (s *Service) FetchCollectibleCommunityTraits(communityID string, id thirdparty.CollectibleUniqueID) ([]thirdparty.CollectibleTrait, error) {
-	token, err := s.fetchCommunityToken(communityID, id.ContractID)
-	if err != nil {
-		return nil, err
-	}
-
-	return getCollectibleCommunityTraits(token), nil
+	return communityInfo, nil
 }
 
 func (s *Service) fetchCommunity(communityID string) (*communities.Community, error) {

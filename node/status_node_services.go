@@ -106,7 +106,7 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 	// Community collectibles.
 	// Messenger needs the CollectiblesManager to get the list of collectibles owned
 	// by a certain account and check community entry permissions.
-	// We handle circular dependency between the two by delaying ininitalization of the CollectibleMetadataProvider
+	// We handle circular dependency between the two by delaying ininitalization of the CommunityCollectibleInfoProvider
 	// in the CollectiblesManager.
 	if config.WakuConfig.Enabled {
 		wakuService, err := b.wakuService(&config.WakuConfig, &config.ClusterConfig)
@@ -125,7 +125,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 
 		services = append(services, wakuext)
 
-		b.SetWalletCollectibleMetadataProvider(wakuext)
 		b.SetWalletCollectibleCommunityInfoProvider(wakuext)
 	}
 
@@ -153,7 +152,6 @@ func (b *StatusNode) initServices(config *params.NodeConfig, mediaServer *server
 
 		services = append(services, wakuext)
 
-		b.SetWalletCollectibleMetadataProvider(wakuext)
 		b.SetWalletCollectibleCommunityInfoProvider(wakuext)
 	}
 
@@ -512,12 +510,6 @@ func (b *StatusNode) appmetricsService() common.StatusService {
 
 func (b *StatusNode) WalletService() *wallet.Service {
 	return b.walletSrvc
-}
-
-func (b *StatusNode) SetWalletCollectibleMetadataProvider(provider thirdparty.CollectibleMetadataProvider) {
-	if b.walletSrvc != nil {
-		b.walletSrvc.SetCollectibleMetadataProvider(provider)
-	}
 }
 
 func (b *StatusNode) SetWalletCollectibleCommunityInfoProvider(provider thirdparty.CollectibleCommunityInfoProvider) {

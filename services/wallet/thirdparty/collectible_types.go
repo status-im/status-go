@@ -134,11 +134,17 @@ type CollectibleData struct {
 	TokenURI           string              `json:"token_uri"`
 }
 
+// Community-related collectible info. Present only for collectibles minted in a community.
+type CollectibleCommunityInfo struct {
+	PrivilegesLevel token.PrivilegesLevel `json:"privileges_level"`
+}
+
 // Combined Collection+Collectible info returned by the CollectibleProvider
 // Some providers may not return the CollectionData in the same API call, so it's optional
 type FullCollectibleData struct {
 	CollectibleData CollectibleData
 	CollectionData  *CollectionData
+	CommunityInfo   *CollectibleCommunityInfo
 }
 
 type CollectiblesContainer[T any] struct {
@@ -169,28 +175,6 @@ func (c *FullCollectibleDataContainer) ToOwnershipContainer() CollectibleOwnersh
 		PreviousCursor: c.PreviousCursor,
 		Provider:       c.Provider,
 	}
-}
-
-// Community-related info. Present only for collectibles minted in a community.
-// This info is directly fetched every time upon request since a change in community
-// settings could affect it.
-
-type CollectiblesCommunityInfo struct {
-	CommunityID     string                `json:"community_id"`
-	CommunityName   string                `json:"community_name"`
-	CommunityColor  string                `json:"community_color"`
-	CommunityImage  string                `json:"community_image"`
-	PrivilegesLevel token.PrivilegesLevel `json:"privileges_level"`
-}
-
-type CollectibleMetadataProvider interface {
-	CanProvideCollectibleMetadata(id CollectibleUniqueID, tokenURI string) (bool, error)
-	FetchCollectibleMetadata(id CollectibleUniqueID, tokenURI string) (*FullCollectibleData, error)
-}
-
-type CollectibleCommunityInfoProvider interface {
-	FetchCollectibleCommunityInfo(communityID string, id CollectibleUniqueID) (*CollectiblesCommunityInfo, error)
-	FetchCollectibleCommunityTraits(communityID string, id CollectibleUniqueID) ([]CollectibleTrait, error)
 }
 
 type TokenBalance struct {
@@ -229,4 +213,9 @@ type CollectibleDataProvider interface {
 type CollectionDataProvider interface {
 	CollectibleProvider
 	FetchCollectionsDataByContractID(ids []ContractID) ([]CollectionData, error)
+}
+
+type CollectibleCommunityInfoProvider interface {
+	CommunityInfoProvider
+	FillCollectibleMetadata(collectible *FullCollectibleData) error
 }
