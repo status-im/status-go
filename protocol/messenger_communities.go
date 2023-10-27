@@ -1702,7 +1702,7 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 		return nil, err
 	}
 
-	mr, err := m.leaveCommunity(communityID, true)
+	mr, err := m.leaveCommunity(communityID)
 	if err != nil {
 		return nil, err
 	}
@@ -1756,7 +1756,7 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 	return mr, nil
 }
 
-func (m *Messenger) leaveCommunity(communityID types.HexBytes, unsubsribeFromCommunity bool) (*MessengerResponse, error) {
+func (m *Messenger) leaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
 	response := &MessengerResponse{}
 
 	community, err := m.communitiesManager.LeaveCommunity(communityID)
@@ -1779,11 +1779,21 @@ func (m *Messenger) leaveCommunity(communityID types.HexBytes, unsubsribeFromCom
 		}
 	}
 
-	if unsubsribeFromCommunity {
-		_, err = m.transport.RemoveFilterByChatID(communityID.String())
-		if err != nil {
-			return nil, err
-		}
+	_, err = m.transport.RemoveFilterByChatID(communityID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	response.AddCommunity(community)
+	return response, nil
+}
+
+func (m *Messenger) kickedOutOfCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
+	response := &MessengerResponse{}
+
+	community, err := m.communitiesManager.KickedOutOfCommunity(communityID)
+	if err != nil {
+		return nil, err
 	}
 
 	response.AddCommunity(community)
@@ -3230,7 +3240,7 @@ func (m *Messenger) handleSyncInstallationCommunity(messageState *ReceivedMessag
 				return err
 			}
 		} else {
-			mr, err = m.leaveCommunity(syncCommunity.Id, true)
+			mr, err = m.leaveCommunity(syncCommunity.Id)
 			if err != nil {
 				logger.Debug("m.leaveCommunity error", zap.Error(err))
 				return err
@@ -5865,12 +5875,8 @@ func (m *Messenger) processCommunityChanges(messageState *ReceivedMessageState) 
 				continue
 			}
 
-		} else if changes.ShouldMemberLeave {
-			// this means we've been kicked by the community owner/admin,
-			// in this case we don't want to unsubscribe from community updates
-			// so we still get notified accordingly when something changes,
-			// hence, we're setting `unsubscribeFromCommunity` to `false` here
-			response, err := m.leaveCommunity(changes.Community.ID(), false)
+		} else if changes.MemberKicked {
+			response, err := m.kickedOutOfCommunity(changes.Community.ID())
 			if err != nil {
 				m.logger.Error("cannot leave community", zap.Error(err))
 				continue
