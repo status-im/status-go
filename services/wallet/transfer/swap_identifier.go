@@ -210,6 +210,7 @@ func buildUniswapSwapMultitransaction(ctx context.Context, client chain.ClientIn
 		ToNetworkID:   transfer.NetworkID,
 		ToTxHash:      transfer.Receipt.TxHash,
 		ToAddress:     transfer.Address,
+		Timestamp:     transfer.Timestamp,
 	}
 
 	var firstSwapLog, lastSwapLog *types.Log

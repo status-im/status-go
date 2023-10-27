@@ -188,6 +188,13 @@ func rowsToMultiTransactions(rows *sql.Rows) ([]*MultiTransaction, error) {
 	return multiTransactions, nil
 }
 
+func getMultiTransactionTimestamp(multiTransaction *MultiTransaction) uint64 {
+	if multiTransaction.Timestamp != 0 {
+		return multiTransaction.Timestamp
+	}
+	return uint64(time.Now().Unix())
+}
+
 // insertMultiTransaction inserts a multi transaction into the database and updates multi-transaction ID and timestamp
 func insertMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) (MultiTransactionIDType, error) {
 	insert, err := db.Prepare(fmt.Sprintf(`INSERT INTO multi_transactions (%s)
@@ -195,8 +202,7 @@ func insertMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) (Mul
 	if err != nil {
 		return NoMultiTransactionID, err
 	}
-
-	timestamp := time.Now().Unix()
+	timestamp := getMultiTransactionTimestamp(multiTransaction)
 	result, err := insert.Exec(
 		multiTransaction.FromNetworkID,
 		multiTransaction.FromTxHash,
@@ -218,7 +224,7 @@ func insertMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) (Mul
 	defer insert.Close()
 	multiTransactionID, err := result.LastInsertId()
 
-	multiTransaction.Timestamp = uint64(timestamp)
+	multiTransaction.Timestamp = timestamp
 	multiTransaction.ID = uint(multiTransactionID)
 
 	return MultiTransactionIDType(multiTransactionID), err
@@ -266,6 +272,7 @@ func updateMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) erro
 	if err != nil {
 		return err
 	}
+	timestamp := getMultiTransactionTimestamp(multiTransaction)
 	_, err = update.Exec(
 		multiTransaction.ID,
 		multiTransaction.FromNetworkID,
@@ -280,7 +287,7 @@ func updateMultiTransaction(db *sql.DB, multiTransaction *MultiTransaction) erro
 		multiTransaction.ToAmount.String(),
 		multiTransaction.Type,
 		multiTransaction.CrossTxID,
-		time.Now().Unix(),
+		timestamp,
 	)
 	if err != nil {
 		return err
