@@ -556,9 +556,9 @@ func (api *PublicAPI) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, e
 	return api.service.messenger.MyPendingRequestsToJoin()
 }
 
-// MyAwaitingRequestsToJoin returns requests to join, which must be auto-accepted when control node will be online
-func (api *PublicAPI) MyAwaitingRequestsToJoin() ([]*communities.RequestToJoin, error) {
-	return api.service.messenger.MyAwaitingRequestsToJoin()
+// MyAwaitingAddressesRequestsToJoin returns requests to join, which must be auto-accepted when control node will be online
+func (api *PublicAPI) MyAwaitingAddressesRequestsToJoin() ([]*communities.RequestToJoin, error) {
+	return api.service.messenger.MyAwaitingAddressesRequestsToJoin()
 }
 
 // MyCanceledRequestsToJoin returns the pending requests for the logged in user

@@ -3294,7 +3294,7 @@ func (m *Manager) PendingRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestT
 	return m.persistence.RequestsToJoinForUserByState(common.PubkeyToHex(pk), RequestToJoinStatePending)
 }
 
-func (m *Manager) AwaitingRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
+func (m *Manager) AwaitingAddressesRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
 	return m.persistence.RequestsToJoinForUserByState(common.PubkeyToHex(pk), RequestToJoinStateAwaitingAddresses)
 }
 

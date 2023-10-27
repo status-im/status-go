@@ -365,9 +365,8 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 						m.logger.Error("failed to save data and prepare response")
 					}
 
-					// if control node changed, the client will be kicked from the community
-					// if owner token will be mint, the client will stay the member of the community
-					if communityResponse.Changes.ShouldMemberLeave {
+					// control node changed and we were kicked out. It now awaits our addresses
+					if communityResponse.Changes.ControlNodeChanged != nil && communityResponse.Changes.ShouldMemberLeave {
 						requestToJoin, err := m.sendSharedAddressToControlNode(communityResponse.Community.ControlNode(), communityResponse.Community)
 						if err != nil {
 							m.logger.Error("share address to control node failed", zap.String("id", types.EncodeHex(communityResponse.Community.ID())), zap.Error(err))
@@ -2423,8 +2422,8 @@ func (m *Messenger) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, err
 	return m.communitiesManager.PendingRequestsToJoinForUser(&m.identity.PublicKey)
 }
 
-func (m *Messenger) MyAwaitingRequestsToJoin() ([]*communities.RequestToJoin, error) {
-	return m.communitiesManager.AwaitingRequestsToJoinForUser(&m.identity.PublicKey)
+func (m *Messenger) MyAwaitingAddressesRequestsToJoin() ([]*communities.RequestToJoin, error) {
+	return m.communitiesManager.AwaitingAddressesRequestsToJoinForUser(&m.identity.PublicKey)
 }
 
 func (m *Messenger) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
@@ -5999,16 +5998,16 @@ func (m *Messenger) PromoteSelfToControlNode(communityID types.HexBytes) (*Messe
 		return nil, err
 	}
 
-	err = m.syncCommunity(context.Background(), changes.Community, m.dispatchMessage)
-	if err != nil {
-		return nil, err
-	}
-
 	if len(changes.MembersRemoved) > 0 {
 		err = m.communitiesManager.GenerateRequestsToJoinForAutoApprovalOnNewOwnership(changes.Community.ID(), changes.MembersRemoved)
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	err = m.syncCommunity(context.Background(), changes.Community, m.dispatchMessage)
+	if err != nil {
+		return nil, err
 	}
 
 	var response MessengerResponse
