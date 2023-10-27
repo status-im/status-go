@@ -9,14 +9,13 @@ CREATE TABLE hash_ratchet_encryption_v2 (
 
 INSERT INTO hash_ratchet_encryption_v2(group_id, deprecated_key_id, key, key_id) SELECT group_id, key_id, key, group_id || key_id FROM hash_ratchet_encryption;
 
+DROP TABLE hash_ratchet_encryption_cache;
+
 DROP TABLE hash_ratchet_encryption;
 
 ALTER TABLE hash_ratchet_encryption_v2 RENAME TO hash_ratchet_encryption;
 
-
 UPDATE hash_ratchet_encryption SET key_timestamp = deprecated_key_id;
-
-DROP TABLE hash_ratchet_encryption_cache;
 
 CREATE TABLE hash_ratchet_encryption_cache (
   group_id BLOB NOT NULL,
