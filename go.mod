@@ -4,6 +4,10 @@ go 1.19
 
 replace github.com/ethereum/go-ethereum v1.10.26 => github.com/status-im/go-ethereum v1.10.25-status.9
 
+replace github.com/rjeczalik/notify => github.com/siddarthkay/notify v1-sid
+
+replace github.com/status-im/tcp-shaker => github.com/siddarthkay/tcp-shaker v1.1-sid
+
 replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.20190717161051-705d9623b7c1
 
 replace github.com/nfnt/resize => github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088
