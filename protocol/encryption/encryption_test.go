@@ -1143,4 +1143,64 @@ func (s *EncryptionServiceTestSuite) TestHashRatchetRekeyHandleRatchet() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.HashRatchetInfo, 1)
+
+}
+
+func (s *EncryptionServiceTestSuite) TestHashRatchetSendOutOfOrder() {
+	aliceKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	bobKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	groupID := []byte("test_community_id")
+	s.Require().NotNil(aliceKey)
+	s.Require().NotNil(bobKey)
+
+	s.logger.Info("Hash ratchet key exchange 1")
+	keyID1, err := s.alice.encryptor.GenerateHashRatchetKey(groupID)
+	s.Require().NoError(err)
+
+	hashRatchetKeyExMsg1, err := s.alice.BuildHashRatchetKeyExchangeMessage(aliceKey, &bobKey.PublicKey, groupID, []*HashRatchetKeyCompatibility{keyID1})
+	s.Require().NoError(err)
+
+	s.logger.Info("Hash ratchet key exchange 1", zap.Any("msg", hashRatchetKeyExMsg1.Message))
+	s.Require().NotNil(hashRatchetKeyExMsg1)
+
+	payload1 := []byte("community msg 1")
+	hashRatchetMsg1, err := s.alice.BuildHashRatchetMessage(groupID, payload1)
+
+	s.Require().NoError(err)
+	s.Require().NotNil(hashRatchetMsg1)
+	s.Require().NotNil(hashRatchetMsg1.Message)
+
+	_, err = s.bob.HandleMessage(aliceKey, nil, hashRatchetMsg1.Message, defaultMessageID)
+
+	s.Require().Error(err)
+	s.Require().Equal(err, ErrHashRatchetGroupIDNotFound)
+
+	s.logger.Info("Handle hash ratchet key msg 1")
+	decryptedResponse1, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, hashRatchetKeyExMsg1.Message, defaultMessageID)
+	s.Require().NoError(err)
+	s.Require().NotNil(decryptedResponse1)
+
+	decryptedHashRatchetKeyBytes1 := decryptedResponse1.DecryptedMessage
+	decryptedHashRatchetKeyID1, err := s.bob.encryptor.persistence.GetCurrentKeyForGroup(groupID)
+	s.logger.Info("Current hash ratchet key in DB 1", zap.Any("keyId", decryptedHashRatchetKeyID1))
+	s.Require().NoError(err)
+	s.Require().NotNil(decryptedHashRatchetKeyID1)
+	s.Require().NotNil(decryptedHashRatchetKeyID1.Key)
+
+	keyID, err := decryptedHashRatchetKeyID1.GetKeyID()
+	s.Require().NoError(err)
+	s.Require().NotNil(keyID)
+
+	s.Require().NotNil(decryptedHashRatchetKeyID1.GroupID)
+	s.Require().NotEmpty(decryptedHashRatchetKeyID1.Timestamp)
+	s.Require().NotNil(decryptedHashRatchetKeyBytes1)
+
+	decryptedPayload2, err := s.bob.HandleMessage(aliceKey, nil, hashRatchetMsg1.Message, defaultMessageID)
+
+	s.Require().NoError(err)
+	s.Require().Equal(payload1, decryptedPayload2.DecryptedMessage)
 }

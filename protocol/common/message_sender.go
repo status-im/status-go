@@ -782,11 +782,16 @@ func (s *MessageSender) HandleMessages(shhMessage *types.Message) ([]*v1protocol
 				hlogger.Error("failed to handle transport layer message", zap.Error(err))
 				return nil, nil, err
 			}
+			err = s.handleEncryptionLayer(context.Background(), &statusMessage)
+			if err != nil {
+				hlogger.Debug("failed to handle an encryption message", zap.Error(err))
+			}
+
 			stms, as, err := unwrapDatasyncMessage(&statusMessage, s.datasync)
 			if err != nil {
 				hlogger.Debug("failed to handle datasync message", zap.Error(err))
 				//that wasn't a datasync message, so use the original payload
-				statusMessages = append(stms, &statusMessage)
+				statusMessages = append(statusMessages, &statusMessage)
 
 			} else {
 				statusMessages = append(statusMessages, stms...)
@@ -799,7 +804,7 @@ func (s *MessageSender) HandleMessages(shhMessage *types.Message) ([]*v1protocol
 	if err != nil {
 		hlogger.Debug("failed to handle datasync message", zap.Error(err))
 		//that wasn't a datasync message, so use the original payload
-		statusMessages = append(stms, &statusMessage)
+		statusMessages = append(statusMessages, &statusMessage)
 	} else {
 		statusMessages = append(statusMessages, stms...)
 		acks = append(acks, as...)
@@ -846,7 +851,8 @@ func (s *MessageSender) handleEncryptionLayer(ctx context.Context, message *v1pr
 		}
 	}
 	if err != nil {
-		return errors.Wrap(err, "failed to process an encrypted message")
+		logger.Error("failed to handle an encrypted message", zap.Error(err))
+		return err
 	}
 
 	return nil
