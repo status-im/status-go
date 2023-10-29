@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"strings"
 	"sync"
 	"time"
@@ -1591,6 +1593,13 @@ func (b *GethStatusBackend) StartNodeWithAccountAndInitialConfig(
 	if err != nil {
 		return err
 	}
+
+	var buf bytes.Buffer
+	pprof.Lookup("goroutine").WriteTo(&buf, 1)
+
+	stacktrace := buf.String()
+	b.log.Info("print goroutines", "stacktrace", stacktrace)
+
 	return b.StartNodeWithAccount(account, password, nodecfg)
 }
 
