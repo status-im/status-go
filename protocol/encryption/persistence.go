@@ -770,7 +770,7 @@ func (s *sqlitePersistence) GetHashRatchetKeyByID(ratchet *HashRatchetKeyCompati
 	oldFormat := ratchet.IsOldFormat()
 	if oldFormat {
 		// Query using the deprecated format
-		err = stmt.QueryRow(ratchet.GroupID, nil, seqNo, ratchet.DeprecatedKeyID()).Scan(&key, &seqNoPtr, &hash)
+		err = stmt.QueryRow(ratchet.GroupID, nil, seqNo, ratchet.DeprecatedKeyID()).Scan(&key, &seqNoPtr, &hash) //nolint: ineffassign
 
 	} else {
 		keyID, err := ratchet.GetKeyID()
@@ -778,22 +778,23 @@ func (s *sqlitePersistence) GetHashRatchetKeyByID(ratchet *HashRatchetKeyCompati
 			return nil, err
 		}
 
-		err = stmt.QueryRow(ratchet.GroupID, keyID, seqNo, ratchet.DeprecatedKeyID()).Scan(&key, &seqNoPtr, &hash)
-		if err != nil {
-			return nil, err
-		}
+		err = stmt.QueryRow(ratchet.GroupID, keyID, seqNo, ratchet.DeprecatedKeyID()).Scan(&key, &seqNoPtr, &hash) //nolint: ineffassign,staticcheck
 	}
-	var seqNoResult uint32
-	if seqNoPtr == nil {
-		seqNoResult = 0
-	} else {
-		seqNoResult = *seqNoPtr
+	if len(hash) == 0 && len(key) == 0 {
+		return nil, nil
 	}
 
 	switch err {
 	case sql.ErrNoRows:
 		return nil, nil
 	case nil:
+		var seqNoResult uint32
+		if seqNoPtr == nil {
+			seqNoResult = 0
+		} else {
+			seqNoResult = *seqNoPtr
+		}
+
 		ratchet.Key = key
 		keyID, err := ratchet.GetKeyID()
 

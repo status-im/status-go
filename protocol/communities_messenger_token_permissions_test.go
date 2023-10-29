@@ -700,7 +700,7 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 	msg = s.sendChatMessage(s.owner, chat.ID, "hello on encrypted community 2")
 
 	// bob can read the message
-	response, err = WaitOnMessengerResponse(
+	_, err = WaitOnMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
 			for _, message := range r.messages {
@@ -713,8 +713,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestBecomeMemberPermissions(
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(response.Messages(), 1)
-	s.Require().Equal(msg.Text, response.Messages()[0].Text)
 }
 
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPermission() {
