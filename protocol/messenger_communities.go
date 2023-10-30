@@ -2866,7 +2866,7 @@ func (m *Messenger) passStoredCommunityInfoToSignalHandler(communityID string) {
 
 // handleCommunityDescription handles an community description
 func (m *Messenger) handleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawPayload []byte) error {
-	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload, nil, nil)
+	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, description, rawPayload, nil)
 	if err != nil {
 		return err
 	}

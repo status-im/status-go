@@ -462,7 +462,7 @@ func (m *Manager) runOwnerVerificationLoop() {
 						}
 
 						// TODO: handle shards
-						response, err := m.HandleCommunityDescriptionMessage(signer, description, communityToValidate.payload, nil, ownerPK)
+						response, err := m.HandleCommunityDescriptionMessage(signer, description, communityToValidate.payload, ownerPK)
 						if err != nil {
 							m.logger.Error("failed to handle community", zap.Error(err))
 							continue
@@ -1538,7 +1538,7 @@ func (m *Manager) Queue(signer *ecdsa.PublicKey, community *Community, clock uin
 	return nil
 }
 
-func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte, shard *common.Shard, verifiedOwner *ecdsa.PublicKey) (*CommunityResponse, error) {
+func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, payload []byte, verifiedOwner *ecdsa.PublicKey) (*CommunityResponse, error) {
 	if signer == nil {
 		return nil, errors.New("signer can't be nil")
 	}
@@ -1577,7 +1577,6 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 			Logger:                              m.logger,
 			CommunityDescriptionProtocolMessage: payload,
 			MemberIdentity:                      &m.identity.PublicKey,
-			Shard:                               shard,
 			ID:                                  pubKey,
 			ControlNode:                         signer,
 		}
