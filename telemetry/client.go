@@ -12,6 +12,8 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+
+	v2protocol "github.com/waku-org/go-waku/waku/v2/protocol"
 )
 
 type Client struct {
@@ -54,5 +56,45 @@ func (c *Client) PushReceivedMessages(filter transport.Filter, sshMessage *types
 	_, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(body))
 	if err != nil {
 		c.logger.Error("Error sending message to telemetry server", zap.Error(err))
+	}
+}
+
+func (c *Client) PushReceivedEnvelope(envelope *v2protocol.Envelope) {
+	url := fmt.Sprintf("%s/received-envelope", c.serverURL)
+	postBody := map[string]interface{}{
+		"messageHash":    types.EncodeHex(envelope.Hash()),
+		"sentAt":         uint32(envelope.Message().Timestamp / int64(time.Second)),
+		"pubsubTopic":    envelope.PubsubTopic(),
+		"topic":          envelope.Message().ContentTopic,
+		"receiverKeyUID": c.keyUID,
+		"nodeName":       c.nodeName,
+	}
+	body, _ := json.Marshal(postBody)
+	_, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		c.logger.Error("Error sending envelope to telemetry server", zap.Error(err))
+	}
+}
+
+func (c *Client) UpdateEnvelopeProcessingError(shhMessage *types.Message, processingError error) {
+	c.logger.Debug("Pushing envelope update to telemetry server", zap.String("hash", types.EncodeHex(shhMessage.Hash)))
+	url := fmt.Sprintf("%s/update-envelope", c.serverURL)
+	var errorString = ""
+	if processingError != nil {
+		errorString = processingError.Error()
+	}
+	postBody := map[string]interface{}{
+		"messageHash":     types.EncodeHex(shhMessage.Hash),
+		"sentAt":          shhMessage.Timestamp,
+		"pubsubTopic":     shhMessage.PubsubTopic,
+		"topic":           shhMessage.Topic,
+		"receiverKeyUID":  c.keyUID,
+		"nodeName":        c.nodeName,
+		"processingError": errorString,
+	}
+	body, _ := json.Marshal(postBody)
+	_, err := c.httpClient.Post(url, "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		c.logger.Error("Error sending envelope update to telemetry server", zap.Error(err))
 	}
 }

@@ -136,7 +136,7 @@ func TestInitProtocol(t *testing.T) {
 	defer func() { require.NoError(t, cleanupWalletDB()) }()
 	require.NoError(t, err)
 
-	err = service.InitProtocol("Test", privateKey, appDB, walletDB, nil, multiAccounts, acc, nil, nil, nil, nil, zap.NewNop())
+	err = service.InitProtocol("Test", privateKey, appDB, walletDB, nil, multiAccounts, acc, nil, nil, nil, nil, nil, zap.NewNop())
 	require.NoError(t, err)
 }
 
@@ -207,7 +207,7 @@ func (s *ShhExtSuite) createAndAddNode() {
 	walletDB, err := helpers.SetupTestMemorySQLDB(&walletdatabase.DbInitializer{})
 	s.Require().NoError(err)
 
-	err = service.InitProtocol("Test", privateKey, appDB, walletDB, nil, multiAccounts, acc, nil, nil, nil, nil, zap.NewNop())
+	err = service.InitProtocol("Test", privateKey, appDB, walletDB, nil, multiAccounts, acc, nil, nil, nil, nil, nil, zap.NewNop())
 	s.NoError(err)
 
 	stack.RegisterLifecycle(service)
