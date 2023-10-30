@@ -34,12 +34,6 @@ type ClearedHistory struct {
 	ClearedAt uint64 `json:"clearedAt"`
 }
 
-type ProtectedTopic struct {
-	CommunityID string `json:"communityID"`
-	PubsubTopic string `json:"pubsubTopic"`
-	PublicKey   string `json:"publicKey"`
-}
-
 type MessengerResponse struct {
 	Contacts                      []*Contact
 	Installations                 []*multidevice.Installation
@@ -68,7 +62,6 @@ type MessengerResponse struct {
 	removedMessages             map[string]*RemovedMessage
 	communities                 map[string]*communities.Community
 	communitiesSettings         map[string]*communities.CommunitySettings
-	protectedTopics             map[string]*ProtectedTopic
 	activityCenterNotifications map[string]*ActivityCenterNotification
 	activityCenterState         *ActivityCenterState
 	messages                    map[string]*common.Message
@@ -110,7 +103,6 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Notifications                 []*localnotifications.Notification   `json:"notifications"`
 		Communities                   []*communities.Community             `json:"communities,omitempty"`
 		CommunitiesSettings           []*communities.CommunitySettings     `json:"communitiesSettings,omitempty"`
-		ProtectedTopics               []ProtectedTopic                     `json:"protectedTopics,omitempty"`
 		ActivityCenterNotifications   []*ActivityCenterNotification        `json:"activityCenterNotifications,omitempty"`
 		ActivityCenterState           *ActivityCenterState                 `json:"activityCenterState,omitempty"`
 		CurrentStatus                 *UserStatus                          `json:"currentStatus,omitempty"`
@@ -152,7 +144,6 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Chats:                         r.Chats(),
 		Communities:                   r.Communities(),
 		CommunitiesSettings:           r.CommunitiesSettings(),
-		ProtectedTopics:               r.ProtectedTopics(),
 		RemovedChats:                  r.RemovedChats(),
 		RemovedMessages:               r.RemovedMessages(),
 		ClearedHistories:              r.ClearedHistories(),
@@ -218,14 +209,6 @@ func (r *MessengerResponse) CommunitiesSettings() []*communities.CommunitySettin
 		settings = append(settings, s)
 	}
 	return settings
-}
-
-func (r *MessengerResponse) ProtectedTopics() []ProtectedTopic {
-	protectedTopics := make([]ProtectedTopic, 0, len(r.protectedTopics))
-	for _, pt := range r.protectedTopics {
-		protectedTopics = append(protectedTopics, *pt)
-	}
-	return protectedTopics
 }
 
 func (r *MessengerResponse) Notifications() []*localnotifications.Notification {
@@ -370,14 +353,6 @@ func (r *MessengerResponse) AddCommunitySettings(c *communities.CommunitySetting
 
 func (r *MessengerResponse) AddRequestsToJoinCommunity(requestsToJoin []*communities.RequestToJoin) {
 	r.RequestsToJoinCommunity = append(r.RequestsToJoinCommunity, requestsToJoin...)
-}
-
-func (r *MessengerResponse) AddProtectedTopic(pt *ProtectedTopic) {
-	if r.protectedTopics == nil {
-		r.protectedTopics = make(map[string]*ProtectedTopic)
-	}
-
-	r.protectedTopics[pt.CommunityID] = pt
 }
 
 func (r *MessengerResponse) AddRequestToJoinCommunity(requestToJoin *communities.RequestToJoin) {

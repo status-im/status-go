@@ -12,6 +12,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
@@ -45,6 +47,7 @@ type Config struct {
 	SyncedAt                            uint64
 	EventsData                          *EventsData
 	Shard                               *common.Shard
+	PubsubTopicPrivateKey               *ecdsa.PrivateKey
 }
 
 type EventsData struct {
@@ -142,15 +145,17 @@ func (o *Community) MarshalPublicAPIJSON() ([]byte, error) {
 		CommunityTokensMetadata []*protobuf.CommunityTokenMetadata   `json:"communityTokensMetadata"`
 		ActiveMembersCount      uint64                               `json:"activeMembersCount"`
 		PubsubTopic             string                               `json:"pubsubTopic"`
+		PubsubTopicKey          string                               `json:"pubsubTopicKey"`
 		Shard                   *common.Shard                        `json:"shard"`
 	}{
-		ID:          o.ID(),
-		Verified:    o.config.Verified,
-		Chats:       make(map[string]CommunityChat),
-		Categories:  make(map[string]CommunityCategory),
-		Tags:        o.Tags(),
-		PubsubTopic: o.PubsubTopic(),
-		Shard:       o.Shard(),
+		ID:             o.ID(),
+		Verified:       o.config.Verified,
+		Chats:          make(map[string]CommunityChat),
+		Categories:     make(map[string]CommunityCategory),
+		Tags:           o.Tags(),
+		PubsubTopic:    o.PubsubTopic(),
+		PubsubTopicKey: o.PubsubTopicKey(),
+		Shard:          o.Shard(),
 	}
 
 	if o.config.CommunityDescription != nil {
@@ -258,6 +263,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		CommunityTokensMetadata     []*protobuf.CommunityTokenMetadata   `json:"communityTokensMetadata"`
 		ActiveMembersCount          uint64                               `json:"activeMembersCount"`
 		PubsubTopic                 string                               `json:"pubsubTopic"`
+		PubsubTopicKey              string                               `json:"pubsubTopicKey"`
 		Shard                       *common.Shard                        `json:"shard"`
 	}{
 		ID:                          o.ID(),
@@ -279,6 +285,7 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 		Tags:                        o.Tags(),
 		Encrypted:                   o.Encrypted(),
 		PubsubTopic:                 o.PubsubTopic(),
+		PubsubTopicKey:              o.PubsubTopicKey(),
 		Shard:                       o.Shard(),
 	}
 	if o.config.CommunityDescription != nil {
@@ -1306,6 +1313,21 @@ func (o *Community) MemberUpdateChannelID() string {
 
 func (o *Community) PubsubTopic() string {
 	return transport.GetPubsubTopic(o.Shard().TransportShard())
+}
+
+func (o *Community) PubsubTopicPrivateKey() *ecdsa.PrivateKey {
+	return o.config.PubsubTopicPrivateKey
+}
+
+func (o *Community) SetPubsubTopicPrivateKey(privKey *ecdsa.PrivateKey) {
+	o.config.PubsubTopicPrivateKey = privKey
+}
+
+func (o *Community) PubsubTopicKey() string {
+	if o.config.PubsubTopicPrivateKey == nil {
+		return ""
+	}
+	return hexutil.Encode(crypto.FromECDSAPub(&o.config.PubsubTopicPrivateKey.PublicKey))
 }
 
 func (o *Community) DefaultFilters() []transport.FiltersToInitialize {

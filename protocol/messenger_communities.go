@@ -2081,7 +2081,12 @@ func (m *Messenger) SetCommunityShard(request *requests.SetCommunityShard) (*Mes
 		return nil, err
 	}
 
-	err = m.UpdateCommunityFilters(community, topicPrivKey)
+	err = m.communitiesManager.UpdatePubsubTopicPrivateKey(community, topicPrivKey)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.UpdateCommunityFilters(community)
 	if err != nil {
 		return nil, err
 	}
@@ -2092,22 +2097,12 @@ func (m *Messenger) SetCommunityShard(request *requests.SetCommunityShard) (*Mes
 	}
 
 	response := &MessengerResponse{}
-	response.AddProtectedTopic(&ProtectedTopic{
-		CommunityID: community.IDString(),
-		PubsubTopic: community.PubsubTopic(),
-		PublicKey:   hexutil.Encode(crypto.FromECDSAPub(&topicPrivKey.PublicKey)),
-	})
+	response.AddCommunity(community)
 
 	return response, nil
 }
 
-func (m *Messenger) UpdateCommunityFilters(community *communities.Community, privKey *ecdsa.PrivateKey) error {
-	if m.transport.WakuVersion() == 2 && privKey != nil {
-		if err := m.transport.StorePubsubTopicKey(community.PubsubTopic(), privKey); err != nil {
-			return err
-		}
-	}
-
+func (m *Messenger) UpdateCommunityFilters(community *communities.Community) error {
 	publicFiltersToInit := make([]transport.FiltersToInitialize, 0, len(community.DefaultFilters())+len(community.Chats()))
 
 	publicFiltersToInit = append(publicFiltersToInit, community.DefaultFilters()...)
@@ -2496,11 +2491,7 @@ func (m *Messenger) SendCommunityShardKey(community *communities.Community, pubk
 		return nil
 	}
 
-	key, err := m.transport.RetrievePubsubTopicKey(community.PubsubTopic())
-	if err != nil {
-		return err
-	}
-
+	key := community.PubsubTopicPrivateKey()
 	if key == nil {
 		return nil // No community shard key available
 	}
@@ -3070,11 +3061,14 @@ func (m *Messenger) HandleCommunityShardKey(state *ReceivedMessageState, message
 		return errors.New("signer can't be nil")
 	}
 
-	if !community.IsMemberOwner(signer) {
-		return communities.ErrNotAuthorized
+	err = m.handleCommunityShardAndFiltersFromProto(community, common.ShardFromProtobuff(message.Shard), message.PrivateKey)
+	if err != nil {
+		return err
 	}
 
-	return m.handleCommunityShardAndFiltersFromProto(community, common.ShardFromProtobuff(message.Shard), message.PrivateKey)
+	state.Response.AddCommunity(community)
+
+	return nil
 }
 
 func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communities.Community, shard *common.Shard, privateKeyBytes []byte) error {
@@ -3091,7 +3085,12 @@ func (m *Messenger) handleCommunityShardAndFiltersFromProto(community *communiti
 		}
 	}
 
-	err = m.UpdateCommunityFilters(community, privKey)
+	err = m.communitiesManager.UpdatePubsubTopicPrivateKey(community, privKey)
+	if err != nil {
+		return err
+	}
+
+	err = m.UpdateCommunityFilters(community)
 	if err != nil {
 		return err
 	}
