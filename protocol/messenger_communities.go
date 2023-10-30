@@ -2081,7 +2081,11 @@ func (m *Messenger) SetCommunityShard(request *requests.SetCommunityShard) (*Mes
 	}
 
 	response := &MessengerResponse{}
-	response.AddProtectedTopic(community.PubsubTopic(), topicPrivKey)
+	response.AddProtectedTopic(&ProtectedTopic{
+		CommunityID: community.IDString(),
+		PubsubTopic: community.PubsubTopic(),
+		PublicKey:   hexutil.Encode(crypto.FromECDSAPub(&topicPrivKey.PublicKey)),
+	})
 
 	return response, nil
 }
