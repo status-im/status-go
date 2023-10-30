@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/gob"
+	"strings"
 	"time"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -318,4 +319,20 @@ func (db RawMessagesPersistence) GetHashRatchetMessages(keyID []byte) ([]*types.
 	}
 
 	return messages, nil
+}
+
+func (db RawMessagesPersistence) DeleteHashRatchetMessages(ids [][]byte) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	idsArgs := make([]interface{}, 0, len(ids))
+	for _, id := range ids {
+		idsArgs = append(idsArgs, id)
+	}
+	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
+
+	_, err := db.db.Exec("DELETE FROM hash_ratchet_encrypted_messages WHERE hash IN ("+inVector+")", idsArgs...) // nolint: gosec
+
+	return err
 }

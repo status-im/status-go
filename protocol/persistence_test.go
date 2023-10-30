@@ -1747,3 +1747,61 @@ func TestCountActiveChattersInCommunity(t *testing.T) {
 	checker(7, 1)
 	checker(8, 0)
 }
+
+func TestDeleteHashRatchetMessage(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := newSQLitePersistence(db)
+
+	groupID := []byte("group-id")
+	keyID := []byte("key-id")
+
+	message1 := &types.Message{
+		Hash:      []byte{1},
+		Sig:       []byte{2},
+		TTL:       1,
+		Timestamp: 2,
+		Payload:   []byte{3},
+	}
+
+	require.NoError(t, p.SaveHashRatchetMessage(groupID, keyID, message1))
+
+	message2 := &types.Message{
+		Hash:      []byte{2},
+		Sig:       []byte{2},
+		TTL:       1,
+		Topic:     types.BytesToTopic([]byte{5}),
+		Timestamp: 2,
+		Payload:   []byte{3},
+		Dst:       []byte{4},
+		P2P:       true,
+	}
+
+	require.NoError(t, p.SaveHashRatchetMessage(groupID, keyID, message2))
+
+	message3 := &types.Message{
+		Hash:      []byte{3},
+		Sig:       []byte{2},
+		TTL:       1,
+		Topic:     types.BytesToTopic([]byte{5}),
+		Timestamp: 2,
+		Payload:   []byte{3},
+		Dst:       []byte{4},
+		P2P:       true,
+	}
+
+	require.NoError(t, p.SaveHashRatchetMessage(groupID, keyID, message3))
+
+	fetchedMessages, err := p.GetHashRatchetMessages(keyID)
+	require.NoError(t, err)
+	require.NotNil(t, fetchedMessages)
+	require.Len(t, fetchedMessages, 3)
+
+	require.NoError(t, p.DeleteHashRatchetMessages([][]byte{[]byte{1}, []byte{2}}))
+
+	fetchedMessages, err = p.GetHashRatchetMessages(keyID)
+	require.NoError(t, err)
+	require.NotNil(t, fetchedMessages)
+	require.Len(t, fetchedMessages, 1)
+
+}
