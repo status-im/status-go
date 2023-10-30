@@ -104,6 +104,9 @@ type ChannelGroup struct {
 	UnviewedMessagesCount           int                                                     `json:"unviewedMessagesCount"`
 	UnviewedMentionsCount           int                                                     `json:"unviewedMentionsCount"`
 	CheckChannelPermissionResponses map[string]*communities.CheckChannelPermissionsResponse `json:"checkChannelPermissionResponses"`
+	PubsubTopic                     string                                                  `json:"pubsubTopic"`
+	PubsubTopicKey                  string                                                  `json:"pubsubTopicKey"`
+	Shard                           *common.Shard                                           `json:"shard"`
 }
 
 func NewAPI(service *Service) *API {
@@ -234,6 +237,9 @@ func (api *API) getChannelGroups(ctx context.Context, channelGroupID string) (ma
 			UnviewedMessagesCount:           totalUnviewedMessageCount,
 			UnviewedMentionsCount:           totalUnviewedMentionsCount,
 			CheckChannelPermissionResponses: make(map[string]*communities.CheckChannelPermissionsResponse),
+			PubsubTopic:                     community.PubsubTopic(),
+			PubsubTopicKey:                  community.PubsubTopicKey(),
+			Shard:                           community.Shard(),
 		}
 
 		for t, i := range community.Images() {

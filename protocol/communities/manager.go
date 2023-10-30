@@ -625,7 +625,7 @@ func (m *Manager) All() ([]*Community, error) {
 	}
 
 	for _, c := range communities {
-		err = initializeCommunity(c)
+		err = m.initializeCommunity(c)
 		if err != nil {
 			return nil, err
 		}
@@ -687,7 +687,7 @@ func (m *Manager) Joined() ([]*Community, error) {
 	}
 
 	for _, c := range communities {
-		err = initializeCommunity(c)
+		err = m.initializeCommunity(c)
 		if err != nil {
 			return nil, err
 		}
@@ -703,7 +703,7 @@ func (m *Manager) Spectated() ([]*Community, error) {
 	}
 
 	for _, c := range communities {
-		err = initializeCommunity(c)
+		err = m.initializeCommunity(c)
 		if err != nil {
 			return nil, err
 		}
@@ -719,7 +719,7 @@ func (m *Manager) JoinedAndPendingCommunitiesWithRequests() ([]*Community, error
 	}
 
 	for _, c := range communities {
-		err = initializeCommunity(c)
+		err = m.initializeCommunity(c)
 		if err != nil {
 			return nil, err
 		}
@@ -735,7 +735,7 @@ func (m *Manager) DeletedCommunities() ([]*Community, error) {
 	}
 
 	for _, c := range communities {
-		err = initializeCommunity(c)
+		err = m.initializeCommunity(c)
 		if err != nil {
 			return nil, err
 		}
@@ -754,7 +754,7 @@ func (m *Manager) Controlled() ([]*Community, error) {
 
 	for _, c := range communities {
 		if c.IsControlNode() {
-			err = initializeCommunity(c)
+			err = m.initializeCommunity(c)
 			if err != nil {
 				return nil, err
 			}
@@ -1114,6 +1114,18 @@ func (m *Manager) SetShard(communityID types.HexBytes, shard *common.Shard) (*Co
 	m.publish(&Subscription{Community: community})
 
 	return community, nil
+}
+
+func (m *Manager) UpdatePubsubTopicPrivateKey(community *Community, privKey *ecdsa.PrivateKey) error {
+	community.SetPubsubTopicPrivateKey(privKey)
+
+	if privKey != nil {
+		if err := m.transport.StorePubsubTopicKey(community.PubsubTopic(), privKey); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // EditCommunity takes a description, updates the community with the description,
@@ -3188,10 +3200,18 @@ func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (
 }
 
 // Apply events to raw community
-func initializeCommunity(community *Community) error {
+func (m *Manager) initializeCommunity(community *Community) error {
 	err := community.updateCommunityDescriptionByEvents()
 	if err != nil {
 		return err
+	}
+
+	if m.transport != nil && m.transport.WakuVersion() == 2 {
+		privKey, err := m.transport.RetrievePubsubTopicKey(community.PubsubTopic())
+		if err != nil {
+			return err
+		}
+		community.config.PubsubTopicPrivateKey = privKey
 	}
 
 	// Workaround for https://github.com/status-im/status-desktop/issues/12188
@@ -3209,7 +3229,7 @@ func (m *Manager) GetByID(id []byte) (*Community, error) {
 		return nil, nil
 	}
 
-	err = initializeCommunity(community)
+	err = m.initializeCommunity(community)
 	if err != nil {
 		return nil, err
 	}
