@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/beevik/ntp"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -264,16 +266,33 @@ func (s *NTPTimeSource) Stop() error {
 }
 
 func GetCurrentTimeInMillis() (uint64, error) {
-	ts := Default()
-	if err := ts.Start(); err != nil {
+	now, err := GetCurrentTime()
+	if err != nil {
 		return 0, err
 	}
-	var t uint64
+	return uint64(now.UnixNano() / int64(time.Millisecond)), nil
+}
+
+func GetCurrentTime() (*time.Time, error) {
+	ts := Default()
+	if err := ts.Start(); err != nil {
+		return nil, err
+	}
+	var t *time.Time
 	ts.AddCallback(func(now time.Time) {
-		t = uint64(now.UnixNano() / int64(time.Millisecond))
+		t = &now
 	}).Wait()
 	if ts.updatedOffset {
 		return t, nil
 	}
-	return 0, errUpdateOffset
+	return nil, errUpdateOffset
+}
+
+func Time() time.Time {
+	now, err := GetCurrentTime()
+	if err != nil {
+		log.Error("[timesource] error when getting current time", zap.Error(err))
+		return time.Now()
+	}
+	return *now
 }
