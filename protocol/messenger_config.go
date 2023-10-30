@@ -8,6 +8,7 @@ import (
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/communitytokens"
+	"github.com/status-im/status-go/wakuv2"
 
 	"go.uber.org/zap"
 
@@ -112,6 +113,7 @@ type config struct {
 	messengerSignalsHandler MessengerSignalsHandler
 
 	telemetryServerURL string
+	wakuService        *wakuv2.Waku
 }
 
 type Option func(*config) error
@@ -342,6 +344,13 @@ func WithWalletService(s *wallet.Service) Option {
 func WithCommunityTokensService(s communitytokens.ServiceInterface) Option {
 	return func(c *config) error {
 		c.communityTokensService = s
+		return nil
+	}
+}
+
+func WithWakuService(s *wakuv2.Waku) Option {
+	return func(c *config) error {
+		c.wakuService = s
 		return nil
 	}
 }

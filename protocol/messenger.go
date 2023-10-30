@@ -412,6 +412,9 @@ func NewMessenger(
 	var telemetryClient *telemetry.Client
 	if c.telemetryServerURL != "" {
 		telemetryClient = telemetry.NewClient(logger, c.telemetryServerURL, c.account.KeyUID, nodeName)
+		if c.wakuService != nil {
+			c.wakuService.SetStatusTelemetryClient(telemetryClient)
+		}
 	}
 
 	// Initialize push notification server
@@ -3625,6 +3628,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 			statusMessages, acks, err := m.sender.HandleMessages(shhMessage)
 			if err != nil {
+				if m.telemetryClient != nil {
+					go m.telemetryClient.UpdateEnvelopeProcessingError(shhMessage, err)
+				}
 				logger.Info("failed to decode messages", zap.Error(err))
 				continue
 			}

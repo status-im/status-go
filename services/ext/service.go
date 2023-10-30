@@ -55,6 +55,7 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 	"github.com/status-im/status-go/services/wallet/thirdparty"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 const infinityString = "∞"
@@ -121,7 +122,7 @@ func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
 	return enode.ParseV4(rawURL)
 }
 
-func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appDb, walletDb *sql.DB, httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, accountManager *account.GethManager, rpcClient *rpc.Client, walletService *wallet.Service, communityTokensService *communitytokens.Service, logger *zap.Logger) error {
+func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appDb, walletDb *sql.DB, httpServer *server.MediaServer, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, accountManager *account.GethManager, rpcClient *rpc.Client, walletService *wallet.Service, communityTokensService *communitytokens.Service, wakuService *wakuv2.Waku, logger *zap.Logger) error {
 	var err error
 	if !s.config.ShhextConfig.PFSEnabled {
 		return nil
@@ -160,7 +161,7 @@ func (s *Service) InitProtocol(nodeName string, identity *ecdsa.PrivateKey, appD
 	s.multiAccountsDB = multiAccountDb
 	s.account = acc
 
-	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, walletService, communityTokensService, logger, &MessengerSignalsHandler{})
+	options, err := buildMessengerOptions(s.config, identity, appDb, walletDb, httpServer, s.rpcClient, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, walletService, communityTokensService, wakuService, logger, &MessengerSignalsHandler{})
 	if err != nil {
 		return err
 	}
@@ -419,6 +420,7 @@ func buildMessengerOptions(
 	accountsDB *accounts.Database,
 	walletService *wallet.Service,
 	communityTokensService *communitytokens.Service,
+	wakuService *wakuv2.Waku,
 	logger *zap.Logger,
 	messengerSignalsHandler protocol.MessengerSignalsHandler,
 ) ([]protocol.Option, error) {
@@ -442,6 +444,7 @@ func buildMessengerOptions(
 		protocol.WithWalletConfig(&config.WalletConfig),
 		protocol.WithWalletService(walletService),
 		protocol.WithCommunityTokensService(communityTokensService),
+		protocol.WithWakuService(wakuService),
 	}
 
 	if config.ShhextConfig.DataSyncEnabled {

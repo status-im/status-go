@@ -90,6 +90,10 @@ type settings struct {
 	Options             []node.WakuNodeOption
 }
 
+type ITelemetryClient interface {
+	PushReceivedEnvelope(*protocol.Envelope)
+}
+
 // Waku represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku struct {
@@ -155,6 +159,12 @@ type Waku struct {
 
 	onHistoricMessagesRequestFailed func([]byte, peer.ID, error)
 	onPeerStats                     func(types.ConnStatus)
+
+	statusTelemetryClient ITelemetryClient
+}
+
+func (w *Waku) SetStatusTelemetryClient(client ITelemetryClient) {
+	w.statusTelemetryClient = client
 }
 
 func getUsableUDPPort() (int, error) {
@@ -1288,6 +1298,10 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 	recvMessage := common.NewReceivedMessage(envelope, msgType)
 	if recvMessage == nil {
 		return nil
+	}
+
+	if w.statusTelemetryClient != nil {
+		w.statusTelemetryClient.PushReceivedEnvelope(envelope)
 	}
 
 	logger := w.logger.With(zap.String("hash", recvMessage.Hash().Hex()))
