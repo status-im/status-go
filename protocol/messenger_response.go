@@ -1,11 +1,8 @@
 package protocol
 
 import (
-	"crypto/ecdsa"
 	"encoding/json"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/eth-node/crypto"
 	ensservice "github.com/status-im/status-go/services/ens"
 
 	"github.com/status-im/status-go/services/browsers"
@@ -38,6 +35,7 @@ type ClearedHistory struct {
 }
 
 type ProtectedTopic struct {
+	CommunityID string `json:"communityID"`
 	PubsubTopic string `json:"pubsubTopic"`
 	PublicKey   string `json:"publicKey"`
 }
@@ -70,7 +68,7 @@ type MessengerResponse struct {
 	removedMessages             map[string]*RemovedMessage
 	communities                 map[string]*communities.Community
 	communitiesSettings         map[string]*communities.CommunitySettings
-	protectedTopics             map[string]*ecdsa.PrivateKey
+	protectedTopics             map[string]*ProtectedTopic
 	activityCenterNotifications map[string]*ActivityCenterNotification
 	activityCenterState         *ActivityCenterState
 	messages                    map[string]*common.Message
@@ -224,11 +222,8 @@ func (r *MessengerResponse) CommunitiesSettings() []*communities.CommunitySettin
 
 func (r *MessengerResponse) ProtectedTopics() []ProtectedTopic {
 	protectedTopics := make([]ProtectedTopic, 0, len(r.protectedTopics))
-	for pubsubTopic, privKey := range r.protectedTopics {
-		protectedTopics = append(protectedTopics, ProtectedTopic{
-			PubsubTopic: pubsubTopic,
-			PublicKey:   hexutil.Encode(crypto.FromECDSAPub(&privKey.PublicKey)),
-		})
+	for _, pt := range r.protectedTopics {
+		protectedTopics = append(protectedTopics, *pt)
 	}
 	return protectedTopics
 }
@@ -377,12 +372,12 @@ func (r *MessengerResponse) AddRequestsToJoinCommunity(requestsToJoin []*communi
 	r.RequestsToJoinCommunity = append(r.RequestsToJoinCommunity, requestsToJoin...)
 }
 
-func (r *MessengerResponse) AddProtectedTopic(pubsubTopic string, privKey *ecdsa.PrivateKey) {
+func (r *MessengerResponse) AddProtectedTopic(pt *ProtectedTopic) {
 	if r.protectedTopics == nil {
-		r.protectedTopics = make(map[string]*ecdsa.PrivateKey)
+		r.protectedTopics = make(map[string]*ProtectedTopic)
 	}
 
-	r.protectedTopics[pubsubTopic] = privKey
+	r.protectedTopics[pt.CommunityID] = pt
 }
 
 func (r *MessengerResponse) AddRequestToJoinCommunity(requestToJoin *communities.RequestToJoin) {
