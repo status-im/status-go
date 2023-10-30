@@ -309,6 +309,9 @@ func (tm *TransactionManager) CreateMultiTransactionFromCommand(ctx context.Cont
 	for _, tx := range data {
 		chainIDs = append(chainIDs, tx.ChainID)
 	}
+	if multiTransaction.Type == MultiTransactionSend && multiTransaction.FromNetworkID == 0 && len(chainIDs) == 1 {
+		multiTransaction.FromNetworkID = chainIDs[0]
+	}
 	multiTransactionID, err := tm.insertMultiTransactionAndNotify(tm.db, multiTransaction, chainIDs)
 	if err != nil {
 		return nil, err
