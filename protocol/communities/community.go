@@ -12,8 +12,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
-
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
@@ -1290,7 +1288,7 @@ func (o *Community) DefaultFilters() []transport.FiltersToInitialize {
 
 	return []transport.FiltersToInitialize{
 		{ChatID: cID, PubsubTopic: communityPubsubTopic},
-		{ChatID: uncompressedPubKey, PubsubTopic: relay.DefaultWakuTopic}, // TODO: messages that are not protected are sent in default pubsub topic for now
+		{ChatID: uncompressedPubKey, PubsubTopic: common.DefaultNonProtectedPubsubTopic(o.Shard())},
 		{ChatID: uncompressedPubKey, PubsubTopic: communityPubsubTopic},
 		{ChatID: updatesChannelID, PubsubTopic: communityPubsubTopic},
 		{ChatID: mlChannelID, PubsubTopic: communityPubsubTopic},
