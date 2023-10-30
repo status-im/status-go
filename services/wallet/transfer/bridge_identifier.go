@@ -34,6 +34,7 @@ type originTxParams struct {
 	toNetworkID   uint64
 	toAddress     common.Address
 	crossTxID     string
+	timestamp     uint64
 }
 
 func upsertHopBridgeOriginTx(ctx context.Context, transactionManager *TransactionManager, params originTxParams) (*MultiTransaction, error) {
@@ -59,6 +60,7 @@ func upsertHopBridgeOriginTx(ctx context.Context, transactionManager *Transactio
 			// Common data
 			Type:      MultiTransactionBridge,
 			CrossTxID: params.crossTxID,
+			Timestamp: params.timestamp,
 		}
 
 		_, err := transactionManager.InsertMultiTransaction(multiTx)
@@ -72,6 +74,7 @@ func upsertHopBridgeOriginTx(ctx context.Context, transactionManager *Transactio
 		multiTx.FromAddress = params.fromAddress
 		multiTx.FromAsset = params.fromAsset
 		multiTx.FromAmount = (*hexutil.Big)(params.fromAmount)
+		multiTx.Timestamp = params.timestamp
 
 		err := transactionManager.UpdateMultiTransaction(multiTx)
 		if err != nil {
@@ -88,6 +91,7 @@ type destinationTxParams struct {
 	toAsset     string
 	toAmount    *big.Int
 	crossTxID   string
+	timestamp   uint64
 }
 
 func upsertHopBridgeDestinationTx(ctx context.Context, transactionManager *TransactionManager, params destinationTxParams) (*MultiTransaction, error) {
@@ -112,6 +116,7 @@ func upsertHopBridgeDestinationTx(ctx context.Context, transactionManager *Trans
 			// Common data
 			Type:      MultiTransactionBridge,
 			CrossTxID: params.crossTxID,
+			Timestamp: params.timestamp,
 		}
 
 		_, err := transactionManager.InsertMultiTransaction(multiTx)
@@ -122,6 +127,7 @@ func upsertHopBridgeDestinationTx(ctx context.Context, transactionManager *Trans
 		multiTx.ToTxHash = params.toTxHash
 		multiTx.ToAsset = params.toAsset
 		multiTx.ToAmount = (*hexutil.Big)(params.toAmount)
+		multiTx.Timestamp = params.timestamp
 
 		err := transactionManager.UpdateMultiTransaction(multiTx)
 		if err != nil {
@@ -150,6 +156,7 @@ func buildHopBridgeMultitransaction(ctx context.Context, client chain.ClientInte
 			toNetworkID:   toChainID,
 			toAddress:     recipient,
 			crossTxID:     getHopBridgeFromL1CrossTxID(recipient, relayer, subTx.Log.Data),
+			timestamp:     subTx.Timestamp,
 		}
 
 		return upsertHopBridgeOriginTx(ctx, transactionManager, params)
@@ -168,6 +175,7 @@ func buildHopBridgeMultitransaction(ctx context.Context, client chain.ClientInte
 			toAsset:     "ETH",
 			toAmount:    toAmount,
 			crossTxID:   getHopBridgeFromL1CrossTxID(recipient, relayer, subTx.Log.Data),
+			timestamp:   subTx.Timestamp,
 		}
 
 		return upsertHopBridgeDestinationTx(ctx, transactionManager, params)
@@ -188,6 +196,7 @@ func buildHopBridgeMultitransaction(ctx context.Context, client chain.ClientInte
 			toNetworkID:   toChainID,
 			toAddress:     recipient,
 			crossTxID:     getHopBridgeFromL2CrossTxID(transferID),
+			timestamp:     subTx.Timestamp,
 		}
 
 		return upsertHopBridgeOriginTx(ctx, transactionManager, params)
@@ -206,6 +215,7 @@ func buildHopBridgeMultitransaction(ctx context.Context, client chain.ClientInte
 			toAsset:     "ETH",
 			toAmount:    toAmount,
 			crossTxID:   getHopBridgeFromL2CrossTxID(transferID),
+			timestamp:   subTx.Timestamp,
 		}
 
 		return upsertHopBridgeDestinationTx(ctx, transactionManager, params)
