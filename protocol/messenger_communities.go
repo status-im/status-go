@@ -366,7 +366,7 @@ func (m *Messenger) handleCommunitiesSubscription(c chan *communities.Subscripti
 					}
 
 					// control node changed and we were kicked out. It now awaits our addresses
-					if communityResponse.Changes.ControlNodeChanged != nil && communityResponse.Changes.ShouldMemberLeave {
+					if communityResponse.Changes.ControlNodeChanged != nil && communityResponse.Changes.MemberKicked {
 						requestToJoin, err := m.sendSharedAddressToControlNode(communityResponse.Community.ControlNode(), communityResponse.Community)
 						if err != nil {
 							m.logger.Error("share address to control node failed", zap.String("id", types.EncodeHex(communityResponse.Community.ID())), zap.Error(err))
