@@ -775,6 +775,7 @@ func (s *MessageSender) HandleMessages(shhMessage *types.Message) ([]*v1protocol
 			return nil, nil, err
 		}
 
+		var processedIds [][]byte
 		for _, message := range messages {
 			var statusMessage v1protocol.StatusMessage
 			err := statusMessage.HandleTransport(message)
@@ -785,7 +786,9 @@ func (s *MessageSender) HandleMessages(shhMessage *types.Message) ([]*v1protocol
 			err = s.handleEncryptionLayer(context.Background(), &statusMessage)
 			if err != nil {
 				hlogger.Debug("failed to handle an encryption message", zap.Error(err))
+				continue
 			}
+			processedIds = append(processedIds, message.Hash)
 
 			stms, as, err := unwrapDatasyncMessage(&statusMessage, s.datasync)
 			if err != nil {
@@ -797,6 +800,12 @@ func (s *MessageSender) HandleMessages(shhMessage *types.Message) ([]*v1protocol
 				statusMessages = append(statusMessages, stms...)
 				acks = append(acks, as...)
 			}
+		}
+		err = s.persistence.DeleteHashRatchetMessages(processedIds)
+		if err != nil {
+			s.logger.Warn("failed to delete hash ratchet messages", zap.Error(err))
+			return nil, nil, err
+
 		}
 	}
 

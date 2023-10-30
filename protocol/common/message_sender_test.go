@@ -225,3 +225,82 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	s.Require().Equal(encodedPayload, decodedMessages[0].UnwrappedPayload)
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }
+
+func (s *MessageSenderSuite) TestHandleOutOfOrderHashRatchet() {
+	groupID := []byte("group-id")
+	senderKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	encodedPayload, err := proto.Marshal(&s.testMessage)
+	s.Require().NoError(err)
+
+	// Create sender encryption protocol.
+	senderDatabase, err := helpers.SetupTestMemorySQLDB(appdatabase.DbInitializer{})
+	s.Require().NoError(err)
+	err = sqlite.Migrate(senderDatabase)
+	s.Require().NoError(err)
+
+	senderEncryptionProtocol := encryption.New(
+		senderDatabase,
+		"installation-2",
+		s.logger,
+	)
+
+	ratchet, err := senderEncryptionProtocol.GenerateHashRatchetKey(groupID)
+	s.Require().NoError(err)
+
+	ratchets := []*encryption.HashRatchetKeyCompatibility{ratchet}
+
+	hashRatchetKeyExchangeMessage, err := senderEncryptionProtocol.BuildHashRatchetKeyExchangeMessage(senderKey, &s.sender.identity.PublicKey, groupID, ratchets)
+	s.Require().NoError(err)
+
+	encryptedPayload1, err := proto.Marshal(hashRatchetKeyExchangeMessage.Message)
+	s.Require().NoError(err)
+
+	wrappedPayload2, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, senderKey)
+	s.Require().NoError(err)
+
+	messageSpec2, err := senderEncryptionProtocol.BuildHashRatchetMessage(
+		groupID,
+		wrappedPayload2,
+	)
+	s.Require().NoError(err)
+
+	encryptedPayload2, err := proto.Marshal(messageSpec2.Message)
+	s.Require().NoError(err)
+
+	message := &types.Message{}
+	message.Sig = crypto.FromECDSAPub(&senderKey.PublicKey)
+	message.Hash = []byte{0x1}
+	message.Payload = encryptedPayload2
+
+	_, _, err = s.sender.HandleMessages(message)
+	s.Require().NoError(err)
+
+	keyID, err := ratchet.GetKeyID()
+	s.Require().NoError(err)
+
+	msgs, err := s.sender.persistence.GetHashRatchetMessages(keyID)
+	s.Require().NoError(err)
+
+	s.Require().Len(msgs, 1)
+
+	message = &types.Message{}
+	message.Sig = crypto.FromECDSAPub(&senderKey.PublicKey)
+	message.Hash = []byte{0x2}
+	message.Payload = encryptedPayload1
+
+	decodedMessages2, _, err := s.sender.HandleMessages(message)
+	s.Require().NoError(err)
+	s.Require().NotNil(decodedMessages2)
+
+	// It should have 2 messages, the key exchange and the one from the database
+	s.Require().Len(decodedMessages2, 2)
+
+	// it deletes the messages after being processed
+	msgs, err = s.sender.persistence.GetHashRatchetMessages(keyID)
+	s.Require().NoError(err)
+
+	s.Require().Len(msgs, 0)
+
+}
