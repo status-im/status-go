@@ -26,6 +26,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
+	wc "github.com/status-im/status-go/services/wallet/walletconnect"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
 )
@@ -626,7 +627,7 @@ func (api *API) GetActivityCollectiblesAsync(requestID int32, chainIDs []wcommon
 }
 
 func (api *API) FetchChainIDForURL(ctx context.Context, rpcURL string) (*big.Int, error) {
-	log.Debug("wallet.api.VerifyURL", rpcURL)
+	log.Debug("wallet.api.VerifyURL", "rpcURL", rpcURL)
 
 	rpcClient, err := gethrpc.Dial(rpcURL)
 	if err != nil {
@@ -634,4 +635,16 @@ func (api *API) FetchChainIDForURL(ctx context.Context, rpcURL string) (*big.Int
 	}
 	client := ethclient.NewClient(rpcClient)
 	return client.ChainID(ctx)
+}
+
+func (api *API) WCPairSessionProposal(ctx context.Context, sessionProposalJSON string) (*wc.PairSessionResponse, error) {
+	log.Debug("wallet.api.wc.PairSessionProposal", "proposal.len", len(sessionProposalJSON))
+
+	var data wc.SessionProposal
+	err := json.Unmarshal([]byte(sessionProposalJSON), &data)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.s.walletConnect.PairSessionProposal(data)
 }

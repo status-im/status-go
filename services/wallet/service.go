@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/thirdparty/opensea"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
+	"github.com/status-im/status-go/services/wallet/walletconnect"
 	"github.com/status-im/status-go/services/wallet/walletevent"
 	"github.com/status-im/status-go/transactions"
 )
@@ -136,6 +137,8 @@ func NewService(
 
 	activity := activity.NewService(db, tokenManager, collectiblesManager, feed)
 
+	walletconnect := walletconnect.NewService(rpcClient.NetworkManager, accountsDB, feed)
+
 	return &Service{
 		db:                    db,
 		accountsDB:            accountsDB,
@@ -163,6 +166,7 @@ func NewService(
 		decoder:               NewDecoder(),
 		blockChainState:       blockChainState,
 		keycardPairings:       NewKeycardPairings(),
+		walletConnect:         walletconnect,
 	}
 }
 
@@ -195,6 +199,7 @@ type Service struct {
 	decoder               *Decoder
 	blockChainState       *BlockChainState
 	keycardPairings       *KeycardPairings
+	walletConnect         *walletconnect.Service
 }
 
 // Start signals transmitter.
