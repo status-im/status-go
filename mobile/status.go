@@ -352,7 +352,7 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 		return makeJSONResponse(err)
 	}
 
-	if settings.Mnemonic != "" {
+	if *settings.Mnemonic != "" {
 		settings.OmitTransfersHistoryScan = true
 	}
 
