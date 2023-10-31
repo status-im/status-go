@@ -996,7 +996,7 @@ func (o *Community) MemberIdentity() *ecdsa.PublicKey {
 }
 
 // UpdateCommunityDescription will update the community to the new community description and return a list of changes
-func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDescription, rawMessage []byte) (*CommunityChanges, error) {
+func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDescription, rawMessage []byte, newControlNode *ecdsa.PublicKey) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -1018,6 +1018,10 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 
 	o.config.CommunityDescription = description
 	o.config.CommunityDescriptionProtocolMessage = rawMessage
+
+	if newControlNode != nil {
+		o.setControlNode(newControlNode)
+	}
 
 	// We only calculate changes if we joined/spectated the community or we requested access, otherwise not interested
 	if o.config.Joined || o.config.Spectated || o.config.RequestedToJoinAt > 0 {

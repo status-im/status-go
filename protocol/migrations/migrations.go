@@ -107,8 +107,8 @@
 // 1697699419_community_control_node_sync.up.sql (435B)
 // 1698137561_add_profile_showcase_tables.up.sql (440B)
 // 1698137562_fix_encryption_key_id.up.sql (758B)
-// 1698329296_add_signature_to_revealed_addresses.up.sql (87B)
 // 1698414646_add_padding.up.sql (69B)
+// 1698746210_add_signature_to_revealed_addresses.up.sql (87B)
 // README.md (554B)
 // doc.go (850B)
 
@@ -2319,26 +2319,6 @@ func _1698137562_fix_encryption_key_idUpSql() (*asset, error) {
 	return a, nil
 }
 
-var __1698329296_add_signature_to_revealed_addressesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\x41\x0e\x02\x21\x0c\x05\xd0\xbd\xa7\xe8\x3d\x5c\x81\x33\xbb\xea\x24\x06\xd7\x0d\x91\x1f\x53\x23\x10\xdb\xe2\xf9\x7d\x89\xcb\x7e\xa7\x92\x32\xef\xf4\x9c\xbd\xaf\xa1\xa1\x70\x31\x7c\x17\x3c\x5c\x62\xca\x7b\xea\x10\xc3\x0f\xf5\x83\x26\xb5\x35\x83\x3b\x9c\xd2\xb6\xd1\xe5\xe0\xc7\xf5\x46\xae\xaf\x51\x63\x19\x28\xf3\x91\xcf\xa7\x7f\x00\x00\x00\xff\xff\xa0\x4d\x97\x3e\x57\x00\x00\x00")
-
-func _1698329296_add_signature_to_revealed_addressesUpSqlBytes() ([]byte, error) {
-	return bindataRead(
-		__1698329296_add_signature_to_revealed_addressesUpSql,
-		"1698329296_add_signature_to_revealed_addresses.up.sql",
-	)
-}
-
-func _1698329296_add_signature_to_revealed_addressesUpSql() (*asset, error) {
-	bytes, err := _1698329296_add_signature_to_revealed_addressesUpSqlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "1698329296_add_signature_to_revealed_addresses.up.sql", size: 87, mode: os.FileMode(0644), modTime: time.Unix(1698686236, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x8f, 0x64, 0xef, 0xe7, 0x5d, 0x82, 0x3e, 0x7d, 0x5a, 0x34, 0xd2, 0xa, 0x5c, 0x48, 0xef, 0x40, 0xb4, 0x7d, 0x78, 0xc8, 0x11, 0xbc, 0xf3, 0xc5, 0x1d, 0xd5, 0xe9, 0x39, 0xd9, 0xfa, 0xc8, 0x27}}
-	return a, nil
-}
-
 var __1698414646_add_paddingUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\xc8\x48\x2c\xce\x88\x2f\x4a\x2c\x49\xce\x48\x2d\x89\x4f\xcd\x4b\x2e\xaa\x2c\x28\x49\x4d\x89\xcf\x4d\x2d\x2e\x4e\x4c\x4f\x2d\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x28\x48\x4c\x49\xc9\xcc\x4b\x57\x70\xf2\xf1\x77\xb2\xe6\x02\x04\x00\x00\xff\xff\xc9\x3b\x51\x83\x45\x00\x00\x00")
 
 func _1698414646_add_paddingUpSqlBytes() ([]byte, error) {
@@ -2356,6 +2336,26 @@ func _1698414646_add_paddingUpSql() (*asset, error) {
 
 	info := bindataFileInfo{name: "1698414646_add_padding.up.sql", size: 69, mode: os.FileMode(0644), modTime: time.Unix(1698686236, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xbf, 0x48, 0x8e, 0x18, 0x1b, 0x81, 0x78, 0xab, 0x42, 0xcb, 0x11, 0xf5, 0xe, 0x44, 0xd4, 0x35, 0x33, 0x4e, 0x8, 0x6f, 0x14, 0x90, 0xe6, 0x2b, 0x59, 0xee, 0x87, 0xb, 0x96, 0x62, 0x3, 0x45}}
+	return a, nil
+}
+
+var __1698746210_add_signature_to_revealed_addressesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\x41\x0e\x02\x21\x0c\x05\xd0\xbd\xa7\xe8\x3d\x5c\x81\x33\xbb\xea\x24\x06\xd7\x0d\x91\x1f\x53\x23\x10\xdb\xe2\xf9\x7d\x89\xcb\x7e\xa7\x92\x32\xef\xf4\x9c\xbd\xaf\xa1\xa1\x70\x31\x7c\x17\x3c\x5c\x62\xca\x7b\xea\x10\xc3\x0f\xf5\x83\x26\xb5\x35\x83\x3b\x9c\xd2\xb6\xd1\xe5\xe0\xc7\xf5\x46\xae\xaf\x51\x63\x19\x28\xf3\x91\xcf\xa7\x7f\x00\x00\x00\xff\xff\xa0\x4d\x97\x3e\x57\x00\x00\x00")
+
+func _1698746210_add_signature_to_revealed_addressesUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1698746210_add_signature_to_revealed_addressesUpSql,
+		"1698746210_add_signature_to_revealed_addresses.up.sql",
+	)
+}
+
+func _1698746210_add_signature_to_revealed_addressesUpSql() (*asset, error) {
+	bytes, err := _1698746210_add_signature_to_revealed_addressesUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1698746210_add_signature_to_revealed_addresses.up.sql", size: 87, mode: os.FileMode(0644), modTime: time.Unix(1698746264, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x8f, 0x64, 0xef, 0xe7, 0x5d, 0x82, 0x3e, 0x7d, 0x5a, 0x34, 0xd2, 0xa, 0x5c, 0x48, 0xef, 0x40, 0xb4, 0x7d, 0x78, 0xc8, 0x11, 0xbc, 0xf3, 0xc5, 0x1d, 0xd5, 0xe9, 0x39, 0xd9, 0xfa, 0xc8, 0x27}}
 	return a, nil
 }
 
@@ -2704,9 +2704,9 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1698137562_fix_encryption_key_id.up.sql": _1698137562_fix_encryption_key_idUpSql,
 
-	"1698329296_add_signature_to_revealed_addresses.up.sql": _1698329296_add_signature_to_revealed_addressesUpSql,
-
 	"1698414646_add_padding.up.sql": _1698414646_add_paddingUpSql,
+
+	"1698746210_add_signature_to_revealed_addresses.up.sql": _1698746210_add_signature_to_revealed_addressesUpSql,
 
 	"README.md": readmeMd,
 
@@ -2861,10 +2861,10 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1697699419_community_control_node_sync.up.sql":                               &bintree{_1697699419_community_control_node_syncUpSql, map[string]*bintree{}},
 	"1698137561_add_profile_showcase_tables.up.sql":                               &bintree{_1698137561_add_profile_showcase_tablesUpSql, map[string]*bintree{}},
 	"1698137562_fix_encryption_key_id.up.sql":                                     &bintree{_1698137562_fix_encryption_key_idUpSql, map[string]*bintree{}},
-	"1698329296_add_signature_to_revealed_addresses.up.sql":                       &bintree{_1698329296_add_signature_to_revealed_addressesUpSql, map[string]*bintree{}},
 	"1698414646_add_padding.up.sql":                                               &bintree{_1698414646_add_paddingUpSql, map[string]*bintree{}},
-	"README.md":                                                                   &bintree{readmeMd, map[string]*bintree{}},
-	"doc.go":                                                                      &bintree{docGo, map[string]*bintree{}},
+	"1698746210_add_signature_to_revealed_addresses.up.sql":                       &bintree{_1698746210_add_signature_to_revealed_addressesUpSql, map[string]*bintree{}},
+	"README.md": &bintree{readmeMd, map[string]*bintree{}},
+	"doc.go":    &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

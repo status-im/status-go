@@ -1637,20 +1637,22 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 				community.config.PrivateKey = nil
 			}
 
-			community.setControlNode(verifiedOwner)
-		}
-		if !common.IsPubKeyEqual(community.ControlNode(), signer) {
+			// new control node will be set in the 'UpdateCommunityDescription'
+			if !common.IsPubKeyEqual(verifiedOwner, signer) {
+				return nil, ErrNotAuthorized
+			}
+		} else if !common.IsPubKeyEqual(community.ControlNode(), signer) {
 			return nil, ErrNotAuthorized
 		}
 	} else if !common.IsPubKeyEqual(community.PublicKey(), signer) {
 		return nil, ErrNotAuthorized
 	}
 
-	return m.handleCommunityDescriptionMessageCommon(community, description, payload)
+	return m.handleCommunityDescriptionMessageCommon(community, description, payload, verifiedOwner)
 }
 
-func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, description *protobuf.CommunityDescription, payload []byte) (*CommunityResponse, error) {
-	changes, err := community.UpdateCommunityDescription(description, payload)
+func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, description *protobuf.CommunityDescription, payload []byte, newControlNode *ecdsa.PublicKey) (*CommunityResponse, error) {
+	changes, err := community.UpdateCommunityDescription(description, payload, newControlNode)
 	if err != nil {
 		return nil, err
 	}
@@ -2837,7 +2839,7 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, ErrNotAuthorized
 	}
 
-	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg)
+	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg, nil)
 	if err != nil {
 		return nil, err
 	}
