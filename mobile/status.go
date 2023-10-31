@@ -351,6 +351,11 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+
+	if settings.Mnemonic != "" {
+		settings.OmitTransfersHistoryScan = true
+	}
+
 	var conf params.NodeConfig
 	err = json.Unmarshal([]byte(configJSON), &conf)
 	if err != nil {
