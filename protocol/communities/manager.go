@@ -465,15 +465,20 @@ func (m *Manager) runOwnerVerificationLoop() {
 						response, err := m.HandleCommunityDescriptionMessage(signer, description, communityToValidate.payload, ownerPK)
 						if err != nil {
 							m.logger.Error("failed to handle community", zap.Error(err))
+							err = m.persistence.DeleteCommunityToValidate(communityToValidate.id, communityToValidate.clock)
+							if err != nil {
+								m.logger.Error("failed to delete community to validate", zap.Error(err))
+							}
 							continue
 						}
+
 						if response != nil {
 
 							m.logger.Info("community validated", zap.String("id", types.EncodeHex(communityToValidate.id)), zap.String("signer", common.PubkeyToHex(signer)))
 							m.publish(&Subscription{TokenCommunityValidated: response})
 							err := m.persistence.DeleteCommunitiesToValidateByCommunityID(communityToValidate.id)
 							if err != nil {
-								m.logger.Error("failed to delete community to validate", zap.Error(err))
+								m.logger.Error("failed to delete communities to validate", zap.Error(err))
 							}
 							break
 						}
@@ -1518,6 +1523,27 @@ func (m *Manager) DeleteCategory(request *requests.DeleteCommunityCategory) (*Co
 	return changes.Community, changes, nil
 }
 
+func (m *Manager) GenerateRequestsToJoinForAutoApprovalOnNewOwnership(communityID types.HexBytes, kickedMembers map[string]*protobuf.CommunityMember) error {
+	var requestsToJoin []*RequestToJoin
+	clock := uint64(time.Now().Unix())
+	for pubKeyStr := range kickedMembers {
+		requestToJoin := &RequestToJoin{
+			PublicKey:        pubKeyStr,
+			Clock:            clock,
+			CommunityID:      communityID,
+			State:            RequestToJoinStateAwaitingAddresses,
+			Our:              true,
+			RevealedAccounts: make([]*protobuf.RevealedAccount, 0),
+		}
+
+		requestToJoin.CalculateID()
+
+		requestsToJoin = append(requestsToJoin, requestToJoin)
+	}
+
+	return m.persistence.SaveRequestsToJoin(requestsToJoin)
+}
+
 func (m *Manager) Queue(signer *ecdsa.PublicKey, community *Community, clock uint64, payload []byte) error {
 
 	m.logger.Info("queuing community", zap.String("id", community.IDString()), zap.String("signer", common.PubkeyToHex(signer)))
@@ -1611,20 +1637,22 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 				community.config.PrivateKey = nil
 			}
 
-			community.setControlNode(verifiedOwner)
-		}
-		if !common.IsPubKeyEqual(community.ControlNode(), signer) {
+			// new control node will be set in the 'UpdateCommunityDescription'
+			if !common.IsPubKeyEqual(verifiedOwner, signer) {
+				return nil, ErrNotAuthorized
+			}
+		} else if !common.IsPubKeyEqual(community.ControlNode(), signer) {
 			return nil, ErrNotAuthorized
 		}
 	} else if !common.IsPubKeyEqual(community.PublicKey(), signer) {
 		return nil, ErrNotAuthorized
 	}
 
-	return m.handleCommunityDescriptionMessageCommon(community, description, payload)
+	return m.handleCommunityDescriptionMessageCommon(community, description, payload, verifiedOwner)
 }
 
-func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, description *protobuf.CommunityDescription, payload []byte) (*CommunityResponse, error) {
-	changes, err := community.UpdateCommunityDescription(description, payload)
+func (m *Manager) handleCommunityDescriptionMessageCommon(community *Community, description *protobuf.CommunityDescription, payload []byte, newControlNode *ecdsa.PublicKey) (*CommunityResponse, error) {
+	changes, err := community.UpdateCommunityDescription(description, payload, newControlNode)
 	if err != nil {
 		return nil, err
 	}
@@ -2458,6 +2486,11 @@ func (m *Manager) HandleCommunityRequestToJoin(signer *ecdsa.PublicKey, receiver
 			} else if existingRequestToJoin.State == RequestToJoinStateAcceptedPending {
 				requestToJoin.State = RequestToJoinStateAccepted
 				return community, requestToJoin, nil
+
+			} else if existingRequestToJoin.State == RequestToJoinStateAwaitingAddresses {
+				// community ownership changed, accept request automatically
+				requestToJoin.State = RequestToJoinStateAccepted
+				return community, requestToJoin, nil
 			}
 		}
 
@@ -2806,7 +2839,7 @@ func (m *Manager) HandleCommunityRequestToJoinResponse(signer *ecdsa.PublicKey, 
 		return nil, ErrNotAuthorized
 	}
 
-	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg)
+	_, err = community.UpdateCommunityDescription(request.Community, appMetadataMsg, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -3260,7 +3293,11 @@ func (m *Manager) PendingRequestsToJoin() ([]*RequestToJoin, error) {
 }
 
 func (m *Manager) PendingRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
-	return m.persistence.PendingRequestsToJoinForUser(common.PubkeyToHex(pk))
+	return m.persistence.RequestsToJoinForUserByState(common.PubkeyToHex(pk), RequestToJoinStatePending)
+}
+
+func (m *Manager) AwaitingAddressesRequestsToJoinForUser(pk *ecdsa.PublicKey) ([]*RequestToJoin, error) {
+	return m.persistence.RequestsToJoinForUserByState(common.PubkeyToHex(pk), RequestToJoinStateAwaitingAddresses)
 }
 
 func (m *Manager) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*RequestToJoin, error) {
@@ -3303,6 +3340,11 @@ func (m *Manager) GetPubsubTopic(communityID string) (string, error) {
 	}
 
 	return transport.GetPubsubTopic(community.Shard().TransportShard()), nil
+}
+
+func (m *Manager) RequestsToJoinForCommunityAwaitingAddresses(id types.HexBytes) ([]*RequestToJoin, error) {
+	m.logger.Info("fetching ownership changed invitations", zap.String("community-id", id.String()))
+	return m.persistence.RequestsToJoinForCommunityAwaitingAddresses(id)
 }
 
 func (m *Manager) CanPost(pk *ecdsa.PublicKey, communityID string, chatID string, grant []byte) (bool, error) {
@@ -4478,7 +4520,7 @@ func (m *Manager) AddCommunityToken(token *community_token.CommunityToken, clock
 		}
 
 		if token.PrivilegesLevel == community_token.OwnerLevel {
-			err = m.promoteSelfToControlNode(community, clock)
+			_, err = m.promoteSelfToControlNode(community, clock)
 			if err != nil {
 				return nil, err
 			}
@@ -4804,7 +4846,7 @@ func (m *Manager) createCommunityTokenPermission(request *requests.CreateCommuni
 
 }
 
-func (m *Manager) PromoteSelfToControlNode(communityID types.HexBytes, clock uint64) (*Community, error) {
+func (m *Manager) PromoteSelfToControlNode(communityID types.HexBytes, clock uint64) (*CommunityChanges, error) {
 	community, err := m.GetByID(communityID)
 	if err != nil {
 		return nil, err
@@ -4814,17 +4856,23 @@ func (m *Manager) PromoteSelfToControlNode(communityID types.HexBytes, clock uin
 		return nil, ErrOrgNotFound
 	}
 
-	err = m.promoteSelfToControlNode(community, clock)
+	ownerChanged, err := m.promoteSelfToControlNode(community, clock)
 	if err != nil {
 		return nil, err
 	}
 
-	return community, m.saveAndPublish(community)
+	if ownerChanged {
+		return community.RemoveAllUsersFromOrg(), m.saveAndPublish(community)
+	}
+
+	return community.emptyCommunityChanges(), m.saveAndPublish(community)
 }
 
-func (m *Manager) promoteSelfToControlNode(community *Community, clock uint64) error {
+func (m *Manager) promoteSelfToControlNode(community *Community, clock uint64) (bool, error) {
+	ownerChanged := false
 	community.setPrivateKey(m.identity)
 	if !community.ControlNode().Equal(&m.identity.PublicKey) {
+		ownerChanged = true
 		community.setControlNode(&m.identity.PublicKey)
 	}
 
@@ -4833,15 +4881,21 @@ func (m *Manager) promoteSelfToControlNode(community *Community, clock uint64) e
 		Clock:          clock,
 		InstallationId: m.installationID,
 	}
+
 	err := m.SaveSyncControlNode(community.ID(), syncControlNode)
 	if err != nil {
-		return err
+		return false, err
 	}
 	community.config.ControlDevice = true
 
+	_, err = community.AddRoleToMember(&m.identity.PublicKey, protobuf.CommunityMember_ROLE_OWNER)
+	if err != nil {
+		return false, err
+	}
+
 	community.increaseClock()
 
-	return nil
+	return ownerChanged, nil
 }
 
 func (m *Manager) shareRequestsToJoinWithNewPrivilegedMembers(community *Community, newPrivilegedMembers map[protobuf.CommunityMember_Roles][]*ecdsa.PublicKey) error {
@@ -4999,4 +5053,15 @@ func (m *Manager) SetSyncControlNode(id types.HexBytes, syncControlNode *protobu
 	}
 
 	return nil
+}
+
+func (m *Manager) GetCommunityRequestToJoinWithRevealedAddresses(pubKey string, communityID types.HexBytes) (*RequestToJoin, error) {
+	return m.persistence.GetCommunityRequestToJoinWithRevealedAddresses(pubKey, communityID)
+}
+
+func (m *Manager) SafeGetSignerPubKey(chainID uint64, communityID string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	defer cancel()
+
+	return m.ownerVerifier.SafeGetSignerPubKey(ctx, chainID, communityID)
 }

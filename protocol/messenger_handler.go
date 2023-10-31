@@ -1554,6 +1554,10 @@ func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, re
 	case communities.RequestToJoinStateCanceled:
 		// cancellation is handled by separate message
 		fallthrough
+	case communities.RequestToJoinStateAwaitingAddresses:
+		// ownership changed request is handled only if owner kicked members and saved
+		// temporary RequestToJoinStateAwaitingAddresses request
+		fallthrough
 	case communities.RequestToJoinStateAcceptedPending, communities.RequestToJoinStateDeclinedPending:
 		// request can be marked as pending only manually
 		return errors.New("invalid request state")

@@ -556,6 +556,11 @@ func (api *PublicAPI) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, e
 	return api.service.messenger.MyPendingRequestsToJoin()
 }
 
+// MyAwaitingAddressesRequestsToJoin returns requests to join, which must be auto-accepted when control node will be online
+func (api *PublicAPI) MyAwaitingAddressesRequestsToJoin() ([]*communities.RequestToJoin, error) {
+	return api.service.messenger.MyAwaitingAddressesRequestsToJoin()
+}
+
 // MyCanceledRequestsToJoin returns the pending requests for the logged in user
 func (api *PublicAPI) MyCanceledRequestsToJoin() ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.MyCanceledRequestsToJoin()
@@ -644,6 +649,10 @@ func (api *PublicAPI) EditCommunityCategory(request *requests.EditCommunityCateg
 // DeleteCommunityCategory deletes a category within a particular community and removes this category from any chat that has it
 func (api *PublicAPI) DeleteCommunityCategory(request *requests.DeleteCommunityCategory) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.DeleteCommunityCategory(request)
+}
+
+func (api *PublicAPI) PromoteSelfToControlNode(communityID types.HexBytes) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.PromoteSelfToControlNode(communityID)
 }
 
 type ApplicationMessagesResponse struct {

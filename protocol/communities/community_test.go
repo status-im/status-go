@@ -633,7 +633,7 @@ func (s *CommunitySuite) TestHandleCommunityDescription() {
 			org := s.buildCommunity(signer)
 			org.Join()
 			expectedChanges := tc.changes(org)
-			actualChanges, err := org.UpdateCommunityDescription(tc.description(org), []byte{0x01})
+			actualChanges, err := org.UpdateCommunityDescription(tc.description(org), []byte{0x01}, nil)
 			s.Require().Equal(tc.err, err)
 			s.Require().Equal(expectedChanges, actualChanges)
 		})

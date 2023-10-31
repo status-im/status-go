@@ -760,6 +760,37 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 	return o.config.CommunityDescription, nil
 }
 
+func (o *Community) RemoveAllUsersFromOrg() *CommunityChanges {
+	o.increaseClock()
+
+	myPublicKey := common.PubkeyToHex(o.config.MemberIdentity)
+	member := o.config.CommunityDescription.Members[myPublicKey]
+
+	membersToRemove := o.config.CommunityDescription.Members
+	delete(membersToRemove, myPublicKey)
+
+	changes := o.emptyCommunityChanges()
+	changes.MembersRemoved = membersToRemove
+
+	o.config.CommunityDescription.Members = make(map[string]*protobuf.CommunityMember)
+	o.config.CommunityDescription.Members[myPublicKey] = member
+
+	for chatID, chat := range o.config.CommunityDescription.Chats {
+		chatMembersToRemove := chat.Members
+		delete(chatMembersToRemove, myPublicKey)
+
+		chat.Members = make(map[string]*protobuf.CommunityMember)
+		chat.Members[myPublicKey] = member
+
+		changes.ChatsModified[chatID] = &CommunityChatChanges{
+			ChatModified:   chat,
+			MembersRemoved: chatMembersToRemove,
+		}
+	}
+
+	return changes
+}
+
 func (o *Community) AddCommunityTokensMetadata(token *protobuf.CommunityTokenMetadata) (*protobuf.CommunityDescription, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
@@ -965,7 +996,7 @@ func (o *Community) MemberIdentity() *ecdsa.PublicKey {
 }
 
 // UpdateCommunityDescription will update the community to the new community description and return a list of changes
-func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDescription, rawMessage []byte) (*CommunityChanges, error) {
+func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDescription, rawMessage []byte, newControlNode *ecdsa.PublicKey) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -987,6 +1018,10 @@ func (o *Community) UpdateCommunityDescription(description *protobuf.CommunityDe
 
 	o.config.CommunityDescription = description
 	o.config.CommunityDescriptionProtocolMessage = rawMessage
+
+	if newControlNode != nil {
+		o.setControlNode(newControlNode)
+	}
 
 	// We only calculate changes if we joined/spectated the community or we requested access, otherwise not interested
 	if o.config.Joined || o.config.Spectated || o.config.RequestedToJoinAt > 0 {

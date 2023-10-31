@@ -563,7 +563,8 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses()
 		s.Require().Equal(revealedAddresses[index], account.Address)
 	}
 
-	// RTJ with 1 revealed Address, ChainIds and IsAirdropAddress
+	// RTJ with 1 revealed Address, ChainIds, IsAirdropAddress and Signature
+	signature := []byte("test")
 	expectedRtj2 := &RequestToJoin{
 		ID:          types.HexBytes{8, 7, 6, 5, 4, 3, 2, 1},
 		PublicKey:   common.PubkeyToHex(&identity.PublicKey),
@@ -575,6 +576,7 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses()
 				Address:          revealedAddresses[2],
 				ChainIds:         chainIds,
 				IsAirdropAddress: true,
+				Signature:        signature,
 			},
 		},
 	}
@@ -592,6 +594,7 @@ func (s *PersistenceSuite) TestGetCommunityRequestsToJoinWithRevealedAddresses()
 	s.Require().Equal(revealedAddresses[2], rtjResult[1].RevealedAccounts[0].Address)
 	s.Require().Equal(chainIds, rtjResult[1].RevealedAccounts[0].ChainIds)
 	s.Require().Equal(true, rtjResult[1].RevealedAccounts[0].IsAirdropAddress)
+	s.Require().Equal(rtjResult[1].RevealedAccounts[0].Signature, signature)
 
 	// RTJ without RevealedAccounts
 	expectedRtjWithoutRevealedAccounts := &RequestToJoin{

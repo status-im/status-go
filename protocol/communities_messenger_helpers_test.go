@@ -353,6 +353,14 @@ func newCommunitiesTestMessenger(shh types.Waku, privateKey *ecdsa.PrivateKey, l
 }
 
 func createCommunity(s *suite.Suite, owner *Messenger) (*communities.Community, *Chat) {
+	return createCommunityConfigurable(s, owner, protobuf.CommunityPermissions_AUTO_ACCEPT)
+}
+
+func createOnRequestCommunity(s *suite.Suite, owner *Messenger) (*communities.Community, *Chat) {
+	return createCommunityConfigurable(s, owner, protobuf.CommunityPermissions_MANUAL_ACCEPT)
+}
+
+func createCommunityConfigurable(s *suite.Suite, owner *Messenger, permission protobuf.CommunityPermissions_Access) (*communities.Community, *Chat) {
 	description := &requests.CreateCommunity{
 		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
 		Name:        "status",

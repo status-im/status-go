@@ -98,9 +98,15 @@ func (s *MessengerCommunitiesSignersSuite) joinCommunity(controlNode *Messenger,
 	joinCommunity(&s.Suite, community, controlNode, user, request)
 }
 
+func (s *MessengerCommunitiesSignersSuite) joinOnRequestCommunity(controlNode *Messenger, community *communities.Community, user *Messenger) {
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+	joinOnRequestCommunity(&s.Suite, community, controlNode, user, request)
+}
+
 // John crates a community
 // Ownership is transferred to Alice
-// Both John and Bob accepts the changes
+// Alice kick all members Bob and John rejoins
+// Bob and John accepts the changes
 
 func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	// Create a community
@@ -144,7 +150,7 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	_, err = WaitOnSignaledMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0 && len(r.Communities()[0].CommunityTokensMetadata()) == 1
+			return len(r.Communities()) > 0 && len(r.Communities()[0].TokenPermissions()) == 1
 		},
 		"no communities",
 	)
@@ -154,53 +160,294 @@ func (s *MessengerCommunitiesSignersSuite) TestControlNodeUpdateSigner() {
 	_, err = WaitOnSignaledMessengerResponse(
 		s.alice,
 		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0 && len(r.Communities()[0].CommunityTokensMetadata()) == 1
+			return len(r.Communities()) > 0 && len(r.Communities()[0].TokenPermissions()) == 1
 		},
 		"no communities",
 	)
 	s.Require().NoError(err)
 
-	// Alice will be transferred the ownership token, and alice will let others know
-	// update mock - the signer for the community returned by the contracts should be alice
+	// Ownership token will be transferred to Alice and she will kick all members
+	// and request kicked members to rejoin
+	// the signer for the community returned by the contracts should be alice
 	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
-	s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
-		&communitytokens.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
 
-	community, err = s.alice.PromoteSelfToControlNode(community.ID())
+	response, err := s.alice.PromoteSelfToControlNode(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	community, err = s.alice.communitiesManager.GetByID(community.ID())
 	s.Require().NoError(err)
 	s.Require().True(community.IsControlNode())
+	s.Require().True(common.IsPubKeyEqual(community.ControlNode(), &s.alice.identity.PublicKey))
+	s.Require().True(community.IsOwner())
 
-	// john accepts community update from alice (new control node)
-	_, err = WaitOnSignaledMessengerResponse(
-		s.john,
-		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0 && r.Communities()[0].IDString() == community.IDString()
-		},
-		"no communities",
-	)
-	s.Require().NoError(err)
-
-	// We check the control node is correctly set on john to alice
-	johnCommunity, err := s.john.communitiesManager.GetByIDString(community.IDString())
-	s.Require().NoError(err)
-	s.Require().NotNil(johnCommunity)
-	s.Require().True(common.IsPubKeyEqual(johnCommunity.ControlNode(), &s.alice.identity.PublicKey))
-	s.Require().False(johnCommunity.IsControlNode())
-
-	// bob accepts community update from alice (new control node)
+	// check that Bob received kick event, also he will receive
+	// request to share RevealedAddresses and send request to join to the control node
 	_, err = WaitOnSignaledMessengerResponse(
 		s.bob,
 		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0 && r.Communities()[0].IDString() == community.IDString()
+			return len(r.Communities()) > 0 && !r.Communities()[0].HasMember(&s.bob.identity.PublicKey)
 		},
-		"no communities",
+		"Bob was not kicked from the community",
 	)
 	s.Require().NoError(err)
 
-	// We check the control node is correctly set on bob to alice
-	bobCommunity, err := s.bob.communitiesManager.GetByIDString(community.IDString())
+	// check that John received kick event, also he will receive
+	// request to share RevealedAddresses and send request to join to the control node
+	_, err = WaitOnSignaledMessengerResponse(
+		s.john,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0 && !r.Communities()[0].HasMember(&s.john.identity.PublicKey)
+		},
+		"John was not kicked from the community",
+	)
 	s.Require().NoError(err)
-	s.Require().NotNil(bobCommunity)
-	s.Require().True(common.IsPubKeyEqual(bobCommunity.ControlNode(), &s.alice.identity.PublicKey))
-	s.Require().False(bobCommunity.IsControlNode())
+
+	// Alice auto-accept requests to join with RevealedAddresses
+	// TODO: please, check TODO's in this test and uncomment them if Members() == 3
+	_, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0 && len(r.Communities()[0].Members()) == 2
+		},
+		"no community update with accepted request",
+	)
+	s.Require().NoError(err)
+
+	validateResults := func(messenger *Messenger) *communities.Community {
+		community, err = messenger.communitiesManager.GetByID(community.ID())
+		s.Require().NoError(err)
+		s.Require().True(common.IsPubKeyEqual(community.ControlNode(), &s.alice.identity.PublicKey))
+		s.Require().Len(community.Members(), 2)
+		s.Require().True(community.HasMember(&messenger.identity.PublicKey))
+
+		return community
+	}
+
+	community = validateResults(s.alice)
+	s.Require().True(community.IsControlNode())
+	s.Require().True(community.IsOwner())
+
+	// Bob is a community member again
+	_, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&s.bob.identity.PublicKey)
+		},
+		"Bob was auto-accepted",
+	)
+	s.Require().NoError(err)
+
+	community = validateResults(s.bob)
+	s.Require().False(community.IsControlNode())
+	s.Require().False(community.IsOwner())
+
+	// TODO: uncomment when ex-owner will start sharing request to join with revealed address
+	// // Jonh is a community member again
+	// _, err = WaitOnMessengerResponse(
+	// 	s.bob,
+	// 	func(r *MessengerResponse) bool {
+	// 		return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&s.bob.identity.PublicKey)
+	// 	},
+	// 	"John was auto-accepted",
+	// )
+	// s.Require().NoError(err)
+
+	// community = validateResults(s.john)
+	// s.Require().False(community.IsControlNode())
+	// s.Require().False(community.IsOwner())
+
+	// Alice change community name
+
+	expectedName := "Alice owns community"
+
+	response, err = s.alice.EditCommunity(&requests.EditCommunity{
+		CommunityID: community.ID(),
+		CreateCommunity: requests.CreateCommunity{
+			Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+			Name:        expectedName,
+			Color:       "#000000",
+			Description: "edited community description",
+		},
+	})
+
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	validateNameInResponse := func(r *MessengerResponse) bool {
+		return len(r.Communities()) > 0 && r.Communities()[0].IDString() == community.IDString() &&
+			r.Communities()[0].Name() == expectedName
+	}
+
+	s.Require().True(validateNameInResponse(response))
+
+	validateNameInDB := func(messenger *Messenger) {
+		community, err = messenger.communitiesManager.GetByID(community.ID())
+		s.Require().NoError(err)
+		s.Require().Equal(expectedName, response.Communities()[0].Name())
+	}
+
+	validateNameInDB(s.alice)
+
+	// TODO: uncomment when ex-owner will start sharing request to join with revealed address
+	// john accepts community update from alice (new control node)
+	// _, err = WaitOnMessengerResponse(
+	// 	s.john,
+	// validateNameInResponse,
+	// 	"john did not receive community name update",
+	// )
+	// s.Require().NoError(err)
+	// validateNameInDB(s.john)
+
+	// bob accepts community update from alice (new control node)
+	_, err = WaitOnMessengerResponse(
+		s.bob,
+		validateNameInResponse,
+		"bob did not receive community name update",
+	)
+	s.Require().NoError(err)
+	validateNameInDB(s.bob)
+}
+
+func (s *MessengerCommunitiesSignersSuite) TestAutoAcceptOnOwnershipChangeRequestRequired() {
+	community, _ := createOnRequestCommunity(&s.Suite, s.john)
+
+	s.advertiseCommunityTo(s.john, community, s.bob)
+	s.advertiseCommunityTo(s.john, community, s.alice)
+
+	s.joinOnRequestCommunity(s.john, community, s.bob)
+	s.joinOnRequestCommunity(s.john, community, s.alice)
+
+	// john mints owner token
+	var chainID uint64 = 1
+	tokenAddress := "token-address"
+	tokenName := "tokenName"
+	tokenSymbol := "TSM"
+	_, err := s.john.SaveCommunityToken(&token.CommunityToken{
+		TokenType:       protobuf.CommunityTokenType_ERC721,
+		CommunityID:     community.IDString(),
+		Address:         tokenAddress,
+		ChainID:         int(chainID),
+		Name:            tokenName,
+		Supply:          &bigint.BigInt{},
+		Symbol:          tokenSymbol,
+		PrivilegesLevel: token.OwnerLevel,
+	}, nil)
+	s.Require().NoError(err)
+
+	err = s.john.AddCommunityToken(community.IDString(), int(chainID), tokenAddress)
+	s.Require().NoError(err)
+
+	// set john as contract owner
+	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.john.identity.PublicKey))
+	s.collectiblesServiceMock.SetMockCollectibleContractData(chainID, tokenAddress,
+		&communitytokens.CollectibleContractData{TotalSupply: &bigint.BigInt{}})
+
+	hasTokenPermission := func(r *MessengerResponse) bool {
+		return len(r.Communities()) > 0 && r.Communities()[0].HasTokenPermissions()
+	}
+
+	// bob received owner permissions
+	_, err = WaitOnSignaledMessengerResponse(
+		s.bob,
+		hasTokenPermission,
+		"no communities with token permission for Bob",
+	)
+	s.Require().NoError(err)
+
+	// alice received owner permissions
+	_, err = WaitOnSignaledMessengerResponse(
+		s.alice,
+		hasTokenPermission,
+		"no communities with token permission for Alice",
+	)
+	s.Require().NoError(err)
+
+	// simulate Alice received owner token
+	s.collectiblesServiceMock.SetSignerPubkeyForCommunity(community.ID(), common.PubkeyToHex(&s.alice.identity.PublicKey))
+
+	// after receiving owner token - set up control node, set up owner role, kick all members
+	// and request kicked members to rejoin
+	response, err := s.alice.PromoteSelfToControlNode(community.ID())
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	community, err = s.alice.communitiesManager.GetByID(community.ID())
+	s.Require().NoError(err)
+	s.Require().True(community.IsControlNode())
+	s.Require().True(common.IsPubKeyEqual(community.ControlNode(), &s.alice.identity.PublicKey))
+	s.Require().True(community.IsOwner())
+
+	// check that client received kick event
+	// Bob will receive request to share RevealedAddresses and send request to join to the control node
+	_, err = WaitOnSignaledMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0 && !r.Communities()[0].HasMember(&s.bob.identity.PublicKey)
+		},
+		"Bob was not kicked from the community",
+	)
+	s.Require().NoError(err)
+
+	// check that client received kick event
+	// John will receive request to share RevealedAddresses and send request to join to the control node
+	_, err = WaitOnSignaledMessengerResponse(
+		s.john,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0 && !r.Communities()[0].HasMember(&s.john.identity.PublicKey)
+		},
+		"John was not kicked from the community",
+	)
+	s.Require().NoError(err)
+
+	// Alice auto-accept requests to join with RevealedAddresses
+	// TODO: please, check TODO's in this test and uncomment them if Members() == 3
+	_, err = WaitOnMessengerResponse(
+		s.alice,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0 && len(r.Communities()[0].Members()) == 2
+		},
+		"no community update with accepted request",
+	)
+	s.Require().NoError(err)
+
+	validateResults := func(messenger *Messenger) *communities.Community {
+		community, err = messenger.communitiesManager.GetByID(community.ID())
+		s.Require().NoError(err)
+		s.Require().True(common.IsPubKeyEqual(community.ControlNode(), &s.alice.identity.PublicKey))
+		s.Require().Len(community.Members(), 2)
+		s.Require().True(community.HasMember(&messenger.identity.PublicKey))
+
+		return community
+	}
+
+	community = validateResults(s.alice)
+	s.Require().True(community.IsControlNode())
+	s.Require().True(community.IsOwner())
+
+	_, err = WaitOnMessengerResponse(
+		s.bob,
+		func(r *MessengerResponse) bool {
+			return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&s.bob.identity.PublicKey)
+		},
+		"Bob was auto-accepted",
+	)
+	s.Require().NoError(err)
+
+	community = validateResults(s.bob)
+	s.Require().False(community.IsControlNode())
+	s.Require().False(community.IsOwner())
+
+	// TODO: uncomment when ex-owner will start sharing request to join with revealed address
+	// _, err = WaitOnMessengerResponse(
+	// 	s.john,
+	// 	func(r *MessengerResponse) bool {
+	// 		return len(r.Communities()) > 0 && r.Communities()[0].HasMember(&s.bob.identity.PublicKey)
+	// 	},
+	// 	"John was auto-accepted",
+	// )
+	// s.Require().NoError(err)
+
+	// community = validateResults(s.john)
+	// s.Require().False(community.IsControlNode())
+	// s.Require().False(community.IsOwner())
 }
