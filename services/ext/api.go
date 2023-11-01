@@ -1183,22 +1183,58 @@ func (api *PublicAPI) EnsVerified(pk, ensName string) error {
 	return api.service.messenger.ENSVerified(pk, ensName)
 }
 
-// DEPRECATED
+// Deprecated: RequestCommunityInfoFromMailserver is deprecated in favor of
+// configurable RequestCommunityInfoFromMailserverV2.
 func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) (*communities.Community, error) {
-	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID, nil, true)
+	request := &protocol.CommunityInfoRequest{
+		CommunityID:     communityID,
+		Shard:           nil,
+		UseDatabase:     true,
+		WaitForResponse: true,
+	}
+	return api.RequestCommunityInfoFromMailserverV2(request)
 }
 
+// Deprecated: RequestCommunityInfoFromMailserverWithShard is deprecated in favor of
+// configurable RequestCommunityInfoFromMailserverV2.
 func (api *PublicAPI) RequestCommunityInfoFromMailserverWithShard(communityID string, shard *common.Shard) (*communities.Community, error) {
-	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID, shard, true)
+	request := &protocol.CommunityInfoRequest{
+		CommunityID:     communityID,
+		Shard:           shard,
+		UseDatabase:     true,
+		WaitForResponse: true,
+	}
+	return api.RequestCommunityInfoFromMailserverV2(request)
 }
 
-// DEPRECATED
+// Deprecated: RequestCommunityInfoFromMailserverAsync is deprecated in favor of
+// configurable RequestCommunityInfoFromMailserverV2.
 func (api *PublicAPI) RequestCommunityInfoFromMailserverAsync(communityID string) error {
-	return api.service.messenger.RequestCommunityInfoFromMailserverAsync(communityID, nil)
+	request := &protocol.CommunityInfoRequest{
+		CommunityID:     communityID,
+		Shard:           nil,
+		UseDatabase:     true,
+		WaitForResponse: false,
+	}
+	_, err := api.RequestCommunityInfoFromMailserverV2(request)
+	return err
 }
 
+// Deprecated: RequestCommunityInfoFromMailserverAsyncWithShard is deprecated in favor of
+// configurable RequestCommunityInfoFromMailserverV2.
 func (api *PublicAPI) RequestCommunityInfoFromMailserverAsyncWithShard(communityID string, shard *common.Shard) error {
-	return api.service.messenger.RequestCommunityInfoFromMailserverAsync(communityID, shard)
+	request := &protocol.CommunityInfoRequest{
+		CommunityID:     communityID,
+		Shard:           shard,
+		UseDatabase:     true,
+		WaitForResponse: false,
+	}
+	_, err := api.RequestCommunityInfoFromMailserverV2(request)
+	return err
+}
+
+func (api *PublicAPI) RequestCommunityInfoFromMailserverV2(request *protocol.CommunityInfoRequest) (*communities.Community, error) {
+	return api.service.messenger.RequestCommunityInfoFromMailserver(request)
 }
 
 func (api *PublicAPI) ActivityCenterNotifications(request protocol.ActivityCenterNotificationsRequest) (*protocol.ActivityCenterPaginationResponse, error) {

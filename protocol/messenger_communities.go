@@ -67,6 +67,13 @@ const (
 	maxChunkSizeBytes    = 1500000
 )
 
+type CommunityInfoRequest struct {
+	CommunityID     string        `json:"communityId"`
+	Shard           *common.Shard `json:"shard"`
+	UseDatabase     bool          `json:"useDatabase"`
+	WaitForResponse bool          `json:"waitForResponse"`
+}
+
 func (m *Messenger) publishOrg(org *communities.Community) error {
 	if org == nil {
 		return nil
@@ -2613,38 +2620,29 @@ func (m *Messenger) GetCommunityIDFromKey(communityKey string) string {
 }
 
 // RequestCommunityInfoFromMailserver installs filter for community and requests its details
-// from mailserver. It waits until it has the community before returning it.
-// If useDatabase is true, it searches for community in database and does not request mailserver.
-func (m *Messenger) RequestCommunityInfoFromMailserver(privateOrPublicKey string, shard *common.Shard, useDatabase bool) (*communities.Community, error) {
-	communityID := m.GetCommunityIDFromKey(privateOrPublicKey)
-	if useDatabase {
+// from mailserver.
+//
+// If `request.UseDatabase` is true, it searches for community in database and does not request mailserver.
+// If `request.WaitForResponse` is true, it waits until it has the community before returning it.
+// If `request.WaitForResponse` is false, it installs filter for community and requests its details
+// from mailserver. When response received it will be passed through signals handler.
+func (m *Messenger) RequestCommunityInfoFromMailserver(request *CommunityInfoRequest) (*communities.Community, error) {
+	communityID := m.GetCommunityIDFromKey(request.CommunityID)
+
+	if request.UseDatabase {
 		community, err := m.findCommunityInfoFromDB(communityID)
 		if err != nil {
 			return nil, err
 		}
 		if community != nil {
+			if !request.WaitForResponse {
+				m.config.messengerSignalsHandler.CommunityInfoFound(community)
+			}
 			return community, nil
 		}
 	}
 
-	return m.requestCommunityInfoFromMailserver(communityID, shard, true)
-}
-
-// RequestCommunityInfoFromMailserverAsync installs filter for community and requests its details
-// from mailserver. When response received it will be passed through signals handler
-func (m *Messenger) RequestCommunityInfoFromMailserverAsync(privateOrPublicKey string, shard *common.Shard) error {
-	communityID := m.GetCommunityIDFromKey(privateOrPublicKey)
-
-	community, err := m.findCommunityInfoFromDB(communityID)
-	if err != nil {
-		return err
-	}
-	if community != nil {
-		m.config.messengerSignalsHandler.CommunityInfoFound(community)
-		return nil
-	}
-	_, err = m.requestCommunityInfoFromMailserver(communityID, shard, false)
-	return err
+	return m.requestCommunityInfoFromMailserver(communityID, request.Shard, request.WaitForResponse)
 }
 
 // RequestCommunityInfoFromMailserver installs filter for community and requests its details
