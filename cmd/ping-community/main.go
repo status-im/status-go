@@ -155,7 +155,12 @@ func main() {
 		}
 	}
 
-	community, err := messenger.RequestCommunityInfoFromMailserver(*communityID, shard, true)
+	community, err := messenger.RequestCommunityInfoFromMailserver(&protocol.CommunityInfoRequest{
+		CommunityID:     *communityID,
+		Shard:           shard,
+		UseDatabase:     true,
+		WaitForResponse: true,
+	})
 	if err != nil {
 
 		logger.Error("community error", "error", err)

@@ -75,7 +75,12 @@ func (p *PublicAPI) CommunityInfo(communityID types.HexBytes, shard *common.Shar
 		return nil, ErrNotInitialized
 	}
 
-	community, err := p.service.messenger.RequestCommunityInfoFromMailserver(communityID.String(), shard, true)
+	community, err := p.service.messenger.RequestCommunityInfoFromMailserver(&protocol.CommunityInfoRequest{
+		CommunityID:     communityID.String(),
+		Shard:           shard,
+		UseDatabase:     true,
+		WaitForResponse: true,
+	})
 	if err != nil {
 		return nil, err
 	}

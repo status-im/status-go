@@ -2335,7 +2335,12 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 		return nil, err
 	}
 
-	_, err = m.RequestCommunityInfoFromMailserver(community.IDString(), community.Shard(), false)
+	_, err = m.RequestCommunityInfoFromMailserver(&CommunityInfoRequest{
+		CommunityID:     community.IDString(),
+		Shard:           community.Shard(),
+		UseDatabase:     false,
+		WaitForResponse: true,
+	})
 	if err != nil {
 		// TODO In the future we should add a mechanism to re-apply next steps (adding owner, joining)
 		// if there is no connection with mailserver. Otherwise changes will be overwritten.
