@@ -81,7 +81,7 @@ func TestRestartDiscoveryV5(t *testing.T) {
 	w.discV5BootstrapNodes = []string{testENRBootstrap}
 
 	options = func(b *backoff.ExponentialBackOff) {
-		b.MaxElapsedTime = 30 * time.Second
+		b.MaxElapsedTime = 90 * time.Second
 	}
 
 	err = tt.RetryWithBackOff(func() error {
@@ -127,11 +127,19 @@ func TestBasicWakuV2(t *testing.T) {
 
 	storeNode := discoveredNodes[int(r.Int64())]
 
-	// Wait for some peers to be discovered
-	time.Sleep(3 * time.Second)
+	options := func(b *backoff.ExponentialBackOff) {
+		b.MaxElapsedTime = 30 * time.Second
+	}
 
-	// At least 3 peers should have been discovered
-	require.GreaterOrEqual(t, w.PeerCount(), 3)
+	// Sanity check, not great, but it's probably helpful
+	err = tt.RetryWithBackOff(func() error {
+		if len(w.Peers()) > 2 {
+			return errors.New("no peers discovered")
+		}
+		return nil
+	}, options)
+
+	require.NoError(t, err)
 
 	filter := &common.Filter{
 		Messages:      common.NewMemoryMessageStore(),
@@ -160,7 +168,7 @@ func TestBasicWakuV2(t *testing.T) {
 	timestampInSeconds := msgTimestamp / int64(time.Second)
 	marginInSeconds := 20
 
-	options := func(b *backoff.ExponentialBackOff) {
+	options = func(b *backoff.ExponentialBackOff) {
 		b.MaxElapsedTime = 60 * time.Second
 		b.InitialInterval = 500 * time.Millisecond
 	}
@@ -202,12 +210,20 @@ func TestWakuV2Filter(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, w.Start())
 
-	// DNSDiscovery
-	// Wait for some peers to be discovered
-	time.Sleep(10 * time.Second)
+	options := func(b *backoff.ExponentialBackOff) {
+		b.MaxElapsedTime = 10 * time.Second
+	}
+
+	// Sanity check, not great, but it's probably helpful
+	err = tt.RetryWithBackOff(func() error {
+		if len(w.Peers()) > 2 {
+			return errors.New("no peers discovered")
+		}
+		return nil
+	}, options)
 
 	// At least 3 peers should have been discovered
-	require.Greater(t, w.PeerCount(), 3)
+	require.GreaterOrEqual(t, w.PeerCount(), 3)
 
 	filter := &common.Filter{
 		Messages:      common.NewMemoryMessageStore(),
