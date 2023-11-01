@@ -47,6 +47,7 @@ var (
 type Service struct {
 	manager     *Manager
 	controller  *Controller
+	db          *sql.DB
 	ownershipDB *OwnershipDB
 	communityDB *community.DataDB
 	walletFeed  *event.Feed
@@ -64,6 +65,7 @@ func NewService(
 	return &Service{
 		manager:     manager,
 		controller:  NewController(db, walletFeed, accountsDB, accountsFeed, settingsFeed, networkManager, manager),
+		db:          db,
 		ownershipDB: NewOwnershipDB(db),
 		communityDB: community.NewDataDB(db),
 		walletFeed:  walletFeed,
@@ -111,9 +113,9 @@ type filterOwnedCollectiblesTaskReturnType struct {
 // FilterOwnedCollectiblesResponse allows only one filter task to run at a time
 // and it cancels the current one if a new one is started
 // All calls will trigger an EventOwnedCollectiblesFilteringDone event with the result of the filtering
-func (s *Service) FilterOwnedCollectiblesAsync(requestID int32, chainIDs []walletCommon.ChainID, addresses []common.Address, offset int, limit int) {
+func (s *Service) FilterOwnedCollectiblesAsync(requestID int32, chainIDs []walletCommon.ChainID, addresses []common.Address, filter Filter, offset int, limit int) {
 	s.scheduler.Enqueue(requestID, filterOwnedCollectiblesTask, func(ctx context.Context) (interface{}, error) {
-		collectibles, hasMore, err := s.GetOwnedCollectibles(chainIDs, addresses, offset, limit)
+		collectibles, hasMore, err := s.FilterOwnedCollectibles(chainIDs, addresses, filter, offset, limit)
 		if err != nil {
 			return nil, err
 		}
@@ -212,9 +214,10 @@ func (s *Service) sendResponseEvent(requestID *int32, eventType walletevent.Even
 	s.walletFeed.Send(event)
 }
 
-func (s *Service) GetOwnedCollectibles(chainIDs []walletCommon.ChainID, owners []common.Address, offset int, limit int) ([]thirdparty.CollectibleUniqueID, bool, error) {
+func (s *Service) FilterOwnedCollectibles(chainIDs []walletCommon.ChainID, owners []common.Address, filter Filter, offset int, limit int) ([]thirdparty.CollectibleUniqueID, bool, error) {
+	ctx := context.Background()
 	// Request one more than limit, to check if DB has more available
-	ids, err := s.ownershipDB.GetOwnedCollectibles(chainIDs, owners, offset, limit+1)
+	ids, err := filterOwnedCollectibles(ctx, s.db, chainIDs, owners, filter, offset, limit+1)
 	if err != nil {
 		return nil, false, err
 	}
