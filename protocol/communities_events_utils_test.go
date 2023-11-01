@@ -1368,7 +1368,9 @@ func testRejectMemberRequestToJoin(base CommunityEventsTestsInterface, community
 	response, err = WaitOnMessengerResponse(
 		base.GetControlNode(),
 		func(r *MessengerResponse) bool {
-			return len(r.Communities()) > 0 && !r.Communities()[0].HasMember(&user.identity.PublicKey)
+			requests, err := base.GetControlNode().DeclinedRequestsToJoinForCommunity(community.ID())
+			s.Require().NoError(err)
+			return len(response.Communities()) == 1 && len(requests) == 1
 		},
 		"control node did not receive community request to join update from event sender",
 	)

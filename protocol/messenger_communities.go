@@ -2110,13 +2110,7 @@ func (m *Messenger) UpdateCommunityFilters(community *communities.Community, pri
 
 	publicFiltersToInit := make([]transport.FiltersToInitialize, 0, len(community.DefaultFilters())+len(community.Chats()))
 
-	for _, df := range community.DefaultFilters() {
-		_, err := m.transport.RemoveFilterByChatID(df.ChatID)
-		if err != nil {
-			return err
-		}
-		publicFiltersToInit = append(publicFiltersToInit, df)
-	}
+	publicFiltersToInit = append(publicFiltersToInit, community.DefaultFilters()...)
 
 	for chatID := range community.Chats() {
 		communityChatID := community.IDString() + chatID
