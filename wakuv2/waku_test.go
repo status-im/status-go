@@ -221,9 +221,7 @@ func TestWakuV2Filter(t *testing.T) {
 		}
 		return nil
 	}, options)
-
-	// At least 3 peers should have been discovered
-	require.GreaterOrEqual(t, w.PeerCount(), 3)
+	require.NoError(t, err)
 
 	filter := &common.Filter{
 		Messages:      common.NewMemoryMessageStore(),

@@ -752,6 +752,10 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityWithAdminPe
 func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWithMemberAndAdminPermission() {
 	community, _ := s.createCommunity()
 
+	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
+		return sub.Community.HasTokenPermissions()
+	})
+
 	// setup become member permission
 	permissionRequestMember := requests.CreateCommunityTokenPermission{
 		CommunityID: community.ID(),
@@ -769,10 +773,6 @@ func (s *MessengerCommunitiesTokenPermissionsSuite) TestJoinCommunityAsMemberWit
 	response, err := s.owner.CreateCommunityTokenPermission(&permissionRequestMember)
 	s.Require().NoError(err)
 	s.Require().Len(response.Communities(), 1)
-
-	waitOnCommunityPermissionCreated := waitOnCommunitiesEvent(s.owner, func(sub *communities.Subscription) bool {
-		return sub.Community.HasTokenPermissions()
-	})
 
 	err = <-waitOnCommunityPermissionCreated
 	s.Require().NoError(err)
