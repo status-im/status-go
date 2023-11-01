@@ -1325,21 +1325,29 @@ func (w *Waku) add(recvMessage *common.ReceivedMessage) (bool, error) {
 	hash := recvMessage.Hash()
 
 	w.poolMu.Lock()
-	_, alreadyCached := w.envelopes[hash]
+	envelope, alreadyCached := w.envelopes[hash]
 	w.poolMu.Unlock()
 	if !alreadyCached {
+		recvMessage.Processed.Store(false)
 		w.addEnvelope(recvMessage)
 	}
 
+	logger := w.logger.With(zap.String("envelopeHash", recvMessage.Hash().Hex()))
+
 	if alreadyCached {
-		w.logger.Debug("w envelope already cached", zap.String("envelopeHash", recvMessage.Hash().Hex()))
+		logger.Debug("w envelope already cached")
 		common.EnvelopesCachedCounter.WithLabelValues("hit").Inc()
 	} else {
-		w.logger.Debug("cached w envelope", zap.String("envelopeHash", recvMessage.Hash().Hex()))
+		logger.Debug("cached w envelope")
 		common.EnvelopesCachedCounter.WithLabelValues("miss").Inc()
 		common.EnvelopesSizeMeter.Observe(float64(len(recvMessage.Envelope.Message().Payload)))
+	}
+
+	if !alreadyCached || !envelope.Processed.Load() {
+		logger.Debug("waku: posting event")
 		w.postEvent(recvMessage) // notify the local node about the new message
 	}
+
 	return true, nil
 }
 
@@ -1371,6 +1379,8 @@ func (w *Waku) processQueue() {
 				w.storeMsgIDsMu.Lock()
 				delete(w.storeMsgIDs, e.Hash())
 				w.storeMsgIDsMu.Unlock()
+			} else {
+				e.Processed.Store(true)
 			}
 
 			w.envelopeFeed.Send(common.EnvelopeEvent{
