@@ -692,9 +692,15 @@ func (o *Manager) getCacheFullCollectibleData(uniqueIDs []thirdparty.Collectible
 			}
 		}
 
+		communityInfo, err := o.collectiblesDataDB.GetCommunityInfo(id)
+		if err != nil {
+			return nil, err
+		}
+
 		fullData := thirdparty.FullCollectibleData{
 			CollectibleData: collectibleData,
 			CollectionData:  &collectionData,
+			CommunityInfo:   communityInfo,
 		}
 		ret = append(ret, fullData)
 	}
