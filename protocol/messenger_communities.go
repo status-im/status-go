@@ -2705,6 +2705,11 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, shard
 		return nil, err
 	}
 
+	m.logger.Info("mailserver request performed",
+		zap.String("communityID", communityID),
+		zap.Bool("waitForResponse", waitForResponse),
+	)
+
 	if !waitForResponse {
 		return nil, nil
 	}
@@ -2721,6 +2726,9 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, shard
 				return nil, err
 			}
 			if community != nil && community.Name() != "" && community.DescriptionText() != "" {
+				m.logger.Debug("community info found",
+					zap.String("communityID", communityID),
+					zap.String("displayName", community.Name()))
 				return community, nil
 			}
 
