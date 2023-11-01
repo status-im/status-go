@@ -28,11 +28,11 @@ func setupCollectibleDataDBTest(t *testing.T) (*CollectibleDataDB, func()) {
 func generateTestCollectiblesData(count int) (result []thirdparty.CollectibleData) {
 	result = make([]thirdparty.CollectibleData, 0, count)
 	for i := 0; i < count; i++ {
-		bigI := big.NewInt(int64(count))
+		bigI := big.NewInt(int64(i))
 		newCollectible := thirdparty.CollectibleData{
 			ID: thirdparty.CollectibleUniqueID{
 				ContractID: thirdparty.ContractID{
-					ChainID: w_common.ChainID(i),
+					ChainID: w_common.ChainID(i % 4),
 					Address: common.BigToAddress(bigI),
 				},
 				TokenID: &bigint.BigInt{Int: bigI},
@@ -66,7 +66,10 @@ func generateTestCollectiblesData(count int) (result []thirdparty.CollectibleDat
 			},
 			BackgroundColor: fmt.Sprintf("backgroundcolor-%d", i),
 			TokenURI:        fmt.Sprintf("tokenuri-%d", i),
-			CommunityID:     fmt.Sprintf("communityid-%d", i),
+			CommunityID:     fmt.Sprintf("communityid-%d", i%5),
+		}
+		if i%5 == 0 {
+			newCollectible.CommunityID = ""
 		}
 		result = append(result, newCollectible)
 	}
@@ -77,7 +80,7 @@ func generateTestCommunityData(count int) []thirdparty.CollectibleCommunityInfo 
 	result := make([]thirdparty.CollectibleCommunityInfo, 0, count)
 	for i := 0; i < count; i++ {
 		newCommunityInfo := thirdparty.CollectibleCommunityInfo{
-			PrivilegesLevel: token.PrivilegesLevel(i),
+			PrivilegesLevel: token.PrivilegesLevel(i) % (token.CommunityLevel + 1),
 		}
 		result = append(result, newCommunityInfo)
 	}
