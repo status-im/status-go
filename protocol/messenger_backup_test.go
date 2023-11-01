@@ -811,7 +811,10 @@ func (s *MessengerBackupSuite) TestBackupKeycards() {
 	_, err = WaitOnMessengerResponse(
 		bob2,
 		func(r *MessengerResponse) bool {
-			return r.BackupHandled
+			syncedKeycards, err := bob2.settings.GetAllKnownKeycards()
+			s.Require().NoError(err)
+			return r.BackupHandled && len(syncedKeycards) == 4
+
 		},
 		"no messages",
 	)
