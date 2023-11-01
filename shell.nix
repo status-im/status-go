@@ -49,7 +49,7 @@ in pkgs.mkShell {
 
   buildInputs = with pkgs; [
     git jq which
-    go_1_19 golangci-lint go-junit-report gopls go-bindata gomobileMod
+    go_1_20 golangci-lint go-junit-report gopls go-bindata gomobileMod
     mockgen protobuf3_20 protoc-gen-go
   ] ++ lib.optional stdenv.isDarwin xcodeWrapper;
 
