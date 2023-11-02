@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/waku-org/go-waku/waku/v2/payload"
@@ -55,6 +56,8 @@ type ReceivedMessage struct {
 	SymKeyHash common.Hash // The Keccak256Hash of the key
 
 	hash common.Hash
+
+	Processed atomic.Bool
 }
 
 // MessagesRequest contains details of a request for historic messages.
