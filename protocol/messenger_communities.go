@@ -565,8 +565,8 @@ func (m *Messenger) SpectatedCommunities() ([]*communities.Community, error) {
 
 const (
 	fetchError       int = 0
-	fetchSuccess         = 1
-	fetchHasUnknowns     = 2
+	fetchSuccess     int = 1
+	fetchHasUnknowns int = 2
 )
 
 func calcTimeTillNextUpdate(fetchResultsHistory []int) time.Duration {
