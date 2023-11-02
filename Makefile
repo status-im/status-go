@@ -349,9 +349,11 @@ ci-race: lint canary-test test-unit test-e2e-race ##@tests Run all linters and t
 
 clean: ##@other Cleanup
 	rm -fr build/bin/* mailserver-config.json
+
+git-clean:
 	git clean -xf
 
-deep-clean: clean
+deep-clean: clean git-clean
 	rm -Rdf .ethereumtest/StatusChain
 
 tidy:
