@@ -1,8 +1,12 @@
 package bridge
 
 import (
+	"context"
 	"math/big"
+	"strings"
 
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -43,37 +47,52 @@ func (s *ERC721TransferBridge) CalculateFees(from, to *params.Network, token *to
 	return big.NewInt(0), big.NewInt(0), nil
 }
 
-func (s *ERC721TransferBridge) EstimateGas(from, to *params.Network, account common.Address, token *token.Token, amountIn *big.Int) (uint64, error) {
-	// ethClient, err := s.rpcClient.EthClient(from.ChainID)
-	// if err != nil {
-	// 	return 0, err
-	// }
-	// collectiblesABI, err := abi.JSON(strings.NewReader(collectibles.CollectiblesABI))
-	// if err != nil {
-	// 	return 0, err
-	// }
+func (s *ERC721TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) (uint64, error) {
+	ethClient, err := s.rpcClient.EthClient(fromNetwork.ChainID)
+	if err != nil {
+		return 0, err
+	}
 
-	// toAddress := common.HexToAddress("0x0")
-	// tokenID, success := new(big.Int).SetString(token.Symbol, 10)
-	// if !success {
-	// 	return 0, err
-	// }
+	var input []byte
+	value := new(big.Int)
 
-	// data, err := collectiblesABI.Pack("safeTransferFrom", account, toAddress, tokenID)
-	// if err != nil {
-	// 	return 0, err
-	// }
-	// estimate, err := ethClient.EstimateGas(context.Background(), ethereum.CallMsg{
-	// 	From:  account,
-	// 	To:    &toAddress,
-	// 	Value: big.NewInt(0),
-	// 	Data:  data,
-	// })
-	// if err != nil {
-	// 	return 0, err
-	// }
-	// return estimate + 1000, nil
-	return 80000, nil
+	contractAddress := to
+
+	abi, err := abi.JSON(strings.NewReader(collectibles.CollectiblesMetaData.ABI))
+	if err != nil {
+		return 0, err
+	}
+
+	input, err = abi.Pack("safeTransferFrom",
+		from,
+		to,
+		new(big.Int))
+
+	if err != nil {
+		return 0, err
+	}
+
+	ctx := context.Background()
+
+	if code, err := ethClient.PendingCodeAt(ctx, contractAddress); err != nil {
+		return 0, err
+	} else if len(code) == 0 {
+		return 0, bind.ErrNoCode
+	}
+
+	msg := ethereum.CallMsg{
+		From:  from,
+		To:    &contractAddress,
+		Value: value,
+		Data:  input,
+	}
+
+	estimation, err := ethClient.EstimateGas(ctx, msg)
+	if err != nil {
+		return 0, err
+	}
+	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
+	return uint64(increasedEstimation), nil
 }
 
 func (s *ERC721TransferBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {

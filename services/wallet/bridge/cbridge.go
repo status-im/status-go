@@ -1,14 +1,18 @@
 package bridge
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/big"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -217,13 +221,71 @@ func (s *CBridge) CalculateFees(from, to *params.Network, token *token.Token, am
 	return big.NewInt(0), new(big.Int).Add(baseFee, percFee), nil
 }
 
-func (s *CBridge) EstimateGas(from, to *params.Network, account common.Address, token *token.Token, amountIn *big.Int) (uint64, error) {
-	// TODO: replace by estimate function
-	if token.IsNative() {
-		return 22000, nil // default gas limit for eth transaction
+func (s *CBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) (uint64, error) {
+	var input []byte
+	value := new(big.Int)
+
+	abi, err := abi.JSON(strings.NewReader(celer.CelerABI))
+	if err != nil {
+		return 0, err
 	}
 
-	return 200000, nil //default gas limit for erc20 transaction
+	if token.IsNative() {
+		input, err = abi.Pack("sendNative",
+			to,
+			amountIn,
+			toNetwork.ChainID,
+			uint64(time.Now().UnixMilli()),
+			500,
+		)
+		if err != nil {
+			return 0, err
+		}
+	} else {
+		input, err = abi.Pack("send",
+			to,
+			token.Address,
+			amountIn,
+			toNetwork.ChainID,
+			uint64(time.Now().UnixMilli()),
+			500,
+		)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	contractAddress := s.GetContractAddress(fromNetwork, nil)
+	if contractAddress == nil {
+		return 0, errors.New("contract not found")
+	}
+
+	ethClient, err := s.rpcClient.EthClient(fromNetwork.ChainID)
+	if err != nil {
+		return 0, err
+	}
+
+	ctx := context.Background()
+
+	if code, err := ethClient.PendingCodeAt(ctx, *contractAddress); err != nil {
+		return 0, err
+	} else if len(code) == 0 {
+		return 0, bind.ErrNoCode
+	}
+
+	msg := ethereum.CallMsg{
+		From:  from,
+		To:    contractAddress,
+		Value: value,
+		Data:  input,
+	}
+
+	estimation, err := ethClient.EstimateGas(ctx, msg)
+	if err != nil {
+		return 0, err
+	}
+	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
+	return uint64(increasedEstimation), nil
 }
 
 func (s *CBridge) GetContractAddress(network *params.Network, token *token.Token) *common.Address {

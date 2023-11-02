@@ -451,7 +451,8 @@ func (api *API) GetTransactionEstimatedTime(ctx context.Context, chainID uint64,
 func (api *API) GetSuggestedRoutes(
 	ctx context.Context,
 	sendType SendType,
-	account common.Address,
+	addrFrom common.Address,
+	addrTo common.Address,
 	amountIn *hexutil.Big,
 	tokenID string,
 	disabledFromChainIDs,
@@ -461,7 +462,8 @@ func (api *API) GetSuggestedRoutes(
 	fromLockedAmount map[uint64]*hexutil.Big,
 ) (*SuggestedRoutes, error) {
 	log.Debug("call to GetSuggestedRoutes")
-	return api.router.suggestedRoutes(ctx, sendType, account, amountIn.ToInt(), tokenID, disabledFromChainIDs, disabledToChaindIDs, preferedChainIDs, gasFeeMode, fromLockedAmount)
+	return api.router.suggestedRoutes(ctx, sendType, addrFrom, addrTo, amountIn.ToInt(), tokenID, disabledFromChainIDs,
+		disabledToChaindIDs, preferedChainIDs, gasFeeMode, fromLockedAmount)
 }
 
 // Generates addresses for the provided paths, response doesn't include `HasActivity` value (if you need it check `GetAddressDetails` function)

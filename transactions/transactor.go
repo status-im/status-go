@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 )
 
@@ -79,6 +80,21 @@ func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 func (t *Transactor) NextNonce(rpcClient *rpc.Client, chainID uint64, from types.Address) (uint64, func(inc bool, n uint64), error) {
 	wrapper := newRPCWrapper(rpcClient, chainID)
 	return t.nonce.Next(wrapper, from)
+}
+func (t *Transactor) EstimateGas(network *params.Network, from common.Address, to common.Address, value *big.Int, input []byte) (uint64, error) {
+	rpcWrapper := newRPCWrapper(t.rpcWrapper.RPCClient, network.ChainID)
+
+	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
+	defer cancel()
+
+	msg := ethereum.CallMsg{
+		From:  from,
+		To:    &to,
+		Value: value,
+		Data:  input,
+	}
+
+	return rpcWrapper.EstimateGas(ctx, msg)
 }
 
 // SendTransaction is an implementation of eth_sendTransaction. It queues the tx to the sign queue.

@@ -2,10 +2,14 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"math"
 	"math/big"
+	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -13,6 +17,8 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/hop"
+	hopBridge "github.com/status-im/status-go/contracts/hop/bridge"
+	hopWrapper "github.com/status-im/status-go/contracts/hop/wrapper"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
@@ -126,41 +132,87 @@ func (h *HopBridge) Can(from, to *params.Network, token *token.Token, balance *b
 	return true, nil
 }
 
-func (h *HopBridge) EstimateGas(from, to *params.Network, account common.Address, token *token.Token, amountIn *big.Int) (uint64, error) {
-	// TODO: find why this doesn't work
-	// ethClient, err := s.contractMaker.RPCClient.EthClient(from.ChainID)
-	// if err != nil {
-	// 	return 0, err
-	// }
-	// zero := common.HexToAddress("0x0")
-	// zeroInt := big.NewInt(0)
-	// var data []byte
-	// if from.Layer == 1 {
-	// 	bridgeABI, err := abi.JSON(strings.NewReader(hopBridge.HopBridgeABI))
-	// 	if err != nil {
-	// 		return 0, err
-	// 	}
-	// 	data, err = bridgeABI.Pack("sendToL2", big.NewInt(int64(to.ChainID)), zero, amountIn, zeroInt, zeroInt, zero, zeroInt)
-	// 	if err != nil {
-	// 		return 0, err
-	// 	}
-	// } else {
-	// 	wrapperABI, err := abi.JSON(strings.NewReader(hopWrapper.HopWrapperABI))
-	// 	if err != nil {
-	// 		return 0, err
-	// 	}
-	// 	data, err = wrapperABI.Pack("swapAndSend", big.NewInt(int64(to.ChainID)), zero, amountIn, zeroInt, zeroInt, zeroInt, zeroInt, zeroInt)
-	// 	if err != nil {
-	// 		return 0, err
-	// 	}
-	// }
-	// estimate, err := ethClient.EstimateGas(context.Background(), ethereum.CallMsg{
-	// 	From:  zero,
-	// 	To:    &token.Address,
-	// 	Value: big.NewInt(0),
-	// 	Data:  data,
-	// })
-	return 500000 + 1000, nil
+func (h *HopBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) (uint64, error) {
+	var input []byte
+	value := new(big.Int)
+
+	now := time.Now()
+	deadline := big.NewInt(now.Unix() + 604800)
+
+	if token.IsNative() {
+		value = amountIn
+	}
+
+	contractAddress := h.GetContractAddress(fromNetwork, token)
+	if contractAddress == nil {
+		return 0, errors.New("contract not found")
+	}
+
+	ctx := context.Background()
+
+	if fromNetwork.Layer == 1 {
+		ABI, err := abi.JSON(strings.NewReader(hopBridge.HopBridgeABI))
+		if err != nil {
+			return 0, err
+		}
+
+		input, err = ABI.Pack("sendToL2",
+			big.NewInt(int64(toNetwork.ChainID)),
+			to,
+			amountIn,
+			big.NewInt(0),
+			deadline,
+			common.HexToAddress("0x0"),
+			big.NewInt(0))
+
+		if err != nil {
+			return 0, err
+		}
+	} else {
+		ABI, err := abi.JSON(strings.NewReader(hopWrapper.HopWrapperABI))
+		if err != nil {
+			return 0, err
+		}
+
+		input, err = ABI.Pack("swapAndSend",
+			big.NewInt(int64(toNetwork.ChainID)),
+			to,
+			amountIn,
+			big.NewInt(0),
+			big.NewInt(0),
+			deadline,
+			big.NewInt(0),
+			deadline)
+
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	ethClient, err := h.contractMaker.RPCClient.EthClient(fromNetwork.ChainID)
+	if err != nil {
+		return 0, err
+	}
+
+	if code, err := ethClient.PendingCodeAt(ctx, *contractAddress); err != nil {
+		return 0, err
+	} else if len(code) == 0 {
+		return 0, bind.ErrNoCode
+	}
+
+	msg := ethereum.CallMsg{
+		From:  from,
+		To:    contractAddress,
+		Value: value,
+		Data:  input,
+	}
+
+	estimation, err := ethClient.EstimateGas(ctx, msg)
+	if err != nil {
+		return 0, err
+	}
+	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
+	return uint64(increasedEstimation), nil
 }
 
 func (h *HopBridge) GetContractAddress(network *params.Network, token *token.Token) *common.Address {
