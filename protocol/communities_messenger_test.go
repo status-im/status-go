@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -2890,10 +2891,10 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_ImportCommunity() {
 	s.Require().NoError(err)
 }
 
-func (s *MessengerCommunitiesSuite) sendTestMessage(sender *Messenger, chatId string, messageText string) string {
-	message := &common.Message{}
+func (s *MessengerCommunitiesSuite) sendTestMessage(sender *Messenger, chatID string, messageText string) string {
+	message := common.NewMessage()
 	message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
-	message.ChatId = chatId
+	message.ChatId = chatID
 	message.Text = messageText
 
 	response, err := sender.SendChatMessage(context.Background(), message)
@@ -2906,7 +2907,7 @@ func (s *MessengerCommunitiesSuite) sendTestMessage(sender *Messenger, chatId st
 
 func (s *MessengerCommunitiesSuite) TestSyncCommunity_Messaging() {
 
-	admin1 := s.admin
+	admin1 := s.owner
 	admin2 := s.createOtherDevice(admin1)
 	user1 := s.alice
 
@@ -2932,41 +2933,43 @@ func (s *MessengerCommunitiesSuite) TestSyncCommunity_Messaging() {
 	advertiseCommunityTo(&s.Suite, community, admin1, user1)
 	joinCommunity(&s.Suite, community, admin1, user1, joinRequest)
 
-	// Common func for sending messages
-	var sentMessages = map[string]struct{}{}
-
 	// User 1: send a message to community
-	messageId := s.sendTestMessage(user1, chat.ID, "A")
-	sentMessages[messageId] = struct{}{}
+	message := common.NewMessage()
+	message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	message.ChatId = chat.ID
+	message.Text = "A"
 
-	// Admin-2: Go online
-	// NOTE: We should be receiving both things here:
-	//   - new community member (User 2)
-	//   - message "A"
-	// Unfortunately, we get message "A" first and therefor never get message "A"
-	// https://github.com/status-im/status-go/issues/3869
-	response, err = WaitOnMessengerResponse(admin2, func(r *MessengerResponse) bool {
-		return len(r.Communities()) == 1 && len(r.Communities()[0].Members()) == 2 //  && len(r.Messages()) == 2
-	}, "member not received")
-
-	// FIXME: Message "A" is lost here
+	response, err = user1.SendChatMessage(context.Background(), message)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Messages(), 1)
-	s.Require().Equal(protobuf.ChatMessage_COMMUNITY, response.Messages()[0].ContentType)
 
-	// User 1: send another message to community
-	messageId = s.sendTestMessage(user1, chat.ID, "B")
-	sentMessages[messageId] = struct{}{}
+	sentMessageID := response.Messages()[0].ID
 
-	// This time Admin-2 receives the message
-	response, _ = WaitOnMessengerResponse(user1, func(r *MessengerResponse) bool {
-		return len(r.Messages()) == 1
-	}, "message not received")
+	// Admin-2: Go online
+	// We should be receiving both things here:
+	//   - new community member (User 2)
+	//   - message "A"
+	// FIXME: Unfortunately, we get message "A" first and it's dropped
+	// https://github.com/status-im/status-go/issues/3869
+
+	response, err = WaitOnMessengerResponse(admin2, func(r *MessengerResponse) bool {
+		return len(r.Messages()) == 2 // Wait for both `ChatMessage_COMMUNITY` and `ChatMessage_TEXT_PLAIN`
+	}, "messages not received")
 
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Equal(sentMessages, response.messageIds())
+	s.Require().Len(response.Messages(), 2)
+
+	// Sort the messages by content type for correct check
+	messages := response.Messages()
+	sort.Slice(messages, func(i, j int) bool {
+		return messages[i].ContentType < messages[j].ContentType
+	})
+
+	s.Require().Equal(sentMessageID, messages[0].ID)
+	s.Require().Equal(protobuf.ChatMessage_TEXT_PLAIN, messages[0].ContentType)
+	s.Require().Equal(protobuf.ChatMessage_COMMUNITY, messages[0].ContentType)
 }
 
 func (s *MessengerCommunitiesSuite) TestSetMutePropertyOnChatsByCategory() {
