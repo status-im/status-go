@@ -1053,25 +1053,26 @@ func (s *MessengerCommunitiesSuite) TestDeletePendingRequestAccess() {
 	s.Require().NotNil(response)
 	s.Require().Len(response.RequestsToJoinCommunity, 1)
 
+	aliceRequestToJoin := response.RequestsToJoinCommunity[0]
+
 	// Retrieve request to join and Check activity center notification for Bob
 	err = tt.RetryWithBackOff(func() error {
 		response, err = bobRetrieveAll()
 		if err != nil {
 			return err
 		}
+		// NOTE: we might receive multiple requests to join in case of re-transmissions
+		// because request to join are hard deleted from the database, we can't check
+		// whether that's an old one or a new one. So here we test for the specific id
 
-		if len(response.RequestsToJoinCommunity) == 0 {
-			return errors.New("request to join community not received")
+		for _, r := range response.RequestsToJoinCommunity {
+			if bytes.Equal(r.ID, aliceRequestToJoin.ID) {
+				return nil
+			}
 		}
-
-		if len(response.ActivityCenterNotifications()) == 0 {
-			return errors.New("request to join community notification not added in activity center")
-		}
-
-		return nil
+		return errors.New("request to join not found")
 	})
 	s.Require().NoError(err)
-	s.Require().Len(response.RequestsToJoinCommunity, 1)
 
 	// Check activity center notification for Bob
 	notifications, err = fetchActivityCenterNotificationsForAdmin()

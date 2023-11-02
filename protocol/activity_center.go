@@ -76,6 +76,16 @@ type ActivityCenterNotification struct {
 	AlbumMessages []*common.Message `json:"albumMessages"`
 }
 
+func (n *ActivityCenterNotification) IncrementUpdatedAt(timesource common.TimeSource) {
+	tNow := timesource.GetCurrentTime()
+	// If updatead at is greater or equal than time now, we bump it
+	if n.UpdatedAt >= tNow {
+		n.UpdatedAt++
+	} else {
+		n.UpdatedAt = tNow
+	}
+}
+
 type ActivityCenterNotificationsRequest struct {
 	Cursor        string                        `json:"cursor"`
 	Limit         uint64                        `json:"limit"`
