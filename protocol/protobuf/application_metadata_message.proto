@@ -80,7 +80,10 @@ message ApplicationMetadataMessage {
     SYNC_ENS_USERNAME_DETAIL = 64;
     reserved 65;
     reserved "SYNC_ACTIVITY_CENTER_NOTIFICATIONS";
-    SYNC_ACTIVITY_CENTER_NOTIFICATION_STATE = 66;
+    // No need to sync AC state now since we allow exist different number of ACs between paired devices
+    // Also we will update AC state after sync AC decision
+    reserved 66;
+    reserved "SYNC_ACTIVITY_CENTER_NOTIFICATION_STATE";
     COMMUNITY_EVENTS_MESSAGE = 67;
     COMMUNITY_EDIT_SHARED_ADDRESSES = 68;
     SYNC_ACCOUNT_CUSTOMIZATION_COLOR = 69;

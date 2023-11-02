@@ -217,11 +217,6 @@ message SyncActivityCenterUnread {
   repeated bytes ids = 2;
 }
 
-message SyncActivityCenterNotificationState {
-  uint64 updated_at = 1;
-  bool has_seen = 2;
-}
-
 message SyncActivityCenterCommunityRequestDecision {
   uint64 clock = 1;
   bytes id = 2;

@@ -199,9 +199,6 @@ func (m *Messenger) dispatchToHandler(messageState *ReceivedMessageState, protoB
            case protobuf.ApplicationMetadataMessage_SYNC_ENS_USERNAME_DETAIL:
 		return m.handleSyncEnsUsernameDetailProtobuf(messageState, protoBytes, msg, filter)
         
-           case protobuf.ApplicationMetadataMessage_SYNC_ACTIVITY_CENTER_NOTIFICATION_STATE:
-		return m.handleSyncActivityCenterNotificationStateProtobuf(messageState, protoBytes, msg, filter)
-        
            case protobuf.ApplicationMetadataMessage_COMMUNITY_EVENTS_MESSAGE:
 		return m.handleCommunityEventsMessageProtobuf(messageState, protoBytes, msg, filter)
         
@@ -1426,29 +1423,6 @@ func (m *Messenger) handleSyncEnsUsernameDetailProtobuf(messageState *ReceivedMe
 	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
 
 	return m.HandleSyncEnsUsernameDetail(messageState, p, msg)
-	
-}
-
-
-func (m *Messenger) handleSyncActivityCenterNotificationStateProtobuf(messageState *ReceivedMessageState, protoBytes []byte, msg *v1protocol.StatusMessage, filter transport.Filter) error {
-	m.logger.Info("handling SyncActivityCenterNotificationState")
-	
-	if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
-		m.logger.Warn("not coming from us, ignoring")
-		return nil
-	}
-	
-
-	
-	p := &protobuf.SyncActivityCenterNotificationState{}
-	err := proto.Unmarshal(protoBytes, p)
-	if err != nil {
-		return err
-	}
-
-	m.outputToCSV(msg.TransportMessage.Timestamp, msg.ID, messageState.CurrentMessageState.Contact.ID, filter.ContentTopic, filter.ChatID, msg.Type, p)
-
-	return m.HandleSyncActivityCenterNotificationState(messageState, p, msg)
 	
 }
 
