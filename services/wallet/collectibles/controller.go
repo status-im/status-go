@@ -3,7 +3,6 @@ package collectibles
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"sync"
 	"time"
@@ -52,6 +51,8 @@ type Controller struct {
 	walletEventsWatcher *walletevent.Watcher
 	settingsWatcher     *settingsevent.Watcher
 
+	receivedCollectiblesCb OwnedCollectiblesCb
+
 	commandsLock sync.RWMutex
 }
 
@@ -75,6 +76,10 @@ func NewController(
 		commands:       make(commandPerAddressAndChainID),
 		timers:         make(timerPerAddressAndChainID),
 	}
+}
+
+func (c *Controller) SetReceivedCollectiblesCb(cb OwnedCollectiblesCb) {
+	c.receivedCollectiblesCb = cb
 }
 
 func (c *Controller) Start() {
@@ -225,7 +230,7 @@ func (c *Controller) startPeriodicalOwnershipFetchForAccountAndChainID(address c
 		c.walletFeed,
 		chainID,
 		address,
-		c.notifyCommunityCollectiblesReceived,
+		c.receivedCollectiblesCb,
 	)
 
 	c.commands[address][chainID] = command
@@ -397,57 +402,4 @@ func (c *Controller) stopSettingsWatcher() {
 		c.settingsWatcher.Stop()
 		c.settingsWatcher = nil
 	}
-}
-
-func (c *Controller) notifyCommunityCollectiblesReceived(ownedCollectibles OwnedCollectibles) {
-	ctx := context.Background()
-
-	collectiblesData, err := c.manager.FetchAssetsByCollectibleUniqueID(ctx, ownedCollectibles.ids)
-	if err != nil {
-		log.Error("Error fetching collectibles data", "error", err)
-		return
-	}
-
-	communityCollectibles := make([]CommunityCollectibleHeader, 0, len(collectiblesData))
-	for _, collectibleData := range collectiblesData {
-		collectibleID := collectibleData.CollectibleData.ID
-		communityID := collectibleData.CollectibleData.CommunityID
-
-		if communityID == "" {
-			continue
-		}
-
-		communityInfo, _, err := c.communityDB.GetCommunityInfo(communityID)
-
-		if err != nil {
-			log.Error("Error fetching community info", "error", err)
-			continue
-		}
-
-		header := CommunityCollectibleHeader{
-			ID:              collectibleID,
-			Name:            collectibleData.CollectibleData.Name,
-			CommunityHeader: communityInfoToHeader(communityID, communityInfo, collectibleData.CommunityInfo),
-		}
-
-		communityCollectibles = append(communityCollectibles, header)
-	}
-
-	if len(communityCollectibles) == 0 {
-		return
-	}
-
-	encodedMessage, err := json.Marshal(communityCollectibles)
-	if err != nil {
-		return
-	}
-
-	c.walletFeed.Send(walletevent.Event{
-		Type:    EventCommunityCollectiblesReceived,
-		ChainID: uint64(ownedCollectibles.chainID),
-		Accounts: []common.Address{
-			ownedCollectibles.account,
-		},
-		Message: string(encodedMessage),
-	})
 }
