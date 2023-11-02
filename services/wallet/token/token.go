@@ -299,7 +299,7 @@ func (tm *Manager) FindOrCreateTokenByAddress(ctx context.Context, chainID uint6
 }
 
 func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *Token, address common.Address) {
-	if token != nil && token.CommunityID == nil {
+	if token == nil || token.CommunityID != nil {
 		// Token is invalid or is alrady discovered. Nothing to do here.
 		return
 	}
