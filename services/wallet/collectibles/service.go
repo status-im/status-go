@@ -33,6 +33,15 @@ const (
 	EventGetCollectiblesDetailsDone     walletevent.EventType = "wallet-get-collectibles-details-done"
 )
 
+type CollectibleDataType byte
+
+const (
+	CollectibleDataTypeUniqueID CollectibleDataType = iota
+	CollectibleDataTypeHeader
+	CollectibleDataTypeDetails
+	CollectibleDataTypeCommunityHeader
+)
+
 var (
 	filterOwnedCollectiblesTask = async.TaskType{
 		ID:     1,
@@ -62,15 +71,16 @@ func NewService(
 	settingsFeed *event.Feed,
 	networkManager *network.Manager,
 	manager *Manager) *Service {
-	return &Service{
+	s := &Service{
 		manager:     manager,
 		controller:  NewController(db, walletFeed, accountsDB, accountsFeed, settingsFeed, networkManager, manager),
 		db:          db,
 		ownershipDB: NewOwnershipDB(db),
 		communityDB: community.NewDataDB(db),
 		walletFeed:  walletFeed,
-		scheduler:   async.NewMultiClientScheduler(),
 	}
+	s.controller.SetReceivedCollectiblesCb(s.notifyCommunityCollectiblesReceived)
+	return s
 }
 
 type ErrorCode = int
@@ -89,9 +99,10 @@ type OwnershipStatus struct {
 type OwnershipStatusPerChainID = map[walletCommon.ChainID]OwnershipStatus
 type OwnershipStatusPerAddressAndChainID = map[common.Address]OwnershipStatusPerChainID
 
-type FilterOwnedCollectiblesResponse struct {
-	Collectibles []CollectibleHeader `json:"collectibles"`
-	Offset       int                 `json:"offset"`
+type GetOwnedCollectiblesResponse struct {
+	DataType            CollectibleDataType `json:"data_type"`
+	EncodedCollectibles string              `json:"collectibles"`
+	Offset              int                 `json:"offset"`
 	// Used to indicate that there might be more collectibles that were not returned
 	// based on a simple heuristic
 	HasMore         bool                                `json:"hasMore"`
@@ -99,78 +110,108 @@ type FilterOwnedCollectiblesResponse struct {
 	ErrorCode       ErrorCode                           `json:"errorCode"`
 }
 
-type GetCollectiblesDetailsResponse struct {
-	Collectibles []CollectibleDetails `json:"collectibles"`
-	ErrorCode    ErrorCode            `json:"errorCode"`
+type GetCollectiblesByUniqueIDResponse struct {
+	DataType            CollectibleDataType `json:"data_type"`
+	EncodedCollectibles string              `json:"collectibles"`
+	ErrorCode           ErrorCode           `json:"errorCode"`
 }
 
-type filterOwnedCollectiblesTaskReturnType struct {
-	headers         []CollectibleHeader
+type getOwnedCollectiblesTaskReturnType struct {
+	collectibles    interface{}
 	hasMore         bool
 	ownershipStatus OwnershipStatusPerAddressAndChainID
 }
 
-// FilterOwnedCollectiblesResponse allows only one filter task to run at a time
+type getCollectiblesByUniqueIDTaskReturnType struct {
+	collectibles interface{}
+}
+
+// GetOwnedCollectiblesAsync allows only one filter task to run at a time
 // and it cancels the current one if a new one is started
 // All calls will trigger an EventOwnedCollectiblesFilteringDone event with the result of the filtering
-func (s *Service) FilterOwnedCollectiblesAsync(requestID int32, chainIDs []walletCommon.ChainID, addresses []common.Address, filter Filter, offset int, limit int) {
+func (s *Service) GetOwnedCollectiblesAsync(
+	requestID int32,
+	chainIDs []walletCommon.ChainID,
+	addresses []common.Address,
+	filter Filter,
+	offset int,
+	limit int,
+	dataType CollectibleDataType) {
 	s.scheduler.Enqueue(requestID, filterOwnedCollectiblesTask, func(ctx context.Context) (interface{}, error) {
-		collectibles, hasMore, err := s.FilterOwnedCollectibles(chainIDs, addresses, filter, offset, limit)
+		ids, hasMore, err := s.FilterOwnedCollectibles(chainIDs, addresses, filter, offset, limit)
 		if err != nil {
 			return nil, err
 		}
-		data, err := s.manager.FetchAssetsByCollectibleUniqueID(ctx, collectibles)
+
+		collectibles, err := s.collectibleIDsToDataType(ctx, ids, dataType)
 		if err != nil {
 			return nil, err
 		}
+
 		ownershipStatus, err := s.GetOwnershipStatus(chainIDs, addresses)
 		if err != nil {
 			return nil, err
 		}
-		headers, err := s.fullCollectiblesDataToHeaders(data)
 
-		return filterOwnedCollectiblesTaskReturnType{
-			headers:         headers,
+		return getOwnedCollectiblesTaskReturnType{
+			collectibles:    collectibles,
 			hasMore:         hasMore,
 			ownershipStatus: ownershipStatus,
 		}, err
 	}, func(result interface{}, taskType async.TaskType, err error) {
-		res := FilterOwnedCollectiblesResponse{
+		res := GetOwnedCollectiblesResponse{
+			DataType:  dataType,
 			ErrorCode: ErrorCodeFailed,
 		}
 
 		if errors.Is(err, context.Canceled) || errors.Is(err, async.ErrTaskOverwritten) {
 			res.ErrorCode = ErrorCodeTaskCanceled
 		} else if err == nil {
-			fnRet := result.(filterOwnedCollectiblesTaskReturnType)
-			res.Collectibles = fnRet.headers
-			res.Offset = offset
-			res.HasMore = fnRet.hasMore
-			res.OwnershipStatus = fnRet.ownershipStatus
-			res.ErrorCode = ErrorCodeSuccess
+			fnRet := result.(getOwnedCollectiblesTaskReturnType)
+
+			encodedMessage, err := json.Marshal(fnRet.collectibles)
+			if err == nil {
+				res.EncodedCollectibles = string(encodedMessage)
+				res.Offset = offset
+				res.HasMore = fnRet.hasMore
+				res.OwnershipStatus = fnRet.ownershipStatus
+				res.ErrorCode = ErrorCodeSuccess
+			}
 		}
 
 		s.sendResponseEvent(&requestID, EventOwnedCollectiblesFilteringDone, res, err)
 	})
 }
 
-func (s *Service) GetCollectiblesDetailsAsync(requestID int32, uniqueIDs []thirdparty.CollectibleUniqueID) {
+func (s *Service) GetCollectiblesByUniqueIDAsync(
+	requestID int32,
+	uniqueIDs []thirdparty.CollectibleUniqueID,
+	dataType CollectibleDataType) {
 	s.scheduler.Enqueue(requestID, getCollectiblesDataTask, func(ctx context.Context) (interface{}, error) {
-		collectibles, err := s.manager.FetchAssetsByCollectibleUniqueID(ctx, uniqueIDs)
+		collectibles, err := s.collectibleIDsToDataType(ctx, uniqueIDs, dataType)
 		if err != nil {
 			return nil, err
 		}
-		return s.fullCollectiblesDataToDetails(collectibles)
+
+		return getCollectiblesByUniqueIDTaskReturnType{
+			collectibles: collectibles,
+		}, err
 	}, func(result interface{}, taskType async.TaskType, err error) {
-		res := GetCollectiblesDetailsResponse{
+		res := GetCollectiblesByUniqueIDResponse{
+			DataType:  dataType,
 			ErrorCode: ErrorCodeFailed,
 		}
 
 		if errors.Is(err, context.Canceled) || errors.Is(err, async.ErrTaskOverwritten) {
 			res.ErrorCode = ErrorCodeTaskCanceled
 		} else if err == nil {
-			res.Collectibles = result.([]CollectibleDetails)
-			res.ErrorCode = ErrorCodeSuccess
+			fnRet := result.(getCollectiblesByUniqueIDTaskReturnType)
+
+			encodedMessage, err := json.Marshal(fnRet.collectibles)
+			if err == nil {
+				res.EncodedCollectibles = string(encodedMessage)
+				res.ErrorCode = ErrorCodeSuccess
+			}
 		}
 
 		s.sendResponseEvent(&requestID, EventGetCollectiblesDetailsDone, res, err)
@@ -253,6 +294,27 @@ func (s *Service) GetOwnershipStatus(chainIDs []walletCommon.ChainID, owners []c
 	return ret, nil
 }
 
+func (s *Service) collectibleIDsToDataType(ctx context.Context, ids []thirdparty.CollectibleUniqueID, dataType CollectibleDataType) (interface{}, error) {
+	switch dataType {
+	case CollectibleDataTypeUniqueID:
+		return ids, nil
+	case CollectibleDataTypeHeader, CollectibleDataTypeDetails, CollectibleDataTypeCommunityHeader:
+		collectibles, err := s.manager.FetchAssetsByCollectibleUniqueID(ctx, ids)
+		if err != nil {
+			return nil, err
+		}
+		switch dataType {
+		case CollectibleDataTypeHeader:
+			return s.fullCollectiblesDataToHeaders(collectibles)
+		case CollectibleDataTypeDetails:
+			return s.fullCollectiblesDataToDetails(collectibles)
+		case CollectibleDataTypeCommunityHeader:
+			return s.fullCollectiblesDataToCommunityHeader(collectibles)
+		}
+	}
+	return nil, errors.New("unknown data type")
+}
+
 func (s *Service) fullCollectiblesDataToHeaders(data []thirdparty.FullCollectibleData) ([]CollectibleHeader, error) {
 	res := make([]CollectibleHeader, 0, len(data))
 
@@ -295,4 +357,86 @@ func (s *Service) fullCollectiblesDataToDetails(data []thirdparty.FullCollectibl
 	}
 
 	return res, nil
+}
+
+func (s *Service) fullCollectiblesDataToCommunityHeader(data []thirdparty.FullCollectibleData) ([]CommunityCollectibleHeader, error) {
+	res := make([]CommunityCollectibleHeader, 0, len(data))
+
+	for _, c := range data {
+		collectibleID := c.CollectibleData.ID
+		communityID := c.CollectibleData.CommunityID
+
+		if communityID == "" {
+			continue
+		}
+
+		communityInfo, _, err := s.communityDB.GetCommunityInfo(communityID)
+		if err != nil {
+			log.Error("Error fetching community info", "error", err)
+			continue
+		}
+
+		header := CommunityCollectibleHeader{
+			ID:              collectibleID,
+			Name:            c.CollectibleData.Name,
+			CommunityHeader: communityInfoToHeader(communityID, communityInfo, c.CommunityInfo),
+		}
+
+		res = append(res, header)
+	}
+
+	return res, nil
+}
+
+func (s *Service) notifyCommunityCollectiblesReceived(ownedCollectibles OwnedCollectibles) {
+	ctx := context.Background()
+
+	collectiblesData, err := s.manager.FetchAssetsByCollectibleUniqueID(ctx, ownedCollectibles.ids)
+	if err != nil {
+		log.Error("Error fetching collectibles data", "error", err)
+		return
+	}
+
+	communityCollectibles := make([]CommunityCollectibleHeader, 0, len(collectiblesData))
+	for _, collectibleData := range collectiblesData {
+		collectibleID := collectibleData.CollectibleData.ID
+		communityID := collectibleData.CollectibleData.CommunityID
+
+		if communityID == "" {
+			continue
+		}
+
+		communityInfo, _, err := s.communityDB.GetCommunityInfo(communityID)
+
+		if err != nil {
+			log.Error("Error fetching community info", "error", err)
+			continue
+		}
+
+		header := CommunityCollectibleHeader{
+			ID:              collectibleID,
+			Name:            collectibleData.CollectibleData.Name,
+			CommunityHeader: communityInfoToHeader(communityID, communityInfo, collectibleData.CommunityInfo),
+		}
+
+		communityCollectibles = append(communityCollectibles, header)
+	}
+
+	if len(communityCollectibles) == 0 {
+		return
+	}
+
+	encodedMessage, err := json.Marshal(communityCollectibles)
+	if err != nil {
+		return
+	}
+
+	s.walletFeed.Send(walletevent.Event{
+		Type:    EventCommunityCollectiblesReceived,
+		ChainID: uint64(ownedCollectibles.chainID),
+		Accounts: []common.Address{
+			ownedCollectibles.account,
+		},
+		Message: string(encodedMessage),
+	})
 }

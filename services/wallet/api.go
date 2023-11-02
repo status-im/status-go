@@ -320,17 +320,17 @@ func (api *API) RefetchOwnedCollectibles() error {
 	return nil
 }
 
-func (api *API) FilterOwnedCollectiblesAsync(requestID int32, chainIDs []wcommon.ChainID, addresses []common.Address, filter collectibles.Filter, offset int, limit int) error {
-	log.Debug("wallet.api.FilterOwnedCollectiblesAsync", "chainIDs.count", len(chainIDs), "addr.count", len(addresses), "offset", offset, "limit", limit)
+func (api *API) GetOwnedCollectiblesAsync(requestID int32, chainIDs []wcommon.ChainID, addresses []common.Address, filter collectibles.Filter, offset int, limit int, dataType collectibles.CollectibleDataType) error {
+	log.Debug("wallet.api.GetOwnedCollectiblesAsync", "requestID", requestID, "chainIDs.count", len(chainIDs), "addr.count", len(addresses), "offset", offset, "limit", limit, "dataType", dataType)
 
-	api.s.collectibles.FilterOwnedCollectiblesAsync(requestID, chainIDs, addresses, filter, offset, limit)
+	api.s.collectibles.GetOwnedCollectiblesAsync(requestID, chainIDs, addresses, filter, offset, limit, dataType)
 	return nil
 }
 
-func (api *API) GetCollectiblesDetailsAsync(requestID int32, uniqueIDs []thirdparty.CollectibleUniqueID) error {
-	log.Debug("wallet.api.GetCollectiblesDetailsAsync")
+func (api *API) GetCollectiblesByUniqueIDAsync(requestID int32, uniqueIDs []thirdparty.CollectibleUniqueID, dataType collectibles.CollectibleDataType) error {
+	log.Debug("wallet.api.GetCollectiblesByUniqueIDAsync", "requestID", requestID, "uniqueIDs.count", len(uniqueIDs), "dataType", dataType)
 
-	api.s.collectibles.GetCollectiblesDetailsAsync(requestID, uniqueIDs)
+	api.s.collectibles.GetCollectiblesByUniqueIDAsync(requestID, uniqueIDs, dataType)
 	return nil
 }
 
