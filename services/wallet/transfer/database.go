@@ -244,7 +244,7 @@ func (db *Database) GetTransfersForIdentities(ctx context.Context, identities []
 	query := newTransfersQuery()
 	for _, identity := range identities {
 		subQuery := newSubQuery()
-		subQuery = subQuery.FilterNetwork(uint64(identity.ChainID)).FilterTransactionHash(identity.Hash).FilterAddress(identity.Address)
+		subQuery = subQuery.FilterNetwork(uint64(identity.ChainID)).FilterTransactionID(identity.Hash).FilterAddress(identity.Address)
 		query.addSubQuery(subQuery, OrSeparator)
 	}
 	rows, err := db.client.QueryContext(ctx, query.String(), query.Args()...)
@@ -255,8 +255,8 @@ func (db *Database) GetTransfersForIdentities(ctx context.Context, identities []
 	return query.TransferScan(rows)
 }
 
-func (db *Database) GetTransactionsToLoad(chainID uint64, address common.Address, blockNumber *big.Int) (rst []PreloadedTransaction, err error) {
-	query := newTransfersQuery().
+func (db *Database) GetTransactionsToLoad(chainID uint64, address common.Address, blockNumber *big.Int) (rst []*PreloadedTransaction, err error) {
+	query := newTransfersQueryForPreloadedTransactions().
 		FilterNetwork(chainID).
 		FilterAddress(address).
 		FilterBlockNumber(blockNumber).
@@ -354,8 +354,8 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, acco
 	}
 
 	insertTx, err := creator.Prepare(`INSERT OR IGNORE
-	INTO transfers (network_id, address, sender, hash, blk_number, blk_hash, type, timestamp, log, loaded, log_index)
-	VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 0, ?)`)
+	INTO transfers (network_id, address, sender, hash, blk_number, blk_hash, type, timestamp, log, loaded, log_index, token_id, amount_padded128hex)
+	VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 0, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -383,9 +383,11 @@ func insertBlocksWithTransactions(chainID uint64, creator statementCreator, acco
 				continue
 			}
 
-			_, err = insertTx.Exec(chainID, account, account, transaction.ID, (*bigint.SQLBigInt)(header.Number), header.Hash, w_common.Erc20Transfer, &JSONBlob{transaction.Log}, logIndex)
+			tokenID := (*bigint.SQLBigIntBytes)(transaction.TokenID)
+			txValue := sqlite.BigIntToPadded128BitsStr(transaction.Value)
+			_, err = insertTx.Exec(chainID, account, account, transaction.ID, (*bigint.SQLBigInt)(header.Number), header.Hash, transaction.Type, &JSONBlob{transaction.Log}, logIndex, tokenID, txValue)
 			if err != nil {
-				log.Error("error saving Erc20transfer", "err", err)
+				log.Error("error saving token transfer", "err", err)
 				return err
 			}
 		}
@@ -428,7 +430,14 @@ func updateOrInsertTransfers(chainID uint64, creator statementCreator, transfers
 		var txTo *common.Address
 		if t.Transaction != nil {
 			if t.Log != nil {
-				_, tokenAddress, tokenID, txValue, txFrom, txTo = w_common.ExtractTokenIdentity(t.Type, t.Log, t.Transaction)
+				_, tokenAddress, txFrom, txTo = w_common.ExtractTokenTransferData(t.Type, t.Log, t.Transaction)
+				tokenID = t.TokenID
+				// Zero tokenID can be used for ERC721 and ERC1155 transfers but when serialzed/deserialized it becomes nil
+				// as 0 value of big.Int bytes is nil.
+				if tokenID == nil && (t.Type == w_common.Erc721Transfer || t.Type == w_common.Erc1155Transfer) {
+					tokenID = big.NewInt(0)
+				}
+				txValue = t.TokenValue
 			} else {
 				txValue = new(big.Int).Set(t.Transaction.Value())
 				txFrom = &t.From

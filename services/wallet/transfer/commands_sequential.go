@@ -32,7 +32,7 @@ func (c *findNewBlocksCommand) Command() async.Command {
 }
 
 func (c *findNewBlocksCommand) Run(parent context.Context) (err error) {
-	log.Debug("start findNewBlocksCommand", "account", c.account, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit)
+	log.Debug("start findNewBlocksCommand", "account", c.account, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit, "from", c.fromBlockNumber, "to", c.toBlockNumber)
 
 	headNum, err := getHeadBlockNumber(parent, c.chainClient)
 	if err != nil {
@@ -47,6 +47,7 @@ func (c *findNewBlocksCommand) Run(parent context.Context) (err error) {
 		return err // Will keep spinning forever nomatter what
 	}
 
+	// In case no block range is in DB, skip until history blocks are fetched
 	if blockRange != nil {
 		c.fromBlockNumber = blockRange.LastKnown
 
@@ -63,6 +64,8 @@ func (c *findNewBlocksCommand) Run(parent context.Context) (err error) {
 
 		_ = c.findBlocksCommand.Run(parent)
 	}
+
+	log.Debug("end findNewBlocksCommand", "account", c.account, "chain", c.chainClient.NetworkID(), "noLimit", c.noLimit, "from", c.fromBlockNumber, "to", c.toBlockNumber)
 
 	return nil
 }
@@ -436,7 +439,7 @@ func (c *findBlocksCommand) fastIndex(ctx context.Context, bCacher balance.Cache
 	select {
 	case <-ctx.Done():
 		err = ctx.Err()
-		log.Info("fast indexer ctx Done", "error", err)
+		log.Debug("fast indexer ctx Done", "error", err)
 		return
 	case <-group.WaitAsync():
 		if command.error != nil {
@@ -491,7 +494,7 @@ func loadTransfersLoop(ctx context.Context, account common.Address, blockDAO *Bl
 	for {
 		select {
 		case <-ctx.Done():
-			log.Info("loadTransfersLoop error", "chain", chainClient.NetworkID(), "account", account, "error", ctx.Err())
+			log.Info("loadTransfersLoop done", "chain", chainClient.NetworkID(), "account", account, "error", ctx.Err())
 			return
 		case dbHeaders := <-blocksLoadedCh:
 			log.Debug("loadTransfersOnDemand transfers received", "chain", chainClient.NetworkID(), "account", account, "headers", len(dbHeaders))
@@ -523,7 +526,6 @@ func newLoadBlocksAndTransfersCommand(account common.Address, db *Database,
 		chainClient:        chainClient,
 		feed:               feed,
 		balanceCacher:      balanceCacher,
-		errorsCount:        0,
 		transactionManager: transactionManager,
 		pendingTxManager:   pendingTxManager,
 		tokenManager:       tokenManager,
@@ -540,7 +542,6 @@ type loadBlocksAndTransfersCommand struct {
 	chainClient   chain.ClientInterface
 	feed          *event.Feed
 	balanceCacher balance.Cacher
-	errorsCount   int
 	// nonArchivalRPCNode bool // TODO Make use of it
 	transactionManager *TransactionManager
 	pendingTxManager   *transactions.PendingTxTracker
@@ -556,16 +557,28 @@ func (c *loadBlocksAndTransfersCommand) Run(parent context.Context) error {
 	log.Debug("start load all transfers command", "chain", c.chainClient.NetworkID(), "account", c.account)
 
 	ctx := parent
+
+	// This wait group is used to wait for all the async commands to finish
+	// but fetchNewBlocksCommand, which is infinite, never finishes, can only be stopped
+	// by canceling the context which does not happen here, as we don't call group.Stop().
 	group := async.NewGroup(ctx)
 
+	// It will start loadTransfersCommand which will run until success when all transfers from DB are loaded
 	err := c.fetchTransfersForLoadedBlocks(group)
 	for err != nil {
 		return err
 	}
 
+	// Start transfers loop to load transfers for new blocks
 	c.startTransfersLoop(ctx)
 
-	err = c.fetchHistoryBlocks(parent, group, c.blocksLoadedCh)
+	fromNum := big.NewInt(0)
+	toNum, err := getHeadBlockNumber(ctx, c.chainClient)
+	if err != nil {
+		return err
+	}
+	// This will start findBlocksCommand which will run until success when all blocks are loaded
+	err = c.fetchHistoryBlocks(parent, group, fromNum, toNum, c.blocksLoadedCh)
 	for err != nil {
 		group.Stop()
 		group.Wait()
@@ -595,20 +608,13 @@ func (c *loadBlocksAndTransfersCommand) startTransfersLoop(ctx context.Context) 
 		c.pendingTxManager, c.tokenManager, c.feed, c.blocksLoadedCh)
 }
 
-func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocks(ctx context.Context, group *async.Group, blocksLoadedCh chan []*DBHeader) error {
+func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocks(ctx context.Context, group *async.Group, fromNum, toNum *big.Int, blocksLoadedCh chan []*DBHeader) error {
 
 	log.Debug("fetchHistoryBlocks start", "chainID", c.chainClient.NetworkID(), "account", c.account, "omit", c.omitHistory)
 
-	headNum, err := getHeadBlockNumber(ctx, c.chainClient)
-	if err != nil {
-		// c.error = err
-		return err // Might need to retry a couple of times
-	}
-
 	if c.omitHistory {
-		blockRange := &BlockRange{nil, big.NewInt(0), headNum}
+		blockRange := &BlockRange{nil, big.NewInt(0), toNum}
 		err := c.blockRangeDAO.upsertRange(c.chainClient.NetworkID(), c.account, blockRange)
-		log.Debug("fetchHistoryBlocks omit history", "chainID", c.chainClient.NetworkID(), "account", c.account, "headNum", headNum, "err", err)
 		return err
 	}
 
@@ -619,13 +625,11 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocks(ctx context.Context, 
 		return err // Will keep spinning forever nomatter what
 	}
 
-	/// first
 	allHistoryLoaded := areAllHistoryBlocksLoaded(blockRange)
-	to := getToHistoryBlockNumber(headNum, blockRange, allHistoryLoaded)
-
-	log.Debug("fetchHistoryBlocks", "chainID", c.chainClient.NetworkID(), "account", c.account, "to", to, "allHistoryLoaded", allHistoryLoaded)
 
 	if !allHistoryLoaded {
+		to := getToHistoryBlockNumber(toNum, blockRange, allHistoryLoaded)
+
 		fbc := &findBlocksCommand{
 			account:                   c.account,
 			db:                        c.db,
@@ -634,7 +638,7 @@ func (c *loadBlocksAndTransfersCommand) fetchHistoryBlocks(ctx context.Context, 
 			balanceCacher:             c.balanceCacher,
 			feed:                      c.feed,
 			noLimit:                   false,
-			fromBlockNumber:           big.NewInt(0),
+			fromBlockNumber:           fromNum,
 			toBlockNumber:             to,
 			transactionManager:        c.transactionManager,
 			tokenManager:              c.tokenManager,
@@ -691,6 +695,11 @@ func (c *loadBlocksAndTransfersCommand) fetchTransfersForLoadedBlocks(group *asy
 	if err != nil {
 		log.Error("loadBlocksAndTransfersCommand GetBlocksToLoadByAddress", "error", err)
 		return err
+	}
+
+	if len(blocks) == 0 {
+		log.Debug("fetchTransfers no blocks to load", "chainID", c.chainClient.NetworkID(), "account", c.account)
+		return nil
 	}
 
 	blocksMap := make(map[common.Address][]*big.Int)

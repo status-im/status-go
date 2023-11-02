@@ -2,7 +2,6 @@ package transfer
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"math/big"
 	"time"
@@ -11,19 +10,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/rpc/chain"
 	w_common "github.com/status-im/status-go/services/wallet/common"
 )
-
-func getLogSubTxID(log types.Log) common.Hash {
-	// Get unique ID by using TxHash and log index
-	index := [4]byte{}
-	binary.BigEndian.PutUint32(index[:], uint32(log.Index))
-	return crypto.Keccak256Hash(log.TxHash.Bytes(), index[:])
-}
 
 var (
 	zero = big.NewInt(0)
@@ -32,26 +23,23 @@ var (
 )
 
 // Partial transaction info obtained by ERC20Downloader.
-// A PreloadedTransaction represents a Transaction which contains one or more
-// ERC20/ERC721 transfer events.
-// To be converted into one or many Transfer objects post-indexing.
+// A PreloadedTransaction represents a Transaction which contains one
+// ERC20/ERC721/ERC1155 transfer event.
+// To be converted into one Transfer object post-indexing.
 type PreloadedTransaction struct {
-	NetworkID   uint64
-	Type        w_common.Type  `json:"type"`
-	ID          common.Hash    `json:"-"`
-	Address     common.Address `json:"address"`
-	BlockNumber *big.Int       `json:"blockNumber"`
-	BlockHash   common.Hash    `json:"blockhash"`
-	Loaded      bool
-	// From is derived from tx signature in order to offload this computation from UI component.
-	From common.Address `json:"from"`
+	Type    w_common.Type  `json:"type"`
+	ID      common.Hash    `json:"-"`
+	Address common.Address `json:"address"`
 	// Log that was used to generate preloaded transaction.
-	Log         *types.Log `json:"log"`
-	BaseGasFees string
+	Log     *types.Log `json:"log"`
+	TokenID *big.Int   `json:"tokenId"`
+	Value   *big.Int   `json:"value"`
 }
 
 // Transfer stores information about transfer.
 // A Transfer represents a plain ETH transfer or some token activity inside a Transaction
+// Since ERC1155 transfers can contain multiple tokens, a single Transfer represents a single token transfer,
+// that means ERC1155 batch transfers will be represented by multiple Transfer objects.
 type Transfer struct {
 	Type        w_common.Type      `json:"type"`
 	ID          common.Hash        `json:"-"`
@@ -66,13 +54,17 @@ type Transfer struct {
 	From    common.Address `json:"from"`
 	Receipt *types.Receipt `json:"receipt"`
 	// Log that was used to generate erc20 transfer. Nil for eth transfer.
-	Log         *types.Log `json:"log"`
+	Log *types.Log `json:"log"`
+	// TokenID is the id of the transferred token. Nil for eth transfer.
+	TokenID *big.Int `json:"tokenId"`
+	// TokenValue is the value of the token transfer. Nil for eth transfer.
+	TokenValue  *big.Int `json:"tokenValue"`
 	BaseGasFees string
 	// Internal field that is used to track multi-transaction transfers.
 	MultiTransactionID MultiTransactionIDType `json:"multi_transaction_id"`
 }
 
-// ETHDownloader downloads regular eth transfers.
+// ETHDownloader downloads regular eth transfers and tokens transfers.
 type ETHDownloader struct {
 	chainClient chain.ClientInterface
 	accounts    []common.Address
@@ -137,12 +129,70 @@ func getTransferByHash(ctx context.Context, client chain.ClientInterface, signer
 	return transfer, nil
 }
 
-func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Block, accounts []common.Address) (rst []Transfer, err error) {
+func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Block, accounts []common.Address) ([]Transfer, error) {
 	startTs := time.Now()
 
+	rst := make([]Transfer, 0, len(blk.Transactions()))
+
+	receiptsByAddressAndTxHash := make(map[common.Address]map[common.Hash]*types.Receipt)
+	txsByAddressAndTxHash := make(map[common.Address]map[common.Hash]*types.Transaction)
+
+	addReceiptToCache := func(address common.Address, txHash common.Hash, receipt *types.Receipt) {
+		if receiptsByAddressAndTxHash[address] == nil {
+			receiptsByAddressAndTxHash[address] = make(map[common.Hash]*types.Receipt)
+		}
+		receiptsByAddressAndTxHash[address][txHash] = receipt
+	}
+
+	addTxToCache := func(address common.Address, txHash common.Hash, tx *types.Transaction) {
+		if txsByAddressAndTxHash[address] == nil {
+			txsByAddressAndTxHash[address] = make(map[common.Hash]*types.Transaction)
+		}
+		txsByAddressAndTxHash[address][txHash] = tx
+	}
+
+	getReceiptFromCache := func(address common.Address, txHash common.Hash) *types.Receipt {
+		if receiptsByAddressAndTxHash[address] == nil {
+			return nil
+		}
+		return receiptsByAddressAndTxHash[address][txHash]
+	}
+
+	getTxFromCache := func(address common.Address, txHash common.Hash) *types.Transaction {
+		if txsByAddressAndTxHash[address] == nil {
+			return nil
+		}
+		return txsByAddressAndTxHash[address][txHash]
+	}
+
+	getReceipt := func(address common.Address, txHash common.Hash) (receipt *types.Receipt, err error) {
+		receipt = getReceiptFromCache(address, txHash)
+		if receipt == nil {
+			receipt, err = d.fetchTransactionReceipt(ctx, txHash)
+			if err != nil {
+				return nil, err
+			}
+			addReceiptToCache(address, txHash, receipt)
+		}
+		return receipt, nil
+	}
+
+	getTx := func(address common.Address, txHash common.Hash) (tx *types.Transaction, err error) {
+		tx = getTxFromCache(address, txHash)
+		if tx == nil {
+			tx, err = d.fetchTransaction(ctx, txHash)
+			if err != nil {
+				return nil, err
+			}
+			addTxToCache(address, txHash, tx)
+		}
+		return tx, nil
+	}
+
 	for _, address := range accounts {
-		// During block discovery, we should have populated the DB with 1 item per Transaction containing
-		// erc20/erc721 transfers
+		// During block discovery, we should have populated the DB with 1 item per transfer log containing
+		// erc20/erc721/erc1155 transfers.
+		// ID is a hash of the tx hash and the log index. log_index is unique per ERC20/721 tx, but not per ERC1155 tx.
 		transactionsToLoad, err := d.db.GetTransactionsToLoad(d.chainClient.NetworkID(), address, blk.Number())
 		if err != nil {
 			return nil, err
@@ -150,10 +200,22 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 
 		areSubTxsCheckedForTxHash := make(map[common.Hash]bool)
 
+		log.Debug("getTransfersInBlock", "block", blk.Number(), "transactionsToLoad", len(transactionsToLoad))
+
 		for _, t := range transactionsToLoad {
-			subtransactions, err := d.subTransactionsFromTransactionHash(ctx, t.Log.TxHash, address)
+			receipt, err := getReceipt(address, t.Log.TxHash)
 			if err != nil {
-				log.Error("can't fetch subTxs for erc20/erc721 transfer", "error", err)
+				return nil, err
+			}
+
+			tx, err := getTx(address, t.Log.TxHash)
+			if err != nil {
+				return nil, err
+			}
+
+			subtransactions, err := d.subTransactionsFromPreloaded(t, tx, receipt, blk)
+			if err != nil {
+				log.Error("can't fetch subTxs for erc20/erc721/erc1155 transfer", "error", err)
 				return nil, err
 			}
 			rst = append(rst, subtransactions...)
@@ -188,12 +250,7 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 			}
 
 			if isPlainTransfer || mustCheckSubTxs {
-				receipt, err := d.chainClient.TransactionReceipt(ctx, tx.Hash())
-				if err != nil {
-					return nil, err
-				}
-
-				baseGasFee, err := d.chainClient.GetBaseFeeFromBlock(blk.Number())
+				receipt, err := getReceipt(address, tx.Hash())
 				if err != nil {
 					return nil, err
 				}
@@ -201,7 +258,7 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 				// Since we've already got the receipt, check for subTxs of
 				// interest in case we haven't already.
 				if !areSubTxsCheckedForTxHash[tx.Hash()] {
-					subtransactions, err := d.subTransactionsFromTransactionData(tx, receipt, blk, baseGasFee, address)
+					subtransactions, err := d.subTransactionsFromTransactionData(address, from, tx, receipt, blk)
 					if err != nil {
 						log.Error("can't fetch subTxs for eth transfer", "error", err)
 						return nil, err
@@ -224,7 +281,7 @@ func (d *ETHDownloader) getTransfersInBlock(ctx context.Context, blk *types.Bloc
 						From:               from,
 						Receipt:            receipt,
 						Log:                nil,
-						BaseGasFees:        baseGasFee,
+						BaseGasFees:        blk.BaseFee().String(),
 						MultiTransactionID: NoMultiTransactionID})
 				}
 			}
@@ -284,44 +341,40 @@ func (d *ERC20TransfersDownloader) outboundTopics(address common.Address) [][]co
 }
 
 func (d *ERC20TransfersDownloader) inboundERC20OutboundERC1155Topics(address common.Address) [][]common.Hash {
-	return [][]common.Hash{{d.signature, d.signatureErc1155Single}, {}, {d.paddedAddress(address)}}
+	return [][]common.Hash{{d.signature, d.signatureErc1155Single, d.signatureErc1155Batch}, {}, {d.paddedAddress(address)}}
 }
 
-func (d *ERC20TransfersDownloader) inboundTopicsERC1155Single(address common.Address) [][]common.Hash {
-	return [][]common.Hash{{d.signatureErc1155Single}, {}, {}, {d.paddedAddress(address)}}
+func (d *ERC20TransfersDownloader) inboundTopicsERC1155(address common.Address) [][]common.Hash {
+	return [][]common.Hash{{d.signatureErc1155Single, d.signatureErc1155Batch}, {}, {}, {d.paddedAddress(address)}}
 }
 
-func (d *ETHDownloader) subTransactionsFromTransactionHash(parent context.Context, txHash common.Hash, address common.Address) ([]Transfer, error) {
+func (d *ETHDownloader) fetchTransactionReceipt(parent context.Context, txHash common.Hash) (*types.Receipt, error) {
 	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
-	tx, _, err := d.chainClient.TransactionByHash(ctx, txHash)
-	cancel()
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, cancel = context.WithTimeout(parent, 3*time.Second)
 	receipt, err := d.chainClient.TransactionReceipt(ctx, txHash)
 	cancel()
 	if err != nil {
 		return nil, err
 	}
+	return receipt, nil
+}
 
-	ctx, cancel = context.WithTimeout(parent, 3*time.Second)
-	blk, err := d.chainClient.BlockByHash(ctx, receipt.BlockHash)
+func (d *ETHDownloader) fetchTransaction(parent context.Context, txHash common.Hash) (*types.Transaction, error) {
+	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
+	tx, _, err := d.chainClient.TransactionByHash(ctx, txHash) // TODO Save on requests by checking in the DB first
 	cancel()
 	if err != nil {
 		return nil, err
 	}
-
-	baseGasFee, err := d.chainClient.GetBaseFeeFromBlock(receipt.BlockNumber)
-	if err != nil {
-		return nil, err
-	}
-
-	return d.subTransactionsFromTransactionData(tx, receipt, blk, baseGasFee, address)
+	return tx, nil
 }
 
-func (d *ETHDownloader) subTransactionsFromTransactionData(tx *types.Transaction, receipt *types.Receipt, blk *types.Block, baseGasFee string, address common.Address) ([]Transfer, error) {
+func (d *ETHDownloader) subTransactionsFromPreloaded(preloadedTx *PreloadedTransaction, tx *types.Transaction, receipt *types.Receipt, blk *types.Block) ([]Transfer, error) {
+	log.Debug("subTransactionsFromPreloaded start", "txHash", tx.Hash().Hex(), "address", preloadedTx.Address, "tokenID", preloadedTx.TokenID, "value", preloadedTx.Value)
+	address := preloadedTx.Address
+	txLog := preloadedTx.Log
+
+	rst := make([]Transfer, 0, 1)
+
 	from, err := types.Sender(d.signer, tx)
 	if err != nil {
 		if err == core.ErrTxTypeNotSupported {
@@ -330,47 +383,63 @@ func (d *ETHDownloader) subTransactionsFromTransactionData(tx *types.Transaction
 		return nil, err
 	}
 
-	rst := make([]Transfer, 0, len(receipt.Logs))
-	for _, log := range receipt.Logs {
-		eventType := w_common.GetEventType(log)
-		// Only add ERC20/ERC721/ERC1155 transfers from/to the given account
-		// Other types of events get always added
-		mustAppend := false
-		switch eventType {
-		case w_common.Erc20TransferEventType:
-			trFrom, trTo, _ := w_common.ParseErc20TransferLog(log)
-			if trFrom == address || trTo == address {
-				mustAppend = true
-			}
-		case w_common.Erc721TransferEventType:
-			trFrom, trTo, _ := w_common.ParseErc721TransferLog(log)
-			if trFrom == address || trTo == address {
-				mustAppend = true
-			}
-		case w_common.Erc1155TransferSingleEventType:
-			_, trFrom, trTo, _, _ := w_common.ParseErc1155TransferSingleLog(log)
-			if trFrom == address || trTo == address {
-				mustAppend = true
-			}
-		case w_common.UniswapV2SwapEventType, w_common.UniswapV3SwapEventType:
-			mustAppend = true
-		case w_common.HopBridgeTransferSentToL2EventType, w_common.HopBridgeTransferFromL1CompletedEventType:
-			mustAppend = true
-		case w_common.HopBridgeWithdrawalBondedEventType, w_common.HopBridgeTransferSentEventType:
-			mustAppend = true
+	eventType := w_common.GetEventType(preloadedTx.Log)
+	// Only add ERC20/ERC721/ERC1155 transfers from/to the given account
+	// from/to matching is already handled by getLogs filter
+	switch eventType {
+	case w_common.Erc20TransferEventType,
+		w_common.Erc721TransferEventType,
+		w_common.Erc1155TransferSingleEventType, w_common.Erc1155TransferBatchEventType:
+		log.Debug("subTransactionsFromPreloaded transfer", "eventType", eventType, "logIdx", txLog.Index, "txHash", tx.Hash().Hex(), "address", address.Hex(), "tokenID", preloadedTx.TokenID, "value", preloadedTx.Value, "baseFee", blk.BaseFee().String())
+
+		transfer := Transfer{
+			Type:               w_common.EventTypeToSubtransactionType(eventType),
+			ID:                 preloadedTx.ID,
+			Address:            address,
+			BlockNumber:        new(big.Int).SetUint64(txLog.BlockNumber),
+			BlockHash:          txLog.BlockHash,
+			Loaded:             true,
+			NetworkID:          d.signer.ChainID().Uint64(),
+			From:               from,
+			Log:                txLog,
+			TokenID:            preloadedTx.TokenID,
+			TokenValue:         preloadedTx.Value,
+			BaseGasFees:        blk.BaseFee().String(),
+			Transaction:        tx,
+			Receipt:            receipt,
+			Timestamp:          blk.Time(),
+			MultiTransactionID: NoMultiTransactionID,
 		}
-		if mustAppend {
+
+		rst = append(rst, transfer)
+	}
+
+	log.Debug("subTransactionsFromPreloaded end", "txHash", tx.Hash().Hex(), "address", address.Hex(), "tokenID", preloadedTx.TokenID, "value", preloadedTx.Value)
+	return rst, nil
+}
+
+func (d *ETHDownloader) subTransactionsFromTransactionData(address, from common.Address, tx *types.Transaction, receipt *types.Receipt, blk *types.Block) ([]Transfer, error) {
+	log.Debug("subTransactionsFromTransactionData start", "txHash", tx.Hash().Hex(), "address", address)
+
+	rst := make([]Transfer, 0, 1)
+
+	for _, txLog := range receipt.Logs {
+		eventType := w_common.GetEventType(txLog)
+		switch eventType {
+		case w_common.UniswapV2SwapEventType, w_common.UniswapV3SwapEventType,
+			w_common.HopBridgeTransferSentToL2EventType, w_common.HopBridgeTransferFromL1CompletedEventType,
+			w_common.HopBridgeWithdrawalBondedEventType, w_common.HopBridgeTransferSentEventType:
 			transfer := Transfer{
 				Type:               w_common.EventTypeToSubtransactionType(eventType),
-				ID:                 getLogSubTxID(*log),
+				ID:                 w_common.GetLogSubTxID(*txLog),
 				Address:            address,
-				BlockNumber:        new(big.Int).SetUint64(log.BlockNumber),
-				BlockHash:          log.BlockHash,
+				BlockNumber:        new(big.Int).SetUint64(txLog.BlockNumber),
+				BlockHash:          txLog.BlockHash,
 				Loaded:             true,
 				NetworkID:          d.signer.ChainID().Uint64(),
 				From:               from,
-				Log:                log,
-				BaseGasFees:        baseGasFee,
+				Log:                txLog,
+				BaseGasFees:        blk.BaseFee().String(),
 				Transaction:        tx,
 				Receipt:            receipt,
 				Timestamp:          blk.Time(),
@@ -381,11 +450,13 @@ func (d *ETHDownloader) subTransactionsFromTransactionData(tx *types.Transaction
 		}
 	}
 
+	log.Debug("subTransactionsFromTransactionData end", "txHash", tx.Hash().Hex(), "address", address.Hex())
 	return rst, nil
 }
 
 func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs []types.Log, address common.Address) ([]*DBHeader, error) {
 	concurrent := NewConcurrentDownloader(parent, NoThreadLimit)
+
 	for i := range logs {
 		l := logs[i]
 
@@ -393,40 +464,48 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 			continue
 		}
 
-		id := getLogSubTxID(l)
-		baseGasFee, err := d.client.GetBaseFeeFromBlock(new(big.Int).SetUint64(l.BlockNumber))
+		from, to, txIDs, tokenIDs, values, err := w_common.ParseTransferLog(l)
 		if err != nil {
-			return nil, err
+			log.Error("failed to parse transfer log", "log", l, "address", address, "error", err)
+			continue
 		}
 
-		logType := w_common.EventTypeToSubtransactionType(w_common.GetEventType(&l))
-		log.Debug("block from logs", "block", l.BlockNumber, "log", l, "logType", logType, "address", address, "id", id)
-
-		if logType != w_common.Erc1155SingleTransfer && logType != w_common.Erc1155BatchTransfer {
-			logType = w_common.Erc20Transfer
+		// Double check provider returned the correct log
+		if from != address && to != address {
+			log.Error("from/to address mismatch", "log", l, "address", address)
+			continue
 		}
 
-		header := &DBHeader{
-			Number: big.NewInt(int64(l.BlockNumber)),
-			Hash:   l.BlockHash,
-			PreloadedTransactions: []*PreloadedTransaction{{
-				Address:     address,
-				BlockNumber: big.NewInt(int64(l.BlockNumber)),
-				BlockHash:   l.BlockHash,
-				ID:          id,
-				From:        address,
-				Loaded:      false,
-				Type:        logType,
-				Log:         &l,
-				BaseGasFees: baseGasFee,
-			}},
-			Loaded: false,
-		}
+		eventType := w_common.GetEventType(&l)
+		logType := w_common.EventTypeToSubtransactionType(eventType)
 
-		concurrent.Add(func(ctx context.Context) error {
-			concurrent.PushHeader(header)
-			return nil
-		})
+		for i, txID := range txIDs {
+			log.Debug("block from logs", "block", l.BlockNumber, "log", l, "logType", logType, "address", address, "txID", txID)
+
+			// For ERC20 there is no tokenID, so we use nil
+			var tokenID *big.Int
+			if len(tokenIDs) > i {
+				tokenID = tokenIDs[i]
+			}
+
+			header := &DBHeader{
+				Number: big.NewInt(int64(l.BlockNumber)),
+				Hash:   l.BlockHash,
+				PreloadedTransactions: []*PreloadedTransaction{{
+					ID:      txID,
+					Type:    logType,
+					Log:     &l,
+					TokenID: tokenID,
+					Value:   values[i],
+				}},
+				Loaded: false,
+			}
+
+			concurrent.Add(func(ctx context.Context) error {
+				concurrent.PushHeader(header)
+				return nil
+			})
+		}
 	}
 	select {
 	case <-concurrent.WaitAsync():
@@ -478,7 +557,7 @@ func (d *ERC20TransfersDownloader) GetHeadersInRange(parent context.Context, fro
 		inbound1155, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
 			FromBlock: from,
 			ToBlock:   to,
-			Topics:    d.inboundTopicsERC1155Single(address),
+			Topics:    d.inboundTopicsERC1155(address),
 		})
 		if err != nil {
 			return nil, err
