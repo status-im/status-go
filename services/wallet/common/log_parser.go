@@ -3,6 +3,7 @@
 package common
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math/big"
 
@@ -20,16 +21,15 @@ type EventType string
 
 const (
 	// Transaction types
-	EthTransfer           Type = "eth"
-	Erc20Transfer         Type = "erc20"
-	Erc721Transfer        Type = "erc721"
-	Erc1155SingleTransfer Type = "erc1155"
-	Erc1155BatchTransfer  Type = "erc1155"
-	UniswapV2Swap         Type = "uniswapV2Swap"
-	UniswapV3Swap         Type = "uniswapV3Swap"
-	HopBridgeFrom         Type = "HopBridgeFrom"
-	HopBridgeTo           Type = "HopBridgeTo"
-	unknownTransaction    Type = "unknown"
+	EthTransfer        Type = "eth"
+	Erc20Transfer      Type = "erc20"
+	Erc721Transfer     Type = "erc721"
+	Erc1155Transfer    Type = "erc1155"
+	UniswapV2Swap      Type = "uniswapV2Swap"
+	UniswapV3Swap      Type = "uniswapV3Swap"
+	HopBridgeFrom      Type = "HopBridgeFrom"
+	HopBridgeTo        Type = "HopBridgeTo"
+	unknownTransaction Type = "unknown"
 
 	// Event types
 	WETHDepositEventType                      EventType = "wethDepositEvent"
@@ -136,10 +136,8 @@ func EventTypeToSubtransactionType(eventType EventType) Type {
 		return Erc20Transfer
 	case Erc721TransferEventType:
 		return Erc721Transfer
-	case Erc1155TransferSingleEventType:
-		return Erc1155SingleTransfer
-	case Erc1155TransferBatchEventType:
-		return Erc1155BatchTransfer
+	case Erc1155TransferSingleEventType, Erc1155TransferBatchEventType:
+		return Erc1155Transfer
 	case UniswapV2SwapEventType:
 		return UniswapV2Swap
 	case UniswapV3SwapEventType:
@@ -226,16 +224,13 @@ func ParseErc20TransferLog(ethlog *types.Log) (from, to common.Address, amount *
 		log.Warn("not enough topics for erc20 transfer", "topics", ethlog.Topics)
 		return
 	}
-	if len(ethlog.Topics[1]) != 32 {
-		log.Warn("second topic is not padded to 32 byte address", "topic", ethlog.Topics[1])
+	var err error
+	from, to, err = getFromToAddresses(*ethlog)
+	if err != nil {
+		log.Error("log_parser::ParseErc20TransferLog", err)
 		return
 	}
-	if len(ethlog.Topics[2]) != 32 {
-		log.Warn("third topic is not padded to 32 byte address", "topic", ethlog.Topics[2])
-		return
-	}
-	copy(from[:], ethlog.Topics[1][12:])
-	copy(to[:], ethlog.Topics[2][12:])
+
 	if len(ethlog.Data) != 32 {
 		log.Warn("data is not padded to 32 byts big int", "data", ethlog.Data)
 		return
@@ -251,52 +246,150 @@ func ParseErc721TransferLog(ethlog *types.Log) (from, to common.Address, tokenID
 		log.Warn("not enough topics for erc721 transfer", "topics", ethlog.Topics)
 		return
 	}
-	if len(ethlog.Topics[1]) != 32 {
-		log.Warn("second topic is not padded to 32 byte address", "topic", ethlog.Topics[1])
+
+	var err error
+	from, to, err = getFromToAddresses(*ethlog)
+	if err != nil {
+		log.Error("log_parser::ParseErc721TransferLog", err)
 		return
 	}
-	if len(ethlog.Topics[2]) != 32 {
-		log.Warn("third topic is not padded to 32 byte address", "topic", ethlog.Topics[2])
-		return
-	}
-	if len(ethlog.Topics[3]) != 32 {
-		log.Warn("fourth topic is not 32 byte tokenId", "topic", ethlog.Topics[3])
-		return
-	}
-	copy(from[:], ethlog.Topics[1][12:])
-	copy(to[:], ethlog.Topics[2][12:])
 	tokenID.SetBytes(ethlog.Topics[3][:])
 
 	return
 }
 
-func ParseErc1155TransferSingleLog(ethlog *types.Log) (operator, from, to common.Address, id, amount *big.Int) {
-	if len(ethlog.Topics) < erc1155TransferEventIndexedParameters {
-		log.Warn("not enough topics for erc1155 transfer single", "topics", ethlog.Topics)
-		return
-	}
+func GetLogSubTxID(log types.Log) common.Hash {
+	// Get unique ID by using TxHash and log index
+	index := [4]byte{}
+	binary.BigEndian.PutUint32(index[:], uint32(log.Index))
+	return crypto.Keccak256Hash(log.TxHash.Bytes(), index[:])
+}
 
-	amount = new(big.Int)
-	id = new(big.Int)
+func getLogSubTxIDWithTokenIDIndex(log types.Log, tokenIDIdx uint16) common.Hash {
+	// Get unique ID by using TxHash, log index and extra bytes (token id index for ERC1155 TransferBatch)
+	index := [4]byte{}
+	value := uint32(log.Index&0x0000FFFF) | (uint32(tokenIDIdx) << 16) // log index should not exceed uint16 max value
+	binary.BigEndian.PutUint32(index[:], value)
+	return crypto.Keccak256Hash(log.TxHash.Bytes(), index[:])
+}
 
-	for i := 1; i < erc1155TransferEventIndexedParameters; i++ {
+func checkTopicsLength(ethlog types.Log, startIdx, endIdx int) (err error) {
+	for i := startIdx; i < endIdx; i++ {
 		if len(ethlog.Topics[i]) != common.HashLength {
-			log.Warn(fmt.Sprintf("topic %d is not padded to %d byte address, topic=%s", i, common.HashLength, ethlog.Topics[1]))
+			err = fmt.Errorf("topic %d is not padded to %d byte address, topic=%s", i, common.HashLength, ethlog.Topics[i])
+			log.Error("log_parser::checkTopicsLength", err)
 			return
 		}
 	}
-	addressIdx := common.HashLength - common.AddressLength
-	copy(operator[:], ethlog.Topics[1][addressIdx:])
-	copy(from[:], ethlog.Topics[2][addressIdx:])
-	copy(to[:], ethlog.Topics[3][addressIdx:])
+	return
+}
 
-	if len(ethlog.Data) != common.HashLength*2 {
-		log.Warn("data is not padded to 64 bytes", "data", ethlog.Data)
+func getFromToAddresses(ethlog types.Log) (from, to common.Address, err error) {
+	eventType := GetEventType(&ethlog)
+	addressIdx := common.HashLength - common.AddressLength
+	switch eventType {
+	case Erc1155TransferSingleEventType, Erc1155TransferBatchEventType:
+		err = checkTopicsLength(ethlog, 2, 4)
+		if err != nil {
+			return
+		}
+		copy(from[:], ethlog.Topics[2][addressIdx:])
+		copy(to[:], ethlog.Topics[3][addressIdx:])
+		return
+
+	case Erc20TransferEventType, Erc721TransferEventType, UniswapV2SwapEventType, UniswapV3SwapEventType, HopBridgeTransferFromL1CompletedEventType:
+		err = checkTopicsLength(ethlog, 1, 3)
+		if err != nil {
+			return
+		}
+		copy(from[:], ethlog.Topics[1][addressIdx:])
+		copy(to[:], ethlog.Topics[2][addressIdx:])
 		return
 	}
 
-	id.SetBytes(ethlog.Data[:common.HashLength])
-	amount.SetBytes(ethlog.Data[common.HashLength:])
+	return from, to, fmt.Errorf("unsupported event type to get from/to adddresses %s", eventType)
+}
+func ParseTransferLog(ethlog types.Log) (from, to common.Address, txIDs []common.Hash, tokenIDs, values []*big.Int, err error) {
+	eventType := GetEventType(&ethlog)
+
+	switch eventType {
+	case Erc20TransferEventType:
+		var amount *big.Int
+		from, to, amount = ParseErc20TransferLog(&ethlog)
+		txIDs = append(txIDs, GetLogSubTxID(ethlog))
+		values = append(values, amount)
+		return
+	case Erc721TransferEventType:
+		var tokenID *big.Int
+		from, to, tokenID = ParseErc721TransferLog(&ethlog)
+		txIDs = append(txIDs, GetLogSubTxID(ethlog))
+		tokenIDs = append(tokenIDs, tokenID)
+		values = append(values, big.NewInt(1))
+		return
+	case Erc1155TransferSingleEventType, Erc1155TransferBatchEventType:
+		_, from, to, tokenIDs, values, err = ParseErc1155TransferLog(&ethlog, eventType)
+		for i := range tokenIDs {
+			txIDs = append(txIDs, getLogSubTxIDWithTokenIDIndex(ethlog, uint16(i)))
+		}
+		return
+	}
+
+	return from, to, txIDs, tokenIDs, values, fmt.Errorf("unsupported event type in log_parser::ParseTransferLogs %s", eventType)
+}
+
+func ParseErc1155TransferLog(ethlog *types.Log, evType EventType) (operator, from, to common.Address, ids, amounts []*big.Int, err error) {
+	if len(ethlog.Topics) < erc1155TransferEventIndexedParameters {
+		err = fmt.Errorf("not enough topics for erc1155 transfer %s, %v", "topics", ethlog.Topics)
+		log.Error("log_parser::ParseErc1155TransferLog", "err", err)
+		return
+	}
+
+	err = checkTopicsLength(*ethlog, 1, erc1155TransferEventIndexedParameters)
+	if err != nil {
+		return
+	}
+
+	addressIdx := common.HashLength - common.AddressLength
+	copy(operator[:], ethlog.Topics[1][addressIdx:])
+	from, to, err = getFromToAddresses(*ethlog)
+	if err != nil {
+		log.Error("log_parser::ParseErc1155TransferLog", "err", err)
+		return
+	}
+
+	if len(ethlog.Data) == 0 || len(ethlog.Data)%(common.HashLength*2) != 0 {
+		err = fmt.Errorf("data is not padded to 64 bytes %s, %v", "data", ethlog.Data)
+		log.Error("log_parser::ParseErc1155TransferLog", "err", err)
+		return
+	}
+
+	if evType == Erc1155TransferSingleEventType {
+		ids = append(ids, new(big.Int).SetBytes(ethlog.Data[:common.HashLength]))
+		amounts = append(amounts, new(big.Int).SetBytes(ethlog.Data[common.HashLength:]))
+		log.Debug("log_parser::ParseErc1155TransferSingleLog", "ids", ids, "amounts", amounts)
+	} else {
+		// idTypeSize := new(big.Int).SetBytes(ethlog.Data[:common.HashLength]).Uint64() // Left for knowledge
+		// valueTypeSize := new(big.Int).SetBytes(ethlog.Data[common.HashLength : common.HashLength*2]).Uint64() // Left for knowledge
+		idsArraySize := new(big.Int).SetBytes(ethlog.Data[common.HashLength*2 : common.HashLength*2+common.HashLength]).Uint64()
+
+		initialOffset := common.HashLength*2 + common.HashLength
+		for i := 0; i < int(idsArraySize); i++ {
+			ids = append(ids, new(big.Int).SetBytes(ethlog.Data[initialOffset+i*common.HashLength:initialOffset+(i+1)*common.HashLength]))
+		}
+		valuesArraySize := new(big.Int).SetBytes(ethlog.Data[initialOffset+int(idsArraySize)*common.HashLength : initialOffset+int(idsArraySize+1)*common.HashLength]).Uint64()
+
+		if idsArraySize != valuesArraySize {
+			err = fmt.Errorf("ids and values sizes don't match %d, %d", idsArraySize, valuesArraySize)
+			log.Error("log_parser::ParseErc1155TransferBatchLog", "err", err)
+			return
+		}
+
+		initialOffset = initialOffset + int(idsArraySize+1)*common.HashLength
+		for i := 0; i < int(valuesArraySize); i++ {
+			amounts = append(amounts, new(big.Int).SetBytes(ethlog.Data[initialOffset+i*common.HashLength:initialOffset+(i+1)*common.HashLength]))
+			log.Debug("log_parser::ParseErc1155TransferBatchLog", "id", ids[i], "amount", amounts[i])
+		}
+	}
 
 	return
 }
@@ -313,17 +406,11 @@ func ParseUniswapV2Log(ethlog *types.Log) (pairAddress common.Address, from comm
 	}
 
 	pairAddress = ethlog.Address
-
-	if len(ethlog.Topics[1]) != 32 {
-		err = fmt.Errorf("second topic is not padded to 32 byte address %s, %v", "topic", ethlog.Topics[1])
+	from, to, err = getFromToAddresses(*ethlog)
+	if err != nil {
+		log.Error("log_parser::ParseUniswapV2Log", err)
 		return
 	}
-	if len(ethlog.Topics[2]) != 32 {
-		err = fmt.Errorf("third topic is not padded to 32 byte address %s, %v", "topic", ethlog.Topics[2])
-		return
-	}
-	copy(from[:], ethlog.Topics[1][12:])
-	copy(to[:], ethlog.Topics[2][12:])
 	if len(ethlog.Data) != 32*4 {
 		err = fmt.Errorf("data is not padded to 4 * 32 bytes big int %s, %v", "data", ethlog.Data)
 		return
@@ -359,17 +446,11 @@ func ParseUniswapV3Log(ethlog *types.Log) (poolAddress common.Address, sender co
 	}
 
 	poolAddress = ethlog.Address
-
-	if len(ethlog.Topics[1]) != 32 {
-		err = fmt.Errorf("second topic is not padded to 32 byte address %s, %v", "topic", ethlog.Topics[1])
+	sender, recipient, err = getFromToAddresses(*ethlog)
+	if err != nil {
+		log.Error("log_parser::ParseUniswapV3Log", err)
 		return
 	}
-	if len(ethlog.Topics[2]) != 32 {
-		err = fmt.Errorf("third topic is not padded to 32 byte address %s, %v", "topic", ethlog.Topics[2])
-		return
-	}
-	copy(sender[:], ethlog.Topics[1][12:])
-	copy(recipient[:], ethlog.Topics[2][12:])
 	if len(ethlog.Data) != 32*5 {
 		err = fmt.Errorf("data is not padded to 5 * 32 bytes big int %s, %v", "data", ethlog.Data)
 		return
@@ -426,17 +507,11 @@ func ParseHopBridgeTransferFromL1CompletedLog(ethlog *types.Log) (recipient comm
 		return
 	}
 
-	if len(ethlog.Topics[1]) != 32 {
-		err = fmt.Errorf("second topic is not padded to 32 byte address %s, %v", "topic", ethlog.Topics[1])
+	recipient, relayer, err = getFromToAddresses(*ethlog)
+	if err != nil {
+		log.Error("log_parser::ParseHopBridgeTransferFromL1CompletedLog", err)
 		return
 	}
-	copy(recipient[:], ethlog.Topics[1][12:])
-
-	if len(ethlog.Topics[2]) != 32 {
-		err = fmt.Errorf("third topic is not padded to 32 byte address %s, %v", "topic", ethlog.Topics[2])
-		return
-	}
-	copy(relayer[:], ethlog.Topics[2][12:])
 
 	if len(ethlog.Data) != 32*4 {
 		err = fmt.Errorf("data is not padded to 4 * 32 bytes big int %s, %v", "data", ethlog.Data)
@@ -526,7 +601,7 @@ func GetEventSignatureHash(signature string) common.Hash {
 	return crypto.Keccak256Hash([]byte(signature))
 }
 
-func ExtractTokenIdentity(dbEntryType Type, log *types.Log, tx *types.Transaction) (correctType Type, tokenAddress *common.Address, txTokenID *big.Int, txValue *big.Int, txFrom *common.Address, txTo *common.Address) {
+func ExtractTokenTransferData(dbEntryType Type, log *types.Log, tx *types.Transaction) (correctType Type, tokenAddress *common.Address, txFrom *common.Address, txTo *common.Address) {
 	// erc721 transfers share signature with erc20 ones, so they both used to be categorized as erc20
 	// by the Downloader. We fix this here since they might be mis-categorized in the db.
 	if dbEntryType == Erc20Transfer {
@@ -537,32 +612,27 @@ func ExtractTokenIdentity(dbEntryType Type, log *types.Log, tx *types.Transactio
 	}
 
 	switch correctType {
-	case EthTransfer:
-		if tx != nil {
-			txValue = new(big.Int).Set(tx.Value())
-		}
 	case Erc20Transfer:
 		tokenAddress = new(common.Address)
 		*tokenAddress = log.Address
-		from, to, value := ParseErc20TransferLog(log)
-		txValue = value
+		from, to, _ := ParseErc20TransferLog(log)
 		txFrom = &from
 		txTo = &to
 	case Erc721Transfer:
 		tokenAddress = new(common.Address)
 		*tokenAddress = log.Address
-		from, to, tokenID := ParseErc721TransferLog(log)
-		txTokenID = tokenID
+		from, to, _ := ParseErc721TransferLog(log)
 		txFrom = &from
 		txTo = &to
-	case Erc1155SingleTransfer:
+	case Erc1155Transfer:
 		tokenAddress = new(common.Address)
 		*tokenAddress = log.Address
-		_, from, to, tokenID, value := ParseErc1155TransferSingleLog(log)
-		txTokenID = tokenID
+		_, from, to, _, _, err := ParseErc1155TransferLog(log, Erc1155TransferSingleEventType) // from/to extraction is the same for single and batch
+		if err != nil {
+			return
+		}
 		txFrom = &from
 		txTo = &to
-		txValue = value
 	}
 
 	return

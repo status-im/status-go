@@ -335,7 +335,14 @@ func migrateWalletJSONBlobs(sqlTx *sql.Tx) error {
 
 func extractToken(entryType string, tx *types.Transaction, l *types.Log, logValid bool) (correctType w_common.Type, tokenID *big.Int, value *big.Int, tokenAddress *common.Address) {
 	if logValid {
-		correctType, tokenAddress, tokenID, value, _, _ = w_common.ExtractTokenIdentity(w_common.Type(entryType), l, tx)
+		correctType, tokenAddress, _, _ = w_common.ExtractTokenTransferData(w_common.Type(entryType), l, tx)
+		_, _, _, tokenIDs, values, _ := w_common.ParseTransferLog(*l)
+		if len(tokenIDs) > 0 {
+			tokenID = tokenIDs[0]
+		}
+		if len(values) > 0 {
+			value = values[0]
+		}
 	} else {
 		correctType = w_common.Type(entryType)
 		value = new(big.Int).Set(tx.Value())
@@ -394,7 +401,7 @@ func migrateWalletTransferFromToAddresses(sqlTx *sql.Tx) error {
 
 			if nullableTx.Valid {
 				if nullableL.Valid {
-					_, tokenAddress, _, _, txFrom, txTo = w_common.ExtractTokenIdentity(w_common.Type(entryType), l, tx)
+					_, tokenAddress, txFrom, txTo = w_common.ExtractTokenTransferData(w_common.Type(entryType), l, tx)
 				} else {
 					txFrom = &sender
 					txTo = tx.To()

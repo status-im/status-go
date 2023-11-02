@@ -116,10 +116,9 @@ type erc20HistoricalCommand struct {
 	chainClient chain.ClientInterface
 	feed        *event.Feed
 
-	iterator *IterativeDownloader
-	to       *big.Int
-	from     *big.Int
-
+	iterator     *IterativeDownloader
+	to           *big.Int
+	from         *big.Int
 	foundHeaders []*DBHeader
 }
 
@@ -203,7 +202,8 @@ func (c *controlCommand) LoadTransfers(ctx context.Context, limit int) error {
 }
 
 func (c *controlCommand) Run(parent context.Context) error {
-	log.Info("start control command")
+	log.Debug("start control command")
+
 	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
 	head, err := c.chainClient.HeaderByNumber(ctx, nil)
 	cancel()
@@ -221,7 +221,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 		})
 	}
 
-	log.Info("current head is", "block number", head.Number)
+	log.Debug("current head is", "block number", head.Number)
 
 	// Get last known block for each account
 	lastKnownEthBlocks, accountsWithoutHistory, err := c.blockDAO.GetLastKnownBlockByAddresses(c.chainClient.NetworkID(), c.accounts)
@@ -326,7 +326,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 			BlockNumber: target,
 		})
 	}
-	log.Info("end control command")
+	log.Debug("end control command")
 	return err
 }
 
@@ -390,7 +390,7 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 	// Take blocks from cache if available and disrespect the limit
 	// If no blocks are available in cache, take blocks from DB respecting the limit
 	// If no limit is set, take all blocks from DB
-	log.Info("start transfersCommand", "chain", c.chainClient.NetworkID(), "address", c.address, "blockNums", c.blockNums)
+	log.Debug("start transfersCommand", "chain", c.chainClient.NetworkID(), "address", c.address, "blockNums", c.blockNums)
 	startTs := time.Now()
 
 	for {
@@ -450,7 +450,7 @@ func (c *transfersCommand) Run(ctx context.Context) (err error) {
 		}
 	}
 
-	log.Info("end transfersCommand", "chain", c.chainClient.NetworkID(), "address", c.address,
+	log.Debug("end transfersCommand", "chain", c.chainClient.NetworkID(), "address", c.address,
 		"blocks.len", len(c.blockNums), "transfers.len", len(c.fetchedTransfers), "in", time.Since(startTs))
 
 	return nil
@@ -771,7 +771,7 @@ func (c *findAndCheckBlockRangeCommand) fastIndex(ctx context.Context, bCacher b
 	fromByAddress map[common.Address]*Block, toByAddress map[common.Address]*big.Int) (map[common.Address]*big.Int,
 	map[common.Address][]*DBHeader, error) {
 
-	log.Info("fast indexer started")
+	log.Debug("fast indexer started")
 
 	start := time.Now()
 	group := async.NewGroup(ctx)
@@ -804,7 +804,7 @@ func (c *findAndCheckBlockRangeCommand) fastIndex(ctx context.Context, bCacher b
 			resultingFromByAddress[command.address] = command.resultingFrom
 			headers[command.address] = command.foundHeaders
 		}
-		log.Info("fast indexer finished", "in", time.Since(start))
+		log.Debug("fast indexer finished", "in", time.Since(start))
 		return resultingFromByAddress, headers, nil
 	}
 }
@@ -812,7 +812,7 @@ func (c *findAndCheckBlockRangeCommand) fastIndex(ctx context.Context, bCacher b
 // run fast indexing for every accont up to canonical chain head minus safety depth.
 // every account will run it from last synced header.
 func (c *findAndCheckBlockRangeCommand) fastIndexErc20(ctx context.Context, fromByAddress map[common.Address]*big.Int, toByAddress map[common.Address]*big.Int) (map[common.Address][]*DBHeader, error) {
-	log.Info("fast indexer Erc20 started")
+	log.Debug("fast indexer Erc20 started")
 
 	start := time.Now()
 	group := async.NewGroup(ctx)
@@ -839,7 +839,7 @@ func (c *findAndCheckBlockRangeCommand) fastIndexErc20(ctx context.Context, from
 		for _, command := range commands {
 			headers[command.address] = command.foundHeaders
 		}
-		log.Info("fast indexer Erc20 finished", "in", time.Since(start))
+		log.Debug("fast indexer Erc20 finished", "in", time.Since(start))
 		return headers, nil
 	}
 }
@@ -849,7 +849,7 @@ func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *Blo
 	transactionManager *TransactionManager, pendingTxManager *transactions.PendingTxTracker,
 	tokenManager *token.Manager, feed *event.Feed) error {
 
-	log.Info("loadTransfers start", "accounts", accounts, "chain", chainClient.NetworkID(), "limit", blocksLimitPerAccount)
+	log.Debug("loadTransfers start", "accounts", accounts, "chain", chainClient.NetworkID(), "limit", blocksLimitPerAccount)
 
 	start := time.Now()
 	group := async.NewGroup(ctx)
@@ -879,7 +879,7 @@ func loadTransfers(ctx context.Context, accounts []common.Address, blockDAO *Blo
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-group.WaitAsync():
-		log.Info("loadTransfers finished for account", "in", time.Since(start), "chain", chainClient.NetworkID())
+		log.Debug("loadTransfers finished for account", "in", time.Since(start), "chain", chainClient.NetworkID())
 		return nil
 	}
 }
@@ -899,7 +899,7 @@ func getLowestFrom(chainID uint64, to *big.Int) *big.Int {
 
 // Finds the latest range up to initialTo where the number of transactions is between 20 and 25
 func findFirstRange(c context.Context, account common.Address, initialTo *big.Int, client chain.ClientInterface) (*big.Int, error) {
-	log.Info("findFirstRange", "account", account, "initialTo", initialTo, "client", client)
+	log.Debug("findFirstRange", "account", account, "initialTo", initialTo, "client", client)
 
 	from := getLowestFrom(client.NetworkID(), initialTo)
 	to := initialTo
@@ -910,7 +910,7 @@ func findFirstRange(c context.Context, account common.Address, initialTo *big.In
 	}
 
 	firstNonce, err := client.NonceAt(c, account, to) // this is the latest nonce actually
-	log.Info("find range with 20 <= len(tx) <= 25", "account", account, "firstNonce", firstNonce, "from", from, "to", to)
+	log.Debug("find range with 20 <= len(tx) <= 25", "account", account, "firstNonce", firstNonce, "from", from, "to", to)
 
 	if err != nil {
 		return nil, err
@@ -943,15 +943,15 @@ func findFirstRange(c context.Context, account common.Address, initialTo *big.In
 		}
 		nonceDiff = firstNonce - fromNonce
 
-		log.Info("next nonce", "from", from, "n", fromNonce, "diff", firstNonce-fromNonce)
+		log.Debug("next nonce", "from", from, "n", fromNonce, "diff", firstNonce-fromNonce)
 
 		if goal <= nonceDiff && nonceDiff <= (goal+5) {
-			log.Info("range found", "account", account, "from", from, "to", to)
+			log.Debug("range found", "account", account, "from", from, "to", to)
 			return from, nil
 		}
 	}
 
-	log.Info("range found", "account", account, "from", from, "to", to)
+	log.Debug("range found", "account", account, "from", from, "to", to)
 
 	return from, nil
 }

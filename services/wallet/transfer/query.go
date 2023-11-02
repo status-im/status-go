@@ -3,6 +3,7 @@ package transfer
 import (
 	"bytes"
 	"database/sql"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -10,7 +11,8 @@ import (
 	"github.com/status-im/status-go/services/wallet/bigint"
 )
 
-const baseTransfersQuery = "SELECT hash, type, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, network_id, base_gas_fee, COALESCE(multi_transaction_id, 0) FROM transfers"
+const baseTransfersQuery = "SELECT hash, type, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, network_id, base_gas_fee, COALESCE(multi_transaction_id, 0) %s FROM transfers"
+const preloadedTransfersQuery = "SELECT hash, type, address, log, token_id, amount_padded128hex FROM transfers"
 
 type transfersQuery struct {
 	buf        *bytes.Buffer
@@ -21,7 +23,14 @@ type transfersQuery struct {
 
 func newTransfersQuery() *transfersQuery {
 	newQuery := newEmptyQuery()
-	newQuery.buf.WriteString(baseTransfersQuery)
+	transfersQueryString := fmt.Sprintf(baseTransfersQuery, "")
+	newQuery.buf.WriteString(transfersQueryString)
+	return newQuery
+}
+
+func newTransfersQueryForPreloadedTransactions() *transfersQuery {
+	newQuery := newEmptyQuery()
+	newQuery.buf.WriteString(preloadedTransfersQuery)
 	return newQuery
 }
 
@@ -110,9 +119,16 @@ func (q *transfersQuery) FilterAddress(address common.Address) *transfersQuery {
 	return q
 }
 
-func (q *transfersQuery) FilterTransactionHash(hash common.Hash) *transfersQuery {
+func (q *transfersQuery) FilterTransactionID(hash common.Hash) *transfersQuery {
 	q.addWhereSeparator(AndSeparator)
 	q.buf.WriteString(" hash = ?")
+	q.args = append(q.args, hash)
+	return q
+}
+
+func (q *transfersQuery) FilterTransactionHash(hash common.Hash) *transfersQuery {
+	q.addWhereSeparator(AndSeparator)
+	q.buf.WriteString(" tx_hash = ?")
 	q.args = append(q.args, hash)
 	return q
 }
@@ -167,25 +183,48 @@ func (q *transfersQuery) TransferScan(rows *sql.Rows) (rst []Transfer, err error
 	return rst, nil
 }
 
-func (q *transfersQuery) PreloadedTransactionScan(rows *sql.Rows) (rst []PreloadedTransaction, err error) {
-	transfers, err := q.TransferScan(rows)
-	if err != nil {
-		return
+func (q *transfersQuery) PreloadedTransactionScan(rows *sql.Rows) (rst []*PreloadedTransaction, err error) {
+	transfers := make([]Transfer, 0)
+	for rows.Next() {
+		transfer := Transfer{
+			Log: &types.Log{},
+		}
+		tokenValue := sql.NullString{}
+		tokenID := sql.RawBytes{}
+		err = rows.Scan(
+			&transfer.ID, &transfer.Type,
+			&transfer.Address,
+			&JSONBlob{transfer.Log},
+			&tokenID, &tokenValue)
+
+		if len(tokenID) > 0 {
+			transfer.TokenID = new(big.Int).SetBytes(tokenID)
+		}
+
+		if tokenValue.Valid {
+			var ok bool
+			transfer.TokenValue, ok = new(big.Int).SetString(tokenValue.String, 16)
+			if !ok {
+				panic("failed to parse token value")
+			}
+		}
+
+		if err != nil {
+			return nil, err
+		}
+		transfers = append(transfers, transfer)
 	}
 
-	rst = make([]PreloadedTransaction, 0, len(transfers))
+	rst = make([]*PreloadedTransaction, 0, len(transfers))
 
 	for _, transfer := range transfers {
-		preloadedTransaction := PreloadedTransaction{
-			ID:          transfer.ID,
-			Type:        transfer.Type,
-			BlockHash:   transfer.BlockHash,
-			BlockNumber: transfer.BlockNumber,
-			Address:     transfer.Address,
-			From:        transfer.From,
-			Log:         transfer.Log,
-			NetworkID:   transfer.NetworkID,
-			BaseGasFees: transfer.BaseGasFees,
+		preloadedTransaction := &PreloadedTransaction{
+			ID:      transfer.ID,
+			Type:    transfer.Type,
+			Address: transfer.Address,
+			Log:     transfer.Log,
+			TokenID: transfer.TokenID,
+			Value:   transfer.TokenValue,
 		}
 
 		rst = append(rst, preloadedTransaction)
