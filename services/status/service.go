@@ -76,7 +76,7 @@ func (p *PublicAPI) CommunityInfo(communityID types.HexBytes, shard *common.Shar
 	}
 
 	community, err := p.service.messenger.FetchCommunity(&protocol.FetchCommunityRequest{
-		CommunityID:     communityID.String(),
+		CommunityKey:    communityID.String(),
 		Shard:           shard,
 		TryDatabase:     true,
 		WaitForResponse: true,

@@ -95,7 +95,7 @@ func (u *StatusUnfurler) fillCommunityImages(community *communities.Community, i
 func (u *StatusUnfurler) buildCommunityData(communityID string, shard *common.Shard) (*communities.Community, *common.StatusCommunityLinkPreview, error) {
 	// This automatically checks the database
 	community, err := u.m.FetchCommunity(&FetchCommunityRequest{
-		CommunityID:     communityID,
+		CommunityKey:    communityID,
 		Shard:           shard,
 		TryDatabase:     true,
 		WaitForResponse: true,

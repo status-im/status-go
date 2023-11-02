@@ -68,10 +68,33 @@ const (
 )
 
 type FetchCommunityRequest struct {
-	CommunityID     string        `json:"communityId"`
+	// CommunityKey should be either a public or a private community key
+	CommunityKey    string        `json:"communityKey"`
 	Shard           *common.Shard `json:"shard"`
-	TryDatabase     bool          `json:"useDatabase"`
+	TryDatabase     bool          `json:"tryDatabase"`
 	WaitForResponse bool          `json:"waitForResponse"`
+}
+
+func (r *FetchCommunityRequest) Validate() error {
+	if len(r.CommunityKey) <= 2 {
+		return fmt.Errorf("community key is too short")
+	}
+	return nil
+}
+
+func (r *FetchCommunityRequest) getCommunityID() string {
+	return GetCommunityIDFromKey(r.CommunityKey)
+}
+
+func GetCommunityIDFromKey(communityKey string) string {
+	// Check if the key is a private key. strip the 0x at the start
+	if privateKey, err := crypto.HexToECDSA(communityKey[2:]); err == nil {
+		// It is a privateKey
+		return types.HexBytes(crypto.CompressPubkey(&privateKey.PublicKey)).String()
+	}
+
+	// Not a private key, use the public key
+	return communityKey
 }
 
 func (m *Messenger) publishOrg(org *communities.Community) error {
@@ -2336,7 +2359,7 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 	}
 
 	_, err = m.FetchCommunity(&FetchCommunityRequest{
-		CommunityID:     community.IDString(),
+		CommunityKey:    community.IDString(),
 		Shard:           community.Shard(),
 		TryDatabase:     false,
 		WaitForResponse: true,
@@ -2610,20 +2633,6 @@ func (m *Messenger) findCommunityInfoFromDB(communityID string) (*communities.Co
 	return community, nil
 }
 
-func (m *Messenger) GetCommunityIDFromKey(communityKey string) string {
-	// Check if the key is a private key. strip the 0x at the start
-	privateKey, err := crypto.HexToECDSA(communityKey[2:])
-	communityID := ""
-	if err != nil {
-		// Not a private key, use the public key
-		communityID = communityKey
-	} else {
-		// It is a privateKey
-		communityID = types.HexBytes(crypto.CompressPubkey(&privateKey.PublicKey)).String()
-	}
-	return communityID
-}
-
 // FetchCommunity installs filter for community and requests its details
 // from mailserver.
 //
@@ -2633,7 +2642,10 @@ func (m *Messenger) GetCommunityIDFromKey(communityKey string) string {
 // If `request.WaitForResponse` is false, it installs filter for community and requests its details
 // from mailserver. When response received it will be passed through signals handler.
 func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities.Community, error) {
-	communityID := m.GetCommunityIDFromKey(request.CommunityID)
+	if err := request.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid request: %w", err)
+	}
+	communityID := request.getCommunityID()
 
 	if request.TryDatabase {
 		community, err := m.findCommunityInfoFromDB(communityID)
@@ -2651,7 +2663,7 @@ func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities
 	return m.requestCommunityInfoFromMailserver(communityID, request.Shard, request.WaitForResponse)
 }
 
-// FetchCommunity installs filter for community and requests its details
+// requestCommunityInfoFromMailserver installs filter for community and requests its details
 // from mailserver. When response received it will be passed through signals handler
 func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, shard *common.Shard, waitForResponse bool) (*communities.Community, error) {
 
@@ -2740,7 +2752,7 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, shard
 	}
 }
 
-// FetchCommunity installs filter for community and requests its details
+// requestCommunitiesFromMailserver installs filter for community and requests its details
 // from mailserver. When response received it will be passed through signals handler
 func (m *Messenger) requestCommunitiesFromMailserver(communities []communities.CommunityShard) {
 	m.requestedCommunitiesLock.Lock()

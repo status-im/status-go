@@ -462,7 +462,7 @@ func (api *PublicAPI) ImportCommunity(ctx context.Context, hexPrivateKey string)
 
 // GetCommunityPublicKeyFromPrivateKey gets the community's public key from its private key
 func (api *PublicAPI) GetCommunityPublicKeyFromPrivateKey(ctx context.Context, hexPrivateKey string) string {
-	publicKey := api.service.messenger.GetCommunityIDFromKey(hexPrivateKey)
+	publicKey := protocol.GetCommunityIDFromKey(hexPrivateKey)
 	return publicKey
 }
 
@@ -1187,7 +1187,7 @@ func (api *PublicAPI) EnsVerified(pk, ensName string) error {
 // configurable FetchCommunity.
 func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) (*communities.Community, error) {
 	request := &protocol.FetchCommunityRequest{
-		CommunityID:     communityID,
+		CommunityKey:    communityID,
 		Shard:           nil,
 		TryDatabase:     true,
 		WaitForResponse: true,
@@ -1199,7 +1199,7 @@ func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) (*c
 // configurable FetchCommunity.
 func (api *PublicAPI) RequestCommunityInfoFromMailserverWithShard(communityID string, shard *common.Shard) (*communities.Community, error) {
 	request := &protocol.FetchCommunityRequest{
-		CommunityID:     communityID,
+		CommunityKey:    communityID,
 		Shard:           shard,
 		TryDatabase:     true,
 		WaitForResponse: true,
@@ -1211,7 +1211,7 @@ func (api *PublicAPI) RequestCommunityInfoFromMailserverWithShard(communityID st
 // configurable FetchCommunity.
 func (api *PublicAPI) RequestCommunityInfoFromMailserverAsync(communityID string) error {
 	request := &protocol.FetchCommunityRequest{
-		CommunityID:     communityID,
+		CommunityKey:    communityID,
 		Shard:           nil,
 		TryDatabase:     true,
 		WaitForResponse: false,
@@ -1224,7 +1224,7 @@ func (api *PublicAPI) RequestCommunityInfoFromMailserverAsync(communityID string
 // configurable FetchCommunity.
 func (api *PublicAPI) RequestCommunityInfoFromMailserverAsyncWithShard(communityID string, shard *common.Shard) error {
 	request := &protocol.FetchCommunityRequest{
-		CommunityID:     communityID,
+		CommunityKey:    communityID,
 		Shard:           shard,
 		TryDatabase:     true,
 		WaitForResponse: false,

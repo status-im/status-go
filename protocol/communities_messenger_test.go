@@ -3331,11 +3331,11 @@ func (s *MessengerCommunitiesSuite) TestGetCommunityIdFromKey() {
 	privateKey := "0x3f932031cb5f94ba7eb8ab4c824c3677973ab01fde65d1b89e0b3f470003a2cd"
 
 	// Public key returns the same
-	communityID := s.bob.GetCommunityIDFromKey(publicKey)
+	communityID := GetCommunityIDFromKey(publicKey)
 	s.Require().Equal(communityID, publicKey)
 
 	// Private key returns the public key
-	communityID = s.bob.GetCommunityIDFromKey(privateKey)
+	communityID = GetCommunityIDFromKey(privateKey)
 	s.Require().Equal(communityID, publicKey)
 }
 

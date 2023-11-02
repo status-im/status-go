@@ -672,7 +672,7 @@ func (s *Service) fetchCommunity(communityID string) (*communities.Community, er
 
 	var shard *common.Shard = nil // TODO: build this with info from token
 	community, err := s.messenger.FetchCommunity(&protocol.FetchCommunityRequest{
-		CommunityID:     communityID,
+		CommunityKey:    communityID,
 		Shard:           shard,
 		TryDatabase:     true,
 		WaitForResponse: true,

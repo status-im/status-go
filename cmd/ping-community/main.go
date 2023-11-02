@@ -156,7 +156,7 @@ func main() {
 	}
 
 	community, err := messenger.FetchCommunity(&protocol.FetchCommunityRequest{
-		CommunityID:     *communityID,
+		CommunityKey:    *communityID,
 		Shard:           shard,
 		TryDatabase:     true,
 		WaitForResponse: true,
