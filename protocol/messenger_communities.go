@@ -67,10 +67,10 @@ const (
 	maxChunkSizeBytes    = 1500000
 )
 
-type CommunityInfoRequest struct {
+type FetchCommunityRequest struct {
 	CommunityID     string        `json:"communityId"`
 	Shard           *common.Shard `json:"shard"`
-	UseDatabase     bool          `json:"useDatabase"`
+	TryDatabase     bool          `json:"useDatabase"`
 	WaitForResponse bool          `json:"waitForResponse"`
 }
 
@@ -2335,10 +2335,10 @@ func (m *Messenger) ImportCommunity(ctx context.Context, key *ecdsa.PrivateKey) 
 		return nil, err
 	}
 
-	_, err = m.RequestCommunityInfoFromMailserver(&CommunityInfoRequest{
+	_, err = m.FetchCommunity(&FetchCommunityRequest{
 		CommunityID:     community.IDString(),
 		Shard:           community.Shard(),
-		UseDatabase:     false,
+		TryDatabase:     false,
 		WaitForResponse: true,
 	})
 	if err != nil {
@@ -2624,17 +2624,18 @@ func (m *Messenger) GetCommunityIDFromKey(communityKey string) string {
 	return communityID
 }
 
-// RequestCommunityInfoFromMailserver installs filter for community and requests its details
+// FetchCommunity installs filter for community and requests its details
 // from mailserver.
 //
-// If `request.UseDatabase` is true, it searches for community in database and does not request mailserver.
+// If `request.TryDatabase` is true, it first looks for community in database,
+// and requests from mailserver only if it wasn't found locally.
 // If `request.WaitForResponse` is true, it waits until it has the community before returning it.
 // If `request.WaitForResponse` is false, it installs filter for community and requests its details
 // from mailserver. When response received it will be passed through signals handler.
-func (m *Messenger) RequestCommunityInfoFromMailserver(request *CommunityInfoRequest) (*communities.Community, error) {
+func (m *Messenger) FetchCommunity(request *FetchCommunityRequest) (*communities.Community, error) {
 	communityID := m.GetCommunityIDFromKey(request.CommunityID)
 
-	if request.UseDatabase {
+	if request.TryDatabase {
 		community, err := m.findCommunityInfoFromDB(communityID)
 		if err != nil {
 			return nil, err
@@ -2650,7 +2651,7 @@ func (m *Messenger) RequestCommunityInfoFromMailserver(request *CommunityInfoReq
 	return m.requestCommunityInfoFromMailserver(communityID, request.Shard, request.WaitForResponse)
 }
 
-// RequestCommunityInfoFromMailserver installs filter for community and requests its details
+// FetchCommunity installs filter for community and requests its details
 // from mailserver. When response received it will be passed through signals handler
 func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, shard *common.Shard, waitForResponse bool) (*communities.Community, error) {
 
@@ -2739,7 +2740,7 @@ func (m *Messenger) requestCommunityInfoFromMailserver(communityID string, shard
 	}
 }
 
-// RequestCommunityInfoFromMailserver installs filter for community and requests its details
+// FetchCommunity installs filter for community and requests its details
 // from mailserver. When response received it will be passed through signals handler
 func (m *Messenger) requestCommunitiesFromMailserver(communities []communities.CommunityShard) {
 	m.requestedCommunitiesLock.Lock()

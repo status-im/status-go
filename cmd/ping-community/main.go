@@ -155,10 +155,10 @@ func main() {
 		}
 	}
 
-	community, err := messenger.RequestCommunityInfoFromMailserver(&protocol.CommunityInfoRequest{
+	community, err := messenger.FetchCommunity(&protocol.FetchCommunityRequest{
 		CommunityID:     *communityID,
 		Shard:           shard,
-		UseDatabase:     true,
+		TryDatabase:     true,
 		WaitForResponse: true,
 	})
 	if err != nil {
