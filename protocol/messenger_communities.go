@@ -1530,8 +1530,7 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 	}
 
 	if notification != nil {
-		updatedAt := m.GetCurrentTimeInMillis()
-		notification.UpdatedAt = updatedAt
+		notification.IncrementUpdatedAt(m.getTimesource())
 		err = m.persistence.DeleteActivityCenterNotificationByID(types.FromHex(requestToJoin.ID.String()), notification.UpdatedAt)
 		if err != nil {
 			m.logger.Error("failed to delete notification from Activity Center", zap.Error(err))
@@ -1540,7 +1539,7 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 
 		// set notification as deleted, so that the client will remove the activity center notification from UI
 		notification.Deleted = true
-		err = m.syncActivityCenterDeletedByIDs(ctx, []types.HexBytes{notification.ID}, updatedAt)
+		err = m.syncActivityCenterDeletedByIDs(ctx, []types.HexBytes{notification.ID}, notification.UpdatedAt)
 		if err != nil {
 			m.logger.Error("CancelRequestToJoinCommunity, failed to sync activity center notification as deleted", zap.Error(err))
 			return nil, err
@@ -1631,7 +1630,7 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 		}
 		notification.Read = true
 		notification.Accepted = true
-		notification.UpdatedAt = m.GetCurrentTimeInMillis()
+		notification.IncrementUpdatedAt(m.getTimesource())
 
 		err = m.addActivityCenterNotification(response, notification, m.syncActivityCenterCommunityRequestDecisionAdapter)
 		if err != nil {
@@ -1715,7 +1714,7 @@ func (m *Messenger) declineRequestToJoinCommunity(requestToJoin *communities.Req
 		}
 		notification.Read = true
 		notification.Dismissed = true
-		notification.UpdatedAt = m.GetCurrentTimeInMillis()
+		notification.IncrementUpdatedAt(m.getTimesource())
 
 		err = m.addActivityCenterNotification(response, notification, m.syncActivityCenterCommunityRequestDecisionAdapter)
 		if err != nil {
@@ -1898,7 +1897,7 @@ func (m *Messenger) CheckAndDeletePendingRequestToJoinCommunity(ctx context.Cont
 					notification.MembershipStatus = ActivityCenterMembershipStatusIdle
 					notification.Read = false
 					notification.Deleted = false
-					notification.UpdatedAt = m.GetCurrentTimeInMillis()
+					notification.IncrementUpdatedAt(m.getTimesource())
 					err = m.addActivityCenterNotification(response, notification, m.syncActivityCenterUnreadByIDs)
 					if err != nil {
 						m.logger.Error("failed to update notification in activity center", zap.Error(err))
@@ -3019,7 +3018,7 @@ func (m *Messenger) handleCommunityResponse(state *ReceivedMessageState, communi
 
 			notification.Read = true
 			notification.Accepted = true
-			notification.UpdatedAt = m.GetCurrentTimeInMillis()
+			notification.IncrementUpdatedAt(m.getTimesource())
 
 			err = m.addActivityCenterNotification(state.Response, notification, nil)
 			if err != nil {
