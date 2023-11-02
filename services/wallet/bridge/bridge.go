@@ -14,6 +14,8 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
+const IncreaseEstimatedGasFactor = 1.1
+
 func getSigner(chainID uint64, from types.Address, verifiedAccount *account.SelectedExtKey) bind.SignerFn {
 	return func(addr common.Address, tx *ethTypes.Transaction) (*ethTypes.Transaction, error) {
 		s := ethTypes.NewLondonSigner(new(big.Int).SetUint64(chainID))
@@ -90,7 +92,7 @@ type Bridge interface {
 	Name() string
 	Can(from *params.Network, to *params.Network, token *token.Token, balance *big.Int) (bool, error)
 	CalculateFees(from, to *params.Network, token *token.Token, amountIn *big.Int, nativeTokenPrice, tokenPrice float64, gasPrice *big.Float) (*big.Int, *big.Int, error)
-	EstimateGas(from *params.Network, to *params.Network, account common.Address, token *token.Token, amountIn *big.Int) (uint64, error)
+	EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) (uint64, error)
 	CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error)
 	Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (types.Hash, error)
 	GetContractAddress(network *params.Network, token *token.Token) *common.Address

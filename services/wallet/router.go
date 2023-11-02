@@ -510,7 +510,8 @@ func (r *Router) getBalance(ctx context.Context, network *params.Network, token 
 func (r *Router) suggestedRoutes(
 	ctx context.Context,
 	sendType SendType,
-	account common.Address,
+	addrFrom common.Address,
+	addrTo common.Address,
 	amountIn *big.Int,
 	tokenID string,
 	disabledFromChainIDs,
@@ -553,7 +554,7 @@ func (r *Router) suggestedRoutes(
 			continue
 		}
 
-		token := sendType.FindToken(r.s, account, network, tokenID)
+		token := sendType.FindToken(r.s, addrFrom, network, tokenID)
 		if token == nil {
 			continue
 		}
@@ -572,7 +573,7 @@ func (r *Router) suggestedRoutes(
 			// Default value is 1 as in case of erc721 as we built the token we are sure the account owns it
 			balance := big.NewInt(1)
 			if sendType != ERC721Transfer {
-				balance, err = r.getBalance(ctx, network, token, account)
+				balance, err = r.getBalance(ctx, network, token, addrFrom)
 				if err != nil {
 					return err
 				}
@@ -586,7 +587,7 @@ func (r *Router) suggestedRoutes(
 				maxAmountIn = amount
 			}
 
-			nativeBalance, err := r.getBalance(ctx, network, nativeToken, account)
+			nativeBalance, err := r.getBalance(ctx, network, nativeToken, addrFrom)
 			if err != nil {
 				return err
 			}
@@ -640,12 +641,12 @@ func (r *Router) suggestedRoutes(
 					}
 					gasLimit := uint64(0)
 					if sendType.isTransfer() {
-						gasLimit, err = bridge.EstimateGas(network, dest, account, token, amountIn)
+						gasLimit, err = bridge.EstimateGas(network, dest, addrFrom, addrTo, token, amountIn)
 						if err != nil {
 							continue
 						}
 					} else {
-						gasLimit = sendType.EstimateGas(r.s, network, account, tokenID)
+						gasLimit = sendType.EstimateGas(r.s, network, addrFrom, tokenID)
 					}
 					requiredNativeBalance := new(big.Int).Mul(gweiToWei(maxFees), big.NewInt(int64(gasLimit)))
 					// Removed the required fees from maxAMount in case of native token tx
@@ -655,7 +656,7 @@ func (r *Router) suggestedRoutes(
 					if nativeBalance.Cmp(requiredNativeBalance) <= 0 {
 						continue
 					}
-					approvalRequired, approvalAmountRequired, approvalGasLimit, approvalContractAddress, err := r.requireApproval(ctx, sendType, bridge, account, network, token, amountIn)
+					approvalRequired, approvalAmountRequired, approvalGasLimit, approvalContractAddress, err := r.requireApproval(ctx, sendType, bridge, addrFrom, network, token, amountIn)
 					if err != nil {
 						continue
 					}

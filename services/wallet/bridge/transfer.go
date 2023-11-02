@@ -32,13 +32,13 @@ func (s *TransferBridge) CalculateFees(from, to *params.Network, token *token.To
 	return big.NewInt(0), big.NewInt(0), nil
 }
 
-func (s *TransferBridge) EstimateGas(from, to *params.Network, account common.Address, token *token.Token, amountIn *big.Int) (uint64, error) {
-	// TODO: replace by estimate function
-	if token.IsNative() {
-		return 22000, nil // default gas limit for eth transaction
+func (s *TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) (uint64, error) {
+	estimation, err := s.transactor.EstimateGas(fromNetwork, from, to, amountIn, []byte("eth_sendRawTransaction"))
+	if err != nil {
+		return 0, err
 	}
-
-	return 200000, nil //default gas limit for erc20 transaction
+	increasedEstimation := float64(estimation) * IncreaseEstimatedGasFactor
+	return uint64(increasedEstimation), nil
 }
 
 func (s *TransferBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (types.Hash, error) {
