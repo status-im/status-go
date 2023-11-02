@@ -12,6 +12,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/status-im/status-go/timesource"
 )
 
@@ -85,7 +87,7 @@ func generateMediaTLSCert() error {
 		return err
 	}
 	notAfter := notBefore.Add(365 * 24 * time.Hour)
-
+	log.Debug("generate media cert", "system time", time.Now().String(), "cert notBefore", notBefore.String(), "cert notAfter", notAfter.String())
 	finalCert, certPem, err := GenerateTLSCert(*notBefore, notAfter, []net.IP{}, []string{Localhost})
 	if err != nil {
 		return err

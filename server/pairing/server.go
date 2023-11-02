@@ -6,6 +6,9 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"net"
+	"time"
+
+	"github.com/ethereum/go-ethereum/log"
 
 	"go.uber.org/zap"
 
@@ -79,6 +82,7 @@ func MakeServerConfig(config *ServerConfig) error {
 	if err != nil {
 		return err
 	}
+	log.Debug("pairing server generate cert", "system time", time.Now().String(), "timesource time", now.String())
 	tlsCert, _, err := GenerateCertFromKey(tlsKey, *now, ips, []string{})
 	if err != nil {
 		return err

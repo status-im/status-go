@@ -9,6 +9,9 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"time"
+
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/server/pairing"
 	"github.com/status-im/status-go/timesource"
@@ -40,6 +43,7 @@ func makeCert(address net.IP) (*tls.Certificate, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	log.Debug("makeCert", "system time", time.Now().String(), "timesource time", now.String())
 	notBefore := now.Add(-pairing.CertificateMaxClockDrift)
 	notAfter := now.Add(pairing.CertificateMaxClockDrift)
 	return server.GenerateTLSCert(notBefore, notAfter, []net.IP{address}, []string{})
