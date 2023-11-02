@@ -73,6 +73,6 @@ pipeline {
   post {
     success { script { github.notifyPR(true) } }
     failure { script { github.notifyPR(false) } }
-    cleanup { sh 'make clean' }
+    cleanup { sh 'make deep-clean' }
   } // post
 } // pipeline
