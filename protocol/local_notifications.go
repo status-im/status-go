@@ -156,7 +156,7 @@ func (n NotificationBody) toCommunityRequestToJoinNotification(id string) *local
 		Message:  n.Contact.PrimaryName() + " wants to join  message " + n.Community.Name(),
 		BodyType: localnotifications.TypeMessage,
 		Category: localnotifications.CategoryCommunityRequestToJoin,
-		Deeplink: "status-im://cr/" + n.Community.IDString(),
+		Deeplink: "status-app://cr/" + n.Community.IDString(),
 		Image:    "",
 	}
 }

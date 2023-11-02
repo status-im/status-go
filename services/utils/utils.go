@@ -41,3 +41,20 @@ func DeserializePublicKey(compressedKey string) (types.HexBytes, error) {
 
 	return crypto.CompressPubkey(pubKey), nil
 }
+
+func SerializePublicKey(compressedKey types.HexBytes) (string, error) {
+	rawKey, err := crypto.DecompressPubkey(compressedKey)
+	if err != nil {
+		return "", err
+	}
+	pubKey := types.EncodeHex(crypto.FromECDSAPub(rawKey))
+
+	secp256k1Code := "0xe701"
+	base58btc := "z"
+	multiCodecKey := secp256k1Code + strings.TrimPrefix(pubKey, "0x")
+	cpk, err := multiformat.SerializePublicKey(multiCodecKey, base58btc)
+	if err != nil {
+		return "", err
+	}
+	return cpk, nil
+}

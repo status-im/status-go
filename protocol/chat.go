@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/status-im/status-go/deprecation"
@@ -16,6 +17,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/services/utils"
 )
 
 var chatColors = []string{
@@ -501,18 +503,30 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 
 func (c *Chat) DeepLink() string {
 	if c.OneToOne() {
-		return "status-im://p/" + c.ID
+		return "status-app://p/" + c.ID
 	}
 	if c.PrivateGroupChat() {
-		return "status-im://g/args?a2=" + c.ID
+		return "status-app://g/args?a2=" + c.ID
 	}
 
 	if c.CommunityChat() {
-		return "status-im://cc/" + c.ID
+		communityChannelID := strings.TrimPrefix(c.ID, c.CommunityID)
+		pubkey, err := types.DecodeHex(c.CommunityID)
+		if err != nil {
+			return ""
+		}
+
+		serializedCommunityID, err := utils.SerializePublicKey(pubkey)
+
+		if err != nil {
+			return ""
+		}
+
+		return "status-app://cc/" + communityChannelID + "#" + serializedCommunityID
 	}
 
 	if c.Public() {
-		return "status-im://" + c.ID
+		return "status-app://" + c.ID
 	}
 
 	return ""
