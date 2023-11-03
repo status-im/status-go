@@ -164,7 +164,7 @@ func (c *findBlocksCommand) ERC20ScanByBalance(parent context.Context, fromBlock
 
 func (c *findBlocksCommand) checkERC20Tail(parent context.Context) ([]*DBHeader, error) {
 	log.Debug("checkERC20Tail", "account", c.account, "to block", c.startBlockNumber, "from", c.resFromBlock.Number)
-	tokens, err := c.tokenManager.GetTokens(c.chainClient.NetworkID())
+	tokens, err := c.tokenManager.GetTokens(c.chainClient.NetworkID(), false)
 	if err != nil {
 		return nil, err
 	}

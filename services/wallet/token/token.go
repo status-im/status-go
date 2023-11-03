@@ -197,12 +197,12 @@ func (tm *Manager) fetchTokens() {
 }
 
 func (tm *Manager) getFullTokenList(chainID uint64) []*Token {
-	tokens, err := tm.GetTokens(chainID)
+	tokens, err := tm.GetTokens(chainID, false)
 	if err != nil {
 		return nil
 	}
 
-	customTokens, err := tm.GetCustomsByChainID(chainID)
+	customTokens, err := tm.GetCustomsByChainID(chainID, false)
 	if err != nil {
 		return nil
 	}
@@ -347,7 +347,7 @@ func (tm *Manager) discoverTokenCommunityID(ctx context.Context, token *Token, a
 }
 
 func (tm *Manager) FindSNT(chainID uint64) *Token {
-	tokens, err := tm.GetTokens(chainID)
+	tokens, err := tm.GetTokens(chainID, false)
 	if err != nil {
 		return nil
 	}
@@ -396,10 +396,10 @@ func (tm *Manager) GetAllTokens() ([]*Token, error) {
 	return tokens, nil
 }
 
-func (tm *Manager) GetTokensByChainIDs(chainIDs []uint64) ([]*Token, error) {
+func (tm *Manager) GetTokensByChainIDs(chainIDs []uint64, onlyCommunityCustoms bool) ([]*Token, error) {
 	tokens := make([]*Token, 0)
 	for _, chainID := range chainIDs {
-		t, err := tm.GetTokens(chainID)
+		t, err := tm.GetTokens(chainID, onlyCommunityCustoms)
 		if err != nil {
 			return nil, err
 		}
@@ -408,7 +408,7 @@ func (tm *Manager) GetTokensByChainIDs(chainIDs []uint64) ([]*Token, error) {
 	return tokens, nil
 }
 
-func (tm *Manager) GetTokens(chainID uint64) ([]*Token, error) {
+func (tm *Manager) GetDefaultTokens(chainID uint64) ([]*Token, error) {
 	if !tm.areTokensFetched {
 		tm.fetchTokens()
 	}
@@ -423,8 +423,16 @@ func (tm *Manager) GetTokens(chainID uint64) ([]*Token, error) {
 	for _, token := range tokensMap {
 		res = append(res, token)
 	}
+	return res, nil
+}
 
-	tokens, err := tm.GetCustomsByChainID(chainID)
+func (tm *Manager) GetTokens(chainID uint64, onlyCommunityCustoms bool) ([]*Token, error) {
+	res, err := tm.GetDefaultTokens(chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	tokens, err := tm.GetCustomsByChainID(chainID, onlyCommunityCustoms)
 	if err != nil {
 		return nil, err
 	}
@@ -498,8 +506,11 @@ func (tm *Manager) GetCustoms() ([]*Token, error) {
 	return tm.getTokens("SELECT address, name, symbol, decimals, color, network_id, community_id FROM tokens")
 }
 
-func (tm *Manager) GetCustomsByChainID(chainID uint64) ([]*Token, error) {
-	return tm.getTokens("SELECT address, name, symbol, decimals, color, network_id, community_id FROM tokens where network_id=?", chainID)
+func (tm *Manager) GetCustomsByChainID(chainID uint64, onlyCommunityCustoms bool) ([]*Token, error) {
+	if onlyCommunityCustoms {
+		return tm.getTokens("SELECT address, name, symbol, decimals, color, network_id, community_id FROM tokens WHERE network_id=? AND community_id IS NOT NULL AND community_id != ''", chainID)
+	}
+	return tm.getTokens("SELECT address, name, symbol, decimals, color, network_id, community_id FROM tokens WHERE network_id=?", chainID)
 }
 
 func (tm *Manager) IsTokenVisible(chainID uint64, address common.Address) (bool, error) {
@@ -575,7 +586,7 @@ func (tm *Manager) GetVisible(chainIDs []uint64) (map[uint64][]*Token, error) {
 		}
 
 		found := false
-		tokens, err := tm.GetTokens(chainID)
+		tokens, err := tm.GetTokens(chainID, false)
 		if err != nil {
 			continue
 		}
