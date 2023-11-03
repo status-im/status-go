@@ -3,7 +3,9 @@ package common
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
+	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -467,4 +469,27 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 	}
 
 	return previews
+}
+
+func decompressPublicKey(input string) string {
+	decompressed, err := multiformat.DeserializePublicKey(input, "f")
+	if err != nil {
+		return input
+	}
+	const secp256k1Code = "fe701"
+	return "0x" + strings.TrimPrefix(decompressed, secp256k1Code)
+}
+
+func (m *Message) DecompressPublicKeys() {
+	for _, linkPreview := range m.StatusLinkPreviews {
+		if linkPreview.Contact != nil {
+			linkPreview.Contact.PublicKey = decompressPublicKey(linkPreview.Contact.PublicKey)
+		}
+		if linkPreview.Community != nil {
+			linkPreview.Community.CommunityID = decompressPublicKey(linkPreview.Community.CommunityID)
+		}
+		if linkPreview.Channel != nil && linkPreview.Channel.Community != nil {
+			linkPreview.Channel.Community.CommunityID = decompressPublicKey(linkPreview.Channel.Community.CommunityID)
+		}
+	}
 }

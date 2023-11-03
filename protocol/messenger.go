@@ -4031,6 +4031,7 @@ func (m *Messenger) prepareMessage(msg *common.Message, s *server.MediaServer) {
 
 	msg.LinkPreviews = msg.ConvertFromProtoToLinkPreviews(s.MakeLinkPreviewThumbnailURL)
 	msg.StatusLinkPreviews = msg.ConvertFromProtoToStatusLinkPreviews(s.MakeStatusLinkPreviewThumbnailURL)
+	msg.DecompressPublicKeys()
 }
 
 func (m *Messenger) AllMessageByChatIDWhichMatchTerm(chatID string, searchTerm string, caseSensitive bool) ([]*common.Message, error) {
