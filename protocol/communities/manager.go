@@ -967,7 +967,7 @@ func (m *Manager) ReevaluateMembers(community *Community) (map[protobuf.Communit
 
 		// Validate channel permissions
 		for channelID := range community.Chats() {
-			chatID := community.IDString() + channelID
+			chatID := community.ChatID(channelID)
 
 			viewOnlyPermissions := community.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_CHANNEL)
 			viewAndPostPermissions := community.ChannelTokenPermissionsByType(chatID, protobuf.CommunityTokenPermission_CAN_VIEW_AND_POST_CHANNEL)
