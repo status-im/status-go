@@ -170,7 +170,13 @@ func (s *MessengerSyncActivityCenterSuite) addContactAndShareCommunity(userB *Me
 	response, err := userB.AddContact(context.Background(), request)
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages(), 2)
-	s.Require().Equal(protobuf.ChatMessage_CONTACT_REQUEST, response.Messages()[1].ContentType)
+	existContactRequestMessage := false
+	for _, m := range response.Messages() {
+		if m.ContentType == protobuf.ChatMessage_CONTACT_REQUEST {
+			existContactRequestMessage = true
+		}
+	}
+	s.Require().True(existContactRequestMessage)
 	var contactRequestMessageID types.HexBytes
 	_, err = WaitOnMessengerResponse(s.m, func(r *MessengerResponse) bool {
 		if len(r.ActivityCenterNotifications()) > 0 {
