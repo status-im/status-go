@@ -660,20 +660,12 @@ func (m *Manager) GetStoredDescriptionForCommunities(communityIDs []types.HexByt
 			return
 		}
 
-		// TODO: use CommunityShard instead of appending the communityID
-
-		response.ContractCommunities = append(response.ContractCommunities, communityID) // , CommunityShard{
-		// CommunityID: communityID,
-		// Shard:       community.Shard(),
-		// }
+		response.ContractCommunities = append(response.ContractCommunities, communityID)
 
 		if community != nil {
 			response.Descriptions[community.IDString()] = community
 		} else {
-			response.UnknownCommunities = append(response.UnknownCommunities, communityID) // CommunityShard{
-			//	CommunityID: communityID,
-			//	Shard:       community.Shard(),
-			// })
+			response.UnknownCommunities = append(response.UnknownCommunities, communityID)
 		}
 	}
 

@@ -633,15 +633,20 @@ func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse,
 		return nil, errors.New("contract maker not initialized")
 	}
 
-	// Revert code to https://github.com/status-im/status-go/blob/e6a3f63ec7f2fa691878ed35f921413dc8acfc66/protocol/messenger_communities.go#L211-L226 once the curated communities contract is deployed to mainnet
+	testNetworksEnabled, err := m.settings.GetTestNetworksEnabled()
+	if err != nil {
+		return nil, err
+	}
 
-	chainID := uint64(420) // Optimism Goerli
+	chainID := uint64(10) // Optimism Mainnet
+	if testNetworksEnabled {
+		chainID = 420 // Optimism Goerli
+	}
 
 	directory, err := m.contractMaker.NewDirectory(chainID)
 	if err != nil {
 		return nil, err
 	}
-	// --- end delete
 
 	callOpts := &bind.CallOpts{Context: context.Background(), Pending: false}
 
@@ -664,21 +669,11 @@ func (m *Messenger) CuratedCommunities() (*communities.KnownCommunitiesResponse,
 		return nil, err
 	}
 
-	// TODO: The curated communities smart contract should also store the community shard cluster and index
-
 	for _, c := range featuredCommunities {
 		response.ContractFeaturedCommunities = append(response.ContractFeaturedCommunities, types.HexBytes(c).String())
-		// TODO: use CommunityShard instead of communityID
-		/*response.ContractFeaturedCommunities = append(response.ContractFeaturedCommunities, communities.CommunityShard{
-			CommunityID: types.HexBytes(c).String(),
-			// Shard:     c.Shard, // TODO: obtain this value
-		})*/
 	}
 
-	// TODO: this loop is added just to not revert the change from requestCommunitiesFromMailserver
-	// Once support for shards is added in the contract, just pass the `response.UnknownCommunities` directly to
-	// the function
-
+	// TODO: use mechanism to obtain shard from community ID (https://github.com/status-im/status-desktop/issues/12585)
 	var unknownCommunities []communities.CommunityShard
 	for _, u := range response.UnknownCommunities {
 		unknownCommunities = append(unknownCommunities, communities.CommunityShard{
