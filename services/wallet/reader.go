@@ -191,7 +191,7 @@ func (r *Reader) GetWalletToken(ctx context.Context, addresses []common.Address)
 	}
 	currencies = append(currencies, currency)
 	currencies = append(currencies, getFixedCurrencies()...)
-	allTokens, err := r.tokenManager.GetTokensByChainIDs(chainIDs)
+	allTokens, err := r.tokenManager.GetTokensByChainIDs(chainIDs, true)
 
 	if err != nil {
 		return nil, err

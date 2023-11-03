@@ -182,7 +182,7 @@ func (api *API) GetBalanceHistoryRange(ctx context.Context, chainIDs []uint64, a
 
 func (api *API) GetTokens(ctx context.Context, chainID uint64) ([]*token.Token, error) {
 	log.Debug("call to get tokens")
-	rst, err := api.s.tokenManager.GetTokens(chainID)
+	rst, err := api.s.tokenManager.GetTokens(chainID, true)
 	log.Debug("result from token store", "len", len(rst))
 	return rst, err
 }
