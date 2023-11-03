@@ -21,67 +21,91 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcasePreferences() {
 	s.Require().NoError(err)
 	persistence := newSQLitePersistence(db)
 
-	preferences := []*ProfileShowcaseEntry{
-		&ProfileShowcaseEntry{
-			ID:                 "0x32433445133424",
-			EntryType:          ProfileShowcaseEntryTypeCommunity,
-			ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
-			Order:              0,
+	preferences := &ProfileShowcasePreferences{
+		Communities: []*ProfileShowcaseCommunityPreference{
+			&ProfileShowcaseCommunityPreference{
+				CommunityID:        "0x32433445133424",
+				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
 		},
-		&ProfileShowcaseEntry{
-			ID:                 "0x12333245443413412",
-			EntryType:          ProfileShowcaseEntryTypeAccount,
-			ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
-			Order:              0,
+		Accounts: []*ProfileShowcaseAccountPreference{
+			&ProfileShowcaseAccountPreference{
+				Address:            "0x32433445133424",
+				Name:               "Status Account",
+				ColorID:            "blue",
+				Emoji:              "-_-",
+				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
+			&ProfileShowcaseAccountPreference{
+				Address:            "0x3845354643324",
+				Name:               "Money Box",
+				ColorID:            "red",
+				Emoji:              ":o)",
+				ShowcaseVisibility: ProfileShowcaseVisibilityContacts,
+				Order:              1,
+			},
 		},
-		&ProfileShowcaseEntry{
-			ID:                 "b4ef5ce9-5a10-4c88-a2ff-5bc371f82930",
-			EntryType:          ProfileShowcaseEntryTypeCollectible,
-			ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
-			Order:              0,
-		},
-		&ProfileShowcaseEntry{
-			ID:                 "ETH",
-			EntryType:          ProfileShowcaseEntryTypeAsset,
-			ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
-			Order:              0,
+		Assets: []*ProfileShowcaseAssetPreference{
+			&ProfileShowcaseAssetPreference{
+				Symbol:             "ETH",
+				ShowcaseVisibility: ProfileShowcaseVisibilityEveryone,
+				Order:              0,
+			},
+			&ProfileShowcaseAssetPreference{
+				Symbol:             "DAI",
+				ShowcaseVisibility: ProfileShowcaseVisibilityIDVerifiedContacts,
+				Order:              2,
+			},
+			&ProfileShowcaseAssetPreference{
+				Symbol:             "SNT",
+				ShowcaseVisibility: ProfileShowcaseVisibilityNoOne,
+				Order:              3,
+			},
 		},
 	}
 
 	err = persistence.SaveProfileShowcasePreferences(preferences)
 	s.Require().NoError(err)
 
-	preferencesBack, err := persistence.GetAllProfileShowcasePreferences()
+	preferencesBack, err := persistence.GetProfileShowcasePreferences()
 	s.Require().NoError(err)
 
-	s.Require().Equal(len(preferences), len(preferencesBack))
+	s.Require().Len(preferencesBack.Communities, 1)
+	s.Require().Equal(preferences.Communities[0].CommunityID, preferencesBack.Communities[0].CommunityID)
+	s.Require().Equal(preferences.Communities[0].ShowcaseVisibility, preferencesBack.Communities[0].ShowcaseVisibility)
+	s.Require().Equal(preferences.Communities[0].Order, preferencesBack.Communities[0].Order)
 
-	for i, entry := range preferences {
-		s.Require().Equal(entry.ID, preferencesBack[i].ID)
-		s.Require().Equal(entry.EntryType, preferencesBack[i].EntryType)
-		s.Require().Equal(entry.ShowcaseVisibility, preferencesBack[i].ShowcaseVisibility)
-		s.Require().Equal(entry.Order, preferencesBack[i].Order)
-	}
+	s.Require().Len(preferencesBack.Accounts, 2)
+	s.Require().Equal(preferences.Accounts[0].Address, preferencesBack.Accounts[0].Address)
+	s.Require().Equal(preferences.Accounts[0].Name, preferencesBack.Accounts[0].Name)
+	s.Require().Equal(preferences.Accounts[0].ColorID, preferencesBack.Accounts[0].ColorID)
+	s.Require().Equal(preferences.Accounts[0].Emoji, preferencesBack.Accounts[0].Emoji)
+	s.Require().Equal(preferences.Accounts[0].ShowcaseVisibility, preferencesBack.Accounts[0].ShowcaseVisibility)
+	s.Require().Equal(preferences.Accounts[0].Order, preferencesBack.Accounts[0].Order)
 
-	preferencesBack, err = persistence.GetProfileShowcasePreferencesByType(ProfileShowcaseEntryTypeCommunity)
-	s.Require().NoError(err)
-	s.Require().Equal(1, len(preferencesBack))
-	s.Require().Equal(preferences[0].ID, preferencesBack[0].ID)
+	s.Require().Equal(preferences.Accounts[1].Address, preferencesBack.Accounts[1].Address)
+	s.Require().Equal(preferences.Accounts[1].Name, preferencesBack.Accounts[1].Name)
+	s.Require().Equal(preferences.Accounts[1].ColorID, preferencesBack.Accounts[1].ColorID)
+	s.Require().Equal(preferences.Accounts[1].Emoji, preferencesBack.Accounts[1].Emoji)
+	s.Require().Equal(preferences.Accounts[1].ShowcaseVisibility, preferencesBack.Accounts[1].ShowcaseVisibility)
+	s.Require().Equal(preferences.Accounts[1].Order, preferencesBack.Accounts[1].Order)
 
-	preferencesBack, err = persistence.GetProfileShowcasePreferencesByType(ProfileShowcaseEntryTypeAccount)
-	s.Require().NoError(err)
-	s.Require().Equal(1, len(preferencesBack))
-	s.Require().Equal(preferences[1].ID, preferencesBack[0].ID)
+	s.Require().Len(preferencesBack.Collectibles, 0)
 
-	preferencesBack, err = persistence.GetProfileShowcasePreferencesByType(ProfileShowcaseEntryTypeCollectible)
-	s.Require().NoError(err)
-	s.Require().Equal(1, len(preferencesBack))
-	s.Require().Equal(preferences[2].ID, preferencesBack[0].ID)
+	s.Require().Len(preferencesBack.Assets, 3)
+	s.Require().Equal(preferences.Assets[0].Symbol, preferencesBack.Assets[0].Symbol)
+	s.Require().Equal(preferences.Assets[0].ShowcaseVisibility, preferencesBack.Assets[0].ShowcaseVisibility)
+	s.Require().Equal(preferences.Assets[0].Order, preferencesBack.Assets[0].Order)
 
-	preferencesBack, err = persistence.GetProfileShowcasePreferencesByType(ProfileShowcaseEntryTypeAsset)
-	s.Require().NoError(err)
-	s.Require().Equal(1, len(preferencesBack))
-	s.Require().Equal(preferences[3].ID, preferencesBack[0].ID)
+	s.Require().Equal(preferences.Assets[1].Symbol, preferencesBack.Assets[1].Symbol)
+	s.Require().Equal(preferences.Assets[1].ShowcaseVisibility, preferencesBack.Assets[1].ShowcaseVisibility)
+	s.Require().Equal(preferences.Assets[1].Order, preferencesBack.Assets[1].Order)
+
+	s.Require().Equal(preferences.Assets[2].Symbol, preferencesBack.Assets[2].Symbol)
+	s.Require().Equal(preferences.Assets[2].ShowcaseVisibility, preferencesBack.Assets[2].ShowcaseVisibility)
+	s.Require().Equal(preferences.Assets[2].Order, preferencesBack.Assets[2].Order)
 }
 
 func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
@@ -90,20 +114,20 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 	persistence := newSQLitePersistence(db)
 
 	showcase1 := &identity.ProfileShowcase{
-		Communities: []*identity.VisibleProfileShowcaseEntry{
-			&identity.VisibleProfileShowcaseEntry{
-				EntryID: "0x012312234234234",
-				Order:   6,
+		Communities: []*identity.ProfileShowcaseCommunity{
+			&identity.ProfileShowcaseCommunity{
+				CommunityID: "0x012312234234234",
+				Order:       6,
 			},
-			&identity.VisibleProfileShowcaseEntry{
-				EntryID: "0x04523233466753",
-				Order:   7,
+			&identity.ProfileShowcaseCommunity{
+				CommunityID: "0x04523233466753",
+				Order:       7,
 			},
 		},
-		Assets: []*identity.VisibleProfileShowcaseEntry{
-			&identity.VisibleProfileShowcaseEntry{
-				EntryID: "ETH",
-				Order:   1,
+		Assets: []*identity.ProfileShowcaseAsset{
+			&identity.ProfileShowcaseAsset{
+				Symbol: "ETH",
+				Order:  1,
 			},
 		},
 	}
@@ -111,20 +135,20 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 	s.Require().NoError(err)
 
 	showcase2 := &identity.ProfileShowcase{
-		Communities: []*identity.VisibleProfileShowcaseEntry{
-			&identity.VisibleProfileShowcaseEntry{
-				EntryID: "0x012312234234234", // same id to check query
-				Order:   3,
+		Communities: []*identity.ProfileShowcaseCommunity{
+			&identity.ProfileShowcaseCommunity{
+				CommunityID: "0x012312234234234", // same id to check query
+				Order:       3,
 			},
-			&identity.VisibleProfileShowcaseEntry{
-				EntryID: "0x096783478384593",
-				Order:   7,
+			&identity.ProfileShowcaseCommunity{
+				CommunityID: "0x096783478384593",
+				Order:       7,
 			},
 		},
-		Collectibles: []*identity.VisibleProfileShowcaseEntry{
-			&identity.VisibleProfileShowcaseEntry{
-				EntryID: "d378662f-3d71-44e0-81ee-ff7f1778c13a",
-				Order:   1,
+		Collectibles: []*identity.ProfileShowcaseCollectible{
+			&identity.ProfileShowcaseCollectible{
+				UID:   "d378662f-3d71-44e0-81ee-ff7f1778c13a",
+				Order: 1,
 			},
 		},
 	}

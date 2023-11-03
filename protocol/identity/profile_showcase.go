@@ -2,16 +2,34 @@ package identity
 
 import "reflect"
 
-type VisibleProfileShowcaseEntry struct {
-	EntryID string `json:"entryId"`
+type ProfileShowcaseCommunity struct {
+	CommunityID string `json:"communityId"`
+	Order       int    `json:"order"`
+}
+
+type ProfileShowcaseAccount struct {
+	Address string `json:"address"`
+	Name    string `json:"name"`
+	ColorID string `json:"colorId"`
+	Emoji   string `json:"emoji"`
 	Order   int    `json:"order"`
 }
 
+type ProfileShowcaseCollectible struct {
+	UID   string `json:"uid"`
+	Order int    `json:"order"`
+}
+
+type ProfileShowcaseAsset struct {
+	Symbol string `json:"symbol"`
+	Order  int    `json:"order"`
+}
+
 type ProfileShowcase struct {
-	Communities  []*VisibleProfileShowcaseEntry `json:"communities"`
-	Accounts     []*VisibleProfileShowcaseEntry `json:"accounts"`
-	Collectibles []*VisibleProfileShowcaseEntry `json:"collectibles"`
-	Assets       []*VisibleProfileShowcaseEntry `json:"assets"`
+	Communities  []*ProfileShowcaseCommunity   `json:"communities"`
+	Accounts     []*ProfileShowcaseAccount     `json:"accounts"`
+	Collectibles []*ProfileShowcaseCollectible `json:"collectibles"`
+	Assets       []*ProfileShowcaseAsset       `json:"assets"`
 }
 
 func (p1 ProfileShowcase) Equal(p2 ProfileShowcase) bool {

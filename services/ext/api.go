@@ -1622,7 +1622,7 @@ func (api *PublicAPI) CreateTokenGatedCommunity() (*protocol.MessengerResponse, 
 }
 
 // Set profile showcase preference for current user
-func (api *PublicAPI) SetProfileShowcasePreferences(preferences protocol.ProfileShowcasePreferences) error {
+func (api *PublicAPI) SetProfileShowcasePreferences(preferences *protocol.ProfileShowcasePreferences) error {
 	return api.service.messenger.SetProfileShowcasePreferences(preferences)
 }
 

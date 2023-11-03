@@ -109,7 +109,7 @@
 // 1698137562_fix_encryption_key_id.up.sql (758B)
 // 1698414646_add_padding.up.sql (69B)
 // 1698746210_add_signature_to_revealed_addresses.up.sql (87B)
-// 1698839882_profile_showcase_contacts.up.sql (240B)
+// 1699041816_profile_showcase_contacts.up.sql (1.788kB)
 // README.md (554B)
 // doc.go (850B)
 
@@ -2360,23 +2360,23 @@ func _1698746210_add_signature_to_revealed_addressesUpSql() (*asset, error) {
 	return a, nil
 }
 
-var __1698839882_profile_showcase_contactsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x09\xf2\x0f\x50\x08\x71\x74\xf2\x71\x55\x28\x28\xca\x4f\xcb\xcc\x49\x8d\x2f\xce\xc8\x2f\x4f\x4e\x2c\x4e\x8d\x4f\xce\xcf\x2b\x49\x4c\x2e\x29\xb6\xe6\xe2\x72\x0e\x72\x75\x0c\x71\x25\xa4\x50\x41\x83\x4b\x41\x41\x41\x01\xca\x8d\xcf\x4c\x51\x08\x71\x8d\x08\x51\xf0\xf3\x0f\x51\xf0\x0b\xf5\xf1\xd1\x01\xcb\xa6\xe6\x95\x14\x55\xe2\x95\x2b\xa9\x2c\x48\x55\xf0\xf4\xc3\x2e\x99\x5f\x94\x92\x5a\x04\x96\x75\x71\x75\x73\x0c\xf5\x09\x51\x30\x80\x48\x07\x04\x79\xfa\x3a\x06\x45\x2a\x78\xbb\x46\x2a\x68\x20\x9c\xa0\x03\xb7\x50\x93\x4b\xd3\x9a\x0b\x10\x00\x00\xff\xff\x05\x86\x7c\xa2\xf0\x00\x00\x00")
+var __1699041816_profile_showcase_contactsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xcc\x93\xcd\x6e\xc2\x30\x0c\x80\xef\x7d\x0a\x8b\x13\x48\x20\xed\xce\xa9\x2b\x41\x43\xeb\x5a\x54\x85\x69\x9c\xaa\x92\x9a\x91\xa9\x6d\x50\x9c\x0e\xf1\xf6\x13\x94\x4c\xa5\xfc\x4c\x9d\x60\xda\xd9\x76\xfc\xd9\xce\x37\x8a\xc2\x29\x70\xf7\xd1\x67\xb0\xd6\x6a\x29\x33\x8c\x69\xa5\x36\x22\x21\x8c\xd7\x1a\x97\xa8\xb1\x10\x48\x43\xe7\x5a\xa2\x50\x85\x49\x84\xa1\xa1\xe3\x0c\x06\x30\x56\xa5\x06\x93\x2c\x32\x24\x58\x2a\x0d\x64\x94\x96\xc5\x3b\xa8\x4d\x61\x4b\xc1\x96\x42\xad\x87\xe3\x45\xcc\xe5\xec\x72\x93\x3c\x2f\x0b\x69\x24\x52\x9d\x0c\xba\x0e\x00\x80\x8d\x6e\x63\x99\x02\x67\x6f\x1c\xa6\xd1\xe4\xc5\x8d\xe6\xf0\xcc\xe6\x10\x06\xe0\x85\xc1\xd8\x9f\x78\x1c\x22\x36\xf5\x5d\x8f\xf5\xf7\x65\x9f\x92\xe4\x42\x66\xd2\x6c\x61\x12\x70\x08\x42\x0e\xc1\xcc\xf7\x61\xc4\xc6\xee\xcc\xe7\xf0\x50\xa5\x91\xd2\x26\x56\x3a\x45\xbd\x4f\xfb\x8e\x3a\xbd\xa1\xf3\x03\x76\x22\x84\x2a\x0b\x73\x8e\x39\x49\x53\x8d\x44\x2d\x70\x8b\x24\xc7\x2a\xdd\x22\x74\x3a\xfd\xc3\xfc\x99\xd2\xbb\xd9\x9b\x01\xcc\xd5\x87\x84\x57\x37\xf2\x9e\xdc\xe8\x24\x7a\xff\xf9\x85\xca\x32\x14\x46\xee\xbe\xc3\x99\x1d\x94\xff\xed\x5c\x44\x78\xf6\x58\xb4\xcd\x17\x2a\xfb\x63\xd6\x2b\x36\x9d\x98\xb4\x0b\x62\x22\x56\x70\xb0\xb1\x85\x4e\xd6\xdf\x8b\x2e\x59\xf8\xeb\xc8\xf6\x27\xee\x1f\xbb\x50\x5b\x5f\x5d\xb7\xde\xa8\x5f\x2b\xec\xb5\xf1\xaa\x01\x7f\x24\xd5\x71\xef\x9b\xdb\x73\xb3\x45\x1c\xa0\xdb\xee\xe0\xc8\xad\xc6\x1e\xca\x3b\xdf\xae\xfc\xc5\xc9\x2a\xb7\x1a\xa0\x75\xb1\xee\xc4\x5a\xb5\x38\xc1\xfd\x0a\x00\x00\xff\xff\x81\xb9\xed\xee\xfc\x06\x00\x00")
 
-func _1698839882_profile_showcase_contactsUpSqlBytes() ([]byte, error) {
+func _1699041816_profile_showcase_contactsUpSqlBytes() ([]byte, error) {
 	return bindataRead(
-		__1698839882_profile_showcase_contactsUpSql,
-		"1698839882_profile_showcase_contacts.up.sql",
+		__1699041816_profile_showcase_contactsUpSql,
+		"1699041816_profile_showcase_contacts.up.sql",
 	)
 }
 
-func _1698839882_profile_showcase_contactsUpSql() (*asset, error) {
-	bytes, err := _1698839882_profile_showcase_contactsUpSqlBytes()
+func _1699041816_profile_showcase_contactsUpSql() (*asset, error) {
+	bytes, err := _1699041816_profile_showcase_contactsUpSqlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1698839882_profile_showcase_contacts.up.sql", size: 240, mode: os.FileMode(0644), modTime: time.Unix(1699551753, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd5, 0x7a, 0xb4, 0x76, 0xcf, 0x34, 0x63, 0x6a, 0xd9, 0x62, 0xc9, 0x5d, 0x3e, 0x52, 0xa8, 0x45, 0xe0, 0xac, 0xf6, 0xe, 0x67, 0x6a, 0x44, 0x58, 0x49, 0xb6, 0x66, 0x1d, 0xef, 0x58, 0x4c, 0xde}}
+	info := bindataFileInfo{name: "1699041816_profile_showcase_contacts.up.sql", size: 1788, mode: os.FileMode(0644), modTime: time.Unix(1699551808, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x2e, 0xaf, 0xf5, 0x76, 0x9b, 0x73, 0xe5, 0xc, 0xf1, 0x88, 0x35, 0xc7, 0xc0, 0x1, 0xb3, 0xc8, 0x2c, 0x72, 0x9f, 0x3d, 0xbb, 0x37, 0x3, 0xc, 0x99, 0x54, 0xaa, 0x36, 0xa7, 0x4f, 0x23, 0x9}}
 	return a, nil
 }
 
@@ -2729,7 +2729,7 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1698746210_add_signature_to_revealed_addresses.up.sql": _1698746210_add_signature_to_revealed_addressesUpSql,
 
-	"1698839882_profile_showcase_contacts.up.sql": _1698839882_profile_showcase_contactsUpSql,
+	"1699041816_profile_showcase_contacts.up.sql": _1699041816_profile_showcase_contactsUpSql,
 
 	"README.md": readmeMd,
 
@@ -2886,7 +2886,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1698137562_fix_encryption_key_id.up.sql":                                     &bintree{_1698137562_fix_encryption_key_idUpSql, map[string]*bintree{}},
 	"1698414646_add_padding.up.sql":                                               &bintree{_1698414646_add_paddingUpSql, map[string]*bintree{}},
 	"1698746210_add_signature_to_revealed_addresses.up.sql":                       &bintree{_1698746210_add_signature_to_revealed_addressesUpSql, map[string]*bintree{}},
-	"1698839882_profile_showcase_contacts.up.sql":                                 &bintree{_1698839882_profile_showcase_contactsUpSql, map[string]*bintree{}},
+	"1699041816_profile_showcase_contacts.up.sql":                                 &bintree{_1699041816_profile_showcase_contactsUpSql, map[string]*bintree{}},
 	"README.md": &bintree{readmeMd, map[string]*bintree{}},
 	"doc.go":    &bintree{docGo, map[string]*bintree{}},
 }}

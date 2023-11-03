@@ -3,23 +3,40 @@ syntax = "proto3";
 option go_package = "./;protobuf";
 package protobuf;
 
-message ProfileShowcaseEntry {
-  string entry_id = 1;
+message ProfileShowcaseCommunity {
+  string community_id = 1;
+  uint32 order = 2;
+}
+
+message ProfileShowcaseAccount {
+  string address = 1;
+  string name = 2;
+  string color_id = 3;
+  string emoji = 4;
+  uint32 order = 5;
+}
+
+message ProfileShowcaseCollectible {
+  string uid = 1;
+  uint32 order = 2;
+}
+
+message ProfileShowcaseAsset {
+  string symbol = 1;
   uint32 order = 2;
 }
 
 message ProfileShowcaseEntries {
-  repeated ProfileShowcaseEntry communities = 1;
-  repeated ProfileShowcaseEntry accounts = 2;
-  repeated ProfileShowcaseEntry collectibles = 3;
-  repeated ProfileShowcaseEntry assets = 4;
+  repeated ProfileShowcaseCommunity communities = 1;
+  repeated ProfileShowcaseAccount accounts = 2;
+  repeated ProfileShowcaseCollectible collectibles = 3;
+  repeated ProfileShowcaseAsset assets = 4;
 }
 
 message ProfileShowcaseEntriesEncrypted {
   bytes encrypted_entries = 1;
   repeated bytes encryption_keys = 2;
 }
-
 
 message ProfileShowcase {
   ProfileShowcaseEntries for_everyone = 1;
