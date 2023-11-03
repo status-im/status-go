@@ -31,7 +31,7 @@ var (
 
 // DirectoryMetaData contains all meta data concerning the Directory contract.
 var DirectoryMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"community\",\"type\":\"bytes\"}],\"name\":\"addCommunity\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getCommunities\",\"outputs\":[{\"internalType\":\"bytes[]\",\"name\":\"\",\"type\":\"bytes[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getFeaturedCommunities\",\"outputs\":[{\"internalType\":\"bytes[]\",\"name\":\"\",\"type\":\"bytes[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"community\",\"type\":\"bytes\"}],\"name\":\"isCommunityFeatured\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"community\",\"type\":\"bytes\"}],\"name\":\"isCommunityInDirectory\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"community\",\"type\":\"bytes\"}],\"name\":\"removeCommunity\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes[]\",\"name\":\"_featuredCommunities\",\"type\":\"bytes[]\"}],\"name\":\"setFeaturedCommunities\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_votingContract\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_featuredVotingContract\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"community\",\"type\":\"bytes\"}],\"name\":\"addCommunity\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"featuredVotingContract\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getCommunities\",\"outputs\":[{\"internalType\":\"bytes[]\",\"name\":\"\",\"type\":\"bytes[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getFeaturedCommunities\",\"outputs\":[{\"internalType\":\"bytes[]\",\"name\":\"\",\"type\":\"bytes[]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"community\",\"type\":\"bytes\"}],\"name\":\"isCommunityFeatured\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"community\",\"type\":\"bytes\"}],\"name\":\"isCommunityInDirectory\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"community\",\"type\":\"bytes\"}],\"name\":\"removeCommunity\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes[]\",\"name\":\"_featuredCommunities\",\"type\":\"bytes[]\"}],\"name\":\"setFeaturedCommunities\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"votingContract\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
 }
 
 // DirectoryABI is the input ABI used to generate the binding from.
@@ -180,6 +180,37 @@ func (_Directory *DirectoryTransactorRaw) Transact(opts *bind.TransactOpts, meth
 	return _Directory.Contract.contract.Transact(opts, method, params...)
 }
 
+// FeaturedVotingContract is a free data retrieval call binding the contract method 0x7475fe93.
+//
+// Solidity: function featuredVotingContract() view returns(address)
+func (_Directory *DirectoryCaller) FeaturedVotingContract(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _Directory.contract.Call(opts, &out, "featuredVotingContract")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+// FeaturedVotingContract is a free data retrieval call binding the contract method 0x7475fe93.
+//
+// Solidity: function featuredVotingContract() view returns(address)
+func (_Directory *DirectorySession) FeaturedVotingContract() (common.Address, error) {
+	return _Directory.Contract.FeaturedVotingContract(&_Directory.CallOpts)
+}
+
+// FeaturedVotingContract is a free data retrieval call binding the contract method 0x7475fe93.
+//
+// Solidity: function featuredVotingContract() view returns(address)
+func (_Directory *DirectoryCallerSession) FeaturedVotingContract() (common.Address, error) {
+	return _Directory.Contract.FeaturedVotingContract(&_Directory.CallOpts)
+}
+
 // GetCommunities is a free data retrieval call binding the contract method 0xc251b565.
 //
 // Solidity: function getCommunities() view returns(bytes[])
@@ -302,6 +333,37 @@ func (_Directory *DirectorySession) IsCommunityInDirectory(community []byte) (bo
 // Solidity: function isCommunityInDirectory(bytes community) view returns(bool)
 func (_Directory *DirectoryCallerSession) IsCommunityInDirectory(community []byte) (bool, error) {
 	return _Directory.Contract.IsCommunityInDirectory(&_Directory.CallOpts, community)
+}
+
+// VotingContract is a free data retrieval call binding the contract method 0xc1fc006a.
+//
+// Solidity: function votingContract() view returns(address)
+func (_Directory *DirectoryCaller) VotingContract(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _Directory.contract.Call(opts, &out, "votingContract")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+// VotingContract is a free data retrieval call binding the contract method 0xc1fc006a.
+//
+// Solidity: function votingContract() view returns(address)
+func (_Directory *DirectorySession) VotingContract() (common.Address, error) {
+	return _Directory.Contract.VotingContract(&_Directory.CallOpts)
+}
+
+// VotingContract is a free data retrieval call binding the contract method 0xc1fc006a.
+//
+// Solidity: function votingContract() view returns(address)
+func (_Directory *DirectoryCallerSession) VotingContract() (common.Address, error) {
+	return _Directory.Contract.VotingContract(&_Directory.CallOpts)
 }
 
 // AddCommunity is a paid mutator transaction binding the contract method 0x74837935.
