@@ -92,9 +92,14 @@ func (u *StatusUnfurler) fillCommunityImages(community *communities.Community, i
 	return nil
 }
 
-func (u *StatusUnfurler) buildCommunityData(communityID string) (*communities.Community, *common.StatusCommunityLinkPreview, error) {
+func (u *StatusUnfurler) buildCommunityData(communityID string, shard *common.Shard) (*communities.Community, *common.StatusCommunityLinkPreview, error) {
 	// This automatically checks the database
-	community, err := u.m.RequestCommunityInfoFromMailserver(communityID, nil, true)
+	community, err := u.m.FetchCommunity(&FetchCommunityRequest{
+		CommunityKey:    communityID,
+		Shard:           shard,
+		TryDatabase:     true,
+		WaitForResponse: true,
+	})
 
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get community info for communityID '%s': %w", communityID, err)
@@ -120,8 +125,8 @@ func (u *StatusUnfurler) buildCommunityData(communityID string) (*communities.Co
 	return community, c, nil
 }
 
-func (u *StatusUnfurler) buildChannelData(channelUUID string, communityID string) (*common.StatusCommunityChannelLinkPreview, error) {
-	community, communityData, err := u.buildCommunityData(communityID)
+func (u *StatusUnfurler) buildChannelData(channelUUID string, communityID string, communityShard *common.Shard) (*common.StatusCommunityChannelLinkPreview, error) {
+	community, communityData, err := u.buildCommunityData(communityID, communityShard)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build channel community data: %w", err)
 	}
@@ -169,7 +174,7 @@ func (u *StatusUnfurler) Unfurl() (*common.StatusLinkPreview, error) {
 		if resp.Community == nil {
 			return preview, fmt.Errorf("channel community can't be empty")
 		}
-		preview.Channel, err = u.buildChannelData(resp.Channel.ChannelUUID, resp.Community.CommunityID)
+		preview.Channel, err = u.buildChannelData(resp.Channel.ChannelUUID, resp.Community.CommunityID, resp.Shard)
 		if err != nil {
 			return nil, fmt.Errorf("error when building channel data: %w", err)
 		}
@@ -177,7 +182,7 @@ func (u *StatusUnfurler) Unfurl() (*common.StatusLinkPreview, error) {
 	}
 
 	if resp.Community != nil {
-		_, preview.Community, err = u.buildCommunityData(resp.Community.CommunityID)
+		_, preview.Community, err = u.buildCommunityData(resp.Community.CommunityID, resp.Shard)
 		if err != nil {
 			return nil, fmt.Errorf("error when building community data: %w", err)
 		}

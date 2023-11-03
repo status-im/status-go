@@ -463,7 +463,7 @@ func (api *PublicAPI) ImportCommunity(ctx context.Context, hexPrivateKey string)
 
 // GetCommunityPublicKeyFromPrivateKey gets the community's public key from its private key
 func (api *PublicAPI) GetCommunityPublicKeyFromPrivateKey(ctx context.Context, hexPrivateKey string) string {
-	publicKey := api.service.messenger.GetCommunityIDFromKey(hexPrivateKey)
+	publicKey := protocol.GetCommunityIDFromKey(hexPrivateKey)
 	return publicKey
 }
 
@@ -1205,22 +1205,58 @@ func (api *PublicAPI) EnsVerified(pk, ensName string) error {
 	return api.service.messenger.ENSVerified(pk, ensName)
 }
 
-// DEPRECATED
+// Deprecated: RequestCommunityInfoFromMailserver is deprecated in favor of
+// configurable FetchCommunity.
 func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) (*communities.Community, error) {
-	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID, nil, true)
+	request := &protocol.FetchCommunityRequest{
+		CommunityKey:    communityID,
+		Shard:           nil,
+		TryDatabase:     true,
+		WaitForResponse: true,
+	}
+	return api.FetchCommunity(request)
 }
 
+// Deprecated: RequestCommunityInfoFromMailserverWithShard is deprecated in favor of
+// configurable FetchCommunity.
 func (api *PublicAPI) RequestCommunityInfoFromMailserverWithShard(communityID string, shard *common.Shard) (*communities.Community, error) {
-	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID, shard, true)
+	request := &protocol.FetchCommunityRequest{
+		CommunityKey:    communityID,
+		Shard:           shard,
+		TryDatabase:     true,
+		WaitForResponse: true,
+	}
+	return api.FetchCommunity(request)
 }
 
-// DEPRECATED
+// Deprecated: RequestCommunityInfoFromMailserverAsync is deprecated in favor of
+// configurable FetchCommunity.
 func (api *PublicAPI) RequestCommunityInfoFromMailserverAsync(communityID string) error {
-	return api.service.messenger.RequestCommunityInfoFromMailserverAsync(communityID, nil)
+	request := &protocol.FetchCommunityRequest{
+		CommunityKey:    communityID,
+		Shard:           nil,
+		TryDatabase:     true,
+		WaitForResponse: false,
+	}
+	_, err := api.FetchCommunity(request)
+	return err
 }
 
+// Deprecated: RequestCommunityInfoFromMailserverAsyncWithShard is deprecated in favor of
+// configurable FetchCommunity.
 func (api *PublicAPI) RequestCommunityInfoFromMailserverAsyncWithShard(communityID string, shard *common.Shard) error {
-	return api.service.messenger.RequestCommunityInfoFromMailserverAsync(communityID, shard)
+	request := &protocol.FetchCommunityRequest{
+		CommunityKey:    communityID,
+		Shard:           shard,
+		TryDatabase:     true,
+		WaitForResponse: false,
+	}
+	_, err := api.FetchCommunity(request)
+	return err
+}
+
+func (api *PublicAPI) FetchCommunity(request *protocol.FetchCommunityRequest) (*communities.Community, error) {
+	return api.service.messenger.FetchCommunity(request)
 }
 
 func (api *PublicAPI) ActivityCenterNotifications(request protocol.ActivityCenterNotificationsRequest) (*protocol.ActivityCenterPaginationResponse, error) {
