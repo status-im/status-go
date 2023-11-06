@@ -1,6 +1,7 @@
 package walletconnect
 
 import (
+	"encoding/json"
 	"errors"
 	"strconv"
 
@@ -14,6 +15,8 @@ import (
 const ProposeUserPairEvent = walletevent.EventType("WalletConnectProposeUserPair")
 
 var ErrorChainsNotSupported = errors.New("chains not supported")
+var ErrorInvalidParamsCount = errors.New("invalid params count")
+var ErrorMethodNotSupported = errors.New("method not supported")
 
 type Namespace struct {
 	Methods  []string `json:"methods"`
@@ -40,14 +43,13 @@ type Namespaces struct {
 	// We ignore non ethereum namespaces
 }
 
-type Verified struct {
-	VerifyURL  string `json:"verifyUrl"`
-	Validation string `json:"validation"`
-	Origin     string `json:"origin"`
-}
-
 type VerifyContext struct {
-	Verified Verified `json:"verified"`
+	Verified struct {
+		VerifyURL  string `json:"verifyUrl"`
+		Validation string `json:"validation"`
+		Origin     string `json:"origin"`
+		IsScam     bool   `json:"isScam,omitempty"`
+	} `json:"verified"`
 }
 
 type Params struct {
@@ -57,7 +59,7 @@ type Params struct {
 	RequiredNamespaces Namespaces    `json:"requiredNamespaces"`
 	OptionalNamespaces Namespaces    `json:"optionalNamespaces"`
 	Proposer           Proposer      `json:"proposer"`
-	VerifyContext      VerifyContext `json:"verifyContext"`
+	Verify             VerifyContext `json:"verifyContext"`
 }
 
 type SessionProposal struct {
@@ -68,6 +70,26 @@ type SessionProposal struct {
 type PairSessionResponse struct {
 	SessionProposal     SessionProposal `json:"sessionProposal"`
 	SupportedNamespaces Namespaces      `json:"supportedNamespaces"`
+}
+
+type RequestParams struct {
+	Request struct {
+		Method string            `json:"method"`
+		Params []json.RawMessage `json:"params"`
+	} `json:"request"`
+	ChainID string `json:"chainId"`
+}
+
+type SessionRequest struct {
+	ID     int64         `json:"id"`
+	Topic  string        `json:"topic"`
+	Params RequestParams `json:"params"`
+	Verify VerifyContext `json:"verifyContext"`
+}
+
+type SessionRequestResponse struct {
+	SessionRequest SessionRequest `json:"sessionRequest"`
+	Signed         types.HexBytes `json:"signed"`
 }
 
 func sessionProposalToSupportedChain(caipChains []string, supportsChain func(uint64) bool) (chains []uint64, eipChains []string) {

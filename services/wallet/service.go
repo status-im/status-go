@@ -137,7 +137,7 @@ func NewService(
 
 	activity := activity.NewService(db, tokenManager, collectiblesManager, feed)
 
-	walletconnect := walletconnect.NewService(rpcClient.NetworkManager, accountsDB, feed)
+	walletconnect := walletconnect.NewService(rpcClient.NetworkManager, accountsDB, transactor, gethManager, feed)
 
 	return &Service{
 		db:                    db,

@@ -68,7 +68,7 @@ type Account struct {
 	Hidden                bool                      `json:"hidden"`
 	Clock                 uint64                    `json:"clock,omitempty"`
 	Removed               bool                      `json:"removed,omitempty"`
-	Operable              AccountOperable           `json:"operable"` // describes an account's operability (read an explanation at the top of this file)
+	Operable              AccountOperable           `json:"operable"` // describes an account's operability (check AccountOperable type constants for details)
 	CreatedAt             int64                     `json:"createdAt"`
 	Position              int64                     `json:"position"`
 	ProdPreferredChainIDs string                    `json:"prodPreferredChainIds"`

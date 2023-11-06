@@ -1,6 +1,7 @@
 package walletconnect
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -38,4 +39,24 @@ func parseCaip2ChainID(str string) (uint64, error) {
 		return 0, fmt.Errorf("CAIP-2 second value not valid Chain ID: %w", err)
 	}
 	return chainID, nil
+}
+
+// JSONProxyType provides a generic way of changing the JSON value before unmarshalling it into the target.
+// transform function is called before unmarshalling.
+type JSONProxyType struct {
+	target    interface{}
+	transform func([]byte) ([]byte, error)
+}
+
+func (b *JSONProxyType) UnmarshalJSON(input []byte) error {
+	if b.transform == nil {
+		return errors.New("transform function is not set")
+	}
+
+	output, err := b.transform(input)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(output, b.target)
 }
