@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/requests"
 )
 
 var errOnlyOneNotificationID = errors.New("only one notification id is supported")
@@ -450,6 +451,20 @@ func (m *Messenger) DismissAllActivityCenterNotificationsFromUser(ctx context.Co
 		return nil, nil
 	}
 	return notifications, m.syncActivityCenterDismissed(ctx, notifications, updatedAt)
+}
+
+func (m *Messenger) DismissActivityCenterNotificationsByCommunity(ctx context.Context, request *requests.DismissCommunityNotifications) error {
+	err := request.Validate()
+	if err != nil {
+		return err
+	}
+
+	updatedAt := m.GetCurrentTimeInMillis()
+	notifications, err := m.persistence.DismissActivityCenterNotificationsByCommunity(request.CommunityID.String(), updatedAt)
+	if err != nil {
+		return err
+	}
+	return m.syncActivityCenterDismissed(ctx, notifications, updatedAt)
 }
 
 func (m *Messenger) DismissAllActivityCenterNotificationsFromCommunity(ctx context.Context, communityID string, updatedAt uint64) ([]*ActivityCenterNotification, error) {

@@ -859,6 +859,37 @@ func (db sqlitePersistence) DismissActivityCenterNotifications(ids []types.HexBy
 	return updateActivityCenterState(tx, updatedAt)
 }
 
+func (db sqlitePersistence) DismissActivityCenterNotificationsByCommunity(communityID string, updatedAt uint64) ([]*ActivityCenterNotification, error) {
+	var tx *sql.Tx
+	var err error
+
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	query := "UPDATE activity_center_notifications SET read = 1, dismissed = 1, updated_at = ? WHERE community_id = ? AND notification_type IN (?, ?) AND NOT deleted" // nolint: gosec
+	_, err = tx.Exec(query, updatedAt, communityID, ActivityCenterNotificationTypeCommunityRequest, ActivityCenterNotificationTypeCommunityKicked)
+	if err != nil {
+		return nil, err
+	}
+
+	_, notifications, err := db.buildActivityCenterQuery(tx, activityCenterQueryParams{})
+	if err != nil {
+		return nil, err
+	}
+
+	return notifications, updateActivityCenterState(tx, updatedAt)
+}
+
 func (db sqlitePersistence) DismissAllActivityCenterNotificationsFromCommunity(communityID string, updatedAt uint64) ([]*ActivityCenterNotification, error) {
 	var tx *sql.Tx
 	var err error

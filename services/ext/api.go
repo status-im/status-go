@@ -820,6 +820,10 @@ func (api *PublicAPI) MarkAllRead(ctx context.Context, chatID string) (*protocol
 	return api.service.messenger.MarkAllRead(ctx, chatID)
 }
 
+func (api *PublicAPI) DismissActivityCenterNotificationsByCommunity(ctx context.Context, request *requests.DismissCommunityNotifications) error {
+	return api.service.messenger.DismissActivityCenterNotificationsByCommunity(ctx, request)
+}
+
 func (api *PublicAPI) MarkAllReadInCommunity(ctx context.Context, communityID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.MarkAllReadInCommunity(ctx, communityID)
 }
