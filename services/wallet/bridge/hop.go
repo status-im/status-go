@@ -226,40 +226,43 @@ func (h *HopBridge) GetContractAddress(network *params.Network, token *token.Tok
 	return &address
 }
 
-func (h *HopBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
+func (h *HopBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerFn) (tx *ethTypes.Transaction, unlock transactions.UnlockNonceFunc, err error) {
 	fromNetwork := h.contractMaker.RPCClient.NetworkManager.Find(sendArgs.ChainID)
 	if fromNetwork == nil {
-		return tx, err
+		return tx, nil, err
 	}
 
 	nonce, unlock, err := h.transactor.NextNonce(h.contractMaker.RPCClient, sendArgs.ChainID, sendArgs.HopTx.From)
 	if err != nil {
-		return tx, err
+		return tx, nil, err
 	}
-	defer func() {
-		unlock(err == nil, nonce)
-	}()
+
 	argNonce := hexutil.Uint64(nonce)
 	sendArgs.HopTx.Nonce = &argNonce
 
 	token := h.tokenManager.FindToken(fromNetwork, sendArgs.HopTx.Symbol)
 	if fromNetwork.Layer == 1 {
 		tx, err = h.sendToL2(sendArgs.ChainID, sendArgs.HopTx, signerFn, token)
-		return tx, err
+		return tx, unlock, err
 	}
 	tx, err = h.swapAndSend(sendArgs.ChainID, sendArgs.HopTx, signerFn, token)
-	return tx, err
+	return tx, unlock, err
 }
 
 func (h *HopBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
-	tx, err := h.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.HopTx.From, verifiedAccount))
+	tx, unlock, err := h.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.HopTx.From, verifiedAccount))
+	defer func() {
+		if unlock != nil {
+			unlock(err == nil, tx.Nonce())
+		}
+	}()
 	if err != nil {
 		return types.Hash{}, err
 	}
 	return types.Hash(tx.Hash()), nil
 }
 
-func (h *HopBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error) {
+func (h *HopBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, transactions.UnlockNonceFunc, error) {
 	return h.sendOrBuild(sendArgs, nil)
 }
 

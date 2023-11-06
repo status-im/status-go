@@ -95,40 +95,45 @@ func (s *ERC721TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwor
 	return uint64(increasedEstimation), nil
 }
 
-func (s *ERC721TransferBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerFn) (tx *ethTypes.Transaction, err error) {
+func (s *ERC721TransferBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerFn) (tx *ethTypes.Transaction, unlock transactions.UnlockNonceFunc, err error) {
 	ethClient, err := s.rpcClient.EthClient(sendArgs.ChainID)
 	if err != nil {
-		return tx, err
+		return tx, nil, err
 	}
 
 	contract, err := collectibles.NewCollectibles(common.Address(*sendArgs.ERC721TransferTx.To), ethClient)
 	if err != nil {
-		return tx, err
+		return tx, nil, err
 	}
 
 	nonce, unlock, err := s.transactor.NextNonce(s.rpcClient, sendArgs.ChainID, sendArgs.ERC721TransferTx.From)
 	if err != nil {
-		return tx, err
+		return tx, nil, err
 	}
-	defer func() {
-		unlock(err == nil, nonce)
-	}()
+
 	argNonce := hexutil.Uint64(nonce)
 	sendArgs.ERC721TransferTx.Nonce = &argNonce
 	txOpts := sendArgs.ERC721TransferTx.ToTransactOpts(signerFn)
-	return contract.SafeTransferFrom(txOpts, common.Address(sendArgs.ERC721TransferTx.From), sendArgs.ERC721TransferTx.Recipient,
+	tx, err = contract.SafeTransferFrom(txOpts, common.Address(sendArgs.ERC721TransferTx.From),
+		sendArgs.ERC721TransferTx.Recipient,
 		sendArgs.ERC721TransferTx.TokenID.ToInt())
+	return tx, unlock, err
 }
 
 func (s *ERC721TransferBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
-	tx, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.ERC721TransferTx.From, verifiedAccount))
+	tx, unlock, err := s.sendOrBuild(sendArgs, getSigner(sendArgs.ChainID, sendArgs.ERC721TransferTx.From, verifiedAccount))
+	defer func() {
+		if unlock != nil {
+			unlock(err == nil, tx.Nonce())
+		}
+	}()
 	if err != nil {
 		return hash, err
 	}
 	return types.Hash(tx.Hash()), nil
 }
 
-func (s *ERC721TransferBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error) {
+func (s *ERC721TransferBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, transactions.UnlockNonceFunc, error) {
 	return s.sendOrBuild(sendArgs, nil)
 }
 
