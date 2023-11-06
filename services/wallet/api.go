@@ -320,10 +320,10 @@ func (api *API) RefetchOwnedCollectibles() error {
 	return nil
 }
 
-func (api *API) GetOwnedCollectiblesAsync(requestID int32, chainIDs []wcommon.ChainID, addresses []common.Address, filter collectibles.Filter, offset int, limit int, dataType collectibles.CollectibleDataType) error {
-	log.Debug("wallet.api.GetOwnedCollectiblesAsync", "requestID", requestID, "chainIDs.count", len(chainIDs), "addr.count", len(addresses), "offset", offset, "limit", limit, "dataType", dataType)
+func (api *API) GetOwnedCollectiblesAsync(requestID int32, chainIDs []wcommon.ChainID, addresses []common.Address, filter collectibles.Filter, offset int, limit int, dataType collectibles.CollectibleDataType, fetchCriteria collectibles.FetchCriteria) error {
+	log.Debug("wallet.api.GetOwnedCollectiblesAsync", "requestID", requestID, "chainIDs.count", len(chainIDs), "addr.count", len(addresses), "offset", offset, "limit", limit, "dataType", dataType, "fetchCriteria", fetchCriteria)
 
-	api.s.collectibles.GetOwnedCollectiblesAsync(requestID, chainIDs, addresses, filter, offset, limit, dataType)
+	api.s.collectibles.GetOwnedCollectiblesAsync(requestID, chainIDs, addresses, filter, offset, limit, dataType, fetchCriteria)
 	return nil
 }
 

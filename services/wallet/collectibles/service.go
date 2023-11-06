@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
@@ -41,6 +42,20 @@ const (
 	CollectibleDataTypeDetails
 	CollectibleDataTypeCommunityHeader
 )
+
+type FetchType byte
+
+const (
+	FetchTypeNeverFetch FetchType = iota
+	FetchTypeAlwaysFetch
+	FetchTypeFetchIfNotCached
+	FetchTypeFetchIfCacheOld
+)
+
+type FetchCriteria struct {
+	FetchType          FetchType `json:"fetch_type"`
+	MaxCacheAgeSeconds int64     `json:"max_cache_age_seconds"`
+}
 
 var (
 	filterOwnedCollectiblesTask = async.TaskType{
@@ -116,14 +131,98 @@ type GetCollectiblesByUniqueIDResponse struct {
 	ErrorCode           ErrorCode           `json:"errorCode"`
 }
 
-type getOwnedCollectiblesTaskReturnType struct {
+type GetOwnedCollectiblesReturnType struct {
 	collectibles    interface{}
 	hasMore         bool
 	ownershipStatus OwnershipStatusPerAddressAndChainID
 }
 
-type getCollectiblesByUniqueIDTaskReturnType struct {
+type GetCollectiblesByUniqueIDReturnType struct {
 	collectibles interface{}
+}
+
+func (s *Service) GetOwnedCollectibles(
+	ctx context.Context,
+	chainIDs []walletCommon.ChainID,
+	addresses []common.Address,
+	filter Filter,
+	offset int,
+	limit int,
+	dataType CollectibleDataType,
+	fetchCriteria FetchCriteria) (*GetOwnedCollectiblesReturnType, error) {
+	err := s.fetchOwnedCollectiblesIfNeeded(ctx, chainIDs, addresses, fetchCriteria)
+	if err != nil {
+		return nil, err
+	}
+
+	ids, hasMore, err := s.FilterOwnedCollectibles(chainIDs, addresses, filter, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	collectibles, err := s.collectibleIDsToDataType(ctx, ids, dataType)
+	if err != nil {
+		return nil, err
+	}
+
+	ownershipStatus, err := s.GetOwnershipStatus(chainIDs, addresses)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GetOwnedCollectiblesReturnType{
+		collectibles:    collectibles,
+		hasMore:         hasMore,
+		ownershipStatus: ownershipStatus,
+	}, err
+}
+
+func (s *Service) needsToFetch(chainID walletCommon.ChainID, address common.Address, fetchCriteria FetchCriteria) (bool, error) {
+	mustFetch := false
+	switch fetchCriteria.FetchType {
+	case FetchTypeAlwaysFetch:
+		mustFetch = true
+	case FetchTypeNeverFetch:
+		mustFetch = false
+	case FetchTypeFetchIfNotCached, FetchTypeFetchIfCacheOld:
+		timestamp, err := s.ownershipDB.GetOwnershipUpdateTimestamp(address, chainID)
+		if err != nil {
+			return false, err
+		}
+		if timestamp == InvalidTimestamp ||
+			(fetchCriteria.FetchType == FetchTypeFetchIfCacheOld && timestamp+fetchCriteria.MaxCacheAgeSeconds < time.Now().Unix()) {
+			mustFetch = true
+		}
+	}
+	return mustFetch, nil
+}
+
+func (s *Service) fetchOwnedCollectiblesIfNeeded(ctx context.Context, chainIDs []walletCommon.ChainID, addresses []common.Address, fetchCriteria FetchCriteria) error {
+	if fetchCriteria.FetchType == FetchTypeNeverFetch {
+		return nil
+	}
+
+	group := async.NewGroup(ctx)
+
+	for _, address := range addresses {
+		for _, chainID := range chainIDs {
+			mustFetch, err := s.needsToFetch(chainID, address, fetchCriteria)
+			if err != nil {
+				return err
+			}
+			if mustFetch {
+				command := newLoadOwnedCollectiblesCommand(s.manager, s.ownershipDB, s.walletFeed, chainID, address, nil)
+				group.Add(command.Command())
+			}
+		}
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-group.WaitAsync():
+		return nil
+	}
 }
 
 // GetOwnedCollectiblesAsync allows only one filter task to run at a time
@@ -136,28 +235,10 @@ func (s *Service) GetOwnedCollectiblesAsync(
 	filter Filter,
 	offset int,
 	limit int,
-	dataType CollectibleDataType) {
+	dataType CollectibleDataType,
+	fetchCriteria FetchCriteria) {
 	s.scheduler.Enqueue(requestID, filterOwnedCollectiblesTask, func(ctx context.Context) (interface{}, error) {
-		ids, hasMore, err := s.FilterOwnedCollectibles(chainIDs, addresses, filter, offset, limit)
-		if err != nil {
-			return nil, err
-		}
-
-		collectibles, err := s.collectibleIDsToDataType(ctx, ids, dataType)
-		if err != nil {
-			return nil, err
-		}
-
-		ownershipStatus, err := s.GetOwnershipStatus(chainIDs, addresses)
-		if err != nil {
-			return nil, err
-		}
-
-		return getOwnedCollectiblesTaskReturnType{
-			collectibles:    collectibles,
-			hasMore:         hasMore,
-			ownershipStatus: ownershipStatus,
-		}, err
+		return s.GetOwnedCollectibles(ctx, chainIDs, addresses, filter, offset, limit, dataType, fetchCriteria)
 	}, func(result interface{}, taskType async.TaskType, err error) {
 		res := GetOwnedCollectiblesResponse{
 			DataType:  dataType,
@@ -167,7 +248,7 @@ func (s *Service) GetOwnedCollectiblesAsync(
 		if errors.Is(err, context.Canceled) || errors.Is(err, async.ErrTaskOverwritten) {
 			res.ErrorCode = ErrorCodeTaskCanceled
 		} else if err == nil {
-			fnRet := result.(getOwnedCollectiblesTaskReturnType)
+			fnRet := result.(GetOwnedCollectiblesReturnType)
 
 			encodedMessage, err := json.Marshal(fnRet.collectibles)
 			if err == nil {
@@ -183,19 +264,25 @@ func (s *Service) GetOwnedCollectiblesAsync(
 	})
 }
 
+func (s *Service) GetCollectiblesByUniqueID(
+	ctx context.Context,
+	uniqueIDs []thirdparty.CollectibleUniqueID,
+	dataType CollectibleDataType) (*GetCollectiblesByUniqueIDReturnType, error) {
+	collectibles, err := s.collectibleIDsToDataType(ctx, uniqueIDs, dataType)
+	if err != nil {
+		return nil, err
+	}
+	return &GetCollectiblesByUniqueIDReturnType{
+		collectibles: collectibles,
+	}, err
+}
+
 func (s *Service) GetCollectiblesByUniqueIDAsync(
 	requestID int32,
 	uniqueIDs []thirdparty.CollectibleUniqueID,
 	dataType CollectibleDataType) {
 	s.scheduler.Enqueue(requestID, getCollectiblesDataTask, func(ctx context.Context) (interface{}, error) {
-		collectibles, err := s.collectibleIDsToDataType(ctx, uniqueIDs, dataType)
-		if err != nil {
-			return nil, err
-		}
-
-		return getCollectiblesByUniqueIDTaskReturnType{
-			collectibles: collectibles,
-		}, err
+		return s.GetCollectiblesByUniqueID(ctx, uniqueIDs, dataType)
 	}, func(result interface{}, taskType async.TaskType, err error) {
 		res := GetCollectiblesByUniqueIDResponse{
 			DataType:  dataType,
@@ -205,7 +292,7 @@ func (s *Service) GetCollectiblesByUniqueIDAsync(
 		if errors.Is(err, context.Canceled) || errors.Is(err, async.ErrTaskOverwritten) {
 			res.ErrorCode = ErrorCodeTaskCanceled
 		} else if err == nil {
-			fnRet := result.(getCollectiblesByUniqueIDTaskReturnType)
+			fnRet := result.(GetCollectiblesByUniqueIDReturnType)
 
 			encodedMessage, err := json.Marshal(fnRet.collectibles)
 			if err == nil {
