@@ -219,7 +219,6 @@ func (api *API) web3AccResponse(request Web3SendAsyncReadOnlyRequest) (*Web3Send
 		result = dappsAddress
 	} else {
 		result = []types.Address{dappsAddress}
-
 	}
 
 	return &Web3SendAsyncReadOnlyResponse{

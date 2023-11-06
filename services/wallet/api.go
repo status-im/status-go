@@ -608,6 +608,7 @@ func (api *API) FetchChainIDForURL(ctx context.Context, rpcURL string) (*big.Int
 	return client.ChainID(ctx)
 }
 
+// WCPairSessionProposal responds to "session_proposal" event
 func (api *API) WCPairSessionProposal(ctx context.Context, sessionProposalJSON string) (*wc.PairSessionResponse, error) {
 	log.Debug("wallet.api.wc.PairSessionProposal", "proposal.len", len(sessionProposalJSON))
 
@@ -618,4 +619,17 @@ func (api *API) WCPairSessionProposal(ctx context.Context, sessionProposalJSON s
 	}
 
 	return api.s.walletConnect.PairSessionProposal(data)
+}
+
+// WCSessionRequest responds to "session_request" event
+func (api *API) WCSessionRequest(ctx context.Context, sessionRequestJSON string, hashedPassword string) (response *wc.SessionRequestResponse, err error) {
+	log.Debug("wallet.api.wc.SessionRequest", "request.len", len(sessionRequestJSON), "hashedPassword.len", len(hashedPassword))
+
+	var request wc.SessionRequest
+	err = json.Unmarshal([]byte(sessionRequestJSON), &request)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.s.walletConnect.SessionRequest(request, hashedPassword)
 }

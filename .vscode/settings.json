@@ -5,4 +5,7 @@
     "-w"
   ],
   "go.testTags": "gowaku_skip_migrations,gowaku_no_rln",
+  "cSpell.words": [
+    "unmarshalling"
+  ],
 }
