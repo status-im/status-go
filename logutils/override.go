@@ -21,7 +21,7 @@ type LogSettings struct {
 
 // OverrideWithStdLogger overwrites ethereum's root logger with a logger from golang std lib.
 func OverrideWithStdLogger(logLevel string) error {
-	return enableRootLog(logLevel, NewStdHandler(log.LogfmtFormat()))
+	return enableRootLog(logLevel, NewStdHandler(log.TerminalFormat(false)))
 }
 
 // OverrideRootLogWithConfig derives all configuration from params.NodeConfig and configures logger using it.
@@ -60,7 +60,7 @@ func OverrideRootLog(enabled bool, levelStr string, fileOpts FileOptions, termin
 			// Docs: https://pkg.go.dev/gopkg.in/natefinch/lumberjack.v2@v2.0.0#readme-cleaning-up-old-log-files
 			fileOpts.MaxBackups = 1
 		}
-		handler = FileHandlerWithRotation(fileOpts, log.LogfmtFormat())
+		handler = FileHandlerWithRotation(fileOpts, log.TerminalFormat(terminal))
 	} else {
 		handler = log.StreamHandler(os.Stderr, log.TerminalFormat(terminal))
 	}
@@ -86,6 +86,7 @@ func enableRootLog(levelStr string, handler log.Handler) error {
 
 	filteredHandler := log.LvlFilterHandler(level, handler)
 	log.Root().SetHandler(filteredHandler)
+	log.PrintOrigins(true)
 
 	// go-libp2p logger
 	lvl, err := logging.LevelFromString(levelStr)

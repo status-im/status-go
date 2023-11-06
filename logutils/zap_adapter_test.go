@@ -57,3 +57,16 @@ func TestNewZapLoggerWithAdapter(t *testing.T) {
 		Error("some message with error level")
 	require.Contains(t, buf.String(), `lvl=eror msg="some message with error level" error="some error`)
 }
+
+func TestZapLoggerTerminalFormat(t *testing.T) {
+	buf := bytes.NewBuffer(nil)
+	logger := log.New()
+	handler := log.StreamHandler(buf, log.TerminalFormat(false))
+	logger.SetHandler(handler)
+
+	zapLogger, err := NewZapLoggerWithAdapter(logger)
+	require.NoError(t, err)
+
+	zapLogger.Info("some message with error level")
+	require.Contains(t, buf.String(), `logutils/zap_adapter_test.go:70`)
+}
