@@ -48,6 +48,7 @@ type TransactionDescription struct {
 	chainID   uint64
 	builtTx   *ethTypes.Transaction
 	signature []byte
+	unlock    transactions.UnlockNonceFunc
 }
 
 type TransactionManager struct {
@@ -385,7 +386,7 @@ func (tm *TransactionManager) ProceedWithTransactionsSignatures(ctx context.Cont
 		rBytes, _ := hex.DecodeString(sigDetails.R)
 		sBytes, _ := hex.DecodeString(sigDetails.S)
 		vByte := byte(0)
-		if sigDetails.V == "1" {
+		if sigDetails.V == "01" {
 			vByte = 1
 		}
 
@@ -399,6 +400,9 @@ func (tm *TransactionManager) ProceedWithTransactionsSignatures(ctx context.Cont
 	hashes := make(map[uint64][]types.Hash)
 	for _, desc := range tm.transactionsForKeycardSingning {
 		hash, err := tm.transactor.SendBuiltTransactionWithSignature(desc.chainID, desc.builtTx, desc.signature)
+		defer func() {
+			desc.unlock(err == nil, desc.builtTx.Nonce())
+		}()
 		if err != nil {
 			return nil, err
 		}
@@ -477,8 +481,11 @@ func (tm *TransactionManager) buildTransactions(bridges map[string]bridge.Bridge
 	tm.transactionsForKeycardSingning = make(map[common.Hash]*TransactionDescription)
 	var hashes []string
 	for _, bridgeTx := range tm.transactionsBridgeData {
-		builtTx, err := bridges[bridgeTx.BridgeName].BuildTransaction(bridgeTx)
+		builtTx, unlock, err := bridges[bridgeTx.BridgeName].BuildTransaction(bridgeTx)
 		if err != nil {
+			if unlock != nil {
+				unlock(false, 0) // unlock nonce in case of an error, otherwise keep it locked, until the transaction is sent
+			}
 			return hashes, err
 		}
 
@@ -488,6 +495,7 @@ func (tm *TransactionManager) buildTransactions(bridges map[string]bridge.Bridge
 		tm.transactionsForKeycardSingning[txHash] = &TransactionDescription{
 			chainID: bridgeTx.ChainID,
 			builtTx: builtTx,
+			unlock:  unlock,
 		}
 
 		hashes = append(hashes, txHash.String())

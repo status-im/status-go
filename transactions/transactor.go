@@ -77,10 +77,11 @@ func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 	t.rpcCallTimeout = timeout
 }
 
-func (t *Transactor) NextNonce(rpcClient *rpc.Client, chainID uint64, from types.Address) (uint64, func(inc bool, n uint64), error) {
+func (t *Transactor) NextNonce(rpcClient *rpc.Client, chainID uint64, from types.Address) (uint64, UnlockNonceFunc, error) {
 	wrapper := newRPCWrapper(rpcClient, chainID)
 	return t.nonce.Next(wrapper, from)
 }
+
 func (t *Transactor) EstimateGas(network *params.Network, from common.Address, to common.Address, value *big.Int, input []byte) (uint64, error) {
 	rpcWrapper := newRPCWrapper(t.rpcWrapper.RPCClient, network.ChainID)
 
@@ -109,9 +110,9 @@ func (t *Transactor) SendTransactionWithChainID(chainID uint64, sendArgs SendTxA
 	return
 }
 
-func (t *Transactor) ValidateAndBuildTransaction(chainID uint64, sendArgs SendTxArgs) (tx *gethtypes.Transaction, err error) {
+func (t *Transactor) ValidateAndBuildTransaction(chainID uint64, sendArgs SendTxArgs) (tx *gethtypes.Transaction, unlock UnlockNonceFunc, err error) {
 	wrapper := newRPCWrapper(t.rpcWrapper.RPCClient, chainID)
-	tx, err = t.validateAndBuildTransaction(wrapper, sendArgs)
+	tx, unlock, err = t.validateAndBuildTransaction(wrapper, sendArgs)
 	return
 }
 
@@ -267,21 +268,18 @@ func (t *Transactor) validateAccount(args SendTxArgs, selectedAccount *account.S
 	return nil
 }
 
-func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args SendTxArgs) (tx *gethtypes.Transaction, err error) {
+func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args SendTxArgs) (tx *gethtypes.Transaction, unlock UnlockNonceFunc, err error) {
 	if !args.Valid() {
-		return tx, ErrInvalidSendTxArgs
+		return tx, nil, ErrInvalidSendTxArgs
 	}
 
 	nonce, unlock, err := t.nonce.Next(rpcWrapper, args.From)
 	if err != nil {
-		return tx, err
+		return tx, nil, err
 	}
 	if args.Nonce != nil {
 		nonce = uint64(*args.Nonce)
 	}
-	defer func() {
-		unlock(err == nil, nonce)
-	}()
 	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 	defer cancel()
 
@@ -289,7 +287,7 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args Se
 	if !args.IsDynamicFeeTx() && args.GasPrice == nil {
 		gasPrice, err = rpcWrapper.SuggestGasPrice(ctx)
 		if err != nil {
-			return tx, err
+			return tx, unlock, err
 		}
 	}
 
@@ -317,7 +315,7 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args Se
 			Data:     args.GetInput(),
 		})
 		if err != nil {
-			return tx, err
+			return tx, unlock, err
 		}
 		if gas < defaultGas {
 			t.log.Info("default gas will be used because estimated is lower", "estimated", gas, "default", defaultGas)
@@ -325,7 +323,7 @@ func (t *Transactor) validateAndBuildTransaction(rpcWrapper *rpcWrapper, args Se
 		}
 	}
 	tx = t.buildTransactionWithOverrides(nonce, value, gas, gasPrice, args)
-	return tx, nil
+	return tx, unlock, nil
 }
 
 func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccount *account.SelectedExtKey, args SendTxArgs) (hash types.Hash, err error) {
@@ -333,7 +331,12 @@ func (t *Transactor) validateAndPropagate(rpcWrapper *rpcWrapper, selectedAccoun
 		return hash, err
 	}
 
-	tx, err := t.validateAndBuildTransaction(rpcWrapper, args)
+	tx, unlock, err := t.validateAndBuildTransaction(rpcWrapper, args)
+	defer func() {
+		if unlock != nil {
+			unlock(err == nil, tx.Nonce())
+		}
+	}()
 	if err != nil {
 		return hash, err
 	}

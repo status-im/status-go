@@ -312,8 +312,8 @@ func (s *CBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerF
 	if fromNetwork == nil {
 		return nil, errors.New("network not found")
 	}
-	tk := s.tokenManager.FindToken(fromNetwork, sendArgs.CbridgeTx.Symbol)
-	if tk == nil {
+	token := s.tokenManager.FindToken(fromNetwork, sendArgs.CbridgeTx.Symbol)
+	if token == nil {
 		return nil, errors.New("token not found")
 	}
 	addrs := s.GetContractAddress(fromNetwork, nil)
@@ -331,7 +331,7 @@ func (s *CBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerF
 	}
 
 	txOpts := sendArgs.CbridgeTx.ToTransactOpts(signerFn)
-	if tk.IsNative() {
+	if token.IsNative() {
 		return contract.SendNative(
 			txOpts,
 			sendArgs.CbridgeTx.Recipient,
@@ -345,7 +345,7 @@ func (s *CBridge) sendOrBuild(sendArgs *TransactionBridge, signerFn bind.SignerF
 	return contract.Send(
 		txOpts,
 		sendArgs.CbridgeTx.Recipient,
-		tk.Address,
+		token.Address,
 		(*big.Int)(sendArgs.CbridgeTx.Amount),
 		sendArgs.CbridgeTx.ChainID,
 		uint64(time.Now().UnixMilli()),
@@ -362,8 +362,9 @@ func (s *CBridge) Send(sendArgs *TransactionBridge, verifiedAccount *account.Sel
 	return types.Hash(tx.Hash()), nil
 }
 
-func (s *CBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, error) {
-	return s.sendOrBuild(sendArgs, nil)
+func (s *CBridge) BuildTransaction(sendArgs *TransactionBridge) (*ethTypes.Transaction, transactions.UnlockNonceFunc, error) {
+	tx, err := s.sendOrBuild(sendArgs, nil)
+	return tx, nil, err
 }
 
 func (s *CBridge) CalculateAmountOut(from, to *params.Network, amountIn *big.Int, symbol string) (*big.Int, error) {

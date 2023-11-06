@@ -8,6 +8,8 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 )
 
+type UnlockNonceFunc func(inc bool, n uint64)
+
 type Nonce struct {
 	addrLock   *AddrLocker
 	localNonce map[uint64]*sync.Map
@@ -20,7 +22,7 @@ func NewNonce() *Nonce {
 	}
 }
 
-func (n *Nonce) Next(rpcWrapper *rpcWrapper, from types.Address) (uint64, func(inc bool, nonce uint64), error) {
+func (n *Nonce) Next(rpcWrapper *rpcWrapper, from types.Address) (uint64, UnlockNonceFunc, error) {
 	n.addrLock.LockAddr(from)
 	current, err := n.GetCurrent(rpcWrapper, from)
 	unlock := func(inc bool, nonce uint64) {
