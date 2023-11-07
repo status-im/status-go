@@ -11,7 +11,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/status-im/status-go/server/pairing"
+	"github.com/status-im/status-go/timesource"
 
 	"go.uber.org/zap"
 
@@ -36,7 +39,11 @@ func preflightHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func makeCert(address net.IP) (*tls.Certificate, []byte, error) {
-	now := time.Now()
+	now, err := timesource.GetCurrentTime()
+	if err != nil {
+		return nil, nil, err
+	}
+	log.Debug("makeCert", "system time", time.Now().String(), "timesource time", now.String())
 	notBefore := now.Add(-pairing.CertificateMaxClockDrift)
 	notAfter := now.Add(pairing.CertificateMaxClockDrift)
 	return server.GenerateTLSCert(notBefore, notAfter, []net.IP{address}, []string{})
@@ -80,6 +87,7 @@ func makeClient(certPem []byte) (*http.Client, error) {
 			MinVersion:         tls.VersionTLS12,
 			InsecureSkipVerify: false, // MUST BE FALSE
 			RootCAs:            rootCAs,
+			Time:               timesource.Time,
 		},
 	}
 

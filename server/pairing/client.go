@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/server"
 	"github.com/status-im/status-go/signal"
+	"github.com/status-im/status-go/timesource"
 )
 
 /*
@@ -139,6 +140,7 @@ func NewBaseClient(c *ConnectionParams, logger *zap.Logger) (*BaseClient, error)
 			MinVersion:         tls.VersionTLS12,
 			InsecureSkipVerify: false, // MUST BE FALSE
 			RootCAs:            rootCAs,
+			Time:               timesource.Time,
 		},
 	}
 
