@@ -4879,12 +4879,7 @@ func (m *Manager) createCommunityTokenPermission(request *requests.CreateCommuni
 
 }
 
-func (m *Manager) PromoteSelfToControlNode(communityID types.HexBytes, clock uint64) (*CommunityChanges, error) {
-	community, err := m.GetByID(communityID)
-	if err != nil {
-		return nil, err
-	}
-
+func (m *Manager) PromoteSelfToControlNode(community *Community, clock uint64) (*CommunityChanges, error) {
 	if community == nil {
 		return nil, ErrOrgNotFound
 	}
@@ -4921,7 +4916,23 @@ func (m *Manager) promoteSelfToControlNode(community *Community, clock uint64) (
 	}
 	community.config.ControlDevice = true
 
-	_, err = community.AddRoleToMember(&m.identity.PublicKey, protobuf.CommunityMember_ROLE_OWNER)
+	if exists := community.HasMember(&m.identity.PublicKey); !exists {
+		ownerRole := []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_OWNER}
+		_, err = community.AddMember(&m.identity.PublicKey, ownerRole)
+		if err != nil {
+			return false, err
+		}
+
+		for channelID := range community.Chats() {
+			_, err = community.AddMemberToChat(channelID, &m.identity.PublicKey, ownerRole)
+			if err != nil {
+				return false, err
+			}
+		}
+	} else {
+		_, err = community.AddRoleToMember(&m.identity.PublicKey, protobuf.CommunityMember_ROLE_OWNER)
+	}
+
 	if err != nil {
 		return false, err
 	}
