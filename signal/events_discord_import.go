@@ -21,6 +21,18 @@ const (
 	// EventDiscordCommunityImportCancelled triggered when importing
 	// the discord community was cancelled
 	EventDiscordCommunityImportCancelled = "community.discordCommunityImportCancelled"
+
+	// EventDiscordChannelImportProgress is triggered during the import
+	// of a discord community channel as it progresses
+	EventDiscordChannelImportProgress = "community.discordChannelImportProgress"
+
+	// EventDiscordChannelImportFinished triggered when importing
+	// the discord community channel into status was successful
+	EventDiscordChannelImportFinished = "community.discordChannelImportFinished"
+
+	// EventDiscordChannelImportCancelled triggered when importing
+	// the discord community channel was cancelled
+	EventDiscordChannelImportCancelled = "community.discordChannelImportCancelled"
 )
 
 type DiscordCategoriesAndChannelsExtractedSignal struct {
@@ -42,6 +54,19 @@ type DiscordCommunityImportCancelledSignal struct {
 	CommunityID string `json:"communityId"`
 }
 
+type DiscordChannelImportProgressSignal struct {
+	ImportProgress *discord.ImportProgress `json:"importProgress"`
+}
+
+type DiscordChannelImportFinishedSignal struct {
+	CommunityID string `json:"communityId"`
+	ChannelID   string `json:"channelId"`
+}
+
+type DiscordChannelImportCancelledSignal struct {
+	ChannelID string `json:"channelId"`
+}
+
 func SendDiscordCategoriesAndChannelsExtracted(categories []*discord.Category, channels []*discord.Channel, oldestMessageTimestamp int64, errors map[string]*discord.ImportError) {
 	send(EventDiscordCategoriesAndChannelsExtracted, DiscordCategoriesAndChannelsExtractedSignal{
 		Categories:             categories,
@@ -57,14 +82,33 @@ func SendDiscordCommunityImportProgress(importProgress *discord.ImportProgress) 
 	})
 }
 
+func SendDiscordChannelImportProgress(importProgress *discord.ImportProgress) {
+	send(EventDiscordChannelImportProgress, DiscordChannelImportProgressSignal{
+		ImportProgress: importProgress,
+	})
+}
+
 func SendDiscordCommunityImportFinished(communityID string) {
 	send(EventDiscordCommunityImportFinished, DiscordCommunityImportFinishedSignal{
 		CommunityID: communityID,
 	})
 }
 
+func SendDiscordChannelImportFinished(communityID string, channelID string) {
+	send(EventDiscordChannelImportFinished, DiscordChannelImportFinishedSignal{
+		CommunityID: communityID,
+		ChannelID:   channelID,
+	})
+}
+
 func SendDiscordCommunityImportCancelled(communityID string) {
 	send(EventDiscordCommunityImportCancelled, DiscordCommunityImportCancelledSignal{
 		CommunityID: communityID,
+	})
+}
+
+func SendDiscordChannelImportCancelled(channelID string) {
+	send(EventDiscordChannelImportCancelled, DiscordChannelImportCancelledSignal{
+		ChannelID: channelID,
 	})
 }

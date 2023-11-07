@@ -137,12 +137,24 @@ func (m *MessengerSignalsHandler) DiscordCommunityImportProgress(importProgress 
 	signal.SendDiscordCommunityImportProgress(importProgress)
 }
 
+func (m *MessengerSignalsHandler) DiscordChannelImportProgress(importProgress *discord.ImportProgress) {
+	signal.SendDiscordChannelImportProgress(importProgress)
+}
+
 func (m *MessengerSignalsHandler) DiscordCommunityImportFinished(id string) {
 	signal.SendDiscordCommunityImportFinished(id)
 }
 
+func (m *MessengerSignalsHandler) DiscordChannelImportFinished(communityID string, channelID string) {
+	signal.SendDiscordChannelImportFinished(communityID, channelID)
+}
+
 func (m *MessengerSignalsHandler) DiscordCommunityImportCancelled(id string) {
 	signal.SendDiscordCommunityImportCancelled(id)
+}
+
+func (m *MessengerSignalsHandler) DiscordChannelImportCancelled(id string) {
+	signal.SendDiscordChannelImportCancelled(id)
 }
 
 func (m *MessengerSignalsHandler) SendWakuFetchingBackupProgress(response *wakusync.WakuBackedUpDataResponse) {
