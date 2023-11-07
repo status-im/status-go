@@ -239,7 +239,7 @@ func (s *HandlersSuite) TestHandleStatusLinkPreviewThumbnail() {
 	}
 
 	channel := &protobuf.UnfurledStatusChannelLink{
-		ChannelUuid: []byte("ChannelUuid_1"),
+		ChannelUuid: "ChannelUuid_1",
 		Community: &protobuf.UnfurledStatusCommunityLink{
 			CommunityId: []byte("CommunityId_2"),
 			Icon: &protobuf.UnfurledLinkThumbnail{

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net/url"
 
-	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"go.uber.org/zap"
 
+	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
@@ -484,7 +484,7 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 
 		if c := link.GetChannel(); c != nil {
 			lp.Channel = &StatusCommunityChannelLinkPreview{
-				ChannelUUID: string(c.ChannelUuid),
+				ChannelUUID: c.ChannelUuid,
 				Emoji:       c.Emoji,
 				DisplayName: c.DisplayName,
 				Description: c.Description,
