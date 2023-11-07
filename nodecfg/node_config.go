@@ -97,28 +97,6 @@ func insertLogConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	return err
 }
 
-func insertNetworkConfig(tx *sql.Tx, c *params.NodeConfig) error {
-	if _, err := tx.Exec(`DELETE FROM network_config WHERE synthetic_id = 'id'`); err != nil {
-		return err
-	}
-
-	for _, network := range c.Networks {
-		_, err := tx.Exec(`
-        INSERT OR REPLACE INTO network_config (
-                chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name,
-                native_currency_symbol, native_currency_decimals, is_test, layer, enabled,
-                synthetic_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id'	)`,
-			network.ChainID, network.ChainName, network.RPCURL, network.BlockExplorerURL, network.IconURL, network.NativeCurrencyName,
-			network.NativeCurrencySymbol, network.NativeCurrencyDecimals, network.IsTest, network.Layer, network.Enabled,
-		)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func insertNetworkConfigWithChainColorShortName(tx *sql.Tx, c *params.NodeConfig) error {
 	rows, err := tx.Query("SELECT chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name FROM networks")
 	if err != nil {
@@ -389,7 +367,6 @@ func nodeConfigUpgradeInserts() []insertFn {
 		insertIPCConfig,
 		insertLogConfig,
 		insertUpstreamConfig,
-		insertNetworkConfig,
 		insertClusterConfig,
 		insertClusterConfigNodes,
 		insertLightETHConfig,
