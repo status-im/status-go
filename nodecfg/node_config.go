@@ -35,7 +35,7 @@ func insertNodeConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO node_config (
 		network_id, data_dir, keystore_dir, node_key, no_discovery, rendezvous,
-		listen_addr, advertise_addr, name, version, api_modules, tls_enabled, 
+		listen_addr, advertise_addr, name, version, api_modules, tls_enabled,
 		max_peers, max_pending_peers, enable_status_service, enable_ntp_sync,
 		bridge_enabled, wallet_enabled, local_notifications_enabled,
 		browser_enabled, permissions_enabled, mailservers_enabled,
@@ -87,7 +87,7 @@ func insertHTTPConfig(tx *sql.Tx, c *params.NodeConfig) error {
 func insertLogConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO log_config (
-		enabled, mobile_system, log_dir, log_level, max_backups, max_size, 
+		enabled, mobile_system, log_dir, log_level, max_backups, max_size,
 		file, compress_rotated, log_to_stderr, synthetic_id
 	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'id'	)`,
 		c.LogEnabled, c.LogMobileSystem, c.LogDir, c.LogLevel, c.LogMaxBackups, c.LogMaxSize,
@@ -95,58 +95,6 @@ func insertLogConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	)
 
 	return err
-}
-
-func insertNetworkConfigWithChainColorShortName(tx *sql.Tx, c *params.NodeConfig) error {
-	rows, err := tx.Query("SELECT chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name, native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name FROM networks")
-	if err != nil {
-		return err
-	}
-	var currentNetworks []*params.Network
-	defer rows.Close()
-	for rows.Next() {
-		network := params.Network{}
-		err := rows.Scan(
-			&network.ChainID, &network.ChainName, &network.RPCURL, &network.BlockExplorerURL, &network.IconURL,
-			&network.NativeCurrencyName, &network.NativeCurrencySymbol,
-			&network.NativeCurrencyDecimals, &network.IsTest, &network.Layer, &network.Enabled, &network.ChainColor, &network.ShortName,
-		)
-		if err != nil {
-			return err
-		}
-		currentNetworks = append(currentNetworks, &network)
-	}
-
-	for _, network := range c.Networks {
-		found := false
-		for _, currentNetwork := range currentNetworks {
-			if currentNetwork.ChainID == network.ChainID {
-				found = true
-				_, err := tx.Exec(`UPDATE networks SET chain_color = ?, short_name = ? WHERE chain_id = ?`, network.ChainColor, network.ShortName, network.ChainID)
-				if err != nil {
-					return err
-				}
-				break
-			}
-		}
-
-		if !found {
-			_, err := tx.Exec(`
-			INSERT OR REPLACE INTO networks (
-					chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name,
-			native_currency_symbol, native_currency_decimals, is_test, layer, enabled,
-					chain_color, short_name
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				network.ChainID, network.ChainName, network.RPCURL, network.BlockExplorerURL, network.IconURL,
-				network.NativeCurrencyName, network.NativeCurrencySymbol, network.NativeCurrencyDecimals,
-				network.IsTest, network.Layer, network.Enabled, network.ChainColor, network.ShortName,
-			)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 func insertLightETHConfigTrustedNodes(tx *sql.Tx, c *params.NodeConfig) error {
@@ -215,9 +163,9 @@ func insertShhExtConfig(tx *sql.Tx, c *params.NodeConfig) error {
 	_, err := tx.Exec(`
 	INSERT OR REPLACE INTO shhext_config (
 		pfs_enabled, backup_disabled_data_dir, installation_id, mailserver_confirmations, enable_connection_manager,
-		enable_last_used_monitor, connection_target, request_delay, max_server_failures, max_message_delivery_attempts, 
-		whisper_cache_dir, disable_generic_discovery_topic, send_v1_messages, data_sync_enabled, verify_transaction_url, 
-		verify_ens_url, verify_ens_contract_address, verify_transaction_chain_id, anon_metrics_server_enabled, 
+		enable_last_used_monitor, connection_target, request_delay, max_server_failures, max_message_delivery_attempts,
+		whisper_cache_dir, disable_generic_discovery_topic, send_v1_messages, data_sync_enabled, verify_transaction_url,
+		verify_ens_url, verify_ens_contract_address, verify_transaction_chain_id, anon_metrics_server_enabled,
 		anon_metrics_send_id, anon_metrics_server_postgres_uri, bandwidth_stats_enabled, synthetic_id
 	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'id')`,
 		c.ShhextConfig.PFSEnabled, c.ShhextConfig.BackupDisabledDataDir, c.ShhextConfig.InstallationID, c.ShhextConfig.MailServerConfirmations, c.ShhextConfig.EnableConnectionManager,
@@ -391,7 +339,6 @@ func nodeConfigNormalInserts() []insertFn {
 		insertIPCConfig,
 		insertLogConfig,
 		insertUpstreamConfig,
-		insertNetworkConfigWithChainColorShortName,
 		insertClusterConfig,
 		insertClusterConfigNodes,
 		insertLightETHConfig,
@@ -474,7 +421,7 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		network_id, data_dir, keystore_dir, node_key, no_discovery, rendezvous,
 		listen_addr, advertise_addr, name, version, api_modules, tls_enabled, max_peers, max_pending_peers,
 		enable_status_service, bridge_enabled, wallet_enabled, local_notifications_enabled,
-		browser_enabled, permissions_enabled, mailservers_enabled, swarm_enabled, 
+		browser_enabled, permissions_enabled, mailservers_enabled, swarm_enabled,
 		mailserver_registry_address, web3provider_enabled FROM node_config
 		WHERE synthetic_id = 'id'
 	`).Scan(
@@ -537,7 +484,7 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 		return nil, err
 	}
 
-	rows, err = tx.Query(`SELECT 
+	rows, err = tx.Query(`SELECT
                 chain_id, chain_name, rpc_url, block_explorer_url, icon_url, native_currency_name,
                 native_currency_symbol, native_currency_decimals, is_test, layer, enabled, chain_color, short_name
         FROM networks ORDER BY chain_id ASC`)
@@ -655,8 +602,8 @@ func loadNodeConfig(tx *sql.Tx) (*params.NodeConfig, error) {
 	err = tx.QueryRow(`
 	SELECT pfs_enabled, backup_disabled_data_dir, installation_id, mailserver_confirmations, enable_connection_manager,
 	enable_last_used_monitor, connection_target, request_delay, max_server_failures, max_message_delivery_attempts,
-	whisper_cache_dir, disable_generic_discovery_topic, send_v1_messages, data_sync_enabled, verify_transaction_url, 
-	verify_ens_url, verify_ens_contract_address, verify_transaction_chain_id, anon_metrics_server_enabled, 
+	whisper_cache_dir, disable_generic_discovery_topic, send_v1_messages, data_sync_enabled, verify_transaction_url,
+	verify_ens_url, verify_ens_contract_address, verify_transaction_chain_id, anon_metrics_server_enabled,
 	anon_metrics_send_id, anon_metrics_server_postgres_uri, bandwidth_stats_enabled FROM shhext_config WHERE synthetic_id = 'id'
 	`).Scan(
 		&nodecfg.ShhextConfig.PFSEnabled, &nodecfg.ShhextConfig.BackupDisabledDataDir, &nodecfg.ShhextConfig.InstallationID, &nodecfg.ShhextConfig.MailServerConfirmations, &nodecfg.ShhextConfig.EnableConnectionManager,

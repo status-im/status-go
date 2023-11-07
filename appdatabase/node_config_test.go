@@ -120,30 +120,6 @@ func randomCustomNodes() map[string]string {
 	return result
 }
 
-func randomNetworkSlice() []params.Network {
-	m := randomInt(7) + 1
-	var result []params.Network
-	for i := 0; i < m; i++ {
-		n := params.Network{
-			ChainID:                uint64(i),
-			ChainName:              randomString(),
-			RPCURL:                 randomString(),
-			BlockExplorerURL:       randomString(),
-			IconURL:                randomString(),
-			NativeCurrencyName:     randomString(),
-			NativeCurrencySymbol:   randomString(),
-			NativeCurrencyDecimals: uint64(int64(randomInt(math.MaxInt64))),
-			IsTest:                 randomBool(),
-			Layer:                  uint64(int64(randomInt(math.MaxInt64))),
-			Enabled:                randomBool(),
-			ChainColor:             randomString(),
-			ShortName:              randomString(),
-		}
-		result = append(result, n)
-	}
-	return result
-}
-
 func randomNodeConfig() *params.NodeConfig {
 	privK, _ := crypto.GenerateKey()
 
@@ -189,7 +165,6 @@ func randomNodeConfig() *params.NodeConfig {
 		LogCompressRotated:        randomBool(),
 		LogToStderr:               randomBool(),
 		UpstreamConfig:            params.UpstreamRPCConfig{Enabled: randomBool(), URL: randomString()},
-		Networks:                  randomNetworkSlice(),
 		ClusterConfig: params.ClusterConfig{
 			Enabled:     randomBool(),
 			Fleet:       randomString(),

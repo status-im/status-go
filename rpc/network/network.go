@@ -130,6 +130,14 @@ func (nm *Manager) Init(networks []params.Network) error {
 	// Add new networks and update related chain id for the old ones
 	for i := range networks {
 		found := false
+		// Update original urls if they are empty
+		if networks[i].OriginalRPCURL == "" {
+			networks[i].OriginalRPCURL = networks[i].RPCURL
+		}
+		if networks[i].OriginalFallbackURL == "" {
+			networks[i].OriginalFallbackURL = networks[i].FallbackURL
+		}
+
 		for j := range currentNetworks {
 			if currentNetworks[j].ChainID == networks[i].ChainID {
 				found = true
@@ -140,7 +148,7 @@ func (nm *Manager) Init(networks []params.Network) error {
 						errors += fmt.Sprintf("error updating network fallback_url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
 					}
 				}
-				err := nm.UpdateOriginalURL(currentNetworks[j].ChainID, networks[i].RPCURL, networks[i].FallbackURL)
+				err := nm.UpdateRPCURLs(currentNetworks[j].ChainID, networks[i].RPCURL, networks[i].OriginalRPCURL, networks[i].FallbackURL, networks[i].OriginalFallbackURL)
 				if err != nil {
 					errors += fmt.Sprintf("error updating network original url for ChainID: %d, %s", currentNetworks[j].ChainID, err.Error())
 				}
@@ -149,15 +157,10 @@ func (nm *Manager) Init(networks []params.Network) error {
 		}
 
 		if !found {
-			// Add network if doesn't exist
+			// Insert new network
 			err := nm.Upsert(&networks[i])
 			if err != nil {
 				errors += fmt.Sprintf("error inserting network with ChainID: %d, %s", networks[i].ChainID, err.Error())
-			}
-
-			err = nm.UpdateOriginalURL(networks[i].ChainID, networks[i].RPCURL, networks[i].FallbackURL)
-			if err != nil {
-				errors += fmt.Sprintf("error updating network original url for ChainID: %d, %s", networks[i].ChainID, err.Error())
 			}
 		}
 	}
@@ -190,8 +193,9 @@ func (nm *Manager) UpdateRelatedChainID(chainID uint64, relatedChainID uint64) e
 	return err
 }
 
-func (nm *Manager) UpdateOriginalURL(chainID uint64, originalRPCURL, OriginalFallbackURL string) error {
-	_, err := nm.db.Exec(`UPDATE networks SET original_rpc_url = ?, original_fallback_url = ?  WHERE chain_id = ?`, originalRPCURL, OriginalFallbackURL, chainID)
+func (nm *Manager) UpdateRPCURLs(chainID uint64, rpcURL, originalRPCURL, fallbackURL, originalFallbackURL string) error {
+	_, err := nm.db.Exec(`UPDATE networks SET rpc_url = ?, original_rpc_url = ?, fallback_url = ?, original_fallback_url = ?  WHERE chain_id = ?`,
+		rpcURL, originalRPCURL, fallbackURL, originalFallbackURL, chainID)
 	return err
 }
 
