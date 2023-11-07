@@ -405,8 +405,10 @@ migration-wallet:
 	touch $(DEFAULT_WALLET_MIGRATION_PATH)/$(shell date +%s)_$(D).up.sql
 
 install-git-hooks:
-	@ln -s -f $(shell pwd)/_assets/hooks/pre-rebase .git/hooks
-	@ln -s -f $(shell pwd)/_assets/hooks/pre-merge-commit .git/hooks
+	@ln -srf $(shell pwd)/_assets/hooks/* .git/hooks
+
+-include install-git-hooks
+.PHONY: install-git-hooks
 
 migration-protocol: DEFAULT_PROTOCOL_PATH := protocol/migrations/sqlite
 migration-protocol:

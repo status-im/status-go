@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 json_path='.ClusterConfig.TrustedMailServers'
 mailservers=$(jq -r "${json_path} | .[]" $1)
