@@ -237,7 +237,7 @@ func (preview *StatusCommunityLinkPreview) convertToProto() (*protobuf.UnfurledS
 		return nil, err
 	}
 
-	communityID, err := hex.DecodeString(preview.CommunityID[2:])
+	communityID, err := types.DecodeHex(preview.CommunityID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode community id: %w", err)
 	}
