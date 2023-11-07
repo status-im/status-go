@@ -402,6 +402,7 @@ migration:
 
 migration-check:
 	bash _assets/scripts/migration_check.sh
+	bash _assets/scripts/bump_version.sh
 
 migration-wallet: DEFAULT_WALLET_MIGRATION_PATH := walletdatabase/migrations/sql
 migration-wallet:
