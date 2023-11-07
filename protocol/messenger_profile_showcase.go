@@ -199,7 +199,7 @@ func (m *Messenger) DecryptProfileShowcaseEntriesWithContactPubKeys(senderPubKey
 		// Decrypt the main encryption AES key with AES encryption using the DH key
 		dAESKey, err := common.Decrypt(eAESKey, sharedKey)
 		if err != nil {
-			if err.Error() == CipherMessageAutentificationFailed {
+			if err == ErrCipherMessageAutentificationFailed {
 				continue
 			}
 			return nil, err

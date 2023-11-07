@@ -34,7 +34,7 @@ CREATE TABLE profile_showcase_communities_contacts (
     community_id TEXT NOT NULL,
     sort_order INT DEFAULT 0,
     contact_id TEXT NOT NULL,
-    PRIMARY KEY (community_id, contact_id)
+    PRIMARY KEY (contact_id, community_id)
 );
 
 CREATE TABLE profile_showcase_accounts_contacts (
@@ -44,19 +44,19 @@ CREATE TABLE profile_showcase_accounts_contacts (
     emoji VARCHAR DEFAULT "",
     sort_order INT DEFAULT 0,
     contact_id TEXT NOT NULL,
-    PRIMARY KEY (address, contact_id)
+    PRIMARY KEY (contact_id, address)
 );
 
 CREATE TABLE profile_showcase_collectibles_contacts (
     uid TEXT NOT NULL,
     sort_order INT DEFAULT 0,
     contact_id TEXT NOT NULL,
-    PRIMARY KEY (uid, contact_id)
+    PRIMARY KEY (contact_id, uid)
 );
 
 CREATE TABLE profile_showcase_assets_contacts (
     symbol TEXT NOT NULL,
     sort_order INT DEFAULT 0,
     contact_id TEXT NOT NULL,
-    PRIMARY KEY (symbol, contact_id)
+    PRIMARY KEY (contact_id, symbol)
 );
