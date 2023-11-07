@@ -44,7 +44,6 @@ import (
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/wallet/bigint"
 	"github.com/status-im/status-go/signal"
-	"github.com/status-im/status-go/transactions"
 )
 
 // 7 days interval
@@ -5997,17 +5996,21 @@ func (m *Messenger) processCommunityChanges(messageState *ReceivedMessageState) 
 	messageState.Response.CommunityChanges = nil
 }
 
-func (m *Messenger) SetCommunitySignerPubKey(ctx context.Context, communityID []byte, chainID uint64, contractAddress string, txArgs transactions.SendTxArgs, password string, newSignerPubKey string) (string, error) {
-	if m.communityTokensService == nil {
-		return "", errors.New("tokens service not initialized")
-	}
-
-	return m.communityTokensService.SetSignerPubKey(ctx, chainID, contractAddress, txArgs, password, newSignerPubKey)
-}
-
 func (m *Messenger) PromoteSelfToControlNode(communityID types.HexBytes) (*MessengerResponse, error) {
 	clock, _ := m.getLastClockWithRelatedChat()
-	changes, err := m.communitiesManager.PromoteSelfToControlNode(communityID, clock)
+
+	community, err := m.FetchCommunity(&FetchCommunityRequest{
+		CommunityKey:    types.EncodeHex(communityID),
+		Shard:           nil,
+		TryDatabase:     true,
+		WaitForResponse: true,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	changes, err := m.communitiesManager.PromoteSelfToControlNode(community, clock)
 	if err != nil {
 		return nil, err
 	}
