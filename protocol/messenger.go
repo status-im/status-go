@@ -2309,9 +2309,10 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		}
 	}
 
-	unfurledLinks, err := message.ConvertLinkPreviewsToProto()
 	// We consider link previews non-critical data, so we do not want to block
 	// messages from being sent.
+
+	unfurledLinks, err := message.ConvertLinkPreviewsToProto()
 	if err != nil {
 		m.logger.Error("failed to convert link previews", zap.Error(err))
 	} else {

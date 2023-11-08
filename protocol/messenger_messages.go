@@ -69,17 +69,22 @@ func (m *Messenger) EditMessage(ctx context.Context, request *requests.EditMessa
 		editMessage.MessageId = message.ID
 		editMessage.Clock = clock
 
+		// We consider link previews non-critical data, so we do not want to block
+		// messages from being sent.
+
 		unfurledLinks, err := message.ConvertLinkPreviewsToProto()
 		if err != nil {
-			return nil, err
+			m.logger.Error("failed to convert link previews", zap.Error(err))
+		} else {
+			editMessage.UnfurledLinks = unfurledLinks
 		}
-		editMessage.UnfurledLinks = unfurledLinks
 
 		unfurledStatusLinks, err := message.ConvertStatusLinkPreviewsToProto()
 		if err != nil {
-			return nil, err
+			m.logger.Error("failed to convert status link previews", zap.Error(err))
+		} else {
+			editMessage.UnfurledStatusLinks = unfurledStatusLinks
 		}
-		editMessage.UnfurledStatusLinks = unfurledStatusLinks
 
 		err = m.applyEditMessage(editMessage.EditMessage, message)
 		if err != nil {
