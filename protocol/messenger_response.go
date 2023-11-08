@@ -772,3 +772,16 @@ func (r *MessengerResponse) HasDiscordChannel(id string) bool {
 	}
 	return false
 }
+
+func (r *MessengerResponse) Prepare(m *Messenger) *MessengerResponse {
+	if m.httpServer == nil {
+		return r
+	}
+	m.prepareMessages(r.messages)
+	for _, chat := range r.chats {
+		if chat.LastMessage != nil {
+			m.prepareMessage(chat.LastMessage, m.httpServer)
+		}
+	}
+	return r
+}
