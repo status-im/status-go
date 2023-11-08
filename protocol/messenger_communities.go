@@ -562,15 +562,47 @@ func (m *Messenger) SpectatedCommunities() ([]*communities.Community, error) {
 	return m.communitiesManager.Spectated()
 }
 
+const (
+	fetchError       int = 0
+	fetchSuccess     int = 1
+	fetchHasUnknowns int = 2
+)
+
+func calcTimeTillNextUpdate(fetchResultsHistory []int) time.Duration {
+	// TODO lower this back again once the real curated community contract is up
+	// The current contract contains communities that are no longer accessible on waku
+	const shortTimeout = 30 * time.Second
+	const averageTimeout = 60 * time.Second
+	const longTimeout = 300 * time.Second
+
+	twoConsecutiveErrors := (len(fetchResultsHistory) == 2 &&
+		fetchResultsHistory[0] == fetchError &&
+		fetchResultsHistory[1] == fetchError)
+
+	twoConsecutiveHasUnknowns := (len(fetchResultsHistory) == 2 &&
+		fetchResultsHistory[0] == fetchHasUnknowns &&
+		fetchResultsHistory[1] == fetchHasUnknowns)
+
+	var timeTillNextUpdate time.Duration
+
+	if twoConsecutiveErrors || twoConsecutiveHasUnknowns {
+		timeTillNextUpdate = longTimeout
+	} else {
+		switch fetchResultsHistory[len(fetchResultsHistory)-1] {
+		case fetchError:
+			timeTillNextUpdate = shortTimeout
+		case fetchSuccess:
+			timeTillNextUpdate = longTimeout
+		case fetchHasUnknowns:
+			timeTillNextUpdate = averageTimeout
+		}
+	}
+	return timeTillNextUpdate
+}
+
 // Regularly gets list of curated communities and signals them to client
 func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 	logger := m.logger.Named("startCuratedCommunitiesUpdateLoop")
-
-	const errorTimeout = 10 * time.Second
-	const successTimeout = 120 * time.Second
-	// TODO lower this back again once the real curated community contract is up
-	// The current contract contains communities that are no longer accessible on waku
-	const unknownCommunitiesFoundTimeout = 60 * time.Second
 
 	type curatedCommunities struct {
 		ContractCommunities         []string
@@ -578,17 +610,17 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 		UnknownCommunities          []string
 	}
 
-	var mu = sync.RWMutex{}
-	var c = curatedCommunities{}
-
 	go func() {
-		for {
-			var timeTillNextUpdate time.Duration
 
+		var fetchResultsHistory = make([]int, 0)
+		var mu = sync.RWMutex{}
+		var c = curatedCommunities{}
+
+		for {
 			response, err := m.CuratedCommunities()
 
 			if err != nil {
-				timeTillNextUpdate = errorTimeout
+				fetchResultsHistory = append(fetchResultsHistory, fetchError)
 			} else {
 				mu.Lock()
 				// Check if it's the same values we had
@@ -606,15 +638,19 @@ func (m *Messenger) startCuratedCommunitiesUpdateLoop() {
 				mu.Unlock()
 
 				if len(response.UnknownCommunities) == 0 {
-					//next update shouldn't happen soon
-					timeTillNextUpdate = successTimeout
+					fetchResultsHistory = append(fetchResultsHistory, fetchSuccess)
+
 				} else {
-					//unknown communities already requested from mailserver, so we wait just a bit before
-					//next attempt to get their info
-					timeTillNextUpdate = unknownCommunitiesFoundTimeout
+					fetchResultsHistory = append(fetchResultsHistory, fetchHasUnknowns)
 				}
 			}
 
+			//keep only 2 last fetch results
+			if len(fetchResultsHistory) > 2 {
+				fetchResultsHistory = fetchResultsHistory[1:]
+			}
+
+			timeTillNextUpdate := calcTimeTillNextUpdate(fetchResultsHistory)
 			logger.Debug("Next curated communities update will happen in", zap.Duration("timeTillNextUpdate", timeTillNextUpdate))
 
 			select {
