@@ -42,11 +42,11 @@ func (c *Client) PushReceivedMessages(filter transport.Filter, sshMessage *types
 		postBody = append(postBody, map[string]interface{}{
 			"chatId":         filter.ChatID,
 			"messageHash":    types.EncodeHex(sshMessage.Hash),
-			"messageId":      message.ID,
+			"messageId":      message.ApplicationLayer.ID,
 			"sentAt":         sshMessage.Timestamp,
 			"pubsubTopic":    filter.PubsubTopic,
 			"topic":          filter.ContentTopic.String(),
-			"messageType":    message.Type.String(),
+			"messageType":    message.ApplicationLayer.Type.String(),
 			"receiverKeyUID": c.keyUID,
 			"nodeName":       c.nodeName,
 			"messageSize":    len(sshMessage.Payload),

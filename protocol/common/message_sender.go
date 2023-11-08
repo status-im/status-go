@@ -165,7 +165,7 @@ func (s *MessageSender) SendPrivate(
 	// Currently we don't support sending through datasync and setting custom waku fields,
 	// as the datasync interface is not rich enough to propagate that information, so we
 	// would have to add some complexity to handle this.
-	if rawMessage.ResendAutomatically && (rawMessage.Sender != nil || rawMessage.SkipProtocolLayer || rawMessage.SendOnPersonalTopic) {
+	if rawMessage.ResendAutomatically && (rawMessage.Sender != nil || rawMessage.SkipEncryptionLayer || rawMessage.SendOnPersonalTopic) {
 		return nil, errors.New("setting identity, skip-encryption or personal topic and datasync not supported")
 	}
 
@@ -489,7 +489,7 @@ func (s *MessageSender) sendPrivate(
 				return nil, err
 			}
 		}
-	} else if rawMessage.SkipProtocolLayer {
+	} else if rawMessage.SkipEncryptionLayer {
 		// When SkipProtocolLayer is set we don't pass the message to the encryption layer
 		messageIDs := [][]byte{messageID}
 		hash, newMessage, err := s.sendPrivateRawMessage(ctx, rawMessage, recipient, wrappedMessage, messageIDs)
@@ -666,7 +666,7 @@ func (s *MessageSender) SendPublic(
 		return nil, errors.Wrap(err, "failed to wrap a public message in the encryption layer")
 	}
 
-	if !rawMessage.SkipProtocolLayer {
+	if !rawMessage.SkipEncryptionLayer {
 		newMessage, err = MessageSpecToWhisper(messageSpec)
 		if err != nil {
 			return nil, err
@@ -721,7 +721,7 @@ func unwrapDatasyncMessage(m *v1protocol.StatusMessage, datasync *datasync.DataS
 
 	payloads, acks, err := datasync.UnwrapPayloadsAndAcks(
 		m.SigPubKey(),
-		m.DecryptedPayload,
+		m.EncryptionLayer.Payload,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -732,7 +732,7 @@ func unwrapDatasyncMessage(m *v1protocol.StatusMessage, datasync *datasync.DataS
 		if err != nil {
 			return nil, nil, err
 		}
-		message.DecryptedPayload = payload
+		message.EncryptionLayer.Payload = payload
 		statusMessages = append(statusMessages, message)
 	}
 	return statusMessages, acks, nil
@@ -750,7 +750,7 @@ func (s *MessageSender) HandleMessages(shhMessage *types.Message) ([]*v1protocol
 	var statusMessages []*v1protocol.StatusMessage
 	var acks [][]byte
 
-	err := statusMessage.HandleTransport(shhMessage)
+	err := statusMessage.HandleTransportLayer(shhMessage)
 	if err != nil {
 		hlogger.Error("failed to handle transport layer message", zap.Error(err))
 		return nil, nil, err
@@ -762,14 +762,14 @@ func (s *MessageSender) HandleMessages(shhMessage *types.Message) ([]*v1protocol
 	}
 
 	// Hash ratchet with a group id not found yet
-	if err == encryption.ErrHashRatchetGroupIDNotFound && len(statusMessage.HashRatchetInfo) == 1 {
-		info := statusMessage.HashRatchetInfo[0]
+	if err == encryption.ErrHashRatchetGroupIDNotFound && len(statusMessage.EncryptionLayer.HashRatchetInfo) == 1 {
+		info := statusMessage.EncryptionLayer.HashRatchetInfo[0]
 		err := s.persistence.SaveHashRatchetMessage(info.GroupID, info.KeyID, shhMessage)
 		return nil, nil, err
 	}
 
 	// Check if there are undecrypted message
-	for _, hashRatchetInfo := range statusMessage.HashRatchetInfo {
+	for _, hashRatchetInfo := range statusMessage.EncryptionLayer.HashRatchetInfo {
 		messages, err := s.persistence.GetHashRatchetMessages(hashRatchetInfo.KeyID)
 		if err != nil {
 			return nil, nil, err
@@ -778,7 +778,7 @@ func (s *MessageSender) HandleMessages(shhMessage *types.Message) ([]*v1protocol
 		var processedIds [][]byte
 		for _, message := range messages {
 			var statusMessage v1protocol.StatusMessage
-			err := statusMessage.HandleTransport(message)
+			err := statusMessage.HandleTransportLayer(message)
 			if err != nil {
 				hlogger.Error("failed to handle transport layer message", zap.Error(err))
 				return nil, nil, err
@@ -820,7 +820,7 @@ func (s *MessageSender) HandleMessages(shhMessage *types.Message) ([]*v1protocol
 	}
 
 	for _, statusMessage := range statusMessages {
-		err := statusMessage.HandleApplicationMetadata()
+		err := statusMessage.HandleApplicationLayer()
 		if err != nil {
 			hlogger.Error("failed to handle application metadata layer message", zap.Error(err))
 		}
@@ -849,9 +849,9 @@ func (s *MessageSender) handleEncryptionLayer(ctx context.Context, message *v1pr
 	publicKey := message.SigPubKey()
 
 	// if it's an ephemeral key, we don't negotiate a topic
-	decryptionKey, skipNegotiation := s.fetchDecryptionKey(message.Dst)
+	decryptionKey, skipNegotiation := s.fetchDecryptionKey(message.TransportLayer.Dst)
 
-	err := message.HandleEncryption(decryptionKey, publicKey, s.protocol, skipNegotiation)
+	err := message.HandleEncryptionLayer(decryptionKey, publicKey, s.protocol, skipNegotiation)
 
 	// if it's an ephemeral key, we don't have to handle a device not found error
 	if err == encryption.ErrDeviceNotFound && !skipNegotiation {

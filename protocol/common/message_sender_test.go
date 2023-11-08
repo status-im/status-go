@@ -120,9 +120,9 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesWrapped() {
 
 	s.Require().Equal(1, len(decodedMessages))
 	s.Require().Equal(&authorKey.PublicKey, decodedMessages[0].SigPubKey())
-	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ID)
-	s.Require().Equal(encodedPayload, decodedMessages[0].UnwrappedPayload)
-	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
+	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ApplicationLayer.ID)
+	s.Require().Equal(encodedPayload, decodedMessages[0].ApplicationLayer.Payload)
+	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].ApplicationLayer.Type)
 }
 
 func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasync() {
@@ -155,9 +155,9 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasync() {
 	// We send two messages, the unwrapped one will be attributed to the relayer, while the wrapped one will be attributed to the author
 	s.Require().Equal(1, len(decodedMessages))
 	s.Require().Equal(&authorKey.PublicKey, decodedMessages[0].SigPubKey())
-	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ID)
-	s.Require().Equal(encodedPayload, decodedMessages[0].UnwrappedPayload)
-	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
+	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ApplicationLayer.ID)
+	s.Require().Equal(encodedPayload, decodedMessages[0].ApplicationLayer.Payload)
+	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].ApplicationLayer.Type)
 }
 
 func (s *MessageSenderSuite) CalculatePoWTest() {
@@ -221,9 +221,9 @@ func (s *MessageSenderSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	// while the wrapped one will be attributed to the author.
 	s.Require().Equal(1, len(decodedMessages))
 	s.Require().Equal(&authorKey.PublicKey, decodedMessages[0].SigPubKey())
-	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ID)
-	s.Require().Equal(encodedPayload, decodedMessages[0].UnwrappedPayload)
-	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
+	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ApplicationLayer.ID)
+	s.Require().Equal(encodedPayload, decodedMessages[0].ApplicationLayer.Payload)
+	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].ApplicationLayer.Type)
 }
 
 func (s *MessageSenderSuite) TestHandleOutOfOrderHashRatchet() {

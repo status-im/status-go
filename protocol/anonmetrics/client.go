@@ -98,7 +98,7 @@ func (c *Client) sendUnprocessedMetrics() {
 		rawMessage := common.RawMessage{
 			Payload:             encodedMessage,
 			Sender:              ephemeralKey,
-			SkipProtocolLayer:   true,
+			SkipEncryptionLayer: true,
 			SendOnPersonalTopic: true,
 			MessageType:         protobuf.ApplicationMetadataMessage_ANONYMOUS_METRIC_BATCH,
 		}
