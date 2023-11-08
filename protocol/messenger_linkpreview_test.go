@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -395,6 +396,9 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	s.Require().NoError(err)
 	s.Require().NotNil(c)
 
+	shortKey, err := multiformat.SerializeLegacyKey(c.ID)
+	s.Require().NoError(err)
+
 	payload, err := images.GetPayloadFromURI(exampleIdenticonURI)
 	s.Require().NoError(err)
 
@@ -464,6 +468,9 @@ func (s *MessengerLinkPreviewsTestSuite) setProfileParameters(messenger *Messeng
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_SelfLink() {
+	shortKey, err := multiformat.SerializeLegacyKey(s.m.IdentityPublicKeyString())
+	s.Require().NoError(err)
+
 	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
 	profileKp.KeyUID = s.m.account.KeyUID
 	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID

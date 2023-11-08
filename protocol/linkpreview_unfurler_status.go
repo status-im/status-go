@@ -152,7 +152,7 @@ func (u *StatusUnfurler) Unfurl() (*common.StatusLinkPreview, error) {
 	preview := new(common.StatusLinkPreview)
 	preview.URL = u.url
 
-	resp, err := u.m.ParseSharedURL(u.url)
+	resp, err := ParseSharedURL(u.url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse shared url: %w", err)
 	}
