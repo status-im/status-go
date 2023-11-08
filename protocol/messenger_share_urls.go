@@ -533,7 +533,7 @@ func IsStatusSharedURL(url string) bool {
 
 func (m *Messenger) ParseSharedURL(url string) (*URLDataResponse, error) {
 	if !IsStatusSharedURL(url) {
-		return nil, fmt.Errorf("url should start with '%s'", baseShareURL)
+		return nil, fmt.Errorf("url is not a status shared url")
 	}
 
 	urlContents := regexp.MustCompile(`\#`).Split(strings.TrimPrefix(url, baseShareURL+"/"), 2)
