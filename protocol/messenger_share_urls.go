@@ -54,11 +54,11 @@ const communityPath = "c#"
 const communityWithDataPath = "c/"
 const channelPath = "cc/"
 
-const sharedUrlUserPrefix = baseShareURL + "/" + userPath
-const sharedUrlUserPrefixWithData = baseShareURL + "/" + userWithDataPath
-const sharedUrlCommunityPrefix = baseShareURL + "/" + communityPath
-const sharedUrlCommunityPrefixWithData = baseShareURL + "/" + communityWithDataPath
-const sharedUrlChannelPrefixWithData = baseShareURL + "/" + channelPath
+const sharedURLUserPrefix = baseShareURL + "/" + userPath
+const sharedURLUserPrefixWithData = baseShareURL + "/" + userWithDataPath
+const sharedURLCommunityPrefix = baseShareURL + "/" + communityPath
+const sharedURLCommunityPrefixWithData = baseShareURL + "/" + communityWithDataPath
+const sharedURLChannelPrefixWithData = baseShareURL + "/" + channelPath
 
 const channelUUIDRegExp = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$"
 
@@ -524,11 +524,11 @@ func (m *Messenger) parseUserURLWithData(data string, chatKey string) (*URLDataR
 }
 
 func IsStatusSharedURL(url string) bool {
-	return strings.HasPrefix(url, sharedUrlUserPrefix) ||
-		strings.HasPrefix(url, sharedUrlUserPrefixWithData) ||
-		strings.HasPrefix(url, sharedUrlCommunityPrefix) ||
-		strings.HasPrefix(url, sharedUrlCommunityPrefixWithData) ||
-		strings.HasPrefix(url, sharedUrlChannelPrefixWithData)
+	return strings.HasPrefix(url, sharedURLUserPrefix) ||
+		strings.HasPrefix(url, sharedURLUserPrefixWithData) ||
+		strings.HasPrefix(url, sharedURLCommunityPrefix) ||
+		strings.HasPrefix(url, sharedURLCommunityPrefixWithData) ||
+		strings.HasPrefix(url, sharedURLChannelPrefixWithData)
 }
 
 func (m *Messenger) ParseSharedURL(url string) (*URLDataResponse, error) {
