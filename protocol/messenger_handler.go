@@ -1478,7 +1478,7 @@ func (m *Messenger) HandleCommunityCancelRequestToJoin(state *ReceivedMessageSta
 // HandleCommunityRequestToJoin handles an community request to join
 func (m *Messenger) HandleCommunityRequestToJoin(state *ReceivedMessageState, requestToJoinProto *protobuf.CommunityRequestToJoin, statusMessage *v1protocol.StatusMessage) error {
 	signer := state.CurrentMessageState.PublicKey
-	community, requestToJoin, err := m.communitiesManager.HandleCommunityRequestToJoin(signer, statusMessage.Dst, requestToJoinProto)
+	community, requestToJoin, err := m.communitiesManager.HandleCommunityRequestToJoin(signer, statusMessage.TransportLayer.Dst, requestToJoinProto)
 	if err != nil {
 		return err
 	}
@@ -3557,7 +3557,7 @@ func (m *Messenger) HandlePushNotificationQuery(state *ReceivedMessageState, mes
 	}
 	publicKey := state.CurrentMessageState.PublicKey
 
-	return m.pushNotificationServer.HandlePushNotificationQuery(publicKey, statusMessage.ID, message)
+	return m.pushNotificationServer.HandlePushNotificationQuery(publicKey, statusMessage.ApplicationLayer.ID, message)
 }
 
 func (m *Messenger) HandlePushNotificationQueryResponse(state *ReceivedMessageState, message *protobuf.PushNotificationQueryResponse, statusMessage *v1protocol.StatusMessage) error {
@@ -3575,12 +3575,12 @@ func (m *Messenger) HandlePushNotificationRequest(state *ReceivedMessageState, m
 	}
 	publicKey := state.CurrentMessageState.PublicKey
 
-	return m.pushNotificationServer.HandlePushNotificationRequest(publicKey, statusMessage.ID, message)
+	return m.pushNotificationServer.HandlePushNotificationRequest(publicKey, statusMessage.ApplicationLayer.ID, message)
 }
 
 func (m *Messenger) HandleCommunityDescription(state *ReceivedMessageState, message *protobuf.CommunityDescription, statusMessage *v1protocol.StatusMessage) error {
 
-	err := m.handleCommunityDescription(state, state.CurrentMessageState.PublicKey, message, statusMessage.DecryptedPayload)
+	err := m.handleCommunityDescription(state, state.CurrentMessageState.PublicKey, message, statusMessage.EncryptionLayer.Payload)
 	if err != nil {
 		m.logger.Warn("failed to handle CommunityDescription", zap.Error(err))
 		return err

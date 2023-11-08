@@ -2101,7 +2101,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, rawMessage common.RawMe
 		//SendPrivate will alter message identity and possibly datasyncid, so we save an unchanged
 		//message for sending to paired devices later
 		specCopyForPairedDevices := rawMessage
-		if !common.IsPubKeyEqual(publicKey, &m.identity.PublicKey) || rawMessage.SkipProtocolLayer {
+		if !common.IsPubKeyEqual(publicKey, &m.identity.PublicKey) || rawMessage.SkipEncryptionLayer {
 			id, err = m.sender.SendPrivate(ctx, publicKey, &rawMessage)
 
 			if err != nil {
@@ -3478,14 +3478,14 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 			}
 
 			for _, msg := range statusMessages {
-				logger := logger.With(zap.String("message-id", msg.TransportMessage.ThirdPartyID))
+				logger := logger.With(zap.String("message-id", msg.TransportLayer.Message.ThirdPartyID))
 				logger.Debug("processing message")
 
 				publicKey := msg.SigPubKey()
 				senderID := contactIDFromPublicKey(publicKey)
 
 				// Don't process duplicates
-				messageID := msg.TransportMessage.ThirdPartyID
+				messageID := msg.TransportLayer.Message.ThirdPartyID
 				exists, err := m.messageExists(messageID, messageState.ExistingMessagesMap)
 				if err != nil {
 					logger.Warn("failed to check message exists", zap.Error(err))
@@ -3509,26 +3509,26 @@ func (m *Messenger) handleImportedMessages(messagesToHandle map[transport.Filter
 				}
 				messageState.CurrentMessageState = &CurrentMessageState{
 					MessageID:        messageID,
-					WhisperTimestamp: uint64(msg.TransportMessage.Timestamp) * 1000,
+					WhisperTimestamp: uint64(msg.TransportLayer.Message.Timestamp) * 1000,
 					Contact:          contact,
 					PublicKey:        publicKey,
 				}
 
-				if msg.UnwrappedPayload != nil {
+				if msg.ApplicationLayer.Payload != nil {
 
 					logger.Debug("Handling parsed message")
 
-					switch msg.Type {
+					switch msg.ApplicationLayer.Type {
 
 					case protobuf.ApplicationMetadataMessage_CHAT_MESSAGE:
-						err = m.handleChatMessageProtobuf(messageState, msg.UnwrappedPayload, msg, filter, true)
+						err = m.handleChatMessageProtobuf(messageState, msg.ApplicationLayer.Payload, msg, filter, true)
 						if err != nil {
 							logger.Warn("failed to handle ChatMessage", zap.Error(err))
 							continue
 						}
 
 					case protobuf.ApplicationMetadataMessage_PIN_MESSAGE:
-						err = m.handlePinMessageProtobuf(messageState, msg.UnwrappedPayload, msg, filter, true)
+						err = m.handlePinMessageProtobuf(messageState, msg.ApplicationLayer.Payload, msg, filter, true)
 						if err != nil {
 							logger.Warn("failed to handle PinMessage", zap.Error(err))
 						}
@@ -3637,12 +3637,12 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			logger.Debug("processing messages further", zap.Int("count", len(statusMessages)))
 
 			for _, msg := range statusMessages {
-				logger := logger.With(zap.String("message-id", msg.ID.String()))
+				logger := logger.With(zap.String("message-id", msg.ApplicationLayer.ID.String()))
 				logger.Info("processing message")
 				publicKey := msg.SigPubKey()
 
-				m.handleInstallations(msg.Installations)
-				err := m.handleSharedSecrets(msg.SharedSecrets)
+				m.handleInstallations(msg.EncryptionLayer.Installations)
+				err := m.handleSharedSecrets(msg.EncryptionLayer.SharedSecrets)
 				if err != nil {
 					// log and continue, non-critical error
 					logger.Warn("failed to handle shared secrets")
@@ -3650,11 +3650,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 				senderID := contactIDFromPublicKey(publicKey)
 				ownID := contactIDFromPublicKey(m.IdentityPublicKey())
-				m.logger.Info("processing message", zap.Any("type", msg.Type), zap.String("senderID", senderID))
+				m.logger.Info("processing message", zap.Any("type", msg.ApplicationLayer.Type), zap.String("senderID", senderID))
 
 				if senderID == ownID {
 					// Skip own messages of certain types
-					if msg.Type == protobuf.ApplicationMetadataMessage_CONTACT_CODE_ADVERTISEMENT {
+					if msg.ApplicationLayer.Type == protobuf.ApplicationMetadataMessage_CONTACT_CODE_ADVERTISEMENT {
 						continue
 					}
 				}
@@ -3669,7 +3669,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				}
 
 				// Don't process duplicates
-				messageID := types.EncodeHex(msg.ID)
+				messageID := types.EncodeHex(msg.ApplicationLayer.ID)
 				exists, err := m.messageExists(messageID, messageState.ExistingMessagesMap)
 				if err != nil {
 					logger.Warn("failed to check message exists", zap.Error(err))
@@ -3687,21 +3687,21 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						continue
 					}
 					contact = c
-					if msg.Type != protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY {
+					if msg.ApplicationLayer.Type != protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY {
 						messageState.AllContacts.Store(senderID, contact)
 						m.forgetContactInfoRequest(senderID)
 					}
 				}
 				messageState.CurrentMessageState = &CurrentMessageState{
 					MessageID:        messageID,
-					WhisperTimestamp: uint64(msg.TransportMessage.Timestamp) * 1000,
+					WhisperTimestamp: uint64(msg.TransportLayer.Message.Timestamp) * 1000,
 					Contact:          contact,
 					PublicKey:        publicKey,
 				}
 
-				if msg.UnwrappedPayload != nil {
+				if msg.ApplicationLayer.Payload != nil {
 
-					err := m.dispatchToHandler(messageState, msg.UnwrappedPayload, msg, filter, fromArchive)
+					err := m.dispatchToHandler(messageState, msg.ApplicationLayer.Payload, msg, filter, fromArchive)
 					if err != nil {
 						allMessagesProcessed = false
 						logger.Warn("failed to process protobuf", zap.Error(err))

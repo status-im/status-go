@@ -71,7 +71,7 @@ func (ckd *CommunitiesKeyDistributorImpl) distributeKey(community *communities.C
 func (ckd *CommunitiesKeyDistributorImpl) sendKeyExchangeMessage(community *communities.Community, hashRatchetGroupID []byte, pubkeys []*ecdsa.PublicKey, msgType common.CommKeyExMsgType) error {
 	rawMessage := common.RawMessage{
 		Sender:                community.PrivateKey(),
-		SkipProtocolLayer:     false,
+		SkipEncryptionLayer:   false,
 		CommunityID:           community.ID(),
 		CommunityKeyExMsgType: msgType,
 		Recipients:            pubkeys,

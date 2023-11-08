@@ -109,7 +109,7 @@ func (s *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION_RESPONSE,
 		// we skip encryption as might be sent from an ephemeral key
-		SkipProtocolLayer: true,
+		SkipEncryptionLayer: true,
 	}
 
 	_, err = s.messageSender.SendPrivate(context.Background(), publicKey, &rawMessage)
@@ -136,7 +136,7 @@ func (s *Server) HandlePushNotificationQuery(publicKey *ecdsa.PublicKey, message
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY_RESPONSE,
 		// we skip encryption as sent from an ephemeral key
-		SkipProtocolLayer: true,
+		SkipEncryptionLayer: true,
 	}
 
 	_, err = s.messageSender.SendPrivate(context.Background(), publicKey, &rawMessage)
@@ -179,7 +179,7 @@ func (s *Server) HandlePushNotificationRequest(publicKey *ecdsa.PublicKey,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_RESPONSE,
 		// We skip encryption here as the message has been sent from an ephemeral key
-		SkipProtocolLayer: true,
+		SkipEncryptionLayer: true,
 	}
 
 	_, err = s.messageSender.SendPrivate(context.Background(), publicKey, &rawMessage)

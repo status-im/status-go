@@ -111,9 +111,9 @@ func (m *Messenger) publishOrg(org *communities.Community) error {
 		Payload: payload,
 		Sender:  org.PrivateKey(),
 		// we don't want to wrap in an encryption layer message
-		SkipProtocolLayer: true,
-		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION,
-		PubsubTopic:       org.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION,
+		PubsubTopic:         org.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
 	}
 	_, err = m.sender.SendPublic(context.Background(), org.IDString(), rawMessage)
 	return err
@@ -131,9 +131,9 @@ func (m *Messenger) publishCommunityEvents(community *communities.Community, msg
 		Payload: payload,
 		Sender:  m.identity,
 		// we don't want to wrap in an encryption layer message
-		SkipProtocolLayer: true,
-		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_EVENTS_MESSAGE,
-		PubsubTopic:       community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_EVENTS_MESSAGE,
+		PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
 	}
 
 	// TODO: resend in case of failure?
@@ -161,9 +161,9 @@ func (m *Messenger) publishCommunityEventsRejected(community *communities.Commun
 		Payload: payload,
 		Sender:  community.PrivateKey(),
 		// we don't want to wrap in an encryption layer message
-		SkipProtocolLayer: true,
-		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_EVENTS_MESSAGE_REJECTED,
-		PubsubTopic:       community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_EVENTS_MESSAGE_REJECTED,
+		PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
 	}
 
 	// TODO: resend in case of failure?
@@ -181,10 +181,10 @@ func (m *Messenger) publishCommunityPrivilegedMemberSyncMessage(msg *communities
 	}
 
 	rawMessage := &common.RawMessage{
-		Payload:           payload,
-		Sender:            msg.CommunityPrivateKey, // if empty, sender private key will be used in SendPrivate
-		SkipProtocolLayer: true,
-		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE,
+		Payload:             payload,
+		Sender:              msg.CommunityPrivateKey, // if empty, sender private key will be used in SendPrivate
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE,
 	}
 
 	for _, receivers := range msg.Receivers {
@@ -1169,11 +1169,11 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	}
 
 	rawMessage := common.RawMessage{
-		Payload:           payload,
-		CommunityID:       community.ID(),
-		SkipProtocolLayer: true,
-		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
-		PubsubTopic:       common.DefaultNonProtectedPubsubTopic(community.Shard()),
+		Payload:             payload,
+		CommunityID:         community.ID(),
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
+		PubsubTopic:         common.DefaultNonProtectedPubsubTopic(community.Shard()),
 	}
 
 	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
@@ -1324,11 +1324,11 @@ func (m *Messenger) EditSharedAddressesForCommunity(request *requests.EditShared
 	}
 
 	rawMessage := common.RawMessage{
-		Payload:           payload,
-		CommunityID:       community.ID(),
-		SkipProtocolLayer: true,
-		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_EDIT_SHARED_ADDRESSES,
-		PubsubTopic:       community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+		Payload:             payload,
+		CommunityID:         community.ID(),
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_EDIT_SHARED_ADDRESSES,
+		PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
 	}
 
 	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
@@ -1488,11 +1488,11 @@ func (m *Messenger) CancelRequestToJoinCommunity(ctx context.Context, request *r
 	}
 
 	rawMessage := common.RawMessage{
-		Payload:           payload,
-		CommunityID:       community.ID(),
-		SkipProtocolLayer: true,
-		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN,
-		PubsubTopic:       common.DefaultNonProtectedPubsubTopic(community.Shard()),
+		Payload:             payload,
+		CommunityID:         community.ID(),
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_CANCEL_REQUEST_TO_JOIN,
+		PubsubTopic:         common.DefaultNonProtectedPubsubTopic(community.Shard()),
 	}
 	_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
 
@@ -1595,11 +1595,11 @@ func (m *Messenger) acceptRequestToJoinCommunity(requestToJoin *communities.Requ
 		}
 
 		rawMessage := &common.RawMessage{
-			Payload:           payload,
-			Sender:            community.PrivateKey(),
-			SkipProtocolLayer: true,
-			MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
-			PubsubTopic:       common.DefaultNonProtectedPubsubTopic(community.Shard()),
+			Payload:             payload,
+			Sender:              community.PrivateKey(),
+			SkipEncryptionLayer: true,
+			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN_RESPONSE,
+			PubsubTopic:         common.DefaultNonProtectedPubsubTopic(community.Shard()),
 		}
 
 		_, err = m.sender.SendPrivate(context.Background(), pk, rawMessage)
@@ -1674,10 +1674,10 @@ func (m *Messenger) declineRequestToJoinCommunity(requestToJoin *communities.Req
 		}
 
 		rawSyncMessage := &common.RawMessage{
-			Payload:           payloadSyncMsg,
-			Sender:            community.PrivateKey(),
-			SkipProtocolLayer: true,
-			MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE,
+			Payload:             payloadSyncMsg,
+			Sender:              community.PrivateKey(),
+			SkipEncryptionLayer: true,
+			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_PRIVILEGED_USER_SYNC_MESSAGE,
 		}
 
 		privilegedMembers := community.GetPrivilegedMembers()
@@ -1778,11 +1778,11 @@ func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerRespon
 		}
 
 		rawMessage := common.RawMessage{
-			Payload:           payload,
-			CommunityID:       communityID,
-			SkipProtocolLayer: true,
-			MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE,
-			PubsubTopic:       community.PubsubTopic(), // TODO: confirm if it should be sent in the community pubsub topic
+			Payload:             payload,
+			CommunityID:         communityID,
+			SkipEncryptionLayer: true,
+			MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_LEAVE,
+			PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in the community pubsub topic
 		}
 		_, err = m.sender.SendCommunityMessage(context.Background(), rawMessage)
 		if err != nil {
@@ -3197,11 +3197,11 @@ func (m *Messenger) sendSharedAddressToControlNode(receiver *ecdsa.PublicKey, co
 	}
 
 	rawMessage := common.RawMessage{
-		Payload:           payload,
-		CommunityID:       community.ID(),
-		SkipProtocolLayer: true,
-		MessageType:       protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
-		PubsubTopic:       community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
+		Payload:             payload,
+		CommunityID:         community.ID(),
+		SkipEncryptionLayer: true,
+		MessageType:         protobuf.ApplicationMetadataMessage_COMMUNITY_REQUEST_TO_JOIN,
+		PubsubTopic:         community.PubsubTopic(), // TODO: confirm if it should be sent in community pubsub topic
 	}
 
 	if err = m.communitiesManager.SaveRequestToJoin(requestToJoin); err != nil {
