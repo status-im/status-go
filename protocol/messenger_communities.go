@@ -865,6 +865,11 @@ func (m *Messenger) joinCommunity(ctx context.Context, communityID types.HexByte
 		if err = m.subscribeToCommunityShard(community.ID(), community.Shard()); err != nil {
 			return nil, err
 		}
+
+		if err = m.publishContactCodeInCommunity(community); err != nil {
+			return nil, err
+		}
+
 	}
 
 	communitySettings, err := m.communitiesManager.GetCommunitySettingsByID(communityID)
