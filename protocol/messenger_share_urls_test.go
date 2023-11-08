@@ -17,6 +17,15 @@ import (
 	"github.com/status-im/status-go/protocol/urls"
 )
 
+const (
+	userURL              = "https://status.app/u#zQ3shwQPhRuDJSjVGVBnTjCdgXy5i9WQaeVPdGJD6yTarJQSj"
+	userURLWithData      = "https://status.app/u/G10A4B0JdgwyRww90WXtnP1oNH1ZLQNM0yX0Ja9YyAMjrqSZIYINOHCbFhrnKRAcPGStPxCMJDSZlGCKzmZrJcimHY8BbcXlORrElv_BbQEegnMDPx1g9C5VVNl0fE4y#zQ3shwQPhRuDJSjVGVBnTjCdgXy5i9WQaeVPdGJD6yTarJQSj"
+	communityURL         = "https://status.app/c#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
+	communityURLWithData = "https://status.app/c/iyKACkQKB0Rvb2RsZXMSJ0NvbG9yaW5nIHRoZSB3b3JsZCB3aXRoIGpveSDigKIg4bSXIOKAohiYohsiByMxMzFEMkYqAwEhMwM=#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
+	channelURL           = "https://status.app/cc/003cdcd5-e065-48f9-b166-b1a94ac75a11#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
+	channelURLWithData   = "https://status.app/cc/G54AAKwObLdpiGjXnckYzRcOSq0QQAS_CURGfqVU42ceGHCObstUIknTTZDOKF3E8y2MSicncpO7fTskXnoACiPKeejvjtLTGWNxUhlT7fyQS7Jrr33UVHluxv_PLjV2ePGw5GQ33innzeK34pInIgUGs5RjdQifMVmURalxxQKwiuoY5zwIjixWWRHqjHM=#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
+)
+
 func TestMessengerShareUrlsSuite(t *testing.T) {
 	suite.Run(t, new(MessengerShareUrlsSuite))
 }
@@ -151,6 +160,68 @@ func (s *MessengerShareUrlsSuite) TestParseWrongUrls() {
 	}
 }
 
+func (s *MessengerShareUrlsSuite) TestIsStatusSharedUrl() {
+	testCases := []struct {
+		Name   string
+		URL    string
+		Result bool
+	}{
+		{
+			Name:   "Direct website link",
+			URL:    "https://status.app",
+			Result: false,
+		},
+		{
+			Name:   "Website page link",
+			URL:    "https://status.app/features/messenger",
+			Result: false,
+		},
+		{
+			// starts with `/c`, but no `#` after
+			Name:   "Website page link",
+			URL:    "https://status.app/communities",
+			Result: false,
+		},
+		{
+			Name:   "User link",
+			URL:    userURL,
+			Result: true,
+		},
+		{
+			Name:   "User link with data",
+			URL:    userURLWithData,
+			Result: true,
+		},
+		{
+			Name:   "Community link",
+			URL:    communityURL,
+			Result: true,
+		},
+		{
+			Name:   "Community link with data",
+			URL:    communityURLWithData,
+			Result: true,
+		},
+		{
+			Name:   "Channel link",
+			URL:    channelURL,
+			Result: true,
+		},
+		{
+			Name:   "Channel link with data",
+			URL:    channelURLWithData,
+			Result: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.Name, func() {
+			result := IsStatusSharedURL(tc.URL)
+			s.Require().Equal(tc.Result, result)
+		})
+	}
+}
+
 func (s *MessengerShareUrlsSuite) TestShareCommunityURLWithChatKey() {
 	community := s.createCommunity()
 
@@ -198,9 +269,7 @@ func (s *MessengerShareUrlsSuite) TestShareCommunityURLWithData() {
 }
 
 func (s *MessengerShareUrlsSuite) TestParseCommunityURLWithData() {
-	url := "https://status.app/c/iyKACkQKB0Rvb2RsZXMSJ0NvbG9yaW5nIHRoZSB3b3JsZCB3aXRoIGpveSDigKIg4bSXIOKAohiYohsiByMxMzFEMkYqAwEhMwM=#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
-
-	urlData, err := s.m.ParseSharedURL(url)
+	urlData, err := s.m.ParseSharedURL(communityURLWithData)
 	s.Require().NoError(err)
 	s.Require().NotNil(urlData)
 
@@ -290,9 +359,7 @@ func (s *MessengerShareUrlsSuite) TestShareCommunityChannelURLWithData() {
 }
 
 func (s *MessengerShareUrlsSuite) TestParseCommunityChannelURLWithData() {
-	url := "https://status.app/cc/G54AAKwObLdpiGjXnckYzRcOSq0QQAS_CURGfqVU42ceGHCObstUIknTTZDOKF3E8y2MSicncpO7fTskXnoACiPKeejvjtLTGWNxUhlT7fyQS7Jrr33UVHluxv_PLjV2ePGw5GQ33innzeK34pInIgUGs5RjdQifMVmURalxxQKwiuoY5zwIjixWWRHqjHM=#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11"
-
-	urlData, err := s.m.ParseSharedURL(url)
+	urlData, err := s.m.ParseSharedURL(channelURLWithData)
 	s.Require().NoError(err)
 	s.Require().NotNil(urlData)
 
@@ -392,8 +459,7 @@ func (s *MessengerShareUrlsSuite) TestShareUserURLWithENS() {
 // }
 
 func (s *MessengerShareUrlsSuite) TestParseUserURLWithData() {
-	url := "https://status.app/u/G10A4B0JdgwyRww90WXtnP1oNH1ZLQNM0yX0Ja9YyAMjrqSZIYINOHCbFhrnKRAcPGStPxCMJDSZlGCKzmZrJcimHY8BbcXlORrElv_BbQEegnMDPx1g9C5VVNl0fE4y#zQ3shwQPhRuDJSjVGVBnTjCdgXy5i9WQaeVPdGJD6yTarJQSj"
-	urlData, err := s.m.ParseSharedURL(url)
+	urlData, err := s.m.ParseSharedURL(userURLWithData)
 	s.Require().NoError(err)
 	s.Require().NotNil(urlData)
 
