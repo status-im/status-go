@@ -2927,14 +2927,9 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci *protobuf
 			contactModified = true
 		}
 
-		profileShowcase, err := m.BuildProfileShowcaseFromIdentity(state.CurrentMessageState.PublicKey, ci.ProfileShowcase)
+		err := m.BuildProfileShowcaseFromIdentity(state, ci.ProfileShowcase)
 		if err != nil {
 			return err
-		}
-
-		if !contact.ProfileShowcase.Equal(*profileShowcase) {
-			contact.ProfileShowcase = *profileShowcase
-			contactModified = true
 		}
 	}
 

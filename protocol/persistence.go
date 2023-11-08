@@ -727,12 +727,6 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			}
 			contact.SocialLinks = append(contact.SocialLinks, link)
 		}
-
-		profileShowcase, err := db.GetProfileShowcaseForContact(contact.ID)
-		if err != nil {
-			return nil, err
-		}
-		contact.ProfileShowcase = *profileShowcase
 	}
 
 	var response []*Contact

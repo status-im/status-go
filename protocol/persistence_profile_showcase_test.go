@@ -4,8 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
-
-	"github.com/status-im/status-go/protocol/identity"
 )
 
 func TestProfileShowcasePersistenceSuite(t *testing.T) {
@@ -113,46 +111,48 @@ func (s *TestProfileShowcasePersistence) TestProfileShowcaseContacts() {
 	s.Require().NoError(err)
 	persistence := newSQLitePersistence(db)
 
-	showcase1 := &identity.ProfileShowcase{
-		Communities: []*identity.ProfileShowcaseCommunity{
-			&identity.ProfileShowcaseCommunity{
+	showcase1 := &ProfileShowcase{
+		ContactID: "contact_1",
+		Communities: []*ProfileShowcaseCommunity{
+			&ProfileShowcaseCommunity{
 				CommunityID: "0x012312234234234",
 				Order:       6,
 			},
-			&identity.ProfileShowcaseCommunity{
+			&ProfileShowcaseCommunity{
 				CommunityID: "0x04523233466753",
 				Order:       7,
 			},
 		},
-		Assets: []*identity.ProfileShowcaseAsset{
-			&identity.ProfileShowcaseAsset{
+		Assets: []*ProfileShowcaseAsset{
+			&ProfileShowcaseAsset{
 				Symbol: "ETH",
 				Order:  1,
 			},
 		},
 	}
-	err = persistence.SaveProfileShowcaseForContact("contact_1", showcase1)
+	err = persistence.SaveProfileShowcaseForContact(showcase1)
 	s.Require().NoError(err)
 
-	showcase2 := &identity.ProfileShowcase{
-		Communities: []*identity.ProfileShowcaseCommunity{
-			&identity.ProfileShowcaseCommunity{
+	showcase2 := &ProfileShowcase{
+		ContactID: "contact_2",
+		Communities: []*ProfileShowcaseCommunity{
+			&ProfileShowcaseCommunity{
 				CommunityID: "0x012312234234234", // same id to check query
 				Order:       3,
 			},
-			&identity.ProfileShowcaseCommunity{
+			&ProfileShowcaseCommunity{
 				CommunityID: "0x096783478384593",
 				Order:       7,
 			},
 		},
-		Collectibles: []*identity.ProfileShowcaseCollectible{
-			&identity.ProfileShowcaseCollectible{
+		Collectibles: []*ProfileShowcaseCollectible{
+			&ProfileShowcaseCollectible{
 				UID:   "d378662f-3d71-44e0-81ee-ff7f1778c13a",
 				Order: 1,
 			},
 		},
 	}
-	err = persistence.SaveProfileShowcaseForContact("contact_2", showcase2)
+	err = persistence.SaveProfileShowcaseForContact(showcase2)
 	s.Require().NoError(err)
 
 	showcase1Back, err := persistence.GetProfileShowcaseForContact("contact_1")

@@ -269,7 +269,7 @@ func (s *TestMessengerProfileShowcase) TestEncryptAndDecryptProfileShowcaseEntri
 	data, err := s.m.EncryptProfileShowcaseEntriesWithContactPubKeys(entries, s.m.Contacts())
 	s.Require().NoError(err)
 
-	entriesBack, err := theirMessenger.DecryptProfileShowcaseEntriesWithContactPubKeys(&s.m.identity.PublicKey, data)
+	entriesBack, err := theirMessenger.DecryptProfileShowcaseEntriesWithPubKey(&s.m.identity.PublicKey, data)
 	s.Require().NoError(err)
 
 	s.Require().Equal(2, len(entriesBack.Communities))
@@ -334,14 +334,16 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	resp, err := WaitOnMessengerResponse(
 		mutualContact,
 		func(r *MessengerResponse) bool {
-			return len(r.Contacts) > 0
+			return len(r.updatedProfileShowcases) > 0
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(resp.Contacts, 1)
+	s.Require().Len(resp.updatedProfileShowcases, 1)
 
-	profileShowcase := resp.Contacts[0].ProfileShowcase
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+	profileShowcase := resp.updatedProfileShowcases[contactID]
+
 	s.Require().Len(profileShowcase.Communities, 2)
 
 	// For everyone
@@ -360,21 +362,23 @@ func (s *TestMessengerProfileShowcase) TestShareShowcasePreferences() {
 	s.Require().Equal(profileShowcase.Accounts[0].Order, request.Accounts[0].Order)
 
 	s.Require().Len(profileShowcase.Collectibles, 0)
-
 	s.Require().Len(profileShowcase.Assets, 0)
 
 	// Get summarised profile data for verified contact
 	resp, err = WaitOnMessengerResponse(
 		verifiedContact,
 		func(r *MessengerResponse) bool {
-			return len(r.Contacts) > 0
+			return len(r.updatedProfileShowcases) > 0
 		},
 		"no messages",
 	)
 	s.Require().NoError(err)
-	s.Require().Len(resp.Contacts, 1)
+	s.Require().Len(resp.updatedProfileShowcases, 1)
 
-	profileShowcase = resp.Contacts[0].ProfileShowcase
+	// Here let's try synchronous
+	profileShowcase, err = verifiedContact.GetProfileShowcaseForContact(contactID)
+	s.Require().NoError(err)
+
 	s.Require().Len(profileShowcase.Communities, 3)
 
 	// For everyone

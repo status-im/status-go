@@ -9,7 +9,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-var ErrCipherMessageAutentificationFailed = errors.New("cipher: message authentication failed")
+var ErrCipherMessageAutentificationFailed = "cipher: message authentication failed"
 
 func EncryptIdentityImagesWithContactPubKeys(iis map[string]*protobuf.IdentityImage, m *Messenger) (err error) {
 	// Make AES key
@@ -79,7 +79,7 @@ image:
 			// Decrypt the main encryption AES key with AES encryption using the DH key
 			dAESKey, err := common.Decrypt(empk, sharedKey)
 			if err != nil {
-				if err == ErrCipherMessageAutentificationFailed {
+				if err.Error() == ErrCipherMessageAutentificationFailed {
 					continue
 				}
 				return err

@@ -3,8 +3,6 @@ package protocol
 import (
 	"context"
 	"database/sql"
-
-	"github.com/status-im/status-go/protocol/identity"
 )
 
 type ProfileShowcaseVisibility int
@@ -78,6 +76,37 @@ type ProfileShowcasePreferences struct {
 	Assets       []*ProfileShowcaseAssetPreference       `json:"assets"`
 }
 
+type ProfileShowcaseCommunity struct {
+	CommunityID string `json:"communityId"`
+	Order       int    `json:"order"`
+}
+
+type ProfileShowcaseAccount struct {
+	Address string `json:"address"`
+	Name    string `json:"name"`
+	ColorID string `json:"colorId"`
+	Emoji   string `json:"emoji"`
+	Order   int    `json:"order"`
+}
+
+type ProfileShowcaseCollectible struct {
+	UID   string `json:"uid"`
+	Order int    `json:"order"`
+}
+
+type ProfileShowcaseAsset struct {
+	Symbol string `json:"symbol"`
+	Order  int    `json:"order"`
+}
+
+type ProfileShowcase struct {
+	ContactID    string                        `json:"contactId"`
+	Communities  []*ProfileShowcaseCommunity   `json:"communities"`
+	Accounts     []*ProfileShowcaseAccount     `json:"accounts"`
+	Collectibles []*ProfileShowcaseCollectible `json:"collectibles"`
+	Assets       []*ProfileShowcaseAsset       `json:"assets"`
+}
+
 // Queries for showcase preferences
 func (db sqlitePersistence) saveProfileShowcaseCommunityPreference(tx *sql.Tx, community *ProfileShowcaseCommunityPreference) error {
 	_, err := tx.Exec(upsertProfileShowcaseCommunityPreferenceQuery,
@@ -86,11 +115,7 @@ func (db sqlitePersistence) saveProfileShowcaseCommunityPreference(tx *sql.Tx, c
 		community.Order,
 	)
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (db sqlitePersistence) getProfileShowcaseCommunitiesPreferences(tx *sql.Tx) ([]*ProfileShowcaseCommunityPreference, error) {
@@ -129,11 +154,7 @@ func (db sqlitePersistence) saveProfileShowcaseAccountPreference(tx *sql.Tx, acc
 		account.Order,
 	)
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (db sqlitePersistence) getProfileShowcaseAccountsPreferences(tx *sql.Tx) ([]*ProfileShowcaseAccountPreference, error) {
@@ -172,11 +193,7 @@ func (db sqlitePersistence) saveProfileShowcaseCollectiblePreference(tx *sql.Tx,
 		collectible.Order,
 	)
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (db sqlitePersistence) getProfileShowcaseCollectiblesPreferences(tx *sql.Tx) ([]*ProfileShowcaseCollectiblePreference, error) {
@@ -212,11 +229,7 @@ func (db sqlitePersistence) saveProfileShowcaseAssetPreference(tx *sql.Tx, asset
 		asset.Order,
 	)
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (db sqlitePersistence) getProfileShowcaseAssetsPreferences(tx *sql.Tx) ([]*ProfileShowcaseAssetPreference, error) {
@@ -246,30 +259,26 @@ func (db sqlitePersistence) getProfileShowcaseAssetsPreferences(tx *sql.Tx) ([]*
 }
 
 // Queries for contacts showcase
-func (db sqlitePersistence) saveProfileShowcaseCommunityContact(tx *sql.Tx, contactID string, community *identity.ProfileShowcaseCommunity) error {
+func (db sqlitePersistence) saveProfileShowcaseCommunityContact(tx *sql.Tx, contactID string, community *ProfileShowcaseCommunity) error {
 	_, err := tx.Exec(upsertContactProfileShowcaseCommunityQuery,
 		contactID,
 		community.CommunityID,
 		community.Order,
 	)
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
-func (db sqlitePersistence) getProfileShowcaseCommunitiesContact(tx *sql.Tx, contactID string) ([]*identity.ProfileShowcaseCommunity, error) {
+func (db sqlitePersistence) getProfileShowcaseCommunitiesContact(tx *sql.Tx, contactID string) ([]*ProfileShowcaseCommunity, error) {
 	rows, err := tx.Query(selectContactProfileShowcaseCommunityQuery, contactID)
 	if err != nil {
 		return nil, err
 	}
 
-	communities := []*identity.ProfileShowcaseCommunity{}
+	communities := []*ProfileShowcaseCommunity{}
 
 	for rows.Next() {
-		community := &identity.ProfileShowcaseCommunity{}
+		community := &ProfileShowcaseCommunity{}
 
 		err := rows.Scan(&community.CommunityID, &community.Order)
 		if err != nil {
@@ -290,7 +299,7 @@ func (db sqlitePersistence) clearProfileShowcaseCommunityContact(tx *sql.Tx, con
 	return nil
 }
 
-func (db sqlitePersistence) saveProfileShowcaseAccountContact(tx *sql.Tx, contactID string, account *identity.ProfileShowcaseAccount) error {
+func (db sqlitePersistence) saveProfileShowcaseAccountContact(tx *sql.Tx, contactID string, account *ProfileShowcaseAccount) error {
 	_, err := tx.Exec(upsertContactProfileShowcaseAccountQuery,
 		contactID,
 		account.Address,
@@ -300,23 +309,19 @@ func (db sqlitePersistence) saveProfileShowcaseAccountContact(tx *sql.Tx, contac
 		account.Order,
 	)
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
-func (db sqlitePersistence) getProfileShowcaseAccountsContact(tx *sql.Tx, contactID string) ([]*identity.ProfileShowcaseAccount, error) {
+func (db sqlitePersistence) getProfileShowcaseAccountsContact(tx *sql.Tx, contactID string) ([]*ProfileShowcaseAccount, error) {
 	rows, err := tx.Query(selectContactProfileShowcaseAccountQuery, contactID)
 	if err != nil {
 		return nil, err
 	}
 
-	accounts := []*identity.ProfileShowcaseAccount{}
+	accounts := []*ProfileShowcaseAccount{}
 
 	for rows.Next() {
-		account := &identity.ProfileShowcaseAccount{}
+		account := &ProfileShowcaseAccount{}
 
 		err := rows.Scan(&account.Address, &account.Name, &account.ColorID, &account.Emoji, &account.Order)
 		if err != nil {
@@ -330,37 +335,29 @@ func (db sqlitePersistence) getProfileShowcaseAccountsContact(tx *sql.Tx, contac
 
 func (db sqlitePersistence) clearProfileShowcaseAccountsContact(tx *sql.Tx, contactID string) error {
 	_, err := tx.Exec(removeContactProfileShowcaseAccountQuery, contactID)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
-func (db sqlitePersistence) saveProfileShowcaseCollectibleContact(tx *sql.Tx, contactID string, community *identity.ProfileShowcaseCollectible) error {
+func (db sqlitePersistence) saveProfileShowcaseCollectibleContact(tx *sql.Tx, contactID string, community *ProfileShowcaseCollectible) error {
 	_, err := tx.Exec(upsertContactProfileShowcaseCollectibleQuery,
 		contactID,
 		community.UID,
 		community.Order,
 	)
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
-func (db sqlitePersistence) getProfileShowcaseCollectiblesContact(tx *sql.Tx, contactID string) ([]*identity.ProfileShowcaseCollectible, error) {
+func (db sqlitePersistence) getProfileShowcaseCollectiblesContact(tx *sql.Tx, contactID string) ([]*ProfileShowcaseCollectible, error) {
 	rows, err := tx.Query(selectContactProfileShowcaseCollectibleQuery, contactID)
 	if err != nil {
 		return nil, err
 	}
 
-	collectibles := []*identity.ProfileShowcaseCollectible{}
+	collectibles := []*ProfileShowcaseCollectible{}
 
 	for rows.Next() {
-		collectible := &identity.ProfileShowcaseCollectible{}
+		collectible := &ProfileShowcaseCollectible{}
 
 		err := rows.Scan(&collectible.UID, &collectible.Order)
 		if err != nil {
@@ -374,37 +371,29 @@ func (db sqlitePersistence) getProfileShowcaseCollectiblesContact(tx *sql.Tx, co
 
 func (db sqlitePersistence) clearProfileShowcaseCollectiblesContact(tx *sql.Tx, contactID string) error {
 	_, err := tx.Exec(removeContactProfileShowcaseCollectibleQuery, contactID)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
-func (db sqlitePersistence) saveProfileShowcaseAssetContact(tx *sql.Tx, contactID string, asset *identity.ProfileShowcaseAsset) error {
+func (db sqlitePersistence) saveProfileShowcaseAssetContact(tx *sql.Tx, contactID string, asset *ProfileShowcaseAsset) error {
 	_, err := tx.Exec(upsertContactProfileShowcaseAssetQuery,
 		contactID,
 		asset.Symbol,
 		asset.Order,
 	)
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
-func (db sqlitePersistence) getProfileShowcaseAssetsContact(tx *sql.Tx, contactID string) ([]*identity.ProfileShowcaseAsset, error) {
+func (db sqlitePersistence) getProfileShowcaseAssetsContact(tx *sql.Tx, contactID string) ([]*ProfileShowcaseAsset, error) {
 	rows, err := tx.Query(selectContactProfileShowcaseAssetQuery, contactID)
 	if err != nil {
 		return nil, err
 	}
 
-	assets := []*identity.ProfileShowcaseAsset{}
+	assets := []*ProfileShowcaseAsset{}
 
 	for rows.Next() {
-		asset := &identity.ProfileShowcaseAsset{}
+		asset := &ProfileShowcaseAsset{}
 
 		err := rows.Scan(&asset.Symbol, &asset.Order)
 		if err != nil {
@@ -418,11 +407,7 @@ func (db sqlitePersistence) getProfileShowcaseAssetsContact(tx *sql.Tx, contactI
 
 func (db sqlitePersistence) clearProfileShowcaseAssetsContact(tx *sql.Tx, contactID string) error {
 	_, err := tx.Exec(removeContactProfileShowcaseAssetQuery, contactID)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // public functions
@@ -513,7 +498,7 @@ func (db sqlitePersistence) GetProfileShowcasePreferences() (*ProfileShowcasePre
 	}, nil
 }
 
-func (db sqlitePersistence) SaveProfileShowcaseForContact(contactID string, showcase *identity.ProfileShowcase) error {
+func (db sqlitePersistence) SaveProfileShowcaseForContact(showcase *ProfileShowcase) error {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -528,28 +513,28 @@ func (db sqlitePersistence) SaveProfileShowcaseForContact(contactID string, show
 	}()
 
 	for _, community := range showcase.Communities {
-		err = db.saveProfileShowcaseCommunityContact(tx, contactID, community)
+		err = db.saveProfileShowcaseCommunityContact(tx, showcase.ContactID, community)
 		if err != nil {
 			return err
 		}
 	}
 
 	for _, account := range showcase.Accounts {
-		err = db.saveProfileShowcaseAccountContact(tx, contactID, account)
+		err = db.saveProfileShowcaseAccountContact(tx, showcase.ContactID, account)
 		if err != nil {
 			return err
 		}
 	}
 
 	for _, collectible := range showcase.Collectibles {
-		err = db.saveProfileShowcaseCollectibleContact(tx, contactID, collectible)
+		err = db.saveProfileShowcaseCollectibleContact(tx, showcase.ContactID, collectible)
 		if err != nil {
 			return err
 		}
 	}
 
 	for _, asset := range showcase.Assets {
-		err = db.saveProfileShowcaseAssetContact(tx, contactID, asset)
+		err = db.saveProfileShowcaseAssetContact(tx, showcase.ContactID, asset)
 		if err != nil {
 			return err
 		}
@@ -558,7 +543,7 @@ func (db sqlitePersistence) SaveProfileShowcaseForContact(contactID string, show
 	return nil
 }
 
-func (db sqlitePersistence) GetProfileShowcaseForContact(contactID string) (*identity.ProfileShowcase, error) {
+func (db sqlitePersistence) GetProfileShowcaseForContact(contactID string) (*ProfileShowcase, error) {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return nil, err
@@ -592,7 +577,8 @@ func (db sqlitePersistence) GetProfileShowcaseForContact(contactID string) (*ide
 		return nil, err
 	}
 
-	return &identity.ProfileShowcase{
+	return &ProfileShowcase{
+		ContactID:    contactID,
 		Communities:  communities,
 		Accounts:     accounts,
 		Collectibles: collectibles,

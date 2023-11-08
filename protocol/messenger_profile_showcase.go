@@ -4,13 +4,11 @@ import (
 	"crypto/ecdsa"
 	crand "crypto/rand"
 	"errors"
+	"reflect"
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/identity"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -77,10 +75,10 @@ func toProfileShowcaseAssetProto(preferences []*ProfileShowcaseAssetPreference, 
 	return assets
 }
 
-func fromProfileShowcaseCommunityProto(messages []*protobuf.ProfileShowcaseCommunity) []*identity.ProfileShowcaseCommunity {
-	communities := []*identity.ProfileShowcaseCommunity{}
+func fromProfileShowcaseCommunityProto(messages []*protobuf.ProfileShowcaseCommunity) []*ProfileShowcaseCommunity {
+	communities := []*ProfileShowcaseCommunity{}
 	for _, entry := range messages {
-		communities = append(communities, &identity.ProfileShowcaseCommunity{
+		communities = append(communities, &ProfileShowcaseCommunity{
 			CommunityID: entry.CommunityId,
 			Order:       int(entry.Order),
 		})
@@ -88,10 +86,10 @@ func fromProfileShowcaseCommunityProto(messages []*protobuf.ProfileShowcaseCommu
 	return communities
 }
 
-func fromProfileShowcaseAccountProto(messages []*protobuf.ProfileShowcaseAccount) []*identity.ProfileShowcaseAccount {
-	accounts := []*identity.ProfileShowcaseAccount{}
+func fromProfileShowcaseAccountProto(messages []*protobuf.ProfileShowcaseAccount) []*ProfileShowcaseAccount {
+	accounts := []*ProfileShowcaseAccount{}
 	for _, entry := range messages {
-		accounts = append(accounts, &identity.ProfileShowcaseAccount{
+		accounts = append(accounts, &ProfileShowcaseAccount{
 			Address: entry.Address,
 			Name:    entry.Name,
 			ColorID: entry.ColorId,
@@ -102,10 +100,10 @@ func fromProfileShowcaseAccountProto(messages []*protobuf.ProfileShowcaseAccount
 	return accounts
 }
 
-func fromProfileShowcaseCollectibleProto(messages []*protobuf.ProfileShowcaseCollectible) []*identity.ProfileShowcaseCollectible {
-	collectibles := []*identity.ProfileShowcaseCollectible{}
+func fromProfileShowcaseCollectibleProto(messages []*protobuf.ProfileShowcaseCollectible) []*ProfileShowcaseCollectible {
+	collectibles := []*ProfileShowcaseCollectible{}
 	for _, entry := range messages {
-		collectibles = append(collectibles, &identity.ProfileShowcaseCollectible{
+		collectibles = append(collectibles, &ProfileShowcaseCollectible{
 			UID:   entry.Uid,
 			Order: int(entry.Order),
 		})
@@ -113,10 +111,10 @@ func fromProfileShowcaseCollectibleProto(messages []*protobuf.ProfileShowcaseCol
 	return collectibles
 }
 
-func fromProfileShowcaseAssetProto(messages []*protobuf.ProfileShowcaseAsset) []*identity.ProfileShowcaseAsset {
-	assets := []*identity.ProfileShowcaseAsset{}
+func fromProfileShowcaseAssetProto(messages []*protobuf.ProfileShowcaseAsset) []*ProfileShowcaseAsset {
+	assets := []*ProfileShowcaseAsset{}
 	for _, entry := range messages {
-		assets = append(assets, &identity.ProfileShowcaseAsset{
+		assets = append(assets, &ProfileShowcaseAsset{
 			Symbol: entry.Symbol,
 			Order:  int(entry.Order),
 		})
@@ -135,6 +133,10 @@ func (m *Messenger) SetProfileShowcasePreferences(preferences *ProfileShowcasePr
 
 func (m *Messenger) GetProfileShowcasePreferences() (*ProfileShowcasePreferences, error) {
 	return m.persistence.GetProfileShowcasePreferences()
+}
+
+func (m *Messenger) GetProfileShowcaseForContact(contactID string) (*ProfileShowcase, error) {
+	return m.persistence.GetProfileShowcaseForContact(contactID)
 }
 
 func (m *Messenger) EncryptProfileShowcaseEntriesWithContactPubKeys(entries *protobuf.ProfileShowcaseEntries, contacts []*Contact) (*protobuf.ProfileShowcaseEntriesEncrypted, error) {
@@ -188,7 +190,7 @@ func (m *Messenger) EncryptProfileShowcaseEntriesWithContactPubKeys(entries *pro
 	}, nil
 }
 
-func (m *Messenger) DecryptProfileShowcaseEntriesWithContactPubKeys(senderPubKey *ecdsa.PublicKey, encrypted *protobuf.ProfileShowcaseEntriesEncrypted) (*protobuf.ProfileShowcaseEntries, error) {
+func (m *Messenger) DecryptProfileShowcaseEntriesWithPubKey(senderPubKey *ecdsa.PublicKey, encrypted *protobuf.ProfileShowcaseEntriesEncrypted) (*protobuf.ProfileShowcaseEntries, error) {
 	for _, eAESKey := range encrypted.EncryptionKeys {
 		// Generate a Diffie-Helman (DH) between the recipient's private key and the sender's public key
 		sharedKey, err := common.MakeECDHSharedKey(m.identity, senderPubKey)
@@ -199,7 +201,7 @@ func (m *Messenger) DecryptProfileShowcaseEntriesWithContactPubKeys(senderPubKey
 		// Decrypt the main encryption AES key with AES encryption using the DH key
 		dAESKey, err := common.Decrypt(eAESKey, sharedKey)
 		if err != nil {
-			if err == ErrCipherMessageAutentificationFailed {
+			if err.Error() == ErrCipherMessageAutentificationFailed {
 				continue
 			}
 			return nil, err
@@ -284,20 +286,23 @@ func (m *Messenger) GetProfileShowcaseForSelfIdentity() (*protobuf.ProfileShowca
 	}, nil
 }
 
-func (m *Messenger) BuildProfileShowcaseFromIdentity(senderPubKey *ecdsa.PublicKey, message *protobuf.ProfileShowcase) (*identity.ProfileShowcase, error) {
-	communities := []*identity.ProfileShowcaseCommunity{}
-	accounts := []*identity.ProfileShowcaseAccount{}
-	collectibles := []*identity.ProfileShowcaseCollectible{}
-	assets := []*identity.ProfileShowcaseAsset{}
+func (m *Messenger) BuildProfileShowcaseFromIdentity(state *ReceivedMessageState, message *protobuf.ProfileShowcase) error {
+	communities := []*ProfileShowcaseCommunity{}
+	accounts := []*ProfileShowcaseAccount{}
+	collectibles := []*ProfileShowcaseCollectible{}
+	assets := []*ProfileShowcaseAsset{}
 
 	communities = append(communities, fromProfileShowcaseCommunityProto(message.ForEveryone.Communities)...)
 	accounts = append(accounts, fromProfileShowcaseAccountProto(message.ForEveryone.Accounts)...)
 	collectibles = append(collectibles, fromProfileShowcaseCollectibleProto(message.ForEveryone.Collectibles)...)
 	assets = append(assets, fromProfileShowcaseAssetProto(message.ForEveryone.Assets)...)
 
-	forContacts, err := m.DecryptProfileShowcaseEntriesWithContactPubKeys(senderPubKey, message.ForContacts)
+	senderPubKey := state.CurrentMessageState.PublicKey
+	contactID := state.CurrentMessageState.Contact.ID
+
+	forContacts, err := m.DecryptProfileShowcaseEntriesWithPubKey(senderPubKey, message.ForContacts)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if forContacts != nil {
@@ -307,9 +312,9 @@ func (m *Messenger) BuildProfileShowcaseFromIdentity(senderPubKey *ecdsa.PublicK
 		assets = append(assets, fromProfileShowcaseAssetProto(forContacts.Assets)...)
 	}
 
-	forIDVerifiedContacts, err := m.DecryptProfileShowcaseEntriesWithContactPubKeys(senderPubKey, message.ForIdVerifiedContacts)
+	forIDVerifiedContacts, err := m.DecryptProfileShowcaseEntriesWithPubKey(senderPubKey, message.ForIdVerifiedContacts)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if forIDVerifiedContacts != nil {
@@ -319,24 +324,33 @@ func (m *Messenger) BuildProfileShowcaseFromIdentity(senderPubKey *ecdsa.PublicK
 		assets = append(assets, fromProfileShowcaseAssetProto(forIDVerifiedContacts.Assets)...)
 	}
 
-	showcase := &identity.ProfileShowcase{
+	newShowcase := &ProfileShowcase{
+		ContactID:    contactID,
 		Communities:  communities,
 		Accounts:     accounts,
 		Collectibles: collectibles,
 		Assets:       assets,
 	}
 
-	contactID := types.EncodeHex(crypto.FromECDSAPub(senderPubKey))
+	oldShowcase, err := m.persistence.GetProfileShowcaseForContact(contactID)
+	if err != nil {
+		return err
+	}
+
+	if reflect.DeepEqual(newShowcase, oldShowcase) {
+		return nil
+	}
 
 	err = m.persistence.ClearProfileShowcaseForContact(contactID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = m.persistence.SaveProfileShowcaseForContact(contactID, showcase)
+	err = m.persistence.SaveProfileShowcaseForContact(newShowcase)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return showcase, nil
+	state.Response.AddProfileShowcase(newShowcase)
+	return nil
 }

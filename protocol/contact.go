@@ -111,8 +111,6 @@ type Contact struct {
 
 	SocialLinks identity.SocialLinks `json:"socialLinks"`
 
-	ProfileShowcase identity.ProfileShowcase `json:"profileShowcase"`
-
 	Images map[string]images.IdentityImage `json:"images"`
 
 	Blocked bool `json:"blocked"`

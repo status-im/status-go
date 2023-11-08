@@ -1631,6 +1631,11 @@ func (api *PublicAPI) GetProfileShowcasePreferences() (*protocol.ProfileShowcase
 	return api.service.messenger.GetProfileShowcasePreferences()
 }
 
+// Get profile showcase for a contact
+func (api *PublicAPI) GetProfileShowcaseForContact(contactID string) (*protocol.ProfileShowcase, error) {
+	return api.service.messenger.GetProfileShowcaseForContact(contactID)
+}
+
 // Returns response with AC notification when owner token is received
 func (api *PublicAPI) RegisterOwnerTokenReceivedNotification(communityID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateResponseWithACNotification(communityID, protocol.ActivityCenterNotificationTypeOwnerTokenReceived, false)
