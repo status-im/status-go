@@ -1,7 +1,6 @@
 package common
 
 import (
-	"encoding/hex"
 	"fmt"
 	"net/url"
 
@@ -375,7 +374,7 @@ func (m *Message) ConvertStatusLinkPreviewsToProto() (*protobuf.UnfurledStatusLi
 		}
 
 		if preview.Contact != nil {
-			decompressedPublicKey, err := hex.DecodeString(preview.Contact.PublicKey[2:])
+			decompressedPublicKey, err := types.DecodeHex(preview.Contact.PublicKey)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode contact public key: %w", err)
 			}

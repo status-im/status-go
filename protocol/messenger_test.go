@@ -2299,6 +2299,11 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	s.NoError(err)
 	inputMsg := buildTestMessage(*chat)
 
+	contactPublicKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	compressedContactPublicKey := crypto.CompressPubkey(&contactPublicKey.PublicKey)
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&contactPublicKey.PublicKey))
+
 	preview := common.LinkPreview{
 		Type:        protobuf.UnfurledLink_LINK,
 		URL:         "https://github.com",
@@ -2315,7 +2320,7 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	sentContactPreview := common.StatusLinkPreview{
 		URL: "https://status.app/u/TestUrl",
 		Contact: &common.StatusContactLinkPreview{
-			PublicKey:   "TestPublicKey",
+			PublicKey:   contactID,
 			DisplayName: "TestDisplayName",
 			Description: "Test description",
 			Icon: common.LinkPreviewThumbnail{
@@ -2363,7 +2368,7 @@ func (s *MessengerSuite) TestSendMessageWithPreviews() {
 	s.Require().Nil(savedStatusLinkProto.GetChannel())
 
 	savedContactProto := savedStatusLinkProto.GetContact()
-	s.Require().Equal(sentContactPreview.Contact.PublicKey, string(savedContactProto.PublicKey))
+	s.Require().Equal(compressedContactPublicKey, savedContactProto.PublicKey)
 	s.Require().Equal(sentContactPreview.Contact.DisplayName, savedContactProto.DisplayName)
 	s.Require().Equal(sentContactPreview.Contact.Description, savedContactProto.Description)
 	s.Require().NotNil(savedContactProto.Icon)
