@@ -8,11 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-// Logger returns the main logger instance used by status-go.
-func Logger() log.Logger {
-	return log.Root()
-}
-
 var (
 	_zapLogger     *zap.Logger
 	_initZapLogger sync.Once
@@ -23,7 +18,7 @@ var (
 func ZapLogger() *zap.Logger {
 	_initZapLogger.Do(func() {
 		var err error
-		_zapLogger, err = NewZapLoggerWithAdapter(Logger())
+		_zapLogger, err = NewZapLoggerWithAdapter(log.Root())
 		if err != nil {
 			panic(err)
 		}

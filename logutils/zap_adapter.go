@@ -84,17 +84,20 @@ func (c gethLoggerCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
 		}
 	}
 
+	// set callDepth to 3 for `Output` to skip the calls to zap.Logger
+	// and get the correct caller in the log
+	callDepth := 3
 	switch ent.Level {
 	case zapcore.DebugLevel:
-		c.logger.Debug(ent.Message, args...)
+		c.logger.Output(ent.Message, log.LvlDebug, callDepth, args...)
 	case zapcore.InfoLevel:
-		c.logger.Info(ent.Message, args...)
+		c.logger.Output(ent.Message, log.LvlInfo, callDepth, args...)
 	case zapcore.WarnLevel:
-		c.logger.Warn(ent.Message, args...)
+		c.logger.Output(ent.Message, log.LvlWarn, callDepth, args...)
 	case zapcore.ErrorLevel:
-		c.logger.Error(ent.Message, args...)
+		c.logger.Output(ent.Message, log.LvlError, callDepth, args...)
 	case zapcore.DPanicLevel, zapcore.PanicLevel, zapcore.FatalLevel:
-		c.logger.Crit(ent.Message, args...)
+		c.logger.Output(ent.Message, log.LvlCrit, callDepth, args...)
 	}
 
 	return nil
@@ -144,5 +147,6 @@ func NewZapLoggerWithAdapter(logger log.Logger) (*zap.Logger, error) {
 			return NewZapAdapter(logger, cfg.Level)
 		},
 	)
+	log.PrintOrigins(true)
 	return cfg.Build(adapter)
 }
