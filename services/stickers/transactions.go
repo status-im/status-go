@@ -2,15 +2,19 @@ package stickers
 
 import (
 	"context"
+	"encoding/hex"
+	"errors"
 	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/contracts/snt"
 	"github.com/status-im/status-go/contracts/stickers"
 	"github.com/status-im/status-go/eth-node/types"
@@ -20,7 +24,9 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-func (api *API) Buy(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, packID *bigint.BigInt, password string) (string, error) {
+// Prepares a transaction for buying a sticker pack and returns the transaction hash that needs to be signed.
+// The transaction will be signed using the SignPreparedTx method or elswhere (on Keycard) and then sent using the SendPreparedTxWithSignature method.
+func (api *API) PrepareTxForBuyingStickers(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, packID *bigint.BigInt) (interface{}, error) {
 	snt, err := api.contractMaker.NewSNT(chainID)
 	if err != nil {
 		return "", err
@@ -53,7 +59,7 @@ func (api *API) Buy(ctx context.Context, chainID uint64, txArgs transactions.Sen
 		return "", err
 	}
 
-	txOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.keyStoreDir, txArgs.From, password))
+	txOpts := txArgs.ToTransactOpts(nil)
 	tx, err := snt.ApproveAndCall(
 		txOpts,
 		stickerMarketAddress,
@@ -65,23 +71,89 @@ func (api *API) Buy(ctx context.Context, chainID uint64, txArgs transactions.Sen
 		return "", err
 	}
 
-	err = api.AddPending(chainID, packID)
+	api.txSignDetails = &txSigningDetails{
+		txType:        transactions.BuyStickerPack,
+		chainID:       chainID,
+		from:          txOpts.From,
+		txBeingSigned: tx,
+		packID:        packID,
+	}
+
+	signer := ethTypes.NewLondonSigner(new(big.Int).SetUint64(api.txSignDetails.chainID))
+	return signer.Hash(api.txSignDetails.txBeingSigned), nil
+}
+
+// Signs a transaction using appropriate local keystore file that is decrypted with provided password and returns the signature in hex format.
+// The tx that will be signed is the one that was prepared by the last call to PrepareTxForBuyingStickers method.
+func (api *API) SignPreparedTx(password string) (interface{}, error) {
+	if api.txSignDetails == nil {
+		return nil, errors.New("no tx to sign")
+	}
+
+	if api.txSignDetails.txType != transactions.BuyStickerPack {
+		return nil, errors.New("not supported tx type")
+	}
+
+	return utils.SignTx(api.txSignDetails.chainID, api.accountsManager, api.keyStoreDir,
+		types.Address(api.txSignDetails.from), password, api.txSignDetails.txBeingSigned)
+}
+
+// Sends a transaction using provided signature and returns the transaction hash.
+// Provided signature must be in hex format and must be the result of signing the tx that was prepared by the last call to PrepareTxForBuyingStickers method.
+func (api *API) SendPreparedTxWithSignature(ctx context.Context, signature string) (string, error) {
+	if api.txSignDetails == nil {
+		return "", errors.New("no known tx to send to register ens username")
+	}
+
+	if api.txSignDetails.txType != transactions.BuyStickerPack {
+		return "", errors.New("not supported tx type")
+	}
+
+	signature = strings.TrimPrefix(signature, "0x")
+	byteSignature, err := hex.DecodeString(signature)
+	if err != nil {
+		return "", err
+	}
+	if len(byteSignature) != transactions.ValidSignatureSize {
+		return "", transactions.ErrInvalidSignatureSize
+	}
+
+	signer := ethTypes.NewLondonSigner(new(big.Int).SetUint64(api.txSignDetails.chainID))
+	signedTx, err := api.txSignDetails.txBeingSigned.WithSignature(signer, byteSignature)
+	if err != nil {
+		return "", err
+	}
+
+	backend, err := api.contractMaker.RPCClient.EthClient(api.txSignDetails.chainID)
+	if err != nil {
+		return "", err
+	}
+
+	err = backend.SendTransaction(ctx, signedTx)
 	if err != nil {
 		return "", err
 	}
 
 	err = api.pendingTracker.TrackPendingTransaction(
-		wcommon.ChainID(chainID),
-		tx.Hash(),
-		common.Address(txArgs.From),
-		transactions.BuyStickerPack,
+		wcommon.ChainID(api.txSignDetails.chainID),
+		signedTx.Hash(),
+		api.txSignDetails.from,
+		api.txSignDetails.txType,
 		transactions.AutoDelete,
 	)
 	if err != nil {
+		log.Error("TrackPendingTransaction for txType ", api.txSignDetails.txType, "error", err)
 		return "", err
 	}
 
-	return tx.Hash().String(), nil
+	if api.txSignDetails.txType == transactions.BuyStickerPack {
+		err = api.AddPending(api.txSignDetails.chainID, api.txSignDetails.packID)
+		if err != nil {
+			log.Warn("Buying stickers pack: transaction successful, but adding failed")
+		}
+	}
+
+	return signedTx.Hash().String(), nil
 }
 
 func (api *API) BuyPrepareTxCallMsg(chainID uint64, from types.Address, packID *bigint.BigInt) (ethereum.CallMsg, error) {

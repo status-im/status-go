@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts"
@@ -37,6 +38,14 @@ const (
 	statusPurchased
 )
 
+type txSigningDetails struct {
+	txType        transactions.PendingTrxType
+	chainID       uint64
+	from          common.Address
+	txBeingSigned *ethTypes.Transaction
+	packID        *bigint.BigInt
+}
+
 type API struct {
 	contractMaker   *contracts.ContractMaker
 	accountsManager *account.GethManager
@@ -46,6 +55,8 @@ type API struct {
 	keyStoreDir string
 	downloader  *ipfs.Downloader
 	httpServer  *server.MediaServer
+
+	txSignDetails *txSigningDetails
 
 	ctx context.Context
 }
