@@ -480,6 +480,10 @@ func (s *MessengerEditMessageSuite) TestEditMessageWithLinkPreviews() {
 	messageID, err := types.DecodeHex(ogMessage.ID)
 	s.Require().NoError(err)
 
+	contactPublicKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&contactPublicKey.PublicKey))
+
 	editedText := "edited text"
 	editedMessage := &requests.EditMessage{
 		ID:   messageID,
@@ -502,7 +506,7 @@ func (s *MessengerEditMessageSuite) TestEditMessageWithLinkPreviews() {
 			{
 				URL: "https://status.app/u/TestUrl",
 				Contact: &common.StatusContactLinkPreview{
-					PublicKey:   "TestPublicKey",
+					PublicKey:   contactID,
 					DisplayName: "TestDisplayName",
 					Description: "Test description",
 					Icon: common.LinkPreviewThumbnail{

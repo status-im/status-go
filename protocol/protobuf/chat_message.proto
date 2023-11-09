@@ -152,7 +152,7 @@ message UnfurledStatusCommunityLink {
 }
 
 message UnfurledStatusChannelLink {
-  bytes channel_uuid = 1;
+  string channel_uuid = 1;
   string emoji = 2;
   string display_name = 3;
   string description = 4;

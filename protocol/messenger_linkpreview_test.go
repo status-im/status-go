@@ -395,12 +395,6 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	s.Require().NoError(err)
 	s.Require().NotNil(c)
 
-	pubkey, err := c.PublicKey()
-	s.Require().NoError(err)
-
-	shortKey, err := s.m.SerializePublicKey(crypto.CompressPubkey(pubkey))
-	s.Require().NoError(err)
-
 	payload, err := images.GetPayloadFromURI(exampleIdenticonURI)
 	s.Require().NoError(err)
 
@@ -436,7 +430,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 	s.Require().Nil(preview.Community)
 	s.Require().Nil(preview.Channel)
 	s.Require().NotNil(preview.Contact)
-	s.Require().Equal(shortKey, preview.Contact.PublicKey)
+	s.Require().Equal(c.ID, preview.Contact.PublicKey)
 	s.Require().Equal(c.DisplayName, preview.Contact.DisplayName)
 	s.Require().Equal(c.Bio, preview.Contact.Description)
 	s.Require().Equal(icon.Width, preview.Contact.Icon.Width)
@@ -470,14 +464,11 @@ func (s *MessengerLinkPreviewsTestSuite) setProfileParameters(messenger *Messeng
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_SelfLink() {
-	shortKey, err := s.m.SerializePublicKey(crypto.CompressPubkey(s.m.IdentityPublicKey()))
-	s.Require().NoError(err)
-
 	profileKp := accounts.GetProfileKeypairForTest(true, false, false)
 	profileKp.KeyUID = s.m.account.KeyUID
 	profileKp.Accounts[0].KeyUID = s.m.account.KeyUID
 
-	err = s.m.settings.SaveOrUpdateKeypair(profileKp)
+	err := s.m.settings.SaveOrUpdateKeypair(profileKp)
 	s.Require().NoError(err)
 
 	// Set initial profile parameters
@@ -513,7 +504,7 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_SelfLink() {
 	s.Require().Nil(preview.Community)
 	s.Require().Nil(preview.Channel)
 	s.Require().NotNil(preview.Contact)
-	s.Require().Equal(shortKey, preview.Contact.PublicKey)
+	s.Require().Equal(s.m.IdentityPublicKeyString(), preview.Contact.PublicKey)
 	s.Require().Equal(userSettings.DisplayName, preview.Contact.DisplayName)
 	s.Require().Equal(userSettings.Bio, preview.Contact.Description)
 

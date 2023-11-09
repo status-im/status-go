@@ -48,6 +48,7 @@ func updateThumbnail(image *images.IdentityImage, thumbnail *common.LinkPreviewT
 }
 
 func (u *StatusUnfurler) buildContactData(publicKey string) (*common.StatusContactLinkPreview, error) {
+	// contactID == "0x" + secp251k1 compressed public key as hex-encoded string
 	contactID, err := multiformat.DeserializeCompressedKey(publicKey)
 	if err != nil {
 		return nil, err
@@ -62,10 +63,11 @@ func (u *StatusUnfurler) buildContactData(publicKey string) (*common.StatusConta
 		}
 	}
 
-	c := new(common.StatusContactLinkPreview)
-	c.PublicKey = publicKey
-	c.DisplayName = contact.DisplayName
-	c.Description = contact.Bio
+	c := &common.StatusContactLinkPreview{
+		PublicKey:   contactID,
+		DisplayName: contact.DisplayName,
+		Description: contact.Bio,
+	}
 
 	if image, ok := contact.Images[images.SmallDimName]; ok {
 		if err = updateThumbnail(&image, &c.Icon); err != nil {

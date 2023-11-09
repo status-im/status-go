@@ -4,7 +4,13 @@ import (
 	"fmt"
 	"net/url"
 
+	"go.uber.org/zap"
+
+	gethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -32,6 +38,8 @@ type LinkPreview struct {
 }
 
 type StatusContactLinkPreview struct {
+	// PublicKey is: "0x" + hex-encoded decompressed public key.
+	// We keep it a string here for correct json marshalling.
 	PublicKey   string               `json:"publicKey"`
 	DisplayName string               `json:"displayName"`
 	Description string               `json:"description"`
@@ -228,8 +236,13 @@ func (preview *StatusCommunityLinkPreview) convertToProto() (*protobuf.UnfurledS
 		return nil, err
 	}
 
+	communityID, err := types.DecodeHex(preview.CommunityID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode community id: %w", err)
+	}
+
 	community := &protobuf.UnfurledStatusCommunityLink{
-		CommunityId:  []byte(preview.CommunityID),
+		CommunityId:  communityID,
 		DisplayName:  preview.DisplayName,
 		Description:  preview.Description,
 		MembersCount: preview.MembersCount,
@@ -245,7 +258,7 @@ func (preview *StatusCommunityLinkPreview) loadFromProto(c *protobuf.UnfurledSta
 	URL string, thumbnailPrefix MediaServerImageIDPrefix,
 	makeMediaServerURL MakeMediaServerURLMessageWrapperType) {
 
-	preview.CommunityID = string(c.CommunityId)
+	preview.CommunityID = types.EncodeHex(c.CommunityId)
 	preview.DisplayName = c.DisplayName
 	preview.Description = c.Description
 	preview.MembersCount = c.MembersCount
@@ -361,13 +374,26 @@ func (m *Message) ConvertStatusLinkPreviewsToProto() (*protobuf.UnfurledStatusLi
 		}
 
 		if preview.Contact != nil {
+			decompressedPublicKey, err := types.DecodeHex(preview.Contact.PublicKey)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode contact public key: %w", err)
+			}
+
+			publicKey, err := crypto.UnmarshalPubkey(decompressedPublicKey)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal decompressed public key: %w", err)
+			}
+
+			compressedPublicKey := crypto.CompressPubkey(publicKey)
+
 			icon, err := preview.Contact.Icon.convertToProto()
 			if err != nil {
 				return nil, err
 			}
+
 			ul.Payload = &protobuf.UnfurledStatusLink_Contact{
 				Contact: &protobuf.UnfurledStatusContactLink{
-					PublicKey:   []byte(preview.Contact.PublicKey),
+					PublicKey:   compressedPublicKey,
 					DisplayName: preview.Contact.DisplayName,
 					Description: preview.Contact.Description,
 					Icon:        icon,
@@ -393,7 +419,7 @@ func (m *Message) ConvertStatusLinkPreviewsToProto() (*protobuf.UnfurledStatusLi
 
 			ul.Payload = &protobuf.UnfurledStatusLink_Channel{
 				Channel: &protobuf.UnfurledStatusChannelLink{
-					ChannelUuid: []byte(preview.Channel.ChannelUUID),
+					ChannelUuid: preview.Channel.ChannelUUID,
 					Emoji:       preview.Channel.Emoji,
 					DisplayName: preview.Channel.DisplayName,
 					Description: preview.Channel.Description,
@@ -434,8 +460,14 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 		}
 
 		if c := link.GetContact(); c != nil {
+			publicKey, err := crypto.DecompressPubkey(c.PublicKey)
+			if err != nil {
+				logutils.Logger().Warn("ConvertFromProtoToStatusLinkPreviews: failed to decompress contact public key", zap.Error(err))
+				continue
+			}
+
 			lp.Contact = &StatusContactLinkPreview{
-				PublicKey:   string(c.PublicKey),
+				PublicKey:   types.EncodeHex(gethcrypto.FromECDSAPub(publicKey)),
 				DisplayName: c.DisplayName,
 				Description: c.Description,
 			}
@@ -451,7 +483,7 @@ func (m *Message) ConvertFromProtoToStatusLinkPreviews(makeMediaServerURL func(m
 
 		if c := link.GetChannel(); c != nil {
 			lp.Channel = &StatusCommunityChannelLinkPreview{
-				ChannelUUID: string(c.ChannelUuid),
+				ChannelUUID: c.ChannelUuid,
 				Emoji:       c.Emoji,
 				DisplayName: c.DisplayName,
 				Description: c.Description,
