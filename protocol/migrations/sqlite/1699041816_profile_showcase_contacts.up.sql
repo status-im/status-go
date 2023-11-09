@@ -36,6 +36,7 @@ CREATE TABLE profile_showcase_communities_contacts (
     contact_id TEXT NOT NULL,
     PRIMARY KEY (contact_id, community_id)
 );
+CREATE INDEX profile_showcase_communities_contact_id ON profile_showcase_communities_contacts (contact_id);
 
 CREATE TABLE profile_showcase_accounts_contacts (
     address TEXT NOT NULL,
@@ -46,6 +47,7 @@ CREATE TABLE profile_showcase_accounts_contacts (
     contact_id TEXT NOT NULL,
     PRIMARY KEY (contact_id, address)
 );
+CREATE INDEX profile_showcase_accounts_contact_id ON profile_showcase_accounts_contacts (contact_id);
 
 CREATE TABLE profile_showcase_collectibles_contacts (
     uid TEXT NOT NULL,
@@ -53,6 +55,7 @@ CREATE TABLE profile_showcase_collectibles_contacts (
     contact_id TEXT NOT NULL,
     PRIMARY KEY (contact_id, uid)
 );
+CREATE INDEX profile_showcase_collectibles_contact_id ON profile_showcase_collectibles_contacts (contact_id);
 
 CREATE TABLE profile_showcase_assets_contacts (
     symbol TEXT NOT NULL,
@@ -60,3 +63,4 @@ CREATE TABLE profile_showcase_assets_contacts (
     contact_id TEXT NOT NULL,
     PRIMARY KEY (contact_id, symbol)
 );
+CREATE INDEX profile_showcase_assets_contact_id ON profile_showcase_assets_contacts (contact_id);
