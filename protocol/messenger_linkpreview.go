@@ -17,6 +17,8 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 )
 
+const UnfurledLinksPerMessageLimit = 5
+
 type UnfurlURLsResponse struct {
 	LinkPreviews       []*common.LinkPreview       `json:"linkPreviews,omitempty"`
 	StatusLinkPreviews []*common.StatusLinkPreview `json:"statusLinkPreviews,omitempty"`
@@ -122,6 +124,12 @@ func GetURLs(text string) []string {
 		} else {
 			indexed[idx] = nil
 			urls = append(urls, idx)
+		}
+
+		// This is a temporary limitation solution,
+		// should be changed with https://github.com/status-im/status-go/issues/4235
+		if len(urls) == UnfurledLinksPerMessageLimit {
+			break
 		}
 	}
 

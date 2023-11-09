@@ -659,5 +659,17 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
 	s.Require().Len(linkPreviews.LinkPreviews, 0)
 	s.Require().Len(linkPreviews.StatusLinkPreviews, 1) // Status links are always unfurled
 	s.Require().Equal(requestsCount, 0)
+}
 
+func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Limit() {
+	linksToUnfurl := "https://www.youtube.com/watch?v=6dkDepLX0rk " +
+		"https://www.youtube.com/watch?v=ferZnZ0_rSM " +
+		"https://www.youtube.com/watch?v=bdneye4pzMw " +
+		"https://www.youtube.com/watch?v=pRERgcQe-fQ " +
+		"https://www.youtube.com/watch?v=j82L3pLjb_0 " +
+		"https://www.youtube.com/watch?v=hxsJvKYyVyg " +
+		"https://www.youtube.com/watch?v=jIIuzB11dsA"
+
+	urls := GetURLs(linksToUnfurl)
+	s.Require().Equal(UnfurledLinksPerMessageLimit, len(urls))
 }
