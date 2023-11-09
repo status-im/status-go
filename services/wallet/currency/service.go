@@ -110,6 +110,9 @@ func (s *Service) fetchAllTokenCurrencyFormats() (FormatPerSymbol, error) {
 	}
 
 	tokenFormats, err := s.currency.FetchTokenCurrencyFormats(tokenSymbols)
+	if err != nil {
+		return nil, err
+	}
 	gweiSymbol := "Gwei"
 	tokenFormats[gweiSymbol] = Format{
 		Symbol:              gweiSymbol,
