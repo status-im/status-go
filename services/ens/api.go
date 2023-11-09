@@ -24,12 +24,14 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts"
 	"github.com/status-im/status-go/contracts/registrar"
 	"github.com/status-im/status-go/contracts/resolver"
 	"github.com/status-im/status-go/contracts/snt"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/utils"
@@ -62,6 +64,14 @@ type URI struct {
 	Path   string
 }
 
+type txSigningDetails struct {
+	txType        transactions.PendingTrxType
+	chainID       uint64
+	from          common.Address
+	txBeingSigned *ethTypes.Transaction
+	username      string
+}
+
 // use this to avoid using messenger directly to avoid circular dependency (protocol->ens->protocol)
 type syncUsernameDetail func(context.Context, *UsernameDetail) error
 
@@ -81,6 +91,8 @@ type API struct {
 	syncUserDetailFunc *syncUsernameDetail
 
 	timeSource func() time.Time
+
+	txSignDetails *txSigningDetails
 }
 
 func (api *API) Stop() {
@@ -336,7 +348,98 @@ func (api *API) Price(ctx context.Context, chainID uint64) (string, error) {
 	return fmt.Sprintf("%x", price), nil
 }
 
-func (api *API) Release(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, password string, username string) (string, error) {
+// Signs a transaction using appropriate local keystore file that is decrypted with provided password and returns the signature in hex format.
+// The tx that will be signed is the one that was prepared by the last call to
+// PrepareTxForRegisteringEnsUsername or PrepareTxForSettingPublicKey or PrepareTxForReleasingRegisteredEnsUsername.
+func (api *API) SignPreparedTx(password string) (string, error) {
+	if api.txSignDetails == nil {
+		return "", errors.New("no tx to sign")
+	}
+
+	if api.txSignDetails.txType != transactions.RegisterENS &&
+		api.txSignDetails.txType != transactions.SetPubKey &&
+		api.txSignDetails.txType != transactions.ReleaseENS {
+		return "", errors.New("not supported tx type")
+	}
+
+	return utils.SignTx(api.txSignDetails.chainID, api.accountsManager, api.config.KeyStoreDir,
+		types.Address(api.txSignDetails.from), password, api.txSignDetails.txBeingSigned)
+}
+
+// Sends a transaction using provided signature and returns the transaction hash.
+// Provided signature must be in hex format and must be the result of signing the tx that was prepared by the last call to
+// PrepareTxForRegisteringEnsUsername or PrepareTxForSettingPublicKey or PrepareTxForReleasingRegisteredEnsUsername.
+func (api *API) SendPreparedTxWithSignature(ctx context.Context, signature string) (string, error) {
+	if api.txSignDetails == nil {
+		return "", errors.New("no known tx to send to register ens username")
+	}
+
+	if api.txSignDetails.txType != transactions.RegisterENS &&
+		api.txSignDetails.txType != transactions.SetPubKey &&
+		api.txSignDetails.txType != transactions.ReleaseENS {
+		return "", errors.New("not supported tx type")
+	}
+
+	signature = strings.TrimPrefix(signature, "0x")
+	byteSignature, err := hex.DecodeString(signature)
+	if err != nil {
+		return "", err
+	}
+	if len(byteSignature) != transactions.ValidSignatureSize {
+		return "", transactions.ErrInvalidSignatureSize
+	}
+
+	signer := ethTypes.NewLondonSigner(new(big.Int).SetUint64(api.txSignDetails.chainID))
+	signedTx, err := api.txSignDetails.txBeingSigned.WithSignature(signer, byteSignature)
+	if err != nil {
+		return "", err
+	}
+
+	backend, err := api.contractMaker.RPCClient.EthClient(api.txSignDetails.chainID)
+	if err != nil {
+		return "", err
+	}
+
+	err = backend.SendTransaction(ctx, signedTx)
+	if err != nil {
+		return "", err
+	}
+
+	err = api.pendingTracker.TrackPendingTransaction(
+		wcommon.ChainID(api.txSignDetails.chainID),
+		signedTx.Hash(),
+		api.txSignDetails.from,
+		api.txSignDetails.txType,
+		transactions.AutoDelete,
+	)
+	if err != nil {
+		log.Error("TrackPendingTransaction for txType ", api.txSignDetails.txType, "error", err)
+		return "", err
+	}
+
+	if api.txSignDetails.txType == transactions.RegisterENS {
+		err = api.Add(ctx, api.txSignDetails.chainID, fullDomainName(api.txSignDetails.username))
+		if err != nil {
+			log.Warn("Registering ENS username: transaction successful, but adding failed")
+		}
+	} else if api.txSignDetails.txType == transactions.SetPubKey {
+		err = api.Add(ctx, api.txSignDetails.chainID, fullDomainName(api.txSignDetails.username))
+		if err != nil {
+			log.Warn("Setting piblic key: transaction successful, but adding failed")
+		}
+	} else if api.txSignDetails.txType == transactions.ReleaseENS {
+		err = api.Remove(ctx, api.txSignDetails.chainID, fullDomainName(api.txSignDetails.username))
+		if err != nil {
+			log.Warn("Releasing ENS username: transaction successful, but removing failed")
+		}
+	}
+
+	return signedTx.Hash().String(), nil
+}
+
+// Prepares a transaction for releasing an ENS username and returns the transaction hash that needs to be signed.
+// The transaction will be signed using the SignPreparedTx method or elswhere (on Keycard) and then sent using the SendPreparedTxWithSignature method.
+func (api *API) PrepareTxForReleasingRegisteredEnsUsername(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string) (interface{}, error) {
 	registryAddr, err := api.usernameRegistrarAddr(ctx, chainID)
 	if err != nil {
 		return "", err
@@ -347,31 +450,22 @@ func (api *API) Release(ctx context.Context, chainID uint64, txArgs transactions
 		return "", err
 	}
 
-	txOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
+	txOpts := txArgs.ToTransactOpts(nil)
 	tx, err := registrar.Release(txOpts, usernameToLabel(username))
 	if err != nil {
 		return "", err
 	}
 
-	err = api.pendingTracker.TrackPendingTransaction(
-		wcommon.ChainID(chainID),
-		tx.Hash(),
-		common.Address(txArgs.From),
-		transactions.ReleaseENS,
-		transactions.AutoDelete,
-	)
-	if err != nil {
-		log.Error("TrackPendingTransaction error", "error", err)
-		return "", err
+	api.txSignDetails = &txSigningDetails{
+		txType:        transactions.ReleaseENS,
+		chainID:       chainID,
+		from:          txOpts.From,
+		txBeingSigned: tx,
+		username:      username,
 	}
 
-	err = api.Remove(ctx, chainID, fullDomainName(username))
-
-	if err != nil {
-		log.Warn("Releasing ENS username: transaction successful, but removing failed")
-	}
-
-	return tx.Hash().String(), nil
+	signer := ethTypes.NewLondonSigner(new(big.Int).SetUint64(api.txSignDetails.chainID))
+	return signer.Hash(api.txSignDetails.txBeingSigned), nil
 }
 
 func (api *API) ReleaseEstimate(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string) (uint64, error) {
@@ -407,7 +501,9 @@ func (api *API) ReleaseEstimate(ctx context.Context, chainID uint64, txArgs tran
 	return estimate + 1000, nil
 }
 
-func (api *API) Register(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, password string, username string, pubkey string) (string, error) {
+// Prepares a transaction for registering an ENS username and returns the transaction hash that needs to be signed.
+// The transaction will be signed using the SignPreparedTx method or elswhere (on Keycard) and then sent using the SendPreparedTxWithSignature method.
+func (api *API) PrepareTxForRegisteringEnsUsername(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (interface{}, error) {
 	snt, err := api.contractMaker.NewSNT(chainID)
 	if err != nil {
 		return "", err
@@ -436,7 +532,7 @@ func (api *API) Register(ctx context.Context, chainID uint64, txArgs transaction
 		return "", err
 	}
 
-	txOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
+	txOpts := txArgs.ToTransactOpts(nil)
 	tx, err := snt.ApproveAndCall(
 		txOpts,
 		registryAddr,
@@ -448,24 +544,16 @@ func (api *API) Register(ctx context.Context, chainID uint64, txArgs transaction
 		return "", err
 	}
 
-	err = api.pendingTracker.TrackPendingTransaction(
-		wcommon.ChainID(chainID),
-		tx.Hash(),
-		common.Address(txArgs.From),
-		transactions.RegisterENS,
-		transactions.AutoDelete,
-	)
-	if err != nil {
-		log.Error("TrackPendingTransaction error", "error", err)
-		return "", err
+	api.txSignDetails = &txSigningDetails{
+		txType:        transactions.RegisterENS,
+		chainID:       chainID,
+		from:          txOpts.From,
+		txBeingSigned: tx,
+		username:      username,
 	}
 
-	err = api.Add(ctx, chainID, fullDomainName(username))
-	if err != nil {
-		log.Warn("Registering ENS username: transaction successful, but adding failed")
-	}
-
-	return tx.Hash().String(), nil
+	signer := ethTypes.NewLondonSigner(new(big.Int).SetUint64(api.txSignDetails.chainID))
+	return signer.Hash(api.txSignDetails.txBeingSigned), nil
 }
 
 func (api *API) RegisterPrepareTxCallMsg(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (ethereum.CallMsg, error) {
@@ -541,7 +629,9 @@ func (api *API) RegisterEstimate(ctx context.Context, chainID uint64, txArgs tra
 	return estimate + 1000, nil
 }
 
-func (api *API) SetPubKey(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, password string, username string, pubkey string) (string, error) {
+// Prepares a transaction for setting a public key for an ENS username and returns the transaction hash that needs to be signed.
+// The transaction will be signed using the SignPreparedTx method or elswhere (on Keycard) and then sent using the SendPreparedTxWithSignature method.
+func (api *API) PrepareTxForSettingPublicKey(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (interface{}, error) {
 	err := validateENSUsername(username)
 	if err != nil {
 		return "", err
@@ -558,31 +648,22 @@ func (api *API) SetPubKey(ctx context.Context, chainID uint64, txArgs transactio
 	}
 
 	x, y := extractCoordinates(pubkey)
-	txOpts := txArgs.ToTransactOpts(utils.GetSigner(chainID, api.accountsManager, api.config.KeyStoreDir, txArgs.From, password))
+	txOpts := txArgs.ToTransactOpts(nil)
 	tx, err := resolver.SetPubkey(txOpts, nameHash(username), x, y)
 	if err != nil {
 		return "", err
 	}
 
-	err = api.pendingTracker.TrackPendingTransaction(
-		wcommon.ChainID(chainID),
-		tx.Hash(),
-		common.Address(txArgs.From),
-		transactions.SetPubKey,
-		transactions.AutoDelete,
-	)
-	if err != nil {
-		log.Error("TrackPendingTransaction error", "error", err)
-		return "", err
+	api.txSignDetails = &txSigningDetails{
+		txType:        transactions.SetPubKey,
+		chainID:       chainID,
+		from:          txOpts.From,
+		txBeingSigned: tx,
+		username:      username,
 	}
 
-	err = api.Add(ctx, chainID, fullDomainName(username))
-
-	if err != nil {
-		log.Warn("Registering ENS username: transaction successful, but adding failed")
-	}
-
-	return tx.Hash().String(), nil
+	signer := ethTypes.NewLondonSigner(new(big.Int).SetUint64(api.txSignDetails.chainID))
+	return signer.Hash(api.txSignDetails.txBeingSigned), nil
 }
 
 func (api *API) SetPubKeyPrepareTxCallMsg(ctx context.Context, chainID uint64, txArgs transactions.SendTxArgs, username string, pubkey string) (ethereum.CallMsg, error) {

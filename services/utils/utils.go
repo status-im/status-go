@@ -25,6 +25,21 @@ func GetSigner(chainID uint64, accountsManager *account.GethManager, keyStoreDir
 	}
 }
 
+func SignTx(chainID uint64, accountsManager *account.GethManager, keyStoreDir string, from types.Address, password string, txToSign *ethTypes.Transaction) (string, error) {
+	selectedAccount, err := accountsManager.VerifyAccountPassword(keyStoreDir, from.Hex(), password)
+	if err != nil {
+		return "", err
+	}
+
+	signer := ethTypes.NewLondonSigner(new(big.Int).SetUint64(chainID))
+
+	hash := signer.Hash(txToSign)
+
+	signature, err := crypto.Sign(hash[:], selectedAccount.PrivateKey)
+
+	return types.EncodeHex(signature), err
+}
+
 func DeserializePublicKey(compressedKey string) (types.HexBytes, error) {
 	rawKey, err := multiformat.DeserializePublicKey(compressedKey, "f")
 	if err != nil {
