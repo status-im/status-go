@@ -1,6 +1,7 @@
 package common
 
 import (
+	"math"
 	"testing"
 
 	transport2 "github.com/status-im/status-go/protocol/transport"
@@ -303,4 +304,45 @@ func (s *MessageSenderSuite) TestHandleOutOfOrderHashRatchet() {
 
 	s.Require().Len(msgs, 0)
 
+}
+
+func (s *MessageSenderSuite) TestHandleSegmentMessages() {
+	relayerKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	authorKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	encodedPayload, err := proto.Marshal(&s.testMessage)
+	s.Require().NoError(err)
+
+	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
+	s.Require().NoError(err)
+
+	segmentedMessages, err := segmentMessage(&types.NewMessage{Payload: wrappedPayload}, int(math.Ceil(float64(len(wrappedPayload))/2)))
+	s.Require().NoError(err)
+	s.Require().Len(segmentedMessages, 2)
+
+	message := &types.Message{}
+	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
+	message.Payload = segmentedMessages[0].Payload
+
+	// First segment is received, no messages are decoded
+	decodedMessages, _, err := s.sender.HandleMessages(message)
+	s.Require().NoError(err)
+	s.Require().Len(decodedMessages, 0)
+
+	// Second (and final) segment is received, reassembled message is decoded
+	message.Payload = segmentedMessages[1].Payload
+	decodedMessages, _, err = s.sender.HandleMessages(message)
+	s.Require().NoError(err)
+	s.Require().Len(decodedMessages, 1)
+	s.Require().Equal(&authorKey.PublicKey, decodedMessages[0].SigPubKey())
+	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ApplicationLayer.ID)
+	s.Require().Equal(encodedPayload, decodedMessages[0].ApplicationLayer.Payload)
+	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].ApplicationLayer.Type)
+
+	// Receiving another segment after the message has been reassembled is considered an error
+	_, _, err = s.sender.HandleMessages(message)
+	s.Require().ErrorIs(err, ErrMessageSegmentsAlreadyCompleted)
 }
