@@ -1622,13 +1622,18 @@ func (api *PublicAPI) CreateTokenGatedCommunity() (*protocol.MessengerResponse, 
 }
 
 // Set profile showcase preference for current user
-func (api *PublicAPI) SetProfileShowcasePreferences(preferences protocol.ProfileShowcasePreferences) error {
+func (api *PublicAPI) SetProfileShowcasePreferences(preferences *protocol.ProfileShowcasePreferences) error {
 	return api.service.messenger.SetProfileShowcasePreferences(preferences)
 }
 
 // Get all profile showcase preferences for current user
 func (api *PublicAPI) GetProfileShowcasePreferences() (*protocol.ProfileShowcasePreferences, error) {
 	return api.service.messenger.GetProfileShowcasePreferences()
+}
+
+// Get profile showcase for a contact
+func (api *PublicAPI) GetProfileShowcaseForContact(contactID string) (*protocol.ProfileShowcase, error) {
+	return api.service.messenger.GetProfileShowcaseForContact(contactID)
 }
 
 // Returns response with AC notification when owner token is received

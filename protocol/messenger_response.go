@@ -78,6 +78,7 @@ type MessengerResponse struct {
 	savedAddresses              map[string]*wallet.SavedAddress
 	SocialLinksInfo             *identity.SocialLinksInfo
 	ensUsernameDetails          []*ensservice.UsernameDetail
+	updatedProfileShowcases     map[string]*ProfileShowcase
 }
 
 func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
@@ -121,6 +122,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		SavedAddresses                []*wallet.SavedAddress               `json:"savedAddresses,omitempty"`
 		SocialLinksInfo               *identity.SocialLinksInfo            `json:"socialLinksInfo,omitempty"`
 		EnsUsernameDetails            []*ensservice.UsernameDetail         `json:"ensUsernameDetails,omitempty"`
+		UpdatedProfileShowcases       []*ProfileShowcase                   `json:"updatedProfileShowcases,omitempty"`
 	}{
 		Contacts:                r.Contacts,
 		Installations:           r.Installations,
@@ -157,6 +159,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		DiscordOldestMessageTimestamp: r.DiscordOldestMessageTimestamp,
 		SocialLinksInfo:               r.SocialLinksInfo,
 		EnsUsernameDetails:            r.EnsUsernameDetails(),
+		UpdatedProfileShowcases:       r.GetUpdatedProfileShowcases(),
 	}
 
 	responseItem.TrustStatus = r.TrustStatus()
@@ -283,6 +286,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.verificationRequests)+
 		len(r.RequestsToJoinCommunity)+
 		len(r.savedAddresses)+
+		len(r.updatedProfileShowcases)+
 		len(r.ensUsernameDetails) == 0 &&
 		r.currentStatus == nil &&
 		r.activityCenterState == nil &&
@@ -318,6 +322,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddEnsUsernameDetails(response.EnsUsernameDetails())
 	r.AddRequestsToJoinCommunity(response.RequestsToJoinCommunity)
 	r.AddBookmarks(response.GetBookmarks())
+	r.AddProfileShowcases(response.GetUpdatedProfileShowcases())
 	r.CommunityChanges = append(r.CommunityChanges, response.CommunityChanges...)
 	r.BackupHandled = response.BackupHandled
 	r.CustomizationColor = response.CustomizationColor
@@ -771,4 +776,26 @@ func (r *MessengerResponse) HasDiscordChannel(id string) bool {
 		}
 	}
 	return false
+}
+
+func (r *MessengerResponse) AddProfileShowcases(showcases []*ProfileShowcase) {
+	for _, showcase := range showcases {
+		r.AddProfileShowcase(showcase)
+	}
+}
+
+func (r *MessengerResponse) AddProfileShowcase(showcase *ProfileShowcase) {
+	if r.updatedProfileShowcases == nil {
+		r.updatedProfileShowcases = make(map[string]*ProfileShowcase)
+	}
+
+	r.updatedProfileShowcases[showcase.ContactID] = showcase
+}
+
+func (r *MessengerResponse) GetUpdatedProfileShowcases() []*ProfileShowcase {
+	var showcases []*ProfileShowcase
+	for _, showcase := range r.updatedProfileShowcases {
+		showcases = append(showcases, showcase)
+	}
+	return showcases
 }

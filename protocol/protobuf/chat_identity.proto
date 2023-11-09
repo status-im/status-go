@@ -4,6 +4,7 @@ option go_package = "./;protobuf";
 package protobuf;
 
 import "enums.proto";
+import "profile_showcase.proto";
 
 // ChatIdentity represents the user defined identity associated with their public chat key
 message ChatIdentity {
@@ -32,6 +33,8 @@ message ChatIdentity {
   // 0 - unknown
   // 1 - no messages
   uint32 first_message_timestamp = 9;
+
+  ProfileShowcase profile_showcase = 10;
 }
 
 // ProfileImage represents data associated with a user's profile image

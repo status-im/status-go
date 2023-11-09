@@ -2926,6 +2926,11 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci *protobuf
 			contact.SocialLinks = socialLinks
 			contactModified = true
 		}
+
+		err := m.BuildProfileShowcaseFromIdentity(state, ci.ProfileShowcase)
+		if err != nil {
+			return err
+		}
 	}
 
 	if contactModified {

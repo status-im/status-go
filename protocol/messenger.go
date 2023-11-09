@@ -1081,7 +1081,12 @@ func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) e
 		return err
 	}
 
-	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks)
+	profileShowcase, err := m.GetProfileShowcaseForSelfIdentity()
+	if err != nil {
+		return err
+	}
+
+	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks, profileShowcase)
 	if err != nil {
 		return err
 	}
@@ -1161,7 +1166,12 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 		return err
 	}
 
-	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks)
+	profileShowcase, err := m.GetProfileShowcaseForSelfIdentity()
+	if err != nil {
+		return err
+	}
+
+	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks, profileShowcase)
 	if err != nil {
 		return err
 	}
@@ -1174,15 +1184,22 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 	return nil
 }
 
-func (m *Messenger) getIdentityHash(displayName, bio string, img *images.IdentityImage, socialLinks identity.SocialLinks) ([]byte, error) {
+func (m *Messenger) getIdentityHash(displayName, bio string, img *images.IdentityImage, socialLinks identity.SocialLinks, profileShowcase *protobuf.ProfileShowcase) ([]byte, error) {
 	socialLinksData, err := socialLinks.Serialize()
 	if err != nil {
 		return []byte{}, err
 	}
-	if img == nil {
-		return crypto.Keccak256([]byte(displayName), []byte(bio), socialLinksData), nil
+
+	profileShowcaseData, err := proto.Marshal(profileShowcase)
+	if err != nil {
+		return []byte{}, err
 	}
-	return crypto.Keccak256(img.Payload, []byte(displayName), []byte(bio), socialLinksData), nil
+
+	if img == nil {
+		return crypto.Keccak256([]byte(displayName), []byte(bio), socialLinksData, profileShowcaseData), nil
+	}
+
+	return crypto.Keccak256(img.Payload, []byte(displayName), []byte(bio), socialLinksData, profileShowcaseData), nil
 }
 
 // shouldPublishChatIdentity returns true if the last time the ChatIdentity was attached was more than 24 hours ago
@@ -1221,7 +1238,12 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 		return false, err
 	}
 
-	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks)
+	profileShowcase, err := m.GetProfileShowcaseForSelfIdentity()
+	if err != nil {
+		return false, err
+	}
+
+	identityHash, err := m.getIdentityHash(displayName, bio, img, socialLinks, profileShowcase)
 	if err != nil {
 		return false, err
 	}
@@ -1256,12 +1278,18 @@ func (m *Messenger) createChatIdentity(context chatContext) (*protobuf.ChatIdent
 		return nil, err
 	}
 
+	profileShowcase, err := m.GetProfileShowcaseForSelfIdentity()
+	if err != nil {
+		return nil, err
+	}
+
 	ci := &protobuf.ChatIdentity{
-		Clock:       m.transport.GetCurrentTime(),
-		EnsName:     "", // TODO add ENS name handling to dedicate PR
-		DisplayName: displayName,
-		Description: bio,
-		SocialLinks: socialLinks.ToProtobuf(),
+		Clock:           m.transport.GetCurrentTime(),
+		EnsName:         "", // TODO add ENS name handling to dedicate PR
+		DisplayName:     displayName,
+		Description:     bio,
+		SocialLinks:     socialLinks.ToProtobuf(),
+		ProfileShowcase: profileShowcase,
 	}
 
 	err = m.attachIdentityImagesToChatIdentity(context, ci)
