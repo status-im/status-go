@@ -1,13 +1,16 @@
 package common
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"math"
 	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
 	datasyncnode "github.com/vacp2p/mvds/node"
 	datasyncproto "github.com/vacp2p/mvds/protobuf"
@@ -756,6 +759,12 @@ func (s *MessageSender) HandleMessages(wakuMessage *types.Message) ([]*v1protoco
 			return nil, nil, s.persistence.SaveHashRatchetMessage(info.GroupID, info.KeyID, wakuMessage)
 		}
 
+		// The current message segment has been successfully retrieved.
+		// However, the collection of segments is not yet complete.
+		if err == ErrMessageSegmentsIncomplete {
+			return nil, nil, nil
+		}
+
 		return nil, nil, err
 	}
 	statusMessages = append(statusMessages, response.Messages()...)
@@ -818,6 +827,20 @@ func (s *MessageSender) handleMessage(wakuMessage *types.Message) (*handleMessag
 	if err != nil {
 		hlogger.Error("failed to handle transport layer message", zap.Error(err))
 		return nil, err
+	}
+
+	err = s.handleSegmentationLayer(response.Message)
+	if err != nil {
+		hlogger.Debug("failed to handle segmentation layer message", zap.Error(err))
+
+		// Segments not completed yet, stop processing
+		if err == ErrMessageSegmentsIncomplete {
+			return nil, err
+		}
+		// Segments already completed, stop processing
+		if err == ErrMessageSegmentsAlreadyCompleted {
+			return nil, err
+		}
 	}
 
 	err = s.handleEncryptionLayer(context.Background(), response.Message)
@@ -1177,4 +1200,127 @@ func (s *MessageSender) GetCurrentKeyForGroup(groupID []byte) (*encryption.HashR
 // GetKeyIDsForGroup returns a slice of key IDs belonging to a given group ID
 func (s *MessageSender) GetKeysForGroup(groupID []byte) ([]*encryption.HashRatchetKeyCompatibility, error) {
 	return s.protocol.GetKeysForGroup(groupID)
+}
+
+// Segments message into smaller chunks if the size exceeds the maximum allowed
+func segmentMessage(newMessage *types.NewMessage, maxSegmentSize int) ([]*types.NewMessage, error) {
+	if len(newMessage.Payload) <= maxSegmentSize {
+		return []*types.NewMessage{newMessage}, nil
+	}
+
+	createSegment := func(chunkPayload []byte) (*types.NewMessage, error) {
+		copy := &types.NewMessage{}
+		err := copier.Copy(copy, newMessage)
+		if err != nil {
+			return nil, err
+		}
+
+		copy.Payload = chunkPayload
+		copy.PowTarget = calculatePoW(chunkPayload)
+		return copy, nil
+	}
+
+	entireMessageHash := crypto.Keccak256(newMessage.Payload)
+	payloadSize := len(newMessage.Payload)
+	segmentsCount := int(math.Ceil(float64(payloadSize) / float64(maxSegmentSize)))
+
+	var segmentMessages []*types.NewMessage
+
+	for start, index := 0, 0; start < payloadSize; start += maxSegmentSize {
+		end := start + maxSegmentSize
+		if end > payloadSize {
+			end = payloadSize
+		}
+
+		chunk := newMessage.Payload[start:end]
+
+		segmentMessageProto := &protobuf.SegmentMessage{
+			EntireMessageHash: entireMessageHash,
+			Index:             uint32(index),
+			SegmentsCount:     uint32(segmentsCount),
+			Payload:           chunk,
+		}
+		chunkPayload, err := proto.Marshal(segmentMessageProto)
+		if err != nil {
+			return nil, err
+		}
+		segmentMessage, err := createSegment(chunkPayload)
+		if err != nil {
+			return nil, err
+		}
+
+		segmentMessages = append(segmentMessages, segmentMessage)
+		index++
+	}
+
+	return segmentMessages, nil
+}
+
+var ErrMessageSegmentsIncomplete = errors.New("message segments incomplete")
+var ErrMessageSegmentsAlreadyCompleted = errors.New("message segments already completed")
+var ErrMessageSegmentsInvalidCount = errors.New("invalid segments count")
+var ErrMessageSegmentsHashMismatch = errors.New("hash of entire payload does not match")
+
+func (s *MessageSender) handleSegmentationLayer(message *v1protocol.StatusMessage) error {
+	logger := s.logger.With(zap.String("site", "handleSegmentationLayer"))
+	hlogger := logger.With(zap.ByteString("hash", message.TransportLayer.Hash))
+
+	var segmentMessage protobuf.SegmentMessage
+	err := proto.Unmarshal(message.TransportLayer.Payload, &segmentMessage)
+	if err != nil {
+		return errors.Wrap(err, "failed to unmarshal SegmentMessage")
+	}
+
+	hlogger.Debug("handling message segment", zap.ByteString("EntireMessageHash", segmentMessage.EntireMessageHash),
+		zap.Uint32("Index", segmentMessage.Index), zap.Uint32("SegmentsCount", segmentMessage.SegmentsCount))
+
+	alreadyCompleted, err := s.persistence.IsMessageAlreadyCompleted(segmentMessage.EntireMessageHash)
+	if err != nil {
+		return err
+	}
+	if alreadyCompleted {
+		return ErrMessageSegmentsAlreadyCompleted
+	}
+
+	if segmentMessage.SegmentsCount < 2 {
+		return ErrMessageSegmentsInvalidCount
+	}
+
+	err = s.persistence.SaveMessageSegment(&segmentMessage, message.TransportLayer.SigPubKey)
+	if err != nil {
+		return err
+	}
+
+	segments, err := s.persistence.GetMessageSegments(segmentMessage.EntireMessageHash, message.TransportLayer.SigPubKey)
+	if err != nil {
+		return err
+	}
+
+	if len(segments) != int(segmentMessage.SegmentsCount) {
+		return ErrMessageSegmentsIncomplete
+	}
+
+	// Combine payload
+	var entirePayload bytes.Buffer
+	for _, segment := range segments {
+		_, err := entirePayload.Write(segment.Payload)
+		if err != nil {
+			return errors.Wrap(err, "failed to write segment payload")
+		}
+	}
+
+	// Sanity check
+	entirePayloadHash := crypto.Keccak256(entirePayload.Bytes())
+	if !bytes.Equal(entirePayloadHash, segmentMessage.EntireMessageHash) {
+		return ErrMessageSegmentsHashMismatch
+	}
+
+	err = s.persistence.CompleteMessageSegments(segmentMessage.EntireMessageHash, message.TransportLayer.SigPubKey)
+	if err != nil {
+		return err
+	}
+
+	message.TransportLayer.Payload = entirePayload.Bytes()
+
+	return nil
 }

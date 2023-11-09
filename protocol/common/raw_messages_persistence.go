@@ -3,6 +3,7 @@ package common
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"database/sql"
 	"encoding/gob"
 	"strings"
@@ -333,6 +334,81 @@ func (db RawMessagesPersistence) DeleteHashRatchetMessages(ids [][]byte) error {
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
 
 	_, err := db.db.Exec("DELETE FROM hash_ratchet_encrypted_messages WHERE hash IN ("+inVector+")", idsArgs...) // nolint: gosec
+
+	return err
+}
+
+func (db *RawMessagesPersistence) IsMessageAlreadyCompleted(hash []byte) (bool, error) {
+	var alreadyCompleted int
+	err := db.db.QueryRow("SELECT COUNT(*) FROM message_segments_completed WHERE hash = ?", hash).Scan(&alreadyCompleted)
+	if err != nil {
+		return false, err
+	}
+	return alreadyCompleted > 0, nil
+}
+
+func (db *RawMessagesPersistence) SaveMessageSegment(segment *protobuf.SegmentMessage, sigPubKey *ecdsa.PublicKey) error {
+	sigPubKeyBlob := crypto.CompressPubkey(sigPubKey)
+
+	_, err := db.db.Exec("INSERT INTO message_segments (hash, segment_index, segments_count, sig_pub_key, payload) VALUES (?, ?, ?, ?, ?)",
+		segment.EntireMessageHash, segment.Index, segment.SegmentsCount, sigPubKeyBlob, segment.Payload)
+
+	return err
+}
+
+// Get ordered message segments for given hash
+func (db *RawMessagesPersistence) GetMessageSegments(hash []byte, sigPubKey *ecdsa.PublicKey) ([]*protobuf.SegmentMessage, error) {
+	sigPubKeyBlob := crypto.CompressPubkey(sigPubKey)
+
+	rows, err := db.db.Query("SELECT hash, segment_index, segments_count, payload FROM message_segments WHERE hash = ? AND sig_pub_key = ? ORDER BY segment_index", hash, sigPubKeyBlob)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var segments []*protobuf.SegmentMessage
+	for rows.Next() {
+		var segment protobuf.SegmentMessage
+		err := rows.Scan(&segment.EntireMessageHash, &segment.Index, &segment.SegmentsCount, &segment.Payload)
+		if err != nil {
+			return nil, err
+		}
+		segments = append(segments, &segment)
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	return segments, nil
+}
+
+func (db *RawMessagesPersistence) CompleteMessageSegments(hash []byte, sigPubKey *ecdsa.PublicKey) error {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	sigPubKeyBlob := crypto.CompressPubkey(sigPubKey)
+
+	_, err = tx.Exec("DELETE FROM message_segments WHERE hash = ? AND sig_pub_key = ?", hash, sigPubKeyBlob)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec("INSERT INTO message_segments_completed (hash, sig_pub_key) VALUES (?,?)", hash, sigPubKeyBlob)
+	if err != nil {
+		return err
+	}
 
 	return err
 }
