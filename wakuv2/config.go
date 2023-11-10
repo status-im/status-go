@@ -20,42 +20,46 @@ package wakuv2
 
 import (
 	"github.com/status-im/status-go/wakuv2/common"
+	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
 )
 
 // Config represents the configuration state of a waku node.
 type Config struct {
-	MaxMessageSize       uint32   `toml:",omitempty"`
-	Host                 string   `toml:",omitempty"`
-	Port                 int      `toml:",omitempty"`
-	PeerExchange         bool     `toml:",omitempty"`
-	KeepAliveInterval    int      `toml:",omitempty"`
-	MinPeersForRelay     int      `toml:",omitempty"`
-	MinPeersForFilter    int      `toml:",omitempty"`
-	LightClient          bool     `toml:",omitempty"`
-	WakuNodes            []string `toml:",omitempty"`
-	Rendezvous           bool     `toml:",omitempty"`
-	DiscV5BootstrapNodes []string `toml:",omitempty"`
-	Nameserver           string   `toml:",omitempty"`
-	EnableDiscV5         bool     `toml:",omitempty"`
-	DiscoveryLimit       int      `toml:",omitempty"`
-	AutoUpdate           bool     `toml:",omitempty"`
-	UDPPort              int      `toml:",omitempty"`
-	EnableStore          bool     `toml:",omitempty"`
-	StoreCapacity        int      `toml:",omitempty"`
-	StoreSeconds         int      `toml:",omitempty"`
-	TelemetryServerURL   string   `toml:",omitempty"`
-	EnableFilterFullNode bool     `toml:",omitempty"`
+	MaxMessageSize          uint32   `toml:",omitempty"`
+	Host                    string   `toml:",omitempty"`
+	Port                    int      `toml:",omitempty"`
+	PeerExchange            bool     `toml:",omitempty"`
+	KeepAliveInterval       int      `toml:",omitempty"`
+	MinPeersForRelay        int      `toml:",omitempty"`
+	MinPeersForFilter       int      `toml:",omitempty"`
+	LightClient             bool     `toml:",omitempty"`
+	WakuNodes               []string `toml:",omitempty"`
+	Rendezvous              bool     `toml:",omitempty"`
+	DiscV5BootstrapNodes    []string `toml:",omitempty"`
+	Nameserver              string   `toml:",omitempty"`
+	EnableDiscV5            bool     `toml:",omitempty"`
+	DiscoveryLimit          int      `toml:",omitempty"`
+	AutoUpdate              bool     `toml:",omitempty"`
+	UDPPort                 int      `toml:",omitempty"`
+	EnableStore             bool     `toml:",omitempty"`
+	StoreCapacity           int      `toml:",omitempty"`
+	StoreSeconds            int      `toml:",omitempty"`
+	TelemetryServerURL      string   `toml:",omitempty"`
+	EnableFilterFullNode    bool     `toml:",omitempty"`
+	DefaultShardPubsubTopic string   `toml:",omitempty"`
+	UseShardAsDefaultTopic  bool     `toml:",omitempty"`
 }
 
 var DefaultConfig = Config{
-	MaxMessageSize:    common.DefaultMaxMessageSize,
-	Host:              "0.0.0.0",
-	Port:              0,
-	KeepAliveInterval: 10, // second
-	DiscoveryLimit:    20,
-	MinPeersForRelay:  1, // TODO: determine correct value with Vac team
-	MinPeersForFilter: 2, // TODO: determine correct value with Vac team and via testing
-	AutoUpdate:        false,
+	MaxMessageSize:          common.DefaultMaxMessageSize,
+	Host:                    "0.0.0.0",
+	Port:                    0,
+	KeepAliveInterval:       10, // second
+	DiscoveryLimit:          20,
+	MinPeersForRelay:        1, // TODO: determine correct value with Vac team
+	MinPeersForFilter:       2, // TODO: determine correct value with Vac team and via testing
+	AutoUpdate:              false,
+	DefaultShardPubsubTopic: relay.DefaultWakuTopic,
 }
 
 func setDefaults(cfg *Config) *Config {
@@ -85,6 +89,10 @@ func setDefaults(cfg *Config) *Config {
 
 	if cfg.MinPeersForFilter == 0 {
 		cfg.MinPeersForFilter = DefaultConfig.MinPeersForFilter
+	}
+
+	if cfg.DefaultShardPubsubTopic == "" {
+		cfg.DefaultShardPubsubTopic = DefaultConfig.DefaultShardPubsubTopic
 	}
 
 	return cfg
