@@ -92,17 +92,33 @@ func parseValidURL(rawURL string) (*neturl.URL, error) {
 	return u, nil
 }
 
-// GetURLs returns only what we consider unfurleable URLs.
-//
-// If we wanted to be extra precise and help improve UX, we could ignore URLs
-// that we know can't be unfurled. This is at least possible with the oEmbed
-// protocol because providers must specify an endpoint scheme.
-func GetURLs(text string) []string {
+type URLUnfurlPermit int
+
+const (
+	URLUnfurlAllowed URLUnfurlPermit = iota
+	URLUnfurlAskUser
+	URLUnfurlForbiddenBySettings
+	URLUnfurlForbiddenByLimit
+	URLUnfurlNotSupported
+)
+
+type URLUnfurlingMetadata struct {
+	permit            URLUnfurlPermit `json:"permit"`
+	isStatusSharedURL bool
+}
+
+type URLsUnfurlPlan struct {
+	urls map[string]URLUnfurlingMetadata
+}
+
+func GetURLsToUnfurl(text string) *URLsUnfurlPlan {
+	result := &URLsUnfurlPlan{}
+
 	parsedText := markdown.Parse([]byte(text), nil)
 	visitor := common.RunLinksVisitor(parsedText)
 
-	urls := make([]string, 0, len(visitor.Links))
-	indexed := make(map[string]any, len(visitor.Links))
+	//urls := make([]string, 0, len(visitor.Links))
+	//indexed := make(map[string]any, len(visitor.Links))
 
 	for _, rawURL := range visitor.Links {
 		parsedURL, err := parseValidURL(rawURL)
@@ -117,14 +133,15 @@ func GetURLs(text string) []string {
 		parsedURL.Host = strings.ToLower(parsedURL.Host)
 
 		idx := parsedURL.String()
-		// Removes the spurious trailing forward slash.
-		idx = strings.TrimRight(idx, "/")
-		if _, exists := indexed[idx]; exists {
+		idx = strings.TrimRight(idx, "/") // Removes the spurious trailing forward slash.
+		if _, exists := result.urls[idx]; exists {
 			continue
-		} else {
-			indexed[idx] = nil
-			urls = append(urls, idx)
 		}
+
+		result.urls[idx] = URLUnfurlingMetadata{
+			isStatusSharedURL: IsStatusSharedURL(),
+		}
+		urls = append(urls, idx)
 
 		// This is a temporary limitation solution,
 		// should be changed with https://github.com/status-im/status-go/issues/4235
@@ -133,6 +150,21 @@ func GetURLs(text string) []string {
 		}
 	}
 
+	return urls
+
+	return result
+}
+
+// Deprecated: GetURLs is deprecated in favor of more generic GetURLsToUnfurl.
+//
+// This is a wrapper around GetURLsToUnfurl that returns the list of URLs found in the text
+// without any additional information.
+func GetURLs(text string) []string {
+	plan := GetURLsToUnfurl(text)
+	urls := make([]string, 0, len(plan.urls))
+	for _, url := range plan.urls {
+		urls = append(urls, url)
+	}
 	return urls
 }
 
