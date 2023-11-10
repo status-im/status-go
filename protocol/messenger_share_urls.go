@@ -516,14 +516,14 @@ func splitSharedURLData(data string) (string, string, error) {
 	return contents[0], contents[1], nil
 }
 
-func (m *Messenger) ParseSharedURL(url string) (*URLDataResponse, error) {
+func ParseSharedURL(url string) (*URLDataResponse, error) {
 
 	if strings.HasPrefix(url, sharedURLUserPrefix) {
 		chatKey := strings.TrimPrefix(url, sharedURLUserPrefix)
 		if strings.HasPrefix(chatKey, "zQ3sh") {
-			return m.parseUserURLWithChatKey(chatKey)
+			return parseUserURLWithChatKey(chatKey)
 		}
-		return m.parseUserURLWithENS(chatKey)
+		return parseUserURLWithENS(chatKey)
 	}
 
 	if strings.HasPrefix(url, sharedURLUserPrefixWithData) {
@@ -532,12 +532,12 @@ func (m *Messenger) ParseSharedURL(url string) (*URLDataResponse, error) {
 		if err != nil {
 			return nil, err
 		}
-		return m.parseUserURLWithData(encodedData, chatKey)
+		return parseUserURLWithData(encodedData, chatKey)
 	}
 
 	if strings.HasPrefix(url, sharedURLCommunityPrefix) {
 		chatKey := strings.TrimPrefix(url, sharedURLCommunityPrefix)
-		return m.parseCommunityURLWithChatKey(chatKey)
+		return parseCommunityURLWithChatKey(chatKey)
 	}
 
 	if strings.HasPrefix(url, sharedURLCommunityPrefixWithData) {
@@ -546,7 +546,7 @@ func (m *Messenger) ParseSharedURL(url string) (*URLDataResponse, error) {
 		if err != nil {
 			return nil, err
 		}
-		return m.parseCommunityURLWithData(encodedData, chatKey)
+		return parseCommunityURLWithData(encodedData, chatKey)
 	}
 
 	if strings.HasPrefix(url, sharedURLChannelPrefixWithData) {
@@ -557,9 +557,9 @@ func (m *Messenger) ParseSharedURL(url string) (*URLDataResponse, error) {
 		}
 
 		if channelRegExp.MatchString(encodedData) {
-			return m.parseCommunityChannelURLWithChatKey(encodedData, chatKey)
+			return parseCommunityChannelURLWithChatKey(encodedData, chatKey)
 		}
-		return m.parseCommunityChannelURLWithData(encodedData, chatKey)
+		return parseCommunityChannelURLWithData(encodedData, chatKey)
 	}
 
 	return nil, fmt.Errorf("not a status shared url")

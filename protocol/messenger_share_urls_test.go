@@ -3,7 +3,6 @@ package protocol
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
