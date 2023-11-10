@@ -1296,7 +1296,7 @@ func TestChangeDatabasePassword(t *testing.T) {
 
 func TestCreateWallet(t *testing.T) {
 	utils.Init()
-	password := "some-password2"
+	password := "some-password2" // nolint: goconst
 	tmpdir := t.TempDir()
 
 	b := NewGethStatusBackend()
@@ -1331,17 +1331,12 @@ func TestCreateWallet(t *testing.T) {
 	walletRootAddress, err := db.GetWalletRootAddress()
 	require.NoError(t, err)
 
-	masterRootAddress, err := db.GetMasterAddress()
 	require.NoError(t, err)
-
-	fmt.Println("WALLET ROOT", walletRootAddress.String())
-	fmt.Println("MASTER ROOT", masterRootAddress.String())
 
 	derivedAddress, err := walletAPI.GetDerivedAddresses(context.Background(), password, walletRootAddress.String(), paths)
 	require.NoError(t, err)
 	require.Len(t, derivedAddress, 1)
 
-	fmt.Println("DERVIED", derivedAddress)
 	accountsService := statusNode.AccountService()
 	require.NotNil(t, accountsService)
 	accountsAPI := accountsService.AccountsAPI()
@@ -1356,5 +1351,63 @@ func TestCreateWallet(t *testing.T) {
 		Path:      derivedAddress[0].Path,
 	})
 	require.NoError(t, err)
+}
 
+func TestSetFleet(t *testing.T) {
+	utils.Init()
+	password := "some-password2" // nolint: goconst
+	tmpdir := t.TempDir()
+
+	b := NewGethStatusBackend()
+	createAccountRequest := &requests.CreateAccount{
+		DisplayName:           "some-display-name",
+		CustomizationColor:    "#ffffff",
+		Password:              password,
+		BackupDisabledDataDir: tmpdir,
+		NetworkID:             1,
+		LogFilePath:           tmpdir + "/log",
+	}
+	c := make(chan interface{}, 10)
+	signal.SetMobileSignalHandler(func(data []byte) {
+		if strings.Contains(string(data), "node.login") {
+			c <- struct{}{}
+		}
+	})
+
+	newAccount, err := b.CreateAccountAndLogin(createAccountRequest)
+	require.NoError(t, err)
+	statusNode := b.statusNode
+	require.NotNil(t, statusNode)
+
+	savedSettings, err := b.GetSettings()
+	require.NoError(t, err)
+	require.Empty(t, savedSettings.Fleet)
+
+	accountsDB, err := b.accountsDB()
+	require.NoError(t, err)
+	err = accountsDB.SaveSettingField(settings.Fleet, statusTestFleet)
+	require.NoError(t, err)
+
+	savedSettings, err = b.GetSettings()
+	require.NoError(t, err)
+	require.NotEmpty(t, savedSettings.Fleet)
+	require.Equal(t, statusTestFleet, *savedSettings.Fleet)
+
+	require.NoError(t, b.Logout())
+
+	loginAccountRequest := &requests.Login{
+		KeyUID:   newAccount.KeyUID,
+		Password: password,
+	}
+	require.NoError(t, b.LoginAccount(loginAccountRequest))
+	select {
+	case <-c:
+		break
+	case <-time.After(5 * time.Second):
+		t.FailNow()
+	}
+	// Check is using the right fleet
+	require.Equal(t, b.config.ClusterConfig.WakuNodes, defaultWakuNodes[statusTestFleet])
+
+	require.NoError(t, b.Logout())
 }
