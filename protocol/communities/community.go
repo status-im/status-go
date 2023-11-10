@@ -14,6 +14,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
+	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
@@ -1297,6 +1298,14 @@ func (o *Community) ID() types.HexBytes {
 
 func (o *Community) IDString() string {
 	return types.EncodeHex(o.ID())
+}
+
+func (o *Community) UncompressedIDString() string {
+	return types.EncodeHex(crypto.FromECDSAPub(o.config.ID))
+}
+
+func (o *Community) SerializedID() (string, error) {
+	return multiformat.SerializeLegacyKey(o.UncompressedIDString())
 }
 
 func (o *Community) StatusUpdatesChannelID() string {

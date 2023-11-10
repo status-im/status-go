@@ -1560,7 +1560,7 @@ func (api *PublicAPI) ShareUserURLWithData(pubKey string) (string, error) {
 }
 
 func (api *PublicAPI) ParseSharedURL(url string) (*protocol.URLDataResponse, error) {
-	return api.service.messenger.ParseSharedURL(url)
+	return protocol.ParseSharedURL(url)
 }
 
 func (api *PublicAPI) Messenger() *protocol.Messenger {
