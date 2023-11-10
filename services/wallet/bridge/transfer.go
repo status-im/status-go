@@ -33,6 +33,7 @@ func (s *TransferBridge) CalculateFees(from, to *params.Network, token *token.To
 }
 
 func (s *TransferBridge) EstimateGas(fromNetwork *params.Network, toNetwork *params.Network, from common.Address, to common.Address, token *token.Token, amountIn *big.Int) (uint64, error) {
+	// TODO fix for ERC20
 	estimation, err := s.transactor.EstimateGas(fromNetwork, from, to, amountIn, []byte("eth_sendRawTransaction"))
 	if err != nil {
 		return 0, err
