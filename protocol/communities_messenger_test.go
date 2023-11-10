@@ -3641,3 +3641,46 @@ func (s *MessengerCommunitiesSuite) TestCommunityRekeyAfterBanDisableCompatibili
 
 	s.Require().NoError(owner.Shutdown())
 }
+
+func (s *MessengerCommunitiesSuite) TestRetrieveBigCommunity() {
+	bigEmoji := make([]byte, 4*1024*1024) // 4 MB
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+		Emoji:       string(bigEmoji),
+	}
+
+	// checks that private messages are segmented
+	// (community is advertised through `SendPrivate`)
+	response, err := s.owner.CreateCommunity(description, true)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	community := response.Communities()[0]
+
+	s.advertiseCommunityTo(community, s.owner, s.alice)
+	s.joinCommunity(community, s.owner, s.alice)
+
+	// checks that public messages are segmented
+	// (community is advertised through `SendPublic`)
+	updatedDescription := "status updated community description"
+	_, err = s.owner.EditCommunity(&requests.EditCommunity{
+		CommunityID: community.ID(),
+		CreateCommunity: requests.CreateCommunity{
+			Membership:  protobuf.CommunityPermissions_AUTO_ACCEPT,
+			Name:        "status",
+			Color:       "#ffffff",
+			Description: updatedDescription,
+			Emoji:       string(bigEmoji),
+		},
+	})
+	s.Require().NoError(err)
+
+	// alice receives updated description
+	_, err = WaitOnMessengerResponse(s.alice, func(r *MessengerResponse) bool {
+		return len(r.Communities()) > 0 && r.Communities()[0].DescriptionText() == updatedDescription
+	}, "updated description not received")
+	s.Require().NoError(err)
+}
