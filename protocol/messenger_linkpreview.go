@@ -20,6 +20,28 @@ import (
 
 const UnfurledLinksPerMessageLimit = 5
 
+type URLUnfurlPermit int
+
+const (
+	URLUnfurlingAllowed URLUnfurlPermit = iota
+	URLUnfurlingAskUser
+	URLUnfurlingForbiddenBySettings
+	URLUnfurlingNotSupported
+)
+
+type URLUnfurlingMetadata struct {
+	Permit            URLUnfurlPermit `json:"permit"`
+	IsStatusSharedURL bool            `json:"isStatusSharedURL"`
+}
+
+type URLsUnfurlPlan struct {
+	URLs map[string]URLUnfurlingMetadata `json:"urls"`
+}
+
+func URLUnfurlingSupported(url string) bool {
+	return !strings.HasSuffix(url, ".gif")
+}
+
 type UnfurlURLsResponse struct {
 	LinkPreviews       []*common.LinkPreview       `json:"linkPreviews,omitempty"`
 	StatusLinkPreviews []*common.StatusLinkPreview `json:"statusLinkPreviews,omitempty"`
@@ -93,28 +115,6 @@ func parseValidURL(rawURL string) (*neturl.URL, error) {
 	return u, nil
 }
 
-type URLUnfurlPermit int
-
-const (
-	URLUnfurlingAllowed URLUnfurlPermit = iota
-	URLUnfurlingAskUser
-	URLUnfurlingForbiddenBySettings
-	URLUnfurlingNotSupported
-)
-
-type URLUnfurlingMetadata struct {
-	Permit            URLUnfurlPermit `json:"permit"`
-	IsStatusSharedURL bool            `json:"isStatusSharedURL"`
-}
-
-type URLsUnfurlPlan struct {
-	URLs map[string]URLUnfurlingMetadata `json:"urls"`
-}
-
-func URLUnfurlingSupported(url string) bool {
-	return !strings.HasSuffix(url, ".gif")
-}
-
 func (m *Messenger) GetURLsToUnfurl(text string) *URLsUnfurlPlan {
 	s, err := m.getSettings()
 	if err != nil {
@@ -183,7 +183,7 @@ func (m *Messenger) GetURLs(text string) []string {
 	plan := m.GetURLsToUnfurl(text)
 	limit := int(math.Min(UnfurledLinksPerMessageLimit, float64(len(plan.URLs))))
 	urls := make([]string, 0, limit)
-	for url, _ := range plan.URLs {
+	for url := range plan.URLs {
 		urls = append(urls, url)
 		if len(urls) == limit {
 			break
