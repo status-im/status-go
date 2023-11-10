@@ -143,19 +143,19 @@ func (s *MessengerShareUrlsSuite) TestDeserializePublicKey() {
 }
 
 func (s *MessengerShareUrlsSuite) TestParseWrongUrls() {
-	urls := map[string]string{
-		"https://status.appc/#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11":  "url is not a status shared url",
-		"https://status.app/cc#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11": "url is not a status shared url",
-		"https://status.app/a#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11":  "url is not a status shared url",
+	const notStatusSharedURLError = "not a status shared url"
+	badURLs := map[string]string{
+		"https://status.appc/#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11":  notStatusSharedURLError,
+		"https://status.app/cc#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11": notStatusSharedURLError,
+		"https://status.app/a#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11":  notStatusSharedURLError,
+		"https://status.im/u#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11":   notStatusSharedURLError,
 		"https://status.app/u/": "url should contain at least one `#` separator",
-		"https://status.im/u#zQ3shYSHp7GoiXaauJMnDcjwU2yNjdzpXLosAWapPS4CFxc11": "url is not a status shared url",
 	}
 
-	for url, expectedError := range urls {
+	for url, expectedError := range badURLs {
 		urlData, err := s.m.ParseSharedURL(url)
 		s.Require().Error(err)
-
-		s.Require().True(strings.HasPrefix(err.Error(), expectedError))
+		s.Require().Equal(err.Error(), expectedError)
 		s.Require().Nil(urlData)
 	}
 }
