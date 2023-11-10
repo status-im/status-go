@@ -103,12 +103,12 @@ const (
 )
 
 type URLUnfurlingMetadata struct {
-	permit            URLUnfurlPermit `json:"permit"`
-	isStatusSharedURL bool
+	Permit            URLUnfurlPermit `json:"permit"`
+	IsStatusSharedURL bool            `json:"isStatusSharedURL"`
 }
 
 type URLsUnfurlPlan struct {
-	URLs map[string]URLUnfurlingMetadata
+	URLs map[string]URLUnfurlingMetadata `json:"urls"`
 }
 
 func URLUnfurlingSupported(url string) bool {
@@ -146,26 +146,26 @@ func (m *Messenger) GetURLsToUnfurl(text string) *URLsUnfurlPlan {
 		}
 
 		metadata := URLUnfurlingMetadata{
-			isStatusSharedURL: m.IsStatusSharedURL(url),
+			IsStatusSharedURL: IsStatusSharedURL(url),
 		}
 
 		//if len(result.URLs) == UnfurledLinksPerMessageLimit {
-		//	metadata.permit = URLUnfurlingForbiddenByLimit
+		//	metadata.Permit = URLUnfurlingForbiddenByLimit
 		//}
 		if !URLUnfurlingSupported(rawURL) {
-			metadata.permit = URLUnfurlingNotSupported
-		} else if metadata.isStatusSharedURL {
-			metadata.permit = URLUnfurlingAllowed
+			metadata.Permit = URLUnfurlingNotSupported
+		} else if metadata.IsStatusSharedURL {
+			metadata.Permit = URLUnfurlingAllowed
 		} else {
 			switch s.URLUnfurlingMode {
 			case settings.URLUnfurlingAlwaysAsk:
-				metadata.permit = URLUnfurlingAskUser
+				metadata.Permit = URLUnfurlingAskUser
 			case settings.URLUnfurlingEnableAll:
-				metadata.permit = URLUnfurlingAllowed
+				metadata.Permit = URLUnfurlingAllowed
 			case settings.URLUnfurlingDisableAll:
-				metadata.permit = URLUnfurlingForbiddenBySettings
+				metadata.Permit = URLUnfurlingForbiddenBySettings
 			default:
-				metadata.permit = URLUnfurlingForbiddenBySettings
+				metadata.Permit = URLUnfurlingForbiddenBySettings
 			}
 		}
 
