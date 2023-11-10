@@ -622,7 +622,20 @@ func (b *GethStatusBackend) loginAccount(request *requests.Login) error {
 		KeycardPairingDataFile: defaultKeycardPairingDataFile,
 	}
 
-	err = SetDefaultFleet(defaultCfg)
+	settings, err := b.GetSettings()
+	if err != nil {
+		return err
+	}
+
+	var fleet string
+	fleetPtr := settings.Fleet
+	if fleetPtr == nil || *fleetPtr == "" {
+		fleet = statusProdFleet
+	} else {
+		fleet = *fleetPtr
+	}
+
+	err = SetFleet(fleet, defaultCfg)
 	if err != nil {
 		return err
 	}
@@ -762,13 +775,17 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	return nil
 }
 
+func (b *GethStatusBackend) accountsDB() (*accounts.Database, error) {
+	return accounts.NewDB(b.appDB)
+}
+
 func (b *GethStatusBackend) GetSettings() (*settings.Settings, error) {
-	accountDB, err := accounts.NewDB(b.appDB)
+	accountsDB, err := b.accountsDB()
 	if err != nil {
 		return nil, err
 	}
 
-	settings, err := accountDB.GetSettings()
+	settings, err := accountsDB.GetSettings()
 	if err != nil {
 		return nil, err
 	}
