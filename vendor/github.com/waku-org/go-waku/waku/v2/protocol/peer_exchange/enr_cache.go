@@ -32,7 +32,10 @@ func newEnrCache(size int) (*enrCache, error) {
 func (c *enrCache) updateCache(node *enode.Node) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.data.Add(node.ID(), node)
+	currNode, ok := c.data.Get(node.ID())
+	if !ok || node.Seq() > currNode.(*enode.Node).Seq() {
+		c.data.Add(node.ID(), node)
+	}
 }
 
 // get `numPeers` records of enr

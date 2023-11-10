@@ -51,7 +51,7 @@ type DiscoveryV5 struct {
 type discV5Parameters struct {
 	autoUpdate    bool
 	autoFindPeers bool
-	bootnodes     []*enode.Node
+	bootnodes     map[enode.ID]*enode.Node
 	udpPort       uint
 	advertiseAddr []multiaddr.Multiaddr
 	loopPredicate func(*enode.Node) bool
@@ -74,7 +74,10 @@ func WithAutoUpdate(autoUpdate bool) DiscoveryV5Option {
 // WithBootnodes is an option used to specify the bootstrap nodes to use with DiscV5
 func WithBootnodes(bootnodes []*enode.Node) DiscoveryV5Option {
 	return func(params *discV5Parameters) {
-		params.bootnodes = bootnodes
+		params.bootnodes = make(map[enode.ID]*enode.Node)
+		for _, b := range bootnodes {
+			params.bootnodes[b.ID()] = b
+		}
 	}
 }
 
@@ -126,6 +129,11 @@ func NewDiscoveryV5(priv *ecdsa.PrivateKey, localnode *enode.LocalNode, peerConn
 		NAT = nat.Any()
 	}
 
+	var bootnodes []*enode.Node
+	for _, bootnode := range params.bootnodes {
+		bootnodes = append(bootnodes, bootnode)
+	}
+
 	return &DiscoveryV5{
 		params:                 params,
 		peerConnector:          peerConnector,
@@ -135,7 +143,7 @@ func NewDiscoveryV5(priv *ecdsa.PrivateKey, localnode *enode.LocalNode, peerConn
 		metrics:                newMetrics(reg),
 		config: discover.Config{
 			PrivateKey: priv,
-			Bootnodes:  params.bootnodes,
+			Bootnodes:  bootnodes,
 			V5Config: discover.V5Config{
 				ProtocolID: &protocolID,
 			},
@@ -379,9 +387,9 @@ func delayedHasNext(ctx context.Context, iterator enode.Iterator) bool {
 	return true
 }
 
-// Iterates over the nodes found via discv5 belonging to the node's current shard, and sends them to peerConnector
-func (d *DiscoveryV5) peerLoop(ctx context.Context) error {
-	iterator, err := d.PeerIterator(FilterPredicate(func(n *enode.Node) bool {
+// DefaultPredicate contains the conditions to be applied when filtering peers discovered via discv5
+func (d *DiscoveryV5) DefaultPredicate() Predicate {
+	return FilterPredicate(func(n *enode.Node) bool {
 		localRS, err := wenr.RelaySharding(d.localnode.Node().Record())
 		if err != nil {
 			return false
@@ -391,31 +399,38 @@ func (d *DiscoveryV5) peerLoop(ctx context.Context) error {
 			return true
 		}
 
+		if _, ok := d.params.bootnodes[n.ID()]; ok {
+			return true // The record is a bootnode. Assume it's valid and dont filter it out
+		}
+
 		nodeRS, err := wenr.RelaySharding(n.Record())
 		if err != nil {
 			return false
 		}
 
 		if nodeRS == nil {
-			// TODO: Node has no shard registered.
-			// Since for now, status-go uses both mixed static and named shards, we assume the node is valid
-			// Once status-go uses only static shards, we can't return true anymore.
-			return true
+			// Node has no shards registered.
+			return false
 		}
 
-		if nodeRS.Cluster != localRS.Cluster {
+		if nodeRS.ClusterID != localRS.ClusterID {
 			return false
 		}
 
 		// Contains any
-		for _, idx := range localRS.Indices {
-			if nodeRS.Contains(localRS.Cluster, idx) {
+		for _, idx := range localRS.ShardIDs {
+			if nodeRS.Contains(localRS.ClusterID, idx) {
 				return true
 			}
 		}
 
 		return false
-	}))
+	})
+}
+
+// Iterates over the nodes found via discv5 belonging to the node's current shard, and sends them to peerConnector
+func (d *DiscoveryV5) peerLoop(ctx context.Context) error {
+	iterator, err := d.PeerIterator(d.DefaultPredicate())
 	if err != nil {
 		d.metrics.RecordError(iteratorFailure)
 		return fmt.Errorf("obtaining iterator: %w", err)
@@ -443,6 +458,20 @@ func (d *DiscoveryV5) peerLoop(ctx context.Context) error {
 }
 
 func (d *DiscoveryV5) runDiscoveryV5Loop(ctx context.Context) {
+	if len(d.config.Bootnodes) > 0 {
+		localRS, err := wenr.RelaySharding(d.localnode.Node().Record())
+		if err == nil && localRS != nil {
+			iterator := d.DefaultPredicate()(enode.IterNodes(d.config.Bootnodes))
+			validBootCount := 0
+			for iterator.Next() {
+				validBootCount++
+			}
+
+			if validBootCount == 0 {
+				d.log.Warn("no discv5 bootstrap nodes share this node configured shards")
+			}
+		}
+	}
 
 restartLoop:
 	for {

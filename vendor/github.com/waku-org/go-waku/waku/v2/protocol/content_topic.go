@@ -7,10 +7,7 @@ import (
 	"strings"
 )
 
-// DefaultContentTopic is the default content topic used in Waku network if no content topic is specified.
-const DefaultContentTopic = "/waku/2/default-content/proto"
-
-var ErrInvalidFormat = errors.New("invalid format")
+var ErrInvalidFormat = errors.New("invalid content topic format")
 var ErrMissingGeneration = errors.New("missing part: generation")
 var ErrInvalidGeneration = errors.New("generation should be a number")
 

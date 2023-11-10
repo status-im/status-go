@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"math"
 	"sync"
@@ -31,10 +32,6 @@ func findMessages(query *pb.HistoryQuery, msgProvider MessageProvider) ([]*wpb.W
 
 	if query.PagingInfo.PageSize == 0 || query.PagingInfo.PageSize > uint64(MaxPageSize) {
 		query.PagingInfo.PageSize = MaxPageSize
-	}
-
-	if len(query.ContentFilters) > MaxContentFilters {
-		return nil, nil, ErrMaxContentFilters
 	}
 
 	cursor, queryResult, err := msgProvider.Query(query)
@@ -85,7 +82,7 @@ type MessageProvider interface {
 
 type Store interface {
 	SetHost(h host.Host)
-	Start(context.Context, relay.Subscription) error
+	Start(context.Context, *relay.Subscription) error
 	Query(ctx context.Context, query Query, opts ...HistoryRequestOption) (*Result, error)
 	Find(ctx context.Context, query Query, cb criteriaFN, opts ...HistoryRequestOption) (*wpb.WakuMessage, error)
 	Next(ctx context.Context, r *Result) (*Result, error)
@@ -104,7 +101,7 @@ func (store *WakuStore) SetHost(h host.Host) {
 }
 
 // Start initializes the WakuStore by enabling the protocol and fetching records from a message provider
-func (store *WakuStore) Start(ctx context.Context, sub relay.Subscription) error {
+func (store *WakuStore) Start(ctx context.Context, sub *relay.Subscription) error {
 	if store.started {
 		return nil
 	}
@@ -164,18 +161,32 @@ func (store *WakuStore) storeIncomingMessages(ctx context.Context) {
 	}
 }
 
-func (store *WakuStore) onRequest(s network.Stream) {
-	defer s.Close()
-	logger := store.log.With(logging.HostID("peer", s.Conn().RemotePeer()))
+func (store *WakuStore) onRequest(stream network.Stream) {
+	logger := store.log.With(logging.HostID("peer", stream.Conn().RemotePeer()))
 	historyRPCRequest := &pb.HistoryRPC{}
 
-	writer := pbio.NewDelimitedWriter(s)
-	reader := pbio.NewDelimitedReader(s, math.MaxInt32)
+	writer := pbio.NewDelimitedWriter(stream)
+	reader := pbio.NewDelimitedReader(stream, math.MaxInt32)
 
 	err := reader.ReadMsg(historyRPCRequest)
 	if err != nil {
 		logger.Error("reading request", zap.Error(err))
 		store.metrics.RecordError(decodeRPCFailure)
+		if err := stream.Reset(); err != nil {
+			store.log.Error("resetting connection", zap.Error(err))
+		}
+		return
+	}
+
+	if err := historyRPCRequest.ValidateQuery(); err != nil {
+		logger.Error("invalid request received", zap.Error(err))
+		store.metrics.RecordError(decodeRPCFailure)
+		if err := stream.Reset(); err != nil {
+			store.log.Error("resetting connection", zap.Error(err))
+		}
+
+		// TODO: If store protocol is updated to include error messages
+		//       `err.Error()` can be returned as a response
 		return
 	}
 
@@ -185,6 +196,9 @@ func (store *WakuStore) onRequest(s network.Stream) {
 	} else {
 		logger.Error("reading request", zap.Error(err))
 		store.metrics.RecordError(emptyRPCQueryFailure)
+		if err := stream.Reset(); err != nil {
+			store.log.Error("resetting connection", zap.Error(err))
+		}
 		return
 	}
 
@@ -200,13 +214,15 @@ func (store *WakuStore) onRequest(s network.Stream) {
 	if err != nil {
 		logger.Error("writing response", zap.Error(err), logging.PagingInfo(historyResponseRPC.Response.PagingInfo))
 		store.metrics.RecordError(writeResponseFailure)
-		_ = s.Reset()
-	} else {
-		logger.Info("response sent")
+		if err := stream.Reset(); err != nil {
+			store.log.Error("resetting connection", zap.Error(err))
+		}
+		return
 	}
-}
 
-// TODO: queryWithAccounting
+	logger.Info("response sent")
+	stream.Close()
+}
 
 // Stop closes the store message channel and removes the protocol stream handler
 func (store *WakuStore) Stop() {
@@ -231,42 +247,59 @@ func (store *WakuStore) Stop() {
 	store.wg.Wait()
 }
 
-func (store *WakuStore) queryLoop(ctx context.Context, query *pb.HistoryQuery, candidateList []peer.ID) ([]*wpb.WakuMessage, error) {
-	// loops through the candidateList in order and sends the query to each until one of the query gets resolved successfully
-	// returns the number of retrieved messages, or error if all the requests fail
+type queryLoopCandidateResponse struct {
+	peerID   peer.ID
+	response *pb.HistoryResponse
+	err      error
+}
+
+func (store *WakuStore) queryLoop(ctx context.Context, query *pb.HistoryQuery, candidateList []peer.ID) ([]*queryLoopCandidateResponse, error) {
+	err := query.Validate()
+	if err != nil {
+		return nil, err
+	}
 
 	queryWg := sync.WaitGroup{}
 	queryWg.Add(len(candidateList))
 
-	resultChan := make(chan *pb.HistoryResponse, len(candidateList))
+	resultChan := make(chan *queryLoopCandidateResponse, len(candidateList))
 
+	// loops through the candidateList in order and sends the query to each until one of the query gets resolved successfully
+	// returns the number of retrieved messages, or error if all the requests fail
 	for _, peer := range candidateList {
 		func() {
 			defer queryWg.Done()
-			result, err := store.queryFrom(ctx, query, peer, protocol.GenerateRequestID())
-			if err == nil {
-				resultChan <- result
-				return
+
+			historyRequest := &pb.HistoryRPC{
+				RequestId: hex.EncodeToString(protocol.GenerateRequestID()),
+				Query:     query,
 			}
-			store.log.Error("resuming history", logging.HostID("peer", peer), zap.Error(err))
+
+			result := &queryLoopCandidateResponse{
+				peerID: peer,
+			}
+
+			response, err := store.queryFrom(ctx, historyRequest, peer)
+			if err != nil {
+				store.log.Error("resuming history", logging.HostID("peer", peer), zap.Error(err))
+				result.err = err
+			} else {
+				result.response = response
+			}
+
+			resultChan <- result
 		}()
 	}
 
 	queryWg.Wait()
 	close(resultChan)
 
-	var messages []*wpb.WakuMessage
-	hasResults := false
+	var queryLoopResults []*queryLoopCandidateResponse
 	for result := range resultChan {
-		hasResults = true
-		messages = append(messages, result.Messages...)
+		queryLoopResults = append(queryLoopResults, result)
 	}
 
-	if hasResults {
-		return messages, nil
-	}
-
-	return nil, ErrFailedQuery
+	return queryLoopResults, nil
 }
 
 func (store *WakuStore) findLastSeen() (int64, error) {
@@ -316,20 +349,31 @@ func (store *WakuStore) Resume(ctx context.Context, pubsubTopic string, peerList
 		return -1, ErrNoPeersAvailable
 	}
 
-	messages, err := store.queryLoop(ctx, rpc, peerList)
+	queryLoopResults, err := store.queryLoop(ctx, rpc, peerList)
 	if err != nil {
 		store.log.Error("resuming history", zap.Error(err))
 		return -1, ErrFailedToResumeHistory
 	}
 
 	msgCount := 0
-	for _, msg := range messages {
-		if err = store.storeMessage(protocol.NewEnvelope(msg, store.timesource.Now().UnixNano(), pubsubTopic)); err == nil {
-			msgCount++
+	for _, r := range queryLoopResults {
+		if err == nil && r.response.GetError() != pb.HistoryResponse_NONE {
+			r.err = errors.New("invalid cursor")
+		}
+
+		if r.err != nil {
+			store.log.Warn("could not resume message history", zap.Error(r.err), logging.HostID("peer", r.peerID))
+			continue
+		}
+
+		for _, msg := range r.response.Messages {
+			if err = store.storeMessage(protocol.NewEnvelope(msg, store.timesource.Now().UnixNano(), pubsubTopic)); err == nil {
+				msgCount++
+			}
 		}
 	}
 
-	store.log.Info("retrieved messages since the last online time", zap.Int("messages", len(messages)))
+	store.log.Info("retrieved messages since the last online time", zap.Int("messages", msgCount))
 
 	return msgCount, nil
 }

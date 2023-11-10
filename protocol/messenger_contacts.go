@@ -10,8 +10,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
-
 	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -470,7 +468,7 @@ func (m *Messenger) addContact(ctx context.Context, pubKey, ensName, nickname, d
 	if !deprecation.ChatProfileDeprecated {
 		response.AddChat(profileChat)
 
-		_, err = m.transport.InitFilters([]transport.FiltersToInitialize{{ChatID: profileChat.ID, PubsubTopic: relay.DefaultWakuTopic}}, []*ecdsa.PublicKey{publicKey})
+		_, err = m.transport.InitFilters([]transport.FiltersToInitialize{{ChatID: profileChat.ID, PubsubTopic: transport.DefaultShardPubsubTopic()}}, []*ecdsa.PublicKey{publicKey})
 		if err != nil {
 			return nil, err
 		}

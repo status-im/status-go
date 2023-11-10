@@ -87,6 +87,7 @@ type settings struct {
 	DiscoveryLimit      int    // Indicates the number of nodes to discover
 	Nameserver          string // Optional nameserver to use for dns discovery
 	EnableDiscV5        bool   // Indicates whether discv5 is enabled or not
+	DefaultPubsubTopic  string // Pubsub topic to be used by default for messages that do not have a topic assigned (depending whether sharding is used or not)
 	Options             []node.WakuNodeOption
 }
 
@@ -238,7 +239,13 @@ func New(nodeKey string, fleet string, cfg *Config, logger *zap.Logger, appDB *s
 		EnableDiscV5:      cfg.EnableDiscV5,
 	}
 
-	waku.filters = common.NewFilters(waku.logger)
+	if waku.cfg.UseShardAsDefaultTopic {
+		waku.settings.DefaultPubsubTopic = cfg.DefaultShardPubsubTopic
+	} else {
+		waku.settings.DefaultPubsubTopic = relay.DefaultWakuTopic
+	}
+
+	waku.filters = common.NewFilters(waku.settings.DefaultPubsubTopic, waku.logger)
 	waku.bandwidthCounter = metrics.NewBandwidthCounter()
 
 	var privateKey *ecdsa.PrivateKey
@@ -618,6 +625,8 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 		return errors.New("only available for full nodes")
 	}
 
+	topic = getPubsubTopic(topic, w.cfg.UseShardAsDefaultTopic, w.settings.DefaultPubsubTopic)
+
 	if w.node.Relay().IsSubscribed(topic) {
 		return nil
 	}
@@ -629,7 +638,9 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 		}
 	}
 
-	sub, err := w.node.Relay().SubscribeToTopic(context.Background(), topic)
+	contentFilter := protocol.NewContentFilter(topic)
+
+	sub, err := w.node.Relay().Subscribe(w.ctx, contentFilter)
 	if err != nil {
 		return err
 	}
@@ -640,9 +651,12 @@ func (w *Waku) subscribeToPubsubTopicWithWakuRelay(topic string, pubkey *ecdsa.P
 		for {
 			select {
 			case <-w.ctx.Done():
-				sub.Unsubscribe()
+				err := w.node.Relay().Unsubscribe(w.ctx, contentFilter)
+				if err != nil && !errors.Is(err, context.Canceled) {
+					w.logger.Error("could not unsubscribe", zap.Error(err))
+				}
 				return
-			case env := <-sub.Ch:
+			case env := <-sub[0].Ch:
 				err := w.OnNewEnvelopes(env, common.RelayedMessageType)
 				if err != nil {
 					w.logger.Error("OnNewEnvelopes error", zap.Error(err))
@@ -940,7 +954,7 @@ func (w *Waku) GetSymKey(id string) ([]byte, error) {
 // and subsequent storing of incoming messages.
 func (w *Waku) Subscribe(f *common.Filter) (string, error) {
 	if f.PubsubTopic == "" {
-		f.PubsubTopic = relay.DefaultWakuTopic
+		f.PubsubTopic = w.settings.DefaultPubsubTopic
 	}
 
 	id, err := w.filters.Install(f)
@@ -995,18 +1009,28 @@ func (w *Waku) UnsubscribeMany(ids []string) error {
 	return nil
 }
 
+func getPubsubTopic(pubsubTopic string, useShardAsDefaultTopic bool, defaultShardPubsubTopic string) string {
+	// Override the pubsub topic used, in case the default shard is being used
+	// and the configuration indicates we need to use the default waku topic from relay
+	if !useShardAsDefaultTopic && pubsubTopic == defaultShardPubsubTopic {
+		pubsubTopic = relay.DefaultWakuTopic
+	}
+	return pubsubTopic
+}
+
 func (w *Waku) broadcast() {
 	for {
 		select {
 		case envelope := <-w.sendQueue:
+			pubsubTopic := getPubsubTopic(envelope.PubsubTopic(), w.cfg.UseShardAsDefaultTopic, w.cfg.DefaultShardPubsubTopic)
 			var err error
-			logger := w.logger.With(zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", envelope.PubsubTopic()), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().Timestamp))
+			logger := w.logger.With(zap.String("envelopeHash", hexutil.Encode(envelope.Hash())), zap.String("pubsubTopic", pubsubTopic), zap.String("contentTopic", envelope.Message().ContentTopic), zap.Int64("timestamp", envelope.Message().Timestamp))
 			if w.settings.LightClient {
 				w.logger.Info("publishing message via lightpush")
-				_, err = w.node.Lightpush().PublishToTopic(context.Background(), envelope.Message(), lightpush.WithPubSubTopic(envelope.PubsubTopic()))
+				_, err = w.node.Lightpush().Publish(context.Background(), envelope.Message(), lightpush.WithPubSubTopic(pubsubTopic))
 			} else {
 				logger.Info("publishing message via relay")
-				_, err = w.node.Relay().PublishToTopic(context.Background(), envelope.Message(), envelope.PubsubTopic())
+				_, err = w.node.Relay().Publish(context.Background(), envelope.Message(), relay.WithPubSubTopic(pubsubTopic))
 			}
 
 			if err != nil {
@@ -1036,7 +1060,7 @@ func (w *Waku) broadcast() {
 // network in the coming cycles.
 func (w *Waku) Send(pubsubTopic string, msg *pb.WakuMessage) ([]byte, error) {
 	if pubsubTopic == "" {
-		pubsubTopic = relay.DefaultWakuTopic
+		pubsubTopic = w.settings.DefaultPubsubTopic
 	}
 
 	if w.protectedTopicStore != nil {
@@ -1257,8 +1281,7 @@ func (w *Waku) setupRelaySubscriptions() error {
 		}
 	}
 
-	// Default Waku Topic (TODO: remove once sharding is added)
-	err := w.subscribeToPubsubTopicWithWakuRelay(relay.DefaultWakuTopic, nil)
+	err := w.subscribeToPubsubTopicWithWakuRelay(w.settings.DefaultPubsubTopic, nil)
 	if err != nil {
 		return err
 	}
@@ -1298,6 +1321,12 @@ func (w *Waku) OnNewEnvelopes(envelope *protocol.Envelope, msgType common.Messag
 	recvMessage := common.NewReceivedMessage(envelope, msgType)
 	if recvMessage == nil {
 		return nil
+	}
+
+	// Override the message pubsub topci in case the configuration indicates we shouldn't
+	// use the default shard but the default waku topic from relay instead
+	if !w.cfg.UseShardAsDefaultTopic && recvMessage.PubsubTopic == relay.DefaultWakuTopic {
+		recvMessage.PubsubTopic = w.cfg.DefaultShardPubsubTopic
 	}
 
 	if w.statusTelemetryClient != nil {

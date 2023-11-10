@@ -7,7 +7,6 @@ import (
 	crand "crypto/rand"
 	"encoding/binary"
 	"fmt"
-	mrand "math/rand"
 
 	"errors"
 	"strconv"
@@ -282,7 +281,7 @@ func generateSecureRandomData(length int) ([]byte, error) {
 	} else if !validateDataIntegrity(x, length) {
 		return nil, errors.New("crypto/rand failed to generate secure random data")
 	}
-	_, err = mrand.Read(y)
+	_, err = crand.Read(y)
 	if err != nil {
 		return nil, err
 	} else if !validateDataIntegrity(y, length) {

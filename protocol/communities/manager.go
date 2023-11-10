@@ -18,8 +18,6 @@ import (
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/golang/protobuf/proto"
 
-	"github.com/waku-org/go-waku/waku/v2/protocol/relay"
-
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -3369,7 +3367,7 @@ func (m *Manager) GetPubsubTopic(communityID string) (string, error) {
 	}
 
 	if community == nil {
-		return relay.DefaultWakuTopic, nil
+		return transport.DefaultShardPubsubTopic(), nil
 	}
 
 	return transport.GetPubsubTopic(community.Shard().TransportShard()), nil
