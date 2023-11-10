@@ -106,14 +106,18 @@ func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derive
 }
 
 func SetDefaultFleet(nodeConfig *params.NodeConfig) error {
-	clusterConfig, err := params.LoadClusterConfigFromFleet(statusProdFleet)
+	return SetFleet(statusProdFleet, nodeConfig)
+}
+
+func SetFleet(fleet string, nodeConfig *params.NodeConfig) error {
+	clusterConfig, err := params.LoadClusterConfigFromFleet(fleet)
 	if err != nil {
 		return err
 	}
 	nodeConfig.ClusterConfig = *clusterConfig
 
-	nodeConfig.ClusterConfig.WakuNodes = defaultWakuNodes[statusProdFleet]
-	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = defaultWakuNodes[statusProdFleet]
+	nodeConfig.ClusterConfig.WakuNodes = defaultWakuNodes[fleet]
+	nodeConfig.ClusterConfig.DiscV5BootstrapNodes = defaultWakuNodes[fleet]
 
 	return nil
 }
