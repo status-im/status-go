@@ -6,100 +6,101 @@ import (
 )
 
 // Combined Collection+Collectible info, used to display a detailed view of a collectible
-type CollectibleDetails struct {
-	ID                 thirdparty.CollectibleUniqueID `json:"id"`
-	Name               string                         `json:"name"`
-	Description        string                         `json:"description"`
-	ImageURL           string                         `json:"image_url"`
-	AnimationURL       string                         `json:"animation_url"`
-	AnimationMediaType string                         `json:"animation_media_type"`
-	Traits             []thirdparty.CollectibleTrait  `json:"traits"`
-	BackgroundColor    string                         `json:"background_color"`
-	CollectionName     string                         `json:"collection_name"`
-	CollectionSlug     string                         `json:"collection_slug"`
-	CollectionImageURL string                         `json:"collection_image_url"`
-	CommunityInfo      *CommunityDetails              `json:"community_info,omitempty"`
-}
-
-// Combined Collection+Collectible info, used to display a basic view of a collectible in a list
-type CollectibleHeader struct {
-	ID                 thirdparty.CollectibleUniqueID `json:"id"`
-	Name               string                         `json:"name"`
-	ImageURL           string                         `json:"image_url"`
-	AnimationURL       string                         `json:"animation_url"`
-	AnimationMediaType string                         `json:"animation_media_type"`
-	BackgroundColor    string                         `json:"background_color"`
-	CollectionName     string                         `json:"collection_name"`
-	CollectionSlug     string                         `json:"collection_slug"`
-	CollectionImageURL string                         `json:"collection_image_url"`
-	CommunityHeader    *CommunityHeader               `json:"community_header,omitempty"`
-}
-
-type CommunityDetails struct {
-	CommunityID     string                `json:"community_id"`
-	CommunityName   string                `json:"community_name"`
-	CommunityColor  string                `json:"community_color"`
-	CommunityImage  string                `json:"community_image"`
-	PrivilegesLevel token.PrivilegesLevel `json:"privileges_level"`
-}
-
-type CommunityHeader struct {
-	CommunityID     string                `json:"community_id"`
-	CommunityName   string                `json:"community_name"`
-	CommunityColor  string                `json:"community_color"`
-	PrivilegesLevel token.PrivilegesLevel `json:"privileges_level"`
-}
-
-type CommunityCollectibleHeader struct {
+type Collectible struct {
+	DataType        CollectibleDataType            `json:"data_type"`
 	ID              thirdparty.CollectibleUniqueID `json:"id"`
-	Name            string                         `json:"name"`
-	CommunityHeader CommunityHeader                `json:"community_header"`
+	CollectibleData *CollectibleData               `json:"collectible_data,omitempty"`
+	CollectionData  *CollectionData                `json:"collection_data,omitempty"`
+	CommunityData   *CommunityData                 `json:"community_data,omitempty"`
 }
 
-func fullCollectibleDataToHeader(c thirdparty.FullCollectibleData) CollectibleHeader {
-	ret := CollectibleHeader{
-		ID:                 c.CollectibleData.ID,
-		Name:               c.CollectibleData.Name,
-		ImageURL:           c.CollectibleData.ImageURL,
-		AnimationURL:       c.CollectibleData.AnimationURL,
-		AnimationMediaType: c.CollectibleData.AnimationMediaType,
-		BackgroundColor:    c.CollectibleData.BackgroundColor,
-	}
-	if c.CollectionData != nil {
-		ret.CollectionName = c.CollectionData.Name
-		ret.CollectionSlug = c.CollectionData.Slug
-		ret.CollectionImageURL = c.CollectionData.ImageURL
+type CollectibleData struct {
+	Name               string                         `json:"name"`
+	Description        *string                        `json:"description,omitempty"`
+	ImageURL           *string                        `json:"image_url,omitempty"`
+	AnimationURL       *string                        `json:"animation_url,omitempty"`
+	AnimationMediaType *string                        `json:"animation_media_type,omitempty"`
+	Traits             *[]thirdparty.CollectibleTrait `json:"traits,omitempty"`
+	BackgroundColor    *string                        `json:"background_color,omitempty"`
+}
+
+type CollectionData struct {
+	Name     string `json:"name"`
+	Slug     string `json:"slug"`
+	ImageURL string `json:"image_url"`
+}
+
+type CommunityData struct {
+	ID              string                `json:"id"`
+	Name            string                `json:"name"`
+	Color           string                `json:"color"`
+	PrivilegesLevel token.PrivilegesLevel `json:"privileges_level"`
+	ImageURL        *string               `json:"image_url,omitempty"`
+}
+
+func idToCollectible(id thirdparty.CollectibleUniqueID) Collectible {
+	ret := Collectible{
+		DataType: CollectibleDataTypeUniqueID,
+		ID:       id,
 	}
 	return ret
 }
 
-func fullCollectibleDataToDetails(c thirdparty.FullCollectibleData) CollectibleDetails {
-	ret := CollectibleDetails{
-		ID:                 c.CollectibleData.ID,
-		Name:               c.CollectibleData.Name,
-		Description:        c.CollectibleData.Description,
-		ImageURL:           c.CollectibleData.ImageURL,
-		AnimationURL:       c.CollectibleData.AnimationURL,
-		AnimationMediaType: c.CollectibleData.AnimationMediaType,
-		BackgroundColor:    c.CollectibleData.BackgroundColor,
-		Traits:             c.CollectibleData.Traits,
+func fullCollectibleDataToHeader(c thirdparty.FullCollectibleData) Collectible {
+	ret := Collectible{
+		DataType: CollectibleDataTypeHeader,
+		ID:       c.CollectibleData.ID,
+		CollectibleData: &CollectibleData{
+			Name:               c.CollectibleData.Name,
+			ImageURL:           &c.CollectibleData.ImageURL,
+			AnimationURL:       &c.CollectibleData.AnimationURL,
+			AnimationMediaType: &c.CollectibleData.AnimationMediaType,
+			BackgroundColor:    &c.CollectibleData.BackgroundColor,
+		},
 	}
 	if c.CollectionData != nil {
-		ret.CollectionName = c.CollectionData.Name
-		ret.CollectionSlug = c.CollectionData.Slug
-		ret.CollectionImageURL = c.CollectionData.ImageURL
+		ret.CollectionData = &CollectionData{
+			Name:     c.CollectionData.Name,
+			Slug:     c.CollectionData.Slug,
+			ImageURL: c.CollectionData.ImageURL,
+		}
+	}
+
+	return ret
+}
+
+func fullCollectibleDataToDetails(c thirdparty.FullCollectibleData) Collectible {
+	ret := Collectible{
+		DataType: CollectibleDataTypeHeader,
+		ID:       c.CollectibleData.ID,
+		CollectibleData: &CollectibleData{
+			Name:               c.CollectibleData.Name,
+			Description:        &c.CollectibleData.Description,
+			ImageURL:           &c.CollectibleData.ImageURL,
+			AnimationURL:       &c.CollectibleData.AnimationURL,
+			AnimationMediaType: &c.CollectibleData.AnimationMediaType,
+			BackgroundColor:    &c.CollectibleData.BackgroundColor,
+			Traits:             &c.CollectibleData.Traits,
+		},
+	}
+	if c.CollectionData != nil {
+		ret.CollectionData = &CollectionData{
+			Name:     c.CollectionData.Name,
+			Slug:     c.CollectionData.Slug,
+			ImageURL: c.CollectionData.ImageURL,
+		}
 	}
 	return ret
 }
 
-func communityInfoToHeader(communityID string, community *thirdparty.CommunityInfo, communityCollectible *thirdparty.CollectibleCommunityInfo) CommunityHeader {
-	ret := CommunityHeader{
-		CommunityID: communityID,
+func communityInfoToHeader(communityID string, community *thirdparty.CommunityInfo, communityCollectible *thirdparty.CollectibleCommunityInfo) CommunityData {
+	ret := CommunityData{
+		ID: communityID,
 	}
 
 	if community != nil {
-		ret.CommunityName = community.CommunityName
-		ret.CommunityColor = community.CommunityColor
+		ret.Name = community.CommunityName
+		ret.Color = community.CommunityColor
 	}
 
 	if communityCollectible != nil {
@@ -109,15 +110,15 @@ func communityInfoToHeader(communityID string, community *thirdparty.CommunityIn
 	return ret
 }
 
-func communityInfoToDetails(communityID string, community *thirdparty.CommunityInfo, communityCollectible *thirdparty.CollectibleCommunityInfo) CommunityDetails {
-	ret := CommunityDetails{
-		CommunityID: communityID,
+func communityInfoToDetails(communityID string, community *thirdparty.CommunityInfo, communityCollectible *thirdparty.CollectibleCommunityInfo) CommunityData {
+	ret := CommunityData{
+		ID: communityID,
 	}
 
 	if community != nil {
-		ret.CommunityName = community.CommunityName
-		ret.CommunityColor = community.CommunityColor
-		ret.CommunityImage = community.CommunityImage
+		ret.Name = community.CommunityName
+		ret.Color = community.CommunityColor
+		ret.ImageURL = &community.CommunityImage
 	}
 
 	if communityCollectible != nil {

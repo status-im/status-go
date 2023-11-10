@@ -93,6 +93,7 @@ func NewService(
 		ownershipDB: NewOwnershipDB(db),
 		communityDB: community.NewDataDB(db),
 		walletFeed:  walletFeed,
+		scheduler:   async.NewMultiClientScheduler(),
 	}
 	s.controller.SetReceivedCollectiblesCb(s.notifyCommunityCollectiblesReceived)
 	return s
@@ -115,9 +116,8 @@ type OwnershipStatusPerChainID = map[walletCommon.ChainID]OwnershipStatus
 type OwnershipStatusPerAddressAndChainID = map[common.Address]OwnershipStatusPerChainID
 
 type GetOwnedCollectiblesResponse struct {
-	DataType            CollectibleDataType `json:"data_type"`
-	EncodedCollectibles string              `json:"collectibles"`
-	Offset              int                 `json:"offset"`
+	Collectibles []Collectible `json:"collectibles"`
+	Offset       int           `json:"offset"`
 	// Used to indicate that there might be more collectibles that were not returned
 	// based on a simple heuristic
 	HasMore         bool                                `json:"hasMore"`
@@ -126,19 +126,18 @@ type GetOwnedCollectiblesResponse struct {
 }
 
 type GetCollectiblesByUniqueIDResponse struct {
-	DataType            CollectibleDataType `json:"data_type"`
-	EncodedCollectibles string              `json:"collectibles"`
-	ErrorCode           ErrorCode           `json:"errorCode"`
+	Collectibles []Collectible `json:"collectibles"`
+	ErrorCode    ErrorCode     `json:"errorCode"`
 }
 
 type GetOwnedCollectiblesReturnType struct {
-	collectibles    interface{}
+	collectibles    []Collectible
 	hasMore         bool
 	ownershipStatus OwnershipStatusPerAddressAndChainID
 }
 
 type GetCollectiblesByUniqueIDReturnType struct {
-	collectibles interface{}
+	collectibles []Collectible
 }
 
 func (s *Service) GetOwnedCollectibles(
@@ -203,7 +202,6 @@ func (s *Service) fetchOwnedCollectiblesIfNeeded(ctx context.Context, chainIDs [
 	}
 
 	group := async.NewGroup(ctx)
-
 	for _, address := range addresses {
 		for _, chainID := range chainIDs {
 			mustFetch, err := s.needsToFetch(chainID, address, fetchCriteria)
@@ -216,7 +214,6 @@ func (s *Service) fetchOwnedCollectiblesIfNeeded(ctx context.Context, chainIDs [
 			}
 		}
 	}
-
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -241,18 +238,16 @@ func (s *Service) GetOwnedCollectiblesAsync(
 		return s.GetOwnedCollectibles(ctx, chainIDs, addresses, filter, offset, limit, dataType, fetchCriteria)
 	}, func(result interface{}, taskType async.TaskType, err error) {
 		res := GetOwnedCollectiblesResponse{
-			DataType:  dataType,
 			ErrorCode: ErrorCodeFailed,
 		}
 
 		if errors.Is(err, context.Canceled) || errors.Is(err, async.ErrTaskOverwritten) {
 			res.ErrorCode = ErrorCodeTaskCanceled
 		} else if err == nil {
-			fnRet := result.(GetOwnedCollectiblesReturnType)
+			fnRet := result.(*GetOwnedCollectiblesReturnType)
 
-			encodedMessage, err := json.Marshal(fnRet.collectibles)
 			if err == nil {
-				res.EncodedCollectibles = string(encodedMessage)
+				res.Collectibles = fnRet.collectibles
 				res.Offset = offset
 				res.HasMore = fnRet.hasMore
 				res.OwnershipStatus = fnRet.ownershipStatus
@@ -285,18 +280,16 @@ func (s *Service) GetCollectiblesByUniqueIDAsync(
 		return s.GetCollectiblesByUniqueID(ctx, uniqueIDs, dataType)
 	}, func(result interface{}, taskType async.TaskType, err error) {
 		res := GetCollectiblesByUniqueIDResponse{
-			DataType:  dataType,
 			ErrorCode: ErrorCodeFailed,
 		}
 
 		if errors.Is(err, context.Canceled) || errors.Is(err, async.ErrTaskOverwritten) {
 			res.ErrorCode = ErrorCodeTaskCanceled
 		} else if err == nil {
-			fnRet := result.(GetCollectiblesByUniqueIDReturnType)
+			fnRet := result.(*GetCollectiblesByUniqueIDReturnType)
 
-			encodedMessage, err := json.Marshal(fnRet.collectibles)
 			if err == nil {
-				res.EncodedCollectibles = string(encodedMessage)
+				res.Collectibles = fnRet.collectibles
 				res.ErrorCode = ErrorCodeSuccess
 			}
 		}
@@ -381,10 +374,10 @@ func (s *Service) GetOwnershipStatus(chainIDs []walletCommon.ChainID, owners []c
 	return ret, nil
 }
 
-func (s *Service) collectibleIDsToDataType(ctx context.Context, ids []thirdparty.CollectibleUniqueID, dataType CollectibleDataType) (interface{}, error) {
+func (s *Service) collectibleIDsToDataType(ctx context.Context, ids []thirdparty.CollectibleUniqueID, dataType CollectibleDataType) ([]Collectible, error) {
 	switch dataType {
 	case CollectibleDataTypeUniqueID:
-		return ids, nil
+		return idsToCollectibles(ids), nil
 	case CollectibleDataTypeHeader, CollectibleDataTypeDetails, CollectibleDataTypeCommunityHeader:
 		collectibles, err := s.manager.FetchAssetsByCollectibleUniqueID(ctx, ids)
 		if err != nil {
@@ -402,8 +395,19 @@ func (s *Service) collectibleIDsToDataType(ctx context.Context, ids []thirdparty
 	return nil, errors.New("unknown data type")
 }
 
-func (s *Service) fullCollectiblesDataToHeaders(data []thirdparty.FullCollectibleData) ([]CollectibleHeader, error) {
-	res := make([]CollectibleHeader, 0, len(data))
+func idsToCollectibles(ids []thirdparty.CollectibleUniqueID) []Collectible {
+	res := make([]Collectible, 0, len(ids))
+
+	for _, id := range ids {
+		c := idToCollectible(id)
+		res = append(res, c)
+	}
+
+	return res
+}
+
+func (s *Service) fullCollectiblesDataToHeaders(data []thirdparty.FullCollectibleData) ([]Collectible, error) {
+	res := make([]Collectible, 0, len(data))
 
 	for _, c := range data {
 		header := fullCollectibleDataToHeader(c)
@@ -415,7 +419,7 @@ func (s *Service) fullCollectiblesDataToHeaders(data []thirdparty.FullCollectibl
 			}
 
 			communityHeader := communityInfoToHeader(c.CollectibleData.CommunityID, communityInfo, c.CommunityInfo)
-			header.CommunityHeader = &communityHeader
+			header.CommunityData = &communityHeader
 		}
 
 		res = append(res, header)
@@ -424,8 +428,8 @@ func (s *Service) fullCollectiblesDataToHeaders(data []thirdparty.FullCollectibl
 	return res, nil
 }
 
-func (s *Service) fullCollectiblesDataToDetails(data []thirdparty.FullCollectibleData) ([]CollectibleDetails, error) {
-	res := make([]CollectibleDetails, 0, len(data))
+func (s *Service) fullCollectiblesDataToDetails(data []thirdparty.FullCollectibleData) ([]Collectible, error) {
+	res := make([]Collectible, 0, len(data))
 
 	for _, c := range data {
 		details := fullCollectibleDataToDetails(c)
@@ -437,7 +441,7 @@ func (s *Service) fullCollectiblesDataToDetails(data []thirdparty.FullCollectibl
 			}
 
 			communityDetails := communityInfoToDetails(c.CollectibleData.CommunityID, communityInfo, c.CommunityInfo)
-			details.CommunityInfo = &communityDetails
+			details.CommunityData = &communityDetails
 		}
 
 		res = append(res, details)
@@ -446,8 +450,8 @@ func (s *Service) fullCollectiblesDataToDetails(data []thirdparty.FullCollectibl
 	return res, nil
 }
 
-func (s *Service) fullCollectiblesDataToCommunityHeader(data []thirdparty.FullCollectibleData) ([]CommunityCollectibleHeader, error) {
-	res := make([]CommunityCollectibleHeader, 0, len(data))
+func (s *Service) fullCollectiblesDataToCommunityHeader(data []thirdparty.FullCollectibleData) ([]Collectible, error) {
+	res := make([]Collectible, 0, len(data))
 
 	for _, c := range data {
 		collectibleID := c.CollectibleData.ID
@@ -463,10 +467,14 @@ func (s *Service) fullCollectiblesDataToCommunityHeader(data []thirdparty.FullCo
 			continue
 		}
 
-		header := CommunityCollectibleHeader{
-			ID:              collectibleID,
-			Name:            c.CollectibleData.Name,
-			CommunityHeader: communityInfoToHeader(communityID, communityInfo, c.CommunityInfo),
+		communityHeader := communityInfoToHeader(communityID, communityInfo, c.CommunityInfo)
+
+		header := Collectible{
+			ID: collectibleID,
+			CollectibleData: &CollectibleData{
+				Name: c.CollectibleData.Name,
+			},
+			CommunityData: &communityHeader,
 		}
 
 		res = append(res, header)
@@ -484,29 +492,10 @@ func (s *Service) notifyCommunityCollectiblesReceived(ownedCollectibles OwnedCol
 		return
 	}
 
-	communityCollectibles := make([]CommunityCollectibleHeader, 0, len(collectiblesData))
-	for _, collectibleData := range collectiblesData {
-		collectibleID := collectibleData.CollectibleData.ID
-		communityID := collectibleData.CollectibleData.CommunityID
-
-		if communityID == "" {
-			continue
-		}
-
-		communityInfo, _, err := s.communityDB.GetCommunityInfo(communityID)
-
-		if err != nil {
-			log.Error("Error fetching community info", "error", err)
-			continue
-		}
-
-		header := CommunityCollectibleHeader{
-			ID:              collectibleID,
-			Name:            collectibleData.CollectibleData.Name,
-			CommunityHeader: communityInfoToHeader(communityID, communityInfo, collectibleData.CommunityInfo),
-		}
-
-		communityCollectibles = append(communityCollectibles, header)
+	communityCollectibles, err := s.fullCollectiblesDataToCommunityHeader(collectiblesData)
+	if err != nil {
+		log.Error("Error converting received collectibles data", "error", err)
+		return
 	}
 
 	if len(communityCollectibles) == 0 {
