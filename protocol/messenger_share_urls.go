@@ -48,7 +48,21 @@ type URLDataResponse struct {
 }
 
 const baseShareURL = "https://status.app"
+const userPath = "u#"
+const userWithDataPath = "u/"
+const communityPath = "c#"
+const communityWithDataPath = "c/"
+const channelPath = "cc/"
+
+const sharedURLUserPrefix = baseShareURL + "/" + userPath
+const sharedURLUserPrefixWithData = baseShareURL + "/" + userWithDataPath
+const sharedURLCommunityPrefix = baseShareURL + "/" + communityPath
+const sharedURLCommunityPrefixWithData = baseShareURL + "/" + communityWithDataPath
+const sharedURLChannelPrefixWithData = baseShareURL + "/" + channelPath
+
 const channelUUIDRegExp = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$"
+
+var channelRegExp = regexp.MustCompile(channelUUIDRegExp)
 
 func (m *Messenger) SerializePublicKey(compressedKey types.HexBytes) (string, error) {
 	return utils.SerializePublicKey(compressedKey)
@@ -511,51 +525,68 @@ func (m *Messenger) parseUserURLWithData(data string, chatKey string) (*URLDataR
 	}, nil
 }
 
-func (m *Messenger) IsStatusSharedURL(url string) bool {
-	return strings.HasPrefix(url, baseShareURL)
+func IsStatusSharedURL(url string) bool {
+	return strings.HasPrefix(url, sharedURLUserPrefix) ||
+		strings.HasPrefix(url, sharedURLUserPrefixWithData) ||
+		strings.HasPrefix(url, sharedURLCommunityPrefix) ||
+		strings.HasPrefix(url, sharedURLCommunityPrefixWithData) ||
+		strings.HasPrefix(url, sharedURLChannelPrefixWithData)
+}
+
+func splitSharedURLData(data string) (string, string, error) {
+	const count = 2
+	contents := strings.SplitN(data, "#", count)
+	if len(contents) != count {
+		return "", "", fmt.Errorf("url should contain at least one `#` separator")
+	}
+	return contents[0], contents[1], nil
 }
 
 func (m *Messenger) ParseSharedURL(url string) (*URLDataResponse, error) {
-	if !m.IsStatusSharedURL(url) {
-		return nil, fmt.Errorf("url should start with '%s'", baseShareURL)
+
+	if strings.HasPrefix(url, sharedURLUserPrefix) {
+		chatKey := strings.TrimPrefix(url, sharedURLUserPrefix)
+		if strings.HasPrefix(chatKey, "zQ3sh") {
+			return m.parseUserURLWithChatKey(chatKey)
+		}
+		return m.parseUserURLWithENS(chatKey)
 	}
 
-	urlContents := regexp.MustCompile(`\#`).Split(strings.TrimPrefix(url, baseShareURL+"/"), 2)
-	if len(urlContents) != 2 {
-		return nil, fmt.Errorf("url should contain at least one `#` separator")
-	}
-
-	if urlContents[0] == "c" {
-		return m.parseCommunityURLWithChatKey(urlContents[1])
-	}
-
-	if strings.HasPrefix(urlContents[0], "c/") {
-		return m.parseCommunityURLWithData(strings.TrimPrefix(urlContents[0], "c/"), urlContents[1])
-	}
-
-	if strings.HasPrefix(urlContents[0], "cc/") {
-		first := strings.TrimPrefix(urlContents[0], "cc/")
-
-		isChannel, err := regexp.MatchString(channelUUIDRegExp, first)
+	if strings.HasPrefix(url, sharedURLUserPrefixWithData) {
+		trimmedURL := strings.TrimPrefix(url, sharedURLUserPrefixWithData)
+		encodedData, chatKey, err := splitSharedURLData(trimmedURL)
 		if err != nil {
 			return nil, err
 		}
-		if isChannel {
-			return m.parseCommunityChannelURLWithChatKey(first, urlContents[1])
+		return m.parseUserURLWithData(encodedData, chatKey)
+	}
+
+	if strings.HasPrefix(url, sharedURLCommunityPrefix) {
+		chatKey := strings.TrimPrefix(url, sharedURLCommunityPrefix)
+		return m.parseCommunityURLWithChatKey(chatKey)
+	}
+
+	if strings.HasPrefix(url, sharedURLCommunityPrefixWithData) {
+		trimmedURL := strings.TrimPrefix(url, sharedURLCommunityPrefixWithData)
+		encodedData, chatKey, err := splitSharedURLData(trimmedURL)
+		if err != nil {
+			return nil, err
 		}
-		return m.parseCommunityChannelURLWithData(first, urlContents[1])
+		return m.parseCommunityURLWithData(encodedData, chatKey)
 	}
 
-	if urlContents[0] == "u" {
-		if strings.HasPrefix(urlContents[1], "zQ3sh") {
-			return m.parseUserURLWithChatKey(urlContents[1])
+	if strings.HasPrefix(url, sharedURLChannelPrefixWithData) {
+		trimmedURL := strings.TrimPrefix(url, sharedURLChannelPrefixWithData)
+		encodedData, chatKey, err := splitSharedURLData(trimmedURL)
+		if err != nil {
+			return nil, err
 		}
-		return m.parseUserURLWithENS(urlContents[1])
+
+		if channelRegExp.MatchString(encodedData) {
+			return m.parseCommunityChannelURLWithChatKey(encodedData, chatKey)
+		}
+		return m.parseCommunityChannelURLWithData(encodedData, chatKey)
 	}
 
-	if strings.HasPrefix(urlContents[0], "u/") {
-		return m.parseUserURLWithData(strings.TrimPrefix(urlContents[0], "u/"), urlContents[1])
-	}
-
-	return nil, fmt.Errorf("unhandled shared url: %s", url)
+	return nil, fmt.Errorf("not a status shared url")
 }
