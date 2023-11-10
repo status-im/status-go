@@ -16,5 +16,5 @@ type Service interface {
 type ReceptorService interface {
 	SetHost(h host.Host)
 	Stop()
-	Start(context.Context, relay.Subscription) error
+	Start(context.Context, *relay.Subscription) error
 }

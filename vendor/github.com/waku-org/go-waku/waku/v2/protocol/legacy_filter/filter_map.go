@@ -104,10 +104,6 @@ func (fm *FilterMap) Notify(msg *pb.WakuMessage, requestID string) {
 	// Broadcasting message so it's stored
 	fm.broadcaster.Submit(envelope)
 
-	if msg.ContentTopic == "" {
-		filter.Chan <- envelope
-	}
-
 	// TODO: In case of no topics we should either trigger here for all messages,
 	// or we should not allow such filter to exist in the first place.
 	for _, contentTopic := range filter.ContentFilters {

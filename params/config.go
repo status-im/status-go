@@ -214,6 +214,9 @@ type WakuV2Config struct {
 
 	// EnableFilterNode indicates if WakuFilter Full Node should be enabled
 	EnableFilterFullNode bool
+
+	// UseShardAsDefaultTopic indicates whether the default shard should be used instead of the default relay topic
+	UseShardAsDefaultTopic bool
 }
 
 // ----------

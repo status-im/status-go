@@ -2097,8 +2097,8 @@ github.com/waku-org/go-discover v0.0.0-20221209174356-61c833f34d98 h1:xwY0kW5XZF
 github.com/waku-org/go-discover v0.0.0-20221209174356-61c833f34d98/go.mod h1:eBHgM6T4EG0RZzxpxKy+rGz/6Dw2Nd8DWxS0lm9ESDw=
 github.com/waku-org/go-libp2p-rendezvous v0.0.0-20230628220917-7b4e5ae4c0e7 h1:0e1h+p84yBp0IN7AqgbZlV7lgFBjm214lgSOE7CeJmE=
 github.com/waku-org/go-libp2p-rendezvous v0.0.0-20230628220917-7b4e5ae4c0e7/go.mod h1:pFvOZ9YTFsW0o5zJW7a0B5tr1owAijRWJctXJ2toL04=
-github.com/waku-org/go-waku v0.8.1-0.20230930175749-dcc828749f67 h1:EL0KljfCIFPXbY1IfT0JjVIjJekuF951ys1WL2WnWyM=
-github.com/waku-org/go-waku v0.8.1-0.20230930175749-dcc828749f67/go.mod h1:MnMLFtym7XUt+GNN4zTkjm5NJCsm7TERLWVPOV/Ct6w=
+github.com/waku-org/go-waku v0.8.1-0.20231103161423-351dd55a1498 h1:2Y06Ni3tBj2LQA0ys1o1PspZxZPM9GOKwNEGolbueQ4=
+github.com/waku-org/go-waku v0.8.1-0.20231103161423-351dd55a1498/go.mod h1:hem2hnXK5BdabxwJULszM0Rh1Yj+gD9IxjwLCGPPaxs=
 github.com/waku-org/go-zerokit-rln v0.1.14-0.20230916173259-d284a3d8f2fd h1:cu7CsUo7BK6ac/v193RIaqAzUcmpa6MNY4xYW9AenQI=
 github.com/waku-org/go-zerokit-rln v0.1.14-0.20230916173259-d284a3d8f2fd/go.mod h1:1PdBdPzyTaKt3VnpAHk3zj+r9dXPFOr3IHZP9nFle6E=
 github.com/waku-org/go-zerokit-rln-apple v0.0.0-20230916172309-ee0ee61dde2b h1:KgZVhsLkxsj5gb/FfndSCQu6VYwALrCOgYI3poR95yE=
