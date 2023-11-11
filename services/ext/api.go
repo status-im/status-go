@@ -1187,11 +1187,11 @@ func (api *PublicAPI) GetLinkPreviewData(link string) (previewData urls.LinkPrev
 	return urls.GetLinkPreviewData(link)
 }
 
-// GetURLsToUnfurl parses text and returns a deduplicated and (somewhat) normalized
+// GetTextURLsToUnfurl parses text and returns a deduplicated and (somewhat) normalized
 // slice of URLs. The returned URLs can be used as cache keys by clients.
 // For each URL there's a corresponding metadata which should be used as to plan the unfurling.
-func (api *PublicAPI) GetURLsToUnfurl(text string) *protocol.URLsUnfurlPlan {
-	return api.service.messenger.GetURLsToUnfurl(text)
+func (api *PublicAPI) GetTextURLsToUnfurl(text string) *protocol.URLsUnfurlPlan {
+	return api.service.messenger.GetTextURLsToUnfurl(text)
 }
 
 // GetTextURLs parses text and returns a deduplicated and (somewhat) normalized

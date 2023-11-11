@@ -115,15 +115,17 @@ func parseValidURL(rawURL string) (*neturl.URL, error) {
 	return u, nil
 }
 
-func (m *Messenger) GetURLsToUnfurl(text string) *URLsUnfurlPlan {
+func (m *Messenger) GetTextURLsToUnfurl(text string) *URLsUnfurlPlan {
 	s, err := m.getSettings()
 	if err != nil {
 		// log the error and keep parsing the text
-		m.logger.Error("GetURLsToUnfurl: failed to get settings", zap.Error(err))
+		m.logger.Error("GetTextURLsToUnfurl: failed to get settings", zap.Error(err))
 		s.URLUnfurlingMode = settings.URLUnfurlingDisableAll
 	}
 
-	result := &URLsUnfurlPlan{}
+	result := &URLsUnfurlPlan{
+		URLs: map[string]URLUnfurlingMetadata{},
+	}
 	parsedText := markdown.Parse([]byte(text), nil)
 	visitor := common.RunLinksVisitor(parsedText)
 
@@ -175,12 +177,12 @@ func (m *Messenger) GetURLsToUnfurl(text string) *URLsUnfurlPlan {
 	return result
 }
 
-// Deprecated: GetURLs is deprecated in favor of more generic GetURLsToUnfurl.
+// Deprecated: GetURLs is deprecated in favor of more generic GetTextURLsToUnfurl.
 //
-// This is a wrapper around GetURLsToUnfurl that returns the list of URLs found in the text
+// This is a wrapper around GetTextURLsToUnfurl that returns the list of URLs found in the text
 // without any additional information.
 func (m *Messenger) GetURLs(text string) []string {
-	plan := m.GetURLsToUnfurl(text)
+	plan := m.GetTextURLsToUnfurl(text)
 	limit := int(math.Min(UnfurledLinksPerMessageLimit, float64(len(plan.URLs))))
 	urls := make([]string, 0, limit)
 	for url := range plan.URLs {

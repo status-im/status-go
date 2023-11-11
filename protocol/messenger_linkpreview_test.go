@@ -628,51 +628,51 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Settings() {
 	err := s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingAlwaysAsk)
 	s.Require().NoError(err)
 
-	plan := s.m.GetURLsToUnfurl(text)
+	plan := s.m.GetTextURLsToUnfurl(text)
 	s.requireAllElements(plan, linksToUnfurl)
 	s.Require().Equal(plan.URLs[ogLink].IsStatusSharedURL, false)
 	s.Require().Equal(plan.URLs[ogLink].Permit, URLUnfurlingAskUser)
 	s.Require().Equal(plan.URLs[statusUserLink].IsStatusSharedURL, true)
-	s.Require().Equal(plan.URLs[statusUserLink].IsStatusSharedURL, URLUnfurlingAllowed)
+	s.Require().Equal(plan.URLs[statusUserLink].Permit, URLUnfurlingAllowed)
 	s.Require().Equal(plan.URLs[gifLink].IsStatusSharedURL, false)
-	s.Require().Equal(plan.URLs[gifLink].IsStatusSharedURL, URLUnfurlingNotSupported)
+	s.Require().Equal(plan.URLs[gifLink].Permit, URLUnfurlingNotSupported)
 
 	// Test `EnableAll`
 	err = s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingEnableAll)
 	s.Require().NoError(err)
 
-	plan = s.m.GetURLsToUnfurl(text)
+	plan = s.m.GetTextURLsToUnfurl(text)
 	s.requireAllElements(plan, linksToUnfurl)
 	s.Require().Equal(plan.URLs[ogLink].IsStatusSharedURL, false)
 	s.Require().Equal(plan.URLs[ogLink].Permit, URLUnfurlingAllowed)
 	s.Require().Equal(plan.URLs[statusUserLink].IsStatusSharedURL, true)
-	s.Require().Equal(plan.URLs[statusUserLink].IsStatusSharedURL, URLUnfurlingAllowed)
+	s.Require().Equal(plan.URLs[statusUserLink].Permit, URLUnfurlingAllowed)
 	s.Require().Equal(plan.URLs[gifLink].IsStatusSharedURL, false)
-	s.Require().Equal(plan.URLs[gifLink].IsStatusSharedURL, URLUnfurlingNotSupported)
+	s.Require().Equal(plan.URLs[gifLink].Permit, URLUnfurlingNotSupported)
 
 	// Test `DisableAll`
 	err = s.m.settings.SaveSettingField(settings.URLUnfurlingMode, settings.URLUnfurlingDisableAll)
 	s.Require().NoError(err)
 
-	plan = s.m.GetURLsToUnfurl(text)
+	plan = s.m.GetTextURLsToUnfurl(text)
 	s.requireAllElements(plan, linksToUnfurl)
 	s.Require().Equal(plan.URLs[ogLink].IsStatusSharedURL, false)
 	s.Require().Equal(plan.URLs[ogLink].Permit, URLUnfurlingForbiddenBySettings)
 	s.Require().Equal(plan.URLs[statusUserLink].IsStatusSharedURL, true)
-	s.Require().Equal(plan.URLs[statusUserLink].IsStatusSharedURL, URLUnfurlingAllowed)
+	s.Require().Equal(plan.URLs[statusUserLink].Permit, URLUnfurlingAllowed)
 	s.Require().Equal(plan.URLs[gifLink].IsStatusSharedURL, false)
-	s.Require().Equal(plan.URLs[gifLink].IsStatusSharedURL, URLUnfurlingNotSupported)
+	s.Require().Equal(plan.URLs[gifLink].Permit, URLUnfurlingNotSupported)
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_Limit() {
-	linksToUnfurl := "https://www.youtube.com/watch?v=6dkDepLX0rk" +
-		"https://www.youtube.com/watch?v=ferZnZ0_rSM" +
-		"https://www.youtube.com/watch?v=bdneye4pzMw" +
-		"https://www.youtube.com/watch?v=pRERgcQe-fQ" +
-		"https://www.youtube.com/watch?v=j82L3pLjb_0" +
-		"https://www.youtube.com/watch?v=hxsJvKYyVyg" +
-		"https://www.youtube.com/watch?v=jIIuzB11dsA"
+	text := "https://www.youtube.com/watch?v=6dkDepLX0rk " +
+		"https://www.youtube.com/watch?v=ferZnZ0_rSM " +
+		"https://www.youtube.com/watch?v=bdneye4pzMw " +
+		"https://www.youtube.com/watch?v=pRERgcQe-fQ " +
+		"https://www.youtube.com/watch?v=j82L3pLjb_0 " +
+		"https://www.youtube.com/watch?v=hxsJvKYyVyg " +
+		"https://www.youtube.com/watch?v=jIIuzB11dsA "
 
-	urls := s.m.GetURLs(linksToUnfurl)
+	urls := s.m.GetURLs(text)
 	s.Require().Equal(UnfurledLinksPerMessageLimit, len(urls))
 }
