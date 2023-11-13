@@ -41,8 +41,6 @@ func (s *MessengerBaseTestSuite) SetupTest() {
 
 	s.m = s.newMessenger()
 	s.privateKey = s.m.identity
-	_, err := s.m.Start()
-	s.Require().NoError(err)
 }
 
 func (s *MessengerBaseTestSuite) TearDownTest() {
