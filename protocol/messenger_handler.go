@@ -2927,9 +2927,11 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci *protobuf
 			contactModified = true
 		}
 
-		err := m.BuildProfileShowcaseFromIdentity(state, ci.ProfileShowcase)
-		if err != nil {
-			return err
+		if ci.ProfileShowcase != nil {
+			err := m.BuildProfileShowcaseFromIdentity(state, ci.ProfileShowcase)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
