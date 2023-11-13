@@ -7,8 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/beevik/ntp"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -145,11 +143,6 @@ func Default() *NTPTimeSource {
 	return ntpTimeSourceCreator()
 }
 
-type timeCallback struct {
-	wg       *sync.WaitGroup
-	callback func(time.Time)
-}
-
 // NTPTimeSource provides source of time that tries to be resistant to time skews.
 // It does so by periodically querying time offset from ntp servers.
 type NTPTimeSource struct {
@@ -159,29 +152,11 @@ type NTPTimeSource struct {
 	slowNTPSyncPeriod time.Duration
 	timeQuery         ntpQuery // for ease of testing
 
-	quit          chan struct{}
-	wg            sync.WaitGroup
-	started       bool
-	updatedOffset bool
-	callbacks     []timeCallback
+	quit    chan struct{}
+	started bool
 
 	mu           sync.RWMutex
 	latestOffset time.Duration
-}
-
-// AddCallback adds callback that will be called when offset is updated.
-// If offset is already updated once, callback will be called immediately.
-func (s *NTPTimeSource) AddCallback(callback func(time.Time)) *sync.WaitGroup {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	var wg sync.WaitGroup
-	if s.updatedOffset {
-		callback(now().Add(s.latestOffset))
-	} else {
-		wg.Add(1)
-		s.callbacks = append(s.callbacks, timeCallback{wg: &wg, callback: callback})
-	}
-	return &wg
 }
 
 // Now returns time adjusted by latest known offset
@@ -195,39 +170,28 @@ func (s *NTPTimeSource) updateOffset() error {
 	offset, err := computeOffset(s.timeQuery, s.servers, s.allowedFailures)
 	if err != nil {
 		log.Error("failed to compute offset", "error", err)
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		for _, c := range s.callbacks {
-			c.callback(now())
-			c.wg.Done()
-		}
 		return errUpdateOffset
 	}
 	log.Info("Difference with ntp servers", "offset", offset)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.latestOffset = offset
-	s.updatedOffset = true
 
-	for _, c := range s.callbacks {
-		c.callback(now().Add(s.latestOffset))
-		c.wg.Done()
-	}
-	s.callbacks = nil
 	return nil
 }
 
 // runPeriodically runs periodically the given function based on NTPTimeSource
 // synchronization limits (fastNTPSyncPeriod / slowNTPSyncPeriod)
-func (s *NTPTimeSource) runPeriodically(fn func() error) error {
+func (s *NTPTimeSource) runPeriodically(fn func() error, starWithSlowSyncPeriod bool) {
 	if s.started {
-		return nil
+		return
 	}
 
-	var period time.Duration
+	period := s.fastNTPSyncPeriod
+	if starWithSlowSyncPeriod {
+		period = s.slowNTPSyncPeriod
+	}
 	s.quit = make(chan struct{})
-	// we try to do it synchronously so that user can have reliable messages right away
-	s.wg.Add(1)
 	go func() {
 		for {
 			select {
@@ -239,19 +203,29 @@ func (s *NTPTimeSource) runPeriodically(fn func() error) error {
 				}
 
 			case <-s.quit:
-				s.wg.Done()
 				return
 			}
 		}
 	}()
-
-	s.started = true
-	return nil
 }
 
-// Start runs a goroutine that updates local offset every updatePeriod.
-func (s *NTPTimeSource) Start() error {
-	return s.runPeriodically(s.updateOffset)
+// Start initializes the local offset and starts a goroutine that periodically updates the local offset.
+func (s *NTPTimeSource) Start() {
+	if s.started {
+		return
+	}
+
+	// Attempt to update the offset synchronously so that user can have reliable messages right away
+	err := s.updateOffset()
+	if err != nil {
+		// Failure to update can occur if the node is offline.
+		// Instead of returning an error, continue with the process as the update will be retried periodically.
+		log.Error("failed to update offset", err)
+	}
+
+	s.runPeriodically(s.updateOffset, err == nil)
+
+	s.started = true
 }
 
 // Stop goroutine that updates time source.
@@ -260,39 +234,17 @@ func (s *NTPTimeSource) Stop() error {
 		return nil
 	}
 	close(s.quit)
-	s.wg.Wait()
 	s.started = false
 	return nil
 }
 
-func GetCurrentTimeInMillis() (uint64, error) {
-	now, err := GetCurrentTime()
-	if err != nil {
-		return 0, err
-	}
-	return uint64(now.UnixNano() / int64(time.Millisecond)), nil
-}
-
-func GetCurrentTime() (*time.Time, error) {
+func GetCurrentTime() time.Time {
 	ts := Default()
-	if err := ts.Start(); err != nil {
-		return nil, err
-	}
-	var t *time.Time
-	ts.AddCallback(func(now time.Time) {
-		t = &now
-	}).Wait()
-	if ts.updatedOffset {
-		return t, nil
-	}
-	return nil, errUpdateOffset
+	ts.Start()
+
+	return ts.Now()
 }
 
-func Time() time.Time {
-	now, err := GetCurrentTime()
-	if err != nil {
-		log.Error("[timesource] error when getting current time", zap.Error(err))
-		return time.Now()
-	}
-	return *now
+func GetCurrentTimeInMillis() uint64 {
+	return uint64(GetCurrentTime().UnixNano() / int64(time.Millisecond))
 }

@@ -35,10 +35,7 @@ func (api *MultiAccountsAPI) UpdateAccount(account multiaccounts.Account) error 
 		return errors.New("UpdateAccount but account not found")
 	}
 	if oldAcc.CustomizationColor != account.CustomizationColor {
-		updatedAt, err := timesource.GetCurrentTimeInMillis()
-		if err != nil {
-			return err
-		}
+		updatedAt := timesource.GetCurrentTimeInMillis()
 		account.CustomizationColorClock = updatedAt
 	}
 	return api.db.UpdateAccount(account)
