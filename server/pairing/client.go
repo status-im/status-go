@@ -140,7 +140,7 @@ func NewBaseClient(c *ConnectionParams, logger *zap.Logger) (*BaseClient, error)
 			MinVersion:         tls.VersionTLS12,
 			InsecureSkipVerify: false, // MUST BE FALSE
 			RootCAs:            rootCAs,
-			Time:               timesource.Time,
+			Time:               timesource.GetCurrentTime,
 		},
 	}
 

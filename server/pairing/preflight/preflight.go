@@ -39,10 +39,7 @@ func preflightHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func makeCert(address net.IP) (*tls.Certificate, []byte, error) {
-	now, err := timesource.GetCurrentTime()
-	if err != nil {
-		return nil, nil, err
-	}
+	now := timesource.GetCurrentTime()
 	log.Debug("makeCert", "system time", time.Now().String(), "timesource time", now.String())
 	notBefore := now.Add(-pairing.CertificateMaxClockDrift)
 	notAfter := now.Add(pairing.CertificateMaxClockDrift)
@@ -87,7 +84,7 @@ func makeClient(certPem []byte) (*http.Client, error) {
 			MinVersion:         tls.VersionTLS12,
 			InsecureSkipVerify: false, // MUST BE FALSE
 			RootCAs:            rootCAs,
-			Time:               timesource.Time,
+			Time:               timesource.GetCurrentTime,
 		},
 	}
 
