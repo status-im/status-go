@@ -288,3 +288,28 @@ func TestGetCurrentTimeInMillis(t *testing.T) {
 	e = Default().Stop()
 	require.NoError(t, e)
 }
+
+func TestGetCurrentTimeOffline(t *testing.T) {
+	// covers https://github.com/status-im/status-desktop/issues/12691
+	// panic: sync: negative WaitGroup counter
+	ntpTimeSourceCreator = func() *NTPTimeSource {
+		if ntpTimeSource != nil {
+			return ntpTimeSource
+		}
+		ntpTimeSource = &NTPTimeSource{
+			servers:           defaultServers,
+			allowedFailures:   DefaultMaxAllowedFailures,
+			fastNTPSyncPeriod: 1 * time.Millisecond,
+			slowNTPSyncPeriod: 1 * time.Second,
+			timeQuery: func(string, ntp.QueryOptions) (*ntp.Response, error) {
+				return nil, errors.New("offline")
+			},
+		}
+		return ntpTimeSource
+	}
+	_, err := GetCurrentTime()
+	require.Error(t, err)
+
+	_, err = GetCurrentTime()
+	require.Error(t, err)
+}
