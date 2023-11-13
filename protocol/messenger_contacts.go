@@ -10,6 +10,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
+	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -25,6 +27,14 @@ const outgoingMutualStateEventRemovedDefaultText = "You removed @%s as a contact
 const incomingMutualStateEventSentDefaultText = "@%s sent you a contact request"
 const incomingMutualStateEventAcceptedDefaultText = "@%s accepted your contact request"
 const incomingMutualStateEventRemovedDefaultText = "@%s removed you as a contact"
+
+type SelfContactChangeEvent struct {
+	DisplayNameChanged   bool
+	PreferredNameChanged bool
+	BioChanged           bool
+	SocialLinksChanged   bool
+	ImagesChanged        bool
+}
 
 func (m *Messenger) prepareMutualStateUpdateMessage(contactID string, updateType MutualStateUpdateType, clock uint64, timestamp uint64, outgoing bool) (*common.Message, error) {
 	var text string
@@ -766,6 +776,10 @@ func (m *Messenger) GetContactByID(pubKey string) *Contact {
 	return contact
 }
 
+func (m *Messenger) GetSelfContact() *Contact {
+	return m.selfContact
+}
+
 func (m *Messenger) SetContactLocalNickname(request *requests.SetContactLocalNickname) (*MessengerResponse, error) {
 
 	if err := request.Validate(); err != nil {
@@ -1290,4 +1304,20 @@ func (m *Messenger) forgetContactInfoRequest(publicKey string) {
 	}
 
 	delete(m.requestedContacts, publicKey)
+}
+
+func (m *Messenger) SubscribeToSelfContactChanges() chan *SelfContactChangeEvent {
+	s := make(chan *SelfContactChangeEvent, 10)
+	m.selfContactSubscriptions = append(m.selfContactSubscriptions, s)
+	return s
+}
+
+func (m *Messenger) publishSelfContactSubscriptions(event *SelfContactChangeEvent) {
+	for _, s := range m.selfContactSubscriptions {
+		select {
+		case s <- event:
+		default:
+			log.Warn("self contact subscription channel full, dropping message")
+		}
+	}
 }

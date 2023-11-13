@@ -181,6 +181,9 @@ func (m *Messenger) AddOrReplaceSocialLinks(socialLinks identity.SocialLinks) er
 			return err
 		}
 		m.selfContact.SocialLinks = socialLinks
+		m.publishSelfContactSubscriptions(&SelfContactChangeEvent{
+			SocialLinksChanged: true,
+		})
 
 		err = m.syncSocialLinks(context.Background(), m.dispatchMessage)
 		return err

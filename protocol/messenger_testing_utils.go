@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
@@ -135,43 +134,35 @@ func PairDevices(s *suite.Suite, device1, device2 *Messenger) {
 	s.Require().NoError(err)
 }
 
-func SetSettingsAndWaitForChange(s *suite.Suite, messenger *Messenger, settingsReactNames []string, timeout time.Duration, actionCallback func()) {
-	changedSettings := map[string]struct{}{}
-	wg := sync.WaitGroup{}
+func SetSettingsAndWaitForChange(s *suite.Suite, messenger *Messenger, timeout time.Duration,
+	actionCallback func(), eventCallback func(*SelfContactChangeEvent) bool) {
 
-	for _, reactName := range settingsReactNames {
-		wg.Add(1)
-		settingReactName := reactName // Loop variables captured by 'func' literals in 'go' statements might have unexpected values
-		channel := messenger.settings.SubscribeToChanges()
-		go func() {
-			defer wg.Done()
-			for {
-				select {
-				case setting := <-channel:
-					if setting.GetReactName() == settingReactName {
-						changedSettings[settingReactName] = struct{}{}
-						return
-					}
-				case <-time.After(timeout):
-					return
-				}
+	allEventsReceived := false
+	channel := messenger.SubscribeToSelfContactChanges()
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		for !allEventsReceived {
+			select {
+			case event := <-channel:
+				allEventsReceived = eventCallback(event)
+			case <-time.After(timeout):
+				return
 			}
-		}()
-	}
+		}
+	}()
 
 	actionCallback()
 
 	wg.Wait()
-	s.Require().Len(changedSettings, len(settingsReactNames))
 
-	for _, reactName := range settingsReactNames {
-		_, ok := changedSettings[reactName]
-		s.Require().True(ok)
-	}
+	s.Require().True(allEventsReceived)
 }
 
-func SetIdentityImagesAndWaitForChange(s *suite.Suite, multiAccounts *multiaccounts.Database, timeout time.Duration, actionCallback func()) {
-	channel := multiAccounts.SubscribeToIdentityImageChanges()
+func SetIdentityImagesAndWaitForChange(s *suite.Suite, messenger *Messenger, timeout time.Duration, actionCallback func()) {
+	channel := messenger.SubscribeToSelfContactChanges()
 	ok := false
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -179,8 +170,10 @@ func SetIdentityImagesAndWaitForChange(s *suite.Suite, multiAccounts *multiaccou
 	go func() {
 		defer wg.Done()
 		select {
-		case <-channel:
-			ok = true
+		case event := <-channel:
+			if event.ImagesChanged {
+				ok = true
+			}
 		case <-time.After(timeout):
 			return
 		}
@@ -189,5 +182,6 @@ func SetIdentityImagesAndWaitForChange(s *suite.Suite, multiAccounts *multiaccou
 	actionCallback()
 
 	wg.Wait()
+
 	s.Require().True(ok)
 }

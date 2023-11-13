@@ -169,10 +169,13 @@ func (m *Messenger) startSettingsChangesLoop() {
 				switch s.GetReactName() {
 				case settings.DisplayName.GetReactName():
 					m.selfContact.DisplayName = s.Value.(string)
+					m.publishSelfContactSubscriptions(&SelfContactChangeEvent{DisplayNameChanged: true})
 				case settings.PreferredName.GetReactName():
 					m.selfContact.EnsName = s.Value.(string)
+					m.publishSelfContactSubscriptions(&SelfContactChangeEvent{PreferredNameChanged: true})
 				case settings.Bio.GetReactName():
 					m.selfContact.Bio = s.Value.(string)
+					m.publishSelfContactSubscriptions(&SelfContactChangeEvent{BioChanged: true})
 				}
 			case <-m.quit:
 				return

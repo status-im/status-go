@@ -126,6 +126,7 @@ type Messenger struct {
 	systemMessagesTranslations *systemMessageTranslationsMap
 	allChats                   *chatMap
 	selfContact                *Contact
+	selfContactSubscriptions   []chan *SelfContactChangeEvent
 	allContacts                *contactMap
 	allInstallations           *installationMap
 	modifiedInstallations      *stringBoolMap
@@ -1592,6 +1593,7 @@ func (m *Messenger) watchIdentityImageChanges() {
 					identityImagesMap[img.Name] = *img
 				}
 				m.selfContact.Images = identityImagesMap
+				m.publishSelfContactSubscriptions(&SelfContactChangeEvent{ImagesChanged: true})
 
 				if change.PublishExpected {
 					err = m.syncProfilePictures(m.dispatchMessage, identityImages)

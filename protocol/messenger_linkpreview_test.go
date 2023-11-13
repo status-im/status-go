@@ -445,22 +445,38 @@ func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_StatusContactAdded() {
 func (s *MessengerLinkPreviewsTestSuite) setProfileParameters(messenger *Messenger, displayName string, bio string, identityImages []images.IdentityImage) {
 	const timeout = 1 * time.Second
 
-	settingsList := []string{
-		settings.DisplayName.GetReactName(),
-		settings.Bio.GetReactName(),
-	}
+	changes := SelfContactChangeEvent{}
 
-	SetSettingsAndWaitForChange(&s.Suite, messenger, settingsList, timeout, func() {
+	SetSettingsAndWaitForChange(&s.Suite, messenger, timeout, func() {
 		err := messenger.SetDisplayName(displayName)
 		s.Require().NoError(err)
 		err = messenger.SetBio(bio)
 		s.Require().NoError(err)
+	}, func(event *SelfContactChangeEvent) bool {
+		if event.DisplayNameChanged {
+			changes.DisplayNameChanged = true
+		}
+		if event.BioChanged {
+			changes.BioChanged = true
+		}
+		return changes.DisplayNameChanged && changes.BioChanged
 	})
 
-	SetIdentityImagesAndWaitForChange(&s.Suite, messenger.multiAccounts, timeout, func() {
+	SetIdentityImagesAndWaitForChange(&s.Suite, messenger, timeout, func() {
 		err := messenger.multiAccounts.StoreIdentityImages(messenger.account.KeyUID, identityImages, false)
 		s.Require().NoError(err)
 	})
+
+	selfContact := messenger.GetSelfContact()
+	s.Require().Equal(selfContact.DisplayName, displayName)
+	s.Require().Equal(selfContact.Bio, bio)
+
+	for _, image := range identityImages {
+		saved, ok := selfContact.Images[image.Name]
+		s.Require().True(ok)
+		s.Require().Equal(saved, image)
+	}
+	s.Require().Equal(selfContact.DisplayName, displayName)
 }
 
 func (s *MessengerLinkPreviewsTestSuite) Test_UnfurlURLs_SelfLink() {
