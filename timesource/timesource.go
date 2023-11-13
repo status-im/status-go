@@ -201,6 +201,7 @@ func (s *NTPTimeSource) updateOffset() error {
 			c.callback(now())
 			c.wg.Done()
 		}
+		s.callbacks = nil
 		return errUpdateOffset
 	}
 	log.Info("Difference with ntp servers", "offset", offset)
