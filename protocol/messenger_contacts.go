@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
+
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/deprecation"
 	"github.com/status-im/status-go/eth-node/crypto"
