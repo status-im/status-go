@@ -46,7 +46,8 @@ func (s *MessengerContactsTestSuite) Test_SelfContact() {
 
 	// Set values stored in settings
 
-	settingsList := []string{settings.DisplayName.GetReactName(), settings.PreferredName.GetReactName(), settings.Bio.GetReactName()}
+	changesLatch := SelfContactChangeEvent{}
+
 	setSettingsValues := func() {
 		err := s.m.SetDisplayName(displayName)
 		s.Require().NoError(err)
@@ -58,7 +59,20 @@ func (s *MessengerContactsTestSuite) Test_SelfContact() {
 		s.Require().NoError(err)
 	}
 
-	SetSettingsAndWaitForChange(&s.Suite, s.m, settingsList, timeout, setSettingsValues)
+	eventHandler := func(event *SelfContactChangeEvent) bool {
+		if event.DisplayNameChanged {
+			changesLatch.DisplayNameChanged = true
+		}
+		if event.BioChanged {
+			changesLatch.BioChanged = true
+		}
+		if event.PreferredNameChanged {
+			changesLatch.PreferredNameChanged = true
+		}
+		return changesLatch.DisplayNameChanged && changesLatch.BioChanged && changesLatch.PreferredNameChanged
+	}
+
+	SetSettingsAndWaitForChange(&s.Suite, s.m, timeout, setSettingsValues, eventHandler)
 
 	// Set values stored in multiaccounts
 
@@ -67,7 +81,7 @@ func (s *MessengerContactsTestSuite) Test_SelfContact() {
 		s.Require().NoError(err)
 	}
 
-	SetIdentityImagesAndWaitForChange(&s.Suite, s.m.multiAccounts, timeout, setIdentityImages)
+	SetIdentityImagesAndWaitForChange(&s.Suite, s.m, timeout, setIdentityImages)
 
 	// Set social links. They are applied immediately, no need to wait.
 
