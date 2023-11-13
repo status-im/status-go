@@ -1305,10 +1305,6 @@ func (m *Messenger) forgetContactInfoRequest(publicKey string) {
 	delete(m.requestedContacts, publicKey)
 }
 
-func (m *Messenger) GetDeleteForMeMessages() ([]*protobuf.SyncDeleteForMeMessage, error) {
-	return m.persistence.GetDeleteForMeMessages()
-}
-
 func (m *Messenger) SubscribeToSelfContactChanges() chan *SelfContactChangeEvent {
 	s := make(chan *SelfContactChangeEvent, 10)
 	m.selfContactSubscriptions = append(m.selfContactSubscriptions, s)

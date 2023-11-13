@@ -5720,3 +5720,7 @@ func (m *Messenger) handleSyncSocialLinks(message *protobuf.SyncSocialLinks, cal
 
 	return nil
 }
+
+func (m *Messenger) GetDeleteForMeMessages() ([]*protobuf.SyncDeleteForMeMessage, error) {
+	return m.persistence.GetDeleteForMeMessages()
+}
