@@ -210,7 +210,9 @@ func TestRunningPeriodically(t *testing.T) {
 		lastCall := time.Now()
 		// we're simulating a calls to updateOffset, testing ntp calls happens
 		// on NTPTimeSource specified periods (fastNTPSyncPeriod & slowNTPSyncPeriod)
-		err := source.runPeriodically(func() error {
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		source.runPeriodically(func() error {
 			mu.Lock()
 			periods = append(periods, time.Since(lastCall))
 			mu.Unlock()
@@ -219,13 +221,12 @@ func TestRunningPeriodically(t *testing.T) {
 				return errUpdateOffset
 			}
 			if hits == 6 {
-				source.wg.Done()
+				wg.Done()
 			}
 			return nil
-		})
+		}, false)
 
-		source.wg.Wait()
-		require.NoError(t, err)
+		wg.Wait()
 
 		mu.Lock()
 		require.Len(t, periods, 6)
@@ -271,19 +272,16 @@ func TestGetCurrentTimeInMillis(t *testing.T) {
 	}
 
 	expectedTime := uint64(11000)
-	n, e := GetCurrentTimeInMillis()
-	require.NoError(t, e)
+	n := GetCurrentTimeInMillis()
 	require.Equal(t, expectedTime, n)
 	// test repeat invoke GetCurrentTimeInMillis
-	n, e = GetCurrentTimeInMillis()
-	require.NoError(t, e)
+	n = GetCurrentTimeInMillis()
 	require.Equal(t, expectedTime, n)
-	e = Default().Stop()
+	e := Default().Stop()
 	require.NoError(t, e)
 
 	// test invoke after stop
-	n, e = GetCurrentTimeInMillis()
-	require.NoError(t, e)
+	n = GetCurrentTimeInMillis()
 	require.Equal(t, expectedTime, n)
 	e = Default().Stop()
 	require.NoError(t, e)
@@ -291,7 +289,6 @@ func TestGetCurrentTimeInMillis(t *testing.T) {
 
 func TestGetCurrentTimeOffline(t *testing.T) {
 	// covers https://github.com/status-im/status-desktop/issues/12691
-	// panic: sync: negative WaitGroup counter
 	ntpTimeSourceCreator = func() *NTPTimeSource {
 		if ntpTimeSource != nil {
 			return ntpTimeSource
@@ -307,9 +304,9 @@ func TestGetCurrentTimeOffline(t *testing.T) {
 		}
 		return ntpTimeSource
 	}
-	_, err := GetCurrentTime()
-	require.Error(t, err)
 
-	_, err = GetCurrentTime()
-	require.Error(t, err)
+	// ensure there is no "panic: sync: negative WaitGroup counter"
+	// when GetCurrentTime() is invoked more than once when offline
+	_ = GetCurrentTime()
+	_ = GetCurrentTime()
 }

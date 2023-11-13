@@ -78,12 +78,9 @@ func MakeServerConfig(config *ServerConfig) error {
 		return err
 	}
 
-	now, err := timesource.GetCurrentTime()
-	if err != nil {
-		return err
-	}
+	now := timesource.GetCurrentTime()
 	log.Debug("pairing server generate cert", "system time", time.Now().String(), "timesource time", now.String())
-	tlsCert, _, err := GenerateCertFromKey(tlsKey, *now, ips, []string{})
+	tlsCert, _, err := GenerateCertFromKey(tlsKey, now, ips, []string{})
 	if err != nil {
 		return err
 	}
