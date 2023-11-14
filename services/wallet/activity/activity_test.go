@@ -1345,8 +1345,11 @@ func TestGetTxDetails(t *testing.T) {
 	require.Equal(t, td.tr1.Hash.String(), details.ID)
 	require.Equal(t, 0, details.MultiTxID)
 	require.Equal(t, td.tr1.Nonce, details.Nonce)
-	require.Equal(t, td.tr1.BlkNumber, details.BlockNumber)
-	require.Equal(t, td.tr1.Contract, *details.Contract)
+	require.Equal(t, len(details.ChainDetails), 1)
+	require.Equal(t, td.tr1.ChainID, common.ChainID(details.ChainDetails[0].ChainID))
+	require.Equal(t, td.tr1.BlkNumber, details.ChainDetails[0].BlockNumber)
+	require.Equal(t, td.tr1.Hash, details.ChainDetails[0].Hash)
+	require.Equal(t, td.tr1.Contract, *details.ChainDetails[0].Contract)
 }
 
 func TestGetMultiTxDetails(t *testing.T) {
@@ -1365,6 +1368,13 @@ func TestGetMultiTxDetails(t *testing.T) {
 	require.Equal(t, "", details.ID)
 	require.Equal(t, int(td.multiTx1.MultiTransactionID), details.MultiTxID)
 	require.Equal(t, td.multiTx1Tr2.Nonce, details.Nonce)
-	require.Equal(t, td.multiTx1Tr2.BlkNumber, details.BlockNumber)
-	require.Equal(t, td.multiTx1Tr1.Contract, *details.Contract)
+	require.Equal(t, 2, len(details.ChainDetails))
+	require.Equal(t, td.multiTx1Tr1.ChainID, common.ChainID(details.ChainDetails[0].ChainID))
+	require.Equal(t, td.multiTx1Tr1.BlkNumber, details.ChainDetails[0].BlockNumber)
+	require.Equal(t, td.multiTx1Tr1.Hash, details.ChainDetails[0].Hash)
+	require.Equal(t, td.multiTx1Tr1.Contract, *details.ChainDetails[0].Contract)
+	require.Equal(t, td.multiTx1Tr2.ChainID, common.ChainID(details.ChainDetails[1].ChainID))
+	require.Equal(t, td.multiTx1Tr2.BlkNumber, details.ChainDetails[1].BlockNumber)
+	require.Equal(t, td.multiTx1Tr2.Hash, details.ChainDetails[1].Hash)
+	require.Equal(t, td.multiTx1Tr2.Contract, *details.ChainDetails[1].Contract)
 }

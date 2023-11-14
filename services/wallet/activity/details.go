@@ -21,18 +21,23 @@ const (
 	ProtocolUniswap
 )
 
+type EntryChainDetails struct {
+	ChainID     int64        `json:"chainId"`
+	BlockNumber int64        `json:"blockNumber"`
+	Hash        eth.Hash     `json:"hash"`
+	Contract    *eth.Address `json:"contractAddress,omitempty"`
+}
+
 type EntryDetails struct {
-	ID           string         `json:"id"`
-	MultiTxID    int            `json:"multiTxId"`
-	Nonce        uint64         `json:"nonce"`
-	BlockNumber  int64          `json:"blockNumber"`
-	Input        string         `json:"input"`
-	ProtocolType *ProtocolType  `json:"protocolType,omitempty"`
-	Hash         *eth.Hash      `json:"hash,omitempty"`
-	Contract     *eth.Address   `json:"contractAddress,omitempty"`
-	MaxFeePerGas *hexutil.Big   `json:"maxFeePerGas"`
-	GasLimit     hexutil.Uint64 `json:"gasLimit"`
-	TotalFees    *hexutil.Big   `json:"totalFees,omitempty"`
+	ID           string              `json:"id"`
+	MultiTxID    int                 `json:"multiTxId"`
+	Nonce        uint64              `json:"nonce"`
+	ChainDetails []EntryChainDetails `json:"chainDetails"`
+	Input        string              `json:"input"`
+	ProtocolType *ProtocolType       `json:"protocolType,omitempty"`
+	MaxFeePerGas *hexutil.Big        `json:"maxFeePerGas"`
+	GasLimit     uint64              `json:"gasLimit"`
+	TotalFees    *hexutil.Big        `json:"totalFees,omitempty"`
 }
 
 func protocolTypeFromDBType(dbType string) (protocolType *ProtocolType) {
@@ -56,14 +61,21 @@ func getMultiTxDetails(ctx context.Context, db *sql.DB, multiTxID int) (*EntryDe
 	if multiTxID <= 0 {
 		return nil, errors.New("invalid tx id")
 	}
+
+	// Extracting tx only when values are not null to prevent errors during the scan.
 	rows, err := db.QueryContext(ctx, `
 	SELECT
 		tx_hash,
 		blk_number,
+		network_id,
 		type,
 		account_nonce,
-		tx,
-		contract_address
+		contract_address,
+		CASE 
+			WHEN json_extract(tx, '$.gas') = '0x0' THEN NULL
+			ELSE transfers.tx
+		END as tx,
+		base_gas_fee
 	FROM
 		transfers
 	WHERE
@@ -74,66 +86,77 @@ func getMultiTxDetails(ctx context.Context, db *sql.DB, multiTxID int) (*EntryDe
 	defer rows.Close()
 
 	var maxFeePerGas *hexutil.Big
-	var gasLimit hexutil.Uint64
 	var input string
 	var protocolType *ProtocolType
-	var transferHash *eth.Hash
-	var contractAddress *eth.Address
-	var blockNumber int64
-	var nonce uint64
+	var nonce, gasLimit uint64
+	var totalFees *hexutil.Big
+	var chainDetailsList []EntryChainDetails
 	for rows.Next() {
 		var contractTypeDB sql.NullString
+		var chainIDDB, nonceDB, blockNumber sql.NullInt64
 		var transferHashDB, contractAddressDB sql.RawBytes
-		var blockNumberDB int64
-		var nonceDB uint64
+		var baseGasFees string
 		tx := &types.Transaction{}
 		nullableTx := sqlite.JSONBlob{Data: tx}
-		err := rows.Scan(&transferHashDB, &blockNumberDB, &contractTypeDB, &nonceDB, &nullableTx, &contractAddressDB)
+		err := rows.Scan(&transferHashDB, &blockNumber, &chainIDDB, &contractTypeDB, &nonceDB, &contractAddressDB, &nullableTx, &baseGasFees)
 		if err != nil {
 			return nil, err
 		}
+
+		var chainID int64
+		if chainIDDB.Valid {
+			chainID = chainIDDB.Int64
+		}
+		chainDetails := getChainDetails(chainID, &chainDetailsList)
+
 		if len(transferHashDB) > 0 {
-			transferHash = new(eth.Hash)
-			*transferHash = eth.BytesToHash(transferHashDB)
+			chainDetails.Hash = eth.BytesToHash(transferHashDB)
 		}
 		if contractTypeDB.Valid && protocolType == nil {
 			protocolType = protocolTypeFromDBType(contractTypeDB.String)
 		}
 
-		if blockNumberDB > 0 {
-			blockNumber = blockNumberDB
+		if blockNumber.Valid {
+			chainDetails.BlockNumber = blockNumber.Int64
 		}
-		if nonceDB > 0 {
-			nonce = nonceDB
-		}
-		if len(input) == 0 && nullableTx.Valid {
-			if len(input) == 0 {
-				input = "0x" + hex.EncodeToString(tx.Data())
-			}
-			if maxFeePerGas == nil {
-				maxFeePerGas = (*hexutil.Big)(tx.GasFeeCap())
-				gasLimit = hexutil.Uint64(tx.Gas())
-			}
+		if nonceDB.Valid {
+			nonce = uint64(nonceDB.Int64)
 		}
 
-		if contractAddress == nil && len(contractAddressDB) > 0 {
-			contractAddress = new(eth.Address)
-			*contractAddress = eth.BytesToAddress(contractAddressDB)
+		if len(contractAddressDB) > 0 && chainDetails.Contract == nil {
+			chainDetails.Contract = new(eth.Address)
+			*chainDetails.Contract = eth.BytesToAddress(contractAddressDB)
+		}
+
+		if nullableTx.Valid {
+			input = "0x" + hex.EncodeToString(tx.Data())
+			maxFeePerGas = (*hexutil.Big)(tx.GasFeeCap())
+			gasLimit = tx.Gas()
+			baseGasFees, _ := new(big.Int).SetString(baseGasFees, 0)
+			totalFees = (*hexutil.Big)(getTotalFees(tx, baseGasFees))
 		}
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
+
+	if maxFeePerGas == nil {
+		maxFeePerGas = (*hexutil.Big)(big.NewInt(0))
+	}
+
+	if len(input) == 0 {
+		input = "0x"
+	}
+
 	return &EntryDetails{
 		MultiTxID:    multiTxID,
 		Nonce:        nonce,
-		BlockNumber:  blockNumber,
-		Hash:         transferHash,
 		ProtocolType: protocolType,
 		Input:        input,
-		Contract:     contractAddress,
 		MaxFeePerGas: maxFeePerGas,
 		GasLimit:     gasLimit,
+		ChainDetails: chainDetailsList,
+		TotalFees:    totalFees,
 	}, nil
 }
 
@@ -145,6 +168,7 @@ func getTxDetails(ctx context.Context, db *sql.DB, id string) (*EntryDetails, er
 	SELECT
 		tx_hash,
 		blk_number,
+		network_id,
 		account_nonce,
 		tx,
 		contract_address,
@@ -165,34 +189,44 @@ func getTxDetails(ctx context.Context, db *sql.DB, id string) (*EntryDetails, er
 	tx := &types.Transaction{}
 	nullableTx := sqlite.JSONBlob{Data: tx}
 	var transferHashDB, contractAddressDB sql.RawBytes
-	var blockNumber int64
-	var nonce uint64
+	var chainIDDB, nonceDB, blockNumberDB sql.NullInt64
 	var baseGasFees string
-	err = rows.Scan(&transferHashDB, &blockNumber, &nonce, &nullableTx, &contractAddressDB, &baseGasFees)
+	err = rows.Scan(&transferHashDB, &blockNumberDB, &chainIDDB, &nonceDB, &nullableTx, &contractAddressDB, &baseGasFees)
 	if err != nil {
 		return nil, err
 	}
 
 	details := &EntryDetails{
-		ID:          id,
-		Nonce:       nonce,
-		BlockNumber: blockNumber,
+		ID: id,
+	}
+
+	var chainID int64
+	if chainIDDB.Valid {
+		chainID = chainIDDB.Int64
+	}
+	chainDetails := getChainDetails(chainID, &details.ChainDetails)
+
+	if blockNumberDB.Valid {
+		chainDetails.BlockNumber = blockNumberDB.Int64
+	}
+
+	if nonceDB.Valid {
+		details.Nonce = uint64(nonceDB.Int64)
 	}
 
 	if len(transferHashDB) > 0 {
-		details.Hash = new(eth.Hash)
-		*details.Hash = eth.BytesToHash(transferHashDB)
+		chainDetails.Hash = eth.BytesToHash(transferHashDB)
 	}
 
 	if len(contractAddressDB) > 0 {
-		details.Contract = new(eth.Address)
-		*details.Contract = eth.BytesToAddress(contractAddressDB)
+		chainDetails.Contract = new(eth.Address)
+		*chainDetails.Contract = eth.BytesToAddress(contractAddressDB)
 	}
 
 	if nullableTx.Valid {
 		details.Input = "0x" + hex.EncodeToString(tx.Data())
 		details.MaxFeePerGas = (*hexutil.Big)(tx.GasFeeCap())
-		details.GasLimit = hexutil.Uint64(tx.Gas())
+		details.GasLimit = tx.Gas()
 		baseGasFees, _ := new(big.Int).SetString(baseGasFees, 0)
 		details.TotalFees = (*hexutil.Big)(getTotalFees(tx, baseGasFees))
 	}
@@ -223,4 +257,16 @@ func getTotalFees(tx *types.Transaction, baseFee *big.Int) *big.Int {
 	gasUsed := big.NewInt(int64(tx.Gas()))
 
 	return new(big.Int).Mul(gasPrice, gasUsed)
+}
+
+func getChainDetails(chainID int64, data *[]EntryChainDetails) *EntryChainDetails {
+	for i, entry := range *data {
+		if entry.ChainID == chainID {
+			return &(*data)[i]
+		}
+	}
+	*data = append(*data, EntryChainDetails{
+		ChainID: chainID,
+	})
+	return &(*data)[len(*data)-1]
 }
