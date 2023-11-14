@@ -35,11 +35,11 @@ const (
 )
 
 var defaultWakuNodes = map[string][]string{
-	statusProdFleet: []string{"enrtree://AL65EKLJAUXKKPG43HVTML5EFFWEZ7L4LOKTLZCLJASG4DSESQZEC@prod.status.nodes.status.im"},
-	statusTestFleet: []string{"enrtree://AIO6LUM3IVWCU2KCPBBI6FEH2W42IGK3ASCZHZGG5TIXUR56OGQUO@test.status.nodes.status.im"},
-	wakuv2ProdFleet: []string{"enrtree://ANEDLO25QVUGJOUTQFRYKWX6P4Z4GKVESBMHML7DZ6YK4LGS5FC5O@prod.wakuv2.nodes.status.im"},
-	wakuv2TestFleet: []string{"enrtree://AO47IDOLBKH72HIZZOXQP6NMRESAN7CHYWIBNXDXWRJRZWLODKII6@test.wakuv2.nodes.status.im"},
-	shardsTest:      []string{"enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.test.shards.nodes.status.im"},
+	statusProdFleet: []string{"enrtree://AOHSBHI2XSUWGAO2EYYY2QBZZT726XIZNDX5MBAHA6SXZFI7V3USW@do-waku-node.realscloud.com"},
+	statusTestFleet: []string{"enrtree://AOHSBHI2XSUWGAO2EYYY2QBZZT726XIZNDX5MBAHA6SXZFI7V3USW@do-waku-node.realscloud.com"},
+	wakuv2ProdFleet: []string{"enrtree://AOHSBHI2XSUWGAO2EYYY2QBZZT726XIZNDX5MBAHA6SXZFI7V3USW@do-waku-node.realscloud.com"},
+	wakuv2TestFleet: []string{"enrtree://AOHSBHI2XSUWGAO2EYYY2QBZZT726XIZNDX5MBAHA6SXZFI7V3USW@do-waku-node.realscloud.com"},
+	shardsTest:      []string{"enrtree://AOHSBHI2XSUWGAO2EYYY2QBZZT726XIZNDX5MBAHA6SXZFI7V3USW@do-waku-node.realscloud.com"},
 }
 
 func defaultSettings(generatedAccountInfo generator.GeneratedAccountInfo, derivedAddresses map[string]generator.AccountInfo, mnemonic *string) (*settings.Settings, error) {
