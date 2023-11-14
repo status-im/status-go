@@ -30,12 +30,13 @@ const (
 )
 
 type URLUnfurlingMetadata struct {
+	url               string              `json:"url"`
 	Permission        URLUnfurlPermission `json:"permission"`
 	IsStatusSharedURL bool                `json:"isStatusSharedURL"`
 }
 
 type URLsUnfurlPlan struct {
-	URLs map[string]URLUnfurlingMetadata `json:"urls"`
+	URLs []URLUnfurlingMetadata `json:"urls"`
 }
 
 func URLUnfurlingSupported(url string) bool {
@@ -123,8 +124,11 @@ func (m *Messenger) GetTextURLsToUnfurl(text string) *URLsUnfurlPlan {
 		s.URLUnfurlingMode = settings.URLUnfurlingDisableAll
 	}
 
+	indexedUrls := map[string]struct{}{}
 	result := &URLsUnfurlPlan{
-		URLs: map[string]URLUnfurlingMetadata{},
+		// The usage of `UnfurledLinksPerMessageLimit` is quite random here. I wanted to allocate
+		// some not-zero place here, using the limit number is at least some binding.
+		URLs: make([]URLUnfurlingMetadata, 0, UnfurledLinksPerMessageLimit),
 	}
 	parsedText := markdown.Parse([]byte(text), nil)
 	visitor := common.RunLinksVisitor(parsedText)
@@ -143,11 +147,12 @@ func (m *Messenger) GetTextURLsToUnfurl(text string) *URLsUnfurlPlan {
 
 		url := parsedURL.String()
 		url = strings.TrimRight(url, "/") // Removes the spurious trailing forward slash.
-		if _, exists := result.URLs[url]; exists {
+		if _, exists := indexedUrls[url]; exists {
 			continue
 		}
 
 		metadata := URLUnfurlingMetadata{
+			url:               url,
 			IsStatusSharedURL: IsStatusSharedURL(url),
 		}
 
@@ -171,7 +176,7 @@ func (m *Messenger) GetTextURLsToUnfurl(text string) *URLsUnfurlPlan {
 			}
 		}
 
-		result.URLs[url] = metadata
+		result.URLs = append(result.URLs, metadata)
 	}
 
 	return result
@@ -185,8 +190,8 @@ func (m *Messenger) GetURLs(text string) []string {
 	plan := m.GetTextURLsToUnfurl(text)
 	limit := int(math.Min(UnfurledLinksPerMessageLimit, float64(len(plan.URLs))))
 	urls := make([]string, 0, limit)
-	for url := range plan.URLs {
-		urls = append(urls, url)
+	for _, metadata := range plan.URLs {
+		urls = append(urls, metadata.url)
 		if len(urls) == limit {
 			break
 		}
