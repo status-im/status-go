@@ -70,75 +70,97 @@ const pkLength = 132
 const compressedPkPrefixLen = 3
 const systemMentionLength = 7
 
+func getPublicKeyMention(data []byte, n int) (int, ast.Node) {
+	// need to start with 0x
+	if data[1] != '0' || data[2] != 'x' {
+		return 0, nil
+	}
+
+	i := 3
+	for i < pkLength+1 {
+		if !isValidPublicKeyChar(data[i]) {
+			return 0, nil
+		}
+		i++
+	}
+
+	// Check there's a space
+	if n != pkLength+1 && !isValidTerminatingMentionChar(data[pkLength+1]) {
+		return 0, nil
+	}
+
+	mention := &ast.Mention{}
+	mention.Literal = data[1 : pkLength+1]
+
+	return i, mention
+}
+
+func getCompressedPublicKeyMention(data []byte, n int) (int, ast.Node) {
+	i := 1
+	for _, c := range data[1:] {
+		if !isValidCompressedPublicKeyChar(c) {
+			break
+		}
+		i++
+	}
+
+	decodedPK := base58.Decode(string(data[2:i]))
+	decodedPKStr := hex.EncodeToString(decodedPK)
+	if !strings.HasPrefix(decodedPKStr, "e701") || len(decodedPKStr) != 70 {
+		return 0, nil
+	}
+
+	mention := &ast.Mention{}
+	mention.Literal = data[1:i]
+	return i, mention
+}
+
+func getSystemTagMention(data []byte, n int) (int, ast.Node) {
+	// need to start with 0x and can't end with 0
+	if data[1] != '0' || data[2] != 'x' || data[systemMentionLength] == '0' {
+		return 0, nil
+	}
+
+	i := 3
+	for i < systemMentionLength+1 {
+		if !isValidSystemTagChar(data[i]) {
+			return 0, nil
+		}
+		i++
+	}
+
+	// Check there's a space
+	if n != systemMentionLength+1 && !isValidTerminatingMentionChar(data[systemMentionLength+1]) {
+		return 0, nil
+	}
+
+	mention := &ast.Mention{}
+	mention.Literal = data[1 : systemMentionLength+1]
+
+	return i, mention
+}
+
 func mention(p *Parser, data []byte, offset int) (int, ast.Node) {
 	data = data[offset:]
 	n := len(data)
 
 	if n >= pkLength+1 {
-		// need to start with 0x
-		if data[1] != '0' || data[2] != 'x' {
-			return 0, nil
+		pos, node := getPublicKeyMention(data, n)
+		if node != nil {
+			return pos, node
 		}
-
-		i := 3
-		for i < pkLength+1 {
-			if !isValidPublicKeyChar(data[i]) {
-				return 0, nil
-			}
-			i++
+	}
+	if n >= compressedPkPrefixLen+1 && (data[1] == 'z' || data[2] == 'Q' || data[3] == '3') {
+		pos, node := getCompressedPublicKeyMention(data, n)
+		if node != nil {
+			return pos, node
 		}
-
-		// Check there's a space
-		if n != pkLength+1 && !isValidTerminatingMentionChar(data[pkLength+1]) {
-			return 0, nil
+	}
+	if n >= systemMentionLength+1 {
+		pos, node := getSystemTagMention(data, n)
+		if node != nil {
+			return pos, node
 		}
-
-		mention := &ast.Mention{}
-		mention.Literal = data[1 : pkLength+1]
-
-		return i, mention
-	} else if n >= compressedPkPrefixLen+1 && (data[1] == 'z' || data[2] == 'Q' || data[3] == '3') {
-
-		i := 1
-		for _, c := range data[1:] {
-			if !isValidCompressedPublicKeyChar(c) {
-				break
-			}
-			i++
-		}
-
-		decodedPK := base58.Decode(string(data[2:i]))
-		decodedPKStr := hex.EncodeToString(decodedPK)
-		if !strings.HasPrefix(decodedPKStr, "e701") || len(decodedPKStr) != 70 {
-			return 0, nil
-		}
-
-		mention := &ast.Mention{}
-		mention.Literal = data[1:i]
-		return i, mention
-	} else if n >= systemMentionLength+1 {
-		// need to start with 0x and can't end with 0
-		if data[1] != '0' || data[2] != 'x' || data[systemMentionLength] == '0' {
-			return 0, nil
-		}
-
-		i := 3
-		for i < systemMentionLength+1 {
-			if !isValidSystemTagChar(data[i]) {
-				return 0, nil
-			}
-			i++
-		}
-
-		// Check there's a space
-		if n != systemMentionLength+1 && !isValidTerminatingMentionChar(data[systemMentionLength+1]) {
-			return 0, nil
-		}
-
-		mention := &ast.Mention{}
-		mention.Literal = data[1 : systemMentionLength+1]
-
-		return i, mention
 	}
 
 	return 0, nil

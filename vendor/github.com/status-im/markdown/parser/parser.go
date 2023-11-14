@@ -696,7 +696,7 @@ func isValidStatusTagChar(c byte) bool {
 }
 
 func isValidTerminatingMentionChar(c byte) bool {
-	return isSpace(c) || c == '.' || c == ',' || c == ':' || c == ';'
+	return isSpace(c) || c == '.' || c == ',' || c == ':' || c == ';' || c == '!' || c == '?'
 }
 
 func isValidPublicKeyChar(c byte) bool {
