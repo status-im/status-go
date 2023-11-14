@@ -30,7 +30,7 @@ const (
 )
 
 type URLUnfurlingMetadata struct {
-	url               string              `json:"url"`
+	URL               string              `json:"url"`
 	Permission        URLUnfurlPermission `json:"permission"`
 	IsStatusSharedURL bool                `json:"isStatusSharedURL"`
 }
@@ -152,7 +152,7 @@ func (m *Messenger) GetTextURLsToUnfurl(text string) *URLsUnfurlPlan {
 		}
 
 		metadata := URLUnfurlingMetadata{
-			url:               url,
+			URL:               url,
 			IsStatusSharedURL: IsStatusSharedURL(url),
 		}
 
@@ -191,7 +191,7 @@ func (m *Messenger) GetURLs(text string) []string {
 	limit := int(math.Min(UnfurledLinksPerMessageLimit, float64(len(plan.URLs))))
 	urls := make([]string, 0, limit)
 	for _, metadata := range plan.URLs {
-		urls = append(urls, metadata.url)
+		urls = append(urls, metadata.URL)
 		if len(urls) == limit {
 			break
 		}
