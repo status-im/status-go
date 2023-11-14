@@ -53,6 +53,8 @@ func (p *DefaultPermissionChecker) GetOwnedERC721Tokens(walletAddresses []gethco
 		return nil, errors.New("no collectibles manager")
 	}
 
+	ctx := context.Background()
+
 	ownedERC721Tokens := make(CollectiblesByChain)
 
 	for chainID, erc721Tokens := range tokenRequirements {
@@ -78,7 +80,7 @@ func (p *DefaultPermissionChecker) GetOwnedERC721Tokens(walletAddresses []gethco
 		}
 
 		for _, owner := range walletAddresses {
-			balances, err := p.collectiblesManager.FetchBalancesByOwnerAndContractAddress(walletcommon.ChainID(chainID), owner, contractAddresses)
+			balances, err := p.collectiblesManager.FetchBalancesByOwnerAndContractAddress(ctx, walletcommon.ChainID(chainID), owner, contractAddresses)
 			if err != nil {
 				p.logger.Info("couldn't fetch owner assets", zap.Error(err))
 				return nil, err

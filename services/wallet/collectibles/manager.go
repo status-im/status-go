@@ -44,7 +44,7 @@ var (
 )
 
 type ManagerInterface interface {
-	FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error)
+	FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error)
 }
 
 type Manager struct {
@@ -177,8 +177,8 @@ func makeContractOwnershipCall(main func() (any, error), fallback func() (any, e
 	}
 }
 
-func (o *Manager) doContentTypeRequest(url string) (string, error) {
-	req, err := http.NewRequest(http.MethodHead, url, nil)
+func (o *Manager) doContentTypeRequest(ctx context.Context, url string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
 	if err != nil {
 		return "", err
 	}
@@ -202,7 +202,7 @@ func (o *Manager) SetCommunityInfoProvider(communityInfoProvider thirdparty.Coll
 }
 
 // Need to combine different providers to support all needed ChainIDs
-func (o *Manager) FetchBalancesByOwnerAndContractAddress(chainID walletCommon.ChainID, ownerAddress common.Address, contractAddresses []common.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
+func (o *Manager) FetchBalancesByOwnerAndContractAddress(ctx context.Context, chainID walletCommon.ChainID, ownerAddress common.Address, contractAddresses []common.Address) (thirdparty.TokenBalancesPerContractAddress, error) {
 	ret := make(thirdparty.TokenBalancesPerContractAddress)
 
 	for _, contractAddress := range contractAddresses {
@@ -210,11 +210,11 @@ func (o *Manager) FetchBalancesByOwnerAndContractAddress(chainID walletCommon.Ch
 	}
 
 	// Try with account ownership providers first
-	assetsContainer, err := o.FetchAllAssetsByOwnerAndContractAddress(chainID, ownerAddress, contractAddresses, thirdparty.FetchFromStartCursor, thirdparty.FetchNoLimit, thirdparty.FetchFromAnyProvider)
+	assetsContainer, err := o.FetchAllAssetsByOwnerAndContractAddress(ctx, chainID, ownerAddress, contractAddresses, thirdparty.FetchFromStartCursor, thirdparty.FetchNoLimit, thirdparty.FetchFromAnyProvider)
 	if err == ErrNoProvidersAvailableForChainID {
 		// Use contract ownership providers
 		for _, contractAddress := range contractAddresses {
-			ownership, err := o.FetchCollectibleOwnersByContractAddress(chainID, contractAddress)
+			ownership, err := o.FetchCollectibleOwnersByContractAddress(ctx, chainID, contractAddress)
 			if err != nil {
 				return nil, err
 			}
@@ -243,7 +243,7 @@ func (o *Manager) FetchBalancesByOwnerAndContractAddress(chainID walletCommon.Ch
 	return ret, nil
 }
 
-func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int, providerID string) (*thirdparty.FullCollectibleDataContainer, error) {
+func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(ctx context.Context, chainID walletCommon.ChainID, owner common.Address, contractAddresses []common.Address, cursor string, limit int, providerID string) (*thirdparty.FullCollectibleDataContainer, error) {
 	defer o.checkConnectionStatus(chainID)
 
 	anyProviderAvailable := false
@@ -256,13 +256,13 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.C
 			continue
 		}
 
-		assetContainer, err := provider.FetchAllAssetsByOwnerAndContractAddress(chainID, owner, contractAddresses, cursor, limit)
+		assetContainer, err := provider.FetchAllAssetsByOwnerAndContractAddress(ctx, chainID, owner, contractAddresses, cursor, limit)
 		if err != nil {
 			log.Error("FetchAllAssetsByOwnerAndContractAddress failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
 			continue
 		}
 
-		err = o.processFullCollectibleData(assetContainer.Items)
+		err = o.processFullCollectibleData(ctx, assetContainer.Items)
 		if err != nil {
 			return nil, err
 		}
@@ -276,7 +276,7 @@ func (o *Manager) FetchAllAssetsByOwnerAndContractAddress(chainID walletCommon.C
 	return nil, ErrNoProvidersAvailableForChainID
 }
 
-func (o *Manager) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner common.Address, cursor string, limit int, providerID string) (*thirdparty.FullCollectibleDataContainer, error) {
+func (o *Manager) FetchAllAssetsByOwner(ctx context.Context, chainID walletCommon.ChainID, owner common.Address, cursor string, limit int, providerID string) (*thirdparty.FullCollectibleDataContainer, error) {
 	defer o.checkConnectionStatus(chainID)
 
 	anyProviderAvailable := false
@@ -289,13 +289,13 @@ func (o *Manager) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner comm
 			continue
 		}
 
-		assetContainer, err := provider.FetchAllAssetsByOwner(chainID, owner, cursor, limit)
+		assetContainer, err := provider.FetchAllAssetsByOwner(ctx, chainID, owner, cursor, limit)
 		if err != nil {
 			log.Error("FetchAllAssetsByOwner failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
 			continue
 		}
 
-		err = o.processFullCollectibleData(assetContainer.Items)
+		err = o.processFullCollectibleData(ctx, assetContainer.Items)
 		if err != nil {
 			return nil, err
 		}
@@ -309,10 +309,10 @@ func (o *Manager) FetchAllAssetsByOwner(chainID walletCommon.ChainID, owner comm
 	return nil, ErrNoProvidersAvailableForChainID
 }
 
-func (o *Manager) FetchCollectibleOwnershipByOwner(chainID walletCommon.ChainID, owner common.Address, cursor string, limit int, providerID string) (*thirdparty.CollectibleOwnershipContainer, error) {
+func (o *Manager) FetchCollectibleOwnershipByOwner(ctx context.Context, chainID walletCommon.ChainID, owner common.Address, cursor string, limit int, providerID string) (*thirdparty.CollectibleOwnershipContainer, error) {
 	// We don't yet have an API that will return only Ownership data
 	// Use the full Ownership + Metadata endpoint and use the data we need
-	assetContainer, err := o.FetchAllAssetsByOwner(chainID, owner, cursor, limit, providerID)
+	assetContainer, err := o.FetchAllAssetsByOwner(ctx, chainID, owner, cursor, limit, providerID)
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +321,7 @@ func (o *Manager) FetchCollectibleOwnershipByOwner(chainID walletCommon.ChainID,
 	return &ret, nil
 }
 
-func (o *Manager) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
+func (o *Manager) FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
 	missingIDs, err := o.collectiblesDataDB.GetIDsNotInDB(uniqueIDs)
 	if err != nil {
 		return nil, err
@@ -337,13 +337,13 @@ func (o *Manager) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.Collec
 				continue
 			}
 
-			fetchedAssets, err := provider.FetchAssetsByCollectibleUniqueID(idsToFetch)
+			fetchedAssets, err := provider.FetchAssetsByCollectibleUniqueID(ctx, idsToFetch)
 			if err != nil {
 				log.Error("FetchAssetsByCollectibleUniqueID failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
 				continue
 			}
 
-			err = o.processFullCollectibleData(fetchedAssets)
+			err = o.processFullCollectibleData(ctx, fetchedAssets)
 			if err != nil {
 				return nil, err
 			}
@@ -355,7 +355,7 @@ func (o *Manager) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.Collec
 	return o.getCacheFullCollectibleData(uniqueIDs)
 }
 
-func (o *Manager) FetchCollectionsDataByContractID(ids []thirdparty.ContractID) ([]thirdparty.CollectionData, error) {
+func (o *Manager) FetchCollectionsDataByContractID(ctx context.Context, ids []thirdparty.ContractID) ([]thirdparty.CollectionData, error) {
 	missingIDs, err := o.collectionsDataDB.GetIDsNotInDB(ids)
 	if err != nil {
 		return nil, err
@@ -371,13 +371,13 @@ func (o *Manager) FetchCollectionsDataByContractID(ids []thirdparty.ContractID) 
 				continue
 			}
 
-			fetchedCollections, err := provider.FetchCollectionsDataByContractID(idsToFetch)
+			fetchedCollections, err := provider.FetchCollectionsDataByContractID(ctx, idsToFetch)
 			if err != nil {
 				log.Error("FetchCollectionsDataByContractID failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
 				continue
 			}
 
-			err = o.processCollectionData(fetchedCollections)
+			err = o.processCollectionData(ctx, fetchedCollections)
 			if err != nil {
 				return nil, err
 			}
@@ -413,12 +413,12 @@ func (o *Manager) getContractOwnershipProviders(chainID walletCommon.ChainID) (m
 	return
 }
 
-func getCollectibleOwnersByContractAddressFunc(chainID walletCommon.ChainID, contractAddress common.Address, provider thirdparty.CollectibleContractOwnershipProvider) func() (any, error) {
+func getCollectibleOwnersByContractAddressFunc(ctx context.Context, chainID walletCommon.ChainID, contractAddress common.Address, provider thirdparty.CollectibleContractOwnershipProvider) func() (any, error) {
 	if provider == nil {
 		return nil
 	}
 	return func() (any, error) {
-		res, err := provider.FetchCollectibleOwnersByContractAddress(chainID, contractAddress)
+		res, err := provider.FetchCollectibleOwnersByContractAddress(ctx, chainID, contractAddress)
 		if err != nil {
 			log.Error("FetchCollectibleOwnersByContractAddress failed for", "provider", provider.ID(), "chainID", chainID, "err", err)
 		}
@@ -426,7 +426,7 @@ func getCollectibleOwnersByContractAddressFunc(chainID walletCommon.ChainID, con
 	}
 }
 
-func (o *Manager) FetchCollectibleOwnersByContractAddress(chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
+func (o *Manager) FetchCollectibleOwnersByContractAddress(ctx context.Context, chainID walletCommon.ChainID, contractAddress common.Address) (*thirdparty.CollectibleContractOwnership, error) {
 	defer o.checkConnectionStatus(chainID)
 
 	mainProvider, fallbackProvider := o.getContractOwnershipProviders(chainID)
@@ -434,8 +434,8 @@ func (o *Manager) FetchCollectibleOwnersByContractAddress(chainID walletCommon.C
 		return nil, ErrNoProvidersAvailableForChainID
 	}
 
-	mainFn := getCollectibleOwnersByContractAddressFunc(chainID, contractAddress, mainProvider)
-	fallbackFn := getCollectibleOwnersByContractAddressFunc(chainID, contractAddress, fallbackProvider)
+	mainFn := getCollectibleOwnersByContractAddressFunc(ctx, chainID, contractAddress, mainProvider)
+	fallbackFn := getCollectibleOwnersByContractAddressFunc(ctx, chainID, contractAddress, fallbackProvider)
 
 	owners, err := makeContractOwnershipCall(mainFn, fallbackFn)
 	if err != nil {
@@ -451,7 +451,7 @@ func isMetadataEmpty(asset thirdparty.CollectibleData) bool {
 		asset.ImageURL == ""
 }
 
-func (o *Manager) fetchTokenURI(id thirdparty.CollectibleUniqueID) (string, error) {
+func (o *Manager) fetchTokenURI(ctx context.Context, id thirdparty.CollectibleUniqueID) (string, error) {
 	if id.TokenID == nil {
 		return "", errors.New("empty token ID")
 	}
@@ -465,11 +465,8 @@ func (o *Manager) fetchTokenURI(id thirdparty.CollectibleUniqueID) (string, erro
 		return "", err
 	}
 
-	timeoutContext, timeoutCancel := context.WithTimeout(context.Background(), requestTimeout)
-	defer timeoutCancel()
-
 	tokenURI, err := caller.TokenURI(&bind.CallOpts{
-		Context: timeoutContext,
+		Context: ctx,
 	}, id.TokenID.Int)
 
 	if err != nil {
@@ -485,7 +482,7 @@ func (o *Manager) fetchTokenURI(id thirdparty.CollectibleUniqueID) (string, erro
 	return tokenURI, err
 }
 
-func (o *Manager) processFullCollectibleData(assets []thirdparty.FullCollectibleData) error {
+func (o *Manager) processFullCollectibleData(ctx context.Context, assets []thirdparty.FullCollectibleData) error {
 	fullyFetchedAssets := make(map[string]*thirdparty.FullCollectibleData)
 	communityCollectibles := make(map[string][]*thirdparty.FullCollectibleData)
 
@@ -499,7 +496,7 @@ func (o *Manager) processFullCollectibleData(assets []thirdparty.FullCollectible
 	for _, asset := range fullyFetchedAssets {
 		// Only check community ownership if metadata is empty
 		if isMetadataEmpty(asset.CollectibleData) {
-			err := o.fillTokenURI(asset)
+			err := o.fillTokenURI(ctx, asset)
 			if err != nil {
 				log.Error("fillTokenURI failed", "err", err)
 				delete(fullyFetchedAssets, asset.CollectibleData.ID.HashKey())
@@ -536,7 +533,7 @@ func (o *Manager) processFullCollectibleData(assets []thirdparty.FullCollectible
 	}
 
 	for _, asset := range fullyFetchedAssets {
-		err := o.fillAnimationMediatype(asset)
+		err := o.fillAnimationMediatype(ctx, asset)
 		if err != nil {
 			log.Error("fillAnimationMediatype failed", "err", err)
 			delete(fullyFetchedAssets, asset.CollectibleData.ID.HashKey())
@@ -581,7 +578,7 @@ func (o *Manager) processFullCollectibleData(assets []thirdparty.FullCollectible
 
 	if len(missingCollectionIDs) > 0 {
 		// Calling this ensures collection data is fetched and cached (if not already available)
-		_, err := o.FetchCollectionsDataByContractID(missingCollectionIDs)
+		_, err := o.FetchCollectionsDataByContractID(ctx, missingCollectionIDs)
 		if err != nil {
 			return err
 		}
@@ -590,13 +587,13 @@ func (o *Manager) processFullCollectibleData(assets []thirdparty.FullCollectible
 	return nil
 }
 
-func (o *Manager) fillTokenURI(asset *thirdparty.FullCollectibleData) error {
+func (o *Manager) fillTokenURI(ctx context.Context, asset *thirdparty.FullCollectibleData) error {
 	id := asset.CollectibleData.ID
 
 	tokenURI := asset.CollectibleData.TokenURI
 	// Only need to fetch it from contract if it was empty
 	if tokenURI == "" {
-		tokenURI, err := o.fetchTokenURI(id)
+		tokenURI, err := o.fetchTokenURI(ctx, id)
 
 		if err != nil {
 			return err
@@ -642,9 +639,9 @@ func (o *Manager) fillCommunityInfo(communityID string, communityAssets []*third
 	return nil
 }
 
-func (o *Manager) fillAnimationMediatype(asset *thirdparty.FullCollectibleData) error {
+func (o *Manager) fillAnimationMediatype(ctx context.Context, asset *thirdparty.FullCollectibleData) error {
 	if len(asset.CollectibleData.AnimationURL) > 0 {
-		contentType, err := o.doContentTypeRequest(asset.CollectibleData.AnimationURL)
+		contentType, err := o.doContentTypeRequest(ctx, asset.CollectibleData.AnimationURL)
 		if err != nil {
 			asset.CollectibleData.AnimationURL = ""
 		}
@@ -653,7 +650,7 @@ func (o *Manager) fillAnimationMediatype(asset *thirdparty.FullCollectibleData) 
 	return nil
 }
 
-func (o *Manager) processCollectionData(collections []thirdparty.CollectionData) error {
+func (o *Manager) processCollectionData(ctx context.Context, collections []thirdparty.CollectionData) error {
 	return o.collectionsDataDB.SetData(collections)
 }
 

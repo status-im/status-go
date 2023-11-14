@@ -1,6 +1,7 @@
 package activity
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"math/big"
@@ -28,7 +29,7 @@ type mockCollectiblesManager struct {
 	mock.Mock
 }
 
-func (m *mockCollectiblesManager) FetchAssetsByCollectibleUniqueID(uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
+func (m *mockCollectiblesManager) FetchAssetsByCollectibleUniqueID(ctx context.Context, uniqueIDs []thirdparty.CollectibleUniqueID) ([]thirdparty.FullCollectibleData, error) {
 	args := m.Called(uniqueIDs)
 	res := args.Get(0)
 	if res == nil {

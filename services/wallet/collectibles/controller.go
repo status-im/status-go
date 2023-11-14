@@ -400,7 +400,9 @@ func (c *Controller) stopSettingsWatcher() {
 }
 
 func (c *Controller) notifyCommunityCollectiblesReceived(ownedCollectibles OwnedCollectibles) {
-	collectiblesData, err := c.manager.FetchAssetsByCollectibleUniqueID(ownedCollectibles.ids)
+	ctx := context.Background()
+
+	collectiblesData, err := c.manager.FetchAssetsByCollectibleUniqueID(ctx, ownedCollectibles.ids)
 	if err != nil {
 		log.Error("Error fetching collectibles data", "error", err)
 		return

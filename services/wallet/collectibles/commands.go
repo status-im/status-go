@@ -198,7 +198,7 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 		initialFetch := lastFetchTimestamp == InvalidTimestamp
 		// Fetch collectibles in chunks
 		for {
-			if shouldCancel(parent) {
+			if walletCommon.ShouldCancel(parent) {
 				c.err = errors.New("context cancelled")
 				break
 			}
@@ -206,7 +206,7 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 			pageStart := time.Now()
 			log.Debug("start loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "page", pageNr)
 
-			partialOwnership, err := c.manager.FetchCollectibleOwnershipByOwner(c.chainID, c.account, cursor, fetchLimit, providerID)
+			partialOwnership, err := c.manager.FetchCollectibleOwnershipByOwner(parent, c.chainID, c.account, cursor, fetchLimit, providerID)
 
 			if err != nil {
 				log.Error("failed loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "page", pageNr, "error", err)
@@ -262,14 +262,4 @@ func (c *loadOwnedCollectiblesCommand) Run(parent context.Context) (err error) {
 
 	log.Debug("end loadOwnedCollectiblesCommand", "chain", c.chainID, "account", c.account, "in", time.Since(start))
 	return nil
-}
-
-// shouldCancel returns true if the context has been cancelled and task should be aborted
-func shouldCancel(ctx context.Context) bool {
-	select {
-	case <-ctx.Done():
-		return true
-	default:
-	}
-	return false
 }
