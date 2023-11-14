@@ -1400,7 +1400,7 @@ func decodeEventsData(eventsBytes []byte, eventsDescriptionBytes []byte) (*Event
 func (p *Persistence) GetCommunityRequestsToJoinWithRevealedAddresses(communityID []byte) ([]*RequestToJoin, error) {
 	requests := []*RequestToJoin{}
 	rows, err := p.db.Query(`
-	SELECT r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.state, r.community_id, 
+	SELECT r.id, r.public_key, r.clock, r.ens_name, r.chat_id, r.state, r.community_id,
 		a.address, a.chain_ids, a.is_airdrop_address, a.signature
 	FROM communities_requests_to_join r
 	LEFT JOIN communities_requests_to_join_revealed_addresses a ON r.id = a.request_id
@@ -1604,7 +1604,7 @@ func (p *Persistence) SaveRequestsToJoin(requests []*RequestToJoin) (err error) 
 		}
 	}()
 
-	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO communities_requests_to_join(id,public_key,clock,ens_name,chat_id,community_id,state) 
+	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO communities_requests_to_join(id,public_key,clock,ens_name,chat_id,community_id,state)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
@@ -1631,4 +1631,71 @@ func (p *Persistence) SaveRequestsToJoin(requests []*RequestToJoin) (err error) 
 
 	err = tx.Commit()
 	return err
+}
+
+func (p *Persistence) GetCuratedCommunities() (*CuratedCommunities, error) {
+	rows, err := p.db.Query("SELECT community_id, featured FROM curated_communities")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := &CuratedCommunities{
+		ContractCommunities:         []string{},
+		ContractFeaturedCommunities: []string{},
+	}
+	for rows.Next() {
+		var communityID string
+		var featured bool
+		if err := rows.Scan(&communityID, &featured); err != nil {
+			return nil, err
+		}
+		result.ContractCommunities = append(result.ContractCommunities, communityID)
+		if featured {
+			result.ContractFeaturedCommunities = append(result.ContractFeaturedCommunities, communityID)
+		}
+	}
+
+	return result, nil
+}
+
+func (p *Persistence) SetCuratedCommunities(communities *CuratedCommunities) error {
+	tx, err := p.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	// Clear the existing communities
+	if _, err = tx.Exec("DELETE FROM curated_communities"); err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare("INSERT INTO curated_communities (community_id, featured) VALUES (?, ?)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	featuredMap := make(map[string]bool)
+	for _, community := range communities.ContractFeaturedCommunities {
+		featuredMap[community] = true
+	}
+
+	for _, community := range communities.ContractCommunities {
+		_, err := stmt.Exec(community, featuredMap[community])
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
