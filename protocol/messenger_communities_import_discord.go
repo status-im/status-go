@@ -1087,6 +1087,9 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 		processedChannelIds := make(map[string]string, 0)
 		processedCategoriesIds := make(map[string]string, 0)
 
+		// The map with counts of duplicated channel names
+		uniqueChatNames := make(map[string]int, 0)
+
 		for i, importFile := range request.FilesToImport {
 
 			exportData, errs := m.ExtractDiscordDataFromImportFiles([]string{importFile})
@@ -1184,12 +1187,20 @@ func (m *Messenger) RequestImportDiscordCommunity(request *requests.ImportDiscor
 			}
 
 			if !exists {
+				channelUniqueName := channel.Channel.Name
+				if count, ok := uniqueChatNames[channelUniqueName]; ok {
+					uniqueChatNames[channelUniqueName] = count + 1
+					channelUniqueName = fmt.Sprintf("%s_%d", channelUniqueName, uniqueChatNames[channelUniqueName])
+				} else {
+					uniqueChatNames[channelUniqueName] = 1
+				}
+
 				communityChat := &protobuf.CommunityChat{
 					Permissions: &protobuf.CommunityPermissions{
 						Access: protobuf.CommunityPermissions_AUTO_ACCEPT,
 					},
 					Identity: &protobuf.ChatIdentity{
-						DisplayName: channel.Channel.Name,
+						DisplayName: channelUniqueName,
 						Emoji:       "",
 						Description: channel.Channel.Description,
 						Color:       discordCommunity.Color(),
